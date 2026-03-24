@@ -1264,13 +1264,21 @@ window.PageAssignments = (function() {
     refreshSidebar();
     showUndoToast(toastMsg, function() { saveScores(cid, prevScores); render(); refreshSidebar(); });
   }
+  function confirmFillAll(aid, value, label) {
+    showConfirm('Fill All Scores', 'Set all students to "' + label + '"?', 'Fill All', 'primary', function() { fillScores(aid, null, value, 'all'); });
+  }
   function confirmFillRubricAll(aid, value, label) {
     showConfirm('Fill All Scores', 'Set all students to "' + label + '" for every criterion?', 'Fill All', 'primary', function() { fillRubricScores(aid, null, value, 'all'); });
   }
 
   function renderTagGrid(cid, a, tagObjs, students, scores) {
     var html = '<div class="rsg-grid">';
-    html += '<div class="rsg-header"><div class="rsg-header-spacer">Student</div><div class="rsg-header-inner"><div class="rsg-header-crit-spacer"></div><div class="rsg-header-levels"><div class="rsg-header-level hl4">Extending</div><div class="rsg-header-level hl3">Proficient</div><div class="rsg-header-level hl2">Developing</div><div class="rsg-header-level hl1">Emerging</div></div></div><div class="rsg-header-action"></div></div>';
+    html += '<div class="rsg-header"><div class="rsg-header-spacer">Student</div><div class="rsg-header-inner"><div class="rsg-header-crit-spacer"></div><div class="rsg-header-levels">' +
+      '<div class="rsg-header-level hl4" data-action="confirmFillAll" data-aid="' + a.id + '" data-score="4" data-label="Extending" title="Fill all Extending">Extending</div>' +
+      '<div class="rsg-header-level hl3" data-action="confirmFillAll" data-aid="' + a.id + '" data-score="3" data-label="Proficient" title="Fill all Proficient">Proficient</div>' +
+      '<div class="rsg-header-level hl2" data-action="confirmFillAll" data-aid="' + a.id + '" data-score="2" data-label="Developing" title="Fill all Developing">Developing</div>' +
+      '<div class="rsg-header-level hl1" data-action="confirmFillAll" data-aid="' + a.id + '" data-score="1" data-label="Emerging" title="Fill all Emerging">Emerging</div>' +
+      '</div></div><div class="rsg-header-action"></div></div>';
     var statuses = getAssignmentStatuses(cid);
     students.forEach(function(st) {
       var studentScores = scores[st.id] || [];
@@ -1800,6 +1808,7 @@ window.PageAssignments = (function() {
       'toggleScoreMenu':      function() { toggleScoreMenu(el); },
       'fillScoresAndClose':   function() { fillScores(el.dataset.aid, el.dataset.sid, parseInt(el.dataset.score), el.dataset.scope); closeMenus(); },
       'fillRubricScoresAndClose': function() { fillRubricScores(el.dataset.aid, el.dataset.sid, parseInt(el.dataset.score), el.dataset.scope); closeMenus(); },
+      'confirmFillAll':       function() { confirmFillAll(el.dataset.aid, parseInt(el.dataset.score), el.dataset.label); },
       'confirmFillRubricAll': function() { confirmFillRubricAll(el.dataset.aid, parseInt(el.dataset.score), el.dataset.label); },
       'toggleStudentStatus':  function() { toggleStudentStatus(el.dataset.aid, el.dataset.sid, el.dataset.status); },
       'openCommentPopover':   function() { openCommentPopover(el.dataset.cid, el.dataset.sid, el.dataset.aid); },

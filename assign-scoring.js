@@ -249,6 +249,9 @@ window.AssignScoring = (function() {
     showUndoToast(toastMsg, function() { saveScores(cid, prevScores); if (callbacks && callbacks.render) callbacks.render(); if (callbacks && callbacks.refreshSidebar) callbacks.refreshSidebar(); });
   }
 
+  function confirmFillAll(aid, value, label, activeCourse, callbacks) {
+    showConfirm('Fill All Scores', 'Set all students to "' + label + '"?', 'Fill All', 'primary', function() { fillScores(aid, null, value, 'all', activeCourse, callbacks); });
+  }
   function confirmFillRubricAll(aid, value, label, activeCourse, callbacks) {
     showConfirm('Fill All Scores', 'Set all students to "' + label + '" for every criterion?', 'Fill All', 'primary', function() { fillRubricScores(aid, null, value, 'all', activeCourse, callbacks); });
   }
@@ -256,7 +259,12 @@ window.AssignScoring = (function() {
   /* ── Tag Grid (proficiency-based) ─────────────────────────── */
   function renderTagGrid(cid, a, tagObjs, students, scores) {
     var html = '<div class="rsg-grid">';
-    html += '<div class="rsg-header"><div class="rsg-header-spacer">Student</div><div class="rsg-header-inner"><div class="rsg-header-crit-spacer"></div><div class="rsg-header-levels"><div class="rsg-header-level hl4">Extending</div><div class="rsg-header-level hl3">Proficient</div><div class="rsg-header-level hl2">Developing</div><div class="rsg-header-level hl1">Emerging</div></div></div><div class="rsg-header-action"></div></div>';
+    html += '<div class="rsg-header"><div class="rsg-header-spacer">Student</div><div class="rsg-header-inner"><div class="rsg-header-crit-spacer"></div><div class="rsg-header-levels">' +
+      '<div class="rsg-header-level hl4" data-action="confirmFillAll" data-aid="' + a.id + '" data-score="4" data-label="Extending" title="Fill all Extending">Extending</div>' +
+      '<div class="rsg-header-level hl3" data-action="confirmFillAll" data-aid="' + a.id + '" data-score="3" data-label="Proficient" title="Fill all Proficient">Proficient</div>' +
+      '<div class="rsg-header-level hl2" data-action="confirmFillAll" data-aid="' + a.id + '" data-score="2" data-label="Developing" title="Fill all Developing">Developing</div>' +
+      '<div class="rsg-header-level hl1" data-action="confirmFillAll" data-aid="' + a.id + '" data-score="1" data-label="Emerging" title="Fill all Emerging">Emerging</div>' +
+      '</div></div><div class="rsg-header-action"></div></div>';
     var statuses = getAssignmentStatuses(cid);
     students.forEach(function(st) {
       var studentScores = scores[st.id] || [];
@@ -362,6 +370,7 @@ window.AssignScoring = (function() {
     toggleScoreMenu: toggleScoreMenu,
     fillScores: fillScores,
     fillRubricScores: fillRubricScores,
+    confirmFillAll: confirmFillAll,
     confirmFillRubricAll: confirmFillRubricAll,
     getRubricCriterion: getRubricCriterion
   };

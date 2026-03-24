@@ -1193,7 +1193,7 @@ body {
 }
 .confirm-ok.danger { background:var(--danger); color:#fff; }
 .confirm-ok.danger:hover { filter: brightness(0.85); }
-.confirm-ok.primary { background:var(--text); color:#fff; }
+.confirm-ok.primary { background:var(--active); color:#fff; }
 .confirm-ok.primary:hover { filter: brightness(0.85); }
 @keyframes fade-in { from { opacity:0; } to { opacity:1; } }
 @keyframes slide-up {
