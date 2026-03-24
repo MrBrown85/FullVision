@@ -2,13 +2,16 @@
 window.Router = (function() {
   'use strict';
 
+  /* ── Lazy-loaded page module definitions ───────────────────
+     Scripts are loaded on first navigation to a route.
+     Sub-modules load before their parent page module. */
   var _routes = {
-    '/dashboard': window.PageDashboard,
-    '/assignments': window.PageAssignments,
-    '/student': window.PageStudent,
-    '/gradebook': window.PageGradebook,
-    '/observations': window.PageObservations,
-    '/reports': window.PageReports
+    '/dashboard':    { scripts: ['dash-overview.js', 'dash-class-manager.js', 'dash-curriculum-wizard.js', 'page-dashboard.js'], globalName: 'PageDashboard' },
+    '/assignments':  { scripts: ['assign-form.js', 'assign-scoring.js', 'assign-rubric-editor.js', 'page-assignments.js'], globalName: 'PageAssignments' },
+    '/student':      { scripts: ['page-student.js'], globalName: 'PageStudent' },
+    '/gradebook':    { scripts: ['page-gradebook.js'], globalName: 'PageGradebook' },
+    '/observations': { scripts: ['page-observations.js'], globalName: 'PageObservations' },
+    '/reports':      { scripts: ['report-blocks.js', 'report-builder.js', 'report-narrative.js', 'page-reports.js'], globalName: 'PageReports' }
   };
 
   /* Map old HTML filenames to hash routes for link interception */
@@ -32,6 +35,27 @@ window.Router = (function() {
 
   var _currentPage = null;
   var _booted = false;
+  var _loadedScripts = {};  // Track which scripts have been loaded
+
+  /* ── Load a single script, returning a promise ────────────── */
+  function _loadScript(src) {
+    if (_loadedScripts[src]) return _loadedScripts[src];
+    _loadedScripts[src] = new Promise(function(resolve, reject) {
+      var script = document.createElement('script');
+      script.src = src;
+      script.onload = resolve;
+      script.onerror = function() { reject(new Error('Failed to load ' + src)); };
+      document.head.appendChild(script);
+    });
+    return _loadedScripts[src];
+  }
+
+  /* ── Load scripts sequentially (order matters for deps) ──── */
+  async function _loadScripts(srcs) {
+    for (var i = 0; i < srcs.length; i++) {
+      await _loadScript(srcs[i]);
+    }
+  }
 
   /* ── Parse hash ──────────────────────────────────────────── */
   function _parseHash(hash) {
@@ -64,7 +88,7 @@ window.Router = (function() {
   }
 
   /* ── Route handler ───────────────────────────────────────── */
-  function _onRoute() {
+  async function _onRoute() {
     var parsed = _parseHash(location.hash);
     var path = parsed.path;
     var params = parsed.params;
@@ -77,8 +101,9 @@ window.Router = (function() {
     else if (path === '/observations') dockPage = 'observations';
     else if (path === '/reports') dockPage = 'reports';
 
-    // If route has no SPA module yet, fall back to old HTML page
-    if (!_routes[path]) {
+    // Check if route exists
+    var routeDef = _routes[path];
+    if (!routeDef) {
       var fallbackFile = _hashToFile[path];
       if (fallbackFile) {
         // Build query string from params
@@ -91,9 +116,8 @@ window.Router = (function() {
       // Unknown route — default to dashboard
       path = '/dashboard';
       dockPage = 'dashboard';
+      routeDef = _routes[path];
     }
-
-    var module = _routes[path];
 
     // Destroy previous page
     if (_currentPage && _currentPage.destroy) {
@@ -110,7 +134,13 @@ window.Router = (function() {
     // Re-render dock on every route change
     _renderDock(dockPage);
 
+    // Lazy-load page scripts if not yet loaded
+    if (!window[routeDef.globalName]) {
+      await _loadScripts(routeDef.scripts);
+    }
+
     // Init new page
+    var module = window[routeDef.globalName];
     _currentPage = module;
     if (module && module.init) {
       module.init(params);
@@ -132,7 +162,7 @@ window.Router = (function() {
     migrateAllStudents();
 
     // Listen for hash changes
-    window.addEventListener('hashchange', _onRoute);
+    window.addEventListener('hashchange', function() { _onRoute(); });
 
     // Intercept clicks on dock links to use hash navigation
     document.addEventListener('click', function(e) {
