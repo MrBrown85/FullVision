@@ -946,6 +946,9 @@
 .student-status-toggles {
   display:flex; gap:6px; margin-top:6px;
 }
+.student-status-row2 {
+  margin-top:2px;
+}
 .student-status-btn {
   font-family:'SF Mono', ui-monospace, 'Menlo', monospace; font-size:var(--text-sm); font-weight:600;
   text-transform:uppercase; letter-spacing:var(--tracking-wide);

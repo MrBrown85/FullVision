@@ -1104,8 +1104,10 @@ window.PageAssignments = (function() {
     return '<div class="student-status-toggles">' +
       '<button class="student-status-btn' + (currentStatus==='excused'?' active-excused':'') + '" tabindex="-1" data-action="toggleStudentStatus" data-aid="' + aid + '" data-sid="' + sid + '" data-status="excused" data-stop-prop="true" title="Excused">EXC</button>' +
       '<button class="student-status-btn' + (currentStatus==='notSubmitted'?' active-ns':'') + '" tabindex="-1" data-action="toggleStudentStatus" data-aid="' + aid + '" data-sid="' + sid + '" data-status="notSubmitted" data-stop-prop="true" title="Not Submitted">NS</button>' +
-      '<button class="student-status-btn' + (currentStatus==='late'?' active-late':'') + '" tabindex="-1" data-action="toggleStudentStatus" data-aid="' + aid + '" data-sid="' + sid + '" data-status="late" data-stop-prop="true" title="Late">LATE</button>' +
       '<button class="comment-btn" data-action="openCommentPopover" data-cid="' + cid + '" data-sid="' + sid + '" data-aid="' + aid + '" data-stop-prop="true" title="Comments">Comment' + (commentCount > 0 ? ' <span class="comment-count">' + commentCount + '</span>' : '') + '</button>' +
+    '</div>' +
+    '<div class="student-status-toggles student-status-row2">' +
+      '<button class="student-status-btn student-status-late' + (currentStatus==='late'?' active-late':'') + '" tabindex="-1" data-action="toggleStudentStatus" data-aid="' + aid + '" data-sid="' + sid + '" data-status="late" data-stop-prop="true" title="Late">LATE</button>' +
     '</div>';
   }
 
