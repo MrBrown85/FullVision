@@ -69,7 +69,7 @@ window.AssignRubricEditor = (function() {
 
   function editRubricUI(rubricId, activeCourse) {
     var rubric = getRubricById(activeCourse, rubricId); if (!rubric) return;
-    _editingRubric = JSON.parse(JSON.stringify(rubric)); _rubricDirty = false; renderRubricEditor(activeCourse);
+    _editingRubric = structuredClone(rubric); _rubricDirty = false; renderRubricEditor(activeCourse);
   }
 
   function deleteRubricUI(rubricId, activeCourse, callbacks) {

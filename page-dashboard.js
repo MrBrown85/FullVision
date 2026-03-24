@@ -1877,11 +1877,11 @@ window.PageDashboard = (function() {
     });
     var srcCC = getCourseConfig(sourceCid);
     if (Object.keys(srcCC).length > 0) {
-      saveCourseConfig(newCourse.id, JSON.parse(JSON.stringify(srcCC)));
+      saveCourseConfig(newCourse.id, structuredClone(srcCC));
     }
     var srcMap = getLearningMap(sourceCid);
     if (srcMap && (srcMap.subjects?.length || srcMap.sections?.length)) {
-      var clone = JSON.parse(JSON.stringify(srcMap));
+      var clone = structuredClone(srcMap);
       clone._customized = true;
       clone._version = 1;
       saveLearningMap(newCourse.id, clone);
