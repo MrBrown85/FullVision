@@ -135,11 +135,12 @@ function renderStudentHeader(cid, sid, opts) {
 
   // NS / EXC counts
   const statuses = getAssignmentStatuses(cid);
-  const nsAssignments = [], excAssignments = [];
+  const nsAssignments = [], excAssignments = [], lateAssignments = [];
   assessments.forEach(a => {
     const st = statuses[sid + ':' + a.id];
     if (st === 'notSubmitted') nsAssignments.push(a.title);
     else if (st === 'excused') excAssignments.push(a.title);
+    else if (st === 'late') lateAssignments.push(a.title);
   });
 
   let html = `<div class="student-header-top">`;
@@ -194,6 +195,12 @@ function renderStudentHeader(cid, sid, opts) {
     html += `<div class="sh-stat" title="${excAssignments.map(t => esc(t)).join('\n')}">
       <div class="sh-stat-val">${excAssignments.length}</div>
       <div class="sh-stat-label">Excused</div>
+    </div>`;
+  }
+  if (lateAssignments.length > 0) {
+    html += `<div class="sh-stat" title="${lateAssignments.map(t => esc(t)).join('\n')}">
+      <div class="sh-stat-val" style="color:var(--score-2)">${lateAssignments.length}</div>
+      <div class="sh-stat-label">Late</div>
     </div>`;
   }
   html += `</div>`; // end sh-stats

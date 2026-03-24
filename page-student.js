@@ -457,7 +457,7 @@ window.PageStudent = (function() {
         '<td class="gt-cell-title">' +
           '<a class="gt-title-text" href="#/assignments?course=' + cid + '&open=' + assess.id + '&student=' + studentId + '" title="Open in Assignments">' + esc(assess.title) + '</a>' +
           (mod ? '<span class="gt-module-dot" style="background:' + mod.color + '" title="' + esc(mod.name) + '"></span>' : '') +
-          (assessStatus === 'notSubmitted' ? '<span class="gt-status-tag gt-tag-ns">NS</span>' : assessStatus === 'excused' ? '<span class="gt-status-tag gt-tag-exc">EXC</span>' : '') +
+          (assessStatus === 'notSubmitted' ? '<span class="gt-status-tag gt-tag-ns">NS</span>' : assessStatus === 'excused' ? '<span class="gt-status-tag gt-tag-exc">EXC</span>' : assessStatus === 'late' ? '<span class="gt-status-tag gt-tag-late">LATE</span>' : '') +
         '</td>' +
         '<td class="gt-cell-date">' + formatDate(assess.date) + '</td>' +
         '<td class="gt-cell-type"><span class="type-badge ' + (assess.type==='summative'?'type-badge-s':'type-badge-f') + '">' + (assess.type==='summative'?'S':'F') + '</span></td>';

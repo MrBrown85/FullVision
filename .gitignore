@@ -19,3 +19,6 @@ test-*.html
 # Environment
 .env
 .env.local
+
+# Local Netlify folder
+.netlify

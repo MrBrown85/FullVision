@@ -18,6 +18,7 @@ window.AssignScoring = (function() {
     return '<div class="student-status-toggles">' +
       '<button class="student-status-btn' + (currentStatus==='excused'?' active-excused':'') + '" tabindex="-1" data-action="toggleStudentStatus" data-aid="' + aid + '" data-sid="' + sid + '" data-status="excused" data-stop-prop="true" title="Excused">EXC</button>' +
       '<button class="student-status-btn' + (currentStatus==='notSubmitted'?' active-ns':'') + '" tabindex="-1" data-action="toggleStudentStatus" data-aid="' + aid + '" data-sid="' + sid + '" data-status="notSubmitted" data-stop-prop="true" title="Not Submitted">NS</button>' +
+      '<button class="student-status-btn' + (currentStatus==='late'?' active-late':'') + '" tabindex="-1" data-action="toggleStudentStatus" data-aid="' + aid + '" data-sid="' + sid + '" data-status="late" data-stop-prop="true" title="Late">LATE</button>' +
       '<button class="comment-btn" data-action="openCommentPopover" data-cid="' + cid + '" data-sid="' + sid + '" data-aid="' + aid + '" data-stop-prop="true" title="Comments">Comment' + (commentCount > 0 ? ' <span class="comment-count">' + commentCount + '</span>' : '') + '</button>' +
     '</div>';
   }
@@ -37,12 +38,13 @@ window.AssignScoring = (function() {
       var raw = getPointsScore(cid, st.id, a.id);
       var pct = raw > 0 ? Math.round(raw / max * 100) : '';
       var stStatus = statuses[st.id + ':' + a.id] || null;
-      html += '<div class="score-row' + (stStatus ? ' has-status' : '') + '" data-status-student="' + st.id + '" data-status-assess="' + a.id + '">' +
+      var disableRow = stStatus && stStatus !== 'late';
+      html += '<div class="score-row' + (disableRow ? ' has-status' : '') + (stStatus === 'late' ? ' has-late' : '') + '" data-status-student="' + st.id + '" data-status-assess="' + a.id + '">' +
         '<span class="score-name">' + esc(displayName(st)) + renderStatusToggles(a.id, st.id, stStatus, cid) + '</span>' +
         '<div class="pts-input-cell">' +
           '<input type="number" class="gb-pts-input" min="0" max="' + max + '" inputmode="numeric"' +
             ' value="' + (raw > 0 ? raw : '') + '" data-sid="' + st.id + '" data-aid="' + a.id + '" data-max="' + max + '"' +
-            (stStatus ? ' disabled' : '') + '>' +
+            (disableRow ? ' disabled' : '') + '>' +
           '<span class="gb-pts-max">/' + max + '</span>' +
         '</div>' +
         '<div class="pts-pct-cell">' +
@@ -116,12 +118,15 @@ window.AssignScoring = (function() {
     var row = document.querySelector('.score-row[data-status-student="' + sid + '"][data-status-assess="' + aid + '"]') ||
               document.querySelector('.rsg-student[data-status-student="' + sid + '"][data-status-assess="' + aid + '"]');
     if (row) {
-      row.querySelectorAll('.student-status-btn').forEach(function(btn) { btn.classList.remove('active-excused', 'active-ns'); });
-      if (newStatus === 'excused') row.querySelector('.student-status-btn:first-child').classList.add('active-excused');
-      else if (newStatus === 'notSubmitted') row.querySelector('.student-status-btn:nth-child(2)').classList.add('active-ns');
-      if (newStatus) row.classList.add('has-status'); else row.classList.remove('has-status');
+      row.querySelectorAll('.student-status-btn').forEach(function(btn) { btn.classList.remove('active-excused', 'active-ns', 'active-late'); });
+      if (newStatus === 'excused') row.querySelector('[data-status="excused"]').classList.add('active-excused');
+      else if (newStatus === 'notSubmitted') row.querySelector('[data-status="notSubmitted"]').classList.add('active-ns');
+      else if (newStatus === 'late') row.querySelector('[data-status="late"]').classList.add('active-late');
+      var disableScoring = newStatus && newStatus !== 'late';
+      if (disableScoring) row.classList.add('has-status'); else row.classList.remove('has-status');
+      if (newStatus === 'late') row.classList.add('has-late'); else row.classList.remove('has-late');
       var ptsInput = row.querySelector('.gb-pts-input');
-      if (ptsInput) ptsInput.disabled = !!newStatus;
+      if (ptsInput) ptsInput.disabled = disableScoring;
       if (newStatus === 'notSubmitted') {
         row.querySelectorAll('.score-opt, .rsg-level').forEach(function(el) { el.classList.remove('active', 'mixed'); });
         if (ptsInput) { ptsInput.value = ''; var ps = row.querySelector('.gb-pts-live-pct'); if (ps) ps.textContent = ''; }
@@ -269,7 +274,8 @@ window.AssignScoring = (function() {
     students.forEach(function(st) {
       var studentScores = scores[st.id] || [];
       var stStatus = statuses[st.id + ':' + a.id] || null;
-      html += '<div class="rsg-student' + (stStatus ? ' has-status' : '') + '" data-status-student="' + st.id + '" data-status-assess="' + a.id + '">' +
+      var disableRow = stStatus && stStatus !== 'late';
+      html += '<div class="rsg-student' + (disableRow ? ' has-status' : '') + (stStatus === 'late' ? ' has-late' : '') + '" data-status-student="' + st.id + '" data-status-assess="' + a.id + '">' +
         '<div class="rsg-student-name">' + esc(displayName(st)) + renderStatusToggles(a.id, st.id, stStatus, cid) + '</div><div class="rsg-criteria">';
       tagObjs.forEach(function(tag) {
         var entry = studentScores.find(function(s) { return s.assessmentId === a.id && s.tagId === tag.id; });
@@ -315,7 +321,8 @@ window.AssignScoring = (function() {
     students.forEach(function(st) {
       var studentScores = scores[st.id] || [];
       var stStatus = statuses[st.id + ':' + a.id] || null;
-      html += '<div class="rsg-student' + (stStatus ? ' has-status' : '') + '" data-status-student="' + st.id + '" data-status-assess="' + a.id + '">' +
+      var disableRow = stStatus && stStatus !== 'late';
+      html += '<div class="rsg-student' + (disableRow ? ' has-status' : '') + (stStatus === 'late' ? ' has-late' : '') + '" data-status-student="' + st.id + '" data-status-assess="' + a.id + '">' +
         '<div class="rsg-student-name">' + esc(displayName(st)) + renderStatusToggles(a.id, st.id, stStatus, cid) + '</div><div class="rsg-criteria">';
       criteria.forEach(function(crit) {
         var tagScores = (crit.tagIds||[]).map(function(tid) { var entry = studentScores.find(function(s) { return s.assessmentId === a.id && s.tagId === tid; }); return entry ? entry.score : 0; });

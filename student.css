@@ -430,6 +430,7 @@
 }
 .gt-tag-ns { background:rgba(255,59,48,0.1); color:var(--score-1); }
 .gt-tag-exc { background:rgba(0,122,255,0.08); color:var(--active); }
+.gt-tag-late { background:rgba(255,149,0,0.1); color:var(--score-2); }
 .gt-row-status { opacity:0.6; }
 .gt-cell-date {
   font-family: 'SF Mono', ui-monospace, 'Menlo', monospace; font-size:var(--text-sm); color: var(--text-3);

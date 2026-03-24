@@ -961,6 +961,14 @@
 .student-status-btn.active-ns {
   background:var(--score-1); color:#fff; border-color:var(--score-1);
 }
+.student-status-btn.active-late {
+  background:var(--score-2); color:#fff; border-color:var(--score-2);
+}
+/* Late indicator — subtle left border, scoring stays fully enabled */
+.score-row.has-late,
+.rsg-student.has-late {
+  border-left:3px solid var(--score-2);
+}
 /* Dim scores when student has a status */
 .score-row.has-status .score-tags,
 .rsg-student.has-status .rsg-criteria {
