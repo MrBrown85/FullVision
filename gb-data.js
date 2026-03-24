@@ -338,7 +338,7 @@ async function initAllCourses() {
   if (!_useSupabase || _cache.courses === null) {
     if (_useSupabase) {
       // New Supabase account — use DEFAULT_COURSES, not stale localStorage
-      _cache.courses = JSON.parse(JSON.stringify(DEFAULT_COURSES));
+      _cache.courses = structuredClone(DEFAULT_COURSES);
       _cache.config = {};
       _syncToSupabase('teacher_config', 'courses', _cache.courses);
       _syncToSupabase('teacher_config', 'config', _cache.config);
@@ -474,7 +474,7 @@ function _loadCoursesFromLS() {
     const stored = JSON.parse(localStorage.getItem('gb-courses'));
     if (stored && Object.keys(stored).length > 0) return stored;
   } catch {}
-  return JSON.parse(JSON.stringify(DEFAULT_COURSES));
+  return structuredClone(DEFAULT_COURSES);
 }
 
 /* Fields that affect proficiency calculations */
@@ -827,7 +827,7 @@ function ensureCustomLearningMap(cid) {
       return ls;
     }
   } catch {}
-  const clone = JSON.parse(JSON.stringify(LEARNING_MAP[cid] || { subjects: [], sections: [] }));
+  const clone = structuredClone(LEARNING_MAP[cid] || { subjects: [], sections: [] });
   clone._customized = true;
   clone._version = 1;
   _saveCourseField('learningMaps', cid, clone);

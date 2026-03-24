@@ -81,15 +81,15 @@ function seedIfNeeded() {
      ════════════════════════════════════════════════════════════ */
   // Ensure default course exists before seeding
   if (!COURSES.sci8 && Object.keys(COURSES).length === 0) {
-    Object.assign(COURSES, JSON.parse(JSON.stringify(DEFAULT_COURSES)));
+    Object.assign(COURSES, structuredClone(DEFAULT_COURSES));
     saveCourses(COURSES);
   }
   if (COURSES.sci8 && getStudents('sci8').length === 0) {
     _didSeed = true;
-    saveStudents('sci8', JSON.parse(JSON.stringify(SHARED_ROSTER)));
+    saveStudents('sci8', structuredClone(SHARED_ROSTER));
     // Seed the learning map from built-in constants
     if (LEARNING_MAP && LEARNING_MAP.sci8) {
-      saveLearningMap('sci8', JSON.parse(JSON.stringify(LEARNING_MAP.sci8)));
+      saveLearningMap('sci8', structuredClone(LEARNING_MAP.sci8));
     }
 
     const sci8Assessments = [

@@ -485,8 +485,8 @@ window.AssignForm = (function() {
   }
   function loadCollabData(assess) {
     collabExcluded = new Set(assess && assess.excludedStudents ? assess.excludedStudents : []);
-    collabPairs = assess && assess.pairs ? JSON.parse(JSON.stringify(assess.pairs)) : [];
-    collabGroups = assess && assess.groups ? JSON.parse(JSON.stringify(assess.groups)) : [];
+    collabPairs = assess && assess.pairs ? structuredClone(assess.pairs) : [];
+    collabGroups = assess && assess.groups ? structuredClone(assess.groups) : [];
     collabGroupCount = assess && assess.groupCount ? assess.groupCount : 4;
     collabPairMode = collabPairs.length > 0 ? 'manual' : 'random';
     collabGroupMode = collabGroups.length > 0 ? 'manual' : 'random';
@@ -593,7 +593,7 @@ window.AssignForm = (function() {
     var orig = assessments.find(function(a) { return a.id === aid; });
     if (!orig) return;
     var id = uid();
-    var dupe = JSON.parse(JSON.stringify(orig));
+    var dupe = structuredClone(orig);
     dupe.id = id; dupe.title = orig.title + ' (Copy)'; dupe.created = new Date().toISOString();
     assessments.push(dupe);
     saveAssessments(cid, assessments);

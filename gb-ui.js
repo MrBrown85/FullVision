@@ -383,14 +383,14 @@ function deleteStudent(cid, sid) {
   // Save snapshot for undo
   const snapshot = {
     student,
-    scores: scores[sid] ? JSON.parse(JSON.stringify(scores[sid])) : [],
-    goals: goals[sid] ? JSON.parse(JSON.stringify(goals[sid])) : undefined,
-    reflections: reflections[sid] ? JSON.parse(JSON.stringify(reflections[sid])) : undefined,
-    notes: notes[sid] ? JSON.parse(JSON.stringify(notes[sid])) : undefined,
+    scores: scores[sid] ? structuredClone(scores[sid]) : [],
+    goals: goals[sid] ? structuredClone(goals[sid]) : undefined,
+    reflections: reflections[sid] ? structuredClone(reflections[sid]) : undefined,
+    notes: notes[sid] ? structuredClone(notes[sid]) : undefined,
     flagged: flags[sid],
     statuses: {},
-    quickObs: getQuickObs(cid)[sid] ? JSON.parse(JSON.stringify(getQuickObs(cid)[sid])) : undefined,
-    termRatings: getTermRatings(cid)[sid] ? JSON.parse(JSON.stringify(getTermRatings(cid)[sid])) : undefined
+    quickObs: getQuickObs(cid)[sid] ? structuredClone(getQuickObs(cid)[sid]) : undefined,
+    termRatings: getTermRatings(cid)[sid] ? structuredClone(getTermRatings(cid)[sid]) : undefined
   };
   Object.keys(statuses).forEach(k => { if (k.startsWith(sid + ':')) snapshot.statuses[k] = statuses[k]; });
 

@@ -788,8 +788,8 @@ window.PageAssignments = (function() {
   }
   function loadCollabData(assess) {
     collabExcluded = new Set(assess && assess.excludedStudents ? assess.excludedStudents : []);
-    collabPairs = assess && assess.pairs ? JSON.parse(JSON.stringify(assess.pairs)) : [];
-    collabGroups = assess && assess.groups ? JSON.parse(JSON.stringify(assess.groups)) : [];
+    collabPairs = assess && assess.pairs ? structuredClone(assess.pairs) : [];
+    collabGroups = assess && assess.groups ? structuredClone(assess.groups) : [];
     collabGroupCount = assess && assess.groupCount ? assess.groupCount : 4;
     collabPairMode = collabPairs.length > 0 ? 'manual' : 'random';
     collabGroupMode = collabGroups.length > 0 ? 'manual' : 'random';
@@ -964,7 +964,7 @@ window.PageAssignments = (function() {
     var orig = assessments.find(function(a) { return a.id === aid; });
     if (!orig) return;
     var id = uid();
-    var dupe = JSON.parse(JSON.stringify(orig));
+    var dupe = structuredClone(orig);
     dupe.id = id; dupe.title = orig.title + ' (Copy)'; dupe.created = new Date().toISOString();
     assessments.push(dupe);
     saveAssessments(cid, assessments);
@@ -1200,7 +1200,7 @@ window.PageAssignments = (function() {
     closeMenus(); if (!wasOpen) { positionMenu(trigger, menu); menu.classList.add('open'); }
   }
   function fillScores(aid, tagId, value, scope) {
-    var cid = activeCourse; var prevScores = JSON.parse(JSON.stringify(getScores(cid)));
+    var cid = activeCourse; var prevScores = structuredClone(getScores(cid));
     var students = getStudents(cid); var assess = getAssessments(cid).find(function(a) { return a.id === aid; });
     var statuses = getAssignmentStatuses(cid); var selector, toastMsg;
     if (scope === 'col') {
@@ -1241,7 +1241,7 @@ window.PageAssignments = (function() {
     if (value > 0) { var lvl = row.querySelector('.l' + value); if (lvl) lvl.classList.add('active'); }
   }
   function fillRubricScores(aid, critId, value, scope) {
-    var cid = activeCourse; var prevScores = JSON.parse(JSON.stringify(getScores(cid)));
+    var cid = activeCourse; var prevScores = structuredClone(getScores(cid));
     var students = getStudents(cid); var assess = getAssessments(cid).find(function(a) { return a.id === aid; });
     var statuses = getAssignmentStatuses(cid); var selector, toastMsg;
     if (scope === 'col') {
@@ -1417,7 +1417,7 @@ window.PageAssignments = (function() {
   }
   function editRubricUI(rubricId) {
     var rubric = getRubricById(activeCourse, rubricId); if (!rubric) return;
-    _editingRubric = JSON.parse(JSON.stringify(rubric)); _rubricDirty = false; renderRubricEditor();
+    _editingRubric = structuredClone(rubric); _rubricDirty = false; renderRubricEditor();
   }
   function deleteRubricUI(rubricId) {
     var rubric = getRubricById(activeCourse, rubricId); if (!rubric) return;
@@ -1694,7 +1694,7 @@ window.PageAssignments = (function() {
       deleteCourseData(activeCourse);
       // If no courses remain, re-seed defaults
       if (Object.keys(COURSES).length === 0) {
-        Object.assign(COURSES, JSON.parse(JSON.stringify(DEFAULT_COURSES)));
+        Object.assign(COURSES, structuredClone(DEFAULT_COURSES));
         saveCourses(COURSES);
         seedIfNeeded();
       }
@@ -1705,7 +1705,7 @@ window.PageAssignments = (function() {
     showConfirm('Reset Demo Data', 'Reset ALL data to demo defaults? This cannot be undone.', 'Reset', 'danger', function() {
       Object.keys(COURSES).forEach(function(cid) { deleteCourseData(cid); });
       Object.keys(COURSES).forEach(function(cid) { delete COURSES[cid]; });
-      Object.assign(COURSES, JSON.parse(JSON.stringify(DEFAULT_COURSES)));
+      Object.assign(COURSES, structuredClone(DEFAULT_COURSES));
       saveCourses(COURSES);
       seedIfNeeded(); Router.navigate('/dashboard');
     });

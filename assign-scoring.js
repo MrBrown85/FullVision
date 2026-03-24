@@ -181,7 +181,7 @@ window.AssignScoring = (function() {
   }
 
   function fillScores(aid, tagId, value, scope, activeCourse, callbacks) {
-    var cid = activeCourse; var prevScores = JSON.parse(JSON.stringify(getScores(cid)));
+    var cid = activeCourse; var prevScores = structuredClone(getScores(cid));
     var students = getStudents(cid); var assess = getAssessments(cid).find(function(a) { return a.id === aid; });
     var statuses = getAssignmentStatuses(cid); var selector, toastMsg;
     if (scope === 'col') {
@@ -225,7 +225,7 @@ window.AssignScoring = (function() {
   }
 
   function fillRubricScores(aid, critId, value, scope, activeCourse, callbacks) {
-    var cid = activeCourse; var prevScores = JSON.parse(JSON.stringify(getScores(cid)));
+    var cid = activeCourse; var prevScores = structuredClone(getScores(cid));
     var students = getStudents(cid); var assess = getAssessments(cid).find(function(a) { return a.id === aid; });
     var statuses = getAssignmentStatuses(cid); var selector, toastMsg;
     if (scope === 'col') {
