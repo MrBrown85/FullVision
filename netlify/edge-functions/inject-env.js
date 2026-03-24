@@ -14,8 +14,8 @@ export default async function handler(request, context) {
 
   let html = await response.text();
 
-  const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-  const supabaseKey = Deno.env.get('SUPABASE_KEY') || '';
+  const supabaseUrl = Netlify.env.get('SUPABASE_URL') || '';
+  const supabaseKey = Netlify.env.get('SUPABASE_KEY') || '';
 
   html = html.replace('__SUPABASE_URL__', supabaseUrl);
   html = html.replace('__SUPABASE_KEY__', supabaseKey);
