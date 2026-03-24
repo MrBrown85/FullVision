@@ -1220,9 +1220,14 @@ function rbUpdatePresetBtns() {
 
 /* ── Pointer-based drag-and-drop reorder ── */
 var _rbDragIdx = null;
+var _dragAbort = null;
 
 function _initPointerDrag(container) {
   if (!container) return;
+  // Remove previous listeners to prevent accumulation
+  if (_dragAbort) _dragAbort.abort();
+  _dragAbort = new AbortController();
+  var signal = _dragAbort.signal;
   var dragEl = null;
   var placeholder = null;
   var offsetY = 0;
@@ -1256,7 +1261,7 @@ function _initPointerDrag(container) {
     block.style.zIndex = '1000';
     block.style.pointerEvents = 'none';
     block.parentNode.insertBefore(placeholder, block);
-  });
+  }, { signal });
 
   container.addEventListener('pointermove', function(e) {
     if (!dragEl) return;
@@ -1276,7 +1281,7 @@ function _initPointerDrag(container) {
     }
     // Past all blocks — append at end
     container.appendChild(placeholder);
-  });
+  }, { signal });
 
   function finishDrag(e) {
     if (!dragEl) return;
@@ -1312,8 +1317,8 @@ function _initPointerDrag(container) {
     startIdx = -1;
   }
 
-  container.addEventListener('pointerup', finishDrag);
-  container.addEventListener('pointercancel', finishDrag);
+  container.addEventListener('pointerup', finishDrag, { signal });
+  container.addEventListener('pointercancel', finishDrag, { signal });
 }
 
 // Legacy stubs (no longer used but kept for safety in case inline attrs remain)
