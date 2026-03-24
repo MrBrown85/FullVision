@@ -46,7 +46,23 @@ if (typeof supabase === 'undefined') {
 <script src="gb-calc.js"></script>
 <script src="gb-ui.js"></script>
 <script src="gb-seed-data.js"></script>
-<!-- Page modules are lazy-loaded by gb-router.js on first navigation -->
+<!-- Submodules (loaded before their parent page modules) -->
+<script src="dash-overview.js"></script>
+<script src="dash-class-manager.js"></script>
+<script src="dash-curriculum-wizard.js"></script>
+<script src="assign-form.js"></script>
+<script src="assign-scoring.js"></script>
+<script src="assign-rubric-editor.js"></script>
+<script src="report-blocks.js"></script>
+<script src="report-builder.js"></script>
+<script src="report-narrative.js"></script>
+<!-- Page modules -->
+<script src="page-dashboard.js"></script>
+<script src="page-assignments.js"></script>
+<script src="page-student.js"></script>
+<script src="page-gradebook.js"></script>
+<script src="page-observations.js"></script>
+<script src="page-reports.js"></script>
 <script src="gb-router.js"></script>
 <script>
 if ('serviceWorker' in navigator) {
