@@ -559,6 +559,84 @@ function anonymizeStudents(students) {
   });
 }
 
+/* ── Learning Map Migration — flatten section/tag hierarchy ── */
+function migrateLearningMap(map) {
+  if (!map || !map.sections || map._flatVersion >= 2) return map;
+  // Build sectionId → tagId mapping for override/goal/reflection migration
+  var sectionToTag = {};
+  map.sections.forEach(function(sec) {
+    if (!sec.tags || sec.tags.length === 0) return;
+    var tag = sec.tags[0];
+    // Promote section properties onto the tag
+    tag.color = sec.color;
+    tag.subject = sec.subject;
+    tag.shortName = sec.shortName;
+    tag.name = sec.name;
+    tag._legacySectionId = sec.id;
+    // Record mapping before changing section ID
+    sectionToTag[sec.id] = tag.id;
+    // Section ID becomes tag ID
+    sec.id = tag.id;
+  });
+  map._flatVersion = 2;
+  map._sectionToTagMap = sectionToTag;
+  return map;
+}
+
+function migrateOverridesForFlatMap(cid, sectionToTag) {
+  if (!sectionToTag || Object.keys(sectionToTag).length === 0) return;
+  var overrides = getOverrides(cid);
+  var changed = false;
+  Object.keys(overrides).forEach(function(studentId) {
+    var studentOverrides = overrides[studentId];
+    if (!studentOverrides) return;
+    Object.keys(studentOverrides).forEach(function(key) {
+      if (sectionToTag[key] && key !== sectionToTag[key]) {
+        studentOverrides[sectionToTag[key]] = studentOverrides[key];
+        delete studentOverrides[key];
+        changed = true;
+      }
+    });
+  });
+  if (changed) saveOverrides(cid, overrides);
+}
+
+function migrateGoalsForFlatMap(cid, sectionToTag) {
+  if (!sectionToTag || Object.keys(sectionToTag).length === 0) return;
+  var goals = getGoals(cid);
+  var changed = false;
+  Object.keys(goals).forEach(function(studentId) {
+    var studentGoals = goals[studentId];
+    if (!studentGoals || typeof studentGoals !== 'object') return;
+    Object.keys(studentGoals).forEach(function(key) {
+      if (sectionToTag[key] && key !== sectionToTag[key]) {
+        studentGoals[sectionToTag[key]] = studentGoals[key];
+        delete studentGoals[key];
+        changed = true;
+      }
+    });
+  });
+  if (changed) saveGoals(cid, goals);
+}
+
+function migrateReflectionsForFlatMap(cid, sectionToTag) {
+  if (!sectionToTag || Object.keys(sectionToTag).length === 0) return;
+  var reflections = getReflections(cid);
+  var changed = false;
+  Object.keys(reflections).forEach(function(studentId) {
+    var studentRefs = reflections[studentId];
+    if (!studentRefs || typeof studentRefs !== 'object') return;
+    Object.keys(studentRefs).forEach(function(key) {
+      if (sectionToTag[key] && key !== sectionToTag[key]) {
+        studentRefs[sectionToTag[key]] = studentRefs[key];
+        delete studentRefs[key];
+        changed = true;
+      }
+    });
+  });
+  if (changed) saveReflections(cid, reflections);
+}
+
 /* ── Student Migration ─────────────────────────────────────── */
 function migrateStudent(st) {
   if (typeof st.designation === 'string' && st.designation) {
@@ -818,11 +896,31 @@ function buildLearningMapFromTags(shortTags) {
 function getLearningMap(cid) {
   if (_cache.learningMaps[cid]) return _cache.learningMaps[cid];
   // Not yet loaded into cache — read from localStorage as fallback
+  var map;
   try {
     const custom = JSON.parse(localStorage.getItem('gb-learningmap-' + cid));
-    if (custom && custom._customized) return custom;
+    if (custom && custom._customized) map = custom;
   } catch (e) { console.warn('LearningMap parse error:', e); }
-  return LEARNING_MAP[cid] || { subjects: [], sections: [] };
+  if (!map) map = structuredClone(LEARNING_MAP[cid] || { subjects: [], sections: [] });
+  // Migrate old nested section/tag format to flat format
+  if (!map._flatVersion || map._flatVersion < 2) {
+    var sectionToTag = {};
+    if (map.sections) {
+      map.sections.forEach(function(sec) {
+        if (sec.tags && sec.tags.length > 0) sectionToTag[sec.id] = sec.tags[0].id;
+      });
+    }
+    migrateLearningMap(map);
+    _cache.learningMaps[cid] = map;
+    if (map._customized) saveLearningMap(cid, map);
+    // Migrate overrides, goals, reflections keyed by old section IDs
+    if (Object.keys(sectionToTag).length > 0) {
+      migrateOverridesForFlatMap(cid, sectionToTag);
+      migrateGoalsForFlatMap(cid, sectionToTag);
+      migrateReflectionsForFlatMap(cid, sectionToTag);
+    }
+  }
+  return map;
 }
 function saveLearningMap(cid, map) {
   map._customized = true;
@@ -838,19 +936,13 @@ function resetLearningMap(cid) {
   }
 }
 function ensureCustomLearningMap(cid) {
-  const existing = _cache.learningMaps[cid];
-  if (existing && existing._customized) return existing;
-  // Also check localStorage for pre-cache access
-  try {
-    const ls = JSON.parse(localStorage.getItem('gb-learningmap-' + cid));
-    if (ls && ls._customized) {
-      _cache.learningMaps[cid] = ls;
-      return ls;
-    }
-  } catch (e) { console.warn('LearningMap cache fallback:', e); }
-  const clone = structuredClone(LEARNING_MAP[cid] || { subjects: [], sections: [] });
+  // getLearningMap handles migration, so use it as the source
+  var map = getLearningMap(cid);
+  if (map._customized) return map;
+  const clone = structuredClone(map);
   clone._customized = true;
   clone._version = 1;
+  migrateLearningMap(clone);
   _saveCourseField('learningMaps', cid, clone);
   return clone;
 }
@@ -1166,6 +1258,10 @@ window.GB = {
   displayNameFirst,
   sortStudents,
   anonymizeStudents,
+  migrateLearningMap,
+  migrateOverridesForFlatMap,
+  migrateGoalsForFlatMap,
+  migrateReflectionsForFlatMap,
   migrateStudent,
   migrateAllStudents,
   formatTs,
