@@ -647,8 +647,16 @@ window.DashClassManager = (function() {
           '</div>' +
           '<div class="cm-tag-row" style="border-top:1px solid #e5e7eb;padding-top:8px;margin-top:4px">' +
             '<div class="cm-tag-fields" style="flex:1">' +
-              '<label class="cm-label">Short Label</label>' +
-              '<input class="cm-input" value="' + esc(tag.label) + '" placeholder="Short label" style="padding:5px 8px;font-size:0.82rem;font-weight:500" data-action-blur="cmStdLabel" data-secid="' + sec.id + '">' +
+              '<div style="display:flex;gap:12px;align-items:flex-end">' +
+                '<div style="flex:0 0 120px">' +
+                  '<label class="cm-label">Tag Code</label>' +
+                  '<input class="cm-input" value="' + esc(tag.id) + '" placeholder="e.g. RD1" maxlength="10" style="padding:5px 8px;font-size:0.82rem;font-weight:600;font-family:monospace;text-transform:uppercase" data-stop-prop="true" data-action-blur="cmStdCode" data-secid="' + sec.id + '">' +
+                '</div>' +
+                '<div style="flex:1">' +
+                  '<label class="cm-label">Short Label</label>' +
+                  '<input class="cm-input" value="' + esc(tag.label) + '" placeholder="Short label" style="padding:5px 8px;font-size:0.82rem;font-weight:500" data-action-blur="cmStdLabel" data-secid="' + sec.id + '">' +
+                '</div>' +
+              '</div>' +
               '<label class="cm-label" style="margin-top:6px">I can\u2026 Statement</label>' +
               '<textarea class="cm-textarea" placeholder="I can\u2026 statement" style="min-height:34px;padding:5px 8px;font-size:0.78rem" data-action-blur="cmStdText" data-secid="' + sec.id + '">' + esc(tag.text||'') + '</textarea>' +
             '</div>' +
@@ -1146,6 +1154,50 @@ window.DashClassManager = (function() {
     var map = ensureCustomLearningMap(cmSelectedCourse);
     var sec = map.sections.find(function(s) { return s.id === secId; });
     if (sec && sec.tags[0]) { sec.tags[0].text = val.trim(); saveLearningMap(cmSelectedCourse, map); }
+  }
+
+  function cmUpdateStdCode(secId, val) {
+    if (!cmSelectedCourse) return;
+    var newId = val.trim().toUpperCase().replace(/[^A-Z0-9._\-]/g, '').slice(0, 10);
+    if (!newId || newId === secId) return;
+    var map = ensureCustomLearningMap(cmSelectedCourse);
+    // Check uniqueness within learning map
+    var exists = map.sections.some(function(s) { return s.id === newId; });
+    if (exists) {
+      alert('Tag code "' + newId + '" already exists. Please choose a different code.');
+      _render();
+      return;
+    }
+    // Update section and tag IDs
+    var sec = map.sections.find(function(s) { return s.id === secId; });
+    if (!sec) return;
+    sec.id = newId;
+    if (sec.tags[0]) sec.tags[0].id = newId;
+    // Update _sectionToTagMap if present
+    if (map._sectionToTagMap) {
+      Object.keys(map._sectionToTagMap).forEach(function(k) {
+        if (map._sectionToTagMap[k] === secId) map._sectionToTagMap[k] = newId;
+      });
+    }
+    saveLearningMap(cmSelectedCourse, map);
+    // Update assessment tagIds references
+    var assessments = getAssessments(cmSelectedCourse);
+    var assessChanged = false;
+    assessments.forEach(function(a) {
+      var idx = (a.tagIds || []).indexOf(secId);
+      if (idx !== -1) { a.tagIds[idx] = newId; assessChanged = true; }
+    });
+    if (assessChanged) saveAssessments(cmSelectedCourse, assessments);
+    // Update score tagId references
+    var allScores = getScores(cmSelectedCourse);
+    var scoresChanged = false;
+    Object.keys(allScores).forEach(function(sid) {
+      (allScores[sid] || []).forEach(function(sc) {
+        if (sc.tagId === secId) { sc.tagId = newId; scoresChanged = true; }
+      });
+    });
+    if (scoresChanged) saveScores(cmSelectedCourse, allScores);
+    _render();
   }
 
   // Legacy aliases for backward compatibility
