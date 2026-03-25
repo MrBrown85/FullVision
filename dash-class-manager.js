@@ -761,9 +761,9 @@ window.DashClassManager = (function() {
     if (!cmSelectedCourse) return;
     document.getElementById('cm-decay-val').textContent = val + '%';
     var cc = getCourseConfig(cmSelectedCourse);
-    cc.decayWeight = parseInt(val) / 100;
+    cc.decayWeight = parseInt(val, 10) / 100;
     saveCourseConfig(cmSelectedCourse, cc);
-    updateCourse(cmSelectedCourse, { decayWeight: parseInt(val) / 100 });
+    updateCourse(cmSelectedCourse, { decayWeight: parseInt(val, 10) / 100 });
   }
 
   function cmToggleReportPct(on) {
@@ -782,7 +782,7 @@ window.DashClassManager = (function() {
   }
 
   function cmUpdateCatWeights(val) {
-    var summ = parseInt(val);
+    var summ = parseInt(val, 10);
     var form = 100 - summ;
     document.getElementById('cm-cw-summ').textContent = summ + '%';
     document.getElementById('cm-cw-form').textContent = form + '%';

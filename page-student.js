@@ -91,7 +91,7 @@ window.PageStudent = (function() {
   function selectOverrideLevel(level) {
     _overrideSelectedLevel = (_overrideSelectedLevel === level) ? 0 : level;
     document.querySelectorAll('.override-level-btn').forEach(function(btn) {
-      btn.classList.toggle('selected', parseInt(btn.dataset.level) === _overrideSelectedLevel);
+      btn.classList.toggle('selected', parseInt(btn.dataset.level, 10) === _overrideSelectedLevel);
     });
   }
 
@@ -212,7 +212,7 @@ window.PageStudent = (function() {
   }
   function saveReflField(secId) {
     var text = (document.getElementById('refl-input-' + secId).value || '').trim();
-    var conf = parseInt(document.getElementById('refl-conf-' + secId).value) || 0;
+    var conf = parseInt(document.getElementById('refl-conf-' + secId, 10).value) || 0;
     var cid = activeCourse;
     var reflections = getReflections(cid);
     if (!reflections[studentId]) reflections[studentId] = {};
@@ -789,7 +789,7 @@ window.PageStudent = (function() {
       'cancelReflEdit':      function() { cancelReflEdit(el.dataset.secid); },
       'addNote':             function() { addNote(); },
       'closeOverridePanel':  function() { closeOverridePanel(el.dataset.secid); },
-      'selectOverrideLevel': function() { selectOverrideLevel(parseInt(el.dataset.value)); },
+      'selectOverrideLevel': function() { selectOverrideLevel(parseInt(el.dataset.value, 10)); },
       'clearOverride':       function() { clearOverride(el.dataset.secid); },
       'saveOverride':        function() { saveOverride(el.dataset.secid); },
       'deleteNote':          function() { deleteNote(el.dataset.noteid); },

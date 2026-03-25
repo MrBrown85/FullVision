@@ -1545,12 +1545,12 @@ window.PageDashboard = (function() {
       description: (cwStep2Desc || '').trim(),
       gradingSystem: cwStep2Grading,
       calcMethod: cwStep2Calc,
-      decayWeight: parseInt(cwStep2Decay) / 100
+      decayWeight: parseInt(cwStep2Decay, 10) / 100
     });
 
     var cc = getCourseConfig(course.id);
     cc.calcMethod = cwStep2Calc;
-    cc.decayWeight = parseInt(cwStep2Decay) / 100;
+    cc.decayWeight = parseInt(cwStep2Decay, 10) / 100;
     saveCourseConfig(course.id, cc);
 
     if (cwSelectedTags.length > 0 && CURRICULUM_INDEX) {
@@ -1633,9 +1633,9 @@ window.PageDashboard = (function() {
     if (!cmSelectedCourse) return;
     document.getElementById('cm-decay-val').textContent = val + '%';
     var cc = getCourseConfig(cmSelectedCourse);
-    cc.decayWeight = parseInt(val) / 100;
+    cc.decayWeight = parseInt(val, 10) / 100;
     saveCourseConfig(cmSelectedCourse, cc);
-    updateCourse(cmSelectedCourse, { decayWeight: parseInt(val) / 100 });
+    updateCourse(cmSelectedCourse, { decayWeight: parseInt(val, 10) / 100 });
   }
 
   function cmToggleReportPct(on) {
@@ -1654,7 +1654,7 @@ window.PageDashboard = (function() {
   }
 
   function cmUpdateCatWeights(val) {
-    var summ = parseInt(val);
+    var summ = parseInt(val, 10);
     var form = 100 - summ;
     document.getElementById('cm-cw-summ').textContent = summ + '%';
     document.getElementById('cm-cw-form').textContent = form + '%';
@@ -2109,7 +2109,7 @@ window.PageDashboard = (function() {
       'cmDuplicateCourse':    function() { cmDuplicateCourse(el.dataset.cid); },
       'cmToggleArchive':      function() { cmToggleArchive(el.dataset.cid); },
       'cmDeleteCourse':       function() { cmDeleteCourse(); },
-      'cwSelectGrade':        function() { cwSelectGrade(parseInt(el.dataset.grade)); },
+      'cwSelectGrade':        function() { cwSelectGrade(parseInt(el.dataset.grade, 10)); },
       'cwSelectSubject':      function() { cwSelectSubject(el.dataset.subject); },
       'cwToggleCourse':       function() { cwToggleCourse(el.dataset.tag); },
       'cwSkipToCustom':       function() { cwSkipToCustom(); },

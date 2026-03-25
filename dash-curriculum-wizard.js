@@ -334,12 +334,12 @@ window.DashCurriculumWizard = (function() {
       description: (cwStep2Desc || '').trim(),
       gradingSystem: cwStep2Grading,
       calcMethod: cwStep2Calc,
-      decayWeight: parseInt(cwStep2Decay) / 100
+      decayWeight: parseInt(cwStep2Decay, 10) / 100
     });
 
     var cc = getCourseConfig(course.id);
     cc.calcMethod = cwStep2Calc;
-    cc.decayWeight = parseInt(cwStep2Decay) / 100;
+    cc.decayWeight = parseInt(cwStep2Decay, 10) / 100;
     saveCourseConfig(course.id, cc);
 
     if (cwSelectedTags.length > 0 && CURRICULUM_INDEX) {

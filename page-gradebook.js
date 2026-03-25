@@ -582,11 +582,11 @@ window.PageGradebook = (function() {
     td.appendChild(wrap);
     inp.focus(); inp.select();
     inp.addEventListener('input', function() {
-      var v = parseInt(inp.value);
+      var v = parseInt(inp.value, 10);
       pctLabel.textContent = (!isNaN(v) && v >= 0) ? Math.round(Math.min(v, max) / max * 100) + '%' : '';
     });
     function commit() {
-      var val = parseInt(inp.value);
+      var val = parseInt(inp.value, 10);
       var raw = isNaN(val) ? 0 : Math.max(0, Math.min(max, val));
       if (isPtsCol) {
         setPointsScore(cid, sid, aid, raw);
@@ -682,7 +682,7 @@ window.PageGradebook = (function() {
       if (ptsAssess && ptsAssess.scoreMode === 'points') { e.preventDefault(); showPointsInput(focused, ptsAssess); var pi = focused.querySelector('.gb-pts-input'); if (pi) { pi.value = e.key; pi.dispatchEvent(new Event('input')); } return; }
       if (!['1','2','3','4'].includes(e.key)) return;
       e.preventDefault();
-      var val = parseInt(e.key); var aid = focused.dataset.aid; var tid = focused.dataset.tid; var sid = focused.dataset.sid;
+      var val = parseInt(e.key, 10); var aid = focused.dataset.aid; var tid = focused.dataset.tid; var sid = focused.dataset.sid;
       if (aid && tid && sid) {
         var scores = getScores(activeCourse); if (!scores[sid]) scores[sid] = [];
         var entry = scores[sid].find(function(en) { return en.assessmentId === aid && en.tagId === tid; });

@@ -61,15 +61,15 @@ window.AssignScoring = (function() {
 
   /* ── Points input helpers ─────────────────────────────────── */
   function livePointsUpdate(inp) {
-    var v = parseInt(inp.value); var max = parseInt(inp.dataset.max) || 100;
+    var v = parseInt(inp.value, 10); var max = parseInt(inp.dataset.max, 10) || 100;
     var pctSpan = inp.closest('.score-row').querySelector('.gb-pts-live-pct');
     if (pctSpan) pctSpan.textContent = (!isNaN(v) && v >= 0) ? Math.round(Math.min(v, max) / max * 100) + '%' : '';
   }
 
   function commitPointsScore(inp, activeCourse) {
     var cid = activeCourse; var sid = inp.dataset.sid; var aid = inp.dataset.aid;
-    var max = parseInt(inp.dataset.max) || 100;
-    var val = parseInt(inp.value);
+    var max = parseInt(inp.dataset.max, 10) || 100;
+    var val = parseInt(inp.value, 10);
     var raw = isNaN(val) ? 0 : Math.max(0, Math.min(max, val));
     inp.value = raw > 0 ? raw : '';
     setScore(cid, sid, aid, aid, raw);

@@ -528,7 +528,7 @@ window.AssignForm = (function() {
     var scoreModeVal = (document.getElementById('af-scoremode') || {}).value || 'proficiency';
     if (scoreModeVal === 'points') {
       var mpEl = document.getElementById('af-maxpoints');
-      var mp = parseInt(mpEl ? mpEl.value : 0);
+      var mp = parseInt(mpEl ? mpEl.value : 0, 10);
       if (!mp || mp <= 0 || isNaN(mp)) { if (mpEl) { mpEl.style.border = '2px solid var(--score-1)'; mpEl.focus(); } return; }
       newAssess.scoreMode = 'points'; newAssess.maxPoints = mp;
     }
@@ -577,7 +577,7 @@ window.AssignForm = (function() {
     assessments[idx].successCriteria = undefined;
     var scoreModeVal = (document.getElementById('af-scoremode') || {}).value || 'proficiency';
     if (scoreModeVal === 'points') {
-      var mpEl = document.getElementById('af-maxpoints'); var mp = parseInt(mpEl ? mpEl.value : 0);
+      var mpEl = document.getElementById('af-maxpoints'); var mp = parseInt(mpEl ? mpEl.value : 0, 10);
       if (!mp || mp <= 0 || isNaN(mp)) { if (mpEl) { mpEl.style.border = '2px solid var(--score-1)'; mpEl.focus(); } return; }
       assessments[idx].scoreMode = 'points'; assessments[idx].maxPoints = mp;
     } else { assessments[idx].scoreMode = undefined; assessments[idx].maxPoints = undefined; }

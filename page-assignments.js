@@ -890,7 +890,7 @@ window.PageAssignments = (function() {
     var scoreModeVal = (document.getElementById('af-scoremode') || {}).value || 'proficiency';
     if (scoreModeVal === 'points') {
       var mpEl = document.getElementById('af-maxpoints');
-      var mp = parseInt(mpEl ? mpEl.value : 0);
+      var mp = parseInt(mpEl ? mpEl.value : 0, 10);
       if (!mp || mp <= 0 || isNaN(mp)) { if (mpEl) { mpEl.style.border = '2px solid var(--score-1)'; mpEl.focus(); } return; }
       newAssess.scoreMode = 'points'; newAssess.maxPoints = mp;
     }
@@ -948,7 +948,7 @@ window.PageAssignments = (function() {
     assessments[idx].successCriteria = undefined;
     var scoreModeVal = (document.getElementById('af-scoremode') || {}).value || 'proficiency';
     if (scoreModeVal === 'points') {
-      var mpEl = document.getElementById('af-maxpoints'); var mp = parseInt(mpEl ? mpEl.value : 0);
+      var mpEl = document.getElementById('af-maxpoints'); var mp = parseInt(mpEl ? mpEl.value : 0, 10);
       if (!mp || mp <= 0 || isNaN(mp)) { if (mpEl) { mpEl.style.border = '2px solid var(--score-1)'; mpEl.focus(); } return; }
       assessments[idx].scoreMode = 'points'; assessments[idx].maxPoints = mp;
     } else { assessments[idx].scoreMode = undefined; assessments[idx].maxPoints = undefined; }
@@ -1066,14 +1066,14 @@ window.PageAssignments = (function() {
   }
 
   function livePointsUpdate(inp) {
-    var v = parseInt(inp.value); var max = parseInt(inp.dataset.max) || 100;
+    var v = parseInt(inp.value, 10); var max = parseInt(inp.dataset.max, 10) || 100;
     var pctSpan = inp.closest('.score-row').querySelector('.gb-pts-live-pct');
     if (pctSpan) pctSpan.textContent = (!isNaN(v) && v >= 0) ? Math.round(Math.min(v, max) / max * 100) + '%' : '';
   }
   function commitPointsScore(inp) {
     var cid = activeCourse; var sid = inp.dataset.sid; var aid = inp.dataset.aid;
-    var max = parseInt(inp.dataset.max) || 100;
-    var val = parseInt(inp.value);
+    var max = parseInt(inp.dataset.max, 10) || 100;
+    var val = parseInt(inp.value, 10);
     var raw = isNaN(val) ? 0 : Math.max(0, Math.min(max, val));
     inp.value = raw > 0 ? raw : '';
     setScore(cid, sid, aid, aid, raw);
@@ -1580,7 +1580,7 @@ window.PageAssignments = (function() {
 
   /* ── Advanced settings ──────────────────────────────────── */
   function updateCalc(val) { var cc = getCourseConfig(activeCourse); cc.calcMethod = val; saveCourseConfig(activeCourse, cc); var dr = document.getElementById('decay-row'); if (dr) dr.style.display = val==='decayingAvg'?'flex':'none'; }
-  function updateDecay(val) { var dv = document.getElementById('decay-val'); if (dv) dv.textContent = val+'%'; var cc = getCourseConfig(activeCourse); cc.decayWeight = parseInt(val)/100; saveCourseConfig(activeCourse, cc); }
+  function updateDecay(val) { var dv = document.getElementById('decay-val'); if (dv) dv.textContent = val+'%'; var cc = getCourseConfig(activeCourse); cc.decayWeight = parseInt(val, 10)/100; saveCourseConfig(activeCourse, cc); }
   function renderGradingScaleEditor(cid) {
     var scale = getGradingScale(cid); var b = scale.boundaries; var labels = scale.labels || [null,null,null,null]; var defaultLabels = ['Emerging','Developing','Proficient','Extending'];
     var html = '<div class="settings-title" style="margin-top:16px;padding-top:12px;border-top:0.5px solid var(--divider-subtle)">Grading Scale</div><div style="font-size:0.72rem;color:var(--text-3);margin-bottom:8px">Set % boundaries for points \u2192 proficiency conversion</div><table style="width:100%;border-collapse:collapse;font-size:0.8rem"><thead><tr style="text-align:left;color:var(--text-3);font-size:0.68rem;text-transform:uppercase;letter-spacing:0.04em"><th style="padding:4px 8px;width:40px">Level</th><th style="padding:4px 8px">Label</th><th style="padding:4px 8px;width:70px">Min %</th></tr></thead><tbody>';
@@ -1590,8 +1590,8 @@ window.PageAssignments = (function() {
   }
   function saveGradingScale() {
     var cc = getCourseConfig(activeCourse); var boundaries = []; var labels = [null,null,null,null];
-    document.querySelectorAll('.gs-label').forEach(function(inp) { var prof = parseInt(inp.dataset.prof); labels[prof-1] = inp.value.trim() || null; });
-    DEFAULT_GRADING_SCALE.boundaries.forEach(function(db, i) { var inp = document.querySelector('.gs-min[data-idx="'+i+'"]'); boundaries.push({ min: inp ? Math.max(0, Math.min(99, parseInt(inp.value)||0)) : 0, proficiency: db.proficiency }); });
+    document.querySelectorAll('.gs-label').forEach(function(inp) { var prof = parseInt(inp.dataset.prof, 10); labels[prof-1] = inp.value.trim() || null; });
+    DEFAULT_GRADING_SCALE.boundaries.forEach(function(db, i) { var inp = document.querySelector('.gs-min[data-idx="'+i+'"]'); boundaries.push({ min: inp ? Math.max(0, Math.min(99, parseInt(inp.value, 10)||0)) : 0, proficiency: db.proficiency }); });
     cc.gradingScale = { boundaries: boundaries, labels: labels }; saveCourseConfig(activeCourse, cc);
   }
   function resetGradingScale() { var cc = getCourseConfig(activeCourse); delete cc.gradingScale; saveCourseConfig(activeCourse, cc); render(); }
@@ -1607,7 +1607,7 @@ window.PageAssignments = (function() {
     else { updateCategoryWeights(70); var r = document.getElementById('cw-range'); if (r) r.value = 70; }
   }
   function updateCategoryWeights(summPct) {
-    summPct = Math.max(0, Math.min(100, parseInt(summPct)||0)); var formPct = 100 - summPct;
+    summPct = Math.max(0, Math.min(100, parseInt(summPct, 10)||0)); var formPct = 100 - summPct;
     var sv = document.getElementById('cw-summ-val'); if (sv) sv.textContent = summPct + '%';
     var fv = document.getElementById('cw-form-val'); if (fv) fv.textContent = formPct + '%';
     var cc = getCourseConfig(activeCourse); cc.categoryWeights = { summative: summPct/100, formative: formPct/100 }; saveCourseConfig(activeCourse, cc);
@@ -1782,7 +1782,7 @@ window.PageAssignments = (function() {
       'saveNewAssess':        function() { saveNewAssess(); },
       'saveEditAssess':       function() { saveEditAssess(el.dataset.aid); },
       'toggleModuleFolder':   function() { toggleModuleFolder(el.dataset.uid); },
-      'deleteModule':         function() { deleteModule(el.dataset.uid, parseInt(el.dataset.count)); },
+      'deleteModule':         function() { deleteModule(el.dataset.uid, parseInt(el.dataset.count, 10)); },
       'addModuleInline':      function() { addModuleInline(); },
       'openColorPicker':      function() { el.querySelector('input').click(); },
       'setRubricView':        function() { setRubricView(el.dataset.aid, el.dataset.rubric === 'true'); },
@@ -1813,13 +1813,13 @@ window.PageAssignments = (function() {
         document.querySelectorAll('.tb-dropdown-btn').forEach(function(btn) { btn.classList.add('open'); });
       },
       'clearAssessFilters':   function() { e.preventDefault(); assessFilterType='all'; assessSearch=''; showUngraded=false; render(); },
-      'selectTagLevel':       function() { selectTagLevel(el, parseInt(el.dataset.level), el.dataset.aid, el.dataset.sid, el.dataset.tagid); },
-      'selectRubricScore':    function() { selectRubricScore(el, parseInt(el.dataset.level), el.dataset.aid, el.dataset.sid, el.dataset.critid); },
+      'selectTagLevel':       function() { selectTagLevel(el, parseInt(el.dataset.level, 10), el.dataset.aid, el.dataset.sid, el.dataset.tagid); },
+      'selectRubricScore':    function() { selectRubricScore(el, parseInt(el.dataset.level, 10), el.dataset.aid, el.dataset.sid, el.dataset.critid); },
       'toggleScoreMenu':      function() { toggleScoreMenu(el); },
-      'fillScoresAndClose':   function() { fillScores(el.dataset.aid, el.dataset.sid, parseInt(el.dataset.score), el.dataset.scope); closeMenus(); },
-      'fillRubricScoresAndClose': function() { fillRubricScores(el.dataset.aid, el.dataset.sid, parseInt(el.dataset.score), el.dataset.scope); closeMenus(); },
-      'confirmFillAll':       function() { confirmFillAll(el.dataset.aid, parseInt(el.dataset.score), el.dataset.label); },
-      'confirmFillRubricAll': function() { confirmFillRubricAll(el.dataset.aid, parseInt(el.dataset.score), el.dataset.label); },
+      'fillScoresAndClose':   function() { fillScores(el.dataset.aid, el.dataset.sid, parseInt(el.dataset.score, 10), el.dataset.scope); closeMenus(); },
+      'fillRubricScoresAndClose': function() { fillRubricScores(el.dataset.aid, el.dataset.sid, parseInt(el.dataset.score, 10), el.dataset.scope); closeMenus(); },
+      'confirmFillAll':       function() { confirmFillAll(el.dataset.aid, parseInt(el.dataset.score, 10), el.dataset.label); },
+      'confirmFillRubricAll': function() { confirmFillRubricAll(el.dataset.aid, parseInt(el.dataset.score, 10), el.dataset.label); },
       'toggleStudentStatus':  function() { toggleStudentStatus(el.dataset.aid, el.dataset.sid, el.dataset.status); },
       'openCommentPopover':   function() { openCommentPopover(el.dataset.cid, el.dataset.sid, el.dataset.aid); },
       'closeCommentPopover':  function() { closeCommentPopover(); },
@@ -1834,15 +1834,15 @@ window.PageAssignments = (function() {
       'collabManualPairs':    function() { collabPairMode='manual'; renderCollabPanel(); },
       'collabRandomGroups':   function() { collabGroupMode='random'; collabRandomGroups(); },
       'collabManualGroups':   function() { collabGroupMode='manual'; renderCollabPanel(); },
-      'collabSetGroupCount':  function() { collabSetGroupCount(parseInt(el.dataset.delta)); },
+      'collabSetGroupCount':  function() { collabSetGroupCount(parseInt(el.dataset.delta, 10)); },
       'rubricModalBackdrop':  function() { if (e.target === el) cancelRubricEdit(); },
       'cancelRubricEdit':     function() { cancelRubricEdit(); },
       'saveRubricEdit':       function() { saveRubricEdit(); },
       'addCriterion':         function() { addCriterion(); },
-      'toggleCriterionExpand': function() { toggleCriterionExpand(parseInt(el.dataset.index)); },
-      'removeCriterion':      function() { removeCriterion(parseInt(el.dataset.index)); },
-      'toggleCritTag':        function() { toggleCritTag(parseInt(el.dataset.index), el.dataset.tagid); },
-      'switchCritSection':    function() { switchCritSection(parseInt(el.dataset.index), el.dataset.secid); },
+      'toggleCriterionExpand': function() { toggleCriterionExpand(parseInt(el.dataset.index, 10)); },
+      'removeCriterion':      function() { removeCriterion(parseInt(el.dataset.index, 10)); },
+      'toggleCritTag':        function() { toggleCritTag(parseInt(el.dataset.index, 10), el.dataset.tagid); },
+      'switchCritSection':    function() { switchCritSection(parseInt(el.dataset.index, 10), el.dataset.secid); },
       'resetGradingScale':    function() { resetGradingScale(); },
       'setMaxPoints':         function() { var mp = document.getElementById('af-maxpoints'); if (mp) mp.value = el.dataset.value; document.querySelectorAll('#af-maxpoints-picks .af-chip').forEach(function(c){c.classList.remove('active')}); el.classList.add('active'); }
     };
@@ -1879,8 +1879,8 @@ window.PageAssignments = (function() {
   function _handleBlur(e) {
     var el = e.target;
     if (el.dataset.actionBlur === 'moduleName') { updateModuleName(el.dataset.moduleid, el.value); return; }
-    if (el.dataset.actionBlur === 'critName') { updateCritName(parseInt(el.dataset.critIdx), el.value); return; }
-    if (el.dataset.actionBlur === 'critLevel') { updateCritLevel(parseInt(el.dataset.crit), parseInt(el.dataset.level), el.value); return; }
+    if (el.dataset.actionBlur === 'critName') { updateCritName(parseInt(el.dataset.critIdx, 10), el.value); return; }
+    if (el.dataset.actionBlur === 'critLevel') { updateCritLevel(parseInt(el.dataset.crit, 10), parseInt(el.dataset.level, 10), el.value); return; }
     // Points input commit on blur
     if (el.classList.contains('gb-pts-input')) { commitPointsScore(el); return; }
   }
@@ -1896,7 +1896,7 @@ window.PageAssignments = (function() {
     if (!_kbFocusEl) return;
     var key = e.key;
     if (['1','2','3','4'].includes(key)) {
-      e.preventDefault(); var val = parseInt(key);
+      e.preventDefault(); var val = parseInt(key, 10);
       if (_kbFocusEl.classList.contains('rsg-criterion-row')) { var lvl = _kbFocusEl.querySelector('.l' + val); if (lvl) lvl.click(); }
       navigateKb('down'); return;
     }
@@ -1916,7 +1916,7 @@ window.PageAssignments = (function() {
     var moduleDrag = e.target.closest('[data-module-drag]');
     if (moduleDrag) { onModuleDragStart(e, moduleDrag.dataset.moduleDrag); return; }
     var collabDrag = e.target.closest('[data-collab-drag-sid]');
-    if (collabDrag) { collabDragStart(e, collabDrag.dataset.collabDragSid, parseInt(collabDrag.dataset.collabDragGroup)); return; }
+    if (collabDrag) { collabDragStart(e, collabDrag.dataset.collabDragSid, parseInt(collabDrag.dataset.collabDragGroup, 10)); return; }
   }
   function _handleDragEnd(e) {
     if (_dragAssessId) { onAssessDragEnd(); return; }
@@ -1963,7 +1963,7 @@ window.PageAssignments = (function() {
   function _handleDrop(e) {
     // Module drop zone
     var dropZone = e.target.closest('[data-mod-drop-zone]');
-    if (dropZone && _dragModuleId) { onModuleDropZoneDrop(e, parseInt(dropZone.dataset.dropIndex)); return; }
+    if (dropZone && _dragModuleId) { onModuleDropZoneDrop(e, parseInt(dropZone.dataset.dropIndex, 10)); return; }
     // Assess card merge drop (check before folder — cards are inside folders)
     var cardDrop = e.target.closest('[data-assess-card-drop]');
     if (cardDrop && _mergeAnimating && _mergeTargetId === cardDrop.dataset.assessCardDrop && _dragAssessId && _dragAssessId !== cardDrop.dataset.assessCardDrop) {
@@ -1974,14 +1974,14 @@ window.PageAssignments = (function() {
     if (folderDrop && _dragAssessId) { folderDrop.classList.remove('drag-over'); onFolderDrop(e, folderDrop.dataset.folderDrop); return; }
     // Collab drop
     var collabDropEl = e.target.closest('[data-collab-drop]');
-    if (collabDropEl) { collabDrop(e, parseInt(collabDropEl.dataset.collabDrop)); return; }
+    if (collabDropEl) { collabDrop(e, parseInt(collabDropEl.dataset.collabDrop, 10)); return; }
   }
 
   /* ── Mouseenter/mouseleave for rubric tooltips ──────────── */
   function _handleMouseOver(e) {
     var lvl = e.target.closest('.rsg-level[data-action="selectRubricScore"]');
     if (lvl) {
-      var aid = lvl.dataset.aid; var critid = lvl.dataset.critid; var level = parseInt(lvl.dataset.level);
+      var aid = lvl.dataset.aid; var critid = lvl.dataset.critid; var level = parseInt(lvl.dataset.level, 10);
       if (aid && critid && level) showCritTooltip(e, aid, critid, level);
     }
   }
