@@ -211,6 +211,8 @@ function _broadcastChange(cid, field) {
 let _hadSyncError = false;
 let _retryQueue = [];
 let _retryTimer = null;
+let _retryCount = 0;
+const _MAX_RETRIES = 6;
 
 function _syncToSupabase(table, key, data) {
   _doSync(table, key, data).catch(err => console.error(`Sync error (${table}/${key}):`, err));
@@ -244,7 +246,7 @@ async function _doSync(table, key, data) {
       if (error) throw error;
     }
     _pendingSyncs--;
-    if (_pendingSyncs <= 0) { _pendingSyncs = 0; _syncStatus = 'idle'; }
+    if (_pendingSyncs <= 0) { _pendingSyncs = 0; _syncStatus = 'idle'; _retryCount = 0; }
     _updateSyncIndicator();
     // Show recovery toast if we previously had an error
     if (_hadSyncError && _syncStatus === 'idle') {
@@ -262,19 +264,30 @@ async function _doSync(table, key, data) {
       if (typeof showSyncToast === 'function') showSyncToast('Sync failed \u2014 changes saved locally', 'error');
     }
     _retryQueue.push({ table, key, data });
-    if (!_retryTimer) _retryTimer = setTimeout(_retryFailedSyncs, 10000);
+    if (!_retryTimer) {
+      var delay = Math.min(10000 * Math.pow(2, _retryCount), 300000);
+      _retryTimer = setTimeout(_retryFailedSyncs, delay);
+    }
     throw err;
   }
 }
 
 function _retryFailedSyncs() {
   _retryTimer = null;
+  _retryCount++;
+  if (_retryCount > _MAX_RETRIES) {
+    console.warn('Sync retry limit reached, dropping', _retryQueue.length, 'items');
+    _retryQueue = [];
+    _retryCount = 0;
+    return;
+  }
   const queue = _retryQueue.splice(0);
   queue.forEach(item => _syncToSupabase(item.table, item.key, item.data));
 }
 
 function retrySyncs() {
   clearTimeout(_retryTimer);
+  _retryCount = 0;
   _retryFailedSyncs();
 }
 
