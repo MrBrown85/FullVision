@@ -182,7 +182,7 @@ window.PageAssignments = (function() {
       '<div class="settings-row"><label>Export</label><button class="btn btn-primary" data-action="exportData">JSON</button></div>' +
       '<div class="settings-row"><label>Export Scores</label><button class="btn btn-primary" data-action="exportScoresCSV">Export Scores CSV</button></div>' +
       '<div class="settings-row"><label>Export Summary</label><button class="btn btn-primary" data-action="exportSummaryCSV">Export Summary CSV</button></div>' +
-      '<div class="settings-row"><label>Import</label><input type="file" accept=".json" data-action-change="importDataFile" style="font-size:0.75rem;max-width:150px"></div>' +
+      '<div class="settings-row"><label>Import JSON</label><button class="btn btn-primary" data-action="triggerImportJSON">Import JSON</button><input type="file" id="import-json-input" accept=".json" data-action-change="importDataFile" style="display:none"></div>' +
       '<div class="settings-row"><label>Clear all</label><button class="btn btn-danger" data-action="clearData">Clear</button></div>' +
       '<div class="settings-title" style="margin-top:16px;padding-top:12px;border-top:0.5px solid var(--divider-subtle)">Demo</div>' +
       '<div class="settings-row"><label>Reset to demo data</label><button class="btn btn-danger" data-action="resetDemoData">Reset Demo</button></div>';
@@ -1800,6 +1800,7 @@ window.PageAssignments = (function() {
       'clearFocusStudent':    function() { clearFocusStudent(); },
       'toggleToolbarDropdown': function() { toggleToolbarDropdown(el.dataset.panel); },
       'exportData':           function() { exportData(); },
+      'triggerImportJSON':    function() { var f = document.getElementById('import-json-input'); if (f) f.click(); },
       'exportScoresCSV':      function() { exportScoresCSV(); },
       'exportSummaryCSV':     function() { exportSummaryCSV(); },
       'clearData':            function() { clearData(); },
