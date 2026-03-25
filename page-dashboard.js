@@ -1477,7 +1477,6 @@ window.PageDashboard = (function() {
 
   function cwSelectSubject(subj) {
     cwSelectedSubject = subj;
-    cwSelectedTags = [];
     renderClassManager();
   }
 

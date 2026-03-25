@@ -269,7 +269,6 @@ window.DashCurriculumWizard = (function() {
 
   function cwSelectSubject(subj) {
     cwSelectedSubject = subj;
-    cwSelectedTags = [];
     _renderClassManager();
   }
 
