@@ -1,22 +1,25 @@
 /**
  * Learning map accessor tests — gb-data.js
+ * Uses flat format (1:1 section-to-tag, section.id = tag.id)
  */
 
 const CID = 'test';
 
 const MOCK_MAP = {
+  _flatVersion: 2,
   subjects: [{ id: 'SCI8', name: 'Science 8' }],
   sections: [
     {
-      id: 'sec1', name: 'Questioning', tags: [
-        { id: 't1', label: 'Question and Predict' },
-        { id: 't2', label: 'Plan Investigations' },
-      ],
+      id: 't1', name: 'Questioning', color: '#0891b2', subject: 'SCI8', shortName: 'Questioning',
+      tags: [{ id: 't1', label: 'Question and Predict', color: '#0891b2', subject: 'SCI8', name: 'Questioning', shortName: 'Questioning' }],
     },
     {
-      id: 'sec2', name: 'Processing', tags: [
-        { id: 't3', label: 'Identify Patterns' },
-      ],
+      id: 't2', name: 'Planning', color: '#0891b2', subject: 'SCI8', shortName: 'Planning',
+      tags: [{ id: 't2', label: 'Plan Investigations', color: '#0891b2', subject: 'SCI8', name: 'Planning', shortName: 'Planning' }],
+    },
+    {
+      id: 't3', name: 'Processing', color: '#0891b2', subject: 'SCI8', shortName: 'Processing',
+      tags: [{ id: 't3', label: 'Identify Patterns', color: '#0891b2', subject: 'SCI8', name: 'Processing', shortName: 'Processing' }],
     },
   ],
 };
@@ -28,7 +31,7 @@ beforeEach(() => {
 describe('getSections', () => {
   it('returns sections from learning map', () => {
     const sections = getSections(CID);
-    expect(sections).toHaveLength(2);
+    expect(sections).toHaveLength(3);
     expect(sections[0].name).toBe('Questioning');
   });
 
@@ -71,9 +74,10 @@ describe('getTagById', () => {
 });
 
 describe('getSectionForTag', () => {
-  it('returns section containing the tag', () => {
+  it('returns section containing the tag (section.id = tag.id in flat format)', () => {
     const section = getSectionForTag(CID, 't3');
-    expect(section.id).toBe('sec2');
+    expect(section.id).toBe('t3');
+    expect(section.name).toBe('Processing');
   });
 
   it('returns undefined for tag not in any section', () => {
