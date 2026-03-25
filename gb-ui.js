@@ -349,7 +349,7 @@ function refreshSidebar() {
           const hrefStr = sel.getAttribute('href') || '';
           const qIdx = hrefStr.indexOf('?');
           if (qIdx >= 0) { selId = new URLSearchParams(hrefStr.substring(qIdx + 1)).get('id'); }
-        } catch {}
+        } catch (e) { console.warn('Sidebar href parse error:', e); }
       }
     }
   }
@@ -358,7 +358,7 @@ function refreshSidebar() {
 
 /* ── Collapsible sidebar (shared across all pages) ─────────── */
 let _sidebarVisible = true;
-try { _sidebarVisible = localStorage.getItem('gb-sidebar-vis') !== 'false'; } catch {}
+try { _sidebarVisible = localStorage.getItem('gb-sidebar-vis') !== 'false'; } catch (e) { console.warn('Sidebar state read error:', e); }
 
 function toggleSidebar() {
   _sidebarVisible = !_sidebarVisible;

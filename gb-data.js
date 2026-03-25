@@ -466,14 +466,14 @@ function _safeParseLS(key, fallback) {
     const raw = localStorage.getItem(key);
     if (raw === null) return fallback;
     return JSON.parse(raw);
-  } catch { return fallback; }
+  } catch (e) { console.warn('LS read fallback:', e); return fallback; }
 }
 
 function _loadCoursesFromLS() {
   try {
     const stored = JSON.parse(localStorage.getItem('gb-courses'));
     if (stored && Object.keys(stored).length > 0) return stored;
-  } catch {}
+  } catch (e) { console.warn('Courses parse error:', e); }
   return structuredClone(DEFAULT_COURSES);
 }
 
@@ -800,7 +800,7 @@ function getLearningMap(cid) {
   try {
     const custom = JSON.parse(localStorage.getItem('gb-learningmap-' + cid));
     if (custom && custom._customized) return custom;
-  } catch {}
+  } catch (e) { console.warn('LearningMap parse error:', e); }
   return LEARNING_MAP[cid] || { subjects: [], sections: [] };
 }
 function saveLearningMap(cid, map) {
@@ -826,7 +826,7 @@ function ensureCustomLearningMap(cid) {
       _cache.learningMaps[cid] = ls;
       return ls;
     }
-  } catch {}
+  } catch (e) { console.warn('LearningMap cache fallback:', e); }
   const clone = structuredClone(LEARNING_MAP[cid] || { subjects: [], sections: [] });
   clone._customized = true;
   clone._version = 1;
@@ -845,7 +845,7 @@ function getModules(cid) {
       if (data) { localStorage.setItem('gb-modules-' + cid, JSON.stringify(data)); localStorage.removeItem('gb-units-' + cid); }
     }
     return data || [];
-  } catch { return []; }
+  } catch (e) { console.warn('Modules parse fallback:', e); return []; }
 }
 function saveModules(cid, arr) { _saveCourseField('modules', cid, arr); }
 function getModuleById(cid, moduleId) { return getModules(cid).find(u => u.id === moduleId); }
@@ -853,7 +853,7 @@ function getModuleById(cid, moduleId) { return getModules(cid).find(u => u.id ==
 /* ── Assignment Statuses (excused / not-submitted) ─────────── */
 function getAssignmentStatuses(cid) {
   if (_cache.statuses[cid] !== undefined) return _cache.statuses[cid];
-  try { return JSON.parse(localStorage.getItem('gb-statuses-' + cid)) || {}; } catch { return {}; }
+  try { return JSON.parse(localStorage.getItem('gb-statuses-' + cid)) || {}; } catch (e) { console.warn('Statuses parse fallback:', e); return {}; }
 }
 function saveAssignmentStatuses(cid, obj) { _saveCourseField('statuses', cid, obj); }
 function getAssignmentStatus(cid, sid, aid) { return getAssignmentStatuses(cid)[sid + ':' + aid] || null; }
@@ -867,7 +867,7 @@ function setAssignmentStatus(cid, sid, aid, status) {
 /* ── Rubrics ───────────────────────────────────────────────── */
 function getRubrics(cid) {
   if (_cache.rubrics[cid] !== undefined) return _cache.rubrics[cid];
-  try { return JSON.parse(localStorage.getItem('gb-rubrics-' + cid)) || []; } catch { return []; }
+  try { return JSON.parse(localStorage.getItem('gb-rubrics-' + cid)) || []; } catch (e) { console.warn('Rubrics parse fallback:', e); return []; }
 }
 function saveRubrics(cid, arr) { _saveCourseField('rubrics', cid, arr); }
 function getRubricById(cid, rubricId) { return getRubrics(cid).find(r => r.id === rubricId); }
@@ -891,7 +891,7 @@ function getSectionForTag(cid, tagId) { return getSections(cid).find(s => s.tags
    ══════════════════════════════════════════════════════════════════ */
 function getConfig() {
   if (_cache.config !== null) return _cache.config;
-  try { return JSON.parse(localStorage.getItem('gb-config'))||{}; } catch { return {}; }
+  try { return JSON.parse(localStorage.getItem('gb-config'))||{}; } catch (e) { console.warn('Config parse fallback:', e); return {}; }
 }
 function saveConfig(obj) {
   _cache.config = obj;
@@ -903,27 +903,27 @@ function saveConfig(obj) {
 }
 function getCourseConfig(cid) {
   if (_cache.courseConfigs[cid] !== undefined) return _cache.courseConfigs[cid];
-  try { return JSON.parse(localStorage.getItem('gb-courseconfig-'+cid))||{}; } catch { return {}; }
+  try { return JSON.parse(localStorage.getItem('gb-courseconfig-'+cid))||{}; } catch (e) { console.warn('CourseConfig parse fallback:', e); return {}; }
 }
 function saveCourseConfig(cid, obj) { _saveCourseField('courseConfigs', cid, obj); }
 function getStudents(cid) {
   if (_cache.students[cid] !== undefined) return _cache.students[cid];
-  try { return (JSON.parse(localStorage.getItem('gb-students-'+cid))||[]).map(migrateStudent); } catch { return []; }
+  try { return (JSON.parse(localStorage.getItem('gb-students-'+cid))||[]).map(migrateStudent); } catch (e) { console.warn('Students parse fallback:', e); return []; }
 }
 function saveStudents(cid, arr) { _saveCourseField('students', cid, arr); }
 function getAssessments(cid) {
   if (_cache.assessments[cid] !== undefined) return _cache.assessments[cid];
-  try { return JSON.parse(localStorage.getItem('gb-assessments-'+cid))||[]; } catch { return []; }
+  try { return JSON.parse(localStorage.getItem('gb-assessments-'+cid))||[]; } catch (e) { console.warn('Assessments parse fallback:', e); return []; }
 }
 function saveAssessments(cid, arr) { _saveCourseField('assessments', cid, arr); }
 function getOverrides(cid) {
   if (_cache.overrides[cid] !== undefined) return _cache.overrides[cid];
-  try { return JSON.parse(localStorage.getItem('gb-overrides-'+cid))||{}; } catch { return {}; }
+  try { return JSON.parse(localStorage.getItem('gb-overrides-'+cid))||{}; } catch (e) { console.warn('Overrides parse fallback:', e); return {}; }
 }
 function saveOverrides(cid, obj) { _saveCourseField('overrides', cid, obj); }
 function getNotes(cid) {
   if (_cache.notes[cid] !== undefined) return _cache.notes[cid];
-  try { return JSON.parse(localStorage.getItem('gb-notes-'+cid))||{}; } catch { return {}; }
+  try { return JSON.parse(localStorage.getItem('gb-notes-'+cid))||{}; } catch (e) { console.warn('Notes parse fallback:', e); return {}; }
 }
 function saveNotes(cid, obj) { _saveCourseField('notes', cid, obj); }
 
@@ -935,7 +935,7 @@ function saveNotes(cid, obj) { _saveCourseField('notes', cid, obj); }
 */
 function getScores(cid) {
   if (_cache.scores[cid] !== undefined) return _cache.scores[cid];
-  try { return JSON.parse(localStorage.getItem('gb-scores-'+cid))||{}; } catch { return {}; }
+  try { return JSON.parse(localStorage.getItem('gb-scores-'+cid))||{}; } catch (e) { console.warn('Scores parse fallback:', e); return {}; }
 }
 function saveScores(cid, obj) { _saveCourseField('scores', cid, obj); }
 
@@ -975,7 +975,7 @@ function setActiveCourse(cid) { saveConfig({ ...getConfig(), activeCourse: cid }
 /* ── Flags ──────────────────────────────────────────────────── */
 function getFlags(cid) {
   if (_cache.flags[cid] !== undefined) return _cache.flags[cid];
-  try { return JSON.parse(localStorage.getItem('gb-flags-'+cid))||{}; } catch { return {}; }
+  try { return JSON.parse(localStorage.getItem('gb-flags-'+cid))||{}; } catch (e) { console.warn('Flags parse fallback:', e); return {}; }
 }
 function saveFlags(cid, obj) { _saveCourseField('flags', cid, obj); }
 function isStudentFlagged(cid, sid) { return !!getFlags(cid)[sid]; }
@@ -988,20 +988,20 @@ function toggleFlag(cid, sid) {
 /* ── Goals & Reflections Storage ───────────────────────────── */
 function getGoals(cid) {
   if (_cache.goals[cid] !== undefined) return _cache.goals[cid];
-  try { return JSON.parse(localStorage.getItem('gb-goals-'+cid))||{}; } catch { return {}; }
+  try { return JSON.parse(localStorage.getItem('gb-goals-'+cid))||{}; } catch (e) { console.warn('Goals parse fallback:', e); return {}; }
 }
 function saveGoals(cid, obj) { _saveCourseField('goals', cid, obj); }
 
 function getReflections(cid) {
   if (_cache.reflections[cid] !== undefined) return _cache.reflections[cid];
-  try { return JSON.parse(localStorage.getItem('gb-reflections-'+cid))||{}; } catch { return {}; }
+  try { return JSON.parse(localStorage.getItem('gb-reflections-'+cid))||{}; } catch (e) { console.warn('Reflections parse fallback:', e); return {}; }
 }
 function saveReflections(cid, obj) { _saveCourseField('reflections', cid, obj); }
 
 /* ── Quick Observations — in-the-moment capture ─────────── */
 function getQuickObs(cid) {
   if (_cache.observations[cid] !== undefined) return _cache.observations[cid];
-  try { return JSON.parse(localStorage.getItem('gb-quick-obs-'+cid))||{}; } catch { return {}; }
+  try { return JSON.parse(localStorage.getItem('gb-quick-obs-'+cid))||{}; } catch (e) { console.warn('Observations parse fallback:', e); return {}; }
 }
 function saveQuickObs(cid, obj) { _saveCourseField('observations', cid, obj); }
 
@@ -1060,7 +1060,7 @@ function hasAssignmentFeedback(cid, sid, assessId) {
 /* ── Custom Tags — user-defined observation tags ─────────── */
 function getCustomTags(cid) {
   if (_cache.customTags[cid] !== undefined) return _cache.customTags[cid];
-  try { return JSON.parse(localStorage.getItem('gb-custom-tags-'+cid))||[]; } catch { return []; }
+  try { return JSON.parse(localStorage.getItem('gb-custom-tags-'+cid))||[]; } catch (e) { console.warn('CustomTags parse fallback:', e); return []; }
 }
 function saveCustomTags(cid, arr) { _saveCourseField('customTags', cid, arr); }
 function addCustomTag(cid, label) {
@@ -1095,7 +1095,7 @@ function resolveTag(tagStr) {
 /* ── Term Ratings — end-of-term learner profile ─────────── */
 function getTermRatings(cid) {
   if (_cache.termRatings[cid] !== undefined) return _cache.termRatings[cid];
-  try { return JSON.parse(localStorage.getItem('gb-term-ratings-'+cid))||{}; } catch { return {}; }
+  try { return JSON.parse(localStorage.getItem('gb-term-ratings-'+cid))||{}; } catch (e) { console.warn('TermRatings parse fallback:', e); return {}; }
 }
 function saveTermRatings(cid, obj) { _saveCourseField('termRatings', cid, obj); }
 
@@ -1126,7 +1126,7 @@ function upsertTermRating(cid, sid, termId, data) {
 /* ── Report Config ─────────────────────────────────────────── */
 function getReportConfig(cid) {
   if (_cache.reportConfig[cid] !== undefined) return _cache.reportConfig[cid];
-  try { return JSON.parse(localStorage.getItem('gb-report-config-'+cid)) || null; } catch { return null; }
+  try { return JSON.parse(localStorage.getItem('gb-report-config-'+cid)) || null; } catch (e) { console.warn('ReportConfig parse fallback:', e); return null; }
 }
 function saveReportConfig(cid, config) { _saveCourseField('reportConfig', cid, config); }
 
