@@ -732,6 +732,7 @@ th.gb-group-alt { background-color: rgba(0,0,0,0.03); }
 
 /* Header hover: highlight entire column */
 .gb-grid-colhead.gb-col-hover { background:var(--active-light) !important; }
+.gb-grid-colhead.gb-col-hover .gb-grid-colhead-fill { opacity:0.25; }
 .gb-scores-cell.gb-col-hover { background:var(--active-light) !important; }
 
 /* Text size controls */
