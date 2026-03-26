@@ -143,6 +143,12 @@
    * @returns {void}
    */
   window.requireAuth = async function() {
+    // Dev mode: bypass auth on localhost with ?dev=1
+    if (location.hostname === 'localhost' && new URLSearchParams(location.search).get('dev') === '1') {
+      window.getCurrentUser = async () => ({ id: 'dev-user', email: 'dev@localhost', user_metadata: { display_name: 'Dev Teacher' } });
+      window.isLoggedIn = async () => true;
+      return;
+    }
     // Auth check
     const sb = getSupabase();
     if (!sb) { window.location.href = 'login.html'; return new Promise(function() {}); }

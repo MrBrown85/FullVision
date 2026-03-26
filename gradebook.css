@@ -576,7 +576,7 @@ th.gb-group-alt { background-color: rgba(0,0,0,0.03); }
 }
 
 .gb-scores-table {
-  border-collapse:collapse; width:100%; font-family:var(--font-base);
+  border-collapse:collapse; width:max-content; font-family:var(--font-base);
   font-size:var(--text-sm);
 }
 .gb-scores-table th, .gb-scores-table td {
