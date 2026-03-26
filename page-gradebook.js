@@ -310,15 +310,15 @@ window.PageGradebook = (function() {
       if (!cols.length) return;
       var innerRect = inner.getBoundingClientRect();
       var colW = cols[0].getBoundingClientRect().width;
-      // Account for horizontal scroll offset
-      var scrollLeft = colheads.scrollLeft || 0;
-      var mouseX = e.clientX - innerRect.left + scrollLeft;
+      // innerRect.left already accounts for scroll — no scrollLeft needed
+      var mouseX = e.clientX - innerRect.left;
       var mouseY = e.clientY - innerRect.top;
       var containerH = innerRect.height;
-      // Skew correction: skewX(-45deg) shifts content LEFT as you go up
-      // To undo: add height-from-bottom to mouseX
+      // Skew correction: skewX(-45deg) with transform-origin:bottom-right
+      // shifts fill RIGHT as you go up. At height h from bottom, column i's
+      // fill spans [i*colW + h, (i+1)*colW + h]. To find column index:
       var hFromBottom = containerH - mouseY;
-      var adjustedX = mouseX + hFromBottom;
+      var adjustedX = mouseX - hFromBottom;
       var idx = Math.floor(adjustedX / colW);
       if (idx < 0 || idx >= cols.length) {
         if (_hoveredColIdx >= 0) hideColTooltip();
