@@ -1,4 +1,4 @@
-/* gb-calc.js — Proficiency calculation engine for TeacherDashboard */
+/* gb-calc.js — Proficiency calculation engine for FullVision */
 
 /**
  * @typedef {Object} Score

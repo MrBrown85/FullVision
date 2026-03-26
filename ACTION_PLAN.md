@@ -1,4 +1,4 @@
-# TeacherDashboard — Action Plan
+# FullVision — Action Plan
 
 Based on full codebase audit (March 2026). Issues organized by priority.
 

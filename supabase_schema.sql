@@ -1,4 +1,4 @@
--- TeacherDashboard Schema
+-- FullVision Schema
 -- Tables for the gradebook app
 
 -- Enable UUID generation

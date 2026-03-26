@@ -1,5 +1,5 @@
 -- ============================================================
--- TeacherDashboard — Complete Database Schema
+-- FullVision — Complete Database Schema
 -- ============================================================
 -- Target: Supabase (PostgreSQL) in ca-central-1 (Montreal)
 --         Required for FOIPPA compliance with BC student data.

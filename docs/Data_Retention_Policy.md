@@ -1,6 +1,6 @@
 # Data Retention Policy
 
-**Application:** TeacherDashboard — Standards-Based Gradebook
+**Application:** FullVision — Learning Profile Builder and Communicator
 **Developer:** Colin Brown (brown_colin@surreyschools.ca)
 **District:** Surrey School District
 **Date:** March 22, 2026
@@ -10,7 +10,7 @@
 
 ## 1. Purpose
 
-This policy defines how long student and teacher data is retained within TeacherDashboard, when data is deleted, and how teachers can manage their own data. It is designed to meet BC records retention requirements while respecting the privacy rights of students and teachers under FOIPPA.
+This policy defines how long student and teacher data is retained within FullVision, when data is deleted, and how teachers can manage their own data. It is designed to meet BC records retention requirements while respecting the privacy rights of students and teachers under FOIPPA.
 
 ---
 

@@ -1,10 +1,10 @@
 # Architecture Guide
 
-Technical reference for developers working on TeacherDashboard.
+Technical reference for developers working on FullVision.
 
 ## Overview
 
-TeacherDashboard is a single-page application (SPA) built with vanilla JavaScript. There is no framework, no build step, and no module bundler. Scripts are loaded via `<script>` tags in `app.html` in dependency order, and each module attaches itself to `window`.
+FullVision is a single-page application (SPA) built with vanilla JavaScript. There is no framework, no build step, and no module bundler. Scripts are loaded via `<script>` tags in `app.html` in dependency order, and each module attaches itself to `window`.
 
 The app uses a **cache-through data pattern**: all reads are synchronous from an in-memory cache, and all writes update the cache immediately then sync to Supabase in the background.
 

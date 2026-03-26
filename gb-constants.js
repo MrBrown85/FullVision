@@ -1,4 +1,4 @@
-/* gb-constants.js — Shared constants for TeacherDashboard */
+/* gb-constants.js — Shared constants for FullVision */
 
 /**
  * @typedef {Object} Course

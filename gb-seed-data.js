@@ -1,4 +1,4 @@
-/* gb-seed-data.js — Demo seed data for TeacherDashboard (extracted from gb-common.js) */
+/* gb-seed-data.js — Demo seed data for FullVision (extracted from gb-common.js) */
 
 function seedIfNeeded() {
   // Don't re-seed if user deliberately deleted all data

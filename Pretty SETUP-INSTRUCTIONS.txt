@@ -1,4 +1,4 @@
-SETUP INSTRUCTIONS — TeacherDashboard
+SETUP INSTRUCTIONS — FullVision
 ======================================
 Come back to this when you're ready to install Node.js and run the code formatting tools.
 
@@ -16,7 +16,7 @@ Verify it worked:
 
 STEP 2: Install project dependencies
 -------------------------------------
-  cd ~/TeacherDashboard
+  cd ~/FullVision
   npm install
 
 This reads package.json and installs Prettier (the code formatter) and Vitest (the test runner).

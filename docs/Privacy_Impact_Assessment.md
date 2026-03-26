@@ -1,6 +1,6 @@
 # Privacy Impact Assessment
 
-**Application:** TeacherDashboard — Standards-Based Gradebook
+**Application:** FullVision — Learning Profile Builder and Communicator
 **Developer:** Colin Brown (brown_colin@surreyschools.ca)
 **District:** Surrey School District
 **Date:** March 22, 2026
@@ -10,7 +10,7 @@
 
 ## 1. Project Overview
 
-TeacherDashboard is a web-based, standards-based gradebook designed for teachers in British Columbia. It allows teachers to record student achievement against BC curriculum competencies, track learner dispositions, and generate reports aligned with BC's proficiency-based reporting requirements.
+FullVision is a web-based learning profile builder and communicator designed for teachers in British Columbia. It allows teachers to record student achievement against BC curriculum competencies, track learner dispositions, and generate reports aligned with BC's proficiency-based reporting requirements.
 
 **Purpose:** To provide BC teachers with a simple, purpose-built tool for standards-based assessment and reporting, replacing ad hoc spreadsheets and paper records.
 
@@ -180,7 +180,7 @@ Every database table enforces Row-Level Security policies at the database level.
 
 ## 8. Data Sharing
 
-**TeacherDashboard does not share data with any third party.**
+**FullVision does not share data with any third party.**
 
 | Sharing Scenario | Status |
 |---|---|
@@ -219,7 +219,7 @@ All personal information is stored and accessed in Canada. The database is hoste
 
 ### Accessibility
 
-TeacherDashboard is designed to meet WCAG 2.1 Level AA accessibility standards, including:
+FullVision is designed to meet WCAG 2.1 Level AA accessibility standards, including:
 
 - Keyboard navigation support
 - Semantic HTML for screen reader compatibility

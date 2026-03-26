@@ -1,4 +1,4 @@
-/* gb-supabase.js — Supabase authentication layer for TeacherDashboard */
+/* gb-supabase.js — Supabase authentication layer for FullVision */
 
 (function() {
   'use strict';

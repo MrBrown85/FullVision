@@ -1,6 +1,6 @@
 # Breach Notification Procedure
 
-**Application:** TeacherDashboard — Standards-Based Gradebook
+**Application:** FullVision — Learning Profile Builder and Communicator
 **Developer:** Colin Brown (brown_colin@surreyschools.ca)
 **District:** Surrey School District
 **Date:** March 22, 2026
@@ -166,7 +166,7 @@ Within 30 days of the breach, conduct a post-incident review that includes:
 |---|---|
 | **Name** | Colin Brown |
 | **Email** | brown_colin@surreyschools.ca |
-| **Role** | Developer and maintainer of TeacherDashboard |
+| **Role** | Developer and maintainer of FullVision |
 
 ### Supabase Security
 

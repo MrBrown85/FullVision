@@ -25,7 +25,7 @@ Both should print a version number.
 ## Step 2: Install project dependencies
 
 ```bash
-cd ~/TeacherDashboard
+cd ~/FullVision
 npm install
 ```
 
@@ -70,8 +70,8 @@ If you want the GitHub Actions CI pipeline to work:
 1. Create a repo on GitHub (private is fine)
 2. Push your code:
 ```bash
-cd ~/TeacherDashboard
-git remote add origin https://github.com/YOUR_USERNAME/TeacherDashboard.git
+cd ~/FullVision
+git remote add origin https://github.com/YOUR_USERNAME/FullVision.git
 git add -A
 git commit -m "Initial commit"
 git push -u origin main
