@@ -131,7 +131,7 @@ window.PageAssignments = (function() {
         '<input class="assess-search-input" type="text" placeholder="Search\u2026" value="' + esc(assessSearch) + '" data-action-input="assessSearch" aria-label="Search assessments">' +
       '</div>' +
       '<div class="assess-seg-control" style="margin-left:4px">' +
-        '<button class="assess-seg-btn' + ((focusStudentId ? (_allExpanded && _collapsedIds.size===0) : false) ? ' active' : '') + '" data-action="expandAllAssess">Expand</button>' +
+        '<button class="assess-seg-btn' + ((focusStudentId ? (_allExpanded && _collapsedIds.size===0) : (openAssessIds.size > 0 && openAssessIds.size >= getAssessments(activeCourse).length)) ? ' active' : '') + '" data-action="expandAllAssess">Expand</button>' +
         '<button class="assess-seg-btn' + ((focusStudentId ? (!_allExpanded && openAssessIds.size===0) : openAssessIds.size===0) ? ' active' : '') + '" data-action="collapseAllAssess">Collapse</button>' +
       '</div>' +
       (focusStudentId ? '<button class="tb-action-btn tb-show-all-btn" data-action="clearFocusStudent">Show All Students</button>' : '') +
