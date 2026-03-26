@@ -428,7 +428,7 @@ th.gb-group-alt { background-color: rgba(0,0,0,0.03); }
 }
 
 /* Score-only columns: neutral background so column reads as continuous */
-.gb-colhead-score-only { background:var(--bg); }
+/* Score-only columns use the same skewed fill as competency columns, just in gray */
 
 /* Hover card tooltip (appended to body to escape overflow:hidden) */
 .gb-colhead-hover-card {

@@ -647,7 +647,7 @@ window.PageGradebook = (function() {
       var maxPts = isScoreOnly ? ' / ' + (a.maxPoints || 100) : '';
       var tagSecs = (a.tagIds || []).map(function(tid) { return getSectionForTag(cid, tid); }).filter(Boolean);
       var stripeColor = tagSecs.length > 0 ? tagSecs[0].color : 'var(--border)';
-      var fillColor = isScoreOnly ? 'transparent' : stripeColor;
+      var fillColor = isScoreOnly ? 'var(--text-3)' : stripeColor;
       var stripeBottom = isScoreOnly ? 'var(--border)' : stripeColor;
       var tagNames = (a.tagIds||[]).map(function(tid) { var t = getTagById(cid, tid); return t ? t.text || t.id : tid; });
       var secNames = tagSecs.map(function(s) { return s.name; }).filter(function(v, i, arr) { return arr.indexOf(v) === i; });
