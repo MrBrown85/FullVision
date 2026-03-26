@@ -484,7 +484,7 @@ function _safeParseLS(key, fallback) {
 
 function _safeLSSet(key, value) {
   try {
-    _safeLSSet(key, value);
+    localStorage.setItem(key, value);
   } catch (e) {
     console.warn('localStorage write failed (' + key + '):', e);
   }
