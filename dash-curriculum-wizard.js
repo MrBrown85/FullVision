@@ -21,6 +21,55 @@ window.DashCurriculumWizard = (function() {
   var cwCollapsedGroups = {};      // groupId -> bool
   var CW_GROUP_COLORS = ['#6366f1','#06b6d4','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316','#64748b'];
 
+  // Drag-and-drop for competencies between group folders in wizard step 3
+  var _cwDragCompId = null;
+  (function initCwCompDrag() {
+    document.addEventListener('dragstart', function(e) {
+      var card = e.target.closest && e.target.closest('.cm-std-card[data-comp-drag]');
+      if (!card) return;
+      _cwDragCompId = card.dataset.compDrag;
+      card.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', _cwDragCompId);
+    });
+    document.addEventListener('dragover', function(e) {
+      if (!_cwDragCompId) return;
+      var folder = e.target.closest && e.target.closest('.mod-folder[data-folder-drop]');
+      if (!folder) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      document.querySelectorAll('.mod-folder.drag-over').forEach(function(f) { f.classList.remove('drag-over'); });
+      folder.classList.add('drag-over');
+      if (!folder.classList.contains('open')) folder.classList.add('open');
+    });
+    document.addEventListener('dragleave', function(e) {
+      if (!_cwDragCompId) return;
+      var folder = e.target.closest && e.target.closest('.mod-folder[data-folder-drop]');
+      if (folder && !folder.contains(e.relatedTarget)) folder.classList.remove('drag-over');
+    });
+    document.addEventListener('drop', function(e) {
+      if (!_cwDragCompId) return;
+      var folder = e.target.closest && e.target.closest('.mod-folder[data-folder-drop]');
+      if (!folder) return;
+      e.preventDefault();
+      var targetGroupId = folder.dataset.folderDrop;
+      if (targetGroupId === '__none__') {
+        delete cwSectionGroupMap[_cwDragCompId];
+      } else {
+        cwSectionGroupMap[_cwDragCompId] = targetGroupId;
+      }
+      _cwDragCompId = null;
+      document.querySelectorAll('.mod-folder.drag-over').forEach(function(f) { f.classList.remove('drag-over'); });
+      document.querySelectorAll('.cm-std-card.dragging').forEach(function(c) { c.classList.remove('dragging'); });
+      _renderClassManager();
+    });
+    document.addEventListener('dragend', function() {
+      _cwDragCompId = null;
+      document.querySelectorAll('.mod-folder.drag-over').forEach(function(f) { f.classList.remove('drag-over'); });
+      document.querySelectorAll('.cm-std-card.dragging').forEach(function(c) { c.classList.remove('dragging'); });
+    });
+  })();
+
   /* ── State accessors ─────────────────────────────────────── */
   function getState() {
     return {
@@ -569,9 +618,9 @@ window.DashCurriculumWizard = (function() {
           });
         }
         // Add custom sections from step 3
-        cwCustomSections.forEach(function(cs) {
+        cwCustomSections.forEach(function(cs, ci) {
           var sub = (map.subjects && map.subjects[0]) ? map.subjects[0].id : '';
-          var color = (map.subjects && map.subjects[0]) ? map.subjects[0].color : '#6366f1';
+          var color = cs.color || CW_GROUP_COLORS[ci % CW_GROUP_COLORS.length];
           var sec = {
             id: cs.id, subject: sub, name: cs.label, shortName: cs.label,
             color: color, _custom: true,

@@ -491,10 +491,11 @@
 
 .cm-detail { overflow-y:auto; padding:20px 24px; background:var(--bg); }
 .cm-detail-inner {
-  display:grid; grid-template-columns:1fr 1fr; gap:16px;
-  max-width:1200px;
+  display:grid; grid-template-columns:1fr 2fr; gap:16px;
+  max-width:1400px;
 }
 .cm-col { display:flex; flex-direction:column; gap:16px; min-width:0; }
+.cm-col-curriculum { display:flex; flex-direction:column; gap:16px; min-width:0; align-self:start; }
 .cm-actions-row, .cm-danger-zone { grid-column: 1 / -1; }
 
 .cm-section {

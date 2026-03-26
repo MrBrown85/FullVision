@@ -1239,12 +1239,7 @@ window.PageDashboard = (function() {
     '<div id="cm-import-preview"></div>' +
     '</div>';
 
-    html += '</div>'; // close left column
-
-    // RIGHT COLUMN: Grading + Curriculum
-    html += '<div class="cm-col">';
-
-    // Section 3: Grading & Calculation
+    // Section 3: Grading & Calculation (still in left column)
     var gs = course.gradingSystem || 'proficiency';
     html += '<div class="cm-section">' +
       '<div class="cm-section-title">Grading &amp; Calculation</div>' +
@@ -1304,10 +1299,13 @@ window.PageDashboard = (function() {
       '</div>' +
     '</div>';
 
-    html += '</div>'; // close right column
+    html += '</div>'; // close left column
 
-    // Section 3: Curriculum -- Subjects (full width)
-    html += '<div class="cm-section" style="grid-column:1/-1">' +
+    // RIGHT COLUMN: Curriculum
+    html += '<div class="cm-col-curriculum">';
+
+    // Curriculum -- Subjects
+    html += '<div class="cm-section">' +
       '<div class="cm-section-title">Curriculum</div>' +
       '<div class="cm-field">' +
         '<label class="cm-label">Subjects</label>';
@@ -1397,7 +1395,7 @@ window.PageDashboard = (function() {
 
     // Section 4: BC Curriculum Link
     var linkedTags = course.curriculumTags || [];
-    html += '<div class="cm-section" style="grid-column:1/-1">' +
+    html += '<div class="cm-section">' +
       '<div class="cm-section-title">BC Curriculum Link</div>';
     if (linkedTags.length > 0) {
       linkedTags.forEach(function(tag) {
@@ -1414,6 +1412,8 @@ window.PageDashboard = (function() {
         '<button class="cm-relink-btn" data-action="cmStartRelink" data-cid="' + cid + '">Link to BC Curriculum</button>';
     }
     html += '</div>';
+
+    html += '</div>'; // close right column (cm-col-curriculum)
 
     // Actions row
     var isArchived = cc.archived || false;
