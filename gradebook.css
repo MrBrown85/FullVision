@@ -393,7 +393,7 @@ th.gb-group-alt { background-color: rgba(0,0,0,0.03); }
 }
 .gb-grid-colheads-inner { display:flex; position:relative; }
 .gb-grid-colhead {
-  flex:0 0 48px; width:48px; height:140px;
+  flex:0 0 48px; width:48px; height:200px;
   position:relative; display:flex; flex-direction:column;
   /* Right border tilted 45° via pseudo-element */
   border-right:none;
@@ -407,12 +407,12 @@ th.gb-group-alt { background-color: rgba(0,0,0,0.03); }
   flex:1; position:relative; overflow:visible;
 }
 .gb-grid-colhead .gb-scores-assess-name {
-  position:absolute; bottom:20px; left:24px;
+  position:absolute; bottom:20px; left:14px;
   transform-origin:bottom left; transform:rotate(-45deg);
   white-space:nowrap; text-align:left;
 }
 .gb-grid-colhead .gb-scores-assess-meta {
-  position:absolute; bottom:4px; left:24px;
+  position:absolute; bottom:4px; left:14px;
   transform-origin:bottom left; transform:rotate(-45deg);
   white-space:nowrap; text-align:left;
 }
@@ -437,17 +437,15 @@ th.gb-group-alt { background-color: rgba(0,0,0,0.03); }
 .gb-colhead-score-only { background:var(--bg); }
 .gb-colhead-score-only::after { border-right-color:var(--border); }
 
-/* Hover card overlay on column headers */
+/* Hover card tooltip (appended to body to escape overflow:hidden) */
 .gb-colhead-hover-card {
-  display:none; position:absolute; z-index:100;
-  top:100%; left:50%; transform:translateX(-50%);
+  display:none; position:fixed; z-index:10000;
+  transform:translateX(-50%);
   background:var(--surface); border:1px solid var(--border);
   border-radius:var(--radius); padding:10px 12px;
   box-shadow:var(--shadow-lg); min-width:180px; max-width:260px;
   text-align:left; white-space:normal; pointer-events:none;
 }
-.gb-grid-colhead:hover .gb-colhead-hover-card { display:block; }
-.gb-grid-colhead:active .gb-colhead-hover-card { display:none; }
 .gb-hover-title {
   font-weight:700; font-size:var(--text-sm); color:var(--text);
   margin-bottom:6px; line-height:1.3;
