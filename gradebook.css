@@ -395,23 +395,18 @@ th.gb-group-alt { background-color: rgba(0,0,0,0.03); }
 .gb-grid-colhead {
   flex:0 0 48px; width:48px; height:200px;
   position:relative; display:flex; flex-direction:column;
-  /* Right border tilted 45° via pseudo-element */
   border-right:none;
-}
-.gb-grid-colhead::after {
-  content:''; position:absolute; top:auto; right:0; bottom:0; height:4px; width:0;
-  border-right:0.5px solid var(--divider-subtle);
 }
 .gb-grid-colhead-text {
   flex:1; position:relative; overflow:visible;
 }
 .gb-grid-colhead .gb-scores-assess-name {
-  position:absolute; bottom:20px; left:14px;
+  position:absolute; bottom:20px; left:24px;
   transform-origin:bottom left; transform:rotate(-45deg);
   white-space:nowrap; text-align:left;
 }
 .gb-grid-colhead .gb-scores-assess-meta {
-  position:absolute; bottom:4px; left:14px;
+  position:absolute; bottom:4px; left:24px;
   transform-origin:bottom left; transform:rotate(-45deg);
   white-space:nowrap; text-align:left;
 }
@@ -434,7 +429,6 @@ th.gb-group-alt { background-color: rgba(0,0,0,0.03); }
 
 /* Score-only columns: neutral background so column reads as continuous */
 .gb-colhead-score-only { background:var(--bg); }
-.gb-colhead-score-only::after { border-right-color:var(--border); }
 
 /* Hover card tooltip (appended to body to escape overflow:hidden) */
 .gb-colhead-hover-card {
@@ -462,6 +456,15 @@ th.gb-group-alt { background-color: rgba(0,0,0,0.03); }
 .gb-hover-tag {
   font-size:10px; padding:1px 6px; border-radius:var(--radius-sm);
   background:var(--overlay-hover); color:var(--text-2);
+}
+
+/* Designation tags inline with student name */
+.gb-des-tag {
+  display:inline-block; font-family:'SF Mono', ui-monospace, monospace;
+  font-size:9px; font-weight:700; line-height:1;
+  padding:1px 4px; margin-left:3px; border-radius:3px;
+  background:var(--overlay-hover); color:var(--text-3);
+  vertical-align:middle; cursor:default;
 }
 
 /* Q3: Row headers — scrolls vertically (driven by data) */
@@ -738,6 +741,7 @@ th.gb-group-alt { background-color: rgba(0,0,0,0.03); }
 
 /* Header hover: highlight entire column */
 .gb-grid-colhead.gb-col-hover { background:var(--active-light) !important; }
+.gb-grid-colhead.gb-col-hover .gb-grid-colhead-fill { opacity:0.25; }
 .gb-scores-cell.gb-col-hover { background:var(--active-light) !important; }
 
 /* Text size controls */
