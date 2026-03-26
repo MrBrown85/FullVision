@@ -50,6 +50,69 @@ window.PageDashboard = (function() {
   var cmRelinkCid = null;
   var cmRelinkStep = 0;
 
+  // Standard folder collapse state
+  var _cmCollapsedStdFolders = {};
+  var _cmOpenStdCards = {};
+
+  // Render a compact standard card (mirrors .assess-card pattern)
+  function _cmRenderStdCard(sec, lm, compGroups) {
+    var tag = sec.tags[0] || {};
+    var sub = (lm.subjects||[]).find(function(s) { return s.id === sec.subject; });
+    var subName = sub ? sub.name : '';
+    var subColor = sub ? sub.color : 'var(--text-3)';
+    var isOpen = _cmOpenStdCards[sec.id];
+    var html = '<div class="cm-std-card' + (isOpen ? ' open' : '') + '" draggable="true" data-std-drag="' + sec.id + '" id="cm-std-' + sec.id + '">' +
+      '<div class="cm-std-header" data-action="cmToggleStdCard" data-secid="' + sec.id + '">' +
+        '<div class="cm-std-color-bar" style="background:' + sec.color + '"></div>' +
+        '<span class="cm-std-tag">' + esc(tag.id) + '</span>' +
+        '<span class="cm-std-label">' + esc(tag.label || sec.shortName || sec.name) + '</span>' +
+        '<span class="cm-std-subject"><span class="cm-std-subject-dot" style="background:' + subColor + '"></span>' + esc(subName) + '</span>' +
+        '<span class="cm-std-chevron">\u25B8</span>' +
+      '</div>' +
+      '<div class="cm-std-body">' +
+        '<div class="cm-std-edit-row-wide">' +
+          '<div style="flex:1"><label class="cm-label">Standard Name</label>' +
+            '<input class="cm-input" value="' + esc(sec.name) + '" style="font-weight:600;font-size:0.82rem" data-stop-prop="true" data-action-blur="cmStdName" data-secid="' + sec.id + '"></div>' +
+          '<div style="min-width:100px"><label class="cm-label">Subject</label>' +
+            '<select class="cm-input" style="font-size:0.78rem" data-stop-prop="true" data-action-change="cmStdSubject" data-secid="' + sec.id + '">' +
+              (lm.subjects||[]).map(function(s) { return '<option value="' + s.id + '"' + (s.id===sec.subject?' selected':'') + '>' + esc(s.name) + '</option>'; }).join('') +
+            '</select></div>' +
+          (compGroups.length > 0 ? '<div style="min-width:90px"><label class="cm-label">Group</label>' +
+            '<select class="cm-input" style="font-size:0.78rem" data-stop-prop="true" data-action-change="cmStdGroup" data-secid="' + sec.id + '">' +
+              '<option value="">None</option>' +
+              compGroups.map(function(g) { return '<option value="' + g.id + '"' + (sec.groupId===g.id?' selected':'') + '>' + esc(g.name) + '</option>'; }).join('') +
+            '</select></div>' : '') +
+          '<div><label class="cm-label">Color</label>' +
+            '<div style="background:' + sec.color + ';width:32px;height:32px;border-radius:8px;margin-top:2px;position:relative">' +
+              '<div class="cm-color-swatch-selected" style="background:' + sec.color + '" data-action="cmToggleColorPalette" data-target="section" data-secid="' + sec.id + '"></div>' +
+              '<div class="cm-color-palette" id="cm-palette-section-' + sec.id + '"></div>' +
+            '</div></div>' +
+          '<button class="cm-delete-mini" data-action="cmDeleteStd" data-stop-prop="true" data-secid="' + sec.id + '" title="Delete standard" style="width:32px;height:32px;align-self:flex-end">\u2715</button>' +
+        '</div>' +
+        '<div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:8px">' +
+          '<div style="flex:0 0 120px"><label class="cm-label">Tag Code</label>' +
+            '<input class="cm-input" value="' + esc(tag.id) + '" placeholder="e.g. RD1" maxlength="10" style="padding:5px 8px;font-size:0.82rem;font-weight:600;font-family:monospace;text-transform:uppercase" data-stop-prop="true" data-action-blur="cmStdCode" data-secid="' + sec.id + '"></div>' +
+          '<div style="flex:1"><label class="cm-label">Short Label</label>' +
+            '<input class="cm-input" value="' + esc(tag.label) + '" placeholder="Short label" style="padding:5px 8px;font-size:0.82rem;font-weight:500" data-action-blur="cmStdLabel" data-secid="' + sec.id + '"></div>' +
+        '</div>' +
+        '<label class="cm-label">I can\u2026 Statement</label>' +
+        '<textarea class="cm-textarea" placeholder="I can\u2026 statement" style="min-height:34px;padding:5px 8px;font-size:0.78rem" data-action-blur="cmStdText" data-secid="' + sec.id + '">' + esc(tag.text||'') + '</textarea>' +
+      '</div></div>';
+    return html;
+  }
+
+  function cmToggleStdCard(secId) {
+    _cmOpenStdCards[secId] = !_cmOpenStdCards[secId];
+    var card = document.getElementById('cm-std-' + secId);
+    if (card) card.classList.toggle('open', _cmOpenStdCards[secId]);
+  }
+
+  function cmToggleStdFolder(uid) {
+    _cmCollapsedStdFolders[uid] = !_cmCollapsedStdFolders[uid];
+    var folder = document.querySelector('.mod-folder[data-module-id="' + uid + '"]');
+    if (folder) folder.classList.toggle('open', !_cmCollapsedStdFolders[uid]);
+  }
+
   // Step 2 stash
   var cwStep2Name = '', cwStep2Grade = '', cwStep2Desc = '';
   var cwStep2Grading = 'proficiency', cwStep2Calc = 'mostRecent', cwStep2Decay = '65';
@@ -1202,100 +1265,77 @@ window.PageDashboard = (function() {
     });
     html += '<button class="cm-add-link" data-action="cmAddSubject">+ Add Subject</button></div>';
 
-    // Competency Groups
+    // Learning Standards — folder-based UI (mirrors assignments page)
     var compGroups = lm.competencyGroups || [];
-    html += '<div class="cm-field"><label class="cm-label">Competency Groups</label>';
-    if (compGroups.length === 0) {
-      html += '<div class="cm-hint" style="margin-bottom:6px">No groups yet. Groups let you organize learning standards into named categories on student cards and reports.</div>';
-    }
-    compGroups.forEach(function(grp) {
-      var count = (lm.sections || []).filter(function(s) { return s.groupId === grp.id; }).length;
-      html += '<div class="cm-subject-row">' +
-        '<div class="cm-subject-color" style="background:' + grp.color + '">' +
-          '<div class="cm-color-swatch-selected" style="background:' + grp.color + '" data-action="cmToggleColorPalette" data-target="compgroup" data-grpid="' + grp.id + '"></div>' +
-          '<div class="cm-color-palette" id="cm-palette-compgroup-' + grp.id + '"></div>' +
-        '</div>' +
-        '<input class="cm-input" value="' + esc(grp.name) + '" style="flex:1" data-action-blur="cmCompGroupName" data-grpid="' + grp.id + '">' +
-        '<span style="font-size:var(--text-2xs);color:var(--text-3);min-width:40px;text-align:right">' + count + ' item' + (count !== 1 ? 's' : '') + '</span>' +
-        '<button class="cm-delete-mini" data-action="cmDeleteCompGroup" data-grpid="' + grp.id + '" title="Delete group">\u2715</button>' +
-      '</div>';
+    var _cmGrouped = { groups: [], ungrouped: [] };
+    var _cmGroupMap = {};
+    compGroups.forEach(function(g) { _cmGroupMap[g.id] = { group: g, sections: [] }; });
+    (lm.sections || []).forEach(function(sec) {
+      if (sec.groupId && _cmGroupMap[sec.groupId]) _cmGroupMap[sec.groupId].sections.push(sec);
+      else _cmGrouped.ungrouped.push(sec);
     });
-    html += '<button class="cm-add-link" data-action="cmAddCompGroup">+ Add Group</button></div>';
+    _cmGrouped.groups = compGroups.map(function(g) { return _cmGroupMap[g.id]; });
 
-    // Learning Standards (flat format)
-    html += '<div class="cm-field">' +
-      '<label class="cm-label">Learning Standards</label>';
-    if ((lm.sections||[]).length === 0) {
+    html += '<div class="cm-field"><label class="cm-label">Learning Standards</label>';
+
+    if ((lm.sections||[]).length === 0 && compGroups.length === 0) {
       html += '<div class="cm-curriculum-empty">' +
         '<div class="cm-curriculum-empty-icon">\uD83D\uDCD0</div>' +
         '<div class="cm-curriculum-empty-text">No learning standards yet. Add a standard to start defining your curriculum.</div>' +
       '</div>';
     }
-    (lm.sections||[]).forEach(function(sec) {
-      var tag = sec.tags[0] || {};
-      var sub = (lm.subjects||[]).find(function(s) { return s.id === sec.subject; });
-      var subName = sub ? sub.name : '';
-      var subColor = sub ? sub.color : 'var(--text-3)';
-      html += '<div class="cm-sec-group open" id="cm-sec-' + sec.id + '">' +
-        '<div class="cm-sec-header">' +
-          '<div class="cm-sec-header-top">' +
-            '<div class="cm-sec-color-bar" style="background:' + sec.color + '"></div>' +
-            '<span class="cm-sec-name-display">' + esc(sec.name) + '</span>' +
-            '<span class="cm-tag-id" style="color:' + sec.color + ';font-size:0.7rem;margin-left:8px">' + esc(tag.id) + '</span>' +
-          '</div>' +
-          '<div class="cm-sec-header-meta">' +
-            '<span class="cm-sec-subject-badge"><span class="cm-sec-subject-dot" style="background:' + subColor + '"></span>' + esc(subName) + '</span>' +
+
+    // Render group folders (reuses .mod-folder pattern from assignments page)
+    _cmGrouped.groups.forEach(function(gi) {
+      var grp = gi.group;
+      var secs = gi.sections;
+      var isOpen = !_cmCollapsedStdFolders[grp.id];
+      html += '<div class="mod-folder' + (isOpen ? ' open' : '') + '" data-module-id="' + grp.id + '" data-folder-drop="' + grp.id + '">' +
+        '<div class="mod-folder-header" data-action="cmToggleStdFolder" data-uid="' + grp.id + '">' +
+          '<span class="mod-folder-grip">\u2807</span>' +
+          '<span class="mod-folder-chevron">\u25B6</span>' +
+          '<span class="mod-folder-color" style="background:' + grp.color + '" title="Change color" data-action="openColorPicker" data-stop-prop="true">' +
+            '<input type="color" value="' + grp.color + '" data-action-change="cmCompGroupColor" data-grpid="' + grp.id + '">' +
+          '</span>' +
+          '<input class="mod-folder-name-input" value="' + esc(grp.name) + '" draggable="false" data-stop-prop="true" data-action-blur="cmCompGroupName" data-grpid="' + grp.id + '">' +
+          '<span class="mod-folder-meta">' + secs.length + ' standard' + (secs.length !== 1 ? 's' : '') + '</span>' +
+          '<div class="mod-folder-actions" data-stop-prop="true">' +
+            '<button class="mod-folder-action delete" data-action="cmDeleteCompGroup" data-grpid="' + grp.id + '" data-count="' + secs.length + '" title="Delete group">\u2715</button>' +
           '</div>' +
         '</div>' +
-        '<div class="cm-sec-body">' +
-          '<div class="cm-sec-edit-row">' +
-            '<div class="cm-sec-edit-name">' +
-              '<label class="cm-label">Standard Name</label>' +
-              '<input class="cm-input" value="' + esc(sec.name) + '" style="font-weight:600;font-size:0.82rem" data-stop-prop="true" data-action-blur="cmStdName" data-secid="' + sec.id + '">' +
-            '</div>' +
-            '<div class="cm-sec-edit-subject">' +
-              '<label class="cm-label">Subject</label>' +
-              '<select class="cm-input" style="font-size:0.78rem" data-stop-prop="true" data-action-change="cmStdSubject" data-secid="' + sec.id + '">' +
-                (lm.subjects||[]).map(function(s) { return '<option value="' + s.id + '"' + (s.id===sec.subject?' selected':'') + '>' + esc(s.name) + '</option>'; }).join('') +
-              '</select>' +
-            '</div>' +
-            (compGroups.length > 0 ? '<div style="min-width:90px">' +
-              '<label class="cm-label">Group</label>' +
-              '<select class="cm-input" style="font-size:0.78rem" data-stop-prop="true" data-action-change="cmStdGroup" data-secid="' + sec.id + '">' +
-                '<option value="">None</option>' +
-                compGroups.map(function(g) { return '<option value="' + g.id + '"' + (sec.groupId===g.id?' selected':'') + '>' + esc(g.name) + '</option>'; }).join('') +
-              '</select>' +
-            '</div>' : '') +
-            '<div style="display:flex;gap:6px;align-items:flex-end">' +
-              '<div>' +
-                '<label class="cm-label">Color</label>' +
-                '<div class="cm-sec-color-dot" style="background:' + sec.color + ';width:32px;height:32px;border-radius:8px;margin-top:2px">' +
-                  '<div class="cm-color-swatch-selected" style="background:' + sec.color + '" data-action="cmToggleColorPalette" data-target="section" data-secid="' + sec.id + '"></div>' +
-                  '<div class="cm-color-palette" id="cm-palette-section-' + sec.id + '"></div>' +
-                '</div>' +
-              '</div>' +
-              '<button class="cm-delete-mini" data-action="cmDeleteStd" data-stop-prop="true" data-secid="' + sec.id + '" title="Delete standard" style="width:32px;height:32px;margin-bottom:2px">\u2715</button>' +
-            '</div>' +
-          '</div>' +
-          '<div class="cm-tag-row" style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px">' +
-            '<div class="cm-tag-fields" style="flex:1">' +
-              '<div style="display:flex;gap:12px;align-items:flex-end">' +
-                '<div style="flex:0 0 120px">' +
-                  '<label class="cm-label">Tag Code</label>' +
-                  '<input class="cm-input" value="' + esc(tag.id) + '" placeholder="e.g. RD1" maxlength="10" style="padding:5px 8px;font-size:0.82rem;font-weight:600;font-family:monospace;text-transform:uppercase" data-stop-prop="true" data-action-blur="cmStdCode" data-secid="' + sec.id + '">' +
-                '</div>' +
-                '<div style="flex:1">' +
-                  '<label class="cm-label">Short Label</label>' +
-                  '<input class="cm-input" value="' + esc(tag.label) + '" placeholder="Short label" style="padding:5px 8px;font-size:0.82rem;font-weight:500" data-action-blur="cmStdLabel" data-secid="' + sec.id + '">' +
-                '</div>' +
-              '</div>' +
-              '<label class="cm-label" style="margin-top:6px">I can\u2026 Statement</label>' +
-              '<textarea class="cm-textarea" placeholder="I can\u2026 statement" style="min-height:34px;padding:5px 8px;font-size:0.78rem" data-action-blur="cmStdText" data-secid="' + sec.id + '">' + esc(tag.text||'') + '</textarea>' +
-            '</div>' +
-          '</div>' +
-        '</div></div>';
+        '<div class="mod-folder-body">';
+      if (secs.length === 0) {
+        html += '<div class="mod-folder-empty">Drag standards here or use the group dropdown when editing a standard</div>';
+      }
+      secs.forEach(function(sec) { html += _cmRenderStdCard(sec, lm, compGroups); });
+      html += '</div></div>';
     });
-    html += '<button class="cm-add-link" data-action="cmAddStd">+ Add Standard</button></div></div>';
+
+    // Ungrouped standards
+    if (_cmGrouped.ungrouped.length > 0 || compGroups.length > 0) {
+      var ungOpen = !_cmCollapsedStdFolders['__none__'];
+      html += '<div class="mod-folder no-module' + (ungOpen ? ' open' : '') + '" data-module-id="__none__" data-folder-drop="__none__">' +
+        '<div class="mod-folder-header" data-action="cmToggleStdFolder" data-uid="__none__">' +
+          '<span class="mod-folder-chevron">\u25B6</span>' +
+          '<span style="font-size:0.88rem;color:var(--text-3)">\uD83D\uDCC1</span>' +
+          '<span class="mod-folder-name" style="font-size:0.95rem;font-weight:500;color:var(--text-3)">Ungrouped</span>' +
+          '<span class="mod-folder-meta">' + _cmGrouped.ungrouped.length + ' standard' + (_cmGrouped.ungrouped.length !== 1 ? 's' : '') + '</span>' +
+        '</div>' +
+        '<div class="mod-folder-body">';
+      _cmGrouped.ungrouped.forEach(function(sec) { html += _cmRenderStdCard(sec, lm, compGroups); });
+      if (_cmGrouped.ungrouped.length === 0) {
+        html += '<div class="mod-folder-empty">All standards are grouped</div>';
+      }
+      html += '</div></div>';
+    } else {
+      // No groups at all — render flat
+      (lm.sections || []).forEach(function(sec) { html += _cmRenderStdCard(sec, lm, compGroups); });
+    }
+
+    // Add buttons
+    html += '<button class="add-module-btn" data-action="cmAddCompGroup">+ Add Group</button>';
+    html += '<button class="cm-add-link" data-action="cmAddStd">+ Add Standard</button>';
+    html += '</div></div>';
 
     // Section 4: BC Curriculum Link
     var linkedTags = course.curriculumTags || [];
@@ -2277,6 +2317,9 @@ window.PageDashboard = (function() {
       'cwRemoveCustomComp':   function() { DashCurriculumWizard.cwRemoveCustomComp(el.dataset.secid); },
       'cmAddCompGroup':       function() { cmAddCompGroup(); },
       'cmDeleteCompGroup':    function() { cmDeleteCompGroup(el.dataset.grpid); },
+      'cmToggleStdCard':      function() { cmToggleStdCard(el.dataset.secid); },
+      'cmToggleStdFolder':    function() { cmToggleStdFolder(el.dataset.uid); },
+      'openColorPicker':      function() { var inp = el.querySelector('input[type="color"]'); if (inp) inp.click(); },
       'cmCreateToggle':       function() { cmCreateToggle(el, el.dataset.group); var dp = document.getElementById('cm-cg-decay'); if (dp) dp.style.display = 'none'; },
       'cmCreateToggleDecay':  function() { cmCreateToggle(el, el.dataset.group); document.getElementById('cm-cg-decay').style.display = el.classList.contains('active') && el.dataset.val === 'decayingAvg' ? '' : 'none'; },
       'cmRelinkCancel':       function() { cmRelinkCancel(); },
@@ -2362,6 +2405,11 @@ window.PageDashboard = (function() {
     // Wizard: competency group color
     if (el.dataset.actionChange === 'cwGroupColor') {
       DashCurriculumWizard.cwUpdateGroupColor(el.dataset.gid, el.value);
+      return;
+    }
+    // Class manager: competency group color
+    if (el.dataset.actionChange === 'cmCompGroupColor') {
+      cmUpdateCompGroupColor(el.dataset.grpid, el.value);
       return;
     }
     // Class manager: standard group assignment
