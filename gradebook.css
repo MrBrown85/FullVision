@@ -389,21 +389,26 @@ th.gb-group-alt { background-color: rgba(0,0,0,0.03); }
 .gb-grid-colhead {
   flex:0 0 48px; width:48px; height:140px;
   position:relative; display:flex; flex-direction:column;
+  /* Right border tilted 45° via pseudo-element */
+  border-right:none;
+}
+.gb-grid-colhead::after {
+  content:''; position:absolute; top:0; right:0; bottom:0; width:0;
   border-right:0.5px solid var(--divider-subtle);
+  transform-origin:bottom right; transform:skewX(-45deg);
 }
 .gb-grid-colhead-text {
-  flex:1; display:flex; align-items:flex-end; padding:0 0 4px 6px;
-  overflow:hidden;
+  flex:1; position:relative; overflow:visible;
 }
-.gb-grid-colhead-text span { display:inline; }
 .gb-grid-colhead .gb-scores-assess-name {
+  position:absolute; bottom:20px; left:4px;
   transform-origin:bottom left; transform:rotate(-45deg);
-  white-space:nowrap; position:absolute; bottom:24px; left:6px;
+  white-space:nowrap; text-align:left;
 }
 .gb-grid-colhead .gb-scores-assess-meta {
-  position:absolute; bottom:8px; left:6px;
+  position:absolute; bottom:4px; left:4px;
   transform-origin:bottom left; transform:rotate(-45deg);
-  white-space:nowrap;
+  white-space:nowrap; text-align:left;
 }
 .gb-grid-colhead-stripe { height:4px; flex-shrink:0; }
 /* Q3: Row headers — scrolls vertically (driven by data) */
