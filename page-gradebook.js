@@ -441,10 +441,14 @@ window.PageGradebook = (function() {
       // Get section color for tag stripe
       var tagSecs = (a.tagIds || []).map(function(tid) { return getSectionForTag(cid, tid); }).filter(Boolean);
       var stripeColor = tagSecs.length > 0 ? tagSecs[0].color : 'var(--border)';
-      html += '<th class="gb-scores-assess-head' + typeClass + '" data-aid="' + a.id + '" data-action-dblclick="startScoreMode" title="Double-click to enter score mode">' +
-        '<div class="gb-scores-assess-inner">' +
-          '<div class="gb-scores-assess-name">' + esc(a.title) + '</div>' +
-          '<div class="gb-scores-assess-meta">' + formatDate(a.date) + maxPts + '</div>' +
+      html += '<th class="gb-scores-assess-head' + typeClass + '" data-aid="' + a.id + '" data-action-dblclick="startScoreMode" title="' + esc(a.title) + ' — Double-click to score">' +
+        '<div class="gb-scores-assess-outer">' +
+          '<div class="gb-scores-assess-inner">' +
+            '<div class="gb-scores-assess-text">' +
+              '<span class="gb-scores-assess-name">' + esc(a.title) + '</span>' +
+              '<span class="gb-scores-assess-meta">' + formatDate(a.date) + maxPts + '</span>' +
+            '</div>' +
+          '</div>' +
         '</div>' +
         '<div class="gb-scores-assess-stripe" style="background:' + stripeColor + '"></div>' +
       '</th>';
