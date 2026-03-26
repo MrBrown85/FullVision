@@ -364,8 +364,8 @@ window.PageGradebook = (function() {
     _colHoverTip.style.display = 'block';
     var rect = colEl.getBoundingClientRect();
     _colHoverTip.style.left = (rect.left + rect.width / 2) + 'px';
-    _colHoverTip.style.top = 'auto';
-    _colHoverTip.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
+    _colHoverTip.style.top = (rect.bottom - 4) + 'px';
+    _colHoverTip.style.bottom = 'auto';
   }
 
   function hideColTooltip() {
