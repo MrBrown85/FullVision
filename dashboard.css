@@ -315,14 +315,14 @@
   font-size:var(--text-2xs); color:var(--priority); margin-left:4px;
 }
 
-/* Section Strip */
+/* Section Strip — Apple HIG 8pt grid */
 .dash-card-sections {
-  display:flex; flex-wrap:wrap; gap:6px; padding:4px 14px 0;
-  margin-bottom:10px; position:relative;
+  display:flex; flex-wrap:wrap; gap:8px; padding:0 16px;
+  margin-bottom:8px; position:relative;
 }
 .dash-section-group {
   display:flex; flex-direction:column; gap:4px; flex:1 1 45%;
-  padding:6px 8px 8px; border-radius:10px;
+  padding:8px; border-radius:8px;
   background:var(--overlay-hover); min-width:0;
 }
 .dash-section-group-label {
@@ -334,7 +334,7 @@
   display:flex; gap:4px;
 }
 .dash-section-mini {
-  flex:1; text-align:center; padding:10px 6px 8px;
+  flex:1; text-align:center; padding:8px 4px;
   border-radius:8px; min-width:0;
   position:relative;
 }
