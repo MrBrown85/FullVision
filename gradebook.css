@@ -397,24 +397,30 @@ thead .gb-scores-sticky { z-index:12; background:var(--bg); }
 .gb-scores-final { color:var(--text); font-weight:700; }
 thead .gb-scores-frozen { background:var(--bg); }
 
-/* Assignment column headers — angled text */
+/* Assignment column headers — 45° angled text */
 .gb-scores-assess-head {
-  padding:4px 4px 8px; min-width:64px; max-width:80px; height:80px;
-  vertical-align:bottom; position:relative;
+  padding:0; min-width:40px; max-width:48px; height:160px;
+  vertical-align:bottom; position:relative; overflow:visible;
+}
+.gb-scores-assess-inner {
+  position:absolute; bottom:8px; left:50%;
+  transform-origin:bottom left; transform:rotate(-45deg);
+  white-space:nowrap; width:max-content;
 }
 .gb-scores-assess-name {
-  writing-mode:vertical-rl; transform:rotate(180deg);
   font-size:11px; font-weight:600; color:var(--text);
-  max-height:70px; overflow:hidden; text-overflow:ellipsis;
-  display:inline-block; text-align:left;
+  max-width:200px; overflow:hidden; text-overflow:ellipsis;
+  display:block;
 }
 .gb-scores-assess-meta {
   font-size:9px; color:var(--text-3); font-weight:400;
-  writing-mode:vertical-rl; transform:rotate(180deg);
-  display:inline-block;
+  display:block;
 }
-.gb-scores-summ { border-bottom:3px solid var(--active); }
-.gb-scores-form { border-bottom:3px solid var(--text-3); }
+.gb-scores-assess-stripe {
+  position:absolute; bottom:0; left:0; right:0; height:3px;
+}
+.gb-scores-summ .gb-scores-assess-stripe { background:var(--active); }
+.gb-scores-form .gb-scores-assess-stripe { background:var(--text-3); }
 
 /* Data rows */
 .gb-scores-row td { padding:0; }
@@ -561,3 +567,21 @@ thead .gb-scores-frozen { background:var(--bg); }
 
 /* Score mode: subtle column highlight */
 .gb-scores-col-active { background:rgba(0,122,255,0.03) !important; }
+
+/* Text size controls */
+.gb-scores-size-controls {
+  display:flex; align-items:center; gap:2px;
+  border:1px solid var(--border); border-radius:var(--radius-xs);
+  padding:0 2px;
+}
+.gb-scores-size-btn {
+  font-family:var(--font-base); font-size:var(--text-md); font-weight:600;
+  width:28px; height:28px; border:none; background:none;
+  color:var(--text-2); cursor:pointer; display:flex; align-items:center;
+  justify-content:center; border-radius:4px; transition:all 0.1s;
+}
+.gb-scores-size-btn:hover { background:var(--overlay-hover); color:var(--text); }
+.gb-scores-size-label {
+  font-family:'SF Mono', ui-monospace, monospace; font-size:var(--text-xs);
+  color:var(--text-3); min-width:32px; text-align:center;
+}

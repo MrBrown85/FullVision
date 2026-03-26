@@ -13,6 +13,7 @@ window.PageGradebook = (function() {
   var activeCourse;
   var viewMode = 'scores';
   var _scoreDensity = 'comfortable'; // 'compact' or 'comfortable'
+  var _scoreTextSize = 13; // base font size in px for score cells
   var _pinnedCols = { name: true, final: true }; // pinnable: name, categories, final
   var _undoStack = [];
   var _scoreMode = null; // null or { assessmentId, studentIdx }
@@ -408,13 +409,18 @@ window.PageGradebook = (function() {
         '<button class="gb-scores-pin-btn' + (_pinnedCols.final ? ' active' : '') + '" data-action="togglePin" data-col="final" title="Toggle final column">Final</button>' +
       '</div>' +
       '<div style="flex:1"></div>' +
+      '<div class="gb-scores-size-controls">' +
+        '<button class="gb-scores-size-btn" data-action="decreaseTextSize" title="Decrease text size">\u2212</button>' +
+        '<span class="gb-scores-size-label">' + _scoreTextSize + 'px</span>' +
+        '<button class="gb-scores-size-btn" data-action="increaseTextSize" title="Increase text size">+</button>' +
+      '</div>' +
       '<button class="gb-scores-density-btn" data-action="toggleDensity" title="Toggle compact/comfortable">' +
         (_scoreDensity === 'compact' ? '\u2630' : '\u2261') + '</button>' +
       '<button class="gb-scores-export-btn" data-action="exportScoresCSV" title="Export CSV">\u2913 Export</button>' +
       '<button class="gb-scores-add-btn" data-action="showAddAssessPopover" title="New assignment">+ New</button>' +
     '</div>';
 
-    html += '<div class="gb-scores-wrap"><div class="gb-scores-scroll"><table class="gb-scores-table ' + rowH + '">';
+    html += '<div class="gb-scores-wrap"><div class="gb-scores-scroll"><table class="gb-scores-table ' + rowH + '" style="font-size:' + _scoreTextSize + 'px">';
 
     // Header row — student name + frozen cols + assignment columns
     html += '<thead><tr>';
@@ -432,9 +438,15 @@ window.PageGradebook = (function() {
       var isPrimary = a.type === 'summative';
       var typeClass = isPrimary ? ' gb-scores-summ' : ' gb-scores-form';
       var maxPts = a.scoreMode === 'points' ? ' / ' + (a.maxPoints || 100) : '';
+      // Get section color for tag stripe
+      var tagSecs = (a.tagIds || []).map(function(tid) { return getSectionForTag(cid, tid); }).filter(Boolean);
+      var stripeColor = tagSecs.length > 0 ? tagSecs[0].color : 'var(--border)';
       html += '<th class="gb-scores-assess-head' + typeClass + '" data-aid="' + a.id + '" data-action-dblclick="startScoreMode" title="Double-click to enter score mode">' +
-        '<div class="gb-scores-assess-name">' + esc(a.title) + '</div>' +
-        '<div class="gb-scores-assess-meta">' + formatDate(a.date) + maxPts + '</div>' +
+        '<div class="gb-scores-assess-inner">' +
+          '<div class="gb-scores-assess-name">' + esc(a.title) + '</div>' +
+          '<div class="gb-scores-assess-meta">' + formatDate(a.date) + maxPts + '</div>' +
+        '</div>' +
+        '<div class="gb-scores-assess-stripe" style="background:' + stripeColor + '"></div>' +
       '</th>';
     });
     html += '</tr></thead>';
@@ -1342,6 +1354,8 @@ window.PageGradebook = (function() {
       'toggleSort':           function() { toggleSort(el.dataset.sortkey); },
       'cycleScore':           function() { cycleScore(el); },
       'toggleDensity':        function() { _scoreDensity = _scoreDensity === 'compact' ? 'comfortable' : 'compact'; render(); },
+      'increaseTextSize':     function() { _scoreTextSize = Math.min(20, _scoreTextSize + 1); render(); },
+      'decreaseTextSize':     function() { _scoreTextSize = Math.max(9, _scoreTextSize - 1); render(); },
       'togglePin':            function() { var col = el.dataset.col; _pinnedCols[col] = !_pinnedCols[col]; render(); },
       'editScoreCell':        function() { startCellEdit(el); },
       'startScoreMode':       function() { enterScoreMode(el.dataset.aid); },
