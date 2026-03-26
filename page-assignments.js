@@ -693,7 +693,7 @@ window.PageAssignments = (function() {
             var st = students.find(function(s) { return s.id === sid; });
             if (!st) return;
             html += '<div class="collab-group-member" draggable="true" data-collab-drag-sid="' + sid + '" data-collab-drag-group="' + gi + '">' +
-              '<span class="member-avatar">' + initials(st) + '</span>' +
+              '<span class="member-avatar" style="background:' + _avatarColor(sid) + '">' + initials(st) + '</span>' +
               '<span>' + esc(displayName(st)) + '</span>' +
             '</div>';
           });
@@ -741,7 +741,7 @@ window.PageAssignments = (function() {
             var st = students.find(function(s) { return s.id === sid; });
             if (!st) return;
             html += '<div class="collab-group-member" draggable="true" data-collab-drag-sid="' + sid + '" data-collab-drag-group="' + gi + '">' +
-              '<span class="member-avatar">' + initials(st) + '</span>' +
+              '<span class="member-avatar" style="background:' + _avatarColor(sid) + '">' + initials(st) + '</span>' +
               '<span>' + esc(displayName(st)) + '</span>' +
             '</div>';
           });
@@ -1940,12 +1940,13 @@ window.PageAssignments = (function() {
 
   /* ── Drag event handlers (delegated) ────────────────────── */
   function _handleDragStart(e) {
+    // Collab drag must be checked FIRST — members are nested inside assess cards
+    var collabDrag = e.target.closest('[data-collab-drag-sid]');
+    if (collabDrag) { collabDragStart(e, collabDrag.dataset.collabDragSid, parseInt(collabDrag.dataset.collabDragGroup, 10)); return; }
     var assessDrag = e.target.closest('[data-assess-drag]');
     if (assessDrag) { onAssessDragStart(e, assessDrag.dataset.assessDrag); return; }
     var moduleDrag = e.target.closest('[data-module-drag]');
     if (moduleDrag) { onModuleDragStart(e, moduleDrag.dataset.moduleDrag); return; }
-    var collabDrag = e.target.closest('[data-collab-drag-sid]');
-    if (collabDrag) { collabDragStart(e, collabDrag.dataset.collabDragSid, parseInt(collabDrag.dataset.collabDragGroup, 10)); return; }
   }
   function _handleDragEnd(e) {
     if (_dragAssessId) { onAssessDragEnd(); return; }
