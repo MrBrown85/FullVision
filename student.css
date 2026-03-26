@@ -2,18 +2,19 @@
 
 /* ── Student page-specific styles ─────────────────────────── */
 
-/* Stats bar: completion on left, section groups fill rest */
+/* Stats bar: completion on left, section cards wrap to rows */
 .student-stats-bar {
-  display: flex; align-items: stretch;
+  display: flex; flex-wrap: wrap; align-items: stretch;
   background: var(--surface); border-radius: var(--radius);
   border: 1px solid var(--border);
   margin-bottom: 20px; overflow: hidden;
 }
 
-/* Completion stats — left end of stats bar */
+/* Completion stats — left end of stats bar, doesn't prevent wrapping */
 .completion-card {
   flex: 0 0 auto; padding: 12px 20px; display: flex;
   align-items: center; gap: 14px; border-right: 1px solid var(--divider-subtle);
+  border-bottom: 1px solid var(--divider-subtle);
   background: rgba(0,0,0,0.02);
 }
 .completion-stats { display: flex; flex-direction: column; gap: 3px; }
@@ -22,18 +23,33 @@
 }
 .completion-stat strong { color: var(--text); font-weight: 700; }
 
-/* Mini section stat cards */
+/* Mini section stat cards — equal size, wrap to rows */
 .section-mini-card {
-  flex: 1; padding: 16px 8px; text-align: center;
-  border-right: 1px solid var(--divider-subtle); position: relative;
-  transition: background 0.12s; cursor: pointer; user-select: none;
-  min-width: 104px;
+  flex: 1 1 0; padding: 16px 8px; text-align: center;
+  border-right: 1px solid var(--divider-subtle);
+  border-bottom: 1px solid var(--divider-subtle);
+  position: relative;
+  transition: background 0.15s, box-shadow 0.15s; cursor: pointer; user-select: none;
+  min-width: 120px;
 }
-.section-mini-card:last-child { border-right: none; }
+.section-mini-card:hover { background: rgba(0,0,0,0.02); }
+/* Selected: darker background, thicker stripe */
+.section-mini-card.active-filter {
+  background: rgba(0,122,255,0.08);
+  box-shadow: inset 0 0 0 1px rgba(0,122,255,0.2);
+}
+.section-mini-card.active-filter .section-mini-stripe { height: 5px; }
+/* Unselected when a filter is active: lighter, NOT invisible */
+.section-mini-card:not(.active-filter).dimmed {
+  background: rgba(0,0,0,0.015);
+}
+.section-mini-card:not(.active-filter).dimmed .section-mini-val { opacity: 0.5; }
+.section-mini-card:not(.active-filter).dimmed .section-mini-label { opacity: 0.5; }
 
 /* Accordion: individual sections revealed below a group card */
 .stu-group-accordion {
-  display: flex; width: 100%; border-top: 1px solid var(--divider-subtle);
+  display: flex; flex-wrap: wrap; width: 100%;
+  border-top: 1px solid var(--divider-subtle);
   background: var(--bg);
 }
 .stu-group-accordion .section-mini-card {
@@ -41,12 +57,6 @@
 }
 .stu-group-accordion .section-mini-val { font-size: var(--text-xl); }
 .stu-group-accordion .section-mini-label { font-size: 9px; }
-.stu-section-group .section-mini-card { border-right: 1px solid var(--divider-subtle); }
-.stu-section-group .section-mini-card:last-child { border-right: none; }
-.section-mini-card:hover { background: var(--bg); }
-.section-mini-card.active-filter { background: rgba(0,122,255,0.06); }
-.section-mini-card.active-filter .section-mini-stripe { height: 5px; }
-.section-mini-card:not(.active-filter).dimmed { opacity: 0.4; }
 .section-mini-stripe {
   position: absolute; top: 0; left: 0; right: 0; height: 3px;
 }
