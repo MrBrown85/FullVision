@@ -9,8 +9,8 @@ test.describe('Login Page', () => {
   test('renders sign-in form by default', async ({ page }) => {
     await expect(page.locator('#form-signin')).toBeVisible();
     await expect(page.locator('#form-signup')).toBeHidden();
-    await expect(page.locator('.auth-title')).toHaveText('TeacherDashboard');
-    await expect(page.locator('.auth-subtitle')).toHaveText('Standards-Based Gradebook');
+    await expect(page.locator('.auth-title')).toHaveText('FullVision');
+    await expect(page.locator('.auth-subtitle')).toHaveText('Learning Profile Builder and Communicator');
   });
 
   test('sign-in form has email and password fields', async ({ page }) => {
