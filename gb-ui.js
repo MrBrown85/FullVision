@@ -1,4 +1,4 @@
-/* gb-ui.js — Shared UI components for TeacherDashboard */
+/* gb-ui.js — Shared UI components for FullVision */
 
 /* ── HTML sanitizer for contenteditable output ──────────────── */
 function sanitizeHtml(raw) {

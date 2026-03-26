@@ -1,5 +1,5 @@
 -- ============================================================
--- TeacherDashboard — Full Database Migration
+-- FullVision — Full Database Migration
 -- ============================================================
 -- Run this entire file in the Supabase SQL Editor to set up
 -- a fresh database from scratch.

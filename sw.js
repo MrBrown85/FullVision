@@ -1,6 +1,6 @@
 // IMPORTANT: Increment the version number when deploying new app code
 // This ensures users get the latest files
-const CACHE_NAME = 'teacherdashboard-v6';
+const CACHE_NAME = 'fullvision-v7';
 
 // All app files to pre-cache on install
 const PRECACHE_URLS = [

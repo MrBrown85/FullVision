@@ -1,7 +1,7 @@
 # Supabase Migration — Comprehensive Implementation Guide
 
 ## Overview
-Migrate TeacherDashboard from browser localStorage to Supabase (PostgreSQL) with authentication, enabling multi-teacher deployment, FOIPPA compliance (data in Canada), and real data persistence.
+Migrate FullVision from browser localStorage to Supabase (PostgreSQL) with authentication, enabling multi-teacher deployment, FOIPPA compliance (data in Canada), and real data persistence.
 
 **Architecture:** Local-first with background sync. localStorage remains the cache layer for instant UI. Supabase is the source of truth. The app works offline and syncs when connected.
 
@@ -13,7 +13,7 @@ Migrate TeacherDashboard from browser localStorage to Supabase (PostgreSQL) with
 
 1. Create account at supabase.com
 2. New Project → Region: **Canada Central (ca-central-1)**
-3. Name: `teacherdashboard-prod`
+3. Name: `fullvision-prod`
 4. Copy from Settings → API:
    - `Project URL` (e.g., `https://xxxxx.supabase.co`)
    - `anon public key`

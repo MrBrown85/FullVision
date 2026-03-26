@@ -1,4 +1,4 @@
-/* gb-data.js — Data access layer for TeacherDashboard
+/* gb-data.js — Data access layer for FullVision
    Cache-through pattern: Supabase persistence with synchronous in-memory reads.
    - initData(cid) fetches all data from Supabase (or localStorage) into _cache
    - get*() functions read from _cache (synchronous)

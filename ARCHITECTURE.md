@@ -1,6 +1,6 @@
-# TeacherDashboard Architecture
+# FullVision Architecture
 
-A standards-based gradebook for BC teachers. Single-page application served from a single `app.html` entry point, using hash-based routing, IIFE page modules, and a local-first data layer that syncs to Supabase.
+A learning profile builder and communicator for BC teachers. Single-page application served from a single `app.html` entry point, using hash-based routing, IIFE page modules, and a local-first data layer that syncs to Supabase.
 
 ## Application Structure
 

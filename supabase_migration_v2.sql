@@ -1,5 +1,5 @@
 -- ============================================================
--- TeacherDashboard — Migration v2: Constraints & Indexes
+-- FullVision — Migration v2: Constraints & Indexes
 -- ============================================================
 -- Run in Supabase SQL Editor after the initial schema.sql.
 -- Adds CHECK constraints for data integrity and indexes for

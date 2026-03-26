@@ -1,4 +1,4 @@
--- Row-Level Security Policies for TeacherDashboard
+-- Row-Level Security Policies for FullVision
 -- Each teacher can only read/write their own data
 
 -- Helper: auto-create profile on signup

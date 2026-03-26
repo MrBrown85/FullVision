@@ -1,6 +1,6 @@
-# TeacherDashboard
+# FullVision
 
-A standards-based gradebook for British Columbia teachers. Track student achievement against BC curriculum competencies using proficiency-based grading, record observations, manage learner dispositions, and generate parent-friendly reports.
+A learning profile builder and communicator for British Columbia teachers. Track student achievement against BC curriculum competencies using proficiency-based grading, record observations, manage learner dispositions, and generate parent-friendly reports.
 
 Built as a single-page application with vanilla JavaScript -- no framework, no build step. Backed by Supabase for authentication and data storage with Row-Level Security, deployed on Netlify.
 
@@ -48,7 +48,7 @@ Built as a single-page application with vanilla JavaScript -- no framework, no b
 
 ```bash
 git clone <your-repo-url>
-cd TeacherDashboard
+cd FullVision
 npm install
 ```
 
@@ -86,7 +86,7 @@ This starts a local server on port 8347. Open [http://localhost:8347/app.html](h
 ## Project Structure
 
 ```
-TeacherDashboard/
+FullVision/
 ├── app.html                    # SPA entry point
 ├── login.html                  # Auth page
 │
@@ -155,7 +155,7 @@ See `supabase_schema.sql` for the complete schema definition.
 
 ## Privacy and Compliance
 
-TeacherDashboard is designed for FOIPPA (Freedom of Information and Protection of Privacy Act) compliance:
+FullVision is designed for FOIPPA (Freedom of Information and Protection of Privacy Act) compliance:
 
 - **Data residency** -- All data stored in Canada via Supabase on AWS ca-central-1 (Montreal)
 - **Row-Level Security** -- Each teacher's data is isolated at the database level
