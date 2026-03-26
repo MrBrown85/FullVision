@@ -408,14 +408,16 @@ th.gb-group-alt { background-color: rgba(0,0,0,0.03); }
   flex:1; position:relative; overflow:visible;
 }
 .gb-grid-colhead .gb-scores-assess-name {
-  position:absolute; bottom:14px; left:36px;
+  position:absolute; bottom:24px; left:36px;
   transform-origin:bottom left; transform:rotate(-45deg);
   white-space:nowrap; text-align:left;
+  font-size:var(--text-sm); font-weight:500;
 }
 .gb-grid-colhead .gb-scores-assess-meta {
-  position:absolute; bottom:0; left:36px;
+  position:absolute; bottom:8px; left:36px;
   transform-origin:bottom left; transform:rotate(-45deg);
   white-space:nowrap; text-align:left;
+  font-size:var(--text-xs); color:var(--text-3);
 }
 /* Subtle color fill behind angled header — inherits section color via inline style */
 .gb-grid-colhead-stripe { height:4px; flex-shrink:0; }
