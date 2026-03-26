@@ -397,16 +397,23 @@ th.gb-group-alt { background-color: rgba(0,0,0,0.03); }
   position:relative; display:flex; flex-direction:column;
   border-right:none;
 }
+/* 45-degree divider line between columns */
+.gb-grid-colhead::after {
+  content:''; position:absolute; top:0; right:0; bottom:0; width:0;
+  border-right:1px solid var(--divider-subtle);
+  transform-origin:bottom right; transform:skewX(-45deg);
+  pointer-events:none;
+}
 .gb-grid-colhead-text {
   flex:1; position:relative; overflow:visible;
 }
 .gb-grid-colhead .gb-scores-assess-name {
-  position:absolute; bottom:20px; left:24px;
+  position:absolute; bottom:8px; left:24px;
   transform-origin:bottom left; transform:rotate(-45deg);
   white-space:nowrap; text-align:left;
 }
 .gb-grid-colhead .gb-scores-assess-meta {
-  position:absolute; bottom:4px; left:24px;
+  position:absolute; bottom:-6px; left:24px;
   transform-origin:bottom left; transform:rotate(-45deg);
   white-space:nowrap; text-align:left;
 }
@@ -740,8 +747,8 @@ th.gb-group-alt { background-color: rgba(0,0,0,0.03); }
 .gb-scores-col-active { background:rgba(0,122,255,0.03) !important; }
 
 /* Header hover: highlight entire column */
-.gb-grid-colhead.gb-col-hover { background:var(--active-light) !important; }
 .gb-grid-colhead.gb-col-hover .gb-grid-colhead-fill { opacity:0.25; }
+.gb-grid-colhead.gb-col-hover::after { border-right-color:var(--active); }
 .gb-scores-cell.gb-col-hover { background:var(--active-light) !important; }
 
 /* Text size controls */
