@@ -391,47 +391,50 @@ window.PageGradebook = (function() {
   function renderSummaryTable(cid, students, sections, isLetter, scores) {
     var sortedStudents = applySorting(cid, students, sections, isLetter);
     var html = '<div class="gb-scroll-wrap"><div class="gb-scroll"><table class="gb-table">';
-    // Competency group header row (if groups exist)
+
+    // Build columns: one per group + one per ungrouped section
     var _gbGrouped = getGroupedSections(cid);
     var _hasGbGroups = _gbGrouped.groups.some(function(gi) { return gi.sections.length > 0; });
-    html += '<thead>';
+    var columns = [];
     if (_hasGbGroups) {
-      html += '<tr><th></th><th></th>';
-      if (isLetter) html += '<th></th>';
-      var _secGrpMap = {};
-      _gbGrouped.groups.forEach(function(gi) { gi.sections.forEach(function(s) { _secGrpMap[s.id] = gi.group; }); });
-      // Build colspan cells for groups
-      var _prevGid = '__init__', _span = 0, _cells = [];
-      sections.forEach(function(sec, i) {
-        var grp = _secGrpMap[sec.id]; var gid = grp ? grp.id : '';
-        if (gid === _prevGid) { _span++; }
-        else { if (_span > 0) _cells.push({ gid: _prevGid, grp: _prevGid ? _secGrpMap[sections[i-_span].id] : null, span: _span }); _span = 1; _prevGid = gid; }
+      _gbGrouped.groups.forEach(function(gi) {
+        if (gi.sections.length === 0) return;
+        columns.push({ type: 'group', group: gi.group, sections: gi.sections, id: 'grp-' + gi.group.id, name: gi.group.name, color: gi.group.color });
       });
-      if (_span > 0) _cells.push({ gid: _prevGid, grp: _prevGid ? _secGrpMap[sections[sections.length-_span].id] : null, span: _span });
-      _cells.forEach(function(c) {
-        if (c.grp) {
-          html += '<th colspan="' + c.span + '" style="text-align:center;font-size:0.65rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:' + c.grp.color + ';padding:4px 2px">' + esc(c.grp.name) + '</th>';
-        } else {
-          html += '<th colspan="' + c.span + '"></th>';
-        }
+      _gbGrouped.ungrouped.forEach(function(sec) {
+        columns.push({ type: 'section', section: sec, id: 'sec-' + sec.id, name: sec.shortName || sec.name, color: sec.color });
       });
-      html += '<th></th><th></th></tr>';
+    } else {
+      sections.forEach(function(sec) {
+        columns.push({ type: 'section', section: sec, id: 'sec-' + sec.id, name: sec.shortName || sec.name, color: sec.color });
+      });
     }
-    html += '<tr><th class="gb-corner gb-sortable" data-action="toggleSort" data-sortkey="name">Student' + sortArrow('name') + '</th>';
+
+    // Header row
+    html += '<thead><tr><th class="gb-corner gb-sortable" data-action="toggleSort" data-sortkey="name">Student' + sortArrow('name') + '</th>';
     html += renderOverallHeader();
     if (isLetter) html += '<th class="gb-summary-header gb-sortable" data-action="toggleSort" data-sortkey="grade">Grade' + sortArrow('grade') + '</th>';
-    sections.forEach(function(sec) {
-      html += '<th class="gb-summary-header gb-sortable" style="border-bottom:3px solid ' + sec.color + '" data-action="toggleSort" data-sortkey="sec-' + sec.id + '">' + esc(sec.shortName || sec.name) + sortArrow('sec-'+sec.id) + '</th>';
+    columns.forEach(function(col) {
+      html += '<th class="gb-summary-header gb-sortable" style="border-bottom:3px solid ' + col.color + '" data-action="toggleSort" data-sortkey="' + col.id + '">' + esc(col.name) + sortArrow(col.id) + '</th>';
     });
     html += '<th class="gb-summary-header gb-sortable" data-action="toggleSort" data-sortkey="coverage">Coverage' + sortArrow('coverage') + '</th>';
     html += '<th class="gb-summary-header">Trend</th>';
     html += '</tr></thead><tbody>';
 
+    // Data rows
     sortedStudents.forEach(function(s) {
       html += '<tr data-sid="' + s.id + '"><th class="gb-name" scope="row">' + renderNameCell(cid, s, sections, isLetter) + '</th>';
       html += renderOverallCell(cid, s.id);
       if (isLetter) html += renderSummaryCell(cid, s.id, { type:'grade' });
-      sections.forEach(function(sec) { html += renderSummaryCell(cid, s.id, { type:'section', section:sec }); });
+      columns.forEach(function(col) {
+        if (col.type === 'group') {
+          var gp = getGroupProficiency(cid, s.id, col.group.id);
+          var gr = Math.round(gp);
+          html += '<td class="gb-summary"' + (gp > 0 ? ' style="background:linear-gradient(' + PROF_TINT[gr] + ',' + PROF_TINT[gr] + '),var(--surface)"' : '') + '><span class="gb-summary-val" style="color:' + (gp > 0 ? PROF_COLORS[gr] : 'var(--text-3)') + '">' + (gp > 0 ? gp.toFixed(1) : '\u2014') + '</span></td>';
+        } else {
+          html += renderSummaryCell(cid, s.id, { type:'section', section:col.section });
+        }
+      });
       var pctV = getCompletionPct(cid, s.id);
       html += '<td class="gb-summary" style="text-align:center"><span class="gb-summary-val" style="color:' + (pctV>=75?'var(--score-3)':pctV>=50?'var(--score-2)':'var(--score-1)') + '">' + pctV + '%</span></td>';
       var allSc = (scores[s.id]||[]).filter(function(sc) { return sc.type==='summative' && sc.score>0; });
@@ -452,8 +455,13 @@ window.PageGradebook = (function() {
     html += '<tr class="gb-stats-row"><th class="gb-name" scope="row">Class Average</th>';
     html += renderOverallStatsCell(cid, sortedStudents);
     if (isLetter) html += '<td class="gb-summary"></td>';
-    sections.forEach(function(sec) {
-      var vals = sortedStudents.map(function(s) { return getSectionProficiency(cid, s.id, sec.id); }).filter(function(v) { return v > 0; });
+    columns.forEach(function(col) {
+      var vals;
+      if (col.type === 'group') {
+        vals = sortedStudents.map(function(s) { return getGroupProficiency(cid, s.id, col.group.id); }).filter(function(v) { return v > 0; });
+      } else {
+        vals = sortedStudents.map(function(s) { return getSectionProficiency(cid, s.id, col.section.id); }).filter(function(v) { return v > 0; });
+      }
       if (!vals.length) html += '<td class="gb-summary"><span class="gb-summary-val" style="color:var(--text-3)">—</span></td>';
       else { var avg = vals.reduce(function(a,b){return a+b;},0)/vals.length; var ar = Math.round(avg); html += '<td class="gb-summary" style="background:linear-gradient(' + PROF_TINT[ar] + ',' + PROF_TINT[ar] + '),var(--surface)"><span class="gb-summary-val" style="color:' + PROF_COLORS[ar] + '">' + avg.toFixed(1) + '</span></td>'; }
     });
@@ -549,6 +557,7 @@ window.PageGradebook = (function() {
         return va < vb ? -dir : va > vb ? dir : 0;
       } else if (key === 'overall') { va = getOverallProficiency(cid, a.id); vb = getOverallProficiency(cid, b.id); }
       else if (key === 'coverage') { va = getCompletionPct(cid, a.id); vb = getCompletionPct(cid, b.id); }
+      else if (key.startsWith('grp-')) { var grpId = key.slice(4); va = getGroupProficiency(cid, a.id, grpId); vb = getGroupProficiency(cid, b.id, grpId); }
       else if (key.startsWith('sec-')) { var secId = key.slice(4); va = getSectionProficiency(cid, a.id, secId); vb = getSectionProficiency(cid, b.id, secId); }
       else if (key.startsWith('avg-')) {
         var aid = key.slice(4); var sc = getScores(cid); var assess = getAssessments(cid).find(function(a) { return a.id === aid; }); var tagIds = assess ? (assess.tagIds||[]) : [];

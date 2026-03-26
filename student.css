@@ -22,24 +22,7 @@
 }
 .completion-stat strong { color: var(--text); font-weight: 700; }
 
-/* Section cards area — wraps when too many */
-.stu-sections-wrap {
-  flex: 1; min-width: 0; display: flex; flex-wrap: wrap;
-}
-.stu-section-group {
-  display: flex; flex-direction: column; flex: 1; min-width: 160px;
-  border-right: 1px solid var(--divider-subtle);
-}
-.stu-section-group:last-child { border-right: none; }
-.stu-section-group-label {
-  font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
-  font-weight: 600; padding: 8px 16px 0; line-height: 1;
-}
-.stu-section-group-items {
-  display: flex; flex: 1;
-}
-
-/* Mini section stat cards — Apple HIG 8pt grid */
+/* Mini section stat cards */
 .section-mini-card {
   flex: 1; padding: 16px 8px; text-align: center;
   border-right: 1px solid var(--divider-subtle); position: relative;
@@ -47,6 +30,17 @@
   min-width: 104px;
 }
 .section-mini-card:last-child { border-right: none; }
+
+/* Accordion: individual sections revealed below a group card */
+.stu-group-accordion {
+  display: flex; width: 100%; border-top: 1px solid var(--divider-subtle);
+  background: var(--bg);
+}
+.stu-group-accordion .section-mini-card {
+  padding: 8px 8px; min-width: 80px;
+}
+.stu-group-accordion .section-mini-val { font-size: var(--text-xl); }
+.stu-group-accordion .section-mini-label { font-size: 9px; }
 .stu-section-group .section-mini-card { border-right: 1px solid var(--divider-subtle); }
 .stu-section-group .section-mini-card:last-child { border-right: none; }
 .section-mini-card:hover { background: var(--bg); }

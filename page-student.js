@@ -13,6 +13,7 @@ window.PageStudent = (function() {
   var studentId;
   var activeCourse;
   var activeSectionFilters = new Set();
+  var _expandedGroups = new Set();
   var _overrideSelectedLevel = 0;
 
   /* ── switchCourse ───────────────────────────────────────── */
@@ -44,6 +45,15 @@ window.PageStudent = (function() {
       activeSectionFilters.delete(secId);
     } else {
       activeSectionFilters.add(secId);
+    }
+    render();
+  }
+
+  function toggleGroupExpand(groupId) {
+    if (_expandedGroups.has(groupId)) {
+      _expandedGroups.delete(groupId);
+    } else {
+      _expandedGroups.add(groupId);
     }
     render();
   }
@@ -383,28 +393,33 @@ window.PageStudent = (function() {
         '<div class="section-mini-label">' + esc(sec.name) + '</div>' +
       '</div>';
     };
-    html += '<div class="stu-sections-wrap">';
-    if (_stGrouped.groups.length > 0) {
+    if (_stGrouped.groups.some(function(g) { return g.sections.length > 0; })) {
+      // Group-aware: one card per group (averaged) + accordion + ungrouped
       _stGrouped.groups.forEach(function(gi) {
         if (gi.sections.length === 0) return;
-        html += '<div class="stu-section-group">' +
-          '<div class="stu-section-group-label" style="color:' + gi.group.color + '">' + esc(gi.group.name) + '</div>' +
-          '<div class="stu-section-group-items">';
-        gi.sections.forEach(function(sec) { html += _renderSecMini(sec); });
-        html += '</div></div>';
+        var gp = getGroupProficiency(cid, studentId, gi.group.id);
+        var isExpanded = _expandedGroups.has(gi.group.id);
+        var anyActive = gi.sections.some(function(s) { return activeSectionFilters.has(s.id); });
+        var isDimmed = activeSectionFilters.size > 0 && !anyActive;
+        html += '<div class="section-mini-card' + (anyActive ? ' active-filter' : '') + (isDimmed ? ' dimmed' : '') + '" data-action="toggleGroupExpand" data-groupid="' + gi.group.id + '">' +
+          '<div class="section-mini-stripe" style="background:' + gi.group.color + '"></div>' +
+          '<div class="section-mini-val" style="color:' + (gp > 0 ? gi.group.color : 'var(--text-3)') + '">' + (gp > 0 ? gp.toFixed(1) : '\u2014') + '</div>' +
+          '<div class="section-mini-label">' + esc(gi.group.name) + '</div>' +
+        '</div>';
+        // Accordion: show individual sections when expanded
+        if (isExpanded) {
+          html += '<div class="stu-group-accordion">';
+          gi.sections.forEach(function(sec) { html += _renderSecMini(sec); });
+          html += '</div>';
+        }
       });
-      if (_stGrouped.ungrouped.length > 0) {
-        html += '<div class="stu-section-group">' +
-          '<div class="stu-section-group-items">';
-        _stGrouped.ungrouped.forEach(function(sec) { html += _renderSecMini(sec); });
-        html += '</div></div>';
-      }
+      // Ungrouped sections as individual cards
+      _stGrouped.ungrouped.forEach(function(sec) { html += _renderSecMini(sec); });
     } else {
-      html += '<div class="stu-section-group-items">';
+      // No groups — flat section cards
       sections.forEach(function(sec) { html += _renderSecMini(sec); });
-      html += '</div>';
     }
-    html += '</div></div>';
+    html += '</div>';
 
     // ── Assessment Grades Table ──
     var sortedAssessments = assessments.slice().sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
@@ -799,7 +814,8 @@ window.PageStudent = (function() {
     var handlers = {
       'openEditStudent':     function() { openEditStudent(); },
       'toggleSectionFilter': function() { toggleSectionFilter(el.dataset.secid); },
-      'clearSectionFilters': function() { e.preventDefault(); activeSectionFilters.clear(); render(); },
+      'toggleGroupExpand':   function() { toggleGroupExpand(el.dataset.groupid); },
+      'clearSectionFilters': function() { e.preventDefault(); activeSectionFilters.clear(); _expandedGroups.clear(); render(); },
       'toggleGradesView':    function() { toggleGradesView(); },
       'toggleOverridePanel': function() { toggleOverridePanel(el.dataset.secid); },
       'toggleTag':           function() { toggleTag(el); },

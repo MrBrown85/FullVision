@@ -259,16 +259,50 @@ function setSectionOverride(cid, studentId, sectionId, level, reason) {
   saveOverrides(cid, overrides);
 }
 
-/** Calculate overall proficiency as the average of all sections with evidence.
+/** Calculate the averaged proficiency for a competency group.
+ * @param {string} cid - Course ID
+ * @param {string} studentId - Student ID
+ * @param {string} groupId - Competency group ID
+ * @returns {number} Group proficiency (0-4), or 0 if no evidence
+ */
+function getGroupProficiency(cid, studentId, groupId) {
+  const grouped = getGroupedSections(cid);
+  const gi = grouped.groups.find(g => g.group.id === groupId);
+  if (!gi || gi.sections.length === 0) return 0;
+  const profs = gi.sections.map(s => getSectionProficiency(cid, studentId, s.id)).filter(p => p > 0);
+  if (profs.length === 0) return 0;
+  return profs.reduce((a,b) => a+b, 0) / profs.length;
+}
+
+/** Calculate overall proficiency — group-aware when competency groups exist.
+ * Each group's sections are averaged into a single value; ungrouped sections count individually.
  * @param {string} cid - Course ID
  * @param {string} studentId - Student ID
  * @returns {number} Overall proficiency (0-4), or 0 if no evidence
  */
 function getOverallProficiency(cid, studentId) {
-  const sections = getSections(cid);
-  const profs = sections.map(s => getSectionProficiency(cid, studentId, s.id)).filter(p => p > 0);
-  if (profs.length === 0) return 0;
-  return profs.reduce((a,b) => a+b, 0) / profs.length;
+  const grouped = getGroupedSections(cid);
+  const hasGroups = grouped.groups.some(g => g.sections.length > 0);
+  if (!hasGroups) {
+    // No groups — original behavior: average all sections
+    const sections = getSections(cid);
+    const profs = sections.map(s => getSectionProficiency(cid, studentId, s.id)).filter(p => p > 0);
+    if (profs.length === 0) return 0;
+    return profs.reduce((a,b) => a+b, 0) / profs.length;
+  }
+  // Group-aware: one value per group + one per ungrouped section
+  const values = [];
+  grouped.groups.forEach(gi => {
+    if (gi.sections.length === 0) return;
+    const gp = getGroupProficiency(cid, studentId, gi.group.id);
+    if (gp > 0) values.push(gp);
+  });
+  grouped.ungrouped.forEach(sec => {
+    const sp = getSectionProficiency(cid, studentId, sec.id);
+    if (sp > 0) values.push(sp);
+  });
+  if (values.length === 0) return 0;
+  return values.reduce((a,b) => a+b, 0) / values.length;
 }
 
 /** Convert an average proficiency to a letter grade and percentage for PHIL12.
@@ -451,6 +485,7 @@ window.Calc = {
   getSectionProficiencyRaw,
   getSectionOverride,
   setSectionOverride,
+  getGroupProficiency,
   getOverallProficiency,
   calcLetterGrade,
   getSectionTrend,
