@@ -242,9 +242,9 @@ th.gb-group-alt { background-color: rgba(0,0,0,0.03); }
 .gb-assess-head.gb-type-formative { background: rgba(52,199,89,0.06); }
 .gb-stats-row td.gb-group-alt { background: var(--bg) !important; }
 
-/* Name column */
+/* Name column — z-index: body=5, header=10 (above all scrolling content) */
 .gb-name {
-  position:sticky; left:0; z-index:6; background:var(--bg);
+  position:sticky; left:0; z-index:5; background:var(--bg);
   padding:8px 12px 8px 16px; font-size:var(--text-md); font-weight:500;
   border-bottom:0.5px solid var(--divider-medium); white-space:nowrap;
   width:160px; min-width:160px; max-width:160px;
@@ -252,7 +252,7 @@ th.gb-group-alt { background-color: rgba(0,0,0,0.03); }
 .gb-name a { color:var(--text); text-decoration:none; }
 .gb-name a:hover { color:var(--active); }
 .gb-corner {
-  position:sticky; left:0; z-index:7; background:var(--bg);
+  position:sticky; left:0; z-index:10; background:var(--bg);
   padding:8px 12px 8px 16px; font-family:'SF Mono', ui-monospace, 'Menlo', monospace; font-size:var(--text-sm);
   font-weight:600; text-transform:uppercase; letter-spacing:var(--tracking-wide); color:var(--text-2);
   width:160px; min-width:160px; max-width:160px;
@@ -260,13 +260,13 @@ th.gb-group-alt { background-color: rgba(0,0,0,0.03); }
 
 /* Overall column — always visible, paired with name */
 .gb-overall-col {
-  position:sticky; left:160px; z-index:6; background:var(--bg);
+  position:sticky; left:160px; z-index:5; background:var(--bg);
   text-align:center; padding:8px 8px; border-bottom:0.5px solid var(--divider-medium);
   border-right:1px solid var(--divider-strong);
   width:90px; min-width:90px; max-width:90px;
 }
 .gb-overall-col-header {
-  position:sticky; left:160px; z-index:7; background:var(--bg);
+  position:sticky; left:160px; z-index:10; background:var(--bg);
   text-align:center; padding:8px 8px;
   font-family:'SF Mono', ui-monospace, 'Menlo', monospace; font-size:var(--text-sm); font-weight:700;
   text-transform:uppercase; letter-spacing:var(--tracking-wide); color:var(--text-2);
@@ -332,6 +332,9 @@ th.gb-group-alt { background-color: rgba(0,0,0,0.03); }
 /* Row banding — border-separate required for sticky z-index to work in Chrome */
 .gb-table { border-collapse:separate; border-spacing:0; width:max-content; }
 .gb-table th, .gb-table td { padding:0; }
+.gb-table thead th { position:sticky; top:0; z-index:8; background:var(--bg); }
+.gb-table thead th.gb-corner { z-index:12; }
+.gb-table thead th.gb-overall-col-header { z-index:12; }
 .gb-table tbody tr { height:48px; }
 .gb-table tbody tr:nth-child(even) td { background-color:rgba(0,0,0,0.015); }
 .gb-table tbody tr:nth-child(even) td.gb-group-alt { background-color:var(--overlay-hover); }
@@ -370,20 +373,20 @@ th.gb-group-alt { background-color: rgba(0,0,0,0.03); }
   white-space:nowrap;
 }
 
-/* Header */
+/* Header — z-index hierarchy: cells(1) < frozen-body(5) < header(8) < corner(12) */
 .gb-scores-table thead th {
   background:var(--bg); font-weight:600; font-size:var(--text-xs);
-  position:sticky; top:0; z-index:5;
+  position:sticky; top:0; z-index:8;
 }
 .gb-scores-corner {
   text-align:left; padding:8px 12px; font-size:var(--text-sm);
-  min-width:160px; z-index:10;
+  min-width:160px; z-index:12;
 }
 .gb-scores-sticky {
-  position:sticky; left:0; z-index:6; background:var(--surface);
+  position:sticky; left:0; z-index:5; background:var(--surface);
   border-right:2px solid var(--border);
 }
-thead .gb-scores-sticky { z-index:11; background:var(--bg); }
+thead .gb-scores-sticky { z-index:12; background:var(--bg); }
 
 /* Frozen summary columns */
 .gb-scores-frozen {
@@ -430,7 +433,7 @@ thead .gb-scores-frozen { background:var(--bg); }
   padding:8px 4px; cursor:pointer; transition:background 0.1s;
   min-width:56px; position:relative;
 }
-.gb-scores-cell:hover { outline:2px solid var(--active); outline-offset:-2px; z-index:2; }
+.gb-scores-cell:hover { outline:2px solid var(--active); outline-offset:-2px; position:relative; z-index:1; }
 .gb-scores-val { font-weight:600; font-size:var(--text-sm); }
 .gb-scores-focus { outline:2px solid var(--active); outline-offset:-2px; background:rgba(0,122,255,0.04) !important; }
 
