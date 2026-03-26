@@ -1,5 +1,8 @@
 /* gradebook.css — Gradebook page styles */
 
+/* Force page-main to constrain children so the table fills remaining viewport */
+.page-main { overflow-y: hidden !important; }
+
 /* Sidebar toggle hidden via JS in page-gradebook.js init() */
 
 /* ── Oversized course selector (replaces sidebar on gradebook) ── */
