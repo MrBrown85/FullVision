@@ -397,27 +397,27 @@ thead .gb-scores-sticky { z-index:12; background:var(--bg); }
 .gb-scores-final { color:var(--text); font-weight:700; }
 thead .gb-scores-frozen { background:var(--bg); }
 
-/* Assignment column headers — 45° angled text */
+/* Assignment column headers — 45° angled text, generous sizing */
 .gb-scores-assess-head {
-  padding:0; min-width:40px; max-width:48px; height:160px;
-  vertical-align:bottom; position:relative; overflow:visible;
+  padding:0; width:56px; min-width:56px; height:180px;
+  vertical-align:bottom; position:relative; overflow:hidden;
+  border-bottom:none;
 }
 .gb-scores-assess-inner {
-  position:absolute; bottom:8px; left:50%;
+  position:absolute; bottom:12px; left:8px;
   transform-origin:bottom left; transform:rotate(-45deg);
-  white-space:nowrap; width:max-content;
+  white-space:nowrap;
 }
 .gb-scores-assess-name {
-  font-size:11px; font-weight:600; color:var(--text);
-  max-width:200px; overflow:hidden; text-overflow:ellipsis;
-  display:block;
+  font-size:12px; font-weight:600; color:var(--text);
+  display:block; line-height:1.3;
 }
 .gb-scores-assess-meta {
-  font-size:9px; color:var(--text-3); font-weight:400;
-  display:block;
+  font-size:10px; color:var(--text-3); font-weight:400;
+  display:block; margin-top:1px;
 }
 .gb-scores-assess-stripe {
-  position:absolute; bottom:0; left:0; right:0; height:3px;
+  position:absolute; bottom:0; left:0; right:0; height:4px;
 }
 .gb-scores-summ .gb-scores-assess-stripe { background:var(--active); }
 .gb-scores-form .gb-scores-assess-stripe { background:var(--text-3); }
@@ -437,7 +437,7 @@ thead .gb-scores-frozen { background:var(--bg); }
 /* Score cells */
 .gb-scores-cell {
   padding:8px 4px; cursor:pointer; transition:background 0.1s;
-  min-width:56px; position:relative;
+  width:56px; min-width:56px; position:relative;
 }
 .gb-scores-cell:hover { outline:2px solid var(--active); outline-offset:-2px; position:relative; z-index:1; }
 .gb-scores-val { font-weight:600; font-size:var(--text-sm); }
