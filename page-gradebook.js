@@ -1050,29 +1050,40 @@ window.PageGradebook = (function() {
   function enterScoreMode(assessmentId) {
     _scoreMode = { assessmentId: assessmentId, studentIdx: 0 };
     render();
-    // After render, auto-focus the first cell in this column
     setTimeout(function() {
       var firstCell = document.querySelector('.gb-scores-cell.gb-scores-focus');
       if (firstCell) startCellEdit(firstCell);
     }, 50);
+    // Click anywhere outside the active column exits score mode
+    setTimeout(function() {
+      document.addEventListener('mousedown', _scoreModeClickAway);
+    }, 100);
+  }
+
+  function _scoreModeClickAway(e) {
+    if (!_scoreMode) { document.removeEventListener('mousedown', _scoreModeClickAway); return; }
+    // If clicking a cell in the same column, stay in score mode
+    var cell = e.target.closest('.gb-scores-cell');
+    if (cell && cell.dataset.aid === _scoreMode.assessmentId) return;
+    // Clicking anywhere else exits score mode
+    exitScoreMode();
+  }
+
+  function exitScoreMode() {
+    _scoreMode = null;
+    document.removeEventListener('mousedown', _scoreModeClickAway);
+    render();
   }
 
   function advanceScoreMode() {
     if (!_scoreMode) return;
     _scoreMode.studentIdx++;
-    // Check if we've passed the last student
-    var sortedStudents = applySorting(activeCourse, sortStudents(getStudents(activeCourse), 'lastName'), getSections(activeCourse), false);
-    if (_scoreMode.studentIdx >= sortedStudents.length) {
-      _scoreMode = null;
-      render();
-      return;
-    }
     render();
     setTimeout(function() {
-      // After render, exactly one cell has gb-scores-focus
       var target = document.querySelector('.gb-scores-cell.gb-scores-focus');
       if (target) startCellEdit(target);
-      else { _scoreMode = null; render(); }
+      // If no focus cell found (past last student), just stay in column mode
+      // User clicks away to exit
     }, 50);
   }
 
@@ -1160,7 +1171,7 @@ window.PageGradebook = (function() {
     inp.addEventListener('keydown', function(ev) {
       if (ev.key === 'Enter') { ev.preventDefault(); _navDir = 'down'; inp.blur(); }
       else if (ev.key === 'Tab') { ev.preventDefault(); _navDir = ev.shiftKey ? 'left' : 'right'; inp.blur(); }
-      else if (ev.key === 'Escape') { inp.remove(); if (span) span.style.display = ''; _scoreMode = null; }
+      else if (ev.key === 'Escape') { inp.remove(); if (span) span.style.display = ''; exitScoreMode(); }
     });
   }
 
