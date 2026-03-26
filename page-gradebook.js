@@ -11,7 +11,7 @@ window.PageGradebook = (function() {
 
   /* ── State variables ────────────────────────────────────── */
   var activeCourse;
-  var viewMode = 'scores';
+  var viewMode = localStorage.getItem('gb_viewMode') || 'detailed';
   var _scoreDensity = 'comfortable'; // 'compact' or 'comfortable'
   var _scoreTextSize = 13; // base font size in px for score cells
   var _pinnedCols = { name: true, final: true }; // pinnable: name, categories, final
@@ -52,7 +52,7 @@ window.PageGradebook = (function() {
   }
 
   /* ── View & filter controls ─────────────────────────────── */
-  function setView(mode) { viewMode = mode; render(); }
+  function setView(mode) { viewMode = mode; localStorage.setItem('gb_viewMode', mode); render(); }
   function toggleSectionFilter(secId) {
     var idx = filterSections.indexOf(secId);
     if (idx >= 0) filterSections.splice(idx, 1);
