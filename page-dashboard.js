@@ -605,42 +605,33 @@ window.PageDashboard = (function() {
           (missingCount > 0 ? '<span class="dash-card-missing" title="' + missingCount + ' past-due unscored">\u26A0' + missingCount + '</span>' : '') +
         '</div>';
 
-        // Section strip (with optional competency groups)
+        // Section strip — one card per group (averaged) + one per ungrouped section
         html += '<div class="dash-card-sections">';
         var _grouped = getGroupedSections(cid);
         if (_grouped.groups.length > 0) {
+          // Group cards: single averaged score per group
           _grouped.groups.forEach(function(gi) {
             if (gi.sections.length === 0) return;
-            html += '<div class="dash-section-group">' +
-              '<div class="dash-section-group-label" style="color:' + gi.group.color + '">' + esc(gi.group.name) + '</div>' +
-              '<div class="dash-section-group-items">';
-            gi.sections.forEach(function(sec) {
-              var secVal = getSectionProficiency(cid, st.id, sec.id);
-              var sr = Math.round(secVal);
-              html += '<div class="dash-section-mini" style="background:' + PROF_TINT[sr] + '">' +
-                '<div style="position:absolute;top:0;left:4px;right:4px;height:3px;border-radius:2px;background:' + sec.color + '"></div>' +
-                '<div class="dash-section-name">' + esc(sec.shortName || sec.name) + '</div>' +
-                '<div class="dash-section-val" style="color:' + PROF_COLORS[sr] + '">' + (secVal > 0 ? secVal.toFixed(1) : '\u2014') + '</div>' +
-              '</div>';
-            });
-            html += '</div></div>';
+            var groupVal = getGroupProficiency(cid, st.id, gi.group.id);
+            var gr = Math.round(groupVal);
+            html += '<div class="dash-section-mini" style="background:' + PROF_TINT[gr] + '">' +
+              '<div style="position:absolute;top:0;left:4px;right:4px;height:3px;border-radius:2px;background:' + gi.group.color + '"></div>' +
+              '<div class="dash-section-name">' + esc(gi.group.name) + '</div>' +
+              '<div class="dash-section-val" style="color:' + PROF_COLORS[gr] + '">' + (groupVal > 0 ? groupVal.toFixed(1) : '\u2014') + '</div>' +
+            '</div>';
           });
-          if (_grouped.ungrouped.length > 0) {
-            html += '<div class="dash-section-group" style="background:transparent">' +
-              '<div class="dash-section-group-items">';
-            _grouped.ungrouped.forEach(function(sec) {
-              var secVal = getSectionProficiency(cid, st.id, sec.id);
-              var sr = Math.round(secVal);
-              html += '<div class="dash-section-mini" style="background:' + PROF_TINT[sr] + '">' +
-                '<div style="position:absolute;top:0;left:4px;right:4px;height:3px;border-radius:2px;background:' + sec.color + '"></div>' +
-                '<div class="dash-section-name">' + esc(sec.shortName || sec.name) + '</div>' +
-                '<div class="dash-section-val" style="color:' + PROF_COLORS[sr] + '">' + (secVal > 0 ? secVal.toFixed(1) : '\u2014') + '</div>' +
-              '</div>';
-            });
-            html += '</div></div>';
-          }
+          // Ungrouped sections: individual cards
+          _grouped.ungrouped.forEach(function(sec) {
+            var secVal = getSectionProficiency(cid, st.id, sec.id);
+            var sr = Math.round(secVal);
+            html += '<div class="dash-section-mini" style="background:' + PROF_TINT[sr] + '">' +
+              '<div style="position:absolute;top:0;left:4px;right:4px;height:3px;border-radius:2px;background:' + sec.color + '"></div>' +
+              '<div class="dash-section-name">' + esc(sec.shortName || sec.name) + '</div>' +
+              '<div class="dash-section-val" style="color:' + PROF_COLORS[sr] + '">' + (secVal > 0 ? secVal.toFixed(1) : '\u2014') + '</div>' +
+            '</div>';
+          });
         } else {
-          html += '<div class="dash-section-group-items">';
+          // No groups — flat section cards
           sections.forEach(function(sec) {
             var secVal = getSectionProficiency(cid, st.id, sec.id);
             var sr = Math.round(secVal);
@@ -650,7 +641,6 @@ window.PageDashboard = (function() {
               '<div class="dash-section-val" style="color:' + PROF_COLORS[sr] + '">' + (secVal > 0 ? secVal.toFixed(1) : '\u2014') + '</div>' +
             '</div>';
           });
-          html += '</div>';
         }
         html += '</div>';
 
@@ -746,12 +736,30 @@ window.PageDashboard = (function() {
     var classAvg = overallVals.length > 0 ? overallVals.reduce(function(a, b) { return a + b; }, 0) / overallVals.length : 0;
     var classR = Math.round(classAvg);
 
-    // Section-level class averages
-    var sectionClassAvgs = sections.map(function(sec) {
-      var vals = allStudents.map(function(s) { return getSectionProficiency(cid, s.id, sec.id); }).filter(function(v) { return v > 0; });
-      var avg = vals.length > 0 ? vals.reduce(function(a, b) { return a + b; }, 0) / vals.length : 0;
-      return { section: sec, avg: avg, count: vals.length };
-    });
+    // Section/group-level class averages for overview bars
+    var _overviewGrouped = getGroupedSections(cid);
+    var _hasOverviewGroups = _overviewGrouped.groups.some(function(g) { return g.sections.length > 0; });
+    var sectionClassAvgs;
+    if (_hasOverviewGroups) {
+      sectionClassAvgs = [];
+      _overviewGrouped.groups.forEach(function(gi) {
+        if (gi.sections.length === 0) return;
+        var vals = allStudents.map(function(s) { return getGroupProficiency(cid, s.id, gi.group.id); }).filter(function(v) { return v > 0; });
+        var avg = vals.length > 0 ? vals.reduce(function(a, b) { return a + b; }, 0) / vals.length : 0;
+        sectionClassAvgs.push({ section: { shortName: gi.group.name, name: gi.group.name, color: gi.group.color }, avg: avg, count: vals.length });
+      });
+      _overviewGrouped.ungrouped.forEach(function(sec) {
+        var vals = allStudents.map(function(s) { return getSectionProficiency(cid, s.id, sec.id); }).filter(function(v) { return v > 0; });
+        var avg = vals.length > 0 ? vals.reduce(function(a, b) { return a + b; }, 0) / vals.length : 0;
+        sectionClassAvgs.push({ section: sec, avg: avg, count: vals.length });
+      });
+    } else {
+      sectionClassAvgs = sections.map(function(sec) {
+        var vals = allStudents.map(function(s) { return getSectionProficiency(cid, s.id, sec.id); }).filter(function(v) { return v > 0; });
+        var avg = vals.length > 0 ? vals.reduce(function(a, b) { return a + b; }, 0) / vals.length : 0;
+        return { section: sec, avg: avg, count: vals.length };
+      });
+    }
 
     // Tag coverage
     var allTags = getAllTags(cid);
