@@ -518,6 +518,7 @@ window.PageGradebook = (function() {
       var stripeColor = tagSecs.length > 0 ? tagSecs[0].color : 'var(--border)';
       html += '<div class="gb-grid-colhead' + typeClass + '" data-aid="' + a.id + '" data-action-dblclick="startScoreMode" title="' + esc(a.title) + '">' +
         '<div class="gb-grid-colhead-text">' +
+          '<div class="gb-grid-colhead-fill" style="background:' + stripeColor + '"></div>' +
           '<span class="gb-scores-assess-name">' + esc(a.title) + '</span>' +
           '<span class="gb-scores-assess-meta">' + formatDate(a.date) + maxPts + '</span>' +
         '</div>' +
