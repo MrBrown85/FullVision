@@ -611,8 +611,9 @@ window.PageDashboard = (function() {
         if (_grouped.groups.length > 0) {
           _grouped.groups.forEach(function(gi) {
             if (gi.sections.length === 0) return;
-            html += '<div class="dash-section-group" style="border-left:2px solid ' + gi.group.color + ';padding-left:2px;border-radius:4px">' +
-              '<div class="dash-section-group-label" style="color:' + gi.group.color + '">' + esc(gi.group.name) + '</div>';
+            html += '<div class="dash-section-group">' +
+              '<div class="dash-section-group-label" style="color:' + gi.group.color + '">' + esc(gi.group.name) + '</div>' +
+              '<div class="dash-section-group-items">';
             gi.sections.forEach(function(sec) {
               var secVal = getSectionProficiency(cid, st.id, sec.id);
               var sr = Math.round(secVal);
@@ -622,18 +623,24 @@ window.PageDashboard = (function() {
                 '<div class="dash-section-val" style="color:' + PROF_COLORS[sr] + '">' + (secVal > 0 ? secVal.toFixed(1) : '\u2014') + '</div>' +
               '</div>';
             });
-            html += '</div>';
+            html += '</div></div>';
           });
-          _grouped.ungrouped.forEach(function(sec) {
-            var secVal = getSectionProficiency(cid, st.id, sec.id);
-            var sr = Math.round(secVal);
-            html += '<div class="dash-section-mini" style="background:' + PROF_TINT[sr] + '">' +
-              '<div style="position:absolute;top:0;left:4px;right:4px;height:3px;border-radius:2px;background:' + sec.color + '"></div>' +
-              '<div class="dash-section-name">' + esc(sec.shortName || sec.name) + '</div>' +
-              '<div class="dash-section-val" style="color:' + PROF_COLORS[sr] + '">' + (secVal > 0 ? secVal.toFixed(1) : '\u2014') + '</div>' +
-            '</div>';
-          });
+          if (_grouped.ungrouped.length > 0) {
+            html += '<div class="dash-section-group" style="background:transparent">' +
+              '<div class="dash-section-group-items">';
+            _grouped.ungrouped.forEach(function(sec) {
+              var secVal = getSectionProficiency(cid, st.id, sec.id);
+              var sr = Math.round(secVal);
+              html += '<div class="dash-section-mini" style="background:' + PROF_TINT[sr] + '">' +
+                '<div style="position:absolute;top:0;left:4px;right:4px;height:3px;border-radius:2px;background:' + sec.color + '"></div>' +
+                '<div class="dash-section-name">' + esc(sec.shortName || sec.name) + '</div>' +
+                '<div class="dash-section-val" style="color:' + PROF_COLORS[sr] + '">' + (secVal > 0 ? secVal.toFixed(1) : '\u2014') + '</div>' +
+              '</div>';
+            });
+            html += '</div></div>';
+          }
         } else {
+          html += '<div class="dash-section-group-items">';
           sections.forEach(function(sec) {
             var secVal = getSectionProficiency(cid, st.id, sec.id);
             var sr = Math.round(secVal);
@@ -643,6 +650,7 @@ window.PageDashboard = (function() {
               '<div class="dash-section-val" style="color:' + PROF_COLORS[sr] + '">' + (secVal > 0 ? secVal.toFixed(1) : '\u2014') + '</div>' +
             '</div>';
           });
+          html += '</div>';
         }
         html += '</div>';
 
