@@ -183,6 +183,36 @@ window.PageGradebook = (function() {
     applyStickyLeft();
     initScrollShadows();
     initGridScrollSync();
+    initGridHoverSync();
+  }
+
+  /* ── 4-quadrant grid: row hover sync between Q3 and Q4 ───── */
+  function initGridHoverSync() {
+    var data = document.getElementById('gb-data');
+    var rowheads = document.getElementById('gb-rowheads');
+    if (!data || !rowheads) return;
+    var rowheadDivs = rowheads.querySelectorAll('.gb-grid-rowhead');
+    var dataRows = data.querySelectorAll('tbody tr:not(.gb-stats-row)');
+
+    // Hover Q4 row → highlight Q3 rowhead
+    dataRows.forEach(function(tr, i) {
+      tr.addEventListener('mouseenter', function() {
+        if (rowheadDivs[i]) rowheadDivs[i].classList.add('gb-row-hover');
+      });
+      tr.addEventListener('mouseleave', function() {
+        if (rowheadDivs[i]) rowheadDivs[i].classList.remove('gb-row-hover');
+      });
+    });
+
+    // Hover Q3 rowhead → highlight Q4 row
+    rowheadDivs.forEach(function(div, i) {
+      div.addEventListener('mouseenter', function() {
+        if (dataRows[i]) dataRows[i].classList.add('gb-row-hover');
+      });
+      div.addEventListener('mouseleave', function() {
+        if (dataRows[i]) dataRows[i].classList.remove('gb-row-hover');
+      });
+    });
   }
 
   /* ── 4-quadrant grid scroll sync ─────────────────────────── */
@@ -285,8 +315,8 @@ window.PageGradebook = (function() {
       var badges = '';
       if (a.scoreMode === 'points') badges += '<span class="gb-assess-badge">/ ' + (a.maxPoints||100) + '</span>';
       if (a.weight && a.weight !== 1) badges += '<span class="gb-assess-badge">' + a.weight + 'x</span>';
-      html += '<div class="gb-grid-assess-group' + typeClass + '" style="width:' + (g.count * 54) + 'px">' +
-        '<a class="gb-assess-title" href="#/assignments?course=' + cid + '&open=' + a.id + '">' + esc(a.title) + '</a>' +
+      html += '<div class="gb-grid-assess-group' + typeClass + '" style="width:' + (g.count * 54) + 'px" title="' + esc(a.title) + '">' +
+        '<a class="gb-assess-title" href="#/assignments?course=' + cid + '&open=' + a.id + '" title="' + esc(a.title) + '">' + esc(a.title) + '</a>' +
         '<div class="gb-assess-meta"><span class="gb-assess-type-pill ' + (isPrimary?'sum':'form') + '">' + (isPrimary?'S':'F') + '</span><span class="gb-assess-date">' + formatDate(a.date) + '</span>' + badges + '</div>' +
         '<div class="gb-assess-stripe" style="background:' + stripeColor + '"></div>' +
       '</div>';
@@ -349,8 +379,18 @@ window.PageGradebook = (function() {
       html += '</tr>';
     });
 
-    // Stats row
-    html += renderClassStatsRow(cid, sortedStudents, cols, groups, sections, scores);
+    // Stats row (grid version — no name/overall cells, those are in Q3)
+    html += '<tr class="gb-stats-row">';
+    var _statsColGroupMap = cols.map(function(_, i) { return groups.find(function(g) { return i >= g.startIdx && i < g.startIdx + g.count; }); });
+    cols.forEach(function(col, i) {
+      var g = _statsColGroupMap[i];
+      var startClass = (g && g.groupIdx > 0 && g.startIdx === i) ? ' gb-group-start' : '';
+      var altClass = (g && g.groupIdx % 2 === 1) ? ' gb-group-alt' : '';
+      var vals = sortedStudents.map(function(s) { var ss = scores[s.id]||[]; var entry = ss.find(function(e) { return e.assessmentId === col.assessmentId && e.tagId === col.tagId; }); return entry && entry.score > 0 ? entry.score : null; }).filter(function(v) { return v !== null; });
+      if (!vals.length) html += '<td class="gb-score' + startClass + altClass + '" style="cursor:default"><span class="gb-score-val s0" style="background:transparent">\u2014</span></td>';
+      else { var avg = vals.reduce(function(a,b){return a+b;},0)/vals.length; var r = Math.round(avg); html += '<td class="gb-score' + startClass + altClass + '" style="cursor:default"><span class="gb-avg-val" style="color:' + PROF_COLORS[r] + ';font-weight:700">' + avg.toFixed(1) + '</span></td>'; }
+    });
+    html += '</tr>';
     html += '</tbody></table></div></div>';
     return html;
   }

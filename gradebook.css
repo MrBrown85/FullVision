@@ -470,7 +470,7 @@ th.gb-group-alt { background-color: rgba(0,0,0,0.03); }
   letter-spacing:var(--tracking-wide);
   border-right:0.5px solid var(--divider-subtle);
   border-bottom:2px solid; /* color set inline */
-  background:var(--surface);
+  background:var(--surface); box-sizing:border-box;
 }
 .gb-grid-rowhead-comp {
   display:flex; align-items:center; justify-content:space-between;
@@ -485,15 +485,21 @@ th.gb-group-alt { background-color: rgba(0,0,0,0.03); }
   display:block; font-size:9px; font-weight:600; text-transform:uppercase;
   letter-spacing:0.3px;
 }
+/* Row hover sync — applied by JS across Q3 and Q4 */
+.gb-grid-rowhead.gb-row-hover { background:var(--active-light) !important; }
+.gb-table tbody tr.gb-row-hover td { background:var(--active-light) !important; }
+.gb-scores-table tbody tr.gb-row-hover td { background:var(--active-light) !important; }
 .gb-grid-rowhead-stats {
   font-weight:700; font-size:var(--text-sm); color:var(--text-2);
   height:48px; display:flex; align-items:center;
   border-top:1px solid var(--border);
 }
-/* Competencies data table rows match row header height */
+/* Competencies data table — rows must match Q3 height exactly */
+.gb-grid-comp .gb-table { border-collapse:collapse; }
 .gb-grid-comp .gb-table tbody tr { height:48px; }
-.gb-grid-comp .gb-table { border-collapse:separate; border-spacing:0; }
-.gb-grid-comp .gb-score { min-width:54px; width:54px; background:var(--surface); }
+.gb-grid-comp .gb-table td { box-sizing:border-box; }
+.gb-grid-comp .gb-score { min-width:54px; width:54px; background:var(--surface); box-sizing:border-box; }
+.gb-grid-comp .gb-stats-row td { border-top:1px solid var(--border); box-sizing:border-box; }
 
 /* Q4: Data area — scrolls both ways, drives Q2 and Q3 */
 .gb-grid-data {
