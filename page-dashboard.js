@@ -113,6 +113,62 @@ window.PageDashboard = (function() {
     if (folder) folder.classList.toggle('open', !_cmCollapsedStdFolders[uid]);
   }
 
+  // Drag-and-drop for standards between group folders
+  var _cmDragStdId = null;
+  (function initCmStdDrag() {
+    document.addEventListener('dragstart', function(e) {
+      var card = e.target.closest && e.target.closest('.cm-std-card[data-std-drag]');
+      if (!card) return;
+      _cmDragStdId = card.dataset.stdDrag;
+      card.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', _cmDragStdId);
+    });
+    document.addEventListener('dragover', function(e) {
+      if (!_cmDragStdId) return;
+      var folder = e.target.closest && e.target.closest('.mod-folder[data-folder-drop]');
+      if (!folder) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      // Add drag-over highlight and auto-open collapsed folder
+      document.querySelectorAll('.mod-folder.drag-over').forEach(function(f) { f.classList.remove('drag-over'); });
+      folder.classList.add('drag-over');
+      if (!folder.classList.contains('open')) folder.classList.add('open');
+    });
+    document.addEventListener('dragleave', function(e) {
+      if (!_cmDragStdId) return;
+      var folder = e.target.closest && e.target.closest('.mod-folder[data-folder-drop]');
+      if (folder && !folder.contains(e.relatedTarget)) folder.classList.remove('drag-over');
+    });
+    document.addEventListener('drop', function(e) {
+      if (!_cmDragStdId) return;
+      var folder = e.target.closest && e.target.closest('.mod-folder[data-folder-drop]');
+      if (!folder) return;
+      e.preventDefault();
+      var targetGroupId = folder.dataset.folderDrop;
+      if (targetGroupId === '__none__') targetGroupId = '';
+      // Update the section's groupId
+      if (cmSelectedCourse) {
+        var map = ensureCustomLearningMap(cmSelectedCourse);
+        var sec = (map.sections || []).find(function(s) { return s.id === _cmDragStdId; });
+        if (sec) {
+          if (targetGroupId) sec.groupId = targetGroupId;
+          else delete sec.groupId;
+          saveLearningMap(cmSelectedCourse, map);
+          renderClassManager();
+        }
+      }
+      _cmDragStdId = null;
+      document.querySelectorAll('.mod-folder.drag-over').forEach(function(f) { f.classList.remove('drag-over'); });
+      document.querySelectorAll('.cm-std-card.dragging').forEach(function(c) { c.classList.remove('dragging'); });
+    });
+    document.addEventListener('dragend', function() {
+      _cmDragStdId = null;
+      document.querySelectorAll('.mod-folder.drag-over').forEach(function(f) { f.classList.remove('drag-over'); });
+      document.querySelectorAll('.cm-std-card.dragging').forEach(function(c) { c.classList.remove('dragging'); });
+    });
+  })();
+
   // Step 2 stash
   var cwStep2Name = '', cwStep2Grade = '', cwStep2Desc = '';
   var cwStep2Grading = 'proficiency', cwStep2Calc = 'mostRecent', cwStep2Decay = '65';
@@ -2095,7 +2151,7 @@ window.PageDashboard = (function() {
     if (!cmSelectedCourse) return;
     var map = ensureCustomLearningMap(cmSelectedCourse);
     var g = (map.competencyGroups || []).find(function(x) { return x.id === grpId; });
-    if (g) { g.color = color; saveLearningMap(cmSelectedCourse, map); renderClassManager(); }
+    if (g) { g.color = color; saveLearningMap(cmSelectedCourse, map); _cmRenderWithScroll(); }
   }
 
   function cmDeleteCompGroup(grpId) {
@@ -2106,7 +2162,7 @@ window.PageDashboard = (function() {
       map.competencyGroups = (map.competencyGroups || []).filter(function(g) { return g.id !== grpId; });
       (map.sections || []).forEach(function(s) { if (s.groupId === grpId) delete s.groupId; });
       saveLearningMap(cmSelectedCourse, map);
-      renderClassManager();
+      _cmRenderWithScroll();
     };
     if (count > 0) {
       showConfirm('Delete Group', count + ' standard(s) will become ungrouped. Delete anyway?', 'Delete', 'danger', doDelete);
@@ -2122,6 +2178,18 @@ window.PageDashboard = (function() {
     if (!sec) return;
     if (groupId) sec.groupId = groupId; else delete sec.groupId;
     saveLearningMap(cmSelectedCourse, map);
+    _cmRenderWithScroll();
+  }
+
+  // Re-render class manager preserving scroll position
+  function _cmRenderWithScroll() {
+    var container = document.querySelector('.cm-detail');
+    var scrollY = container ? container.scrollTop : window.scrollY;
+    renderClassManager();
+    requestAnimationFrame(function() {
+      var c = document.querySelector('.cm-detail');
+      if (c) c.scrollTop = scrollY; else window.scrollTo(0, scrollY);
+    });
   }
 
   // ── Flat Learning Standard CRUD ──────────────────────────────

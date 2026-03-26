@@ -256,24 +256,27 @@ window.DashCurriculumWizard = (function() {
     html += '<div class="cm-section"><div class="cm-section-title">Customize Competencies</div>' +
       '<div class="cm-hint" style="margin-bottom:12px">Organize your competencies into groups, or leave them ungrouped. This step is optional.</div>';
 
-    // Render groups
+    // Render groups (uses .mod-folder pattern from assignments page)
     cwCompetencyGroups.sort(function(a, b) { return (a.sortOrder || 0) - (b.sortOrder || 0); });
     cwCompetencyGroups.forEach(function(grp, gi) {
       var groupSections = allSections.filter(function(s) { return cwSectionGroupMap[s.id] === grp.id; });
       var collapsed = cwCollapsedGroups[grp.id];
-      html += '<div class="cw-comp-folder' + (collapsed ? '' : ' open') + '" data-group-id="' + grp.id + '">' +
-        '<div class="cw-comp-folder-header" data-action="cwToggleGroup" data-gid="' + grp.id + '">' +
-          '<span class="cw-comp-chevron">' + (collapsed ? '\u25B6' : '\u25BC') + '</span>' +
-          '<span class="cw-comp-color" style="background:' + grp.color + '">' +
-            '<input type="color" value="' + grp.color + '" data-action-change="cwGroupColor" data-gid="' + grp.id + '" style="opacity:0;position:absolute;width:100%;height:100%;cursor:pointer">' +
+      html += '<div class="mod-folder' + (collapsed ? '' : ' open') + '" data-group-id="' + grp.id + '" data-folder-drop="' + grp.id + '">' +
+        '<div class="mod-folder-header" data-action="cwToggleGroup" data-gid="' + grp.id + '">' +
+          '<span class="mod-folder-grip">\u2807</span>' +
+          '<span class="mod-folder-chevron">\u25B6</span>' +
+          '<span class="mod-folder-color" style="background:' + grp.color + '" title="Change color" data-action="openColorPicker" data-stop-prop="true">' +
+            '<input type="color" value="' + grp.color + '" data-action-change="cwGroupColor" data-gid="' + grp.id + '">' +
           '</span>' +
-          '<input class="cw-comp-name-input" value="' + esc(grp.name) + '" data-action-blur="cwGroupName" data-gid="' + grp.id + '" data-stop-prop="true">' +
-          '<span class="cw-comp-meta">' + groupSections.length + ' item' + (groupSections.length !== 1 ? 's' : '') + '</span>' +
-          '<button class="cw-comp-delete" data-action="cwDeleteGroup" data-gid="' + grp.id + '" data-stop-prop="true" title="Delete group">\u2715</button>' +
+          '<input class="mod-folder-name-input" value="' + esc(grp.name) + '" draggable="false" data-stop-prop="true" data-action-blur="cwGroupName" data-gid="' + grp.id + '">' +
+          '<span class="mod-folder-meta">' + groupSections.length + ' standard' + (groupSections.length !== 1 ? 's' : '') + '</span>' +
+          '<div class="mod-folder-actions" data-stop-prop="true">' +
+            '<button class="mod-folder-action delete" data-action="cwDeleteGroup" data-gid="' + grp.id + '" title="Delete group">\u2715</button>' +
+          '</div>' +
         '</div>' +
-        '<div class="cw-comp-folder-body"' + (collapsed ? ' style="display:none"' : '') + '>';
+        '<div class="mod-folder-body">';
       if (groupSections.length === 0) {
-        html += '<div class="cw-comp-empty">Drag competencies here or use the dropdown on each competency</div>';
+        html += '<div class="mod-folder-empty">Drag competencies here or use the dropdown on each competency</div>';
       }
       groupSections.forEach(function(sec) {
         html += _cwRenderCompItem(sec, grp.id);
@@ -283,24 +286,22 @@ window.DashCurriculumWizard = (function() {
 
     // Ungrouped
     var ungrouped = allSections.filter(function(s) { return !cwSectionGroupMap[s.id]; });
-    html += '<div class="cw-comp-folder cw-comp-ungrouped open">' +
-      '<div class="cw-comp-folder-header" data-action="cwToggleGroup" data-gid="__none__">' +
-        '<span class="cw-comp-chevron">\u25BC</span>' +
+    html += '<div class="mod-folder no-module' + (cwCollapsedGroups['__none__'] ? '' : ' open') + '" data-group-id="__none__" data-folder-drop="__none__">' +
+      '<div class="mod-folder-header" data-action="cwToggleGroup" data-gid="__none__">' +
+        '<span class="mod-folder-chevron">\u25B6</span>' +
         '<span style="font-size:0.88rem;color:var(--text-3)">\uD83D\uDCC1</span>' +
-        '<span style="font-size:0.95rem;font-weight:500;color:var(--text-3)">Ungrouped</span>' +
-        '<span class="cw-comp-meta">' + ungrouped.length + ' item' + (ungrouped.length !== 1 ? 's' : '') + '</span>' +
+        '<span class="mod-folder-name" style="font-size:0.95rem;font-weight:500;color:var(--text-3)">Ungrouped</span>' +
+        '<span class="mod-folder-meta">' + ungrouped.length + ' standard' + (ungrouped.length !== 1 ? 's' : '') + '</span>' +
       '</div>' +
-      '<div class="cw-comp-folder-body">';
+      '<div class="mod-folder-body">';
     ungrouped.forEach(function(sec) {
       html += _cwRenderCompItem(sec, null);
     });
     html += '</div></div>';
 
     // Action buttons
-    html += '<div style="display:flex;gap:8px;margin-top:12px">' +
-      '<button class="cw-custom-btn" data-action="cwAddGroup" style="flex:0">\u2795 Add Group</button>' +
-      '<button class="cw-custom-btn" data-action="cwAddCustomComp" style="flex:0">\u2795 Add Custom Competency</button>' +
-    '</div>';
+    html += '<button class="add-module-btn" data-action="cwAddGroup">+ Add Group</button>' +
+      '<button class="cm-add-link" data-action="cwAddCustomComp" style="margin-top:4px">+ Add Custom Competency</button>';
 
     html += '</div>'; // close cm-section
 
@@ -318,12 +319,13 @@ window.DashCurriculumWizard = (function() {
     cwCompetencyGroups.forEach(function(g) {
       groupOptions += '<option value="' + g.id + '"' + (currentGroupId === g.id ? ' selected' : '') + '>' + esc(g.name) + '</option>';
     });
-    return '<div class="cw-comp-item" draggable="true" data-comp-drag="' + esc(sec.id) + '">' +
-      '<span class="cw-comp-tag" style="color:var(--text-3)">' + esc(sec.tag) + '</span>' +
-      '<span class="cw-comp-label">' + esc(sec.label) + '</span>' +
-      '<select class="cw-comp-group-select" data-action-change="cwCompGroupChange" data-secid="' + esc(sec.id) + '" data-stop-prop="true">' + groupOptions + '</select>' +
-      (sec._custom ? '<button class="cw-comp-remove" data-action="cwRemoveCustomComp" data-secid="' + esc(sec.id) + '" data-stop-prop="true" title="Remove">\u2715</button>' : '') +
-    '</div>';
+    return '<div class="cm-std-card" draggable="true" data-comp-drag="' + esc(sec.id) + '">' +
+      '<div class="cm-std-header">' +
+        '<span class="cm-std-tag">' + esc(sec.tag) + '</span>' +
+        '<span class="cm-std-label">' + esc(sec.label) + '</span>' +
+        '<select class="cm-std-group-select" data-action-change="cwCompGroupChange" data-secid="' + esc(sec.id) + '" data-stop-prop="true" style="font-size:var(--text-xs);padding:2px 6px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text-2);max-width:120px">' + groupOptions + '</select>' +
+        (sec._custom ? '<button class="cm-delete-mini" data-action="cwRemoveCustomComp" data-secid="' + esc(sec.id) + '" data-stop-prop="true" title="Remove" style="width:20px;height:20px;font-size:11px">\u2715</button>' : '') +
+      '</div></div>';
   }
 
   /* ── Step 3 actions ──────────────────────────────────────── */
@@ -353,13 +355,9 @@ window.DashCurriculumWizard = (function() {
 
   function cwToggleGroup(gid) {
     cwCollapsedGroups[gid] = !cwCollapsedGroups[gid];
-    var folder = document.querySelector('.cw-comp-folder[data-group-id="' + gid + '"]');
+    var folder = document.querySelector('.mod-folder[data-group-id="' + gid + '"]');
     if (folder) {
       folder.classList.toggle('open', !cwCollapsedGroups[gid]);
-      var chevron = folder.querySelector('.cw-comp-chevron');
-      if (chevron) chevron.textContent = cwCollapsedGroups[gid] ? '\u25B6' : '\u25BC';
-      var body = folder.querySelector('.cw-comp-folder-body');
-      if (body) body.style.display = cwCollapsedGroups[gid] ? 'none' : '';
     }
   }
 
