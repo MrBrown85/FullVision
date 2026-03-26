@@ -383,20 +383,28 @@ window.PageStudent = (function() {
         '<div class="section-mini-label">' + esc(sec.name) + '</div>' +
       '</div>';
     };
+    html += '<div class="stu-sections-wrap">';
     if (_stGrouped.groups.length > 0) {
       _stGrouped.groups.forEach(function(gi) {
         if (gi.sections.length === 0) return;
-        html += '<div style="display:flex;flex-direction:column;gap:2px;border-left:2px solid ' + gi.group.color + ';padding-left:4px;margin-top:8px">' +
-          '<div style="font-size:8px;text-transform:uppercase;letter-spacing:0.5px;color:' + gi.group.color + ';font-weight:600">' + esc(gi.group.name) + '</div>' +
-          '<div style="display:flex;gap:4px">';
+        html += '<div class="stu-section-group">' +
+          '<div class="stu-section-group-label" style="color:' + gi.group.color + '">' + esc(gi.group.name) + '</div>' +
+          '<div class="stu-section-group-items">';
         gi.sections.forEach(function(sec) { html += _renderSecMini(sec); });
         html += '</div></div>';
       });
-      _stGrouped.ungrouped.forEach(function(sec) { html += _renderSecMini(sec); });
+      if (_stGrouped.ungrouped.length > 0) {
+        html += '<div class="stu-section-group">' +
+          '<div class="stu-section-group-items">';
+        _stGrouped.ungrouped.forEach(function(sec) { html += _renderSecMini(sec); });
+        html += '</div></div>';
+      }
     } else {
+      html += '<div class="stu-section-group-items">';
       sections.forEach(function(sec) { html += _renderSecMini(sec); });
+      html += '</div>';
     }
-    html += '</div>';
+    html += '</div></div>';
 
     // ── Assessment Grades Table ──
     var sortedAssessments = assessments.slice().sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });

@@ -2,9 +2,9 @@
 
 /* ── Student page-specific styles ─────────────────────────── */
 
-/* Stats bar: completion on left, section cards fill rest */
+/* Stats bar: completion on left, section groups fill rest */
 .student-stats-bar {
-  display: flex; align-items: stretch; gap: 0;
+  display: flex; align-items: stretch;
   background: var(--surface); border-radius: var(--radius);
   border: 1px solid var(--border);
   margin-bottom: 20px; overflow: hidden;
@@ -22,13 +22,33 @@
 }
 .completion-stat strong { color: var(--text); font-weight: 700; }
 
+/* Section cards area — wraps when too many */
+.stu-sections-wrap {
+  flex: 1; min-width: 0; display: flex; flex-wrap: wrap;
+}
+.stu-section-group {
+  display: flex; flex-direction: column; flex: 1; min-width: 160px;
+  border-right: 1px solid var(--divider-subtle);
+}
+.stu-section-group:last-child { border-right: none; }
+.stu-section-group-label {
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px;
+  font-weight: 700; padding: 6px 12px 0; line-height: 1;
+}
+.stu-section-group-items {
+  display: flex; flex: 1;
+}
+
 /* Mini section stat cards */
 .section-mini-card {
-  flex: 1; padding: 18px 20px; text-align: center;
+  flex: 1; padding: 14px 12px 12px; text-align: center;
   border-right: 1px solid var(--divider-subtle); position: relative;
   transition: background 0.12s; cursor: pointer; user-select: none;
+  min-width: 100px;
 }
 .section-mini-card:last-child { border-right: none; }
+.stu-section-group .section-mini-card { border-right: 1px solid var(--divider-subtle); }
+.stu-section-group .section-mini-card:last-child { border-right: none; }
 .section-mini-card:hover { background: var(--bg); }
 .section-mini-card.active-filter { background: rgba(0,122,255,0.06); }
 .section-mini-card.active-filter .section-mini-stripe { height: 5px; }
@@ -37,10 +57,10 @@
   position: absolute; top: 0; left: 0; right: 0; height: 3px;
 }
 .section-mini-val {
-  font-family:var(--font-base); font-size: var(--text-4xl); font-weight: 700; line-height: 1.2;
+  font-family:var(--font-base); font-size: var(--text-3xl); font-weight: 700; line-height: 1.2;
 }
 .section-mini-label {
-  font-family:var(--font-base); font-size:var(--text-sm); text-transform: uppercase;
+  font-family:var(--font-base); font-size:var(--text-xs); text-transform: uppercase;
   color: var(--text-2); letter-spacing:var(--tracking-wide); margin-top: 4px; font-weight: 600;
   line-height: 1.3;
 }

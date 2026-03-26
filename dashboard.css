@@ -321,9 +321,9 @@
   margin-bottom:10px; position:relative;
 }
 .dash-section-group {
-  display:flex; flex-direction:column; gap:4px; flex:1; min-width:0;
+  display:flex; flex-direction:column; gap:4px; flex:1 1 45%;
   padding:6px 8px 8px; border-radius:10px;
-  background:var(--overlay-hover);
+  background:var(--overlay-hover); min-width:0;
 }
 .dash-section-group-label {
   font-size:9px; text-transform:uppercase; letter-spacing:0.6px;
