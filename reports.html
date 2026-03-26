@@ -94,7 +94,6 @@ const DEFAULT_BLOCKS = [
   // Academic
   { id:'academic-summary',   label:'Academic Summary',         enabled:true,  locked:false },
   { id:'teacher-narrative',  label:'Teacher Comment',          enabled:true,  locked:false },
-  { id:'section-chart',      label:'Section Proficiency Chart', enabled:false, locked:false },
   { id:'grade-table',        label:'Assignment Grades',        enabled:false, locked:false },
   { id:'score-distribution', label:'Score Distribution',       enabled:false, locked:false },
   { id:'section-outcomes',   label:'Learning Outcomes',        enabled:false, locked:false },
@@ -542,136 +541,6 @@ function renderBlockStudentReflectionHabits(cid, student) {
   return html;
 }
 
-/* ── Section Proficiency Bar Chart (horizontal bars) ── */
-function renderBlockSectionChart(cid, student) {
-  const sections = getSections(cid);
-  const assessments = getAssessments(cid);
-  const allScores = getScores(cid)[student.id] || [];
-  let html = `<div class="report-block-box" style="page-break-inside:avoid">
-    <div class="report-block-title">Section Proficiency Breakdown</div>`;
-
-  sections.forEach((sec, si) => {
-    const secProf = getSectionProficiency(cid, student.id, sec.id);
-    const sr = Math.round(secProf);
-    const secLabel = secProf > 0 ? PROF_LABELS[sr] : 'No Evidence';
-
-    // Tag-level breakdown
-    const tagData = sec.tags.map(tag => {
-      const prof = getTagProficiency(cid, student.id, tag.id);
-      const r = Math.round(prof);
-      return { tag, prof, r };
-    });
-    const assessed = tagData.filter(t => t.prof > 0);
-    const strengths = assessed.filter(t => t.r >= 3).sort((a,b) => b.prof - a.prof);
-    const growth = assessed.filter(t => t.r <= 2).sort((a,b) => a.prof - b.prof);
-    const notYet = tagData.filter(t => t.prof === 0);
-
-    // Assessments that touched this section + student performance
-    const secTagIds = new Set(sec.tags.map(t => t.id));
-    const secScores = allScores.filter(s => secTagIds.has(s.tagId) && s.score > 0);
-    const touchedAssessIds = new Set(secScores.map(s => s.assessmentId));
-    const touchedAssess = assessments.filter(a => touchedAssessIds.has(a.id));
-    // Per-assessment avg for this section's tags
-    const assessPerf = touchedAssess.map(a => {
-      const aScores = secScores.filter(s => s.assessmentId === a.id);
-      if (aScores.length === 0) return null;
-      const avg = aScores.reduce((s,x) => s + x.score, 0) / aScores.length;
-      return { title: a.title, avg, r: Math.round(avg) };
-    }).filter(Boolean).sort((a,b) => b.avg - a.avg);
-    // Missing: assessments that have tags in this section but student has no scores
-    const missingAssess = assessments.filter(a => {
-      const hasTags = (a.tagIds || []).some(tid => secTagIds.has(tid));
-      if (!hasTags) return false;
-      return !allScores.some(s => s.assessmentId === a.id && secTagIds.has(s.tagId) && s.score > 0);
-    });
-
-    // 4-dot proficiency indicator
-    let dots = '';
-    for (let i = 1; i <= 4; i++) {
-      const filled = secProf > 0 && i <= sr;
-      dots += `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;border:1.5px solid ${secProf > 0 ? '#333' : '#ccc'};${filled ? 'background:#333;' : ''}margin-right:3px"></span>`;
-    }
-
-    html += `<div style="${si > 0 ? 'margin-top:12px;padding-top:10px;border-top:1.5px solid var(--border);' : ''}page-break-inside:avoid">`;
-    // Header row
-    html += `<div style="display:flex;align-items:center;gap:10px;margin-bottom:5px">
-      <div style="font-size:0.88rem;font-weight:700;color:var(--text);flex:1">${esc(sec.shortName || sec.name)}</div>
-      <div style="display:flex;align-items:center;gap:2px">${dots}</div>
-      <div style="font-size:0.82rem;font-weight:700;color:var(--text)">${secLabel}</div>
-      <div style="font-size:0.64rem;color:var(--text-3);font-weight:500">${assessed.length}/${tagData.length} outcomes</div>
-    </div>`;
-
-    // 3-column layout: strengths | growth | assessments
-    html += `<div style="display:flex;gap:14px;font-size:0.76rem;line-height:1.55">`;
-
-    // Col 1: Strengths
-    html += `<div style="flex:1;min-width:0">`;
-    html += `<div style="font-weight:700;font-size:0.6rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-2);margin-bottom:2px">Strengths</div>`;
-    if (strengths.length > 0) {
-      strengths.forEach(t => {
-        html += `<div style="display:flex;align-items:baseline;gap:4px;color:var(--text)">
-          <span style="font-size:0.64rem;font-weight:600;color:var(--text-3);flex-shrink:0">${(PROF_LABELS[t.r]||'?')[0]}</span>
-          <span>${esc(t.tag.label)}</span>
-        </div>`;
-      });
-    } else {
-      html += `<div style="color:var(--text-3);font-style:italic;font-size:0.72rem">None yet</div>`;
-    }
-    html += `</div>`;
-
-    // Col 2: Growth
-    html += `<div style="flex:1;min-width:0">`;
-    html += `<div style="font-weight:700;font-size:0.6rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-2);margin-bottom:2px">Areas for Growth</div>`;
-    if (growth.length > 0) {
-      growth.forEach(t => {
-        html += `<div style="display:flex;align-items:baseline;gap:4px;color:var(--text)">
-          <span style="font-size:0.64rem;font-weight:600;color:var(--text-3);flex-shrink:0">${(PROF_LABELS[t.r]||'?')[0]}</span>
-          <span>${esc(t.tag.label)}</span>
-        </div>`;
-      });
-    } else if (assessed.length > 0) {
-      html += `<div style="color:var(--text-3);font-style:italic;font-size:0.72rem">All at/above proficient</div>`;
-    }
-    if (notYet.length > 0) {
-      html += `<div style="font-size:0.66rem;color:var(--text-3);margin-top:2px;font-style:italic">${notYet.length} not yet assessed</div>`;
-    }
-    html += `</div>`;
-
-    // Col 3: Assessments & Evidence
-    html += `<div style="flex:1;min-width:0">`;
-    html += `<div style="font-weight:700;font-size:0.6rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-2);margin-bottom:2px">Assessments</div>`;
-    if (assessPerf.length > 0) {
-      assessPerf.slice(0, 4).forEach(a => {
-        html += `<div style="display:flex;align-items:baseline;gap:4px;color:var(--text)">
-          <span style="font-size:0.64rem;font-weight:600;color:var(--text-3);flex-shrink:0">${(PROF_LABELS[a.r]||'?')[0]}</span>
-          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.title)}</span>
-        </div>`;
-      });
-      if (assessPerf.length > 4) {
-        html += `<div style="font-size:0.64rem;color:var(--text-3);font-style:italic">+${assessPerf.length - 4} more</div>`;
-      }
-    } else {
-      html += `<div style="color:var(--text-3);font-style:italic;font-size:0.72rem">No evidence yet</div>`;
-    }
-    if (missingAssess.length > 0) {
-      html += `<div class="report-missing-title" style="font-size:0.64rem;color:var(--score-1);font-weight:600;margin-top:3px">Missing:</div>`;
-      missingAssess.slice(0, 3).forEach(a => {
-        html += `<div style="font-size:0.68rem;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">· ${esc(a.title)}</div>`;
-      });
-      if (missingAssess.length > 3) {
-        html += `<div style="font-size:0.64rem;color:var(--text-3);font-style:italic">+${missingAssess.length - 3} more</div>`;
-      }
-    }
-    html += `</div>`;
-
-    html += `</div>`; // close 3-col
-    html += `</div>`; // close section
-  });
-
-  html += `</div>`;
-  return html;
-}
-
 /* ── Score Distribution & Assignment Highlights ── */
 function renderBlockScoreDistribution(cid, student) {
   const allScores = getScores(cid)[student.id] || [];
@@ -977,7 +846,6 @@ function renderReportBlock(blockId, cid, student) {
   switch (blockId) {
     case 'header':            return renderBlockHeader(cid, student);
     case 'academic-summary':  return renderBlockAcademicSummary(cid, student);
-    case 'section-chart':     return renderBlockSectionChart(cid, student);
     case 'score-distribution':return renderBlockScoreDistribution(cid, student);
     case 'grade-table':       return renderBlockGradeTable(cid, student);
     case 'section-outcomes':  return renderBlockSectionOutcomes(cid, student);
