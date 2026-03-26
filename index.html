@@ -2,10 +2,38 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="refresh" content="0;url=login.html">
-<title>TeacherDashboard</title>
+<title>Sign In — TeacherDashboard</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',sans-serif;background:#f5f5f7;display:flex;align-items:center;justify-content:center;min-height:100vh}
+.c{background:#fff;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,0.08);padding:40px 36px 36px;width:100%;max-width:400px;margin:20px}
+h1{font-size:1.5rem;font-weight:700;color:#1d1d1f;text-align:center;margin:0 0 4px;letter-spacing:-0.02em}
+p{font-size:1rem;color:#636366;text-align:center;margin:0 0 28px}
+.t{display:flex;gap:2px;background:#e5e5ea;border-radius:8px;padding:2px;margin-bottom:24px}
+.t span{flex:1;padding:8px 0;text-align:center;font-size:0.94rem;border-radius:6px;color:#636366}
+.t .a{background:#fff;color:#1d1d1f;font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,0.08)}
+.f{display:flex;flex-direction:column;gap:14px}
+label{display:block;font-size:0.85rem;font-weight:500;color:#636366;margin-bottom:5px}
+input{font-family:inherit;font-size:1rem;padding:10px 14px;border:1px solid #d1d1d6;border-radius:10px;background:#fff;color:#1d1d1f;outline:none;width:100%}
+button{margin-top:6px;padding:12px;font-family:inherit;font-size:1rem;font-weight:600;border:none;border-radius:10px;background:#007AFF;color:#fff;width:100%}
+.fg{text-align:center;margin-top:8px;font-size:0.85rem}
+.fg a{color:#007AFF;text-decoration:none}
+</style>
 <script>window.location.replace('login.html');</script>
-<style>body{margin:0;background:#f5f5f7;}</style>
 </head>
-<body></body>
+<body>
+<main class="c">
+<h1>TeacherDashboard</h1>
+<p>Standards-Based Gradebook</p>
+<div class="t"><span class="a">Sign In</span><span>Sign Up</span></div>
+<div class="f">
+<div><label>Email</label><input type="email" placeholder="you@school.ca"></div>
+<div><label>Password</label><input type="password" placeholder="Password"></div>
+<button>Sign In</button>
+<div class="fg"><a href="login.html">Forgot password?</a></div>
+</div>
+</main>
+</body>
 </html>
