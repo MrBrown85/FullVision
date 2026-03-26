@@ -391,7 +391,7 @@ th.gb-group-alt { background-color: rgba(0,0,0,0.03); }
   overflow:hidden; border-bottom:2px solid var(--border);
   background:var(--bg); position:relative;
 }
-.gb-grid-colheads-inner { display:flex; position:relative; }
+.gb-grid-colheads-inner { display:flex; position:relative; width:max-content; }
 .gb-grid-colhead {
   flex:0 0 48px; width:48px; height:200px;
   position:relative; display:flex; flex-direction:column;
