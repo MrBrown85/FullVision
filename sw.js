@@ -1,6 +1,6 @@
 // IMPORTANT: Increment the version number when deploying new app code
 // This ensures users get the latest files
-const CACHE_NAME = 'fullvision-v11';
+const CACHE_NAME = 'fullvision-v12';
 
 // All app files to pre-cache on install
 const PRECACHE_URLS = [
@@ -12,7 +12,7 @@ const PRECACHE_URLS = [
   '/shared/constants.js',
   '/shared/data.js',
   '/shared/calc.js',
-  '/shared/seed-data.js',
+  // seed-data.js omitted — lazy-loaded on demand for new accounts only
   // Teacher desktop
   '/teacher/app.html',
   '/teacher/styles.css',

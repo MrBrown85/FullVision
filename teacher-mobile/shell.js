@@ -43,7 +43,7 @@
     await initAllCourses();
     _cid = getActiveCourse();
     await initData(_cid);
-    if (typeof seedIfNeeded === 'function') seedIfNeeded();
+    if (typeof loadSeedIfNeeded === 'function') loadSeedIfNeeded();
     if (typeof migrateAllStudents === 'function') migrateAllStudents();
 
     MC.setupOfflineDetection();

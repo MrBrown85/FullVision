@@ -1513,3 +1513,21 @@ window.GB = {
   getReportConfig,
   saveReportConfig,
 };
+
+/**
+ * Lazily loads seed-data.js and calls seedIfNeeded() — only fetches the 113KB
+ * script when actually needed (new accounts, or after explicit data reset).
+ * Existing teachers with data already in localStorage never trigger the fetch.
+ * Safe to call from any portal — seed-data.js has its own internal guards.
+ */
+window.loadSeedIfNeeded = function() {
+  // Already loaded this session — call directly (handles re-seed after data reset)
+  if (typeof seedIfNeeded === 'function') { seedIfNeeded(); return; }
+  // User deliberately wiped all data — never auto-seed
+  if (localStorage.getItem('gb-data-wiped') === '1') return;
+  // Lazy-load the script, then seed
+  var s = document.createElement('script');
+  s.src = '/shared/seed-data.js';
+  s.onload = function() { if (typeof seedIfNeeded === 'function') seedIfNeeded(); };
+  document.head.appendChild(s);
+};

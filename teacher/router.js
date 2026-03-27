@@ -126,9 +126,8 @@ window.Router = (function() {
     await initAllCourses();
     var cid = getActiveCourse();
     await initData(cid);
-    // Seed demo data if no courses/students exist
-    // seedIfNeeded writes directly to cache, so no need to reload from Supabase
-    seedIfNeeded();
+    // Seed demo data if no courses/students exist — lazy-loads seed-data.js on demand
+    loadSeedIfNeeded();
     migrateAllStudents();
 
     // Listen for hash changes

@@ -1742,7 +1742,7 @@ window.PageAssignments = (function() {
       if (Object.keys(COURSES).length === 0) {
         Object.assign(COURSES, structuredClone(DEFAULT_COURSES));
         saveCourses(COURSES);
-        seedIfNeeded();
+        loadSeedIfNeeded();
       }
       Router.navigate('/dashboard');
     });
@@ -1753,7 +1753,7 @@ window.PageAssignments = (function() {
       Object.keys(COURSES).forEach(function(cid) { delete COURSES[cid]; });
       Object.assign(COURSES, structuredClone(DEFAULT_COURSES));
       saveCourses(COURSES);
-      seedIfNeeded(); Router.navigate('/dashboard');
+      loadSeedIfNeeded(); Router.navigate('/dashboard');
     });
   }
 
