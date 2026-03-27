@@ -611,8 +611,7 @@ window.PageGradebook = (function() {
     var sortedStudents = applySorting(cid, students, sections, isLetter);
     var cc = getCourseConfig(cid);
     var cw = getCategoryWeights(cid);
-    var isCompact = _scoreDensity === 'compact';
-    var rowH = isCompact ? 'gb-scores-compact' : '';
+    var rowH = '';
 
     // Assignments sorted newest-first (left)
     var sortedAssess = assessments.slice().sort(function(a, b) { return (b.date || '').localeCompare(a.date || ''); });
