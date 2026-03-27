@@ -366,21 +366,10 @@ CREATE TABLE IF NOT EXISTS grading_scales (
 -- ════════════════════════════════════════════════════════════
 -- SECTION 3: Indexes
 -- ════════════════════════════════════════════════════════════
-
--- course_data: speed up fetching all keys for a teacher+course
-CREATE INDEX IF NOT EXISTS idx_course_data_teacher_course
-  ON course_data(teacher_id, course_id);
-
--- scores: fast lookups by course+student and course+assessment
-CREATE INDEX IF NOT EXISTS idx_scores_course_student
-  ON scores(course_id, student_id);
-
-CREATE INDEX IF NOT EXISTS idx_scores_course_assess
-  ON scores(course_id, assessment_id);
-
--- observations: fast per-student lookups
-CREATE INDEX IF NOT EXISTS idx_obs_course_student
-  ON observations(course_id, student_id);
+-- Note: The app reads all data via the JSONB store (course_data
+-- + teacher_config), which uses composite PKs as indexes.
+-- Indexes on normalized tables are omitted until those tables
+-- are actively queried. Unused indexes waste disk IO on writes.
 
 
 -- ════════════════════════════════════════════════════════════
