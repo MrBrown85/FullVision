@@ -801,7 +801,8 @@ window.PageAssignments = (function() {
   }
   function collabDrop(e, toGroup) {
     e.preventDefault();
-    e.currentTarget.classList.remove('drag-over');
+    var dropEl = e.target.closest('[data-collab-drop]');
+    if (dropEl) dropEl.classList.remove('drag-over');
     if (_dragSid == null || _dragFromGroup === toGroup) return;
     var arr = newCollaboration === 'pair' ? collabPairs : collabGroups;
     if (!arr[_dragFromGroup] || !arr[toGroup]) return;
