@@ -423,7 +423,12 @@ window.PageGradebook = (function() {
           cols.push({ assessmentId: a.id, tagId: tagId, tagCode: tag ? tag.id : tagId, sectionColor: sec ? sec.color : 'var(--text-3)', tagText: tag ? tag.text : '' });
         });
       }
-      groups.push({ assessment: a, startIdx: start, count: cols.length - start, groupIdx: groupIdx++ });
+      var colCount = cols.length - start;
+      var groupW = Math.max(120, colCount * 54);
+      var colW = colCount === 1 ? groupW : 54;
+      // Set colWidth on each column in this group
+      for (var ci = start; ci < cols.length; ci++) cols[ci].colWidth = colW;
+      groups.push({ assessment: a, startIdx: start, count: colCount, groupIdx: groupIdx++, groupW: groupW });
     });
     var colGroupMap = cols.map(function(_, i) { return groups.find(function(g) { return i >= g.startIdx && i < g.startIdx + g.count; }); });
     var sortedStudents = applySorting(cid, students, sections, isLetter);
@@ -449,7 +454,7 @@ window.PageGradebook = (function() {
       var badges = '';
       if (a.scoreMode === 'points') badges += '<span class="gb-assess-badge">/ ' + (a.maxPoints||100) + '</span>';
       if (a.weight && a.weight !== 1) badges += '<span class="gb-assess-badge">' + a.weight + 'x</span>';
-      html += '<div class="gb-grid-assess-group' + typeClass + '" style="width:' + (g.count * 54) + 'px" title="' + esc(a.title) + '">' +
+      html += '<div class="gb-grid-assess-group' + typeClass + '" style="width:' + g.groupW + 'px" title="' + esc(a.title) + '">' +
         '<a class="gb-assess-title" href="#/assignments?course=' + cid + '&open=' + a.id + '" title="' + esc(a.title) + '">' + esc(a.title) + '</a>' +
         '<div class="gb-assess-meta"><span class="gb-assess-type-pill ' + (isPrimary?'sum':'form') + '">' + (isPrimary?'S':'F') + '</span><span class="gb-assess-date">' + formatDate(a.date) + '</span>' + badges + '</div>' +
         '<div class="gb-assess-stripe" style="background:' + stripeColor + '"></div>' +
@@ -461,7 +466,8 @@ window.PageGradebook = (function() {
     cols.forEach(function(col, i) {
       var g = colGroupMap[i];
       var altClass = (g && g.groupIdx % 2 === 1) ? ' gb-group-alt' : '';
-      html += '<div class="gb-grid-tag-header' + altClass + '" style="border-bottom-color:' + col.sectionColor + ';color:' + col.sectionColor + '" title="' + esc(col.tagText || col.tagCode) + '">' + esc(col.tagCode) + '</div>';
+      var tagW = col.colWidth || 54;
+      html += '<div class="gb-grid-tag-header' + altClass + '" style="flex:0 0 ' + tagW + 'px;width:' + tagW + 'px;border-bottom-color:' + col.sectionColor + ';color:' + col.sectionColor + '" title="' + esc(col.tagText || col.tagCode) + '">' + esc(col.tagCode) + '</div>';
     });
     html += '</div>';
     html += '</div></div>';
@@ -491,6 +497,8 @@ window.PageGradebook = (function() {
         var g = colGroupMap[i];
         var startClass = (g && g.groupIdx > 0 && g.startIdx === i) ? ' gb-group-start' : '';
         var altClass = (g && g.groupIdx % 2 === 1) ? ' gb-group-alt' : '';
+        var cellW = col.colWidth || 54;
+        var cellStyle = cellW !== 54 ? ' style="min-width:' + cellW + 'px;width:' + cellW + 'px"' : '';
         var assess = assessments.find(function(a) { return a.id === col.assessmentId; });
         if (col.isPointsCol) {
           var max = assess.maxPoints || 100;
@@ -500,14 +508,14 @@ window.PageGradebook = (function() {
           var cellContent = score > 0
             ? '<div class="gb-pts-display"><span class="gb-pts-score">' + score + '<span class="gb-pts-max">/' + max + '</span></span><span class="gb-pts-pct">' + pct + '%</span></div>'
             : '<span class="gb-pts-empty">\u00B7</span>';
-          html += '<td class="gb-score gb-score-pts' + startClass + altClass + '" data-aid="' + col.assessmentId + '" data-pts="1" data-sid="' + s.id + '" data-max="' + max + '" data-action="cycleScore" title="' + title + '">' + cellContent + '</td>';
+          html += '<td class="gb-score gb-score-pts' + startClass + altClass + '"' + cellStyle + ' data-aid="' + col.assessmentId + '" data-pts="1" data-sid="' + s.id + '" data-max="' + max + '" data-action="cycleScore" title="' + title + '">' + cellContent + '</td>';
         } else {
           var studentScores = scores[s.id] || [];
           var entry = studentScores.find(function(e) { return e.assessmentId === col.assessmentId && e.tagId === col.tagId; });
           var score = entry ? entry.score : 0;
           var assigned = assess && (assess.tagIds||[]).includes(col.tagId);
           var content = score > 0 ? score : (assigned ? '<span class="gb-unscored">\u00B7</span>' : '\u2014');
-          html += '<td class="gb-score' + startClass + altClass + '" data-aid="' + col.assessmentId + '" data-tid="' + col.tagId + '" data-sid="' + s.id + '" data-action="cycleScore"><span class="gb-score-val s' + score + '">' + content + '</span></td>';
+          html += '<td class="gb-score' + startClass + altClass + '"' + cellStyle + ' data-aid="' + col.assessmentId + '" data-tid="' + col.tagId + '" data-sid="' + s.id + '" data-action="cycleScore"><span class="gb-score-val s' + score + '">' + content + '</span></td>';
         }
       });
       html += '</tr>';
@@ -520,9 +528,11 @@ window.PageGradebook = (function() {
       var g = _statsColGroupMap[i];
       var startClass = (g && g.groupIdx > 0 && g.startIdx === i) ? ' gb-group-start' : '';
       var altClass = (g && g.groupIdx % 2 === 1) ? ' gb-group-alt' : '';
+      var cellW = col.colWidth || 54;
+      var wStyle = cellW !== 54 ? 'min-width:' + cellW + 'px;width:' + cellW + 'px;' : '';
       var vals = sortedStudents.map(function(s) { var ss = scores[s.id]||[]; var entry = ss.find(function(e) { return e.assessmentId === col.assessmentId && e.tagId === col.tagId; }); return entry && entry.score > 0 ? entry.score : null; }).filter(function(v) { return v !== null; });
-      if (!vals.length) html += '<td class="gb-score' + startClass + altClass + '" style="cursor:default"><span class="gb-score-val s0" style="background:transparent">\u2014</span></td>';
-      else { var avg = vals.reduce(function(a,b){return a+b;},0)/vals.length; var r = Math.round(avg); html += '<td class="gb-score' + startClass + altClass + '" style="cursor:default"><span class="gb-avg-val" style="color:' + PROF_COLORS[r] + ';font-weight:700">' + avg.toFixed(1) + '</span></td>'; }
+      if (!vals.length) html += '<td class="gb-score' + startClass + altClass + '" style="' + wStyle + 'cursor:default"><span class="gb-score-val s0" style="background:transparent">\u2014</span></td>';
+      else { var avg = vals.reduce(function(a,b){return a+b;},0)/vals.length; var r = Math.round(avg); html += '<td class="gb-score' + startClass + altClass + '" style="' + wStyle + 'cursor:default"><span class="gb-avg-val" style="color:' + PROF_COLORS[r] + ';font-weight:700">' + avg.toFixed(1) + '</span></td>'; }
     });
     html += '</tr>';
     html += '</tbody></table></div></div>';
