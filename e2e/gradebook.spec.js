@@ -74,4 +74,59 @@ test.describe('Gradebook — Spreadsheet View', () => {
     const main = page.locator('#main');
     await expect(main).not.toBeEmpty();
   });
+
+  test('clicking Scores tab renders Scores view without crashing', async ({ page }) => {
+    await seedStudents(page);
+    await seedAssessments(page);
+    await gotoApp(page, '/gradebook');
+    await seedScores(page);
+    // Click the Scores tab
+    const scoresBtn = page.locator('[data-action="setView"][data-mode="scores"]');
+    await scoresBtn.click();
+    await page.waitForTimeout(500);
+    // Verify the view rendered — student names should still be visible
+    const body = await page.locator('body').textContent();
+    expect(body).toContain('Alice');
+    // Verify the Scores tab is now active
+    await expect(scoresBtn).toHaveClass(/active/);
+  });
+
+  test('clicking Summary tab renders Summary view without crashing', async ({ page }) => {
+    await seedStudents(page);
+    await seedAssessments(page);
+    await gotoApp(page, '/gradebook');
+    await seedScores(page);
+    // Click the Summary tab
+    const summaryBtn = page.locator('[data-action="setView"][data-mode="summary"]');
+    await summaryBtn.click();
+    await page.waitForTimeout(500);
+    // Verify the view rendered
+    const main = page.locator('#main');
+    await expect(main).not.toBeEmpty();
+    await expect(summaryBtn).toHaveClass(/active/);
+  });
+
+  test('switching between all three tabs does not crash', async ({ page }) => {
+    await seedStudents(page);
+    await seedAssessments(page);
+    await gotoApp(page, '/gradebook');
+    await seedScores(page);
+    // Competencies → Scores
+    await page.locator('[data-action="setView"][data-mode="scores"]').click();
+    await page.waitForTimeout(300);
+    await expect(page.locator('#main')).not.toBeEmpty();
+    // Scores → Summary
+    await page.locator('[data-action="setView"][data-mode="summary"]').click();
+    await page.waitForTimeout(300);
+    await expect(page.locator('#main')).not.toBeEmpty();
+    // Summary → Competencies
+    await page.locator('[data-action="setView"][data-mode="detailed"]').click();
+    await page.waitForTimeout(300);
+    await expect(page.locator('#main')).not.toBeEmpty();
+    // Back to Scores one more time
+    await page.locator('[data-action="setView"][data-mode="scores"]').click();
+    await page.waitForTimeout(300);
+    const body = await page.locator('body').textContent();
+    expect(body).toContain('Alice');
+  });
 });
