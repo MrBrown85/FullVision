@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="description" content="TeacherDashboard Mobile — quick student lookup, observations, and grading">
+<title>Teacher Dashboard</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#F2F2F7">
+<link rel="stylesheet" href="gb-styles.css?v=3">
+<link rel="stylesheet" href="mobile.css">
+</head>
+<body class="mobile-mode">
+
+<!-- Mobile login screen (hidden once authenticated) -->
+<div id="m-auth" class="m-auth">
+  <div class="m-auth-card">
+    <h1 class="m-auth-title">FullVision</h1>
+    <p class="m-auth-subtitle">Learning Profile Builder</p>
+
+    <!-- Sign In / Sign Up toggle -->
+    <div class="m-segmented m-auth-tabs" role="tablist" aria-label="Authentication">
+      <button class="m-seg-btn m-seg-active" data-action="m-auth-tab" data-tab="signin" role="tab" aria-selected="true">Sign In</button>
+      <button class="m-seg-btn" data-action="m-auth-tab" data-tab="signup" role="tab" aria-selected="false">Sign Up</button>
+    </div>
+
+    <!-- Messages -->
+    <div class="m-auth-error" id="m-auth-error" role="alert" aria-live="assertive"></div>
+    <div class="m-auth-success" id="m-auth-success" role="status" aria-live="polite"></div>
+
+    <!-- Sign In form -->
+    <form class="m-auth-form" id="m-form-signin">
+      <label class="m-auth-label" for="m-si-email">Email</label>
+      <input class="m-auth-input" id="m-si-email" type="email" placeholder="you@school.ca" required autocomplete="email" inputmode="email">
+      <label class="m-auth-label" for="m-si-password">Password</label>
+      <input class="m-auth-input" id="m-si-password" type="password" placeholder="Password" required autocomplete="current-password">
+      <button class="m-auth-submit" type="submit" id="m-si-submit">Sign In</button>
+      <div class="m-auth-forgot"><a href="#" data-action="m-auth-forgot">Forgot password?</a></div>
+    </form>
+
+    <!-- Sign Up form -->
+    <form class="m-auth-form" id="m-form-signup" style="display:none">
+      <label class="m-auth-label" for="m-su-name">Display Name</label>
+      <input class="m-auth-input" id="m-su-name" type="text" placeholder="Ms. Brown" required autocomplete="name">
+      <label class="m-auth-label" for="m-su-email">Email</label>
+      <input class="m-auth-input" id="m-su-email" type="email" placeholder="you@school.ca" required autocomplete="email" inputmode="email">
+      <label class="m-auth-label" for="m-su-password">Password</label>
+      <input class="m-auth-input" id="m-su-password" type="password" placeholder="At least 6 characters" required minlength="6" autocomplete="new-password">
+      <label class="m-auth-label" for="m-su-confirm">Confirm Password</label>
+      <input class="m-auth-input" id="m-su-confirm" type="password" placeholder="Confirm password" required minlength="6" autocomplete="new-password">
+      <button class="m-auth-submit" type="submit" id="m-su-submit">Create Account</button>
+    </form>
+  </div>
+</div>
+
+<!-- Mobile app shell (hidden until authenticated) -->
+<div id="m-app" style="display:none">
+  <div id="m-nav-stack"></div>
+  <div id="m-sheet-backdrop" class="m-sheet-backdrop" style="display:none"></div>
+  <div id="m-sheet-container"></div>
+  <div id="m-toast"></div>
+  <nav id="m-tab-bar" role="tablist" aria-label="Main navigation">
+    <button class="m-tab-item m-tab-active" role="tab" aria-selected="true" data-tab="students">
+      <svg class="m-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3-7 8-7s8 3 8 7"/></svg>
+      <span class="m-tab-label">Students</span>
+    </button>
+    <button class="m-tab-item" role="tab" aria-selected="false" data-tab="observe">
+      <svg class="m-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="12" y2="16"/></svg>
+      <span class="m-tab-label">Observe</span>
+    </button>
+    <button class="m-tab-item" role="tab" aria-selected="false" data-tab="grade">
+      <svg class="m-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
+      <span class="m-tab-label">Grade</span>
+    </button>
+  </nav>
+</div>
+
+<!-- Offline banner -->
+<div id="m-offline-banner" class="m-offline-banner" style="display:none">
+  Offline — changes will sync when connected
+</div>
+
+<!-- Same script stack as app.html for shared data layer -->
+<script>
+window.__ENV = {
+  SUPABASE_URL: '__SUPABASE_URL__',
+  SUPABASE_KEY: '__SUPABASE_KEY__'
+};
+window.__MOBILE = true;
+</script>
+<script src="vendor/supabase.min.js"></script>
+<script>
+if (typeof supabase === 'undefined') {
+  document.write('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"><\/script>');
+}
+</script>
+<script src="gb-supabase.js"></script>
+<script src="gb-constants.js"></script>
+<script src="gb-data.js"></script>
+<script src="gb-calc.js"></script>
+<!-- Mobile-specific modules -->
+<script src="m-components.js"></script>
+<script src="m-students.js"></script>
+<script src="m-observe.js"></script>
+<script src="m-grade.js"></script>
+<script src="page-mobile.js"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(function(){});
+}
+</script>
+</body>
+</html>

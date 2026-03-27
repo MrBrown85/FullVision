@@ -1,6 +1,6 @@
 // IMPORTANT: Increment the version number when deploying new app code
 // This ensures users get the latest files
-const CACHE_NAME = 'fullvision-v9';
+const CACHE_NAME = 'fullvision-v10';
 
 // All app files to pre-cache on install
 const PRECACHE_URLS = [
@@ -45,7 +45,14 @@ const PRECACHE_URLS = [
   '/assign-rubric-editor.js',
   '/report-blocks.js',
   '/report-builder.js',
-  '/report-narrative.js'
+  '/report-narrative.js',
+  '/mobile.html',
+  '/mobile.css',
+  '/m-components.js',
+  '/m-students.js',
+  '/m-observe.js',
+  '/m-grade.js',
+  '/page-mobile.js'
 ];
 
 // Install: pre-cache all app files

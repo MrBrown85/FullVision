@@ -78,7 +78,7 @@ window.__ENV = {
     if (sb) {
       const { data: { session } } = await sb.auth.getSession();
       if (session) {
-        window.location.href = 'app.html';
+        window.location.href = (window.innerWidth <= 768 && localStorage.getItem('td-mobile-pref') !== 'desktop') ? 'mobile.html' : 'app.html';
         return;
       }
     }
@@ -127,7 +127,7 @@ async function handleSignIn(e) {
     const email = document.getElementById('si-email').value.trim();
     const password = document.getElementById('si-password').value;
     await signIn(email, password);
-    window.location.href = 'app.html';
+    window.location.href = (window.innerWidth <= 768 && localStorage.getItem('td-mobile-pref') !== 'desktop') ? 'mobile.html' : 'app.html';
   } catch(err) {
     showError(err.message || 'Sign in failed. Please try again.');
     btn.disabled = false;

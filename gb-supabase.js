@@ -122,7 +122,7 @@
     if ('caches' in window) {
       caches.keys().then(names => names.forEach(name => caches.delete(name)));
     }
-    window.location.href = 'login.html';
+    window.location.href = window.__MOBILE ? 'mobile.html' : 'login.html';
   };
 
   /**
@@ -155,7 +155,7 @@
     }
     // Auth check
     const sb = getSupabase();
-    if (!sb) { window.location.href = 'login.html'; return new Promise(function() {}); }
+    if (!sb) { window.location.href = window.__MOBILE ? 'mobile.html' : 'login.html'; return new Promise(function() {}); }
 
     // Fast path: check localStorage for cached session (Supabase stores this automatically)
     const storageKey = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
@@ -177,10 +177,10 @@
     // Slow path: no cached session found, check with Supabase
     try {
       const { data: { session } } = await sb.auth.getSession();
-      if (!session) { window.location.href = 'login.html'; return new Promise(function() {}); }
+      if (!session) { window.location.href = window.__MOBILE ? 'mobile.html' : 'login.html'; return new Promise(function() {}); }
     } catch(e) {
       console.warn('Session check failed:', e);
-      window.location.href = 'login.html';
+      window.location.href = window.__MOBILE ? 'mobile.html' : 'login.html';
       return new Promise(function() {}); // Never resolve — page is redirecting
     }
   };
@@ -206,7 +206,7 @@
   document.addEventListener('click', function(e) {
     var btn = e.target.closest('[data-action="go-login"]');
     if (btn) {
-      window.location.href = 'login.html';
+      window.location.href = window.__MOBILE ? 'mobile.html' : 'login.html';
     }
   });
 
