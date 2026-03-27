@@ -15,6 +15,8 @@ window.TeamsImport = (function() {
   var tiAssignDupes = {};      // assignIdx → existingAssessmentId | null
   var tiImportResult = null;   // { students, assessments, scores, feedback }
   var tiFileName = '';
+  var tiClassName = '';        // name for new class (when creating)
+  var tiCreatedCourseId = null; // course ID created during import
   var _renderPageFn = null;
   var _overlayEl = null;
   var _triggerEl = null;       // element that opened wizard (for focus restore)
@@ -28,6 +30,8 @@ window.TeamsImport = (function() {
     tiAssignDupes = {};
     tiImportResult = null;
     tiFileName = '';
+    tiClassName = '';
+    tiCreatedCourseId = null;
   }
 
   /* ── Helpers ───────────────────────────────────────────────── */
@@ -159,7 +163,8 @@ window.TeamsImport = (function() {
 
   function _renderFooter() {
     if (tiStep === 1) return '<div class="ti-footer"></div>';
-    if (tiStep === 5) return '<div class="ti-footer"><button class="btn btn-primary" data-ti="viewAssignments">View Assignments</button></div>';
+    if (tiStep === 5) return '<div class="ti-footer"><button class="btn btn-primary" data-ti="viewAssignments">' +
+      (tiCreatedCourseId ? 'Go to Class' : 'View Assignments') + '</button></div>';
     var backBtn = '<button class="btn btn-ghost" data-ti="back">Back</button>';
     var nextBtn = '';
     if (tiStep === 2) nextBtn = '<button class="btn btn-primary" data-ti="toStep3">Next</button>';
@@ -344,7 +349,7 @@ window.TeamsImport = (function() {
 
   /* ── Student matching ──────────────────────────────────────── */
   function _runStudentMatching() {
-    var existing = getStudents(tiCourseId) || [];
+    var existing = tiCourseId ? (getStudents(tiCourseId) || []) : [];
     tiStudentMap = {};
 
     tiParsedFile.students.forEach(function(ts) {
@@ -391,7 +396,7 @@ window.TeamsImport = (function() {
 
   /* ── Duplicate assignment detection ────────────────────────── */
   function _runDuplicateDetection() {
-    var existing = getAssessments(tiCourseId) || [];
+    var existing = tiCourseId ? (getAssessments(tiCourseId) || []) : [];
     tiAssignDupes = {};
     tiParsedFile.assignments.forEach(function(a) {
       var normTitle = _norm(a.title);
@@ -514,7 +519,22 @@ window.TeamsImport = (function() {
       });
     });
 
-    var html = '<div class="ti-preview-summary">' +
+    var html = '';
+
+    // If creating a new class, show class name input
+    if (!tiCourseId) {
+      if (!tiClassName) {
+        // Default class name: strip date/extension from filename
+        tiClassName = tiFileName.replace(/\.[^.]+$/, '').replace(/\s*[-_]\s*\d{2}[_/]\d{2}[_/]\d{4}.*/, '').replace(/^COPY THIS TEAM grades\s*/i, '').trim() || 'Imported Class';
+      }
+      html += '<div class="form-group" style="margin-bottom:16px">' +
+        '<label for="ti-class-name" style="font-weight:600;font-size:var(--text-sm);display:block;margin-bottom:4px">Class Name</label>' +
+        '<input type="text" class="form-input" id="ti-class-name" value="' + _esc(tiClassName) + '" ' +
+          'data-ti-change="className" placeholder="e.g. English 10 Block A" style="width:100%;max-width:400px">' +
+      '</div>';
+    }
+
+    html += '<div class="ti-preview-summary">' +
       '<div class="ti-preview-stat"><b>' + activeStudents.length + '</b>students' +
         (newStudents.length ? ' (' + newStudents.length + ' new)' : '') + '</div>' +
       '<div class="ti-preview-stat"><b>' + selected.length + '</b>assignments</div>' +
@@ -559,6 +579,7 @@ window.TeamsImport = (function() {
     return '<div class="ti-results-card">' +
       '<div class="ti-results-icon" aria-hidden="true">&#9989;</div>' +
       '<div class="ti-results-title">Import Complete</div>' +
+      (r.className ? '<div style="text-align:center;color:var(--text-2);margin-bottom:12px">Class: <b>' + _esc(r.className) + '</b></div>' : '') +
       '<div class="ti-results-stats">' +
         '<div class="ti-results-stat"><b>' + r.studentsCreated + '</b>students created</div>' +
         '<div class="ti-results-stat"><b>' + r.assessmentsCreated + '</b>assignments imported</div>' +
@@ -572,11 +593,21 @@ window.TeamsImport = (function() {
   /* ── Commit import ─────────────────────────────────────────── */
   function _commitImport() {
     var cid = tiCourseId;
-    var result = { studentsCreated: 0, assessmentsCreated: 0, scoresWritten: 0, feedbackSaved: 0, errors: [] };
+    var result = { studentsCreated: 0, assessmentsCreated: 0, scoresWritten: 0, feedbackSaved: 0, errors: [], className: '' };
     var today = new Date().toISOString().slice(0, 10);
     var now = new Date().toISOString();
 
     try {
+      // 0. Create new class if importing without an existing course
+      if (!cid) {
+        var className = (tiClassName || '').trim() || 'Imported Class';
+        var newCourse = createCourse({ name: className, gradingSystem: 'points' });
+        cid = newCourse.id;
+        tiCourseId = cid;
+        tiCreatedCourseId = cid;
+        result.className = className;
+      }
+
       // 1. Create new students
       var students = getStudents(cid) || [];
       var idLookup = {}; // teamsIdx → FullVision student ID
@@ -701,7 +732,17 @@ window.TeamsImport = (function() {
       tiStep = 4; _render();
     },
     commitImport: function() { _commitImport(); },
-    viewAssignments: function() { close(); },
+    viewAssignments: function() {
+      if (tiCreatedCourseId) {
+        // Navigate to the new class's assignments page
+        var cid = tiCreatedCourseId;
+        close();
+        if (typeof setActiveCourse === 'function') setActiveCourse(cid);
+        if (typeof window.location !== 'undefined') window.location.hash = '#assignments';
+      } else {
+        close();
+      }
+    },
     createAllNew: function() {
       tiParsedFile.students.forEach(function(s) {
         if (tiStudentMap[s.idx].matchType === 'none') tiStudentMap[s.idx].action = 'new';
@@ -719,6 +760,9 @@ window.TeamsImport = (function() {
   var _changeActions = {
     fileSelected: function(el) {
       if (el.files[0]) _handleFile(el.files[0]);
+    },
+    className: function(el) {
+      tiClassName = el.value;
     },
     studentAction: function(el) {
       var idx = Number(el.dataset.idx);

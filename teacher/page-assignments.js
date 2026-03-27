@@ -178,8 +178,6 @@ window.PageAssignments = (function() {
       '<div id="decay-row" style="display:' + (method==='decayingAvg'?'flex':'none') + '" class="settings-row"><label>Weight: <span id="decay-val">' + (dw*100).toFixed(0) + '%</span></label><input type="range" min="0" max="100" value="' + (dw*100).toFixed(0) + '" data-action-input="updateDecaySlider"></div>' +
       renderGradingScaleEditor(cid) +
       renderCategoryWeightsEditor(cid) +
-      '<div class="settings-title" style="margin-top:16px;padding-top:12px;border-top:0.5px solid var(--divider-subtle)">Microsoft Teams</div>' +
-      '<div class="settings-row"><label>Import Grades</label><button class="btn btn-primary" data-action="openTeamsImport">Import from Teams</button></div>' +
       '<div class="settings-title" style="margin-top:16px;padding-top:12px;border-top:0.5px solid var(--divider-subtle)">Data</div>' +
       '<div class="settings-row"><label>Export</label><button class="btn btn-primary" data-action="exportData">JSON</button></div>' +
       '<div class="settings-row"><label>Export Scores</label><button class="btn btn-primary" data-action="exportScoresCSV">Export Scores CSV</button></div>' +
@@ -1830,7 +1828,6 @@ window.PageAssignments = (function() {
       'collapseAllAssess':    function() { collapseAllAssess(); },
       'clearFocusStudent':    function() { clearFocusStudent(); },
       'toggleToolbarDropdown': function() { toggleToolbarDropdown(el.dataset.panel); },
-      'openTeamsImport':      function() { if (window.TeamsImport) TeamsImport.open(activeCourse, render); },
       'exportData':           function() { exportData(); },
       'triggerImportJSON':    function() { var f = document.getElementById('import-json-input'); if (f) f.click(); },
       'exportScoresCSV':      function() { exportScoresCSV(); },

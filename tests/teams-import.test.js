@@ -760,3 +760,126 @@ describe('Import Commit Logic', () => {
     expect(scores['existing-stu'][1].score).toBe(8); // new
   });
 });
+
+// ═══════════════════════════════════════════════════════════════
+//  NEW CLASS CREATION ON IMPORT
+// ═══════════════════════════════════════════════════════════════
+describe('Import creates new class when courseId is null', () => {
+
+  function simulateCommitWithNewClass(parsedFile, studentMap, selectedAssigns, className) {
+    const today = '2026-03-27';
+    const now = new Date().toISOString();
+    const result = { studentsCreated: 0, assessmentsCreated: 0, scoresWritten: 0, feedbackSaved: 0, className: '' };
+
+    // Create new class
+    const newCourse = createCourse({ name: className || 'Imported Class', gradingSystem: 'points' });
+    const cid = newCourse.id;
+    result.className = className || 'Imported Class';
+
+    // Create students
+    const students = [];
+    const idLookup = {};
+    parsedFile.students.forEach(ts => {
+      const m = studentMap[ts.idx];
+      if (!m || m.action === 'skip') return;
+      const newId = uid();
+      students.push({
+        id: newId, firstName: ts.firstName, lastName: ts.lastName,
+        preferred: '', pronouns: '', studentNumber: '', dateOfBirth: '',
+        email: ts.email, designations: [], attendance: [],
+        sortName: ts.lastName + ' ' + ts.firstName, enrolledDate: today
+      });
+      idLookup[ts.idx] = newId;
+      result.studentsCreated++;
+    });
+    saveStudents(cid, students);
+
+    // Create assessments
+    const assessments = [];
+    const assignIdLookup = {};
+    const selected = parsedFile.assignments.filter(a => selectedAssigns[a.idx]);
+    selected.forEach(a => {
+      const newId = uid();
+      assessments.push({
+        id: newId, title: a.title, date: today, type: 'summative',
+        tagIds: [], scoreMode: 'points', maxPoints: a.maxPoints,
+        weight: 1, created: now
+      });
+      assignIdLookup[a.idx] = newId;
+      result.assessmentsCreated++;
+    });
+    saveAssessments(cid, assessments);
+
+    // Write scores
+    const scores = {};
+    selected.forEach(a => {
+      const assessId = assignIdLookup[a.idx];
+      parsedFile.students.forEach(ts => {
+        const sid = idLookup[ts.idx];
+        if (!sid) return;
+        const sc = a.scores[ts.idx];
+        if (!sc || sc.earned === null) return;
+        if (!scores[sid]) scores[sid] = [];
+        scores[sid].push({
+          id: uid(), assessmentId: assessId, tagId: '',
+          score: sc.earned, date: today, type: 'summative',
+          note: sc.feedback || '', created: now
+        });
+        result.scoresWritten++;
+        if (sc.feedback) result.feedbackSaved++;
+      });
+    });
+    saveScores(cid, scores);
+
+    return { result, courseId: cid };
+  }
+
+  it('creates a new course with the given name', () => {
+    const parsed = {
+      students: [{ idx: 0, firstName: 'Jane', lastName: 'Smith', email: 'jane@test.ca' }],
+      assignments: [{ idx: 0, title: 'Test', maxPoints: 10, scores: { 0: { earned: 8, feedback: '' } } }]
+    };
+    const map = { 0: { action: 'new', existingId: null, matchType: 'none' } };
+    const { result, courseId } = simulateCommitWithNewClass(parsed, map, { 0: true }, 'English 10 Block A');
+
+    expect(COURSES[courseId]).toBeDefined();
+    expect(COURSES[courseId].name).toBe('English 10 Block A');
+    expect(COURSES[courseId].gradingSystem).toBe('points');
+    expect(result.className).toBe('English 10 Block A');
+  });
+
+  it('populates the new class with students, assignments, and scores', () => {
+    const parsed = {
+      students: [
+        { idx: 0, firstName: 'Jane', lastName: 'Smith', email: '' },
+        { idx: 1, firstName: 'Bob', lastName: 'Lee', email: '' },
+      ],
+      assignments: [
+        { idx: 0, title: 'Essay', maxPoints: 16, scores: { 0: { earned: 12, feedback: 'Good' }, 1: { earned: 14, feedback: '' } } },
+      ]
+    };
+    const map = {
+      0: { action: 'new', existingId: null, matchType: 'none' },
+      1: { action: 'new', existingId: null, matchType: 'none' },
+    };
+    const { result, courseId } = simulateCommitWithNewClass(parsed, map, { 0: true });
+
+    expect(result.studentsCreated).toBe(2);
+    expect(result.assessmentsCreated).toBe(1);
+    expect(result.scoresWritten).toBe(2);
+    expect(getStudents(courseId)).toHaveLength(2);
+    expect(getAssessments(courseId)).toHaveLength(1);
+    expect(Object.keys(getScores(courseId))).toHaveLength(2);
+  });
+
+  it('defaults class name to "Imported Class" when empty', () => {
+    const parsed = {
+      students: [{ idx: 0, firstName: 'Jane', lastName: 'Smith', email: '' }],
+      assignments: [{ idx: 0, title: 'Test', maxPoints: 10, scores: { 0: { earned: 8, feedback: '' } } }]
+    };
+    const map = { 0: { action: 'new', existingId: null, matchType: 'none' } };
+    const { result, courseId } = simulateCommitWithNewClass(parsed, map, { 0: true }, '');
+
+    expect(COURSES[courseId].name).toBe('Imported Class');
+  });
+});
