@@ -19,5 +19,13 @@
       "type": "image/svg+xml",
       "purpose": "any"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "Mobile View",
+      "short_name": "Mobile",
+      "description": "Quick student lookup, observations, and grading",
+      "url": "/mobile.html"
+    }
   ]
 }
