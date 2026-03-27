@@ -206,16 +206,45 @@ function _broadcastChange(cid, field) {
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   Supabase sync helpers (fire-and-forget)
+   Supabase sync helpers (fire-and-forget with coalescing)
    ══════════════════════════════════════════════════════════════════ */
 let _hadSyncError = false;
-let _retryQueue = [];
+let _retryQueue = [];       // { table, key, data }
 let _retryTimer = null;
 let _retryCount = 0;
+let _consecutiveFailures = 0;
 const _MAX_RETRIES = 6;
+const _MAX_RETRY_QUEUE = 20;
+const _SYNC_TIMEOUT_MS = 10000;
+
+/* Track in-flight and pending syncs per key to coalesce rapid saves */
+const _inflightSyncs = new Map();   // syncKey → true (currently in-flight)
+const _pendingWrites = new Map();   // syncKey → { table, key, data } (queued behind in-flight)
+
+function _syncKey(table, key) {
+  if (table === 'course_data') return table + ':' + key.cid + ':' + key.dataKey;
+  return table + ':' + key;
+}
 
 function _syncToSupabase(table, key, data) {
-  _doSync(table, key, data).catch(err => console.error(`Sync error (${table}/${key}):`, err));
+  const sk = _syncKey(table, key);
+
+  // If a sync for this exact key is already in-flight, just update the pending data (latest wins)
+  if (_inflightSyncs.has(sk)) {
+    _pendingWrites.set(sk, { table, key, data });
+    return;
+  }
+
+  _inflightSyncs.set(sk, true);
+  _doSync(table, key, data).catch(err => console.error(`Sync error (${sk}):`, err)).finally(() => {
+    _inflightSyncs.delete(sk);
+    // If a newer write arrived while we were in-flight, send it now
+    if (_pendingWrites.has(sk)) {
+      const next = _pendingWrites.get(sk);
+      _pendingWrites.delete(sk);
+      _syncToSupabase(next.table, next.key, next.data);
+    }
+  });
 }
 
 async function _doSync(table, key, data) {
@@ -226,6 +255,10 @@ async function _doSync(table, key, data) {
   _syncStatus = 'syncing';
   _updateSyncIndicator();
 
+  // AbortController for request timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), _SYNC_TIMEOUT_MS);
+
   try {
     if (table === 'course_data') {
       const { error } = await sb.from('course_data').upsert({
@@ -234,7 +267,7 @@ async function _doSync(table, key, data) {
         data_key: key.dataKey,
         data: data,
         updated_at: new Date().toISOString()
-      }, { onConflict: 'teacher_id,course_id,data_key' });
+      }, { onConflict: 'teacher_id,course_id,data_key' }).abortSignal(controller.signal);
       if (error) throw error;
     } else if (table === 'teacher_config') {
       const { error } = await sb.from('teacher_config').upsert({
@@ -242,10 +275,12 @@ async function _doSync(table, key, data) {
         config_key: key,
         data: data,
         updated_at: new Date().toISOString()
-      }, { onConflict: 'teacher_id,config_key' });
+      }, { onConflict: 'teacher_id,config_key' }).abortSignal(controller.signal);
       if (error) throw error;
     }
+    clearTimeout(timeoutId);
     _pendingSyncs--;
+    _consecutiveFailures = 0;
     if (_pendingSyncs <= 0) { _pendingSyncs = 0; _syncStatus = 'idle'; _retryCount = 0; }
     _updateSyncIndicator();
     // Show recovery toast if we previously had an error
@@ -254,40 +289,78 @@ async function _doSync(table, key, data) {
       if (typeof showSyncToast === 'function') showSyncToast('All changes synced', 'success');
     }
   } catch (err) {
+    clearTimeout(timeoutId);
     _pendingSyncs--;
     if (_pendingSyncs <= 0) _pendingSyncs = 0;
     _syncStatus = 'error';
+    _consecutiveFailures++;
     _updateSyncIndicator();
     // Show error toast and queue retry
     if (!_hadSyncError) {
       _hadSyncError = true;
       if (typeof showSyncToast === 'function') showSyncToast('Sync failed \u2014 changes saved locally', 'error');
     }
-    _retryQueue.push({ table, key, data });
-    if (!_retryTimer) {
-      var delay = Math.min(10000 * Math.pow(2, _retryCount), 300000);
+    if (_consecutiveFailures >= 3) {
+      if (typeof showSyncToast === 'function') showSyncToast('Server overloaded \u2014 retries paused, data safe locally', 'error');
+    }
+    _addToRetryQueue(table, key, data);
+    // Only schedule retries if not in overload backoff
+    if (!_retryTimer && _consecutiveFailures < 3) {
+      var delay = Math.min(30000 * Math.pow(2, _retryCount), 300000);
+      // Add jitter: ±30%
+      delay = delay * (0.7 + Math.random() * 0.6);
       _retryTimer = setTimeout(_retryFailedSyncs, delay);
     }
     throw err;
   }
 }
 
-function _retryFailedSyncs() {
+/* Deduplicated, bounded retry queue — keeps only latest data per key */
+function _addToRetryQueue(table, key, data) {
+  const sk = _syncKey(table, key);
+  // Replace existing entry for same key (latest data wins)
+  const idx = _retryQueue.findIndex(item => _syncKey(item.table, item.key) === sk);
+  if (idx !== -1) {
+    _retryQueue[idx] = { table, key, data };
+  } else {
+    _retryQueue.push({ table, key, data });
+  }
+  // Cap queue size — drop oldest entries
+  while (_retryQueue.length > _MAX_RETRY_QUEUE) {
+    _retryQueue.shift();
+  }
+}
+
+/* Process retry queue sequentially (not all at once) */
+async function _retryFailedSyncs() {
   _retryTimer = null;
   _retryCount++;
   if (_retryCount > _MAX_RETRIES) {
     console.warn('Sync retry limit reached, dropping', _retryQueue.length, 'items');
     _retryQueue = [];
     _retryCount = 0;
+    _consecutiveFailures = 0;
     return;
   }
+  // Process one at a time to avoid hammering the server
   const queue = _retryQueue.splice(0);
-  queue.forEach(item => _syncToSupabase(item.table, item.key, item.data));
+  for (const item of queue) {
+    try {
+      await _doSync(item.table, item.key, item.data);
+    } catch (e) {
+      // _doSync already re-adds to _retryQueue on failure — stop processing rest
+      // Re-add remaining unprocessed items
+      const remaining = queue.slice(queue.indexOf(item) + 1);
+      remaining.forEach(r => _addToRetryQueue(r.table, r.key, r.data));
+      break;
+    }
+  }
 }
 
 function retrySyncs() {
   clearTimeout(_retryTimer);
   _retryCount = 0;
+  _consecutiveFailures = 0;
   _retryFailedSyncs();
 }
 
