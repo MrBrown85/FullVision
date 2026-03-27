@@ -14,6 +14,7 @@
 <link rel="stylesheet" href="../teacher/gradebook.css">
 <link rel="stylesheet" href="../teacher/observations.css">
 <link rel="stylesheet" href="../teacher/reports.css">
+<link rel="stylesheet" href="../teacher/teams-import.css">
 <!-- login.css omitted: only needed on login.html, its body{} rules conflict with SPA layout -->
 </head>
 <body>
@@ -61,6 +62,10 @@ if (typeof supabase === 'undefined') {
 <script src="../teacher/report-blocks.js"></script>
 <script src="../teacher/report-builder.js"></script>
 <script src="../teacher/report-narrative.js"></script>
+<!-- Teams import (SheetJS for CSV/Excel parsing + wizard module) -->
+<script src="../vendor/xlsx.mini.min.js"></script>
+<script>if(typeof XLSX==='undefined')document.write('<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.mini.min.js"><\/script>');</script>
+<script src="../teacher/teams-import.js"></script>
 <!-- Page modules -->
 <script src="../teacher/page-dashboard.js"></script>
 <script src="../teacher/page-assignments.js"></script>
