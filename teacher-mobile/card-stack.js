@@ -130,10 +130,11 @@ window.MCardStack = (function() {
       var velocity = Math.abs(_deltaX) / Math.max(elapsed, 1);
       var shouldSwipe = Math.abs(_deltaX) > SWIPE_THRESHOLD || velocity > VELOCITY_THRESHOLD;
 
-      if (shouldSwipe && _idx < _cards.length - 1) {
-        _animateExit(_deltaX > 0 ? 'right' : 'left');
+      if (shouldSwipe && _deltaX < 0 && _idx < _cards.length - 1) {
+        // Swipe left — advance forward
+        _animateExit('left');
       } else if (shouldSwipe && _deltaX > 0 && _idx > 0) {
-        // Swipe right at start — go back
+        // Swipe right — go back
         _animateExit('right');
       } else {
         // Spring back

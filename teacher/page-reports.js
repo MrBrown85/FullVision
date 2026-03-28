@@ -721,9 +721,7 @@ function renderBlockScoreDistribution(cid, student) {
   const latePolicy = cc.lateWorkPolicy || '';
   html += `<div style="flex:1;min-width:0;padding-top:6px">
     <div style="font-size:0.68rem;font-weight:700;color:var(--text-2);margin-bottom:4px">Late Work Policy</div>
-    <div contenteditable="true" style="font-size:0.68rem;color:${latePolicy ? 'var(--text-2)' : 'var(--text-3)'};line-height:1.45;font-style:${latePolicy ? 'normal' : 'italic'};outline:none;min-height:1.4em"
-      onblur="(function(el){const v=el.textContent.trim();const c=getCourseConfig('${cid}');c.lateWorkPolicy=v;saveCourseConfig('${cid}',c);el.style.color=v?'var(--text-2)':'var(--text-3)';el.style.fontStyle=v?'normal':'italic';if(!v)el.textContent='No late work policy set'})(this)"
-      onfocus="(function(el){if(!getCourseConfig('${cid}').lateWorkPolicy){el.textContent='';el.style.color='var(--text-2)';el.style.fontStyle='normal'}})(this)"
+    <div contenteditable="true" data-action="latePolicyEdit" style="font-size:0.68rem;color:${latePolicy ? 'var(--text-2)' : 'var(--text-3)'};line-height:1.45;font-style:${latePolicy ? 'normal' : 'italic'};outline:none;min-height:1.4em"
     >${latePolicy || 'No late work policy set'}</div>
   </div>`;
   html += `</div>`;
@@ -2703,6 +2701,30 @@ function renderTermQuestionnaire(cid) {
     }
   }
 
+  /* -- Late policy contenteditable handlers (replaces inline onblur/onfocus) -- */
+  function _handleLatePolicyFocus(e) {
+    var el = e.target;
+    if (!el || el.dataset.action !== 'latePolicyEdit') return;
+    var cid = activeCourse;
+    if (!getCourseConfig(cid).lateWorkPolicy) {
+      el.textContent = '';
+      el.style.color = 'var(--text-2)';
+      el.style.fontStyle = 'normal';
+    }
+  }
+  function _handleLatePolicyBlur(e) {
+    var el = e.target;
+    if (!el || el.dataset.action !== 'latePolicyEdit') return;
+    var cid = activeCourse;
+    var v = el.textContent.trim();
+    var c = getCourseConfig(cid);
+    c.lateWorkPolicy = v;
+    saveCourseConfig(cid, c);
+    el.style.color = v ? 'var(--text-2)' : 'var(--text-3)';
+    el.style.fontStyle = v ? 'normal' : 'italic';
+    if (!v) el.textContent = 'No late work policy set';
+  }
+
   /* -- init / destroy ------------------------------------- */
   function init(params) {
     activeCourse = params.course || getActiveCourse();
@@ -2756,6 +2778,8 @@ function renderTermQuestionnaire(cid) {
     _addDocListener('click', _handleClick);
     _addDocListener('selectionchange', _handleSelectionChange);
     _addDocListener('keyup', _handleKeyup);
+    _addDocListener('focusin', _handleLatePolicyFocus);
+    _addDocListener('focusout', _handleLatePolicyBlur);
   }
 
   function destroy() {

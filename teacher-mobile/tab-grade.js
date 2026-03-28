@@ -195,10 +195,10 @@ window.MGrade = (function() {
         tagGroups += '<div class="m-score-group" data-sid="' + st.id + '" data-aid="' + assessment.id + '" data-tid="' + tid + '">' +
           '<div class="m-score-tag-label"><span class="m-score-tag-dot" style="background:' + tagColor + '"></span>' + MC.esc(tagLabel) + '</div>' +
           '<div style="display:flex;align-items:center;justify-content:center;gap:12px">' +
-            '<button class="m-score-btn" data-action="m-grade-points-dec" style="width:44px;height:44px;font-size:20px">−</button>' +
-            '<div style="text-align:center"><span style="font-size:28px;font-weight:700" id="m-pts-' + st.id + '-' + tid + '">' + (rawScore != null ? rawScore : '—') + '</span>' +
+            '<button class="m-score-btn" data-action="m-grade-points-dec" data-sid="' + st.id + '" data-aid="' + assessment.id + '" data-max="' + assessment.maxPoints + '" style="width:44px;height:44px;font-size:20px">−</button>' +
+            '<div style="text-align:center"><span style="font-size:28px;font-weight:700" id="m-pts-' + st.id + '-' + assessment.id + '">' + (rawScore != null ? rawScore : '0') + '</span>' +
             '<span style="font-size:15px;color:var(--text-3)"> / ' + assessment.maxPoints + '</span></div>' +
-            '<button class="m-score-btn" data-action="m-grade-points-inc" style="width:44px;height:44px;font-size:20px">+</button>' +
+            '<button class="m-score-btn" data-action="m-grade-points-inc" data-sid="' + st.id + '" data-aid="' + assessment.id + '" data-max="' + assessment.maxPoints + '" style="width:44px;height:44px;font-size:20px">+</button>' +
           '</div></div>';
       } else {
         // Proficiency mode
@@ -382,12 +382,25 @@ window.MGrade = (function() {
     });
   }
 
+  function adjustPointsScore(cid, sid, aid, delta, maxPts) {
+    var current = getPointsScore(cid, sid, aid) || 0;
+    var next = Math.max(0, Math.min(maxPts, current + delta));
+    setPointsScore(cid, sid, aid, next);
+    clearProfCache();
+    MC.haptic();
+    // Update display
+    var el = document.getElementById('m-pts-' + sid + '-' + aid);
+    if (el) el.textContent = next;
+    _updateThumbGraded(cid, aid);
+  }
+
   return {
     renderPicker: renderPicker,
     filterAssessments: filterAssessments,
     renderSwiper: renderSwiper,
     setScore: setScore,
     setStatus: setStatus,
+    adjustPointsScore: adjustPointsScore,
     undoLastScore: undoLastScore,
     setupSwiper: setupSwiper,
     jumpToStudent: jumpToStudent

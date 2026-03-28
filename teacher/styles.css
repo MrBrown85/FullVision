@@ -260,9 +260,6 @@ body {
   box-shadow: var(--shadow-sm);
 }
 
-/* Legacy dock classes — hidden */
-.dock-divider { display: none; }
-
 /* ── Layout ─────────────────────────────────────────────────── */
 .page-layout { display: flex; height: calc(100vh - var(--dock-h)); }
 
@@ -788,56 +785,7 @@ body {
 .btn-back { font-family: inherit; font-size: var(--text-base); color: var(--text-3); text-decoration: none; display: inline-flex; align-items: center; gap: 4px; padding: 4px 0; }
 .btn-back:hover { color: var(--active); }
 
-/* ── Spreadsheet ────────────────────────────────────────────── */
-.gb-table { border-collapse: collapse; width: 100%; }
-.gb-table th, .gb-table td { padding: 0; }
-.gb-name {
-  position: sticky; left: 0; z-index: 2; background: var(--bg);
-  padding: 10px 14px; font-size: var(--text-md); font-weight: 500;
-  border-bottom: 1px solid var(--border); white-space: nowrap; min-width: 160px;
-}
-.gb-name a { color: var(--text); text-decoration: none; }
-.gb-name a:hover { color: var(--active); }
-/* Assessment group header */
-.gb-assess-group {
-  text-align: center; padding: 8px 6px; font-weight: 700;
-  font-family: var(--font-base); font-size: var(--text-base);
-  border-bottom: 1px solid var(--border); color: var(--text);
-  background: var(--surface);
-}
-.gb-assess-type {
-  font-family: 'SF Mono', ui-monospace, 'Menlo', monospace; font-size: var(--text-2xs); font-weight: 600;
-  text-transform: uppercase; padding: 1px 6px; border-radius: var(--radius); margin-left: 6px;
-}
-.gb-assess-type-s { background: var(--active); color: #fff; }
-.gb-assess-type-f { background: var(--surface-2); color: var(--text-2); }
-/* Tag sub-header */
-.gb-tag-header {
-  text-align: center; padding: 6px 8px;
-  font-family: 'SF Mono', ui-monospace, 'Menlo', monospace; font-size: var(--text-xs); font-weight: 600;
-  color: var(--text-3); text-transform: uppercase; letter-spacing: var(--tracking-wide);
-  border-bottom: 2px solid var(--border); background: var(--bg);
-  min-width: 60px;
-}
-/* Score cell */
-.gb-score {
-  text-align: center; padding: 5px 3px; border-bottom: 1px solid var(--border);
-  cursor: pointer; user-select: none; transition: background 0.1s; min-width: 60px;
-}
-.gb-score:hover { background: rgba(0,122,255,0.04); }
-.gb-score-val {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 36px; height: 30px; border-radius: var(--radius-sm);
-  font-family: 'SF Mono', ui-monospace, 'Menlo', monospace; font-size: var(--text-base); font-weight: 700; color: #fff;
-  font-variant-numeric: tabular-nums;
-}
-.gb-score-val.s0 { background: transparent; color: var(--text-3); }
-.gb-score-val.s1 { background: var(--score-1); }
-.gb-score-val.s2 { background: var(--score-2); }
-.gb-score-val.s3 { background: var(--score-3); }
-.gb-score-val.s4 { background: var(--score-4); }
-
-/* ── Points-mode cells: traditional gradebook ────────────── */
+/* ── Points-mode cells (shared: assignments + gradebook) ── */
 .gb-score-pts { min-width: 68px; }
 .gb-pts-display {
   display: flex; flex-direction: column; align-items: center;
@@ -911,30 +859,6 @@ body {
   font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
   font-size: var(--text-base); color: var(--text-3);
 }
-
-.gb-group-start { border-left: 3px solid var(--border-2); padding-left: 6px; }
-.gb-summary {
-  text-align: center; padding: 8px 6px; border-bottom: 1px solid var(--border);
-  background: var(--surface); min-width: 70px;
-}
-.gb-summary-header {
-  text-align: center; padding: 8px 6px; background: var(--surface);
-  font-family: 'SF Mono', ui-monospace, 'Menlo', monospace; font-size: var(--text-sm); font-weight: 700;
-  text-transform: uppercase; letter-spacing: var(--tracking-wide); border-bottom: 2px solid var(--border);
-  min-width: 70px;
-}
-.gb-summary-val {
-  font-family: 'SF Mono', ui-monospace, 'Menlo', monospace; font-size: var(--text-md); font-weight: 700;
-}
-.gb-corner { position: sticky; left: 0; z-index: 3; background: var(--bg); }
-/* Row banding for readability */
-.gb-table tbody tr:nth-child(even) td { background-color: var(--overlay-hover); }
-.gb-table tbody tr:nth-child(even) td.gb-name, .gb-table tbody tr:nth-child(even) th.gb-name { background-color: var(--bg); }
-.gb-table tbody tr:nth-child(even) td.gb-summary { background-color: var(--surface); }
-.gb-table tbody tr:hover td { background-color: var(--active-light) !important; }
-.gb-table tbody tr:hover td.gb-name, .gb-table tbody tr:hover th.gb-name { background-color: var(--active-light) !important; }
-.gb-table tbody tr:hover td.gb-overall-col { background-color: var(--active-light) !important; }
-.gb-table tbody tr:hover td.gb-summary { background-color: var(--overlay-hover) !important; }
 
 /* ── Form elements ──────────────────────────────────────────── */
 .form-group { margin-bottom: 12px; }
@@ -1247,10 +1171,6 @@ body {
 @media (max-width: 768px) {
   :root { --dock-h: 48px; }
   #app-dock { height: 48px; padding: 0 4px; }
-  .dock-icon { padding: 4px 8px 3px; flex: 0 1 80px; min-height: 44px; }
-  .dock-label { font-size: var(--text-2xs); }
-  .dock-glyph { font-size: var(--text-lg); }
-
   .page-main { padding: 12px 10px; }
 
   /* Heatmap: make horizontally scrollable */
@@ -1283,10 +1203,6 @@ body {
 
 /* ── Responsive: Small Mobile (≤480px) ────────────────────── */
 @media (max-width: 480px) {
-  .dock-icon { flex: 0 1 60px; min-height: 36px; }
-  .dock-label { display: none; }
-  .dock-glyph { font-size: var(--text-xl); }
-  .dock-icon.dock-active::after { width: 18px; height: 2px; }
   .page-main { padding: 8px 6px; }
 
   .hm-table { font-size: var(--text-sm); }
