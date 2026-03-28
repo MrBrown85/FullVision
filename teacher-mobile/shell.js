@@ -49,6 +49,75 @@
     MC.setupOfflineDetection();
     _renderTab('students');
     _bindEvents();
+    _initPullToRefresh();
+
+    // Register mobile re-render callback for cross-device sync
+    if (typeof _registerMobileRerender === 'function') {
+      _registerMobileRerender(function() { _renderTab(_activeTab); });
+    }
+  }
+
+  /* ── Pull to refresh ───────────────────────────────────────── */
+  var _pullStartY = 0;
+  var _pulling = false;
+  var _pullIndicator = null;
+
+  function _initPullToRefresh() {
+    document.addEventListener('touchstart', function(e) {
+      var screen = e.target.closest('.m-screen-content');
+      if (!screen || screen.scrollTop > 0) return;
+      _pullStartY = e.touches[0].clientY;
+      _pulling = true;
+    }, { passive: true });
+
+    document.addEventListener('touchmove', function(e) {
+      if (!_pulling) return;
+      var dy = e.touches[0].clientY - _pullStartY;
+      if (dy < 0) { _pulling = false; return; }
+      if (dy > 60) {
+        _showPullIndicator();
+      }
+    }, { passive: true });
+
+    document.addEventListener('touchend', function() {
+      if (!_pulling) return;
+      _pulling = false;
+      if (_pullIndicator && _pullIndicator.classList.contains('active')) {
+        _doRefresh();
+      }
+      _hidePullIndicator();
+    }, { passive: true });
+  }
+
+  function _showPullIndicator() {
+    if (!_pullIndicator) {
+      _pullIndicator = document.createElement('div');
+      _pullIndicator.className = 'm-pull-indicator';
+      _pullIndicator.innerHTML = '<span class="m-pull-spinner"></span>';
+      document.getElementById('m-app').prepend(_pullIndicator);
+    }
+    _pullIndicator.classList.add('active');
+  }
+
+  function _hidePullIndicator() {
+    if (_pullIndicator) {
+      _pullIndicator.classList.remove('active');
+    }
+  }
+
+  async function _doRefresh() {
+    try {
+      if (typeof refreshFromSupabase === 'function') {
+        await refreshFromSupabase();
+      } else if (window.GB && window.GB.refreshFromSupabase) {
+        await window.GB.refreshFromSupabase();
+      }
+      _renderTab(_activeTab);
+      MC.toast('Data refreshed');
+    } catch (e) {
+      MC.toast('Refresh failed');
+    }
+    _hidePullIndicator();
   }
 
   /* ── Auth screen ──────────────────────────────────────────── */

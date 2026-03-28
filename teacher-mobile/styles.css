@@ -1544,6 +1544,22 @@ body.mobile-mode :focus:not(:focus-visible) { outline: none; }
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   PULL TO REFRESH
+   ═══════════════════════════════════════════════════════════════ */
+.m-pull-indicator {
+  display:flex; align-items:center; justify-content:center;
+  height:0; overflow:hidden; transition:height 0.2s;
+  background:var(--bg);
+}
+.m-pull-indicator.active { height:40px; }
+.m-pull-spinner {
+  width:20px; height:20px; border:2px solid var(--border);
+  border-top-color:var(--active); border-radius:50%;
+  animation:m-spin 0.6s linear infinite;
+}
+@keyframes m-spin { to { transform:rotate(360deg); } }
+
+/* ═══════════════════════════════════════════════════════════════
    VIEW TOGGLE — Cards / List segmented control in nav bar
    ═══════════════════════════════════════════════════════════════ */
 .m-view-toggle {

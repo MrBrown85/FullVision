@@ -493,6 +493,9 @@ async function initAllCourses() {
 
   // Subscribe to Supabase Realtime for cross-device sync (phone → laptop)
   _initRealtimeSync();
+
+  // Re-fetch from Supabase when user returns to this tab/app
+  _initVisibilityRefresh();
 }
 
 /* Reverse map: Supabase data_key → cache field name */
@@ -543,6 +546,78 @@ function _initRealtimeSync() {
       .subscribe();
   } catch (e) {
     console.warn('Realtime sync not available:', e);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Visibility-change refresh — re-fetch from Supabase when user returns
+   to this tab/app (phone → desktop, tab switch, wake from sleep).
+   This is the most reliable cross-device sync mechanism.
+   ══════════════════════════════════════════════════════════════════ */
+var _lastVisibilityRefresh = 0;
+var _VISIBILITY_DEBOUNCE = 3000; // Don't re-fetch more than once per 3 seconds
+
+function _initVisibilityRefresh() {
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState !== 'visible') return;
+    if (!_useSupabase || !_teacherId) return;
+    var now = Date.now();
+    if (now - _lastVisibilityRefresh < _VISIBILITY_DEBOUNCE) return;
+    _lastVisibilityRefresh = now;
+    _refreshFromSupabase();
+  });
+}
+
+async function _refreshFromSupabase() {
+  var cid = null;
+  try { cid = getActiveCourse(); } catch (e) { return; }
+  if (!cid) return;
+
+  var sb = getSupabase();
+  if (!sb) return;
+
+  try {
+    // Re-fetch all course data
+    var result = await sb.from('course_data')
+      .select('data_key, data')
+      .eq('teacher_id', _teacherId)
+      .eq('course_id', cid);
+
+    if (result.error) { console.warn('Visibility refresh failed:', result.error); return; }
+
+    var changed = false;
+    var byKey = {};
+    (result.data || []).forEach(function(r) { byKey[r.data_key] = r.data; });
+
+    for (var field in _DATA_KEYS) {
+      var dataKey = _DATA_KEYS[field];
+      if (byKey[dataKey] !== undefined) {
+        var newVal = byKey[dataKey];
+        var oldVal = _cache[field][cid];
+        // Simple deep comparison via JSON — only update if actually different
+        if (JSON.stringify(newVal) !== JSON.stringify(oldVal)) {
+          _cache[field][cid] = newVal;
+          changed = true;
+        }
+      }
+    }
+
+    if (changed) {
+      if (typeof clearProfCache === 'function') clearProfCache();
+      _allTagsCache = {};
+      _tagToSectionCache = {};
+      // Re-render current page (desktop)
+      var currentPage = (typeof Router !== 'undefined' && Router.getCurrentPage) ? Router.getCurrentPage() : null;
+      if (currentPage && currentPage.render) {
+        try { currentPage.render(); } catch (e) { /* page may not be ready */ }
+      }
+      // Re-render current tab (mobile)
+      if (window.__MOBILE && typeof _mobileRerender === 'function') {
+        try { _mobileRerender(); } catch (e) { /* mobile may not be ready */ }
+      }
+    }
+  } catch (e) {
+    console.warn('Visibility refresh failed:', e);
   }
 }
 
@@ -1539,9 +1614,14 @@ function getReportConfig(cid) {
 function saveReportConfig(cid, config) { _saveCourseField('reportConfig', cid, config); }
 
 /* ── Namespace ──────────────────────────────────────────────── */
+// Allow mobile shell to register its re-render callback
+window._registerMobileRerender = function(fn) { _mobileRerender = fn; };
+var _mobileRerender = null;
+
 window.GB = {
   getSyncStatus,
   retrySyncs,
+  refreshFromSupabase: _refreshFromSupabase,
   initAllCourses,
   initData,
   esc,
