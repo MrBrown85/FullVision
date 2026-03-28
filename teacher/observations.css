@@ -261,5 +261,3 @@
 .obs-empty-title { font-size:var(--text-md); font-weight:600; color:var(--text-2); margin-bottom:4px; }
 .obs-empty-sub { font-size:var(--text-base); }
 
-/* Global font for all controls */
-* { font-family:var(--font-base); }

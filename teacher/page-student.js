@@ -222,7 +222,7 @@ window.PageStudent = (function() {
   }
   function saveReflField(secId) {
     var text = (document.getElementById('refl-input-' + secId).value || '').trim();
-    var conf = parseInt(document.getElementById('refl-conf-' + secId, 10).value) || 0;
+    var conf = parseInt(document.getElementById('refl-conf-' + secId).value, 10) || 0;
     var cid = activeCourse;
     var reflections = getReflections(cid);
     if (!reflections[studentId]) reflections[studentId] = {};

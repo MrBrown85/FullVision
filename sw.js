@@ -1,6 +1,6 @@
 // IMPORTANT: Increment the version number when deploying new app code
 // This ensures users get the latest files
-const CACHE_NAME = 'fullvision-v14';
+const CACHE_NAME = 'fullvision-v15';
 
 // All app files to pre-cache on install
 const PRECACHE_URLS = [
@@ -30,15 +30,6 @@ const PRECACHE_URLS = [
   '/teacher/page-gradebook.js',
   '/teacher/page-observations.js',
   '/teacher/page-reports.js',
-  '/teacher/dash-overview.js',
-  '/teacher/dash-class-manager.js',
-  '/teacher/dash-curriculum-wizard.js',
-  '/teacher/assign-form.js',
-  '/teacher/assign-scoring.js',
-  '/teacher/assign-rubric-editor.js',
-  '/teacher/report-blocks.js',
-  '/teacher/report-builder.js',
-  '/teacher/report-narrative.js',
   '/teacher/teams-import.js',
   '/teacher/teams-import.css',
   '/vendor/xlsx.mini.min.js',

@@ -230,7 +230,9 @@
 })();
 
 // Idle timeout: sign out after 30 minutes of inactivity on shared computers
+// Skip on login page — signOut() there causes pointless reload
 (function() {
+  if (window.location.pathname.indexOf('login') !== -1) return;
   var _idleTimer = null;
   var IDLE_TIMEOUT = 30 * 60 * 1000; // 30 minutes
   function resetIdleTimer() {

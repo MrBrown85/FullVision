@@ -2,8 +2,9 @@
 
 /* Force page-main to constrain children so the grid fills remaining viewport.
    overflow-y:hidden prevents page-main from becoming a scroll container,
-   forcing flex children to fit within the available space instead. */
-.page-main { overflow-y: hidden !important; min-height: 0 !important; }
+   forcing flex children to fit within the available space instead.
+   Scoped via :has() so it only applies when the gradebook is active (not conflicting with reports.css). */
+.page-main:has(.gb-toolbar) { overflow-y: hidden !important; min-height: 0 !important; }
 
 /* Sidebar toggle hidden via JS in page-gradebook.js init() */
 

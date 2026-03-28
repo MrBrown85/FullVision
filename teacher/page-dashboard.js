@@ -488,8 +488,8 @@ window.PageDashboard = (function() {
       actionItems.forEach(function(item) {
         html += '<div class="dash-action-item">' +
           '<span class="dash-action-dot"></span>' +
-          '<span class="dash-action-text">' + item.text + '</span>' +
-          (item.link ? '<a class="dash-action-link" href="' + item.link + '">' + item.linkText + ' &rarr;</a>' : '') +
+          '<span class="dash-action-text">' + esc(item.text) + '</span>' +
+          (item.link ? '<a class="dash-action-link" href="' + item.link + '">' + esc(item.linkText) + ' &rarr;</a>' : '') +
         '</div>';
       });
       html += '</div>';
@@ -575,7 +575,7 @@ window.PageDashboard = (function() {
         var obsText = '';
         if (lastObs) {
           var snippet = lastObs.text.length > 45 ? lastObs.text.slice(0, 45) + '\u2026' : lastObs.text;
-          obsText = '\uD83D\uDCDD "' + snippet + '"';
+          obsText = '\uD83D\uDCDD "' + esc(snippet) + '"';
         } else {
           obsText = '<span style="color:var(--text-3)">No observations</span>';
         }

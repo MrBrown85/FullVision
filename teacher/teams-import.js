@@ -35,8 +35,6 @@ window.TeamsImport = (function() {
   }
 
   /* ── Helpers ───────────────────────────────────────────────── */
-  function _esc(s) { return esc(s); }  // reuse global esc() from data.js
-
   function _norm(s) { return (s || '').trim().toLowerCase(); }
 
   function _stepLabels() {
@@ -134,9 +132,9 @@ window.TeamsImport = (function() {
       '<div class="ti-steps" role="list" aria-label="Import progress">' + labels.map(function(_, i) {
         var cls = i + 1 < tiStep ? 'done' : (i + 1 === tiStep ? 'active' : '');
         var state = i + 1 < tiStep ? 'completed' : (i + 1 === tiStep ? 'current' : 'upcoming');
-        return '<div class="ti-step-pill ' + cls + '" role="listitem" aria-label="Step ' + (i+1) + ': ' + _esc(labels[i]) + ', ' + state + '"></div>';
+        return '<div class="ti-step-pill ' + cls + '" role="listitem" aria-label="Step ' + (i+1) + ': ' + esc(labels[i]) + ', ' + state + '"></div>';
       }).join('') + '</div>' +
-      '<div class="ti-step-label" tabindex="-1" id="ti-step-label">Step ' + tiStep + ' of ' + labels.length + ': ' + _esc(labels[tiStep - 1]) + '</div>' +
+      '<div class="ti-step-label" tabindex="-1" id="ti-step-label">Step ' + tiStep + ' of ' + labels.length + ': ' + esc(labels[tiStep - 1]) + '</div>' +
       '<div class="ti-body" id="ti-body">' + _renderStep() + '</div>' +
       _renderFooter() +
     '</div>';
@@ -183,7 +181,7 @@ window.TeamsImport = (function() {
     '<input type="file" class="ti-file-input" id="ti-file-input" accept=".csv,.xlsx" data-ti-change="fileSelected">';
     if (tiFileName) {
       html += '<div class="ti-file-info"><span class="ti-file-info-icon">&#9989;</span>' +
-        '<span class="ti-file-info-text">' + _esc(tiFileName) + '</span></div>';
+        '<span class="ti-file-info-text">' + esc(tiFileName) + '</span></div>';
     }
     return html;
   }
@@ -242,7 +240,7 @@ window.TeamsImport = (function() {
 
   function _showError(msg) {
     var body = document.getElementById('ti-body');
-    if (body) body.innerHTML = _renderStep1() + '<div class="ti-error" role="alert">' + _esc(msg) + '</div>';
+    if (body) body.innerHTML = _renderStep1() + '<div class="ti-error" role="alert">' + esc(msg) + '</div>';
     if (tiStep === 1) _setupDropzone();
   }
 
@@ -440,11 +438,11 @@ window.TeamsImport = (function() {
       if (m.action === 'match') {
         detail = '<span style="font-size:var(--text-xs);color:var(--text-3)">' +
           (m.matchType === 'email' ? 'by email' : 'by name') +
-          ' &rarr; ' + _esc(m.existingName) + '</span>';
+          ' &rarr; ' + esc(m.existingName) + '</span>';
       }
 
       // Action dropdown for unmatched students
-      var studentLabel = _esc(s.firstName + ' ' + s.lastName);
+      var studentLabel = esc(s.firstName + ' ' + s.lastName);
       var actionHtml = '';
       if (m.matchType === 'none') {
         actionHtml = '<select class="ti-action-select" data-ti-change="studentAction" data-idx="' + s.idx + '" aria-label="Action for ' + studentLabel + '">' +
@@ -460,8 +458,8 @@ window.TeamsImport = (function() {
       }
 
       html += '<tr>' +
-        '<td><div>' + _esc(s.firstName + ' ' + s.lastName) + '</div>' +
-          (s.email ? '<div class="ti-match-email">' + _esc(s.email) + '</div>' : '') +
+        '<td><div>' + esc(s.firstName + ' ' + s.lastName) + '</div>' +
+          (s.email ? '<div class="ti-match-email">' + esc(s.email) + '</div>' : '') +
         '</td>' +
         '<td>' + badge + ' ' + detail + '</td>' +
         '<td>' + actionHtml + '</td>' +
@@ -492,7 +490,7 @@ window.TeamsImport = (function() {
       html += '<li class="ti-assign-item">' +
         '<label style="display:contents"><input type="checkbox" data-ti-change="toggleAssign" data-idx="' + a.idx + '"' +
           (tiSelectedAssigns[a.idx] ? ' checked' : '') + '>' +
-        '<span class="ti-assign-title">' + _esc(a.title) +
+        '<span class="ti-assign-title">' + esc(a.title) +
           (isDupe ? ' <span class="ti-badge ti-badge-dupe">Already exists</span>' : '') +
         '</span>' +
         '<span class="ti-assign-meta">' + a.maxPoints + ' pts &middot; ' + scoredCount + ' scored</span>' +
@@ -529,7 +527,7 @@ window.TeamsImport = (function() {
       }
       html += '<div class="form-group" style="margin-bottom:16px">' +
         '<label for="ti-class-name" style="font-weight:600;font-size:var(--text-sm);display:block;margin-bottom:4px">Class Name</label>' +
-        '<input type="text" class="form-input" id="ti-class-name" value="' + _esc(tiClassName) + '" ' +
+        '<input type="text" class="form-input" id="ti-class-name" value="' + esc(tiClassName) + '" ' +
           'data-ti-change="className" placeholder="e.g. English 10 Block A" style="width:100%;max-width:400px">' +
       '</div>';
     }
@@ -545,20 +543,20 @@ window.TeamsImport = (function() {
     // Preview table
     html += '<div class="ti-preview-wrap"><table class="ti-preview-table"><thead><tr><th>Student</th>';
     selected.forEach(function(a) {
-      html += '<th title="' + _esc(a.title) + '">' + _esc(a.title.length > 18 ? a.title.slice(0, 16) + '..' : a.title) + '</th>';
+      html += '<th title="' + esc(a.title) + '">' + esc(a.title.length > 18 ? a.title.slice(0, 16) + '..' : a.title) + '</th>';
     });
     html += '</tr></thead><tbody>';
 
     activeStudents.forEach(function(s) {
       html += '<tr><td style="white-space:nowrap;font-weight:500">' +
-        _esc(s.firstName + ' ' + s.lastName) + '</td>';
+        esc(s.firstName + ' ' + s.lastName) + '</td>';
       selected.forEach(function(a) {
         var sc = a.scores[s.idx];
         if (!sc || sc.earned === null) {
           html += '<td class="ti-cell-empty">&mdash;</td>';
         } else {
           var cls = sc.feedback ? 'ti-cell-feedback' : 'ti-cell-score';
-          html += '<td class="' + cls + '" title="' + (sc.feedback ? _esc(sc.feedback.slice(0, 100)) : '') + '">' +
+          html += '<td class="' + cls + '" title="' + (sc.feedback ? esc(sc.feedback.slice(0, 100)) : '') + '">' +
             sc.earned + '/' + a.maxPoints +
             (sc.feedback ? ' *' : '') +
           '</td>';
@@ -579,14 +577,14 @@ window.TeamsImport = (function() {
     return '<div class="ti-results-card">' +
       '<div class="ti-results-icon" aria-hidden="true">&#9989;</div>' +
       '<div class="ti-results-title">Import Complete</div>' +
-      (r.className ? '<div style="text-align:center;color:var(--text-2);margin-bottom:12px">Class: <b>' + _esc(r.className) + '</b></div>' : '') +
+      (r.className ? '<div style="text-align:center;color:var(--text-2);margin-bottom:12px">Class: <b>' + esc(r.className) + '</b></div>' : '') +
       '<div class="ti-results-stats">' +
         '<div class="ti-results-stat"><b>' + r.studentsCreated + '</b>students created</div>' +
         '<div class="ti-results-stat"><b>' + r.assessmentsCreated + '</b>assignments imported</div>' +
         '<div class="ti-results-stat"><b>' + r.scoresWritten + '</b>scores recorded</div>' +
         '<div class="ti-results-stat"><b>' + r.feedbackSaved + '</b>feedback notes</div>' +
       '</div>' +
-      (r.errors.length ? '<div class="ti-error">' + r.errors.length + ' error(s): ' + _esc(r.errors.join('; ')) + '</div>' : '') +
+      (r.errors.length ? '<div class="ti-error">' + r.errors.length + ' error(s): ' + esc(r.errors.join('; ')) + '</div>' : '') +
     '</div>';
   }
 
