@@ -545,25 +545,36 @@ body.mobile-mode :focus:not(:focus-visible) { outline: none; }
 .m-tag-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 6px 0;
-  font-size: 15px;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 0.5px solid var(--divider-subtle);
 }
+.m-tag-row:last-child { border-bottom: none; }
 .m-tag-name {
-  color: var(--text-2);
-  flex: 1;
+  flex: 1; min-width: 0;
+  font-size: 14px; color: var(--text); font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+.m-tag-bar {
+  width: 40px; height: 6px; border-radius: 3px;
+  background: var(--overlay-hover); overflow: hidden; flex-shrink: 0;
+}
+.m-tag-bar-fill { height: 100%; border-radius: 3px; }
 .m-tag-score {
-  font-weight: 600;
-  min-width: 24px;
-  text-align: right;
+  font-size: 14px; font-weight: 700;
+  min-width: 28px; text-align: center;
+  padding: 2px 6px; border-radius: 6px;
 }
 .m-tag-evidence {
-  font-size: 13px;
-  color: var(--text-3);
-  min-width: 60px;
-  text-align: right;
+  font-size: 11px; font-weight: 500;
+  color: var(--text-3); text-transform: uppercase;
+  letter-spacing: 0.03em; flex-shrink: 0;
 }
+.m-tag-latest {
+  font-size: 12px; color: var(--text-3); margin-top: 3px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.m-tag-latest strong { color: var(--text-2); font-weight: 500; }
 
 /* ── Focus Areas ──────────────────────────────────────────── */
 .m-focus-row {
@@ -608,11 +619,13 @@ body.mobile-mode :focus:not(:focus-visible) { outline: none; }
 
 /* ── Growth Sparkline (mobile sizing) ─────────────────────── */
 .m-section-header .growth-sparkline {
-  max-width: 60px;
+  max-width: 50px;
   height: 16px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
+  overflow: hidden;
+  margin-right: 4px;
 }
 
 /* ── Recent Assessments (compact cards) ────────────────────── */

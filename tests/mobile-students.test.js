@@ -260,9 +260,9 @@ describe('Evidence count filtering', () => {
       getTagProficiency: () => 3.0,
     });
     const html = MStudents.renderDetail(CID, 'stu1');
-    // Should show "1 evidence" (only the summative), not "3 evidence"
-    expect(html).toContain('1 evidence');
-    expect(html).not.toContain('3 evidence');
+    // Evidence count should be 1 (only the summative), not 3
+    expect(html).toContain('class="m-tag-evidence">1<');
+    expect(html).not.toContain('class="m-tag-evidence">3<');
   });
 });
 

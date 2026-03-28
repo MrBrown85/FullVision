@@ -296,14 +296,31 @@ window.MStudents = (function() {
 
       // Tag details (hidden until expanded)
       var tagRows = '';
+      var allAssessments = getAssessments(cid);
       sec.tags.forEach(function(tag) {
         var tagScores = getTagScores(cid, sid, tag.id);
         var tagProf = getTagProficiency(cid, sid, tag.id);
-        var evCount = tagScores.filter(function(s) { return s.type === 'summative'; }).length;
+        var tagR = Math.round(tagProf);
+        var summScores = tagScores.filter(function(s) { return s.type === 'summative' && s.score > 0; });
+        var evCount = summScores.length;
+        var barPct = tagProf > 0 ? Math.round(tagProf / 4 * 100) : 0;
+        var profLabel = tagProf > 0 ? (PROF_LABELS[tagR] || '') : 'No evidence';
+        // Latest assessment for this tag
+        var latestScore = summScores.length ? summScores.sort(function(a,b) { return (b.date||'').localeCompare(a.date||''); })[0] : null;
+        var latestAssess = latestScore ? allAssessments.find(function(a) { return a.id === latestScore.assessmentId; }) : null;
+        var latestLine = latestAssess
+          ? '<div class="m-tag-latest">Latest: <strong>' + MC.esc(latestAssess.title) + '</strong> · ' + PROF_LABELS[latestScore.score] + '</div>'
+          : '';
         tagRows += '<div class="m-tag-row">' +
-          '<span class="m-tag-name">' + MC.esc(tag.label || tag.name || tag.id) + '</span>' +
-          '<span class="m-tag-score" style="color:' + MC.profBg(Math.round(tagProf)) + '">' + (tagProf > 0 ? tagProf.toFixed(1) : '—') + '</span>' +
-          '<span class="m-tag-evidence">' + evCount + ' evidence</span>' +
+          '<div style="flex:1;min-width:0">' +
+            '<div style="display:flex;align-items:center;gap:8px">' +
+              '<span class="m-tag-name">' + MC.esc(tag.label || tag.name || tag.id) + '</span>' +
+              '<div class="m-tag-bar"><div class="m-tag-bar-fill" style="width:' + barPct + '%;background:' + MC.profBg(tagR) + '"></div></div>' +
+              '<span class="m-tag-score" style="color:' + MC.profBg(tagR) + '">' + profLabel + '</span>' +
+              '<span class="m-tag-evidence">' + evCount + '</span>' +
+            '</div>' +
+            latestLine +
+          '</div>' +
         '</div>';
       });
 
