@@ -116,14 +116,15 @@
   async function _doRefresh() {
     try {
       if (window.GB && window.GB.refreshFromSupabase) {
-        await window.GB.refreshFromSupabase();
+        var timeout = new Promise(function(_, reject) {
+          setTimeout(function() { reject(new Error('timeout')); }, 8000);
+        });
+        await Promise.race([window.GB.refreshFromSupabase(), timeout]);
       }
-      // refreshFromSupabase already re-renders via _mobileRerender if data changed,
-      // but we always re-render here to ensure the UI is fresh even if no data changed
       _renderTab(_activeTab);
-      MC.toast('Synced just now');
+      MC.showToast('Synced just now');
     } catch (e) {
-      MC.toast('Refresh failed');
+      MC.showToast(e.message === 'timeout' ? 'Sync timed out' : 'Refresh failed');
     }
     _hidePullIndicator();
   }

@@ -1616,6 +1616,7 @@ body.mobile-mode :focus:not(:focus-visible) { outline: none; }
 .m-loading-text { font-size:15px; color:var(--text-3); font-weight:500; }
 
 .m-pull-indicator {
+  position:fixed; top:0; left:0; right:0; z-index:9999;
   display:flex; align-items:center; justify-content:center;
   height:0; overflow:hidden; transition:height 0.2s;
   background:var(--bg);
