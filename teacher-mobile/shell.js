@@ -52,8 +52,8 @@
     _initPullToRefresh();
 
     // Register mobile re-render callback for cross-device sync
-    if (typeof _registerMobileRerender === 'function') {
-      _registerMobileRerender(function() { _renderTab(_activeTab); });
+    if (window.GB && window.GB.registerMobileRerender) {
+      window.GB.registerMobileRerender(function() { _renderTab(_activeTab); });
     }
   }
 
@@ -83,9 +83,10 @@
       if (!_pulling) return;
       _pulling = false;
       if (_pullIndicator && _pullIndicator.classList.contains('active')) {
-        _doRefresh();
+        _doRefresh(); // async — spinner hidden inside _doRefresh after fetch completes
+      } else {
+        _hidePullIndicator();
       }
-      _hidePullIndicator();
     }, { passive: true });
   }
 
@@ -107,11 +108,11 @@
 
   async function _doRefresh() {
     try {
-      if (typeof refreshFromSupabase === 'function') {
-        await refreshFromSupabase();
-      } else if (window.GB && window.GB.refreshFromSupabase) {
+      if (window.GB && window.GB.refreshFromSupabase) {
         await window.GB.refreshFromSupabase();
       }
+      // refreshFromSupabase already re-renders via _mobileRerender if data changed,
+      // but we always re-render here to ensure the UI is fresh even if no data changed
       _renderTab(_activeTab);
       MC.toast('Data refreshed');
     } catch (e) {

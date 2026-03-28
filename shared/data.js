@@ -534,18 +534,27 @@ function _initRealtimeSync() {
           _cache[field][cid] = payload.new.data;
         }
 
-        if (_PROF_FIELDS.includes(field) && typeof clearProfCache === 'function') clearProfCache();
-        if (field === 'learningMaps') { _allTagsCache = {}; _tagToSectionCache = {}; }
-
-        // Re-render current page
-        var currentPage = (typeof Router !== 'undefined' && Router.getCurrentPage) ? Router.getCurrentPage() : null;
-        if (currentPage && currentPage.render) {
-          try { currentPage.render(); } catch (e) { /* page may not be ready */ }
-        }
+        _invalidateAndRerender();
       })
       .subscribe();
   } catch (e) {
     console.warn('Realtime sync not available:', e);
+  }
+}
+
+/** Shared cache invalidation + re-render for both Realtime and visibility refresh */
+function _invalidateAndRerender() {
+  if (typeof clearProfCache === 'function') clearProfCache();
+  _allTagsCache = {};
+  _tagToSectionCache = {};
+  // Re-render current page (desktop)
+  var currentPage = (typeof Router !== 'undefined' && Router.getCurrentPage) ? Router.getCurrentPage() : null;
+  if (currentPage && currentPage.render) {
+    try { currentPage.render(); } catch (e) { /* page may not be ready */ }
+  }
+  // Re-render current tab (mobile)
+  if (window.__MOBILE && typeof _mobileRerender === 'function') {
+    try { _mobileRerender(); } catch (e) { /* mobile may not be ready */ }
   }
 }
 
@@ -603,18 +612,7 @@ async function _refreshFromSupabase() {
     }
 
     if (changed) {
-      if (typeof clearProfCache === 'function') clearProfCache();
-      _allTagsCache = {};
-      _tagToSectionCache = {};
-      // Re-render current page (desktop)
-      var currentPage = (typeof Router !== 'undefined' && Router.getCurrentPage) ? Router.getCurrentPage() : null;
-      if (currentPage && currentPage.render) {
-        try { currentPage.render(); } catch (e) { /* page may not be ready */ }
-      }
-      // Re-render current tab (mobile)
-      if (window.__MOBILE && typeof _mobileRerender === 'function') {
-        try { _mobileRerender(); } catch (e) { /* mobile may not be ready */ }
-      }
+      _invalidateAndRerender();
     }
   } catch (e) {
     console.warn('Visibility refresh failed:', e);
@@ -1614,14 +1612,13 @@ function getReportConfig(cid) {
 function saveReportConfig(cid, config) { _saveCourseField('reportConfig', cid, config); }
 
 /* ── Namespace ──────────────────────────────────────────────── */
-// Allow mobile shell to register its re-render callback
-window._registerMobileRerender = function(fn) { _mobileRerender = fn; };
 var _mobileRerender = null;
 
 window.GB = {
   getSyncStatus,
   retrySyncs,
   refreshFromSupabase: _refreshFromSupabase,
+  registerMobileRerender: function(fn) { _mobileRerender = fn; },
   initAllCourses,
   initData,
   esc,
