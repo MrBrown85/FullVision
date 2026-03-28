@@ -375,6 +375,12 @@
       }
 
       // ── Students tab ──
+      if (action === 'm-set-view') {
+        var mode = target.getAttribute('data-mode');
+        if (mode) MStudents.setViewMode(mode);
+        return;
+      }
+
       if (action === 'm-student-detail') {
         var sid = target.getAttribute('data-sid');
         var html = MStudents.renderDetail(_cid, sid);

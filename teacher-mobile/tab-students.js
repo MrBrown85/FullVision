@@ -5,13 +5,20 @@ window.MStudents = (function() {
 
   var MC = window.MComponents;
   var MAX_PROF = 4;
+  var _viewMode = 'cards'; // 'cards' or 'list'
 
   /* ── Student List Screen ────────────────────────────────────── */
   function renderList(cid) {
     var students = getStudents(cid);
     students = sortStudents(students.slice(), 'alpha');
 
+    var toggleHTML = '<div class="m-view-toggle">' +
+      '<button class="m-view-toggle-btn' + (_viewMode === 'cards' ? ' active' : '') + '" data-action="m-set-view" data-mode="cards">Cards</button>' +
+      '<button class="m-view-toggle-btn' + (_viewMode === 'list' ? ' active' : '') + '" data-action="m-set-view" data-mode="list">List</button>' +
+    '</div>';
+
     var nav = MC.navBar({ id: 'students-list', title: 'Students', rightHTML:
+      toggleHTML +
       '<button class="m-nav-bar-action" data-action="m-settings" title="Settings">' + MC.ICONS.settings + '</button>'
     });
 
@@ -152,6 +159,15 @@ window.MStudents = (function() {
   function initCardStack(cid) {
     if (_stackInstance) { _stackInstance.destroy(); _stackInstance = null; }
     var container = document.getElementById('m-student-card-stack');
+    var list = document.getElementById('m-student-list');
+
+    // If in list mode, just show the list and skip card stack init
+    if (_viewMode === 'list') {
+      if (container) container.style.display = 'none';
+      if (list) list.style.display = '';
+      return;
+    }
+
     if (!container) return;
 
     var students = getStudents(cid);
@@ -167,8 +183,37 @@ window.MStudents = (function() {
       onSwipe: function() { /* no-op, browsing only */ }
     });
 
-    var list = document.getElementById('m-student-list');
+    if (container) container.style.display = '';
     if (list) list.style.display = 'none';
+  }
+
+  function setViewMode(mode) {
+    _viewMode = mode;
+    var container = document.getElementById('m-student-card-stack');
+    var list = document.getElementById('m-student-list');
+
+    // Update toggle buttons
+    document.querySelectorAll('.m-view-toggle-btn').forEach(function(btn) {
+      btn.classList.toggle('active', btn.dataset.mode === mode);
+    });
+
+    if (mode === 'list') {
+      // Switch to list
+      if (_stackInstance) { _stackInstance.destroy(); _stackInstance = null; }
+      if (container) container.style.display = 'none';
+      if (list) {
+        list.style.display = '';
+        // Show all cells (clear any search filter)
+        list.querySelectorAll('.m-cell').forEach(function(c) { c.style.display = ''; });
+      }
+    } else {
+      // Switch to cards — re-init card stack
+      // Find current cid from the screen's data or the global active course
+      var cid = getActiveCourse();
+      if (container) container.style.display = '';
+      if (list) list.style.display = 'none';
+      initCardStack(cid);
+    }
   }
 
   function destroyCardStack() {
@@ -409,12 +454,13 @@ window.MStudents = (function() {
         cell.style.display = name.toLowerCase().indexOf(q) >= 0 ? '' : 'none';
       });
     } else {
-      // Search cleared: restore card stack, hide list
-      if (_stackInstance && stack) {
+      // Search cleared: restore the active view mode
+      if (_viewMode === 'cards' && _stackInstance && stack) {
         stack.style.display = '';
         if (list) list.style.display = 'none';
       } else {
-        // No card stack — show full list
+        // List mode or no card stack — show full list
+        if (stack && _viewMode === 'list') stack.style.display = 'none';
         if (list) list.style.display = '';
         var cells = document.querySelectorAll('#m-student-list .m-cell');
         cells.forEach(function(cell) { cell.style.display = ''; });
@@ -434,6 +480,7 @@ window.MStudents = (function() {
     renderDetail: renderDetail,
     filterList: filterList,
     initCardStack: initCardStack,
-    destroyCardStack: destroyCardStack
+    destroyCardStack: destroyCardStack,
+    setViewMode: setViewMode
   };
 })();

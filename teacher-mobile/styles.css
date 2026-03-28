@@ -1545,6 +1545,25 @@ body.mobile-mode :focus:not(:focus-visible) { outline: none; }
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   VIEW TOGGLE — Cards / List segmented control in nav bar
+   ═══════════════════════════════════════════════════════════════ */
+.m-view-toggle {
+  display:flex; background:rgba(118,118,128,0.12); border-radius:8px;
+  padding:2px; gap:0; margin-right:8px;
+}
+.m-view-toggle-btn {
+  font-family:inherit; font-size:13px; font-weight:500;
+  padding:4px 12px; border:none; background:none; border-radius:6px;
+  color:var(--text-2); cursor:pointer; transition:all 0.2s;
+  -webkit-tap-highlight-color:transparent;
+}
+.m-view-toggle-btn.active {
+  background:var(--surface); color:var(--text);
+  box-shadow:0 1px 3px rgba(0,0,0,0.08), 0 0.5px 1px rgba(0,0,0,0.04);
+  font-weight:600;
+}
+
+/* ═══════════════════════════════════════════════════════════════
    CARD STACK — Swipeable card deck with physical depth
    ═══════════════════════════════════════════════════════════════ */
 .m-card-stack {
