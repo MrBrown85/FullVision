@@ -1,79 +1,82 @@
 # FullVision
 
-A learning profile builder and communicator for British Columbia teachers. Track student achievement against BC curriculum competencies using proficiency-based grading, record observations, manage learner dispositions, and generate parent-friendly reports.
+A standards-based grading and observation tool for British Columbia teachers. Track student proficiency against BC curriculum competencies, record classroom observations, and generate parent-friendly reports.
 
-Built as a single-page application with vanilla JavaScript -- no framework, no build step. Backed by Supabase for authentication and data storage with Row-Level Security, deployed on Netlify.
+Built with vanilla JavaScript — no framework, no build step. Backed by Supabase for auth and data, deployed on Netlify.
 
-## Screenshots
+**Live app:** [fullvision.ca](https://fullvision.ca) · [Mobile](https://fullvision.ca/teacher-mobile/)
 
-<!-- Add screenshots here -->
-<!-- ![Dashboard overview](docs/screenshots/dashboard.png) -->
-<!-- ![Gradebook spreadsheet](docs/screenshots/gradebook.png) -->
-<!-- ![Report builder](docs/screenshots/reports.png) -->
+---
 
 ## Features
 
-- **Proficiency-based grading** -- 4-level scale (Emerging, Developing, Proficient, Extending) aligned with BC curriculum
-- **4 calculation methods** -- Most Recent, Decaying Average, Mode, Mean
-- **BC curriculum mapping** -- Built-in curriculum data for tagging assessments to learning standards
-- **Student observations** -- Quick notes with disposition dimensions (social, personal, intellectual)
-- **Report builder** -- Configurable report cards with drag-and-drop block ordering
-- **Term questionnaire** -- Disposition ratings per student per term
-- **CSV import** -- Bulk import students from CSV files
-- **Multi-course** -- Manage multiple courses with independent grading configurations
-- **Dark mode** -- Full light/dark theme support via CSS custom properties
-- **Offline caching** -- Service worker pre-caches all app assets for offline use
-- **FOIPPA compliant** -- Student data stored in Canada (AWS ca-central-1), idle timeout, logout clears local data
+**Desktop**
+- **Proficiency-based grading** — 4-level scale (Emerging → Extending) aligned to BC curriculum
+- **4 calculation methods** — Most Recent, Decaying Average, Mode, Mean
+- **BC curriculum mapping** — Tag assessments to specific learning standards
+- **Gradebook** — Spreadsheet view with per-tag and overall scores
+- **Student profiles** — Score timeline, sparklines, and smart insights (Apple Health style)
+- **Observations** — Quick notes with sentiment tagging (strength / growth / concern)
+- **Report builder** — 15 configurable block types, drag-to-reorder, AI narrative generation
+- **Term questionnaire** — Disposition ratings per student per term
+- **CSV import** — Bulk import students; Microsoft Teams roster support
+- **Multi-course** — Independent grading config per course
+- **Dark mode** — Full light/dark theme via CSS custom properties
+
+**Mobile PWA** (installable on iOS/Android)
+- **Cards view** — Swipeable student cards showing proficiency + recent observation
+- **List view** — Sortable by name, proficiency, missing work, or last observed
+- **Speed grader** — Tap to score assessments one student at a time
+- **Observation feed** — Social-feed style; one-tap quick-post
+- **Pull-to-refresh** — Manual sync with last-synced timestamp
+- **Offline-capable** — Service worker pre-caches all assets
+
+---
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | Vanilla JavaScript (IIFE modules), CSS custom properties |
-| Auth & Database | [Supabase](https://supabase.com) (Auth, Postgres, Row-Level Security) |
-| Hosting | [Netlify](https://netlify.com) (static site) |
-| Testing | [Vitest](https://vitest.dev) |
+| Frontend | Vanilla JS (IIFE modules), CSS custom properties |
+| Auth & Database | [Supabase](https://supabase.com) (Auth, Postgres, Realtime, RLS) |
+| Hosting | [Netlify](https://netlify.com) (static, no build step) |
+| Testing | [Vitest](https://vitest.dev) — 580 tests |
 | Formatting | [Prettier](https://prettier.io) |
-| Offline | Service worker with pre-caching |
-| PWA | Web app manifest for installability |
+| PWA | Web app manifest + service worker |
+
+---
 
 ## Getting Started
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org) (for the local dev server and test runner)
+- [Node.js](https://nodejs.org) (for the dev server and test runner)
 - A [Supabase](https://supabase.com) project (free tier works)
 
-### 1. Clone the repository
+### 1. Clone and install
 
 ```bash
-git clone <your-repo-url>
-cd FullVision
+git clone https://github.com/MrBrown85/TeacherDashboard.git
+cd TeacherDashboard
 npm install
 ```
 
 ### 2. Set up Supabase
 
-Create a Supabase project in the **ca-central-1 (Montreal)** region for FOIPPA compliance.
+Create a Supabase project in **ca-central-1 (Montreal)** for FOIPPA compliance.
 
-Run the SQL migration files in order in the Supabase SQL Editor:
+Run the SQL files in order in the Supabase SQL Editor:
 
 ```
-1. supabase_schema.sql       -- Creates all tables and indexes
-2. supabase_rls.sql          -- Enables Row-Level Security policies
-3. supabase_errors.sql       -- Error handling setup
-4. supabase_course_data.sql  -- Course data initialization (optional)
+schema.sql                  -- Tables and indexes
+supabase_rls.sql            -- Row-Level Security policies
+supabase_errors.sql         -- Error logging setup
+supabase_course_data.sql    -- Optional seed data
 ```
 
-### 3. Configure environment
+### 3. Configure credentials
 
-Copy the example environment file:
-
-```bash
-cp .env.example .env
-```
-
-Update `gb-supabase.js` with your Supabase project URL and anon key. See `.env.example` for reference. Do not commit credentials to version control.
+Update `shared/supabase.js` with your Supabase project URL and anon key. Do not commit credentials.
 
 ### 4. Run locally
 
@@ -81,125 +84,98 @@ Update `gb-supabase.js` with your Supabase project URL and anon key. See `.env.e
 npm run dev
 ```
 
-This starts a local server on port 8347. Open [http://localhost:8347/app.html](http://localhost:8347/app.html).
+Opens on port 8347. Desktop app at [localhost:8347/teacher/app.html](http://localhost:8347/teacher/app.html), mobile at [localhost:8347/teacher-mobile/](http://localhost:8347/teacher-mobile/).
+
+---
 
 ## Project Structure
 
 ```
-FullVision/
-├── app.html                    # SPA entry point
-├── login.html                  # Auth page
+TeacherDashboard/
 │
-├── gb-router.js                # Hash-based SPA router
-├── gb-supabase.js              # Supabase client and auth
-├── gb-data.js                  # Data layer (cache-through pattern)
-├── gb-calc.js                  # Proficiency calculation engine
-├── gb-constants.js             # Shared constants and defaults
-├── gb-ui.js                    # UI utilities (toasts, modals, helpers)
-├── gb-seed-data.js             # Demo data for new accounts
-├── gb-styles.css               # Global styles and design system
+├── teacher/                    # Desktop SPA
+│   ├── app.html                # Entry point
+│   ├── router.js               # Hash-based SPA router
+│   ├── page-dashboard.js       # Class overview + student cards
+│   ├── page-assignments.js     # Assessment CRUD, scoring, rubrics
+│   ├── page-gradebook.js       # Spreadsheet scores view
+│   ├── page-student.js         # Individual student profile
+│   ├── page-observations.js    # Observation capture
+│   ├── page-reports.js         # Report builder
+│   ├── dash-class-manager.js   # Class + student management
+│   ├── report-blocks.js        # 15 report block renderers
+│   ├── report-questionnaire.js # Term questionnaire + AI narrative
+│   └── ui.js                   # Toast, modal, and DOM helpers
 │
-├── page-dashboard.js           # Dashboard page module
-├── page-assignments.js         # Assignments page module
-├── page-gradebook.js           # Spreadsheet/gradebook page
-├── page-student.js             # Student detail page
-├── page-observations.js        # Observations page
-├── page-reports.js             # Reports page module
+├── teacher-mobile/             # Mobile PWA
+│   ├── index.html              # Entry point
+│   ├── shell.js                # Boot, tab routing, pull-to-refresh
+│   ├── tab-students.js         # Card stack + list + student detail
+│   ├── tab-observe.js          # Observation feed + compose sheet
+│   ├── tab-grade.js            # Speed grader
+│   ├── components.js           # Shared iOS-style UI components
+│   └── styles.css              # Mobile styles
 │
-├── dash-overview.js            # Dashboard overview component
-├── dash-class-manager.js       # Class/student management + CSV import
-├── dash-curriculum-wizard.js   # Curriculum selection wizard
-├── assign-form.js              # Assignment creation form
-├── assign-scoring.js           # Score entry interface
-├── assign-rubric-editor.js     # Rubric editor component
-├── report-builder.js           # Report builder orchestration
-├── report-blocks.js            # Report section renderers
-├── report-narrative.js         # Narrative report generation
+├── shared/                     # Shared across both apps
+│   ├── data.js                 # Cache-through Supabase sync layer
+│   ├── calc.js                 # Proficiency calculation engine
+│   ├── constants.js            # Shared constants
+│   ├── supabase.js             # Supabase client
+│   └── seed-data.js            # Demo data for new accounts
 │
-├── curriculum_data.js          # BC curriculum data (auto-generated)
-├── curriculum_by_course.json   # Raw curriculum JSON
-├── vendor/supabase.min.js      # Supabase client library
 ├── sw.js                       # Service worker (offline caching)
 ├── manifest.json               # PWA manifest
-├── netlify.toml                # Netlify deployment config
-├── _headers                    # Security and cache headers
-│
-├── supabase_schema.sql         # Database schema
-├── supabase_rls.sql            # Row-Level Security policies
-├── supabase_errors.sql         # Error handling
-├── supabase_course_data.sql    # Seed course data
-│
-├── docs/
-│   ├── ARCHITECTURE.md                 # Technical architecture guide
-│   ├── Privacy_Impact_Assessment.md    # FOIPPA PIA
-│   ├── Data_Retention_Policy.md        # Data retention rules
-│   └── Breach_Notification_Procedure.md # Incident response plan
-│
-└── package.json                # Dev dependencies and scripts
+├── schema.sql                  # Database schema
+├── netlify.toml                # Netlify config
+├── _headers                    # Security + cache headers
+├── curriculum_data.js          # BC curriculum data
+└── tests/                      # Vitest test suite (580 tests)
 ```
 
-### Architecture overview
+### Architecture
 
-- **SPA routing**: Hash-based router (`gb-router.js`) swaps page modules without full reloads
-- **Data layer**: Cache-through pattern in `gb-data.js` -- reads from localStorage first, syncs with Supabase in the background
-- **Calculation engine**: `gb-calc.js` supports four proficiency methods (mostRecent, decayingAverage, mode, mean) with memoization
-- **Modules**: Each page is an IIFE module (e.g., `page-gradebook.js`) that exports `init()` and `destroy()` lifecycle hooks
+- **Routing**: Hash-based router in `teacher/router.js` swaps page modules without full reloads
+- **Data layer**: `shared/data.js` — cache-through pattern; reads from localStorage, syncs with Supabase in the background. Realtime broadcast pushes changes to other open devices.
+- **Database**: 3 Postgres tables — `course_data` (all grading data as JSON per teacher), `teacher_config` (settings), `error_logs`. RLS on all tables.
+- **Calculation engine**: `shared/calc.js` — four proficiency methods with memoization
+- **Mobile shell**: `teacher-mobile/shell.js` — handles boot, tab switching, pull-to-refresh, and all event delegation via `data-action` attributes
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full technical guide.
-
-## Database
-
-14 Postgres tables with Row-Level Security ensuring each teacher can only access their own data. Key tables include `courses`, `students`, `assessments`, `scores`, `observations`, `learning_maps`, `term_ratings`, and `report_config`.
-
-See `supabase_schema.sql` for the complete schema definition.
+---
 
 ## Privacy and Compliance
 
-FullVision is designed for FOIPPA (Freedom of Information and Protection of Privacy Act) compliance:
+Designed for [FOIPPA](https://www.bclaws.gov.bc.ca/civix/document/id/complete/statreg/96165_00) compliance:
 
-- **Data residency** -- All data stored in Canada via Supabase on AWS ca-central-1 (Montreal)
-- **Row-Level Security** -- Each teacher's data is isolated at the database level
-- **Idle timeout** -- Automatic sign-out after 30 minutes of inactivity
-- **Logout clears data** -- All `gb-*` localStorage keys are removed on sign-out
-- **No student accounts** -- Only teachers access the system
-- **Security headers** -- CSP, HSTS, X-Frame-Options, and X-Content-Type-Options configured in `_headers`
+| Area | Detail |
+|------|--------|
+| Data residency | Canada only — Supabase on AWS ca-central-1 (Montreal) |
+| Row-Level Security | Teachers can only access their own data |
+| Idle timeout | Auto sign-out after 30 minutes of inactivity |
+| Logout | Clears all local data on sign-out |
+| No student accounts | Only the teacher accesses the system |
+| Security headers | CSP, HSTS, X-Frame-Options, X-Content-Type-Options |
 
-See the `docs/` directory for the full Privacy Impact Assessment, Data Retention Policy, and Breach Notification Procedure.
+See `docs/` for the Privacy Impact Assessment, Data Retention Policy, and Breach Notification Procedure.
+
+---
 
 ## Testing
 
-Run the test suite:
-
 ```bash
-npm test
+npm test               # Run full suite
+npm run test:watch     # Watch mode
 ```
 
-Run tests in watch mode during development:
+580 tests covering the calculation engine, data layer, and mobile UI components.
 
-```bash
-npm run test:watch
-```
-
-Tests use [Vitest](https://vitest.dev) and cover the proficiency calculation engine.
-
-## Code Formatting
-
-```bash
-npm run format          # Format all files with Prettier
-npm run format:check    # Check formatting without writing
-```
+---
 
 ## Deployment
 
-The app is configured for Netlify static hosting. Push to a Git repository connected to Netlify and it deploys automatically.
+Push to `main` — Netlify deploys automatically. No build step; publish directory is the project root.
 
-The `netlify.toml` configuration:
-- Publish directory: `.` (project root, no build step)
-- Root `/` redirects to `/app.html`
-- JS and CSS cached for 1 hour; HTML pages are not cached
-
-Security headers are defined in `_headers` and include Content-Security-Policy, Strict-Transport-Security, and frame/content-type protections.
+---
 
 ## License
 
-All rights reserved. This software is proprietary.
+All rights reserved. Proprietary software.
