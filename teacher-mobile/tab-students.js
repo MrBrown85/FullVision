@@ -6,9 +6,34 @@ window.MStudents = (function() {
   var MC = window.MComponents;
   var MAX_PROF = 4;
   var _viewMode = 'cards'; // 'cards' or 'list'
+  var _activeCid = null;
+
+  /* ── Shared helpers ──────────────────────────────────────────── */
+  function _renderBadges(st) {
+    var badges = '';
+    if (st.designations && st.designations.length) {
+      st.designations.forEach(function(code) {
+        var des = BC_DESIGNATIONS[code];
+        if (des && des.iep) badges += '<span class="m-badge m-badge-iep">IEP</span>';
+        if (des && des.modified) badges += '<span class="m-badge m-badge-mod">MOD</span>';
+      });
+    }
+    return badges;
+  }
+
+  function _syncViewVisibility(showCards) {
+    var container = document.getElementById('m-student-card-stack');
+    var list = document.getElementById('m-student-list');
+    if (container) container.style.display = showCards ? '' : 'none';
+    if (list) {
+      list.style.display = showCards ? 'none' : '';
+      if (!showCards) list.querySelectorAll('.m-cell').forEach(function(c) { c.style.display = ''; });
+    }
+  }
 
   /* ── Student List Screen ────────────────────────────────────── */
   function renderList(cid) {
+    _activeCid = cid;
     var students = getStudents(cid);
     students = sortStudents(students.slice(), 'alpha');
 
@@ -42,15 +67,7 @@ window.MStudents = (function() {
         var subtitle = '';
         if (st.pronouns) subtitle += MC.esc(st.pronouns);
 
-        // Designation badges
-        var badges = '';
-        if (st.designations && st.designations.length) {
-          st.designations.forEach(function(code) {
-            var des = BC_DESIGNATIONS[code];
-            if (des && des.iep) badges += ' <span class="m-badge m-badge-iep">IEP</span>';
-            if (des && des.modified) badges += ' <span class="m-badge m-badge-mod">MOD</span>';
-          });
-        }
+        var badges = _renderBadges(st);
 
         // Missing work check
         var hasMissing = allAssessments.some(function(a) {
@@ -93,15 +110,7 @@ window.MStudents = (function() {
     var initials = MC.avatarInitials(st);
     var name = displayName(st);
 
-    // Badges
-    var badges = '';
-    if (st.designations && st.designations.length) {
-      st.designations.forEach(function(code) {
-        var des = BC_DESIGNATIONS[code];
-        if (des && des.iep) badges += '<span class="m-badge m-badge-iep">IEP</span> ';
-        if (des && des.modified) badges += '<span class="m-badge m-badge-mod">MOD</span> ';
-      });
-    }
+    var badges = _renderBadges(st);
 
     // Section mini-bars
     var sections = data.sections;
@@ -157,17 +166,14 @@ window.MStudents = (function() {
   var _stackInstance = null;
 
   function initCardStack(cid) {
-    if (_stackInstance) { _stackInstance.destroy(); _stackInstance = null; }
-    var container = document.getElementById('m-student-card-stack');
-    var list = document.getElementById('m-student-list');
+    destroyCardStack();
 
-    // If in list mode, just show the list and skip card stack init
     if (_viewMode === 'list') {
-      if (container) container.style.display = 'none';
-      if (list) list.style.display = '';
+      _syncViewVisibility(false);
       return;
     }
 
+    var container = document.getElementById('m-student-card-stack');
     if (!container) return;
 
     var students = getStudents(cid);
@@ -183,14 +189,12 @@ window.MStudents = (function() {
       onSwipe: function() { /* no-op, browsing only */ }
     });
 
-    if (container) container.style.display = '';
-    if (list) list.style.display = 'none';
+    _syncViewVisibility(true);
   }
 
   function setViewMode(mode) {
+    if (mode !== 'cards' && mode !== 'list') return;
     _viewMode = mode;
-    var container = document.getElementById('m-student-card-stack');
-    var list = document.getElementById('m-student-list');
 
     // Update toggle buttons
     document.querySelectorAll('.m-view-toggle-btn').forEach(function(btn) {
@@ -198,21 +202,11 @@ window.MStudents = (function() {
     });
 
     if (mode === 'list') {
-      // Switch to list
-      if (_stackInstance) { _stackInstance.destroy(); _stackInstance = null; }
-      if (container) container.style.display = 'none';
-      if (list) {
-        list.style.display = '';
-        // Show all cells (clear any search filter)
-        list.querySelectorAll('.m-cell').forEach(function(c) { c.style.display = ''; });
-      }
+      destroyCardStack();
+      _syncViewVisibility(false);
     } else {
-      // Switch to cards — re-init card stack
-      // Find current cid from the screen's data or the global active course
-      var cid = getActiveCourse();
-      if (container) container.style.display = '';
-      if (list) list.style.display = 'none';
-      initCardStack(cid);
+      _syncViewVisibility(true);
+      initCardStack(_activeCid);
     }
   }
 
@@ -235,14 +229,7 @@ window.MStudents = (function() {
     var nav = MC.navBar({ id: 'student-detail', title: name, backLabel: 'Students' });
 
     // Hero
-    var badges = '';
-    if (st.designations && st.designations.length) {
-      st.designations.forEach(function(code) {
-        var des = BC_DESIGNATIONS[code];
-        if (des && des.iep) badges += '<span class="m-badge m-badge-iep">IEP</span>';
-        if (des && des.modified) badges += '<span class="m-badge m-badge-mod">MOD</span>';
-      });
-    }
+    var badges = _renderBadges(st);
 
     var hero = '<div class="m-hero">' +
       '<div class="m-hero-avatar" style="background:' + color + '">' + initials + '</div>' +
@@ -441,30 +428,16 @@ window.MStudents = (function() {
   /* ── Handle search filtering ────────────────────────────────── */
   function filterList(query) {
     var q = (query || '').toLowerCase().trim();
-    var list = document.getElementById('m-student-list');
-    var stack = document.getElementById('m-student-card-stack');
-
     if (q) {
-      // Searching: hide card stack, show list, filter it
-      if (stack) stack.style.display = 'none';
-      if (list) list.style.display = '';
-      var cells = document.querySelectorAll('#m-student-list .m-cell');
-      cells.forEach(function(cell) {
+      // Searching: always show filtered list, hide cards
+      _syncViewVisibility(false);
+      document.querySelectorAll('#m-student-list .m-cell').forEach(function(cell) {
         var name = (cell.querySelector('.m-cell-title') || {}).textContent || '';
         cell.style.display = name.toLowerCase().indexOf(q) >= 0 ? '' : 'none';
       });
     } else {
       // Search cleared: restore the active view mode
-      if (_viewMode === 'cards' && _stackInstance && stack) {
-        stack.style.display = '';
-        if (list) list.style.display = 'none';
-      } else {
-        // List mode or no card stack — show full list
-        if (stack && _viewMode === 'list') stack.style.display = 'none';
-        if (list) list.style.display = '';
-        var cells = document.querySelectorAll('#m-student-list .m-cell');
-        cells.forEach(function(cell) { cell.style.display = ''; });
-      }
+      _syncViewVisibility(_viewMode === 'cards' && !!_stackInstance);
     }
   }
 

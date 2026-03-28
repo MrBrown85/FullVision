@@ -388,11 +388,6 @@
         return;
       }
 
-      if (action === 'm-student-search') {
-        // Handled by input event below
-        return;
-      }
-
       if (action === 'm-toggle-section') {
         var card = target.closest('.m-section-card');
         if (card) {
