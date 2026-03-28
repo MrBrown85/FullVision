@@ -50,9 +50,7 @@
     _renderTab('students');
     _bindEvents();
 
-    // Hide loading spinner
-    var loader = document.getElementById('m-loading');
-    if (loader) loader.style.display = 'none';
+    _hideLoader();
     _initPullToRefresh();
 
     // Register mobile re-render callback for cross-device sync
@@ -126,9 +124,13 @@
   }
 
   /* ── Auth screen ──────────────────────────────────────────── */
+  function _hideLoader() {
+    var el = document.getElementById('m-loading');
+    if (el) el.style.display = 'none';
+  }
+
   function _showAuth() {
-    var loader = document.getElementById('m-loading');
-    if (loader) loader.style.display = 'none';
+    _hideLoader();
     var auth = document.getElementById('m-auth');
     var app = document.getElementById('m-app');
     if (auth) auth.style.display = '';
@@ -509,7 +511,20 @@
       if (action === 'm-obs-delete') {
         var obId = target.getAttribute('data-obid');
         var obSid = target.getAttribute('data-sid');
-        if (obId && obSid) MObserve.deleteObservation(_cid, obSid, obId);
+        if (!obId || !obSid) return;
+        // Hide card immediately, delete after undo window
+        var card = target.closest('.m-obs-card');
+        if (card) card.style.display = 'none';
+        MC.showToast('Observation deleted', function() {
+          // Undo: restore the card
+          if (card) card.style.display = '';
+        });
+        // Delete after toast auto-dismisses (5s)
+        setTimeout(function() {
+          if (card && card.style.display === 'none') {
+            MObserve.deleteObservation(_cid, obSid, obId);
+          }
+        }, 5500);
         return;
       }
 
@@ -634,6 +649,9 @@
     window.addEventListener('popstate', function() {
       if (_navStacks[_activeTab] && _navStacks[_activeTab].length > 1) {
         _popScreen();
+      } else {
+        // Prevent exiting the PWA on accidental extra back press
+        history.pushState(null, '');
       }
     });
   }

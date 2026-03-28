@@ -714,6 +714,7 @@ body.mobile-mode :focus:not(:focus-visible) { outline: none; }
   opacity:0.4; transition:opacity 0.15s;
   -webkit-tap-highlight-color:transparent;
 }
+.m-obs-delete-btn:hover { opacity:0.7; }
 .m-obs-delete-btn:active { opacity:1; color:var(--priority); }
 .m-obs-student-name {
   font-size: 15px;
@@ -1553,6 +1554,17 @@ body.mobile-mode :focus:not(:focus-visible) { outline: none; }
 /* ═══════════════════════════════════════════════════════════════
    PULL TO REFRESH
    ═══════════════════════════════════════════════════════════════ */
+.m-loading-overlay {
+  position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+  background:var(--bg); z-index:9999;
+}
+.m-loading-spinner {
+  width:32px; height:32px; border:3px solid var(--border);
+  border-top-color:var(--active); border-radius:50%;
+  animation:m-spin 0.6s linear infinite; margin:0 auto 12px;
+}
+.m-loading-text { font-size:15px; color:var(--text-3); font-weight:500; }
+
 .m-pull-indicator {
   display:flex; align-items:center; justify-content:center;
   height:0; overflow:hidden; transition:height 0.2s;
