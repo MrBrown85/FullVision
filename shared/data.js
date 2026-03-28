@@ -1778,12 +1778,15 @@ window.GB = {
  */
 window.loadSeedIfNeeded = function() {
   // Already loaded this session — call directly (handles re-seed after data reset)
-  if (typeof seedIfNeeded === 'function') { seedIfNeeded(); return; }
+  if (typeof seedIfNeeded === 'function') { seedIfNeeded(); return Promise.resolve(); }
   // User deliberately wiped all data — never auto-seed
-  if (localStorage.getItem('gb-data-wiped') === '1') return;
+  if (localStorage.getItem('gb-data-wiped') === '1') return Promise.resolve();
   // Lazy-load the script, then seed
-  var s = document.createElement('script');
-  s.src = '/shared/seed-data.js';
-  s.onload = function() { if (typeof seedIfNeeded === 'function') seedIfNeeded(); };
-  document.head.appendChild(s);
+  return new Promise(function(resolve) {
+    var s = document.createElement('script');
+    s.src = '/shared/seed-data.js';
+    s.onload = function() { if (typeof seedIfNeeded === 'function') seedIfNeeded(); resolve(); };
+    s.onerror = resolve;
+    document.head.appendChild(s);
+  });
 };

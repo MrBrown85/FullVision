@@ -15,22 +15,9 @@ window.MObserve = (function() {
     students = sortStudents(students.slice(), 'alpha');
     var filters = '<div class="m-filter-strip">' +
       '<button class="m-filter-pill m-filter-active" data-action="m-obs-filter" data-filter="all">All</button>';
-    // Sentiment filters
     Object.keys(OBS_SENTIMENTS).forEach(function(key) {
       var s = OBS_SENTIMENTS[key];
       filters += '<button class="m-filter-pill" data-action="m-obs-filter" data-filter="sentiment:' + key + '">' + s.icon + ' ' + s.label + '</button>';
-    });
-    // Student name filters (top 6 by recent obs)
-    var allObs = getAllQuickObs(cid);
-    var studentObsCounts = {};
-    allObs.forEach(function(ob) {
-      studentObsCounts[ob.studentId] = (studentObsCounts[ob.studentId] || 0) + 1;
-    });
-    var topStudents = students.filter(function(st) { return studentObsCounts[st.id]; })
-      .sort(function(a, b) { return (studentObsCounts[b.id] || 0) - (studentObsCounts[a.id] || 0); })
-      .slice(0, 6);
-    topStudents.forEach(function(st) {
-      filters += '<button class="m-filter-pill" data-action="m-obs-filter" data-filter="student:' + st.id + '">' + MC.esc(displayName(st)) + '</button>';
     });
     filters += '</div>';
 
@@ -48,7 +35,7 @@ window.MObserve = (function() {
     quickBar += '</div>';
 
     // Render observation cards grouped by date
-    var cardHTML = _renderObsCards(cid, allObs, 'all');
+    var cardHTML = _renderObsCards(cid, getAllQuickObs(cid), 'all');
 
     // FAB
     var fab = '<button class="m-fab" data-action="m-obs-new" aria-label="New observation">' + MC.ICONS.plus + '</button>';
