@@ -152,20 +152,8 @@ function _initCrossTab() {
   try {
     _crossTabChannel = new BroadcastChannel('td-data-sync');
     _crossTabChannel.onmessage = function(e) {
-      if (e.data && e.data.type === 'data-changed' && !_crossTabAlerted) {
-        _crossTabAlerted = true;
-        if (typeof showSyncToast === 'function') {
-          // Dismiss after showing — we'll use a custom element so it doesn't auto-dismiss
-          var el = document.getElementById('sync-toast');
-          if (el) el.remove();
-          var toast = document.createElement('div');
-          toast.className = 'sync-toast error';
-          toast.id = 'sync-toast';
-          toast.setAttribute('role', 'alert');
-          toast.setAttribute('aria-live', 'assertive');
-          toast.innerHTML = '<span>Data changed in another tab</span><button class="sync-toast-btn" data-action="reload-cross-tab">Reload</button>';
-          document.body.appendChild(toast);
-        }
+      if (e.data && e.data.type === 'data-changed') {
+        _handleCrossTabChange(e.data.cid, e.data.field);
       }
     };
   } catch (e) {
@@ -174,6 +162,7 @@ function _initCrossTab() {
   // Fallback: storage event fires cross-tab when localStorage changes
   window.addEventListener('storage', function(e) {
     if (e.key && e.key.startsWith('gb-') && !_crossTabAlerted) {
+      // Storage events don't carry field info — reload as fallback
       _crossTabAlerted = true;
       if (typeof showSyncToast === 'function') {
         var el = document.getElementById('sync-toast');
@@ -189,7 +178,7 @@ function _initCrossTab() {
     }
   });
 
-  // Delegated click handler for cross-tab reload buttons
+  // Delegated click handler for cross-tab reload buttons (storage fallback only)
   document.addEventListener('click', function(e) {
     var btn = e.target.closest('[data-action="reload-cross-tab"]');
     if (btn) {
@@ -197,6 +186,41 @@ function _initCrossTab() {
       window.location.reload();
     }
   });
+}
+
+/* Re-fetch a single field from Supabase after cross-tab change, then re-render */
+async function _handleCrossTabChange(cid, field) {
+  if (!cid || !field) return;
+  var dataKey = _DATA_KEYS[field];
+  if (!dataKey) return;
+
+  // Re-fetch from Supabase if available
+  if (_useSupabase) {
+    try {
+      var sb = getSupabase();
+      var result = await sb.from('course_data')
+        .select('data')
+        .eq('teacher_id', _teacherId)
+        .eq('course_id', cid)
+        .eq('data_key', dataKey)
+        .single();
+      if (!result.error && result.data) {
+        _cache[field][cid] = result.data.data;
+      }
+    } catch (e) { /* fall through — cache stays as-is */ }
+  }
+
+  // Clear proficiency cache if relevant field changed
+  if (_PROF_FIELDS.includes(field) && typeof clearProfCache === 'function') clearProfCache();
+
+  // Clear tag/section caches if learning map changed
+  if (field === 'learningMaps') { _allTagsCache = {}; _tagToSectionCache = {}; }
+
+  // Re-render current page if it has a render() method
+  var currentPage = (typeof Router !== 'undefined' && Router.getCurrentPage) ? Router.getCurrentPage() : null;
+  if (currentPage && currentPage.render) {
+    try { currentPage.render(); } catch (e) { /* page may not be ready */ }
+  }
 }
 
 function _broadcastChange(cid, field) {

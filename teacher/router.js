@@ -196,7 +196,8 @@ window.Router = (function() {
   return {
     boot: boot,
     navigate: navigate,
-    parseHash: _parseHash
+    parseHash: _parseHash,
+    getCurrentPage: function() { return _currentPage; }
   };
 })();
 
