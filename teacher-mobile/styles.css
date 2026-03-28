@@ -303,18 +303,17 @@ body.mobile-mode :focus:not(:focus-visible) { outline: none; }
   background: var(--overlay-hover);
 }
 .m-cell + .m-cell {
-  border-top: 0.5px solid var(--divider-subtle);
-  margin-left: 60px;
-  padding-left: 0;
+  /* iOS inset separator: line starts after the avatar (60px in) */
+  border-top: none;
 }
 .m-cell + .m-cell::before {
   content: '';
   position: absolute;
-  left: -60px;
-  top: -0.5px;
-  width: 60px;
+  left: 60px;
+  right: 0;
+  top: 0;
   height: 0.5px;
-  /* Transparent gap on left to match iOS inset separator */
+  background: var(--divider-subtle);
 }
 
 .m-cell-avatar {
