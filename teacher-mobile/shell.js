@@ -319,16 +319,58 @@
         return;
       }
 
-      // Settings (switch to desktop)
+      // Settings sheet (course switcher + sign out + switch to desktop)
       if (action === 'm-settings') {
+        var courseOpts = Object.keys(COURSES).map(function(id) {
+          var c = COURSES[id];
+          return '<option value="' + id + '"' + (id === _cid ? ' selected' : '') + '>' + MC.esc(c.name) + '</option>';
+        }).join('');
+        var hasCourses = Object.keys(COURSES).length > 1;
         MC.presentSheet(
-          '<div style="padding:8px 0 16px;text-align:center">' +
-            '<div style="font-size:17px;font-weight:600;margin-bottom:4px">Switch to Desktop?</div>' +
-            '<div style="font-size:15px;color:var(--text-3);margin-bottom:20px">You can return to mobile anytime.</div>' +
-            '<button class="m-btn-primary" onclick="localStorage.setItem(\'td-mobile-pref\',\'desktop\');window.location.href=\'/teacher/app.html\'">Switch to Desktop</button>' +
-            '<button style="width:100%;padding:14px;border:none;background:none;font-size:17px;color:var(--active);font-family:inherit;cursor:pointer;margin-top:8px" onclick="MC.dismissSheet()">Cancel</button>' +
+          '<div style="padding:8px 0 16px">' +
+            '<div style="font-size:17px;font-weight:600;text-align:center;margin-bottom:16px">Settings</div>' +
+            (hasCourses ? '<div style="margin-bottom:16px">' +
+              '<div style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-3);margin-bottom:6px">Active Class</div>' +
+              '<select id="m-course-select" style="width:100%;padding:12px;border-radius:10px;border:1px solid var(--border);font-size:17px;font-family:inherit;background:var(--surface);color:var(--text)">' + courseOpts + '</select>' +
+            '</div>' : '') +
+            '<button class="m-btn-primary" style="background:var(--surface);color:var(--text);border:1px solid var(--border)" data-action="m-switch-desktop">Switch to Desktop</button>' +
+            '<button class="m-btn-primary" style="background:none;color:var(--score-1);border:none;margin-top:4px" data-action="m-sign-out">Sign Out</button>' +
+            '<button style="width:100%;padding:14px;border:none;background:none;font-size:17px;color:var(--active);font-family:inherit;cursor:pointer;margin-top:4px" data-action="m-dismiss-sheet">Cancel</button>' +
           '</div>'
         );
+        // Wire course select change
+        var courseSelect = document.getElementById('m-course-select');
+        if (courseSelect) {
+          courseSelect.addEventListener('change', function() {
+            var newCid = this.value;
+            if (newCid && newCid !== _cid) {
+              _cid = newCid;
+              setActiveCourse(newCid);
+              initData(newCid).then(function() {
+                MC.dismissSheet();
+                _renderTab(_activeTab);
+              });
+            }
+          });
+        }
+        return;
+      }
+
+      if (action === 'm-switch-desktop') {
+        localStorage.setItem('td-mobile-pref', 'desktop');
+        window.location.href = '/teacher/app.html';
+        return;
+      }
+
+      if (action === 'm-sign-out') {
+        MC.dismissSheet();
+        if (typeof signOut === 'function') signOut();
+        else window.location.href = '/login.html';
+        return;
+      }
+
+      if (action === 'm-dismiss-sheet') {
+        MC.dismissSheet();
         return;
       }
 

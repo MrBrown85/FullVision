@@ -395,12 +395,31 @@ window.MStudents = (function() {
 
   /* ── Handle search filtering ────────────────────────────────── */
   function filterList(query) {
-    var cells = document.querySelectorAll('#m-student-list .m-cell');
-    var q = (query || '').toLowerCase();
-    cells.forEach(function(cell) {
-      var name = (cell.querySelector('.m-cell-title') || {}).textContent || '';
-      cell.style.display = name.toLowerCase().indexOf(q) >= 0 ? '' : 'none';
-    });
+    var q = (query || '').toLowerCase().trim();
+    var list = document.getElementById('m-student-list');
+    var stack = document.getElementById('m-student-card-stack');
+
+    if (q) {
+      // Searching: hide card stack, show list, filter it
+      if (stack) stack.style.display = 'none';
+      if (list) list.style.display = '';
+      var cells = document.querySelectorAll('#m-student-list .m-cell');
+      cells.forEach(function(cell) {
+        var name = (cell.querySelector('.m-cell-title') || {}).textContent || '';
+        cell.style.display = name.toLowerCase().indexOf(q) >= 0 ? '' : 'none';
+      });
+    } else {
+      // Search cleared: restore card stack, hide list
+      if (_stackInstance && stack) {
+        stack.style.display = '';
+        if (list) list.style.display = 'none';
+      } else {
+        // No card stack — show full list
+        if (list) list.style.display = '';
+        var cells = document.querySelectorAll('#m-student-list .m-cell');
+        cells.forEach(function(cell) { cell.style.display = ''; });
+      }
+    }
   }
 
   /* ── Helpers ────────────────────────────────────────────────── */
