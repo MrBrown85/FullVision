@@ -123,7 +123,6 @@
         });
         await Promise.race([window.GB.refreshFromSupabase(), timeout]);
       }
-      _renderTab(_activeTab);
       MC.showToast('Synced just now');
     } catch (e) {
       MC.showToast(e.message === 'timeout' ? 'Sync timed out' : 'Refresh failed');
