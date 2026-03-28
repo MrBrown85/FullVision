@@ -542,39 +542,38 @@ body.mobile-mode :focus:not(:focus-visible) { outline: none; }
   max-height: 500px;
   padding: 12px 16px 14px;
 }
-.m-tag-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 0;
-  border-bottom: 0.5px solid var(--divider-subtle);
+/* Section detail: score timeline + insights */
+.m-sec-empty {
+  font-size: 14px; color: var(--text-3); text-align: center;
+  padding: 12px 0; font-style: italic;
 }
-.m-tag-row:last-child { border-bottom: none; }
-.m-tag-name {
-  flex: 1; min-width: 0;
-  font-size: 14px; color: var(--text); font-weight: 500;
+.m-sec-timeline { display: flex; flex-direction: column; gap: 0; }
+.m-sec-tl-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 0; position: relative;
+}
+.m-sec-tl-item + .m-sec-tl-item { border-top: 0.5px solid var(--divider-subtle); }
+.m-sec-tl-dot {
+  width: 28px; height: 28px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; color: #fff; flex-shrink: 0;
+}
+.m-sec-tl-info { flex: 1; min-width: 0; }
+.m-sec-tl-name {
+  font-size: 14px; font-weight: 500; color: var(--text);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.m-tag-bar {
-  width: 40px; height: 6px; border-radius: 3px;
-  background: var(--overlay-hover); overflow: hidden; flex-shrink: 0;
+.m-sec-tl-date {
+  font-size: 12px; color: var(--text-3); margin-top: 1px;
 }
-.m-tag-bar-fill { height: 100%; border-radius: 3px; }
-.m-tag-score {
-  font-size: 14px; font-weight: 700;
-  min-width: 28px; text-align: center;
-  padding: 2px 6px; border-radius: 6px;
+.m-sec-insight {
+  font-size: 13px; color: var(--text-2); padding: 10px 12px;
+  background: var(--overlay-hover); border-radius: 8px; margin-top: 8px;
 }
-.m-tag-evidence {
-  font-size: 11px; font-weight: 500;
-  color: var(--text-3); text-transform: uppercase;
-  letter-spacing: 0.03em; flex-shrink: 0;
-}
-.m-tag-latest {
-  font-size: 12px; color: var(--text-3); margin-top: 3px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.m-tag-latest strong { color: var(--text-2); font-weight: 500; }
+.m-sec-insight strong { font-weight: 600; }
+.m-sec-insight-up { color: var(--score-3); background: rgba(46,125,50,0.06); }
+.m-sec-insight-down { color: var(--score-1); background: rgba(211,47,47,0.06); }
+.m-sec-insight-alert { color: var(--score-2); background: rgba(192,122,0,0.06); }
 
 /* ── Focus Areas ──────────────────────────────────────────── */
 .m-focus-row {

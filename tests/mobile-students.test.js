@@ -260,9 +260,11 @@ describe('Evidence count filtering', () => {
       getTagProficiency: () => 3.0,
     });
     const html = MStudents.renderDetail(CID, 'stu1');
-    // Evidence count should be 1 (only the summative), not 3
-    expect(html).toContain('class="m-tag-evidence">1<');
-    expect(html).not.toContain('class="m-tag-evidence">3<');
+    // Timeline should only show the summative score (score=3), not formatives
+    expect(html).toContain('m-sec-tl-dot');
+    // Only 1 timeline item (the summative), not 3
+    var dotCount = (html.match(/m-sec-tl-dot/g) || []).length;
+    expect(dotCount).toBe(1);
   });
 });
 
@@ -495,9 +497,9 @@ describe('Student detail with multiple sections', () => {
       getTagProficiency: () => 0,
     });
     const html = MStudents.renderDetail(CID, 'stu1');
-    expect(html).toContain('Tag Alpha');
-    expect(html).toContain('Tag Beta');
-    expect(html).toContain('m-tag-row');
+    // Section detail now shows timeline (not per-tag rows) — with no scores, shows empty state
+    expect(html).toContain('m-sec-empty');
+    expect(html).toContain('No summative scores yet');
   });
 });
 

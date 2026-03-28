@@ -294,35 +294,61 @@ window.MStudents = (function() {
       var growthData = getSectionGrowthData(cid, sid, sec.id);
       var sparkline = renderGrowthSparkline(growthData);
 
-      // Tag details (hidden until expanded)
-      var tagRows = '';
+      // Section detail: score timeline + insight (Apple Health-style)
       var allAssessments = getAssessments(cid);
+      var allSummScores = [];
       sec.tags.forEach(function(tag) {
-        var tagScores = getTagScores(cid, sid, tag.id);
-        var tagProf = getTagProficiency(cid, sid, tag.id);
-        var tagR = Math.round(tagProf);
-        var summScores = tagScores.filter(function(s) { return s.type === 'summative' && s.score > 0; });
-        var evCount = summScores.length;
-        var barPct = tagProf > 0 ? Math.round(tagProf / 4 * 100) : 0;
-        var profLabel = tagProf > 0 ? (PROF_LABELS[tagR] || '') : 'No evidence';
-        // Latest assessment for this tag
-        var latestScore = summScores.length ? summScores.sort(function(a,b) { return (b.date||'').localeCompare(a.date||''); })[0] : null;
-        var latestAssess = latestScore ? allAssessments.find(function(a) { return a.id === latestScore.assessmentId; }) : null;
-        var latestLine = latestAssess
-          ? '<div class="m-tag-latest">Latest: <strong>' + MC.esc(latestAssess.title) + '</strong> · ' + PROF_LABELS[latestScore.score] + '</div>'
-          : '';
-        tagRows += '<div class="m-tag-row">' +
-          '<div style="flex:1;min-width:0">' +
-            '<div style="display:flex;align-items:center;gap:8px">' +
-              '<span class="m-tag-name">' + MC.esc(tag.label || tag.name || tag.id) + '</span>' +
-              '<div class="m-tag-bar"><div class="m-tag-bar-fill" style="width:' + barPct + '%;background:' + MC.profBg(tagR) + '"></div></div>' +
-              '<span class="m-tag-score" style="color:' + MC.profBg(tagR) + '">' + profLabel + '</span>' +
-              '<span class="m-tag-evidence">' + evCount + '</span>' +
-            '</div>' +
-            latestLine +
-          '</div>' +
-        '</div>';
+        getTagScores(cid, sid, tag.id).forEach(function(s) {
+          if (s.type === 'summative' && s.score > 0) allSummScores.push(s);
+        });
       });
+      allSummScores.sort(function(a, b) { return (a.date || '').localeCompare(b.date || ''); });
+      var recentScores = allSummScores.slice(-5);
+
+      // Build timeline
+      var timelineHtml = '';
+      if (recentScores.length === 0) {
+        timelineHtml = '<div class="m-sec-empty">No summative scores yet</div>';
+      } else {
+        timelineHtml = '<div class="m-sec-timeline">';
+        recentScores.forEach(function(s) {
+          var assess = allAssessments.find(function(a) { return a.id === s.assessmentId; });
+          var assessName = assess ? MC.esc(assess.title) : '';
+          var shortDate = new Date(s.date + 'T00:00:00').toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
+          timelineHtml += '<div class="m-sec-tl-item">' +
+            '<div class="m-sec-tl-dot" style="background:' + MC.profBg(s.score) + '">' + s.score + '</div>' +
+            '<div class="m-sec-tl-info">' +
+              '<div class="m-sec-tl-name">' + assessName + '</div>' +
+              '<div class="m-sec-tl-date">' + shortDate + ' · ' + PROF_LABELS[s.score] + '</div>' +
+            '</div>' +
+          '</div>';
+        });
+        timelineHtml += '</div>';
+      }
+
+      // Build insight
+      var insightHtml = '';
+      if (allSummScores.length >= 2) {
+        var first = allSummScores[0].score;
+        var last = allSummScores[allSummScores.length - 1].score;
+        var allSame = allSummScores.every(function(s) { return s.score === first; });
+        if (allSame) {
+          insightHtml = '<div class="m-sec-insight">Consistently <strong>' + PROF_LABELS[first] + '</strong> across ' + allSummScores.length + ' assessments</div>';
+        } else if (last > first) {
+          insightHtml = '<div class="m-sec-insight m-sec-insight-up">Improving from <strong>' + PROF_LABELS[first] + '</strong> → <strong>' + PROF_LABELS[last] + '</strong></div>';
+        } else if (last < first) {
+          insightHtml = '<div class="m-sec-insight m-sec-insight-down">Dropped from <strong>' + PROF_LABELS[first] + '</strong> → <strong>' + PROF_LABELS[last] + '</strong></div>';
+        }
+      } else if (allSummScores.length === 0) {
+        // Check how long since last assessment in this section
+        var secTagIds = new Set(sec.tags.map(function(t) { return t.id; }));
+        var secAssessments = allAssessments.filter(function(a) { return (a.tagIds || []).some(function(tid) { return secTagIds.has(tid); }); });
+        if (secAssessments.length > 0) {
+          insightHtml = '<div class="m-sec-insight m-sec-insight-alert">' + secAssessments.length + ' assessment' + (secAssessments.length !== 1 ? 's' : '') + ' assigned but not yet scored</div>';
+        }
+      }
+
+      var tagRows = timelineHtml + insightHtml;
 
       return '<div class="m-section-card" role="button" tabindex="0" aria-expanded="false" data-action="m-toggle-section" data-sec="' + sec.id + '">' +
         '<div class="m-section-header">' +
