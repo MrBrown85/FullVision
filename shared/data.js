@@ -490,6 +490,60 @@ async function initAllCourses() {
 
   // Start cross-tab conflict detection
   _initCrossTab();
+
+  // Subscribe to Supabase Realtime for cross-device sync (phone → laptop)
+  _initRealtimeSync();
+}
+
+/* Reverse map: Supabase data_key → cache field name */
+var _REVERSE_DATA_KEYS = null;
+function _getReverseKeys() {
+  if (!_REVERSE_DATA_KEYS) {
+    _REVERSE_DATA_KEYS = {};
+    for (var field in _DATA_KEYS) { _REVERSE_DATA_KEYS[_DATA_KEYS[field]] = field; }
+  }
+  return _REVERSE_DATA_KEYS;
+}
+
+var _realtimeChannel = null;
+function _initRealtimeSync() {
+  if (_realtimeChannel || !_useSupabase || !_teacherId) return;
+  var sb = getSupabase();
+  if (!sb) return;
+
+  try {
+    _realtimeChannel = sb.channel('course-data-sync')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'course_data',
+        filter: 'teacher_id=eq.' + _teacherId
+      }, function(payload) {
+        var row = payload.new || payload.old;
+        if (!row) return;
+        var cid = row.course_id;
+        var dataKey = row.data_key;
+        var field = _getReverseKeys()[dataKey];
+        if (!field || !cid) return;
+
+        // Update cache directly from the payload data (no extra fetch needed)
+        if (payload.new && payload.new.data !== undefined) {
+          _cache[field][cid] = payload.new.data;
+        }
+
+        if (_PROF_FIELDS.includes(field) && typeof clearProfCache === 'function') clearProfCache();
+        if (field === 'learningMaps') { _allTagsCache = {}; _tagToSectionCache = {}; }
+
+        // Re-render current page
+        var currentPage = (typeof Router !== 'undefined' && Router.getCurrentPage) ? Router.getCurrentPage() : null;
+        if (currentPage && currentPage.render) {
+          try { currentPage.render(); } catch (e) { /* page may not be ready */ }
+        }
+      })
+      .subscribe();
+  } catch (e) {
+    console.warn('Realtime sync not available:', e);
+  }
 }
 
 /** Load all data for a specific course into the cache. */
