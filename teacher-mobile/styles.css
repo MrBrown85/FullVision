@@ -708,6 +708,10 @@ body.mobile-mode :focus:not(:focus-visible) { outline: none; }
 .m-obs-sentiment-icon {
   font-size: 14px;
 }
+.m-obs-student-fixed {
+  padding:8px 12px; background:var(--overlay-hover); border-radius:10px;
+  font-size:15px; font-weight:500; color:var(--text); margin-bottom:12px;
+}
 .m-obs-edit-btn, .m-obs-delete-btn {
   background:none; border:none; cursor:pointer; color:var(--text-3);
   font-size:16px; min-width:44px; min-height:44px; border-radius:8px;

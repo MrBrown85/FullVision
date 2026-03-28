@@ -1531,8 +1531,8 @@ function updateQuickOb(cid, sid, obId, updates) {
   if (!ob) return;
   if (updates.text !== undefined) ob.text = updates.text.trim();
   if (updates.dims !== undefined) ob.dims = updates.dims;
-  if (updates.sentiment !== undefined) ob.sentiment = updates.sentiment || undefined;
-  if (updates.context !== undefined) ob.context = updates.context || undefined;
+  if (updates.sentiment !== undefined) ob.sentiment = updates.sentiment || null;
+  if (updates.context !== undefined) ob.context = updates.context || null;
   ob.modified = new Date().toISOString();
   saveQuickObs(cid, all);
 }
