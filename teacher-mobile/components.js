@@ -40,13 +40,13 @@ window.MComponents = (function() {
     return '<div class="m-nav-bar" id="m-nav-bar-' + (opts.id || 'main') + '">' +
       '<div class="m-nav-bar-inner">' +
         back +
-        '<div class="m-nav-bar-title-inline">' + _esc(opts.title) + subtitle + '</div>' +
+        '<h1 class="m-nav-bar-title-inline">' + _esc(opts.title) + subtitle + '</h1>' +
         actions +
       '</div></div>';
   }
 
   function largeTitleHTML(title) {
-    return '<div class="m-title-large">' + _esc(title) + '</div>';
+    return '<div class="m-title-large" aria-hidden="true">' + _esc(title) + '</div>';
   }
 
   /* ── Sheet (present / dismiss) ─────────────────────────────── */

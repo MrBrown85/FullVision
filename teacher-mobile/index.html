@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="description" content="TeacherDashboard Mobile — quick student lookup, observations, and grading">
@@ -57,28 +57,30 @@
 
 <!-- Mobile app shell (hidden until authenticated) -->
 <div id="m-app" style="display:none">
-  <div id="m-nav-stack"></div>
+  <a href="#m-nav-stack" class="m-skip-nav">Skip to content</a>
+  <main id="m-nav-stack" role="main">
+  </main>
   <div id="m-sheet-backdrop" class="m-sheet-backdrop" style="display:none"></div>
   <div id="m-sheet-container"></div>
   <div id="m-toast"></div>
   <nav id="m-tab-bar" role="tablist" aria-label="Main navigation">
     <button class="m-tab-item m-tab-active" role="tab" aria-selected="true" data-tab="students">
-      <svg class="m-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3-7 8-7s8 3 8 7"/></svg>
+      <svg class="m-tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3-7 8-7s8 3 8 7"/></svg>
       <span class="m-tab-label">Students</span>
     </button>
     <button class="m-tab-item" role="tab" aria-selected="false" data-tab="observe">
-      <svg class="m-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="12" y2="16"/></svg>
+      <svg class="m-tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><line x1="8" y1="8" x2="16" y2="8"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="12" y2="16"/></svg>
       <span class="m-tab-label">Observe</span>
     </button>
     <button class="m-tab-item" role="tab" aria-selected="false" data-tab="grade">
-      <svg class="m-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
+      <svg class="m-tab-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
       <span class="m-tab-label">Grade</span>
     </button>
   </nav>
 </div>
 
 <!-- Loading spinner (visible during boot, hidden by shell.js) -->
-<div id="m-loading" class="m-loading-overlay">
+<div id="m-loading" class="m-loading-overlay" role="status" aria-live="polite">
   <div style="text-align:center">
     <div class="m-loading-spinner"></div>
     <div class="m-loading-text">Loading...</div>
@@ -86,7 +88,7 @@
 </div>
 
 <!-- Offline banner -->
-<div id="m-offline-banner" class="m-offline-banner" style="display:none">
+<div id="m-offline-banner" class="m-offline-banner" role="alert" aria-live="assertive" style="display:none">
   Offline — changes will sync when connected
 </div>
 
