@@ -82,6 +82,7 @@ window.MCardWidgetEditor = (function() {
     MC.presentSheet(buildEditorHTML(), { half: false });
     MC.haptic();
     _onUpdate = onUpdate || null;
+    initDragListeners();
   }
 
   function handleAction(action, el) {
@@ -95,6 +96,17 @@ window.MCardWidgetEditor = (function() {
       return true;
     }
     if (action === 'm-wdg-reset') {
+      if (el.dataset.confirm !== 'yes') {
+        el.textContent = 'Reset card layout?';
+        el.dataset.confirm = 'yes';
+        el.classList.add('m-wdg-editor-reset-confirm');
+        setTimeout(function() {
+          el.textContent = 'Reset to Defaults';
+          delete el.dataset.confirm;
+          el.classList.remove('m-wdg-editor-reset-confirm');
+        }, 3000);
+        return true;
+      }
       resetToDefaults();
       var container = document.getElementById('m-sheet-container');
       var content = container.querySelector('.m-sheet-content');

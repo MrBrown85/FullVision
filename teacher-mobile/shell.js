@@ -487,6 +487,12 @@
       }
 
       // Widget editor actions
+      if (action === 'm-open-widget-editor') {
+        MCardWidgetEditor.show(function onUpdate() {
+          MStudents.initCardStack(_cid);
+        });
+        return;
+      }
       if (action === 'm-wdg-toggle' || action === 'm-wdg-reset') {
         MCardWidgetEditor.handleAction(action, target);
         return;
