@@ -396,9 +396,10 @@ window.PageDashboard = (function() {
           _grouped.ungrouped.forEach(function(sec) {
             var secVal = getSectionProficiency(cid, st.id, sec.id);
             var sr = Math.round(secVal);
+            var secLabel = sec.tags && sec.tags[0] ? sec.tags[0].id : sec.shortName || sec.name;
             html += '<div class="dash-section-mini" style="background:' + PROF_TINT[sr] + '">' +
               '<div style="position:absolute;top:0;left:4px;right:4px;height:3px;border-radius:2px;background:' + sec.color + '"></div>' +
-              '<div class="dash-section-name">' + esc(sec.shortName || sec.name) + '</div>' +
+              '<div class="dash-section-name">' + esc(secLabel) + '</div>' +
               '<div class="dash-section-val" style="color:' + PROF_COLORS[sr] + '">' + (secVal > 0 ? secVal.toFixed(1) : '\u2014') + '</div>' +
             '</div>';
           });
@@ -407,9 +408,10 @@ window.PageDashboard = (function() {
           sections.forEach(function(sec) {
             var secVal = getSectionProficiency(cid, st.id, sec.id);
             var sr = Math.round(secVal);
+            var secLabel = sec.tags && sec.tags[0] ? sec.tags[0].id : sec.shortName || sec.name;
             html += '<div class="dash-section-mini" style="background:' + PROF_TINT[sr] + '">' +
               '<div style="position:absolute;top:0;left:4px;right:4px;height:3px;border-radius:2px;background:' + sec.color + '"></div>' +
-              '<div class="dash-section-name">' + esc(sec.shortName || sec.name) + '</div>' +
+              '<div class="dash-section-name">' + esc(secLabel) + '</div>' +
               '<div class="dash-section-val" style="color:' + PROF_COLORS[sr] + '">' + (secVal > 0 ? secVal.toFixed(1) : '\u2014') + '</div>' +
             '</div>';
           });
