@@ -785,3 +785,102 @@ describe('Card Assembly', () => {
     expect(html).not.toContain('m-scard-obs');
   });
 });
+
+describe('Integration — Full Card Render Cycle', () => {
+  var cid = 'course-1';
+  var st = { id: 's1', firstName: 'Cece', lastName: 'Adams', pronouns: 'she/her', designations: ['A'] };
+
+  beforeEach(() => {
+    localStorage.clear();
+    // Reset cache values without deleting the top-level keys (data.js reads from them directly)
+    Object.keys(_cache).forEach(function(k) {
+      if (_cache[k] !== null && typeof _cache[k] === 'object' && !Array.isArray(_cache[k])) {
+        Object.keys(_cache[k]).forEach(function(ck) { delete _cache[k][ck]; });
+      } else {
+        _cache[k] = null;
+      }
+    });
+
+    // Seed comprehensive data
+    localStorage.setItem('gb-sections-course-1', JSON.stringify([
+      { id: 'sec1', name: 'Questioning', shortName: 'Quest', color: '#4A90D9', tags: [{ id: 't1', name: 'Tag1' }] }
+    ]));
+    localStorage.setItem('gb-tags-course-1', JSON.stringify([
+      { id: 't1', name: 'Tag1', sectionId: 'sec1' }
+    ]));
+    localStorage.setItem('gb-scores-course-1', JSON.stringify({
+      s1: [
+        { tagId: 't1', assessmentId: 'a1', score: 2, type: 'summative', date: '2026-01-15' },
+        { tagId: 't1', assessmentId: 'a2', score: 3, type: 'summative', date: '2026-03-15' }
+      ]
+    }));
+    localStorage.setItem('gb-quick-obs-course-1', JSON.stringify({
+      s1: [{ text: 'Great participation in group work', created: '2026-03-20T14:00:00Z', sentiment: 'strength', context: 'small-group' }]
+    }));
+    localStorage.setItem('gb-term-ratings-course-1', JSON.stringify({
+      s1: { 'term-1': {
+        dims: { engagement: 4, collaboration: 3, selfRegulation: 2, resilience: 3, curiosity: 4, respect: 3 },
+        workHabits: 3, participation: 4,
+        socialTraits: ['leader', 'empathetic', 'low-confidence'],
+        growthAreas: ['t1'],
+        narrative: '<p>Cece has shown excellent growth this term.</p>'
+      }}
+    }));
+    localStorage.setItem('gb-reflections-course-1', JSON.stringify({
+      s1: { text: 'I feel more confident about science now' }
+    }));
+  });
+
+  it('renders all widgets when all are enabled', () => {
+    saveCardWidgetConfig({
+      order: ['hero', 'sectionBars', 'completion', 'missingWork', 'growth',
+              'obsSnippet', 'obsSummary', 'flagStatus', 'reflection',
+              'dispositions', 'traits', 'concerns', 'workHabits', 'growthAreas',
+              'narrative', 'actions'],
+      disabled: []
+    });
+
+    var data = {
+      sections: [{ id: 'sec1', name: 'Questioning', shortName: 'Quest', color: '#4A90D9' }],
+      assessments: [{ id: 'a1' }, { id: 'a2' }],
+      statuses: {},
+      termId: 'term-1'
+    };
+    var html = MCardWidgets.assembleCard(st, cid, data);
+
+    expect(html).toContain('m-scard-hero');
+    expect(html).toContain('m-scard-sections');
+    expect(html).toContain('m-wdg-arc');
+    expect(html).toContain('m-wdg-growth');
+    expect(html).toContain('m-scard-obs');
+    expect(html).toContain('m-wdg-obs-summary');
+    expect(html).toContain('m-wdg-reflection');
+    expect(html).toContain('m-wdg-dispositions');
+    expect(html).toContain('m-wdg-traits');
+    expect(html).toContain('m-wdg-concerns');
+    expect(html).toContain('m-wdg-habits');
+    expect(html).toContain('m-wdg-growth-areas');
+    expect(html).toContain('m-wdg-narrative');
+    expect(html).toContain('m-scard-actions');
+  });
+
+  it('editor toggle cycle preserves other widgets', () => {
+    var config = getCardWidgetConfig();
+    expect(config.order.length).toBe(4);
+
+    MCardWidgetEditor.toggleWidget('dispositions');
+    config = getCardWidgetConfig();
+    expect(config.order).toContain('dispositions');
+    expect(config.order.length).toBe(5);
+
+    MCardWidgetEditor.toggleWidget('sectionBars');
+    config = getCardWidgetConfig();
+    expect(config.order).not.toContain('sectionBars');
+    expect(config.order).toContain('dispositions');
+    expect(config.order.length).toBe(4);
+
+    var data = { sections: [], assessments: [], statuses: {}, termId: 'term-1' };
+    var html = MCardWidgets.assembleCard(st, cid, data);
+    expect(html).toContain('m-scard');
+  });
+});
