@@ -32,7 +32,7 @@ export default async function handler(request, context) {
   const csp = [
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' https://cdn.jsdelivr.net https://cdn.sheetjs.com`,
-    `style-src 'self' 'nonce-${nonce}'`,
+    `style-src 'self' 'unsafe-inline'`,
     "img-src 'self' data: blob:",
     "font-src 'self'",
     "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.nsvcs.net",
