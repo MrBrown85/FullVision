@@ -258,6 +258,9 @@ function _syncKey(table, key) {
   if (table === 'course_data') return table + ':' + key.cid + ':' + key.dataKey;
   if (table === 'scores') return 'scores:' + key.cid;
   if (table === 'scores_row') return 'scores_row:' + key.cid + ':' + key.sid + ':' + key.aid + ':' + key.tid;
+  if (table === 'observations') return 'observations:' + key.cid;
+  if (table === 'obs_row') return 'obs_row:' + key.cid + ':' + key.obId;
+  if (table === 'obs_delete') return 'obs_delete:' + key.cid + ':' + key.obId;
   return table + ':' + key;
 }
 
@@ -310,6 +313,36 @@ async function _doSync(table, key, data) {
           .abortSignal(controller.signal);
         if (insErr) throw insErr;
       }
+    } else if (table === 'observations') {
+      // Full observations sync: delete all for this course, then bulk insert
+      const obsRows = _obsBlobToRows(key.cid, data);
+      const { error: delErr } = await sb.from('observations')
+        .delete()
+        .eq('teacher_id', _teacherId)
+        .eq('course_id', key.cid)
+        .abortSignal(controller.signal);
+      if (delErr) throw delErr;
+      if (obsRows.length > 0) {
+        const { error: insErr } = await sb.from('observations')
+          .insert(obsRows)
+          .abortSignal(controller.signal);
+        if (insErr) throw insErr;
+      }
+    } else if (table === 'obs_row') {
+      // Single observation upsert
+      const { error } = await sb.from('observations').upsert(data, {
+        onConflict: 'teacher_id,course_id,id'
+      }).abortSignal(controller.signal);
+      if (error) throw error;
+    } else if (table === 'obs_delete') {
+      // Single observation delete
+      const { error } = await sb.from('observations')
+        .delete()
+        .eq('teacher_id', _teacherId)
+        .eq('course_id', key.cid)
+        .eq('id', key.obId)
+        .abortSignal(controller.signal);
+      if (error) throw error;
     } else if (table === 'scores_row') {
       // Single score upsert — the efficient hot path
       const { error } = await sb.from('scores').upsert(data, {
@@ -571,6 +604,43 @@ function _initRealtimeSync() {
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
+        table: 'observations',
+        filter: 'teacher_id=eq.' + _teacherId
+      }, function(payload) {
+        var row = payload.new || payload.old;
+        if (!row) return;
+        var cid = row.course_id;
+        if (!cid) return;
+        if (!_cache.observations[cid]) _cache.observations[cid] = {};
+
+        var sid = row.student_id;
+        var obId = row.id;
+
+        if (payload.eventType === 'DELETE') {
+          if (_cache.observations[cid][sid]) {
+            _cache.observations[cid][sid] = _cache.observations[cid][sid].filter(function(o) { return o.id !== obId; });
+          }
+        } else {
+          var r = payload.new;
+          if (!_cache.observations[cid][sid]) _cache.observations[cid][sid] = [];
+          var arr = _cache.observations[cid][sid];
+          var idx = arr.findIndex(function(o) { return o.id === obId; });
+          var entry = { id: r.id, text: r.text || '', dims: r.dims || [], created: r.created_at, date: r.date };
+          if (r.sentiment) entry.sentiment = r.sentiment;
+          if (r.context) entry.context = r.context;
+          if (r.assignment_context) entry.assignmentContext = r.assignment_context;
+          if (r.modified_at) entry.modified = r.modified_at;
+
+          // Self-echo check
+          if (idx !== -1 && arr[idx].text === entry.text && arr[idx].modified === entry.modified) return;
+
+          if (idx !== -1) { arr[idx] = entry; } else { arr.push(entry); }
+        }
+        _invalidateAndRerender();
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
         table: 'scores',
         filter: 'teacher_id=eq.' + _teacherId
       }, function(payload) {
@@ -694,15 +764,12 @@ async function _refreshFromSupabase() {
     }
 
     // Refresh scores from normalized table
+    var since = _lastSyncedAt ? new Date(_lastSyncedAt.getTime() - 30000).toISOString() : null;
     var scoreQuery = sb.from('scores').select('*')
       .eq('teacher_id', _teacherId).eq('course_id', cid);
-    if (_lastSyncedAt) {
-      var scoreSince = new Date(_lastSyncedAt.getTime() - 30000).toISOString();
-      scoreQuery = scoreQuery.gt('updated_at', scoreSince);
-    }
+    if (since) scoreQuery = scoreQuery.gt('updated_at', since);
     var scoreResult = await scoreQuery;
     if (!scoreResult.error && scoreResult.data && scoreResult.data.length > 0) {
-      // Merge updated scores into cache
       var blob = _cache.scores[cid] || {};
       scoreResult.data.forEach(function(r) {
         if (!blob[r.student_id]) blob[r.student_id] = [];
@@ -718,6 +785,28 @@ async function _refreshFromSupabase() {
         if (idx !== -1) { arr[idx] = entry; } else { arr.push(entry); }
       });
       _cache.scores[cid] = blob;
+      changed = true;
+    }
+
+    // Refresh observations from normalized table
+    var obsQuery = sb.from('observations').select('*')
+      .eq('teacher_id', _teacherId).eq('course_id', cid);
+    if (since) obsQuery = obsQuery.gt('modified_at', since);
+    var obsResult = await obsQuery;
+    if (!obsResult.error && obsResult.data && obsResult.data.length > 0) {
+      var obsBlob = _cache.observations[cid] || {};
+      obsResult.data.forEach(function(r) {
+        if (!obsBlob[r.student_id]) obsBlob[r.student_id] = [];
+        var arr = obsBlob[r.student_id];
+        var idx = arr.findIndex(function(o) { return o.id === r.id; });
+        var entry = { id: r.id, text: r.text || '', dims: r.dims || [], created: r.created_at, date: r.date };
+        if (r.sentiment) entry.sentiment = r.sentiment;
+        if (r.context) entry.context = r.context;
+        if (r.assignment_context) entry.assignmentContext = r.assignment_context;
+        if (r.modified_at) entry.modified = r.modified_at;
+        if (idx !== -1) { arr[idx] = entry; } else { arr.push(entry); }
+      });
+      _cache.observations[cid] = obsBlob;
       changed = true;
     }
 
@@ -758,9 +847,9 @@ async function _doInitData(cid) {
       const byKey = {};
       (rows || []).forEach(r => { byKey[r.data_key] = r.data; });
 
-      // Populate cache from Supabase rows (except scores — loaded from normalized table)
+      // Populate cache from Supabase rows (except normalized tables)
       for (const [field, dataKey] of Object.entries(_DATA_KEYS)) {
-        if (field === 'scores') continue; // loaded separately below
+        if (field === 'scores' || field === 'observations') continue;
         _cache[field][cid] = byKey[dataKey] !== undefined ? byKey[dataKey] : _defaultForField(field);
       }
 
@@ -774,6 +863,18 @@ async function _doInitData(cid) {
         _cache.scores[cid] = {};
       } else {
         _cache.scores[cid] = _scoreRowsToBlob(scoreRows);
+      }
+
+      // Load observations from normalized table
+      const { data: obsRows, error: obsErr } = await sb.from('observations')
+        .select('*')
+        .eq('teacher_id', _teacherId)
+        .eq('course_id', cid);
+      if (obsErr) {
+        console.warn('Failed to load observations table for', cid, obsErr);
+        _cache.observations[cid] = {};
+      } else {
+        _cache.observations[cid] = _obsRowsToBlob(obsRows);
       }
 
       // If Supabase had no data for this course, use empty defaults
@@ -889,6 +990,9 @@ function _saveCourseField(field, cid, value) {
   if (field === 'scores' && _useSupabase) {
     // Scores use normalized table — sync per-row instead of blob
     _syncToSupabase('scores', { cid }, value);
+  } else if (field === 'observations' && _useSupabase) {
+    // Observations use normalized table
+    _syncToSupabase('observations', { cid }, value);
   } else if (_useSupabase) {
     _syncToSupabase('course_data', { cid, dataKey }, value);
   } else {
@@ -934,6 +1038,51 @@ function _scoreRowsToBlob(rows) {
       note: r.note || '',
       created: r.created_at || new Date().toISOString()
     });
+  });
+  return blob;
+}
+
+/* Convert observations blob { sid: [...entries] } → flat array of table rows */
+function _obsBlobToRows(cid, obsObj) {
+  const rows = [];
+  for (const sid in obsObj) {
+    (obsObj[sid] || []).forEach(function(e) {
+      rows.push({
+        teacher_id: _teacherId,
+        course_id: cid,
+        student_id: sid,
+        id: e.id,
+        text: e.text || '',
+        dims: e.dims || [],
+        sentiment: e.sentiment || null,
+        context: e.context || null,
+        assignment_context: e.assignmentContext || null,
+        date: e.date || null,
+        created_at: e.created || new Date().toISOString(),
+        modified_at: e.modified || null
+      });
+    });
+  }
+  return rows;
+}
+
+/* Convert flat observation rows → blob format { sid: [...entries] } */
+function _obsRowsToBlob(rows) {
+  const blob = {};
+  (rows || []).forEach(function(r) {
+    if (!blob[r.student_id]) blob[r.student_id] = [];
+    var entry = {
+      id: r.id,
+      text: r.text || '',
+      dims: r.dims || [],
+      created: r.created_at || new Date().toISOString(),
+      date: r.date
+    };
+    if (r.sentiment) entry.sentiment = r.sentiment;
+    if (r.context) entry.context = r.context;
+    if (r.assignment_context) entry.assignmentContext = r.assignment_context;
+    if (r.modified_at) entry.modified = r.modified_at;
+    blob[r.student_id].push(entry);
   });
   return blob;
 }
@@ -1746,14 +1895,32 @@ function addQuickOb(cid, sid, text, dims, sentiment, context, assignmentContext)
   if (context) entry.context = context;
   if (assignmentContext) entry.assignmentContext = assignmentContext;
   all[sid].push(entry);
-  saveQuickObs(cid, all);
+  _cache.observations[cid] = all;
+  if (_useSupabase) {
+    _syncToSupabase('obs_row', { cid, obId: entry.id }, {
+      teacher_id: _teacherId, course_id: cid, student_id: sid,
+      id: entry.id, text: entry.text, dims: entry.dims,
+      sentiment: entry.sentiment || null, context: entry.context || null,
+      assignment_context: entry.assignmentContext || null,
+      date: entry.date, created_at: entry.created
+    });
+  } else {
+    _safeLSSet('gb-quick-obs-' + cid, JSON.stringify(all));
+  }
+  _broadcastChange(cid, 'observations');
 }
 
 function deleteQuickOb(cid, sid, obId) {
   const all = getQuickObs(cid);
   if (!all[sid]) return;
   all[sid] = all[sid].filter(o => o.id !== obId);
-  saveQuickObs(cid, all);
+  _cache.observations[cid] = all;
+  if (_useSupabase) {
+    _syncToSupabase('obs_delete', { cid, obId }, null);
+  } else {
+    _safeLSSet('gb-quick-obs-' + cid, JSON.stringify(all));
+  }
+  _broadcastChange(cid, 'observations');
 }
 
 function updateQuickOb(cid, sid, obId, updates) {
@@ -1766,7 +1933,20 @@ function updateQuickOb(cid, sid, obId, updates) {
   if (updates.sentiment !== undefined) ob.sentiment = updates.sentiment || null;
   if (updates.context !== undefined) ob.context = updates.context || null;
   ob.modified = new Date().toISOString();
-  saveQuickObs(cid, all);
+  _cache.observations[cid] = all;
+  if (_useSupabase) {
+    _syncToSupabase('obs_row', { cid, obId: ob.id }, {
+      teacher_id: _teacherId, course_id: cid, student_id: sid,
+      id: ob.id, text: ob.text, dims: ob.dims,
+      sentiment: ob.sentiment || null, context: ob.context || null,
+      assignment_context: ob.assignmentContext || null,
+      date: ob.date, created_at: ob.created,
+      modified_at: ob.modified
+    });
+  } else {
+    _safeLSSet('gb-quick-obs-' + cid, JSON.stringify(all));
+  }
+  _broadcastChange(cid, 'observations');
 }
 
 function getQuickObsByDim(cid, sid, dim) {

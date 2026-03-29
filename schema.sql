@@ -89,16 +89,45 @@ CREATE POLICY "Teachers access own scores"
   WITH CHECK (auth.uid() = teacher_id);
 
 -- ──────────────────────────────────────────────────────────
+-- observations  [NORMALIZED TABLE — Phase 2]
+-- One row per observation. Replaces the JSONB blob that was
+-- previously stored in course_data with data_key='quick-obs'.
+-- ──────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS observations (
+  teacher_id         UUID        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  course_id          TEXT        NOT NULL,
+  student_id         TEXT        NOT NULL,
+  id                 TEXT        NOT NULL,
+  text               TEXT        NOT NULL DEFAULT '',
+  dims               JSONB       DEFAULT '[]',
+  sentiment          TEXT,
+  context            TEXT,
+  assignment_context JSONB,
+  date               DATE,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  modified_at        TIMESTAMPTZ,
+  PRIMARY KEY (teacher_id, course_id, id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_observations_student
+  ON observations (teacher_id, course_id, student_id);
+
+ALTER TABLE observations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Teachers access own observations"
+  ON observations FOR ALL
+  USING (auth.uid() = teacher_id)
+  WITH CHECK (auth.uid() = teacher_id);
+
+-- ──────────────────────────────────────────────────────────
 -- course_data  [PRIMARY RUNTIME TABLE]
 -- Generic key-value store scoped to teacher + course.
 -- gb-data.js upserts all per-course data here as JSONB.
--- Scores have been migrated to the normalized `scores` table.
+-- Scores → `scores` table. Observations → `observations` table.
 --
 -- data_key values (one row per key per course per teacher):
 --   students, assessments, learningmap, courseconfig,
 --   modules, rubrics, flags, goals, reflections, overrides,
---   statuses, quick-obs, term-ratings, custom-tags, notes,
---   report-config
+--   statuses, term-ratings, custom-tags, notes, report-config
 --
 -- onConflict: (teacher_id, course_id, data_key)
 -- ──────────────────────────────────────────────────────────
