@@ -72,7 +72,10 @@
   var _pulling = false;
   var _pullIndicator = null;
 
+  var _pullToRefreshInitialized = false;
   function _initPullToRefresh() {
+    if (_pullToRefreshInitialized) return;
+    _pullToRefreshInitialized = true;
     document.addEventListener('touchstart', function(e) {
       var screen = e.target.closest('.m-screen-content');
       if (!screen || screen.scrollTop > 0) return;

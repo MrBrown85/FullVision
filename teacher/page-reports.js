@@ -737,6 +737,12 @@ function _configureQuestionnaire() {
     if (sidebarEl) sidebarEl.removeEventListener('click', _handleSidebarClick);
 
     delete window._pageSwitchCourse;
+    delete window.rbDragStart;
+    delete window.rbDragEnd;
+    delete window.rbDragOver;
+    delete window.rbDragLeave;
+    delete window.rbDrop;
+    delete window._tqMarkDirty;
   }
 
   /* -- Toolbar HTML (rendered into main on init) ---------- */
