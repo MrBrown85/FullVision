@@ -7,6 +7,7 @@ const PRECACHE_URLS = [
   '/',
   '/login.html',
   '/login.css',
+  '/login-auth.js',
   // Shared modules
   '/shared/supabase.js',
   '/shared/constants.js',

@@ -20,9 +20,28 @@ export default async function handler(request, context) {
   html = html.replaceAll('__SUPABASE_URL__', supabaseUrl);
   html = html.replaceAll('__SUPABASE_KEY__', supabaseKey);
 
+  // Generate a per-request nonce and inject into all script/style tags
+  const nonce = crypto.randomUUID();
+  html = html.replace(/<script(?=[\s>])/gi, `<script nonce="${nonce}"`);
+  html = html.replace(/<style(?=[\s>])/gi, `<style nonce="${nonce}"`);
+
   // Build new headers without Content-Length (it changed after replacement)
   const headers = new Headers(response.headers);
   headers.delete('content-length');
+
+  // Set CSP with nonce (replaces static unsafe-inline headers)
+  const csp = [
+    "default-src 'self'",
+    `script-src 'self' 'nonce-${nonce}' https://cdn.jsdelivr.net https://cdn.sheetjs.com`,
+    `style-src 'self' 'nonce-${nonce}'`,
+    "img-src 'self' data: blob:",
+    "font-src 'self'",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.nsvcs.net",
+    "worker-src 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'"
+  ].join('; ');
+  headers.set('Content-Security-Policy', csp);
 
   return new Response(html, {
     status: response.status,

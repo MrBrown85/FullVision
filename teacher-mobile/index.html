@@ -41,7 +41,7 @@
     </form>
 
     <!-- Sign Up form -->
-    <form class="m-auth-form" id="m-form-signup" style="display:none">
+    <form class="m-auth-form u-hidden" id="m-form-signup">
       <label class="m-auth-label" for="m-su-name">Display Name</label>
       <input class="m-auth-input" id="m-su-name" type="text" placeholder="Ms. Brown" required autocomplete="name">
       <label class="m-auth-label" for="m-su-email">Email</label>
@@ -56,11 +56,11 @@
 </div>
 
 <!-- Mobile app shell (hidden until authenticated) -->
-<div id="m-app" style="display:none">
+<div id="m-app" class="u-hidden">
   <a href="#m-nav-stack" class="m-skip-nav">Skip to content</a>
   <main id="m-nav-stack" role="main">
   </main>
-  <div id="m-sheet-backdrop" class="m-sheet-backdrop" style="display:none"></div>
+  <div id="m-sheet-backdrop" class="m-sheet-backdrop u-hidden"></div>
   <div id="m-sheet-container"></div>
   <div id="m-toast"></div>
   <nav id="m-tab-bar" role="tablist" aria-label="Main navigation">
@@ -81,14 +81,14 @@
 
 <!-- Loading spinner (visible during boot, hidden by shell.js) -->
 <div id="m-loading" class="m-loading-overlay" role="status" aria-live="polite">
-  <div style="text-align:center">
+  <div class="u-text-center">
     <div class="m-loading-spinner"></div>
     <div class="m-loading-text">Loading...</div>
   </div>
 </div>
 
 <!-- Offline banner -->
-<div id="m-offline-banner" class="m-offline-banner" role="alert" aria-live="assertive" style="display:none">
+<div id="m-offline-banner" class="m-offline-banner u-hidden" role="alert" aria-live="assertive">
   Offline — changes will sync when connected
 </div>
 

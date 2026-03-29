@@ -1319,3 +1319,8 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* ── Utility classes (CSP: replace inline style attrs) ──────── */
+.u-hidden { display: none; }
+.u-text-center { text-align: center; }
+.u-flex-col-fill { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; overflow: hidden; }

@@ -21,7 +21,6 @@
   for = "/**/*.html"
   [headers.values]
     Cache-Control = "no-cache"
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.nsvcs.net; worker-src 'self'; form-action 'self'; frame-ancestors 'none'"
 
 [[edge_functions]]
   path = "/**/*.html"
