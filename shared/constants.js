@@ -183,6 +183,49 @@ const OBS_CONTEXTS = {
   'discussion':    { icon:'💬', label:'Discussion' }
 };
 
+/* ── Card Widget Registry ─────────────────────────────────── */
+const WIDGET_REGISTRY = [
+  { key: 'hero',         label: 'Name & Proficiency',         defaultOn: true },
+  { key: 'sectionBars',  label: 'Section Progress',           defaultOn: true },
+  { key: 'completion',   label: 'Completion',                 defaultOn: false },
+  { key: 'missingWork',  label: 'Missing Work',               defaultOn: false },
+  { key: 'growth',       label: 'Growth Journey',             defaultOn: false },
+  { key: 'obsSnippet',   label: 'Latest Observation',         defaultOn: true },
+  { key: 'obsSummary',   label: 'Observation Insights',       defaultOn: false },
+  { key: 'flagStatus',   label: 'Flag',                       defaultOn: false },
+  { key: 'reflection',   label: 'Student Voice',              defaultOn: false },
+  { key: 'dispositions', label: 'Learner Dispositions',       defaultOn: false },
+  { key: 'traits',       label: 'Character Strengths',        defaultOn: false },
+  { key: 'concerns',     label: 'Concerns',                   defaultOn: false },
+  { key: 'workHabits',   label: 'Work Habits & Participation',defaultOn: false },
+  { key: 'growthAreas',  label: 'Growth Areas',               defaultOn: false },
+  { key: 'narrative',    label: 'Teacher Narrative',           defaultOn: false },
+  { key: 'actions',      label: 'Action Buttons',             defaultOn: true },
+];
+const WIDGET_KEYS = WIDGET_REGISTRY.map(function(w) { return w.key; });
+
+/* ── Social / Character Traits ────────────────────────────── */
+const SOCIAL_TRAITS_POSITIVE = [
+  {id:'leader', label:'Leader'}, {id:'collaborative', label:'Collaborative'},
+  {id:'independent', label:'Independent'}, {id:'peer-mentor', label:'Peer Mentor'},
+  {id:'risk-taker', label:'Risk Taker'}, {id:'reflective', label:'Reflective'},
+  {id:'creative', label:'Creative Thinker'}, {id:'persistent', label:'Persistent'},
+  {id:'organized', label:'Organized'}, {id:'empathetic', label:'Empathetic'},
+  {id:'curious', label:'Curious'}, {id:'respectful', label:'Respectful'},
+  {id:'positive-attitude', label:'Positive Attitude'}, {id:'detail-oriented', label:'Detail-Oriented'},
+  {id:'advocate', label:'Self-Advocate'}
+];
+const SOCIAL_TRAITS_CONCERN = [
+  {id:'needs-support', label:'Needs Support'}, {id:'often-late', label:'Often Late'},
+  {id:'device-issue', label:'Device Issue'}, {id:'reminders-focus', label:'Reminders to Focus'},
+  {id:'often-absent', label:'Often Absent'}, {id:'incomplete-work', label:'Incomplete Work'},
+  {id:'disorganized', label:'Disorganized'}, {id:'off-task', label:'Off-Task Behaviour'},
+  {id:'social-conflicts', label:'Social Conflicts'}, {id:'low-confidence', label:'Low Confidence'},
+  {id:'avoids-challenges', label:'Avoids Challenges'}, {id:'rushed-work', label:'Rushes Work'}
+];
+const SOCIAL_TRAITS_POSITIVE_IDS = new Set(SOCIAL_TRAITS_POSITIVE.map(function(t) { return t.id; }));
+const SOCIAL_TRAITS_CONCERN_IDS = new Set(SOCIAL_TRAITS_CONCERN.map(function(t) { return t.id; }));
+
 /* ── Shared HTML: Unified Toolbar ──────────────────────────── */
 const TB_SIDEBAR_SVG = `<svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="2.5" width="13" height="11" rx="2"/><line x1="5.5" y1="2.5" x2="5.5" y2="13.5"/></svg>`;
 const TB_PAGES = [

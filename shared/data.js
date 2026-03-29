@@ -2551,6 +2551,41 @@ function getReportConfig(cid) {
 }
 function saveReportConfig(cid, config) { _saveCourseField('reportConfig', cid, config); }
 
+/* ── Card Widget Config ───────────────────────────────────── */
+function _defaultWidgetConfig() {
+  var order = [];
+  var disabled = [];
+  WIDGET_REGISTRY.forEach(function(w) {
+    if (w.defaultOn) order.push(w.key);
+    else disabled.push(w.key);
+  });
+  return { order: order, disabled: disabled };
+}
+
+function getCardWidgetConfig() {
+  var raw = _safeParseLS('m-card-widgets', null);
+  if (!raw || !Array.isArray(raw.order)) return _defaultWidgetConfig();
+
+  // Filter out unknown keys
+  var validKeys = new Set(WIDGET_KEYS);
+  var order = raw.order.filter(function(k) { return validKeys.has(k); });
+  var disabled = Array.isArray(raw.disabled)
+    ? raw.disabled.filter(function(k) { return validKeys.has(k); })
+    : [];
+
+  // Find any registry keys missing from both arrays (future-proofing)
+  var present = new Set(order.concat(disabled));
+  WIDGET_KEYS.forEach(function(k) {
+    if (!present.has(k)) disabled.push(k);
+  });
+
+  return { order: order, disabled: disabled };
+}
+
+function saveCardWidgetConfig(config) {
+  _safeLSSet('m-card-widgets', JSON.stringify(config));
+}
+
 /* ── Namespace ──────────────────────────────────────────────── */
 var _mobileRerender = null;
 
