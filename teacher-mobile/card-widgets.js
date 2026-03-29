@@ -187,6 +187,127 @@ window.MCardWidgets = (function() {
     '</div>';
   };
 
+  /* ── obsSummary ──────────────────────────────────────────────── */
+  _renderers.obsSummary = function(st, cid) {
+    var obs = getStudentQuickObs(cid, st.id);
+    if (obs.length === 0) return '';
+    // Count observation contexts
+    var ctxCounts = {};
+    obs.forEach(function(o) { var c = o.context || 'unknown'; ctxCounts[c] = (ctxCounts[c] || 0) + 1; });
+    // Find most frequent
+    var topCtx = null, topCount = 0, allSame = true, firstCount = null;
+    Object.keys(ctxCounts).forEach(function(c) {
+      if (firstCount === null) firstCount = ctxCounts[c];
+      else if (ctxCounts[c] !== firstCount) allSame = false;
+      if (ctxCounts[c] > topCount) { topCtx = c; topCount = ctxCounts[c]; }
+    });
+    var contextLabel = OBS_CONTEXTS[topCtx] ? OBS_CONTEXTS[topCtx].label.toLowerCase() : topCtx;
+    var text = obs.length + ' observation' + (obs.length !== 1 ? 's' : '');
+    if (allSame && Object.keys(ctxCounts).length > 1) {
+      text += ' \u00b7 across settings';
+    } else if (topCtx && topCtx !== 'unknown') {
+      text += ' \u00b7 strongest in ' + contextLabel;
+    }
+    return '<div class="m-wdg-obs-summary">' + text + '</div>';
+  };
+
+  /* ── reflection ──────────────────────────────────────────────── */
+  _renderers.reflection = function(st, cid) {
+    var reflections = getReflections(cid);
+    var goals = getGoals(cid);
+    var entry = (reflections[st.id] && reflections[st.id].text) ? reflections[st.id]
+              : (goals[st.id] && goals[st.id].text) ? goals[st.id]
+              : null;
+    if (!entry) return '';
+    var text = entry.text;
+    if (text.length > 60) text = text.substring(0, 60) + '\u2026';
+    return '<div class="m-wdg-reflection">' +
+      '<div class="m-wdg-reflection-label">\ud83c\udfaf Student voice</div>' +
+      '<div class="m-wdg-reflection-text">' + MC.esc(text) + '</div>' +
+    '</div>';
+  };
+
+  /* ── _petalPath helper ───────────────────────────────────────── */
+  function _petalPath(sides, r, cx, cy, fill, stroke) {
+    var pts = [];
+    for (var i = 0; i < sides; i++) {
+      var angle = (2 * Math.PI * i / sides) - Math.PI / 2;
+      pts.push((cx + r * Math.cos(angle)).toFixed(2) + ',' + (cy + r * Math.sin(angle)).toFixed(2));
+    }
+    return '<polygon points="' + pts.join(' ') + '" fill="' + fill + '" stroke="' + stroke + '"/>';
+  }
+
+  /* ── dispositions ────────────────────────────────────────────── */
+  _renderers.dispositions = function(st, cid, data) {
+    var termId = (data && data.termId) || 'term-1';
+    var rating = getStudentTermRating(cid, st.id, termId);
+    if (!rating || !rating.dims) return '';
+    var dims = rating.dims;
+    var vals = OBS_DIMS.map(function(d) { return dims[d] || 0; });
+    if (vals.every(function(v) { return v === 0; })) return '';
+
+    var cx = 24, cy = 24, maxR = 20;
+    var bgHex = _petalPath(6, maxR, cx, cy, 'var(--bg-secondary)', 'none');
+
+    // Data polygon
+    var dataPts = OBS_DIMS.map(function(d, i) {
+      var angle = (2 * Math.PI * i / 6) - Math.PI / 2;
+      var r = (vals[i] / MAX_PROF) * maxR;
+      return (cx + r * Math.cos(angle)).toFixed(2) + ',' + (cy + r * Math.sin(angle)).toFixed(2);
+    });
+    var dataShape = '<polygon points="' + dataPts.join(' ') + '" fill="var(--active-light)" stroke="var(--active)" stroke-width="1.5"/>';
+
+    var svg = '<svg class="m-wdg-petal" width="48" height="48" viewBox="0 0 48 48">' +
+      bgHex + dataShape +
+    '</svg>';
+
+    // Top 2 dimensions
+    var sorted = OBS_DIMS.slice().sort(function(a, b) { return (dims[b] || 0) - (dims[a] || 0); });
+    var topTwo = sorted.slice(0, 2).filter(function(d) { return (dims[d] || 0) > 0; });
+    var summary = topTwo.length ? 'Strong in ' + topTwo.map(function(d) { return OBS_LABELS[d]; }).join(', ') : '';
+
+    return '<div class="m-wdg-dispositions">' +
+      svg +
+      '<div class="m-wdg-disp-text">' + MC.esc(summary) + '</div>' +
+    '</div>';
+  };
+
+  /* ── traits ──────────────────────────────────────────────────── */
+  _renderers.traits = function(st, cid, data) {
+    var termId = (data && data.termId) || 'term-1';
+    var rating = getStudentTermRating(cid, st.id, termId);
+    if (!rating) return '';
+    var positive = (rating.socialTraits || []).filter(function(t) { return SOCIAL_TRAITS_POSITIVE_IDS.has(t); });
+    if (!positive.length) return '';
+    var shown = positive.slice(0, 4);
+    var overflow = positive.length - shown.length;
+    var chips = shown.map(function(tid) {
+      var trait = SOCIAL_TRAITS_POSITIVE.find(function(t) { return t.id === tid; });
+      var label = trait ? trait.label : tid;
+      return '<span class="m-wdg-chip m-wdg-chip-positive">' + MC.esc(label) + '</span>';
+    }).join('');
+    if (overflow > 0) chips += '<span class="m-wdg-chip m-wdg-chip-more">+' + overflow + '</span>';
+    return '<div class="m-wdg-traits">' + chips + '</div>';
+  };
+
+  /* ── concerns ────────────────────────────────────────────────── */
+  _renderers.concerns = function(st, cid, data) {
+    var termId = (data && data.termId) || 'term-1';
+    var rating = getStudentTermRating(cid, st.id, termId);
+    if (!rating) return '';
+    var concern = (rating.socialTraits || []).filter(function(t) { return SOCIAL_TRAITS_CONCERN_IDS.has(t); });
+    if (!concern.length) return '';
+    var shown = concern.slice(0, 4);
+    var overflow = concern.length - shown.length;
+    var chips = shown.map(function(tid) {
+      var trait = SOCIAL_TRAITS_CONCERN.find(function(t) { return t.id === tid; });
+      var label = trait ? trait.label : tid;
+      return '<span class="m-wdg-chip m-wdg-chip-concern">' + MC.esc(label) + '</span>';
+    }).join('');
+    if (overflow > 0) chips += '<span class="m-wdg-chip m-wdg-chip-more">+' + overflow + '</span>';
+    return '<div class="m-wdg-concerns">' + chips + '</div>';
+  };
+
   /* ── Public API ──────────────────────────────────────────────── */
   return {
     render: render,
