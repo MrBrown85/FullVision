@@ -4,6 +4,7 @@
   "description": "Standards-based gradebook for BC teachers",
   "private": true,
   "scripts": {
+    "build": "bash scripts/build.sh",
     "dev": "npx serve -l 8347 --no-single",
     "test": "vitest run",
     "test:watch": "vitest",

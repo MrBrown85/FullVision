@@ -1,5 +1,6 @@
 [build]
-  publish = "."
+  command = "bash scripts/build.sh"
+  publish = "dist"
 
 [[headers]]
   for = "/**/*.js"
