@@ -15,20 +15,20 @@
 --   5. Row-Level Security (RLS) policies
 --
 -- Architecture note:
---   The app uses TWO storage strategies side by side:
+--   The app is migrating from JSONB blobs to normalized tables:
 --
---   A) JSONB document store (course_data + teacher_config)
---      This is what gb-data.js actually reads/writes at runtime.
---      Each localStorage key maps to one row in course_data with
---      a data_key like 'students', 'assessments', 'scores', etc.
---      All course data is stored as JSONB blobs per teacher+course.
+--   A) Normalized per-entity tables (scores, observations, assessments, students)
+--      These are the PRIMARY runtime tables for high-frequency data.
+--      gb-data.js reads/writes directly to these tables, converting
+--      between app blob format and normalized rows on the fly.
+--      All include teacher_id in the PK for co-teaching readiness.
 --
---   B) Normalized tables (courses, students, assessments, etc.)
---      These exist for future query optimization, reporting, and
---      potential migration from the JSONB store. Some are
---      referenced by the account deletion flow in gb-ui.js.
+--   B) JSONB document store (course_data + teacher_config)
+--      Remaining data types still stored as JSONB blobs per
+--      teacher+course. Being migrated incrementally (Phases 4-6).
 --
---   Both are included here so the schema is complete.
+--   C) Legacy normalized tables (courses, rubrics, modules, etc.)
+--      These exist for future migration phases and reporting.
 -- ============================================================
 
 
@@ -119,13 +119,88 @@ CREATE POLICY "Teachers access own observations"
   WITH CHECK (auth.uid() = teacher_id);
 
 -- ──────────────────────────────────────────────────────────
+-- assessments  [NORMALIZED TABLE — Phase 3]
+-- One row per assessment. Replaces the JSONB blob that was
+-- previously stored in course_data with data_key='assessments'.
+-- ──────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS assessments (
+  teacher_id          UUID        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  course_id           TEXT        NOT NULL,
+  id                  TEXT        NOT NULL,
+  title               TEXT        NOT NULL DEFAULT '',
+  date                TEXT        DEFAULT '',
+  type                TEXT        NOT NULL DEFAULT 'summative',
+  tag_ids             JSONB       DEFAULT '[]',
+  evidence_type       TEXT        DEFAULT '',
+  notes               TEXT        DEFAULT '',
+  core_competency_ids JSONB       DEFAULT '[]',
+  rubric_id           TEXT        DEFAULT '',
+  score_mode          TEXT        DEFAULT '',
+  max_points          INTEGER     DEFAULT 0,
+  weight              REAL        DEFAULT 1,
+  due_date            TEXT        DEFAULT '',
+  collaboration       TEXT        DEFAULT 'individual',
+  module_id           TEXT        DEFAULT '',
+  pairs               JSONB       DEFAULT '[]',
+  groups              JSONB       DEFAULT '[]',
+  excluded_students   JSONB       DEFAULT '[]',
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (teacher_id, course_id, id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_assessments_course
+  ON assessments (teacher_id, course_id);
+
+ALTER TABLE assessments ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Teachers access own assessments"
+  ON assessments FOR ALL
+  USING (auth.uid() = teacher_id)
+  WITH CHECK (auth.uid() = teacher_id);
+
+-- ──────────────────────────────────────────────────────────
+-- students  [NORMALIZED TABLE — Phase 3]
+-- One row per enrolled student per course. Replaces the JSONB
+-- blob previously stored in course_data with data_key='students'.
+-- ──────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS students (
+  teacher_id         UUID        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  course_id          TEXT        NOT NULL,
+  id                 TEXT        NOT NULL,
+  first_name         TEXT        NOT NULL DEFAULT '',
+  last_name          TEXT        DEFAULT '',
+  preferred          TEXT        DEFAULT '',
+  pronouns           TEXT        DEFAULT '',
+  student_number     TEXT        DEFAULT '',
+  email              TEXT        DEFAULT '',
+  date_of_birth      TEXT        DEFAULT '',
+  designations       JSONB       DEFAULT '[]',
+  enrolled_date      TEXT        DEFAULT '',
+  attendance         JSONB       DEFAULT '[]',
+  sort_name          TEXT        DEFAULT '',
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (teacher_id, course_id, id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_students_course
+  ON students (teacher_id, course_id);
+
+ALTER TABLE students ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Teachers access own students"
+  ON students FOR ALL
+  USING (auth.uid() = teacher_id)
+  WITH CHECK (auth.uid() = teacher_id);
+
+-- ──────────────────────────────────────────────────────────
 -- course_data  [PRIMARY RUNTIME TABLE]
 -- Generic key-value store scoped to teacher + course.
 -- gb-data.js upserts all per-course data here as JSONB.
 -- Scores → `scores` table. Observations → `observations` table.
+-- Assessments → `assessments` table. Students → `students` table.
 --
 -- data_key values (one row per key per course per teacher):
---   students, assessments, learningmap, courseconfig,
+--   learningmap, courseconfig,
 --   modules, rubrics, flags, goals, reflections, overrides,
 --   statuses, term-ratings, custom-tags, notes, report-config
 --
@@ -228,78 +303,8 @@ CREATE TABLE IF NOT EXISTS learning_maps (
 );
 
 
--- ──────────────────────────────────────────────────────────
--- students
--- Enrolled students per course. Composite PK of (id, course_id)
--- because the same student ID could appear in multiple courses.
--- ──────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS students (
-  id              TEXT NOT NULL,
-  course_id       TEXT NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
-  first_name      TEXT NOT NULL,
-  last_name       TEXT DEFAULT '',
-  preferred       TEXT DEFAULT '',
-  pronouns        TEXT DEFAULT '',
-  student_number  TEXT DEFAULT '',
-  email           TEXT DEFAULT '',
-  date_of_birth   TEXT DEFAULT '',
-  designation     TEXT DEFAULT '',
-  enrolled_date   TEXT DEFAULT '',
-  attendance      JSONB DEFAULT '[]',
-  PRIMARY KEY (id, course_id)
-);
-
-
--- ──────────────────────────────────────────────────────────
--- assessments
--- Summative and formative assessments. Each assessment links
--- to curriculum tags via tag_ids and optionally to a module.
--- Supports individual, pair, and group collaboration modes.
--- ──────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS assessments (
-  id                  TEXT NOT NULL,
-  course_id           TEXT NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
-  title               TEXT NOT NULL,
-  date                TEXT DEFAULT '',
-  type                TEXT DEFAULT 'summative',
-  tag_ids             TEXT[] DEFAULT '{}',
-  evidence_type       TEXT DEFAULT '',
-  notes               TEXT DEFAULT '',
-  core_competency_ids TEXT[] DEFAULT '{}',
-  rubric_id           TEXT DEFAULT '',
-  score_mode          TEXT DEFAULT '',
-  max_points          INTEGER DEFAULT 0,
-  weight              REAL DEFAULT 1,
-  due_date            TEXT DEFAULT '',
-  collaboration       TEXT DEFAULT 'individual',
-  module_id           TEXT DEFAULT '',
-  pairs               JSONB DEFAULT '[]',
-  groups              JSONB DEFAULT '[]',
-  excluded_students   TEXT[] DEFAULT '{}',
-  created_at          TIMESTAMPTZ DEFAULT now(),
-  PRIMARY KEY (id, course_id)
-);
-
-
--- ──────────────────────────────────────────────────────────
--- scores
--- One row per student + assessment + tag combination.
--- This is the largest table in a production deployment.
--- Uses BIGSERIAL id for the normalized version (the JSONB
--- store in course_data uses the app-generated string IDs).
--- ──────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS scores (
-  id            BIGSERIAL PRIMARY KEY,
-  course_id     TEXT NOT NULL,
-  student_id    TEXT NOT NULL,
-  assessment_id TEXT NOT NULL,
-  tag_id        TEXT NOT NULL,
-  score         REAL DEFAULT 0,
-  type          TEXT DEFAULT 'summative',
-  date          TEXT DEFAULT '',
-  note          TEXT DEFAULT '',
-  FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
-);
+-- (Old normalized students, assessments, scores tables removed —
+--  replaced by Phase 1-3 normalized tables above course_data)
 
 
 -- ──────────────────────────────────────────────────────────
@@ -349,25 +354,8 @@ CREATE TABLE IF NOT EXISTS student_meta (
 );
 
 
--- ──────────────────────────────────────────────────────────
--- observations
--- Quick observations / anecdotal notes per student.
--- dims links to curriculum dimensions; sentiment and context
--- are optional metadata. assignment_context links an
--- observation to a specific assessment if applicable.
--- ──────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS observations (
-  id                 TEXT PRIMARY KEY,
-  course_id          TEXT NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
-  student_id         TEXT NOT NULL,
-  text               TEXT NOT NULL,
-  date               TEXT DEFAULT '',
-  dims               TEXT[] DEFAULT '{}',
-  sentiment          TEXT DEFAULT '',
-  context            TEXT DEFAULT '',
-  assignment_context JSONB DEFAULT NULL,
-  created_at         TIMESTAMPTZ DEFAULT now()
-);
+-- (Old normalized observations table removed —
+--  replaced by Phase 2 normalized table above course_data)
 
 
 -- ──────────────────────────────────────────────────────────
@@ -550,28 +538,7 @@ CREATE POLICY "Teachers manage own learning maps"
   USING (course_id IN (SELECT id FROM courses WHERE teacher_id = auth.uid()));
 
 
--- ── students ──────────────────────────────────────────────
-ALTER TABLE students ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Teachers manage own students"
-  ON students FOR ALL
-  USING (course_id IN (SELECT id FROM courses WHERE teacher_id = auth.uid()));
-
-
--- ── assessments ───────────────────────────────────────────
-ALTER TABLE assessments ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Teachers manage own assessments"
-  ON assessments FOR ALL
-  USING (course_id IN (SELECT id FROM courses WHERE teacher_id = auth.uid()));
-
-
--- ── scores ────────────────────────────────────────────────
-ALTER TABLE scores ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Teachers manage own scores"
-  ON scores FOR ALL
-  USING (course_id IN (SELECT id FROM courses WHERE teacher_id = auth.uid()));
+-- (students, assessments, scores RLS defined inline with table definitions above)
 
 
 -- ── rubrics ───────────────────────────────────────────────
@@ -598,12 +565,7 @@ CREATE POLICY "Teachers manage own student meta"
   USING (course_id IN (SELECT id FROM courses WHERE teacher_id = auth.uid()));
 
 
--- ── observations ──────────────────────────────────────────
-ALTER TABLE observations ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Teachers manage own observations"
-  ON observations FOR ALL
-  USING (course_id IN (SELECT id FROM courses WHERE teacher_id = auth.uid()));
+-- (observations RLS defined inline with table definition above)
 
 
 -- ── term_ratings ──────────────────────────────────────────
