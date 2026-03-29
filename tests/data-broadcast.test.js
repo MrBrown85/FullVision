@@ -6,12 +6,22 @@ import { vi } from 'vitest';
 
 const CID = 'bctest';
 
+// Capture postMessage calls on BroadcastChannel instances
+let postMessageSpy;
+
 beforeEach(() => {
   localStorage.clear();
   _cache.students[CID] = undefined;
   _cache.scores[CID] = undefined;
   _cache.assessments[CID] = undefined;
   _cache.courseConfigs[CID] = undefined;
+
+  // Spy on BroadcastChannel.prototype.postMessage to detect broadcasts
+  postMessageSpy = vi.spyOn(BroadcastChannel.prototype, 'postMessage');
+});
+
+afterEach(() => {
+  postMessageSpy.mockRestore();
 });
 
 describe('_broadcastChange', () => {
@@ -27,43 +37,36 @@ describe('_broadcastChange', () => {
 });
 
 describe('save functions trigger _broadcastChange', () => {
-  let spy;
-
-  beforeEach(() => {
-    spy = vi.fn();
-    // Replace the real _broadcastChange with our spy.
-    // _broadcastChange is called inside _saveCourseField, which is a closure.
-    // Since _broadcastChange is a top-level function, we can intercept the
-    // BroadcastChannel.postMessage to detect that broadcasting occurred.
-    // Instead, we spy on the channel itself.
-  });
-
-  it('saveStudents calls _broadcastChange (via localStorage write)', () => {
+  it('saveStudents broadcasts a data-changed message', () => {
     const students = [
       { id: 's1', firstName: 'Test', lastName: 'User', designations: [], sortName: 'User Test' }
     ];
-    // Before save, no localStorage entry
-    expect(localStorage.getItem('gb-students-' + CID)).toBeNull();
+    postMessageSpy.mockClear();
     saveStudents(CID, students);
-    // After save, localStorage is updated (confirming _saveCourseField ran,
-    // which always calls _broadcastChange at the end)
-    expect(localStorage.getItem('gb-students-' + CID)).not.toBeNull();
-    // Verify cache is also updated
-    expect(_cache.students[CID]).toEqual(students);
+    expect(postMessageSpy).toHaveBeenCalled();
+    const call = postMessageSpy.mock.calls.find(c => c[0] && c[0].field === 'students');
+    expect(call).toBeTruthy();
+    expect(call[0].cid).toBe(CID);
   });
 
-  it('saveScores calls _broadcastChange (via localStorage write)', () => {
+  it('saveScores broadcasts a data-changed message', () => {
     const scores = { s1: [{ id: 'sc1', assessmentId: 'a1', tagId: 'QAP', score: 3, date: '2025-01-15', type: 'summative' }] };
+    postMessageSpy.mockClear();
     saveScores(CID, scores);
-    expect(localStorage.getItem('gb-scores-' + CID)).not.toBeNull();
-    expect(_cache.scores[CID]).toEqual(scores);
+    expect(postMessageSpy).toHaveBeenCalled();
+    const call = postMessageSpy.mock.calls.find(c => c[0] && c[0].field === 'scores');
+    expect(call).toBeTruthy();
+    expect(call[0].cid).toBe(CID);
   });
 
-  it('saveAssessments calls _broadcastChange (via localStorage write)', () => {
+  it('saveAssessments broadcasts a data-changed message', () => {
     const assessments = [{ id: 'a1', title: 'Test Quiz', date: '2025-01-15', type: 'summative', tagIds: ['QAP'] }];
+    postMessageSpy.mockClear();
     saveAssessments(CID, assessments);
-    expect(localStorage.getItem('gb-assessments-' + CID)).not.toBeNull();
-    expect(_cache.assessments[CID]).toEqual(assessments);
+    expect(postMessageSpy).toHaveBeenCalled();
+    const call = postMessageSpy.mock.calls.find(c => c[0] && c[0].field === 'assessments');
+    expect(call).toBeTruthy();
+    expect(call[0].cid).toBe(CID);
   });
 });
 

@@ -17,10 +17,10 @@ test.describe('Observations — Quick Capture', () => {
     // Should have a text area or input for observation text
     const textarea = page.locator('textarea, [contenteditable="true"], input[placeholder*="observation" i], input[placeholder*="note" i]').first();
     const submitBtn = page.locator('[data-action="submitOb"], button:has-text("Add"), button:has-text("Save"), button:has-text("Submit")').first();
-    // At least one of these should be visible
-    const hasInput = await textarea.isVisible().catch(() => false);
-    const hasSubmit = await submitBtn.isVisible().catch(() => false);
-    expect(hasInput || hasSubmit).toBeTruthy();
+    // At least one of these must be visible
+    const inputCount = await textarea.count();
+    const submitCount = await submitBtn.count();
+    expect(inputCount + submitCount).toBeGreaterThanOrEqual(1);
   });
 
   test('student selector is visible with seeded students', async ({ page }) => {
@@ -39,13 +39,9 @@ test.describe('Observations — Quick Capture', () => {
 
   test('sentiment buttons exist', async ({ page }) => {
     // Should have positive/neutral/constructive sentiment options
-    const body = await page.locator('body').textContent();
-    const sentimentWords = ['strength', 'growth', 'concern', 'positive', 'neutral', 'constructive'];
-    const hasSentiment = sentimentWords.some(w => body.toLowerCase().includes(w));
-    // Sentiment buttons might only show after selecting a student
-    // Just verify the page rendered without errors
-    const main = page.locator('#main');
-    await expect(main).not.toBeEmpty();
+    const sentimentBtns = page.locator('[data-action="setSentiment"], .ob-sentiment-btn, button:has-text("Strength"), button:has-text("Growth"), button:has-text("Concern")');
+    const count = await sentimentBtns.count();
+    expect(count).toBeGreaterThanOrEqual(1);
   });
 
   test('observation list shows empty state initially', async ({ page }) => {

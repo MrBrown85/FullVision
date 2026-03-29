@@ -57,10 +57,7 @@ test.describe('Gradebook — Spreadsheet View', () => {
   test('filter button exists', async ({ page }) => {
     await gotoApp(page, '/gradebook');
     const filterBtn = page.locator('[data-action="toggleFilterStrip"], button:has-text("Filter"), text=Filters').first();
-    const exists = await filterBtn.isVisible().catch(() => false);
-    // Filter UI should exist in the gradebook
-    const main = page.locator('#main');
-    await expect(main).not.toBeEmpty();
+    await expect(filterBtn).toBeVisible();
   });
 
   test('search input exists', async ({ page }) => {
@@ -69,17 +66,18 @@ test.describe('Gradebook — Spreadsheet View', () => {
     await gotoApp(page, '/gradebook');
 
     const searchInput = page.locator('input[placeholder*="Search" i], input[data-action="onSearch"]').first();
-    const visible = await searchInput.isVisible().catch(() => false);
-    // Search might be in the toolbar, not main - just verify page rendered
-    const main = page.locator('#main');
-    await expect(main).not.toBeEmpty();
+    await expect(searchInput).toBeVisible();
   });
 
   test('clicking Scores tab renders Scores view without crashing', async ({ page }) => {
     await seedStudents(page);
     await seedAssessments(page);
+    await seedScores(page, {
+      'stu-001': { 'assess-001': { 'QAP': 3 } },
+      'stu-002': { 'assess-001': { 'QAP': 2 } },
+      'stu-003': { 'assess-001': { 'QAP': 4 } },
+    });
     await gotoApp(page, '/gradebook');
-    await seedScores(page);
     // Click the Scores tab
     const scoresBtn = page.locator('[data-action="setView"][data-mode="scores"]');
     await scoresBtn.click();
@@ -94,8 +92,12 @@ test.describe('Gradebook — Spreadsheet View', () => {
   test('clicking Summary tab renders Summary view without crashing', async ({ page }) => {
     await seedStudents(page);
     await seedAssessments(page);
+    await seedScores(page, {
+      'stu-001': { 'assess-001': { 'QAP': 3 } },
+      'stu-002': { 'assess-001': { 'QAP': 2 } },
+      'stu-003': { 'assess-001': { 'QAP': 4 } },
+    });
     await gotoApp(page, '/gradebook');
-    await seedScores(page);
     // Click the Summary tab
     const summaryBtn = page.locator('[data-action="setView"][data-mode="summary"]');
     await summaryBtn.click();
@@ -109,8 +111,12 @@ test.describe('Gradebook — Spreadsheet View', () => {
   test('switching between all three tabs does not crash', async ({ page }) => {
     await seedStudents(page);
     await seedAssessments(page);
+    await seedScores(page, {
+      'stu-001': { 'assess-001': { 'QAP': 3 } },
+      'stu-002': { 'assess-001': { 'QAP': 2 } },
+      'stu-003': { 'assess-001': { 'QAP': 4 } },
+    });
     await gotoApp(page, '/gradebook');
-    await seedScores(page);
     // Competencies → Scores
     await page.locator('[data-action="setView"][data-mode="scores"]').click();
     await page.waitForTimeout(300);
