@@ -560,10 +560,10 @@
         // Hide card immediately, delete after undo window
         var card = target.closest('.m-obs-card');
         if (card) card.style.display = 'none';
-        MC.showToast('Observation deleted', function() {
+        MC.showToast('Observation deleted', { onUndo: function() {
           // Undo: restore the card
           if (card) card.style.display = '';
-        });
+        } });
         // Delete after toast auto-dismisses (5s)
         setTimeout(function() {
           if (card && card.style.display === 'none') {

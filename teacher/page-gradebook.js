@@ -227,10 +227,11 @@ window.PageGradebook = (function() {
     }
     var data = document.getElementById('gb-data');
     var colheads = document.getElementById('gb-colheads');
+    var colheadsInner = colheads && colheads.querySelector('.gb-grid-colheads-inner');
     var rowheads = document.getElementById('gb-rowheads');
     if (!data || !colheads || !rowheads) return;
     var fn = function() {
-      colheads.scrollLeft = data.scrollLeft;
+      if (colheadsInner) colheadsInner.style.transform = 'translateX(-' + data.scrollLeft + 'px)';
       rowheads.scrollTop = data.scrollTop;
     };
     data.addEventListener('scroll', fn, { passive: true });

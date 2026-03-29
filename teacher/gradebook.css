@@ -356,12 +356,14 @@ th.gb-group-alt { background-color: rgba(0,0,0,0.03); }
    ══════════════════════════════════════════════════════════ */
 
 /* ── 4-quadrant grid layout (like a spreadsheet app) ────── */
+/* Inner radius for quadrant corners: 1px inset from the grid border */
+.gb-grid { --qr: calc(var(--radius) - 1px); }
 .gb-grid {
   display:grid;
   grid-template-columns:200px 1fr;
   grid-template-rows:auto 1fr;
   border:1px solid var(--border); border-radius:var(--radius);
-  overflow:hidden; background:var(--surface);
+  background:var(--surface);
   flex:1; min-height:0;
 }
 /* Q1: Corner — fixed top-left */
@@ -370,18 +372,23 @@ th.gb-group-alt { background-color: rgba(0,0,0,0.03); }
   background:var(--bg); border-right:2px solid var(--border);
   border-bottom:2px solid var(--border);
   display:flex; align-items:flex-end; padding:8px 12px;
+  position:relative; z-index:2; overflow:hidden;
+  border-top-left-radius:var(--qr);
 }
 .gb-grid-corner-inner {
   font-size:11px; font-weight:600; text-transform:uppercase;
   letter-spacing:0.5px; color:var(--text-2);
 }
-/* Q2: Column headers — scrolls horizontally (driven by data) */
+/* Q2: Column headers — scrolls horizontally via JS transform on inner div.
+   overflow:visible is intentional — allows rotated header text to extend
+   past the right edge without clipping. scrollLeft is not used here. */
 .gb-grid-colheads {
   grid-row:1; grid-column:2;
-  overflow:hidden; border-bottom:2px solid var(--border);
+  overflow:visible; border-bottom:2px solid var(--border);
   background:var(--bg); position:relative;
+  border-top-right-radius:var(--qr);
 }
-.gb-grid-colheads-inner { display:flex; position:relative; width:max-content; padding-right:150px; }
+.gb-grid-colheads-inner { display:flex; position:relative; width:max-content; }
 .gb-grid-colhead {
   flex:0 0 48px; width:48px; height:200px;
   position:relative; display:flex; flex-direction:column;
@@ -469,6 +476,7 @@ th.gb-group-alt { background-color: rgba(0,0,0,0.03); }
   grid-row:2; grid-column:1;
   overflow:hidden; border-right:2px solid var(--border);
   background:var(--bg);
+  border-bottom-left-radius:var(--qr);
 }
 .gb-grid-rowhead {
   display:flex; align-items:center; justify-content:space-between;
@@ -563,6 +571,7 @@ th.gb-group-alt { background-color: rgba(0,0,0,0.03); }
 .gb-grid-data {
   grid-row:2; grid-column:2;
   overflow:auto;
+  border-bottom-right-radius:var(--qr);
 }
 
 .gb-scores-table {
@@ -636,6 +645,7 @@ th.gb-group-alt { background-color: rgba(0,0,0,0.03); }
   .gb-scores-table { font-size:7pt; }
   .gb-scores-cell { padding:1px 2px !important; min-width:0 !important; }
   .gb-grid-cols { transform:none !important; }
+  .gb-grid-colheads-inner { transform:none !important; }
   .gb-filter-strip, .gb-undo-hint { display:none !important; }
 }
 

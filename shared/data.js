@@ -1472,14 +1472,17 @@ function setPointsScore(cid, sid, aid, rawScore) {
   const tagIds = assess.tagIds || [];
   const scores = getScores(cid);
   if (!scores[sid]) scores[sid] = [];
+  let changed = false;
   tagIds.forEach(tid => {
     const entry = scores[sid].find(e => e.assessmentId === aid && e.tagId === tid);
-    if (entry) { entry.score = rawScore; }
-    else if (rawScore > 0) {
+    if (entry) {
+      if (entry.score !== rawScore) { entry.score = rawScore; changed = true; }
+    } else if (rawScore >= 0) {
       scores[sid].push({ id: uid(), assessmentId: aid, tagId: tid, score: rawScore, date: assess.date || new Date().toISOString().slice(0,10), type: assess.type || 'summative', note: '', created: new Date().toISOString() });
+      changed = true;
     }
   });
-  saveScores(cid, scores);
+  if (changed) saveScores(cid, scores);
   return scores;
 }
 
