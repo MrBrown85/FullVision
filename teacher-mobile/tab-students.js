@@ -147,6 +147,27 @@ window.MStudents = (function() {
     });
 
     _syncViewVisibility(true);
+
+    // Long-press to edit card layout
+    var _longPressTimer = null;
+    container.addEventListener('touchstart', function(e) {
+      if (e.target.closest('button') || e.target.closest('[data-action]')) return;
+      _longPressTimer = setTimeout(function() {
+        _longPressTimer = null;
+        MCardWidgetEditor.show(function onUpdate() {
+          initCardStack(cid);
+        });
+        MCardWidgetEditor.initDragListeners();
+      }, 500);
+    }, { passive: true });
+
+    container.addEventListener('touchmove', function() {
+      if (_longPressTimer) { clearTimeout(_longPressTimer); _longPressTimer = null; }
+    }, { passive: true });
+
+    container.addEventListener('touchend', function() {
+      if (_longPressTimer) { clearTimeout(_longPressTimer); _longPressTimer = null; }
+    }, { passive: true });
   }
 
   function setViewMode(mode) {

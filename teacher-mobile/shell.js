@@ -486,6 +486,12 @@
         return;
       }
 
+      // Widget editor actions
+      if (action === 'm-wdg-toggle' || action === 'm-wdg-reset') {
+        MCardWidgetEditor.handleAction(action, target);
+        return;
+      }
+
       // ── Students tab ──
       if (action === 'm-set-view') {
         var mode = target.getAttribute('data-mode');
