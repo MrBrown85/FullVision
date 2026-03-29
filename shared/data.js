@@ -382,14 +382,14 @@ async function _retryFailedSyncs() {
   // Process one at a time to avoid hammering the server
   const queue = _retryQueue.splice(0);
   if (queue.length === 0) { localStorage.removeItem('gb-retry-queue'); return; }
-  for (const item of queue) {
+  for (let i = 0; i < queue.length; i++) {
     try {
-      await _doSync(item.table, item.key, item.data);
+      await _doSync(queue[i].table, queue[i].key, queue[i].data);
     } catch (e) {
-      // _doSync already re-adds to _retryQueue on failure — stop processing rest
-      // Re-add remaining unprocessed items
-      const remaining = queue.slice(queue.indexOf(item) + 1);
-      remaining.forEach(r => _addToRetryQueue(r.table, r.key, r.data, true));
+      // _doSync already re-adds the failed item — re-add remaining unprocessed items
+      for (let j = i + 1; j < queue.length; j++) {
+        _addToRetryQueue(queue[j].table, queue[j].key, queue[j].data, true);
+      }
       _persistRetryQueue();
       break;
     }

@@ -29,9 +29,9 @@ export const TEST_COURSE = {
 };
 
 export const TEST_STUDENTS = [
-  { id: 'stu-001', firstName: 'Alice', lastName: 'Anderson', preferred: 'Alice', pronouns: '', studentNumber: '1001', email: '', dateOfBirth: '', designation: '', enrolledDate: '', attendance: [], sortName: 'Anderson Alice' },
-  { id: 'stu-002', firstName: 'Bob', lastName: 'Baker', preferred: 'Bob', pronouns: '', studentNumber: '1002', email: '', dateOfBirth: '', designation: '', enrolledDate: '', attendance: [], sortName: 'Baker Bob' },
-  { id: 'stu-003', firstName: 'Charlie', lastName: 'Chen', preferred: 'Charlie', pronouns: '', studentNumber: '1003', email: '', dateOfBirth: '', designation: '', enrolledDate: '', attendance: [], sortName: 'Chen Charlie' },
+  { id: 'stu-001', firstName: 'Alice', lastName: 'Anderson', preferred: 'Alice', pronouns: '', studentNumber: '1001', email: '', dateOfBirth: '', designations: [], enrolledDate: '', attendance: [], sortName: 'Anderson Alice' },
+  { id: 'stu-002', firstName: 'Bob', lastName: 'Baker', preferred: 'Bob', pronouns: '', studentNumber: '1002', email: '', dateOfBirth: '', designations: [], enrolledDate: '', attendance: [], sortName: 'Baker Bob' },
+  { id: 'stu-003', firstName: 'Charlie', lastName: 'Chen', preferred: 'Charlie', pronouns: '', studentNumber: '1003', email: '', dateOfBirth: '', designations: [], enrolledDate: '', attendance: [], sortName: 'Chen Charlie' },
 ];
 
 export const TEST_ASSESSMENT = {

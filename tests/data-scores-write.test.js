@@ -64,8 +64,9 @@ describe('setPointsScore', () => {
     setPointsScore(CID, 'stu1', 'a1', 0);
 
     const scores = getScores(CID);
-    // No new entries created for score 0 (only creates if rawScore > 0)
-    expect(scores['stu1'] || []).toHaveLength(0);
+    // Score 0 creates entries (rawScore >= 0) so teachers can record zero scores
+    expect(scores['stu1']).toHaveLength(1);
+    expect(scores['stu1'][0].score).toBe(0);
   });
 
   it('uses assessment date and type for new entries', () => {
