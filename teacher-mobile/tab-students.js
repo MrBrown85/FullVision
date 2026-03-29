@@ -109,62 +109,7 @@ window.MStudents = (function() {
 
   /* ── Rich Student Card (for card stack) ───────────────────── */
   function _renderStudentCard(st, cid, data) {
-    var overall = getOverallProficiency(cid, st.id);
-    var rounded = Math.round(overall);
-    var color = MC.avatarColor(st.id);
-    var initials = MC.avatarInitials(st);
-    var name = displayName(st);
-
-    var badges = _renderBadges(st);
-
-    // Section mini-bars
-    var sections = data.sections;
-    var secBars = '';
-    sections.forEach(function(sec) {
-      var secProf = getSectionProficiency(cid, st.id, sec.id);
-      var pct = Math.min(100, Math.round(secProf / MAX_PROF * 100));
-      secBars += '<div class="m-scard-sec-row">' +
-        '<div class="m-scard-sec-dot" style="background:' + (sec.color || '#888') + '"></div>' +
-        '<div class="m-scard-sec-name">' + MC.esc(sec.shortName || sec.name) + '</div>' +
-        '<div class="m-scard-sec-bar"><div class="m-scard-sec-fill" style="width:' + pct + '%;background:' + MC.profBg(Math.round(secProf)) + '"></div></div>' +
-      '</div>';
-    });
-
-    // Latest observation
-    var obs = getStudentQuickObs(cid, st.id);
-    var obsSnippet = '';
-    if (obs.length) {
-      var latest = obs[0];
-      var text = (latest.text || '').substring(0, 80);
-      if (latest.text && latest.text.length > 80) text += '…';
-      obsSnippet = '<div class="m-scard-obs">' +
-        '<span style="color:var(--text-3);font-size:12px">' + MC.relativeTime(latest.created) + '</span> ' +
-        MC.esc(text) +
-      '</div>';
-    } else {
-      obsSnippet = '<div class="m-scard-obs-empty">No observations yet</div>';
-    }
-
-    return '<div class="m-scard">' +
-      '<div class="m-scard-hero">' +
-        '<div class="m-scard-avatar" style="background:' + color + '">' + initials + '</div>' +
-        '<div class="m-scard-info">' +
-          '<div class="m-scard-name">' + MC.esc(name) + '</div>' +
-          (st.pronouns ? '<div class="m-scard-sub">' + MC.esc(st.pronouns) + '</div>' : '') +
-          (badges ? '<div class="m-scard-badges">' + badges + '</div>' : '') +
-        '</div>' +
-        '<div class="m-scard-prof">' +
-          '<div class="m-scard-prof-val" style="color:' + MC.profBg(rounded) + '">' + (overall > 0 ? overall.toFixed(1) : '—') + '</div>' +
-          '<div class="m-scard-prof-label">' + (PROF_LABELS[rounded] || 'No Evidence') + '</div>' +
-        '</div>' +
-      '</div>' +
-      '<div class="m-scard-sections">' + secBars + '</div>' +
-      obsSnippet +
-      '<div class="m-scard-actions">' +
-        '<button class="m-scard-btn m-scard-btn-observe" data-action="m-obs-quick-menu" data-sid="' + st.id + '">Observe</button>' +
-        '<button class="m-scard-btn m-scard-btn-view" data-action="m-student-detail" data-sid="' + st.id + '">View Profile</button>' +
-      '</div>' +
-    '</div>';
+    return MCardWidgets.assembleCard(st, cid, data);
   }
 
   /* ── Init card stack after DOM render ─────────────────────── */
@@ -186,7 +131,14 @@ window.MStudents = (function() {
     if (!students.length) return;
 
     var sections = getSections(cid);
-    var data = { sections: sections };
+    var allStatuses = getAssignmentStatuses(cid);
+    var allAssessments = getAssessments(cid);
+    var data = {
+      sections: sections,
+      statuses: allStatuses,
+      assessments: allAssessments,
+      termId: 'term-1'
+    };
 
     _stackInstance = MCardStack.create(container, students, {
       renderCard: function(st) { return _renderStudentCard(st, cid, data); },

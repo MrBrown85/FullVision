@@ -715,3 +715,73 @@ describe('MCardWidgets.render flagStatus', () => {
     expect(html).toBe('');
   });
 });
+
+describe('Card Assembly', () => {
+  var cid = 'course-1';
+  var st = { id: 's1', firstName: 'Cece', lastName: 'Adams', pronouns: 'she/her', designations: [] };
+
+  beforeEach(() => {
+    localStorage.clear();
+    Object.keys(_cache).forEach(function(k) { delete _cache[k]; });
+    _cache.scores = {}; _cache.tags = {}; _cache.statuses = {};
+    _cache.quickObs = {}; _cache.termRatings = {};
+    _cache.learningMaps = {}; _cache.students = {}; _cache.assessments = {};
+    _cache.flags = {}; _cache.observations = {}; _cache.goals = {};
+    _cache.reflections = {}; _cache.overrides = {}; _cache.customTags = {};
+    _cache.notes = {}; _cache.reportConfig = {}; _cache.courseConfigs = {};
+    _cache.modules = {}; _cache.rubrics = {};
+  });
+
+  it('assembles default card with hero, sectionBars, obsSnippet, actions', () => {
+    var data = { sections: [{ id: 'sec1', name: 'Questioning', color: '#4A90D9' }] };
+    var html = MCardWidgets.assembleCard(st, cid, data);
+    expect(html).toContain('m-scard');
+    expect(html).toContain('m-scard-hero');
+    expect(html).toContain('m-scard-sections');
+    expect(html).toContain('m-scard-obs');
+    expect(html).toContain('m-scard-actions');
+    expect(html).toContain('m-scard-widgets');
+  });
+
+  it('shows hero fallback when hero is disabled', () => {
+    saveCardWidgetConfig({
+      order: ['sectionBars', 'obsSnippet', 'actions'],
+      disabled: ['hero', 'completion', 'missingWork', 'growth', 'obsSummary',
+                 'flagStatus', 'reflection', 'dispositions', 'traits', 'concerns',
+                 'workHabits', 'growthAreas', 'narrative']
+    });
+    var data = { sections: [] };
+    var html = MCardWidgets.assembleCard(st, cid, data);
+    expect(html).toContain('m-scard-hero-min');
+    expect(html).not.toContain('m-scard-prof');
+  });
+
+  it('renders completion and missingWork as 2-up when both enabled', () => {
+    saveCardWidgetConfig({
+      order: ['hero', 'completion', 'missingWork', 'actions'],
+      disabled: ['sectionBars', 'obsSnippet', 'growth', 'obsSummary',
+                 'flagStatus', 'reflection', 'dispositions', 'traits', 'concerns',
+                 'workHabits', 'growthAreas', 'narrative']
+    });
+    localStorage.setItem('gb-tags-course-1', JSON.stringify([{ id: 't1', name: 'Tag1' }]));
+    var data = {
+      sections: [],
+      assessments: [{ id: 'a1' }],
+      statuses: { 's1:a1': 'NS' }
+    };
+    var html = MCardWidgets.assembleCard(st, cid, data);
+    expect(html).toContain('m-wdg-2up');
+  });
+
+  it('skips disabled widgets', () => {
+    saveCardWidgetConfig({
+      order: ['hero', 'actions'],
+      disabled: ['sectionBars', 'obsSnippet', 'completion', 'missingWork', 'growth',
+                 'obsSummary', 'flagStatus', 'reflection', 'dispositions', 'traits',
+                 'concerns', 'workHabits', 'growthAreas', 'narrative']
+    });
+    var html = MCardWidgets.assembleCard(st, cid, { sections: [] });
+    expect(html).not.toContain('m-scard-sections');
+    expect(html).not.toContain('m-scard-obs');
+  });
+});

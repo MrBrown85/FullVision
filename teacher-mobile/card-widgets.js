@@ -385,9 +385,60 @@ window.MCardWidgets = (function() {
   /* ── flagStatus ──────────────────────────────────────────────── */
   _renderers.flagStatus = function() { return ''; };
 
+  /* ── assembleCard ────────────────────────────────────────────── */
+  function assembleCard(st, cid, data) {
+    var config = getCardWidgetConfig();
+    var order = config.order;
+
+    // Hero: pinned top (or fallback if disabled)
+    var heroIdx = order.indexOf('hero');
+    var heroHtml = heroIdx >= 0
+      ? render('hero', st, cid, data)
+      : renderFallbackHero(st);
+
+    // Actions: pinned bottom
+    var actionsIdx = order.indexOf('actions');
+    var actionsHtml = actionsIdx >= 0 ? render('actions', st, cid, data) : '';
+
+    // Middle widgets: everything except hero, actions, flagStatus
+    var skip = new Set(['hero', 'actions', 'flagStatus']);
+    var middleHtml = '';
+
+    // Check for completion+missingWork 2-up pairing
+    var hasCompletion = order.indexOf('completion') >= 0;
+    var hasMissing = order.indexOf('missingWork') >= 0;
+    var paired = hasCompletion && hasMissing;
+    var pairedRendered = false;
+
+    for (var i = 0; i < order.length; i++) {
+      var key = order[i];
+      if (skip.has(key)) continue;
+
+      if (paired && (key === 'completion' || key === 'missingWork')) {
+        if (pairedRendered) continue;
+        pairedRendered = true;
+        var compHtml = render('completion', st, cid, data);
+        var missHtml = render('missingWork', st, cid, data);
+        if (compHtml || missHtml) {
+          middleHtml += '<div class="m-wdg-2up">' + compHtml + missHtml + '</div>';
+        }
+        continue;
+      }
+
+      middleHtml += render(key, st, cid, data);
+    }
+
+    return '<div class="m-scard">' +
+      heroHtml +
+      '<div class="m-scard-widgets">' + middleHtml + '</div>' +
+      actionsHtml +
+    '</div>';
+  }
+
   /* ── Public API ──────────────────────────────────────────────── */
   return {
     render: render,
     renderFallbackHero: renderFallbackHero,
+    assembleCard: assembleCard,
   };
 })();
