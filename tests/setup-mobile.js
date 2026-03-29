@@ -87,6 +87,7 @@ function _mobileStubElement(id) {
 // Load mobile modules in dependency order
 load('teacher-mobile/components.js');
 load('teacher-mobile/card-stack.js');
+load('teacher-mobile/card-widgets.js');
 load('teacher-mobile/tab-students.js');
 load('teacher-mobile/tab-observe.js');
 load('teacher-mobile/tab-grade.js');
