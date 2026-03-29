@@ -194,21 +194,31 @@ function _initCrossTab() {
 /* Re-fetch a single field from Supabase after cross-tab change, then re-render */
 async function _handleCrossTabChange(cid, field) {
   if (!cid || !field) return;
-  var dataKey = _DATA_KEYS[field];
-  if (!dataKey) return;
 
-  // Re-fetch from Supabase if available
+  // Re-fetch from the appropriate normalized table
   if (_useSupabase) {
     try {
       var sb = getSupabase();
-      var result = await sb.from('course_data')
-        .select('data')
-        .eq('teacher_id', _teacherId)
-        .eq('course_id', cid)
-        .eq('data_key', dataKey)
-        .single();
-      if (!result.error && result.data) {
-        _cache[field][cid] = result.data.data;
+      var normTable = _NORMALIZED_TABLES[field];
+      if (normTable) {
+        var result = await sb.from(normTable).select('*')
+          .eq('teacher_id', _teacherId)
+          .eq('course_id', cid);
+        if (!result.error && result.data) {
+          if (_getConfigTableSet().has(normTable)) {
+            _cache[field][cid] = (result.data.length > 0) ? result.data[0].data : _defaultForField(field);
+          } else if (_BULK_LOAD_CONVERTERS[normTable]) {
+            _cache[field][cid] = _BULK_LOAD_CONVERTERS[normTable](result.data);
+          } else if (field === 'scores') {
+            _cache[field][cid] = _scoreRowsToBlob(result.data);
+          } else if (field === 'observations') {
+            _cache[field][cid] = _obsRowsToBlob(result.data);
+          } else if (field === 'assessments') {
+            _cache[field][cid] = _assessmentRowsToBlob(result.data);
+          } else if (field === 'students') {
+            _cache[field][cid] = _studentRowsToBlob(result.data).map(migrateStudent);
+          }
+        }
       }
     } catch (e) { /* fall through — cache stays as-is */ }
   }
@@ -267,7 +277,6 @@ function _getConfigTableSet() {
 }
 
 function _syncKey(table, key) {
-  if (table === 'course_data') return 'course_data:' + key.cid + ':' + key.dataKey;
   if (table === 'scores_row') return 'scores_row:' + key.cid + ':' + key.sid + ':' + key.aid + ':' + key.tid;
   if (table === 'obs_row') return 'obs_row:' + key.cid + ':' + key.obId;
   if (table === 'obs_delete') return 'obs_delete:' + key.cid + ':' + key.obId;
@@ -416,15 +425,6 @@ async function _doSync(table, key, data) {
         updated_at: new Date().toISOString()
       }, { onConflict: 'teacher_id,course_id' }).abortSignal(controller.signal);
       if (error) throw error;
-    } else if (table === 'course_data') {
-      const { error } = await sb.from('course_data').upsert({
-        teacher_id: _teacherId,
-        course_id: key.cid,
-        data_key: key.dataKey,
-        data: data,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'teacher_id,course_id,data_key' }).abortSignal(controller.signal);
-      if (error) throw error;
     } else if (table === 'teacher_config') {
       const { error } = await sb.from('teacher_config').upsert({
         teacher_id: _teacherId,
@@ -531,13 +531,10 @@ async function _deleteFromSupabase(table, key) {
   const sb = getSupabase();
   if (!sb || !_teacherId) return;
   try {
-    if (table === 'course_data') {
-      const { error } = await sb.from('course_data').delete()
-        .eq('teacher_id', _teacherId)
-        .eq('course_id', key.cid)
-        .eq('data_key', key.dataKey);
-      if (error) throw error;
-    }
+    const { error } = await sb.from(table).delete()
+      .eq('teacher_id', _teacherId)
+      .eq('course_id', key.cid);
+    if (error) throw error;
   } catch (err) {
     console.error('Failed to delete from Supabase:', err);
   }
@@ -629,16 +626,6 @@ async function initAllCourses() {
   _initVisibilityRefresh();
 }
 
-/* Reverse map: Supabase data_key → cache field name */
-var _REVERSE_DATA_KEYS = null;
-function _getReverseKeys() {
-  if (!_REVERSE_DATA_KEYS) {
-    _REVERSE_DATA_KEYS = {};
-    for (var field in _DATA_KEYS) { _REVERSE_DATA_KEYS[_DATA_KEYS[field]] = field; }
-  }
-  return _REVERSE_DATA_KEYS;
-}
-
 var _realtimeChannel = null;
 function _initRealtimeSync() {
   if (_realtimeChannel || !_useSupabase || !_teacherId) return;
@@ -647,27 +634,6 @@ function _initRealtimeSync() {
 
   try {
     _realtimeChannel = sb.channel('course-data-sync')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'course_data',
-        filter: 'teacher_id=eq.' + _teacherId
-      }, function(payload) {
-        var row = payload.new || payload.old;
-        if (!row) return;
-        var cid = row.course_id;
-        var dataKey = row.data_key;
-        var field = _getReverseKeys()[dataKey];
-        if (!field || !cid) return;
-
-        // Skip re-render if data hasn't changed (handles self-echo from own writes)
-        if (payload.new && payload.new.data !== undefined) {
-          if (!_hasDataChanged(payload.new.data, _cache[field][cid])) return;
-          _cache[field][cid] = payload.new.data;
-        }
-
-        _invalidateAndRerender();
-      })
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
@@ -911,36 +877,7 @@ async function _refreshFromSupabase() {
   if (!sb) return;
 
   try {
-    // Re-fetch course data — incremental when possible (only rows updated since last sync)
-    var query = sb.from('course_data')
-      .select('data_key, data')
-      .eq('teacher_id', _teacherId)
-      .eq('course_id', cid);
-    if (_lastSyncedAt) {
-      // 30s buffer for clock skew between devices
-      var since = new Date(_lastSyncedAt.getTime() - 30000).toISOString();
-      query = query.gt('updated_at', since);
-    }
-    var result = await query;
-
-    if (result.error) { console.warn('Visibility refresh failed:', result.error); return; }
-
     var changed = false;
-    var byKey = {};
-    (result.data || []).forEach(function(r) { byKey[r.data_key] = r.data; });
-
-    for (var field in _DATA_KEYS) {
-      if (_NORMALIZED_TABLES[field]) continue;
-      var dataKey = _DATA_KEYS[field];
-      if (byKey[dataKey] !== undefined) {
-        var newVal = byKey[dataKey];
-        var oldVal = _cache[field][cid];
-        if (_hasDataChanged(newVal, oldVal)) {
-          _cache[field][cid] = newVal;
-          changed = true;
-        }
-      }
-    }
 
     // Refresh all normalized tables in parallel
     var since = _lastSyncedAt ? new Date(_lastSyncedAt.getTime() - 30000).toISOString() : null;
@@ -1073,24 +1010,8 @@ async function initData(cid) {
 async function _doInitData(cid) {
   if (_useSupabase) {
     const sb = getSupabase();
-    const { data: rows, error } = await sb.from('course_data')
-      .select('data_key, data')
-      .eq('teacher_id', _teacherId)
-      .eq('course_id', cid);
 
-    if (error) {
-      console.error('Failed to load course_data for', cid, error);
-      // Fall through to localStorage
-    } else {
-      const byKey = {};
-      (rows || []).forEach(r => { byKey[r.data_key] = r.data; });
-
-      // Populate cache from course_data rows (only non-normalized fields)
-      for (const [field, dataKey] of Object.entries(_DATA_KEYS)) {
-        if (_NORMALIZED_TABLES[field]) continue;
-        _cache[field][cid] = byKey[dataKey] !== undefined ? byKey[dataKey] : _defaultForField(field);
-      }
-
+    try {
       // Load all normalized tables in parallel
       const _q = (tbl) => sb.from(tbl).select('*').eq('teacher_id', _teacherId).eq('course_id', cid);
       const [scoreRes, obsRes, assessRes, studentRes,
@@ -1142,19 +1063,15 @@ async function _doInitData(cid) {
         }
       }
 
-      // If Supabase had no data for this course, use empty defaults
-      // (seedIfNeeded will populate demo data if appropriate)
-      if (!rows || rows.length === 0) {
-        for (const [field] of Object.entries(_DATA_KEYS)) {
-          _cache[field][cid] = _defaultForField(field);
-        }
-      }
       // Fall back to built-in learning map if none stored
       const lm = _cache.learningMaps[cid];
       if (!lm || (!lm._customized && (!lm.sections || lm.sections.length === 0))) {
         _cache.learningMaps[cid] = LEARNING_MAP[cid] || { subjects: [], sections: [] };
       }
       return;
+    } catch (error) {
+      console.error('Failed to load data for', cid, error);
+      // Fall through to localStorage
     }
   }
 
@@ -1200,15 +1117,10 @@ function _loadCourseFromLS(cid) {
 }
 
 function _seedCourseToSupabase(cid) {
-  for (const [field, dataKey] of Object.entries(_DATA_KEYS)) {
+  for (const [field, normTable] of Object.entries(_NORMALIZED_TABLES)) {
     const val = _cache[field][cid];
     if (val === undefined || val === null) continue;
-    var normTable = _NORMALIZED_TABLES[field];
-    if (normTable) {
-      _syncToSupabase(normTable, { cid }, val);
-    } else {
-      _syncToSupabase('course_data', { cid, dataKey }, val);
-    }
+    _syncToSupabase(normTable, { cid }, val);
   }
 }
 
@@ -1283,7 +1195,7 @@ const _MEDIUM_FREQ_TABLES = {
   termRatings: 'term_ratings'
 };
 
-/* Config tables: single JSONB blob per course, same shape as course_data but with teacher_id PK */
+/* Config tables: single JSONB blob per course, teacher_id in PK */
 const _CONFIG_TABLES = {
   learningMaps: 'config_learning_maps',
   courseConfigs: 'config_course',
@@ -1293,7 +1205,7 @@ const _CONFIG_TABLES = {
   reportConfig: 'config_report'
 };
 
-/* Fields stored in their own normalized tables instead of course_data */
+/* Fields stored in their own normalized tables */
 const _NORMALIZED_TABLES = {
   scores: 'scores',
   observations: 'observations',
@@ -1318,15 +1230,10 @@ const _NORMALIZED_TABLES = {
 function _saveCourseField(field, cid, value) {
   _cache[field][cid] = value;
   if (_PROF_FIELDS.includes(field) && typeof clearProfCache === 'function') clearProfCache();
-  const dataKey = _DATA_KEYS[field];
   if (_useSupabase) {
-    var normTable = _NORMALIZED_TABLES[field];
-    if (normTable) {
-      _syncToSupabase(normTable, { cid }, value);
-    } else {
-      _syncToSupabase('course_data', { cid, dataKey }, value);
-    }
+    _syncToSupabase(_NORMALIZED_TABLES[field], { cid }, value);
   } else {
+    const dataKey = _DATA_KEYS[field];
     _safeLSSet('gb-' + dataKey + '-' + cid, JSON.stringify(value));
   }
   _broadcastChange(cid, field);
@@ -1938,14 +1845,17 @@ function deleteCourseData(id) {
     delete _cache[field][id];
   }
 
-  // Delete from Supabase
+  // Delete from all normalized Supabase tables
   if (_useSupabase) {
     const sb = getSupabase();
     if (sb) {
-      sb.from('course_data').delete()
-        .eq('teacher_id', _teacherId)
-        .eq('course_id', id)
-        .then(({ error }) => { if (error) console.error('Failed to delete course_data for', id, error); });
+      var tables = Object.values(_NORMALIZED_TABLES);
+      tables.forEach(function(tbl) {
+        sb.from(tbl).delete()
+          .eq('teacher_id', _teacherId)
+          .eq('course_id', id)
+          .then(({ error }) => { if (error) console.error('Failed to delete ' + tbl + ' for', id, error); });
+      });
     }
   }
 
@@ -2137,7 +2047,7 @@ function saveLearningMap(cid, map) {
 function resetLearningMap(cid) {
   _cache.learningMaps[cid] = LEARNING_MAP[cid] || { subjects: [], sections: [] }; // ref change auto-busts tag/section caches
   if (_useSupabase) {
-    _deleteFromSupabase('course_data', { cid, dataKey: 'learningmap' });
+    _deleteFromSupabase('config_learning_maps', { cid });
   } else {
     localStorage.removeItem('gb-learningmap-' + cid);
   }

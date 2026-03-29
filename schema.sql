@@ -31,9 +31,9 @@
 --      config_rubrics, config_custom_tags, config_report)
 --      Single JSONB blob per teacher+course. Upsert sync pattern.
 --
---   D) JSONB document store (course_data + teacher_config)
---      course_data is now empty — all data migrated to A/B/C.
---      teacher_config stores global config (courses, preferences).
+--   D) Global config (teacher_config)
+--      Stores the COURSES object and gb-config preferences.
+--      Not scoped to a course.
 -- ============================================================
 
 
@@ -322,22 +322,7 @@ CREATE POLICY "Teachers access own term_ratings"
   WITH CHECK (auth.uid() = teacher_id);
 
 
--- ──────────────────────────────────────────────────────────
--- course_data  [LEGACY — being phased out]
--- Generic key-value store scoped to teacher + course.
--- All data has been migrated to normalized/config tables.
--- Retained temporarily for Phase 6 cleanup.
---
--- onConflict: (teacher_id, course_id, data_key)
--- ──────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS course_data (
-  teacher_id UUID     NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  course_id  TEXT     NOT NULL,
-  data_key   TEXT     NOT NULL,
-  data       JSONB    NOT NULL DEFAULT '{}',
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  PRIMARY KEY (teacher_id, course_id, data_key)
-);
+-- (course_data table removed in Phase 6 — all data now in normalized tables above)
 
 
 -- ──────────────────────────────────────────────────────────
@@ -487,10 +472,9 @@ CREATE POLICY "Teachers access own config_report"
 -- ════════════════════════════════════════════════════════════
 -- SECTION 3: Indexes
 -- ════════════════════════════════════════════════════════════
--- Note: The app reads all data via the JSONB store (course_data
--- + teacher_config), which uses composite PKs as indexes.
--- Indexes on normalized tables are omitted until those tables
--- are actively queried. Unused indexes waste disk IO on writes.
+-- All tables use composite PKs as their primary indexes.
+-- Additional indexes are omitted until query patterns warrant them.
+-- Unused indexes waste disk IO on writes.
 
 
 -- ════════════════════════════════════════════════════════════
@@ -527,9 +511,7 @@ CREATE TRIGGER on_auth_user_created
 -- SECTION 5: Row-Level Security (RLS)
 -- ════════════════════════════════════════════════════════════
 -- Every table has RLS enabled. Teachers can only access their
--- own data. The course_data and teacher_config tables check
--- teacher_id = auth.uid() directly. Normalized tables that
--- lack a teacher_id column use a subquery on the courses table.
+-- own data. All tables check teacher_id = auth.uid() directly.
 
 
 -- ── profiles ──────────────────────────────────────────────
@@ -544,16 +526,7 @@ CREATE POLICY "Users can update own profile"
   USING (auth.uid() = id);
 
 
--- ── course_data (JSONB store) ─────────────────────────────
-ALTER TABLE course_data ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Teachers access own course_data"
-  ON course_data FOR ALL
-  USING (auth.uid() = teacher_id)
-  WITH CHECK (auth.uid() = teacher_id);
-
-
--- ── teacher_config (JSONB store) ──────────────────────────
+-- ── teacher_config ───────────────────────────────────────
 ALTER TABLE teacher_config ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Teachers access own teacher_config"
@@ -589,5 +562,5 @@ CREATE POLICY "Service role can read all errors"
 -- Next steps:
 --   1. Configure gb-supabase.js with your Project URL and anon key
 --   2. Sign up a user — the handle_new_user trigger creates their profile
---   3. The app will auto-seed course_data rows from localStorage on first login
+--   3. The app will auto-seed normalized tables from localStorage on first login
 -- ════════════════════════════════════════════════════════════
