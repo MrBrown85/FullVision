@@ -67,6 +67,49 @@ window.MComponents = (function() {
       container.querySelector('.m-sheet').classList.add('m-sheet-visible');
     });
     backdrop.onclick = dismissSheet;
+    _bindSheetSwipe(container.querySelector('.m-sheet'));
+  }
+
+  function _bindSheetSwipe(sheet) {
+    if (!sheet) return;
+    var startY = 0, dy = 0, dragging = false;
+    var DISMISS_THRESHOLD = 80;
+
+    sheet.addEventListener('touchstart', function(e) {
+      // Only allow swipe from handle area or when content is scrolled to top
+      var content = sheet.querySelector('.m-sheet-content');
+      var isHandle = e.target.closest('.m-sheet-handle');
+      if (!isHandle && content && content.scrollTop > 0) return;
+      startY = e.touches[0].clientY;
+      dy = 0;
+      dragging = false;
+    }, { passive: true });
+
+    sheet.addEventListener('touchmove', function(e) {
+      if (startY === 0) return;
+      dy = e.touches[0].clientY - startY;
+      if (!dragging && dy > 10) {
+        dragging = true;
+        sheet.style.transition = 'none';
+      }
+      if (dragging && dy > 0) {
+        sheet.style.transform = 'translateY(' + dy + 'px)';
+        e.preventDefault();
+      }
+    }, { passive: false });
+
+    sheet.addEventListener('touchend', function() {
+      if (!dragging) { startY = 0; return; }
+      sheet.style.transition = '';
+      if (dy > DISMISS_THRESHOLD) {
+        dismissSheet();
+      } else {
+        sheet.style.transform = 'translateY(0)';
+      }
+      startY = 0;
+      dy = 0;
+      dragging = false;
+    }, { passive: true });
   }
 
   function dismissSheet() {
