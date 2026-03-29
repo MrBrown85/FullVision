@@ -2702,6 +2702,8 @@ window.GB = {
   upsertTermRating,
   getReportConfig,
   saveReportConfig,
+  getCardWidgetConfig,
+  saveCardWidgetConfig,
 };
 
 /**
