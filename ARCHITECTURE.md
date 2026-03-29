@@ -1,58 +1,81 @@
 # FullVision Architecture
 
-A learning profile builder and communicator for BC teachers. Single-page application served from a single `app.html` entry point, using hash-based routing, IIFE page modules, and a local-first data layer that syncs to Supabase.
+A learning profile builder and communicator for BC teachers. Two entry points — desktop SPA (`teacher/app.html`) and mobile PWA (`teacher-mobile/index.html`) — sharing a common data layer that syncs to Supabase.
 
-## Application Structure
+## Directory Structure
 
 ```
-app.html                  Entry point - loads all CSS + JS, defines DOM mount points
-gb-constants.js           Shared constants (DEFAULT_COURSES, LEARNING_MAP, proficiency labels/colors)
-gb-supabase.js            Supabase client init + auth API (signIn, signOut, requireAuth)
-gb-data.js                Data access layer (cache-through pattern, localStorage + Supabase sync)
-gb-calc.js                Proficiency calculation engine (4 methods, section/tag/overall rollups)
-gb-ui.js                  Shared UI components (dock, sidebar, student header, modals, toasts)
-gb-seed-data.js           Demo data seeder for new accounts
-gb-router.js              Hash-based SPA router with page lifecycle
+shared/                   Shared modules (both desktop + mobile)
+  supabase.js             Supabase client init + auth API (signIn, signOut, requireAuth)
+  constants.js            Shared constants (DEFAULT_COURSES, LEARNING_MAP, proficiency labels/colors)
+  data.js                 Data access layer (cache-through pattern, localStorage + Supabase sync)
+  calc.js                 Proficiency calculation engine (4 methods, section/tag/overall rollups)
+  seed-data.js            Demo data seeder for new accounts (lazy-loaded)
 
-page-dashboard.js         Dashboard: student roster overview, class manager, curriculum wizard
-page-assignments.js       Assignment management and scoring
-page-student.js           Individual student detail view
-page-gradebook.js         Spreadsheet-style class gradebook
-page-observations.js      Quick observations / anecdotal notes
-page-reports.js           Report card generation
+teacher/                  Desktop SPA
+  app.html                Entry point — loads all CSS + JS, defines DOM mount points
+  ui.js                   Shared UI components (dock, sidebar, student header, modals, toasts)
+  router.js               Hash-based SPA router with page lifecycle
+  page-dashboard.js       Dashboard: student roster overview, class manager, curriculum wizard
+  page-assignments.js     Assignment management and scoring
+  page-student.js         Individual student detail view
+  page-gradebook.js       Spreadsheet-style class gradebook
+  page-observations.js    Quick observations / anecdotal notes
+  page-reports.js         Report card generation
+  dash-class-manager.js   Submodule: class/student CRUD, drag reordering, student merge
+  assign-collab.js        Submodule: collaborative pairs/groups
+  report-blocks.js        Submodule: report block renderers
+  report-questionnaire.js Submodule: term questionnaire UI
+  teams-import.js         Submodule: CSV/Excel roster import (uses SheetJS)
+  *.css                   Page-specific stylesheets
 
-dash-overview.js          Dashboard submodule: overview tab rendering
-dash-class-manager.js     Dashboard submodule: class/student CRUD
-dash-curriculum-wizard.js Dashboard submodule: BC curriculum import wizard
-assign-form.js            Assignments submodule: create/edit form
-assign-scoring.js         Assignments submodule: score entry UI
-assign-rubric-editor.js   Assignments submodule: rubric builder
-report-blocks.js          Reports submodule: report block components
-report-builder.js         Reports submodule: report layout builder
-report-narrative.js       Reports submodule: narrative generation
+teacher-mobile/           Mobile PWA
+  index.html              Entry point — standalone mobile shell
+  shell.js                Boot, auth, routing, pull-to-refresh, navigation stacks
+  components.js           Shared mobile UI components (sheets, toasts, swipe gestures)
+  tab-students.js         Students tab — roster list, student detail, section detail
+  tab-observe.js          Observe tab — observation feed, capture sheet
+  tab-grade.js            Grade tab — assignment list, score entry
+  card-stack.js           Card stack view — swipeable student cards
+  styles.css              Mobile styles (iOS-native patterns)
+
+vendor/                   Third-party libraries
+  supabase.min.js         Supabase SDK (with CDN fallback)
+  xlsx.mini.min.js        SheetJS for CSV/Excel parsing (with CDN fallback)
+
+netlify/                  Netlify configuration
+  edge-functions/
+    inject-env.js         Replaces __SUPABASE_URL__/__SUPABASE_KEY__ in HTML at edge
+
+scripts/
+  build.sh                Copies public files to dist/ for Netlify deploy
+
+login.html                Auth page (email/password, sign up, password reset)
+sw.js                     Service worker — precache + network-first strategy
 ```
 
-## Script Load Order
+## Script Load Order (Desktop)
 
-Defined in `app.html`. Order matters because modules attach to `window` and later scripts depend on earlier ones:
+Defined in `teacher/app.html`. Order matters because modules attach to `window` and later scripts depend on earlier ones:
 
-1. `curriculum_data.js` - BC curriculum dataset
-2. `vendor/supabase.min.js` - Supabase client SDK (with CDN fallback)
-3. `gb-supabase.js` - Auth layer (needs Supabase SDK)
-4. `gb-constants.js` - Constants (no dependencies)
-5. `gb-data.js` - Data layer (needs constants + Supabase)
-6. `gb-calc.js` - Calculation engine (needs data layer)
-7. `gb-ui.js` - Shared UI (needs data + calc)
-8. `gb-seed-data.js` - Demo seeder
-9. Submodules (`dash-*.js`, `assign-*.js`, `report-*.js`)
-10. Page modules (`page-*.js`) - must load after their submodules
-11. `gb-router.js` - Router (needs all page modules registered on `window`)
+1. `vendor/supabase.min.js` - Supabase client SDK (with CDN fallback)
+2. `shared/supabase.js` - Auth layer (needs Supabase SDK)
+3. `shared/constants.js` - Constants (no dependencies)
+4. `shared/data.js` - Data layer (needs constants + Supabase)
+5. `shared/calc.js` - Calculation engine (needs data layer)
+6. `teacher/ui.js` - Shared UI (needs data + calc)
+7. `vendor/xlsx.mini.min.js` + `teacher/teams-import.js` - Roster import
+8. Submodules: `report-blocks.js`, `report-questionnaire.js`, `dash-class-manager.js`, `assign-collab.js`
+9. Page modules: `page-dashboard.js`, `page-assignments.js`, `page-student.js`, `page-gradebook.js`, `page-observations.js`, `page-reports.js`
+10. `teacher/router.js` - Router (needs all page modules on `window`)
 
-The router auto-boots at the bottom of `gb-router.js` via `Router.boot()`.
+Note: `shared/seed-data.js` is lazy-loaded by `loadSeedIfNeeded()` — only fetched for new accounts. `curriculum_data.js` (994KB) is loaded via `<script>` in `app.html` but should be lazy-loaded.
+
+The router auto-boots at the bottom of `router.js` via `Router.boot()`.
 
 ## Page Routing System
 
-`gb-router.js` implements hash-based routing as an IIFE exposing `window.Router`.
+`teacher/router.js` implements hash-based routing as an IIFE exposing `window.Router`.
 
 **Route table:**
 ```
@@ -99,7 +122,7 @@ Each page module is an IIFE that returns `{ init(params), destroy() }`:
 
 ## Data Layer
 
-`gb-data.js` implements a **cache-through** pattern: synchronous in-memory reads, async background writes to Supabase with localStorage fallback.
+`shared/data.js` implements a **cache-through** pattern: synchronous in-memory reads, async background writes to Supabase with localStorage fallback.
 
 ### Architecture
 
@@ -117,7 +140,7 @@ _cache (in-memory object)
    |   3. Sync to Supabase (or localStorage if offline)
    |   4. Broadcast change to other tabs
    v
-Supabase (primary)  OR  localStorage (fallback)
+Supabase (17 normalized tables)  OR  localStorage (fallback)
 ```
 
 ### Initialization
@@ -129,15 +152,29 @@ Supabase (primary)  OR  localStorage (fallback)
 4. If localStorage has data but Supabase doesn't, seed Supabase in background
 
 `initData(cid)` loads a specific course:
-1. Fetch all `course_data` rows for (teacher_id, course_id) from Supabase
-2. Populate `_cache` fields from the returned rows
-3. If Supabase had no data, load from localStorage and seed Supabase
+1. Fetch all 17 normalized tables in parallel via `Promise.all`
+2. Convert per-row data back to in-memory blob format via converter functions
+3. Populate `_cache` fields from the returned rows
+4. If Supabase had no data, load from localStorage and seed Supabase
 
 ### Data Storage
 
-**Supabase tables:**
-- `teacher_config` - global data keyed by `(teacher_id, config_key)`. Keys: `'courses'`, `'config'`
-- `course_data` - per-course data keyed by `(teacher_id, course_id, data_key)`. Keys match `_DATA_KEYS`
+**Supabase tables (17 normalized + 2 global):**
+
+| Category | Tables |
+|----------|--------|
+| Global config | `teacher_config` (courses, settings) |
+| High-frequency (per-row) | `scores`, `observations`, `assessments`, `students` |
+| Medium-frequency (bulk sync) | `goals`, `reflections`, `overrides`, `statuses`, `notes`, `flags`, `term_ratings` |
+| Config (single JSONB per course) | `config_learning_maps`, `config_course`, `config_modules`, `config_rubrics`, `config_custom_tags`, `config_report` |
+| Diagnostics | `error_logs` |
+
+All tables include `teacher_id` in primary keys for co-teaching readiness. RLS policy: `auth.uid() = teacher_id` on every table. Realtime enabled on all course tables.
+
+**Sync patterns by table type:**
+- **High-frequency**: per-row upsert (scores use composite key: teacher_id + course_id + student_id + assessment_id + tag_id)
+- **Medium-frequency**: delete-all + bulk-insert per course
+- **Config**: single-row upsert per (teacher_id, course_id)
 
 **localStorage keys:** `gb-{dataKey}-{courseId}` (e.g., `gb-students-sci8`, `gb-scores-ss10`)
 
@@ -156,6 +193,7 @@ The `_saveCourseField` function is the central write path that handles cache upd
 - Writes are fire-and-forget: UI stays responsive, sync happens in background
 - Sync status indicator in the dock shows idle/syncing/error states
 - Failed syncs are queued in `_retryQueue` and retried after 10 seconds
+- Inflight deduplication via `_inflightSyncs` / `_pendingWrites` Maps
 - Cross-tab conflict detection via `BroadcastChannel` (fallback: `storage` event)
 
 ### Data Types (cache fields -> localStorage/Supabase keys)
@@ -182,7 +220,7 @@ The `_saveCourseField` function is the central write path that handles cache upd
 
 ## Authentication Flow
 
-`gb-supabase.js` wraps the Supabase Auth SDK as an IIFE.
+`shared/supabase.js` wraps the Supabase Auth SDK as an IIFE.
 
 **Key functions (all on `window`):**
 - `requireAuth()` - called at boot. Checks localStorage for a cached Supabase session token. If valid and not expired, allows the page to load immediately. Otherwise, calls `sb.auth.getSession()` and redirects to `login.html` if no session.
@@ -193,14 +231,16 @@ The `_saveCourseField` function is the central write path that handles cache upd
 **Idle timeout:** A separate IIFE sets a 30-minute inactivity timer. Resets on mouse/keyboard/touch/scroll events. Calls `signOut()` on expiry. Designed for shared classroom computers.
 
 **Session flow:**
-1. User loads `app.html` -> `Router.boot()` -> `requireAuth()`
+1. User loads `teacher/app.html` -> `Router.boot()` -> `requireAuth()`
 2. Fast path: parse `sb-*-auth-token` from localStorage, check `expires_at`
 3. Slow path: call `sb.auth.getSession()` if no cached token
 4. No session -> redirect to `login.html` (separate page, not part of SPA)
 
+**Mobile auth:** `shell.js` has its own auth check in `boot()`. On network error, the auth screen is shown (no silent bypass). After successful sign-in, `_bootApp()` initializes the data layer and renders tabs.
+
 ## Proficiency Calculation Engine
 
-`gb-calc.js` computes proficiency levels (0-4 scale) from score data.
+`shared/calc.js` computes proficiency levels (0-4 scale) from score data.
 
 ### Proficiency Scale
 
@@ -313,7 +353,7 @@ Keyed as `"studentId:assessmentId"` -> `'excused'` | `'notSubmitted'` | `null`
 
 ## Shared UI Components
 
-`gb-ui.js` provides reusable UI rendered into the DOM mount points:
+`teacher/ui.js` provides reusable UI rendered into the DOM mount points:
 
 - **renderDock()** - top navigation bar with page tabs, sync indicator, and user menu
 - **renderSidebar()** - student roster with search, course switcher, proficiency badges, and "Add Student" button
@@ -349,3 +389,10 @@ window.PageExample = (function() {
 ```
 
 Functions are exposed on `window` for cross-module access (e.g., `window.Calc`, `window.UI`, `window.Router`). Submodules (like `dash-class-manager.js`) add their functions directly to `window` or are called by their parent page module.
+
+## Hosting & Deployment
+
+- **Netlify** hosts the app with a build step (`scripts/build.sh`) that copies only public files to `dist/`
+- **Edge function** (`inject-env.js`) replaces `__SUPABASE_URL__` and `__SUPABASE_KEY__` placeholders in HTML responses with environment variables
+- **Service worker** (`sw.js`) precaches all app files and uses a network-first strategy with cache fallback
+- **CSP** set via `netlify.toml` headers — restricts scripts, connections, and framing

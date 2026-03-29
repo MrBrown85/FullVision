@@ -1,234 +1,398 @@
-# Architecture Guide
+# FullVision Architecture
 
-Technical reference for developers working on FullVision.
+A learning profile builder and communicator for BC teachers. Two entry points — desktop SPA (`teacher/app.html`) and mobile PWA (`teacher-mobile/index.html`) — sharing a common data layer that syncs to Supabase.
 
-## Overview
+## Directory Structure
 
-FullVision is a single-page application (SPA) built with vanilla JavaScript. There is no framework, no build step, and no module bundler. Scripts are loaded via `<script>` tags in `app.html` in dependency order, and each module attaches itself to `window`.
+```
+shared/                   Shared modules (both desktop + mobile)
+  supabase.js             Supabase client init + auth API (signIn, signOut, requireAuth)
+  constants.js            Shared constants (DEFAULT_COURSES, LEARNING_MAP, proficiency labels/colors)
+  data.js                 Data access layer (cache-through pattern, localStorage + Supabase sync)
+  calc.js                 Proficiency calculation engine (4 methods, section/tag/overall rollups)
+  seed-data.js            Demo data seeder for new accounts (lazy-loaded)
 
-The app uses a **cache-through data pattern**: all reads are synchronous from an in-memory cache, and all writes update the cache immediately then sync to Supabase in the background.
+teacher/                  Desktop SPA
+  app.html                Entry point — loads all CSS + JS, defines DOM mount points
+  ui.js                   Shared UI components (dock, sidebar, student header, modals, toasts)
+  router.js               Hash-based SPA router with page lifecycle
+  page-dashboard.js       Dashboard: student roster overview, class manager, curriculum wizard
+  page-assignments.js     Assignment management and scoring
+  page-student.js         Individual student detail view
+  page-gradebook.js       Spreadsheet-style class gradebook
+  page-observations.js    Quick observations / anecdotal notes
+  page-reports.js         Report card generation
+  dash-class-manager.js   Submodule: class/student CRUD, drag reordering, student merge
+  assign-collab.js        Submodule: collaborative pairs/groups
+  report-blocks.js        Submodule: report block renderers
+  report-questionnaire.js Submodule: term questionnaire UI
+  teams-import.js         Submodule: CSV/Excel roster import (uses SheetJS)
+  *.css                   Page-specific stylesheets
 
-## Entry Point
+teacher-mobile/           Mobile PWA
+  index.html              Entry point — standalone mobile shell
+  shell.js                Boot, auth, routing, pull-to-refresh, navigation stacks
+  components.js           Shared mobile UI components (sheets, toasts, swipe gestures)
+  tab-students.js         Students tab — roster list, student detail, section detail
+  tab-observe.js          Observe tab — observation feed, capture sheet
+  tab-grade.js            Grade tab — assignment list, score entry
+  card-stack.js           Card stack view — swipeable student cards
+  styles.css              Mobile styles (iOS-native patterns)
 
-`app.html` is the SPA shell. It loads:
-1. Global styles (8 CSS files)
-2. Vendor scripts (`supabase.min.js`)
-3. Core modules in order: `gb-supabase.js` → `gb-constants.js` → `gb-data.js` → `gb-calc.js` → `gb-ui.js`
-4. Component modules (dash-*, assign-*, report-*)
-5. Page modules (page-*.js)
-6. Router (`gb-router.js`) — boots the app
+vendor/                   Third-party libraries
+  supabase.min.js         Supabase SDK (with CDN fallback)
+  xlsx.mini.min.js        SheetJS for CSV/Excel parsing (with CDN fallback)
 
-`login.html` is a separate page for authentication. It redirects to `app.html` on successful login.
+netlify/                  Netlify configuration
+  edge-functions/
+    inject-env.js         Replaces __SUPABASE_URL__/__SUPABASE_KEY__ in HTML at edge
 
-## Routing
+scripts/
+  build.sh                Copies public files to dist/ for Netlify deploy
 
-**File:** `gb-router.js`
-
-Hash-based SPA router. Routes map to page modules:
-
-| Hash | Module | Page |
-|------|--------|------|
-| `#/dashboard` | `PageDashboard` | Teacher dashboard with class overview |
-| `#/assignments` | `PageAssignments` | Assignment list and scoring |
-| `#/student` | `PageStudent` | Individual student detail view |
-| `#/gradebook` | `PageGradebook` | Spreadsheet-style grade entry |
-| `#/observations` | `PageObservations` | Quick observation notes |
-| `#/reports` | `PageReports` | Report builder and generation |
-
-### Page Lifecycle
-
-Each page module is an IIFE that returns an object with:
-- `init(params)` — Called when navigating to the page. Receives parsed hash params.
-- `destroy()` — Called when leaving the page. Cleans up event listeners and DOM.
-
-The router clears three DOM mount points on every navigation:
-- `#main` — Page content
-- `#page-toolbar-mount` — Page-specific toolbar
-- `#sidebar-mount` — Page-specific sidebar
-
-### Navigation
-
-```javascript
-Router.navigate('/student?id=st1&course=sci8');
+login.html                Auth page (email/password, sign up, password reset)
+sw.js                     Service worker — precache + network-first strategy
 ```
 
-Backward-compatible with old HTML filenames (e.g., `settings.html` → `#/assignments`).
+## Script Load Order (Desktop)
+
+Defined in `teacher/app.html`. Order matters because modules attach to `window` and later scripts depend on earlier ones:
+
+1. `vendor/supabase.min.js` - Supabase client SDK (with CDN fallback)
+2. `shared/supabase.js` - Auth layer (needs Supabase SDK)
+3. `shared/constants.js` - Constants (no dependencies)
+4. `shared/data.js` - Data layer (needs constants + Supabase)
+5. `shared/calc.js` - Calculation engine (needs data layer)
+6. `teacher/ui.js` - Shared UI (needs data + calc)
+7. `vendor/xlsx.mini.min.js` + `teacher/teams-import.js` - Roster import
+8. Submodules: `report-blocks.js`, `report-questionnaire.js`, `dash-class-manager.js`, `assign-collab.js`
+9. Page modules: `page-dashboard.js`, `page-assignments.js`, `page-student.js`, `page-gradebook.js`, `page-observations.js`, `page-reports.js`
+10. `teacher/router.js` - Router (needs all page modules on `window`)
+
+Note: `shared/seed-data.js` is lazy-loaded by `loadSeedIfNeeded()` — only fetched for new accounts. `curriculum_data.js` (994KB) is loaded via `<script>` in `app.html` but should be lazy-loaded.
+
+The router auto-boots at the bottom of `router.js` via `Router.boot()`.
+
+## Page Routing System
+
+`teacher/router.js` implements hash-based routing as an IIFE exposing `window.Router`.
+
+**Route table:**
+```
+#/dashboard    -> window.PageDashboard
+#/assignments  -> window.PageAssignments
+#/student      -> window.PageStudent
+#/gradebook    -> window.PageGradebook
+#/observations -> window.PageObservations
+#/reports      -> window.PageReports
+```
+
+**Hash format:** `#/student?id=st1&course=sci8` - path + query params parsed by `_parseHash()`.
+
+**Page lifecycle:**
+
+Each page module is an IIFE that returns `{ init(params), destroy() }`:
+
+- `init(params)` - receives parsed query params, renders into DOM mount points
+- `destroy()` - cleans up event listeners, timers, and DOM state
+
+**Route change flow (`_onRoute`):**
+1. Parse hash into path + params
+2. Call `_currentPage.destroy()` if a previous page exists
+3. Clear DOM mounts: `#main`, `#page-toolbar-mount`, `#sidebar-mount`
+4. Re-render the navigation dock via `_renderDock()`
+5. Call `module.init(params)` on the new page
+
+**DOM mount points** (defined in `app.html`):
+- `#dock-mount` - top navigation bar
+- `#sidebar-mount` - student roster sidebar
+- `#page-toolbar-mount` - page-specific toolbar
+- `#main` - primary content area
+
+**Navigation:** `Router.navigate(hash, replace)` sets `location.hash` which triggers `hashchange` -> `_onRoute`. Pass `replace=true` to use `replaceState` instead of pushing history.
+
+**Boot sequence** (`Router.boot()`, runs once):
+1. `requireAuth()` - redirect to login if no session
+2. `seedIfNeeded()` - create demo data for new accounts
+3. `initAllCourses()` - load global course list from Supabase/localStorage
+4. `initData(cid)` - load active course data into cache
+5. `migrateAllStudents()` - apply schema migrations
+6. Attach `hashchange` listener and intercept dock link clicks
+7. Trigger initial route
 
 ## Data Layer
 
-**File:** `gb-data.js`
+`shared/data.js` implements a **cache-through** pattern: synchronous in-memory reads, async background writes to Supabase with localStorage fallback.
 
-### Cache-Through Pattern
-
-```
-┌──────────────┐     sync read      ┌──────────────┐
-│   get*()     │ ←────────────────── │   _cache     │
-│  (instant)   │                     │  (in-memory) │
-└──────────────┘                     └──────┬───────┘
-                                            │
-┌──────────────┐     save*()         ┌──────┴───────┐
-│  UI update   │ ──────────────────→ │  _cache +    │
-│  (immediate) │                     │  Supabase    │
-└──────────────┘                     │  (async bg)  │
-                                     └──────────────┘
-```
-
-1. `initData(courseId)` fetches all data from Supabase into `_cache`
-2. `get*()` functions read synchronously from `_cache` — no async, no loading states
-3. `save*()` functions update `_cache` immediately, then fire a background Supabase write
-4. If Supabase is unavailable, falls back to localStorage
-
-### Data Keys
-
-Each data type maps to a localStorage key and a Supabase table:
-
-| Cache Field | localStorage Key | Supabase Table |
-|-------------|-----------------|----------------|
-| students | `gb-{cid}-students` | `students` |
-| assessments | `gb-{cid}-assessments` | `assessments` |
-| scores | `gb-{cid}-scores` | `scores` |
-| learningMaps | `gb-{cid}-learningmap` | `learning_maps` |
-| courseConfigs | `gb-{cid}-courseconfig` | `course_config` |
-| modules | `gb-{cid}-modules` | `modules` |
-| observations | `gb-{cid}-quick-obs` | `observations` |
-| termRatings | `gb-{cid}-term-ratings` | `term_ratings` |
-| reportConfig | `gb-{cid}-report-config` | `report_config` |
-
-### Sync and Conflict Resolution
-
-- Writes are debounced (500ms) to batch rapid changes
-- BroadcastChannel detects multi-tab conflicts
-- On conflict, a toast warns the user and offers to reload
-- Sync failures show a toast with retry option
-
-### Course Switching
-
-`initData(courseId)` can be called with a different course ID at any time. It:
-1. Clears the proficiency cache (`clearProfCache()`)
-2. Fetches all data for the new course
-3. Page modules re-render with the new data
-
-## Calculation Engine
-
-**File:** `gb-calc.js`
-
-Pure functions for proficiency calculation. No DOM access, no side effects (except memoization caches).
-
-### Core Flow
+### Architecture
 
 ```
-scores[] → filter by tag → split summative/formative → _calcGroup() → weighted merge → proficiency (0-4)
+Page Code
+   |
+   | get*() - synchronous read from _cache
+   | save*() - write to _cache + trigger sync
+   v
+_cache (in-memory object)
+   |
+   | _saveCourseField() - central write path
+   |   1. Update _cache[field][cid]
+   |   2. Clear proficiency cache if field affects calculations
+   |   3. Sync to Supabase (or localStorage if offline)
+   |   4. Broadcast change to other tabs
+   v
+Supabase (17 normalized tables)  OR  localStorage (fallback)
 ```
+
+### Initialization
+
+`initAllCourses()` runs first:
+1. Check for valid Supabase session -> set `_useSupabase` flag
+2. Fetch `teacher_config` rows (courses list + global config)
+3. Fall back to localStorage if Supabase unavailable
+4. If localStorage has data but Supabase doesn't, seed Supabase in background
+
+`initData(cid)` loads a specific course:
+1. Fetch all 17 normalized tables in parallel via `Promise.all`
+2. Convert per-row data back to in-memory blob format via converter functions
+3. Populate `_cache` fields from the returned rows
+4. If Supabase had no data, load from localStorage and seed Supabase
+
+### Data Storage
+
+**Supabase tables (17 normalized + 2 global):**
+
+| Category | Tables |
+|----------|--------|
+| Global config | `teacher_config` (courses, settings) |
+| High-frequency (per-row) | `scores`, `observations`, `assessments`, `students` |
+| Medium-frequency (bulk sync) | `goals`, `reflections`, `overrides`, `statuses`, `notes`, `flags`, `term_ratings` |
+| Config (single JSONB per course) | `config_learning_maps`, `config_course`, `config_modules`, `config_rubrics`, `config_custom_tags`, `config_report` |
+| Diagnostics | `error_logs` |
+
+All tables include `teacher_id` in primary keys for co-teaching readiness. RLS policy: `auth.uid() = teacher_id` on every table. Realtime enabled on all course tables.
+
+**Sync patterns by table type:**
+- **High-frequency**: per-row upsert (scores use composite key: teacher_id + course_id + student_id + assessment_id + tag_id)
+- **Medium-frequency**: delete-all + bulk-insert per course
+- **Config**: single-row upsert per (teacher_id, course_id)
+
+**localStorage keys:** `gb-{dataKey}-{courseId}` (e.g., `gb-students-sci8`, `gb-scores-ss10`)
+
+### Getter/Setter Pattern
+
+Every data type follows the same pattern:
+```js
+function getStudents(cid)       { return _cache.students[cid] || []; }
+function saveStudents(cid, arr) { _saveCourseField('students', cid, arr); }
+```
+
+The `_saveCourseField` function is the central write path that handles cache update, proficiency cache invalidation, Supabase sync, and cross-tab broadcasting.
+
+### Sync Behavior
+
+- Writes are fire-and-forget: UI stays responsive, sync happens in background
+- Sync status indicator in the dock shows idle/syncing/error states
+- Failed syncs are queued in `_retryQueue` and retried after 10 seconds
+- Inflight deduplication via `_inflightSyncs` / `_pendingWrites` Maps
+- Cross-tab conflict detection via `BroadcastChannel` (fallback: `storage` event)
+
+### Data Types (cache fields -> localStorage/Supabase keys)
+
+| Cache Field    | Data Key       | Type              | Description                           |
+|----------------|----------------|-------------------|---------------------------------------|
+| students       | students       | Array             | Student roster                        |
+| assessments    | assessments    | Array             | Assignment definitions                |
+| scores         | scores         | Object {sid: []}  | Score entries keyed by student ID     |
+| learningMaps   | learningmap    | Object            | Sections and tags (curriculum map)    |
+| courseConfigs   | courseconfig   | Object            | Per-course settings (calc method, etc)|
+| modules        | modules        | Array             | Teaching modules/units                |
+| rubrics        | rubrics        | Array             | Rubric definitions                    |
+| flags          | flags          | Object {sid: bool}| Flagged students                      |
+| goals          | goals          | Object {sid: ...} | Student goals                         |
+| reflections    | reflections    | Object {sid: ...} | Student reflections                   |
+| overrides      | overrides      | Object            | Teacher proficiency overrides         |
+| statuses       | statuses       | Object            | Assignment statuses (excused, NS)     |
+| observations   | quick-obs      | Object {sid: []}  | Quick observations                    |
+| termRatings    | term-ratings   | Object            | Core competency term ratings          |
+| customTags     | custom-tags    | Array             | Custom learning tags                  |
+| notes          | notes          | Object {sid: ...} | Student notes                         |
+| reportConfig   | report-config  | Object            | Report card configuration             |
+
+## Authentication Flow
+
+`shared/supabase.js` wraps the Supabase Auth SDK as an IIFE.
+
+**Key functions (all on `window`):**
+- `requireAuth()` - called at boot. Checks localStorage for a cached Supabase session token. If valid and not expired, allows the page to load immediately. Otherwise, calls `sb.auth.getSession()` and redirects to `login.html` if no session.
+- `signOut()` - signs out via Supabase, clears all `gb-*` localStorage keys (FOIPPA compliance for shared computers), redirects to `login.html`.
+- `getCurrentUser()` / `isLoggedIn()` - async session checks
+- `onAuthChange(callback)` - listens for auth state changes; shows "Session expired" toast on `SIGNED_OUT`
+
+**Idle timeout:** A separate IIFE sets a 30-minute inactivity timer. Resets on mouse/keyboard/touch/scroll events. Calls `signOut()` on expiry. Designed for shared classroom computers.
+
+**Session flow:**
+1. User loads `teacher/app.html` -> `Router.boot()` -> `requireAuth()`
+2. Fast path: parse `sb-*-auth-token` from localStorage, check `expires_at`
+3. Slow path: call `sb.auth.getSession()` if no cached token
+4. No session -> redirect to `login.html` (separate page, not part of SPA)
+
+**Mobile auth:** `shell.js` has its own auth check in `boot()`. On network error, the auth screen is shown (no silent bypass). After successful sign-in, `_bootApp()` initializes the data layer and renders tabs.
+
+## Proficiency Calculation Engine
+
+`shared/calc.js` computes proficiency levels (0-4 scale) from score data.
+
+### Proficiency Scale
+
+| Level | Label       |
+|-------|-------------|
+| 0     | No Evidence |
+| 1     | Emerging    |
+| 2     | Developing  |
+| 3     | Proficient  |
+| 4     | Extending   |
 
 ### Calculation Methods
 
-| Method | Logic |
-|--------|-------|
-| `mostRecent` | Last non-zero score by date |
-| `highest` | Maximum score |
-| `mode` | Most frequent score (ties broken by recency) |
-| `decayingAvg` | Weighted running average where newer scores have more influence |
+Configured per-course in `courseConfig.calcMethod`:
 
-### Function Hierarchy
+- **mostRecent** - uses the last score by date
+- **highest** - uses the maximum score
+- **mode** - most frequent score (ties broken by most recent among tied values); assessment weights affect frequency count
+- **decayingAvg** - exponentially weighted average where newer scores have more influence. Controlled by `decayWeight` (default 0.65). Formula: `avg = avg * (1 - dw) + score * dw`
+
+### Calculation Hierarchy
 
 ```
-getOverallProficiency(cid, studentId)
-  └→ getSectionProficiency(cid, studentId, sectionId)  [checks overrides]
-       └→ getTagProficiency(cid, studentId, tagId)       [per-tag calc]
-            └→ calcProficiency(scores, method, decay, opts)
-                 └→ _calcGroup(scores, method, decay, weights)
+Score entries (per student, per tag, per assessment)
+  |
+  v
+getTagScores(cid, sid, tagId)
+  - Filters by tag, excludes "excused" statuses
+  - Converts points-mode scores to proficiency via grading scale boundaries
+  |
+  v
+getTagProficiency(cid, sid, tagId)
+  - Splits scores into summative/formative categories
+  - Applies category weights (summative vs formative)
+  - Runs _calcGroup() with the course's chosen method
+  |
+  v
+getSectionProficiency(cid, sid, sectionId)
+  - Averages tag proficiencies within a section
+  - Applies teacher override if one exists
+  |
+  v
+getOverallProficiency(cid, sid)
+  - Averages all section proficiencies
 ```
 
-### Memoization
+### Supporting Features
 
-Three caches speed up repeated calculations:
-- `_tagScoresCache` — Filtered/converted scores per student-tag
-- `_tagProfCache` — Calculated proficiency per student-tag
-- `_awCache` — Assessment weight maps per course
+- **Teacher overrides:** `setSectionOverride()` stores a manual proficiency level with a reason and the calculated value at time of override
+- **Points-to-proficiency conversion:** `pointsToProf()` converts raw point scores using configurable percentage boundaries
+- **Category weights:** summative/formative weighting via `getCategoryWeights()`
+- **Assessment weights:** individual assessments can be weighted (default 1)
+- **Memoization:** Three caches (`_tagScoresCache`, `_tagProfCache`, `_awCache`) cleared by `clearProfCache()` whenever scores, assessments, overrides, statuses, or configs change (triggered automatically by `_saveCourseField`)
+- **Growth sparklines:** `getSectionGrowthData()` builds chronological proficiency snapshots for charting
+- **Focus areas:** `getFocusAreas()` identifies tags with no evidence or lowest proficiency
+- **Letter grades:** `calcLetterGrade()` converts average proficiency to letter grade + percentage
 
-All cleared by `clearProfCache()` when scores, assessments, or overrides change.
+## Key Data Structures
 
-### Points-to-Proficiency Conversion
+### Course
+```js
+{ id: 'sci8', name: 'Science 8', gradingSystem: 'proficiency',
+  calcMethod: 'mostRecent', decayWeight: 0.65, curriculumTags: ['SCI8'] }
+```
 
-Assessments scored in points mode are converted using percentage boundaries:
+### Student
+```js
+{ id: 'sXXX', firstName: '', lastName: '', preferred: '',
+  pronouns: '', studentNumber: '', dateOfBirth: '', email: '',
+  designations: ['D','G'],  // BC designation codes
+  attendance: [{ date: '2025-01-15', status: 'present' }] }
+```
 
-| Percentage | Proficiency |
-|-----------|-------------|
-| ≥ 86% | 4 (Extending) |
-| ≥ 73% | 3 (Proficient) |
-| ≥ 60% | 2 (Developing) |
-| ≥ 0% | 1 (Emerging) |
+### Assessment
+```js
+{ id: 'aXXX', title: '', date: '2025-01-15', type: 'summative',
+  tags: ['QAP','PI'],  // linked learning tags
+  weight: 1, scoreMode: 'proficiency',  // or 'points'
+  maxPoints: 10,  // if points mode
+  excludedStudents: [], pairs: [], groups: [] }
+```
 
-Boundaries are configurable per course via `grading_scales`.
+### Score Entry
+```js
+{ score: 3, date: '2025-01-15', type: 'summative',
+  tagId: 'QAP', assessmentId: 'aXXX', rawPoints: 8 }
+```
+Scores are stored as `{ [studentId]: Score[] }`.
 
-## Authentication
+### Learning Map
+```js
+{ subjects: [{ id: 'SCI8', name: 'Science 8', color: '#0891b2' }],
+  sections: [{
+    id: 'SCI8_questioning', subject: 'SCI8', name: 'Questioning and Predicting',
+    shortName: 'Questioning', color: '#0891b2',
+    tags: [{ id: 'QAP', label: 'Question and Predict', text: '',
+             i_can_statements: ['I can...'] }]
+  }],
+  _customized: true, _version: 1 }
+```
 
-**File:** `gb-supabase.js`
+### Assignment Status
+Keyed as `"studentId:assessmentId"` -> `'excused'` | `'notSubmitted'` | `null`
 
-- Supabase email/password auth
-- `requireAuth()` checks for a valid session token in localStorage (fast path) before hitting the Supabase API (slow path)
-- 30-minute idle timeout auto-signs out (FOIPPA requirement for shared computers)
-- Sign-out clears all `gb-*` localStorage keys
+### Module
+```js
+{ id: 'mXXX', title: '', startDate: '', endDate: '',
+  assessmentIds: [] }
+```
 
-## Security
+## Shared UI Components
 
-### Row-Level Security (RLS)
+`teacher/ui.js` provides reusable UI rendered into the DOM mount points:
 
-Every table has RLS enabled. Policies ensure:
-- Teachers can only SELECT/INSERT/UPDATE/DELETE rows where `teacher_id = auth.uid()` (for `courses`)
-- Child tables (students, assessments, scores, etc.) check that `course_id` belongs to the authenticated teacher via a subquery
+- **renderDock()** - top navigation bar with page tabs, sync indicator, and user menu
+- **renderSidebar()** - student roster with search, course switcher, proficiency badges, and "Add Student" button
+- **renderStudentHeader()** - student detail header with avatar, overall proficiency, stats (assessed/tags/observations/attendance), metadata chips, and designation badges
+- **Toasts** - `showSyncToast()` for sync status, `showUndoToast()` for reversible actions
+- **showConfirm()** - modal confirmation dialog with focus trap and keyboard support
+- **Delegated click handler** - global `[data-action]` delegation for sidebar clicks, user menu, sign out, undo, etc.
+- **Error monitoring** - global `error` and `unhandledrejection` handlers that log to Supabase `error_logs` table
 
-### XSS Prevention
+## Module Pattern
 
-All user-generated content is escaped via `esc()` (in `gb-ui.js`) before DOM insertion. This includes student names, assessment titles, observation text, and any other user input.
+All page modules and the router use the IIFE (Immediately Invoked Function Expression) pattern:
 
-## CSS Architecture
+```js
+window.PageExample = (function() {
+  'use strict';
+  // Private state
+  var activeCourse;
+  var _listeners = [];
 
-### Design System
+  function init(params) {
+    // Mount UI, attach listeners
+  }
 
-CSS custom properties define the design system in `gb-styles.css`:
+  function destroy() {
+    // Remove listeners, clear timers
+    _listeners.forEach(l => document.removeEventListener(l.type, l.handler));
+    _listeners = [];
+  }
 
-- `--text-1`, `--text-2`, `--text-3` — Text hierarchy
-- `--surface-0` through `--surface-3` — Background layers
-- `--active`, `--active-bg` — Interactive element colors
-- `--score-1` through `--score-4` — Proficiency level colors
-- `--radius-s`, `--radius-m`, `--radius-l` — Border radii
+  return { init, destroy };
+})();
+```
 
-### Dark Mode
+Functions are exposed on `window` for cross-module access (e.g., `window.Calc`, `window.UI`, `window.Router`). Submodules (like `dash-class-manager.js`) add their functions directly to `window` or are called by their parent page module.
 
-`@media (prefers-color-scheme: dark)` overrides all custom properties. No JavaScript toggle — follows system preference.
+## Hosting & Deployment
 
-### Page-Specific Styles
-
-Each page has its own CSS file (`dashboard.css`, `assignments.css`, etc.) loaded in `app.html`. All files are loaded upfront since the SPA never reloads.
-
-## Key Globals
-
-| Global | Source | Purpose |
-|--------|--------|---------|
-| `COURSES` | `gb-data.js` | Active courses object |
-| `Router` | `gb-router.js` | SPA router |
-| `Calc` | `gb-calc.js` | Calculation engine namespace |
-| `getSupabase()` | `gb-supabase.js` | Supabase client accessor |
-| `getStudents(cid)` | `gb-data.js` | Get students for a course |
-| `getAssessments(cid)` | `gb-data.js` | Get assessments for a course |
-| `getScores(cid)` | `gb-data.js` | Get all scores for a course |
-| `saveScores(cid, data)` | `gb-data.js` | Save scores (cache + Supabase) |
-| `showSyncToast(msg, type)` | `gb-ui.js` | Show sync status notification |
-
-## Adding a New Page
-
-1. Create `page-newpage.js` as an IIFE returning `{ init, destroy }`
-2. Add a route in `gb-router.js`: `'/newpage': window.PageNewPage`
-3. Add the script tag in `app.html` before `gb-router.js`
-4. Add a dock icon in the `renderDock()` function in `app.html`
-5. Create `newpage.css` if needed and add the `<link>` in `app.html`
-
-## Adding a New Data Type
-
-1. Add the table to `supabase_schema.sql` with appropriate foreign keys
-2. Add RLS policies in `supabase_rls.sql`
-3. Add a cache field in `_cache` object in `gb-data.js`
-4. Add the key mapping in `_DATA_KEYS`
-5. Create `get*()` and `save*()` functions following existing patterns
-6. Add to the `initData()` fetch list
+- **Netlify** hosts the app with a build step (`scripts/build.sh`) that copies only public files to `dist/`
+- **Edge function** (`inject-env.js`) replaces `__SUPABASE_URL__` and `__SUPABASE_KEY__` placeholders in HTML responses with environment variables
+- **Service worker** (`sw.js`) precaches all app files and uses a network-first strategy with cache fallback
+- **CSP** set via `netlify.toml` headers — restricts scripts, connections, and framing
