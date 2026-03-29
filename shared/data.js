@@ -878,6 +878,8 @@ async function _refreshFromSupabase() {
 
   try {
     var changed = false;
+    var profChanged = false;
+    var tagsChanged = false;
 
     // Refresh all normalized tables in parallel
     var since = _lastSyncedAt ? new Date(_lastSyncedAt.getTime() - 30000).toISOString() : null;
@@ -917,6 +919,7 @@ async function _refreshFromSupabase() {
       });
       _cache.scores[cid] = blob;
       changed = true;
+      profChanged = true;
     }
 
     if (!obsResult.error && obsResult.data && obsResult.data.length > 0) {
@@ -945,6 +948,7 @@ async function _refreshFromSupabase() {
       });
       _cache.assessments[cid] = currentAssess;
       changed = true;
+      profChanged = true;
     }
 
     if (!studResult.error && studResult.data && studResult.data.length > 0) {
@@ -968,6 +972,7 @@ async function _refreshFromSupabase() {
         if (_hasDataChanged(newBlob, _cache[_mrf][cid])) {
           _cache[_mrf][cid] = newBlob;
           changed = true;
+          if (_PROF_FIELDS.includes(_mrf)) profChanged = true;
         }
       }
     }
@@ -981,12 +986,24 @@ async function _refreshFromSupabase() {
         if (_hasDataChanged(newCfg, _cache[_crf][cid])) {
           _cache[_crf][cid] = newCfg;
           changed = true;
+          if (_PROF_FIELDS.includes(_crf)) profChanged = true;
+          if (_crf === 'learningMaps' || _crf === 'customTags') tagsChanged = true;
         }
       }
     }
 
     if (changed) {
-      _invalidateAndRerender();
+      if (profChanged && typeof clearProfCache === 'function') clearProfCache();
+      if (tagsChanged) { _allTagsCache = {}; _tagToSectionCache = {}; }
+      // Re-render current page (desktop)
+      var currentPage = (typeof Router !== 'undefined' && Router.getCurrentPage) ? Router.getCurrentPage() : null;
+      if (currentPage && currentPage.render) {
+        try { currentPage.render(); } catch (e) { /* page may not be ready */ }
+      }
+      // Re-render current tab (mobile)
+      if (window.__MOBILE && typeof _mobileRerender === 'function') {
+        try { _mobileRerender(); } catch (e) { /* mobile may not be ready */ }
+      }
     }
     _lastSyncedAt = new Date();
   } catch (e) {
