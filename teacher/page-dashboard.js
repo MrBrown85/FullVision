@@ -500,7 +500,7 @@ window.PageDashboard = (function() {
       students = students.filter(function(s) { return flags[s.id]; });
     }
 
-    var flagCount = Object.keys(flags).length;
+    var flagCount = Object.values(flags).filter(Boolean).length;
     var allStudents = getStudents(cid);
 
     /* -- Compute class-level data -- */
