@@ -259,3 +259,113 @@ describe('MCardWidgets.render actions', () => {
   });
 });
 
+/* ── Task 3: completion ──────────────────────────────────────────── */
+describe('MCardWidgets.render completion', () => {
+  it('renders arc ring with percentage', () => {
+    mockWidgetDataLayer({ getCompletionPct: () => 85 });
+    const html = MCardWidgets.render('completion', STUDENT, CID, DATA);
+    expect(html).toContain('m-wdg-tile');
+    expect(html).toContain('m-wdg-arc');
+    expect(html).toContain('85');
+    expect(html).toContain('Complete');
+  });
+
+  it('uses green color for >= 80%', () => {
+    mockWidgetDataLayer({ getCompletionPct: () => 80 });
+    const html = MCardWidgets.render('completion', STUDENT, CID, DATA);
+    expect(html).toContain('var(--score-3)');
+  });
+
+  it('uses amber color for >= 50% and < 80%', () => {
+    mockWidgetDataLayer({ getCompletionPct: () => 60 });
+    const html = MCardWidgets.render('completion', STUDENT, CID, DATA);
+    expect(html).toContain('var(--score-2)');
+  });
+
+  it('uses red color for < 50%', () => {
+    mockWidgetDataLayer({ getCompletionPct: () => 40 });
+    const html = MCardWidgets.render('completion', STUDENT, CID, DATA);
+    expect(html).toContain('var(--score-1)');
+  });
+});
+
+/* ── Task 3: missingWork ─────────────────────────────────────────── */
+describe('MCardWidgets.render missingWork', () => {
+  it('renders count when missing work > 0', () => {
+    mockWidgetDataLayer({
+      getAssignmentStatuses: () => ({ 'stu1:a1': 'NS', 'stu1:a2': 'NS' }),
+      getAssessments: () => [
+        { id: 'a1', type: 'summative', date: '2026-01-01', tagIds: [] },
+        { id: 'a2', type: 'summative', date: '2026-01-02', tagIds: [] },
+      ],
+    });
+    const html = MCardWidgets.render('missingWork', STUDENT, CID, DATA);
+    expect(html).toContain('m-wdg-tile');
+    expect(html).toContain('m-wdg-alert');
+    expect(html).toContain('2');
+  });
+
+  it('returns empty string when 0 missing', () => {
+    mockWidgetDataLayer({
+      getAssignmentStatuses: () => ({}),
+      getAssessments: () => [{ id: 'a1', type: 'summative', date: '2026-01-01', tagIds: [] }],
+    });
+    const html = MCardWidgets.render('missingWork', STUDENT, CID, DATA);
+    expect(html).toBe('');
+  });
+});
+
+/* ── Task 3: growth ──────────────────────────────────────────────── */
+describe('MCardWidgets.render growth', () => {
+  it('renders journey text when multiple summative scores exist', () => {
+    mockWidgetDataLayer({
+      getTagScores: (cid, sid, tagId) => [
+        { score: 1, type: 'summative', date: '2026-01-01', tagId, assessmentId: 'a1' },
+        { score: 3, type: 'summative', date: '2026-02-01', tagId, assessmentId: 'a2' },
+      ],
+    });
+    const dataWithSections = {
+      sections: [{ id: 's1', name: 'Test', shortName: 'Test', color: '#888', tags: [{ id: 't1' }] }],
+    };
+    const html = MCardWidgets.render('growth', STUDENT, CID, dataWithSections);
+    expect(html).toContain('m-wdg-growth');
+  });
+
+  it('shows improving arrow direction (green) when score increased', () => {
+    mockWidgetDataLayer({
+      getTagScores: (cid, sid, tagId) => [
+        { score: 1, type: 'summative', date: '2026-01-01', tagId, assessmentId: 'a1' },
+        { score: 3, type: 'summative', date: '2026-02-01', tagId, assessmentId: 'a2' },
+      ],
+    });
+    const dataWithSections = {
+      sections: [{ id: 's1', name: 'Test', shortName: 'Test', color: '#888', tags: [{ id: 't1' }] }],
+    };
+    const html = MCardWidgets.render('growth', STUDENT, CID, dataWithSections);
+    expect(html).toContain('var(--score-3)');
+  });
+
+  it('shows single assessment note for only one score', () => {
+    mockWidgetDataLayer({
+      getTagScores: (cid, sid, tagId) => [
+        { score: 2, type: 'summative', date: '2026-01-01', tagId, assessmentId: 'a1' },
+      ],
+    });
+    const dataWithSections = {
+      sections: [{ id: 's1', name: 'Test', shortName: 'Test', color: '#888', tags: [{ id: 't1' }] }],
+    };
+    const html = MCardWidgets.render('growth', STUDENT, CID, dataWithSections);
+    expect(html).toContain('1 assessment');
+  });
+
+  it('returns empty string when no summative scores', () => {
+    mockWidgetDataLayer({
+      getTagScores: () => [],
+    });
+    const dataWithSections = {
+      sections: [{ id: 's1', name: 'Test', shortName: 'Test', color: '#888', tags: [{ id: 't1' }] }],
+    };
+    const html = MCardWidgets.render('growth', STUDENT, CID, dataWithSections);
+    expect(html).toBe('');
+  });
+});

@@ -110,6 +110,83 @@ window.MCardWidgets = (function() {
     '</div>';
   };
 
+  /* ── completion (arc ring metric tile) ───────────────────────── */
+  _renderers.completion = function(st, cid) {
+    var pct = getCompletionPct(cid, st.id);
+    var color = pct >= 80 ? 'var(--score-3)' : pct >= 50 ? 'var(--score-2)' : 'var(--score-1)';
+    var r = 11, cx = 14, cy = 14, circ = 2 * Math.PI * r;
+    var offset = circ * (1 - pct / 100);
+    var svg = '<svg class="m-wdg-arc" width="28" height="28" viewBox="0 0 28 28">' +
+      '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="var(--bg-secondary)" stroke-width="3"/>' +
+      '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="' + color + '" stroke-width="3" ' +
+        'stroke-dasharray="' + circ + '" stroke-dashoffset="' + offset + '" stroke-linecap="round" transform="rotate(-90 ' + cx + ' ' + cy + ')"/>' +
+      '<text x="' + cx + '" y="' + cy + '" text-anchor="middle" dominant-baseline="central" font-size="9" font-weight="700" fill="' + color + '">' + Math.round(pct) + '</text>' +
+    '</svg>';
+    return '<div class="m-wdg-tile">' + svg + '<div class="m-wdg-tile-label">Complete</div></div>';
+  };
+
+  /* ── missingWork (alert metric tile) ─────────────────────────── */
+  _renderers.missingWork = function(st, cid, data) {
+    var statuses = (data && data.statuses) || getAssignmentStatuses(cid);
+    var assessments = getAssessments(cid);
+    var count = assessments.filter(function(a) {
+      return statuses[st.id + ':' + a.id] === 'NS';
+    }).length;
+    if (count === 0) return '';
+    return '<div class="m-wdg-tile m-wdg-alert">' +
+      '<div class="m-wdg-alert-val">' + count + '</div>' +
+      '<div class="m-wdg-tile-label">Missing</div>' +
+    '</div>';
+  };
+
+  /* ── growth (journey pill) ────────────────────────────────────── */
+  _renderers.growth = function(st, cid, data) {
+    // Collect all summative scores across all sections/tags
+    var allSummScores = [];
+    var sections = (data && data.sections) || [];
+    sections.forEach(function(sec) {
+      (sec.tags || []).forEach(function(tag) {
+        getTagScores(cid, st.id, tag.id).forEach(function(s) {
+          if (s.type === 'summative' && s.score > 0) allSummScores.push(s);
+        });
+      });
+    });
+
+    if (!allSummScores.length) return '';
+
+    // Sort ascending by date
+    allSummScores.sort(function(a, b) { return (a.date || '').localeCompare(b.date || ''); });
+
+    if (allSummScores.length === 1) {
+      var onlyScore = allSummScores[0].score;
+      return '<div class="m-wdg-growth">' +
+        '<span class="m-wdg-growth-label">' + (PROF_LABELS[onlyScore] || 'No Evidence') + '</span>' +
+        '<span class="m-wdg-growth-meta"> — 1 assessment</span>' +
+      '</div>';
+    }
+
+    var firstScore = allSummScores[0].score;
+    var lastScore = allSummScores[allSummScores.length - 1].score;
+    var arrowColor, arrowChar;
+    if (lastScore > firstScore) {
+      arrowColor = 'var(--score-3)';
+      arrowChar = '↑';
+    } else if (lastScore < firstScore) {
+      arrowColor = 'var(--score-1)';
+      arrowChar = '↓';
+    } else {
+      arrowColor = 'var(--text-3)';
+      arrowChar = '→';
+    }
+
+    return '<div class="m-wdg-growth">' +
+      '<span class="m-wdg-growth-label">' + (PROF_LABELS[firstScore] || 'No Evidence') + '</span>' +
+      '<span class="m-wdg-growth-arrow" style="color:' + arrowColor + '">' + arrowChar + '</span>' +
+      '<span class="m-wdg-growth-label">' + (PROF_LABELS[lastScore] || 'No Evidence') + '</span>' +
+      '<span class="m-wdg-growth-meta"> (' + allSummScores.length + ' assessments)</span>' +
+    '</div>';
+  };
+
   /* ── Public API ──────────────────────────────────────────────── */
   return {
     render: render,
