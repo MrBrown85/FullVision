@@ -32,7 +32,8 @@
       }
     } catch(e) {
       console.warn('Auth check failed:', e);
-      hasSession = true; // Local dev fallback
+      // Do not grant session on network error — show auth screen so the
+      // teacher can sign in once connectivity is restored.
     }
 
     if (!hasSession) {
