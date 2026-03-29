@@ -598,13 +598,14 @@ window.PageStudent = (function() {
         } else {
           tagScores.forEach(function(sc) {
             var assess = assessments.find(function(a) { return a.id === sc.assessmentId; });
-            var sLabel = PROF_LABELS[sc.score] || '—';
             var sColor = PROF_COLORS[sc.score] || PROF_COLORS[0];
-            html += '<div class="tag-assess-row">' +
-              '<span class="tag-assess-prof" style="color:' + sColor + '">' + sLabel + '</span>' +
-              (assess ? '<a class="tag-assess-title" href="#/assignments?course=' + cid + '&open=' + assess.id + '&student=' + studentId + '" style="color:inherit;text-decoration:none" title="Open in Assignments">' + esc(assess.title) + '</a>' : '<span class="tag-assess-title">Unknown</span>') +
+            var href = assess ? '#/assignments?course=' + cid + '&open=' + assess.id + '&student=' + studentId : '';
+            var title = assess ? esc(assess.title) : 'Unknown';
+            html += '<a class="tag-assess-row"' + (href ? ' href="' + href + '"' : '') + ' title="Open in Assignments">' +
+              '<span class="tag-assess-pip" style="background:' + sColor + '">' + (sc.score || '\u2014') + '</span>' +
+              '<span class="tag-assess-title">' + title + '</span>' +
               '<span class="tag-assess-date">' + formatDate(sc.date) + '</span>' +
-            '</div>';
+            '</a>';
           });
         }
         html += '</div>';

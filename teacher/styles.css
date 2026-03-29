@@ -629,12 +629,35 @@ body {
 }
 
 /* ── Tag detail dropdown ───────────────────────────────────── */
-.tag-detail { display: none; padding: 4px 0 8px 34px; }
+.tag-detail {
+  display: none; padding: 4px 0 8px 0;
+  background: rgba(0,0,0,0.015); border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+}
 .dash-tag-row.open + .tag-detail { display: block; }
-.tag-assess-row { display: flex; align-items: center; gap: 6px; padding: 3px 0; font-size: var(--text-sm); flex-wrap: wrap; }
-.tag-assess-title { color: var(--text); font-weight: 500; }
-.tag-assess-prof { font-family: 'SF Mono', ui-monospace, 'Menlo', monospace; font-size: var(--text-xs); font-weight: 600; }
-.tag-assess-date { font-family: 'SF Mono', ui-monospace, 'Menlo', monospace; font-size: var(--text-xs); color: var(--text-3); flex-shrink: 0; }
+.tag-assess-row {
+  display: grid; grid-template-columns: 24px 1fr auto;
+  align-items: center; gap: 8px; padding: 5px 8px;
+  font-size: var(--text-sm); text-decoration: none; color: inherit;
+  border-bottom: 1px solid var(--overlay-hover); transition: background 0.1s;
+}
+.tag-assess-row:last-child { border-bottom: none; }
+.tag-assess-row:hover { background: var(--overlay-hover); }
+.tag-assess-row:hover .tag-assess-title { text-decoration: underline; color: var(--active); }
+.tag-assess-pip {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 20px; border-radius: var(--radius-xs, 4px);
+  font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
+  font-size: var(--text-xs); font-weight: 700; color: #fff; flex-shrink: 0;
+}
+.tag-assess-title {
+  color: var(--text); font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+}
+.tag-assess-date {
+  font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
+  font-size: var(--text-xs); color: var(--text-3);
+  flex-shrink: 0; white-space: nowrap; text-align: right;
+}
 
 /* ── Growth Sparkline ──────────────────────────────────────── */
 .growth-sparkline {
