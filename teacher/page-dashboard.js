@@ -708,6 +708,7 @@ window.PageDashboard = (function() {
   }
 
   function destroy() {
+    CM.destroy();
     _listeners.forEach(function(l) {
       document.removeEventListener(l.type, l.handler, l.options);
     });

@@ -1484,9 +1484,9 @@ window.DashClassManager = (function() {
     var name = COURSES[cmSelectedCourse].name;
     showConfirm('Delete "' + name + '"',
       'This permanently removes all students, assessments, scores, and settings. This cannot be undone.',
-      'Delete Class', 'danger', function() {
+      'Delete Class', 'danger', async function() {
         var wasActive = (cmSelectedCourse === _activeCourse);
-        deleteCourseData(cmSelectedCourse);
+        await deleteCourseData(cmSelectedCourse);
         var remaining = Object.keys(COURSES);
         if (remaining.length > 0) {
           cmSelectedCourse = remaining[0];

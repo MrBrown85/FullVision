@@ -1833,7 +1833,19 @@ function updateCourse(id, updates) {
   saveCourses(COURSES);
 }
 
-function deleteCourseData(id) {
+async function deleteCourseData(id) {
+  // Delete from Supabase before clearing local state so a failed delete
+  // doesn't leave the course gone locally but still alive in the database.
+  if (_useSupabase) {
+    const sb = getSupabase();
+    if (sb) {
+      const tables = Object.values(_NORMALIZED_TABLES);
+      await Promise.all(tables.map(tbl =>
+        sb.from(tbl).delete().eq('teacher_id', _teacherId).eq('course_id', id)
+      )).catch(err => console.error('Failed to delete course data from Supabase:', err));
+    }
+  }
+
   // Clear localStorage
   ['students','assessments','scores','overrides','courseconfig','learningmap',
    'modules','rubrics','statuses','quick-obs','term-ratings','notes',
@@ -1843,20 +1855,6 @@ function deleteCourseData(id) {
   // Clear cache
   for (const field of Object.keys(_DATA_KEYS)) {
     delete _cache[field][id];
-  }
-
-  // Delete from all normalized Supabase tables
-  if (_useSupabase) {
-    const sb = getSupabase();
-    if (sb) {
-      var tables = Object.values(_NORMALIZED_TABLES);
-      tables.forEach(function(tbl) {
-        sb.from(tbl).delete()
-          .eq('teacher_id', _teacherId)
-          .eq('course_id', id)
-          .then(({ error }) => { if (error) console.error('Failed to delete ' + tbl + ' for', id, error); });
-      });
-    }
   }
 
   delete COURSES[id];

@@ -1556,8 +1556,8 @@ window.PageAssignments = (function() {
   }
   function clearData() {
     if (!activeCourse || !COURSES[activeCourse]) return;
-    showConfirm('Clear All Data', 'Delete ALL data for ' + COURSES[activeCourse].name + '?', 'Delete All', 'danger', function() {
-      deleteCourseData(activeCourse);
+    showConfirm('Clear All Data', 'Delete ALL data for ' + COURSES[activeCourse].name + '?', 'Delete All', 'danger', async function() {
+      await deleteCourseData(activeCourse);
       // If no courses remain, re-seed defaults
       if (Object.keys(COURSES).length === 0) {
         Object.assign(COURSES, structuredClone(DEFAULT_COURSES));
@@ -1568,8 +1568,8 @@ window.PageAssignments = (function() {
     });
   }
   function resetDemoData() {
-    showConfirm('Reset Demo Data', 'Reset ALL data to demo defaults? This cannot be undone.', 'Reset', 'danger', function() {
-      Object.keys(COURSES).forEach(function(cid) { deleteCourseData(cid); });
+    showConfirm('Reset Demo Data', 'Reset ALL data to demo defaults? This cannot be undone.', 'Reset', 'danger', async function() {
+      await Promise.all(Object.keys(COURSES).map(function(cid) { return deleteCourseData(cid); }));
       Object.keys(COURSES).forEach(function(cid) { delete COURSES[cid]; });
       Object.assign(COURSES, structuredClone(DEFAULT_COURSES));
       saveCourses(COURSES);

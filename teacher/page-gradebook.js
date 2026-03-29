@@ -1589,6 +1589,7 @@ window.PageGradebook = (function() {
   }
 
   function destroy() {
+    if (_scoreMode) exitScoreMode();
     _listeners.forEach(function(l) {
       document.removeEventListener(l.type, l.handler, l.options);
     });
