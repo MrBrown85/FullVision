@@ -1085,6 +1085,22 @@ async function _doInitData(cid) {
       if (!lm || (!lm._customized && (!lm.sections || lm.sections.length === 0))) {
         _cache.learningMaps[cid] = LEARNING_MAP[cid] || { subjects: [], sections: [] };
       }
+
+      // Migration: if Supabase returned all-empty but localStorage has data,
+      // this is a post-normalization first load. Populate Supabase from localStorage.
+      var _supabaseEmpty = (!scoreRes.data || scoreRes.data.length === 0)
+        && (!obsRes.data || obsRes.data.length === 0)
+        && (!assessRes.data || assessRes.data.length === 0)
+        && (!studentRes.data || studentRes.data.length === 0);
+      if (_supabaseEmpty) {
+        var lsStudents = _safeParseLS('gb-students-' + cid, []);
+        if (lsStudents.length > 0) {
+          console.info('Migration: Supabase tables empty, uploading localStorage data for', cid);
+          _loadCourseFromLS(cid);
+          _seedCourseToSupabase(cid);
+        }
+      }
+
       return;
     } catch (error) {
       console.error('Failed to load data for', cid, error);
