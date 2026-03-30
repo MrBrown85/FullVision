@@ -107,6 +107,24 @@ let _useSupabase = false;
 let _teacherId = null;
 let _initPromise = null;  // dedup concurrent initData calls
 
+/* Echo guard: suppress Realtime events for a field+cid shortly after a local save.
+   The delete-all + insert-all sync pattern causes Realtime to echo DELETE events
+   that temporarily wipe the in-memory cache before the INSERTs arrive. */
+const _echoGuard = {};  // key: "field:cid" → expiry timestamp
+const _ECHO_GUARD_MS = 8000;  // suppress echoes for 8s after save
+
+function _setEchoGuard(field, cid) {
+  _echoGuard[field + ':' + cid] = Date.now() + _ECHO_GUARD_MS;
+}
+function _isEchoGuarded(field, cid) {
+  var key = field + ':' + cid;
+  var expiry = _echoGuard[key];
+  if (!expiry) return false;
+  if (Date.now() < expiry) return true;
+  delete _echoGuard[key];
+  return false;
+}
+
 /* ══════════════════════════════════════════════════════════════════
    Sync status tracking
    ══════════════════════════════════════════════════════════════════ */
@@ -644,6 +662,8 @@ function _initRealtimeSync() {
         if (!row) return;
         var cid = row.course_id;
         if (!cid) return;
+        // Skip echoes from our own delete-all + insert-all sync
+        if (_isEchoGuarded('observations', cid)) return;
         if (!_cache.observations[cid]) _cache.observations[cid] = {};
 
         var sid = row.student_id;
@@ -681,6 +701,8 @@ function _initRealtimeSync() {
         if (!row) return;
         var cid = row.course_id;
         if (!cid || !_cache.scores[cid]) return;
+        // Skip echoes from our own delete-all + insert-all sync
+        if (_isEchoGuarded('scores', cid)) return;
 
         var sid = row.student_id;
         var aid = row.assessment_id;
@@ -725,6 +747,8 @@ function _initRealtimeSync() {
         if (!row) return;
         var cid = row.course_id;
         if (!cid) return;
+        // Skip echoes from our own delete-all + insert-all sync
+        if (_isEchoGuarded('assessments', cid)) return;
         if (!_cache.assessments[cid]) _cache.assessments[cid] = [];
 
         if (payload.eventType === 'DELETE') {
@@ -753,6 +777,8 @@ function _initRealtimeSync() {
         if (!row) return;
         var cid = row.course_id;
         if (!cid) return;
+        // Skip echoes from our own delete-all + insert-all sync
+        if (_isEchoGuarded('students', cid)) return;
         if (!_cache.students[cid]) _cache.students[cid] = [];
 
         if (payload.eventType === 'DELETE') {
@@ -1276,6 +1302,7 @@ function _saveCourseField(field, cid, value) {
   _cache[field][cid] = value;
   if (_PROF_FIELDS.includes(field) && typeof clearProfCache === 'function') clearProfCache();
   if (_useSupabase) {
+    _setEchoGuard(field, cid);
     _syncToSupabase(_NORMALIZED_TABLES[field], { cid }, value);
   } else {
     const dataKey = _DATA_KEYS[field];
