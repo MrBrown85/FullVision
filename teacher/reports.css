@@ -583,7 +583,7 @@
   grid-template-areas:
     "header  header  header"
     "rate    data    write"
-    "rate    obs     write"
+    "rate    obs     obs"
     "footer  footer  footer";
   gap:12px; padding:12px 2px 4px; min-height:calc(100vh - 110px);
 }
@@ -715,6 +715,7 @@
 
 /* ── Column 2: Data — auto-populated panels ── */
 .tq-col-data { grid-area:data; display:flex; flex-direction:column; gap:12px; }
+.tq-col-data > .tq-panel:first-child { flex:1; min-height:0; display:flex; flex-direction:column; }
 
 /* Snapshot rows */
 .tq-snapshot-grid { display:flex; flex-direction:column; gap:3px; }
@@ -950,7 +951,7 @@
 .tq-nav-btn.primary:hover { background:rgba(0,100,210,1); }
 
 /* Assignment rows in snapshot */
-.tq-assignment-list { display:flex; flex-direction:column; gap:3px; margin-top:6px; max-height:360px; overflow-y:auto; }
+.tq-assignment-list { display:flex; flex-direction:column; gap:3px; margin-top:6px; flex:1; min-height:0; overflow-y:auto; }
 .tq-assignment-row {
   display:flex; align-items:center; gap:8px; padding:5px 10px;
   background:var(--bg); border-radius:var(--radius-sm); cursor:pointer; transition:all 0.1s;

@@ -1154,7 +1154,7 @@ function renderTermQuestionnaire(cid) {
 
   // Assignment performance rows (toggleable for mention in narrative)
   if (assignmentPerf.length > 0) {
-    html += `<div style="margin-top:10px"><div class="tq-panel-title" style="font-size:0.5rem;margin-bottom:6px">Assignments — select to mention</div>
+    html += `<div style="margin-top:10px;flex:1;min-height:0;display:flex;flex-direction:column"><div class="tq-panel-title" style="font-size:0.5rem;margin-bottom:6px">Assignments — select to mention</div>
     <div class="tq-assignment-list">`;
     assignmentPerf.forEach(a => {
       const r = Math.round(a.avg);
