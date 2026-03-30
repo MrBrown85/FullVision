@@ -359,7 +359,7 @@ window.PageAssignments = (function() {
     var method = cc.calcMethod || course.calcMethod || 'mostRecent';
     var dw = cc.decayWeight != null ? cc.decayWeight : (course.decayWeight || 0.65);
     var sections = getSections(cid);
-    var allAssessments = getAssessments(cid).sort(function(a,b) { return (b.date||'').localeCompare(a.date||''); });
+    var allAssessments = getAssessments(cid).slice().sort(function(a,b) { return (b.date||'').localeCompare(a.date||''); });
     var students = sortStudents(getStudents(cid), 'lastName');
     var scores = getScores(cid);
     var modules = getModules(cid);

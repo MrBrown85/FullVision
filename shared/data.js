@@ -315,8 +315,10 @@ function _syncToSupabase(table, key, data) {
   const sk = _syncKey(table, key);
 
   // If a sync for this exact key is already in-flight, just update the pending data (latest wins)
+  // Snapshot data so later in-place mutations can't corrupt the queued write
   if (_inflightSyncs.has(sk)) {
-    _pendingWrites.set(sk, { table, key, data });
+    var pendingSnapshot = (typeof structuredClone === 'function') ? structuredClone(data) : JSON.parse(JSON.stringify(data));
+    _pendingWrites.set(sk, { table, key, data: pendingSnapshot });
     return;
   }
 
@@ -1299,7 +1301,9 @@ function _saveCourseField(field, cid, value) {
   if (dataKey) _safeLSSet('gb-' + dataKey + '-' + cid, JSON.stringify(value));
   if (_useSupabase) {
     _setEchoGuard(field, cid);
-    _syncToSupabase(_NORMALIZED_TABLES[field], { cid }, value);
+    // Deep-clone so in-flight sync is immune to later in-place mutations
+    var snapshot = (typeof structuredClone === 'function') ? structuredClone(value) : JSON.parse(JSON.stringify(value));
+    _syncToSupabase(_NORMALIZED_TABLES[field], { cid }, snapshot);
   }
   _broadcastChange(cid, field);
 }
