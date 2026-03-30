@@ -1135,7 +1135,7 @@ function renderTermQuestionnaire(cid) {
   html += `<div class="tq-col-data">`;
 
   // Academic Snapshot + Assignments
-  html += `<div class="tq-panel">
+  html += `<div class="tq-panel" style="position:absolute;inset:0">
     <div class="tq-panel-title">Academic Snapshot <span class="tq-panel-badge">${assignmentPerf.length} assessed</span></div>
     <div class="tq-snapshot-grid">
       <div class="tq-snapshot-item" style="background:var(--overlay-hover)">
