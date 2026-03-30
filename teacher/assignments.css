@@ -103,20 +103,20 @@
 }
 .score-opt:hover { transform:scale(1.12); }
 /* Faint / unselected states */
-.score-opt.s1 { background:rgba(211,47,47,0.12); color:rgba(211,47,47,0.35); }
-.score-opt.s2 { background:rgba(192,122,0,0.12); color:rgba(192,122,0,0.35); }
-.score-opt.s3 { background:rgba(46,125,50,0.12); color:rgba(46,125,50,0.35); }
-.score-opt.s4 { background:rgba(21,101,192,0.12); color:rgba(21,101,192,0.35); }
+.score-opt.s1 { background:rgba(194,88,74,0.12); color:rgba(194,88,74,0.35); }
+.score-opt.s2 { background:rgba(184,137,58,0.12); color:rgba(184,137,58,0.35); }
+.score-opt.s3 { background:rgba(84,140,90,0.12); color:rgba(84,140,90,0.35); }
+.score-opt.s4 { background:rgba(62,125,145,0.12); color:rgba(62,125,145,0.35); }
 /* Active / selected states */
-.score-opt.s1.active { background:var(--score-1); color:#fff; border-color:var(--score-1-dark); box-shadow:0 1px 4px rgba(211,47,47,0.3); }
-.score-opt.s2.active { background:var(--score-2); color:#fff; border-color:var(--score-2-dark); box-shadow:0 1px 4px rgba(192,122,0,0.3); }
-.score-opt.s3.active { background:var(--score-3); color:#fff; border-color:var(--score-3-dark); box-shadow:0 1px 4px rgba(46,125,50,0.3); }
-.score-opt.s4.active { background:var(--score-4); color:#fff; border-color:var(--score-4-dark); box-shadow:0 1px 4px rgba(21,101,192,0.3); }
+.score-opt.s1.active { background:var(--score-1); color:#fff; border-color:var(--score-1-dark); box-shadow:0 1px 4px rgba(194,88,74,0.3); }
+.score-opt.s2.active { background:var(--score-2); color:#fff; border-color:var(--score-2-dark); box-shadow:0 1px 4px rgba(184,137,58,0.3); }
+.score-opt.s3.active { background:var(--score-3); color:#fff; border-color:var(--score-3-dark); box-shadow:0 1px 4px rgba(84,140,90,0.3); }
+.score-opt.s4.active { background:var(--score-4); color:#fff; border-color:var(--score-4-dark); box-shadow:0 1px 4px rgba(62,125,145,0.3); }
 /* Hover on unselected */
-.score-opt.s1:not(.active):hover { background:rgba(211,47,47,0.22); color:rgba(211,47,47,0.7); }
-.score-opt.s2:not(.active):hover { background:rgba(192,122,0,0.22); color:rgba(192,122,0,0.7); }
-.score-opt.s3:not(.active):hover { background:rgba(46,125,50,0.22); color:rgba(46,125,50,0.7); }
-.score-opt.s4:not(.active):hover { background:rgba(21,101,192,0.22); color:rgba(21,101,192,0.7); }
+.score-opt.s1:not(.active):hover { background:rgba(194,88,74,0.22); color:rgba(194,88,74,0.7); }
+.score-opt.s2:not(.active):hover { background:rgba(184,137,58,0.22); color:rgba(184,137,58,0.7); }
+.score-opt.s3:not(.active):hover { background:rgba(84,140,90,0.22); color:rgba(84,140,90,0.7); }
+.score-opt.s4:not(.active):hover { background:rgba(62,125,145,0.22); color:rgba(62,125,145,0.7); }
 
 /* Row fill button */
 .row-fill-btn {
@@ -686,7 +686,7 @@
   background:transparent; cursor:pointer; font-size:var(--text-sm); color:var(--text-3);
   display:flex; align-items:center; justify-content:center; transition:all 0.1s;
 }
-.rubric-criterion-delete:hover { background:rgba(211,47,47,0.08); color:var(--score-1); border-color:rgba(211,47,47,0.2); }
+.rubric-criterion-delete:hover { background:rgba(194,88,74,0.08); color:var(--score-1); border-color:rgba(194,88,74,0.2); }
 
 /* Tag picker — two-column layout */
 .rubric-criterion-body { padding:0; }
@@ -751,7 +751,7 @@
   border-radius:var(--radius); background:rgba(26,26,46,0.08); color:var(--text);
   cursor:pointer; transition:all 0.1s;
 }
-.rubric-selected-chip:hover { background:rgba(211,47,47,0.1); color:var(--score-1); }
+.rubric-selected-chip:hover { background:rgba(194,88,74,0.1); color:var(--score-1); }
 .rubric-selected-chip .chip-label {
   font-family:var(--font-base); font-weight:400; font-size:var(--text-sm);
   color:var(--text-2);
@@ -864,14 +864,14 @@
   transition:all 0.15s var(--ease-out); user-select:none;
 }
 .rsg-header-level:hover { transform:scale(1.02); }
-.rsg-header-level.hl1 { color:var(--score-1); background:rgba(211,47,47,0.06); }
-.rsg-header-level.hl2 { color:var(--score-2); background:rgba(192,122,0,0.06); }
-.rsg-header-level.hl3 { color:var(--score-3); background:rgba(46,125,50,0.06); }
-.rsg-header-level.hl4 { color:var(--score-4); background:rgba(21,101,192,0.06); }
-.rsg-header-level.hl1:hover { background:rgba(211,47,47,0.14); }
-.rsg-header-level.hl2:hover { background:rgba(192,122,0,0.14); }
-.rsg-header-level.hl3:hover { background:rgba(46,125,50,0.14); }
-.rsg-header-level.hl4:hover { background:rgba(21,101,192,0.14); }
+.rsg-header-level.hl1 { color:var(--score-1); background:rgba(194,88,74,0.06); }
+.rsg-header-level.hl2 { color:var(--score-2); background:rgba(184,137,58,0.06); }
+.rsg-header-level.hl3 { color:var(--score-3); background:rgba(84,140,90,0.06); }
+.rsg-header-level.hl4 { color:var(--score-4); background:rgba(62,125,145,0.06); }
+.rsg-header-level.hl1:hover { background:rgba(194,88,74,0.14); }
+.rsg-header-level.hl2:hover { background:rgba(184,137,58,0.14); }
+.rsg-header-level.hl3:hover { background:rgba(84,140,90,0.14); }
+.rsg-header-level.hl4:hover { background:rgba(62,125,145,0.14); }
 .rsg-header-action { width:36px; flex-shrink:0; }
 
 /* Student row */
@@ -929,10 +929,10 @@
 .rsg-level.active.l2 { background:var(--score-2); color:#fff; font-weight:700; }
 .rsg-level.active.l1 { background:var(--score-1); color:#fff; font-weight:700; }
 /* Hover on unselected */
-.rsg-level.l4:not(.active):hover { background:rgba(21,101,192,0.08); color:var(--score-4); }
-.rsg-level.l3:not(.active):hover { background:rgba(46,125,50,0.08); color:var(--score-3); }
-.rsg-level.l2:not(.active):hover { background:rgba(192,122,0,0.08); color:var(--score-2); }
-.rsg-level.l1:not(.active):hover { background:rgba(211,47,47,0.08); color:var(--score-1); }
+.rsg-level.l4:not(.active):hover { background:rgba(62,125,145,0.08); color:var(--score-4); }
+.rsg-level.l3:not(.active):hover { background:rgba(84,140,90,0.08); color:var(--score-3); }
+.rsg-level.l2:not(.active):hover { background:rgba(184,137,58,0.08); color:var(--score-2); }
+.rsg-level.l1:not(.active):hover { background:rgba(194,88,74,0.08); color:var(--score-1); }
 /* Mixed indicator */
 .rsg-level.active.mixed {
   background:repeating-linear-gradient(135deg, transparent, transparent 3px, rgba(255,255,255,0.2) 3px, rgba(255,255,255,0.2) 5px);
