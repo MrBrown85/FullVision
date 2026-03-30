@@ -42,6 +42,15 @@ window.Router = (function() {
   var _currentPage = null;
   var _booted = false;
 
+  function _flushPendingEdits() {
+    var active = document.activeElement;
+    if (!active || typeof active.blur !== 'function') return;
+    var tag = active.tagName || '';
+    var isEditable = active.isContentEditable || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+    if (!isEditable) return;
+    try { active.blur(); } catch (e) { /* best-effort flush */ }
+  }
+
   /* ── Parse hash ──────────────────────────────────────────── */
   function _parseHash(hash) {
     // e.g. "#/student?id=st1&course=sci8" → { path: '/student', params: { id:'st1', course:'sci8' } }
@@ -77,6 +86,8 @@ window.Router = (function() {
     var parsed = _parseHash(location.hash);
     var path = parsed.path;
     var params = parsed.params;
+
+    _flushPendingEdits();
 
     // Determine which dock tab is active
     var dockPage = 'dashboard';

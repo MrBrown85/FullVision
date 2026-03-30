@@ -26,6 +26,13 @@ window.PageGradebook = (function() {
   var _scrollShadowCleanup = null;
   var _tipSource = null;
 
+  function _flushActiveScoreEditor() {
+    var active = document.activeElement;
+    if (!active || typeof active.blur !== 'function' || !active.classList) return;
+    if (!active.classList.contains('gb-scores-input') && !active.classList.contains('gb-pts-input')) return;
+    active.blur();
+  }
+
   /* ── Filter strip toggle ────────────────────────────────── */
   function toggleFilterStrip() {
     _filterStripOpen = !_filterStripOpen;
@@ -33,18 +40,21 @@ window.PageGradebook = (function() {
     if (strip) strip.classList.toggle('open', _filterStripOpen);
   }
   function clearAllFilters() {
+    _flushActiveScoreEditor();
     filterType = 'all'; filterSections = []; filterModules = [];
     render();
   }
 
   /* ── Course switch ──────────────────────────────────────── */
   function toggleModuleFilter(moduleId) {
+    _flushActiveScoreEditor();
     var idx = filterModules.indexOf(moduleId);
     if (idx >= 0) filterModules.splice(idx, 1);
     else filterModules.push(moduleId);
     render();
   }
   async function switchCourse(cid) {
+    _flushActiveScoreEditor();
     activeCourse = cid; setActiveCourse(cid);
     await initData(cid);
     filterSections = []; filterModules = []; filterType = 'all';
@@ -52,16 +62,18 @@ window.PageGradebook = (function() {
   }
 
   /* ── View & filter controls ─────────────────────────────── */
-  function setView(mode) { viewMode = mode; localStorage.setItem('gb_viewMode', mode); render(); }
+  function setView(mode) { _flushActiveScoreEditor(); viewMode = mode; localStorage.setItem('gb_viewMode', mode); render(); }
   function toggleSectionFilter(secId) {
+    _flushActiveScoreEditor();
     var idx = filterSections.indexOf(secId);
     if (idx >= 0) filterSections.splice(idx, 1);
     else filterSections.push(secId);
     render();
   }
-  function setTypeFilter(type) { filterType = filterType === type ? 'all' : type; render(); }
+  function setTypeFilter(type) { _flushActiveScoreEditor(); filterType = filterType === type ? 'all' : type; render(); }
   function onSearch(val) { searchQuery = (val || '').toLowerCase().trim(); render(); }
   function toggleSort(key) {
+    _flushActiveScoreEditor();
     if (sortCol && sortCol.key === key) sortCol.dir = sortCol.dir === 'asc' ? 'desc' : 'asc';
     else sortCol = { key: key, dir: 'asc' };
     render();
@@ -1209,6 +1221,7 @@ window.PageGradebook = (function() {
     var cell = e.target.closest('.gb-scores-cell');
     if (cell && cell.dataset.aid === _scoreMode.assessmentId) return;
     // Clicking anywhere else exits score mode
+    _flushActiveScoreEditor();
     exitScoreMode();
   }
 
@@ -1590,6 +1603,7 @@ window.PageGradebook = (function() {
   }
 
   function destroy() {
+    _flushActiveScoreEditor();
     if (_scoreMode) exitScoreMode();
     _listeners.forEach(function(l) {
       document.removeEventListener(l.type, l.handler, l.options);

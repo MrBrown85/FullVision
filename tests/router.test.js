@@ -3,6 +3,16 @@
  * Pure string parsing, no DOM needed.
  */
 
+var _activeElementDescriptor = Object.getOwnPropertyDescriptor(document, 'activeElement');
+
+afterEach(() => {
+  if (_activeElementDescriptor) {
+    Object.defineProperty(document, 'activeElement', _activeElementDescriptor);
+  } else {
+    delete document.activeElement;
+  }
+});
+
 describe('Router.parseHash', () => {
   it('parses hash with path and params', () => {
     const result = Router.parseHash('#/student?id=st1&course=sci8');
@@ -56,5 +66,43 @@ describe('Router.parseHash', () => {
   it('handles null/undefined input', () => {
     expect(Router.parseHash(null).path).toBe('/dashboard');
     expect(Router.parseHash(undefined).path).toBe('/dashboard');
+  });
+});
+
+describe('Router navigation flushes pending edits', () => {
+  it('blurs the active input before destroying the current page', () => {
+    var events = [];
+    PageDashboard.destroy = () => { events.push('destroy'); };
+
+    var activeEl = {
+      tagName: 'INPUT',
+      isContentEditable: false,
+      blur: () => { events.push('blur'); },
+    };
+    Object.defineProperty(document, 'activeElement', {
+      configurable: true,
+      get: () => activeEl,
+    });
+
+    Router.navigate('/assignments', true);
+
+    expect(events).toEqual(['blur', 'destroy']);
+  });
+
+  it('blurs contenteditable elements before route teardown', () => {
+    var blurred = false;
+    var activeEl = {
+      tagName: 'DIV',
+      isContentEditable: true,
+      blur: () => { blurred = true; },
+    };
+    Object.defineProperty(document, 'activeElement', {
+      configurable: true,
+      get: () => activeEl,
+    });
+
+    Router.navigate('/reports', true);
+
+    expect(blurred).toBe(true);
   });
 });
