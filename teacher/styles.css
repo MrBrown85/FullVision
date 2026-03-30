@@ -4,18 +4,18 @@
    ═══════════════════════════════════════════════════════════════ */
 
 :root {
-  /* Proficiency score colors — used across all pages */
+  /* Proficiency score colors — warm earthy palette */
   --score-0:  #bbb;     /* Not Assessed */
-  --score-1:  #d32f2f;  /* Emerging */
-  --score-2:  #c07a00;  /* Developing */
-  --score-3:  #2e7d32;  /* Proficient */
-  --score-4:  #1565c0;  /* Extending */
+  --score-1:  #C2584A;  /* Emerging — terracotta */
+  --score-2:  #B8893A;  /* Developing — golden amber */
+  --score-3:  #548C5A;  /* Proficient — sage green */
+  --score-4:  #3E7D91;  /* Extending — warm teal */
 
   /* Semantic tinted score badge backgrounds */
-  --score-1-bg: #FEE2E2; --score-1-text: #991B1B;
-  --score-2-bg: #FEF3C7; --score-2-text: #92400E;
-  --score-3-bg: #BBF7D0; --score-3-text: #166534;
-  --score-4-bg: #DBEAFE; --score-4-text: #1E40AF;
+  --score-1-bg: #F6E2DE; --score-1-text: #8A3D33;
+  --score-2-bg: #F3ECDA; --score-2-text: #7A5A1E;
+  --score-3-bg: #DDE9DE; --score-3-text: #365C3A;
+  --score-4-bg: #DAEAEE; --score-4-text: #2A5868;
 
   /* Font stack */
   --font-base: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', system-ui, sans-serif;
@@ -59,10 +59,10 @@
   --divider-heavy: rgba(0,0,0,0.14);
 
   /* Accent / UI colors (used in assignments, reports, toasts) */
-  --score-1-dark: #b71c1c;
-  --score-2-dark: #a06800;
-  --score-3-dark: #1b5e20;
-  --score-4-dark: #0d47a1;
+  --score-1-dark: #A84A3E;
+  --score-2-dark: #9E7530;
+  --score-3-dark: #467A4C;
+  --score-4-dark: #306D80;
   --focus-banner-bg: #e8f0fe;
   --focus-banner-border: #c4d7f2;
   --section-hover: #f0ede4;
@@ -1277,18 +1277,18 @@ body {
     --priority-light: rgba(255,69,58,0.18);
     --late: #FF9F0A;
     --score-0: #636366;
-    --score-1: #FF453A;
-    --score-2: #FF9F0A;
-    --score-3: #30D158;
-    --score-4: #0A84FF;
-    --score-1-bg: rgba(255,69,58,0.2);
-    --score-1-text: #FF6961;
-    --score-2-bg: rgba(255,159,10,0.2);
-    --score-2-text: #FFB340;
-    --score-3-bg: rgba(48,209,88,0.2);
-    --score-3-text: #4ADE80;
-    --score-4-bg: rgba(10,132,255,0.2);
-    --score-4-text: #64B5F6;
+    --score-1: #E07060;
+    --score-2: #DDA854;
+    --score-3: #6BAE70;
+    --score-4: #5AA0AE;
+    --score-1-bg: rgba(224,112,96,0.2);
+    --score-1-text: #E8887A;
+    --score-2-bg: rgba(221,168,84,0.2);
+    --score-2-text: #E5BC72;
+    --score-3-bg: rgba(107,174,112,0.2);
+    --score-3-text: #82C487;
+    --score-4-bg: rgba(90,160,174,0.2);
+    --score-4-text: #78B8C6;
     --toolbar-bg-start: #2C2C2E;
     --toolbar-bg-end: #1C1C1E;
     --btn-hover-blue: #409CFF;
@@ -1305,10 +1305,10 @@ body {
     --shadow-sm: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
     --shadow-md: 0 4px 12px rgba(0,0,0,0.3), 0 2px 4px rgba(0,0,0,0.2);
     --shadow-lg: 0 8px 32px rgba(0,0,0,0.4), 0 4px 8px rgba(0,0,0,0.2);
-    --score-1-dark: #FF453A;
-    --score-2-dark: #FF9F0A;
-    --score-3-dark: #30D158;
-    --score-4-dark: #0A84FF;
+    --score-1-dark: #E07060;
+    --score-2-dark: #DDA854;
+    --score-3-dark: #6BAE70;
+    --score-4-dark: #5AA0AE;
     --focus-banner-bg: rgba(10,132,255,0.12);
     --focus-banner-border: rgba(10,132,255,0.25);
     --section-hover: rgba(255,255,255,0.06);

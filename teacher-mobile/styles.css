@@ -597,9 +597,9 @@ body.mobile-mode :focus:not(:focus-visible) { outline: none; }
   background: var(--overlay-hover); border-radius: 8px; margin-top: 8px;
 }
 .m-sec-insight strong { font-weight: 600; }
-.m-sec-insight-up { color: var(--score-3); background: rgba(46,125,50,0.06); }
-.m-sec-insight-down { color: var(--score-1); background: rgba(211,47,47,0.06); }
-.m-sec-insight-alert { color: var(--score-2); background: rgba(192,122,0,0.06); }
+.m-sec-insight-up { color: var(--score-3); background: rgba(84,140,90,0.06); }
+.m-sec-insight-down { color: var(--score-1); background: rgba(194,88,74,0.06); }
+.m-sec-insight-alert { color: var(--score-2); background: rgba(184,137,58,0.06); }
 
 /* ── Focus Areas ──────────────────────────────────────────── */
 .m-focus-row {
@@ -733,9 +733,9 @@ body.mobile-mode :focus:not(:focus-visible) { outline: none; }
   position: relative;
   overflow: hidden;
 }
-.m-obs-card[data-sentiment="strength"] { border-left-color: #2e7d32; }
+.m-obs-card[data-sentiment="strength"] { border-left-color: var(--score-3); }
 .m-obs-card[data-sentiment="growth"]   { border-left-color: #007AFF; }
-.m-obs-card[data-sentiment="concern"]  { border-left-color: #c07a00; }
+.m-obs-card[data-sentiment="concern"]  { border-left-color: var(--score-2); }
 
 .m-obs-header {
   display: flex;
