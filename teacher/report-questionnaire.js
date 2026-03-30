@@ -1267,7 +1267,7 @@ function renderTermQuestionnaire(cid) {
     });
     html += `</div>`;
   } else {
-    html += `<div style="font-size:0.78rem;color:var(--text-3);padding:8px 0">No observations yet</div>`;
+    html += `<div style="font-size:0.78rem;color:var(--text-3);padding:12px 0">There are no observations for this student.</div>`;
   }
   html += `</div>`;
 
