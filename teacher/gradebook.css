@@ -357,6 +357,25 @@ th.gb-group-alt { background-color: rgba(0,0,0,0.03); }
 
 /* ── 4-quadrant grid layout (like a spreadsheet app) ────── */
 /* Inner radius for quadrant corners: 1px inset from the grid border */
+/* Earthy palette scoped to competencies grid only */
+.gb-grid {
+  --score-1: #C2584A; --score-2: #B8893A; --score-3: #548C5A; --score-4: #3E7D91;
+  --score-1-bg: #F6E2DE; --score-1-text: #8A3D33;
+  --score-2-bg: #F3ECDA; --score-2-text: #7A5A1E;
+  --score-3-bg: #DDE9DE; --score-3-text: #365C3A;
+  --score-4-bg: #DAEAEE; --score-4-text: #2A5868;
+  --score-1-dark: #A84A3E; --score-2-dark: #9E7530; --score-3-dark: #467A4C; --score-4-dark: #306D80;
+}
+@media (prefers-color-scheme: dark) {
+  .gb-grid {
+    --score-1: #E07060; --score-2: #DDA854; --score-3: #6BAE70; --score-4: #5AA0AE;
+    --score-1-bg: rgba(224,112,96,0.2); --score-1-text: #E8887A;
+    --score-2-bg: rgba(221,168,84,0.2); --score-2-text: #E5BC72;
+    --score-3-bg: rgba(107,174,112,0.2); --score-3-text: #82C487;
+    --score-4-bg: rgba(90,160,174,0.2); --score-4-text: #78B8C6;
+    --score-1-dark: #E07060; --score-2-dark: #DDA854; --score-3-dark: #6BAE70; --score-4-dark: #5AA0AE;
+  }
+}
 .gb-grid { --qr: calc(var(--radius) - 1px); }
 .gb-grid {
   display:grid;

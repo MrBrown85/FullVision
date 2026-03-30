@@ -657,10 +657,10 @@
   box-shadow:0 0.5px 1.5px rgba(0,0,0,0.12), 0 0 0.5px var(--overlay-pressed);
   font-weight:600;
 }
-.tq-pill.active.pill-1, .tq-rate-pill.active.rp-1 { background:var(--score-1-bg); color:var(--score-1-text); box-shadow:0 0.5px 2px rgba(194,88,74,0.15); }
-.tq-pill.active.pill-2, .tq-rate-pill.active.rp-2 { background:var(--score-2-bg); color:var(--score-2-text); box-shadow:0 0.5px 2px rgba(184,137,58,0.15); }
-.tq-pill.active.pill-3, .tq-rate-pill.active.rp-3 { background:var(--score-3-bg); color:var(--score-3-text); box-shadow:0 0.5px 2px rgba(84,140,90,0.15); }
-.tq-pill.active.pill-4, .tq-rate-pill.active.rp-4 { background:var(--score-4-bg); color:var(--score-4-text); box-shadow:0 0.5px 2px rgba(62,125,145,0.15); }
+.tq-pill.active.pill-1, .tq-rate-pill.active.rp-1 { background:var(--score-1-bg); color:var(--score-1-text); box-shadow:0 0.5px 2px rgba(211,47,47,0.15); }
+.tq-pill.active.pill-2, .tq-rate-pill.active.rp-2 { background:var(--score-2-bg); color:var(--score-2-text); box-shadow:0 0.5px 2px rgba(192,122,0,0.15); }
+.tq-pill.active.pill-3, .tq-rate-pill.active.rp-3 { background:var(--score-3-bg); color:var(--score-3-text); box-shadow:0 0.5px 2px rgba(46,125,50,0.15); }
+.tq-pill.active.pill-4, .tq-rate-pill.active.rp-4 { background:var(--score-4-bg); color:var(--score-4-text); box-shadow:0 0.5px 2px rgba(21,101,192,0.15); }
 
 /* ── Quick Profile rows — stacked like dispositions ── */
 .tq-rate-row {

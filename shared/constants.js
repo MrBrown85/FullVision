@@ -113,7 +113,7 @@ const BC_DESIGNATIONS = {
 
 const PROF_LABELS = { 0:'No Evidence', 1:'Emerging', 2:'Developing', 3:'Proficient', 4:'Extending' };
 const PROF_COLORS = { 0:'#bbb', 1:'var(--score-1)', 2:'var(--score-2)', 3:'var(--score-3)', 4:'var(--score-4)' };
-const PROF_TINT = { 0:'rgba(187,187,187,0.12)', 1:'rgba(194,88,74,0.10)', 2:'rgba(184,137,58,0.10)', 3:'rgba(84,140,90,0.10)', 4:'rgba(62,125,145,0.12)' };
+const PROF_TINT = { 0:'rgba(187,187,187,0.12)', 1:'rgba(211,47,47,0.10)', 2:'rgba(192,122,0,0.10)', 3:'rgba(46,125,50,0.10)', 4:'rgba(21,101,192,0.12)' };
 const CORE_COMPETENCIES = [
   { id:'COM', label:'Communicating', group:'Communication', color:'#e67700' },
   { id:'COL', label:'Collaborating', group:'Communication', color:'#e67700' },
@@ -177,9 +177,9 @@ const OBS_LEVEL_LABELS = { 0:'Not Assessed', 1:'Needs Support', 2:'Developing', 
 const OBS_LEVEL_COLORS = { 0:'var(--text-3)', 1:'var(--score-1)', 2:'var(--score-2)', 3:'var(--score-3)', 4:'var(--score-4)' };
 
 const OBS_SENTIMENTS = {
-  strength: { icon:'✅', label:'Strength', color:'var(--score-3)', tint:'rgba(84,140,90,0.08)', border:'#548C5A' },
+  strength: { icon:'✅', label:'Strength', color:'var(--score-3)', tint:'rgba(46,125,50,0.08)', border:'#2e7d32' },
   growth:   { icon:'🔄', label:'Growth',   color:'var(--active)',  tint:'rgba(0,122,255,0.08)', border:'#007AFF' },
-  concern:  { icon:'⚠️', label:'Concern',  color:'var(--score-2)', tint:'rgba(184,137,58,0.08)', border:'#B8893A' }
+  concern:  { icon:'⚠️', label:'Concern',  color:'var(--score-2)', tint:'rgba(192,122,0,0.08)', border:'#c07a00' }
 };
 
 const OBS_CONTEXTS = {
