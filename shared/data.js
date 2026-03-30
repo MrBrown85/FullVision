@@ -661,6 +661,11 @@ function _initRealtimeSync() {
             return;
           }
         }
+        if (field === 'students' || field === 'scores') {
+          console.warn('[DIAG] Realtime refetch replacing cache.' + field + '[' + cid + ']',
+            'old=' + (Array.isArray(existing) ? existing.length : Object.keys(existing||{}).length),
+            'new=' + (Array.isArray(newData) ? newData.length : Object.keys(newData||{}).length));
+        }
         _cache[field][cid] = newData;
         _invalidateAndRerender();
       });
@@ -2252,7 +2257,14 @@ function getStudents(cid) {
   if (_cache.students[cid] !== undefined) return _cache.students[cid];
   try { return (JSON.parse(localStorage.getItem('gb-students-'+cid))||[]).map(migrateStudent); } catch (e) { console.warn('Students parse fallback:', e); return []; }
 }
-function saveStudents(cid, arr) { _saveCourseField('students', cid, arr); }
+function saveStudents(cid, arr) {
+  var prev = _cache.students[cid];
+  console.warn('[DIAG] saveStudents called: prev=' + (prev ? prev.length : '?') + ' new=' + (arr ? arr.length : '?'), new Error().stack);
+  if (prev && arr && arr.length < prev.length) {
+    console.error('[DIAG] STUDENT COUNT DECREASED!', { cid: cid, prevCount: prev.length, newCount: arr.length, prevNames: prev.map(function(s){return s.lastName;}).join(','), newNames: arr.map(function(s){return s.lastName;}).join(',') });
+  }
+  _saveCourseField('students', cid, arr);
+}
 function getAssessments(cid) {
   if (_cache.assessments[cid] !== undefined) return _cache.assessments[cid];
   try { return JSON.parse(localStorage.getItem('gb-assessments-'+cid))||[]; } catch (e) { console.warn('Assessments parse fallback:', e); return []; }
@@ -2296,7 +2308,15 @@ function getScores(cid) {
   if (_cache.scores[cid] !== undefined) return _cache.scores[cid];
   try { return JSON.parse(localStorage.getItem('gb-scores-'+cid))||{}; } catch (e) { console.warn('Scores parse fallback:', e); return {}; }
 }
-function saveScores(cid, obj) { _saveCourseField('scores', cid, obj); }
+function saveScores(cid, obj) {
+  var prev = _cache.scores[cid];
+  var prevCount = prev ? Object.keys(prev).length : 0;
+  var newCount = obj ? Object.keys(obj).length : 0;
+  if (prevCount > 0 && newCount < prevCount * 0.5) {
+    console.error('[DIAG] SCORES STUDENT-COUNT DECREASED!', { cid: cid, prevStudents: prevCount, newStudents: newCount }, new Error().stack);
+  }
+  _saveCourseField('scores', cid, obj);
+}
 
 /* ── Points-mode helpers: one score → all tags ──────────────── */
 function getPointsScore(cid, sid, aid) {
