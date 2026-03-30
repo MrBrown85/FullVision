@@ -616,7 +616,6 @@
 
 /* ── Column 1: Rate ── */
 .tq-col-rate { grid-area:rate; display:flex; flex-direction:column; gap:14px; }
-.tq-col-rate > .tq-panel { flex:1; min-height:0; overflow-y:auto; }
 
 /* Dimension rows — stacked label + segmented control */
 .tq-dim-row {
