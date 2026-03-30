@@ -615,7 +615,7 @@
 }
 
 /* ── Column 1: Rate ── */
-.tq-col-rate { grid-area:rate; display:flex; flex-direction:column; gap:14px; }
+.tq-col-rate { grid-area:rate; display:flex; flex-direction:column; gap:14px; min-height:0; }
 
 /* Dimension rows — stacked label + segmented control */
 .tq-dim-row {
@@ -715,7 +715,7 @@
 
 /* ── Column 2: Data — auto-populated panels ── */
 .tq-col-data { grid-area:data; display:flex; flex-direction:column; gap:12px; min-height:0; }
-.tq-col-data > .tq-panel:first-child { flex:1; min-height:0; display:flex; flex-direction:column; }
+.tq-col-data > .tq-panel:first-child { flex:1; min-height:0; }
 
 /* Snapshot rows */
 .tq-snapshot-grid { display:flex; flex-direction:column; gap:3px; }
@@ -802,9 +802,9 @@
 .tq-reflection-val { font-size:var(--text-xs); font-weight:600; flex-shrink:0; }
 
 /* ── Column 3: Write — narrative workspace ── */
-.tq-col-write { grid-area:write; position:relative; }
+.tq-col-write { grid-area:write; position:relative; min-height:0; }
 .tq-col-obs { grid-area:obs; display:flex; flex-direction:column; gap:12px; }
-.tq-col-obs > .tq-panel { display:flex; flex-direction:column; flex:1; min-height:0; }
+.tq-col-obs > .tq-panel { flex:1; min-height:0; }
 .tq-col-obs .tq-evidence-list { flex:1; min-height:0; overflow-y:auto; }
 
 /* ── Wide observations layout ── */

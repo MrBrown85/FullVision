@@ -1192,7 +1192,7 @@ function renderTermQuestionnaire(cid) {
   // ══ COLUMN 3: WRITE — Narrative workspace ══
   html += `<div class="tq-col-write">`;
 
-  html += `<div class="tq-panel" style="position:absolute;inset:0;display:flex;flex-direction:column">
+  html += `<div class="tq-panel" style="position:absolute;inset:0">
     <div class="tq-panel-title">Narrative Comment</div>
     <div class="tq-editor-wrap" style="flex:1;min-height:0">
       <div class="tq-toolbar">
