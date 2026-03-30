@@ -951,7 +951,7 @@
 .tq-nav-btn.primary:hover { background:rgba(0,100,210,1); }
 
 /* Assignment rows in snapshot */
-.tq-assignment-list { display:flex; flex-direction:column; gap:3px; margin-top:6px; max-height:600px; overflow-y:auto; }
+.tq-assignment-list { display:flex; flex-direction:column; gap:3px; margin-top:6px; max-height:calc(100vh - 450px); overflow-y:auto; }
 .tq-assignment-row {
   display:flex; align-items:center; gap:8px; padding:5px 10px;
   background:var(--bg); border-radius:var(--radius-sm); cursor:pointer; transition:all 0.1s;
