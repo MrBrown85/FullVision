@@ -354,20 +354,27 @@ async function _doSync(table, key, data) {
 
   try {
     if (table === 'scores') {
-      // Transactional bulk sync via RPC — DELETE+INSERT in one atomic operation
       const rows = _scoreBlobToRows(key.cid, data);
-      const { error } = await sb.rpc('bulk_sync', {
-        p_table: 'scores', p_teacher_id: _teacherId,
-        p_course_id: key.cid, p_rows: rows
-      }).abortSignal(controller.signal);
-      if (error) throw error;
+      const { error: delErr } = await sb.from('scores')
+        .delete().eq('teacher_id', _teacherId).eq('course_id', key.cid)
+        .abortSignal(controller.signal);
+      if (delErr) throw delErr;
+      if (rows.length > 0) {
+        const { error: insErr } = await sb.from('scores').insert(rows)
+          .abortSignal(controller.signal);
+        if (insErr) throw insErr;
+      }
     } else if (table === 'observations') {
       const obsRows = _obsBlobToRows(key.cid, data);
-      const { error } = await sb.rpc('bulk_sync', {
-        p_table: 'observations', p_teacher_id: _teacherId,
-        p_course_id: key.cid, p_rows: obsRows
-      }).abortSignal(controller.signal);
-      if (error) throw error;
+      const { error: delErr } = await sb.from('observations')
+        .delete().eq('teacher_id', _teacherId).eq('course_id', key.cid)
+        .abortSignal(controller.signal);
+      if (delErr) throw delErr;
+      if (obsRows.length > 0) {
+        const { error: insErr } = await sb.from('observations').insert(obsRows)
+          .abortSignal(controller.signal);
+        if (insErr) throw insErr;
+      }
     } else if (table === 'obs_row') {
       // Single observation upsert
       const { error } = await sb.from('observations').upsert(data, {
@@ -391,27 +398,38 @@ async function _doSync(table, key, data) {
       if (error) throw error;
     } else if (table === 'assessments') {
       const aRows = _assessmentsBlobToRows(key.cid, data);
-      const { error } = await sb.rpc('bulk_sync', {
-        p_table: 'assessments', p_teacher_id: _teacherId,
-        p_course_id: key.cid, p_rows: aRows
-      }).abortSignal(controller.signal);
-      if (error) throw error;
+      const { error: delErr } = await sb.from('assessments')
+        .delete().eq('teacher_id', _teacherId).eq('course_id', key.cid)
+        .abortSignal(controller.signal);
+      if (delErr) throw delErr;
+      if (aRows.length > 0) {
+        const { error: insErr } = await sb.from('assessments').insert(aRows)
+          .abortSignal(controller.signal);
+        if (insErr) throw insErr;
+      }
     } else if (table === 'students') {
       const sRows = _studentsBlobToRows(key.cid, data);
-      const { error } = await sb.rpc('bulk_sync', {
-        p_table: 'students', p_teacher_id: _teacherId,
-        p_course_id: key.cid, p_rows: sRows
-      }).abortSignal(controller.signal);
-      if (error) throw error;
+      const { error: delErr } = await sb.from('students')
+        .delete().eq('teacher_id', _teacherId).eq('course_id', key.cid)
+        .abortSignal(controller.signal);
+      if (delErr) throw delErr;
+      if (sRows.length > 0) {
+        const { error: insErr } = await sb.from('students').insert(sRows)
+          .abortSignal(controller.signal);
+        if (insErr) throw insErr;
+      }
     } else if (_BULK_SYNC_CONVERTERS[table]) {
-      // Medium-frequency normalized tables — transactional bulk sync
       const convFn = _BULK_SYNC_CONVERTERS[table];
       const bulkRows = convFn(key.cid, data);
-      const { error } = await sb.rpc('bulk_sync', {
-        p_table: table, p_teacher_id: _teacherId,
-        p_course_id: key.cid, p_rows: bulkRows
-      }).abortSignal(controller.signal);
-      if (error) throw error;
+      const { error: delErr } = await sb.from(table)
+        .delete().eq('teacher_id', _teacherId).eq('course_id', key.cid)
+        .abortSignal(controller.signal);
+      if (delErr) throw delErr;
+      if (bulkRows.length > 0) {
+        const { error: insErr } = await sb.from(table).insert(bulkRows)
+          .abortSignal(controller.signal);
+        if (insErr) throw insErr;
+      }
     } else if (_getConfigTableSet().has(table)) {
       // Config tables: single JSONB blob per course, upsert
       const { error } = await sb.from(table).upsert({
