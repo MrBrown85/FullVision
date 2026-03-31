@@ -219,18 +219,20 @@ async function _handleCrossTabChange(cid, field) {
       var sb = getSupabase();
       var normTable = _NORMALIZED_TABLES[field];
       if (normTable) {
-        var result = await sb.from(normTable).select('*')
-          .eq('teacher_id', _teacherId)
-          .eq('course_id', cid);
+        var result = await _selectCourseTable(sb, normTable, _teacherId, cid);
         if (!result.error && result.data) {
           if (_getConfigTableSet().has(normTable)) {
             _cache[field][cid] = (result.data.length > 0) ? result.data[0].data : _defaultForField(field);
           } else if (_BULK_LOAD_CONVERTERS[normTable]) {
             _cache[field][cid] = _BULK_LOAD_CONVERTERS[normTable](result.data);
           } else if (field === 'scores') {
-            _cache[field][cid] = _scoreRowsToBlob(result.data);
+            var newScores = _scoreRowsToBlob(result.data);
+            if (_shouldSkipEntryShrink(field, _cache[field][cid], newScores, 'Cross-tab refetch')) return;
+            _cache[field][cid] = newScores;
           } else if (field === 'observations') {
-            _cache[field][cid] = _obsRowsToBlob(result.data);
+            var newObs = _obsRowsToBlob(result.data);
+            if (_shouldSkipEntryShrink(field, _cache[field][cid], newObs, 'Cross-tab refetch')) return;
+            _cache[field][cid] = newObs;
           } else if (field === 'assessments') {
             _cache[field][cid] = _assessmentRowsToBlob(result.data);
           } else if (field === 'students') {
@@ -378,19 +380,29 @@ async function _doSync(table, key, data) {
         }
       }
 
-      // 3. DELETE only rows that were removed (targeted, not blanket)
+      // 3. DELETE only rows that were removed — batch by (assessment_id, tag_id) to minimize requests
       const toDelete = (existing || []).filter(r =>
         !currentKeys.has(r.student_id + ':' + r.assessment_id + ':' + r.tag_id)
       );
-      for (let i = 0; i < toDelete.length; i++) {
-        const d = toDelete[i];
-        const { error: delErr } = await sb.from('scores')
-          .delete()
-          .eq('teacher_id', _teacherId).eq('course_id', key.cid)
-          .eq('student_id', d.student_id).eq('assessment_id', d.assessment_id)
-          .eq('tag_id', d.tag_id)
-          .abortSignal(controller.signal);
-        if (delErr) throw delErr;
+      if (toDelete.length > 0) {
+        const deleteGroups = new Map();
+        for (const d of toDelete) {
+          const gk = d.assessment_id + ':' + d.tag_id;
+          if (!deleteGroups.has(gk)) deleteGroups.set(gk, { assessment_id: d.assessment_id, tag_id: d.tag_id, student_ids: [] });
+          deleteGroups.get(gk).student_ids.push(d.student_id);
+        }
+        for (const g of deleteGroups.values()) {
+          for (let i = 0; i < g.student_ids.length; i += 500) {
+            const chunk = g.student_ids.slice(i, i + 500);
+            const { error: delErr } = await sb.from('scores')
+              .delete()
+              .eq('teacher_id', _teacherId).eq('course_id', key.cid)
+              .eq('assessment_id', g.assessment_id).eq('tag_id', g.tag_id)
+              .in('student_id', chunk)
+              .abortSignal(controller.signal);
+            if (delErr) throw delErr;
+          }
+        }
       }
     } else if (table === 'observations') {
       // Safe sync: UPSERT + targeted DELETE (same pattern as scores)
@@ -414,11 +426,12 @@ async function _doSync(table, key, data) {
       }
 
       const obsToDelete = (existingObs || []).filter(r => !currentIds.has(r.id));
-      for (let i = 0; i < obsToDelete.length; i++) {
+      for (let i = 0; i < obsToDelete.length; i += 500) {
+        const chunk = obsToDelete.slice(i, i + 500).map(r => r.id);
         const { error: delErr } = await sb.from('observations')
           .delete()
           .eq('teacher_id', _teacherId).eq('course_id', key.cid)
-          .eq('id', obsToDelete[i].id)
+          .in('id', chunk)
           .abortSignal(controller.signal);
         if (delErr) throw delErr;
       }
@@ -793,7 +806,7 @@ function _initRealtimeSync() {
       if (_isEchoGuarded(field, cid)) return;
       var sb2 = getSupabase();
       if (!sb2) return;
-      sb2.from(supabaseTable).select('*').eq('teacher_id', _teacherId).eq('course_id', cid).then(function(res) {
+      _selectCourseTable(sb2, supabaseTable, _teacherId, cid).then(function(res) {
         if (res.error || !res.data) return;
         var newData = converter(res.data);
         if (!_hasDataChanged(newData, _cache[field][cid])) return;
@@ -808,20 +821,11 @@ function _initRealtimeSync() {
             return;
           }
         }
-        if (existing && !Array.isArray(existing) && typeof existing === 'object' &&
-            newData && !Array.isArray(newData) && typeof newData === 'object') {
-          var existingKeys = Object.keys(existing).length;
-          var newKeys = Object.keys(newData).length;
-          if (existingKeys > 0 && newKeys < existingKeys * 0.8) {
-            console.warn('[GUARD] Realtime refetch for', field, 'returned', newKeys,
-              'keys vs', existingKeys, 'in cache — skipping (likely mid-sync snapshot)');
-            return;
-          }
-        }
+        if (_shouldSkipEntryShrink(field, existing, newData, 'Realtime refetch')) return;
         if (field === 'students' || field === 'scores') {
           console.warn('[DIAG] Realtime refetch replacing cache.' + field + '[' + cid + ']',
-            'old=' + (Array.isArray(existing) ? existing.length : Object.keys(existing||{}).length),
-            'new=' + (Array.isArray(newData) ? newData.length : Object.keys(newData||{}).length));
+            'old=' + _countFieldItems(field, existing),
+            'new=' + _countFieldItems(field, newData));
         }
         _cache[field][cid] = newData;
         _invalidateAndRerender();
@@ -895,7 +899,7 @@ function _initRealtimeSync() {
         // Re-fetch entire table for this course (medium-freq = small data, simple approach)
         var sb2 = getSupabase();
         if (!sb2) return;
-        sb2.from(tblName).select('*').eq('teacher_id', _teacherId).eq('course_id', cid).then(function(res) {
+        _selectCourseTable(sb2, tblName, _teacherId, cid).then(function(res) {
           if (res.error || !res.data) return;
           var conv = _BULK_LOAD_CONVERTERS[tblName];
           if (!conv) return;
@@ -1001,9 +1005,7 @@ async function _refreshFromSupabase() {
     // Refresh all normalized tables in parallel
     var since = _lastSyncedAt ? new Date(_lastSyncedAt.getTime() - 30000).toISOString() : null;
     function _rq(tbl, tsCol) {
-      var q = sb.from(tbl).select('*').eq('teacher_id', _teacherId).eq('course_id', cid);
-      if (since) q = q.gt(tsCol, since);
-      return q;
+      return _selectCourseTable(sb, tbl, _teacherId, cid, since ? { gtColumn: tsCol, gtValue: since } : null);
     }
     var [scoreResult, obsResult, assessResult, studResult,
          goalsRefRes, reflRefRes, overRefRes, statusRefRes, notesRefRes, flagsRefRes, trRefRes,
@@ -1141,22 +1143,42 @@ async function initData(cid) {
   try { await p; } finally { if (_initPromise === p) _initPromise = null; }
 }
 
-/* Fetch all rows for a table, paginating past PostgREST's 1000-row default cap. */
-async function _pagedSelect(sb, tbl, teacherId, cid, pageSize) {
-  pageSize = pageSize || 1000;
+/* Fetch all course rows for a table, paginating past PostgREST's 1000-row default cap. */
+async function _selectCourseTable(sb, tbl, teacherId, cid, opts) {
+  opts = opts || {};
+  var columns = opts.columns || '*';
+  var pageSize = opts.pageSize || 1000;
+  var gtColumn = opts.gtColumn;
+  var gtValue = opts.gtValue;
+  var signal = opts.signal;
   var allRows = [];
   var offset = 0;
   while (true) {
-    var res = await sb.from(tbl).select('*')
-      .eq('teacher_id', teacherId).eq('course_id', cid)
-      .range(offset, offset + pageSize - 1);
-    if (res.error) throw res.error;
+    var q = sb.from(tbl).select(columns)
+      .eq('teacher_id', teacherId).eq('course_id', cid);
+    if (gtColumn && gtValue && typeof q.gt === 'function') q = q.gt(gtColumn, gtValue);
+    var supportsRange = typeof q.range === 'function';
+    if (supportsRange) q = q.range(offset, offset + pageSize - 1);
+    if (signal && typeof q.abortSignal === 'function') q = q.abortSignal(signal);
+    var res;
+    try {
+      res = await q;
+    } catch (error) {
+      return { data: null, error: error };
+    }
+    if (res.error) return { data: null, error: res.error };
     var batch = res.data || [];
     allRows = allRows.concat(batch);
-    if (batch.length < pageSize) break;
+    if (!supportsRange || batch.length < pageSize) break;
     offset += pageSize;
   }
-  return allRows;
+  return { data: allRows, error: null };
+}
+
+async function _pagedSelect(sb, tbl, teacherId, cid, opts) {
+  var result = await _selectCourseTable(sb, tbl, teacherId, cid, opts);
+  if (result.error) throw result.error;
+  return result.data || [];
 }
 
 async function _doInitData(cid) {
@@ -1165,8 +1187,15 @@ async function _doInitData(cid) {
 
     try {
       // Load all normalized tables in parallel
-      // scores and observations use paged fetch to bypass PostgREST's 1000-row cap
-      const _q = (tbl) => sb.from(tbl).select('*').eq('teacher_id', _teacherId).eq('course_id', cid);
+      // Use paged fetches for every course table so fresh logins do not
+      // truncate datasets at PostgREST's default 1000-row cap.
+      const _q = async function(tbl) {
+        try {
+          return { data: await _pagedSelect(sb, tbl, _teacherId, cid), error: null };
+        } catch (error) {
+          return { data: null, error: error };
+        }
+      };
       const [scoreRows, obsRows, assessRes, studentRes,
              goalsRes, reflRes, overRes, statusRes, notesRes, flagsRes, trRes,
              cfgLmRes, cfgCourseRes, cfgModRes, cfgRubRes, cfgTagRes, cfgRepRes] = await Promise.all([
@@ -1261,16 +1290,11 @@ function _healFromLocalBackup(cid, field, lsKey) {
   var lsRaw = _safeParseLS('gb-' + lsKey + '-' + cid, null);
   if (!lsRaw) return; // no local backup
 
-  var supaCount, lsCount;
-  if (Array.isArray(supaData)) {
-    supaCount = supaData.length;
-    lsCount = Array.isArray(lsRaw) ? lsRaw.length : 0;
-  } else {
-    supaCount = Object.keys(supaData || {}).length;
-    lsCount = Object.keys(lsRaw || {}).length;
-  }
+  var supaCount = _countFieldItems(field, supaData);
+  var lsCount = _countFieldItems(field, lsRaw);
 
-  if (lsCount > 0 && supaCount < lsCount * 0.5) {
+  var healThreshold = (field === 'scores' || field === 'observations') ? 0.8 : 0.5;
+  if (lsCount > 0 && supaCount < lsCount * healThreshold) {
     console.warn('Healing ' + field + ' from localStorage: Supabase had', supaCount,
       'items vs', lsCount, 'locally — restoring and re-syncing');
     // Restore cache from localStorage
@@ -1333,6 +1357,29 @@ function _seedCourseToSupabase(cid) {
 function _defaultForField(field) {
   const arrayFields = ['students', 'assessments', 'modules', 'rubrics', 'customTags'];
   return arrayFields.includes(field) ? [] : {};
+}
+
+function _countFieldItems(field, data) {
+  if (!data) return 0;
+  if (Array.isArray(data)) return data.length;
+  if (field === 'scores' || field === 'observations') {
+    return Object.keys(data).reduce(function(total, sid) {
+      return total + ((data[sid] || []).length || 0);
+    }, 0);
+  }
+  return Object.keys(data).length;
+}
+
+function _shouldSkipEntryShrink(field, existing, incoming, source) {
+  if (field !== 'scores' && field !== 'observations') return false;
+  var existingCount = _countFieldItems(field, existing);
+  var incomingCount = _countFieldItems(field, incoming);
+  if (existingCount > 0 && incomingCount < existingCount * 0.8) {
+    console.warn('[GUARD]', source, 'for', field, 'returned', incomingCount,
+      'entries vs', existingCount, 'in cache — skipping (likely partial snapshot)');
+    return true;
+  }
+  return false;
 }
 
 function _safeParseLS(key, fallback) {
