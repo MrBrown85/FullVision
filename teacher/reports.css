@@ -968,10 +968,21 @@
 .tq-wrap.floating .tq-col-write {
   display:contents;
 }
+/* Header & footer flow normally at top/bottom; panels float between them */
+.tq-wrap.floating .student-header-top {
+  position:relative; z-index:200; margin-bottom:4px;
+}
+.tq-wrap.floating .tq-nav-footer {
+  position:relative; z-index:200; background:var(--bg);
+}
 .tq-wrap.floating .tq-panel {
   position:absolute;
-  overflow:auto;
+  overflow:visible;   /* let resize handles extend outside */
   box-sizing:border-box;
+}
+.tq-wrap.floating .tq-panel > :not(.tq-resize-handle) {
+  /* inner content scrolls if needed */
+  max-height:100%; overflow-y:auto;
 }
 .tq-wrap.floating .tq-panel.dragging { opacity:0.85; }
 .tq-wrap.floating .tq-panel-title {
@@ -989,7 +1000,7 @@
 }
 .tq-reset-layout-btn:hover { border-color:var(--text-3); color:var(--text-2); }
 
-/* Resize handles */
+/* Resize handles — positioned at panel edges, overflow:visible lets them extend outside */
 .tq-resize-handle { position:absolute; z-index:1; }
 .tq-resize-handle.n  { top:-3px; left:6px; right:6px; height:6px; cursor:n-resize; }
 .tq-resize-handle.s  { bottom:-3px; left:6px; right:6px; height:6px; cursor:s-resize; }

@@ -1,6 +1,7 @@
 /* tq-panel-manager.js — Free-floating draggable & resizable panel system
    Converts the Term Questionnaire grid into independently positionable windows.
-   Persists layout per-course via getReportConfig / saveReportConfig. */
+   Persists layout per-course via getReportConfig / saveReportConfig.
+   Panels snap to a 3-column grid (or 2-col / full-width when resized). */
 window.TqPanelManager = (function() {
   'use strict';
 
@@ -13,6 +14,8 @@ window.TqPanelManager = (function() {
 
   var DRAG_THRESHOLD = 4;
   var SAVE_DEBOUNCE = 500;
+  var SNAP_THRESHOLD = 24;       // px — how close before snapping
+  var COL_GAP = 12;              // matches CSS gap
   var HANDLE_DIRS = ['n','s','e','w','nw','ne','sw','se'];
 
   // Min dimensions per panel type
@@ -27,30 +30,75 @@ window.TqPanelManager = (function() {
   };
   var DEFAULT_MIN = { w: 200, h: 100 };
 
+  /* ── Snap grid ─────────────────────────────────────────────── */
+
+  function _getSnapColumns(wrapW) {
+    var usable = wrapW - COL_GAP * 2;  // 3 cols → 2 gaps
+    var colW = usable / 3;
+    // Snap X positions: left edge of each column
+    var xs = [
+      0,
+      colW + COL_GAP,
+      (colW + COL_GAP) * 2,
+    ];
+    // Snap widths: 1-col, 2-col, 3-col
+    var ws = [
+      colW,
+      colW * 2 + COL_GAP,
+      wrapW,
+    ];
+    return { xs: xs, ws: ws, colW: colW };
+  }
+
+  function _snapX(x, wrapW) {
+    var cols = _getSnapColumns(wrapW);
+    for (var i = 0; i < cols.xs.length; i++) {
+      if (Math.abs(x - cols.xs[i]) < SNAP_THRESHOLD) return cols.xs[i];
+    }
+    return x;
+  }
+
+  function _snapW(w, wrapW) {
+    var cols = _getSnapColumns(wrapW);
+    for (var i = 0; i < cols.ws.length; i++) {
+      if (Math.abs(w - cols.ws[i]) < SNAP_THRESHOLD) return cols.ws[i];
+    }
+    return w;
+  }
+
   /* ── Layout persistence ────────────────────────────────────── */
 
   function _loadLayout(cid) {
-    var cfg = getReportConfig(cid);
-    return (cfg && cfg.panelLayout) ? cfg.panelLayout : null;
+    try {
+      var cfg = getReportConfig(cid);
+      return (cfg && cfg.panelLayout) ? cfg.panelLayout : null;
+    } catch (e) {
+      console.error('Panel layout load failed:', e);
+      return null;
+    }
   }
 
   function _saveLayout(cid) {
     clearTimeout(_saveTimer);
     _saveTimer = setTimeout(function() {
-      var wrap = document.querySelector('.tq-wrap.floating');
-      if (!wrap) return;
-      var layout = {};
-      wrap.querySelectorAll('[data-panel-id]').forEach(function(panel) {
-        layout[panel.dataset.panelId] = {
-          x: parseFloat(panel.style.left) || 0,
-          y: parseFloat(panel.style.top) || 0,
-          w: parseFloat(panel.style.width) || panel.offsetWidth,
-          h: parseFloat(panel.style.height) || panel.offsetHeight,
-        };
-      });
-      var cfg = getReportConfig(cid) || {};
-      cfg.panelLayout = layout;
-      saveReportConfig(cid, cfg);
+      try {
+        var wrap = document.querySelector('.tq-wrap.floating');
+        if (!wrap) return;
+        var layout = {};
+        wrap.querySelectorAll('[data-panel-id]').forEach(function(panel) {
+          layout[panel.dataset.panelId] = {
+            x: parseFloat(panel.style.left) || 0,
+            y: parseFloat(panel.style.top) || 0,
+            w: parseFloat(panel.style.width) || panel.offsetWidth,
+            h: parseFloat(panel.style.height) || panel.offsetHeight,
+          };
+        });
+        var cfg = getReportConfig(cid) || {};
+        cfg.panelLayout = layout;
+        saveReportConfig(cid, cfg);
+      } catch (e) {
+        console.error('Panel layout save failed:', e);
+      }
     }, SAVE_DEBOUNCE);
   }
 
@@ -86,10 +134,8 @@ window.TqPanelManager = (function() {
   /* ── Drag logic ────────────────────────────────────────────── */
 
   function _onPointerDown(e) {
-    // Only start drag from panel title
     var title = e.target.closest('.tq-panel-title');
     if (!title) return;
-    // Don't drag from buttons/inputs inside the title
     if (e.target.closest('button, input, select, a')) return;
     var panel = title.closest('[data-panel-id]');
     if (!panel) return;
@@ -125,9 +171,11 @@ window.TqPanelManager = (function() {
 
     // Constrain to wrap bounds
     var wrap = _drag.panel.parentElement;
+    if (wrap && wrap.classList.contains('floating')) wrap = wrap; // direct child
+    else wrap = _drag.panel.closest('.tq-wrap.floating');
     if (wrap) {
       var maxX = wrap.clientWidth - _drag.panel.offsetWidth;
-      var maxY = wrap.scrollHeight - _drag.panel.offsetHeight;
+      var maxY = wrap.clientHeight - _drag.panel.offsetHeight;
       newLeft = Math.max(0, Math.min(newLeft, maxX));
       newTop = Math.max(0, Math.min(newTop, maxY));
     }
@@ -139,7 +187,18 @@ window.TqPanelManager = (function() {
   function _onPointerUpDrag(e) {
     if (!_drag || e.pointerId !== _drag.pointerId) return;
     _drag.panel.classList.remove('dragging');
-    if (_drag.started) _saveLayout(_cid);
+
+    if (_drag.started) {
+      // Snap to column grid
+      var wrap = _drag.panel.closest('.tq-wrap.floating');
+      if (wrap) {
+        var wrapW = wrap.clientWidth;
+        var curLeft = parseFloat(_drag.panel.style.left) || 0;
+        var snappedX = _snapX(curLeft, wrapW);
+        _drag.panel.style.left = snappedX + 'px';
+      }
+      _saveLayout(_cid);
+    }
     _drag = null;
   }
 
@@ -156,7 +215,7 @@ window.TqPanelManager = (function() {
     _bringToFront(panel);
 
     var rect = panel.getBoundingClientRect();
-    var wrapRect = panel.parentElement.getBoundingClientRect();
+    var wrap = panel.closest('.tq-wrap.floating');
     var pid = panel.dataset.panelId;
     var mins = MIN_DIMS[pid] || DEFAULT_MIN;
 
@@ -171,8 +230,8 @@ window.TqPanelManager = (function() {
       origH: rect.height,
       minW: mins.w,
       minH: mins.h,
-      wrapW: wrapRect.width,
-      wrapH: panel.parentElement.scrollHeight,
+      wrapW: wrap ? wrap.clientWidth : rect.width + 200,
+      wrapH: wrap ? wrap.clientHeight : rect.height + 200,
       pointerId: e.pointerId,
     };
     handle.setPointerCapture(e.pointerId);
@@ -196,17 +255,18 @@ window.TqPanelManager = (function() {
     if (dir.indexOf('w') >= 0) {
       var wDx = Math.min(dx, r.origW - r.minW);
       newL = Math.max(0, r.origLeft + wDx);
-      newW = r.origW - (newL - r.origLeft);
+      newW = Math.max(r.minW, r.origW - (newL - r.origLeft));
     }
     // South
     if (dir === 's' || dir === 'se' || dir === 'sw') {
       newH = Math.max(r.minH, r.origH + dy);
+      newH = Math.min(newH, r.wrapH - r.origTop);
     }
     // North
     if (dir === 'n' || dir === 'ne' || dir === 'nw') {
       var nDy = Math.min(dy, r.origH - r.minH);
       newT = Math.max(0, r.origTop + nDy);
-      newH = r.origH - (newT - r.origTop);
+      newH = Math.max(r.minH, r.origH - (newT - r.origTop));
     }
 
     r.panel.style.left = newL + 'px';
@@ -217,6 +277,20 @@ window.TqPanelManager = (function() {
 
   function _onResizeUp(e) {
     if (!_resize || e.pointerId !== _resize.pointerId) return;
+
+    // Snap width to column grid
+    var wrap = _resize.panel.closest('.tq-wrap.floating');
+    if (wrap) {
+      var wrapW = wrap.clientWidth;
+      var curW = parseFloat(_resize.panel.style.width) || _resize.panel.offsetWidth;
+      var curL = parseFloat(_resize.panel.style.left) || 0;
+      var snappedW = _snapW(curW, wrapW);
+      _resize.panel.style.width = snappedW + 'px';
+      // Also snap left edge
+      var snappedX = _snapX(curL, wrapW);
+      _resize.panel.style.left = snappedX + 'px';
+    }
+
     _resize = null;
     _saveLayout(_cid);
   }
@@ -224,6 +298,9 @@ window.TqPanelManager = (function() {
   /* ── Init / Destroy ────────────────────────────────────────── */
 
   function init(cid) {
+    // Clean up previous session
+    destroy();
+
     _cid = cid;
     var wrap = document.querySelector('.tq-wrap');
     if (!wrap) return;
@@ -249,14 +326,24 @@ window.TqPanelManager = (function() {
     // Switch to floating mode
     wrap.classList.add('floating');
 
-    // Apply positions
+    // Apply positions — snap defaults to column grid
+    var wrapW = wrap.clientWidth;
     panels.forEach(function(panel) {
       var pid = panel.dataset.panelId;
       var pos = (saved && saved[pid]) ? saved[pid] : defaults[pid];
       if (!pos) return;
-      panel.style.left = pos.x + 'px';
+
+      // Snap default positions to column grid (saved positions are already snapped)
+      var x = pos.x;
+      var w = pos.w;
+      if (!saved || !saved[pid]) {
+        x = _snapX(x, wrapW);
+        w = _snapW(w, wrapW);
+      }
+
+      panel.style.left = x + 'px';
       panel.style.top = pos.y + 'px';
-      panel.style.width = pos.w + 'px';
+      panel.style.width = w + 'px';
       panel.style.height = pos.h + 'px';
       _injectHandles(panel);
     });
@@ -268,16 +355,13 @@ window.TqPanelManager = (function() {
     if (footer) footer.style.zIndex = '200';
 
     // Attach listeners
-    if (_ac) _ac.abort();
     _ac = new AbortController();
     var sig = { signal: _ac.signal };
 
     wrap.addEventListener('pointerdown', function(e) {
-      // Resize handle takes priority
       if (e.target.closest('.tq-resize-handle')) {
         _onResizeDown(e);
       } else {
-        // Bring to front on any click inside panel
         var panel = e.target.closest('[data-panel-id]');
         if (panel) _bringToFront(panel);
         _onPointerDown(e);
@@ -305,13 +389,17 @@ window.TqPanelManager = (function() {
     clearTimeout(_saveTimer);
     _drag = null;
     _resize = null;
+    _cid = null;
   }
 
   function resetLayout(cid) {
-    var cfg = getReportConfig(cid) || {};
-    delete cfg.panelLayout;
-    saveReportConfig(cid, cfg);
-    // Caller should re-render to restore grid defaults
+    try {
+      var cfg = getReportConfig(cid) || {};
+      delete cfg.panelLayout;
+      saveReportConfig(cid, cfg);
+    } catch (e) {
+      console.error('Panel layout reset failed:', e);
+    }
   }
 
   return {

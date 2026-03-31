@@ -593,7 +593,7 @@ function _configureQuestionnaire() {
       'tqCopyNarrative':        function() { tqCopyNarrative(); },
       'tqObsFilter':            function() { tqObsFilter = el.dataset.filter; RQ.tqObsFilter = el.dataset.filter; renderReports(); },
       'tqToggleOb':             function() { tqToggleOb(el.dataset.sid, el.dataset.obid); },
-      'resetTqLayout':          function() { if (window.TqPanelManager) { TqPanelManager.resetLayout(cid); renderReports(); } }
+      'resetTqLayout':          function() { if (window.TqPanelManager) { TqPanelManager.resetLayout(activeCourse); renderReports(); } }
     };
     if (handlers[action]) {
       handlers[action]();
@@ -719,6 +719,8 @@ function _configureQuestionnaire() {
   }
 
   function destroy() {
+    // Clean up panel manager
+    if (window.TqPanelManager) TqPanelManager.destroy();
     // Save any unsaved narrative
     if (RQ.tqNarrativeDirty) tqSaveCurrentIfNeeded();
 
