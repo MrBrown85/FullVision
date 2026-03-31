@@ -285,6 +285,7 @@ function renderReports() {
 
   if (activeTab === 'questionnaire') {
     output.innerHTML = renderTermQuestionnaire(cid);
+    if (window.TqPanelManager) TqPanelManager.init(cid);
     // Highlight active student in sidebar
     const students = getTqStudents();
     const activeSid = students[RQ.tqStudentIndex]?.id;
@@ -591,7 +592,8 @@ function _configureQuestionnaire() {
       'tqAutoNarrative':        function() { tqAutoNarrative(el.dataset.sid); },
       'tqCopyNarrative':        function() { tqCopyNarrative(); },
       'tqObsFilter':            function() { tqObsFilter = el.dataset.filter; RQ.tqObsFilter = el.dataset.filter; renderReports(); },
-      'tqToggleOb':             function() { tqToggleOb(el.dataset.sid, el.dataset.obid); }
+      'tqToggleOb':             function() { tqToggleOb(el.dataset.sid, el.dataset.obid); },
+      'resetTqLayout':          function() { if (window.TqPanelManager) { TqPanelManager.resetLayout(cid); renderReports(); } }
     };
     if (handlers[action]) {
       handlers[action]();

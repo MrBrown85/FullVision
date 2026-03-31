@@ -1029,8 +1029,8 @@ function renderTermQuestionnaire(cid) {
   const ratedLearning = LEARNING_DIMS.filter(d => (dims[d]||0) > 0).length;
   const ratedRelational = RELATIONAL_DIMS.filter(d => (dims[d]||0) > 0).length;
 
-  const _renderDimPanel = (dimList, title, ratedCount) => {
-    html += `<div class="tq-panel">
+  const _renderDimPanel = (dimList, title, ratedCount, panelId) => {
+    html += `<div class="tq-panel" data-panel-id="${panelId}">
       <div class="tq-panel-title">${title} <span class="tq-panel-badge">${ratedCount}/${dimList.length}</span></div>`;
     dimList.forEach(dim => {
       const val = dims[dim] || 0;
@@ -1049,12 +1049,12 @@ function renderTermQuestionnaire(cid) {
     });
     html += `</div>`;
   };
-  _renderDimPanel(LEARNING_DIMS, 'Learning Dispositions', ratedLearning);
-  _renderDimPanel(RELATIONAL_DIMS, 'Relational & Identity', ratedRelational);
+  _renderDimPanel(LEARNING_DIMS, 'Learning Dispositions', ratedLearning, 'learning-dispositions');
+  _renderDimPanel(RELATIONAL_DIMS, 'Relational & Identity', ratedRelational, 'relational-identity');
 
   // Quick Profile
   const RATE_LABELS = {1:'Rarely', 2:'Sometimes', 3:'Usually', 4:'Consistently'};
-  html += `<div class="tq-panel">
+  html += `<div class="tq-panel" data-panel-id="quick-profile">
     <div class="tq-panel-title">Quick Profile</div>`;
   ['workHabits', 'participation'].forEach(field => {
     const val = rating[field] || 0;
@@ -1116,7 +1116,7 @@ function renderTermQuestionnaire(cid) {
   html += `<div class="tq-col-data">`;
 
   // Academic Snapshot + Assignments
-  html += `<div class="tq-panel fill">
+  html += `<div class="tq-panel fill" data-panel-id="academic-snapshot">
     <div class="tq-panel-title">Academic Snapshot <span class="tq-panel-badge">${assignmentPerf.length} assessed</span></div>
     <div class="tq-snapshot-grid">
       <div class="tq-snapshot-item overall">
@@ -1154,7 +1154,7 @@ function renderTermQuestionnaire(cid) {
   // Self-reflections (stays in col-data)
   const reflectionEntries = Object.entries(studentReflections).filter(([,r]) => r && r.confidence > 0);
   if (reflectionEntries.length > 0) {
-    html += `<div class="tq-panel">
+    html += `<div class="tq-panel" data-panel-id="self-reflections">
       <div class="tq-panel-title">Student Self-Reflections</div>`;
     reflectionEntries.forEach(([secId, ref]) => {
       const sec = sections.find(s => s.id === secId);
@@ -1170,7 +1170,7 @@ function renderTermQuestionnaire(cid) {
   // Observations (inside col-data, below snapshot + reflections)
   const mentionObs = rating.mentionObs || [];
   const recentObs = allObs.slice(0, 8);
-  html += `<div class="tq-panel">
+  html += `<div class="tq-panel" data-panel-id="observations">
     <div class="tq-panel-title spread">
       <span>Observations <span class="tq-panel-badge">${obsCount}</span></span>
       <div class="tq-obs-summary">`;
@@ -1215,7 +1215,7 @@ function renderTermQuestionnaire(cid) {
   // ══ COLUMN 3: WRITE — Narrative workspace ══
   html += `<div class="tq-col-write">`;
 
-  html += `<div class="tq-panel fill">
+  html += `<div class="tq-panel fill" data-panel-id="narrative-comment">
     <div class="tq-panel-title">Narrative Comment</div>
     <div class="tq-editor-wrap">
       <div class="tq-toolbar">
@@ -1251,6 +1251,7 @@ function renderTermQuestionnaire(cid) {
   // ══ NAV FOOTER (spans all 3 cols) ══
   html += `<div class="tq-nav-footer">
     <button class="tq-nav-btn" data-action="tqPrevStudent" ${tqStudentIndex === 0 ? 'disabled' : ''}>← Previous</button>
+    <button class="tq-reset-layout-btn" data-action="resetTqLayout">Reset Layout</button>
     <span class="tq-nav-counter">${tqStudentIndex + 1} of ${students.length}</span>
     <button class="tq-nav-btn primary" data-action="tqNextStudent">${tqStudentIndex >= students.length - 1 ? 'Done ✓' : 'Save & Next →'}</button>
   </div>`;
