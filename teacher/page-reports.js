@@ -285,7 +285,6 @@ function renderReports() {
 
   if (activeTab === 'questionnaire') {
     output.innerHTML = renderTermQuestionnaire(cid);
-    if (window.TqPanelManager) TqPanelManager.init(cid);
     // Highlight active student in sidebar
     const students = getTqStudents();
     const activeSid = students[RQ.tqStudentIndex]?.id;
@@ -592,8 +591,7 @@ function _configureQuestionnaire() {
       'tqAutoNarrative':        function() { tqAutoNarrative(el.dataset.sid); },
       'tqCopyNarrative':        function() { tqCopyNarrative(); },
       'tqObsFilter':            function() { tqObsFilter = el.dataset.filter; RQ.tqObsFilter = el.dataset.filter; renderReports(); },
-      'tqToggleOb':             function() { tqToggleOb(el.dataset.sid, el.dataset.obid); },
-      'resetTqLayout':          function() { if (window.TqPanelManager) { TqPanelManager.resetLayout(activeCourse); renderReports(); } }
+      'tqToggleOb':             function() { tqToggleOb(el.dataset.sid, el.dataset.obid); }
     };
     if (handlers[action]) {
       handlers[action]();
@@ -719,8 +717,6 @@ function _configureQuestionnaire() {
   }
 
   function destroy() {
-    // Clean up panel manager
-    if (window.TqPanelManager) TqPanelManager.destroy();
     // Save any unsaved narrative
     if (RQ.tqNarrativeDirty) tqSaveCurrentIfNeeded();
 

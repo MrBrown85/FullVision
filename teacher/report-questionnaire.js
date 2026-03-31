@@ -1251,7 +1251,6 @@ function renderTermQuestionnaire(cid) {
   // ══ NAV FOOTER (spans all 3 cols) ══
   html += `<div class="tq-nav-footer">
     <button class="tq-nav-btn" data-action="tqPrevStudent" ${tqStudentIndex === 0 ? 'disabled' : ''}>← Previous</button>
-    <button class="tq-reset-layout-btn" data-action="resetTqLayout">Reset Layout</button>
     <span class="tq-nav-counter">${tqStudentIndex + 1} of ${students.length}</span>
     <button class="tq-nav-btn primary" data-action="tqNextStudent">${tqStudentIndex >= students.length - 1 ? 'Done ✓' : 'Save & Next →'}</button>
   </div>`;
