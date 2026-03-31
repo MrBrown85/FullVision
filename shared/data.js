@@ -1141,29 +1141,46 @@ async function initData(cid) {
   try { await p; } finally { if (_initPromise === p) _initPromise = null; }
 }
 
+/* Fetch all rows for a table, paginating past PostgREST's 1000-row default cap. */
+async function _pagedSelect(sb, tbl, teacherId, cid, pageSize) {
+  pageSize = pageSize || 1000;
+  var allRows = [];
+  var offset = 0;
+  while (true) {
+    var res = await sb.from(tbl).select('*')
+      .eq('teacher_id', teacherId).eq('course_id', cid)
+      .range(offset, offset + pageSize - 1);
+    if (res.error) throw res.error;
+    var batch = res.data || [];
+    allRows = allRows.concat(batch);
+    if (batch.length < pageSize) break;
+    offset += pageSize;
+  }
+  return allRows;
+}
+
 async function _doInitData(cid) {
   if (_useSupabase) {
     const sb = getSupabase();
 
     try {
       // Load all normalized tables in parallel
+      // scores and observations use paged fetch to bypass PostgREST's 1000-row cap
       const _q = (tbl) => sb.from(tbl).select('*').eq('teacher_id', _teacherId).eq('course_id', cid);
-      const [scoreRes, obsRes, assessRes, studentRes,
+      const [scoreRows, obsRows, assessRes, studentRes,
              goalsRes, reflRes, overRes, statusRes, notesRes, flagsRes, trRes,
              cfgLmRes, cfgCourseRes, cfgModRes, cfgRubRes, cfgTagRes, cfgRepRes] = await Promise.all([
-        _q('scores'), _q('observations'), _q('assessments'), _q('students'),
+        _pagedSelect(sb, 'scores', _teacherId, cid),
+        _pagedSelect(sb, 'observations', _teacherId, cid),
+        _q('assessments'), _q('students'),
         _q('goals'), _q('reflections'), _q('overrides'), _q('statuses'),
         _q('student_notes'), _q('student_flags'), _q('term_ratings'),
         _q('config_learning_maps'), _q('config_course'), _q('config_modules'),
         _q('config_rubrics'), _q('config_custom_tags'), _q('config_report')
       ]);
 
-      _cache.scores[cid] = scoreRes.error
-        ? (console.warn('Failed to load scores for', cid, scoreRes.error), {})
-        : _scoreRowsToBlob(scoreRes.data);
-      _cache.observations[cid] = obsRes.error
-        ? (console.warn('Failed to load observations for', cid, obsRes.error), {})
-        : _obsRowsToBlob(obsRes.data);
+      _cache.scores[cid] = _scoreRowsToBlob(scoreRows);
+      _cache.observations[cid] = _obsRowsToBlob(obsRows);
       _cache.assessments[cid] = assessRes.error
         ? (console.warn('Failed to load assessments for', cid, assessRes.error), [])
         : _assessmentRowsToBlob(assessRes.data);
@@ -1213,7 +1230,8 @@ async function _doInitData(cid) {
 
       // Migration: if Supabase returned all-empty but localStorage has data,
       // this is a post-normalization first load. Populate Supabase from localStorage.
-      var supabaseEmpty = [scoreRes, obsRes, assessRes, studentRes,
+      var supabaseEmpty = scoreRows.length === 0 && obsRows.length === 0 &&
+        [assessRes, studentRes,
         goalsRes, reflRes, overRes, statusRes, notesRes, flagsRes, trRes,
         cfgLmRes, cfgCourseRes, cfgModRes, cfgRubRes, cfgTagRes, cfgRepRes].every(function(r) {
         return !r.data || r.data.length === 0;
