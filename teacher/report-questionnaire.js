@@ -152,17 +152,6 @@ function tqToggleOb(sid, obId) {
   rerender();
 }
 
-function tqToggleTag(sid, field, tagId) {
-  tqSaveNarrative();
-  const termId = getTermId();
-  const existing = getStudentTermRating(_activeCourse, sid, termId) || {};
-  const tags = [...(existing[field] || [])];
-  const idx = tags.indexOf(tagId);
-  if (idx >= 0) tags.splice(idx, 1); else tags.push(tagId);
-  upsertTermRating(_activeCourse, sid, termId, { [field]: tags });
-  rerender();
-}
-
 function tqAutoNarrative(sid) {
   const cid = _activeCourse;
   const student = getStudents(cid).find(s => s.id === sid);
@@ -209,9 +198,7 @@ function tqAutoNarrative(sid) {
   const assessments = getAssessments(cid);
   const studentScores = getScores(cid)[sid] || [];
   const completion = getCompletionPct(cid, sid);
-  const goals = getGoals(cid);
   const reflections = getReflections(cid);
-  const studentGoals = goals[sid] || {};
   const studentReflections = reflections[sid] || {};
 
   // Dimension analysis
@@ -990,9 +977,7 @@ function renderTermQuestionnaire(cid) {
   const sections = getSections(cid);
   const allObs = getStudentQuickObs(cid, sid);
   const allTags = getAllTags(cid);
-  const goals = getGoals(cid);
   const reflections = getReflections(cid);
-  const studentGoals = goals[sid] || {};
   const studentReflections = reflections[sid] || {};
 
   // Observation insights
@@ -1017,9 +1002,7 @@ function renderTermQuestionnaire(cid) {
   const assignmentPerf = assessments.map(a => {
     const aScores = studentScores.filter(s => s.assessmentId === a.id && s.score > 0);
     const avg = aScores.length > 0 ? aScores.reduce((sum,s) => sum + s.score, 0) / aScores.length : 0;
-    const high = aScores.length > 0 ? Math.max(...aScores.map(s => s.score)) : 0;
-    const low = aScores.length > 0 ? Math.min(...aScores.map(s => s.score)) : 0;
-    return { id: a.id, title: a.title, date: a.date, type: a.type || 'summative', avg, high, low, count: aScores.length };
+    return { id: a.id, title: a.title, date: a.date, type: a.type || 'summative', avg, count: aScores.length };
   }).filter(a => a.count > 0).sort((a,b) => (b.date || '').localeCompare(a.date || ''));
 
   // Saved quick-profile data
@@ -1030,8 +1013,6 @@ function renderTermQuestionnaire(cid) {
   const savedGrowth = rating.growthAreas || growthAreas.map(g => g.tag.id);
   const mentionAssessments = rating.mentionAssessments || [];
 
-  // Completion counts
-  const ratedDimCount = OBS_DIMS.filter(d => (dims[d]||0) > 0).length;
   let html = `<div class="tq-wrap">`;
 
   // ══ HEADER BAR (shared component) ══
@@ -1135,11 +1116,11 @@ function renderTermQuestionnaire(cid) {
   html += `<div class="tq-col-data">`;
 
   // Academic Snapshot + Assignments
-  html += `<div class="tq-panel" style="position:absolute;inset:0">
+  html += `<div class="tq-panel fill">
     <div class="tq-panel-title">Academic Snapshot <span class="tq-panel-badge">${assignmentPerf.length} assessed</span></div>
     <div class="tq-snapshot-grid">
-      <div class="tq-snapshot-item" style="background:var(--overlay-hover)">
-        <div class="tq-snapshot-item-label" style="font-weight:700">Overall</div>
+      <div class="tq-snapshot-item overall">
+        <div class="tq-snapshot-item-label">Overall</div>
         <div class="tq-snapshot-item-value" style="color:${PROF_COLORS[Math.round(overall)]||'var(--text-3)'};background:${PROF_TINT[Math.round(overall)]||'transparent'}">${overall > 0 ? PROF_LABELS[Math.round(overall)] : 'No data'}</div>
       </div>`;
   sections.forEach(sec => {
@@ -1154,7 +1135,7 @@ function renderTermQuestionnaire(cid) {
 
   // Assignment performance rows (toggleable for mention in narrative)
   if (assignmentPerf.length > 0) {
-    html += `<div style="margin-top:10px;flex:1;min-height:0;display:flex;flex-direction:column"><div class="tq-panel-title" style="font-size:0.5rem;margin-bottom:6px">Assignments — select to mention</div>
+    html += `<div class="tq-assignment-section"><div class="tq-panel-title">Assignments — select to mention</div>
     <div class="tq-assignment-list">`;
     assignmentPerf.forEach(a => {
       const r = Math.round(a.avg);
@@ -1169,7 +1150,6 @@ function renderTermQuestionnaire(cid) {
     html += `</div></div>`;
   }
   html += `</div>`;
-
 
   // Self-reflections (stays in col-data)
   const reflectionEntries = Object.entries(studentReflections).filter(([,r]) => r && r.confidence > 0);
@@ -1187,14 +1167,57 @@ function renderTermQuestionnaire(cid) {
     html += `</div>`;
   }
 
+  // Observations (inside col-data, below snapshot + reflections)
+  const mentionObs = rating.mentionObs || [];
+  const recentObs = allObs.slice(0, 8);
+  html += `<div class="tq-panel">
+    <div class="tq-panel-title spread">
+      <span>Observations <span class="tq-panel-badge">${obsCount}</span></span>
+      <div class="tq-obs-summary">`;
+  if (sentimentCounts.strength > 0) html += `<div class="tq-obs-stat">✅ ${sentimentCounts.strength}</div>`;
+  if (sentimentCounts.growth > 0) html += `<div class="tq-obs-stat">🔄 ${sentimentCounts.growth}</div>`;
+  if (sentimentCounts.concern > 0) html += `<div class="tq-obs-stat">⚠️ ${sentimentCounts.concern}</div>`;
+  if (topContext) html += `<div class="tq-obs-stat">${OBS_CONTEXTS[topContext[0]]?.icon||''} ${OBS_CONTEXTS[topContext[0]]?.label||topContext[0]}</div>`;
+  html += `</div></div>`;
+
+  if (recentObs.length > 0) {
+    const hasAssignObs = recentObs.some(o => o.assignmentContext);
+    const hasGenObs = recentObs.some(o => !o.assignmentContext);
+    if (hasAssignObs && hasGenObs) {
+      html += `<div class="tq-obs-filter-bar">
+        <button class="tq-obs-filter-btn${_tqObsFilter==='all'?' active':''}" data-action="tqObsFilter" data-filter="all">All</button>
+        <button class="tq-obs-filter-btn${_tqObsFilter==='general'?' active':''}" data-action="tqObsFilter" data-filter="general">General</button>
+        <button class="tq-obs-filter-btn${_tqObsFilter==='assignment'?' active':''}" data-action="tqObsFilter" data-filter="assignment">Assignment</button>
+      </div>`;
+    }
+    const filteredObs = recentObs.filter(o => _tqObsFilter === 'all' ? true : _tqObsFilter === 'assignment' ? !!o.assignmentContext : !o.assignmentContext);
+    html += `<div class="tq-obs-hint">Select to mention in narrative</div>`;
+    html += `<div class="tq-evidence-list">`;
+    filteredObs.forEach(ob => {
+      const d = new Date(ob.created);
+      const dateStr = d.toLocaleDateString('en-CA', { month:'short', day:'numeric' });
+      const sentIcon = ob.sentiment ? (OBS_SENTIMENTS[ob.sentiment]?.icon || '') + ' ' : '';
+      const selected = mentionObs.includes(ob.id);
+      html += `<div class="tq-evidence-item${selected ? ' selected' : ''}" data-action="tqToggleOb" data-sid="${sid}" data-obid="${ob.id}">
+        <span class="tq-tag-check"></span>
+        <span class="tq-evidence-text"><span class="tq-evidence-sentiment">${sentIcon}</span>${ob.assignmentContext ? `<span class="tq-obs-assign-tag">${esc(ob.assignmentContext.assessmentTitle)}</span>` : ''}${esc(ob.text)}</span>
+        <span class="tq-obs-wide-date">${dateStr}</span>
+      </div>`;
+    });
+    html += `</div>`;
+  } else {
+    html += `<div class="tq-obs-empty">There are no observations for this student.</div>`;
+  }
+  html += `</div>`;
+
   html += `</div>`; // close col-data
 
   // ══ COLUMN 3: WRITE — Narrative workspace ══
   html += `<div class="tq-col-write">`;
 
-  html += `<div class="tq-panel" style="position:absolute;inset:0">
+  html += `<div class="tq-panel fill">
     <div class="tq-panel-title">Narrative Comment</div>
-    <div class="tq-editor-wrap" style="flex:1;min-height:0">
+    <div class="tq-editor-wrap">
       <div class="tq-toolbar">
         <div class="tq-toolbar-group">
           <button type="button" class="tq-tb-btn" data-action="tqExec" data-cmd="bold" title="Bold (⌘B)"><svg viewBox="0 0 24 24"><path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/><path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"/></svg></button>
@@ -1225,58 +1248,10 @@ function renderTermQuestionnaire(cid) {
 
   html += `</div>`; // close col-write
 
-  // ══ OBSERVATIONS — spans cols 2-3, below data+write ══
-  html += `<div class="tq-col-obs">`;
-
-  // Observation Insights + Evidence — wide layout
-  const mentionObs = rating.mentionObs || [];
-  const recentObs = allObs.slice(0, 8);
-  html += `<div class="tq-panel">
-    <div class="tq-panel-title" style="display:flex;align-items:center;justify-content:space-between">
-      <span>Observations <span class="tq-panel-badge">${obsCount}</span></span>
-      <div class="tq-obs-summary" style="margin:0;gap:8px">`;
-  if (sentimentCounts.strength > 0) html += `<div class="tq-obs-stat" style="color:var(--score-3)">✅ ${sentimentCounts.strength}</div>`;
-  if (sentimentCounts.growth > 0) html += `<div class="tq-obs-stat" style="color:var(--active)">🔄 ${sentimentCounts.growth}</div>`;
-  if (sentimentCounts.concern > 0) html += `<div class="tq-obs-stat" style="color:var(--score-2)">⚠️ ${sentimentCounts.concern}</div>`;
-  if (topContext) html += `<div class="tq-obs-stat">${OBS_CONTEXTS[topContext[0]]?.icon||''} ${OBS_CONTEXTS[topContext[0]]?.label||topContext[0]}</div>`;
-  html += `</div></div>`;
-
-  if (recentObs.length > 0) {
-    const hasAssignObs = recentObs.some(o => o.assignmentContext);
-    const hasGenObs = recentObs.some(o => !o.assignmentContext);
-    if (hasAssignObs && hasGenObs) {
-      html += `<div style="display:flex;gap:4px;margin-bottom:6px">
-        <button class="tq-obs-filter-btn${_tqObsFilter==='all'?' active':''}" data-action="tqObsFilter" data-filter="all">All</button>
-        <button class="tq-obs-filter-btn${_tqObsFilter==='general'?' active':''}" data-action="tqObsFilter" data-filter="general">General</button>
-        <button class="tq-obs-filter-btn${_tqObsFilter==='assignment'?' active':''}" data-action="tqObsFilter" data-filter="assignment">Assignment</button>
-      </div>`;
-    }
-    const filteredObs = recentObs.filter(o => _tqObsFilter === 'all' ? true : _tqObsFilter === 'assignment' ? !!o.assignmentContext : !o.assignmentContext);
-    html += `<div style="font-size:0.55rem;color:var(--text-3);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px">Select to mention in narrative</div>`;
-    html += `<div class="tq-evidence-list">`;
-    filteredObs.forEach(ob => {
-      const d = new Date(ob.created);
-      const dateStr = d.toLocaleDateString('en-CA', { month:'short', day:'numeric' });
-      const sentIcon = ob.sentiment ? (OBS_SENTIMENTS[ob.sentiment]?.icon || '') + ' ' : '';
-      const selected = mentionObs.includes(ob.id);
-      html += `<div class="tq-evidence-item${selected ? ' selected' : ''}" data-action="tqToggleOb" data-sid="${sid}" data-obid="${ob.id}" style="align-items:flex-start">
-        <span class="tq-tag-check" style="margin-top:2px"></span>
-        <span class="tq-evidence-text" style="flex:1;min-width:0"><span class="tq-evidence-sentiment">${sentIcon}</span>${ob.assignmentContext ? `<span style="font-size:0.5rem;font-weight:600;color:var(--active);margin-right:3px">${esc(ob.assignmentContext.assessmentTitle)}</span>` : ''}${esc(ob.text)}</span>
-        <span class="tq-obs-wide-date">${dateStr}</span>
-      </div>`;
-    });
-    html += `</div>`;
-  } else {
-    html += `<div style="font-size:0.78rem;color:var(--text-3);padding:12px 0">There are no observations for this student.</div>`;
-  }
-  html += `</div>`;
-
-  html += `</div>`; // close col-obs
-
   // ══ NAV FOOTER (spans all 3 cols) ══
   html += `<div class="tq-nav-footer">
-    <button class="tq-nav-btn" data-action="tqPrevStudent" ${tqStudentIndex === 0 ? 'disabled style="opacity:0.4"' : ''}>← Previous</button>
-    <span style="font-family:'SF Mono',monospace;font-size:0.6rem;color:var(--text-3);text-transform:uppercase">${tqStudentIndex + 1} of ${students.length}</span>
+    <button class="tq-nav-btn" data-action="tqPrevStudent" ${tqStudentIndex === 0 ? 'disabled' : ''}>← Previous</button>
+    <span class="tq-nav-counter">${tqStudentIndex + 1} of ${students.length}</span>
     <button class="tq-nav-btn primary" data-action="tqNextStudent">${tqStudentIndex >= students.length - 1 ? 'Done ✓' : 'Save & Next →'}</button>
   </div>`;
 
@@ -1300,7 +1275,6 @@ function renderTermQuestionnaire(cid) {
     tqToggleTrait: tqToggleTrait,
     tqToggleAssignment: tqToggleAssignment,
     tqToggleOb: tqToggleOb,
-    tqToggleTag: tqToggleTag,
     tqAutoNarrative: tqAutoNarrative,
     tqSelectStudent: tqSelectStudent,
     renderTermQuestionnaire: renderTermQuestionnaire,
