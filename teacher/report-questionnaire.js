@@ -1110,6 +1110,12 @@ function renderTermQuestionnaire(cid) {
       </div>
     </div></div>`;
 
+  html += `<div class="tq-nav-footer">
+    <button class="tq-nav-btn" data-action="tqPrevStudent" ${tqStudentIndex === 0 ? 'disabled' : ''}>← Previous</button>
+    <span class="tq-nav-counter">${tqStudentIndex + 1} of ${students.length}</span>
+    <button class="tq-nav-btn primary" data-action="tqNextStudent">${tqStudentIndex >= students.length - 1 ? 'Done ✓' : 'Save & Next →'}</button>
+  </div>`;
+
   html += `</div>`; // close col-rate
 
   // ══ COLUMN 2: DATA — Auto-populated intelligence ══
@@ -1248,13 +1254,6 @@ function renderTermQuestionnaire(cid) {
   </div>`;
 
   html += `</div>`; // close col-write
-
-  // ══ NAV FOOTER (spans all 3 cols) ══
-  html += `<div class="tq-nav-footer">
-    <button class="tq-nav-btn" data-action="tqPrevStudent" ${tqStudentIndex === 0 ? 'disabled' : ''}>← Previous</button>
-    <span class="tq-nav-counter">${tqStudentIndex + 1} of ${students.length}</span>
-    <button class="tq-nav-btn primary" data-action="tqNextStudent">${tqStudentIndex >= students.length - 1 ? 'Done ✓' : 'Save & Next →'}</button>
-  </div>`;
 
   html += `</div>`; // close tq-wrap
   return html;
