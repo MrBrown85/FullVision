@@ -745,6 +745,9 @@
 .tq-col-observations > .tq-panel.fill {
   flex:1 1 auto;
 }
+.tq-col-observations > .tq-panel {
+  max-height:320px;
+}
 .tq-col-observations .tq-evidence-list { flex:1; min-height:0; overflow-y:auto; }
 
 /* Snapshot rows */
@@ -959,7 +962,15 @@
 .tq-nav-btn.primary:hover { background:rgba(0,100,210,1); }
 
 /* Assignment rows in snapshot */
-.tq-assignment-list { display:flex; flex-direction:column; gap:3px; margin-top:6px; flex:1; min-height:0; overflow-y:auto; }
+.tq-assignment-list {
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+  margin-top:6px;
+  max-height:220px;
+  overflow-y:auto;
+  padding-right:2px;
+}
 .tq-assignment-row {
   display:flex; align-items:center; gap:8px; padding:5px 10px;
   background:var(--bg); border-radius:var(--radius-sm); cursor:pointer; transition:all 0.1s;
