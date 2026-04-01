@@ -578,10 +578,10 @@
 
 /* ── Full-bleed 3-column workboard ── */
 .tq-wrap {
-  --tq-top-panel-height: 760px;
+  --tq-top-panel-height: 1020px;
   --tq-bottom-panel-height: 180px;
   display:grid; grid-template-columns:minmax(0, 1.12fr) minmax(0, 0.86fr) minmax(0, 1fr);
-  grid-template-rows:auto auto auto auto;
+  grid-template-rows:auto minmax(var(--tq-top-panel-height), auto) auto auto;
   grid-template-areas:
     "header  header  header"
     "rateTop data    write"
@@ -739,11 +739,11 @@
   flex-direction:column;
 }
 .tq-col-data { grid-area:data; gap:12px; align-self:stretch; min-height:100%; }
-.tq-col-write { grid-area:write; gap:12px; align-self:start; }
+.tq-col-write { grid-area:write; gap:12px; align-self:stretch; min-height:100%; }
 .tq-col-observations { grid-area:obs; align-self:stretch; justify-content:flex-end; }
 .tq-col-data > .tq-panel.fill { flex:1 1 auto; min-height:100%; }
-.tq-col-write > .tq-panel.fill { flex:0 0 auto; }
-.tq-col-observations > .tq-panel.fill { flex:0 0 auto; }
+.tq-col-write > .tq-panel.fill { flex:1 1 auto; min-height:100%; }
+.tq-col-observations > .tq-panel.fill { flex:1 1 auto; }
 .tq-col-data > .tq-panel[data-panel-id="academic-snapshot"] {
   display:flex;
   flex-direction:column;
@@ -758,7 +758,7 @@
 }
 .tq-col-observations > .tq-panel {
   width:100%;
-  max-height:var(--tq-bottom-panel-height);
+  min-height:var(--tq-bottom-panel-height);
 }
 .tq-col-observations .tq-evidence-list { flex:1; min-height:0; overflow-y:auto; }
 
