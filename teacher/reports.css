@@ -578,7 +578,7 @@
 
 /* ── Full-bleed 3-column workboard ── */
 .tq-wrap {
-  --tq-top-panel-height: 560px;
+  --tq-top-panel-height: 760px;
   --tq-bottom-panel-height: 180px;
   display:grid; grid-template-columns:minmax(0, 1.12fr) minmax(0, 0.86fr) minmax(0, 1fr);
   grid-template-rows:auto auto auto auto;
