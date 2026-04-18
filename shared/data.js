@@ -727,28 +727,42 @@ async function initAllCourses() {
     }
   }
 
-  // CANONICAL-RPC TRANSITION: the public.teacher_config table was dropped by the
-  // April 3 canonical_schema_foundation migration. The replacement is
-  // get_teacher_preferences() (returns { activeCourseId, uiPrefs }) +
-  // list_teacher_courses() (returns the course list). Wiring those in is part of
-  // the data-layer rewrite. For now we run global state from localStorage only.
+  // Load global state from canonical RPCs:
+  //   get_teacher_preferences() → { activeCourseId, uiPrefs }
+  //   list_teacher_courses()    → [{ course_offering_id, title, ... }]
+  // On any failure fall back to localStorage so the app still loads offline.
   if (_useSupabase) {
-    _syncStatus = 'offline';
-    _updateSyncIndicator();
+    const sb = getSupabase();
+    try {
+      const [prefsRes, coursesRes] = await Promise.all([
+        sb.rpc('get_teacher_preferences'),
+        sb.rpc('list_teacher_courses')
+      ]);
+      if (prefsRes.error) throw prefsRes.error;
+      if (coursesRes.error) throw coursesRes.error;
+      const prefs = prefsRes.data || {};
+      const courseList = coursesRes.data || [];
+      _cache.courses = _canonicalCoursesToBlob(courseList);
+      _cache.config = Object.assign(
+        { activeCourse: prefs.activeCourseId || null },
+        prefs.uiPrefs || {}
+      );
+      // Mirror to localStorage so offline reloads (or transient Supabase failures)
+      // can boot from cache instead of starting empty.
+      _safeLSSet('gb-courses', JSON.stringify(_cache.courses));
+      _safeLSSet('gb-config', JSON.stringify(_cache.config));
+      _syncStatus = 'idle';
+      _updateSyncIndicator();
+    } catch (e) {
+      console.warn('Canonical course load failed, falling back to localStorage:', e);
+      _useSupabase = false;
+    }
   }
 
-  // Fall back to defaults if needed
+  // Fall back to localStorage when Supabase is unavailable or the RPC load failed.
   if (!_useSupabase || _cache.courses === null) {
-    if (_useSupabase) {
-      // New Supabase account — use DEFAULT_COURSES, not stale localStorage
-      _cache.courses = structuredClone(DEFAULT_COURSES);
-      _cache.config = {};
-      _syncToSupabase('teacher_config', 'courses', _cache.courses);
-      _syncToSupabase('teacher_config', 'config', _cache.config);
-    } else {
-      _cache.courses = _loadCoursesFromLS();
-      _cache.config = _safeParseLS('gb-config', {});
-    }
+    _cache.courses = _loadCoursesFromLS();
+    _cache.config = _safeParseLS('gb-config', {});
   }
 
   // Ensure COURSES global is set
@@ -1662,6 +1676,31 @@ function _assessmentRowsToBlob(rows) {
     if (r.excluded_students && r.excluded_students.length) a.excludedStudents = r.excluded_students;
     return a;
   });
+}
+
+/* Convert canonical list_teacher_courses() response → COURSES blob shape.
+   Canonical row: { course_offering_id, title, subject_code, grade_band,
+                    description, school_year, term_code, status }
+   Legacy shape:  { [id]: { id, name, gradeLevel, description, ...,
+                            gradingSystem?, calcMethod?, decayWeight? } }
+   Policy fields (gradingSystem/calcMethod/decayWeight) are populated lazily by
+   getCourseConfig(cid) → get_course_policy(uuid) when a course becomes active. */
+function _canonicalCoursesToBlob(rows) {
+  var out = {};
+  (rows || []).forEach(function(r) {
+    if (!r || !r.course_offering_id) return;
+    out[r.course_offering_id] = {
+      id: r.course_offering_id,
+      name: r.title || 'Untitled Class',
+      description: r.description || '',
+      gradeLevel: r.grade_band || '',
+      subjectCode: r.subject_code || '',
+      schoolYear: r.school_year || '',
+      termCode: r.term_code || '',
+      archived: r.status === 'archived'
+    };
+  });
+  return out;
 }
 
 /* Convert students array → flat array of table rows */
