@@ -601,9 +601,22 @@
 .tq-panel[data-panel-id="academic-snapshot"]     { grid-column:span 6; }
 .tq-panel[data-panel-id="narrative-comment"]     { grid-column:span 6; }
 
-/* Internal scroll caps — panels flow, but long lists cap their own height */
+/* Internal scroll caps — panels flow, but long lists cap their own height.
+   Observations list splits into two columns at wide widths (the observations
+   panel is span-12 full-bleed; a single-column list wastes the width).
+   Uses CSS grid rather than multi-column so flex items inside the list
+   respect the column width. */
 .tq-panel[data-panel-id="observations"] .tq-evidence-list {
   max-height:420px; overflow-y:auto;
+  display:grid;
+  grid-template-columns:repeat(2, minmax(0, 1fr));
+  gap:6px 16px;
+  align-content:start;
+}
+@media (max-width: 900px) {
+  .tq-panel[data-panel-id="observations"] .tq-evidence-list {
+    grid-template-columns:1fr;
+  }
 }
 .tq-panel[data-panel-id="academic-snapshot"] .tq-assignment-list {
   max-height:360px; overflow-y:auto;
