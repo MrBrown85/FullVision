@@ -4,6 +4,20 @@ Last refreshed: 2026-04-17. Items are tracked here as they're discovered; closed
 
 ---
 
+## Recommended sequencing for the canonical-RPC migration
+
+If you're picking up the database work, ship in this order — each step depends on the previous one being stable.
+
+1. **Phase 1c-reads** (P0, item #1 below). Highest impact: until this lands, data written from one device never appears on another. After it ships, validate in production for a day or two with real scoring/observation flows.
+2. **Score race-window fix** (P0, item #2 below). Once Phase 1c-reads is in, you'll *see* the partial-import problem — scores written before their enrollment promise resolves silently skip canonical sync. Two fixes possible (await in `teams-import.js`, or queue deferred syncs in `data.js`); the second is more robust.
+3. **Delete the bridge short-circuits** (P1, item #6 below). Only after Phase 1c-reads is verified in real use. The `// CANONICAL-RPC TRANSITION:` early-returns in `_doSync`, `_handleCrossTabChange`, `_refreshFromSupabase`, `_deleteFromSupabase` become dead code at that point.
+4. **Realtime publication** (P2, item #7 below). Add the canonical entity tables back to `supabase_realtime` and re-enable the no-op'd `_initRealtimeSync` body, pointed at the new tables filtered by `course_offering_id`. Restores phone↔laptop live sync.
+5. **Small DB additions** (P2, items #9 and #10). `delete_course` if you decide against archive-only; missing storage for modules/rubrics/customTags/notes if you want them server-backed.
+
+Items #3 (key rotation), #4 (E2E suite), and #5 (CI) below are independent of the database work and can run in parallel — none of them block the migration.
+
+---
+
 ## P0 — In flight
 
 ### 1. Phase 1c-reads — wire `_doInitData` to canonical RPCs
