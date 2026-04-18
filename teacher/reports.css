@@ -967,9 +967,10 @@
 }
 .tq-auto-btn:hover { border-color:var(--active); color:var(--active); background:rgba(0,122,255,0.04); }
 
-/* ── Nav footer — full-width page footer ── */
+/* ── Nav footer — full-width page footer ──
+   grid-column is set in the 12-col grid block (span full row); this
+   rule just handles visuals. */
 .tq-nav-footer {
-  grid-area:footer;
   display:flex; align-items:center; justify-content:space-between;
   gap:10px;
   margin-top:4px;
