@@ -1219,115 +1219,275 @@ async function _pagedSelect(sb, tbl, teacherId, cid, opts) {
 }
 
 async function _doInitData(cid) {
-  // CANONICAL-RPC TRANSITION: every legacy public table this block reads from
-  // (scores, observations, assessments, students, goals, reflections, overrides,
-  // statuses, student_notes, student_flags, term_ratings, config_*) was dropped
-  // by the April 3 canonical_schema_foundation migration. Until each load is
-  // rewritten to call its canonical RPC (list_course_scores, list_course_roster,
-  // list_course_assessments, list_course_observations, get_course_policy,
-  // get_report_config, list_course_outcomes, list_assignment_statuses,
-  // list_section_overrides, list_student_reflections, get_student_goals,
-  // list_term_ratings_for_course, projection.list_student_flags) we initialize
-  // from localStorage only. Skipping the broken Promise.all also avoids the
-  // 18 PGRST205 errors that fire on every page load today.
-  if (false && _useSupabase) {
-    const sb = getSupabase();
-
-    try {
-      // Load all normalized tables in parallel
-      // Use paged fetches for every course table so fresh logins do not
-      // truncate datasets at PostgREST's default 1000-row cap.
-      const _q = async function(tbl) {
-        try {
-          return { data: await _pagedSelect(sb, tbl, _teacherId, cid), error: null };
-        } catch (error) {
-          return { data: null, error: error };
-        }
-      };
-      const [scoreRows, obsRows, assessRes, studentRes,
-             goalsRes, reflRes, overRes, statusRes, notesRes, flagsRes, trRes,
-             cfgLmRes, cfgCourseRes, cfgModRes, cfgRubRes, cfgTagRes, cfgRepRes] = await Promise.all([
-        _pagedSelect(sb, 'scores', _teacherId, cid),
-        _pagedSelect(sb, 'observations', _teacherId, cid),
-        _q('assessments'), _q('students'),
-        _q('goals'), _q('reflections'), _q('overrides'), _q('statuses'),
-        _q('student_notes'), _q('student_flags'), _q('term_ratings'),
-        _q('config_learning_maps'), _q('config_course'), _q('config_modules'),
-        _q('config_rubrics'), _q('config_custom_tags'), _q('config_report')
-      ]);
-
-      _cache.scores[cid] = _scoreRowsToBlob(scoreRows);
-      _cache.observations[cid] = _obsRowsToBlob(obsRows);
-      _cache.assessments[cid] = assessRes.error
-        ? (console.warn('Failed to load assessments for', cid, assessRes.error), [])
-        : _assessmentRowsToBlob(assessRes.data);
-      _cache.students[cid] = studentRes.error
-        ? (console.warn('Failed to load students for', cid, studentRes.error), [])
-        : _studentRowsToBlob(studentRes.data).map(migrateStudent);
-
-      // Safety net: if Supabase returned dramatically fewer items than
-      // localStorage has, a prior DELETE+INSERT sync likely failed mid-way.
-      // Restore from localStorage and re-sync to heal Supabase.
-      _healFromLocalBackup(cid, 'students', 'students');
-      _healFromLocalBackup(cid, 'assessments', 'assessments');
-      _healFromLocalBackup(cid, 'scores', 'scores');
-      _healFromLocalBackup(cid, 'observations', 'quick-obs');
-
-      // Medium-frequency tables
-      var _medResults = { goals: goalsRes, reflections: reflRes, overrides: overRes, statuses: statusRes, notes: notesRes, flags: flagsRes, termRatings: trRes };
-      for (var _mf in _MEDIUM_FREQ_TABLES) {
-        var _tbl = _MEDIUM_FREQ_TABLES[_mf];
-        var _res = _medResults[_mf];
-        if (_res.error) {
-          console.warn('Failed to load ' + _tbl + ' for', cid, _res.error);
-          _cache[_mf][cid] = _defaultForField(_mf);
-        } else {
-          _cache[_mf][cid] = _BULK_LOAD_CONVERTERS[_tbl](_res.data);
-        }
-      }
-
-      // Config tables: single JSONB blob per course
-      var _cfgResults = { learningMaps: cfgLmRes, courseConfigs: cfgCourseRes, modules: cfgModRes, rubrics: cfgRubRes, customTags: cfgTagRes, reportConfig: cfgRepRes };
-      for (var _cf in _CONFIG_TABLES) {
-        var _cfTbl = _CONFIG_TABLES[_cf];
-        var _cfRes = _cfgResults[_cf];
-        if (_cfRes.error) {
-          console.warn('Failed to load ' + _cfTbl + ' for', cid, _cfRes.error);
-          _cache[_cf][cid] = _defaultForField(_cf);
-        } else {
-          _cache[_cf][cid] = (_cfRes.data && _cfRes.data.length > 0) ? _cfRes.data[0].data : _defaultForField(_cf);
-        }
-      }
-
-      // Fall back to built-in learning map if none stored
-      const lm = _cache.learningMaps[cid];
-      if (!lm || (!lm._customized && (!lm.sections || lm.sections.length === 0))) {
-        _cache.learningMaps[cid] = LEARNING_MAP[cid] || { subjects: [], sections: [] };
-      }
-
-      // Migration: if Supabase returned all-empty but localStorage has data,
-      // this is a post-normalization first load. Populate Supabase from localStorage.
-      var supabaseEmpty = scoreRows.length === 0 && obsRows.length === 0 &&
-        [assessRes, studentRes,
-        goalsRes, reflRes, overRes, statusRes, notesRes, flagsRes, trRes,
-        cfgLmRes, cfgCourseRes, cfgModRes, cfgRubRes, cfgTagRes, cfgRepRes].every(function(r) {
-        return !r.data || r.data.length === 0;
-      });
-      if (supabaseEmpty && _safeParseLS('gb-students-' + cid, []).length > 0) {
-        console.info('Migration: Supabase tables empty, uploading localStorage data for', cid);
-        _loadCourseFromLS(cid);
-        _seedCourseToSupabase(cid);
-      }
-
-      return;
-    } catch (error) {
-      console.error('Failed to load data for', cid, error);
-      // Fall through to localStorage
-    }
+  // Demo mode + offline: keep using the localStorage cache.
+  // The seed populates it; no Supabase round-trips wanted in demo.
+  var _demoMode = localStorage.getItem('gb-demo-mode') === '1';
+  if (_demoMode || !_useSupabase) {
+    _loadCourseFromLS(cid);
+    return;
   }
 
-  // localStorage path
-  _loadCourseFromLS(cid);
+  var sb = getSupabase();
+  if (!sb || !cid) {
+    _loadCourseFromLS(cid);
+    return;
+  }
+
+  // Load core entities + per-course config in parallel via canonical RPCs.
+  // Goals / reflections / overrides / term_ratings / flags are NOT loaded here
+  // — they have no bulk-by-course RPC in the canonical schema. They continue
+  // to come from localStorage; future work can layer per-student loops.
+  // Modules / rubrics / customTags / notes have no canonical storage at all.
+  try {
+    var results = await Promise.all([
+      sb.rpc('list_course_roster',       { p_course_offering_id: cid, p_search: null, p_limit: null, p_offset: 0 }),
+      sb.rpc('list_course_assessments',  { p_course_offering_id: cid, p_search: null, p_limit: null, p_offset: 0 }),
+      sb.rpc('list_course_scores',       { p_course_offering_id: cid, p_assessment_id: null, p_enrollment_id: null, p_limit: null, p_offset: 0 }),
+      sb.rpc('list_course_observations', { p_course_offering_id: cid, p_student_id: null, p_limit: null, p_offset: 0 }),
+      sb.rpc('list_course_outcomes',     { p_course_offering_id: cid }),
+      sb.rpc('get_course_policy',        { p_course_offering_id: cid }),
+      sb.rpc('get_report_config',        { p_course_offering_id: cid }),
+      sb.rpc('list_assignment_statuses', { p_course_offering_id: cid })
+    ]);
+    var rosterRes = results[0], assessRes = results[1], scoreRes = results[2],
+        obsRes = results[3], outcomeRes = results[4], policyRes = results[5],
+        reportRes = results[6], statusRes = results[7];
+
+    if (rosterRes.error) console.warn('list_course_roster failed:', rosterRes.error);
+    if (assessRes.error) console.warn('list_course_assessments failed:', assessRes.error);
+    if (scoreRes.error)  console.warn('list_course_scores failed:', scoreRes.error);
+    if (obsRes.error)    console.warn('list_course_observations failed:', obsRes.error);
+    if (outcomeRes.error) console.warn('list_course_outcomes failed:', outcomeRes.error);
+    if (policyRes.error) console.warn('get_course_policy failed:', policyRes.error);
+    if (reportRes.error) console.warn('get_report_config failed:', reportRes.error);
+    if (statusRes.error) console.warn('list_assignment_statuses failed:', statusRes.error);
+
+    // Convert + populate cache. Each converter is forgiving: if its source
+    // failed it leaves the cache field as the defaults from localStorage.
+    var assessments = _canonicalAssessmentsToBlob(assessRes.data);
+    _cache.assessments[cid] = assessments;
+    _safeLSSet('gb-assessments-' + cid, JSON.stringify(assessments));
+
+    var students = _canonicalRosterToBlob(rosterRes.data).map(migrateStudent);
+    _cache.students[cid] = students;
+    _safeLSSet('gb-students-' + cid, JSON.stringify(students));
+
+    // Scores need the assessment list to derive score.type from assessment_kind.
+    var scoresBlob = _canonicalScoresToBlob(scoreRes.data, assessments);
+    _cache.scores[cid] = scoresBlob;
+    _safeLSSet('gb-scores-' + cid, JSON.stringify(scoresBlob));
+
+    var obsBlob = _canonicalObservationsToBlob(obsRes.data);
+    _cache.observations[cid] = obsBlob;
+    _safeLSSet('gb-quick-obs-' + cid, JSON.stringify(obsBlob));
+
+    // Learning map: derived from course_outcome rows. Falls back to built-in
+    // LEARNING_MAP[cid] (constants.js) if the canonical schema has no outcomes.
+    var lm = _canonicalOutcomesToLearningMap(outcomeRes.data);
+    if (!lm || !lm.sections || lm.sections.length === 0) {
+      lm = LEARNING_MAP[cid] || { subjects: [], sections: [], _flatVersion: 2 };
+    }
+    _cache.learningMaps[cid] = lm;
+    _safeLSSet('gb-learningmap-' + cid, JSON.stringify(lm));
+
+    // Course policy → camelCased blob the existing getCourseConfig consumers expect.
+    var policy = _canonicalPolicyToBlob(policyRes.data);
+    _cache.courseConfigs[cid] = policy;
+    _safeLSSet('gb-courseconfig-' + cid, JSON.stringify(policy));
+
+    var reportCfg = (reportRes.data && typeof reportRes.data === 'object') ? reportRes.data : {};
+    _cache.reportConfig[cid] = reportCfg;
+    _safeLSSet('gb-report-config-' + cid, JSON.stringify(reportCfg));
+
+    // Assignment statuses: canonical RPC returns {student_id, assessment_id, status, updated_at}
+    // (text IDs — the assignment_status table predates UUID-everything). Cache shape: "sid:aid" -> status.
+    var statuses = _canonicalStatusesToBlob(statusRes.data);
+    _cache.statuses[cid] = statuses;
+    _safeLSSet('gb-statuses-' + cid, JSON.stringify(statuses));
+
+    // Fields with no bulk canonical RPC keep their localStorage values.
+    // Reading them re-uses the get*() fallback path.
+    if (_cache.goals[cid] === undefined)        _cache.goals[cid] = _safeParseLS('gb-goals-' + cid, {});
+    if (_cache.reflections[cid] === undefined)  _cache.reflections[cid] = _safeParseLS('gb-reflections-' + cid, {});
+    if (_cache.overrides[cid] === undefined)    _cache.overrides[cid] = _safeParseLS('gb-overrides-' + cid, {});
+    if (_cache.termRatings[cid] === undefined)  _cache.termRatings[cid] = _safeParseLS('gb-term-ratings-' + cid, {});
+    if (_cache.flags[cid] === undefined)        _cache.flags[cid] = _safeParseLS('gb-flags-' + cid, {});
+    if (_cache.notes[cid] === undefined)        _cache.notes[cid] = _safeParseLS('gb-notes-' + cid, {});
+    if (_cache.modules[cid] === undefined)      _cache.modules[cid] = _safeParseLS('gb-modules-' + cid, []);
+    if (_cache.rubrics[cid] === undefined)      _cache.rubrics[cid] = _safeParseLS('gb-rubrics-' + cid, []);
+    if (_cache.customTags[cid] === undefined)   _cache.customTags[cid] = _safeParseLS('gb-custom-tags-' + cid, []);
+    return;
+  } catch (error) {
+    console.error('Canonical _doInitData failed for', cid, '— falling back to localStorage:', error);
+    _loadCourseFromLS(cid);
+  }
+}
+
+/* ── Canonical RPC response → legacy cache shape ───────────────
+   Translate the multi-namespace canonical row shapes into the
+   in-memory blobs that page modules and calc.js have always read.
+   Keeping the cache shape stable means consumers don't change. */
+
+function _canonicalRosterToBlob(rows) {
+  return (rows || []).map(function(r) {
+    if (!r) return null;
+    var first = r.first_name || '';
+    var last = r.last_name || '';
+    return {
+      id: r.enrollment_id,                                     // within-course key
+      personId: r.student_id,                                  // cross-course identity
+      firstName: first,
+      lastName: last,
+      preferred: r.preferred_first_name || '',
+      pronouns: r.pronouns || '',
+      studentNumber: r.local_student_number || '',
+      email: r.email || '',
+      dateOfBirth: r.date_of_birth || '',
+      designations: Array.isArray(r.designations) ? r.designations : [],
+      attendance: [],
+      sortName: (last + ' ' + first).trim(),
+      enrolledDate: r.enrolled_on || ''
+    };
+  }).filter(Boolean);
+}
+
+function _canonicalAssessmentsToBlob(rows) {
+  return (rows || []).map(function(r) {
+    if (!r) return null;
+    var due = r.due_at ? String(r.due_at).slice(0, 10) : '';
+    return {
+      id: r.assessment_id,
+      title: r.title || '',
+      date: due,
+      type: r.assessment_kind || 'summative',
+      tagIds: Array.isArray(r.target_outcome_ids) ? r.target_outcome_ids : [],
+      evidenceType: '',
+      notes: r.notes || '',
+      coreCompetencyIds: [],
+      rubricId: r.rubric_id || '',
+      scoreMode: r.score_mode || 'proficiency',
+      maxPoints: r.points_possible != null ? r.points_possible : 0,
+      weight: r.weighting != null ? r.weighting : 1,
+      dueDate: due,
+      collaboration: r.collaboration_mode || 'individual',
+      pairs: [],
+      groups: [],
+      excludedStudents: [],
+      moduleId: r.module_id || '',
+      created: r.created_at || ''
+    };
+  }).filter(Boolean);
+}
+
+function _canonicalScoresToBlob(rows, assessments) {
+  // Build assessment_id → assessment_kind lookup so we can carry score.type
+  // (the legacy calc engine splits scores by summative/formative).
+  var kindByAid = {};
+  (assessments || []).forEach(function(a) { if (a && a.id) kindByAid[a.id] = a.type || 'summative'; });
+  var out = {};
+  (rows || []).forEach(function(r) {
+    if (!r) return;
+    var sid = r.enrollment_id;
+    if (!sid) return;
+    if (!out[sid]) out[sid] = [];
+    // Pick the score value: prefer normalized_level (proficiency-mode), fall
+    // back to raw_numeric_score (points-mode), then null.
+    var val = r.normalized_level != null ? r.normalized_level
+            : (r.raw_numeric_score != null ? r.raw_numeric_score : null);
+    out[sid].push({
+      id: r.score_current_id,
+      assessmentId: r.assessment_id,
+      tagId: r.course_outcome_id,
+      score: val,
+      date: r.entered_at ? String(r.entered_at).slice(0, 10) : '',
+      type: kindByAid[r.assessment_id] || 'summative',
+      note: r.comment_text || '',
+      created: r.created_at || ''
+    });
+  });
+  return out;
+}
+
+function _canonicalObservationsToBlob(rows) {
+  var out = {};
+  (rows || []).forEach(function(r) {
+    if (!r) return;
+    var sid = r.enrollment_id;
+    if (!sid) return;
+    if (!out[sid]) out[sid] = [];
+    out[sid].push({
+      id: r.observation_id,
+      text: r.body || '',
+      dims: Array.isArray(r.dims) ? r.dims : [],
+      sentiment: r.sentiment || null,
+      context: r.context_type || null,
+      date: r.observed_at ? String(r.observed_at).slice(0, 10) : '',
+      created: r.created_at || r.observed_at || ''
+    });
+  });
+  return out;
+}
+
+function _canonicalOutcomesToLearningMap(rows) {
+  // Group outcomes by section_name into the legacy { sections: [{tags: []}] } shape.
+  if (!Array.isArray(rows) || rows.length === 0) return null;
+  var bySection = {};
+  var sectionOrder = [];
+  rows.forEach(function(r) {
+    if (!r || r.is_archived) return;
+    var key = r.section_name || 'Untitled';
+    if (!bySection[key]) {
+      bySection[key] = {
+        id: key,                         // legacy used short codes; section_name is good enough
+        subject: '',                     // canonical schema doesn't track subject buckets per outcome
+        name: key,
+        shortName: key,
+        color: r.color || '',
+        tags: []
+      };
+      sectionOrder.push(key);
+    }
+    bySection[key].tags.push({
+      id: r.course_outcome_id,
+      label: r.short_label || r.outcome_code || key,
+      text: r.body || '',
+      color: r.color || bySection[key].color || '',
+      i_can_statements: []
+    });
+  });
+  return {
+    subjects: [],
+    sections: sectionOrder.map(function(k) { return bySection[k]; }),
+    _flatVersion: 2,
+    _customized: true,
+    _version: 1
+  };
+}
+
+function _canonicalPolicyToBlob(data) {
+  // get_course_policy returns {} when no policy exists yet.
+  var d = (data && typeof data === 'object') ? data : {};
+  return {
+    gradingSystem: d.grading_system || 'proficiency',
+    calcMethod: d.calculation_method || 'mostRecent',
+    decayWeight: d.decay_weight != null ? Number(d.decay_weight) : 0.65,
+    reportAsPercentage: !!d.report_as_percentage,
+    categoryWeights: d.category_weights || { summative: 1, formative: 0 },
+    defaultLetterGradeScaleId: d.default_letter_grade_scale_id || '',
+    letterGradeScales: d.letter_grade_scales || [],
+    assignmentCategories: d.assignment_categories || [],
+    specialScoreDefinitions: d.special_score_definitions || [],
+    dropLowestRules: d.drop_lowest_rules || []
+  };
+}
+
+function _canonicalStatusesToBlob(rows) {
+  var out = {};
+  (rows || []).forEach(function(r) {
+    if (!r || !r.student_id || !r.assessment_id) return;
+    out[r.student_id + ':' + r.assessment_id] = r.status || '';
+  });
+  return out;
 }
 
 /* If Supabase returned dramatically fewer items than localStorage for a field,
