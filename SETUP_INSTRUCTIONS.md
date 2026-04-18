@@ -1,109 +1,99 @@
 # Setup Instructions
 
-Follow these steps to finish configuring your dev environment. You can do this whenever you have 15 minutes.
+Pick the path that fits — Demo Mode is the fastest way to see the app, full setup is for real development against Supabase.
 
 ---
 
-## Step 1: Install Node.js
+## Fastest path: Demo Mode (no install)
+
+1. Visit [fullvision.ca](https://fullvision.ca)
+2. Click **"Try Demo Mode"** on the login screen
+3. The Science 8 sample class loads with 27 students, learning map, assessments, and pre-populated scores
+
+Demo data lives in your browser's localStorage. Sign-out wipes it.
+
+---
+
+## Full development setup
+
+### Step 1: Install Node.js
 
 1. Go to [https://nodejs.org](https://nodejs.org)
-2. Click the big green **LTS** button (left side) to download the installer
-3. Open the downloaded `.pkg` file
-4. Click through the installer (Next → Next → Install → Done)
-5. **Quit Terminal completely** (Cmd+Q) and reopen it
+2. Download the **LTS** installer
+3. Open the `.pkg`, click through, install
+4. **Quit Terminal completely** (Cmd+Q) and reopen it
 
-Verify it worked:
+Verify:
 ```bash
-node --version
+node --version    # should print v20.x.x or newer
 npm --version
 ```
 
-Both should print a version number.
-
----
-
-## Step 2: Install project dependencies
+### Step 2: Clone and install
 
 ```bash
-cd ~/FullVision
+git clone https://github.com/MrBrown85/TeacherDashboard.git ~/Documents/FullVision
+cd ~/Documents/FullVision
 npm install
 ```
 
-This installs Prettier (code formatter) and Vitest (test runner). Takes about 30 seconds.
+Installs Prettier, Vitest, Playwright, and linkedom. Takes ~30 seconds.
 
----
-
-## Step 3: Format the codebase
-
-```bash
-npm run format
-```
-
-This applies consistent formatting across all JS, CSS, HTML, and JSON files. It's a one-time cleanup — after this, the CI pipeline will check formatting on every push.
-
----
-
-## Step 4: Run tests
+### Step 3: Run the unit suite
 
 ```bash
 npm test
 ```
 
-Should see all 47 calculation engine tests pass.
+Should print **648 passed, 5 skipped**.
 
----
+### Step 4: Run the E2E suite (optional)
 
-## Step 5: Run the app locally
+First time only — install the headless browser:
+```bash
+npx playwright install chromium
+```
+
+Then:
+```bash
+npm run test:e2e          # headless (137 tests, ~25 min)
+npm run test:e2e:headed   # see the browser
+```
+
+### Step 5: Run the app locally
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:8347/app.html](http://localhost:8347/app.html) in your browser.
+Opens on port 8347. The root redirects to `/login.html`. To skip auth, click **"Try Demo Mode"** — `npm run dev` runs `serve` without env-var injection, so the real Supabase login won't work locally.
 
 ---
 
-## Step 6 (optional): Push to GitHub with CI
-
-If you want the GitHub Actions CI pipeline to work:
-
-1. Create a repo on GitHub (private is fine)
-2. Push your code:
-```bash
-cd ~/FullVision
-git remote add origin https://github.com/YOUR_USERNAME/FullVision.git
-git add -A
-git commit -m "Initial commit"
-git push -u origin main
-```
-
-Every push to `main` will now automatically run tests and check formatting.
-
----
-
-## Available commands after setup
+## Available commands
 
 | Command | What it does |
 |---------|-------------|
-| `npm run dev` | Start local dev server on port 8347 |
-| `npm test` | Run calculation engine tests |
-| `npm run test:watch` | Run tests in watch mode (re-runs on file changes) |
+| `npm run dev` | Local dev server on port 8347 |
+| `npm test` | Vitest unit suite (one-shot) |
+| `npm run test:watch` | Vitest in watch mode |
+| `npm run test:e2e` | Playwright E2E suite (headless) |
+| `npm run test:e2e:headed` | Playwright with visible browser |
 | `npm run format` | Format all code with Prettier |
-| `npm run format:check` | Check formatting without changing files |
+| `npm run format:check` | Check formatting without writing |
+| `npm run build` | `bash scripts/build.sh` — copies public files to `dist/` for Netlify |
 
 ---
 
-## Files created during this session
+## Deploying to Netlify
 
-| File | Purpose |
-|------|---------|
-| `README.md` | Project overview, setup guide, and architecture summary |
-| `.env.example` | Documents required Supabase credentials |
-| `docs/ARCHITECTURE.md` | Technical guide for developers (routing, data layer, calc engine) |
-| `supabase_migration.sql` | Single SQL file to recreate the entire database from scratch |
-| `package.json` | Node project config with dev/test/format scripts |
-| `.prettierrc` | Code formatting rules |
-| `.prettierignore` | Files excluded from formatting |
-| `.github/workflows/ci.yml` | GitHub Actions pipeline (test + format check on every push) |
-| `.gitignore` | Updated to exclude node_modules, .env files |
-| `SETUP_INSTRUCTIONS.md` | This file |
+The repo auto-deploys on push to `main`. Netlify env vars to set on the site:
+
+| Variable | Source |
+|----------|--------|
+| `SUPABASE_URL` | Supabase → Project Settings → API |
+| `SUPABASE_KEY` | Supabase → Project Settings → API Keys → publishable |
+
+These are injected at edge by [`netlify/edge-functions/inject-env.js`](netlify/edge-functions/inject-env.js) — never committed to source.
+
+Bump [`sw.js`](sw.js) `CACHE_NAME` on every deploy so installed PWAs reload fresh.

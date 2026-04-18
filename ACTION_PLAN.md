@@ -1,278 +1,101 @@
 # FullVision — Action Plan
 
-Based on full codebase audit (March 2026). Issues organized by priority.
+Last refreshed: 2026-04-17. Items are tracked here as they're discovered; closed items live in the Done section at the bottom.
 
 ---
 
-## P0 — Fix Now (before any production use with real student data)
+## P0 — In flight
 
-### 1. Move Supabase credentials to environment variables
+### 1. Phase 1c-reads — wire `_doInitData` to canonical RPCs
 
-**Problem:** URL and publishable key are hardcoded in `gb-supabase.js:6-7`.
-Anyone viewing source can see the database endpoint.
+**Why**: Phase 2 (commit `c02e6e3` on `phase-2-canonical-writes`) wired all high-frequency *writes* to canonical RPCs (`enroll_student`, `create_assessment`, `save_course_score`, `create_observation`, etc.). Reads still come from localStorage — so data written from another device (or imported on the server side) never appears until you log out and back in. The bridge in `_doInitData` short-circuits the broken legacy `.from('students')` etc. calls.
 
-**Fix:**
+**Plan**:
+- Replace `_doInitData(cid)` body with parallel calls to `list_course_roster`, `list_course_assessments`, `list_course_scores`, `list_course_observations`, `get_course_policy`, `get_report_config`, `list_course_outcomes`, `list_assignment_statuses`.
+- Per-student loops for `get_student_goals`, `list_student_reflections`, `list_section_overrides` (no bulk variant in the canonical schema).
+- Update converter functions to map canonical row shapes to the existing legacy cache shape so consumers don't have to change in lockstep.
+- Re-enable `tests/data-pagination.test.js` (currently `describe.skip`) against the canonical reads.
 
-- Create a minimal build/inject step. Two options:
+### 2. Score race-window during import
 
-  **Option A — Netlify env vars + inline script (no build step):**
-  1. Set `SUPABASE_URL` and `SUPABASE_KEY` in Netlify UI → Site settings → Environment variables
-  2. Create `netlify/edge-functions/inject-config.js` that replaces a placeholder in `app.html`
-  3. In `app.html`, add before other scripts:
-     ```html
-     <script>
-       window.__ENV = { SUPABASE_URL: '__SUPABASE_URL__', SUPABASE_KEY: '__SUPABASE_KEY__' };
-     </script>
-     ```
-  4. Edge function replaces the `__SUPABASE_URL__` and `__SUPABASE_KEY__` placeholders at serve time
+**Why**: When a Teams import enrolls a student and immediately scores the same student in the same tick, the local student `id` is still a non-UUID `uid()` and `_persistScoreToCanonical` skips. The score lands in localStorage but never syncs. Users see scores locally but not on other devices.
 
-  **Option B — Simple build script (recommended):**
-  1. Add a `build.sh` that copies `gb-supabase.js.template` → `gb-supabase.js` with `sed` replacements
-  2. Update `netlify.toml`: `[build] command = "bash build.sh"`
-  3. Keep `.env` locally for dev, Netlify env vars for production
-  4. Add `gb-supabase.js` to `.gitignore`, commit only the template
-
-- In `gb-supabase.js`, replace hardcoded values:
-  ```javascript
-  // Before (lines 6-7):
-  const SUPABASE_URL = 'https://novsfeqjhbleyyaztmlh.supabase.co';
-  const SUPABASE_KEY = 'sb_publishable__CxM2aY7iVOxRid2EMtCiw_jT1g_n96';
-
-  // After:
-  const SUPABASE_URL = window.__ENV?.SUPABASE_URL || '';
-  const SUPABASE_KEY = window.__ENV?.SUPABASE_KEY || '';
-  ```
-
-- **Rotate the existing key** in Supabase dashboard since it's been committed to git history.
+**Fix options**: await the per-row `enroll_student` promise inside `teams-import.js` before scoring, OR queue a deferred score sync in `data.js` that fires once all in-flight enrollments resolve.
 
 ---
 
-### 2. Replace inline onclick handlers with event delegation
+## P1 — Near term
 
-**Problem:** 5+ locations use `onclick="..."` in HTML template strings. If any interpolated value
-is ever user-controlled, this is an XSS vector. Also blocks adding CSP headers.
+### 3. Rotate the leaked publishable key
 
-**Files and lines to fix:**
+`sb_publishable__CxM2aY7iVOxRid2EMtCiw_jT1g_n96` was committed to git history. Even with env-var injection in place now, the leaked key is still active. Step-by-step in the rotation thread; short version: create a new publishable key in Supabase → update `SUPABASE_KEY` in Netlify → "Clear cache and deploy site" → verify in incognito → disable the old key.
 
-| File | Line(s) | Current code | Fix |
-|------|---------|-------------|-----|
-| `gb-supabase.js` | ~178 | `onclick="window.location.href='login.html'"` | Add `data-action="go-login"` and a delegated click handler |
-| `gb-data.js` | ~166 | `onclick="_crossTabAlerted=false;window.location.reload()"` | Add `data-action="reload-tab"` |
-| `gb-data.js` | ~186 | Same reload pattern | Same fix |
-| `gb-ui.js` | ~474 | `onclick="if(typeof retrySyncs==='function')retrySyncs();dismissSyncToast();"` | Add `data-action="retry-sync"` |
-| `gb-ui.js` | ~599 | `onclick="window.location.reload()"` | Add `data-action="reload-page"` |
+### 4. Get the E2E suite green
 
-**Pattern to apply everywhere:**
+Last run: 102 of ~141 specs failing. Root cause for the auth specs: [`login-auth.js:33`](login-auth.js#L33) auto-redirects to `/teacher/app.html` whenever `localhost` lacks env vars, so tests that try to assert anything on the login page never see it. Fix: require an explicit `?dev=1` opt-in (mirrors what `shared/supabase.js` already does for the dashboard).
 
-```javascript
-// Before (inline handler):
-html += '<button onclick="doThing()">Click</button>';
+### 5. CI / branch-protection
 
-// After (data-action delegation):
-html += '<button data-action="do-thing">Click</button>';
+No GitHub Actions yet. Add a workflow that runs `npm test` + `npm run format:check` on push/PR, then turn on branch protection requiring it on `main`.
 
-// Add once, at module level:
-document.addEventListener('click', function(e) {
-  var btn = e.target.closest('[data-action]');
-  if (!btn) return;
-  switch (btn.dataset.action) {
-    case 'do-thing': doThing(); break;
-    case 'reload-page': window.location.reload(); break;
-    case 'go-login': window.location.href = 'login.html'; break;
-    case 'retry-sync':
-      if (typeof retrySyncs === 'function') retrySyncs();
-      dismissSyncToast();
-      break;
-  }
-});
-```
+### 6. Clear the legacy bridge in `data.js`
 
-Since toasts are created dynamically, a single delegated listener on `document` handles all cases.
+Once Phase 1c-reads lands and the canonical write paths have been validated in production, delete the `// CANONICAL-RPC TRANSITION:` early-return short-circuits in `_doSync`, `_initRealtimeSync`, `_handleCrossTabChange`, `_refreshFromSupabase`, and `_deleteFromSupabase`. Their replacements should be the canonical RPC paths added in Phases 1b–2.
 
 ---
 
-### 3. Add empty-array guards before Math.max/Math.min spreads
+## P2 — Medium term
 
-**Problem:** `Math.max(...[])` returns `-Infinity`. Two locations risk this after filtering.
+### 7. Realtime publication for the canonical schema
 
-**Fixes:**
+`supabase_realtime` was emptied by the `zero_data_publication` migration. Cross-device live sync is offline. Add the canonical entity tables (`assessment.score_current`, `observation.observation`, `academics.enrollment`, etc.) to the publication and re-enable the realtime listener in `data.js`.
 
-```javascript
-// gb-calc.js:83 — in the "highest" method branch
-// Before:
-return Math.max(...valid.map(s => s.score));
+### 8. Add bulk RPCs for medium-frequency entities
 
-// After:
-var mapped = valid.map(s => s.score);
-return mapped.length ? Math.max(...mapped) : 0;
-```
+Goals, reflections, and overrides have only per-student RPCs in the canonical schema. Loading 30 students = 90 round-trips. Add `list_student_goals_for_course`, etc., or accept the latency (acceptable for typical class sizes; revisit if it bites).
 
-```javascript
-// page-reports.js:2342-2343 — in report score aggregation
-// Before:
-Math.max(...aScores.map(...))
+### 9. Add a `delete_course` RPC
 
-// After:
-var vals = aScores.map(...);
-var maxVal = vals.length ? Math.max(...vals) : 0;
-```
+There's no canonical way to delete a course — only `update_course` to archive it. Decide: archive-only (no delete), or add `delete_course` that cascades through `score_current`, `enrollment`, etc.
 
-Search for other instances: `grep -n 'Math\.\(max\|min\)(\.\.\.' *.js`
+### 10. Storage for modules / rubrics / custom tags / student-notes
+
+The canonical schema has no tables for these. They currently live in localStorage only. Decide: keep client-only, or add JSONB fields on `course_policy`.
+
+### 11. Error monitoring
+
+No Sentry-equivalent. The data layer already has a global error logger; wire it to a real backend.
+
+### 12. Asset fingerprinting + minification
+
+Trade off the simplicity of the no-build deploy for cache busting and ~30% size reduction. Only worth it if perf becomes a real complaint.
 
 ---
 
-## P1 — Near Term (next sprint / next few sessions)
+## P3 — Long term
 
-### 4. Add CI pipeline
+### 13. ES modules migration
 
-- Create `.github/workflows/test.yml`:
-  ```yaml
-  name: Tests
-  on: [push, pull_request]
-  jobs:
-    test:
-      runs-on: ubuntu-latest
-      steps:
-        - uses: actions/checkout@v4
-        - uses: actions/setup-node@v4
-          with: { node-version: 20 }
-        - run: npm ci
-        - run: npm test
-  ```
-- Also add `npm run format:check` as a CI step.
+IIFE pattern works but blocks tree-shaking and modern tooling. Migrate one leaf module at a time (`shared/constants.js` first), keep IIFE shim for backward compat during the transition.
 
-### 5. Add parseInt radix everywhere
+### 14. Multi-portal scaffolding
 
-- Find all: `grep -n 'parseInt(' *.js` (expect 15-20 hits)
-- Add `, 10` as second argument to each call
-- Files known to need it: `page-student.js`, `page-assignments.js`, `page-reports.js`
-
-### 6. Handle localStorage QuotaExceededError
-
-- In `gb-data.js`, wrap all `localStorage.setItem()` calls:
-  ```javascript
-  function _safeLSSet(key, value) {
-    try {
-      localStorage.setItem(key, value);
-    } catch (e) {
-      if (e.name === 'QuotaExceededError') {
-        console.warn('localStorage full, clearing old data');
-        _clearStaleLSData();
-      }
-    }
-  }
-  ```
-- Replace direct `localStorage.setItem` calls with `_safeLSSet`.
-
-### 7. Replace empty catch blocks
-
-- `gb-data.js:195` — `catch(e){}` → `catch(e){ console.warn('BroadcastChannel error:', e); }`
-- `gb-data.js:467` — `catch{}` → `catch(e){ console.warn('Course load fallback:', e); }`
-- Audit for others: `grep -n 'catch\s*{' *.js` and `grep -n 'catch(.*)\s*{}' *.js`
-
-### 8. Add CSP headers (after P0-2 is done)
-
-- In `netlify.toml` or `_headers`, add:
-  ```
-  Content-Security-Policy: default-src 'self'; connect-src 'self' https://*.supabase.co; style-src 'self' 'unsafe-inline'; img-src 'self' data:;
-  ```
-- Test thoroughly — inline styles are used heavily, so `'unsafe-inline'` for style-src is needed.
-- No `'unsafe-inline'` for script-src since inline handlers will be removed in P0-2.
+`netlify.toml` already reserves `/student` and `/parent` routes. The `projection.dashboard_student_summary` schema also points to a multi-stakeholder future. Build out when there's a real need.
 
 ---
 
-## P2 — Medium Term (next month)
+## Done
 
-### 9. Expand test coverage
-
-Priority targets (most failure-prone, least tested):
-
-1. **Supabase sync layer** (`gb-data.js:200-280`)
-   - Mock Supabase client, test retry queue, test sync status transitions
-   - Test `_doSync` success/failure/retry paths
-2. **Page module init/destroy lifecycle**
-   - Verify event listeners are cleaned up on page switch
-3. **Report generation** (`report-blocks.js`)
-   - Test block rendering with various data states
-
-### 10. Add exponential backoff to retry queue
-
-- In `gb-data.js`, replace fixed `setTimeout(10000)`:
-  ```javascript
-  var retryDelay = Math.min(10000 * Math.pow(2, retryCount), 300000); // max 5 min
-  ```
-
-### 11. Debounce gradebook rendering
-
-- In `page-gradebook.js`, wrap filter/sort handlers:
-  ```javascript
-  var _renderTimer;
-  function scheduleRender() {
-    clearTimeout(_renderTimer);
-    _renderTimer = setTimeout(render, 150);
-  }
-  ```
-
-### 12. Add error monitoring
-
-- Integrate Sentry (free tier) or similar:
-  ```javascript
-  window.addEventListener('error', function(e) { /* report */ });
-  window.addEventListener('unhandledrejection', function(e) { /* report */ });
-  ```
-- Especially important for catching Supabase sync failures in production.
-
-### 13. Add asset fingerprinting
-
-- If adding a build step (P0-1 Option B), extend it to append content hashes:
-  `gb-calc.js` → `gb-calc.a1b2c3.js`
-- Update `app.html` references during build.
-- Change cache headers to `max-age=31536000` (1 year) for fingerprinted assets.
-
----
-
-## P3 — Long Term (roadmap)
-
-### 14. Introduce a build step
-
-Even a minimal one (no bundler needed) enables:
-- Env var injection (solves P0-1 permanently)
-- Asset fingerprinting (solves P2-13)
-- Minification (~30-40% size reduction)
-- Could use a simple shell script or esbuild (fast, zero-config)
-
-### 15. Evaluate ES modules migration
-
-- Current IIFE pattern works but prevents tree-shaking and modern tooling.
-- Migration path: Convert one module at a time, starting with leaf modules (`gb-constants.js`, `gb-calc.js`).
-- Keep backward compat during transition with a bundler that outputs IIFE.
-
-### 16. Add E2E tests
-
-- Playwright recommended (fast, reliable, good Netlify integration).
-- Start with critical paths: login → create class → add student → score assignment → view report.
-- Run in CI on deploy previews.
-
-### 17. Standardize naming conventions
-
-- Adopt consistent rules:
-  - `camelCase` for variables and functions
-  - `SCREAMING_CASE` for true constants
-  - `_prefixed` only for module-private variables
-- Apply incrementally, one module per PR.
-
----
-
-## Quick Reference: File Locations
-
-| File | Lines | Role |
-|------|-------|------|
-| `gb-supabase.js` | 200 | Auth, credentials (**P0-1**) |
-| `gb-data.js` | 1,223 | Data layer, sync, caching (**P0-2, P1-6, P1-7**) |
-| `gb-calc.js` | 463 | Proficiency engine (**P0-3**) |
-| `gb-ui.js` | 655 | UI helpers, toasts (**P0-2**) |
-| `page-reports.js` | 2,780 | Report generation (**P0-3**) |
-| `page-assignments.js` | 2,097 | Assignments (**P1-5**) |
-| `page-gradebook.js` | 871 | Gradebook (**P2-11**) |
-| `page-student.js` | 848 | Student view (**P1-5**) |
-| `netlify.toml` | 23 | Deploy config (**P1-8**) |
+| When | What |
+|------|------|
+| 2026-04-18 | Phase 2 — high-frequency writes (`saveStudents`, `saveAssessments`, `upsertScore`, `addQuickOb`/`updateQuickOb`/`deleteQuickOb`) wired to canonical RPCs. PR #63. |
+| 2026-04-18 | Demo Mode — login-screen button bypasses auth and loads Science 8 sample class. PR #63. |
+| 2026-04-17 | Phase 1c-writes — `createCourse`, `updateCourse`, `saveCourseConfig`, `saveReportConfig`, `saveConfig` wired to canonical RPCs. Commit `dfb4331`. |
+| 2026-04-17 | Phase 1b — `initAllCourses` wired to `get_teacher_preferences` + `list_teacher_courses`. Commit `39f0461`. |
+| 2026-04-17 | Bridge — short-circuited every legacy `.from()` write so production stops throwing 18 PGRST205 errors per page load. Commit `3abbcba`. |
+| 2026-04-17 | `schema.sql` regenerated from `supabase_migrations.schema_migrations` (130 KB across 31 migrations). |
+| 2026-04-17 | Locked `search_path` on 10 functions flagged by Supabase advisors. Migration `lock_function_search_paths`. |
+| Earlier | Move Supabase credentials to env vars (Netlify edge function `inject-env.js`). |
+| Earlier | Inline `onclick` handlers replaced with `data-action` delegation in shared modules. |
+| Earlier | CSP headers + per-request nonce wired in `inject-env.js`. |
+| Earlier | Service worker, PWA manifest, idle-timeout sign-out, FOIPPA-compliant data wiping. |

@@ -38,11 +38,11 @@ Built with vanilla JavaScript — no framework, no build step. Backed by Supabas
 | Layer | Technology |
 |-------|-----------|
 | Frontend | Vanilla JS (IIFE modules), CSS custom properties |
-| Auth & Database | [Supabase](https://supabase.com) (Auth, Postgres, Realtime, RLS) |
-| Hosting | [Netlify](https://netlify.com) (static, no build step) |
-| Testing | [Vitest](https://vitest.dev) — 580 tests |
+| Auth & Database | [Supabase](https://supabase.com) — Auth, Postgres, RLS, multi-namespace canonical schema with public-schema RPC interface |
+| Hosting | [Netlify](https://netlify.com) (static, no build step) — edge function injects env vars + per-request CSP nonce |
+| Testing | [Vitest](https://vitest.dev) — 648 unit tests · [Playwright](https://playwright.dev) — 137 E2E specs |
 | Formatting | [Prettier](https://prettier.io) |
-| PWA | Web app manifest + service worker |
+| PWA | Web app manifest + service worker (network-first, offline-capable) |
 
 ---
 
@@ -65,18 +65,19 @@ npm install
 
 Create a Supabase project in **ca-central-1 (Montreal)** for FOIPPA compliance.
 
-Run the SQL files in order in the Supabase SQL Editor:
+The deployed schema is captured in [`schema.sql`](schema.sql) (auto-generated from `supabase_migrations.schema_migrations` — do not edit by hand). Apply it with the [Supabase CLI](https://supabase.com/docs/guides/cli):
 
+```bash
+supabase db push      # applies all migrations under supabase/migrations
 ```
-schema.sql                  -- Tables and indexes
-supabase_rls.sql            -- Row-Level Security policies
-supabase_errors.sql         -- Error logging setup
-supabase_course_data.sql    -- Optional seed data
-```
+
+The schema is multi-namespace (`academics.*`, `assessment.*`, `observation.*`, `reporting.*`, `identity.*`, `projection.*`, `integration.*`) with a public-schema RPC interface. Clients only call public RPCs — direct table access is not exposed via PostgREST.
 
 ### 3. Configure credentials
 
-Update `shared/supabase.js` with your Supabase project URL and anon key. Do not commit credentials.
+Credentials are injected at serve time by [`netlify/edge-functions/inject-env.js`](netlify/edge-functions/inject-env.js). Set `SUPABASE_URL` and `SUPABASE_KEY` in Netlify → **Site configuration → Environment variables**. Never commit credentials to source.
+
+For local dev without Supabase, use **Demo Mode** (see below) — no credentials needed.
 
 ### 4. Run locally
 
@@ -84,7 +85,14 @@ Update `shared/supabase.js` with your Supabase project URL and anon key. Do not 
 npm run dev
 ```
 
-Opens on port 8347. Desktop app at [localhost:8347/teacher/app.html](http://localhost:8347/teacher/app.html), mobile at [localhost:8347/teacher-mobile/](http://localhost:8347/teacher-mobile/).
+Opens on port 8347. The root redirects to [`/login.html`](http://localhost:8347/login.html). Click **"Try Demo Mode"** to skip auth and load the Science 8 sample class — handy for UI work without a live Supabase backend.
+
+E2E tests:
+
+```bash
+npm run test:e2e          # headless
+npm run test:e2e:headed   # see the browser
+```
 
 ---
 
@@ -129,16 +137,19 @@ TeacherDashboard/
 ├── netlify.toml                # Netlify config
 ├── _headers                    # Security + cache headers
 ├── curriculum_data.js          # BC curriculum data
-└── tests/                      # Vitest test suite (580 tests)
+├── tests/                      # Vitest unit suite (648 tests)
+├── e2e/                        # Playwright E2E suite (137 tests)
+└── docs/                       # Architecture + privacy docs
 ```
 
 ### Architecture
 
-- **Routing**: Hash-based router in `teacher/router.js` swaps page modules without full reloads
-- **Data layer**: `shared/data.js` — cache-through pattern; reads from localStorage, syncs with Supabase in the background. Realtime broadcast pushes changes to other open devices.
-- **Database**: 3 Postgres tables — `course_data` (all grading data as JSON per teacher), `teacher_config` (settings), `error_logs`. RLS on all tables.
-- **Calculation engine**: `shared/calc.js` — four proficiency methods with memoization
-- **Mobile shell**: `teacher-mobile/shell.js` — handles boot, tab switching, pull-to-refresh, and all event delegation via `data-action` attributes
+- **Routing**: Hash-based router in [`teacher/router.js`](teacher/router.js) swaps page modules without full reloads
+- **Data layer**: [`shared/data.js`](shared/data.js) — cache-through pattern; synchronous reads from an in-memory `_cache` backed by localStorage. Writes update the cache, persist to localStorage, and fire-and-forget canonical Supabase RPCs in the background. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for details.
+- **Database**: Multi-namespace canonical schema (`academics.*`, `assessment.*`, `observation.*`, `reporting.*`, `identity.*`, `projection.*`, `integration.*`) with a public-schema RPC interface. Every RPC is `SECURITY DEFINER` with `auth.uid()` checks — clients can't bypass authorization via direct table access.
+- **Demo mode**: `localStorage.gb-demo-mode='1'` short-circuits Supabase; the Science 8 sample class is auto-seeded by [`shared/seed-data.js`](shared/seed-data.js).
+- **Calculation engine**: [`shared/calc.js`](shared/calc.js) — four proficiency methods (mostRecent / highest / mode / decayingAvg) with memoization.
+- **Mobile shell**: [`teacher-mobile/shell.js`](teacher-mobile/shell.js) — boot, tab switching, pull-to-refresh, all event delegation via `data-action` attributes.
 
 ---
 

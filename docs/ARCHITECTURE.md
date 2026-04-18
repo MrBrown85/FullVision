@@ -122,61 +122,88 @@ Each page module is an IIFE that returns `{ init(params), destroy() }`:
 
 ## Data Layer
 
-`shared/data.js` implements a **cache-through** pattern: synchronous in-memory reads, async background writes to Supabase with localStorage fallback.
+`shared/data.js` implements a **cache-through** pattern: synchronous in-memory reads, async background writes to Supabase via canonical RPCs, with localStorage as the durable cache.
 
 ### Architecture
 
 ```
 Page Code
-   |
-   | get*() - synchronous read from _cache
-   | save*() - write to _cache + trigger sync
-   v
+   │
+   │ get*() — synchronous read from _cache (falls back to localStorage)
+   │ save*() — write to _cache + persist to localStorage + fire-and-forget canonical RPC
+   ▼
 _cache (in-memory object)
-   |
-   | _saveCourseField() - central write path
-   |   1. Update _cache[field][cid]
-   |   2. Clear proficiency cache if field affects calculations
-   |   3. Sync to Supabase (or localStorage if offline)
-   |   4. Broadcast change to other tabs
-   v
-Supabase (17 normalized tables)  OR  localStorage (fallback)
+   │
+   ├── _saveCourseField() — central local write path
+   │     1. Update _cache[field][cid]
+   │     2. Clear proficiency cache if the field affects calculations
+   │     3. Persist to localStorage (gb-{key}-{cid})
+   │     4. Broadcast change to other tabs (BroadcastChannel)
+   │
+   └── _persist*ToCanonical() — async canonical RPC dispatch
+         1. Diff prev vs new array (added / modified / withdrawn)
+         2. Route each row to its canonical RPC
+         3. Patch _cache row.id with the canonical UUID returned
+         4. Re-persist localStorage so the canonical id sticks across reloads
 ```
+
+The two write paths run in parallel: localStorage is updated synchronously so the UI never blocks on the network; canonical RPCs publish in the background and patch the cache when they return.
 
 ### Initialization
 
-`initAllCourses()` runs first:
-1. Check for valid Supabase session -> set `_useSupabase` flag
-2. Fetch `teacher_config` rows (courses list + global config)
-3. Fall back to localStorage if Supabase unavailable
-4. If localStorage has data but Supabase doesn't, seed Supabase in background
+`initAllCourses()` runs first (called by both `Router.boot()` and `shell.js` on mobile):
+1. Check for a valid Supabase session → set `_useSupabase`, `_teacherId`
+2. Demo mode (`localStorage.gb-demo-mode === '1'`) hard-skips Supabase and runs from localStorage only
+3. Otherwise call `get_teacher_preferences()` + `list_teacher_courses()` in parallel
+4. Convert canonical rows to the legacy `COURSES` blob shape (UUID-keyed) and mirror to localStorage as offline cache
+5. On any RPC failure, fall through to localStorage so the app still loads offline
 
-`initData(cid)` loads a specific course:
-1. Fetch all 17 normalized tables in parallel via `Promise.all`
-2. Convert per-row data back to in-memory blob format via converter functions
-3. Populate `_cache` fields from the returned rows
-4. If Supabase had no data, load from localStorage and seed Supabase
+`initData(cid)` loads a specific course's per-course data. **Currently bridged** — reads come from localStorage only. Phase 1c-reads will wire it to `list_course_roster`, `list_course_assessments`, `list_course_scores`, `list_course_observations`, `get_course_policy`, `get_report_config`, `list_course_outcomes`, etc.
 
-### Data Storage
+### Canonical schema (Supabase)
 
-**Supabase tables (17 normalized + 2 global):**
+Multi-namespace design with **public-schema RPCs as the only client interface** — direct table access is not exposed via PostgREST. Every RPC is `SECURITY DEFINER` with `auth.uid()` checks, so clients can't bypass authorization.
 
-| Category | Tables |
-|----------|--------|
-| Global config | `teacher_config` (courses, settings) |
-| High-frequency (per-row) | `scores`, `observations`, `assessments`, `students` |
-| Medium-frequency (bulk sync) | `goals`, `reflections`, `overrides`, `statuses`, `notes`, `flags`, `term_ratings` |
-| Config (single JSONB per course) | `config_learning_maps`, `config_course`, `config_modules`, `config_rubrics`, `config_custom_tags`, `config_report` |
-| Diagnostics | `error_logs` |
+| Schema | Purpose | Notable tables |
+|--------|---------|----------------|
+| `academics` | Course offerings, students, enrollments, designations | `course_offering`, `course_outcome`, `course_policy`, `student`, `enrollment`, `designation_type`, `enrollment_designation` |
+| `assessment` | Assignments and scores | `assessment`, `assessment_target`, `assignment_status`, `score_current`, `score_revision` |
+| `observation` | Anecdotal notes | `observation` |
+| `reporting` | End-of-term reporting | `term_rating`, `report_config`, `student_goal`, `student_reflection`, `section_override` |
+| `identity` | Teacher accounts | `teacher_profile`, `teacher_preference` |
+| `projection` | Read-optimized projections | `dashboard_student_summary`, `flag_tag`, `student_flag` |
+| `integration` | Import staging | `import_job`, `import_row` |
 
-All tables include `teacher_id` in primary keys for co-teaching readiness. RLS policy: `auth.uid() = teacher_id` on every table. Realtime enabled on all course tables.
+Public RPCs the client calls (selection):
 
-**Sync patterns by table type:**
-- **High-frequency**: per-row upsert (scores use composite key: teacher_id + course_id + student_id + assessment_id + tag_id)
-- **Medium-frequency**: delete-all + bulk-insert per course
-- **Config**: single-row upsert per (teacher_id, course_id)
+| Read | Write |
+|------|-------|
+| `list_teacher_courses` | `create_course`, `update_course` |
+| `get_teacher_preferences` | `save_teacher_preferences` |
+| `get_course_policy` | `save_course_policy` |
+| `get_report_config` | `save_report_config` |
+| `list_course_outcomes` | `save_learning_map` |
+| `list_course_roster` | `enroll_student`, `update_enrollment`, `update_student`, `withdraw_enrollment` |
+| `list_course_assessments` | `create_assessment`, `update_assessment`, `delete_assessment` |
+| `list_course_scores` | `save_course_score`, `bulk_save_course_scores`, `delete_course_score` |
+| `list_course_observations` | `create_observation`, `update_observation`, `delete_observation` |
+| `get_student_goals` | `save_student_goals` |
+| `list_student_reflections` | `save_student_reflection` |
+| `list_section_overrides` | `save_section_override`, `clear_section_override` |
+| `list_term_ratings_for_course`, `get_term_rating` | `upsert_term_rating` |
+| `list_assignment_statuses` | `save_assignment_status` |
+| `list_import_jobs`, `list_import_rows` | `stage_import`, `validate_import_job`, `commit_import_job` |
+| `projection.list_student_flags` | `projection.add_student_flag`, `projection.remove_student_flag`, `toggle_student_flag` |
 
-**localStorage keys:** `gb-{dataKey}-{courseId}` (e.g., `gb-students-sci8`, `gb-scores-ss10`)
+**Sync patterns by entity:**
+- **Students** (`saveStudents`): diffs prev vs new → routes to `enroll_student` / `update_enrollment` + `update_student` / `withdraw_enrollment`. Patches cache `id` to canonical `enrollment_id`, stores `personId = student_id`. Per-course async queue serializes saves so rapid clicks don't double-enroll.
+- **Assessments** (`saveAssessments`): same diff pattern → `create_assessment` / `update_assessment` / `delete_assessment`. `tagIds` filtered to UUIDs only so demo-mode text codes don't fail the canonical UUID cast.
+- **Scores** (`upsertScore`): single-row → `save_course_score`. UUID-gated on all four IDs (cid/sid/aid/tid) — if any is still local, only localStorage holds the score until IDs resolve.
+- **Observations** (`addQuickOb` / `updateQuickOb` / `deleteQuickOb`): single-row → `create_observation` / `update_observation` / `delete_observation`. Create patches cache `id` to canonical `observation_id`.
+
+All canonical RPC writes are gated on `gb-demo-mode !== '1'` AND `_useSupabase` so demo mode and offline mode stay 100% local. All RPCs are fire-and-forget with `console.warn` on error.
+
+**localStorage keys:** `gb-{dataKey}-{courseId}` (e.g., `gb-students-{uuid}`, `gb-scores-{uuid}`). Course IDs are now UUIDs except in demo mode where the seed uses text IDs (`sci8`, etc.).
 
 ### Getter/Setter Pattern
 
@@ -393,6 +420,6 @@ Functions are exposed on `window` for cross-module access (e.g., `window.Calc`, 
 ## Hosting & Deployment
 
 - **Netlify** hosts the app with a build step (`scripts/build.sh`) that copies only public files to `dist/`
-- **Edge function** (`inject-env.js`) replaces `__SUPABASE_URL__` and `__SUPABASE_KEY__` placeholders in HTML responses with environment variables
-- **Service worker** (`sw.js`) precaches all app files and uses a network-first strategy with cache fallback
-- **CSP** set via `netlify.toml` headers — restricts scripts, connections, and framing
+- **Edge function** (`netlify/edge-functions/inject-env.js`) replaces `__SUPABASE_URL__` / `__SUPABASE_KEY__` placeholders in HTML responses with environment variables, generates a per-request nonce, and emits the `Content-Security-Policy` header (with `script-src 'self' 'nonce-...'` — no `unsafe-inline` for scripts)
+- **Service worker** (`sw.js`) precaches all app files and uses a network-first strategy with cache fallback. Bump `CACHE_NAME` on every deploy so installed PWAs reload fresh.
+- **Demo mode** is the recommended way to try the app without Supabase — it short-circuits auth and seeds the Science 8 sample class from `shared/seed-data.js` (113 KB, lazy-loaded only on demand)
