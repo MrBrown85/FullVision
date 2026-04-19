@@ -31,7 +31,7 @@ These are stated up-front because the rest of the document depends on them. Each
 | A2 | Credentials (password hashes, reset tokens, email verification tokens) live in the auth provider, **not** in our schema. | ERD has no password column and no token columns on Teacher. | Valid as-is. Don't add credential columns to Teacher. |
 | A3 | Every API call that writes data includes a verified session token. The API extracts `teacher_id` from the token and uses it as the `caller` referenced throughout Pass B. | This is what Pass B's "caller" means operationally. | If unauthenticated writes are ever needed (e.g. a public share link that accepts comments), that path would not go through the teacher-scoped write paths. Not currently in the inputs. |
 | A4 | **Email verification is required before sign-in is permitted.** Sign-up creates only the auth record; the Teacher + TeacherPreference rows are created on first verified sign-in. | User decision. | To drop verification, collapse §1 into a single bootstrap-at-sign-up flow. |
-| A5 | A new Teacher starts with zero courses. First action post-verification is creating a course (§2.1 or §2.2 of Pass B) or launching the wizard. | No "default course" creation appears in inputs. | If you want a "Welcome" course auto-seeded, first-sign-in (§2) grows a Course INSERT. |
+| A5 | **On first verified sign-in, a Welcome Class is auto-seeded** from the demo-seed JSON (per final Q45 = D, Q47 = A). Teacher lands in a populated gradebook; can delete the Welcome Class anytime. | User decision. | To revert to empty-state home, drop the seed step from §1.3. |
 | A6 | **Sliding 30-minute idle timeout.** Each successful API response issues a refreshed session token valid for 30 more minutes. 30 minutes with no API calls → next call returns 401 → client must re-authenticate. | User decision. | Absolute-lifetime tokens (fixed expiry regardless of activity) would require a different refresh mechanism, likely a refresh-token rotation scheme. |
 
 ---
@@ -103,6 +103,8 @@ sequenceDiagram
             rect rgb(235, 245, 255)
             API->>T: INSERT (id = caller_id, email,<br/>display_name from auth metadata,<br/>created_at = now())
             API->>TP: INSERT (teacher_id = caller_id, defaults)
+            Note over API: Auto-seed Welcome Class from demo-seed JSON<br/>(per final Q45=D, Q47=A):<br/>INSERT Course, Categories, Subjects, Sections, Tags,<br/>Modules, Rubrics, Criteria, Students, Enrollments,<br/>Assessments, Scores, Observations, ObservationTemplates<br/>(same static seed as demo mode uses)
+            API->>TP: UPDATE active_course_id = welcome_class.id
             end
         end
         API-->>Client: { teacher, preferences }
@@ -253,9 +255,9 @@ sequenceDiagram
 
 ---
 
-## 5. Delete account (with password re-entry)
+## 5. Delete account (soft-delete with 30-day grace)
 
-Trigger: Row 16.
+Trigger: Row 16. Final decision: **soft-delete with 30-day grace** (per Q29 = A).
 
 ```mermaid
 sequenceDiagram
@@ -264,32 +266,47 @@ sequenceDiagram
     participant API
     participant Auth as Auth Provider
     participant T as Teacher
-    participant DB as (all teacher-scoped tables)
 
     Teacher->>Client: Delete account
-    Client->>Teacher: show confirmation dialog<br/>"Enter your password to confirm"
+    Client->>Teacher: show confirmation dialog<br/>"Enter your password to confirm.<br/>Your account will be deleted in 30 days.<br/>Sign in within 30 days to cancel deletion."
     Teacher->>Client: enter current password
-    Client->>API: deleteAccount(password) + token
+    Client->>API: requestAccountDeletion(password) + token
     API->>API: verify token → caller_id
     API->>Auth: reauthenticate(caller_id, password)
     alt password wrong
         Auth-->>API: 401
         API-->>Client: 401 "password incorrect"
-        Client->>Teacher: show error, stay on dialog
     else password correct
         Auth-->>API: ok
-        rect rgb(255, 235, 235)
-        API->>T: DELETE id = caller_id
-        Note over T,DB: CASCADE:<br/>TeacherPreference (1:1)<br/>All Courses → full tree (Pass B §2.6)<br/>All Students → full tree (Pass B §4.5)
+        rect rgb(255, 245, 225)
+        API->>T: UPDATE deleted_at = now() WHERE id = caller_id
+        Note over T: Soft-delete only.<br/>Data remains intact for 30 days.<br/>All reads filter where deleted_at IS NULL.
         end
-        API->>Auth: deleteUser(caller_id)
-        alt auth delete fails
-            Note over API,Auth: log for manual cleanup —<br/>domain is already gone, orphan auth record remains.<br/>Next sign-in attempt will fail at §2 recovery path<br/>(no Teacher row, can't rebootstrap because user is actively deleting).
-        end
+        API->>Auth: signOut(caller_id)
         API-->>Client: ok
-        Client->>Client: clear local storage, redirect to marketing site
+        Client->>Client: clear localStorage, redirect to marketing site
     end
 ```
+
+**Cancel deletion within the grace period:** if the user signs in via §2 before the 30-day window closes, the sign-in flow detects `Teacher.deleted_at IS NOT NULL`, prompts: *"Your account is scheduled for deletion. Restore it?"* — and on confirm, runs `UPDATE Teacher SET deleted_at = NULL`.
+
+**Hard-delete cleanup job:** a scheduled Supabase Edge Function runs daily:
+
+```sql
+-- Called via Supabase cron extension daily at 03:00 UTC
+DELETE FROM Teacher
+WHERE deleted_at IS NOT NULL
+  AND deleted_at < now() - interval '30 days';
+-- Cascades through all teacher-scoped entities per Pass B §5.6.
+```
+
+The cleanup job is idempotent and the cascade delete is the same one documented in Pass B — just deferred by 30 days.
+
+**Why soft-delete beats the prior hard-delete design:**
+- Recovery: "I deleted my account by mistake" becomes fixable. The sign-in path (§2) detects the soft-delete flag and offers restoration.
+- Two-system atomicity: auth provider only gets a `signOut`, not a `deleteUser`. No orphan auth records during the grace window.
+- Data audit: during the grace period, an admin can still query the teacher's data if disputes arise.
+- Post-cleanup: after 30 days, the full cascade still happens (same effect as immediate hard-delete, just delayed).
 
 **Ordering choice: domain first, then auth.** Reasoning:
 

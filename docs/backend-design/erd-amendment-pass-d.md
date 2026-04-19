@@ -29,14 +29,15 @@ Category {
 ```
 
 - Per-course. Many per Course. Optional — a course may have zero categories.
-- Weights are teacher-managed. App should surface a warning if `SUM(weight) != 100` but not hard-enforce.
-- When present and `Course.grading_system` includes letter/percentage, categories drive the percentage pipeline.
-- When absent and `Course.grading_system` includes letter/percentage, all assessments contribute equally (implicit equal weighting).
+- Weights are teacher-managed. **UI hard-caps at 100**: a teacher cannot save a configuration whose weights sum > 100. If they type a value that would push the sum over, the input is rejected or auto-clamped down (per final decision on Q18). Sums below 100 are tolerated and renormalized at read time (Pass D §1.4).
+- When present and `Course.grading_system = 'letter'` or `'both'`, categories drive the percentage pipeline.
+- When absent, **letter/both mode is blocked** — UI prompts teacher to create at least one category before selecting those modes (per final decision on Q11).
 
 #### New columns
 
 - `Assessment.category_id uuid FK → Category, nullable`
 - `Course.grading_system text` — enum: `'proficiency' | 'letter' | 'both'`. Replaces `report_as_percentage`. The UI already has a `course.gradingSystem` field with values `proficiency` and `letter` — this amendment adds `both` and standardizes the three-value enum.
+- `Course.timezone text` — IANA tz string (e.g., `'America/Vancouver'`). Defaults to the teacher's browser timezone on course creation (per Q22). All date/datetime fields inside the course render in this TZ.
 - `Criterion.weight numeric` — default 1.0. Normalized across criteria at read time: `criterion_weight / SUM(all criteria weights in rubric)`. Teacher-adjustable.
 - `Criterion.level_1_value numeric` — default 1. Teacher-adjustable.
 - `Criterion.level_2_value numeric` — default 2. Teacher-adjustable.

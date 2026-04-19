@@ -764,6 +764,8 @@ Notes:
 
 Score, RubricScore, TagScore all live at `(enrollment_id, assessment_id[, criterion_id | tag_id])`. Writes are upserts keyed on the unique constraint.
 
+**Audit trail (per Q28 = A):** every Score upsert writes one row to `ScoreAudit` inside the same transaction, capturing the old and new value/status plus the acting teacher_id and timestamp. Retention: 2 years. This provides a complete change history for dispute resolution. RubricScore and TagScore changes are not audited directly — their effect on computed tag/proficiency values is derivable by walking the audit chain of their parent Score. The transaction rectangle in each diagram below should be read as including the audit write even when not shown explicitly.
+
 ### 9.1 Score — single cell (cycle, numeric, inline, mobile)
 
 Trigger: Rows 117–120, 131–134. Teacher clicks/cycles a cell, types a points value, inline-edits, mobile taps.
@@ -1053,8 +1055,43 @@ sequenceDiagram
 ```
 
 Notes:
-- Depends on open question #7. Until template creation is specified, this path assumes templates are read-only seeded data.
-- No write is made back to the ObservationTemplate row itself on quick-post. Usage counts / last-used timestamps are not in the ERD.
+- No write is made back to the ObservationTemplate row on quick-post. Usage counts / last-used timestamps are not in the ERD.
+
+### 10.5 Teacher-added custom templates (Q4 = B)
+
+Per final decision: the app ships with 6–10 curated seed templates (`is_seed = true`, immutable). Teachers can **add** their own custom templates but cannot edit or delete seeds.
+
+```mermaid
+sequenceDiagram
+    actor Teacher
+    participant Client
+    participant API
+    participant ObservationTemplate
+
+    alt create custom template
+        Teacher->>Client: fill template form (body, default_sentiment, default_context_type, optional tags)
+        Client->>API: createCustomTemplate(course_id, payload)
+        rect rgb(235, 245, 255)
+        API->>ObservationTemplate: INSERT (course_id, body, default_*,<br/>is_seed = false,<br/>display_order = MAX+1)
+        end
+    else edit custom template
+        Teacher->>Client: edit fields → Save
+        Client->>API: updateCustomTemplate(id, patch)
+        rect rgb(235, 245, 255)
+        API->>ObservationTemplate: UPDATE WHERE id = target AND is_seed = false<br/>(returns 403 if seed)
+        end
+    else delete custom template
+        Client->>API: deleteCustomTemplate(id)
+        rect rgb(255, 235, 235)
+        API->>ObservationTemplate: DELETE WHERE id = target AND is_seed = false
+        end
+    end
+    API-->>Client: ok
+```
+
+Notes:
+- The API enforces `is_seed = false` on every mutation. Seeds are protected at the database level too via an RLS policy: `USING (is_seed = false)`.
+- Seed templates are inserted at schema-migration time, not by teachers. Updating seeds is a deployment operation.
 
 ---
 
@@ -1184,6 +1221,8 @@ Notes:
 ## 13. TermRating
 
 Trigger: Rows 230–241. Term ratings are edited as a composite form per (enrollment, term). UNIQUE(enrollment_id, term). The full form is saved as one transaction.
+
+**Audit trail (per Q28 = A):** every change to a TermRating field (narrative_html, work_habits_rating, participation_rating, social_traits, each Dimension rating, each join-table membership) writes one row to `TermRatingAudit` inside the same transaction. One audit row per changed field. Retention: 2 years. The diagram below shows the audit write as a single `API->>TermRatingAudit: INSERT per changed field` step for brevity; implementation computes the diff against the prior state.
 
 ```mermaid
 sequenceDiagram

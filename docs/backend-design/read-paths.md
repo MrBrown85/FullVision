@@ -222,7 +222,15 @@ function percentage_to_letter(R):
 **Key differences from the Phil 12 spreadsheet:**
 - Blank cells (no Score row) → **drop from category average**, not counted as zero. Per your decision.
 - `status='NS'` (not submitted) → counted as zero. Same effect as the spreadsheet's blank cells, but it's now explicit.
-- Category weights that don't sum to 100 → renormalized at read time. Weights summing to 98 or 103 still yield a sensible percentage.
+- Category weights that don't sum to 100 → renormalized at read time. Weights summing to 98 yield a sensible percentage. Weights > 100 cannot be saved (UI hard-caps per Q18).
+
+**Display rounding (per Q14 = C):** both proficiency and percentage rendered to **1 decimal place**.
+- Q (proficiency) rendered as e.g. `2.7`
+- R (percentage) rendered as e.g. `78.6%`
+- S (letter) rendered as-is (`B`, `C+`, etc.)
+- Intermediate math retains full precision; rounding happens at display only.
+
+**Letter mode without categories (per Q11 = A):** if `grading_system ∈ {'letter', 'both'}` and the course has **zero** Categories, the UI blocks selecting that mode in course settings. The course-creation wizard enforces "create at least one category" before enabling letter mode. The fallback branch below never triggers in practice because the UI prevents that state:
 
 ### 1.5 Section (competency) proficiency
 
@@ -428,6 +436,8 @@ sequenceDiagram
 
 **Why one endpoint, not many:** the student profile is the busiest read surface (teacher taps a student frequently). Bundling it avoids the "waterfall of 8 fetches" pattern that commonly destroys performance.
 
+**Course-scoped only — no cross-year carry-forward (per Q42 = B):** the student profile shows **only data from the current Enrollment**. Even though `Student` is teacher-owned (Q41) and the same Student record is reused when re-enrolling in a new course, the profile view in Course B does **not** surface observations, notes, goals, or reflections from Course A. Each course is a sandbox. This keeps the teacher's current-year view focused. Historical context across years can be added later (v2+) as an opt-in "history" panel if teachers request it.
+
 ### 2.3 Class dashboard (teacher overview)
 
 Trigger: Teacher opens the course landing page.
@@ -450,7 +460,11 @@ sequenceDiagram
     API-->>Client: { class_avg, distribution, competency_class_avgs[…],<br/>at_risk_students[…], flagged_count, assessment_stats[…] }
 ```
 
-**"At risk" threshold:** not specified by the inputs. Conservative default: students with `overall_proficiency < 2.0` OR percentage `< 60%`. Flagged as an open question — your call on the threshold, or make it teacher-configurable.
+**"At risk" threshold (per Q17 = A):** fixed app-wide. A student is flagged "at risk" if either:
+- `overall_proficiency < 2.0`, OR
+- letter percentage `R < 60%`
+
+Not teacher-configurable in v1 — simpler implementation and consistent experience across teachers. Can be revisited post-launch if teachers request customization.
 
 ### 2.4 Learning map view
 
@@ -505,6 +519,8 @@ sequenceDiagram
 - **Target behavior (new feature):** when the term rating is new, `TermRatingDimension.rating` is pre-filled with `round(section_proficiency)` for each section. Teacher can accept or override. Reduces re-work for the common case where the auto-computed level is correct.
 
 The backend read endpoint returns the computed defaults regardless. The UI will switch from zero-fill to proficiency-fill when the term-rating editor is updated as part of this rebuild.
+
+**Narrative auto-generate — deferred to external workstream (per Q46 = B + note):** the existing UI has an "auto-generate narrative" button. User has indicated this feature is being developed in a separate repo. For v1 of this rebuild, **hide the button** in the term-rating editor. When the external workstream ships, the feature can be wired back in — it consumes the same computed context (proficiencies, scores, observations) this read endpoint already returns.
 
 ### 2.6 Report preview
 

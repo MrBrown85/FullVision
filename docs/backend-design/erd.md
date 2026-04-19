@@ -93,6 +93,7 @@ erDiagram
         text email
         text display_name
         timestamp created_at
+        timestamp deleted_at "nullable; soft-delete marker, 30-day grace"
     }
 
     TeacherPreference {
@@ -290,9 +291,31 @@ erDiagram
         text body
         text default_sentiment "nullable"
         text default_context_type "nullable"
+        boolean is_seed "app-seeded (immutable) vs teacher-added"
         int display_order "within course"
         timestamp created_at
         timestamp updated_at
+    }
+
+    ScoreAudit {
+        uuid id PK
+        uuid score_id FK "FK → Score"
+        uuid changed_by FK "FK → Teacher"
+        numeric old_value "nullable"
+        numeric new_value "nullable"
+        text old_status "nullable"
+        text new_status "nullable"
+        timestamp changed_at
+    }
+
+    TermRatingAudit {
+        uuid id PK
+        uuid term_rating_id FK "FK → TermRating"
+        uuid changed_by FK "FK → Teacher"
+        text field_changed "narrative_html, work_habits_rating, etc."
+        text old_value "serialized"
+        text new_value "serialized"
+        timestamp changed_at
     }
 
     CustomTag {
@@ -415,6 +438,8 @@ erDiagram
 | 34 | **TermRatingAssessment** | Assessments mentioned/highlighted in a term rating narrative. | term_rating_id, assessment_id | -- | Join table. |
 | 35 | **TermRatingObservation** | Observations mentioned/highlighted in a term rating narrative. | term_rating_id, observation_id | -- | Join table. |
 | 36 | **ReportConfig** | Per-course report layout: which blocks to include, preset level. | course_id (PK/FK), preset, blocks_config | Teacher | 1:1 with Course. |
+| 37 | **ScoreAudit** | Append-only log of every Score write (value or status change). | score_id, changed_by, old_value, new_value, old_status, new_status, changed_at | System | 2-year retention. Written inside the same transaction as the Score write. |
+| 38 | **TermRatingAudit** | Append-only log of every TermRating field change (narrative, ratings, social traits). | term_rating_id, changed_by, field_changed, old_value, new_value, changed_at | System | 2-year retention. One row per field changed per write. |
 
 ---
 
