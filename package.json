@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "build": "bash scripts/build.sh",
-    "dev": "python3 -m http.server 8347",
+    "dev": "npx serve -l 8347 --no-single",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "npx playwright test",

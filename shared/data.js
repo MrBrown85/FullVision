@@ -1469,672 +1469,556 @@ async function _pagedSelect(sb, tbl, teacherId, cid, opts) {
   return result.data || [];
 }
 
-async function _rpcData(sb, name, params) {
-  if (!sb || typeof sb.rpc !== 'function') throw new Error('Supabase RPC client unavailable');
-  var target = sb;
-  var fnName = name;
-  if (typeof name === 'string' && name.indexOf('.') > 0) {
-    var parts = name.split('.');
-    var schemaName = parts.shift();
-    fnName = parts.join('.');
-    if (!schemaName || !fnName) throw new Error('Invalid RPC name: ' + name);
-    if (!sb.schema || typeof sb.schema !== 'function')
-      throw new Error('Supabase schema client unavailable for ' + name);
-    target = sb.schema(schemaName);
-    if (!target || typeof target.rpc !== 'function')
-      throw new Error('Supabase schema RPC client unavailable for ' + name);
+function _dateOnly(value) {
+  if (!value) return '';
+  if (typeof value === 'string') return value.slice(0, 10);
+  try {
+    return new Date(value).toISOString().slice(0, 10);
+  } catch (e) {
+    return '';
   }
-  var res = await target.rpc(fnName, params || {});
-  if (res && !res.error) return res.data;
-  throw (res && res.error) || new Error(name + ' failed');
 }
 
-function _isMissingRpcError(error) {
-  if (!error) return false;
-  if (error.code === 'PGRST202' || error.code === '42883') return true;
-  var message = String(error.message || '');
-  return (
-    message.indexOf('Could not find the function') >= 0 ||
-    (message.indexOf('function') >= 0 && message.indexOf('does not exist') >= 0) ||
-    message.indexOf('schema cache') >= 0
-  );
+function _plainObject(value) {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
-async function _rpcDataWithFallbacks(sb, names, params) {
-  var list = Array.isArray(names) ? names : [names];
-  var lastError = null;
-  for (var i = 0; i < list.length; i++) {
+function _rpcRows(data) {
+  if (data == null) return [];
+  if (typeof data === 'string') {
     try {
-      return await _rpcData(sb, list[i], params);
-    } catch (error) {
-      lastError = error;
-      if (!_isMissingRpcError(error) || i === list.length - 1) throw error;
-    }
-  }
-  throw lastError || new Error('RPC failed');
-}
-
-function _coerceArray(value) {
-  if (Array.isArray(value)) return value;
-  if (value == null) return [];
-  if (typeof value === 'string') {
-    try {
-      var parsed = JSON.parse(value);
-      return Array.isArray(parsed) ? parsed : value ? [value] : [];
+      data = JSON.parse(data);
     } catch (e) {
-      return value ? [value] : [];
+      return [];
     }
+  }
+  if (Array.isArray(data)) return data;
+  if (_plainObject(data)) {
+    if (Array.isArray(data.items)) return data.items;
+    if (Array.isArray(data.rows)) return data.rows;
+    if (Array.isArray(data.data)) return data.data;
   }
   return [];
 }
 
-function _coerceObject(value) {
-  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-}
-
-function _firstDefined(obj, keys) {
-  if (!obj) return null;
-  for (var i = 0; i < keys.length; i++) {
-    var val = obj[keys[i]];
-    if (val !== undefined && val !== null) return val;
+function _rpcObject(data) {
+  if (data == null) return null;
+  if (typeof data === 'string') {
+    try {
+      data = JSON.parse(data);
+    } catch (e) {
+      return null;
+    }
   }
-  return null;
+  if (Array.isArray(data)) return data[0] || null;
+  if (_plainObject(data) && _plainObject(data.data)) return data.data;
+  return _plainObject(data) ? data : null;
 }
 
-function _dateOnly(value) {
-  if (!value) return '';
-  var text = String(value);
-  return text.length >= 10 ? text.slice(0, 10) : text;
+async function _rpcPagedArray(sb, fn, payload, opts) {
+  opts = opts || {};
+  var pageSize = opts.pageSize || 1000;
+  var offset = 0;
+  var allRows = [];
+  var tryPaging = opts.tryPaging !== false;
+
+  while (true) {
+    var rpcPayload = Object.assign({}, payload || {});
+    if (tryPaging) {
+      rpcPayload.p_limit = pageSize;
+      rpcPayload.p_offset = offset;
+    }
+
+    var res = await sb.rpc(fn, rpcPayload);
+    if (res.error && tryPaging && offset === 0) {
+      tryPaging = false;
+      continue;
+    }
+    if (res.error) return { data: null, error: res.error };
+
+    var batch = _rpcRows(res.data);
+    allRows = allRows.concat(batch);
+    if (!tryPaging || batch.length < pageSize) break;
+    offset += pageSize;
+  }
+
+  return { data: allRows, error: null };
 }
 
-function _isoTimestamp(value) {
-  return value ? String(value) : new Date().toISOString();
+function _persistLoadedField(cid, field, value) {
+  _cache[field][cid] = value;
+  var key = _DATA_KEYS[field];
+  if (key) _safeLSSet('gb-' + key + '-' + cid, JSON.stringify(value));
 }
 
-function _numberOr(value, fallback) {
-  var num = Number(value);
-  return Number.isFinite(num) ? num : fallback;
+function _personToEnrollmentId(studentId, enrollmentByStudentId) {
+  return (enrollmentByStudentId && studentId && enrollmentByStudentId[studentId]) || studentId || null;
 }
 
-function _shortLabel(text) {
-  text = (text || '').trim();
-  if (!text) return '';
-  return text.length > 22 ? text.slice(0, 19) + '...' : text;
-}
-
-function _canonicalRosterToStudents(rows) {
+function _canonicalRosterRowsToStudents(rows) {
   return (rows || [])
     .map(function (r) {
-      var firstName = _firstDefined(r, ['first_name', 'firstName']) || '';
-      var lastName = _firstDefined(r, ['last_name', 'lastName']) || '';
-      var preferredFirst = _firstDefined(r, ['preferred_first_name', 'preferredFirstName', 'preferred']) || '';
       return {
-        id: _firstDefined(r, ['enrollment_id', 'id']) || uid(),
-        personId: _firstDefined(r, ['student_id', 'person_id', 'personId']) || null,
-        firstName: firstName,
-        lastName: lastName,
-        preferred: preferredFirst,
-        pronouns: _firstDefined(r, ['pronouns']) || '',
-        studentNumber: _firstDefined(r, ['local_student_number', 'student_number', 'studentNumber']) || '',
-        email: _firstDefined(r, ['email']) || '',
-        dateOfBirth: _firstDefined(r, ['date_of_birth', 'dateOfBirth']) || '',
-        designations: _coerceArray(_firstDefined(r, ['designations'])),
-        enrolledDate: _dateOnly(_firstDefined(r, ['enrolled_on', 'enrolled_date', 'enrolledDate'])),
-        attendance: _coerceArray(_firstDefined(r, ['attendance'])),
-        sortName: ((lastName || '') + ' ' + (firstName || '')).trim(),
-        _rosterPosition: _numberOr(_firstDefined(r, ['roster_position', 'rosterPosition']), 0),
+        id: r.enrollment_id || r.enrollmentId || r.id || r.student_id || r.studentId,
+        personId: r.student_id || r.studentId || r.person_id || r.personId || null,
+        firstName: r.first_name || r.firstName || '',
+        lastName: r.last_name || r.lastName || '',
+        preferred: r.preferred || r.preferred_first_name || r.preferredFirstName || '',
+        pronouns: r.pronouns || '',
+        studentNumber: r.student_number || r.local_student_number || r.studentNumber || '',
+        email: r.email || '',
+        dateOfBirth: r.date_of_birth || r.dateOfBirth || '',
+        designations: r.designations || r.designation_codes || [],
+        enrolledDate: _dateOnly(r.enrolled_on || r.enrolled_date || r.enrolledDate),
+        attendance: r.attendance || [],
+        sortName: r.sort_name || '',
+        rosterPosition: Number(r.roster_position || r.rosterPosition || 0),
       };
     })
     .sort(function (a, b) {
-      return a._rosterPosition - b._rosterPosition || a.sortName.localeCompare(b.sortName);
-    })
-    .map(function (student) {
-      delete student._rosterPosition;
-      return student;
+      if (a.rosterPosition && b.rosterPosition && a.rosterPosition !== b.rosterPosition) {
+        return a.rosterPosition - b.rosterPosition;
+      }
+      return fullName(a).localeCompare(fullName(b));
     });
 }
 
-function _canonicalAssessmentsToBlob(rows) {
-  return (rows || []).map(function (r) {
-    var assessment = {
-      id: _firstDefined(r, ['assessment_id', 'id']) || uid(),
-      title: _firstDefined(r, ['title']) || '',
-      date: _dateOnly(_firstDefined(r, ['due_at', 'date', 'dueDate', 'assigned_at'])),
-      type: _firstDefined(r, ['assessment_kind', 'type']) || 'summative',
-      tagIds: _coerceArray(_firstDefined(r, ['target_outcome_ids', 'tag_ids', 'targetOutcomeIds'])),
-      weight: _numberOr(_firstDefined(r, ['weighting', 'weight']), 1),
-      collaboration: _firstDefined(r, ['collaboration_mode', 'collaboration']) || 'individual',
-    };
-    var scoreMode = _firstDefined(r, ['score_mode', 'scoreMode']);
-    var maxPoints = _firstDefined(r, ['points_possible', 'max_points', 'maxPoints']);
-    var notes = _firstDefined(r, ['notes']);
-    var rubricId = _firstDefined(r, ['rubric_id', 'rubricId']);
-    var moduleId = _firstDefined(r, ['module_id', 'moduleId']);
-    var dateAssigned = _firstDefined(r, ['assigned_at', 'date_assigned', 'dateAssigned']);
-    if (scoreMode) assessment.scoreMode = scoreMode;
-    if (maxPoints !== null && maxPoints !== undefined && maxPoints !== '')
-      assessment.maxPoints = _numberOr(maxPoints, 0);
-    if (notes) assessment.notes = notes;
-    if (rubricId) assessment.rubricId = rubricId;
-    if (moduleId) assessment.moduleId = moduleId;
-    if (dateAssigned) assessment.dateAssigned = _dateOnly(dateAssigned);
-    return assessment;
-  });
+function _canonicalScoreRowsToBlob(rows, enrollmentByStudentId) {
+  return _scoreRowsToBlob(
+    (rows || []).map(function (r) {
+      return {
+        student_id: r.enrollment_id || r.enrollmentId || _personToEnrollmentId(r.student_id || r.studentId, enrollmentByStudentId),
+        assessment_id: r.assessment_id || r.assessmentId,
+        tag_id: r.course_outcome_id || r.outcome_id || r.tag_id || r.tagId,
+        score:
+          r.raw_numeric_score !== undefined && r.raw_numeric_score !== null
+            ? Number(r.raw_numeric_score)
+            : r.normalized_level !== undefined && r.normalized_level !== null
+              ? Number(r.normalized_level)
+              : r.score,
+        date: _dateOnly(r.entered_at || r.date),
+        type: r.type || 'summative',
+        note: r.comment_text || r.comment || r.note || '',
+        created_at: r.created_at || r.entered_at,
+      };
+    }).filter(function (r) {
+      return r.student_id && r.assessment_id && r.tag_id;
+    }),
+  );
 }
 
-function _canonicalScoresToBlob(rows, personToEnrollment) {
-  var blob = {};
-  (rows || []).forEach(function (r) {
-    var studentId =
-      _firstDefined(r, ['enrollment_id']) ||
-      personToEnrollment[_firstDefined(r, ['student_id'])] ||
-      _firstDefined(r, ['student_id']);
-    var assessmentId = _firstDefined(r, ['assessment_id']);
-    var outcomeId = _firstDefined(r, ['course_outcome_id', 'outcome_id', 'tag_id']);
-    if (!studentId || !assessmentId || !outcomeId) return;
-    if (!blob[studentId]) blob[studentId] = [];
-    var scoreValue = _firstDefined(r, ['normalized_level', 'score', 'raw_numeric_score']);
-    blob[studentId].push({
-      id: _firstDefined(r, ['score_current_id', 'id']) || studentId + ':' + assessmentId + ':' + outcomeId,
-      assessmentId: assessmentId,
-      tagId: outcomeId,
-      score: _numberOr(scoreValue, 0),
-      date: _dateOnly(_firstDefined(r, ['updated_at', 'entered_at', 'date'])),
-      type: _firstDefined(r, ['assessment_kind', 'type']) || 'summative',
-      note: _firstDefined(r, ['comment_text', 'comment', 'note']) || '',
-      created: _isoTimestamp(_firstDefined(r, ['created_at', 'entered_at'])),
-    });
-  });
-  return blob;
+function _canonicalObservationRowsToBlob(rows, enrollmentByStudentId) {
+  return _obsRowsToBlob(
+    (rows || []).map(function (r) {
+      return {
+        id: r.observation_id || r.id,
+        student_id: r.enrollment_id || r.enrollmentId || _personToEnrollmentId(r.student_id || r.studentId, enrollmentByStudentId),
+        text: r.text || '',
+        dims: r.dims || [],
+        sentiment: r.sentiment || null,
+        context: r.context || null,
+        assignment_context: r.assignment_context || null,
+        date: _dateOnly(r.observed_at || r.date),
+        created_at: r.created_at || r.observed_at,
+        modified_at: r.updated_at || r.modified_at,
+      };
+    }).filter(function (r) {
+      return r.id && r.student_id;
+    }),
+  );
 }
 
-function _canonicalObservationsToBlob(rows, personToEnrollment) {
-  var blob = {};
-  (rows || []).forEach(function (r) {
-    var studentId =
-      _firstDefined(r, ['enrollment_id']) ||
-      personToEnrollment[_firstDefined(r, ['student_id'])] ||
-      _firstDefined(r, ['student_id']);
-    if (!studentId) return;
-    if (!blob[studentId]) blob[studentId] = [];
-    var entry = {
-      id: _firstDefined(r, ['observation_id', 'id']) || uid(),
-      text: _firstDefined(r, ['text', 'body', 'note_text']) || '',
-      dims: _coerceArray(_firstDefined(r, ['dims', 'dimension_codes', 'dimension_ids'])),
-      created: _isoTimestamp(_firstDefined(r, ['observed_at', 'created_at'])),
-      date: _dateOnly(_firstDefined(r, ['observed_at', 'date'])),
-    };
-    var sentiment = _firstDefined(r, ['sentiment']);
-    var context = _firstDefined(r, ['context']);
-    var modified = _firstDefined(r, ['updated_at', 'modified_at']);
-    var assignmentId = _firstDefined(r, ['assessment_id']);
-    if (sentiment) entry.sentiment = sentiment;
-    if (context) entry.context = context;
-    if (modified) entry.modified = _isoTimestamp(modified);
-    if (assignmentId) entry.assignmentContext = { assessmentId: assignmentId };
-    blob[studentId].push(entry);
-  });
-  return blob;
+function _canonicalAssessmentRowsToBlob(rows) {
+  return _assessmentRowsToBlob(
+    (rows || []).map(function (r) {
+      return {
+        id: r.assessment_id || r.id,
+        title: r.title || '',
+        date: _dateOnly(r.due_at || r.date),
+        type: r.assessment_kind || r.type || 'summative',
+        tag_ids: r.target_outcome_ids || r.tag_ids || r.tagIds || [],
+        score_mode: r.score_mode || r.scoreMode || '',
+        collaboration: r.collaboration_mode || r.collaboration || 'individual',
+        max_points:
+          r.points_possible !== undefined && r.points_possible !== null ? Number(r.points_possible) : r.max_points,
+        weight: r.weighting !== undefined && r.weighting !== null ? Number(r.weighting) : r.weight,
+        notes: r.notes || '',
+        rubric_id: r.rubric_id || '',
+        module_id: r.module_id || '',
+        due_date: _dateOnly(r.due_at || r.due_date),
+        assigned_at: _dateOnly(r.assigned_at || r.date_assigned),
+      };
+    }).filter(function (r) {
+      return r.id;
+    }),
+  );
 }
 
-function _canonicalPolicyToCourseConfig(policy) {
-  var src = Array.isArray(policy) ? policy[0] : policy;
-  if (src && src.config && typeof src.config === 'object') src = src.config;
-  src = _coerceObject(src);
-  var out = Object.assign({}, src);
-  var gradingSystem = _firstDefined(src, ['gradingSystem', 'grading_system']);
-  var calcMethod = _firstDefined(src, ['calcMethod', 'calculationMethod', 'calculation_method']);
-  var decayWeight = _firstDefined(src, ['decayWeight', 'decay_weight']);
-  var categoryWeights = _firstDefined(src, ['categoryWeights', 'category_weights']);
-  var gradingScale = _firstDefined(src, ['gradingScale', 'grading_scale']);
-  var reportAsPercentage = _firstDefined(src, ['reportAsPercentage', 'report_as_percentage']);
-  var lateWorkPolicy = _firstDefined(src, ['lateWorkPolicy', 'late_work_policy']);
-  if (gradingSystem != null) out.gradingSystem = gradingSystem;
-  if (calcMethod != null) out.calcMethod = calcMethod;
-  if (decayWeight != null) out.decayWeight = _numberOr(decayWeight, decayWeight);
-  if (categoryWeights != null) out.categoryWeights = categoryWeights;
-  if (gradingScale != null) out.gradingScale = gradingScale;
-  if (reportAsPercentage != null) out.reportAsPercentage = !!reportAsPercentage;
-  if (lateWorkPolicy != null) out.lateWorkPolicy = lateWorkPolicy;
+function _canonicalCoursePolicyToConfig(data) {
+  var row = _rpcObject(data);
+  if (!row) return {};
+  if (_plainObject(row.policy)) row = row.policy;
+  if (_plainObject(row.config)) row = row.config;
+  var out = {};
+  if (row.grading_system !== undefined || row.gradingSystem !== undefined) {
+    out.gradingSystem = row.grading_system !== undefined ? row.grading_system : row.gradingSystem;
+  }
+  if (row.calculation_method !== undefined || row.calcMethod !== undefined || row.calculationMethod !== undefined) {
+    out.calcMethod =
+      row.calculation_method !== undefined
+        ? row.calculation_method
+        : row.calcMethod !== undefined
+          ? row.calcMethod
+          : row.calculationMethod;
+  }
+  if (row.decay_weight !== undefined || row.decayWeight !== undefined) {
+    out.decayWeight = Number(row.decay_weight !== undefined ? row.decay_weight : row.decayWeight);
+  }
+  if (row.category_weights !== undefined || row.categoryWeights !== undefined) {
+    out.categoryWeights = row.category_weights !== undefined ? row.category_weights : row.categoryWeights;
+  }
+  if (row.grading_scale !== undefined || row.gradingScale !== undefined) {
+    out.gradingScale = row.grading_scale !== undefined ? row.grading_scale : row.gradingScale;
+  }
+  if (row.report_as_percentage !== undefined || row.reportAsPercentage !== undefined) {
+    out.reportAsPercentage = !!(
+      row.report_as_percentage !== undefined ? row.report_as_percentage : row.reportAsPercentage
+    );
+  }
+  if (row.late_work_policy !== undefined || row.lateWorkPolicy !== undefined) {
+    out.lateWorkPolicy = row.late_work_policy !== undefined ? row.late_work_policy : row.lateWorkPolicy;
+  }
   return out;
 }
 
-function _canonicalReportConfigToBlob(config) {
-  var src = Array.isArray(config) ? config[0] : config;
-  if (src && src.config !== undefined) src = src.config;
-  return src == null ? null : src;
+function _canonicalReportConfig(data) {
+  var row = _rpcObject(data);
+  if (!row) return null;
+  if (_plainObject(row.config)) return row.config;
+  return row;
 }
 
 function _canonicalOutcomesToLearningMap(cid, rows) {
-  if (!rows || rows.length === 0) return null;
-  var course = (typeof COURSES !== 'undefined' && COURSES[cid]) || {};
-  var subjectId = course.subjectCode || course.subject || cid;
-  var subjectName = course.name || course.subjectCode || 'Course';
-  var defaultColor = SUBJECT_COLOURS[subjectId] || SUBJECT_COLOURS[course.subjectCode] || '#2563eb';
-  var sections = rows
-    .slice()
-    .sort(function (a, b) {
-      return _numberOr(a.sort_order, 0) - _numberOr(b.sort_order, 0);
-    })
-    .map(function (row) {
-      var tagId = _firstDefined(row, ['course_outcome_id', 'id']);
-      if (!tagId) return null;
-      var sectionName =
-        _firstDefined(row, ['section_name', 'sectionName']) ||
-        _firstDefined(row, ['short_label', 'outcome_code']) ||
-        'Outcome';
-      var shortName = _shortLabel(_firstDefined(row, ['short_label', 'outcome_code']) || sectionName);
-      var color = _firstDefined(row, ['color']) || defaultColor;
-      var tag = {
-        id: tagId,
-        label: _firstDefined(row, ['short_label', 'outcome_code']) || shortName,
-        text: _firstDefined(row, ['body', 'description']) || '',
-        color: color,
-        subject: subjectId,
-        name: sectionName,
-        shortName: shortName,
-      };
-      return {
-        id: tagId,
-        subject: subjectId,
-        name: sectionName,
-        shortName: shortName,
-        color: color,
-        tags: [tag],
-      };
-    })
-    .filter(Boolean);
-  if (sections.length === 0) return null;
+  var course = COURSES[cid] || {};
+  var subjectId = course.subjectCode || course.id || cid;
+  var sections = [];
+  var seenSubjects = {};
+
+  (rows || []).forEach(function (r, idx) {
+    var outcomeId = r.course_outcome_id || r.outcomeId || r.id;
+    if (!outcomeId) return;
+    var color = r.color || SUBJECT_COLOURS[course.subjectCode] || '#6366f1';
+    var sectionName = r.section_name || r.sectionName || r.short_label || r.outcome_code || 'Standard';
+    var shortName = (sectionName || 'Standard').replace(/\s*\(.*?\)\s*/g, '').trim();
+    if (shortName.length > 20) shortName = shortName.slice(0, 18) + '\u2026';
+    var tagLabel = r.short_label || r.outcome_code || shortName || 'Standard';
+    var tag = {
+      id: outcomeId,
+      label: tagLabel,
+      text: r.body || r.text || '',
+      color: color,
+      subject: subjectId,
+      name: sectionName,
+      shortName: shortName,
+      sortOrder: Number(r.sort_order || idx),
+      sourceKind: r.source_kind || r.sourceKind || 'curriculum',
+    };
+    sections.push({
+      id: outcomeId,
+      subject: subjectId,
+      name: sectionName,
+      shortName: shortName,
+      color: color,
+      tags: [tag],
+      sortOrder: tag.sortOrder,
+      outcome: tag,
+    });
+    seenSubjects[subjectId] = color;
+  });
+
+  sections.sort(function (a, b) {
+    return Number(a.sortOrder || 0) - Number(b.sortOrder || 0);
+  });
+
+  var subjects = Object.keys(seenSubjects).map(function (id) {
+    return {
+      id: id,
+      name: course.name || 'Learning Outcomes',
+      color: seenSubjects[id],
+    };
+  });
+
   return {
-    subjects: [{ id: subjectId, name: subjectName, color: defaultColor }],
+    subjects: subjects,
     sections: sections,
+    outcomes: sections.map(function (section) {
+      return section.outcome;
+    }),
     _customized: true,
     _version: 1,
     _flatVersion: 2,
   };
 }
 
-function _canonicalStatusesToBlob(rows, personToEnrollment) {
-  var blob = {};
-  (rows || []).forEach(function (r) {
-    var studentId =
-      _firstDefined(r, ['enrollment_id']) ||
-      personToEnrollment[_firstDefined(r, ['student_id'])] ||
-      _firstDefined(r, ['student_id']);
-    var assessmentId = _firstDefined(r, ['assessment_id']);
-    if (!studentId || !assessmentId) return;
-    blob[studentId + ':' + assessmentId] = _firstDefined(r, ['status']) || '';
+function _canonicalStudentGoalsToMap(data) {
+  var rows = _rpcRows(data);
+  var out = {};
+  if (rows.length > 0) {
+    rows.forEach(function (r) {
+      var key = r.course_outcome_id || r.outcome_id || r.tag_id || r.tagId || r.id;
+      if (key) out[key] = r.text || r.goal_text || r.value || '';
+    });
+    return out;
+  }
+  var obj = _rpcObject(data);
+  if (!obj) return out;
+  if (_plainObject(obj.goals)) obj = obj.goals;
+  Object.keys(obj).forEach(function (key) {
+    var value = obj[key];
+    out[key] = typeof value === 'string' ? value : value && typeof value.text === 'string' ? value.text : '';
   });
-  return blob;
+  return out;
 }
 
-function _canonicalFlagsToBlob(rows, personToEnrollment) {
-  var blob = {};
-  (rows || []).forEach(function (r) {
-    var studentId =
-      _firstDefined(r, ['enrollment_id']) ||
-      personToEnrollment[_firstDefined(r, ['student_id'])] ||
-      _firstDefined(r, ['student_id']);
-    if (studentId) blob[studentId] = true;
-  });
-  return blob;
-}
-
-function _canonicalTermRatingsToBlob(rows, personToEnrollment) {
-  var blob = {};
-  (rows || []).forEach(function (r) {
-    var studentId =
-      _firstDefined(r, ['enrollment_id']) ||
-      personToEnrollment[_firstDefined(r, ['student_id'])] ||
-      _firstDefined(r, ['student_id']);
-    var termId = _firstDefined(r, ['term_id']);
-    if (!studentId || !termId) return;
-    if (!blob[studentId]) blob[studentId] = {};
-    var entry = {
-      dims: _coerceObject(_firstDefined(r, ['dims'])),
-      narrative: _firstDefined(r, ['narrative']) || '',
-      created: _isoTimestamp(_firstDefined(r, ['created_at'])),
-    };
-    var modified = _firstDefined(r, ['updated_at', 'modified_at']);
-    var workHabits = _firstDefined(r, ['work_habits', 'workHabits']);
-    var participation = _firstDefined(r, ['participation']);
-    var socialTraits = _firstDefined(r, ['social_traits', 'socialTraits']);
-    var strengths = _firstDefined(r, ['strengths']);
-    var growthAreas = _firstDefined(r, ['growth_areas', 'growthAreas']);
-    var mentionAssessments = _firstDefined(r, ['mention_assessments', 'mentionAssessments']);
-    var mentionObs = _firstDefined(r, ['mention_obs', 'mentionObs']);
-    var includeCourseSummary = _firstDefined(r, ['include_course_summary', 'includeCourseSummary']);
-    if (modified) entry.modified = _isoTimestamp(modified);
-    if (workHabits != null) entry.workHabits = _numberOr(workHabits, workHabits);
-    if (participation != null) entry.participation = _numberOr(participation, participation);
-    if (socialTraits != null) entry.socialTraits = _coerceArray(socialTraits);
-    if (strengths != null) entry.strengths = _coerceArray(strengths);
-    if (growthAreas != null) entry.growthAreas = _coerceArray(growthAreas);
-    if (mentionAssessments != null) entry.mentionAssessments = _coerceArray(mentionAssessments);
-    if (mentionObs != null) entry.mentionObs = _coerceArray(mentionObs);
-    if (includeCourseSummary != null) entry.includeCourseSummary = !!includeCourseSummary;
-    blob[studentId][termId] = entry;
-  });
-  return blob;
-}
-
-function _canonicalStudentTagId(row) {
-  return _firstDefined(row, ['course_outcome_id', 'outcome_id', 'tag_id', 'section_id']);
-}
-
-function _canonicalGoalsToBlob(rows, personToEnrollment, fallbackStudentId) {
-  var blob = {};
-  (rows || []).forEach(function (r) {
-    var studentId =
-      _firstDefined(r, ['enrollment_id']) ||
-      personToEnrollment[_firstDefined(r, ['student_id', 'person_id'])] ||
-      fallbackStudentId;
-    var tagId = _canonicalStudentTagId(r);
-    if (!studentId || !tagId) return;
-    if (!blob[studentId]) blob[studentId] = {};
-    blob[studentId][tagId] = _firstDefined(r, ['text', 'goal_text', 'goal', 'body']) || '';
-  });
-  return blob;
-}
-
-function _canonicalReflectionsToBlob(rows, personToEnrollment, fallbackStudentId) {
-  var blob = {};
-  (rows || []).forEach(function (r) {
-    var studentId =
-      _firstDefined(r, ['enrollment_id']) ||
-      personToEnrollment[_firstDefined(r, ['student_id', 'person_id'])] ||
-      fallbackStudentId;
-    var tagId = _canonicalStudentTagId(r);
-    if (!studentId || !tagId) return;
-    if (!blob[studentId]) blob[studentId] = {};
-    blob[studentId][tagId] = {
-      confidence: _numberOr(_firstDefined(r, ['confidence']), 0),
-      text: _firstDefined(r, ['text', 'reflection_text', 'body']) || '',
-      date: _dateOnly(_firstDefined(r, ['date', 'reflected_at', 'created_at'])),
+function _canonicalStudentReflectionsToMap(data) {
+  var rows = _rpcRows(data);
+  var out = {};
+  if (rows.length > 0) {
+    rows.forEach(function (r) {
+      var key = r.course_outcome_id || r.outcome_id || r.tag_id || r.tagId || r.id;
+      if (!key) return;
+      out[key] = {
+        confidence: Number(r.confidence || 0),
+        text: r.text || r.reflection_text || '',
+        date: _dateOnly(r.date || r.reflection_date),
+      };
+    });
+    return out;
+  }
+  var obj = _rpcObject(data);
+  if (!obj) return out;
+  if (_plainObject(obj.reflections)) obj = obj.reflections;
+  Object.keys(obj).forEach(function (key) {
+    var value = obj[key] || {};
+    out[key] = {
+      confidence: Number(value.confidence || 0),
+      text: value.text || '',
+      date: _dateOnly(value.date),
     };
   });
-  return blob;
+  return out;
 }
 
-function _canonicalOverridesToBlob(rows, personToEnrollment, fallbackStudentId) {
-  var blob = {};
-  (rows || []).forEach(function (r) {
-    var studentId =
-      _firstDefined(r, ['enrollment_id']) ||
-      personToEnrollment[_firstDefined(r, ['student_id', 'person_id'])] ||
-      fallbackStudentId;
-    var tagId = _canonicalStudentTagId(r);
-    if (!studentId || !tagId) return;
-    if (!blob[studentId]) blob[studentId] = {};
-    var entry = {
-      level: _numberOr(_firstDefined(r, ['level', 'override_level', 'normalized_level']), 0),
-      reason: _firstDefined(r, ['reason', 'comment_text', 'text']) || '',
-    };
-    var date = _dateOnly(_firstDefined(r, ['date', 'updated_at', 'created_at']));
-    var calculated = _firstDefined(r, ['calculated', 'calculated_level']);
-    if (date) entry.date = date;
-    if (calculated !== undefined && calculated !== null && calculated !== '') {
-      entry.calculated = _numberOr(calculated, calculated);
-    }
-    blob[studentId][tagId] = entry;
-  });
-  return blob;
-}
-
-async function _loadPerStudentCanonicalField(sb, cid, students, rpcName, field, personToEnrollment, converter, label) {
-  if (!students || students.length === 0) return;
-  var loads = await Promise.allSettled(
-    students.map(function (student) {
-      var canonicalStudentId = _isUuid(student && student.personId)
-        ? student.personId
-        : _isUuid(student && student.id)
-          ? student.id
-          : null;
-      if (!canonicalStudentId) {
-        return Promise.resolve({ student: student, skipped: true });
+function _canonicalStudentOverridesToMap(data) {
+  var rows = _rpcRows(data);
+  var out = {};
+  if (rows.length > 0) {
+    rows.forEach(function (r) {
+      var key = r.course_outcome_id || r.outcome_id || r.tag_id || r.tagId || r.id;
+      if (!key) return;
+      var entry = {
+        level:
+          r.level !== undefined && r.level !== null
+            ? Number(r.level)
+            : r.override_level !== undefined && r.override_level !== null
+              ? Number(r.override_level)
+              : 0,
+        reason: r.reason || r.comment || '',
+      };
+      if (r.date || r.override_date) entry.date = _dateOnly(r.date || r.override_date);
+      if (r.calculated !== undefined || r.calculated_level !== undefined) {
+        entry.calculated = Number(r.calculated !== undefined ? r.calculated : r.calculated_level);
       }
-      return _rpcData(sb, rpcName, {
-        p_course_offering_id: cid,
-        p_student_id: canonicalStudentId,
-      }).then(function (data) {
-        return { student: student, data: data };
-      });
+      out[key] = entry;
+    });
+    return out;
+  }
+  var obj = _rpcObject(data);
+  if (!obj) return out;
+  if (_plainObject(obj.overrides)) obj = obj.overrides;
+  Object.keys(obj).forEach(function (key) {
+    var value = obj[key] || {};
+    out[key] = {
+      level: Number(value.level || 0),
+      reason: value.reason || '',
+      date: _dateOnly(value.date),
+      calculated: Number(value.calculated || 0),
+    };
+  });
+  return out;
+}
+
+function _canonicalStatusesToBlob(rows, enrollmentByStudentId) {
+  return _statusesRowsToBlob(
+    (rows || []).map(function (r) {
+      return {
+        student_id: _personToEnrollmentId(r.student_id || r.studentId, enrollmentByStudentId),
+        assessment_id: r.assessment_id || r.assessmentId,
+        status: r.status || '',
+      };
+    }).filter(function (r) {
+      return r.student_id && r.assessment_id;
     }),
   );
-
-  var nextValue = Object.assign({}, _cache[field][cid] || {});
-  var anySuccess = false;
-  var lastError = null;
-  for (var i = 0; i < loads.length; i++) {
-    var result = loads[i];
-    if (result.status !== 'fulfilled') {
-      lastError = result.reason;
-      continue;
-    }
-    if (result.value && result.value.skipped) continue;
-    anySuccess = true;
-    var student = result.value.student || {};
-    var studentId = student.id;
-    var partial = converter(_coerceArray(result.value.data), personToEnrollment, studentId);
-    if (partial[studentId] && Object.keys(partial[studentId]).length > 0) {
-      nextValue[studentId] = partial[studentId];
-    } else {
-      delete nextValue[studentId];
-    }
-  }
-
-  if (anySuccess) {
-    _cache[field][cid] = nextValue;
-  } else if (lastError && !_isMissingRpcError(lastError)) {
-    console.warn(label + ' failed for', cid, lastError);
-  }
 }
 
-function _applyCanonicalField(field, cid, nextValue, source) {
-  if (nextValue === undefined) return false;
-  var existing = _cache[field][cid];
-  if (Array.isArray(existing) && Array.isArray(nextValue) && existing.length > 0) {
-    var shrinkThreshold = field === 'students' ? 0.5 : 0.8;
-    if (nextValue.length < existing.length * shrinkThreshold) {
-      console.warn(
-        '[GUARD]',
-        source,
-        'for',
-        field,
-        'returned',
-        nextValue.length,
-        'items vs',
-        existing.length,
-        'in cache - keeping local copy',
-      );
-      return false;
-    }
-  }
-  if (_shouldSkipEntryShrink(field, existing, nextValue, source)) return false;
-  _cache[field][cid] = nextValue;
-  return true;
+function _canonicalTermRatingsToBlob(rows, enrollmentByStudentId) {
+  return _termRatingsRowsToBlob(
+    (rows || []).map(function (r) {
+      return {
+        student_id: _personToEnrollmentId(r.student_id || r.studentId, enrollmentByStudentId),
+        term_id: r.term_id || r.termId,
+        dims: r.dims || {},
+        narrative: r.narrative || '',
+        work_habits: r.work_habits,
+        participation: r.participation,
+        social_traits: r.social_traits || r.socialTraits,
+        strengths: r.strengths,
+        growth_areas: r.growth_areas || r.growthAreas,
+        mention_assessments: r.mention_assessments || r.mentionAssessments,
+        mention_obs: r.mention_obs || r.mentionObs,
+        include_course_summary: r.include_course_summary || r.includeCourseSummary,
+        created_at: r.created_at || r.created,
+        modified_at: r.updated_at || r.modified_at || r.modified,
+      };
+    }).filter(function (r) {
+      return r.student_id && r.term_id;
+    }),
+  );
+}
+
+function _canonicalFlagsToBlob(rows, enrollmentByStudentId) {
+  var blob = {};
+  (rows || []).forEach(function (r) {
+    var sid = r.enrollment_id || r.enrollmentId || _personToEnrollmentId(r.student_id || r.studentId, enrollmentByStudentId);
+    if (!sid) return;
+    if (!blob[sid]) blob[sid] = { active: true, tags: [] };
+    blob[sid].tags.push({
+      id: r.flag_tag_id || r.flagTagId || r.student_flag_id || r.studentFlagId,
+      label: r.label || '',
+      color: r.color || '',
+      note: r.note || '',
+      preset: !!(r.is_preset || r.isPreset),
+      sortOrder: Number(r.sort_order || r.sortOrder || 0),
+    });
+    if (r.note) blob[sid].note = r.note;
+  });
+  return blob;
 }
 
 async function _doInitData(cid) {
-  _loadCourseFromLS(cid);
-  if (!_useSupabase || !_isUuid(cid)) return;
+  if (_useSupabase) {
+    const sb = getSupabase();
 
-  var sb = getSupabase();
-  if (!sb || typeof sb.rpc !== 'function') return;
+    try {
+      var rosterRes = await _rpcPagedArray(sb, 'list_course_roster', { p_course_offering_id: cid });
+      if (rosterRes.error) throw rosterRes.error;
 
-  try {
-    var settled = await Promise.allSettled([
-      _rpcData(sb, 'list_course_roster', { p_course_offering_id: cid }),
-      _rpcData(sb, 'list_course_assessments', { p_course_offering_id: cid }),
-      _rpcData(sb, 'list_course_scores', { p_course_offering_id: cid }),
-      _rpcData(sb, 'list_course_observations', { p_course_offering_id: cid }),
-      _rpcData(sb, 'get_course_policy', { p_course_offering_id: cid }),
-      _rpcData(sb, 'get_report_config', { p_course_offering_id: cid }),
-      _rpcData(sb, 'list_course_outcomes', { p_course_offering_id: cid }),
-      _rpcData(sb, 'list_assignment_statuses', { p_course_offering_id: cid }),
-      _rpcData(sb, 'list_term_ratings_for_course', { p_course_offering_id: cid }),
-      _rpcDataWithFallbacks(sb, ['list_student_flags', 'projection.list_student_flags'], { p_course_offering_id: cid }),
-    ]);
+      var students = _canonicalRosterRowsToStudents(rosterRes.data).map(migrateStudent);
+      var enrollmentByStudentId = {};
+      students.forEach(function (student) {
+        if (student.personId) enrollmentByStudentId[student.personId] = student.id;
+      });
 
-    var rosterRes = settled[0];
-    var assessmentsRes = settled[1];
-    var scoresRes = settled[2];
-    var observationsRes = settled[3];
-    var policyRes = settled[4];
-    var reportConfigRes = settled[5];
-    var outcomesRes = settled[6];
-    var statusesRes = settled[7];
-    var termRatingsRes = settled[8];
-    var flagsRes = settled[9];
+      var studentReads = students
+        .filter(function (student) {
+          return _isUuid(student.personId);
+        })
+        .map(async function (student) {
+          var payload = { p_course_offering_id: cid, p_student_id: student.personId };
+          var [goalsRes, reflectionsRes, overridesRes] = await Promise.all([
+            sb.rpc('get_student_goals', payload),
+            sb.rpc('list_student_reflections', payload),
+            sb.rpc('list_section_overrides', payload),
+          ]);
+          return {
+            sid: student.id,
+            goals: goalsRes,
+            reflections: reflectionsRes,
+            overrides: overridesRes,
+          };
+        });
 
-    if (rosterRes.status === 'fulfilled') {
-      _applyCanonicalField(
-        'students',
+      var [
+        scoreRes,
+        obsRes,
+        assessRes,
+        policyRes,
+        reportRes,
+        outcomesRes,
+        statusRes,
+        termRatingsRes,
+        flagsRes,
+        studentDetails,
+      ] = await Promise.all([
+        _rpcPagedArray(sb, 'list_course_scores', { p_course_offering_id: cid }),
+        _rpcPagedArray(sb, 'list_course_observations', { p_course_offering_id: cid }),
+        _rpcPagedArray(sb, 'list_course_assessments', { p_course_offering_id: cid }),
+        sb.rpc('get_course_policy', { p_course_offering_id: cid }),
+        sb.rpc('get_report_config', { p_course_offering_id: cid }),
+        _rpcPagedArray(sb, 'list_course_outcomes', { p_course_offering_id: cid }),
+        sb.rpc('list_assignment_statuses', { p_course_offering_id: cid }),
+        sb.rpc('list_term_ratings_for_course', { p_course_offering_id: cid }),
+        sb.rpc('projection.list_student_flags', { p_course_offering_id: cid }),
+        Promise.all(studentReads),
+      ]);
+
+      _persistLoadedField(cid, 'students', students);
+      _persistLoadedField(cid, 'assessments', assessRes.error ? [] : _canonicalAssessmentRowsToBlob(assessRes.data));
+      _persistLoadedField(cid, 'scores', scoreRes.error ? {} : _canonicalScoreRowsToBlob(scoreRes.data, enrollmentByStudentId));
+      _persistLoadedField(
         cid,
-        _canonicalRosterToStudents(_coerceArray(rosterRes.value)),
-        'Canonical roster load',
-      );
-    } else {
-      console.warn('Canonical roster load failed for', cid, rosterRes.reason);
-    }
-
-    var personToEnrollment = {};
-    (_cache.students[cid] || []).forEach(function (student) {
-      if (student && student.personId) personToEnrollment[student.personId] = student.id;
-    });
-
-    if (assessmentsRes.status === 'fulfilled') {
-      _applyCanonicalField(
-        'assessments',
-        cid,
-        _canonicalAssessmentsToBlob(_coerceArray(assessmentsRes.value)),
-        'Canonical assessment load',
-      );
-    } else {
-      console.warn('Canonical assessment load failed for', cid, assessmentsRes.reason);
-    }
-
-    if (scoresRes.status === 'fulfilled') {
-      _applyCanonicalField(
-        'scores',
-        cid,
-        _canonicalScoresToBlob(_coerceArray(scoresRes.value), personToEnrollment),
-        'Canonical score load',
-      );
-    } else {
-      console.warn('Canonical score load failed for', cid, scoresRes.reason);
-    }
-
-    if (observationsRes.status === 'fulfilled') {
-      _applyCanonicalField(
         'observations',
-        cid,
-        _canonicalObservationsToBlob(_coerceArray(observationsRes.value), personToEnrollment),
-        'Canonical observation load',
+        obsRes.error ? {} : _canonicalObservationRowsToBlob(obsRes.data, enrollmentByStudentId),
       );
-    } else {
-      console.warn('Canonical observation load failed for', cid, observationsRes.reason);
-    }
-
-    if (policyRes.status === 'fulfilled') {
-      _cache.courseConfigs[cid] = _canonicalPolicyToCourseConfig(policyRes.value);
-      if (COURSES[cid]) {
-        if (_cache.courseConfigs[cid].gradingSystem !== undefined)
-          COURSES[cid].gradingSystem = _cache.courseConfigs[cid].gradingSystem;
-        if (_cache.courseConfigs[cid].calcMethod !== undefined)
-          COURSES[cid].calcMethod = _cache.courseConfigs[cid].calcMethod;
-        if (_cache.courseConfigs[cid].decayWeight !== undefined)
-          COURSES[cid].decayWeight = _cache.courseConfigs[cid].decayWeight;
-      }
-    } else {
-      console.warn('Canonical course policy load failed for', cid, policyRes.reason);
-    }
-
-    if (reportConfigRes.status === 'fulfilled') {
-      _cache.reportConfig[cid] = _canonicalReportConfigToBlob(reportConfigRes.value);
-    } else {
-      console.warn('Canonical report config load failed for', cid, reportConfigRes.reason);
-    }
-
-    var learningMapUpdated = false;
-    if (outcomesRes.status === 'fulfilled') {
-      var canonicalMap = _canonicalOutcomesToLearningMap(cid, _coerceArray(outcomesRes.value));
-      if (canonicalMap) {
-        _cache.learningMaps[cid] = canonicalMap;
-        learningMapUpdated = true;
-      }
-    } else {
-      console.warn('Canonical outcome load failed for', cid, outcomesRes.reason);
-    }
-
-    if (statusesRes.status === 'fulfilled') {
-      _cache.statuses[cid] = _canonicalStatusesToBlob(_coerceArray(statusesRes.value), personToEnrollment);
-    } else {
-      console.warn('Canonical assignment-status load failed for', cid, statusesRes.reason);
-    }
-
-    if (termRatingsRes.status === 'fulfilled') {
-      _cache.termRatings[cid] = _canonicalTermRatingsToBlob(_coerceArray(termRatingsRes.value), personToEnrollment);
-    } else {
-      console.warn('Canonical term-rating load failed for', cid, termRatingsRes.reason);
-    }
-
-    if (flagsRes.status === 'fulfilled') {
-      _cache.flags[cid] = _canonicalFlagsToBlob(_coerceArray(flagsRes.value), personToEnrollment);
-    } else {
-      console.warn('Canonical flag load failed for', cid, flagsRes.reason);
-    }
-
-    await Promise.all([
-      _loadPerStudentCanonicalField(
-        sb,
+      _persistLoadedField(cid, 'courseConfigs', policyRes.error ? {} : _canonicalCoursePolicyToConfig(policyRes.data));
+      _persistLoadedField(cid, 'reportConfig', reportRes.error ? null : _canonicalReportConfig(reportRes.data));
+      _persistLoadedField(
         cid,
-        _cache.students[cid] || [],
-        'get_student_goals',
-        'goals',
-        personToEnrollment,
-        _canonicalGoalsToBlob,
-        'Canonical student-goal load',
-      ),
-      _loadPerStudentCanonicalField(
-        sb,
+        'learningMaps',
+        outcomesRes.error ? LEARNING_MAP[cid] || { subjects: [], sections: [] } : _canonicalOutcomesToLearningMap(cid, outcomesRes.data),
+      );
+      _persistLoadedField(cid, 'statuses', statusRes.error ? {} : _canonicalStatusesToBlob(_rpcRows(statusRes.data), enrollmentByStudentId));
+      _persistLoadedField(
         cid,
-        _cache.students[cid] || [],
-        'list_student_reflections',
-        'reflections',
-        personToEnrollment,
-        _canonicalReflectionsToBlob,
-        'Canonical reflection load',
-      ),
-      _loadPerStudentCanonicalField(
-        sb,
-        cid,
-        _cache.students[cid] || [],
-        'list_section_overrides',
-        'overrides',
-        personToEnrollment,
-        _canonicalOverridesToBlob,
-        'Canonical override load',
-      ),
-    ]);
+        'termRatings',
+        termRatingsRes.error ? {} : _canonicalTermRatingsToBlob(_rpcRows(termRatingsRes.data), enrollmentByStudentId),
+      );
+      _persistLoadedField(cid, 'flags', flagsRes.error ? {} : _canonicalFlagsToBlob(_rpcRows(flagsRes.data), enrollmentByStudentId));
 
-    if (
-      !_cache.learningMaps[cid] ||
-      (!_cache.learningMaps[cid]._customized &&
-        (!_cache.learningMaps[cid].sections || _cache.learningMaps[cid].sections.length === 0))
-    ) {
-      _cache.learningMaps[cid] = LEARNING_MAP[cid] || { subjects: [], sections: [] };
-      learningMapUpdated = true;
-    }
+      var goalsBlob = {};
+      var reflectionsBlob = {};
+      var overridesBlob = {};
+      studentDetails.forEach(function (result) {
+        goalsBlob[result.sid] = result.goals && !result.goals.error ? _canonicalStudentGoalsToMap(result.goals.data) : {};
+        reflectionsBlob[result.sid] =
+          result.reflections && !result.reflections.error ? _canonicalStudentReflectionsToMap(result.reflections.data) : {};
+        overridesBlob[result.sid] =
+          result.overrides && !result.overrides.error ? _canonicalStudentOverridesToMap(result.overrides.data) : {};
+      });
+      _persistLoadedField(cid, 'goals', goalsBlob);
+      _persistLoadedField(cid, 'reflections', reflectionsBlob);
+      _persistLoadedField(cid, 'overrides', overridesBlob);
 
-    if (learningMapUpdated) {
-      _allTagsCache = {};
-      _tagToSectionCache = {};
+      // Client-only fields stay on their local cache for now.
+      _cache.notes[cid] = _safeParseLS('gb-notes-' + cid, {});
+      _cache.modules[cid] = _safeParseLS('gb-modules-' + cid, _safeParseLS('gb-units-' + cid, [])) || [];
+      _cache.rubrics[cid] = _safeParseLS('gb-rubrics-' + cid, []);
+      _cache.customTags[cid] = _safeParseLS('gb-custom-tags-' + cid, []);
+
+      _healFromLocalBackup(cid, 'students', 'students');
+      _healFromLocalBackup(cid, 'assessments', 'assessments');
+      _healFromLocalBackup(cid, 'scores', 'scores');
+      _healFromLocalBackup(cid, 'observations', 'quick-obs');
+      return;
+    } catch (error) {
+      console.error('Failed to load canonical data for', cid, error);
+      // Fall through to localStorage
     }
-    if (typeof clearProfCache === 'function') clearProfCache();
-  } catch (error) {
-    console.error('Failed to load canonical course data for', cid, error);
   }
+
+  // localStorage path
+  _loadCourseFromLS(cid);
 }
 
 /* If Supabase returned dramatically fewer items than localStorage for a field,
@@ -3624,10 +3508,26 @@ function removeSection(cid, sectionId) {
 
 /* ── Helpers: get sections/tags for a course ─────────────────── */
 function getSections(cid) {
-  return getLearningMap(cid).sections || [];
+  var map = getLearningMap(cid);
+  if (map.sections && map.sections.length) return map.sections;
+  if (map.outcomes && map.outcomes.length) {
+    return map.outcomes.map(function (tag) {
+      return {
+        id: tag.id,
+        subject: tag.subject,
+        name: tag.name || tag.label || tag.id,
+        shortName: tag.shortName || tag.label || tag.id,
+        color: tag.color,
+        tags: [tag],
+        outcome: tag,
+      };
+    });
+  }
+  return [];
 }
 function getSubjects(cid) {
-  return getLearningMap(cid).subjects || [];
+  var map = getLearningMap(cid);
+  return map.subjects || [];
 }
 
 // Cached flat tag list — keyed by learning map object reference so any direct
@@ -3637,7 +3537,10 @@ function getAllTags(cid) {
   const map = getLearningMap(cid);
   const c = _allTagsCache[cid];
   if (c && c.mapRef === map) return c.tags;
-  const tags = (map.sections || []).flatMap(s => s.tags);
+  const sections = getSections(cid);
+  const tags = sections.flatMap(function (s) {
+    return s.tags || (s.outcome ? [s.outcome] : []);
+  });
   _allTagsCache[cid] = { mapRef: map, tags };
   return tags;
 }
@@ -3654,8 +3557,8 @@ function getSectionForTag(cid, tagId) {
   const c = _tagToSectionCache[cid];
   if (!c || c.mapRef !== map) {
     const index = {};
-    (map.sections || []).forEach(function (s) {
-      s.tags.forEach(function (t) {
+    getSections(cid).forEach(function (s) {
+      (s.tags || (s.outcome ? [s.outcome] : [])).forEach(function (t) {
         index[t.id] = s;
       });
     });

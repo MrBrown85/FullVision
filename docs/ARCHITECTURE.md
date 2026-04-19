@@ -158,7 +158,9 @@ The two write paths run in parallel: localStorage is updated synchronously so th
 4. Convert canonical rows to the legacy `COURSES` blob shape (UUID-keyed) and mirror to localStorage as offline cache
 5. On any RPC failure, fall through to localStorage so the app still loads offline
 
-`initData(cid)` loads a specific course's per-course data. **Currently bridged** — reads come from localStorage only. Phase 1c-reads will wire it to `list_course_roster`, `list_course_assessments`, `list_course_scores`, `list_course_observations`, `get_course_policy`, `get_report_config`, `list_course_outcomes`, etc.
+`initData(cid)` now loads per-course data from canonical RPCs, then mirrors the loaded state back into localStorage as an offline cache. The read path currently covers `list_course_roster`, `list_course_assessments`, `list_course_scores`, `list_course_observations`, `get_course_policy`, `get_report_config`, `list_course_outcomes`, `list_assignment_statuses`, `list_term_ratings_for_course`, `projection.list_student_flags`, plus per-student calls for goals, reflections, and overrides.
+
+Some entities are still intentionally client-only: modules, rubrics, custom tags, and notes still load from localStorage because there is no canonical server-backed storage for them yet.
 
 ### Canonical schema (Supabase)
 
@@ -200,6 +202,7 @@ Public RPCs the client calls (selection):
 - **Assessments** (`saveAssessments`): same diff pattern → `create_assessment` / `update_assessment` / `delete_assessment`. `tagIds` filtered to UUIDs only so demo-mode text codes don't fail the canonical UUID cast.
 - **Scores** (`upsertScore`): single-row → `save_course_score`. UUID-gated on all four IDs (cid/sid/aid/tid) — if any is still local, only localStorage holds the score until IDs resolve.
 - **Observations** (`addQuickOb` / `updateQuickOb` / `deleteQuickOb`): single-row → `create_observation` / `update_observation` / `delete_observation`. Create patches cache `id` to canonical `observation_id`.
+- **Per-course reads** (`initData`): RPC results are normalized into the existing cache/helper surface so page modules continue to use `getStudents`, `getSections`, `getAllTags`, `getScores`, etc. without needing to understand the canonical wire format directly.
 
 All canonical RPC writes are gated on `gb-demo-mode !== '1'` AND `_useSupabase` so demo mode and offline mode stay 100% local. All RPCs are fire-and-forget with `console.warn` on error.
 

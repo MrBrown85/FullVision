@@ -1,186 +1,310 @@
 import './setup.js';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it } from 'vitest';
 
-const CID = 'aaaaaaaa-1111-2222-3333-bbbbbbbbbbbb';
-const TEACHER_ID = '99999999-9999-9999-9999-999999999999';
-
-function buildRosterRows(total) {
-  var rows = [];
-  for (var i = 0; i < total; i++) {
-    rows.push({
-      enrollment_id: 'enroll-' + String(i + 1).padStart(4, '0'),
-      student_id: 'student-' + String(i + 1).padStart(4, '0'),
-      first_name: 'Student',
-      last_name: String(i + 1).padStart(4, '0'),
-      roster_position: i + 1,
-      designations: [],
-    });
-  }
-  return rows;
-}
-
-function buildScoreRows(total, rosterRows) {
-  var rows = [];
-  for (var i = 0; i < total; i++) {
-    var roster = rosterRows[i % rosterRows.length];
-    rows.push({
-      score_current_id: 'score-' + String(i + 1).padStart(4, '0'),
-      enrollment_id: roster.enrollment_id,
-      student_id: roster.student_id,
-      assessment_id: 'assessment-' + String(i + 1).padStart(4, '0'),
-      course_outcome_id: 'outcome-qap',
-      normalized_level: String((i % 4) + 1),
-      updated_at: '2026-03-20T12:00:00.000Z',
-      created_at: '2026-03-20T12:00:00.000Z',
-    });
-  }
-  return rows;
-}
+const CID = '11111111-1111-1111-1111-111111111111';
+const STUDENT_ID = '33333333-3333-3333-3333-333333333333';
+const ENROLLMENT_ID = '22222222-2222-2222-2222-222222222222';
+const OUTCOME_ID = '44444444-4444-4444-4444-444444444444';
+const ASSESSMENT_ID = '55555555-5555-5555-5555-555555555555';
 
 function buildAssessmentRows(total) {
   var rows = [];
   for (var i = 0; i < total; i++) {
     rows.push({
-      assessment_id: 'assessment-' + String(i + 1).padStart(4, '0'),
+      assessment_id: 'aaaaaaaa-aaaa-4aaa-8aaa-' + String(i + 1).padStart(12, '0'),
       title: 'Assessment ' + (i + 1),
       assessment_kind: 'summative',
+      target_outcome_ids: [OUTCOME_ID],
       weighting: 1,
-      target_outcome_ids: ['outcome-qap'],
-      due_at: '2026-03-20T12:00:00.000Z',
+      due_at: '2026-04-18T00:00:00.000Z',
     });
   }
   return rows;
 }
 
-function makeRpcClient(responses) {
+function makeSupabaseClient(routes) {
+  routes = routes || {};
+  var rpcCalls = [];
+
   return {
-    rpc: function (name) {
-      if (!Object.prototype.hasOwnProperty.call(responses, name)) {
-        return Promise.resolve({ data: null, error: new Error('Unexpected RPC: ' + name) });
-      }
-      var handler = responses[name];
-      if (typeof handler === 'function') return Promise.resolve(handler());
-      if (handler && handler.error) return Promise.resolve({ data: null, error: handler.error });
-      return Promise.resolve({ data: handler, error: null });
-    },
-    schema: function (schemaName) {
-      return {
-        rpc: function (name) {
-          var key = schemaName + '.' + name;
-          if (!Object.prototype.hasOwnProperty.call(responses, key)) {
-            return Promise.resolve({ data: null, error: new Error('Unexpected RPC: ' + key) });
-          }
-          var handler = responses[key];
-          if (typeof handler === 'function') return Promise.resolve(handler());
-          if (handler && handler.error) return Promise.resolve({ data: null, error: handler.error });
-          return Promise.resolve({ data: handler, error: null });
-        },
-      };
+    rpcCalls: rpcCalls,
+    rpc(name, payload) {
+      rpcCalls.push({ name: name, payload: payload || {} });
+      var handler = routes[name];
+      if (!handler) return Promise.resolve({ data: [], error: null });
+      var result = typeof handler === 'function' ? handler(payload || {}) : handler;
+      return Promise.resolve(result);
     },
   };
 }
 
-function clearCourseCache(cid) {
-  Object.keys(_cache).forEach(function (key) {
-    if (_cache[key] && typeof _cache[key] === 'object' && key !== 'courses' && key !== 'config') {
-      delete _cache[key][cid];
-    }
-  });
-}
-
-describe('canonical initData large-payload guards', () => {
+describe('canonical initData pagination + shape bridge', () => {
   var originalGetSupabase;
   var originalUseSupabase;
-  var originalTeacherId;
 
   beforeEach(() => {
-    originalGetSupabase = globalThis.getSupabase;
+    originalGetSupabase = getSupabase;
     originalUseSupabase = _useSupabase;
-    originalTeacherId = _teacherId;
-
-    localStorage.clear();
-    clearCourseCache(CID);
     _useSupabase = true;
-    _teacherId = TEACHER_ID;
-    COURSES[CID] = { id: CID, name: 'Science 8', subjectCode: 'Science', gradingSystem: 'proficiency' };
+    localStorage.clear();
+
+    [
+      'students',
+      'assessments',
+      'scores',
+      'courseConfigs',
+      'learningMaps',
+      'reportConfig',
+      'statuses',
+      'goals',
+      'reflections',
+      'overrides',
+      'termRatings',
+      'flags',
+      'observations',
+    ].forEach(function (field) {
+      _cache[field][CID] = undefined;
+    });
+
+    COURSES[CID] = {
+      id: CID,
+      name: 'Science 8',
+      subjectCode: 'SCI8',
+    };
   });
 
   afterEach(() => {
     globalThis.getSupabase = originalGetSupabase;
     _useSupabase = originalUseSupabase;
-    _teacherId = originalTeacherId;
-    clearCourseCache(CID);
   });
 
-  it('hydrates more than 1000 assessments and score entries from canonical RPC reads', async () => {
-    var rosterRows = buildRosterRows(30);
+  it('paginates canonical assessment reads and maps canonical rows into the UI cache shape', async () => {
     var assessmentRows = buildAssessmentRows(1500);
-    var scoreRows = buildScoreRows(1500, rosterRows);
-
+    var client = makeSupabaseClient({
+      list_course_roster() {
+        return {
+          data: [
+            {
+              enrollment_id: ENROLLMENT_ID,
+              student_id: STUDENT_ID,
+              first_name: 'Ada',
+              last_name: 'Lovelace',
+              roster_position: 1,
+              local_student_number: '42',
+            },
+          ],
+          error: null,
+        };
+      },
+      list_course_assessments(payload) {
+        var start = payload.p_offset || 0;
+        var limit = payload.p_limit || 1000;
+        return {
+          data: assessmentRows.slice(start, start + limit),
+          error: null,
+        };
+      },
+      list_course_scores() {
+        return {
+          data: [
+            {
+              enrollment_id: ENROLLMENT_ID,
+              assessment_id: ASSESSMENT_ID,
+              course_outcome_id: OUTCOME_ID,
+              raw_numeric_score: 3,
+              comment_text: 'solid',
+              entered_at: '2026-04-18T12:00:00.000Z',
+            },
+          ],
+          error: null,
+        };
+      },
+      list_course_observations() {
+        return {
+          data: [
+            {
+              observation_id: '66666666-6666-4666-8666-666666666666',
+              enrollment_id: ENROLLMENT_ID,
+              text: 'Observed strong reasoning',
+              dims: ['curiosity'],
+              sentiment: 'strength',
+              observed_at: '2026-04-18T09:00:00.000Z',
+            },
+          ],
+          error: null,
+        };
+      },
+      get_course_policy() {
+        return {
+          data: {
+            grading_system: 'proficiency',
+            calculation_method: 'mostRecent',
+            decay_weight: 0.65,
+          },
+          error: null,
+        };
+      },
+      get_report_config() {
+        return {
+          data: { config: { includeSummary: true } },
+          error: null,
+        };
+      },
+      list_course_outcomes() {
+        return {
+          data: [
+            {
+              course_outcome_id: OUTCOME_ID,
+              section_name: 'Questioning and Predicting',
+              short_label: 'Question and Predict',
+              body: 'Ask questions and make predictions.',
+              color: '#0891b2',
+              sort_order: 1,
+            },
+          ],
+          error: null,
+        };
+      },
+      list_assignment_statuses() {
+        return {
+          data: [{ student_id: ENROLLMENT_ID, assessment_id: ASSESSMENT_ID, status: 'late' }],
+          error: null,
+        };
+      },
+      get_student_goals() {
+        return {
+          data: [{ course_outcome_id: OUTCOME_ID, text: 'Ask stronger questions' }],
+          error: null,
+        };
+      },
+      list_student_reflections() {
+        return {
+          data: [{ course_outcome_id: OUTCOME_ID, confidence: 3, text: 'I can explain my thinking', date: '2026-04-18' }],
+          error: null,
+        };
+      },
+      list_section_overrides() {
+        return {
+          data: [{ course_outcome_id: OUTCOME_ID, level: 4, reason: 'Recent conference', date: '2026-04-18' }],
+          error: null,
+        };
+      },
+      list_term_ratings_for_course() {
+        return {
+          data: [{ student_id: STUDENT_ID, term_id: 'term1', dims: { engagement: 4 }, narrative: 'Excellent term' }],
+          error: null,
+        };
+      },
+      'projection.list_student_flags'() {
+        return {
+          data: [{ enrollment_id: ENROLLMENT_ID, label: 'General', color: 'red' }],
+          error: null,
+        };
+      },
+    });
     globalThis.getSupabase = function () {
-      return makeRpcClient({
-        list_course_roster: rosterRows,
-        list_course_assessments: assessmentRows,
-        list_course_scores: scoreRows,
-        list_course_observations: [],
-        get_course_policy: {},
-        get_report_config: null,
-        list_course_outcomes: [],
-        list_assignment_statuses: [],
-        list_term_ratings_for_course: [],
-        list_student_flags: [],
-      });
+      return client;
     };
 
     await initData(CID);
 
-    expect(_cache.students[CID]).toHaveLength(30);
-    expect(_cache.assessments[CID]).toHaveLength(1500);
-    expect(_countFieldItems('scores', _cache.scores[CID])).toBe(1500);
+    var assessmentCalls = client.rpcCalls.filter(function (call) {
+      return call.name === 'list_course_assessments';
+    });
+
+    expect(assessmentCalls).toHaveLength(2);
+    expect(assessmentCalls[0].payload.p_limit).toBe(1000);
+    expect(assessmentCalls[0].payload.p_offset).toBe(0);
+    expect(assessmentCalls[1].payload.p_offset).toBe(1000);
+
+    expect(getStudents(CID)).toEqual([
+      expect.objectContaining({
+        id: ENROLLMENT_ID,
+        personId: STUDENT_ID,
+        firstName: 'Ada',
+        studentNumber: '42',
+      }),
+    ]);
+
+    expect(getAssessments(CID)).toHaveLength(1500);
+    expect(getAssessments(CID)[0]).toEqual(
+      expect.objectContaining({
+        id: assessmentRows[0].assessment_id,
+        tagIds: [OUTCOME_ID],
+      }),
+    );
+
+    expect(getScores(CID)[ENROLLMENT_ID][0]).toEqual(
+      expect.objectContaining({
+        assessmentId: ASSESSMENT_ID,
+        tagId: OUTCOME_ID,
+        score: 3,
+        note: 'solid',
+      }),
+    );
+
+    expect(getStudentQuickObs(CID, ENROLLMENT_ID)[0]).toEqual(
+      expect.objectContaining({
+        text: 'Observed strong reasoning',
+        sentiment: 'strength',
+      }),
+    );
+
+    expect(getCourseConfig(CID)).toEqual(
+      expect.objectContaining({
+        gradingSystem: 'proficiency',
+        calcMethod: 'mostRecent',
+        decayWeight: 0.65,
+      }),
+    );
+
+    expect(getReportConfig(CID)).toEqual({ includeSummary: true });
+    expect(getSections(CID)[0]).toEqual(
+      expect.objectContaining({
+        id: OUTCOME_ID,
+        name: 'Questioning and Predicting',
+      }),
+    );
+    expect(getAllTags(CID)[0]).toEqual(
+      expect.objectContaining({
+        id: OUTCOME_ID,
+        label: 'Question and Predict',
+      }),
+    );
+    expect(getAssignmentStatus(CID, ENROLLMENT_ID, ASSESSMENT_ID)).toBe('late');
+    expect(getGoals(CID)[ENROLLMENT_ID][OUTCOME_ID]).toBe('Ask stronger questions');
+    expect(getReflections(CID)[ENROLLMENT_ID][OUTCOME_ID].confidence).toBe(3);
+    expect(getOverrides(CID)[ENROLLMENT_ID][OUTCOME_ID].level).toBe(4);
+    expect(getStudentTermRating(CID, ENROLLMENT_ID, 'term1')).toEqual(
+      expect.objectContaining({
+        narrative: 'Excellent term',
+      }),
+    );
+    expect(isStudentFlagged(CID, ENROLLMENT_ID)).toBe(true);
   });
 
-  it('keeps the fuller local assessment and score cache when canonical reads are truncated', async () => {
-    var rosterRows = buildRosterRows(30);
-    var fullAssessmentRows = buildAssessmentRows(1500);
-    var partialAssessmentRows = buildAssessmentRows(1000);
-    var fullScoreRows = buildScoreRows(1500, rosterRows);
-    var partialScoreRows = buildScoreRows(1000, rosterRows);
+  it('falls back cleanly when a read RPC is unavailable', async () => {
+    localStorage.setItem(
+      'gb-students-' + CID,
+      JSON.stringify([{ id: 'local-stu', firstName: 'Local', lastName: 'Only' }]),
+    );
 
-    localStorage.setItem('gb-students-' + CID, JSON.stringify(_canonicalRosterToStudents(rosterRows)));
-    localStorage.setItem('gb-assessments-' + CID, JSON.stringify(_canonicalAssessmentsToBlob(fullAssessmentRows)));
-    localStorage.setItem('gb-scores-' + CID, JSON.stringify(_canonicalScoresToBlob(fullScoreRows, {})));
-
+    var client = makeSupabaseClient({
+      list_course_roster() {
+        return { data: null, error: { message: 'missing function' } };
+      },
+    });
     globalThis.getSupabase = function () {
-      return makeRpcClient({
-        list_course_roster: rosterRows,
-        list_course_assessments: partialAssessmentRows,
-        list_course_scores: partialScoreRows,
-        list_course_observations: [],
-        get_course_policy: {},
-        get_report_config: null,
-        list_course_outcomes: [],
-        list_assignment_statuses: [],
-        list_term_ratings_for_course: [],
-        list_student_flags: [],
-      });
+      return client;
     };
 
     await initData(CID);
 
-    expect(_cache.assessments[CID]).toHaveLength(1500);
-    expect(_countFieldItems('scores', _cache.scores[CID])).toBe(1500);
-  });
-
-  it('heals scores from local backup using total score entries, not just student keys', () => {
-    var rosterRows = buildRosterRows(5);
-    var fullRows = buildScoreRows(1500, rosterRows);
-    var partialRows = buildScoreRows(1000, rosterRows);
-    _cache.scores[CID] = _canonicalScoresToBlob(partialRows, {});
-    localStorage.setItem('gb-scores-' + CID, JSON.stringify(_canonicalScoresToBlob(fullRows, {})));
-
-    _teacherId = null; // avoid enqueueing a background sync in this unit test
-    _healFromLocalBackup(CID, 'scores', 'scores');
-
-    expect(_countFieldItems('scores', _cache.scores[CID])).toBe(1500);
+    expect(getStudents(CID)).toEqual([
+      expect.objectContaining({
+        id: 'local-stu',
+        firstName: 'Local',
+      }),
+    ]);
   });
 });
