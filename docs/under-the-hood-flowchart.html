@@ -1,0 +1,1449 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FullVision Under the Hood</title>
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
+    <style>
+      :root {
+        --bg: #f6f1e7;
+        --panel: rgba(255, 252, 246, 0.84);
+        --panel-strong: rgba(255, 253, 249, 0.95);
+        --ink: #16233d;
+        --muted: #5b6781;
+        --line: rgba(22, 35, 61, 0.12);
+        --entry: #d36d35;
+        --runtime: #1f736e;
+        --state: #2f5ea8;
+        --backend: #6b43a5;
+        --accent: #d4b15d;
+        --shadow: 0 22px 60px rgba(19, 27, 47, 0.12);
+        --radius: 26px;
+        --sans: 'Avenir Next', 'Segoe UI', sans-serif;
+        --mono: 'SFMono-Regular', 'SF Mono', 'Consolas', monospace;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        color-scheme: light;
+      }
+
+      body {
+        margin: 0;
+        font-family: var(--sans);
+        color: var(--ink);
+        background:
+          radial-gradient(circle at 15% 15%, rgba(211, 109, 53, 0.12), transparent 24%),
+          radial-gradient(circle at 85% 20%, rgba(47, 94, 168, 0.11), transparent 26%),
+          radial-gradient(circle at 70% 80%, rgba(107, 67, 165, 0.11), transparent 24%),
+          linear-gradient(180deg, #fcf8f0 0%, #f3ede1 52%, #ede6d8 100%);
+        min-height: 100vh;
+      }
+
+      body::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background-image:
+          linear-gradient(rgba(22, 35, 61, 0.025) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(22, 35, 61, 0.025) 1px, transparent 1px);
+        background-size: 28px 28px;
+        mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.45), transparent 92%);
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .page {
+        width: min(1400px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 28px 0 48px;
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
+        gap: 22px;
+        align-items: start;
+      }
+
+      .hero-panel,
+      .summary-panel,
+      .section-panel,
+      .detail-panel {
+        background: var(--panel);
+        backdrop-filter: blur(16px);
+        border: 1px solid rgba(22, 35, 61, 0.08);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+      }
+
+      .hero-panel {
+        padding: 32px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .hero-panel::after {
+        content: '';
+        position: absolute;
+        right: -70px;
+        top: -80px;
+        width: 260px;
+        height: 260px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(212, 177, 93, 0.32), transparent 66%);
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--muted);
+        font-size: 12px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+
+      .eyebrow::before {
+        content: '';
+        width: 24px;
+        height: 1px;
+        background: currentColor;
+      }
+
+      h1 {
+        margin: 16px 0 14px;
+        font-size: clamp(2.6rem, 5vw, 5rem);
+        line-height: 0.93;
+        letter-spacing: -0.05em;
+        max-width: 11ch;
+      }
+
+      .lead {
+        margin: 0;
+        max-width: 60ch;
+        font-size: 1.03rem;
+        line-height: 1.72;
+        color: var(--muted);
+      }
+
+      .hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 24px;
+      }
+
+      .chip {
+        border: 1px solid rgba(22, 35, 61, 0.1);
+        background: rgba(255, 255, 255, 0.62);
+        border-radius: 999px;
+        padding: 10px 14px;
+        font: inherit;
+        color: var(--ink);
+        cursor: pointer;
+        transition:
+          transform 180ms ease,
+          background 180ms ease;
+      }
+
+      .chip:hover,
+      .chip:focus-visible {
+        transform: translateY(-1px);
+        background: rgba(255, 255, 255, 0.9);
+        outline: none;
+      }
+
+      .summary-panel {
+        padding: 24px;
+        display: grid;
+        gap: 16px;
+      }
+
+      .summary-panel h2,
+      .section-head h2,
+      .detail-panel h2 {
+        margin: 0;
+        font-size: 0.95rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .summary-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .summary-item {
+        padding: 14px 16px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.5);
+        border: 1px solid rgba(22, 35, 61, 0.08);
+      }
+
+      .summary-item strong {
+        display: block;
+        margin-bottom: 5px;
+      }
+
+      .summary-item span,
+      .helper,
+      .step-body p,
+      .detail-panel p,
+      .mini-card p,
+      details p,
+      details li {
+        color: var(--muted);
+        line-height: 1.58;
+      }
+
+      .controls {
+        display: grid;
+        grid-template-columns: minmax(280px, 420px) auto;
+        gap: 12px;
+        align-items: center;
+        margin: 24px 0 18px;
+      }
+
+      .search {
+        display: grid;
+        gap: 4px;
+        padding: 10px 14px;
+        background: rgba(255, 255, 255, 0.7);
+        border-radius: 18px;
+        border: 1px solid rgba(22, 35, 61, 0.1);
+      }
+
+      .search span {
+        font-size: 0.74rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .search input {
+        border: 0;
+        background: transparent;
+        font: inherit;
+        color: var(--ink);
+        padding: 0;
+      }
+
+      .search input:focus {
+        outline: none;
+      }
+
+      .status {
+        min-height: 56px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 0 16px;
+        background: rgba(255, 255, 255, 0.7);
+        border-radius: 18px;
+        border: 1px solid rgba(22, 35, 61, 0.1);
+      }
+
+      .status strong {
+        color: var(--ink);
+      }
+
+      .main-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.35fr) 360px;
+        gap: 20px;
+        align-items: start;
+      }
+
+      .section-panel {
+        padding: 22px;
+      }
+
+      .section-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 14px;
+        align-items: end;
+        margin-bottom: 16px;
+      }
+
+      .section-head p {
+        margin: 0;
+        color: var(--muted);
+        max-width: 60ch;
+      }
+
+      .primary-flow {
+        display: grid;
+        gap: 14px;
+      }
+
+      .step {
+        display: grid;
+        grid-template-columns: 58px minmax(0, 1fr);
+        gap: 14px;
+        align-items: start;
+        padding: 18px;
+        border-radius: 22px;
+        background: rgba(255, 255, 255, 0.54);
+        border: 1px solid rgba(22, 35, 61, 0.08);
+        transition:
+          transform 180ms ease,
+          border-color 180ms ease,
+          background 180ms ease,
+          opacity 180ms ease;
+      }
+
+      .step:hover,
+      .step:focus-within {
+        transform: translateY(-1px);
+        background: rgba(255, 255, 255, 0.82);
+      }
+
+      .step.active {
+        border-color: rgba(22, 35, 61, 0.26);
+        background: rgba(255, 255, 255, 0.88);
+      }
+
+      .step.dimmed {
+        opacity: 0.42;
+      }
+
+      .step-index {
+        width: 58px;
+        height: 58px;
+        display: grid;
+        place-items: center;
+        border-radius: 18px;
+        font-weight: 700;
+        font-size: 1.15rem;
+        color: #fff;
+      }
+
+      .step[data-tone='entry'] .step-index {
+        background: var(--entry);
+      }
+
+      .step[data-tone='runtime'] .step-index {
+        background: var(--runtime);
+      }
+
+      .step[data-tone='state'] .step-index {
+        background: var(--state);
+      }
+
+      .step[data-tone='backend'] .step-index {
+        background: var(--backend);
+      }
+
+      .step-body small {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.75rem;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .step-body small::before {
+        content: '';
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: currentColor;
+        opacity: 0.5;
+      }
+
+      .step-body h3 {
+        margin: 8px 0 6px;
+        font-size: 1.18rem;
+      }
+
+      .step-body p {
+        margin: 0;
+      }
+
+      .step-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .link-chip {
+        border: 1px solid rgba(22, 35, 61, 0.1);
+        background: rgba(255, 255, 255, 0.68);
+        border-radius: 999px;
+        padding: 7px 10px;
+        font-family: var(--mono);
+        font-size: 0.82rem;
+        text-decoration: none;
+      }
+
+      .link-chip:hover {
+        background: rgba(255, 255, 255, 0.94);
+      }
+
+      .branch-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 20px;
+      }
+
+      .mini-card {
+        padding: 18px;
+        border-radius: 22px;
+        border: 1px solid rgba(22, 35, 61, 0.08);
+        background: rgba(255, 255, 255, 0.52);
+      }
+
+      .mini-card h3 {
+        margin: 0 0 8px;
+        font-size: 1.08rem;
+      }
+
+      .mini-card ul {
+        margin: 10px 0 0;
+        padding-left: 18px;
+      }
+
+      .mini-card li {
+        color: var(--muted);
+        line-height: 1.55;
+      }
+
+      .sync-loop {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 20px;
+      }
+
+      .sync-card {
+        padding: 16px;
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.56);
+        border: 1px solid rgba(22, 35, 61, 0.08);
+      }
+
+      .sync-card strong {
+        display: block;
+        margin-bottom: 6px;
+      }
+
+      .detail-panel {
+        padding: 22px;
+        position: sticky;
+        top: 18px;
+        display: grid;
+        gap: 18px;
+      }
+
+      .detail-title {
+        font-size: 1.48rem;
+        line-height: 1.04;
+        margin: 0;
+      }
+
+      .detail-kicker {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.74rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .detail-kicker::before {
+        content: '';
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--accent);
+      }
+
+      .detail-block {
+        padding: 14px 15px;
+        border-radius: 18px;
+        border: 1px solid rgba(22, 35, 61, 0.08);
+        background: rgba(255, 255, 255, 0.54);
+      }
+
+      .detail-block strong {
+        display: block;
+        margin-bottom: 5px;
+      }
+
+      .detail-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      details {
+        border: 1px solid rgba(22, 35, 61, 0.08);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.46);
+        padding: 14px 16px;
+      }
+
+      details + details {
+        margin-top: 12px;
+      }
+
+      summary {
+        cursor: pointer;
+        font-weight: 600;
+      }
+
+      summary::marker {
+        color: var(--muted);
+      }
+
+      .bottom-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 20px;
+        margin-top: 20px;
+      }
+
+      @media (max-width: 1120px) {
+        .hero,
+        .main-grid,
+        .controls,
+        .bottom-grid,
+        .branch-grid,
+        .sync-loop {
+          grid-template-columns: 1fr;
+        }
+
+        .detail-panel {
+          position: static;
+        }
+      }
+
+      @media (max-width: 760px) {
+        .page {
+          width: min(100vw - 20px, 1400px);
+          padding-top: 12px;
+        }
+
+        .hero-panel,
+        .summary-panel,
+        .section-panel,
+        .detail-panel {
+          border-radius: 22px;
+        }
+
+        .hero-panel {
+          padding: 24px 20px;
+        }
+
+        h1 {
+          font-size: clamp(2.2rem, 11vw, 3.3rem);
+        }
+
+        .step {
+          grid-template-columns: 46px minmax(0, 1fr);
+          padding: 16px;
+        }
+
+        .step-index {
+          width: 46px;
+          height: 46px;
+          border-radius: 14px;
+          font-size: 1rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <section class="hero">
+        <article class="hero-panel">
+          <div class="eyebrow">Architecture Walkthrough</div>
+          <h1>FullVision Under the Hood</h1>
+          <p class="lead">
+            This page explains the app as one main story: a teacher opens FullVision, works inside a desktop or mobile
+            shell, the app writes to a local cache immediately, and only then syncs into Supabase’s canonical backend.
+            Everything else is a supporting detail around that loop.
+          </p>
+          <div class="hero-actions">
+            <button class="chip" data-jump="user-flowcharts" type="button">Start With User Flowcharts</button>
+            <button class="chip" data-jump="first-use-flow" type="button">First Login To Printed Reports</button>
+            <button class="chip" data-jump="teacher-workflow-flow" type="button">Assignments, Comments, Grades</button>
+            <button class="chip" data-jump="primary-flow" type="button">Then See The System View</button>
+          </div>
+        </article>
+
+        <aside class="summary-panel">
+          <h2>Plain-English Summary</h2>
+          <div class="summary-list">
+            <div class="summary-item">
+              <strong>User flow 1</strong>
+              <span>First-time teacher path from login to printing reports.</span>
+            </div>
+            <div class="summary-item">
+              <strong>User flow 2</strong>
+              <span>Day-to-day teacher workflow for assignments, comments, and grades.</span>
+            </div>
+            <div class="summary-item">
+              <strong>System view</strong>
+              <span>The architecture walkthrough is still below, but it is now secondary to the teacher journeys.</span>
+            </div>
+            <div class="summary-item">
+              <strong>Click any step</strong>
+              <span
+                >The right-hand panel will explain what the teacher is doing, why it matters, and where it lives.</span
+              >
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <section class="controls" aria-label="Page controls">
+        <label class="search" for="concept-search">
+          <span>Find A Concept</span>
+          <input id="concept-search" type="search" placeholder="Search: auth, mobile, report, sync, cache..." />
+        </label>
+        <div class="status" id="status-bar" aria-live="polite">
+          <span><strong>Selected:</strong> Main Flow</span>
+          <button class="chip" data-action="clear-search" type="button">Clear Search</button>
+        </div>
+      </section>
+
+      <section class="main-grid">
+        <div>
+          <section class="section-panel" id="user-flowcharts">
+            <div class="section-head">
+              <div>
+                <h2>User Flowcharts</h2>
+                <p>
+                  These are the teacher-facing journeys. Read these first if the goal is to understand actual use of the
+                  product.
+                </p>
+              </div>
+            </div>
+
+            <div class="branch-grid">
+              <div>
+                <div class="section-head" id="first-use-flow" style="margin-bottom: 12px">
+                  <div>
+                    <h2>First-Time Use: Login To Printed Reports</h2>
+                    <p>The shortest realistic first-run path for a teacher who wants to get to reporting.</p>
+                  </div>
+                </div>
+
+                <div class="primary-flow">
+                  <article
+                    class="step"
+                    data-step="user-first-login"
+                    data-tone="entry"
+                    data-tags="user first time login sign in dashboard landing first run"
+                  >
+                    <div class="step-index">1</div>
+                    <div class="step-body">
+                      <small>Start</small>
+                      <h3>Log in and land on the teacher dashboard</h3>
+                      <p>
+                        The teacher signs in, enters the teacher interface, and sees the desktop dashboard as the home
+                        base.
+                      </p>
+                    </div>
+                  </article>
+
+                  <article
+                    class="step"
+                    data-step="user-first-class"
+                    data-tone="runtime"
+                    data-tags="user first time class setup roster course students import"
+                  >
+                    <div class="step-index">2</div>
+                    <div class="step-body">
+                      <small>Class Setup</small>
+                      <h3>Create or import the class roster</h3>
+                      <p>
+                        The teacher confirms the active course, adds students manually or imports a roster, and makes
+                        sure the class list is usable.
+                      </p>
+                    </div>
+                  </article>
+
+                  <article
+                    class="step"
+                    data-step="user-first-assessment"
+                    data-tone="runtime"
+                    data-tags="user first time assignments assessment create learning targets tags"
+                  >
+                    <div class="step-index">3</div>
+                    <div class="step-body">
+                      <small>Assessment Setup</small>
+                      <h3>Create the first assignment and connect it to learning targets</h3>
+                      <p>
+                        The teacher creates an assignment, picks the assessment type, and links it to the right tags or
+                        sections.
+                      </p>
+                    </div>
+                  </article>
+
+                  <article
+                    class="step"
+                    data-step="user-first-evidence"
+                    data-tone="state"
+                    data-tags="user first time observations grades comments evidence entry"
+                  >
+                    <div class="step-index">4</div>
+                    <div class="step-body">
+                      <small>Evidence Entry</small>
+                      <h3>Enter scores, notes, or observations for students</h3>
+                      <p>
+                        The teacher begins building evidence by grading work, marking proficiency, and recording
+                        comments or observations.
+                      </p>
+                    </div>
+                  </article>
+
+                  <article
+                    class="step"
+                    data-step="user-first-report-build"
+                    data-tone="state"
+                    data-tags="user first time reports build preview questionnaire narrative"
+                  >
+                    <div class="step-index">5</div>
+                    <div class="step-body">
+                      <small>Reporting</small>
+                      <h3>Open the reports page and build the report view</h3>
+                      <p>
+                        The teacher goes to reports, chooses the report structure, reviews narratives, and checks that
+                        each student’s report looks right.
+                      </p>
+                    </div>
+                  </article>
+
+                  <article
+                    class="step"
+                    data-step="user-first-print"
+                    data-tone="backend"
+                    data-tags="user first time print reports export final output"
+                  >
+                    <div class="step-index">6</div>
+                    <div class="step-body">
+                      <small>Output</small>
+                      <h3>Print or export the finished reports</h3>
+                      <p>
+                        The teacher produces the final parent-facing output after reviewing the report content and
+                        layout.
+                      </p>
+                    </div>
+                  </article>
+                </div>
+              </div>
+
+              <div>
+                <div class="section-head" id="teacher-workflow-flow" style="margin-bottom: 12px">
+                  <div>
+                    <h2>Teacher Workflow: Assignments, Comments, And Grades</h2>
+                    <p>The recurring classroom workflow for building assessments and recording evidence.</p>
+                  </div>
+                </div>
+
+                <div class="primary-flow">
+                  <article
+                    class="step"
+                    data-step="user-assign-open"
+                    data-tone="runtime"
+                    data-tags="teacher workflow assignments page open planning"
+                  >
+                    <div class="step-index">1</div>
+                    <div class="step-body">
+                      <small>Planning</small>
+                      <h3>Open the assignments area for the current course</h3>
+                      <p>
+                        The teacher enters the assignments workflow for the active course and reviews existing
+                        assessment items.
+                      </p>
+                    </div>
+                  </article>
+
+                  <article
+                    class="step"
+                    data-step="user-assign-create"
+                    data-tone="runtime"
+                    data-tags="teacher workflow create assignment title date type rubric tags"
+                  >
+                    <div class="step-index">2</div>
+                    <div class="step-body">
+                      <small>Assignment Setup</small>
+                      <h3>Create or edit the assignment details</h3>
+                      <p>
+                        The teacher adds the title, date, type, tags, rubric, and any weight or scoring mode for the
+                        task.
+                      </p>
+                    </div>
+                  </article>
+
+                  <article
+                    class="step"
+                    data-step="user-assign-grade"
+                    data-tone="state"
+                    data-tags="teacher workflow enter grades scores proficiency points gradebook speed grader"
+                  >
+                    <div class="step-index">3</div>
+                    <div class="step-body">
+                      <small>Grading</small>
+                      <h3>Enter grades or proficiency for each student</h3>
+                      <p>
+                        The teacher records grades in the assignment view, gradebook, or mobile grading surface
+                        depending on context.
+                      </p>
+                    </div>
+                  </article>
+
+                  <article
+                    class="step"
+                    data-step="user-assign-comment"
+                    data-tone="state"
+                    data-tags="teacher workflow comments feedback notes observation narrative"
+                  >
+                    <div class="step-index">4</div>
+                    <div class="step-body">
+                      <small>Comments</small>
+                      <h3>Add comments, observations, or feedback</h3>
+                      <p>
+                        The teacher records comment-level evidence that gives context beyond a score and helps with
+                        later reporting.
+                      </p>
+                    </div>
+                  </article>
+
+                  <article
+                    class="step"
+                    data-step="user-assign-review"
+                    data-tone="state"
+                    data-tags="teacher workflow review gradebook dashboard student profile check progress"
+                  >
+                    <div class="step-index">5</div>
+                    <div class="step-body">
+                      <small>Review</small>
+                      <h3>Review progress in gradebook, dashboard, or student view</h3>
+                      <p>
+                        The teacher checks whether the evidence looks complete, which students need attention, and how
+                        proficiency is trending.
+                      </p>
+                    </div>
+                  </article>
+
+                  <article
+                    class="step"
+                    data-step="user-assign-report"
+                    data-tone="backend"
+                    data-tags="teacher workflow report output share print comments grades narrative"
+                  >
+                    <div class="step-index">6</div>
+                    <div class="step-body">
+                      <small>Reuse</small>
+                      <h3>Carry that evidence into reports</h3>
+                      <p>
+                        The same assignments, grades, and comments later feed the reporting workflow without re-entry.
+                      </p>
+                    </div>
+                  </article>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="section-panel" id="primary-flow">
+            <div class="section-head">
+              <div>
+                <h2>Main Flow</h2>
+                <p>
+                  The shortest correct mental model of the whole system. If this part makes sense, the app makes sense.
+                </p>
+              </div>
+            </div>
+
+            <div class="primary-flow">
+              <article
+                class="step"
+                data-step="enter"
+                data-tone="entry"
+                data-tags="entry auth netlify browser login shell mobile desktop"
+              >
+                <div class="step-index">1</div>
+                <div class="step-body">
+                  <small>Entry + Delivery</small>
+                  <h3>Teacher opens the app</h3>
+                  <p>
+                    Netlify serves HTML, injects environment values, and the browser decides whether the teacher lands
+                    in the login page, desktop SPA, or mobile PWA shell.
+                  </p>
+                  <div class="step-actions">
+                    <a class="link-chip" href="../netlify/edge-functions/inject-env.js">inject-env.js</a>
+                    <a class="link-chip" href="../login-auth.js">login-auth.js</a>
+                    <a class="link-chip" href="../teacher/app.html">teacher/app.html</a>
+                    <a class="link-chip" href="../teacher-mobile/index.html">teacher-mobile/index.html</a>
+                  </div>
+                </div>
+              </article>
+
+              <article
+                class="step"
+                data-step="shell"
+                data-tone="runtime"
+                data-tags="runtime router shell ui desktop mobile pages tabs"
+              >
+                <div class="step-index">2</div>
+                <div class="step-body">
+                  <small>UI Runtime</small>
+                  <h3>The shell takes over</h3>
+                  <p>
+                    Desktop uses a router and page modules. Mobile uses a tab shell and touch-first navigation. They
+                    look different, but they are two front ends over the same shared model.
+                  </p>
+                  <div class="step-actions">
+                    <a class="link-chip" href="../teacher/router.js">teacher/router.js</a>
+                    <a class="link-chip" href="../teacher-mobile/shell.js">teacher-mobile/shell.js</a>
+                  </div>
+                </div>
+              </article>
+
+              <article
+                class="step"
+                data-step="local"
+                data-tone="state"
+                data-tags="state data cache localstorage offline sync write read"
+              >
+                <div class="step-index">3</div>
+                <div class="step-body">
+                  <small>Local-First State</small>
+                  <h3>The app reads and writes locally first</h3>
+                  <p>
+                    <code>shared/data.js</code> is the center of gravity. Screens read synchronously from memory and
+                    localStorage. When a teacher changes data, the app updates locally immediately so the interface
+                    stays fast and resilient.
+                  </p>
+                  <div class="step-actions">
+                    <a class="link-chip" href="../shared/data.js">shared/data.js</a>
+                    <a class="link-chip" href="../docs/ARCHITECTURE.md">docs/ARCHITECTURE.md</a>
+                  </div>
+                </div>
+              </article>
+
+              <article
+                class="step"
+                data-step="logic"
+                data-tone="state"
+                data-tags="calc report observations proficiency logic state interpretation"
+              >
+                <div class="step-index">4</div>
+                <div class="step-body">
+                  <small>Interpretation Layer</small>
+                  <h3>The app turns evidence into meaning</h3>
+                  <p>
+                    Raw scores, statuses, overrides, and observations are interpreted by the calculation and reporting
+                    layers into proficiency, dashboards, and parent-facing narratives.
+                  </p>
+                  <div class="step-actions">
+                    <a class="link-chip" href="../shared/calc.js">shared/calc.js</a>
+                    <a class="link-chip" href="../teacher/page-reports.js">teacher/page-reports.js</a>
+                    <a class="link-chip" href="../teacher/report-blocks.js">report-blocks.js</a>
+                  </div>
+                </div>
+              </article>
+
+              <article
+                class="step"
+                data-step="backend"
+                data-tone="backend"
+                data-tags="supabase rpc database canonical backend auth schema"
+              >
+                <div class="step-index">5</div>
+                <div class="step-body">
+                  <small>Cloud Canon</small>
+                  <h3>Background sync updates the official record</h3>
+                  <p>
+                    Local writes are pushed to Supabase through guarded RPCs. The canonical multi-schema database is the
+                    official source of truth, but the teacher never has to wait for it during normal interaction.
+                  </p>
+                  <div class="step-actions">
+                    <a class="link-chip" href="../shared/supabase.js">shared/supabase.js</a>
+                    <a class="link-chip" href="../schema.sql">schema.sql</a>
+                  </div>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <section class="section-panel" id="branch-view" style="margin-top: 20px">
+            <div class="section-head">
+              <div>
+                <h2>Desktop vs Mobile</h2>
+                <p>Same facts underneath. Different interaction surfaces on top.</p>
+              </div>
+            </div>
+
+            <div class="branch-grid">
+              <article class="mini-card">
+                <h3>Desktop</h3>
+                <p>
+                  Best thought of as a classic single-page app. A hash router swaps page modules like dashboard,
+                  assignments, gradebook, observations, and reports.
+                </p>
+                <ul>
+                  <li>Navigation model: router + page lifecycle</li>
+                  <li>Best for: broad class management and dense workflows</li>
+                  <li>Primary files: <code>teacher/app.html</code>, <code>teacher/router.js</code>, page modules</li>
+                </ul>
+              </article>
+
+              <article class="mini-card">
+                <h3>Mobile</h3>
+                <p>
+                  Best thought of as a compact PWA shell. It uses persistent tabs, touch gestures, pull-to-refresh, and
+                  quick capture patterns for in-the-moment classroom work.
+                </p>
+                <ul>
+                  <li>Navigation model: tab shell + stacked subviews</li>
+                  <li>Best for: observation, quick grading, hallway use</li>
+                  <li>Primary files: <code>teacher-mobile/index.html</code>, <code>teacher-mobile/shell.js</code></li>
+                </ul>
+              </article>
+            </div>
+          </section>
+
+          <section class="section-panel" id="sync-view" style="margin-top: 20px">
+            <div class="section-head">
+              <div>
+                <h2>The Sync Loop</h2>
+                <p>This is the most important technical trick in the app.</p>
+              </div>
+            </div>
+
+            <div class="sync-loop">
+              <article class="sync-card">
+                <strong>1. Teacher edits data</strong>
+                <p>A score, note, student record, or report setting changes.</p>
+              </article>
+              <article class="sync-card">
+                <strong>2. Local state updates immediately</strong>
+                <p>Memory and localStorage are updated right away so the UI remains responsive.</p>
+              </article>
+              <article class="sync-card">
+                <strong>3. Background RPC runs</strong>
+                <p>The app sends a canonical write to Supabase without blocking the teacher.</p>
+              </article>
+              <article class="sync-card">
+                <strong>4. Canonical IDs and truth settle</strong>
+                <p>The backend returns official IDs and durable state, which the local cache patches back in.</p>
+              </article>
+            </div>
+          </section>
+
+          <section class="section-panel" style="margin-top: 20px">
+            <div class="section-head">
+              <div>
+                <h2>Optional Deep Dives</h2>
+                <p>Only open these after the main flow feels obvious.</p>
+              </div>
+            </div>
+
+            <details>
+              <summary>Authentication and session behavior</summary>
+              <p>
+                FullVision uses Supabase Auth, but the client tries a fast local token path before calling the network.
+                Sign-out also clears local app state for shared-computer safety.
+              </p>
+            </details>
+
+            <details>
+              <summary>Why the data layer matters more than the UI</summary>
+              <p>
+                The page modules are comparatively straightforward. The real architecture lives in
+                <code>shared/data.js</code>, where caching, retries, inflight tracking, and cross-tab coordination live.
+              </p>
+            </details>
+
+            <details>
+              <summary>What the calculation engine actually does</summary>
+              <p>
+                <code>shared/calc.js</code> is not storage. It is interpretation. It transforms raw evidence into tag,
+                section, and overall proficiency using the chosen pedagogy and weighting rules.
+              </p>
+            </details>
+
+            <details>
+              <summary>What “canonical” means here</summary>
+              <p>
+                The canonical backend is the official database representation in Supabase. The frontend’s local state is
+                optimized for speed and resilience, but the RPC-backed multi-schema database is the durable record.
+              </p>
+            </details>
+          </section>
+        </div>
+
+        <aside class="detail-panel" id="detail-panel">
+          <h2>Selected Explanation</h2>
+          <div id="detail-content"></div>
+        </aside>
+      </section>
+
+      <section class="bottom-grid">
+        <article class="section-panel">
+          <div class="section-head">
+            <div>
+              <h2>One-Sentence Mental Model</h2>
+              <p>If you remember only one thing, remember this.</p>
+            </div>
+          </div>
+          <p class="helper">
+            FullVision is a local-first teacher app with two UI shells, one shared data layer, one interpretation layer,
+            and one canonical Supabase backend that syncs in the background.
+          </p>
+        </article>
+
+        <article class="section-panel">
+          <div class="section-head">
+            <div>
+              <h2>Source Basis</h2>
+              <p>The page is based on the real code, not an invented architecture.</p>
+            </div>
+          </div>
+          <p class="helper">
+            <code>docs/ARCHITECTURE.md</code>, <code>teacher/app.html</code>, <code>teacher/router.js</code>,
+            <code>teacher-mobile/shell.js</code>, <code>shared/data.js</code>, <code>shared/calc.js</code>,
+            <code>shared/supabase.js</code>, <code>login-auth.js</code>, <code>sw.js</code>, and
+            <code>netlify/edge-functions/inject-env.js</code>.
+          </p>
+        </article>
+      </section>
+    </div>
+
+    <script>
+      const stepMeta = {
+        'user-first-login': {
+          label: 'User Flowchart',
+          title: '1. Log in and land on the teacher dashboard',
+          engineer:
+            'After authentication and portal routing, the teacher lands in the teacher shell and starts from the dashboard, which acts as the operational home screen for the active course.',
+          plain: 'The teacher gets into the app and starts from the main working surface.',
+          why: 'This is the point where the teacher stops thinking about access and starts thinking about class work.',
+          links: [
+            ['login-auth.js', '../login-auth.js'],
+            ['teacher/app.html', '../teacher/app.html'],
+            ['page-dashboard.js', '../teacher/page-dashboard.js'],
+          ],
+        },
+        'user-first-class': {
+          label: 'User Flowchart',
+          title: '2. Create or import the class roster',
+          engineer:
+            'The teacher either creates students manually or imports them through the roster tooling, establishing the course roster that later grading and reporting depend on.',
+          plain: 'Before anything meaningful can happen, the teacher needs a real class list.',
+          why: 'Roster setup is the first dependency for assignments, observations, gradebook views, and reports.',
+          links: [
+            ['dash-class-manager.js', '../teacher/dash-class-manager.js'],
+            ['teams-import.js', '../teacher/teams-import.js'],
+            ['shared/data.js', '../shared/data.js'],
+          ],
+        },
+        'user-first-assessment': {
+          label: 'User Flowchart',
+          title: '3. Create the first assignment and connect it to learning targets',
+          engineer:
+            'The teacher creates an assessment record, configures its metadata, and links it to the relevant tags or learning targets so future scores have instructional meaning.',
+          plain: 'The teacher defines what students are being assessed on, not just what the assignment is called.',
+          why: 'This is the bridge between classroom tasks and proficiency-based reporting.',
+          links: [
+            ['page-assignments.js', '../teacher/page-assignments.js'],
+            ['shared/calc.js', '../shared/calc.js'],
+          ],
+        },
+        'user-first-evidence': {
+          label: 'User Flowchart',
+          title: '4. Enter scores, notes, or observations for students',
+          engineer:
+            'The teacher starts populating the evidence model with scores, statuses, and qualitative observations, which are stored locally first and later synced canonically.',
+          plain: 'This is where the teacher starts recording real evidence of student learning.',
+          why: 'Without this step, reports remain structure without substance.',
+          links: [
+            ['page-gradebook.js', '../teacher/page-gradebook.js'],
+            ['page-observations.js', '../teacher/page-observations.js'],
+            ['shared/data.js', '../shared/data.js'],
+          ],
+        },
+        'user-first-report-build': {
+          label: 'User Flowchart',
+          title: '5. Open reports and build the report view',
+          engineer:
+            'The reports page combines configuration, ratings, observations, and calculated proficiency into a teacher-reviewable report composition surface.',
+          plain: 'The teacher turns accumulated evidence into a report that families can understand.',
+          why: 'This is where the system starts producing outward-facing communication instead of internal tracking.',
+          links: [
+            ['page-reports.js', '../teacher/page-reports.js'],
+            ['report-blocks.js', '../teacher/report-blocks.js'],
+            ['report-questionnaire.js', '../teacher/report-questionnaire.js'],
+          ],
+        },
+        'user-first-print': {
+          label: 'User Flowchart',
+          title: '6. Print or export the finished reports',
+          engineer:
+            'After report review, the teacher moves from editable report composition into final output generation for printing or sharing.',
+          plain: 'The teacher produces the final deliverable.',
+          why: 'This is the end of the first-run value chain: from login to a real parent-facing artifact.',
+          links: [
+            ['page-reports.js', '../teacher/page-reports.js'],
+            ['report-blocks.js', '../teacher/report-blocks.js'],
+          ],
+        },
+        'user-assign-open': {
+          label: 'User Flowchart',
+          title: '1. Open the assignments area for the current course',
+          engineer:
+            'The teacher enters the assignment-management surface for the active course and sees the current assessment set for planning or editing.',
+          plain: 'This is the control room for assignment work.',
+          why: 'It anchors the recurring workflow in one predictable place.',
+          links: [
+            ['page-assignments.js', '../teacher/page-assignments.js'],
+            ['teacher/router.js', '../teacher/router.js'],
+          ],
+        },
+        'user-assign-create': {
+          label: 'User Flowchart',
+          title: '2. Create or edit the assignment details',
+          engineer:
+            'The teacher configures the assessment object: title, date, type, rubric, tags, collaboration mode, and any scoring rules such as points or proficiency.',
+          plain: 'The teacher defines how the assignment should behave before entering any student results.',
+          why: 'Good setup makes later grading and reporting cleaner and more consistent.',
+          links: [
+            ['page-assignments.js', '../teacher/page-assignments.js'],
+            ['assign-collab.js', '../teacher/assign-collab.js'],
+          ],
+        },
+        'user-assign-grade': {
+          label: 'User Flowchart',
+          title: '3. Enter grades or proficiency for each student',
+          engineer:
+            'The teacher records student-level results through assignment views, gradebook surfaces, or mobile grade flows, feeding the shared score model.',
+          plain: 'This is the main grade-entry step.',
+          why: 'It creates the structured evidence the app can calculate from.',
+          links: [
+            ['page-gradebook.js', '../teacher/page-gradebook.js'],
+            ['teacher-mobile/tab-grade.js', '../teacher-mobile/tab-grade.js'],
+            ['shared/data.js', '../shared/data.js'],
+          ],
+        },
+        'user-assign-comment': {
+          label: 'User Flowchart',
+          title: '4. Add comments, observations, or feedback',
+          engineer:
+            'The teacher captures qualitative evidence alongside numerical or proficiency-based grading so the record includes context, not just scores.',
+          plain: 'This is where teacher judgment and narrative context get added.',
+          why: 'Comments and observations are often what make reports useful rather than merely accurate.',
+          links: [
+            ['page-observations.js', '../teacher/page-observations.js'],
+            ['page-student.js', '../teacher/page-student.js'],
+            ['shared/data.js', '../shared/data.js'],
+          ],
+        },
+        'user-assign-review': {
+          label: 'User Flowchart',
+          title: '5. Review progress in gradebook, dashboard, or student view',
+          engineer:
+            'The teacher inspects how recently entered evidence propagates into dashboards, gradebook summaries, and student-level views, verifying completeness and identifying follow-up needs.',
+          plain: 'The teacher checks whether the class picture now makes sense.',
+          why: 'Review closes the loop between entry and instructional decision-making.',
+          links: [
+            ['page-dashboard.js', '../teacher/page-dashboard.js'],
+            ['page-gradebook.js', '../teacher/page-gradebook.js'],
+            ['page-student.js', '../teacher/page-student.js'],
+          ],
+        },
+        'user-assign-report': {
+          label: 'User Flowchart',
+          title: '6. Carry assignments, grades, and comments into reports',
+          engineer:
+            'Previously entered assessment and comment data becomes reusable reporting input, so the teacher does not have to reconstruct the story at report time.',
+          plain: 'The work done during teaching becomes report-ready later.',
+          why: 'This is the payoff for consistent entry during the term.',
+          links: [
+            ['page-reports.js', '../teacher/page-reports.js'],
+            ['report-blocks.js', '../teacher/report-blocks.js'],
+            ['shared/calc.js', '../shared/calc.js'],
+          ],
+        },
+        enter: {
+          label: 'Main Flow',
+          title: '1. Teacher opens the app',
+          engineer:
+            'A request hits Netlify, the edge function injects environment placeholders and CSP nonce into HTML, then login routing and viewport/device logic determine whether the user lands in the login page, desktop shell, or mobile shell.',
+          plain: 'The app first figures out who the teacher is and which front door they should use.',
+          why: 'This explains why login, device behavior, and environment injection belong in the same first step.',
+          links: [
+            ['inject-env.js', '../netlify/edge-functions/inject-env.js'],
+            ['login-auth.js', '../login-auth.js'],
+            ['teacher/app.html', '../teacher/app.html'],
+            ['teacher-mobile/index.html', '../teacher-mobile/index.html'],
+          ],
+        },
+        shell: {
+          label: 'Main Flow',
+          title: '2. The shell takes over',
+          engineer:
+            'Desktop and mobile are separate runtime shells. Desktop uses router-driven page modules; mobile uses a tab shell and stacked touch flows. Both are consumers of the same shared domain model.',
+          plain: 'There are two different user interfaces, but they are looking at the same underlying class data.',
+          why: 'This is the cleanest way to understand why the product feels different across devices without being two different products.',
+          links: [
+            ['teacher/router.js', '../teacher/router.js'],
+            ['teacher-mobile/shell.js', '../teacher-mobile/shell.js'],
+          ],
+        },
+        local: {
+          label: 'Main Flow',
+          title: '3. The app works locally first',
+          engineer:
+            'The in-memory cache and localStorage mirror allow synchronous reads and immediate writes. The UI is not coupled to network latency. The data layer also handles retries, broadcast signaling, and sync status.',
+          plain:
+            'The app behaves like it has its own notebook. It saves locally first, then worries about the cloud second.',
+          why: 'This is the key to FullVision’s responsiveness and offline resilience.',
+          links: [
+            ['shared/data.js', '../shared/data.js'],
+            ['docs/ARCHITECTURE.md', '../docs/ARCHITECTURE.md'],
+          ],
+        },
+        logic: {
+          label: 'Main Flow',
+          title: '4. Evidence becomes meaning',
+          engineer:
+            'The calculation and report layers interpret raw records rather than storing them. Score events, statuses, overrides, and observations are transformed into proficiency summaries and reporting outputs.',
+          plain:
+            'The app does not just store teacher input. It interprets that input into useful judgments and narratives.',
+          why: 'This is where the product’s educational philosophy becomes real code.',
+          links: [
+            ['shared/calc.js', '../shared/calc.js'],
+            ['page-reports.js', '../teacher/page-reports.js'],
+            ['report-blocks.js', '../teacher/report-blocks.js'],
+          ],
+        },
+        backend: {
+          label: 'Main Flow',
+          title: '5. Background sync updates the official record',
+          engineer:
+            'The frontend does not write directly to exposed tables. It uses guarded public RPCs that update the canonical multi-schema Supabase backend. Local temporary IDs can later be patched to canonical IDs.',
+          plain: 'The cloud becomes the official record after the teacher has already kept working.',
+          why: 'This explains how the app can be both fast for the teacher and rigorous about its durable backend.',
+          links: [
+            ['shared/supabase.js', '../shared/supabase.js'],
+            ['schema.sql', '../schema.sql'],
+          ],
+        },
+      };
+
+      const steps = Array.from(document.querySelectorAll('.step'));
+      const detailContent = document.getElementById('detail-content');
+      const searchInput = document.getElementById('concept-search');
+      const statusBar = document.getElementById('status-bar');
+
+      let activeStep = 'user-first-login';
+      let searchTerm = '';
+
+      function renderDetail(stepKey) {
+        const item = stepMeta[stepKey];
+        if (!item) return;
+        detailContent.innerHTML = `
+          <div class="detail-kicker">${item.label}</div>
+          <h3 class="detail-title">${item.title}</h3>
+          <div class="detail-block">
+            <strong>Engineer View</strong>
+            <p>${item.engineer}</p>
+          </div>
+          <div class="detail-block">
+            <strong>Plain-English Translation</strong>
+            <p>${item.plain}</p>
+          </div>
+          <div class="detail-block">
+            <strong>Why This Matters</strong>
+            <p>${item.why}</p>
+          </div>
+          <div class="detail-block">
+            <strong>Relevant Files</strong>
+            <div class="detail-links">
+              ${item.links.map(([label, href]) => `<a class="link-chip" href="${href}">${label}</a>`).join('')}
+            </div>
+          </div>
+        `;
+
+        statusBar.innerHTML = `
+          <span><strong>Selected:</strong> ${item.title}</span>
+          <button class="chip" data-action="clear-search" type="button">Clear Search</button>
+        `;
+
+        statusBar.querySelector('[data-action="clear-search"]').addEventListener('click', clearSearch);
+      }
+
+      function applyState() {
+        steps.forEach(step => {
+          const tagString = (step.dataset.tags || '').toLowerCase();
+          const matchesSearch =
+            !searchTerm || tagString.includes(searchTerm) || step.textContent.toLowerCase().includes(searchTerm);
+          step.classList.toggle('active', step.dataset.step === activeStep);
+          step.classList.toggle('dimmed', !matchesSearch);
+        });
+      }
+
+      function clearSearch() {
+        searchTerm = '';
+        searchInput.value = '';
+        applyState();
+      }
+
+      steps.forEach(step => {
+        step.addEventListener('click', () => {
+          activeStep = step.dataset.step;
+          renderDetail(activeStep);
+          applyState();
+        });
+      });
+
+      searchInput.addEventListener('input', () => {
+        searchTerm = searchInput.value.trim().toLowerCase();
+        applyState();
+      });
+
+      searchInput.addEventListener('keydown', event => {
+        if (event.key !== 'Enter') return;
+        const match = steps.find(step => {
+          const tagString = (step.dataset.tags || '').toLowerCase();
+          return !searchTerm || tagString.includes(searchTerm) || step.textContent.toLowerCase().includes(searchTerm);
+        });
+        if (!match) return;
+        activeStep = match.dataset.step;
+        renderDetail(activeStep);
+        applyState();
+        match.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+
+      document.querySelectorAll('[data-jump]').forEach(button => {
+        button.addEventListener('click', () => {
+          const target = document.getElementById(button.dataset.jump);
+          if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      });
+
+      renderDetail(activeStep);
+      applyState();
+    </script>
+  </body>
+</html>

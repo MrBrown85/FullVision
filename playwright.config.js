@@ -9,9 +9,7 @@ export default defineConfig({
     headless: true,
     screenshot: 'only-on-failure',
   },
-  projects: [
-    { name: 'chromium', use: { browserName: 'chromium' } },
-  ],
+  projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],
   webServer: {
     command: 'npx serve -l 8347',
     port: 8347,

@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test-and-format:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Collect changed files for format check
+        id: changed-files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            range="origin/${GITHUB_BASE_REF}...HEAD"
+          else
+            before="${{ github.event.before }}"
+            if [[ -n "$before" && "$before" != "0000000000000000000000000000000000000000" ]]; then
+              range="${before}...HEAD"
+            elif git rev-parse HEAD^ >/dev/null 2>&1; then
+              range="$(git rev-parse HEAD^)...HEAD"
+            else
+              range="HEAD"
+            fi
+          fi
+
+          git diff -z --name-only --diff-filter=ACMRT "$range" -- '*.js' '*.css' '*.html' '*.json' '*.md' > /tmp/prettier-files.txt
+
+          if [[ -s /tmp/prettier-files.txt ]]; then
+            echo "has_files=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_files=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check formatting for changed files
+        if: steps.changed-files.outputs.has_files == 'true'
+        shell: bash
+        run: xargs -0 npx prettier --check < /tmp/prettier-files.txt
