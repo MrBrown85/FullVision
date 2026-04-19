@@ -179,9 +179,7 @@ describe('canonical initData pagination + shape bridge', () => {
       },
       list_student_reflections() {
         return {
-          data: [
-            { course_outcome_id: OUTCOME_ID, confidence: 3, text: 'I can explain my thinking', date: '2026-04-18' },
-          ],
+          data: [{ course_outcome_id: OUTCOME_ID, confidence: 3, text: 'I can explain my thinking', date: '2026-04-18' }],
           error: null,
         };
       },
