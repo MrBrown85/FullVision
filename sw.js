@@ -52,27 +52,26 @@ const PRECACHE_URLS = [
   // Vendor & data
   '/vendor/supabase.min.js',
   '/curriculum_data.js',
-  '/manifest.json'
+  '/manifest.json',
 ];
 
 // Install: pre-cache all app files
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
+    caches
+      .open(CACHE_NAME)
       .then(cache => cache.addAll(PRECACHE_URLS))
-      .then(() => self.skipWaiting())
+      .then(() => self.skipWaiting()),
   );
 });
 
 // Activate: clean up old caches
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(
-        keys.filter(key => key !== CACHE_NAME)
-            .map(key => caches.delete(key))
-      )
-    ).then(() => self.clients.claim())
+    caches
+      .keys()
+      .then(keys => Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))))
+      .then(() => self.clients.claim()),
   );
 });
 
@@ -95,8 +94,10 @@ self.addEventListener('fetch', event => {
   }
 
   // HTML pages: network first, cache fallback
-  if (event.request.mode === 'navigate' ||
-      (event.request.headers.get('accept') && event.request.headers.get('accept').includes('text/html'))) {
+  if (
+    event.request.mode === 'navigate' ||
+    (event.request.headers.get('accept') && event.request.headers.get('accept').includes('text/html'))
+  ) {
     event.respondWith(
       fetch(event.request)
         .then(response => {
@@ -107,13 +108,15 @@ self.addEventListener('fetch', event => {
         })
         .catch(() => {
           // Network failed — serve from cache
-          return caches.match(event.request).then(cached =>
-            cached || new Response('Offline — please check your connection.', {
-              status: 503,
-              headers: { 'Content-Type': 'text/plain' }
-            })
+          return caches.match(event.request).then(
+            cached =>
+              cached ||
+              new Response('Offline — please check your connection.', {
+                status: 503,
+                headers: { 'Content-Type': 'text/plain' },
+              }),
           );
-        })
+        }),
     );
     return;
   }
@@ -128,10 +131,8 @@ self.addEventListener('fetch', event => {
         return response;
       })
       .catch(() => {
-        return caches.match(event.request).then(cached =>
-          cached || new Response('', { status: 503 })
-        );
-      })
+        return caches.match(event.request).then(cached => cached || new Response('', { status: 503 }));
+      }),
   );
 });
 

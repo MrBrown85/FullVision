@@ -78,6 +78,7 @@ The router auto-boots at the bottom of `router.js` via `Router.boot()`.
 `teacher/router.js` implements hash-based routing as an IIFE exposing `window.Router`.
 
 **Route table:**
+
 ```
 #/dashboard    -> window.PageDashboard
 #/assignments  -> window.PageAssignments
@@ -97,6 +98,7 @@ Each page module is an IIFE that returns `{ init(params), destroy() }`:
 - `destroy()` - cleans up event listeners, timers, and DOM state
 
 **Route change flow (`_onRoute`):**
+
 1. Parse hash into path + params
 2. Call `_currentPage.destroy()` if a previous page exists
 3. Clear DOM mounts: `#main`, `#page-toolbar-mount`, `#sidebar-mount`
@@ -104,6 +106,7 @@ Each page module is an IIFE that returns `{ init(params), destroy() }`:
 5. Call `module.init(params)` on the new page
 
 **DOM mount points** (defined in `app.html`):
+
 - `#dock-mount` - top navigation bar
 - `#sidebar-mount` - student roster sidebar
 - `#page-toolbar-mount` - page-specific toolbar
@@ -112,6 +115,7 @@ Each page module is an IIFE that returns `{ init(params), destroy() }`:
 **Navigation:** `Router.navigate(hash, replace)` sets `location.hash` which triggers `hashchange` -> `_onRoute`. Pass `replace=true` to use `replaceState` instead of pushing history.
 
 **Boot sequence** (`Router.boot()`, runs once):
+
 1. `requireAuth()` - redirect to login if no session
 2. `seedIfNeeded()` - create demo data for new accounts
 3. `initAllCourses()` - load global course list from Supabase/localStorage
@@ -152,6 +156,7 @@ The two write paths run in parallel: localStorage is updated synchronously so th
 ### Initialization
 
 `initAllCourses()` runs first (called by both `Router.boot()` and `shell.js` on mobile):
+
 1. Check for a valid Supabase session → set `_useSupabase`, `_teacherId`
 2. Demo mode (`localStorage.gb-demo-mode === '1'`) hard-skips Supabase and runs from localStorage only
 3. Otherwise call `get_teacher_preferences()` + `list_teacher_courses()` in parallel
@@ -166,38 +171,39 @@ Some entities are still intentionally client-only: modules, rubrics, custom tags
 
 Multi-namespace design with **public-schema RPCs as the only client interface** — direct table access is not exposed via PostgREST. Every RPC is `SECURITY DEFINER` with `auth.uid()` checks, so clients can't bypass authorization.
 
-| Schema | Purpose | Notable tables |
-|--------|---------|----------------|
-| `academics` | Course offerings, students, enrollments, designations | `course_offering`, `course_outcome`, `course_policy`, `student`, `enrollment`, `designation_type`, `enrollment_designation` |
-| `assessment` | Assignments and scores | `assessment`, `assessment_target`, `assignment_status`, `score_current`, `score_revision` |
-| `observation` | Anecdotal notes | `observation` |
-| `reporting` | End-of-term reporting | `term_rating`, `report_config`, `student_goal`, `student_reflection`, `section_override` |
-| `identity` | Teacher accounts | `teacher_profile`, `teacher_preference` |
-| `projection` | Read-optimized projections | `dashboard_student_summary`, `flag_tag`, `student_flag` |
-| `integration` | Import staging | `import_job`, `import_row` |
+| Schema        | Purpose                                               | Notable tables                                                                                                              |
+| ------------- | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `academics`   | Course offerings, students, enrollments, designations | `course_offering`, `course_outcome`, `course_policy`, `student`, `enrollment`, `designation_type`, `enrollment_designation` |
+| `assessment`  | Assignments and scores                                | `assessment`, `assessment_target`, `assignment_status`, `score_current`, `score_revision`                                   |
+| `observation` | Anecdotal notes                                       | `observation`                                                                                                               |
+| `reporting`   | End-of-term reporting                                 | `term_rating`, `report_config`, `student_goal`, `student_reflection`, `section_override`                                    |
+| `identity`    | Teacher accounts                                      | `teacher_profile`, `teacher_preference`                                                                                     |
+| `projection`  | Read-optimized projections                            | `dashboard_student_summary`, `flag_tag`, `student_flag`                                                                     |
+| `integration` | Import staging                                        | `import_job`, `import_row`                                                                                                  |
 
 Public RPCs the client calls (selection):
 
-| Read | Write |
-|------|-------|
-| `list_teacher_courses` | `create_course`, `update_course` |
-| `get_teacher_preferences` | `save_teacher_preferences` |
-| `get_course_policy` | `save_course_policy` |
-| `get_report_config` | `save_report_config` |
-| `list_course_outcomes` | `save_learning_map` |
-| `list_course_roster` | `enroll_student`, `update_enrollment`, `update_student`, `withdraw_enrollment` |
-| `list_course_assessments` | `create_assessment`, `update_assessment`, `delete_assessment` |
-| `list_course_scores` | `save_course_score`, `bulk_save_course_scores`, `delete_course_score` |
-| `list_course_observations` | `create_observation`, `update_observation`, `delete_observation` |
-| `get_student_goals` | `save_student_goals` |
-| `list_student_reflections` | `save_student_reflection` |
-| `list_section_overrides` | `save_section_override`, `clear_section_override` |
-| `list_term_ratings_for_course`, `get_term_rating` | `upsert_term_rating` |
-| `list_assignment_statuses` | `save_assignment_status` |
-| `list_import_jobs`, `list_import_rows` | `stage_import`, `validate_import_job`, `commit_import_job` |
-| `projection.list_student_flags` | `projection.add_student_flag`, `projection.remove_student_flag`, `toggle_student_flag` |
+| Read                                              | Write                                                                                  |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `list_teacher_courses`                            | `create_course`, `update_course`                                                       |
+| `get_teacher_preferences`                         | `save_teacher_preferences`                                                             |
+| `get_course_policy`                               | `save_course_policy`                                                                   |
+| `get_report_config`                               | `save_report_config`                                                                   |
+| `list_course_outcomes`                            | `save_learning_map`                                                                    |
+| `list_course_roster`                              | `enroll_student`, `update_enrollment`, `update_student`, `withdraw_enrollment`         |
+| `list_course_assessments`                         | `create_assessment`, `update_assessment`, `delete_assessment`                          |
+| `list_course_scores`                              | `save_course_score`, `bulk_save_course_scores`, `delete_course_score`                  |
+| `list_course_observations`                        | `create_observation`, `update_observation`, `delete_observation`                       |
+| `get_student_goals`                               | `save_student_goals`                                                                   |
+| `list_student_reflections`                        | `save_student_reflection`                                                              |
+| `list_section_overrides`                          | `save_section_override`, `clear_section_override`                                      |
+| `list_term_ratings_for_course`, `get_term_rating` | `upsert_term_rating`                                                                   |
+| `list_assignment_statuses`                        | `save_assignment_status`                                                               |
+| `list_import_jobs`, `list_import_rows`            | `stage_import`, `validate_import_job`, `commit_import_job`                             |
+| `projection.list_student_flags`                   | `projection.add_student_flag`, `projection.remove_student_flag`, `toggle_student_flag` |
 
 **Sync patterns by entity:**
+
 - **Students** (`saveStudents`): diffs prev vs new → routes to `enroll_student` / `update_enrollment` + `update_student` / `withdraw_enrollment`. Patches cache `id` to canonical `enrollment_id`, stores `personId = student_id`. Per-course async queue serializes saves so rapid clicks don't double-enroll.
 - **Assessments** (`saveAssessments`): same diff pattern → `create_assessment` / `update_assessment` / `delete_assessment`. `tagIds` filtered to UUIDs only so demo-mode text codes don't fail the canonical UUID cast.
 - **Scores** (`upsertScore`): single-row → `save_course_score`. UUID-gated on all four IDs (cid/sid/aid/tid) — if any is still local, only localStorage holds the score until IDs resolve.
@@ -211,9 +217,14 @@ All canonical RPC writes are gated on `gb-demo-mode !== '1'` AND `_useSupabase` 
 ### Getter/Setter Pattern
 
 Every data type follows the same pattern:
+
 ```js
-function getStudents(cid)       { return _cache.students[cid] || []; }
-function saveStudents(cid, arr) { _saveCourseField('students', cid, arr); }
+function getStudents(cid) {
+  return _cache.students[cid] || [];
+}
+function saveStudents(cid, arr) {
+  _saveCourseField('students', cid, arr);
+}
 ```
 
 The `_saveCourseField` function is the central write path that handles cache update, proficiency cache invalidation, Supabase sync, and cross-tab broadcasting.
@@ -228,31 +239,32 @@ The `_saveCourseField` function is the central write path that handles cache upd
 
 ### Data Types (cache fields -> localStorage/Supabase keys)
 
-| Cache Field    | Data Key       | Type              | Description                           |
-|----------------|----------------|-------------------|---------------------------------------|
-| students       | students       | Array             | Student roster                        |
-| assessments    | assessments    | Array             | Assignment definitions                |
-| scores         | scores         | Object {sid: []}  | Score entries keyed by student ID     |
-| learningMaps   | learningmap    | Object            | Sections and tags (curriculum map)    |
-| courseConfigs   | courseconfig   | Object            | Per-course settings (calc method, etc)|
-| modules        | modules        | Array             | Teaching modules/units                |
-| rubrics        | rubrics        | Array             | Rubric definitions                    |
-| flags          | flags          | Object {sid: bool}| Flagged students                      |
-| goals          | goals          | Object {sid: ...} | Student goals                         |
-| reflections    | reflections    | Object {sid: ...} | Student reflections                   |
-| overrides      | overrides      | Object            | Teacher proficiency overrides         |
-| statuses       | statuses       | Object            | Assignment statuses (excused, NS)     |
-| observations   | quick-obs      | Object {sid: []}  | Quick observations                    |
-| termRatings    | term-ratings   | Object            | Core competency term ratings          |
-| customTags     | custom-tags    | Array             | Custom learning tags                  |
-| notes          | notes          | Object {sid: ...} | Student notes                         |
-| reportConfig   | report-config  | Object            | Report card configuration             |
+| Cache Field   | Data Key      | Type               | Description                            |
+| ------------- | ------------- | ------------------ | -------------------------------------- |
+| students      | students      | Array              | Student roster                         |
+| assessments   | assessments   | Array              | Assignment definitions                 |
+| scores        | scores        | Object {sid: []}   | Score entries keyed by student ID      |
+| learningMaps  | learningmap   | Object             | Sections and tags (curriculum map)     |
+| courseConfigs | courseconfig  | Object             | Per-course settings (calc method, etc) |
+| modules       | modules       | Array              | Teaching modules/units                 |
+| rubrics       | rubrics       | Array              | Rubric definitions                     |
+| flags         | flags         | Object {sid: bool} | Flagged students                       |
+| goals         | goals         | Object {sid: ...}  | Student goals                          |
+| reflections   | reflections   | Object {sid: ...}  | Student reflections                    |
+| overrides     | overrides     | Object             | Teacher proficiency overrides          |
+| statuses      | statuses      | Object             | Assignment statuses (excused, NS)      |
+| observations  | quick-obs     | Object {sid: []}   | Quick observations                     |
+| termRatings   | term-ratings  | Object             | Core competency term ratings           |
+| customTags    | custom-tags   | Array              | Custom learning tags                   |
+| notes         | notes         | Object {sid: ...}  | Student notes                          |
+| reportConfig  | report-config | Object             | Report card configuration              |
 
 ## Authentication Flow
 
 `shared/supabase.js` wraps the Supabase Auth SDK as an IIFE.
 
 **Key functions (all on `window`):**
+
 - `requireAuth()` - called at boot. Checks localStorage for a cached Supabase session token. If valid and not expired, allows the page to load immediately. Otherwise, calls `sb.auth.getSession()` and redirects to `login.html` if no session.
 - `signOut()` - signs out via Supabase, clears all `gb-*` localStorage keys (FOIPPA compliance for shared computers), redirects to `login.html`.
 - `getCurrentUser()` / `isLoggedIn()` - async session checks
@@ -261,6 +273,7 @@ The `_saveCourseField` function is the central write path that handles cache upd
 **Idle timeout:** A separate IIFE sets a 30-minute inactivity timer. Resets on mouse/keyboard/touch/scroll events. Calls `signOut()` on expiry. Designed for shared classroom computers.
 
 **Session flow:**
+
 1. User loads `teacher/app.html` -> `Router.boot()` -> `requireAuth()`
 2. Fast path: parse `sb-*-auth-token` from localStorage, check `expires_at`
 3. Slow path: call `sb.auth.getSession()` if no cached token
@@ -275,7 +288,7 @@ The `_saveCourseField` function is the central write path that handles cache upd
 ### Proficiency Scale
 
 | Level | Label       |
-|-------|-------------|
+| ----- | ----------- |
 | 0     | No Evidence |
 | 1     | Emerging    |
 | 2     | Developing  |
@@ -331,12 +344,14 @@ getOverallProficiency(cid, sid)
 ## Key Data Structures
 
 ### Course
+
 ```js
 { id: 'sci8', name: 'Science 8', gradingSystem: 'proficiency',
   calcMethod: 'mostRecent', decayWeight: 0.65, curriculumTags: ['SCI8'] }
 ```
 
 ### Student
+
 ```js
 { id: 'sXXX', firstName: '', lastName: '', preferred: '',
   pronouns: '', studentNumber: '', dateOfBirth: '', email: '',
@@ -345,6 +360,7 @@ getOverallProficiency(cid, sid)
 ```
 
 ### Assessment
+
 ```js
 { id: 'aXXX', title: '', date: '2025-01-15', type: 'summative',
   tags: ['QAP','PI'],  // linked learning tags
@@ -354,13 +370,16 @@ getOverallProficiency(cid, sid)
 ```
 
 ### Score Entry
+
 ```js
 { score: 3, date: '2025-01-15', type: 'summative',
   tagId: 'QAP', assessmentId: 'aXXX', rawPoints: 8 }
 ```
+
 Scores are stored as `{ [studentId]: Score[] }`.
 
 ### Learning Map
+
 ```js
 { subjects: [{ id: 'SCI8', name: 'Science 8', color: '#0891b2' }],
   sections: [{
@@ -373,9 +392,11 @@ Scores are stored as `{ [studentId]: Score[] }`.
 ```
 
 ### Assignment Status
+
 Keyed as `"studentId:assessmentId"` -> `'excused'` | `'notSubmitted'` | `null`
 
 ### Module
+
 ```js
 { id: 'mXXX', title: '', startDate: '', endDate: '',
   assessmentIds: [] }
@@ -398,7 +419,7 @@ Keyed as `"studentId:assessmentId"` -> `'excused'` | `'notSubmitted'` | `null`
 All page modules and the router use the IIFE (Immediately Invoked Function Expression) pattern:
 
 ```js
-window.PageExample = (function() {
+window.PageExample = (function () {
   'use strict';
   // Private state
   var activeCourse;

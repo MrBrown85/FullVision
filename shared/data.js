@@ -1585,72 +1585,84 @@ function _canonicalRosterRowsToStudents(rows) {
 
 function _canonicalScoreRowsToBlob(rows, enrollmentByStudentId) {
   return _scoreRowsToBlob(
-    (rows || []).map(function (r) {
-      return {
-        student_id: r.enrollment_id || r.enrollmentId || _personToEnrollmentId(r.student_id || r.studentId, enrollmentByStudentId),
-        assessment_id: r.assessment_id || r.assessmentId,
-        tag_id: r.course_outcome_id || r.outcome_id || r.tag_id || r.tagId,
-        score:
-          r.raw_numeric_score !== undefined && r.raw_numeric_score !== null
-            ? Number(r.raw_numeric_score)
-            : r.normalized_level !== undefined && r.normalized_level !== null
-              ? Number(r.normalized_level)
-              : r.score,
-        date: _dateOnly(r.entered_at || r.date),
-        type: r.type || 'summative',
-        note: r.comment_text || r.comment || r.note || '',
-        created_at: r.created_at || r.entered_at,
-      };
-    }).filter(function (r) {
-      return r.student_id && r.assessment_id && r.tag_id;
-    }),
+    (rows || [])
+      .map(function (r) {
+        return {
+          student_id:
+            r.enrollment_id ||
+            r.enrollmentId ||
+            _personToEnrollmentId(r.student_id || r.studentId, enrollmentByStudentId),
+          assessment_id: r.assessment_id || r.assessmentId,
+          tag_id: r.course_outcome_id || r.outcome_id || r.tag_id || r.tagId,
+          score:
+            r.raw_numeric_score !== undefined && r.raw_numeric_score !== null
+              ? Number(r.raw_numeric_score)
+              : r.normalized_level !== undefined && r.normalized_level !== null
+                ? Number(r.normalized_level)
+                : r.score,
+          date: _dateOnly(r.entered_at || r.date),
+          type: r.type || 'summative',
+          note: r.comment_text || r.comment || r.note || '',
+          created_at: r.created_at || r.entered_at,
+        };
+      })
+      .filter(function (r) {
+        return r.student_id && r.assessment_id && r.tag_id;
+      }),
   );
 }
 
 function _canonicalObservationRowsToBlob(rows, enrollmentByStudentId) {
   return _obsRowsToBlob(
-    (rows || []).map(function (r) {
-      return {
-        id: r.observation_id || r.id,
-        student_id: r.enrollment_id || r.enrollmentId || _personToEnrollmentId(r.student_id || r.studentId, enrollmentByStudentId),
-        text: r.text || '',
-        dims: r.dims || [],
-        sentiment: r.sentiment || null,
-        context: r.context || null,
-        assignment_context: r.assignment_context || null,
-        date: _dateOnly(r.observed_at || r.date),
-        created_at: r.created_at || r.observed_at,
-        modified_at: r.updated_at || r.modified_at,
-      };
-    }).filter(function (r) {
-      return r.id && r.student_id;
-    }),
+    (rows || [])
+      .map(function (r) {
+        return {
+          id: r.observation_id || r.id,
+          student_id:
+            r.enrollment_id ||
+            r.enrollmentId ||
+            _personToEnrollmentId(r.student_id || r.studentId, enrollmentByStudentId),
+          text: r.text || '',
+          dims: r.dims || [],
+          sentiment: r.sentiment || null,
+          context: r.context || null,
+          assignment_context: r.assignment_context || null,
+          date: _dateOnly(r.observed_at || r.date),
+          created_at: r.created_at || r.observed_at,
+          modified_at: r.updated_at || r.modified_at,
+        };
+      })
+      .filter(function (r) {
+        return r.id && r.student_id;
+      }),
   );
 }
 
 function _canonicalAssessmentRowsToBlob(rows) {
   return _assessmentRowsToBlob(
-    (rows || []).map(function (r) {
-      return {
-        id: r.assessment_id || r.id,
-        title: r.title || '',
-        date: _dateOnly(r.due_at || r.date),
-        type: r.assessment_kind || r.type || 'summative',
-        tag_ids: r.target_outcome_ids || r.tag_ids || r.tagIds || [],
-        score_mode: r.score_mode || r.scoreMode || '',
-        collaboration: r.collaboration_mode || r.collaboration || 'individual',
-        max_points:
-          r.points_possible !== undefined && r.points_possible !== null ? Number(r.points_possible) : r.max_points,
-        weight: r.weighting !== undefined && r.weighting !== null ? Number(r.weighting) : r.weight,
-        notes: r.notes || '',
-        rubric_id: r.rubric_id || '',
-        module_id: r.module_id || '',
-        due_date: _dateOnly(r.due_at || r.due_date),
-        assigned_at: _dateOnly(r.assigned_at || r.date_assigned),
-      };
-    }).filter(function (r) {
-      return r.id;
-    }),
+    (rows || [])
+      .map(function (r) {
+        return {
+          id: r.assessment_id || r.id,
+          title: r.title || '',
+          date: _dateOnly(r.due_at || r.date),
+          type: r.assessment_kind || r.type || 'summative',
+          tag_ids: r.target_outcome_ids || r.tag_ids || r.tagIds || [],
+          score_mode: r.score_mode || r.scoreMode || '',
+          collaboration: r.collaboration_mode || r.collaboration || 'individual',
+          max_points:
+            r.points_possible !== undefined && r.points_possible !== null ? Number(r.points_possible) : r.max_points,
+          weight: r.weighting !== undefined && r.weighting !== null ? Number(r.weighting) : r.weight,
+          notes: r.notes || '',
+          rubric_id: r.rubric_id || '',
+          module_id: r.module_id || '',
+          due_date: _dateOnly(r.due_at || r.due_date),
+          assigned_at: _dateOnly(r.assigned_at || r.date_assigned),
+        };
+      })
+      .filter(function (r) {
+        return r.id;
+      }),
   );
 }
 
@@ -1681,9 +1693,9 @@ function _canonicalCoursePolicyToConfig(data) {
     out.gradingScale = row.grading_scale !== undefined ? row.grading_scale : row.gradingScale;
   }
   if (row.report_as_percentage !== undefined || row.reportAsPercentage !== undefined) {
-    out.reportAsPercentage = !!(
-      row.report_as_percentage !== undefined ? row.report_as_percentage : row.reportAsPercentage
-    );
+    out.reportAsPercentage = !!(row.report_as_percentage !== undefined
+      ? row.report_as_percentage
+      : row.reportAsPercentage);
   }
   if (row.late_work_policy !== undefined || row.lateWorkPolicy !== undefined) {
     out.lateWorkPolicy = row.late_work_policy !== undefined ? row.late_work_policy : row.lateWorkPolicy;
@@ -1850,47 +1862,52 @@ function _canonicalStudentOverridesToMap(data) {
 
 function _canonicalStatusesToBlob(rows, enrollmentByStudentId) {
   return _statusesRowsToBlob(
-    (rows || []).map(function (r) {
-      return {
-        student_id: _personToEnrollmentId(r.student_id || r.studentId, enrollmentByStudentId),
-        assessment_id: r.assessment_id || r.assessmentId,
-        status: r.status || '',
-      };
-    }).filter(function (r) {
-      return r.student_id && r.assessment_id;
-    }),
+    (rows || [])
+      .map(function (r) {
+        return {
+          student_id: _personToEnrollmentId(r.student_id || r.studentId, enrollmentByStudentId),
+          assessment_id: r.assessment_id || r.assessmentId,
+          status: r.status || '',
+        };
+      })
+      .filter(function (r) {
+        return r.student_id && r.assessment_id;
+      }),
   );
 }
 
 function _canonicalTermRatingsToBlob(rows, enrollmentByStudentId) {
   return _termRatingsRowsToBlob(
-    (rows || []).map(function (r) {
-      return {
-        student_id: _personToEnrollmentId(r.student_id || r.studentId, enrollmentByStudentId),
-        term_id: r.term_id || r.termId,
-        dims: r.dims || {},
-        narrative: r.narrative || '',
-        work_habits: r.work_habits,
-        participation: r.participation,
-        social_traits: r.social_traits || r.socialTraits,
-        strengths: r.strengths,
-        growth_areas: r.growth_areas || r.growthAreas,
-        mention_assessments: r.mention_assessments || r.mentionAssessments,
-        mention_obs: r.mention_obs || r.mentionObs,
-        include_course_summary: r.include_course_summary || r.includeCourseSummary,
-        created_at: r.created_at || r.created,
-        modified_at: r.updated_at || r.modified_at || r.modified,
-      };
-    }).filter(function (r) {
-      return r.student_id && r.term_id;
-    }),
+    (rows || [])
+      .map(function (r) {
+        return {
+          student_id: _personToEnrollmentId(r.student_id || r.studentId, enrollmentByStudentId),
+          term_id: r.term_id || r.termId,
+          dims: r.dims || {},
+          narrative: r.narrative || '',
+          work_habits: r.work_habits,
+          participation: r.participation,
+          social_traits: r.social_traits || r.socialTraits,
+          strengths: r.strengths,
+          growth_areas: r.growth_areas || r.growthAreas,
+          mention_assessments: r.mention_assessments || r.mentionAssessments,
+          mention_obs: r.mention_obs || r.mentionObs,
+          include_course_summary: r.include_course_summary || r.includeCourseSummary,
+          created_at: r.created_at || r.created,
+          modified_at: r.updated_at || r.modified_at || r.modified,
+        };
+      })
+      .filter(function (r) {
+        return r.student_id && r.term_id;
+      }),
   );
 }
 
 function _canonicalFlagsToBlob(rows, enrollmentByStudentId) {
   var blob = {};
   (rows || []).forEach(function (r) {
-    var sid = r.enrollment_id || r.enrollmentId || _personToEnrollmentId(r.student_id || r.studentId, enrollmentByStudentId);
+    var sid =
+      r.enrollment_id || r.enrollmentId || _personToEnrollmentId(r.student_id || r.studentId, enrollmentByStudentId);
     if (!sid) return;
     if (!blob[sid]) blob[sid] = { active: true, tags: [] };
     blob[sid].tags.push({
@@ -1965,7 +1982,11 @@ async function _doInitData(cid) {
 
       _persistLoadedField(cid, 'students', students);
       _persistLoadedField(cid, 'assessments', assessRes.error ? [] : _canonicalAssessmentRowsToBlob(assessRes.data));
-      _persistLoadedField(cid, 'scores', scoreRes.error ? {} : _canonicalScoreRowsToBlob(scoreRes.data, enrollmentByStudentId));
+      _persistLoadedField(
+        cid,
+        'scores',
+        scoreRes.error ? {} : _canonicalScoreRowsToBlob(scoreRes.data, enrollmentByStudentId),
+      );
       _persistLoadedField(
         cid,
         'observations',
@@ -1976,23 +1997,36 @@ async function _doInitData(cid) {
       _persistLoadedField(
         cid,
         'learningMaps',
-        outcomesRes.error ? LEARNING_MAP[cid] || { subjects: [], sections: [] } : _canonicalOutcomesToLearningMap(cid, outcomesRes.data),
+        outcomesRes.error
+          ? LEARNING_MAP[cid] || { subjects: [], sections: [] }
+          : _canonicalOutcomesToLearningMap(cid, outcomesRes.data),
       );
-      _persistLoadedField(cid, 'statuses', statusRes.error ? {} : _canonicalStatusesToBlob(_rpcRows(statusRes.data), enrollmentByStudentId));
+      _persistLoadedField(
+        cid,
+        'statuses',
+        statusRes.error ? {} : _canonicalStatusesToBlob(_rpcRows(statusRes.data), enrollmentByStudentId),
+      );
       _persistLoadedField(
         cid,
         'termRatings',
         termRatingsRes.error ? {} : _canonicalTermRatingsToBlob(_rpcRows(termRatingsRes.data), enrollmentByStudentId),
       );
-      _persistLoadedField(cid, 'flags', flagsRes.error ? {} : _canonicalFlagsToBlob(_rpcRows(flagsRes.data), enrollmentByStudentId));
+      _persistLoadedField(
+        cid,
+        'flags',
+        flagsRes.error ? {} : _canonicalFlagsToBlob(_rpcRows(flagsRes.data), enrollmentByStudentId),
+      );
 
       var goalsBlob = {};
       var reflectionsBlob = {};
       var overridesBlob = {};
       studentDetails.forEach(function (result) {
-        goalsBlob[result.sid] = result.goals && !result.goals.error ? _canonicalStudentGoalsToMap(result.goals.data) : {};
+        goalsBlob[result.sid] =
+          result.goals && !result.goals.error ? _canonicalStudentGoalsToMap(result.goals.data) : {};
         reflectionsBlob[result.sid] =
-          result.reflections && !result.reflections.error ? _canonicalStudentReflectionsToMap(result.reflections.data) : {};
+          result.reflections && !result.reflections.error
+            ? _canonicalStudentReflectionsToMap(result.reflections.data)
+            : {};
         overridesBlob[result.sid] =
           result.overrides && !result.overrides.error ? _canonicalStudentOverridesToMap(result.overrides.data) : {};
       });
