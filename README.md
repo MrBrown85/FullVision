@@ -2,7 +2,7 @@
 
 A standards-based grading and observation tool for British Columbia teachers. Track student proficiency against BC curriculum competencies, record classroom observations, and generate parent-friendly reports.
 
-Built with vanilla JavaScript and a simple copy build for Netlify deploys. Backed by Supabase for auth and data, deployed on Netlify.
+Built with vanilla JavaScript and a simple copy build for Netlify deploys. Backed by Supabase for auth and canonical RPC-based data access, deployed on Netlify.
 
 **Live app:** [fullvision.ca](https://fullvision.ca) · [Mobile](https://fullvision.ca/teacher-mobile/)
 
@@ -42,7 +42,7 @@ Built with vanilla JavaScript and a simple copy build for Netlify deploys. Backe
 | Frontend        | Vanilla JS (IIFE modules), CSS custom properties                                                                          |
 | Auth & Database | [Supabase](https://supabase.com) — Auth, Postgres, RLS, multi-namespace canonical schema with public-schema RPC interface |
 | Hosting         | [Netlify](https://netlify.com) (static site, publish `dist/`) — edge function injects env vars + per-request CSP nonce    |
-| Testing         | [Vitest](https://vitest.dev) — 657 unit tests · [Playwright](https://playwright.dev) — 137 E2E specs                      |
+| Testing         | [Vitest](https://vitest.dev) — 655 unit tests · [Playwright](https://playwright.dev) — 137 E2E specs                      |
 | Formatting      | [Prettier](https://prettier.io)                                                                                           |
 | PWA             | Web app manifest + service worker (network-first, offline-capable)                                                        |
 
@@ -58,8 +58,8 @@ Built with vanilla JavaScript and a simple copy build for Netlify deploys. Backe
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/MrBrown85/TeacherDashboard.git
-cd TeacherDashboard
+git clone https://github.com/MrBrown85/FullVision.git
+cd FullVision
 npm install
 ```
 
@@ -110,7 +110,7 @@ TeacherDashboard/
 │   ├── page-reports.js         # Report builder
 │   ├── dash-class-manager.js   # Class + student management
 │   ├── report-blocks.js        # 15 report block renderers
-│   ├── report-questionnaire.js # Term questionnaire + AI narrative
+│   ├── report-questionnaire.js # Term questionnaire + auto narrative
 │   └── ui.js                   # Toast, modal, and DOM helpers
 │
 ├── teacher-mobile/             # Mobile PWA
@@ -143,7 +143,7 @@ TeacherDashboard/
 ### Architecture
 
 - **Routing**: Hash-based router in [`teacher/router.js`](teacher/router.js) swaps page modules without full reloads
-- **Data layer**: [`shared/data.js`](shared/data.js) — cache-through pattern; synchronous reads from an in-memory `_cache` backed by localStorage. Writes update the cache, persist to localStorage, and fire-and-forget canonical Supabase RPCs in the background. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for details.
+- **Data layer**: [`shared/data.js`](shared/data.js) — cache-through pattern; synchronous reads from an in-memory `_cache` backed by localStorage. `initData` now hydrates per-course data from canonical Supabase RPCs, mirrors that state into localStorage for offline fallback, and keeps writes on fire-and-forget canonical RPCs in the background. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for details.
 - **Database**: Multi-namespace canonical schema (`academics.*`, `assessment.*`, `observation.*`, `reporting.*`, `identity.*`, `projection.*`, `integration.*`) with a public-schema RPC interface. Every RPC is `SECURITY DEFINER` with `auth.uid()` checks — clients can't bypass authorization via direct table access.
 - **Demo mode**: `localStorage.gb-demo-mode='1'` short-circuits Supabase; the Science 8 sample class is auto-seeded by [`shared/seed-data.js`](shared/seed-data.js).
 - **Calculation engine**: [`shared/calc.js`](shared/calc.js) — four proficiency methods (mostRecent / highest / mode / decayingAvg) with memoization.
@@ -175,7 +175,7 @@ npm test               # Run full suite
 npm run test:watch     # Watch mode
 ```
 
-657 tests covering the calculation engine, data layer, and mobile UI components.
+655 tests covering the calculation engine, data layer, and mobile UI components.
 
 ---
 
