@@ -63,7 +63,7 @@ You are continuing an ongoing rebuild. **Read this whole file before touching an
 | **Design worktree (this repo, read-only charter)** | `/Users/colinbrown/Documents/fullvision-backend-design` |
 | **Main FullVision repo (write target for client port)** | `/Users/colinbrown/Documents/FullVision` |
 | Legacy (reference-only) | `/Users/colinbrown/Documents/Projects/FullVision -- Legacy` |
-| Main repo branch at last touch | `docs-cleanup-redundant-stale` (NOT `main`; has 17 uncommitted changes) |
+| Main repo active branch | `rebuild-v2` (15 local commits past `main`, not yet pushed past `e9f84ce` — see Working mode) |
 | User has **no budget** for new Supabase projects | Reuse `gradebook-prod`. Do NOT create new projects or paid resources. |
 | User owns domain | `fullvision.ca` (+ `fullvision.netlify.com` fallback). DNS changes are user-only. |
 
@@ -73,10 +73,10 @@ You are continuing an ongoing rebuild. **Read this whole file before touching an
 2. This file.
 3. [DECISIONS.md](DECISIONS.md) — every answered question, do not relitigate.
 4. [erd.md](erd.md) — live schema (source of truth).
-5. [write-paths.md](write-paths.md) — Pass B RPC specs (what to implement next).
+5. [write-paths.md](write-paths.md) — Pass B RPC specs (now implemented).
 6. [read-paths.md](read-paths.md) — Pass D computations.
 7. [auth-lifecycle.md](auth-lifecycle.md) — Pass C flows.
-8. [schema.sql](schema.sql), [rls-policies.sql](rls-policies.sql), [read-paths.sql](read-paths.sql) — what's deployed.
+8. [schema.sql](schema.sql), [rls-policies.sql](rls-policies.sql), [read-paths.sql](read-paths.sql), [write-paths.sql](write-paths.sql) — what's deployed.
 
 ---
 
@@ -106,57 +106,33 @@ If the user said "yes" to one action in a past session, **do not** assume it ext
 
 ---
 
-## What's already done (as of 2026-04-19)
+## Current state (end of day 2026-04-19)
 
-**Design artifacts (complete, in this worktree):**
-- ERD (Pass A), Write paths (Pass B), Auth (Pass C), Read paths (Pass D), Decisions, Offline-sync stub, Spec-vs-UI diff.
-- `schema.sql` — v2 schema with composite FKs, audit tables, FK covering indexes, category weight-cap trigger, role grants.
-- `rls-policies.sql` — 4 helper fns + 39 RLS policies; auth.uid() wrapped in subselect per Supabase linter 0003.
-- `read-paths.sql` — 11 computation primitives + 2 read RPCs (`get_gradebook`, `get_student_profile`).
+Phases 1 → 4 of the queue are all checked. Phase 5 remains.
 
-**Live state on `gradebook-prod`:**
-- Legacy schema (old `public`, `academics`, `assessment`, `identity`, `integration`, `observation`, `projection`, `reporting`) was **wiped and replaced** with v2 (user authorized). Zero production data was preserved.
-- 13 v2 migrations applied in order:
-  1. `fullvision_v2_reset_public_schema`
-  2. `fullvision_v2_schema`
-  3. `fullvision_v2_rls_policies`
-  4. `fullvision_v2_read_path_primitives`
-  5. `fullvision_v2_fix_audit_changed_by_nullable`
-  6. `fullvision_v2_lock_function_search_paths`
-  7. `fullvision_v2_drop_legacy_schemas`
-  8. `fullvision_v2_perf_rls_initplan_and_fk_indexes`
-  9. `fullvision_v2_category_weight_cap_trigger`
-  10. `fullvision_v2_fix_section_proficiency_mostrecent_ambiguity`
-  11. `fullvision_v2_fix_decaying_avg_ambiguity`
-  12. `fullvision_v2_grant_table_privileges`
-  13. `fullvision_v2_write_path_auth_bootstrap` ← Phase 1.1
-  14. `fullvision_v2_write_path_course_crud` ← Phase 1.2
-- 39 tables, all RLS-enabled with ≥1 policy.
-- 25 functions, all with `search_path=public` locked.
-- Security advisor: **0 lints.** Performance advisor: 0 actionable.
+### gradebook-prod (Supabase)
 
-**Verified via smoke tests (today):**
-- §1.1 assessment_overall: no-score → `not_yet_graded`; proficiency value → `value`; EXC → `excluded`; NS → `0`; points 40/50 → `3.2`.
-- §1.2 rubric tag derivation: multi-criterion-linking average correct.
-- Rubric overall weighted-by-criterion: `(1·3 + 2·4)/3 = 3.67`.
-- §1.5 calc_methods (proven with [2,3,4] contributions): `average=3.0`, `median=3.0`, `highest=4.0`, `mostRecent=4.0` (by max date), `mode` non-null, `decayingAvg(dw=0.5)=3.25`.
-- Cascade deletes: `delete course` collapses enrollment + assessment + score + section + tag.
-- Category weight-cap trigger: rejects INSERT and UPDATE that would push sum > 100.
-- **RLS cross-tenant isolation: 10 assertions passed.** Teacher A cannot SELECT/INSERT/UPDATE/DELETE B's rows; WITH CHECK rejects cross-teacher inserts.
+- **Schema + RLS + read primitives:** all deployed. 39 tables, every one RLS-enabled with ≥1 policy. 25+ functions, `search_path = public` locked.
+- **Write-path RPCs:** every Pass B §1–§16 path is live. Write-paths.sql mirrors what's deployed.
+- **Read-path RPCs:** `get_gradebook`, `get_student_profile`, `list_teacher_courses` (+ 11 computation primitives from the design phase).
+- **Retention cron:** `fv_retention_cleanup_daily` (pg_cron, 03:17 UTC) — purges 30-day-stale soft-deleted teachers + >2yr audit rows.
+- **Advisors:** 0 security lints, 0 actionable performance lints.
 
-**Main FullVision repo: UNTOUCHED so far.** No git operations performed there.
+### Main FullVision repo (branch `rebuild-v2`, local-only past `e9f84ce`)
 
----
+- **`shared/supabase.js`** — audited clean (auth-only).
+- **`shared/data.js`** — boot path (`initAllCourses` / `_doInitData`) calls the v2 RPCs. `_canonicalCoursesToBlob`, `_v2GradebookToCache`, `_persistScoreToCanonical`, `_canonical{Enroll,UpdateStudent,UpdateEnrollment,Withdraw}`, `_canonicalCreate/Update/DeleteAssessment`, `_persistObservationCreate/Update/Delete` all routed to v2 RPCs. Legacy per-course RPC fan-out is unreachable (retained for reference).
+- **`window.v2.*` namespace** — 40+ thin RPC wrappers covering everything the backend exposes: course / category / module / rubric / subject / competency-group / section / tag CRUD + reorder; student + enrollment + roster + bulk pronouns + CSV import; assessment CRUD + collab; scoring (cell/tag/rubric/status/comment/fill/clear); observations + templates + custom tags; student-record writes + `getStudentProfile`; `saveTermRating`; ReportConfig + preferences + teacher-lifecycle; imports (CSV, Teams, JSON restore).
+- **`shared/offline-queue.js`** — `window.v2Queue` FIFO + dead-letter + 3-attempt backoff + auto-flush, wired into `teacher/app.html` and `teacher-mobile/index.html`.
+- **Feature flags** on `window`: `__V2_GRADEBOOK_READY` (default true), `__V2_WRITE_PATHS_READY` (false — legacy `gb-retry-queue` replay gated off until the bulk `_syncToSupabase` machinery is retired).
 
-## Scope reality check (read before Phase 2+)
+### Remaining work
 
-`shared/data.js` in the main repo is **4,666 lines** and calls ~30 legacy RPCs that do not exist in v2. None of the following exist in `gradebook-prod` anymore:
-
-> `get_teacher_preferences`, `list_teacher_courses`, `save_course_score`, `create_course`, `update_course`, `save_course_policy`, `get_course_policy`, `enroll_student`, `update_enrollment`, `withdraw_enrollment`, `update_student`, `create_assessment`, `update_assessment`, `delete_assessment`, `save_assignment_status`, `list_assignment_statuses`, `create_observation`, `update_observation`, `delete_observation`, `upsert_term_rating`, `list_term_ratings_for_course`, `save_report_config`, `get_report_config`, `get_student_goals`, `list_student_reflections`, `list_section_overrides`, `projection.list_student_flags`, `save_teacher_preferences`, `save_course_score`
-
-Also, direct `.from('scores' | 'students' | 'assessments' | 'observations' | 'teacher_config')` calls hit plural table names that don't exist (v2 is singular: `score`, `student`, `assessment`, `observation`; `teacher_config` was dropped).
-
-**The legacy app is currently broken** (its schema was wiped). No production traffic to protect — zero-risk to reset main-repo client code.
+- **Phase 5.1** — Demo-seed JSON (Grade 8 Humanities, 20–30 students, ~8 assessments) shared between Demo Mode and Welcome Class (DECISIONS Q43/Q47).
+- **Phase 5.2** — Custom SMTP via `fullvision.ca` (DNS change is user-only, DECISIONS Q6).
+- **Phase 5.3** — pgTAP or smoke-test pack runnable as CI check.
+- **Demo-Mode + signed-in verification** of the Phase 3/4 ports (user-side, once the push embargo lifts).
+- Eventual retirement of the dormant legacy fan-out in `_doInitData` and the bulk `_syncToSupabase` block (cosmetic — unreachable today).
 
 ---
 
@@ -226,9 +202,10 @@ Each task = one functional area (students, assessments, observations, term ratin
 
 When Claude finds a real defect mid-session that reshapes the plan, add a bullet here describing it and the remediation. Don't silently fix and continue.
 
-- *(none recorded yet in this file; earlier bugs — mostRecent ambiguity, decaying_avg ambiguity, missing GRANTs — were all fixed on 2026-04-19 and recorded in the Activity log.)*
-- **2026-04-19 (Phase 1.11):** report_config.preset CHECK was `in (brief,standard,detailed)` but write-paths §14 requires `'custom'` for manual block toggles. Fixed via migration `fullvision_v2_fix_report_config_add_custom_preset`; schema.sql updated.
+Earlier bugs fixed inline (mostRecent ambiguity, decaying_avg ambiguity, missing GRANTs) are in the Activity log, not here.
+
 - **2026-04-19 (Phase 1.4):** `section_competency_group_fk` used `ON DELETE SET NULL` without a column list, so deleting a `competency_group` tried to null `section.course_id` (NOT NULL). Fixed via migration `fullvision_v2_fix_section_competency_group_fk_set_null` using PG15+ `SET NULL (competency_group_id)`. schema.sql updated to match.
+- **2026-04-19 (Phase 1.11):** `report_config.preset` CHECK was `in (brief,standard,detailed)` but write-paths §14 requires `'custom'` for manual block toggles. Fixed via migration `fullvision_v2_fix_report_config_add_custom_preset`; schema.sql updated.
 
 ---
 

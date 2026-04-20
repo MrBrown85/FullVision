@@ -1,6 +1,8 @@
-# Offline Sync — Architecture Stub
+# Offline Sync — Architecture
 
-Per final decision on **Q33 = B** (full offline with write queue and sync), this document stubs out the architecture for offline support. The full spec lands during implementation; this captures the key design questions and the default approach.
+Per final decision on **Q33 = B** (full offline with write queue and sync), this document captures the architecture for offline support.
+
+**Status (Phase 4.10, 2026-04-19):** queue model + sync lifecycle below are implemented in [`shared/offline-queue.js`](https://github.com/MrBrown85/FullVision/blob/rebuild-v2/shared/offline-queue.js) on the main repo's `rebuild-v2` branch. Exposed as `window.v2Queue.{enqueue, flush, stats, deadLetter, dismissDeadLetter, clear, callOrEnqueue}`. Read-side caching (service worker + IndexedDB delta-refresh) and the dead-letter UI remain future work.
 
 ## Scope
 
@@ -85,9 +87,9 @@ For offline reads to work, cached GET responses need to survive:
 3. **Queue size cap.** How many offline writes before the app refuses more? Recommend: 500 entries or 5 MB localStorage, whichever hits first.
 4. **Clock-skew tolerance.** Client clocks can be wrong. Does the server reject writes with `updated_at` far in the future? Recommend: client sends `client_timestamp`; server applies `updated_at = server_now()` regardless, using client_timestamp only for ordering among same-second writes.
 
-## When to build this
+## When this was built
 
-Offline support is a **later workstream**, after the core online flow ships. The design phase treats it as "architecture known, implementation deferred." Kick off after auth, write paths, and read paths are live.
+Phase 4.10 of the v2 rebuild (2026-04-19). Auth, write paths, and read paths landed first; the queue module was added immediately after the last data.js port (Phase 4.9 imports) so every v2 `sb.rpc` call has a matching `v2Queue.callOrEnqueue` path.
 
 ## Risks
 

@@ -571,6 +571,39 @@ $$;
 -- rows with RLS-scoped selects, compose jsonb, return. Skeletons at the
 -- bottom mark what each remaining RPC should return.
 
+-- ── Course list (boot-time read for app shell) ────────────────────────────
+-- Deployed in migration fullvision_v2_read_path_list_teacher_courses (Phase 3.2).
+-- Returns the calling teacher's courses (RLS-scoped on course.teacher_id).
+-- Columns returned are the v2 course schema directly — the client maps them
+-- to its in-memory blob shape (shared/data.js _canonicalCoursesToBlob).
+create or replace function list_teacher_courses()
+returns table (
+    id             uuid,
+    name           text,
+    grade_level    text,
+    description    text,
+    color          text,
+    is_archived    boolean,
+    display_order  int,
+    grading_system text,
+    calc_method    text,
+    decay_weight   numeric,
+    timezone       text,
+    late_work_policy text,
+    created_at     timestamptz,
+    updated_at     timestamptz
+)
+language sql security invoker stable set search_path = public as $$
+    select c.id, c.name, c.grade_level, c.description, c.color,
+           c.is_archived, c.display_order, c.grading_system, c.calc_method,
+           c.decay_weight, c.timezone, c.late_work_policy,
+           c.created_at, c.updated_at
+      from course c
+     where c.teacher_id = (select auth.uid())
+     order by c.is_archived asc, c.display_order asc, c.created_at asc;
+$$;
+grant execute on function list_teacher_courses() to authenticated;
+
 -- ── §2.1 Gradebook grid ────────────────────────────────────────────────────
 create or replace function get_gradebook(p_course_id uuid)
 returns jsonb

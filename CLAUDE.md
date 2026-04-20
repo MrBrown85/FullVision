@@ -1,6 +1,6 @@
 # FullVision Backend Design — Charter
 
-**Status:** Design phase complete (Passes A–D + decisions questionnaire). Implementation starts next.
+**Status:** Design phase complete (Passes A–D). Backend implementation complete on `gradebook-prod` (all Phase 1 write-path RPCs + read-path RPCs + pg_cron retention + imports). Client port complete on branch `rebuild-v2` in the main FullVision repo (Phase 3 + 4 landed as 15 local commits). Phase 5 polish — demo-seed JSON, custom SMTP, pgTAP/smoke-test CI — remains. See [HANDOFF.md](docs/backend-design/HANDOFF.md) for the authoritative activity log and remaining work.
 
 This worktree originally designed the backend **from scratch** from the user inputs inventory. That phase is done. Partway through Pass D the charter shifted to **"match the UI the user already has."** UI references in design docs are intentional and welcome.
 
