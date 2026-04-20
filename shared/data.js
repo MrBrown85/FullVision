@@ -221,73 +221,12 @@ function _initCrossTab() {
 async function _handleCrossTabChange(cid, field) {
   if (!cid || !field) return;
 
-  // CANONICAL-RPC TRANSITION: skip the remote refetch (legacy tables don't exist).
-  // Cross-tab still sees the localStorage update via the BroadcastChannel listener.
-  return;
-  // eslint-disable-next-line no-unreachable
-  // Re-fetch from the appropriate normalized table
-  if (_useSupabase) {
-    try {
-      var sb = getSupabase();
-      var normTable = _NORMALIZED_TABLES[field];
-      if (normTable) {
-        var result = await _selectCourseTable(sb, normTable, _teacherId, cid);
-        if (!result.error && result.data) {
-          if (_getConfigTableSet().has(normTable)) {
-            _cache[field][cid] = result.data.length > 0 ? result.data[0].data : _defaultForField(field);
-          } else if (_BULK_LOAD_CONVERTERS[normTable]) {
-            _cache[field][cid] = _BULK_LOAD_CONVERTERS[normTable](result.data);
-          } else if (field === 'scores') {
-            var newScores = _scoreRowsToBlob(result.data);
-            if (_shouldSkipEntryShrink(field, _cache[field][cid], newScores, 'Cross-tab refetch')) return;
-            _cache[field][cid] = newScores;
-          } else if (field === 'observations') {
-            var newObs = _obsRowsToBlob(result.data);
-            if (_shouldSkipEntryShrink(field, _cache[field][cid], newObs, 'Cross-tab refetch')) return;
-            _cache[field][cid] = newObs;
-          } else if (field === 'assessments') {
-            _cache[field][cid] = _assessmentRowsToBlob(result.data);
-          } else if (field === 'students') {
-            var newStudents = _studentRowsToBlob(result.data).map(migrateStudent);
-            var curStudents = _cache[field][cid];
-            // Never-shrink guard
-            if (Array.isArray(curStudents) && curStudents.length > 0 && newStudents.length < curStudents.length * 0.5) {
-              console.warn(
-                'Cross-tab students refetch returned',
-                newStudents.length,
-                'vs',
-                curStudents.length,
-                'in cache — skipping',
-              );
-            } else {
-              _cache[field][cid] = newStudents;
-            }
-          }
-        }
-      }
-    } catch (e) {
-      /* fall through — cache stays as-is */
-    }
-  }
-
-  // Clear proficiency cache if relevant field changed
-  if (_PROF_FIELDS.includes(field) && typeof clearProfCache === 'function') clearProfCache();
-
-  // Clear tag/section caches if learning map changed
-  if (field === 'learningMaps') {
-    _allTagsCache = {};
-    _tagToSectionCache = {};
-  }
-
-  // Re-render current page if it has a render() method
-  var currentPage = typeof Router !== 'undefined' && Router.getCurrentPage ? Router.getCurrentPage() : null;
-  if (currentPage && currentPage.render) {
-    try {
-      currentPage.render();
-    } catch (e) {
-      /* page may not be ready */
-    }
-  }
+  // v2: the boot path seeds _cache from get_gradebook, and save helpers
+  // update it optimistically. Cross-tab reactions now rely on the 'storage'
+  // event fallback in _initCrossTab (which shows a "reload" toast) rather
+  // than a live remote refetch. The legacy refetch against dropped tables
+  // (public.scores / .observations / .assessments / .students / …) used to
+  // live here; it was removed when the v2 schema shipped.
 }
 
 function _broadcastChange(cid, field) {
@@ -392,364 +331,6 @@ async function _doSync(table, key, data) {
   _updateSyncIndicator();
   return;
 
-  _pendingSyncs++;
-  _syncStatus = 'syncing';
-  _updateSyncIndicator();
-
-  // AbortController for request timeout
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), _SYNC_TIMEOUT_MS);
-
-  try {
-    if (table === 'scores') {
-      // Safe sync: UPSERT all current rows + DELETE only removed rows.
-      // Never delete-all — a failed INSERT after delete-all loses all grades.
-      const rows = _scoreBlobToRows(key.cid, data);
-      const currentKeys = new Set(rows.map(r => r.student_id + ':' + r.assessment_id + ':' + r.tag_id));
-
-      // 1. Fetch existing row keys from DB to find what to delete
-      const { data: existing, error: fetchErr } = await sb
-        .from('scores')
-        .select('student_id,assessment_id,tag_id')
-        .eq('teacher_id', _teacherId)
-        .eq('course_id', key.cid)
-        .abortSignal(controller.signal);
-      if (fetchErr) throw fetchErr;
-
-      // 2. UPSERT all current rows (safe — inserts or updates, never deletes)
-      if (rows.length > 0) {
-        // Batch in chunks of 500 to stay within Supabase payload limits
-        for (let i = 0; i < rows.length; i += 500) {
-          const chunk = rows.slice(i, i + 500);
-          const { error: upsertErr } = await sb
-            .from('scores')
-            .upsert(chunk, {
-              onConflict: 'teacher_id,course_id,student_id,assessment_id,tag_id',
-            })
-            .abortSignal(controller.signal);
-          if (upsertErr) throw upsertErr;
-        }
-      }
-
-      // 3. DELETE only rows that were removed — batch by (assessment_id, tag_id) to minimize requests
-      const toDelete = (existing || []).filter(
-        r => !currentKeys.has(r.student_id + ':' + r.assessment_id + ':' + r.tag_id),
-      );
-      if (toDelete.length > 0) {
-        const deleteGroups = new Map();
-        for (const d of toDelete) {
-          const gk = d.assessment_id + ':' + d.tag_id;
-          if (!deleteGroups.has(gk))
-            deleteGroups.set(gk, { assessment_id: d.assessment_id, tag_id: d.tag_id, student_ids: [] });
-          deleteGroups.get(gk).student_ids.push(d.student_id);
-        }
-        for (const g of deleteGroups.values()) {
-          for (let i = 0; i < g.student_ids.length; i += 500) {
-            const chunk = g.student_ids.slice(i, i + 500);
-            const { error: delErr } = await sb
-              .from('scores')
-              .delete()
-              .eq('teacher_id', _teacherId)
-              .eq('course_id', key.cid)
-              .eq('assessment_id', g.assessment_id)
-              .eq('tag_id', g.tag_id)
-              .in('student_id', chunk)
-              .abortSignal(controller.signal);
-            if (delErr) throw delErr;
-          }
-        }
-      }
-    } else if (table === 'observations') {
-      // Safe sync: UPSERT + targeted DELETE (same pattern as scores)
-      const obsRows = _obsBlobToRows(key.cid, data);
-      const currentIds = new Set(obsRows.map(r => r.id));
-
-      const { data: existingObs, error: fetchErr } = await sb
-        .from('observations')
-        .select('id')
-        .eq('teacher_id', _teacherId)
-        .eq('course_id', key.cid)
-        .abortSignal(controller.signal);
-      if (fetchErr) throw fetchErr;
-
-      if (obsRows.length > 0) {
-        for (let i = 0; i < obsRows.length; i += 500) {
-          const chunk = obsRows.slice(i, i + 500);
-          const { error: upsertErr } = await sb
-            .from('observations')
-            .upsert(chunk, {
-              onConflict: 'teacher_id,course_id,id',
-            })
-            .abortSignal(controller.signal);
-          if (upsertErr) throw upsertErr;
-        }
-      }
-
-      const obsToDelete = (existingObs || []).filter(r => !currentIds.has(r.id));
-      for (let i = 0; i < obsToDelete.length; i += 500) {
-        const chunk = obsToDelete.slice(i, i + 500).map(r => r.id);
-        const { error: delErr } = await sb
-          .from('observations')
-          .delete()
-          .eq('teacher_id', _teacherId)
-          .eq('course_id', key.cid)
-          .in('id', chunk)
-          .abortSignal(controller.signal);
-        if (delErr) throw delErr;
-      }
-    } else if (table === 'obs_row') {
-      // Single observation upsert
-      const { error } = await sb
-        .from('observations')
-        .upsert(data, {
-          onConflict: 'teacher_id,course_id,id',
-        })
-        .abortSignal(controller.signal);
-      if (error) throw error;
-    } else if (table === 'obs_delete') {
-      // Single observation delete
-      const { error } = await sb
-        .from('observations')
-        .delete()
-        .eq('teacher_id', _teacherId)
-        .eq('course_id', key.cid)
-        .eq('id', key.obId)
-        .abortSignal(controller.signal);
-      if (error) throw error;
-    } else if (table === 'scores_row') {
-      // Single score upsert — the efficient hot path
-      const { error } = await sb
-        .from('scores')
-        .upsert(data, {
-          onConflict: 'teacher_id,course_id,student_id,assessment_id,tag_id',
-        })
-        .abortSignal(controller.signal);
-      if (error) throw error;
-    } else if (table === 'assessments') {
-      // Safe sync: UPSERT + targeted DELETE
-      const aRows = _assessmentsBlobToRows(key.cid, data);
-      const currentIds = new Set(aRows.map(r => r.id));
-
-      const { data: existingA, error: fetchErr } = await sb
-        .from('assessments')
-        .select('id')
-        .eq('teacher_id', _teacherId)
-        .eq('course_id', key.cid)
-        .abortSignal(controller.signal);
-      if (fetchErr) throw fetchErr;
-
-      if (aRows.length > 0) {
-        for (let i = 0; i < aRows.length; i += 500) {
-          const chunk = aRows.slice(i, i + 500);
-          const { error: upsertErr } = await sb
-            .from('assessments')
-            .upsert(chunk, {
-              onConflict: 'teacher_id,course_id,id',
-            })
-            .abortSignal(controller.signal);
-          if (upsertErr) throw upsertErr;
-        }
-      }
-
-      const aToDelete = (existingA || []).filter(r => !currentIds.has(r.id));
-      for (let i = 0; i < aToDelete.length; i++) {
-        const { error: delErr } = await sb
-          .from('assessments')
-          .delete()
-          .eq('teacher_id', _teacherId)
-          .eq('course_id', key.cid)
-          .eq('id', aToDelete[i].id)
-          .abortSignal(controller.signal);
-        if (delErr) throw delErr;
-      }
-    } else if (table === 'students') {
-      // Safe sync: UPSERT + targeted DELETE
-      const sRows = _studentsBlobToRows(key.cid, data);
-      const currentIds = new Set(sRows.map(r => r.id));
-
-      const { data: existingS, error: fetchErr } = await sb
-        .from('students')
-        .select('id')
-        .eq('teacher_id', _teacherId)
-        .eq('course_id', key.cid)
-        .abortSignal(controller.signal);
-      if (fetchErr) throw fetchErr;
-
-      if (sRows.length > 0) {
-        for (let i = 0; i < sRows.length; i += 500) {
-          const chunk = sRows.slice(i, i + 500);
-          const { error: upsertErr } = await sb
-            .from('students')
-            .upsert(chunk, {
-              onConflict: 'teacher_id,course_id,id',
-            })
-            .abortSignal(controller.signal);
-          if (upsertErr) throw upsertErr;
-        }
-      }
-
-      const sToDelete = (existingS || []).filter(r => !currentIds.has(r.id));
-      for (let i = 0; i < sToDelete.length; i++) {
-        const { error: delErr } = await sb
-          .from('students')
-          .delete()
-          .eq('teacher_id', _teacherId)
-          .eq('course_id', key.cid)
-          .eq('id', sToDelete[i].id)
-          .abortSignal(controller.signal);
-        if (delErr) throw delErr;
-      }
-    } else if (_BULK_SYNC_CONVERTERS[table]) {
-      // Safe sync: UPSERT + targeted DELETE for medium-frequency tables
-      const convFn = _BULK_SYNC_CONVERTERS[table];
-      const bulkRows = convFn(key.cid, data);
-
-      // Determine the primary key column(s) for this table
-      const pkMap = {
-        goals: {
-          pk: 'student_id,tag_id',
-          keyCols: ['student_id', 'tag_id'],
-          keyFn: r => r.student_id + ':' + r.tag_id,
-        },
-        reflections: {
-          pk: 'student_id,tag_id',
-          keyCols: ['student_id', 'tag_id'],
-          keyFn: r => r.student_id + ':' + r.tag_id,
-        },
-        overrides: {
-          pk: 'student_id,tag_id',
-          keyCols: ['student_id', 'tag_id'],
-          keyFn: r => r.student_id + ':' + r.tag_id,
-        },
-        statuses: {
-          pk: 'student_id,assessment_id',
-          keyCols: ['student_id', 'assessment_id'],
-          keyFn: r => r.student_id + ':' + r.assessment_id,
-        },
-        student_notes: { pk: 'student_id', keyCols: ['student_id'], keyFn: r => r.student_id },
-        student_flags: { pk: 'student_id', keyCols: ['student_id'], keyFn: r => r.student_id },
-        term_ratings: {
-          pk: 'student_id,term_id',
-          keyCols: ['student_id', 'term_id'],
-          keyFn: r => r.student_id + ':' + r.term_id,
-        },
-      };
-      const info = pkMap[table];
-      if (info) {
-        const currentKeys = new Set(bulkRows.map(info.keyFn));
-        const selectCols = info.keyCols.join(',');
-        const { data: existingRows, error: fetchErr } = await sb
-          .from(table)
-          .select(selectCols)
-          .eq('teacher_id', _teacherId)
-          .eq('course_id', key.cid)
-          .abortSignal(controller.signal);
-        if (fetchErr) throw fetchErr;
-
-        if (bulkRows.length > 0) {
-          for (let i = 0; i < bulkRows.length; i += 500) {
-            const chunk = bulkRows.slice(i, i + 500);
-            const { error: upsertErr } = await sb
-              .from(table)
-              .upsert(chunk, {
-                onConflict: 'teacher_id,course_id,' + info.pk,
-              })
-              .abortSignal(controller.signal);
-            if (upsertErr) throw upsertErr;
-          }
-        }
-
-        const rowsToDelete = (existingRows || []).filter(r => !currentKeys.has(info.keyFn(r)));
-        for (let i = 0; i < rowsToDelete.length; i++) {
-          const d = rowsToDelete[i];
-          let q = sb.from(table).delete().eq('teacher_id', _teacherId).eq('course_id', key.cid);
-          info.keyCols.forEach(col => {
-            q = q.eq(col, d[col]);
-          });
-          const { error: delErr } = await q.abortSignal(controller.signal);
-          if (delErr) throw delErr;
-        }
-      } else {
-        // Fallback for unknown tables: upsert all (no delete)
-        if (bulkRows.length > 0) {
-          for (let i = 0; i < bulkRows.length; i += 500) {
-            const chunk = bulkRows.slice(i, i + 500);
-            const { error: insErr } = await sb.from(table).upsert(chunk).abortSignal(controller.signal);
-            if (insErr) throw insErr;
-          }
-        }
-      }
-    } else if (_getConfigTableSet().has(table)) {
-      // Config tables: single JSONB blob per course, upsert
-      const { error } = await sb
-        .from(table)
-        .upsert(
-          {
-            teacher_id: _teacherId,
-            course_id: key.cid,
-            data: data,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'teacher_id,course_id' },
-        )
-        .abortSignal(controller.signal);
-      if (error) throw error;
-    } else if (table === 'teacher_config') {
-      const { error } = await sb
-        .from('teacher_config')
-        .upsert(
-          {
-            teacher_id: _teacherId,
-            config_key: key,
-            data: data,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'teacher_id,config_key' },
-        )
-        .abortSignal(controller.signal);
-      if (error) throw error;
-    }
-    clearTimeout(timeoutId);
-    _pendingSyncs--;
-    _consecutiveFailures = 0;
-    if (_pendingSyncs <= 0) {
-      _pendingSyncs = 0;
-      _syncStatus = 'idle';
-      _retryCount = 0;
-      _lastSyncedAt = new Date();
-    }
-    _updateSyncIndicator();
-    // Show recovery toast if we previously had an error
-    if (_hadSyncError && _syncStatus === 'idle') {
-      _hadSyncError = false;
-      if (typeof showSyncToast === 'function') showSyncToast('All changes synced', 'success');
-    }
-  } catch (err) {
-    clearTimeout(timeoutId);
-    _pendingSyncs--;
-    if (_pendingSyncs <= 0) _pendingSyncs = 0;
-    _syncStatus = 'error';
-    _consecutiveFailures++;
-    _updateSyncIndicator();
-    // Show error toast and queue retry
-    if (!_hadSyncError) {
-      _hadSyncError = true;
-      if (typeof showSyncToast === 'function') showSyncToast('Sync failed \u2014 changes saved locally', 'error');
-    }
-    if (_consecutiveFailures >= 3) {
-      if (typeof showSyncToast === 'function')
-        showSyncToast('Server overloaded \u2014 retries paused, data safe locally', 'error');
-    }
-    _addToRetryQueue(table, key, data);
-    // Only schedule retries if not in overload backoff
-    if (!_retryTimer && _consecutiveFailures < 3) {
-      var delay = Math.min(30000 * Math.pow(2, _retryCount), 300000);
-      // Add jitter: ±30%
-      delay = delay * (0.7 + Math.random() * 0.6);
-      _retryTimer = setTimeout(_retryFailedSyncs, delay);
-    }
-    throw err;
-  }
 }
 
 /* Deduplicated, bounded retry queue — keeps only latest data per key */
@@ -971,198 +552,6 @@ function _initRealtimeSync() {
   // canonical schema gets its own publication strategy. Cross-tab sync via
   // BroadcastChannel still works (see _initCrossTab).
   return;
-  // eslint-disable-next-line no-unreachable
-  if (_realtimeChannel || !_useSupabase || !_teacherId) return;
-  var sb = getSupabase();
-  if (!sb) return;
-
-  /* Debounced re-fetch for high-frequency tables.
-     Instead of processing individual DELETE/INSERT events (which is fragile
-     with the delete-all + insert-all sync pattern), we re-fetch the full
-     table from Supabase on any change — same safe approach used by
-     medium-frequency tables. Debounced so a flood of WAL events from a
-     bulk sync only triggers one re-fetch. */
-  var _realtimeRefetchTimers = {};
-  function _debouncedRefetch(field, supabaseTable, cid, converter) {
-    // Skip echoes from our own delete-all + insert-all sync
-    if (_isEchoGuarded(field, cid)) return;
-    var key = field + ':' + cid;
-    if (_realtimeRefetchTimers[key]) clearTimeout(_realtimeRefetchTimers[key]);
-    _realtimeRefetchTimers[key] = setTimeout(function () {
-      delete _realtimeRefetchTimers[key];
-      // Re-check guard (may have been set while debounce waited)
-      if (_isEchoGuarded(field, cid)) return;
-      var sb2 = getSupabase();
-      if (!sb2) return;
-      _selectCourseTable(sb2, supabaseTable, _teacherId, cid).then(function (res) {
-        if (res.error || !res.data) return;
-        var newData = converter(res.data);
-        if (!_hasDataChanged(newData, _cache[field][cid])) return;
-        // Never-shrink guard: if the remote result is smaller than the local
-        // cache, it may have caught the DB mid-sync. Skip to avoid data loss.
-        // Applies to both array-shaped (students, assessments) and object-shaped (scores) data.
-        var existing = _cache[field][cid];
-        if (Array.isArray(existing) && Array.isArray(newData)) {
-          if (existing.length > 0 && newData.length < existing.length * 0.8) {
-            console.warn(
-              '[GUARD] Realtime refetch for',
-              field,
-              'returned',
-              newData.length,
-              'items vs',
-              existing.length,
-              'in cache — skipping (likely mid-sync snapshot)',
-            );
-            return;
-          }
-        }
-        if (_shouldSkipEntryShrink(field, existing, newData, 'Realtime refetch')) return;
-        if (field === 'students' || field === 'scores') {
-          console.warn(
-            '[DIAG] Realtime refetch replacing cache.' + field + '[' + cid + ']',
-            'old=' + _countFieldItems(field, existing),
-            'new=' + _countFieldItems(field, newData),
-          );
-        }
-        _cache[field][cid] = newData;
-        _invalidateAndRerender();
-      });
-    }, 500);
-  }
-
-  try {
-    _realtimeChannel = sb
-      .channel('course-data-sync')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'observations',
-          filter: 'teacher_id=eq.' + _teacherId,
-        },
-        function (payload) {
-          var row = payload.new || payload.old;
-          if (!row || !row.course_id) return;
-          _debouncedRefetch('observations', 'observations', row.course_id, _obsRowsToBlob);
-        },
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'scores',
-          filter: 'teacher_id=eq.' + _teacherId,
-        },
-        function (payload) {
-          var row = payload.new || payload.old;
-          if (!row || !row.course_id) return;
-          _debouncedRefetch('scores', 'scores', row.course_id, _scoreRowsToBlob);
-        },
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'assessments',
-          filter: 'teacher_id=eq.' + _teacherId,
-        },
-        function (payload) {
-          var row = payload.new || payload.old;
-          if (!row || !row.course_id) return;
-          _debouncedRefetch('assessments', 'assessments', row.course_id, _assessmentRowsToBlob);
-        },
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'students',
-          filter: 'teacher_id=eq.' + _teacherId,
-        },
-        function (payload) {
-          var row = payload.new || payload.old;
-          if (!row || !row.course_id) return;
-          _debouncedRefetch('students', 'students', row.course_id, function (rows) {
-            return _studentRowsToBlob(rows).map(migrateStudent);
-          });
-        },
-      );
-
-    // Medium-frequency tables: on any change, re-fetch full table for course
-    var _medTables = Object.values(_MEDIUM_FREQ_TABLES);
-    _medTables.forEach(function (tblName) {
-      _realtimeChannel = _realtimeChannel.on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: tblName,
-          filter: 'teacher_id=eq.' + _teacherId,
-        },
-        function (payload) {
-          var row = payload.new || payload.old;
-          if (!row || !row.course_id) return;
-          var cid = row.course_id;
-          // Find the cache field for this table
-          var cacheField = null;
-          for (var f in _MEDIUM_FREQ_TABLES) {
-            if (_MEDIUM_FREQ_TABLES[f] === tblName) {
-              cacheField = f;
-              break;
-            }
-          }
-          if (!cacheField) return;
-          // Re-fetch entire table for this course (medium-freq = small data, simple approach)
-          var sb2 = getSupabase();
-          if (!sb2) return;
-          _selectCourseTable(sb2, tblName, _teacherId, cid).then(function (res) {
-            if (res.error || !res.data) return;
-            var conv = _BULK_LOAD_CONVERTERS[tblName];
-            if (!conv) return;
-            var newBlob = conv(res.data);
-            if (!_hasDataChanged(newBlob, _cache[cacheField][cid])) return;
-            _cache[cacheField][cid] = newBlob;
-            _invalidateAndRerender();
-          });
-        },
-      );
-    });
-
-    // Config tables: on any change, update cache from JSONB data column
-    Object.keys(_CONFIG_TABLES).forEach(function (cfgField) {
-      var cfgTblName = _CONFIG_TABLES[cfgField];
-      _realtimeChannel = _realtimeChannel.on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: cfgTblName,
-          filter: 'teacher_id=eq.' + _teacherId,
-        },
-        function (payload) {
-          var row = payload.new || payload.old;
-          if (!row || !row.course_id) return;
-          var cid = row.course_id;
-          if (payload.eventType === 'DELETE') {
-            _cache[cfgField][cid] = _defaultForField(cfgField);
-          } else {
-            var newData = payload.new.data;
-            if (!_hasDataChanged(newData, _cache[cfgField][cid])) return;
-            _cache[cfgField][cid] = newData;
-          }
-          _invalidateAndRerender();
-        },
-      );
-    });
-
-    _realtimeChannel.subscribe();
-  } catch (e) {
-    console.warn('Realtime sync not available:', e);
-  }
 }
 
 /** Shared cache invalidation + re-render for both Realtime and visibility refresh */
@@ -1213,242 +602,7 @@ async function _refreshFromSupabase() {
   // Until the per-RPC reads land we no-op here; cache stays as last loaded from
   // localStorage. Cross-device sync resumes once each canonical read RPC is wired up.
   return;
-  // eslint-disable-next-line no-unreachable
-  var cid = null;
-  try {
-    cid = getActiveCourse();
-  } catch (e) {
-    return;
-  }
-  if (!cid) return;
 
-  var sb = getSupabase();
-  if (!sb) return;
-
-  // Re-establish Supabase connection if it was lost (e.g. transient error during boot)
-  if (!_teacherId || !_useSupabase) {
-    try {
-      var sess = await sb.auth.getSession();
-      if (sess && sess.data && sess.data.session && sess.data.session.user) {
-        _teacherId = sess.data.session.user.id;
-        _useSupabase = true;
-        _initRealtimeSync(); // start live updates if skipped during boot
-      } else {
-        return; // No valid session — can't refresh
-      }
-    } catch (e) {
-      return;
-    }
-  }
-
-  try {
-    var changed = false;
-    var profChanged = false;
-    var tagsChanged = false;
-
-    // Refresh all normalized tables in parallel
-    var since = _lastSyncedAt ? new Date(_lastSyncedAt.getTime() - 30000).toISOString() : null;
-    function _rq(tbl, tsCol) {
-      return _selectCourseTable(sb, tbl, _teacherId, cid, since ? { gtColumn: tsCol, gtValue: since } : null);
-    }
-    var [
-      scoreResult,
-      obsResult,
-      assessResult,
-      studResult,
-      goalsRefRes,
-      reflRefRes,
-      overRefRes,
-      statusRefRes,
-      notesRefRes,
-      flagsRefRes,
-      trRefRes,
-      cfgLmRefRes,
-      cfgCourseRefRes,
-      cfgModRefRes,
-      cfgRubRefRes,
-      cfgTagRefRes,
-      cfgRepRefRes,
-    ] = await Promise.all([
-      _rq('scores', 'updated_at'),
-      _rq('observations', 'modified_at'),
-      _rq('assessments', 'updated_at'),
-      _rq('students', 'updated_at'),
-      _rq('goals', 'updated_at'),
-      _rq('reflections', 'updated_at'),
-      _rq('overrides', 'updated_at'),
-      _rq('statuses', 'updated_at'),
-      _rq('student_notes', 'updated_at'),
-      _rq('student_flags', 'updated_at'),
-      _rq('term_ratings', 'updated_at'),
-      _rq('config_learning_maps', 'updated_at'),
-      _rq('config_course', 'updated_at'),
-      _rq('config_modules', 'updated_at'),
-      _rq('config_rubrics', 'updated_at'),
-      _rq('config_custom_tags', 'updated_at'),
-      _rq('config_report', 'updated_at'),
-    ]);
-
-    if (!scoreResult.error && scoreResult.data && scoreResult.data.length > 0) {
-      var blob = _cache.scores[cid] || {};
-      scoreResult.data.forEach(function (r) {
-        if (!blob[r.student_id]) blob[r.student_id] = [];
-        var arr = blob[r.student_id];
-        var idx = arr.findIndex(function (e) {
-          return e.assessmentId === r.assessment_id && e.tagId === r.tag_id;
-        });
-        var entry = {
-          id: r.student_id + ':' + r.assessment_id + ':' + r.tag_id,
-          assessmentId: r.assessment_id,
-          tagId: r.tag_id,
-          score: r.score,
-          date: r.date,
-          type: r.type || 'summative',
-          note: r.note || '',
-          created: r.created_at || new Date().toISOString(),
-        };
-        if (idx !== -1) {
-          arr[idx] = entry;
-        } else {
-          arr.push(entry);
-        }
-      });
-      _cache.scores[cid] = blob;
-      changed = true;
-      profChanged = true;
-    }
-
-    if (!obsResult.error && obsResult.data && obsResult.data.length > 0) {
-      var obsBlob = _cache.observations[cid] || {};
-      obsResult.data.forEach(function (r) {
-        if (!obsBlob[r.student_id]) obsBlob[r.student_id] = [];
-        var arr = obsBlob[r.student_id];
-        var idx = arr.findIndex(function (o) {
-          return o.id === r.id;
-        });
-        var entry = { id: r.id, text: r.text || '', dims: r.dims || [], created: r.created_at, date: r.date };
-        if (r.sentiment) entry.sentiment = r.sentiment;
-        if (r.context) entry.context = r.context;
-        if (r.assignment_context) entry.assignmentContext = r.assignment_context;
-        if (r.modified_at) entry.modified = r.modified_at;
-        if (idx !== -1) {
-          arr[idx] = entry;
-        } else {
-          arr.push(entry);
-        }
-      });
-      _cache.observations[cid] = obsBlob;
-      changed = true;
-    }
-
-    if (!assessResult.error && assessResult.data && assessResult.data.length > 0) {
-      var currentAssess = _cache.assessments[cid] || [];
-      assessResult.data.forEach(function (r) {
-        var idx = currentAssess.findIndex(function (a) {
-          return a.id === r.id;
-        });
-        var entry = _assessmentRowsToBlob([r])[0];
-        if (idx !== -1) {
-          currentAssess[idx] = entry;
-        } else {
-          currentAssess.push(entry);
-        }
-      });
-      _cache.assessments[cid] = currentAssess;
-      changed = true;
-      profChanged = true;
-    }
-
-    if (!studResult.error && studResult.data && studResult.data.length > 0) {
-      var currentStudents = _cache.students[cid] || [];
-      studResult.data.forEach(function (r) {
-        var idx = currentStudents.findIndex(function (s) {
-          return s.id === r.id;
-        });
-        var entry = _studentRowsToBlob([r])[0];
-        if (idx !== -1) {
-          currentStudents[idx] = entry;
-        } else {
-          currentStudents.push(migrateStudent(entry));
-        }
-      });
-      _cache.students[cid] = currentStudents;
-      changed = true;
-    }
-
-    // Refresh medium-frequency normalized tables (full replace on visibility change)
-    var _medRefResults = {
-      goals: goalsRefRes,
-      reflections: reflRefRes,
-      overrides: overRefRes,
-      statuses: statusRefRes,
-      notes: notesRefRes,
-      flags: flagsRefRes,
-      termRatings: trRefRes,
-    };
-    for (var _mrf in _MEDIUM_FREQ_TABLES) {
-      var _mrTbl = _MEDIUM_FREQ_TABLES[_mrf];
-      var _mrRes = _medRefResults[_mrf];
-      if (!_mrRes.error && _mrRes.data && _mrRes.data.length > 0) {
-        var newBlob = _BULK_LOAD_CONVERTERS[_mrTbl](_mrRes.data);
-        if (_hasDataChanged(newBlob, _cache[_mrf][cid])) {
-          _cache[_mrf][cid] = newBlob;
-          changed = true;
-          if (_PROF_FIELDS.includes(_mrf)) profChanged = true;
-        }
-      }
-    }
-
-    // Refresh config tables
-    var _cfgRefResults = {
-      learningMaps: cfgLmRefRes,
-      courseConfigs: cfgCourseRefRes,
-      modules: cfgModRefRes,
-      rubrics: cfgRubRefRes,
-      customTags: cfgTagRefRes,
-      reportConfig: cfgRepRefRes,
-    };
-    for (var _crf in _CONFIG_TABLES) {
-      var _crRes = _cfgRefResults[_crf];
-      if (!_crRes.error && _crRes.data && _crRes.data.length > 0) {
-        var newCfg = _crRes.data[0].data;
-        if (_hasDataChanged(newCfg, _cache[_crf][cid])) {
-          _cache[_crf][cid] = newCfg;
-          changed = true;
-          if (_PROF_FIELDS.includes(_crf)) profChanged = true;
-          if (_crf === 'learningMaps' || _crf === 'customTags') tagsChanged = true;
-        }
-      }
-    }
-
-    if (changed) {
-      if (profChanged && typeof clearProfCache === 'function') clearProfCache();
-      if (tagsChanged) {
-        _allTagsCache = {};
-        _tagToSectionCache = {};
-      }
-      // Re-render current page (desktop)
-      var currentPage = typeof Router !== 'undefined' && Router.getCurrentPage ? Router.getCurrentPage() : null;
-      if (currentPage && currentPage.render) {
-        try {
-          currentPage.render();
-        } catch (e) {
-          /* page may not be ready */
-        }
-      }
-      // Re-render current tab (mobile)
-      if (window.__MOBILE && typeof _mobileRerender === 'function') {
-        try {
-          _mobileRerender();
-        } catch (e) {
-          /* mobile may not be ready */
-        }
-      }
-    }
-    _lastSyncedAt = new Date();
-  } catch (e) {
-    console.warn('Visibility refresh failed:', e);
-  }
 }
 
 /** Load all data for a specific course into the cache. */
@@ -2064,134 +1218,6 @@ async function _doInitData(cid) {
       return;
     }
 
-    // (Legacy per-course RPC fan-out removed — get_gradebook above is the v2
-    // boot read. Phase 4.x will add purpose-built v2 RPCs for scoring,
-    // observations, learning map, etc. as each UI path is ported.)
-    return;
-
-    // eslint-disable-next-line no-unreachable
-    try {
-      var rosterRes = await _rpcPagedArray(sb, 'list_course_roster', { p_course_offering_id: cid });
-      if (rosterRes.error) throw rosterRes.error;
-
-      var students = _canonicalRosterRowsToStudents(rosterRes.data).map(migrateStudent);
-      var enrollmentByStudentId = {};
-      students.forEach(function (student) {
-        if (student.personId) enrollmentByStudentId[student.personId] = student.id;
-      });
-
-      var studentReads = students
-        .filter(function (student) {
-          return _isUuid(student.personId);
-        })
-        .map(async function (student) {
-          var payload = { p_course_offering_id: cid, p_student_id: student.personId };
-          var [goalsRes, reflectionsRes, overridesRes] = await Promise.all([
-            sb.rpc('get_student_goals', payload),
-            sb.rpc('list_student_reflections', payload),
-            sb.rpc('list_section_overrides', payload),
-          ]);
-          return {
-            sid: student.id,
-            goals: goalsRes,
-            reflections: reflectionsRes,
-            overrides: overridesRes,
-          };
-        });
-
-      var [
-        scoreRes,
-        obsRes,
-        assessRes,
-        policyRes,
-        reportRes,
-        outcomesRes,
-        statusRes,
-        termRatingsRes,
-        flagsRes,
-        studentDetails,
-      ] = await Promise.all([
-        _rpcPagedArray(sb, 'list_course_scores', { p_course_offering_id: cid }),
-        _rpcPagedArray(sb, 'list_course_observations', { p_course_offering_id: cid }),
-        _rpcPagedArray(sb, 'list_course_assessments', { p_course_offering_id: cid }),
-        sb.rpc('get_course_policy', { p_course_offering_id: cid }),
-        sb.rpc('get_report_config', { p_course_offering_id: cid }),
-        _rpcPagedArray(sb, 'list_course_outcomes', { p_course_offering_id: cid }),
-        sb.rpc('list_assignment_statuses', { p_course_offering_id: cid }),
-        sb.rpc('list_term_ratings_for_course', { p_course_offering_id: cid }),
-        sb.rpc('projection.list_student_flags', { p_course_offering_id: cid }),
-        Promise.all(studentReads),
-      ]);
-
-      _persistLoadedField(cid, 'students', students);
-      _persistLoadedField(cid, 'assessments', assessRes.error ? [] : _canonicalAssessmentRowsToBlob(assessRes.data));
-      _persistLoadedField(
-        cid,
-        'scores',
-        scoreRes.error ? {} : _canonicalScoreRowsToBlob(scoreRes.data, enrollmentByStudentId),
-      );
-      _persistLoadedField(
-        cid,
-        'observations',
-        obsRes.error ? {} : _canonicalObservationRowsToBlob(obsRes.data, enrollmentByStudentId),
-      );
-      _persistLoadedField(cid, 'courseConfigs', policyRes.error ? {} : _canonicalCoursePolicyToConfig(policyRes.data));
-      _persistLoadedField(cid, 'reportConfig', reportRes.error ? null : _canonicalReportConfig(reportRes.data));
-      _persistLoadedField(
-        cid,
-        'learningMaps',
-        outcomesRes.error
-          ? LEARNING_MAP[cid] || { subjects: [], sections: [] }
-          : _canonicalOutcomesToLearningMap(cid, outcomesRes.data),
-      );
-      _persistLoadedField(
-        cid,
-        'statuses',
-        statusRes.error ? {} : _canonicalStatusesToBlob(_rpcRows(statusRes.data), enrollmentByStudentId),
-      );
-      _persistLoadedField(
-        cid,
-        'termRatings',
-        termRatingsRes.error ? {} : _canonicalTermRatingsToBlob(_rpcRows(termRatingsRes.data), enrollmentByStudentId),
-      );
-      _persistLoadedField(
-        cid,
-        'flags',
-        flagsRes.error ? {} : _canonicalFlagsToBlob(_rpcRows(flagsRes.data), enrollmentByStudentId),
-      );
-
-      var goalsBlob = {};
-      var reflectionsBlob = {};
-      var overridesBlob = {};
-      studentDetails.forEach(function (result) {
-        goalsBlob[result.sid] =
-          result.goals && !result.goals.error ? _canonicalStudentGoalsToMap(result.goals.data) : {};
-        reflectionsBlob[result.sid] =
-          result.reflections && !result.reflections.error
-            ? _canonicalStudentReflectionsToMap(result.reflections.data)
-            : {};
-        overridesBlob[result.sid] =
-          result.overrides && !result.overrides.error ? _canonicalStudentOverridesToMap(result.overrides.data) : {};
-      });
-      _persistLoadedField(cid, 'goals', goalsBlob);
-      _persistLoadedField(cid, 'reflections', reflectionsBlob);
-      _persistLoadedField(cid, 'overrides', overridesBlob);
-
-      // Client-only fields stay on their local cache for now.
-      _cache.notes[cid] = _safeParseLS('gb-notes-' + cid, {});
-      _cache.modules[cid] = _safeParseLS('gb-modules-' + cid, _safeParseLS('gb-units-' + cid, [])) || [];
-      _cache.rubrics[cid] = _safeParseLS('gb-rubrics-' + cid, []);
-      _cache.customTags[cid] = _safeParseLS('gb-custom-tags-' + cid, []);
-
-      _healFromLocalBackup(cid, 'students', 'students');
-      _healFromLocalBackup(cid, 'assessments', 'assessments');
-      _healFromLocalBackup(cid, 'scores', 'scores');
-      _healFromLocalBackup(cid, 'observations', 'quick-obs');
-      return;
-    } catch (error) {
-      console.error('Failed to load canonical data for', cid, error);
-      // Fall through to localStorage
-    }
   }
 
   // localStorage path
@@ -3306,46 +2332,32 @@ function createCourse(data) {
   if (_useSupabase) {
     const sb = getSupabase();
     if (sb) {
+      // v2 create_course(p_name, p_grade_level, p_description, p_color,
+      //                   p_grading_system, p_calc_method, p_decay_weight,
+      //                   p_timezone, p_late_work_policy, p_subjects text[])
+      // → uuid.  Policy fields (grading_system / calc_method / decay_weight)
+      // live on the course row directly — save_course_policy was merged
+      // into the course table per ERD "Merged CoursePolicy into Course".
       sb.rpc('create_course', {
-        p_payload: {
-          name: course.name,
-          description: course.description,
-          gradeLevel: course.gradeLevel,
-        },
+        p_name:           course.name,
+        p_grade_level:    course.gradeLevel || null,
+        p_description:    course.description || null,
+        p_grading_system: course.gradingSystem || 'proficiency',
+        p_calc_method:    course.calcMethod || 'average',
+        p_decay_weight:   course.decayWeight != null ? Number(course.decayWeight) : null,
       }).then(function (res) {
         if (res.error) {
           console.warn('create_course RPC failed:', res.error);
           return;
         }
-        const row = res.data || {};
-        const canonicalId = row.course_offering_id;
+        const canonicalId = res.data;
         if (!canonicalId || canonicalId === localId) return;
-        // Re-key under the canonical UUID and migrate any per-course localStorage.
-        const migrated = Object.assign({}, course, {
-          id: canonicalId,
-          name: row.title || course.name,
-          gradeLevel: row.grade_band || course.gradeLevel,
-          description: row.description || course.description,
-          subjectCode: row.subject_code || '',
-          schoolYear: row.school_year || '',
-          termCode: row.term_code || '',
-          archived: row.status === 'archived',
-        });
+        // Re-key under the canonical UUID so subsequent saves hit update_course.
+        const migrated = Object.assign({}, course, { id: canonicalId });
         delete COURSES[localId];
         COURSES[canonicalId] = migrated;
         _cache.courses = COURSES;
         _safeLSSet('gb-courses', JSON.stringify(COURSES));
-        // Persist policy with the user's chosen defaults.
-        sb.rpc('save_course_policy', {
-          p_course_offering_id: canonicalId,
-          p_payload: {
-            gradingSystem: course.gradingSystem,
-            calcMethod: course.calcMethod,
-            decayWeight: course.decayWeight,
-          },
-        }).then(function (pr) {
-          if (pr.error) console.warn('save_course_policy RPC failed:', pr.error);
-        });
       });
     }
   }
@@ -3360,30 +2372,28 @@ function updateCourse(id, updates) {
   if (_useSupabase) {
     const sb = getSupabase();
     if (sb) {
-      // Only push fields the canonical schema knows about; ignore unknown locals.
-      const payload = {};
-      if (updates.name !== undefined) payload.name = updates.name;
-      if (updates.description !== undefined) payload.description = updates.description;
-      if (updates.gradeLevel !== undefined) payload.gradeLevel = updates.gradeLevel;
-      if (updates.subjectCode !== undefined) payload.subjectCode = updates.subjectCode;
-      if (updates.schoolYear !== undefined) payload.schoolYear = updates.schoolYear;
-      if (updates.termCode !== undefined) payload.termCode = updates.termCode;
-      if (updates.archived !== undefined) payload.archived = !!updates.archived;
-      if (Object.keys(payload).length > 0) {
-        sb.rpc('update_course', { p_course_offering_id: id, p_payload: payload }).then(function (res) {
+      // v2 update_course(p_id, p_patch jsonb). Policy fields (grading_system,
+      // calc_method, decay_weight, timezone, late_work_policy) are columns on
+      // the course row so one jsonb patch covers the full surface.
+      const patch = {};
+      if (updates.name        !== undefined) patch.name          = updates.name;
+      if (updates.description !== undefined) patch.description   = updates.description;
+      if (updates.gradeLevel  !== undefined) patch.grade_level   = updates.gradeLevel;
+      if (updates.color       !== undefined) patch.color         = updates.color;
+      if (updates.gradingSystem !== undefined) patch.grading_system = updates.gradingSystem;
+      if (updates.calcMethod    !== undefined) patch.calc_method    = updates.calcMethod;
+      if (updates.decayWeight   !== undefined) patch.decay_weight   = updates.decayWeight;
+      if (updates.timezone      !== undefined) patch.timezone       = updates.timezone;
+      if (updates.lateWorkPolicy !== undefined) patch.late_work_policy = updates.lateWorkPolicy;
+      if (Object.keys(patch).length > 0 && _isUuid(id)) {
+        sb.rpc('update_course', { p_course_id: id, p_patch: patch }).then(function (res) {
           if (res.error) console.warn('update_course RPC failed:', res.error);
         });
       }
-      // Policy fields write through save_course_policy.
-      const policyKeys = ['gradingSystem', 'calcMethod', 'decayWeight'];
-      const policyPatch = {};
-      policyKeys.forEach(function (k) {
-        if (updates[k] !== undefined) policyPatch[k] = updates[k];
-      });
-      if (Object.keys(policyPatch).length > 0) {
-        const merged = Object.assign({}, getCourseConfig(id), policyPatch);
-        sb.rpc('save_course_policy', { p_course_offering_id: id, p_payload: merged }).then(function (res) {
-          if (res.error) console.warn('save_course_policy RPC failed:', res.error);
+      // archive toggle goes through archive_course (dedicated RPC).
+      if (updates.archived !== undefined && _isUuid(id)) {
+        sb.rpc('archive_course', { p_course_id: id, p_archived: !!updates.archived }).then(function (res) {
+          if (res.error) console.warn('archive_course RPC failed:', res.error);
         });
       }
     }
@@ -3687,16 +2697,18 @@ function setAssignmentStatus(cid, sid, aid, status) {
   if (status) st[key] = status;
   else delete st[key];
   saveAssignmentStatuses(cid, st);
-  if (_useSupabase && localStorage.getItem('gb-demo-mode') !== '1') {
+  if (_useSupabase && localStorage.getItem('gb-demo-mode') !== '1' && _isUuid(sid) && _isUuid(aid)) {
+    // v2 set_score_status(p_enrollment_id, p_assessment_id, p_status).
+    // The legacy `save_assignment_status` RPC is gone; status now writes
+    // directly onto the Score row. `sid` here is the enrollment_id.
     var sb = getSupabase();
     if (sb) {
-      sb.rpc('save_assignment_status', {
-        p_course_offering_id: cid,
-        p_student_id: sid,
+      sb.rpc('set_score_status', {
+        p_enrollment_id: sid,
         p_assessment_id: aid,
         p_status: status || null,
       }).then(function (res) {
-        if (res.error) console.warn('save_assignment_status RPC failed:', res.error);
+        if (res.error) console.warn('set_score_status RPC failed:', res.error);
       });
     }
   }
@@ -3913,12 +2925,22 @@ function getCourseConfig(cid) {
 }
 function saveCourseConfig(cid, obj) {
   _saveCourseField('courseConfigs', cid, obj);
-  if (_useSupabase && cid) {
+  if (_useSupabase && _isUuid(cid)) {
+    // v2: policy fields live on the course row. save_course_policy is gone;
+    // remap the legacy courseConfig blob onto a update_course jsonb patch.
     const sb = getSupabase();
-    if (sb) {
-      sb.rpc('save_course_policy', { p_course_offering_id: cid, p_payload: obj || {} }).then(function (res) {
-        if (res.error) console.warn('save_course_policy RPC failed:', res.error);
-      });
+    if (sb && obj) {
+      const patch = {};
+      if (obj.gradingSystem  != null) patch.grading_system  = obj.gradingSystem;
+      if (obj.calcMethod     != null) patch.calc_method     = obj.calcMethod;
+      if (obj.decayWeight    != null) patch.decay_weight    = obj.decayWeight;
+      if (obj.timezone       != null) patch.timezone        = obj.timezone;
+      if (obj.lateWorkPolicy != null) patch.late_work_policy = obj.lateWorkPolicy;
+      if (Object.keys(patch).length > 0) {
+        sb.rpc('update_course', { p_course_id: cid, p_patch: patch }).then(function (res) {
+          if (res.error) console.warn('update_course (saveCourseConfig) failed:', res.error);
+        });
+      }
     }
   }
 }
@@ -5260,23 +4282,28 @@ function upsertTermRating(cid, sid, termId, data) {
     };
   }
   saveTermRatings(cid, all);
-  if (_useSupabase && localStorage.getItem('gb-demo-mode') !== '1' && _isUuid(cid)) {
-    var student = getStudents(cid).find(function (s) {
-      return s.id === sid;
-    });
-    var canonicalStudentId = student && _isUuid(student.personId) ? student.personId : null;
-    if (canonicalStudentId) {
-      var sb = getSupabase();
-      if (sb) {
-        sb.rpc('upsert_term_rating', {
-          p_course_offering_id: cid,
-          p_student_id: canonicalStudentId,
-          p_term_id: termId,
-          p_patch: all[sid][termId],
-        }).then(function (res) {
-          if (res.error) console.warn('upsert_term_rating RPC failed:', res.error);
-        });
-      }
+  // v2 save_term_rating(p_enrollment_id, p_term, p_payload). In v2 mode
+  // `sid` IS the enrollment_id (see _canonicalRosterRowsToStudents); the
+  // window.v2.saveTermRating helper handles the camelCase → snake_case
+  // payload translation.
+  if (_useSupabase && localStorage.getItem('gb-demo-mode') !== '1' &&
+      _isUuid(sid) && window.v2 && window.v2.saveTermRating) {
+    var t = Number(termId);
+    if (t >= 1 && t <= 6) {
+      var blob = all[sid][termId] || {};
+      window.v2.saveTermRating(sid, t, {
+        narrativeHtml:        blob.narrative,
+        workHabitsRating:     blob.workHabits,
+        participationRating:  blob.participation,
+        socialTraits:         blob.socialTraits,
+        // dims / strengths / growthAreas / mention* on the blob are already
+        // structured per the v2 helper's contract; passing as-is when present.
+        dimensions:           blob.dimensions,
+        strengthTagIds:       blob.strengths,
+        growthTagIds:         blob.growthAreas,
+        mentionAssessmentIds: blob.mentionAssessments,
+        mentionObservationIds: blob.mentionObs,
+      });
     }
   }
 }
@@ -5293,10 +4320,23 @@ function getReportConfig(cid) {
 }
 function saveReportConfig(cid, config) {
   _saveCourseField('reportConfig', cid, config);
-  if (_useSupabase && cid) {
+  if (_useSupabase && _isUuid(cid)) {
+    // v2 save_report_config(p_course_id, p_blocks_config jsonb, p_preset).
+    // Legacy signature was (p_course_offering_id, p_config) — no preset split.
+    // The v2 RPC stores blocks_config verbatim + records the preset; caller
+    // can pass preset explicitly via config._preset, else it defaults to
+    // 'custom' server-side (which matches the "teacher mutated blocks
+    // manually" semantics of the legacy single-blob save).
     const sb = getSupabase();
     if (sb) {
-      sb.rpc('save_report_config', { p_course_offering_id: cid, p_config: config || {} }).then(function (res) {
+      var preset = (config && config._preset) || null;
+      var blocks = Object.assign({}, config || {});
+      delete blocks._preset;
+      sb.rpc('save_report_config', {
+        p_course_id:     cid,
+        p_blocks_config: blocks,
+        p_preset:        preset,
+      }).then(function (res) {
         if (res.error) console.warn('save_report_config RPC failed:', res.error);
       });
     }
