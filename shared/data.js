@@ -4199,50 +4199,121 @@ function _assessmentPayload(a) {
   };
 }
 
+/* v2 create_assessment — explicit positional params.  tagIds passed as uuid[].
+   Returns the new assessment id; client patches its cached row to swap in the
+   canonical uuid so subsequent saves hit update_assessment, not re-create. */
 function _canonicalCreateAssessment(sb, cid, a) {
-  return sb
-    .rpc('create_assessment', {
-      p_course_offering_id: cid,
-      p_payload: _assessmentPayload(a),
-    })
-    .then(function (res) {
-      if (res.error) {
-        console.warn('create_assessment failed:', res.error, a);
-        return;
-      }
-      var row = res.data || {};
-      var cached = (_cache.assessments[cid] || []).find(function (c) {
-        return c.id === a.id;
-      });
-      if (cached && row.assessment_id) cached.id = row.assessment_id;
-      if (_cache.assessments[cid]) {
-        _safeLSSet('gb-assessments-' + cid, JSON.stringify(_cache.assessments[cid]));
-      }
+  var tagIds = (a.tagIds || []).filter(_isUuid);
+  var params = {
+    p_course_id:     cid,
+    p_title:         a.title || '',
+    p_category_id:   _isUuid(a.categoryId) ? a.categoryId : null,
+    p_description:   a.description || null,
+    p_date_assigned: a.dateAssigned || a.date || null,
+    p_due_date:      a.dueDate || null,
+    p_score_mode:    a.scoreMode || 'proficiency',
+    p_max_points:    a.maxPoints != null ? Number(a.maxPoints) : null,
+    p_weight:        a.weight != null ? Number(a.weight) : 1.0,
+    p_evidence_type: a.evidenceType || null,
+    p_rubric_id:     _isUuid(a.rubricId) ? a.rubricId : null,
+    p_module_id:     _isUuid(a.moduleId) ? a.moduleId : null,
+    p_tag_ids:       tagIds,
+  };
+  return sb.rpc('create_assessment', params).then(function (res) {
+    if (res.error) {
+      console.warn('create_assessment failed:', res.error, a);
+      return;
+    }
+    var newId = res.data;
+    var cached = (_cache.assessments[cid] || []).find(function (c) {
+      return c.id === a.id;
     });
+    if (cached && newId) cached.id = newId;
+    if (_cache.assessments[cid]) {
+      _safeLSSet('gb-assessments-' + cid, JSON.stringify(_cache.assessments[cid]));
+    }
+  });
 }
 
+/* v2 update_assessment(p_id, p_patch jsonb, p_tag_ids uuid[]).
+   Full field replace via jsonb patch; when tag_ids is passed, fully replaces
+   the assessment_tag join set. */
 function _canonicalUpdateAssessment(sb, cid, assessmentId, a) {
+  var tagIds = (a.tagIds || []).filter(_isUuid);
+  var patch = {
+    title:         a.title || '',
+    description:   a.description || '',
+    category_id:   _isUuid(a.categoryId) ? a.categoryId : null,
+    date_assigned: a.dateAssigned || a.date || null,
+    due_date:      a.dueDate || null,
+    score_mode:    a.scoreMode || 'proficiency',
+    max_points:    a.maxPoints != null ? String(a.maxPoints) : null,
+    weight:        a.weight != null ? String(a.weight) : '1',
+    evidence_type: a.evidenceType || null,
+    rubric_id:     _isUuid(a.rubricId) ? a.rubricId : null,
+    module_id:     _isUuid(a.moduleId) ? a.moduleId : null,
+  };
   return sb
-    .rpc('update_assessment', {
-      p_course_offering_id: cid,
-      p_assessment_id: assessmentId,
-      p_payload: _assessmentPayload(a),
-    })
+    .rpc('update_assessment', { p_id: assessmentId, p_patch: patch, p_tag_ids: tagIds })
     .then(function (res) {
       if (res.error) console.warn('update_assessment failed:', res.error, assessmentId);
     });
 }
 
+/* v2 delete_assessment(p_id).  FK cascade handles scores/rubric_scores/
+   tag_scores/assessment_tag/term_rating_assessment; observation.assessment_id
+   is ON DELETE SET NULL so observations survive. */
 function _canonicalDeleteAssessment(sb, cid, assessmentId) {
+  return sb.rpc('delete_assessment', { p_id: assessmentId }).then(function (res) {
+    if (res.error) console.warn('delete_assessment failed:', res.error, assessmentId);
+  });
+}
+
+/* ── Public v2 assessment helpers (Phase 4.2) ─────────────────── */
+
+window.duplicateAssessment = function (srcAssessmentId) {
+  var sb = getSupabase();
+  if (!sb) return Promise.resolve();
+  if (!_isUuid(srcAssessmentId)) return Promise.resolve();
   return sb
-    .rpc('delete_assessment', {
-      p_course_offering_id: cid,
-      p_assessment_id: assessmentId,
+    .rpc('duplicate_assessment', { p_src_id: srcAssessmentId })
+    .then(function (res) {
+      if (res.error) console.warn('duplicate_assessment failed:', res.error);
+      return res;
+    });
+};
+
+window.saveAssessmentTags = function (assessmentId, tagIds) {
+  var sb = getSupabase();
+  if (!sb) return Promise.resolve();
+  if (!_isUuid(assessmentId)) return Promise.resolve();
+  var ids = (tagIds || []).filter(_isUuid);
+  return sb
+    .rpc('save_assessment_tags', { p_id: assessmentId, p_tag_ids: ids })
+    .then(function (res) {
+      if (res.error) console.warn('save_assessment_tags failed:', res.error);
+      return res;
+    });
+};
+
+/* Collaboration panel save (§8.5). mode ∈ {none, pairs, groups}; config is
+   a client-computed jsonb blob (excluded ids, random pairs, manual groups,
+   etc.) — server stores it verbatim, nulled when mode='none'. */
+window.saveCollab = function (assessmentId, mode, config) {
+  var sb = getSupabase();
+  if (!sb) return Promise.resolve();
+  if (!_isUuid(assessmentId)) return Promise.resolve();
+  return sb
+    .rpc('save_collab', {
+      p_id: assessmentId,
+      p_mode: mode || 'none',
+      p_config: mode === 'none' ? null : (config || null),
     })
     .then(function (res) {
-      if (res.error) console.warn('delete_assessment failed:', res.error, assessmentId);
+      if (res.error) console.warn('save_collab failed:', res.error);
+      return res;
     });
-}
+};
 
 function _cleanOrphanedScores(cid, validArr) {
   var validIds = new Set(
