@@ -2012,3 +2012,36 @@ revoke all on function fv_retention_cleanup() from public;
 
 grant execute on function import_teams_class(jsonb) to authenticated;
 grant execute on function import_json_restore(jsonb) to authenticated;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Phase 5.5 — Write-path completion
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Deployed in migration fullvision_v2_write_path_student_delete_relink_clear
+-- (2026-04-20).
+--
+-- delete_student(p_id)                                   — §4.5 full cascade
+-- relink_student(ghost_student_id, canonical_student_id) — §15.4 post-import reconcile;
+--                                                          same-course enrollments merge
+--                                                          (designations unioned, withdrawn_at
+--                                                          resets to null if either side active),
+--                                                          cross-course enrollments move;
+--                                                          ghost student deleted
+-- clear_data()                                           — §16.2 self-service wipe;
+--                                                          removes all courses + students owned
+--                                                          by the calling teacher; Teacher +
+--                                                          TeacherPreference rows preserved
+--                                                          (active_course_id nulled)
+
+create or replace function delete_student(p_id uuid) returns void
+language plpgsql security invoker set search_path = public as $$
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    delete from student where id = p_id;
+    if not found then raise exception 'student not found' using errcode = 'P0002'; end if;
+end; $$;
+grant execute on function delete_student(uuid) to authenticated;
+
+-- relink_student + clear_data bodies: see migration fullvision_v2_write_path_student_delete_relink_clear.
+grant execute on function relink_student(uuid, uuid) to authenticated;
+grant execute on function clear_data() to authenticated;

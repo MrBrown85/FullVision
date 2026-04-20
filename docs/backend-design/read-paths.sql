@@ -813,3 +813,30 @@ $$;
 --
 --  * Add pg_typeof checks or a small test harness: for a seeded class,
 --    assert fv_course_letter_pipeline matches a hand-computed value.
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Phase 5.4 — Read-path completion
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Deployed in migrations:
+--   fullvision_v2_read_path_get_learning_map              (2026-04-20)
+--   fullvision_v2_read_path_get_class_dashboard           (2026-04-20)
+--   fullvision_v2_read_path_get_term_rating               (2026-04-20)
+--   fullvision_v2_read_path_get_observations              (2026-04-20)
+--   fullvision_v2_read_path_get_assessment_detail         (2026-04-20)
+--   fullvision_v2_read_path_get_report                    (2026-04-20)
+--   fullvision_v2_get_student_profile_competency_tree     (2026-04-20)
+--
+-- get_learning_map(p_course_id)            → full tree + per-tag class_avg + coverage_count
+-- get_class_dashboard(p_course_id)         → class_avg, prof histogram, letter histogram,
+--                                            per_assessment_avg, per_competency_group_avg,
+--                                            at_risk list, flagged_count
+-- get_term_rating(p_enrollment_id, p_term) → existing state + course-scoped pickers +
+--                                            context numbers + suggested_dim_defaults
+-- get_observations(p_course_id, p_filters, p_page, p_page_size) → filtered + paginated
+-- get_assessment_detail(p_assessment_id)   → assessment + rubric + criteria + linked tags +
+--                                            per-cell state for every active enrollment
+-- get_report(p_enrollment_id, p_term?)     → block-by-block report composition per ReportConfig
+-- get_student_profile.competency_tree      → backfilled (was stub-null in the original §2.2 RPC)
+--
+-- Full bodies live on gradebook-prod; see migrations for source.

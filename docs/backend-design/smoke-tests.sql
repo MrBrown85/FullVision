@@ -805,4 +805,421 @@ begin
   end;
 end $$;
 
-\echo === all 14 smoke blocks passed ===
+\echo === all 23 smoke blocks passed ===
+
+-- ═════════════════════════════════════════════════════════════════════════
+-- 15.  get_learning_map (Phase 5.4.1)
+-- ═════════════════════════════════════════════════════════════════════════
+\echo [15/23] get_learning_map
+do $$
+declare
+    _uid uuid := gen_random_uuid();
+    _course uuid; _subj uuid; _grp uuid; _sect1 uuid; _sect2 uuid;
+    _t1 uuid; _t2 uuid; _t3 uuid;
+    _stu uuid; _stu2 uuid; _enr uuid; _enr2 uuid; _a uuid;
+    _lm jsonb; _avg numeric; _cov int;
+begin
+  begin
+    insert into teacher (id, email) values (_uid, 'smoke-lm@t');
+    insert into teacher_preference (teacher_id) values (_uid);
+    insert into course (teacher_id, name) values (_uid, 'c') returning id into _course;
+    insert into subject (course_id, name) values (_course, 'M') returning id into _subj;
+    insert into competency_group (course_id, name) values (_course, 'Core') returning id into _grp;
+    insert into section (course_id, subject_id, competency_group_id, name) values (_course, _subj, _grp, 'S1') returning id into _sect1;
+    insert into section (course_id, subject_id, name) values (_course, _subj, 'S2') returning id into _sect2;
+    insert into tag (section_id, label) values (_sect1, 'T1') returning id into _t1;
+    insert into tag (section_id, label) values (_sect1, 'T2') returning id into _t2;
+    insert into tag (section_id, label) values (_sect2, 'T3') returning id into _t3;
+    insert into student (teacher_id, first_name) values (_uid, 'A') returning id into _stu;
+    insert into student (teacher_id, first_name) values (_uid, 'B') returning id into _stu2;
+    insert into enrollment (student_id, course_id) values (_stu, _course) returning id into _enr;
+    insert into enrollment (student_id, course_id) values (_stu2, _course) returning id into _enr2;
+    insert into assessment (course_id, title) values (_course, 'A') returning id into _a;
+    insert into assessment_tag (assessment_id, tag_id) values (_a, _t1), (_a, _t2);
+    insert into tag_score (enrollment_id, assessment_id, tag_id, value) values (_enr, _a, _t1, 3);
+    insert into tag_score (enrollment_id, assessment_id, tag_id, value) values (_enr2, _a, _t1, 4);
+
+    perform set_config('request.jwt.claim.sub', _uid::text, true);
+    perform set_config('role', 'authenticated', true);
+    _lm := get_learning_map(_course);
+
+    assert jsonb_array_length(_lm->'competency_groups') = 1;
+    assert jsonb_array_length(_lm->'subjects') = 1;
+    assert jsonb_array_length(_lm->'subjects'->0->'sections') = 2;
+
+    select (t->>'class_avg')::numeric, (t->>'coverage_count')::int into _avg, _cov
+      from jsonb_array_elements(_lm->'subjects'->0->'sections'->0->'tags') t
+     where (t->>'id')::uuid = _t1;
+    assert _avg = 3.5 and _cov = 1;
+
+    raise exception 'ROLLBACK_SMOKE_OK';
+  exception when others then if sqlerrm <> 'ROLLBACK_SMOKE_OK' then raise; end if; end;
+end $$;
+
+-- ═════════════════════════════════════════════════════════════════════════
+-- 16.  get_class_dashboard (Phase 5.4.2)
+-- ═════════════════════════════════════════════════════════════════════════
+\echo [16/23] get_class_dashboard
+do $$
+declare
+    _uid uuid := gen_random_uuid();
+    _course uuid; _subj uuid; _grp uuid; _sect uuid; _t1 uuid; _t2 uuid;
+    _s1 uuid; _s2 uuid; _s3 uuid; _e1 uuid; _e2 uuid; _e3 uuid;
+    _a1 uuid; _a2 uuid; _db jsonb;
+begin
+  begin
+    insert into teacher (id, email) values (_uid, 'smoke-dash@t');
+    insert into teacher_preference (teacher_id) values (_uid);
+    insert into course (teacher_id, name, grading_system) values (_uid, 'c', 'proficiency') returning id into _course;
+    insert into subject (course_id, name) values (_course, 'M') returning id into _subj;
+    insert into competency_group (course_id, name) values (_course, 'Core') returning id into _grp;
+    insert into section (course_id, subject_id, competency_group_id, name) values (_course, _subj, _grp, 'S') returning id into _sect;
+    insert into tag (section_id, label) values (_sect, 'T1') returning id into _t1;
+    insert into tag (section_id, label) values (_sect, 'T2') returning id into _t2;
+    insert into student (teacher_id, first_name) values (_uid, 'A') returning id into _s1;
+    insert into student (teacher_id, first_name) values (_uid, 'B') returning id into _s2;
+    insert into student (teacher_id, first_name) values (_uid, 'C') returning id into _s3;
+    insert into enrollment (student_id, course_id) values (_s1, _course) returning id into _e1;
+    insert into enrollment (student_id, course_id) values (_s2, _course) returning id into _e2;
+    insert into enrollment (student_id, course_id, is_flagged) values (_s3, _course, true) returning id into _e3;
+    insert into assessment (course_id, title) values (_course, 'A1') returning id into _a1;
+    insert into assessment (course_id, title) values (_course, 'A2') returning id into _a2;
+    insert into assessment_tag (assessment_id, tag_id) values (_a1, _t1), (_a1, _t2), (_a2, _t1);
+    insert into score (enrollment_id, assessment_id, value) values (_e1, _a1, 4), (_e2, _a1, 2), (_e3, _a1, 3), (_e1, _a2, 4), (_e2, _a2, 1);
+    insert into tag_score (enrollment_id, assessment_id, tag_id, value)
+         values (_e1, _a1, _t1, 4), (_e2, _a1, _t1, 2), (_e3, _a1, _t2, 3),
+                (_e1, _a2, _t1, 4), (_e2, _a2, _t1, 1);
+
+    perform set_config('request.jwt.claim.sub', _uid::text, true);
+    perform set_config('role', 'authenticated', true);
+    _db := get_class_dashboard(_course);
+
+    assert (_db->>'flagged_count')::int = 1;
+    assert jsonb_array_length(_db->'per_assessment_avg') = 2;
+    assert (_db->'letter_histogram') = 'null'::jsonb;
+    assert (_db->>'class_avg_proficiency')::numeric between 1 and 4;
+
+    raise exception 'ROLLBACK_SMOKE_OK';
+  exception when others then if sqlerrm <> 'ROLLBACK_SMOKE_OK' then raise; end if; end;
+end $$;
+
+-- ═════════════════════════════════════════════════════════════════════════
+-- 17.  get_term_rating (Phase 5.4.3)
+-- ═════════════════════════════════════════════════════════════════════════
+\echo [17/23] get_term_rating
+do $$
+declare
+    _uid uuid := gen_random_uuid();
+    _course uuid; _subj uuid; _sect uuid; _t uuid;
+    _stu uuid; _enr uuid; _a uuid; _obs uuid;
+    _tr jsonb; _ok boolean;
+begin
+  begin
+    insert into teacher (id, email) values (_uid, 'smoke-tr@t');
+    insert into teacher_preference (teacher_id) values (_uid);
+    insert into course (teacher_id, name) values (_uid, 'c') returning id into _course;
+    insert into subject (course_id, name) values (_course, 'M') returning id into _subj;
+    insert into section (course_id, subject_id, name) values (_course, _subj, 'S') returning id into _sect;
+    insert into tag (section_id, label) values (_sect, 'T') returning id into _t;
+    insert into student (teacher_id, first_name) values (_uid, 'S') returning id into _stu;
+    insert into enrollment (student_id, course_id) values (_stu, _course) returning id into _enr;
+    insert into assessment (course_id, title) values (_course, 'A') returning id into _a;
+    insert into observation (course_id, body) values (_course, 'O') returning id into _obs;
+    insert into observation_student (observation_id, enrollment_id) values (_obs, _enr);
+
+    perform set_config('request.jwt.claim.sub', _uid::text, true);
+    perform set_config('role', 'authenticated', true);
+
+    _tr := get_term_rating(_enr, 2);
+    assert (_tr->'term_rating') = 'null'::jsonb;
+    assert jsonb_array_length(_tr->'pickers'->'observations') = 1;
+
+    _ok := false;
+    begin perform get_term_rating(_enr, 7); exception when others then _ok := true; end;
+    assert _ok, 'term 7 rejected';
+
+    perform save_term_rating(_enr, 2, jsonb_build_object('narrative_html','x','work_habits_rating',3));
+    _tr := get_term_rating(_enr, 2);
+    assert (_tr->'term_rating'->>'narrative_html') = 'x';
+
+    raise exception 'ROLLBACK_SMOKE_OK';
+  exception when others then if sqlerrm <> 'ROLLBACK_SMOKE_OK' then raise; end if; end;
+end $$;
+
+-- ═════════════════════════════════════════════════════════════════════════
+-- 18.  get_observations (Phase 5.4.4)
+-- ═════════════════════════════════════════════════════════════════════════
+\echo [18/23] get_observations
+do $$
+declare
+    _uid uuid := gen_random_uuid();
+    _course uuid; _subj uuid; _sect uuid; _tag uuid;
+    _s1 uuid; _s2 uuid; _e1 uuid; _e2 uuid; _ct uuid;
+    _o1 uuid; _o2 uuid; _o3 uuid; _res jsonb;
+begin
+  begin
+    insert into teacher (id, email) values (_uid, 'smoke-obs@t');
+    insert into teacher_preference (teacher_id) values (_uid);
+    insert into course (teacher_id, name) values (_uid, 'c') returning id into _course;
+    insert into subject (course_id, name) values (_course, 'M') returning id into _subj;
+    insert into section (course_id, subject_id, name) values (_course, _subj, 'S') returning id into _sect;
+    insert into tag (section_id, label) values (_sect, 'T') returning id into _tag;
+    insert into student (teacher_id, first_name) values (_uid, 'A') returning id into _s1;
+    insert into student (teacher_id, first_name) values (_uid, 'B') returning id into _s2;
+    insert into enrollment (student_id, course_id) values (_s1, _course) returning id into _e1;
+    insert into enrollment (student_id, course_id) values (_s2, _course) returning id into _e2;
+    insert into custom_tag (course_id, label) values (_course, 'CT') returning id into _ct;
+    insert into observation (course_id, body, sentiment) values (_course, 'alpha', 'strength') returning id into _o1;
+    insert into observation_student (observation_id, enrollment_id) values (_o1, _e1);
+    insert into observation_tag (observation_id, tag_id) values (_o1, _tag);
+    insert into observation (course_id, body, sentiment) values (_course, 'beta', 'growth') returning id into _o2;
+    insert into observation_student (observation_id, enrollment_id) values (_o2, _e2);
+    insert into observation_custom_tag (observation_id, custom_tag_id) values (_o2, _ct);
+    insert into observation (course_id, body, sentiment) values (_course, 'gamma zebra', 'strength') returning id into _o3;
+    insert into observation_student (observation_id, enrollment_id) values (_o3, _e1), (_o3, _e2);
+
+    perform set_config('request.jwt.claim.sub', _uid::text, true);
+    perform set_config('role', 'authenticated', true);
+
+    _res := get_observations(_course, '{}'::jsonb, 1, 50);
+    assert (_res->>'total')::int = 3;
+
+    _res := get_observations(_course, jsonb_build_object('enrollment_id', _e1::text), 1, 50);
+    assert (_res->>'total')::int = 2;
+
+    _res := get_observations(_course, jsonb_build_object('tag_ids', jsonb_build_array(_tag::text)), 1, 50);
+    assert (_res->>'total')::int = 1;
+
+    _res := get_observations(_course, jsonb_build_object('search', 'zebra'), 1, 50);
+    assert (_res->>'total')::int = 1;
+
+    _res := get_observations(_course, '{}'::jsonb, 1, 2);
+    assert (_res->>'has_more')::boolean = true;
+
+    raise exception 'ROLLBACK_SMOKE_OK';
+  exception when others then if sqlerrm <> 'ROLLBACK_SMOKE_OK' then raise; end if; end;
+end $$;
+
+-- ═════════════════════════════════════════════════════════════════════════
+-- 19.  get_assessment_detail (Phase 5.4.5)
+-- ═════════════════════════════════════════════════════════════════════════
+\echo [19/23] get_assessment_detail
+do $$
+declare
+    _uid uuid := gen_random_uuid();
+    _course uuid; _subj uuid; _sect uuid; _t uuid;
+    _cat uuid; _rub uuid; _crit uuid;
+    _stu uuid; _enr uuid;
+    _a_plain uuid; _a_rub uuid; _r jsonb; _ok boolean;
+begin
+  begin
+    insert into teacher (id, email) values (_uid, 'smoke-ad@t');
+    insert into teacher_preference (teacher_id) values (_uid);
+    insert into course (teacher_id, name) values (_uid, 'c') returning id into _course;
+    insert into subject (course_id, name) values (_course, 'M') returning id into _subj;
+    insert into section (course_id, subject_id, name) values (_course, _subj, 'S') returning id into _sect;
+    insert into tag (section_id, label) values (_sect, 'T') returning id into _t;
+    insert into category (course_id, name, weight) values (_course, 'Tests', 40) returning id into _cat;
+    insert into rubric (course_id, name) values (_course, 'R') returning id into _rub;
+    insert into criterion (rubric_id, name) values (_rub, 'C') returning id into _crit;
+    insert into criterion_tag (criterion_id, tag_id) values (_crit, _t);
+    insert into student (teacher_id, first_name) values (_uid, 'S') returning id into _stu;
+    insert into enrollment (student_id, course_id) values (_stu, _course) returning id into _enr;
+    insert into assessment (course_id, title, category_id) values (_course, 'Plain', _cat) returning id into _a_plain;
+    insert into assessment_tag (assessment_id, tag_id) values (_a_plain, _t);
+    insert into score (enrollment_id, assessment_id, value) values (_enr, _a_plain, 3.5);
+    insert into assessment (course_id, title, rubric_id) values (_course, 'Rubric', _rub) returning id into _a_rub;
+    insert into rubric_score (enrollment_id, assessment_id, criterion_id, value) values (_enr, _a_rub, _crit, 3);
+
+    perform set_config('request.jwt.claim.sub', _uid::text, true);
+    perform set_config('role', 'authenticated', true);
+
+    _r := get_assessment_detail(_a_plain);
+    assert (_r->'category'->>'id')::uuid = _cat;
+    assert jsonb_array_length(_r->'linked_tags') = 1;
+    assert ((_r->'cells'->0->'overall'->>'value')::numeric) = 3.5;
+
+    _r := get_assessment_detail(_a_rub);
+    assert jsonb_array_length(_r->'criteria') = 1;
+    assert ((_r->'cells'->0->'overall'->>'value')::numeric) = 3;
+
+    _ok := false;
+    begin perform get_assessment_detail(gen_random_uuid()); exception when others then _ok := true; end;
+    assert _ok, 'not-found should raise';
+
+    raise exception 'ROLLBACK_SMOKE_OK';
+  exception when others then if sqlerrm <> 'ROLLBACK_SMOKE_OK' then raise; end if; end;
+end $$;
+
+-- ═════════════════════════════════════════════════════════════════════════
+-- 20.  get_report (Phase 5.4.6)
+-- ═════════════════════════════════════════════════════════════════════════
+\echo [20/23] get_report
+do $$
+declare
+    _uid uuid := gen_random_uuid();
+    _course uuid; _subj uuid; _sect uuid; _tag uuid;
+    _stu uuid; _enr uuid; _a uuid; _rep jsonb;
+    _has bool;
+begin
+  begin
+    insert into teacher (id, email, display_name) values (_uid, 'smoke-rep@t', 'T');
+    insert into teacher_preference (teacher_id) values (_uid);
+    insert into course (teacher_id, name, grade_level) values (_uid, 'Sci', '8') returning id into _course;
+    insert into subject (course_id, name) values (_course, 'Bio') returning id into _subj;
+    insert into section (course_id, subject_id, name) values (_course, _subj, 'Cells') returning id into _sect;
+    insert into tag (section_id, label) values (_sect, 'T') returning id into _tag;
+    insert into student (teacher_id, first_name, last_name) values (_uid, 'Alice', 'A') returning id into _stu;
+    insert into enrollment (student_id, course_id) values (_stu, _course) returning id into _enr;
+    insert into assessment (course_id, title) values (_course, 'Q1') returning id into _a;
+    insert into assessment_tag (assessment_id, tag_id) values (_a, _tag);
+    insert into score (enrollment_id, assessment_id, value) values (_enr, _a, 3);
+    insert into tag_score (enrollment_id, assessment_id, tag_id, value) values (_enr, _a, _tag, 3);
+    insert into goal (enrollment_id, section_id, body) values (_enr, _sect, 'x');
+    insert into report_config (course_id, preset, blocks_config) values (_course, 'detailed',
+      jsonb_build_object('header',true,'narrative',true,'grades',true,'competencies',true,
+                         'goals',true,'reflections',true,'attendance',true,
+                         'strengths',true,'growth',true));
+
+    perform set_config('request.jwt.claim.sub', _uid::text, true);
+    perform set_config('role', 'authenticated', true);
+
+    perform save_term_rating(_enr, 2, jsonb_build_object(
+      'narrative_html','<p>n</p>','strength_tags', jsonb_build_array(_tag::text)));
+
+    _rep := get_report(_enr);
+    assert jsonb_array_length(_rep->'blocks') >= 5;
+    select exists (select 1 from jsonb_array_elements(_rep->'blocks') b
+                   where b->>'type' = 'strengths'
+                     and jsonb_array_length(b->'data'->'tags') = 1)
+      into _has;
+    assert _has, 'strengths block';
+
+    raise exception 'ROLLBACK_SMOKE_OK';
+  exception when others then if sqlerrm <> 'ROLLBACK_SMOKE_OK' then raise; end if; end;
+end $$;
+
+-- ═════════════════════════════════════════════════════════════════════════
+-- 21.  get_student_profile competency_tree backfill (Phase 5.4.7)
+-- ═════════════════════════════════════════════════════════════════════════
+\echo [21/23] get_student_profile.competency_tree
+do $$
+declare
+    _uid uuid := gen_random_uuid();
+    _course uuid; _subj uuid; _sect uuid; _t1 uuid; _t2 uuid;
+    _stu uuid; _enr uuid; _a uuid; _prof jsonb; _tag_row jsonb;
+begin
+  begin
+    insert into teacher (id, email) values (_uid, 'smoke-prof@t');
+    insert into teacher_preference (teacher_id) values (_uid);
+    insert into course (teacher_id, name) values (_uid, 'c') returning id into _course;
+    insert into subject (course_id, name) values (_course, 'M') returning id into _subj;
+    insert into section (course_id, subject_id, name) values (_course, _subj, 'S') returning id into _sect;
+    insert into tag (section_id, label) values (_sect, 'T1') returning id into _t1;
+    insert into tag (section_id, label) values (_sect, 'T2') returning id into _t2;
+    insert into student (teacher_id, first_name) values (_uid, 'S') returning id into _stu;
+    insert into enrollment (student_id, course_id) values (_stu, _course) returning id into _enr;
+    insert into assessment (course_id, title) values (_course, 'A') returning id into _a;
+    insert into assessment_tag (assessment_id, tag_id) values (_a, _t1);
+    insert into score (enrollment_id, assessment_id, value) values (_enr, _a, 3);
+    insert into tag_score (enrollment_id, assessment_id, tag_id, value) values (_enr, _a, _t1, 4);
+
+    perform set_config('request.jwt.claim.sub', _uid::text, true);
+    perform set_config('role', 'authenticated', true);
+
+    _prof := get_student_profile(_enr);
+    assert _prof->'competency_tree' <> 'null'::jsonb;
+    assert jsonb_array_length(_prof->'competency_tree'->'subjects'->0->'sections'->0->'tags') = 2;
+
+    select t into _tag_row
+      from jsonb_array_elements(_prof->'competency_tree'->'subjects'->0->'sections'->0->'tags') t
+     where (t->>'id')::uuid = _t1;
+    assert (_tag_row->>'latest_value')::int = 4;
+    assert (_tag_row->>'coverage_count')::int = 1;
+
+    raise exception 'ROLLBACK_SMOKE_OK';
+  exception when others then if sqlerrm <> 'ROLLBACK_SMOKE_OK' then raise; end if; end;
+end $$;
+
+-- ═════════════════════════════════════════════════════════════════════════
+-- 22.  delete_student + relink_student (Phase 5.5.1 + 5.5.2)
+-- ═════════════════════════════════════════════════════════════════════════
+\echo [22/23] delete_student + relink_student
+do $$
+declare
+    _uid uuid := gen_random_uuid();
+    _c uuid; _stu uuid; _e uuid; _a uuid;
+    _ghost uuid; _canon uuid; _ge uuid; _ce uuid;
+    _res jsonb; _d text[];
+begin
+  begin
+    insert into teacher (id, email) values (_uid, 'smoke-del@t');
+    insert into teacher_preference (teacher_id) values (_uid);
+    insert into course (teacher_id, name) values (_uid, 'c') returning id into _c;
+    insert into student (teacher_id, first_name) values (_uid, 'S') returning id into _stu;
+    insert into enrollment (student_id, course_id) values (_stu, _c) returning id into _e;
+    insert into assessment (course_id, title) values (_c, 'A') returning id into _a;
+    insert into score (enrollment_id, assessment_id, value) values (_e, _a, 3);
+
+    perform set_config('request.jwt.claim.sub', _uid::text, true);
+    perform set_config('role', 'authenticated', true);
+
+    perform delete_student(_stu);
+    assert not exists (select 1 from student where id = _stu);
+    assert not exists (select 1 from enrollment where student_id = _stu);
+    assert not exists (select 1 from score where enrollment_id = _e);
+    assert exists (select 1 from course where id = _c);
+
+    -- relink merge path
+    insert into student (teacher_id, first_name) values (_uid, 'G') returning id into _ghost;
+    insert into student (teacher_id, first_name) values (_uid, 'C') returning id into _canon;
+    insert into enrollment (student_id, course_id, designations) values (_ghost, _c, array['IEP']) returning id into _ge;
+    insert into enrollment (student_id, course_id, designations) values (_canon, _c, array['ELL']) returning id into _ce;
+
+    _res := relink_student(_ghost, _canon);
+    assert (_res->>'enrollments_merged')::int = 1;
+    assert not exists (select 1 from student where id = _ghost);
+
+    select designations into _d from enrollment where id = _ce;
+    assert _d @> array['IEP'];
+    assert _d @> array['ELL'];
+
+    raise exception 'ROLLBACK_SMOKE_OK';
+  exception when others then if sqlerrm <> 'ROLLBACK_SMOKE_OK' then raise; end if; end;
+end $$;
+
+-- ═════════════════════════════════════════════════════════════════════════
+-- 23.  clear_data (Phase 5.5.3)
+-- ═════════════════════════════════════════════════════════════════════════
+\echo [23/23] clear_data
+do $$
+declare
+    _uid uuid := gen_random_uuid();
+    _other uuid := gen_random_uuid();
+    _c uuid; _stu uuid; _enr uuid; _res jsonb;
+begin
+  begin
+    insert into teacher (id, email) values (_uid, 'smoke-clr@t');
+    insert into teacher_preference (teacher_id) values (_uid);
+    insert into course (teacher_id, name) values (_uid, 'c') returning id into _c;
+    update teacher_preference set active_course_id = _c where teacher_id = _uid;
+    insert into student (teacher_id, first_name) values (_uid, 'S') returning id into _stu;
+    insert into enrollment (student_id, course_id) values (_stu, _c) returning id into _enr;
+    insert into teacher (id, email) values (_other, 'other@t');
+    insert into teacher_preference (teacher_id) values (_other);
+    insert into course (teacher_id, name) values (_other, 'O');
+
+    perform set_config('request.jwt.claim.sub', _uid::text, true);
+    perform set_config('role', 'authenticated', true);
+
+    _res := clear_data();
+    assert (_res->>'courses')::int = 1;
+    assert (_res->>'students')::int = 1;
+    assert not exists (select 1 from course where teacher_id = _uid);
+    assert (select active_course_id from teacher_preference where teacher_id = _uid) is null;
+    assert exists (select 1 from teacher where id = _uid);
+    assert exists (select 1 from course where teacher_id = _other), 'other teacher''s data preserved';
+
+    raise exception 'ROLLBACK_SMOKE_OK';
+  exception when others then if sqlerrm <> 'ROLLBACK_SMOKE_OK' then raise; end if; end;
+end $$;
