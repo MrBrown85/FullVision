@@ -1,0 +1,1314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>FullVision — Backend Design Decisions</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root {
+    --bg: #fafaf8;
+    --surface: #ffffff;
+    --ink: #1a1a1a;
+    --ink-soft: #555;
+    --ink-faint: #888;
+    --border: #e5e5e0;
+    --accent: #2a5d7e;
+    --accent-soft: #e8eff3;
+    --rec: #0a6b3a;
+    --rec-bg: #e8f4ec;
+    --branch: #8c5a1c;
+    --branch-bg: #faf0e2;
+    --answered: #0a6b3a;
+    --sidebar-w: 280px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  aside.sidebar {
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    width: var(--sidebar-w);
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 24px 20px;
+    overflow-y: auto;
+  }
+  aside h1 { margin: 0 0 4px; font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
+  aside .subtitle { font-size: 12px; color: var(--ink-faint); margin-bottom: 20px; }
+  aside .progress-bar { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-bottom: 4px; }
+  aside .progress-fill { height: 100%; background: var(--accent); width: 0%; transition: width 0.3s ease; }
+  aside .progress-text { font-size: 12px; color: var(--ink-faint); margin-bottom: 20px; }
+  aside nav ol { margin: 0; padding: 0; list-style: none; }
+  aside nav li { margin-bottom: 2px; }
+  aside nav a { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; color: var(--ink-soft); text-decoration: none; border-radius: 4px; font-size: 13px; }
+  aside nav a:hover { background: var(--accent-soft); color: var(--accent); }
+  aside nav .tier-count { font-size: 11px; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+  aside nav .tier-complete .tier-count { color: var(--answered); font-weight: 600; }
+  aside .actions { margin-top: 24px; display: flex; flex-direction: column; gap: 8px; }
+  aside button { padding: 8px 12px; font-size: 13px; border: 1px solid var(--border); background: var(--surface); border-radius: 6px; cursor: pointer; text-align: left; color: var(--ink); font-family: inherit; }
+  aside button:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+  aside button.primary { background: var(--accent); color: white; border-color: var(--accent); }
+  aside button.primary:hover { background: #1d4862; color: white; }
+  main { margin-left: var(--sidebar-w); padding: 40px 60px 120px; max-width: 840px; }
+  header.page-header { margin-bottom: 40px; padding-bottom: 24px; border-bottom: 1px solid var(--border); }
+  header.page-header h1 { margin: 0 0 8px; font-size: 28px; letter-spacing: -0.02em; }
+  header.page-header p { margin: 0 0 8px; color: var(--ink-soft); max-width: 62ch; }
+  header.page-header .meta { font-size: 13px; color: var(--ink-faint); }
+  section.tier { margin-bottom: 56px; }
+  section.tier > h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); margin: 0 0 4px; }
+  section.tier > .tier-desc { color: var(--ink-soft); font-size: 14px; margin: 0 0 24px; max-width: 62ch; }
+  article.question { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; margin-bottom: 16px; scroll-margin-top: 20px; transition: border-color 0.2s, box-shadow 0.2s; }
+  article.question.answered { border-left: 3px solid var(--answered); }
+  article.question.branch { border-left: 3px solid var(--branch); background: linear-gradient(to right, var(--branch-bg), var(--surface) 8%); }
+  article.question.branch.answered { border-left: 3px solid var(--answered); }
+  article.question h3 { margin: 0 0 8px; font-size: 16px; font-weight: 600; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  article.question .qnum { color: var(--ink-faint); font-weight: 500; font-variant-numeric: tabular-nums; }
+  article.question .branch-flag { display: inline-block; font-size: 10px; background: var(--branch-bg); color: var(--branch); padding: 2px 8px; border-radius: 3px; margin-left: 4px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+  article.question .context { color: var(--ink-soft); font-size: 14px; margin: 0 0 16px; }
+  article.question .context code { background: #f0efeb; padding: 1px 5px; border-radius: 3px; font-size: 13px; }
+  .sub-q { margin-top: 18px; padding-top: 4px; }
+  .sub-q-head { font-weight: 500; margin-bottom: 8px; font-size: 14px; }
+  .options { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+  .options label { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 14px; transition: background 0.15s, border-color 0.15s; }
+  .options label:hover { background: var(--accent-soft); border-color: var(--accent); }
+  .options input[type="radio"], .options input[type="checkbox"] { margin-top: 2px; flex-shrink: 0; accent-color: var(--accent); }
+  .options label:has(input:checked) { background: var(--accent-soft); border-color: var(--accent); }
+  .options .letter { display: inline-block; width: 16px; font-weight: 600; color: var(--accent); }
+  .options .rec { display: inline-block; font-size: 11px; background: var(--rec-bg); color: var(--rec); padding: 1px 6px; border-radius: 3px; margin-left: 6px; font-weight: 600; letter-spacing: 0.02em; vertical-align: middle; }
+  .options .detail { display: block; color: var(--ink-faint); font-size: 12px; margin-top: 4px; line-height: 1.4; }
+  .other-row { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; border-top: 1px dashed var(--border); margin-top: 6px; }
+  .other-row label { font-size: 12px; color: var(--ink-faint); font-weight: 500; letter-spacing: 0.02em; text-transform: uppercase; }
+  .other-row textarea { width: 100%; font-family: inherit; font-size: 14px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); resize: vertical; min-height: 36px; }
+  .other-row textarea:focus { outline: none; border-color: var(--accent); background: var(--surface); }
+  dialog.export-dialog { border: 1px solid var(--border); border-radius: 8px; padding: 0; background: var(--surface); max-width: 760px; width: 92%; }
+  dialog.export-dialog::backdrop { background: rgba(0,0,0,0.4); }
+  dialog .dialog-head { padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  dialog .dialog-head h2 { margin: 0; font-size: 18px; }
+  dialog .dialog-head button { border: none; background: transparent; font-size: 20px; cursor: pointer; color: var(--ink-faint); }
+  dialog .dialog-body { padding: 20px 24px; }
+  dialog .dialog-body p { margin: 0 0 12px; color: var(--ink-soft); font-size: 14px; }
+  dialog textarea { width: 100%; min-height: 460px; font: 13px/1.5 "SF Mono", Menlo, Consolas, monospace; padding: 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); resize: vertical; }
+  dialog .dialog-actions { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; }
+  dialog .dialog-actions button { padding: 8px 16px; font-size: 14px; border: 1px solid var(--border); background: var(--surface); border-radius: 6px; cursor: pointer; font-family: inherit; }
+  dialog .dialog-actions button.primary { background: var(--accent); color: white; border-color: var(--accent); }
+  .save-toast { position: fixed; bottom: 20px; right: 20px; background: var(--ink); color: white; padding: 10px 16px; border-radius: 6px; font-size: 13px; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 1000; }
+  .save-toast.show { opacity: 1; }
+  @media (max-width: 980px) {
+    aside.sidebar { position: static; width: 100%; border-right: none; border-bottom: 1px solid var(--border); }
+    main { margin-left: 0; padding: 24px 20px 80px; }
+  }
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <h1>FullVision Decisions</h1>
+  <div class="subtitle">Backend rebuild — all open questions</div>
+  <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+  <div class="progress-text"><span id="progressText">0 / 48 answered</span></div>
+
+  <nav>
+    <ol>
+      <li><a href="#tier1" data-tier="1">Tier 1 — Blockers <span class="tier-count" data-count-tier="1">0/8</span></a></li>
+      <li><a href="#tier2" data-tier="2">Tier 2 — Grade math <span class="tier-count" data-count-tier="2">0/8</span></a></li>
+      <li><a href="#tier3" data-tier="3">Tier 3 — Defaults <span class="tier-count" data-count-tier="3">0/11</span></a></li>
+      <li><a href="#tier4" data-tier="4">Tier 4 — Quality <span class="tier-count" data-count-tier="4">0/10</span></a></li>
+      <li><a href="#tierA" data-tier="A">Pass A opens <span class="tier-count" data-count-tier="A">0/5</span></a></li>
+      <li><a href="#tierProduct" data-tier="P">Product/content <span class="tier-count" data-count-tier="P">0/4</span></a></li>
+      <li><a href="#tierOps" data-tier="O">Operational <span class="tier-count" data-count-tier="O">0/2</span></a></li>
+    </ol>
+  </nav>
+
+  <div class="actions">
+    <button class="primary" id="exportBtn">Export answers</button>
+    <button id="jumpBtn">Jump to next unanswered</button>
+    <button id="clearBtn">Clear all</button>
+  </div>
+</aside>
+
+<main>
+  <header class="page-header">
+    <h1>Backend design decisions</h1>
+    <p>Pick one option per question. Green <span class="rec">REC</span> badges mark my recommendation. Some questions are <span class="branch-flag">branch</span> — they appear only when a prior answer triggers them. Every option has a detail line explaining the trade-off. Answers autosave.</p>
+    <div class="meta">48 base questions + 3 conditional follow-ups · tier totals grow as you unlock branches</div>
+  </header>
+
+  <!-- ============ TIER 1 ============ -->
+  <section class="tier" id="tier1">
+    <h2>Tier 1 — Infrastructure blockers</h2>
+    <p class="tier-desc">Nothing can be built without resolving these. Eight base questions plus up to two branches depending on your answers.</p>
+
+    <article class="question" data-qid="q1">
+      <h3><span class="qnum">1.</span> Tech stack</h3>
+      <p class="context">Determines auth, DB, API style, RLS vs application-layer authorization. ERD types (<code>jsonb</code>, <code>text[]</code>, <code>uuid</code>) are Postgres-native.</p>
+      <div class="options">
+        <label><input type="radio" name="q1" value="A"/><span><span class="letter">A.</span> <strong>Supabase full stack</strong> — Postgres + Auth + Storage + RLS + PostgREST/RPC <span class="rec">REC</span>
+          <span class="detail">Lowest friction. Matches existing code. One product.</span></span></label>
+        <label><input type="radio" name="q1" value="B"/><span><span class="letter">B.</span> <strong>Supabase Auth only</strong> + different Postgres host (Neon, Fly, RDS) + custom Node/Python API
+          <span class="detail">Keeps proven auth; more control over DB and API. More pieces.</span></span></label>
+        <label><input type="radio" name="q1" value="C"/><span><span class="letter">C.</span> <strong>Fully self-hosted</strong> — Postgres + custom API + separate auth (Clerk, Auth0, Lucia)
+          <span class="detail">Maximum control; significantly more infrastructure work.</span></span></label>
+        <label><input type="radio" name="q1" value="D"/><span><span class="letter">D.</span> <strong>Non-Postgres stack</strong> — Firebase, Cloudflare D1, MongoDB
+          <span class="detail">Requires ERD rework; <code>jsonb</code>/<code>text[]</code> semantics don't translate.</span></span></label>
+        <label><input type="radio" name="q1" value="E"/><span><span class="letter">E.</span> Other / want to discuss</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q1_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q2">
+      <h3><span class="qnum">2.</span> New Supabase project vs. modify existing</h3>
+      <p class="context">Separating rebuild from legacy prevents "accidentally wrote to wrong project" disasters.</p>
+      <div class="options">
+        <label><input type="radio" name="q2" value="A"/><span><span class="letter">A.</span> Fresh project <code>fullvision-v2</code>; old stays as read-only reference <span class="rec">REC</span>
+          <span class="detail">Old project referenceable; no write collision risk.</span></span></label>
+        <label><input type="radio" name="q2" value="B"/><span><span class="letter">B.</span> Two fresh projects from day 1: <code>fullvision-staging</code> + <code>fullvision-prod</code>
+          <span class="detail">Staging separation from launch. Slightly more cost on free tier.</span></span></label>
+        <label><input type="radio" name="q2" value="C"/><span><span class="letter">C.</span> Modify existing project in place
+          <span class="detail">No parallel cost; can't reference old data once dropped.</span></span></label>
+        <label><input type="radio" name="q2" value="D"/><span><span class="letter">D.</span> Delete existing, create new with same name</span></label>
+        <label><input type="radio" name="q2" value="E"/><span><span class="letter">E.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q2_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q3">
+      <h3><span class="qnum">3.</span> Code location / repo strategy</h3>
+      <p class="context">Where the rebuild lives, and what happens to the old code.</p>
+      <div class="options">
+        <label><input type="radio" name="q3" value="A"/><span><span class="letter">A.</span> Same repo; tag current main as <code>legacy-v1</code>; rebuild on fresh branch that becomes new main <span class="rec">REC</span>
+          <span class="detail">One repo. <code>git checkout legacy-v1</code> restores old code.</span></span></label>
+        <label><input type="radio" name="q3" value="B"/><span><span class="letter">B.</span> Same repo; keep old main alive as <code>legacy-v1</code>; new work on <code>v2</code> branch until cutover
+          <span class="detail">Defers the "new main" switch until rebuild ready.</span></span></label>
+        <label><input type="radio" name="q3" value="C"/><span><span class="letter">C.</span> Brand-new repository <code>fullvision-v2</code>; old archived
+          <span class="detail">Clean slate; loses unified history.</span></span></label>
+        <label><input type="radio" name="q3" value="D"/><span><span class="letter">D.</span> Same repo, parallel <code>v2/</code> subdirectory</span></label>
+        <label><input type="radio" name="q3" value="E"/><span><span class="letter">E.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q3_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q4">
+      <h3><span class="qnum">4.</span> ObservationTemplate creation</h3>
+      <p class="context">ERD has the entity; row 159 quick-posts from them; no input covers creating one. How do templates come into existence?</p>
+      <div class="options">
+        <label><input type="radio" name="q4" value="A"/><span><span class="letter">A.</span> App-seeded defaults (6–10 curated); no teacher editing in v1 <span class="rec">REC</span>
+          <span class="detail">Ships with "Strong effort on X," "Needs support with Y," etc.</span></span></label>
+        <label><input type="radio" name="q4" value="B"/><span><span class="letter">B.</span> Seeded defaults + teacher can <em>add</em> custom (not edit/delete seeds)
+          <span class="detail">Good defaults always exist; teacher personalizes over time.</span></span></label>
+        <label><input type="radio" name="q4" value="C"/><span><span class="letter">C.</span> Full CRUD in v1 — teacher manages their own templates, no seeds
+          <span class="detail">Full flexibility; new UI + write paths.</span></span></label>
+        <label><input type="radio" name="q4" value="D"/><span><span class="letter">D.</span> Drop templates entirely; row 159 becomes "pin recent observation as quick-post"
+          <span class="detail">Simplest schema; changes quick-post UX.</span></span></label>
+        <label><input type="radio" name="q4" value="E"/><span><span class="letter">E.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q4_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q27">
+      <h3><span class="qnum">5.</span> Sign-up gating — who can create an account?</h3>
+      <p class="context">Current app is open self-serve. Shapes acquisition and who ends up in your system.</p>
+      <div class="options">
+        <label><input type="radio" name="q27" value="A"/><span><span class="letter">A.</span> Open self-serve — any email after verification <span class="rec">REC</span>
+          <span class="detail">Lowest friction. Verification filters noise.</span></span></label>
+        <label><input type="radio" name="q27" value="B"/><span><span class="letter">B.</span> Invite code required — sign-up form asks for a code you distribute
+          <span class="detail">Controlled rollout; lets you pilot with a specific group. Unlocks follow-up Q9.</span></span></label>
+        <label><input type="radio" name="q27" value="C"/><span><span class="letter">C.</span> Email-domain whitelist (e.g., <code>*.sd43.bc.ca</code>)
+          <span class="detail">Useful for district/school deployment.</span></span></label>
+        <label><input type="radio" name="q27" value="D"/><span><span class="letter">D.</span> Admin approval — accounts "pending" until you approve
+          <span class="detail">Highest control; highest ops cost.</span></span></label>
+        <label><input type="radio" name="q27" value="E"/><span><span class="letter">E.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes (if domain whitelist, list domains here)</label><textarea name="q27_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q30">
+      <h3><span class="qnum">6.</span> Email deliverability (verification, password reset)</h3>
+      <p class="context">Who sends verification and password-reset emails? Affects trust and inbox placement.</p>
+      <div class="options">
+        <label><input type="radio" name="q30" value="A"/><span><span class="letter">A.</span> Supabase default SMTP — <code>noreply@supabase.co</code> sender
+          <span class="detail">Zero setup. Frequently flagged as spam.</span></span></label>
+        <label><input type="radio" name="q30" value="B"/><span><span class="letter">B.</span> Custom domain SMTP via Supabase (<code>noreply@fullvision.app</code>) <span class="rec">REC</span>
+          <span class="detail">Requires SPF/DKIM DNS setup. Teachers trust emails from your domain.</span></span></label>
+        <label><input type="radio" name="q30" value="C"/><span><span class="letter">C.</span> External provider (Resend, Postmark, SendGrid) via Supabase Auth hooks
+          <span class="detail">Best deliverability; service to pay for. Unlocks follow-up Q10.</span></span></label>
+        <label><input type="radio" name="q30" value="D"/><span><span class="letter">D.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q30_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q33">
+      <h3><span class="qnum">7.</span> Custom domain ownership and DNS status</h3>
+      <p class="context">Custom email (Q6), Netlify hosting, and legacy parking (Q49) all depend on knowing which domain you own and where its DNS is managed.</p>
+      <div class="options">
+        <label><input type="radio" name="q33" value="A"/><span><span class="letter">A.</span> I own <code>fullvision.app</code>; DNS at a provider I can access (Netlify DNS, Cloudflare, Namecheap, etc.) <span class="rec">REC</span>
+          <span class="detail">Specify provider in notes so I know where to send DNS records.</span></span></label>
+        <label><input type="radio" name="q33" value="B"/><span><span class="letter">B.</span> I own the domain but need to look up DNS provider
+          <span class="detail">Common. Check the email receipt from when you bought it, or check your registrar dashboard.</span></span></label>
+        <label><input type="radio" name="q33" value="C"/><span><span class="letter">C.</span> Not purchased yet; will acquire before launch
+          <span class="detail">Decide now so email/DNS setup isn't blocked.</span></span></label>
+        <label><input type="radio" name="q33" value="D"/><span><span class="letter">D.</span> Using a different domain (specify in notes)</span></label>
+        <label><input type="radio" name="q33" value="E"/><span><span class="letter">E.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Domain + DNS provider (if known)</label><textarea name="q33_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q34">
+      <h3><span class="qnum">8.</span> CI/CD pipeline</h3>
+      <p class="context">How code lands in production, and whether tests gate deploys.</p>
+      <div class="options">
+        <label><input type="radio" name="q34" value="A"/><span><span class="letter">A.</span> Netlify auto-deploy from <code>git push</code> to main; preview deploys per PR branch <span class="rec">REC</span>
+          <span class="detail">Zero config. Fast iteration. No automated test gate.</span></span></label>
+        <label><input type="radio" name="q34" value="B"/><span><span class="letter">B.</span> GitHub Actions runs tests first; deploys to Netlify only if tests pass
+          <span class="detail">Safer. Adds ~1 min to each deploy. Matches Q23 testing philosophy.</span></span></label>
+        <label><input type="radio" name="q34" value="C"/><span><span class="letter">C.</span> Both: GitHub Actions for tests + Netlify continuous deploy (tests are advisory, not gating)
+          <span class="detail">See failing tests in PRs without blocking urgent hotfixes.</span></span></label>
+        <label><input type="radio" name="q34" value="D"/><span><span class="letter">D.</span> Manual deploys via Netlify CLI — no auto-deploy
+          <span class="detail">Maximum control. Slows iteration.</span></span></label>
+        <label><input type="radio" name="q34" value="E"/><span><span class="letter">E.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q34_other" rows="2"></textarea></div>
+    </article>
+
+    <!-- BRANCH q27=B -->
+    <article class="question" data-qid="q35" data-show-if="q27=B">
+      <h3><span class="qnum">9.</span> Invite code management <span class="branch-flag">branch · unlocks if Q5 = B</span></h3>
+      <p class="context">You chose invite-code gating. How are codes generated and distributed?</p>
+      <div class="options">
+        <label><input type="radio" name="q35" value="A"/><span><span class="letter">A.</span> Single global code (e.g., <code>TEACHERS2026</code>) you share manually; rotate periodically <span class="rec">REC</span>
+          <span class="detail">Simplest. Good for small-group pilot.</span></span></label>
+        <label><input type="radio" name="q35" value="B"/><span><span class="letter">B.</span> Individual codes per teacher, generated on-demand, single-use
+          <span class="detail">You generate codes in an admin panel. More secure, more work.</span></span></label>
+        <label><input type="radio" name="q35" value="C"/><span><span class="letter">C.</span> Time-limited codes (auto-expire after N days)
+          <span class="detail">Useful if running pilot cohorts with entry windows.</span></span></label>
+        <label><input type="radio" name="q35" value="D"/><span><span class="letter">D.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q35_other" rows="2"></textarea></div>
+    </article>
+
+    <!-- BRANCH q30=C -->
+    <article class="question" data-qid="q36" data-show-if="q30=C">
+      <h3><span class="qnum">10.</span> External email provider <span class="branch-flag">branch · unlocks if Q6 = C</span></h3>
+      <p class="context">You chose external email provider. Which one?</p>
+      <div class="options">
+        <label><input type="radio" name="q36" value="A"/><span><span class="letter">A.</span> Resend <span class="rec">REC</span>
+          <span class="detail">Modern, developer-friendly, generous free tier (3k/mo), good deliverability.</span></span></label>
+        <label><input type="radio" name="q36" value="B"/><span><span class="letter">B.</span> Postmark
+          <span class="detail">Best-in-class deliverability for transactional email. Paid after trial.</span></span></label>
+        <label><input type="radio" name="q36" value="C"/><span><span class="letter">C.</span> SendGrid
+          <span class="detail">Most common. Free tier 100/day. Historically spam-flagged on shared IPs.</span></span></label>
+        <label><input type="radio" name="q36" value="D"/><span><span class="letter">D.</span> Mailgun</span></label>
+        <label><input type="radio" name="q36" value="E"/><span><span class="letter">E.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q36_other" rows="2"></textarea></div>
+    </article>
+  </section>
+
+  <!-- ============ TIER 2 ============ -->
+  <section class="tier" id="tier2">
+    <h2>Tier 2 — Math that affects grades</h2>
+    <p class="tier-desc">Eight questions. Wrong answers silently change grades.</p>
+
+    <article class="question" data-qid="q5">
+      <h3><span class="qnum">11.</span> Per-tag contribution in section proficiency</h3>
+      <p class="context">If one assessment covers 5 tags inside a section, how does it contribute to that section's proficiency calc?</p>
+      <div class="options">
+        <label><input type="radio" name="q5" value="A"/><span><span class="letter">A.</span> <strong>1 averaged contribution per assessment per section</strong> <span class="rec">REC</span>
+          <span class="detail">Average the assessment's tag-scores inside the section, feed single value into <code>calc_method</code>. "Each assessment is one piece of evidence."</span></span></label>
+        <label><input type="radio" name="q5" value="B"/><span><span class="letter">B.</span> <strong>N contributions</strong> — each tag-link is separate; heavily-tagged assessments dominate
+          <span class="detail">Rewards thorough tagging; can swamp the calc.</span></span></label>
+        <label><input type="radio" name="q5" value="C"/><span><span class="letter">C.</span> <strong>Assessment-overall, ignore per-tag variance</strong> — use rubric-weighted overall for every section
+          <span class="detail">Simplest. Loses per-competency nuance.</span></span></label>
+        <label><input type="radio" name="q5" value="D"/><span><span class="letter">D.</span> Teacher-configurable per course</span></label>
+        <label><input type="radio" name="q5" value="E"/><span><span class="letter">E.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q5_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q6">
+      <h3><span class="qnum">12.</span> Decaying-average direction and semantics</h3>
+      <p class="context"><code>decayingAvg</code> calc_method with <code>decay_weight = 0.65</code>.</p>
+      <div class="options">
+        <label><input type="radio" name="q6" value="A"/><span><span class="letter">A.</span> Order-based, new dominates: <code>avg = avg × (1 − dw) + new × dw</code> <span class="rec">REC</span>
+          <span class="detail">Chronological; higher dw = recency dominates. Matches existing code.</span></span></label>
+        <label><input type="radio" name="q6" value="B"/><span><span class="letter">B.</span> Order-based, old dominates (inverse of A)
+          <span class="detail">Early evidence sticks; recent fluctuations smoothed.</span></span></label>
+        <label><input type="radio" name="q6" value="C"/><span><span class="letter">C.</span> Time-based half-life: <code>weight = e^(−t_since / half_life_days)</code>
+          <span class="detail">Real-time decay (3-month gap > 3-day gap). Harder to explain.</span></span></label>
+        <label><input type="radio" name="q6" value="D"/><span><span class="letter">D.</span> Rank-based: N most recent, weighted N, N−1, …, 1
+          <span class="detail">Easy to explain ("most recent 3 scores").</span></span></label>
+        <label><input type="radio" name="q6" value="E"/><span><span class="letter">E.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q6_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q7">
+      <h3><span class="qnum">13.</span> No-category, letter-mode fallback</h3>
+      <p class="context">If <code>grading_system = 'letter'</code> but no Categories exist.</p>
+      <div class="options">
+        <label><input type="radio" name="q7" value="A"/><span><span class="letter">A.</span> Block letter mode until ≥1 category exists <span class="rec">REC</span>
+          <span class="detail">Clear mental model. UI prompts "create a category first."</span></span></label>
+        <label><input type="radio" name="q7" value="B"/><span><span class="letter">B.</span> Fallback: implicit "all assessments equal weight" category
+          <span class="detail">Works with zero categories; hides that weighting exists.</span></span></label>
+        <label><input type="radio" name="q7" value="C"/><span><span class="letter">C.</span> Auto-seed default category "General — 100%" on course create
+          <span class="detail">Categories always exist; hides concept until useful.</span></span></label>
+        <label><input type="radio" name="q7" value="D"/><span><span class="letter">D.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q7_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q8">
+      <h3><span class="qnum">14.</span> Rubric with zero criteria linked to a tag</h3>
+      <p class="context">A rubric-based assessment where no criterion links to Tag X. Does it contribute to Section X's proficiency?</p>
+      <div class="options">
+        <label><input type="radio" name="q8" value="A"/><span><span class="letter">A.</span> NOT_APPLICABLE — contributes nothing <span class="rec">REC</span>
+          <span class="detail">Only explicit links count. Cleanest.</span></span></label>
+        <label><input type="radio" name="q8" value="B"/><span><span class="letter">B.</span> Use rubric's overall weighted score as tag contribution
+          <span class="detail">Never-zero evidence; inflates loosely-relevant rubrics.</span></span></label>
+        <label><input type="radio" name="q8" value="C"/><span><span class="letter">C.</span> Hybrid — use AssessmentTag link at assessment level, bypass criteria for unlinked tags</span></label>
+        <label><input type="radio" name="q8" value="D"/><span><span class="letter">D.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q8_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q39">
+      <h3><span class="qnum">15.</span> Points-mode score normalization</h3>
+      <p class="context">Assessment with <code>score_mode='points'</code>, <code>max_points=20</code>, student scored 18. For category averages and course Q/R/S, the value must live on the 0–4 scale. Where does the conversion happen?</p>
+      <div class="options">
+        <label><input type="radio" name="q39" value="A"/><span><span class="letter">A.</span> Store raw points in <code>Score.value</code>; normalize at read time via <code>(value / max_points) × 4</code> <span class="rec">REC</span>
+          <span class="detail">Teacher sees raw points in gradebook. Calculations adapt automatically if max_points ever changes.</span></span></label>
+        <label><input type="radio" name="q39" value="B"/><span><span class="letter">B.</span> Normalize at write time — store only the 0–4 value; max_points is display-only
+          <span class="detail">Simpler reads. Can't correct max_points without re-entering scores.</span></span></label>
+        <label><input type="radio" name="q39" value="C"/><span><span class="letter">C.</span> Store both: raw in <code>value</code>, normalized in a derived column
+          <span class="detail">Fastest reads; duplicate data; sync risk.</span></span></label>
+        <label><input type="radio" name="q39" value="D"/><span><span class="letter">D.</span> Don't normalize — points-mode assessments don't mix with proficiency ones in the calc
+          <span class="detail">Segregation; some teachers' assessments never roll up to course grade.</span></span></label>
+        <label><input type="radio" name="q39" value="E"/><span><span class="letter">E.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q39_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q40">
+      <h3><span class="qnum">16.</span> Display rounding — proficiency and percentage</h3>
+      <p class="context">Internal math yields Q = 2.67, R = 78.56. What does the teacher see?</p>
+      <div class="options">
+        <label><input type="radio" name="q40" value="A"/><span><span class="letter">A.</span> Proficiency: 1 decimal (<code>2.7</code>); Percentage: whole (<code>79%</code>) <span class="rec">REC</span>
+          <span class="detail">Precise enough for proficiency; percentages feel noisy with decimals.</span></span></label>
+        <label><input type="radio" name="q40" value="B"/><span><span class="letter">B.</span> Both whole numbers (<code>3</code> / <code>79%</code>)
+          <span class="detail">Simplest. Loses resolution near level boundaries.</span></span></label>
+        <label><input type="radio" name="q40" value="C"/><span><span class="letter">C.</span> Both with 1 decimal (<code>2.7</code> / <code>78.6%</code>)
+          <span class="detail">Consistent precision. Percentages feel clinical.</span></span></label>
+        <label><input type="radio" name="q40" value="D"/><span><span class="letter">D.</span> Proficiency as level label only (<code>Proficient</code> / <code>Developing</code>); Percentage whole (<code>79%</code>)
+          <span class="detail">Most human-friendly; loses the numeric nuance teachers often want.</span></span></label>
+        <label><input type="radio" name="q40" value="E"/><span><span class="letter">E.</span> Proficiency 1 decimal + label (<code>2.7 — Proficient</code>); Percentage whole + letter (<code>79% B</code>)
+          <span class="detail">Maximum information. Potentially busy.</span></span></label>
+        <label><input type="radio" name="q40" value="F"/><span><span class="letter">F.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q40_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q41">
+      <h3><span class="qnum">17.</span> Decaying-average chronological sort key</h3>
+      <p class="context">Decay processes scores in chronological order. Which timestamp defines "chronological"?</p>
+      <div class="options">
+        <label><input type="radio" name="q41" value="A"/><span><span class="letter">A.</span> <code>Assessment.date_assigned</code> — teacher's intended sequence <span class="rec">REC</span>
+          <span class="detail">Matches the curriculum flow. A late-scored assessment doesn't jump to "most recent."</span></span></label>
+        <label><input type="radio" name="q41" value="B"/><span><span class="letter">B.</span> <code>Score.scored_at</code> — when the grade was first entered
+          <span class="detail">Teacher's workflow timing. Resilient to back-dating assessments.</span></span></label>
+        <label><input type="radio" name="q41" value="C"/><span><span class="letter">C.</span> <code>Score.updated_at</code> — latest edit
+          <span class="detail">Edits re-rank; a correction bumps a score to "newest." Unexpected for decay.</span></span></label>
+        <label><input type="radio" name="q41" value="D"/><span><span class="letter">D.</span> <code>Assessment.due_date</code> — when work was due
+          <span class="detail">Similar to A. Inconsistent when due_date is left blank.</span></span></label>
+        <label><input type="radio" name="q41" value="E"/><span><span class="letter">E.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q41_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q42">
+      <h3><span class="qnum">18.</span> Empty category handling in the weighted-average calc</h3>
+      <p class="context">A category exists ("Unit Tests" 40%) but has no assessments yet. How does the percentage-pipeline calc handle it?</p>
+      <div class="options">
+        <label><input type="radio" name="q42" value="A"/><span><span class="letter">A.</span> Drop from calc; renormalize remaining weights <span class="rec">REC</span>
+          <span class="detail">If only "Essays 50%" and "Quizzes 10%" have data, calc uses 50/60 and 10/60 = 83% and 17%. Student's grade reflects what's been assessed.</span></span></label>
+        <label><input type="radio" name="q42" value="B"/><span><span class="letter">B.</span> Treat empty category as 0 in the calc
+          <span class="detail">Grade starts at zero until every category has at least one assessment. Punishes students in early weeks.</span></span></label>
+        <label><input type="radio" name="q42" value="C"/><span><span class="letter">C.</span> Treat as null; show "—" for overall % until all categories have data
+          <span class="detail">No grade visible until fully populated. Honest but frustrating mid-term.</span></span></label>
+        <label><input type="radio" name="q42" value="D"/><span><span class="letter">D.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q42_other" rows="2"></textarea></div>
+    </article>
+  </section>
+
+  <!-- ============ TIER 3 ============ -->
+  <section class="tier" id="tier3">
+    <h2>Tier 3 — Behavioral defaults</h2>
+    <p class="tier-desc">Eleven questions with safe defaults (includes three legacy-UI migration decisions from the inputs-spreadsheet re-read). Blast through with "your rec" where you don't have opinions.</p>
+
+    <article class="question" data-qid="q9">
+      <h3><span class="qnum">19.</span> "At risk" student threshold on class dashboard</h3>
+      <p class="context">Which students show up in the "at risk" list?</p>
+      <div class="options">
+        <label><input type="radio" name="q9" value="A"/><span><span class="letter">A.</span> Fixed app-wide: proficiency &lt; 2.0, or letter % &lt; 60%</span></label>
+        <label><input type="radio" name="q9" value="B"/><span><span class="letter">B.</span> Teacher-configurable per course; sensible defaults <span class="rec">REC</span>
+          <span class="detail">Different cohorts have different baselines.</span></span></label>
+        <label><input type="radio" name="q9" value="C"/><span><span class="letter">C.</span> Multi-level zones (thriving / on-track / watch / at-risk / failing) per course
+          <span class="detail">Color bands on dashboard; more setup UI.</span></span></label>
+        <label><input type="radio" name="q9" value="D"/><span><span class="letter">D.</span> Teacher-tagged: "flag for follow-up" toggle, no automatic threshold</span></label>
+        <label><input type="radio" name="q9" value="E"/><span><span class="letter">E.</span> No at-risk indicator</span></label>
+        <label><input type="radio" name="q9" value="F"/><span><span class="letter">F.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q9_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q10">
+      <h3><span class="qnum">20.</span> Category weights not summing to 100</h3>
+      <p class="context">Teacher types 40/50/10, changes one to 45 (sum=105%).</p>
+      <div class="options">
+        <label><input type="radio" name="q10" value="A"/><span><span class="letter">A.</span> Inline warning + auto-normalize at read time <span class="rec">REC</span>
+          <span class="detail">Save tolerated; calc always sensible.</span></span></label>
+        <label><input type="radio" name="q10" value="B"/><span><span class="letter">B.</span> Hard-enforce sum=100; Save disabled until balanced</span></label>
+        <label><input type="radio" name="q10" value="C"/><span><span class="letter">C.</span> Silent auto-normalize (no warning)</span></label>
+        <label><input type="radio" name="q10" value="D"/><span><span class="letter">D.</span> "Re-balance" button redistributes to sum 100</span></label>
+        <label><input type="radio" name="q10" value="E"/><span><span class="letter">E.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q10_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q11">
+      <h3><span class="qnum">21.</span> <code>grading_system</code> auto-default from <code>grade_level</code></h3>
+      <p class="context">Preset on course create based on grade level?</p>
+      <div class="options">
+        <label><input type="radio" name="q11" value="A"/><span><span class="letter">A.</span> Grade 8–9 → <code>proficiency</code>; 10–12 → <code>letter</code>; toggle visible <span class="rec">REC</span>
+          <span class="detail">Matches BC convention. One-click override.</span></span></label>
+        <label><input type="radio" name="q11" value="B"/><span><span class="letter">B.</span> Grade 8–9 → <code>proficiency</code>; 10–12 → <code>both</code></span></label>
+        <label><input type="radio" name="q11" value="C"/><span><span class="letter">C.</span> All grades default to <code>both</code></span></label>
+        <label><input type="radio" name="q11" value="D"/><span><span class="letter">D.</span> Always prompt — no auto-default</span></label>
+        <label><input type="radio" name="q11" value="E"/><span><span class="letter">E.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q11_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q12">
+      <h3><span class="qnum">22.</span> Per-section <code>calc_method</code> override</h3>
+      <p class="context">Can individual sections override the course-wide calc method?</p>
+      <div class="options">
+        <label><input type="radio" name="q12" value="A"/><span><span class="letter">A.</span> Course-wide only for v1 <span class="rec">REC</span>
+          <span class="detail">Simpler UI; no use case needed per-section variation.</span></span></label>
+        <label><input type="radio" name="q12" value="B"/><span><span class="letter">B.</span> Per-section override with course-wide default (advanced)</span></label>
+        <label><input type="radio" name="q12" value="C"/><span><span class="letter">C.</span> Per-section only; no course-wide setting</span></label>
+        <label><input type="radio" name="q12" value="D"/><span><span class="letter">D.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q12_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q13">
+      <h3><span class="qnum">23.</span> Focus Areas ranking in the report</h3>
+      <p class="context">How "focus areas" are chosen.</p>
+      <div class="options">
+        <label><input type="radio" name="q13" value="A"/><span><span class="letter">A.</span> Algorithm: lowest-N sections with zero-evidence first <span class="rec">REC</span>
+          <span class="detail">Zero-evidence = "we don't know" = legit focus.</span></span></label>
+        <label><input type="radio" name="q13" value="B"/><span><span class="letter">B.</span> Lowest-N only; zero-evidence in a separate "not yet assessed" block</span></label>
+        <label><input type="radio" name="q13" value="C"/><span><span class="letter">C.</span> Algorithm suggests; teacher can override per report</span></label>
+        <label><input type="radio" name="q13" value="D"/><span><span class="letter">D.</span> Teacher-selected only</span></label>
+        <label><input type="radio" name="q13" value="E"/><span><span class="letter">E.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q13_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q28">
+      <h3><span class="qnum">24.</span> Timezone handling</h3>
+      <p class="context">Assessment dates, attendance, score timestamps — whose timezone?</p>
+      <div class="options">
+        <label><input type="radio" name="q28" value="A"/><span><span class="letter">A.</span> One timezone per course (teacher sets; defaults to browser TZ on course create) <span class="rec">REC</span>
+          <span class="detail">Due dates are course-local. Clear mental model.</span></span></label>
+        <label><input type="radio" name="q28" value="B"/><span><span class="letter">B.</span> Teacher's browser TZ applied everywhere
+          <span class="detail">Simpler; breaks if teacher travels.</span></span></label>
+        <label><input type="radio" name="q28" value="C"/><span><span class="letter">C.</span> UTC in storage; display converts to viewer's local
+          <span class="detail">Engineering-correct. Confusing for non-technical teachers at midnight boundaries.</span></span></label>
+        <label><input type="radio" name="q28" value="D"/><span><span class="letter">D.</span> Date-only (no time component); sidesteps TZ
+          <span class="detail">"Due April 21." Simplest. Loses minute-level due times.</span></span></label>
+        <label><input type="radio" name="q28" value="E"/><span><span class="letter">E.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q28_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q43">
+      <h3><span class="qnum">25.</span> Gradebook Tab direction (mass-entry flow)</h3>
+      <p class="context">In the gradebook grid, a teacher presses Tab after entering a score. Where does focus move?</p>
+      <div class="options">
+        <label><input type="radio" name="q43" value="A"/><span><span class="letter">A.</span> Right — next assignment, same student <span class="rec">REC</span>
+          <span class="detail">Matches spreadsheet convention. Teacher grades one student across all assignments before moving to the next.</span></span></label>
+        <label><input type="radio" name="q43" value="B"/><span><span class="letter">B.</span> Down — same assignment, next student
+          <span class="detail">"Grade this assignment all at once." Common in many gradebook apps.</span></span></label>
+        <label><input type="radio" name="q43" value="C"/><span><span class="letter">C.</span> Teacher-toggleable per course (or global setting)
+          <span class="detail">Flexibility; extra preferences UI.</span></span></label>
+        <label><input type="radio" name="q43" value="D"/><span><span class="letter">D.</span> Smart default — Shift+Tab reverses, Enter always moves down, Tab always moves right</span></label>
+        <label><input type="radio" name="q43" value="E"/><span><span class="letter">E.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q43_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q52">
+      <h3><span class="qnum">26.</span> Legacy UI — grading scale controls (rows 37–39)</h3>
+      <p class="context">Current UI has inputs for editing the grading scale (label + min boundary per level) plus a "Reset grading scale" button (rows 37, 38, 39 of the inputs spreadsheet). The new design hardcodes the BC-region Q→%→letter mapping. What happens to these UI controls?</p>
+      <div class="options">
+        <label><input type="radio" name="q52" value="A"/><span><span class="letter">A.</span> Remove the inputs entirely; simplify the course-policy panel <span class="rec">REC</span>
+          <span class="detail">Cleanest. One less way for teachers to get confused about why their scale changes didn't apply.</span></span></label>
+        <label><input type="radio" name="q52" value="B"/><span><span class="letter">B.</span> Keep inputs visible but read-only — display the hardcoded scale
+          <span class="detail">Informs teachers what the scale is; no editing.</span></span></label>
+        <label><input type="radio" name="q52" value="C"/><span><span class="letter">C.</span> Keep inputs editable but treat as display-only override (overrides apply to letter display, not to computed %)
+          <span class="detail">Half-measure. Probably confusing.</span></span></label>
+        <label><input type="radio" name="q52" value="D"/><span><span class="letter">D.</span> Reverse the earlier decision — make the scale teacher-configurable after all
+          <span class="detail">Undoes the "hardcoded" decision. Adds schema complexity back.</span></span></label>
+        <label><input type="radio" name="q52" value="E"/><span><span class="letter">E.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q52_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q53">
+      <h3><span class="qnum">27.</span> Legacy UI — Assessment type toggle (rows 92–93)</h3>
+      <p class="context">Current UI has a summative/formative toggle on the assessment form. New design replaces <code>Assessment.type</code> with <code>Assessment.category_id</code>. What happens to the toggle UI?</p>
+      <div class="options">
+        <label><input type="radio" name="q53" value="A"/><span><span class="letter">A.</span> Replace the toggle with a Category dropdown (lists teacher-defined categories for this course) <span class="rec">REC</span>
+          <span class="detail">Categories fully replace the binary. If no categories exist yet, dropdown prompts teacher to create one.</span></span></label>
+        <label><input type="radio" name="q53" value="B"/><span><span class="letter">B.</span> Keep the summative/formative toggle AND add a Category dropdown (both stored)
+          <span class="detail">Dual model. Complicates the data. Redundant.</span></span></label>
+        <label><input type="radio" name="q53" value="C"/><span><span class="letter">C.</span> Keep summative/formative semantics by seeding every course with two default categories named "Summative" and "Formative"
+          <span class="detail">Existing teachers see familiar labels; under the hood it's just Categories. Invisible migration.</span></span></label>
+        <label><input type="radio" name="q53" value="D"/><span><span class="letter">D.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q53_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q54">
+      <h3><span class="qnum">28.</span> Legacy UI — old category-weights controls (rows 40–43)</h3>
+      <p class="context">Current Course Policy UI has a "Category weights enabled" checkbox and a "Summative %" slider. These are the <em>old</em> binary weighting model. The new Category entity has its own management panel. What happens to the old controls?</p>
+      <div class="options">
+        <label><input type="radio" name="q54" value="A"/><span><span class="letter">A.</span> Remove old controls entirely; Categories managed in their own dedicated panel <span class="rec">REC</span>
+          <span class="detail">One weighting model, one UI. No ambiguity.</span></span></label>
+        <label><input type="radio" name="q54" value="B"/><span><span class="letter">B.</span> Keep old controls as a "quick two-category setup" shortcut (creates "Summative" + "Formative" categories behind the scenes)
+          <span class="detail">Familiar UI as a fast path for teachers who only want two buckets.</span></span></label>
+        <label><input type="radio" name="q54" value="C"/><span><span class="letter">C.</span> Keep old controls visible but disabled, with "Use Categories instead →" link
+          <span class="detail">Signposts the new feature without breaking muscle memory.</span></span></label>
+        <label><input type="radio" name="q54" value="D"/><span><span class="letter">D.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q54_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q44">
+      <h3><span class="qnum">29.</span> Course duplicate — what gets copied?</h3>
+      <p class="context">Teacher clicks "Duplicate course." Which entities copy to the new course?</p>
+      <div class="options">
+        <label><input type="radio" name="q44" value="A"/><span><span class="letter">A.</span> Structure only — Subjects, Sections, Tags, Modules, Rubrics, Categories, ReportConfig. No students, no scores, no observations. <span class="rec">REC</span>
+          <span class="detail">"Template" semantics. Typical use: last year's setup as scaffold for new year.</span></span></label>
+        <label><input type="radio" name="q44" value="B"/><span><span class="letter">B.</span> Structure + assessments (with empty score rows)
+          <span class="detail">Same lesson plan ready to grade. Useful if teaching parallel sections.</span></span></label>
+        <label><input type="radio" name="q44" value="C"/><span><span class="letter">C.</span> Structure + students + enrollments (no scores)
+          <span class="detail">For "same class, next term" scenarios.</span></span></label>
+        <label><input type="radio" name="q44" value="D"/><span><span class="letter">D.</span> Full copy — everything including scores and observations
+          <span class="detail">Rarely useful; easy to accidentally corrupt historical data.</span></span></label>
+        <label><input type="radio" name="q44" value="E"/><span><span class="letter">E.</span> Checkbox list at duplicate time — teacher picks what to copy
+          <span class="detail">Most flexible; extra dialog.</span></span></label>
+        <label><input type="radio" name="q44" value="F"/><span><span class="letter">F.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q44_other" rows="2"></textarea></div>
+    </article>
+  </section>
+
+  <!-- ============ TIER 4 ============ -->
+  <section class="tier" id="tier4">
+    <h2>Tier 4 — Quality features</h2>
+    <p class="tier-desc">Ten questions. With no users yet, these are cheap now and painful to retrofit.</p>
+
+    <article class="question" data-qid="q14">
+      <h3><span class="qnum">30.</span> Audit log for score and grade changes</h3>
+      <p class="context">First grade dispute, you'll be glad this exists.</p>
+      <div class="options">
+        <label><input type="radio" name="q14" value="A"/><span><span class="letter">A.</span> <code>ScoreAudit</code> + <code>TermRatingAudit</code>; old/new/actor/timestamp; retain 2 years <span class="rec">REC</span></span></label>
+        <label><input type="radio" name="q14" value="B"/><span><span class="letter">B.</span> Same as A but retain indefinitely</span></label>
+        <label><input type="radio" name="q14" value="C"/><span><span class="letter">C.</span> <code>ScoreAudit</code> only in v1; TermRating audit later</span></label>
+        <label><input type="radio" name="q14" value="D"/><span><span class="letter">D.</span> Generic <code>AuditLog</code> covering all writes</span></label>
+        <label><input type="radio" name="q14" value="E"/><span><span class="letter">E.</span> No audit in v1</span></label>
+        <label><input type="radio" name="q14" value="F"/><span><span class="letter">F.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q14_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q15">
+      <h3><span class="qnum">31.</span> Soft-delete for Teacher accounts</h3>
+      <p class="context">Recovery window after account deletion.</p>
+      <div class="options">
+        <label><input type="radio" name="q15" value="A"/><span><span class="letter">A.</span> <code>deleted_at</code> + 30-day grace + scheduled cleanup <span class="rec">REC</span></span></label>
+        <label><input type="radio" name="q15" value="B"/><span><span class="letter">B.</span> 90-day grace</span></label>
+        <label><input type="radio" name="q15" value="C"/><span><span class="letter">C.</span> Indefinite grace; no auto-cleanup</span></label>
+        <label><input type="radio" name="q15" value="D"/><span><span class="letter">D.</span> Hard-delete immediately</span></label>
+        <label><input type="radio" name="q15" value="E"/><span><span class="letter">E.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q15_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q16">
+      <h3><span class="qnum">32.</span> Multi-session caps</h3>
+      <p class="context">Concurrent signed-in devices per teacher.</p>
+      <div class="options">
+        <label><input type="radio" name="q16" value="A"/><span><span class="letter">A.</span> Unlimited <span class="rec">REC</span></span></label>
+        <label><input type="radio" name="q16" value="B"/><span><span class="letter">B.</span> Limit to 2 (desktop + mobile)</span></label>
+        <label><input type="radio" name="q16" value="C"/><span><span class="letter">C.</span> Limit to 1 (new sign-in kicks old)</span></label>
+        <label><input type="radio" name="q16" value="D"/><span><span class="letter">D.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q16_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q17">
+      <h3><span class="qnum">33.</span> Data export (availability and format)</h3>
+      <p class="context">"Download all my data" capability.</p>
+      <div class="options">
+        <label><input type="radio" name="q17" value="A"/><span><span class="letter">A.</span> JSON export; always available in settings + offered at delete <span class="rec">REC</span>
+          <span class="detail">Covers GDPR-style compliance + backup.</span></span></label>
+        <label><input type="radio" name="q17" value="B"/><span><span class="letter">B.</span> JSON + PDF report-card bundle
+          <span class="detail">Practical to share with next-year's teacher or parents.</span></span></label>
+        <label><input type="radio" name="q17" value="C"/><span><span class="letter">C.</span> CSV per entity (roster / grades / observations as separate files)
+          <span class="detail">Familiar for teachers; lossy.</span></span></label>
+        <label><input type="radio" name="q17" value="D"/><span><span class="letter">D.</span> All three — JSON + PDF + CSV</span></label>
+        <label><input type="radio" name="q17" value="E"/><span><span class="letter">E.</span> No export in v1</span></label>
+        <label><input type="radio" name="q17" value="F"/><span><span class="letter">F.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q17_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q18">
+      <h3><span class="qnum">34.</span> Rate limiting</h3>
+      <p class="context">Sign-in brute-force, password-reset flooding.</p>
+      <div class="options">
+        <label><input type="radio" name="q18" value="A"/><span><span class="letter">A.</span> Supabase Auth defaults <span class="rec">REC</span></span></label>
+        <label><input type="radio" name="q18" value="B"/><span><span class="letter">B.</span> Customize Supabase rate limits via dashboard</span></label>
+        <label><input type="radio" name="q18" value="C"/><span><span class="letter">C.</span> Custom rate limiting at API layer (Upstash/Redis)</span></label>
+        <label><input type="radio" name="q18" value="D"/><span><span class="letter">D.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q18_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q29">
+      <h3><span class="qnum">35.</span> Offline / PWA service-worker behavior</h3>
+      <p class="context">Current app is a PWA with <code>sw.js</code>. Offline story in v2?</p>
+      <div class="options">
+        <label><input type="radio" name="q29" value="A"/><span><span class="letter">A.</span> Read-only offline — cached pages load; writes fail with "sync when online" <span class="rec">REC</span>
+          <span class="detail">View class list offline; scoring requires connection. Avoids conflict hell.</span></span></label>
+        <label><input type="radio" name="q29" value="B"/><span><span class="letter">B.</span> Full offline — queue writes, sync when reconnected, conflict resolution
+          <span class="detail">Best for low-connectivity schools. Big complexity investment.</span></span></label>
+        <label><input type="radio" name="q29" value="C"/><span><span class="letter">C.</span> No offline — remove service worker entirely
+          <span class="detail">Simplest. Loses PWA "installable" feel.</span></span></label>
+        <label><input type="radio" name="q29" value="D"/><span><span class="letter">D.</span> PWA installable but no offline data caching
+          <span class="detail">"Feels like an app"; still requires network.</span></span></label>
+        <label><input type="radio" name="q29" value="E"/><span><span class="letter">E.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q29_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q31">
+      <h3><span class="qnum">36.</span> Error monitoring</h3>
+      <p class="context">Finding production bugs when teachers don't email you.</p>
+      <div class="options">
+        <label><input type="radio" name="q31" value="A"/><span><span class="letter">A.</span> Sentry (or similar) for JS + API errors <span class="rec">REC</span>
+          <span class="detail">Industry standard. Free tier covers small apps.</span></span></label>
+        <label><input type="radio" name="q31" value="B"/><span><span class="letter">B.</span> Supabase built-in logs only</span></label>
+        <label><input type="radio" name="q31" value="C"/><span><span class="letter">C.</span> Custom error-log table + dashboard panel</span></label>
+        <label><input type="radio" name="q31" value="D"/><span><span class="letter">D.</span> No monitoring — rely on user reports</span></label>
+        <label><input type="radio" name="q31" value="E"/><span><span class="letter">E.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q31_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q46">
+      <h3><span class="qnum">37.</span> Backup strategy</h3>
+      <p class="context">Supabase does managed daily backups. Is that enough?</p>
+      <div class="options">
+        <label><input type="radio" name="q46" value="A"/><span><span class="letter">A.</span> Supabase managed daily + weekly manual JSON export saved locally <span class="rec">REC</span>
+          <span class="detail">Belt-and-suspenders. Offline copy of teacher data — protects against Supabase outages and account issues.</span></span></label>
+        <label><input type="radio" name="q46" value="B"/><span><span class="letter">B.</span> Supabase managed only; trust the provider
+          <span class="detail">Free-tier retention is 7 days. Acceptable for v1 with no real users.</span></span></label>
+        <label><input type="radio" name="q46" value="C"/><span><span class="letter">C.</span> Automated daily export to external storage (S3, Google Drive, Dropbox) via scheduled job
+          <span class="detail">Proper DR strategy. Infrastructure to build and maintain.</span></span></label>
+        <label><input type="radio" name="q46" value="D"/><span><span class="letter">D.</span> Streaming replica (Supabase Pro feature, enterprise DB)
+          <span class="detail">Real-time backup. Cost.</span></span></label>
+        <label><input type="radio" name="q46" value="E"/><span><span class="letter">E.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q46_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q47">
+      <h3><span class="qnum">38.</span> Analytics / telemetry</h3>
+      <p class="context">Does the app collect any usage data?</p>
+      <div class="options">
+        <label><input type="radio" name="q47" value="A"/><span><span class="letter">A.</span> None in v1 <span class="rec">REC</span>
+          <span class="detail">Solo dev, no users — nothing to optimize yet. Privacy-first default.</span></span></label>
+        <label><input type="radio" name="q47" value="B"/><span><span class="letter">B.</span> Anonymous error tracking only (overlaps with Q33 Sentry answer)
+          <span class="detail">Just crash/exception visibility. No user behavior.</span></span></label>
+        <label><input type="radio" name="q47" value="C"/><span><span class="letter">C.</span> Privacy-respecting usage analytics (Plausible or self-hosted PostHog)
+          <span class="detail">DAU, feature adoption, page views — no personal data.</span></span></label>
+        <label><input type="radio" name="q47" value="D"/><span><span class="letter">D.</span> Full product analytics (Mixpanel, Amplitude, PostHog Cloud)
+          <span class="detail">Event-level tracking. Overkill pre-launch; potentially privacy-sensitive.</span></span></label>
+        <label><input type="radio" name="q47" value="E"/><span><span class="letter">E.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q47_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q48">
+      <h3><span class="qnum">39.</span> Testing philosophy</h3>
+      <p class="context">What's the testing bar for v1 code? Current repo has vitest + Playwright configured.</p>
+      <div class="options">
+        <label><input type="radio" name="q48" value="A"/><span><span class="letter">A.</span> Critical paths only: auth, scoring, Pass D computations, persistence layer (unit + integration) <span class="rec">REC</span>
+          <span class="detail">Best ROI. Tests live where bugs change grades. UI + layout covered by manual QA.</span></span></label>
+        <label><input type="radio" name="q48" value="B"/><span><span class="letter">B.</span> Full coverage mandate (≥80% across all code)
+          <span class="detail">Expensive. Tests fragile UI assertions that mostly re-confirm DOM shape.</span></span></label>
+        <label><input type="radio" name="q48" value="C"/><span><span class="letter">C.</span> Critical paths + E2E flows via Playwright (sign-in → create course → score → report)
+          <span class="detail">Adds confidence that the whole system wires together. Slower CI.</span></span></label>
+        <label><input type="radio" name="q48" value="D"/><span><span class="letter">D.</span> TDD — tests written first for all new code
+          <span class="detail">Highest discipline; slowest iteration.</span></span></label>
+        <label><input type="radio" name="q48" value="E"/><span><span class="letter">E.</span> Manual QA only; no automated tests
+          <span class="detail">Fastest to ship; relies on you being thorough.</span></span></label>
+        <label><input type="radio" name="q48" value="F"/><span><span class="letter">F.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q48_other" rows="2"></textarea></div>
+    </article>
+  </section>
+
+  <!-- ============ PASS A OPENS ============ -->
+  <section class="tier" id="tierA">
+    <h2>Pass A — surviving open questions</h2>
+    <p class="tier-desc">ERD defaults never explicitly confirmed. Mostly "your rec."</p>
+
+    <article class="question" data-qid="q19">
+      <h3><span class="qnum">40.</span> CustomTag vs. learning-map Tag</h3>
+      <p class="context">Teacher-made tags for observations vs. structured learning-map Tags.</p>
+      <div class="options">
+        <label><input type="radio" name="q19" value="A"/><span><span class="letter">A.</span> Permanently distinct; no promotion path <span class="rec">REC</span></span></label>
+        <label><input type="radio" name="q19" value="B"/><span><span class="letter">B.</span> Allow explicit promotion (CustomTag → Tag action)</span></label>
+        <label><input type="radio" name="q19" value="C"/><span><span class="letter">C.</span> Unify — drop CustomTag, use Tag with nullable section_id</span></label>
+        <label><input type="radio" name="q19" value="D"/><span><span class="letter">D.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q19_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q20">
+      <h3><span class="qnum">41.</span> Term identifier</h3>
+      <p class="context">How a term is identified on TermRating.</p>
+      <div class="options">
+        <label><input type="radio" name="q20" value="A"/><span><span class="letter">A.</span> Int 1–6 (BC-style) <span class="rec">REC</span></span></label>
+        <label><input type="radio" name="q20" value="B"/><span><span class="letter">B.</span> Int 1–6 + optional teacher label per course</span></label>
+        <label><input type="radio" name="q20" value="C"/><span><span class="letter">C.</span> Full <code>TermDefinition</code> entity with dates</span></label>
+        <label><input type="radio" name="q20" value="D"/><span><span class="letter">D.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q20_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q21">
+      <h3><span class="qnum">42.</span> Rubric scope</h3>
+      <p class="context">Can a rubric be reused across courses?</p>
+      <div class="options">
+        <label><input type="radio" name="q21" value="A"/><span><span class="letter">A.</span> Course-scoped; duplicate copies rubrics <span class="rec">REC</span></span></label>
+        <label><input type="radio" name="q21" value="B"/><span><span class="letter">B.</span> Teacher-scoped library</span></label>
+        <label><input type="radio" name="q21" value="C"/><span><span class="letter">C.</span> Both: default course-scoped; "save to library" action</span></label>
+        <label><input type="radio" name="q21" value="D"/><span><span class="letter">D.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q21_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q22">
+      <h3><span class="qnum">43.</span> Student ownership model</h3>
+      <p class="context">How Student ties to Teacher.</p>
+      <div class="options">
+        <label><input type="radio" name="q22" value="A"/><span><span class="letter">A.</span> Teacher-owned (<code>Student.teacher_id</code> FK); delete cascades <span class="rec">REC</span></span></label>
+        <label><input type="radio" name="q22" value="B"/><span><span class="letter">B.</span> Independent Student; Enrollment carries teacher relationship</span></label>
+        <label><input type="radio" name="q22" value="C"/><span><span class="letter">C.</span> School-owned with Teacher as role (future-proof for multi-teacher orgs)</span></label>
+        <label><input type="radio" name="q22" value="D"/><span><span class="letter">D.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q22_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q49">
+      <h3><span class="qnum">44.</span> Student data carry-forward across school years</h3>
+      <p class="context">Teacher teaches Kate in English 10 in 2025–26. Next year she's in the same teacher's English 11. Should Kate's English 10 observations, notes, goals, reflections be visible in the English 11 view?</p>
+      <div class="options">
+        <label><input type="radio" name="q49" value="A"/><span><span class="letter">A.</span> Yes — since Student is teacher-owned, show a "historical context" panel on the student profile aggregating prior courses <span class="rec">REC</span>
+          <span class="detail">Reuses teacher-owned Student record (Q40 answer A). Prior context informs current teaching.</span></span></label>
+        <label><input type="radio" name="q49" value="B"/><span><span class="letter">B.</span> No — each course is a sandbox; only this course's data appears in this course's views
+          <span class="detail">Cleaner mental model; loses valuable continuity.</span></span></label>
+        <label><input type="radio" name="q49" value="C"/><span><span class="letter">C.</span> Partial — notes + goals + reflections carry forward; observations stay course-scoped
+          <span class="detail">Observations often term-specific ("Kate struggled with Essay 2"). Notes and goals more universal.</span></span></label>
+        <label><input type="radio" name="q49" value="D"/><span><span class="letter">D.</span> Teacher-controlled per course: "include historical data on student profile?" toggle
+          <span class="detail">Flexibility for teachers who want fresh starts or continuity.</span></span></label>
+        <label><input type="radio" name="q49" value="E"/><span><span class="letter">E.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q49_other" rows="2"></textarea></div>
+    </article>
+  </section>
+
+  <!-- ============ PRODUCT ============ -->
+  <section class="tier" id="tierProduct">
+    <h2>Product / content decisions</h2>
+    <p class="tier-desc">Four base questions plus one conditional branch.</p>
+
+    <article class="question" data-qid="q23">
+      <h3><span class="qnum">45.</span> Demo seed content</h3>
+      <p class="context">The bundled JSON loaded when a visitor taps "Try Demo Mode."</p>
+
+      <div class="sub-q">
+        <div class="sub-q-head">a. Grade level + subject of the demo class</div>
+        <div class="options">
+          <label><input type="radio" name="q23a" value="A"/><span><span class="letter">A.</span> Grade 10 English — showcases both modes <span class="rec">REC</span></span></label>
+          <label><input type="radio" name="q23a" value="B"/><span><span class="letter">B.</span> Grade 8 Humanities (proficiency-focused)</span></label>
+          <label><input type="radio" name="q23a" value="C"/><span><span class="letter">C.</span> Grade 12 Philosophy (letter-focused)</span></label>
+          <label><input type="radio" name="q23a" value="D"/><span><span class="letter">D.</span> Two demo classes (one junior + one senior)</span></label>
+          <label><input type="radio" name="q23a" value="E"/><span><span class="letter">E.</span> Three classes (junior + senior + hybrid)</span></label>
+          <label><input type="radio" name="q23a" value="F"/><span><span class="letter">F.</span> Other</span></label>
+        </div>
+      </div>
+
+      <div class="sub-q">
+        <div class="sub-q-head">b. Number of students in each demo class</div>
+        <div class="options">
+          <label><input type="radio" name="q23b" value="A"/><span><span class="letter">A.</span> 12–15 (realistic small class) <span class="rec">REC</span></span></label>
+          <label><input type="radio" name="q23b" value="B"/><span><span class="letter">B.</span> 8–10 (minimal)</span></label>
+          <label><input type="radio" name="q23b" value="C"/><span><span class="letter">C.</span> 20–30 (full secondary class)</span></label>
+          <label><input type="radio" name="q23b" value="D"/><span><span class="letter">D.</span> Other</span></label>
+        </div>
+      </div>
+
+      <div class="sub-q">
+        <div class="sub-q-head">c. Assessment count and rubric mix</div>
+        <div class="options">
+          <label><input type="radio" name="q23c" value="A"/><span><span class="letter">A.</span> ~8 assessments, mix of rubric + direct-scored, varied completion <span class="rec">REC</span></span></label>
+          <label><input type="radio" name="q23c" value="B"/><span><span class="letter">B.</span> ~4 (simpler)</span></label>
+          <label><input type="radio" name="q23c" value="C"/><span><span class="letter">C.</span> ~15 (fuller)</span></label>
+          <label><input type="radio" name="q23c" value="D"/><span><span class="letter">D.</span> Other</span></label>
+        </div>
+      </div>
+
+      <div class="sub-q">
+        <div class="sub-q-head">d. Dataset personality (performance distribution)</div>
+        <div class="options">
+          <label><input type="radio" name="q23d" value="A"/><span><span class="letter">A.</span> Realistic bell curve — mostly middle, a few high, a few struggling <span class="rec">REC</span>
+            <span class="detail">Shows off at-risk indicator and class-average math.</span></span></label>
+          <label><input type="radio" name="q23d" value="B"/><span><span class="letter">B.</span> Uniformly strong class</span></label>
+          <label><input type="radio" name="q23d" value="C"/><span><span class="letter">C.</span> Struggling class (most at developing/emerging)</span></label>
+          <label><input type="radio" name="q23d" value="D"/><span><span class="letter">D.</span> Bimodal split</span></label>
+          <label><input type="radio" name="q23d" value="E"/><span><span class="letter">E.</span> Other</span></label>
+        </div>
+      </div>
+
+      <div class="sub-q">
+        <div class="sub-q-head">e. Include pre-populated observations / notes / one completed term rating?</div>
+        <div class="options">
+          <label><input type="radio" name="q23e" value="A"/><span><span class="letter">A.</span> Yes — a few observations + 1 student with a filled term rating narrative <span class="rec">REC</span></span></label>
+          <label><input type="radio" name="q23e" value="B"/><span><span class="letter">B.</span> Observations only; no term rating pre-fill</span></label>
+          <label><input type="radio" name="q23e" value="C"/><span><span class="letter">C.</span> Bare scores only</span></label>
+          <label><input type="radio" name="q23e" value="D"/><span><span class="letter">D.</span> Other</span></label>
+        </div>
+      </div>
+
+      <div class="other-row"><label>Additional seed notes</label><textarea name="q23_other" rows="3"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q24">
+      <h3><span class="qnum">46.</span> Report blocks — which appear in v1?</h3>
+      <p class="context">Check the blocks. Order matters; check them roughly in intended rendering order.</p>
+      <div class="options">
+        <label><input type="checkbox" name="q24" value="header"/><span><span class="letter">▫</span> <strong>Header</strong> — student/course/teacher/term <span class="rec">REC</span></span></label>
+        <label><input type="checkbox" name="q24" value="cover"/><span><span class="letter">▫</span> <strong>Cover page</strong> — logo, full info, issued-date, signature line
+          <span class="detail">For printed reports. Can skip for screen.</span></span></label>
+        <label><input type="checkbox" name="q24" value="academic_summary"/><span><span class="letter">▫</span> <strong>Academic Summary</strong> — overall Q/R/S + proficiency + category breakdown <span class="rec">REC</span></span></label>
+        <label><input type="checkbox" name="q24" value="section_outcomes"/><span><span class="letter">▫</span> <strong>Section Outcomes</strong> — per-competency with descriptors <span class="rec">REC</span></span></label>
+        <label><input type="checkbox" name="q24" value="focus_areas"/><span><span class="letter">▫</span> <strong>Focus Areas</strong> — per Q23 ranking rule <span class="rec">REC</span></span></label>
+        <label><input type="checkbox" name="q24" value="strengths"/><span><span class="letter">▫</span> <strong>Strengths</strong> — counterpart to Focus Areas</span></label>
+        <label><input type="checkbox" name="q24" value="completion"/><span><span class="letter">▫</span> <strong>Completion / Late Work</strong> — "N late this term", NS count, EXC count <span class="rec">REC</span></span></label>
+        <label><input type="checkbox" name="q24" value="attendance"/><span><span class="letter">▫</span> <strong>Attendance</strong> — term totals</span></label>
+        <label><input type="checkbox" name="q24" value="learner_dimensions"/><span><span class="letter">▫</span> <strong>Learner Dimensions</strong> — work habits, participation, social traits <span class="rec">REC</span></span></label>
+        <label><input type="checkbox" name="q24" value="teacher_narrative"/><span><span class="letter">▫</span> <strong>Teacher Narrative</strong> <span class="rec">REC</span></span></label>
+        <label><input type="checkbox" name="q24" value="goals"/><span><span class="letter">▫</span> <strong>Goals</strong> — per section</span></label>
+        <label><input type="checkbox" name="q24" value="observations"/><span><span class="letter">▫</span> <strong>Observations</strong> — cited via TermRatingObservation <span class="rec">REC</span></span></label>
+        <label><input type="checkbox" name="q24" value="assessments_list"/><span><span class="letter">▫</span> <strong>Assessment list</strong> — every assessment with score and category
+          <span class="detail">For dispute clarity. Detail-heavy.</span></span></label>
+        <label><input type="checkbox" name="q24" value="signature"/><span><span class="letter">▫</span> <strong>Signature block</strong> — teacher + optional principal signature lines</span></label>
+      </div>
+      <div class="other-row"><label>Other blocks (describe each)</label><textarea name="q24_other" rows="3"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q32">
+      <h3><span class="qnum">47.</span> First-run onboarding flow</h3>
+      <p class="context">A new teacher just verified email and signed in for the first time. What do they see?</p>
+      <div class="options">
+        <label><input type="radio" name="q32" value="A"/><span><span class="letter">A.</span> Empty-state home with prominent "Create your first course" card + "Try demo data" secondary link <span class="rec">REC</span>
+          <span class="detail">Explicit; self-paced. Matches current UX philosophy.</span></span></label>
+        <label><input type="radio" name="q32" value="B"/><span><span class="letter">B.</span> Forced class-creation wizard on first sign-in
+          <span class="detail">No "where do I start" moment; also no escape hatch.</span></span></label>
+        <label><input type="radio" name="q32" value="C"/><span><span class="letter">C.</span> Guided multi-step tour (class wizard → sample assessment → sample scoring)
+          <span class="detail">Most polished; most to build.</span></span></label>
+        <label><input type="radio" name="q32" value="D"/><span><span class="letter">D.</span> Auto-seed a "Welcome Class" with sample students + assessments
+          <span class="detail">Instant content; teacher modifies. Unlocks follow-up Q45.</span></span></label>
+        <label><input type="radio" name="q32" value="E"/><span><span class="letter">E.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q32_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q55">
+      <h3><span class="qnum">48.</span> Term Rating narrative auto-generate (row 232)</h3>
+      <p class="context">The current UI has an "auto-generate narrative" button on the term-rating editor. It's listed as SB in the inputs (saves via <code>upsert_term_rating</code>), but <em>how</em> the narrative is generated isn't specified anywhere in the design docs. This is a real product decision.</p>
+      <div class="options">
+        <label><input type="radio" name="q55" value="A"/><span><span class="letter">A.</span> AI-generated via Claude / OpenAI API — backend calls LLM with student's scores, competency breakdown, and observations as context; returns a draft narrative the teacher can edit
+          <span class="detail">Most powerful. Requires API key, per-call cost, and privacy review (student data leaves your DB). Teachers love this feature when it works.</span></span></label>
+        <label><input type="radio" name="q55" value="B"/><span><span class="letter">B.</span> Template-based — fill merge fields from student data: <code>"{name} has demonstrated {strength} in {top_section}. Focus areas include {focus}."</code>
+          <span class="detail">Deterministic, free, predictable. Often feels robotic to read.</span></span></label>
+        <label><input type="radio" name="q55" value="C"/><span><span class="letter">C.</span> Hybrid — template scaffold with AI-generated fill-ins for the personalized sentences <span class="rec">REC</span>
+          <span class="detail">Predictable structure + personalized nuance. Cheaper than full-AI per narrative.</span></span></label>
+        <label><input type="radio" name="q55" value="D"/><span><span class="letter">D.</span> Remove the feature — delete the button; teacher writes from scratch
+          <span class="detail">Simplest. Loses a feature already in the UI.</span></span></label>
+        <label><input type="radio" name="q55" value="E"/><span><span class="letter">E.</span> Defer — keep button as "coming soon"; decide implementation post-v1
+          <span class="detail">Ships v1 without this workstream.</span></span></label>
+        <label><input type="radio" name="q55" value="F"/><span><span class="letter">F.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes (which LLM provider? prompt style?)</label><textarea name="q55_other" rows="2"></textarea></div>
+    </article>
+
+    <!-- BRANCH q32=D -->
+    <article class="question" data-qid="q51" data-show-if="q32=D">
+      <h3><span class="qnum">49.</span> Welcome class content <span class="branch-flag">branch · unlocks if Q47 = D</span></h3>
+      <p class="context">Since you're auto-seeding, what goes in the Welcome Class? Should it mirror demo content, or be simpler?</p>
+      <div class="options">
+        <label><input type="radio" name="q51" value="A"/><span><span class="letter">A.</span> Same seed as demo class (use Q45 answers) <span class="rec">REC</span>
+          <span class="detail">One seed file, two use cases. Teachers see what demo users see.</span></span></label>
+        <label><input type="radio" name="q51" value="B"/><span><span class="letter">B.</span> Smaller "Hello World" class — 2 students, 1 assessment, 2 competencies
+          <span class="detail">Minimal scaffold; teacher quickly builds up from empty.</span></span></label>
+        <label><input type="radio" name="q51" value="C"/><span><span class="letter">C.</span> Different content from demo (specify in notes)
+          <span class="detail">Two seeds to maintain.</span></span></label>
+        <label><input type="radio" name="q51" value="D"/><span><span class="letter">D.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q51_other" rows="2"></textarea></div>
+    </article>
+  </section>
+
+  <!-- ============ OPERATIONAL ============ -->
+  <section class="tier" id="tierOps">
+    <h2>Operational setup</h2>
+    <p class="tier-desc">When code work actually starts.</p>
+
+    <article class="question" data-qid="q25">
+      <h3><span class="qnum">50.</span> Where to park the old site</h3>
+      <p class="context">Current Netlify deploy — stay online as reference, not primary.</p>
+      <div class="options">
+        <label><input type="radio" name="q25" value="A"/><span><span class="letter">A.</span> Move to <code>legacy.fullvision.app</code> subdomain <span class="rec">REC</span></span></label>
+        <label><input type="radio" name="q25" value="B"/><span><span class="letter">B.</span> Keep URL + HTTP basic-auth password gate</span></label>
+        <label><input type="radio" name="q25" value="C"/><span><span class="letter">C.</span> Take fully offline</span></label>
+        <label><input type="radio" name="q25" value="D"/><span><span class="letter">D.</span> Main stays on old; build new at <code>v2.fullvision.app</code>; swap at launch</span></label>
+        <label><input type="radio" name="q25" value="E"/><span><span class="letter">E.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q25_other" rows="2"></textarea></div>
+    </article>
+
+    <article class="question" data-qid="q26">
+      <h3><span class="qnum">51.</span> Env var strategy (prevent cross-environment writes)</h3>
+      <p class="context">Biggest risk of keeping old Supabase alive: pointing new code at old URL.</p>
+      <div class="options">
+        <label><input type="radio" name="q26" value="A"/><span><span class="letter">A.</span> Separate <code>.env</code> files per environment; never coexist <span class="rec">REC</span></span></label>
+        <label><input type="radio" name="q26" value="B"/><span><span class="letter">B.</span> Single <code>.env</code> with suffixes (<code>_V2</code> / <code>_LEGACY</code>)</span></label>
+        <label><input type="radio" name="q26" value="C"/><span><span class="letter">C.</span> Netlify deploy-context prefixes per branch</span></label>
+        <label><input type="radio" name="q26" value="D"/><span><span class="letter">D.</span> Other</span></label>
+      </div>
+      <div class="other-row"><label>Notes</label><textarea name="q26_other" rows="2"></textarea></div>
+    </article>
+  </section>
+
+</main>
+
+<dialog class="export-dialog" id="exportDialog">
+  <div class="dialog-head">
+    <h2>Your answers</h2>
+    <button id="closeDialog" aria-label="Close">×</button>
+  </div>
+  <div class="dialog-body">
+    <p>Copy this and paste it back to me. Anything marked <code>(no answer)</code> means you skipped it.</p>
+    <textarea id="exportText" readonly></textarea>
+  </div>
+  <div class="dialog-actions">
+    <button id="copyBtn" class="primary">Copy to clipboard</button>
+  </div>
+</dialog>
+
+<div class="save-toast" id="saveToast">Saved</div>
+
+<script>
+(() => {
+  const STORAGE_KEY = 'fullvision-decisions-v2';
+  const TIER_MAP = {
+    '1': ['q1','q2','q3','q4','q27','q30','q33','q34','q35','q36'],
+    '2': ['q5','q6','q7','q8','q39','q40','q41','q42'],
+    '3': ['q9','q10','q11','q12','q13','q28','q43','q52','q53','q54','q44'],
+    '4': ['q14','q15','q16','q17','q18','q29','q31','q46','q47','q48'],
+    'A': ['q19','q20','q21','q22','q49'],
+    'P': ['q23','q24','q32','q55','q51'],
+    'O': ['q25','q26']
+  };
+  const Q23_PARTS = ['q23a','q23b','q23c','q23d','q23e'];
+
+  const TITLES = {
+    q1: 'Tech stack',
+    q2: 'Fresh Supabase project',
+    q3: 'Code location',
+    q4: 'ObservationTemplate creation',
+    q27: 'Sign-up gating',
+    q30: 'Email deliverability',
+    q33: 'Custom domain ownership',
+    q34: 'CI/CD pipeline',
+    q35: 'Invite code management (branch)',
+    q36: 'External email provider (branch)',
+    q5: 'Per-tag contribution in section proficiency',
+    q6: 'Decaying-average semantics',
+    q7: 'No-category letter-mode fallback',
+    q8: 'Rubric with zero criteria linked to a tag',
+    q39: 'Points-mode score normalization',
+    q40: 'Display rounding (proficiency / percentage)',
+    q41: 'Decaying-avg chronological sort key',
+    q42: 'Empty category handling',
+    q9: 'At-risk threshold',
+    q10: 'Category weights summing behavior',
+    q11: 'grading_system auto-default from grade_level',
+    q12: 'Per-section calc_method override',
+    q13: 'Focus Areas ranking',
+    q28: 'Timezone handling',
+    q43: 'Gradebook Tab direction',
+    q52: 'Legacy grading-scale UI controls',
+    q53: 'Legacy summative/formative toggle',
+    q54: 'Legacy category-weights controls',
+    q44: 'Course duplicate scope',
+    q14: 'Audit log',
+    q15: 'Soft-delete for Teacher',
+    q16: 'Multi-session caps',
+    q17: 'Data export',
+    q18: 'Rate limiting',
+    q29: 'Offline / PWA behavior',
+    q31: 'Error monitoring',
+    q46: 'Backup strategy',
+    q47: 'Analytics / telemetry',
+    q48: 'Testing philosophy',
+    q19: 'CustomTag vs Tag',
+    q20: 'Term identifier',
+    q21: 'Rubric scope',
+    q22: 'Student ownership',
+    q49: 'Student data carry-forward across years',
+    q23a: 'Demo class grade/subject',
+    q23b: 'Demo student count',
+    q23c: 'Demo assessment mix',
+    q23d: 'Demo dataset personality',
+    q23e: 'Demo extras (observations/term rating)',
+    q24: 'Report blocks',
+    q32: 'First-run onboarding',
+    q55: 'Term rating narrative auto-generate',
+    q51: 'Welcome class content (branch)',
+    q25: 'Old-site parking',
+    q26: 'Env var strategy'
+  };
+
+  let state = {};
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) state = JSON.parse(raw);
+  } catch(e) { state = {}; }
+
+  function applyState() {
+    document.querySelectorAll('input[type="radio"]').forEach(el => {
+      if (state[el.name] === el.value) el.checked = true;
+    });
+    document.querySelectorAll('input[type="checkbox"]').forEach(el => {
+      const arr = state[el.name];
+      if (Array.isArray(arr) && arr.includes(el.value)) el.checked = true;
+    });
+    document.querySelectorAll('textarea[name]').forEach(el => {
+      if (state[el.name]) el.value = state[el.name];
+    });
+  }
+
+  function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const toast = document.getElementById('saveToast');
+    toast.classList.add('show');
+    clearTimeout(save._t);
+    save._t = setTimeout(() => toast.classList.remove('show'), 800);
+  }
+
+  function isApplicable(qid) {
+    const article = document.querySelector('article[data-qid="'+qid+'"]');
+    if (!article) return false;
+    const condition = article.getAttribute('data-show-if');
+    if (!condition) return true;
+    const [triggerQ, triggerVals] = condition.split('=');
+    const values = triggerVals.split('|');
+    return values.includes(state[triggerQ]);
+  }
+
+  function isAnswered(qid) {
+    if (!isApplicable(qid)) return false;
+    if (qid === 'q23') return Q23_PARTS.every(p => state[p]);
+    if (qid === 'q24') return Array.isArray(state.q24) && state.q24.length > 0;
+    return !!state[qid];
+  }
+
+  function updateVisibility() {
+    document.querySelectorAll('article[data-show-if]').forEach(article => {
+      const qid = article.getAttribute('data-qid');
+      article.style.display = isApplicable(qid) ? '' : 'none';
+    });
+  }
+
+  function updateProgress() {
+    document.querySelectorAll('article.question').forEach(a => {
+      const qid = a.getAttribute('data-qid');
+      a.classList.toggle('answered', isAnswered(qid));
+    });
+
+    let totalAnswered = 0, totalQuestions = 0;
+    Object.entries(TIER_MAP).forEach(([tier, qids]) => {
+      const applicable = qids.filter(isApplicable);
+      const count = applicable.filter(isAnswered).length;
+      const total = applicable.length;
+      totalAnswered += count;
+      totalQuestions += total;
+      const el = document.querySelector('[data-count-tier="'+tier+'"]');
+      if (el) el.textContent = count + '/' + total;
+      const nav = el ? el.closest('a') : null;
+      if (nav) nav.classList.toggle('tier-complete', count === total && total > 0);
+    });
+
+    const pct = totalQuestions ? (totalAnswered / totalQuestions * 100) : 0;
+    document.getElementById('progressFill').style.width = pct + '%';
+    document.getElementById('progressText').textContent = totalAnswered + ' / ' + totalQuestions + ' answered';
+  }
+
+  document.addEventListener('change', (e) => {
+    const el = e.target;
+    if (el.type === 'radio' && el.name) {
+      state[el.name] = el.value;
+      save();
+      updateVisibility();
+      updateProgress();
+    } else if (el.type === 'checkbox' && el.name) {
+      if (!Array.isArray(state[el.name])) state[el.name] = [];
+      if (el.checked) {
+        if (!state[el.name].includes(el.value)) state[el.name].push(el.value);
+      } else {
+        state[el.name] = state[el.name].filter(v => v !== el.value);
+      }
+      save();
+      updateProgress();
+    } else if (el.tagName === 'TEXTAREA' && el.name) {
+      state[el.name] = el.value;
+      save();
+    }
+  });
+
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    if (!confirm('Clear all answers?')) return;
+    state = {};
+    localStorage.removeItem(STORAGE_KEY);
+    document.querySelectorAll('input[type="radio"], input[type="checkbox"]').forEach(el => el.checked = false);
+    document.querySelectorAll('textarea[name]').forEach(el => el.value = '');
+    updateVisibility();
+    updateProgress();
+  });
+
+  document.getElementById('jumpBtn').addEventListener('click', () => {
+    const articles = Array.from(document.querySelectorAll('article.question'));
+    const next = articles.find(a => {
+      const qid = a.getAttribute('data-qid');
+      return isApplicable(qid) && !isAnswered(qid);
+    });
+    if (next) next.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    else alert('All applicable questions answered! Hit "Export answers".');
+  });
+
+  function renderExport() {
+    const lines = [];
+    lines.push('# FullVision Backend Design — My Answers');
+    lines.push('');
+    lines.push('Generated ' + new Date().toISOString().slice(0,10) + '.');
+    lines.push('');
+
+    const tierNames = {
+      '1': 'Tier 1 — Infrastructure blockers',
+      '2': 'Tier 2 — Math that affects grades',
+      '3': 'Tier 3 — Behavioral defaults',
+      '4': 'Tier 4 — Quality features',
+      'A': 'Pass A — surviving open questions',
+      'P': 'Product / content decisions',
+      'O': 'Operational setup'
+    };
+
+    let qNum = 0;
+    Object.entries(TIER_MAP).forEach(([tier, qids]) => {
+      lines.push('## ' + tierNames[tier]);
+      lines.push('');
+      qids.forEach(qid => {
+        // Skip branches that aren't applicable
+        if (!isApplicable(qid)) return;
+        qNum++;
+        if (qid === 'q23') {
+          lines.push('**' + qNum + '. Demo seed content**');
+          Q23_PARTS.forEach(p => {
+            const ans = state[p] || '(no answer)';
+            lines.push('- ' + TITLES[p] + ': **' + ans + '**');
+          });
+          if (state.q23_other && state.q23_other.trim())
+            lines.push('- Notes: ' + state.q23_other.trim());
+          lines.push('');
+        } else if (qid === 'q24') {
+          lines.push('**' + qNum + '. ' + TITLES.q24 + '**');
+          const arr = state.q24 || [];
+          if (arr.length) arr.forEach(b => lines.push('- ✓ ' + b));
+          else lines.push('- (no blocks selected)');
+          if (state.q24_other && state.q24_other.trim())
+            lines.push('- Other blocks: ' + state.q24_other.trim());
+          lines.push('');
+        } else {
+          const ans = state[qid] || '(no answer)';
+          lines.push('**' + qNum + '. ' + TITLES[qid] + ':** ' + ans);
+          const other = state[qid+'_other'];
+          if (other && other.trim()) lines.push('  _Notes:_ ' + other.trim());
+          lines.push('');
+        }
+      });
+    });
+
+    return lines.join('\n');
+  }
+
+  const dialog = document.getElementById('exportDialog');
+  const exportText = document.getElementById('exportText');
+  document.getElementById('exportBtn').addEventListener('click', () => {
+    exportText.value = renderExport();
+    if (typeof dialog.showModal === 'function') dialog.showModal();
+    else dialog.setAttribute('open','');
+  });
+  document.getElementById('closeDialog').addEventListener('click', () => dialog.close());
+  document.getElementById('copyBtn').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(exportText.value);
+      document.getElementById('copyBtn').textContent = 'Copied!';
+      setTimeout(() => document.getElementById('copyBtn').textContent = 'Copy to clipboard', 1500);
+    } catch(e) {
+      exportText.select();
+      document.execCommand('copy');
+      document.getElementById('copyBtn').textContent = 'Copied!';
+      setTimeout(() => document.getElementById('copyBtn').textContent = 'Copy to clipboard', 1500);
+    }
+  });
+
+  applyState();
+  updateVisibility();
+  updateProgress();
+})();
+</script>
+</body>
+</html>
