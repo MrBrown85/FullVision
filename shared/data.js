@@ -3957,90 +3957,146 @@ function _studentIdentityChanged(a, b) {
   );
 }
 
+/* v2 create_student_and_enroll(p_course_id, p_first_name, p_last_name,
+   p_preferred_name, p_pronouns, p_student_number, p_email, p_date_of_birth,
+   p_designations, p_existing_student_id) → { student_id, enrollment_id } */
 function _canonicalEnrollStudent(sb, cid, s, idx) {
+  var existingStudentId = _isUuid(s.personId) ? s.personId : null;
   return sb
-    .rpc('enroll_student', {
-      p_course_offering_id: cid,
-      p_payload: {
-        student: {
-          firstName: s.firstName || '',
-          lastName: s.lastName || '',
-          preferred: s.preferred || '',
-          pronouns: s.pronouns || '',
-          email: s.email || '',
-          dateOfBirth: s.dateOfBirth || '',
-        },
-        rosterPosition: idx + 1,
-        studentNumber: s.studentNumber || '',
-        enrolledDate: s.enrolledDate || '',
-        designations: s.designations || [],
-      },
+    .rpc('create_student_and_enroll', {
+      p_course_id:            cid,
+      p_first_name:           s.firstName || '',
+      p_last_name:            s.lastName || null,
+      p_preferred_name:       s.preferred || null,
+      p_pronouns:             s.pronouns || null,
+      p_student_number:       s.studentNumber || null,
+      p_email:                s.email || null,
+      p_date_of_birth:        s.dateOfBirth || null,
+      p_designations:         s.designations || [],
+      p_existing_student_id:  existingStudentId,
     })
     .then(function (res) {
       if (res.error) {
-        console.warn('enroll_student failed:', res.error, s);
+        console.warn('create_student_and_enroll failed:', res.error, s);
         return;
       }
       var row = res.data || {};
-      // roster_entry_json returns canonical ids — patch the cached student in place
       var cached = (_cache.students[cid] || []).find(function (c) {
         return c.id === s.id;
       });
       if (cached && row.enrollment_id) {
         cached.id = row.enrollment_id;
         cached.personId = row.student_id;
+        cached.rosterPosition = idx;
       }
-      // Persist the patched cache so the canonical id sticks across reloads
       if (_cache.students[cid]) {
         _safeLSSet('gb-students-' + cid, JSON.stringify(_cache.students[cid]));
       }
     });
 }
 
+/* v2 update_enrollment(p_id, p_patch jsonb) — jsonb patch.
+   Accepted keys: designations (text[]), is_flagged, roster_position, withdrawn_at. */
 function _canonicalUpdateEnrollment(sb, enrollmentId, s, idx) {
+  var patch = {
+    designations: s.designations || [],
+    roster_position: idx,
+  };
+  if (typeof s.isFlagged === 'boolean') patch.is_flagged = s.isFlagged;
   return sb
-    .rpc('update_enrollment', {
-      p_enrollment_id: enrollmentId,
-      p_payload: {
-        studentNumber: s.studentNumber || '',
-        rosterPosition: idx + 1,
-        enrolledDate: s.enrolledDate || '',
-        designations: s.designations || [],
-      },
-    })
+    .rpc('update_enrollment', { p_id: enrollmentId, p_patch: patch })
     .then(function (res) {
       if (res.error) console.warn('update_enrollment failed:', res.error, enrollmentId);
     });
 }
 
+/* v2 update_student(p_id, p_patch jsonb).
+   Accepted keys: first_name, last_name, preferred_name, pronouns,
+   student_number, email, date_of_birth. */
 function _canonicalUpdateStudent(sb, studentId, s) {
+  var patch = {
+    first_name:     s.firstName || '',
+    last_name:      s.lastName || null,
+    preferred_name: s.preferred || null,
+    pronouns:       s.pronouns || null,
+    student_number: s.studentNumber || null,
+    email:          s.email || null,
+    date_of_birth:  s.dateOfBirth || null,
+  };
   return sb
-    .rpc('update_student', {
-      p_student_id: studentId,
-      p_payload: {
-        firstName: s.firstName || '',
-        lastName: s.lastName || '',
-        preferred: s.preferred || '',
-        pronouns: s.pronouns || '',
-        email: s.email || '',
-        dateOfBirth: s.dateOfBirth || '',
-      },
-    })
+    .rpc('update_student', { p_id: studentId, p_patch: patch })
     .then(function (res) {
       if (res.error) console.warn('update_student failed:', res.error, studentId);
     });
 }
 
+/* v2 withdraw_enrollment(p_id) — sets withdrawn_at = now(). */
 function _canonicalWithdrawEnrollment(sb, enrollmentId) {
   return sb
-    .rpc('withdraw_enrollment', {
-      enrollment_id: enrollmentId,
-      withdrawn_on: new Date().toISOString().slice(0, 10),
-    })
+    .rpc('withdraw_enrollment', { p_id: enrollmentId })
     .then(function (res) {
       if (res.error) console.warn('withdraw_enrollment failed:', res.error, enrollmentId);
     });
 }
+
+/* ── Public v2 student/enrollment helpers (Phase 4.1) ─────────────────── */
+
+/* Bulk reorder the active roster. Accepts an ordered array of enrollment_ids. */
+window.reorderRoster = function (enrollmentIds) {
+  var sb = getSupabase();
+  if (!sb) return Promise.resolve();
+  var ids = (enrollmentIds || []).filter(_isUuid);
+  if (ids.length === 0) return Promise.resolve();
+  return sb.rpc('reorder_roster', { p_ids: ids }).then(function (res) {
+    if (res.error) console.warn('reorder_roster failed:', res.error);
+    return res;
+  });
+};
+
+/* Apply one pronoun string to N students. */
+window.bulkApplyPronouns = function (studentIds, pronouns) {
+  var sb = getSupabase();
+  if (!sb) return Promise.resolve();
+  var ids = (studentIds || []).filter(_isUuid);
+  if (ids.length === 0) return Promise.resolve();
+  return sb
+    .rpc('bulk_apply_pronouns', { p_student_ids: ids, p_pronouns: pronouns || null })
+    .then(function (res) {
+      if (res.error) console.warn('bulk_apply_pronouns failed:', res.error);
+      return res;
+    });
+};
+
+/* CSV import — rows are objects mirroring the RPC's expected keys:
+   { first_name, last_name, preferred_name?, pronouns?, student_number?,
+     email?, date_of_birth?, designations?: string[] } */
+window.importRosterCsv = function (cid, rows) {
+  var sb = getSupabase();
+  if (!sb) return Promise.resolve();
+  if (!_isUuid(cid)) return Promise.resolve();
+  return sb
+    .rpc('import_roster_csv', { p_course_id: cid, p_rows: rows || [] })
+    .then(function (res) {
+      if (res.error) console.warn('import_roster_csv failed:', res.error);
+      return res;
+    });
+};
+
+/* Single-enrollment flag toggle — v2 enrollment.is_flagged column. */
+window.setEnrollmentFlag = function (enrollmentId, flagged) {
+  var sb = getSupabase();
+  if (!sb) return Promise.resolve();
+  if (!_isUuid(enrollmentId)) return Promise.resolve();
+  return sb
+    .rpc('update_enrollment', {
+      p_id: enrollmentId,
+      p_patch: { is_flagged: !!flagged },
+    })
+    .then(function (res) {
+      if (res.error) console.warn('update_enrollment (flag) failed:', res.error);
+      return res;
+    });
+};
 function getAssessments(cid) {
   if (_cache.assessments[cid] !== undefined) return _cache.assessments[cid];
   try {
