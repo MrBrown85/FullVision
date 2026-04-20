@@ -16,6 +16,7 @@
 --   fullvision_v2_write_path_scoring          (2026-04-19)
 --   fullvision_v2_fix_score_audit_security_definer (2026-04-19)
 --   fullvision_v2_write_path_observation      (2026-04-19)
+--   fullvision_v2_write_path_student_records  (2026-04-19)
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Phase 1.1 — Auth / bootstrap RPCs
@@ -1700,3 +1701,105 @@ grant execute on function delete_observation(uuid) to authenticated;
 grant execute on function upsert_observation_template(uuid, uuid, text, text, text, int) to authenticated;
 grant execute on function delete_observation_template(uuid) to authenticated;
 grant execute on function create_custom_tag(uuid, text) to authenticated;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Phase 1.9 — Student-scoped records (§11, §4.7)
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Note: immutable (add + delete only). Goal/Reflection/SectionOverride: upsert
+-- per (enrollment_id, section_id). Attendance: bulk upsert per (enrollment, date).
+
+create or replace function upsert_note(p_enrollment_id uuid, p_body text) returns uuid
+language plpgsql security invoker set search_path = public as $$
+declare _id uuid;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    insert into note (enrollment_id, body) values (p_enrollment_id, p_body) returning id into _id;
+    return _id;
+end; $$;
+
+create or replace function delete_note(p_id uuid) returns void
+language plpgsql security invoker set search_path = public as $$
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    delete from note where id = p_id;
+    if not found then raise exception 'note not found' using errcode = 'P0002'; end if;
+end; $$;
+
+create or replace function upsert_goal(p_enrollment_id uuid, p_section_id uuid, p_body text) returns uuid
+language plpgsql security invoker set search_path = public as $$
+declare _id uuid;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    insert into goal (enrollment_id, section_id, body)
+    values (p_enrollment_id, p_section_id, p_body)
+    on conflict (enrollment_id, section_id) do update
+       set body = excluded.body, updated_at = now()
+    returning id into _id;
+    return _id;
+end; $$;
+
+create or replace function upsert_reflection(
+    p_enrollment_id uuid, p_section_id uuid, p_body text, p_confidence int default null
+) returns uuid
+language plpgsql security invoker set search_path = public as $$
+declare _id uuid;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    if p_confidence is not null and (p_confidence < 1 or p_confidence > 5) then
+        raise exception 'confidence must be 1..5' using errcode = '22023';
+    end if;
+    insert into reflection (enrollment_id, section_id, body, confidence)
+    values (p_enrollment_id, p_section_id, p_body, p_confidence)
+    on conflict (enrollment_id, section_id) do update
+       set body = excluded.body, confidence = excluded.confidence, updated_at = now()
+    returning id into _id;
+    return _id;
+end; $$;
+
+create or replace function upsert_section_override(
+    p_enrollment_id uuid, p_section_id uuid, p_level int, p_reason text default null
+) returns uuid
+language plpgsql security invoker set search_path = public as $$
+declare _id uuid;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    if p_level < 1 or p_level > 4 then raise exception 'level must be 1..4' using errcode = '22023'; end if;
+    insert into section_override (enrollment_id, section_id, level, reason)
+    values (p_enrollment_id, p_section_id, p_level, p_reason)
+    on conflict (enrollment_id, section_id) do update
+       set level = excluded.level, reason = excluded.reason, updated_at = now()
+    returning id into _id;
+    return _id;
+end; $$;
+
+create or replace function clear_section_override(p_enrollment_id uuid, p_section_id uuid) returns void
+language plpgsql security invoker set search_path = public as $$
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    delete from section_override where enrollment_id = p_enrollment_id and section_id = p_section_id;
+end; $$;
+
+create or replace function bulk_attendance(p_enrollment_ids uuid[], p_date date, p_status text) returns int
+language plpgsql security invoker set search_path = public as $$
+declare _n int := 0; _eid uuid;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    if p_enrollment_ids is null then return 0; end if;
+    foreach _eid in array p_enrollment_ids loop
+        insert into attendance (enrollment_id, attendance_date, status)
+        values (_eid, p_date, p_status)
+        on conflict (enrollment_id, attendance_date) do update
+           set status = excluded.status, updated_at = now();
+        _n := _n + 1;
+    end loop;
+    return _n;
+end; $$;
+
+grant execute on function upsert_note(uuid, text) to authenticated;
+grant execute on function delete_note(uuid) to authenticated;
+grant execute on function upsert_goal(uuid, uuid, text) to authenticated;
+grant execute on function upsert_reflection(uuid, uuid, text, int) to authenticated;
+grant execute on function upsert_section_override(uuid, uuid, int, text) to authenticated;
+grant execute on function clear_section_override(uuid, uuid) to authenticated;
+grant execute on function bulk_attendance(uuid[], date, text) to authenticated;
