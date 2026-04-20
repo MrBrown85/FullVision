@@ -5031,6 +5031,54 @@ window.v2.bulkAttendance = function (enrollmentIds, date, status) {
   });
 };
 
+/* ── v2 term rating composite save (Phase 4.7) ──────────────────────────
+   Mirrors the §13 capture form: one RPC saves the TermRating row plus all
+   five dependent sets (dimensions, strength/growth tag memberships,
+   assessment mentions, observation mentions), with per-field audit rows
+   written inside the same transaction (Q28).
+
+   payload (camelCase client → snake_case wire): any key may be omitted to
+   leave that field / set alone. Passing empty [] for a set wipes it.
+     narrativeHtml        → narrative_html
+     workHabitsRating     → work_habits_rating    (1..4 or null)
+     participationRating  → participation_rating  (1..4 or null)
+     socialTraits         → social_traits         (string[])
+     dimensions           → dimensions: [{ sectionId, rating 1..4 }]
+     strengthTagIds       → strength_tags[]
+     growthTagIds         → growth_tags[]
+     mentionAssessmentIds → mention_assessments[]
+     mentionObservationIds→ mention_observations[] */
+window.v2.saveTermRating = function (enrollmentId, term, payload) {
+  payload = payload || {};
+  var wire = {};
+  if ('narrativeHtml' in payload)        wire.narrative_html       = payload.narrativeHtml;
+  if ('workHabitsRating' in payload)     wire.work_habits_rating   = payload.workHabitsRating;
+  if ('participationRating' in payload)  wire.participation_rating = payload.participationRating;
+  if ('socialTraits' in payload)         wire.social_traits        = payload.socialTraits || [];
+  if (Array.isArray(payload.dimensions)) {
+    wire.dimensions = payload.dimensions.map(function (d) {
+      return { section_id: d.sectionId, rating: Number(d.rating) };
+    });
+  }
+  if (Array.isArray(payload.strengthTagIds)) {
+    wire.strength_tags = payload.strengthTagIds.filter(_isUuid);
+  }
+  if (Array.isArray(payload.growthTagIds)) {
+    wire.growth_tags = payload.growthTagIds.filter(_isUuid);
+  }
+  if (Array.isArray(payload.mentionAssessmentIds)) {
+    wire.mention_assessments = payload.mentionAssessmentIds.filter(_isUuid);
+  }
+  if (Array.isArray(payload.mentionObservationIds)) {
+    wire.mention_observations = payload.mentionObservationIds.filter(_isUuid);
+  }
+  return _rpcOrNoop('save_term_rating', {
+    p_enrollment_id: enrollmentId,
+    p_term:          Number(term),
+    p_payload:       wire,
+  });
+};
+
 /* Custom tag — per §12, create-only path (no edit/delete inventoried). */
 window.createCustomTag = function (cid, label) {
   var sb = getSupabase();
