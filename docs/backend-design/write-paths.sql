@@ -12,6 +12,7 @@
 --   fullvision_v2_write_path_learning_map     (2026-04-19)
 --   fullvision_v2_write_path_student_enrollment (2026-04-19)
 --   fullvision_v2_fix_import_roster_csv_reenroll (2026-04-19)
+--   fullvision_v2_write_path_assessment_crud  (2026-04-19)
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Phase 1.1 — Auth / bootstrap RPCs
@@ -1196,3 +1197,144 @@ grant execute on function withdraw_enrollment(uuid) to authenticated;
 grant execute on function reorder_roster(uuid[]) to authenticated;
 grant execute on function bulk_apply_pronouns(uuid[], text) to authenticated;
 grant execute on function import_roster_csv(uuid, jsonb) to authenticated;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Phase 1.6 — Assessment CRUD (§8)
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Migration: fullvision_v2_write_path_assessment_crud (2026-04-19)
+
+create or replace function create_assessment(
+    p_course_id uuid, p_title text, p_category_id uuid default null,
+    p_description text default null, p_date_assigned date default null,
+    p_due_date date default null, p_score_mode text default 'proficiency',
+    p_max_points numeric default null, p_weight numeric default 1.0,
+    p_evidence_type text default null, p_rubric_id uuid default null,
+    p_module_id uuid default null, p_tag_ids uuid[] default '{}'
+) returns uuid
+language plpgsql security invoker set search_path = public as $$
+declare _id uuid; _next_pos int; _tag uuid;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    select coalesce(max(display_order)+1, 0) into _next_pos
+      from assessment where course_id = p_course_id and module_id is not distinct from p_module_id;
+
+    insert into assessment (course_id, category_id, title, description, date_assigned, due_date,
+                            score_mode, max_points, weight, evidence_type,
+                            rubric_id, module_id, display_order)
+    values (p_course_id, p_category_id, p_title, p_description, p_date_assigned, p_due_date,
+            p_score_mode, p_max_points, p_weight, p_evidence_type,
+            p_rubric_id, p_module_id, _next_pos)
+    returning id into _id;
+
+    if p_tag_ids is not null then
+        foreach _tag in array p_tag_ids loop
+            insert into assessment_tag (assessment_id, tag_id) values (_id, _tag) on conflict do nothing;
+        end loop;
+    end if;
+    return _id;
+end; $$;
+
+-- update_assessment: jsonb patch; when p_tag_ids is non-null, fully replaces tag set.
+create or replace function update_assessment(
+    p_id uuid, p_patch jsonb, p_tag_ids uuid[] default null
+) returns void
+language plpgsql security invoker set search_path = public as $$
+declare _tag uuid;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    update assessment set
+        title         = coalesce(p_patch->>'title', title),
+        description   = case when p_patch ? 'description'   then p_patch->>'description'   else description end,
+        category_id   = case when p_patch ? 'category_id'   then nullif(p_patch->>'category_id','')::uuid else category_id end,
+        date_assigned = case when p_patch ? 'date_assigned' then nullif(p_patch->>'date_assigned','')::date else date_assigned end,
+        due_date      = case when p_patch ? 'due_date'      then nullif(p_patch->>'due_date','')::date else due_date end,
+        score_mode    = coalesce(p_patch->>'score_mode', score_mode),
+        max_points    = case when p_patch ? 'max_points'    then nullif(p_patch->>'max_points','')::numeric else max_points end,
+        weight        = coalesce((p_patch->>'weight')::numeric, weight),
+        evidence_type = case when p_patch ? 'evidence_type' then p_patch->>'evidence_type' else evidence_type end,
+        rubric_id     = case when p_patch ? 'rubric_id'     then nullif(p_patch->>'rubric_id','')::uuid else rubric_id end,
+        module_id     = case when p_patch ? 'module_id'     then nullif(p_patch->>'module_id','')::uuid else module_id end,
+        display_order = case when p_patch ? 'display_order' then (p_patch->>'display_order')::int else display_order end,
+        updated_at    = now()
+    where id = p_id;
+    if not found then raise exception 'assessment not found' using errcode = 'P0002'; end if;
+
+    if p_tag_ids is not null then
+        delete from assessment_tag where assessment_id = p_id;
+        foreach _tag in array p_tag_ids loop
+            insert into assessment_tag (assessment_id, tag_id) values (p_id, _tag) on conflict do nothing;
+        end loop;
+    end if;
+end; $$;
+
+create or replace function duplicate_assessment(p_src_id uuid) returns uuid
+language plpgsql security invoker set search_path = public as $$
+declare _new_id uuid; _course uuid; _module uuid; _next_pos int;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    select course_id, module_id into _course, _module from assessment where id = p_src_id;
+    if _course is null then raise exception 'assessment not found' using errcode = 'P0002'; end if;
+    select coalesce(max(display_order)+1, 0) into _next_pos
+      from assessment where course_id = _course and module_id is not distinct from _module;
+
+    insert into assessment (course_id, category_id, title, description, date_assigned, due_date,
+                            score_mode, max_points, weight, evidence_type,
+                            rubric_id, module_id, collab_mode, collab_config, display_order)
+    select course_id, category_id, title || ' (copy)', description, date_assigned, due_date,
+           score_mode, max_points, weight, evidence_type,
+           rubric_id, module_id, collab_mode, collab_config, _next_pos
+      from assessment where id = p_src_id
+    returning id into _new_id;
+
+    insert into assessment_tag (assessment_id, tag_id)
+    select _new_id, tag_id from assessment_tag where assessment_id = p_src_id;
+    return _new_id;
+end; $$;
+
+create or replace function delete_assessment(p_id uuid) returns void
+language plpgsql security invoker set search_path = public as $$
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    delete from assessment where id = p_id;
+    if not found then raise exception 'assessment not found' using errcode = 'P0002'; end if;
+end; $$;
+
+create or replace function save_assessment_tags(p_id uuid, p_tag_ids uuid[]) returns void
+language plpgsql security invoker set search_path = public as $$
+declare _tag uuid;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    if not exists (select 1 from assessment where id = p_id) then
+        raise exception 'assessment not found' using errcode = 'P0002';
+    end if;
+    delete from assessment_tag where assessment_id = p_id;
+    if p_tag_ids is not null then
+        foreach _tag in array p_tag_ids loop
+            insert into assessment_tag (assessment_id, tag_id) values (p_id, _tag) on conflict do nothing;
+        end loop;
+    end if;
+end; $$;
+
+-- save_collab: sets collab_mode + collab_config atomically; null config when mode='none'.
+create or replace function save_collab(p_id uuid, p_mode text, p_config jsonb) returns void
+language plpgsql security invoker set search_path = public as $$
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    if p_mode not in ('none','pairs','groups') then
+        raise exception 'invalid collab_mode %', p_mode using errcode = '22023';
+    end if;
+    update assessment set
+        collab_mode   = p_mode,
+        collab_config = case when p_mode = 'none' then null else p_config end,
+        updated_at    = now()
+    where id = p_id;
+    if not found then raise exception 'assessment not found' using errcode = 'P0002'; end if;
+end; $$;
+
+grant execute on function create_assessment(uuid, text, uuid, text, date, date, text, numeric, numeric, text, uuid, uuid, uuid[]) to authenticated;
+grant execute on function update_assessment(uuid, jsonb, uuid[]) to authenticated;
+grant execute on function duplicate_assessment(uuid) to authenticated;
+grant execute on function delete_assessment(uuid) to authenticated;
+grant execute on function save_assessment_tags(uuid, uuid[]) to authenticated;
+grant execute on function save_collab(uuid, text, jsonb) to authenticated;
