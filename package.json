@@ -5,7 +5,8 @@
   "private": true,
   "scripts": {
     "build": "bash scripts/build.sh",
-    "dev": "npx serve -l 8347 --no-single",
+    "dev": "npx serve -l 8347",
+    "dev:local": "netlify dev --port 8347",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "npx playwright test",

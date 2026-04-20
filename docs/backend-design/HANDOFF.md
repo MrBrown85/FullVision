@@ -270,5 +270,6 @@ Claude appends one line per completed task. Format: `YYYY-MM-DD | session-<n> | 
 
 - `2026-04-20 | session-5 | plan-3.0 | created verify-rebuild-v2 worktree from rebuild-v2; npm install clean; fixed 2 stale test files (data-init-invokes-canonical-reads + data-pagination — were testing cancelled list_course_roster RPCs, updated to guard get_gradebook); all 36 tests green; commit 570529c`
 - `2026-04-20 | session-5 | plan-3.1-a | HANDOFF 3.2 code review: initAllCourses() correctly calls bootstrap_teacher → list_teacher_courses; Demo Mode short-circuits before those calls; tests green; dev server running at http://localhost:8347; browser + signed-in verification pending user action`
+- `2026-04-20 | session-5 | plan-3.1-a-verify | HANDOFF 3.2 fully verified end-to-end: signed in as brown_colin@surreyschools.ca → bootstrap_teacher created Teacher "Colin Brown" + Welcome Class on first v2 sign-in → list_teacher_courses returned it → Dashboard rendered with Welcome Class active (0 students — empty-state). DB confirms teacher row + 1 course. Local dev: required .env + substituted dist/ + npx serve (netlify dev --dir . bypasses edge function; netlify dev without --dir resolves publish-dir to git root, not worktree). Added dev:local script on rebuild-v2.`
 
 *(next session, keep appending.)*
