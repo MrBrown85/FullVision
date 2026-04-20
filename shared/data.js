@@ -921,14 +921,23 @@ async function initAllCourses() {
   if (!localStorage.getItem('gb-courses') && !_useSupabase) saveCourses(COURSES);
 
   try {
-    var savedQueue = JSON.parse(localStorage.getItem('gb-retry-queue') || '[]').filter(function (item) {
-      return item && item.table && item.key;
-    });
-    if (savedQueue.length > 0 && _useSupabase) {
-      _retryQueue = savedQueue;
-      setTimeout(_retryFailedSyncs, 2000);
-    } else {
+    // v2 TRANSITION (Phase 3.3): any queued retries are aimed at dropped
+    // legacy tables (scores/observations/assessments/students/teacher_config).
+    // Draining them would spam errors against v2. Discard until write paths
+    // are ported (Phases 3.5 + 4.x), at which point a fresh queue will form
+    // from live user actions.
+    if (!window.__V2_WRITE_PATHS_READY) {
       localStorage.removeItem('gb-retry-queue');
+    } else {
+      var savedQueue = JSON.parse(localStorage.getItem('gb-retry-queue') || '[]').filter(function (item) {
+        return item && item.table && item.key;
+      });
+      if (savedQueue.length > 0 && _useSupabase) {
+        _retryQueue = savedQueue;
+        setTimeout(_retryFailedSyncs, 2000);
+      } else {
+        localStorage.removeItem('gb-retry-queue');
+      }
     }
   } catch (e) {
     localStorage.removeItem('gb-retry-queue');
@@ -1951,6 +1960,33 @@ function _canonicalFlagsToBlob(rows, enrollmentByStudentId) {
 
 async function _doInitData(cid) {
   if (_useSupabase) {
+    // v2 TRANSITION (Phase 3.3): the legacy per-course RPCs below
+    // (list_course_roster, list_course_scores, list_course_observations, …)
+    // were dropped with the gradebook-prod schema wipe. Until Phase 3.4 wires
+    // up v2 get_gradebook(course_id), present an empty-but-valid cache for
+    // the active course so the app shell renders without crashing or spamming
+    // "RPC not found" errors. Real data reload happens when 3.4 lands.
+    if (!window.__V2_GRADEBOOK_READY) {
+      _persistLoadedField(cid, 'students', []);
+      _persistLoadedField(cid, 'assessments', []);
+      _persistLoadedField(cid, 'scores', {});
+      _persistLoadedField(cid, 'observations', {});
+      _persistLoadedField(cid, 'courseConfigs', {});
+      _persistLoadedField(cid, 'reportConfig', null);
+      _persistLoadedField(cid, 'learningMaps', (typeof LEARNING_MAP !== 'undefined' && LEARNING_MAP[cid]) || { subjects: [], sections: [] });
+      _persistLoadedField(cid, 'statuses', {});
+      _persistLoadedField(cid, 'termRatings', {});
+      _persistLoadedField(cid, 'flags', {});
+      _persistLoadedField(cid, 'goals', {});
+      _persistLoadedField(cid, 'reflections', {});
+      _persistLoadedField(cid, 'overrides', {});
+      _cache.notes[cid] = _safeParseLS('gb-notes-' + cid, {});
+      _cache.modules[cid] = _safeParseLS('gb-modules-' + cid, _safeParseLS('gb-units-' + cid, [])) || [];
+      _cache.rubrics[cid] = _safeParseLS('gb-rubrics-' + cid, []);
+      _cache.customTags[cid] = _safeParseLS('gb-custom-tags-' + cid, []);
+      return;
+    }
+
     const sb = getSupabase();
 
     try {
