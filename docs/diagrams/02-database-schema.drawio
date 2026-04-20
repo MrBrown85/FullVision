@@ -1,0 +1,116 @@
+<mxfile host="app.diagrams.net" modified="2026-04-18T00:00:00.000Z" agent="fullvision" version="22.0.0">
+  <diagram name="Database Schema" id="erd">
+    <mxGraphModel dx="1800" dy="1100" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="Canonical Database Schema (Supabase / Postgres)" style="text;html=1;align=center;fontSize=20;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="550" y="20" width="700" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="g-identity" value="identity" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;verticalAlign=top;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="60" y="80" width="340" height="280" as="geometry" />
+        </mxCell>
+        <mxCell id="teacher_profile" value="teacher_profile&#10;PK profile_id (uuid)&#10;FK user_id → auth.users&#10;display_name&#10;created_at" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top;fontFamily=monospace" vertex="1" parent="1">
+          <mxGeometry x="80" y="120" width="300" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="teacher_preference" value="teacher_preference&#10;PK teacher_id (uuid) → teacher_profile.profile_id&#10;active_course_offering_id → course_offering&#10;ui_prefs (jsonb)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top;fontFamily=monospace" vertex="1" parent="1">
+          <mxGeometry x="80" y="230" width="300" height="110" as="geometry" />
+        </mxCell>
+
+        <mxCell id="g-academics" value="academics" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=top;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="440" y="80" width="820" height="720" as="geometry" />
+        </mxCell>
+        <mxCell id="course_offering" value="course_offering&#10;PK course_offering_id (uuid)&#10;FK teacher_id → teacher_profile.profile_id&#10;title · subject_code · grade_band&#10;school_year · term_code&#10;description · status · created_at" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top;fontFamily=monospace" vertex="1" parent="1">
+          <mxGeometry x="460" y="120" width="320" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="course_policy" value="course_policy&#10;PK course_offering_id → course_offering&#10;grading_system · calculation_method&#10;decay_weight · grading_scale (jsonb)&#10;category_weights (jsonb)&#10;late_work_policy · report_as_percentage" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top;fontFamily=monospace" vertex="1" parent="1">
+          <mxGeometry x="820" y="120" width="420" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="course_outcome" value="course_outcome (learning-map tag)&#10;PK course_outcome_id (uuid)&#10;FK course_offering_id → course_offering&#10;section_name · short_label · outcome_code&#10;body (I-can statement) · color&#10;source_kind · sort_order" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top;fontFamily=monospace" vertex="1" parent="1">
+          <mxGeometry x="460" y="280" width="320" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="student" value="student (person)&#10;PK student_id (uuid)&#10;first_name · last_name&#10;preferred_first_name · preferred_last_name&#10;pronouns · email · date_of_birth" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top;fontFamily=monospace" vertex="1" parent="1">
+          <mxGeometry x="820" y="280" width="420" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="enrollment" value="enrollment (many-to-many: student × course)&#10;PK enrollment_id (uuid)&#10;FK course_offering_id → course_offering&#10;FK student_id → student&#10;roster_position · local_student_number&#10;status (active | withdrawn)&#10;enrolled_on · created_at" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top;fontFamily=monospace" vertex="1" parent="1">
+          <mxGeometry x="460" y="450" width="420" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="desig" value="enrollment_designation / designation_type&#10;PK (enrollment_id, designation_type_id)&#10;code (IEP · MOD · ELL · GIFT · …)&#10;effective_from · effective_to" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top;fontFamily=monospace" vertex="1" parent="1">
+          <mxGeometry x="920" y="450" width="320" height="140" as="geometry" />
+        </mxCell>
+
+        <mxCell id="g-assessment" value="assessment" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=top;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="1300" y="80" width="460" height="340" as="geometry" />
+        </mxCell>
+        <mxCell id="assessment" value="assessment&#10;PK assessment_id (uuid)&#10;FK course_offering_id → course_offering&#10;title · assessment_kind (summative|formative)&#10;due_at · assigned_at · weighting&#10;target_outcome_ids (uuid[])&#10;score_mode · points_possible · rubric_id&#10;module_id · collaboration_mode · notes" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top;fontFamily=monospace" vertex="1" parent="1">
+          <mxGeometry x="1320" y="120" width="420" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="score_current" value="score_current&#10;PK score_current_id (uuid)&#10;FK enrollment_id → enrollment&#10;FK assessment_id → assessment&#10;FK course_outcome_id → course_outcome&#10;normalized_level · raw_numeric_score&#10;comment_text · entered_at · updated_at" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top;fontFamily=monospace" vertex="1" parent="1">
+          <mxGeometry x="1320" y="310" width="420" height="90" as="geometry" />
+        </mxCell>
+
+        <mxCell id="assignment_status" value="assignment_status&#10;PK (enrollment_id, assessment_id)&#10;status (NS | EXC | LATE | …)&#10;updated_at" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top;fontFamily=monospace" vertex="1" parent="1">
+          <mxGeometry x="460" y="630" width="420" height="100" as="geometry" />
+        </mxCell>
+
+        <mxCell id="g-observation" value="observation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;verticalAlign=top;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="60" y="420" width="340" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="observation" value="observation&#10;PK observation_id (uuid)&#10;FK enrollment_id → enrollment&#10;text · dims (jsonb) · sentiment&#10;context · assignment_context&#10;observed_at · created_at · updated_at" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top;fontFamily=monospace" vertex="1" parent="1">
+          <mxGeometry x="80" y="460" width="300" height="140" as="geometry" />
+        </mxCell>
+
+        <mxCell id="g-reporting" value="reporting" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;verticalAlign=top;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="60" y="650" width="340" height="380" as="geometry" />
+        </mxCell>
+        <mxCell id="student_goal" value="student_goal&#10;PK (enrollment_id, course_outcome_id)&#10;text · updated_at" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top;fontFamily=monospace" vertex="1" parent="1">
+          <mxGeometry x="80" y="690" width="300" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="student_reflection" value="student_reflection&#10;PK (enrollment_id, course_outcome_id)&#10;text · confidence (1-5) · date" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top;fontFamily=monospace" vertex="1" parent="1">
+          <mxGeometry x="80" y="770" width="300" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="section_override" value="section_override&#10;PK (enrollment_id, section_id)&#10;level · reason · date · calculated" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top;fontFamily=monospace" vertex="1" parent="1">
+          <mxGeometry x="80" y="850" width="300" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="term_rating" value="term_rating&#10;PK (enrollment_id, term_id)&#10;dims (jsonb) · narrative&#10;work_habits · participation&#10;social_traits · strengths · growth_areas&#10;mention_assessments · mention_obs" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top;fontFamily=monospace" vertex="1" parent="1">
+          <mxGeometry x="80" y="930" width="300" height="90" as="geometry" />
+        </mxCell>
+
+        <mxCell id="g-projection" value="projection (materialized views / read models)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff4e6;strokeColor=#d79b00;verticalAlign=top;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="440" y="820" width="820" height="210" as="geometry" />
+        </mxCell>
+        <mxCell id="dss" value="projection.dashboard_student_summary&#10;(enrollment_id, course_offering_id)&#10;overall · completion_pct · flagged · last_obs_at&#10;designation_codes (jsonb)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top;fontFamily=monospace" vertex="1" parent="1">
+          <mxGeometry x="460" y="860" width="380" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="sflag" value="projection.student_flag&#10;PK student_flag_id (uuid)&#10;FK enrollment_id → enrollment&#10;label · color · note · is_preset · sort_order" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top;fontFamily=monospace" vertex="1" parent="1">
+          <mxGeometry x="860" y="860" width="380" height="130" as="geometry" />
+        </mxCell>
+
+        <mxCell id="note1" value="NOT in canonical schema yet — stored client-side only:&#10;• modules · rubrics · competency_groups · custom_tags · student_notes · attendance" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;align=left" vertex="1" parent="1">
+          <mxGeometry x="1300" y="500" width="460" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="rel1" style="endArrow=ERmany;html=1;rounded=0;startArrow=ERone" edge="1" parent="1" source="teacher_profile" target="course_offering"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="rel2" style="endArrow=ERone;html=1;rounded=0;startArrow=ERone" edge="1" parent="1" source="course_offering" target="course_policy"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="rel3" style="endArrow=ERmany;html=1;rounded=0;startArrow=ERone" edge="1" parent="1" source="course_offering" target="course_outcome"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="rel4" style="endArrow=ERmany;html=1;rounded=0;startArrow=ERone" edge="1" parent="1" source="course_offering" target="enrollment"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="rel5" style="endArrow=ERmany;html=1;rounded=0;startArrow=ERone" edge="1" parent="1" source="student" target="enrollment"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="rel6" style="endArrow=ERmany;html=1;rounded=0;startArrow=ERone" edge="1" parent="1" source="enrollment" target="desig"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="rel7" style="endArrow=ERmany;html=1;rounded=0;startArrow=ERone" edge="1" parent="1" source="course_offering" target="assessment"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="rel8" style="endArrow=ERmany;html=1;rounded=0;startArrow=ERone" edge="1" parent="1" source="assessment" target="score_current"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="rel9" style="endArrow=ERmany;html=1;rounded=0;startArrow=ERone" edge="1" parent="1" source="enrollment" target="score_current"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="rel10" style="endArrow=ERmany;html=1;rounded=0;startArrow=ERone" edge="1" parent="1" source="course_outcome" target="score_current"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="rel11" style="endArrow=ERmany;html=1;rounded=0;startArrow=ERone" edge="1" parent="1" source="enrollment" target="observation"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="rel12" style="endArrow=ERmany;html=1;rounded=0;startArrow=ERone" edge="1" parent="1" source="enrollment" target="assignment_status"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="rel13" style="endArrow=ERmany;html=1;rounded=0;startArrow=ERone" edge="1" parent="1" source="enrollment" target="student_goal"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="rel14" style="endArrow=ERmany;html=1;rounded=0;startArrow=ERone" edge="1" parent="1" source="enrollment" target="student_reflection"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="rel15" style="endArrow=ERmany;html=1;rounded=0;startArrow=ERone" edge="1" parent="1" source="enrollment" target="section_override"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="rel16" style="endArrow=ERmany;html=1;rounded=0;startArrow=ERone" edge="1" parent="1" source="enrollment" target="term_rating"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="rel17" style="endArrow=ERone;html=1;rounded=0;startArrow=ERone;dashed=1" edge="1" parent="1" source="enrollment" target="dss"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="rel18" style="endArrow=ERmany;html=1;rounded=0;startArrow=ERone" edge="1" parent="1" source="enrollment" target="sflag"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="rel19" style="endArrow=ERone;html=1;rounded=0;startArrow=ERone" edge="1" parent="1" source="teacher_profile" target="teacher_preference"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

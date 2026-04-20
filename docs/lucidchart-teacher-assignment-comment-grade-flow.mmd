@@ -1,0 +1,22 @@
+flowchart TD
+    A([Teacher opens active course]) --> B[Open Assignments]
+    B --> C{New assignment or existing one?}
+
+    C -- New --> D[Create assignment]
+    C -- Existing --> E[Open existing assignment]
+
+    D --> F[Set title, date, type,\nand linked tags]
+    E --> F
+
+    F --> G[Choose rubric, points,\nor proficiency setup]
+    G --> H[Enter grades or proficiency\nfor each student]
+    H --> I[Mark exceptions if needed\nMissing, excused, not submitted]
+    I --> J[Add comments, feedback,\nor observations]
+    J --> K[Review results in Gradebook,\nDashboard, or Student view]
+    K --> L{Need revisions?}
+
+    L -- Yes --> M[Adjust assignment setup,\ngrades, or comments]
+    M --> F
+
+    L -- No --> N[Save locally and sync\nin the background]
+    N --> O([Evidence is ready for\nprogress tracking and reports])
