@@ -1,0 +1,77 @@
+<mxfile host="app.diagrams.net" modified="2026-04-18T00:00:00.000Z" agent="fullvision" version="22.0.0">
+  <diagram name="System Architecture" id="arch">
+    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="FullVision — System Architecture" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="600" y="20" width="500" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="client-box" value="Client (Browser / PWA)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;verticalAlign=top;fontStyle=1;fontSize=14" vertex="1" parent="1">
+          <mxGeometry x="60" y="80" width="560" height="680" as="geometry" />
+        </mxCell>
+        <mxCell id="desktop" value="Desktop UI&#10;/teacher/app.html&#10;(Router, Dashboard, Gradebook,&#10;Assignments, Observations, Reports,&#10;Student Profile, Class Manager)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="80" y="120" width="260" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="mobile" value="Mobile UI (PWA)&#10;/teacher-mobile/index.html&#10;(Students / Observe / Grade tabs,&#10;Card stack, Widgets)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="350" y="120" width="260" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="shared" value="shared/ (common data layer)&#10;• data.js — caches, save/get, init, canonical RPC callers&#10;• calc.js — proficiency / sections / trends&#10;• supabase.js — client bootstrap, sign-out wiper&#10;• constants.js — competencies, subject colours" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="80" y="270" width="530" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="cache" value="In-memory cache&#10;_cache.{students,assessments,scores,observations,&#10;goals,reflections,overrides,statuses,flags,notes,&#10;termRatings,learningMaps,modules,rubrics,courses,&#10;customTags,reportConfig,config}" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="80" y="400" width="260" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="ls" value="localStorage (FOIPPA-wiped on sign-out)&#10;• gb-students-{cid} / gb-assessments-{cid}&#10;• gb-scores-{cid} / gb-quick-obs-{cid}&#10;• gb-courses / gb-config&#10;• gb-demo-mode / gb-data-wiped&#10;• sb-{project}-auth-token" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="350" y="400" width="260" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="sw" value="Service Worker (sw.js)&#10;Cache: fullvision-v35&#10;Strategy: network-first for JS/CSS,&#10;cache-fallback when offline,&#10;bypass for Supabase hosts,&#10;bypass for non-GET" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="80" y="550" width="530" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="bc" value="BroadcastChannel 'td-data-sync'&#10;Cross-tab refresh on changes" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf" vertex="1" parent="1">
+          <mxGeometry x="80" y="680" width="530" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="edge-box" value="Netlify Edge" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff4e6;strokeColor=#d79b00;verticalAlign=top;fontStyle=1;fontSize=14" vertex="1" parent="1">
+          <mxGeometry x="680" y="80" width="320" height="310" as="geometry" />
+        </mxCell>
+        <mxCell id="edgefn" value="inject-env.js (edge function)&#10;• Substitutes __SUPABASE_URL__ / __SUPABASE_KEY__&#10;• Emits CSP header + per-request nonce&#10;• Injects env into login.html, app.html,&#10;  teacher-mobile/index.html" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d79b00;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="700" y="120" width="280" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="netlifyconf" value="netlify.toml&#10;• /teacher/* → teacher assets&#10;• /teacher-mobile/* → mobile assets&#10;• /student, /parent reserved&#10;• _headers (HSTS, X-Frame, Referrer)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#d79b00;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="700" y="260" width="280" height="110" as="geometry" />
+        </mxCell>
+
+        <mxCell id="sb-box" value="Supabase (managed Postgres + Auth + PostgREST)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=top;fontStyle=1;fontSize=14" vertex="1" parent="1">
+          <mxGeometry x="1060" y="80" width="580" height="680" as="geometry" />
+        </mxCell>
+        <mxCell id="auth" value="Auth (GoTrue)&#10;• signInWithPassword / signUp / signOut&#10;• session.user.id = teacher_id&#10;• onAuthStateChange" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="1080" y="120" width="540" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="schemas" value="Postgres schemas&#10;• identity — teacher_profile, teacher_preference&#10;• academics — course_offering, course_policy, course_outcome,&#10;    student, enrollment, enrollment_designation, designation_type&#10;• assessment — assessment, score_current, assignment_status&#10;• observation — observation&#10;• reporting — student_goal, student_reflection, term_rating, section_override&#10;• projection — dashboard_student_summary, student_flag" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="1080" y="230" width="540" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="rpcs" value="Public RPCs (SECURITY DEFINER, auth.uid() gated)&#10;READS: list_course_roster, list_course_assessments,&#10;list_course_scores, list_course_observations,&#10;get_course_policy, get_report_config,&#10;list_course_outcomes, list_assignment_statuses,&#10;list_term_ratings_for_course, list_student_flags,&#10;get_student_goals, list_student_reflections,&#10;list_section_overrides, get_teacher_preferences,&#10;list_teacher_courses&#10;WRITES: enroll_student, withdraw_enrollment,&#10;update_enrollment, update_student, create_assessment,&#10;update_assessment, delete_assessment, save_course_score,&#10;delete_course_score, create/update/delete_observation,&#10;save_assignment_status, save_course_policy,&#10;save_report_config, save_learning_map,&#10;save_section_override, save_student_goals,&#10;save_student_reflection, upsert_term_rating,&#10;save_teacher_preferences, create_course, update_course&#10;projection.add_student_flag, projection.remove_student_flag" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="1080" y="400" width="540" height="340" as="geometry" />
+        </mxCell>
+
+        <mxCell id="legend" value="Colour legend&#10;Blue = UI · Yellow = Shared lib · Purple = in-memory · Red = localStorage (wiped on sign-out) · Green = Server / SW · Orange = Edge" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;align=left" vertex="1" parent="1">
+          <mxGeometry x="60" y="790" width="1580" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e1" style="endArrow=classic;html=1;rounded=0;strokeColor=#333333" edge="1" parent="1" source="desktop" target="shared"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e2" style="endArrow=classic;html=1;rounded=0;strokeColor=#333333" edge="1" parent="1" source="mobile" target="shared"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e3" style="endArrow=classic;html=1;rounded=0;strokeColor=#333333" edge="1" parent="1" source="shared" target="cache"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e4" style="endArrow=classic;html=1;rounded=0;strokeColor=#333333" edge="1" parent="1" source="shared" target="ls"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e5" style="endArrow=classic;html=1;rounded=0;strokeColor=#333333" edge="1" parent="1" source="desktop" target="sw"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e6" style="endArrow=classic;html=1;rounded=0;strokeColor=#333333" edge="1" parent="1" source="mobile" target="sw"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e7" value="HTML request" style="endArrow=classic;html=1;rounded=0;strokeColor=#d79b00" edge="1" parent="1" source="sw" target="edgefn"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e8" value="RPC / Auth" style="endArrow=classic;html=1;rounded=0;strokeColor=#82b366" edge="1" parent="1" source="shared" target="auth"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e9" style="endArrow=classic;html=1;rounded=0;strokeColor=#82b366" edge="1" parent="1" source="shared" target="rpcs"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e10" style="endArrow=classic;html=1;rounded=0;strokeColor=#82b366;dashed=1" edge="1" parent="1" source="auth" target="schemas"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e11" style="endArrow=classic;html=1;rounded=0;strokeColor=#82b366" edge="1" parent="1" source="rpcs" target="schemas"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
