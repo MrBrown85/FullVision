@@ -181,7 +181,7 @@ RPC inventory is grouped so each box is ~one session of work:
 
 Each task here edits one file in `/Users/colinbrown/Documents/FullVision/`, then stops for the user to verify in Demo Mode. Do NOT batch.
 
-- [ ] **3.1** `shared/supabase.js` — audit current file; no changes expected unless it references dropped schemas.
+- [x] **3.1** `shared/supabase.js` audited on branch `rebuild-v2`: no references to any dropped schema, no legacy RPC calls, no `.from('plural_name')` table calls. Pure auth + session + idle-timeout code; fully v2-compatible. No edits needed.
 - [ ] **3.2** Identify the first write path that's used on app boot (likely teacher preferences + course list) and wire it to the new RPCs (`bootstrap_teacher`, whatever equivalent reads the teacher's courses).
 - [ ] **3.3** Get the login → app shell rendering against v2 without crashing. User-verified in Demo Mode.
 - [ ] **3.4** Port the gradebook read (call `get_gradebook(course_id)` RPC; render its payload). User-verified.
@@ -249,6 +249,7 @@ Claude appends one line per completed task. Format: `YYYY-MM-DD | session-<n> | 
 - `2026-04-19 | session-3 | 1.3 | deployed migration fullvision_v2_write_path_category_module_rubric: upsert_category/delete_category (weight-cap trigger verified rejects >100), upsert_module/delete_module (assessment.module_id SET NULL confirmed), upsert_rubric (composite criteria+criterion_tag diff with insert/update/delete) / delete_rubric; 13-assertion smoke test passed`
 - `2026-04-19 | session-3 | bugfix | found latent schema bug: section_competency_group_fk SET NULL also nulled section.course_id (NOT NULL); deployed migration fullvision_v2_fix_section_competency_group_fk_set_null using PG15+ SET NULL (column_list) form; schema.sql updated`
 - `2026-04-19 | session-3 | 1.12 | enabled pg_cron extension; deployed fv_retention_cleanup() SECURITY DEFINER (hard-deletes teachers w/ deleted_at < now() - 30d, purges score_audit + term_rating_audit > 2yr); scheduled daily at 03:17 UTC as cron job 'fv_retention_cleanup_daily'; smoke verified stale teacher purge + stale-audit purge + fresh-row survival`
+- `2026-04-19 | session-3 | 3.1 | audited shared/supabase.js on rebuild-v2 — clean (auth-only, no legacy refs). Pushed docs-cleanup-redundant-stale + rebuild-v2 + legacy-v1 tag to origin; opened PR #75 (https://github.com/MrBrown85/FullVision/pull/75) for the Phase 2.1 checkpoint commit.`
 - `2026-04-19 | session-3 | 2.1-2.3 | main FullVision repo: committed 17 pending changes on docs-cleanup-redundant-stale as e7f935c (gitignored .playwright-cli/); tagged legacy-v1 at main (c028ec9); created rebuild-v2 branch from main. Tag/branch are local — user pushes when ready.`
 - `2026-04-19 | session-3 | phase-1-complete | all 12 Phase-1 write-path RPC groups landed; no Phase-1 tasks remain. Next unchecked item is Phase 2 (git hygiene) which requires user input per Safety gate — stopping and returning control.`
 - `2026-04-19 | session-3 | 1.11 | deployed migrations fullvision_v2_fix_report_config_add_custom_preset + fullvision_v2_write_path_prefs_report: apply_report_preset (validates brief/standard/detailed), save_report_config (custom default), toggle_report_block (flips preset→custom), save_teacher_preferences (partial jsonb patch); smoke passed`
