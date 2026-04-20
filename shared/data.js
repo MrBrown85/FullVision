@@ -4818,6 +4818,151 @@ window.deleteObservationTemplate = function (tplId) {
     });
 };
 
+/* ── v2 learning-map + structural helpers (Phase 4.5) ───────────────────
+   Namespaced under window.v2 to avoid colliding with the existing
+   blob-based local client functions (saveLearningMap, deleteRubric, etc.).
+   New UI code calls v2.<name>() directly; the legacy blob save machinery
+   stays as a localStorage cache until the UI is rewritten to drive these
+   RPCs per-entity. */
+window.v2 = window.v2 || {};
+
+function _rpcOrNoop(name, params) {
+  var sb = getSupabase();
+  if (!sb) return Promise.resolve({ data: null, error: null });
+  return sb.rpc(name, params).then(function (res) {
+    if (res.error) console.warn(name + ' failed:', res.error);
+    return res;
+  });
+}
+
+/* Subject: upsert (p_id null for new), delete, reorder. */
+window.v2.upsertSubject = function (params) {
+  params = params || {};
+  return _rpcOrNoop('upsert_subject', {
+    p_id: _isUuid(params.id) ? params.id : null,
+    p_course_id: params.courseId,
+    p_name: params.name || '',
+    p_display_order: params.displayOrder != null ? Number(params.displayOrder) : null,
+  });
+};
+window.v2.deleteSubject = function (id) { return _rpcOrNoop('delete_subject', { p_id: id }); };
+window.v2.reorderSubjects = function (ids) {
+  return _rpcOrNoop('reorder_subjects', { p_ids: (ids || []).filter(_isUuid) });
+};
+
+/* CompetencyGroup. */
+window.v2.upsertCompetencyGroup = function (params) {
+  params = params || {};
+  return _rpcOrNoop('upsert_competency_group', {
+    p_id: _isUuid(params.id) ? params.id : null,
+    p_course_id: params.courseId,
+    p_name: params.name || '',
+    p_color: params.color || null,
+    p_display_order: params.displayOrder != null ? Number(params.displayOrder) : null,
+  });
+};
+window.v2.deleteCompetencyGroup = function (id) { return _rpcOrNoop('delete_competency_group', { p_id: id }); };
+window.v2.reorderCompetencyGroups = function (ids) {
+  return _rpcOrNoop('reorder_competency_groups', { p_ids: (ids || []).filter(_isUuid) });
+};
+
+/* Section — course_id is auto-inferred from the owning subject. */
+window.v2.upsertSection = function (params) {
+  params = params || {};
+  return _rpcOrNoop('upsert_section', {
+    p_id: _isUuid(params.id) ? params.id : null,
+    p_subject_id: params.subjectId,
+    p_name: params.name || '',
+    p_competency_group_id: _isUuid(params.competencyGroupId) ? params.competencyGroupId : null,
+    p_display_order: params.displayOrder != null ? Number(params.displayOrder) : null,
+  });
+};
+window.v2.deleteSection = function (id) { return _rpcOrNoop('delete_section', { p_id: id }); };
+window.v2.reorderSections = function (ids) {
+  return _rpcOrNoop('reorder_sections', { p_ids: (ids || []).filter(_isUuid) });
+};
+
+/* Tag. */
+window.v2.upsertTag = function (params) {
+  params = params || {};
+  return _rpcOrNoop('upsert_tag', {
+    p_id: _isUuid(params.id) ? params.id : null,
+    p_section_id: params.sectionId,
+    p_label: params.label || '',
+    p_code: params.code || null,
+    p_i_can_text: params.iCanText || null,
+    p_display_order: params.displayOrder != null ? Number(params.displayOrder) : null,
+  });
+};
+window.v2.deleteTag = function (id) { return _rpcOrNoop('delete_tag', { p_id: id }); };
+window.v2.reorderTags = function (ids) {
+  return _rpcOrNoop('reorder_tags', { p_ids: (ids || []).filter(_isUuid) });
+};
+
+/* Module. */
+window.v2.upsertModule = function (params) {
+  params = params || {};
+  return _rpcOrNoop('upsert_module', {
+    p_id: _isUuid(params.id) ? params.id : null,
+    p_course_id: params.courseId,
+    p_name: params.name || '',
+    p_color: params.color || null,
+    p_display_order: params.displayOrder != null ? Number(params.displayOrder) : null,
+  });
+};
+window.v2.deleteModule = function (id) { return _rpcOrNoop('delete_module', { p_id: id }); };
+window.v2.reorderModules = function (ids) {
+  return _rpcOrNoop('reorder_modules', { p_ids: (ids || []).filter(_isUuid) });
+};
+
+/* Category — assessment weighting bucket (weight-cap trigger enforces ≤100). */
+window.v2.upsertCategory = function (params) {
+  params = params || {};
+  return _rpcOrNoop('upsert_category', {
+    p_id: _isUuid(params.id) ? params.id : null,
+    p_course_id: params.courseId,
+    p_name: params.name || '',
+    p_weight: params.weight != null ? Number(params.weight) : 0,
+    p_display_order: params.displayOrder != null ? Number(params.displayOrder) : null,
+  });
+};
+window.v2.deleteCategory = function (id) { return _rpcOrNoop('delete_category', { p_id: id }); };
+
+/* Rubric — composite save: rubric row + criteria diff + criterion_tag replace,
+   all in one transaction.  criteria payload:
+     [{ id?: uuid, name, level_{1..4}_descriptor, level_{1..4}_value?,
+        weight?, display_order?, linked_tag_ids?: uuid[] }, …]
+   Criteria present in the array are upserted; criteria absent are deleted
+   (cascades criterion_tag + rubric_score). */
+window.v2.upsertRubric = function (params) {
+  params = params || {};
+  var criteria = (params.criteria || []).map(function (c) {
+    var payload = {
+      name: c.name || '',
+      level_4_descriptor: c.level4Descriptor || null,
+      level_3_descriptor: c.level3Descriptor || null,
+      level_2_descriptor: c.level2Descriptor || null,
+      level_1_descriptor: c.level1Descriptor || null,
+      weight: c.weight != null ? Number(c.weight) : 1.0,
+      display_order: c.displayOrder != null ? Number(c.displayOrder) : 0,
+      linked_tag_ids: (c.linkedTagIds || []).filter(_isUuid),
+    };
+    if (c.level4Value != null) payload.level_4_value = Number(c.level4Value);
+    if (c.level3Value != null) payload.level_3_value = Number(c.level3Value);
+    if (c.level2Value != null) payload.level_2_value = Number(c.level2Value);
+    if (c.level1Value != null) payload.level_1_value = Number(c.level1Value);
+    if (_isUuid(c.id)) payload.id = c.id;
+    return payload;
+  });
+  return _rpcOrNoop('upsert_rubric', {
+    p_id: _isUuid(params.id) ? params.id : null,
+    p_course_id: params.courseId,
+    p_name: params.name || '',
+    p_criteria: criteria,
+  });
+};
+window.v2.deleteRubric = function (id) { return _rpcOrNoop('delete_rubric', { p_id: id }); };
+
 /* Custom tag — per §12, create-only path (no edit/delete inventoried). */
 window.createCustomTag = function (cid, label) {
   var sb = getSupabase();
