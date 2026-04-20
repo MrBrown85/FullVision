@@ -19,6 +19,8 @@
 --   fullvision_v2_write_path_student_records  (2026-04-19)
 --   fullvision_v2_write_path_term_rating      (2026-04-19)
 --   fullvision_v2_fix_save_term_rating_dim_audit (2026-04-19)
+--   fullvision_v2_fix_report_config_add_custom_preset (2026-04-19)
+--   fullvision_v2_write_path_prefs_report     (2026-04-19)
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Phase 1.1 — Auth / bootstrap RPCs
@@ -1840,3 +1842,99 @@ grant execute on function _term_rating_audit_field(uuid, text, text, text) to au
 -- emits a term_rating_audit row in the same transaction.
 
 grant execute on function save_term_rating(uuid, int, jsonb) to authenticated;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Phase 1.11 — ReportConfig + TeacherPreference RPCs (§1.1, §14)
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Migration fullvision_v2_fix_report_config_add_custom_preset (2026-04-19)
+-- added 'custom' to the preset CHECK (was brief/standard/detailed only).
+
+create or replace function _report_preset_defaults(p_preset text) returns jsonb
+language plpgsql immutable set search_path = public as $$
+begin
+    return case p_preset
+        when 'brief'    then '{"header":true,"narrative":true,"grades":false,"competencies":false,"goals":false,"attendance":false}'::jsonb
+        when 'standard' then '{"header":true,"narrative":true,"grades":true,"competencies":true,"goals":true,"attendance":false}'::jsonb
+        when 'detailed' then '{"header":true,"narrative":true,"grades":true,"competencies":true,"goals":true,"attendance":true,"reflections":true,"strengths":true,"growth":true}'::jsonb
+        else '{}'::jsonb
+    end;
+end; $$;
+
+create or replace function apply_report_preset(p_course_id uuid, p_preset text) returns void
+language plpgsql security invoker set search_path = public as $$
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    if p_preset not in ('brief','standard','detailed') then
+        raise exception 'preset must be brief|standard|detailed' using errcode = '22023';
+    end if;
+    insert into report_config (course_id, preset, blocks_config)
+    values (p_course_id, p_preset, _report_preset_defaults(p_preset))
+    on conflict (course_id) do update
+       set preset = excluded.preset, blocks_config = excluded.blocks_config, updated_at = now();
+end; $$;
+
+-- Pass p_preset='custom' (or leave null → defaults to 'custom') when blocks_config
+-- diverges from a named preset's defaults.
+create or replace function save_report_config(
+    p_course_id uuid, p_blocks_config jsonb, p_preset text default null
+) returns void
+language plpgsql security invoker set search_path = public as $$
+declare _preset text;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    _preset := coalesce(p_preset, 'custom');
+    if _preset not in ('brief','standard','detailed','custom') then
+        raise exception 'invalid preset %', _preset using errcode = '22023';
+    end if;
+    insert into report_config (course_id, preset, blocks_config)
+    values (p_course_id, _preset, p_blocks_config)
+    on conflict (course_id) do update
+       set preset = excluded.preset, blocks_config = excluded.blocks_config, updated_at = now();
+end; $$;
+
+create or replace function toggle_report_block(p_course_id uuid, p_block_key text, p_enabled boolean) returns void
+language plpgsql security invoker set search_path = public as $$
+declare _cur jsonb;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    select blocks_config into _cur from report_config where course_id = p_course_id;
+    _cur := coalesce(_cur, '{}'::jsonb) || jsonb_build_object(p_block_key, p_enabled);
+    insert into report_config (course_id, preset, blocks_config)
+    values (p_course_id, 'custom', _cur)
+    on conflict (course_id) do update
+       set preset = 'custom', blocks_config = _cur, updated_at = now();
+end; $$;
+
+-- save_teacher_preferences: partial jsonb patch; omitted keys unchanged.
+create or replace function save_teacher_preferences(p_patch jsonb) returns void
+language plpgsql security invoker set search_path = public as $$
+declare _uid uuid := (select auth.uid());
+begin
+    if _uid is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    insert into teacher_preference (teacher_id,
+        active_course_id, view_mode, mobile_view_mode, mobile_sort_mode, card_widget_config)
+    values (_uid,
+        nullif(p_patch->>'active_course_id','')::uuid,
+        nullif(p_patch->>'view_mode',''),
+        nullif(p_patch->>'mobile_view_mode',''),
+        nullif(p_patch->>'mobile_sort_mode',''),
+        case when p_patch ? 'card_widget_config' then p_patch->'card_widget_config' else null end)
+    on conflict (teacher_id) do update set
+        active_course_id   = case when p_patch ? 'active_course_id'
+                                  then nullif(p_patch->>'active_course_id','')::uuid
+                                  else teacher_preference.active_course_id end,
+        view_mode          = case when p_patch ? 'view_mode' then nullif(p_patch->>'view_mode','')
+                                  else teacher_preference.view_mode end,
+        mobile_view_mode   = case when p_patch ? 'mobile_view_mode' then nullif(p_patch->>'mobile_view_mode','')
+                                  else teacher_preference.mobile_view_mode end,
+        mobile_sort_mode   = case when p_patch ? 'mobile_sort_mode' then nullif(p_patch->>'mobile_sort_mode','')
+                                  else teacher_preference.mobile_sort_mode end,
+        card_widget_config = case when p_patch ? 'card_widget_config' then p_patch->'card_widget_config'
+                                  else teacher_preference.card_widget_config end;
+end; $$;
+
+grant execute on function apply_report_preset(uuid, text) to authenticated;
+grant execute on function save_report_config(uuid, jsonb, text) to authenticated;
+grant execute on function toggle_report_block(uuid, text, boolean) to authenticated;
+grant execute on function save_teacher_preferences(jsonb) to authenticated;

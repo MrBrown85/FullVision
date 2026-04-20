@@ -168,7 +168,7 @@ RPC inventory is grouped so each box is ~one session of work:
 - [x] **1.8 Observation + Template RPCs**: `create_observation`, `update_observation`, `delete_observation`, `upsert_observation_template` (per Q4; seed `is_seed=true` are immutable), `delete_observation_template`.
 - [x] **1.9 Student-record RPCs**: `upsert_note`, `delete_note`, `upsert_goal`, `upsert_reflection`, `upsert_section_override`, `clear_section_override`, `bulk_attendance`.
 - [x] **1.10 Term rating RPCs**: `upsert_term_rating` (with TermRatingAudit writes per Q28), all join-table updates (strengths, growth, assessment mentions, observation mentions).
-- [ ] **1.11 ReportConfig + preferences RPCs**: `save_report_config`, `apply_report_preset`, `save_teacher_preferences`.
+- [x] **1.11 ReportConfig + preferences RPCs**: `save_report_config`, `apply_report_preset`, `save_teacher_preferences`.
 - [ ] **1.12 Cleanup cron (pg_cron Edge Function)**: hard-delete teachers where `deleted_at < now() - interval '30 days'` (Q29), and purge audit rows older than 2 years (Q28).
 
 ### Phase 2 — Git hygiene on main repo (needs user OK per Safety gate)
@@ -215,6 +215,7 @@ Each task = one functional area (students, assessments, observations, term ratin
 When Claude finds a real defect mid-session that reshapes the plan, add a bullet here describing it and the remediation. Don't silently fix and continue.
 
 - *(none recorded yet in this file; earlier bugs — mostRecent ambiguity, decaying_avg ambiguity, missing GRANTs — were all fixed on 2026-04-19 and recorded in the Activity log.)*
+- **2026-04-19 (Phase 1.11):** report_config.preset CHECK was `in (brief,standard,detailed)` but write-paths §14 requires `'custom'` for manual block toggles. Fixed via migration `fullvision_v2_fix_report_config_add_custom_preset`; schema.sql updated.
 - **2026-04-19 (Phase 1.4):** `section_competency_group_fk` used `ON DELETE SET NULL` without a column list, so deleting a `competency_group` tried to null `section.course_id` (NOT NULL). Fixed via migration `fullvision_v2_fix_section_competency_group_fk_set_null` using PG15+ `SET NULL (competency_group_id)`. schema.sql updated to match.
 
 ---
@@ -247,6 +248,7 @@ Claude appends one line per completed task. Format: `YYYY-MM-DD | session-<n> | 
 - `2026-04-19 | session-2 | 1.2 | deployed migration fullvision_v2_write_path_course_crud: create_course (plain+wizard), update_course (jsonb patch), archive_course, duplicate_course (full structure remap), delete_course; 14-assertion smoke test passed`
 - `2026-04-19 | session-3 | 1.3 | deployed migration fullvision_v2_write_path_category_module_rubric: upsert_category/delete_category (weight-cap trigger verified rejects >100), upsert_module/delete_module (assessment.module_id SET NULL confirmed), upsert_rubric (composite criteria+criterion_tag diff with insert/update/delete) / delete_rubric; 13-assertion smoke test passed`
 - `2026-04-19 | session-3 | bugfix | found latent schema bug: section_competency_group_fk SET NULL also nulled section.course_id (NOT NULL); deployed migration fullvision_v2_fix_section_competency_group_fk_set_null using PG15+ SET NULL (column_list) form; schema.sql updated`
+- `2026-04-19 | session-3 | 1.11 | deployed migrations fullvision_v2_fix_report_config_add_custom_preset + fullvision_v2_write_path_prefs_report: apply_report_preset (validates brief/standard/detailed), save_report_config (custom default), toggle_report_block (flips preset→custom), save_teacher_preferences (partial jsonb patch); smoke passed`
 - `2026-04-19 | session-3 | 1.10 | deployed migrations fullvision_v2_write_path_term_rating + fullvision_v2_fix_save_term_rating_dim_audit: save_term_rating composite jsonb payload (parent fields + dimensions + 4 join tables), per-field audit rows via _term_rating_audit_field (SECURITY DEFINER, bypasses audit RLS); smoke passed (first save + edit + partial-update preserves unchanged fields + invalid-rating/invalid-term rejections)`
 - `2026-04-19 | session-3 | 1.9 | deployed migration fullvision_v2_write_path_student_records: upsert_note (immutable) / delete_note, upsert_goal / upsert_reflection (1..5 guard) / upsert_section_override (1..4 guard) + clear, bulk_attendance (same-day overwrite); smoke passed`
 - `2026-04-19 | session-3 | 1.8 | deployed migration fullvision_v2_write_path_observation: create_observation (+ enrollment/tag/custom_tag joins), update_observation (null array param leaves set alone; empty array wipes), delete_observation, upsert_observation_template (seed-immutable enforced), delete_observation_template (seed-immutable), create_custom_tag; smoke passed (8 assertions + 2 immutability rejections)`

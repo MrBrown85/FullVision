@@ -486,7 +486,7 @@ create table term_rating_observation (
 create table report_config (
     course_id      uuid primary key references course(id) on delete cascade,
     preset         text not null default 'standard'
-                   check (preset in ('brief','standard','detailed')),
+                   check (preset in ('brief','standard','detailed','custom')),
     blocks_config  jsonb,
     updated_at     timestamptz not null default now()
 );
