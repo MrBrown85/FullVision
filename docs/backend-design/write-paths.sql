@@ -7,6 +7,7 @@
 -- Applied migrations (in order):
 --   fullvision_v2_write_path_auth_bootstrap   (2026-04-19)
 --   fullvision_v2_write_path_course_crud      (2026-04-19)
+--   fullvision_v2_write_path_category_module_rubric (2026-04-19)
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Phase 1.1 — Auth / bootstrap RPCs
@@ -456,3 +457,287 @@ begin
     end if;
 end;
 $$;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Phase 1.3 — Category + Module + Rubric RPCs
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- upsert_category(p_id, p_course_id, p_name, p_weight, p_display_order) → uuid
+--
+-- Insert (p_id null) or update a Category row. Per-course weight-cap
+-- (sum(weight) ≤ 100) is enforced by the existing category_weight_cap trigger
+-- — violations surface as a trigger-raised exception.
+create or replace function upsert_category(
+    p_id            uuid,
+    p_course_id     uuid,
+    p_name          text,
+    p_weight        numeric,
+    p_display_order int default null
+) returns uuid
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+    _id uuid;
+begin
+    if (select auth.uid()) is null then
+        raise exception 'not authenticated' using errcode = 'PT401';
+    end if;
+
+    if p_id is null then
+        insert into category (course_id, name, weight, display_order)
+        values (p_course_id, p_name, p_weight, coalesce(p_display_order, 0))
+        returning id into _id;
+    else
+        update category set
+            name          = p_name,
+            weight        = p_weight,
+            display_order = coalesce(p_display_order, display_order),
+            updated_at    = now()
+        where id = p_id
+        returning id into _id;
+
+        if _id is null then
+            raise exception 'category not found' using errcode = 'P0002';
+        end if;
+    end if;
+
+    return _id;
+end;
+$$;
+
+
+-- delete_category(p_id) → void
+-- Hard-delete; assessment.category_id is ON DELETE SET NULL.
+create or replace function delete_category(p_id uuid) returns void
+language plpgsql
+security invoker
+set search_path = public
+as $$
+begin
+    if (select auth.uid()) is null then
+        raise exception 'not authenticated' using errcode = 'PT401';
+    end if;
+
+    delete from category where id = p_id;
+    if not found then
+        raise exception 'category not found' using errcode = 'P0002';
+    end if;
+end;
+$$;
+
+
+-- upsert_module(p_id, p_course_id, p_name, p_color, p_display_order) → uuid
+create or replace function upsert_module(
+    p_id            uuid,
+    p_course_id     uuid,
+    p_name          text,
+    p_color         text default null,
+    p_display_order int  default null
+) returns uuid
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+    _id uuid;
+begin
+    if (select auth.uid()) is null then
+        raise exception 'not authenticated' using errcode = 'PT401';
+    end if;
+
+    if p_id is null then
+        insert into module (course_id, name, color, display_order)
+        values (p_course_id, p_name, p_color, coalesce(p_display_order, 0))
+        returning id into _id;
+    else
+        update module set
+            name          = p_name,
+            color         = p_color,
+            display_order = coalesce(p_display_order, display_order),
+            updated_at    = now()
+        where id = p_id
+        returning id into _id;
+
+        if _id is null then
+            raise exception 'module not found' using errcode = 'P0002';
+        end if;
+    end if;
+
+    return _id;
+end;
+$$;
+
+
+-- delete_module(p_id) → void
+-- assessment.module_id is ON DELETE SET NULL — assessments survive (§6).
+create or replace function delete_module(p_id uuid) returns void
+language plpgsql
+security invoker
+set search_path = public
+as $$
+begin
+    if (select auth.uid()) is null then
+        raise exception 'not authenticated' using errcode = 'PT401';
+    end if;
+
+    delete from module where id = p_id;
+    if not found then
+        raise exception 'module not found' using errcode = 'P0002';
+    end if;
+end;
+$$;
+
+
+-- upsert_rubric(p_id, p_course_id, p_name, p_criteria jsonb) → uuid
+--
+-- Composite save per §7.1: rubric + criteria + criterion_tag in one transaction.
+-- p_criteria shape:
+--   [
+--     {
+--       id: uuid | null,           -- null = new criterion
+--       name: text,
+--       level_4_descriptor..level_1_descriptor: text,
+--       level_4_value..level_1_value: numeric (defaults 4/3/2/1),
+--       weight: numeric (default 1.0),
+--       display_order: int (default 0),
+--       linked_tag_ids: [uuid, ...]
+--     }, ...
+--   ]
+-- Diff semantics: criteria present in payload are INSERTed (no id) or
+-- UPDATEd (id given); criteria not in payload are DELETEd (cascades
+-- CriterionTag + RubricScore). linked_tag_ids fully replace prior links.
+create or replace function upsert_rubric(
+    p_id         uuid,
+    p_course_id  uuid,
+    p_name       text,
+    p_criteria   jsonb
+) returns uuid
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+    _rubric_id uuid;
+    _elem      jsonb;
+    _crit_id   uuid;
+    _kept_ids  uuid[] := '{}';
+    _tag_id    uuid;
+begin
+    if (select auth.uid()) is null then
+        raise exception 'not authenticated' using errcode = 'PT401';
+    end if;
+
+    if p_criteria is null or jsonb_typeof(p_criteria) <> 'array' then
+        raise exception 'p_criteria must be a jsonb array' using errcode = '22023';
+    end if;
+
+    if p_id is null then
+        insert into rubric (course_id, name)
+        values (p_course_id, p_name)
+        returning id into _rubric_id;
+    else
+        update rubric set name = p_name, updated_at = now()
+         where id = p_id
+        returning id into _rubric_id;
+
+        if _rubric_id is null then
+            raise exception 'rubric not found' using errcode = 'P0002';
+        end if;
+    end if;
+
+    for _elem in select * from jsonb_array_elements(p_criteria) loop
+        if _elem ? 'id' and nullif(_elem->>'id','') is not null then
+            _crit_id := (_elem->>'id')::uuid;
+
+            update criterion set
+                name               = _elem->>'name',
+                level_4_descriptor = _elem->>'level_4_descriptor',
+                level_3_descriptor = _elem->>'level_3_descriptor',
+                level_2_descriptor = _elem->>'level_2_descriptor',
+                level_1_descriptor = _elem->>'level_1_descriptor',
+                level_4_value      = coalesce((_elem->>'level_4_value')::numeric, 4),
+                level_3_value      = coalesce((_elem->>'level_3_value')::numeric, 3),
+                level_2_value      = coalesce((_elem->>'level_2_value')::numeric, 2),
+                level_1_value      = coalesce((_elem->>'level_1_value')::numeric, 1),
+                weight             = coalesce((_elem->>'weight')::numeric, 1.0),
+                display_order      = coalesce((_elem->>'display_order')::int, 0),
+                updated_at         = now()
+            where id = _crit_id and rubric_id = _rubric_id;
+
+            if not found then
+                raise exception 'criterion % not in rubric %', _crit_id, _rubric_id
+                    using errcode = 'P0002';
+            end if;
+        else
+            insert into criterion (
+                rubric_id, name,
+                level_4_descriptor, level_3_descriptor,
+                level_2_descriptor, level_1_descriptor,
+                level_4_value, level_3_value, level_2_value, level_1_value,
+                weight, display_order
+            ) values (
+                _rubric_id,
+                _elem->>'name',
+                _elem->>'level_4_descriptor', _elem->>'level_3_descriptor',
+                _elem->>'level_2_descriptor', _elem->>'level_1_descriptor',
+                coalesce((_elem->>'level_4_value')::numeric, 4),
+                coalesce((_elem->>'level_3_value')::numeric, 3),
+                coalesce((_elem->>'level_2_value')::numeric, 2),
+                coalesce((_elem->>'level_1_value')::numeric, 1),
+                coalesce((_elem->>'weight')::numeric, 1.0),
+                coalesce((_elem->>'display_order')::int, 0)
+            ) returning id into _crit_id;
+        end if;
+
+        _kept_ids := _kept_ids || _crit_id;
+
+        delete from criterion_tag where criterion_id = _crit_id;
+        if _elem ? 'linked_tag_ids' and jsonb_typeof(_elem->'linked_tag_ids') = 'array' then
+            for _tag_id in
+                select (v #>> '{}')::uuid
+                  from jsonb_array_elements(_elem->'linked_tag_ids') v
+            loop
+                insert into criterion_tag (criterion_id, tag_id)
+                values (_crit_id, _tag_id)
+                on conflict do nothing;
+            end loop;
+        end if;
+    end loop;
+
+    delete from criterion
+     where rubric_id = _rubric_id
+       and id <> all (_kept_ids);
+
+    return _rubric_id;
+end;
+$$;
+
+
+-- delete_rubric(p_id) → void
+-- assessment.rubric_id is ON DELETE SET NULL; criterion/criterion_tag/rubric_score cascade.
+create or replace function delete_rubric(p_id uuid) returns void
+language plpgsql
+security invoker
+set search_path = public
+as $$
+begin
+    if (select auth.uid()) is null then
+        raise exception 'not authenticated' using errcode = 'PT401';
+    end if;
+
+    delete from rubric where id = p_id;
+    if not found then
+        raise exception 'rubric not found' using errcode = 'P0002';
+    end if;
+end;
+$$;
+
+grant execute on function upsert_category(uuid, uuid, text, numeric, int) to authenticated;
+grant execute on function delete_category(uuid) to authenticated;
+grant execute on function upsert_module(uuid, uuid, text, text, int) to authenticated;
+grant execute on function delete_module(uuid) to authenticated;
+grant execute on function upsert_rubric(uuid, uuid, text, jsonb) to authenticated;
+grant execute on function delete_rubric(uuid) to authenticated;

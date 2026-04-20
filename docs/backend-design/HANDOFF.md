@@ -160,7 +160,7 @@ RPC inventory is grouped so each box is ~one session of work:
 
 - [x] **1.1 Auth/bootstrap RPCs**: `bootstrap_teacher()` (creates Teacher + TeacherPreference + Welcome-Class seed per Pass C §1.3 + Q45/Q47), `soft_delete_teacher()` (Q29).
 - [x] **1.2 Course CRUD RPCs**: `create_course`, `update_course`, `archive_course`, `duplicate_course` (structure-only per Q27), `delete_course`.
-- [ ] **1.3 Category + Module + Rubric RPCs**: `upsert_category` (per-course weight-cap enforced by trigger already deployed), `delete_category`, `upsert_module`, `delete_module`, `upsert_rubric` (full criteria payload), `delete_rubric`.
+- [x] **1.3 Category + Module + Rubric RPCs**: `upsert_category` (per-course weight-cap enforced by trigger already deployed), `delete_category`, `upsert_module`, `delete_module`, `upsert_rubric` (full criteria payload), `delete_rubric`.
 - [ ] **1.4 Learning map RPCs**: `upsert_subject`, `delete_subject`, `upsert_competency_group`, `delete_competency_group`, `upsert_section`, `delete_section`, `upsert_tag`, `delete_tag`, `reorder_*` family.
 - [ ] **1.5 Student + Enrollment RPCs**: `create_student_and_enroll`, `update_student`, `update_enrollment`, `withdraw_enrollment`, `reorder_roster`, `bulk_apply_pronouns`, `import_roster_csv`.
 - [ ] **1.6 Assessment CRUD RPCs**: `create_assessment`, `update_assessment`, `duplicate_assessment`, `delete_assessment`, `save_assessment_tags` (AssessmentTag join).
@@ -244,5 +244,6 @@ Claude appends one line per completed task. Format: `YYYY-MM-DD | session-<n> | 
 - `2026-04-19 | session-2 | 1.1 | deployed migration fullvision_v2_write_path_auth_bootstrap: bootstrap_teacher, soft_delete_teacher, restore_teacher; 7-assertion smoke test passed; write-paths.sql created`
 - `2026-04-19 | session-2 | docs | updated HANDOFF What's-already-done: 13 migrations, 20 functions`
 - `2026-04-19 | session-2 | 1.2 | deployed migration fullvision_v2_write_path_course_crud: create_course (plain+wizard), update_course (jsonb patch), archive_course, duplicate_course (full structure remap), delete_course; 14-assertion smoke test passed`
+- `2026-04-19 | session-3 | 1.3 | deployed migration fullvision_v2_write_path_category_module_rubric: upsert_category/delete_category (weight-cap trigger verified rejects >100), upsert_module/delete_module (assessment.module_id SET NULL confirmed), upsert_rubric (composite criteria+criterion_tag diff with insert/update/delete) / delete_rubric; 13-assertion smoke test passed`
 
 *(next session, keep appending.)*
