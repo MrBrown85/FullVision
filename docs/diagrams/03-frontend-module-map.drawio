@@ -1,0 +1,125 @@
+<mxfile host="app.diagrams.net" modified="2026-04-18T00:00:00.000Z" agent="fullvision" version="22.0.0">
+  <diagram name="Frontend Module Map" id="fe">
+    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="Frontend Module Map" style="text;html=1;align=center;fontSize=20;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="600" y="20" width="500" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="g-entry" value="HTML entry points" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff4e6;strokeColor=#d79b00;verticalAlign=top;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="80" width="460" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="login" value="login.html&#10;• login.css / login-auth.js&#10;• window.__ENV injected at edge" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="60" y="120" width="200" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="app" value="teacher/app.html (desktop)&#10;• Auto-redirects mobile UAs to /teacher-mobile/&#10;• Loads shared + teacher stack" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="280" y="120" width="200" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="mentry" value="teacher-mobile/index.html (PWA)&#10;• Auth screen + tab shell&#10;• window.__MOBILE = true" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="60" y="200" width="420" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="g-shared" value="shared/ (loaded first, common to all portals)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;verticalAlign=top;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="300" width="460" height="380" as="geometry" />
+        </mxCell>
+        <mxCell id="sb-js" value="vendor/supabase.min.js&#10;(UMD client, CDN fallback)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="60" y="340" width="420" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="sh-sb" value="shared/supabase.js&#10;• createClient, getSupabase()&#10;• signOut() — wipes gb-*/sb-*/td-*&#10;• idle-timeout sign-out" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="60" y="390" width="200" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="sh-const" value="shared/constants.js&#10;• BC_DESIGNATIONS · OBS_DIMS&#10;• SUBJECT_COLOURS · PROF_LABELS" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="280" y="390" width="200" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="sh-data" value="shared/data.js — data layer (~4700 lines)&#10;• _cache, _pendingSyncs, _syncStatus&#10;• initAllCourses / initData / _doInitData&#10;• Save/get APIs for every entity&#10;• _persist*Canonical helpers&#10;• _saveCourseField / _syncToSupabase / _doSync (STUBBED)&#10;• waitForPendingSyncs · BroadcastChannel" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="60" y="490" width="420" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="sh-calc" value="shared/calc.js&#10;• getOverallProficiency / getSectionProficiency&#10;• getFocusAreas / getSectionTrend · trends" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="60" y="630" width="420" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="g-desktop" value="teacher/ — desktop portal" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;verticalAlign=top;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="540" y="80" width="560" height="600" as="geometry" />
+        </mxCell>
+        <mxCell id="ui" value="ui.js — top-bar, nav, toasts, user menu, signOut binding" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="560" y="120" width="520" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="router" value="router.js — hash router, boot sequence, global auth boundary" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="560" y="170" width="520" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="pg-dash" value="page-dashboard.js&#10;• Dashboard roster + class distribution&#10;• Class mgr entry" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="560" y="220" width="250" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="pg-gb" value="page-gradebook.js&#10;• Score cell editing, cycleScore&#10;• Bulk ops, undo, context menu" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="830" y="220" width="250" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="pg-as" value="page-assignments.js&#10;• Assessment form (add/edit)&#10;• Rubrics, modules, category weights&#10;• Grading scale editor · JSON import" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="560" y="320" width="250" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="pg-obs" value="page-observations.js&#10;• Quick-capture input, tag popovers&#10;• Sentiment/context filters" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="830" y="320" width="250" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="pg-st" value="page-student.js&#10;• Profile, goals, reflections, overrides&#10;• Notes, flag toggle, edit dialog" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="560" y="440" width="250" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="pg-rp" value="page-reports.js / report-blocks.js&#10;report-questionnaire.js&#10;• Term questionnaire, narrative editor&#10;• Progress report blocks, auto-narrative" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="830" y="440" width="250" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="dcm" value="dash-class-manager.js&#10;• Add/edit student · CSV import&#10;• Learning-map editor · policy · competency groups" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="560" y="550" width="250" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="ti" value="teams-import.js / assign-collab.js&#10;• Teams CSV/XLSX wizard&#10;• Collaboration mode picker" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="830" y="550" width="250" height="100" as="geometry" />
+        </mxCell>
+
+        <mxCell id="g-mobile" value="teacher-mobile/ — mobile portal" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=top;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="1140" y="80" width="520" height="600" as="geometry" />
+        </mxCell>
+        <mxCell id="msh" value="shell.js — boot, tab bar, nav stacks, settings sheet, sign-out" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="1160" y="120" width="480" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="mcomp" value="components.js — iOS-style primitives (sheets, toasts, nav bar, avatar)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="1160" y="170" width="480" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="mts" value="tab-students.js — list + card stack, sort sheet, student detail" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="1160" y="220" width="480" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="mto" value="tab-observe.js — quick-compose, templates, obs feed, filters" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="1160" y="280" width="480" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="mtg" value="tab-grade.js — swipe cards, score buttons (LS-only path — see 07)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="1160" y="340" width="480" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="mcs" value="card-stack.js / card-widgets.js / card-widget-editor.js&#10;Rich student card + long-press configuration sheet" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="1160" y="400" width="480" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="g-sw" value="Service worker + PWA" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;verticalAlign=top;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="700" width="1620" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="sw" value="sw.js — precache + network-first runtime fetch; CACHE_NAME = 'fullvision-v35'" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="60" y="735" width="800" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="man" value="manifest.json — display: standalone, theme_color, icons, start_url" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top" vertex="1" parent="1">
+          <mxGeometry x="880" y="735" width="760" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e1" style="endArrow=classic;html=1" edge="1" parent="1" source="app" target="sh-data"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e2" style="endArrow=classic;html=1" edge="1" parent="1" source="mentry" target="sh-data"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e3" style="endArrow=classic;html=1" edge="1" parent="1" source="login" target="sh-sb"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e4" style="endArrow=classic;html=1" edge="1" parent="1" source="sh-data" target="sh-sb"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e5" style="endArrow=classic;html=1" edge="1" parent="1" source="router" target="pg-dash"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e6" style="endArrow=classic;html=1" edge="1" parent="1" source="router" target="pg-gb"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e7" style="endArrow=classic;html=1" edge="1" parent="1" source="router" target="pg-as"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e8" style="endArrow=classic;html=1" edge="1" parent="1" source="router" target="pg-obs"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e9" style="endArrow=classic;html=1" edge="1" parent="1" source="router" target="pg-st"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e10" style="endArrow=classic;html=1" edge="1" parent="1" source="router" target="pg-rp"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e11" style="endArrow=classic;html=1" edge="1" parent="1" source="msh" target="mts"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e12" style="endArrow=classic;html=1" edge="1" parent="1" source="msh" target="mto"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e13" style="endArrow=classic;html=1" edge="1" parent="1" source="msh" target="mtg"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

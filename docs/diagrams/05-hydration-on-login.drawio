@@ -1,0 +1,129 @@
+<mxfile host="app.diagrams.net" modified="2026-04-18T00:00:00.000Z" agent="fullvision" version="22.0.0">
+  <diagram name="Hydration on Login" id="hydr">
+    <mxGraphModel dx="1800" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1300" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="Data Hydration on Sign-In (initAllCourses + initData)" style="text;html=1;align=center;fontSize=20;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="500" y="20" width="800" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" value="This is where the April 3 → 18 production bug lived: _doInitData was gated behind `if (false &amp;&amp; _useSupabase)`, so no canonical reads fired." style="text;html=1;align=center;fontSize=12;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="300" y="60" width="1200" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="start" value="Portal boots&#10;(app.html or teacher-mobile/index.html)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366" vertex="1" parent="1">
+          <mxGeometry x="700" y="110" width="280" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="iac" value="initAllCourses()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="700" y="200" width="280" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="demo-check" value="gb-demo-mode === '1'?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf" vertex="1" parent="1">
+          <mxGeometry x="720" y="260" width="240" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="demo-branch" value="_useSupabase = false&#10;_teacherId = 'demo-user'&#10;Load everything from LS&#10;(seed-data.js injects if empty)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=left" vertex="1" parent="1">
+          <mxGeometry x="1080" y="260" width="260" height="100" as="geometry" />
+        </mxCell>
+
+        <mxCell id="auth-check" value="sb.auth.getSession()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf" vertex="1" parent="1">
+          <mxGeometry x="720" y="360" width="240" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="global-rpcs" value="Parallel:&#10;• get_teacher_preferences → {activeCourseId, uiPrefs}&#10;• list_teacher_courses → [{course_offering_id,…}]&#10;(mirrored to localStorage: gb-courses, gb-config)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left" vertex="1" parent="1">
+          <mxGeometry x="660" y="430" width="360" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="fallback" value="RPC failed?&#10;→ _useSupabase=false&#10;→ load from LS: gb-courses, gb-config" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;align=left" vertex="1" parent="1">
+          <mxGeometry x="1080" y="430" width="260" height="90" as="geometry" />
+        </mxCell>
+
+        <mxCell id="gac" value="cid = getActiveCourse()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf" vertex="1" parent="1">
+          <mxGeometry x="720" y="550" width="240" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="id" value="initData(cid) → _doInitData(cid)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="700" y="610" width="280" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="ls-seed" value="_loadCourseFromLS(cid)&#10;Seeds cache from gb-students-{cid} etc.&#10;so UI has something to render while RPCs resolve" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=left" vertex="1" parent="1">
+          <mxGeometry x="660" y="670" width="360" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="uuid-check" value="_useSupabase &amp;&amp; _isUuid(cid)?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf" vertex="1" parent="1">
+          <mxGeometry x="720" y="770" width="240" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="skip" value="Skip canonical reads&#10;(demo, offline, or local-only course)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;align=left" vertex="1" parent="1">
+          <mxGeometry x="1080" y="770" width="260" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="fanout-title" value="Promise.allSettled over canonical read RPCs&#10;(parallel; each populates _cache via _applyCanonicalField)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="200" y="880" width="1400" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="r1" value="list_course_roster&#10;→ students cache" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366" vertex="1" parent="1">
+          <mxGeometry x="40" y="940" width="170" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="r2" value="list_course_assessments&#10;→ assessments cache" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366" vertex="1" parent="1">
+          <mxGeometry x="220" y="940" width="170" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="r3" value="list_course_scores&#10;→ scores cache" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366" vertex="1" parent="1">
+          <mxGeometry x="400" y="940" width="170" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="r4" value="list_course_observations&#10;→ observations cache" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366" vertex="1" parent="1">
+          <mxGeometry x="580" y="940" width="170" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="r5" value="get_course_policy&#10;→ courseConfigs cache" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366" vertex="1" parent="1">
+          <mxGeometry x="760" y="940" width="170" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="r6" value="get_report_config&#10;→ reportConfig cache" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366" vertex="1" parent="1">
+          <mxGeometry x="940" y="940" width="170" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="r7" value="list_course_outcomes&#10;→ learningMaps cache" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366" vertex="1" parent="1">
+          <mxGeometry x="1120" y="940" width="170" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="r8" value="list_assignment_statuses&#10;→ statuses cache" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366" vertex="1" parent="1">
+          <mxGeometry x="1300" y="940" width="180" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="r9" value="list_term_ratings_for_course&#10;→ termRatings cache" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366" vertex="1" parent="1">
+          <mxGeometry x="1490" y="940" width="180" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="r10" value="projection.list_student_flags&#10;(fallback: list_student_flags)&#10;→ flags cache" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366" vertex="1" parent="1">
+          <mxGeometry x="40" y="1020" width="200" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="r11" value="per-student:&#10;get_student_goals&#10;→ goals cache" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366" vertex="1" parent="1">
+          <mxGeometry x="260" y="1020" width="200" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="r12" value="per-student:&#10;list_student_reflections&#10;→ reflections cache" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366" vertex="1" parent="1">
+          <mxGeometry x="480" y="1020" width="200" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="r13" value="per-student:&#10;list_section_overrides&#10;→ overrides cache" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366" vertex="1" parent="1">
+          <mxGeometry x="700" y="1020" width="200" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="guard" value="_applyCanonicalField(field, cid, nextValue)&#10;Guard: if nextValue.length &lt; existing.length × shrinkThreshold → keep local (anti-data-loss)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;align=left" vertex="1" parent="1">
+          <mxGeometry x="400" y="1110" width="1000" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="done" value="render() — UI reads from populated caches&#10;getStudents(cid), getAssessments(cid), getScores(cid), …" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="560" y="1200" width="680" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="eh1" style="endArrow=classic;html=1" edge="1" parent="1" source="start" target="iac"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="eh2" style="endArrow=classic;html=1" edge="1" parent="1" source="iac" target="demo-check"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="eh3" value="yes" style="endArrow=classic;html=1" edge="1" parent="1" source="demo-check" target="demo-branch"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="eh4" value="no" style="endArrow=classic;html=1" edge="1" parent="1" source="demo-check" target="auth-check"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="eh5" style="endArrow=classic;html=1" edge="1" parent="1" source="auth-check" target="global-rpcs"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="eh6" value="error" style="endArrow=classic;html=1;dashed=1" edge="1" parent="1" source="global-rpcs" target="fallback"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="eh7" style="endArrow=classic;html=1" edge="1" parent="1" source="global-rpcs" target="gac"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="eh8" style="endArrow=classic;html=1" edge="1" parent="1" source="fallback" target="gac"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="eh9" style="endArrow=classic;html=1" edge="1" parent="1" source="demo-branch" target="gac"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="eh10" style="endArrow=classic;html=1" edge="1" parent="1" source="gac" target="id"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="eh11" style="endArrow=classic;html=1" edge="1" parent="1" source="id" target="ls-seed"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="eh12" style="endArrow=classic;html=1" edge="1" parent="1" source="ls-seed" target="uuid-check"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="eh13" value="no" style="endArrow=classic;html=1" edge="1" parent="1" source="uuid-check" target="skip"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="eh14" value="yes" style="endArrow=classic;html=1" edge="1" parent="1" source="uuid-check" target="fanout-title"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="eh15" style="endArrow=none;html=1;dashed=1" edge="1" parent="1" source="r1" target="guard"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="eh16" style="endArrow=none;html=1;dashed=1" edge="1" parent="1" source="r2" target="guard"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="eh17" style="endArrow=none;html=1;dashed=1" edge="1" parent="1" source="r3" target="guard"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="eh18" style="endArrow=none;html=1;dashed=1" edge="1" parent="1" source="r4" target="guard"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="eh19" style="endArrow=none;html=1;dashed=1" edge="1" parent="1" source="r7" target="guard"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="eh20" style="endArrow=classic;html=1" edge="1" parent="1" source="guard" target="done"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="eh21" style="endArrow=classic;html=1;dashed=1" edge="1" parent="1" source="skip" target="done"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,0 +1,101 @@
+<mxfile host="app.diagrams.net" modified="2026-04-18T00:00:00.000Z" agent="fullvision" version="22.0.0">
+  <diagram name="Term Report Flow" id="rep">
+    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1300" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="Term Questionnaire → Term Rating → Progress Report" style="text;html=1;align=center;fontSize=20;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="450" y="20" width="800" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="g-inputs" value="Questionnaire inputs (per student × term)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;verticalAlign=top;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="100" width="780" height="500" as="geometry" />
+        </mxCell>
+        <mxCell id="q-narr" value="Narrative editor (rich contenteditable)&#10;#tq-narrative · bold/italic/list via tqExec&#10;tqCopyNarrative · tqAutoNarrative" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;align=left" vertex="1" parent="1">
+          <mxGeometry x="60" y="150" width="360" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="q-dims" value="Dim ratings (1-4) per competency&#10;tqSetDim(sid, dim, val)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;align=left" vertex="1" parent="1">
+          <mxGeometry x="440" y="150" width="360" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="q-wh" value="Work habits (1-4)&#10;tqSetField('workHabits', val)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;align=left" vertex="1" parent="1">
+          <mxGeometry x="60" y="260" width="360" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="q-pt" value="Participation (1-4)&#10;tqSetField('participation', val)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;align=left" vertex="1" parent="1">
+          <mxGeometry x="440" y="260" width="360" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="q-tr" value="Social traits toggles&#10;tqToggleTrait(sid, traitId)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;align=left" vertex="1" parent="1">
+          <mxGeometry x="60" y="350" width="360" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="q-str" value="Strengths / growth-areas tag IDs&#10;tqSetField('strengths'/'growthAreas', …)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;align=left" vertex="1" parent="1">
+          <mxGeometry x="440" y="350" width="360" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="q-ma" value="Mention assessments (toggle IDs)&#10;tqToggleAssignment(sid, aId)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;align=left" vertex="1" parent="1">
+          <mxGeometry x="60" y="440" width="360" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="q-mo" value="Mention observations (toggle IDs)&#10;tqToggleOb(sid, obId)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;align=left" vertex="1" parent="1">
+          <mxGeometry x="440" y="440" width="360" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="q-nav" value="Student navigation: tqNextStudent · tqPrevStudent (ephemeral)" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;align=left" vertex="1" parent="1">
+          <mxGeometry x="60" y="530" width="740" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="g-save" value="Persistence path" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=top;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="620" width="780" height="420" as="geometry" />
+        </mxCell>
+        <mxCell id="s1" value="Every edit eventually calls:&#10;upsertTermRating(cid, sid, termId, patch)&#10;[shared/data.js]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;align=left" vertex="1" parent="1">
+          <mxGeometry x="60" y="660" width="740" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="s2" value="Merge patch into _cache.termRatings[cid][sid][termId]&#10;_safeLSSet('gb-term-ratings-' + cid, …)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;align=left" vertex="1" parent="1">
+          <mxGeometry x="60" y="760" width="740" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="s3" value="sb.rpc('upsert_term_rating', {&#10;  p_course_offering_id: cid,&#10;  p_enrollment_id: sid,&#10;  p_term_id: termId,&#10;  p_payload: { dims, narrative, workHabits, participation,&#10;    socialTraits, strengths, growthAreas,&#10;    mentionAssessments, mentionObs, includeCourseSummary }&#10;})" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;align=left;fontFamily=monospace" vertex="1" parent="1">
+          <mxGeometry x="60" y="850" width="740" height="180" as="geometry" />
+        </mxCell>
+
+        <mxCell id="g-render" value="Report rendering + print" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;verticalAlign=top;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="860" y="100" width="800" height="940" as="geometry" />
+        </mxCell>
+        <mxCell id="r1" value="User switches to Progress Reports tab&#10;page-reports.js · switchTab(progress)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;align=left" vertex="1" parent="1">
+          <mxGeometry x="880" y="150" width="760" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="r2" value="Active blocks (from saveReportConfig / get_report_config)&#10;applied via rbApplyPreset · rbToggleBlock" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;align=left" vertex="1" parent="1">
+          <mxGeometry x="880" y="230" width="760" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="r3" value="report-blocks.js renders each enabled block per student:&#10;• Identity header · Overall · Section breakdown · Focus areas&#10;• Strengths / Growth · Recent assessments · Recent observations&#10;• Teacher narrative (from term_rating.narrative)&#10;• Work habits / Participation · Late-work policy&#10;Each block reads from the hydrated _cache caches (getStudents, getScores, getObservations, …)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;align=left" vertex="1" parent="1">
+          <mxGeometry x="880" y="320" width="760" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="r4" value="Student picker &amp; filters&#10;selectAllStudents / selectNoneStudents / toggleStudentSelection&#10;toggleAnon (class summary)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;align=left" vertex="1" parent="1">
+          <mxGeometry x="880" y="510" width="760" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="r5" value="printReports → window.print()&#10;@media print: hides chrome, page-breaks per student" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#9673a6;align=left" vertex="1" parent="1">
+          <mxGeometry x="880" y="610" width="760" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="r-auto" value="Auto-narrative (tqAutoNarrative):&#10;1. Pull latest scores by section from _cache.scores&#10;2. Pull focus areas (getFocusAreas) and overall trend&#10;3. Pull 2-3 recent observations tagged strengths/growth&#10;4. Apply template sentences, inject student name, pronouns&#10;5. Write into #tq-narrative → fires blur handler → upsert_term_rating" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=left" vertex="1" parent="1">
+          <mxGeometry x="880" y="710" width="760" height="150" as="geometry" />
+        </mxCell>
+
+        <mxCell id="r-post" value="Post-print: teacher can toggle anonymize, switch student, or print again.&#10;upsert_term_rating has already landed for every field edited — data is durable." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;align=left" vertex="1" parent="1">
+          <mxGeometry x="880" y="880" width="760" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="er1" style="endArrow=classic;html=1" edge="1" parent="1" source="q-narr" target="s1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="er2" style="endArrow=classic;html=1" edge="1" parent="1" source="q-dims" target="s1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="er3" style="endArrow=classic;html=1" edge="1" parent="1" source="q-wh" target="s1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="er4" style="endArrow=classic;html=1" edge="1" parent="1" source="q-pt" target="s1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="er5" style="endArrow=classic;html=1" edge="1" parent="1" source="q-tr" target="s1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="er6" style="endArrow=classic;html=1" edge="1" parent="1" source="q-str" target="s1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="er7" style="endArrow=classic;html=1" edge="1" parent="1" source="q-ma" target="s1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="er8" style="endArrow=classic;html=1" edge="1" parent="1" source="q-mo" target="s1"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="er9" style="endArrow=classic;html=1" edge="1" parent="1" source="s1" target="s2"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="er10" style="endArrow=classic;html=1" edge="1" parent="1" source="s2" target="s3"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="er11" style="endArrow=classic;html=1;dashed=1" edge="1" parent="1" source="s3" target="r3"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="er12" style="endArrow=classic;html=1" edge="1" parent="1" source="r1" target="r2"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="er13" style="endArrow=classic;html=1" edge="1" parent="1" source="r2" target="r3"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="er14" style="endArrow=classic;html=1" edge="1" parent="1" source="r3" target="r4"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="er15" style="endArrow=classic;html=1" edge="1" parent="1" source="r4" target="r5"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="er16" style="endArrow=classic;html=1;dashed=1" edge="1" parent="1" source="r-auto" target="s1"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

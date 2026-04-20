@@ -1,0 +1,94 @@
+<mxfile host="app.diagrams.net" modified="2026-04-18T00:00:00.000Z" agent="fullvision" version="22.0.0">
+  <diagram name="Score Entry Paths" id="scores">
+    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" value="Score Entry — Desktop vs Mobile (side-by-side)" style="text;html=1;align=center;fontSize=20;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="500" y="20" width="700" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="subtitle" value="Known open bug: mobile + points-mode + deletes all route through saveScores → stubbed _doSync and never reach Supabase." style="text;html=1;align=center;fontSize=12;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="300" y="60" width="1100" height="30" as="geometry" />
+        </mxCell>
+
+        <mxCell id="g-desktop" value="DESKTOP proficiency-mode score entry — reaches Supabase ✓" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;verticalAlign=top;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="100" width="790" height="1050" as="geometry" />
+        </mxCell>
+
+        <mxCell id="d1" value="Teacher clicks gradebook cell&#10;(proficiency 1-4)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366" vertex="1" parent="1">
+          <mxGeometry x="160" y="150" width="260" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="d2" value="cycleScore(td) [page-gradebook.js:864]&#10;Determines next score (click cycles 0→1→2→3→4→0)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;align=left" vertex="1" parent="1">
+          <mxGeometry x="120" y="240" width="340" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="d3" value="upsertScore(cid, sid, aid, tid, next, date, type, note)&#10;[shared/data.js:2688]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;align=left" vertex="1" parent="1">
+          <mxGeometry x="120" y="340" width="340" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="d4" value="Update _cache.scores[cid][sid]&#10;Write gb-scores-{cid} (LS safety net)&#10;clearProfCache()&#10;_broadcastChange('scores')" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;align=left" vertex="1" parent="1">
+          <mxGeometry x="120" y="430" width="340" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="d5" value="_persistScoreToCanonical(cid, sid, aid, tid, score, note)&#10;Preconditions: _useSupabase &amp;&amp; !demoMode &amp;&amp;&#10;  _isUuid(sid) &amp;&amp; _isUuid(aid) &amp;&amp; _isUuid(tid)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;align=left" vertex="1" parent="1">
+          <mxGeometry x="120" y="540" width="340" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="d6" value="sb.rpc('save_course_score', {&#10;  p_course_offering_id: cid,&#10;  p_enrollment_id: sid,&#10;  p_assessment_id: aid,&#10;  p_course_outcome_id: tid,&#10;  p_score: score,&#10;  p_comment: note&#10;})" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;align=left;fontFamily=monospace" vertex="1" parent="1">
+          <mxGeometry x="120" y="650" width="340" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="d7" value="Postgres: assessment.score_current UPSERT&#10;(enrollment_id, assessment_id, course_outcome_id)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left" vertex="1" parent="1">
+          <mxGeometry x="120" y="790" width="340" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="d8" value="✓ Persisted. Survives sign-out / cross-device." style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="140" y="880" width="300" height="50" as="geometry" />
+        </mxCell>
+
+        <mxCell id="d-note" value="Note: comment entry in the popover (#comment-input)&#10;goes through the SAME upsertScore → save_course_score path.&#10;The 'Clear cell' context menu, however, does NOT —&#10;it calls saveScores(cid, scores) which falls in the stubbed&#10;_doSync path (LS only). delete_course_score RPC exists but is unused." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=left" vertex="1" parent="1">
+          <mxGeometry x="60" y="960" width="750" height="110" as="geometry" />
+        </mxCell>
+
+        <mxCell id="g-mobile" value="MOBILE proficiency + any points-mode — localStorage only ✗" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;verticalAlign=top;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="860" y="100" width="790" height="1050" as="geometry" />
+        </mxCell>
+
+        <mxCell id="m1" value="Teacher taps score button&#10;(1-4) on mobile Grade tab" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450" vertex="1" parent="1">
+          <mxGeometry x="980" y="150" width="260" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="m2" value="shell.js delegated 'm-grade-score' →&#10;MGrade.setScore(cid, sid, aid, tid, score)&#10;[teacher-mobile/tab-grade.js:229]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;align=left" vertex="1" parent="1">
+          <mxGeometry x="940" y="240" width="340" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="m3" value="Build new score entry locally:&#10;{ id: 'ms_…', assessmentId, tagId,&#10;  score, date, type, created }&#10;Push to allScores[sid]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;align=left" vertex="1" parent="1">
+          <mxGeometry x="940" y="340" width="340" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="m4" value="saveScores(cid, allScores)&#10;[shared/data.js:4047]" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;align=left;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="940" y="450" width="340" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="m5" value="_saveCourseField('scores', cid, allScores)&#10;→ _cache.scores[cid] = allScores&#10;→ _safeLSSet('gb-scores-' + cid, json)&#10;→ _syncToSupabase('scores', {cid}, snapshot)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;align=left" vertex="1" parent="1">
+          <mxGeometry x="940" y="540" width="340" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="m6" value="_doSync('scores', {cid}, data)&#10;[shared/data.js:379]&#10;&#10;// CANONICAL-RPC TRANSITION stub:&#10;_syncStatus = 'offline'; return;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#b85450;align=left;fontStyle=1;fontFamily=monospace" vertex="1" parent="1">
+          <mxGeometry x="940" y="660" width="340" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="m7" value="✗ Score lives only in localStorage.&#10;Wiped on sign-out. Never visible on desktop." style="ellipse;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="960" y="790" width="300" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="m-fix" value="One-line fix for mobile: swap saveScores for a per-tag upsertScore loop.&#10;&#10;For the same tags the assessment targets, iterate and call upsertScore(cid, sid, aid, tid, score, date, type, '').&#10;upsertScore already handles cache + LS + canonical RPC in one step." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=left" vertex="1" parent="1">
+          <mxGeometry x="880" y="880" width="750" height="120" as="geometry" />
+        </mxCell>
+
+        <mxCell id="se1" style="endArrow=classic;html=1;strokeColor=#82b366" edge="1" parent="1" source="d1" target="d2"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="se2" style="endArrow=classic;html=1;strokeColor=#82b366" edge="1" parent="1" source="d2" target="d3"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="se3" style="endArrow=classic;html=1;strokeColor=#82b366" edge="1" parent="1" source="d3" target="d4"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="se4" style="endArrow=classic;html=1;strokeColor=#82b366" edge="1" parent="1" source="d4" target="d5"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="se5" style="endArrow=classic;html=1;strokeColor=#82b366" edge="1" parent="1" source="d5" target="d6"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="se6" style="endArrow=classic;html=1;strokeColor=#82b366" edge="1" parent="1" source="d6" target="d7"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="se7" style="endArrow=classic;html=1;strokeColor=#82b366" edge="1" parent="1" source="d7" target="d8"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="se8" style="endArrow=classic;html=1;strokeColor=#b85450" edge="1" parent="1" source="m1" target="m2"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="se9" style="endArrow=classic;html=1;strokeColor=#b85450" edge="1" parent="1" source="m2" target="m3"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="se10" style="endArrow=classic;html=1;strokeColor=#b85450" edge="1" parent="1" source="m3" target="m4"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="se11" style="endArrow=classic;html=1;strokeColor=#b85450" edge="1" parent="1" source="m4" target="m5"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="se12" style="endArrow=classic;html=1;strokeColor=#b85450" edge="1" parent="1" source="m5" target="m6"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="se13" style="endArrow=classic;html=1;strokeColor=#b85450" edge="1" parent="1" source="m6" target="m7"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,0 +1,31 @@
+flowchart TD
+    A([Teacher logs in]) --> B[Land on Dashboard]
+    B --> C{Is the course and roster ready?}
+
+    C -- No --> D[Create or select the course]
+    D --> E[Add students or import roster]
+    E --> F[Review class setup on Dashboard]
+
+    C -- Yes --> F
+
+    F --> G[Open Assignments]
+    G --> H[Create the first assignment]
+    H --> I[Link learning targets / tags]
+    I --> J[Choose scoring approach\nProficiency or points]
+    J --> K[Enter student scores]
+    K --> L[Add comments, notes,\nor observations]
+    L --> M{Enough evidence for reporting?}
+
+    M -- No --> N[Repeat assignments,\ngrading, and comments]
+    N --> G
+
+    M -- Yes --> O[Open Reports]
+    O --> P[Choose report blocks and settings]
+    P --> Q[Complete questionnaire / narrative inputs]
+    Q --> R[Preview student reports]
+    R --> S{Ready to print?}
+
+    S -- No --> T[Return to grades,\ncomments, or report settings]
+    T --> K
+
+    S -- Yes --> U([Print or export reports])
