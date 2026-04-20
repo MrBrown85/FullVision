@@ -4963,6 +4963,74 @@ window.v2.upsertRubric = function (params) {
 };
 window.v2.deleteRubric = function (id) { return _rpcOrNoop('delete_rubric', { p_id: id }); };
 
+/* ── v2 student-profile read + student-record writes (Phase 4.6) ─────────
+   Reader: get_student_profile(p_enrollment_id) returns a composite jsonb
+   payload with the enrollment + student + course rows, overall proficiency,
+   letter grade, status counts, and arrays of notes / goals / reflections.
+   Competency tree is left null by the deployed RPC — it will be filled in
+   during Phase 4.5 learning-map composition work. */
+window.v2.getStudentProfile = function (enrollmentId) {
+  return _rpcOrNoop('get_student_profile', { p_enrollment_id: enrollmentId });
+};
+
+/* Notes: immutable add + delete (per ERD). Note body cannot be edited;
+   corrections mean delete + add. */
+window.v2.addNote = function (enrollmentId, body) {
+  return _rpcOrNoop('upsert_note', {
+    p_enrollment_id: enrollmentId,
+    p_body: body || '',
+  });
+};
+window.v2.deleteNote = function (noteId) {
+  return _rpcOrNoop('delete_note', { p_id: noteId });
+};
+
+/* Goal: one per (enrollment, section). Upsert replaces body. */
+window.v2.saveGoal = function (enrollmentId, sectionId, body) {
+  return _rpcOrNoop('upsert_goal', {
+    p_enrollment_id: enrollmentId,
+    p_section_id:    sectionId,
+    p_body:          body || '',
+  });
+};
+
+/* Reflection: one per (enrollment, section). confidence ∈ 1..5 or null. */
+window.v2.saveReflection = function (enrollmentId, sectionId, body, confidence) {
+  return _rpcOrNoop('upsert_reflection', {
+    p_enrollment_id: enrollmentId,
+    p_section_id:    sectionId,
+    p_body:          body || '',
+    p_confidence:    confidence != null ? Number(confidence) : null,
+  });
+};
+
+/* SectionOverride: teacher-judgment level override per (enrollment, section).
+   level ∈ 1..4; reason is optional free text. */
+window.v2.saveSectionOverride = function (enrollmentId, sectionId, level, reason) {
+  return _rpcOrNoop('upsert_section_override', {
+    p_enrollment_id: enrollmentId,
+    p_section_id:    sectionId,
+    p_level:         Number(level),
+    p_reason:        reason || null,
+  });
+};
+window.v2.clearSectionOverride = function (enrollmentId, sectionId) {
+  return _rpcOrNoop('clear_section_override', {
+    p_enrollment_id: enrollmentId,
+    p_section_id:    sectionId,
+  });
+};
+
+/* Bulk attendance: apply one status to many students on one date. Status is
+   free text (matches client "Present"/"Absent"/"Late" convention). */
+window.v2.bulkAttendance = function (enrollmentIds, date, status) {
+  return _rpcOrNoop('bulk_attendance', {
+    p_enrollment_ids: (enrollmentIds || []).filter(_isUuid),
+    p_date:           date,
+    p_status:         status || '',
+  });
+};
+
 /* Custom tag — per §12, create-only path (no edit/delete inventoried). */
 window.createCustomTag = function (cid, label) {
   var sb = getSupabase();
