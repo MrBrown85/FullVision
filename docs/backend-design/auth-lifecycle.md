@@ -32,7 +32,7 @@ These are stated up-front because the rest of the document depends on them. Each
 | A3 | Every API call that writes data includes a verified session token. The API extracts `teacher_id` from the token and uses it as the `caller` referenced throughout Pass B. | This is what Pass B's "caller" means operationally. | If unauthenticated writes are ever needed (e.g. a public share link that accepts comments), that path would not go through the teacher-scoped write paths. Not currently in the inputs. |
 | A4 | **Email verification is required before sign-in is permitted.** Sign-up creates only the auth record; the Teacher + TeacherPreference rows are created on first verified sign-in. | User decision. | To drop verification, collapse §1 into a single bootstrap-at-sign-up flow. |
 | A5 | **On first verified sign-in, a Welcome Class is auto-seeded** from the demo-seed JSON (per final Q45 = D, Q47 = A). Teacher lands in a populated gradebook; can delete the Welcome Class anytime. | User decision. | To revert to empty-state home, drop the seed step from §1.3. |
-| A6 | **Sliding 30-minute idle timeout.** Each successful API response issues a refreshed session token valid for 30 more minutes. 30 minutes with no API calls → next call returns 401 → client must re-authenticate. | User decision. | Absolute-lifetime tokens (fixed expiry regardless of activity) would require a different refresh mechanism, likely a refresh-token rotation scheme. |
+| A6 | **Access + refresh token model (Supabase default).** Short-TTL access token (~30 min) + long-TTL refresh token (~7 days). On 401, client calls `refreshSession()` silently and retries. Only when the refresh token itself expires does the user see a re-auth prompt. | Industry-standard OAuth2 pattern; ships with Supabase out of the box; survives offline periods (critical for `offline-sync.md`). | Single-token sliding-window would require custom middleware and breaks offline reconnect. |
 
 ---
 
@@ -488,36 +488,59 @@ Two ways to implement the ownership walk:
 
 The second is safer (belt-and-braces: a bug in API code can't leak data across teachers) but implementation-specific. Either is acceptable; **some form of enforcement is mandatory.**
 
-### 8.1 Sliding timeout mechanics (A6)
+### 8.1 Access + refresh token mechanics (A6)
 
-**Every successful API response carries a refreshed token** with a fresh 30-minute TTL. The client replaces its stored token on each response. Result:
+**On sign-in, Supabase issues two tokens:**
 
-- Active user: token effectively never expires; slides forward with each action.
-- Idle user: after 30 minutes with no API calls, the token in hand is stale. Next action gets 401 → client shows sign-in prompt.
-- Reads count as activity. Scrolling a gradebook that auto-refreshes hits the API and slides the window. Whether background/automatic reads should count is a subtle choice — the conservative default is **yes, any successful API call slides the window**.
+- **Access token** (~30-minute TTL). Sent on every API request as `Authorization: Bearer <token>`.
+- **Refresh token** (~7-day TTL). Stored client-side; used to mint new access tokens without user interaction.
+
+**On a request with an expired access token:**
+
+1. API returns 401.
+2. Client's auth wrapper calls `supabase.auth.refreshSession()` with the refresh token.
+3. **Refresh succeeds** → new access + refresh tokens issued → client retries the original request silently. User sees no interruption.
+4. **Refresh fails** (refresh token itself expired or revoked) → client shows re-auth prompt. Re-entry of credentials required.
+
+**Result:**
+- Active user: access tokens rotate silently in the background every ~30 min. Zero friction.
+- User returning within ~7 days: silent refresh on first request; no re-auth prompt.
+- User returning after ~7+ days of inactivity: re-auth prompt.
+
+**Why this matters for offline support ([offline-sync.md](offline-sync.md)):** a teacher offline for 45 minutes has an expired access token on reconnect. The queue-drain engine hits 401 on the first queued write → silently refreshes → proceeds. No re-auth interruption unless they've been offline for a full week. This is why we picked refresh tokens over a single sliding-window token.
+
+**Refresh-token rotation:** each successful refresh issues a new refresh token and invalidates the previous one (Supabase default). This catches stolen refresh tokens: if an attacker uses a token before the legitimate client does, the legitimate client's next refresh fails and signals compromise.
 
 **Draft preservation on mid-edit expiry — tiered approach.**
 
 The current UI (`shared/supabase.js:240-256`) shows a **toast** saying "Session expired" with a "Sign In" button, then redirects to `/login.html`. Unsaved drafts are lost. This is acceptable for most surfaces (gradebook score entry, roster edits, settings) because the individual edits are small and easily re-done.
 
-**Path A — default (matches existing UI):** toast + redirect. Applies to all surfaces except the two flagged below.
+**Path A — default (matches existing UI):** silent refresh first; toast + redirect only on refresh failure. Applies to all surfaces except the two flagged below.
 
 ```
 On 401:
-  show toast "Session expired — Sign in again"
-  redirect to /login.html after 3 seconds (or immediate on click)
+  attempt silent refreshSession()
+  if refresh succeeded:
+    retry original request with new access token
+    (user sees nothing)
+  if refresh failed (refresh token also expired or revoked):
+    show toast "Session expired — Sign in again"
+    redirect to /login.html after 3 seconds (or immediate on click)
 ```
 
 **Path B — draft preservation for long-form text surfaces:** applies ONLY to the term-rating narrative editor and the observation capture. These are the two places where a teacher may type for 10+ minutes before saving, and a lost draft is a genuine pain point.
 
 ```
 On 401 in term-rating narrative or observation capture:
-  1. do NOT destroy the current form state
-  2. show modal overlay: "Session expired — enter password to continue"
-     (email pre-filled from the expired token's claim)
-  3. on successful re-auth: retry the failed write with the new token
-  4. on dismiss or re-auth failure: keep the draft visible with a copy button
-     so the teacher can paste the text somewhere safe before the page reloads
+  1. attempt silent refreshSession() (same as Path A)
+  2. if refresh succeeded → retry write, user sees nothing
+  3. if refresh failed:
+     a. do NOT destroy the current form state
+     b. show modal overlay: "Session expired — enter password to continue"
+        (email pre-filled from the expired token's claim)
+     c. on successful re-auth: retry the failed write with the new token
+     d. on dismiss or re-auth failure: keep the draft visible with a copy button
+        so the teacher can paste the text somewhere safe before the page reloads
 ```
 
 **Why this tier split:** Building full draft preservation across every edit surface is a large UI investment. Limiting it to the two surfaces where the pain is high gives ~90% of the value for ~10% of the work. All other surfaces keep the existing toast behavior.

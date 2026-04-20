@@ -1,25 +1,28 @@
-# FullVision Backend Design — Clean-Room Rules
+# FullVision Backend Design — Charter
 
-This worktree exists to design a backend **from scratch** from the user inputs inventory. The existing codebase is intentionally absent.
+**Status:** Design phase complete (Passes A–D + decisions questionnaire). Implementation starts next.
 
-## Hard rules
+This worktree originally designed the backend **from scratch** from the user inputs inventory. That phase is done. Partway through Pass D the charter shifted to **"match the UI the user already has."** UI references in design docs are intentional and welcome.
 
-- **Source of truth:** `fullvision-user-inputs.xlsx` only. Do not invent inputs not listed there.
-- **Do not read, fetch, or grep** any file outside this worktree — especially `shared/`, `supabase/`, `teacher/`, `teacher-mobile/`, `scripts/`, or any `.js` / `.sql` / schema files in the main repo. They don't exist for this task.
+## Hard rules (still in force)
+
+- **Source of truth for feature coverage:** `fullvision-user-inputs.xlsx`. Every row worth persisting maps to exactly one entity.
 - **Ignore the `Persistence` column** (LS / SB / LS pref / EPH / Mixed). Treat every row that represents real user-authored data as "must persist." The existing split is an implementation artifact, not a domain fact.
 - **Ignore rows that are pure UI state:** search boxes, filter toggles, modal open/close, sort toggles, sheet open/close, drag reorders of UI-only elements, tab switches, sidebar toggles. These are client concerns, not backend entities.
 - **Collapse mobile + desktop rows** for the same action into one write path. `m-grade-score` and `cycleScore` are the same write.
-- **Ignore existing RPC names** (`save_course_score`, `save_learning_map`, etc.) and the `Gaps (priority)` sheet's fix recipes. Those describe the current system; we are not retrofitting it.
-- **No Supabase-specific assumptions** up front. Design entities first. RLS, RPC boundaries, auth.users coupling come after the ERD is stable.
-- **No running code, no preview server, no Bash to inspect the parent repo.** This is design work.
 
-## Three-pass workflow
+## Retired rules (design-phase only; no longer in force)
 
-Work in three separate sessions. Do not start the next pass until the user has reviewed the previous.
+- ~~"Do not read files outside this worktree."~~ The rebuild charter is explicitly "match the existing UI," so referencing UI code is expected. [spec-vs-ui-diff.md](docs/backend-design/spec-vs-ui-diff.md) and Pass C §8.1 cite UI file paths on purpose.
+- ~~"No Supabase-specific assumptions."~~ Q1 in [DECISIONS.md](docs/backend-design/DECISIONS.md) committed to Supabase full-stack; Supabase patterns (RLS, Edge Functions, refresh tokens) are now in scope.
+- ~~"Ignore existing RPC names."~~ Post-fold, the implementation layer can align with existing RPC names where the UI already calls them.
 
-- **Pass A — ERD.** Entities, attributes, FKs. Output: `docs/backend-design/erd.md` (mermaid + entity dictionary). Stop when stable.
-- **Pass B — Write paths.** Sequence diagrams for each persistence boundary, reading only Pass A's ERD. Output: `docs/backend-design/write-paths.md`.
-- **Pass C — Auth & session lifecycle.** Sign-in, demo mode, course switch, sign-out, delete account. Output: `docs/backend-design/auth-lifecycle.md`.
+## Three-pass workflow (complete)
+
+- **Pass A — ERD.** `docs/backend-design/erd.md`. Final state includes the Pass D amendment folded in (2026-04-19).
+- **Pass B — Write paths.** `docs/backend-design/write-paths.md`.
+- **Pass C — Auth & session lifecycle.** `docs/backend-design/auth-lifecycle.md`.
+- **Pass D — Read paths + computations.** `docs/backend-design/read-paths.md`.
 
 ## Deliverable conventions
 

@@ -13,6 +13,7 @@ erDiagram
 
     Course ||--o| ReportConfig : "has"
     Course ||--o{ Enrollment : "contains"
+    Course ||--o{ Category : "has"
     Course ||--o{ Subject : "has"
     Course ||--o{ CompetencyGroup : "has"
     Course ||--o{ Section : "has"
@@ -40,6 +41,7 @@ erDiagram
 
     Assessment }o--o| Rubric : "uses"
     Assessment }o--o| Module : "belongs to"
+    Assessment }o--o| Category : "in"
     Assessment }o--o{ Tag : "linked via AssessmentTag"
 
     %% ── Scoring ───────────────────────────────────────────
@@ -114,14 +116,21 @@ erDiagram
         text color
         boolean is_archived
         int display_order
-        text grading_system
-        text calc_method
+        text grading_system "proficiency | letter | both"
+        text calc_method "average | median | mostRecent | highest | mode | decayingAvg"
         numeric decay_weight
-        jsonb grading_scale "array of label+min"
-        boolean category_weights_enabled
-        numeric summative_weight_pct
-        boolean report_as_percentage
-        text late_work_policy
+        text timezone "IANA tz, e.g. America/Vancouver"
+        text late_work_policy "free-text; human-readable, not enforced"
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    Category {
+        uuid id PK
+        uuid course_id FK "FK → Course"
+        text name
+        numeric weight "0-100; teacher-set percentage, UI hard-caps sum at 100"
+        int display_order "within course"
         timestamp created_at
         timestamp updated_at
     }
@@ -219,6 +228,11 @@ erDiagram
         text level_3_descriptor
         text level_2_descriptor
         text level_1_descriptor
+        numeric level_4_value "default 4; teacher-adjustable"
+        numeric level_3_value "default 3; teacher-adjustable"
+        numeric level_2_value "default 2; teacher-adjustable"
+        numeric level_1_value "default 1; teacher-adjustable"
+        numeric weight "default 1.0; normalized across rubric at read time"
         int display_order "within rubric"
         timestamp created_at
         timestamp updated_at
@@ -227,11 +241,11 @@ erDiagram
     Assessment {
         uuid id PK
         uuid course_id FK "FK → Course"
+        uuid category_id "FK → Category, nullable"
         text title
         text description
         date date_assigned
         date due_date
-        text type "summative or formative"
         text score_mode "proficiency or points"
         numeric max_points
         numeric weight
@@ -404,7 +418,8 @@ erDiagram
 |---|--------|---------|----------------|-------------|-------------------|
 | 1 | **Teacher** | The authenticated user (teacher account). | id, email, display_name | System (auth) | Root entity. One per account. |
 | 2 | **TeacherPreference** | Per-teacher settings: active course, view modes, widget layout. | teacher_id (PK/FK), active_course_id, view_mode, mobile_view_mode, mobile_sort_mode, card_widget_config | Teacher | 1:1 with Teacher. |
-| 3 | **Course** | A class the teacher manages. Includes grading policy (system, calc method, decay, scale, category weights, late-work policy). | id, teacher_id, name, grade_level, description, color, is_archived, grading_system, calc_method, decay_weight, grading_scale, category_weights_enabled, summative_weight_pct, report_as_percentage, late_work_policy | Teacher | Many per Teacher. Central hub. Policy fields formerly in CoursePolicy are inlined -- always 1:1 and always co-fetched. |
+| 3 | **Course** | A class the teacher manages. Includes grading policy (system, calc method, decay, timezone, late-work policy). | id, teacher_id, name, grade_level, description, color, is_archived, grading_system, calc_method, decay_weight, timezone, late_work_policy | Teacher | Many per Teacher. Central hub. `grading_system` is `'proficiency' \| 'letter' \| 'both'`. When `letter` or `both`, Categories drive the percentage pipeline (Pass D §1.4). `late_work_policy` is free text — display only, not enforced by calc. Q→R% and R→letter cutoffs are hardcoded app-wide (BC standard). |
+| 3a | **Category** | Teacher-named assessment grouping with a percentage weight — drives the letter/percentage pipeline. | id, course_id, name, weight, display_order | Teacher | Many per Course. Optional (a course may have zero). Weights UI-capped so the sum cannot exceed 100; sums < 100 are renormalized at read time. When `grading_system ∈ {letter, both}` the UI blocks selecting that mode without ≥1 Category. |
 | 4 | **Student** | A student record. Can appear in multiple courses via Enrollment. | id, teacher_id, first_name, last_name, preferred_name, pronouns, student_number, email, date_of_birth | Teacher | Many per Teacher. Shared across courses. |
 | 5 | **Enrollment** | Joins a Student to a Course. Carries per-course student state. | id, student_id, course_id, designations (`text[]`), roster_position, is_flagged, withdrawn_at | Teacher | Many per Course, many per Student. UNIQUE(student_id, course_id). `withdrawn_at` is nullable -- null means active. |
 | 6 | **Subject** | A top-level subject in the learning map (e.g. "Reading", "Math"). | id, course_id, name, display_order | Teacher | Many per Course. display_order scoped within course. |
@@ -413,9 +428,9 @@ erDiagram
 | 9 | **Tag** | A specific indicator / "I can" statement within a section. | id, section_id, code, label, i_can_text, display_order | Teacher | Many per Section. Leaf of the learning map tree. display_order scoped within section. |
 | 10 | **Module** | An organizational unit for assessments (like a unit or chapter). | id, course_id, name, color, display_order | Teacher | Many per Course. display_order scoped within course. |
 | 11 | **Rubric** | A reusable scoring rubric template. | id, course_id, name | Teacher | Many per Course. |
-| 12 | **Criterion** | A single row in a rubric with 4-level descriptors. | id, rubric_id, name, level_{1..4}_descriptor, display_order | Teacher | Many per Rubric. display_order scoped within rubric. |
+| 12 | **Criterion** | A single row in a rubric with 4-level descriptors, per-level point values, and a criterion weight. | id, rubric_id, name, level_{1..4}_descriptor, level_{1..4}_value, weight, display_order | Teacher | Many per Rubric. display_order scoped within rubric. `level_N_value` defaults to N (teacher can override). `weight` defaults to 1.0; normalized across the rubric at read time. |
 | 13 | **CriterionTag** | Links a Criterion to Tags (standards the criterion assesses). | criterion_id, tag_id | -- | Join table. Many-to-many. |
-| 14 | **Assessment** | An assignment, test, or task students are scored on. | id, course_id, title, description, date_assigned, due_date, type, score_mode, max_points, weight, evidence_type, rubric_id, module_id, collab_mode, collab_config | Teacher | Many per Course. display_order scoped within module (or within course for unmoduled assessments). `collab_config` is jsonb storing group assignments and exclusions atomically -- see design note below. |
+| 14 | **Assessment** | An assignment, test, or task students are scored on. | id, course_id, category_id, title, description, date_assigned, due_date, score_mode, max_points, weight, evidence_type, rubric_id, module_id, collab_mode, collab_config | Teacher | Many per Course. `category_id` is nullable; when present, participates in the percentage pipeline. `type` (summative/formative) was removed in favour of `category_id`. display_order scoped within module (or within course for unmoduled assessments). `collab_config` is jsonb storing group assignments and exclusions atomically -- see design note below. |
 | 15 | **AssessmentTag** | Links an Assessment to Tags (standards it covers). | assessment_id, tag_id | -- | Join table. Many-to-many. |
 | 16 | **Score** | A student's overall score on an assessment, including assignment status. | id, enrollment_id, assessment_id, value *(nullable)*, status *(nullable: NS/EXC/LATE)*, comment | Teacher | One per Enrollment x Assessment. UNIQUE(enrollment_id, assessment_id). A row can have value only, status only, or both. Replaces the former separate AssignmentStatus entity. |
 | 17 | **RubricScore** | Per-criterion score when an assessment uses a rubric. Sibling of Score, not child. | id, enrollment_id, assessment_id, criterion_id, value | Teacher | UNIQUE(enrollment_id, assessment_id, criterion_id). Exists independently of Score -- criterion-level entry comes first, overall Score.value can be derived or separately entered. |
@@ -477,13 +492,38 @@ These two entities handle different scoring flows and never overlap for the same
 
 This avoids the ambiguity of two conflicting sources for the same tag-level score.
 
-### Section.course_id denormalization
+### Section.course_id denormalization + composite FK enforcement
 
 Section carries `course_id` even though it's derivable from `subject.course_id`. This is intentional:
 
 - Enables direct joins from course-scoped queries without chaining through Subject.
-- Allows a database-level FK constraint ensuring a Section only references Subjects and CompetencyGroups within its own course.
-- **Invariant to maintain:** `section.course_id = subject.course_id` for all rows. Enforce via trigger or application logic.
+- Allows **database-level composite FK** constraints ensuring a Section only references Subjects and CompetencyGroups within its own course.
+
+**Enforcement: composite foreign keys, not triggers.** Add `UNIQUE(id, course_id)` to Subject and CompetencyGroup. Then Section declares:
+
+```sql
+-- Subject and CompetencyGroup each get a composite uniqueness guarantee
+ALTER TABLE Subject         ADD CONSTRAINT subject_id_course_uk         UNIQUE (id, course_id);
+ALTER TABLE CompetencyGroup ADD CONSTRAINT competency_group_id_course_uk UNIQUE (id, course_id);
+
+-- Section references them as composite FKs
+ALTER TABLE Section
+    ADD CONSTRAINT section_subject_fk
+        FOREIGN KEY (subject_id, course_id)
+        REFERENCES Subject(id, course_id);
+
+ALTER TABLE Section
+    ADD CONSTRAINT section_competency_group_fk
+        FOREIGN KEY (competency_group_id, course_id)
+        REFERENCES CompetencyGroup(id, course_id)
+        MATCH SIMPLE;   -- competency_group_id is nullable; null skips the check
+```
+
+Postgres rejects at write time any Section row whose `course_id` doesn't match its referenced Subject / CompetencyGroup. No trigger, no application-layer check, no silent drift — the planner enforces it.
+
+### Late-work policy is display-only
+
+`Course.late_work_policy` is a free-text field that appears on report cards and student-profile headers. The backend does **not** parse, apply, or enforce it. Score rows with `status='LATE'` are informational (per Pass D §1.8) — no deduction is applied. If teachers later want automated late penalties, that's a separate entity (`LatePenaltyRule`) and a new calc-method branch.
 
 ### Soft-delete consideration
 
@@ -644,6 +684,22 @@ Every non-ephemeral row from `All Inputs` mapped to its entity. Mobile/desktop d
 
 ---
 
+## Changes from v2 — Pass D amendment folded in (2026-04-19)
+
+The former `erd-amendment-pass-d.md` has been merged into this document. Its contents are now canonical here. Summary of what changed:
+
+1. **Added `Category` entity** (row 3a) — teacher-named assessment grouping with a percentage weight. Drives the letter/percentage pipeline.
+2. **Added `Assessment.category_id`** (FK to Category, nullable). Replaces the old `Assessment.type` (summative/formative).
+3. **Dropped `Assessment.type`** — replaced by `category_id`.
+4. **Expanded `Course.grading_system` enum** to `'proficiency' | 'letter' | 'both'`.
+5. **Added `Course.timezone`** (IANA string; defaults to browser TZ on create; per Q22).
+6. **Expanded `Course.calc_method` enum** to include `'average'` and `'median'` alongside the original four options.
+7. **Dropped `Course.grading_scale`, `category_weights_enabled`, `summative_weight_pct`, `report_as_percentage`** — Q→R% and R→letter cutoffs are hardcoded app-wide (BC standard); category mechanics replace the old summative-weight slider.
+8. **Added `Criterion.level_{1..4}_value`** (defaults 1/2/3/4; teacher-adjustable) and `Criterion.weight` (default 1.0; normalized across rubric at read time).
+9. **Clarified `Score.status` values** as `'NS' | 'EXC' | 'LATE' | null` (matches existing UI; no rename).
+10. **Added composite FK enforcement** for `Section.(subject_id, course_id)` and `Section.(competency_group_id, course_id)` — see Design Notes.
+11. **Documented `late_work_policy` as display-only** in Design Notes and on the Course entity itself.
+
 ## Changes from v1
 
 Summary of revisions applied during review:
@@ -666,6 +722,8 @@ Summary of revisions applied during review:
 ---
 
 ## Open Questions
+
+> **Status (2026-04-19):** all 7 questions below were answered during the decisions questionnaire. See [DECISIONS.md](DECISIONS.md) Tier 1 (Q4) and the "Pass A surviving open questions" section (Q38–Q42). Left here verbatim as a record of what was asked.
 
 1. **Demo Mode entity status.** Row 17 records a "demo mode" toggle. Demo mode appears to be a session-level flag that seeds fake data and prevents real writes. It is not a persisted entity in the domain sense. Should we model a `demo_session` flag on Teacher, or treat it as purely an auth/session concern handled in Pass C?
 

@@ -2,7 +2,7 @@
 
 Pass B specified every way data gets **into** the database. This pass specifies every way data comes **out** — the read surfaces the app renders, and (the harder half) the computations that derive grades, proficiencies, and summary indicators from the raw Score / RubricScore / TagScore rows.
 
-Prerequisite: apply [erd-amendment-pass-d.md](erd-amendment-pass-d.md) before reading this. The amendment adds the `Category` entity, `Course.grading_system`, `Criterion.weight`, and per-level criterion values, and renames the Score status enum.
+All required schema (Category entity, `Course.grading_system`, `Criterion.weight`, per-level criterion values, etc.) lives in [erd.md](erd.md) — the Pass D amendment was folded into Pass A on 2026-04-19.
 
 ## 0. Design rules
 
@@ -251,16 +251,21 @@ function section_proficiency(student, section, course):
     if override exists and override.level > 0:
         return override.level
 
-    // Collect tag scores contributing to this section
+    // Collect ONE contribution per assessment (average its tag scores in this section first)
+    // Per Q9 = A: each assessment contributes once, regardless of how many tags it covers.
     tags = Tag rows where section_id = section
+    assessments_covering_section = unique set of assessments that score ANY tag in this section
+                                   (via AssessmentTag for non-rubric,
+                                    or via Rubric→Criterion→CriterionTag for rubric)
     contributions = []      // list of { value, date }
-    for each tag in tags:
-        assessments = assessments that score this tag
-                     (via AssessmentTag for non-rubric, or via Rubric→Criterion→CriterionTag for rubric)
-        for each assessment in assessments:
+    for each assessment in assessments_covering_section:
+        tag_values = []
+        for each tag in tags:
             ts = tag_score_for_assessment(student, assessment, tag)
             if ts in {EXCLUDED, NOT_YET_GRADED, NOT_APPLICABLE}: continue
-            contributions.append({ value: ts, date: assessment.date_assigned })
+            tag_values.append(ts)
+        if tag_values is empty: continue   // assessment covers no scored tag in this section
+        contributions.append({ value: mean(tag_values), date: assessment.date_assigned })
 
     if contributions is empty:
         return null
@@ -288,7 +293,7 @@ function decaying_avg(contributions, dw):
     return avg
 ```
 
-**Edge case — per-tag contribution counting:** A single assessment may contribute to multiple tags in the same section (via tag-links). Each tag→assessment pair adds one entry to `contributions`. This means an assessment heavily tagged to one section weighs more in that section's proficiency. Confirm this is desired — alternative would be one contribution per assessment (averaged across its tags first).
+**Design note — one contribution per assessment (per Q9 = A):** Each assessment contributes exactly one entry to `contributions`, computed as the mean of its tag scores within this section. An assessment that covers 5 tags in the section does **not** weight 5× — it counts once, at the average. This matches teacher intuition ("one assignment, one contribution"). An assessment whose tags in this section are all excused/ungraded/not-applicable contributes nothing.
 
 ### 1.6 Competency-group rollup
 
@@ -344,7 +349,10 @@ function status_counts(student, course, term_filter=null):
             counts.excused += 1
         elif s.status == 'LATE':
             counts.late += 1
-            counts.graded += 1   // LATE still counts as graded, because it also has a value
+            if s.value is not null:
+                counts.graded += 1   // LATE counts as graded only when a value exists
+            else:
+                counts.not_yet_graded += 1   // LATE status with no value yet
         elif s.value is not null:
             counts.graded += 1
         else:
@@ -628,7 +636,7 @@ Every aggregate in §1 is computed on read. This is deliberate.
 
 ## 5. Open questions and flagged decisions
 
-1. **Per-tag contribution counting in §1.5.** If one assessment covers 5 tags in a section, each tag→assessment pair produces a contribution. That assessment effectively contributes 5× to section proficiency. Alternative: one contribution per assessment (average its tag scores first). Confirm which is intended.
+1. ~~Per-tag contribution counting in §1.5.~~ **Resolved (Q9 = A):** one contribution per assessment, computed as the mean of its tag scores in the section. §1.5 formula updated.
 2. **"At risk" threshold in §2.3.** Currently defaulted to proficiency < 2.0 or percentage < 60%. Teacher-configurable? Fixed?
 3. **No-category, letter-mode fallback in §1.4.** When a course is in `letter` mode with zero Categories, I default to "average all assessments equally." Alternative: require at least one Category before letter mode is selectable. Which is intended?
 4. **Report block `Focus Areas` rule.** Current spec (inherited from existing code): lowest-N sections, with zero-evidence sections ranked first. Confirm this is the right ranking.

@@ -41,11 +41,11 @@ Answers that diverge from my recommendation are **highlighted**. Answers that ma
 | # | Question | Answer | Impact |
 |---|---|---|---|
 | 17 | At-risk threshold | **A** — Fixed app-wide: proficiency < 2.0 OR letter % < 60% ⚠️ differs from REC | **Pass D §2.3 updated**: threshold is fixed, not teacher-configurable. Simpler implementation; can revisit later. |
-| 18 | Category weights sum | **D + note** — "Don't allow users to exceed 100%" ⚠️ user's note overrides the option letter | **ERD amendment updated**: hard-cap at 100. UI enforces cap on input change (typing a value that would push sum over 100 is rejected or auto-clamped). Teacher cannot save a configuration that sums > 100. |
+| 18 | Category weights sum | **D + note** — "Don't allow users to exceed 100%" ⚠️ user's note overrides the option letter | **ERD updated**: Category.weight description notes the hard-cap at 100. UI enforces cap on input change (typing a value that would push sum over 100 is rejected or auto-clamped). Teacher cannot save a configuration that sums > 100. |
 | 19 | grading_system auto-default | **A** — Grade 8–9 → proficiency; 10–12 → letter; toggle visible | Matches REC. |
 | 20 | Per-section calc_method override | **A** — Course-wide only for v1 | Matches REC. |
 | 21 | Focus Areas ranking | **A** — Lowest-N sections; zero-evidence first | Matches REC. |
-| 22 | Timezone handling | **A** — Per-course TZ; defaults to browser TZ on create | Matches REC. `Course.timezone text` added to ERD amendment. |
+| 22 | Timezone handling | **A** — Per-course TZ; defaults to browser TZ on create | Matches REC. `Course.timezone text` added to ERD. |
 | 23 | Gradebook Tab direction | **A** — Right (next assignment, same student) | Matches REC. |
 | 24 | Legacy grading-scale UI | **A** — Remove controls entirely | Spec-vs-UI diff finalized. |
 | 25 | Legacy summative/formative toggle | **A** — Replace with Category dropdown | Spec-vs-UI diff finalized. |
@@ -152,7 +152,7 @@ One seed file, two use cases. Saves a content-building effort.
   - `TermRatingAudit` entity added (6 cols)
   - `ObservationTemplate.is_seed boolean` added (per Q4)
 
-- **`erd-amendment-pass-d.md`**:
+- **`erd.md`** (folded from the former `erd-amendment-pass-d.md` on 2026-04-19):
   - `Course.timezone text` added (per Q22)
   - Category weights cap documented (per Q18)
   - Legacy UI migration decisions logged (Q24, Q25, Q26)
@@ -192,7 +192,7 @@ None of the 49 questions left truly unanswered. The following are **implementati
 
 Implementation can now start. Recommended kickoff order:
 
-1. Create `fullvision-v2` Supabase project + apply schema migrations (ERD + amendments).
+1. Create `fullvision-v2` Supabase project + apply schema migrations ([erd.md](erd.md) is now the single source of truth — the Pass D amendment was folded in on 2026-04-19).
 2. Tag current main as `legacy-v1` in git; cut fresh branch for rebuild.
 3. Wire auth (Pass C §1–§2 sign-up/sign-in including email verification via custom domain SMTP).
 4. Implement Pass B write paths in dependency order (Course → Student → Enrollment → Assessment → Score).
