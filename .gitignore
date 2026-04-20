@@ -27,3 +27,6 @@ test-*.html
 # Playwright test artifacts (per-run state and failure screenshots)
 test-results/
 playwright-report/
+
+# Playwright CLI scratch (per-run session dumps)
+.playwright-cli/
