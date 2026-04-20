@@ -13,6 +13,8 @@
 --   fullvision_v2_write_path_student_enrollment (2026-04-19)
 --   fullvision_v2_fix_import_roster_csv_reenroll (2026-04-19)
 --   fullvision_v2_write_path_assessment_crud  (2026-04-19)
+--   fullvision_v2_write_path_scoring          (2026-04-19)
+--   fullvision_v2_fix_score_audit_security_definer (2026-04-19)
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Phase 1.1 — Auth / bootstrap RPCs
@@ -1338,3 +1340,212 @@ grant execute on function duplicate_assessment(uuid) to authenticated;
 grant execute on function delete_assessment(uuid) to authenticated;
 grant execute on function save_assessment_tags(uuid, uuid[]) to authenticated;
 grant execute on function save_collab(uuid, text, jsonb) to authenticated;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Phase 1.7 — Scoring RPCs (§9) + ScoreAudit (Q28)
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Migrations:
+--   fullvision_v2_write_path_scoring (2026-04-19)
+--   fullvision_v2_fix_score_audit_security_definer (2026-04-19) — audit helper
+--     must be SECURITY DEFINER because rls-policies.sql reserves writes to
+--     service_role (no INSERT policy on score_audit by design).
+
+create or replace function _score_audit_diff(
+    p_score_id uuid,
+    p_old_value numeric, p_new_value numeric,
+    p_old_status text,   p_new_status text
+) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+    if p_old_value is distinct from p_new_value
+       or p_old_status is distinct from p_new_status then
+        insert into score_audit (score_id, changed_by, old_value, new_value, old_status, new_status)
+        values (p_score_id, (select auth.uid()), p_old_value, p_new_value, p_old_status, p_new_status);
+    end if;
+end; $$;
+revoke all on function _score_audit_diff(uuid, numeric, numeric, text, text) from public;
+grant execute on function _score_audit_diff(uuid, numeric, numeric, text, text) to authenticated;
+
+create or replace function upsert_score(
+    p_enrollment_id uuid, p_assessment_id uuid, p_value numeric
+) returns uuid
+language plpgsql security invoker set search_path = public as $$
+declare _id uuid; _old_v numeric; _old_s text;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    select id, value, status into _id, _old_v, _old_s
+      from score where enrollment_id = p_enrollment_id and assessment_id = p_assessment_id;
+    if _id is null then
+        insert into score (enrollment_id, assessment_id, value)
+        values (p_enrollment_id, p_assessment_id, p_value) returning id into _id;
+        perform _score_audit_diff(_id, null, p_value, null, null);
+    else
+        update score set value = p_value, scored_at = now(), updated_at = now() where id = _id;
+        perform _score_audit_diff(_id, _old_v, p_value, _old_s, _old_s);
+    end if;
+    return _id;
+end; $$;
+
+create or replace function set_score_status(
+    p_enrollment_id uuid, p_assessment_id uuid, p_status text
+) returns uuid
+language plpgsql security invoker set search_path = public as $$
+declare _id uuid; _old_v numeric; _old_s text;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    if p_status is not null and p_status not in ('NS','EXC','LATE') then
+        raise exception 'invalid status %', p_status using errcode = '22023';
+    end if;
+    select id, value, status into _id, _old_v, _old_s
+      from score where enrollment_id = p_enrollment_id and assessment_id = p_assessment_id;
+    if _id is null then
+        insert into score (enrollment_id, assessment_id, status)
+        values (p_enrollment_id, p_assessment_id, p_status) returning id into _id;
+        perform _score_audit_diff(_id, null, null, null, p_status);
+    else
+        update score set status = p_status, updated_at = now() where id = _id;
+        perform _score_audit_diff(_id, _old_v, _old_v, _old_s, p_status);
+    end if;
+    return _id;
+end; $$;
+
+-- save_score_comment is NOT audited (Q28 scope is value/status, not comment).
+create or replace function save_score_comment(
+    p_enrollment_id uuid, p_assessment_id uuid, p_comment text
+) returns uuid
+language plpgsql security invoker set search_path = public as $$
+declare _id uuid;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    select id into _id from score where enrollment_id = p_enrollment_id and assessment_id = p_assessment_id;
+    if _id is null then
+        insert into score (enrollment_id, assessment_id, comment)
+        values (p_enrollment_id, p_assessment_id, p_comment) returning id into _id;
+    else
+        update score set comment = p_comment, updated_at = now() where id = _id;
+    end if;
+    return _id;
+end; $$;
+
+-- rubric_score / tag_score are unaudited (derivable from parent Score audit chain).
+create or replace function upsert_rubric_score(
+    p_enrollment_id uuid, p_assessment_id uuid, p_criterion_id uuid, p_value int
+) returns uuid
+language plpgsql security invoker set search_path = public as $$
+declare _id uuid;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    insert into rubric_score (enrollment_id, assessment_id, criterion_id, value)
+    values (p_enrollment_id, p_assessment_id, p_criterion_id, p_value)
+    on conflict (enrollment_id, assessment_id, criterion_id) do update
+       set value = excluded.value, updated_at = now()
+    returning id into _id;
+    return _id;
+end; $$;
+
+create or replace function upsert_tag_score(
+    p_enrollment_id uuid, p_assessment_id uuid, p_tag_id uuid, p_value int
+) returns uuid
+language plpgsql security invoker set search_path = public as $$
+declare _id uuid;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    if (select rubric_id from assessment where id = p_assessment_id) is not null then
+        raise exception 'tag_score is not used for rubric assessments' using errcode = '22023';
+    end if;
+    insert into tag_score (enrollment_id, assessment_id, tag_id, value)
+    values (p_enrollment_id, p_assessment_id, p_tag_id, p_value)
+    on conflict (enrollment_id, assessment_id, tag_id) do update
+       set value = excluded.value, updated_at = now()
+    returning id into _id;
+    return _id;
+end; $$;
+
+-- fill_rubric: sets every criterion for (enrollment, assessment) to p_value (§9.6).
+create or replace function fill_rubric(
+    p_enrollment_id uuid, p_assessment_id uuid, p_value int
+) returns int
+language plpgsql security invoker set search_path = public as $$
+declare _n int := 0; _crit record; _rubric uuid;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    select rubric_id into _rubric from assessment where id = p_assessment_id;
+    if _rubric is null then
+        raise exception 'assessment % has no rubric', p_assessment_id using errcode = '22023';
+    end if;
+    for _crit in select id from criterion where rubric_id = _rubric loop
+        perform upsert_rubric_score(p_enrollment_id, p_assessment_id, _crit.id, p_value);
+        _n := _n + 1;
+    end loop;
+    return _n;
+end; $$;
+
+-- Clear variants (§9.7). Writes a deletion audit diff before removing rows.
+-- (Cascade from score → score_audit still removes the history; acceptable since
+-- a "clear" is a zero-out. Teachers needing historical recovery use the audit
+-- chain, not the score table.)
+create or replace function clear_score(p_enrollment_id uuid, p_assessment_id uuid) returns void
+language plpgsql security invoker set search_path = public as $$
+declare _id uuid; _old_v numeric; _old_s text;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    select id, value, status into _id, _old_v, _old_s
+      from score where enrollment_id = p_enrollment_id and assessment_id = p_assessment_id;
+    if _id is not null then
+        perform _score_audit_diff(_id, _old_v, null, _old_s, null);
+    end if;
+    delete from score        where enrollment_id = p_enrollment_id and assessment_id = p_assessment_id;
+    delete from rubric_score where enrollment_id = p_enrollment_id and assessment_id = p_assessment_id;
+    delete from tag_score    where enrollment_id = p_enrollment_id and assessment_id = p_assessment_id;
+end; $$;
+
+create or replace function clear_row_scores(p_enrollment_id uuid, p_course_id uuid) returns int
+language plpgsql security invoker set search_path = public as $$
+declare _n int := 0; _s record;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    for _s in select s.id, s.value, s.status from score s
+              join assessment a on a.id = s.assessment_id
+              where s.enrollment_id = p_enrollment_id and a.course_id = p_course_id
+    loop
+        perform _score_audit_diff(_s.id, _s.value, null, _s.status, null);
+        _n := _n + 1;
+    end loop;
+    delete from score
+     where enrollment_id = p_enrollment_id
+       and assessment_id in (select id from assessment where course_id = p_course_id);
+    delete from rubric_score
+     where enrollment_id = p_enrollment_id
+       and assessment_id in (select id from assessment where course_id = p_course_id);
+    delete from tag_score
+     where enrollment_id = p_enrollment_id
+       and assessment_id in (select id from assessment where course_id = p_course_id);
+    return _n;
+end; $$;
+
+create or replace function clear_column_scores(p_assessment_id uuid) returns int
+language plpgsql security invoker set search_path = public as $$
+declare _n int := 0; _s record;
+begin
+    if (select auth.uid()) is null then raise exception 'not authenticated' using errcode = 'PT401'; end if;
+    for _s in select id, value, status from score where assessment_id = p_assessment_id
+    loop
+        perform _score_audit_diff(_s.id, _s.value, null, _s.status, null);
+        _n := _n + 1;
+    end loop;
+    delete from score        where assessment_id = p_assessment_id;
+    delete from rubric_score where assessment_id = p_assessment_id;
+    delete from tag_score    where assessment_id = p_assessment_id;
+    return _n;
+end; $$;
+
+grant execute on function upsert_score(uuid, uuid, numeric) to authenticated;
+grant execute on function set_score_status(uuid, uuid, text) to authenticated;
+grant execute on function save_score_comment(uuid, uuid, text) to authenticated;
+grant execute on function upsert_rubric_score(uuid, uuid, uuid, int) to authenticated;
+grant execute on function upsert_tag_score(uuid, uuid, uuid, int) to authenticated;
+grant execute on function fill_rubric(uuid, uuid, int) to authenticated;
+grant execute on function clear_score(uuid, uuid) to authenticated;
+grant execute on function clear_row_scores(uuid, uuid) to authenticated;
+grant execute on function clear_column_scores(uuid) to authenticated;
