@@ -23,6 +23,7 @@
 --   fullvision_v2_write_path_prefs_report     (2026-04-19)
 --   fullvision_v2_enable_pg_cron              (2026-04-19)
 --   fullvision_v2_write_path_retention_cleanup (2026-04-19)
+--   fullvision_v2_write_path_imports          (2026-04-19)
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Phase 1.1 — Auth / bootstrap RPCs
@@ -1987,3 +1988,27 @@ revoke all on function fv_retention_cleanup() from public;
 --   jobname:  fv_retention_cleanup_daily
 --   schedule: '17 3 * * *'
 --   command:  select public.fv_retention_cleanup();
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Phase 4.9 backend — Imports (§15.2 Teams, §15.3 JSON restore)
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Migration: fullvision_v2_write_path_imports (2026-04-19)
+
+-- import_teams_class(p_payload jsonb) → jsonb
+--   Creates Course + ReportConfig + Students (match by SN→email→name) +
+--   Enrollments + Assessments. Scores are NOT imported from Teams in this flow.
+--   Returns { course_id, students_created, enrollments_created, assessments_created }.
+--   Sets the new course as active_course_id on teacher_preference.
+
+-- import_json_restore(p_payload jsonb) → jsonb
+--   Full-data restore from a legacy export, FK-safe topological replay.
+--   Courses → ReportConfig → Subject/CompetencyGroup → Section → Tag →
+--   Module → Rubric → Criterion → CriterionTag → Student → Enrollment →
+--   Assessment → AssessmentTag → Score/RubricScore/TagScore →
+--   Note / Goal / Reflection.  Idempotent: UPSERT on UUID.
+--   teacher_id on Course + Student is forced to auth.uid() regardless of
+--   payload value — never trust the caller's ownership claim.
+
+grant execute on function import_teams_class(jsonb) to authenticated;
+grant execute on function import_json_restore(jsonb) to authenticated;
