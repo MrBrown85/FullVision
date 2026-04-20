@@ -277,5 +277,6 @@ Claude appends one line per completed task. Format: `YYYY-MM-DD | session-<n> | 
 - `2026-04-20 | session-5 | plan-3.1-e-verify | HANDOFF 4.1 verified: added tests/data-students-v2-dispatch.test.js (18 tests) covering all 4 _canonical* helpers (enroll / updateStudent / updateEnrollment / withdraw) + 4 window helpers (reorderRoster, bulkApplyPronouns, importRosterCsv, setEnrollmentFlag). Full suite 38 files / 693 passing. DB smoke already in original Phase 4.1 commit.`
 - `2026-04-20 | session-5 | plan-3.1-f-verify | HANDOFF 4.2 verified: added tests/data-assessments-v2-dispatch.test.js (14 tests) covering _canonicalCreate/Update/DeleteAssessment + duplicateAssessment + saveAssessmentTags + saveCollab. Full suite 39 files / 707 passing.`
 - `2026-04-20 | session-5 | plan-3.1-g-verify | HANDOFF 4.3 verified: scoring clear helpers (fillRubric, clearScore, clearRowScores, clearColumnScores) already covered by tests/data-scores-v2-dispatch.test.js added for 3.1-d. No additional tests needed.`
+- `2026-04-20 | session-5 | plan-3.1-h-verify | HANDOFF 4.4 verified: added tests/data-observations-v2-dispatch.test.js (17 tests) covering _persistObservation{Create,Update,Delete}, createObservationRich, updateObservationRich, upsertObservationTemplate, deleteObservationTemplate, createCustomTag. 725 total passing.`
 
 *(next session, keep appending.)*
