@@ -173,9 +173,9 @@ RPC inventory is grouped so each box is ~one session of work:
 
 ### Phase 2 — Git hygiene on main repo (needs user OK per Safety gate)
 
-- [ ] **2.1** Ask user what to do with the 17 uncommitted changes on `docs-cleanup-redundant-stale`: commit, stash, or discard.
-- [ ] **2.2** Ask user to confirm tag placement. Then: `git tag legacy-v1 main` (only after user confirms main is the right commit to freeze).
-- [ ] **2.3** Ask user whether rebuild branch starts from `main` or current HEAD, then cut it. Suggested name: `rebuild-v2`.
+- [x] **2.1** User chose "commit". Committed 27 files on `docs-cleanup-redundant-stale` as `e7f935c` ("Checkpoint: diagrams, inputs inventory, stale-docs cleanup"); added `.playwright-cli/` to .gitignore.
+- [x] **2.2** Tagged `legacy-v1` at `main` (commit `c028ec9`, "Merge pull request #73 from MrBrown85/guard-initdata-rpc-calls"). Tag is local only — user pushes to origin when ready.
+- [x] **2.3** Created branch `rebuild-v2` from `main` (same commit as `legacy-v1` tag). Local only; not yet pushed.
 
 ### Phase 3 — Minimal client port (main repo, one file at a time)
 
@@ -249,6 +249,7 @@ Claude appends one line per completed task. Format: `YYYY-MM-DD | session-<n> | 
 - `2026-04-19 | session-3 | 1.3 | deployed migration fullvision_v2_write_path_category_module_rubric: upsert_category/delete_category (weight-cap trigger verified rejects >100), upsert_module/delete_module (assessment.module_id SET NULL confirmed), upsert_rubric (composite criteria+criterion_tag diff with insert/update/delete) / delete_rubric; 13-assertion smoke test passed`
 - `2026-04-19 | session-3 | bugfix | found latent schema bug: section_competency_group_fk SET NULL also nulled section.course_id (NOT NULL); deployed migration fullvision_v2_fix_section_competency_group_fk_set_null using PG15+ SET NULL (column_list) form; schema.sql updated`
 - `2026-04-19 | session-3 | 1.12 | enabled pg_cron extension; deployed fv_retention_cleanup() SECURITY DEFINER (hard-deletes teachers w/ deleted_at < now() - 30d, purges score_audit + term_rating_audit > 2yr); scheduled daily at 03:17 UTC as cron job 'fv_retention_cleanup_daily'; smoke verified stale teacher purge + stale-audit purge + fresh-row survival`
+- `2026-04-19 | session-3 | 2.1-2.3 | main FullVision repo: committed 17 pending changes on docs-cleanup-redundant-stale as e7f935c (gitignored .playwright-cli/); tagged legacy-v1 at main (c028ec9); created rebuild-v2 branch from main. Tag/branch are local — user pushes when ready.`
 - `2026-04-19 | session-3 | phase-1-complete | all 12 Phase-1 write-path RPC groups landed; no Phase-1 tasks remain. Next unchecked item is Phase 2 (git hygiene) which requires user input per Safety gate — stopping and returning control.`
 - `2026-04-19 | session-3 | 1.11 | deployed migrations fullvision_v2_fix_report_config_add_custom_preset + fullvision_v2_write_path_prefs_report: apply_report_preset (validates brief/standard/detailed), save_report_config (custom default), toggle_report_block (flips preset→custom), save_teacher_preferences (partial jsonb patch); smoke passed`
 - `2026-04-19 | session-3 | 1.10 | deployed migrations fullvision_v2_write_path_term_rating + fullvision_v2_fix_save_term_rating_dim_audit: save_term_rating composite jsonb payload (parent fields + dimensions + 4 join tables), per-field audit rows via _term_rating_audit_field (SECURITY DEFINER, bypasses audit RLS); smoke passed (first save + edit + partial-update preserves unchanged fields + invalid-rating/invalid-term rejections)`
