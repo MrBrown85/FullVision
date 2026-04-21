@@ -8,6 +8,13 @@
 
 ## P1 — operational / security (do first)
 
+### P1.0 · Netlify site is serving 503 "usage_exceeded" — quota hit
+
+- [ ] **User-only, urgent.** 2026-04-20 post-push probe returned `{"error":"usage_exceeded","message":"Usage exceeded"}` from `https://fullvision.ca/`. Site is on the **Team Dev** plan (`nf_team_dev`); monthly bandwidth / build minutes / edge-function invocations are capped.
+- Check Netlify dashboard → Billing → see which quota is exhausted.
+- Options: (a) wait for the month to roll over (if the cap is soft/monthly), (b) upgrade to Pro/Business, (c) reduce edge-function invocations (the `inject-env` function runs per HTML request — consider caching or pre-substituting at build time).
+- While 503ing, the post-reconciliation push (commit `f76c666` and onwards) cannot be verified on production. Local `npm test` + `dev:local` flow still works end-to-end.
+
 ### P1.1 · Rotate the leaked publishable key `sb_publishable__CxM2aY7iVOxRid2EMtCiw_jT1g_n96`
 
 - [ ] **User-only** (requires Supabase dashboard access).
@@ -72,6 +79,13 @@
 
 - [ ] The Phase 3 verification added ~111 new unit tests but didn't re-read `spec-vs-ui-diff.md` against the actual post-merge UI. Entries in the "historical" status column may now be "matches" or "fixed."
 - Light-touch pass — rerun any grep-based checks the original audit used and update per-row status.
+
+### P3.4 · Fix Playwright e2e webServer to serve the built `dist/` with credentials injected
+
+- [ ] **Blocks P1.2 and the entire existing e2e suite.** Current `playwright.config.js` runs `npx serve -l 8347` against the source tree; `__SUPABASE_URL__` / `__SUPABASE_KEY__` placeholders are never substituted, so `getSupabase()` returns null and login forms render but their JS fails to wire up. Ran `auth.spec.js` on 2026-04-20 — all 8 tests failed at the first locator.
+- Two options: (a) change `webServer.command` to `npm run build && npx serve dist -l 8347` and add a pre-step that does the sed substitution (mirrors the `dev:local` flow from Phase 3.1-a), or (b) run `netlify dev` so the `inject-env` edge function handles substitution at request time.
+- Option (a) is probably more reliable for CI (no Netlify CLI dependency). Option (b) is closer to production parity.
+- Once fixed, unskip `e2e/regression-smoke.spec.js` (skeleton written 2026-04-20, commit TBD) and expect it to pass end-to-end.
 
 ---
 

@@ -307,5 +307,7 @@ Claude appends one line per completed task. Format: `YYYY-MM-DD | session-<n> | 
 - \`2026-04-20 | session-5 | push | local main (31 commits past origin/main) pushed clean — origin now at f76c666. Netlify auto-deploy triggered.\`
 - \`2026-04-20 | session-5 | backlog-P3.1 | fixed 5 flaky date-sensitive mobile tests (commit 145686d): vi.setSystemTime freeze at 2026-04-20T12:00:00Z for dateGroupLabel describes + renders-multiple-date-groups test. 805/805 passing.\`
 - \`2026-04-20 | session-5 | cleanup | removed throwaway worktrees .claude/worktrees/merge-test (was main) and .claude/worktrees/verify-rebuild-v2 (was rebuild-v2). main branch now checked out on primary repo path. Other pre-existing worktrees (heuristic-leakey + 4 older colin/*) left intact.\`
+- \`2026-04-20 | session-5 | backlog-P1.2 | added e2e/regression-smoke.spec.js skeleton (skipped pending P3.4 infra fix). Pre-probe of existing e2e suite found all 8 auth.spec.js tests failing — webServer serves raw source without credential substitution. New P3.4 backlog item tracks the fix.\`
+- \`2026-04-20 | session-5 | backlog-P1.0 | DISCOVERED: fullvision.ca serving 503 "usage_exceeded" from Netlify post-push. Team Dev plan quota hit. Live site dark until user addresses billing. New P1.0 backlog item tracks the remediation options.\`
 
 *(next session, keep appending.)*
