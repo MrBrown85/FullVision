@@ -62,6 +62,12 @@
 - [ ] 17 live-only RPCs drifted during Phases 4.9 + 5.x (see HANDOFF Discovered gaps 2026-04-20 Phase 2.2 diff). Live database is correct; only the design-artifact mirrors are behind.
 - Low-urgency cosmetic fix; blocks no functional work.
 
+### P2.5 · Wire `saveRubrics` UI → `window.v2.upsertRubric`
+
+- [ ] Discovered 2026-04-21 while shipping T-UI-09/T-UI-10. The rubric editor in `teacher/page-assignments.js` persists via `saveRubrics(cid, arr)` which writes only to localStorage via `_saveCourseField('rubrics', …)`. The v2 `window.v2.upsertRubric` composite RPC exists and is unit-tested, but nothing in the UI invokes it — so rubric creations / edits on main (including the new weight + levelValues fields) don't reach `gradebook-prod`.
+- Scope: add a thin adapter in `saveRubrics` that maps the editor's internal shape (`criteria[i].levels = { 4, 3, 2, 1 }` + `weight` + `levelValues`) into the v2 composite payload (`level4Descriptor` etc., plus `linkedTagIds` from `tagIds`) and dispatches one `window.v2.upsertRubric` per rubric when `_useSupabase`.
+- Affects every teacher who has non-trivial rubrics once the SMTP / quota issues are resolved and teachers start using the product. High leverage, small code.
+
 ---
 
 ## P3 — UI polish / copy

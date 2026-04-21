@@ -62,19 +62,13 @@ No AI co-author. No AI references in branch or commit content (`feedback_no_ai_r
 
 ### A.3 · T-UI-09 — Rubric per-criterion weight input · ~1 hour (ship together with A.4)
 
-- [ ] **File:** `teacher/page-assignments.js` (rubric editor lives inline here, not in a separate file).
-- Small number input next to each criterion's name, ~60px wide, labeled "Weight".
-- Any positive number accepted; values normalize at read time per Pass D §1.1.
-- Save path through `window.v2.upsertRubric` already accepts `weight` on each criterion — no dispatcher change needed.
-- **Ship criterion:** set weights 1/1/2 on three criteria → save → reopen → weights persist.
+- [x] *Shipped 2026-04-21 commit TBD.* `teacher/page-assignments.js` rubric editor — added a small `Weight` number input in each criterion header, right of the name (`.rubric-criterion-weight` ~54px). `addCriterion` seeds `weight: 1`; `updateCritWeight` handler normalizes NaN/negative → 1. Wired on both `actionInput` (live) and `actionBlur` (commit). Normalization at read-time is Pass D §1.1's job.
 
 ### A.4 · T-UI-10 — Rubric per-level value inputs (disclosure) · ~1 hour
 
-- [ ] **File:** same as A.3.
-- Per-criterion `<details><summary>Customize point values</summary>` disclosure, defaults **closed**.
-- When open: 4 small inputs (~40–50px wide) labeled `L4 L3 L2 L1`, pre-filled with defaults 4/3/2/1.
-- Writes `level_1_value`..`level_4_value` via existing `v2.upsertRubric` dispatch.
-- **Ship criterion:** open disclosure → set custom 5/3/2/1 → save → reopen → overrides persist; closed disclosure remains the default shape for teachers who don't need custom values.
+- [x] *Shipped 2026-04-21 commit TBD.* Added a per-criterion `<details><summary>Customize point values</summary>` disclosure below the 4 level cards. Default closed (opens when `levelValues` is populated so existing overrides remain visible). When open: 4 ~48px inputs labeled L4 / L3 / L2 / L1 pre-filled with defaults 4/3/2/1. `updateCritLevelValue` handler lazily creates `levelValues` only when a teacher actually overrides a default — reverting to the default value auto-removes the override so clean criteria stay clean. Blur-commit via `critLevelValue` dispatcher.
+
+**Persistence caveat** (tracked as new item): the editor still saves through the legacy `saveRubrics → localStorage` pipeline; `window.v2.upsertRubric` is wired in the dispatch layer (Phase 4.5) but nothing in the UI calls it. Rubric writes don't reach `gradebook-prod` yet. New backlog item **P2.5** covers wiring `saveRubrics` to the v2 composite RPC.
 
 ---
 

@@ -786,6 +786,44 @@
 .rubric-level-text:focus { background:rgba(0,122,255,0.03); }
 .rubric-level-text::placeholder { color:var(--text-3); }
 
+/* T-UI-09 · per-criterion weight input (in the header next to the name) */
+.rubric-criterion-weight-label {
+  display:inline-flex; align-items:center; gap:6px;
+  font-size:var(--text-xs); color:var(--text-2); font-weight:500;
+  margin-right:10px; white-space:nowrap;
+}
+.rubric-criterion-weight {
+  width:54px; padding:4px 6px; font-size:var(--text-sm); font-weight:600;
+  border:1px solid var(--border); border-radius:var(--radius-sm);
+  background:var(--surface); color:var(--text); text-align:right;
+}
+.rubric-criterion-weight:focus { outline:none; box-shadow:0 0 0 2px rgba(0,122,255,0.15); }
+
+/* T-UI-10 · per-level point value overrides (disclosure, defaults closed) */
+.rubric-level-values {
+  margin:8px 20px 0; padding:8px 12px; border:1px dashed var(--border);
+  border-radius:var(--radius-sm); background:var(--bg);
+}
+.rubric-level-values-summary {
+  font-size:var(--text-xs); color:var(--text-2); cursor:pointer;
+  user-select:none; font-weight:500;
+}
+.rubric-level-values-summary::marker { color:var(--text-3); }
+.rubric-level-values[open] .rubric-level-values-summary { color:var(--text); margin-bottom:6px; }
+.rubric-level-values-grid {
+  display:flex; gap:12px; margin-top:6px; flex-wrap:wrap;
+}
+.rubric-level-value-label {
+  display:inline-flex; align-items:center; gap:4px;
+  font-size:var(--text-xs); color:var(--text-2); font-weight:500;
+}
+.rubric-level-value {
+  width:48px; padding:3px 6px; font-size:var(--text-sm); font-weight:600;
+  border:1px solid var(--border); border-radius:var(--radius-sm);
+  background:var(--surface); color:var(--text); text-align:right;
+}
+.rubric-level-value:focus { outline:none; box-shadow:0 0 0 2px rgba(0,122,255,0.15); }
+
 /* Footer — sticky */
 .rubric-editor-footer {
   display:flex; gap:8px; align-items:center; justify-content:flex-end;
