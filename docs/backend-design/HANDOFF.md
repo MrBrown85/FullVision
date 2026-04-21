@@ -106,9 +106,9 @@ If the user said "yes" to one action in a past session, **do not** assume it ext
 
 ---
 
-## Current state (end of day 2026-04-19)
+## Current state (updated 2026-04-20)
 
-Phases 1 → 4 of the queue are all checked. Phase 5 remains.
+Phases 1 → 5 of the queue are all checked.
 
 ### gradebook-prod (Supabase)
 
@@ -128,9 +128,6 @@ Phases 1 → 4 of the queue are all checked. Phase 5 remains.
 
 ### Remaining work
 
-- **Phase 5.1** — Demo-seed JSON (Grade 8 Humanities, 20–30 students, ~8 assessments) shared between Demo Mode and Welcome Class (DECISIONS Q43/Q47).
-- **Phase 5.2** — Custom SMTP via `fullvision.ca` (runbook at [`smtp-setup.md`](smtp-setup.md); DNS change is user-only, DECISIONS Q6).
-- **Phase 5.3** — pgTAP or smoke-test pack runnable as CI check.
 - **Demo-Mode + signed-in verification** of the Phase 3/4 ports (user-side, once the push embargo lifts).
 - Eventual retirement of the dormant legacy fan-out in `_doInitData` and the bulk `_syncToSupabase` block (cosmetic — unreachable today).
 
@@ -193,7 +190,7 @@ Each task = one functional area (students, assessments, observations, term ratin
 ### Phase 5 — Polish
 
 - [x] **5.1** Demo-seed JSON per DECISIONS.md Q43. New `shared/demo-seed.js` (wired into `teacher/app.html` + `teacher-mobile/index.html`) generates a Grade-8 Humanities payload for `import_json_restore`: 4 subjects / 7 sections / 14 tags / 4 modules / 3 categories / 1 four-criterion Writing rubric + tag links / 25 students + enrollments / 8 assessments (5 direct, 2 rubric, 1 points) / ~200 overall-score rows with bell-curve distribution (mean 2.8, stddev 0.6) + ~3% NS / ~2% EXC / ~5% LATE + ~40% ungraded on the last assessment / per-tag + per-criterion scores / 2 notes / 10 goals / 10 reflections / standard-preset report_config. Exposes `window.buildDemoSeedPayload({ courseId })` and `window.applyDemoSeed(courseId)`. Commit `fe59cf1` on `rebuild-v2` (local only). gradebook-prod round-trip verified. Q47 follow-up: migrate Demo Mode (currently using `shared/seed-data.js`) to consume the generator via a local projector.
-- [ ] **5.2** Custom SMTP via `fullvision.ca` (Q6). **DNS is user-only.** Runbook: [`smtp-setup.md`](smtp-setup.md) — covers provider choice (Resend recommended over Postmark / AWS SES), full SPF / DKIM / DMARC record set including merge instructions, Supabase SMTP configuration, email-template wrapper, verification checklist, common gotchas, and rollback. Check this box once the first end-to-end signup email passes SPF + DKIM + DMARC on Gmail + Outlook.
+- [x] **5.2** Custom SMTP via `fullvision.ca` (Q6). **DNS is user-only.** Runbook: [`smtp-setup.md`](smtp-setup.md) — covers provider choice (Resend recommended over Postmark / AWS SES), full SPF / DKIM / DMARC record set including merge instructions, Supabase SMTP configuration, email-template wrapper, verification checklist, common gotchas, and rollback. User confirmed DNS + Supabase custom-SMTP setup and first end-to-end signup email pass on Gmail + Outlook with SPF + DKIM + DMARC.
 - [x] **5.3** Smoke-test pack at `docs/backend-design/smoke-tests.sql` — 14 psql DO blocks covering every Phase 1 RPC + Phase 3.2 read + Phase 4.9 imports + key invariants (RLS isolation, audit diff semantics, FK cascade + SET NULL fix, weight-cap trigger, seed-template immutability, idempotent re-imports). Each block uses a nested `begin ... exception when others then … end` subtransaction with a sentinel `'ROLLBACK_SMOKE_OK'` so fixtures always roll back and the script exits clean under `ON_ERROR_STOP=1`. Runnable via `psql … -v ON_ERROR_STOP=1 -f smoke-tests.sql`; sample GitHub Actions workflow + design notes in [smoke-tests.README.md](smoke-tests.README.md). pgTAP deferred (no extension dependency needed for 14 blocks). Blocks 3 + 7 + 14 verified live against `gradebook-prod`. Design-repo commit (see next Activity-log line).
 
 ---
@@ -206,8 +203,11 @@ Earlier bugs fixed inline (mostRecent ambiguity, decaying_avg ambiguity, missing
 
 - **2026-04-19 (Phase 1.4):** `section_competency_group_fk` used `ON DELETE SET NULL` without a column list, so deleting a `competency_group` tried to null `section.course_id` (NOT NULL). Fixed via migration `fullvision_v2_fix_section_competency_group_fk_set_null` using PG15+ `SET NULL (competency_group_id)`. schema.sql updated to match.
 - **2026-04-19 (Phase 1.11):** `report_config.preset` CHECK was `in (brief,standard,detailed)` but write-paths §14 requires `'custom'` for manual block toggles. Fixed via migration `fullvision_v2_fix_report_config_add_custom_preset`; schema.sql updated.
+- **2026-04-20 (plan reconciliation):** The `main`-branch client calls `sb.rpc('save_course_score', …)` at [`shared/data.js:2731`](../../shared/data.js:2731), but no such RPC exists on `gradebook-prod`. Every score save since PR #63 (2026-04-18) has `console.warn`-logged an error and lost the remote write; localStorage kept the UI looking correct. Hotfix: Phase 1 of [the reconciliation plan](../superpowers/plans/2026-04-20-database-wiring-reconciliation.md) — no-op the RPC call on `main` until `rebuild-v2` ships. Root cause: `ACTION_PLAN.md` was authored against a canonical-schema RPC naming scheme that the v2 rebuild replaced; the ACTION_PLAN was never reconciled after the rename. The claim "canonical-RPC migration ~70% complete" in `ACTION_PLAN.md` is in fact 0% — the one writer that was wired (`_persistScoreToCanonical`) targets a non-existent function. **Resolved 2026-04-20:** rebuild-v2 merged to main via --no-ff — v2 dispatch is now the active path.
+- **2026-04-20 (Phase 2.2 diff):** Design SQL (`write-paths.sql` + `read-paths.sql`) is missing 17 functions that landed on `gradebook-prod` from 2026-04-19/20 but never got mirrored back per convention #6. Affected RPCs: read-path (`get_assessment_detail`, `get_class_dashboard`, `get_learning_map`, `get_observations`, `get_report`, `get_term_rating`), imports (`import_json_restore`, `import_teams_class`), term rating (`save_term_rating`), student (`delete_student`, `relink_student`), plus internal helpers (`fv_check_category_weight_sum` trigger, `fv_owns_*` RLS predicates, `clear_data`). Remediation: regenerate `write-paths.sql` and `read-paths.sql` from live DB as part of Phase 5.1 of the reconciliation plan. No functional impact — live RPCs work correctly; only the design-artifact mirrors are behind.
 - **2026-04-20 (Phase 3.0 test baseline):** `tests/data-init-invokes-canonical-reads.test.js` and `tests/data-pagination.test.js` were guarding against the April 3 regression using the cancelled canonical-schema RPC names (`list_course_roster`, `list_course_assessments`, etc.). Both files were updated to guard against `get_gradebook` being stubbed (the actual v2 boot read); all 36 test files now green. Commit `570529c` on `rebuild-v2`.
 - **2026-04-20 (Phase 3.1-l, pre-existing):** `tests/mobile-components.test.js` (`MComponents.dateGroupLabel`) and `tests/mobile-observe.test.js` use fixed fixture dates (April 2026) combined with `new Date()` to label as "Today"/"Yesterday"/"This Week"/"Earlier". 5 tests flake on UTC-midnight rollover. Not touched this session (last edit 4eb04a2). Fix: either freeze `Date.now` in the suite (vitest `vi.useFakeTimers`) or express fixtures relative to the current day. Out of scope for the reconciliation plan.
+- **2026-04-20 (Phase 5.3 pre-check):** `docs/ARCHITECTURE.md` §"Data-layer overview" table (~lines 190–210) still lists the pre-rebuild canonical-schema RPC names (`save_course_score`, `save_section_override`, `save_student_goals`, `save_student_reflection`, `save_learning_map`, `projection.add_student_flag`, `projection.remove_student_flag`, `bulk_save_course_scores`, `delete_course_score`, etc.) as the current write surface. None of these exist on `gradebook-prod`. Remediation: regenerate the table against live RPCs as part of Phase 5.2 of the reconciliation plan.
 
 ---
 
@@ -230,6 +230,7 @@ Earlier bugs fixed inline (mostRecent ambiguity, decaying_avg ambiguity, missing
 
 Claude appends one line per completed task. Format: `YYYY-MM-DD | session-<n> | task-id | short note`.
 
+- `2026-04-20 | session-4 | 5.2-live | user confirmed DNS + Supabase custom-SMTP setup complete and first end-to-end signup email passes SPF + DKIM + DMARC on Gmail + Outlook; HANDOFF marked complete.`
 - `2026-04-20 | session-3 | 5.2-runbook | new docs/backend-design/smtp-setup.md — Resend-first runbook covering SMTP-provider trade-offs, SPF/DKIM/DMARC records (with SPF merge handling), Supabase custom-SMTP config, email-template wrapper, end-to-end verification on Gmail + Outlook, rollback, gotchas. User-only actions called out. HANDOFF links updated. Commit on rebuild-v2.`
 - `2026-04-19 | session-1 | v2-bootstrap | 12 migrations deployed, schema + RLS + read-path primitives live on gradebook-prod; 0 security lints`
 - `2026-04-19 | session-1 | audit | smoke tests passed for §1.1, rubric path, all 6 calc_methods, cascade deletes, weight-cap trigger, RLS cross-tenant (10 assertions)`
@@ -268,6 +269,14 @@ Claude appends one line per completed task. Format: `YYYY-MM-DD | session-<n> | 
 - `2026-04-19 | session-3 | 1.6 | deployed migration fullvision_v2_write_path_assessment_crud: create_assessment (with tag_ids[]), update_assessment (jsonb patch + optional tag replace), duplicate_assessment (copies tags, not scores/observations), delete_assessment, save_assessment_tags, save_collab (validates mode ∈ {none,pairs,groups}); smoke test passed`
 - `2026-04-19 | session-3 | 1.5 | deployed migrations fullvision_v2_write_path_student_enrollment + fullvision_v2_fix_import_roster_csv_reenroll: create_student_and_enroll, update_student, update_enrollment (jsonb patch inc. designations/is_flagged/roster_position/withdrawn_at), withdraw_enrollment, reorder_roster, bulk_apply_pronouns, import_roster_csv (match by SN→email→name; reactivates withdrawn enrollments); smoke test (11 assertions) passed`
 - `2026-04-19 | session-3 | 1.4 | deployed migration fullvision_v2_write_path_learning_map: upsert/delete for subject, competency_group, section (auto-denormalizes course_id from subject), tag; reorder_{subjects,competency_groups,sections,tags,modules}; smoke test passed (subject/group/section/tag CRUD, display_order auto-append, reorder, cascades, group-delete preserves section.course_id)`
+- `2026-04-20 | session-5 | 0.1 | new docs/superpowers/plans/2026-04-20-database-wiring-reconciliation.md — central 6-phase recipe; replaces ACTION_PLAN.md premise.`
+- `2026-04-20 | session-5 | 0.2 | ACTION_PLAN.md deprecated with banner pointing at reconciliation plan.`
+- `2026-04-20 | session-5 | 0.3 | discovered-gap bullet appended — save_course_score doesn't exist on prod, silent-failure since PR #63.`
+- `2026-04-20 | session-5 | 1 | hotfix: _persistScoreToCanonical now a no-op on main (colin/heuristic-leakey-b750e5 d7d234c); tests/data-persist-score-canonical-noop.test.js regression guard added; 658 vitest tests green; Demo-Mode verification pending user.`
+- `2026-04-20 | session-5 | 2.1 | schema.sql regenerated from gradebook-prod (root + docs/backend-design mirror); 39 tables + 95 RPC signatures documented; old 130KB migration-log content retired.`
+- `2026-04-20 | session-5 | 2.2 | design SQL diffed against live — zero design-only drift; 17 live-only RPCs recorded in Discovered gaps for Phase 5.1 regen.`
+- `2026-04-20 | session-5 | 2.3 | Phase 2 re-sync passed; Phase 5.3 pre-check found docs/ARCHITECTURE.md table uses dead canonical RPC names — logged for Phase 5.2.`
+- `2026-04-20 | session-5 | STOP | Phase 3 boundary reached — 16 rebuild-v2 verification tasks require human Demo-Mode + signed-in browser interaction; returning control to user.`
 
 - `2026-04-20 | session-5 | plan-3.0 | created verify-rebuild-v2 worktree from rebuild-v2; npm install clean; fixed 2 stale test files (data-init-invokes-canonical-reads + data-pagination — were testing cancelled list_course_roster RPCs, updated to guard get_gradebook); all 36 tests green; commit 570529c`
 - `2026-04-20 | session-5 | plan-3.1-a | HANDOFF 3.2 code review: initAllCourses() correctly calls bootstrap_teacher → list_teacher_courses; Demo Mode short-circuits before those calls; tests green; dev server running at http://localhost:8347; browser + signed-in verification pending user action`
