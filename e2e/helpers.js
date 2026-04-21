@@ -387,12 +387,63 @@ export async function seedAssessments(page, assessments = [TEST_ASSESSMENT]) {
 /**
  * Seed scores into localStorage BEFORE page load.
  * Must be called before gotoApp / page.goto.
- * @param {Object} scores - { 'stu-001': { 'assess-001': { 'QAP': 3 } } }
+ * Accepts either the raw score blob shape:
+ *   { 'stu-001': [{ assessmentId, tagId, score, ... }] }
+ * or a shorthand nested shape:
+ *   { 'stu-001': { 'assess-001': { 'QAP': 3 } } }
  */
 export async function seedScores(page, scores) {
   await page.addInitScript(
     data => {
-      localStorage.setItem('gb-scores-' + data.cid, JSON.stringify(data.scores));
+      function normalizeScores(rawScores) {
+        if (!rawScores || typeof rawScores !== 'object') return {};
+
+        var studentIds = Object.keys(rawScores);
+        var alreadyNormalized = studentIds.every(function(sid) {
+          return Array.isArray(rawScores[sid]);
+        });
+        if (alreadyNormalized) return rawScores;
+
+        var normalized = {};
+        studentIds.forEach(function(sid) {
+          var assessmentMap = rawScores[sid];
+          var entries = [];
+          if (!assessmentMap || typeof assessmentMap !== 'object') {
+            normalized[sid] = entries;
+            return;
+          }
+
+          Object.keys(assessmentMap).forEach(function(aid) {
+            var tagMap = assessmentMap[aid];
+            if (!tagMap || typeof tagMap !== 'object') return;
+
+            Object.keys(tagMap).forEach(function(tid) {
+              var rawEntry = tagMap[tid];
+              if (rawEntry === undefined || rawEntry === null) return;
+
+              var entry = typeof rawEntry === 'object' ? rawEntry : { score: rawEntry };
+              if (typeof entry.score !== 'number') return;
+
+              entries.push({
+                id: entry.id || ['seed', sid, aid, tid].join('-'),
+                assessmentId: aid,
+                tagId: tid,
+                score: entry.score,
+                date: entry.date || new Date().toISOString().slice(0, 10),
+                type: entry.type || 'summative',
+                note: entry.note || '',
+                created: entry.created || new Date().toISOString(),
+              });
+            });
+          });
+
+          normalized[sid] = entries;
+        });
+
+        return normalized;
+      }
+
+      localStorage.setItem('gb-scores-' + data.cid, JSON.stringify(normalizeScores(data.scores)));
     },
     { cid: TEST_COURSE.id, scores },
   );

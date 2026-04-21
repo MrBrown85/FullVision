@@ -56,7 +56,7 @@ test.describe('Gradebook — Spreadsheet View', () => {
 
   test('filter button exists', async ({ page }) => {
     await gotoApp(page, '/gradebook');
-    const filterBtn = page.locator('[data-action="toggleFilterStrip"], button:has-text("Filter"), text=Filters').first();
+    const filterBtn = page.locator('[data-action="toggleFilterStrip"]').first();
     await expect(filterBtn).toBeVisible();
   });
 

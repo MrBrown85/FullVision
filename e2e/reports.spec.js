@@ -1,6 +1,12 @@
 import { test, expect } from '@playwright/test';
 import { mockAuth, seedCourse, seedStudents, seedAssessments, seedScores, gotoApp } from './helpers.js';
 
+async function openProgressReports(page) {
+  const progressTab = page.getByRole('tab', { name: 'Progress Reports' });
+  await expect(progressTab).toBeVisible();
+  await progressTab.click();
+}
+
 test.describe('Reports — Report Builder', () => {
   test.beforeEach(async ({ page }) => {
     await mockAuth(page);
@@ -23,6 +29,7 @@ test.describe('Reports — Report Builder', () => {
 
   test('has report preset buttons', async ({ page }) => {
     await gotoApp(page, '/reports');
+    await openProgressReports(page);
     const presetBtns = page.locator('[data-action="rbApplyPreset"]');
     const count = await presetBtns.count();
     expect(count).toBeGreaterThanOrEqual(1);
@@ -30,6 +37,7 @@ test.describe('Reports — Report Builder', () => {
 
   test('report blocks can be toggled', async ({ page }) => {
     await gotoApp(page, '/reports');
+    await openProgressReports(page);
     const toggleBtns = page.locator('[data-action="rbToggleBlock"]');
     const count = await toggleBtns.count();
     expect(count).toBeGreaterThanOrEqual(1);
@@ -68,6 +76,7 @@ test.describe('Reports — Report Builder', () => {
   test('print button exists when students are loaded', async ({ page }) => {
     await seedStudents(page);
     await gotoApp(page, '/reports');
+    await openProgressReports(page);
 
     const printBtn = page.locator('[data-action="printReports"], button:has-text("Print"), button:has-text("Export"), button:has-text("Generate")').first();
     await expect(printBtn).toBeVisible();
