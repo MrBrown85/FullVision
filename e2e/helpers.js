@@ -399,13 +399,13 @@ export async function seedScores(page, scores) {
         if (!rawScores || typeof rawScores !== 'object') return {};
 
         var studentIds = Object.keys(rawScores);
-        var alreadyNormalized = studentIds.every(function(sid) {
+        var alreadyNormalized = studentIds.every(function (sid) {
           return Array.isArray(rawScores[sid]);
         });
         if (alreadyNormalized) return rawScores;
 
         var normalized = {};
-        studentIds.forEach(function(sid) {
+        studentIds.forEach(function (sid) {
           var assessmentMap = rawScores[sid];
           var entries = [];
           if (!assessmentMap || typeof assessmentMap !== 'object') {
@@ -413,11 +413,11 @@ export async function seedScores(page, scores) {
             return;
           }
 
-          Object.keys(assessmentMap).forEach(function(aid) {
+          Object.keys(assessmentMap).forEach(function (aid) {
             var tagMap = assessmentMap[aid];
             if (!tagMap || typeof tagMap !== 'object') return;
 
-            Object.keys(tagMap).forEach(function(tid) {
+            Object.keys(tagMap).forEach(function (tid) {
               var rawEntry = tagMap[tid];
               if (rawEntry === undefined || rawEntry === null) return;
 

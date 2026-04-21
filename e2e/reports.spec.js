@@ -51,8 +51,8 @@ test.describe('Reports — Report Builder', () => {
     await seedStudents(page);
     await seedAssessments(page);
     await seedScores(page, {
-      'stu-001': { 'assess-001': { 'QAP': 3 } },
-      'stu-002': { 'assess-001': { 'QAP': 2 } },
+      'stu-001': { 'assess-001': { QAP: 3 } },
+      'stu-002': { 'assess-001': { QAP: 2 } },
     });
     await gotoApp(page, '/reports');
 
@@ -65,7 +65,11 @@ test.describe('Reports — Report Builder', () => {
     await seedStudents(page);
     await gotoApp(page, '/reports');
 
-    const tab = page.locator('[data-action*="questionnaire" i], [data-tab="questionnaire"], button:has-text("Questionnaire"), a:has-text("Questionnaire")').first();
+    const tab = page
+      .locator(
+        '[data-action*="questionnaire" i], [data-tab="questionnaire"], button:has-text("Questionnaire"), a:has-text("Questionnaire")',
+      )
+      .first();
     await expect(tab).toBeVisible();
     await tab.click();
     await page.waitForTimeout(500);
@@ -78,7 +82,11 @@ test.describe('Reports — Report Builder', () => {
     await gotoApp(page, '/reports');
     await openProgressReports(page);
 
-    const printBtn = page.locator('[data-action="printReports"], button:has-text("Print"), button:has-text("Export"), button:has-text("Generate")').first();
+    const printBtn = page
+      .locator(
+        '[data-action="printReports"], button:has-text("Print"), button:has-text("Export"), button:has-text("Generate")',
+      )
+      .first();
     await expect(printBtn).toBeVisible();
   });
 });

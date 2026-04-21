@@ -1,5 +1,14 @@
 import { test, expect } from '@playwright/test';
-import { mockAuth, seedCourse, seedStudents, seedAssessments, seedScores, gotoApp, TEST_ASSESSMENT, TEST_STUDENTS } from './helpers.js';
+import {
+  mockAuth,
+  seedCourse,
+  seedStudents,
+  seedAssessments,
+  seedScores,
+  gotoApp,
+  TEST_ASSESSMENT,
+  TEST_STUDENTS,
+} from './helpers.js';
 
 test.describe('Gradebook — Spreadsheet View', () => {
   test.beforeEach(async ({ page }) => {
@@ -39,7 +48,8 @@ test.describe('Gradebook — Spreadsheet View', () => {
 
     const body = await page.locator('body').textContent();
     // Should show tag/section names in column headers
-    const hasColumns = body.includes('Questioning') || body.includes('Planning') || body.includes('Processing') || body.includes('QAP');
+    const hasColumns =
+      body.includes('Questioning') || body.includes('Planning') || body.includes('Processing') || body.includes('QAP');
     expect(hasColumns).toBeTruthy();
   });
 
@@ -50,7 +60,8 @@ test.describe('Gradebook — Spreadsheet View', () => {
 
     // Gradebook should have a "New Assessment" option or show assessments
     const body = await page.locator('body').textContent();
-    const hasAssessmentUI = body.includes('New Assessment') || body.includes('Lab Report') || body.includes('assessment');
+    const hasAssessmentUI =
+      body.includes('New Assessment') || body.includes('Lab Report') || body.includes('assessment');
     expect(hasAssessmentUI).toBeTruthy();
   });
 
@@ -73,9 +84,9 @@ test.describe('Gradebook — Spreadsheet View', () => {
     await seedStudents(page);
     await seedAssessments(page);
     await seedScores(page, {
-      'stu-001': { 'assess-001': { 'QAP': 3 } },
-      'stu-002': { 'assess-001': { 'QAP': 2 } },
-      'stu-003': { 'assess-001': { 'QAP': 4 } },
+      'stu-001': { 'assess-001': { QAP: 3 } },
+      'stu-002': { 'assess-001': { QAP: 2 } },
+      'stu-003': { 'assess-001': { QAP: 4 } },
     });
     await gotoApp(page, '/gradebook');
     // Click the Scores tab
@@ -93,9 +104,9 @@ test.describe('Gradebook — Spreadsheet View', () => {
     await seedStudents(page);
     await seedAssessments(page);
     await seedScores(page, {
-      'stu-001': { 'assess-001': { 'QAP': 3 } },
-      'stu-002': { 'assess-001': { 'QAP': 2 } },
-      'stu-003': { 'assess-001': { 'QAP': 4 } },
+      'stu-001': { 'assess-001': { QAP: 3 } },
+      'stu-002': { 'assess-001': { QAP: 2 } },
+      'stu-003': { 'assess-001': { QAP: 4 } },
     });
     await gotoApp(page, '/gradebook');
     // Click the Summary tab
@@ -112,9 +123,9 @@ test.describe('Gradebook — Spreadsheet View', () => {
     await seedStudents(page);
     await seedAssessments(page);
     await seedScores(page, {
-      'stu-001': { 'assess-001': { 'QAP': 3 } },
-      'stu-002': { 'assess-001': { 'QAP': 2 } },
-      'stu-003': { 'assess-001': { 'QAP': 4 } },
+      'stu-001': { 'assess-001': { QAP: 3 } },
+      'stu-002': { 'assess-001': { QAP: 2 } },
+      'stu-003': { 'assess-001': { QAP: 4 } },
     });
     await gotoApp(page, '/gradebook');
     // Competencies → Scores
