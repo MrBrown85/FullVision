@@ -4,7 +4,9 @@ A standards-based grading and observation tool for British Columbia teachers. Tr
 
 Built with vanilla JavaScript and a simple copy build for Netlify deploys. Backed by Supabase for auth and canonical RPC-based data access, deployed on Netlify.
 
-**Live app:** [fullvision.ca](https://fullvision.ca) · [Mobile](https://fullvision.ca/teacher-mobile/)
+**Primary URL:** [fullvision.ca](https://fullvision.ca) · [Mobile](https://fullvision.ca/teacher-mobile/)
+
+Production may temporarily return `503` if the Netlify site has exhausted its quota. Use the local run instructions below for reliable verification.
 
 ---
 

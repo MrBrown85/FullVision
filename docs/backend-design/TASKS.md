@@ -2,9 +2,10 @@
 
 Every remaining task packaged as a self-contained Claude Code session. Copy a task's prompt block into a fresh session; it has enough context to act without prior conversation.
 
-**Branch:** `rebuild-v2` (single review target is PR #76). **Never force-push or rewrite history.**
+**Branch:** `main`. Historical references to `rebuild-v2` / PR `#76` below are pre-merge notes and should not drive current work.
 
 **Canonical references every session should read first:**
+
 - `docs/backend-design/INSTRUCTIONS.md` — full scope + content strings baked in
 - `docs/backend-design/DESIGN-SYSTEM.md` — existing CSS tokens and component patterns
 - `docs/backend-design/HANDOFF.md` — implementation log; append per-session entry
@@ -17,6 +18,7 @@ Every remaining task packaged as a self-contained Claude Code session. Copy a ta
 ## How tasks are structured
 
 Each task block has:
+
 - **ID** — stable; do not renumber when tasks complete
 - **Goal** — one-line outcome
 - **Prompt** — paste verbatim into a fresh Claude Code session
@@ -33,11 +35,12 @@ Mark tasks done by editing the ID to **[DONE]** and adding a commit hash. Do not
 
 These unblock the UI tasks and prevent "why isn't my change visible?" confusion.
 
-### T-WIRE-01 · Audit legacy save* calls
+### T-WIRE-01 · Audit legacy save\* calls
 
 **Goal:** Confirm every UI write action calls a `window.v2.*` helper, not a legacy `save*` / `_canonical*` stub.
 
 **Prompt:**
+
 ```
 Read docs/backend-design/HANDOFF.md to see which legacy functions
 were replaced with window.v2.* helpers during Phases 3–4. Then grep the
@@ -69,6 +72,7 @@ Can run in any order, in parallel. Each lands as its own commit.
 **Goal:** The existing "auto-generate narrative" button in the term-rating editor is hidden in v1. Do NOT wire to a "coming soon" modal — just hide.
 
 **Prompt:**
+
 ```
 Per INSTRUCTIONS.md §2.1 U17 and §12.5, hide the term-rating
 auto-generate button in v1. The feature is deferred to a separate repo.
@@ -96,6 +100,7 @@ auto-generate button (deferred to external workstream)".
 **Goal:** Update the existing delete-account confirmation dialog with the exact soft-delete copy from INSTRUCTIONS.md §12.4.
 
 **Prompt:**
+
 ```
 Per INSTRUCTIONS.md §12.4, the delete-account confirmation dialog
 must show this exact copy:
@@ -129,6 +134,7 @@ and reading the copy. Commit.
 **Goal:** When a newly-verified teacher lands for the first time, the Welcome Class is auto-seeded (HANDOFF 5.1 shipped `shared/demo-seed.js`) and a banner renders per INSTRUCTIONS.md §12.3.
 
 **Prompt:**
+
 ```
 Per INSTRUCTIONS.md §12.3, the Welcome Class banner must render with:
 
@@ -174,6 +180,7 @@ Each lands as its own commit. Can run in parallel after T-WIRE-01.
 **Goal:** Add the 3-way segmented control (proficiency / letter / both) in the course-policy panel. Disabled state when no Categories.
 
 **Prompt:**
+
 ```
 Per INSTRUCTIONS.md §2.1 U2, §12.9, and spec-vs-ui-diff.md Bucket 3:
 add a segmented control in Course Settings for grading_system. Three
@@ -218,6 +225,7 @@ the gradebook switch between proficiency and letter displays.
 **Goal:** Add an IANA timezone picker in Course Settings.
 
 **Prompt:**
+
 ```
 Per INSTRUCTIONS.md §2.1 U9 and erd.md (Pass D amendment folded in):
 Course.timezone is a new text column holding an IANA tz string
@@ -253,6 +261,7 @@ persists after reload.
 **Goal:** When a teacher with `deleted_at IS NOT NULL` signs in during the 30-day grace window, show a prompt to restore the account.
 
 **Prompt:**
+
 ```
 Per INSTRUCTIONS.md §12.5 and auth-lifecycle.md §5: during the
 30-day soft-delete grace window, if a teacher signs in while their
@@ -293,6 +302,7 @@ see the modal. Click Restore, sign in again, no modal.
 **Goal:** Add "Export my data" to the user-menu dropdown + secondary button in delete-account dialog.
 
 **Prompt:**
+
 ```
 Per INSTRUCTIONS.md §12.9: add a "Export my data" entry to the
 user-menu dropdown (top-right of the app dock). Clicking it calls
@@ -335,6 +345,7 @@ confirm it contains expected data.
 **Goal:** A badge on the user avatar showing the count of writes in the offline queue.
 
 **Prompt:**
+
 ```
 Per INSTRUCTIONS.md §2.1 U5 and §12.9: render an "N unsynced" badge
 on the user-avatar element in the top dock. Count comes from
@@ -372,6 +383,7 @@ disappear once the queue drains.
 **Goal:** A thin amber banner at the top when `navigator.onLine === false`.
 
 **Prompt:**
+
 ```
 Per INSTRUCTIONS.md §2.1 U7 and §12.9: render a thin strip at the
 top of the viewport when navigator.onLine === false. Listen to
@@ -408,6 +420,7 @@ Re-enable → banner disappears.
 **Goal:** Clicking the unsynced-count badge opens a popover showing queue detail.
 
 **Prompt:**
+
 ```
 Per INSTRUCTIONS.md §2.1 U6 and §12.9: clicking the offline badge
 (T-UI-06) opens a small popover anchored to the badge. Popover shows:
@@ -449,6 +462,7 @@ retry flush.
 **Goal:** A numeric input per criterion in the rubric editor, storing `criterion.weight`.
 
 **Prompt:**
+
 ```
 Per INSTRUCTIONS.md §2.1 U3, §12.9, and erd.md (Pass D amendment folded in):
 Criterion now has a `weight numeric` column (default 1.0). The rubric
@@ -486,6 +500,7 @@ criteria, save, reopen — confirm values persist.
 **Goal:** Four numeric inputs per criterion for `level_N_value`, hidden under a disclosure that defaults closed.
 
 **Prompt:**
+
 ```
 Per INSTRUCTIONS.md §2.1 U4 and erd.md (Pass D amendment folded in):
 Criterion now has level_1_value through level_4_value numeric columns
@@ -525,6 +540,7 @@ values persist and defaults are only used where not overridden.
 **Goal:** On 401 in the term-rating narrative or observation capture, show a modal that preserves the form state.
 
 **Prompt:**
+
 ```
 Per INSTRUCTIONS.md §2.1 U8, auth-lifecycle.md §8.1, and
 DESIGN-SYSTEM.md §4.4: when an API call returns 401 on the
@@ -571,6 +587,7 @@ re-auth, confirm draft still there and save succeeds.
 **Goal:** The Category CRUD inline row in Course Settings. Clones the existing Modules-panel pattern.
 
 **Prompt:**
+
 ```
 Per INSTRUCTIONS.md §2.1 U1, §12.7, §12.9, and spec-vs-ui-diff.md
 Bucket 3: add Category management as an inline row in Course Settings.
@@ -628,6 +645,7 @@ dropdown now shows the new categories.
 **Goal:** Emails from Supabase Auth (verification, password reset) come from the custom domain.
 
 **Prompt:**
+
 ```
 Per INSTRUCTIONS.md §1 and DECISIONS.md Q6=B: configure Supabase Auth
 to send email via custom domain noreply@fullvision.ca.
@@ -664,6 +682,7 @@ credentials to the repo.
 **Goal:** Runtime errors captured in Sentry.
 
 **Prompt:**
+
 ```
 Per INSTRUCTIONS.md §8.2 and DECISIONS.md Q34=A: wire Sentry for
 runtime error capture.
@@ -694,22 +713,23 @@ Do not commit the DSN. Document the env var name in INSTRUCTIONS.md
 
 ---
 
-### T-OPS-03 · Park old site at `legacy.fullvision.ca`
+### T-OPS-03 · Optional legacy-site parking at `legacy.fullvision.ca`
 
-**Goal:** Current Netlify deploy is reachable at a legacy subdomain; primary domain is reserved for the new build.
+**Goal:** If desired, expose the old app on a legacy subdomain without changing the current `main`-based production flow.
 
 **Prompt:**
+
 ```
-Per INSTRUCTIONS.md §1 operational decisions: move the current
-(legacy) Netlify deploy off the primary fullvision.ca domain.
+Per INSTRUCTIONS.md §1 operational decisions: if the team wants the
+old app reachable for comparison or rollback drills, park it at a
+legacy subdomain.
 
 Steps:
 1. In Netlify, create a new site or take the current deploy and
    change its primary domain to legacy.fullvision.ca.
-2. Add the DNS CNAME at fullvision.ca for legacy → the Netlify
+2. Add the DNS CNAME for `legacy.fullvision.ca` → the Netlify
    site's URL.
-3. Leave fullvision.ca pointing nowhere (or at a "Coming soon"
-   placeholder) until T-OPS-04 cutover.
+3. Do **not** disturb the current `fullvision.ca` production routing.
 4. Verify legacy.fullvision.ca loads the old site; the legacy-v1
    git tag remains accessible.
 
@@ -718,54 +738,30 @@ No code changes in the repo. This is a Netlify + DNS task.
 
 **Depends on:** `fullvision.ca` DNS access
 
-**Acceptance:** `legacy.fullvision.ca` serves the old app. `fullvision.ca` is parked.
+**Acceptance:** `legacy.fullvision.ca` serves the old app without changing the current `fullvision.ca` routing.
 
 **Budget:** 30 min
 
 ---
 
-### T-OPS-04 · Cutover: `rebuild-v2` → new `main`
+### T-OPS-04 · Historical cutover (completed 2026-04-20)
 
-**Goal:** The rebuild becomes production.
+**Goal:** Historical record of the old cutover plan. Do not execute these steps now.
 
 **Prompt:**
+
 ```
-Per INSTRUCTIONS.md §11.15: cutover from legacy to v2.
+This cutover already happened. `rebuild-v2` was merged into `main`, the stale PR path was closed, and current work should target `main` directly.
 
-Pre-flight checklist (all must be green):
-- [ ] PR #76 reviewed and ready to merge
-- [ ] T-WIRE-01 audit clean
-- [ ] All Tier 2–5 UI tasks done and Demo-Mode verified
-- [ ] T-OPS-01 SMTP working (test password reset end-to-end)
-- [ ] T-OPS-02 Sentry capturing errors
-- [ ] T-OPS-03 legacy.fullvision.ca serving old site
-- [ ] fullvision-v2 Supabase project has latest migrations
-- [ ] Supabase Pro backups + PITR active
-- [ ] Weekly JSON export cron scheduled (per DECISIONS Q35)
-
-Cutover steps:
-1. Merge PR #76 → rebuild-v2 becomes stable.
-2. Update main: `git checkout main && git reset --hard rebuild-v2`
-   (force-push OK on main ONLY with explicit user authorization;
-   confirm first). Alternatively: keep main pointing at
-   docs-cleanup-redundant-stale, and have the Netlify prod site
-   build from rebuild-v2 directly by switching the production
-   branch in Netlify settings — no force-push required.
-3. Update Netlify prod site:
-   - Production branch → rebuild-v2 (or new main)
-   - Env vars → fullvision-v2 Supabase URL + anon key
-4. DNS flip: fullvision.ca → Netlify prod deploy.
-5. Smoke test production: sign up → verify → sign in → gradebook →
-   enter a score → Demo Mode "Try Demo" → report preview.
-6. Update HANDOFF.md with cutover timestamp and any issues seen.
-
-Rollback plan: if issues in first hour, DNS back to parked state
-(fullvision.ca → placeholder); investigate; re-cutover later.
+Use the current backlog instead:
+1. Resolve production blockers like Netlify quota, SMTP verification, and Sentry.
+2. Finish remaining UI and persistence gaps on `main`.
+3. Treat any future deploy/cutover work as a fresh task, not a continuation of PR `#76`.
 ```
 
 **Depends on:** every Tier 2–5 task above plus OPS-01/02/03
 
-**Acceptance:** fullvision.ca serves new app with backend at fullvision-v2 Supabase. Smoke test passes.
+**Acceptance:** Historical note only; no action required.
 
 **Budget:** 1 hour + rollback buffer
 
@@ -774,15 +770,17 @@ Rollback plan: if issues in first hour, DNS back to parked state
 ## Parallel vs. serial execution
 
 **Can run in parallel (no dependencies between them):**
+
 - T-UI-01 (hide button) · T-COPY-01 (dialog copy) · T-COPY-02 (welcome class)
 - T-UI-02 · T-UI-03 · T-UI-04 · T-UI-05 · T-UI-06 · T-UI-07 — all after T-WIRE-01
 - T-OPS-01 · T-OPS-02 · T-OPS-03 — infrastructure, can run any time
 
 **Must be serial:**
+
 - T-UI-08 (sync popover) waits on T-UI-06 (badge exists first)
 - T-UI-09 and T-UI-10 easier together (same rubric editor file)
 - T-UI-12 (Category row) waits on T-UI-02 (segmented control exists, needs updating when categories populate)
-- T-OPS-04 cutover waits on everything else
+- Historical note: the old T-OPS-04 cutover used to wait on everything else; current work no longer depends on that task.
 
 **Recommended session ordering for one-Claude-Code-session-at-a-time:**
 
@@ -797,7 +795,7 @@ Rollback plan: if issues in first hour, DNS back to parked state
 9. T-UI-03, T-UI-04, T-UI-05 (timezone, restore prompt, export)
 10. T-COPY-02 (welcome class banner + auto-seed)
 11. T-OPS-01, 02, 03 (infra — any order)
-12. T-OPS-04 (cutover)
+12. T-OPS-04 is historical only; use the active backlog plans for current production follow-up work
 
 ---
 
@@ -823,4 +821,4 @@ Rollback plan: if issues in first hour, DNS back to parked state
 - **T-TEST-02** · E2E: soft-delete account → sign-in within 30d → restore
 - **T-TEST-03** · E2E: offline queue fills → reconnect → queue drains
 - **T-OPS-05** · Weekly JSON export cron
-- **T-OPS-06** · Demo Mode smoke test on live fullvision.ca post-cutover
+- **T-OPS-06** · Demo Mode / production smoke on `fullvision.ca` once the Netlify quota issue is resolved

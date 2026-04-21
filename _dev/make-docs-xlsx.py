@@ -8,16 +8,16 @@ ROWS = [
     # (Section, Type, Path, Size, Audience, Description, Notes)
 
     # 1. TOP-LEVEL
-    ("1. Top-level", "Markdown", "README.md", "216 lines", "Repo visitor", "Project overview, features, tech stack, getting started, full commands table, Netlify env-vars table, sw.js cache-bump reminder, project structure, architecture summary, privacy/compliance", "Absorbed SETUP_INSTRUCTIONS.md content in docs-cleanup (Apr 18 2026)"),
-    ("1. Top-level", "Markdown", "ACTION_PLAN.md", "135 lines", "Developer", "Post-PR-#71 roadmap: data-loss P0s from write-path audit, P1/P2 tasks, Done log", "Rewritten Apr 18 2026 to strip landed items (CI, Phase 1c reads)"),
+    ("1. Top-level", "Markdown", "README.md", "227 lines", "Repo visitor", "Project overview, features, tech stack, getting started, full commands table, Netlify env-vars table, sw.js cache-bump reminder, project structure, architecture summary, privacy/compliance", "Absorbed SETUP_INSTRUCTIONS.md content in docs-cleanup (Apr 18 2026)"),
+    ("1. Top-level", "Markdown", "CLAUDE.md", "38 lines", "AI agent / Developer", "Repo charter: current status, hard rules, pass references, and design-worktree context", "Present on main; AGENTS.md absent"),
     ("1. Top-level", "Text", "_headers", "653 B", "Tooling", "Netlify security headers: X-Frame-Options, CSP note, Referrer-Policy, HSTS, per-filetype cache rules", ""),
     ("1. Top-level", "JSON", "manifest.json", "1.2 KB", "Tooling", "PWA manifest: app name, icons, theme color, shortcuts", "Browser-facing"),
     ("1. Top-level", "JSON", "package.json", "658 B", "Tooling", "npm scripts (dev, test, test:watch, test:e2e, format, build), project metadata, devDependencies", ""),
     ("1. Top-level", "—", "LICENSE", "(missing)", "Repo visitor", "Would define usage terms", "GAP — no LICENSE file; repo metadata also shows licenseInfo: null"),
-    ("1. Top-level", "—", ".env.example", "(not present in checkout)", "Developer", "Template env vars for Supabase creds", "Credentials injected by Netlify edge function in production"),
+    ("1. Top-level", "—", ".env.example", "15 lines", "Developer", "Template env vars for local signed-in dev (`SUPABASE_URL`, `SUPABASE_KEY`)", "Used by scripts/dev-local.mjs"),
     ("1. Top-level", "—", "CONTRIBUTING.md", "(missing)", "Contributor", "Would describe contribution workflow, code style, PR process", "GAP"),
     ("1. Top-level", "—", "CHANGELOG.md", "(missing)", "Developer", "Would track release notes", "GAP"),
-    ("1. Top-level", "—", "CLAUDE.md / AGENTS.md", "(missing)", "AI agent", "Would document repo conventions for AI workers", "GAP — superpowers workflow expects these"),
+    ("1. Top-level", "—", "AGENTS.md", "(missing)", "AI agent", "Optional alternate agent-conventions file", "Low priority because CLAUDE.md exists"),
     ("1. Top-level", "—", "CODE_OF_CONDUCT.md / SECURITY.md", "(missing)", "Contributor", "Community / security disclosure docs", "GAP"),
 
     # 2. BUILD / CI / TOOLING CONFIG
@@ -28,77 +28,93 @@ ROWS = [
     ("2. Build & CI", "Shell", "scripts/build.sh", "17 lines", "Tooling", "Netlify build: copies public files to dist/", ""),
 
     # 3. ARCHITECTURE
-    ("3. docs/ architecture", "Markdown", "docs/ARCHITECTURE.md", "449 lines", "Developer", "System design: directory structure, script load order, page routing, data flow, calculation engine, demo mode", "References line numbers in shared/data.js that may have shifted after canonical-reads merge"),
+    ("3. docs/ architecture", "Markdown", "docs/ARCHITECTURE.md", "447 lines", "Developer", "System design: directory structure, script load order, page routing, data flow, calculation engine, demo mode", "Needs periodic refresh when sync/write architecture changes"),
 
-    # 4. COMPLIANCE / GOVERNANCE
-    ("4. docs/ compliance", "Markdown", "docs/Privacy_Impact_Assessment.md", "243 lines", "Compliance", "PIA (March 22 2026): personal info inventory, collection purposes, data residency ca-central-1, RLS, idle timeout, no student accounts", "BC FOIPPA-aligned"),
-    ("4. docs/ compliance", "Markdown", "docs/Data_Retention_Policy.md", "133 lines", "Compliance", "FOIPPA retention policy: what's kept vs deleted, retention periods, secure deletion on account wipe", ""),
-    ("4. docs/ compliance", "Markdown", "docs/Breach_Notification_Procedure.md", "197 lines", "Compliance", "Breach definition, detection channels, response steps, 24-72hr notification timeline", ""),
+    # 4. BACKEND DESIGN / IMPLEMENTATION DOCS
+    ("4. docs/backend-design", "Markdown", "docs/backend-design/HANDOFF.md", "342 lines", "Developer / AI agent", "Authoritative implementation log, current-state summary, discovered gaps, and activity history", "Refreshed Apr 21 2026 to remove stale rebuild-v2 / push-embargo guidance"),
+    ("4. docs/backend-design", "Markdown", "docs/backend-design/INSTRUCTIONS.md", "441 lines", "Developer / AI agent", "Design-level implementation instructions: scope, strings, data rules, UI directives", "Operational branch/cutover notes were refreshed Apr 21 2026"),
+    ("4. docs/backend-design", "Markdown", "docs/backend-design/TASKS.md", "801 lines", "Developer / AI agent", "Task queue for UI/ops follow-ups derived from the design doc set", "Historical cutover task retained as completed record; branch target is now main"),
+    ("4. docs/backend-design", "Markdown", "docs/backend-design/DECISIONS.md", "221 lines", "Developer", "Answer-by-answer decision log backing the rebuild scope", ""),
+    ("4. docs/backend-design", "Markdown", "docs/backend-design/erd.md", "745 lines", "Developer", "Canonical ERD including Pass D amendment", ""),
+    ("4. docs/backend-design", "Markdown", "docs/backend-design/write-paths.md", "1534 lines", "Developer", "Write-path RPC design and sequencing", ""),
+    ("4. docs/backend-design", "Markdown", "docs/backend-design/read-paths.md", "650 lines", "Developer", "Read-path computation and surface design", ""),
+    ("4. docs/backend-design", "Markdown", "docs/backend-design/auth-lifecycle.md", "604 lines", "Developer", "Auth, session, soft-delete, and restore lifecycle design", ""),
+    ("4. docs/backend-design", "Markdown", "docs/backend-design/offline-sync.md", "103 lines", "Developer", "Offline queue model and sync lifecycle", ""),
+    ("4. docs/backend-design", "Markdown", "docs/backend-design/spec-vs-ui-diff.md", "140 lines", "Developer", "Spec/UI reconciliation log", "Likely needs replay against post-merge UI"),
+    ("4. docs/backend-design", "HTML", "docs/backend-design/decisions.html", "generated", "Developer / Stakeholder", "Rendered questionnaire / decision mirror", "Likely needs regeneration from DECISIONS.md"),
+    ("4. docs/backend-design", "SQL", "docs/backend-design/schema.sql", "581 lines", "Developer", "Canonical schema mirror for the backend-design doc set", "Regenerated from live DB during reconciliation"),
+    ("4. docs/backend-design", "SQL", "docs/backend-design/rls-policies.sql", "382 lines", "Developer", "RLS policy mirror for gradebook-prod", ""),
+    ("4. docs/backend-design", "SQL", "docs/backend-design/read-paths.sql", "842 lines", "Developer", "Read-path RPC mirror", ""),
+    ("4. docs/backend-design", "SQL", "docs/backend-design/write-paths.sql", "2047 lines", "Developer", "Write-path RPC mirror", ""),
+    ("4. docs/backend-design", "SQL", "docs/backend-design/smoke-tests.sql", "1225 lines", "Developer", "psql-runnable smoke suite for live DB verification", ""),
+    ("4. docs/backend-design", "Markdown", "docs/backend-design/smoke-tests.README.md", "137 lines", "Developer", "How to run and extend the smoke suite", ""),
+    ("4. docs/backend-design", "Markdown", "docs/backend-design/smtp-setup.md", "146 lines", "Developer / Ops", "Runbook for custom SMTP setup and verification", ""),
+    ("4. docs/backend-design", "Markdown", "docs/backend-design/DESIGN-SYSTEM.md", "current", "Developer / Designer", "CSS token and component-pattern inventory used to preserve the existing visual language", ""),
 
-    # 5. DIAGRAMS
-    ("5. docs/diagrams/", "Markdown", "docs/diagrams/README.md", "35 lines", "Developer", "Guide to the 10 numbered diagrams, recommended reading order, color legend (green=Supabase, red=LS, yellow=conditional, blue=UI, purple=projection, orange=edge)", ""),
-    ("5. docs/diagrams/", "Draw.io", "docs/diagrams/01-system-architecture.drawio", "10 KB", "Developer", "System containers: teacher desktop, mobile PWA, login, Supabase (Auth/Postgres/Realtime), Netlify edge, SW", ""),
-    ("5. docs/diagrams/", "Draw.io", "docs/diagrams/02-database-schema.drawio", "14 KB", "Developer", "Entity relationships: course_data JSON blobs, teacher_config, auth users, RLS policies", "Pre-canonical-schema — may be stale"),
-    ("5. docs/diagrams/", "Draw.io", "docs/diagrams/03-frontend-module-map.drawio", "13 KB", "Developer", "JS module ownership: which file handles each page/tab", ""),
-    ("5. docs/diagrams/", "Draw.io", "docs/diagrams/04-auth-and-routing.drawio", "10 KB", "Developer", "Login flow: Supabase Auth → portal redirect → app boot", ""),
-    ("5. docs/diagrams/", "Draw.io", "docs/diagrams/05-hydration-on-login.drawio", "13 KB", "Developer", "Data loading: initAllCourses + initData RPC fan-out; notes April 3-18 data-invisible bug", ""),
-    ("5. docs/diagrams/", "Draw.io", "docs/diagrams/06-write-path-map.drawio", "24 KB", "Developer", "Entity write paths color-coded by persistence (fully/partially/LS-only)", "Largest diagram — critical reference"),
-    ("5. docs/diagrams/", "Draw.io", "docs/diagrams/07-score-entry-paths.drawio", "10 KB", "Developer", "Desktop (canonical RPC) vs mobile (stubbed) scoring; notes open bug", ""),
-    ("5. docs/diagrams/", "Draw.io", "docs/diagrams/08-observation-lifecycle.drawio", "12 KB", "Developer", "Full observation CRUD — template for unwired entities", ""),
-    ("5. docs/diagrams/", "Draw.io", "docs/diagrams/09-term-report-flow.drawio", "11 KB", "Developer", "Questionnaire → term rating → progress report render → print", ""),
-    ("5. docs/diagrams/", "Draw.io", "docs/diagrams/10-service-worker-cache.drawio", "10 KB", "Developer", "SW lifecycle, fetch strategy, cache busting, why PWA users need Unregister + hard reload", ""),
+    # 5. COMPLIANCE / GOVERNANCE
+    ("5. docs/ compliance", "Markdown", "docs/Privacy_Impact_Assessment.md", "243 lines", "Compliance", "PIA (March 22 2026): personal info inventory, collection purposes, data residency ca-central-1, RLS, idle timeout, no student accounts", "BC FOIPPA-aligned"),
+    ("5. docs/ compliance", "Markdown", "docs/Data_Retention_Policy.md", "133 lines", "Compliance", "FOIPPA retention policy: what's kept vs deleted, retention periods, secure deletion on account wipe", ""),
+    ("5. docs/ compliance", "Markdown", "docs/Breach_Notification_Procedure.md", "197 lines", "Compliance", "Breach definition, detection channels, response steps, 24-72hr notification timeline", ""),
 
-    # 6. USER-FLOW DIAGRAMS (Lucidchart)
-    ("6. User-flow diagrams", "Markdown", "docs/lucidchart-user-flowcharts.md", "73 lines", "End user / Dev", "Two Mermaid flowcharts: first-time teacher path; recurring assignment/grade/report workflow", ""),
-    ("6. User-flow diagrams", "Mermaid", "docs/lucidchart-first-time-report-flow.mmd", "971 B", "End user", "Flowchart: login → reports for first-time teacher", ""),
-    ("6. User-flow diagrams", "Mermaid", "docs/lucidchart-teacher-assignment-comment-grade-flow.mmd", "825 B", "End user", "Flowchart: recurring workflow (assignments → grading → reports)", ""),
-    ("6. User-flow diagrams", "Draw.io", "docs/lucidchart-user-flows.drawio", "20 KB", "Developer", "Same user flows in Draw.io format", ""),
-    ("6. User-flow diagrams", "Draw.io", "docs/lucidchart-assignment-comment-grade-flow.drawio", "9 KB", "Developer", "Assignment workflow Draw.io", ""),
+    # 6. DIAGRAMS
+    ("6. docs/diagrams/", "Markdown", "docs/diagrams/README.md", "35 lines", "Developer", "Guide to the 10 numbered diagrams, recommended reading order, color legend (green=Supabase, red=LS, yellow=conditional, blue=UI, purple=projection, orange=edge)", ""),
+    ("6. docs/diagrams/", "Draw.io", "docs/diagrams/01-system-architecture.drawio", "10 KB", "Developer", "System containers: teacher desktop, mobile PWA, login, Supabase (Auth/Postgres/Realtime), Netlify edge, SW", ""),
+    ("6. docs/diagrams/", "Draw.io", "docs/diagrams/02-database-schema.drawio", "14 KB", "Developer", "Entity relationships: course_data JSON blobs, teacher_config, auth users, RLS policies", "Pre-canonical-schema — likely stale"),
+    ("6. docs/diagrams/", "Draw.io", "docs/diagrams/03-frontend-module-map.drawio", "13 KB", "Developer", "JS module ownership: which file handles each page/tab", ""),
+    ("6. docs/diagrams/", "Draw.io", "docs/diagrams/04-auth-and-routing.drawio", "10 KB", "Developer", "Login flow: Supabase Auth → portal redirect → app boot", ""),
+    ("6. docs/diagrams/", "Draw.io", "docs/diagrams/05-hydration-on-login.drawio", "13 KB", "Developer", "Data loading: initAllCourses + initData RPC fan-out; notes April 3-18 data-invisible bug", ""),
+    ("6. docs/diagrams/", "Draw.io", "docs/diagrams/06-write-path-map.drawio", "24 KB", "Developer", "Entity write paths color-coded by persistence (fully/partially/LS-only)", "Likely stale after v2 merge"),
+    ("6. docs/diagrams/", "Draw.io", "docs/diagrams/07-score-entry-paths.drawio", "10 KB", "Developer", "Desktop vs mobile scoring flow", "Likely stale after v2 merge"),
+    ("6. docs/diagrams/", "Draw.io", "docs/diagrams/08-observation-lifecycle.drawio", "12 KB", "Developer", "Full observation CRUD — template for unwired entities", ""),
+    ("6. docs/diagrams/", "Draw.io", "docs/diagrams/09-term-report-flow.drawio", "11 KB", "Developer", "Questionnaire → term rating → progress report render → print", ""),
+    ("6. docs/diagrams/", "Draw.io", "docs/diagrams/10-service-worker-cache.drawio", "10 KB", "Developer", "SW lifecycle, fetch strategy, cache busting, why PWA users need Unregister + hard reload", ""),
 
-    # 7. SUPERPOWERS (feature plans + design specs)
-    ("7. docs/superpowers/", "Markdown", "docs/superpowers/plans/2026-03-29-family-centered-observations.md", "1320 lines", "AI agent / Dev", "Plan: family voice in observations, sentiment tagging, parent-accessible narrative", ""),
-    ("7. docs/superpowers/", "Markdown", "docs/superpowers/plans/2026-03-29-questionnaire-indigenous-attachment-informed.md", "261 lines", "AI agent / Dev", "Plan: culturally responsive questionnaire design", ""),
-    ("7. docs/superpowers/", "Markdown", "docs/superpowers/specs/2026-03-29-family-centered-observations-design.md", "178 lines", "AI agent / Dev", "Design spec: observation editor, family narrative field", ""),
-    ("7. docs/superpowers/", "Markdown", "docs/superpowers/shipped/2026-03-29-customizable-student-card-widgets.md", "2796 lines", "AI agent / Dev", "Shipped implementation plan: widget registry, config data layer, editor UI, long-press, petal chart SVG; task checkboxes, file-structure table, code examples", "Moved to shipped/ Apr 18 2026 after feature landed"),
-    ("7. docs/superpowers/", "Markdown", "docs/superpowers/shipped/2026-03-29-customizable-student-card-widgets-design.md", "313 lines", "AI agent / Dev", "Shipped design spec: widget types, UI mockups, interaction patterns", "Moved to shipped/ Apr 18 2026"),
+    # 7. USER-FLOW DIAGRAMS (Lucidchart)
+    ("7. User-flow diagrams", "Markdown", "docs/lucidchart-user-flowcharts.md", "73 lines", "End user / Dev", "Two Mermaid flowcharts: first-time teacher path; recurring assignment/grade/report workflow", ""),
+    ("7. User-flow diagrams", "Mermaid", "docs/lucidchart-first-time-report-flow.mmd", "971 B", "End user", "Flowchart: login → reports for first-time teacher", ""),
+    ("7. User-flow diagrams", "Mermaid", "docs/lucidchart-teacher-assignment-comment-grade-flow.mmd", "825 B", "End user", "Flowchart: recurring workflow (assignments → grading → reports)", ""),
+    ("7. User-flow diagrams", "Draw.io", "docs/lucidchart-user-flows.drawio", "20 KB", "Developer", "Same user flows in Draw.io format", ""),
+    ("7. User-flow diagrams", "Draw.io", "docs/lucidchart-assignment-comment-grade-flow.drawio", "9 KB", "Developer", "Assignment workflow Draw.io", ""),
 
-    # 8. INLINE CODE DOCS (file headers only)
-    ("8. Inline code headers", "JSDoc", "shared/data.js", "~2800 lines", "Developer", "Cache-through pattern comment, Student/Assessment/Observation/TermRating typedefs, sync flow, fire-and-forget RPCs", "Entry point to the data layer"),
-    ("8. Inline code headers", "JSDoc", "shared/calc.js", "~1500 lines", "Developer", "Proficiency calculation engine comment, Score typedef, 4 calc methods (mostRecent/highest/mode/decayingAvg), memoization caches, pointsToProf", ""),
-    ("8. Inline code headers", "JSDoc", "shared/constants.js", "~800 lines", "Developer", "Course/LearningTag/LearningSection typedefs; curriculum structure; course config shape", ""),
-    ("8. Inline code headers", "JSDoc", "shared/supabase.js", "~600 lines", "Developer", "Portal convention block (teacher/student/parent), auth strategy, dev mode bypass, credential handling, client init", ""),
-    ("8. Inline code headers", "Comment", "teacher/app.html", "~50 lines", "Developer", "Meta tags, script load-order comment, curriculum_data lazy-load note, mobile auto-redirect", ""),
-    ("8. Inline code headers", "Comment", "teacher/router.js", "~800 lines", "Developer", "Hash-based SPA router comment + route table; page lifecycle (init/destroy), query params", ""),
-    ("8. Inline code headers", "Comment", "teacher/ui.js", "~900 lines", "Developer", "Shared UI components: dock, sidebar, modals; toast system; event delegation", ""),
-    ("8. Inline code headers", "Comment", "teacher/page-dashboard.js", "~1200 lines", "Developer", "Page module IIFE pattern comment; dashboard cards, class overview", ""),
-    ("8. Inline code headers", "Comment", "teacher/page-assignments.js", "~1400 lines", "Developer", "Assignment CRUD, scoring UI, rubric linking", ""),
-    ("8. Inline code headers", "Comment", "teacher/page-student.js", "~1100 lines", "Developer", "Individual student profile: score timeline, sparklines, insights", ""),
-    ("8. Inline code headers", "Comment", "teacher/page-gradebook.js", "~1300 lines", "Developer", "Spreadsheet-style gradebook; pinnable columns; view modes", ""),
-    ("8. Inline code headers", "Comment", "teacher/page-observations.js", "~800 lines", "Developer", "Observation capture: quick notes, sentiment tagging", ""),
-    ("8. Inline code headers", "Comment", "teacher/page-reports.js", "~1500 lines", "Developer", "Report builder: block selection, drag reorder, narrative generation", ""),
-    ("8. Inline code headers", "Comment", "teacher/report-blocks.js", "~700 lines", "Developer", "Individual report block renderers (narrative, late policy, grade summary)", ""),
-    ("8. Inline code headers", "Comment", "teacher/report-questionnaire.js", "~1300 lines", "Developer", "Term-questionnaire UI; narrative contenteditable; dim/trait/strength pickers", ""),
-    ("8. Inline code headers", "Comment", "teacher/dash-class-manager.js", "~1800 lines", "Developer", "Class manager: student CRUD, roster import, curriculum editor, course create/delete", ""),
-    ("8. Inline code headers", "Comment", "teacher/teams-import.js", "~900 lines", "Developer", "CSV/Excel roster import using SheetJS; Teams format parsing", ""),
-    ("8. Inline code headers", "Comment", "teacher/assign-collab.js", "~235 lines", "Developer", "Collaboration panel: pairs/groups generation, drag-drop members", ""),
-    ("8. Inline code headers", "Comment", "teacher-mobile/shell.js", "~1400 lines", "Developer", "Mobile shell + boot flow: auth check, tab routing, pull-to-refresh; offline fallback; data-action delegation", ""),
-    ("8. Inline code headers", "Comment", "teacher-mobile/components.js", "~900 lines", "Developer", "iOS-style UI components: sheets, toasts, swipe gestures, native patterns", ""),
-    ("8. Inline code headers", "Comment", "teacher-mobile/tab-students.js", "~1200 lines", "Developer", "Students tab: card stack, list, detail view, pull-to-refresh", ""),
-    ("8. Inline code headers", "Comment", "teacher-mobile/tab-observe.js", "~900 lines", "Developer", "Observation feed + compose sheet (social feed pattern)", ""),
-    ("8. Inline code headers", "Comment", "teacher-mobile/tab-grade.js", "~700 lines", "Developer", "Speed grader: one-student-at-a-time scoring optimized for mobile", "CRITICAL: still uses saveScores bulk (LS-only)"),
-    ("8. Inline code headers", "Comment", "teacher-mobile/card-widget-editor.js", "~80 lines", "Developer", "Mobile card widget editor sheet: toggles + drag-reorder + reset", ""),
-    ("8. Inline code headers", "Comment", "teacher-mobile/card-widgets.js", "~500 lines", "Developer", "Widget registry + renderers for the mobile student card", ""),
-    ("8. Inline code headers", "Comment", "teacher-mobile/card-stack.js", "~400 lines", "Developer", "Swipeable student card stack component", ""),
-    ("8. Inline code headers", "JSDoc", "netlify/edge-functions/inject-env.js", "49 lines", "Developer", "Edge function: env var injection, per-request CSP nonce, script/style tag rewriting", ""),
-    ("8. Inline code headers", "Comment", "login-auth.js", "210 lines", "Developer", "Portal routing comment block (teacher/student/parent metadata), demo URL redirect (?demo=1), device-based mobile redirect", ""),
-    ("8. Inline code headers", "Comment", "login.html", "88 lines", "End user", "Sign in / sign up tabs, error/success messages, demo mode button", ""),
-    ("8. Inline code headers", "Comment", "sw.js", "~150 lines", "Developer", "Service worker: IMPORTANT CACHE_NAME comment, network-first strategy, offline fallback, PWA install", "Currently v34 on main; v35 pending"),
+    # 8. SUPERPOWERS (feature plans + design specs)
+    ("8. docs/superpowers/", "Markdown", "docs/superpowers/plans/2026-04-20-post-reconciliation-backlog.md", "current", "AI agent / Dev", "Post-reconciliation backlog: quota, key rotation, e2e, rubric persistence, and follow-up work", ""),
+    ("8. docs/superpowers/", "Markdown", "docs/superpowers/plans/2026-04-21-ui-v1-feature-gap.md", "current", "AI agent / Dev", "UI-v1 backlog and shipped Tier-A work summary", ""),
+    ("8. docs/superpowers/", "Markdown", "docs/superpowers/shipped/2026-04-20-database-wiring-reconciliation.md", "current", "AI agent / Dev", "Shipped reconciliation plan documenting the rebuild merge path", ""),
 
-    # 9. SCHEMA / DATABASE
-    ("9. Schema & DB", "SQL", "schema.sql", "133 KB / 3608 lines", "Developer", "Auto-generated DB dump from supabase_migrations.schema_migrations (31 migrations); multi-namespace (academics, identity, canonical, projection, reporting); RLS policies; locked search_path", "Auto-generated 2026-04-17 — may be stale vs current DB"),
-    ("9. Schema & DB", "—", "supabase/migrations/*.sql", "(not in repo)", "Developer", "Individual migration files with per-change commentary", "GAP — only the aggregated schema.sql is checked in; per-migration history lives in Supabase dashboard"),
+    # 9. INLINE CODE DOCS (file headers only)
+    ("9. Inline code headers", "JSDoc", "shared/data.js", "~2800 lines", "Developer", "Cache-through pattern comment, Student/Assessment/Observation/TermRating typedefs, sync flow, fire-and-forget RPCs", "Entry point to the data layer"),
+    ("9. Inline code headers", "JSDoc", "shared/calc.js", "~1500 lines", "Developer", "Proficiency calculation engine comment, Score typedef, 4 calc methods (mostRecent/highest/mode/decayingAvg), memoization caches, pointsToProf", ""),
+    ("9. Inline code headers", "JSDoc", "shared/constants.js", "~800 lines", "Developer", "Course/LearningTag/LearningSection typedefs; curriculum structure; course config shape", ""),
+    ("9. Inline code headers", "JSDoc", "shared/supabase.js", "~600 lines", "Developer", "Portal convention block (teacher/student/parent), auth strategy, dev mode bypass, credential handling, client init", ""),
+    ("9. Inline code headers", "Comment", "teacher/app.html", "~50 lines", "Developer", "Meta tags, script load-order comment, curriculum_data lazy-load note, mobile auto-redirect", ""),
+    ("9. Inline code headers", "Comment", "teacher/router.js", "~800 lines", "Developer", "Hash-based SPA router comment + route table; page lifecycle (init/destroy), query params", ""),
+    ("9. Inline code headers", "Comment", "teacher/ui.js", "~900 lines", "Developer", "Shared UI components: dock, sidebar, modals; toast system; event delegation", ""),
+    ("9. Inline code headers", "Comment", "teacher/page-dashboard.js", "~1200 lines", "Developer", "Page module IIFE pattern comment; dashboard cards, class overview", ""),
+    ("9. Inline code headers", "Comment", "teacher/page-assignments.js", "~1400 lines", "Developer", "Assignment CRUD, scoring UI, rubric linking", ""),
+    ("9. Inline code headers", "Comment", "teacher/page-student.js", "~1100 lines", "Developer", "Individual student profile: score timeline, sparklines, insights", ""),
+    ("9. Inline code headers", "Comment", "teacher/page-gradebook.js", "~1300 lines", "Developer", "Spreadsheet-style gradebook; pinnable columns; view modes", ""),
+    ("9. Inline code headers", "Comment", "teacher/page-observations.js", "~800 lines", "Developer", "Observation capture: quick notes, sentiment tagging", ""),
+    ("9. Inline code headers", "Comment", "teacher/page-reports.js", "~1500 lines", "Developer", "Report builder: block selection, drag reorder, narrative generation", ""),
+    ("9. Inline code headers", "Comment", "teacher/report-blocks.js", "~700 lines", "Developer", "Individual report block renderers (narrative, late policy, grade summary)", ""),
+    ("9. Inline code headers", "Comment", "teacher/report-questionnaire.js", "~1300 lines", "Developer", "Term-questionnaire UI; narrative contenteditable; dim/trait/strength pickers", ""),
+    ("9. Inline code headers", "Comment", "teacher/dash-class-manager.js", "~1800 lines", "Developer", "Class manager: student CRUD, roster import, curriculum editor, course create/delete", ""),
+    ("9. Inline code headers", "Comment", "teacher/teams-import.js", "~900 lines", "Developer", "CSV/Excel roster import using SheetJS; Teams format parsing", ""),
+    ("9. Inline code headers", "Comment", "teacher/assign-collab.js", "~235 lines", "Developer", "Collaboration panel: pairs/groups generation, drag-drop members", ""),
+    ("9. Inline code headers", "Comment", "teacher-mobile/shell.js", "~1400 lines", "Developer", "Mobile shell + boot flow: auth check, tab routing, pull-to-refresh; offline fallback; data-action delegation", ""),
+    ("9. Inline code headers", "Comment", "teacher-mobile/components.js", "~900 lines", "Developer", "iOS-style UI components: sheets, toasts, swipe gestures, native patterns", ""),
+    ("9. Inline code headers", "Comment", "teacher-mobile/tab-students.js", "~1200 lines", "Developer", "Students tab: card stack, list, detail view, pull-to-refresh", ""),
+    ("9. Inline code headers", "Comment", "teacher-mobile/tab-observe.js", "~900 lines", "Developer", "Observation feed + compose sheet (social feed pattern)", ""),
+    ("9. Inline code headers", "Comment", "teacher-mobile/tab-grade.js", "~700 lines", "Developer", "Speed grader: one-student-at-a-time scoring optimized for mobile", "CRITICAL: still uses saveScores bulk (LS-only)"),
+    ("9. Inline code headers", "Comment", "teacher-mobile/card-widget-editor.js", "~80 lines", "Developer", "Mobile card widget editor sheet: toggles + drag-reorder + reset", ""),
+    ("9. Inline code headers", "Comment", "teacher-mobile/card-widgets.js", "~500 lines", "Developer", "Widget registry + renderers for the mobile student card", ""),
+    ("9. Inline code headers", "Comment", "teacher-mobile/card-stack.js", "~400 lines", "Developer", "Swipeable student card stack component", ""),
+    ("9. Inline code headers", "JSDoc", "netlify/edge-functions/inject-env.js", "49 lines", "Developer", "Edge function: env var injection, per-request CSP nonce, script/style tag rewriting", ""),
+    ("9. Inline code headers", "Comment", "login-auth.js", "210 lines", "Developer", "Portal routing comment block (teacher/student/parent metadata), demo URL redirect (?demo=1), device-based mobile redirect", ""),
+    ("9. Inline code headers", "Comment", "login.html", "88 lines", "End user", "Sign in / sign up tabs, error/success messages, demo mode button", ""),
+    ("9. Inline code headers", "Comment", "sw.js", "~150 lines", "Developer", "Service worker: IMPORTANT CACHE_NAME comment, network-first strategy, offline fallback, PWA install", "Currently v34 on main; v35 pending"),
 
     # 10. TEST INFRASTRUCTURE
+
     ("10. Test infra", "JavaScript", "tests/setup.js", "86 lines", "Developer", "Vitest setup: browser globals shim (window, localStorage, DOM), script-tag loader for shared modules", ""),
     ("10. Test infra", "JavaScript", "e2e/helpers.js", "428 lines", "Developer", "Playwright helpers: auth seeding, fake Supabase client, localStorage fixtures", ""),
     ("10. Test infra", "—", "tests/README.md", "(missing)", "Developer", "Would document unit-test conventions, fake-client pattern, how to add tests", "GAP — 37 test files with no guide"),
@@ -113,7 +129,7 @@ ROWS = [
     ("11. _dev/ internal", "Python", "_dev/make-docs-xlsx.py", "(this script)", "Developer", "Generator: this documentation inventory xlsx", ""),
     ("11. _dev/ internal", "JSON", "_dev/BC Curriculum Documents/*.json", "300+ files", "Data", "BC Ministry of Education curriculum standards (Grades 8-12, all subjects)", "Source for curriculum_data.js"),
 
-    # 12. GITHUB REPO METADATA (from gh CLI 2026-04-18)
+    # 12. GITHUB REPO METADATA (manual snapshot)
     ("12. GitHub metadata", "GitHub", "Repository", "MrBrown85/FullVision", "Repo visitor", "Public repo, default branch: main, visibility: public", ""),
     ("12. GitHub metadata", "GitHub", "Description", "(empty)", "Repo visitor", "No one-line repo description set", "GAP — add a description for GitHub search"),
     ("12. GitHub metadata", "GitHub", "Homepage URL", "(empty)", "Repo visitor", "No homepage linked (e.g. fullvision.ca)", "GAP — easy win"),
@@ -125,7 +141,7 @@ ROWS = [
     ("12. GitHub metadata", "GitHub", "Projects", "Enabled", "Contributor", "Projects enabled", ""),
     ("12. GitHub metadata", "GitHub", "GitHub Pages", "Not configured", "Repo visitor", "No Pages site (/pages endpoint returns 404)", ""),
     ("12. GitHub metadata", "GitHub", "Releases", "0", "Repo visitor", "No releases published", "GAP — no version history"),
-    ("12. GitHub metadata", "GitHub", "Branches", "8 active (main + 7 feature)", "Developer", "codex/canonical-read-migration, codex/canonical-reads-and-test-automation, colin/vibrant-cohen, demo-url-param, guard-initdata-rpc-calls, phase-2-canonical-writes, questionnaire-layout-grid", ""),
+    ("12. GitHub metadata", "GitHub", "Branches", "(refresh via gh api)", "Developer", "Branch list changes frequently; rerun the GitHub query when refreshing this workbook", "Local worktrees/branches were consolidated Apr 21 2026"),
     ("12. GitHub metadata", "File", ".github/workflows/ci.yml", "1.6 KB", "Tooling", "CI workflow (already listed in section 2)", ""),
     ("12. GitHub metadata", "—", ".github/PULL_REQUEST_TEMPLATE.md", "(missing)", "Contributor", "Would standardize PR descriptions", "GAP"),
     ("12. GitHub metadata", "—", ".github/ISSUE_TEMPLATE/", "(missing)", "Contributor", "Would standardize issue filing", "GAP"),
@@ -140,16 +156,16 @@ GAPS = [
     ("Governance", "No CODE_OF_CONDUCT.md / SECURITY.md", "No reporting channel documented", "15 min each — use standard templates"),
     ("Governance", "No CHANGELOG.md", "No release notes; no version history for end-users or devs", "Start now; maintain per PR"),
     ("Governance", "Empty repo description and homepage URL", "GitHub search doesn't find it; no link to fullvision.ca", "2 min via gh repo edit"),
-    ("AI / agents", "No CLAUDE.md or AGENTS.md", "Superpowers plans assume agent conventions that aren't written down", "30 min — codify what superpowers plans already imply"),
+    ("AI / agents", "AGENTS.md absent", "Low impact because CLAUDE.md already documents agent conventions", "Optional"),
     ("Tests", "No tests/README.md or e2e/README.md", "37 unit specs + 16 E2E specs without contributor guide; test-writing conventions not documented", "45 min — explain fake Supabase client pattern, how to add a spec"),
     ("Tests", "Inline test comments sparse", "Complex test intent hard to follow", "Ongoing — add as you touch tests"),
     ("GitHub surface", "No PR / issue templates", "PRs vary in quality; no issue triage template", "15 min each"),
     ("GitHub surface", "No CODEOWNERS", "No auto-review assignment", "5 min"),
     ("GitHub surface", "No Dependabot config", "Deps drift silently", "5 min"),
     ("GitHub surface", "Wiki enabled but empty", "Surface area with no content", "Disable or populate"),
-    ("Reference drift", "docs/ARCHITECTURE.md references line numbers in shared/data.js", "Line numbers shifted after canonical-reads merge", "20 min — audit and update or switch to anchor names"),
+    ("Reference drift", "docs/ARCHITECTURE.md write/sync section can drift from the actual v2 queue and RPC dispatch paths", "Readers may infer the removed legacy retry bridge still exists", "20 min — audit whenever sync behavior changes"),
     ("Reference drift", "docs/diagrams/02-database-schema.drawio predates canonical schema", "Still shows course_data JSONB blobs; current DB uses academics/identity/canonical schemas", "1-2 hr — redraw"),
-    ("Reference drift", "schema.sql auto-generated 2026-04-17", "May not match current DB after subsequent migrations", "Regenerate via Supabase CLI"),
+    ("Reference drift", "Documentation inventory workbook is manually generated from this script", "Workbook drifts whenever docs are added, renamed, or reclassified unless the script is updated and rerun", "15–30 min for each inventory refresh"),
     ("Feature coverage", "curriculum_data.js (994 KB) not documented", "Readers don't understand curriculum data model", "30 min — add section to ARCHITECTURE.md referencing _dev/build_curriculum_index.py"),
     ("Feature coverage", "Mobile platform-specific quirks undocumented", "iOS PWA cache / SW / home-screen install quirks live only in commit messages", "1 hr — write docs/MOBILE_PWA_NOTES.md"),
     ("Feature coverage", "Supabase migrations not in repo", "Only aggregated schema.sql; per-migration narrative is in Supabase dashboard only", "Export to supabase/migrations/ via CLI for future migrations"),
@@ -157,13 +173,14 @@ GAPS = [
 
 SUMMARY = [
     ("Category", "Count", "Notes"),
-    ("Top-level docs (present)", 5, "README, ACTION_PLAN, _headers, manifest.json, package.json (SETUP_INSTRUCTIONS merged into README)"),
+    ("Top-level docs (present)", 6, "README, CLAUDE.md, _headers, manifest.json, package.json, .env.example"),
     ("Build & CI configs", 5, "netlify.toml, vitest.config.js, playwright.config.js, ci.yml, build.sh"),
     ("Architecture + compliance docs", 4, "ARCHITECTURE, PIA, Retention, Breach (under-the-hood HTML removed)"),
+    ("Backend-design docs", 19, "HANDOFF, INSTRUCTIONS, TASKS, DECISIONS, pass docs, SQL mirrors, smoke tests, SMTP runbook"),
     ("Diagrams (draw.io / mmd)", 15, "10 numbered + 1 diagram-README + 4 lucidchart user-flow files"),
-    ("Superpowers plans + specs", 5, "2 plans + 1 design spec (active) + 2 shipped (Mar 29 2026)"),
+    ("Superpowers plans + specs", 3, "2 active plans + 1 shipped reconciliation plan"),
     ("Inline code file headers", 26, "shared, teacher, teacher-mobile, netlify, login, sw.js"),
-    ("Schema / DB docs", 1, "schema.sql only; per-migration files absent"),
+    ("Schema / DB docs", 6, "root schema mirror + backend-design schema/rls/read/write/smoke SQL docs"),
     ("Test infra docs", 2, "setup.js + helpers.js; no READMEs"),
     ("_dev/ internal docs + scripts", 7, "macOS Rulebook, Dashboard Audit, curriculum + server + xlsx scripts, BC curriculum JSONs"),
     ("GitHub metadata rows", 15, "repo settings + branches + missing templates"),
@@ -291,7 +308,7 @@ summ.column_dimensions["C"].width = 70
 # Sheet 4: Legend
 legend = wb.create_sheet("Legend")
 legend.append(["Item", "Meaning"])
-legend.append(["Audit date", "2026-04-18 (updated after docs-cleanup-redundant-stale branch)"])
+legend.append(["Audit date", "2026-04-21 (refreshed after main-branch reconciliation + docs sweep)"])
 legend.append(["Local checkout", "/Users/colinbrown/Documents/FullVision"])
 legend.append(["GitHub repo", "MrBrown85/FullVision (public, main branch)"])
 legend.append([])

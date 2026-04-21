@@ -338,5 +338,6 @@ Claude appends one line per completed task. Format: `YYYY-MM-DD | session-<n> | 
 - \`2026-04-21 | session-7 | main-consolidation | consolidated remaining useful branch-only work onto main, removed stale FullVision worktrees/branches, closed superseded PR #79, and confirmed main is the only active app branch.\`
 - \`2026-04-21 | session-7 | e2e-gradebook-reports | fixed approved gradebook + reports e2e mismatches (seedScores normalization + report-tab selectors) and re-ran targeted Playwright slice: 17 gradebook/reports tests + 1 score-entry helper test passing.\`
 - \`2026-04-21 | session-7 | handoff-refresh | removed stale pre-push / rebuild-v2 operational guidance from HANDOFF; current next work now lives in the backlog plans, not this completed phase queue.\`
+- \`2026-04-21 | session-7 | docs-sweep | refreshed CLAUDE.md, INSTRUCTIONS.md, TASKS.md, ARCHITECTURE.md, README.md, backlog P2.4, and regenerated fullvision-documentation-inventory.xlsx to remove stale rebuild-v2 / missing-file / inventory references. decisions.html + spec-vs-ui-diff remain separate follow-up docs.\`
 
 _(next session, keep appending.)_

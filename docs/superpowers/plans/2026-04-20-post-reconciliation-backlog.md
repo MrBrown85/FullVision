@@ -59,8 +59,8 @@
 
 ### P2.4 · Regenerate `write-paths.sql` and `read-paths.sql` from live DB
 
-- [ ] 17 live-only RPCs drifted during Phases 4.9 + 5.x (see HANDOFF Discovered gaps 2026-04-20 Phase 2.2 diff). Live database is correct; only the design-artifact mirrors are behind.
-- Low-urgency cosmetic fix; blocks no functional work.
+- [x] Resolved during the Phase 5 gap-fill / reconciliation merge. The previously missing 2026-04-19/20 RPCs are now mirrored in `docs/backend-design/read-paths.sql` and `docs/backend-design/write-paths.sql`.
+- Keep this entry as a historical note only; no current action required unless new drift appears.
 
 ### P2.5 · Wire `saveRubrics` UI → `window.v2.upsertRubric`
 
@@ -74,7 +74,7 @@
 
 ### P3.1 · Freeze `Date.now` in the mobile-components test suite
 
-- [x] *Shipped 2026-04-20 via commit `145686d`* — wrapped the `dateGroupLabel` describe blocks and the multi-group `renders multiple date groups correctly` test with `vi.useFakeTimers()` + `vi.setSystemTime(new Date('2026-04-20T12:00:00Z'))` + `vi.useRealTimers()` in afterEach / finally. Full suite now 805/805 green (previously 800 + 5 flakes). Root cause was `dateGroupLabel` parsing YYYY-MM-DD as local midnight while fixtures computed today via UTC `.toISOString()`.
+- [x] _Shipped 2026-04-20 via commit `145686d`_ — wrapped the `dateGroupLabel` describe blocks and the multi-group `renders multiple date groups correctly` test with `vi.useFakeTimers()` + `vi.setSystemTime(new Date('2026-04-20T12:00:00Z'))` + `vi.useRealTimers()` in afterEach / finally. Full suite now 805/805 green (previously 800 + 5 flakes). Root cause was `dateGroupLabel` parsing YYYY-MM-DD as local midnight while fixtures computed today via UTC `.toISOString()`.
 
 ### P3.2 · Regenerate `docs/backend-design/decisions.html`
 
@@ -88,7 +88,7 @@
 
 ### P3.4 · Fix Playwright e2e webServer to serve the built `dist/` with credentials injected
 
-- [x] *Shipped 2026-04-20 via commit TBD.* Added `scripts/build-e2e.sh` (wraps `build.sh`, then sed-substitutes `__SUPABASE_URL__` / `__SUPABASE_KEY__` with syntactically-valid dummies) + `npm run build:e2e` script. Updated `playwright.config.js` webServer command to `npm run build:e2e && npx serve dist -l 8347` with 60s timeout. Result: went from 0 passing → **123 passing / 18 failing / 1 skipped** out of 142. The remaining 18 are content-mismatch (not infrastructure) and tracked under P3.5.
+- [x] _Shipped 2026-04-20 via commit TBD._ Added `scripts/build-e2e.sh` (wraps `build.sh`, then sed-substitutes `__SUPABASE_URL__` / `__SUPABASE_KEY__` with syntactically-valid dummies) + `npm run build:e2e` script. Updated `playwright.config.js` webServer command to `npm run build:e2e && npx serve dist -l 8347` with 60s timeout. Result: went from 0 passing → **123 passing / 18 failing / 1 skipped** out of 142. The remaining 18 are content-mismatch (not infrastructure) and tracked under P3.5.
 
 ### P3.5 · Reconcile 18 remaining e2e failures against post-merge UI
 

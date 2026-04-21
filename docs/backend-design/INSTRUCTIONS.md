@@ -1,6 +1,6 @@
 # FullVision Backend Rebuild — Implementation Instructions
 
-Authoritative instruction set for the FullVision v2 rebuild. Derived from 49 finalized decisions (see `DECISIONS.md` for the answer-by-answer log). This document is **self-contained** — fresh implementation sessions can act from this file alone without prior conversation context.
+Authoritative design-level instruction set for the FullVision v2 rebuild. Derived from 49 finalized decisions (see `DECISIONS.md` for the answer-by-answer log). This document remains the source of truth for scope, content strings, and UX intent, while current operational state lives in `HANDOFF.md` and the backlog plans.
 
 If anything in this file contradicts the other design docs (`erd.md`, `write-paths.md`, `auth-lifecycle.md`, `read-paths.md`, `spec-vs-ui-diff.md`, `offline-sync.md`), **this file is the later decision and wins**.
 
@@ -23,8 +23,8 @@ If anything in this file contradicts the other design docs (`erd.md`, `write-pat
 ## 1. Architecture stack (fixed)
 
 - **Database + Auth + API:** Supabase full stack (Postgres, Supabase Auth, RLS, PostgREST/RPC). Do not switch stacks mid-implementation.
-- **Project:** Fresh Supabase project named `fullvision-v2`. The legacy project stays read-only.
-- **Repo:** Same GitHub repo (`MrBrown85/FullVision`). Old `main` is tagged `legacy-v1`. Rebuild branch is `rebuild-v2`. When the rebuild is complete, it becomes the new `main`.
+- **Project:** Live Supabase project is `gradebook-prod` (`novsfeqjhbleyyaztmlh`). The earlier fresh-project `fullvision-v2` plan was superseded during implementation.
+- **Repo:** Same GitHub repo (`MrBrown85/FullVision`). `legacy-v1` remains a historical tag; `main` is now the active implementation branch.
 - **Primary domain:** `fullvision.ca`. Netlify deploy URL (`fullvision.netlify.com`) stays as a fallback.
 - **Custom SMTP sender:** `noreply@fullvision.ca` via Supabase Auth (configure SPF + DKIM + DMARC DNS).
 - **CI/CD:** Netlify auto-deploys on git push. Preview deploys per PR branch.
@@ -39,44 +39,44 @@ This is the part that differs most from the old app. Implement exactly as listed
 
 ### 2.1 UI to ADD
 
-| # | UI feature | Where | Notes |
-|---|---|---|---|
-| U1 | **Category management** | Course settings (inline row UX, clones Modules-panel pattern) | Add / rename / weight / reorder / delete `Category` rows. Per-course. **Not added to the class-creation wizard** — teachers set up categories post-create in Course Settings. Weights are percentages; UI displays running sum "85 / 100 %" in `var(--text-2)` when ≤100, `var(--priority)` when >100. Save disabled while sum > 100. No hard-clamp on keystroke. |
-| U2 | **`grading_system` toggle** | Course settings | 3-way: `proficiency` / `letter` / `both`. Default seeded by grade level: 8–9 → proficiency, 10–12 → letter. Always visible so teacher can override. **If teacher picks letter/both without any Categories, block with inline prompt: "Create a category first →".** |
-| U3 | **Per-criterion weight input** | Rubric editor | New numeric input per criterion row. Default 1.0. Normalized across the rubric at read time. |
-| U4 | **Per-level value inputs** | Rubric editor | Four numeric inputs per criterion (`level_1_value` through `level_4_value`). Defaults 1/2/3/4. Teacher-adjustable (matches Teams/Schoology flexibility). |
-| U5 | **"N unsynced" badge** | Top-right user avatar | Shows count of pending writes in offline queue. Queue module lives at `shared/offline-queue.js` on `rebuild-v2`. |
-| U6 | **Sync status panel** | Accessible from user menu | Shows queue size, last-sync time, dead-letter list. Dead-letter entries the user can dismiss individually. |
-| U7 | **Offline banner** | Top of app | Appears when `navigator.onLine === false`. Small strip, non-blocking. |
-| U8 | **Session-expired modal with draft preservation** | Only on term-rating narrative editor + observation capture | On 401 after 30min idle, show modal that re-prompts password WITHOUT destroying the form state. Other surfaces use the existing toast + redirect pattern. |
-| U9 | **Course `timezone` setting** | Course settings | IANA tz string picker. Defaults to browser TZ on create. All dates in that course render in this TZ. |
-| U10 | **Welcome Class** | Auto-seeded on first verified sign-in | Same content as demo seed. Teacher lands in a populated gradebook, not an empty state. They can delete it anytime. |
-| U11 | **Delete-account 30-day grace notice** | Delete-account confirmation dialog | Copy: "Your account will be deleted in 30 days. Sign in within 30 days to cancel." |
-| U12 | **Restore-account prompt** | Sign-in flow | If a teacher signs in during their 30-day grace window, detect `Teacher.deleted_at IS NOT NULL` and prompt: "Your account is scheduled for deletion. Restore it?" |
-| U13 | **Data export** | Settings + delete-account flow | "Download all my data (JSON)" button in settings. Same export offered inside the delete-account dialog before destructive confirmation. |
+| #   | UI feature                                        | Where                                                         | Notes                                                                                                                                                                                                                                                                                                                                                             |
+| --- | ------------------------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| U1  | **Category management**                           | Course settings (inline row UX, clones Modules-panel pattern) | Add / rename / weight / reorder / delete `Category` rows. Per-course. **Not added to the class-creation wizard** — teachers set up categories post-create in Course Settings. Weights are percentages; UI displays running sum "85 / 100 %" in `var(--text-2)` when ≤100, `var(--priority)` when >100. Save disabled while sum > 100. No hard-clamp on keystroke. |
+| U2  | **`grading_system` toggle**                       | Course settings                                               | 3-way: `proficiency` / `letter` / `both`. Default seeded by grade level: 8–9 → proficiency, 10–12 → letter. Always visible so teacher can override. **If teacher picks letter/both without any Categories, block with inline prompt: "Create a category first →".**                                                                                               |
+| U3  | **Per-criterion weight input**                    | Rubric editor                                                 | New numeric input per criterion row. Default 1.0. Normalized across the rubric at read time.                                                                                                                                                                                                                                                                      |
+| U4  | **Per-level value inputs**                        | Rubric editor                                                 | Four numeric inputs per criterion (`level_1_value` through `level_4_value`). Defaults 1/2/3/4. Teacher-adjustable (matches Teams/Schoology flexibility).                                                                                                                                                                                                          |
+| U5  | **"N unsynced" badge**                            | Top-right user avatar                                         | Shows count of pending writes in offline queue. Queue module lives at `shared/offline-queue.js` on `main`.                                                                                                                                                                                                                                                        |
+| U6  | **Sync status panel**                             | Accessible from user menu                                     | Shows queue size, last-sync time, dead-letter list. Dead-letter entries the user can dismiss individually.                                                                                                                                                                                                                                                        |
+| U7  | **Offline banner**                                | Top of app                                                    | Appears when `navigator.onLine === false`. Small strip, non-blocking.                                                                                                                                                                                                                                                                                             |
+| U8  | **Session-expired modal with draft preservation** | Only on term-rating narrative editor + observation capture    | On 401 after 30min idle, show modal that re-prompts password WITHOUT destroying the form state. Other surfaces use the existing toast + redirect pattern.                                                                                                                                                                                                         |
+| U9  | **Course `timezone` setting**                     | Course settings                                               | IANA tz string picker. Defaults to browser TZ on create. All dates in that course render in this TZ.                                                                                                                                                                                                                                                              |
+| U10 | **Welcome Class**                                 | Auto-seeded on first verified sign-in                         | Same content as demo seed. Teacher lands in a populated gradebook, not an empty state. They can delete it anytime.                                                                                                                                                                                                                                                |
+| U11 | **Delete-account 30-day grace notice**            | Delete-account confirmation dialog                            | Copy: "Your account will be deleted in 30 days. Sign in within 30 days to cancel."                                                                                                                                                                                                                                                                                |
+| U12 | **Restore-account prompt**                        | Sign-in flow                                                  | If a teacher signs in during their 30-day grace window, detect `Teacher.deleted_at IS NOT NULL` and prompt: "Your account is scheduled for deletion. Restore it?"                                                                                                                                                                                                 |
+| U13 | **Data export**                                   | Settings + delete-account flow                                | "Download all my data (JSON)" button in settings. Same export offered inside the delete-account dialog before destructive confirmation.                                                                                                                                                                                                                           |
 
 ### 2.2 UI to REMOVE (legacy controls that are now dead)
 
-| # | Remove | Reason |
-|---|---|---|
-| U14 | **Grading scale inputs** (labels, min boundaries, reset button) | Scale is hardcoded app-wide. BC-region Q→%→letter map is fixed. Controls have nothing to persist to. |
-| U15 | **Summative/formative toggle** on assessment form | Replaced by a Category dropdown populated from the course's Categories. |
-| U16 | **"Category weights enabled" checkbox + "Summative %" slider** | Replaced by the dedicated Category management panel (U1). |
-| U17 | **Term-rating narrative "Auto-generate" button** | Feature is deferred to a separate workstream in another repo. Hide the button in v1. Do NOT wire it to a placeholder or "coming soon" modal — just hide. |
+| #   | Remove                                                          | Reason                                                                                                                                                   |
+| --- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| U14 | **Grading scale inputs** (labels, min boundaries, reset button) | Scale is hardcoded app-wide. BC-region Q→%→letter map is fixed. Controls have nothing to persist to.                                                     |
+| U15 | **Summative/formative toggle** on assessment form               | Replaced by a Category dropdown populated from the course's Categories.                                                                                  |
+| U16 | **"Category weights enabled" checkbox + "Summative %" slider**  | Replaced by the dedicated Category management panel (U1).                                                                                                |
+| U17 | **Term-rating narrative "Auto-generate" button**                | Feature is deferred to a separate workstream in another repo. Hide the button in v1. Do NOT wire it to a placeholder or "coming soon" modal — just hide. |
 
 ### 2.3 UI to MODIFY
 
-| # | UI | Change |
-|---|---|---|
-| U18 | **Assignment status pills** | Already exist as `NS / EXC / LATE`. **Keep the labels as-is.** Do NOT rename `NS` to `Missing`. Wire each to the backend: `NS` counts as 0 in calcs; `EXC` excludes from calcs; `LATE` is informational (surfaces in reports as "N late this term"). |
-| U19 | **Term-rating dimension editor** | Currently pre-fills with zeros. Change to pre-fill with `round(section_proficiency)` computed from the student's current section-level proficiency at editor load time. Teacher can override. |
-| U20 | **Gradebook cell display** | Round to 1 decimal for both proficiency (`2.7`) and percentage (`78.6%`). Don't show whole numbers only for percentage. |
-| U21 | **Gradebook Tab key** | Moves focus RIGHT (next assignment, same student). Standard spreadsheet behavior. |
-| U22 | **Student profile** | Render data from the active course Enrollment only. Do NOT aggregate observations/notes/goals across prior courses the student was in. |
-| U23 | **"At-risk" list on class dashboard** | Apply fixed threshold: student is at-risk if `overall_proficiency < 2.0` OR letter `R < 60%`. No teacher-configurable threshold UI in v1. |
-| U24 | **Delete-account dialog** | Require password re-entry. Backend calls Supabase `reauthenticate` before proceeding with soft-delete. |
-| U25 | **Session-expiry** (default surfaces) | Existing toast + redirect pattern is fine for most surfaces. Only the two long-form surfaces in U8 get the modal upgrade. |
-| U26 | **Email-verification screen** | May already exist (check `login-auth.js` and Supabase Auth flow). If it does, leave it. If not, add a simple "check your email" screen post-sign-up. |
+| #   | UI                                    | Change                                                                                                                                                                                                                                               |
+| --- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| U18 | **Assignment status pills**           | Already exist as `NS / EXC / LATE`. **Keep the labels as-is.** Do NOT rename `NS` to `Missing`. Wire each to the backend: `NS` counts as 0 in calcs; `EXC` excludes from calcs; `LATE` is informational (surfaces in reports as "N late this term"). |
+| U19 | **Term-rating dimension editor**      | Currently pre-fills with zeros. Change to pre-fill with `round(section_proficiency)` computed from the student's current section-level proficiency at editor load time. Teacher can override.                                                        |
+| U20 | **Gradebook cell display**            | Round to 1 decimal for both proficiency (`2.7`) and percentage (`78.6%`). Don't show whole numbers only for percentage.                                                                                                                              |
+| U21 | **Gradebook Tab key**                 | Moves focus RIGHT (next assignment, same student). Standard spreadsheet behavior.                                                                                                                                                                    |
+| U22 | **Student profile**                   | Render data from the active course Enrollment only. Do NOT aggregate observations/notes/goals across prior courses the student was in.                                                                                                               |
+| U23 | **"At-risk" list on class dashboard** | Apply fixed threshold: student is at-risk if `overall_proficiency < 2.0` OR letter `R < 60%`. No teacher-configurable threshold UI in v1.                                                                                                            |
+| U24 | **Delete-account dialog**             | Require password re-entry. Backend calls Supabase `reauthenticate` before proceeding with soft-delete.                                                                                                                                               |
+| U25 | **Session-expiry** (default surfaces) | Existing toast + redirect pattern is fine for most surfaces. Only the two long-form surfaces in U8 get the modal upgrade.                                                                                                                            |
+| U26 | **Email-verification screen**         | May already exist (check `login-auth.js` and Supabase Auth flow). If it does, leave it. If not, add a simple "check your email" screen post-sign-up.                                                                                                 |
 
 ### 2.4 UI to LEAVE ALONE
 
@@ -229,7 +229,7 @@ Implement these exactly. Wrong math silently changes grades.
 7. **Delete student** cascades all student-scoped rows (enrollments across all courses, scores, notes, goals, reflections, overrides, attendance, term ratings, observation links).
 8. **Delete account = soft-delete.** Set `Teacher.deleted_at = now()`. Data stays intact. A scheduled daily Supabase function hard-deletes teachers where `deleted_at < now() - interval '30 days'`.
 9. **Demo mode is entirely client-side.** No backend writes in demo mode. Demo data lives in localStorage, loaded from a bundled static seed JSON. "Reset demo data" = client-side wipe + reload of seed; do NOT write a backend `reset_demo` function.
-10. **Offline writes enqueue to `shared/offline-queue.js`** (already implemented on `rebuild-v2`). Every v2 RPC call has a matching `v2Queue.callOrEnqueue` path.
+10. **Offline writes enqueue to `shared/offline-queue.js`** (already implemented on `main`). Every v2 RPC call has a matching `v2Queue.callOrEnqueue` path.
 
 ---
 
@@ -338,7 +338,7 @@ Phase order — each phase builds on the previous:
 12. **Import flows** — CSV roster, Teams file, JSON, class-creation wizard. The existing wizard is untouched — no Category step added to it. Teachers set up Categories in Course Settings after the wizard finishes.
 13. **Report renderer** — the 10 blocks in §9.2, rendered from the `/api/report/{enrollment_id}` endpoint.
 14. **E2E tests** (Playwright) for: sign-up → verify → first sign-in shows Welcome Class; create course → create category → create assessment → score a student → view dashboard → view report; offline score entry → reconnect → verify sync; soft-delete account → sign-in within 30 days → restore.
-15. **Cutover:** tag `main` → `legacy-v1`, rename `rebuild-v2` → `main`, update Netlify to build from new main, move old site to `legacy.fullvision.ca`.
+15. **Post-cutover ops:** the rebuild already shipped to `main` on 2026-04-20. Remaining ops work is production hardening: quota recovery, SMTP verification, Sentry wiring, and any future legacy-site parking.
 
 ---
 
@@ -423,7 +423,7 @@ Keep both. Global semantic `--score-1..4` (red/orange/green/blue) stays on pills
 - **Answer-by-answer log:** `docs/backend-design/DECISIONS.md`
 - **This file:** `docs/backend-design/INSTRUCTIONS.md` (actionable summary)
 
-All of the above live on the `design/backend-v2` branch of `MrBrown85/FullVision`. Implementation work lives on `rebuild-v2` (same repo). Browse them rendered on GitHub or at <https://fullvision-decisions.netlify.app>.
+All of the above live in `docs/backend-design/` on `main`. A separate `design/backend-v2` worktree still exists for design archaeology, but implementation source of truth is the main repo branch.
 
 ---
 
