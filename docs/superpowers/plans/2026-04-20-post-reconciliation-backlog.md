@@ -61,9 +61,7 @@
 
 ### P3.1 · Freeze `Date.now` in the mobile-components test suite
 
-- [ ] 5 date-sensitive tests in `mobile-components.test.js` + `mobile-observe.test.js` flake around UTC-midnight rollover (`dateGroupLabel` expects "Today" / "Yesterday" / "This Week" / "Earlier" against fixed April 2026 fixtures).
-- Fix: either wrap each `describe` in `vi.useFakeTimers({ now: new Date('2026-04-20T12:00:00Z') })` or express the fixtures relative to the current day.
-- Unblocks green-by-default CI runs.
+- [x] *Shipped 2026-04-20 via commit `145686d`* — wrapped the `dateGroupLabel` describe blocks and the multi-group `renders multiple date groups correctly` test with `vi.useFakeTimers()` + `vi.setSystemTime(new Date('2026-04-20T12:00:00Z'))` + `vi.useRealTimers()` in afterEach / finally. Full suite now 805/805 green (previously 800 + 5 flakes). Root cause was `dateGroupLabel` parsing YYYY-MM-DD as local midnight while fixtures computed today via UTC `.toISOString()`.
 
 ### P3.2 · Regenerate `docs/backend-design/decisions.html`
 
