@@ -123,6 +123,51 @@ describe('_calcGroup', () => {
     });
   });
 
+  describe('average', () => {
+    it('returns the unweighted mean, rounded', () => {
+      // 2 + 3 + 4 = 9 / 3 = 3
+      expect(_calcGroup([s(2), s(3), s(4)], 'average', 0.65)).toBe(3);
+    });
+
+    it('returns the single score for one entry', () => {
+      expect(_calcGroup([s(4)], 'average', 0.65)).toBe(4);
+    });
+
+    it('rounds .5 to nearest integer', () => {
+      // (2+3) / 2 = 2.5 → rounds to 3 (JS Math.round)
+      expect(_calcGroup([s(2), s(3)], 'average', 0.65)).toBe(3);
+    });
+
+    it('respects per-assessment weights', () => {
+      // (2*3 + 4*1) / 4 = 10/4 = 2.5 → rounds to 3
+      const scores = [
+        { score: 2, date: '2025-01-01', assessmentId: 'heavy' },
+        { score: 4, date: '2025-02-01', assessmentId: 'light' },
+      ];
+      expect(_calcGroup(scores, 'average', 0.65, { heavy: 3, light: 1 })).toBe(3);
+    });
+  });
+
+  describe('median', () => {
+    it('returns the middle value for an odd-length list', () => {
+      expect(_calcGroup([s(1), s(3), s(4)], 'median', 0.65)).toBe(3);
+    });
+
+    it('averages the two middle values for an even-length list', () => {
+      // (2+4)/2 = 3
+      expect(_calcGroup([s(1), s(2), s(4), s(4)], 'median', 0.65)).toBe(3);
+    });
+
+    it('is insensitive to an unusually low outlier', () => {
+      // Mean of [1, 3, 4] = 2.67 but median = 3 (rewards typical performance)
+      expect(_calcGroup([s(1), s(3), s(4)], 'median', 0.65)).toBe(3);
+    });
+
+    it('returns the single score for one entry', () => {
+      expect(_calcGroup([s(2)], 'median', 0.65)).toBe(2);
+    });
+  });
+
   describe('decayingAvg', () => {
     it('returns the score for a single entry', () => {
       expect(_calcGroup([s(3)], 'decayingAvg', 0.65)).toBe(3);

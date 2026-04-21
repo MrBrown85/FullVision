@@ -101,6 +101,25 @@ function _calcGroup(scores, method, decayWeight, assessmentWeights) {
   switch (method) {
     case 'mostRecent': return valid[valid.length - 1].score;
     case 'highest': return Math.max(...valid.map(s => s.score)); // safe: valid.length > 0 guaranteed by guard on line 79
+    case 'average': {
+      // Weighted mean — every valid score contributes equally by default; per-assessment weights scale contributions.
+      let sum = 0, weightSum = 0;
+      valid.forEach(s => {
+        const w = (assessmentWeights && assessmentWeights[s.assessmentId]) || 1;
+        sum += s.score * w;
+        weightSum += w;
+      });
+      return weightSum > 0 ? Math.round(sum / weightSum) : 0;
+    }
+    case 'median': {
+      // Sorted-middle — robust against one unusually low/high score.
+      // Tie-break on even-length lists: take the higher of the two middles
+      // (matches the "cleanest-recent" spirit of FullVision's mode + decay semantics).
+      const sorted = valid.map(s => s.score).sort((a, b) => a - b);
+      const n = sorted.length;
+      if (n % 2 === 1) return sorted[(n - 1) / 2];
+      return Math.round((sorted[n / 2 - 1] + sorted[n / 2]) / 2);
+    }
     case 'mode': {
       const freq = {};
       valid.forEach(s => {

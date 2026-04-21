@@ -745,6 +745,9 @@ window.DashClassManager = (function() {
           '<button class="cm-seg-btn' + (gs==='both'?' active':'') + (hasCats?'':' cm-seg-btn-disabled') + '" role="radio" aria-checked="' + (gs==='both') + '" aria-disabled="' + (!hasCats) + '"' + (hasCats?'':' title="' + gradeLockReason + '"') + ' data-action="cmSetGradingSystem" data-value="both">Both</button>' +
         '</div>' +
         (hasCats ? '' : '<div class="cm-hint cm-seg-hint-locked">' + esc(gradeLockReason) + '</div>') +
+        // Contextual grading-system description — mirrors the Phoneox React
+        // pattern at src/components/courses/grading-config.tsx:56-70.
+        '<div class="cm-hint" style="margin-top:6px">' + _cmGradingSystemDescription(gs) + '</div>' +
       '</div>' +
       _cmRenderCategoriesField(cmSelectedCourse) +
       '<div class="cm-field">' +
@@ -752,6 +755,8 @@ window.DashClassManager = (function() {
         '<div class="cm-seg">' +
           '<button class="cm-seg-btn' + (method==='mostRecent'?' active':'') + '" data-action="cmSetCalcMethod" data-value="mostRecent">Most Recent</button>' +
           '<button class="cm-seg-btn' + (method==='highest'?' active':'') + '" data-action="cmSetCalcMethod" data-value="highest">Highest</button>' +
+          '<button class="cm-seg-btn' + (method==='average'?' active':'') + '" data-action="cmSetCalcMethod" data-value="average">Mean</button>' +
+          '<button class="cm-seg-btn' + (method==='median'?' active':'') + '" data-action="cmSetCalcMethod" data-value="median">Median</button>' +
           '<button class="cm-seg-btn' + (method==='mode'?' active':'') + '" data-action="cmSetCalcMethod" data-value="mode">Mode</button>' +
           '<button class="cm-seg-btn' + (method==='decayingAvg'?' active':'') + '" data-action="cmSetCalcMethod" data-value="decayingAvg">Decaying Avg</button>' +
         '</div>' +
@@ -767,6 +772,14 @@ window.DashClassManager = (function() {
           '<span class="cm-slider-label" id="cm-decay-val">' + Math.round(dw*100) + '%</span>' +
         '</div>' +
         '<div class="cm-hint">Higher values weight recent scores more heavily.</div>' +
+      '</div>' +
+      // Late Work Policy — free-text, optional. Copy adapted from Phoneox
+      // src/components/courses/grading-config.tsx:204-222. Surfaced on the
+      // Score Distribution section of printed progress reports when set.
+      '<div class="cm-field">' +
+        '<label class="cm-label" for="cm-late-policy">Late Work Policy</label>' +
+        '<textarea class="cm-textarea" id="cm-late-policy" rows="2" placeholder="e.g. Late assignments lose 10% per day, up to 3 days." data-action-blur="cmLateWorkPolicy" aria-label="Late work policy">' + esc(course.lateWorkPolicy || '') + '</textarea>' +
+        '<div class="cm-hint">Optional. If set, this text appears on the Score Distribution section of printed progress reports.</div>' +
       '</div>' +
       // T-UI-02 retired controls: the legacy "Category weights (summative vs
       // formative slider)" and "Report final grade as percentage" checkbox
@@ -1263,17 +1276,39 @@ window.DashClassManager = (function() {
   // `src/components/courses/grading-config.tsx:100-115`). Keep these two copies
   // in sync — changes to one should land in the other.
   function _cmCalcMethodDescription(method) {
+    // Mean / Median copy matches Phoneox src/components/courses/grading-config.tsx:107-109
+    // (Phoneox labels the value 'mean'; we persist 'average' to match the backend CHECK
+    // constraint — same concept, different internal string).
     var map = {
       mostRecent:
         'Only the latest score counts. If a student scores 2, then 3, then 4, their grade is 4. Earlier scores are ignored entirely. This is the BC standard for competency-based grading \u2014 it answers "where is the student now?" not "how did they do on average."',
       highest:
         'Only the best score counts. If a student scores 2, then 4, then 3, their grade is 4. This rewards students who demonstrate mastery at any point and removes the penalty for early struggles while learning new material.',
+      average:
+        'All scores are added up and divided equally. If a student scores 2, 3, and 4, their grade is 3. This is the traditional average \u2014 every assignment carries the same weight, so a low early score pulls the final grade down even after improvement.',
+      median:
+        'Scores are sorted and the middle value is used. If a student scores 1, 3, and 4, their grade is 3 (not 2.7 like the mean). This protects against one unusually low or high score skewing the result.',
       mode:
         'The most repeated score is used. If a student scores 3, 3, 4, and 2, their grade is 3 because it appeared most often. This reflects the level a student performs at most consistently, filtering out one-off results.',
       decayingAvg:
         'A weighted average where recent scores count more than older ones. If a student scores 2, then 3, then 4, the grade will be closer to 4 than a simple average. Use the slider below to control how much more recent work matters.',
     };
     return esc(map[method] || map.mostRecent);
+  }
+
+  // Grading-system descriptions — proficiency + letter copy adapted from
+  // Project Phoneox (grading-config.tsx:58-62). 'both' is original (FullVision
+  // v2-only; INSTRUCTIONS.md:15 states it runs both pipelines side by side).
+  function _cmGradingSystemDescription(gs) {
+    var map = {
+      proficiency:
+        'Students are scored on a 1\u20134 scale: 1 (Beginning), 2 (Developing), 3 (Proficient), 4 (Extending). This is the standard scale used across BC K\u201312 classrooms and aligns directly with BC report card requirements.',
+      letter:
+        'Students receive letter grades (A, B, C+, C, C\u2013, F) using BC Ministry of Education percentage cutoffs and conversion tables. All calculations follow the official BC grading scale, so report cards are generated correctly without manual conversion.',
+      both:
+        'Both pipelines run side by side: proficiency (1\u20134) drives the competency view and the dashboard overview; letter + percentage (derived from categories and the BC conversion tables) drive reports for grades 10\u201312. Useful when a teacher wants the competency lens day-to-day but the parent-facing report card still needs letter grades.',
+    };
+    return esc(map[gs] || map.proficiency);
   }
 
   // Does the course have at least one assessment Category (T-UI-12)?
@@ -2126,6 +2161,13 @@ window.DashClassManager = (function() {
     if (el.dataset.actionBlur === 'cmUpdateName') { cmUpdateField('name', el.value, el); return true; }
     if (el.dataset.actionBlur === 'cmUpdateGrade') { cmUpdateField('gradeLevel', el.value); return true; }
     if (el.dataset.actionBlur === 'cmUpdateDesc') { cmUpdateField('description', el.value); return true; }
+    // Late Work Policy — empty becomes null (matches Phoneox `value || null`
+    // pattern, so blanking the textarea clears the server-side column).
+    if (el.dataset.actionBlur === 'cmLateWorkPolicy') {
+      var _lp = (el.value || '').trim();
+      cmUpdateField('lateWorkPolicy', _lp || null);
+      return true;
+    }
     if (el.dataset.actionBlur === 'cmCatName') { cmCatName(parseInt(el.dataset.idx, 10), el.value); return true; }
     if (el.dataset.actionBlur === 'cmCatWeight') { cmCatWeight(parseInt(el.dataset.idx, 10), el.value); return true; }
     if (el.dataset.actionBlur === 'cmCompGroupName') { cmUpdateCompGroupName(el.dataset.grpid, el.value); return true; }
