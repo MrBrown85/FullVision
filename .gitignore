@@ -23,6 +23,7 @@ test-*.html
 
 # Local Netlify folder
 .netlify
+deno.lock
 
 # Playwright test artifacts (per-run state and failure screenshots)
 test-results/
