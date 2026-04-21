@@ -300,5 +300,6 @@ Claude appends one line per completed task. Format: `YYYY-MM-DD | session-<n> | 
 
 - `2026-04-20 | session-5 | 4.2-merge | reconciliation plan Phase 4 executed locally: git merge --no-ff rebuild-v2 into main (merge commit 2fbc6d7) + git merge --no-ff phase-5.2-complete (merge commit e563ef4, HANDOFF activity-log/gap conflict resolved additively). 2 stale canonical-RPC tests fixed post-merge (commit 8f99dee). Full suite 793 passing + 5 pre-existing date flakes (logged). Local only — push embargo remains.`
 - `2026-04-20 | session-5 | 4.3-action-plan | ACTION_PLAN.md already absent from main (deleted in earlier cleanup); no action required.`
+- `2026-04-20 | session-5 | 5.3-sweep | Phase 5 doc sweep complete (commit 01112cb): 11 reference docs footered (8 backend-design + 3 root); docs/ARCHITECTURE.md Data-layer table regenerated with v2 RPCs; DECISIONS.md Q50 (save_course_score hotfix rationale) + Q51 (--no-ff merge choice) added. Re-sync grep found only historical comments in shared/data.js explaining retired RPCs — no live code or current-state claims reference dead canonical names.`
 
 *(next session, keep appending.)*
