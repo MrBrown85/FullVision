@@ -56,16 +56,16 @@ You are continuing an ongoing rebuild. **Read this whole file before touching an
 
 ## Ground truth
 
-| Fact                                                    | Value                                                                                             |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| Supabase project ref                                    | `novsfeqjhbleyyaztmlh` (name: `gradebook-prod`, ca-central-1, Postgres 17)                        |
-| Org                                                     | `MrBrown85's Org` (`zvqlrjxkzxeidhrnqgny`)                                                        |
-| **Design worktree (this repo, read-only charter)**      | `/Users/colinbrown/Documents/fullvision-backend-design`                                           |
-| **Main FullVision repo (write target for client port)** | `/Users/colinbrown/Documents/FullVision`                                                          |
-| Legacy (reference-only)                                 | `/Users/colinbrown/Documents/Projects/FullVision -- Legacy`                                       |
-| Main repo active branch                                 | `main` (rebuild-v2 merged locally on 2026-04-20; see Activity log + reconciliation entries below) |
-| User has **no budget** for new Supabase projects        | Reuse `gradebook-prod`. Do NOT create new projects or paid resources.                             |
-| User owns domain                                        | `fullvision.ca` (+ `fullvision.netlify.com` fallback). DNS changes are user-only.                 |
+| Fact                                                    | Value                                                                             |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Supabase project ref                                    | `novsfeqjhbleyyaztmlh` (name: `gradebook-prod`, ca-central-1, Postgres 17)        |
+| Org                                                     | `MrBrown85's Org` (`zvqlrjxkzxeidhrnqgny`)                                        |
+| **Design worktree (this repo, read-only charter)**      | `/Users/colinbrown/Documents/fullvision-backend-design`                           |
+| **Main FullVision repo (write target for client port)** | `/Users/colinbrown/Documents/FullVision`                                          |
+| Legacy (reference-only)                                 | `/Users/colinbrown/Documents/Projects/FullVision -- Legacy`                       |
+| Main repo active branch                                 | `main` (rebuild-v2 merged and pushed; this is the only active app branch now)     |
+| User has **no budget** for new Supabase projects        | Reuse `gradebook-prod`. Do NOT create new projects or paid resources.             |
+| User owns domain                                        | `fullvision.ca` (+ `fullvision.netlify.com` fallback). DNS changes are user-only. |
 
 ### Reading order for first-time context load
 
@@ -80,17 +80,14 @@ You are continuing an ongoing rebuild. **Read this whole file before touching an
 
 ---
 
-## Working mode (as of 2026-04-19 evening)
+## Working mode (updated 2026-04-21)
 
-**Local-only until the user pushes.** The user is out of Netlify build credits and has asked that no further work be pushed to `origin` — every push triggers a Netlify deploy and burns minutes. Until the user explicitly says "push" again:
+`main` is the source of truth and has been pushed to `origin`. The old `rebuild-v2` / PR-75 / PR-76 / PR-79 branch choreography is historical only.
 
-- Do **not** run `git push` on any branch in the main FullVision repo.
-- Do **not** run `gh pr create` / `gh pr edit` / any command that changes remote state on GitHub.
-- Do **not** update PRs #75 or #76 from the CLI — they stay frozen at their last pushed commit.
-- Commits on `rebuild-v2` (and the design repo's `design/backend-v2`) are fine and expected — just keep them local.
-- Supabase migrations on `gradebook-prod` are unaffected (free tier, no Netlify involvement).
-
-The user plans to push early next week. When they do, the accumulated local commits on `rebuild-v2` will update PR #76 in one batch.
+- Default to local commits first; **push only when the user explicitly asks**.
+- Avoid reviving or targeting historical branches/PRs that were superseded by `main`.
+- Netlify still auto-deploys on push, and production is currently quota-blocked (`usage_exceeded`), so do not push speculatively just to "keep things synced."
+- Supabase migrations on `gradebook-prod` are still allowed when a task requires them and the Safety gates permit it.
 
 ## Safety gates (NEVER proceed without explicit user approval)
 
@@ -106,36 +103,43 @@ If the user said "yes" to one action in a past session, **do not** assume it ext
 
 ---
 
-## Current state (updated 2026-04-20)
+## Current state (updated 2026-04-21)
 
-Phases 1 → 5 of the queue are all checked.
+The rebuild/reconciliation work is complete and lives on `main`. The phase queue below is preserved as a historical record, not as the current execution driver.
 
 ### gradebook-prod (Supabase)
 
-- **Schema + RLS + read primitives:** all deployed. 39 tables, every one RLS-enabled with ≥1 policy. 25+ functions, `search_path = public` locked.
+- **Schema + RLS + function surface:** all deployed. 39 tables, every one RLS-enabled with ≥1 policy; live functions use `search_path = public`.
 - **Write-path RPCs:** every Pass B §1–§16 path is live. Write-paths.sql mirrors what's deployed.
-- **Read-path RPCs:** `get_gradebook`, `get_student_profile`, `list_teacher_courses` (+ 11 computation primitives from the design phase).
+- **Read-path RPCs:** live surface includes `list_teacher_courses`, `get_gradebook`, `get_student_profile`, `get_learning_map`, `get_class_dashboard`, `get_term_rating`, `get_observations`, `get_assessment_detail`, and `get_report` (+ computation helpers described in `read-paths.md` / `read-paths.sql`).
 - **Retention cron:** `fv_retention_cleanup_daily` (pg_cron, 03:17 UTC) — purges 30-day-stale soft-deleted teachers + >2yr audit rows.
 - **Advisors:** 0 security lints, 0 actionable performance lints.
 
-### Main FullVision repo (branch `rebuild-v2`, local-only past `e9f84ce`)
+### Main FullVision repo (branch `main`, pushed)
 
 - **`shared/supabase.js`** — audited clean (auth-only).
 - **`shared/data.js`** — boot path (`initAllCourses` / `_doInitData`) calls the v2 RPCs. `_canonicalCoursesToBlob`, `_v2GradebookToCache`, `_persistScoreToCanonical`, `_canonical{Enroll,UpdateStudent,UpdateEnrollment,Withdraw}`, `_canonicalCreate/Update/DeleteAssessment`, `_persistObservationCreate/Update/Delete` all routed to v2 RPCs. Legacy per-course RPC fan-out is unreachable (retained for reference).
 - **`window.v2.*` namespace** — 40+ thin RPC wrappers covering everything the backend exposes: course / category / module / rubric / subject / competency-group / section / tag CRUD + reorder; student + enrollment + roster + bulk pronouns + CSV import; assessment CRUD + collab; scoring (cell/tag/rubric/status/comment/fill/clear); observations + templates + custom tags; student-record writes + `getStudentProfile`; `saveTermRating`; ReportConfig + preferences + teacher-lifecycle; imports (CSV, Teams, JSON restore).
 - **`shared/offline-queue.js`** — `window.v2Queue` FIFO + dead-letter + 3-attempt backoff + auto-flush, wired into `teacher/app.html` and `teacher-mobile/index.html`.
+- **`scripts/dev-local.mjs` / `npm run dev:local`** — local signed-in dev flow now lives on `main`; no Netlify preview/build credits are needed for local verification.
 - **Feature flags** on `window`: `__V2_GRADEBOOK_READY` (default true), `__V2_WRITE_PATHS_READY` (false — legacy `gb-retry-queue` replay gated off until the bulk `_syncToSupabase` machinery is retired).
+- **GitHub state:** no open app PRs are required for the rebuild; stale gap-fill PR #79 was closed as superseded by `main`.
 
 ### Remaining work
 
-- **Demo-Mode + signed-in verification** of the Phase 3/4 ports (user-side, once the push embargo lifts).
-- Eventual retirement of the dormant legacy fan-out in `_doInitData` and the bulk `_syncToSupabase` block (cosmetic — unreachable today).
+- The active next-work lists are now:
+  - [`docs/superpowers/plans/2026-04-20-post-reconciliation-backlog.md`](../superpowers/plans/2026-04-20-post-reconciliation-backlog.md)
+  - [`docs/superpowers/plans/2026-04-21-ui-v1-feature-gap.md`](../superpowers/plans/2026-04-21-ui-v1-feature-gap.md)
+- Highest-signal unresolved items today: Netlify quota / `fullvision.ca` 503 (`P1.0`), leaked publishable key cleanup (`P1.1`), auth round-trip Playwright smoke (`P1.2`), and rubric persistence wiring `saveRubrics -> window.v2.upsertRubric` (`P2.5`).
+- The dormant legacy fan-out in `_doInitData` and the bulk `_syncToSupabase` block are now cleanup/backlog work, not blockers.
 
 ---
 
-## Active work queue
+## Historical work queue
 
-Check the top-most unchecked box; do that task; then update. **One task per session.**
+The queue below is complete and kept for archaeology. Do **not** treat it as the live next-task list anymore; use the backlog plans linked above instead.
+
+Any references below to `rebuild-v2`, "local only," or "pending Demo-Mode verification" are historical checkpoint notes from before the merge/push.
 
 ### Phase 1 — Pass B write-path RPCs (server-side, deploy to gradebook-prod)
 
@@ -331,5 +335,8 @@ Claude appends one line per completed task. Format: `YYYY-MM-DD | session-<n> | 
 - \`2026-04-21 | session-6 | T-UI-12-fix | cmHasCategories now only counts SAVED rows (server id AND non-empty name) — transient '+ Add category' rows no longer flip Letter/Both enabled prematurely. Commit 3665af5.\`
 - \`2026-04-21 | session-6 | calc-method-descriptions | added contextual 1-paragraph descriptions beneath the Calculation Method toggle (Phoneox port: grading-config.tsx:100-115). Commit 2293ada.\`
 - \`2026-04-21 | session-6 | calc+grading+late-policy | three additions to Grading & Calculation panel (Q10 + Q19 + Phoneox port): Mean + Median calc methods (shared/calc.js \_calcGroup 'average' and 'median' branches; internal value 'average' matches backend CHECK, label reads 'Mean'); contextual grading-system descriptions for proficiency/letter/both; Late Work Policy textarea persisting through existing course.lateWorkPolicy → update_course RPC with null-on-empty coercion. +8 calc-pure unit tests. 815/815 passing. Commit df7d131.\`
+- \`2026-04-21 | session-7 | main-consolidation | consolidated remaining useful branch-only work onto main, removed stale FullVision worktrees/branches, closed superseded PR #79, and confirmed main is the only active app branch.\`
+- \`2026-04-21 | session-7 | e2e-gradebook-reports | fixed approved gradebook + reports e2e mismatches (seedScores normalization + report-tab selectors) and re-ran targeted Playwright slice: 17 gradebook/reports tests + 1 score-entry helper test passing.\`
+- \`2026-04-21 | session-7 | handoff-refresh | removed stale pre-push / rebuild-v2 operational guidance from HANDOFF; current next work now lives in the backlog plans, not this completed phase queue.\`
 
 _(next session, keep appending.)_
