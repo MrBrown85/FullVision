@@ -179,11 +179,10 @@ function _initCrossTab() {
   _crossTabAlerted = false;
   try {
     _crossTabChannel = new BroadcastChannel('td-data-sync');
-    _crossTabChannel.onmessage = function (e) {
-      if (e.data && e.data.type === 'data-changed') {
-        _handleCrossTabChange(e.data.cid, e.data.field);
-      }
-    };
+    // v2: cross-tab reactions rely on the 'storage' event fallback (reload toast).
+    // The live remote refetch that used to run here was removed with the legacy
+    // public-schema tables it queried.
+    _crossTabChannel.onmessage = function () { /* no-op */ };
   } catch (e) {
     // BroadcastChannel not supported — fall back to storage event
   }
@@ -217,18 +216,6 @@ function _initCrossTab() {
   });
 }
 
-/* Re-fetch a single field from Supabase after cross-tab change, then re-render */
-async function _handleCrossTabChange(cid, field) {
-  if (!cid || !field) return;
-
-  // v2: the boot path seeds _cache from get_gradebook, and save helpers
-  // update it optimistically. Cross-tab reactions now rely on the 'storage'
-  // event fallback in _initCrossTab (which shows a "reload" toast) rather
-  // than a live remote refetch. The legacy refetch against dropped tables
-  // (public.scores / .observations / .assessments / .students / …) used to
-  // live here; it was removed when the v2 schema shipped.
-}
-
 function _broadcastChange(cid, field) {
   if (_crossTabChannel) {
     try {
@@ -240,170 +227,13 @@ function _broadcastChange(cid, field) {
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   Supabase sync helpers (fire-and-forget with coalescing)
+   Supabase sync helpers — removed in Phase 6.1 of the reconciliation plan.
+   The legacy bridge (_syncToSupabase / _doSync / _initRealtimeSync /
+   _refreshFromSupabase / _handleCrossTabChange / _deleteFromSupabase) wrote
+   to public-schema tables that were dropped by the v2 schema. Writes now
+   route through v2 RPC dispatch (window.v2.*) directly from the save paths;
+   offline queuing lives in window.v2Queue (shared/offline-queue.js).
    ══════════════════════════════════════════════════════════════════ */
-let _hadSyncError = false;
-let _retryQueue = []; // { table, key, data }
-let _retryTimer = null;
-let _lsQuotaWarned = false;
-let _beforeUnloadBound = false;
-let _retryCount = 0;
-let _consecutiveFailures = 0;
-const _MAX_RETRIES = 6;
-const _MAX_RETRY_QUEUE = 100;
-const _SYNC_TIMEOUT_MS = 30000; // 30s — bulk upserts of 2000+ rows need headroom on mobile
-
-/* Track in-flight and pending syncs per key to coalesce rapid saves */
-const _inflightSyncs = new Map(); // syncKey → true (currently in-flight)
-const _pendingWrites = new Map(); // syncKey → { table, key, data } (queued behind in-flight)
-
-function _hasDataChanged(a, b) {
-  return JSON.stringify(a) !== JSON.stringify(b);
-}
-
-// Lazily built sets for table lookups (avoids TDZ — constants declared later)
-var _cidKeyedTablesCache = null;
-function _getCidKeyedTables() {
-  if (!_cidKeyedTablesCache) _cidKeyedTablesCache = new Set(Object.values(_NORMALIZED_TABLES));
-  return _cidKeyedTablesCache;
-}
-var _configTableSetCache = null;
-function _getConfigTableSet() {
-  if (!_configTableSetCache) _configTableSetCache = new Set(Object.values(_CONFIG_TABLES));
-  return _configTableSetCache;
-}
-
-function _syncKey(table, key) {
-  if (table === 'scores_row') return 'scores_row:' + key.cid + ':' + key.sid + ':' + key.aid + ':' + key.tid;
-  if (table === 'obs_row') return 'obs_row:' + key.cid + ':' + key.obId;
-  if (table === 'obs_delete') return 'obs_delete:' + key.cid + ':' + key.obId;
-  if (_getCidKeyedTables().has(table)) return table + ':' + key.cid;
-  return table + ':' + key;
-}
-
-function _syncToSupabase(table, key, data) {
-  const sk = _syncKey(table, key);
-
-  // If a sync for this exact key is already in-flight, just update the pending data (latest wins)
-  // Snapshot data so later in-place mutations can't corrupt the queued write
-  if (_inflightSyncs.has(sk)) {
-    var pendingSnapshot =
-      typeof structuredClone === 'function' ? structuredClone(data) : JSON.parse(JSON.stringify(data));
-    _pendingWrites.set(sk, { table, key, data: pendingSnapshot });
-    return;
-  }
-
-  _inflightSyncs.set(sk, true);
-  _doSync(table, key, data)
-    .catch(err => console.error(`Sync error (${sk}):`, err))
-    .finally(() => {
-      _inflightSyncs.delete(sk);
-      // If a newer write arrived while we were in-flight, send it now
-      if (_pendingWrites.has(sk)) {
-        const next = _pendingWrites.get(sk);
-        _pendingWrites.delete(sk);
-        // Refresh echo guard so the queued sync's Realtime echoes are suppressed
-        if (next.key && next.key.cid) {
-          for (var _f in _NORMALIZED_TABLES) {
-            if (_NORMALIZED_TABLES[_f] === next.table) {
-              _setEchoGuard(_f, next.key.cid);
-              break;
-            }
-          }
-        }
-        _syncToSupabase(next.table, next.key, next.data);
-      }
-    });
-}
-
-async function _doSync(table, key, data) {
-  const sb = getSupabase();
-  if (!sb || !_teacherId) return;
-
-  // CANONICAL-RPC TRANSITION: the legacy public-schema tables this function writes to
-  // (scores, observations, assessments, students, teacher_config, config_*, etc.) were
-  // dropped by the April 3 canonical_schema_foundation migration. Until each table's
-  // sync path is rewritten to call its canonical RPC (save_course_score,
-  // create_observation, save_course_policy, save_learning_map, save_report_config, ...),
-  // run as localStorage-only and surface the offline state. localStorage writes happen
-  // separately in _saveCourseField — this only suppresses the failing remote writes.
-  _syncStatus = 'offline';
-  _updateSyncIndicator();
-  return;
-
-}
-
-/* Deduplicated, bounded retry queue — keeps only latest data per key */
-function _addToRetryQueue(table, key, data, skipPersist) {
-  const sk = _syncKey(table, key);
-  const idx = _retryQueue.findIndex(item => _syncKey(item.table, item.key) === sk);
-  if (idx !== -1) {
-    _retryQueue[idx] = { table, key, data };
-  } else {
-    _retryQueue.push({ table, key, data });
-  }
-  while (_retryQueue.length > _MAX_RETRY_QUEUE) {
-    _retryQueue.shift();
-  }
-  if (!skipPersist) _persistRetryQueue();
-}
-
-function _persistRetryQueue() {
-  _safeLSSet('gb-retry-queue', JSON.stringify(_retryQueue));
-}
-
-/* Process retry queue sequentially (not all at once) */
-async function _retryFailedSyncs() {
-  _retryTimer = null;
-  _retryCount++;
-  if (_retryCount > _MAX_RETRIES) {
-    // Don't drop the queue — keep it in localStorage so it can be retried
-    // on next page load or manual retry. Only reset counters.
-    console.error(
-      '[GUARD] Sync retry limit reached.',
-      _retryQueue.length,
-      'items preserved in localStorage for recovery. Call retrySyncs() to retry.',
-    );
-    _retryCount = 0;
-    _consecutiveFailures = 0;
-    if (typeof showSyncToast === 'function')
-      showSyncToast('Sync retries exhausted — data safe locally, will retry on reload', 'error');
-    return;
-  }
-  // Process one at a time to avoid hammering the server
-  const queue = _retryQueue.splice(0);
-  if (queue.length === 0) {
-    localStorage.removeItem('gb-retry-queue');
-    return;
-  }
-  for (let i = 0; i < queue.length; i++) {
-    try {
-      await _doSync(queue[i].table, queue[i].key, queue[i].data);
-    } catch (e) {
-      // _doSync already re-adds the failed item — re-add remaining unprocessed items
-      for (let j = i + 1; j < queue.length; j++) {
-        _addToRetryQueue(queue[j].table, queue[j].key, queue[j].data, true);
-      }
-      _persistRetryQueue();
-      break;
-    }
-  }
-}
-
-function retrySyncs() {
-  if (_retryQueue.length === 0) return;
-  clearTimeout(_retryTimer);
-  _retryCount = 0;
-  _consecutiveFailures = 0;
-  _retryFailedSyncs();
-}
-
-async function _deleteFromSupabase(table, key) {
-  // CANONICAL-RPC TRANSITION: legacy tables this would delete from don't exist.
-  // Course deletion is handled locally; canonical equivalent (when added) will
-  // call delete_course() / withdraw_enrollment() / delete_assessment() etc.
-  return;
-}
 
 /* ══════════════════════════════════════════════════════════════════
    Initialization — call once per page load (or on course switch)
@@ -502,56 +332,19 @@ async function initAllCourses() {
   COURSES = _cache.courses;
   if (!localStorage.getItem('gb-courses') && !_useSupabase) saveCourses(COURSES);
 
-  try {
-    // v2 TRANSITION (Phase 3.3): any queued retries are aimed at dropped
-    // legacy tables (scores/observations/assessments/students/teacher_config).
-    // Draining them would spam errors against v2. Discard until write paths
-    // are ported (Phases 3.5 + 4.x), at which point a fresh queue will form
-    // from live user actions.
-    if (!window.__V2_WRITE_PATHS_READY) {
-      localStorage.removeItem('gb-retry-queue');
-    } else {
-      var savedQueue = JSON.parse(localStorage.getItem('gb-retry-queue') || '[]').filter(function (item) {
-        return item && item.table && item.key;
-      });
-      if (savedQueue.length > 0 && _useSupabase) {
-        _retryQueue = savedQueue;
-        setTimeout(_retryFailedSyncs, 2000);
-      } else {
-        localStorage.removeItem('gb-retry-queue');
-      }
-    }
-  } catch (e) {
-    localStorage.removeItem('gb-retry-queue');
-  }
-
-  if (!_beforeUnloadBound) {
-    _beforeUnloadBound = true;
-    window.addEventListener('beforeunload', function () {
-      if (_retryQueue.length > 0) _persistRetryQueue();
-    });
-  }
+  // v2: the legacy gb-retry-queue (targeted dropped public-schema tables) is
+  // permanently discarded — replaced by window.v2Queue in Phase 4.10.
+  try { localStorage.removeItem('gb-retry-queue'); } catch (e) { /* ignore */ }
 
   // Start cross-tab conflict detection
   _initCrossTab();
 
-  // Subscribe to Supabase Realtime for cross-device sync (phone → laptop)
-  _initRealtimeSync();
+  // v2: Realtime / cross-device sync removed with the legacy public-schema
+  // tables. The canonical v2 schema has its own publication strategy to be
+  // designed (tracked in the post-reconciliation backlog).
 
   // Re-fetch from Supabase when user returns to this tab/app
   _initVisibilityRefresh();
-}
-
-var _realtimeChannel = null;
-function _initRealtimeSync() {
-  // CANONICAL-RPC TRANSITION: supabase_realtime publication was emptied by the
-  // April 17 zero_data_publication migration — none of the legacy public tables
-  // this function subscribed to (scores, observations, assessments, students,
-  // and the medium-frequency / config tables) emit postgres_changes events any
-  // more (they don't exist). Cross-device sync is out of scope until the
-  // canonical schema gets its own publication strategy. Cross-tab sync via
-  // BroadcastChannel still works (see _initCrossTab).
-  return;
 }
 
 /** Shared cache invalidation + re-render for both Realtime and visibility refresh */
@@ -587,22 +380,10 @@ var _lastVisibilityRefresh = 0;
 var _VISIBILITY_DEBOUNCE = 3000; // Don't re-fetch more than once per 3 seconds
 
 function _initVisibilityRefresh() {
-  document.addEventListener('visibilitychange', function () {
-    if (document.visibilityState !== 'visible') return;
-    var now = Date.now();
-    if (now - _lastVisibilityRefresh < _VISIBILITY_DEBOUNCE) return;
-    _lastVisibilityRefresh = now;
-    // _refreshFromSupabase handles re-establishing lost connections internally
-    _refreshFromSupabase();
-  });
-}
-
-async function _refreshFromSupabase() {
-  // CANONICAL-RPC TRANSITION: visibility-refresh path queries dropped legacy tables.
-  // Until the per-RPC reads land we no-op here; cache stays as last loaded from
-  // localStorage. Cross-device sync resumes once each canonical read RPC is wired up.
-  return;
-
+  // v2: visibility-refresh now lives in _doInitData (it re-runs get_gradebook
+  // when the active course is reloaded). The legacy per-table refetch was
+  // removed with the dropped public-schema tables.
+  var _ = _lastVisibilityRefresh; _ = _VISIBILITY_DEBOUNCE;  // reference to keep linter happy; vars preserved
 }
 
 /** Load all data for a specific course into the cache. */
@@ -1250,9 +1031,9 @@ function _healFromLocalBackup(cid, field, lsKey) {
     } else {
       _cache[field][cid] = lsRaw;
     }
-    // Re-sync to heal Supabase
-    _setEchoGuard(field, cid);
-    _syncToSupabase(_NORMALIZED_TABLES[field], { cid: cid }, _cache[field][cid]);
+    // v2: legacy bridge removed — cache restoration no longer triggers a
+    // remote re-sync. When the canonical v2 reads are fully wired end-to-end
+    // a targeted heal (get_gradebook re-fetch) can replace this path.
   }
 }
 
@@ -1294,11 +1075,10 @@ function _loadCourseFromLS(cid) {
 }
 
 function _seedCourseToSupabase(cid) {
-  for (const [field, normTable] of Object.entries(_NORMALIZED_TABLES)) {
-    const val = _cache[field][cid];
-    if (val === undefined || val === null) continue;
-    _syncToSupabase(normTable, { cid }, val);
-  }
+  // v2: legacy seeding to dropped public-schema tables removed in Phase 6.1.
+  // Course-wide seeding is now handled by v2 imports (import_json_restore,
+  // import_teams_class, import_roster_csv) called directly from the UI.
+  void cid;
 }
 
 function _defaultForField(field) {
@@ -1444,16 +1224,10 @@ const _NORMALIZED_TABLES = {
 function _saveCourseField(field, cid, value) {
   _cache[field][cid] = value;
   if (_PROF_FIELDS.includes(field) && typeof clearProfCache === 'function') clearProfCache();
-  // Always persist to localStorage as a safety net — the non-transactional
-  // DELETE+INSERT Supabase sync can lose data if INSERT fails after DELETE.
+  // Persist to localStorage (primary store in v2; remote writes happen through
+  // the dispatcher functions at each save site, not via this field-save path).
   var dataKey = _DATA_KEYS[field];
   if (dataKey) _safeLSSet('gb-' + dataKey + '-' + cid, JSON.stringify(value));
-  if (_useSupabase) {
-    _setEchoGuard(field, cid);
-    // Deep-clone so in-flight sync is immune to later in-place mutations
-    var snapshot = typeof structuredClone === 'function' ? structuredClone(value) : JSON.parse(JSON.stringify(value));
-    _syncToSupabase(_NORMALIZED_TABLES[field], { cid }, snapshot);
-  }
   _broadcastChange(cid, field);
 }
 
@@ -2301,11 +2075,9 @@ function loadCourses() {
 }
 function saveCourses(obj) {
   _cache.courses = obj;
-  if (_useSupabase) {
-    _syncToSupabase('teacher_config', 'courses', obj);
-  } else {
-    _safeLSSet('gb-courses', JSON.stringify(obj));
-  }
+  // v2: localStorage is the local mirror; remote course writes go through
+  // window.v2 helpers (createCourse / update_course / etc.) at each save site.
+  _safeLSSet('gb-courses', JSON.stringify(obj));
 }
 
 let COURSES = loadCourses();
@@ -2631,11 +2403,10 @@ function saveLearningMap(cid, map) {
 }
 function resetLearningMap(cid) {
   _cache.learningMaps[cid] = LEARNING_MAP[cid] || { subjects: [], sections: [] }; // ref change auto-busts tag/section caches
-  if (_useSupabase) {
-    _deleteFromSupabase('config_learning_maps', { cid });
-  } else {
-    localStorage.removeItem('gb-learningmap-' + cid);
-  }
+  // v2: local-only reset. The legacy config_learning_maps table was dropped;
+  // the structural learning-map RPCs (upsert_subject / delete_section / etc.)
+  // now live under window.v2.* and are called from the UI directly.
+  localStorage.removeItem('gb-learningmap-' + cid);
 }
 function ensureCustomLearningMap(cid) {
   // getLearningMap handles migration, so use it as the source
@@ -4396,8 +4167,8 @@ var _mobileRerender = null;
 window.GB = {
   getSyncStatus,
   getLastSyncedAt,
-  retrySyncs,
-  refreshFromSupabase: _refreshFromSupabase,
+  // retrySyncs + refreshFromSupabase removed in Phase 6.1; v2 offline path
+  // exposes `window.v2Queue.flush()` as the retry entry point.
   registerMobileRerender: function (fn) {
     _mobileRerender = fn;
   },
