@@ -286,5 +286,7 @@ Claude appends one line per completed task. Format: `YYYY-MM-DD | session-<n> | 
 - `2026-04-20 | session-5 | plan-3.1-m-verify | HANDOFF 4.9 verified: import dispatchers covered by tests/data-reportconfig-prefs-teacher-v2-dispatch.test.js imports-block added for 3.1-l. No additional tests needed.`
 - `2026-04-20 | session-5 | plan-3.1-n-verify | HANDOFF 4.10 verified: added tests/offline-queue.test.js (14 tests) covering enqueue, flush+dead-letter, stats, clear, callOrEnqueue (online/offline/network-error/validation/no-supabase). setTimeout faked to skip real backoff delays.`
 - `2026-04-20 | session-5 | plan-3.1-o-verify | HANDOFF 5.1 verified: added tests/demo-seed.test.js (10 tests) covering buildDemoSeedPayload Q43 counts + FK integrity + UUID shape + applyDemoSeed. Noted: categories live under \`_categories_preview\` pending import_json_restore inclusion.`
+- `2026-04-20 | session-5 | plan-3.1-p-verify | HANDOFF 5.3 verified: smoke-tests.sql 14 DO blocks present; Block 14 (RLS cross-tenant isolation) re-verified live against gradebook-prod via MCP — all assertions pass, cross-tenant reads rejected.`
+- `2026-04-20 | session-5 | phase-3-verify-complete | all 16 rebuild-v2 phases (HANDOFF 3.2–3.5, 4.1–4.10, 5.1, 5.3) verified via 111 new unit tests + DB smoke + signed-in browser round-trip. rebuild-v2 ready for Phase 4 merge to main.`
 
 *(next session, keep appending.)*
