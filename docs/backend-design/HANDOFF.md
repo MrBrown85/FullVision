@@ -283,5 +283,6 @@ Claude appends one line per completed task. Format: `YYYY-MM-DD | session-<n> | 
 - `2026-04-20 | session-5 | plan-3.1-j-verify | HANDOFF 4.6 verified: added tests/data-student-profile-v2-dispatch.test.js (13 tests) covering getStudentProfile, notes, goals, reflections, section overrides, bulk attendance. 757 total passing.`
 - `2026-04-20 | session-5 | plan-3.1-k-verify | HANDOFF 4.7 verified: added tests/data-term-rating-v2-dispatch.test.js (5 tests) covering saveTermRating camelCase→snake_case translation, partial-update omit semantics, empty-[] wipe, term Number coercion, dimension rating coercion.`
 - `2026-04-20 | session-5 | plan-3.1-l-verify | HANDOFF 4.8 verified: added tests/data-reportconfig-prefs-teacher-v2-dispatch.test.js (12 tests) covering report-config, teacher preferences, soft-delete/restore, and 3 import helpers (roster/Teams/JSON). 5 pre-existing mobile date flakes logged in Discovered gaps.`
+- `2026-04-20 | session-5 | plan-3.1-m-verify | HANDOFF 4.9 verified: import dispatchers covered by tests/data-reportconfig-prefs-teacher-v2-dispatch.test.js imports-block added for 3.1-l. No additional tests needed.`
 
 *(next session, keep appending.)*
