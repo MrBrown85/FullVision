@@ -2245,6 +2245,7 @@ function createCourse(data) {
     decayWeight: data.decayWeight || 0.65,
     description: data.description || '',
     gradeLevel: data.gradeLevel || '',
+    timezone: data.timezone || 'America/Vancouver',
   };
   COURSES[localId] = course;
   _safeLSSet('gb-courses', JSON.stringify(COURSES));
@@ -2266,6 +2267,7 @@ function createCourse(data) {
         p_grading_system: course.gradingSystem || 'proficiency',
         p_calc_method: course.calcMethod || 'average',
         p_decay_weight: course.decayWeight != null ? Number(course.decayWeight) : null,
+        p_timezone: course.timezone,
       }).then(function (res) {
         if (res.error) {
           console.warn('create_course RPC failed:', res.error);

@@ -355,7 +355,9 @@ the gradebook switch between proficiency and letter displays.
 
 ---
 
-### T-UI-03 · Course `timezone` picker in Course Settings
+### [DONE] T-UI-03 · Course `timezone` picker in Course Settings
+
+**Status:** Shipped 2026-04-22 with reduced scope per product decision: no picker UI, all new courses default to `America/Vancouver` (Pacific time). `shared/data.js:createCourse` now sets `timezone: 'America/Vancouver'` on the local object and passes `p_timezone` to `create_course` RPC. Picker can be added later if per-course timezones are needed.
 
 **Goal:** Add an IANA timezone picker in Course Settings.
 
