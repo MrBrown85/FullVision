@@ -1064,6 +1064,7 @@ function _v2GradebookToCache(cid, payload) {
   var assessments = (payload.assessments || []).map(function (a) {
     var maxPts = a.max_points != null ? Number(a.max_points) : null;
     var sMode = a.score_mode || 'proficiency';
+    var tIds = a.tag_ids || [];
     return {
       id: a.id,
       title: a.title || '',
@@ -1071,8 +1072,8 @@ function _v2GradebookToCache(cid, payload) {
       type: 'summative',
       categoryId: a.category_id || null,
       category_id: a.category_id || null,
-      tagIds: [],
-      tag_ids: [],
+      tagIds: tIds,
+      tag_ids: tIds,
       scoreMode: sMode,
       score_mode: sMode,
       maxPoints: maxPts,
