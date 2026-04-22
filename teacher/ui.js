@@ -103,7 +103,9 @@ function _humanizeEndpoint(endpoint) {
   return (endpoint || 'queued write')
     .replace(/^v2\./, '')
     .replace(/_/g, ' ')
-    .replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+    .replace(/\b\w/g, function (c) {
+      return c.toUpperCase();
+    });
 }
 
 function _renderSyncDeadEntry(entry) {
@@ -114,7 +116,7 @@ function _renderSyncDeadEntry(entry) {
       <div class="tb-sync-dead-title">${esc(label)}</div>
       <div class="tb-sync-dead-error">${esc(error)}</div>
     </div>
-    <button class="tb-sync-dead-dismiss" data-action="dismissSyncDeadLetter" data-id="${esc(entry && entry.id || '')}">Dismiss</button>
+    <button class="tb-sync-dead-dismiss" data-action="dismissSyncDeadLetter" data-id="${esc((entry && entry.id) || '')}">Dismiss</button>
   </div>`;
 }
 
@@ -199,7 +201,8 @@ function refreshSyncStatusUI() {
     var dotTitle = 'All changes saved';
     if (stats.deadLettered > 0) {
       dotStatus = 'error';
-      dotTitle = stats.deadLettered === 1 ? '1 sync item needs attention' : stats.deadLettered + ' sync items need attention';
+      dotTitle =
+        stats.deadLettered === 1 ? '1 sync item needs attention' : stats.deadLettered + ' sync items need attention';
     } else if (!stats.online && total > 0) {
       dotStatus = 'error';
       dotTitle = total === 1 ? 'Offline — 1 change queued' : 'Offline — ' + total + ' changes queued';
@@ -281,7 +284,14 @@ function _copySessionExpiredDraft() {
   var text = (_sessionExpiredCopyDraft() || '').trim();
   if (!text) return Promise.resolve(false);
   if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-    return navigator.clipboard.writeText(text).then(function () { return true; }, function () { return false; });
+    return navigator.clipboard.writeText(text).then(
+      function () {
+        return true;
+      },
+      function () {
+        return false;
+      },
+    );
   }
   return Promise.resolve(false);
 }
@@ -371,7 +381,7 @@ function queueSessionExpiredRetry(opts) {
       var retryKeys = Object.keys(_sessionExpiredRetries);
       for (var i = 0; i < retryKeys.length; i++) {
         var res = await _sessionExpiredRetries[retryKeys[i]]();
-        if (res && res.error) throw (res.error.sourceError || res.error);
+        if (res && res.error) throw res.error.sourceError || res.error;
       }
       _clearSessionExpiredState();
       overlay.remove();
@@ -954,7 +964,7 @@ async function softDeleteAccountWithPassword(typedEmail, password) {
   var currentUser = typeof getCurrentUser === 'function' ? await getCurrentUser() : null;
   var expectedEmail = ((currentUser && currentUser.email) || '').trim();
   if (!expectedEmail) throw new Error('Could not verify the current account email.');
-  if (((typedEmail || '').trim().toLowerCase()) !== expectedEmail.toLowerCase()) {
+  if ((typedEmail || '').trim().toLowerCase() !== expectedEmail.toLowerCase()) {
     throw new Error('Type your account email exactly to confirm deletion.');
   }
   if (!password) throw new Error('Enter your password to confirm deletion.');
@@ -973,7 +983,8 @@ async function showDeleteAccountDialog() {
   var currentUser = typeof getCurrentUser === 'function' ? await getCurrentUser() : null;
   var email = ((currentUser && currentUser.email) || '').trim();
   if (!email) {
-    if (typeof showSyncToast === 'function') showSyncToast('Could not load account details. Sign in again and retry.', 'error');
+    if (typeof showSyncToast === 'function')
+      showSyncToast('Could not load account details. Sign in again and retry.', 'error');
     return;
   }
 

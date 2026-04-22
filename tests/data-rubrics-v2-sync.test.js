@@ -26,7 +26,9 @@ function makeRubricSyncClient(options) {
   function makeQuery(table) {
     var filters = [];
     return {
-      select() { return this; },
+      select() {
+        return this;
+      },
       eq(column, value) {
         filters.push({ kind: 'eq', column: column, value: value });
         return this;
@@ -94,9 +96,7 @@ describe('rubric canonical sync', () => {
     var client = makeRubricSyncClient({
       upsertResults: [RUBRIC_ID],
       tableData: {
-        rubric: [
-          { id: RUBRIC_ID, course_id: CID, name: 'Writing', created_at: '2026-04-21T12:00:00Z' },
-        ],
+        rubric: [{ id: RUBRIC_ID, course_id: CID, name: 'Writing', created_at: '2026-04-21T12:00:00Z' }],
         criterion: [
           {
             id: CRITERION_ID,
@@ -114,9 +114,7 @@ describe('rubric canonical sync', () => {
             display_order: 0,
           },
         ],
-        criterion_tag: [
-          { criterion_id: CRITERION_ID, tag_id: TAG },
-        ],
+        criterion_tag: [{ criterion_id: CRITERION_ID, tag_id: TAG }],
       },
     });
 
@@ -146,7 +144,9 @@ describe('rubric canonical sync', () => {
     ]);
     await _assessmentSaveQueue[CID];
 
-    var upsertCall = client.calls.find(function (c) { return c.name === 'upsert_rubric'; });
+    var upsertCall = client.calls.find(function (c) {
+      return c.name === 'upsert_rubric';
+    });
     expect(upsertCall.payload.p_id).toBeNull();
     expect(upsertCall.payload.p_name).toBe('Writing');
     expect(upsertCall.payload.p_criteria[0]).toMatchObject({
@@ -163,7 +163,9 @@ describe('rubric canonical sync', () => {
     expect(getRubrics(CID)[0].criteria[0].levelValues).toEqual({ 4: 5 });
     expect(getAssessments(CID)[0].rubricId).toBe(RUBRIC_ID);
 
-    var assessmentUpdate = client.calls.find(function (c) { return c.name === 'update_assessment'; });
+    var assessmentUpdate = client.calls.find(function (c) {
+      return c.name === 'update_assessment';
+    });
     expect(assessmentUpdate.payload.p_id).toBe(AID);
     expect(assessmentUpdate.payload.p_patch.rubric_id).toBe(RUBRIC_ID);
   });
@@ -190,7 +192,9 @@ describe('rubric canonical sync', () => {
 
     var result = await saveRubrics(CID, []);
 
-    var deleteCall = client.calls.find(function (c) { return c.name === 'delete_rubric'; });
+    var deleteCall = client.calls.find(function (c) {
+      return c.name === 'delete_rubric';
+    });
     expect(deleteCall).toEqual({
       type: 'rpc',
       name: 'delete_rubric',

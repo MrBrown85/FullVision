@@ -39,9 +39,16 @@ describe('session-expired long-form guard', () => {
       return { session: { access_token: 'fresh-token' } };
     });
     window.UI.queueSessionExpiredRetry = vi.fn();
-    setLongFormAuthContext({ kind: 'term-rating', getDraftText() { return 'Draft'; } });
+    setLongFormAuthContext({
+      kind: 'term-rating',
+      getDraftText() {
+        return 'Draft';
+      },
+    });
 
-    var res = await window.v2.saveTermRating('11111111-1111-1111-1111-111111111111', 1, { narrativeHtml: '<p>Draft</p>' });
+    var res = await window.v2.saveTermRating('11111111-1111-1111-1111-111111111111', 1, {
+      narrativeHtml: '<p>Draft</p>',
+    });
 
     expect(globalThis.refreshSupabaseSession).toHaveBeenCalledTimes(1);
     expect(window.UI.queueSessionExpiredRetry).not.toHaveBeenCalled();
@@ -61,9 +68,16 @@ describe('session-expired long-form guard', () => {
       throw new Error('refresh failed');
     });
     window.UI.queueSessionExpiredRetry = vi.fn();
-    setLongFormAuthContext({ kind: 'term-rating', getDraftText() { return 'Half written narrative'; } });
+    setLongFormAuthContext({
+      kind: 'term-rating',
+      getDraftText() {
+        return 'Half written narrative';
+      },
+    });
 
-    var res = await window.v2.saveTermRating('11111111-1111-1111-1111-111111111111', 1, { narrativeHtml: '<p>Draft</p>' });
+    var res = await window.v2.saveTermRating('11111111-1111-1111-1111-111111111111', 1, {
+      narrativeHtml: '<p>Draft</p>',
+    });
 
     expect(window.UI.queueSessionExpiredRetry).toHaveBeenCalledTimes(1);
     expect(window.UI.queueSessionExpiredRetry.mock.calls[0][0].key).toContain('save_term_rating');
@@ -82,7 +96,12 @@ describe('session-expired long-form guard', () => {
     };
     globalThis.refreshSupabaseSession = vi.fn();
     window.UI.queueSessionExpiredRetry = vi.fn();
-    setLongFormAuthContext({ kind: 'observation-capture', getDraftText() { return 'Observation draft'; } });
+    setLongFormAuthContext({
+      kind: 'observation-capture',
+      getDraftText() {
+        return 'Observation draft';
+      },
+    });
     markLongFormSessionExpired();
 
     var res = await window.createObservationRich({

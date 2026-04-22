@@ -12,9 +12,7 @@ describe('esc', () => {
   });
 
   it('handles all dangerous characters together', () => {
-    expect(esc('<script>alert("xss")</script>')).toBe(
-      '&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;'
-    );
+    expect(esc('<script>alert("xss")</script>')).toBe('&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;');
   });
 
   it('returns empty string for null/undefined', () => {
@@ -87,7 +85,10 @@ describe('migrateStudent', () => {
 
   it('preserves already-migrated students including sortName', () => {
     const modern = {
-      firstName: 'Jane', lastName: 'Doe', sortName: 'Doe Jane', designations: ['G']
+      firstName: 'Jane',
+      lastName: 'Doe',
+      sortName: 'Doe Jane',
+      designations: ['G'],
     };
     const result = migrateStudent(modern);
     expect(result.firstName).toBe('Jane');

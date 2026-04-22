@@ -1030,16 +1030,18 @@ function _canonicalFlagsToBlob(rows, enrollmentByStudentId) {
        row_summaries: { enrollment_id → {letter, overall_proficiency, counts} } } */
 function _v2GradebookToCache(cid, payload) {
   payload = payload || {};
-  var categories = (payload.categories || []).map(function (c) {
-    return {
-      id: c.id,
-      name: c.name || '',
-      weight: Number(c.weight || 0),
-      displayOrder: Number(c.display_order || c.displayOrder || 0),
-    };
-  }).sort(function (a, b) {
-    return a.displayOrder - b.displayOrder;
-  });
+  var categories = (payload.categories || [])
+    .map(function (c) {
+      return {
+        id: c.id,
+        name: c.name || '',
+        weight: Number(c.weight || 0),
+        displayOrder: Number(c.display_order || c.displayOrder || 0),
+      };
+    })
+    .sort(function (a, b) {
+      return a.displayOrder - b.displayOrder;
+    });
   var students = (payload.students || []).map(function (s) {
     return migrateStudent({
       id: s.enrollment_id,
@@ -2661,13 +2663,18 @@ function _rubricCriteriaPayload(rubric) {
       level2Descriptor: levels[2] || levels['2'] || '',
       level1Descriptor: levels[1] || levels['1'] || '',
       weight: crit && crit.weight != null && !isNaN(Number(crit.weight)) ? Number(crit.weight) : 1,
-      displayOrder: crit && crit.displayOrder != null && !isNaN(Number(crit.displayOrder)) ? Number(crit.displayOrder) : idx,
+      displayOrder:
+        crit && crit.displayOrder != null && !isNaN(Number(crit.displayOrder)) ? Number(crit.displayOrder) : idx,
       linkedTagIds: crit && crit.tagIds ? crit.tagIds : [],
     };
-    if (levelValues[4] != null || levelValues['4'] != null) payload.level4Value = Number(levelValues[4] != null ? levelValues[4] : levelValues['4']);
-    if (levelValues[3] != null || levelValues['3'] != null) payload.level3Value = Number(levelValues[3] != null ? levelValues[3] : levelValues['3']);
-    if (levelValues[2] != null || levelValues['2'] != null) payload.level2Value = Number(levelValues[2] != null ? levelValues[2] : levelValues['2']);
-    if (levelValues[1] != null || levelValues['1'] != null) payload.level1Value = Number(levelValues[1] != null ? levelValues[1] : levelValues['1']);
+    if (levelValues[4] != null || levelValues['4'] != null)
+      payload.level4Value = Number(levelValues[4] != null ? levelValues[4] : levelValues['4']);
+    if (levelValues[3] != null || levelValues['3'] != null)
+      payload.level3Value = Number(levelValues[3] != null ? levelValues[3] : levelValues['3']);
+    if (levelValues[2] != null || levelValues['2'] != null)
+      payload.level2Value = Number(levelValues[2] != null ? levelValues[2] : levelValues['2']);
+    if (levelValues[1] != null || levelValues['1'] != null)
+      payload.level1Value = Number(levelValues[1] != null ? levelValues[1] : levelValues['1']);
     if (crit && _isUuid(crit.id)) payload.id = crit.id;
     return payload;
   });
@@ -2787,7 +2794,7 @@ function _reconcileCanonicalRubrics(localArr, canonicalArr, idMap) {
           candidate &&
           !used[candidate.id] &&
           _rubricName(candidate) === _rubricName(rubric) &&
-          (candidate.criteria || []).length === ((rubric.criteria || []).length)
+          (candidate.criteria || []).length === (rubric.criteria || []).length
         );
       });
       if (matches.length === 1) canonical = matches[0];
@@ -2820,48 +2827,50 @@ function _patchAssessmentRubricIds(cid, idMap) {
 }
 function _persistRubricsToCanonical(cid, prev, arr) {
   var tail = _rubricSaveQueue[cid] || Promise.resolve({ rubrics: arr || [], idMap: {} });
-  var next = tail.then(async function () {
-    var target = Array.isArray(arr) ? arr : [];
-    var previous = Array.isArray(prev) ? prev : [];
-    var idMap = {};
-    var keptCanonicalIds = {};
+  var next = tail
+    .then(async function () {
+      var target = Array.isArray(arr) ? arr : [];
+      var previous = Array.isArray(prev) ? prev : [];
+      var idMap = {};
+      var keptCanonicalIds = {};
 
-    for (var i = 0; i < target.length; i++) {
-      var rubric = target[i];
-      if (!rubric) continue;
-      var res = await window.v2.upsertRubric({
-        id: rubric.id,
-        courseId: cid,
-        name: _rubricName(rubric),
-        criteria: _rubricCriteriaPayload(rubric),
-      });
-      if (res && res.error) throw res.error;
-      var canonicalId = res && res.data ? res.data : _isUuid(rubric.id) ? rubric.id : null;
-      if (canonicalId) {
-        keptCanonicalIds[canonicalId] = true;
-        if (rubric.id && rubric.id !== canonicalId) idMap[rubric.id] = canonicalId;
+      for (var i = 0; i < target.length; i++) {
+        var rubric = target[i];
+        if (!rubric) continue;
+        var res = await window.v2.upsertRubric({
+          id: rubric.id,
+          courseId: cid,
+          name: _rubricName(rubric),
+          criteria: _rubricCriteriaPayload(rubric),
+        });
+        if (res && res.error) throw res.error;
+        var canonicalId = res && res.data ? res.data : _isUuid(rubric.id) ? rubric.id : null;
+        if (canonicalId) {
+          keptCanonicalIds[canonicalId] = true;
+          if (rubric.id && rubric.id !== canonicalId) idMap[rubric.id] = canonicalId;
+        }
       }
-    }
 
-    for (var j = 0; j < previous.length; j++) {
-      var oldRubric = previous[j];
-      if (!oldRubric || !_isUuid(oldRubric.id) || keptCanonicalIds[oldRubric.id]) continue;
-      var deleteRes = await window.v2.deleteRubric(oldRubric.id);
-      if (deleteRes && deleteRes.error) throw deleteRes.error;
-    }
+      for (var j = 0; j < previous.length; j++) {
+        var oldRubric = previous[j];
+        if (!oldRubric || !_isUuid(oldRubric.id) || keptCanonicalIds[oldRubric.id]) continue;
+        var deleteRes = await window.v2.deleteRubric(oldRubric.id);
+        if (deleteRes && deleteRes.error) throw deleteRes.error;
+      }
 
-    var canonicalArr = await _loadCanonicalRubrics(cid);
-    var reconciled = _reconcileCanonicalRubrics(target, canonicalArr, idMap);
-    _saveCourseField('rubrics', cid, reconciled);
-    _patchAssessmentRubricIds(cid, idMap);
-    return { rubrics: reconciled, idMap: idMap };
-  }).catch(function (err) {
-    console.warn('Rubric sync to canonical RPCs failed:', err);
-    if (typeof showSyncToast === 'function') {
-      showSyncToast('Rubric saved locally. Cloud sync needs attention.', 'error');
-    }
-    return { rubrics: arr || [], idMap: {} };
-  });
+      var canonicalArr = await _loadCanonicalRubrics(cid);
+      var reconciled = _reconcileCanonicalRubrics(target, canonicalArr, idMap);
+      _saveCourseField('rubrics', cid, reconciled);
+      _patchAssessmentRubricIds(cid, idMap);
+      return { rubrics: reconciled, idMap: idMap };
+    })
+    .catch(function (err) {
+      console.warn('Rubric sync to canonical RPCs failed:', err);
+      if (typeof showSyncToast === 'function') {
+        showSyncToast('Rubric saved locally. Cloud sync needs attention.', 'error');
+      }
+      return { rubrics: arr || [], idMap: {} };
+    });
   _rubricSaveQueue[cid] = next;
   return next;
 }
@@ -3348,7 +3357,11 @@ function saveCategories(cid, arr) {
 }
 function getCategoryById(cid, categoryId) {
   if (!categoryId) return null;
-  return getCategories(cid).find(function (c) { return c.id === categoryId; }) || null;
+  return (
+    getCategories(cid).find(function (c) {
+      return c.id === categoryId;
+    }) || null
+  );
 }
 function saveAssessments(cid, arr) {
   var prev = ((_cache.assessments && _cache.assessments[cid]) || []).slice();
@@ -3852,31 +3865,35 @@ function _persistObservationCreate(cid, sid, entry) {
   // entry.dims is an array of dimension codes (text labels) — not UUIDs in the
   // legacy store. Passing [] here; tag linkage lands in Phase 4.5 once the
   // learning map port carries real tag ids through to observation capture.
-  _callRpcWithAuthGuard('create_observation', {
-    p_course_id: cid,
-    p_body: entry.text || '',
-    p_sentiment: entry.sentiment || null,
-    p_context_type: entry.context || null,
-    p_assessment_id: ctxAsmt,
-    p_enrollment_ids: [sid],
-    p_tag_ids: [],
-    p_custom_tag_ids: [],
-  }, {
-    retryKey: 'create_observation:' + entry.id,
-    onSuccess: function (res) {
-      var newId = res.data;
-      var arr = (_cache.observations[cid] || {})[sid];
-      if (Array.isArray(arr)) {
-        var cached = arr.find(function (o) {
-          return o.id === entry.id;
-        });
-        if (cached && newId) {
-          cached.id = newId;
-          _safeLSSet('gb-quick-obs-' + cid, JSON.stringify(_cache.observations[cid]));
-        }
-      }
+  _callRpcWithAuthGuard(
+    'create_observation',
+    {
+      p_course_id: cid,
+      p_body: entry.text || '',
+      p_sentiment: entry.sentiment || null,
+      p_context_type: entry.context || null,
+      p_assessment_id: ctxAsmt,
+      p_enrollment_ids: [sid],
+      p_tag_ids: [],
+      p_custom_tag_ids: [],
     },
-  }).then(function (res) {
+    {
+      retryKey: 'create_observation:' + entry.id,
+      onSuccess: function (res) {
+        var newId = res.data;
+        var arr = (_cache.observations[cid] || {})[sid];
+        if (Array.isArray(arr)) {
+          var cached = arr.find(function (o) {
+            return o.id === entry.id;
+          });
+          if (cached && newId) {
+            cached.id = newId;
+            _safeLSSet('gb-quick-obs-' + cid, JSON.stringify(_cache.observations[cid]));
+          }
+        }
+      },
+    },
+  ).then(function (res) {
     if (res.error) {
       if (res.error.handledSessionExpired) return;
       console.warn('create_observation failed:', res.error);
@@ -3899,15 +3916,19 @@ function _persistObservationUpdate(cid, ob) {
   if (ob.assignmentContext && _isUuid(ob.assignmentContext.assessmentId)) {
     patch.assessment_id = ob.assignmentContext.assessmentId;
   }
-  _callRpcWithAuthGuard('update_observation', {
-    p_id: ob.id,
-    p_patch: patch,
-    p_enrollment_ids: null,
-    p_tag_ids: null,
-    p_custom_tag_ids: null,
-  }, {
-    retryKey: 'update_observation:' + ob.id,
-  }).then(function (res) {
+  _callRpcWithAuthGuard(
+    'update_observation',
+    {
+      p_id: ob.id,
+      p_patch: patch,
+      p_enrollment_ids: null,
+      p_tag_ids: null,
+      p_custom_tag_ids: null,
+    },
+    {
+      retryKey: 'update_observation:' + ob.id,
+    },
+  ).then(function (res) {
     if (res.error && !res.error.handledSessionExpired) console.warn('update_observation failed:', res.error);
   });
 }
@@ -3930,7 +3951,9 @@ function _persistObservationDelete(cid, obId) {
 window.createObservationRich = function (params) {
   params = params || {};
   if (!_isUuid(params.courseId)) return Promise.resolve();
-  return _callRpcWithAuthGuard('create_observation', {
+  return _callRpcWithAuthGuard(
+    'create_observation',
+    {
       p_course_id: params.courseId,
       p_body: params.body || '',
       p_sentiment: params.sentiment || null,
@@ -3939,31 +3962,36 @@ window.createObservationRich = function (params) {
       p_enrollment_ids: (params.enrollmentIds || []).filter(_isUuid),
       p_tag_ids: (params.tagIds || []).filter(_isUuid),
       p_custom_tag_ids: (params.customTagIds || []).filter(_isUuid),
-    }, {
-      retryKey: 'create_observation:' + ((params.localId || params.body || '') + ':' + (params.enrollmentIds || []).join(',')),
-    })
-    .then(function (res) {
-      if (res.error && !res.error.handledSessionExpired) console.warn('create_observation failed:', res.error);
-      return res;
-    });
+    },
+    {
+      retryKey:
+        'create_observation:' + ((params.localId || params.body || '') + ':' + (params.enrollmentIds || []).join(',')),
+    },
+  ).then(function (res) {
+    if (res.error && !res.error.handledSessionExpired) console.warn('create_observation failed:', res.error);
+    return res;
+  });
 };
 
 window.updateObservationRich = function (obId, patch, joins) {
   if (!_isUuid(obId)) return Promise.resolve();
   joins = joins || {};
-  return _callRpcWithAuthGuard('update_observation', {
+  return _callRpcWithAuthGuard(
+    'update_observation',
+    {
       p_id: obId,
       p_patch: patch || {},
       p_enrollment_ids: joins.enrollmentIds ? joins.enrollmentIds.filter(_isUuid) : null,
       p_tag_ids: joins.tagIds ? joins.tagIds.filter(_isUuid) : null,
       p_custom_tag_ids: joins.customTagIds ? joins.customTagIds.filter(_isUuid) : null,
-    }, {
+    },
+    {
       retryKey: 'update_observation:' + obId,
-    })
-    .then(function (res) {
-      if (res.error && !res.error.handledSessionExpired) console.warn('update_observation failed:', res.error);
-      return res;
-    });
+    },
+  ).then(function (res) {
+    if (res.error && !res.error.handledSessionExpired) console.warn('update_observation failed:', res.error);
+    return res;
+  });
 };
 
 /* Observation templates — seeds (is_seed=true) are immutable; these helpers
@@ -4013,7 +4041,9 @@ function _isSessionExpiredRpcError(err) {
   if (err && err.message) msg += err.message + ' ';
   if (err && err.details) msg += err.details + ' ';
   if (err && err.hint) msg += err.hint + ' ';
-  return /jwt.*expired|session.*expired|refresh.*token|not authenticated|unauthorized|invalid jwt|auth session missing|401/i.test(msg);
+  return /jwt.*expired|session.*expired|refresh.*token|not authenticated|unauthorized|invalid jwt|auth session missing|401/i.test(
+    msg,
+  );
 }
 
 function _handledSessionExpiredError(sourceError) {
@@ -4498,13 +4528,17 @@ window.v2.saveTermRating = function (enrollmentId, term, payload) {
   if (Array.isArray(payload.mentionObservationIds)) {
     wire.mention_observations = payload.mentionObservationIds.filter(_isUuid);
   }
-  return _callRpcWithAuthGuard('save_term_rating', {
-    p_enrollment_id: enrollmentId,
-    p_term: Number(term),
-    p_payload: wire,
-  }, {
-    retryKey: 'save_term_rating:' + enrollmentId + ':' + Number(term),
-  }).then(function (res) {
+  return _callRpcWithAuthGuard(
+    'save_term_rating',
+    {
+      p_enrollment_id: enrollmentId,
+      p_term: Number(term),
+      p_payload: wire,
+    },
+    {
+      retryKey: 'save_term_rating:' + enrollmentId + ':' + Number(term),
+    },
+  ).then(function (res) {
     if (res.error && !res.error.handledSessionExpired) console.warn('save_term_rating failed:', res.error);
     return res;
   });

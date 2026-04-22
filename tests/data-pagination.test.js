@@ -115,7 +115,9 @@ describe('get_gradebook shape bridge + fallback', () => {
         };
       },
     });
-    globalThis.getSupabase = function () { return client; };
+    globalThis.getSupabase = function () {
+      return client;
+    };
 
     await initData(CID);
 
@@ -154,7 +156,9 @@ describe('get_gradebook shape bridge + fallback', () => {
         return { data: null, error: { message: 'function not found' } };
       },
     });
-    globalThis.getSupabase = function () { return client; };
+    globalThis.getSupabase = function () {
+      return client;
+    };
 
     await initData(CID);
 

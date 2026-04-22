@@ -47,7 +47,9 @@ describe('createCourse timezone default', () => {
 
   it('passes p_timezone=America/Vancouver to create_course RPC', () => {
     createCourse({ name: 'Test Class' });
-    var call = client.calls.find(function (c) { return c.name === 'create_course'; });
+    var call = client.calls.find(function (c) {
+      return c.name === 'create_course';
+    });
     expect(call).toBeDefined();
     expect(call.payload.p_timezone).toBe('America/Vancouver');
   });

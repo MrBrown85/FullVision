@@ -70,7 +70,9 @@ describe('setPointsScore', () => {
   });
 
   it('creates entries for all tags on a multi-tag assessment', () => {
-    saveAssessments(CID, [{ id: 'a1', title: 'Multi', date: '2025-02-01', type: 'summative', tagIds: ['t1', 't2', 't3'] }]);
+    saveAssessments(CID, [
+      { id: 'a1', title: 'Multi', date: '2025-02-01', type: 'summative', tagIds: ['t1', 't2', 't3'] },
+    ]);
     saveScores(CID, {});
     setPointsScore(CID, 'stu1', 'a1', 90);
     const entries = getScores(CID)['stu1'];
@@ -205,10 +207,18 @@ describe('overrides / goals / reflections / notes roundtrips', () => {
     _cache.learningMaps[cid] = {
       _flatVersion: 2,
       subjects: [{ id: 'SCI', name: 'Science' }],
-      sections: [{
-        id: 'sec1', name: 'Questioning', color: '#0891b2', subject: 'SCI', shortName: 'Q',
-        tags: [{ id: 'sec1', label: 'Question', color: '#0891b2', subject: 'SCI', name: 'Questioning', shortName: 'Q' }],
-      }],
+      sections: [
+        {
+          id: 'sec1',
+          name: 'Questioning',
+          color: '#0891b2',
+          subject: 'SCI',
+          shortName: 'Q',
+          tags: [
+            { id: 'sec1', label: 'Question', color: '#0891b2', subject: 'SCI', name: 'Questioning', shortName: 'Q' },
+          ],
+        },
+      ],
     };
     saveCourseConfig(cid, { calcMethod: 'mostRecent', decayWeight: 0.65 });
     saveAssessments(cid, [{ id: 'a1', title: 'Quiz', date: '2025-01-15', type: 'summative', tagIds: ['sec1'] }]);

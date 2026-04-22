@@ -1,5 +1,5 @@
 /* dash-class-manager.js — Class manager + curriculum wizard (extracted from page-dashboard.js) */
-window.DashClassManager = (function() {
+window.DashClassManager = (function () {
   'use strict';
 
   /* ── Listener tracking for cleanup ──────────────────────── */
@@ -9,7 +9,7 @@ window.DashClassManager = (function() {
     _listeners.push({ type: type, handler: handler, options: options });
   }
   function _removeAllListeners() {
-    _listeners.forEach(function(l) {
+    _listeners.forEach(function (l) {
       document.removeEventListener(l.type, l.handler, l.options);
     });
     _listeners = [];
@@ -25,12 +25,26 @@ window.DashClassManager = (function() {
     _onRender = opts.onRender;
     _onCourseChange = opts.onCourseChange;
   }
-  function _setActiveCourse(cid) { _activeCourse = cid; }
+  function _setActiveCourse(cid) {
+    _activeCourse = cid;
+  }
 
   var CM_COLORS = [
-    '#dc2626', '#ea580c', '#d97706', '#ca8a04', '#16a34a',
-    '#059669', '#0891b2', '#2563eb', '#7c3aed', '#c026d3',
-    '#db2777', '#78716c', '#475569', '#1e3a5f', '#334155'
+    '#dc2626',
+    '#ea580c',
+    '#d97706',
+    '#ca8a04',
+    '#16a34a',
+    '#059669',
+    '#0891b2',
+    '#2563eb',
+    '#7c3aed',
+    '#c026d3',
+    '#db2777',
+    '#78716c',
+    '#475569',
+    '#1e3a5f',
+    '#334155',
   ];
 
   var classManagerOpen = false;
@@ -65,46 +79,117 @@ window.DashClassManager = (function() {
 
   function _cmRenderStdCard(sec, lm, compGroups) {
     var tag = sec.tags[0] || {};
-    var sub = (lm.subjects||[]).find(function(s) { return s.id === sec.subject; });
+    var sub = (lm.subjects || []).find(function (s) {
+      return s.id === sec.subject;
+    });
     var subName = sub ? sub.name : '';
     var subColor = sub ? sub.color : 'var(--text-3)';
     var isOpen = _cmOpenStdCards[sec.id];
-    var html = '<div class="cm-std-card' + (isOpen ? ' open' : '') + '" draggable="true" data-std-drag="' + sec.id + '" id="cm-std-' + sec.id + '">' +
-      '<div class="cm-std-header" data-action="cmToggleStdCard" data-secid="' + sec.id + '">' +
-        '<div class="cm-std-color-bar" style="background:' + sec.color + '"></div>' +
-        '<span class="cm-std-tag">' + esc(tag.id) + '</span>' +
-        '<span class="cm-std-label">' + esc(tag.label || sec.shortName || sec.name) + '</span>' +
-        '<span class="cm-std-subject"><span class="cm-std-subject-dot" style="background:' + subColor + '"></span>' + esc(subName) + '</span>' +
-        '<span class="cm-std-chevron">\u25B8</span>' +
+    var html =
+      '<div class="cm-std-card' +
+      (isOpen ? ' open' : '') +
+      '" draggable="true" data-std-drag="' +
+      sec.id +
+      '" id="cm-std-' +
+      sec.id +
+      '">' +
+      '<div class="cm-std-header" data-action="cmToggleStdCard" data-secid="' +
+      sec.id +
+      '">' +
+      '<div class="cm-std-color-bar" style="background:' +
+      sec.color +
+      '"></div>' +
+      '<span class="cm-std-tag">' +
+      esc(tag.id) +
+      '</span>' +
+      '<span class="cm-std-label">' +
+      esc(tag.label || sec.shortName || sec.name) +
+      '</span>' +
+      '<span class="cm-std-subject"><span class="cm-std-subject-dot" style="background:' +
+      subColor +
+      '"></span>' +
+      esc(subName) +
+      '</span>' +
+      '<span class="cm-std-chevron">\u25B8</span>' +
       '</div>' +
       '<div class="cm-std-body">' +
-        '<div class="cm-std-edit-row-wide">' +
-          '<div style="flex:1"><label class="cm-label">Standard Name</label>' +
-            '<input class="cm-input" value="' + esc(sec.name) + '" style="font-weight:600;font-size:0.82rem" data-stop-prop="true" data-action-blur="cmStdName" data-secid="' + sec.id + '"></div>' +
-          '<div style="min-width:100px"><label class="cm-label">Subject</label>' +
-            '<select class="cm-input" style="font-size:0.78rem" data-stop-prop="true" data-action-change="cmStdSubject" data-secid="' + sec.id + '">' +
-              (lm.subjects||[]).map(function(s) { return '<option value="' + s.id + '"' + (s.id===sec.subject?' selected':'') + '>' + esc(s.name) + '</option>'; }).join('') +
-            '</select></div>' +
-          (compGroups.length > 0 ? '<div style="min-width:90px"><label class="cm-label">Group</label>' +
-            '<select class="cm-input" style="font-size:0.78rem" data-stop-prop="true" data-action-change="cmStdGroup" data-secid="' + sec.id + '">' +
-              '<option value="">None</option>' +
-              compGroups.map(function(g) { return '<option value="' + g.id + '"' + (sec.groupId===g.id?' selected':'') + '>' + esc(g.name) + '</option>'; }).join('') +
-            '</select></div>' : '') +
-          '<div><label class="cm-label">Color</label>' +
-            '<div style="background:' + sec.color + ';width:32px;height:32px;border-radius:8px;margin-top:2px;position:relative">' +
-              '<div class="cm-color-swatch-selected" style="background:' + sec.color + '" data-action="cmToggleColorPalette" data-target="section" data-secid="' + sec.id + '"></div>' +
-              '<div class="cm-color-palette" id="cm-palette-section-' + sec.id + '"></div>' +
-            '</div></div>' +
-          '<button class="cm-delete-mini" data-action="cmDeleteStd" data-stop-prop="true" data-secid="' + sec.id + '" title="Delete standard" style="width:32px;height:32px;align-self:flex-end">\u2715</button>' +
-        '</div>' +
-        '<div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:8px">' +
-          '<div style="flex:0 0 120px"><label class="cm-label">Tag Code</label>' +
-            '<input class="cm-input" value="' + esc(tag.id) + '" placeholder="e.g. RD1" maxlength="10" style="padding:5px 8px;font-size:0.82rem;font-weight:600;font-family:monospace;text-transform:uppercase" data-stop-prop="true" data-action-blur="cmStdCode" data-secid="' + sec.id + '"></div>' +
-          '<div style="flex:1"><label class="cm-label">Short Label</label>' +
-            '<input class="cm-input" value="' + esc(tag.label) + '" placeholder="Short label" style="padding:5px 8px;font-size:0.82rem;font-weight:500" data-action-blur="cmStdLabel" data-secid="' + sec.id + '"></div>' +
-        '</div>' +
-        '<label class="cm-label">I can\u2026 Statement</label>' +
-        '<textarea class="cm-textarea" placeholder="I can\u2026 statement" style="min-height:34px;padding:5px 8px;font-size:0.78rem" data-action-blur="cmStdText" data-secid="' + sec.id + '">' + esc(tag.text||'') + '</textarea>' +
+      '<div class="cm-std-edit-row-wide">' +
+      '<div style="flex:1"><label class="cm-label">Standard Name</label>' +
+      '<input class="cm-input" value="' +
+      esc(sec.name) +
+      '" style="font-weight:600;font-size:0.82rem" data-stop-prop="true" data-action-blur="cmStdName" data-secid="' +
+      sec.id +
+      '"></div>' +
+      '<div style="min-width:100px"><label class="cm-label">Subject</label>' +
+      '<select class="cm-input" style="font-size:0.78rem" data-stop-prop="true" data-action-change="cmStdSubject" data-secid="' +
+      sec.id +
+      '">' +
+      (lm.subjects || [])
+        .map(function (s) {
+          return (
+            '<option value="' + s.id + '"' + (s.id === sec.subject ? ' selected' : '') + '>' + esc(s.name) + '</option>'
+          );
+        })
+        .join('') +
+      '</select></div>' +
+      (compGroups.length > 0
+        ? '<div style="min-width:90px"><label class="cm-label">Group</label>' +
+          '<select class="cm-input" style="font-size:0.78rem" data-stop-prop="true" data-action-change="cmStdGroup" data-secid="' +
+          sec.id +
+          '">' +
+          '<option value="">None</option>' +
+          compGroups
+            .map(function (g) {
+              return (
+                '<option value="' +
+                g.id +
+                '"' +
+                (sec.groupId === g.id ? ' selected' : '') +
+                '>' +
+                esc(g.name) +
+                '</option>'
+              );
+            })
+            .join('') +
+          '</select></div>'
+        : '') +
+      '<div><label class="cm-label">Color</label>' +
+      '<div style="background:' +
+      sec.color +
+      ';width:32px;height:32px;border-radius:8px;margin-top:2px;position:relative">' +
+      '<div class="cm-color-swatch-selected" style="background:' +
+      sec.color +
+      '" data-action="cmToggleColorPalette" data-target="section" data-secid="' +
+      sec.id +
+      '"></div>' +
+      '<div class="cm-color-palette" id="cm-palette-section-' +
+      sec.id +
+      '"></div>' +
+      '</div></div>' +
+      '<button class="cm-delete-mini" data-action="cmDeleteStd" data-stop-prop="true" data-secid="' +
+      sec.id +
+      '" title="Delete standard" style="width:32px;height:32px;align-self:flex-end">\u2715</button>' +
+      '</div>' +
+      '<div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:8px">' +
+      '<div style="flex:0 0 120px"><label class="cm-label">Tag Code</label>' +
+      '<input class="cm-input" value="' +
+      esc(tag.id) +
+      '" placeholder="e.g. RD1" maxlength="10" style="padding:5px 8px;font-size:0.82rem;font-weight:600;font-family:monospace;text-transform:uppercase" data-stop-prop="true" data-action-blur="cmStdCode" data-secid="' +
+      sec.id +
+      '"></div>' +
+      '<div style="flex:1"><label class="cm-label">Short Label</label>' +
+      '<input class="cm-input" value="' +
+      esc(tag.label) +
+      '" placeholder="Short label" style="padding:5px 8px;font-size:0.82rem;font-weight:500" data-action-blur="cmStdLabel" data-secid="' +
+      sec.id +
+      '"></div>' +
+      '</div>' +
+      '<label class="cm-label">I can\u2026 Statement</label>' +
+      '<textarea class="cm-textarea" placeholder="I can\u2026 statement" style="min-height:34px;padding:5px 8px;font-size:0.78rem" data-action-blur="cmStdText" data-secid="' +
+      sec.id +
+      '">' +
+      esc(tag.text || '') +
+      '</textarea>' +
       '</div></div>';
     return html;
   }
@@ -126,7 +211,18 @@ window.DashClassManager = (function() {
   var _cmMergeTargetId = null;
   var _cmMergeHoverTimer = null;
   var _cmMergeAnimating = false;
-  var CM_GROUP_COLORS = ['#6366f1','#06b6d4','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316','#64748b'];
+  var CM_GROUP_COLORS = [
+    '#6366f1',
+    '#06b6d4',
+    '#10b981',
+    '#f59e0b',
+    '#ef4444',
+    '#8b5cf6',
+    '#ec4899',
+    '#14b8a6',
+    '#f97316',
+    '#64748b',
+  ];
 
   var _UUID_RE_CM = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   function _isCanonicalId(id) {
@@ -135,28 +231,35 @@ window.DashClassManager = (function() {
 
   function _patchMapId(cid, map, localId, canonicalId) {
     if (!localId || !canonicalId || localId === canonicalId) return;
-    (map.subjects || []).forEach(function(s) {
+    (map.subjects || []).forEach(function (s) {
       if (s.id === localId) s.id = canonicalId;
     });
-    (map.sections || []).forEach(function(s) {
+    (map.sections || []).forEach(function (s) {
       if (s.id === localId) s.id = canonicalId;
       if (s.subject === localId) s.subject = canonicalId;
       if (s.groupId === localId) s.groupId = canonicalId;
-      (s.tags || []).forEach(function(t) {
+      (s.tags || []).forEach(function (t) {
         if (t.id === localId) t.id = canonicalId;
         if (t.subject === localId) t.subject = canonicalId;
       });
     });
-    (map.competencyGroups || []).forEach(function(g) {
+    (map.competencyGroups || []).forEach(function (g) {
       if (g.id === localId) g.id = canonicalId;
     });
     saveLearningMap(cid, map);
   }
 
   function _cmClearMerge() {
-    if (_cmMergeHoverTimer) { clearTimeout(_cmMergeHoverTimer); _cmMergeHoverTimer = null; }
-    if (_cmMergeTargetId) { var el = document.getElementById('cm-std-' + _cmMergeTargetId); if (el) el.classList.remove('merge-target'); }
-    _cmMergeTargetId = null; _cmMergeAnimating = false;
+    if (_cmMergeHoverTimer) {
+      clearTimeout(_cmMergeHoverTimer);
+      _cmMergeHoverTimer = null;
+    }
+    if (_cmMergeTargetId) {
+      var el = document.getElementById('cm-std-' + _cmMergeTargetId);
+      if (el) el.classList.remove('merge-target');
+    }
+    _cmMergeTargetId = null;
+    _cmMergeAnimating = false;
   }
 
   function _cmMergeToNewGroup(draggedId, targetId) {
@@ -169,32 +272,38 @@ window.DashClassManager = (function() {
       id: 'grp_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
       name: 'Group ' + (idx + 1),
       color: CM_GROUP_COLORS[idx % CM_GROUP_COLORS.length],
-      sortOrder: idx
+      sortOrder: idx,
     };
     map.competencyGroups.push(grp);
-    [draggedId, targetId].forEach(function(sid) {
-      var sec = (map.sections || []).find(function(s) { return s.id === sid; });
+    [draggedId, targetId].forEach(function (sid) {
+      var sec = (map.sections || []).find(function (s) {
+        return s.id === sid;
+      });
       if (sec) sec.groupId = grp.id;
     });
     saveLearningMap(cid, map);
     renderClassManager();
     var grpLocalId = grp.id;
-    window.v2.upsertCompetencyGroup({ id: grpLocalId, courseId: cid, name: grp.name, color: grp.color, displayOrder: idx })
-      .then(function(res) {
+    window.v2
+      .upsertCompetencyGroup({ id: grpLocalId, courseId: cid, name: grp.name, color: grp.color, displayOrder: idx })
+      .then(function (res) {
         var canonicalId = res && res.data ? res.data : null;
         if (canonicalId && canonicalId !== grpLocalId) {
           var m = getLearningMap(cid);
           _patchMapId(cid, m, grpLocalId, canonicalId);
         }
       });
-    setTimeout(function() {
+    setTimeout(function () {
       var input = document.querySelector('.mod-folder[data-module-id="' + grp.id + '"] .mod-folder-name-input');
-      if (input) { input.focus(); input.select(); }
+      if (input) {
+        input.focus();
+        input.select();
+      }
     }, 50);
   }
 
   function _initCmStdDrag() {
-    _addDocListener('dragstart', function(e) {
+    _addDocListener('dragstart', function (e) {
       var card = e.target.closest && e.target.closest('.cm-std-card[data-std-drag]');
       if (!card) return;
       _cmDragStdId = card.dataset.stdDrag;
@@ -202,19 +311,25 @@ window.DashClassManager = (function() {
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', _cmDragStdId);
     });
-    _addDocListener('dragover', function(e) {
+    _addDocListener('dragover', function (e) {
       if (!_cmDragStdId) return;
       var targetCard = e.target.closest && e.target.closest('.cm-std-card[data-std-drag]');
       if (targetCard) {
         var targetId = targetCard.dataset.stdDrag;
         if (targetId !== _cmDragStdId) {
           var map = cmSelectedCourse ? getLearningMap(cmSelectedCourse) : null;
-          var targetSec = map && (map.sections || []).find(function(s) { return s.id === targetId; });
+          var targetSec =
+            map &&
+            (map.sections || []).find(function (s) {
+              return s.id === targetId;
+            });
           if (targetSec && !targetSec.groupId) {
-            e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
             if (_cmMergeTargetId === targetId) return;
-            _cmClearMerge(); _cmMergeTargetId = targetId;
-            _cmMergeHoverTimer = setTimeout(function() {
+            _cmClearMerge();
+            _cmMergeTargetId = targetId;
+            _cmMergeHoverTimer = setTimeout(function () {
               _cmMergeAnimating = true;
               var el = document.getElementById('cm-std-' + targetId);
               if (el) el.classList.add('merge-target');
@@ -229,11 +344,13 @@ window.DashClassManager = (function() {
       if (!folder) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
-      document.querySelectorAll('.mod-folder.drag-over').forEach(function(f) { f.classList.remove('drag-over'); });
+      document.querySelectorAll('.mod-folder.drag-over').forEach(function (f) {
+        f.classList.remove('drag-over');
+      });
       folder.classList.add('drag-over');
       if (!folder.classList.contains('open')) folder.classList.add('open');
     });
-    _addDocListener('dragleave', function(e) {
+    _addDocListener('dragleave', function (e) {
       if (!_cmDragStdId) return;
       var targetCard = e.target.closest && e.target.closest('.cm-std-card[data-std-drag]');
       if (targetCard && !targetCard.contains(e.relatedTarget)) {
@@ -243,14 +360,18 @@ window.DashClassManager = (function() {
       var folder = e.target.closest && e.target.closest('.mod-folder[data-folder-drop]');
       if (folder && !folder.contains(e.relatedTarget)) folder.classList.remove('drag-over');
     });
-    _addDocListener('drop', function(e) {
+    _addDocListener('drop', function (e) {
       if (!_cmDragStdId) return;
       var targetCard = e.target.closest && e.target.closest('.cm-std-card[data-std-drag]');
       if (targetCard && _cmMergeAnimating && _cmMergeTargetId === targetCard.dataset.stdDrag) {
-        e.preventDefault(); e.stopPropagation();
+        e.preventDefault();
+        e.stopPropagation();
         _cmMergeToNewGroup(_cmDragStdId, targetCard.dataset.stdDrag);
-        _cmClearMerge(); _cmDragStdId = null;
-        document.querySelectorAll('.cm-std-card.dragging').forEach(function(c) { c.classList.remove('dragging'); });
+        _cmClearMerge();
+        _cmDragStdId = null;
+        document.querySelectorAll('.cm-std-card.dragging').forEach(function (c) {
+          c.classList.remove('dragging');
+        });
         return;
       }
       var folder = e.target.closest && e.target.closest('.mod-folder[data-folder-drop]');
@@ -260,7 +381,9 @@ window.DashClassManager = (function() {
       if (targetGroupId === '__none__') targetGroupId = '';
       if (cmSelectedCourse) {
         var map = ensureCustomLearningMap(cmSelectedCourse);
-        var sec = (map.sections || []).find(function(s) { return s.id === _cmDragStdId; });
+        var sec = (map.sections || []).find(function (s) {
+          return s.id === _cmDragStdId;
+        });
         if (sec) {
           if (targetGroupId) sec.groupId = targetGroupId;
           else delete sec.groupId;
@@ -270,45 +393,94 @@ window.DashClassManager = (function() {
         }
       }
       _cmDragStdId = null;
-      document.querySelectorAll('.mod-folder.drag-over').forEach(function(f) { f.classList.remove('drag-over'); });
-      document.querySelectorAll('.cm-std-card.dragging').forEach(function(c) { c.classList.remove('dragging'); });
+      document.querySelectorAll('.mod-folder.drag-over').forEach(function (f) {
+        f.classList.remove('drag-over');
+      });
+      document.querySelectorAll('.cm-std-card.dragging').forEach(function (c) {
+        c.classList.remove('dragging');
+      });
     });
-    _addDocListener('dragend', function() {
-      _cmDragStdId = null; _cmClearMerge();
-      document.querySelectorAll('.mod-folder.drag-over').forEach(function(f) { f.classList.remove('drag-over'); });
-      document.querySelectorAll('.cm-std-card.dragging').forEach(function(c) { c.classList.remove('dragging'); });
+    _addDocListener('dragend', function () {
+      _cmDragStdId = null;
+      _cmClearMerge();
+      document.querySelectorAll('.mod-folder.drag-over').forEach(function (f) {
+        f.classList.remove('drag-over');
+      });
+      document.querySelectorAll('.cm-std-card.dragging').forEach(function (c) {
+        c.classList.remove('dragging');
+      });
     });
   }
 
-  var cwStep2Name = '', cwStep2Grade = '', cwStep2Desc = '';
-  var cwStep2Grading = 'proficiency', cwStep2Calc = 'mostRecent', cwStep2Decay = '65';
+  var cwStep2Name = '',
+    cwStep2Grade = '',
+    cwStep2Desc = '';
+  var cwStep2Grading = 'proficiency',
+    cwStep2Calc = 'mostRecent',
+    cwStep2Decay = '65';
 
   function deleteStudentUI(sid) {
     var students = getStudents(_activeCourse);
-    var st = students.find(function(s) { return s.id === sid; });
+    var st = students.find(function (s) {
+      return s.id === sid;
+    });
     if (!st) return;
     var dname = displayName(st);
-    showConfirm('Delete Student', 'Delete ' + dname + '? This removes all their scores, goals, and notes.', 'Delete', 'danger', function() {
-      var snapshot = deleteStudent(_activeCourse, sid);
-      renderClassManager();
-      showUndoToast('Student deleted', function() {
-        var cid = _activeCourse;
-        var sts = getStudents(cid); sts.push(snapshot.student); saveStudents(cid, sts);
-        var sc = getScores(cid); sc[sid] = snapshot.scores; saveScores(cid, sc);
-        if (snapshot.goals !== undefined) { var g = getGoals(cid); g[sid] = snapshot.goals; saveGoals(cid, g); }
-        if (snapshot.reflections !== undefined) { var r = getReflections(cid); r[sid] = snapshot.reflections; saveReflections(cid, r); }
-        if (snapshot.notes !== undefined) { var n = getNotes(cid); n[sid] = snapshot.notes; saveNotes(cid, n); }
-        if (snapshot.flagged) { var f = getFlags(cid); f[sid] = true; saveFlags(cid, f); }
-        if (snapshot.statuses) { var s = getAssignmentStatuses(cid); Object.assign(s, snapshot.statuses); saveAssignmentStatuses(cid, s); }
+    showConfirm(
+      'Delete Student',
+      'Delete ' + dname + '? This removes all their scores, goals, and notes.',
+      'Delete',
+      'danger',
+      function () {
+        var snapshot = deleteStudent(_activeCourse, sid);
         renderClassManager();
-      });
-    });
+        showUndoToast('Student deleted', function () {
+          var cid = _activeCourse;
+          var sts = getStudents(cid);
+          sts.push(snapshot.student);
+          saveStudents(cid, sts);
+          var sc = getScores(cid);
+          sc[sid] = snapshot.scores;
+          saveScores(cid, sc);
+          if (snapshot.goals !== undefined) {
+            var g = getGoals(cid);
+            g[sid] = snapshot.goals;
+            saveGoals(cid, g);
+          }
+          if (snapshot.reflections !== undefined) {
+            var r = getReflections(cid);
+            r[sid] = snapshot.reflections;
+            saveReflections(cid, r);
+          }
+          if (snapshot.notes !== undefined) {
+            var n = getNotes(cid);
+            n[sid] = snapshot.notes;
+            saveNotes(cid, n);
+          }
+          if (snapshot.flagged) {
+            var f = getFlags(cid);
+            f[sid] = true;
+            saveFlags(cid, f);
+          }
+          if (snapshot.statuses) {
+            var s = getAssignmentStatuses(cid);
+            Object.assign(s, snapshot.statuses);
+            saveAssignmentStatuses(cid, s);
+          }
+          renderClassManager();
+        });
+      },
+    );
   }
 
   /* ── Class Manager Student Functions ────────────────────── */
   function cmShowAddStudent() {
     var form = document.getElementById('cm-add-student-form');
-    if (form) { form.style.display = 'block'; var el = document.getElementById('cm-add-first'); if (el) el.focus(); }
+    if (form) {
+      form.style.display = 'block';
+      var el = document.getElementById('cm-add-first');
+      if (el) el.focus();
+    }
   }
 
   function cmCancelStudent() {
@@ -317,49 +489,82 @@ window.DashClassManager = (function() {
     if (form) form.style.display = 'none';
     var btn = document.getElementById('cm-save-btn');
     if (btn) btn.textContent = 'Save';
-    ['cm-add-first','cm-add-last','cm-add-pref','cm-add-num','cm-add-dob','cm-add-email'].forEach(function(id) {
-      var el = document.getElementById(id); if (el) el.value = '';
+    ['cm-add-first', 'cm-add-last', 'cm-add-pref', 'cm-add-num', 'cm-add-dob', 'cm-add-email'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.value = '';
     });
     var proEl = document.getElementById('cm-add-pro');
     if (proEl) proEl.value = '';
-    document.querySelectorAll('.cm-desig-check').forEach(function(cb) { cb.checked = false; });
+    document.querySelectorAll('.cm-desig-check').forEach(function (cb) {
+      cb.checked = false;
+    });
   }
 
   function cmSaveStudent() {
     if (!cmSelectedCourse) return;
-    var firstName = (document.getElementById('cm-add-first')?.value||'').trim();
-    var lastName = (document.getElementById('cm-add-last')?.value||'').trim();
+    var firstName = (document.getElementById('cm-add-first')?.value || '').trim();
+    var lastName = (document.getElementById('cm-add-last')?.value || '').trim();
     if (!firstName) {
       var el = document.getElementById('cm-add-first');
-      if (el) { el.style.border = '2px solid var(--score-1)'; el.placeholder = 'First name is required'; el.oninput = function() { this.style.border = ''; }; el.focus(); }
+      if (el) {
+        el.style.border = '2px solid var(--score-1)';
+        el.placeholder = 'First name is required';
+        el.oninput = function () {
+          this.style.border = '';
+        };
+        el.focus();
+      }
       return;
     }
-    var preferred = (document.getElementById('cm-add-pref')?.value||'').trim();
-    var pronouns = (document.getElementById('cm-add-pro')?.value||'').trim();
-    var studentNumber = (document.getElementById('cm-add-num')?.value||'').trim();
-    var dateOfBirth = (document.getElementById('cm-add-dob')?.value||'').trim();
-    var email = (document.getElementById('cm-add-email')?.value||'').trim();
-    var designations = Array.from(document.querySelectorAll('.cm-desig-check:checked')).map(function(cb) { return cb.value; });
+    var preferred = (document.getElementById('cm-add-pref')?.value || '').trim();
+    var pronouns = (document.getElementById('cm-add-pro')?.value || '').trim();
+    var studentNumber = (document.getElementById('cm-add-num')?.value || '').trim();
+    var dateOfBirth = (document.getElementById('cm-add-dob')?.value || '').trim();
+    var email = (document.getElementById('cm-add-email')?.value || '').trim();
+    var designations = Array.from(document.querySelectorAll('.cm-desig-check:checked')).map(function (cb) {
+      return cb.value;
+    });
     var students = getStudents(cmSelectedCourse);
-    var sortName = ((lastName||'') + ' ' + firstName).trim();
+    var sortName = ((lastName || '') + ' ' + firstName).trim();
 
     if (cmEditingStudentId) {
-      var st = students.find(function(s) { return s.id === cmEditingStudentId; });
+      var st = students.find(function (s) {
+        return s.id === cmEditingStudentId;
+      });
       if (st) {
-        st.firstName = firstName; st.lastName = lastName; st.preferred = preferred;
-        st.pronouns = pronouns; st.sortName = sortName;
-        st.studentNumber = studentNumber; st.dateOfBirth = dateOfBirth; st.email = email;
-        st.designations = designations; delete st.designation;
+        st.firstName = firstName;
+        st.lastName = lastName;
+        st.preferred = preferred;
+        st.pronouns = pronouns;
+        st.sortName = sortName;
+        st.studentNumber = studentNumber;
+        st.dateOfBirth = dateOfBirth;
+        st.email = email;
+        st.designations = designations;
+        delete st.designation;
         if (!st.attendance) st.attendance = [];
       }
       cmEditingStudentId = null;
     } else {
-      students.push({ id: uid(), firstName: firstName, lastName: lastName, preferred: preferred, pronouns: pronouns, studentNumber: studentNumber, dateOfBirth: dateOfBirth, email: email, designations: designations, attendance:[], sortName: sortName, enrolledDate: new Date().toISOString().slice(0,10) });
+      students.push({
+        id: uid(),
+        firstName: firstName,
+        lastName: lastName,
+        preferred: preferred,
+        pronouns: pronouns,
+        studentNumber: studentNumber,
+        dateOfBirth: dateOfBirth,
+        email: email,
+        designations: designations,
+        attendance: [],
+        sortName: sortName,
+        enrolledDate: new Date().toISOString().slice(0, 10),
+      });
     }
     saveStudents(cmSelectedCourse, students);
     cmCancelStudent();
     renderClassManager();
-    requestAnimationFrame(function() {
+    requestAnimationFrame(function () {
       var detail = document.querySelector('.cm-detail');
       if (detail) detail.scrollTop = 0;
     });
@@ -368,12 +573,16 @@ window.DashClassManager = (function() {
   function cmEditStudent(sid) {
     if (!cmSelectedCourse) return;
     var students = getStudents(cmSelectedCourse);
-    var st = students.find(function(s) { return s.id === sid; });
+    var st = students.find(function (s) {
+      return s.id === sid;
+    });
     if (!st) return;
     cmEditingStudentId = sid;
     var form = document.getElementById('cm-add-student-form');
     if (form) form.style.display = 'block';
-    var el = function(id) { return document.getElementById(id); };
+    var el = function (id) {
+      return document.getElementById(id);
+    };
     if (el('cm-add-first')) el('cm-add-first').value = st.firstName || '';
     if (el('cm-add-last')) el('cm-add-last').value = st.lastName || '';
     if (el('cm-add-pref')) el('cm-add-pref').value = st.preferred || '';
@@ -382,7 +591,9 @@ window.DashClassManager = (function() {
     if (el('cm-add-dob')) el('cm-add-dob').value = st.dateOfBirth || '';
     if (el('cm-add-email')) el('cm-add-email').value = st.email || '';
     var desigs = st.designations || [];
-    document.querySelectorAll('.cm-desig-check').forEach(function(cb) { cb.checked = desigs.indexOf(cb.value) >= 0; });
+    document.querySelectorAll('.cm-desig-check').forEach(function (cb) {
+      cb.checked = desigs.indexOf(cb.value) >= 0;
+    });
     var btn = el('cm-save-btn');
     if (btn) btn.textContent = 'Update';
     if (el('cm-add-first')) el('cm-add-first').focus();
@@ -408,7 +619,9 @@ window.DashClassManager = (function() {
 
   function cmBulkSelectAll() {
     var students = getStudents(cmSelectedCourse);
-    students.forEach(function(s) { cmBulkSelected.add(s.id); });
+    students.forEach(function (s) {
+      cmBulkSelected.add(s.id);
+    });
     renderClassManager();
   }
 
@@ -419,17 +632,19 @@ window.DashClassManager = (function() {
 
   function cmApplyBulk() {
     if (!cmSelectedCourse || cmBulkSelected.size === 0) return;
-    var pronouns = (document.getElementById('cm-bulk-pro')?.value||'').trim();
-    var attDate = (document.getElementById('cm-bulk-att-date')?.value||'').trim();
-    var attStatus = (document.getElementById('cm-bulk-att-status')?.value||'').trim();
+    var pronouns = (document.getElementById('cm-bulk-pro')?.value || '').trim();
+    var attDate = (document.getElementById('cm-bulk-att-date')?.value || '').trim();
+    var attStatus = (document.getElementById('cm-bulk-att-status')?.value || '').trim();
     var students = getStudents(cmSelectedCourse);
-    students.forEach(function(st) {
+    students.forEach(function (st) {
       if (!cmBulkSelected.has(st.id)) return;
       if (pronouns) st.pronouns = pronouns;
       if (attDate && attStatus) {
         if (!st.attendance) st.attendance = [];
         st.attendance.push({ date: attDate, status: attStatus, note: '' });
-        st.attendance.sort(function(a,b) { return b.date.localeCompare(a.date); });
+        st.attendance.sort(function (a, b) {
+          return b.date.localeCompare(a.date);
+        });
       }
     });
     saveStudents(cmSelectedCourse, students);
@@ -447,20 +662,42 @@ window.DashClassManager = (function() {
     var file = input.files[0];
     if (!file) return;
     var reader = new FileReader();
-    reader.onload = function(e) {
-      var lines = e.target.result.split('\n').map(function(l) { return l.trim(); }).filter(function(l) { return l; });
-      var hdr = (lines[0]||'').toLowerCase();
+    reader.onload = function (e) {
+      var lines = e.target.result
+        .split('\n')
+        .map(function (l) {
+          return l.trim();
+        })
+        .filter(function (l) {
+          return l;
+        });
+      var hdr = (lines[0] || '').toLowerCase();
       var hasHeader = hdr.includes('first') || hdr.includes('name') || hdr.includes('last');
       var start = hasHeader ? 1 : 0;
       var parsed = [];
       for (var i = start; i < lines.length; i++) {
-        var parts = lines[i].split(',').map(function(p) { return p.trim(); });
+        var parts = lines[i].split(',').map(function (p) {
+          return p.trim();
+        });
         if (!parts[0]) continue;
         if (hdr.includes('first') || parts.length >= 4) {
-          parsed.push({ firstName: parts[0], lastName: parts[1]||'', preferred: parts[2]||'', pronouns: parts[3]||'', studentNumber: parts[4]||'', dateOfBirth: parts[5]||'', email: parts[6]||'' });
+          parsed.push({
+            firstName: parts[0],
+            lastName: parts[1] || '',
+            preferred: parts[2] || '',
+            pronouns: parts[3] || '',
+            studentNumber: parts[4] || '',
+            dateOfBirth: parts[5] || '',
+            email: parts[6] || '',
+          });
         } else {
           var np = parts[0].split(/\s+/);
-          parsed.push({ firstName: np[0]||'', lastName: np.slice(1).join(' ')||'', preferred: parts[1]||'', pronouns: parts[2]||'' });
+          parsed.push({
+            firstName: np[0] || '',
+            lastName: np.slice(1).join(' ') || '',
+            preferred: parts[1] || '',
+            pronouns: parts[2] || '',
+          });
         }
       }
       cmShowImportPreview(parsed);
@@ -472,33 +709,54 @@ window.DashClassManager = (function() {
   function cmShowImportPreview(parsed) {
     cmPendingImport = parsed;
     var cid = cmSelectedCourse;
-    var existing = getStudents(cid).map(function(s) { return fullName(s).toLowerCase(); });
-    var html = '<div style="border:1px solid var(--active);border-radius:var(--radius-sm);padding:10px 12px;margin-top:8px;background:rgba(0,122,255,0.02)">' +
-      '<div class="cm-label" style="margin-bottom:6px">Import Preview \u2014 ' + parsed.length + ' student' + (parsed.length !== 1 ? 's' : '') + ' found</div>' +
-      '<div style="max-height:180px;overflow-y:auto;margin-bottom:8px">' +
-        '<table style="width:100%;border-collapse:collapse;font-size:0.78rem">' +
-          '<thead><tr style="border-bottom:1px solid var(--border)">' +
-            '<th style="text-align:left;padding:3px 6px" class="cm-label">First</th>' +
-            '<th style="text-align:left;padding:3px 6px" class="cm-label">Last</th>' +
-            '<th style="text-align:left;padding:3px 6px" class="cm-label">Pronouns</th>' +
-            '<th style="text-align:left;padding:3px 6px" class="cm-label">Status</th>' +
-          '</tr></thead><tbody>';
-    parsed.forEach(function(p) {
-      var fn = ((p.firstName||'')+' '+(p.lastName||'')).trim().toLowerCase();
-      var dupe = existing.includes(fn);
-      html += '<tr style="border-bottom:1px solid var(--divider-subtle)' + (dupe ? ';opacity:0.5' : '') + '">' +
-        '<td style="padding:3px 6px">' + esc(p.firstName||'') + '</td>' +
-        '<td style="padding:3px 6px">' + esc(p.lastName||'') + '</td>' +
-        '<td style="padding:3px 6px">' + esc(p.pronouns||'') + '</td>' +
-        '<td style="padding:3px 6px;font-size:0.65rem;font-weight:600;color:' + (dupe ? 'var(--priority)' : 'var(--score-3)') + '">' + (dupe ? 'SKIP' : 'NEW') + '</td>' +
-      '</tr>';
+    var existing = getStudents(cid).map(function (s) {
+      return fullName(s).toLowerCase();
     });
-    html += '</tbody></table></div>' +
+    var html =
+      '<div style="border:1px solid var(--active);border-radius:var(--radius-sm);padding:10px 12px;margin-top:8px;background:rgba(0,122,255,0.02)">' +
+      '<div class="cm-label" style="margin-bottom:6px">Import Preview \u2014 ' +
+      parsed.length +
+      ' student' +
+      (parsed.length !== 1 ? 's' : '') +
+      ' found</div>' +
+      '<div style="max-height:180px;overflow-y:auto;margin-bottom:8px">' +
+      '<table style="width:100%;border-collapse:collapse;font-size:0.78rem">' +
+      '<thead><tr style="border-bottom:1px solid var(--border)">' +
+      '<th style="text-align:left;padding:3px 6px" class="cm-label">First</th>' +
+      '<th style="text-align:left;padding:3px 6px" class="cm-label">Last</th>' +
+      '<th style="text-align:left;padding:3px 6px" class="cm-label">Pronouns</th>' +
+      '<th style="text-align:left;padding:3px 6px" class="cm-label">Status</th>' +
+      '</tr></thead><tbody>';
+    parsed.forEach(function (p) {
+      var fn = ((p.firstName || '') + ' ' + (p.lastName || '')).trim().toLowerCase();
+      var dupe = existing.includes(fn);
+      html +=
+        '<tr style="border-bottom:1px solid var(--divider-subtle)' +
+        (dupe ? ';opacity:0.5' : '') +
+        '">' +
+        '<td style="padding:3px 6px">' +
+        esc(p.firstName || '') +
+        '</td>' +
+        '<td style="padding:3px 6px">' +
+        esc(p.lastName || '') +
+        '</td>' +
+        '<td style="padding:3px 6px">' +
+        esc(p.pronouns || '') +
+        '</td>' +
+        '<td style="padding:3px 6px;font-size:0.65rem;font-weight:600;color:' +
+        (dupe ? 'var(--priority)' : 'var(--score-3)') +
+        '">' +
+        (dupe ? 'SKIP' : 'NEW') +
+        '</td>' +
+        '</tr>';
+    });
+    html +=
+      '</tbody></table></div>' +
       '<div style="display:flex;gap:8px">' +
-        '<button class="btn btn-primary" style="font-size:0.78rem;padding:6px 14px" data-action="cmConfirmImport">Import</button>' +
-        '<button class="btn btn-ghost" style="font-size:0.78rem;padding:6px 10px" data-action="cmCancelImport">Cancel</button>' +
+      '<button class="btn btn-primary" style="font-size:0.78rem;padding:6px 14px" data-action="cmConfirmImport">Import</button>' +
+      '<button class="btn btn-ghost" style="font-size:0.78rem;padding:6px 10px" data-action="cmCancelImport">Cancel</button>' +
       '</div>' +
-    '</div>';
+      '</div>';
     var el = document.getElementById('cm-import-preview');
     if (el) el.innerHTML = html;
   }
@@ -506,12 +764,26 @@ window.DashClassManager = (function() {
   function cmConfirmImport() {
     if (!cmPendingImport || !cmSelectedCourse) return;
     var students = getStudents(cmSelectedCourse);
-    var existingNames = students.map(function(s) { return fullName(s).toLowerCase(); });
-    cmPendingImport.forEach(function(p) {
-      var fn = ((p.firstName||'')+' '+(p.lastName||'')).trim().toLowerCase();
+    var existingNames = students.map(function (s) {
+      return fullName(s).toLowerCase();
+    });
+    cmPendingImport.forEach(function (p) {
+      var fn = ((p.firstName || '') + ' ' + (p.lastName || '')).trim().toLowerCase();
       if (existingNames.includes(fn)) return;
-      var sortName = ((p.lastName||'') + ' ' + (p.firstName||'')).trim();
-      students.push({ id: uid(), firstName: p.firstName||'', lastName: p.lastName||'', preferred: p.preferred||'', pronouns: p.pronouns||'', studentNumber: p.studentNumber||'', dateOfBirth: p.dateOfBirth||'', email: p.email||'', attendance:[], sortName: sortName, enrolledDate: new Date().toISOString().slice(0,10) });
+      var sortName = ((p.lastName || '') + ' ' + (p.firstName || '')).trim();
+      students.push({
+        id: uid(),
+        firstName: p.firstName || '',
+        lastName: p.lastName || '',
+        preferred: p.preferred || '',
+        pronouns: p.pronouns || '',
+        studentNumber: p.studentNumber || '',
+        dateOfBirth: p.dateOfBirth || '',
+        email: p.email || '',
+        attendance: [],
+        sortName: sortName,
+        enrolledDate: new Date().toISOString().slice(0, 10),
+      });
     });
     saveStudents(cmSelectedCourse, students);
     cmPendingImport = null;
@@ -540,24 +812,32 @@ window.DashClassManager = (function() {
     var html = '';
 
     // Top bar
-    var detailTitle = cmMode === 'create' ? 'New Class' :
-      (cmSelectedCourse && COURSES[cmSelectedCourse] ? COURSES[cmSelectedCourse].name : 'Class Management');
-    html += '<div class="cm-topbar">' +
+    var detailTitle =
+      cmMode === 'create'
+        ? 'New Class'
+        : cmSelectedCourse && COURSES[cmSelectedCourse]
+          ? COURSES[cmSelectedCourse].name
+          : 'Class Management';
+    html +=
+      '<div class="cm-topbar">' +
       '<button class="cm-back-btn" data-action="closeClassManager">\u2190 Dashboard</button>' +
       '<span class="cm-topbar-title">Class Management</span>' +
       '<span class="cm-topbar-spacer"></span>' +
-      '<span style="font-size:0.75rem;color:var(--text-3)">' + esc(detailTitle) + '</span>' +
-    '</div>';
+      '<span style="font-size:0.75rem;color:var(--text-3)">' +
+      esc(detailTitle) +
+      '</span>' +
+      '</div>';
 
     // Empty state
     if (courseIds.length === 0 && cmMode !== 'create') {
-      html += '<div class="cm-empty">' +
+      html +=
+        '<div class="cm-empty">' +
         '<div class="cm-empty-icon">\uD83D\uDCDA</div>' +
         '<div class="cm-empty-title">No classes yet</div>' +
         '<div class="cm-empty-text">Create your first class to get started with your gradebook.</div>' +
         '<button class="btn btn-primary" data-action="cmStartCreate" style="margin-top:16px">Create a Class</button>' +
         '<button class="btn btn-ghost" data-action="cmImportTeams" style="margin-top:8px">Import from Teams</button>' +
-      '</div>';
+        '</div>';
       document.getElementById('main').innerHTML = html;
       return;
     }
@@ -586,41 +866,76 @@ window.DashClassManager = (function() {
   }
 
   function renderCmSidebar(courseIds) {
-    var html = '<div class="cm-sidebar">' +
+    var html =
+      '<div class="cm-sidebar">' +
       '<div class="cm-sidebar-header">' +
-        '<span class="cm-sidebar-label">' + courseIds.length + ' Class' + (courseIds.length!==1?'es':'') + '</span>' +
-        '<button class="cm-new-btn" data-action="cmStartCreate">+ New</button>' +
-        '<button class="cm-new-btn" data-action="cmImportTeams" style="margin-left:4px">Import Teams</button>' +
+      '<span class="cm-sidebar-label">' +
+      courseIds.length +
+      ' Class' +
+      (courseIds.length !== 1 ? 'es' : '') +
+      '</span>' +
+      '<button class="cm-new-btn" data-action="cmStartCreate">+ New</button>' +
+      '<button class="cm-new-btn" data-action="cmImportTeams" style="margin-left:4px">Import Teams</button>' +
       '</div>' +
       '<div class="cm-class-list">';
     if (cmMode === 'create') {
-      html += '<div class="cm-class-item cm-create-active">' +
+      html +=
+        '<div class="cm-class-item cm-create-active">' +
         '<div class="cm-class-name" style="color:var(--active)">New Class</div>' +
         '<div class="cm-class-meta">Setting up\u2026</div>' +
-      '</div>';
+        '</div>';
     }
-    var activeCids = courseIds.filter(function(cid) { return !getCourseConfig(cid).archived; });
-    var archivedCids = courseIds.filter(function(cid) { return getCourseConfig(cid).archived; });
-    activeCids.forEach(function(cid) {
+    var activeCids = courseIds.filter(function (cid) {
+      return !getCourseConfig(cid).archived;
+    });
+    var archivedCids = courseIds.filter(function (cid) {
+      return getCourseConfig(cid).archived;
+    });
+    activeCids.forEach(function (cid) {
       var c = COURSES[cid];
       var sc = getStudents(cid).length;
-      var sel = (cid === cmSelectedCourse && cmMode === 'edit') ? ' selected' : '';
+      var sel = cid === cmSelectedCourse && cmMode === 'edit' ? ' selected' : '';
       var gs = c.gradingSystem === 'proficiency' ? 'Proficiency' : c.gradingSystem === 'letter' ? 'Letter' : 'Points';
-      html += '<div class="cm-class-item' + sel + '" data-action="cmSelectClass" data-cid="' + cid + '">' +
-        '<div class="cm-class-name">' + esc(c.name) + '</div>' +
-        '<div class="cm-class-meta">' + gs + ' \u00B7 ' + sc + ' student' + (sc!==1?'s':'') + '</div>' +
-      '</div>';
+      html +=
+        '<div class="cm-class-item' +
+        sel +
+        '" data-action="cmSelectClass" data-cid="' +
+        cid +
+        '">' +
+        '<div class="cm-class-name">' +
+        esc(c.name) +
+        '</div>' +
+        '<div class="cm-class-meta">' +
+        gs +
+        ' \u00B7 ' +
+        sc +
+        ' student' +
+        (sc !== 1 ? 's' : '') +
+        '</div>' +
+        '</div>';
     });
     if (archivedCids.length > 0) {
-      html += '<div style="padding:8px 12px 4px;font-size:0.6rem;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:0.05em;margin-top:8px;border-top:1px solid var(--border)">Archived</div>';
-      archivedCids.forEach(function(cid) {
+      html +=
+        '<div style="padding:8px 12px 4px;font-size:0.6rem;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:0.05em;margin-top:8px;border-top:1px solid var(--border)">Archived</div>';
+      archivedCids.forEach(function (cid) {
         var c = COURSES[cid];
         var sc = getStudents(cid).length;
-        var sel = (cid === cmSelectedCourse && cmMode === 'edit') ? ' selected' : '';
-        html += '<div class="cm-class-item' + sel + '" data-action="cmSelectClass" data-cid="' + cid + '" style="opacity:0.5">' +
-          '<div class="cm-class-name">' + esc(c.name) + '</div>' +
-          '<div class="cm-class-meta">' + sc + ' student' + (sc!==1?'s':'') + ' \u00B7 archived</div>' +
-        '</div>';
+        var sel = cid === cmSelectedCourse && cmMode === 'edit' ? ' selected' : '';
+        html +=
+          '<div class="cm-class-item' +
+          sel +
+          '" data-action="cmSelectClass" data-cid="' +
+          cid +
+          '" style="opacity:0.5">' +
+          '<div class="cm-class-name">' +
+          esc(c.name) +
+          '</div>' +
+          '<div class="cm-class-meta">' +
+          sc +
+          ' student' +
+          (sc !== 1 ? 's' : '') +
+          ' \u00B7 archived</div>' +
+          '</div>';
       });
     }
     html += '</div></div>';
@@ -631,8 +946,8 @@ window.DashClassManager = (function() {
     var course = COURSES[cid];
     var cc = getCourseConfig(cid);
     var method = cc.calcMethod || course.calcMethod || 'mostRecent';
-    var dw = cc.decayWeight != null ? cc.decayWeight : (course.decayWeight || 0.65);
-    var cw = cc.categoryWeights || { summative:1.0, formative:0.0 };
+    var dw = cc.decayWeight != null ? cc.decayWeight : course.decayWeight || 0.65;
+    var cw = cc.categoryWeights || { summative: 1.0, formative: 0.0 };
     var cwEnabled = cw.formative > 0;
     var lm = getLearningMap(cid);
     var studentCount = getStudents(cid).length;
@@ -645,184 +960,331 @@ window.DashClassManager = (function() {
     html += '<div class="cm-col">';
 
     // Section 1: Class Details
-    html += '<div class="cm-section">' +
+    html +=
+      '<div class="cm-section">' +
       '<div class="cm-section-title">Class Details</div>' +
       '<div class="cm-field">' +
-        '<label class="cm-label">Class Name</label>' +
-        '<input class="cm-input" id="cm-name" value="' + esc(course.name) + '" data-action-blur="cmUpdateName">' +
+      '<label class="cm-label">Class Name</label>' +
+      '<input class="cm-input" id="cm-name" value="' +
+      esc(course.name) +
+      '" data-action-blur="cmUpdateName">' +
       '</div>' +
       '<div class="cm-row">' +
-        '<div class="cm-field">' +
-          '<label class="cm-label">Grade Level</label>' +
-          '<input class="cm-input" id="cm-grade" value="' + esc(course.gradeLevel||'') + '" placeholder="e.g. 8, 10-12" data-action-blur="cmUpdateGrade">' +
-        '</div>' +
-        '<div class="cm-field">' +
-          '<label class="cm-label">Stats</label>' +
-          '<div style="display:flex;gap:12px;padding:7px 0;font-size:0.78rem;color:var(--text-2)">' +
-            '<span><strong>' + studentCount + '</strong> student' + (studentCount!==1?'s':'') + '</span>' +
-            '<span><strong>' + assessCount + '</strong> assessment' + (assessCount!==1?'s':'') + '</span>' +
-            '<span><strong>' + tagCount + '</strong> standard' + (tagCount!==1?'s':'') + '</span>' +
-          '</div>' +
-        '</div>' +
+      '<div class="cm-field">' +
+      '<label class="cm-label">Grade Level</label>' +
+      '<input class="cm-input" id="cm-grade" value="' +
+      esc(course.gradeLevel || '') +
+      '" placeholder="e.g. 8, 10-12" data-action-blur="cmUpdateGrade">' +
       '</div>' +
       '<div class="cm-field">' +
-        '<label class="cm-label">Description</label>' +
-        '<textarea class="cm-textarea" id="cm-desc" placeholder="Optional course description\u2026" data-action-blur="cmUpdateDesc">' + esc(course.description||'') + '</textarea>' +
+      '<label class="cm-label">Stats</label>' +
+      '<div style="display:flex;gap:12px;padding:7px 0;font-size:0.78rem;color:var(--text-2)">' +
+      '<span><strong>' +
+      studentCount +
+      '</strong> student' +
+      (studentCount !== 1 ? 's' : '') +
+      '</span>' +
+      '<span><strong>' +
+      assessCount +
+      '</strong> assessment' +
+      (assessCount !== 1 ? 's' : '') +
+      '</span>' +
+      '<span><strong>' +
+      tagCount +
+      '</strong> standard' +
+      (tagCount !== 1 ? 's' : '') +
+      '</span>' +
       '</div>' +
-    '</div>';
+      '</div>' +
+      '</div>' +
+      '<div class="cm-field">' +
+      '<label class="cm-label">Description</label>' +
+      '<textarea class="cm-textarea" id="cm-desc" placeholder="Optional course description\u2026" data-action-blur="cmUpdateDesc">' +
+      esc(course.description || '') +
+      '</textarea>' +
+      '</div>' +
+      '</div>';
 
     // Section 2: Students (Roster)
     var students = getStudents(cid);
-    html += '<div class="cm-section">' +
+    html +=
+      '<div class="cm-section">' +
       '<div class="cm-section-title" style="display:flex;align-items:center;justify-content:space-between">' +
-        '<span>Students <span style="font-weight:400;color:var(--text-3);text-transform:none;letter-spacing:0">(' + students.length + ')</span></span>' +
-        (students.length > 1 ? '<button class="cm-add-link" data-action="cmToggleBulk" style="font-size:0.7rem;padding:2px 8px;border-radius:4px;' + (cmBulkMode?'background:var(--active);color:white':'') + '">' + (cmBulkMode?'Exit Bulk Edit':'Bulk Edit') + '</button>' : '') +
+      '<span>Students <span style="font-weight:400;color:var(--text-3);text-transform:none;letter-spacing:0">(' +
+      students.length +
+      ')</span></span>' +
+      (students.length > 1
+        ? '<button class="cm-add-link" data-action="cmToggleBulk" style="font-size:0.7rem;padding:2px 8px;border-radius:4px;' +
+          (cmBulkMode ? 'background:var(--active);color:white' : '') +
+          '">' +
+          (cmBulkMode ? 'Exit Bulk Edit' : 'Bulk Edit') +
+          '</button>'
+        : '') +
       '</div>';
     if (students.length > 0) {
       html += '<div class="cm-student-list">';
       var sorted = sortStudents(students, 'lastName');
-      sorted.forEach(function(st) {
+      sorted.forEach(function (st) {
         var pref = st.preferred && st.preferred !== st.firstName ? st.preferred : '';
-        html += '<div class="cm-student-row">' +
-          (cmBulkMode ? '<input type="checkbox" class="cm-bulk-check" ' + (cmBulkSelected.has(st.id)?'checked':'') + ' data-action="cmBulkToggleCheck" data-sid="' + st.id + '">' : '') +
-          '<span class="cm-student-name">' + esc(fullName(st)) + '</span>' +
+        html +=
+          '<div class="cm-student-row">' +
+          (cmBulkMode
+            ? '<input type="checkbox" class="cm-bulk-check" ' +
+              (cmBulkSelected.has(st.id) ? 'checked' : '') +
+              ' data-action="cmBulkToggleCheck" data-sid="' +
+              st.id +
+              '">'
+            : '') +
+          '<span class="cm-student-name">' +
+          esc(fullName(st)) +
+          '</span>' +
           (pref ? '<span class="cm-student-pref">"' + esc(pref) + '"</span>' : '') +
-          (st.designations || []).map(function(code) { var d = BC_DESIGNATIONS[code]; if (!d) return ''; return '<span class="cm-desig-badge' + (d.level > 0 ? ' low-inc' : '') + '" title="' + code + ' \u2014 ' + esc(d.name) + '">' + esc(code) + '</span>'; }).join('') +
-          (function() { var ds = st.designations || []; var hasIep = ds.some(function(c) { return BC_DESIGNATIONS[c]?.iep; }); var hasMod = ds.some(function(c) { return BC_DESIGNATIONS[c]?.modified; }); return (hasIep ? '<span class="cm-iep-tag">IEP</span>' : '') + (hasMod ? '<span class="cm-mod-tag">MOD</span>' : ''); })() +
+          (st.designations || [])
+            .map(function (code) {
+              var d = BC_DESIGNATIONS[code];
+              if (!d) return '';
+              return (
+                '<span class="cm-desig-badge' +
+                (d.level > 0 ? ' low-inc' : '') +
+                '" title="' +
+                code +
+                ' \u2014 ' +
+                esc(d.name) +
+                '">' +
+                esc(code) +
+                '</span>'
+              );
+            })
+            .join('') +
+          (function () {
+            var ds = st.designations || [];
+            var hasIep = ds.some(function (c) {
+              return BC_DESIGNATIONS[c]?.iep;
+            });
+            var hasMod = ds.some(function (c) {
+              return BC_DESIGNATIONS[c]?.modified;
+            });
+            return (
+              (hasIep ? '<span class="cm-iep-tag">IEP</span>' : '') +
+              (hasMod ? '<span class="cm-mod-tag">MOD</span>' : '')
+            );
+          })() +
           (st.pronouns ? '<span class="cm-student-pronouns">' + esc(st.pronouns) + '</span>' : '') +
-          (st.studentNumber ? '<span style="font-size:0.65rem;color:var(--text-3);font-family:\'SF Mono\',monospace">#' + esc(st.studentNumber) + '</span>' : '') +
+          (st.studentNumber
+            ? '<span style="font-size:0.65rem;color:var(--text-3);font-family:\'SF Mono\',monospace">#' +
+              esc(st.studentNumber) +
+              '</span>'
+            : '') +
           '<div class="cm-student-actions">' +
-            '<button class="cm-delete-mini" data-action="cmEditStudent" data-sid="' + st.id + '" title="Edit" style="font-size:0.65rem">\u270E</button>' +
-            '<button class="cm-delete-mini" data-action="cmRemoveStudent" data-sid="' + st.id + '" title="Remove">\u2715</button>' +
+          '<button class="cm-delete-mini" data-action="cmEditStudent" data-sid="' +
+          st.id +
+          '" title="Edit" style="font-size:0.65rem">\u270E</button>' +
+          '<button class="cm-delete-mini" data-action="cmRemoveStudent" data-sid="' +
+          st.id +
+          '" title="Remove">\u2715</button>' +
           '</div>' +
-        '</div>';
+          '</div>';
       });
       html += '</div>';
     } else {
-      html += '<div style="text-align:center;padding:16px;color:var(--text-3);font-size:0.82rem;border:1.5px dashed var(--border);border-radius:var(--radius-sm)">' +
+      html +=
+        '<div style="text-align:center;padding:16px;color:var(--text-3);font-size:0.82rem;border:1.5px dashed var(--border);border-radius:var(--radius-sm)">' +
         'No students yet. Add students individually or import a CSV roster.' +
-      '</div>';
+        '</div>';
     }
     // Bulk edit panel
     if (cmBulkMode && students.length > 0) {
-      html += '<div class="cm-bulk-panel">' +
+      html +=
+        '<div class="cm-bulk-panel">' +
         '<div style="display:flex;gap:8px;margin-bottom:8px">' +
-          '<button class="cm-add-link" data-action="cmBulkSelectAll" style="font-size:0.7rem">Select All</button>' +
-          '<button class="cm-add-link" data-action="cmBulkDeselectAll" style="font-size:0.7rem">Deselect All</button>' +
-          '<span style="font-size:0.7rem;color:var(--text-3);margin-left:auto">' + cmBulkSelected.size + ' selected</span>' +
+        '<button class="cm-add-link" data-action="cmBulkSelectAll" style="font-size:0.7rem">Select All</button>' +
+        '<button class="cm-add-link" data-action="cmBulkDeselectAll" style="font-size:0.7rem">Deselect All</button>' +
+        '<span style="font-size:0.7rem;color:var(--text-3);margin-left:auto">' +
+        cmBulkSelected.size +
+        ' selected</span>' +
         '</div>' +
         '<div class="cm-student-form" style="gap:8px 12px">' +
-          '<div class="cm-field">' +
-            '<label class="cm-label">Set Pronouns</label>' +
-            pronounsSelect('cm-bulk-pro', '') +
-          '</div>' +
-          '<div class="cm-field">' +
-            '<label class="cm-label">Add Attendance</label>' +
-            '<div style="display:flex;gap:6px">' +
-              '<input type="date" class="cm-input" id="cm-bulk-att-date" value="' + getTodayStr() + '" style="font-size:0.78rem;flex:1">' +
-              '<select class="cm-input" id="cm-bulk-att-status" style="font-size:0.78rem;flex:1">' +
-                '<option value="present">Present</option>' +
-                '<option value="absent">Absent</option>' +
-                '<option value="late">Late</option>' +
-                '<option value="excused">Excused</option>' +
-              '</select>' +
-            '</div>' +
-          '</div>' +
+        '<div class="cm-field">' +
+        '<label class="cm-label">Set Pronouns</label>' +
+        pronounsSelect('cm-bulk-pro', '') +
+        '</div>' +
+        '<div class="cm-field">' +
+        '<label class="cm-label">Add Attendance</label>' +
+        '<div style="display:flex;gap:6px">' +
+        '<input type="date" class="cm-input" id="cm-bulk-att-date" value="' +
+        getTodayStr() +
+        '" style="font-size:0.78rem;flex:1">' +
+        '<select class="cm-input" id="cm-bulk-att-status" style="font-size:0.78rem;flex:1">' +
+        '<option value="present">Present</option>' +
+        '<option value="absent">Absent</option>' +
+        '<option value="late">Late</option>' +
+        '<option value="excused">Excused</option>' +
+        '</select>' +
+        '</div>' +
+        '</div>' +
         '</div>' +
         '<div style="display:flex;gap:8px;margin-top:8px">' +
-          '<button class="btn btn-primary" data-action="cmApplyBulk" style="font-size:0.78rem;padding:6px 14px" ' + (cmBulkSelected.size===0?'disabled':'') + '>Apply to Selected</button>' +
+        '<button class="btn btn-primary" data-action="cmApplyBulk" style="font-size:0.78rem;padding:6px 14px" ' +
+        (cmBulkSelected.size === 0 ? 'disabled' : '') +
+        '>Apply to Selected</button>' +
         '</div>' +
-      '</div>';
+        '</div>';
     }
     // Add/Edit student form
-    html += '<div id="cm-add-student-form" style="display:none" class="cm-add-student-form">' +
+    html +=
+      '<div id="cm-add-student-form" style="display:none" class="cm-add-student-form">' +
       '<div class="cm-student-form">' +
-        '<div class="cm-field"><label class="cm-label">First Name *</label><input class="cm-input" id="cm-add-first" placeholder="e.g. Amara" style="font-size:0.82rem;padding:6px 10px"></div>' +
-        '<div class="cm-field"><label class="cm-label">Last Name</label><input class="cm-input" id="cm-add-last" placeholder="e.g. Osei" style="font-size:0.82rem;padding:6px 10px"></div>' +
-        '<div class="cm-field"><label class="cm-label">Preferred Name</label><input class="cm-input" id="cm-add-pref" placeholder="e.g. Amara" style="font-size:0.82rem;padding:6px 10px"></div>' +
-        '<div class="cm-field"><label class="cm-label">Pronouns</label>' + pronounsSelect('cm-add-pro', '') + '</div>' +
-        '<div class="cm-field"><label class="cm-label">Student Number</label><input class="cm-input" id="cm-add-num" placeholder="e.g. STU-101" style="font-size:0.82rem;padding:6px 10px"></div>' +
-        '<div class="cm-field"><label class="cm-label">Email</label><input class="cm-input" id="cm-add-email" type="email" placeholder="student@school.edu" style="font-size:0.82rem;padding:6px 10px"></div>' +
-        '<div class="cm-field"><label class="cm-label">Date of Birth</label><input class="cm-input" id="cm-add-dob" type="date" style="font-size:0.82rem;padding:6px 10px"></div>' +
-        '<div class="cm-field" style="grid-column:1/-1"><label class="cm-label">Designations</label>' +
-          '<div class="desig-check-grid">' +
-            Object.entries(BC_DESIGNATIONS).map(function(entry) { var k = entry[0], v = entry[1]; return '<label class="desig-check-item" title="' + esc(v.desc) + '"><input type="checkbox" class="cm-desig-check" value="' + k + '"><span class="desig-check-code">' + k + '</span><span class="desig-check-name">' + esc(v.name) + '</span></label>'; }).join('') +
-          '</div>' +
-        '</div>' +
-        '<div class="cm-field" style="grid-column:1/-1;display:flex;align-items:flex-end;gap:8px;justify-content:flex-end">' +
-          '<button class="btn btn-ghost" data-action="cmCancelStudent" style="padding:6px 10px;font-size:0.78rem">Cancel</button>' +
-          '<button class="btn btn-primary" id="cm-save-btn" data-action="cmSaveStudent" style="padding:6px 14px;font-size:0.78rem">Save</button>' +
-        '</div>' +
+      '<div class="cm-field"><label class="cm-label">First Name *</label><input class="cm-input" id="cm-add-first" placeholder="e.g. Amara" style="font-size:0.82rem;padding:6px 10px"></div>' +
+      '<div class="cm-field"><label class="cm-label">Last Name</label><input class="cm-input" id="cm-add-last" placeholder="e.g. Osei" style="font-size:0.82rem;padding:6px 10px"></div>' +
+      '<div class="cm-field"><label class="cm-label">Preferred Name</label><input class="cm-input" id="cm-add-pref" placeholder="e.g. Amara" style="font-size:0.82rem;padding:6px 10px"></div>' +
+      '<div class="cm-field"><label class="cm-label">Pronouns</label>' +
+      pronounsSelect('cm-add-pro', '') +
       '</div>' +
-    '</div>' +
-    '<div class="cm-roster-actions">' +
+      '<div class="cm-field"><label class="cm-label">Student Number</label><input class="cm-input" id="cm-add-num" placeholder="e.g. STU-101" style="font-size:0.82rem;padding:6px 10px"></div>' +
+      '<div class="cm-field"><label class="cm-label">Email</label><input class="cm-input" id="cm-add-email" type="email" placeholder="student@school.edu" style="font-size:0.82rem;padding:6px 10px"></div>' +
+      '<div class="cm-field"><label class="cm-label">Date of Birth</label><input class="cm-input" id="cm-add-dob" type="date" style="font-size:0.82rem;padding:6px 10px"></div>' +
+      '<div class="cm-field" style="grid-column:1/-1"><label class="cm-label">Designations</label>' +
+      '<div class="desig-check-grid">' +
+      Object.entries(BC_DESIGNATIONS)
+        .map(function (entry) {
+          var k = entry[0],
+            v = entry[1];
+          return (
+            '<label class="desig-check-item" title="' +
+            esc(v.desc) +
+            '"><input type="checkbox" class="cm-desig-check" value="' +
+            k +
+            '"><span class="desig-check-code">' +
+            k +
+            '</span><span class="desig-check-name">' +
+            esc(v.name) +
+            '</span></label>'
+          );
+        })
+        .join('') +
+      '</div>' +
+      '</div>' +
+      '<div class="cm-field" style="grid-column:1/-1;display:flex;align-items:flex-end;gap:8px;justify-content:flex-end">' +
+      '<button class="btn btn-ghost" data-action="cmCancelStudent" style="padding:6px 10px;font-size:0.78rem">Cancel</button>' +
+      '<button class="btn btn-primary" id="cm-save-btn" data-action="cmSaveStudent" style="padding:6px 14px;font-size:0.78rem">Save</button>' +
+      '</div>' +
+      '</div>' +
+      '</div>' +
+      '<div class="cm-roster-actions">' +
       '<button class="cm-add-link" data-action="cmShowAddStudent" style="padding:4px 0">+ Add Student</button>' +
       '<span style="color:var(--border)">|</span>' +
       '<button class="cm-add-link" data-action="cmImportRoster" style="padding:4px 0">Import Roster</button>' +
       '<input type="file" id="cm-csv-input" accept=".csv,.txt" style="display:none" data-action-change="cmCSV">' +
-    '</div>' +
-    '<div id="cm-import-preview"></div>' +
-    '</div>';
+      '</div>' +
+      '<div id="cm-import-preview"></div>' +
+      '</div>';
 
     // Section 3: Grading & Calculation (still in left column)
     // T-UI-02 — grading_system segmented control. Three segments:
     //   proficiency / letter / both. letter+both require at least one
     //   assessment Category (T-UI-12) — disabled with tooltip otherwise.
-    var gs = course.gradingSystem || (_cmDefaultGradingSystem(course));
+    var gs = course.gradingSystem || _cmDefaultGradingSystem(course);
     var hasCats = _cmHasCategories(cmSelectedCourse);
     var gradeLockReason = hasCats ? '' : 'Create a category first \u2192';
-    html += '<div class="cm-section">' +
+    html +=
+      '<div class="cm-section">' +
       '<div class="cm-section-title">Grading &amp; Calculation</div>' +
       '<div class="cm-field">' +
-        '<label class="cm-label">Grading System</label>' +
-        '<div class="cm-seg" role="radiogroup" aria-label="Grading system">' +
-          '<button class="cm-seg-btn' + (gs==='proficiency'?' active':'') + '" role="radio" aria-checked="' + (gs==='proficiency') + '" data-action="cmSetGradingSystem" data-value="proficiency">Proficiency</button>' +
-          '<button class="cm-seg-btn' + (gs==='letter'?' active':'') + (hasCats?'':' cm-seg-btn-disabled') + '" role="radio" aria-checked="' + (gs==='letter') + '" aria-disabled="' + (!hasCats) + '"' + (hasCats?'':' title="' + gradeLockReason + '"') + ' data-action="cmSetGradingSystem" data-value="letter">Letter</button>' +
-          '<button class="cm-seg-btn' + (gs==='both'?' active':'') + (hasCats?'':' cm-seg-btn-disabled') + '" role="radio" aria-checked="' + (gs==='both') + '" aria-disabled="' + (!hasCats) + '"' + (hasCats?'':' title="' + gradeLockReason + '"') + ' data-action="cmSetGradingSystem" data-value="both">Both</button>' +
-        '</div>' +
-        (hasCats ? '' : '<div class="cm-hint cm-seg-hint-locked">' + esc(gradeLockReason) + '</div>') +
-        // Contextual grading-system description — mirrors the Phoneox React
-        // pattern at src/components/courses/grading-config.tsx:56-70.
-        '<div class="cm-hint" style="margin-top:6px">' + _cmGradingSystemDescription(gs) + '</div>' +
+      '<label class="cm-label">Grading System</label>' +
+      '<div class="cm-seg" role="radiogroup" aria-label="Grading system">' +
+      '<button class="cm-seg-btn' +
+      (gs === 'proficiency' ? ' active' : '') +
+      '" role="radio" aria-checked="' +
+      (gs === 'proficiency') +
+      '" data-action="cmSetGradingSystem" data-value="proficiency">Proficiency</button>' +
+      '<button class="cm-seg-btn' +
+      (gs === 'letter' ? ' active' : '') +
+      (hasCats ? '' : ' cm-seg-btn-disabled') +
+      '" role="radio" aria-checked="' +
+      (gs === 'letter') +
+      '" aria-disabled="' +
+      !hasCats +
+      '"' +
+      (hasCats ? '' : ' title="' + gradeLockReason + '"') +
+      ' data-action="cmSetGradingSystem" data-value="letter">Letter</button>' +
+      '<button class="cm-seg-btn' +
+      (gs === 'both' ? ' active' : '') +
+      (hasCats ? '' : ' cm-seg-btn-disabled') +
+      '" role="radio" aria-checked="' +
+      (gs === 'both') +
+      '" aria-disabled="' +
+      !hasCats +
+      '"' +
+      (hasCats ? '' : ' title="' + gradeLockReason + '"') +
+      ' data-action="cmSetGradingSystem" data-value="both">Both</button>' +
+      '</div>' +
+      (hasCats ? '' : '<div class="cm-hint cm-seg-hint-locked">' + esc(gradeLockReason) + '</div>') +
+      // Contextual grading-system description — mirrors the Phoneox React
+      // pattern at src/components/courses/grading-config.tsx:56-70.
+      '<div class="cm-hint" style="margin-top:6px">' +
+      _cmGradingSystemDescription(gs) +
+      '</div>' +
       '</div>' +
       _cmRenderCategoriesField(cmSelectedCourse) +
       '<div class="cm-field">' +
-        '<label class="cm-label">Calculation Method</label>' +
-        '<div class="cm-seg">' +
-          '<button class="cm-seg-btn' + (method==='mostRecent'?' active':'') + '" data-action="cmSetCalcMethod" data-value="mostRecent">Most Recent</button>' +
-          '<button class="cm-seg-btn' + (method==='highest'?' active':'') + '" data-action="cmSetCalcMethod" data-value="highest">Highest</button>' +
-          '<button class="cm-seg-btn' + (method==='average'?' active':'') + '" data-action="cmSetCalcMethod" data-value="average">Mean</button>' +
-          '<button class="cm-seg-btn' + (method==='median'?' active':'') + '" data-action="cmSetCalcMethod" data-value="median">Median</button>' +
-          '<button class="cm-seg-btn' + (method==='mode'?' active':'') + '" data-action="cmSetCalcMethod" data-value="mode">Mode</button>' +
-          '<button class="cm-seg-btn' + (method==='decayingAvg'?' active':'') + '" data-action="cmSetCalcMethod" data-value="decayingAvg">Decaying Avg</button>' +
-        '</div>' +
-        // Contextual description beneath the selected method — copied verbatim
-        // from Project Phoneox (src/components/courses/grading-config.tsx:100-115)
-        // so explanatory copy stays consistent across the React and JS builds.
-        '<div class="cm-hint" style="margin-top:6px">' + _cmCalcMethodDescription(method) + '</div>' +
+      '<label class="cm-label">Calculation Method</label>' +
+      '<div class="cm-seg">' +
+      '<button class="cm-seg-btn' +
+      (method === 'mostRecent' ? ' active' : '') +
+      '" data-action="cmSetCalcMethod" data-value="mostRecent">Most Recent</button>' +
+      '<button class="cm-seg-btn' +
+      (method === 'highest' ? ' active' : '') +
+      '" data-action="cmSetCalcMethod" data-value="highest">Highest</button>' +
+      '<button class="cm-seg-btn' +
+      (method === 'average' ? ' active' : '') +
+      '" data-action="cmSetCalcMethod" data-value="average">Mean</button>' +
+      '<button class="cm-seg-btn' +
+      (method === 'median' ? ' active' : '') +
+      '" data-action="cmSetCalcMethod" data-value="median">Median</button>' +
+      '<button class="cm-seg-btn' +
+      (method === 'mode' ? ' active' : '') +
+      '" data-action="cmSetCalcMethod" data-value="mode">Mode</button>' +
+      '<button class="cm-seg-btn' +
+      (method === 'decayingAvg' ? ' active' : '') +
+      '" data-action="cmSetCalcMethod" data-value="decayingAvg">Decaying Avg</button>' +
       '</div>' +
-      '<div class="cm-field" style="' + (method==='decayingAvg'?'':'display:none') + '">' +
-        '<label class="cm-label">Decay Weight</label>' +
-        '<div class="cm-slider-row">' +
-          '<input type="range" min="10" max="95" value="' + Math.round(dw*100) + '" id="cm-decay-slider" data-action-input="cmDecaySlider" style="flex:1">' +
-          '<span class="cm-slider-label" id="cm-decay-val">' + Math.round(dw*100) + '%</span>' +
-        '</div>' +
-        '<div class="cm-hint">Higher values weight recent scores more heavily.</div>' +
+      // Contextual description beneath the selected method — copied verbatim
+      // from Project Phoneox (src/components/courses/grading-config.tsx:100-115)
+      // so explanatory copy stays consistent across the React and JS builds.
+      '<div class="cm-hint" style="margin-top:6px">' +
+      _cmCalcMethodDescription(method) +
+      '</div>' +
+      '</div>' +
+      '<div class="cm-field" style="' +
+      (method === 'decayingAvg' ? '' : 'display:none') +
+      '">' +
+      '<label class="cm-label">Decay Weight</label>' +
+      '<div class="cm-slider-row">' +
+      '<input type="range" min="10" max="95" value="' +
+      Math.round(dw * 100) +
+      '" id="cm-decay-slider" data-action-input="cmDecaySlider" style="flex:1">' +
+      '<span class="cm-slider-label" id="cm-decay-val">' +
+      Math.round(dw * 100) +
+      '%</span>' +
+      '</div>' +
+      '<div class="cm-hint">Higher values weight recent scores more heavily.</div>' +
       '</div>' +
       // Late Work Policy — free-text, optional. Copy adapted from Phoneox
       // src/components/courses/grading-config.tsx:204-222. Surfaced on the
       // Score Distribution section of printed progress reports when set.
       '<div class="cm-field">' +
-        '<label class="cm-label" for="cm-late-policy">Late Work Policy</label>' +
-        '<textarea class="cm-textarea" id="cm-late-policy" rows="2" placeholder="e.g. Late assignments lose 10% per day, up to 3 days." data-action-blur="cmLateWorkPolicy" aria-label="Late work policy">' + esc(course.lateWorkPolicy || '') + '</textarea>' +
-        '<div class="cm-hint">Optional. If set, this text appears on the Score Distribution section of printed progress reports.</div>' +
+      '<label class="cm-label" for="cm-late-policy">Late Work Policy</label>' +
+      '<textarea class="cm-textarea" id="cm-late-policy" rows="2" placeholder="e.g. Late assignments lose 10% per day, up to 3 days." data-action-blur="cmLateWorkPolicy" aria-label="Late work policy">' +
+      esc(course.lateWorkPolicy || '') +
+      '</textarea>' +
+      '<div class="cm-hint">Optional. If set, this text appears on the Score Distribution section of printed progress reports.</div>' +
       '</div>' +
       // T-UI-02 retired controls: the legacy "Category weights (summative vs
       // formative slider)" and "Report final grade as percentage" checkbox
       // were deleted 2026-04-21. Real category weighting lands in T-UI-12's
       // Category management row; percentage/letter display is driven entirely
       // by grading_system above.
-    '</div>';
+      '</div>';
 
     html += '</div>'; // close left column
 
@@ -830,19 +1292,35 @@ window.DashClassManager = (function() {
     html += '<div class="cm-col-curriculum">';
 
     // Curriculum -- Subjects
-    html += '<div class="cm-section">' +
+    html +=
+      '<div class="cm-section">' +
       '<div class="cm-section-title">Curriculum</div>' +
       '<div class="cm-field">' +
-        '<label class="cm-label">Subjects</label>';
-    (lm.subjects||[]).forEach(function(sub) {
-      html += '<div class="cm-subject-row">' +
-        '<div class="cm-subject-color" style="background:' + sub.color + '">' +
-          '<div class="cm-color-swatch-selected" style="background:' + sub.color + '" data-action="cmToggleColorPalette" data-target="subject" data-subid="' + sub.id + '"></div>' +
-          '<div class="cm-color-palette" id="cm-palette-subject-' + sub.id + '"></div>' +
+      '<label class="cm-label">Subjects</label>';
+    (lm.subjects || []).forEach(function (sub) {
+      html +=
+        '<div class="cm-subject-row">' +
+        '<div class="cm-subject-color" style="background:' +
+        sub.color +
+        '">' +
+        '<div class="cm-color-swatch-selected" style="background:' +
+        sub.color +
+        '" data-action="cmToggleColorPalette" data-target="subject" data-subid="' +
+        sub.id +
+        '"></div>' +
+        '<div class="cm-color-palette" id="cm-palette-subject-' +
+        sub.id +
+        '"></div>' +
         '</div>' +
-        '<input class="cm-input" value="' + esc(sub.name) + '" style="flex:1" data-action-blur="cmSubjectName" data-subid="' + sub.id + '">' +
-        '<button class="cm-delete-mini" data-action="cmDeleteSubject" data-subid="' + sub.id + '" title="Delete subject" aria-label="Delete subject">\u2715</button>' +
-      '</div>';
+        '<input class="cm-input" value="' +
+        esc(sub.name) +
+        '" style="flex:1" data-action-blur="cmSubjectName" data-subid="' +
+        sub.id +
+        '">' +
+        '<button class="cm-delete-mini" data-action="cmDeleteSubject" data-subid="' +
+        sub.id +
+        '" title="Delete subject" aria-label="Delete subject">\u2715</button>' +
+        '</div>';
     });
     html += '<button class="cm-add-link" data-action="cmAddSubject">+ Add Subject</button></div>';
 
@@ -850,67 +1328,113 @@ window.DashClassManager = (function() {
     var compGroups = lm.competencyGroups || [];
     var _cmGrouped = { groups: [], ungrouped: [] };
     var _cmGroupMap = {};
-    compGroups.forEach(function(g) { _cmGroupMap[g.id] = { group: g, sections: [] }; });
-    (lm.sections || []).forEach(function(sec) {
+    compGroups.forEach(function (g) {
+      _cmGroupMap[g.id] = { group: g, sections: [] };
+    });
+    (lm.sections || []).forEach(function (sec) {
       if (sec.groupId && _cmGroupMap[sec.groupId]) _cmGroupMap[sec.groupId].sections.push(sec);
       else _cmGrouped.ungrouped.push(sec);
     });
-    _cmGrouped.groups = compGroups.map(function(g) { return _cmGroupMap[g.id]; });
+    _cmGrouped.groups = compGroups.map(function (g) {
+      return _cmGroupMap[g.id];
+    });
 
     html += '<div class="cm-field"><label class="cm-label">Learning Standards</label>';
 
-    if ((lm.sections||[]).length === 0 && compGroups.length === 0) {
-      html += '<div class="cm-curriculum-empty">' +
+    if ((lm.sections || []).length === 0 && compGroups.length === 0) {
+      html +=
+        '<div class="cm-curriculum-empty">' +
         '<div class="cm-curriculum-empty-icon">\uD83D\uDCD0</div>' +
         '<div class="cm-curriculum-empty-text">No learning standards yet. Add a standard to start defining your curriculum.</div>' +
-      '</div>';
+        '</div>';
     }
 
     // Render group folders (reuses .mod-folder pattern from assignments page)
-    _cmGrouped.groups.forEach(function(gi) {
+    _cmGrouped.groups.forEach(function (gi) {
       var grp = gi.group;
       var secs = gi.sections;
       var isOpen = !_cmCollapsedStdFolders[grp.id];
-      html += '<div class="mod-folder' + (isOpen ? ' open' : '') + '" data-module-id="' + grp.id + '" data-folder-drop="' + grp.id + '">' +
-        '<div class="mod-folder-header" data-action="cmToggleStdFolder" data-uid="' + grp.id + '">' +
-          '<span class="mod-folder-grip">\u2807</span>' +
-          '<span class="mod-folder-chevron">\u25B6</span>' +
-          '<span class="mod-folder-color" style="background:' + grp.color + '" title="Change color" data-action="openColorPicker" data-stop-prop="true">' +
-            '<input type="color" value="' + grp.color + '" data-action-change="cmCompGroupColor" data-grpid="' + grp.id + '">' +
-          '</span>' +
-          '<input class="mod-folder-name-input" value="' + esc(grp.name) + '" draggable="false" data-stop-prop="true" data-action-blur="cmCompGroupName" data-grpid="' + grp.id + '">' +
-          '<span class="mod-folder-meta">' + secs.length + ' standard' + (secs.length !== 1 ? 's' : '') + '</span>' +
-          '<div class="mod-folder-actions" data-stop-prop="true">' +
-            '<button class="mod-folder-action delete" data-action="cmDeleteCompGroup" data-grpid="' + grp.id + '" data-count="' + secs.length + '" title="Delete group">\u2715</button>' +
-          '</div>' +
+      html +=
+        '<div class="mod-folder' +
+        (isOpen ? ' open' : '') +
+        '" data-module-id="' +
+        grp.id +
+        '" data-folder-drop="' +
+        grp.id +
+        '">' +
+        '<div class="mod-folder-header" data-action="cmToggleStdFolder" data-uid="' +
+        grp.id +
+        '">' +
+        '<span class="mod-folder-grip">\u2807</span>' +
+        '<span class="mod-folder-chevron">\u25B6</span>' +
+        '<span class="mod-folder-color" style="background:' +
+        grp.color +
+        '" title="Change color" data-action="openColorPicker" data-stop-prop="true">' +
+        '<input type="color" value="' +
+        grp.color +
+        '" data-action-change="cmCompGroupColor" data-grpid="' +
+        grp.id +
+        '">' +
+        '</span>' +
+        '<input class="mod-folder-name-input" value="' +
+        esc(grp.name) +
+        '" draggable="false" data-stop-prop="true" data-action-blur="cmCompGroupName" data-grpid="' +
+        grp.id +
+        '">' +
+        '<span class="mod-folder-meta">' +
+        secs.length +
+        ' standard' +
+        (secs.length !== 1 ? 's' : '') +
+        '</span>' +
+        '<div class="mod-folder-actions" data-stop-prop="true">' +
+        '<button class="mod-folder-action delete" data-action="cmDeleteCompGroup" data-grpid="' +
+        grp.id +
+        '" data-count="' +
+        secs.length +
+        '" title="Delete group">\u2715</button>' +
+        '</div>' +
         '</div>' +
         '<div class="mod-folder-body">';
       if (secs.length === 0) {
-        html += '<div class="mod-folder-empty">Drag standards here or use the group dropdown when editing a standard</div>';
+        html +=
+          '<div class="mod-folder-empty">Drag standards here or use the group dropdown when editing a standard</div>';
       }
-      secs.forEach(function(sec) { html += _cmRenderStdCard(sec, lm, compGroups); });
+      secs.forEach(function (sec) {
+        html += _cmRenderStdCard(sec, lm, compGroups);
+      });
       html += '</div></div>';
     });
 
     // Ungrouped standards
     if (_cmGrouped.ungrouped.length > 0 || compGroups.length > 0) {
       var ungOpen = !_cmCollapsedStdFolders['__none__'];
-      html += '<div class="mod-folder no-module' + (ungOpen ? ' open' : '') + '" data-module-id="__none__" data-folder-drop="__none__">' +
+      html +=
+        '<div class="mod-folder no-module' +
+        (ungOpen ? ' open' : '') +
+        '" data-module-id="__none__" data-folder-drop="__none__">' +
         '<div class="mod-folder-header" data-action="cmToggleStdFolder" data-uid="__none__">' +
-          '<span class="mod-folder-chevron">\u25B6</span>' +
-          '<span style="font-size:0.88rem;color:var(--text-3)">\uD83D\uDCC1</span>' +
-          '<span class="mod-folder-name" style="font-size:0.95rem;font-weight:500;color:var(--text-3)">Ungrouped</span>' +
-          '<span class="mod-folder-meta">' + _cmGrouped.ungrouped.length + ' standard' + (_cmGrouped.ungrouped.length !== 1 ? 's' : '') + '</span>' +
+        '<span class="mod-folder-chevron">\u25B6</span>' +
+        '<span style="font-size:0.88rem;color:var(--text-3)">\uD83D\uDCC1</span>' +
+        '<span class="mod-folder-name" style="font-size:0.95rem;font-weight:500;color:var(--text-3)">Ungrouped</span>' +
+        '<span class="mod-folder-meta">' +
+        _cmGrouped.ungrouped.length +
+        ' standard' +
+        (_cmGrouped.ungrouped.length !== 1 ? 's' : '') +
+        '</span>' +
         '</div>' +
         '<div class="mod-folder-body">';
-      _cmGrouped.ungrouped.forEach(function(sec) { html += _cmRenderStdCard(sec, lm, compGroups); });
+      _cmGrouped.ungrouped.forEach(function (sec) {
+        html += _cmRenderStdCard(sec, lm, compGroups);
+      });
       if (_cmGrouped.ungrouped.length === 0) {
         html += '<div class="mod-folder-empty">All standards are grouped</div>';
       }
       html += '</div></div>';
     } else {
       // No groups at all — render flat
-      (lm.sections || []).forEach(function(sec) { html += _cmRenderStdCard(sec, lm, compGroups); });
+      (lm.sections || []).forEach(function (sec) {
+        html += _cmRenderStdCard(sec, lm, compGroups);
+      });
     }
 
     // Add buttons
@@ -920,21 +1444,29 @@ window.DashClassManager = (function() {
 
     // Section 4: BC Curriculum Link
     var linkedTags = course.curriculumTags || [];
-    html += '<div class="cm-section">' +
-      '<div class="cm-section-title">BC Curriculum Link</div>';
+    html += '<div class="cm-section">' + '<div class="cm-section-title">BC Curriculum Link</div>';
     if (linkedTags.length > 0) {
-      linkedTags.forEach(function(tag) {
+      linkedTags.forEach(function (tag) {
         var courseData = CURRICULUM_INDEX ? CURRICULUM_INDEX[tag] : null;
         var courseName = courseData ? courseData.course_name : tag;
-        html += '<div class="cm-curric-link">' +
-          '<span class="cm-curric-tag">' + esc(tag) + '</span>' +
-          '<span class="cm-curric-name">' + esc(courseName) + '</span>' +
-        '</div>';
+        html +=
+          '<div class="cm-curric-link">' +
+          '<span class="cm-curric-tag">' +
+          esc(tag) +
+          '</span>' +
+          '<span class="cm-curric-name">' +
+          esc(courseName) +
+          '</span>' +
+          '</div>';
       });
-      html += '<button class="cm-relink-btn" data-action="cmStartRelink" data-cid="' + cid + '">Re-link Curriculum</button>';
+      html +=
+        '<button class="cm-relink-btn" data-action="cmStartRelink" data-cid="' + cid + '">Re-link Curriculum</button>';
     } else {
-      html += '<div class="cm-curric-unlinked">Not linked to BC Curriculum</div>' +
-        '<button class="cm-relink-btn" data-action="cmStartRelink" data-cid="' + cid + '">Link to BC Curriculum</button>';
+      html +=
+        '<div class="cm-curric-unlinked">Not linked to BC Curriculum</div>' +
+        '<button class="cm-relink-btn" data-action="cmStartRelink" data-cid="' +
+        cid +
+        '">Link to BC Curriculum</button>';
     }
     html += '</div>';
 
@@ -942,18 +1474,28 @@ window.DashClassManager = (function() {
 
     // Actions row
     var isArchived = cc.archived || false;
-    html += '<div class="cm-actions-row">' +
-      '<button class="cm-action-btn" data-action="cmDuplicateCourse" data-cid="' + cid + '">\u29C9 Duplicate Class</button>' +
-      '<button class="cm-action-btn" data-action="cmToggleArchive" data-cid="' + cid + '">' + (isArchived ? '\uD83D\uDCE6 Unarchive Class' : '\uD83D\uDCE6 Archive Class') + '</button>' +
-    '</div>';
+    html +=
+      '<div class="cm-actions-row">' +
+      '<button class="cm-action-btn" data-action="cmDuplicateCourse" data-cid="' +
+      cid +
+      '">\u29C9 Duplicate Class</button>' +
+      '<button class="cm-action-btn" data-action="cmToggleArchive" data-cid="' +
+      cid +
+      '">' +
+      (isArchived ? '\uD83D\uDCE6 Unarchive Class' : '\uD83D\uDCE6 Archive Class') +
+      '</button>' +
+      '</div>';
 
     // Danger Zone
-    html += '<div class="cm-danger-zone">' +
+    html +=
+      '<div class="cm-danger-zone">' +
       '<div style="display:flex;align-items:center;gap:12px">' +
-        '<button class="cm-danger-btn" data-action="cmDeleteCourse">Delete "' + esc(course.name) + '"</button>' +
-        '<span class="cm-hint" style="margin:0">Permanently removes all data for this class.</span>' +
+      '<button class="cm-danger-btn" data-action="cmDeleteCourse">Delete "' +
+      esc(course.name) +
+      '"</button>' +
+      '<span class="cm-hint" style="margin:0">Permanently removes all data for this class.</span>' +
       '</div>' +
-    '</div>';
+      '</div>';
 
     html += '</div>'; // close cm-detail-inner
     return html;
@@ -969,15 +1511,29 @@ window.DashClassManager = (function() {
 
   function renderCwStepBar() {
     var labels = ['Choose Courses', 'Class Details', 'Review'];
-    return '<div class="cw-steps">' + labels.map(function(l, i) {
-      var n = i + 1;
-      var cls = n < cwStep ? 'done' : n === cwStep ? 'active' : '';
-      return (i > 0 ? '<span class="cw-step-arrow">\u203A</span>' : '') +
-        '<div class="cw-step ' + cls + '">' +
-          '<span class="cw-step-num">' + (n < cwStep ? '\u2713' : n) + '</span>' +
-          '<span>' + l + '</span>' +
-        '</div>';
-    }).join('') + '</div>';
+    return (
+      '<div class="cw-steps">' +
+      labels
+        .map(function (l, i) {
+          var n = i + 1;
+          var cls = n < cwStep ? 'done' : n === cwStep ? 'active' : '';
+          return (
+            (i > 0 ? '<span class="cw-step-arrow">\u203A</span>' : '') +
+            '<div class="cw-step ' +
+            cls +
+            '">' +
+            '<span class="cw-step-num">' +
+            (n < cwStep ? '\u2713' : n) +
+            '</span>' +
+            '<span>' +
+            l +
+            '</span>' +
+            '</div>'
+          );
+        })
+        .join('') +
+      '</div>'
+    );
   }
 
   function renderCwStep1() {
@@ -992,17 +1548,26 @@ window.DashClassManager = (function() {
     }
 
     if (cwLoadError) {
-      html += '<div class="cm-section"><div class="cw-empty-msg">Could not load BC Curriculum data.<br>You can still create a class with a custom learning map.</div></div>';
-      html += '<div class="cw-footer"><button class="btn btn-ghost" data-action="cmCancelCreate">Cancel</button><button class="btn btn-primary" data-action="cwSkipToCustom">Custom Class</button></div>';
+      html +=
+        '<div class="cm-section"><div class="cw-empty-msg">Could not load BC Curriculum data.<br>You can still create a class with a custom learning map.</div></div>';
+      html +=
+        '<div class="cw-footer"><button class="btn btn-ghost" data-action="cmCancelCreate">Cancel</button><button class="btn btn-primary" data-action="cwSkipToCustom">Custom Class</button></div>';
       html += '</div>';
       return html;
     }
 
     // Grade selection
     html += '<div class="cm-section"><div class="cm-section-title">Grade</div><div class="cw-grade-row">';
-    [8, 9, 10, 11, 12].forEach(function(g) {
+    [8, 9, 10, 11, 12].forEach(function (g) {
       var active = cwSelectedGrade === g ? ' active' : '';
-      html += '<button class="cw-grade-btn' + active + '" data-action="cwSelectGrade" data-grade="' + g + '">Grade ' + g + '</button>';
+      html +=
+        '<button class="cw-grade-btn' +
+        active +
+        '" data-action="cwSelectGrade" data-grade="' +
+        g +
+        '">Grade ' +
+        g +
+        '</button>';
     });
     html += '</div></div>';
 
@@ -1010,61 +1575,102 @@ window.DashClassManager = (function() {
     if (cwSelectedGrade !== null) {
       var allCourses = getCoursesByGrade(cwSelectedGrade);
       var bySubject = {};
-      allCourses.forEach(function(c) {
+      allCourses.forEach(function (c) {
         if (!bySubject[c.subject]) bySubject[c.subject] = [];
         bySubject[c.subject].push(c);
       });
       var subjectNames = Object.keys(bySubject).sort();
 
       html += '<div class="cm-section"><div class="cm-section-title">Subject</div><div class="cw-subject-row">';
-      subjectNames.forEach(function(subj) {
+      subjectNames.forEach(function (subj) {
         var active = cwSelectedSubject === subj ? ' active' : '';
         var color = SUBJECT_COLOURS[subj] || '#6366f1';
-        html += '<button class="cw-subject-btn' + active + '" data-action="cwSelectSubject" data-subject="' + esc(subj) + '">' +
-          '<span class="cw-subject-dot" style="background:' + color + '"></span>' + esc(subj) + '</button>';
+        html +=
+          '<button class="cw-subject-btn' +
+          active +
+          '" data-action="cwSelectSubject" data-subject="' +
+          esc(subj) +
+          '">' +
+          '<span class="cw-subject-dot" style="background:' +
+          color +
+          '"></span>' +
+          esc(subj) +
+          '</button>';
       });
       html += '</div></div>';
 
       // Course checklist
       if (cwSelectedSubject && bySubject[cwSelectedSubject]) {
         var courses = bySubject[cwSelectedSubject];
-        html += '<div class="cm-section"><div class="cm-section-title">Courses</div>' +
+        html +=
+          '<div class="cm-section"><div class="cm-section-title">Courses</div>' +
           '<div class="cm-hint" style="margin-bottom:8px">Select one or more courses. Multiple selections create a combined class.</div>' +
           '<div class="cw-course-list">';
-        courses.forEach(function(c) {
+        courses.forEach(function (c) {
           var sel = cwSelectedTags.includes(c.short_tag) ? ' selected' : '';
           var fullCourse = CURRICULUM_INDEX[c.short_tag];
-          var compCount = 0, catCount = 0;
+          var compCount = 0,
+            catCount = 0;
           if (fullCourse && fullCourse.categories) {
             catCount = fullCourse.categories.length;
-            fullCourse.categories.forEach(function(cat) { compCount += (cat.competencies || []).length; });
+            fullCourse.categories.forEach(function (cat) {
+              compCount += (cat.competencies || []).length;
+            });
           }
-          html += '<div class="cw-course-item' + sel + '" data-action="cwToggleCourse" data-tag="' + esc(c.short_tag) + '">' +
-            '<span class="cw-course-check">' + (sel ? '\u2713' : '') + '</span>' +
-            '<span class="cw-course-name">' + esc(c.course_name) + '</span>' +
-            '<span class="cw-course-tag">' + esc(c.short_tag) + '</span>' +
-            '<span class="cw-course-count">' + catCount + ' categories \u00B7 ' + compCount + ' standards</span>' +
-          '</div>';
+          html +=
+            '<div class="cw-course-item' +
+            sel +
+            '" data-action="cwToggleCourse" data-tag="' +
+            esc(c.short_tag) +
+            '">' +
+            '<span class="cw-course-check">' +
+            (sel ? '\u2713' : '') +
+            '</span>' +
+            '<span class="cw-course-name">' +
+            esc(c.course_name) +
+            '</span>' +
+            '<span class="cw-course-tag">' +
+            esc(c.short_tag) +
+            '</span>' +
+            '<span class="cw-course-count">' +
+            catCount +
+            ' categories \u00B7 ' +
+            compCount +
+            ' standards</span>' +
+            '</div>';
         });
         html += '</div>';
 
         if (cwSelectedTags.length > 0) {
           var totalComps = 0;
-          cwSelectedTags.forEach(function(tag) {
+          cwSelectedTags.forEach(function (tag) {
             var full = CURRICULUM_INDEX[tag];
             if (full && full.categories) {
-              full.categories.forEach(function(cat) { totalComps += (cat.competencies || []).length; });
+              full.categories.forEach(function (cat) {
+                totalComps += (cat.competencies || []).length;
+              });
             }
           });
-          html += '<div class="cw-selection-summary"><strong>' + cwSelectedTags.length + '</strong> course' + (cwSelectedTags.length !== 1 ? 's' : '') + ' selected \u00B7 <strong>' + totalComps + '</strong> competencies will become gradebook standards</div>';
+          html +=
+            '<div class="cw-selection-summary"><strong>' +
+            cwSelectedTags.length +
+            '</strong> course' +
+            (cwSelectedTags.length !== 1 ? 's' : '') +
+            ' selected \u00B7 <strong>' +
+            totalComps +
+            '</strong> competencies will become gradebook standards</div>';
         }
         html += '</div>';
       }
     }
 
-    html += '<button class="cw-custom-btn" data-action="cwSkipToCustom">\u270E Create a custom class without BC Curriculum</button>';
-    html += '<div class="cw-footer"><button class="btn btn-ghost" data-action="cmCancelCreate">Cancel</button>' +
-      '<button class="btn btn-primary" data-action="cwGoToStep2" ' + (cwSelectedTags.length === 0 ? 'disabled style="opacity:0.4;pointer-events:none"' : '') + '>Next</button></div>';
+    html +=
+      '<button class="cw-custom-btn" data-action="cwSkipToCustom">\u270E Create a custom class without BC Curriculum</button>';
+    html +=
+      '<div class="cw-footer"><button class="btn btn-ghost" data-action="cmCancelCreate">Cancel</button>' +
+      '<button class="btn btn-primary" data-action="cwGoToStep2" ' +
+      (cwSelectedTags.length === 0 ? 'disabled style="opacity:0.4;pointer-events:none"' : '') +
+      '>Next</button></div>';
     html += '</div>';
     return html;
   }
@@ -1073,7 +1679,14 @@ window.DashClassManager = (function() {
     var preName = '';
     var preGrade = '';
     if (cwSelectedTags.length > 0 && CURRICULUM_INDEX) {
-      var names = cwSelectedTags.map(function(tag) { return CURRICULUM_INDEX[tag]; }).filter(Boolean).map(function(c) { return c.course_name; });
+      var names = cwSelectedTags
+        .map(function (tag) {
+          return CURRICULUM_INDEX[tag];
+        })
+        .filter(Boolean)
+        .map(function (c) {
+          return c.course_name;
+        });
       preName = names.join(' / ');
       preGrade = cwSelectedGrade ? String(cwSelectedGrade) : '';
     }
@@ -1081,36 +1694,43 @@ window.DashClassManager = (function() {
     var html = '<div class="cm-detail-inner" style="display:block">';
     html += renderCwStepBar();
 
-    html += '<div class="cm-section"><div class="cm-section-title">Class Details</div>' +
-      '<div class="cm-field"><label class="cm-label">Class Name</label><input class="cm-input" id="cm-new-name" value="' + esc(preName) + '" placeholder="e.g. English 10" autofocus></div>' +
-      '<div style="display:flex;gap:16px"><div class="cm-field" style="flex:1"><label class="cm-label">Grade Level</label><input class="cm-input" id="cm-new-grade" value="' + esc(preGrade) + '" placeholder="e.g. 8, 10-12"></div></div>' +
+    html +=
+      '<div class="cm-section"><div class="cm-section-title">Class Details</div>' +
+      '<div class="cm-field"><label class="cm-label">Class Name</label><input class="cm-input" id="cm-new-name" value="' +
+      esc(preName) +
+      '" placeholder="e.g. English 10" autofocus></div>' +
+      '<div style="display:flex;gap:16px"><div class="cm-field" style="flex:1"><label class="cm-label">Grade Level</label><input class="cm-input" id="cm-new-grade" value="' +
+      esc(preGrade) +
+      '" placeholder="e.g. 8, 10-12"></div></div>' +
       '<div class="cm-field"><label class="cm-label">Description</label><textarea class="cm-textarea" id="cm-new-desc" placeholder="Optional"></textarea></div></div>';
 
-    html += '<div class="cm-section"><div class="cm-section-title">Grading &amp; Calculation</div>' +
+    html +=
+      '<div class="cm-section"><div class="cm-section-title">Grading &amp; Calculation</div>' +
       '<div class="cm-field"><label class="cm-label">Grading System</label>' +
-        // T-UI-02 · wizard grading_system picker. Letter/Both are hidden in
-        // the create wizard (no categories exist yet) — teacher picks them
-        // later in Course Settings after adding at least one category.
-        '<div class="cm-seg" id="cm-cg-grading">' +
-          '<button class="cm-seg-btn active" data-val="proficiency" data-action="cmCreateToggle" data-group="cm-cg-grading">Proficiency</button>' +
-          '<button class="cm-seg-btn cm-seg-btn-disabled" data-val="letter" disabled title="Add a category in Course Settings first \u2192">Letter</button>' +
-          '<button class="cm-seg-btn cm-seg-btn-disabled" data-val="both" disabled title="Add a category in Course Settings first \u2192">Both</button>' +
-        '</div>' +
-        '<div class="cm-hint cm-seg-hint-locked">Create categories in Course Settings to unlock Letter and Both.</div>' +
+      // T-UI-02 · wizard grading_system picker. Letter/Both are hidden in
+      // the create wizard (no categories exist yet) — teacher picks them
+      // later in Course Settings after adding at least one category.
+      '<div class="cm-seg" id="cm-cg-grading">' +
+      '<button class="cm-seg-btn active" data-val="proficiency" data-action="cmCreateToggle" data-group="cm-cg-grading">Proficiency</button>' +
+      '<button class="cm-seg-btn cm-seg-btn-disabled" data-val="letter" disabled title="Add a category in Course Settings first \u2192">Letter</button>' +
+      '<button class="cm-seg-btn cm-seg-btn-disabled" data-val="both" disabled title="Add a category in Course Settings first \u2192">Both</button>' +
+      '</div>' +
+      '<div class="cm-hint cm-seg-hint-locked">Create categories in Course Settings to unlock Letter and Both.</div>' +
       '</div>' +
       '<div class="cm-field"><label class="cm-label">Calculation Method</label>' +
-        '<div class="cm-seg" id="cm-cg-calc">' +
-          '<button class="cm-seg-btn active" data-val="mostRecent" data-action="cmCreateToggle" data-group="cm-cg-calc">Most Recent</button>' +
-          '<button class="cm-seg-btn" data-val="highest" data-action="cmCreateToggle" data-group="cm-cg-calc">Highest</button>' +
-          '<button class="cm-seg-btn" data-val="mode" data-action="cmCreateToggle" data-group="cm-cg-calc">Mode</button>' +
-          '<button class="cm-seg-btn" data-val="decayingAvg" data-action="cmCreateToggleDecay" data-group="cm-cg-calc">Decaying Avg</button>' +
-        '</div></div>' +
+      '<div class="cm-seg" id="cm-cg-calc">' +
+      '<button class="cm-seg-btn active" data-val="mostRecent" data-action="cmCreateToggle" data-group="cm-cg-calc">Most Recent</button>' +
+      '<button class="cm-seg-btn" data-val="highest" data-action="cmCreateToggle" data-group="cm-cg-calc">Highest</button>' +
+      '<button class="cm-seg-btn" data-val="mode" data-action="cmCreateToggle" data-group="cm-cg-calc">Mode</button>' +
+      '<button class="cm-seg-btn" data-val="decayingAvg" data-action="cmCreateToggleDecay" data-group="cm-cg-calc">Decaying Avg</button>' +
+      '</div></div>' +
       '<div id="cm-cg-decay" class="cm-field" style="display:none"><label class="cm-label">Decay Weight</label>' +
-        '<div class="cm-slider-row"><input type="range" min="10" max="95" value="65" id="cm-cg-decay-slider" style="flex:1"><span class="cm-slider-label">65%</span></div>' +
-        '<div class="cm-hint">Higher values weight recent scores more heavily.</div></div>' +
-    '</div>';
+      '<div class="cm-slider-row"><input type="range" min="10" max="95" value="65" id="cm-cg-decay-slider" style="flex:1"><span class="cm-slider-label">65%</span></div>' +
+      '<div class="cm-hint">Higher values weight recent scores more heavily.</div></div>' +
+      '</div>';
 
-    html += '<div class="cw-footer"><button class="btn btn-ghost" data-action="cwGoBack">Back</button><button class="btn btn-primary" data-action="cwGoToStep3">Next</button></div>';
+    html +=
+      '<div class="cw-footer"><button class="btn btn-ghost" data-action="cwGoBack">Back</button><button class="btn btn-primary" data-action="cwGoToStep3">Next</button></div>';
     html += '</div>';
     return html;
   }
@@ -1122,36 +1742,65 @@ window.DashClassManager = (function() {
     var className = document.getElementById('cm-new-name')?.value || cwGetPreName();
     var gradeLevel = document.getElementById('cm-new-grade')?.value || (cwSelectedGrade ? String(cwSelectedGrade) : '');
 
-    html += '<div class="cm-section"><div class="cm-section-title">Review</div>' +
-      '<div class="cm-field"><label class="cm-label">Class Name</label><div style="font-size:var(--text-lg);font-weight:600;color:var(--text)">' + esc(className || 'Untitled') + '</div></div>' +
-      '<div class="cm-field"><label class="cm-label">Grade</label><div style="font-size:var(--text-md);color:var(--text-2)">' + esc(gradeLevel || '\u2014') + '</div></div></div>';
+    html +=
+      '<div class="cm-section"><div class="cm-section-title">Review</div>' +
+      '<div class="cm-field"><label class="cm-label">Class Name</label><div style="font-size:var(--text-lg);font-weight:600;color:var(--text)">' +
+      esc(className || 'Untitled') +
+      '</div></div>' +
+      '<div class="cm-field"><label class="cm-label">Grade</label><div style="font-size:var(--text-md);color:var(--text-2)">' +
+      esc(gradeLevel || '\u2014') +
+      '</div></div></div>';
 
     if (cwSelectedTags.length > 0 && CURRICULUM_INDEX) {
-      var subjectColors = ['#0891b2','#7c3aed','#059669','#d97706','#dc2626','#2563eb','#db2777','#4f46e5'];
+      var subjectColors = ['#0891b2', '#7c3aed', '#059669', '#d97706', '#dc2626', '#2563eb', '#db2777', '#4f46e5'];
       var colorIdx = 0;
-      cwSelectedTags.forEach(function(tag) {
+      cwSelectedTags.forEach(function (tag) {
         var courseData = CURRICULUM_INDEX[tag];
         if (!courseData) return;
         var color = subjectColors[colorIdx % subjectColors.length];
         colorIdx++;
         var cats = courseData.categories || [];
         var totalComps = 0;
-        cats.forEach(function(c) { totalComps += (c.competencies || []).length; });
-        html += '<div class="cw-review-card">' +
-          '<div class="cw-review-title" style="color:' + color + '">' + esc(courseData.course_name) + '</div>' +
-          '<div class="cw-review-meta">' + esc(tag) + ' \u00B7 ' + totalComps + ' competencies across ' + cats.length + ' categories</div>' +
+        cats.forEach(function (c) {
+          totalComps += (c.competencies || []).length;
+        });
+        html +=
+          '<div class="cw-review-card">' +
+          '<div class="cw-review-title" style="color:' +
+          color +
+          '">' +
+          esc(courseData.course_name) +
+          '</div>' +
+          '<div class="cw-review-meta">' +
+          esc(tag) +
+          ' \u00B7 ' +
+          totalComps +
+          ' competencies across ' +
+          cats.length +
+          ' categories</div>' +
           '<div class="cw-review-sections">';
-        cats.forEach(function(cat) {
+        cats.forEach(function (cat) {
           var compCount = (cat.competencies || []).length;
-          html += '<div class="cw-review-sec"><span class="cw-review-sec-dot" style="background:' + color + '"></span>' + esc(cat.name) + '<span class="cw-review-sec-count">' + compCount + ' standard' + (compCount !== 1 ? 's' : '') + '</span></div>';
+          html +=
+            '<div class="cw-review-sec"><span class="cw-review-sec-dot" style="background:' +
+            color +
+            '"></span>' +
+            esc(cat.name) +
+            '<span class="cw-review-sec-count">' +
+            compCount +
+            ' standard' +
+            (compCount !== 1 ? 's' : '') +
+            '</span></div>';
         });
         html += '</div></div>';
       });
     } else {
-      html += '<div class="cm-section"><div class="cw-empty-msg">Custom class \u2014 no curriculum data. You can add sections and tags manually after creation.</div></div>';
+      html +=
+        '<div class="cm-section"><div class="cw-empty-msg">Custom class \u2014 no curriculum data. You can add sections and tags manually after creation.</div></div>';
     }
 
-    html += '<div class="cw-footer"><button class="btn btn-ghost" data-action="cwGoBack">Back</button><button class="btn btn-primary" data-action="cwFinishCreate">Create Class</button></div>';
+    html +=
+      '<div class="cw-footer"><button class="btn btn-ghost" data-action="cwGoBack">Back</button><button class="btn btn-primary" data-action="cwFinishCreate">Create Class</button></div>';
     html += '</div>';
     return html;
   }
@@ -1208,7 +1857,15 @@ window.DashClassManager = (function() {
   function cwGetPreName() {
     if (cwStep2Name) return cwStep2Name;
     if (cwSelectedTags.length > 0 && CURRICULUM_INDEX) {
-      return cwSelectedTags.map(function(tag) { return CURRICULUM_INDEX[tag]; }).filter(Boolean).map(function(c) { return c.course_name; }).join(' / ');
+      return cwSelectedTags
+        .map(function (tag) {
+          return CURRICULUM_INDEX[tag];
+        })
+        .filter(Boolean)
+        .map(function (c) {
+          return c.course_name;
+        })
+        .join(' / ');
     }
     return '';
   }
@@ -1219,10 +1876,18 @@ window.DashClassManager = (function() {
     // Needs a dedicated session to design the full canonical-id-patch sequence.
     var name = cwStep2Name || cwGetPreName();
     if (!name.trim()) {
-      cwStep = 2; renderClassManager();
-      requestAnimationFrame(function() {
+      cwStep = 2;
+      renderClassManager();
+      requestAnimationFrame(function () {
         var el = document.getElementById('cm-new-name');
-        if (el) { el.style.border = '2px solid var(--score-1)'; el.placeholder = 'Class name is required'; el.oninput = function() { this.style.border = ''; }; el.focus(); }
+        if (el) {
+          el.style.border = '2px solid var(--score-1)';
+          el.placeholder = 'Class name is required';
+          el.oninput = function () {
+            this.style.border = '';
+          };
+          el.focus();
+        }
       });
       return;
     }
@@ -1233,7 +1898,7 @@ window.DashClassManager = (function() {
       description: (cwStep2Desc || '').trim(),
       gradingSystem: cwStep2Grading,
       calcMethod: cwStep2Calc,
-      decayWeight: parseInt(cwStep2Decay, 10) / 100
+      decayWeight: parseInt(cwStep2Decay, 10) / 100,
     });
 
     var cc = getCourseConfig(course.id);
@@ -1271,7 +1936,7 @@ window.DashClassManager = (function() {
     cwSelectedSubject = null;
     cwSelectedTags = [];
     cwLoadError = false;
-    loadCurriculumIndex().then(function(idx) {
+    loadCurriculumIndex().then(function (idx) {
       cwCurriculumLoaded = !!idx;
       cwLoadError = !idx;
       if (cmMode === 'create' && cwStep === 1) renderClassManager();
@@ -1286,7 +1951,9 @@ window.DashClassManager = (function() {
   }
 
   function cmCreateToggle(btn, containerId) {
-    document.querySelectorAll('#'+containerId+' .cm-seg-btn').forEach(function(b) { b.classList.remove('active'); });
+    document.querySelectorAll('#' + containerId + ' .cm-seg-btn').forEach(function (b) {
+      b.classList.remove('active');
+    });
     btn.classList.add('active');
   }
 
@@ -1294,7 +1961,14 @@ window.DashClassManager = (function() {
   function cmUpdateField(field, value, inputEl) {
     if (!cmSelectedCourse) return;
     if (field === 'name' && !value.trim()) {
-      if (inputEl) { inputEl.style.border = '2px solid var(--score-1)'; inputEl.placeholder = 'Class name is required'; inputEl.oninput = function() { this.style.border = ''; }; inputEl.focus(); }
+      if (inputEl) {
+        inputEl.style.border = '2px solid var(--score-1)';
+        inputEl.placeholder = 'Class name is required';
+        inputEl.oninput = function () {
+          this.style.border = '';
+        };
+        inputEl.focus();
+      }
       return;
     }
     updateCourse(cmSelectedCourse, { [field]: value.trim() });
@@ -1327,8 +2001,7 @@ window.DashClassManager = (function() {
         'All scores are added up and divided equally. If a student scores 2, 3, and 4, their grade is 3. This is the traditional average \u2014 every assignment carries the same weight, so a low early score pulls the final grade down even after improvement.',
       median:
         'Scores are sorted and the middle value is used. If a student scores 1, 3, and 4, their grade is 3 (not 2.7 like the mean). This protects against one unusually low or high score skewing the result.',
-      mode:
-        'The most repeated score is used. If a student scores 3, 3, 4, and 2, their grade is 3 because it appeared most often. This reflects the level a student performs at most consistently, filtering out one-off results.',
+      mode: 'The most repeated score is used. If a student scores 3, 3, 4, and 2, their grade is 3 because it appeared most often. This reflects the level a student performs at most consistently, filtering out one-off results.',
       decayingAvg:
         'A weighted average where recent scores count more than older ones. If a student scores 2, then 3, then 4, the grade will be closer to 4 than a simple average. Use the slider below to control how much more recent work matters.',
     };
@@ -1344,8 +2017,7 @@ window.DashClassManager = (function() {
         'Students are scored on a 1\u20134 scale: 1 (Beginning), 2 (Developing), 3 (Proficient), 4 (Extending). This is the standard scale used across BC K\u201312 classrooms and aligns directly with BC report card requirements.',
       letter:
         'Students receive letter grades (A, B, C+, C, C\u2013, F) using BC Ministry of Education percentage cutoffs and conversion tables. All calculations follow the official BC grading scale, so report cards are generated correctly without manual conversion.',
-      both:
-        'Both pipelines run side by side: proficiency (1\u20134) drives the competency view and the dashboard overview; letter + percentage (derived from categories and the BC conversion tables) drive reports for grades 10\u201312. Useful when a teacher wants the competency lens day-to-day but the parent-facing report card still needs letter grades.',
+      both: 'Both pipelines run side by side: proficiency (1\u20134) drives the competency view and the dashboard overview; letter + percentage (derived from categories and the BC conversion tables) drive reports for grades 10\u201312. Useful when a teacher wants the competency lens day-to-day but the parent-facing report card still needs letter grades.',
     };
     return esc(map[gs] || map.proficiency);
   }
@@ -1367,11 +2039,13 @@ window.DashClassManager = (function() {
       }
       var gb = (typeof _cache !== 'undefined' && _cache.v2Gradebook && _cache.v2Gradebook[cid]) || null;
       if (gb && Array.isArray(gb.categories) && gb.categories.length > 0) return true;
-      var assArr = (typeof getAssessments === 'function') ? getAssessments(cid) : [];
+      var assArr = typeof getAssessments === 'function' ? getAssessments(cid) : [];
       for (var i = 0; i < (assArr || []).length; i++) {
         if (assArr[i] && assArr[i].category_id) return true;
       }
-    } catch (e) { /* best-effort detection */ }
+    } catch (e) {
+      /* best-effort detection */
+    }
     return false;
   }
 
@@ -1394,21 +2068,31 @@ window.DashClassManager = (function() {
       st.loaded = true;
       return;
     }
-    st.loading = window.v2.listCategories(cid).then(function (res) {
-      st.loading = null;
-      st.loaded = true;
-      if (res && !res.error && Array.isArray(res.data)) {
-        st.rows = res.data.map(function (r) {
-          return {
-            id: r.id,
-            name: r.name || '',
-            weight: Number(r.weight) || 0,
-            display_order: Number(r.display_order) || 0,
-          };
-        }).sort(function (a, b) { return a.display_order - b.display_order; });
-        renderClassManager();
-      }
-    }).catch(function () { st.loading = null; st.loaded = true; });
+    st.loading = window.v2
+      .listCategories(cid)
+      .then(function (res) {
+        st.loading = null;
+        st.loaded = true;
+        if (res && !res.error && Array.isArray(res.data)) {
+          st.rows = res.data
+            .map(function (r) {
+              return {
+                id: r.id,
+                name: r.name || '',
+                weight: Number(r.weight) || 0,
+                display_order: Number(r.display_order) || 0,
+              };
+            })
+            .sort(function (a, b) {
+              return a.display_order - b.display_order;
+            });
+          renderClassManager();
+        }
+      })
+      .catch(function () {
+        st.loading = null;
+        st.loaded = true;
+      });
   }
 
   function _cmCatSum(cid) {
@@ -1421,36 +2105,61 @@ window.DashClassManager = (function() {
   function _cmRenderCategoriesField(cid) {
     if (!cid) return '';
     var st = _cmCatState(cid);
-    if (!st.loaded && !st.loading) setTimeout(function () { _cmLoadCategories(cid); }, 0);
+    if (!st.loaded && !st.loading)
+      setTimeout(function () {
+        _cmLoadCategories(cid);
+      }, 0);
 
     var rows = st.rows || [];
     var sum = _cmCatSum(cid);
     var over = sum > 100;
     var sumClass = over ? 'cm-cat-sum cm-cat-sum-over' : 'cm-cat-sum';
-    var html = '<div class="cm-field cm-cat-field">' +
+    var html =
+      '<div class="cm-field cm-cat-field">' +
       '<label class="cm-label">Categories</label>' +
       '<div class="cm-cat-list">';
     if (rows.length === 0) {
-      html += '<div class="cm-hint" style="padding:6px 0">No categories yet. Add one to weight assessments and unlock Letter / Both grading.</div>';
+      html +=
+        '<div class="cm-hint" style="padding:6px 0">No categories yet. Add one to weight assessments and unlock Letter / Both grading.</div>';
     }
     rows.forEach(function (row, idx) {
-      html += '<div class="cm-cat-row"' + (row.id ? ' draggable="true" data-cat-drag="' + row.id + '"' : '') + '>' +
+      html +=
+        '<div class="cm-cat-row"' +
+        (row.id ? ' draggable="true" data-cat-drag="' + row.id + '"' : '') +
+        '>' +
         '<span class="cm-cat-handle" aria-hidden="true">\u22EE\u22EE</span>' +
-        '<input class="cm-input cm-cat-name" value="' + esc(row.name) + '" placeholder="Category name" data-action-blur="cmCatName" data-idx="' + idx + '">' +
-        '<input class="cm-input cm-cat-weight" type="number" min="0" max="100" step="1" value="' + (row.weight != null ? row.weight : '') + '" data-action-blur="cmCatWeight" data-action-input="cmCatWeightLive" data-idx="' + idx + '" aria-label="Weight percent">' +
+        '<input class="cm-input cm-cat-name" value="' +
+        esc(row.name) +
+        '" placeholder="Category name" data-action-blur="cmCatName" data-idx="' +
+        idx +
+        '">' +
+        '<input class="cm-input cm-cat-weight" type="number" min="0" max="100" step="1" value="' +
+        (row.weight != null ? row.weight : '') +
+        '" data-action-blur="cmCatWeight" data-action-input="cmCatWeightLive" data-idx="' +
+        idx +
+        '" aria-label="Weight percent">' +
         '<span class="cm-cat-pct">%</span>' +
-        '<button class="cm-delete-mini" data-action="cmCatDelete" data-idx="' + idx + '" title="Delete category" aria-label="Delete category">\u2715</button>' +
-      '</div>';
+        '<button class="cm-delete-mini" data-action="cmCatDelete" data-idx="' +
+        idx +
+        '" title="Delete category" aria-label="Delete category">\u2715</button>' +
+        '</div>';
     });
-    html += '</div>' +
-      '<div class="cm-cat-footer">' +
-        '<button class="cm-add-link" data-action="cmCatAdd">+ Add category</button>' +
-        '<div class="' + sumClass + '" id="cm-cat-sum-' + cid + '">' +
-          'Sum: <strong>' + sum + '</strong> / 100%' +
-          (over ? ' <span class="cm-cat-sum-warn">(reduce weights to save)</span>' : '') +
-        '</div>' +
+    html +=
       '</div>' +
-    '</div>';
+      '<div class="cm-cat-footer">' +
+      '<button class="cm-add-link" data-action="cmCatAdd">+ Add category</button>' +
+      '<div class="' +
+      sumClass +
+      '" id="cm-cat-sum-' +
+      cid +
+      '">' +
+      'Sum: <strong>' +
+      sum +
+      '</strong> / 100%' +
+      (over ? ' <span class="cm-cat-sum-warn">(reduce weights to save)</span>' : '') +
+      '</div>' +
+      '</div>' +
+      '</div>';
     return html;
   }
 
@@ -1464,7 +2173,8 @@ window.DashClassManager = (function() {
   function cmCatName(idx, value) {
     if (!cmSelectedCourse) return;
     var st = _cmCatState(cmSelectedCourse);
-    var row = st.rows[idx]; if (!row) return;
+    var row = st.rows[idx];
+    if (!row) return;
     var name = (value || '').trim();
     if (!name) return;
     row.name = name;
@@ -1474,7 +2184,8 @@ window.DashClassManager = (function() {
   function cmCatWeightLive(idx, value) {
     if (!cmSelectedCourse) return;
     var st = _cmCatState(cmSelectedCourse);
-    var row = st.rows[idx]; if (!row) return;
+    var row = st.rows[idx];
+    if (!row) return;
     var v = parseFloat(value);
     row.weight = isNaN(v) ? 0 : Math.max(0, v); // no hard-clamp to 100 per §12.7
     var sumEl = document.getElementById('cm-cat-sum-' + cmSelectedCourse);
@@ -1482,16 +2193,22 @@ window.DashClassManager = (function() {
       var sum = _cmCatSum(cmSelectedCourse);
       var over = sum > 100;
       sumEl.className = over ? 'cm-cat-sum cm-cat-sum-over' : 'cm-cat-sum';
-      sumEl.innerHTML = 'Sum: <strong>' + sum + '</strong> / 100%' + (over ? ' <span class="cm-cat-sum-warn">(reduce weights to save)</span>' : '');
+      sumEl.innerHTML =
+        'Sum: <strong>' +
+        sum +
+        '</strong> / 100%' +
+        (over ? ' <span class="cm-cat-sum-warn">(reduce weights to save)</span>' : '');
     }
   }
 
   function cmCatWeight(idx /* , value */) {
     if (!cmSelectedCourse) return;
     var st = _cmCatState(cmSelectedCourse);
-    var row = st.rows[idx]; if (!row || !row.name) return;
+    var row = st.rows[idx];
+    if (!row || !row.name) return;
     if (_cmCatSum(cmSelectedCourse) > 100) {
-      if (typeof showSyncToast === 'function') showSyncToast('Category weights exceed 100% — reduce before saving.', 'info');
+      if (typeof showSyncToast === 'function')
+        showSyncToast('Category weights exceed 100% — reduce before saving.', 'info');
       return;
     }
     _cmCatPersist(cmSelectedCourse, row);
@@ -1500,26 +2217,32 @@ window.DashClassManager = (function() {
   function cmCatDelete(idx) {
     if (!cmSelectedCourse) return;
     var st = _cmCatState(cmSelectedCourse);
-    var row = st.rows[idx]; if (!row) return;
+    var row = st.rows[idx];
+    if (!row) return;
     st.rows.splice(idx, 1);
     if (row.id && window.v2 && window.v2.deleteCategory) window.v2.deleteCategory(row.id);
     renderClassManager();
   }
 
   function _cmCatPersist(cid, row) {
-    if (!window.v2 || !window.v2.upsertCategory) { renderClassManager(); return; }
-    window.v2.upsertCategory({
-      id: row.id,
-      courseId: cid,
-      name: row.name,
-      weight: row.weight,
-      displayOrder: row.display_order,
-    }).then(function (res) {
-      if (res && !res.error) {
-        if (!row.id && res.data) row.id = res.data;
-        renderClassManager();
-      }
-    });
+    if (!window.v2 || !window.v2.upsertCategory) {
+      renderClassManager();
+      return;
+    }
+    window.v2
+      .upsertCategory({
+        id: row.id,
+        courseId: cid,
+        name: row.name,
+        weight: row.weight,
+        displayOrder: row.display_order,
+      })
+      .then(function (res) {
+        if (res && !res.error) {
+          if (!row.id && res.data) row.id = res.data;
+          renderClassManager();
+        }
+      });
   }
 
   // Drag-reorder using delegated document listeners. Drop on another row → move.
@@ -1535,7 +2258,10 @@ window.DashClassManager = (function() {
     _addDocListener('dragover', function (e) {
       if (!_cmCatDragId) return;
       var row = e.target.closest && e.target.closest('.cm-cat-row[data-cat-drag]');
-      if (row && row.dataset.catDrag !== _cmCatDragId) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+      if (row && row.dataset.catDrag !== _cmCatDragId) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+      }
     });
     _addDocListener('drop', function (e) {
       if (!_cmCatDragId || !cmSelectedCourse) return;
@@ -1543,21 +2269,36 @@ window.DashClassManager = (function() {
       if (!row) return;
       e.preventDefault();
       var st = _cmCatState(cmSelectedCourse);
-      var fromIdx = st.rows.findIndex(function (r) { return r.id === _cmCatDragId; });
-      var toIdx = st.rows.findIndex(function (r) { return r.id === row.dataset.catDrag; });
-      if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) { _cmCatDragId = null; return; }
+      var fromIdx = st.rows.findIndex(function (r) {
+        return r.id === _cmCatDragId;
+      });
+      var toIdx = st.rows.findIndex(function (r) {
+        return r.id === row.dataset.catDrag;
+      });
+      if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) {
+        _cmCatDragId = null;
+        return;
+      }
       var moved = st.rows.splice(fromIdx, 1)[0];
       st.rows.splice(toIdx, 0, moved);
-      st.rows.forEach(function (r, i) { r.display_order = i; });
+      st.rows.forEach(function (r, i) {
+        r.display_order = i;
+      });
       _cmCatDragId = null;
       renderClassManager();
       if (window.v2 && window.v2.reorderCategories) {
-        var ids = st.rows.map(function (r) { return r.id; }).filter(Boolean);
+        var ids = st.rows
+          .map(function (r) {
+            return r.id;
+          })
+          .filter(Boolean);
         window.v2.reorderCategories(ids);
       }
     });
     _addDocListener('dragend', function () {
-      document.querySelectorAll('.cm-cat-row.dragging').forEach(function (el) { el.classList.remove('dragging'); });
+      document.querySelectorAll('.cm-cat-row.dragging').forEach(function (el) {
+        el.classList.remove('dragging');
+      });
       _cmCatDragId = null;
     });
   }
@@ -1607,7 +2348,7 @@ window.DashClassManager = (function() {
     var course = COURSES[cid];
     cwSelectedTags = course && course.curriculumTags ? course.curriculumTags.slice() : [];
     cwLoadError = false;
-    loadCurriculumIndex().then(function(idx) {
+    loadCurriculumIndex().then(function (idx) {
       cwCurriculumLoaded = !!idx;
       cwLoadError = !idx;
       renderClassManager();
@@ -1645,18 +2386,32 @@ window.DashClassManager = (function() {
       var existing = getLearningMap(cid);
       var newMap = buildLearningMapFromTags(cwSelectedTags);
       if (newMap) {
-        var existingSubIds = new Set((existing.subjects || []).map(function(s) { return s.id; }));
-        (newMap.subjects || []).forEach(function(s) {
+        var existingSubIds = new Set(
+          (existing.subjects || []).map(function (s) {
+            return s.id;
+          }),
+        );
+        (newMap.subjects || []).forEach(function (s) {
           if (!existingSubIds.has(s.id)) existing.subjects.push(s);
         });
-        var existingSecIds = new Set((existing.sections || []).map(function(s) { return s.id; }));
-        (newMap.sections || []).forEach(function(s) {
+        var existingSecIds = new Set(
+          (existing.sections || []).map(function (s) {
+            return s.id;
+          }),
+        );
+        (newMap.sections || []).forEach(function (s) {
           if (!existingSecIds.has(s.id)) {
             existing.sections.push(s);
           } else {
-            var existingSec = existing.sections.find(function(es) { return es.id === s.id; });
-            var existingTagIds = new Set(existingSec.tags.map(function(t) { return t.id; }));
-            s.tags.forEach(function(t) {
+            var existingSec = existing.sections.find(function (es) {
+              return es.id === s.id;
+            });
+            var existingTagIds = new Set(
+              existingSec.tags.map(function (t) {
+                return t.id;
+              }),
+            );
+            s.tags.forEach(function (t) {
               if (!existingTagIds.has(t.id)) existingSec.tags.push(t);
             });
           }
@@ -1686,38 +2441,73 @@ window.DashClassManager = (function() {
         html += '<div class="cw-empty-msg">Could not load BC Curriculum data.</div>';
       } else {
         html += '<div class="cm-field"><label class="cm-label">Grade</label><div class="cw-grade-row">';
-        [8, 9, 10, 11, 12].forEach(function(g) {
-          html += '<button class="cw-grade-btn' + (cwSelectedGrade === g ? ' active' : '') + '" data-action="cwSelectGrade" data-grade="' + g + '">Grade ' + g + '</button>';
+        [8, 9, 10, 11, 12].forEach(function (g) {
+          html +=
+            '<button class="cw-grade-btn' +
+            (cwSelectedGrade === g ? ' active' : '') +
+            '" data-action="cwSelectGrade" data-grade="' +
+            g +
+            '">Grade ' +
+            g +
+            '</button>';
         });
         html += '</div></div>';
 
         if (cwSelectedGrade) {
           var subjects = getSubjectsByGrade(cwSelectedGrade);
           html += '<div class="cm-field"><label class="cm-label">Subject</label><div class="cw-subject-row">';
-          subjects.forEach(function(s) {
-            html += '<button class="cw-subject-btn' + (cwSelectedSubject === s ? ' active' : '') + '" data-action="cwSelectSubject" data-subject="' + esc(s) + '">' + esc(s) + '</button>';
+          subjects.forEach(function (s) {
+            html +=
+              '<button class="cw-subject-btn' +
+              (cwSelectedSubject === s ? ' active' : '') +
+              '" data-action="cwSelectSubject" data-subject="' +
+              esc(s) +
+              '">' +
+              esc(s) +
+              '</button>';
           });
           html += '</div></div>';
 
           var courses = getCoursesByGrade(cwSelectedGrade);
-          if (cwSelectedSubject) courses = courses.filter(function(c) { return c.subject === cwSelectedSubject; });
+          if (cwSelectedSubject)
+            courses = courses.filter(function (c) {
+              return c.subject === cwSelectedSubject;
+            });
 
           if (courses.length > 0) {
             html += '<div class="cm-field"><label class="cm-label">Courses</label><div class="cw-course-list">';
-            courses.forEach(function(c) {
+            courses.forEach(function (c) {
               var sel = cwSelectedTags.includes(c.short_tag) ? ' selected' : '';
               var fullCourse = CURRICULUM_INDEX[c.short_tag];
-              var compCount = 0, catCount = 0;
+              var compCount = 0,
+                catCount = 0;
               if (fullCourse && fullCourse.categories) {
                 catCount = fullCourse.categories.length;
-                fullCourse.categories.forEach(function(cat) { compCount += (cat.competencies || []).length; });
+                fullCourse.categories.forEach(function (cat) {
+                  compCount += (cat.competencies || []).length;
+                });
               }
-              html += '<div class="cw-course-item' + sel + '" data-action="cwToggleCourse" data-tag="' + esc(c.short_tag) + '">' +
-                '<span class="cw-course-check">' + (sel ? '\u2713' : '') + '</span>' +
-                '<span class="cw-course-name">' + esc(c.course_name) + '</span>' +
-                '<span class="cw-course-tag">' + esc(c.short_tag) + '</span>' +
-                '<span class="cw-course-count">' + catCount + ' categories \u00B7 ' + compCount + ' standards</span>' +
-              '</div>';
+              html +=
+                '<div class="cw-course-item' +
+                sel +
+                '" data-action="cwToggleCourse" data-tag="' +
+                esc(c.short_tag) +
+                '">' +
+                '<span class="cw-course-check">' +
+                (sel ? '\u2713' : '') +
+                '</span>' +
+                '<span class="cw-course-name">' +
+                esc(c.course_name) +
+                '</span>' +
+                '<span class="cw-course-tag">' +
+                esc(c.short_tag) +
+                '</span>' +
+                '<span class="cw-course-count">' +
+                catCount +
+                ' categories \u00B7 ' +
+                compCount +
+                ' standards</span>' +
+                '</div>';
             });
             html += '</div></div>';
           }
@@ -1725,21 +2515,32 @@ window.DashClassManager = (function() {
 
         if (cwSelectedTags.length > 0) {
           var totalComps = 0;
-          cwSelectedTags.forEach(function(tag) {
+          cwSelectedTags.forEach(function (tag) {
             var full = CURRICULUM_INDEX[tag];
             if (full && full.categories) {
-              full.categories.forEach(function(cat) { totalComps += (cat.competencies || []).length; });
+              full.categories.forEach(function (cat) {
+                totalComps += (cat.competencies || []).length;
+              });
             }
           });
-          html += '<div class="cw-selection-summary"><strong>' + cwSelectedTags.length + '</strong> course' + (cwSelectedTags.length !== 1 ? 's' : '') + ' selected \u00B7 <strong>' + totalComps + '</strong> competencies</div>';
+          html +=
+            '<div class="cw-selection-summary"><strong>' +
+            cwSelectedTags.length +
+            '</strong> course' +
+            (cwSelectedTags.length !== 1 ? 's' : '') +
+            ' selected \u00B7 <strong>' +
+            totalComps +
+            '</strong> competencies</div>';
         }
       }
 
-      html += '<div class="cm-relink-actions">' +
+      html +=
+        '<div class="cm-relink-actions">' +
         '<button class="btn btn-ghost" data-action="cmRelinkCancel">Cancel</button>' +
-        '<button class="btn btn-primary" data-action="cmRelinkNext"' + (cwSelectedTags.length === 0 ? ' disabled style="opacity:0.5;pointer-events:none"' : '') + '>Next</button>' +
-      '</div></div>';
-
+        '<button class="btn btn-primary" data-action="cmRelinkNext"' +
+        (cwSelectedTags.length === 0 ? ' disabled style="opacity:0.5;pointer-events:none"' : '') +
+        '>Next</button>' +
+        '</div></div>';
     } else if (cmRelinkStep === 2) {
       var course = COURSES[cid];
       var existingTags = course.curriculumTags || [];
@@ -1748,22 +2549,32 @@ window.DashClassManager = (function() {
       html += '<div class="cm-section"><div class="cm-section-title">Confirm Curriculum Change</div>';
 
       html += '<div class="cm-field"><label class="cm-label">New Curriculum Link</label>';
-      cwSelectedTags.forEach(function(tag) {
+      cwSelectedTags.forEach(function (tag) {
         var courseData = CURRICULUM_INDEX ? CURRICULUM_INDEX[tag] : null;
-        html += '<div class="cm-curric-link"><span class="cm-curric-tag">' + esc(tag) + '</span><span class="cm-curric-name">' + esc(courseData ? courseData.course_name : tag) + '</span></div>';
+        html +=
+          '<div class="cm-curric-link"><span class="cm-curric-tag">' +
+          esc(tag) +
+          '</span><span class="cm-curric-name">' +
+          esc(courseData ? courseData.course_name : tag) +
+          '</span></div>';
       });
       html += '</div>';
 
       if (tagCount > 0) {
-        html += '<div class="cm-relink-warning">This class currently has <strong>' + tagCount + '</strong> learning standards with existing score data. Choose how to handle the change:</div>';
+        html +=
+          '<div class="cm-relink-warning">This class currently has <strong>' +
+          tagCount +
+          '</strong> learning standards with existing score data. Choose how to handle the change:</div>';
       }
 
       html += '<div class="cm-relink-actions" style="flex-direction:column;gap:8px">';
       if (tagCount > 0) {
-        html += '<button class="btn btn-primary" data-action="cmRelinkConfirm" data-mode="merge" style="width:100%;text-align:left;padding:12px 16px"><strong>Merge</strong> \u2014 Add new standards, keep existing ones and all scores</button>' +
+        html +=
+          '<button class="btn btn-primary" data-action="cmRelinkConfirm" data-mode="merge" style="width:100%;text-align:left;padding:12px 16px"><strong>Merge</strong> \u2014 Add new standards, keep existing ones and all scores</button>' +
           '<button class="cm-relink-btn" data-action="cmRelinkConfirm" data-mode="replace" style="width:100%;text-align:left;padding:12px 16px;border-color:var(--score-2);color:var(--score-2)"><strong>Replace</strong> \u2014 Remove current standards and replace with curriculum. Existing scores may be orphaned.</button>';
       } else {
-        html += '<button class="btn btn-primary" data-action="cmRelinkConfirm" data-mode="replace">Apply Curriculum</button>';
+        html +=
+          '<button class="btn btn-primary" data-action="cmRelinkConfirm" data-mode="replace">Apply Curriculum</button>';
       }
       html += '<button class="btn btn-ghost" data-action="cmRelinkBack">Back</button></div></div>';
     }
@@ -1775,22 +2586,28 @@ window.DashClassManager = (function() {
   function cmDeleteCourse() {
     if (!cmSelectedCourse) return;
     var name = COURSES[cmSelectedCourse].name;
-    showConfirm('Delete "' + name + '"',
+    showConfirm(
+      'Delete "' + name + '"',
       'This permanently removes all students, assessments, scores, and settings. This cannot be undone.',
-      'Delete Class', 'danger', async function() {
-        var wasActive = (cmSelectedCourse === _activeCourse);
+      'Delete Class',
+      'danger',
+      async function () {
+        var wasActive = cmSelectedCourse === _activeCourse;
         await deleteCourseData(cmSelectedCourse);
         var remaining = Object.keys(COURSES);
         if (remaining.length > 0) {
           cmSelectedCourse = remaining[0];
-          if (wasActive) { _activeCourse = remaining[0]; setActiveCourse(remaining[0]); }
+          if (wasActive) {
+            _activeCourse = remaining[0];
+            setActiveCourse(remaining[0]);
+          }
         } else {
           cmSelectedCourse = null;
           _activeCourse = null;
         }
         cmMode = 'edit';
         renderClassManager();
-      }
+      },
     );
   }
 
@@ -1813,7 +2630,7 @@ window.DashClassManager = (function() {
       description: src.description || '',
       gradingSystem: src.gradingSystem || 'proficiency',
       calcMethod: src.calcMethod || 'mostRecent',
-      decayWeight: src.decayWeight || 0.65
+      decayWeight: src.decayWeight || 0.65,
     });
     var srcCC = getCourseConfig(sourceCid);
     if (Object.keys(srcCC).length > 0) {
@@ -1837,12 +2654,13 @@ window.DashClassManager = (function() {
     var cid = cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
     var id = 'subj' + Date.now().toString(36);
-    map.subjects.push({ id: id, name:'New Subject', color:'#6366f1' });
+    map.subjects.push({ id: id, name: 'New Subject', color: '#6366f1' });
     var displayOrder = map.subjects.length - 1;
     saveLearningMap(cid, map);
     renderClassManager();
-    window.v2.upsertSubject({ id: id, courseId: cid, name: 'New Subject', displayOrder: displayOrder })
-      .then(function(res) {
+    window.v2
+      .upsertSubject({ id: id, courseId: cid, name: 'New Subject', displayOrder: displayOrder })
+      .then(function (res) {
         var canonicalId = res && res.data ? res.data : null;
         if (canonicalId && canonicalId !== id) {
           var m = getLearningMap(cid);
@@ -1855,7 +2673,9 @@ window.DashClassManager = (function() {
     if (!cmSelectedCourse) return;
     var cid = cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
-    var sub = map.subjects.find(function(s) { return s.id === subId; });
+    var sub = map.subjects.find(function (s) {
+      return s.id === subId;
+    });
     if (sub) {
       sub.name = val.trim();
       saveLearningMap(cid, map);
@@ -1866,9 +2686,15 @@ window.DashClassManager = (function() {
   function cmUpdateSubjectColor(subId, color) {
     if (!cmSelectedCourse) return;
     var map = ensureCustomLearningMap(cmSelectedCourse);
-    var sub = map.subjects.find(function(s) { return s.id === subId; });
+    var sub = map.subjects.find(function (s) {
+      return s.id === subId;
+    });
     // T-WIRE-02: subject color is local-only (no p_color in upsert_subject RPC)
-    if (sub) { sub.color = color; saveLearningMap(cmSelectedCourse, map); renderClassManager(); }
+    if (sub) {
+      sub.color = color;
+      saveLearningMap(cmSelectedCourse, map);
+      renderClassManager();
+    }
   }
 
   function cmToggleColorPalette(el) {
@@ -1878,11 +2704,27 @@ window.DashClassManager = (function() {
     var palette = document.getElementById(paletteId);
     if (!palette) return;
     // Close any other open palettes
-    document.querySelectorAll('.cm-color-palette.open').forEach(function(p) { if (p.id !== paletteId) p.classList.remove('open'); p.innerHTML = ''; });
-    if (palette.classList.contains('open')) { palette.classList.remove('open'); palette.innerHTML = ''; return; }
+    document.querySelectorAll('.cm-color-palette.open').forEach(function (p) {
+      if (p.id !== paletteId) p.classList.remove('open');
+      p.innerHTML = '';
+    });
+    if (palette.classList.contains('open')) {
+      palette.classList.remove('open');
+      palette.innerHTML = '';
+      return;
+    }
     var html = '';
-    CM_COLORS.forEach(function(c) {
-      html += '<div class="cm-color-dot" data-action="cmPickColor" data-target="' + target + '" data-id="' + id + '" data-color="' + c + '" style="background:' + c + '"></div>';
+    CM_COLORS.forEach(function (c) {
+      html +=
+        '<div class="cm-color-dot" data-action="cmPickColor" data-target="' +
+        target +
+        '" data-id="' +
+        id +
+        '" data-color="' +
+        c +
+        '" style="background:' +
+        c +
+        '"></div>';
     });
     palette.innerHTML = html;
     palette.classList.add('open');
@@ -1896,11 +2738,15 @@ window.DashClassManager = (function() {
     var map = ensureCustomLearningMap(cmSelectedCourse);
     if (target === 'subject') {
       // T-WIRE-02: subject color is local-only (no p_color in upsert_subject RPC)
-      var sub = map.subjects.find(function(s) { return s.id === id; });
+      var sub = map.subjects.find(function (s) {
+        return s.id === id;
+      });
       if (sub) sub.color = color;
     } else {
       // T-WIRE-02: section color is local-only (no p_color in upsert_section RPC)
-      var sec = map.sections.find(function(s) { return s.id === id; });
+      var sec = map.sections.find(function (s) {
+        return s.id === id;
+      });
       if (sec) sec.color = color;
     }
     saveLearningMap(cmSelectedCourse, map);
@@ -1911,24 +2757,44 @@ window.DashClassManager = (function() {
     if (!cmSelectedCourse) return;
     var cid = cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
-    var sectionCount = map.sections.filter(function(s) { return s.subject === subId; }).length;
+    var sectionCount = map.sections.filter(function (s) {
+      return s.subject === subId;
+    }).length;
     if (sectionCount > 0) {
-      showConfirm('Delete Subject', 'This subject has ' + sectionCount + ' section(s). Delete them too?',
-        'Delete All', 'danger', function() {
+      showConfirm(
+        'Delete Subject',
+        'This subject has ' + sectionCount + ' section(s). Delete them too?',
+        'Delete All',
+        'danger',
+        function () {
           var deletedSectionIds = map.sections
-            .filter(function(s) { return s.subject === subId; })
-            .map(function(s) { return s.id; });
-          map.subjects = map.subjects.filter(function(s) { return s.id !== subId; });
-          map.sections = map.sections.filter(function(s) { return s.subject !== subId; });
+            .filter(function (s) {
+              return s.subject === subId;
+            })
+            .map(function (s) {
+              return s.id;
+            });
+          map.subjects = map.subjects.filter(function (s) {
+            return s.id !== subId;
+          });
+          map.sections = map.sections.filter(function (s) {
+            return s.subject !== subId;
+          });
           saveLearningMap(cid, map);
           renderClassManager();
           if (_isCanonicalId(subId)) window.v2.deleteSubject(subId);
-          deletedSectionIds.forEach(function(sid) {
-            if (_isCanonicalId(sid)) { window.v2.deleteSection(sid); window.v2.deleteTag(sid); }
+          deletedSectionIds.forEach(function (sid) {
+            if (_isCanonicalId(sid)) {
+              window.v2.deleteSection(sid);
+              window.v2.deleteTag(sid);
+            }
           });
-        });
+        },
+      );
     } else {
-      map.subjects = map.subjects.filter(function(s) { return s.id !== subId; });
+      map.subjects = map.subjects.filter(function (s) {
+        return s.id !== subId;
+      });
       saveLearningMap(cid, map);
       renderClassManager();
       if (_isCanonicalId(subId)) window.v2.deleteSubject(subId);
@@ -1942,15 +2808,27 @@ window.DashClassManager = (function() {
     var map = ensureCustomLearningMap(cid);
     if (!map.competencyGroups) map.competencyGroups = [];
     var idx = map.competencyGroups.length;
-    var colors = ['#6366f1','#06b6d4','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316','#64748b'];
-    var grpLocalId = 'grp_' + Date.now().toString(36) + Math.random().toString(36).slice(2,5);
+    var colors = [
+      '#6366f1',
+      '#06b6d4',
+      '#10b981',
+      '#f59e0b',
+      '#ef4444',
+      '#8b5cf6',
+      '#ec4899',
+      '#14b8a6',
+      '#f97316',
+      '#64748b',
+    ];
+    var grpLocalId = 'grp_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
     var grpName = 'Group ' + (idx + 1);
     var grpColor = colors[idx % colors.length];
     map.competencyGroups.push({ id: grpLocalId, name: grpName, color: grpColor, sortOrder: idx });
     saveLearningMap(cid, map);
     renderClassManager();
-    window.v2.upsertCompetencyGroup({ id: grpLocalId, courseId: cid, name: grpName, color: grpColor, displayOrder: idx })
-      .then(function(res) {
+    window.v2
+      .upsertCompetencyGroup({ id: grpLocalId, courseId: cid, name: grpName, color: grpColor, displayOrder: idx })
+      .then(function (res) {
         var canonicalId = res && res.data ? res.data : null;
         if (canonicalId && canonicalId !== grpLocalId) {
           var m = getLearningMap(cid);
@@ -1963,7 +2841,9 @@ window.DashClassManager = (function() {
     if (!cmSelectedCourse) return;
     var cid = cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
-    var g = (map.competencyGroups || []).find(function(x) { return x.id === grpId; });
+    var g = (map.competencyGroups || []).find(function (x) {
+      return x.id === grpId;
+    });
     if (g && val.trim()) {
       g.name = val.trim();
       saveLearningMap(cid, map);
@@ -1975,7 +2855,9 @@ window.DashClassManager = (function() {
     if (!cmSelectedCourse) return;
     var cid = cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
-    var g = (map.competencyGroups || []).find(function(x) { return x.id === grpId; });
+    var g = (map.competencyGroups || []).find(function (x) {
+      return x.id === grpId;
+    });
     if (g) {
       g.color = color;
       saveLearningMap(cid, map);
@@ -1988,16 +2870,28 @@ window.DashClassManager = (function() {
     if (!cmSelectedCourse) return;
     var cid = cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
-    var count = (map.sections || []).filter(function(s) { return s.groupId === grpId; }).length;
-    var doDelete = function() {
-      map.competencyGroups = (map.competencyGroups || []).filter(function(g) { return g.id !== grpId; });
-      (map.sections || []).forEach(function(s) { if (s.groupId === grpId) delete s.groupId; });
+    var count = (map.sections || []).filter(function (s) {
+      return s.groupId === grpId;
+    }).length;
+    var doDelete = function () {
+      map.competencyGroups = (map.competencyGroups || []).filter(function (g) {
+        return g.id !== grpId;
+      });
+      (map.sections || []).forEach(function (s) {
+        if (s.groupId === grpId) delete s.groupId;
+      });
       saveLearningMap(cid, map);
       _cmRenderWithScroll();
       if (_isCanonicalId(grpId)) window.v2.deleteCompetencyGroup(grpId);
     };
     if (count > 0) {
-      showConfirm('Delete Group', count + ' standard(s) will become ungrouped. Delete anyway?', 'Delete', 'danger', doDelete);
+      showConfirm(
+        'Delete Group',
+        count + ' standard(s) will become ungrouped. Delete anyway?',
+        'Delete',
+        'danger',
+        doDelete,
+      );
     } else {
       doDelete();
     }
@@ -2007,9 +2901,12 @@ window.DashClassManager = (function() {
     if (!cmSelectedCourse) return;
     var cid = cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
-    var sec = (map.sections || []).find(function(s) { return s.id === secId; });
+    var sec = (map.sections || []).find(function (s) {
+      return s.id === secId;
+    });
     if (!sec) return;
-    if (groupId) sec.groupId = groupId; else delete sec.groupId;
+    if (groupId) sec.groupId = groupId;
+    else delete sec.groupId;
     saveLearningMap(cid, map);
     _cmRenderWithScroll();
     window.v2.upsertSection({ id: secId, competencyGroupId: groupId || null });
@@ -2020,9 +2917,10 @@ window.DashClassManager = (function() {
     var container = document.querySelector('.cm-detail');
     var scrollY = container ? container.scrollTop : window.scrollY;
     renderClassManager();
-    requestAnimationFrame(function() {
+    requestAnimationFrame(function () {
       var c = document.querySelector('.cm-detail');
-      if (c) c.scrollTop = scrollY; else window.scrollTo(0, scrollY);
+      if (c) c.scrollTop = scrollY;
+      else window.scrollTo(0, scrollY);
     });
   }
 
@@ -2032,56 +2930,98 @@ window.DashClassManager = (function() {
     var cid = cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
     if (map.subjects.length === 0) {
-      map.subjects.push({ id:'subj1', name:'General', color:'#6366f1' });
+      map.subjects.push({ id: 'subj1', name: 'General', color: '#6366f1' });
     }
     var subId = map.subjects[0].id;
     var stdId = 'S' + Date.now().toString(36).slice(-4).toUpperCase();
-    var colour = map.subjects.find(function(s) { return s.id===subId; })?.color || '#6366f1';
+    var colour =
+      map.subjects.find(function (s) {
+        return s.id === subId;
+      })?.color || '#6366f1';
     map.sections.push({
-      id: stdId, subject: subId, name:'New Standard', shortName:'New', color: colour,
-      tags: [{ id: stdId, label:'New Standard', text:'', color: colour, subject: subId, name:'New Standard', shortName:'New' }]
+      id: stdId,
+      subject: subId,
+      name: 'New Standard',
+      shortName: 'New',
+      color: colour,
+      tags: [
+        {
+          id: stdId,
+          label: 'New Standard',
+          text: '',
+          color: colour,
+          subject: subId,
+          name: 'New Standard',
+          shortName: 'New',
+        },
+      ],
     });
     map._flatVersion = 2;
     var displayOrder = map.sections.length - 1;
     saveLearningMap(cid, map);
     renderClassManager();
-    requestAnimationFrame(function() {
-      var el = document.getElementById('cm-sec-'+stdId);
-      if (el) { el.classList.add('open'); el.scrollIntoView({behavior:'smooth',block:'center'}); }
+    requestAnimationFrame(function () {
+      var el = document.getElementById('cm-sec-' + stdId);
+      if (el) {
+        el.classList.add('open');
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
     });
     // Ensure subject is canonical before inserting section (subjectId FK must be UUID)
-    var subjObj = map.subjects.find(function(s) { return s.id === subId; });
+    var subjObj = map.subjects.find(function (s) {
+      return s.id === subId;
+    });
     var subjectRpc = _isCanonicalId(subId)
       ? Promise.resolve({ data: subId })
-      : window.v2.upsertSubject({ id: subId, courseId: cid, name: subjObj ? subjObj.name : 'General', displayOrder: 0 })
-          .then(function(res) {
+      : window.v2
+          .upsertSubject({ id: subId, courseId: cid, name: subjObj ? subjObj.name : 'General', displayOrder: 0 })
+          .then(function (res) {
             var canon = res && res.data ? res.data : null;
             if (canon && canon !== subId) _patchMapId(cid, getLearningMap(cid), subId, canon);
             return res;
           });
-    subjectRpc.then(function(subRes) {
-      var canonicalSubjectId = (subRes && subRes.data) ? subRes.data : subId;
-      return window.v2.upsertSection({ id: stdId, subjectId: canonicalSubjectId, name: 'New Standard', displayOrder: displayOrder });
-    }).then(function(secRes) {
-      var canonicalSectionId = secRes && secRes.data ? secRes.data : null;
-      if (canonicalSectionId && canonicalSectionId !== stdId) {
-        _patchMapId(cid, getLearningMap(cid), stdId, canonicalSectionId);
-      }
-      var finalSectionId = canonicalSectionId || stdId;
-      return window.v2.upsertTag({ id: stdId, sectionId: finalSectionId, label: 'New Standard', code: stdId, iCanText: '', displayOrder: 0 });
-    });
+    subjectRpc
+      .then(function (subRes) {
+        var canonicalSubjectId = subRes && subRes.data ? subRes.data : subId;
+        return window.v2.upsertSection({
+          id: stdId,
+          subjectId: canonicalSubjectId,
+          name: 'New Standard',
+          displayOrder: displayOrder,
+        });
+      })
+      .then(function (secRes) {
+        var canonicalSectionId = secRes && secRes.data ? secRes.data : null;
+        if (canonicalSectionId && canonicalSectionId !== stdId) {
+          _patchMapId(cid, getLearningMap(cid), stdId, canonicalSectionId);
+        }
+        var finalSectionId = canonicalSectionId || stdId;
+        return window.v2.upsertTag({
+          id: stdId,
+          sectionId: finalSectionId,
+          label: 'New Standard',
+          code: stdId,
+          iCanText: '',
+          displayOrder: 0,
+        });
+      });
   }
 
   function cmUpdateStdName(secId, val) {
     if (!cmSelectedCourse) return;
     var cid = cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
-    var sec = map.sections.find(function(s) { return s.id === secId; });
+    var sec = map.sections.find(function (s) {
+      return s.id === secId;
+    });
     if (!sec) return;
     var trimmed = val.trim();
     sec.name = trimmed;
     sec.shortName = trimmed.split(' ')[0];
-    if (sec.tags[0]) { sec.tags[0].name = trimmed; sec.tags[0].shortName = sec.shortName; }
+    if (sec.tags[0]) {
+      sec.tags[0].name = trimmed;
+      sec.tags[0].shortName = sec.shortName;
+    }
     saveLearningMap(cid, map);
     window.v2.upsertSection({ id: secId, name: trimmed });
     var tag = sec.tags[0];
@@ -2092,7 +3032,9 @@ window.DashClassManager = (function() {
     if (!cmSelectedCourse) return;
     var cid = cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
-    var sec = map.sections.find(function(s) { return s.id === secId; });
+    var sec = map.sections.find(function (s) {
+      return s.id === secId;
+    });
     if (!sec) return;
     sec.subject = subId;
     if (sec.tags[0]) sec.tags[0].subject = subId;
@@ -2103,7 +3045,9 @@ window.DashClassManager = (function() {
   function cmUpdateStdColor(secId, color) {
     if (!cmSelectedCourse) return;
     var map = ensureCustomLearningMap(cmSelectedCourse);
-    var sec = map.sections.find(function(s) { return s.id === secId; });
+    var sec = map.sections.find(function (s) {
+      return s.id === secId;
+    });
     if (!sec) return;
     sec.color = color;
     if (sec.tags[0]) sec.tags[0].color = color;
@@ -2113,22 +3057,34 @@ window.DashClassManager = (function() {
   }
 
   function cmDeleteStd(secId) {
-    showConfirm('Delete Standard', 'Delete this learning standard? Existing scores are preserved.',
-      'Delete', 'danger', function() {
+    showConfirm(
+      'Delete Standard',
+      'Delete this learning standard? Existing scores are preserved.',
+      'Delete',
+      'danger',
+      function () {
         var cid = cmSelectedCourse;
         var map = ensureCustomLearningMap(cid);
-        map.sections = map.sections.filter(function(s) { return s.id !== secId; });
+        map.sections = map.sections.filter(function (s) {
+          return s.id !== secId;
+        });
         saveLearningMap(cid, map);
         renderClassManager();
-        if (_isCanonicalId(secId)) { window.v2.deleteSection(secId); window.v2.deleteTag(secId); }
-      });
+        if (_isCanonicalId(secId)) {
+          window.v2.deleteSection(secId);
+          window.v2.deleteTag(secId);
+        }
+      },
+    );
   }
 
   function cmUpdateStdLabel(secId, val) {
     if (!cmSelectedCourse) return;
     var cid = cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
-    var sec = map.sections.find(function(s) { return s.id === secId; });
+    var sec = map.sections.find(function (s) {
+      return s.id === secId;
+    });
     if (sec && sec.tags[0]) {
       sec.tags[0].label = val.trim();
       saveLearningMap(cid, map);
@@ -2140,7 +3096,9 @@ window.DashClassManager = (function() {
     if (!cmSelectedCourse) return;
     var cid = cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
-    var sec = map.sections.find(function(s) { return s.id === secId; });
+    var sec = map.sections.find(function (s) {
+      return s.id === secId;
+    });
     if (sec && sec.tags[0]) {
       sec.tags[0].text = val.trim();
       saveLearningMap(cid, map);
@@ -2151,18 +3109,26 @@ window.DashClassManager = (function() {
   function cmUpdateStdCode(secId, val) {
     if (!cmSelectedCourse) return;
     var cid = cmSelectedCourse;
-    var newId = val.trim().toUpperCase().replace(/[^A-Z0-9._\-]/g, '').slice(0, 10);
+    var newId = val
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9._\-]/g, '')
+      .slice(0, 10);
     if (!newId || newId === secId) return;
     var map = ensureCustomLearningMap(cid);
     // Check uniqueness within learning map
-    var exists = map.sections.some(function(s) { return s.id === newId; });
+    var exists = map.sections.some(function (s) {
+      return s.id === newId;
+    });
     if (exists) {
       alert('Tag code "' + newId + '" already exists. Please choose a different code.');
       renderClassManager();
       return;
     }
     // Update section and tag IDs
-    var sec = map.sections.find(function(s) { return s.id === secId; });
+    var sec = map.sections.find(function (s) {
+      return s.id === secId;
+    });
     if (!sec) return;
     // T-WIRE-02: capture canonical status BEFORE renaming the local ID
     var wasCanonical = _isCanonicalId(secId);
@@ -2171,7 +3137,7 @@ window.DashClassManager = (function() {
     if (sec.tags[0]) sec.tags[0].id = newId;
     // Update _sectionToTagMap if present
     if (map._sectionToTagMap) {
-      Object.keys(map._sectionToTagMap).forEach(function(k) {
+      Object.keys(map._sectionToTagMap).forEach(function (k) {
         if (map._sectionToTagMap[k] === secId) map._sectionToTagMap[k] = newId;
       });
     }
@@ -2179,17 +3145,23 @@ window.DashClassManager = (function() {
     // Update assessment tagIds references
     var assessments = getAssessments(cmSelectedCourse);
     var assessChanged = false;
-    assessments.forEach(function(a) {
+    assessments.forEach(function (a) {
       var idx = (a.tagIds || []).indexOf(secId);
-      if (idx !== -1) { a.tagIds[idx] = newId; assessChanged = true; }
+      if (idx !== -1) {
+        a.tagIds[idx] = newId;
+        assessChanged = true;
+      }
     });
     if (assessChanged) saveAssessments(cmSelectedCourse, assessments);
     // Update score tagId references
     var allScores = getScores(cmSelectedCourse);
     var scoresChanged = false;
-    Object.keys(allScores).forEach(function(sid) {
-      (allScores[sid] || []).forEach(function(sc) {
-        if (sc.tagId === secId) { sc.tagId = newId; scoresChanged = true; }
+    Object.keys(allScores).forEach(function (sid) {
+      (allScores[sid] || []).forEach(function (sc) {
+        if (sc.tagId === secId) {
+          sc.tagId = newId;
+          scoresChanged = true;
+        }
       });
     });
     if (scoresChanged) saveScores(cmSelectedCourse, allScores);
@@ -2198,92 +3170,249 @@ window.DashClassManager = (function() {
     // Known limitation: if re-insert fails after delete, the DB loses the record
     // while local state is intact. Acceptable for V1 (code rename is rare).
     if (wasCanonical) {
-      var renamedSec = map.sections.find(function(s) { return s.id === newId; });
+      var renamedSec = map.sections.find(function (s) {
+        return s.id === newId;
+      });
       window.v2.deleteSection(oldId);
       window.v2.deleteTag(oldId);
       if (renamedSec) {
-        window.v2.upsertSection({ id: newId, subjectId: renamedSec.subject, name: renamedSec.name, displayOrder: map.sections.indexOf(renamedSec) })
-          .then(function(secRes) {
+        window.v2
+          .upsertSection({
+            id: newId,
+            subjectId: renamedSec.subject,
+            name: renamedSec.name,
+            displayOrder: map.sections.indexOf(renamedSec),
+          })
+          .then(function (secRes) {
             var canonicalSectionId = secRes && secRes.data ? secRes.data : null;
             var finalSectionId = canonicalSectionId || newId;
             var tag = renamedSec.tags[0];
-            if (tag) window.v2.upsertTag({ id: newId, sectionId: finalSectionId, label: tag.label || newId, code: newId, iCanText: tag.text || '', displayOrder: 0 });
+            if (tag)
+              window.v2.upsertTag({
+                id: newId,
+                sectionId: finalSectionId,
+                label: tag.label || newId,
+                code: newId,
+                iCanText: tag.text || '',
+                displayOrder: 0,
+              });
           });
       }
     }
   }
 
   // Legacy aliases
-  function cmAddSec() { cmAddStd(); }
-  function cmUpdateSecName(secId, val) { cmUpdateStdName(secId, val); }
-  function cmUpdateSecSubject(secId, subId) { cmUpdateStdSubject(secId, subId); }
-  function cmUpdateSecColor(secId, color) { cmUpdateStdColor(secId, color); }
-  function cmDeleteSec(secId) { cmDeleteStd(secId); }
-  function cmToggleSec(headerEl) { headerEl.closest('.cm-sec-group').classList.toggle('open'); }
-  function cmAddTag(secId) { /* no-op in flat mode */ }
-  function cmUpdateTagLabel(secId, tagId, val) { cmUpdateStdLabel(secId, val); }
-  function cmUpdateTagText(secId, tagId, val) { cmUpdateStdText(secId, val); }
-  function cmDeleteTag(secId, tagId) { cmDeleteStd(secId); }
+  function cmAddSec() {
+    cmAddStd();
+  }
+  function cmUpdateSecName(secId, val) {
+    cmUpdateStdName(secId, val);
+  }
+  function cmUpdateSecSubject(secId, subId) {
+    cmUpdateStdSubject(secId, subId);
+  }
+  function cmUpdateSecColor(secId, color) {
+    cmUpdateStdColor(secId, color);
+  }
+  function cmDeleteSec(secId) {
+    cmDeleteStd(secId);
+  }
+  function cmToggleSec(headerEl) {
+    headerEl.closest('.cm-sec-group').classList.toggle('open');
+  }
+  function cmAddTag(secId) {
+    /* no-op in flat mode */
+  }
+  function cmUpdateTagLabel(secId, tagId, val) {
+    cmUpdateStdLabel(secId, val);
+  }
+  function cmUpdateTagText(secId, tagId, val) {
+    cmUpdateStdText(secId, val);
+  }
+  function cmDeleteTag(secId, tagId) {
+    cmDeleteStd(secId);
+  }
 
   /* ── Action dispatcher (called from parent's _handleClick) ── */
   function handleAction(action, el, e) {
     var handlers = {
-      'openClassManager':     function() { openClassManager(); },
-      'closeClassManager':    function() { closeClassManager(); },
-      'cmStartCreate':        function() { cmStartCreate(); },
-      'cmImportTeams':        function() { if (window.TeamsImport) TeamsImport.open(null, function() { renderClassManager(); }); },
-      'cmCancelCreate':       function() { cmCancelCreate(); },
-      'cmSelectClass':        function() { cmSelectClass(el.dataset.cid); },
-      'cmEditStudent':        function() { cmEditStudent(el.dataset.sid); },
-      'cmRemoveStudent':      function() { cmRemoveStudent(el.dataset.sid); },
-      'cmCancelStudent':      function() { cmCancelStudent(); },
-      'cmSaveStudent':        function() { cmSaveStudent(); },
-      'cmShowAddStudent':     function() { cmShowAddStudent(); },
-      'cmImportRoster':       function() { cmImportRoster(); },
-      'cmConfirmImport':      function() { cmConfirmImport(); },
-      'cmCancelImport':       function() { cmCancelImport(); },
-      'cmToggleBulk':         function() { cmToggleBulk(); },
-      'cmBulkSelectAll':      function() { cmBulkSelectAll(); },
-      'cmBulkDeselectAll':    function() { cmBulkDeselectAll(); },
-      'cmApplyBulk':          function() { cmApplyBulk(); },
-      'cmSetGradingSystem':   function() { cmSetGradingSystem(el.dataset.value); },
-      'cmSetCalcMethod':      function() { cmSetCalcMethod(el.dataset.value); },
-      'cmCatAdd':             function() { cmCatAdd(); },
-      'cmCatDelete':          function() { cmCatDelete(parseInt(el.dataset.idx, 10)); },
-      'cmToggleColorPalette': function() { cmToggleColorPalette(el); },
-      'cmPickColor':          function() { cmPickColor(el); },
-      'cmDeleteSubject':      function() { cmDeleteSubject(el.dataset.subid); },
-      'cmAddSubject':         function() { cmAddSubject(); },
-      'cmToggleSec':          function() { cmToggleSec(el); },
-      'cmDeleteSec':          function() { cmDeleteSec(el.dataset.secid); },
-      'cmDeleteStd':          function() { cmDeleteStd(el.dataset.secid); },
-      'cmDeleteTag':          function() { cmDeleteTag(el.dataset.secid, el.dataset.tagid); },
-      'cmAddTag':             function() { cmAddTag(el.dataset.secid); },
-      'cmAddSec':             function() { cmAddSec(); },
-      'cmAddStd':             function() { cmAddStd(); },
-      'cmStartRelink':        function() { cmStartRelink(el.dataset.cid); },
-      'cmDuplicateCourse':    function() { cmDuplicateCourse(el.dataset.cid); },
-      'cmToggleArchive':      function() { cmToggleArchive(el.dataset.cid); },
-      'cmDeleteCourse':       function() { cmDeleteCourse(); },
-      'cwSelectGrade':        function() { cwSelectGrade(parseInt(el.dataset.grade, 10)); },
-      'cwSelectSubject':      function() { cwSelectSubject(el.dataset.subject); },
-      'cwToggleCourse':       function() { cwToggleCourse(el.dataset.tag); },
-      'cwSkipToCustom':       function() { cwSkipToCustom(); },
-      'cwGoToStep2':          function() { cwGoToStep2(); },
-      'cwGoToStep3':          function() { cwGoToStep3(); },
-      'cwGoBack':             function() { cwGoBack(); },
-      'cwFinishCreate':       function() { cwFinishCreate(); },
-      'cmAddCompGroup':       function() { cmAddCompGroup(); },
-      'cmDeleteCompGroup':    function() { cmDeleteCompGroup(el.dataset.grpid); },
-      'cmToggleStdCard':      function() { cmToggleStdCard(el.dataset.secid); },
-      'cmToggleStdFolder':    function() { cmToggleStdFolder(el.dataset.uid); },
-      'openColorPicker':      function() { var inp = el.querySelector('input[type="color"]'); if (inp) inp.click(); },
-      'cmCreateToggle':       function() { cmCreateToggle(el, el.dataset.group); var dp = document.getElementById('cm-cg-decay'); if (dp) dp.style.display = 'none'; },
-      'cmCreateToggleDecay':  function() { cmCreateToggle(el, el.dataset.group); document.getElementById('cm-cg-decay').style.display = el.classList.contains('active') && el.dataset.val === 'decayingAvg' ? '' : 'none'; },
-      'cmRelinkCancel':       function() { cmRelinkCancel(); },
-      'cmRelinkNext':         function() { cmRelinkNext(); },
-      'cmRelinkConfirm':      function() { cmRelinkConfirm(el.dataset.mode); },
-      'cmRelinkBack':         function() { cmRelinkStep = 1; renderClassManager(); },
+      openClassManager: function () {
+        openClassManager();
+      },
+      closeClassManager: function () {
+        closeClassManager();
+      },
+      cmStartCreate: function () {
+        cmStartCreate();
+      },
+      cmImportTeams: function () {
+        if (window.TeamsImport)
+          TeamsImport.open(null, function () {
+            renderClassManager();
+          });
+      },
+      cmCancelCreate: function () {
+        cmCancelCreate();
+      },
+      cmSelectClass: function () {
+        cmSelectClass(el.dataset.cid);
+      },
+      cmEditStudent: function () {
+        cmEditStudent(el.dataset.sid);
+      },
+      cmRemoveStudent: function () {
+        cmRemoveStudent(el.dataset.sid);
+      },
+      cmCancelStudent: function () {
+        cmCancelStudent();
+      },
+      cmSaveStudent: function () {
+        cmSaveStudent();
+      },
+      cmShowAddStudent: function () {
+        cmShowAddStudent();
+      },
+      cmImportRoster: function () {
+        cmImportRoster();
+      },
+      cmConfirmImport: function () {
+        cmConfirmImport();
+      },
+      cmCancelImport: function () {
+        cmCancelImport();
+      },
+      cmToggleBulk: function () {
+        cmToggleBulk();
+      },
+      cmBulkSelectAll: function () {
+        cmBulkSelectAll();
+      },
+      cmBulkDeselectAll: function () {
+        cmBulkDeselectAll();
+      },
+      cmApplyBulk: function () {
+        cmApplyBulk();
+      },
+      cmSetGradingSystem: function () {
+        cmSetGradingSystem(el.dataset.value);
+      },
+      cmSetCalcMethod: function () {
+        cmSetCalcMethod(el.dataset.value);
+      },
+      cmCatAdd: function () {
+        cmCatAdd();
+      },
+      cmCatDelete: function () {
+        cmCatDelete(parseInt(el.dataset.idx, 10));
+      },
+      cmToggleColorPalette: function () {
+        cmToggleColorPalette(el);
+      },
+      cmPickColor: function () {
+        cmPickColor(el);
+      },
+      cmDeleteSubject: function () {
+        cmDeleteSubject(el.dataset.subid);
+      },
+      cmAddSubject: function () {
+        cmAddSubject();
+      },
+      cmToggleSec: function () {
+        cmToggleSec(el);
+      },
+      cmDeleteSec: function () {
+        cmDeleteSec(el.dataset.secid);
+      },
+      cmDeleteStd: function () {
+        cmDeleteStd(el.dataset.secid);
+      },
+      cmDeleteTag: function () {
+        cmDeleteTag(el.dataset.secid, el.dataset.tagid);
+      },
+      cmAddTag: function () {
+        cmAddTag(el.dataset.secid);
+      },
+      cmAddSec: function () {
+        cmAddSec();
+      },
+      cmAddStd: function () {
+        cmAddStd();
+      },
+      cmStartRelink: function () {
+        cmStartRelink(el.dataset.cid);
+      },
+      cmDuplicateCourse: function () {
+        cmDuplicateCourse(el.dataset.cid);
+      },
+      cmToggleArchive: function () {
+        cmToggleArchive(el.dataset.cid);
+      },
+      cmDeleteCourse: function () {
+        cmDeleteCourse();
+      },
+      cwSelectGrade: function () {
+        cwSelectGrade(parseInt(el.dataset.grade, 10));
+      },
+      cwSelectSubject: function () {
+        cwSelectSubject(el.dataset.subject);
+      },
+      cwToggleCourse: function () {
+        cwToggleCourse(el.dataset.tag);
+      },
+      cwSkipToCustom: function () {
+        cwSkipToCustom();
+      },
+      cwGoToStep2: function () {
+        cwGoToStep2();
+      },
+      cwGoToStep3: function () {
+        cwGoToStep3();
+      },
+      cwGoBack: function () {
+        cwGoBack();
+      },
+      cwFinishCreate: function () {
+        cwFinishCreate();
+      },
+      cmAddCompGroup: function () {
+        cmAddCompGroup();
+      },
+      cmDeleteCompGroup: function () {
+        cmDeleteCompGroup(el.dataset.grpid);
+      },
+      cmToggleStdCard: function () {
+        cmToggleStdCard(el.dataset.secid);
+      },
+      cmToggleStdFolder: function () {
+        cmToggleStdFolder(el.dataset.uid);
+      },
+      openColorPicker: function () {
+        var inp = el.querySelector('input[type="color"]');
+        if (inp) inp.click();
+      },
+      cmCreateToggle: function () {
+        cmCreateToggle(el, el.dataset.group);
+        var dp = document.getElementById('cm-cg-decay');
+        if (dp) dp.style.display = 'none';
+      },
+      cmCreateToggleDecay: function () {
+        cmCreateToggle(el, el.dataset.group);
+        document.getElementById('cm-cg-decay').style.display =
+          el.classList.contains('active') && el.dataset.val === 'decayingAvg' ? '' : 'none';
+      },
+      cmRelinkCancel: function () {
+        cmRelinkCancel();
+      },
+      cmRelinkNext: function () {
+        cmRelinkNext();
+      },
+      cmRelinkConfirm: function () {
+        cmRelinkConfirm(el.dataset.mode);
+      },
+      cmRelinkBack: function () {
+        cmRelinkStep = 1;
+        renderClassManager();
+      },
     };
     if (handlers[action]) {
       if (el.tagName !== 'SELECT' && e) e.preventDefault();
@@ -2294,30 +3423,72 @@ window.DashClassManager = (function() {
   }
 
   function handleInput(el) {
-    if (el.dataset.actionInput === 'cmDecaySlider') { cmUpdateDecay(el.value); return true; }
-    if (el.dataset.actionInput === 'cmCatWeightLive') { cmCatWeightLive(parseInt(el.dataset.idx, 10), el.value); return true; }
+    if (el.dataset.actionInput === 'cmDecaySlider') {
+      cmUpdateDecay(el.value);
+      return true;
+    }
+    if (el.dataset.actionInput === 'cmCatWeightLive') {
+      cmCatWeightLive(parseInt(el.dataset.idx, 10), el.value);
+      return true;
+    }
     // T-UI-02 retired: cmCwRange (legacy summative/formative slider).
     return false;
   }
 
   function handleChange(el) {
-    if (el.dataset.actionChange === 'cmCSV') { cmHandleCSV(el); return true; }
+    if (el.dataset.actionChange === 'cmCSV') {
+      cmHandleCSV(el);
+      return true;
+    }
     // T-UI-02 retired: cmCwEnabled + cmReportPct (deleted 2026-04-21).
-    if (el.dataset.actionChange === 'cmSubjectColor') { cmUpdateSubjectColor(el.dataset.subid, el.value); return true; }
-    if (el.dataset.actionChange === 'cmStdSubject') { cmUpdateStdSubject(el.dataset.secid, el.value); return true; }
-    if (el.dataset.actionChange === 'cmStdColor') { cmUpdateStdColor(el.dataset.secid, el.value); return true; }
-    if (el.dataset.actionChange === 'cmCompGroupColor') { cmUpdateCompGroupColor(el.dataset.grpid, el.value); return true; }
-    if (el.dataset.actionChange === 'cmStdGroup') { cmUpdateStdGroup(el.dataset.secid, el.value); return true; }
-    if (el.dataset.actionChange === 'cmSecSubject') { cmUpdateSecSubject(el.dataset.secid, el.value); return true; }
-    if (el.dataset.actionChange === 'cmSecColor') { cmUpdateSecColor(el.dataset.secid, el.value); return true; }
-    if (el.dataset.action === 'cmBulkToggleCheck') { cmBulkToggle(el.dataset.sid); return true; }
+    if (el.dataset.actionChange === 'cmSubjectColor') {
+      cmUpdateSubjectColor(el.dataset.subid, el.value);
+      return true;
+    }
+    if (el.dataset.actionChange === 'cmStdSubject') {
+      cmUpdateStdSubject(el.dataset.secid, el.value);
+      return true;
+    }
+    if (el.dataset.actionChange === 'cmStdColor') {
+      cmUpdateStdColor(el.dataset.secid, el.value);
+      return true;
+    }
+    if (el.dataset.actionChange === 'cmCompGroupColor') {
+      cmUpdateCompGroupColor(el.dataset.grpid, el.value);
+      return true;
+    }
+    if (el.dataset.actionChange === 'cmStdGroup') {
+      cmUpdateStdGroup(el.dataset.secid, el.value);
+      return true;
+    }
+    if (el.dataset.actionChange === 'cmSecSubject') {
+      cmUpdateSecSubject(el.dataset.secid, el.value);
+      return true;
+    }
+    if (el.dataset.actionChange === 'cmSecColor') {
+      cmUpdateSecColor(el.dataset.secid, el.value);
+      return true;
+    }
+    if (el.dataset.action === 'cmBulkToggleCheck') {
+      cmBulkToggle(el.dataset.sid);
+      return true;
+    }
     return false;
   }
 
   function handleBlur(el) {
-    if (el.dataset.actionBlur === 'cmUpdateName') { cmUpdateField('name', el.value, el); return true; }
-    if (el.dataset.actionBlur === 'cmUpdateGrade') { cmUpdateField('gradeLevel', el.value); return true; }
-    if (el.dataset.actionBlur === 'cmUpdateDesc') { cmUpdateField('description', el.value); return true; }
+    if (el.dataset.actionBlur === 'cmUpdateName') {
+      cmUpdateField('name', el.value, el);
+      return true;
+    }
+    if (el.dataset.actionBlur === 'cmUpdateGrade') {
+      cmUpdateField('gradeLevel', el.value);
+      return true;
+    }
+    if (el.dataset.actionBlur === 'cmUpdateDesc') {
+      cmUpdateField('description', el.value);
+      return true;
+    }
     // Late Work Policy — empty becomes null (matches Phoneox `value || null`
     // pattern, so blanking the textarea clears the server-side column).
     if (el.dataset.actionBlur === 'cmLateWorkPolicy') {
@@ -2325,17 +3496,50 @@ window.DashClassManager = (function() {
       cmUpdateField('lateWorkPolicy', _lp || null);
       return true;
     }
-    if (el.dataset.actionBlur === 'cmCatName') { cmCatName(parseInt(el.dataset.idx, 10), el.value); return true; }
-    if (el.dataset.actionBlur === 'cmCatWeight') { cmCatWeight(parseInt(el.dataset.idx, 10), el.value); return true; }
-    if (el.dataset.actionBlur === 'cmCompGroupName') { cmUpdateCompGroupName(el.dataset.grpid, el.value); return true; }
-    if (el.dataset.actionBlur === 'cmSubjectName') { cmUpdateSubjectName(el.dataset.subid, el.value); return true; }
-    if (el.dataset.actionBlur === 'cmStdCode') { cmUpdateStdCode(el.dataset.secid, el.value); return true; }
-    if (el.dataset.actionBlur === 'cmStdName') { cmUpdateStdName(el.dataset.secid, el.value); return true; }
-    if (el.dataset.actionBlur === 'cmStdLabel') { cmUpdateStdLabel(el.dataset.secid, el.value); return true; }
-    if (el.dataset.actionBlur === 'cmStdText') { cmUpdateStdText(el.dataset.secid, el.value); return true; }
-    if (el.dataset.actionBlur === 'cmSecName') { cmUpdateSecName(el.dataset.secid, el.value); return true; }
-    if (el.dataset.actionBlur === 'cmTagLabel') { cmUpdateTagLabel(el.dataset.secid, el.dataset.tagid, el.value); return true; }
-    if (el.dataset.actionBlur === 'cmTagText') { cmUpdateTagText(el.dataset.secid, el.dataset.tagid, el.value); return true; }
+    if (el.dataset.actionBlur === 'cmCatName') {
+      cmCatName(parseInt(el.dataset.idx, 10), el.value);
+      return true;
+    }
+    if (el.dataset.actionBlur === 'cmCatWeight') {
+      cmCatWeight(parseInt(el.dataset.idx, 10), el.value);
+      return true;
+    }
+    if (el.dataset.actionBlur === 'cmCompGroupName') {
+      cmUpdateCompGroupName(el.dataset.grpid, el.value);
+      return true;
+    }
+    if (el.dataset.actionBlur === 'cmSubjectName') {
+      cmUpdateSubjectName(el.dataset.subid, el.value);
+      return true;
+    }
+    if (el.dataset.actionBlur === 'cmStdCode') {
+      cmUpdateStdCode(el.dataset.secid, el.value);
+      return true;
+    }
+    if (el.dataset.actionBlur === 'cmStdName') {
+      cmUpdateStdName(el.dataset.secid, el.value);
+      return true;
+    }
+    if (el.dataset.actionBlur === 'cmStdLabel') {
+      cmUpdateStdLabel(el.dataset.secid, el.value);
+      return true;
+    }
+    if (el.dataset.actionBlur === 'cmStdText') {
+      cmUpdateStdText(el.dataset.secid, el.value);
+      return true;
+    }
+    if (el.dataset.actionBlur === 'cmSecName') {
+      cmUpdateSecName(el.dataset.secid, el.value);
+      return true;
+    }
+    if (el.dataset.actionBlur === 'cmTagLabel') {
+      cmUpdateTagLabel(el.dataset.secid, el.dataset.tagid, el.value);
+      return true;
+    }
+    if (el.dataset.actionBlur === 'cmTagText') {
+      cmUpdateTagText(el.dataset.secid, el.dataset.tagid, el.value);
+      return true;
+    }
     return false;
   }
 
@@ -2343,8 +3547,12 @@ window.DashClassManager = (function() {
   return {
     configure: configure,
     setActiveCourse: _setActiveCourse,
-    get classManagerOpen() { return classManagerOpen; },
-    set classManagerOpen(v) { classManagerOpen = v; },
+    get classManagerOpen() {
+      return classManagerOpen;
+    },
+    set classManagerOpen(v) {
+      classManagerOpen = v;
+    },
     openClassManager: openClassManager,
     closeClassManager: closeClassManager,
     renderClassManager: renderClassManager,
@@ -2352,9 +3560,12 @@ window.DashClassManager = (function() {
     handleInput: handleInput,
     handleChange: handleChange,
     handleBlur: handleBlur,
-    initDrag: function() { _initCmStdDrag(); _initCmCatDrag(); },
+    initDrag: function () {
+      _initCmStdDrag();
+      _initCmCatDrag();
+    },
     destroy: _removeAllListeners,
-    resetState: function() {
+    resetState: function () {
       classManagerOpen = false;
       cmMode = 'edit';
       cmSelectedCourse = _activeCourse;
@@ -2368,10 +3579,14 @@ window.DashClassManager = (function() {
       cwSelectedGrade = null;
       cwSelectedSubject = null;
       cwSelectedTags = [];
-      cwStep2Name = ''; cwStep2Grade = ''; cwStep2Desc = '';
-      cwStep2Grading = 'proficiency'; cwStep2Calc = 'mostRecent'; cwStep2Decay = '65';
+      cwStep2Name = '';
+      cwStep2Grade = '';
+      cwStep2Desc = '';
+      cwStep2Grading = 'proficiency';
+      cwStep2Calc = 'mostRecent';
+      cwStep2Decay = '65';
       _cmCollapsedStdFolders = {};
       _cmOpenStdCards = {};
-    }
+    },
   };
 })();

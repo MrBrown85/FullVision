@@ -15,9 +15,7 @@ beforeEach(() => {
 
 describe('localStorage key format — data isolation', () => {
   it('stores course data using gb-{dataKey}-{courseId} format, not student names', () => {
-    const students = [
-      { id: 's1', firstName: 'Alice', lastName: 'Smith', designations: [], sortName: 'Smith Alice' }
-    ];
+    const students = [{ id: 's1', firstName: 'Alice', lastName: 'Smith', designations: [], sortName: 'Smith Alice' }];
     saveStudents(CID, students);
 
     const key = 'gb-students-' + CID;

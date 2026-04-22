@@ -45,10 +45,10 @@ describe('pointsToProf', () => {
   });
 
   it('works with non-100 maxPoints', () => {
-    expect(pointsToProf(9, 10)).toBe(4);   // 90%
-    expect(pointsToProf(7, 10)).toBe(2);   // 70%
-    expect(pointsToProf(43, 50)).toBe(4);  // 86%
-    expect(pointsToProf(5, 10)).toBe(2);   // 50%
+    expect(pointsToProf(9, 10)).toBe(4); // 90%
+    expect(pointsToProf(7, 10)).toBe(2); // 70%
+    expect(pointsToProf(43, 50)).toBe(4); // 86%
+    expect(pointsToProf(5, 10)).toBe(2); // 50%
   });
 
   it('supports custom grading scale', () => {
@@ -99,16 +99,16 @@ describe('_calcGroup', () => {
 
     it('breaks ties with the most recent score', () => {
       // 2 and 3 each appear twice — 3 is more recent
-      expect(_calcGroup([
-        s(2, '2025-01-01'), s(3, '2025-02-01'), s(2, '2025-03-01'), s(3, '2025-04-01'),
-      ], 'mode', 0.65)).toBe(3);
+      expect(
+        _calcGroup([s(2, '2025-01-01'), s(3, '2025-02-01'), s(2, '2025-03-01'), s(3, '2025-04-01')], 'mode', 0.65),
+      ).toBe(3);
     });
 
     it('breaks ties with most recent (reversed)', () => {
       // 2 and 3 each appear twice — 2 is more recent
-      expect(_calcGroup([
-        s(3, '2025-01-01'), s(2, '2025-02-01'), s(3, '2025-03-01'), s(2, '2025-04-01'),
-      ], 'mode', 0.65)).toBe(2);
+      expect(
+        _calcGroup([s(3, '2025-01-01'), s(2, '2025-02-01'), s(3, '2025-03-01'), s(2, '2025-04-01')], 'mode', 0.65),
+      ).toBe(2);
     });
 
     it('respects assessment weights', () => {
@@ -216,38 +216,40 @@ describe('calcProficiency', () => {
   });
 
   it('ignores formative when formative weight is 0', () => {
-    const scores = [
-      s(3, '2025-01-01', { type: 'summative' }),
-      s(1, '2025-02-01', { type: 'formative' }),
-    ];
-    expect(calcProficiency(scores, 'mostRecent', 0.65, {
-      categoryWeights: { summative: 1.0, formative: 0 },
-    })).toBe(3);
+    const scores = [s(3, '2025-01-01', { type: 'summative' }), s(1, '2025-02-01', { type: 'formative' })];
+    expect(
+      calcProficiency(scores, 'mostRecent', 0.65, {
+        categoryWeights: { summative: 1.0, formative: 0 },
+      }),
+    ).toBe(3);
   });
 
   it('blends summative and formative with weights', () => {
-    const scores = [
-      s(4, '2025-01-01', { type: 'summative' }),
-      s(2, '2025-02-01', { type: 'formative' }),
-    ];
+    const scores = [s(4, '2025-01-01', { type: 'summative' }), s(2, '2025-02-01', { type: 'formative' })];
     // 4*0.7 + 2*0.3 = 2.8 + 0.6 = 3.4 → rounds to 3
-    expect(calcProficiency(scores, 'mostRecent', 0.65, {
-      categoryWeights: { summative: 0.7, formative: 0.3 },
-    })).toBe(3);
+    expect(
+      calcProficiency(scores, 'mostRecent', 0.65, {
+        categoryWeights: { summative: 0.7, formative: 0.3 },
+      }),
+    ).toBe(3);
   });
 
   it('uses only formative when no summative evidence', () => {
     const scores = [s(3, '2025-01-01', { type: 'formative' })];
-    expect(calcProficiency(scores, 'mostRecent', 0.65, {
-      categoryWeights: { summative: 0.7, formative: 0.3 },
-    })).toBe(3);
+    expect(
+      calcProficiency(scores, 'mostRecent', 0.65, {
+        categoryWeights: { summative: 0.7, formative: 0.3 },
+      }),
+    ).toBe(3);
   });
 
   it('uses only summative when no formative evidence', () => {
     const scores = [s(4, '2025-01-01', { type: 'summative' })];
-    expect(calcProficiency(scores, 'mostRecent', 0.65, {
-      categoryWeights: { summative: 0.7, formative: 0.3 },
-    })).toBe(4);
+    expect(
+      calcProficiency(scores, 'mostRecent', 0.65, {
+        categoryWeights: { summative: 0.7, formative: 0.3 },
+      }),
+    ).toBe(4);
   });
 
   it('returns 0 for empty scores', () => {
@@ -258,18 +260,18 @@ describe('calcProficiency', () => {
 /* ── calcLetterGrade ──────────────────────────────────────── */
 describe('calcLetterGrade', () => {
   it('returns A for 3.50+', () => {
-    expect(calcLetterGrade(3.50)).toEqual({ letter: 'A', pct: 89 });
+    expect(calcLetterGrade(3.5)).toEqual({ letter: 'A', pct: 89 });
     expect(calcLetterGrade(4.0).letter).toBe('A');
     expect(calcLetterGrade(4.0).pct).toBe(96);
   });
 
   it('returns B for 3.00-3.49', () => {
-    expect(calcLetterGrade(3.00)).toEqual({ letter: 'B', pct: 82 });
+    expect(calcLetterGrade(3.0)).toEqual({ letter: 'B', pct: 82 });
     expect(calcLetterGrade(3.25).letter).toBe('B');
   });
 
   it('returns C+ for 2.00-2.99', () => {
-    expect(calcLetterGrade(2.00)).toEqual({ letter: 'C+', pct: 68 });
+    expect(calcLetterGrade(2.0)).toEqual({ letter: 'C+', pct: 68 });
     expect(calcLetterGrade(2.25).letter).toBe('C+');
   });
 

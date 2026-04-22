@@ -12,7 +12,8 @@ runInThisContext(readFileSync(resolve(root, 'teacher/page-gradebook.js'), 'utf-8
 
 const CID = '11111111-1111-1111-1111-111111111111';
 const TEACHER_ID = '22222222-2222-2222-2222-222222222222';
-const BANNER_COPY = 'Welcome! This is a sample class. Explore the features, then delete it anytime from Course Settings.';
+const BANNER_COPY =
+  'Welcome! This is a sample class. Explore the features, then delete it anytime from Course Settings.';
 
 describe('PageGradebook Welcome Class banner', () => {
   var originalDocument;
@@ -24,12 +25,23 @@ describe('PageGradebook Welcome Class banner', () => {
       innerHTML: '',
       style: {},
       scrollTop: 0,
-      classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } },
+      classList: {
+        add() {},
+        remove() {},
+        toggle() {},
+        contains() {
+          return false;
+        },
+      },
       addEventListener() {},
       removeEventListener() {},
       appendChild() {},
-      querySelector() { return null; },
-      querySelectorAll() { return []; },
+      querySelector() {
+        return null;
+      },
+      querySelectorAll() {
+        return [];
+      },
     };
   }
 
@@ -56,15 +68,19 @@ describe('PageGradebook Welcome Class banner', () => {
         if (!elements[id]) elements[id] = makeElement();
         return elements[id];
       },
-      querySelector() { return null; },
-      querySelectorAll() { return []; },
+      querySelector() {
+        return null;
+      },
+      querySelectorAll() {
+        return [];
+      },
       addEventListener() {},
       removeEventListener() {},
       body: { appendChild() {} },
     };
 
     globalThis.getStudents = () => [];
-    globalThis.sortStudents = (arr) => arr;
+    globalThis.sortStudents = arr => arr;
     globalThis.getAssessments = () => [];
     globalThis.getSections = () => [];
     globalThis.getModules = () => [];

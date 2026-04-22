@@ -24,8 +24,13 @@ describe('rubric CRUD', () => {
       id: 'r1',
       title: 'Detailed Rubric',
       criteria: [
-        { id: 'c1', label: 'Content', weight: 2, tagIds: ['t1', 't2'],
-          levels: { 1: 'Beginning', 2: 'Developing', 3: 'Proficient', 4: 'Extending' } },
+        {
+          id: 'c1',
+          label: 'Content',
+          weight: 2,
+          tagIds: ['t1', 't2'],
+          levels: { 1: 'Beginning', 2: 'Developing', 3: 'Proficient', 4: 'Extending' },
+        },
         { id: 'c2', label: 'Organization', weight: 1, tagIds: ['t3'] },
       ],
     };
@@ -44,7 +49,10 @@ describe('rubric CRUD', () => {
   });
 
   it('saveRubrics replaces the previous set (no merge)', () => {
-    saveRubrics(CID, [{ id: 'r1', title: 'Old' }, { id: 'r2', title: 'Old2' }]);
+    saveRubrics(CID, [
+      { id: 'r1', title: 'Old' },
+      { id: 'r2', title: 'Old2' },
+    ]);
     saveRubrics(CID, [{ id: 'r3', title: 'New' }]);
     const rubrics = getRubrics(CID);
     expect(rubrics).toHaveLength(1);

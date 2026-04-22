@@ -3,23 +3,23 @@
    5-step wizard: Upload → Match Students → Select Assignments →
                   Preview → Results
    ═══════════════════════════════════════════════════════════════ */
-window.TeamsImport = (function() {
+window.TeamsImport = (function () {
   'use strict';
 
   /* ── Module state ──────────────────────────────────────────── */
   var tiStep = 1;
   var tiCourseId = null;
-  var tiParsedFile = null;     // { students:[], assignments:[] }
-  var tiStudentMap = {};       // teamsIdx → { matchType, existingId, action }
-  var tiSelectedAssigns = {};  // assignIdx → boolean
-  var tiAssignDupes = {};      // assignIdx → existingAssessmentId | null
-  var tiImportResult = null;   // { students, assessments, scores, feedback }
+  var tiParsedFile = null; // { students:[], assignments:[] }
+  var tiStudentMap = {}; // teamsIdx → { matchType, existingId, action }
+  var tiSelectedAssigns = {}; // assignIdx → boolean
+  var tiAssignDupes = {}; // assignIdx → existingAssessmentId | null
+  var tiImportResult = null; // { students, assessments, scores, feedback }
   var tiFileName = '';
-  var tiClassName = '';        // name for new class (when creating)
+  var tiClassName = ''; // name for new class (when creating)
   var tiCreatedCourseId = null; // course ID created during import
   var _renderPageFn = null;
   var _overlayEl = null;
-  var _triggerEl = null;       // element that opened wizard (for focus restore)
+  var _triggerEl = null; // element that opened wizard (for focus restore)
 
   function _resetState() {
     tiStep = 1;
@@ -35,7 +35,9 @@ window.TeamsImport = (function() {
   }
 
   /* ── Helpers ───────────────────────────────────────────────── */
-  function _norm(s) { return (s || '').trim().toLowerCase(); }
+  function _norm(s) {
+    return (s || '').trim().toLowerCase();
+  }
 
   function _stepLabels() {
     return ['Upload', 'Match Students', 'Assignments', 'Preview', 'Done'];
@@ -66,7 +68,10 @@ window.TeamsImport = (function() {
 
   function _escHandler(e) {
     if (e.key === 'Escape') {
-      if (tiStep === 5 || !tiParsedFile) { close(); return; }
+      if (tiStep === 5 || !tiParsedFile) {
+        close();
+        return;
+      }
       // If data loaded, confirm before closing
       if (confirm('Discard import progress?')) close();
     }
@@ -75,13 +80,18 @@ window.TeamsImport = (function() {
   /* ── Focus trap ─────────────────────────────────────────────── */
   function _focusTrapHandler(e) {
     if (e.key !== 'Tab' || !_overlayEl) return;
-    var focusable = _overlayEl.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    var focusable = _overlayEl.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    );
     if (focusable.length === 0) return;
-    var first = focusable[0], last = focusable[focusable.length - 1];
+    var first = focusable[0],
+      last = focusable[focusable.length - 1];
     if (e.shiftKey && document.activeElement === first) {
-      e.preventDefault(); last.focus();
+      e.preventDefault();
+      last.focus();
     } else if (!e.shiftKey && document.activeElement === last) {
-      e.preventDefault(); first.focus();
+      e.preventDefault();
+      first.focus();
     }
   }
 
@@ -103,15 +113,18 @@ window.TeamsImport = (function() {
     document.addEventListener('keydown', _focusTrapHandler);
 
     // Delegated click handler
-    _overlayEl.addEventListener('click', function(e) {
+    _overlayEl.addEventListener('click', function (e) {
       var el = e.target.closest('[data-ti]');
       if (!el) return;
       var action = el.dataset.ti;
-      if (_actions[action]) { e.preventDefault(); _actions[action](el); }
+      if (_actions[action]) {
+        e.preventDefault();
+        _actions[action](el);
+      }
     });
 
     // Delegated change handler
-    _overlayEl.addEventListener('change', function(e) {
+    _overlayEl.addEventListener('change', function (e) {
       var el = e.target;
       if (el.dataset.tiChange) {
         var handler = _changeActions[el.dataset.tiChange];
@@ -124,26 +137,49 @@ window.TeamsImport = (function() {
   function _render() {
     if (!_overlayEl) return;
     var labels = _stepLabels();
-    var html = '<div class="ti-card">' +
+    var html =
+      '<div class="ti-card">' +
       '<div class="ti-header">' +
-        '<div class="ti-title" id="ti-title">Import from Teams</div>' +
-        '<button class="ti-close" data-ti="close" aria-label="Close">&times;</button>' +
+      '<div class="ti-title" id="ti-title">Import from Teams</div>' +
+      '<button class="ti-close" data-ti="close" aria-label="Close">&times;</button>' +
       '</div>' +
-      '<div class="ti-steps" role="list" aria-label="Import progress">' + labels.map(function(_, i) {
-        var cls = i + 1 < tiStep ? 'done' : (i + 1 === tiStep ? 'active' : '');
-        var state = i + 1 < tiStep ? 'completed' : (i + 1 === tiStep ? 'current' : 'upcoming');
-        return '<div class="ti-step-pill ' + cls + '" role="listitem" aria-label="Step ' + (i+1) + ': ' + esc(labels[i]) + ', ' + state + '"></div>';
-      }).join('') + '</div>' +
-      '<div class="ti-step-label" tabindex="-1" id="ti-step-label">Step ' + tiStep + ' of ' + labels.length + ': ' + esc(labels[tiStep - 1]) + '</div>' +
-      '<div class="ti-body" id="ti-body">' + _renderStep() + '</div>' +
+      '<div class="ti-steps" role="list" aria-label="Import progress">' +
+      labels
+        .map(function (_, i) {
+          var cls = i + 1 < tiStep ? 'done' : i + 1 === tiStep ? 'active' : '';
+          var state = i + 1 < tiStep ? 'completed' : i + 1 === tiStep ? 'current' : 'upcoming';
+          return (
+            '<div class="ti-step-pill ' +
+            cls +
+            '" role="listitem" aria-label="Step ' +
+            (i + 1) +
+            ': ' +
+            esc(labels[i]) +
+            ', ' +
+            state +
+            '"></div>'
+          );
+        })
+        .join('') +
+      '</div>' +
+      '<div class="ti-step-label" tabindex="-1" id="ti-step-label">Step ' +
+      tiStep +
+      ' of ' +
+      labels.length +
+      ': ' +
+      esc(labels[tiStep - 1]) +
+      '</div>' +
+      '<div class="ti-body" id="ti-body">' +
+      _renderStep() +
+      '</div>' +
       _renderFooter() +
-    '</div>';
+      '</div>';
     _overlayEl.innerHTML = html;
 
     // Post-render hooks
     if (tiStep === 1) _setupDropzone();
     // Set focus after render — to step label for step transitions, close button on first open
-    requestAnimationFrame(function() {
+    requestAnimationFrame(function () {
       var label = _overlayEl && _overlayEl.querySelector('#ti-step-label');
       if (label && tiStep > 1) label.focus();
       else _setInitialFocus();
@@ -161,8 +197,12 @@ window.TeamsImport = (function() {
 
   function _renderFooter() {
     if (tiStep === 1) return '<div class="ti-footer"></div>';
-    if (tiStep === 5) return '<div class="ti-footer"><button class="btn btn-primary" data-ti="viewAssignments">' +
-      (tiCreatedCourseId ? 'Go to Class' : 'View Assignments') + '</button></div>';
+    if (tiStep === 5)
+      return (
+        '<div class="ti-footer"><button class="btn btn-primary" data-ti="viewAssignments">' +
+        (tiCreatedCourseId ? 'Go to Class' : 'View Assignments') +
+        '</button></div>'
+      );
     var backBtn = '<button class="btn btn-ghost" data-ti="back">Back</button>';
     var nextBtn = '';
     if (tiStep === 2) nextBtn = '<button class="btn btn-primary" data-ti="toStep3">Next</button>';
@@ -173,15 +213,19 @@ window.TeamsImport = (function() {
 
   /* ── STEP 1: File Upload ───────────────────────────────────── */
   function _renderStep1() {
-    var html = '<div class="ti-dropzone" id="ti-dropzone" data-ti="triggerFile" tabindex="0" role="button" aria-label="Upload Teams grade export file">' +
+    var html =
+      '<div class="ti-dropzone" id="ti-dropzone" data-ti="triggerFile" tabindex="0" role="button" aria-label="Upload Teams grade export file">' +
       '<div class="ti-dropzone-icon" aria-hidden="true">&#128196;</div>' +
       '<div class="ti-dropzone-text">Drop a Teams grade export here, or click to browse</div>' +
       '<div class="ti-dropzone-hint">Accepts .csv, .xlsx</div>' +
-    '</div>' +
-    '<input type="file" class="ti-file-input" id="ti-file-input" accept=".csv,.xlsx" data-ti-change="fileSelected">';
+      '</div>' +
+      '<input type="file" class="ti-file-input" id="ti-file-input" accept=".csv,.xlsx" data-ti-change="fileSelected">';
     if (tiFileName) {
-      html += '<div class="ti-file-info"><span class="ti-file-info-icon">&#9989;</span>' +
-        '<span class="ti-file-info-text">' + esc(tiFileName) + '</span></div>';
+      html +=
+        '<div class="ti-file-info"><span class="ti-file-info-icon">&#9989;</span>' +
+        '<span class="ti-file-info-text">' +
+        esc(tiFileName) +
+        '</span></div>';
     }
     return html;
   }
@@ -189,16 +233,21 @@ window.TeamsImport = (function() {
   function _setupDropzone() {
     var dz = document.getElementById('ti-dropzone');
     if (!dz) return;
-    dz.addEventListener('dragover', function(e) { e.preventDefault(); dz.classList.add('drag-over'); });
-    dz.addEventListener('dragleave', function() { dz.classList.remove('drag-over'); });
-    dz.addEventListener('drop', function(e) {
+    dz.addEventListener('dragover', function (e) {
+      e.preventDefault();
+      dz.classList.add('drag-over');
+    });
+    dz.addEventListener('dragleave', function () {
+      dz.classList.remove('drag-over');
+    });
+    dz.addEventListener('drop', function (e) {
       e.preventDefault();
       dz.classList.remove('drag-over');
       var file = e.dataTransfer.files[0];
       if (file) _handleFile(file);
     });
     // Keyboard activation (Enter/Space)
-    dz.addEventListener('keydown', function(e) {
+    dz.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         var f = document.getElementById('ti-file-input');
@@ -217,16 +266,18 @@ window.TeamsImport = (function() {
 
     // Show loading
     var body = document.getElementById('ti-body');
-    if (body) body.innerHTML = '<div class="ti-loading" role="status" aria-live="polite"><div class="ti-spinner"></div>Parsing file...</div>';
+    if (body)
+      body.innerHTML =
+        '<div class="ti-loading" role="status" aria-live="polite"><div class="ti-spinner"></div>Parsing file...</div>';
 
     var reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = function (e) {
       try {
         _parseTeamsFile(new Uint8Array(e.target.result));
         _runStudentMatching();
         _runDuplicateDetection();
         // Pre-select all non-duplicate assignments
-        tiParsedFile.assignments.forEach(function(a) {
+        tiParsedFile.assignments.forEach(function (a) {
           tiSelectedAssigns[a.idx] = !tiAssignDupes[a.idx];
         });
         tiStep = 2;
@@ -252,11 +303,15 @@ window.TeamsImport = (function() {
     var rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
 
     if (rows.length < 2) throw new Error('File appears to be empty');
-    var header = rows[0].map(function(h) { return String(h || '').trim(); });
+    var header = rows[0].map(function (h) {
+      return String(h || '').trim();
+    });
 
     // Find identity columns
-    var fnIdx = -1, lnIdx = -1, emIdx = -1;
-    header.forEach(function(h, i) {
+    var fnIdx = -1,
+      lnIdx = -1,
+      emIdx = -1;
+    header.forEach(function (h, i) {
       var hl = h.toLowerCase();
       if (hl === 'first name') fnIdx = i;
       else if (hl === 'last name') lnIdx = i;
@@ -283,9 +338,9 @@ window.TeamsImport = (function() {
           colMax: i + 1,
           colFeedback: (header[i + 2] || '').toLowerCase() === 'feedback' ? i + 2 : -1,
           maxPoints: 0,
-          scores: {}
+          scores: {},
         });
-        i += (assignments[assignments.length - 1].colFeedback >= 0) ? 3 : 2;
+        i += assignments[assignments.length - 1].colFeedback >= 0 ? 3 : 2;
       } else {
         i++; // skip unrecognized column
       }
@@ -305,12 +360,12 @@ window.TeamsImport = (function() {
         idx: students.length,
         firstName: fn,
         lastName: ln,
-        email: emIdx >= 0 ? String(row[emIdx] || '').trim() : ''
+        email: emIdx >= 0 ? String(row[emIdx] || '').trim() : '',
       };
       students.push(student);
 
       // Extract scores for each assignment
-      assignments.forEach(function(a) {
+      assignments.forEach(function (a) {
         var earnedRaw = row[a.colEarned];
         var maxRaw = row[a.colMax];
         var feedbackRaw = a.colFeedback >= 0 ? row[a.colFeedback] : '';
@@ -325,14 +380,14 @@ window.TeamsImport = (function() {
         if (earned !== null || feedback) {
           a.scores[student.idx] = {
             earned: earned,
-            feedback: feedback
+            feedback: feedback,
           };
         }
       });
     }
 
     // Default maxPoints for assignments where we couldn't detect it
-    assignments.forEach(function(a) {
+    assignments.forEach(function (a) {
       if (a.maxPoints <= 0) a.maxPoints = 100;
     });
 
@@ -347,10 +402,10 @@ window.TeamsImport = (function() {
 
   /* ── Student matching ──────────────────────────────────────── */
   function _runStudentMatching() {
-    var existing = tiCourseId ? (getStudents(tiCourseId) || []) : [];
+    var existing = tiCourseId ? getStudents(tiCourseId) || [] : [];
     tiStudentMap = {};
 
-    tiParsedFile.students.forEach(function(ts) {
+    tiParsedFile.students.forEach(function (ts) {
       var match = null;
       var matchType = 'none';
 
@@ -386,19 +441,21 @@ window.TeamsImport = (function() {
       tiStudentMap[ts.idx] = {
         matchType: matchType,
         existingId: match ? match.id : null,
-        existingName: match ? (match.firstName + ' ' + match.lastName) : '',
-        action: match ? 'match' : 'new'  // default: matched students link, unmatched create new
+        existingName: match ? match.firstName + ' ' + match.lastName : '',
+        action: match ? 'match' : 'new', // default: matched students link, unmatched create new
       };
     });
   }
 
   /* ── Duplicate assignment detection ────────────────────────── */
   function _runDuplicateDetection() {
-    var existing = tiCourseId ? (getAssessments(tiCourseId) || []) : [];
+    var existing = tiCourseId ? getAssessments(tiCourseId) || [] : [];
     tiAssignDupes = {};
-    tiParsedFile.assignments.forEach(function(a) {
+    tiParsedFile.assignments.forEach(function (a) {
       var normTitle = _norm(a.title);
-      var dupe = existing.find(function(ea) { return _norm(ea.title) === normTitle; });
+      var dupe = existing.find(function (ea) {
+        return _norm(ea.title) === normTitle;
+      });
       tiAssignDupes[a.idx] = dupe ? dupe.id : null;
     });
   }
@@ -406,28 +463,37 @@ window.TeamsImport = (function() {
   /* ── STEP 2: Match Students ────────────────────────────────── */
   function _renderStep2() {
     var sts = tiParsedFile.students;
-    var matched = 0, newCount = 0, skipped = 0;
-    sts.forEach(function(s) {
+    var matched = 0,
+      newCount = 0,
+      skipped = 0;
+    sts.forEach(function (s) {
       var m = tiStudentMap[s.idx];
       if (m.action === 'match') matched++;
       else if (m.action === 'new') newCount++;
       else skipped++;
     });
 
-    var html = '<div class="ti-match-summary">' +
-      '<span><b>' + matched + '</b> matched</span>' +
-      '<span><b>' + newCount + '</b> new</span>' +
-      '<span><b>' + skipped + '</b> skipped</span>' +
-    '</div>' +
-    '<div class="ti-quick-actions">' +
+    var html =
+      '<div class="ti-match-summary">' +
+      '<span><b>' +
+      matched +
+      '</b> matched</span>' +
+      '<span><b>' +
+      newCount +
+      '</b> new</span>' +
+      '<span><b>' +
+      skipped +
+      '</b> skipped</span>' +
+      '</div>' +
+      '<div class="ti-quick-actions">' +
       '<button class="btn btn-ghost" data-ti="createAllNew" style="font-size:var(--text-xs)">Create All Unmatched</button>' +
       '<button class="btn btn-ghost" data-ti="skipAllNew" style="font-size:var(--text-xs)">Skip All Unmatched</button>' +
-    '</div>' +
-    '<table class="ti-match-table"><thead><tr>' +
+      '</div>' +
+      '<table class="ti-match-table"><thead><tr>' +
       '<th>Teams Student</th><th>Status</th><th>Action</th>' +
-    '</tr></thead><tbody>';
+      '</tr></thead><tbody>';
 
-    sts.forEach(function(s) {
+    sts.forEach(function (s) {
       var m = tiStudentMap[s.idx];
       var badge = '';
       if (m.action === 'match') badge = '<span class="ti-badge ti-badge-matched">Matched</span>';
@@ -436,34 +502,60 @@ window.TeamsImport = (function() {
 
       var detail = '';
       if (m.action === 'match') {
-        detail = '<span style="font-size:var(--text-xs);color:var(--text-3)">' +
+        detail =
+          '<span style="font-size:var(--text-xs);color:var(--text-3)">' +
           (m.matchType === 'email' ? 'by email' : 'by name') +
-          ' &rarr; ' + esc(m.existingName) + '</span>';
+          ' &rarr; ' +
+          esc(m.existingName) +
+          '</span>';
       }
 
       // Action dropdown for unmatched students
       var studentLabel = esc(s.firstName + ' ' + s.lastName);
       var actionHtml = '';
       if (m.matchType === 'none') {
-        actionHtml = '<select class="ti-action-select" data-ti-change="studentAction" data-idx="' + s.idx + '" aria-label="Action for ' + studentLabel + '">' +
-          '<option value="new"' + (m.action === 'new' ? ' selected' : '') + '>Create new</option>' +
-          '<option value="skip"' + (m.action === 'skip' ? ' selected' : '') + '>Skip</option>' +
-        '</select>';
+        actionHtml =
+          '<select class="ti-action-select" data-ti-change="studentAction" data-idx="' +
+          s.idx +
+          '" aria-label="Action for ' +
+          studentLabel +
+          '">' +
+          '<option value="new"' +
+          (m.action === 'new' ? ' selected' : '') +
+          '>Create new</option>' +
+          '<option value="skip"' +
+          (m.action === 'skip' ? ' selected' : '') +
+          '>Skip</option>' +
+          '</select>';
       } else {
-        actionHtml = '<select class="ti-action-select" data-ti-change="studentAction" data-idx="' + s.idx + '" aria-label="Action for ' + studentLabel + '">' +
+        actionHtml =
+          '<select class="ti-action-select" data-ti-change="studentAction" data-idx="' +
+          s.idx +
+          '" aria-label="Action for ' +
+          studentLabel +
+          '">' +
           '<option value="match" selected>Use match</option>' +
           '<option value="new">Create new</option>' +
           '<option value="skip">Skip</option>' +
-        '</select>';
+          '</select>';
       }
 
-      html += '<tr>' +
-        '<td><div>' + esc(s.firstName + ' ' + s.lastName) + '</div>' +
-          (s.email ? '<div class="ti-match-email">' + esc(s.email) + '</div>' : '') +
+      html +=
+        '<tr>' +
+        '<td><div>' +
+        esc(s.firstName + ' ' + s.lastName) +
+        '</div>' +
+        (s.email ? '<div class="ti-match-email">' + esc(s.email) + '</div>' : '') +
         '</td>' +
-        '<td>' + badge + ' ' + detail + '</td>' +
-        '<td>' + actionHtml + '</td>' +
-      '</tr>';
+        '<td>' +
+        badge +
+        ' ' +
+        detail +
+        '</td>' +
+        '<td>' +
+        actionHtml +
+        '</td>' +
+        '</tr>';
     });
 
     html += '</tbody></table>';
@@ -473,28 +565,44 @@ window.TeamsImport = (function() {
   /* ── STEP 3: Select Assignments ────────────────────────────── */
   function _renderStep3() {
     var assigns = tiParsedFile.assignments;
-    var allSelected = assigns.every(function(a) { return tiSelectedAssigns[a.idx]; });
+    var allSelected = assigns.every(function (a) {
+      return tiSelectedAssigns[a.idx];
+    });
 
-    var html = '<label class="ti-select-all">' +
-      '<input type="checkbox" data-ti-change="toggleAll"' + (allSelected ? ' checked' : '') + '>' +
-      'Select All (' + assigns.length + ' assignments)' +
-    '</label>' +
-    '<ul class="ti-assign-list">';
+    var html =
+      '<label class="ti-select-all">' +
+      '<input type="checkbox" data-ti-change="toggleAll"' +
+      (allSelected ? ' checked' : '') +
+      '>' +
+      'Select All (' +
+      assigns.length +
+      ' assignments)' +
+      '</label>' +
+      '<ul class="ti-assign-list">';
 
-    assigns.forEach(function(a) {
-      var scoredCount = Object.keys(a.scores).filter(function(k) {
+    assigns.forEach(function (a) {
+      var scoredCount = Object.keys(a.scores).filter(function (k) {
         return a.scores[k].earned !== null;
       }).length;
       var isDupe = !!tiAssignDupes[a.idx];
 
-      html += '<li class="ti-assign-item">' +
-        '<label style="display:contents"><input type="checkbox" data-ti-change="toggleAssign" data-idx="' + a.idx + '"' +
-          (tiSelectedAssigns[a.idx] ? ' checked' : '') + '>' +
-        '<span class="ti-assign-title">' + esc(a.title) +
-          (isDupe ? ' <span class="ti-badge ti-badge-dupe">Already exists</span>' : '') +
+      html +=
+        '<li class="ti-assign-item">' +
+        '<label style="display:contents"><input type="checkbox" data-ti-change="toggleAssign" data-idx="' +
+        a.idx +
+        '"' +
+        (tiSelectedAssigns[a.idx] ? ' checked' : '') +
+        '>' +
+        '<span class="ti-assign-title">' +
+        esc(a.title) +
+        (isDupe ? ' <span class="ti-badge ti-badge-dupe">Already exists</span>' : '') +
         '</span>' +
-        '<span class="ti-assign-meta">' + a.maxPoints + ' pts &middot; ' + scoredCount + ' scored</span>' +
-      '</label></li>';
+        '<span class="ti-assign-meta">' +
+        a.maxPoints +
+        ' pts &middot; ' +
+        scoredCount +
+        ' scored</span>' +
+        '</label></li>';
     });
 
     html += '</ul>';
@@ -503,14 +611,20 @@ window.TeamsImport = (function() {
 
   /* ── STEP 4: Preview & Confirm ─────────────────────────────── */
   function _renderStep4() {
-    var selected = tiParsedFile.assignments.filter(function(a) { return tiSelectedAssigns[a.idx]; });
-    var activeStudents = tiParsedFile.students.filter(function(s) { return tiStudentMap[s.idx].action !== 'skip'; });
-    var newStudents = activeStudents.filter(function(s) { return tiStudentMap[s.idx].action === 'new'; });
+    var selected = tiParsedFile.assignments.filter(function (a) {
+      return tiSelectedAssigns[a.idx];
+    });
+    var activeStudents = tiParsedFile.students.filter(function (s) {
+      return tiStudentMap[s.idx].action !== 'skip';
+    });
+    var newStudents = activeStudents.filter(function (s) {
+      return tiStudentMap[s.idx].action === 'new';
+    });
     var totalScores = 0;
     var totalFeedback = 0;
 
-    selected.forEach(function(a) {
-      activeStudents.forEach(function(s) {
+    selected.forEach(function (a) {
+      activeStudents.forEach(function (s) {
         var sc = a.scores[s.idx];
         if (sc && sc.earned !== null) totalScores++;
         if (sc && sc.feedback) totalFeedback++;
@@ -523,43 +637,72 @@ window.TeamsImport = (function() {
     if (!tiCourseId) {
       if (!tiClassName) {
         // Default class name: strip date/extension from filename
-        tiClassName = tiFileName.replace(/\.[^.]+$/, '').replace(/\s*[-_]\s*\d{2}[_/]\d{2}[_/]\d{4}.*/, '').replace(/^COPY THIS TEAM grades\s*/i, '').trim() || 'Imported Class';
+        tiClassName =
+          tiFileName
+            .replace(/\.[^.]+$/, '')
+            .replace(/\s*[-_]\s*\d{2}[_/]\d{2}[_/]\d{4}.*/, '')
+            .replace(/^COPY THIS TEAM grades\s*/i, '')
+            .trim() || 'Imported Class';
       }
-      html += '<div class="form-group" style="margin-bottom:16px">' +
+      html +=
+        '<div class="form-group" style="margin-bottom:16px">' +
         '<label for="ti-class-name" style="font-weight:600;font-size:var(--text-sm);display:block;margin-bottom:4px">Class Name</label>' +
-        '<input type="text" class="form-input" id="ti-class-name" value="' + esc(tiClassName) + '" ' +
-          'data-ti-change="className" placeholder="e.g. English 10 Block A" style="width:100%;max-width:400px">' +
-      '</div>';
+        '<input type="text" class="form-input" id="ti-class-name" value="' +
+        esc(tiClassName) +
+        '" ' +
+        'data-ti-change="className" placeholder="e.g. English 10 Block A" style="width:100%;max-width:400px">' +
+        '</div>';
     }
 
-    html += '<div class="ti-preview-summary">' +
-      '<div class="ti-preview-stat"><b>' + activeStudents.length + '</b>students' +
-        (newStudents.length ? ' (' + newStudents.length + ' new)' : '') + '</div>' +
-      '<div class="ti-preview-stat"><b>' + selected.length + '</b>assignments</div>' +
-      '<div class="ti-preview-stat"><b>' + totalScores + '</b>scores</div>' +
-      '<div class="ti-preview-stat"><b>' + totalFeedback + '</b>feedback notes</div>' +
-    '</div>';
+    html +=
+      '<div class="ti-preview-summary">' +
+      '<div class="ti-preview-stat"><b>' +
+      activeStudents.length +
+      '</b>students' +
+      (newStudents.length ? ' (' + newStudents.length + ' new)' : '') +
+      '</div>' +
+      '<div class="ti-preview-stat"><b>' +
+      selected.length +
+      '</b>assignments</div>' +
+      '<div class="ti-preview-stat"><b>' +
+      totalScores +
+      '</b>scores</div>' +
+      '<div class="ti-preview-stat"><b>' +
+      totalFeedback +
+      '</b>feedback notes</div>' +
+      '</div>';
 
     // Preview table
     html += '<div class="ti-preview-wrap"><table class="ti-preview-table"><thead><tr><th>Student</th>';
-    selected.forEach(function(a) {
-      html += '<th title="' + esc(a.title) + '">' + esc(a.title.length > 18 ? a.title.slice(0, 16) + '..' : a.title) + '</th>';
+    selected.forEach(function (a) {
+      html +=
+        '<th title="' +
+        esc(a.title) +
+        '">' +
+        esc(a.title.length > 18 ? a.title.slice(0, 16) + '..' : a.title) +
+        '</th>';
     });
     html += '</tr></thead><tbody>';
 
-    activeStudents.forEach(function(s) {
-      html += '<tr><td style="white-space:nowrap;font-weight:500">' +
-        esc(s.firstName + ' ' + s.lastName) + '</td>';
-      selected.forEach(function(a) {
+    activeStudents.forEach(function (s) {
+      html += '<tr><td style="white-space:nowrap;font-weight:500">' + esc(s.firstName + ' ' + s.lastName) + '</td>';
+      selected.forEach(function (a) {
         var sc = a.scores[s.idx];
         if (!sc || sc.earned === null) {
           html += '<td class="ti-cell-empty">&mdash;</td>';
         } else {
           var cls = sc.feedback ? 'ti-cell-feedback' : 'ti-cell-score';
-          html += '<td class="' + cls + '" title="' + (sc.feedback ? esc(sc.feedback.slice(0, 100)) : '') + '">' +
-            sc.earned + '/' + a.maxPoints +
+          html +=
+            '<td class="' +
+            cls +
+            '" title="' +
+            (sc.feedback ? esc(sc.feedback.slice(0, 100)) : '') +
+            '">' +
+            sc.earned +
+            '/' +
+            a.maxPoints +
             (sc.feedback ? ' *' : '') +
-          '</td>';
+            '</td>';
         }
       });
       html += '</tr>';
@@ -574,24 +717,47 @@ window.TeamsImport = (function() {
     var r = tiImportResult;
     if (!r) return '<div class="ti-error">No results available</div>';
 
-    return '<div class="ti-results-card">' +
+    return (
+      '<div class="ti-results-card">' +
       '<div class="ti-results-icon" aria-hidden="true">&#9989;</div>' +
       '<div class="ti-results-title">Import Complete</div>' +
-      (r.className ? '<div style="text-align:center;color:var(--text-2);margin-bottom:12px">Class: <b>' + esc(r.className) + '</b></div>' : '') +
+      (r.className
+        ? '<div style="text-align:center;color:var(--text-2);margin-bottom:12px">Class: <b>' +
+          esc(r.className) +
+          '</b></div>'
+        : '') +
       '<div class="ti-results-stats">' +
-        '<div class="ti-results-stat"><b>' + r.studentsCreated + '</b>students created</div>' +
-        '<div class="ti-results-stat"><b>' + r.assessmentsCreated + '</b>assignments imported</div>' +
-        '<div class="ti-results-stat"><b>' + r.scoresWritten + '</b>scores recorded</div>' +
-        '<div class="ti-results-stat"><b>' + r.feedbackSaved + '</b>feedback notes</div>' +
+      '<div class="ti-results-stat"><b>' +
+      r.studentsCreated +
+      '</b>students created</div>' +
+      '<div class="ti-results-stat"><b>' +
+      r.assessmentsCreated +
+      '</b>assignments imported</div>' +
+      '<div class="ti-results-stat"><b>' +
+      r.scoresWritten +
+      '</b>scores recorded</div>' +
+      '<div class="ti-results-stat"><b>' +
+      r.feedbackSaved +
+      '</b>feedback notes</div>' +
       '</div>' +
-      (r.errors.length ? '<div class="ti-error">' + r.errors.length + ' error(s): ' + esc(r.errors.join('; ')) + '</div>' : '') +
-    '</div>';
+      (r.errors.length
+        ? '<div class="ti-error">' + r.errors.length + ' error(s): ' + esc(r.errors.join('; ')) + '</div>'
+        : '') +
+      '</div>'
+    );
   }
 
   /* ── Commit import ─────────────────────────────────────────── */
   function _commitImport() {
     var cid = tiCourseId;
-    var result = { studentsCreated: 0, assessmentsCreated: 0, scoresWritten: 0, feedbackSaved: 0, errors: [], className: '' };
+    var result = {
+      studentsCreated: 0,
+      assessmentsCreated: 0,
+      scoresWritten: 0,
+      feedbackSaved: 0,
+      errors: [],
+      className: '',
+    };
     var today = new Date().toISOString().slice(0, 10);
     var now = new Date().toISOString();
 
@@ -614,7 +780,7 @@ window.TeamsImport = (function() {
       var students = getStudents(cid) || [];
       var idLookup = {}; // teamsIdx → FullVision student ID
 
-      tiParsedFile.students.forEach(function(ts) {
+      tiParsedFile.students.forEach(function (ts) {
         var m = tiStudentMap[ts.idx];
         if (m.action === 'skip') return;
 
@@ -634,7 +800,7 @@ window.TeamsImport = (function() {
             designations: [],
             attendance: [],
             sortName: ts.lastName + ' ' + ts.firstName,
-            enrolledDate: today
+            enrolledDate: today,
           });
           idLookup[ts.idx] = newId;
           result.studentsCreated++;
@@ -646,8 +812,10 @@ window.TeamsImport = (function() {
       var assessments = getAssessments(cid) || [];
       var assignIdLookup = {}; // assignIdx → new assessment ID
 
-      var selected = tiParsedFile.assignments.filter(function(a) { return tiSelectedAssigns[a.idx]; });
-      selected.forEach(function(a) {
+      var selected = tiParsedFile.assignments.filter(function (a) {
+        return tiSelectedAssigns[a.idx];
+      });
+      selected.forEach(function (a) {
         var newId = uid();
         assessments.push({
           id: newId,
@@ -668,7 +836,7 @@ window.TeamsImport = (function() {
           groups: [],
           excludedStudents: [],
           moduleId: '',
-          created: now
+          created: now,
         });
         assignIdLookup[a.idx] = newId;
         result.assessmentsCreated++;
@@ -683,9 +851,9 @@ window.TeamsImport = (function() {
       // adapter RPC is tracked as T-BE-02 before remote dispatch can be wired.
       var scores = getScores(cid) || {};
 
-      selected.forEach(function(a) {
+      selected.forEach(function (a) {
         var assessId = assignIdLookup[a.idx];
-        tiParsedFile.students.forEach(function(ts) {
+        tiParsedFile.students.forEach(function (ts) {
           var sid = idLookup[ts.idx];
           if (!sid) return; // skipped student
 
@@ -701,14 +869,13 @@ window.TeamsImport = (function() {
             date: today,
             type: 'summative',
             note: sc.feedback || '',
-            created: now
+            created: now,
           });
           result.scoresWritten++;
           if (sc.feedback) result.feedbackSaved++;
         });
       });
       saveScores(cid, scores);
-
     } catch (err) {
       result.errors.push(err.message);
     }
@@ -721,25 +888,42 @@ window.TeamsImport = (function() {
 
   /* ── Action handlers ───────────────────────────────────────── */
   var _actions = {
-    close: function() {
-      if (tiStep === 5 || !tiParsedFile) { close(); return; }
+    close: function () {
+      if (tiStep === 5 || !tiParsedFile) {
+        close();
+        return;
+      }
       if (confirm('Discard import progress?')) close();
     },
-    triggerFile: function() {
+    triggerFile: function () {
       var f = document.getElementById('ti-file-input');
       if (f) f.click();
     },
-    back: function() {
-      if (tiStep > 1) { tiStep--; _render(); }
+    back: function () {
+      if (tiStep > 1) {
+        tiStep--;
+        _render();
+      }
     },
-    toStep3: function() { tiStep = 3; _render(); },
-    toStep4: function() {
-      var anySelected = tiParsedFile.assignments.some(function(a) { return tiSelectedAssigns[a.idx]; });
-      if (!anySelected) { alert('Select at least one assignment to import.'); return; }
-      tiStep = 4; _render();
+    toStep3: function () {
+      tiStep = 3;
+      _render();
     },
-    commitImport: function() { _commitImport(); },
-    viewAssignments: function() {
+    toStep4: function () {
+      var anySelected = tiParsedFile.assignments.some(function (a) {
+        return tiSelectedAssigns[a.idx];
+      });
+      if (!anySelected) {
+        alert('Select at least one assignment to import.');
+        return;
+      }
+      tiStep = 4;
+      _render();
+    },
+    commitImport: function () {
+      _commitImport();
+    },
+    viewAssignments: function () {
       if (tiCreatedCourseId) {
         // Navigate to the new class's assignments page
         var cid = tiCreatedCourseId;
@@ -750,43 +934,52 @@ window.TeamsImport = (function() {
         close();
       }
     },
-    createAllNew: function() {
-      tiParsedFile.students.forEach(function(s) {
+    createAllNew: function () {
+      tiParsedFile.students.forEach(function (s) {
         if (tiStudentMap[s.idx].matchType === 'none') tiStudentMap[s.idx].action = 'new';
       });
       _render();
     },
-    skipAllNew: function() {
-      tiParsedFile.students.forEach(function(s) {
+    skipAllNew: function () {
+      tiParsedFile.students.forEach(function (s) {
         if (tiStudentMap[s.idx].matchType === 'none') tiStudentMap[s.idx].action = 'skip';
       });
       _render();
-    }
+    },
   };
 
   var _changeActions = {
-    fileSelected: function(el) {
+    fileSelected: function (el) {
       if (el.files[0]) _handleFile(el.files[0]);
     },
-    className: function(el) {
+    className: function (el) {
       tiClassName = el.value;
     },
-    studentAction: function(el) {
+    studentAction: function (el) {
       var idx = Number(el.dataset.idx);
       tiStudentMap[idx].action = el.value;
       // Re-render to update summary counts
       var summary = _overlayEl.querySelector('.ti-match-summary');
       if (summary) {
-        var matched = 0, newCount = 0, skipped = 0;
-        tiParsedFile.students.forEach(function(s) {
+        var matched = 0,
+          newCount = 0,
+          skipped = 0;
+        tiParsedFile.students.forEach(function (s) {
           var m = tiStudentMap[s.idx];
           if (m.action === 'match') matched++;
           else if (m.action === 'new') newCount++;
           else skipped++;
         });
-        summary.innerHTML = '<span><b>' + matched + '</b> matched</span>' +
-          '<span><b>' + newCount + '</b> new</span>' +
-          '<span><b>' + skipped + '</b> skipped</span>';
+        summary.innerHTML =
+          '<span><b>' +
+          matched +
+          '</b> matched</span>' +
+          '<span><b>' +
+          newCount +
+          '</b> new</span>' +
+          '<span><b>' +
+          skipped +
+          '</b> skipped</span>';
       }
       // Update badge
       var row = el.closest('tr');
@@ -794,29 +987,32 @@ window.TeamsImport = (function() {
         var badgeEl = row.querySelector('.ti-badge');
         if (badgeEl) {
           var act = el.value;
-          badgeEl.className = 'ti-badge ' + (act === 'match' ? 'ti-badge-matched' : act === 'new' ? 'ti-badge-new' : 'ti-badge-skip');
+          badgeEl.className =
+            'ti-badge ' + (act === 'match' ? 'ti-badge-matched' : act === 'new' ? 'ti-badge-new' : 'ti-badge-skip');
           badgeEl.textContent = act === 'match' ? 'Matched' : act === 'new' ? 'New' : 'Skip';
         }
       }
     },
-    toggleAssign: function(el) {
+    toggleAssign: function (el) {
       var idx = Number(el.dataset.idx);
       tiSelectedAssigns[idx] = el.checked;
     },
-    toggleAll: function(el) {
+    toggleAll: function (el) {
       var checked = el.checked;
-      tiParsedFile.assignments.forEach(function(a) {
+      tiParsedFile.assignments.forEach(function (a) {
         tiSelectedAssigns[a.idx] = checked;
       });
       // Update all checkboxes without full re-render
       var items = _overlayEl.querySelectorAll('[data-ti-change="toggleAssign"]');
-      items.forEach(function(cb) { cb.checked = checked; });
-    }
+      items.forEach(function (cb) {
+        cb.checked = checked;
+      });
+    },
   };
 
   /* ── Public API ────────────────────────────────────────────── */
   return {
     open: open,
-    close: close
+    close: close,
   };
 })();

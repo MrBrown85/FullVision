@@ -26,7 +26,12 @@ runInThisContext(readFileSync(resolve(root, 'shared/offline-queue.js'), 'utf-8')
 const Q = window.v2Queue;
 
 function setOnline(v) {
-  Object.defineProperty(navigator, 'onLine', { configurable: true, get() { return v; } });
+  Object.defineProperty(navigator, 'onLine', {
+    configurable: true,
+    get() {
+      return v;
+    },
+  });
 }
 
 describe('v2Queue (offline write queue)', () => {
@@ -42,7 +47,10 @@ describe('v2Queue (offline write queue)', () => {
     // Speed up flush backoff: the module awaits setTimeout for backoff delays.
     // Replace with an immediate-firing stub so tests don't wait real seconds.
     originalSetTimeout = globalThis.setTimeout;
-    globalThis.setTimeout = function (fn) { fn(); return 0; };
+    globalThis.setTimeout = function (fn) {
+      fn();
+      return 0;
+    };
     globalThis.getSupabase = () => ({
       rpc(name, payload) {
         calls.push({ name: name, payload: payload });
@@ -84,7 +92,12 @@ describe('v2Queue (offline write queue)', () => {
     it('notifies queue listeners as the queue changes', async () => {
       var events = [];
       var unsubscribe = Q.subscribe(function (event) {
-        events.push({ kind: event.kind, queued: event.stats.queued, deadLettered: event.stats.deadLettered, flushing: event.stats.flushing });
+        events.push({
+          kind: event.kind,
+          queued: event.stats.queued,
+          deadLettered: event.stats.deadLettered,
+          flushing: event.stats.flushing,
+        });
       });
 
       Q.enqueue('rpc', { a: 1 });
@@ -92,9 +105,22 @@ describe('v2Queue (offline write queue)', () => {
 
       setOnline(true);
       await Q.flush();
-      expect(events.some(function (event) { return event.kind === 'flush:start' && event.flushing === true; })).toBe(true);
-      expect(events.some(function (event) { return event.kind === 'flush:success' && event.queued === 0; })).toBe(true);
-      expect(events[events.length - 1]).toMatchObject({ kind: 'flush:end', queued: 0, deadLettered: 0, flushing: false });
+      expect(
+        events.some(function (event) {
+          return event.kind === 'flush:start' && event.flushing === true;
+        }),
+      ).toBe(true);
+      expect(
+        events.some(function (event) {
+          return event.kind === 'flush:success' && event.queued === 0;
+        }),
+      ).toBe(true);
+      expect(events[events.length - 1]).toMatchObject({
+        kind: 'flush:end',
+        queued: 0,
+        deadLettered: 0,
+        flushing: false,
+      });
 
       var countBeforeUnsubscribe = events.length;
       unsubscribe();
@@ -122,14 +148,20 @@ describe('v2Queue (offline write queue)', () => {
       expect(res.deadLettered).toBe(0);
       expect(Q.stats().queued).toBe(0);
       expect(Q.stats().lastFlushAt).not.toBeNull();
-      expect(calls.map(function (c) { return c.name; })).toEqual(['rpc1', 'rpc2']);
+      expect(
+        calls.map(function (c) {
+          return c.name;
+        }),
+      ).toEqual(['rpc1', 'rpc2']);
     });
 
     it('dead-letters an entry after MAX_ATTEMPTS failures', async () => {
       Q.enqueue('bad_rpc', {});
       setOnline(true);
       globalThis.getSupabase = () => ({
-        rpc() { return Promise.resolve({ data: null, error: { message: 'boom' } }); },
+        rpc() {
+          return Promise.resolve({ data: null, error: { message: 'boom' } });
+        },
       });
       // Each flush() attempt increments; when attempts === MAX_ATTEMPTS (3)
       // the entry is moved to dead-letter. We drive the attempts manually so
@@ -169,7 +201,9 @@ describe('v2Queue (offline write queue)', () => {
       Q.enqueue('bad', {});
       setOnline(true);
       globalThis.getSupabase = () => ({
-        rpc() { return Promise.resolve({ data: null, error: { message: 'x' } }); },
+        rpc() {
+          return Promise.resolve({ data: null, error: { message: 'x' } });
+        },
       });
       for (var i = 0; i < Q.MAX_ATTEMPTS; i++) await Q.flush();
       var dead = Q.deadLetter();
@@ -211,7 +245,9 @@ describe('v2Queue (offline write queue)', () => {
     it('enqueues on network-shaped error from the RPC', async () => {
       setOnline(true);
       globalThis.getSupabase = () => ({
-        rpc() { return Promise.resolve({ data: null, error: { message: 'network: failed to fetch' } }); },
+        rpc() {
+          return Promise.resolve({ data: null, error: { message: 'network: failed to fetch' } });
+        },
       });
       var res = await Q.callOrEnqueue('rpc', {});
       expect(res.ok).toBe(false);
@@ -222,7 +258,9 @@ describe('v2Queue (offline write queue)', () => {
     it('returns ok:false without enqueueing on non-network errors (validation/auth)', async () => {
       setOnline(true);
       globalThis.getSupabase = () => ({
-        rpc() { return Promise.resolve({ data: null, error: { message: 'row-level security violation' } }); },
+        rpc() {
+          return Promise.resolve({ data: null, error: { message: 'row-level security violation' } });
+        },
       });
       var res = await Q.callOrEnqueue('rpc', {});
       expect(res.ok).toBe(false);

@@ -64,12 +64,24 @@ describe('login restore-account prompt', () => {
     globalThis.window = globalThis;
     globalThis.localStorage = {
       _store: {},
-      getItem(k) { return this._store[k] ?? null; },
-      setItem(k, v) { this._store[k] = String(v); },
-      removeItem(k) { delete this._store[k]; },
-      clear() { this._store = {}; },
-      key(i) { return Object.keys(this._store)[i] || null; },
-      get length() { return Object.keys(this._store).length; },
+      getItem(k) {
+        return this._store[k] ?? null;
+      },
+      setItem(k, v) {
+        this._store[k] = String(v);
+      },
+      removeItem(k) {
+        delete this._store[k];
+      },
+      clear() {
+        this._store = {};
+      },
+      key(i) {
+        return Object.keys(this._store)[i] || null;
+      },
+      get length() {
+        return Object.keys(this._store).length;
+      },
     };
     globalThis.document = {
       getElementById(id) {

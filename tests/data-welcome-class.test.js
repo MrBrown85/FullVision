@@ -18,28 +18,25 @@ function makeClient(options) {
   options = options || {};
   var calls = [];
   var createdAt = options.createdAt || new Date().toISOString();
-  var courses =
-    options.courses ||
-    [
-      {
-        id: COURSE_ID,
-        name: 'Welcome Class',
-        grade_level: '8',
-        description: '',
-        color: '',
-        is_archived: false,
-        display_order: 0,
-        grading_system: 'proficiency',
-        calc_method: 'average',
-        decay_weight: null,
-        timezone: 'America/Vancouver',
-        late_work_policy: null,
-        created_at: createdAt,
-        updated_at: createdAt,
-      },
-    ];
-  var gradebook =
-    options.gradebook || { categories: [], students: [], assessments: [], cells: {}, row_summaries: {} };
+  var courses = options.courses || [
+    {
+      id: COURSE_ID,
+      name: 'Welcome Class',
+      grade_level: '8',
+      description: '',
+      color: '',
+      is_archived: false,
+      display_order: 0,
+      grading_system: 'proficiency',
+      calc_method: 'average',
+      decay_weight: null,
+      timezone: 'America/Vancouver',
+      late_work_policy: null,
+      created_at: createdAt,
+      updated_at: createdAt,
+    },
+  ];
+  var gradebook = options.gradebook || { categories: [], students: [], assessments: [], cells: {}, row_summaries: {} };
 
   return {
     calls: calls,
@@ -124,9 +121,11 @@ describe('Welcome Class bootstrap seeding', () => {
     expect(localStorage.getItem('gb-post-bootstrap-route')).toBe('/gradebook?course=' + COURSE_ID);
     expect(localStorage.getItem('gb-welcome-class-seeded-' + TEACHER_ID + '-' + COURSE_ID)).toBe('1');
     expect(getActiveCourse()).toBe(COURSE_ID);
-    expect(client.calls.map(function (c) { return c.name; })).toEqual(
-      expect.arrayContaining(['bootstrap_teacher', 'list_teacher_courses', 'get_gradebook']),
-    );
+    expect(
+      client.calls.map(function (c) {
+        return c.name;
+      }),
+    ).toEqual(expect.arrayContaining(['bootstrap_teacher', 'list_teacher_courses', 'get_gradebook']));
   });
 
   it('does not reseed returning teachers', async () => {

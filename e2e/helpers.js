@@ -777,7 +777,9 @@ export async function mockPersistentAuthFlow(
             email: normalizedEmail,
             password: password,
             display_name:
-              (options && options.data && options.data.display_name) || normalizedEmail.split('@')[0] || 'Smoke Teacher',
+              (options && options.data && options.data.display_name) ||
+              normalizedEmail.split('@')[0] ||
+              'Smoke Teacher',
             created_at: new Date().toISOString(),
             deleted_at: null,
             appState: null,

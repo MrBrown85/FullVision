@@ -14,9 +14,9 @@
 var _tagScoresCache = {};
 var _tagProfCache = {};
 var _awCache = {};
-var _assessMapCache = {};    // cid → Map<assessmentId, assessment> — avoids O(n) find per score
-var _sectionByIdCache = {};  // cid → Map<sectionId, section>      — avoids repeated getSections().find()
-var _categoryMapCache = {};  // cid → Map<categoryId, category>
+var _assessMapCache = {}; // cid → Map<assessmentId, assessment> — avoids O(n) find per score
+var _sectionByIdCache = {}; // cid → Map<sectionId, section>      — avoids repeated getSections().find()
+var _categoryMapCache = {}; // cid → Map<categoryId, category>
 var _assessmentOverallCache = {};
 var _categoryAvgCache = {};
 var _courseLetterCache = {};
@@ -39,7 +39,9 @@ function _getAW(cid) {
   if (_awCache[cid]) return _awCache[cid];
   var assessments = getAssessments(cid);
   var aw = {};
-  assessments.forEach(function(a) { aw[a.id] = a.weight || 1; });
+  assessments.forEach(function (a) {
+    aw[a.id] = a.weight || 1;
+  });
   _awCache[cid] = aw;
   return aw;
 }
@@ -47,7 +49,11 @@ function _getAW(cid) {
 /** Get or build a Map<assessmentId, assessment> for O(1) lookups instead of O(n) find(). */
 function _getAssessMap(cid) {
   if (_assessMapCache[cid]) return _assessMapCache[cid];
-  var m = new Map(getAssessments(cid).map(function(a) { return [a.id, a]; }));
+  var m = new Map(
+    getAssessments(cid).map(function (a) {
+      return [a.id, a];
+    }),
+  );
   _assessMapCache[cid] = m;
   return m;
 }
@@ -55,14 +61,22 @@ function _getAssessMap(cid) {
 /** Get a section by id using a cached Map — avoids repeated getSections().find() in hot loops. */
 function _getSectionById(cid, sectionId) {
   if (!_sectionByIdCache[cid]) {
-    _sectionByIdCache[cid] = new Map(getSections(cid).map(function(s) { return [s.id, s]; }));
+    _sectionByIdCache[cid] = new Map(
+      getSections(cid).map(function (s) {
+        return [s.id, s];
+      }),
+    );
   }
   return _sectionByIdCache[cid].get(sectionId);
 }
 
 function _getCategoryMap(cid) {
   if (_categoryMapCache[cid]) return _categoryMapCache[cid];
-  var map = new Map((getCategories(cid) || []).map(function (c) { return [c.id, c]; }));
+  var map = new Map(
+    (getCategories(cid) || []).map(function (c) {
+      return [c.id, c];
+    }),
+  );
   _categoryMapCache[cid] = map;
   return map;
 }
@@ -96,7 +110,9 @@ function getCategoryWeights(cid) {
  * @param {number} [assessment.weight] - Weight value, defaults to 1
  * @returns {number} Assessment weight
  */
-function getAssessmentWeight(assessment) { return assessment.weight || 1; }
+function getAssessmentWeight(assessment) {
+  return assessment.weight || 1;
+}
 
 function courseShowsLetterGrades(course) {
   return !!course && (course.gradingSystem === 'letter' || course.gradingSystem === 'both');
@@ -134,16 +150,25 @@ function getAssessmentOverallScore(cid, studentId, assessmentId) {
 
   var studentScores = getScores(cid)[studentId] || [];
   var values = studentScores
-    .filter(function (entry) { return entry.assessmentId === assessmentId; })
-    .map(function (entry) { return _normalizeAssessmentEntryValue(assessment, entry.score); })
-    .filter(function (value) { return value != null; });
+    .filter(function (entry) {
+      return entry.assessmentId === assessmentId;
+    })
+    .map(function (entry) {
+      return _normalizeAssessmentEntryValue(assessment, entry.score);
+    })
+    .filter(function (value) {
+      return value != null;
+    });
 
   if (values.length === 0) {
     _assessmentOverallCache[cacheKey] = null;
     return null;
   }
 
-  var result = values.reduce(function (sum, value) { return sum + value; }, 0) / values.length;
+  var result =
+    values.reduce(function (sum, value) {
+      return sum + value;
+    }, 0) / values.length;
   _assessmentOverallCache[cacheKey] = result;
   return result;
 }
@@ -168,7 +193,10 @@ function getCategoryAverage(cid, studentId, categoryId) {
     return null;
   }
 
-  var result = values.reduce(function (sum, value) { return sum + value; }, 0) / values.length;
+  var result =
+    values.reduce(function (sum, value) {
+      return sum + value;
+    }, 0) / values.length;
   _categoryAvgCache[cacheKey] = result;
   return result;
 }
@@ -211,10 +239,17 @@ function getCourseLetterData(cid, studentId) {
     if (weightTotal > 0) Q = weightedSum / weightTotal;
   } else {
     var values = getAssessments(cid)
-      .map(function (assessment) { return getAssessmentOverallScore(cid, studentId, assessment.id); })
-      .filter(function (value) { return value != null; });
+      .map(function (assessment) {
+        return getAssessmentOverallScore(cid, studentId, assessment.id);
+      })
+      .filter(function (value) {
+        return value != null;
+      });
     if (values.length > 0) {
-      Q = values.reduce(function (sum, value) { return sum + value; }, 0) / values.length;
+      Q =
+        values.reduce(function (sum, value) {
+          return sum + value;
+        }, 0) / values.length;
     }
   }
 
@@ -242,13 +277,16 @@ function getCourseLetterData(cid, studentId) {
 function _calcGroup(scores, method, decayWeight, assessmentWeights) {
   const valid = scores.filter(s => s.score > 0);
   if (valid.length === 0) return 0;
-  valid.sort((a,b) => (a.date||'').localeCompare(b.date||''));
+  valid.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   switch (method) {
-    case 'mostRecent': return valid[valid.length - 1].score;
-    case 'highest': return Math.max(...valid.map(s => s.score)); // safe: valid.length > 0 guaranteed by guard on line 79
+    case 'mostRecent':
+      return valid[valid.length - 1].score;
+    case 'highest':
+      return Math.max(...valid.map(s => s.score)); // safe: valid.length > 0 guaranteed by guard on line 79
     case 'average': {
       // Weighted mean — every valid score contributes equally by default; per-assessment weights scale contributions.
-      let sum = 0, weightSum = 0;
+      let sum = 0,
+        weightSum = 0;
       valid.forEach(s => {
         const w = (assessmentWeights && assessmentWeights[s.assessmentId]) || 1;
         sum += s.score * w;
@@ -269,12 +307,16 @@ function _calcGroup(scores, method, decayWeight, assessmentWeights) {
       const freq = {};
       valid.forEach(s => {
         const w = (assessmentWeights && assessmentWeights[s.assessmentId]) || 1;
-        freq[s.score] = (freq[s.score]||0) + w;
+        freq[s.score] = (freq[s.score] || 0) + w;
       });
       const maxFreq = Math.max(...Object.values(freq)); // safe: freq is non-empty since valid.length > 0
-      const modes = Object.keys(freq).filter(k => freq[k] === maxFreq).map(Number);
+      const modes = Object.keys(freq)
+        .filter(k => freq[k] === maxFreq)
+        .map(Number);
       if (modes.length === 1) return modes[0];
-      for (let i = valid.length - 1; i >= 0; i--) { if (modes.includes(valid[i].score)) return valid[i].score; }
+      for (let i = valid.length - 1; i >= 0; i--) {
+        if (modes.includes(valid[i].score)) return valid[i].score;
+      }
       return modes[0];
     }
     case 'decayingAvg': {
@@ -282,11 +324,12 @@ function _calcGroup(scores, method, decayWeight, assessmentWeights) {
       let avg = valid[0].score;
       for (let i = 1; i < valid.length; i++) {
         const w = (assessmentWeights && assessmentWeights[valid[i].assessmentId]) || 1;
-        avg = avg * (1 - dw) + valid[i].score * dw * w / ((1 - dw) + dw * w);
+        avg = avg * (1 - dw) + (valid[i].score * dw * w) / (1 - dw + dw * w);
       }
       return Math.round(avg);
     }
-    default: return valid[valid.length - 1].score;
+    default:
+      return valid[valid.length - 1].score;
   }
 }
 
@@ -365,7 +408,7 @@ function getTagProficiency(cid, studentId, tagId) {
   const cc = getCourseConfig(cid);
   const course = COURSES[cid];
   const method = cc.calcMethod || course.calcMethod || 'mostRecent';
-  const dw = cc.decayWeight != null ? cc.decayWeight : (course.decayWeight || 0.65);
+  const dw = cc.decayWeight != null ? cc.decayWeight : course.decayWeight || 0.65;
   const scores = getTagScores(cid, studentId, tagId);
   const cw = getCategoryWeights(cid);
   const aw = _getAW(cid);
@@ -385,7 +428,7 @@ function getSectionProficiency(cid, studentId, sectionId) {
   if (!section) return 0;
   const profs = section.tags.map(t => getTagProficiency(cid, studentId, t.id)).filter(p => p > 0);
   if (profs.length === 0) return 0;
-  const calculated = profs.reduce((a,b) => a+b, 0) / profs.length;
+  const calculated = profs.reduce((a, b) => a + b, 0) / profs.length;
   // Check for teacher override
   const overrides = getOverrides(cid);
   const override = overrides[studentId]?.[sectionId];
@@ -404,7 +447,7 @@ function getSectionProficiencyRaw(cid, studentId, sectionId) {
   if (!section) return 0;
   const profs = section.tags.map(t => getTagProficiency(cid, studentId, t.id)).filter(p => p > 0);
   if (profs.length === 0) return 0;
-  return profs.reduce((a,b) => a+b, 0) / profs.length;
+  return profs.reduce((a, b) => a + b, 0) / profs.length;
 }
 
 /** Get the teacher override for a section, if one exists.
@@ -435,7 +478,7 @@ function setSectionOverride(cid, studentId, sectionId, level, reason) {
       level: level,
       reason: reason,
       date: new Date().toISOString().slice(0, 10),
-      calculated: Math.round(raw * 10) / 10
+      calculated: Math.round(raw * 10) / 10,
     };
   } else {
     delete overrides[studentId][sectionId];
@@ -456,7 +499,7 @@ function getGroupProficiency(cid, studentId, groupId) {
   if (!gi || gi.sections.length === 0) return 0;
   const profs = gi.sections.map(s => getSectionProficiency(cid, studentId, s.id)).filter(p => p > 0);
   if (profs.length === 0) return 0;
-  return profs.reduce((a,b) => a+b, 0) / profs.length;
+  return profs.reduce((a, b) => a + b, 0) / profs.length;
 }
 
 /** Calculate overall proficiency — group-aware when competency groups exist.
@@ -473,7 +516,7 @@ function getOverallProficiency(cid, studentId) {
     const sections = getSections(cid);
     const profs = sections.map(s => getSectionProficiency(cid, studentId, s.id)).filter(p => p > 0);
     if (profs.length === 0) return 0;
-    return profs.reduce((a,b) => a+b, 0) / profs.length;
+    return profs.reduce((a, b) => a + b, 0) / profs.length;
   }
   // Group-aware: one value per group + one per ungrouped section
   const values = [];
@@ -487,7 +530,7 @@ function getOverallProficiency(cid, studentId) {
     if (sp > 0) values.push(sp);
   });
   if (values.length === 0) return 0;
-  return values.reduce((a,b) => a+b, 0) / values.length;
+  return values.reduce((a, b) => a + b, 0) / values.length;
 }
 
 /** Convert an average proficiency to a letter grade and percentage for PHIL12.
@@ -511,11 +554,12 @@ function getSectionTrend(cid, studentId, sectionId) {
   // Collect all summative scores across all tags in this section, sorted by date
   const allScores = [];
   section.tags.forEach(tag => {
-    getTagScores(cid, studentId, tag.id).filter(s => s.type === 'summative' && s.score > 0)
+    getTagScores(cid, studentId, tag.id)
+      .filter(s => s.type === 'summative' && s.score > 0)
       .forEach(s => allScores.push(s));
   });
   if (allScores.length < 2) return 'flat';
-  allScores.sort((a,b) => (a.date||'').localeCompare(b.date||''));
+  allScores.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   const recent = allScores[allScores.length - 1].score;
   const prev = allScores[allScores.length - 2].score;
   if (recent > prev) return 'up';
@@ -547,7 +591,11 @@ function getSectionEvidenceCount(cid, studentId, sectionId) {
  */
 function getFocusAreas(cid, studentId, maxItems) {
   const tags = getAllTags(cid);
-  const scored = tags.map(t => ({ tag: t, prof: getTagProficiency(cid, studentId, t.id), section: getSectionForTag(cid, t.id) }));
+  const scored = tags.map(t => ({
+    tag: t,
+    prof: getTagProficiency(cid, studentId, t.id),
+    section: getSectionForTag(cid, t.id),
+  }));
   // Tags with no evidence first, then lowest proficiency
   scored.sort((a, b) => {
     if (a.prof === 0 && b.prof === 0) return 0;
@@ -570,7 +618,7 @@ function getCompletionPct(cid, studentId) {
     const scores = getTagScores(cid, studentId, t.id);
     return scores.some(s => s.type === 'summative' && s.score > 0);
   }).length;
-  return Math.round(covered / tags.length * 100);
+  return Math.round((covered / tags.length) * 100);
 }
 
 /** Render an SVG completion ring showing a percentage value.
@@ -579,7 +627,8 @@ function getCompletionPct(cid, studentId) {
  * @returns {string} HTML string containing the SVG ring element
  */
 function completionRing(pct, color) {
-  const r = 22, c = 2 * Math.PI * r;
+  const r = 22,
+    c = 2 * Math.PI * r;
   const offset = c - (pct / 100) * c;
   return `<div class="completion-ring">
     <svg width="56" height="56" viewBox="0 0 56 56">
@@ -603,7 +652,7 @@ function getSectionGrowthData(cid, studentId, sectionId) {
   const cc = getCourseConfig(cid);
   const course = COURSES[cid];
   const method = cc.calcMethod || course.calcMethod || 'mostRecent';
-  const dw = cc.decayWeight != null ? cc.decayWeight : (course.decayWeight || 0.65);
+  const dw = cc.decayWeight != null ? cc.decayWeight : course.decayWeight || 0.65;
 
   // Collect all summative scores across all tags in this section
   const allScores = [];
@@ -625,7 +674,7 @@ function getSectionGrowthData(cid, studentId, sectionId) {
   // Sort allScores once by date, then use a running pointer — O(n) instead of O(n²).
   // For each date, advance the pointer to include all scores up to that date,
   // accumulating them into a per-tag Map so grouping is also O(1) per score.
-  allScores.sort((a,b) => (a.date||'').localeCompare(b.date||''));
+  allScores.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   const runningByTag = new Map(section.tags.map(t => [t.id, []]));
   let ri = 0;
 
@@ -646,7 +695,7 @@ function getSectionGrowthData(cid, studentId, sectionId) {
       }
     });
     if (tagProfs.length > 0) {
-      const avg = tagProfs.reduce((a,b) => a+b, 0) / tagProfs.length;
+      const avg = tagProfs.reduce((a, b) => a + b, 0) / tagProfs.length;
       points.push({ date, prof: avg });
     }
   });
@@ -659,10 +708,12 @@ function getSectionGrowthData(cid, studentId, sectionId) {
  */
 function renderGrowthSparkline(points) {
   if (!points || points.length === 0) return '<span style="font-size:0.65rem;color:var(--text-3)">No data yet</span>';
-  return `<div class="growth-sparkline">${points.map((p, i) => {
-    const color = PROF_COLORS[Math.round(p.prof)] || PROF_COLORS[0];
-    return `${i > 0 ? '<span class="sparkline-line"></span>' : ''}<span class="sparkline-dot" style="background:${color}" title="${formatDate(p.date)}: ${PROF_LABELS[Math.round(p.prof)] || '—'}"></span>`;
-  }).join('')}</div>`;
+  return `<div class="growth-sparkline">${points
+    .map((p, i) => {
+      const color = PROF_COLORS[Math.round(p.prof)] || PROF_COLORS[0];
+      return `${i > 0 ? '<span class="sparkline-line"></span>' : ''}<span class="sparkline-dot" style="background:${color}" title="${formatDate(p.date)}: ${PROF_LABELS[Math.round(p.prof)] || '—'}"></span>`;
+    })
+    .join('')}</div>`;
 }
 
 /* ── Namespace ──────────────────────────────────────────────── */

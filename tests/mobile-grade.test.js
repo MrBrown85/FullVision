@@ -17,8 +17,8 @@ function mockDataLayer(overrides) {
       { id: 'stu2', firstName: 'Noor', lastName: 'Khan', preferred: 'Noor', pronouns: '', designations: [] },
       { id: 'stu3', firstName: 'Liam', lastName: 'Chen', preferred: '', pronouns: 'he/him', designations: [] },
     ],
-    sortStudents: (arr) => arr,
-    displayName: (st) => (st.preferred || st.firstName) + ' ' + st.lastName,
+    sortStudents: arr => arr,
+    displayName: st => (st.preferred || st.firstName) + ' ' + st.lastName,
     getAssessments: () => [
       { id: 'a1', title: 'Science Fair Proposal', type: 'summative', date: '2025-03-20', tagIds: ['t1', 't2'] },
       { id: 'a2', title: 'Lab Quiz', type: 'formative', date: '2025-03-10', tagIds: ['t1'] },
@@ -118,7 +118,7 @@ describe('MGrade.renderPicker', () => {
     mockDataLayer({});
     const html = MGrade.renderPicker(CID);
     expect(html).toContain('2 tags'); // a1 has 2 tagIds
-    expect(html).toContain('1 tag');  // a2 has 1 tagId
+    expect(html).toContain('1 tag'); // a2 has 1 tagId
   });
 
   it('shows empty state when no assessments', () => {
@@ -215,7 +215,10 @@ describe('MGrade.renderSwiper', () => {
   it('does NOT call getAssignmentStatuses per student (N+1 fix)', () => {
     let statusCalls = 0;
     mockDataLayer({
-      getAssignmentStatuses: () => { statusCalls++; return {}; },
+      getAssignmentStatuses: () => {
+        statusCalls++;
+        return {};
+      },
     });
     MGrade.renderSwiper(CID, 'a1');
     // Should be called once (hoisted in renderSwiper), not per student
@@ -266,9 +269,19 @@ describe('Points mode variant', () => {
   it.skip('shows +/- stepper for points-based courses', () => {
     globalThis.getPointsScore = () => 85;
     mockDataLayer({
-      getStudents: () => [{ id: 'stu1', firstName: 'Test', lastName: 'Student', preferred: '', pronouns: '', designations: [] }],
+      getStudents: () => [
+        { id: 'stu1', firstName: 'Test', lastName: 'Student', preferred: '', pronouns: '', designations: [] },
+      ],
       getAssessments: () => [
-        { id: 'a1', title: 'Points Test', type: 'summative', date: '2025-03-20', tagIds: ['t1'], maxPoints: 100, score_mode: 'points' },
+        {
+          id: 'a1',
+          title: 'Points Test',
+          type: 'summative',
+          date: '2025-03-20',
+          tagIds: ['t1'],
+          maxPoints: 100,
+          score_mode: 'points',
+        },
       ],
       getAssignmentStatuses: () => ({}),
       getScores: () => ({}),
@@ -306,7 +319,9 @@ describe('MGrade.setScore', () => {
       getAssessments: () => [{ id: 'a1', type: 'summative', date: '2025-03-20' }],
     });
     const origClear = globalThis.clearProfCache;
-    globalThis.clearProfCache = () => { cacheClearedCount++; };
+    globalThis.clearProfCache = () => {
+      cacheClearedCount++;
+    };
     MGrade.setScore(CID, 'stu1', 'a1', 't1', 3);
     expect(cacheClearedCount).toBeGreaterThan(0);
     globalThis.clearProfCache = origClear;
@@ -330,9 +345,7 @@ describe('MGrade.setScore', () => {
 
   it('preserves scores for other tags when scoring one tag', () => {
     let store = {
-      stu1: [
-        { id: 'keep1', assessmentId: 'a1', tagId: 't2', score: 3, type: 'summative', date: '2025-03-20' },
-      ],
+      stu1: [{ id: 'keep1', assessmentId: 'a1', tagId: 't2', score: 3, type: 'summative', date: '2025-03-20' }],
     };
     mockDataLayer({
       getScores: () => store,
@@ -356,7 +369,9 @@ describe('Undo stack', () => {
     };
     mockDataLayer({
       getScores: () => JSON.parse(JSON.stringify(originalScores)),
-      saveScores: (cid, scores) => { savedScores = scores; },
+      saveScores: (cid, scores) => {
+        savedScores = scores;
+      },
       getAssessments: () => [{ id: 'a1', type: 'summative', date: '2025-03-20' }],
     });
 
@@ -379,7 +394,9 @@ describe('Undo stack', () => {
     let saveCount = 0;
     mockDataLayer({
       getScores: () => ({}),
-      saveScores: () => { saveCount++; },
+      saveScores: () => {
+        saveCount++;
+      },
       getAssessments: () => [{ id: 'a1', type: 'summative', date: '2025-03-20' }],
     });
     // Score 25 times — each pushes to undo stack, but cap at 20
@@ -404,7 +421,9 @@ describe('MGrade.setStatus', () => {
     let setTo = null;
     mockDataLayer({
       getAssignmentStatus: () => null,
-      setAssignmentStatus: (cid, sid, aid, status) => { setTo = status; },
+      setAssignmentStatus: (cid, sid, aid, status) => {
+        setTo = status;
+      },
     });
     MGrade.setStatus(CID, 'stu1', 'a1', 'NS');
     expect(setTo).toBe('NS');
@@ -414,7 +433,9 @@ describe('MGrade.setStatus', () => {
     let setTo = 'initial';
     mockDataLayer({
       getAssignmentStatus: () => 'NS',
-      setAssignmentStatus: (cid, sid, aid, status) => { setTo = status; },
+      setAssignmentStatus: (cid, sid, aid, status) => {
+        setTo = status;
+      },
     });
     MGrade.setStatus(CID, 'stu1', 'a1', 'NS');
     expect(setTo).toBeNull(); // toggled off
@@ -495,7 +516,7 @@ describe('Swiper card edge cases', () => {
     });
     const html = MGrade.renderSwiper(CID, 'a1');
     // Each tag should have 5 buttons (0-4) per student
-    const scoreButtons = (html.match(/data-action="m-grade-score"/g) || []);
+    const scoreButtons = html.match(/data-action="m-grade-score"/g) || [];
     // 3 students x 1 tag x 5 levels = 15 buttons
     expect(scoreButtons.length).toBe(15);
   });
@@ -506,7 +527,7 @@ describe('Swiper card edge cases', () => {
     });
     const html = MGrade.renderSwiper(CID, 'a1');
     // 3 students x 2 tags x 5 levels = 30 buttons
-    const scoreButtons = (html.match(/data-action="m-grade-score"/g) || []);
+    const scoreButtons = html.match(/data-action="m-grade-score"/g) || [];
     expect(scoreButtons.length).toBe(30);
   });
 
@@ -514,7 +535,7 @@ describe('Swiper card edge cases', () => {
     mockDataLayer({});
     const html = MGrade.renderSwiper(CID, 'a1');
     // 3 students x 3 status types = 9 status pills
-    const statusPills = (html.match(/data-action="m-grade-status"/g) || []);
+    const statusPills = html.match(/data-action="m-grade-status"/g) || [];
     expect(statusPills.length).toBe(9);
   });
 
@@ -530,7 +551,9 @@ describe('Swiper card edge cases', () => {
   it('handles missing tag gracefully', () => {
     mockDataLayer({
       getTagById: () => null,
-      getAssessments: () => [{ id: 'a1', title: 'Test', type: 'summative', date: '2025-03-20', tagIds: ['unknown-tag'] }],
+      getAssessments: () => [
+        { id: 'a1', title: 'Test', type: 'summative', date: '2025-03-20', tagIds: ['unknown-tag'] },
+      ],
     });
     const html = MGrade.renderSwiper(CID, 'a1');
     // Should not crash — falls back to using tag ID as label
@@ -587,7 +610,9 @@ describe('Multiple undo operations', () => {
     let store = {};
     mockDataLayer({
       getScores: () => store,
-      saveScores: (cid, scores) => { store = scores; },
+      saveScores: (cid, scores) => {
+        store = scores;
+      },
       getAssessments: () => [{ id: 'a1', type: 'summative', date: '2025-03-20' }],
     });
     MGrade.setScore(CID, 'stu1', 'a1', 't1', 3);
@@ -600,7 +625,9 @@ describe('Multiple undo operations', () => {
     let store = {};
     mockDataLayer({
       getScores: () => store,
-      saveScores: (cid, scores) => { store = scores; },
+      saveScores: (cid, scores) => {
+        store = scores;
+      },
       getAssessments: () => [{ id: 'a1', type: 'summative', date: '2025-03-20' }],
     });
     MGrade.setScore(CID, 'stu1', 'a1', 't1', 2);
@@ -615,7 +642,9 @@ describe('Multiple undo operations', () => {
     let store = {};
     mockDataLayer({
       getScores: () => store,
-      saveScores: (cid, scores) => { store = scores; },
+      saveScores: (cid, scores) => {
+        store = scores;
+      },
       getAssessments: () => [{ id: 'a1', type: 'summative', date: '2025-03-20' }],
     });
     // Score 3, then undo, then score 4, then undo

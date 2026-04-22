@@ -1,5 +1,5 @@
 /* ── gb-router.js — Hash-based SPA router ─────────────────── */
-window.Router = (function() {
+window.Router = (function () {
   'use strict';
 
   var _routes = {
@@ -8,7 +8,7 @@ window.Router = (function() {
     '/student': window.PageStudent,
     '/gradebook': window.PageGradebook,
     '/observations': window.PageObservations,
-    '/reports': window.PageReports
+    '/reports': window.PageReports,
   };
 
   var _titles = {
@@ -17,26 +17,26 @@ window.Router = (function() {
     '/student': 'Student',
     '/gradebook': 'Gradebook',
     '/observations': 'Observations',
-    '/reports': 'Reports'
+    '/reports': 'Reports',
   };
 
   /* Map old HTML filenames to hash routes for link interception */
   var _fileToHash = {
-    'index.html':        '/dashboard',
-    'settings.html':     '/assignments',
-    'student.html':      '/student',
-    'spreadsheet.html':  '/gradebook',
+    'index.html': '/dashboard',
+    'settings.html': '/assignments',
+    'student.html': '/student',
+    'spreadsheet.html': '/gradebook',
     'observations.html': '/observations',
-    'reports.html':      '/reports'
+    'reports.html': '/reports',
   };
 
   /* Map hash routes back to old HTML files (for Phase 1 fallback) */
   var _hashToFile = {
-    '/assignments':  'settings.html',
-    '/student':      'student.html',
-    '/gradebook':    'spreadsheet.html',
+    '/assignments': 'settings.html',
+    '/student': 'student.html',
+    '/gradebook': 'spreadsheet.html',
     '/observations': 'observations.html',
-    '/reports':      'reports.html'
+    '/reports': 'reports.html',
   };
 
   var _currentPage = null;
@@ -59,7 +59,11 @@ window.Router = (function() {
     var tag = active.tagName || '';
     var isEditable = active.isContentEditable || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
     if (!isEditable) return;
-    try { active.blur(); } catch (e) { /* best-effort flush */ }
+    try {
+      active.blur();
+    } catch (e) {
+      /* best-effort flush */
+    }
   }
 
   /* ── Parse hash ──────────────────────────────────────────── */
@@ -74,7 +78,7 @@ window.Router = (function() {
     var params = {};
     if (qIdx >= 0) {
       var qs = raw.substring(qIdx + 1);
-      qs.split('&').forEach(function(pair) {
+      qs.split('&').forEach(function (pair) {
         var parts = pair.split('=');
         if (parts[0]) {
           params[decodeURIComponent(parts[0])] = decodeURIComponent(parts[1] || '');
@@ -114,9 +118,11 @@ window.Router = (function() {
       var fallbackFile = _hashToFile[path];
       if (fallbackFile) {
         // Build query string from params
-        var qs = Object.keys(params).map(function(k) {
-          return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
-        }).join('&');
+        var qs = Object.keys(params)
+          .map(function (k) {
+            return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
+          })
+          .join('&');
         window.location.href = fallbackFile + (qs ? '?' + qs : '');
         return;
       }
@@ -152,9 +158,13 @@ window.Router = (function() {
     var pageTitle = _titles[path] || 'Dashboard';
     if (path === '/student' && params.id) {
       try {
-        var stu = getStudents(getActiveCourse()).find(function(s) { return s.id === params.id; });
+        var stu = getStudents(getActiveCourse()).find(function (s) {
+          return s.id === params.id;
+        });
         if (stu) pageTitle = fullName(stu);
-      } catch (e) { /* use default */ }
+      } catch (e) {
+        /* use default */
+      }
     }
     document.title = 'FullVision \u2014 ' + pageTitle;
   }
@@ -176,7 +186,7 @@ window.Router = (function() {
     window.addEventListener('hashchange', _onRoute);
 
     // Intercept clicks on dock links to use hash navigation
-    document.addEventListener('click', function(e) {
+    document.addEventListener('click', function (e) {
       var link = e.target.closest('#app-dock a[href]');
       if (!link) return;
       var href = link.getAttribute('href');
@@ -220,7 +230,9 @@ window.Router = (function() {
     boot: boot,
     navigate: navigate,
     parseHash: _parseHash,
-    getCurrentPage: function() { return _currentPage; }
+    getCurrentPage: function () {
+      return _currentPage;
+    },
   };
 })();
 

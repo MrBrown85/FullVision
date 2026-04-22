@@ -68,7 +68,9 @@ describe('v2 scoring-dispatch', () => {
   describe('_persistScoreToCanonical', () => {
     it('dispatches to upsert_tag_score for a non-rubric assessment', () => {
       _persistScoreToCanonical(CID, ENR, AID_TAG, TAG_ID, 3, '');
-      var call = client.calls.find(function (c) { return c.name === 'upsert_tag_score'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'upsert_tag_score';
+      });
       expect(call).toBeDefined();
       expect(call.payload).toEqual({
         p_enrollment_id: ENR,
@@ -80,7 +82,9 @@ describe('v2 scoring-dispatch', () => {
 
     it('dispatches to upsert_rubric_score when assessment.has_rubric is true', () => {
       _persistScoreToCanonical(CID, ENR, AID_RUBRIC, CRIT_ID, 4, '');
-      var call = client.calls.find(function (c) { return c.name === 'upsert_rubric_score'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'upsert_rubric_score';
+      });
       expect(call).toBeDefined();
       expect(call.payload).toEqual({
         p_enrollment_id: ENR,
@@ -89,12 +93,18 @@ describe('v2 scoring-dispatch', () => {
         p_value: 4,
       });
       // Must NOT have also called the tag variant
-      expect(client.calls.find(function (c) { return c.name === 'upsert_tag_score'; })).toBeUndefined();
+      expect(
+        client.calls.find(function (c) {
+          return c.name === 'upsert_tag_score';
+        }),
+      ).toBeUndefined();
     });
 
     it('dispatches to save_score_comment when note is present', () => {
       _persistScoreToCanonical(CID, ENR, AID_TAG, null, null, 'great effort');
-      var call = client.calls.find(function (c) { return c.name === 'save_score_comment'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'save_score_comment';
+      });
       expect(call).toBeDefined();
       expect(call.payload).toEqual({
         p_enrollment_id: ENR,
@@ -105,7 +115,11 @@ describe('v2 scoring-dispatch', () => {
 
     it('can dispatch both tag_score and save_score_comment in one call', () => {
       _persistScoreToCanonical(CID, ENR, AID_TAG, TAG_ID, 3, 'solid');
-      var names = client.calls.map(function (c) { return c.name; }).sort();
+      var names = client.calls
+        .map(function (c) {
+          return c.name;
+        })
+        .sort();
       expect(names).toEqual(['save_score_comment', 'upsert_tag_score']);
     });
 
@@ -121,13 +135,25 @@ describe('v2 scoring-dispatch', () => {
 
     it('emits no tag/rubric call when tid is absent', () => {
       _persistScoreToCanonical(CID, ENR, AID_TAG, null, 3, '');
-      expect(client.calls.find(function (c) { return c.name === 'upsert_tag_score'; })).toBeUndefined();
-      expect(client.calls.find(function (c) { return c.name === 'upsert_rubric_score'; })).toBeUndefined();
+      expect(
+        client.calls.find(function (c) {
+          return c.name === 'upsert_tag_score';
+        }),
+      ).toBeUndefined();
+      expect(
+        client.calls.find(function (c) {
+          return c.name === 'upsert_rubric_score';
+        }),
+      ).toBeUndefined();
     });
 
     it('emits no tag/rubric call when value is null', () => {
       _persistScoreToCanonical(CID, ENR, AID_TAG, TAG_ID, null, '');
-      expect(client.calls.find(function (c) { return c.name === 'upsert_tag_score'; })).toBeUndefined();
+      expect(
+        client.calls.find(function (c) {
+          return c.name === 'upsert_tag_score';
+        }),
+      ).toBeUndefined();
     });
 
     it('defaults to tag_score when _cache.v2Gradebook has no entry for the assessment', () => {
@@ -135,7 +161,9 @@ describe('v2 scoring-dispatch', () => {
       // that is the intended safety net per the commit message.
       var UNKNOWN = '99999999-9999-4999-8999-999999999999';
       _persistScoreToCanonical(CID, ENR, UNKNOWN, TAG_ID, 3, '');
-      var call = client.calls.find(function (c) { return c.name === 'upsert_tag_score'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'upsert_tag_score';
+      });
       expect(call).toBeDefined();
     });
   });
@@ -143,7 +171,9 @@ describe('v2 scoring-dispatch', () => {
   describe('window.upsertCellScore', () => {
     it('calls upsert_score with the cell value', async () => {
       await window.upsertCellScore(CID, ENR, AID_TAG, 3);
-      var call = client.calls.find(function (c) { return c.name === 'upsert_score'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'upsert_score';
+      });
       expect(call).toBeDefined();
       expect(call.payload).toEqual({
         p_enrollment_id: ENR,
@@ -154,7 +184,9 @@ describe('v2 scoring-dispatch', () => {
 
     it('passes null for empty value (clear cell)', async () => {
       await window.upsertCellScore(CID, ENR, AID_TAG, '');
-      var call = client.calls.find(function (c) { return c.name === 'upsert_score'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'upsert_score';
+      });
       expect(call.payload.p_value).toBeNull();
     });
 
@@ -167,7 +199,9 @@ describe('v2 scoring-dispatch', () => {
   describe('window.setCellStatus', () => {
     it('calls set_score_status with the status string', async () => {
       await window.setCellStatus(ENR, AID_TAG, 'LATE');
-      var call = client.calls.find(function (c) { return c.name === 'set_score_status'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'set_score_status';
+      });
       expect(call).toBeDefined();
       expect(call.payload).toEqual({
         p_enrollment_id: ENR,
@@ -178,7 +212,9 @@ describe('v2 scoring-dispatch', () => {
 
     it('coerces falsy status to null (clear)', async () => {
       await window.setCellStatus(ENR, AID_TAG, '');
-      var call = client.calls.find(function (c) { return c.name === 'set_score_status'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'set_score_status';
+      });
       expect(call.payload.p_status).toBeNull();
     });
   });
@@ -186,7 +222,9 @@ describe('v2 scoring-dispatch', () => {
   describe('window.fillRubric', () => {
     it('calls fill_rubric', async () => {
       await window.fillRubric(ENR, AID_RUBRIC, 3);
-      var call = client.calls.find(function (c) { return c.name === 'fill_rubric'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'fill_rubric';
+      });
       expect(call).toBeDefined();
       expect(call.payload).toEqual({
         p_enrollment_id: ENR,
@@ -199,17 +237,29 @@ describe('v2 scoring-dispatch', () => {
   describe('clear helpers', () => {
     it('clearScore calls clear_score', async () => {
       await window.clearScore(ENR, AID_TAG);
-      expect(client.calls.find(function (c) { return c.name === 'clear_score'; })).toBeDefined();
+      expect(
+        client.calls.find(function (c) {
+          return c.name === 'clear_score';
+        }),
+      ).toBeDefined();
     });
 
     it('clearRowScores calls clear_row_scores', async () => {
       await window.clearRowScores(ENR, CID);
-      expect(client.calls.find(function (c) { return c.name === 'clear_row_scores'; })).toBeDefined();
+      expect(
+        client.calls.find(function (c) {
+          return c.name === 'clear_row_scores';
+        }),
+      ).toBeDefined();
     });
 
     it('clearColumnScores calls clear_column_scores', async () => {
       await window.clearColumnScores(AID_TAG);
-      expect(client.calls.find(function (c) { return c.name === 'clear_column_scores'; })).toBeDefined();
+      expect(
+        client.calls.find(function (c) {
+          return c.name === 'clear_column_scores';
+        }),
+      ).toBeDefined();
     });
   });
 
@@ -229,7 +279,9 @@ describe('v2 scoring-dispatch', () => {
 
     it('dispatches upsert_score for the overall cell value when ids are UUIDs', function () {
       setPointsScore(CID, ENR, AID_TAG, 3.5);
-      var call = client.calls.find(function (c) { return c.name === 'upsert_score'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'upsert_score';
+      });
       expect(call).toBeDefined();
       expect(call.payload).toEqual({
         p_enrollment_id: ENR,
@@ -240,13 +292,21 @@ describe('v2 scoring-dispatch', () => {
 
     it('skips dispatch when enrollment id is not a UUID', function () {
       setPointsScore(CID, 'local-stu-id', AID_TAG, 3.5);
-      expect(client.calls.find(function (c) { return c.name === 'upsert_score'; })).toBeUndefined();
+      expect(
+        client.calls.find(function (c) {
+          return c.name === 'upsert_score';
+        }),
+      ).toBeUndefined();
     });
 
     it('skips dispatch in demo mode', function () {
       localStorage.setItem('gb-demo-mode', '1');
       setPointsScore(CID, ENR, AID_TAG, 3.5);
-      expect(client.calls.find(function (c) { return c.name === 'upsert_score'; })).toBeUndefined();
+      expect(
+        client.calls.find(function (c) {
+          return c.name === 'upsert_score';
+        }),
+      ).toBeUndefined();
     });
   });
 });

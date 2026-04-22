@@ -21,8 +21,8 @@ describe('report config persistence', () => {
       preset: 'standard',
       blocks: [
         { id: 'header', label: 'Header', enabled: true, locked: true },
-        { id: 'academic-summary', label: 'Academic Summary', enabled: true, locked: false }
-      ]
+        { id: 'academic-summary', label: 'Academic Summary', enabled: true, locked: false },
+      ],
     };
     saveReportConfig(CID, config);
     const loaded = getReportConfig(CID);
