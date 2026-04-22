@@ -136,7 +136,7 @@ Append to HANDOFF.md activity log.
 
 ---
 
-### T-WIRE-02 · Learning-map CRUD v2 dispatch in dash-class-manager.js
+### [DONE] T-WIRE-02 · Learning-map CRUD v2 dispatch in dash-class-manager.js
 
 **Goal:** Every subject / section / group / tag mutation in the class manager also calls the matching `window.v2.*` RPC so learning maps persist to Supabase.
 

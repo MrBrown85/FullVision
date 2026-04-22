@@ -128,6 +128,31 @@ window.DashClassManager = (function() {
   var _cmMergeAnimating = false;
   var CM_GROUP_COLORS = ['#6366f1','#06b6d4','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316','#64748b'];
 
+  var _UUID_RE_CM = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  function _isCanonicalId(id) {
+    return typeof id === 'string' && _UUID_RE_CM.test(id);
+  }
+
+  function _patchMapId(cid, map, localId, canonicalId) {
+    if (!localId || !canonicalId || localId === canonicalId) return;
+    (map.subjects || []).forEach(function(s) {
+      if (s.id === localId) s.id = canonicalId;
+    });
+    (map.sections || []).forEach(function(s) {
+      if (s.id === localId) s.id = canonicalId;
+      if (s.subject === localId) s.subject = canonicalId;
+      if (s.groupId === localId) s.groupId = canonicalId;
+      (s.tags || []).forEach(function(t) {
+        if (t.id === localId) t.id = canonicalId;
+        if (t.subject === localId) t.subject = canonicalId;
+      });
+    });
+    (map.competencyGroups || []).forEach(function(g) {
+      if (g.id === localId) g.id = canonicalId;
+    });
+    saveLearningMap(cid, map);
+  }
+
   function _cmClearMerge() {
     if (_cmMergeHoverTimer) { clearTimeout(_cmMergeHoverTimer); _cmMergeHoverTimer = null; }
     if (_cmMergeTargetId) { var el = document.getElementById('cm-std-' + _cmMergeTargetId); if (el) el.classList.remove('merge-target'); }
@@ -136,7 +161,8 @@ window.DashClassManager = (function() {
 
   function _cmMergeToNewGroup(draggedId, targetId) {
     if (!cmSelectedCourse) return;
-    var map = ensureCustomLearningMap(cmSelectedCourse);
+    var cid = cmSelectedCourse;
+    var map = ensureCustomLearningMap(cid);
     if (!map.competencyGroups) map.competencyGroups = [];
     var idx = map.competencyGroups.length;
     var grp = {
@@ -150,8 +176,17 @@ window.DashClassManager = (function() {
       var sec = (map.sections || []).find(function(s) { return s.id === sid; });
       if (sec) sec.groupId = grp.id;
     });
-    saveLearningMap(cmSelectedCourse, map);
+    saveLearningMap(cid, map);
     renderClassManager();
+    var grpLocalId = grp.id;
+    window.v2.upsertCompetencyGroup({ id: grpLocalId, courseId: cid, name: grp.name, color: grp.color, displayOrder: idx })
+      .then(function(res) {
+        var canonicalId = res && res.data ? res.data : null;
+        if (canonicalId && canonicalId !== grpLocalId) {
+          var m = getLearningMap(cid);
+          _patchMapId(cid, m, grpLocalId, canonicalId);
+        }
+      });
     setTimeout(function() {
       var input = document.querySelector('.mod-folder[data-module-id="' + grp.id + '"] .mod-folder-name-input');
       if (input) { input.focus(); input.select(); }
@@ -231,6 +266,7 @@ window.DashClassManager = (function() {
           else delete sec.groupId;
           saveLearningMap(cmSelectedCourse, map);
           renderClassManager();
+          window.v2.upsertSection({ id: _cmDragStdId, competencyGroupId: targetGroupId || null });
         }
       }
       _cmDragStdId = null;
@@ -1178,6 +1214,9 @@ window.DashClassManager = (function() {
   }
 
   function cwFinishCreate() {
+    // T-WIRE-02 DEFERRED: bulk operation — v2 dispatch not wired.
+    // Bulk-creates all subjects/sections/tags from curriculum wizard.
+    // Needs a dedicated session to design the full canonical-id-patch sequence.
     var name = cwStep2Name || cwGetPreName();
     if (!name.trim()) {
       cwStep = 2; renderClassManager();
@@ -1590,6 +1629,9 @@ window.DashClassManager = (function() {
   }
 
   function cmRelinkConfirm(mode) {
+    // T-WIRE-02 DEFERRED: bulk operation — v2 dispatch not wired.
+    // Bulk-relinks sections between courses (replace/merge modes).
+    // Needs a dedicated session to design the full canonical-id-patch sequence.
     if (!cmRelinkCid || cwSelectedTags.length === 0) return;
     var cid = cmRelinkCid;
 
@@ -1760,6 +1802,9 @@ window.DashClassManager = (function() {
   }
 
   function cmDuplicateCourse(sourceCid) {
+    // T-WIRE-02 DEFERRED: bulk operation — v2 dispatch not wired.
+    // Bulk-duplicates all learning map entities (subjects/sections/tags/groups).
+    // Needs a dedicated session to design the full canonical-id-patch sequence.
     var src = COURSES[sourceCid];
     if (!src) return;
     var newCourse = createCourse({
@@ -1789,24 +1834,40 @@ window.DashClassManager = (function() {
   /* ── CM Curriculum Editing ──────────────────────────────── */
   function cmAddSubject() {
     if (!cmSelectedCourse) return;
-    var map = ensureCustomLearningMap(cmSelectedCourse);
+    var cid = cmSelectedCourse;
+    var map = ensureCustomLearningMap(cid);
     var id = 'subj' + Date.now().toString(36);
     map.subjects.push({ id: id, name:'New Subject', color:'#6366f1' });
-    saveLearningMap(cmSelectedCourse, map);
+    var displayOrder = map.subjects.length - 1;
+    saveLearningMap(cid, map);
     renderClassManager();
+    window.v2.upsertSubject({ id: id, courseId: cid, name: 'New Subject', displayOrder: displayOrder })
+      .then(function(res) {
+        var canonicalId = res && res.data ? res.data : null;
+        if (canonicalId && canonicalId !== id) {
+          var m = getLearningMap(cid);
+          _patchMapId(cid, m, id, canonicalId);
+        }
+      });
   }
 
   function cmUpdateSubjectName(subId, val) {
     if (!cmSelectedCourse) return;
-    var map = ensureCustomLearningMap(cmSelectedCourse);
+    var cid = cmSelectedCourse;
+    var map = ensureCustomLearningMap(cid);
     var sub = map.subjects.find(function(s) { return s.id === subId; });
-    if (sub) { sub.name = val.trim(); saveLearningMap(cmSelectedCourse, map); }
+    if (sub) {
+      sub.name = val.trim();
+      saveLearningMap(cid, map);
+      window.v2.upsertSubject({ id: subId, courseId: cid, name: val.trim() });
+    }
   }
 
   function cmUpdateSubjectColor(subId, color) {
     if (!cmSelectedCourse) return;
     var map = ensureCustomLearningMap(cmSelectedCourse);
     var sub = map.subjects.find(function(s) { return s.id === subId; });
+    // T-WIRE-02: subject color is local-only (no p_color in upsert_subject RPC)
     if (sub) { sub.color = color; saveLearningMap(cmSelectedCourse, map); renderClassManager(); }
   }
 
@@ -1834,9 +1895,11 @@ window.DashClassManager = (function() {
     if (!cmSelectedCourse) return;
     var map = ensureCustomLearningMap(cmSelectedCourse);
     if (target === 'subject') {
+      // T-WIRE-02: subject color is local-only (no p_color in upsert_subject RPC)
       var sub = map.subjects.find(function(s) { return s.id === id; });
       if (sub) sub.color = color;
     } else {
+      // T-WIRE-02: section color is local-only (no p_color in upsert_section RPC)
       var sec = map.sections.find(function(s) { return s.id === id; });
       if (sec) sec.color = color;
     }
@@ -1846,63 +1909,92 @@ window.DashClassManager = (function() {
 
   function cmDeleteSubject(subId) {
     if (!cmSelectedCourse) return;
-    var map = ensureCustomLearningMap(cmSelectedCourse);
+    var cid = cmSelectedCourse;
+    var map = ensureCustomLearningMap(cid);
     var sectionCount = map.sections.filter(function(s) { return s.subject === subId; }).length;
     if (sectionCount > 0) {
       showConfirm('Delete Subject', 'This subject has ' + sectionCount + ' section(s). Delete them too?',
         'Delete All', 'danger', function() {
+          var deletedSectionIds = map.sections
+            .filter(function(s) { return s.subject === subId; })
+            .map(function(s) { return s.id; });
           map.subjects = map.subjects.filter(function(s) { return s.id !== subId; });
           map.sections = map.sections.filter(function(s) { return s.subject !== subId; });
-          saveLearningMap(cmSelectedCourse, map);
+          saveLearningMap(cid, map);
           renderClassManager();
+          if (_isCanonicalId(subId)) window.v2.deleteSubject(subId);
+          deletedSectionIds.forEach(function(sid) {
+            if (_isCanonicalId(sid)) { window.v2.deleteSection(sid); window.v2.deleteTag(sid); }
+          });
         });
     } else {
       map.subjects = map.subjects.filter(function(s) { return s.id !== subId; });
-      saveLearningMap(cmSelectedCourse, map);
+      saveLearningMap(cid, map);
       renderClassManager();
+      if (_isCanonicalId(subId)) window.v2.deleteSubject(subId);
     }
   }
 
   // ── Competency Group CRUD ──────────────────────────────────
   function cmAddCompGroup() {
     if (!cmSelectedCourse) return;
-    var map = ensureCustomLearningMap(cmSelectedCourse);
+    var cid = cmSelectedCourse;
+    var map = ensureCustomLearningMap(cid);
     if (!map.competencyGroups) map.competencyGroups = [];
     var idx = map.competencyGroups.length;
     var colors = ['#6366f1','#06b6d4','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#f97316','#64748b'];
-    map.competencyGroups.push({
-      id: 'grp_' + Date.now().toString(36) + Math.random().toString(36).slice(2,5),
-      name: 'Group ' + (idx + 1),
-      color: colors[idx % colors.length],
-      sortOrder: idx
-    });
-    saveLearningMap(cmSelectedCourse, map);
+    var grpLocalId = 'grp_' + Date.now().toString(36) + Math.random().toString(36).slice(2,5);
+    var grpName = 'Group ' + (idx + 1);
+    var grpColor = colors[idx % colors.length];
+    map.competencyGroups.push({ id: grpLocalId, name: grpName, color: grpColor, sortOrder: idx });
+    saveLearningMap(cid, map);
     renderClassManager();
+    window.v2.upsertCompetencyGroup({ id: grpLocalId, courseId: cid, name: grpName, color: grpColor, displayOrder: idx })
+      .then(function(res) {
+        var canonicalId = res && res.data ? res.data : null;
+        if (canonicalId && canonicalId !== grpLocalId) {
+          var m = getLearningMap(cid);
+          _patchMapId(cid, m, grpLocalId, canonicalId);
+        }
+      });
   }
 
   function cmUpdateCompGroupName(grpId, val) {
     if (!cmSelectedCourse) return;
-    var map = ensureCustomLearningMap(cmSelectedCourse);
+    var cid = cmSelectedCourse;
+    var map = ensureCustomLearningMap(cid);
     var g = (map.competencyGroups || []).find(function(x) { return x.id === grpId; });
-    if (g && val.trim()) { g.name = val.trim(); saveLearningMap(cmSelectedCourse, map); }
+    if (g && val.trim()) {
+      g.name = val.trim();
+      saveLearningMap(cid, map);
+      window.v2.upsertCompetencyGroup({ id: grpId, courseId: cid, name: val.trim() });
+    }
   }
 
   function cmUpdateCompGroupColor(grpId, color) {
     if (!cmSelectedCourse) return;
-    var map = ensureCustomLearningMap(cmSelectedCourse);
+    var cid = cmSelectedCourse;
+    var map = ensureCustomLearningMap(cid);
     var g = (map.competencyGroups || []).find(function(x) { return x.id === grpId; });
-    if (g) { g.color = color; saveLearningMap(cmSelectedCourse, map); _cmRenderWithScroll(); }
+    if (g) {
+      g.color = color;
+      saveLearningMap(cid, map);
+      _cmRenderWithScroll();
+      window.v2.upsertCompetencyGroup({ id: grpId, courseId: cid, color: color });
+    }
   }
 
   function cmDeleteCompGroup(grpId) {
     if (!cmSelectedCourse) return;
-    var map = ensureCustomLearningMap(cmSelectedCourse);
+    var cid = cmSelectedCourse;
+    var map = ensureCustomLearningMap(cid);
     var count = (map.sections || []).filter(function(s) { return s.groupId === grpId; }).length;
     var doDelete = function() {
       map.competencyGroups = (map.competencyGroups || []).filter(function(g) { return g.id !== grpId; });
       (map.sections || []).forEach(function(s) { if (s.groupId === grpId) delete s.groupId; });
-      saveLearningMap(cmSelectedCourse, map);
+      saveLearningMap(cid, map);
       _cmRenderWithScroll();
+      if (_isCanonicalId(grpId)) window.v2.deleteCompetencyGroup(grpId);
     };
     if (count > 0) {
       showConfirm('Delete Group', count + ' standard(s) will become ungrouped. Delete anyway?', 'Delete', 'danger', doDelete);
@@ -1913,12 +2005,14 @@ window.DashClassManager = (function() {
 
   function cmUpdateStdGroup(secId, groupId) {
     if (!cmSelectedCourse) return;
-    var map = ensureCustomLearningMap(cmSelectedCourse);
+    var cid = cmSelectedCourse;
+    var map = ensureCustomLearningMap(cid);
     var sec = (map.sections || []).find(function(s) { return s.id === secId; });
     if (!sec) return;
     if (groupId) sec.groupId = groupId; else delete sec.groupId;
-    saveLearningMap(cmSelectedCourse, map);
+    saveLearningMap(cid, map);
     _cmRenderWithScroll();
+    window.v2.upsertSection({ id: secId, competencyGroupId: groupId || null });
   }
 
   // Re-render class manager preserving scroll position
@@ -1935,7 +2029,8 @@ window.DashClassManager = (function() {
   // ── Flat Learning Standard CRUD ──────────────────────────────
   function cmAddStd() {
     if (!cmSelectedCourse) return;
-    var map = ensureCustomLearningMap(cmSelectedCourse);
+    var cid = cmSelectedCourse;
+    var map = ensureCustomLearningMap(cid);
     if (map.subjects.length === 0) {
       map.subjects.push({ id:'subj1', name:'General', color:'#6366f1' });
     }
@@ -1947,34 +2042,62 @@ window.DashClassManager = (function() {
       tags: [{ id: stdId, label:'New Standard', text:'', color: colour, subject: subId, name:'New Standard', shortName:'New' }]
     });
     map._flatVersion = 2;
-    saveLearningMap(cmSelectedCourse, map);
+    var displayOrder = map.sections.length - 1;
+    saveLearningMap(cid, map);
     renderClassManager();
     requestAnimationFrame(function() {
       var el = document.getElementById('cm-sec-'+stdId);
       if (el) { el.classList.add('open'); el.scrollIntoView({behavior:'smooth',block:'center'}); }
     });
+    // Ensure subject is canonical before inserting section (subjectId FK must be UUID)
+    var subjObj = map.subjects.find(function(s) { return s.id === subId; });
+    var subjectRpc = _isCanonicalId(subId)
+      ? Promise.resolve({ data: subId })
+      : window.v2.upsertSubject({ id: subId, courseId: cid, name: subjObj ? subjObj.name : 'General', displayOrder: 0 })
+          .then(function(res) {
+            var canon = res && res.data ? res.data : null;
+            if (canon && canon !== subId) _patchMapId(cid, getLearningMap(cid), subId, canon);
+            return res;
+          });
+    subjectRpc.then(function(subRes) {
+      var canonicalSubjectId = (subRes && subRes.data) ? subRes.data : subId;
+      return window.v2.upsertSection({ id: stdId, subjectId: canonicalSubjectId, name: 'New Standard', displayOrder: displayOrder });
+    }).then(function(secRes) {
+      var canonicalSectionId = secRes && secRes.data ? secRes.data : null;
+      if (canonicalSectionId && canonicalSectionId !== stdId) {
+        _patchMapId(cid, getLearningMap(cid), stdId, canonicalSectionId);
+      }
+      var finalSectionId = canonicalSectionId || stdId;
+      return window.v2.upsertTag({ id: stdId, sectionId: finalSectionId, label: 'New Standard', code: stdId, iCanText: '', displayOrder: 0 });
+    });
   }
 
   function cmUpdateStdName(secId, val) {
     if (!cmSelectedCourse) return;
-    var map = ensureCustomLearningMap(cmSelectedCourse);
+    var cid = cmSelectedCourse;
+    var map = ensureCustomLearningMap(cid);
     var sec = map.sections.find(function(s) { return s.id === secId; });
     if (!sec) return;
     var trimmed = val.trim();
     sec.name = trimmed;
     sec.shortName = trimmed.split(' ')[0];
     if (sec.tags[0]) { sec.tags[0].name = trimmed; sec.tags[0].shortName = sec.shortName; }
-    saveLearningMap(cmSelectedCourse, map);
+    saveLearningMap(cid, map);
+    window.v2.upsertSection({ id: secId, name: trimmed });
+    var tag = sec.tags[0];
+    if (tag) window.v2.upsertTag({ id: tag.id, sectionId: secId, label: tag.label || trimmed });
   }
 
   function cmUpdateStdSubject(secId, subId) {
     if (!cmSelectedCourse) return;
-    var map = ensureCustomLearningMap(cmSelectedCourse);
+    var cid = cmSelectedCourse;
+    var map = ensureCustomLearningMap(cid);
     var sec = map.sections.find(function(s) { return s.id === secId; });
     if (!sec) return;
     sec.subject = subId;
     if (sec.tags[0]) sec.tags[0].subject = subId;
-    saveLearningMap(cmSelectedCourse, map);
+    saveLearningMap(cid, map);
+    window.v2.upsertSection({ id: secId, subjectId: subId });
   }
 
   function cmUpdateStdColor(secId, color) {
@@ -1984,6 +2107,7 @@ window.DashClassManager = (function() {
     if (!sec) return;
     sec.color = color;
     if (sec.tags[0]) sec.tags[0].color = color;
+    // T-WIRE-02: section color is local-only (no p_color in upsert_section RPC)
     saveLearningMap(cmSelectedCourse, map);
     renderClassManager();
   }
@@ -1991,32 +2115,45 @@ window.DashClassManager = (function() {
   function cmDeleteStd(secId) {
     showConfirm('Delete Standard', 'Delete this learning standard? Existing scores are preserved.',
       'Delete', 'danger', function() {
-        var map = ensureCustomLearningMap(cmSelectedCourse);
+        var cid = cmSelectedCourse;
+        var map = ensureCustomLearningMap(cid);
         map.sections = map.sections.filter(function(s) { return s.id !== secId; });
-        saveLearningMap(cmSelectedCourse, map);
+        saveLearningMap(cid, map);
         renderClassManager();
+        if (_isCanonicalId(secId)) { window.v2.deleteSection(secId); window.v2.deleteTag(secId); }
       });
   }
 
   function cmUpdateStdLabel(secId, val) {
     if (!cmSelectedCourse) return;
-    var map = ensureCustomLearningMap(cmSelectedCourse);
+    var cid = cmSelectedCourse;
+    var map = ensureCustomLearningMap(cid);
     var sec = map.sections.find(function(s) { return s.id === secId; });
-    if (sec && sec.tags[0]) { sec.tags[0].label = val.trim(); saveLearningMap(cmSelectedCourse, map); }
+    if (sec && sec.tags[0]) {
+      sec.tags[0].label = val.trim();
+      saveLearningMap(cid, map);
+      window.v2.upsertTag({ id: sec.tags[0].id, sectionId: secId, label: val.trim() });
+    }
   }
 
   function cmUpdateStdText(secId, val) {
     if (!cmSelectedCourse) return;
-    var map = ensureCustomLearningMap(cmSelectedCourse);
+    var cid = cmSelectedCourse;
+    var map = ensureCustomLearningMap(cid);
     var sec = map.sections.find(function(s) { return s.id === secId; });
-    if (sec && sec.tags[0]) { sec.tags[0].text = val.trim(); saveLearningMap(cmSelectedCourse, map); }
+    if (sec && sec.tags[0]) {
+      sec.tags[0].text = val.trim();
+      saveLearningMap(cid, map);
+      window.v2.upsertTag({ id: sec.tags[0].id, sectionId: secId, iCanText: val.trim() });
+    }
   }
 
   function cmUpdateStdCode(secId, val) {
     if (!cmSelectedCourse) return;
+    var cid = cmSelectedCourse;
     var newId = val.trim().toUpperCase().replace(/[^A-Z0-9._\-]/g, '').slice(0, 10);
     if (!newId || newId === secId) return;
-    var map = ensureCustomLearningMap(cmSelectedCourse);
+    var map = ensureCustomLearningMap(cid);
     // Check uniqueness within learning map
     var exists = map.sections.some(function(s) { return s.id === newId; });
     if (exists) {
@@ -2027,6 +2164,9 @@ window.DashClassManager = (function() {
     // Update section and tag IDs
     var sec = map.sections.find(function(s) { return s.id === secId; });
     if (!sec) return;
+    // T-WIRE-02: capture canonical status BEFORE renaming the local ID
+    var wasCanonical = _isCanonicalId(secId);
+    var oldId = secId;
     sec.id = newId;
     if (sec.tags[0]) sec.tags[0].id = newId;
     // Update _sectionToTagMap if present
@@ -2054,6 +2194,23 @@ window.DashClassManager = (function() {
     });
     if (scoresChanged) saveScores(cmSelectedCourse, allScores);
     renderClassManager();
+    // T-WIRE-02: delete old canonical record and re-insert under new code.
+    // Known limitation: if re-insert fails after delete, the DB loses the record
+    // while local state is intact. Acceptable for V1 (code rename is rare).
+    if (wasCanonical) {
+      var renamedSec = map.sections.find(function(s) { return s.id === newId; });
+      window.v2.deleteSection(oldId);
+      window.v2.deleteTag(oldId);
+      if (renamedSec) {
+        window.v2.upsertSection({ id: newId, subjectId: renamedSec.subject, name: renamedSec.name, displayOrder: map.sections.indexOf(renamedSec) })
+          .then(function(secRes) {
+            var canonicalSectionId = secRes && secRes.data ? secRes.data : null;
+            var finalSectionId = canonicalSectionId || newId;
+            var tag = renamedSec.tags[0];
+            if (tag) window.v2.upsertTag({ id: newId, sectionId: finalSectionId, label: tag.label || newId, code: newId, iCanText: tag.text || '', displayOrder: 0 });
+          });
+      }
+    }
   }
 
   // Legacy aliases
