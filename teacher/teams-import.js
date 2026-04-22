@@ -676,6 +676,11 @@ window.TeamsImport = (function() {
       saveAssessments(cid, assessments);
 
       // 3. Write scores (batch — one saveScores call)
+      // NOTE: window.v2.importTeamsClass expects a fully-normalized payload
+      // (course + students + enrollments + assessments + scores in canonical
+      // schema shape). tiParsedFile uses the raw Teams-CSV structure
+      // { students:[], assignments:[] } which does not match. A server-side
+      // adapter RPC is tracked as T-BE-02 before remote dispatch can be wired.
       var scores = getScores(cid) || {};
 
       selected.forEach(function(a) {

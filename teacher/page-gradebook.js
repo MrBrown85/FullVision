@@ -1273,6 +1273,7 @@ window.PageGradebook = (function() {
             if (idx >= 0) scores[sid].splice(idx, 1);
           });
           saveScores(cid, scores); clearProfCache(); render();
+          window.clearScore(sid, aid);
         }
       }
       _dismissContextMenu();

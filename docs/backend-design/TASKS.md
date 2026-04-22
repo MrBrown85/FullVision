@@ -96,7 +96,7 @@ Append to HANDOFF.md activity log.
 
 ---
 
-### T-WIRE-01b · Fix "Clear cell" and Teams import dispatch
+### [DONE] T-WIRE-01b · Fix "Clear cell" and Teams import dispatch
 
 **Goal:** Wire "Clear cell" to `window.clearScore` and Teams CSV import to `window.v2.importTeamsClass`.
 
@@ -961,6 +961,7 @@ Use the current backlog instead:
 ## Future tasks (spawn as needed)
 
 - **T-BE-01** · Backend `export_my_data` RPC (if T-UI-05 audit finds it missing)
+- **T-BE-02** · Teams-import adapter RPC: `import_teams_class` currently expects a fully-normalized payload; `tiParsedFile` (raw Teams-CSV shape `{ students, assignments }`) needs a server-side adapter before `window.v2.importTeamsClass` can be called from `teacher/teams-import.js`. Gap documented inline at line 678.
 - **T-TEST-01** · Expand the shipped `e2e/regression-smoke.spec.js` auth smoke into a fuller Playwright flow: live email verification/test-project path (if available), Welcome Class → score entry → report generation
 - **T-TEST-02** · E2E: soft-delete account → sign-in within 30d → restore
 - **T-TEST-03** · E2E: offline queue fills → reconnect → queue drains

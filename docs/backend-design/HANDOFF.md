@@ -387,5 +387,6 @@ Claude appends one line per completed task. Format: `YYYY-MM-DD | session-<n> | 
 
 - `2026-04-22 | session-15 | T-WIRE-01 | audit complete — see Discovered gaps below for the full inventory. No code changes in this session; follow-up patches queued.`
 - `2026-04-22 | session-16 | T-WIRE-01a | score-entry paths wired to upsertScore: selectScore + setScore in page-assignments.js, notSubmitted zero-writes, commit() in page-gradebook.js, setPointsScore in data.js (+ unit test), and setScore in tab-grade.js. Mobile test mocks updated to shared-store pattern. 837 passed + 1 skipped.`
+- `2026-04-22 | session-16 | T-WIRE-01b | clearCell handler now calls window.clearScore(sid, aid) after saveScores. Teams-import audit: tiParsedFile shape mismatches import_teams_class expected payload — gap documented inline + T-BE-02 added to Future tasks. 837 passed + 1 skipped.`
 
 _(next session, keep appending.)_
