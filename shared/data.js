@@ -109,6 +109,7 @@ const _DATA_KEYS = {
 let _useSupabase = false;
 let _teacherId = null;
 let _initPromise = null; // dedup concurrent initData calls
+let _lsQuotaWarned = false; // show the "storage full" toast at most once per session
 const _WELCOME_CLASS_NAME = 'Welcome Class';
 const _WELCOME_CLASS_SEEDED_PREFIX = 'gb-welcome-class-seeded-';
 const _WELCOME_CLASS_ROUTE_KEY = 'gb-post-bootstrap-route';
@@ -514,7 +515,6 @@ function _initVisibilityRefresh() {
 async function initData(cid) {
   if (!cid) return;
   // Avoid duplicate concurrent loads for same course
-  const key = '_init_' + cid;
   if (_initPromise && _initPromise._cid === cid) return _initPromise;
 
   const p = _doInitData(cid);
@@ -1062,6 +1062,9 @@ function _v2GradebookToCache(cid, payload) {
   });
 
   var assessments = (payload.assessments || []).map(function (a) {
+    var maxPts = a.max_points != null ? Number(a.max_points) : null;
+    var sMode = a.score_mode || 'proficiency';
+    var tIds = a.tag_ids || [];
     return {
       id: a.id,
       title: a.title || '',
@@ -1069,11 +1072,13 @@ function _v2GradebookToCache(cid, payload) {
       type: 'summative',
       categoryId: a.category_id || null,
       category_id: a.category_id || null,
-      tag_ids: [],
-      score_mode: a.score_mode || 'proficiency',
-      max_points: a.max_points != null ? Number(a.max_points) : null,
+      tagIds: tIds,
+      tag_ids: tIds,
+      scoreMode: sMode,
+      score_mode: sMode,
+      maxPoints: maxPts,
+      max_points: maxPts,
       has_rubric: !!a.has_rubric,
-      category_id: a.category_id || null,
       due_date: _dateOnly(a.due_date),
       assigned_at: _dateOnly(a.date_assigned),
       display_order: Number(a.display_order || 0),
@@ -2328,13 +2333,16 @@ function updateCourse(id, updates) {
 async function deleteCourseData(id) {
   // Delete from Supabase before clearing local state so a failed delete
   // doesn't leave the course gone locally but still alive in the database.
-  if (_useSupabase) {
+  // In v2 the course row FK-cascades to all child tables, so one RPC is enough.
+  if (_useSupabase && _isUuid(id)) {
     const sb = getSupabase();
     if (sb) {
-      const tables = Object.values(_NORMALIZED_TABLES);
-      await Promise.all(
-        tables.map(tbl => sb.from(tbl).delete().eq('teacher_id', _teacherId).eq('course_id', id)),
-      ).catch(err => console.error('Failed to delete course data from Supabase:', err));
+      await sb
+        .rpc('delete_course', { p_course_id: id })
+        .then(function (res) {
+          if (res.error) console.error('delete_course RPC failed:', res.error);
+        })
+        .catch(err => console.error('delete_course RPC threw:', err));
     }
   }
 
@@ -3058,14 +3066,15 @@ function saveConfig(obj) {
   if (_useSupabase) {
     const sb = getSupabase();
     if (sb) {
-      // Split: activeCourse → first arg (must be a UUID or null); the rest is uiPrefs.
+      // v2 save_teacher_preferences(p_patch jsonb).  Build a flat patch that
+      // carries both the active-course pointer and the remaining ui prefs so
+      // both callers (saveConfig and window.v2.saveTeacherPreferences) use the
+      // same RPC signature and neither silently no-ops.
       const activeCourse = obj && obj.activeCourse ? obj.activeCourse : null;
       const uiPrefs = Object.assign({}, obj || {});
       delete uiPrefs.activeCourse;
-      sb.rpc('save_teacher_preferences', {
-        p_active_course_offering_id: activeCourse,
-        p_ui_prefs: uiPrefs,
-      }).then(function (res) {
+      const patch = Object.assign({ active_course_offering_id: activeCourse || null }, uiPrefs);
+      sb.rpc('save_teacher_preferences', { p_patch: patch }).then(function (res) {
         if (res.error) console.warn('save_teacher_preferences RPC failed:', res.error);
       });
     }
