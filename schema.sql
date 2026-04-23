@@ -67,7 +67,8 @@ create table course (
   timezone         text        not null default 'America/Vancouver',
   late_work_policy text,
   created_at       timestamptz not null default now(),
-  updated_at       timestamptz not null default now()
+  updated_at       timestamptz not null default now(),
+  deleted_at       timestamptz                                         -- soft-delete marker; hidden immediately, purged after 30d by fv_retention_cleanup
 );
 
 create table subject (
@@ -459,7 +460,7 @@ create table course_sync_cursor (
 --   fv_owns_course(cid uuid) / fv_owns_assessment(aid uuid) / fv_owns_enrollment(eid uuid)
 --     / fv_owns_term_rating(trid uuid) — RLS predicates.
 --   fv_check_category_weight_sum() — trigger enforcing per-course ≤100% cap.
---   fv_retention_cleanup() — cron entry point (30d teacher purge + 2yr audit purge).
+--   fv_retention_cleanup() — cron entry point (30d course + teacher purge + 2yr audit purge).
 --
 -- Auth + bootstrap:
 --   bootstrap_teacher(p_email text, p_display_name text)

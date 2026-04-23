@@ -277,7 +277,8 @@ begin
                                 then p_patch->>'late_work_policy'
                                 else late_work_policy end,
         updated_at       = now()
-    where id = p_course_id;
+    where id = p_course_id
+      and deleted_at is null;
 
     if not found then
         raise exception 'course not found' using errcode = 'P0002';
@@ -305,7 +306,8 @@ begin
     update course
        set is_archived = p_archived,
            updated_at  = now()
-     where id = p_course_id;
+     where id = p_course_id
+       and deleted_at is null;
 
     if not found then
         raise exception 'course not found' using errcode = 'P0002';
@@ -505,7 +507,13 @@ begin
         raise exception 'not authenticated' using errcode = 'PT401';
     end if;
 
-    if not exists (select 1 from course where id = p_src_id and teacher_id = _uid) then
+    if not exists (
+        select 1
+          from course
+         where id = p_src_id
+           and teacher_id = _uid
+           and deleted_at is null
+    ) then
         raise exception 'course not found' using errcode = 'P0002';
     end if;
 
@@ -515,7 +523,9 @@ begin
     select _new_course, teacher_id, name || ' (copy)', grade_level, description, color,
            false, display_order, grading_system, calc_method,
            decay_weight, timezone, late_work_policy
-    from course where id = p_src_id;
+    from course
+    where id = p_src_id
+      and deleted_at is null;
 
     insert into report_config (course_id, preset, blocks_config)
     select _new_course, preset, blocks_config from report_config where course_id = p_src_id;
@@ -618,23 +628,38 @@ $$;
 
 -- delete_course(p_course_id) → void
 --
--- Hard-delete; FK cascade removes all course-scoped data (§2.6).
--- Student rows are NOT deleted — only their Enrollment rows cascade.
+-- Soft-delete; hides the course immediately and defers hard-delete to the
+-- retention job after 30 days (§2.6). Student rows are NOT deleted — only
+-- the Course row is marked deleted_at, and course-scoped data remains intact
+-- until purge time.
 create or replace function delete_course(p_course_id uuid) returns void
 language plpgsql
 security invoker
 set search_path = public
 as $$
+declare
+    _uid uuid := (select auth.uid());
 begin
-    if (select auth.uid()) is null then
+    if _uid is null then
         raise exception 'not authenticated' using errcode = 'PT401';
     end if;
 
-    delete from course where id = p_course_id;
+    update course
+       set deleted_at  = now(),
+           is_archived = true,
+           updated_at  = now()
+     where id = p_course_id
+       and teacher_id = _uid
+       and deleted_at is null;
 
     if not found then
         raise exception 'course not found' using errcode = 'P0002';
     end if;
+
+    update teacher_preference
+       set active_course_id = null
+     where teacher_id = _uid
+       and active_course_id = p_course_id;
 end;
 $$;
 
@@ -2120,6 +2145,7 @@ grant execute on function save_teacher_preferences(jsonb) to authenticated;
 --
 -- Schedule: 'fv_retention_cleanup_daily' at 03:17 UTC daily.
 -- Actions:
+--   • Hard-delete soft-deleted courses where deleted_at < now() - 30 days.
 --   • Hard-delete teachers where deleted_at < now() - 30 days (Q29).
 --     Cascades remove every owned row (course, student, score, observation, ...).
 --   • Purge score_audit + term_rating_audit rows older than 2 years (Q28).
@@ -2128,10 +2154,16 @@ grant execute on function save_teacher_preferences(jsonb) to authenticated;
 create or replace function fv_retention_cleanup() returns jsonb
 language plpgsql security definer set search_path = public as $$
 declare
+    _courses_purged int;
     _teachers_purged int;
     _score_audit_purged int;
     _tr_audit_purged    int;
 begin
+    delete from course
+     where deleted_at is not null
+       and deleted_at < now() - interval '30 days';
+    get diagnostics _courses_purged = row_count;
+
     delete from teacher
      where deleted_at is not null
        and deleted_at < now() - interval '30 days';
@@ -2144,6 +2176,7 @@ begin
     get diagnostics _tr_audit_purged = row_count;
 
     return jsonb_build_object(
+        'courses_purged', _courses_purged,
         'teachers_purged', _teachers_purged,
         'score_audit_purged', _score_audit_purged,
         'term_rating_audit_purged', _tr_audit_purged,

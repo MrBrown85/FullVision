@@ -125,6 +125,7 @@ erDiagram
         text late_work_policy "free-text; human-readable, not enforced"
         timestamp created_at
         timestamp updated_at
+        timestamp deleted_at "nullable; soft-delete marker, 30-day grace"
     }
 
     Category {
@@ -530,7 +531,7 @@ Postgres rejects at write time any Section row whose `course_id` doesn't match i
 
 ### Soft-delete consideration
 
-Assessment and Student are high-value entities where accidental deletion is catastrophic (cascades to scores, observations, etc.). This ERD does not prescribe a soft-delete mechanism, but implementers should consider one of:
+Course now uses `deleted_at` for a 30-day soft-delete grace window before retention cleanup hard-deletes it. Assessment and Student are still high-value entities where accidental deletion is catastrophic (cascades to scores, observations, etc.), so implementers should consider a similar strategy if those deletes ever become user-facing:
 
 - `deleted_at timestamp` column (soft delete, filter in queries)
 - Audit log table capturing deletes with payload
@@ -551,14 +552,14 @@ Every non-ephemeral row from `All Inputs` mapped to its entity. Mobile/desktop d
 | 6, 13        | Password confirm                                                          | Validation only -- no entity                                       |
 | 7            | Forgot-password email                                                     | **Teacher** (auth flow)                                            |
 | 14-15        | Sign-out (desktop + mobile)                                               | **Teacher** (session teardown)                                     |
-| 16           | Delete account                                                            | **Teacher** (cascade delete)                                       |
+| 16           | Delete account                                                            | **Teacher** (soft delete; 30-day grace)                            |
 | 17           | Demo Mode toggle                                                          | **Teacher** (session flag; see Open Questions)                     |
 | 18-23        | New course fields (name, grade, desc, grading system, calc method, decay) | **Course**                                                         |
 | 24-26        | Edit course fields                                                        | **Course**                                                         |
 | 27-28        | Switch active course (desktop + mobile)                                   | **TeacherPreference** (active_course_id)                           |
 | 29           | Duplicate course                                                          | **Course** (new row, copied)                                       |
 | 30           | Archive / unarchive course                                                | **Course** (is_archived)                                           |
-| 31           | Delete course                                                             | **Course** (delete)                                                |
+| 31           | Delete course                                                             | **Course** (soft delete; 30-day grace)                             |
 | 32           | Course color picker                                                       | **Course** (color)                                                 |
 | 33-36        | Grading system, calc method, decay slider                                 | **Course** (policy fields)                                         |
 | 37-38        | Grading scale label + min boundary                                        | **Course** (grading_scale jsonb)                                   |

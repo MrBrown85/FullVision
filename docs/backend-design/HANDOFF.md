@@ -100,9 +100,9 @@ The rebuild/reconciliation work is complete and lives on `main`.
 ### gradebook-prod (Supabase)
 
 - **Schema + RLS + function surface:** all deployed. 39 tables, every one RLS-enabled with ≥1 policy; live functions use `search_path = public`.
-- **Write-path RPCs:** every Pass B §1–§16 path is live. Write-paths.sql mirrors what's deployed.
+- **Write-path RPCs:** every Pass B §1–§16 path is live. Repo snapshots currently include one pending local-only delta: course soft-delete (`delete_course`, read filters, retention cleanup) until the next live migration is applied.
 - **Read-path RPCs:** live surface includes `list_teacher_courses`, `get_gradebook`, `get_student_profile`, `get_learning_map`, `get_class_dashboard`, `get_term_rating`, `get_observations`, `get_assessment_detail`, and `get_report` (+ computation helpers described in `read-paths.md` / `read-paths.sql`).
-- **Retention cron:** `fv_retention_cleanup_daily` (pg_cron, 03:17 UTC) — purges 30-day-stale soft-deleted teachers + >2yr audit rows.
+- **Retention cron:** `fv_retention_cleanup_daily` (pg_cron, 03:17 UTC) — deployed job purges 30-day-stale soft-deleted teachers + >2yr audit rows; repo snapshots now queue 30-day course purge as the next migration delta.
 - **Advisors:** 0 security lints, 0 actionable performance lints.
 
 ### Main FullVision repo (branch `main`, pushed)
@@ -216,6 +216,7 @@ Keep only the recent tail here for startup context.
 
 - `2026-04-23 | session-22 | docs-backend-cleanup | deleted 7 stale design-phase archive files (DECISIONS.md, DESIGN-SYSTEM.md, INSTRUCTIONS.md, smtp-setup.md, smoke-tests.*, duplicate schema.sql); added "Status: Shipped" banners to erd/auth/read/write-paths docs; removed dead links from README, ARCHITECTURE, CLAUDE, erd.`
 - `2026-04-23 | session-22 | P4.1 | promoted categories into import_json_restore: added categories UPSERT block (after report_configs, before subjects — FK order); renamed _categories_preview → categories in demo-seed.js; removed strip in applyDemoSeed. Welcome Class seed now persists categories to Supabase. 779 passed + 1 skipped.`
+- `2026-04-23 | session-24 | P2.3 | repo-side delete-course soft-delete landed: shared/data.js now clears a class locally only after a successful delete_course RPC and advances active course safely; page-assignments relabels the destructive action to Delete class with 30-day copy; write/read/RLS/schema artifacts now model Course.deleted_at + 30-day retention purge; tests/data-course-soft-delete.test.js added. Focused vitest: 20 passed. Live apply_migration was not available in this session.`
 
 - `2026-04-22 | session-23 | T-READ-01 | wired competency_tree to student profile page: mirrored live get_student_profile CTE body into read-paths.sql (replacing null stub); removed stale Phase 4.5 comment in data.js; added _profileData module var + async getStudentProfile fetch in page-student.js init() + reset in switchStudent(); added _renderCompetencyTree renderer (subjects → sections → tags with proficiency badges + latest_value/coverage_count columns) + ct-* CSS; Demo Mode hides tree correctly (no Supabase). 779 passed + 1 skipped.`
 

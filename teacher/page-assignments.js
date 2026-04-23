@@ -358,7 +358,7 @@ window.PageAssignments = (function () {
       '<div class="settings-row"><label>Export Scores</label><button class="btn btn-primary" data-action="exportScoresCSV">Export Scores CSV</button></div>' +
       '<div class="settings-row"><label>Export Summary</label><button class="btn btn-primary" data-action="exportSummaryCSV">Export Summary CSV</button></div>' +
       '<div class="settings-row"><label>Import JSON</label><button class="btn btn-primary" data-action="triggerImportJSON">Import JSON</button><input type="file" id="import-json-input" accept=".json" data-action-change="importDataFile" style="display:none"></div>' +
-      '<div class="settings-row"><label>Clear all</label><button class="btn btn-danger" data-action="clearData">Clear</button></div>' +
+      '<div class="settings-row"><label>Delete class</label><button class="btn btn-danger" data-action="clearData">Delete</button></div>' +
       '<div class="settings-title" style="margin-top:16px;padding-top:12px;border-top:0.5px solid var(--divider-subtle)">Demo</div>' +
       '<div class="settings-row"><label>Reset to demo data</label><button class="btn btn-danger" data-action="resetDemoData">Reset Demo</button></div>';
 
@@ -3447,14 +3447,21 @@ window.PageAssignments = (function () {
   function clearData() {
     if (!activeCourse || !COURSES[activeCourse]) return;
     showConfirm(
-      'Clear All Data',
-      'Delete ALL data for ' + COURSES[activeCourse].name + '?',
-      'Delete All',
+      'Delete Class',
+      'Delete ' + COURSES[activeCourse].name + '? It will be hidden immediately and permanently removed after 30 days.',
+      'Delete Class',
       'danger',
       async function () {
-        await deleteCourseData(activeCourse);
-        // If no courses remain, re-seed defaults
-        if (Object.keys(COURSES).length === 0) {
+        try {
+          await deleteCourseData(activeCourse);
+        } catch (err) {
+          console.error('deleteCourseData failed:', err);
+          showSyncToast('Delete class failed. Try again.', 'error');
+          return;
+        }
+
+        // Local/demo mode still expects a seed course after deleting the last class.
+        if (Object.keys(COURSES).length === 0 && (!_useSupabase || localStorage.getItem('gb-demo-mode') === '1')) {
           Object.assign(COURSES, structuredClone(DEFAULT_COURSES));
           saveCourses(COURSES);
           loadSeedIfNeeded();
