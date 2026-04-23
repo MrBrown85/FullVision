@@ -73,3 +73,9 @@ This is the only active work list for the repo. Implementation history belongs i
 - File uploads / attachments
 - Calendar / schedule view
 - Email / push notifications
+
+### D6 · Redesigned Teams import
+
+- The original Microsoft Teams CSV/XLSX import wizard was removed on 2026-04-23 (commit `f618f9b`) because it never dispatched through the v2 `import_teams_class` RPC and silently lost data on sync.
+- The server-side `import_teams_class` RPC is still deployed on `gradebook-prod` and untouched — a future client flow can call it once redesigned.
+- Before reintroducing: decide on the parse surface (reuse SheetJS vs. CSV-only), define the payload-normalization layer that aligns with the RPC, and spec the UI wizard.
