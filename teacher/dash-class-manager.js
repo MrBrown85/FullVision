@@ -890,7 +890,6 @@ window.DashClassManager = (function () {
         '<div class="cm-empty-title">No classes yet</div>' +
         '<div class="cm-empty-text">Create your first class to get started with your gradebook.</div>' +
         '<button class="btn btn-primary" data-action="cmStartCreate" style="margin-top:16px">Create a Class</button>' +
-        '<button class="btn btn-ghost" data-action="cmImportTeams" style="margin-top:8px">Import from Teams</button>' +
         '</div>';
       document.getElementById('main').innerHTML = html;
       return;
@@ -929,7 +928,6 @@ window.DashClassManager = (function () {
       (courseIds.length !== 1 ? 'es' : '') +
       '</span>' +
       '<button class="cm-new-btn" data-action="cmStartCreate">+ New</button>' +
-      '<button class="cm-new-btn" data-action="cmImportTeams" style="margin-left:4px">Import Teams</button>' +
       '</div>' +
       '<div class="cm-class-list">';
     if (cmMode === 'create') {
@@ -3289,12 +3287,6 @@ window.DashClassManager = (function () {
       },
       cmStartCreate: function () {
         cmStartCreate();
-      },
-      cmImportTeams: function () {
-        if (window.TeamsImport)
-          TeamsImport.open(null, function () {
-            renderClassManager();
-          });
       },
       cmCancelCreate: function () {
         cmCancelCreate();

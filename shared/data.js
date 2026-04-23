@@ -4710,19 +4710,6 @@ window.v2.importRosterCsv = function (courseId, rows) {
   });
 };
 
-/* Teams (§15.2). Creates Course + ReportConfig + Students + Enrollments +
-   Assessments from a parsed Microsoft Teams export. Scores are not imported
-   — Teams files don't carry score data in this flow.
-
-   payload: { class_name, grade_level?, timezone?,
-              students:[{first_name, last_name?, preferred_name?, pronouns?,
-                         student_number?, email?, date_of_birth?}],
-              assignments:[{title, description?, date_assigned?, due_date?,
-                            score_mode?, max_points?, weight?}] } */
-window.v2.importTeamsClass = function (payload) {
-  return _rpcOrNoop('import_teams_class', { p_payload: payload || {} });
-};
-
 /* JSON full-data restore (§15.3). Replays every entity in FK-safe
    topological order; UPSERT semantics mean re-importing the same payload
    is idempotent. Payload sections are all optional:

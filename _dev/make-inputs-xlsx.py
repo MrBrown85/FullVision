@@ -302,14 +302,9 @@ ROWS = [
     ("20. Report Config", "Report Config", "Print reports", "page-reports.js", "printReports", "N/A", "print dialog"),
 
     # 21. Imports
-    ("21. Imports", "Import", "JSON full-data import", "page-assignments.js:202", "#import-json-input / importDataFile", "Mixed", "SB for students/assessments/scores-via-upsert; LS otherwise"),
-    ("21. Imports", "Import", "Trigger JSON import", "page-assignments.js", "triggerImportJSON", "EPH", ""),
     ("21. Imports", "Import", "Class roster CSV", "dash-class-manager.js:726", "#cm-csv-input / cmCSV", "SB", "via saveStudents"),
     ("21. Imports", "Import", "Roster import confirm", "dash-class-manager.js", "cmConfirmImport", "SB", ""),
     ("21. Imports", "Import", "Roster import cancel", "dash-class-manager.js", "cmCancelImport", "EPH", ""),
-    ("21. Imports", "Import", "Teams file (CSV/XLSX)", "teams-import.js:181", "#ti-file-input", "SB", "students + assessments"),
-    ("21. Imports", "Import", "Teams class name", "teams-import.js:530", "#ti-class-name", "SB", "via createCourse"),
-    ("21. Imports", "Import", "Teams select assignments", "teams-import.js", ".ti-assign-item checkboxes", "SB", "via saveAssessments"),
     ("21. Imports", "Import", "Class wizard select grade", "dash-class-manager.js", "cwSelectGrade", "SB", "via createCourse"),
     ("21. Imports", "Import", "Class wizard select subject", "dash-class-manager.js", "cwSelectSubject", "SB", ""),
     ("21. Imports", "Import", "Class wizard toggle course", "dash-class-manager.js", "cwToggleCourse", "EPH", ""),

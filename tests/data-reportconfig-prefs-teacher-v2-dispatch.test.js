@@ -10,7 +10,6 @@
  *   softDeleteTeacher       → soft_delete_teacher
  *   restoreTeacher          → restore_teacher
  *   importRosterCsv         → import_roster_csv (v2-namespace alias)
- *   importTeamsClass        → import_teams_class
  *   importJsonRestore       → import_json_restore
  */
 import './setup.js';
@@ -114,15 +113,6 @@ describe('v2 report-config / preferences / teacher-lifecycle dispatch', () => {
       });
     });
 
-    it('v2.importTeamsClass wraps payload in p_payload', async () => {
-      var pl = { class_name: 'Science 8', students: [] };
-      await window.v2.importTeamsClass(pl);
-      expect(client.calls[0]).toEqual({
-        name: 'import_teams_class',
-        payload: { p_payload: pl },
-      });
-    });
-
     it('v2.importJsonRestore wraps payload in p_payload', async () => {
       var pl = { courses: [{ id: CID }] };
       await window.v2.importJsonRestore(pl);
@@ -134,11 +124,9 @@ describe('v2 report-config / preferences / teacher-lifecycle dispatch', () => {
 
     it('imports default to empty payload / rows when missing', async () => {
       await window.v2.importRosterCsv(CID);
-      await window.v2.importTeamsClass();
       await window.v2.importJsonRestore();
       expect(client.calls[0].payload.p_rows).toEqual([]);
       expect(client.calls[1].payload.p_payload).toEqual({});
-      expect(client.calls[2].payload.p_payload).toEqual({});
     });
   });
 });

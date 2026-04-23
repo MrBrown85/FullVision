@@ -31,14 +31,14 @@ export default async function handler(request, context) {
   // Set CSP with nonce (replaces static unsafe-inline headers)
   const csp = [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' https://cdn.jsdelivr.net https://cdn.sheetjs.com`,
+    `script-src 'self' 'nonce-${nonce}' https://cdn.jsdelivr.net`,
     `style-src 'self' 'unsafe-inline'`,
     "img-src 'self' data: blob:",
     "font-src 'self'",
     "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.nsvcs.net",
     "worker-src 'self'",
     "form-action 'self'",
-    "frame-ancestors 'none'"
+    "frame-ancestors 'none'",
   ].join('; ');
   headers.set('Content-Security-Policy', csp);
 

@@ -88,7 +88,7 @@
   --z-popover: 1000; /* popovers (gb-tooltip) */
   --z-skip: 9000; /* skip-to-content links */
   --z-loading: 9500; /* loading overlays, pull-to-refresh */
-  --z-top: 9900; /* top-level modals (teams import, edit student) */
+  --z-top: 9900; /* top-level modals (edit student) */
 
   /* Elevation shadows */
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.04);

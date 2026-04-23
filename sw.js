@@ -1,6 +1,6 @@
 // IMPORTANT: Increment the version number when deploying new app code
 // This ensures users get the latest files
-const CACHE_NAME = 'fullvision-v34';
+const CACHE_NAME = 'fullvision-v35';
 
 // All app files to pre-cache on install
 const PRECACHE_URLS = [
@@ -35,9 +35,6 @@ const PRECACHE_URLS = [
   '/teacher/report-questionnaire.js',
   '/teacher/dash-class-manager.js',
   '/teacher/assign-collab.js',
-  '/teacher/teams-import.js',
-  '/teacher/teams-import.css',
-  '/vendor/xlsx.mini.min.js',
   // Teacher mobile
   '/teacher-mobile/index.html',
   '/teacher-mobile/styles.css',

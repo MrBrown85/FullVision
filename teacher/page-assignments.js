@@ -357,7 +357,6 @@ window.PageAssignments = (function () {
       '<div class="settings-row"><label>Export</label><button class="btn btn-primary" data-action="exportData">JSON</button></div>' +
       '<div class="settings-row"><label>Export Scores</label><button class="btn btn-primary" data-action="exportScoresCSV">Export Scores CSV</button></div>' +
       '<div class="settings-row"><label>Export Summary</label><button class="btn btn-primary" data-action="exportSummaryCSV">Export Summary CSV</button></div>' +
-      '<div class="settings-row"><label>Import JSON</label><button class="btn btn-primary" data-action="triggerImportJSON">Import JSON</button><input type="file" id="import-json-input" accept=".json" data-action-change="importDataFile" style="display:none"></div>' +
       '<div class="settings-row"><label>Delete class</label><button class="btn btn-danger" data-action="clearData">Delete</button></div>' +
       '<div class="settings-title" style="margin-top:16px;padding-top:12px;border-top:0.5px solid var(--divider-subtle)">Demo</div>' +
       '<div class="settings-row"><label>Reset to demo data</label><button class="btn btn-danger" data-action="resetDemoData">Reset Demo</button></div>';
@@ -3337,46 +3336,6 @@ window.PageAssignments = (function () {
     a.download = 'gradebook-' + cid + '-' + new Date().toISOString().slice(0, 10) + '.json';
     a.click();
   }
-  function importData(input) {
-    var file = input.files[0];
-    if (!file) return;
-    var reader = new FileReader();
-    reader.onload = function (e) {
-      try {
-        var data = JSON.parse(e.target.result);
-        if (!data || typeof data !== 'object' || Array.isArray(data)) {
-          alert('Invalid file.');
-          return;
-        }
-        var cid = data.course || activeCourse;
-        if (data.students) saveStudents(cid, data.students);
-        if (data.categories) saveCategories(cid, data.categories);
-        if (data.assessments) saveAssessments(cid, data.assessments);
-        if (data.scores) saveScores(cid, data.scores);
-        if (data.overrides) saveOverrides(cid, data.overrides);
-        if (data.notes) saveNotes(cid, data.notes);
-        if (data.config) saveCourseConfig(cid, data.config);
-        if (data.learningMap && data.learningMap._customized) saveLearningMap(cid, data.learningMap);
-        if (data.modules) saveModules(cid, data.modules);
-        if (data.units) saveModules(cid, data.units);
-        if (data.rubrics) saveRubrics(cid, data.rubrics);
-        if (data.statuses) saveAssignmentStatuses(cid, data.statuses);
-        if (data.flags) saveFlags(cid, data.flags);
-        if (data.goals) saveGoals(cid, data.goals);
-        if (data.reflections) saveReflections(cid, data.reflections);
-        if (data.observations) saveQuickObs(cid, data.observations);
-        if (data.termRatings) saveTermRatings(cid, data.termRatings);
-        if (data.customTags) saveCustomTags(cid, data.customTags);
-        if (data.reportConfig) saveReportConfig(cid, data.reportConfig);
-        activeCourse = cid;
-        setActiveCourse(cid);
-        render();
-      } catch (err) {
-        alert('Invalid JSON: ' + err.message);
-      }
-    };
-    reader.readAsText(file);
-  }
   function downloadCSV(csv, filename) {
     var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     var a = document.createElement('a');
@@ -3634,10 +3593,6 @@ window.PageAssignments = (function () {
       exportData: function () {
         exportData();
       },
-      triggerImportJSON: function () {
-        var f = document.getElementById('import-json-input');
-        if (f) f.click();
-      },
       exportScoresCSV: function () {
         exportScoresCSV();
       },
@@ -3820,10 +3775,6 @@ window.PageAssignments = (function () {
     }
     if (el.dataset.actionChange === 'updateCalcMethod') {
       updateCalc(el.value);
-      return;
-    }
-    if (el.dataset.actionChange === 'importDataFile') {
-      importData(el);
       return;
     }
     if (el.dataset.actionChange === 'onRubricSelect') {

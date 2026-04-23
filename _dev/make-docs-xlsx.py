@@ -98,7 +98,6 @@ ROWS = [
     ("9. Inline code headers", "Comment", "teacher/report-blocks.js", "~700 lines", "Developer", "Individual report block renderers (narrative, late policy, grade summary)", ""),
     ("9. Inline code headers", "Comment", "teacher/report-questionnaire.js", "~1300 lines", "Developer", "Term-questionnaire UI; narrative contenteditable; dim/trait/strength pickers", ""),
     ("9. Inline code headers", "Comment", "teacher/dash-class-manager.js", "~1800 lines", "Developer", "Class manager: student CRUD, roster import, curriculum editor, course create/delete", ""),
-    ("9. Inline code headers", "Comment", "teacher/teams-import.js", "~900 lines", "Developer", "CSV/Excel roster import using SheetJS; Teams format parsing", ""),
     ("9. Inline code headers", "Comment", "teacher/assign-collab.js", "~235 lines", "Developer", "Collaboration panel: pairs/groups generation, drag-drop members", ""),
     ("9. Inline code headers", "Comment", "teacher-mobile/shell.js", "~1400 lines", "Developer", "Mobile shell + boot flow: auth check, tab routing, pull-to-refresh; offline fallback; data-action delegation", ""),
     ("9. Inline code headers", "Comment", "teacher-mobile/components.js", "~900 lines", "Developer", "iOS-style UI components: sheets, toasts, swipe gestures, native patterns", ""),

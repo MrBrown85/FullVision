@@ -17,7 +17,6 @@
     <link rel="stylesheet" href="../teacher/gradebook.css" />
     <link rel="stylesheet" href="../teacher/observations.css" />
     <link rel="stylesheet" href="../teacher/reports.css" />
-    <link rel="stylesheet" href="../teacher/teams-import.css" />
     <!-- login.css omitted: only needed on login.html, its body{} rules conflict with SPA layout -->
   </head>
   <body>
@@ -64,13 +63,6 @@
     <script src="../shared/calc.js"></script>
     <script src="../teacher/ui.js"></script>
     <!-- seed-data.js (113KB) lazy-loaded by loadSeedIfNeeded() — only fetched for new accounts -->
-    <!-- Teams import (SheetJS for CSV/Excel parsing + wizard module) -->
-    <script src="../vendor/xlsx.mini.min.js"></script>
-    <script>
-      if (typeof XLSX === 'undefined')
-        document.write('<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.mini.min.js"><\/script>');
-    </script>
-    <script src="../teacher/teams-import.js"></script>
     <!-- Submodules (loaded before their parent page modules) -->
     <script src="../teacher/report-blocks.js"></script>
     <script src="../teacher/report-questionnaire.js"></script>

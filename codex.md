@@ -26,26 +26,12 @@ This is the only active work list for the repo. Implementation history belongs i
   - verify the real delete flow on a live account: delete class -> class disappears immediately -> active course falls back cleanly -> no immediate hard-delete regression
   - confirm the scheduled retention job now purges 30-day-stale soft-deleted courses in production, not just teachers + audit rows
 
-### T-OPS-03 · Park legacy site at `legacy.fullvision.ca`
-
-- DNS / user-facing operational task.
-
 ## Platform / integration
 
 ### P2.1 · Realtime rollout verification for v2 invalidation
 
 - `course_sync_cursor` schema/docs, SQL trigger/publication plan, and client invalidation wiring exist in the repo.
 - Still needs live Supabase rollout verification before this can be treated as fully closed.
-
-### T-IMPORT-JSON-01 · Route legacy local JSON restore through v2 import
-
-- `teacher/page-assignments.js` still has a lower-priority local `importData()` escape hatch.
-- It should dispatch through `window.v2.importJsonRestore(...)` instead of only mutating local state.
-
-### T-BE-02 · Teams import adapter
-
-- `tiParsedFile` still does not match the payload expected by `import_teams_class`.
-- Needs a normalization layer before Teams import can dispatch through `window.v2.importTeamsClass(...)` cleanly.
 
 ### T-UI-05 / T-BE-01 · Data export
 
@@ -90,3 +76,9 @@ This is the only active work list for the repo. Implementation history belongs i
 - File uploads / attachments
 - Calendar / schedule view
 - Email / push notifications
+
+### D6 · Redesigned Teams import
+
+- The original Microsoft Teams CSV/XLSX import wizard was removed on 2026-04-23 (commit `f618f9b`) because it never dispatched through the v2 `import_teams_class` RPC and silently lost data on sync.
+- The server-side `import_teams_class` RPC is still deployed on `gradebook-prod` and untouched — a future client flow can call it once redesigned.
+- Before reintroducing: decide on the parse surface (reuse SheetJS vs. CSV-only), define the payload-normalization layer that aligns with the RPC, and spec the UI wizard.

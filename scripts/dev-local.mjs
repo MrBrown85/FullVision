@@ -79,7 +79,7 @@ function processHtml(html) {
 function cspHeader(nonce) {
   return [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' https://cdn.jsdelivr.net https://cdn.sheetjs.com`,
+    `script-src 'self' 'nonce-${nonce}' https://cdn.jsdelivr.net`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self'",
