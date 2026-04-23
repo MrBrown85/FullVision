@@ -14,7 +14,7 @@ This worktree originally designed the backend **from scratch** from the user inp
 ## Retired rules (design-phase only; no longer in force)
 
 - ~~"Do not read files outside this worktree."~~ The rebuild charter is explicitly "match the existing UI," so referencing UI code is expected. Pass C §8.1 cites UI file paths on purpose.
-- ~~"No Supabase-specific assumptions."~~ Q1 in [DECISIONS.md](docs/backend-design/DECISIONS.md) committed to Supabase full-stack; Supabase patterns (RLS, Edge Functions, refresh tokens) are now in scope.
+- ~~"No Supabase-specific assumptions."~~ The design Q&A committed to Supabase full-stack; Supabase patterns (RLS, Edge Functions, refresh tokens) are now in scope.
 - ~~"Ignore existing RPC names."~~ Post-fold, the implementation layer can align with existing RPC names where the UI already calls them.
 
 ## Three-pass workflow (complete)

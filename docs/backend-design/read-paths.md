@@ -1,5 +1,8 @@
 # Pass D — Read Paths and Computation Spec
 
+> **Status:** Shipped. Design reference only. The live SQL is `read-paths.sql` in this directory.
+
+
 Pass B specified every way data gets **into** the database. This pass specifies every way data comes **out** — the read surfaces the app renders, and (the harder half) the computations that derive grades, proficiencies, and summary indicators from the raw Score / RubricScore / TagScore rows.
 
 All required schema (Category entity, `Course.grading_system`, `Criterion.weight`, per-level criterion values, etc.) lives in [erd.md](erd.md) — the Pass D amendment was folded into Pass A on 2026-04-19.

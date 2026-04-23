@@ -262,8 +262,7 @@ This file is intentionally high-level. For authoritative detail, use:
 - [`README.md`](../README.md) for repo entry and run instructions
 - [`docs/backend-design/HANDOFF.md`](backend-design/HANDOFF.md) for current live state and discovered gaps
 - [`codex.md`](../codex.md) for the live open-work list
-- [`docs/backend-design/INSTRUCTIONS.md`](backend-design/INSTRUCTIONS.md) for normalized product and UX intent
-- [`docs/backend-design/schema.sql`](backend-design/schema.sql) and [`docs/backend-design/rls-policies.sql`](backend-design/rls-policies.sql) for deployed reference artifacts
+- [`schema.sql`](../schema.sql) and [`docs/backend-design/rls-policies.sql`](backend-design/rls-policies.sql) for deployed reference artifacts
 - [`docs/backend-design/read-paths.md`](backend-design/read-paths.md) and [`docs/backend-design/write-paths.md`](backend-design/write-paths.md) for backend design detail
 
 ## What this document should not carry

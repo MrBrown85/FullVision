@@ -1,5 +1,8 @@
 # Pass A -- Entity-Relationship Design
 
+> **Status:** Shipped. Design reference only. The live schema is `schema.sql` at the repo root.
+
+
 ## ER Diagram
 
 ```mermaid
@@ -723,7 +726,7 @@ Summary of revisions applied during review:
 
 ## Open Questions
 
-> **Status (2026-04-19):** all 7 questions below were answered during the decisions questionnaire. See [DECISIONS.md](DECISIONS.md) Tier 1 (Q4) and the "Pass A surviving open questions" section (Q38–Q42). Left here verbatim as a record of what was asked.
+> **Status (2026-04-19):** all 7 questions below were answered during the decisions questionnaire. All design questions were answered during the decisions questionnaire (archive deleted 2026-04-22; answers are folded into HANDOFF.md and the design docs). Left here verbatim as a record of what was asked.
 
 1. **Demo Mode entity status.** Row 17 records a "demo mode" toggle. Demo mode appears to be a session-level flag that seeds fake data and prevents real writes. It is not a persisted entity in the domain sense. Should we model a `demo_session` flag on Teacher, or treat it as purely an auth/session concern handled in Pass C?
 

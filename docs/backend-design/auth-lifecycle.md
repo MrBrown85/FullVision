@@ -1,5 +1,8 @@
 # Pass C — Auth & Session Lifecycle
 
+> **Status:** Shipped. Design reference only. Operational auth notes live in `HANDOFF.md`.
+
+
 This pass covers how a Teacher comes into existence, proves their identity on each request, and ceases to exist. It also defines what "demo mode" is architecturally, since Pass B's write paths depended on that definition.
 
 ## Scope and non-scope

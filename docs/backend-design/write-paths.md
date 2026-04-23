@@ -1,5 +1,8 @@
 # Pass B — Write-Path Sequence Diagrams
 
+> **Status:** Shipped. Design reference only. The live SQL is `write-paths.sql` in this directory.
+
+
 Every persistence boundary — every way user-authored data enters, updates, or leaves the system — is diagrammed below. Mobile and desktop are collapsed; batch variants share a write path with their single-record sibling unless the batch changes the transactional envelope.
 
 Conventions used in every diagram:
