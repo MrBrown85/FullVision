@@ -2576,21 +2576,16 @@ function updateCourse(id, updates) {
   }
 }
 
-async function deleteCourseData(id) {
-  // Delete from Supabase before clearing local state so a failed delete
-  // doesn't leave the course gone locally but still alive in the database.
-  // In v2 the course row FK-cascades to all child tables, so one RPC is enough.
-  if (_useSupabase && _isUuid(id)) {
-    const sb = getSupabase();
-    if (sb) {
-      await sb
-        .rpc('delete_course', { p_course_id: id })
-        .then(function (res) {
-          if (res.error) console.error('delete_course RPC failed:', res.error);
-        })
-        .catch(err => console.error('delete_course RPC threw:', err));
-    }
-  }
+function _nextVisibleCourseId() {
+  var ids = Object.keys(COURSES || {});
+  var firstActive = ids.find(function (cid) {
+    return !isCourseArchived(cid);
+  });
+  return firstActive || (ids.length > 0 ? ids[0] : null);
+}
+
+function _clearCourseLocalState(id) {
+  if (!id) return;
 
   // Clear localStorage
   [
@@ -2620,6 +2615,26 @@ async function deleteCourseData(id) {
 
   delete COURSES[id];
   saveCourses(COURSES);
+
+  var cfg = Object.assign({}, getConfig() || {});
+  if (cfg.activeCourse === id) {
+    cfg.activeCourse = _nextVisibleCourseId();
+    saveConfig(cfg);
+  }
+}
+
+async function deleteCourseData(id) {
+  // Soft-delete in Supabase before clearing local state so a failed delete
+  // never leaves the class hidden locally while still visible remotely.
+  if (_useSupabase && _isUuid(id)) {
+    const sb = getSupabase();
+    if (sb) {
+      const res = await sb.rpc('delete_course', { p_course_id: id });
+      if (res.error) throw res.error;
+    }
+  }
+
+  _clearCourseLocalState(id);
 }
 
 /* ── Grading Scale ─────────────────────────────────────────── */

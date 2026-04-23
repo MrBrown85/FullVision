@@ -573,7 +573,8 @@ $$;
 
 -- ── Course list (boot-time read for app shell) ────────────────────────────
 -- Deployed in migration fullvision_v2_read_path_list_teacher_courses (Phase 3.2).
--- Returns the calling teacher's courses (RLS-scoped on course.teacher_id).
+-- Returns the calling teacher's visible courses (RLS-scoped on course.teacher_id).
+-- Soft-deleted courses are hidden immediately.
 -- Columns returned are the v2 course schema directly — the client maps them
 -- to its in-memory blob shape (shared/data.js _canonicalCoursesToBlob).
 create or replace function list_teacher_courses()
@@ -600,6 +601,7 @@ language sql security invoker stable set search_path = public as $$
            c.created_at, c.updated_at
       from course c
      where c.teacher_id = (select auth.uid())
+       and c.deleted_at is null
      order by c.is_archived asc, c.display_order asc, c.created_at asc;
 $$;
 grant execute on function list_teacher_courses() to authenticated;
@@ -617,7 +619,7 @@ declare
     cells       jsonb;
     summaries   jsonb;
 begin
-    select * into course_row from course where id = p_course_id;
+    select * into course_row from course where id = p_course_id and deleted_at is null;
     if not found then
         raise exception 'course not found or not owned';
     end if;

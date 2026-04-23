@@ -18,10 +18,13 @@ This is the only active work list for the repo. Implementation history belongs i
 - User-only decision if more local-only commits accumulate.
 - After the quota issue is resolved and the user wants a production update, run a live smoke on the deployed site.
 
-### P2.3 · Decide `delete_course` semantics before wiring UI
+### P2.3 · Apply course soft-delete migration live and verify the delete flow
 
-- Normal teacher UI is archive-first now.
-- A product decision is still required before any user-facing destructive delete affordance should exist.
+- Repo-side implementation is done: `delete_course` is modeled as a 30-day soft-delete, reads hide `Course.deleted_at`, retention cleanup purges stale soft-deleted courses, and the current destructive UI now says "Delete class" with 30-day copy.
+- Remaining debt:
+  - apply the live Supabase migration for `Course.deleted_at`, `delete_course`, read filters, RLS helper predicates, and retention cleanup
+  - verify the real delete flow on a live account: delete class -> class disappears immediately -> active course falls back cleanly -> no immediate hard-delete regression
+  - confirm the scheduled retention job now purges 30-day-stale soft-deleted courses in production, not just teachers + audit rows
 
 ## Platform / integration
 

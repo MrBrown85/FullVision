@@ -23,8 +23,9 @@
 --
 -- Deferred-delete behavior: rows for teachers where `deleted_at is not null`
 -- are still visible to that teacher during the 30-day grace window (so the
--- teacher can sign in, cancel, and recover). After hard-delete, cascades
--- remove everything.
+-- teacher can sign in, cancel, and recover). Soft-deleted courses, however,
+-- are hidden immediately from normal course-scoped reads/writes by the helper
+-- predicates below. After hard-delete, cascades remove everything.
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- Helper: owns_course(course_id) — used by 80% of the policies below.
@@ -44,7 +45,9 @@ set search_path = public
 as $$
     select exists (
         select 1 from course c
-        where c.id = cid and c.teacher_id = (select auth.uid())
+        where c.id = cid
+          and c.teacher_id = (select auth.uid())
+          and c.deleted_at is null
     );
 $$;
 
@@ -58,7 +61,9 @@ as $$
     select exists (
         select 1 from enrollment e
         join course c on c.id = e.course_id
-        where e.id = eid and c.teacher_id = (select auth.uid())
+        where e.id = eid
+          and c.teacher_id = (select auth.uid())
+          and c.deleted_at is null
     );
 $$;
 
@@ -72,7 +77,9 @@ as $$
     select exists (
         select 1 from assessment a
         join course c on c.id = a.course_id
-        where a.id = aid and c.teacher_id = (select auth.uid())
+        where a.id = aid
+          and c.teacher_id = (select auth.uid())
+          and c.deleted_at is null
     );
 $$;
 
@@ -87,7 +94,9 @@ as $$
         select 1 from term_rating tr
         join enrollment e on e.id = tr.enrollment_id
         join course c on c.id = e.course_id
-        where tr.id = trid and c.teacher_id = (select auth.uid())
+        where tr.id = trid
+          and c.teacher_id = (select auth.uid())
+          and c.deleted_at is null
     );
 $$;
 

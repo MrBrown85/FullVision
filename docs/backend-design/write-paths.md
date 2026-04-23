@@ -210,7 +210,7 @@ sequenceDiagram
 
 ### 2.6 Delete course
 
-Trigger: Row 31. Cascades through every course-scoped entity.
+Trigger: Row 31. Soft-delete immediately; hard-delete after the 30-day retention window.
 
 ```mermaid
 sequenceDiagram
@@ -223,8 +223,9 @@ sequenceDiagram
     Teacher->>Client: confirm delete course
     Client->>API: deleteCourse(id)
     rect rgb(255, 235, 235)
-    API->>Course: DELETE id
-    Note over Course,DB: CASCADE via FK:<br/>Enrollment → (Score, RubricScore, TagScore,<br/>Note, Goal, Reflection, SectionOverride,<br/>Attendance, TermRating → TermRatingDimension,<br/>TermRatingStrength, TermRatingGrowthArea,<br/>TermRatingAssessment, TermRatingObservation,<br/>ObservationStudent)<br/>Subject → Section → Tag (→ CriterionTag, AssessmentTag, ObservationTag, TermRatingStrength/GrowthArea)<br/>CompetencyGroup, Module, Assessment → (Score, RubricScore, TagScore, AssessmentTag, TermRatingAssessment, collab_config is on row)<br/>Rubric → Criterion → CriterionTag, RubricScore<br/>Observation → (ObservationStudent, ObservationTag, ObservationCustomTag, TermRatingObservation)<br/>CustomTag → ObservationCustomTag<br/>ObservationTemplate<br/>ReportConfig
+    API->>Course: UPDATE deleted_at = now(), is_archived = true
+    API->>TeacherPreference: UPDATE active_course_id = NULL (when matched)
+    Note over Course,DB: No FK cascades at write time.<br/>All course-scoped rows remain intact but are hidden from normal reads/writes.<br/>Retention job hard-deletes the course after 30 days,<br/>then FK cascades remove the course-scoped graph.
     end
     API-->>Client: ok
 ```
@@ -233,7 +234,8 @@ Notes:
 
 - Student rows themselves are **not** deleted — only Enrollment rows that point at this course. A student appearing only in this course remains in the Teacher's student pool.
 - This depends on open question #6 (Student ownership). Under the ERD default (Student is teacher-owned, separate from Enrollment), the above holds.
-- If a soft-delete mechanism is adopted (see ERD "Soft-delete consideration"), this path becomes a flip of `deleted_at` on Course with no cascades executed at write time.
+- The course disappears from boot/read surfaces immediately because queries and helper predicates filter `Course.deleted_at is null`.
+- The eventual hard-delete is performed by `fv_retention_cleanup()` after the 30-day grace period.
 
 ---
 
