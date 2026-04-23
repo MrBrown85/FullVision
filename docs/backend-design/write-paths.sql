@@ -771,7 +771,8 @@ create or replace function upsert_subject(
     p_id            uuid,
     p_course_id     uuid,
     p_name          text,
-    p_display_order int default null
+    p_color         text default null,
+    p_display_order int  default null
 ) returns uuid
 language plpgsql security invoker set search_path = public as $$
 declare _id uuid;
@@ -781,14 +782,15 @@ begin
     end if;
 
     if p_id is null then
-        insert into subject (course_id, name, display_order)
-        values (p_course_id, p_name,
+        insert into subject (course_id, name, color, display_order)
+        values (p_course_id, p_name, p_color,
                 coalesce(p_display_order,
                          (select coalesce(max(display_order)+1, 0) from subject where course_id = p_course_id)))
         returning id into _id;
     else
         update subject set
             name          = p_name,
+            color         = p_color,
             display_order = coalesce(p_display_order, display_order),
             updated_at    = now()
          where id = p_id
@@ -848,6 +850,7 @@ create or replace function upsert_section(
     p_id                  uuid,
     p_subject_id          uuid,
     p_name                text,
+    p_color               text default null,
     p_competency_group_id uuid  default null,
     p_display_order       int   default null
 ) returns uuid
@@ -859,8 +862,8 @@ begin
     if _course_id is null then raise exception 'subject not found' using errcode = 'P0002'; end if;
 
     if p_id is null then
-        insert into section (course_id, subject_id, competency_group_id, name, display_order)
-        values (_course_id, p_subject_id, p_competency_group_id, p_name,
+        insert into section (course_id, subject_id, competency_group_id, name, color, display_order)
+        values (_course_id, p_subject_id, p_competency_group_id, p_name, p_color,
                 coalesce(p_display_order,
                          (select coalesce(max(display_order)+1, 0) from section where subject_id = p_subject_id)))
         returning id into _id;
@@ -870,6 +873,7 @@ begin
             course_id           = _course_id,
             competency_group_id = p_competency_group_id,
             name                = p_name,
+            color               = p_color,
             display_order       = coalesce(p_display_order, display_order),
             updated_at          = now()
          where id = p_id
