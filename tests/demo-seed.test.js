@@ -33,7 +33,7 @@ describe('buildDemoSeedPayload', () => {
         'sections',
         'tags',
         'modules',
-        '_categories_preview',
+        'categories',
         'rubrics',
         'criteria',
         'criterion_tags',
@@ -57,7 +57,7 @@ describe('buildDemoSeedPayload', () => {
     expect(payload.sections).toHaveLength(7);
     expect(payload.tags).toHaveLength(14);
     expect(payload.modules).toHaveLength(4);
-    expect(payload._categories_preview).toHaveLength(3);
+    expect(payload.categories).toHaveLength(3);
     expect(payload.rubrics).toHaveLength(1);
     expect(payload.criteria).toHaveLength(4);
     expect(payload.students).toHaveLength(25);
@@ -75,7 +75,7 @@ describe('buildDemoSeedPayload', () => {
     payload.modules.forEach(function (m) {
       expect(m.course_id).toBe(COURSE_ID);
     });
-    payload._categories_preview.forEach(function (c) {
+    payload.categories.forEach(function (c) {
       expect(c.course_id).toBe(COURSE_ID);
     });
     payload.enrollments.forEach(function (e) {
@@ -103,7 +103,7 @@ describe('buildDemoSeedPayload', () => {
         expect(row.id).toMatch(UUID_RE);
       });
     });
-    payload._categories_preview.forEach(function (row) {
+    payload.categories.forEach(function (row) {
       expect(row.id).toMatch(UUID_RE);
     });
   });
@@ -157,7 +157,7 @@ describe('buildDemoSeedPayload', () => {
 
   it('emits category-first assessments with real evidence types', () => {
     var categoryIds = new Set(
-      payload._categories_preview.map(function (c) {
+      payload.categories.map(function (c) {
         return c.id;
       }),
     );
@@ -198,6 +198,15 @@ describe('applyDemoSeed', () => {
     expect(captured).not.toBeNull();
     expect(captured.subjects).toHaveLength(4);
     expect(captured.subjects[0].course_id).toBe(COURSE_ID);
+  });
+
+  it('includes categories in the dispatched payload', async () => {
+    await window.applyDemoSeed(COURSE_ID);
+    expect(captured.categories).toHaveLength(3);
+    captured.categories.forEach(function (c) {
+      expect(c.course_id).toBe(COURSE_ID);
+      expect(typeof c.weight).toBe('number');
+    });
   });
 
   it('refuses when courseId is missing', async () => {

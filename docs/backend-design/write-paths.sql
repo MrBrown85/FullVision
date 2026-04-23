@@ -2171,7 +2171,7 @@ revoke all on function fv_retention_cleanup() from public;
 
 -- import_json_restore(p_payload jsonb) → jsonb
 --   Full-data restore from a legacy export, FK-safe topological replay.
---   Courses → ReportConfig → Subject/CompetencyGroup → Section → Tag →
+--   Courses → ReportConfig → Category → Subject/CompetencyGroup → Section → Tag →
 --   Module → Rubric → Criterion → CriterionTag → Student → Enrollment →
 --   Assessment → AssessmentTag → Score/RubricScore/TagScore →
 --   Note / Goal / Reflection.  Idempotent: UPSERT on UUID.

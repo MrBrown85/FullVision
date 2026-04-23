@@ -58,11 +58,6 @@ This is the only active work list for the repo. Implementation history belongs i
 
 - Targeted smoke coverage and PR CI are green, but the broader Playwright suite still needs a clean reconciliation pass.
 
-### P4.1 · Promote categories into `import_json_restore`
-
-- Welcome Class/demo payloads now carry category data, but `import_json_restore` still does not ingest categories as a first-class section.
-- `shared/demo-seed.js` still builds them under a preview-only section and strips that section before dispatching to the RPC.
-
 ### P4.2 · Migrate Demo Mode to `buildDemoSeedPayload`
 
 - Local Demo Mode still depends on `shared/seed-data.js`.

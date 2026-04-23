@@ -627,9 +627,7 @@
       notes: notes,
       goals: goals,
       reflections: reflections,
-      // Categories aren't a section in import_json_restore today — they're
-      // declared here for future use + easy inspection. See HANDOFF 5.1.
-      _categories_preview: categories,
+      categories: categories,
     };
   }
 
@@ -646,8 +644,6 @@
       return Promise.resolve(null);
     }
     var payload = buildDemoSeedPayload({ courseId: courseId });
-    // Strip the preview-only key; the RPC doesn't know the section.
-    delete payload._categories_preview;
     return window.v2.importJsonRestore(payload);
   }
 
