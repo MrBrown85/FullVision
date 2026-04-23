@@ -2659,7 +2659,7 @@ window.DashClassManager = (function () {
     saveLearningMap(cid, map);
     renderClassManager();
     window.v2
-      .upsertSubject({ id: id, courseId: cid, name: 'New Subject', displayOrder: displayOrder })
+      .upsertSubject({ id: id, courseId: cid, name: 'New Subject', color: '#6366f1', displayOrder: displayOrder })
       .then(function (res) {
         var canonicalId = res && res.data ? res.data : null;
         if (canonicalId && canonicalId !== id) {
@@ -2987,6 +2987,7 @@ window.DashClassManager = (function () {
           id: stdId,
           subjectId: canonicalSubjectId,
           name: 'New Standard',
+          color: colour,
           displayOrder: displayOrder,
         });
       })
