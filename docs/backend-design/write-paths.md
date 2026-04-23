@@ -1,5 +1,7 @@
 # Pass B — Write-Path Sequence Diagrams
 
+> **Status:** Shipped. Design reference only. The live SQL is `write-paths.sql` in this directory.
+
 Every persistence boundary — every way user-authored data enters, updates, or leaves the system — is diagrammed below. Mobile and desktop are collapsed; batch variants share a write path with their single-record sibling unless the batch changes the transactional envelope.
 
 Conventions used in every diagram:
@@ -19,15 +21,15 @@ Authentication, sign-out, delete account, demo mode, and active-course session l
 
 Several write paths depend on unresolved ERD questions. Each is diagrammed against the current ERD default, with the dependency called out inline.
 
-| ERD Open Question | Affected write paths | Default assumed |
-|---|---|---|
-| #1 Demo Mode | §16.1 only | **Resolved (Pass C §6):** demo mode is 100% client-side. Writes in demo never reach the API. All Pass B write paths here describe authenticated, non-demo sessions only. §16.1 is a client-only localStorage reset, not a backend call. |
-| #2 Attendance scope | §4.7 Bulk attendance | Attendance is a real persisted entity per ERD. Diagrammed accordingly. |
-| #3 CustomTag reuse | §12 CustomTag create; §10 Observations | CustomTag is permanently distinct from Tag — no promotion path. |
-| #4 Term identifier | §13 TermRating save | `term` is an int 1–6; no TermDefinition entity. |
-| #5 Rubric scope | §7 Rubrics | Rubrics are course-scoped. Duplicate-course (§2.4) copies rubrics. |
-| #6 Student ownership | §4 Students; §2.6 Delete course | Student is teacher-owned. Delete-teacher cascades delete students; delete-course does **not** delete students (only their enrollments). |
-| #7 ObservationTemplate creation | §10.5 Quick-post from template | Templates are assumed seeded/app-provided — no teacher-facing create/edit path is inventoried. Flagged below. |
+| ERD Open Question               | Affected write paths                   | Default assumed                                                                                                                                                                                                                         |
+| ------------------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| #1 Demo Mode                    | §16.1 only                             | **Resolved (Pass C §6):** demo mode is 100% client-side. Writes in demo never reach the API. All Pass B write paths here describe authenticated, non-demo sessions only. §16.1 is a client-only localStorage reset, not a backend call. |
+| #2 Attendance scope             | §4.7 Bulk attendance                   | Attendance is a real persisted entity per ERD. Diagrammed accordingly.                                                                                                                                                                  |
+| #3 CustomTag reuse              | §12 CustomTag create; §10 Observations | CustomTag is permanently distinct from Tag — no promotion path.                                                                                                                                                                         |
+| #4 Term identifier              | §13 TermRating save                    | `term` is an int 1–6; no TermDefinition entity.                                                                                                                                                                                         |
+| #5 Rubric scope                 | §7 Rubrics                             | Rubrics are course-scoped. Duplicate-course (§2.4) copies rubrics.                                                                                                                                                                      |
+| #6 Student ownership            | §4 Students; §2.6 Delete course        | Student is teacher-owned. Delete-teacher cascades delete students; delete-course does **not** delete students (only their enrollments).                                                                                                 |
+| #7 ObservationTemplate creation | §10.5 Quick-post from template         | Templates are assumed seeded/app-provided — no teacher-facing create/edit path is inventoried. Flagged below.                                                                                                                           |
 
 ---
 
@@ -53,6 +55,7 @@ sequenceDiagram
 ```
 
 Notes:
+
 - TeacherPreference is 1:1 with Teacher. First write creates the row.
 - Active-course switch (rows 27–28, 46) writes only `active_course_id`. No other entity is touched at switch time.
 - Mobile card-widget reset (row 52) writes `card_widget_config` back to defaults — same path, different payload.
@@ -85,6 +88,7 @@ sequenceDiagram
 ```
 
 Notes:
+
 - ReportConfig is 1:1 with Course and is created implicitly so the report page has a row to render against.
 - Setting the new course as active on create is a UX assumption; if the user already had an active course, the client may skip the preference update. Either way, it rides inside the same transaction.
 
@@ -135,6 +139,7 @@ sequenceDiagram
 ```
 
 Notes:
+
 - All course-policy fields are columns on Course (per ERD "Merged CoursePolicy into Course"), so one UPDATE covers every policy edit.
 - "Reset grading scale" (row 39) writes the default `grading_scale` jsonb back — same path.
 
@@ -180,6 +185,7 @@ sequenceDiagram
 ```
 
 Notes:
+
 - Depends on open question #5 (Rubric scope). Under course-scoped default, rubrics are copied. If rubrics became teacher-scoped, Rubric/Criterion/CriterionTag would drop from this transaction.
 - Enrollments, Assessments, Scores, Observations, Notes, Goals, Reflections, SectionOverrides, Attendance, TermRating, and TermRatingDimension are **not** copied — they are student-specific, not structural.
 
@@ -224,6 +230,7 @@ sequenceDiagram
 ```
 
 Notes:
+
 - Student rows themselves are **not** deleted — only Enrollment rows that point at this course. A student appearing only in this course remains in the Teacher's student pool.
 - This depends on open question #6 (Student ownership). Under the ERD default (Student is teacher-owned, separate from Enrollment), the above holds.
 - If a soft-delete mechanism is adopted (see ERD "Soft-delete consideration"), this path becomes a flip of `deleted_at` on Course with no cascades executed at write time.
@@ -260,6 +267,7 @@ sequenceDiagram
 ```
 
 Notes:
+
 - When adding an **existing** student from the teacher's pool to a new course, the Student INSERT is skipped; only Enrollment is written. The client selects the path based on whether the user picked an existing student or entered a new one.
 - `roster_position` is appended (MAX(roster_position)+1 within the course) so new students land at the end of the roster.
 
@@ -302,6 +310,7 @@ sequenceDiagram
 ```
 
 Notes:
+
 - Roster drag reorder (row 74) is a batch variant: a single call sends the new ordered list and the API issues one UPDATE per moved enrollment inside one transaction. Same write path, wider payload.
 
 ### 4.4 Withdraw student from course
@@ -324,6 +333,7 @@ sequenceDiagram
 ```
 
 Notes:
+
 - No cascade. Scores, notes, goals, reflections, overrides, attendance, term ratings remain for historical record. Client filters withdrawn enrollments out of active views.
 - Re-enrolling the same student is a separate UPDATE setting `withdrawn_at = NULL`.
 
@@ -391,6 +401,7 @@ sequenceDiagram
 ```
 
 Notes:
+
 - Depends on open question #2 (Attendance scope). Attendance is included per ERD default. If dropped, this path is removed entirely.
 
 ---
@@ -464,6 +475,7 @@ sequenceDiagram
 ```
 
 Notes:
+
 - Delete does **not** cascade to Section — groups are decorative. Sections are detached (group set to NULL) and preserved.
 
 ### 5.3 Section — add / edit / reassign group / delete
@@ -566,6 +578,7 @@ sequenceDiagram
 ```
 
 Notes:
+
 - Deleting a module does **not** delete its assessments. Assessments are detached (module_id → NULL) and remain gradebook-visible in the "unmoduled" section.
 
 ---
@@ -608,6 +621,7 @@ sequenceDiagram
 ```
 
 Notes:
+
 - One atomic transaction. Partial saves are not supported — either the whole rubric lands or none of it does.
 - "Add criterion" and "Remove criterion" (rows 218–219) are staged in the client until Save; they do not hit the server on their own.
 - Editing a rubric that has existing RubricScore rows: if a criterion is deleted, its scores cascade away. The ERD does not prescribe a warning; the API should surface the score-loss count so the client can confirm.
@@ -635,6 +649,7 @@ sequenceDiagram
 ```
 
 Notes:
+
 - Assessments that referenced the deleted rubric become rubric-less; their existing RubricScore rows are cascade-deleted. The assessment itself survives.
 
 ---
@@ -689,6 +704,7 @@ sequenceDiagram
 ```
 
 Notes:
+
 - Changing `rubric_id` between null and non-null does **not** cascade the old scores. Orphaned RubricScore or TagScore rows should be explicitly deleted before the switch — the API layer is responsible for this pre-step and should warn first. Not diagrammed here as it's a confirmation flow, but the transactional envelope should include the cleanup.
 
 ### 8.3 Duplicate assessment
@@ -712,6 +728,7 @@ sequenceDiagram
 ```
 
 Notes:
+
 - Scores, RubricScores, TagScores, Observations linking to the original are **not** copied.
 
 ### 8.4 Delete assessment
@@ -734,6 +751,7 @@ sequenceDiagram
 ```
 
 Notes:
+
 - Observations that cited this assessment as context survive with `assessment_id` set to NULL. Losing all observations when an assessment is deleted would be catastrophic.
 
 ### 8.5 Save collab config
@@ -756,6 +774,7 @@ sequenceDiagram
 ```
 
 Notes:
+
 - Group count +/-, random pairs, random groups, manual assignment, drag-between-groups all compute the new `collab_config` client-side and write it as a single jsonb replacement. No normalized collab tables per ERD.
 
 ---
@@ -813,6 +832,7 @@ sequenceDiagram
 ```
 
 Notes:
+
 - If no Score row existed, writing a comment creates one with `value = NULL, status = NULL`. A Score row is allowed to carry any subset of `{value, status, comment}`.
 
 ### 9.3 Assignment status (NS / EXC / LATE)
@@ -835,6 +855,7 @@ sequenceDiagram
 ```
 
 Notes:
+
 - Status and value coexist on one row. Setting status to NS does not null out `value`. Teacher decides semantics.
 
 ### 9.4 RubricScore — per-criterion entry
@@ -857,6 +878,7 @@ sequenceDiagram
 ```
 
 Notes:
+
 - Per ERD note: for rubric assessments, tag-level scores are **derived at read time** from RubricScore + CriterionTag. **No TagScore row is written.**
 
 ### 9.5 TagScore — per-tag entry
@@ -938,6 +960,7 @@ sequenceDiagram
 ```
 
 Notes:
+
 - Each clear variant is one atomic transaction across the three scoring tables.
 - "Undo score change" (row 130) is a client-side operation that reads the prior value from an undo buffer and re-issues an upsert via §9.1. Not a separate write path.
 
@@ -977,6 +1000,7 @@ sequenceDiagram
 ```
 
 Notes:
+
 - Dimension tag toggle (row 147) and context toggle (149–150) are staged client-side until submit. They alter the payload, not separate write paths.
 - "Remove capture student/tag" (rows 151–152) are pre-submit client operations.
 
@@ -1008,6 +1032,7 @@ sequenceDiagram
 ```
 
 Notes:
+
 - Delete-then-reinsert on the three join tables is the simplest atomic way to replace a set. Optimising to a diff is permissible but not required.
 
 ### 10.3 Delete observation
@@ -1055,6 +1080,7 @@ sequenceDiagram
 ```
 
 Notes:
+
 - No write is made back to the ObservationTemplate row on quick-post. Usage counts / last-used timestamps are not in the ERD.
 
 ### 10.5 Teacher-added custom templates (Q4 = B)
@@ -1090,6 +1116,7 @@ sequenceDiagram
 ```
 
 Notes:
+
 - The API enforces `is_seed = false` on every mutation. Seeds are protected at the database level too via an RLS policy: `USING (is_seed = false)`.
 - Seed templates are inserted at schema-migration time, not by teachers. Updating seeds is a deployment operation.
 
@@ -1124,6 +1151,7 @@ sequenceDiagram
 ```
 
 Notes:
+
 - Per ERD: Notes are immutable (no edit). Only add and delete.
 
 ### 11.2 Toggle flag
@@ -1213,6 +1241,7 @@ sequenceDiagram
 ```
 
 Notes:
+
 - Open question #3: custom tags are permanently distinct from Tag per ERD default. No promotion path is diagrammed.
 - The inputs don't cover custom-tag delete; if added later, a delete path would cascade ObservationCustomTag.
 
@@ -1253,6 +1282,7 @@ sequenceDiagram
 ```
 
 Notes:
+
 - Depends on open question #4. Under ERD default, `term` is an int 1–6 — no FK, no TermDefinition join.
 - "Auto-generate narrative" (row 232) produces HTML client-side (or via an AI call outside the entity model) and feeds `narrative_html` into the same save path. Not a separate write path.
 - "Copy narrative" (row 233) is clipboard — not a write.
@@ -1286,6 +1316,7 @@ sequenceDiagram
 ```
 
 Notes:
+
 - Any manual block toggle implicitly switches `preset` to `'custom'` — otherwise the displayed preset would misrepresent the active layout.
 - ReportConfig exists 1:1 with Course and is created at course-create time (§2.1, §2.2). Subsequent writes are always UPDATEs in practice, but the API uses UPSERT to tolerate the rare case where the row was not seeded.
 
@@ -1321,6 +1352,7 @@ sequenceDiagram
 ```
 
 Notes:
+
 - Matching strategy (by student_number, email, or name) is an API-layer policy decision; not an ERD concern. Defaulting to student_number per typical SIS convention.
 
 ### 15.2 Teams file import
@@ -1357,6 +1389,7 @@ sequenceDiagram
 ```
 
 Notes:
+
 - Scores are **not** imported from Teams in this flow — only the structure (class, roster, assignment list). If Teams files eventually include score data, a §15.2-extended path would upsert Score rows within the same transaction.
 
 ### 15.3 JSON full-data import
@@ -1380,6 +1413,7 @@ sequenceDiagram
 ```
 
 Notes:
+
 - Treated as one atomic transaction. A partial import is worse than no import.
 - "UPSERT" semantics versus "INSERT only" is a policy question: does JSON import merge into existing data or require a clean slate? The ERD doesn't prescribe. Defaulting to UPSERT keyed on UUIDs, so re-importing the same file is idempotent.
 
@@ -1406,6 +1440,7 @@ sequenceDiagram
 ```
 
 Notes:
+
 - Any student-scoped rows (notes, goals, etc.) are already attached via Enrollment and move with the enrollment reassignment — no per-table rewrite needed.
 
 ---
@@ -1431,6 +1466,7 @@ sequenceDiagram
 ```
 
 Notes:
+
 - In authenticated (non-demo) sessions, the "Reset demo data" action is not available — the button is hidden by the client when `gb-demo-mode` is not set.
 - The seed is a static JSON file bundled with the client build. It is not fetched from the API and does not require authentication.
 
@@ -1456,6 +1492,7 @@ sequenceDiagram
 ```
 
 Notes:
+
 - Delete-account (row 16) is a Pass C concern. It extends this path with a delete of the Teacher row itself, which cascades TeacherPreference.
 
 ---
@@ -1464,70 +1501,69 @@ Notes:
 
 Every non-ephemeral input row from `All Inputs` is covered below. Rows excluded as pure UI state are listed in the ERD's "Rows excluded as pure UI state" table and not repeated here.
 
-| Row(s) | Write path |
-|---|---|
-| 1–16 | Pass C (auth lifecycle) |
-| 17 | Pass C (demo session flag) |
-| 18–23 | §2.1 Create course |
-| 24–26, 32–45 | §2.3 Update course |
-| 27–28, 46 | §1.1 / §3 Active course switch |
-| 29 | §2.4 Duplicate course |
-| 30 | §2.5 Archive |
-| 31 | §2.6 Delete course |
-| 48–53 | §1.1 Preferences |
-| 56–62, 83 | §4.1 Add student |
-| 63 | §4.1 (designations on add) |
-| 64–70 | §4.2 Edit student |
-| 71 | §4.3 Edit enrollment (designations) |
-| 72 | §4.4 Withdraw |
-| 73 | §4.5 Delete student |
-| 74 | §4.3 (roster reorder batch) |
-| 75 | §4.6 Bulk pronouns |
-| 76–77 | §4.7 Bulk attendance |
-| 86–103 | §8.1 Create assessment |
-| 104 | §8.2 Edit assessment |
-| 105 | §8.3 Duplicate assessment |
-| 106 | §8.4 Delete assessment |
-| 108–116 | §8.5 Save collab config |
-| 117–120, 131–134 | §9.1 Score single cell |
-| 121–123 | §9.2 Score comment |
-| 124–126 | §9.6 Fill rubric |
-| 127 | §9.7 Clear cell |
-| 128 | §9.7 Clear row |
-| 129 | §9.7 Clear column |
-| 130 | §9.1 (undo via re-upsert) |
-| 139 | §9.4 RubricScore |
-| 140 | §9.5 TagScore |
-| 141–144 | §9.3 Assignment status |
-| 145–154 | §10.1 Create observation |
-| 155–156 | §10.2 Edit observation |
-| 157–158 | §10.3 Delete observation |
-| 159 | §10.4 Quick-post from template |
-| 168 | §11.1 Add note |
-| 170 | §11.1 Delete note |
-| 171 | §11.2 → §4.3 Toggle flag |
-| 173–174 | §11.3 Goal |
-| 177–179 | §11.4 Reflection |
-| 182–184 | §11.5 Save override |
-| 185 | §11.5 Clear override |
-| 187–189 | §5.1 Subject |
-| 190–194 | §5.3 Section |
-| 197–200 | §5.4 Tag |
-| 201–204 | §5.2 CompetencyGroup |
-| 205–208 | §6 Module |
-| 211–219, 222, 224 | §7.1 Save rubric |
-| 226 | §7.2 Delete rubric |
-| 229 | §12 CustomTag create |
-| 230–241 | §13 TermRating save |
-| 245–246 | §14 ReportConfig |
-| 254 | §15.3 JSON import |
-| 256–257 | §15.1 Roster CSV |
-| 259–261 | §15.2 Teams import |
-| 262–263, 269 | §2.2 Wizard create |
-| 271 | §15.4 Relink |
-| 309 | §16.1 Reset demo |
-| 310 | §16.2 Clear data |
-
+| Row(s)            | Write path                          |
+| ----------------- | ----------------------------------- |
+| 1–16              | Pass C (auth lifecycle)             |
+| 17                | Pass C (demo session flag)          |
+| 18–23             | §2.1 Create course                  |
+| 24–26, 32–45      | §2.3 Update course                  |
+| 27–28, 46         | §1.1 / §3 Active course switch      |
+| 29                | §2.4 Duplicate course               |
+| 30                | §2.5 Archive                        |
+| 31                | §2.6 Delete course                  |
+| 48–53             | §1.1 Preferences                    |
+| 56–62, 83         | §4.1 Add student                    |
+| 63                | §4.1 (designations on add)          |
+| 64–70             | §4.2 Edit student                   |
+| 71                | §4.3 Edit enrollment (designations) |
+| 72                | §4.4 Withdraw                       |
+| 73                | §4.5 Delete student                 |
+| 74                | §4.3 (roster reorder batch)         |
+| 75                | §4.6 Bulk pronouns                  |
+| 76–77             | §4.7 Bulk attendance                |
+| 86–103            | §8.1 Create assessment              |
+| 104               | §8.2 Edit assessment                |
+| 105               | §8.3 Duplicate assessment           |
+| 106               | §8.4 Delete assessment              |
+| 108–116           | §8.5 Save collab config             |
+| 117–120, 131–134  | §9.1 Score single cell              |
+| 121–123           | §9.2 Score comment                  |
+| 124–126           | §9.6 Fill rubric                    |
+| 127               | §9.7 Clear cell                     |
+| 128               | §9.7 Clear row                      |
+| 129               | §9.7 Clear column                   |
+| 130               | §9.1 (undo via re-upsert)           |
+| 139               | §9.4 RubricScore                    |
+| 140               | §9.5 TagScore                       |
+| 141–144           | §9.3 Assignment status              |
+| 145–154           | §10.1 Create observation            |
+| 155–156           | §10.2 Edit observation              |
+| 157–158           | §10.3 Delete observation            |
+| 159               | §10.4 Quick-post from template      |
+| 168               | §11.1 Add note                      |
+| 170               | §11.1 Delete note                   |
+| 171               | §11.2 → §4.3 Toggle flag            |
+| 173–174           | §11.3 Goal                          |
+| 177–179           | §11.4 Reflection                    |
+| 182–184           | §11.5 Save override                 |
+| 185               | §11.5 Clear override                |
+| 187–189           | §5.1 Subject                        |
+| 190–194           | §5.3 Section                        |
+| 197–200           | §5.4 Tag                            |
+| 201–204           | §5.2 CompetencyGroup                |
+| 205–208           | §6 Module                           |
+| 211–219, 222, 224 | §7.1 Save rubric                    |
+| 226               | §7.2 Delete rubric                  |
+| 229               | §12 CustomTag create                |
+| 230–241           | §13 TermRating save                 |
+| 245–246           | §14 ReportConfig                    |
+| 254               | §15.3 JSON import                   |
+| 256–257           | §15.1 Roster CSV                    |
+| 259–261           | §15.2 Teams import                  |
+| 262–263, 269      | §2.2 Wizard create                  |
+| 271               | §15.4 Relink                        |
+| 309               | §16.1 Reset demo                    |
+| 310               | §16.2 Clear data                    |
 
 ---
 

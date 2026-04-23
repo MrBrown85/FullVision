@@ -61,12 +61,12 @@ You are continuing an ongoing rebuild. **Read this whole file before touching an
 
 1. [CLAUDE.md](../../CLAUDE.md) — charter, hard rules.
 2. This file.
-3. [DECISIONS.md](DECISIONS.md) — every answered question, do not relitigate.
-4. [erd.md](erd.md) — live schema (source of truth).
-5. [write-paths.md](write-paths.md) — Pass B RPC specs (now implemented).
-6. [read-paths.md](read-paths.md) — Pass D computations.
-7. [auth-lifecycle.md](auth-lifecycle.md) — Pass C flows.
-8. [schema.sql](schema.sql), [rls-policies.sql](rls-policies.sql), [read-paths.sql](read-paths.sql), [write-paths.sql](write-paths.sql) — what's deployed.
+3. [erd.md](erd.md) — entity-relationship design reference (shipped).
+4. [write-paths.md](write-paths.md) — Pass B RPC specs (shipped).
+5. [read-paths.md](read-paths.md) — Pass D computations (shipped).
+6. [auth-lifecycle.md](auth-lifecycle.md) — Pass C flows (shipped).
+7. [rls-policies.sql](rls-policies.sql), [read-paths.sql](read-paths.sql), [write-paths.sql](write-paths.sql) — live SQL mirrors.
+8. [../../schema.sql](../../schema.sql) — live schema (root, authoritative).
 
 ---
 

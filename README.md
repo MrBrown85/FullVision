@@ -147,7 +147,6 @@ The live backend is Supabase Auth plus a public RPC surface over Postgres.
 Primary SQL mirrors:
 
 - [schema.sql](schema.sql)
-- [docs/backend-design/schema.sql](docs/backend-design/schema.sql)
 - [docs/backend-design/read-paths.sql](docs/backend-design/read-paths.sql)
 - [docs/backend-design/write-paths.sql](docs/backend-design/write-paths.sql)
 - [docs/backend-design/rls-policies.sql](docs/backend-design/rls-policies.sql)
@@ -155,8 +154,6 @@ Primary SQL mirrors:
 Primary backend-design references:
 
 - [docs/backend-design/HANDOFF.md](docs/backend-design/HANDOFF.md)
-- [docs/backend-design/DECISIONS.md](docs/backend-design/DECISIONS.md)
-- [docs/backend-design/INSTRUCTIONS.md](docs/backend-design/INSTRUCTIONS.md)
 - [docs/backend-design/read-paths.md](docs/backend-design/read-paths.md)
 - [docs/backend-design/write-paths.md](docs/backend-design/write-paths.md)
 - [docs/backend-design/auth-lifecycle.md](docs/backend-design/auth-lifecycle.md)
@@ -191,7 +188,6 @@ Use the docs in this order if you need to understand the current repository quic
 
 Additional references:
 
-- [docs/backend-design/DESIGN-SYSTEM.md](docs/backend-design/DESIGN-SYSTEM.md)
 - [docs/diagrams/README.md](docs/diagrams/README.md) for reference-only visual assets
 
 ## Operational notes
