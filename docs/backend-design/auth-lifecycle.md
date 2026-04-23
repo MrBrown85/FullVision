@@ -2,12 +2,12 @@
 
 > **Status:** Shipped. Design reference only. Operational auth notes live in `HANDOFF.md`.
 
-
 This pass covers how a Teacher comes into existence, proves their identity on each request, and ceases to exist. It also defines what "demo mode" is architecturally, since Pass B's write paths depended on that definition.
 
 ## Scope and non-scope
 
 **In scope:**
+
 - Sign-up (account creation)
 - Sign-in (credential verification → session)
 - Forgot password → reset
@@ -18,6 +18,7 @@ This pass covers how a Teacher comes into existence, proves their identity on ea
 - Active-course switch as a session-adjacent concept
 
 **Out of scope (deliberately):**
+
 - Specific auth provider (Supabase, Auth0, Clerk, custom). CLAUDE.md forbids provider-specific assumptions at this stage. This document describes the **contract** the auth layer must meet; the provider is an implementation choice.
 - Email templates, password policy, rate limiting, MFA. These are operational concerns layered on top of the lifecycle.
 - Session token format (JWT vs. opaque), refresh token rotation, cookie vs. header transport. All implementation-level.
@@ -28,14 +29,14 @@ This pass covers how a Teacher comes into existence, proves their identity on ea
 
 These are stated up-front because the rest of the document depends on them. Each one is flagged rather than silently baked in.
 
-| # | Assumption | Why I'm defaulting this way | How to invalidate |
-|---|---|---|---|
-| A1 | `Teacher.id` equals the auth provider's user id (same UUID on both sides). | Standard pattern; ERD has no separate `auth_user_id` column, so the two must be the same value. | If you want Teacher and auth-user to be separately identified, add `Teacher.auth_user_id uuid UNIQUE` to the ERD. |
-| A2 | Credentials (password hashes, reset tokens, email verification tokens) live in the auth provider, **not** in our schema. | ERD has no password column and no token columns on Teacher. | Valid as-is. Don't add credential columns to Teacher. |
-| A3 | Every API call that writes data includes a verified session token. The API extracts `teacher_id` from the token and uses it as the `caller` referenced throughout Pass B. | This is what Pass B's "caller" means operationally. | If unauthenticated writes are ever needed (e.g. a public share link that accepts comments), that path would not go through the teacher-scoped write paths. Not currently in the inputs. |
-| A4 | **Email verification is required before sign-in is permitted.** Sign-up creates only the auth record; the Teacher + TeacherPreference rows are created on first verified sign-in. | User decision. | To drop verification, collapse §1 into a single bootstrap-at-sign-up flow. |
-| A5 | **On first verified sign-in, a Welcome Class is auto-seeded** from the demo-seed JSON (per final Q45 = D, Q47 = A). Teacher lands in a populated gradebook; can delete the Welcome Class anytime. | User decision. | To revert to empty-state home, drop the seed step from §1.3. |
-| A6 | **Access + refresh token model (Supabase default).** Short-TTL access token (~30 min) + long-TTL refresh token (~7 days). On 401, client calls `refreshSession()` silently and retries. Only when the refresh token itself expires does the user see a re-auth prompt. | Industry-standard OAuth2 pattern; ships with Supabase out of the box; survives offline periods (critical for `offline-sync.md`). | Single-token sliding-window would require custom middleware and breaks offline reconnect. |
+| #   | Assumption                                                                                                                                                                                                                                                             | Why I'm defaulting this way                                                                                                      | How to invalidate                                                                                                                                                                       |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A1  | `Teacher.id` equals the auth provider's user id (same UUID on both sides).                                                                                                                                                                                             | Standard pattern; ERD has no separate `auth_user_id` column, so the two must be the same value.                                  | If you want Teacher and auth-user to be separately identified, add `Teacher.auth_user_id uuid UNIQUE` to the ERD.                                                                       |
+| A2  | Credentials (password hashes, reset tokens, email verification tokens) live in the auth provider, **not** in our schema.                                                                                                                                               | ERD has no password column and no token columns on Teacher.                                                                      | Valid as-is. Don't add credential columns to Teacher.                                                                                                                                   |
+| A3  | Every API call that writes data includes a verified session token. The API extracts `teacher_id` from the token and uses it as the `caller` referenced throughout Pass B.                                                                                              | This is what Pass B's "caller" means operationally.                                                                              | If unauthenticated writes are ever needed (e.g. a public share link that accepts comments), that path would not go through the teacher-scoped write paths. Not currently in the inputs. |
+| A4  | **Email verification is required before sign-in is permitted.** Sign-up creates only the auth record; the Teacher + TeacherPreference rows are created on first verified sign-in.                                                                                      | User decision.                                                                                                                   | To drop verification, collapse §1 into a single bootstrap-at-sign-up flow.                                                                                                              |
+| A5  | **On first verified sign-in, a Welcome Class is auto-seeded** from the demo-seed JSON (per final Q45 = D, Q47 = A). Teacher lands in a populated gradebook; can delete the Welcome Class anytime.                                                                      | User decision.                                                                                                                   | To revert to empty-state home, drop the seed step from §1.3.                                                                                                                            |
+| A6  | **Access + refresh token model (Supabase default).** Short-TTL access token (~30 min) + long-TTL refresh token (~7 days). On 401, client calls `refreshSession()` silently and retries. Only when the refresh token itself expires does the user see a re-auth prompt. | Industry-standard OAuth2 pattern; ships with Supabase out of the box; survives offline periods (critical for `offline-sync.md`). | Single-token sliding-window would require custom middleware and breaks offline reconnect.                                                                                               |
 
 ---
 
@@ -229,6 +230,7 @@ sequenceDiagram
 **No domain writes anywhere in §3.** This is entirely an auth-provider flow. The Teacher row is untouched — password hashes don't live there (A2).
 
 **Security choices baked in:**
+
 - Reset tokens are **single-use** — consuming one invalidates it, so a leaked email can't be replayed.
 - Resetting a password **invalidates all existing sessions** for that user. If the account was compromised, attackers holding a live token are kicked out at reset. The teacher signs in fresh on the redirect.
 - Redirecting to sign-in rather than auto-signing-in is deliberate: after a password change, requiring a fresh sign-in confirms the new password works and prevents "resetter is not the owner" edge cases.
@@ -291,7 +293,7 @@ sequenceDiagram
     end
 ```
 
-**Cancel deletion within the grace period:** if the user signs in via §2 before the 30-day window closes, the sign-in flow detects `Teacher.deleted_at IS NOT NULL`, prompts: *"Your account is scheduled for deletion. Restore it?"* — and on confirm, runs `UPDATE Teacher SET deleted_at = NULL`.
+**Cancel deletion within the grace period:** if the user signs in via §2 before the 30-day window closes, the sign-in flow detects `Teacher.deleted_at IS NOT NULL`, prompts: _"Your account is scheduled for deletion. Restore it?"_ — and on confirm, runs `UPDATE Teacher SET deleted_at = NULL`.
 
 **Hard-delete cleanup job:** a scheduled Supabase Edge Function runs daily:
 
@@ -306,6 +308,7 @@ WHERE deleted_at IS NOT NULL
 The cleanup job is idempotent and the cascade delete is the same one documented in Pass B — just deferred by 30 days.
 
 **Why soft-delete beats the prior hard-delete design:**
+
 - Recovery: "I deleted my account by mistake" becomes fixable. The sign-in path (§2) detects the soft-delete flag and offers restoration.
 - Two-system atomicity: auth provider only gets a `signOut`, not a `deleteUser`. No orphan auth records during the grace window.
 - Data audit: during the grace period, an admin can still query the teacher's data if disputes arise.
@@ -313,7 +316,7 @@ The cleanup job is idempotent and the cascade delete is the same one documented 
 
 **Ordering choice: domain first, then auth.** Reasoning:
 
-- Domain delete is the thing the user *actually wants* (their data gone). Doing it first guarantees the destructive step happens even if the secondary step fails.
+- Domain delete is the thing the user _actually wants_ (their data gone). Doing it first guarantees the destructive step happens even if the secondary step fails.
 - If auth delete fails, the worst outcome is an orphan auth record that can't be signed into usefully (the §2 sign-in flow would try to bootstrap a new Teacher row, but a user actively deleting their account is not going to sign in again in that window). This is recoverable via ops cleanup.
 - The reverse ordering (auth first) would leave a worse failure mode: data persists in the DB with no way to sign in and delete it. User-visible ghost.
 
@@ -328,12 +331,14 @@ The cleanup job is idempotent and the cascade delete is the same one documented 
 **Decision:** Demo mode is 100% client-side. The backend is never called. Demo data lives in the browser. Everything is thrown away on sign-out.
 
 **What a demo user can do (per product spec):**
+
 - Explore a seeded class with seeded assignments (read).
 - Create new assignments during the session. They render, they work, they don't survive sign-out.
 - Create new classes during the session. Same — ephemeral.
 - All of Pass B's write paths appear to function inside the demo session, but the target is a client-side store, not the real API.
 
 **What a demo user cannot do:**
+
 - Sign up, verify email, or interact with the auth provider.
 - Persist anything.
 - Collide with any real teacher's data.
@@ -486,6 +491,7 @@ sequenceDiagram
 **The authorization step is non-negotiable.** Every Pass B write path says "Teacher edits X" — the API must prove that the session's `caller_id` actually owns X before writing. For top-level entities (Course, Student), this is a straight `WHERE teacher_id = caller_id` check. For deeper entities (Score, ObservationTag), the check walks up the FK chain to the owning Teacher.
 
 Two ways to implement the ownership walk:
+
 - **Application-layer check:** the API code performs an ownership query before each write.
 - **Database-layer check:** row-level security policies in the database enforce ownership regardless of what the API code does.
 
@@ -506,6 +512,7 @@ The second is safer (belt-and-braces: a bug in API code can't leak data across t
 4. **Refresh fails** (refresh token itself expired or revoked) → client shows re-auth prompt. Re-entry of credentials required.
 
 **Result:**
+
 - Active user: access tokens rotate silently in the background every ~30 min. Zero friction.
 - User returning within ~7 days: silent refresh on first request; no re-auth prompt.
 - User returning after ~7+ days of inactivity: re-auth prompt.
@@ -589,7 +596,7 @@ All five ambiguities flagged at the start of Pass C are now resolved. The ones s
 
 ---
 
-## 11. What Pass C still does *not* answer
+## 11. What Pass C still does _not_ answer
 
 Being honest about remaining gaps that touch the session contract but aren't session-shape decisions:
 
@@ -600,7 +607,6 @@ Being honest about remaining gaps that touch the session contract but aren't ses
 - **Data export on account deletion.** §5 destroys everything immediately. Jurisdictions with data-portability rules (GDPR) require an export option before deletion. Not in the inputs; flagged for product/legal.
 
 None of these block a first implementation — they're the next layer of hardening.
-
 
 ---
 

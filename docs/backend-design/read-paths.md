@@ -2,7 +2,6 @@
 
 > **Status:** Shipped. Design reference only. The live SQL is `read-paths.sql` in this directory.
 
-
 Pass B specified every way data gets **into** the database. This pass specifies every way data comes **out** — the read surfaces the app renders, and (the harder half) the computations that derive grades, proficiencies, and summary indicators from the raw Score / RubricScore / TagScore rows.
 
 All required schema (Category entity, `Course.grading_system`, `Criterion.weight`, per-level criterion values, etc.) lives in [erd.md](erd.md) — the Pass D amendment was folded into Pass A on 2026-04-19.
@@ -25,6 +24,7 @@ These are the pure functions. Every read path in §2 calls them. Each is defined
 **Purpose:** For a given (student, assessment), what's the student's overall score on this assessment on the 0–4 scale?
 
 **Inputs:**
+
 - `assessment` (with `rubric_id`, `score_mode`, `max_points`)
 - Either:
   - `score` (a Score row for this enrollment/assessment), **or**
@@ -79,6 +79,7 @@ function assessment_overall(student, assessment):
 ```
 
 **Edge cases:**
+
 - `EXC`, `NS`, and "no row" are distinct sentinels. Callers MUST distinguish them — `NS` (not submitted) counts as 0 (hurts the average); the other two drop the assessment entirely.
 - Partial rubric scoring (some criteria scored, others not) still computes an overall score from the scored criteria only. The alternative — requiring all criteria to be scored before showing anything — was rejected because it would leave the gradebook blank during multi-session rubric grading.
 - Criterion weights are normalized at read time, not stored normalized. If a teacher gives three criteria weights 1.0/1.0/2.0, they become 0.25/0.25/0.5 at read time.
@@ -89,6 +90,7 @@ function assessment_overall(student, assessment):
 **Purpose:** For a (student, assessment, tag), derive the student's score on that tag from this assessment.
 
 **Inputs:**
+
 - `student`, `assessment`, `tag`
 - If rubric-based: the Rubric's Criteria + CriterionTag rows + RubricScore rows
 - If non-rubric: TagScore row
@@ -223,11 +225,13 @@ function percentage_to_letter(R):
 ```
 
 **Key differences from the Phil 12 spreadsheet:**
+
 - Blank cells (no Score row) → **drop from category average**, not counted as zero. Per your decision.
 - `status='NS'` (not submitted) → counted as zero. Same effect as the spreadsheet's blank cells, but it's now explicit.
 - Category weights that don't sum to 100 → renormalized at read time. Weights summing to 98 yield a sensible percentage. Weights > 100 cannot be saved (UI hard-caps per Q18).
 
 **Display rounding (per Q14 = C):** both proficiency and percentage rendered to **1 decimal place**.
+
 - Q (proficiency) rendered as e.g. `2.7`
 - R (percentage) rendered as e.g. `78.6%`
 - S (letter) rendered as-is (`B`, `C+`, etc.)
@@ -396,6 +400,7 @@ sequenceDiagram
 ```
 
 **Payload shape:**
+
 - `cells[student_idx][assessment_idx]` — `{ value, status, overall_score, comment_present, has_rubric_scores }`
 - `row_summaries[student_idx]` — `{ Q, R, S, overall_proficiency, counts }`
 
@@ -430,6 +435,7 @@ sequenceDiagram
 ```
 
 **Competency tree shape:**
+
 ```
 {
   groups: [
@@ -472,6 +478,7 @@ sequenceDiagram
 ```
 
 **"At risk" threshold (per Q17 = A):** fixed app-wide. A student is flagged "at risk" if either:
+
 - `overall_proficiency < 2.0`, OR
 - letter percentage `R < 60%`
 
@@ -606,15 +613,15 @@ sequenceDiagram
 
 Every read above branches on `course.grading_system`. To keep it explicit:
 
-| Surface | `proficiency` | `letter` | `both` |
-|---|---|---|---|
-| 2.1 Gradebook | row summaries show overall proficiency only | row summaries show Q/R/S | show both |
-| 2.2 Student profile | competency tree + overall proficiency; hide Q/R/S | categories + Q/R/S; competency tree shown as secondary | both sections rendered |
-| 2.3 Class dashboard | proficiency distribution | percentage distribution | both |
-| 2.4 Learning map | same in all modes — competencies are universal |
-| 2.5 Term rating | proficiency defaults for dimensions | same — TermRatingDimension is proficiency-based regardless of grading_system |
-| 2.6 Report | proficiency blocks | percentage/letter blocks | both, per blocks_config |
-| 2.7 Observations | unaffected by grading_system |
+| Surface               | `proficiency`                                                                                     | `letter`                                                                     | `both`                  |
+| --------------------- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ----------------------- |
+| 2.1 Gradebook         | row summaries show overall proficiency only                                                       | row summaries show Q/R/S                                                     | show both               |
+| 2.2 Student profile   | competency tree + overall proficiency; hide Q/R/S                                                 | categories + Q/R/S; competency tree shown as secondary                       | both sections rendered  |
+| 2.3 Class dashboard   | proficiency distribution                                                                          | percentage distribution                                                      | both                    |
+| 2.4 Learning map      | same in all modes — competencies are universal                                                    |
+| 2.5 Term rating       | proficiency defaults for dimensions                                                               | same — TermRatingDimension is proficiency-based regardless of grading_system |
+| 2.6 Report            | proficiency blocks                                                                                | percentage/letter blocks                                                     | both, per blocks_config |
+| 2.7 Observations      | unaffected by grading_system                                                                      |
 | 2.8 Assessment detail | score entry UI adapts based on `score_mode` (proficiency vs points), orthogonal to grading_system |
 
 **Flag:** in `both` mode, the UI presentation is **your acknowledged design challenge**. The backend runs both pipelines regardless and surfaces both results in every payload; the client chooses whether to render side-by-side, toggle, or split by block. No data-layer decision required.
@@ -626,11 +633,13 @@ Every read above branches on `course.grading_system`. To keep it explicit:
 Every aggregate in §1 is computed on read. This is deliberate.
 
 **Arguments against caching right now:**
+
 - The old backend's failures came from denormalized aggregates that didn't get invalidated when source data changed. "Compute on read" removes a whole class of bugs.
 - The data sizes are small — a class is 30 students × ~100 assessments × ~50 tags. In-memory composition is fast.
 - Reads don't need to be faster than ~100ms for any of these surfaces. They just need to be correct.
 
 **When to revisit:**
+
 - If a single class exceeds ~100 students or ~500 assessments, profile reads first.
 - If the same aggregate is requested by multiple surfaces within a few seconds (e.g., teacher rapid-taps between students), consider a short-lived in-memory cache at the API layer keyed on `(course_id, max(Score.updated_at))`. Invalidation is then automatic — a fresh write bumps `updated_at`, the cache key changes, the next read recomputes.
 - Never introduce a persistent denormalized "overall_grade" column on Enrollment. That's the trap the old backend fell into.
@@ -646,7 +655,6 @@ Every aggregate in §1 is computed on read. This is deliberate.
 5. **Decaying-average boundary condition.** With `decay_weight = 0.65`, a single score contributes 65% weight on insertion; with many scores, old ones fade fast. This is the spreadsheet's behavior. Confirm it matches what teachers expect — some gradebooks use the opposite convention (new = 1-dw, running = dw). The formula in §1.5's helper matches the old code.
 6. **Per-section calc_method override.** Currently `calc_method` is a course-wide setting. Use cases don't show per-section variation, but it's conceivable a teacher would want "most recent" for one competency and "decaying average" for another. Add later if asked.
 7. **Rubric with zero linked criteria for a tag.** If a rubric-based assessment has no criteria linking to a tag, that assessment contributes nothing to that tag's proficiency — treated as `NOT_APPLICABLE`, not zero. Confirm this is the right choice (alternative: still count the assessment, with value = the rubric overall). Current choice is cleaner.
-
 
 ---
 

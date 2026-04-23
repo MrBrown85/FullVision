@@ -2,7 +2,6 @@
 
 > **Status:** Shipped. Design reference only. The live schema is `schema.sql` at the repo root.
 
-
 ## ER Diagram
 
 ```mermaid
@@ -417,47 +416,47 @@ erDiagram
 
 ## Entity Dictionary
 
-| # | Entity | Purpose | Key Attributes | Owning Actor | Cardinality Notes |
-|---|--------|---------|----------------|-------------|-------------------|
-| 1 | **Teacher** | The authenticated user (teacher account). | id, email, display_name | System (auth) | Root entity. One per account. |
-| 2 | **TeacherPreference** | Per-teacher settings: active course, view modes, widget layout. | teacher_id (PK/FK), active_course_id, view_mode, mobile_view_mode, mobile_sort_mode, card_widget_config | Teacher | 1:1 with Teacher. |
-| 3 | **Course** | A class the teacher manages. Includes grading policy (system, calc method, decay, timezone, late-work policy). | id, teacher_id, name, grade_level, description, color, is_archived, grading_system, calc_method, decay_weight, timezone, late_work_policy | Teacher | Many per Teacher. Central hub. `grading_system` is `'proficiency' \| 'letter' \| 'both'`. When `letter` or `both`, Categories drive the percentage pipeline (Pass D §1.4). `late_work_policy` is free text — display only, not enforced by calc. Q→R% and R→letter cutoffs are hardcoded app-wide (BC standard). |
-| 3a | **Category** | Teacher-named assessment grouping with a percentage weight — drives the letter/percentage pipeline. | id, course_id, name, weight, display_order | Teacher | Many per Course. Optional (a course may have zero). Weights UI-capped so the sum cannot exceed 100; sums < 100 are renormalized at read time. When `grading_system ∈ {letter, both}` the UI blocks selecting that mode without ≥1 Category. |
-| 4 | **Student** | A student record. Can appear in multiple courses via Enrollment. | id, teacher_id, first_name, last_name, preferred_name, pronouns, student_number, email, date_of_birth | Teacher | Many per Teacher. Shared across courses. |
-| 5 | **Enrollment** | Joins a Student to a Course. Carries per-course student state. | id, student_id, course_id, designations (`text[]`), roster_position, is_flagged, withdrawn_at | Teacher | Many per Course, many per Student. UNIQUE(student_id, course_id). `withdrawn_at` is nullable -- null means active. |
-| 6 | **Subject** | A top-level subject in the learning map (e.g. "Reading", "Math"). | id, course_id, name, display_order | Teacher | Many per Course. display_order scoped within course. |
-| 7 | **CompetencyGroup** | A named color-coded grouping of sections in the learning map. | id, course_id, name, color, display_order | Teacher | Many per Course. Optional grouping. display_order scoped within course. |
-| 8 | **Section** | A learning standard / competency within a subject. | id, course_id *(denormalized)*, subject_id, competency_group_id, name, display_order | Teacher | Many per Subject. Optionally in a CompetencyGroup. display_order scoped within subject. `course_id` is denormalized from Subject for query convenience and FK validation -- invariant: must match `subject.course_id`. |
-| 9 | **Tag** | A specific indicator / "I can" statement within a section. | id, section_id, code, label, i_can_text, display_order | Teacher | Many per Section. Leaf of the learning map tree. display_order scoped within section. |
-| 10 | **Module** | An organizational unit for assessments (like a unit or chapter). | id, course_id, name, color, display_order | Teacher | Many per Course. display_order scoped within course. |
-| 11 | **Rubric** | A reusable scoring rubric template. | id, course_id, name | Teacher | Many per Course. |
-| 12 | **Criterion** | A single row in a rubric with 4-level descriptors, per-level point values, and a criterion weight. | id, rubric_id, name, level_{1..4}_descriptor, level_{1..4}_value, weight, display_order | Teacher | Many per Rubric. display_order scoped within rubric. `level_N_value` defaults to N (teacher can override). `weight` defaults to 1.0; normalized across the rubric at read time. |
-| 13 | **CriterionTag** | Links a Criterion to Tags (standards the criterion assesses). | criterion_id, tag_id | -- | Join table. Many-to-many. |
-| 14 | **Assessment** | An assignment, test, or task students are scored on. | id, course_id, category_id, title, description, date_assigned, due_date, score_mode, max_points, weight, evidence_type, rubric_id, module_id, collab_mode, collab_config | Teacher | Many per Course. `category_id` is nullable; when present, participates in the percentage pipeline. `type` (summative/formative) was removed in favour of `category_id`. display_order scoped within module (or within course for unmoduled assessments). `collab_config` is jsonb storing group assignments and exclusions atomically -- see design note below. |
-| 15 | **AssessmentTag** | Links an Assessment to Tags (standards it covers). | assessment_id, tag_id | -- | Join table. Many-to-many. |
-| 16 | **Score** | A student's overall score on an assessment, including assignment status. | id, enrollment_id, assessment_id, value *(nullable)*, status *(nullable: NS/EXC/LATE)*, comment | Teacher | One per Enrollment x Assessment. UNIQUE(enrollment_id, assessment_id). A row can have value only, status only, or both. Replaces the former separate AssignmentStatus entity. |
-| 17 | **RubricScore** | Per-criterion score when an assessment uses a rubric. Sibling of Score, not child. | id, enrollment_id, assessment_id, criterion_id, value | Teacher | UNIQUE(enrollment_id, assessment_id, criterion_id). Exists independently of Score -- criterion-level entry comes first, overall Score.value can be derived or separately entered. |
-| 18 | **TagScore** | Per-tag (standard) score on a non-rubric assessment. | id, enrollment_id, assessment_id, tag_id, value | Teacher | UNIQUE(enrollment_id, assessment_id, tag_id). **Only used for non-rubric assessments.** For rubric assessments, tag-level scores are derived at read time from RubricScore + CriterionTag -- not stored in TagScore. See design note below. |
-| 19 | **Observation** | A qualitative teacher observation about student(s). | id, course_id, body, sentiment, context_type, assessment_id | Teacher | Many per Course. Links to students and tags via join tables. |
-| 20 | **ObservationStudent** | Links an Observation to the student(s) it concerns. | observation_id, enrollment_id | -- | Join table. Many-to-many. |
-| 21 | **ObservationTag** | Links an Observation to dimension/standard Tags. | observation_id, tag_id | -- | Join table. Many-to-many. |
-| 22 | **ObservationCustomTag** | Links an Observation to teacher-defined CustomTags. | observation_id, custom_tag_id | -- | Join table. Many-to-many. |
-| 23 | **ObservationTemplate** | A reusable template for quick-posting observations (mobile row 159). | id, course_id, body, default_sentiment, default_context_type, display_order | Teacher | Many per Course. Provides pre-filled text and defaults; the posted observation is a normal Observation row. |
-| 24 | **CustomTag** | A free-form tag created by the teacher for observations. | id, course_id, label | Teacher | Many per Course. Permanently distinct from learning-map Tags. |
-| 25 | **Note** | A free-text note attached to a student in a course. Immutable (add/delete only, no edit). | id, enrollment_id, body, created_at | Teacher | Many per Enrollment. |
-| 26 | **Goal** | A goal set for a student on a specific learning section. | id, enrollment_id, section_id, body | Teacher | One per Enrollment x Section. UNIQUE(enrollment_id, section_id). |
-| 27 | **Reflection** | A teacher reflection on a student for a section, with confidence rating. | id, enrollment_id, section_id, body, confidence | Teacher | One per Enrollment x Section. UNIQUE(enrollment_id, section_id). |
-| 28 | **SectionOverride** | Manual override of a student's computed level for a section. | id, enrollment_id, section_id, level, reason | Teacher | One per Enrollment x Section. UNIQUE(enrollment_id, section_id). |
-| 29 | **Attendance** | A daily attendance record for a student in a course. | id, enrollment_id, attendance_date, status | Teacher | UNIQUE(enrollment_id, attendance_date). |
-| 30 | **TermRating** | Per-student per-term narrative and holistic ratings for report cards. | id, enrollment_id, term, narrative_html, work_habits_rating, participation_rating, social_traits (`text[]`) | Teacher | UNIQUE(enrollment_id, term). `social_traits` is a text array of selected trait names from a fixed app-defined set. |
-| 31 | **TermRatingDimension** | Per-section competency rating within a term rating. | id, term_rating_id, section_id, rating | Teacher | Many per TermRating. UNIQUE(term_rating_id, section_id). |
-| 32 | **TermRatingStrength** | Tags identified as strengths in a term rating. | term_rating_id, tag_id | -- | Join table. |
-| 33 | **TermRatingGrowthArea** | Tags identified as growth areas in a term rating. | term_rating_id, tag_id | -- | Join table. |
-| 34 | **TermRatingAssessment** | Assessments mentioned/highlighted in a term rating narrative. | term_rating_id, assessment_id | -- | Join table. |
-| 35 | **TermRatingObservation** | Observations mentioned/highlighted in a term rating narrative. | term_rating_id, observation_id | -- | Join table. |
-| 36 | **ReportConfig** | Per-course report layout: which blocks to include, preset level. | course_id (PK/FK), preset, blocks_config | Teacher | 1:1 with Course. |
-| 37 | **ScoreAudit** | Append-only log of every Score write (value or status change). | score_id, changed_by, old_value, new_value, old_status, new_status, changed_at | System | 2-year retention. Written inside the same transaction as the Score write. |
-| 38 | **TermRatingAudit** | Append-only log of every TermRating field change (narrative, ratings, social traits). | term_rating_id, changed_by, field_changed, old_value, new_value, changed_at | System | 2-year retention. One row per field changed per write. |
+| #   | Entity                    | Purpose                                                                                                        | Key Attributes                                                                                                                                                           | Owning Actor  | Cardinality Notes                                                                                                                                                                                                                                                                                                                                               |
+| --- | ------------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **Teacher**               | The authenticated user (teacher account).                                                                      | id, email, display_name                                                                                                                                                  | System (auth) | Root entity. One per account.                                                                                                                                                                                                                                                                                                                                   |
+| 2   | **TeacherPreference**     | Per-teacher settings: active course, view modes, widget layout.                                                | teacher_id (PK/FK), active_course_id, view_mode, mobile_view_mode, mobile_sort_mode, card_widget_config                                                                  | Teacher       | 1:1 with Teacher.                                                                                                                                                                                                                                                                                                                                               |
+| 3   | **Course**                | A class the teacher manages. Includes grading policy (system, calc method, decay, timezone, late-work policy). | id, teacher_id, name, grade_level, description, color, is_archived, grading_system, calc_method, decay_weight, timezone, late_work_policy                                | Teacher       | Many per Teacher. Central hub. `grading_system` is `'proficiency' \| 'letter' \| 'both'`. When `letter` or `both`, Categories drive the percentage pipeline (Pass D §1.4). `late_work_policy` is free text — display only, not enforced by calc. Q→R% and R→letter cutoffs are hardcoded app-wide (BC standard).                                                |
+| 3a  | **Category**              | Teacher-named assessment grouping with a percentage weight — drives the letter/percentage pipeline.            | id, course_id, name, weight, display_order                                                                                                                               | Teacher       | Many per Course. Optional (a course may have zero). Weights UI-capped so the sum cannot exceed 100; sums < 100 are renormalized at read time. When `grading_system ∈ {letter, both}` the UI blocks selecting that mode without ≥1 Category.                                                                                                                     |
+| 4   | **Student**               | A student record. Can appear in multiple courses via Enrollment.                                               | id, teacher_id, first_name, last_name, preferred_name, pronouns, student_number, email, date_of_birth                                                                    | Teacher       | Many per Teacher. Shared across courses.                                                                                                                                                                                                                                                                                                                        |
+| 5   | **Enrollment**            | Joins a Student to a Course. Carries per-course student state.                                                 | id, student_id, course_id, designations (`text[]`), roster_position, is_flagged, withdrawn_at                                                                            | Teacher       | Many per Course, many per Student. UNIQUE(student_id, course_id). `withdrawn_at` is nullable -- null means active.                                                                                                                                                                                                                                              |
+| 6   | **Subject**               | A top-level subject in the learning map (e.g. "Reading", "Math").                                              | id, course_id, name, display_order                                                                                                                                       | Teacher       | Many per Course. display_order scoped within course.                                                                                                                                                                                                                                                                                                            |
+| 7   | **CompetencyGroup**       | A named color-coded grouping of sections in the learning map.                                                  | id, course_id, name, color, display_order                                                                                                                                | Teacher       | Many per Course. Optional grouping. display_order scoped within course.                                                                                                                                                                                                                                                                                         |
+| 8   | **Section**               | A learning standard / competency within a subject.                                                             | id, course_id _(denormalized)_, subject_id, competency_group_id, name, display_order                                                                                     | Teacher       | Many per Subject. Optionally in a CompetencyGroup. display_order scoped within subject. `course_id` is denormalized from Subject for query convenience and FK validation -- invariant: must match `subject.course_id`.                                                                                                                                          |
+| 9   | **Tag**                   | A specific indicator / "I can" statement within a section.                                                     | id, section_id, code, label, i_can_text, display_order                                                                                                                   | Teacher       | Many per Section. Leaf of the learning map tree. display_order scoped within section.                                                                                                                                                                                                                                                                           |
+| 10  | **Module**                | An organizational unit for assessments (like a unit or chapter).                                               | id, course_id, name, color, display_order                                                                                                                                | Teacher       | Many per Course. display_order scoped within course.                                                                                                                                                                                                                                                                                                            |
+| 11  | **Rubric**                | A reusable scoring rubric template.                                                                            | id, course_id, name                                                                                                                                                      | Teacher       | Many per Course.                                                                                                                                                                                                                                                                                                                                                |
+| 12  | **Criterion**             | A single row in a rubric with 4-level descriptors, per-level point values, and a criterion weight.             | id, rubric*id, name, level*{1..4}_descriptor, level_{1..4}\_value, weight, display_order                                                                                 | Teacher       | Many per Rubric. display_order scoped within rubric. `level_N_value` defaults to N (teacher can override). `weight` defaults to 1.0; normalized across the rubric at read time.                                                                                                                                                                                 |
+| 13  | **CriterionTag**          | Links a Criterion to Tags (standards the criterion assesses).                                                  | criterion_id, tag_id                                                                                                                                                     | --            | Join table. Many-to-many.                                                                                                                                                                                                                                                                                                                                       |
+| 14  | **Assessment**            | An assignment, test, or task students are scored on.                                                           | id, course_id, category_id, title, description, date_assigned, due_date, score_mode, max_points, weight, evidence_type, rubric_id, module_id, collab_mode, collab_config | Teacher       | Many per Course. `category_id` is nullable; when present, participates in the percentage pipeline. `type` (summative/formative) was removed in favour of `category_id`. display_order scoped within module (or within course for unmoduled assessments). `collab_config` is jsonb storing group assignments and exclusions atomically -- see design note below. |
+| 15  | **AssessmentTag**         | Links an Assessment to Tags (standards it covers).                                                             | assessment_id, tag_id                                                                                                                                                    | --            | Join table. Many-to-many.                                                                                                                                                                                                                                                                                                                                       |
+| 16  | **Score**                 | A student's overall score on an assessment, including assignment status.                                       | id, enrollment_id, assessment_id, value _(nullable)_, status _(nullable: NS/EXC/LATE)_, comment                                                                          | Teacher       | One per Enrollment x Assessment. UNIQUE(enrollment_id, assessment_id). A row can have value only, status only, or both. Replaces the former separate AssignmentStatus entity.                                                                                                                                                                                   |
+| 17  | **RubricScore**           | Per-criterion score when an assessment uses a rubric. Sibling of Score, not child.                             | id, enrollment_id, assessment_id, criterion_id, value                                                                                                                    | Teacher       | UNIQUE(enrollment_id, assessment_id, criterion_id). Exists independently of Score -- criterion-level entry comes first, overall Score.value can be derived or separately entered.                                                                                                                                                                               |
+| 18  | **TagScore**              | Per-tag (standard) score on a non-rubric assessment.                                                           | id, enrollment_id, assessment_id, tag_id, value                                                                                                                          | Teacher       | UNIQUE(enrollment_id, assessment_id, tag_id). **Only used for non-rubric assessments.** For rubric assessments, tag-level scores are derived at read time from RubricScore + CriterionTag -- not stored in TagScore. See design note below.                                                                                                                     |
+| 19  | **Observation**           | A qualitative teacher observation about student(s).                                                            | id, course_id, body, sentiment, context_type, assessment_id                                                                                                              | Teacher       | Many per Course. Links to students and tags via join tables.                                                                                                                                                                                                                                                                                                    |
+| 20  | **ObservationStudent**    | Links an Observation to the student(s) it concerns.                                                            | observation_id, enrollment_id                                                                                                                                            | --            | Join table. Many-to-many.                                                                                                                                                                                                                                                                                                                                       |
+| 21  | **ObservationTag**        | Links an Observation to dimension/standard Tags.                                                               | observation_id, tag_id                                                                                                                                                   | --            | Join table. Many-to-many.                                                                                                                                                                                                                                                                                                                                       |
+| 22  | **ObservationCustomTag**  | Links an Observation to teacher-defined CustomTags.                                                            | observation_id, custom_tag_id                                                                                                                                            | --            | Join table. Many-to-many.                                                                                                                                                                                                                                                                                                                                       |
+| 23  | **ObservationTemplate**   | A reusable template for quick-posting observations (mobile row 159).                                           | id, course_id, body, default_sentiment, default_context_type, display_order                                                                                              | Teacher       | Many per Course. Provides pre-filled text and defaults; the posted observation is a normal Observation row.                                                                                                                                                                                                                                                     |
+| 24  | **CustomTag**             | A free-form tag created by the teacher for observations.                                                       | id, course_id, label                                                                                                                                                     | Teacher       | Many per Course. Permanently distinct from learning-map Tags.                                                                                                                                                                                                                                                                                                   |
+| 25  | **Note**                  | A free-text note attached to a student in a course. Immutable (add/delete only, no edit).                      | id, enrollment_id, body, created_at                                                                                                                                      | Teacher       | Many per Enrollment.                                                                                                                                                                                                                                                                                                                                            |
+| 26  | **Goal**                  | A goal set for a student on a specific learning section.                                                       | id, enrollment_id, section_id, body                                                                                                                                      | Teacher       | One per Enrollment x Section. UNIQUE(enrollment_id, section_id).                                                                                                                                                                                                                                                                                                |
+| 27  | **Reflection**            | A teacher reflection on a student for a section, with confidence rating.                                       | id, enrollment_id, section_id, body, confidence                                                                                                                          | Teacher       | One per Enrollment x Section. UNIQUE(enrollment_id, section_id).                                                                                                                                                                                                                                                                                                |
+| 28  | **SectionOverride**       | Manual override of a student's computed level for a section.                                                   | id, enrollment_id, section_id, level, reason                                                                                                                             | Teacher       | One per Enrollment x Section. UNIQUE(enrollment_id, section_id).                                                                                                                                                                                                                                                                                                |
+| 29  | **Attendance**            | A daily attendance record for a student in a course.                                                           | id, enrollment_id, attendance_date, status                                                                                                                               | Teacher       | UNIQUE(enrollment_id, attendance_date).                                                                                                                                                                                                                                                                                                                         |
+| 30  | **TermRating**            | Per-student per-term narrative and holistic ratings for report cards.                                          | id, enrollment_id, term, narrative_html, work_habits_rating, participation_rating, social_traits (`text[]`)                                                              | Teacher       | UNIQUE(enrollment_id, term). `social_traits` is a text array of selected trait names from a fixed app-defined set.                                                                                                                                                                                                                                              |
+| 31  | **TermRatingDimension**   | Per-section competency rating within a term rating.                                                            | id, term_rating_id, section_id, rating                                                                                                                                   | Teacher       | Many per TermRating. UNIQUE(term_rating_id, section_id).                                                                                                                                                                                                                                                                                                        |
+| 32  | **TermRatingStrength**    | Tags identified as strengths in a term rating.                                                                 | term_rating_id, tag_id                                                                                                                                                   | --            | Join table.                                                                                                                                                                                                                                                                                                                                                     |
+| 33  | **TermRatingGrowthArea**  | Tags identified as growth areas in a term rating.                                                              | term_rating_id, tag_id                                                                                                                                                   | --            | Join table.                                                                                                                                                                                                                                                                                                                                                     |
+| 34  | **TermRatingAssessment**  | Assessments mentioned/highlighted in a term rating narrative.                                                  | term_rating_id, assessment_id                                                                                                                                            | --            | Join table.                                                                                                                                                                                                                                                                                                                                                     |
+| 35  | **TermRatingObservation** | Observations mentioned/highlighted in a term rating narrative.                                                 | term_rating_id, observation_id                                                                                                                                           | --            | Join table.                                                                                                                                                                                                                                                                                                                                                     |
+| 36  | **ReportConfig**          | Per-course report layout: which blocks to include, preset level.                                               | course_id (PK/FK), preset, blocks_config                                                                                                                                 | Teacher       | 1:1 with Course.                                                                                                                                                                                                                                                                                                                                                |
+| 37  | **ScoreAudit**            | Append-only log of every Score write (value or status change).                                                 | score_id, changed_by, old_value, new_value, old_status, new_status, changed_at                                                                                           | System        | 2-year retention. Written inside the same transaction as the Score write.                                                                                                                                                                                                                                                                                       |
+| 38  | **TermRatingAudit**       | Append-only log of every TermRating field change (narrative, ratings, social traits).                          | term_rating_id, changed_by, field_changed, old_value, new_value, changed_at                                                                                              | System        | 2-year retention. One row per field changed per write.                                                                                                                                                                                                                                                                                                          |
 
 ---
 
@@ -472,6 +471,7 @@ Assessment collaboration (groups, pairs, exclusions) is stored as a single `coll
 - The data is only read back in the context of a single assessment's collab panel.
 
 Schema for `collab_config`:
+
 ```json
 {
   "excluded_enrollment_ids": ["uuid", "..."],
@@ -490,7 +490,7 @@ When `collab_mode` is `"none"`, `collab_config` is null.
 
 These two entities handle different scoring flows and never overlap for the same assessment:
 
-- **Rubric assessments** (assessment.rubric_id is not null): Teacher scores per-criterion via RubricScore. Tag-level scores are *derived at read time* by joining RubricScore → Criterion → CriterionTag. No rows are written to TagScore.
+- **Rubric assessments** (assessment.rubric_id is not null): Teacher scores per-criterion via RubricScore. Tag-level scores are _derived at read time_ by joining RubricScore → Criterion → CriterionTag. No rows are written to TagScore.
 - **Non-rubric assessments** (assessment.rubric_id is null): Teacher scores per-tag directly via TagScore. RubricScore has no rows.
 
 This avoids the ambiguity of two conflicting sources for the same tag-level score.
@@ -544,146 +544,146 @@ This is an implementation concern for Pass B/C.
 
 Every non-ephemeral row from `All Inputs` mapped to its entity. Mobile/desktop duplicates collapsed. Pure UI-state rows excluded per CLAUDE.md rules.
 
-| Row(s) | Input | Entity |
-|--------|-------|--------|
-| 1-2, 8-9 | Sign-in email/password (desktop + mobile) | **Teacher** (auth credentials) |
-| 3-5, 10-12 | Sign-up name/email/password (desktop + mobile) | **Teacher** |
-| 6, 13 | Password confirm | Validation only -- no entity |
-| 7 | Forgot-password email | **Teacher** (auth flow) |
-| 14-15 | Sign-out (desktop + mobile) | **Teacher** (session teardown) |
-| 16 | Delete account | **Teacher** (cascade delete) |
-| 17 | Demo Mode toggle | **Teacher** (session flag; see Open Questions) |
-| 18-23 | New course fields (name, grade, desc, grading system, calc method, decay) | **Course** |
-| 24-26 | Edit course fields | **Course** |
-| 27-28 | Switch active course (desktop + mobile) | **TeacherPreference** (active_course_id) |
-| 29 | Duplicate course | **Course** (new row, copied) |
-| 30 | Archive / unarchive course | **Course** (is_archived) |
-| 31 | Delete course | **Course** (delete) |
-| 32 | Course color picker | **Course** (color) |
-| 33-36 | Grading system, calc method, decay slider | **Course** (policy fields) |
-| 37-38 | Grading scale label + min boundary | **Course** (grading_scale jsonb) |
-| 39 | Reset grading scale | **Course** (reset to defaults) |
-| 40-43 | Category weights enabled + summative % slider | **Course** (policy fields) |
-| 44 | Report as percentage toggle | **Course** (report_as_percentage) |
-| 45 | Late-work policy text | **Course** (late_work_policy) |
-| 46 | Active course ID | **TeacherPreference** |
-| 48 | Mobile view mode (cards/list) | **TeacherPreference** |
-| 49 | Mobile sort mode | **TeacherPreference** |
-| 50-52 | Mobile card widget toggles / reorder / reset | **TeacherPreference** (card_widget_config) |
-| 53 | Desktop view mode (grid/list) | **TeacherPreference** |
-| 56-62 | Add student fields | **Student** |
-| 63 | Add student designations (IEP/MOD) | **Enrollment** (designations) |
-| 64-70 | Edit student fields | **Student** |
-| 71 | Edit designations | **Enrollment** |
-| 72 | Remove student from course | **Enrollment** (withdrawn_at) |
-| 73 | Delete student (full cascade) | **Student** (delete cascade) |
-| 74 | Roster drag reorder | **Enrollment** (roster_position) |
-| 75 | Bulk apply pronouns | **Student** (pronouns, batch) |
-| 76-77 | Bulk attendance date + status | **Attendance** |
-| 83 | Save edited student | **Student** (write action) |
-| 86-87 | Assessment title (new + form) | **Assessment** |
-| 88 | Assessment description | **Assessment** |
-| 89-91 | Dates (assigned, due, gradebook date) | **Assessment** |
-| 92-93 | Type (summative/formative) | **Assessment** |
-| 94 | Score mode (proficiency/points) | **Assessment** |
-| 95-97 | Max points (form, gradebook, chips) | **Assessment** |
-| 98 | Weight select | **Assessment** |
-| 99 | Evidence type | **Assessment** |
-| 100 | Rubric select | **Assessment** (rubric_id FK) |
-| 101 | Module select | **Assessment** (module_id FK) |
-| 102 | Linked tag IDs (standards) | **AssessmentTag** |
-| 103 | Save new assessment | **Assessment** (create) |
-| 104 | Save edited assessment | **Assessment** (update) |
-| 105 | Duplicate assessment | **Assessment** (new row, copied) |
-| 106 | Delete assessment | **Assessment** (delete) |
-| 108 | Collab mode | **Assessment** (collab_mode) |
-| 109-116 | Collab exclusions, groups, members, drag | **Assessment** (collab_config jsonb) |
-| 117-118 | Click/cycle score, inline edit (desktop) | **Score** |
-| 119-120 | Points-mode numeric input | **Score** |
-| 121-123 | Score comment: input, submit, delete | **Score** (comment field) |
-| 124-126 | Fill rubric scores / fill all | **Score** + **RubricScore** (batch) |
-| 127 | Clear cell | **Score** (delete) |
-| 128 | Clear all row's scores | **Score** (batch delete) |
-| 129 | Clear all column's scores | **Score** (batch delete) |
-| 130 | Undo score change | **Score** (revert) |
-| 131-134 | Mobile score (proficiency, points inc/dec, undo) | **Score** |
-| 139 | Select rubric score in fill | **RubricScore** |
-| 140 | Select tag level | **TagScore** |
-| 141-144 | Assignment status (desktop + mobile pills) | **Score** (status field) |
-| 145-146 | Observation capture text (desktop + mobile) | **Observation** |
-| 147 | Dimension tag toggle | **ObservationTag** |
-| 148 | Sentiment | **Observation** (sentiment) |
-| 149-150 | Context button + assignment context | **Observation** (context_type, assessment_id) |
-| 151 | Remove capture student | **ObservationStudent** (remove) |
-| 152 | Remove capture tag | **ObservationTag** (remove) |
-| 153-154 | Submit / save observation (desktop + mobile) | **Observation** (create) |
-| 155-156 | Edit observation (desktop + mobile) | **Observation** (update) |
-| 157-158 | Delete observation (desktop + mobile) | **Observation** (delete) |
-| 159 | Mobile template quick-post | **ObservationTemplate** → **Observation** (create from template) |
-| 168 | Add note text | **Note** |
-| 170 | Delete note | **Note** (delete) |
-| 171 | Toggle flag | **Enrollment** (is_flagged) |
-| 173-174 | Goal text + save | **Goal** |
-| 177-179 | Reflection text, confidence, save | **Reflection** |
-| 182-184 | Override level, reason, save | **SectionOverride** |
-| 185 | Clear override | **SectionOverride** (delete) |
-| 187-189 | Subject name, add, delete | **Subject** |
-| 190-194 | Section name, subject select, group select, add, delete | **Section** |
-| 197-200 | Tag code, label, I-can text, drag reorder | **Tag** |
-| 201-204 | CompetencyGroup add, delete, name, color | **CompetencyGroup** |
-| 205-208 | Module name, color, add, delete | **Module** |
-| 211 | Rubric name | **Rubric** |
-| 212-216 | Criterion name + level descriptors | **Criterion** |
-| 217 | Criterion linked tags | **CriterionTag** |
-| 218-219 | Add / remove criterion | **Criterion** |
-| 222 | Save rubric | **Rubric** + **Criterion** (write) |
-| 224 | New rubric | **Rubric** (create) |
-| 226 | Delete rubric | **Rubric** (delete) |
-| 229 | Add custom tag text | **CustomTag** |
-| 230-232 | Term rating narrative (rich HTML, formatting, auto-generate) | **TermRating** (narrative_html) |
-| 234 | Dim rating per competency (1-4) | **TermRatingDimension** |
-| 235 | Work habits rating | **TermRating** (work_habits_rating) |
-| 236 | Participation rating | **TermRating** (participation_rating) |
-| 237 | Social trait toggle | **TermRating** (social_traits) |
-| 238 | Strengths (tag IDs) | **TermRatingStrength** |
-| 239 | Growth areas (tag IDs) | **TermRatingGrowthArea** |
-| 240 | Mention assessment toggle | **TermRatingAssessment** |
-| 241 | Mention observation toggle | **TermRatingObservation** |
-| 245 | Apply preset (brief/standard/detailed) | **ReportConfig** |
-| 246 | Toggle block enabled | **ReportConfig** (blocks_config) |
-| 254 | JSON full-data import | Multiple entities (Student, Assessment, Score, etc.) |
-| 256-257 | Class roster CSV import + confirm | **Student** + **Enrollment** (batch create) |
-| 259-261 | Teams file import | **Course** + **Student** + **Enrollment** + **Assessment** (batch) |
-| 262-263, 269 | Class wizard (grade, subject, finish create) | **Course** (create via wizard) |
-| 271 | Relink confirm | **Enrollment** (re-associate) |
-| 309 | Reset demo data | All entities (demo wipe + reseed) |
-| 310 | Clear data | All entities (wipe) |
+| Row(s)       | Input                                                                     | Entity                                                             |
+| ------------ | ------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| 1-2, 8-9     | Sign-in email/password (desktop + mobile)                                 | **Teacher** (auth credentials)                                     |
+| 3-5, 10-12   | Sign-up name/email/password (desktop + mobile)                            | **Teacher**                                                        |
+| 6, 13        | Password confirm                                                          | Validation only -- no entity                                       |
+| 7            | Forgot-password email                                                     | **Teacher** (auth flow)                                            |
+| 14-15        | Sign-out (desktop + mobile)                                               | **Teacher** (session teardown)                                     |
+| 16           | Delete account                                                            | **Teacher** (cascade delete)                                       |
+| 17           | Demo Mode toggle                                                          | **Teacher** (session flag; see Open Questions)                     |
+| 18-23        | New course fields (name, grade, desc, grading system, calc method, decay) | **Course**                                                         |
+| 24-26        | Edit course fields                                                        | **Course**                                                         |
+| 27-28        | Switch active course (desktop + mobile)                                   | **TeacherPreference** (active_course_id)                           |
+| 29           | Duplicate course                                                          | **Course** (new row, copied)                                       |
+| 30           | Archive / unarchive course                                                | **Course** (is_archived)                                           |
+| 31           | Delete course                                                             | **Course** (delete)                                                |
+| 32           | Course color picker                                                       | **Course** (color)                                                 |
+| 33-36        | Grading system, calc method, decay slider                                 | **Course** (policy fields)                                         |
+| 37-38        | Grading scale label + min boundary                                        | **Course** (grading_scale jsonb)                                   |
+| 39           | Reset grading scale                                                       | **Course** (reset to defaults)                                     |
+| 40-43        | Category weights enabled + summative % slider                             | **Course** (policy fields)                                         |
+| 44           | Report as percentage toggle                                               | **Course** (report_as_percentage)                                  |
+| 45           | Late-work policy text                                                     | **Course** (late_work_policy)                                      |
+| 46           | Active course ID                                                          | **TeacherPreference**                                              |
+| 48           | Mobile view mode (cards/list)                                             | **TeacherPreference**                                              |
+| 49           | Mobile sort mode                                                          | **TeacherPreference**                                              |
+| 50-52        | Mobile card widget toggles / reorder / reset                              | **TeacherPreference** (card_widget_config)                         |
+| 53           | Desktop view mode (grid/list)                                             | **TeacherPreference**                                              |
+| 56-62        | Add student fields                                                        | **Student**                                                        |
+| 63           | Add student designations (IEP/MOD)                                        | **Enrollment** (designations)                                      |
+| 64-70        | Edit student fields                                                       | **Student**                                                        |
+| 71           | Edit designations                                                         | **Enrollment**                                                     |
+| 72           | Remove student from course                                                | **Enrollment** (withdrawn_at)                                      |
+| 73           | Delete student (full cascade)                                             | **Student** (delete cascade)                                       |
+| 74           | Roster drag reorder                                                       | **Enrollment** (roster_position)                                   |
+| 75           | Bulk apply pronouns                                                       | **Student** (pronouns, batch)                                      |
+| 76-77        | Bulk attendance date + status                                             | **Attendance**                                                     |
+| 83           | Save edited student                                                       | **Student** (write action)                                         |
+| 86-87        | Assessment title (new + form)                                             | **Assessment**                                                     |
+| 88           | Assessment description                                                    | **Assessment**                                                     |
+| 89-91        | Dates (assigned, due, gradebook date)                                     | **Assessment**                                                     |
+| 92-93        | Type (summative/formative)                                                | **Assessment**                                                     |
+| 94           | Score mode (proficiency/points)                                           | **Assessment**                                                     |
+| 95-97        | Max points (form, gradebook, chips)                                       | **Assessment**                                                     |
+| 98           | Weight select                                                             | **Assessment**                                                     |
+| 99           | Evidence type                                                             | **Assessment**                                                     |
+| 100          | Rubric select                                                             | **Assessment** (rubric_id FK)                                      |
+| 101          | Module select                                                             | **Assessment** (module_id FK)                                      |
+| 102          | Linked tag IDs (standards)                                                | **AssessmentTag**                                                  |
+| 103          | Save new assessment                                                       | **Assessment** (create)                                            |
+| 104          | Save edited assessment                                                    | **Assessment** (update)                                            |
+| 105          | Duplicate assessment                                                      | **Assessment** (new row, copied)                                   |
+| 106          | Delete assessment                                                         | **Assessment** (delete)                                            |
+| 108          | Collab mode                                                               | **Assessment** (collab_mode)                                       |
+| 109-116      | Collab exclusions, groups, members, drag                                  | **Assessment** (collab_config jsonb)                               |
+| 117-118      | Click/cycle score, inline edit (desktop)                                  | **Score**                                                          |
+| 119-120      | Points-mode numeric input                                                 | **Score**                                                          |
+| 121-123      | Score comment: input, submit, delete                                      | **Score** (comment field)                                          |
+| 124-126      | Fill rubric scores / fill all                                             | **Score** + **RubricScore** (batch)                                |
+| 127          | Clear cell                                                                | **Score** (delete)                                                 |
+| 128          | Clear all row's scores                                                    | **Score** (batch delete)                                           |
+| 129          | Clear all column's scores                                                 | **Score** (batch delete)                                           |
+| 130          | Undo score change                                                         | **Score** (revert)                                                 |
+| 131-134      | Mobile score (proficiency, points inc/dec, undo)                          | **Score**                                                          |
+| 139          | Select rubric score in fill                                               | **RubricScore**                                                    |
+| 140          | Select tag level                                                          | **TagScore**                                                       |
+| 141-144      | Assignment status (desktop + mobile pills)                                | **Score** (status field)                                           |
+| 145-146      | Observation capture text (desktop + mobile)                               | **Observation**                                                    |
+| 147          | Dimension tag toggle                                                      | **ObservationTag**                                                 |
+| 148          | Sentiment                                                                 | **Observation** (sentiment)                                        |
+| 149-150      | Context button + assignment context                                       | **Observation** (context_type, assessment_id)                      |
+| 151          | Remove capture student                                                    | **ObservationStudent** (remove)                                    |
+| 152          | Remove capture tag                                                        | **ObservationTag** (remove)                                        |
+| 153-154      | Submit / save observation (desktop + mobile)                              | **Observation** (create)                                           |
+| 155-156      | Edit observation (desktop + mobile)                                       | **Observation** (update)                                           |
+| 157-158      | Delete observation (desktop + mobile)                                     | **Observation** (delete)                                           |
+| 159          | Mobile template quick-post                                                | **ObservationTemplate** → **Observation** (create from template)   |
+| 168          | Add note text                                                             | **Note**                                                           |
+| 170          | Delete note                                                               | **Note** (delete)                                                  |
+| 171          | Toggle flag                                                               | **Enrollment** (is_flagged)                                        |
+| 173-174      | Goal text + save                                                          | **Goal**                                                           |
+| 177-179      | Reflection text, confidence, save                                         | **Reflection**                                                     |
+| 182-184      | Override level, reason, save                                              | **SectionOverride**                                                |
+| 185          | Clear override                                                            | **SectionOverride** (delete)                                       |
+| 187-189      | Subject name, add, delete                                                 | **Subject**                                                        |
+| 190-194      | Section name, subject select, group select, add, delete                   | **Section**                                                        |
+| 197-200      | Tag code, label, I-can text, drag reorder                                 | **Tag**                                                            |
+| 201-204      | CompetencyGroup add, delete, name, color                                  | **CompetencyGroup**                                                |
+| 205-208      | Module name, color, add, delete                                           | **Module**                                                         |
+| 211          | Rubric name                                                               | **Rubric**                                                         |
+| 212-216      | Criterion name + level descriptors                                        | **Criterion**                                                      |
+| 217          | Criterion linked tags                                                     | **CriterionTag**                                                   |
+| 218-219      | Add / remove criterion                                                    | **Criterion**                                                      |
+| 222          | Save rubric                                                               | **Rubric** + **Criterion** (write)                                 |
+| 224          | New rubric                                                                | **Rubric** (create)                                                |
+| 226          | Delete rubric                                                             | **Rubric** (delete)                                                |
+| 229          | Add custom tag text                                                       | **CustomTag**                                                      |
+| 230-232      | Term rating narrative (rich HTML, formatting, auto-generate)              | **TermRating** (narrative_html)                                    |
+| 234          | Dim rating per competency (1-4)                                           | **TermRatingDimension**                                            |
+| 235          | Work habits rating                                                        | **TermRating** (work_habits_rating)                                |
+| 236          | Participation rating                                                      | **TermRating** (participation_rating)                              |
+| 237          | Social trait toggle                                                       | **TermRating** (social_traits)                                     |
+| 238          | Strengths (tag IDs)                                                       | **TermRatingStrength**                                             |
+| 239          | Growth areas (tag IDs)                                                    | **TermRatingGrowthArea**                                           |
+| 240          | Mention assessment toggle                                                 | **TermRatingAssessment**                                           |
+| 241          | Mention observation toggle                                                | **TermRatingObservation**                                          |
+| 245          | Apply preset (brief/standard/detailed)                                    | **ReportConfig**                                                   |
+| 246          | Toggle block enabled                                                      | **ReportConfig** (blocks_config)                                   |
+| 254          | JSON full-data import                                                     | Multiple entities (Student, Assessment, Score, etc.)               |
+| 256-257      | Class roster CSV import + confirm                                         | **Student** + **Enrollment** (batch create)                        |
+| 259-261      | Teams file import                                                         | **Course** + **Student** + **Enrollment** + **Assessment** (batch) |
+| 262-263, 269 | Class wizard (grade, subject, finish create)                              | **Course** (create via wizard)                                     |
+| 271          | Relink confirm                                                            | **Enrollment** (re-associate)                                      |
+| 309          | Reset demo data                                                           | All entities (demo wipe + reseed)                                  |
+| 310          | Clear data                                                                | All entities (wipe)                                                |
 
 ### Rows excluded as pure UI state
 
-| Row(s) | Reason |
-|--------|--------|
-| 47 | Report period selector -- ephemeral view filter, not persisted data |
-| 54-55 | Sidebar toggle, toolbar dropdown -- UI chrome state |
-| 78-82 | Bulk select/deselect checkboxes, toggle bulk mode, show/cancel add-student form -- ephemeral UI |
-| 84-85 | Edit-student modal open/close |
-| 107 | Cancel assessment add/edit |
-| 135-138 | Mobile score filter, jump-to-student, toggle score menu, start score mode |
-| 160-167 | Mobile observation compose/quick-menu/pick-student/search/remove/filter/FAB |
-| 169 | Note search |
-| 172 | Flagged-only filter toggle |
-| 175-176 | Cancel/edit goal (UI actions, the write is row 174) |
-| 180-181 | Cancel/edit reflection (UI actions) |
-| 186 | Toggle/close override panel |
-| 195-196 | Toggle section folder/card (UI) |
-| 209-210 | Toggle module folder, open color picker |
-| 220-221, 223, 225, 227-228 | Rubric: switch section, toggle expand, cancel edit, edit UI, switch view, open panel |
-| 233 | Narrative copy (clipboard) |
-| 242-244 | Term rating: next/prev student nav, obs filter |
-| 247-253 | Report config: anonymize toggle, tab switch, student picker toggles, print |
-| 255, 258, 264-268, 270, 272 | Import wizard: trigger, cancel, toggle, step nav, back, skip, relink start/back/cancel/next |
-| 273-308 | All Nav & Filter rows: searches, sorts, filters, tab switches, sidebar, modals, sheet dismiss, retry, reload |
-| 311-313 | Export actions (read-only downloads, no write) |
+| Row(s)                      | Reason                                                                                                       |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| 47                          | Report period selector -- ephemeral view filter, not persisted data                                          |
+| 54-55                       | Sidebar toggle, toolbar dropdown -- UI chrome state                                                          |
+| 78-82                       | Bulk select/deselect checkboxes, toggle bulk mode, show/cancel add-student form -- ephemeral UI              |
+| 84-85                       | Edit-student modal open/close                                                                                |
+| 107                         | Cancel assessment add/edit                                                                                   |
+| 135-138                     | Mobile score filter, jump-to-student, toggle score menu, start score mode                                    |
+| 160-167                     | Mobile observation compose/quick-menu/pick-student/search/remove/filter/FAB                                  |
+| 169                         | Note search                                                                                                  |
+| 172                         | Flagged-only filter toggle                                                                                   |
+| 175-176                     | Cancel/edit goal (UI actions, the write is row 174)                                                          |
+| 180-181                     | Cancel/edit reflection (UI actions)                                                                          |
+| 186                         | Toggle/close override panel                                                                                  |
+| 195-196                     | Toggle section folder/card (UI)                                                                              |
+| 209-210                     | Toggle module folder, open color picker                                                                      |
+| 220-221, 223, 225, 227-228  | Rubric: switch section, toggle expand, cancel edit, edit UI, switch view, open panel                         |
+| 233                         | Narrative copy (clipboard)                                                                                   |
+| 242-244                     | Term rating: next/prev student nav, obs filter                                                               |
+| 247-253                     | Report config: anonymize toggle, tab switch, student picker toggles, print                                   |
+| 255, 258, 264-268, 270, 272 | Import wizard: trigger, cancel, toggle, step nav, back, skip, relink start/back/cancel/next                  |
+| 273-308                     | All Nav & Filter rows: searches, sorts, filters, tab switches, sidebar, modals, sheet dismiss, retry, reload |
+| 311-313                     | Export actions (read-only downloads, no write)                                                               |
 
 ---
 
@@ -740,8 +740,7 @@ Summary of revisions applied during review:
 
 6. **Student ownership model.** Students are owned by teacher (`teacher_id` FK). If a student appears in another teacher's courses, they'd need a separate Student record. Is this the intended model, or should Student be independent with Enrollment carrying the full relationship?
 
-7. **ObservationTemplate creation.** Row 159 shows quick-posting from templates but no rows show template *creation or editing*. Are templates app-provided (seed data), or teacher-created through a UI that wasn't inventoried?
-
+7. **ObservationTemplate creation.** Row 159 shows quick-posting from templates but no rows show template _creation or editing_. Are templates app-provided (seed data), or teacher-created through a UI that wasn't inventoried?
 
 ---
 
