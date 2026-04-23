@@ -334,7 +334,8 @@ function _calcGroup(scores, method, decayWeight, assessmentWeights) {
       let avg = valid[0].score;
       for (let i = 1; i < valid.length; i++) {
         const w = (assessmentWeights && assessmentWeights[valid[i].assessmentId]) || 1;
-        avg = avg * (1 - dw) + (valid[i].score * dw * w) / (1 - dw + dw * w);
+        const denom = 1 - dw + dw * w;
+        avg = (avg * (1 - dw) + valid[i].score * dw * w) / denom;
       }
       return Math.round(avg);
     }
@@ -368,8 +369,9 @@ function calcProficiency(scores, method, decayWeight, opts) {
   if (formProf === 0) return summProf; // no formative evidence, use summative only
   if (summProf === 0) return formProf; // no summative evidence, use formative only
 
-  const raw = summProf * cw.summative + formProf * cw.formative;
-  return Math.round(raw);
+  const weightTotal = cw.summative + cw.formative;
+  const raw = (summProf * cw.summative + formProf * cw.formative) / weightTotal;
+  return Math.min(4, Math.round(raw));
 }
 
 /** Get all score entries for a student on a specific tag, excluding excused and converting points-mode scores.
