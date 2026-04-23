@@ -214,4 +214,7 @@ Keep only the recent tail here for startup context.
 - `2026-04-22 | session-19 | docs-cleanup-pass-4 | rewrote ARCHITECTURE.md as a current-state architecture doc centered on the live boot flow, explicit v2 RPC dispatch model, offline queue, grading model, and deployment/runtime boundaries.`
 - `2026-04-22 | session-20 | docs-cleanup-pass-5 | relabeled docs/diagrams/README.md as a reference-only index, folded the Lucidchart source pointers into it, and archived docs/lucidchart-user-flowcharts.md so the diagram layer stops reading like a live operational doc set.`
 
+- `2026-04-23 | session-22 | docs-backend-cleanup | deleted 7 stale design-phase archive files (DECISIONS.md, DESIGN-SYSTEM.md, INSTRUCTIONS.md, smtp-setup.md, smoke-tests.*, duplicate schema.sql); added "Status: Shipped" banners to erd/auth/read/write-paths docs; removed dead links from README, ARCHITECTURE, CLAUDE, erd.`
+- `2026-04-23 | session-22 | P4.1 | promoted categories into import_json_restore: added categories UPSERT block (after report_configs, before subjects — FK order); renamed _categories_preview → categories in demo-seed.js; removed strip in applyDemoSeed. Welcome Class seed now persists categories to Supabase. 779 passed + 1 skipped.`
+
 _(next session, keep appending.)_
