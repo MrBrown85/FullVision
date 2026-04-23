@@ -251,51 +251,55 @@ window.DashClassManager = (function () {
 
   async function _dispatchMapToV2(cid, map, forceNewIds) {
     if (!_isCanonicalId(cid)) return;
-    var subjects = map.subjects || [];
-    for (var si = 0; si < subjects.length; si++) {
-      var sub = subjects[si];
-      var oldSubId = sub.id;
-      var subRes = await window.v2.upsertSubject({
-        id: forceNewIds ? null : oldSubId,
-        courseId: cid,
-        name: sub.name,
-        color: sub.color || null,
-        displayOrder: si,
-      });
-      if (subRes && subRes.data && subRes.data !== oldSubId) {
-        _patchMapId(cid, map, oldSubId, subRes.data);
-      }
-    }
-    var sections = map.sections || [];
-    for (var si = 0; si < sections.length; si++) {
-      var sec = sections[si];
-      var oldSecId = sec.id;
-      var secRes = await window.v2.upsertSection({
-        id: forceNewIds ? null : oldSecId,
-        subjectId: sec.subject,
-        name: sec.name,
-        color: sec.color || null,
-        displayOrder: si,
-      });
-      if (secRes && secRes.data && secRes.data !== oldSecId) {
-        _patchMapId(cid, map, oldSecId, secRes.data);
-      }
-      var tags = sec.tags || [];
-      for (var ti = 0; ti < tags.length; ti++) {
-        var tag = tags[ti];
-        var oldTagId = tag.id;
-        var tagRes = await window.v2.upsertTag({
-          id: forceNewIds ? null : oldTagId,
-          sectionId: sec.id,
-          label: tag.name || tag.label || '',
-          code: tag.shortName || tag.code || '',
-          iCanText: tag.text || tag.i_can_statements || '',
-          displayOrder: ti,
+    try {
+      var subjects = map.subjects || [];
+      for (var si = 0; si < subjects.length; si++) {
+        var sub = subjects[si];
+        var oldSubId = sub.id;
+        var subRes = await window.v2.upsertSubject({
+          id: forceNewIds ? null : oldSubId,
+          courseId: cid,
+          name: sub.name,
+          color: sub.color || null,
+          displayOrder: si,
         });
-        if (tagRes && tagRes.data && tagRes.data !== oldTagId) {
-          _patchMapId(cid, map, oldTagId, tagRes.data);
+        if (subRes && subRes.data && subRes.data !== oldSubId) {
+          _patchMapId(cid, map, oldSubId, subRes.data);
         }
       }
+      var sections = map.sections || [];
+      for (var si = 0; si < sections.length; si++) {
+        var sec = sections[si];
+        var oldSecId = sec.id;
+        var secRes = await window.v2.upsertSection({
+          id: forceNewIds ? null : oldSecId,
+          subjectId: sec.subject,
+          name: sec.name,
+          color: sec.color || null,
+          displayOrder: si,
+        });
+        if (secRes && secRes.data && secRes.data !== oldSecId) {
+          _patchMapId(cid, map, oldSecId, secRes.data);
+        }
+        var tags = sec.tags || [];
+        for (var ti = 0; ti < tags.length; ti++) {
+          var tag = tags[ti];
+          var oldTagId = tag.id;
+          var tagRes = await window.v2.upsertTag({
+            id: forceNewIds ? null : oldTagId,
+            sectionId: sec.id,
+            label: tag.name || tag.label || '',
+            code: tag.shortName || tag.code || '',
+            iCanText: tag.text || tag.i_can_statements || '',
+            displayOrder: ti,
+          });
+          if (tagRes && tagRes.data && tagRes.data !== oldTagId) {
+            _patchMapId(cid, map, oldTagId, tagRes.data);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[_dispatchMapToV2] dispatch failed for course', cid, err);
     }
   }
 
