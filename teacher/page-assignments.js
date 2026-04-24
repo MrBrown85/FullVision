@@ -1776,8 +1776,7 @@ window.PageAssignments = (function () {
         btn.classList.remove('active-excused', 'active-ns', 'active-late');
       });
       if (newStatus === 'EXC') row.querySelector('[data-status="EXC"]').classList.add('active-excused');
-      else if (newStatus === 'NS')
-        row.querySelector('[data-status="NS"]').classList.add('active-ns');
+      else if (newStatus === 'NS') row.querySelector('[data-status="NS"]').classList.add('active-ns');
       else if (newStatus === 'LATE') row.querySelector('[data-status="LATE"]').classList.add('active-late');
       // Late doesn't disable scoring — student submitted, just late
       var disableScoring = newStatus && newStatus !== 'LATE';
@@ -2855,13 +2854,7 @@ window.PageAssignments = (function () {
           freshRubrics
             .map(function (r) {
               return (
-                '<option value="' +
-                esc(r.id) +
-                '">' +
-                esc(r.name) +
-                ' (' +
-                r.criteria.length +
-                ' criteria)</option>'
+                '<option value="' + esc(r.id) + '">' + esc(r.name) + ' (' + r.criteria.length + ' criteria)</option>'
               );
             })
             .join('');

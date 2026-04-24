@@ -495,9 +495,7 @@ window.MCardWidgets = (function () {
           });
           if (sec) dotColor = sec.color || '';
         }
-        var dot = dotColor
-          ? '<span class="m-wdg-chip-dot" style="background:' + cssColor(dotColor) + '"></span>'
-          : '';
+        var dot = dotColor ? '<span class="m-wdg-chip-dot" style="background:' + cssColor(dotColor) + '"></span>' : '';
         return '<span class="m-wdg-chip m-wdg-chip-neutral">' + dot + MC.esc(label) + '</span>';
       })
       .join('');

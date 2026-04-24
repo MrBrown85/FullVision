@@ -1662,15 +1662,7 @@ window.PageGradebook = (function () {
     // Use single-row upsert instead of full DELETE+INSERT bulk sync —
     // the bulk pattern is non-transactional and can lose data if INSERT
     // fails after DELETE succeeds.
-    upsertScore(
-      cid,
-      sid,
-      aid,
-      tid,
-      next,
-      assess ? assess.date : courseToday(cid),
-      assess ? assess.type : 'summative',
-    );
+    upsertScore(cid, sid, aid, tid, next, assess ? assess.date : courseToday(cid), assess ? assess.type : 'summative');
     var span = td.querySelector('.gb-score-val');
     span.className = 'gb-score-val s' + next;
     if (next > 0) {
@@ -1740,15 +1732,7 @@ window.PageGradebook = (function () {
         setPointsScore(cid, sid, aid, raw);
       } else {
         var tidVal = td.dataset.tid;
-        upsertScore(
-          cid,
-          sid,
-          aid,
-          tidVal,
-          raw,
-          assess.date || courseToday(cid),
-          assess.type || 'summative',
-        );
+        upsertScore(cid, sid, aid, tidVal, raw, assess.date || courseToday(cid), assess.type || 'summative');
       }
       wrap.remove();
       if (existing) existing.remove();
@@ -2234,16 +2218,7 @@ window.PageGradebook = (function () {
       while (_undoStack.length > 50) _undoStack.shift();
       // Apply score to all tags in this assessment
       tagIds.forEach(function (tid) {
-        upsertScore(
-          cid,
-          sid,
-          aid,
-          tid,
-          val,
-          assess.date || courseToday(cid),
-          assess.type || 'summative',
-          '',
-        );
+        upsertScore(cid, sid, aid, tid, val, assess.date || courseToday(cid), assess.type || 'summative', '');
       });
       clearProfCache();
       inp.remove();

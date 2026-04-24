@@ -68,9 +68,7 @@ describe('getTagScores', () => {
   it('excludes excused assessments', () => {
     mockDataLayer({
       getScores: () => ({
-        stu1: [
-          { score: 3, tagId: 't1', assessmentId: 'a1', date: '2025-01-01', type: 'summative' },
-        ],
+        stu1: [{ score: 3, tagId: 't1', assessmentId: 'a1', date: '2025-01-01', type: 'summative' }],
       }),
       getAssignmentStatuses: () => ({ 'stu1:a1': 'EXC' }),
       getAssessments: () => [{ id: 'a1', type: 'summative' }],
@@ -102,18 +100,14 @@ describe('getTagScores', () => {
   it('converts points-mode scores to proficiency', () => {
     mockDataLayer({
       getScores: () => ({
-        stu1: [
-          { score: 90, tagId: 't1', assessmentId: 'a1', date: '2025-01-01', type: 'summative' },
-        ],
+        stu1: [{ score: 90, tagId: 't1', assessmentId: 'a1', date: '2025-01-01', type: 'summative' }],
       }),
-      getAssessments: () => [
-        { id: 'a1', type: 'summative', scoreMode: 'points', maxPoints: 100 },
-      ],
+      getAssessments: () => [{ id: 'a1', type: 'summative', scoreMode: 'points', maxPoints: 100 }],
     });
 
     const result = getTagScores('test', 'stu1', 't1');
-    expect(result[0].score).toBe(4);       // 90% → proficiency 4
-    expect(result[0].rawPoints).toBe(90);   // original preserved
+    expect(result[0].score).toBe(4); // 90% → proficiency 4
+    expect(result[0].rawPoints).toBe(90); // original preserved
   });
 
   it('returns empty array for nonexistent student', () => {
@@ -171,9 +165,7 @@ describe('getTagProficiency', () => {
 describe('getSectionProficiency', () => {
   it('averages tag proficiencies', () => {
     mockDataLayer({
-      getSections: () => [
-        { id: 'sec1', tags: [{ id: 't1' }, { id: 't2' }] },
-      ],
+      getSections: () => [{ id: 'sec1', tags: [{ id: 't1' }, { id: 't2' }] }],
       getScores: () => ({
         stu1: [
           { score: 4, tagId: 't1', assessmentId: 'a1', date: '2025-01-01', type: 'summative' },
@@ -192,13 +184,9 @@ describe('getSectionProficiency', () => {
 
   it('uses teacher override when present', () => {
     mockDataLayer({
-      getSections: () => [
-        { id: 'sec1', tags: [{ id: 't1' }] },
-      ],
+      getSections: () => [{ id: 'sec1', tags: [{ id: 't1' }] }],
       getScores: () => ({
-        stu1: [
-          { score: 2, tagId: 't1', assessmentId: 'a1', date: '2025-01-01', type: 'summative' },
-        ],
+        stu1: [{ score: 2, tagId: 't1', assessmentId: 'a1', date: '2025-01-01', type: 'summative' }],
       }),
       getAssessments: () => [{ id: 'a1', type: 'summative', weight: 1 }],
       getCourseConfig: () => ({ calcMethod: 'mostRecent', decayWeight: 0.65 }),
@@ -275,10 +263,15 @@ describe('getGroupProficiency', () => {
       ],
       getCourseConfig: () => ({ calcMethod: 'mostRecent', decayWeight: 0.65 }),
       getGroupedSections: () => ({
-        groups: [{ group: { id: 'g1', name: 'Group 1', color: '#6366f1', sortOrder: 0 }, sections: [
-          { id: 'sec1', tags: [{ id: 't1' }], groupId: 'g1' },
-          { id: 'sec2', tags: [{ id: 't2' }], groupId: 'g1' },
-        ]}],
+        groups: [
+          {
+            group: { id: 'g1', name: 'Group 1', color: '#6366f1', sortOrder: 0 },
+            sections: [
+              { id: 'sec1', tags: [{ id: 't1' }], groupId: 'g1' },
+              { id: 'sec2', tags: [{ id: 't2' }], groupId: 'g1' },
+            ],
+          },
+        ],
         ungrouped: [],
       }),
     });
@@ -289,16 +282,17 @@ describe('getGroupProficiency', () => {
 
   it('returns 0 when group sections have no evidence', () => {
     mockDataLayer({
-      getSections: () => [
-        { id: 'sec1', tags: [{ id: 't1' }], groupId: 'g1' },
-      ],
+      getSections: () => [{ id: 'sec1', tags: [{ id: 't1' }], groupId: 'g1' }],
       getScores: () => ({}),
       getAssessments: () => [],
       getCourseConfig: () => ({ calcMethod: 'mostRecent', decayWeight: 0.65 }),
       getGroupedSections: () => ({
-        groups: [{ group: { id: 'g1', name: 'Group 1', color: '#6366f1', sortOrder: 0 }, sections: [
-          { id: 'sec1', tags: [{ id: 't1' }], groupId: 'g1' },
-        ]}],
+        groups: [
+          {
+            group: { id: 'g1', name: 'Group 1', color: '#6366f1', sortOrder: 0 },
+            sections: [{ id: 'sec1', tags: [{ id: 't1' }], groupId: 'g1' }],
+          },
+        ],
         ungrouped: [],
       }),
     });
@@ -349,14 +343,20 @@ describe('getOverallProficiency (with groups)', () => {
       getCourseConfig: () => ({ calcMethod: 'mostRecent', decayWeight: 0.65 }),
       getGroupedSections: () => ({
         groups: [
-          { group: { id: 'g1', name: 'Group 1', color: '#6366f1', sortOrder: 0 }, sections: [
-            { id: 'sec1', tags: [{ id: 't1' }], groupId: 'g1' },
-            { id: 'sec2', tags: [{ id: 't2' }], groupId: 'g1' },
-          ]},
-          { group: { id: 'g2', name: 'Group 2', color: '#06b6d4', sortOrder: 1 }, sections: [
-            { id: 'sec3', tags: [{ id: 't3' }], groupId: 'g2' },
-            { id: 'sec4', tags: [{ id: 't4' }], groupId: 'g2' },
-          ]},
+          {
+            group: { id: 'g1', name: 'Group 1', color: '#6366f1', sortOrder: 0 },
+            sections: [
+              { id: 'sec1', tags: [{ id: 't1' }], groupId: 'g1' },
+              { id: 'sec2', tags: [{ id: 't2' }], groupId: 'g1' },
+            ],
+          },
+          {
+            group: { id: 'g2', name: 'Group 2', color: '#06b6d4', sortOrder: 1 },
+            sections: [
+              { id: 'sec3', tags: [{ id: 't3' }], groupId: 'g2' },
+              { id: 'sec4', tags: [{ id: 't4' }], groupId: 'g2' },
+            ],
+          },
         ],
         ungrouped: [{ id: 'sec5', tags: [{ id: 't5' }] }],
       }),
@@ -384,10 +384,13 @@ describe('getOverallProficiency (with groups)', () => {
         { id: 'a2', type: 'summative', weight: 1 },
       ],
       getCourseConfig: () => ({ calcMethod: 'mostRecent', decayWeight: 0.65 }),
-      getGroupedSections: () => ({ groups: [], ungrouped: [
-        { id: 'sec1', tags: [{ id: 't1' }] },
-        { id: 'sec2', tags: [{ id: 't2' }] },
-      ]}),
+      getGroupedSections: () => ({
+        groups: [],
+        ungrouped: [
+          { id: 'sec1', tags: [{ id: 't1' }] },
+          { id: 'sec2', tags: [{ id: 't2' }] },
+        ],
+      }),
     });
 
     // (4 + 2) / 2 = 3 — same as original behavior
@@ -396,23 +399,18 @@ describe('getOverallProficiency (with groups)', () => {
 
   it('skips empty groups in overall calculation', () => {
     mockDataLayer({
-      getSections: () => [
-        { id: 'sec1', tags: [{ id: 't1' }], groupId: 'g1' },
-      ],
+      getSections: () => [{ id: 'sec1', tags: [{ id: 't1' }], groupId: 'g1' }],
       getScores: () => ({
-        stu1: [
-          { score: 4, tagId: 't1', assessmentId: 'a1', date: '2025-01-01', type: 'summative' },
-        ],
+        stu1: [{ score: 4, tagId: 't1', assessmentId: 'a1', date: '2025-01-01', type: 'summative' }],
       }),
-      getAssessments: () => [
-        { id: 'a1', type: 'summative', weight: 1 },
-      ],
+      getAssessments: () => [{ id: 'a1', type: 'summative', weight: 1 }],
       getCourseConfig: () => ({ calcMethod: 'mostRecent', decayWeight: 0.65 }),
       getGroupedSections: () => ({
         groups: [
-          { group: { id: 'g1', name: 'Group 1', color: '#6366f1', sortOrder: 0 }, sections: [
-            { id: 'sec1', tags: [{ id: 't1' }], groupId: 'g1' },
-          ]},
+          {
+            group: { id: 'g1', name: 'Group 1', color: '#6366f1', sortOrder: 0 },
+            sections: [{ id: 'sec1', tags: [{ id: 't1' }], groupId: 'g1' }],
+          },
           { group: { id: 'g2', name: 'Empty Group', color: '#06b6d4', sortOrder: 1 }, sections: [] },
         ],
         ungrouped: [],
@@ -501,10 +499,15 @@ describe('getGroupProficiency (edge cases)', () => {
       getAssessments: () => [{ id: 'a1', type: 'summative', weight: 1 }],
       getCourseConfig: () => ({ calcMethod: 'mostRecent', decayWeight: 0.65 }),
       getGroupedSections: () => ({
-        groups: [{ group: { id: 'g1', name: 'G1', color: '#000', sortOrder: 0 }, sections: [
-          { id: 'sec1', tags: [{ id: 't1' }], groupId: 'g1' },
-          { id: 'sec2', tags: [{ id: 't2' }], groupId: 'g1' },
-        ]}],
+        groups: [
+          {
+            group: { id: 'g1', name: 'G1', color: '#000', sortOrder: 0 },
+            sections: [
+              { id: 'sec1', tags: [{ id: 't1' }], groupId: 'g1' },
+              { id: 'sec2', tags: [{ id: 't2' }], groupId: 'g1' },
+            ],
+          },
+        ],
         ungrouped: [],
       }),
     });
@@ -532,10 +535,15 @@ describe('getGroupProficiency (edge cases)', () => {
       getCourseConfig: () => ({ calcMethod: 'mostRecent', decayWeight: 0.65 }),
       getOverrides: () => ({ stu1: { sec1: { level: 4, reason: 'Conference' } } }),
       getGroupedSections: () => ({
-        groups: [{ group: { id: 'g1', name: 'G1', color: '#000', sortOrder: 0 }, sections: [
-          { id: 'sec1', tags: [{ id: 't1' }], groupId: 'g1' },
-          { id: 'sec2', tags: [{ id: 't2' }], groupId: 'g1' },
-        ]}],
+        groups: [
+          {
+            group: { id: 'g1', name: 'G1', color: '#000', sortOrder: 0 },
+            sections: [
+              { id: 'sec1', tags: [{ id: 't1' }], groupId: 'g1' },
+              { id: 'sec2', tags: [{ id: 't2' }], groupId: 'g1' },
+            ],
+          },
+        ],
         ungrouped: [],
       }),
     });
@@ -546,20 +554,19 @@ describe('getGroupProficiency (edge cases)', () => {
 
   it('handles single-section groups', () => {
     mockDataLayer({
-      getSections: () => [
-        { id: 'sec1', tags: [{ id: 't1' }], groupId: 'g1' },
-      ],
+      getSections: () => [{ id: 'sec1', tags: [{ id: 't1' }], groupId: 'g1' }],
       getScores: () => ({
-        stu1: [
-          { score: 3, tagId: 't1', assessmentId: 'a1', date: '2025-01-01', type: 'summative' },
-        ],
+        stu1: [{ score: 3, tagId: 't1', assessmentId: 'a1', date: '2025-01-01', type: 'summative' }],
       }),
       getAssessments: () => [{ id: 'a1', type: 'summative', weight: 1 }],
       getCourseConfig: () => ({ calcMethod: 'mostRecent', decayWeight: 0.65 }),
       getGroupedSections: () => ({
-        groups: [{ group: { id: 'g1', name: 'G1', color: '#000', sortOrder: 0 }, sections: [
-          { id: 'sec1', tags: [{ id: 't1' }], groupId: 'g1' },
-        ]}],
+        groups: [
+          {
+            group: { id: 'g1', name: 'G1', color: '#000', sortOrder: 0 },
+            sections: [{ id: 'sec1', tags: [{ id: 't1' }], groupId: 'g1' }],
+          },
+        ],
         ungrouped: [],
       }),
     });
@@ -570,9 +577,7 @@ describe('getGroupProficiency (edge cases)', () => {
 
   it('handles multi-tag sections in groups', () => {
     mockDataLayer({
-      getSections: () => [
-        { id: 'sec1', tags: [{ id: 't1' }, { id: 't2' }], groupId: 'g1' },
-      ],
+      getSections: () => [{ id: 'sec1', tags: [{ id: 't1' }, { id: 't2' }], groupId: 'g1' }],
       getScores: () => ({
         stu1: [
           { score: 4, tagId: 't1', assessmentId: 'a1', date: '2025-01-01', type: 'summative' },
@@ -585,9 +590,12 @@ describe('getGroupProficiency (edge cases)', () => {
       ],
       getCourseConfig: () => ({ calcMethod: 'mostRecent', decayWeight: 0.65 }),
       getGroupedSections: () => ({
-        groups: [{ group: { id: 'g1', name: 'G1', color: '#000', sortOrder: 0 }, sections: [
-          { id: 'sec1', tags: [{ id: 't1' }, { id: 't2' }], groupId: 'g1' },
-        ]}],
+        groups: [
+          {
+            group: { id: 'g1', name: 'G1', color: '#000', sortOrder: 0 },
+            sections: [{ id: 'sec1', tags: [{ id: 't1' }, { id: 't2' }], groupId: 'g1' }],
+          },
+        ],
         ungrouped: [],
       }),
     });

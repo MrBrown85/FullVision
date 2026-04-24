@@ -233,7 +233,7 @@ Remaining agent work:
 
 ### D8 · Gradebook DOM virtualization `[agent-ready, deferred]`
 
-- What IS in place: network/DB fetch pagination. [_selectCourseTable in shared/data.js:632-665](shared/data.js) pages past PostgREST's 1000-row cap when loading scores; [`p_page_size`](shared/data.js) is passed on bulk reads. A course with 5k scores correctly loads every row.
+- What IS in place: network/DB fetch pagination. [\_selectCourseTable in shared/data.js:632-665](shared/data.js) pages past PostgREST's 1000-row cap when loading scores; [`p_page_size`](shared/data.js) is passed on bulk reads. A course with 5k scores correctly loads every row.
 - What is NOT in place: DOM-side virtualization. [page-gradebook.js:830](teacher/page-gradebook.js) does `sortedStudents.forEach(...)` and builds every row into an HTML string assigned via innerHTML. A class with 25-30 students × 50-80 assessments = 1.5-2.4k cells, which modern browsers handle without issue. Degradation shows up around 8-10k cells (year-end 30-student class with 200+ assessment columns) and becomes noticeable on low-end Chromebooks.
 - Fix if needed: virtualize the row list (IntersectionObserver + fixed-height row tracks, render only the visible window).
 - Deferred because current pilot-class sizes stay comfortably under the degradation threshold. Revisit if teacher feedback reports year-end jitter, or if a class hits ~10k cells.
