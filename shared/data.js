@@ -118,9 +118,11 @@ const _WELCOME_CLASS_ROUTE_KEY = 'gb-post-bootstrap-route';
 
 /* Echo guard: suppress Realtime refetches for a field+cid shortly after a local save.
    Prevents Realtime events from triggering a refetch that could see partial state
-   while an UPSERT batch is still in-flight. */
+   while an UPSERT batch is still in-flight. 8s covers typical RPC round-trip
+   (p50 ~200ms, p99 ~3s) with headroom; longer windows let stale reads win over
+   a second legitimate write that landed inside the same window. */
 const _echoGuard = {}; // key: "field:cid" → expiry timestamp
-const _ECHO_GUARD_MS = 35000; // suppress echoes for 35s after save (must exceed _SYNC_TIMEOUT_MS)
+const _ECHO_GUARD_MS = 8000;
 
 function _setEchoGuard(field, cid) {
   _echoGuard[field + ':' + cid] = Date.now() + _ECHO_GUARD_MS;
