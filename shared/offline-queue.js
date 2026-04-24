@@ -48,6 +48,19 @@
     create_custom_tag: true,
     upsert_note: true,
     create_student_and_enroll: true,
+    create_course: true,
+    duplicate_course: true,
+    import_roster_csv: true,
+    import_teams_class: true,
+    import_json_restore: true,
+    upsert_observation_template: true,
+    upsert_category: true,
+    upsert_module: true,
+    upsert_rubric: true,
+    upsert_subject: true,
+    upsert_competency_group: true,
+    upsert_section: true,
+    upsert_tag: true,
   };
 
   function _withIdemKey(endpoint, payload, key) {

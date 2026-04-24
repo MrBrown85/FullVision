@@ -46,6 +46,10 @@
   // Initialize immediately (CDN script should already be loaded synchronously)
   _initClient();
 
+  // Cache the one server auth-check per page load so subsequent requireAuth()
+  // callers reuse the same promise instead of round-tripping again.
+  let _authCheckPromise = null;
+
   /* ── Public API ──────────────────────────────────────────────── */
 
   /**
@@ -265,37 +269,27 @@
       return new Promise(function () {});
     }
 
-    // Fast path: check localStorage for cached session (Supabase stores this automatically)
-    const storageKey = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
-    if (storageKey) {
-      try {
-        const stored = JSON.parse(localStorage.getItem(storageKey));
-        if (stored && stored.access_token && stored.expires_at) {
-          // Check if token is expired
-          const expiresAt = stored.expires_at * 1000; // convert to ms
-          if (Date.now() < expiresAt) {
-            return; // Session exists and is not expired — allow page to load
+    // Always call sb.auth.getUser() — it round-trips to the Supabase Auth
+    // server, so a user who edits the cached expires_at in localStorage
+    // cannot fake a live session. getSession() (the old fast path) reads
+    // straight from storage and is editable; getUser() re-validates the
+    // JWT signature server-side.
+    if (!_authCheckPromise) {
+      _authCheckPromise = (async function () {
+        try {
+          const { data, error } = await sb.auth.getUser();
+          if (error || !data || !data.user) {
+            window.location.href = '/login.html';
+            return new Promise(function () {});
           }
+        } catch (e) {
+          console.warn('Session check failed:', e);
+          window.location.href = '/login.html';
+          return new Promise(function () {});
         }
-      } catch (e) {
-        console.warn('Session token parse failed:', e);
-      }
+      })();
     }
-
-    // Slow path: no cached session found, check with Supabase
-    try {
-      const {
-        data: { session },
-      } = await sb.auth.getSession();
-      if (!session) {
-        window.location.href = '/login.html';
-        return new Promise(function () {});
-      }
-    } catch (e) {
-      console.warn('Session check failed:', e);
-      window.location.href = '/login.html';
-      return new Promise(function () {}); // Never resolve — page is redirecting
-    }
+    return _authCheckPromise;
   };
 
   // Listen for auth state changes — notify on mid-session expiry

@@ -105,34 +105,23 @@ Pilot-audit findings from 2026-04-23. Ordered: blockers first, then HIGH, then M
 - Browser preview: legitimate "Try Demo Mode" flow verified (27-student seed, full widgets); attack path (lone `gb-demo-mode=1`) confirms `isDemoMode() === false` and orphan stripped. Production-redirect leg to `/login.html` is environment-gated by `_isDevMode` — will take effect automatically on Netlify since `__ENV.SUPABASE_URL` is set there; un-testable locally without stubbing.
 - Deploy: bump [sw.js](sw.js) `CACHE_NAME` when shipping. No SQL migration needed.
 
-### P5.5 · Session hardening `[agent-ready]` — HIGH
+### P5.5 · Session hardening ✅ done 2026-04-23
 
-- Problem A: [shared/supabase.js:246-261](shared/supabase.js) fast-path checks `expires_at` from localStorage only — editable on shared devices, no server-side validation.
-- Problem B: [shared/data.js:119-135](shared/data.js) 35s echo-guard window is longer than typical RPC timeout (~5–10s). A batch taking >35s can trigger a Realtime refetch mid-flight and surface stale state.
-- Fix A: call `sb.auth.getUser()` (server round-trip, ~200ms) once per page load, cache for that page load only; drop the `expires_at`-only branch in production (keep for dev-mode stub).
-- Fix B: reduce echo guard to 8s, or gate the refetch on server-provided `updated_at` comparison rather than time alone.
-- Acceptance: manually-edited `expires_at` in localStorage does not grant access; long-running batch completes without a stale-refetch race.
+- Fix A landed: [shared/supabase.js](shared/supabase.js) `requireAuth()` now always round-trips `sb.auth.getUser()` (server-side JWT validation); the old localStorage `expires_at` fast-path is gone. Result is cached via `_authCheckPromise` so repeated `requireAuth()` calls on one page load share one server round-trip. Demo-mode + dev-mode branches unchanged.
+- Fix B landed: `_ECHO_GUARD_MS` in [shared/data.js](shared/data.js) reduced `35000` → `8000`. The old 35s window could swallow a second legitimate write that landed inside it; 8s still covers the p99 RPC round-trip (~3s) with headroom.
+- Tests: [tests/session-hardening.test.js](tests/session-hardening.test.js) — 5 cases covering getUser-hit, forged-expires_at rejection, getUser-throws fallback, per-page-load caching, and the 8000ms source-pin. Full suite 804 passed + 1 skipped.
 
-### P5.6 · Idempotency retrofit follow-up `[agent-ready]` — HIGH
+### P5.6 · Idempotency retrofit ✅ done 2026-04-23
 
-- Phase 1 done 2026-04-23: [migrations/20260423_write_path_idempotency.sql](migrations/20260423_write_path_idempotency.sql) retrofits `create_observation`, `create_assessment`, `duplicate_assessment`, `create_custom_tag`, `upsert_note`, `create_student_and_enroll`. `IDEMPOTENT_ENDPOINTS` allowlist in [shared/offline-queue.js](shared/offline-queue.js) matches.
-- Deploy still needed: apply the migration to `gradebook-prod` (`[user-blocked]` until the user runs the MCP call).
-- Follow-up retrofits (same three-line pattern; see docstring at top of the migration):
-  - `create_course`, `duplicate_course`.
-  - `import_roster_csv`, `import_teams_class`, `import_json_restore`.
-  - `upsert_observation_template`.
-  - Null-id insert branch of `upsert_category`, `upsert_module`, `upsert_rubric`, `upsert_subject`, `upsert_competency_group`, `upsert_section`, `upsert_tag`.
-- Each retrofit: (1) add `p_idempotency_key uuid default null` as last param, (2) `fv_idem_check` at top — early-return cached result, (3) `fv_idem_store` before final `return`, (4) update `grant execute` signature, (5) add endpoint name to `IDEMPOTENT_ENDPOINTS` in the client.
+- Phase 1 done 2026-04-23: [migrations/20260423_write_path_idempotency.sql](migrations/20260423_write_path_idempotency.sql) retrofits `create_observation`, `create_assessment`, `duplicate_assessment`, `create_custom_tag`, `upsert_note`, `create_student_and_enroll`. Applied to `gradebook-prod` as `fullvision_v2_write_path_idempotency`; cron `fv_idempotency_cleanup` scheduled (`*/15 * * * *`, 24h retention).
+- Phase 2 done 2026-04-23: [migrations/20260423_write_path_idempotency_phase2.sql](migrations/20260423_write_path_idempotency_phase2.sql) retrofits the remaining 13 RPCs — `create_course`, `duplicate_course`, `import_roster_csv`, `import_teams_class`, `import_json_restore`, `upsert_observation_template`, and the null-id insert branch of `upsert_category`, `upsert_module`, `upsert_rubric`, `upsert_subject`, `upsert_competency_group`, `upsert_section`, `upsert_tag`. Applied to `gradebook-prod` as three migrations (`fullvision_v2_write_path_idempotency_phase2`, `_imports`, `_import_json_restore`, `_upserts`). All 19 idempotent RPCs verified via `pg_get_function_identity_arguments` to expose the `p_idempotency_key` overload. 0 security advisor lints post-deploy.
+- `IDEMPOTENT_ENDPOINTS` allowlist in [shared/offline-queue.js](shared/offline-queue.js) now covers all 19 endpoints. Client-side queue retries pass `entry.id` as the idempotency key so a blip-after-commit replay returns the cached row id instead of duplicating.
 
 ### P5.7 · XSS hardening follow-up `[agent-ready]` — HIGH
 
 Day 1 done 2026-04-23: audit script [scripts/audit-innerhtml.mjs](scripts/audit-innerhtml.mjs) shipped; 117 sites catalogued (47 LITERAL + 15 TRUSTED_EXPR + 11 ESC_WRAPPED proven safe, 44 UNKNOWN needing review); `cssColor()` helper in [shared/data.js](shared/data.js) with 7 unit tests; color-format validation migration [migrations/20260423_color_format_validation.sql](migrations/20260423_color_format_validation.sql); gradebook `data-tip` WeakMap refactor; 3 defence-in-depth wraps landed. Audit regenerates via `node scripts/audit-innerhtml.mjs`.
 
-Deploy steps owed (user):
-
-- Pre-scan prod for malformed colors: `select table_name, count(*) from (... union all ...) where color is not null and color !~ '^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$'`. Normalize any rows before the constraint migration runs.
-- Apply `migrations/20260423_color_format_validation.sql`.
-- Bump `CACHE_NAME` in [sw.js](sw.js) (currently `fullvision-v35`).
+Deploy done 2026-04-23: pre-scan returned 0 malformed rows across course/subject/competency_group/section/module; migration applied to `gradebook-prod` as `fullvision_v2_color_format_validation` (CHECK constraints VALIDATED from day one); [sw.js](sw.js) `CACHE_NAME` bumped `fullvision-v36` → `fullvision-v37`.
 
 Remaining agent work:
 
