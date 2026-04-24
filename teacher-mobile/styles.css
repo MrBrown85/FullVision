@@ -944,6 +944,96 @@ body.mobile-mode :focus:not(:focus-visible) {
   color: #fff;
   border-color: var(--active);
 }
+/* Wrapping variant used inside the Grade-picker filter sheet — categories
+ * and modules can exceed one line. */
+.m-filter-strip-wrap {
+  flex-wrap: wrap;
+  overflow-x: visible;
+  padding-bottom: 0;
+}
+
+/* ── Grade Filter Bar ──────────────────────────────────────── */
+.m-grade-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 16px 12px;
+}
+.m-grade-filter-bar .m-segmented {
+  flex: 1;
+  margin: 0;
+}
+.m-grade-filter-btn {
+  position: relative;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 10px;
+  background: var(--overlay-pressed);
+  color: var(--text);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.15s;
+}
+.m-grade-filter-btn:active {
+  background: var(--overlay-hover, var(--overlay-pressed));
+}
+.m-grade-filter-badge {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--active);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}
+
+/* ── Grade Filter Sheet ────────────────────────────────────── */
+.m-filter-sheet-heading {
+  font-size: 20px;
+  font-weight: 700;
+  padding: 4px 0 12px;
+}
+.m-filter-sheet-section {
+  margin-bottom: 18px;
+}
+.m-filter-sheet-title {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-2);
+  margin-bottom: 8px;
+}
+.m-filter-sheet-section .m-filter-strip,
+.m-filter-sheet-section .m-segmented {
+  margin: 0;
+  padding: 0;
+}
+.m-filter-sheet-footer {
+  display: flex;
+  gap: 12px;
+  padding: 12px 0 env(safe-area-inset-bottom, 0px);
+  position: sticky;
+  bottom: 0;
+  background: var(--surface);
+  border-top: 0.5px solid var(--divider-medium);
+  margin-top: 12px;
+}
+.m-filter-sheet-footer .m-btn-ghost,
+.m-filter-sheet-footer .m-btn-primary {
+  flex: 1;
+}
 
 /* ── FAB (Floating Action Button) ──────────────────────────── */
 .m-fab {
@@ -1376,6 +1466,25 @@ body.mobile-mode :focus:not(:focus-visible) {
 /* Score selector row */
 .m-score-group {
   margin-bottom: 20px;
+}
+
+/* Visual disable: when the assessment is flagged NS or EXC (not LATE), the
+ * score rows are non-gradable. Dim and disable pointer events on the score
+ * groups while leaving the status pills fully interactive so the teacher
+ * can still toggle the flag off. Mirrors the `.has-status` row-dim the
+ * desktop gradebook applies in teacher/page-assignments.js. */
+.m-grade-card-surface.m-card-status-disabled .m-score-group {
+  opacity: 0.4;
+  pointer-events: none;
+  filter: saturate(0.3);
+  transition:
+    opacity 0.2s,
+    filter 0.2s;
+}
+.m-grade-card-surface .m-score-group {
+  transition:
+    opacity 0.2s,
+    filter 0.2s;
 }
 .m-score-tag-label {
   display: flex;

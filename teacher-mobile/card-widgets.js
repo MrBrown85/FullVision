@@ -79,7 +79,6 @@ window.MCardWidgets = (function () {
       MC.esc(name) +
       flagHTML +
       '</div>' +
-      (st.pronouns ? '<div class="m-scard-sub">' + MC.esc(st.pronouns) + '</div>' : '') +
       (badges ? '<div class="m-scard-badges">' + badges + '</div>' : '') +
       '</div>' +
       '<div class="m-scard-prof">' +

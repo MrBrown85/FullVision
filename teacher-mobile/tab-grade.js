@@ -8,6 +8,74 @@ window.MGrade = (function () {
   var _undoStack = [];
   var _scrollRAF = null;
 
+  /* ── Filter state ─────────────────────────────────────────────
+   * Per-course, persisted to localStorage under gb-grade-filters-<cid>.
+   * `category` / `module` are inclusive allowlists (empty = no filter).
+   * '__none' sentinel in either array matches assessments with no
+   * categoryId / moduleId. `dateRange` and `gradedStatus` are single-
+   * value selectors. Defaults are the "no filter applied" state. */
+  var _FILTER_DEFAULTS = {
+    category: [],
+    module: [],
+    dateRange: 'all', //  'all' | 'week' | '30d' | 'term'
+    gradedStatus: 'all', //  'all' | 'has-ungraded' | 'fully-graded'
+  };
+  var _filters = _cloneFilters(_FILTER_DEFAULTS);
+  var _segmentMode = 'recent';
+  // Sheet-local staging copy: changes made in the filter sheet only commit
+  // to _filters on Apply. Cancel/swipe-dismiss discards pending changes.
+  var _sheetStaged = null;
+  var _FILTER_ICON_SVG =
+    '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>';
+
+  function _cloneFilters(f) {
+    return {
+      category: (f.category || []).slice(),
+      module: (f.module || []).slice(),
+      dateRange: f.dateRange || 'all',
+      gradedStatus: f.gradedStatus || 'all',
+    };
+  }
+
+  function _loadFilters(cid) {
+    var raw = typeof _safeParseLS === 'function' ? _safeParseLS('gb-grade-filters-' + cid, null) : null;
+    if (!raw || typeof raw !== 'object') return _cloneFilters(_FILTER_DEFAULTS);
+    return {
+      category: Array.isArray(raw.category) ? raw.category.slice() : [],
+      module: Array.isArray(raw.module) ? raw.module.slice() : [],
+      dateRange: ['all', 'week', '30d', 'term'].indexOf(raw.dateRange) >= 0 ? raw.dateRange : 'all',
+      gradedStatus: ['all', 'has-ungraded', 'fully-graded'].indexOf(raw.gradedStatus) >= 0 ? raw.gradedStatus : 'all',
+    };
+  }
+
+  function _saveFilters(cid) {
+    if (typeof _safeLSSet === 'function') {
+      _safeLSSet('gb-grade-filters-' + cid, JSON.stringify(_filters));
+    }
+  }
+
+  function _activeFilterCount() {
+    var n = 0;
+    if (_filters.category.length > 0) n++;
+    if (_filters.module.length > 0) n++;
+    if (_filters.dateRange !== 'all') n++;
+    if (_filters.gradedStatus !== 'all') n++;
+    return n;
+  }
+
+  function _updateFilterBadge() {
+    var badge = document.querySelector('.m-grade-filter-badge');
+    if (!badge) return;
+    var n = _activeFilterCount();
+    if (n > 0) {
+      badge.textContent = String(n);
+      badge.hidden = false;
+    } else {
+      badge.textContent = '';
+      badge.hidden = true;
+    }
+  }
+
   function _assessmentBadgeData(cid, assessment) {
     var categoryId = getAssessmentCategoryId(assessment);
     return {
@@ -25,17 +93,33 @@ window.MGrade = (function () {
     var students = getStudents(cid);
     var allScores = getScores(cid);
 
+    // Load persisted filters for this course.
+    _filters = _loadFilters(cid);
+    _segmentMode = 'recent';
+
     // Sort by date, newest first
     var sorted = assessments.slice().sort(function (a, b) {
       return b.date.localeCompare(a.date);
     });
 
-    // Segmented control
+    // Filter bar: quick segments + a "more filters" icon button that opens
+    // the multi-dimension bottom sheet. Ungraded moved into the sheet as
+    // gradedStatus='has-ungraded' (richer: also supports fully-graded).
+    var activeN = _activeFilterCount();
     var segmented =
+      '<div class="m-grade-filter-bar">' +
       '<div class="m-segmented">' +
       '<button class="m-seg-btn m-seg-active" data-action="m-grade-seg" data-val="recent">Recent</button>' +
       '<button class="m-seg-btn" data-action="m-grade-seg" data-val="all">All</button>' +
-      '<button class="m-seg-btn" data-action="m-grade-seg" data-val="ungraded">Ungraded</button>' +
+      '</div>' +
+      '<button class="m-grade-filter-btn" data-action="m-grade-filter-open" aria-label="Filter assessments">' +
+      _FILTER_ICON_SVG +
+      '<span class="m-grade-filter-badge"' +
+      (activeN > 0 ? '' : ' hidden') +
+      '>' +
+      (activeN > 0 ? activeN : '') +
+      '</span>' +
+      '</button>' +
       '</div>';
 
     var cells = '';
@@ -110,22 +194,80 @@ window.MGrade = (function () {
     );
   }
 
+  /* ── Filter evaluation ──────────────────────────────────────── */
+
+  function _gradedCountFor(a, students, allScores) {
+    var n = 0;
+    students.forEach(function (st) {
+      var stScores = allScores[st.id] || [];
+      if (
+        stScores.some(function (s) {
+          return s.assessmentId === a.id && s.score > 0;
+        })
+      )
+        n++;
+    });
+    return n;
+  }
+
+  /* Returns true if the assessment passes every active filter dimension
+   * plus the current segment mode. `ctx` pre-computes shared values so
+   * we're not rebuilding dates/counts in a hot loop. */
+  function _matchesAllFilters(a, ctx) {
+    // Segment: 'recent' narrows to last 30 days regardless of sheet state.
+    if (_segmentMode === 'recent') {
+      if (ctx.recentCutoff && new Date(a.date) < ctx.recentCutoff) return false;
+    }
+    // Category: '__none' sentinel matches assessments with no categoryId.
+    if (_filters.category.length > 0) {
+      var cat = a.categoryId || '__none';
+      if (_filters.category.indexOf(cat) === -1) return false;
+    }
+    // Module: same sentinel pattern.
+    if (_filters.module.length > 0) {
+      var mod = a.moduleId || '__none';
+      if (_filters.module.indexOf(mod) === -1) return false;
+    }
+    // Date range: segment === 'recent' already applied above, don't double-cut.
+    if (_segmentMode !== 'recent' && _filters.dateRange !== 'all') {
+      var cutoff = ctx.dateCutoffs[_filters.dateRange];
+      if (cutoff && new Date(a.date) < cutoff) return false;
+    }
+    // Graded status.
+    if (_filters.gradedStatus !== 'all') {
+      var graded = _gradedCountFor(a, ctx.students, ctx.allScores);
+      var total = ctx.students.length;
+      if (_filters.gradedStatus === 'has-ungraded' && graded >= total) return false;
+      if (_filters.gradedStatus === 'fully-graded' && graded < total) return false;
+    }
+    return true;
+  }
+
   /* ── Filter assessment list ─────────────────────────────────── */
   function filterAssessments(cid, mode) {
+    if (mode) _segmentMode = mode;
+
     var assessments = getAssessments(cid);
     var students = getStudents(cid);
     var allScores = getScores(cid);
+    var now = new Date();
+    var ctx = {
+      students: students,
+      allScores: allScores,
+      recentCutoff: new Date(now.getTime() - 30 * 86400000),
+      dateCutoffs: {
+        week: new Date(now.getTime() - 7 * 86400000),
+        '30d': new Date(now.getTime() - 30 * 86400000),
+        term: new Date(now.getTime() - 90 * 86400000),
+      },
+    };
 
-    // Update segmented control
-    document.querySelectorAll('.m-seg-btn').forEach(function (btn) {
-      btn.classList.toggle('m-seg-active', btn.getAttribute('data-val') === mode);
+    // Update segmented control active state
+    document.querySelectorAll('.m-seg-btn[data-action="m-grade-seg"]').forEach(function (btn) {
+      btn.classList.toggle('m-seg-active', btn.getAttribute('data-val') === _segmentMode);
     });
 
-    var cells = document.querySelectorAll('#m-grade-list .m-cell');
-    var now = new Date();
-    var thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000);
-
-    cells.forEach(function (cell) {
+    document.querySelectorAll('#m-grade-list .m-cell').forEach(function (cell) {
       var aid = cell.getAttribute('data-aid');
       var a = assessments.find(function (x) {
         return x.id === aid;
@@ -134,25 +276,177 @@ window.MGrade = (function () {
         cell.style.display = 'none';
         return;
       }
-
-      if (mode === 'recent') {
-        cell.style.display = new Date(a.date) >= thirtyDaysAgo ? '' : 'none';
-      } else if (mode === 'ungraded') {
-        var gradedCount = 0;
-        students.forEach(function (st) {
-          var stScores = allScores[st.id] || [];
-          if (
-            stScores.some(function (s) {
-              return s.assessmentId === a.id && s.score > 0;
-            })
-          )
-            gradedCount++;
-        });
-        cell.style.display = gradedCount < students.length ? '' : 'none';
-      } else {
-        cell.style.display = '';
-      }
+      cell.style.display = _matchesAllFilters(a, ctx) ? '' : 'none';
     });
+
+    _updateFilterBadge();
+  }
+
+  /* ── Filter sheet ───────────────────────────────────────────── */
+
+  function _renderFilterSheet(cid) {
+    _sheetStaged = _cloneFilters(_filters);
+
+    var categories = typeof getCategories === 'function' ? getCategories(cid) : [];
+    var modules = typeof getModules === 'function' ? getModules(cid) : [];
+
+    function pill(kind, value, label, active) {
+      return (
+        '<button class="m-filter-pill' +
+        (active ? ' m-filter-active' : '') +
+        '" data-action="m-grade-filter-toggle" data-kind="' +
+        MC.esc(kind) +
+        '" data-val="' +
+        MC.esc(value) +
+        '">' +
+        MC.esc(label) +
+        '</button>'
+      );
+    }
+
+    function seg(kind, options, currentValue) {
+      return (
+        '<div class="m-segmented">' +
+        options
+          .map(function (o) {
+            return (
+              '<button class="m-seg-btn' +
+              (o.val === currentValue ? ' m-seg-active' : '') +
+              '" data-action="m-grade-filter-seg" data-kind="' +
+              MC.esc(kind) +
+              '" data-val="' +
+              MC.esc(o.val) +
+              '">' +
+              MC.esc(o.label) +
+              '</button>'
+            );
+          })
+          .join('') +
+        '</div>'
+      );
+    }
+
+    var catPills = categories
+      .map(function (c) {
+        return pill('category', c.id, c.name, _sheetStaged.category.indexOf(c.id) >= 0);
+      })
+      .join('');
+    catPills += pill('category', '__none', 'No Category', _sheetStaged.category.indexOf('__none') >= 0);
+
+    var modSection = '';
+    if (modules.length > 0) {
+      var modPills = modules
+        .map(function (m) {
+          return pill('module', m.id, m.name, _sheetStaged.module.indexOf(m.id) >= 0);
+        })
+        .join('');
+      modPills += pill('module', '__none', 'No Module', _sheetStaged.module.indexOf('__none') >= 0);
+      modSection =
+        '<div class="m-filter-sheet-section">' +
+        '<div class="m-filter-sheet-title">Module</div>' +
+        '<div class="m-filter-strip m-filter-strip-wrap">' +
+        modPills +
+        '</div>' +
+        '</div>';
+    }
+
+    var dateSeg = seg(
+      'dateRange',
+      [
+        { val: 'all', label: 'All time' },
+        { val: 'week', label: 'This week' },
+        { val: '30d', label: 'Last 30 days' },
+        { val: 'term', label: 'Last term' },
+      ],
+      _sheetStaged.dateRange,
+    );
+
+    var statusSeg = seg(
+      'gradedStatus',
+      [
+        { val: 'all', label: 'All' },
+        { val: 'has-ungraded', label: 'Has ungraded' },
+        { val: 'fully-graded', label: 'Fully graded' },
+      ],
+      _sheetStaged.gradedStatus,
+    );
+
+    return (
+      '<div class="m-filter-sheet">' +
+      '<div class="m-filter-sheet-heading">Filter assessments</div>' +
+      '<div class="m-filter-sheet-section">' +
+      '<div class="m-filter-sheet-title">Category</div>' +
+      '<div class="m-filter-strip m-filter-strip-wrap">' +
+      catPills +
+      '</div>' +
+      '</div>' +
+      modSection +
+      '<div class="m-filter-sheet-section">' +
+      '<div class="m-filter-sheet-title">Date range</div>' +
+      dateSeg +
+      '</div>' +
+      '<div class="m-filter-sheet-section">' +
+      '<div class="m-filter-sheet-title">Graded status</div>' +
+      statusSeg +
+      '</div>' +
+      '<div class="m-filter-sheet-footer">' +
+      '<button class="m-btn-ghost" data-action="m-grade-filter-clear">Clear all</button>' +
+      '<button class="m-btn-primary" data-action="m-grade-filter-apply">Apply</button>' +
+      '</div>' +
+      '</div>'
+    );
+  }
+
+  function openFilterSheet(cid) {
+    MC.presentSheet(_renderFilterSheet(cid), {
+      onClose: function () {
+        _sheetStaged = null;
+      },
+    });
+  }
+
+  /* ── Action dispatch from shell.js ──────────────────────────── */
+
+  function onFilterTogglePill(kind, value) {
+    if (!_sheetStaged) return;
+    var arr = _sheetStaged[kind];
+    if (!Array.isArray(arr)) return;
+    var idx = arr.indexOf(value);
+    if (idx >= 0) arr.splice(idx, 1);
+    else arr.push(value);
+    // Reflect the toggle in the sheet DOM without re-rendering the whole sheet
+    var sel = '.m-filter-pill[data-kind="' + kind + '"][data-val="' + value.replace(/"/g, '\\"') + '"]';
+    var btn = document.querySelector('#m-sheet-container ' + sel);
+    if (btn) btn.classList.toggle('m-filter-active', idx < 0);
+  }
+
+  function onFilterSegChange(kind, value) {
+    if (!_sheetStaged) return;
+    _sheetStaged[kind] = value;
+    // Update the segmented control inside the sheet
+    var container = document.querySelector('#m-sheet-container');
+    if (!container) return;
+    container
+      .querySelectorAll('.m-seg-btn[data-action="m-grade-filter-seg"][data-kind="' + kind + '"]')
+      .forEach(function (btn) {
+        btn.classList.toggle('m-seg-active', btn.getAttribute('data-val') === value);
+      });
+  }
+
+  function applyFilterSheet(cid) {
+    if (_sheetStaged) _filters = _cloneFilters(_sheetStaged);
+    _sheetStaged = null;
+    _saveFilters(cid);
+    MC.dismissSheet();
+    filterAssessments(cid);
+  }
+
+  function clearFilterSheet(cid) {
+    _filters = _cloneFilters(_FILTER_DEFAULTS);
+    _sheetStaged = null;
+    _saveFilters(cid);
+    MC.dismissSheet();
+    filterAssessments(cid);
   }
 
   /* ── Student Card Swiper Screen ─────────────────────────────── */
@@ -241,7 +535,6 @@ window.MGrade = (function () {
       MC.esc(name) +
       badges +
       '</div>' +
-      (st.pronouns ? '<div class="m-grade-student-sub">' + MC.esc(st.pronouns) + '</div>' : '') +
       '</div></div>';
 
     // Score selectors for each tag
@@ -371,7 +664,9 @@ window.MGrade = (function () {
       '<div class="m-swiper-card" data-sid="' +
       st.id +
       '">' +
-      '<div class="m-grade-card-surface">' +
+      '<div class="m-grade-card-surface' +
+      (status === 'NS' || status === 'EXC' ? ' m-card-status-disabled' : '') +
+      '">' +
       header +
       tagGroups +
       statusRow +
@@ -486,6 +781,13 @@ window.MGrade = (function () {
         card.querySelectorAll('.m-score-btn[data-aid="' + aid + '"]').forEach(function (btn) {
           btn.classList.remove('m-score-active');
         });
+      }
+      // Dim the score rows when the assessment is flagged NS or EXC (not
+      // LATE, which doesn't disable grading). Mirrors desktop .has-status.
+      var surface = card.querySelector('.m-grade-card-surface');
+      if (surface) {
+        var disabled = newStatus === 'NS' || newStatus === 'EXC';
+        surface.classList.toggle('m-card-status-disabled', disabled);
       }
     }
 
@@ -609,6 +911,11 @@ window.MGrade = (function () {
   return {
     renderPicker: renderPicker,
     filterAssessments: filterAssessments,
+    openFilterSheet: openFilterSheet,
+    onFilterTogglePill: onFilterTogglePill,
+    onFilterSegChange: onFilterSegChange,
+    applyFilterSheet: applyFilterSheet,
+    clearFilterSheet: clearFilterSheet,
     renderSwiper: renderSwiper,
     setScore: setScore,
     setStatus: setStatus,

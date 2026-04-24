@@ -65,13 +65,19 @@ describe('MGrade.renderPicker', () => {
     expect(html).toContain('m-screen');
   });
 
-  it('shows segmented control with Recent/All/Ungraded', () => {
+  it('shows segmented control with Recent/All + Filter button (Ungraded moved into filter sheet)', () => {
     mockDataLayer({});
     const html = MGrade.renderPicker(CID);
     expect(html).toContain('Recent');
     expect(html).toContain('All');
-    expect(html).toContain('Ungraded');
     expect(html).toContain('m-segmented');
+    // Ungraded is no longer a segment; it's rolled into the filter sheet as
+    // gradedStatus='has-ungraded'.
+    expect(html).not.toContain('data-val="ungraded"');
+    // Filter button with badge slot is rendered.
+    expect(html).toContain('m-grade-filter-btn');
+    expect(html).toContain('m-grade-filter-badge');
+    expect(html).toContain('data-action="m-grade-filter-open"');
   });
 
   it('lists assessments sorted newest first', () => {
@@ -566,6 +572,29 @@ describe('MGrade.setStatus', () => {
     expect(store.stu1[0].score).toBe(3); // preserved
   });
 
+  it('renders m-card-status-disabled on the surface when initial status is NS or EXC', () => {
+    mockDataLayer({
+      getScores: () => ({}),
+      getAssessments: () => [{ id: 'a1', type: 'summative', date: '2025-03-20', tagIds: ['t1'] }],
+      getAssignmentStatuses: () => ({
+        stu1: 'NS', // no effect — keyed wrong; the real lookup is composite-key
+        'stu1:a1': 'NS',
+        'stu2:a1': 'EXC',
+        'stu3:a1': 'LATE',
+      }),
+    });
+    const html = MGrade.renderSwiper(CID, 'a1');
+    // Card for stu1 (NS) and stu2 (EXC) should have the disable class;
+    // stu3 (LATE) should NOT — LATE doesn't disable grading.
+    const stu1Idx = html.indexOf('data-sid="stu1"');
+    const stu2Idx = html.indexOf('data-sid="stu2"');
+    const stu3Idx = html.indexOf('data-sid="stu3"');
+    const next = idx => html.slice(idx, idx + 600);
+    expect(next(stu1Idx)).toContain('m-card-status-disabled');
+    expect(next(stu2Idx)).toContain('m-card-status-disabled');
+    expect(next(stu3Idx)).not.toContain('m-card-status-disabled');
+  });
+
   it('clearing NS does NOT restore scores (destructive by design)', () => {
     // Student had a 3, teacher hit NS (which zeroed), now clears NS — score stays 0.
     let store = {
@@ -587,6 +616,132 @@ describe('MGrade.setStatus', () => {
 describe('MGrade.filterAssessments', () => {
   it('is a callable function', () => {
     expect(typeof MGrade.filterAssessments).toBe('function');
+  });
+});
+
+/* ── Filter sheet: state + persistence + rendering ───────────── */
+describe('MGrade filter sheet', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it('renderPicker hides the filter badge when no filters are persisted', () => {
+    mockDataLayer({});
+    const html = MGrade.renderPicker(CID);
+    // Badge element is rendered but hidden; the hidden attribute is present
+    // and the count slot is empty.
+    const match = html.match(/<span class="m-grade-filter-badge"([^>]*)>([^<]*)<\/span>/);
+    expect(match).not.toBeNull();
+    expect(match[1]).toContain('hidden');
+    expect(match[2].trim()).toBe('');
+  });
+
+  it('renderPicker surfaces the active filter count when filters are persisted', () => {
+    localStorage.setItem(
+      'gb-grade-filters-' + CID,
+      JSON.stringify({ category: ['c1'], module: [], dateRange: '30d', gradedStatus: 'all' }),
+    );
+    mockDataLayer({});
+    const html = MGrade.renderPicker(CID);
+    const match = html.match(/<span class="m-grade-filter-badge"([^>]*)>([^<]*)<\/span>/);
+    expect(match[1]).not.toContain('hidden');
+    expect(match[2].trim()).toBe('2'); // category(1) + dateRange(1)
+  });
+
+  it('applyFilterSheet persists staged filters to localStorage', () => {
+    mockDataLayer({});
+    // Render first so _loadFilters picks up defaults
+    MGrade.renderPicker(CID);
+    // Seed a staged set via openFilterSheet (requires sheet DOM — stub
+    // presentSheet so the HTML isn't actually mounted)
+    const origPresent = window.MComponents.presentSheet;
+    const origDismiss = window.MComponents.dismissSheet;
+    window.MComponents.presentSheet = () => {};
+    window.MComponents.dismissSheet = () => {};
+
+    MGrade.openFilterSheet(CID);
+    MGrade.onFilterTogglePill('category', 'c1');
+    MGrade.onFilterSegChange('dateRange', '30d');
+    MGrade.applyFilterSheet(CID);
+
+    const persisted = JSON.parse(localStorage.getItem('gb-grade-filters-' + CID));
+    expect(persisted.category).toEqual(['c1']);
+    expect(persisted.dateRange).toBe('30d');
+    expect(persisted.gradedStatus).toBe('all');
+
+    window.MComponents.presentSheet = origPresent;
+    window.MComponents.dismissSheet = origDismiss;
+  });
+
+  it('clearFilterSheet wipes persisted filters back to defaults', () => {
+    localStorage.setItem(
+      'gb-grade-filters-' + CID,
+      JSON.stringify({ category: ['c1'], module: ['m1'], dateRange: 'term', gradedStatus: 'has-ungraded' }),
+    );
+    mockDataLayer({});
+    const origPresent = window.MComponents.presentSheet;
+    const origDismiss = window.MComponents.dismissSheet;
+    window.MComponents.presentSheet = () => {};
+    window.MComponents.dismissSheet = () => {};
+
+    MGrade.renderPicker(CID);
+    MGrade.clearFilterSheet(CID);
+
+    const persisted = JSON.parse(localStorage.getItem('gb-grade-filters-' + CID));
+    expect(persisted).toEqual({ category: [], module: [], dateRange: 'all', gradedStatus: 'all' });
+
+    window.MComponents.presentSheet = origPresent;
+    window.MComponents.dismissSheet = origDismiss;
+  });
+
+  it('filter sheet HTML includes Category + Date range + Graded status sections, hides Module when no modules', () => {
+    mockDataLayer({
+      getCategories: () => [{ id: 'c1', name: 'Labs' }],
+      getModules: () => [],
+    });
+    const origPresent = window.MComponents.presentSheet;
+    let capturedHtml = '';
+    window.MComponents.presentSheet = html => {
+      capturedHtml = html;
+    };
+
+    MGrade.renderPicker(CID);
+    MGrade.openFilterSheet(CID);
+
+    expect(capturedHtml).toContain('Category');
+    expect(capturedHtml).toContain('Date range');
+    expect(capturedHtml).toContain('Graded status');
+    expect(capturedHtml).toContain('Labs'); // the one category chip
+    expect(capturedHtml).toContain('No Category');
+    expect(capturedHtml).not.toContain('m-filter-sheet-title">Module'); // Module section hidden
+    expect(capturedHtml).toContain('data-action="m-grade-filter-apply"');
+    expect(capturedHtml).toContain('data-action="m-grade-filter-clear"');
+
+    window.MComponents.presentSheet = origPresent;
+  });
+
+  it('filter sheet HTML includes Module section when course has modules', () => {
+    mockDataLayer({
+      getCategories: () => [],
+      getModules: () => [{ id: 'm1', name: 'Unit 1' }],
+    });
+    const origPresent = window.MComponents.presentSheet;
+    let capturedHtml = '';
+    window.MComponents.presentSheet = html => {
+      capturedHtml = html;
+    };
+
+    MGrade.renderPicker(CID);
+    MGrade.openFilterSheet(CID);
+
+    expect(capturedHtml).toContain('m-filter-sheet-title">Module');
+    expect(capturedHtml).toContain('Unit 1');
+
+    window.MComponents.presentSheet = origPresent;
   });
 });
 

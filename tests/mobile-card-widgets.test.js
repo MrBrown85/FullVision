@@ -167,13 +167,15 @@ afterEach(() => {
 
 /* ── Task 2: hero ──────────────────────────────────────────────── */
 describe('MCardWidgets.render hero', () => {
-  it('renders avatar, name, pronouns, and proficiency', () => {
+  it('renders avatar, name, and proficiency (pronouns removed from card)', () => {
     mockWidgetDataLayer({ getOverallProficiency: () => 3.5 });
     const html = MCardWidgets.render('hero', STUDENT, CID, DATA);
     expect(html).toContain('m-scard-hero');
     expect(html).toContain('m-scard-avatar');
     expect(html).toContain('Cece Adams');
-    expect(html).toContain('she/her');
+    // Pronouns were intentionally dropped from card surfaces; the full
+    // profile page is where identity info lives.
+    expect(html).not.toContain('she/her');
     expect(html).toContain('3.5');
   });
 
