@@ -13,7 +13,8 @@ dist/
 *.map
 
 # Project-specific excludes
-.claude/
+.claude/*
+!.claude/settings.json
 mockups/
 test-*.html
 
