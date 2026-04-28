@@ -18,10 +18,12 @@ staged=$(git diff --cached --name-only --diff-filter=ACMR 2>/dev/null)
 
 # Feed staged paths to prettier via a null-delimited list so filenames with
 # spaces survive. --ignore-unknown drops anything prettier can't handle.
+# Errors surface to stderr — silencing them previously hid real formatting
+# bugs that then failed CI (--log-level silent + ||true was a footgun).
 printf '%s\n' "$staged" \
   | tr '\n' '\0' \
-  | xargs -0 npx --offline --no-install prettier --write --ignore-unknown --log-level silent \
-    >/dev/null 2>&1 || true
+  | xargs -0 npx --offline --no-install prettier --write --ignore-unknown --log-level warn \
+  || printf '[format-staged] prettier exited non-zero — see output above\n' >&2
 
 # Determine which staged files prettier actually edited (= have a worktree
 # diff against the index after the rewrite).
