@@ -27,6 +27,19 @@ window.PageObservations = (function () {
   var _students = [];
   var _studentsById = {};
 
+  /* ── Focus card state ───────────────────────────────────── */
+  var _focusObId = null;
+  var _focusSid = null;
+  var _focusEl = null;
+  var _focusBackdropEl = null;
+  var _focusDebounce = null;
+  var _focusDraft = null;
+  var _focusTagPopoverOpen = false;
+  var _focusFocusables = null;
+  var _focusLastActiveEl = null;
+  var _motion = null;
+  var _viewMode = 'list';
+
   var SEARCH_SVG =
     '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
   var TAG_SVG =
@@ -187,6 +200,24 @@ window.PageObservations = (function () {
       '</span><input class="obs-search-input" type="text" placeholder="Search\u2026" id="obs-search-input" value="' +
       esc(searchQuery) +
       '" aria-label="Search observations"></div>' +
+      '<div class="obs-view-toggle" role="tablist" aria-label="View mode">' +
+      ['list', 'sticky', 'waveform']
+        .map(function (m) {
+          var label = m === 'list' ? 'List' : m === 'sticky' ? 'Sticky' : 'Voice';
+          return (
+            '<button type="button" data-action="setView" data-view="' +
+            m +
+            '" class="' +
+            (_viewMode === m ? 'active' : '') +
+            '" role="tab" aria-selected="' +
+            (_viewMode === m) +
+            '">' +
+            label +
+            '</button>'
+          );
+        })
+        .join('') +
+      '</div>' +
       '<span class="obs-toolbar-count" id="obs-count">' +
       filtered.length +
       (filtered.length !== allObs.length ? ' of ' + allObs.length : '') +
@@ -247,7 +278,7 @@ window.PageObservations = (function () {
       '</div>';
 
     // Feed
-    h += '<div class="obs-feed" id="obs-feed">' + renderFeedHtml(filtered) + '</div>';
+    h += '<div class="obs-feed view-' + _viewMode + '" id="obs-feed">' + renderFeedHtml(filtered) + '</div>';
 
     document.getElementById('main').innerHTML = h;
     wireSearch();
@@ -601,9 +632,15 @@ window.PageObservations = (function () {
           var sent = ob.sentiment && OBS_SENTIMENTS[ob.sentiment];
           var bc = sent ? sent.border : ft ? tagColor(ft) : 'var(--border)';
           out +=
-            '<div class="obs-card" style="border-left-color:' +
+            '<div class="obs-card" data-action="openFocus" data-sid="' +
+            ob.studentId +
+            '" data-obid="' +
+            ob.id +
+            '"' +
+            (ob.sentiment ? ' data-sentiment="' + ob.sentiment + '"' : '') +
+            ' style="border-left-color:' +
             bc +
-            (sent ? ';background:' + sent.tint : '') +
+            (sent && _viewMode === 'list' ? ';background:' + sent.tint : '') +
             '">' +
             '<div class="obs-card-header"><span>' +
             (sent ? '<span class="obs-card-sentiment">' + sent.icon + '</span>' : '') +
@@ -620,11 +657,12 @@ window.PageObservations = (function () {
                 '</span>'
               : '') +
             '</span>' +
+            '<span class="obs-card-header-actions">' +
             '<button class="obs-card-delete" data-action="deleteOb" data-sid="' +
             ob.studentId +
             '" data-obid="' +
             ob.id +
-            '" data-stop-prop="true" title="Delete">🗑</button></div>' +
+            '" data-stop-prop="true" title="Delete">🗑</button></span></div>' +
             '<div class="obs-card-text">' +
             esc(ob.text) +
             '</div>';
@@ -955,8 +993,406 @@ window.PageObservations = (function () {
     }
   }
 
+  /* ══════════════════════════════════════════════════════════
+     FOCUS CARD — click-to-expand inline editor
+     ══════════════════════════════════════════════════════════ */
+
+  function setView(v) {
+    if (!v || (v !== 'list' && v !== 'sticky' && v !== 'waveform')) return;
+    if (_viewMode === v) return;
+    _viewMode = v;
+    try {
+      localStorage.setItem('obs-view-mode', v);
+    } catch (e) {}
+    var feedEl = document.getElementById('obs-feed');
+    if (feedEl) feedEl.className = 'obs-feed view-' + _viewMode;
+    document.querySelectorAll('.obs-view-toggle button').forEach(function (b) {
+      var isActive = b.dataset.view === _viewMode;
+      b.classList.toggle('active', isActive);
+      b.setAttribute('aria-selected', isActive);
+    });
+    refreshFeedAndCount();
+  }
+
+  async function _ensureMotion() {
+    if (_motion) return _motion;
+    try {
+      _motion = await import('https://esm.sh/motion@10.18.0');
+    } catch (err) {
+      console.warn('Motion One unavailable; falling back to CSS transitions', err);
+      _motion = { animate: null };
+    }
+    return _motion;
+  }
+
+  function _focusFindOb(sid, obId) {
+    var byStudent = getQuickObs(activeCourse) || {};
+    var arr = byStudent[sid] || [];
+    for (var i = 0; i < arr.length; i++) {
+      if (arr[i].id === obId) {
+        // Raw entries in the by-student map don't carry studentId — only the
+        // map key does. Attach it so the focus card can resolve the student.
+        return Object.assign({ studentId: sid }, arr[i]);
+      }
+    }
+    return null;
+  }
+
+  function _focusDoSave(patch) {
+    if (!_focusSid || !_focusObId) return;
+    updateQuickOb(activeCourse, _focusSid, _focusObId, patch);
+    refreshFeedAndCount();
+  }
+
+  function _focusScheduleSave(patch) {
+    if (_focusDebounce) clearTimeout(_focusDebounce);
+    _focusDebounce = setTimeout(function () {
+      _focusDebounce = null;
+      _focusDoSave(patch);
+    }, 500);
+  }
+
+  function _focusFlush(patch) {
+    if (_focusDebounce) {
+      clearTimeout(_focusDebounce);
+      _focusDebounce = null;
+    }
+    var merged = patch;
+    if (patch && _focusDraft && !('text' in patch)) {
+      merged = Object.assign({}, patch, { text: _focusDraft.text });
+    }
+    _focusDoSave(merged);
+  }
+
+  function _focusFlushAll() {
+    if (!_focusDebounce || !_focusDraft) return;
+    clearTimeout(_focusDebounce);
+    _focusDebounce = null;
+    _focusDoSave({
+      text: _focusDraft.text,
+      sentiment: _focusDraft.sentiment,
+      context: _focusDraft.context,
+      dims: _focusDraft.dims,
+    });
+  }
+
+  function _renderFocusDimsRow() {
+    var h = '';
+    _focusDraft.dims.forEach(function (t) {
+      var info = resolveTag(t);
+      h +=
+        '<span class="obs-focus-dim"><span class="dim-dot" style="background:' +
+        tagColor(t) +
+        '"></span>' +
+        esc(info.label) +
+        '<button type="button" class="obs-focus-dim-remove" aria-label="Remove ' +
+        esc(info.label) +
+        '" data-action="focusRemoveDim" data-value="' +
+        esc(t) +
+        '">&times;</button></span>';
+    });
+    h +=
+      '<div class="obs-focus-tag-popover-wrap">' +
+      '<button type="button" class="obs-focus-add-tag" data-action="toggleFocusTagPopover">+ Tag</button>' +
+      renderTagPopover('focus-tag-dropdown', _focusDraft.dims, 'toggleFocusDim') +
+      '</div>';
+    return h;
+  }
+
+  function _refreshFocusDimsRow() {
+    if (!_focusEl) return;
+    var row = _focusEl.querySelector('.obs-focus-dims');
+    if (!row) return;
+    row.innerHTML = _renderFocusDimsRow();
+    _focusFocusables = null;
+    if (_focusTagPopoverOpen) {
+      var pop = document.getElementById('focus-tag-dropdown');
+      if (pop) pop.classList.add('open');
+    }
+  }
+
+  function _renderFocusCardHtml(ob) {
+    var s = _studentsById[ob.studentId];
+    var sn = s ? displayName(s) : ob.studentId;
+    var tm = new Date(ob.created).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' });
+    var sentAttr = _focusDraft.sentiment ? ' data-sentiment="' + _focusDraft.sentiment + '"' : '';
+
+    var sentimentPills = Object.entries(OBS_SENTIMENTS)
+      .map(function (entry) {
+        var key = entry[0];
+        var v = entry[1];
+        var active = _focusDraft.sentiment === key;
+        return (
+          '<button type="button" class="obs-focus-pill' +
+          (active ? ' active' : '') +
+          '" data-sentiment="' +
+          key +
+          '" data-action="focusToggleSentiment" data-value="' +
+          key +
+          '">' +
+          v.icon +
+          ' ' +
+          esc(v.label) +
+          '</button>'
+        );
+      })
+      .join('');
+
+    var contextPills = Object.entries(OBS_CONTEXTS)
+      .map(function (entry) {
+        var key = entry[0];
+        var v = entry[1];
+        var active = _focusDraft.context === key;
+        return (
+          '<button type="button" class="obs-focus-pill' +
+          (active ? ' active' : '') +
+          '" data-action="focusToggleContext" data-value="' +
+          key +
+          '">' +
+          v.icon +
+          ' ' +
+          esc(v.label) +
+          '</button>'
+        );
+      })
+      .join('');
+
+    return (
+      '<div class="obs-focus-card" id="obs-focus-card"' +
+      sentAttr +
+      ' role="dialog" aria-modal="true" aria-label="Observation focus" tabindex="-1">' +
+      '<div class="obs-focus-header"><span><span class="obs-focus-student">' +
+      esc(sn) +
+      '</span><span class="obs-focus-time">' +
+      tm +
+      '</span></span>' +
+      '<button type="button" class="obs-focus-close" aria-label="Close" data-action="closeFocus">&times;</button>' +
+      '</div>' +
+      '<div class="obs-focus-sentiments">' +
+      sentimentPills +
+      '</div>' +
+      '<textarea class="obs-focus-textarea" id="focus-textarea" aria-label="Observation text" data-action-input="focusText">' +
+      esc(_focusDraft.text) +
+      '</textarea>' +
+      '<div class="obs-focus-contexts">' +
+      contextPills +
+      '</div>' +
+      '<div class="obs-focus-dims">' +
+      _renderFocusDimsRow() +
+      '</div>' +
+      '</div>'
+    );
+  }
+
+  function _autosizeFocusTextarea() {
+    var ta = document.getElementById('focus-textarea');
+    if (!ta) return;
+    ta.style.height = 'auto';
+    ta.style.height = Math.min(280, Math.max(140, ta.scrollHeight)) + 'px';
+  }
+
+  async function _animateFocusOpen() {
+    if (!_focusBackdropEl || !_focusEl) return;
+    // Add `.open` so the underlying resting state is fully visible — Motion One
+    // and the CSS fallback both end up here; Motion One simply paints a spring
+    // transition on top before settling to the underlying style.
+    _focusBackdropEl.classList.add('open');
+    _focusEl.classList.add('open');
+    var m = await _ensureMotion();
+    if (!_focusBackdropEl || !_focusEl || !m.animate) return;
+    // Suppress the CSS transition so Motion One owns the timing.
+    _focusBackdropEl.style.transition = 'none';
+    _focusEl.style.transition = 'none';
+    m.animate(_focusBackdropEl, { opacity: [0, 1] }, { duration: 0.2 });
+    m.animate(
+      _focusEl,
+      { opacity: [0, 1], transform: ['scale(0.96)', 'scale(1)'] },
+      { type: 'spring', stiffness: 300, damping: 30 },
+    );
+  }
+
+  async function _animateFocusClose(done) {
+    var bd = _focusBackdropEl;
+    var card = _focusEl;
+    if (!bd || !card) {
+      done();
+      return;
+    }
+    var m = await _ensureMotion();
+    if (!bd || !card) {
+      done();
+      return;
+    }
+    // Remove `.open` so the underlying resting state is hidden; the animation
+    // (Motion One or CSS) interpolates from current → that resting state.
+    bd.classList.remove('open');
+    card.classList.remove('open');
+    if (!m.animate) {
+      setTimeout(done, 200);
+      return;
+    }
+    bd.style.transition = 'none';
+    card.style.transition = 'none';
+    m.animate(bd, { opacity: [1, 0] }, { duration: 0.15 });
+    var anim = m.animate(card, { opacity: [1, 0], transform: ['scale(1)', 'scale(0.96)'] }, { duration: 0.15 });
+    if (anim && anim.finished && typeof anim.finished.then === 'function') {
+      anim.finished.then(done, done);
+    } else {
+      setTimeout(done, 160);
+    }
+  }
+
+  function openFocus(sid, obId) {
+    if (_focusBackdropEl) return; // already open
+    var ob = _focusFindOb(sid, obId);
+    if (!ob) return;
+    _focusSid = sid;
+    _focusObId = obId;
+    _focusDraft = {
+      text: ob.text || '',
+      sentiment: ob.sentiment || null,
+      context: ob.context || null,
+      dims: (ob.dims || []).slice(),
+    };
+    _focusTagPopoverOpen = false;
+    _focusLastActiveEl = document.activeElement;
+
+    _focusBackdropEl = document.createElement('div');
+    _focusBackdropEl.className = 'obs-focus-backdrop';
+    _focusBackdropEl.id = 'obs-focus-backdrop';
+    _focusBackdropEl.innerHTML = _renderFocusCardHtml(ob);
+    document.body.appendChild(_focusBackdropEl);
+    _focusEl = _focusBackdropEl.querySelector('.obs-focus-card');
+
+    _animateFocusOpen();
+
+    requestAnimationFrame(function () {
+      _autosizeFocusTextarea();
+      var ta = document.getElementById('focus-textarea');
+      if (ta) {
+        ta.focus();
+        var len = ta.value.length;
+        try {
+          ta.setSelectionRange(len, len);
+        } catch (e) {}
+      }
+    });
+  }
+
+  function closeFocus() {
+    if (!_focusBackdropEl) return;
+    _focusFlushAll();
+    _focusTagPopoverOpen = false;
+    var bd = _focusBackdropEl;
+    _animateFocusClose(function () {
+      if (bd && bd.parentNode) bd.parentNode.removeChild(bd);
+      _focusBackdropEl = null;
+      _focusEl = null;
+      _focusObId = null;
+      _focusSid = null;
+      _focusDraft = null;
+      _focusFocusables = null;
+      if (_focusLastActiveEl && document.body.contains(_focusLastActiveEl)) {
+        try {
+          _focusLastActiveEl.focus();
+        } catch (e) {}
+      }
+      _focusLastActiveEl = null;
+    });
+  }
+
+  function focusToggleSentiment(val) {
+    if (!_focusDraft) return;
+    _focusDraft.sentiment = _focusDraft.sentiment === val ? null : val;
+    if (_focusEl) {
+      if (_focusDraft.sentiment) _focusEl.setAttribute('data-sentiment', _focusDraft.sentiment);
+      else _focusEl.removeAttribute('data-sentiment');
+      _focusEl.querySelectorAll('.obs-focus-sentiments .obs-focus-pill').forEach(function (b) {
+        b.classList.toggle('active', b.dataset.value === _focusDraft.sentiment);
+      });
+    }
+    _focusFlush({ sentiment: _focusDraft.sentiment });
+  }
+
+  function focusToggleContext(val) {
+    if (!_focusDraft) return;
+    _focusDraft.context = _focusDraft.context === val ? null : val;
+    if (_focusEl) {
+      _focusEl.querySelectorAll('.obs-focus-contexts .obs-focus-pill').forEach(function (b) {
+        b.classList.toggle('active', b.dataset.value === _focusDraft.context);
+      });
+    }
+    _focusFlush({ context: _focusDraft.context });
+  }
+
+  function focusRemoveDim(t) {
+    if (!_focusDraft) return;
+    _focusDraft.dims = _focusDraft.dims.filter(function (d) {
+      return d !== t;
+    });
+    _refreshFocusDimsRow();
+    _focusFlush({ dims: _focusDraft.dims });
+  }
+
+  function toggleFocusDim(t) {
+    if (!_focusDraft) return;
+    var idx = _focusDraft.dims.indexOf(t);
+    if (idx >= 0) _focusDraft.dims.splice(idx, 1);
+    else _focusDraft.dims.push(t);
+    _refreshFocusDimsRow();
+    _focusFlush({ dims: _focusDraft.dims });
+  }
+
+  function toggleFocusTagPopover() {
+    var pop = document.getElementById('focus-tag-dropdown');
+    if (!pop) return;
+    _focusTagPopoverOpen = !_focusTagPopoverOpen;
+    pop.classList.toggle('open', _focusTagPopoverOpen);
+    if (_focusTagPopoverOpen) {
+      var s = pop.querySelector('.obs-popover-search');
+      if (s) {
+        s.value = '';
+        s.focus();
+      }
+    }
+  }
+
+  function _focusGetFocusables() {
+    if (!_focusEl) return [];
+    if (_focusFocusables) return _focusFocusables;
+    _focusFocusables = Array.from(
+      _focusEl.querySelectorAll('button, [href], input, textarea, [tabindex]:not([tabindex="-1"])'),
+    ).filter(function (el) {
+      return !el.disabled && el.offsetParent !== null;
+    });
+    return _focusFocusables;
+  }
+
+  function _focusHandleTab(e) {
+    var focusables = _focusGetFocusables();
+    if (focusables.length === 0) return;
+    var first = focusables[0];
+    var last = focusables[focusables.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+
   /* ── Click-away for popovers ────────────────────────────── */
   function _handleMousedown(e) {
+    if (_focusBackdropEl && e.target === _focusBackdropEl) {
+      closeFocus();
+      return;
+    }
+    if (_focusTagPopoverOpen && !e.target.closest('#focus-tag-dropdown') && !e.target.closest('.obs-focus-add-tag')) {
+      _focusTagPopoverOpen = false;
+      var pop = document.getElementById('focus-tag-dropdown');
+      if (pop) pop.classList.remove('open');
+    }
     if (
       _openPopover &&
       !e.target.closest('.obs-popover') &&
@@ -977,6 +1413,13 @@ window.PageObservations = (function () {
     if (e.target.matches('[data-action-input="tagPopoverSearch"]')) {
       filterPopoverItems(e.target.dataset.popoverId, e.target.value);
     }
+    if (e.target.matches('[data-action-input="focusText"]')) {
+      if (_focusDraft) {
+        _focusDraft.text = e.target.value;
+        _autosizeFocusTextarea();
+        _focusScheduleSave({ text: e.target.value });
+      }
+    }
   }
 
   /* ── Delegated click handler ──────────────────────────────── */
@@ -992,6 +1435,7 @@ window.PageObservations = (function () {
       toggleCaptureTag: toggleCaptureTag,
       toggleFilterStudent: toggleFilterStudent,
       toggleFilterTag: toggleFilterTag,
+      toggleFocusDim: toggleFocusDim,
     };
 
     var handlers = {
@@ -1038,6 +1482,27 @@ window.PageObservations = (function () {
         var fn = toggleFns[el.dataset.toggleFn];
         if (fn) fn(el.dataset.value);
       },
+      openFocus: function () {
+        openFocus(el.dataset.sid, el.dataset.obid);
+      },
+      closeFocus: function () {
+        closeFocus();
+      },
+      focusToggleSentiment: function () {
+        focusToggleSentiment(el.dataset.value);
+      },
+      focusToggleContext: function () {
+        focusToggleContext(el.dataset.value);
+      },
+      focusRemoveDim: function () {
+        focusRemoveDim(el.dataset.value);
+      },
+      toggleFocusTagPopover: function () {
+        toggleFocusTagPopover();
+      },
+      setView: function () {
+        setView(el.dataset.view);
+      },
     };
     if (handlers[action]) {
       if (el.tagName !== 'SELECT') e.preventDefault();
@@ -1047,6 +1512,17 @@ window.PageObservations = (function () {
 
   /* ── Capture input keydown ──────────────────────────────── */
   function _handleKeydown(e) {
+    if (_focusBackdropEl) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeFocus();
+        return;
+      }
+      if (e.key === 'Tab') {
+        _focusHandleTab(e);
+        return;
+      }
+    }
     if (e.target.id === 'capture-input' && e.metaKey && e.key === 'Enter') {
       e.preventDefault();
       submitOb();
@@ -1072,6 +1548,10 @@ window.PageObservations = (function () {
     filterSentiment = null;
     _openPopover = null;
     _filterStripOpen = false;
+    try {
+      var stored = localStorage.getItem('obs-view-mode');
+      if (stored === 'list' || stored === 'sticky' || stored === 'waveform') _viewMode = stored;
+    } catch (e) {}
 
     // Show sidebar
     document.getElementById('sidebar-mount').style.display = '';
@@ -1112,6 +1592,19 @@ window.PageObservations = (function () {
     _listeners = [];
     if (_searchDebounce) clearTimeout(_searchDebounce);
     _searchDebounce = null;
+    if (_focusDebounce) clearTimeout(_focusDebounce);
+    _focusDebounce = null;
+    if (_focusBackdropEl && _focusBackdropEl.parentNode) {
+      _focusBackdropEl.parentNode.removeChild(_focusBackdropEl);
+    }
+    _focusBackdropEl = null;
+    _focusEl = null;
+    _focusObId = null;
+    _focusSid = null;
+    _focusDraft = null;
+    _focusFocusables = null;
+    _focusLastActiveEl = null;
+    _focusTagPopoverOpen = false;
     Object.keys(_deleteTimers).forEach(function (k) {
       clearTimeout(_deleteTimers[k]);
     });
