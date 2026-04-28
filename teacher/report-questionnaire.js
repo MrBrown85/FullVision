@@ -153,7 +153,16 @@ window.ReportQuestionnaire = (function () {
     if (idx >= 0) list.splice(idx, 1);
     else list.push(aId);
     upsertTermRating(_activeCourse, sid, termId, { mentionAssessments: list });
-    rerender();
+    // Toggle in place — full rerender would reset scroll position. The
+    // selection only affects this row's checkbox + .selected class; nothing
+    // else on screen reads mentionAssessments.
+    const row = document.querySelector(`.tq-assignment-row[data-aid="${aId}"][data-sid="${sid}"]`);
+    if (row) {
+      const nowSelected = idx < 0;
+      row.classList.toggle('selected', nowSelected);
+      const check = row.querySelector('.tq-tag-check');
+      if (check) check.textContent = nowSelected ? '✓' : '';
+    }
   }
 
   function tqToggleOb(sid, obId) {
@@ -1137,23 +1146,51 @@ window.ReportQuestionnaire = (function () {
       .sort((a, b) => a.prof - b.prof)
       .slice(0, 6);
 
-    // Per-assignment performance
+    // Per-assignment performance.
+    //   • `overall` (0–4) drives the row color via PROF_COLORS — uniform across
+    //     score modes thanks to Calc.getAssessmentOverallScore's normalization.
+    //   • `displayLabel` reflects the score mode the teacher actually used:
+    //       points-mode  → "85 / 100" (raw average over maxPoints)
+    //       rubric-mode  → proficiency word (rubric crit averages map to 0–4)
+    //       proficiency  → proficiency word
+    //     This matches the principle that a quiz scored out of 100 should not
+    //     be reported as "Proficient" in a place where the assessment method's
+    //     own units are clearer.
     const assessments = getAssessments(cid);
-    const studentScores = getScores(cid)[sid] || [];
+    const studentScoresForPerf = getScores(cid)[sid] || [];
     const assignmentPerf = assessments
       .map(a => {
-        const aScores = studentScores.filter(s => s.assessmentId === a.id && s.score > 0);
-        const avg = aScores.length > 0 ? aScores.reduce((sum, s) => sum + s.score, 0) / aScores.length : 0;
+        const overall =
+          window.Calc && window.Calc.getAssessmentOverallScore
+            ? window.Calc.getAssessmentOverallScore(cid, sid, a.id)
+            : null;
+        if (overall == null) return null;
+        let displayLabel;
+        if (a.scoreMode === 'points' && a.maxPoints > 0) {
+          const raw = studentScoresForPerf
+            .filter(s => s.assessmentId === a.id && s.score != null && s.score !== '' && isFinite(Number(s.score)))
+            .map(s => Number(s.score));
+          if (raw.length > 0) {
+            const rawAvg = raw.reduce((sum, v) => sum + v, 0) / raw.length;
+            const rounded = Math.round(rawAvg * 10) / 10; // one decimal
+            displayLabel = `${rounded} / ${a.maxPoints}`;
+          } else {
+            displayLabel = '—';
+          }
+        } else {
+          const r = Math.round(overall);
+          displayLabel = PROF_LABELS[r] || '—';
+        }
         return {
           id: a.id,
           title: a.title,
           date: a.date,
           categoryLabel: getAssessmentCategoryName(cid, a),
-          avg,
-          count: aScores.length,
+          avg: overall,
+          displayLabel,
         };
       })
-      .filter(a => a.count > 0)
+      .filter(a => a != null)
       .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
     // Saved quick-profile data
@@ -1361,7 +1398,7 @@ window.ReportQuestionnaire = (function () {
         <span class="tq-tag-check">${selected ? '✓' : ''}</span>
         <span class="tq-assignment-title">${esc(a.title)}</span>
         <span class="tq-assignment-type">${esc(a.categoryLabel)}</span>
-        <span class="tq-assignment-score" style="color:${PROF_COLORS[r] || 'var(--text-3)'}">${PROF_LABELS[r]}</span>
+        <span class="tq-assignment-score" style="color:${PROF_COLORS[r] || 'var(--text-3)'}">${esc(a.displayLabel)}</span>
       </div>`;
       });
       html += `</div></div>`;
