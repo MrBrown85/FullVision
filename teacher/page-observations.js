@@ -27,6 +27,8 @@ window.PageObservations = (function () {
   var _students = [];
   var _studentsById = {};
 
+  var VIEW_MODES = ['list', 'sticky', 'waveform'];
+
   /* ── Focus card state ───────────────────────────────────── */
   var _focusObId = null;
   var _focusSid = null;
@@ -201,22 +203,20 @@ window.PageObservations = (function () {
       esc(searchQuery) +
       '" aria-label="Search observations"></div>' +
       '<div class="obs-view-toggle" role="tablist" aria-label="View mode">' +
-      ['list', 'sticky', 'waveform']
-        .map(function (m) {
-          var label = m === 'list' ? 'List' : m === 'sticky' ? 'Sticky' : 'Voice';
-          return (
-            '<button type="button" data-action="setView" data-view="' +
-            m +
-            '" class="' +
-            (_viewMode === m ? 'active' : '') +
-            '" role="tab" aria-selected="' +
-            (_viewMode === m) +
-            '">' +
-            label +
-            '</button>'
-          );
-        })
-        .join('') +
+      VIEW_MODES.map(function (m) {
+        var label = m === 'list' ? 'List' : m === 'sticky' ? 'Sticky' : 'Voice';
+        return (
+          '<button type="button" data-action="setView" data-view="' +
+          m +
+          '" class="' +
+          (_viewMode === m ? 'active' : '') +
+          '" role="tab" aria-selected="' +
+          (_viewMode === m) +
+          '">' +
+          label +
+          '</button>'
+        );
+      }).join('') +
       '</div>' +
       '<span class="obs-toolbar-count" id="obs-count">' +
       filtered.length +
@@ -583,6 +583,64 @@ window.PageObservations = (function () {
   }
 
   /* ── Feed HTML ──────────────────────────────────────────── */
+  function renderObsCardHtml(ob) {
+    var s = _studentsById[ob.studentId];
+    var sn = s ? displayName(s) : ob.studentId;
+    var tm = new Date(ob.created).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' });
+    var ft = (ob.dims && ob.dims[0]) || null;
+    var sent = ob.sentiment && OBS_SENTIMENTS[ob.sentiment];
+    var bc = sent ? sent.border : ft ? tagColor(ft) : 'var(--border)';
+    var out =
+      '<div class="obs-card" data-action="openFocus" data-sid="' +
+      ob.studentId +
+      '" data-obid="' +
+      ob.id +
+      '"' +
+      (ob.sentiment ? ' data-sentiment="' + ob.sentiment + '"' : '') +
+      ' style="border-left-color:' +
+      bc +
+      '">' +
+      '<div class="obs-card-header"><span>' +
+      (sent ? '<span class="obs-card-sentiment">' + sent.icon + '</span>' : '') +
+      '<span class="obs-card-student">' +
+      esc(sn) +
+      '</span><span class="obs-card-time">' +
+      tm +
+      '</span>' +
+      (ob.context && OBS_CONTEXTS[ob.context]
+        ? '<span class="obs-card-context">' +
+          OBS_CONTEXTS[ob.context].icon +
+          ' ' +
+          OBS_CONTEXTS[ob.context].label +
+          '</span>'
+        : '') +
+      '</span>' +
+      '<span class="obs-card-header-actions">' +
+      '<button class="obs-card-delete" data-action="deleteOb" data-sid="' +
+      ob.studentId +
+      '" data-obid="' +
+      ob.id +
+      '" data-stop-prop="true" title="Delete">🗑</button></span></div>' +
+      '<div class="obs-card-text">' +
+      esc(ob.text) +
+      '</div>';
+    if (ob.dims && ob.dims.length > 0) {
+      out += '<div class="obs-card-dims">';
+      ob.dims.forEach(function (t) {
+        var info = resolveTag(t);
+        out +=
+          '<span class="obs-card-dim"><span class="dim-dot" style="background:' +
+          tagColor(t) +
+          '"></span>' +
+          esc(info.label) +
+          '</span>';
+      });
+      out += '</div>';
+    }
+    out += '</div>';
+    return out;
+  }
+
   function renderFeedHtml(filtered) {
     if (filtered.length === 0) {
       var n = getAllQuickObs(activeCourse).length;
@@ -625,61 +683,7 @@ window.PageObservations = (function () {
                 });
         out += '<div class="obs-feed-date-group"><div class="obs-feed-date-label">' + lbl + '</div>';
         groups[ds].forEach(function (ob) {
-          var s = _studentsById[ob.studentId];
-          var sn = s ? displayName(s) : ob.studentId;
-          var tm = new Date(ob.created).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' });
-          var ft = (ob.dims && ob.dims[0]) || null;
-          var sent = ob.sentiment && OBS_SENTIMENTS[ob.sentiment];
-          var bc = sent ? sent.border : ft ? tagColor(ft) : 'var(--border)';
-          out +=
-            '<div class="obs-card" data-action="openFocus" data-sid="' +
-            ob.studentId +
-            '" data-obid="' +
-            ob.id +
-            '"' +
-            (ob.sentiment ? ' data-sentiment="' + ob.sentiment + '"' : '') +
-            ' style="border-left-color:' +
-            bc +
-            (sent && _viewMode === 'list' ? ';background:' + sent.tint : '') +
-            '">' +
-            '<div class="obs-card-header"><span>' +
-            (sent ? '<span class="obs-card-sentiment">' + sent.icon + '</span>' : '') +
-            '<span class="obs-card-student">' +
-            esc(sn) +
-            '</span><span class="obs-card-time">' +
-            tm +
-            '</span>' +
-            (ob.context && OBS_CONTEXTS[ob.context]
-              ? '<span class="obs-card-context">' +
-                OBS_CONTEXTS[ob.context].icon +
-                ' ' +
-                OBS_CONTEXTS[ob.context].label +
-                '</span>'
-              : '') +
-            '</span>' +
-            '<span class="obs-card-header-actions">' +
-            '<button class="obs-card-delete" data-action="deleteOb" data-sid="' +
-            ob.studentId +
-            '" data-obid="' +
-            ob.id +
-            '" data-stop-prop="true" title="Delete">🗑</button></span></div>' +
-            '<div class="obs-card-text">' +
-            esc(ob.text) +
-            '</div>';
-          if (ob.dims && ob.dims.length > 0) {
-            out += '<div class="obs-card-dims">';
-            ob.dims.forEach(function (t) {
-              var info = resolveTag(t);
-              out +=
-                '<span class="obs-card-dim"><span class="dim-dot" style="background:' +
-                tagColor(t) +
-                '"></span>' +
-                esc(info.label) +
-                '</span>';
-            });
-            out += '</div>';
-          }
-          out += '</div>';
+          out += renderObsCardHtml(ob);
         });
         out += '</div>';
       });
@@ -998,7 +1002,7 @@ window.PageObservations = (function () {
      ══════════════════════════════════════════════════════════ */
 
   function setView(v) {
-    if (!v || (v !== 'list' && v !== 'sticky' && v !== 'waveform')) return;
+    if (VIEW_MODES.indexOf(v) === -1) return;
     if (_viewMode === v) return;
     _viewMode = v;
     try {
@@ -1011,7 +1015,6 @@ window.PageObservations = (function () {
       b.classList.toggle('active', isActive);
       b.setAttribute('aria-selected', isActive);
     });
-    refreshFeedAndCount();
   }
 
   async function _ensureMotion() {
@@ -1041,7 +1044,14 @@ window.PageObservations = (function () {
   function _focusDoSave(patch) {
     if (!_focusSid || !_focusObId) return;
     updateQuickOb(activeCourse, _focusSid, _focusObId, patch);
-    refreshFeedAndCount();
+    // Patch only the affected card, not the whole feed — saving on every
+    // keystroke (after debounce) would otherwise rebuild ~117 cards each time.
+    // The closing path calls refreshFeedAndCount() once to reconcile filters.
+    var card = document.querySelector('.obs-card[data-sid="' + _focusSid + '"][data-obid="' + _focusObId + '"]');
+    if (card) {
+      var fresh = _focusFindOb(_focusSid, _focusObId);
+      if (fresh) card.outerHTML = renderObsCardHtml(fresh);
+    }
   }
 
   function _focusScheduleSave(patch) {
@@ -1283,6 +1293,9 @@ window.PageObservations = (function () {
     if (!_focusBackdropEl) return;
     _focusFlushAll();
     _focusTagPopoverOpen = false;
+    // Reconcile filters/count once on close — per-keystroke saves only patched
+    // the single edited card.
+    refreshFeedAndCount();
     var bd = _focusBackdropEl;
     _animateFocusClose(function () {
       if (bd && bd.parentNode) bd.parentNode.removeChild(bd);
@@ -1550,7 +1563,7 @@ window.PageObservations = (function () {
     _filterStripOpen = false;
     try {
       var stored = localStorage.getItem('obs-view-mode');
-      if (stored === 'list' || stored === 'sticky' || stored === 'waveform') _viewMode = stored;
+      if (VIEW_MODES.indexOf(stored) !== -1) _viewMode = stored;
     } catch (e) {}
 
     // Show sidebar

@@ -806,6 +806,17 @@
   color: var(--text-2);
 }
 
+/* List-view sentiment tints (CSS-only so view switching needs no re-render) */
+.obs-feed.view-list .obs-card[data-sentiment='strength'] {
+  background: rgba(46, 125, 50, 0.08);
+}
+.obs-feed.view-list .obs-card[data-sentiment='growth'] {
+  background: rgba(0, 122, 255, 0.08);
+}
+.obs-feed.view-list .obs-card[data-sentiment='concern'] {
+  background: rgba(192, 122, 0, 0.08);
+}
+
 /* ══════════════════════════════════════════════════════════════
    VIEW: STICKY NOTES — Post-it grid with pastel sentiment colors
    ══════════════════════════════════════════════════════════════ */
