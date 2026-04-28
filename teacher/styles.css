@@ -1795,9 +1795,12 @@ body.offline-active #app-dock {
   padding: 2px 7px;
   border-radius: var(--radius-xl);
 }
+/* Color is driven by inline style from CATEGORY_PALETTE
+   (shared/constants.js → categoryTintByIndex). These fallbacks only apply
+   when no inline style is set. */
 .type-badge-s {
-  background: var(--active);
-  color: #fff;
+  background: var(--surface-2);
+  color: var(--text-2);
 }
 .type-badge-f {
   background: var(--surface-2);

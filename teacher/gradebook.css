@@ -440,9 +440,13 @@
   border-radius: var(--radius);
   line-height: 1.4;
 }
+/* .sum / .form are kept for legacy hooks but the actual color is now driven
+   by an inline style derived from CATEGORY_PALETTE (see shared/constants.js
+   categoryTintByIndex). The fallbacks below only show up if inline style is
+   missing for some reason. */
 .gb-assess-type-pill.sum {
-  background: var(--active);
-  color: #fff;
+  background: var(--surface-2);
+  color: var(--text-2);
 }
 .gb-assess-type-pill.form {
   background: var(--surface-2);

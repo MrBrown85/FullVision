@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Category Pill Mockups</title>
+    <style>
+      :root {
+        --bg: #f7f8fb;
+        --surface: #fff;
+        --border: #e5e7eb;
+        --border-strong: #d1d5db;
+        --text: #111827;
+        --text-2: #4b5563;
+        --text-3: #9ca3af;
+        --active: #3b82f6;
+        --radius: 4px;
+        --radius-xl: 999px;
+        --tracking-wide: 0.06em;
+        --text-2xs: 10px;
+        --text-xs: 11px;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        margin: 0;
+        padding: 32px;
+      }
+      h1 {
+        font-size: 18px;
+        margin: 0 0 6px;
+      }
+      h2 {
+        font-size: 14px;
+        margin: 28px 0 10px;
+        color: var(--text-2);
+      }
+      .lead {
+        color: var(--text-2);
+        font-size: 13px;
+        margin-bottom: 20px;
+      }
+      .variant {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 18px 20px;
+        margin-bottom: 14px;
+      }
+      .variant-title {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-3);
+        margin-bottom: 12px;
+        font-weight: 600;
+      }
+      .row {
+        display: flex;
+        gap: 20px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-bottom: 6px;
+      }
+      .group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        align-items: flex-start;
+      }
+      .group-label {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text);
+      }
+      .group-meta {
+        font-size: 11px;
+        color: var(--text-3);
+        font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
+      }
+      .notes {
+        margin-top: 10px;
+        font-size: 12px;
+        color: var(--text-2);
+      }
+      .current-warning {
+        background: #fef3c7;
+        border: 1px solid #fbbf24;
+        color: #78350f;
+        padding: 10px 14px;
+        border-radius: 6px;
+        font-size: 13px;
+        margin-bottom: 18px;
+      }
+
+      /* === CURRENT (for reference) ============================== */
+      .pill-current {
+        font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
+        font-size: var(--text-2xs);
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: var(--tracking-wide);
+        padding: 1px 6px;
+        border-radius: var(--radius);
+        line-height: 1.4;
+        background: var(--active);
+        color: #fff;
+      }
+
+      /* === V1: Soft tint + matching darker text ================= */
+      .pill-v1 {
+        font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
+        font-size: var(--text-2xs);
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: var(--tracking-wide);
+        padding: 2px 7px;
+        border-radius: var(--radius);
+        line-height: 1.4;
+      }
+      .pill-v1.cat-quiz {
+        background: hsl(220, 90%, 95%);
+        color: hsl(220, 65%, 38%);
+      }
+      .pill-v1.cat-lab {
+        background: hsl(160, 60%, 92%);
+        color: hsl(160, 55%, 28%);
+      }
+      .pill-v1.cat-proj {
+        background: hsl(280, 70%, 95%);
+        color: hsl(280, 50%, 38%);
+      }
+
+      /* === V2: Tint + thin matching border (more defined) ====== */
+      .pill-v2 {
+        font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
+        font-size: var(--text-2xs);
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: var(--tracking-wide);
+        padding: 1px 7px;
+        border-radius: 999px;
+        line-height: 1.4;
+        border: 1px solid;
+      }
+      .pill-v2.cat-quiz {
+        background: hsl(220, 90%, 96%);
+        color: hsl(220, 65%, 38%);
+        border-color: hsl(220, 60%, 80%);
+      }
+      .pill-v2.cat-lab {
+        background: hsl(160, 60%, 94%);
+        color: hsl(160, 55%, 28%);
+        border-color: hsl(160, 45%, 70%);
+      }
+      .pill-v2.cat-proj {
+        background: hsl(280, 70%, 96%);
+        color: hsl(280, 50%, 38%);
+        border-color: hsl(280, 45%, 80%);
+      }
+
+      /* === V3: Outline only + colored leading dot ============== */
+      .pill-v3 {
+        font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
+        font-size: var(--text-2xs);
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: var(--tracking-wide);
+        padding: 1px 8px 1px 6px;
+        border-radius: 999px;
+        line-height: 1.4;
+        background: transparent;
+        border: 1px solid var(--border-strong);
+        color: var(--text-2);
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .pill-v3::before {
+        content: '';
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        flex: 0 0 7px;
+      }
+      .pill-v3.cat-quiz::before {
+        background: hsl(220, 70%, 55%);
+      }
+      .pill-v3.cat-lab::before {
+        background: hsl(160, 55%, 45%);
+      }
+      .pill-v3.cat-proj::before {
+        background: hsl(280, 55%, 55%);
+      }
+
+      /* === V4: Soft gray bg, colored text only (minimal) ====== */
+      .pill-v4 {
+        font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
+        font-size: var(--text-2xs);
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: var(--tracking-wide);
+        padding: 2px 8px;
+        border-radius: var(--radius);
+        line-height: 1.4;
+        background: #f3f4f6;
+      }
+      .pill-v4.cat-quiz {
+        color: hsl(220, 60%, 42%);
+      }
+      .pill-v4.cat-lab {
+        color: hsl(160, 50%, 30%);
+      }
+      .pill-v4.cat-proj {
+        color: hsl(280, 50%, 42%);
+      }
+
+      /* === V5: Sentence-case + tint (drops uppercase yelling) = */
+      .pill-v5 {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: none;
+        letter-spacing: 0;
+        padding: 2px 9px;
+        border-radius: 999px;
+        line-height: 1.5;
+      }
+      .pill-v5.cat-quiz {
+        background: hsl(220, 90%, 96%);
+        color: hsl(220, 65%, 38%);
+      }
+      .pill-v5.cat-lab {
+        background: hsl(160, 60%, 94%);
+        color: hsl(160, 55%, 28%);
+      }
+      .pill-v5.cat-proj {
+        background: hsl(280, 70%, 96%);
+        color: hsl(280, 50%, 38%);
+      }
+
+      /* Mock gradebook column layout for context */
+      .ctx-block {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 14px;
+        margin-top: 8px;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .ctx-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text);
+        flex: 1;
+      }
+      .ctx-date {
+        font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
+        font-size: 11px;
+        color: var(--text-3);
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Category pill — visual mockups</h1>
+    <p class="lead">
+      Each variant shows the three actual category labels at the size they
+      currently appear. Pick one; I'll wire it into both Gradebook and
+      Assignments. Variants 1–4 keep the existing all-caps mono style; V5
+      drops it for sentence case if you prefer that direction.
+    </p>
+
+    <div class="variant" style="border-color:#fcd34d;background:#fffbeb">
+      <div class="variant-title">Current (for reference)</div>
+      <div class="row">
+        <span class="pill-current">QUIZZES &amp; CHECKS</span>
+        <span class="pill-current">LABS &amp; INVESTIGATIONS</span>
+        <span class="pill-current">PROJECTS &amp; COMMUNICATION</span>
+      </div>
+      <div class="notes">All three look identical and shout. Hard to scan.</div>
+    </div>
+
+    <div class="variant">
+      <div class="variant-title">V1 — Soft tint, no border</div>
+      <div class="row">
+        <span class="pill-v1 cat-quiz">QUIZZES &amp; CHECKS</span>
+        <span class="pill-v1 cat-lab">LABS &amp; INVESTIGATIONS</span>
+        <span class="pill-v1 cat-proj">PROJECTS &amp; COMMUNICATION</span>
+      </div>
+      <div class="notes">
+        Notion-style. Pastel bg + matching darker text. Minimal but distinct.
+      </div>
+    </div>
+
+    <div class="variant">
+      <div class="variant-title">V2 — Tint + thin matching border (rounded)</div>
+      <div class="row">
+        <span class="pill-v2 cat-quiz">QUIZZES &amp; CHECKS</span>
+        <span class="pill-v2 cat-lab">LABS &amp; INVESTIGATIONS</span>
+        <span class="pill-v2 cat-proj">PROJECTS &amp; COMMUNICATION</span>
+      </div>
+      <div class="notes">More defined edges; reads as a "tag." Still soft.</div>
+    </div>
+
+    <div class="variant">
+      <div class="variant-title">V3 — Outline + colored leading dot</div>
+      <div class="row">
+        <span class="pill-v3 cat-quiz">QUIZZES &amp; CHECKS</span>
+        <span class="pill-v3 cat-lab">LABS &amp; INVESTIGATIONS</span>
+        <span class="pill-v3 cat-proj">PROJECTS &amp; COMMUNICATION</span>
+      </div>
+      <div class="notes">
+        Most muted — tag itself is monochrome; color carried by a small dot.
+        Great if you want the title to dominate.
+      </div>
+    </div>
+
+    <div class="variant">
+      <div class="variant-title">V4 — Gray bg, colored text only</div>
+      <div class="row">
+        <span class="pill-v4 cat-quiz">QUIZZES &amp; CHECKS</span>
+        <span class="pill-v4 cat-lab">LABS &amp; INVESTIGATIONS</span>
+        <span class="pill-v4 cat-proj">PROJECTS &amp; COMMUNICATION</span>
+      </div>
+      <div class="notes">
+        Single neutral surface; differentiation is type-color only. Quiet.
+      </div>
+    </div>
+
+    <div class="variant">
+      <div class="variant-title">V5 — Sentence case + tint (drops uppercase mono)</div>
+      <div class="row">
+        <span class="pill-v5 cat-quiz">Quizzes &amp; Checks</span>
+        <span class="pill-v5 cat-lab">Labs &amp; Investigations</span>
+        <span class="pill-v5 cat-proj">Projects &amp; Communication</span>
+      </div>
+      <div class="notes">
+        Less "yelling," easier to read at small sizes. Bigger departure from
+        the existing visual language — say so if you want this direction.
+      </div>
+    </div>
+
+    <h2>The full palette (rotation order)</h2>
+    <p class="lead">
+      Categories rotate through these 10 hand-picked tints in creation order
+      (1st category gets slot 0, 2nd gets slot 1, …, 11th wraps to slot 0).
+      Same softness as V1, just with 7 more hues so the first 10 categories
+      never collide.
+    </p>
+    <div class="variant">
+      <div class="variant-title">Palette · 10 slots</div>
+      <div class="row" style="gap:8px;flex-wrap:wrap">
+        <span class="pill-v1" style="background:hsl(220, 75%, 95%);color:hsl(220, 55%, 32%)">SLOT 0 · BLUE</span>
+        <span class="pill-v1" style="background:hsl(160, 60%, 93%);color:hsl(160, 50%, 26%)">SLOT 1 · GREEN</span>
+        <span class="pill-v1" style="background:hsl(280, 70%, 95%);color:hsl(280, 45%, 36%)">SLOT 2 · PURPLE</span>
+        <span class="pill-v1" style="background:hsl(25, 80%, 94%);color:hsl(25, 65%, 35%)">SLOT 3 · ORANGE</span>
+        <span class="pill-v1" style="background:hsl(335, 75%, 95%);color:hsl(335, 50%, 38%)">SLOT 4 · PINK</span>
+        <span class="pill-v1" style="background:hsl(195, 70%, 93%);color:hsl(195, 55%, 28%)">SLOT 5 · CYAN</span>
+        <span class="pill-v1" style="background:hsl(50, 75%, 92%);color:hsl(45, 55%, 30%)">SLOT 6 · GOLD</span>
+        <span class="pill-v1" style="background:hsl(245, 70%, 95%);color:hsl(245, 50%, 40%)">SLOT 7 · INDIGO</span>
+        <span class="pill-v1" style="background:hsl(5, 75%, 95%);color:hsl(5, 55%, 38%)">SLOT 8 · RED</span>
+        <span class="pill-v1" style="background:hsl(115, 55%, 92%);color:hsl(115, 45%, 26%)">SLOT 9 · LIME</span>
+      </div>
+      <div class="notes">
+        Teachers don't pick the color — assignment is automatic by creation
+        order. Same category id always renders with the same color.
+      </div>
+    </div>
+
+    <h2>In context — gradebook column header</h2>
+    <p class="lead">Same pill in the layout it actually appears in.</p>
+
+    <div class="ctx-block">
+      <div class="ctx-title">Cell Microscope Lab</div>
+      <span class="pill-v1 cat-lab">LABS &amp; INVESTIGATIONS</span>
+      <span class="ctx-date">Oct 2, 2025</span>
+    </div>
+    <div class="ctx-block">
+      <div class="ctx-title">Periodic Table Quiz</div>
+      <span class="pill-v1 cat-quiz">QUIZZES &amp; CHECKS</span>
+      <span class="ctx-date">Oct 7, 2025</span>
+    </div>
+    <div class="ctx-block">
+      <div class="ctx-title">Ecosystem Connections Essay</div>
+      <span class="pill-v1 cat-proj">PROJECTS &amp; COMMUNICATION</span>
+      <span class="ctx-date">Oct 12, 2025</span>
+    </div>
+  </body>
+</html>

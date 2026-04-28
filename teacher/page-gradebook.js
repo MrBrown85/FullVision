@@ -738,6 +738,14 @@ window.PageGradebook = (function () {
       var badges = '';
       if (a.scoreMode === 'points') badges += '<span class="gb-assess-badge">/ ' + (a.maxPoints || 100) + '</span>';
       if (a.weight && a.weight !== 1) badges += '<span class="gb-assess-badge">' + a.weight + 'x</span>';
+      var _catId = _getAssessmentCategoryId(a);
+      var _catIdx = _catId
+        ? (getCategories(cid) || []).findIndex(function (c) {
+            return c.id === _catId;
+          })
+        : -1;
+      var catTint =
+        typeof categoryTintByIndex === 'function' ? categoryTintByIndex(_catIdx, categoryName) : { bg: '', fg: '' };
       html +=
         '<div class="gb-grid-assess-group' +
         typeClass +
@@ -757,6 +765,10 @@ window.PageGradebook = (function () {
         '</a>' +
         '<div class="gb-assess-meta"><span class="gb-assess-type-pill ' +
         categoryClass +
+        '" style="background:' +
+        catTint.bg +
+        ';color:' +
+        catTint.fg +
         '" title="' +
         esc(categoryName) +
         '">' +

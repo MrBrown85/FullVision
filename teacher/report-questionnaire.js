@@ -305,20 +305,44 @@ window.ReportQuestionnaire = (function () {
     const lowConfidence = refEntries.filter(([, r]) => r.confidence <= 1);
     const selfAware = refEntries.length > 0; // student has done self-assessment
 
-    // Mentioned assignments
+    // Mentioned assignments — use Calc.getAssessmentOverallScore to normalize
+    // every score mode to 0–4 so the strong/weak bucketing (r ≥ 3) works
+    // uniformly. The narrative `level` phrase respects the assessment method:
+    //   points-mode → "85 / 100" (raw average over maxPoints)
+    //   proficiency / rubric → lowercased proficiency word
+    // This keeps points-mode quizzes from rendering as "she reached" with an
+    // empty level word, and avoids force-fitting numeric assessments into
+    // proficiency vocabulary the teacher didn't choose.
     const mentionIds = rating.mentionAssessments || [];
     const mentionedAssignments = mentionIds
       .map(aId => {
         const a = assessments.find(x => x.id === aId);
         if (!a) return null;
-        const aScores = studentScores.filter(sc => sc.assessmentId === aId && sc.score > 0);
-        const avg = aScores.length > 0 ? aScores.reduce((sum, sc) => sum + sc.score, 0) / aScores.length : 0;
-        const r = Math.round(avg);
+        const overall =
+          window.Calc && window.Calc.getAssessmentOverallScore
+            ? window.Calc.getAssessmentOverallScore(cid, sid, aId)
+            : null;
+        if (overall == null) return null;
+        const r = Math.round(overall);
+        let level;
+        if (a.scoreMode === 'points' && a.maxPoints > 0) {
+          const raw = studentScores
+            .filter(sc => sc.assessmentId === aId && sc.score != null && sc.score !== '' && isFinite(Number(sc.score)))
+            .map(sc => Number(sc.score));
+          if (raw.length > 0) {
+            const rawAvg = raw.reduce((sum, v) => sum + v, 0) / raw.length;
+            level = `${Math.round(rawAvg * 10) / 10} / ${a.maxPoints}`;
+          } else {
+            level = (PROF_LABELS[r] || '').toLowerCase();
+          }
+        } else {
+          level = (PROF_LABELS[r] || '').toLowerCase();
+        }
         return {
           title: a.title,
-          avg,
+          avg: overall,
           r,
-          level: (PROF_LABELS[r] || '').toLowerCase(),
+          level,
           categoryLabel: getAssessmentCategoryName(cid, a),
         };
       })
@@ -1185,6 +1209,7 @@ window.ReportQuestionnaire = (function () {
           id: a.id,
           title: a.title,
           date: a.date,
+          categoryId: a.categoryId || a.category_id || null,
           categoryLabel: getAssessmentCategoryName(cid, a),
           avg: overall,
           displayLabel,
@@ -1391,13 +1416,17 @@ window.ReportQuestionnaire = (function () {
     if (assignmentPerf.length > 0) {
       html += `<div class="tq-assignment-section"><div class="tq-panel-title">Assignments — select to mention</div>
     <div class="tq-assignment-list">`;
+      const cidCategories = typeof getCategories === 'function' ? getCategories(cid) || [] : [];
       assignmentPerf.forEach(a => {
         const r = Math.round(a.avg);
         const selected = mentionAssessments.includes(a.id);
+        const catIdx = a.categoryId ? cidCategories.findIndex(c => c.id === a.categoryId) : -1;
+        const catTint =
+          typeof categoryTintByIndex === 'function' ? categoryTintByIndex(catIdx, a.categoryLabel) : { bg: '', fg: '' };
         html += `<div class="tq-assignment-row${selected ? ' selected' : ''}" data-action="tqToggleAssignment" data-sid="${sid}" data-aid="${a.id}">
         <span class="tq-tag-check">${selected ? '✓' : ''}</span>
         <span class="tq-assignment-title">${esc(a.title)}</span>
-        <span class="tq-assignment-type">${esc(a.categoryLabel)}</span>
+        <span class="tq-assignment-type" style="background:${catTint.bg};color:${catTint.fg}">${esc(a.categoryLabel)}</span>
         <span class="tq-assignment-score" style="color:${PROF_COLORS[r] || 'var(--text-3)'}">${esc(a.displayLabel)}</span>
       </div>`;
       });
