@@ -166,10 +166,8 @@ window.DashClassManager = (function () {
             .join('') +
           '</select></div>'
         : '') +
-      '<div><label class="cm-label">Color</label>' +
-      '<div style="background:' +
-      sec.color +
-      ';width:32px;height:32px;border-radius:8px;margin-top:2px;position:relative">' +
+      '<div><label class="cm-label">Colour</label>' +
+      '<div style="position:relative;margin-top:2px;width:32px;height:32px">' +
       '<div class="cm-color-swatch-selected" style="background:' +
       sec.color +
       '" data-action="cmToggleColorPalette" data-target="section" data-secid="' +
@@ -1472,7 +1470,7 @@ window.DashClassManager = (function () {
         '<span class="mod-folder-chevron">\u25B6</span>' +
         '<span class="mod-folder-color" style="background:' +
         grp.color +
-        '" title="Change color" data-action="openColorPicker" data-stop-prop="true">' +
+        '" title="Change colour" data-action="openColorPicker" data-stop-prop="true">' +
         '<input type="color" value="' +
         grp.color +
         '" data-action-change="cmCompGroupColor" data-grpid="' +
