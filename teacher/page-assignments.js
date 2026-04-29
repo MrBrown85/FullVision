@@ -1110,7 +1110,7 @@ window.PageAssignments = (function () {
             '<span class="af-tag-id" style="color:' +
             sec.color +
             '">' +
-            esc(tag.id) +
+            esc(tag.code || tag.shortName || '') +
             '</span>' +
             '<span class="af-tag-name">' +
             esc(sec.name) +
@@ -1141,7 +1141,7 @@ window.PageAssignments = (function () {
           '<span class="af-tag-id" style="color:' +
           sec.color +
           '">' +
-          esc(tag.id) +
+          esc(tag.code || tag.shortName || '') +
           '</span>' +
           '<span class="af-tag-name">' +
           esc(sec.name) +
@@ -1172,7 +1172,7 @@ window.PageAssignments = (function () {
           '<span class="af-tag-id" style="color:' +
           sec.color +
           '">' +
-          esc(tag.id) +
+          esc(tag.code || tag.shortName || '') +
           '</span>' +
           '<span class="af-tag-name">' +
           esc(sec.name) +
@@ -2640,7 +2640,7 @@ window.PageAssignments = (function () {
           '><span class="rubric-tag-id" style="color:' +
           openSec.color +
           '">' +
-          esc(tag.id) +
+          esc(tag.code || tag.shortName || '') +
           '</span><span class="rubric-tag-label">' +
           esc(tag.label) +
           '</span>' +

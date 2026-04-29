@@ -113,7 +113,7 @@ window.DashClassManager = (function () {
       sec.color +
       '"></div>' +
       '<span class="cm-std-tag">' +
-      esc(tag.id) +
+      esc(tag.code || tag.shortName || '') +
       '</span>' +
       '<span class="cm-std-label">' +
       esc(tag.label || sec.shortName || sec.name) +
