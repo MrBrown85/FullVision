@@ -81,81 +81,91 @@ test.describe('Persistence across sign-out — real Supabase', () => {
     expect(afterRelogin.subjects, 'subjects must persist across sign-out').toBeGreaterThan(0);
   });
 
-  test('students added via class manager persist after sign-out', async ({ page }) => {
+  test('students added via saveStudents persist after sign-out', async ({ page }) => {
     const courseName = `${TEST_COURSE_PREFIX}-students-${Date.now()}`;
 
-    await openClassManagerAndStartCreate(page);
-    await pickGrade(page, 8);
-    await pickSubject(page, 'Science');
-    await toggleCourse(page, 'SCI8');
-    await goToStep2(page);
-    await page.fill('#cm-new-name', courseName);
-    await goToStep3(page);
-    await finishWizard(page);
+    // Create a course server-side so this test isn't coupled to the wizard.
+    // The UI bug under test is the sign-out / async-RPC race in saveStudents,
+    // not anything wizard-specific.
+    const courseId = await createCourseDirect(page, courseName);
 
-    // Add one student through the same code path users hit.
-    await page.click('[data-action="cmShowAddStudent"]');
-    await page.fill('#cm-add-first', 'Persistence');
-    await page.fill('#cm-add-last', 'Probe');
-    await page.click('[data-action="cmSaveStudent"]');
+    // Trigger the same code path the UI hits: cmSaveStudent → saveStudents
+    // → _persistStudentsToCanonical → queued create_student_and_enroll.
+    await page.evaluate(
+      ({ cid }) => {
+        const student = {
+          id: 'stu-' + Date.now().toString(36),
+          firstName: 'Persistence',
+          lastName: 'Probe',
+          preferred: '',
+          pronouns: '',
+          studentNumber: '',
+          email: '',
+          dateOfBirth: '',
+          designations: [],
+          attendance: [],
+          sortName: 'Probe Persistence',
+          enrolledDate: new Date().toISOString().slice(0, 10),
+        };
+        // saveStudents is exported globally from shared/data.js.
+        window.saveStudents(cid, [student]);
+      },
+      { cid: courseId },
+    );
 
-    // Give the queued _canonicalEnrollStudent RPC a chance to fire while we
-    // are still authenticated. This is the window the bug exploits — without
-    // a real wait-for-pending-syncs, sign-out can race the queue.
-    await page.waitForTimeout(2000);
-
-    const beforeLogout = await readCourseRowCounts(page, courseName);
-    expect(beforeLogout.enrollments, 'enrollment must reach Supabase before sign-out').toBeGreaterThan(0);
-
+    // Sign out IMMEDIATELY without giving the queue extra time. This is the
+    // window the bug exploits in production — a fast sign-out after add.
     await signOutFlow(page);
     await signIn(page);
 
     const afterRelogin = await readCourseRowCounts(page, courseName);
-    expect(afterRelogin.enrollments, 'enrollment must persist across sign-out').toBeGreaterThan(0);
+    expect(
+      afterRelogin.enrollments,
+      'student must persist across sign-out — currently lost because waitForPendingSyncs is broken',
+    ).toBeGreaterThan(0);
   });
 
   test('categories created via class manager are visible to assignment dropdown', async ({ page }) => {
     const courseName = `${TEST_COURSE_PREFIX}-categories-${Date.now()}`;
+    const courseId = await createCourseDirect(page, courseName);
 
-    await openClassManagerAndStartCreate(page);
-    await pickGrade(page, 8);
-    await pickSubject(page, 'Science');
-    await toggleCourse(page, 'SCI8');
-    await goToStep2(page);
-    await page.fill('#cm-new-name', courseName);
-    await goToStep3(page);
-    await finishWizard(page);
-
-    // Add a category through the editor — same path as the user clicking
-    // "+ Add category" in the class manager.
-    await page.evaluate(() => {
-      const btn = document.querySelector('[data-action="cmCatAdd"]');
-      window.DashClassManager.handleAction('cmCatAdd', btn, null);
-    });
-    await page.waitForSelector('.cm-cat-row .cm-cat-name', { timeout: 5000 });
-    // The newest row is the last one. Set its name and weight, then blur to
-    // trigger the cmCatName / cmCatWeight handlers that persist via
-    // upsert_category.
-    await page.evaluate(() => {
-      const rows = document.querySelectorAll('.cm-cat-row');
-      const row = rows[rows.length - 1];
-      const nameInput = row.querySelector('.cm-cat-name');
-      nameInput.value = 'Labs';
-      nameInput.dispatchEvent(new Event('blur', { bubbles: true }));
-      const weightInput = row.querySelector('.cm-cat-weight');
-      weightInput.value = '50';
-      weightInput.dispatchEvent(new Event('blur', { bubbles: true }));
-    });
-    // Wait for the upsert_category RPC to settle.
-    await page.waitForTimeout(1500);
+    // Write the category through the same RPC the class manager uses.
+    // The bug under test is on the READ side (get_gradebook doesn't return
+    // categories), so what matters is that the category exists in Supabase
+    // before we navigate to assignments.
+    await page.evaluate(
+      async ({ cid }) => {
+        await window.v2.upsertCategory({
+          id: null,
+          courseId: cid,
+          name: 'Labs',
+          weight: 50,
+          displayOrder: 0,
+        });
+      },
+      { cid: courseId },
+    );
 
     const counts = await readCourseRowCounts(page, courseName);
     expect(counts.categories, 'category was created').toBeGreaterThan(0);
 
-    // Navigate to the assignments page for this course, open New Assessment,
-    // and confirm the category dropdown is populated.
-    const courseId = await getCourseIdByName(page, courseName);
-    await page.goto(`/teacher/app.html#/assignments?course=${courseId}&new=1`);
+    // Navigate to the assignments page, switch to the test course, then
+    // open New Assessment. The URL ?course= param is not honored by
+    // page-assignments init (it reads from _activeCourse), so we drive the
+    // switch explicitly through the exposed API.
+    await page.goto(`/teacher/app.html#/assignments`);
+    await page.waitForLoadState('networkidle');
+    await page.waitForFunction(() => window.PageAssignments !== undefined, null, { timeout: 15_000 });
+    await page.evaluate(cid => window.PageAssignments.switchCourse(cid), courseId);
+    await page.evaluate(async () => {
+      const deadline = Date.now() + 5000;
+      while (Date.now() < deadline) {
+        if (document.getElementById('af-category')) return;
+        const btn = document.querySelector('[data-action="showNewForm"]');
+        if (btn) btn.click();
+        await new Promise(r => setTimeout(r, 200));
+      }
+    });
     await page.waitForSelector('#af-category', { timeout: 10_000 });
 
     const optionTexts = await page.$$eval('#af-category option', opts => opts.map(o => o.textContent.trim()));
@@ -176,8 +186,17 @@ async function signIn(page) {
   await page.click('#si-submit');
   await page.waitForURL('**/teacher/app.html**', { timeout: 15_000 });
   await page.waitForFunction(() => window.DashClassManager !== undefined, null, { timeout: 15_000 });
-  // Wait for the initial bootstrap RPC chain to settle.
-  await page.waitForFunction(() => typeof window.COURSES !== 'undefined', null, { timeout: 10_000 });
+  // Wait for the initial bootstrap RPC chain to settle by waiting for the
+  // supabase client and an authenticated session.
+  await page.waitForFunction(
+    async () => {
+      if (!window._supabase || !window._supabase.auth) return false;
+      const { data } = await window._supabase.auth.getSession();
+      return !!(data && data.session);
+    },
+    null,
+    { timeout: 15_000 },
+  );
 }
 
 async function signOutFlow(page) {
@@ -204,10 +223,21 @@ async function archiveTestCourses(page) {
 
 async function openClassManagerAndStartCreate(page) {
   await page.evaluate(() => window.DashClassManager.openClassManager());
-  await page.waitForSelector('[data-action="cmStartCreate"]', { timeout: 5000 });
-  await page.evaluate(() => {
-    const btn = document.querySelector('[data-action="cmStartCreate"]');
-    window.DashClassManager.handleAction('cmStartCreate', btn, null);
+  // Initial empty-state render and the data-loaded sidebar render both expose
+  // a [data-action="cmStartCreate"] button, but they swap the DOM node out
+  // between renders. Poll inside a single evaluate so we don't race the swap.
+  await page.evaluate(async () => {
+    const dcm = window.DashClassManager;
+    const deadline = Date.now() + 10_000;
+    while (Date.now() < deadline) {
+      const btn = document.querySelector('[data-action="cmStartCreate"]');
+      if (btn) {
+        dcm.handleAction('cmStartCreate', btn, null);
+        return;
+      }
+      await new Promise(r => setTimeout(r, 50));
+    }
+    throw new Error('cmStartCreate button never appeared');
   });
   // Wait for CURRICULUM_INDEX to load, otherwise the grade picker won't render the courses.
   await page.waitForFunction(
@@ -275,41 +305,75 @@ async function finishWizard(page) {
 }
 
 async function readCourseRowCounts(page, courseName) {
+  // Poll the `course` table directly until the row appears or we time out.
+  // createCourse fires its create_course RPC without awaiting, so there's a
+  // brief window after the wizard finishes where the row hasn't landed in
+  // Supabase yet.
+  return page.evaluate(
+    async ({ name, timeoutMs }) => {
+      const sb = window._supabase;
+      if (!sb) return null;
+      const deadline = Date.now() + timeoutMs;
+      let cid = null;
+      while (Date.now() < deadline) {
+        const res = await sb.from('course').select('id').eq('name', name).maybeSingle();
+        if (res.data && res.data.id) {
+          cid = res.data.id;
+          break;
+        }
+        await new Promise(r => setTimeout(r, 250));
+      }
+      if (!cid) return { found: false, courseName: name };
+      const [enr, cat, sub, sec, tags] = await Promise.all([
+        sb.from('enrollment').select('id', { count: 'exact', head: true }).eq('course_id', cid),
+        sb.from('category').select('id', { count: 'exact', head: true }).eq('course_id', cid),
+        sb.from('subject').select('id', { count: 'exact', head: true }).eq('course_id', cid),
+        sb.from('section').select('id', { count: 'exact', head: true }).eq('course_id', cid),
+        sb
+          .from('tag')
+          .select('id, section!inner(course_id)', { count: 'exact', head: true })
+          .eq('section.course_id', cid),
+      ]);
+      return {
+        found: true,
+        courseId: cid,
+        enrollments: enr.count || 0,
+        categories: cat.count || 0,
+        subjects: sub.count || 0,
+        sections: sec.count || 0,
+        tags: tags.count || 0,
+      };
+    },
+    { name: courseName, timeoutMs: 15_000 },
+  );
+}
+
+/**
+ * Create a course directly via Supabase RPC, bypassing the wizard. Used by
+ * tests that aren't about the wizard itself — they only need a valid course
+ * row to attach students/categories to.
+ */
+async function createCourseDirect(page, courseName) {
   return page.evaluate(async name => {
     const sb = window._supabase;
-    if (!sb) return null;
-    const courses = await sb.rpc('list_teacher_courses');
-    const match = (courses.data || []).find(c => c && c.name === name);
-    if (!match) return { found: false };
-    const cid = match.id;
-    // Direct table reads as the authenticated user (RLS will scope to their data).
-    const [enr, cat, sub, sec, tags] = await Promise.all([
-      sb.from('enrollment').select('id', { count: 'exact', head: true }).eq('course_id', cid),
-      sb.from('category').select('id', { count: 'exact', head: true }).eq('course_id', cid),
-      sb.from('subject').select('id', { count: 'exact', head: true }).eq('course_id', cid),
-      sb.from('section').select('id', { count: 'exact', head: true }).eq('course_id', cid),
-      sb
-        .from('tag')
-        .select('id, section!inner(course_id)', { count: 'exact', head: true })
-        .eq('section.course_id', cid),
-    ]);
-    return {
-      found: true,
-      courseId: cid,
-      enrollments: enr.count || 0,
-      categories: cat.count || 0,
-      subjects: sub.count || 0,
-      sections: sec.count || 0,
-      tags: tags.count || 0,
-    };
+    const res = await sb.rpc('create_course', {
+      p_name: name,
+      p_grade_level: '8',
+      p_description: null,
+      p_grading_system: 'proficiency',
+      p_calc_method: 'mostRecent',
+      p_decay_weight: 0.65,
+      p_timezone: 'America/Vancouver',
+    });
+    if (res.error) throw new Error('create_course failed: ' + res.error.message);
+    return res.data;
   }, courseName);
 }
 
 async function getCourseIdByName(page, courseName) {
   return page.evaluate(async name => {
     const sb = window._supabase;
-    const courses = await sb.rpc('list_teacher_courses');
-    const match = (courses.data || []).find(c => c && c.name === name);
-    return match ? match.id : null;
+    const res = await sb.from('course').select('id').eq('name', name).maybeSingle();
+    return res.data ? res.data.id : null;
   }, courseName);
 }

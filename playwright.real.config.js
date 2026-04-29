@@ -1,5 +1,21 @@
 import { defineConfig } from '@playwright/test';
 
+// Load .env into process.env for the test runner. dev-local.mjs does this
+// for the webServer process, but the test runner is a separate process and
+// needs the vars too (TEST_USER_EMAIL, TEST_USER_PASSWORD, etc). Playwright
+// loads this config in a CJS context so we use require() for node builtins.
+const { existsSync, readFileSync } = require('node:fs');
+const { join } = require('node:path');
+const envPath = join(__dirname, '.env');
+if (existsSync(envPath)) {
+  for (const line of readFileSync(envPath, 'utf-8').split('\n')) {
+    const match = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*?)\s*$/);
+    if (match && !process.env[match[1]]) {
+      process.env[match[1]] = match[2].replace(/^["']|["']$/g, '');
+    }
+  }
+}
+
 /**
  * Real-Supabase end-to-end config.
  *
