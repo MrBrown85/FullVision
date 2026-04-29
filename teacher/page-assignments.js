@@ -415,26 +415,6 @@ window.PageAssignments = (function () {
         '<div class="assess-header" data-action="toggleAssess" data-aid="' +
         a.id +
         '">' +
-        (function () {
-          var idx = categoryId
-            ? (getCategories(cid) || []).findIndex(function (c) {
-                return c.id === categoryId;
-              })
-            : -1;
-          var t =
-            typeof categoryTintByIndex === 'function' ? categoryTintByIndex(idx, categoryName) : { bg: '', fg: '' };
-          return (
-            '<span class="type-badge ' +
-            (categoryId ? 'type-badge-s' : 'type-badge-f') +
-            '" style="background:' +
-            t.bg +
-            ';color:' +
-            t.fg +
-            '">' +
-            esc(categoryName) +
-            '</span>'
-          );
-        })() +
         '<div class="assess-header-info">' +
         '<span class="assess-title">' +
         esc(a.title) +
@@ -496,6 +476,26 @@ window.PageAssignments = (function () {
         })() +
         '</span>' +
         '</div>' +
+        (function () {
+          var idx = categoryId
+            ? (getCategories(cid) || []).findIndex(function (c) {
+                return c.id === categoryId;
+              })
+            : -1;
+          var t =
+            typeof categoryTintByIndex === 'function' ? categoryTintByIndex(idx, categoryName) : { bg: '', fg: '' };
+          return (
+            '<span class="type-badge ' +
+            (categoryId ? 'type-badge-s' : 'type-badge-f') +
+            '" style="background:' +
+            t.bg +
+            ';color:' +
+            t.fg +
+            '">' +
+            esc(categoryName) +
+            '</span>'
+          );
+        })() +
         '<div class="assess-header-actions" data-stop-prop="true">' +
         (a.rubricId && getRubricById(cid, a.rubricId)
           ? (function () {

@@ -25,8 +25,25 @@ window.PageStudent = (function () {
 
   function _assessmentCategoryBadge(cid, assessment) {
     var label = _assessmentCategoryLabel(cid, assessment);
-    var hasCategory = !!(getAssessmentCategoryId(assessment) || (assessment && assessment.type === 'summative'));
-    return '<span class="type-badge ' + (hasCategory ? 'type-badge-s' : 'type-badge-f') + '">' + esc(label) + '</span>';
+    var categoryId = getAssessmentCategoryId(assessment);
+    var hasCategory = !!(categoryId || (assessment && assessment.type === 'summative'));
+    var idx = categoryId
+      ? (getCategories(cid) || []).findIndex(function (c) {
+          return c.id === categoryId;
+        })
+      : -1;
+    var t = typeof categoryTintByIndex === 'function' ? categoryTintByIndex(idx, label) : { bg: '', fg: '' };
+    return (
+      '<span class="type-badge ' +
+      (hasCategory ? 'type-badge-s' : 'type-badge-f') +
+      '" style="background:' +
+      t.bg +
+      ';color:' +
+      t.fg +
+      '">' +
+      esc(label) +
+      '</span>'
+    );
   }
 
   /* ── switchCourse ───────────────────────────────────────── */
