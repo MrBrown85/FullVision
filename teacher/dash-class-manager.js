@@ -2187,6 +2187,25 @@ window.DashClassManager = (function () {
     return _cmCategoryState[cid];
   }
 
+  // Push the class-manager's private category state into the shared
+  // _cache.categories that getCategories / getCategoryById / page-assignments /
+  // page-gradebook / shared/calc.js all read from. Without this, a category
+  // added or deleted in the same session is invisible to those readers
+  // until the next sign-in (which re-hydrates via get_gradebook).
+  function _cmMirrorCategoriesToCache(cid) {
+    if (!cid || typeof saveCategories !== 'function') return;
+    var st = _cmCatState(cid);
+    var camelRows = (st.rows || []).map(function (r) {
+      return {
+        id: r.id,
+        name: r.name || '',
+        weight: Number(r.weight) || 0,
+        displayOrder: Number(r.display_order) || 0,
+      };
+    });
+    saveCategories(cid, camelRows);
+  }
+
   function _cmLoadCategories(cid) {
     if (!cid) return;
     var st = _cmCatState(cid);
@@ -2213,6 +2232,7 @@ window.DashClassManager = (function () {
             .sort(function (a, b) {
               return a.display_order - b.display_order;
             });
+          _cmMirrorCategoriesToCache(cid);
           renderClassManager();
         }
       })
@@ -2348,6 +2368,7 @@ window.DashClassManager = (function () {
     if (!row) return;
     st.rows.splice(idx, 1);
     if (row.id && window.v2 && window.v2.deleteCategory) window.v2.deleteCategory(row.id);
+    _cmMirrorCategoriesToCache(cmSelectedCourse);
     renderClassManager();
   }
 
@@ -2367,6 +2388,7 @@ window.DashClassManager = (function () {
       .then(function (res) {
         if (res && !res.error) {
           if (!row.id && res.data) row.id = res.data;
+          _cmMirrorCategoriesToCache(cid);
           renderClassManager();
         }
       });

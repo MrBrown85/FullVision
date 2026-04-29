@@ -149,6 +149,12 @@ test.describe('Persistence across sign-out — real Supabase', () => {
     const counts = await readCourseRowCounts(page, courseName);
     expect(counts.categories, 'category was created').toBeGreaterThan(0);
 
+    // Cycle sign-out before checking the dropdown. This exercises the
+    // get_gradebook re-hydration path on a fresh sign-in, which is what
+    // the production read path actually depends on.
+    await signOutFlow(page);
+    await signIn(page);
+
     // Navigate to the assignments page, switch to the test course, then
     // open New Assessment. The URL ?course= param is not honored by
     // page-assignments init (it reads from _activeCourse), so we drive the
