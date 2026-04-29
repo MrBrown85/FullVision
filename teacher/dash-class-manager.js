@@ -242,23 +242,66 @@ window.DashClassManager = (function () {
     return typeof id === 'string' && _UUID_RE_CM.test(id);
   }
 
-  function _patchMapId(cid, map, localId, canonicalId) {
-    if (!localId || !canonicalId || localId === canonicalId) return;
-    (map.subjects || []).forEach(function (s) {
-      if (s.id === localId) s.id = canonicalId;
-    });
-    (map.sections || []).forEach(function (s) {
-      if (s.id === localId) s.id = canonicalId;
-      if (s.subject === localId) s.subject = canonicalId;
-      if (s.groupId === localId) s.groupId = canonicalId;
-      (s.tags || []).forEach(function (t) {
-        if (t.id === localId) t.id = canonicalId;
-        if (t.subject === localId) t.subject = canonicalId;
+  // Wait for the create_course RPC fired by createCourse (shared/data.js)
+  // to settle. createCourse returns a course object with a local id like
+  // "c{ts}{rand}" before the canonical UUID is known; the rekey lands when
+  // the RPC callback runs and replaces COURSES[localId] with
+  // COURSES[canonicalId]. The canonical row keeps a __pendingLocalId tag so
+  // we can find it after rekey.
+  async function _awaitCanonicalCourse(localId, timeoutMs) {
+    if (_isCanonicalId(localId)) return localId;
+    var deadline = Date.now() + (timeoutMs || 10000);
+    while (Date.now() < deadline) {
+      if (!COURSES[localId]) {
+        var keys = Object.keys(COURSES);
+        for (var i = 0; i < keys.length; i++) {
+          if (COURSES[keys[i]] && COURSES[keys[i]].__pendingLocalId === localId) {
+            return keys[i];
+          }
+        }
+      }
+      await new Promise(function (r) {
+        setTimeout(r, 75);
       });
-    });
-    (map.competencyGroups || []).forEach(function (g) {
-      if (g.id === localId) g.id = canonicalId;
-    });
+    }
+    return null;
+  }
+
+  // Patch a single entity-kind's id from local → canonical. Scoping is
+  // required: buildLearningMapFromTags assigns the same baseId to a section
+  // and the tag inside it, so a kind-blind walk would rewrite the tag's id
+  // to the section's UUID and the next upsert_tag would 500 with
+  // "tag not found".
+  function _patchMapId(cid, map, kind, localId, canonicalId) {
+    if (!localId || !canonicalId || localId === canonicalId) return;
+    if (kind === 'subject') {
+      (map.subjects || []).forEach(function (s) {
+        if (s.id === localId) s.id = canonicalId;
+      });
+      (map.sections || []).forEach(function (s) {
+        if (s.subject === localId) s.subject = canonicalId;
+        (s.tags || []).forEach(function (t) {
+          if (t.subject === localId) t.subject = canonicalId;
+        });
+      });
+    } else if (kind === 'section') {
+      (map.sections || []).forEach(function (s) {
+        if (s.id === localId) s.id = canonicalId;
+      });
+    } else if (kind === 'tag') {
+      (map.sections || []).forEach(function (s) {
+        (s.tags || []).forEach(function (t) {
+          if (t.id === localId) t.id = canonicalId;
+        });
+      });
+    } else if (kind === 'group') {
+      (map.competencyGroups || []).forEach(function (g) {
+        if (g.id === localId) g.id = canonicalId;
+      });
+      (map.sections || []).forEach(function (s) {
+        if (s.groupId === localId) s.groupId = canonicalId;
+      });
+    }
     saveLearningMap(cid, map);
   }
 
@@ -277,7 +320,7 @@ window.DashClassManager = (function () {
           displayOrder: si,
         });
         if (subRes && subRes.data && subRes.data !== oldSubId) {
-          _patchMapId(cid, map, oldSubId, subRes.data);
+          _patchMapId(cid, map, 'subject', oldSubId, subRes.data);
         }
       }
       var sections = map.sections || [];
@@ -292,7 +335,7 @@ window.DashClassManager = (function () {
           displayOrder: si,
         });
         if (secRes && secRes.data && secRes.data !== oldSecId) {
-          _patchMapId(cid, map, oldSecId, secRes.data);
+          _patchMapId(cid, map, 'section', oldSecId, secRes.data);
         }
         var tags = sec.tags || [];
         for (var ti = 0; ti < tags.length; ti++) {
@@ -307,7 +350,7 @@ window.DashClassManager = (function () {
             displayOrder: ti,
           });
           if (tagRes && tagRes.data && tagRes.data !== oldTagId) {
-            _patchMapId(cid, map, oldTagId, tagRes.data);
+            _patchMapId(cid, map, 'tag', oldTagId, tagRes.data);
           }
         }
       }
@@ -359,7 +402,7 @@ window.DashClassManager = (function () {
         var canonicalId = res && res.data ? res.data : null;
         if (canonicalId && canonicalId !== grpLocalId) {
           var m = getLearningMap(cid);
-          _patchMapId(cid, m, grpLocalId, canonicalId);
+          _patchMapId(cid, m, 'group', grpLocalId, canonicalId);
         }
       });
     setTimeout(function () {
@@ -1975,10 +2018,20 @@ window.DashClassManager = (function () {
       if (map) {
         saveLearningMap(course.id, map);
         updateCourse(course.id, { curriculumTags: cwSelectedTags.slice() });
-        // Await so the editor's V2 reads land after subjects/sections/tags
-        // are written. Without this, renderClassManager runs before Supabase
-        // ack and the curriculum panel loads empty.
-        dispatchOk = await _dispatchMapToV2(course.id, map, false);
+        // _dispatchMapToV2 short-circuits on a non-canonical course id
+        // (createCourse fires create_course async; the rekey to a UUID
+        // hasn't landed yet at this point). Wait for the canonical id,
+        // mirror the learning map under it, then dispatch.
+        var canonicalCid = await _awaitCanonicalCourse(course.id, 10000);
+        if (canonicalCid && canonicalCid !== course.id) {
+          saveLearningMap(canonicalCid, map);
+          course.id = canonicalCid;
+        }
+        if (canonicalCid) {
+          dispatchOk = await _dispatchMapToV2(canonicalCid, map, false);
+        } else {
+          dispatchOk = false;
+        }
       }
     }
 
@@ -2134,6 +2187,25 @@ window.DashClassManager = (function () {
     return _cmCategoryState[cid];
   }
 
+  // Push the class-manager's private category state into the shared
+  // _cache.categories that getCategories / getCategoryById / page-assignments /
+  // page-gradebook / shared/calc.js all read from. Without this, a category
+  // added or deleted in the same session is invisible to those readers
+  // until the next sign-in (which re-hydrates via get_gradebook).
+  function _cmMirrorCategoriesToCache(cid) {
+    if (!cid || typeof saveCategories !== 'function') return;
+    var st = _cmCatState(cid);
+    var camelRows = (st.rows || []).map(function (r) {
+      return {
+        id: r.id,
+        name: r.name || '',
+        weight: Number(r.weight) || 0,
+        displayOrder: Number(r.display_order) || 0,
+      };
+    });
+    saveCategories(cid, camelRows);
+  }
+
   function _cmLoadCategories(cid) {
     if (!cid) return;
     var st = _cmCatState(cid);
@@ -2160,6 +2232,7 @@ window.DashClassManager = (function () {
             .sort(function (a, b) {
               return a.display_order - b.display_order;
             });
+          _cmMirrorCategoriesToCache(cid);
           renderClassManager();
         }
       })
@@ -2295,6 +2368,7 @@ window.DashClassManager = (function () {
     if (!row) return;
     st.rows.splice(idx, 1);
     if (row.id && window.v2 && window.v2.deleteCategory) window.v2.deleteCategory(row.id);
+    _cmMirrorCategoriesToCache(cmSelectedCourse);
     renderClassManager();
   }
 
@@ -2314,6 +2388,7 @@ window.DashClassManager = (function () {
       .then(function (res) {
         if (res && !res.error) {
           if (!row.id && res.data) row.id = res.data;
+          _cmMirrorCategoriesToCache(cid);
           renderClassManager();
         }
       });
@@ -2715,7 +2790,7 @@ window.DashClassManager = (function () {
         var canonicalId = res && res.data ? res.data : null;
         if (canonicalId && canonicalId !== id) {
           var m = getLearningMap(cid);
-          _patchMapId(cid, m, id, canonicalId);
+          _patchMapId(cid, m, 'subject', id, canonicalId);
         }
       });
   }
@@ -2900,7 +2975,7 @@ window.DashClassManager = (function () {
         var canonicalId = res && res.data ? res.data : null;
         if (canonicalId && canonicalId !== grpLocalId) {
           var m = getLearningMap(cid);
-          _patchMapId(cid, m, grpLocalId, canonicalId);
+          _patchMapId(cid, m, 'group', grpLocalId, canonicalId);
         }
       });
   }
@@ -3045,7 +3120,7 @@ window.DashClassManager = (function () {
           .upsertSubject({ id: subId, courseId: cid, name: subjObj ? subjObj.name : 'General', displayOrder: 0 })
           .then(function (res) {
             var canon = res && res.data ? res.data : null;
-            if (canon && canon !== subId) _patchMapId(cid, getLearningMap(cid), subId, canon);
+            if (canon && canon !== subId) _patchMapId(cid, getLearningMap(cid), 'subject', subId, canon);
             return res;
           });
     subjectRpc
@@ -3062,7 +3137,7 @@ window.DashClassManager = (function () {
       .then(function (secRes) {
         var canonicalSectionId = secRes && secRes.data ? secRes.data : null;
         if (canonicalSectionId && canonicalSectionId !== stdId) {
-          _patchMapId(cid, getLearningMap(cid), stdId, canonicalSectionId);
+          _patchMapId(cid, getLearningMap(cid), 'section', stdId, canonicalSectionId);
         }
         var finalSectionId = canonicalSectionId || stdId;
         return window.v2.upsertTag({

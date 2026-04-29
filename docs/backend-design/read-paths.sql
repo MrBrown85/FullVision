@@ -616,6 +616,7 @@ declare
     course_row  course%rowtype;
     students    jsonb;
     assessments jsonb;
+    categories  jsonb;
     cells       jsonb;
     summaries   jsonb;
 begin
@@ -647,6 +648,16 @@ begin
       into assessments
       from assessment a
      where a.course_id = p_course_id;
+
+    select jsonb_agg(jsonb_build_object(
+               'id', cat.id,
+               'name', cat.name,
+               'weight', cat.weight,
+               'display_order', cat.display_order
+           ) order by cat.display_order)
+      into categories
+      from category cat
+     where cat.course_id = p_course_id;
 
     -- Cells: nested { enrollment_id -> { assessment_id -> cell } }
     with pairs as (
@@ -705,6 +716,7 @@ begin
         'course', to_jsonb(course_row),
         'students', coalesce(students, '[]'::jsonb),
         'assessments', coalesce(assessments, '[]'::jsonb),
+        'categories', coalesce(categories, '[]'::jsonb),
         'cells', coalesce(cells, '{}'::jsonb),
         'row_summaries', coalesce(summaries, '{}'::jsonb)
     );

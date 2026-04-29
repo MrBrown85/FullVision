@@ -2624,6 +2624,11 @@ function createCourse(data) {
   const localId = 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
   const course = {
     id: localId,
+    // Marker that survives the create_course RPC rekey (see line ~2666
+    // below). The curriculum wizard reads this on the migrated record so
+    // it can find the canonical course id before dispatching subjects /
+    // sections / tags to V2.
+    __pendingLocalId: localId,
     name: data.name || 'Untitled Class',
     gradingSystem: data.gradingSystem || 'proficiency',
     calcMethod: data.calcMethod || 'mostRecent',
