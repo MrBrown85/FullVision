@@ -572,7 +572,10 @@ function renderStudentHeader(cid, sid, opts) {
   if (student.studentNumber)
     chips.push(`<span class="sh-chip"><em class="sh-chip-icon">#</em> ${esc(student.studentNumber)}</span>`);
   if (student.dateOfBirth) chips.push(`<span class="sh-chip">${formatDate(student.dateOfBirth)}</span>`);
-  if (student.email) chips.push(`<span class="sh-chip">${esc(student.email)}</span>`);
+  if (student.email)
+    chips.push(
+      `<button type="button" class="sh-chip sh-chip-email" data-action="copy-student-email" data-email="${esc(student.email)}" title="Copy email">${esc(student.email)}</button>`,
+    );
   if (att.length > 0) {
     let attParts = [`${attPresent} present`];
     if (attAbsent > 0) attParts.push(`${attAbsent} absent`);
@@ -1140,8 +1143,55 @@ document.addEventListener('click', function (e) {
     case 'reload-page':
       window.location.reload();
       break;
+    case 'copy-student-email':
+      _handleCopyStudentEmail(btn);
+      break;
   }
 });
+
+function _handleCopyStudentEmail(btn) {
+  var email = btn.dataset.email;
+  if (!email) return;
+  _copyTextToClipboard(email).then(function (ok) {
+    if (!ok) return;
+    var original = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(function () {
+      if (btn.textContent === 'Copied!') btn.textContent = original;
+    }, 1500);
+  });
+}
+
+function _copyTextToClipboard(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    return navigator.clipboard.writeText(text).then(
+      function () {
+        return true;
+      },
+      function () {
+        return _execCommandCopy(text);
+      },
+    );
+  }
+  return Promise.resolve(_execCommandCopy(text));
+}
+
+function _execCommandCopy(text) {
+  try {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  } catch (e) {
+    return false;
+  }
+}
 
 // Global error monitoring — cache teacher_id synchronously from the data layer
 function _getTeacherId() {
