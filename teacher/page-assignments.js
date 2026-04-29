@@ -15,7 +15,7 @@ window.PageAssignments = (function () {
   var focusStudentParam = null;
   var _allExpanded = true;
   var _collapsedIds = new Set();
-  var assessFilterType = 'all';
+  var filterCategories = [];
   var assessSearch = '';
   var showUngraded = false;
   var rubricViewStates = {};
@@ -126,7 +126,7 @@ window.PageAssignments = (function () {
     activeCourse = cid;
     setActiveCourse(cid);
     await initData(cid);
-    assessFilterType = 'all';
+    filterCategories = [];
     assessSearch = '';
     showUngraded = false;
     focusStudentId = null;
@@ -177,8 +177,10 @@ window.PageAssignments = (function () {
   }
 
   /* ── Assessment Filters ────────────────────────────────── */
-  function setAssessTypeFilter(val) {
-    assessFilterType = val;
+  function toggleCategoryFilter(catId) {
+    var idx = filterCategories.indexOf(catId);
+    if (idx >= 0) filterCategories.splice(idx, 1);
+    else filterCategories.push(catId);
     render();
   }
 
@@ -227,23 +229,30 @@ window.PageAssignments = (function () {
       '<select class="assess-course-select" data-action="assessSwitchCourse" aria-label="Select course">' +
       courseOptions +
       '</select>' +
-      '<div class="assess-seg-control" role="tablist" aria-label="Assessment category filter">' +
-      '<button class="assess-seg-btn' +
-      (assessFilterType === 'all' ? ' active' : '') +
-      '" data-action="setAssessTypeFilter" data-type="all" role="tab" aria-selected="' +
-      (assessFilterType === 'all') +
-      '">All</button>' +
-      '<button class="assess-seg-btn' +
-      (assessFilterType === 'categorized' ? ' active' : '') +
-      '" data-action="setAssessTypeFilter" data-type="categorized" role="tab" aria-selected="' +
-      (assessFilterType === 'categorized') +
-      '">Categorized</button>' +
-      '<button class="assess-seg-btn' +
-      (assessFilterType === 'uncategorized' ? ' active' : '') +
-      '" data-action="setAssessTypeFilter" data-type="uncategorized" role="tab" aria-selected="' +
-      (assessFilterType === 'uncategorized') +
-      '">No Category</button>' +
-      '</div>' +
+      (function () {
+        var sortedCats = _getSortedCategories(cid);
+        if (!sortedCats.length) return '';
+        var pillsHtml =
+          '<div role="group" aria-label="Filter by category" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">';
+        sortedCats.forEach(function (cat, i) {
+          var t = typeof categoryTintByIndex === 'function' ? categoryTintByIndex(i, cat.name) : { fg: '' };
+          var isActive = filterCategories.indexOf(cat.id) >= 0;
+          pillsHtml +=
+            '<button class="gb-filter-chip' +
+            (isActive ? ' active' : '') +
+            '" data-action="toggleCategoryFilter" data-catid="' +
+            esc(cat.id) +
+            '" aria-pressed="' +
+            isActive +
+            '"><span class="chip-dot" style="background:' +
+            t.fg +
+            '"></span>' +
+            esc(cat.name) +
+            '</button>';
+        });
+        pillsHtml += '</div>';
+        return pillsHtml;
+      })() +
       '<button class="assess-ungraded-chip' +
       (showUngraded ? ' active' : '') +
       '" data-action="toggleUngraded" aria-pressed="' +
@@ -420,6 +429,26 @@ window.PageAssignments = (function () {
         esc(a.title) +
         '</span>' +
         '<span class="assess-meta">' +
+        (function () {
+          var idx = categoryId
+            ? (getCategories(cid) || []).findIndex(function (c) {
+                return c.id === categoryId;
+              })
+            : -1;
+          var t =
+            typeof categoryTintByIndex === 'function' ? categoryTintByIndex(idx, categoryName) : { bg: '', fg: '' };
+          return (
+            '<span class="type-badge ' +
+            (categoryId ? 'type-badge-s' : 'type-badge-f') +
+            '" style="background:' +
+            t.bg +
+            ';color:' +
+            t.fg +
+            '">' +
+            esc(categoryName) +
+            '</span>'
+          );
+        })() +
         (a.rubricId
           ? (function () {
               var r = getRubricById(cid, a.rubricId);
@@ -476,26 +505,6 @@ window.PageAssignments = (function () {
         })() +
         '</span>' +
         '</div>' +
-        (function () {
-          var idx = categoryId
-            ? (getCategories(cid) || []).findIndex(function (c) {
-                return c.id === categoryId;
-              })
-            : -1;
-          var t =
-            typeof categoryTintByIndex === 'function' ? categoryTintByIndex(idx, categoryName) : { bg: '', fg: '' };
-          return (
-            '<span class="type-badge ' +
-            (categoryId ? 'type-badge-s' : 'type-badge-f') +
-            '" style="background:' +
-            t.bg +
-            ';color:' +
-            t.fg +
-            '">' +
-            esc(categoryName) +
-            '</span>'
-          );
-        })() +
         '<div class="assess-header-actions" data-stop-prop="true">' +
         (a.rubricId && getRubricById(cid, a.rubricId)
           ? (function () {
@@ -569,7 +578,7 @@ window.PageAssignments = (function () {
       grouped[key].push(a);
     });
 
-    var filtersActive = assessFilterType !== 'all' || showUngraded || !!assessSearch;
+    var filtersActive = filterCategories.length > 0 || showUngraded || !!assessSearch;
 
     // Render module folders with drop zones
     modules.forEach(function (u, idx) {
@@ -726,13 +735,10 @@ window.PageAssignments = (function () {
 
     // Apply filters
     var assessments = allAssessments;
-    if (assessFilterType === 'categorized') {
+    if (filterCategories.length > 0) {
       assessments = assessments.filter(function (a) {
-        return !!_getAssessmentCategoryId(a);
-      });
-    } else if (assessFilterType === 'uncategorized') {
-      assessments = assessments.filter(function (a) {
-        return !_getAssessmentCategoryId(a);
+        var catId = _getAssessmentCategoryId(a);
+        return catId && filterCategories.indexOf(catId) >= 0;
       });
     }
     if (assessSearch) {
@@ -3587,8 +3593,8 @@ window.PageAssignments = (function () {
       setScoreMode: function () {
         setScoreMode(el.dataset.mode);
       },
-      setAssessTypeFilter: function () {
-        setAssessTypeFilter(el.dataset.type);
+      toggleCategoryFilter: function () {
+        toggleCategoryFilter(el.dataset.catid);
       },
       toggleUngraded: function () {
         showUngraded = !showUngraded;
@@ -3636,7 +3642,7 @@ window.PageAssignments = (function () {
       },
       clearAssessFilters: function () {
         e.preventDefault();
-        assessFilterType = 'all';
+        filterCategories = [];
         assessSearch = '';
         showUngraded = false;
         render();
@@ -4068,7 +4074,7 @@ window.PageAssignments = (function () {
     focusStudentId = focusStudentParam || null;
     _allExpanded = !(params && params.open && focusStudentParam);
     _collapsedIds = new Set();
-    assessFilterType = 'all';
+    filterCategories = [];
     assessSearch = '';
     showUngraded = false;
     rubricViewStates = {};

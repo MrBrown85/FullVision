@@ -17,7 +17,7 @@ window.PageGradebook = (function () {
   var _scoreMode = null; // null or { assessmentId, studentIdx }
   var filterSections = [];
   var filterModules = [];
-  var filterType = 'all';
+  var filterCategories = [];
   var searchQuery = '';
   var sortCol = null;
   var _filterStripOpen = false;
@@ -104,7 +104,7 @@ window.PageGradebook = (function () {
   }
   function clearAllFilters() {
     _flushActiveScoreEditor();
-    filterType = 'all';
+    filterCategories = [];
     filterSections = [];
     filterModules = [];
     render();
@@ -125,7 +125,7 @@ window.PageGradebook = (function () {
     await initData(cid);
     filterSections = [];
     filterModules = [];
-    filterType = 'all';
+    filterCategories = [];
     render();
   }
 
@@ -143,9 +143,11 @@ window.PageGradebook = (function () {
     else filterSections.push(secId);
     render();
   }
-  function setTypeFilter(type) {
+  function toggleCategoryFilter(catId) {
     _flushActiveScoreEditor();
-    filterType = filterType === type ? 'all' : type;
+    var idx = filterCategories.indexOf(catId);
+    if (idx >= 0) filterCategories.splice(idx, 1);
+    else filterCategories.push(catId);
     render();
   }
   function onSearch(val) {
@@ -233,13 +235,10 @@ window.PageGradebook = (function () {
     }
 
     var assessments = allAssessments;
-    if (filterType === 'categorized') {
+    if (filterCategories.length > 0) {
       assessments = assessments.filter(function (a) {
-        return !!_getAssessmentCategoryId(a);
-      });
-    } else if (filterType === 'uncategorized') {
-      assessments = assessments.filter(function (a) {
-        return !_getAssessmentCategoryId(a);
+        var catId = _getAssessmentCategoryId(a);
+        return catId && filterCategories.indexOf(catId) >= 0;
       });
     }
     if (filterSections.length > 0) {
@@ -270,7 +269,7 @@ window.PageGradebook = (function () {
 
     // ── Toolbar ──
     var modules = getModules(cid);
-    var activeFilterCount = (filterType !== 'all' ? 1 : 0) + filterSections.length + filterModules.length;
+    var activeFilterCount = filterCategories.length + filterSections.length + filterModules.length;
 
     html += '<div class="gb-toolbar">';
     var courseOpts = Object.values(COURSES)
@@ -339,18 +338,29 @@ window.PageGradebook = (function () {
 
     // ── Filter strip ──
     html += '<div class="gb-filter-strip' + (_filterStripOpen ? ' open' : '') + '" id="gb-filter-strip">';
-    html +=
-      '<span class="gb-filter-strip-label">Category</span><div class="gb-filter-strip-group">' +
-      '<button class="gb-type-chip' +
-      (filterType === 'categorized' ? ' active' : '') +
-      '" data-action="setTypeFilter" data-type="categorized">Categorized</button>' +
-      '<button class="gb-type-chip' +
-      (filterType === 'uncategorized' ? ' active' : '') +
-      '" data-action="setTypeFilter" data-type="uncategorized">No Category</button>' +
-      '</div>';
+    var sortedCategories = _getSortedCategories(cid);
+    if (sortedCategories.length > 0) {
+      html += '<span class="gb-filter-strip-label">Category</span><div class="gb-filter-strip-group">';
+      sortedCategories.forEach(function (cat, i) {
+        var t = typeof categoryTintByIndex === 'function' ? categoryTintByIndex(i, cat.name) : { fg: '' };
+        var isActive = filterCategories.indexOf(cat.id) >= 0;
+        html +=
+          '<button class="gb-filter-chip' +
+          (isActive ? ' active' : '') +
+          '" data-action="toggleCategoryFilter" data-catid="' +
+          esc(cat.id) +
+          '"><span class="chip-dot" style="background:' +
+          t.fg +
+          '"></span>' +
+          esc(cat.name) +
+          '</button>';
+      });
+      html += '</div>';
+    }
 
     html +=
-      '<div class="gb-filter-strip-divider"></div><span class="gb-filter-strip-label">Outcomes</span><div class="gb-filter-strip-group">';
+      (sortedCategories.length > 0 ? '<div class="gb-filter-strip-divider"></div>' : '') +
+      '<span class="gb-filter-strip-label">Outcomes</span><div class="gb-filter-strip-group">';
     sections.forEach(function (sec) {
       var isActive = filterSections.includes(sec.id);
       html +=
@@ -394,15 +404,11 @@ window.PageGradebook = (function () {
     if (viewMode === 'summary') {
       html += renderSummaryTable(cid, students, assessments, sections, isLetter, scores);
     } else if (assessments.length === 0) {
-      var typeLabel =
-        filterType === 'categorized' ? 'categorized' : filterType === 'uncategorized' ? 'uncategorized' : '';
       var secLabel = filterSections.length > 0 ? ' in the selected sections' : '';
       html +=
         '<div style="text-align:center;padding:60px 20px;color:var(--text-3)">' +
         '<div style="font-size:1.5rem;margin-bottom:8px;opacity:0.4">📋</div>' +
-        '<div style="font-family:var(--font-base);font-size:0.95rem;margin-bottom:4px">No ' +
-        typeLabel +
-        ' assignments found' +
+        '<div style="font-family:var(--font-base);font-size:0.95rem;margin-bottom:4px">No assignments found' +
         secLabel +
         '.</div>' +
         '<div style="font-family:var(--font-base);font-size:0.82rem">Try adjusting your filters or <a href="#/assignments?course=' +
@@ -2622,8 +2628,8 @@ window.PageGradebook = (function () {
       toggleFilterStrip: function () {
         toggleFilterStrip();
       },
-      setTypeFilter: function () {
-        setTypeFilter(el.dataset.type);
+      toggleCategoryFilter: function () {
+        toggleCategoryFilter(el.dataset.catid);
       },
       toggleSectionFilter: function () {
         toggleSectionFilter(el.dataset.secid);
@@ -2690,7 +2696,7 @@ window.PageGradebook = (function () {
     viewMode = localStorage.getItem('gb_viewMode') || 'detailed';
     filterSections = [];
     filterModules = [];
-    filterType = 'all';
+    filterCategories = [];
     searchQuery = '';
     sortCol = null;
     _filterStripOpen = false;
