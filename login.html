@@ -1,88 +1,151 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Sign in to FullVision — a learning profile builder and communicator for BC teachers.">
-<title>Sign In — FullVision</title>
-<link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#007AFF">
-<link rel="stylesheet" href="teacher/styles.css?v=3">
-<link rel="stylesheet" href="login.css">
-</head>
-<body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Sign in to FullVision — a learning profile builder and communicator for BC teachers."
+    />
+    <title>Sign In — FullVision</title>
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#007AFF" />
+    <link rel="stylesheet" href="teacher/styles.css?v=3" />
+    <link rel="stylesheet" href="login.css" />
+  </head>
+  <body>
+    <main class="auth-card">
+      <h1 class="auth-title">FullVision</h1>
+      <p class="auth-subtitle">Learning Profile Builder and Communicator</p>
 
-<main class="auth-card">
-  <h1 class="auth-title">FullVision</h1>
-  <p class="auth-subtitle">Learning Profile Builder and Communicator</p>
+      <!-- Tab toggle -->
+      <div class="auth-tabs" role="tablist" aria-label="Authentication">
+        <button
+          class="auth-tab active"
+          id="tab-signin"
+          data-action="switch-tab"
+          data-tab="signin"
+          role="tab"
+          aria-selected="true"
+          aria-controls="form-signin"
+        >
+          Sign In
+        </button>
+        <button
+          class="auth-tab"
+          id="tab-signup"
+          data-action="switch-tab"
+          data-tab="signup"
+          role="tab"
+          aria-selected="false"
+          aria-controls="form-signup"
+        >
+          Sign Up
+        </button>
+      </div>
 
-  <!-- Tab toggle -->
-  <div class="auth-tabs" role="tablist" aria-label="Authentication">
-    <button class="auth-tab active" id="tab-signin" data-action="switch-tab" data-tab="signin" role="tab" aria-selected="true" aria-controls="form-signin">Sign In</button>
-    <button class="auth-tab" id="tab-signup" data-action="switch-tab" data-tab="signup" role="tab" aria-selected="false" aria-controls="form-signup">Sign Up</button>
-  </div>
+      <!-- Error / success messages -->
+      <div class="auth-error" id="auth-error" role="alert" aria-live="assertive"></div>
+      <div class="auth-success" id="auth-success" role="status" aria-live="polite"></div>
 
-  <!-- Error / success messages -->
-  <div class="auth-error" id="auth-error" role="alert" aria-live="assertive"></div>
-  <div class="auth-success" id="auth-success" role="status" aria-live="polite"></div>
+      <!-- Sign In form -->
+      <form class="auth-form" id="form-signin" role="tabpanel" aria-labelledby="tab-signin">
+        <div class="auth-field">
+          <label class="auth-label" for="si-email">Email</label>
+          <input
+            class="auth-input"
+            id="si-email"
+            type="email"
+            placeholder="you@school.ca"
+            required
+            autocomplete="email"
+          />
+        </div>
+        <div class="auth-field">
+          <label class="auth-label" for="si-password">Password</label>
+          <input
+            class="auth-input"
+            id="si-password"
+            type="password"
+            placeholder="Password"
+            required
+            autocomplete="current-password"
+          />
+        </div>
+        <button class="auth-submit" type="submit" id="si-submit">Sign In</button>
+        <div class="auth-forgot"><a href="#" data-action="forgot-password">Forgot password?</a></div>
+      </form>
 
-  <!-- Sign In form -->
-  <form class="auth-form" id="form-signin" role="tabpanel" aria-labelledby="tab-signin">
-    <div class="auth-field">
-      <label class="auth-label" for="si-email">Email</label>
-      <input class="auth-input" id="si-email" type="email" placeholder="you@school.ca" required autocomplete="email">
-    </div>
-    <div class="auth-field">
-      <label class="auth-label" for="si-password">Password</label>
-      <input class="auth-input" id="si-password" type="password" placeholder="Password" required autocomplete="current-password">
-    </div>
-    <button class="auth-submit" type="submit" id="si-submit">Sign In</button>
-    <div class="auth-forgot"><a href="#" data-action="forgot-password">Forgot password?</a></div>
-  </form>
+      <!-- Sign Up form -->
+      <form class="auth-form" id="form-signup" hidden role="tabpanel" aria-labelledby="tab-signup">
+        <div class="auth-field">
+          <label class="auth-label" for="su-name">Display Name</label>
+          <input class="auth-input" id="su-name" type="text" placeholder="Ms. Brown" required autocomplete="name" />
+        </div>
+        <div class="auth-field">
+          <label class="auth-label" for="su-email">Email</label>
+          <input
+            class="auth-input"
+            id="su-email"
+            type="email"
+            placeholder="you@school.ca"
+            required
+            autocomplete="email"
+          />
+        </div>
+        <div class="auth-field">
+          <label class="auth-label" for="su-password">Password</label>
+          <input
+            class="auth-input"
+            id="su-password"
+            type="password"
+            placeholder="At least 6 characters"
+            required
+            minlength="6"
+            autocomplete="new-password"
+          />
+        </div>
+        <div class="auth-field">
+          <label class="auth-label" for="su-confirm">Confirm Password</label>
+          <input
+            class="auth-input"
+            id="su-confirm"
+            type="password"
+            placeholder="Confirm password"
+            required
+            minlength="6"
+            autocomplete="new-password"
+          />
+        </div>
+        <button class="auth-submit" type="submit" id="su-submit">Create Account</button>
+      </form>
 
-  <!-- Sign Up form -->
-  <form class="auth-form" id="form-signup" hidden role="tabpanel" aria-labelledby="tab-signup">
-    <div class="auth-field">
-      <label class="auth-label" for="su-name">Display Name</label>
-      <input class="auth-input" id="su-name" type="text" placeholder="Ms. Brown" required autocomplete="name">
-    </div>
-    <div class="auth-field">
-      <label class="auth-label" for="su-email">Email</label>
-      <input class="auth-input" id="su-email" type="email" placeholder="you@school.ca" required autocomplete="email">
-    </div>
-    <div class="auth-field">
-      <label class="auth-label" for="su-password">Password</label>
-      <input class="auth-input" id="su-password" type="password" placeholder="At least 6 characters" required minlength="6" autocomplete="new-password">
-    </div>
-    <div class="auth-field">
-      <label class="auth-label" for="su-confirm">Confirm Password</label>
-      <input class="auth-input" id="su-confirm" type="password" placeholder="Confirm password" required minlength="6" autocomplete="new-password">
-    </div>
-    <button class="auth-submit" type="submit" id="su-submit">Create Account</button>
-  </form>
+      <!-- Demo mode — no auth, seeded sample data, local-only -->
+      <div class="auth-demo">
+        <div class="auth-demo-divider"><span>or</span></div>
+        <button class="auth-demo-btn" type="button" id="demo-mode-btn" data-action="enter-demo-mode">
+          Try Demo Mode
+        </button>
+        <p class="auth-demo-hint">
+          Skip sign-in and explore with the Science 8 sample class. Data stays on this device only.
+        </p>
+      </div>
+    </main>
 
-  <!-- Demo mode — no auth, seeded sample data, local-only -->
-  <div class="auth-demo">
-    <div class="auth-demo-divider"><span>or</span></div>
-    <button class="auth-demo-btn" type="button" id="demo-mode-btn" data-action="enter-demo-mode">Try Demo Mode</button>
-    <p class="auth-demo-hint">Skip sign-in and explore with the Science 8 sample class. Data stays on this device only.</p>
-  </div>
-</main>
+    <script>
+      window.__ENV = {
+        SUPABASE_URL: '__SUPABASE_URL__',
+        SUPABASE_KEY: '__SUPABASE_KEY__',
+      };
+    </script>
+    <script src="vendor/supabase.min.js"></script>
+    <script src="shared/supabase.js"></script>
+    <script src="login-auth.js"></script>
 
-<script>
-window.__ENV = {
-  SUPABASE_URL: '__SUPABASE_URL__',
-  SUPABASE_KEY: '__SUPABASE_KEY__'
-};
-</script>
-<script src="vendor/supabase.min.js"></script>
-<script src="shared/supabase.js"></script>
-<script src="login-auth.js"></script>
-
-<script>
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js').catch(() => {});
-}
-</script>
-</body>
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      }
+    </script>
+  </body>
 </html>
