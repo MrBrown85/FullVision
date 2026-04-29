@@ -927,6 +927,17 @@ body.offline-active #app-dock {
 .sh-chip-icon {
   font-style: normal;
 }
+.sh-chip-email {
+  cursor: pointer;
+  border: none;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.sh-chip-email:hover {
+  background: var(--overlay-active);
+  color: var(--active);
+}
 .sh-chip-desig {
   background: rgba(0, 122, 255, 0.08);
   color: var(--active);
