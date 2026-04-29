@@ -2,14 +2,18 @@
   command = "bash scripts/build.sh"
   publish = "dist"
 
-# Sentry build plugin: skip set-commits since we don't have a Sentry → GitHub
-# repo integration, and the build runs on a shallow clone that lacks the parent
-# commits set-commits would walk. The release tag and source-map upload still
-# run (no maps to upload yet — vanilla JS, no bundler).
+# Sentry build plugin config:
+# - skipSetCommits: the default sentry-cli `releases set-commits` step fails
+#   because Netlify uses a shallow git clone (parent SHAs missing) AND we
+#   have no Sentry → GitHub repo integration configured.
+# - deployPreviews: skip the plugin entirely on PR previews — we only care
+#   about Sentry release tagging on production deploys, and there are no
+#   source maps to upload anyway (no bundler in this project).
 [[plugins]]
   package = "@sentry/netlify-build-plugin"
   [plugins.inputs]
     skipSetCommits = true
+    deployPreviews = false
 
 [[headers]]
   for = "/**/*.js"
