@@ -29,13 +29,16 @@ export default async function handler(request, context) {
   headers.delete('content-length');
 
   // Set CSP with nonce (replaces static unsafe-inline headers)
+  // Sentry: js.sentry-cdn.com hosts the loader, browser.sentry-cdn.com hosts
+  // the SDK bundle the loader lazy-fetches. *.sentry.io covers ingest endpoints
+  // across all regions (including EU's ingest.de.sentry.io).
   const csp = [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' https://cdn.jsdelivr.net`,
+    `script-src 'self' 'nonce-${nonce}' https://cdn.jsdelivr.net https://js.sentry-cdn.com https://browser.sentry-cdn.com`,
     `style-src 'self' 'unsafe-inline'`,
     "img-src 'self' data: blob:",
     "font-src 'self'",
-    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.nsvcs.net",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.nsvcs.net https://*.sentry.io",
     "worker-src 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",
