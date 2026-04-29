@@ -47,6 +47,19 @@ window.DashClassManager = (function () {
     '#334155',
   ];
 
+  // Single source of truth for calculation method options. Rendered by both
+  // the create wizard (step 2) and the post-creation editor — keep order
+  // identical across both surfaces. Value strings are persisted in
+  // course.calcMethod and courseConfig.calcMethod; do not rename.
+  var CALC_METHODS = [
+    { value: 'mostRecent', label: 'Most Recent' },
+    { value: 'highest', label: 'Highest' },
+    { value: 'average', label: 'Mean' },
+    { value: 'median', label: 'Median' },
+    { value: 'mode', label: 'Mode' },
+    { value: 'decayingAvg', label: 'Decaying Avg' },
+  ];
+
   var classManagerOpen = false;
   var cmSelectedCourse = null;
   var cmMode = 'edit';
@@ -250,7 +263,7 @@ window.DashClassManager = (function () {
   }
 
   async function _dispatchMapToV2(cid, map, forceNewIds) {
-    if (!_isCanonicalId(cid)) return;
+    if (!_isCanonicalId(cid)) return true;
     try {
       var subjects = map.subjects || [];
       for (var si = 0; si < subjects.length; si++) {
@@ -298,8 +311,10 @@ window.DashClassManager = (function () {
           }
         }
       }
+      return true;
     } catch (err) {
       console.error('[_dispatchMapToV2] dispatch failed for course', cid, err);
+      return false;
     }
   }
 
@@ -1281,24 +1296,17 @@ window.DashClassManager = (function () {
       '<div class="cm-field">' +
       '<label class="cm-label">Calculation Method</label>' +
       '<div class="cm-seg">' +
-      '<button class="cm-seg-btn' +
-      (method === 'mostRecent' ? ' active' : '') +
-      '" data-action="cmSetCalcMethod" data-value="mostRecent">Most Recent</button>' +
-      '<button class="cm-seg-btn' +
-      (method === 'highest' ? ' active' : '') +
-      '" data-action="cmSetCalcMethod" data-value="highest">Highest</button>' +
-      '<button class="cm-seg-btn' +
-      (method === 'average' ? ' active' : '') +
-      '" data-action="cmSetCalcMethod" data-value="average">Mean</button>' +
-      '<button class="cm-seg-btn' +
-      (method === 'median' ? ' active' : '') +
-      '" data-action="cmSetCalcMethod" data-value="median">Median</button>' +
-      '<button class="cm-seg-btn' +
-      (method === 'mode' ? ' active' : '') +
-      '" data-action="cmSetCalcMethod" data-value="mode">Mode</button>' +
-      '<button class="cm-seg-btn' +
-      (method === 'decayingAvg' ? ' active' : '') +
-      '" data-action="cmSetCalcMethod" data-value="decayingAvg">Decaying Avg</button>' +
+      CALC_METHODS.map(function (m) {
+        return (
+          '<button class="cm-seg-btn' +
+          (method === m.value ? ' active' : '') +
+          '" data-action="cmSetCalcMethod" data-value="' +
+          m.value +
+          '">' +
+          m.label +
+          '</button>'
+        );
+      }).join('') +
       '</div>' +
       // Contextual description beneath the selected method — copied verbatim
       // from Project Phoneox (src/components/courses/grading-config.tsx:100-115)
@@ -1760,10 +1768,21 @@ window.DashClassManager = (function () {
       '</div>' +
       '<div class="cm-field"><label class="cm-label">Calculation Method</label>' +
       '<div class="cm-seg" id="cm-cg-calc">' +
-      '<button class="cm-seg-btn active" data-val="mostRecent" data-action="cmCreateToggle" data-group="cm-cg-calc">Most Recent</button>' +
-      '<button class="cm-seg-btn" data-val="highest" data-action="cmCreateToggle" data-group="cm-cg-calc">Highest</button>' +
-      '<button class="cm-seg-btn" data-val="mode" data-action="cmCreateToggle" data-group="cm-cg-calc">Mode</button>' +
-      '<button class="cm-seg-btn" data-val="decayingAvg" data-action="cmCreateToggleDecay" data-group="cm-cg-calc">Decaying Avg</button>' +
+      CALC_METHODS.map(function (m) {
+        var action = m.value === 'decayingAvg' ? 'cmCreateToggleDecay' : 'cmCreateToggle';
+        var isActive = m.value === (cwStep2Calc || 'mostRecent');
+        return (
+          '<button class="cm-seg-btn' +
+          (isActive ? ' active' : '') +
+          '" data-val="' +
+          m.value +
+          '" data-action="' +
+          action +
+          '" data-group="cm-cg-calc">' +
+          m.label +
+          '</button>'
+        );
+      }).join('') +
       '</div></div>' +
       '<div id="cm-cg-decay" class="cm-field" style="display:none"><label class="cm-label">Decay Weight</label>' +
       '<div class="cm-slider-row"><input type="range" min="10" max="95" value="65" id="cm-cg-decay-slider" style="flex:1"><span class="cm-slider-label">65%</span></div>' +
@@ -1911,7 +1930,7 @@ window.DashClassManager = (function () {
     return '';
   }
 
-  function cwFinishCreate() {
+  async function cwFinishCreate() {
     var name = cwStep2Name || cwGetPreName();
     if (!name.trim()) {
       cwStep = 2;
@@ -1930,6 +1949,12 @@ window.DashClassManager = (function () {
       return;
     }
 
+    var finishBtn = document.querySelector('[data-action="cwFinishCreate"]');
+    if (finishBtn) {
+      finishBtn.disabled = true;
+      finishBtn.textContent = 'Creating…';
+    }
+
     var course = createCourse({
       name: name.trim(),
       gradeLevel: (cwStep2Grade || (cwSelectedGrade ? String(cwSelectedGrade) : '')).trim(),
@@ -1944,12 +1969,16 @@ window.DashClassManager = (function () {
     cc.decayWeight = parseInt(cwStep2Decay, 10) / 100;
     saveCourseConfig(course.id, cc);
 
+    var dispatchOk = true;
     if (cwSelectedTags.length > 0 && CURRICULUM_INDEX) {
       var map = buildLearningMapFromTags(cwSelectedTags);
       if (map) {
         saveLearningMap(course.id, map);
         updateCourse(course.id, { curriculumTags: cwSelectedTags.slice() });
-        _dispatchMapToV2(course.id, map, false);
+        // Await so the editor's V2 reads land after subjects/sections/tags
+        // are written. Without this, renderClassManager runs before Supabase
+        // ack and the curriculum panel loads empty.
+        dispatchOk = await _dispatchMapToV2(course.id, map, false);
       }
     }
 
@@ -1958,6 +1987,12 @@ window.DashClassManager = (function () {
     _activeCourse = course.id;
     setActiveCourse(course.id);
     renderClassManager();
+
+    if (!dispatchOk) {
+      alert(
+        'Class created, but curriculum competencies failed to sync. You can re-add them from the curriculum panel.',
+      );
+    }
   }
 
   /* ── CM Actions ─────────────────────────────────────────── */
