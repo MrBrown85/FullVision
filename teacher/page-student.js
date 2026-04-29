@@ -635,7 +635,7 @@ window.PageStudent = (function () {
           '" title="' +
           esc(tag.text || tag.label) +
           '">' +
-          esc(tag.id) +
+          esc(tag.code || tag.shortName || '') +
           '</th>';
     });
     html += '<th class="gt-col-avg">Avg</th></tr></thead><tbody>';

@@ -609,7 +609,7 @@ window.PageAssignments = (function () {
         '<span class="mod-folder-chevron">\u25B6</span>' +
         '<span class="mod-folder-color" style="background:' +
         (u.color || '#6366f1') +
-        '" title="Change color" data-action="openColorPicker" data-stop-prop="true">' +
+        '" title="Change colour" data-action="openColorPicker" data-stop-prop="true">' +
         '<input type="color" value="' +
         (u.color || '#6366f1') +
         '" data-action-change="moduleColor" data-moduleid="' +
@@ -1110,7 +1110,7 @@ window.PageAssignments = (function () {
             '<span class="af-tag-id" style="color:' +
             sec.color +
             '">' +
-            esc(tag.id) +
+            esc(tag.code || tag.shortName || '') +
             '</span>' +
             '<span class="af-tag-name">' +
             esc(sec.name) +
@@ -1141,7 +1141,7 @@ window.PageAssignments = (function () {
           '<span class="af-tag-id" style="color:' +
           sec.color +
           '">' +
-          esc(tag.id) +
+          esc(tag.code || tag.shortName || '') +
           '</span>' +
           '<span class="af-tag-name">' +
           esc(sec.name) +
@@ -1172,7 +1172,7 @@ window.PageAssignments = (function () {
           '<span class="af-tag-id" style="color:' +
           sec.color +
           '">' +
-          esc(tag.id) +
+          esc(tag.code || tag.shortName || '') +
           '</span>' +
           '<span class="af-tag-name">' +
           esc(sec.name) +
@@ -2640,7 +2640,7 @@ window.PageAssignments = (function () {
           '><span class="rubric-tag-id" style="color:' +
           openSec.color +
           '">' +
-          esc(tag.id) +
+          esc(tag.code || tag.shortName || '') +
           '</span><span class="rubric-tag-label">' +
           esc(tag.label) +
           '</span>' +
@@ -2685,7 +2685,7 @@ window.PageAssignments = (function () {
           ' data-crit-idx="' +
           ci +
           '" data-stop-prop="true">' +
-          '<summary class="rubric-level-values-summary" data-stop-prop="true">Customize point values</summary>' +
+          '<summary class="rubric-level-values-summary" data-stop-prop="true">Customise point values</summary>' +
           '<div class="rubric-level-values-grid">' +
           '<label class="rubric-level-value-label">L4 <input class="rubric-level-value" type="number" step="0.5" value="' +
           v4 +
