@@ -3605,9 +3605,16 @@ function getLearningMap(cid) {
   return map;
 }
 function saveLearningMap(cid, map) {
+  var prev = _loadPersistedCourseFieldSnapshot(
+    'learningMaps',
+    cid,
+    (_cache.learningMaps && _cache.learningMaps[cid]) || { subjects: [], sections: [] },
+  );
   map._customized = true;
   map._version = (map._version || 0) + 1;
   _saveCourseField('learningMaps', cid, map); // derived tag/section caches auto-invalidate via mapRef check
+  if (localStorage.getItem('gb-demo-mode') === '1' || !_useSupabase || !_isUuid(cid)) return;
+  _persistLearningMapToCanonical(cid, prev, map);
 }
 function resetLearningMap(cid) {
   _cache.learningMaps[cid] = LEARNING_MAP[cid] || { subjects: [], sections: [] }; // ref change auto-busts tag/section caches
@@ -3738,6 +3745,413 @@ function getModuleById(cid, moduleId) {
   return getModules(cid).find(u => u.id === moduleId);
 }
 
+var _learningMapSaveQueue = {};
+
+function _mapItemsById(items) {
+  var out = {};
+  (items || []).forEach(function (item) {
+    if (item && item.id) out[item.id] = item;
+  });
+  return out;
+}
+
+function _learningMapTags(map) {
+  var out = [];
+  (map && map.sections ? map.sections : []).forEach(function (section) {
+    (section.tags || (section.outcome ? [section.outcome] : [])).forEach(function (tag, idx) {
+      if (!tag) return;
+      out.push({ tag: tag, section: section, displayOrder: idx });
+    });
+  });
+  return out;
+}
+
+function _patchLearningMapEntityId(map, kind, oldId, newId) {
+  if (!map || !oldId || !newId || oldId === newId) return;
+  if (kind === 'subject') {
+    (map.subjects || []).forEach(function (subject) {
+      if (subject.id === oldId) subject.id = newId;
+    });
+    (map.sections || []).forEach(function (section) {
+      if (section.subject === oldId) section.subject = newId;
+      (section.tags || []).forEach(function (tag) {
+        if (tag.subject === oldId) tag.subject = newId;
+      });
+    });
+  } else if (kind === 'group') {
+    (map.competencyGroups || []).forEach(function (group) {
+      if (group.id === oldId) group.id = newId;
+    });
+    (map.sections || []).forEach(function (section) {
+      if (section.groupId === oldId) section.groupId = newId;
+      if (section.competencyGroupId === oldId) section.competencyGroupId = newId;
+    });
+  } else if (kind === 'section') {
+    (map.sections || []).forEach(function (section) {
+      if (section.id === oldId) section.id = newId;
+    });
+  } else if (kind === 'tag') {
+    (map.sections || []).forEach(function (section) {
+      if (section.outcome && section.outcome.id === oldId) section.outcome.id = newId;
+      (section.tags || []).forEach(function (tag) {
+        if (tag.id === oldId) tag.id = newId;
+      });
+    });
+  }
+}
+
+function _patchObjectKeys(obj, idMap) {
+  if (!obj || !idMap) return false;
+  var changed = false;
+  Object.keys(idMap).forEach(function (oldId) {
+    var newId = idMap[oldId];
+    if (!newId || obj[oldId] === undefined) return;
+    if (obj[newId] === undefined) obj[newId] = obj[oldId];
+    delete obj[oldId];
+    changed = true;
+  });
+  return changed;
+}
+
+function _patchLearningMapReferences(cid, idMaps) {
+  idMaps = idMaps || {};
+  var tagMap = idMaps.tag || {};
+  var sectionMap = idMaps.section || {};
+  var changedAssessments = false;
+  var assessments = structuredClone(getAssessments(cid) || []);
+  assessments.forEach(function (assessment) {
+    if (!assessment || !Array.isArray(assessment.tagIds)) return;
+    var nextTagIds = assessment.tagIds.map(function (id) {
+      return tagMap[id] || id;
+    });
+    if (JSON.stringify(nextTagIds) !== JSON.stringify(assessment.tagIds)) {
+      assessment.tagIds = nextTagIds;
+      assessment.tag_ids = nextTagIds;
+      changedAssessments = true;
+    }
+  });
+  if (changedAssessments) saveAssessments(cid, assessments);
+
+  var scores = structuredClone(getScores(cid) || {});
+  var changedScores = false;
+  Object.keys(scores).forEach(function (sid) {
+    (scores[sid] || []).forEach(function (entry) {
+      if (entry && tagMap[entry.tagId]) {
+        entry.tagId = tagMap[entry.tagId];
+        changedScores = true;
+      }
+    });
+  });
+  if (changedScores) saveScores(cid, scores);
+
+  var goals = structuredClone(getGoals(cid) || {});
+  if (_patchObjectKeys(goals, sectionMap)) {
+    _saveCourseField('goals', cid, goals);
+  }
+  var reflections = structuredClone(getReflections(cid) || {});
+  if (_patchObjectKeys(reflections, sectionMap)) {
+    _saveCourseField('reflections', cid, reflections);
+  }
+  var overrides = structuredClone(getOverrides(cid) || {});
+  var changedOverrides = false;
+  Object.keys(overrides || {}).forEach(function (sid) {
+    if (_patchObjectKeys(overrides[sid], sectionMap)) changedOverrides = true;
+  });
+  if (changedOverrides) {
+    _saveCourseField('overrides', cid, overrides);
+  }
+}
+
+function _stringifyICanText(tag) {
+  if (!tag) return '';
+  if (typeof tag.text === 'string') return tag.text;
+  if (typeof tag.iCanText === 'string') return tag.iCanText;
+  if (typeof tag.i_can_text === 'string') return tag.i_can_text;
+  if (Array.isArray(tag.i_can_statements)) return tag.i_can_statements.join('\n');
+  if (Array.isArray(tag.iCanStatements)) return tag.iCanStatements.join('\n');
+  return '';
+}
+
+function _persistLearningMapToCanonical(cid, prevMap, nextMap) {
+  if (!window.v2 || !window.v2.upsertSubject || !window.v2.upsertSection || !window.v2.upsertTag) return;
+  var tail = _learningMapSaveQueue[cid] || Promise.resolve();
+  var next = tail.then(async function () {
+    var map = structuredClone(nextMap || { subjects: [], sections: [] });
+    var idMaps = { subject: {}, group: {}, section: {}, tag: {} };
+    var opsToDelete = [];
+
+    var groups = map.competencyGroups || [];
+    if (window.v2.upsertCompetencyGroup) {
+      for (var gi = 0; gi < groups.length; gi++) {
+        var group = groups[gi];
+        if (!group) continue;
+        var oldGroupId = group.id;
+        var groupRes = await window.v2.upsertCompetencyGroup({
+          id: _isUuid(oldGroupId) ? oldGroupId : null,
+          courseId: cid,
+          name: group.name || '',
+          color: group.color || null,
+          displayOrder: group.displayOrder != null ? Number(group.displayOrder) : gi,
+        });
+        if (groupRes && groupRes.error) throw groupRes.error;
+        if (groupRes && groupRes.data && groupRes.data !== oldGroupId) {
+          idMaps.group[oldGroupId] = groupRes.data;
+          _patchLearningMapEntityId(map, 'group', oldGroupId, groupRes.data);
+        }
+      }
+    }
+
+    var subjects = map.subjects || [];
+    for (var si = 0; si < subjects.length; si++) {
+      var subject = subjects[si];
+      if (!subject) continue;
+      var oldSubjectId = subject.id;
+      var subjectRes = await window.v2.upsertSubject({
+        id: _isUuid(oldSubjectId) ? oldSubjectId : null,
+        courseId: cid,
+        name: subject.name || '',
+        color: subject.color || null,
+        displayOrder: subject.displayOrder != null ? Number(subject.displayOrder) : Number(subject.sortOrder || si),
+      });
+      if (subjectRes && subjectRes.error) throw subjectRes.error;
+      if (subjectRes && subjectRes.data && subjectRes.data !== oldSubjectId) {
+        idMaps.subject[oldSubjectId] = subjectRes.data;
+        _patchLearningMapEntityId(map, 'subject', oldSubjectId, subjectRes.data);
+      }
+    }
+
+    var sections = map.sections || [];
+    for (var xi = 0; xi < sections.length; xi++) {
+      var section = sections[xi];
+      if (!section) continue;
+      var oldSectionId = section.id;
+      var sectionRes = await window.v2.upsertSection({
+        id: _isUuid(oldSectionId) ? oldSectionId : null,
+        subjectId: idMaps.subject[section.subject] || section.subject,
+        name: section.name || section.shortName || '',
+        color: section.color || null,
+        competencyGroupId: idMaps.group[section.groupId] || section.groupId || section.competencyGroupId || null,
+        displayOrder: section.displayOrder != null ? Number(section.displayOrder) : Number(section.sortOrder || xi),
+      });
+      if (sectionRes && sectionRes.error) throw sectionRes.error;
+      if (sectionRes && sectionRes.data && sectionRes.data !== oldSectionId) {
+        idMaps.section[oldSectionId] = sectionRes.data;
+        _patchLearningMapEntityId(map, 'section', oldSectionId, sectionRes.data);
+      }
+      var tags = section.tags || (section.outcome ? [section.outcome] : []);
+      for (var ti = 0; ti < tags.length; ti++) {
+        var tag = tags[ti];
+        if (!tag) continue;
+        var oldTagId = tag.id;
+        var tagRes = await window.v2.upsertTag({
+          id: _isUuid(oldTagId) ? oldTagId : null,
+          sectionId: section.id,
+          label: tag.label || tag.name || section.name || '',
+          code: tag.code || tag.shortName || '',
+          iCanText: _stringifyICanText(tag),
+          displayOrder: tag.displayOrder != null ? Number(tag.displayOrder) : Number(tag.sortOrder || ti),
+        });
+        if (tagRes && tagRes.error) throw tagRes.error;
+        if (tagRes && tagRes.data && tagRes.data !== oldTagId) {
+          idMaps.tag[oldTagId] = tagRes.data;
+          _patchLearningMapEntityId(map, 'tag', oldTagId, tagRes.data);
+        }
+      }
+    }
+
+    var nextSubjects = _mapItemsById(map.subjects || []);
+    var nextGroups = _mapItemsById(map.competencyGroups || []);
+    var nextSections = _mapItemsById(map.sections || []);
+    var nextTags = _mapItemsById(
+      _learningMapTags(map).map(function (entry) {
+        return entry.tag;
+      }),
+    );
+    var prevSubjects = _mapItemsById((prevMap && prevMap.subjects) || []);
+    var prevGroups = _mapItemsById((prevMap && prevMap.competencyGroups) || []);
+    var prevSections = _mapItemsById((prevMap && prevMap.sections) || []);
+    var prevTags = _mapItemsById(
+      _learningMapTags(prevMap || {}).map(function (entry) {
+        return entry.tag;
+      }),
+    );
+
+    Object.keys(prevTags).forEach(function (id) {
+      if (!nextTags[id] && _isUuid(id) && window.v2.deleteTag) opsToDelete.push(window.v2.deleteTag(id));
+    });
+    Object.keys(prevSections).forEach(function (id) {
+      if (!nextSections[id] && _isUuid(id) && window.v2.deleteSection) opsToDelete.push(window.v2.deleteSection(id));
+    });
+    Object.keys(prevGroups).forEach(function (id) {
+      if (!nextGroups[id] && _isUuid(id) && window.v2.deleteCompetencyGroup)
+        opsToDelete.push(window.v2.deleteCompetencyGroup(id));
+    });
+    Object.keys(prevSubjects).forEach(function (id) {
+      if (!nextSubjects[id] && _isUuid(id) && window.v2.deleteSubject) opsToDelete.push(window.v2.deleteSubject(id));
+    });
+    await Promise.all(
+      opsToDelete.map(function (op) {
+        return op.then(function (res) {
+          if (res && res.error) throw res.error;
+        });
+      }),
+    );
+
+    if (
+      Object.keys(idMaps.subject).length ||
+      Object.keys(idMaps.group).length ||
+      Object.keys(idMaps.section).length ||
+      Object.keys(idMaps.tag).length
+    ) {
+      _saveCourseField('learningMaps', cid, map);
+      _patchLearningMapReferences(cid, idMaps);
+    }
+  });
+  _learningMapSaveQueue[cid] = _trackPendingSync(
+    next.catch(function (err) {
+      console.warn('Learning map sync to canonical RPCs failed:', err);
+      if (typeof showSyncToast === 'function') {
+        showSyncToast('Learning map saved locally. Cloud sync needs attention.', 'error');
+      }
+    }),
+  );
+  return _learningMapSaveQueue[cid];
+}
+
+var _categorySaveQueue = {};
+
+function _categoryChanged(a, b, idx) {
+  return (
+    !a ||
+    (a.name || '') !== (b.name || '') ||
+    Number(a.weight || 0) !== Number(b.weight || 0) ||
+    Number(a.displayOrder ?? a.display_order ?? idx) !== Number(b.displayOrder ?? b.display_order ?? idx)
+  );
+}
+
+function _persistCategoriesToCanonical(cid, prev, arr) {
+  if (!window.v2 || !window.v2.upsertCategory) return;
+  var tail = _categorySaveQueue[cid] || Promise.resolve();
+  var next = tail.then(function () {
+    var prevById = {};
+    (prev || []).forEach(function (category) {
+      if (category && category.id) prevById[category.id] = category;
+    });
+    var nextById = {};
+    (arr || []).forEach(function (category) {
+      if (category && category.id) nextById[category.id] = category;
+    });
+    var ops = [];
+    var idMap = {};
+    (arr || []).forEach(function (category, idx) {
+      if (!category) return;
+      var existing = category.id ? prevById[category.id] : null;
+      if (existing && !_categoryChanged(existing, category, idx)) return;
+      ops.push(
+        window.v2
+          .upsertCategory({
+            id: _isUuid(category.id) ? category.id : null,
+            courseId: cid,
+            name: category.name || '',
+            weight: category.weight != null ? Number(category.weight) : 0,
+            displayOrder:
+              category.displayOrder != null
+                ? Number(category.displayOrder)
+                : category.display_order != null
+                  ? Number(category.display_order)
+                  : idx,
+          })
+          .then(function (res) {
+            if (res && res.error) throw res.error;
+            var canonicalId = res && res.data ? res.data : null;
+            if (canonicalId && category.id !== canonicalId) {
+              idMap[category.id] = canonicalId;
+              var cached = (_cache.categories[cid] || []).find(function (c) {
+                return c.id === category.id;
+              });
+              if (cached) cached.id = canonicalId;
+              _safeLSSet('gb-categories-' + cid, JSON.stringify(_cache.categories[cid] || []));
+            }
+          }),
+      );
+    });
+    (prev || []).forEach(function (category) {
+      if (category && _isUuid(category.id) && !nextById[category.id] && window.v2.deleteCategory) {
+        ops.push(window.v2.deleteCategory(category.id));
+      }
+    });
+    var reorderIds = (arr || [])
+      .map(function (category) {
+        return category && category.id;
+      })
+      .filter(_isUuid);
+    if (reorderIds.length > 1 && window.v2.reorderCategories) {
+      ops.push(window.v2.reorderCategories(reorderIds));
+    }
+    return Promise.all(
+      ops.map(function (op) {
+        return op.then(function (res) {
+          if (res && res.error) throw res.error;
+        });
+      }),
+    ).then(function () {
+      var localIds = Object.keys(idMap);
+      if (localIds.length === 0) return;
+      var assessments = structuredClone(getAssessments(cid) || []);
+      var changed = false;
+      assessments.forEach(function (assessment) {
+        if (!assessment) return;
+        var categoryId = assessment.categoryId || assessment.category_id;
+        if (categoryId && idMap[categoryId]) {
+          assessment.categoryId = idMap[categoryId];
+          assessment.category_id = idMap[categoryId];
+          changed = true;
+        }
+      });
+      if (changed) saveAssessments(cid, assessments);
+    });
+  });
+  _categorySaveQueue[cid] = _trackPendingSync(
+    next.catch(function (err) {
+      console.warn('Category sync to canonical RPCs failed:', err);
+    }),
+  );
+  return _categorySaveQueue[cid];
+}
+
+function _persistStatusDiffToCanonical(prev, next) {
+  var sb = getSupabase();
+  if (!sb) return;
+  var keys = {};
+  Object.keys(prev || {}).forEach(function (key) {
+    keys[key] = true;
+  });
+  Object.keys(next || {}).forEach(function (key) {
+    keys[key] = true;
+  });
+  Object.keys(keys).forEach(function (key) {
+    var before = (prev || {})[key] || null;
+    var after = (next || {})[key] || null;
+    if (before === after) return;
+    var parts = key.split(':');
+    if (parts.length < 2) return;
+    var enrollmentId = parts[0];
+    var assessmentId = parts.slice(1).join(':');
+    if (!_isUuid(enrollmentId) || !_isUuid(assessmentId)) return;
+    _trackPendingSync(
+      sb
+        .rpc('set_score_status', {
+          p_enrollment_id: enrollmentId,
+          p_assessment_id: assessmentId,
+          p_status: after || null,
+        })
+        .then(function (res) {
+          if (res.error) console.warn('set_score_status RPC failed:', res.error);
+        }),
+    );
+  });
+}
+
 /* ── Assignment Statuses (excused / not-submitted) ─────────── */
 function getAssignmentStatuses(cid) {
   if (_cache.statuses[cid] !== undefined) return _cache.statuses[cid];
@@ -3749,7 +4163,11 @@ function getAssignmentStatuses(cid) {
   }
 }
 function saveAssignmentStatuses(cid, obj) {
-  _saveCourseField('statuses', cid, obj);
+  var prev = _loadPersistedCourseFieldSnapshot('statuses', cid, (_cache.statuses && _cache.statuses[cid]) || {});
+  var next = obj || {};
+  _saveCourseField('statuses', cid, next);
+  if (localStorage.getItem('gb-demo-mode') === '1' || !_useSupabase || !_isUuid(cid)) return;
+  _persistStatusDiffToCanonical(prev, next);
 }
 function getAssignmentStatus(cid, sid, aid) {
   return getAssignmentStatuses(cid)[sid + ':' + aid] || null;
@@ -4515,7 +4933,11 @@ function getCategories(cid) {
   }
 }
 function saveCategories(cid, arr) {
-  _saveCourseField('categories', cid, arr || []);
+  var prev = _loadPersistedCourseFieldSnapshot('categories', cid, (_cache.categories && _cache.categories[cid]) || []);
+  var next = arr || [];
+  _saveCourseField('categories', cid, next);
+  if (localStorage.getItem('gb-demo-mode') === '1' || !_useSupabase || !_isUuid(cid)) return;
+  _persistCategoriesToCanonical(cid, prev, next);
 }
 function getCategoryById(cid, categoryId) {
   if (!categoryId) return null;
@@ -4871,7 +5293,7 @@ function getScores(cid) {
   }
 }
 function saveScores(cid, obj) {
-  var prev = _cache.scores[cid];
+  var prev = _loadPersistedCourseFieldSnapshot('scores', cid, (_cache.scores && _cache.scores[cid]) || {});
   var prevCount = prev ? Object.keys(prev).length : 0;
   var newCount = obj ? Object.keys(obj).length : 0;
   // Block catastrophic saves: if student-count drops >50%, refuse to save.
@@ -4906,6 +5328,7 @@ function saveScores(cid, obj) {
     return;
   }
   _saveCourseField('scores', cid, obj);
+  persistScoreDiffToCanonical(cid, prev, obj || {});
 }
 
 /* ── Points-mode helpers: one score → all tags ──────────────── */
