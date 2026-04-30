@@ -3536,8 +3536,92 @@ function getModules(cid) {
   }
 }
 function saveModules(cid, arr) {
+  var prev = ((_cache.modules && _cache.modules[cid]) || []).slice();
   _saveCourseField('modules', cid, arr);
+  if (localStorage.getItem('gb-demo-mode') === '1' || !_useSupabase || !_isUuid(cid)) return;
+  if (!cid || !arr) return;
+  _persistModulesToCanonical(cid, prev, arr);
 }
+
+/* Per-course save lock — same pattern as students / assessments. */
+var _moduleSaveQueue = {};
+
+function _persistModulesToCanonical(cid, prev, arr) {
+  var sb = getSupabase();
+  if (!sb || !window.v2 || !window.v2.upsertModule) return;
+  var tail = _moduleSaveQueue[cid] || Promise.resolve();
+  var next = tail.then(async function () {
+    var prevById = {};
+    prev.forEach(function (m) {
+      if (m && m.id) prevById[m.id] = m;
+    });
+    var arrById = {};
+    arr.forEach(function (m) {
+      if (m && m.id) arrById[m.id] = m;
+    });
+    var ops = [];
+    // Adds + updates (idempotent — upsert_module handles both)
+    arr.forEach(function (m, idx) {
+      if (!m || !m.id) return;
+      var p = prevById[m.id];
+      var displayOrder = m.sortOrder != null ? Number(m.sortOrder) : idx;
+      ops.push(
+        window.v2
+          .upsertModule({
+            id: _isUuid(m.id) ? m.id : null,
+            courseId: cid,
+            name: m.name || '',
+            color: m.color || null,
+            displayOrder: displayOrder,
+          })
+          .then(function (res) {
+            if (res && res.error) {
+              console.warn('upsert_module failed:', res.error, m);
+              return;
+            }
+            // If insert, swap local id → canonical so subsequent saves
+            // hit the update branch. Mutates the cached entry directly.
+            var canonicalId = res && res.data ? res.data : null;
+            if (!p && canonicalId && canonicalId !== m.id) {
+              var cached = (_cache.modules[cid] || []).find(function (c) {
+                return c.id === m.id;
+              });
+              if (cached) cached.id = canonicalId;
+              if (_cache.modules[cid]) {
+                _safeLSSet('gb-modules-' + cid, JSON.stringify(_cache.modules[cid]));
+              }
+              // Re-key any assessment that references the old local id.
+              var assessments = _cache.assessments[cid] || [];
+              var assessChanged = false;
+              assessments.forEach(function (a) {
+                if (a.moduleId === m.id) {
+                  a.moduleId = canonicalId;
+                  assessChanged = true;
+                }
+              });
+              if (assessChanged) _safeLSSet('gb-assessments-' + cid, JSON.stringify(assessments));
+            }
+          }),
+      );
+    });
+    // Deletes — anything in prev with a canonical id that's missing from arr
+    prev.forEach(function (m) {
+      if (m && m.id && !arrById[m.id] && _isUuid(m.id) && window.v2.deleteModule) {
+        ops.push(
+          window.v2.deleteModule(m.id).then(function (res) {
+            if (res && res.error) console.warn('delete_module failed:', res.error, m.id);
+          }),
+        );
+      }
+    });
+    return Promise.all(ops).catch(function (err) {
+      console.warn('Module sync to canonical RPCs failed for one or more rows:', err);
+    });
+  });
+  _moduleSaveQueue[cid] = _trackPendingSync(next);
+  return _moduleSaveQueue[cid];
+}
+
 function getModuleById(cid, moduleId) {
   return getModules(cid).find(u => u.id === moduleId);
 }
@@ -4565,8 +4649,85 @@ function getNotes(cid) {
     return {};
   }
 }
+/* Per-course note ID registry: maps enrollmentId → most-recently-written
+   note UUID for the current session. Populated by upsert_note responses so
+   that a subsequent edit can delete the old row before inserting the new one
+   (notes are schema-immutable; "edit" = delete + insert). */
+var _noteIds = {};
+var _noteSaveQueue = {};
+
 function saveNotes(cid, obj) {
+  var prev = (_cache.notes && _cache.notes[cid]) || {};
   _saveCourseField('notes', cid, obj);
+  if (localStorage.getItem('gb-demo-mode') === '1' || !_useSupabase || !_isUuid(cid)) return;
+  if (!obj) return;
+  _persistNotesToCanonical(cid, prev, obj);
+}
+
+function _persistNotesToCanonical(cid, prev, obj) {
+  var sb = getSupabase();
+  if (!sb || !window.v2 || !window.v2.addNote) return;
+  var tail = _noteSaveQueue[cid] || Promise.resolve();
+  var next = tail.then(function () {
+    var ops = [];
+    var existingIds = _noteIds[cid] || {};
+
+    // Added or changed notes
+    Object.keys(obj || {}).forEach(function (eid) {
+      if (!_isUuid(eid)) return;
+      var body = obj[eid];
+      if (body === prev[eid]) return; // unchanged
+      if (!body || !body.trim()) return; // empty string treated as delete (handled below)
+      var existingId = existingIds[eid];
+      var op;
+      if (existingId && _isUuid(existingId)) {
+        op = window.v2.deleteNote(existingId).then(function () {
+          return window.v2.addNote(eid, body).then(function (res) {
+            var id = res && res.data;
+            if (id) {
+              if (!_noteIds[cid]) _noteIds[cid] = {};
+              _noteIds[cid][eid] = id;
+            }
+          });
+        });
+      } else {
+        op = window.v2.addNote(eid, body).then(function (res) {
+          var id = res && res.data;
+          if (id) {
+            if (!_noteIds[cid]) _noteIds[cid] = {};
+            _noteIds[cid][eid] = id;
+          }
+        });
+      }
+      ops.push(
+        op.catch(function (err) {
+          console.warn('Note sync failed for enrollment', eid, ':', err);
+        }),
+      );
+    });
+
+    // Deleted notes (present in prev, absent in obj)
+    Object.keys(prev || {}).forEach(function (eid) {
+      if (obj[eid] !== undefined) return;
+      var existingId = existingIds[eid];
+      if (existingId && _isUuid(existingId)) {
+        ops.push(
+          window.v2
+            .deleteNote(existingId)
+            .then(function () {
+              if (_noteIds[cid]) delete _noteIds[cid][eid];
+            })
+            .catch(function (err) {
+              console.warn('Note delete failed for enrollment', eid, ':', err);
+            }),
+        );
+      }
+    });
+
+    return Promise.all(ops);
+  });
+  _noteSaveQueue[cid] = _trackPendingSync(next);
+  return _noteSaveQueue[cid];
 }
 
 /*
@@ -5565,8 +5726,44 @@ function getCustomTags(cid) {
     return [];
   }
 }
+var _customTagSaveQueue = {};
+
 function saveCustomTags(cid, arr) {
+  var prev = (_cache.customTags && _cache.customTags[cid]) || [];
   _saveCourseField('customTags', cid, arr);
+  if (localStorage.getItem('gb-demo-mode') === '1' || !_useSupabase || !_isUuid(cid)) return;
+  if (!arr) return;
+  _persistCustomTagsToCanonical(cid, prev, arr);
+}
+
+function _persistCustomTagsToCanonical(cid, prev, arr) {
+  var sb = getSupabase();
+  if (!sb) return;
+  var tail = _customTagSaveQueue[cid] || Promise.resolve();
+  var next = tail.then(function () {
+    var prevSet = {};
+    (prev || []).forEach(function (l) {
+      prevSet[l] = true;
+    });
+    var ops = [];
+    (arr || []).forEach(function (label) {
+      if (!label || prevSet[label]) return; // already persisted
+      ops.push(
+        sb
+          .rpc('create_custom_tag', { p_course_id: cid, p_label: label })
+          .then(function (res) {
+            if (res.error) console.warn('create_custom_tag failed:', res.error);
+          })
+          .catch(function (err) {
+            console.warn('Custom tag sync failed for label', label, ':', err);
+          }),
+      );
+    });
+    // No delete_custom_tag RPC — removed labels persist in DB until one is added.
+    return Promise.all(ops);
+  });
+  _customTagSaveQueue[cid] = _trackPendingSync(next);
+  return _customTagSaveQueue[cid];
 }
 function addCustomTag(cid, label) {
   const tags = getCustomTags(cid);
