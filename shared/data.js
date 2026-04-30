@@ -235,6 +235,30 @@ function _trackWriteSync(name, promise) {
   return _trackPendingSync(promise);
 }
 
+/* Wrap a promise so it rejects-as-error-result if it doesn't settle within
+   `ms`. Used on per-row hydration calls where one slow / hung row should
+   not block the whole sign-in. The timeout result has the same shape as
+   the .catch() error wrapper used by the same call site, so existing
+   error-handling forEach loops degrade gracefully (treat as missing row). */
+function _withTimeout(promise, ms, label) {
+  var timer;
+  var timeout = new Promise(function (resolve) {
+    timer = setTimeout(function () {
+      resolve({ error: new Error((label || 'request') + ' timed out after ' + ms + 'ms') });
+    }, ms);
+  });
+  return Promise.race([promise, timeout]).then(
+    function (res) {
+      clearTimeout(timer);
+      return res;
+    },
+    function (err) {
+      clearTimeout(timer);
+      return { error: err };
+    },
+  );
+}
+
 function _updateSyncIndicator() {
   const dot = document.getElementById('sync-indicator-dot');
   if (!dot) return;
@@ -1101,6 +1125,10 @@ async function _loadStudentProfileSummariesIndividually(cid) {
   var students = _cache.students[cid] || [];
   var rows = [];
   var batchSize = 6;
+  // Each per-student fetch is bounded by a 30s timeout so a single hung
+  // get_student_profile call cannot stall sign-in indefinitely. Timed-out
+  // entries surface as { error: ... } below, same as the .catch() branch.
+  var perCallTimeoutMs = 30_000;
   for (var i = 0; i < students.length; i += batchSize) {
     var batch = students.slice(i, i + batchSize);
     var results = await Promise.all(
@@ -1108,9 +1136,13 @@ async function _loadStudentProfileSummariesIndividually(cid) {
         if (!student || !_isUuid(student.id) || !window.v2 || typeof window.v2.getStudentProfile !== 'function') {
           return Promise.resolve(null);
         }
-        return window.v2.getStudentProfile(student.id).catch(function (e) {
-          return { error: e };
-        });
+        return _withTimeout(
+          window.v2.getStudentProfile(student.id).catch(function (e) {
+            return { error: e };
+          }),
+          perCallTimeoutMs,
+          'get_student_profile(' + student.id + ')',
+        );
       }),
     );
     results.forEach(function (res) {
