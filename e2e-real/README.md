@@ -4,13 +4,19 @@ These tests exercise the production write path against the live `gradebook-prod`
 
 They exist because the mocked tests cannot detect data-loss bugs that live in the auth + RPC layer.
 
-## What they cover today
+## Layout
 
-- **Curriculum competencies persist after sign-out.** Currently fails — `_dispatchMapToV2` calls `upsert_tag` with the wrong UUID and Postgres throws "tag not found".
-- **Students added through the class manager persist after sign-out.** Currently fails — `saveStudents` queues a canonical RPC but `signOut` clears `localStorage` before the queue drains.
-- **User-created categories appear in the assignment-form dropdown.** Currently fails — `get_gradebook` doesn't return categories, and `_cache.categories` stays empty.
+```
+e2e-real/
+├── helpers/         shared auth, course, db, ui, fixture helpers
+├── persistence/     per-entity specs (5-test matrix each, 80 tests across 16 entities)
+└── smoke/           full-class smoke (1 test, builds an entire class and round-trips it)
+```
 
-Each test is expected to fail on `main` today. They should pass once the underlying bugs are fixed.
+## Test surfaces
+
+- **Per-entity specs** (`persistence/`) — every entity that the UI writes has its own spec covering create, edit, delete, race-immediate-signOut, and value round-trip. Drives the production write helper, not the RPC directly. Coverage: students, categories, curriculum, assignments, grades, observations, rubrics, modules, notes, goals, reflections, term-ratings, tag-scores, custom-tags, course-config, section-overrides.
+- **Smoke spec** (`smoke/full-class.spec.js`) — one comprehensive test that builds a complete class through the same UI helpers a real teacher uses (wizard + roster + scoring + observations + notes + goals + …), recycles the session, and asserts every entity round-trips. Tagged `@smoke`.
 
 ## Required setup
 
@@ -34,20 +40,27 @@ These tests are skipped automatically when env vars are missing. To run them loc
 ## Running
 
 ```bash
+# Full suite — every persistence spec + the smoke spec (~7–10 minutes serial)
 npm run test:e2e:real
+
+# Smoke only — fastest pre-merge confidence check (~90s)
+npm run test:e2e:real:smoke
+
+# Race tests only — when debugging queue / sign-out timing
+npm run test:e2e:real:race
+
+# Watch the browser during a run
+npm run test:e2e:real:headed
+
+# Target one test by name
+npx playwright test --config=playwright.real.config.js -g "value round-trip"
 ```
 
-To watch the browser during a run:
+### When to run what
 
-```bash
-npx playwright test --config=playwright.real.config.js --headed
-```
-
-To target one test:
-
-```bash
-npx playwright test --config=playwright.real.config.js -g "competencies persist"
-```
+- **Smoke** — before merging any PR that touches `shared/data.js`, `shared/supabase.js`, `shared/offline-queue.js`, or auth lifecycle. CI runs this automatically on persistence-touching paths.
+- **Full suite** — before merging a structural change (new RPC, new write path, new entity); locally only — the suite is too slow to gate every PR.
+- **Race only** — when chasing a specific sign-out / queue regression; tag is on every spec's race-immediate-signOut test.
 
 ## What these tests don't do
 
