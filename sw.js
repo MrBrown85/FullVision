@@ -1,6 +1,6 @@
 // IMPORTANT: Increment the version number when deploying new app code
 // This ensures users get the latest files
-const CACHE_NAME = 'fullvision-v39';
+const CACHE_NAME = 'fullvision-v40';
 
 // All app files to pre-cache on install
 const PRECACHE_URLS = [
@@ -58,7 +58,7 @@ self.addEventListener('install', event => {
   event.waitUntil(
     caches
       .open(CACHE_NAME)
-      .then(cache => cache.addAll(PRECACHE_URLS))
+      .then(cache => cache.addAll(PRECACHE_URLS.map(url => new Request(url, { cache: 'reload' }))))
       .then(() => self.skipWaiting()),
   );
 });

@@ -3086,13 +3086,14 @@ function seedIfNeeded() {
   // ── Migrate old gb-notes into gb-quick-obs (one-time) ──
   Object.keys(COURSES).forEach(cid => {
     const oldNotes = getNotes(cid);
-    const hasOld = Object.keys(oldNotes).some(sid => (oldNotes[sid] || []).length > 0);
+    const hasOld = Object.keys(oldNotes).some(sid => Array.isArray(oldNotes[sid]) && oldNotes[sid].length > 0);
     if (hasOld) {
       const obs = getQuickObs(cid);
       Object.keys(oldNotes).forEach(sid => {
+        if (!Array.isArray(oldNotes[sid])) return;
         if (!obs[sid]) obs[sid] = [];
         const existingIds = new Set(obs[sid].map(o => o.id));
-        (oldNotes[sid] || []).forEach(n => {
+        oldNotes[sid].forEach(n => {
           if (!existingIds.has(n.id)) {
             obs[sid].push({
               id: n.id,
