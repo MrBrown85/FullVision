@@ -3,6 +3,7 @@
  *
  * Covers the write path from HANDOFF 3.5 + 4.3:
  *   _persistScoreToCanonical → upsert_tag_score / upsert_rubric_score / save_score_comment
+ *   persistScoreDiffToCanonical → per-row upsert/zero dispatch after bulk local restores
  *   window.upsertCellScore   → upsert_score
  *   window.setCellStatus     → set_score_status
  *   window.fillRubric        → fill_rubric
@@ -22,6 +23,7 @@ const AID_TAG = '33333333-3333-3333-3333-333333333333';
 const AID_RUBRIC = '44444444-4444-4444-4444-444444444444';
 const TAG_ID = '55555555-5555-5555-5555-555555555555';
 const CRIT_ID = '66666666-6666-4666-8666-666666666666';
+const TAG_ID_2 = '77777777-7777-4777-8777-777777777777';
 
 function makeRecordingClient() {
   var calls = [];
@@ -165,6 +167,46 @@ describe('v2 scoring-dispatch', () => {
         return c.name === 'upsert_tag_score';
       });
       expect(call).toBeDefined();
+    });
+  });
+
+  describe('persistScoreDiffToCanonical', () => {
+    it('dispatches changed rows and zeroes removed rows after a bulk local restore', () => {
+      const prev = {
+        [ENR]: [
+          { assessmentId: AID_TAG, tagId: TAG_ID, score: 4, note: '' },
+          { assessmentId: AID_TAG, tagId: TAG_ID_2, score: 2, note: '' },
+        ],
+      };
+      const next = {
+        [ENR]: [{ assessmentId: AID_TAG, tagId: TAG_ID, score: 1, note: '' }],
+      };
+
+      persistScoreDiffToCanonical(CID, prev, next);
+
+      const tagCalls = client.calls.filter(function (c) {
+        return c.name === 'upsert_tag_score';
+      });
+      expect(tagCalls).toEqual([
+        {
+          name: 'upsert_tag_score',
+          payload: {
+            p_enrollment_id: ENR,
+            p_assessment_id: AID_TAG,
+            p_tag_id: TAG_ID,
+            p_value: 1,
+          },
+        },
+        {
+          name: 'upsert_tag_score',
+          payload: {
+            p_enrollment_id: ENR,
+            p_assessment_id: AID_TAG,
+            p_tag_id: TAG_ID_2,
+            p_value: 0,
+          },
+        },
+      ]);
     });
   });
 

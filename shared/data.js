@@ -201,13 +201,24 @@ window.setLongFormAuthContext = setLongFormAuthContext;
 window.clearLongFormAuthContext = clearLongFormAuthContext;
 window.markLongFormSessionExpired = markLongFormSessionExpired;
 
-/** Returns a promise that resolves when all pending syncs complete (or after timeout). */
-function waitForPendingSyncs(timeoutMs = 5000) {
+/** Returns a promise that resolves when all pending syncs complete.
+    Passing a numeric timeout preserves the old bounded-wait behavior for tests
+    or diagnostics; sign-out intentionally calls this without a ceiling. */
+function waitForPendingSyncs(timeoutMs) {
   if (_pendingSyncs <= 0) return Promise.resolve();
   return new Promise(resolve => {
     const start = Date.now();
+    let warned = false;
     const check = setInterval(() => {
-      if (_pendingSyncs <= 0 || Date.now() - start > timeoutMs) {
+      const elapsed = Date.now() - start;
+      if (!warned && elapsed > 10000) {
+        warned = true;
+        console.warn('Still waiting for pending Supabase writes before sign-out:', _pendingSyncs);
+        if (typeof showSyncToast === 'function') {
+          showSyncToast('Still saving changes before sign-out...', 'info');
+        }
+      }
+      if (_pendingSyncs <= 0 || (typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && elapsed > timeoutMs)) {
         clearInterval(check);
         resolve();
       }
@@ -2771,6 +2782,53 @@ function _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note) {
   }
 }
 
+function _scoreEntryKey(sid, entry) {
+  if (!sid || !entry || !entry.assessmentId) return null;
+  return [sid, entry.assessmentId, entry.tagId || ''].join(':');
+}
+
+function _scoreEntryRemoteChanged(a, b) {
+  if (!a || !b) return true;
+  return (a.score || 0) !== (b.score || 0) || (a.note || '') !== (b.note || '');
+}
+
+function _scoreEntriesByKey(blob) {
+  var out = {};
+  Object.keys(blob || {}).forEach(function (sid) {
+    (blob[sid] || []).forEach(function (entry) {
+      var key = _scoreEntryKey(sid, entry);
+      if (key) out[key] = { sid: sid, entry: entry };
+    });
+  });
+  return out;
+}
+
+function persistScoreDiffToCanonical(cid, prevBlob, nextBlob) {
+  if (!_useSupabase || localStorage.getItem('gb-demo-mode') === '1') return;
+  var prevByKey = _scoreEntriesByKey(prevBlob || {});
+  var nextByKey = _scoreEntriesByKey(nextBlob || {});
+
+  Object.keys(nextByKey).forEach(function (key) {
+    var next = nextByKey[key];
+    var prev = prevByKey[key];
+    if (prev && !_scoreEntryRemoteChanged(prev.entry, next.entry)) return;
+    _persistScoreToCanonical(
+      cid,
+      next.sid,
+      next.entry.assessmentId,
+      next.entry.tagId,
+      next.entry.score,
+      next.entry.note || '',
+    );
+  });
+
+  Object.keys(prevByKey).forEach(function (key) {
+    if (nextByKey[key]) return;
+    var prev = prevByKey[key];
+    _persistScoreToCanonical(cid, prev.sid, prev.entry.assessmentId, prev.entry.tagId, 0, '');
+  });
+}
+
 /* Overall per-cell score — writes to score.value (Phase 3.5 HANDOFF target).
    Used by UI paths that enter a top-level proficiency/points value for a
    (student, assessment) cell, independent of tag/criterion breakdown. */
@@ -4115,20 +4173,33 @@ function getConfig() {
     return {};
   }
 }
+function _teacherPrefsPatchFromConfig(obj) {
+  var patch = {};
+  if (!obj) return patch;
+  if (Object.prototype.hasOwnProperty.call(obj, 'activeCourse')) {
+    patch.active_course_id = obj.activeCourse || null;
+  }
+  if (Object.prototype.hasOwnProperty.call(obj, 'viewMode')) {
+    patch.view_mode = obj.viewMode || null;
+  }
+  if (Object.prototype.hasOwnProperty.call(obj, 'mobileViewMode')) {
+    patch.mobile_view_mode = obj.mobileViewMode || null;
+  }
+  if (Object.prototype.hasOwnProperty.call(obj, 'mobileSortMode')) {
+    patch.mobile_sort_mode = obj.mobileSortMode || null;
+  }
+  if (Object.prototype.hasOwnProperty.call(obj, 'cardWidgetConfig')) {
+    patch.card_widget_config = obj.cardWidgetConfig || null;
+  }
+  return patch;
+}
 function saveConfig(obj) {
   _cache.config = obj;
   _safeLSSet('gb-config', JSON.stringify(obj));
   if (_useSupabase) {
     const sb = getSupabase();
     if (sb) {
-      // v2 save_teacher_preferences(p_patch jsonb).  Build a flat patch that
-      // carries both the active-course pointer and the remaining ui prefs so
-      // both callers (saveConfig and window.v2.saveTeacherPreferences) use the
-      // same RPC signature and neither silently no-ops.
-      const activeCourse = obj && obj.activeCourse ? obj.activeCourse : null;
-      const uiPrefs = Object.assign({}, obj || {});
-      delete uiPrefs.activeCourse;
-      const patch = Object.assign({ active_course_offering_id: activeCourse || null }, uiPrefs);
+      const patch = _teacherPrefsPatchFromConfig(obj);
       _trackPendingSync(
         sb.rpc('save_teacher_preferences', { p_patch: patch }).then(function (res) {
           if (res.error) console.warn('save_teacher_preferences RPC failed:', res.error);
@@ -5946,11 +6017,9 @@ function _defaultWidgetConfig() {
   return { order: order, disabled: disabled };
 }
 
-function getCardWidgetConfig() {
-  var raw = _safeParseLS('m-card-widgets', null);
+function getCardWidgetConfigFromRaw(raw) {
   if (!raw || !Array.isArray(raw.order)) return _defaultWidgetConfig();
 
-  // Filter out unknown keys
   var validKeys = new Set(WIDGET_KEYS);
   var order = raw.order.filter(function (k) {
     return validKeys.has(k);
@@ -5961,7 +6030,6 @@ function getCardWidgetConfig() {
       })
     : [];
 
-  // Find any registry keys missing from both arrays (future-proofing)
   var present = new Set(order.concat(disabled));
   WIDGET_KEYS.forEach(function (k) {
     if (!present.has(k)) disabled.push(k);
@@ -5970,8 +6038,26 @@ function getCardWidgetConfig() {
   return { order: order, disabled: disabled };
 }
 
+function getCardWidgetConfig() {
+  var raw = _safeParseLS('m-card-widgets', null);
+  var cfg = _cache.config || getConfig();
+  if (!raw && cfg && cfg.cardWidgetConfig) {
+    raw = cfg.cardWidgetConfig;
+    if (!_cache.config) _cache.config = cfg;
+    _safeLSSet('m-card-widgets', JSON.stringify(raw));
+  }
+  return getCardWidgetConfigFromRaw(raw);
+}
+
 function saveCardWidgetConfig(config) {
-  _safeLSSet('m-card-widgets', JSON.stringify(config));
+  var normalized = getCardWidgetConfigFromRaw(config);
+  _safeLSSet('m-card-widgets', JSON.stringify(normalized));
+  var cfg = Object.assign({}, getConfig() || {}, { cardWidgetConfig: normalized });
+  _cache.config = cfg;
+  _safeLSSet('gb-config', JSON.stringify(cfg));
+  if (_useSupabase && localStorage.getItem('gb-demo-mode') !== '1' && window.v2 && window.v2.saveTeacherPreferences) {
+    window.v2.saveTeacherPreferences({ card_widget_config: normalized });
+  }
 }
 
 function clearCardWidgetConfig() {
@@ -5979,6 +6065,12 @@ function clearCardWidgetConfig() {
     localStorage.removeItem('m-card-widgets');
   } catch (e) {
     /* storage error */
+  }
+  var cfg = Object.assign({}, getConfig() || {}, { cardWidgetConfig: null });
+  _cache.config = cfg;
+  _safeLSSet('gb-config', JSON.stringify(cfg));
+  if (_useSupabase && localStorage.getItem('gb-demo-mode') !== '1' && window.v2 && window.v2.saveTeacherPreferences) {
+    window.v2.saveTeacherPreferences({ card_widget_config: null });
   }
 }
 
@@ -6072,6 +6164,7 @@ window.GB = {
   getScores,
   saveScores,
   upsertScore,
+  persistScoreDiffToCanonical,
   getPointsScore,
   setPointsScore,
   getActiveCourse,

@@ -137,7 +137,7 @@ test.describe('Students — persistence across sign-out', () => {
     // Fire the helper, then sign out IMMEDIATELY without any wait. This is
     // the production failure mode: user clicks Save and clicks Sign Out
     // before the queue drains. window.signOut now awaits
-    // waitForPendingSyncs(5000); the test confirms that gate is doing its
+    // waitForPendingSyncs(); the test confirms that gate is doing its
     // job.
     await page.evaluate(({ cid, s }) => window.saveStudents(cid, [s]), { cid: courseId, s: student });
     await signOut(page);

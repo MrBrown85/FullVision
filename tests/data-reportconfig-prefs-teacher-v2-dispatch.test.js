@@ -6,6 +6,7 @@
  *   applyReportPreset       → apply_report_preset
  *   saveReportConfig        → save_report_config (nulls preset when omitted)
  *   toggleReportBlock       → toggle_report_block (boolean coerce)
+ *   saveConfig              → save_teacher_preferences (local keys mapped to v2 patch)
  *   saveTeacherPreferences  → save_teacher_preferences (jsonb patch)
  *   softDeleteTeacher       → soft_delete_teacher
  *   restoreTeacher          → restore_teacher
@@ -78,6 +79,30 @@ describe('v2 report-config / preferences / teacher-lifecycle dispatch', () => {
   });
 
   describe('TeacherPreferences', () => {
+    it('saveConfig maps local config keys to the v2 preference patch', () => {
+      saveConfig({
+        activeCourse: CID,
+        viewMode: 'dashboard',
+        mobileViewMode: 'cards',
+        mobileSortMode: 'alpha',
+        cardWidgetConfig: { order: ['hero'], disabled: [] },
+        displayName: 'Ignored Locally',
+      });
+
+      expect(client.calls[0]).toEqual({
+        name: 'save_teacher_preferences',
+        payload: {
+          p_patch: {
+            active_course_id: CID,
+            view_mode: 'dashboard',
+            mobile_view_mode: 'cards',
+            mobile_sort_mode: 'alpha',
+            card_widget_config: { order: ['hero'], disabled: [] },
+          },
+        },
+      });
+    });
+
     it('passes jsonb patch to save_teacher_preferences', async () => {
       await window.v2.saveTeacherPreferences({ view_mode: 'classic', active_course_id: CID });
       expect(client.calls[0]).toEqual({

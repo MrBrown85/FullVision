@@ -104,7 +104,7 @@ test.describe('Assignments — persistence across sign-out', () => {
     // Fire saveAssessments and IMMEDIATELY recycle. This is the production
     // failure: user clicks Save Assessment then clicks Sign Out, queue is
     // mid-flight when localStorage clears. window.signOut now awaits
-    // waitForPendingSyncs(5000); the test confirms the gate is honoured.
+    // waitForPendingSyncs(); the test confirms the gate is honoured.
     await page.evaluate(({ cid, asmt }) => window.saveAssessments(cid, [asmt]), { cid: courseId, asmt: a });
     await recycleSession(page);
 

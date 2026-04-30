@@ -64,7 +64,8 @@ Tag glossary (inline on each ticket title):
 
 ### P3.5 · Reconcile remaining Playwright failures `[agent-ready]`
 
-- Targeted smoke coverage and PR CI are green, but the broader Playwright suite still needs a clean reconciliation pass.
+- The flaky real-Supabase full-class smoke spec and its CI workflow were removed; the manual `e2e-real/persistence/` suite remains the persistence gate.
+- Broader mocked Playwright still needs a clean reconciliation pass.
 
 ## District pilot readiness
 

@@ -1941,7 +1941,9 @@ window.PageAssignments = (function () {
     });
     refreshSidebar();
     showUndoToast(toastMsg, function () {
+      var beforeScores = getScores(cid);
       saveScores(cid, prevScores);
+      if (getScores(cid) === prevScores) persistScoreDiffToCanonical(cid, beforeScores, prevScores);
       render();
       refreshSidebar();
     });
@@ -2035,7 +2037,9 @@ window.PageAssignments = (function () {
     });
     refreshSidebar();
     showUndoToast(toastMsg, function () {
+      var beforeScores = getScores(cid);
       saveScores(cid, prevScores);
+      if (getScores(cid) === prevScores) persistScoreDiffToCanonical(cid, beforeScores, prevScores);
       render();
       refreshSidebar();
     });

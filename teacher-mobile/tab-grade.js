@@ -802,6 +802,7 @@ window.MGrade = (function () {
     var entry = _undoStack.pop();
     if (!entry) return;
     var allScores = getScores(entry.cid);
+    var beforeScores = structuredClone(allScores);
     var stScores = (allScores[entry.sid] || []).filter(function (s) {
       return !(s.assessmentId === entry.aid && s.tagId === entry.tid);
     });
@@ -811,6 +812,7 @@ window.MGrade = (function () {
     });
     allScores[entry.sid] = stScores;
     saveScores(entry.cid, allScores);
+    persistScoreDiffToCanonical(entry.cid, beforeScores, allScores);
     clearProfCache();
 
     // Update UI

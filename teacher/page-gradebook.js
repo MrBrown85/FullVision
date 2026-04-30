@@ -2358,6 +2358,7 @@ window.PageGradebook = (function () {
       var undo = _undoStack.pop();
       var scores = getScores(undo.cid);
       if (!scores[undo.sid]) scores[undo.sid] = [];
+      var beforeScores = structuredClone(scores);
       // Restore previous entries (full objects)
       (undo.tagIds || []).forEach(function (tid, i) {
         var prevEntry = undo.prevEntries[i];
@@ -2370,6 +2371,7 @@ window.PageGradebook = (function () {
         if (prevEntry) scores[undo.sid].push(prevEntry);
       });
       saveScores(undo.cid, scores);
+      persistScoreDiffToCanonical(undo.cid, beforeScores, scores);
       clearProfCache();
       render();
       return;
@@ -2465,28 +2467,19 @@ window.PageGradebook = (function () {
       var tid = focused.dataset.tid;
       var sid = focused.dataset.sid;
       if (aid && tid && sid) {
-        var scores = getScores(activeCourse);
-        if (!scores[sid]) scores[sid] = [];
-        var entry = scores[sid].find(function (en) {
-          return en.assessmentId === aid && en.tagId === tid;
+        var assess = getAssessments(activeCourse).find(function (a) {
+          return a.id === aid;
         });
-        if (entry) entry.score = val;
-        else {
-          var assess = getAssessments(activeCourse).find(function (a) {
-            return a.id === aid;
-          });
-          scores[sid].push({
-            id: uid(),
-            assessmentId: aid,
-            tagId: tid,
-            score: val,
-            date: assess ? assess.date : courseToday(cid),
-            type: assess ? assess.type : 'summative',
-            note: '',
-            created: new Date().toISOString(),
-          });
-        }
-        saveScores(activeCourse, scores);
+        upsertScore(
+          activeCourse,
+          sid,
+          aid,
+          tid,
+          val,
+          assess ? assess.date : courseToday(activeCourse),
+          assess ? assess.type : 'summative',
+          '',
+        );
         var span = focused.querySelector('.gb-score-val');
         if (span) {
           span.className = 'gb-score-val s' + val;
@@ -2510,13 +2503,19 @@ window.PageGradebook = (function () {
         if (focused.dataset.pts === '1') {
           setPointsScore(activeCourse, sid, aid, 0);
         } else if (tid) {
-          var scores = getScores(activeCourse);
-          if (!scores[sid]) scores[sid] = [];
-          var entry = scores[sid].find(function (en) {
-            return en.assessmentId === aid && en.tagId === tid;
+          var assess = getAssessments(activeCourse).find(function (a) {
+            return a.id === aid;
           });
-          if (entry) entry.score = 0;
-          saveScores(activeCourse, scores);
+          upsertScore(
+            activeCourse,
+            sid,
+            aid,
+            tid,
+            0,
+            assess ? assess.date : courseToday(activeCourse),
+            assess ? assess.type : 'summative',
+            '',
+          );
         }
         if (focused.classList.contains('gb-score-pts')) {
           focused.innerHTML = '<span class="gb-pts-empty">·</span>';

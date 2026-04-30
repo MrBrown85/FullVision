@@ -33,7 +33,7 @@ export async function signIn(page) {
 }
 
 /**
- * Production sign-out path: window.signOut wraps waitForPendingSyncs(5000)
+ * Production sign-out path: window.signOut wraps waitForPendingSyncs()
  * → supabase.auth.signOut → localStorage clear → redirect to login. This is
  * exactly what the user hits via the account menu.
  *

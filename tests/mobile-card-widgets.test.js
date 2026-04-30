@@ -7,6 +7,7 @@ describe('Card Widget Config', () => {
     if (typeof _cache !== 'undefined') {
       // Clear any cached widget config
       delete _cache.cardWidgets;
+      _cache.config = null;
     }
   });
 
@@ -70,6 +71,52 @@ describe('Card Widget Config', () => {
     saveCardWidgetConfig(config);
     var raw = JSON.parse(localStorage.getItem('m-card-widgets'));
     expect(raw.order).toEqual(config.order);
+  });
+
+  it('reads config hydrated from teacher preferences', () => {
+    _cache.config = {
+      cardWidgetConfig: {
+        order: ['hero', 'actions'],
+        disabled: ['sectionBars'],
+      },
+    };
+
+    var config = getCardWidgetConfig();
+
+    expect(config.order).toEqual(['hero', 'actions']);
+    expect(JSON.parse(localStorage.getItem('m-card-widgets')).order).toEqual(['hero', 'actions']);
+  });
+
+  it('persists config to teacher preferences when Supabase is active', async () => {
+    var originalGetSupabase = getSupabase;
+    var originalUseSupabase = _useSupabase;
+    var calls = [];
+    _useSupabase = true;
+    globalThis.getSupabase = () => ({
+      rpc(name, payload) {
+        calls.push({ name, payload });
+        return Promise.resolve({ data: null, error: null });
+      },
+    });
+
+    try {
+      saveCardWidgetConfig({ order: ['hero', 'actions'], disabled: ['sectionBars'] });
+      await waitForPendingSyncs(1000);
+    } finally {
+      globalThis.getSupabase = originalGetSupabase;
+      _useSupabase = originalUseSupabase;
+    }
+
+    expect(calls[0]).toEqual({
+      name: 'save_teacher_preferences',
+      payload: {
+        p_patch: {
+          card_widget_config: expect.objectContaining({
+            order: ['hero', 'actions'],
+          }),
+        },
+      },
+    });
   });
 
   it('handles new widgets added in future releases', () => {

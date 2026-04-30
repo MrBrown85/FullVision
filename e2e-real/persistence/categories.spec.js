@@ -101,7 +101,7 @@ test.describe('Categories — persistence across sign-out', () => {
   test('race-immediate-signOut — upsertCategory queue must drain before localStorage clears', async ({ page }) => {
     const courseId = await createTestCourse(page, makeCourseName('cats-race'));
     // Fire the upsert and IMMEDIATELY recycle (no manual wait). window.signOut
-    // calls waitForPendingSyncs(5000) before clearing local data; this
+    // calls waitForPendingSyncs() before clearing local data; this
     // confirms the upsert RPC promise was tracked.
     await page.evaluate(cid => {
       // Intentionally no `await` — fire and immediately fall through to
