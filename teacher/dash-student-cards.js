@@ -8,6 +8,11 @@ window.DashStudentCards = (function () {
     flat: '<span style="color:var(--text-3);font-size:0.85rem">&#x2192;</span>',
   };
 
+  function standardLabel(sec) {
+    var tag = sec && sec.tags && sec.tags[0];
+    return (tag && (tag.code || tag.label || tag.shortName || tag.name)) || (sec && (sec.shortName || sec.name)) || '';
+  }
+
   function renderStudentCards(cid, students, allStudents, sections, assessments, allScores, flags) {
     var html = '<div class="dash-section">';
     if (students.length === 0 && allStudents.length === 0) {
@@ -184,7 +189,7 @@ window.DashStudentCards = (function () {
           grouped.ungrouped.forEach(function (sec) {
             var secVal = getSectionProficiency(cid, st.id, sec.id);
             var sr = Math.round(secVal);
-            var secLabel = sec.tags && sec.tags[0] ? sec.tags[0].id : sec.shortName || sec.name;
+            var secLabel = standardLabel(sec);
             html +=
               '<div class="dash-section-mini" style="background:' +
               PROF_TINT[sr] +
@@ -206,7 +211,7 @@ window.DashStudentCards = (function () {
           sections.forEach(function (sec) {
             var secVal = getSectionProficiency(cid, st.id, sec.id);
             var secRounded = Math.round(secVal);
-            var secLabel = sec.tags && sec.tags[0] ? sec.tags[0].id : sec.shortName || sec.name;
+            var secLabel = standardLabel(sec);
             html +=
               '<div class="dash-section-mini" style="background:' +
               PROF_TINT[secRounded] +
