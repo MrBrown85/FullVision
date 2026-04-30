@@ -33,10 +33,16 @@ if (existsSync(envPath)) {
  * Run with: npm run test:e2e:real
  */
 export default defineConfig({
+  // testDir points at the per-entity persistence specs and the smoke spec.
+  // The legacy e2e-real/persistence.spec.js has been retired; keeping the
+  // glob explicit prevents it from re-running if someone restores the file
+  // by accident.
   testDir: './e2e-real',
-  // Real network round-trips are slower than mocked ones. 60s per test, the
-  // sign-out → sign-in cycle alone can take 5-10s.
-  timeout: 60_000,
+  testMatch: ['persistence/**/*.spec.js', 'smoke/**/*.spec.js'],
+  // Real network round-trips are slower than mocked ones. 90s per test —
+  // multi-step persistence tests (e.g. setup-student-then-score-then-cycle)
+  // can run a 4-RPC chain plus two sign-in/out cycles.
+  timeout: 90_000,
   retries: 0,
   // Force serial execution. Tests share a single test user account, so
   // parallel runs would race on cleanup.
