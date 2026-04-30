@@ -4249,13 +4249,22 @@ function getStudents(cid) {
     return [];
   }
 }
+function _loadPersistedStudentsSnapshot(cid) {
+  try {
+    return (JSON.parse(localStorage.getItem('gb-students-' + cid)) || []).map(migrateStudent);
+  } catch (e) {
+    return (_cache.students[cid] || []).map(function (s) {
+      return Object.assign({}, s);
+    });
+  }
+}
 function saveStudents(cid, arr) {
-  var prev = (_cache.students[cid] || []).slice();
+  var prev = _loadPersistedStudentsSnapshot(cid);
   _saveCourseField('students', cid, arr);
   // Demo mode and offline both stay local-only.
   if (localStorage.getItem('gb-demo-mode') === '1' || !_useSupabase) return;
   if (!cid || !arr) return;
-  _persistStudentsToCanonical(cid, prev, arr);
+  return _persistStudentsToCanonical(cid, prev, arr);
 }
 
 /* UUID detection — distinguishes canonical enrollment_ids from local uid()s */
