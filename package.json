@@ -14,7 +14,6 @@
     "test:e2e:headed": "npx playwright test --headed",
     "test:e2e:real": "npx playwright test --config=playwright.real.config.js",
     "test:e2e:real:race": "npx playwright test --config=playwright.real.config.js -g \"race-immediate-signOut\"",
-    "test:e2e:real:smoke": "npx playwright test --config=playwright.real.config.js -g \"@smoke\"",
     "test:e2e:real:headed": "npx playwright test --config=playwright.real.config.js --headed",
     "format": "prettier --write '**/*.{js,css,html,json,md}'",
     "format:check": "prettier --check '**/*.{js,css,html,json,md}'",
