@@ -1542,8 +1542,7 @@ function _assessmentFromDetail(existing, detail) {
   if (a.rubric_id !== undefined) next.rubricId = a.rubric_id || '';
   if (a.module_id !== undefined) next.moduleId = a.module_id || '';
   if (a.evidence_type !== undefined) next.evidenceType = a.evidence_type || '';
-  if (a.collab_mode !== undefined)
-    next.collaboration = _localCollabModeFromCanonical(a.collab_mode || 'individual');
+  if (a.collab_mode !== undefined) next.collaboration = _localCollabModeFromCanonical(a.collab_mode || 'individual');
   if (a.collab_config !== undefined && a.collab_config) {
     if (a.collab_config.pairs) next.pairs = a.collab_config.pairs;
     if (a.collab_config.groups) next.groups = a.collab_config.groups;
@@ -2041,6 +2040,24 @@ function _v2GradebookToCache(cid, payload) {
   _persistLoadedField(cid, 'categories', categories);
   _persistLoadedField(cid, 'students', students);
   _persistLoadedField(cid, 'assessments', assessments);
+
+  // Modules: hydrate from payload when the server returned them. If the server
+  // omits the field (older migration not yet deployed), preserve whatever's
+  // already in cache/localStorage so we don't blank a populated module list
+  // during a client/server version skew.
+  if (Array.isArray(payload.modules)) {
+    var modules = payload.modules.map(function (m) {
+      return {
+        id: m.id,
+        name: m.name || '',
+        color: m.color || null,
+        sortOrder: Number(m.display_order != null ? m.display_order : m.sortOrder || 0),
+        created: m.created_at || m.created || null,
+      };
+    });
+    _persistLoadedField(cid, 'modules', modules);
+  }
+
   _cache.v2Gradebook[cid] = payload;
   var cellCache = _gradebookCellsToScoreCache(cid, assessments, payload.cells || {});
   _persistLoadedField(cid, 'scores', cellCache.scores);
@@ -2787,6 +2804,13 @@ function upsertScore(cid, sid, aid, tid, scoreVal, date, type, note) {
   _cache.scores[cid] = scores;
   if (typeof clearProfCache === 'function') clearProfCache();
   _safeLSSet('gb-scores-' + cid, JSON.stringify(scores));
+  // Arm the same echo guard that _saveCourseField sets for blob writes.
+  // Without this, the course_sync_cursor realtime subscription delivers an
+  // UPDATE event after each RPC commits, _handleExternalCourseUpdate calls
+  // initData(cid), and the resulting get_gradebook re-fetch overwrites
+  // _cache.scores while RPCs are still in flight — wiping rapid sequential
+  // rubric clicks once realtime catches up.
+  _setEchoGuard('gradebook', cid);
 
   if (_useSupabase && localStorage.getItem('gb-demo-mode') !== '1') {
     _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note);
@@ -5004,7 +5028,11 @@ function getCategoryById(cid, categoryId) {
   );
 }
 function saveAssessments(cid, arr) {
-  var prev = _loadPersistedCourseFieldSnapshot('assessments', cid, (_cache.assessments && _cache.assessments[cid]) || []);
+  var prev = _loadPersistedCourseFieldSnapshot(
+    'assessments',
+    cid,
+    (_cache.assessments && _cache.assessments[cid]) || [],
+  );
   _saveCourseField('assessments', cid, arr);
   if (arr.length < prev.length) _cleanOrphanedScores(cid, arr);
   if (localStorage.getItem('gb-demo-mode') === '1' || !_useSupabase) return;
@@ -5195,15 +5223,13 @@ function _canonicalUpdateAssessment(sb, cid, assessmentId, a) {
     rubric_id: _isUuid(a.rubricId) ? a.rubricId : null,
     module_id: _isUuid(a.moduleId) ? a.moduleId : null,
   };
-  return sb
-    .rpc('update_assessment', { p_id: assessmentId, p_patch: patch, p_tag_ids: tagIds })
-    .then(function (res) {
-      if (res.error) {
-        console.warn('update_assessment failed:', res.error, assessmentId);
-        return res;
-      }
-      return _persistAssessmentCollab(sb, assessmentId, a);
-    });
+  return sb.rpc('update_assessment', { p_id: assessmentId, p_patch: patch, p_tag_ids: tagIds }).then(function (res) {
+    if (res.error) {
+      console.warn('update_assessment failed:', res.error, assessmentId);
+      return res;
+    }
+    return _persistAssessmentCollab(sb, assessmentId, a);
+  });
 }
 
 /* v2 delete_assessment(p_id).  FK cascade handles scores/rubric_scores/

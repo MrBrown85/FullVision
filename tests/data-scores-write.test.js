@@ -14,9 +14,7 @@ beforeEach(() => {
 /* ── setPointsScore ───────────────────────────────────────── */
 describe('setPointsScore', () => {
   it('creates score entries for each tag in the assessment', () => {
-    saveAssessments(CID, [
-      { id: 'a1', title: 'Test', date: '2025-01-15', type: 'summative', tagIds: ['t1', 't2'] },
-    ]);
+    saveAssessments(CID, [{ id: 'a1', title: 'Test', date: '2025-01-15', type: 'summative', tagIds: ['t1', 't2'] }]);
     saveScores(CID, {});
 
     setPointsScore(CID, 'stu1', 'a1', 85);
@@ -30,9 +28,7 @@ describe('setPointsScore', () => {
   });
 
   it('updates existing score entries', () => {
-    saveAssessments(CID, [
-      { id: 'a1', title: 'Test', date: '2025-01-15', type: 'summative', tagIds: ['t1'] },
-    ]);
+    saveAssessments(CID, [{ id: 'a1', title: 'Test', date: '2025-01-15', type: 'summative', tagIds: ['t1'] }]);
     saveScores(CID, {
       stu1: [{ id: 'existing', assessmentId: 'a1', tagId: 't1', score: 50, date: '2025-01-15', type: 'summative' }],
     });
@@ -56,9 +52,7 @@ describe('setPointsScore', () => {
   });
 
   it('does not create entries for score of 0', () => {
-    saveAssessments(CID, [
-      { id: 'a1', title: 'Test', date: '2025-01-15', type: 'summative', tagIds: ['t1'] },
-    ]);
+    saveAssessments(CID, [{ id: 'a1', title: 'Test', date: '2025-01-15', type: 'summative', tagIds: ['t1'] }]);
     saveScores(CID, {});
 
     setPointsScore(CID, 'stu1', 'a1', 0);
@@ -102,6 +96,17 @@ describe('upsertScore durability', () => {
     expect(stored.stu1[0].tagId).toBe('t1');
     expect(stored.stu1[0].score).toBe(4);
   });
+
+  it('arms the gradebook echo guard so realtime cursor events do not race in-flight writes', () => {
+    _useSupabase = true;
+    _teacherId = 'teacher-1';
+    delete _echoGuard['gradebook:' + CID];
+    expect(_isEchoGuarded('gradebook', CID)).toBe(false);
+
+    upsertScore(CID, 'stu1', 'a1', 't1', 4, '2025-03-20', 'summative');
+
+    expect(_isEchoGuarded('gradebook', CID)).toBe(true);
+  });
 });
 
 /* ── deleteRubric ─────────────────────────────────────────── */
@@ -141,9 +146,7 @@ describe('deleteRubric', () => {
       { id: 'r1', title: 'A' },
       { id: 'r2', title: 'B' },
     ]);
-    saveAssessments(CID, [
-      { id: 'a1', title: 'Uses r2', rubricId: 'r2', tagIds: ['t1'] },
-    ]);
+    saveAssessments(CID, [{ id: 'a1', title: 'Uses r2', rubricId: 'r2', tagIds: ['t1'] }]);
 
     deleteRubric(CID, 'r1');
 
