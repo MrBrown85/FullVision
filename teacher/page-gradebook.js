@@ -2122,6 +2122,20 @@ window.PageGradebook = (function () {
             });
           });
           saveScores(cid, scores);
+          // P6.5: previously this branch only cleaned scores+assessments,
+          // leaving status pills + observations orphaned in LS and on the
+          // server. Mirror page-assignments.js's deleteAssess so the two
+          // delete entry points produce the same canonical end state.
+          var statuses = getAssignmentStatuses(cid);
+          var statusChanged = false;
+          Object.keys(statuses).forEach(function (k) {
+            if (k.endsWith(':' + aid)) {
+              delete statuses[k];
+              statusChanged = true;
+            }
+          });
+          if (statusChanged) saveAssignmentStatuses(cid, statuses);
+          deleteAssessmentObservations(cid, aid);
           clearProfCache();
           render();
         }

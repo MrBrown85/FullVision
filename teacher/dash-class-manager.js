@@ -538,7 +538,7 @@ window.DashClassManager = (function () {
     var dname = displayName(st);
     showConfirm(
       'Delete Student',
-      'Delete ' + dname + '? This removes all their scores, goals, and notes.',
+      'Permanently delete ' + dname + ' and all their data? This cannot be undone.',
       'Delete',
       'danger',
       function () {

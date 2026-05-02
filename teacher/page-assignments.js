@@ -1535,16 +1535,10 @@ window.PageAssignments = (function () {
         }
       });
       if (statusChanged) saveAssignmentStatuses(cid, statuses);
-      var obs = getQuickObs(cid);
-      var obsChanged = false;
-      Object.keys(obs).forEach(function (sid) {
-        var before = obs[sid].length;
-        obs[sid] = obs[sid].filter(function (o) {
-          return !(o.assignmentContext && o.assignmentContext.assessmentId === aid);
-        });
-        if (obs[sid].length !== before) obsChanged = true;
-      });
-      if (obsChanged) saveQuickObs(cid, obs);
+      // P6.5: dispatch delete_observation RPC for each linked observation
+      // before clearing LS. Replaces a bare saveQuickObs call that left
+      // server rows orphaned with stale assignmentContext.assessmentId.
+      deleteAssessmentObservations(cid, aid);
       openAssessIds.delete(aid);
       _collapsedIds.delete(aid);
       render();

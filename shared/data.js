@@ -116,6 +116,32 @@ const _WELCOME_CLASS_NAME = 'Welcome Class';
 const _WELCOME_CLASS_SEEDED_PREFIX = 'gb-welcome-class-seeded-';
 const _WELCOME_CLASS_ROUTE_KEY = 'gb-post-bootstrap-route';
 
+/* Degraded-mode state (P6.1).
+   _supabaseDegraded is set when initial bootstrap fails after retry. While
+   degraded, _useSupabase is false and every persist function short-circuits
+   at its existing gate, so writes only land in LS. The recovery probe re-runs
+   bootstrap_teacher periodically; on success it flips back to live mode and
+   replays each touched course's writes through the diff-based persist
+   functions so the canonical store catches up. */
+let _supabaseDegraded = false;
+let _degradedReason = null;
+let _recoveryProbeTimer = null;
+let _recoveryProbeInFlight = false;
+const _degradedTouchedCourses = new Set();
+const _BOOTSTRAP_RETRY_DELAYS_MS = [1000, 2000, 4000];
+const _RECOVERY_PROBE_INTERVAL_MS = 30000;
+
+/* Pending-canonical-course-id state (P6.2).
+   createCourse mints a local id (e.g. 'cabc123') synchronously and fires
+   create_course async. Any persist call against the local id during the
+   in-flight window writes to LS under the local id, then short-circuits at
+   the !_isUuid(cid) gate. When the canonical UUID arrives, we (a) migrate
+   every gb-{kind}-{localId} LS key + in-memory cache entry to the canonical
+   id, (b) replay each entity through its diff-based save so the canonical
+   store catches up. Without this, all writes during the create_course
+   round-trip were silently dropped. */
+const _pendingLocalCids = new Set();
+
 /* Echo guard: suppress Realtime refetches for a field+cid shortly after a local save.
    Prevents Realtime events from triggering a refetch that could see partial state
    while an UPSERT batch is still in-flight. 8s covers typical RPC round-trip
@@ -274,13 +300,350 @@ function _updateSyncIndicator() {
   const dot = document.getElementById('sync-indicator-dot');
   if (!dot) return;
   const s = getSyncStatus();
-  dot.className = 'tb-sync-dot ' + s.status;
+  // Degraded mode reuses the 'error' visual but conveys a different message.
+  var visual = s.status === 'degraded' ? 'error' : s.status;
+  dot.className = 'tb-sync-dot ' + visual;
   dot.title =
     s.status === 'idle'
       ? 'All changes saved'
       : s.status === 'syncing'
         ? 'Syncing...'
-        : 'Sync error — changes saved locally';
+        : s.status === 'degraded'
+          ? 'Cloud sync paused — saving locally'
+          : 'Sync error — changes saved locally';
+}
+
+function isSupabaseDegraded() {
+  return _supabaseDegraded;
+}
+
+/* Run one bootstrap_teacher + list_teacher_courses + welcome-seed cycle.
+   Throws on any error so the caller can decide whether to retry or degrade.
+   Returns the data the cache hydration step needs. */
+async function _attemptInitialBootstrap(sb) {
+  const {
+    data: { session },
+  } = await sb.auth.getSession();
+  const email = (session && session.user && session.user.email) || '';
+  const displayName =
+    (session && session.user && session.user.user_metadata && session.user.user_metadata.display_name) || null;
+
+  const bootRes = await sb.rpc('bootstrap_teacher', {
+    p_email: email,
+    p_display_name: displayName,
+  });
+  if (bootRes.error) throw bootRes.error;
+  const teacher = bootRes.data || {};
+
+  const coursesRes = await sb.rpc('list_teacher_courses');
+  if (coursesRes.error) throw coursesRes.error;
+  const seededWelcomeCourseId = await _maybeSeedWelcomeClass(sb, teacher, coursesRes.data || []);
+
+  return { teacher, courseRows: coursesRes.data || [], seededWelcomeCourseId };
+}
+
+/* Wrap _attemptInitialBootstrap with retry-with-backoff. 1 initial attempt
+   plus retries at 1s/2s/4s. On final failure, throws the last error. */
+async function _bootstrapWithRetry(sb) {
+  var lastErr = null;
+  var attempts = 1 + _BOOTSTRAP_RETRY_DELAYS_MS.length;
+  for (var i = 0; i < attempts; i++) {
+    try {
+      return await _attemptInitialBootstrap(sb);
+    } catch (e) {
+      lastErr = e;
+      if (i < _BOOTSTRAP_RETRY_DELAYS_MS.length) {
+        await new Promise(function (r) {
+          setTimeout(r, _BOOTSTRAP_RETRY_DELAYS_MS[i]);
+        });
+      }
+    }
+  }
+  throw lastErr || new Error('bootstrap failed');
+}
+
+function _enterDegradedMode(reason) {
+  _useSupabase = false;
+  _supabaseDegraded = true;
+  _degradedReason = reason;
+  _syncStatus = 'degraded';
+  _updateSyncIndicator();
+  if (typeof showSyncToast === 'function') {
+    showSyncToast('Saving locally — cloud sync paused.', 'degraded');
+  }
+  _scheduleRecoveryProbe();
+}
+
+function _scheduleRecoveryProbe() {
+  if (!_supabaseDegraded) return;
+  if (_recoveryProbeTimer) return;
+  _recoveryProbeTimer = setTimeout(function () {
+    _recoveryProbeTimer = null;
+    _attemptRecoveryProbe();
+  }, _RECOVERY_PROBE_INTERVAL_MS);
+}
+
+async function _attemptRecoveryProbe() {
+  if (!_supabaseDegraded || _recoveryProbeInFlight) return;
+  _recoveryProbeInFlight = true;
+  try {
+    const sb = typeof getSupabase === 'function' ? getSupabase() : null;
+    if (!sb) {
+      _scheduleRecoveryProbe();
+      return;
+    }
+    const data = await _attemptInitialBootstrap(sb);
+    _exitDegradedMode(data);
+  } catch (e) {
+    console.warn('Supabase recovery probe failed; will retry:', e);
+    _scheduleRecoveryProbe();
+  } finally {
+    _recoveryProbeInFlight = false;
+  }
+}
+
+/* Manual retry — wired to the "Retry now" button in the degraded toast.
+   Cancels the pending timer and probes immediately. */
+function retrySupabaseRecovery() {
+  if (!_supabaseDegraded) return Promise.resolve();
+  if (_recoveryProbeTimer) {
+    clearTimeout(_recoveryProbeTimer);
+    _recoveryProbeTimer = null;
+  }
+  return _attemptRecoveryProbe();
+}
+
+function _exitDegradedMode(bootstrapData) {
+  _supabaseDegraded = false;
+  _degradedReason = null;
+  _useSupabase = true;
+  _syncStatus = 'idle';
+  if (_recoveryProbeTimer) {
+    clearTimeout(_recoveryProbeTimer);
+    _recoveryProbeTimer = null;
+  }
+  // Refresh global cache from the recovery bootstrap so subsequent diffs
+  // compare against canonical state, not the pre-degraded snapshot.
+  if (bootstrapData) {
+    var teacher = bootstrapData.teacher || {};
+    var prefs = teacher.preferences || {};
+    _teacherId = teacher.id || _teacherId;
+    _cache.courses = _canonicalCoursesToBlob(bootstrapData.courseRows || []);
+    _cache.config = {
+      activeCourse: prefs.active_course_id || bootstrapData.seededWelcomeCourseId || null,
+      viewMode: prefs.view_mode || null,
+      mobileViewMode: prefs.mobile_view_mode || null,
+      mobileSortMode: prefs.mobile_sort_mode || null,
+      cardWidgetConfig: prefs.card_widget_config || null,
+      displayName: teacher.display_name || null,
+      email: teacher.email || null,
+      accountDeletedAt: teacher.deleted_at || null,
+    };
+    COURSES = _cache.courses;
+    _safeLSSet('gb-courses', JSON.stringify(_cache.courses));
+    _safeLSSet('gb-config', JSON.stringify(_cache.config));
+  }
+  _replayDegradedTouchedCourses();
+  _updateSyncIndicator();
+  if (typeof dismissSyncToast === 'function') dismissSyncToast();
+  if (typeof showSyncToast === 'function') {
+    showSyncToast('Cloud sync restored. Catching up…', 'success');
+  }
+}
+
+/* Re-dispatch a single canonical-cid course's entities through the diff-based
+   save functions. Each save function compares the persisted snapshot against
+   current LS, so only actual changes dispatch. Idempotent for unchanged
+   entities. Used by both P6.1 (degraded-mode recovery) and P6.2 (canonical-id
+   arrival on a freshly-created course). */
+function _replayCourseEntities(cid) {
+  if (!cid || !_isUuid(cid)) return;
+  try {
+    saveStudents(cid, getStudents(cid));
+  } catch (e) {
+    console.warn('Replay saveStudents failed for', cid, e);
+  }
+  try {
+    saveAssessments(cid, getAssessments(cid));
+  } catch (e) {
+    console.warn('Replay saveAssessments failed for', cid, e);
+  }
+  try {
+    saveScores(cid, getScores(cid));
+  } catch (e) {
+    console.warn('Replay saveScores failed for', cid, e);
+  }
+  try {
+    if (typeof saveCategories === 'function') saveCategories(cid, getCategories(cid));
+  } catch (e) {
+    console.warn('Replay saveCategories failed for', cid, e);
+  }
+  try {
+    saveAssignmentStatuses(cid, getAssignmentStatuses(cid));
+  } catch (e) {
+    console.warn('Replay saveAssignmentStatuses failed for', cid, e);
+  }
+  try {
+    saveModules(cid, getModules(cid));
+  } catch (e) {
+    console.warn('Replay saveModules failed for', cid, e);
+  }
+  try {
+    saveRubrics(cid, getRubrics(cid));
+  } catch (e) {
+    console.warn('Replay saveRubrics failed for', cid, e);
+  }
+  try {
+    saveLearningMap(cid, getLearningMap(cid));
+  } catch (e) {
+    console.warn('Replay saveLearningMap failed for', cid, e);
+  }
+  try {
+    saveNotes(cid, getNotes(cid));
+  } catch (e) {
+    console.warn('Replay saveNotes failed for', cid, e);
+  }
+  try {
+    saveCustomTags(cid, getCustomTags(cid));
+  } catch (e) {
+    console.warn('Replay saveCustomTags failed for', cid, e);
+  }
+}
+
+function _replayDegradedTouchedCourses() {
+  if (_degradedTouchedCourses.size === 0) return;
+  var ids = Array.from(_degradedTouchedCourses);
+  _degradedTouchedCourses.clear();
+  ids.forEach(_replayCourseEntities);
+}
+
+/* Migrate course-scoped data from a local placeholder cid to the canonical
+   UUID returned by create_course (P6.2). The save-function diff path
+   compares "what's persisted under this cid" (prev) vs. "what's being
+   written" (next); if we migrated LS straight across, prev would equal next
+   and the diff would dispatch nothing. So we (a) capture the user's edits
+   into a snapshot, (b) clear LS + cache for both ids, (c) re-call each save
+   with the snapshot — the diff now sees empty→edits and dispatches full
+   inserts to the canonical store. */
+function _migrateCourseDataLocalToCanonical(localId, canonicalId) {
+  if (!localId || !canonicalId || localId === canonicalId) return;
+  // 1. Snapshot the user's edits from LS (preferred) or cache for each field.
+  var userEdits = {};
+  Object.keys(_DATA_KEYS).forEach(function (field) {
+    var dataKey = _DATA_KEYS[field];
+    if (!dataKey) return;
+    var srcKey = 'gb-' + dataKey + '-' + localId;
+    var raw = localStorage.getItem(srcKey);
+    if (raw != null) {
+      try {
+        userEdits[field] = JSON.parse(raw);
+      } catch (e) {
+        /* skip un-parseable */
+      }
+      try {
+        localStorage.removeItem(srcKey);
+      } catch (e) {
+        /* ignore */
+      }
+    } else if (_cache[field] && Object.prototype.hasOwnProperty.call(_cache[field], localId)) {
+      userEdits[field] = _cache[field][localId];
+    }
+  });
+  // 2. Clear cache for BOTH the local id (no longer valid) and the canonical
+  //    id (so the next save's prev-snapshot lookup falls through to empty).
+  Object.keys(_cache).forEach(function (field) {
+    var bucket = _cache[field];
+    if (!bucket || typeof bucket !== 'object' || Array.isArray(bucket)) return;
+    delete bucket[localId];
+    delete bucket[canonicalId];
+  });
+  // 3. Replay each entity that had user edits. Each save function diffs
+  //    prev=empty (LS cleared above, cache cleared) vs. next=user-edits and
+  //    dispatches a full insert through the canonical persist path.
+  if (userEdits.students) {
+    try {
+      saveStudents(canonicalId, userEdits.students);
+    } catch (e) {
+      console.warn('Pending-cid replay saveStudents failed', e);
+    }
+  }
+  if (userEdits.assessments) {
+    try {
+      saveAssessments(canonicalId, userEdits.assessments);
+    } catch (e) {
+      console.warn('Pending-cid replay saveAssessments failed', e);
+    }
+  }
+  if (userEdits.scores) {
+    try {
+      saveScores(canonicalId, userEdits.scores);
+    } catch (e) {
+      console.warn('Pending-cid replay saveScores failed', e);
+    }
+  }
+  if (userEdits.statuses) {
+    try {
+      saveAssignmentStatuses(canonicalId, userEdits.statuses);
+    } catch (e) {
+      console.warn('Pending-cid replay saveAssignmentStatuses failed', e);
+    }
+  }
+  if (userEdits.categories && typeof saveCategories === 'function') {
+    try {
+      saveCategories(canonicalId, userEdits.categories);
+    } catch (e) {
+      console.warn('Pending-cid replay saveCategories failed', e);
+    }
+  }
+  if (userEdits.modules) {
+    try {
+      saveModules(canonicalId, userEdits.modules);
+    } catch (e) {
+      console.warn('Pending-cid replay saveModules failed', e);
+    }
+  }
+  if (userEdits.rubrics) {
+    try {
+      saveRubrics(canonicalId, userEdits.rubrics);
+    } catch (e) {
+      console.warn('Pending-cid replay saveRubrics failed', e);
+    }
+  }
+  if (userEdits.learningMaps) {
+    try {
+      saveLearningMap(canonicalId, userEdits.learningMaps);
+    } catch (e) {
+      console.warn('Pending-cid replay saveLearningMap failed', e);
+    }
+  }
+  if (userEdits.notes) {
+    try {
+      saveNotes(canonicalId, userEdits.notes);
+    } catch (e) {
+      console.warn('Pending-cid replay saveNotes failed', e);
+    }
+  }
+  if (userEdits.customTags) {
+    try {
+      saveCustomTags(canonicalId, userEdits.customTags);
+    } catch (e) {
+      console.warn('Pending-cid replay saveCustomTags failed', e);
+    }
+  }
+  // Goals/reflections/observations/flags currently have LS-only bulk saves
+  // (per audit P6.6/P6.7). Their per-action UI paths fire RPCs directly, so
+  // anything written via the bulk save during the pending window stays local
+  // until P6.6 wires those bulk fallbacks. Migrate cache+LS for parity even
+  // though no canonical dispatch fires today.
+  ['goals', 'reflections', 'observations', 'flags', 'overrides', 'termRatings', 'reportConfig'].forEach(
+    function (field) {
+      if (userEdits[field] !== undefined && _cache[field]) {
+        _cache[field][canonicalId] = userEdits[field];
+        var dataKey = _DATA_KEYS[field];
+        if (dataKey) _safeLSSet('gb-' + dataKey + '-' + canonicalId, JSON.stringify(userEdits[field]));
+      }
+    },
+  );
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -559,29 +922,14 @@ async function initAllCourses() {
   if (_useSupabase) {
     const sb = getSupabase();
     try {
-      const {
-        data: { session },
-      } = await sb.auth.getSession();
-      const email = (session && session.user && session.user.email) || '';
-      const displayName =
-        (session && session.user && session.user.user_metadata && session.user.user_metadata.display_name) || null;
-
-      const bootRes = await sb.rpc('bootstrap_teacher', {
-        p_email: email,
-        p_display_name: displayName,
-      });
-      if (bootRes.error) throw bootRes.error;
-      const teacher = bootRes.data || {};
+      const data = await _bootstrapWithRetry(sb);
+      const teacher = data.teacher || {};
       const prefs = teacher.preferences || {};
       _teacherId = teacher.id || _teacherId;
 
-      const coursesRes = await sb.rpc('list_teacher_courses');
-      if (coursesRes.error) throw coursesRes.error;
-      const seededWelcomeCourseId = await _maybeSeedWelcomeClass(sb, teacher, coursesRes.data || []);
-
-      _cache.courses = _canonicalCoursesToBlob(coursesRes.data || []);
+      _cache.courses = _canonicalCoursesToBlob(data.courseRows || []);
       _cache.config = {
-        activeCourse: prefs.active_course_id || seededWelcomeCourseId || null,
+        activeCourse: prefs.active_course_id || data.seededWelcomeCourseId || null,
         viewMode: prefs.view_mode || null,
         mobileViewMode: prefs.mobile_view_mode || null,
         mobileSortMode: prefs.mobile_sort_mode || null,
@@ -598,8 +946,8 @@ async function initAllCourses() {
       _syncStatus = 'idle';
       _updateSyncIndicator();
     } catch (e) {
-      console.warn('v2 course load failed, falling back to localStorage:', e);
-      _useSupabase = false;
+      console.warn('v2 course load failed after retry; entering degraded mode:', e);
+      _enterDegradedMode(e);
     }
   }
 
@@ -2346,6 +2694,8 @@ function _saveCourseField(field, cid, value) {
   // the dispatcher functions at each save site, not via this field-save path).
   var dataKey = _DATA_KEYS[field];
   if (dataKey) _safeLSSet('gb-' + dataKey + '-' + cid, JSON.stringify(value));
+  // Track which courses got writes during degraded mode so recovery can replay.
+  if (_supabaseDegraded && cid) _degradedTouchedCourses.add(cid);
   _broadcastChange(cid, field);
 }
 
@@ -2821,7 +3171,17 @@ function upsertScore(cid, sid, aid, tid, scoreVal, date, type, note) {
 /* v2 per-cell / per-tag / per-criterion score write. Rubric grading UI writes
    linked competency tag ids, while rubric_score requires criterion ids. Keep
    tag writes authoritative for UI hydration and mirror to rubric_score only
-   when the tag has exactly one criterion owner. */
+   when the tag has exactly one criterion owner.
+
+   P6.4 audit (2026-05-01): every UI call site to upsertScore was traced and
+   confirmed to pass (a) a truthy tid sourced from a tag column / data-tid /
+   tagIds array, and (b) a numeric scoreVal (0 for clear, 1-4 for proficiency,
+   integer ≥0 for points). The `_isUuid(tid)` and `intVal != null` checks
+   below are therefore defensive: when tid is non-UUID we can't link a tag
+   score to a non-existent canonical tag row anyway (skipping is correct);
+   when intVal is null (only reachable from non-UI callers with explicit
+   nulls, e.g. test fixtures) there's no value to write. Both conditions
+   together represent "skip dispatch, but cache + LS still wrote correctly". */
 function _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note) {
   if (!_isUuid(sid) || !_isUuid(aid)) return;
   var sb = getSupabase();
@@ -3372,6 +3732,10 @@ function createCourse(data) {
       // → uuid.  Policy fields (grading_system / calc_method / decay_weight)
       // live on the course row directly — save_course_policy was merged
       // into the course table per ERD "Merged CoursePolicy into Course".
+      // Mark this id as pending so any course-level edits made during the
+      // create_course round-trip can be migrated + replayed when the
+      // canonical UUID arrives (P6.2).
+      _pendingLocalCids.add(localId);
       var createPromise = sb
         .rpc('create_course', {
           p_name: course.name,
@@ -3385,16 +3749,28 @@ function createCourse(data) {
         .then(function (res) {
           if (res.error) {
             console.warn('create_course RPC failed:', res.error);
+            _pendingLocalCids.delete(localId);
             return;
           }
           const canonicalId = res.data;
-          if (!canonicalId || canonicalId === localId) return;
+          if (!canonicalId || canonicalId === localId) {
+            _pendingLocalCids.delete(localId);
+            return;
+          }
           // Re-key under the canonical UUID so subsequent saves hit update_course.
           const migrated = Object.assign({}, course, { id: canonicalId });
           delete COURSES[localId];
           COURSES[canonicalId] = migrated;
           _cache.courses = COURSES;
           _safeLSSet('gb-courses', JSON.stringify(COURSES));
+          // Migrate course-scoped LS + replay any user edits made during the
+          // in-flight window so they land in the canonical store (P6.2).
+          _migrateCourseDataLocalToCanonical(localId, canonicalId);
+          _pendingLocalCids.delete(localId);
+        })
+        .catch(function (err) {
+          console.warn('create_course threw:', err);
+          _pendingLocalCids.delete(localId);
         });
       _trackPendingSync(createPromise);
     }
@@ -5647,6 +6023,44 @@ function deleteQuickOb(cid, sid, obId) {
   _broadcastChange(cid, 'observations');
 }
 
+/* Delete every observation linked to an assessment via assignmentContext.
+   Used by the assignment-delete UI flows in both page-assignments.js (full
+   inline editor) and page-gradebook.js (context menu). Returns the number
+   of removed observations.
+
+   Why this exists: observations reference assessments through a JSON
+   `assignmentContext` field (not a real FK), so DB-level FK cascade from
+   `assessment` does not reach them. Without this helper, a deleted
+   assessment leaves orphaned observation rows on the server with a stale
+   assessmentId that reappear on reload (P6.5 audit, 2026-05-01). */
+function deleteAssessmentObservations(cid, aid) {
+  if (!cid || !aid) return 0;
+  const all = getQuickObs(cid);
+  const removedIds = [];
+  let touched = false;
+  Object.keys(all).forEach(function (sid) {
+    const before = (all[sid] || []).length;
+    all[sid] = (all[sid] || []).filter(function (o) {
+      const matches = o && o.assignmentContext && o.assignmentContext.assessmentId === aid;
+      if (matches && o.id) removedIds.push(o.id);
+      return !matches;
+    });
+    if (all[sid].length !== before) touched = true;
+  });
+  if (!touched) return 0;
+  // Persist the trimmed blob to LS + cache.
+  saveQuickObs(cid, all);
+  // Dispatch delete_observation for each removed observation that has a
+  // canonical UUID. Locally-created observations not yet synced have local
+  // string ids; _persistObservationDelete skips those.
+  if (_useSupabase && localStorage.getItem('gb-demo-mode') !== '1') {
+    removedIds.forEach(function (obId) {
+      _persistObservationDelete(cid, obId);
+    });
+  }
+  return removedIds.length;
+}
+
 function updateQuickOb(cid, sid, obId, updates) {
   const all = getQuickObs(cid);
   if (!all[sid]) return;
@@ -6366,15 +6780,29 @@ window.v2.saveTermRating = function (enrollmentId, term, payload) {
   );
 };
 
-/* Custom tag — per §12, create-only path (no edit/delete inventoried). */
+/* Custom tag direct RPC wrappers. Used by addCustomTag/removeCustomTag-driven
+   flows via _persistCustomTagsToCanonical, and exposed for direct callers. */
 window.createCustomTag = function (cid, label) {
   var sb = getSupabase();
   if (!sb) return Promise.resolve();
   if (!_isUuid(cid)) return Promise.resolve();
   return sb.rpc('create_custom_tag', { p_course_id: cid, p_label: label || '' }).then(function (res) {
     if (res.error) console.warn('create_custom_tag failed:', res.error);
+    var id = res && res.data;
+    if (id && label) {
+      if (!_customTagIds[cid]) _customTagIds[cid] = {};
+      _customTagIds[cid][label] = id;
+    }
     return res;
   });
+};
+
+window.v2 = window.v2 || {};
+window.v2.deleteCustomTag = function (id) {
+  return _rpcOrNoop('delete_custom_tag', { p_id: id });
+};
+window.v2.deleteCustomTagByLabel = function (cid, label) {
+  return _rpcOrNoop('delete_custom_tag_by_label', { p_course_id: cid, p_label: label });
 };
 
 function getQuickObsByDim(cid, sid, dim) {
@@ -6402,6 +6830,11 @@ function getCustomTags(cid) {
   }
 }
 var _customTagSaveQueue = {};
+/* Per-course label→uuid cache, populated from create_custom_tag responses.
+   Lets removeCustomTag dispatch a delete_custom_tag(p_id) for tags created
+   in the current session. Tags that pre-existed (loaded from server) won't
+   have an entry here; those fall through to delete_custom_tag_by_label. */
+var _customTagIds = {};
 
 function saveCustomTags(cid, arr) {
   var prev = _loadPersistedCourseFieldSnapshot('customTags', cid, (_cache.customTags && _cache.customTags[cid]) || []);
@@ -6420,21 +6853,66 @@ function _persistCustomTagsToCanonical(cid, prev, arr) {
     (prev || []).forEach(function (l) {
       prevSet[l] = true;
     });
+    var nextSet = {};
+    (arr || []).forEach(function (l) {
+      nextSet[l] = true;
+    });
     var ops = [];
+    // Adds — labels in next that weren't in prev.
     (arr || []).forEach(function (label) {
-      if (!label || prevSet[label]) return; // already persisted
+      if (!label || prevSet[label]) return;
       ops.push(
         sb
           .rpc('create_custom_tag', { p_course_id: cid, p_label: label })
           .then(function (res) {
-            if (res.error) console.warn('create_custom_tag failed:', res.error);
+            if (res.error) {
+              console.warn('create_custom_tag failed:', res.error);
+              return;
+            }
+            // Cache the canonical uuid so a later remove can dispatch a
+            // by-id delete rather than the label-fallback variant.
+            var id = res && res.data;
+            if (id) {
+              if (!_customTagIds[cid]) _customTagIds[cid] = {};
+              _customTagIds[cid][label] = id;
+            }
           })
           .catch(function (err) {
             console.warn('Custom tag sync failed for label', label, ':', err);
           }),
       );
     });
-    // No delete_custom_tag RPC — removed labels persist in DB until one is added.
+    // Deletes — labels in prev that aren't in next.
+    (prev || []).forEach(function (label) {
+      if (!label || nextSet[label]) return;
+      var knownId = _customTagIds[cid] && _customTagIds[cid][label];
+      if (knownId && _isUuid(knownId)) {
+        ops.push(
+          sb
+            .rpc('delete_custom_tag', { p_id: knownId })
+            .then(function (res) {
+              if (res.error) console.warn('delete_custom_tag failed:', res.error);
+              else if (_customTagIds[cid]) delete _customTagIds[cid][label];
+            })
+            .catch(function (err) {
+              console.warn('Custom tag delete sync failed for label', label, ':', err);
+            }),
+        );
+      } else {
+        // Cross-session delete: uuid not cached locally. Use the label
+        // fallback so the canonical row is still removed.
+        ops.push(
+          sb
+            .rpc('delete_custom_tag_by_label', { p_course_id: cid, p_label: label })
+            .then(function (res) {
+              if (res.error) console.warn('delete_custom_tag_by_label failed:', res.error);
+            })
+            .catch(function (err) {
+              console.warn('Custom tag label-delete sync failed for label', label, ':', err);
+            }),
+        );
+      }
+    });
     return Promise.all(ops);
   });
   _customTagSaveQueue[cid] = _trackPendingSync(next);
@@ -6649,8 +7127,15 @@ function clearCardWidgetConfig() {
 /* ── Namespace ──────────────────────────────────────────────── */
 var _mobileRerender = null;
 
+function hasPendingLocalCid(cid) {
+  return !!cid && _pendingLocalCids.has(cid);
+}
+
 window.GB = {
   getSyncStatus,
+  isSupabaseDegraded,
+  retrySupabaseRecovery,
+  hasPendingLocalCid,
   getLastSyncedAt,
   // retrySyncs + refreshFromSupabase removed in Phase 6.1; v2 offline path
   // exposes `window.v2Queue.flush()` as the retry entry point.
@@ -6755,6 +7240,7 @@ window.GB = {
   getAllQuickObs,
   addQuickOb,
   deleteQuickOb,
+  deleteAssessmentObservations,
   updateQuickOb,
   getQuickObsByDim,
   getAssignmentObs,

@@ -758,7 +758,14 @@ function initSidebarToggle() {
   applySidebarState();
 }
 
-/* ── Delete Student (removes all associated data, returns snapshot for undo) ── */
+/* ── Delete Student (P6.7 hard delete — removes all associated data, returns snapshot for undo) ──
+   Strategy: skip the per-entity dispatch paths (saveX) for LS cleanup and
+   call _saveCourseField directly so we don't fire redundant RPCs against
+   rows that delete_student is about to cascade-delete server-side. The
+   canonical hard-delete RPC at the end does the real work; cascade through
+   enrollment in the FK chain handles every dependent table (note, goal,
+   reflection, section_override, attendance, term_rating, score, tag_score,
+   rubric_score, observation_student). */
 function deleteStudent(cid, sid) {
   const students = getStudents(cid);
   const student = students.find(s => s.id === sid);
@@ -785,37 +792,38 @@ function deleteStudent(cid, sid) {
     if (k.startsWith(sid + ':')) snapshot.statuses[k] = statuses[k];
   });
 
-  // Delete
-  saveStudents(
+  // LS-only cleanup. Each _saveCourseField writes localStorage + cache and
+  // broadcasts the change without touching the canonical store.
+  _saveCourseField(
+    'students',
     cid,
     students.filter(s => s.id !== sid),
   );
   delete scores[sid];
-  saveScores(cid, scores);
+  _saveCourseField('scores', cid, scores);
   delete goals[sid];
-  saveGoals(cid, goals);
+  _saveCourseField('goals', cid, goals);
   delete reflections[sid];
-  saveReflections(cid, reflections);
+  _saveCourseField('reflections', cid, reflections);
   delete notes[sid];
-  saveNotes(cid, notes);
+  _saveCourseField('notes', cid, notes);
   delete flags[sid];
-  saveFlags(cid, flags);
+  _saveCourseField('flags', cid, flags);
   Object.keys(statuses).forEach(k => {
     if (k.startsWith(sid + ':')) delete statuses[k];
   });
-  saveAssignmentStatuses(cid, statuses);
-
-  // Clean up quick-obs for the student
+  _saveCourseField('statuses', cid, statuses);
   const obs = getQuickObs(cid);
   delete obs[sid];
-  saveQuickObs(cid, obs);
-
-  // Clean up term-ratings for the student
+  _saveCourseField('observations', cid, obs);
   const tr = getTermRatings(cid);
   delete tr[sid];
-  saveTermRatings(cid, tr);
+  _saveCourseField('termRatings', cid, tr);
 
-  // Clean student from assignment collaboration data (pairs, groups, excludedStudents)
+  // Clean student from assignment collaboration data (pairs, groups,
+  // excludedStudents). These edits MUST go through saveAssessments because
+  // they update assessment.collab_config server-side — the cascade chain
+  // can't reach JSONB columns on assessment rows that survive.
   const assessments = getAssessments(cid);
   let changed = false;
   assessments.forEach(a => {
@@ -836,6 +844,20 @@ function deleteStudent(cid, sid) {
     }
   });
   if (changed) saveAssessments(cid, assessments);
+
+  // Fire the canonical hard-delete. Schema FK cascade through enrollment
+  // handles every per-enrollment dependent table. Skipped in demo mode and
+  // when Supabase is degraded/disabled — LS cleanup above is the only state
+  // that matters in those modes.
+  if (
+    typeof _useSupabase !== 'undefined' &&
+    _useSupabase &&
+    localStorage.getItem('gb-demo-mode') !== '1' &&
+    window.v2 &&
+    typeof window.v2.deleteStudent === 'function'
+  ) {
+    window.v2.deleteStudent(sid);
+  }
 
   return snapshot;
 }
@@ -881,11 +903,17 @@ let _syncToastTimer = null;
 function showSyncToast(message, type) {
   dismissSyncToast();
   const toast = document.createElement('div');
-  toast.className = 'sync-toast ' + (type || 'error');
+  // 'degraded' reuses the error visual but persists (no auto-dismiss) and
+  // wires a different retry action that re-runs bootstrap_teacher rather
+  // than flushing the offline queue.
+  var visualClass = type === 'degraded' ? 'error' : type || 'error';
+  toast.className = 'sync-toast ' + visualClass;
   toast.id = 'sync-toast';
   toast.setAttribute('role', 'alert');
   toast.setAttribute('aria-live', 'assertive');
-  if (type === 'error') {
+  if (type === 'degraded') {
+    toast.innerHTML = `<span>${esc(message)}</span><button class="sync-toast-btn" data-action="retry-supabase-recovery">Retry Now</button>`;
+  } else if (type === 'error') {
     toast.innerHTML = `<span>${esc(message)}</span><button class="sync-toast-btn" data-action="retry-sync">Retry Now</button>`;
   } else {
     toast.innerHTML = `<span>${esc(message)}</span>`;
@@ -1131,6 +1159,14 @@ document.addEventListener('click', function (e) {
     case 'retry-sync':
       retrySyncQueue();
       dismissSyncToast();
+      break;
+    case 'retry-supabase-recovery':
+      if (window.GB && typeof window.GB.retrySupabaseRecovery === 'function') {
+        window.GB.retrySupabaseRecovery();
+      }
+      // Don't dismiss — the recovery probe will dismiss/replace the toast itself
+      // (success → "Cloud sync restored" via _exitDegradedMode; failure → keep
+      // the existing toast in place and reschedule the next probe).
       break;
     case 'copy-session-draft':
       _copySessionExpiredDraft().then(function (copied) {
