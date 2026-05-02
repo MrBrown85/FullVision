@@ -37,7 +37,12 @@ jobs:
             range="origin/${GITHUB_BASE_REF}...HEAD"
           else
             before="${{ github.event.before }}"
-            if [[ -n "$before" && "$before" != "0000000000000000000000000000000000000000" ]]; then
+            # Skip the before-sha branch if the SHA is unreachable, which
+            # happens after a force-push rewrites history past it. Without
+            # this guard the symmetric-difference expression below errors
+            # with "Invalid symmetric difference expression" and the job
+            # fails on every force-pushed branch.
+            if [[ -n "$before" && "$before" != "0000000000000000000000000000000000000000" ]] && git cat-file -e "$before" 2>/dev/null; then
               range="${before}...HEAD"
             elif git rev-parse HEAD^ >/dev/null 2>&1; then
               range="$(git rev-parse HEAD^)...HEAD"
