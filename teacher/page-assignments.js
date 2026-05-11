@@ -125,7 +125,7 @@ window.PageAssignments = (function () {
   async function switchCourse(cid) {
     activeCourse = cid;
     setActiveCourse(cid);
-    await initData(cid);
+    await withSwitchingLock(() => initData(cid));
     filterCategories = [];
     assessSearch = '';
     showUngraded = false;
@@ -2814,11 +2814,25 @@ window.PageAssignments = (function () {
     _refreshCriterionDOM(0);
   }
   function cancelRubricEdit() {
-    if (_rubricDirty && !confirm('Discard unsaved rubric changes?')) return;
-    _editingRubric = null;
-    _rubricDirty = false;
-    var modal = document.getElementById('rubric-modal');
-    if (modal) modal.remove();
+    // P7.8: route through the in-app confirm dialog so it matches the rest of
+    // the destructive-action UX (focus trap, Esc handling, restored focus).
+    function _doCancel() {
+      _editingRubric = null;
+      _rubricDirty = false;
+      var modal = document.getElementById('rubric-modal');
+      if (modal) modal.remove();
+    }
+    if (!_rubricDirty) {
+      _doCancel();
+      return;
+    }
+    showConfirm(
+      'Discard rubric changes?',
+      'Your unsaved edits to this rubric will be lost.',
+      'Discard',
+      'danger',
+      _doCancel,
+    );
   }
   function saveRubricEdit() {
     if (!_editingRubric) return;

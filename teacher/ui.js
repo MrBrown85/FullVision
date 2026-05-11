@@ -23,6 +23,21 @@ function sanitizeHtml(raw) {
   return tmp.innerHTML;
 }
 
+/* ── Course-switch input lock (P7.3) ───────────────────────── */
+async function withSwitchingLock(fn) {
+  const body = document.body;
+  if (!body) return await fn();
+  body.setAttribute('aria-busy', 'true');
+  body.classList.add('fv-switching-course');
+  try {
+    return await fn();
+  } finally {
+    body.removeAttribute('aria-busy');
+    body.classList.remove('fv-switching-course');
+  }
+}
+window.withSwitchingLock = withSwitchingLock;
+
 /* ── Shared HTML: Unified Toolbar ──────────────────────────── */
 const OFFLINE_BANNER_COPY = "You're offline. Changes will sync when connection returns.";
 let _syncUIBound = false;

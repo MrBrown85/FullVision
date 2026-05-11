@@ -101,7 +101,7 @@ window.PageObservations = (function () {
   async function switchCourse(cid) {
     activeCourse = cid;
     setActiveCourse(cid);
-    await initData(cid);
+    await withSwitchingLock(() => initData(cid));
     document.getElementById('sidebar-mount').innerHTML = renderSidebar(cid);
     refreshStudentCache();
     selectedStudents = [];

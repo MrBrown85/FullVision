@@ -2596,14 +2596,18 @@ function _safeParseLS(key, fallback) {
 function _safeLSSet(key, value) {
   try {
     localStorage.setItem(key, value);
+    return true;
   } catch (e) {
     console.warn('localStorage write failed (' + key + '):', e);
-    if (e.name === 'QuotaExceededError' && !_lsQuotaWarned) {
+    if (e.name === 'QuotaExceededError') {
+      // P7.1: surface every quota event, not just the first \u2014 teacher needs to
+      // know each subsequent write also failed to persist locally.
       _lsQuotaWarned = true;
       if (typeof showSyncToast === 'function') {
-        showSyncToast('Local storage full \u2014 ensure you have internet for data safety', 'error');
+        showSyncToast('Local storage full \u2014 your changes may not save offline', 'error');
       }
     }
+    return false;
   }
 }
 
@@ -2693,10 +2697,12 @@ function _saveCourseField(field, cid, value) {
   // Persist to localStorage (primary store in v2; remote writes happen through
   // the dispatcher functions at each save site, not via this field-save path).
   var dataKey = _DATA_KEYS[field];
-  if (dataKey) _safeLSSet('gb-' + dataKey + '-' + cid, JSON.stringify(value));
+  var lsOk = true;
+  if (dataKey) lsOk = _safeLSSet('gb-' + dataKey + '-' + cid, JSON.stringify(value));
   // Track which courses got writes during degraded mode so recovery can replay.
   if (_supabaseDegraded && cid) _degradedTouchedCourses.add(cid);
   _broadcastChange(cid, field);
+  return lsOk;
 }
 
 function _loadPersistedCourseFieldSnapshot(field, cid, fallbackValue) {
@@ -3135,7 +3141,7 @@ function upsertScore(cid, sid, aid, tid, scoreVal, date, type, note) {
     return e.assessmentId === aid && e.tagId === tid;
   });
   if (existing) {
-    if (existing.score === scoreVal) return; // no change
+    if (existing.score === scoreVal) return true; // no change
     existing.score = scoreVal;
     if (date) existing.date = date;
     if (note !== undefined) existing.note = note;
@@ -3153,7 +3159,7 @@ function upsertScore(cid, sid, aid, tid, scoreVal, date, type, note) {
   }
   _cache.scores[cid] = scores;
   if (typeof clearProfCache === 'function') clearProfCache();
-  _safeLSSet('gb-scores-' + cid, JSON.stringify(scores));
+  var lsOk = _safeLSSet('gb-scores-' + cid, JSON.stringify(scores));
   // Arm the same echo guard that _saveCourseField sets for blob writes.
   // Without this, the course_sync_cursor realtime subscription delivers an
   // UPDATE event after each RPC commits, _handleExternalCourseUpdate calls
@@ -3166,6 +3172,7 @@ function upsertScore(cid, sid, aid, tid, scoreVal, date, type, note) {
     _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note);
   }
   _broadcastChange(cid, 'scores');
+  return lsOk;
 }
 
 /* v2 per-cell / per-tag / per-criterion score write. Rubric grading UI writes
@@ -5811,7 +5818,7 @@ function saveScores(cid, obj) {
       new Error().stack,
     );
     if (typeof showSyncToast === 'function') showSyncToast('Score save blocked — data loss prevented', 'error');
-    return;
+    return false;
   }
   // Also count total score entries for a more granular check
   var prevEntries = 0,
@@ -5828,10 +5835,11 @@ function saveScores(cid, obj) {
       new Error().stack,
     );
     if (typeof showSyncToast === 'function') showSyncToast('Score save blocked — data loss prevented', 'error');
-    return;
+    return false;
   }
-  _saveCourseField('scores', cid, obj);
+  var lsOk = _saveCourseField('scores', cid, obj);
   persistScoreDiffToCanonical(cid, prev, obj || {});
+  return lsOk;
 }
 
 /* ── Points-mode helpers: one score → all tags ──────────────── */
@@ -6004,11 +6012,12 @@ function addQuickOb(cid, sid, text, dims, sentiment, context, assignmentContext)
   if (assignmentContext) entry.assignmentContext = assignmentContext;
   all[sid].push(entry);
   _cache.observations[cid] = all;
-  _safeLSSet('gb-quick-obs-' + cid, JSON.stringify(all));
+  var lsOk = _safeLSSet('gb-quick-obs-' + cid, JSON.stringify(all));
   if (_useSupabase && localStorage.getItem('gb-demo-mode') !== '1') {
     _persistObservationCreate(cid, sid, entry);
   }
   _broadcastChange(cid, 'observations');
+  return lsOk;
 }
 
 function deleteQuickOb(cid, sid, obId) {
@@ -6063,20 +6072,21 @@ function deleteAssessmentObservations(cid, aid) {
 
 function updateQuickOb(cid, sid, obId, updates) {
   const all = getQuickObs(cid);
-  if (!all[sid]) return;
+  if (!all[sid]) return false;
   const ob = all[sid].find(o => o.id === obId);
-  if (!ob) return;
+  if (!ob) return false;
   if (updates.text !== undefined) ob.text = updates.text.trim();
   if (updates.dims !== undefined) ob.dims = updates.dims;
   if (updates.sentiment !== undefined) ob.sentiment = updates.sentiment || null;
   if (updates.context !== undefined) ob.context = updates.context || null;
   ob.modified = new Date().toISOString();
   _cache.observations[cid] = all;
-  _safeLSSet('gb-quick-obs-' + cid, JSON.stringify(all));
+  var lsOk = _safeLSSet('gb-quick-obs-' + cid, JSON.stringify(all));
   if (_useSupabase && localStorage.getItem('gb-demo-mode') !== '1') {
     _persistObservationUpdate(cid, ob);
   }
   _broadcastChange(cid, 'observations');
+  return lsOk;
 }
 
 /* v2 create_observation(p_course_id, p_body, p_sentiment, p_context_type,

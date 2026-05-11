@@ -525,7 +525,11 @@
             if (newCid && newCid !== _cid) {
               _cid = newCid;
               setActiveCourse(newCid);
-              initData(newCid).then(function () {
+              document.body.setAttribute('aria-busy', 'true');
+              document.body.classList.add('fv-switching-course');
+              initData(newCid).finally(function () {
+                document.body.removeAttribute('aria-busy');
+                document.body.classList.remove('fv-switching-course');
                 MC.dismissSheet();
                 _renderTab(_activeTab);
               });

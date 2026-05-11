@@ -122,7 +122,7 @@ window.PageGradebook = (function () {
     _flushActiveScoreEditor();
     activeCourse = cid;
     setActiveCourse(cid);
-    await initData(cid);
+    await withSwitchingLock(() => initData(cid));
     filterSections = [];
     filterModules = [];
     filterCategories = [];
@@ -2109,36 +2109,45 @@ window.PageGradebook = (function () {
           render();
         }
       } else if (action === 'deleteAssess') {
-        if (confirm('Delete this assignment and all its scores?')) {
-          var cid = activeCourse;
-          var assessments = getAssessments(cid).filter(function (a) {
-            return a.id !== aid;
-          });
-          saveAssessments(cid, assessments);
-          var scores = getScores(cid);
-          Object.keys(scores).forEach(function (sid) {
-            scores[sid] = scores[sid].filter(function (e) {
-              return e.assessmentId !== aid;
+        // P7.8: replace native confirm with the in-app dialog so the dialog
+        // can spell out irreversibility and stay consistent with other
+        // destructive actions in the gradebook.
+        showConfirm(
+          'Delete this assignment?',
+          'All scores, statuses, and observations linked to this assignment will be removed. This cannot be undone.',
+          'Delete',
+          'danger',
+          function () {
+            var cid = activeCourse;
+            var assessments = getAssessments(cid).filter(function (a) {
+              return a.id !== aid;
             });
-          });
-          saveScores(cid, scores);
-          // P6.5: previously this branch only cleaned scores+assessments,
-          // leaving status pills + observations orphaned in LS and on the
-          // server. Mirror page-assignments.js's deleteAssess so the two
-          // delete entry points produce the same canonical end state.
-          var statuses = getAssignmentStatuses(cid);
-          var statusChanged = false;
-          Object.keys(statuses).forEach(function (k) {
-            if (k.endsWith(':' + aid)) {
-              delete statuses[k];
-              statusChanged = true;
-            }
-          });
-          if (statusChanged) saveAssignmentStatuses(cid, statuses);
-          deleteAssessmentObservations(cid, aid);
-          clearProfCache();
-          render();
-        }
+            saveAssessments(cid, assessments);
+            var scores = getScores(cid);
+            Object.keys(scores).forEach(function (sid) {
+              scores[sid] = scores[sid].filter(function (e) {
+                return e.assessmentId !== aid;
+              });
+            });
+            saveScores(cid, scores);
+            // P6.5: previously this branch only cleaned scores+assessments,
+            // leaving status pills + observations orphaned in LS and on the
+            // server. Mirror page-assignments.js's deleteAssess so the two
+            // delete entry points produce the same canonical end state.
+            var statuses = getAssignmentStatuses(cid);
+            var statusChanged = false;
+            Object.keys(statuses).forEach(function (k) {
+              if (k.endsWith(':' + aid)) {
+                delete statuses[k];
+                statusChanged = true;
+              }
+            });
+            if (statusChanged) saveAssignmentStatuses(cid, statuses);
+            deleteAssessmentObservations(cid, aid);
+            clearProfCache();
+            render();
+          },
+        );
       }
       _dismissContextMenu();
     });
@@ -2248,10 +2257,28 @@ window.PageGradebook = (function () {
       });
       _undoStack.push({ cid: cid, sid: sid, aid: aid, tagIds: tagIds, prevEntries: prevEntries });
       while (_undoStack.length > 50) _undoStack.shift();
-      // Apply score to all tags in this assessment
+      // Apply score to all tags in this assessment.
+      // P7.1: if any per-tag write fails (LS quota / blocked guard), revert
+      // the cached state from the undo snapshot so the rendered cell matches
+      // truth, then surface a retry toast.
+      var allOk = true;
       tagIds.forEach(function (tid) {
-        upsertScore(cid, sid, aid, tid, val, assess.date || courseToday(cid), assess.type || 'summative', '');
+        var ok = upsertScore(cid, sid, aid, tid, val, assess.date || courseToday(cid), assess.type || 'summative', '');
+        if (ok === false) allOk = false;
       });
+      if (!allOk) {
+        var revertScores = getScores(cid);
+        revertScores[sid] = (revertScores[sid] || []).filter(function (e) {
+          return e.assessmentId !== aid || tagIds.indexOf(e.tagId) === -1;
+        });
+        prevEntries.forEach(function (e) {
+          if (e) revertScores[sid].push(structuredClone(e));
+        });
+        saveScores(cid, revertScores);
+        if (typeof showSyncToast === 'function') {
+          showSyncToast("Couldn't save score — your other changes are safe. Try again in a moment.", 'error');
+        }
+      }
       clearProfCache();
       inp.remove();
       if (span) span.style.display = '';

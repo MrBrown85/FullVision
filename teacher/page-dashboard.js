@@ -57,7 +57,7 @@ window.PageDashboard = (function () {
     // Reset class manager state for new course
     CM.configure({ activeCourse: cid, onRender: render, onCourseChange: switchCourse });
     CM.resetState();
-    await initData(cid);
+    await withSwitchingLock(() => initData(cid));
     render();
   }
 

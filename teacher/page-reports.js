@@ -284,7 +284,7 @@ window.PageReports = (function () {
   async function switchCourse(cid) {
     activeCourse = cid;
     setActiveCourse(cid);
-    await initData(cid);
+    await withSwitchingLock(() => initData(cid));
     selectedStudentIds = null; // reset to all
     reportConfig = Builder.getReportConfigWrapped(cid);
     _configureQuestionnaire();
