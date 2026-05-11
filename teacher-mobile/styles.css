@@ -43,6 +43,31 @@ body.mobile-mode :focus:not(:focus-visible) {
   position: relative;
 }
 
+/* ── Course-switch input lock (P7.3) ────────────────────────── */
+body.fv-switching-course #m-app,
+body.fv-switching-course .m-tab-content,
+body.fv-switching-course .m-tab-bar {
+  pointer-events: none;
+  opacity: 0.55;
+}
+body.fv-switching-course::after {
+  content: 'Loading course…';
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10000;
+  background: var(--surface, #fff);
+  color: var(--text-1, #111);
+  border: 1px solid var(--border, #ddd);
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+}
+
 /* ── Tab Bar (iOS style) ───────────────────────────────────── */
 #m-tab-bar {
   display: flex;

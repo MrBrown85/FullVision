@@ -280,6 +280,18 @@ document.addEventListener('click', function (e) {
 
 /* ── Demo mode — bypass Supabase auth, run local-only with seeded data ── */
 function enterDemoMode() {
+  // P7.7: confirm before wiping. Skip the prompt only when this device has no
+  // existing gb-* state to lose (fresh install or already-cleared session).
+  var hasExistingState = Object.keys(localStorage).some(function (k) {
+    return k.indexOf('gb-') === 0 && k !== 'gb-demo-mode' && k !== 'gb-demo-mode-token';
+  });
+  if (hasExistingState) {
+    var ok = window.confirm(
+      'Demo Mode will erase the FullVision data on this device and load a sample class.\n\n' +
+        'Anything not synced to your account will be lost. Continue?',
+    );
+    if (!ok) return;
+  }
   // Wipe any existing gb-* state so seedIfNeeded gets a clean slate.
   // The seed only fires when COURSES is empty AND the wiped flag isn't set,
   // so prior real-account data would otherwise block it.

@@ -246,6 +246,37 @@ body.offline-active {
   display: none;
 }
 
+/* ── Course-switch input lock (P7.3) ────────────────────────── */
+body.fv-switching-course #app-table,
+body.fv-switching-course #sidebar-mount,
+body.fv-switching-course .gb-course-select,
+body.fv-switching-course #gb-course-select,
+body.fv-switching-course [data-action='switchCourse'],
+body.fv-switching-course .gb-grade-cell,
+body.fv-switching-course .score-val,
+body.fv-switching-course [data-action='openScoreEditor'] {
+  pointer-events: none;
+  opacity: 0.55;
+  cursor: progress;
+}
+body.fv-switching-course::after {
+  content: 'Loading course…';
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: calc(var(--z-popover) + 5);
+  background: var(--surface, #fff);
+  color: var(--text-1, #111);
+  border: 1px solid var(--border, #ddd);
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+}
+
 /* ── Unified Toolbar — macOS-native title bar + controls ───── */
 #app-dock {
   position: fixed;

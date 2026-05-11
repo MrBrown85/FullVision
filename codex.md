@@ -133,6 +133,140 @@ Audit findings from 2026-05-01. Cross-checked every "must persist" row in [fullv
 - Live deploy still owed: confirm `delete_student` RPC is deployed on `gradebook-prod` (likely already there; was added 2026-04-20 per the schema.sql:512 inline comment).
 - Out of scope (potential follow-ups): "ghost observation" cleanup — when `delete_student` cascades, top-level `observation` rows survive after their `observation_student` join rows cascade-delete. UI read paths filter implicitly so it's invisible, but a server-side cleanup pass (or extending `delete_student` to also delete observations with zero remaining join rows) would tighten data hygiene. Bulk delete via the class manager's bulk-edit mode wasn't audited; if exposed it should route through the same `deleteStudent` per-id loop today.
 
+## Usability hardening
+
+Audit findings from 2026-05-11. Cross-cutting issues teachers feel in real classroom use: data-trust signals, multi-device write races, perceived-performance hotspots, touch/keyboard parity. Scope is user-facing impact only — internal refactors, test gaps, and doc cleanup are deliberately out.
+
+### P7.1 · Silent save failures on score + observation paths ✅ done 2026-05-11
+
+- `_safeLSSet` returns boolean (drops the one-shot `_lsQuotaWarned` so every quota event re-toasts); `_saveCourseField`, `saveScores`, `upsertScore`, `addQuickOb`, `updateQuickOb` all propagate the status.
+- [teacher/page-gradebook.js](teacher/page-gradebook.js) `commitScoreEdit` checks the `upsertScore` return per-tag; on any false, it rolls the cache back from the existing undo snapshot via `saveScores(cid, revertScores)` and surfaces "Couldn't save score — your other changes are safe. Try again in a moment." through `showSyncToast`.
+- [teacher-mobile/tab-observe.js](teacher-mobile/tab-observe.js) `saveObservation` aggregates results across the multi-student case: a single failure suppresses the success toast/dismiss and shows "Couldn't save — local storage full. Try again after freeing space." instead.
+- Out of scope (handled separately): auto-enqueue into the offline queue for failed writes — the queue already runs in parallel for live RPC failures, and LS-quota failures (the new path this ticket surfaces) need a separate "free local space" UX rather than silent retry. Track under P7.9 if the dead-letter path needs to grow to cover it.
+
+### P7.2 · Promote degraded-mode signal from toast to persistent banner `[agent-ready]` — BLOCKER
+
+- Extends P6.1. Today `_enterDegradedMode()` at [shared/data.js:371-372](shared/data.js) only calls `showSyncToast('Saving locally — cloud sync paused.', 'degraded')`, which auto-dismisses after 3s via [teacher/ui.js:920](teacher/ui.js). A teacher who misses or closes the toast keeps grading for the rest of the period with no signal that nothing is reaching Supabase.
+- Fix: use the persistent banner pattern already in place for the offline indicator at [teacher/ui.js:58](teacher/ui.js). Banner stays up while `_useSupabase === false`, shows the current retry attempt count and a "Retry now" button, hides on successful recovery probe. Mirror the banner into the mobile shell at [teacher-mobile/shell.js](teacher-mobile/shell.js).
+- Acceptance: with Supabase mocked-failed at boot, the banner is visible the entire session until the probe succeeds; clicking "Retry now" triggers an immediate `_attemptRecoveryProbe()`.
+
+### P7.3 · Course-switch is async with no input lock ✅ done 2026-05-11
+
+- New `withSwitchingLock(fn)` helper exposed on `window` from [teacher/ui.js](teacher/ui.js); sets `aria-busy="true"` and adds `body.fv-switching-course` for the duration of the awaited fn, removes both in `finally`.
+- All six desktop `switchCourse` entry points wrap their `initData(cid)` await: gradebook, assignments, dashboard, observations, reports, student. Mobile shell at [teacher-mobile/shell.js:527](teacher-mobile/shell.js) inlines the same body-class manipulation around its `initData` chain (mobile doesn't load `teacher/ui.js`).
+- CSS rules added to both [teacher/styles.css](teacher/styles.css) and [teacher-mobile/styles.css](teacher-mobile/styles.css): while the body class is set, course pickers, the gradebook table, and grade-edit cells get `pointer-events: none; opacity: .55`, plus a centred "Loading course…" pseudo-element overlay.
+- Verified in Demo Mode preview: `body.fv-switching-course` toggles correctly through `withSwitchingLock`, overlay renders centred with shadow.
+
+### P7.4 · Echo-guard race loses rapid writes; several mutators don't arm the guard `[agent-ready]` — HIGH
+
+- Problem: the 8-second echo guard is too short for slow networks and is bypassed entirely by several write paths. Realtime fires after expiry but before the slow RPC commits → `_handleExternalCourseUpdate` runs `initData(cid)` and overwrites the in-flight change. Symptoms in the wild: rapid grade entries that "vanish" a few seconds later, multi-device edits clobbering each other, flag toggles that revert.
+  - Cross-device race: [shared/data.js:678-689,3157-3163](shared/data.js).
+  - Missing-guard paths: `saveFlags` at [data.js:5910](shared/data.js); `addQuickOb` at [data.js:5992-6012](shared/data.js); `createCustomTag` at [data.js:6785](shared/data.js); modules-during-createCourse at [data.js:598-603](shared/data.js).
+  - Cross-tab races via BroadcastChannel: [data.js:766-777](shared/data.js).
+- Fix:
+  1. Track in-flight RPC count per `(cid, kind)`; in `_handleExternalCourseUpdate`, skip the re-fetch while > 0 even if the guard expired.
+  2. Arm `_setEchoGuard` in every mutating helper before dispatching the RPC, not only inside `_saveCourseField`.
+  3. Unify the echo-guard key namespace between realtime and BroadcastChannel handlers so cross-tab and cross-device messages suppress symmetrically.
+- Acceptance: scripted test driving two fake clients can hammer scores/flags/observations through a forced 10s RPC delay without any write being lost to a realtime re-fetch.
+
+### P7.5 · Local-cid migration drops nested references `[agent-ready]` — HIGH
+
+- Problem: offline `createCourse` mints local UUIDs for the course and its nested entities (modules, paired assessments). [\_migrateCourseDataLocalToCanonical at shared/data.js:4157-4170](shared/data.js) replays top-level arrays but doesn't recursively remap references — module assignments on assessments and `pairsWith`-style links between assessments are orphaned once the canonical UUIDs land. Teacher loses module groupings created offline.
+- Fix: build the id-map for every entity created under the local cid, then walk every field on every replayed row, swapping local IDs for canonical ones before dispatch.
+- Acceptance: offline-create a course with two modules and three assessments where two are paired, go online, the canonical rows preserve every module assignment and pairing.
+
+### P7.6 · Zero-weight categories produce Infinity proficiency ✅ done 2026-05-11
+
+- [shared/calc.js:375-381](shared/calc.js) — coerces both weights through `Number(…) || 0` (handles undefined / NaN / negative) and short-circuits with `if (weightTotal <= 0) return summProf || formProf || 0;` before the division. No more `Infinity`/`NaN` reaching the rounding step.
+- Out of scope for this ticket: the proposed UI hint "Category weights sum to zero". Fold that into a future course-config validation pass; today's fix removes the bad render but doesn't surface why the course is misconfigured.
+
+### P7.7 · Demo-mode button wipes localStorage with no confirmation ✅ done 2026-05-11
+
+- [login-auth.js:282-302](login-auth.js) — `enterDemoMode()` now scans LS for any `gb-*` keys other than the demo flags. If any exist, prompts via native `window.confirm` (login page has no in-app dialog system) with "Demo Mode will erase the FullVision data on this device and load a sample class. Anything not synced to your account will be lost. Continue?" Cancelling preserves every key intact; fresh-install case skips the prompt entirely.
+- Out of scope: moving the trigger into a "More options" disclosure. Kept the existing prominent button — the confirm itself is the safety net the audit asked for.
+
+### P7.8 · Replace native confirm() for destructive actions ✅ done 2026-05-11
+
+- Two call-sites converted to `showConfirm()`:
+  - [teacher/page-gradebook.js:2112](teacher/page-gradebook.js) — "Delete this assignment?" / "All scores, statuses, and observations linked to this assignment will be removed. This cannot be undone." / red "Delete" button. Existing scoring + status + observation cleanup runs inside the confirm callback.
+  - [teacher/page-assignments.js:2816](teacher/page-assignments.js) — `cancelRubricEdit` now uses showConfirm only when `_rubricDirty`; clean cancel path bypasses the dialog.
+- `grep '\bconfirm('` across `teacher/` and `teacher-mobile/` is now clean (only `su-confirm` password-confirm input ID remains).
+- Verified visually in Demo Mode preview: dialog renders with `role="dialog"`, `aria-modal="true"`, focus on Cancel, danger-style Delete button.
+- Out of scope: a 5–10s undo toast for the assignment-delete case. Adding undo here would require staging the deleted scores/statuses/observations for restore — non-trivial. Today's dialog has explicit irreversibility copy in place of undo.
+
+### P7.9 · Dead-letter queue invisible until the sync popover is opened `[agent-ready]` — MEDIUM
+
+- [shared/offline-queue.js:268](shared/offline-queue.js) — failed-3-times writes get `_notify('flush:dead-letter', …)` only; the entries land in `fv-sync-dead-letter-v1` LS and surface only inside the sync popover. A teacher who reloads before opening that popover never sees them; today's "Dismiss" button hides without retrying or deleting.
+- Fix:
+  1. On app boot, if dead-letter LS is non-empty, mount a persistent "N changes need attention" banner that opens the popover.
+  2. Replace the popover's per-row "Dismiss" with "Retry" + "Discard" — discard removes the entry, retry re-enqueues into the live queue.
+- Acceptance: forcing 4 failures on an offline write leaves a visible boot-time banner on next reload; "Retry" re-enqueues and the entry clears on success.
+
+### P7.10 · Map Supabase error codes to teacher-friendly copy `[agent-ready]` — MEDIUM
+
+- [shared/supabase.js:147-157](shared/supabase.js) handles session-expired well but other paths still surface raw strings ("PGRST116", "JWT expired", "Failed to fetch") through the generic error modal at [teacher/ui.js:295-360](teacher/ui.js).
+- Fix: add a small `friendlyError(err) → string` helper that translates known Supabase / PostgREST / network error codes. Default fallback: "Something went wrong — please reload."
+- Acceptance: a list of ~10 common error fixtures all render plain-English messages; the raw code is still logged to console for debug.
+
+### P7.11 · Mobile pending-write feedback `[agent-ready]` — MEDIUM
+
+- Desktop has the sync badge at [teacher/ui.js:43](teacher/ui.js). Mobile has nothing equivalent and the pull-to-refresh timeout at [teacher-mobile/shell.js:140-159](teacher-mobile/shell.js) only says "Sync timed out" with no retry affordance or queue depth.
+- Fix:
+  1. Add a sync badge to the mobile tab bar wired to `window.v2Queue.stats()` — shows pending count + a checkmark when 0.
+  2. Pull-to-refresh failure toast becomes "Sync timed out — your changes are queued locally" with a visible Retry.
+- Acceptance: offline-grading on the mobile shell visibly accumulates a pending count; coming online drains it back to a green check.
+
+### P7.12 · Perceived-performance pass for low-end Chromebooks `[agent-ready]` — MEDIUM
+
+- Cluster of hotspots that compound into a "feels slow" experience on the actual hardware teachers use. Pair with — but distinct from — D8 (DOM virtualization, deferred).
+  - **Filter/search rebuilds the whole gradebook via innerHTML** ([teacher/page-gradebook.js:213-421](teacher/page-gradebook.js)) — 300–600 ms freeze per keystroke. Cache row templates; toggle `display:none` for non-matches.
+  - **`structuredClone` in hot RPC loops** ([shared/data.js:1991,2617,2707,4041-4311](shared/data.js)) — 15–30 ms per clone, multiplied by batch size. Move clones outside loops; clone only the edited slice.
+  - **Listener leak** — 108 `addEventListener` vs 23 `removeEventListener` across [teacher/page-gradebook.js:7-10](teacher/page-gradebook.js) and [page-assignments.js](teacher/page-assignments.js); 20–40 ms drift per interaction after 30 min of grading. Move to event delegation on a stable root.
+  - **rAF leak on table scroll** at [teacher/page-gradebook.js:663](teacher/page-gradebook.js) — track and `cancelAnimationFrame` before re-registering.
+  - **Tooltip triple `getBoundingClientRect`** at [page-gradebook.js:2568-2593](teacher/page-gradebook.js) — batch reads, then writes.
+  - **Unbounded `_cache` growth** across class switches at [shared/data.js:63-85](shared/data.js) — per-cid TTL eviction after 10 min idle.
+- Acceptance: a representative class (30 students × 80 assessments) on a 4 GB Chromebook stays under 100 ms per filter keystroke and under 30 MB resident after switching across 10 classes.
+
+### P7.13 · Touch / iPad parity pass `[agent-ready]` — MEDIUM
+
+- Bundle of CSS-first fixes that affect every teacher grading on iPad in class.
+  - Hover-only row actions at [teacher/styles.css:1277-1279](teacher/styles.css) — wrap in `@media (hover: none)` to show always (or add long-press reveal).
+  - Score cells at 32×28 px ([teacher/styles.css:2249-2251](teacher/styles.css)) — bump to ≥44×44 inside `@media (hover: none)`.
+  - Mobile tab labels at 11 px ([teacher-mobile/styles.css:88](teacher-mobile/styles.css)) — minimum 12 px.
+  - Sheet backdrop ignores safe-area on notched iPhones ([teacher-mobile/styles.css:1082-1095](teacher-mobile/styles.css)) — `inset: 0; padding-bottom: env(safe-area-inset-bottom)`.
+  - Observation textarea can be hidden by the iOS keyboard ([teacher-mobile/styles.css:1137-1152](teacher-mobile/styles.css)) — `overflow-y: auto; max-height: calc(50vh - 200px)`.
+- Acceptance: on an iPad Air in landscape and an iPhone with home indicator, every interactive element is reachable by touch alone, no tap targets under 44 px, and no sheet content hidden by the keyboard.
+
+### P7.14 · Keyboard + screen-reader pass (extends D9) `[agent-ready]` — MEDIUM
+
+- Promotes the deferred D9 audit to active work, scoped to the gradebook + assignments routes only. Findings below are the minimum-viable subset; the full WCAG 2.1 AA audit remains deferred in D9.
+  - **Unsemantic context menu** at [teacher/page-gradebook.js:1487-1510](teacher/page-gradebook.js) — `<div data-ctx>` → `<button role="menuitem">`.
+  - **Unsemantic proficiency buttons** at [teacher/page-assignments.js:~800-900](teacher/page-assignments.js) — convert `<div role="button" tabindex="0">` to native `<button>`, or add `onkeydown` Enter/Space handlers.
+  - **Score cells lack per-cell aria-label** at [teacher/page-gradebook.js:680-750](teacher/page-gradebook.js) — `aria-label="Score for ${student} on ${assessment}"`.
+  - **Modal focus trap** at [teacher/ui.js:250-310](teacher/ui.js) — trap Tab inside; restore focus to the trigger element on close.
+  - **No live region for save events** — add a hidden `<div role="status" aria-live="polite" aria-atomic="true">` and announce score saves + sync state transitions.
+  - **Proficiency badges convey level by colour only** at [teacher/styles.css:8-22](teacher/styles.css) — add letter labels (E/D/P/X) or icon overlays.
+- Acceptance: a keyboard-only run of "open gradebook → tab to a student → enter a score → save → open context menu → close" works without grabbing the mouse; VoiceOver announces each score save.
+
+### P7.15 · Withdraw vs hard-delete read-filter gaps `[agent-ready]` — MEDIUM
+
+- [shared/data.js:5192-5196](shared/data.js) — `_persistStudentsToCanonical` calls `_canonicalWithdrawEnrollment` on removal, but read-side queries (`getStudents`, downstream summary aggregations) don't all filter `withdrawn_at IS NULL`. Re-enroll-after-withdraw with the withdraw RPC arriving after the re-enroll RPC leaves a row that looks active client-side but withdrawn server-side.
+- Fix: add `withdrawn_at IS NULL` to every read-path student selector; add an integration check that fakes the out-of-order RPC ordering and asserts the eventual server state matches the UI.
+- Acceptance: scripted out-of-order withdraw/re-enroll converges to "active" on both sides.
+
+### P7.16 · Assessment weight changes silently rescore the class `[needs-design]` — MEDIUM
+
+- Changing an assessment's weight after scores exist invalidates the proficiency cache via `clearProfCache()` but renders mid-update inconsistently (some rows pre-clear, some post-clear) until the next full render. No audit log; teacher and students get a quiet shift in proficiency with no acknowledgement.
+- Decisions owed: (a) require explicit confirmation before applying a weight change to a populated assessment? (b) record `weight_changed_at` per assessment for an audit trail? (c) recompute everything synchronously on the change and block the UI for the duration?
+- Once decided, ship as a follow-up; do not implement speculatively.
+
+### P7.17 · First-run + polish bundle `[agent-ready]` — LOW
+
+- Empty/first-run state for a fresh teacher (no courses) — replace the blank dashboard with a hero block linking to "Create a course" and "Import roster (CSV)". File location: dashboard render in [teacher/dash-class-manager.js](teacher/dash-class-manager.js).
+- `prefers-reduced-motion` rule for the undo toast slide-in at [teacher/styles.css:2641-2649](teacher/styles.css) (current global override is `0.01ms` only).
+- Light-grey body text at [teacher/styles.css:36](teacher/styles.css) (`--text-3: #58585d`) sits at ~5:1 contrast — bump toward 7:1 for older eyes.
+- Login button "Signing in…" gets a CSS spinner so slow logins don't look frozen ([login-auth.js:208-230](login-auth.js)).
+
 ## District pilot readiness
 
 Pilot-audit findings from 2026-04-23. Ordered: blockers first, then HIGH, then MEDIUM.
@@ -305,3 +439,4 @@ Remaining agent work:
 - Current: [e2e/accessibility.spec.js](e2e/accessibility.spec.js) checks skip link + 3 aria-labels. Not a WCAG 2.1 AA audit.
 - Fix: wire axe-core into Playwright; add keyboard-nav + color-contrast specs per key route.
 - Deferred because no district has requested formal accessibility sign-off. Revisit when asked.
+- Note (2026-05-11): the highest-pain subset is being addressed under P7.14 (gradebook + assignments routes only); the broader cross-route WCAG audit remains deferred here.

@@ -372,8 +372,11 @@ function calcProficiency(scores, method, decayWeight, opts) {
   if (formProf === 0) return summProf; // no formative evidence, use summative only
   if (summProf === 0) return formProf; // no summative evidence, use formative only
 
-  const weightTotal = cw.summative + cw.formative;
-  const raw = (summProf * cw.summative + formProf * cw.formative) / weightTotal;
+  const summW = Number(cw.summative) || 0;
+  const formW = Number(cw.formative) || 0;
+  const weightTotal = summW + formW;
+  if (weightTotal <= 0) return summProf || formProf || 0;
+  const raw = (summProf * summW + formProf * formW) / weightTotal;
   return Math.min(4, Math.round(raw));
 }
 
