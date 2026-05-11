@@ -5,7 +5,7 @@ decisions, and deploy steps live here — no sibling docs (XSS, pilot, ops) to
 keep in sync. Implementation history still belongs in
 `docs/backend-design/HANDOFF.md`; everything else is here.
 
-Last pilot audit: 2026-04-23. Last production deploy: 2026-04-28.
+Last pilot audit: 2026-04-23. Last usability audit: 2026-05-11 (PR #111 in review). Last production deploy: 2026-04-28.
 
 Tag glossary (inline on each ticket title):
 
@@ -137,7 +137,7 @@ Audit findings from 2026-05-01. Cross-checked every "must persist" row in [fullv
 
 Audit findings from 2026-05-11. Cross-cutting issues teachers feel in real classroom use: data-trust signals, multi-device write races, perceived-performance hotspots, touch/keyboard parity. Scope is user-facing impact only — internal refactors, test gaps, and doc cleanup are deliberately out.
 
-### P7.1 · Silent save failures on score + observation paths ✅ done 2026-05-11
+### P7.1 · Silent save failures on score + observation paths ✅ done 2026-05-11 (PR #111)
 
 - `_safeLSSet` returns boolean (drops the one-shot `_lsQuotaWarned` so every quota event re-toasts); `_saveCourseField`, `saveScores`, `upsertScore`, `addQuickOb`, `updateQuickOb` all propagate the status.
 - [teacher/page-gradebook.js](teacher/page-gradebook.js) `commitScoreEdit` checks the `upsertScore` return per-tag; on any false, it rolls the cache back from the existing undo snapshot via `saveScores(cid, revertScores)` and surfaces "Couldn't save score — your other changes are safe. Try again in a moment." through `showSyncToast`.
@@ -150,7 +150,7 @@ Audit findings from 2026-05-11. Cross-cutting issues teachers feel in real class
 - Fix: use the persistent banner pattern already in place for the offline indicator at [teacher/ui.js:58](teacher/ui.js). Banner stays up while `_useSupabase === false`, shows the current retry attempt count and a "Retry now" button, hides on successful recovery probe. Mirror the banner into the mobile shell at [teacher-mobile/shell.js](teacher-mobile/shell.js).
 - Acceptance: with Supabase mocked-failed at boot, the banner is visible the entire session until the probe succeeds; clicking "Retry now" triggers an immediate `_attemptRecoveryProbe()`.
 
-### P7.3 · Course-switch is async with no input lock ✅ done 2026-05-11
+### P7.3 · Course-switch is async with no input lock ✅ done 2026-05-11 (PR #111)
 
 - New `withSwitchingLock(fn)` helper exposed on `window` from [teacher/ui.js](teacher/ui.js); sets `aria-busy="true"` and adds `body.fv-switching-course` for the duration of the awaited fn, removes both in `finally`.
 - All six desktop `switchCourse` entry points wrap their `initData(cid)` await: gradebook, assignments, dashboard, observations, reports, student. Mobile shell at [teacher-mobile/shell.js:527](teacher-mobile/shell.js) inlines the same body-class manipulation around its `initData` chain (mobile doesn't load `teacher/ui.js`).
@@ -175,17 +175,17 @@ Audit findings from 2026-05-11. Cross-cutting issues teachers feel in real class
 - Fix: build the id-map for every entity created under the local cid, then walk every field on every replayed row, swapping local IDs for canonical ones before dispatch.
 - Acceptance: offline-create a course with two modules and three assessments where two are paired, go online, the canonical rows preserve every module assignment and pairing.
 
-### P7.6 · Zero-weight categories produce Infinity proficiency ✅ done 2026-05-11
+### P7.6 · Zero-weight categories produce Infinity proficiency ✅ done 2026-05-11 (PR #111)
 
 - [shared/calc.js:375-381](shared/calc.js) — coerces both weights through `Number(…) || 0` (handles undefined / NaN / negative) and short-circuits with `if (weightTotal <= 0) return summProf || formProf || 0;` before the division. No more `Infinity`/`NaN` reaching the rounding step.
 - Out of scope for this ticket: the proposed UI hint "Category weights sum to zero". Fold that into a future course-config validation pass; today's fix removes the bad render but doesn't surface why the course is misconfigured.
 
-### P7.7 · Demo-mode button wipes localStorage with no confirmation ✅ done 2026-05-11
+### P7.7 · Demo-mode button wipes localStorage with no confirmation ✅ done 2026-05-11 (PR #111)
 
 - [login-auth.js:282-302](login-auth.js) — `enterDemoMode()` now scans LS for any `gb-*` keys other than the demo flags. If any exist, prompts via native `window.confirm` (login page has no in-app dialog system) with "Demo Mode will erase the FullVision data on this device and load a sample class. Anything not synced to your account will be lost. Continue?" Cancelling preserves every key intact; fresh-install case skips the prompt entirely.
 - Out of scope: moving the trigger into a "More options" disclosure. Kept the existing prominent button — the confirm itself is the safety net the audit asked for.
 
-### P7.8 · Replace native confirm() for destructive actions ✅ done 2026-05-11
+### P7.8 · Replace native confirm() for destructive actions ✅ done 2026-05-11 (PR #111)
 
 - Two call-sites converted to `showConfirm()`:
   - [teacher/page-gradebook.js:2112](teacher/page-gradebook.js) — "Delete this assignment?" / "All scores, statuses, and observations linked to this assignment will be removed. This cannot be undone." / red "Delete" button. Existing scoring + status + observation cleanup runs inside the confirm callback.
