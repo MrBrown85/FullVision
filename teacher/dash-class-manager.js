@@ -258,6 +258,12 @@ window.DashClassManager = (function () {
           }
         }
       }
+      // Nothing in flight and no canonical id in sight: either create_course
+      // failed or we're offline / local-only, where the rekey never happens.
+      // Bail rather than blocking the wizard for the full timeout — createCourse
+      // clears the pending marker only after the rekey, so a successful create
+      // is always caught by the lookup above first.
+      if (typeof hasPendingLocalCid === 'function' && !hasPendingLocalCid(localId)) return null;
       await new Promise(function (r) {
         setTimeout(r, 75);
       });
@@ -2005,6 +2011,17 @@ window.DashClassManager = (function () {
       decayWeight: parseInt(cwStep2Decay, 10) / 100,
     });
 
+    // createCourse fires create_course asynchronously and returns a course
+    // object carrying a local placeholder id; the rekey to the canonical UUID
+    // lands when the RPC resolves. Everything below needs the real id — the
+    // course-config write, the learning-map dispatch, the class-manager
+    // selection and the active-course pointer — so resolve it once, here,
+    // before any of them run. Resolving outside the curriculum branch matters:
+    // a class created with no curriculum tags used to skip the wait entirely
+    // and carry the placeholder all the way to setActiveCourse.
+    var canonicalCid = await _awaitCanonicalCourse(course.id, 10000);
+    if (canonicalCid && canonicalCid !== course.id) course.id = canonicalCid;
+
     var cc = getCourseConfig(course.id);
     cc.calcMethod = cwStep2Calc;
     cc.decayWeight = parseInt(cwStep2Decay, 10) / 100;
@@ -2016,20 +2033,9 @@ window.DashClassManager = (function () {
       if (map) {
         saveLearningMap(course.id, map);
         updateCourse(course.id, { curriculumTags: cwSelectedTags.slice() });
-        // _dispatchMapToV2 short-circuits on a non-canonical course id
-        // (createCourse fires create_course async; the rekey to a UUID
-        // hasn't landed yet at this point). Wait for the canonical id,
-        // mirror the learning map under it, then dispatch.
-        var canonicalCid = await _awaitCanonicalCourse(course.id, 10000);
-        if (canonicalCid && canonicalCid !== course.id) {
-          saveLearningMap(canonicalCid, map);
-          course.id = canonicalCid;
-        }
-        if (canonicalCid) {
-          dispatchOk = await _dispatchMapToV2(canonicalCid, map, false);
-        } else {
-          dispatchOk = false;
-        }
+        // _dispatchMapToV2 short-circuits on a non-canonical course id, so a
+        // create whose RPC never landed leaves the curriculum unsynced.
+        dispatchOk = canonicalCid ? await _dispatchMapToV2(canonicalCid, map, false) : false;
       }
     }
 
