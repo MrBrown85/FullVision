@@ -616,6 +616,16 @@ function _migrateCourseDataLocalToCanonical(localId, canonicalId) {
       console.warn('Pending-cid replay saveLearningMap failed', e);
     }
   }
+  // courseConfigs is captured (and cleared) by step 1 like every other keyed
+  // field, so without a replay the policy blob written during the in-flight
+  // window — the class wizard's calc method and decay weight — is dropped.
+  if (userEdits.courseConfigs) {
+    try {
+      saveCourseConfig(canonicalId, userEdits.courseConfigs);
+    } catch (e) {
+      console.warn('Pending-cid replay saveCourseConfig failed', e);
+    }
+  }
   if (userEdits.notes) {
     try {
       saveNotes(canonicalId, userEdits.notes);
@@ -644,6 +654,19 @@ function _migrateCourseDataLocalToCanonical(localId, canonicalId) {
       }
     },
   );
+  // 4. gb-config's active-course pointer is keyed by course id as well. If it
+  //    still holds the placeholder, move it across — otherwise it survives the
+  //    re-key permanently and every later saveConfig re-sends a non-uuid to
+  //    save_teacher_preferences. This save also lets the server-side pointer
+  //    catch up now that a canonical id exists.
+  try {
+    var cfg = getConfig();
+    if (cfg && cfg.activeCourse === localId) {
+      saveConfig(Object.assign({}, cfg, { activeCourse: canonicalId }));
+    }
+  } catch (e) {
+    console.warn('Active-course pointer migration failed', e);
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -5076,11 +5099,41 @@ function getConfig() {
     return {};
   }
 }
+/* Resolve a course id that may still be a client-side placeholder.
+
+   createCourse() returns synchronously with a local id ("c{ts}{rand}") and
+   re-keys COURSES to the server's uuid when create_course resolves. The
+   re-keyed record keeps __pendingLocalId, so the placeholder stays traceable
+   after the swap. Returns the canonical uuid, or null while the create is
+   still in flight and no uuid exists yet. */
+function _resolveCanonicalCourseId(cid) {
+  if (!cid) return null;
+  if (_isUuid(cid)) return cid;
+  var keys = Object.keys(COURSES || {});
+  for (var i = 0; i < keys.length; i++) {
+    // Before the re-key the pending record is still filed under the
+    // placeholder itself, so a match only counts once the key is a uuid.
+    if (_isUuid(keys[i]) && COURSES[keys[i]] && COURSES[keys[i]].__pendingLocalId === cid) return keys[i];
+  }
+  return null;
+}
+
 function _teacherPrefsPatchFromConfig(obj) {
   var patch = {};
   if (!obj) return patch;
   if (Object.prototype.hasOwnProperty.call(obj, 'activeCourse')) {
-    patch.active_course_id = obj.activeCourse || null;
+    // save_teacher_preferences casts this straight to uuid, so a placeholder
+    // id fails the whole RPC with 22P02 and the teacher's preferences never
+    // save. Resolve it, and when it can't be resolved omit the key entirely:
+    // the RPC's on-conflict branch leaves active_course_id untouched when the
+    // key is absent, and create_course has already pointed it at the new
+    // course server-side. An explicit empty value still clears the pointer.
+    if (!obj.activeCourse) {
+      patch.active_course_id = null;
+    } else {
+      var canonicalActive = _resolveCanonicalCourseId(obj.activeCourse);
+      if (canonicalActive) patch.active_course_id = canonicalActive;
+    }
   }
   if (Object.prototype.hasOwnProperty.call(obj, 'viewMode')) {
     patch.view_mode = obj.viewMode || null;
@@ -5897,7 +5950,13 @@ function getActiveCourse() {
   return firstActive || (ids.length > 0 ? ids[0] : null);
 }
 function setActiveCourse(cid) {
-  saveConfig({ ...getConfig(), activeCourse: cid });
+  // Prefer the canonical uuid once the re-key has landed so the persisted
+  // pointer never keeps a placeholder alive. While create_course is still in
+  // flight the placeholder is kept — it is a valid local COURSES key, so the
+  // UI still resolves the new course — and _migrateCourseDataLocalToCanonical
+  // rewrites it when the uuid arrives. Either way the id is sanitized again
+  // in _teacherPrefsPatchFromConfig before it reaches the server.
+  saveConfig({ ...getConfig(), activeCourse: _resolveCanonicalCourseId(cid) || cid || null });
 }
 
 function isCourseArchived(cid) {
