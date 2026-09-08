@@ -19,9 +19,18 @@ window.DashClassManager = (function () {
   var _activeCourse = null;
   var _onRender = null;
   var _onCourseChange = null;
+  // Set when the manager changes the active course itself (finishing the create
+  // wizard, or archiving the class that was active). The parent page holds its
+  // own copy of the active course for rendering and only learns about a change
+  // through _onCourseChange, so the switch is deferred until the manager closes
+  // — announcing it mid-wizard would tear down the panel the teacher is using.
+  var _activeCourseChanged = false;
 
   function configure(opts) {
+    // The parent is telling us which course it is on, so any pending switch of
+    // ours is now reflected there and must not be replayed on close.
     _activeCourse = opts.activeCourse;
+    _activeCourseChanged = false;
     _onRender = opts.onRender;
     _onCourseChange = opts.onCourseChange;
   }
@@ -929,6 +938,15 @@ window.DashClassManager = (function () {
   }
   function closeClassManager() {
     classManagerOpen = false;
+    // Hand a course switch made in here back to the parent, so it re-syncs its
+    // own activeCourse, loads that course's data and renders it. Without this
+    // the parent falls back to whichever class was active before the manager
+    // opened — and re-injects that stale id on the next configure().
+    if (_activeCourseChanged && _onCourseChange) {
+      _activeCourseChanged = false;
+      _onCourseChange(_activeCourse);
+      return;
+    }
     if (_onRender) _onRender();
   }
 
@@ -2051,6 +2069,7 @@ window.DashClassManager = (function () {
     cmSelectedCourse = course.id;
     cmMode = 'edit';
     _activeCourse = course.id;
+    _activeCourseChanged = true;
     setActiveCourse(course.id);
     renderClassManager();
 
@@ -2753,6 +2772,7 @@ window.DashClassManager = (function () {
       });
       if (nextActive) {
         _activeCourse = nextActive;
+        _activeCourseChanged = true;
         setActiveCourse(nextActive);
       }
     }
@@ -3667,6 +3687,7 @@ window.DashClassManager = (function () {
       classManagerOpen = false;
       cmMode = 'edit';
       cmSelectedCourse = _activeCourse;
+      _activeCourseChanged = false;
       cmEditingStudentId = null;
       cmBulkMode = false;
       cmBulkSelected = new Set();
