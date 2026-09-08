@@ -536,7 +536,17 @@ window.DashClassManager = (function () {
     cwStep2Decay = '65';
 
   function deleteStudentUI(sid) {
-    var students = getStudents(_activeCourse);
+    // The roster is rendered for cmSelectedCourse, which is not always the
+    // dashboard's active course: cmSelectClass moves the manager's selection
+    // on its own, and page-dashboard re-injects its own activeCourse through
+    // CM.configure. Looking the student up in _activeCourse therefore searched
+    // the wrong course, found nothing and returned here — the X button did
+    // nothing at all. Every other roster action (add, edit, bulk, CSV import)
+    // already keys off cmSelectedCourse; this was the lone outlier.
+    // Capture the id once so the confirm and undo callbacks stay pinned to the
+    // course the row belonged to even if the selection moves meanwhile.
+    var cid = cmSelectedCourse;
+    var students = getStudents(cid);
     var st = students.find(function (s) {
       return s.id === sid;
     });
@@ -548,10 +558,9 @@ window.DashClassManager = (function () {
       'Delete',
       'danger',
       function () {
-        var snapshot = deleteStudent(_activeCourse, sid);
+        var snapshot = deleteStudent(cid, sid);
         renderClassManager();
         showUndoToast('Student deleted', function () {
-          var cid = _activeCourse;
           var sts = getStudents(cid);
           sts.push(snapshot.student);
           saveStudents(cid, sts);
