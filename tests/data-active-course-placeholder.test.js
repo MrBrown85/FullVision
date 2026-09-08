@@ -151,5 +151,28 @@ describe('active-course placeholder guard', () => {
         }
       });
     });
+
+    it('sends a uuid idempotency key with create_course', () => {
+      createCourse({ name: 'Humanities 8' });
+
+      var call = client.calls.find(function (c) {
+        return c.name === 'create_course';
+      });
+      expect(call.payload.p_idempotency_key).toMatch(UUID_RE);
+    });
+
+    it('mints a fresh key per create so two deliberate classes both save', () => {
+      createCourse({ name: 'Class One' });
+      createCourse({ name: 'Class Two' });
+
+      var keys = client.calls
+        .filter(function (c) {
+          return c.name === 'create_course';
+        })
+        .map(function (c) {
+          return c.payload.p_idempotency_key;
+        });
+      expect(keys[0]).not.toBe(keys[1]);
+    });
   });
 });

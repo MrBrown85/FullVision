@@ -3700,6 +3700,26 @@ function formatDate(ts) {
 function uid() {
   return 's' + Date.now() + Math.random().toString(36).slice(2, 10);
 }
+
+/* Mint an idempotency key for a mutating RPC. The v2 write paths accept an
+   optional p_idempotency_key uuid and cache the result per
+   (key, teacher, endpoint) via fv_idem_check / fv_idem_store, so a retry of a
+   call that committed server-side but whose response never reached the client
+   returns the original row instead of inserting a duplicate. One key per
+   logical user action — reusing it across distinct actions would suppress a
+   write the teacher actually asked for.
+
+   Returns null when crypto.randomUUID is unavailable; a null key makes
+   fv_idem_check a no-op, which is exactly the pre-existing behaviour. */
+function _idempotencyKey() {
+  try {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  } catch (e) {
+    /* fall through — dedup is an optimisation, never a hard requirement */
+  }
+  return null;
+}
+
 function getParam(key) {
   return new URLSearchParams(window.location.search).get(key);
 }
@@ -3775,6 +3795,7 @@ function createCourse(data) {
           p_calc_method: course.calcMethod || 'average',
           p_decay_weight: course.decayWeight != null ? Number(course.decayWeight) : null,
           p_timezone: course.timezone,
+          p_idempotency_key: _idempotencyKey(),
         })
         .then(function (res) {
           if (res.error) {
