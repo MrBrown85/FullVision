@@ -97,15 +97,14 @@ describe('upsertScore durability', () => {
     expect(stored.stu1[0].score).toBe(4);
   });
 
-  it('arms the gradebook echo guard so realtime cursor events do not race in-flight writes', () => {
+  it('records the edit so a realtime refresh already in flight cannot overwrite it', () => {
     _useSupabase = true;
     _teacherId = 'teacher-1';
-    delete _echoGuard['gradebook:' + CID];
-    expect(_isEchoGuarded('gradebook', CID)).toBe(false);
+    var before = _localWriteCount(CID, 'scores');
 
     upsertScore(CID, 'stu1', 'a1', 't1', 4, '2025-03-20', 'summative');
 
-    expect(_isEchoGuarded('gradebook', CID)).toBe(true);
+    expect(_localWriteCount(CID, 'scores')).toBe(before + 1);
   });
 });
 

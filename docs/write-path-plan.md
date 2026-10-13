@@ -1,6 +1,6 @@
 # Write-path rebuild plan
 
-Status: Phases 0–2 done (#118–#120); Phase 3 in review (2026-10-12). Replaces the whole-array save model in `shared/data.js` with a durable outbox of single-record operations.
+Status: Phases 0–3 done (#118–#121); Phase 4 in review (2026-10-12). Replaces the whole-array save model in `shared/data.js` with a durable outbox of single-record operations.
 
 ## Why
 
@@ -114,13 +114,15 @@ Rebuild `shared/offline-queue.js` as the only path to the server for writes.
 
 **Done:** the four Phase 3 regression tests pass, plus new ones for class-manager inserts and the stale-id rename. In a real browser, adding a subject and a standard sent one insert each, and a rename against the stale id was saved.
 
-### Phase 4: realtime without lost edits — medium
+### Phase 4: realtime without lost edits — medium (done)
 
-- `_handleExternalCourseUpdate` refetches, stores the result as `_serverState`, then rebuilds the cache by replaying pending operations on top.
-- Remove `_ECHO_GUARD_MS`, `_setEchoGuard` and `_isEchoGuarded` (`:153`), and the echo checks in the BroadcastChannel handler.
-- Closes P7.4.
+- The 8-second echo guard is gone (`_ECHO_GUARD_MS`, `_setEchoGuard`, `_isEchoGuarded`, and the leftover calls in `calc.js` and `page-student.js`). It let a refresh overwrite a write that took longer than 8 s, and it ignored other devices' changes for 8 s after every local edit.
+- Every local edit bumps a per-course, per-field counter (`_markLocalWrite`, called from `_saveCourseField`, `upsertScore` and `toggleFlag`).
+- `_handleExternalCourseUpdate` coalesces events per course and runs one refresh at a time. Before fetching, it waits until no writes are pending and the course has had no local edit for 2 s (`_REFRESH_QUIET_MS`). During the fetch, `_persistLoadedField` skips any field edited after the refresh started (`_refreshMustSkip`), and the refresh runs again later, up to three passes per event.
+- Changed from the plan: the cache isn't rebuilt by replaying pending operations. Waiting for the outbox to drain and skipping fields edited mid-fetch gives the same guarantee — a refresh never overwrites a local edit — without inverting every RPC back into cache shape.
+- Teachers who grade continuously no longer trigger a full refetch for every score that lands; the refresh comes after they pause. Changes from another device show up within about 2 s of the teacher pausing.
 
-**Done when:** a test with a 10-second delayed RPC plus a realtime refresh in the middle keeps the edit, both on screen and in the final server write.
+**Done:** a score entered while a refresh is fetching survives it and reaches the server, and the test fails with the guard disabled. A refresh waits for in-flight writes. A refresh with no local edits applies the server's changes.
 
 ### Phase 5: explicit actions per data type — large, incremental
 

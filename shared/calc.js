@@ -514,7 +514,6 @@ function setSectionOverride(cid, studentId, sectionId, level, reason) {
     if (Object.keys(overrides[studentId]).length === 0) delete overrides[studentId];
   }
   saveOverrides(cid, overrides);
-  if (typeof _setEchoGuard === 'function') _setEchoGuard('student-records', cid);
   if (window.v2 && _isUuid && _isUuid(studentId)) {
     if (level > 0 && reason) window.v2.saveSectionOverride(studentId, sectionId, level, reason);
     else window.v2.clearSectionOverride(studentId, sectionId);

@@ -10,6 +10,9 @@
  *   error.
  * - hold() parks every call until release(), so a test can start a save,
  *   change something while it is in flight, then let it finish.
+ * - on(name, handler) answers that RPC with handler(params, n) instead (n is
+ *   the 1-based call count); it may return a promise. Handled calls ignore
+ *   hold().
  */
 
 export function settle(rounds = 25) {
@@ -28,6 +31,8 @@ export function makeFakeSupabase() {
   var seq = 0;
   var failures = {};
   var held = null;
+  var handlers = {};
+  var handledCount = {};
 
   function newId() {
     seq += 1;
@@ -54,6 +59,10 @@ export function makeFakeSupabase() {
     rpc: function (name, params) {
       params = params || {};
       fake.calls.push({ name: name, params: params });
+      if (handlers[name]) {
+        handledCount[name] = (handledCount[name] || 0) + 1;
+        return Promise.resolve(handlers[name](params, handledCount[name]));
+      }
       if (held) {
         return new Promise(function (resolve) {
           held.push(function () {
@@ -62,6 +71,9 @@ export function makeFakeSupabase() {
         });
       }
       return Promise.resolve(respond(name, params));
+    },
+    on: function (name, handler) {
+      handlers[name] = handler;
     },
     failNext: function (name, times) {
       failures[name] = (failures[name] || 0) + (times || 1);

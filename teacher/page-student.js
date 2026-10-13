@@ -164,7 +164,6 @@ window.PageStudent = (function () {
     if (!goals[studentId]) goals[studentId] = {};
     goals[studentId][secId] = text;
     saveGoals(cid, goals);
-    if (typeof _setEchoGuard === 'function') _setEchoGuard('student-records', cid);
     if (window.v2 && _isUuid && _isUuid(studentId)) {
       await window.v2.saveGoal(studentId, secId, text);
     }
@@ -188,7 +187,6 @@ window.PageStudent = (function () {
     if (!reflections[studentId]) reflections[studentId] = {};
     reflections[studentId][secId] = { confidence: conf, text: text, date: new Date().toISOString() };
     saveReflections(cid, reflections);
-    if (typeof _setEchoGuard === 'function') _setEchoGuard('student-records', cid);
     if (window.v2 && _isUuid && _isUuid(studentId)) {
       await window.v2.saveReflection(studentId, secId, text, conf || null);
     }
