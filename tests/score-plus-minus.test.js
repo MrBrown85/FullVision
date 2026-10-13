@@ -4,6 +4,17 @@
  */
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { readFileSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import { runInThisContext } from 'vm';
+import { makeFakeSupabase, settle } from './helpers/fake-supabase.js';
+
+// Production loads the outbox next to shared/data.js; so do these tests.
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+runInThisContext(readFileSync(resolve(root, 'shared/offline-queue.js'), 'utf-8'), {
+  filename: 'shared/offline-queue.js',
+});
 
 describe('modifier helpers', () => {
   it('allows + and − on every level except 1− and 4+', () => {
@@ -60,46 +71,46 @@ describe('upsertScore with a modifier', () => {
 });
 
 describe('modifier in the score RPC', () => {
-  const CID = '11111111-1111-1111-1111-111111111111';
-  const ENR = '22222222-2222-2222-2222-222222222222';
-  const AID = '33333333-3333-3333-3333-333333333333';
-  const TAG = '55555555-5555-5555-5555-555555555555';
-  let originalGetSupabase, originalUseSupabase, calls;
+  const CID = '11111111-1111-4111-8111-111111111111';
+  const ENR = '22222222-2222-4222-8222-222222222222';
+  const AID = '44444444-4444-4444-8444-444444444444';
+  const TAG = '77777777-7777-4777-8777-777777777777';
+  let fake, originalGetSupabase, originalUseSupabase;
 
   beforeEach(() => {
-    originalGetSupabase = getSupabase;
-    originalUseSupabase = _useSupabase;
-    _useSupabase = true;
-    _teacherId = 'teacher-uuid';
     localStorage.clear();
-    calls = [];
-    _cache.v2Gradebook = _cache.v2Gradebook || {};
-    _cache.v2Gradebook[CID] = { assessments: [{ id: AID, has_rubric: false }] };
-    globalThis.getSupabase = () => ({
-      rpc(name, payload) {
-        calls.push({ name, payload: payload || {} });
-        return Promise.resolve({ data: null, error: null });
-      },
-    });
+    _cache.scores[CID] = undefined;
+    const assessments = [{ id: AID, title: 'Lab', type: 'summative', tagIds: [TAG] }];
+    _cache.assessments[CID] = assessments;
+    localStorage.setItem('gb-' + _DATA_KEYS.assessments + '-' + CID, JSON.stringify(assessments));
+    _serverState = {};
+    fake = makeFakeSupabase();
+    originalGetSupabase = globalThis.getSupabase;
+    originalUseSupabase = _useSupabase;
+    globalThis.getSupabase = () => fake;
+    _useSupabase = true;
+    _supabaseDegraded = false;
+    _teacherId = 'teacher-uuid';
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => true });
+    window.v2Queue.clear();
   });
 
   afterEach(() => {
     globalThis.getSupabase = originalGetSupabase;
     _useSupabase = originalUseSupabase;
-    delete _cache.v2Gradebook[CID];
+    window.v2Queue.clear();
   });
 
-  it('sends p_modifier with the level', () => {
-    _persistScoreToCanonical(CID, ENR, AID, TAG, 3, '', 1);
-    const call = calls.find(c => c.name === 'upsert_tag_score');
-    expect(call.payload.p_value).toBe(3);
-    expect(call.payload.p_modifier).toBe(1);
+  it('sends p_modifier with the level', async () => {
+    upsertScore(CID, ENR, AID, TAG, 3, '2026-10-13', 'summative', '', 1);
+    await settle();
+    expect(fake.committedCount('upsert_tag_score', p => p.p_value === 3 && p.p_modifier === 1)).toBe(1);
   });
 
-  it('sends 0 when there is no modifier', () => {
-    _persistScoreToCanonical(CID, ENR, AID, TAG, 2, '');
-    const call = calls.find(c => c.name === 'upsert_tag_score');
-    expect(call.payload.p_modifier).toBe(0);
+  it('sends 0 when there is no modifier', async () => {
+    upsertScore(CID, ENR, AID, TAG, 2, '2026-10-13', 'summative', '');
+    await settle();
+    expect(fake.committedCount('upsert_tag_score', p => p.p_value === 2 && p.p_modifier === 0)).toBe(1);
   });
 });
 
