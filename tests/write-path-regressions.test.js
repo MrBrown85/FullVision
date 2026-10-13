@@ -36,6 +36,8 @@ const SUBJ = '55555555-5555-4555-8555-555555555555';
 const SEC1 = '66666666-6666-4666-8666-666666666666';
 const TAG1 = '77777777-7777-4777-8777-777777777777';
 const TAG2 = '88888888-8888-4888-8888-888888888888';
+const NOTE = '99999999-9999-4999-8999-999999999999';
+const AID2 = 'abababab-abab-4bab-8bab-abababababab';
 
 function seed(field, value) {
   _cache[field][CID] = value;
@@ -64,6 +66,7 @@ describe('write-path regressions (Phase 0)', () => {
     _learningMapIdRemap = {};
     _noteSaveQueue = {};
     _noteIds = {};
+    _serverState = {};
     fake = makeFakeSupabase();
     originalGetSupabase = globalThis.getSupabase;
     originalUseSupabase = _useSupabase;
@@ -124,7 +127,7 @@ describe('write-path regressions (Phase 0)', () => {
 
   // ── Phase 2 ────────────────────────────────────────────────────────────
 
-  it.fails('enrolls a new student once when a second save starts before the first finishes', async () => {
+  it('enrolls a new student once when a second save starts before the first finishes', async () => {
     seed('students', [studentY()]);
     fake.hold();
 
@@ -141,15 +144,41 @@ describe('write-path regressions (Phase 0)', () => {
     expect(fake.committedCount('create_student_and_enroll', p => p.p_first_name === 'Xavier')).toBe(1);
   });
 
-  it.fails('replaces an existing note instead of adding a second one', async () => {
-    // A note loaded from the server in an earlier session.
-    seed('notes', { [ENR_Y]: 'Needs a seat near the front.' });
+  it('replaces an existing note instead of adding a second one', async () => {
+    // A note loaded from the server, as get_student_profile returns it.
+    _applyStudentProfileSummaries(CID, [
+      {
+        student: { id: STU_Y, first_name: 'Yara', last_name: 'Young' },
+        enrollment: { id: ENR_Y },
+        notes: [{ id: NOTE, enrollment_id: ENR_Y, body: 'Needs a seat near the front.' }],
+      },
+    ]);
 
     saveNotes(CID, { [ENR_Y]: 'Needs a seat near the front and large print.' });
     await settle();
 
+    expect(fake.committedCount('delete_note', p => p.p_id === NOTE)).toBe(1);
     expect(fake.committedCount('upsert_note')).toBe(1);
-    expect(fake.committedCount('delete_note')).toBe(1);
+  });
+
+  it('creates a new assessment once when a second save starts before the first finishes', async () => {
+    seed('assessments', [{ id: AID2, title: 'Quiz 1', type: 'summative', tagIds: [] }]);
+    // Loaded from the server, so the baseline is the server's copy.
+    _rememberServerState('assessments', CID, getAssessments(CID));
+    fake.hold();
+
+    var assessments = getAssessments(CID);
+    assessments.push({ id: 'local-a', title: 'Lab report', type: 'summative', tagIds: [] });
+    saveAssessments(CID, assessments);
+    // Before the create comes back, rename the other assessment.
+    assessments[0].title = 'Quiz 1 (retake)';
+    saveAssessments(CID, assessments);
+
+    await fake.release();
+    await settle();
+
+    expect(fake.committedCount('create_assessment', p => p.p_title === 'Lab report')).toBe(1);
+    expect(fake.committedCount('update_assessment', p => p.p_patch && p.p_patch.title === 'Quiz 1 (retake)')).toBe(1);
   });
 
   // ── Phase 3 ────────────────────────────────────────────────────────────
