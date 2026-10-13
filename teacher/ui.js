@@ -417,8 +417,9 @@ function queueSessionExpiredRetry(opts) {
 function _populateDockUser() {
   const el = document.getElementById('tb-user-name');
   if (!el || typeof getSupabase !== 'function') return;
-  getSupabase()
-    .auth.getSession()
+  const sb = getSupabase();
+  if (!sb) return;
+  sb.auth.getSession()
     .then(({ data: { session } }) => {
       if (!session) return;
       const user = session.user;

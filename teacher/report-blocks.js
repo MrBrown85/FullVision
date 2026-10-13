@@ -488,7 +488,7 @@ window.ReportBlocks = (function () {
     const sections = getSections(cid);
     const assessments = getAssessments(cid);
     const allScores = getScores(cid)[student.id] || [];
-    let html = `<div class="report-block-box" style="page-break-inside:avoid">
+    let html = `<div class="report-block-box report-section-chart">
     <div class="report-block-title">Section Proficiency Breakdown</div>`;
 
     sections.forEach((sec, si) => {
