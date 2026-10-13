@@ -794,7 +794,8 @@ window.ReportBlocks = (function () {
     function renderRows(list) {
       let rows = '';
       list.forEach(a => {
-        const aScores = scores.filter(s => s.assessmentId === a.id && s.score > 0);
+        const cmpEntry = isCompletionScored(a) ? scores.find(s => s.assessmentId === a.id && s.score != null) : null;
+        const aScores = cmpEntry ? [cmpEntry] : scores.filter(s => s.assessmentId === a.id && s.score > 0);
         const isPoints = a.scoreMode === 'points';
         const max = a.maxPoints || 100;
         const weightLabel =
@@ -827,7 +828,12 @@ window.ReportBlocks = (function () {
           return;
         }
         let scoreDisplay, profDisplay;
-        if (isPoints) {
+        if (cmpEntry) {
+          const done = Number(cmpEntry.score) > 0;
+          const color = done ? 'var(--score-3)' : 'var(--score-1)';
+          scoreDisplay = `<td style="text-align:center;font-weight:600;font-size:1rem;color:${color}">${done ? '\u2713' : '\u2717'}</td>`;
+          profDisplay = `<td style="text-align:center;font-size:0.74rem;font-weight:600;color:${color}">${done ? 'Complete' : 'Incomplete'}</td>`;
+        } else if (isPoints) {
           const rawAvg = aScores.reduce((s, x) => s + x.score, 0) / aScores.length;
           const pct = Math.round((rawAvg / max) * 100);
           const profLevel = pointsToProf(rawAvg, max, scale);

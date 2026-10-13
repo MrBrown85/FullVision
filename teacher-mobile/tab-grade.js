@@ -138,7 +138,7 @@ window.MGrade = (function () {
         students.forEach(function (st) {
           var stScores = allScores[st.id] || [];
           var hasScore = stScores.some(function (s) {
-            return s.assessmentId === a.id && s.score > 0;
+            return s.assessmentId === a.id && isScoreEntered(a, s);
           });
           if (hasScore) gradedCount++;
         });
@@ -202,7 +202,7 @@ window.MGrade = (function () {
       var stScores = allScores[st.id] || [];
       if (
         stScores.some(function (s) {
-          return s.assessmentId === a.id && s.score > 0;
+          return s.assessmentId === a.id && isScoreEntered(a, s);
         })
       )
         n++;
@@ -476,7 +476,7 @@ window.MGrade = (function () {
       var initials = MC.avatarInitials(st);
       var stScores = allScores[st.id] || [];
       var isGraded = stScores.some(function (s) {
-        return s.assessmentId === aid && s.score > 0;
+        return s.assessmentId === aid && isScoreEntered(assessment, s);
       });
       var currentClass = idx === 0 ? ' m-thumb-current' : '';
       var gradedClass = isGraded ? ' m-thumb-graded' : '';
@@ -511,8 +511,9 @@ window.MGrade = (function () {
     var name = displayName(st);
     var stScores = allScores[st.id] || [];
     var status = allStatuses[st.id + ':' + assessment.id] || null;
-    var course = typeof COURSES !== 'undefined' ? COURSES[cid] : null;
-    var isPoints = course && course.gradingSystem === 'points';
+    // Points and Complete/Incomplete are one value per assessment, so they get
+    // one control rather than one per competency.
+    var isPoints = assessment.scoreMode === 'points';
 
     // Badges
     var badges = '';
@@ -539,7 +540,17 @@ window.MGrade = (function () {
 
     // Score selectors for each tag
     var tagGroups = '';
-    (assessment.tagIds || []).forEach(function (tid) {
+    if (isCompletionScored(assessment)) {
+      tagGroups =
+        '<div class="m-score-group m-cmp-group" data-sid="' +
+        st.id +
+        '" data-aid="' +
+        assessment.id +
+        '">' +
+        _completionBtnsHtml(getCompletionMark(cid, st.id, assessment.id)) +
+        '</div>';
+    }
+    (isCompletionScored(assessment) ? [] : assessment.tagIds || []).forEach(function (tid, tagIdx) {
       var tag = getTagById(cid, tid);
       var sec = getSectionForTag(cid, tid);
       var tagLabel = tag ? tag.label || tag.name || tag.id : tid;
@@ -554,6 +565,7 @@ window.MGrade = (function () {
 
       if (isPoints && assessment.maxPoints) {
         // Points mode
+        if (tagIdx > 0) return;
         var rawScore = getPointsScore(cid, st.id, assessment.id);
         tagGroups +=
           '<div class="m-score-group" data-sid="' +
@@ -962,16 +974,52 @@ window.MGrade = (function () {
     var students = getStudents(cid);
     students = sortStudents(students.slice(), 'alpha');
     var allScores = getScores(cid);
+    var assessment = getAssessments(cid).find(function (a) {
+      return a.id === aid;
+    });
     var thumbs = document.querySelectorAll('#m-thumb-strip .m-thumb');
     thumbs.forEach(function (t, i) {
       if (i >= students.length) return;
       var st = students[i];
       var stScores = allScores[st.id] || [];
       var isGraded = stScores.some(function (s) {
-        return s.assessmentId === aid && s.score > 0;
+        return s.assessmentId === aid && isScoreEntered(assessment, s);
       });
       t.classList.toggle('m-thumb-graded', isGraded);
     });
+  }
+
+  /* ── Complete / Incomplete ──────────────────────────────── */
+  function _completionBtnsHtml(mark) {
+    return (
+      '<div class="m-cmp-btns">' +
+      ['complete', 'incomplete']
+        .map(function (m) {
+          return (
+            '<button class="m-cmp-btn m-cmp-' +
+            m +
+            (mark === m ? ' m-cmp-active' : '') +
+            '" data-action="m-grade-completion" data-mark="' +
+            m +
+            '">' +
+            (m === 'complete' ? '\u2713 Complete' : '\u2717 Incomplete') +
+            '</button>'
+          );
+        })
+        .join('') +
+      '</div>'
+    );
+  }
+
+  // Tapping the active mark again clears it.
+  function setCompletion(cid, sid, aid, mark) {
+    var next = getCompletionMark(cid, sid, aid) === mark ? null : mark;
+    setCompletionMark(cid, sid, aid, next);
+    clearProfCache();
+    MC.haptic();
+    var group = document.querySelector('.m-cmp-group[data-sid="' + sid + '"][data-aid="' + aid + '"]');
+    if (group) group.innerHTML = _completionBtnsHtml(next);
+    _updateThumbGraded(cid, aid);
   }
 
   function adjustPointsScore(cid, sid, aid, delta, maxPts) {
@@ -999,6 +1047,7 @@ window.MGrade = (function () {
     setScoreMod: setScoreMod,
     setStatus: setStatus,
     adjustPointsScore: adjustPointsScore,
+    setCompletion: setCompletion,
     undoLastScore: undoLastScore,
     setupSwiper: setupSwiper,
     jumpToStudent: jumpToStudent,

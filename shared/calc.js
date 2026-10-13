@@ -119,7 +119,7 @@ function _normalizeAssessmentEntryValue(assessment, rawScore) {
   if (rawScore == null || rawScore === '') return null;
   var num = Number(rawScore);
   if (!isFinite(num)) return null;
-  if (assessment && assessment.scoreMode === 'points' && assessment.maxPoints > 0) {
+  if (isPointsScored(assessment) && assessment.maxPoints > 0) {
     return Math.max(0, Math.min(4, (num / assessment.maxPoints) * 4));
   }
   return num;
@@ -155,7 +155,7 @@ function getAssessmentOverallScore(cid, studentId, assessmentId) {
     })
     .map(function (entry) {
       // A proficiency level counts with its + or − (3+ = 3.33).
-      var raw = assessment.scoreMode === 'points' ? entry.score : entry.score > 0 ? scoreModValue(entry) : entry.score;
+      var raw = isPointsScored(assessment) ? entry.score : entry.score > 0 ? scoreModValue(entry) : entry.score;
       return _normalizeAssessmentEntryValue(assessment, raw);
     })
     .filter(function (value) {
@@ -394,7 +394,7 @@ function getTagScores(cid, studentId, tagId) {
   const scale = getGradingScale(cid);
   var result = filtered.map(s => {
     const assess = assessMap.get(s.assessmentId);
-    if (assess && assess.scoreMode === 'points' && assess.maxPoints > 0) {
+    if (isPointsScored(assess) && assess.maxPoints > 0) {
       return { ...s, rawPoints: s.score, score: pointsToProf(s.score, assess.maxPoints, scale) };
     }
     // A + or − counts in every calculation (3+ = 3.33). `level` keeps the

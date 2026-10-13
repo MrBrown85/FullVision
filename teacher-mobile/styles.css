@@ -1585,6 +1585,36 @@ body.fv-switching-course::after {
   background: var(--score-4);
 }
 
+/* Complete / Incomplete */
+.m-cmp-btns {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+.m-cmp-btn {
+  flex: 1;
+  max-width: 160px;
+  height: 52px;
+  border-radius: 14px;
+  border: 2.5px solid var(--border);
+  background: var(--surface);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-2);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.m-cmp-btn.m-cmp-complete.m-cmp-active {
+  background: var(--score-3);
+  border-color: transparent;
+  color: #fff;
+}
+.m-cmp-btn.m-cmp-incomplete.m-cmp-active {
+  background: var(--score-1);
+  border-color: transparent;
+  color: #fff;
+}
+
 /* + / − under the levels */
 .m-score-mods {
   display: flex;

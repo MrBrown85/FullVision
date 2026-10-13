@@ -782,6 +782,17 @@
         return;
       }
 
+      if (action === 'm-grade-completion') {
+        var cmpGroup = target.closest('.m-cmp-group');
+        MGrade.setCompletion(
+          _cid,
+          cmpGroup.getAttribute('data-sid'),
+          cmpGroup.getAttribute('data-aid'),
+          target.closest('[data-mark]').getAttribute('data-mark'),
+        );
+        return;
+      }
+
       if (action === 'm-grade-points-inc' || action === 'm-grade-points-dec') {
         var pBtn = target.closest('[data-sid]');
         var delta = action === 'm-grade-points-inc' ? 1 : -1;
