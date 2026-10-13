@@ -1139,12 +1139,27 @@
   .report-toolbar {
     display: none !important;
   }
-  .page-layout {
+  /* Print the report as flowing pages, not a snapshot of the app shell.
+     Every wrapper between <body> and the report is a fixed-height flex box
+     or scroll container on screen; left alone, the printout keeps the
+     scrollbar, clips the right edge and cannot paginate cleanly. */
+  html,
+  body {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+  .page-layout,
+  .u-flex-col-fill,
+  .page-main,
+  .page-main:has(.report-toolbar),
+  #report-output {
     display: block !important;
     height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
   }
   .page-main {
-    overflow: visible !important;
     padding: 0 !important;
   }
   .rb-layout {
@@ -1287,10 +1302,18 @@
     page-break-inside: avoid !important;
   }
 
-  /* Keep block boxes together */
+  /* Short blocks stay whole; the section breakdown can run longer than a
+     page, so it breaks between sections (each section row keeps itself
+     together) instead of leaving the first page half empty. */
   .report-block-box {
     page-break-inside: avoid !important;
     border-color: #bbb !important;
+  }
+  .report-block-box.report-section-chart {
+    page-break-inside: auto !important;
+  }
+  .report-block-title {
+    page-break-after: avoid !important;
   }
   .report-next-steps {
     page-break-inside: avoid !important;
