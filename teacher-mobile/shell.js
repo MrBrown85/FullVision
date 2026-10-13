@@ -547,8 +547,17 @@
 
       if (action === 'm-sign-out') {
         MC.dismissSheet();
-        if (typeof signOut === 'function') signOut();
-        else window.location.href = '/login.html';
+        if (typeof signOut === 'function') {
+          signOut().then(function (res) {
+            if (!res || !res.unsent) return;
+            var msg =
+              res.unsent === 1
+                ? '1 change hasn’t reached the server yet. If you sign out now, it will be lost. Sign out anyway?'
+                : res.unsent +
+                  ' changes haven’t reached the server yet. If you sign out now, they will be lost. Sign out anyway?';
+            if (window.confirm(msg)) signOut({ force: true });
+          });
+        } else window.location.href = '/login.html';
         return;
       }
 

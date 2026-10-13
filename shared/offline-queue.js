@@ -9,7 +9,13 @@
  *   fv-sync-dead-letter-v1    — entries that exceeded the retry cap
  *
  * Entry shape:
- *   { id, created_at, endpoint, payload, attempts, last_error }
+ *   { id, created_at, owner, endpoint, payload, attempts, last_error }
+ *
+ * Owner: the signed-in user's id when the entry was queued. The queue lives
+ *   in localStorage, so on a shared computer it can outlast a sign-out. An
+ *   entry is only ever sent under its owner's session; one owned by someone
+ *   else is discarded. Entries queued before owners existed have none and are
+ *   sent under whoever is signed in.
  *
  * Retry policy: 3 attempts with backoff 1s / 5s / 30s.
  * Drain policy: FIFO; a failure on one entry does NOT block the rest
@@ -67,6 +73,47 @@
       })
       .join('');
     return h.slice(0, 8) + '-' + h.slice(8, 12) + '-' + h.slice(12, 16) + '-' + h.slice(16, 20) + '-' + h.slice(20);
+  }
+
+  /* The signed-in user's id, read synchronously from the Supabase session
+     that supabase-js keeps in localStorage (sb-<project>-auth-token). */
+  function currentOwner() {
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        var key = localStorage.key(i);
+        if (!key || !/^sb-.*-auth-token$/.test(key)) continue;
+        var session = JSON.parse(localStorage.getItem(key));
+        var user = session && (session.user || (session.currentSession && session.currentSession.user));
+        if (user && user.id) return user.id;
+      }
+    } catch (e) {
+      /* unreadable session → treat as signed out */
+    }
+    return null;
+  }
+
+  function _isForeign(entry, owner) {
+    return !!(entry && entry.owner && owner && entry.owner !== owner);
+  }
+
+  /* Drop queued and dead-lettered entries that belong to another user. */
+  function _discardForeign(owner) {
+    if (!owner) return 0;
+    var q = _readQueue();
+    var keep = q.entries.filter(function (e) {
+      return !_isForeign(e, owner);
+    });
+    var d = _readDead();
+    var keepDead = d.filter(function (e) {
+      return !_isForeign(e, owner);
+    });
+    var dropped = q.entries.length - keep.length + (d.length - keepDead.length);
+    if (keep.length !== q.entries.length) {
+      q.entries = keep;
+      _writeQueue(q);
+    }
+    if (keepDead.length !== d.length) _writeDead(keepDead);
+    return dropped;
   }
 
   function _readQueue() {
@@ -161,6 +208,7 @@
     var entry = {
       id: (opts && opts.id) || _uuid4(),
       created_at: new Date().toISOString(),
+      owner: currentOwner(),
       endpoint: endpoint,
       payload: payload || {},
       attempts: 0,
@@ -211,10 +259,14 @@
     var deadLettered = 0;
     var processed = 0;
     try {
+      var owner = currentOwner();
+      if (_discardForeign(owner) > 0) _notify('discard:foreign');
       while (true) {
         var q = _readQueue();
         if (q.entries.length === 0) break;
         var head = q.entries[0];
+        // An owned entry with nobody signed in waits for its owner.
+        if (head.owner && !owner) break;
 
         var res = await _runEntry(head);
         processed++;
@@ -268,8 +320,15 @@
   }
 
   function stats() {
+    var owner = currentOwner();
     var q = _readQueue();
     var d = _readDead();
+    q.entries = q.entries.filter(function (e) {
+      return !_isForeign(e, owner);
+    });
+    d = d.filter(function (e) {
+      return !_isForeign(e, owner);
+    });
     return {
       queued: q.entries.length,
       deadLettered: d.length,
@@ -280,7 +339,10 @@
   }
 
   function deadLetter() {
-    return _readDead();
+    var owner = currentOwner();
+    return _readDead().filter(function (e) {
+      return !_isForeign(e, owner);
+    });
   }
 
   function dismissDeadLetter(id) {
@@ -366,6 +428,7 @@
     deadLetter: deadLetter,
     dismissDeadLetter: dismissDeadLetter,
     clear: clear,
+    currentOwner: currentOwner,
     callOrEnqueue: callOrEnqueue,
     subscribe: subscribe,
     MAX_ENTRIES: MAX_ENTRIES,

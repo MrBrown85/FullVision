@@ -6516,14 +6516,28 @@ async function _callRpcWithAuthGuard(name, params, options) {
   return res;
 }
 
+/* A write RPC the server doesn't have means a migration never reached
+   production, and every call to it is silently lost. Report it once per name
+   so it shows up in Sentry instead of hiding. */
+var _reportedMissingRpcs = {};
+function _reportMissingRpc(name, error) {
+  if (_reportedMissingRpcs[name]) return;
+  _reportedMissingRpcs[name] = true;
+  console.error('Server is missing RPC ' + name + ' — this write was not saved:', error);
+  if (window.Sentry && typeof window.Sentry.captureMessage === 'function') {
+    window.Sentry.captureMessage('Missing RPC: ' + name, 'error');
+  }
+}
+
 function _rpcOrNoop(name, params, options) {
   var sb = getSupabase();
   if (!sb) return Promise.resolve({ data: null, error: null });
   return _trackWriteSync(
     name,
     _callRpcWithAuthGuard(name, params, options).then(function (res) {
-      if (res.error && !res.error.handledSessionExpired && !_isMissingRpcError(res.error)) {
-        console.warn(name + ' failed:', res.error);
+      if (res.error && !res.error.handledSessionExpired) {
+        if (_isMissingRpcError(res.error)) _reportMissingRpc(name, res.error);
+        else console.warn(name + ' failed:', res.error);
       }
       return res;
     }),

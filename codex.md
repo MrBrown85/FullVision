@@ -32,9 +32,11 @@ Tag glossary (inline on each ticket title):
 
 ### P2.3 · Apply course soft-delete migration live and verify the delete flow `[user-blocked]` (deploy) + `[agent-ready]` (RLS fix)
 
-- Repo-side implementation is done: `delete_course` is modeled as a 30-day soft-delete, reads hide `Course.deleted_at`, retention cleanup purges stale soft-deleted courses, and the current destructive UI now says "Delete class" with 30-day copy.
+- 2026-10-12 audit: the soft-delete had never reached production. Live `delete_course` hard-deleted the class while the UI promised 30 days, and hard deletes left 72 student rows with no enrollment.
+- [migrations/20261012_course_soft_delete.sql](migrations/20261012_course_soft_delete.sql) adds `course.deleted_at`, makes `delete_course` a soft delete, hides deleted classes through `fv_owns_course` / `fv_owns_enrollment` / `fv_owns_assessment` / `fv_owns_term_rating` and `list_teacher_courses`, and has `fv_retention_cleanup` purge classes after 30 days along with their students who are left with no enrollment. Verified against `gradebook-prod` in a rolled-back transaction. Restore a class with `update course set deleted_at = null where id = …`.
+- [migrations/20261012_orphan_student_cleanup.sql](migrations/20261012_orphan_student_cleanup.sql) backs up and deletes the 72 existing orphans.
 - Remaining debt:
-  - apply the live Supabase migration for `Course.deleted_at`, `delete_course`, read filters, RLS helper predicates, and retention cleanup.
+  - apply both 2026-10-12 migrations live (owner approval needed; both are written and the first is tested).
   - verify the real delete flow on a live account: delete class → class disappears immediately → active course falls back cleanly → no immediate hard-delete regression.
   - confirm the scheduled retention job now purges 30-day-stale soft-deleted courses in production, not just teachers + audit rows.
   - tighten `teacher_self` RLS policy to filter `deleted_at IS NULL`: a soft-deleted teacher can currently still read/write their own `teacher` row during the 30-day grace window (flagged by the 2026-04-23 pilot audit).
@@ -95,7 +97,7 @@ Audit findings from 2026-05-01. Cross-checked every "must persist" row in [fullv
 - [shared/data.js](shared/data.js) `_persistCustomTagsToCanonical` now diffs prev vs. arr in both directions: adds dispatch `create_custom_tag` and cache the returned uuid in a new per-course `_customTagIds` map (mirrors the `_noteIds` pattern); removes dispatch `delete_custom_tag(p_id)` when a uuid is cached, falling through to `delete_custom_tag_by_label(cid, label)` when the user is removing a tag from a previous session. `window.v2.deleteCustomTag` and `window.v2.deleteCustomTagByLabel` exposed for direct callers; `window.createCustomTag` updated to populate `_customTagIds` from the response.
 - Tests: [tests/persistence-custom-tag-delete.test.js](tests/persistence-custom-tag-delete.test.js) — 8 cases covering uuid caching on add, by-id delete with cached uuid, by-label fallback for cross-session deletes, only-removed-labels fire deletes, all three skip gates (demo mode, !\_useSupabase, non-uuid cid), full add-then-remove regression guard. All pass; 841 in the wider suite.
 - Browser preview: with demo mode disabled and Supabase mocked, end-to-end add → remove cycle dispatches `create_custom_tag` then `delete_custom_tag` with the cached uuid; cross-session simulation (clear `_customTagIds`, then remove) falls through to `delete_custom_tag_by_label` correctly. No console errors.
-- Live deploy still owed: apply the migration to `gradebook-prod` once user is ready (`[user-blocked]` per the established cadence).
+- Applied to `gradebook-prod` on 2026-10-12 as `add_delete_custom_tag`, rewritten as SECURITY INVOKER (the `custom_tag_via_course` RLS policy already scopes deletes) with EXECUTE revoked from PUBLIC/anon. Until then every custom-tag delete failed and the tag came back on reload.
 
 ### P6.4 · Score-path null-tag/null-value guard ✅ closed-as-theoretical 2026-05-01
 
