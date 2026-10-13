@@ -32,63 +32,6 @@ window.PageGradebook = (function () {
    * reconstructed the intended HTML without injection). Keeping the HTML
    * in a JS-side map removes the attribute round-trip entirely. */
   var _nameTipHtml = {};
-  var _WELCOME_CLASS_NAME = 'Welcome Class';
-  var _WELCOME_CLASS_SEEDED_PREFIX = 'gb-welcome-class-seeded-';
-  var _WELCOME_BANNER_DISMISSED_PREFIX = 'gb-welcome-banner-dismissed-';
-  var _WELCOME_BANNER_COPY =
-    'Welcome! This is a sample class. Explore the features, then delete it anytime from Course Settings.';
-
-  function _getTeacherStorageScope() {
-    try {
-      return typeof _teacherId !== 'undefined' && _teacherId ? _teacherId : 'local';
-    } catch (e) {
-      return 'local';
-    }
-  }
-
-  function _getWelcomeSeededKey(cid) {
-    return _WELCOME_CLASS_SEEDED_PREFIX + _getTeacherStorageScope() + '-' + cid;
-  }
-
-  function _getWelcomeDismissKey(cid) {
-    return _WELCOME_BANNER_DISMISSED_PREFIX + _getTeacherStorageScope() + '-' + cid;
-  }
-
-  function _isWelcomeClassCourse(course) {
-    return !!(course && course.name === _WELCOME_CLASS_NAME);
-  }
-
-  function _isSeededWelcomeClass(cid, course) {
-    if (!_isWelcomeClassCourse(course)) return false;
-    try {
-      return localStorage.getItem(_getWelcomeSeededKey(cid)) === '1';
-    } catch (e) {
-      return false;
-    }
-  }
-
-  function _isWelcomeBannerDismissed(cid) {
-    try {
-      return localStorage.getItem(_getWelcomeDismissKey(cid)) === '1';
-    } catch (e) {
-      return false;
-    }
-  }
-
-  function _shouldShowWelcomeBanner(cid, course) {
-    return _isSeededWelcomeClass(cid, course) && !_isWelcomeBannerDismissed(cid);
-  }
-
-  function dismissWelcomeBanner() {
-    if (!activeCourse) return;
-    try {
-      localStorage.setItem(_getWelcomeDismissKey(activeCourse), '1');
-    } catch (e) {
-      /* best effort */
-    }
-    render();
-  }
-
   function _flushActiveScoreEditor() {
     var active = document.activeElement;
     if (!active || typeof active.blur !== 'function' || !active.classList) return;
@@ -256,16 +199,6 @@ window.PageGradebook = (function () {
     }
 
     var html = '';
-
-    if (_shouldShowWelcomeBanner(cid, course)) {
-      html +=
-        '<div class="focus-banner gb-welcome-banner" role="status">' +
-        '<span class="focus-banner-label">' +
-        esc(_WELCOME_BANNER_COPY) +
-        '</span>' +
-        '<button class="focus-banner-btn gb-welcome-banner-dismiss" data-action="dismissWelcomeBanner" aria-label="Dismiss sample class banner" title="Dismiss sample class banner">\u00d7</button>' +
-        '</div>';
-    }
 
     // ── Toolbar ──
     var modules = getModules(cid);
@@ -2749,9 +2682,6 @@ window.PageGradebook = (function () {
       },
       exportScoresCSV: function () {
         exportScoresCSV();
-      },
-      dismissWelcomeBanner: function () {
-        dismissWelcomeBanner();
       },
       stopPropOnly: function () {
         /* just stop propagation */

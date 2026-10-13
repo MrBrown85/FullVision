@@ -161,7 +161,7 @@ export const TEST_LEARNING_MAP = {
 
 export const SMOKE_WELCOME_COURSE = {
   id: 'welcome-class-smoke',
-  name: 'Welcome Class',
+  name: 'Smoke Class',
   gradingSystem: 'proficiency',
   calcMethod: 'mostRecent',
   decayWeight: 0.65,
@@ -520,8 +520,6 @@ export async function mockPersistentAuthFlow(
       appState['gb-reportConfig-' + cid] = JSON.stringify({});
       appState['gb-gradingScales-' + cid] = JSON.stringify({});
       appState['gb-data-wiped'] = '1';
-      appState['gb-post-bootstrap-route'] = '/gradebook?course=' + cid;
-      appState['gb-welcome-class-seeded-local-' + cid] = '1';
       return appState;
     }
 

@@ -112,9 +112,6 @@ let _useSupabase = false;
 let _teacherId = null;
 let _initPromise = null; // dedup concurrent initData calls
 let _lsQuotaWarned = false; // show the "storage full" toast at most once per session
-const _WELCOME_CLASS_NAME = 'Welcome Class';
-const _WELCOME_CLASS_SEEDED_PREFIX = 'gb-welcome-class-seeded-';
-const _WELCOME_CLASS_ROUTE_KEY = 'gb-post-bootstrap-route';
 
 /* Degraded-mode state (P6.1).
    _supabaseDegraded is set when initial bootstrap fails after retry. While
@@ -317,7 +314,7 @@ function isSupabaseDegraded() {
   return _supabaseDegraded;
 }
 
-/* Run one bootstrap_teacher + list_teacher_courses + welcome-seed cycle.
+/* Run one bootstrap_teacher + list_teacher_courses cycle.
    Throws on any error so the caller can decide whether to retry or degrade.
    Returns the data the cache hydration step needs. */
 async function _attemptInitialBootstrap(sb) {
@@ -337,9 +334,8 @@ async function _attemptInitialBootstrap(sb) {
 
   const coursesRes = await sb.rpc('list_teacher_courses');
   if (coursesRes.error) throw coursesRes.error;
-  const seededWelcomeCourseId = await _maybeSeedWelcomeClass(sb, teacher, coursesRes.data || []);
 
-  return { teacher, courseRows: coursesRes.data || [], seededWelcomeCourseId };
+  return { teacher, courseRows: coursesRes.data || [] };
 }
 
 /* Wrap _attemptInitialBootstrap with retry-with-backoff. 1 initial attempt
@@ -430,7 +426,7 @@ function _exitDegradedMode(bootstrapData) {
     _teacherId = teacher.id || _teacherId;
     _cache.courses = _canonicalCoursesToBlob(bootstrapData.courseRows || []);
     _cache.config = {
-      activeCourse: prefs.active_course_id || bootstrapData.seededWelcomeCourseId || null,
+      activeCourse: prefs.active_course_id || null,
       viewMode: prefs.view_mode || null,
       mobileViewMode: prefs.mobile_view_mode || null,
       mobileSortMode: prefs.mobile_sort_mode || null,
@@ -928,7 +924,7 @@ async function initAllCourses() {
   //   bootstrap_teacher(email, display_name) → { id, email, display_name,
   //     created_at, deleted_at, preferences: { active_course_id, view_mode,
   //     mobile_view_mode, mobile_sort_mode, card_widget_config } }
-  //     Creates teacher + teacher_preference + Welcome Class on first sign-in;
+  //     Creates teacher + teacher_preference on first sign-in;
   //     returns existing rows on subsequent sign-ins.
   //   list_teacher_courses() → [{ id, name, grade_level, description, color,
   //     is_archived, display_order, grading_system, calc_method, decay_weight,
@@ -944,7 +940,7 @@ async function initAllCourses() {
 
       _cache.courses = _canonicalCoursesToBlob(data.courseRows || []);
       _cache.config = {
-        activeCourse: prefs.active_course_id || data.seededWelcomeCourseId || null,
+        activeCourse: prefs.active_course_id || null,
         viewMode: prefs.view_mode || null,
         mobileViewMode: prefs.mobile_view_mode || null,
         mobileSortMode: prefs.mobile_sort_mode || null,
@@ -993,66 +989,6 @@ async function initAllCourses() {
 
   // Re-fetch from Supabase when user returns to this tab/app
   _initVisibilityRefresh();
-}
-
-function _getWelcomeClassSeedKey(teacherId, courseId) {
-  if (!teacherId || !courseId) return null;
-  return _WELCOME_CLASS_SEEDED_PREFIX + teacherId + '-' + courseId;
-}
-
-function _markWelcomeClassSeeded(teacherId, courseId) {
-  var key = _getWelcomeClassSeedKey(teacherId, courseId);
-  if (!key) return;
-  _safeLSSet(key, '1');
-}
-
-function _queueWelcomeClassRoute(courseId) {
-  if (!courseId) return;
-  _safeLSSet(_WELCOME_CLASS_ROUTE_KEY, '/gradebook?course=' + courseId);
-}
-
-function _isFreshBootstrapTimestamp(isoTs) {
-  if (!isoTs) return false;
-  var createdAt = Date.parse(isoTs);
-  if (!isFinite(createdAt)) return false;
-  return Math.abs(Date.now() - createdAt) <= 10 * 60 * 1000;
-}
-
-function _isWelcomeClassRow(row) {
-  return !!(row && row.id && !row.is_archived && row.name === _WELCOME_CLASS_NAME);
-}
-
-async function _maybeSeedWelcomeClass(sb, teacher, courseRows) {
-  if (!_useSupabase || !sb || !teacher || !_teacherId) return null;
-  if (!_isFreshBootstrapTimestamp(teacher.created_at)) return null;
-
-  var welcomeCourse = (courseRows || []).find(_isWelcomeClassRow);
-  if (!welcomeCourse || !_isUuid(welcomeCourse.id)) return null;
-
-  try {
-    var gradebookRes = await sb.rpc('get_gradebook', { p_course_id: welcomeCourse.id });
-    if (gradebookRes.error) throw gradebookRes.error;
-
-    var gradebook = gradebookRes.data || {};
-    var hasStudents = Array.isArray(gradebook.students) && gradebook.students.length > 0;
-    var hasAssessments = Array.isArray(gradebook.assessments) && gradebook.assessments.length > 0;
-
-    if (!hasStudents && !hasAssessments) {
-      if (typeof window.applyDemoSeed !== 'function') {
-        console.warn('Welcome Class seed skipped: window.applyDemoSeed unavailable');
-        return null;
-      }
-      var seedRes = await window.applyDemoSeed(welcomeCourse.id);
-      if (seedRes && seedRes.error) throw seedRes.error;
-    }
-
-    _markWelcomeClassSeeded(_teacherId, welcomeCourse.id);
-    _queueWelcomeClassRoute(welcomeCourse.id);
-    return welcomeCourse.id;
-  } catch (e) {
-    console.warn('Welcome Class auto-seed failed:', e);
-    return null;
-  }
 }
 
 /** Shared cache invalidation + re-render for both Realtime and visibility refresh */
@@ -7056,6 +6992,9 @@ window.GB = {
  * Safe to call from any portal — seed-data.js has its own internal guards.
  */
 window.loadSeedIfNeeded = function () {
+  // Sample data is for Demo Mode only. A signed-in teacher with no classes
+  // gets the empty class manager, never a fake class.
+  if (typeof isDemoMode !== 'function' || !isDemoMode()) return Promise.resolve();
   // Already loaded this session — call directly (handles re-seed after data reset)
   if (typeof seedIfNeeded === 'function') {
     seedIfNeeded();
