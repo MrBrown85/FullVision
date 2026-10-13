@@ -1296,6 +1296,7 @@ var _SERVER_STATE_FIELDS = {
   customTags: true,
   scores: true,
   statuses: true,
+  rubrics: true,
 };
 var _serverState = {}; // field → cid → value
 
@@ -4847,7 +4848,13 @@ function _persistCategoriesToCanonical(cid, prev, arr) {
         return category && category.id;
       })
       .filter(_isUuid);
-    if (reorderIds.length > 1 && window.v2.reorderCategories) {
+    var prevOrder = (prev || [])
+      .map(function (category) {
+        return category && category.id;
+      })
+      .filter(_isUuid)
+      .join(',');
+    if (reorderIds.length > 1 && reorderIds.join(',') !== prevOrder && window.v2.reorderCategories) {
       ops.push(window.v2.reorderCategories(reorderIds));
     }
     return Promise.all(
@@ -5129,19 +5136,44 @@ function _patchAssessmentRubricIds(cid, idMap) {
   });
   if (changed) saveAssessments(cid, assessments);
 }
+/* The fields a rubric is saved with; equal signatures need no write. */
+function _rubricSignature(rubric) {
+  return JSON.stringify([_rubricName(rubric), _rubricCriteriaPayload(rubric)]);
+}
+
 function _persistRubricsToCanonical(cid, prev, arr) {
   var tail = _rubricSaveQueue[cid] || Promise.resolve({ rubrics: arr || [], idMap: {} });
   var next = tail
     .then(async function () {
       var target = Array.isArray(arr) ? arr : [];
-      var previous = Array.isArray(prev) ? prev : [];
+      // Against a confirmed baseline only changed rubrics are sent; without
+      // one, every rubric is sent as before.
+      var hasBaseline = _hasServerState('rubrics', cid);
+      var previous = _serverStateOr('rubrics', cid, Array.isArray(prev) ? prev : []) || [];
+      var sentById = {};
+      previous.forEach(function (r) {
+        if (r && _isUuid(r.id)) sentById[r.id] = _rubricSignature(r);
+      });
       var startedWith = JSON.stringify(target);
       var idMap = {};
       var keptCanonicalIds = {};
+      var insertedRows = false;
 
       for (var i = 0; i < target.length; i++) {
         var rubric = target[i];
         if (!rubric) continue;
+        if (hasBaseline && _isUuid(rubric.id) && sentById[rubric.id] === _rubricSignature(rubric)) {
+          keptCanonicalIds[rubric.id] = true;
+          continue;
+        }
+        if (
+          !_isUuid(rubric.id) ||
+          (rubric.criteria || []).some(function (c) {
+            return !(c && _isUuid(c.id));
+          })
+        ) {
+          insertedRows = true;
+        }
         var res = await window.v2.upsertRubric({
           id: rubric.id,
           courseId: cid,
@@ -5163,8 +5195,16 @@ function _persistRubricsToCanonical(cid, prev, arr) {
         if (deleteRes && deleteRes.error) throw deleteRes.error;
       }
 
+      if (!insertedRows) {
+        // Nothing new was created, so every id the cache holds is already the
+        // server's: no reload needed.
+        _rememberServerState('rubrics', cid, target);
+        return { rubrics: target, idMap: idMap };
+      }
+
       var canonicalArr = await _loadCanonicalRubrics(cid);
       var reconciled = _reconcileCanonicalRubrics(target, canonicalArr, idMap);
+      _rememberServerState('rubrics', cid, reconciled);
       // Only adopt the server's copy if nothing was edited while this ran; a
       // newer edit has its own save queued, which reconciles after it.
       var live = _cache.rubrics[cid];
@@ -5724,6 +5764,14 @@ function saveCategories(cid, arr) {
   _saveCourseField('categories', cid, next);
   if (!_writesEnabled() || !_isUuid(cid)) return;
   _persistCategoriesToCanonical(cid, prev, next);
+}
+/* The class manager writes categories itself (upsert_category,
+   delete_category, reorder_categories) and hands the resulting rows here.
+   Cache, localStorage and the server baseline take them without sending
+   anything a second time. */
+function adoptCategoriesFromServer(cid, rows) {
+  _persistLoadedField(cid, 'categories', rows || []);
+  if (typeof clearProfCache === 'function') clearProfCache();
 }
 function getCategoryById(cid, categoryId) {
   if (!categoryId) return null;

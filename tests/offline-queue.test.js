@@ -368,6 +368,34 @@ describe('v2Queue (offline write queue)', () => {
       await Promise.all([second, other]);
     });
 
+    it('treats deleting a row that is already gone as done', async () => {
+      setOnline(true);
+      globalThis.getSupabase = () => ({
+        rpc(name, payload) {
+          calls.push({ name: name, payload: payload });
+          return Promise.resolve({ data: null, error: { code: 'P0002', message: 'category not found' } });
+        },
+      });
+      var res = await Q.push('delete_category', { p_id: 'cat-1' });
+      expect(res.error).toBeNull();
+      expect(Q.stats()).toMatchObject({ queued: 0, deadLettered: 0 });
+    });
+
+    it('still reports a seed observation template that cannot be deleted', async () => {
+      setOnline(true);
+      globalThis.getSupabase = () => ({
+        rpc() {
+          return Promise.resolve({
+            data: null,
+            error: { code: 'P0002', message: 'observation_template not found or is seed (immutable)' },
+          });
+        },
+      });
+      var res = await Q.push('delete_observation_template', { p_id: 'tpl-1' });
+      expect(res.error.code).toBe('P0002');
+      expect(Q.stats().deadLettered).toBe(1);
+    });
+
     it('holds writes while paused', async () => {
       setOnline(true);
       var paused = true;
