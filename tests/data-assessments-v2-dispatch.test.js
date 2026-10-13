@@ -71,7 +71,9 @@ describe('v2 assessment CRUD dispatch', () => {
         tagIds: [TAG1, TAG2, 'not-a-uuid'],
       };
       await _canonicalCreateAssessment(client, CID, a);
-      var call = client.calls.find(function (c) { return c.name === 'create_assessment'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'create_assessment';
+      });
       expect(call).toBeDefined();
       expect(call.payload).toEqual({
         p_course_id: CID,
@@ -87,12 +89,15 @@ describe('v2 assessment CRUD dispatch', () => {
         p_rubric_id: RUBRIC_ID,
         p_module_id: MODULE_ID,
         p_tag_ids: [TAG1, TAG2],
+        p_idempotency_key: expect.any(String),
       });
     });
 
     it('defaults score_mode to proficiency and weight to 1.0', async () => {
       await _canonicalCreateAssessment(client, CID, { id: 'x', title: 'T' });
-      var call = client.calls.find(function (c) { return c.name === 'create_assessment'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'create_assessment';
+      });
       expect(call.payload.p_score_mode).toBe('proficiency');
       expect(call.payload.p_weight).toBe(1.0);
       expect(call.payload.p_max_points).toBeNull();
@@ -101,7 +106,9 @@ describe('v2 assessment CRUD dispatch', () => {
     it('nullifies non-UUID categoryId / rubricId / moduleId', async () => {
       var a = { id: 'x', title: 'T', categoryId: 'legacy-cat', rubricId: 'legacy-rubric', moduleId: 'legacy-mod' };
       await _canonicalCreateAssessment(client, CID, a);
-      var call = client.calls.find(function (c) { return c.name === 'create_assessment'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'create_assessment';
+      });
       expect(call.payload.p_category_id).toBeNull();
       expect(call.payload.p_rubric_id).toBeNull();
       expect(call.payload.p_module_id).toBeNull();
@@ -136,7 +143,9 @@ describe('v2 assessment CRUD dispatch', () => {
         tagIds: [TAG1],
       };
       await _canonicalUpdateAssessment(client, CID, AID, a);
-      var call = client.calls.find(function (c) { return c.name === 'update_assessment'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'update_assessment';
+      });
       expect(call.payload.p_id).toBe(AID);
       expect(call.payload.p_tag_ids).toEqual([TAG1]);
       expect(call.payload.p_patch).toMatchObject({
@@ -157,7 +166,9 @@ describe('v2 assessment CRUD dispatch', () => {
 
     it('defaults missing weight to "1"', async () => {
       await _canonicalUpdateAssessment(client, CID, AID, { title: 'T' });
-      var call = client.calls.find(function (c) { return c.name === 'update_assessment'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'update_assessment';
+      });
       expect(call.payload.p_patch.weight).toBe('1');
     });
   });
@@ -165,7 +176,9 @@ describe('v2 assessment CRUD dispatch', () => {
   describe('_canonicalDeleteAssessment', () => {
     it('calls delete_assessment with the assessment id', async () => {
       await _canonicalDeleteAssessment(client, CID, AID);
-      var call = client.calls.find(function (c) { return c.name === 'delete_assessment'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'delete_assessment';
+      });
       expect(call.payload).toEqual({ p_id: AID });
     });
   });
@@ -173,8 +186,10 @@ describe('v2 assessment CRUD dispatch', () => {
   describe('window.duplicateAssessment', () => {
     it('calls duplicate_assessment with p_src_id', async () => {
       await window.duplicateAssessment(AID);
-      var call = client.calls.find(function (c) { return c.name === 'duplicate_assessment'; });
-      expect(call.payload).toEqual({ p_src_id: AID });
+      var call = client.calls.find(function (c) {
+        return c.name === 'duplicate_assessment';
+      });
+      expect(call.payload).toEqual({ p_src_id: AID, p_idempotency_key: expect.any(String) });
     });
 
     it('skips dispatch on non-UUID id', async () => {
@@ -186,7 +201,9 @@ describe('v2 assessment CRUD dispatch', () => {
   describe('window.saveAssessmentTags', () => {
     it('calls save_assessment_tags with filtered UUID list', async () => {
       await window.saveAssessmentTags(AID, [TAG1, 'junk', TAG2]);
-      var call = client.calls.find(function (c) { return c.name === 'save_assessment_tags'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'save_assessment_tags';
+      });
       expect(call.payload).toEqual({ p_id: AID, p_tag_ids: [TAG1, TAG2] });
     });
 
@@ -200,19 +217,25 @@ describe('v2 assessment CRUD dispatch', () => {
     it('calls save_collab with mode + config jsonb', async () => {
       var cfg = { pairs: [['a', 'b']] };
       await window.saveCollab(AID, 'pairs', cfg);
-      var call = client.calls.find(function (c) { return c.name === 'save_collab'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'save_collab';
+      });
       expect(call.payload).toEqual({ p_id: AID, p_mode: 'pairs', p_config: cfg });
     });
 
     it('nulls the config when mode is "none"', async () => {
       await window.saveCollab(AID, 'none', { stale: true });
-      var call = client.calls.find(function (c) { return c.name === 'save_collab'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'save_collab';
+      });
       expect(call.payload.p_config).toBeNull();
     });
 
     it('defaults mode to "none" when missing', async () => {
       await window.saveCollab(AID);
-      var call = client.calls.find(function (c) { return c.name === 'save_collab'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'save_collab';
+      });
       expect(call.payload.p_mode).toBe('none');
     });
   });

@@ -70,7 +70,7 @@ describe('v2 student-profile / student-records dispatch', () => {
       await window.v2.addNote(ENR1, 'Helpful note');
       expect(client.calls[0]).toEqual({
         name: 'upsert_note',
-        payload: { p_enrollment_id: ENR1, p_body: 'Helpful note' },
+        payload: { p_enrollment_id: ENR1, p_body: 'Helpful note', p_idempotency_key: expect.any(String) },
       });
     });
 

@@ -66,7 +66,9 @@ describe('v2 student/enrollment CRUD dispatch', () => {
         personId: null,
       };
       await _canonicalEnrollStudent(client, CID, s, 3);
-      var call = client.calls.find(function (c) { return c.name === 'create_student_and_enroll'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'create_student_and_enroll';
+      });
       expect(call).toBeDefined();
       expect(call.payload).toEqual({
         p_course_id: CID,
@@ -79,20 +81,25 @@ describe('v2 student/enrollment CRUD dispatch', () => {
         p_date_of_birth: '2012-05-01',
         p_designations: ['IEP'],
         p_existing_student_id: null,
+        p_idempotency_key: expect.any(String),
       });
     });
 
     it('passes existing personId when it is a UUID (re-enrollment path)', async () => {
       var s = { id: 'temp', firstName: 'X', personId: STU };
       await _canonicalEnrollStudent(client, CID, s, 0);
-      var call = client.calls.find(function (c) { return c.name === 'create_student_and_enroll'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'create_student_and_enroll';
+      });
       expect(call.payload.p_existing_student_id).toBe(STU);
     });
 
     it('nullifies non-UUID personId', async () => {
       var s = { id: 'temp', firstName: 'X', personId: 'legacy-string' };
       await _canonicalEnrollStudent(client, CID, s, 0);
-      var call = client.calls.find(function (c) { return c.name === 'create_student_and_enroll'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'create_student_and_enroll';
+      });
       expect(call.payload.p_existing_student_id).toBeNull();
     });
 
@@ -113,12 +120,18 @@ describe('v2 student/enrollment CRUD dispatch', () => {
   describe('_canonicalUpdateStudent', () => {
     it('calls update_student with a jsonb patch of snake_case keys', async () => {
       var s = {
-        firstName: 'Ada', lastName: 'Lovelace', preferred: 'Ada',
-        pronouns: 'she/her', studentNumber: '42',
-        email: 'a@b.com', dateOfBirth: '2012-05-01',
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        preferred: 'Ada',
+        pronouns: 'she/her',
+        studentNumber: '42',
+        email: 'a@b.com',
+        dateOfBirth: '2012-05-01',
       };
       await _canonicalUpdateStudent(client, STU, s);
-      var call = client.calls.find(function (c) { return c.name === 'update_student'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'update_student';
+      });
       expect(call).toBeDefined();
       expect(call.payload).toEqual({
         p_id: STU,
@@ -136,7 +149,9 @@ describe('v2 student/enrollment CRUD dispatch', () => {
 
     it('nullifies empty fields except first_name (which defaults to empty string)', async () => {
       await _canonicalUpdateStudent(client, STU, { firstName: '', lastName: '', preferred: '' });
-      var call = client.calls.find(function (c) { return c.name === 'update_student'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'update_student';
+      });
       expect(call.payload.p_patch.first_name).toBe('');
       expect(call.payload.p_patch.last_name).toBeNull();
       expect(call.payload.p_patch.preferred_name).toBeNull();
@@ -146,7 +161,9 @@ describe('v2 student/enrollment CRUD dispatch', () => {
   describe('_canonicalUpdateEnrollment', () => {
     it('patches designations + roster_position', async () => {
       await _canonicalUpdateEnrollment(client, ENR, { designations: ['IEP', 'ELL'] }, 7);
-      var call = client.calls.find(function (c) { return c.name === 'update_enrollment'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'update_enrollment';
+      });
       expect(call.payload.p_id).toBe(ENR);
       expect(call.payload.p_patch.designations).toEqual(['IEP', 'ELL']);
       expect(call.payload.p_patch.roster_position).toBe(7);
@@ -154,12 +171,16 @@ describe('v2 student/enrollment CRUD dispatch', () => {
 
     it('includes is_flagged only when isFlagged is a boolean', async () => {
       await _canonicalUpdateEnrollment(client, ENR, { isFlagged: true }, 0);
-      var call1 = client.calls.find(function (c) { return c.name === 'update_enrollment'; });
+      var call1 = client.calls.find(function (c) {
+        return c.name === 'update_enrollment';
+      });
       expect(call1.payload.p_patch.is_flagged).toBe(true);
 
       client.calls.length = 0;
       await _canonicalUpdateEnrollment(client, ENR, {}, 0);
-      var call2 = client.calls.find(function (c) { return c.name === 'update_enrollment'; });
+      var call2 = client.calls.find(function (c) {
+        return c.name === 'update_enrollment';
+      });
       expect(call2.payload.p_patch.is_flagged).toBeUndefined();
     });
   });
@@ -167,7 +188,9 @@ describe('v2 student/enrollment CRUD dispatch', () => {
   describe('_canonicalWithdrawEnrollment', () => {
     it('calls withdraw_enrollment with the enrollment id', async () => {
       await _canonicalWithdrawEnrollment(client, ENR);
-      var call = client.calls.find(function (c) { return c.name === 'withdraw_enrollment'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'withdraw_enrollment';
+      });
       expect(call).toBeDefined();
       expect(call.payload).toEqual({ p_id: ENR });
     });
@@ -176,7 +199,9 @@ describe('v2 student/enrollment CRUD dispatch', () => {
   describe('window.reorderRoster', () => {
     it('calls reorder_roster with the filtered UUID list', async () => {
       await window.reorderRoster([ENR, 'not-a-uuid', STU]);
-      var call = client.calls.find(function (c) { return c.name === 'reorder_roster'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'reorder_roster';
+      });
       expect(call).toBeDefined();
       expect(call.payload.p_ids).toEqual([ENR, STU]);
     });
@@ -190,13 +215,17 @@ describe('v2 student/enrollment CRUD dispatch', () => {
   describe('window.bulkApplyPronouns', () => {
     it('calls bulk_apply_pronouns with filtered ids and pronoun string', async () => {
       await window.bulkApplyPronouns([STU, 'junk'], 'they/them');
-      var call = client.calls.find(function (c) { return c.name === 'bulk_apply_pronouns'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'bulk_apply_pronouns';
+      });
       expect(call.payload).toEqual({ p_student_ids: [STU], p_pronouns: 'they/them' });
     });
 
     it('passes null when pronouns is empty (clears)', async () => {
       await window.bulkApplyPronouns([STU], '');
-      var call = client.calls.find(function (c) { return c.name === 'bulk_apply_pronouns'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'bulk_apply_pronouns';
+      });
       expect(call.payload.p_pronouns).toBeNull();
     });
   });
@@ -205,8 +234,14 @@ describe('v2 student/enrollment CRUD dispatch', () => {
     it('calls import_roster_csv with course id + row array', async () => {
       var rows = [{ first_name: 'Ada', last_name: 'Lovelace' }];
       await window.importRosterCsv(CID, rows);
-      var call = client.calls.find(function (c) { return c.name === 'import_roster_csv'; });
-      expect(call.payload).toEqual({ p_course_id: CID, p_rows: rows });
+      var call = client.calls.find(function (c) {
+        return c.name === 'import_roster_csv';
+      });
+      expect(call.payload).toEqual({
+        p_course_id: CID,
+        p_rows: rows,
+        p_idempotency_key: expect.any(String),
+      });
     });
 
     it('skips dispatch when course id is not a UUID', async () => {
@@ -218,7 +253,9 @@ describe('v2 student/enrollment CRUD dispatch', () => {
   describe('window.setEnrollmentFlag', () => {
     it('calls update_enrollment with an is_flagged patch', async () => {
       await window.setEnrollmentFlag(ENR, true);
-      var call = client.calls.find(function (c) { return c.name === 'update_enrollment'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'update_enrollment';
+      });
       expect(call.payload).toEqual({
         p_id: ENR,
         p_patch: { is_flagged: true },
@@ -227,7 +264,9 @@ describe('v2 student/enrollment CRUD dispatch', () => {
 
     it('coerces falsy flag to false', async () => {
       await window.setEnrollmentFlag(ENR, 0);
-      var call = client.calls.find(function (c) { return c.name === 'update_enrollment'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'update_enrollment';
+      });
       expect(call.payload.p_patch.is_flagged).toBe(false);
     });
 

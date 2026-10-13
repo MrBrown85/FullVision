@@ -3730,6 +3730,32 @@ function _idempotencyKey() {
   return null;
 }
 
+/* Stamp an idempotency key onto an RPC's params, in place and only once.
+
+   Mutating the caller's object is deliberate. _callRpcWithAuthGuard retries the
+   same params twice over — once straight after a token refresh, and again from
+   the session-expired queue once the teacher re-authenticates — and both reuse
+   the object they were handed. A key minted inside the retry would be a fresh
+   key each attempt and would dedup nothing; stamped here, every attempt at the
+   same logical write carries the same key, which is the whole point.
+
+   One key per logical write, so distinct writes never share one: two
+   deliberate creates, or two successive edits of the same note, each get their
+   own key and both land. Only endpoints in FV_IDEMPOTENT_RPCS are stamped —
+   PostgREST resolves overloads by argument name, so sending the parameter to an
+   RPC that lacks it would fail the call outright. */
+function _stampIdempotencyKey(name, params) {
+  if (!params || typeof params !== 'object') return params;
+  var accepts = typeof FV_IDEMPOTENT_RPCS !== 'undefined' && FV_IDEMPOTENT_RPCS[name];
+  if (!accepts) return params;
+  if (Object.prototype.hasOwnProperty.call(params, 'p_idempotency_key')) return params;
+  var key = _idempotencyKey();
+  // A null key leaves fv_idem_check a no-op; don't send the parameter at all
+  // rather than pass an explicit null on every write.
+  if (key) params.p_idempotency_key = key;
+  return params;
+}
+
 function getParam(key) {
   return new URLSearchParams(window.location.search).get(key);
 }
@@ -3797,16 +3823,18 @@ function createCourse(data) {
       // canonical UUID arrives (P6.2).
       _pendingLocalCids.add(localId);
       var createPromise = sb
-        .rpc('create_course', {
-          p_name: course.name,
-          p_grade_level: course.gradeLevel || null,
-          p_description: course.description || null,
-          p_grading_system: course.gradingSystem || 'proficiency',
-          p_calc_method: course.calcMethod || 'average',
-          p_decay_weight: course.decayWeight != null ? Number(course.decayWeight) : null,
-          p_timezone: course.timezone,
-          p_idempotency_key: _idempotencyKey(),
-        })
+        .rpc(
+          'create_course',
+          _stampIdempotencyKey('create_course', {
+            p_name: course.name,
+            p_grade_level: course.gradeLevel || null,
+            p_description: course.description || null,
+            p_grading_system: course.gradingSystem || 'proficiency',
+            p_calc_method: course.calcMethod || 'average',
+            p_decay_weight: course.decayWeight != null ? Number(course.decayWeight) : null,
+            p_timezone: course.timezone,
+          }),
+        )
         .then(function (res) {
           if (res.error) {
             console.warn('create_course RPC failed:', res.error);
@@ -5352,18 +5380,21 @@ function _studentIdentityChanged(a, b) {
 function _canonicalEnrollStudent(sb, cid, s, idx) {
   var existingStudentId = _isUuid(s.personId) ? s.personId : null;
   return sb
-    .rpc('create_student_and_enroll', {
-      p_course_id: cid,
-      p_first_name: s.firstName || '',
-      p_last_name: s.lastName || null,
-      p_preferred_name: s.preferred || null,
-      p_pronouns: s.pronouns || null,
-      p_student_number: s.studentNumber || null,
-      p_email: s.email || null,
-      p_date_of_birth: s.dateOfBirth || null,
-      p_designations: s.designations || [],
-      p_existing_student_id: existingStudentId,
-    })
+    .rpc(
+      'create_student_and_enroll',
+      _stampIdempotencyKey('create_student_and_enroll', {
+        p_course_id: cid,
+        p_first_name: s.firstName || '',
+        p_last_name: s.lastName || null,
+        p_preferred_name: s.preferred || null,
+        p_pronouns: s.pronouns || null,
+        p_student_number: s.studentNumber || null,
+        p_email: s.email || null,
+        p_date_of_birth: s.dateOfBirth || null,
+        p_designations: s.designations || [],
+        p_existing_student_id: existingStudentId,
+      }),
+    )
     .then(function (res) {
       if (res.error) {
         console.warn('create_student_and_enroll failed:', res.error, s);
@@ -5455,10 +5486,12 @@ window.importRosterCsv = function (cid, rows) {
   var sb = getSupabase();
   if (!sb) return Promise.resolve();
   if (!_isUuid(cid)) return Promise.resolve();
-  return sb.rpc('import_roster_csv', { p_course_id: cid, p_rows: rows || [] }).then(function (res) {
-    if (res.error) console.warn('import_roster_csv failed:', res.error);
-    return res;
-  });
+  return sb
+    .rpc('import_roster_csv', _stampIdempotencyKey('import_roster_csv', { p_course_id: cid, p_rows: rows || [] }))
+    .then(function (res) {
+      if (res.error) console.warn('import_roster_csv failed:', res.error);
+      return res;
+    });
 };
 
 /* Single-enrollment flag toggle — v2 enrollment.is_flagged column. */
@@ -5670,7 +5703,7 @@ function _canonicalCreateAssessment(sb, cid, a) {
     p_module_id: _isUuid(a.moduleId) ? a.moduleId : null,
     p_tag_ids: tagIds,
   };
-  return sb.rpc('create_assessment', params).then(function (res) {
+  return sb.rpc('create_assessment', _stampIdempotencyKey('create_assessment', params)).then(function (res) {
     if (res.error) {
       console.warn('create_assessment failed:', res.error, a);
       return;
@@ -5729,10 +5762,12 @@ window.duplicateAssessment = function (srcAssessmentId) {
   var sb = getSupabase();
   if (!sb) return Promise.resolve();
   if (!_isUuid(srcAssessmentId)) return Promise.resolve();
-  return sb.rpc('duplicate_assessment', { p_src_id: srcAssessmentId }).then(function (res) {
-    if (res.error) console.warn('duplicate_assessment failed:', res.error);
-    return res;
-  });
+  return sb
+    .rpc('duplicate_assessment', _stampIdempotencyKey('duplicate_assessment', { p_src_id: srcAssessmentId }))
+    .then(function (res) {
+      if (res.error) console.warn('duplicate_assessment failed:', res.error);
+      return res;
+    });
 };
 
 window.saveAssessmentTags = function (assessmentId, tagIds) {
@@ -6354,14 +6389,17 @@ window.upsertObservationTemplate = function (cid, payload) {
   if (!_isUuid(cid)) return Promise.resolve();
   payload = payload || {};
   return sb
-    .rpc('upsert_observation_template', {
-      p_id: _isUuid(payload.id) ? payload.id : null,
-      p_course_id: cid,
-      p_body: payload.body || '',
-      p_default_sentiment: payload.defaultSentiment || null,
-      p_default_context_type: payload.defaultContextType || null,
-      p_display_order: payload.displayOrder != null ? Number(payload.displayOrder) : null,
-    })
+    .rpc(
+      'upsert_observation_template',
+      _stampIdempotencyKey('upsert_observation_template', {
+        p_id: _isUuid(payload.id) ? payload.id : null,
+        p_course_id: cid,
+        p_body: payload.body || '',
+        p_default_sentiment: payload.defaultSentiment || null,
+        p_default_context_type: payload.defaultContextType || null,
+        p_display_order: payload.displayOrder != null ? Number(payload.displayOrder) : null,
+      }),
+    )
     .then(function (res) {
       if (res.error) console.warn('upsert_observation_template failed:', res.error);
       return res;
@@ -6431,6 +6469,11 @@ async function _callRpcWithAuthGuard(name, params, options) {
   options = options || {};
   var sb = getSupabase();
   if (!sb) return { data: null, error: null };
+
+  // Before either retry below can fire, so every attempt at this write carries
+  // the same key and the server returns the first result instead of inserting
+  // a second row.
+  _stampIdempotencyKey(name, params);
 
   if (!options.suppressSessionExpiredModal && consumeLongFormSessionExpired()) {
     return _queueLongFormSessionRetry(name, params, options, { message: 'idle_timeout', status: 401 });
@@ -6901,15 +6944,17 @@ window.createCustomTag = function (cid, label) {
   var sb = getSupabase();
   if (!sb) return Promise.resolve();
   if (!_isUuid(cid)) return Promise.resolve();
-  return sb.rpc('create_custom_tag', { p_course_id: cid, p_label: label || '' }).then(function (res) {
-    if (res.error) console.warn('create_custom_tag failed:', res.error);
-    var id = res && res.data;
-    if (id && label) {
-      if (!_customTagIds[cid]) _customTagIds[cid] = {};
-      _customTagIds[cid][label] = id;
-    }
-    return res;
-  });
+  return sb
+    .rpc('create_custom_tag', _stampIdempotencyKey('create_custom_tag', { p_course_id: cid, p_label: label || '' }))
+    .then(function (res) {
+      if (res.error) console.warn('create_custom_tag failed:', res.error);
+      var id = res && res.data;
+      if (id && label) {
+        if (!_customTagIds[cid]) _customTagIds[cid] = {};
+        _customTagIds[cid][label] = id;
+      }
+      return res;
+    });
 };
 
 window.v2 = window.v2 || {};
@@ -6978,7 +7023,7 @@ function _persistCustomTagsToCanonical(cid, prev, arr) {
       if (!label || prevSet[label]) return;
       ops.push(
         sb
-          .rpc('create_custom_tag', { p_course_id: cid, p_label: label })
+          .rpc('create_custom_tag', _stampIdempotencyKey('create_custom_tag', { p_course_id: cid, p_label: label }))
           .then(function (res) {
             if (res.error) {
               console.warn('create_custom_tag failed:', res.error);

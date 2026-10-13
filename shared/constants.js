@@ -536,3 +536,43 @@ const TB_PAGES = [
   { id: 'spreadsheet', label: 'Gradebook', href: 'spreadsheet.html' },
   { id: 'reports', label: 'Reports', href: 'reports.html' },
 ];
+
+/* ── Idempotent write RPCs ──────────────────────────────────── */
+/* Server-side write paths that accept an optional `p_idempotency_key uuid`
+   (migration 20260423_write_path_idempotency). Each caches its result per
+   (key, teacher, endpoint) through fv_idem_check / fv_idem_store, so a retry
+   of a call that committed server-side but whose response never reached the
+   client returns the original row instead of inserting a duplicate.
+
+   IMPORTANT: this list must stay in lockstep with the server. Naming an
+   endpoint here that has not had the parameter added makes every call to it
+   fail with "function … does not exist", because PostgREST resolves overloads
+   by argument name. Verify against the database before adding one:
+
+     select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public'
+       and exists (select 1 from unnest(p.proargnames) a where a = 'p_idempotency_key');
+
+   Read by shared/data.js (direct online writes) and shared/offline-queue.js
+   (queued writes replayed on reconnect). */
+const FV_IDEMPOTENT_RPCS = {
+  create_assessment: true,
+  create_course: true,
+  create_custom_tag: true,
+  create_observation: true,
+  create_student_and_enroll: true,
+  duplicate_assessment: true,
+  duplicate_course: true,
+  import_json_restore: true,
+  import_roster_csv: true,
+  import_teams_class: true,
+  upsert_category: true,
+  upsert_competency_group: true,
+  upsert_module: true,
+  upsert_note: true,
+  upsert_observation_template: true,
+  upsert_rubric: true,
+  upsert_section: true,
+  upsert_subject: true,
+  upsert_tag: true,
+};
