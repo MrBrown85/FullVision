@@ -3,7 +3,9 @@
 -- account, created 2026-04-29/30. Nothing in the app shows a student with no
 -- enrollment. Rows are copied to fv_backup first.
 --
--- NOT YET APPLIED: waiting for the owner's confirmation.
+-- Applied to gradebook-prod on 2026-10-12 as orphan_student_cleanup, after the
+-- owner confirmed. All 72 were test fixtures ("… Probe" names) from the
+-- 2026-04-29/30 persistence test runs.
 
 create table if not exists fv_backup.orphan_student_20261012 as
     select s.* from public.student s

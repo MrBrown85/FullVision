@@ -36,7 +36,7 @@ Tag glossary (inline on each ticket title):
 - [migrations/20261012_course_soft_delete.sql](migrations/20261012_course_soft_delete.sql) adds `course.deleted_at`, makes `delete_course` a soft delete, hides deleted classes through `fv_owns_course` / `fv_owns_enrollment` / `fv_owns_assessment` / `fv_owns_term_rating` and `list_teacher_courses`, and has `fv_retention_cleanup` purge classes after 30 days along with their students who are left with no enrollment. Verified against `gradebook-prod` in a rolled-back transaction. Restore a class with `update course set deleted_at = null where id = …`.
 - [migrations/20261012_orphan_student_cleanup.sql](migrations/20261012_orphan_student_cleanup.sql) backs up and deletes the 72 existing orphans.
 - Remaining debt:
-  - apply both 2026-10-12 migrations live (owner approval needed; both are written and the first is tested).
+  - ~~apply both 2026-10-12 migrations live~~ applied 2026-10-12 as `course_soft_delete` and `orphan_student_cleanup` (72 test-fixture rows backed up to `fv_backup.orphan_student_20261012`).
   - verify the real delete flow on a live account: delete class → class disappears immediately → active course falls back cleanly → no immediate hard-delete regression.
   - confirm the scheduled retention job now purges 30-day-stale soft-deleted courses in production, not just teachers + audit rows.
   - tighten `teacher_self` RLS policy to filter `deleted_at IS NULL`: a soft-deleted teacher can currently still read/write their own `teacher` row during the 30-day grace window (flagged by the 2026-04-23 pilot audit).
