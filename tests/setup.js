@@ -165,4 +165,6 @@ globalThis.setTimeout = _realSetTimeout;
 // starts a fresh session alongside its cleared localStorage and cache.
 beforeEach(() => {
   _serverState = {};
+  _localWrites = {};
+  _refreshState = {};
 });

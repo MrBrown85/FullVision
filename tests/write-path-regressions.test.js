@@ -15,6 +15,8 @@
  *                                   doesn't revert edits made while it ran;
  *                                   class-manager edits write through
  *                                   saveLearningMap only
+ *   Phase 4 (realtime)            — a refresh waits for in-flight writes and
+ *                                   never overwrites an edit made during it
  */
 import './setup.js';
 import { beforeEach, afterEach, describe, expect, it } from 'vitest';
@@ -81,6 +83,7 @@ describe('write-path regressions (Phase 0)', () => {
   });
 
   afterEach(() => {
+    _REFRESH_QUIET_MS = 2000;
     globalThis.getSupabase = originalGetSupabase;
     _useSupabase = originalUseSupabase;
     _supabaseDegraded = false;
@@ -333,5 +336,92 @@ describe('write-path regressions (Phase 0)', () => {
 
     var section = getLearningMap(CID).sections.find(s => s.id === SEC1);
     expect(section.name).toBe('Questioning and predicting');
+  });
+  // ── Phase 4 ────────────────────────────────────────────────────────────
+
+  function loadGradebookFixture() {
+    _persistLoadedField(CID, 'students', [studentY()]);
+    _persistLoadedField(CID, 'assessments', [
+      { id: AID, title: 'Lab', type: 'summative', scoreMode: 'proficiency', tagIds: [TAG1] },
+    ]);
+    _persistLoadedField(CID, 'scores', {});
+  }
+
+  // What get_gradebook returns when the server doesn't have the edit yet.
+  var staleGradebook = { data: { categories: [], students: [], assessments: [], cells: {} }, error: null };
+
+  it('keeps a score entered while a realtime refresh is fetching', async () => {
+    _REFRESH_QUIET_MS = 0;
+    loadGradebookFixture();
+    var finishFirstFetch;
+    var laterFetches = [];
+    fake.on('get_gradebook', function (params, n) {
+      return new Promise(function (resolve) {
+        var finish = function () {
+          resolve(staleGradebook);
+        };
+        if (n === 1) finishFirstFetch = finish;
+        else laterFetches.push(finish); // held until the assertions are done
+      });
+    });
+
+    _handleExternalCourseUpdate(CID, 'gradebook');
+    await settle();
+    expect(fake.count('get_gradebook')).toBe(1);
+
+    // The teacher enters a score while that fetch is out.
+    upsertScore(CID, ENR_Y, AID, TAG1, 3, '2026-10-12', 'summative');
+    await settle();
+    finishFirstFetch();
+    await settle(60);
+
+    expect(getScores(CID)[ENR_Y]).toHaveLength(1);
+    expect(getScores(CID)[ENR_Y][0].score).toBe(3);
+    expect(fake.committedCount('upsert_tag_score', p => p.p_value === 3)).toBe(1);
+
+    laterFetches.forEach(function (finish) {
+      finish();
+    });
+    await settle(60);
+  });
+
+  it('waits for writes still in flight before refreshing', async () => {
+    _REFRESH_QUIET_MS = 0;
+    loadGradebookFixture();
+    fake.on('get_gradebook', function () {
+      return staleGradebook;
+    });
+    fake.hold();
+    upsertScore(CID, ENR_Y, AID, TAG1, 2, '2026-10-12', 'summative');
+
+    _handleExternalCourseUpdate(CID, 'gradebook');
+    await settle();
+    expect(fake.count('get_gradebook')).toBe(0);
+
+    await fake.release();
+    // The refresh polls for in-flight writes every 250 ms.
+    await new Promise(r => setTimeout(r, 400));
+    await settle(60);
+    expect(fake.count('get_gradebook')).toBeGreaterThan(0);
+  });
+
+  it('applies server changes when nothing was edited', async () => {
+    _REFRESH_QUIET_MS = 0;
+    loadGradebookFixture();
+    fake.on('get_gradebook', function () {
+      return {
+        data: {
+          categories: [],
+          students: [],
+          assessments: [{ id: AID2, title: 'Added on another device', type: 'summative', tag_ids: [] }],
+          cells: {},
+        },
+        error: null,
+      };
+    });
+
+    await _handleExternalCourseUpdate(CID, 'gradebook');
+
+    expect(getAssessments(CID).map(a => a.title)).toEqual(['Added on another device']);
   });
 });

@@ -140,24 +140,26 @@ const _RECOVERY_PROBE_INTERVAL_MS = 30000;
    round-trip were silently dropped. */
 const _pendingLocalCids = new Set();
 
-/* Echo guard: suppress Realtime refetches for a field+cid shortly after a local save.
-   Prevents Realtime events from triggering a refetch that could see partial state
-   while an UPSERT batch is still in-flight. 8s covers typical RPC round-trip
-   (p50 ~200ms, p99 ~3s) with headroom; longer windows let stale reads win over
-   a second legitimate write that landed inside the same window. */
-const _echoGuard = {}; // key: "field:cid" → expiry timestamp
-const _ECHO_GUARD_MS = 8000;
+/* Local-write tracking (docs/write-path-plan.md, Phase 4).
+   Every local edit bumps a per-course, per-field counter. A realtime refresh
+   waits until the course's writes have landed and the teacher has paused,
+   records the counters, and refuses to overwrite any field whose counter
+   moved while it was fetching; it runs again later instead. This replaces an
+   8-second echo guard, which let a refresh overwrite a write slower than 8s
+   and blocked other devices' changes for 8s after every local edit. */
+var _localWrites = {}; // cid → { at: ms of last local edit, fields: { field: count } }
+var _REFRESH_QUIET_MS = 2000;
 
-function _setEchoGuard(field, cid) {
-  _echoGuard[field + ':' + cid] = Date.now() + _ECHO_GUARD_MS;
+function _markLocalWrite(field, cid) {
+  if (!cid) return;
+  var w = _localWrites[cid] || (_localWrites[cid] = { at: 0, fields: {} });
+  w.at = Date.now();
+  w.fields[field] = (w.fields[field] || 0) + 1;
 }
-function _isEchoGuarded(field, cid) {
-  var key = field + ':' + cid;
-  var expiry = _echoGuard[key];
-  if (!expiry) return false;
-  if (Date.now() < expiry) return true;
-  delete _echoGuard[key];
-  return false;
+
+function _localWriteCount(cid, field) {
+  var w = _localWrites[cid];
+  return (w && w.fields[field]) || 0;
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -633,17 +635,72 @@ function _isStudentRecordField(field) {
   );
 }
 
-async function _handleExternalCourseUpdate(cid, kind) {
-  if (!cid) return;
-  if (kind === 'student-records') {
-    if (_isEchoGuarded('student-records', cid)) return;
-    await loadStudentProfileSummaries(cid);
-    _invalidateAndRerender();
-    return;
+var _refreshState = {}; // cid → { kind, running, snapshot, skipped }
+
+/* A course changed on the server (another device, another tab, or our own
+   writes landing). Refresh it once it's safe: see _localWrites above. */
+function _handleExternalCourseUpdate(cid, kind) {
+  if (!cid) return Promise.resolve();
+  var st = _refreshState[cid] || (_refreshState[cid] = {});
+  st.kind = st.kind === 'gradebook' || kind === 'gradebook' ? 'gradebook' : 'student-records';
+  if (!st.running) st.running = _runCourseRefresh(cid, st);
+  return st.running;
+}
+
+async function _runCourseRefresh(cid, st) {
+  try {
+    // Bounded: a field skipped because of a newer local edit is retried, but
+    // a teacher who never pauses shouldn't keep this loop alive; the next
+    // server change starts it again.
+    for (var attempt = 0; attempt < 3 && st.kind; attempt++) {
+      await _waitForQuietCourse(cid);
+      var kind = st.kind;
+      st.kind = null;
+      st.snapshot = Object.assign({}, (_localWrites[cid] && _localWrites[cid].fields) || {});
+      st.skipped = false;
+      try {
+        if (kind === 'student-records') await loadStudentProfileSummaries(cid);
+        else await initData(cid);
+      } catch (e) {
+        console.warn('Realtime refresh failed for ' + cid + ':', e);
+      } finally {
+        st.snapshot = null;
+      }
+      _invalidateAndRerender();
+      if (st.skipped && !st.kind) st.kind = kind;
+    }
+  } finally {
+    st.running = null;
   }
-  if (_isEchoGuarded('gradebook', cid)) return;
-  await initData(cid);
-  _invalidateAndRerender();
+}
+
+/* Resolves once nothing is waiting to be sent and the course has had no
+   local edit for _REFRESH_QUIET_MS. */
+async function _waitForQuietCourse(cid) {
+  while (true) {
+    if (_pendingSyncs > 0) {
+      await new Promise(function (resolve) {
+        setTimeout(resolve, 250);
+      });
+      continue;
+    }
+    var last = (_localWrites[cid] && _localWrites[cid].at) || 0;
+    var wait = last + _REFRESH_QUIET_MS - Date.now();
+    if (wait <= 0) return;
+    await new Promise(function (resolve) {
+      setTimeout(resolve, wait);
+    });
+  }
+}
+
+/* True when a running refresh must not overwrite this field: the teacher
+   edited it after the refresh started. */
+function _refreshMustSkip(cid, field) {
+  var st = _refreshState[cid];
+  if (!st || !st.snapshot) return false;
+  if (_localWriteCount(cid, field) === (st.snapshot[field] || 0)) return false;
+  st.skipped = true;
+  return true;
 }
 
 function _unsubscribeCourseSyncCursor() {
@@ -1211,6 +1268,7 @@ async function _rpcPagedArray(sb, fn, payload, opts) {
 }
 
 function _persistLoadedField(cid, field, value) {
+  if (_refreshMustSkip(cid, field)) return;
   _cache[field][cid] = value;
   var key = _DATA_KEYS[field];
   if (key) _safeLSSet('gb-' + key + '-' + cid, JSON.stringify(value));
@@ -2728,8 +2786,7 @@ const _NORMALIZED_TABLES = {
 function _saveCourseField(field, cid, value) {
   _cache[field][cid] = value;
   if (_PROF_FIELDS.includes(field) && typeof clearProfCache === 'function') clearProfCache();
-  if (_isGradebookField(field)) _setEchoGuard('gradebook', cid);
-  if (_isStudentRecordField(field)) _setEchoGuard('student-records', cid);
+  _markLocalWrite(field, cid);
   // Persist to localStorage (primary store in v2; remote writes happen through
   // the dispatcher functions at each save site, not via this field-save path).
   var dataKey = _DATA_KEYS[field];
@@ -3194,13 +3251,8 @@ function upsertScore(cid, sid, aid, tid, scoreVal, date, type, note) {
   _cache.scores[cid] = scores;
   if (typeof clearProfCache === 'function') clearProfCache();
   var lsOk = _safeLSSet('gb-scores-' + cid, JSON.stringify(scores));
-  // Arm the same echo guard that _saveCourseField sets for blob writes.
-  // Without this, the course_sync_cursor realtime subscription delivers an
-  // UPDATE event after each RPC commits, _handleExternalCourseUpdate calls
-  // initData(cid), and the resulting get_gradebook re-fetch overwrites
-  // _cache.scores while RPCs are still in flight — wiping rapid sequential
-  // rubric clicks once realtime catches up.
-  _setEchoGuard('gradebook', cid);
+  // A realtime refresh that started before this edit must not overwrite it.
+  _markLocalWrite('scores', cid);
 
   if (_writesEnabled()) {
     _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note);
@@ -6204,8 +6256,8 @@ function toggleFlag(cid, sid) {
     if (summaries[sid].enrollment) summaries[sid].enrollment.isFlagged = nextFlagged;
     _persistLoadedField(cid, 'studentProfileSummaries', summaries);
   }
+  _markLocalWrite('studentProfileSummaries', cid);
   if (_writesEnabled() && _isUuid(sid)) {
-    _setEchoGuard('student-records', cid);
     return window.setEnrollmentFlag(sid, nextFlagged).then(function (res) {
       if (res && res.error) console.warn('setEnrollmentFlag failed:', res.error);
       return nextFlagged;

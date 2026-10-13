@@ -142,12 +142,3 @@ describe('requireAuth — server-side session validation', () => {
     expect(getUserSpy).toHaveBeenCalledTimes(1);
   });
 });
-
-describe('echo guard window', () => {
-  it('is set to 8000ms — the old 35000ms window was longer than any real RPC timeout and masked a second legitimate write landing inside the same window with stale cached state', () => {
-    const src = readFileSync(resolve(root, 'shared/data.js'), 'utf-8');
-    const match = src.match(/const\s+_ECHO_GUARD_MS\s*=\s*(\d+)\s*;/);
-    expect(match).not.toBeNull();
-    expect(Number(match[1])).toBe(8000);
-  });
-});
