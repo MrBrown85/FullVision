@@ -1,7 +1,8 @@
 /**
  * Persistence degraded recovery (P6.1) — tests the retry-with-backoff,
- * enter/exit degraded mode, touched-course tracking, and replay-on-recovery
- * behavior added in shared/data.js.
+ * enter/exit degraded mode, and send-on-recovery behavior in shared/data.js.
+ * Writes made while degraded wait in the outbox (shared/offline-queue.js) and
+ * go out when the recovery probe succeeds.
  *
  * Background: a single transient bootstrap_teacher / list_teacher_courses
  * failure on init used to silently flip _useSupabase = false for the rest of
@@ -10,6 +11,15 @@
  */
 import './setup.js';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import { runInThisContext } from 'vm';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+runInThisContext(readFileSync(resolve(root, 'shared/offline-queue.js'), 'utf-8'), {
+  filename: 'shared/offline-queue.js',
+});
 
 const CID_A = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const CID_B = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
@@ -17,6 +27,7 @@ const CID_B = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 function makeBootstrapClient(opts) {
   opts = opts || {};
   var state = {
+    calls: [],
     bootstrapAttempts: 0,
     listAttempts: 0,
     bootstrapFailUntilAttempt: opts.bootstrapFailUntilAttempt || 0,
@@ -45,6 +56,10 @@ function makeBootstrapClient(opts) {
         state.listAttempts += 1;
         return Promise.resolve({ data: state.courseRows, error: null });
       }
+      state.calls.push(name);
+      if (name === 'create_student_and_enroll') {
+        return Promise.resolve({ data: { student_id: 'stu-1', enrollment_id: 'enr-1' }, error: null });
+      }
       return Promise.resolve({ data: null, error: null });
     },
   };
@@ -72,7 +87,8 @@ describe('Persistence degraded recovery (P6.1)', () => {
     globalThis.dismissSyncToast = function () {};
     _useSupabase = false;
     _supabaseDegraded = false;
-    _degradedTouchedCourses.clear();
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => true });
+    window.v2Queue.clear();
     if (_recoveryProbeTimer) {
       clearTimeout(_recoveryProbeTimer);
       _recoveryProbeTimer = null;
@@ -102,7 +118,7 @@ describe('Persistence degraded recovery (P6.1)', () => {
     globalThis.dismissSyncToast = originalDismissSyncToast;
     _useSupabase = originalUseSupabase;
     _supabaseDegraded = false;
-    _degradedTouchedCourses.clear();
+    window.v2Queue.clear();
     if (_recoveryProbeTimer) {
       clearTimeout(_recoveryProbeTimer);
       _recoveryProbeTimer = null;
@@ -176,25 +192,25 @@ describe('Persistence degraded recovery (P6.1)', () => {
     });
   });
 
-  describe('_saveCourseField touched-course tracking', () => {
-    it('records the cid in _degradedTouchedCourses when degraded', () => {
+  describe('writes while degraded', () => {
+    it('are held in the outbox, not sent', async () => {
       _enterDegradedMode(new Error('boom'));
-      _saveCourseField('students', CID_A, []);
-      expect(_degradedTouchedCourses.has(CID_A)).toBe(true);
+      var client = makeBootstrapClient();
+      globalThis.getSupabase = () => client;
+
+      saveStudents(CID_A, [{ id: 's1', firstName: 'A', lastName: 'B', designations: [], sortName: 'B A' }]);
+      // The student save dispatches on the next microtask.
+      await new Promise(r => setImmediate(r));
+
+      expect(client.state.calls).toEqual([]);
+      expect(window.v2Queue.stats().queued).toBe(1);
     });
 
-    it('does NOT record the cid when not degraded', () => {
-      _supabaseDegraded = false;
-      _saveCourseField('students', CID_A, []);
-      expect(_degradedTouchedCourses.has(CID_A)).toBe(false);
-    });
-
-    it('records multiple distinct courses', () => {
+    it('stay local in demo mode', () => {
       _enterDegradedMode(new Error('boom'));
-      _saveCourseField('students', CID_A, []);
-      _saveCourseField('scores', CID_B, {});
-      expect(_degradedTouchedCourses.has(CID_A)).toBe(true);
-      expect(_degradedTouchedCourses.has(CID_B)).toBe(true);
+      localStorage.setItem('gb-demo-mode', '1');
+      saveStudents(CID_A, [{ id: 's1', firstName: 'A', lastName: 'B', designations: [], sortName: 'B A' }]);
+      expect(window.v2Queue.stats().queued).toBe(0);
     });
   });
 
@@ -229,43 +245,46 @@ describe('Persistence degraded recovery (P6.1)', () => {
       expect(_useSupabase).toBe(false);
     });
 
-    it('clears _degradedTouchedCourses after recovery (replay consumes them)', async () => {
+    it('sends the writes held while degraded once recovery succeeds', async () => {
       _enterDegradedMode(new Error('boom'));
-      _saveCourseField('students', CID_A, [{ id: 's1', firstName: 'A', lastName: 'B', designations: [] }]);
-      expect(_degradedTouchedCourses.has(CID_A)).toBe(true);
-
       var client = makeBootstrapClient();
       globalThis.getSupabase = () => client;
-      await retrySupabaseRecovery();
+      saveStudents(CID_A, [{ id: 's1', firstName: 'A', lastName: 'B', designations: [], sortName: 'B A' }]);
+      expect(client.state.calls).toEqual([]);
 
-      expect(_degradedTouchedCourses.size).toBe(0);
+      await retrySupabaseRecovery();
+      await window.v2Queue.flush();
+
+      expect(client.state.calls).toContain('create_student_and_enroll');
+      expect(window.v2Queue.stats().queued).toBe(0);
     });
   });
 
   describe('integration — silent dataloss regression guard', () => {
-    it('writes during a degraded window are tracked, then replayed on recovery (canonical store catches up)', async () => {
+    it('writes during a degraded window are held, then sent on recovery (canonical store catches up)', async () => {
       // Step 1: enter degraded mode (simulating a failed init).
       _useSupabase = true;
       _enterDegradedMode(new Error('init failed'));
       expect(_useSupabase).toBe(false);
 
       // Step 2: teacher writes during the degraded window.
-      saveStudents(CID_A, [{ id: 's1', firstName: 'Alice', lastName: 'A', designations: [], sortName: 'A Alice' }]);
-      expect(_degradedTouchedCourses.has(CID_A)).toBe(true);
-      // The save landed in LS but no canonical write fired (_useSupabase is false).
-      expect(getStudents(CID_A)).toHaveLength(1);
-
-      // Step 3: recovery probe succeeds.
       var client = makeBootstrapClient();
       globalThis.getSupabase = () => client;
-      await retrySupabaseRecovery();
+      saveStudents(CID_A, [{ id: 's1', firstName: 'Alice', lastName: 'A', designations: [], sortName: 'A Alice' }]);
+      // The save landed in LS; the enrollment waits in the outbox.
+      expect(getStudents(CID_A)).toHaveLength(1);
+      expect(client.state.calls).not.toContain('create_student_and_enroll');
 
-      // Step 4: post-recovery, the touched course was replayed and the LS data
-      // is still present (replay re-invokes the diff-based save, which writes
-      // LS again idempotently and dispatches the canonical delta).
+      // Step 3: recovery probe succeeds and the outbox drains.
+      await retrySupabaseRecovery();
+      await window.v2Queue.flush();
+
+      // Step 4: the enrollment reached the server and the local student got
+      // its canonical id.
       expect(_useSupabase).toBe(true);
       expect(_supabaseDegraded).toBe(false);
-      expect(getStudents(CID_A)).toHaveLength(1);
+      expect(client.state.calls).toContain('create_student_and_enroll');
+      expect(getStudents(CID_A)[0].id).toBe('enr-1');
     });
   });
 });

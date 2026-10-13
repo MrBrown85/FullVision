@@ -276,6 +276,124 @@ describe('v2Queue (offline write queue)', () => {
     });
   });
 
+  // push() is the write path shared/data.js uses for every RPC.
+  describe('push', () => {
+    it('sends at once and resolves with the server result', async () => {
+      setOnline(true);
+      var res = await Q.push('update_student', { p_id: 'st-1', p_patch: {} });
+      expect(res).toEqual({ data: 'ok', error: null });
+      expect(calls).toHaveLength(1);
+      expect(Q.stats().queued).toBe(0);
+    });
+
+    it('waits while offline and resolves once the write gets through', async () => {
+      setOnline(false);
+      var settled = false;
+      var p = Q.push('update_student', { p_id: 'st-1', p_patch: {} }).then(function (res) {
+        settled = true;
+        return res;
+      });
+      await Promise.resolve();
+      expect(settled).toBe(false);
+      expect(Q.stats().queued).toBe(1);
+
+      setOnline(true);
+      await Q.flush();
+      expect(await p).toEqual({ data: 'ok', error: null });
+    });
+
+    it('retries a network error and resolves with the eventual success', async () => {
+      setOnline(true);
+      var n = 0;
+      globalThis.getSupabase = () => ({
+        rpc(name, payload) {
+          calls.push({ name: name, payload: payload });
+          n++;
+          if (n < 3) return Promise.resolve({ data: null, error: { message: 'TypeError: Failed to fetch' } });
+          return Promise.resolve({ data: 'saved', error: null });
+        },
+      });
+      var res = await Q.push('update_student', { p_id: 'st-1', p_patch: {} });
+      expect(res.data).toBe('saved');
+      expect(calls).toHaveLength(3);
+      expect(Q.stats()).toMatchObject({ queued: 0, deadLettered: 0 });
+    });
+
+    it('dead-letters a validation error at once instead of retrying it', async () => {
+      setOnline(true);
+      globalThis.getSupabase = () => ({
+        rpc(name, payload) {
+          calls.push({ name: name, payload: payload });
+          return Promise.resolve({ data: null, error: { code: '23514', message: 'violates check constraint' } });
+        },
+      });
+      var res = await Q.push('upsert_tag_score', { p_enrollment_id: 'e', p_assessment_id: 'a', p_value: 9 });
+      expect(res.error.code).toBe('23514');
+      expect(calls).toHaveLength(1);
+      expect(Q.stats()).toMatchObject({ queued: 0, deadLettered: 1 });
+    });
+
+    it('sends writes to the same record in order, one at a time', async () => {
+      setOnline(true);
+      var release = [];
+      globalThis.getSupabase = () => ({
+        rpc(name, payload) {
+          calls.push({ name: name, payload: payload });
+          return new Promise(function (resolve) {
+            release.push(function () {
+              resolve({ data: 'ok', error: null });
+            });
+          });
+        },
+      });
+      var cell = { p_enrollment_id: 'e1', p_assessment_id: 'a1' };
+      var first = Q.push('upsert_tag_score', Object.assign({ p_value: 2 }, cell));
+      var second = Q.push('upsert_tag_score', Object.assign({ p_value: 3 }, cell));
+      var other = Q.push('upsert_tag_score', { p_enrollment_id: 'e2', p_assessment_id: 'a1', p_value: 4 });
+      await Promise.resolve();
+
+      // The second write to cell e1/a1 waits for the first; e2 doesn't.
+      expect(
+        calls.map(function (c) {
+          return c.payload.p_value;
+        }),
+      ).toEqual([2, 4]);
+      release.shift()();
+      await first;
+      await Promise.resolve();
+      expect(calls[2].payload.p_value).toBe(3);
+      release.splice(0).forEach(function (go) {
+        go();
+      });
+      await Promise.all([second, other]);
+    });
+
+    it('holds writes while paused', async () => {
+      setOnline(true);
+      var paused = true;
+      Q.configure({
+        isPaused: function () {
+          return paused;
+        },
+      });
+      try {
+        var p = Q.push('update_student', { p_id: 'st-1', p_patch: {} });
+        await Promise.resolve();
+        expect(calls).toHaveLength(0);
+        paused = false;
+        await Q.flush();
+        await p;
+        expect(calls).toHaveLength(1);
+      } finally {
+        Q.configure({
+          isPaused: function () {
+            return false;
+          },
+        });
+      }
+    });
+  });
+
   // The queue lives in localStorage, so on a shared Chromebook it can outlast
   // a sign-out. One teacher's queued writes must never be sent under another
   // teacher's session.

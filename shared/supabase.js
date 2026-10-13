@@ -190,9 +190,10 @@
     opts = opts || {};
     const sb = getSupabase();
     if (!sb) return;
-    // Wait for any pending data syncs to finish before clearing local data
+    // Give in-flight writes a moment to land. Anything still unsent after
+    // that sits in the outbox, which the check below reports.
     if (typeof waitForPendingSyncs === 'function') {
-      await waitForPendingSyncs();
+      await waitForPendingSyncs(5000);
     }
     if (!opts.force && !opts.keepQueue) {
       const unsent = await _unsentQueueCount();
