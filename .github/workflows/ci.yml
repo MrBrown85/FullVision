@@ -27,6 +27,20 @@ jobs:
       - name: Run unit tests
         run: npm test
 
+      # Fails when the client calls an RPC the live database doesn't have, or
+      # a file in migrations/ was never applied. Skipped until the read-only
+      # role's connection string is saved as a secret (see
+      # migrations/20261012_ci_schema_reader_role.sql).
+      - name: Check the live database matches the repo
+        env:
+          DATABASE_URL: ${{ secrets.FV_SCHEMA_READER_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::notice::Database drift check skipped: the FV_SCHEMA_READER_URL secret is not set."
+            exit 0
+          fi
+          node scripts/check-db-drift.mjs
+
       - name: Collect changed files for format check
         id: changed-files
         shell: bash
