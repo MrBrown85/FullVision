@@ -16,7 +16,6 @@ var _tagProfCache = {};
 var _awCache = {};
 var _assessMapCache = {}; // cid → Map<assessmentId, assessment> — avoids O(n) find per score
 var _sectionByIdCache = {}; // cid → Map<sectionId, section>      — avoids repeated getSections().find()
-var _categoryMapCache = {}; // cid → Map<categoryId, category>
 var _assessmentOverallCache = {};
 var _categoryAvgCache = {};
 var _courseLetterCache = {};
@@ -28,7 +27,6 @@ function clearProfCache() {
   _awCache = {};
   _assessMapCache = {};
   _sectionByIdCache = {};
-  _categoryMapCache = {};
   _assessmentOverallCache = {};
   _categoryAvgCache = {};
   _courseLetterCache = {};
@@ -68,17 +66,6 @@ function _getSectionById(cid, sectionId) {
     );
   }
   return _sectionByIdCache[cid].get(sectionId);
-}
-
-function _getCategoryMap(cid) {
-  if (_categoryMapCache[cid]) return _categoryMapCache[cid];
-  var map = new Map(
-    (getCategories(cid) || []).map(function (c) {
-      return [c.id, c];
-    }),
-  );
-  _categoryMapCache[cid] = map;
-  return map;
 }
 
 /** Convert a raw point score to a proficiency level using percentage boundaries.
