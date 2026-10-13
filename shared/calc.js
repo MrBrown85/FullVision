@@ -154,6 +154,8 @@ function getAssessmentOverallScore(cid, studentId, assessmentId) {
       return entry.assessmentId === assessmentId;
     })
     .map(function (entry) {
+      // A points score of 0 counts as ungraded (see getTagScores).
+      if (isPointsScored(assessment) && !isCompletionScored(assessment) && !(Number(entry.score) > 0)) return null;
       // A proficiency level counts with its + or − (3+ = 3.33).
       var raw = isPointsScored(assessment) ? entry.score : entry.score > 0 ? scoreModValue(entry) : entry.score;
       return _normalizeAssessmentEntryValue(assessment, raw);
@@ -395,6 +397,10 @@ function getTagScores(cid, studentId, tagId) {
   var result = filtered.map(s => {
     const assess = assessMap.get(s.assessmentId);
     if (isPointsScored(assess) && assess.maxPoints > 0) {
+      // A points score of 0 is blank in every view and counts as ungraded, so
+      // it is no evidence (pointsToProf would make it a 1). Incomplete is the
+      // only 0 that counts.
+      if (!isCompletionScored(assess) && !(Number(s.score) > 0)) return { ...s, rawPoints: s.score, score: 0 };
       return { ...s, rawPoints: s.score, score: pointsToProf(s.score, assess.maxPoints, scale) };
     }
     // A + or − counts in every calculation (3+ = 3.33). `level` keeps the
