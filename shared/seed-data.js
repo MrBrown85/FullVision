@@ -433,6 +433,20 @@ function seedIfNeeded() {
     });
   }
 
+  /* helper: a + or − for about a quarter of proficiency scores, fixed per
+     student, assessment and tag so the demo looks the same every time. A
+     rubric gets one sign for the whole assessment: a competency can sit in
+     two criteria, and its score is shared by both. */
+  function seedScoreMod(sid, a, row, level) {
+    if (a.scoreMode === 'points') return 0;
+    var key = sid + '|' + a.id + '|' + row;
+    var h = 0;
+    for (var i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+    var pick = h % 100;
+    var mod = pick < 12 ? 1 : pick < 24 ? -1 : 0;
+    return normalizeScoreMod(level, mod);
+  }
+
   /* helper: build score entries from a compact map */
   function buildScores(studentIds, assessments, scoreMap) {
     const sc = {};
@@ -442,11 +456,13 @@ function seedIfNeeded() {
         const baseScore = scoreMap[a.id] ? scoreMap[a.id][idx] : 0;
         if (baseScore === 0) return; // blank — not yet assessed
         (a.tagIds || []).forEach(tagId => {
+          const mod = seedScoreMod(sid, a, a.rubricId ? 'rubric' : tagId, baseScore);
           sc[sid].push({
             id: uid(),
             assessmentId: a.id,
             tagId,
             score: baseScore,
+            ...(mod ? { mod } : {}),
             date: a.date,
             categoryId: a.categoryId || a.category_id || null,
             category_id: a.categoryId || a.category_id || null,
@@ -1406,7 +1422,7 @@ function seedIfNeeded() {
     saveRubrics('sci8', current(sci8Rubrics));
 
     //  Distribution: Extending(st2,st9,st13), Proficient(st1,st3,st4,st5,st7,st8,st10,st11,st14,st17,st19,st20), Developing(st6,st12,st15,st16,st18), Emerging(st3 early only — shows growth)
-    //  0 = not yet assessed (blank)
+    //  Every student has a score on every assessment.
     const sci8ScoreMap = {
       sci8a1: [3, 4, 2, 3, 3, 2, 3, 3, 4, 3, 3, 2, 4, 3, 2, 2, 3, 2, 3, 3, 3, 2, 4, 3, 3, 2, 3],
       sci8a2: [3, 4, 3, 3, 3, 2, 3, 3, 4, 3, 3, 2, 4, 3, 2, 2, 3, 2, 3, 3, 3, 3, 4, 2, 3, 2, 3],
@@ -1417,7 +1433,7 @@ function seedIfNeeded() {
       sci8a7: [3, 4, 3, 3, 3, 2, 3, 3, 4, 3, 3, 2, 4, 3, 3, 2, 3, 2, 4, 3, 3, 2, 3, 3, 4, 3, 3],
       sci8a8: [4, 4, 3, 3, 3, 2, 3, 4, 4, 3, 3, 2, 4, 3, 2, 3, 3, 2, 3, 3, 4, 3, 3, 3, 3, 2, 3],
       sci8a9: [3, 4, 3, 3, 4, 2, 3, 3, 4, 3, 3, 3, 4, 3, 2, 2, 4, 2, 3, 4, 3, 2, 4, 3, 3, 3, 3],
-      sci8a10: [3, 4, 3, 3, 3, 0, 3, 3, 4, 3, 3, 0, 4, 3, 2, 2, 3, 0, 3, 3, 3, 3, 3, 2, 3, 0, 3],
+      sci8a10: [3, 4, 3, 3, 3, 2, 3, 3, 4, 3, 3, 2, 4, 3, 2, 2, 3, 2, 3, 3, 3, 3, 3, 2, 3, 3, 3],
       sci8a11: [3, 4, 2, 3, 3, 2, 3, 3, 4, 3, 3, 2, 4, 3, 2, 2, 3, 2, 3, 3, 3, 2, 4, 3, 3, 2, 3],
       sci8a12: [3, 4, 3, 3, 3, 2, 3, 3, 4, 3, 3, 2, 4, 3, 2, 2, 3, 2, 3, 3, 3, 3, 4, 2, 3, 2, 3],
       sci8a13: [3, 4, 3, 3, 3, 2, 3, 3, 4, 3, 3, 2, 4, 3, 2, 2, 3, 2, 3, 3, 3, 2, 3, 3, 4, 3, 3],
@@ -1427,7 +1443,7 @@ function seedIfNeeded() {
       sci8a17: [3, 4, 3, 3, 3, 2, 3, 3, 4, 3, 3, 2, 4, 3, 3, 2, 3, 2, 4, 3, 3, 2, 3, 3, 4, 3, 3],
       sci8a18: [4, 4, 3, 3, 3, 2, 3, 4, 4, 3, 3, 2, 4, 3, 2, 3, 3, 2, 3, 3, 4, 3, 3, 3, 3, 2, 3],
       sci8a19: [3, 4, 3, 3, 4, 2, 3, 3, 4, 3, 3, 3, 4, 3, 2, 2, 4, 2, 3, 4, 3, 2, 4, 3, 3, 3, 3],
-      sci8a20: [3, 4, 3, 3, 3, 0, 3, 3, 4, 3, 3, 0, 4, 3, 2, 2, 3, 0, 3, 3, 3, 3, 3, 0, 3, 0, 3],
+      sci8a20: [3, 4, 3, 3, 3, 2, 3, 3, 4, 3, 3, 2, 4, 3, 2, 2, 3, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3],
       // ── Science 8 Quiz Scores (points-based) ──
       sci8q1: [8, 10, 6, 8, 9, 5, 7, 9, 10, 8, 7, 5, 10, 8, 6, 5, 7, 4, 8, 7, 8, 6, 10, 7, 9, 5, 8],
       sci8q2: [12, 15, 10, 13, 12, 7, 11, 13, 15, 12, 11, 8, 14, 12, 9, 8, 11, 6, 12, 11, 13, 9, 14, 10, 13, 8, 12],
@@ -1439,8 +1455,8 @@ function seedIfNeeded() {
       sci8q8: [8, 10, 7, 8, 8, 5, 8, 9, 10, 8, 7, 5, 10, 8, 6, 5, 8, 4, 8, 8, 8, 7, 10, 7, 8, 5, 8],
       sci8q9: [8, 10, 7, 9, 8, 5, 8, 9, 10, 8, 8, 6, 10, 8, 6, 5, 7, 4, 8, 8, 9, 7, 10, 7, 8, 6, 8],
       sci8q10: [12, 15, 10, 12, 13, 7, 11, 12, 15, 12, 11, 8, 14, 12, 9, 7, 12, 6, 13, 12, 12, 9, 14, 10, 13, 8, 12],
-      sci8q11: [8, 10, 7, 8, 8, 5, 7, 8, 10, 8, 7, 0, 10, 8, 6, 5, 7, 0, 8, 8, 8, 6, 10, 7, 8, 0, 8],
-      sci8q12: [8, 10, 7, 8, 8, 0, 7, 8, 10, 8, 7, 0, 10, 8, 6, 5, 7, 0, 8, 8, 8, 0, 10, 7, 8, 0, 8],
+      sci8q11: [8, 10, 7, 8, 8, 5, 7, 8, 10, 8, 7, 5, 10, 8, 6, 5, 7, 4, 8, 8, 8, 6, 10, 7, 8, 5, 8],
+      sci8q12: [8, 10, 7, 8, 8, 5, 7, 8, 10, 8, 7, 5, 10, 8, 6, 5, 7, 4, 8, 8, 8, 6, 10, 7, 8, 5, 8],
       // ── Science 8 Unit Test Scores (points-based) ──
       sci8t1: [
         48, 57, 36, 50, 49, 31, 42, 50, 58, 48, 44, 30, 56, 47, 33, 30, 44, 28, 48, 46, 50, 36, 56, 42, 50, 32, 46,
@@ -1452,9 +1468,11 @@ function seedIfNeeded() {
         41, 48, 33, 43, 41, 27, 37, 43, 49, 41, 38, 26, 47, 40, 28, 25, 38, 24, 41, 40, 43, 33, 47, 36, 42, 27, 40,
       ],
       sci8t4: [
-        49, 57, 37, 50, 50, 31, 43, 51, 58, 49, 44, 30, 56, 48, 33, 31, 44, 28, 49, 47, 50, 0, 56, 43, 50, 0, 47,
+        49, 57, 37, 50, 50, 31, 43, 51, 58, 49, 44, 30, 56, 48, 33, 31, 44, 28, 49, 47, 50, 37, 56, 43, 50, 32, 47,
       ],
-      sci8t5: [65, 76, 53, 67, 67, 42, 57, 68, 77, 65, 59, 0, 75, 64, 44, 42, 58, 0, 65, 62, 66, 53, 75, 56, 67, 0, 62],
+      sci8t5: [
+        65, 76, 53, 67, 67, 42, 57, 68, 77, 65, 59, 42, 75, 64, 44, 42, 58, 39, 65, 62, 66, 53, 75, 56, 67, 44, 62,
+      ],
     };
     saveScores('sci8', current(buildScores(STIDS, sci8SeedAssessments, sci8ScoreMap)));
 

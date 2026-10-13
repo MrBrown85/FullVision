@@ -54,3 +54,21 @@ describe('seed timeline', () => {
     expect(dates.filter(d => d > SEED_LAST_DAY)).toEqual([]);
   });
 });
+
+describe('seed scores', () => {
+  it('scores every student on every assessment', () => {
+    const start = source.indexOf('const sci8ScoreMap = {');
+    const map = source.slice(start, source.indexOf('saveScores(', start));
+    const rows = [...map.matchAll(/(sci8[a-z]\d+): \[([^\]]+)\]/g)];
+    expect(rows.length).toBe(37);
+    rows.forEach(([, id, list]) => {
+      const values = list
+        .split(',')
+        .map(v => v.trim())
+        .filter(Boolean)
+        .map(Number);
+      expect([id, values.length]).toEqual([id, 27]);
+      expect([id, values.filter(v => v === 0).length]).toEqual([id, 0]);
+    });
+  });
+});
