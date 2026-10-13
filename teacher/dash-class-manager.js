@@ -245,6 +245,27 @@ window.DashClassManager = (function () {
   ];
 
   var _UUID_RE_CM = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  // True unless the promise settles false within ms. A slow or offline save
+  // is still queued in the outbox, so it isn't reported as a failure.
+  function _resolvesTrueWithin(promise, ms) {
+    return Promise.race([
+      Promise.resolve(promise).then(function (ok) {
+        return ok !== false;
+      }),
+      new Promise(function (resolve) {
+        setTimeout(function () {
+          resolve(true);
+        }, ms);
+      }),
+    ]);
+  }
+
+  // Inputs rendered before a new row's server id came back still carry its
+  // local id; look rows up by their current id.
+  function _currentId(kind, id) {
+    return cmSelectedCourse && id ? resolveLearningMapId(cmSelectedCourse, kind, id) : id;
+  }
+
   function _isCanonicalId(id) {
     return typeof id === 'string' && _UUID_RE_CM.test(id);
   }
@@ -280,100 +301,6 @@ window.DashClassManager = (function () {
     return null;
   }
 
-  // Patch a single entity-kind's id from local → canonical. Scoping is
-  // required: buildLearningMapFromTags assigns the same baseId to a section
-  // and the tag inside it, so a kind-blind walk would rewrite the tag's id
-  // to the section's UUID and the next upsert_tag would 500 with
-  // "tag not found".
-  function _patchMapId(cid, map, kind, localId, canonicalId) {
-    if (!localId || !canonicalId || localId === canonicalId) return;
-    if (kind === 'subject') {
-      (map.subjects || []).forEach(function (s) {
-        if (s.id === localId) s.id = canonicalId;
-      });
-      (map.sections || []).forEach(function (s) {
-        if (s.subject === localId) s.subject = canonicalId;
-        (s.tags || []).forEach(function (t) {
-          if (t.subject === localId) t.subject = canonicalId;
-        });
-      });
-    } else if (kind === 'section') {
-      (map.sections || []).forEach(function (s) {
-        if (s.id === localId) s.id = canonicalId;
-      });
-    } else if (kind === 'tag') {
-      (map.sections || []).forEach(function (s) {
-        (s.tags || []).forEach(function (t) {
-          if (t.id === localId) t.id = canonicalId;
-        });
-      });
-    } else if (kind === 'group') {
-      (map.competencyGroups || []).forEach(function (g) {
-        if (g.id === localId) g.id = canonicalId;
-      });
-      (map.sections || []).forEach(function (s) {
-        if (s.groupId === localId) s.groupId = canonicalId;
-      });
-    }
-    saveLearningMap(cid, map);
-  }
-
-  async function _dispatchMapToV2(cid, map, forceNewIds) {
-    if (!_isCanonicalId(cid)) return true;
-    try {
-      var subjects = map.subjects || [];
-      for (var si = 0; si < subjects.length; si++) {
-        var sub = subjects[si];
-        var oldSubId = sub.id;
-        var subRes = await window.v2.upsertSubject({
-          id: forceNewIds ? null : oldSubId,
-          courseId: cid,
-          name: sub.name,
-          color: sub.color || null,
-          displayOrder: si,
-        });
-        if (subRes && subRes.data && subRes.data !== oldSubId) {
-          _patchMapId(cid, map, 'subject', oldSubId, subRes.data);
-        }
-      }
-      var sections = map.sections || [];
-      for (var si = 0; si < sections.length; si++) {
-        var sec = sections[si];
-        var oldSecId = sec.id;
-        var secRes = await window.v2.upsertSection({
-          id: forceNewIds ? null : oldSecId,
-          subjectId: sec.subject,
-          name: sec.name,
-          color: sec.color || null,
-          displayOrder: si,
-        });
-        if (secRes && secRes.data && secRes.data !== oldSecId) {
-          _patchMapId(cid, map, 'section', oldSecId, secRes.data);
-        }
-        var tags = sec.tags || [];
-        for (var ti = 0; ti < tags.length; ti++) {
-          var tag = tags[ti];
-          var oldTagId = tag.id;
-          var tagRes = await window.v2.upsertTag({
-            id: forceNewIds ? null : oldTagId,
-            sectionId: sec.id,
-            label: tag.name || tag.label || '',
-            code: tag.shortName || tag.code || '',
-            iCanText: tag.text || tag.i_can_statements || '',
-            displayOrder: ti,
-          });
-          if (tagRes && tagRes.data && tagRes.data !== oldTagId) {
-            _patchMapId(cid, map, 'tag', oldTagId, tagRes.data);
-          }
-        }
-      }
-      return true;
-    } catch (err) {
-      console.error('[_dispatchMapToV2] dispatch failed for course', cid, err);
-      return false;
-    }
-  }
-
   function _cmClearMerge() {
     if (_cmMergeHoverTimer) {
       clearTimeout(_cmMergeHoverTimer);
@@ -388,6 +315,8 @@ window.DashClassManager = (function () {
   }
 
   function _cmMergeToNewGroup(draggedId, targetId) {
+    draggedId = _currentId('section', draggedId);
+    targetId = _currentId('section', targetId);
     if (!cmSelectedCourse) return;
     var cid = cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
@@ -408,16 +337,6 @@ window.DashClassManager = (function () {
     });
     saveLearningMap(cid, map);
     renderClassManager();
-    var grpLocalId = grp.id;
-    window.v2
-      .upsertCompetencyGroup({ id: grpLocalId, courseId: cid, name: grp.name, color: grp.color, displayOrder: idx })
-      .then(function (res) {
-        var canonicalId = res && res.data ? res.data : null;
-        if (canonicalId && canonicalId !== grpLocalId) {
-          var m = getLearningMap(cid);
-          _patchMapId(cid, m, 'group', grpLocalId, canonicalId);
-        }
-      });
     setTimeout(function () {
       var input = document.querySelector('.mod-folder[data-module-id="' + grp.id + '"] .mod-folder-name-input');
       if (input) {
@@ -506,15 +425,16 @@ window.DashClassManager = (function () {
       if (targetGroupId === '__none__') targetGroupId = '';
       if (cmSelectedCourse) {
         var map = ensureCustomLearningMap(cmSelectedCourse);
+        var dragId = _currentId('section', _cmDragStdId);
+        if (targetGroupId) targetGroupId = _currentId('group', targetGroupId);
         var sec = (map.sections || []).find(function (s) {
-          return s.id === _cmDragStdId;
+          return s.id === dragId;
         });
         if (sec) {
           if (targetGroupId) sec.groupId = targetGroupId;
           else delete sec.groupId;
           saveLearningMap(cmSelectedCourse, map);
           renderClassManager();
-          window.v2.upsertSection({ id: _cmDragStdId, competencyGroupId: targetGroupId || null });
         }
       }
       _cmDragStdId = null;
@@ -2098,11 +2018,12 @@ window.DashClassManager = (function () {
     if (cwSelectedTags.length > 0 && CURRICULUM_INDEX) {
       var map = buildLearningMapFromTags(cwSelectedTags);
       if (map) {
-        saveLearningMap(course.id, map);
+        var mapSaved = saveLearningMap(course.id, map);
         updateCourse(course.id, { curriculumTags: cwSelectedTags.slice() });
-        // _dispatchMapToV2 short-circuits on a non-canonical course id, so a
-        // create whose RPC never landed leaves the curriculum unsynced.
-        dispatchOk = canonicalCid ? await _dispatchMapToV2(canonicalCid, map, false) : false;
+        // A class whose create never landed has no server id, so its
+        // curriculum can't be sent yet. Otherwise wait for the map to reach
+        // the server, within reason: offline, the outbox keeps it for later.
+        dispatchOk = canonicalCid ? await _resolvesTrueWithin(mapSaved, 15000) : false;
       }
     }
 
@@ -2610,7 +2531,6 @@ window.DashClassManager = (function () {
       if (map) {
         saveLearningMap(cid, map);
         updateCourse(cid, { curriculumTags: cwSelectedTags.slice() });
-        _dispatchMapToV2(cid, map, false);
       }
     } else if (mode === 'merge') {
       var existing = getLearningMap(cid);
@@ -2648,7 +2568,6 @@ window.DashClassManager = (function () {
         });
         existing._customized = true;
         saveLearningMap(cid, existing);
-        _dispatchMapToV2(cid, existing, false);
         var allTags = new Set((COURSES[cid].curriculumTags || []).concat(cwSelectedTags));
         updateCourse(cid, { curriculumTags: Array.from(allTags) });
       }
@@ -2847,11 +2766,12 @@ window.DashClassManager = (function () {
     }
     var srcMap = getLearningMap(sourceCid);
     if (srcMap && (srcMap.subjects?.length || srcMap.sections?.length)) {
-      var clone = structuredClone(srcMap);
+      // Fresh local ids: the copy is new rows for the new class, not an
+      // update of the source class's rows.
+      var clone = withFreshLearningMapIds(srcMap);
       clone._customized = true;
       clone._version = 1;
       saveLearningMap(newCourse.id, clone);
-      _dispatchMapToV2(newCourse.id, clone, true);
     }
     cmSelectedCourse = newCourse.id;
     cmMode = 'edit';
@@ -2865,21 +2785,12 @@ window.DashClassManager = (function () {
     var map = ensureCustomLearningMap(cid);
     var id = 'subj' + Date.now().toString(36);
     map.subjects.push({ id: id, name: 'New Subject', color: '#6366f1' });
-    var displayOrder = map.subjects.length - 1;
     saveLearningMap(cid, map);
     renderClassManager();
-    window.v2
-      .upsertSubject({ id: id, courseId: cid, name: 'New Subject', color: '#6366f1', displayOrder: displayOrder })
-      .then(function (res) {
-        var canonicalId = res && res.data ? res.data : null;
-        if (canonicalId && canonicalId !== id) {
-          var m = getLearningMap(cid);
-          _patchMapId(cid, m, 'subject', id, canonicalId);
-        }
-      });
   }
 
   function cmUpdateSubjectName(subId, val) {
+    subId = _currentId('subject', subId);
     if (!cmSelectedCourse) return;
     var cid = cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
@@ -2889,11 +2800,11 @@ window.DashClassManager = (function () {
     if (sub) {
       sub.name = val.trim();
       saveLearningMap(cid, map);
-      window.v2.upsertSubject({ id: subId, courseId: cid, name: val.trim() });
     }
   }
 
   function cmUpdateSubjectColor(subId, color) {
+    subId = _currentId('subject', subId);
     if (!cmSelectedCourse) return;
     var cid = cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
@@ -2904,9 +2815,6 @@ window.DashClassManager = (function () {
       sub.color = color;
       saveLearningMap(cid, map);
       renderClassManager();
-      if (_isCanonicalId(sub.id)) {
-        window.v2.upsertSubject({ id: sub.id, courseId: cid, name: sub.name, color: color });
-      }
     }
   }
 
@@ -2945,7 +2853,7 @@ window.DashClassManager = (function () {
 
   function cmPickColor(el) {
     var target = el.dataset.target;
-    var id = el.dataset.id;
+    var id = _currentId(el.dataset.target === 'subject' ? 'subject' : 'section', el.dataset.id);
     var color = el.dataset.color;
     if (!cmSelectedCourse) return;
     var map = ensureCustomLearningMap(cmSelectedCourse);
@@ -2955,9 +2863,6 @@ window.DashClassManager = (function () {
       });
       if (sub) {
         sub.color = color;
-        if (_isCanonicalId(sub.id)) {
-          window.v2.upsertSubject({ id: sub.id, courseId: cmSelectedCourse, name: sub.name, color: color });
-        }
       }
     } else {
       var sec = map.sections.find(function (s) {
@@ -2965,15 +2870,6 @@ window.DashClassManager = (function () {
       });
       if (sec) {
         sec.color = color;
-        if (_isCanonicalId(sec.id)) {
-          window.v2.upsertSection({
-            id: sec.id,
-            subjectId: sec.subject,
-            name: sec.name,
-            color: color,
-            competencyGroupId: sec.groupId || null,
-          });
-        }
       }
     }
     saveLearningMap(cmSelectedCourse, map);
@@ -2981,6 +2877,7 @@ window.DashClassManager = (function () {
   }
 
   function cmDeleteSubject(subId) {
+    subId = _currentId('subject', subId);
     if (!cmSelectedCourse) return;
     var cid = cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
@@ -2994,9 +2891,6 @@ window.DashClassManager = (function () {
         'Delete All',
         'danger',
         function () {
-          var deletedSections = map.sections.filter(function (s) {
-            return s.subject === subId;
-          });
           map.subjects = map.subjects.filter(function (s) {
             return s.id !== subId;
           });
@@ -3005,13 +2899,6 @@ window.DashClassManager = (function () {
           });
           saveLearningMap(cid, map);
           renderClassManager();
-          if (_isCanonicalId(subId)) window.v2.deleteSubject(subId);
-          deletedSections.forEach(function (sec) {
-            (sec.tags || []).forEach(function (tag) {
-              if (_isCanonicalId(tag.id)) window.v2.deleteTag(tag.id);
-            });
-            if (_isCanonicalId(sec.id)) window.v2.deleteSection(sec.id);
-          });
         },
       );
     } else {
@@ -3020,7 +2907,6 @@ window.DashClassManager = (function () {
       });
       saveLearningMap(cid, map);
       renderClassManager();
-      if (_isCanonicalId(subId)) window.v2.deleteSubject(subId);
     }
   }
 
@@ -3049,18 +2935,10 @@ window.DashClassManager = (function () {
     map.competencyGroups.push({ id: grpLocalId, name: grpName, color: grpColor, sortOrder: idx });
     saveLearningMap(cid, map);
     renderClassManager();
-    window.v2
-      .upsertCompetencyGroup({ id: grpLocalId, courseId: cid, name: grpName, color: grpColor, displayOrder: idx })
-      .then(function (res) {
-        var canonicalId = res && res.data ? res.data : null;
-        if (canonicalId && canonicalId !== grpLocalId) {
-          var m = getLearningMap(cid);
-          _patchMapId(cid, m, 'group', grpLocalId, canonicalId);
-        }
-      });
   }
 
   function cmUpdateCompGroupName(grpId, val) {
+    grpId = _currentId('group', grpId);
     if (!cmSelectedCourse) return;
     var cid = cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
@@ -3070,11 +2948,11 @@ window.DashClassManager = (function () {
     if (g && val.trim()) {
       g.name = val.trim();
       saveLearningMap(cid, map);
-      window.v2.upsertCompetencyGroup({ id: grpId, courseId: cid, name: val.trim() });
     }
   }
 
   function cmUpdateCompGroupColor(grpId, color) {
+    grpId = _currentId('group', grpId);
     if (!cmSelectedCourse) return;
     var cid = cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
@@ -3085,11 +2963,11 @@ window.DashClassManager = (function () {
       g.color = color;
       saveLearningMap(cid, map);
       _cmRenderWithScroll();
-      window.v2.upsertCompetencyGroup({ id: grpId, courseId: cid, color: color });
     }
   }
 
   function cmDeleteCompGroup(grpId) {
+    grpId = _currentId('group', grpId);
     if (!cmSelectedCourse) return;
     var cid = cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
@@ -3105,7 +2983,6 @@ window.DashClassManager = (function () {
       });
       saveLearningMap(cid, map);
       _cmRenderWithScroll();
-      if (_isCanonicalId(grpId)) window.v2.deleteCompetencyGroup(grpId);
     };
     if (count > 0) {
       showConfirm(
@@ -3121,6 +2998,8 @@ window.DashClassManager = (function () {
   }
 
   function cmUpdateStdGroup(secId, groupId) {
+    secId = _currentId('section', secId);
+    groupId = _currentId('group', groupId);
     if (!cmSelectedCourse) return;
     var cid = cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
@@ -3132,7 +3011,6 @@ window.DashClassManager = (function () {
     else delete sec.groupId;
     saveLearningMap(cid, map);
     _cmRenderWithScroll();
-    window.v2.upsertSection({ id: secId, competencyGroupId: groupId || null });
   }
 
   // Re-render class manager preserving scroll position
@@ -3180,7 +3058,6 @@ window.DashClassManager = (function () {
       ],
     });
     map._flatVersion = 2;
-    var displayOrder = map.sections.length - 1;
     saveLearningMap(cid, map);
     renderClassManager();
     requestAnimationFrame(function () {
@@ -3190,48 +3067,10 @@ window.DashClassManager = (function () {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
     });
-    // Ensure subject is canonical before inserting section (subjectId FK must be UUID)
-    var subjObj = map.subjects.find(function (s) {
-      return s.id === subId;
-    });
-    var subjectRpc = _isCanonicalId(subId)
-      ? Promise.resolve({ data: subId })
-      : window.v2
-          .upsertSubject({ id: subId, courseId: cid, name: subjObj ? subjObj.name : 'General', displayOrder: 0 })
-          .then(function (res) {
-            var canon = res && res.data ? res.data : null;
-            if (canon && canon !== subId) _patchMapId(cid, getLearningMap(cid), 'subject', subId, canon);
-            return res;
-          });
-    subjectRpc
-      .then(function (subRes) {
-        var canonicalSubjectId = subRes && subRes.data ? subRes.data : subId;
-        return window.v2.upsertSection({
-          id: stdId,
-          subjectId: canonicalSubjectId,
-          name: 'New Standard',
-          color: colour,
-          displayOrder: displayOrder,
-        });
-      })
-      .then(function (secRes) {
-        var canonicalSectionId = secRes && secRes.data ? secRes.data : null;
-        if (canonicalSectionId && canonicalSectionId !== stdId) {
-          _patchMapId(cid, getLearningMap(cid), 'section', stdId, canonicalSectionId);
-        }
-        var finalSectionId = canonicalSectionId || stdId;
-        return window.v2.upsertTag({
-          id: stdId,
-          sectionId: finalSectionId,
-          label: 'New Standard',
-          code: stdId,
-          iCanText: '',
-          displayOrder: 0,
-        });
-      });
   }
 
   function cmUpdateStdName(secId, val) {
+    secId = _currentId('section', secId);
     if (!cmSelectedCourse) return;
     var cid = cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
@@ -3247,12 +3086,11 @@ window.DashClassManager = (function () {
       sec.tags[0].shortName = sec.shortName;
     }
     saveLearningMap(cid, map);
-    window.v2.upsertSection({ id: secId, name: trimmed });
-    var tag = sec.tags[0];
-    if (tag) window.v2.upsertTag({ id: tag.id, sectionId: secId, label: tag.label || trimmed });
   }
 
   function cmUpdateStdSubject(secId, subId) {
+    secId = _currentId('section', secId);
+    subId = _currentId('subject', subId);
     if (!cmSelectedCourse) return;
     var cid = cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
@@ -3263,10 +3101,10 @@ window.DashClassManager = (function () {
     sec.subject = subId;
     if (sec.tags[0]) sec.tags[0].subject = subId;
     saveLearningMap(cid, map);
-    window.v2.upsertSection({ id: secId, subjectId: subId });
   }
 
   function cmUpdateStdColor(secId, color) {
+    secId = _currentId('section', secId);
     if (!cmSelectedCourse) return;
     var cid = cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
@@ -3278,15 +3116,6 @@ window.DashClassManager = (function () {
     if (sec.tags[0]) sec.tags[0].color = color;
     saveLearningMap(cid, map);
     renderClassManager();
-    if (_isCanonicalId(sec.id)) {
-      window.v2.upsertSection({
-        id: sec.id,
-        subjectId: sec.subject,
-        name: sec.name,
-        color: color,
-        competencyGroupId: sec.groupId || null,
-      });
-    }
   }
 
   function cmDeleteStd(secId) {
@@ -3298,23 +3127,19 @@ window.DashClassManager = (function () {
       function () {
         var cid = cmSelectedCourse;
         var map = ensureCustomLearningMap(cid);
-        var deleted = map.sections.find(function (s) {
-          return s.id === secId;
-        });
+        // Resolved now: the id may have been re-keyed while the dialog was open.
+        var currentId = _currentId('section', secId);
         map.sections = map.sections.filter(function (s) {
-          return s.id !== secId;
+          return s.id !== currentId;
         });
         saveLearningMap(cid, map);
         renderClassManager();
-        ((deleted && deleted.tags) || []).forEach(function (tag) {
-          if (_isCanonicalId(tag.id)) window.v2.deleteTag(tag.id);
-        });
-        if (_isCanonicalId(secId)) window.v2.deleteSection(secId);
       },
     );
   }
 
   function cmUpdateStdLabel(secId, val) {
+    secId = _currentId('section', secId);
     if (!cmSelectedCourse) return;
     var cid = cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
@@ -3324,11 +3149,11 @@ window.DashClassManager = (function () {
     if (sec && sec.tags[0]) {
       sec.tags[0].label = val.trim();
       saveLearningMap(cid, map);
-      window.v2.upsertTag({ id: sec.tags[0].id, sectionId: secId, label: val.trim() });
     }
   }
 
   function cmUpdateStdText(secId, val) {
+    secId = _currentId('section', secId);
     if (!cmSelectedCourse) return;
     var cid = cmSelectedCourse;
     var map = ensureCustomLearningMap(cid);
@@ -3338,7 +3163,6 @@ window.DashClassManager = (function () {
     if (sec && sec.tags[0]) {
       sec.tags[0].text = val.trim();
       saveLearningMap(cid, map);
-      window.v2.upsertTag({ id: sec.tags[0].id, sectionId: secId, iCanText: val.trim() });
     }
   }
 
@@ -3347,8 +3171,9 @@ window.DashClassManager = (function () {
   // to assessment.tagIds and score.tagId references; post-V2 those IDs are
   // server-owned UUIDs that the database authoritatively holds, and the
   // user-visible code is its own column. This implementation just updates
-  // tag.code locally and pushes that single column change via upsert_tag.
+  // tag.code locally; saveLearningMap sends the changed tag.
   function cmUpdateStdCode(secId, val) {
+    secId = _currentId('section', secId);
     if (!cmSelectedCourse) return;
     var newCode = val
       .trim()
@@ -3365,16 +3190,6 @@ window.DashClassManager = (function () {
     if (newCode === tag.code) return;
     tag.code = newCode;
     saveLearningMap(cmSelectedCourse, map);
-    if (window.v2 && window.v2.upsertTag && _isCanonicalId(tag.id) && _isCanonicalId(sec.id)) {
-      window.v2.upsertTag({
-        id: tag.id,
-        sectionId: sec.id,
-        label: tag.label || tag.name || newCode,
-        code: newCode,
-        iCanText: tag.text || '',
-        displayOrder: tag.displayOrder != null ? tag.displayOrder : 0,
-      });
-    }
     renderClassManager();
   }
 

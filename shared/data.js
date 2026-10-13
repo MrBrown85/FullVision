@@ -3319,11 +3319,23 @@ function persistScoreDiffToCanonical(cid, prevBlob, nextBlob) {
   if (!_writesEnabled()) return;
   var prevByKey = _scoreEntriesByKey(prevBlob || {});
   var nextByKey = _scoreEntriesByKey(nextBlob || {});
+  // A points assessment stores one value per cell, mirrored onto every tag
+  // entry locally. Send it once per cell, not once per tag.
+  var pointsCellsSent = {};
+  function firstForPointsCell(sid, aid) {
+    var a = _assessmentById(cid, aid);
+    if (!a || (a.scoreMode || a.score_mode) !== 'points') return true;
+    var cell = sid + ':' + aid;
+    if (pointsCellsSent[cell]) return false;
+    pointsCellsSent[cell] = true;
+    return true;
+  }
 
   Object.keys(nextByKey).forEach(function (key) {
     var next = nextByKey[key];
     var prev = prevByKey[key];
     if (prev && !_scoreEntryRemoteChanged(prev.entry, next.entry)) return;
+    if (!firstForPointsCell(next.sid, next.entry.assessmentId)) return;
     _persistScoreToCanonical(
       cid,
       next.sid,
@@ -3337,6 +3349,7 @@ function persistScoreDiffToCanonical(cid, prevBlob, nextBlob) {
   Object.keys(prevByKey).forEach(function (key) {
     if (nextByKey[key]) return;
     var prev = prevByKey[key];
+    if (!firstForPointsCell(prev.sid, prev.entry.assessmentId)) return;
     _persistScoreToCanonical(cid, prev.sid, prev.entry.assessmentId, prev.entry.tagId, 0, '');
   });
 }
@@ -4160,9 +4173,40 @@ function saveLearningMap(cid, map) {
   map._customized = true;
   map._version = (map._version || 0) + 1;
   _saveCourseField('learningMaps', cid, map); // derived tag/section caches auto-invalidate via mapRef check
-  if (!_writesEnabled() || !_isUuid(cid)) return;
-  _persistLearningMapToCanonical(cid, prev, map);
+  if (!_writesEnabled() || !_isUuid(cid)) return Promise.resolve(true);
+  return _persistLearningMapToCanonical(cid, prev, map);
 }
+/* A copy of a learning map with every subject, group, section and tag given a
+   new local id (references follow), so saving it inserts new rows instead of
+   updating the original's. Used when duplicating a class. */
+function withFreshLearningMapIds(map) {
+  var copy = structuredClone(map || { subjects: [], sections: [] });
+  var fresh = { subject: {}, group: {}, section: {}, tag: {} };
+  function next(kind, id) {
+    if (!id) return id;
+    if (!fresh[kind][id]) fresh[kind][id] = uid();
+    return fresh[kind][id];
+  }
+  (copy.subjects || []).forEach(function (sub) {
+    sub.id = next('subject', sub.id);
+  });
+  (copy.competencyGroups || []).forEach(function (g) {
+    g.id = next('group', g.id);
+  });
+  (copy.sections || []).forEach(function (sec) {
+    sec.id = next('section', sec.id);
+    if (sec.subject) sec.subject = next('subject', sec.subject);
+    if (sec.groupId) sec.groupId = next('group', sec.groupId);
+    if (sec.competencyGroupId) sec.competencyGroupId = next('group', sec.competencyGroupId);
+    (sec.tags || []).forEach(function (tag) {
+      tag.id = next('tag', tag.id);
+      if (tag.subject) tag.subject = next('subject', tag.subject);
+    });
+    if (sec.outcome && sec.outcome.id) sec.outcome.id = next('tag', sec.outcome.id);
+  });
+  return copy;
+}
+
 function resetLearningMap(cid) {
   _cache.learningMaps[cid] = LEARNING_MAP[cid] || { subjects: [], sections: [] }; // ref change auto-busts tag/section caches
   // v2: local-only reset. The legacy config_learning_maps table was dropped;
@@ -4313,6 +4357,14 @@ var _learningMapSaveQueue = {};
 // course. A save queued before an earlier one resolved still holds the local
 // ids; without applying these it inserts a second copy of every row.
 var _learningMapIdRemap = {};
+
+/* The current id of a learning-map row the page may still know by its local
+   id: the class manager renders a new subject, group or standard before its
+   server id comes back, and its inputs keep the old id until the next render. */
+function resolveLearningMapId(cid, kind, id) {
+  var known = _learningMapIdRemap[cid];
+  return (known && known[kind] && known[kind][id]) || id;
+}
 
 function _mapItemsById(items) {
   var out = {};
@@ -4641,16 +4693,32 @@ function _persistLearningMapToCanonical(cid, prevMap, nextMap) {
       Object.keys(idMaps.section).length ||
       Object.keys(idMaps.tag).length
     ) {
-      _saveCourseField('learningMaps', cid, map);
+      // Patch the new ids into the live map. Replacing it with this save's
+      // copy would revert anything edited while the sync was running.
+      var live = _cache.learningMaps[cid];
+      if (live) {
+        ['group', 'subject', 'section', 'tag'].forEach(function (kind) {
+          Object.keys(idMaps[kind]).forEach(function (oldId) {
+            _patchLearningMapEntityId(live, kind, oldId, idMaps[kind][oldId]);
+          });
+        });
+        delete _allTagsCache[cid];
+        delete _tagToSectionCache[cid];
+        if (typeof clearProfCache === 'function') clearProfCache();
+        _safeLSSet('gb-learningmap-' + cid, JSON.stringify(live));
+      }
       _patchLearningMapReferences(cid, idMaps);
     }
+    return true;
   });
+  // Resolves true once the map reached the server, false if it failed.
   _learningMapSaveQueue[cid] = _trackPendingSync(
     next.catch(function (err) {
       console.warn('Learning map sync to canonical RPCs failed:', err);
       if (typeof showSyncToast === 'function') {
         showSyncToast('Learning map saved locally. Cloud sync needs attention.', 'error');
       }
+      return false;
     }),
   );
   return _learningMapSaveQueue[cid];
@@ -4818,24 +4886,8 @@ function setAssignmentStatus(cid, sid, aid, status) {
   const key = sid + ':' + aid;
   if (status) st[key] = status;
   else delete st[key];
+  // saveAssignmentStatuses' diff sends the one set_score_status for this cell.
   saveAssignmentStatuses(cid, st);
-  if (_writesEnabled() && _isUuid(sid) && _isUuid(aid)) {
-    // v2 set_score_status(p_enrollment_id, p_assessment_id, p_status).
-    // The legacy `save_assignment_status` RPC is gone; status now writes
-    // directly onto the Score row. `sid` here is the enrollment_id.
-    var sb = getSupabase();
-    if (sb) {
-      _trackPendingSync(
-        _writeRpc('set_score_status', {
-          p_enrollment_id: sid,
-          p_assessment_id: aid,
-          p_status: status || null,
-        }).then(function (res) {
-          if (res.error) console.warn('set_score_status RPC failed:', res.error);
-        }),
-      );
-    }
-  }
 }
 
 /* ── Rubrics ───────────────────────────────────────────────── */
@@ -5031,6 +5083,7 @@ function _persistRubricsToCanonical(cid, prev, arr) {
     .then(async function () {
       var target = Array.isArray(arr) ? arr : [];
       var previous = Array.isArray(prev) ? prev : [];
+      var startedWith = JSON.stringify(target);
       var idMap = {};
       var keptCanonicalIds = {};
 
@@ -5060,7 +5113,10 @@ function _persistRubricsToCanonical(cid, prev, arr) {
 
       var canonicalArr = await _loadCanonicalRubrics(cid);
       var reconciled = _reconcileCanonicalRubrics(target, canonicalArr, idMap);
-      _saveCourseField('rubrics', cid, reconciled);
+      // Only adopt the server's copy if nothing was edited while this ran; a
+      // newer edit has its own save queued, which reconciles after it.
+      var live = _cache.rubrics[cid];
+      if (live === target && JSON.stringify(live) === startedWith) _saveCourseField('rubrics', cid, reconciled);
       _patchAssessmentRubricIds(cid, idMap);
       return { rubrics: reconciled, idMap: idMap };
     })
@@ -6091,12 +6147,8 @@ function setPointsScore(cid, sid, aid, rawScore) {
       changed = true;
     }
   });
-  if (changed) {
-    saveScores(cid, scores);
-    if (_writesEnabled() && _isUuid(sid) && _isUuid(aid)) {
-      window.upsertCellScore(cid, sid, aid, rawScore);
-    }
-  }
+  // saveScores' diff sends the one upsert_score for this cell.
+  if (changed) saveScores(cid, scores);
   return scores;
 }
 

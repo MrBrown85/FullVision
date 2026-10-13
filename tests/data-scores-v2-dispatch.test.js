@@ -336,10 +336,12 @@ describe('v2 scoring-dispatch', () => {
 
   describe('setPointsScore v2 dispatch', () => {
     beforeEach(function () {
-      _cache.assessments = _cache.assessments || {};
-      _cache.assessments[CID] = [{ id: AID_TAG, tagIds: [TAG_ID], type: 'summative', date: '2026-04-22' }];
-      _cache.scores = _cache.scores || {};
-      _cache.scores[CID] = {};
+      // Loaded from the server, as the gradebook would be.
+      if (_cache.v2Gradebook) delete _cache.v2Gradebook[CID];
+      _persistLoadedField(CID, 'assessments', [
+        { id: AID_TAG, tagIds: [TAG_ID], type: 'summative', scoreMode: 'points', date: '2026-04-22' },
+      ]);
+      _persistLoadedField(CID, 'scores', {});
     });
 
     afterEach(function () {

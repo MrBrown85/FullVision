@@ -8,7 +8,8 @@
  * RPC, including the UUID guard that falls back to local-only.
  */
 
-const CID = 'status-test';
+// A real course id: statuses only sync for server courses.
+const CID = '33333333-3333-4333-8333-333333333333';
 let _origGetSupabase;
 let _origUseSupabase;
 
