@@ -371,6 +371,7 @@ Remaining agent work:
 - Current: [schema.sql](schema.sql) is a readable snapshot, not replayable. `migrations/` didn't exist before 2026-04-23. No documented rollback. No runbook for district onboarding or deploy verification. Service-worker cache-busting ([sw.js](sw.js) `CACHE_NAME`) is bumped manually per release.
 - Decisions owed:
   1. Adopt a migration tool (Supabase CLI migrations? Flyway? Stay with hand-numbered `migrations/*.sql` + forward-only convention?). Affects every future DB change.
+     - 2026-10-12: CI now runs `scripts/check-db-drift.mjs` against `gradebook-prod` (read-only `fv_schema_reader` role). It fails if the client calls an RPC the database lacks, or a `migrations/` file was never applied. It's skipped until the `FV_SCHEMA_READER_URL` secret is set.
   2. Rollback policy: forward-only with fix-up migrations, or reversible up/down pairs?
   3. Service worker contract: does a schema change auto-bump `CACHE_NAME` in the build step, or is it always manual?
 - Once decided (agent-ready follow-ups): deploy runbook in codex.md, district-onboarding runbook in codex.md, SW cache-bust hook in [scripts/build.sh](scripts/build.sh).
