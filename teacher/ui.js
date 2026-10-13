@@ -419,7 +419,8 @@ function _populateDockUser() {
   if (!el || typeof getSupabase !== 'function') return;
   const sb = getSupabase();
   if (!sb) return;
-  sb.auth.getSession()
+  sb.auth
+    .getSession()
     .then(({ data: { session } }) => {
       if (!session) return;
       const user = session.user;
