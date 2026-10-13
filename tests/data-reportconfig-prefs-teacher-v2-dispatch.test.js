@@ -134,7 +134,7 @@ describe('v2 report-config / preferences / teacher-lifecycle dispatch', () => {
       await window.v2.importRosterCsv(CID, [{ first_name: 'A' }]);
       expect(client.calls[0]).toEqual({
         name: 'import_roster_csv',
-        payload: { p_course_id: CID, p_rows: [{ first_name: 'A' }] },
+        payload: { p_course_id: CID, p_rows: [{ first_name: 'A' }], p_idempotency_key: expect.any(String) },
       });
     });
 
@@ -143,7 +143,7 @@ describe('v2 report-config / preferences / teacher-lifecycle dispatch', () => {
       await window.v2.importJsonRestore(pl);
       expect(client.calls[0]).toEqual({
         name: 'import_json_restore',
-        payload: { p_payload: pl },
+        payload: { p_payload: pl, p_idempotency_key: expect.any(String) },
       });
     });
 

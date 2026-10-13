@@ -61,6 +61,7 @@ describe('v2 learning-map structural dispatch (window.v2.*)', () => {
         p_name: 'English',
         p_color: null,
         p_display_order: 2,
+        p_idempotency_key: expect.any(String),
       });
     });
 
@@ -117,6 +118,7 @@ describe('v2 learning-map structural dispatch (window.v2.*)', () => {
         p_name: 'CC',
         p_color: '#0891b2',
         p_display_order: 1,
+        p_idempotency_key: expect.any(String),
       });
     });
     it('delete + reorder', async () => {
@@ -149,6 +151,7 @@ describe('v2 learning-map structural dispatch (window.v2.*)', () => {
         p_color: null,
         p_competency_group_id: GRP_ID,
         p_display_order: 3,
+        p_idempotency_key: expect.any(String),
       });
     });
 
@@ -209,6 +212,7 @@ describe('v2 learning-map structural dispatch (window.v2.*)', () => {
         p_code: 'QAP-1',
         p_i_can_text: 'I can ask questions',
         p_display_order: 0,
+        p_idempotency_key: expect.any(String),
       });
     });
 
@@ -252,6 +256,7 @@ describe('v2 learning-map structural dispatch (window.v2.*)', () => {
         p_name: 'Tests',
         p_weight: 40,
         p_display_order: 1,
+        p_idempotency_key: expect.any(String),
       });
     });
 

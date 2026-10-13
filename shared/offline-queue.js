@@ -30,38 +30,13 @@
   var BACKOFF_MS = [1000, 5000, 30000];
   var AUTO_FLUSH_MS = 60000; // periodic retry while online
 
-  /* Endpoints that accept `p_idempotency_key` on the server side
-   * (migration 20260423_write_path_idempotency). For each of these, the
-   * queue passes `entry.id` as the key so that a retry after a network
-   * blip — where the server committed but the client missed the 200 —
-   * returns the cached row id instead of inserting a duplicate.
-   *
-   * IMPORTANT: adding an endpoint here without the matching server-side
-   * retrofit (an optional `p_idempotency_key uuid default null` parameter
-   * on the RPC) causes every call to that endpoint to fail with
-   * "function … does not exist" because PostgREST resolves by argument
-   * names. Keep this list in lockstep with the migration. */
-  var IDEMPOTENT_ENDPOINTS = {
-    create_observation: true,
-    create_assessment: true,
-    duplicate_assessment: true,
-    create_custom_tag: true,
-    upsert_note: true,
-    create_student_and_enroll: true,
-    create_course: true,
-    duplicate_course: true,
-    import_roster_csv: true,
-    import_teams_class: true,
-    import_json_restore: true,
-    upsert_observation_template: true,
-    upsert_category: true,
-    upsert_module: true,
-    upsert_rubric: true,
-    upsert_subject: true,
-    upsert_competency_group: true,
-    upsert_section: true,
-    upsert_tag: true,
-  };
+  /* Endpoints that accept `p_idempotency_key` on the server side. The list
+   * lives in shared/constants.js (FV_IDEMPOTENT_RPCS) so the queued-write and
+   * direct-write paths cannot drift apart; see the warning there before adding
+   * one. For each of these the queue passes `entry.id` as the key, so a retry
+   * after a network blip — where the server committed but the client missed
+   * the 200 — returns the cached row id instead of inserting a duplicate. */
+  var IDEMPOTENT_ENDPOINTS = typeof FV_IDEMPOTENT_RPCS !== 'undefined' ? FV_IDEMPOTENT_RPCS : {};
 
   function _withIdemKey(endpoint, payload, key) {
     if (!IDEMPOTENT_ENDPOINTS[endpoint] || !key) return payload || {};

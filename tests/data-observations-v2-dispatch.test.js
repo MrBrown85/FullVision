@@ -64,8 +64,12 @@ describe('v2 observation / template / custom-tag dispatch', () => {
         sentiment: 'strength',
         context: 'class-discussion',
       });
-      await new Promise(function (r) { setTimeout(r, 0); });
-      var call = client.calls.find(function (c) { return c.name === 'create_observation'; });
+      await new Promise(function (r) {
+        setTimeout(r, 0);
+      });
+      var call = client.calls.find(function (c) {
+        return c.name === 'create_observation';
+      });
       expect(call).toBeDefined();
       expect(call.payload).toEqual({
         p_course_id: CID,
@@ -76,15 +80,22 @@ describe('v2 observation / template / custom-tag dispatch', () => {
         p_enrollment_ids: [ENR],
         p_tag_ids: [],
         p_custom_tag_ids: [],
+        p_idempotency_key: expect.any(String),
       });
     });
 
     it('passes p_assessment_id when assignmentContext has a UUID', async () => {
       _persistObservationCreate(CID, ENR, {
-        id: 'x', text: 't', assignmentContext: { assessmentId: AID },
+        id: 'x',
+        text: 't',
+        assignmentContext: { assessmentId: AID },
       });
-      await new Promise(function (r) { setTimeout(r, 0); });
-      var call = client.calls.find(function (c) { return c.name === 'create_observation'; });
+      await new Promise(function (r) {
+        setTimeout(r, 0);
+      });
+      var call = client.calls.find(function (c) {
+        return c.name === 'create_observation';
+      });
       expect(call.payload.p_assessment_id).toBe(AID);
     });
 
@@ -102,7 +113,9 @@ describe('v2 observation / template / custom-tag dispatch', () => {
       });
       globalThis.getSupabase = () => client;
       _persistObservationCreate(CID, ENR, entry);
-      await new Promise(function (r) { setTimeout(r, 0); });
+      await new Promise(function (r) {
+        setTimeout(r, 0);
+      });
       expect(entry.id).toBe(OB_ID);
     });
   });
@@ -110,8 +123,12 @@ describe('v2 observation / template / custom-tag dispatch', () => {
   describe('_persistObservationUpdate', () => {
     it('calls update_observation with jsonb patch and null joins', async () => {
       _persistObservationUpdate(CID, { id: OB_ID, text: 'Updated', sentiment: 'growth', context: 'lab' });
-      await new Promise(function (r) { setTimeout(r, 0); });
-      var call = client.calls.find(function (c) { return c.name === 'update_observation'; });
+      await new Promise(function (r) {
+        setTimeout(r, 0);
+      });
+      var call = client.calls.find(function (c) {
+        return c.name === 'update_observation';
+      });
       expect(call.payload.p_id).toBe(OB_ID);
       expect(call.payload.p_patch).toEqual({
         body: 'Updated',
@@ -125,8 +142,12 @@ describe('v2 observation / template / custom-tag dispatch', () => {
 
     it('adds assessment_id to patch when assignmentContext is a UUID', async () => {
       _persistObservationUpdate(CID, { id: OB_ID, assignmentContext: { assessmentId: AID } });
-      await new Promise(function (r) { setTimeout(r, 0); });
-      var call = client.calls.find(function (c) { return c.name === 'update_observation'; });
+      await new Promise(function (r) {
+        setTimeout(r, 0);
+      });
+      var call = client.calls.find(function (c) {
+        return c.name === 'update_observation';
+      });
       expect(call.payload.p_patch.assessment_id).toBe(AID);
     });
   });
@@ -134,8 +155,12 @@ describe('v2 observation / template / custom-tag dispatch', () => {
   describe('_persistObservationDelete', () => {
     it('calls delete_observation', async () => {
       _persistObservationDelete(CID, OB_ID);
-      await new Promise(function (r) { setTimeout(r, 0); });
-      var call = client.calls.find(function (c) { return c.name === 'delete_observation'; });
+      await new Promise(function (r) {
+        setTimeout(r, 0);
+      });
+      var call = client.calls.find(function (c) {
+        return c.name === 'delete_observation';
+      });
       expect(call.payload).toEqual({ p_id: OB_ID });
     });
 
@@ -157,7 +182,9 @@ describe('v2 observation / template / custom-tag dispatch', () => {
         tagIds: [TAG1, 'junk'],
         customTagIds: [CTAG1],
       });
-      var call = client.calls.find(function (c) { return c.name === 'create_observation'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'create_observation';
+      });
       expect(call.payload.p_enrollment_ids).toEqual([ENR, ENR2]);
       expect(call.payload.p_tag_ids).toEqual([TAG1]);
       expect(call.payload.p_custom_tag_ids).toEqual([CTAG1]);
@@ -167,19 +194,27 @@ describe('v2 observation / template / custom-tag dispatch', () => {
   describe('window.updateObservationRich', () => {
     it('passes null for any joins not provided', async () => {
       await window.updateObservationRich(OB_ID, { body: 'x' }, {});
-      var call = client.calls.find(function (c) { return c.name === 'update_observation'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'update_observation';
+      });
       expect(call.payload.p_enrollment_ids).toBeNull();
       expect(call.payload.p_tag_ids).toBeNull();
       expect(call.payload.p_custom_tag_ids).toBeNull();
     });
 
     it('passes filtered UUID arrays when joins are provided', async () => {
-      await window.updateObservationRich(OB_ID, {}, {
-        enrollmentIds: [ENR, 'junk'],
-        tagIds: [TAG1],
-        customTagIds: [],
+      await window.updateObservationRich(
+        OB_ID,
+        {},
+        {
+          enrollmentIds: [ENR, 'junk'],
+          tagIds: [TAG1],
+          customTagIds: [],
+        },
+      );
+      var call = client.calls.find(function (c) {
+        return c.name === 'update_observation';
       });
-      var call = client.calls.find(function (c) { return c.name === 'update_observation'; });
       expect(call.payload.p_enrollment_ids).toEqual([ENR]);
       expect(call.payload.p_tag_ids).toEqual([TAG1]);
       expect(call.payload.p_custom_tag_ids).toEqual([]);
@@ -195,7 +230,9 @@ describe('v2 observation / template / custom-tag dispatch', () => {
         defaultContextType: 'class',
         displayOrder: 2,
       });
-      var call = client.calls.find(function (c) { return c.name === 'upsert_observation_template'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'upsert_observation_template';
+      });
       expect(call.payload).toEqual({
         p_id: TPL_ID,
         p_course_id: CID,
@@ -203,12 +240,15 @@ describe('v2 observation / template / custom-tag dispatch', () => {
         p_default_sentiment: 'strength',
         p_default_context_type: 'class',
         p_display_order: 2,
+        p_idempotency_key: expect.any(String),
       });
     });
 
     it('nullifies non-UUID template id (insert path)', async () => {
       await window.upsertObservationTemplate(CID, { body: 'new' });
-      var call = client.calls.find(function (c) { return c.name === 'upsert_observation_template'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'upsert_observation_template';
+      });
       expect(call.payload.p_id).toBeNull();
     });
   });
@@ -216,7 +256,9 @@ describe('v2 observation / template / custom-tag dispatch', () => {
   describe('window.deleteObservationTemplate', () => {
     it('calls delete_observation_template with the template id', async () => {
       await window.deleteObservationTemplate(TPL_ID);
-      var call = client.calls.find(function (c) { return c.name === 'delete_observation_template'; });
+      var call = client.calls.find(function (c) {
+        return c.name === 'delete_observation_template';
+      });
       expect(call.payload).toEqual({ p_id: TPL_ID });
     });
 
@@ -229,8 +271,14 @@ describe('v2 observation / template / custom-tag dispatch', () => {
   describe('window.createCustomTag', () => {
     it('calls create_custom_tag with course id and label', async () => {
       await window.createCustomTag(CID, 'My Tag');
-      var call = client.calls.find(function (c) { return c.name === 'create_custom_tag'; });
-      expect(call.payload).toEqual({ p_course_id: CID, p_label: 'My Tag' });
+      var call = client.calls.find(function (c) {
+        return c.name === 'create_custom_tag';
+      });
+      expect(call.payload).toEqual({
+        p_course_id: CID,
+        p_label: 'My Tag',
+        p_idempotency_key: expect.any(String),
+      });
     });
 
     it('skips on non-UUID course id', async () => {
