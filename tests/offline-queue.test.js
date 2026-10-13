@@ -275,4 +275,74 @@ describe('v2Queue (offline write queue)', () => {
       expect(res.reason).toBe('offline');
     });
   });
+
+  // The queue lives in localStorage, so on a shared Chromebook it can outlast
+  // a sign-out. One teacher's queued writes must never be sent under another
+  // teacher's session.
+  describe('owner', () => {
+    var TEACHER_A = '11111111-1111-4111-8111-111111111111';
+    var TEACHER_B = '22222222-2222-4222-8222-222222222222';
+
+    function signInAs(id) {
+      localStorage.setItem('sb-testproject-auth-token', JSON.stringify({ access_token: 'x', user: { id: id } }));
+    }
+    function signOutLocally() {
+      localStorage.removeItem('sb-testproject-auth-token');
+    }
+
+    it('stamps each entry with the signed-in user', () => {
+      signInAs(TEACHER_A);
+      Q.enqueue('rpc', { a: 1 });
+      var stored = JSON.parse(localStorage.getItem('fv-sync-queue-v1'));
+      expect(stored.entries[0].owner).toBe(TEACHER_A);
+    });
+
+    it("discards another teacher's queued and dead-lettered writes instead of sending them", async () => {
+      signInAs(TEACHER_A);
+      Q.enqueue('upsert_score', { mine: false });
+      localStorage.setItem(
+        'fv-sync-dead-letter-v1',
+        JSON.stringify([{ id: 'd1', owner: TEACHER_A, endpoint: 'rpc', payload: {} }]),
+      );
+      signInAs(TEACHER_B);
+      expect(Q.stats()).toMatchObject({ queued: 0, deadLettered: 0 });
+      expect(Q.deadLetter()).toEqual([]);
+
+      Q.enqueue('upsert_score', { mine: true });
+      setOnline(true);
+      await Q.flush();
+
+      expect(calls).toHaveLength(1);
+      expect(calls[0].payload).toEqual({ mine: true });
+      expect(JSON.parse(localStorage.getItem('fv-sync-queue-v1')).entries).toHaveLength(0);
+      expect(JSON.parse(localStorage.getItem('fv-sync-dead-letter-v1'))).toEqual([]);
+    });
+
+    it("sends a teacher's own writes when they sign back in", async () => {
+      signInAs(TEACHER_A);
+      Q.enqueue('upsert_score', { v: 3 });
+      signOutLocally();
+      setOnline(true);
+      await Q.flush();
+      expect(calls).toHaveLength(0);
+      expect(JSON.parse(localStorage.getItem('fv-sync-queue-v1')).entries).toHaveLength(1);
+
+      signInAs(TEACHER_A);
+      await Q.flush();
+      expect(calls).toHaveLength(1);
+      expect(calls[0].payload).toEqual({ v: 3 });
+    });
+
+    it('sends entries queued before owners existed under the current session', async () => {
+      localStorage.setItem(
+        'fv-sync-queue-v1',
+        JSON.stringify({ entries: [{ id: 'legacy', endpoint: 'rpc', payload: { old: true }, attempts: 0 }] }),
+      );
+      signInAs(TEACHER_B);
+      setOnline(true);
+      await Q.flush();
+      expect(calls).toHaveLength(1);
+      expect(calls[0].payload).toEqual({ old: true });
+    });
+  });
 });

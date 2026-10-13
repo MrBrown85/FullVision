@@ -1029,7 +1029,7 @@ async function softDeleteAccountWithPassword(typedEmail, password) {
   }
   var result = await window.v2.softDeleteTeacher();
   if (result && result.error) throw result.error;
-  await signOut();
+  await signOut({ force: true });
 }
 
 async function showDeleteAccountDialog() {
@@ -1117,8 +1117,20 @@ document.addEventListener('click', function (e) {
       if (!popover) return;
       _setSyncPopoverOpen(popover.hidden);
     },
-    signOut: function () {
-      signOut();
+    signOut: async function () {
+      var res = await signOut();
+      if (!res || !res.unsent) return;
+      showConfirm(
+        'Unsaved changes',
+        res.unsent === 1
+          ? '1 change hasn’t reached the server yet. If you sign out now, it will be lost.'
+          : res.unsent + ' changes haven’t reached the server yet. If you sign out now, they will be lost.',
+        'Sign out anyway',
+        'danger',
+        function () {
+          signOut({ force: true });
+        },
+      );
     },
     deleteAccount: async function () {
       await showDeleteAccountDialog();

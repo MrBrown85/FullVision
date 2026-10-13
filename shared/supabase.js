@@ -156,16 +156,47 @@
     document.body.appendChild(toast);
   };
 
+  /* Changes still waiting in the offline queue (queued + failed) for the
+     signed-in user. Tries one upload first so a sign-out only warns about
+     what genuinely could not be sent. */
+  async function _unsentQueueCount() {
+    var q = window.v2Queue;
+    if (!q || typeof q.stats !== 'function') return 0;
+    if (navigator.onLine && typeof q.flush === 'function' && q.stats().queued > 0) {
+      await Promise.race([
+        q.flush(),
+        new Promise(function (r) {
+          setTimeout(r, 8000);
+        }),
+      ]);
+    }
+    var stats = q.stats();
+    return Number(stats.queued || 0) + Number(stats.deadLettered || 0);
+  }
+
   /**
    * Signs out the current user, clears application localStorage data, and redirects to login.
-   * @returns {Promise<void>}
+   *
+   * Unsent changes in the offline queue would be lost by the wipe, so by
+   * default the sign-out stops and resolves { unsent: n } instead; the caller
+   * asks the teacher and calls again with { force: true }. { keepQueue: true }
+   * (idle timeout, where nobody is there to ask) signs out but leaves the
+   * queue in place: entries carry their owner's id, so only the same teacher's
+   * next session sends them and anyone else's discards them.
+   * @param {{force?: boolean, keepQueue?: boolean}} [opts]
+   * @returns {Promise<void|{unsent: number}>}
    */
-  window.signOut = async function () {
+  window.signOut = async function (opts) {
+    opts = opts || {};
     const sb = getSupabase();
     if (!sb) return;
     // Wait for any pending data syncs to finish before clearing local data
     if (typeof waitForPendingSyncs === 'function') {
       await waitForPendingSyncs();
+    }
+    if (!opts.force && !opts.keepQueue) {
+      const unsent = await _unsentQueueCount();
+      if (unsent > 0) return { unsent: unsent };
     }
     try {
       const { error } = await sb.auth.signOut();
@@ -180,7 +211,16 @@
       // gb- and gb_ prefixes (data layer uses dashes, some UI prefs use underscores)
       // sb- prefix (Supabase auth tokens)
       // td- prefix (cross-portal prefs like td-mobile-pref)
-      if (key && (key.startsWith('gb-') || key.startsWith('gb_') || key.startsWith('sb-') || key.startsWith('td-')))
+      // fv- prefix (offline write queue + dead letters, which hold student data)
+      if (!key) continue;
+      if (key.startsWith('fv-') && opts.keepQueue) continue;
+      if (
+        key.startsWith('gb-') ||
+        key.startsWith('gb_') ||
+        key.startsWith('sb-') ||
+        key.startsWith('td-') ||
+        key.startsWith('fv-')
+      )
         keysToRemove.push(key);
     }
     keysToRemove.forEach(k => localStorage.removeItem(k));
@@ -326,7 +366,7 @@
         if (typeof markLongFormSessionExpired === 'function') markLongFormSessionExpired();
         return;
       }
-      if (typeof signOut === 'function') signOut();
+      if (typeof signOut === 'function') signOut({ keepQueue: true });
     }, IDLE_TIMEOUT);
   }
   ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'].forEach(function (evt) {
