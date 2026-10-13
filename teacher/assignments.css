@@ -873,8 +873,10 @@
   font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
   font-size: var(--text-sm);
   font-weight: 600;
+  /* Sized to the code: a fixed 32px let codes like "Questioning" run into the name. */
   flex-shrink: 0;
-  width: 32px;
+  min-width: 32px;
+  white-space: nowrap;
 }
 .af-tag-name {
   color: var(--text);
@@ -1797,7 +1799,9 @@
   font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
   font-size: var(--text-sm);
   font-weight: 600;
-  width: 30px;
+  /* Same as .af-tag-id: long codes overlapped the label at a fixed width. */
+  min-width: 30px;
+  white-space: nowrap;
   flex-shrink: 0;
 }
 .rubric-tag-label {
