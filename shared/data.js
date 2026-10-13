@@ -3804,6 +3804,7 @@ function createCourse(data) {
     description: data.description || '',
     gradeLevel: data.gradeLevel || '',
     timezone: data.timezone || 'America/Vancouver',
+    lateWorkPolicy: data.lateWorkPolicy || null,
   };
   COURSES[localId] = course;
   _safeLSSet('gb-courses', JSON.stringify(COURSES));
@@ -3833,6 +3834,7 @@ function createCourse(data) {
             p_calc_method: course.calcMethod || 'average',
             p_decay_weight: course.decayWeight != null ? Number(course.decayWeight) : null,
             p_timezone: course.timezone,
+            p_late_work_policy: course.lateWorkPolicy || null,
           }),
         )
         .then(function (res) {
