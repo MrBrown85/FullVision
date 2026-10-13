@@ -91,6 +91,27 @@ describe('Persistence: hard-delete student (P6.7)', () => {
     expect(deleteCall.payload.p_id).toBe(SID);
   });
 
+  it("sends the person's student id, not the enrollment id, when the roster row has one", () => {
+    var client = makeRpcRecorder();
+    globalThis.getSupabase = () => client;
+    seedStudentData();
+    var PERSON = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    _saveCourseField(
+      'students',
+      CID,
+      getStudents(CID).map(function (s) {
+        return s.id === SID ? Object.assign({}, s, { personId: PERSON }) : s;
+      }),
+    );
+
+    deleteStudent(CID, SID);
+
+    var deleteCall = client.calls.find(function (c) {
+      return c.name === 'delete_student';
+    });
+    expect(deleteCall.payload.p_id).toBe(PERSON);
+  });
+
   it('does NOT fire withdraw_enrollment redundantly', () => {
     var client = makeRpcRecorder();
     globalThis.getSupabase = () => client;

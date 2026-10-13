@@ -2943,13 +2943,9 @@ window.DashClassManager = (function () {
         'Delete All',
         'danger',
         function () {
-          var deletedSectionIds = map.sections
-            .filter(function (s) {
-              return s.subject === subId;
-            })
-            .map(function (s) {
-              return s.id;
-            });
+          var deletedSections = map.sections.filter(function (s) {
+            return s.subject === subId;
+          });
           map.subjects = map.subjects.filter(function (s) {
             return s.id !== subId;
           });
@@ -2959,11 +2955,11 @@ window.DashClassManager = (function () {
           saveLearningMap(cid, map);
           renderClassManager();
           if (_isCanonicalId(subId)) window.v2.deleteSubject(subId);
-          deletedSectionIds.forEach(function (sid) {
-            if (_isCanonicalId(sid)) {
-              window.v2.deleteSection(sid);
-              window.v2.deleteTag(sid);
-            }
+          deletedSections.forEach(function (sec) {
+            (sec.tags || []).forEach(function (tag) {
+              if (_isCanonicalId(tag.id)) window.v2.deleteTag(tag.id);
+            });
+            if (_isCanonicalId(sec.id)) window.v2.deleteSection(sec.id);
           });
         },
       );
@@ -3251,15 +3247,18 @@ window.DashClassManager = (function () {
       function () {
         var cid = cmSelectedCourse;
         var map = ensureCustomLearningMap(cid);
+        var deleted = map.sections.find(function (s) {
+          return s.id === secId;
+        });
         map.sections = map.sections.filter(function (s) {
           return s.id !== secId;
         });
         saveLearningMap(cid, map);
         renderClassManager();
-        if (_isCanonicalId(secId)) {
-          window.v2.deleteSection(secId);
-          window.v2.deleteTag(secId);
-        }
+        ((deleted && deleted.tags) || []).forEach(function (tag) {
+          if (_isCanonicalId(tag.id)) window.v2.deleteTag(tag.id);
+        });
+        if (_isCanonicalId(secId)) window.v2.deleteSection(secId);
       },
     );
   }
