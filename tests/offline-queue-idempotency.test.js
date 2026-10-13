@@ -155,15 +155,14 @@ describe('offline-queue idempotency key', () => {
       expect(calls[0].payload.p_idempotency_key).toBe(calls[1].payload.p_idempotency_key);
     });
 
-    it('sends the same key across all 3 attempts before dead-lettering', async () => {
-      rpcImpl = () => Promise.resolve({ data: null, error: { message: 'always fail' } });
+    it('sends the same key on every retry until the entry is dead-lettered', async () => {
+      rpcImpl = () => Promise.resolve({ data: null, error: { message: 'network: failed to fetch' } });
 
       const enq = Q.enqueue('create_observation', { p_body: 'permanently-broken' });
       setOnline(true);
 
-      // The module flushes up to MAX_ATTEMPTS internally before dead-lettering.
-      await Q.flush();
-      await Q.flush();
+      // A network error retries (setTimeout is immediate here) until
+      // MAX_ATTEMPTS, then the entry is dead-lettered.
       await Q.flush();
 
       expect(calls.length).toBeGreaterThanOrEqual(3);

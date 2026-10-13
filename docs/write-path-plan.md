@@ -1,6 +1,6 @@
 # Write-path rebuild plan
 
-Status: Phase 0 in progress (2026-10-12). Replaces the whole-array save model in `shared/data.js` with a durable outbox of single-record operations.
+Status: Phase 0 done (#118); Phase 1 in review (2026-10-12). Replaces the whole-array save model in `shared/data.js` with a durable outbox of single-record operations.
 
 ## Why
 
@@ -74,7 +74,7 @@ Rebuild `shared/offline-queue.js` as the only path to the server for writes.
 - Entry shape gains `key` (record identity, e.g. `assessment:<id>`), `deps` (local ids this op needs resolved) and `kind`.
 - **Ordering:** operations with the same `key` run one at a time, in order; different keys run in parallel, up to a small limit.
 - **Errors:** network errors, 5xx and timeouts retry with backoff and no attempt cap while online. 4xx, validation and RLS errors go straight to the failed list. Session-expired errors pause the outbox until re-auth.
-- **Id map:** `fv-idmap-<cid>` in localStorage. On a create's success, record `local → uuid` and call `rekey(cid, local, uuid)`. That rewrites the cache, localStorage blobs and pending operations' params and deps, replacing:
+- **Id map — moved to Phase 2.** Callers' own re-key code still runs, because `push()` resolves with the final result after any retries. A create retried after a reload is re-keyed by the next server load instead. The id map below lands with Phase 2's server-state baseline, which needs it anyway. `fv-idmap-<cid>` in localStorage: on a create's success, record `local → uuid` and call `rekey(cid, local, uuid)`. That rewrites the cache, localStorage blobs and pending operations' params and deps, replacing:
   - `_canonicalEnrollStudent`'s patch;
   - the modules → assessments patch;
   - categories → `saveAssessments`;
@@ -82,7 +82,8 @@ Rebuild `shared/offline-queue.js` as the only path to the server for writes.
   - `_patchAssessmentRubricIds`;
   - `_migrateCourseDataLocalToCanonical` (`:528`) for course ids.
 - **Draining:** on boot after `bootstrap_teacher`, on `online`, after any successful operation, and every 60 seconds.
-- Route `_rpcOrNoop` (`:6532`) and every direct `sb.rpc` write in `shared/data.js` through `outbox.push(...)`. Reads stay direct.
+- Route `_rpcOrNoop` (`:6532`) and every direct `sb.rpc` write in `shared/data.js` through `outbox.push(...)`, via one `_writeRpc()`. Reads stay direct.
+- Writes made while degraded are queued instead of skipped (`_writesEnabled()`); the outbox holds them while `_supabaseDegraded` and sends them on recovery. Course create, rename and delete still need a live connection.
 - `_trackPendingSync` counts outbox depth, so the sync badge, `waitForPendingSyncs` and the #117 sign-out warning reflect real unsent work.
 - Delete degraded-mode replay (`_replayCourseEntities`, `_degradedTouchedCourses`). The outbox already holds everything sent during the degraded window.
 

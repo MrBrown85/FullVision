@@ -118,16 +118,14 @@ const _WELCOME_CLASS_ROUTE_KEY = 'gb-post-bootstrap-route';
 
 /* Degraded-mode state (P6.1).
    _supabaseDegraded is set when initial bootstrap fails after retry. While
-   degraded, _useSupabase is false and every persist function short-circuits
-   at its existing gate, so writes only land in LS. The recovery probe re-runs
+   degraded, _useSupabase is false but writes still go to the outbox
+   (_writesEnabled), which holds them while paused. The recovery probe re-runs
    bootstrap_teacher periodically; on success it flips back to live mode and
-   replays each touched course's writes through the diff-based persist
-   functions so the canonical store catches up. */
+   the outbox sends everything saved in the meantime. */
 let _supabaseDegraded = false;
 let _degradedReason = null;
 let _recoveryProbeTimer = null;
 let _recoveryProbeInFlight = false;
-const _degradedTouchedCourses = new Set();
 const _BOOTSTRAP_RETRY_DELAYS_MS = [1000, 2000, 4000];
 const _RECOVERY_PROBE_INTERVAL_MS = 30000;
 
@@ -443,78 +441,13 @@ function _exitDegradedMode(bootstrapData) {
     _safeLSSet('gb-courses', JSON.stringify(_cache.courses));
     _safeLSSet('gb-config', JSON.stringify(_cache.config));
   }
-  _replayDegradedTouchedCourses();
+  var outbox = _outbox();
+  if (outbox) outbox.flush();
   _updateSyncIndicator();
   if (typeof dismissSyncToast === 'function') dismissSyncToast();
   if (typeof showSyncToast === 'function') {
     showSyncToast('Cloud sync restored. Catching up…', 'success');
   }
-}
-
-/* Re-dispatch a single canonical-cid course's entities through the diff-based
-   save functions. Each save function compares the persisted snapshot against
-   current LS, so only actual changes dispatch. Idempotent for unchanged
-   entities. Used by both P6.1 (degraded-mode recovery) and P6.2 (canonical-id
-   arrival on a freshly-created course). */
-function _replayCourseEntities(cid) {
-  if (!cid || !_isUuid(cid)) return;
-  try {
-    saveStudents(cid, getStudents(cid));
-  } catch (e) {
-    console.warn('Replay saveStudents failed for', cid, e);
-  }
-  try {
-    saveAssessments(cid, getAssessments(cid));
-  } catch (e) {
-    console.warn('Replay saveAssessments failed for', cid, e);
-  }
-  try {
-    saveScores(cid, getScores(cid));
-  } catch (e) {
-    console.warn('Replay saveScores failed for', cid, e);
-  }
-  try {
-    if (typeof saveCategories === 'function') saveCategories(cid, getCategories(cid));
-  } catch (e) {
-    console.warn('Replay saveCategories failed for', cid, e);
-  }
-  try {
-    saveAssignmentStatuses(cid, getAssignmentStatuses(cid));
-  } catch (e) {
-    console.warn('Replay saveAssignmentStatuses failed for', cid, e);
-  }
-  try {
-    saveModules(cid, getModules(cid));
-  } catch (e) {
-    console.warn('Replay saveModules failed for', cid, e);
-  }
-  try {
-    saveRubrics(cid, getRubrics(cid));
-  } catch (e) {
-    console.warn('Replay saveRubrics failed for', cid, e);
-  }
-  try {
-    saveLearningMap(cid, getLearningMap(cid));
-  } catch (e) {
-    console.warn('Replay saveLearningMap failed for', cid, e);
-  }
-  try {
-    saveNotes(cid, getNotes(cid));
-  } catch (e) {
-    console.warn('Replay saveNotes failed for', cid, e);
-  }
-  try {
-    saveCustomTags(cid, getCustomTags(cid));
-  } catch (e) {
-    console.warn('Replay saveCustomTags failed for', cid, e);
-  }
-}
-
-function _replayDegradedTouchedCourses() {
-  if (_degradedTouchedCourses.size === 0) return;
-  var ids = Array.from(_degradedTouchedCourses);
-  _degradedTouchedCourses.clear();
-  ids.forEach(_replayCourseEntities);
 }
 
 /* Migrate course-scoped data from a local placeholder cid to the canonical
@@ -2722,8 +2655,6 @@ function _saveCourseField(field, cid, value) {
   var dataKey = _DATA_KEYS[field];
   var lsOk = true;
   if (dataKey) lsOk = _safeLSSet('gb-' + dataKey + '-' + cid, JSON.stringify(value));
-  // Track which courses got writes during degraded mode so recovery can replay.
-  if (_supabaseDegraded && cid) _degradedTouchedCourses.add(cid);
   _broadcastChange(cid, field);
   return lsOk;
 }
@@ -3191,7 +3122,7 @@ function upsertScore(cid, sid, aid, tid, scoreVal, date, type, note) {
   // rubric clicks once realtime catches up.
   _setEchoGuard('gradebook', cid);
 
-  if (_useSupabase && localStorage.getItem('gb-demo-mode') !== '1') {
+  if (_writesEnabled()) {
     _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note);
   }
   _broadcastChange(cid, 'scores');
@@ -3259,7 +3190,7 @@ function _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note) {
     }
     ops.forEach(function (op) {
       _trackPendingSync(
-        sb.rpc(op.rpc, op.params).then(function (res) {
+        _writeRpc(op.rpc, op.params).then(function (res) {
           if (res.error) _reportScoreWriteFailure(op.rpc, res.error);
         }),
       );
@@ -3271,15 +3202,13 @@ function _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note) {
   // comments live on Score, not on TagScore/RubricScore.
   if (note != null && note !== '') {
     _trackPendingSync(
-      sb
-        .rpc('save_score_comment', {
-          p_enrollment_id: sid,
-          p_assessment_id: aid,
-          p_comment: note,
-        })
-        .then(function (res) {
-          if (res.error) console.warn('save_score_comment failed:', res.error);
-        }),
+      _writeRpc('save_score_comment', {
+        p_enrollment_id: sid,
+        p_assessment_id: aid,
+        p_comment: note,
+      }).then(function (res) {
+        if (res.error) console.warn('save_score_comment failed:', res.error);
+      }),
     );
   }
 }
@@ -3306,7 +3235,7 @@ function _scoreEntriesByKey(blob) {
 }
 
 function persistScoreDiffToCanonical(cid, prevBlob, nextBlob) {
-  if (!_useSupabase || localStorage.getItem('gb-demo-mode') === '1') return;
+  if (!_writesEnabled()) return;
   var prevByKey = _scoreEntriesByKey(prevBlob || {});
   var nextByKey = _scoreEntriesByKey(nextBlob || {});
 
@@ -3340,16 +3269,14 @@ window.upsertCellScore = function (cid, enrollmentId, assessmentId, value) {
   if (!sb) return Promise.resolve();
   var v = value === '' || value == null ? null : Number(value);
   return _trackPendingSync(
-    sb
-      .rpc('upsert_score', {
-        p_enrollment_id: enrollmentId,
-        p_assessment_id: assessmentId,
-        p_value: v,
-      })
-      .then(function (res) {
-        if (res.error) _reportScoreWriteFailure('upsert_score', res.error);
-        return res;
-      }),
+    _writeRpc('upsert_score', {
+      p_enrollment_id: enrollmentId,
+      p_assessment_id: assessmentId,
+      p_value: v,
+    }).then(function (res) {
+      if (res.error) _reportScoreWriteFailure('upsert_score', res.error);
+      return res;
+    }),
   );
 };
 
@@ -3361,16 +3288,14 @@ window.fillRubric = function (enrollmentId, assessmentId, value) {
   if (!sb) return Promise.resolve();
   var v = value == null ? null : Number(value);
   return _trackPendingSync(
-    sb
-      .rpc('fill_rubric', {
-        p_enrollment_id: enrollmentId,
-        p_assessment_id: assessmentId,
-        p_value: v,
-      })
-      .then(function (res) {
-        if (res.error) console.warn('fill_rubric failed:', res.error);
-        return res;
-      }),
+    _writeRpc('fill_rubric', {
+      p_enrollment_id: enrollmentId,
+      p_assessment_id: assessmentId,
+      p_value: v,
+    }).then(function (res) {
+      if (res.error) console.warn('fill_rubric failed:', res.error);
+      return res;
+    }),
   );
 };
 
@@ -3382,15 +3307,13 @@ window.clearScore = function (enrollmentId, assessmentId) {
   var sb = getSupabase();
   if (!sb) return Promise.resolve();
   return _trackPendingSync(
-    sb
-      .rpc('clear_score', {
-        p_enrollment_id: enrollmentId,
-        p_assessment_id: assessmentId,
-      })
-      .then(function (res) {
-        if (res.error) console.warn('clear_score failed:', res.error);
-        return res;
-      }),
+    _writeRpc('clear_score', {
+      p_enrollment_id: enrollmentId,
+      p_assessment_id: assessmentId,
+    }).then(function (res) {
+      if (res.error) console.warn('clear_score failed:', res.error);
+      return res;
+    }),
   );
 };
 
@@ -3401,15 +3324,13 @@ window.clearRowScores = function (enrollmentId, courseId) {
   var sb = getSupabase();
   if (!sb) return Promise.resolve();
   return _trackPendingSync(
-    sb
-      .rpc('clear_row_scores', {
-        p_enrollment_id: enrollmentId,
-        p_course_id: courseId,
-      })
-      .then(function (res) {
-        if (res.error) console.warn('clear_row_scores failed:', res.error);
-        return res;
-      }),
+    _writeRpc('clear_row_scores', {
+      p_enrollment_id: enrollmentId,
+      p_course_id: courseId,
+    }).then(function (res) {
+      if (res.error) console.warn('clear_row_scores failed:', res.error);
+      return res;
+    }),
   );
 };
 
@@ -3420,7 +3341,7 @@ window.clearColumnScores = function (assessmentId) {
   var sb = getSupabase();
   if (!sb) return Promise.resolve();
   return _trackPendingSync(
-    sb.rpc('clear_column_scores', { p_assessment_id: assessmentId }).then(function (res) {
+    _writeRpc('clear_column_scores', { p_assessment_id: assessmentId }).then(function (res) {
       if (res.error) console.warn('clear_column_scores failed:', res.error);
       return res;
     }),
@@ -3433,16 +3354,14 @@ window.setCellStatus = function (enrollmentId, assessmentId, status) {
   var sb = getSupabase();
   if (!sb) return Promise.resolve();
   return _trackPendingSync(
-    sb
-      .rpc('set_score_status', {
-        p_enrollment_id: enrollmentId,
-        p_assessment_id: assessmentId,
-        p_status: status || null,
-      })
-      .then(function (res) {
-        if (res.error) console.warn('set_score_status failed:', res.error);
-        return res;
-      }),
+    _writeRpc('set_score_status', {
+      p_enrollment_id: enrollmentId,
+      p_assessment_id: assessmentId,
+      p_status: status || null,
+    }).then(function (res) {
+      if (res.error) console.warn('set_score_status failed:', res.error);
+      return res;
+    }),
   );
 };
 
@@ -3823,20 +3742,19 @@ function createCourse(data) {
       // create_course round-trip can be migrated + replayed when the
       // canonical UUID arrives (P6.2).
       _pendingLocalCids.add(localId);
-      var createPromise = sb
-        .rpc(
-          'create_course',
-          _stampIdempotencyKey('create_course', {
-            p_name: course.name,
-            p_grade_level: course.gradeLevel || null,
-            p_description: course.description || null,
-            p_grading_system: course.gradingSystem || 'proficiency',
-            p_calc_method: course.calcMethod || 'average',
-            p_decay_weight: course.decayWeight != null ? Number(course.decayWeight) : null,
-            p_timezone: course.timezone,
-            p_late_work_policy: course.lateWorkPolicy || null,
-          }),
-        )
+      var createPromise = _writeRpc(
+        'create_course',
+        _stampIdempotencyKey('create_course', {
+          p_name: course.name,
+          p_grade_level: course.gradeLevel || null,
+          p_description: course.description || null,
+          p_grading_system: course.gradingSystem || 'proficiency',
+          p_calc_method: course.calcMethod || 'average',
+          p_decay_weight: course.decayWeight != null ? Number(course.decayWeight) : null,
+          p_timezone: course.timezone,
+          p_late_work_policy: course.lateWorkPolicy || null,
+        }),
+      )
         .then(function (res) {
           if (res.error) {
             console.warn('create_course RPC failed:', res.error);
@@ -3892,7 +3810,7 @@ function updateCourse(id, updates) {
       if (updates.lateWorkPolicy !== undefined) patch.late_work_policy = updates.lateWorkPolicy;
       if (Object.keys(patch).length > 0 && _isUuid(id)) {
         _trackPendingSync(
-          sb.rpc('update_course', { p_course_id: id, p_patch: patch }).then(function (res) {
+          _writeRpc('update_course', { p_course_id: id, p_patch: patch }).then(function (res) {
             if (res.error) console.warn('update_course RPC failed:', res.error);
           }),
         );
@@ -3900,7 +3818,7 @@ function updateCourse(id, updates) {
       // archive toggle goes through archive_course (dedicated RPC).
       if (updates.archived !== undefined && _isUuid(id)) {
         _trackPendingSync(
-          sb.rpc('archive_course', { p_course_id: id, p_archived: !!updates.archived }).then(function (res) {
+          _writeRpc('archive_course', { p_course_id: id, p_archived: !!updates.archived }).then(function (res) {
             if (res.error) console.warn('archive_course RPC failed:', res.error);
           }),
         );
@@ -3962,7 +3880,7 @@ async function deleteCourseData(id) {
   if (_useSupabase && _isUuid(id)) {
     const sb = getSupabase();
     if (sb) {
-      const res = await sb.rpc('delete_course', { p_course_id: id });
+      const res = await _writeRpc('delete_course', { p_course_id: id });
       if (res.error) throw res.error;
     }
   }
@@ -4160,7 +4078,7 @@ function saveLearningMap(cid, map) {
   map._customized = true;
   map._version = (map._version || 0) + 1;
   _saveCourseField('learningMaps', cid, map); // derived tag/section caches auto-invalidate via mapRef check
-  if (localStorage.getItem('gb-demo-mode') === '1' || !_useSupabase || !_isUuid(cid)) return;
+  if (!_writesEnabled() || !_isUuid(cid)) return;
   _persistLearningMapToCanonical(cid, prev, map);
 }
 function resetLearningMap(cid) {
@@ -4204,7 +4122,7 @@ function getModules(cid) {
 function saveModules(cid, arr) {
   var prev = _loadPersistedCourseFieldSnapshot('modules', cid, (_cache.modules && _cache.modules[cid]) || []);
   _saveCourseField('modules', cid, arr);
-  if (localStorage.getItem('gb-demo-mode') === '1' || !_useSupabase || !_isUuid(cid)) return;
+  if (!_writesEnabled() || !_isUuid(cid)) return;
   if (!cid || !arr) return;
   _persistModulesToCanonical(cid, prev, arr);
 }
@@ -4701,15 +4619,13 @@ function _persistStatusDiffToCanonical(prev, next) {
     var assessmentId = parts.slice(1).join(':');
     if (!_isUuid(enrollmentId) || !_isUuid(assessmentId)) return;
     _trackPendingSync(
-      sb
-        .rpc('set_score_status', {
-          p_enrollment_id: enrollmentId,
-          p_assessment_id: assessmentId,
-          p_status: after || null,
-        })
-        .then(function (res) {
-          if (res.error) console.warn('set_score_status RPC failed:', res.error);
-        }),
+      _writeRpc('set_score_status', {
+        p_enrollment_id: enrollmentId,
+        p_assessment_id: assessmentId,
+        p_status: after || null,
+      }).then(function (res) {
+        if (res.error) console.warn('set_score_status RPC failed:', res.error);
+      }),
     );
   });
 }
@@ -4728,7 +4644,7 @@ function saveAssignmentStatuses(cid, obj) {
   var prev = _loadPersistedCourseFieldSnapshot('statuses', cid, (_cache.statuses && _cache.statuses[cid]) || {});
   var next = obj || {};
   _saveCourseField('statuses', cid, next);
-  if (localStorage.getItem('gb-demo-mode') === '1' || !_useSupabase || !_isUuid(cid)) return;
+  if (!_writesEnabled() || !_isUuid(cid)) return;
   _persistStatusDiffToCanonical(prev, next);
 }
 function getAssignmentStatus(cid, sid, aid) {
@@ -4740,22 +4656,20 @@ function setAssignmentStatus(cid, sid, aid, status) {
   if (status) st[key] = status;
   else delete st[key];
   saveAssignmentStatuses(cid, st);
-  if (_useSupabase && localStorage.getItem('gb-demo-mode') !== '1' && _isUuid(sid) && _isUuid(aid)) {
+  if (_writesEnabled() && _isUuid(sid) && _isUuid(aid)) {
     // v2 set_score_status(p_enrollment_id, p_assessment_id, p_status).
     // The legacy `save_assignment_status` RPC is gone; status now writes
     // directly onto the Score row. `sid` here is the enrollment_id.
     var sb = getSupabase();
     if (sb) {
       _trackPendingSync(
-        sb
-          .rpc('set_score_status', {
-            p_enrollment_id: sid,
-            p_assessment_id: aid,
-            p_status: status || null,
-          })
-          .then(function (res) {
-            if (res.error) console.warn('set_score_status RPC failed:', res.error);
-          }),
+        _writeRpc('set_score_status', {
+          p_enrollment_id: sid,
+          p_assessment_id: aid,
+          p_status: status || null,
+        }).then(function (res) {
+          if (res.error) console.warn('set_score_status RPC failed:', res.error);
+        }),
       );
     }
   }
@@ -5001,7 +4915,7 @@ function saveRubrics(cid, arr) {
   var nextArr = Array.isArray(arr) ? arr : [];
   var prev = _safeParseLS('gb-rubrics-' + cid, []);
   _saveCourseField('rubrics', cid, nextArr);
-  if (localStorage.getItem('gb-demo-mode') === '1' || !_useSupabase || !_isUuid(cid)) {
+  if (!_writesEnabled() || !_isUuid(cid)) {
     return Promise.resolve({ rubrics: nextArr, idMap: {} });
   }
   return _persistRubricsToCanonical(cid, prev, nextArr);
@@ -5228,12 +5142,12 @@ function _teacherPrefsPatchFromConfig(obj) {
 function saveConfig(obj) {
   _cache.config = obj;
   _safeLSSet('gb-config', JSON.stringify(obj));
-  if (_useSupabase) {
+  if (_writesEnabled()) {
     const sb = getSupabase();
     if (sb) {
       const patch = _teacherPrefsPatchFromConfig(obj);
       _trackPendingSync(
-        sb.rpc('save_teacher_preferences', { p_patch: patch }).then(function (res) {
+        _writeRpc('save_teacher_preferences', { p_patch: patch }).then(function (res) {
           if (res.error) console.warn('save_teacher_preferences RPC failed:', res.error);
         }),
       );
@@ -5251,7 +5165,7 @@ function getCourseConfig(cid) {
 }
 function saveCourseConfig(cid, obj) {
   _saveCourseField('courseConfigs', cid, obj);
-  if (_useSupabase && _isUuid(cid)) {
+  if (_writesEnabled() && _isUuid(cid)) {
     // v2: policy fields live on the course row. save_course_policy is gone;
     // remap the legacy courseConfig blob onto a update_course jsonb patch.
     const sb = getSupabase();
@@ -5264,7 +5178,7 @@ function saveCourseConfig(cid, obj) {
       if (obj.lateWorkPolicy != null) patch.late_work_policy = obj.lateWorkPolicy;
       if (Object.keys(patch).length > 0) {
         _trackPendingSync(
-          sb.rpc('update_course', { p_course_id: cid, p_patch: patch }).then(function (res) {
+          _writeRpc('update_course', { p_course_id: cid, p_patch: patch }).then(function (res) {
             if (res.error) console.warn('update_course (saveCourseConfig) failed:', res.error);
           }),
         );
@@ -5285,7 +5199,7 @@ function saveStudents(cid, arr) {
   var prev = _loadPersistedCourseFieldSnapshot('students', cid, _cache.students[cid] || []).map(migrateStudent);
   _saveCourseField('students', cid, arr);
   // Demo mode and offline both stay local-only.
-  if (localStorage.getItem('gb-demo-mode') === '1' || !_useSupabase) return;
+  if (!_writesEnabled()) return;
   if (!cid || !arr) return;
   return _persistStudentsToCanonical(cid, prev, arr);
 }
@@ -5381,40 +5295,38 @@ function _studentIdentityChanged(a, b) {
    p_designations, p_existing_student_id) → { student_id, enrollment_id } */
 function _canonicalEnrollStudent(sb, cid, s, idx) {
   var existingStudentId = _isUuid(s.personId) ? s.personId : null;
-  return sb
-    .rpc(
-      'create_student_and_enroll',
-      _stampIdempotencyKey('create_student_and_enroll', {
-        p_course_id: cid,
-        p_first_name: s.firstName || '',
-        p_last_name: s.lastName || null,
-        p_preferred_name: s.preferred || null,
-        p_pronouns: s.pronouns || null,
-        p_student_number: s.studentNumber || null,
-        p_email: s.email || null,
-        p_date_of_birth: s.dateOfBirth || null,
-        p_designations: s.designations || [],
-        p_existing_student_id: existingStudentId,
-      }),
-    )
-    .then(function (res) {
-      if (res.error) {
-        console.warn('create_student_and_enroll failed:', res.error, s);
-        return;
-      }
-      var row = res.data || {};
-      var cached = (_cache.students[cid] || []).find(function (c) {
-        return c.id === s.id;
-      });
-      if (cached && row.enrollment_id) {
-        cached.id = row.enrollment_id;
-        cached.personId = row.student_id;
-        cached.rosterPosition = idx;
-      }
-      if (_cache.students[cid]) {
-        _safeLSSet('gb-students-' + cid, JSON.stringify(_cache.students[cid]));
-      }
+  return _writeRpc(
+    'create_student_and_enroll',
+    _stampIdempotencyKey('create_student_and_enroll', {
+      p_course_id: cid,
+      p_first_name: s.firstName || '',
+      p_last_name: s.lastName || null,
+      p_preferred_name: s.preferred || null,
+      p_pronouns: s.pronouns || null,
+      p_student_number: s.studentNumber || null,
+      p_email: s.email || null,
+      p_date_of_birth: s.dateOfBirth || null,
+      p_designations: s.designations || [],
+      p_existing_student_id: existingStudentId,
+    }),
+  ).then(function (res) {
+    if (res.error) {
+      console.warn('create_student_and_enroll failed:', res.error, s);
+      return;
+    }
+    var row = res.data || {};
+    var cached = (_cache.students[cid] || []).find(function (c) {
+      return c.id === s.id;
     });
+    if (cached && row.enrollment_id) {
+      cached.id = row.enrollment_id;
+      cached.personId = row.student_id;
+      cached.rosterPosition = idx;
+    }
+    if (_cache.students[cid]) {
+      _safeLSSet('gb-students-' + cid, JSON.stringify(_cache.students[cid]));
+    }
+  });
 }
 
 /* v2 update_enrollment(p_id, p_patch jsonb) — jsonb patch.
@@ -5425,7 +5337,7 @@ function _canonicalUpdateEnrollment(sb, enrollmentId, s, idx) {
     roster_position: idx,
   };
   if (typeof s.isFlagged === 'boolean') patch.is_flagged = s.isFlagged;
-  return sb.rpc('update_enrollment', { p_id: enrollmentId, p_patch: patch }).then(function (res) {
+  return _writeRpc('update_enrollment', { p_id: enrollmentId, p_patch: patch }).then(function (res) {
     if (res.error) console.warn('update_enrollment failed:', res.error, enrollmentId);
   });
 }
@@ -5443,14 +5355,14 @@ function _canonicalUpdateStudent(sb, studentId, s) {
     email: s.email || null,
     date_of_birth: s.dateOfBirth || null,
   };
-  return sb.rpc('update_student', { p_id: studentId, p_patch: patch }).then(function (res) {
+  return _writeRpc('update_student', { p_id: studentId, p_patch: patch }).then(function (res) {
     if (res.error) console.warn('update_student failed:', res.error, studentId);
   });
 }
 
 /* v2 withdraw_enrollment(p_id) — sets withdrawn_at = now(). */
 function _canonicalWithdrawEnrollment(sb, enrollmentId) {
-  return sb.rpc('withdraw_enrollment', { p_id: enrollmentId }).then(function (res) {
+  return _writeRpc('withdraw_enrollment', { p_id: enrollmentId }).then(function (res) {
     if (res.error) console.warn('withdraw_enrollment failed:', res.error, enrollmentId);
   });
 }
@@ -5463,7 +5375,7 @@ window.reorderRoster = function (enrollmentIds) {
   if (!sb) return Promise.resolve();
   var ids = (enrollmentIds || []).filter(_isUuid);
   if (ids.length === 0) return Promise.resolve();
-  return sb.rpc('reorder_roster', { p_ids: ids }).then(function (res) {
+  return _writeRpc('reorder_roster', { p_ids: ids }).then(function (res) {
     if (res.error) console.warn('reorder_roster failed:', res.error);
     return res;
   });
@@ -5475,7 +5387,7 @@ window.bulkApplyPronouns = function (studentIds, pronouns) {
   if (!sb) return Promise.resolve();
   var ids = (studentIds || []).filter(_isUuid);
   if (ids.length === 0) return Promise.resolve();
-  return sb.rpc('bulk_apply_pronouns', { p_student_ids: ids, p_pronouns: pronouns || null }).then(function (res) {
+  return _writeRpc('bulk_apply_pronouns', { p_student_ids: ids, p_pronouns: pronouns || null }).then(function (res) {
     if (res.error) console.warn('bulk_apply_pronouns failed:', res.error);
     return res;
   });
@@ -5488,12 +5400,13 @@ window.importRosterCsv = function (cid, rows) {
   var sb = getSupabase();
   if (!sb) return Promise.resolve();
   if (!_isUuid(cid)) return Promise.resolve();
-  return sb
-    .rpc('import_roster_csv', _stampIdempotencyKey('import_roster_csv', { p_course_id: cid, p_rows: rows || [] }))
-    .then(function (res) {
-      if (res.error) console.warn('import_roster_csv failed:', res.error);
-      return res;
-    });
+  return _writeRpc(
+    'import_roster_csv',
+    _stampIdempotencyKey('import_roster_csv', { p_course_id: cid, p_rows: rows || [] }),
+  ).then(function (res) {
+    if (res.error) console.warn('import_roster_csv failed:', res.error);
+    return res;
+  });
 };
 
 /* Single-enrollment flag toggle — v2 enrollment.is_flagged column. */
@@ -5501,15 +5414,13 @@ window.setEnrollmentFlag = function (enrollmentId, flagged) {
   var sb = getSupabase();
   if (!sb) return Promise.resolve();
   if (!_isUuid(enrollmentId)) return Promise.resolve();
-  return sb
-    .rpc('update_enrollment', {
-      p_id: enrollmentId,
-      p_patch: { is_flagged: !!flagged },
-    })
-    .then(function (res) {
-      if (res.error) console.warn('update_enrollment (flag) failed:', res.error);
-      return res;
-    });
+  return _writeRpc('update_enrollment', {
+    p_id: enrollmentId,
+    p_patch: { is_flagged: !!flagged },
+  }).then(function (res) {
+    if (res.error) console.warn('update_enrollment (flag) failed:', res.error);
+    return res;
+  });
 };
 function getAssessments(cid) {
   if (_cache.assessments[cid] !== undefined) return _cache.assessments[cid];
@@ -5533,7 +5444,7 @@ function saveCategories(cid, arr) {
   var prev = _loadPersistedCourseFieldSnapshot('categories', cid, (_cache.categories && _cache.categories[cid]) || []);
   var next = arr || [];
   _saveCourseField('categories', cid, next);
-  if (localStorage.getItem('gb-demo-mode') === '1' || !_useSupabase || !_isUuid(cid)) return;
+  if (!_writesEnabled() || !_isUuid(cid)) return;
   _persistCategoriesToCanonical(cid, prev, next);
 }
 function getCategoryById(cid, categoryId) {
@@ -5552,7 +5463,7 @@ function saveAssessments(cid, arr) {
   );
   _saveCourseField('assessments', cid, arr);
   if (arr.length < prev.length) _cleanOrphanedScores(cid, arr);
-  if (localStorage.getItem('gb-demo-mode') === '1' || !_useSupabase) return;
+  if (!_writesEnabled()) return;
   if (!cid || !arr) return;
   _persistAssessmentsToCanonical(cid, prev, arr);
 }
@@ -5679,7 +5590,7 @@ function _persistAssessmentCollab(sb, assessmentId, a) {
   if (!sb || !_isUuid(assessmentId)) return Promise.resolve();
   var mode = _canonicalCollabModeFromAssessment(a);
   var config = mode === 'none' ? null : _collabConfigFromAssessment(a);
-  return sb.rpc('save_collab', { p_id: assessmentId, p_mode: mode, p_config: config }).then(function (res) {
+  return _writeRpc('save_collab', { p_id: assessmentId, p_mode: mode, p_config: config }).then(function (res) {
     if (res.error) console.warn('save_collab failed:', res.error, assessmentId);
     return res;
   });
@@ -5705,7 +5616,7 @@ function _canonicalCreateAssessment(sb, cid, a) {
     p_module_id: _isUuid(a.moduleId) ? a.moduleId : null,
     p_tag_ids: tagIds,
   };
-  return sb.rpc('create_assessment', _stampIdempotencyKey('create_assessment', params)).then(function (res) {
+  return _writeRpc('create_assessment', _stampIdempotencyKey('create_assessment', params)).then(function (res) {
     if (res.error) {
       console.warn('create_assessment failed:', res.error, a);
       return;
@@ -5740,7 +5651,7 @@ function _canonicalUpdateAssessment(sb, cid, assessmentId, a) {
     rubric_id: _isUuid(a.rubricId) ? a.rubricId : null,
     module_id: _isUuid(a.moduleId) ? a.moduleId : null,
   };
-  return sb.rpc('update_assessment', { p_id: assessmentId, p_patch: patch, p_tag_ids: tagIds }).then(function (res) {
+  return _writeRpc('update_assessment', { p_id: assessmentId, p_patch: patch, p_tag_ids: tagIds }).then(function (res) {
     if (res.error) {
       console.warn('update_assessment failed:', res.error, assessmentId);
       return res;
@@ -5753,7 +5664,7 @@ function _canonicalUpdateAssessment(sb, cid, assessmentId, a) {
    tag_scores/assessment_tag/term_rating_assessment; observation.assessment_id
    is ON DELETE SET NULL so observations survive. */
 function _canonicalDeleteAssessment(sb, cid, assessmentId) {
-  return sb.rpc('delete_assessment', { p_id: assessmentId }).then(function (res) {
+  return _writeRpc('delete_assessment', { p_id: assessmentId }).then(function (res) {
     if (res.error) console.warn('delete_assessment failed:', res.error, assessmentId);
   });
 }
@@ -5764,12 +5675,13 @@ window.duplicateAssessment = function (srcAssessmentId) {
   var sb = getSupabase();
   if (!sb) return Promise.resolve();
   if (!_isUuid(srcAssessmentId)) return Promise.resolve();
-  return sb
-    .rpc('duplicate_assessment', _stampIdempotencyKey('duplicate_assessment', { p_src_id: srcAssessmentId }))
-    .then(function (res) {
-      if (res.error) console.warn('duplicate_assessment failed:', res.error);
-      return res;
-    });
+  return _writeRpc(
+    'duplicate_assessment',
+    _stampIdempotencyKey('duplicate_assessment', { p_src_id: srcAssessmentId }),
+  ).then(function (res) {
+    if (res.error) console.warn('duplicate_assessment failed:', res.error);
+    return res;
+  });
 };
 
 window.saveAssessmentTags = function (assessmentId, tagIds) {
@@ -5777,7 +5689,7 @@ window.saveAssessmentTags = function (assessmentId, tagIds) {
   if (!sb) return Promise.resolve();
   if (!_isUuid(assessmentId)) return Promise.resolve();
   var ids = (tagIds || []).filter(_isUuid);
-  return sb.rpc('save_assessment_tags', { p_id: assessmentId, p_tag_ids: ids }).then(function (res) {
+  return _writeRpc('save_assessment_tags', { p_id: assessmentId, p_tag_ids: ids }).then(function (res) {
     if (res.error) console.warn('save_assessment_tags failed:', res.error);
     return res;
   });
@@ -5791,16 +5703,14 @@ window.saveCollab = function (assessmentId, mode, config) {
   if (!sb) return Promise.resolve();
   if (!_isUuid(assessmentId)) return Promise.resolve();
   var canonicalMode = _canonicalCollabModeFromAssessment({ collaboration: mode });
-  return sb
-    .rpc('save_collab', {
-      p_id: assessmentId,
-      p_mode: canonicalMode,
-      p_config: canonicalMode === 'none' ? null : config || null,
-    })
-    .then(function (res) {
-      if (res.error) console.warn('save_collab failed:', res.error);
-      return res;
-    });
+  return _writeRpc('save_collab', {
+    p_id: assessmentId,
+    p_mode: canonicalMode,
+    p_config: canonicalMode === 'none' ? null : config || null,
+  }).then(function (res) {
+    if (res.error) console.warn('save_collab failed:', res.error);
+    return res;
+  });
 };
 
 function _cleanOrphanedScores(cid, validArr) {
@@ -5852,7 +5762,7 @@ var _noteSaveQueue = {};
 function saveNotes(cid, obj) {
   var prev = _loadPersistedCourseFieldSnapshot('notes', cid, (_cache.notes && _cache.notes[cid]) || {});
   _saveCourseField('notes', cid, obj);
-  if (localStorage.getItem('gb-demo-mode') === '1' || !_useSupabase || !_isUuid(cid)) return;
+  if (!_writesEnabled() || !_isUuid(cid)) return;
   if (!obj) return;
   _persistNotesToCanonical(cid, prev, obj);
 }
@@ -6015,7 +5925,7 @@ function setPointsScore(cid, sid, aid, rawScore) {
   });
   if (changed) {
     saveScores(cid, scores);
-    if (_useSupabase && localStorage.getItem('gb-demo-mode') !== '1' && _isUuid(sid) && _isUuid(aid)) {
+    if (_writesEnabled() && _isUuid(sid) && _isUuid(aid)) {
       window.upsertCellScore(cid, sid, aid, rawScore);
     }
   }
@@ -6074,7 +5984,7 @@ function toggleFlag(cid, sid) {
     if (summaries[sid].enrollment) summaries[sid].enrollment.isFlagged = nextFlagged;
     _persistLoadedField(cid, 'studentProfileSummaries', summaries);
   }
-  if (_useSupabase && localStorage.getItem('gb-demo-mode') !== '1' && _isUuid(sid)) {
+  if (_writesEnabled() && _isUuid(sid)) {
     _setEchoGuard('student-records', cid);
     return window.setEnrollmentFlag(sid, nextFlagged).then(function (res) {
       if (res && res.error) console.warn('setEnrollmentFlag failed:', res.error);
@@ -6155,7 +6065,7 @@ function addQuickOb(cid, sid, text, dims, sentiment, context, assignmentContext)
   all[sid].push(entry);
   _cache.observations[cid] = all;
   var lsOk = _safeLSSet('gb-quick-obs-' + cid, JSON.stringify(all));
-  if (_useSupabase && localStorage.getItem('gb-demo-mode') !== '1') {
+  if (_writesEnabled()) {
     _persistObservationCreate(cid, sid, entry);
   }
   _broadcastChange(cid, 'observations');
@@ -6168,7 +6078,7 @@ function deleteQuickOb(cid, sid, obId) {
   all[sid] = all[sid].filter(o => o.id !== obId);
   _cache.observations[cid] = all;
   _safeLSSet('gb-quick-obs-' + cid, JSON.stringify(all));
-  if (_useSupabase && localStorage.getItem('gb-demo-mode') !== '1') {
+  if (_writesEnabled()) {
     _persistObservationDelete(cid, obId);
   }
   _broadcastChange(cid, 'observations');
@@ -6204,7 +6114,7 @@ function deleteAssessmentObservations(cid, aid) {
   // Dispatch delete_observation for each removed observation that has a
   // canonical UUID. Locally-created observations not yet synced have local
   // string ids; _persistObservationDelete skips those.
-  if (_useSupabase && localStorage.getItem('gb-demo-mode') !== '1') {
+  if (_writesEnabled()) {
     removedIds.forEach(function (obId) {
       _persistObservationDelete(cid, obId);
     });
@@ -6224,7 +6134,7 @@ function updateQuickOb(cid, sid, obId, updates) {
   ob.modified = new Date().toISOString();
   _cache.observations[cid] = all;
   var lsOk = _safeLSSet('gb-quick-obs-' + cid, JSON.stringify(all));
-  if (_useSupabase && localStorage.getItem('gb-demo-mode') !== '1') {
+  if (_writesEnabled()) {
     _persistObservationUpdate(cid, ob);
   }
   _broadcastChange(cid, 'observations');
@@ -6244,7 +6154,7 @@ function _persistObservationCreate(cid, sid, entry) {
   // legacy store. Passing [] here; tag linkage lands in Phase 4.5 once the
   // learning map port carries real tag ids through to observation capture.
   _trackPendingSync(
-    _callRpcWithAuthGuard(
+    _writeRpc(
       'create_observation',
       {
         p_course_id: cid,
@@ -6297,7 +6207,7 @@ function _persistObservationUpdate(cid, ob) {
     patch.assessment_id = ob.assignmentContext.assessmentId;
   }
   _trackPendingSync(
-    _callRpcWithAuthGuard(
+    _writeRpc(
       'update_observation',
       {
         p_id: ob.id,
@@ -6322,7 +6232,7 @@ function _persistObservationDelete(cid, obId) {
   var sb = getSupabase();
   if (!sb) return;
   _trackPendingSync(
-    sb.rpc('delete_observation', { p_id: obId }).then(function (res) {
+    _writeRpc('delete_observation', { p_id: obId }).then(function (res) {
       if (res.error) console.warn('delete_observation failed:', res.error);
     }),
   );
@@ -6336,7 +6246,7 @@ window.createObservationRich = function (params) {
   params = params || {};
   if (!_isUuid(params.courseId)) return Promise.resolve();
   return _trackPendingSync(
-    _callRpcWithAuthGuard(
+    _writeRpc(
       'create_observation',
       {
         p_course_id: params.courseId,
@@ -6364,7 +6274,7 @@ window.updateObservationRich = function (obId, patch, joins) {
   if (!_isUuid(obId)) return Promise.resolve();
   joins = joins || {};
   return _trackPendingSync(
-    _callRpcWithAuthGuard(
+    _writeRpc(
       'update_observation',
       {
         p_id: obId,
@@ -6390,29 +6300,27 @@ window.upsertObservationTemplate = function (cid, payload) {
   if (!sb) return Promise.resolve();
   if (!_isUuid(cid)) return Promise.resolve();
   payload = payload || {};
-  return sb
-    .rpc(
-      'upsert_observation_template',
-      _stampIdempotencyKey('upsert_observation_template', {
-        p_id: _isUuid(payload.id) ? payload.id : null,
-        p_course_id: cid,
-        p_body: payload.body || '',
-        p_default_sentiment: payload.defaultSentiment || null,
-        p_default_context_type: payload.defaultContextType || null,
-        p_display_order: payload.displayOrder != null ? Number(payload.displayOrder) : null,
-      }),
-    )
-    .then(function (res) {
-      if (res.error) console.warn('upsert_observation_template failed:', res.error);
-      return res;
-    });
+  return _writeRpc(
+    'upsert_observation_template',
+    _stampIdempotencyKey('upsert_observation_template', {
+      p_id: _isUuid(payload.id) ? payload.id : null,
+      p_course_id: cid,
+      p_body: payload.body || '',
+      p_default_sentiment: payload.defaultSentiment || null,
+      p_default_context_type: payload.defaultContextType || null,
+      p_display_order: payload.displayOrder != null ? Number(payload.displayOrder) : null,
+    }),
+  ).then(function (res) {
+    if (res.error) console.warn('upsert_observation_template failed:', res.error);
+    return res;
+  });
 };
 
 window.deleteObservationTemplate = function (tplId) {
   var sb = getSupabase();
   if (!sb) return Promise.resolve();
   if (!_isUuid(tplId)) return Promise.resolve();
-  return sb.rpc('delete_observation_template', { p_id: tplId }).then(function (res) {
+  return _writeRpc('delete_observation_template', { p_id: tplId }).then(function (res) {
     if (res.error) console.warn('delete_observation_template failed:', res.error);
     return res;
   });
@@ -6529,12 +6437,58 @@ function _reportMissingRpc(name, error) {
   }
 }
 
+function _isReadRpc(name) {
+  return /^(get|list)_/i.test(name || '');
+}
+
+/* Can writes be queued? True when signed in to Supabase, including while
+   cloud sync is paused (degraded): those writes wait in the outbox and go out
+   on recovery. False in demo mode and local-only dev. */
+function _writesEnabled() {
+  return (_useSupabase || _supabaseDegraded) && localStorage.getItem('gb-demo-mode') !== '1';
+}
+
+var _outboxConfigured = false;
+function _outbox() {
+  var q = window.v2Queue;
+  if (!q || typeof q.push !== 'function') return null;
+  if (!_outboxConfigured) {
+    _outboxConfigured = true;
+    q.configure({
+      send: function (name, params, options) {
+        if (!getSupabase()) return { data: null, error: { message: 'no_supabase' } };
+        return _callRpcWithAuthGuard(name, params, options);
+      },
+      isPaused: function () {
+        return _supabaseDegraded;
+      },
+    });
+  }
+  return q;
+}
+
+/* Every write RPC goes through here and on to the outbox
+   (shared/offline-queue.js), which keeps writes to one record in order and
+   retries network failures until the server accepts them. Resolves with the
+   final { data, error }. Without the outbox (unit tests that don't load it)
+   the write is sent directly. */
+function _writeRpc(name, params, options) {
+  params = params || {};
+  _stampIdempotencyKey(name, params);
+  var outbox = _outbox();
+  if (outbox) return outbox.push(name, params, options ? { sendOptions: options } : null);
+  var sb = getSupabase();
+  if (!sb) return Promise.resolve({ data: null, error: null });
+  return _callRpcWithAuthGuard(name, params, options);
+}
+
 function _rpcOrNoop(name, params, options) {
   var sb = getSupabase();
   if (!sb) return Promise.resolve({ data: null, error: null });
+  var call = _isReadRpc(name) ? _callRpcWithAuthGuard(name, params, options) : _writeRpc(name, params, options);
   return _trackWriteSync(
     name,
-    _callRpcWithAuthGuard(name, params, options).then(function (res) {
+    call.then(function (res) {
       if (res.error && !res.error.handledSessionExpired) {
         if (_isMissingRpcError(res.error)) _reportMissingRpc(name, res.error);
         else console.warn(name + ' failed:', res.error);
@@ -6937,7 +6891,7 @@ window.v2.saveTermRating = function (enrollmentId, term, payload) {
     wire.mention_observations = payload.mentionObservationIds.filter(_isUuid);
   }
   return _trackPendingSync(
-    _callRpcWithAuthGuard(
+    _writeRpc(
       'save_term_rating',
       {
         p_enrollment_id: enrollmentId,
@@ -6960,17 +6914,18 @@ window.createCustomTag = function (cid, label) {
   var sb = getSupabase();
   if (!sb) return Promise.resolve();
   if (!_isUuid(cid)) return Promise.resolve();
-  return sb
-    .rpc('create_custom_tag', _stampIdempotencyKey('create_custom_tag', { p_course_id: cid, p_label: label || '' }))
-    .then(function (res) {
-      if (res.error) console.warn('create_custom_tag failed:', res.error);
-      var id = res && res.data;
-      if (id && label) {
-        if (!_customTagIds[cid]) _customTagIds[cid] = {};
-        _customTagIds[cid][label] = id;
-      }
-      return res;
-    });
+  return _writeRpc(
+    'create_custom_tag',
+    _stampIdempotencyKey('create_custom_tag', { p_course_id: cid, p_label: label || '' }),
+  ).then(function (res) {
+    if (res.error) console.warn('create_custom_tag failed:', res.error);
+    var id = res && res.data;
+    if (id && label) {
+      if (!_customTagIds[cid]) _customTagIds[cid] = {};
+      _customTagIds[cid][label] = id;
+    }
+    return res;
+  });
 };
 
 window.v2 = window.v2 || {};
@@ -7015,7 +6970,7 @@ var _customTagIds = {};
 function saveCustomTags(cid, arr) {
   var prev = _loadPersistedCourseFieldSnapshot('customTags', cid, (_cache.customTags && _cache.customTags[cid]) || []);
   _saveCourseField('customTags', cid, arr);
-  if (localStorage.getItem('gb-demo-mode') === '1' || !_useSupabase || !_isUuid(cid)) return;
+  if (!_writesEnabled() || !_isUuid(cid)) return;
   if (!arr) return;
   _persistCustomTagsToCanonical(cid, prev, arr);
 }
@@ -7038,8 +6993,7 @@ function _persistCustomTagsToCanonical(cid, prev, arr) {
     (arr || []).forEach(function (label) {
       if (!label || prevSet[label]) return;
       ops.push(
-        sb
-          .rpc('create_custom_tag', _stampIdempotencyKey('create_custom_tag', { p_course_id: cid, p_label: label }))
+        _writeRpc('create_custom_tag', _stampIdempotencyKey('create_custom_tag', { p_course_id: cid, p_label: label }))
           .then(function (res) {
             if (res.error) {
               console.warn('create_custom_tag failed:', res.error);
@@ -7064,8 +7018,7 @@ function _persistCustomTagsToCanonical(cid, prev, arr) {
       var knownId = _customTagIds[cid] && _customTagIds[cid][label];
       if (knownId && _isUuid(knownId)) {
         ops.push(
-          sb
-            .rpc('delete_custom_tag', { p_id: knownId })
+          _writeRpc('delete_custom_tag', { p_id: knownId })
             .then(function (res) {
               if (res.error) console.warn('delete_custom_tag failed:', res.error);
               else if (_customTagIds[cid]) delete _customTagIds[cid][label];
@@ -7078,8 +7031,7 @@ function _persistCustomTagsToCanonical(cid, prev, arr) {
         // Cross-session delete: uuid not cached locally. Use the label
         // fallback so the canonical row is still removed.
         ops.push(
-          sb
-            .rpc('delete_custom_tag_by_label', { p_course_id: cid, p_label: label })
+          _writeRpc('delete_custom_tag_by_label', { p_course_id: cid, p_label: label })
             .then(function (res) {
               if (res.error) console.warn('delete_custom_tag_by_label failed:', res.error);
             })
@@ -7166,13 +7118,7 @@ function upsertTermRating(cid, sid, termId, data) {
   // `sid` IS the enrollment_id (see _canonicalRosterRowsToStudents); the
   // window.v2.saveTermRating helper handles the camelCase → snake_case
   // payload translation.
-  if (
-    _useSupabase &&
-    localStorage.getItem('gb-demo-mode') !== '1' &&
-    _isUuid(sid) &&
-    window.v2 &&
-    window.v2.saveTermRating
-  ) {
+  if (_writesEnabled() && _isUuid(sid) && window.v2 && window.v2.saveTermRating) {
     var t = Number(termId);
     if (t >= 1 && t <= 6) {
       var blob = all[sid][termId] || {};
@@ -7205,7 +7151,7 @@ function getReportConfig(cid) {
 }
 function saveReportConfig(cid, config) {
   _saveCourseField('reportConfig', cid, config);
-  if (_useSupabase && _isUuid(cid)) {
+  if (_writesEnabled() && _isUuid(cid)) {
     // v2 save_report_config(p_course_id, p_blocks_config jsonb, p_preset).
     // Legacy signature was (p_course_offering_id, p_config) — no preset split.
     // The v2 RPC stores blocks_config verbatim + records the preset; caller
@@ -7218,15 +7164,13 @@ function saveReportConfig(cid, config) {
       var blocks = Object.assign({}, config || {});
       delete blocks._preset;
       _trackPendingSync(
-        sb
-          .rpc('save_report_config', {
-            p_course_id: cid,
-            p_blocks_config: blocks,
-            p_preset: preset,
-          })
-          .then(function (res) {
-            if (res.error) console.warn('save_report_config RPC failed:', res.error);
-          }),
+        _writeRpc('save_report_config', {
+          p_course_id: cid,
+          p_blocks_config: blocks,
+          p_preset: preset,
+        }).then(function (res) {
+          if (res.error) console.warn('save_report_config RPC failed:', res.error);
+        }),
       );
     }
   }
@@ -7281,7 +7225,7 @@ function saveCardWidgetConfig(config) {
   var cfg = Object.assign({}, getConfig() || {}, { cardWidgetConfig: normalized });
   _cache.config = cfg;
   _safeLSSet('gb-config', JSON.stringify(cfg));
-  if (_useSupabase && localStorage.getItem('gb-demo-mode') !== '1' && window.v2 && window.v2.saveTeacherPreferences) {
+  if (_writesEnabled() && window.v2 && window.v2.saveTeacherPreferences) {
     window.v2.saveTeacherPreferences({ card_widget_config: normalized });
   }
 }
@@ -7295,7 +7239,7 @@ function clearCardWidgetConfig() {
   var cfg = Object.assign({}, getConfig() || {}, { cardWidgetConfig: null });
   _cache.config = cfg;
   _safeLSSet('gb-config', JSON.stringify(cfg));
-  if (_useSupabase && localStorage.getItem('gb-demo-mode') !== '1' && window.v2 && window.v2.saveTeacherPreferences) {
+  if (_writesEnabled() && window.v2 && window.v2.saveTeacherPreferences) {
     window.v2.saveTeacherPreferences({ card_widget_config: null });
   }
 }

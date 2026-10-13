@@ -16,7 +16,17 @@
  */
 import './setup.js';
 import { beforeEach, afterEach, describe, expect, it } from 'vitest';
+import { readFileSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import { runInThisContext } from 'vm';
 import { makeFakeSupabase, settle } from './helpers/fake-supabase.js';
+
+// Production loads the outbox next to shared/data.js; so do these tests.
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+runInThisContext(readFileSync(resolve(root, 'shared/offline-queue.js'), 'utf-8'), {
+  filename: 'shared/offline-queue.js',
+});
 
 const CID = '11111111-1111-4111-8111-111111111111';
 const ENR_Y = '22222222-2222-4222-8222-222222222222';
@@ -61,18 +71,20 @@ describe('write-path regressions (Phase 0)', () => {
     _useSupabase = true;
     _supabaseDegraded = false;
     _teacherId = 'teacher-uuid';
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => true });
+    window.v2Queue.clear();
   });
 
   afterEach(() => {
     globalThis.getSupabase = originalGetSupabase;
     _useSupabase = originalUseSupabase;
     _supabaseDegraded = false;
-    _degradedTouchedCourses.clear();
+    window.v2Queue.clear();
   });
 
   // ── Phase 1 ────────────────────────────────────────────────────────────
 
-  it.fails('retries an assessment update that failed once', async () => {
+  it('retries an assessment update that failed once', async () => {
     seed('assessments', [{ id: AID, title: 'Old title', type: 'summative', tagIds: [] }]);
     fake.failNext('update_assessment');
 
@@ -82,12 +94,13 @@ describe('write-path regressions (Phase 0)', () => {
     await settle();
     // Any later save of the same list, as the next edit in the app would do.
     saveAssessments(CID, getAssessments(CID));
-    await settle();
+    // Then the outbox's retry comes due.
+    await window.v2Queue.flush();
 
     expect(fake.committedCount('update_assessment', p => p.p_patch && p.p_patch.title === 'New title')).toBe(1);
   });
 
-  it.fails('re-sends edits saved while cloud sync was paused once it recovers', async () => {
+  it('re-sends edits saved while cloud sync was paused once it recovers', async () => {
     seed('students', [studentY()]);
     _useSupabase = false;
     _supabaseDegraded = true;
@@ -101,7 +114,7 @@ describe('write-path regressions (Phase 0)', () => {
     globalThis.dismissSyncToast = function () {};
     try {
       _exitDegradedMode(null);
-      await settle();
+      await window.v2Queue.flush();
     } finally {
       globalThis.dismissSyncToast = originalDismiss;
     }
