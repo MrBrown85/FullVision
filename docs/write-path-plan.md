@@ -1,6 +1,6 @@
 # Write-path rebuild plan
 
-Status: Phases 0–1 done (#118, #119); Phase 2 in review (2026-10-12). Replaces the whole-array save model in `shared/data.js` with a durable outbox of single-record operations.
+Status: Phases 0–2 done (#118–#120); Phase 3 in review (2026-10-12). Replaces the whole-array save model in `shared/data.js` with a durable outbox of single-record operations.
 
 ## Why
 
@@ -101,16 +101,18 @@ Rebuild `shared/offline-queue.js` as the only path to the server for writes.
 
 **Done:** the overlapping-save tests for students and assessments and the older-note test pass, and a real-browser run of the overlapping student save sends one enrollment.
 
-### Phase 3: one writer per record — small to medium
+### Phase 3: one writer per record — small to medium (done)
 
-- Remove `_dispatchMapToV2` and `_patchMapId` from `dash-class-manager.js`. The wizard calls `saveLearningMap` once and awaits the outbox drain for that course before continuing.
-- `setAssignmentStatus` and `setPointsScore` each push exactly one operation.
-- Remove the post-sync cache overwrites in the learning-map and rubric paths; the id map's `rekey` replaces them.
-- Add the central id map (moved here from Phases 1–2), replacing the per-path re-key code.
-- Remove the cascading `saveAssessments` and `saveScores` calls triggered by re-keys.
-- Look into the two empty "English Studies 12" classes Brett created on 2026-09-18 next to his real one, in case `createCourse` or the wizard double-submits. Fix that here if so.
+- `_dispatchMapToV2` and `_patchMapId` are gone from `dash-class-manager.js`, along with about 20 direct `window.v2.upsert*`/`delete*` calls in the class-manager actions (add, rename, recolour, regroup and delete for subjects, groups and standards). Every one of those actions already called `saveLearningMap`, so each change was written twice. Adding a subject or standard inserted it twice, and partial direct upserts sent `color: null` and could wipe the colour. `saveLearningMap` is now the only writer.
+- The class wizard waits up to 15 s for the map to reach the server (`saveLearningMap` now resolves true/false). Offline, the outbox keeps it, and it isn't reported as a failure.
+- Duplicating a class gives the copied map fresh local ids (`withFreshLearningMapIds`). Its rows used to keep the source class's ids, so the copy updated the source's rows instead of inserting its own.
+- `setAssignmentStatus` and `setPointsScore` send one write each. The score diff sends one `upsert_score` per points cell instead of one per tag.
+- The learning-map sync patches new ids into the live map instead of replacing the cache with its starting copy. The rubric sync adopts the server's copy only if nothing was edited while it ran.
+- Found while testing in the browser: the class manager renders a new row with its local id, and an input keeps that id after the row is re-keyed, so a rename typed straight away was dropped. `resolveLearningMapId` maps a stale id to the current one at the top of each class-manager action.
+- Kept: the re-key follow-up saves (`saveAssessments`/`saveScores` after a tag, category or rubric re-key). They send references the server never had (it rejected the local ids), so they're needed, not redundant. No central id map was added: the per-path re-keys plus `resolveLearningMapId` cover it.
+- Brett's two empty "English Studies 12" classes were created 7–8 minutes before the real one: re-creates, not a double-submit.
 
-**Done when:** the wizard-double-insert, lost-edit and double-write tests pass.
+**Done:** the four Phase 3 regression tests pass, plus new ones for class-manager inserts and the stale-id rename. In a real browser, adding a subject and a standard sent one insert each, and a rename against the stale id was saved.
 
 ### Phase 4: realtime without lost edits — medium
 

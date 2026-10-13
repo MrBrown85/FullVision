@@ -12,7 +12,9 @@
  *                                   editing an older note replaces it
  *   Phase 3 (one writer)          — re-linking curriculum inserts once; one
  *                                   write per status/points change; a sync
- *                                   doesn't revert edits made while it ran
+ *                                   doesn't revert edits made while it ran;
+ *                                   class-manager edits write through
+ *                                   saveLearningMap only
  */
 import './setup.js';
 import { beforeEach, afterEach, describe, expect, it } from 'vitest';
@@ -183,7 +185,7 @@ describe('write-path regressions (Phase 0)', () => {
 
   // ── Phase 3 ────────────────────────────────────────────────────────────
 
-  it.fails('inserts a re-linked curriculum once', async () => {
+  it('inserts a re-linked curriculum once', async () => {
     saveCourses({ [CID]: { id: CID, name: 'Science 8', curriculumTags: ['SCI8'] } });
     CURRICULUM_INDEX = {
       SCI8: {
@@ -221,14 +223,82 @@ describe('write-path regressions (Phase 0)', () => {
     expect(fake.committedCount('upsert_tag', p => !p.p_id)).toBe(2);
   });
 
-  it.fails('sends one write when a status is set', async () => {
+  it('adds a subject and a standard in the class manager with one insert each', async () => {
+    saveCourses({ [CID]: { id: CID, name: 'Science 8' } });
+    seed('learningMaps', {
+      subjects: [{ id: SUBJ, name: 'Science', color: '#6366f1' }],
+      sections: [],
+      _customized: true,
+      _version: 1,
+      _flatVersion: 2,
+    });
+    _rememberServerState('learningMaps', CID, getLearningMap(CID));
+    DashClassManager.configure({ activeCourse: CID, onRender: function () {}, onCourseChange: function () {} });
+    DashClassManager.openClassManager();
+    // cmAddStd scrolls the new card into view; the DOM stub has no layout.
+    var originalRaf = globalThis.requestAnimationFrame;
+    globalThis.requestAnimationFrame = function () {
+      return 0;
+    };
+    try {
+      DashClassManager.handleAction('cmSelectClass', { dataset: { cid: CID } });
+      DashClassManager.handleAction('cmAddSubject', { dataset: {} });
+      await settle(60);
+      DashClassManager.handleAction('cmAddStd', { dataset: {} });
+      await settle(60);
+    } finally {
+      DashClassManager.resetState();
+      globalThis.requestAnimationFrame = originalRaf;
+    }
+
+    expect(fake.committedCount('upsert_subject', p => !p.p_id)).toBe(1);
+    expect(fake.committedCount('upsert_section', p => !p.p_id)).toBe(1);
+    expect(fake.committedCount('upsert_tag', p => !p.p_id)).toBe(1);
+  });
+
+  it('saves a rename typed into a standard rendered before its server id came back', async () => {
+    saveCourses({ [CID]: { id: CID, name: 'Science 8' } });
+    seed('learningMaps', {
+      subjects: [{ id: SUBJ, name: 'Science', color: '#6366f1' }],
+      sections: [],
+      _customized: true,
+      _version: 1,
+      _flatVersion: 2,
+    });
+    _rememberServerState('learningMaps', CID, getLearningMap(CID));
+    DashClassManager.configure({ activeCourse: CID, onRender: function () {}, onCourseChange: function () {} });
+    DashClassManager.openClassManager();
+    var originalRaf = globalThis.requestAnimationFrame;
+    globalThis.requestAnimationFrame = function () {
+      return 0;
+    };
+    try {
+      DashClassManager.handleAction('cmSelectClass', { dataset: { cid: CID } });
+      DashClassManager.handleAction('cmAddStd', { dataset: {} });
+      // The rendered input keeps this local id after the insert re-keys it.
+      var localId = getLearningMap(CID).sections[0].id;
+      await settle(60);
+      expect(getLearningMap(CID).sections[0].id).not.toBe(localId);
+
+      DashClassManager.handleBlur({ dataset: { actionBlur: 'cmStdName', secid: localId }, value: 'Questioning' });
+      await settle(60);
+    } finally {
+      DashClassManager.resetState();
+      globalThis.requestAnimationFrame = originalRaf;
+    }
+
+    expect(getLearningMap(CID).sections[0].name).toBe('Questioning');
+    expect(fake.committedCount('upsert_section', p => !!p.p_id && p.p_name === 'Questioning')).toBe(1);
+  });
+
+  it('sends one write when a status is set', async () => {
     setAssignmentStatus(CID, ENR_Y, AID, 'LATE');
     await settle();
 
     expect(fake.count('set_score_status')).toBe(1);
   });
 
-  it.fails('sends one write when a points score is entered', async () => {
+  it('sends one write when a points score is entered', async () => {
     seed('assessments', [{ id: AID, title: 'Lab', scoreMode: 'points', maxPoints: 10, tagIds: [TAG1, TAG2] }]);
     seed('scores', {});
 
@@ -238,7 +308,7 @@ describe('write-path regressions (Phase 0)', () => {
     expect(fake.count('upsert_score') + fake.count('upsert_tag_score')).toBe(1);
   });
 
-  it.fails('keeps a rename made while a learning-map sync is running', async () => {
+  it('keeps a rename made while a learning-map sync is running', async () => {
     seed('learningMaps', {
       subjects: [{ id: SUBJ, name: 'Science' }],
       sections: [
