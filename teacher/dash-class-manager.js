@@ -19,9 +19,18 @@ window.DashClassManager = (function () {
   var _activeCourse = null;
   var _onRender = null;
   var _onCourseChange = null;
+  // Set when the manager changes the active course itself (finishing the create
+  // wizard, or archiving the class that was active). The parent page holds its
+  // own copy of the active course for rendering and only learns about a change
+  // through _onCourseChange, so the switch is deferred until the manager closes
+  // — announcing it mid-wizard would tear down the panel the teacher is using.
+  var _activeCourseChanged = false;
 
   function configure(opts) {
+    // The parent is telling us which course it is on, so any pending switch of
+    // ours is now reflected there and must not be replayed on close.
     _activeCourse = opts.activeCourse;
+    _activeCourseChanged = false;
     _onRender = opts.onRender;
     _onCourseChange = opts.onCourseChange;
   }
@@ -258,6 +267,12 @@ window.DashClassManager = (function () {
           }
         }
       }
+      // Nothing in flight and no canonical id in sight: either create_course
+      // failed or we're offline / local-only, where the rekey never happens.
+      // Bail rather than blocking the wizard for the full timeout — createCourse
+      // clears the pending marker only after the rekey, so a successful create
+      // is always caught by the lookup above first.
+      if (typeof hasPendingLocalCid === 'function' && !hasPendingLocalCid(localId)) return null;
       await new Promise(function (r) {
         setTimeout(r, 75);
       });
@@ -530,7 +545,17 @@ window.DashClassManager = (function () {
     cwStep2Decay = '65';
 
   function deleteStudentUI(sid) {
-    var students = getStudents(_activeCourse);
+    // The roster is rendered for cmSelectedCourse, which is not always the
+    // dashboard's active course: cmSelectClass moves the manager's selection
+    // on its own, and page-dashboard re-injects its own activeCourse through
+    // CM.configure. Looking the student up in _activeCourse therefore searched
+    // the wrong course, found nothing and returned here — the X button did
+    // nothing at all. Every other roster action (add, edit, bulk, CSV import)
+    // already keys off cmSelectedCourse; this was the lone outlier.
+    // Capture the id once so the confirm and undo callbacks stay pinned to the
+    // course the row belonged to even if the selection moves meanwhile.
+    var cid = cmSelectedCourse;
+    var students = getStudents(cid);
     var st = students.find(function (s) {
       return s.id === sid;
     });
@@ -542,10 +567,9 @@ window.DashClassManager = (function () {
       'Delete',
       'danger',
       function () {
-        var snapshot = deleteStudent(_activeCourse, sid);
+        var snapshot = deleteStudent(cid, sid);
         renderClassManager();
         showUndoToast('Student deleted', function () {
-          var cid = _activeCourse;
           var sts = getStudents(cid);
           sts.push(snapshot.student);
           saveStudents(cid, sts);
@@ -914,6 +938,15 @@ window.DashClassManager = (function () {
   }
   function closeClassManager() {
     classManagerOpen = false;
+    // Hand a course switch made in here back to the parent, so it re-syncs its
+    // own activeCourse, loads that course's data and renders it. Without this
+    // the parent falls back to whichever class was active before the manager
+    // opened — and re-injects that stale id on the next configure().
+    if (_activeCourseChanged && _onCourseChange) {
+      _activeCourseChanged = false;
+      _onCourseChange(_activeCourse);
+      return;
+    }
     if (_onRender) _onRender();
   }
 
@@ -2005,6 +2038,17 @@ window.DashClassManager = (function () {
       decayWeight: parseInt(cwStep2Decay, 10) / 100,
     });
 
+    // createCourse fires create_course asynchronously and returns a course
+    // object carrying a local placeholder id; the rekey to the canonical UUID
+    // lands when the RPC resolves. Everything below needs the real id — the
+    // course-config write, the learning-map dispatch, the class-manager
+    // selection and the active-course pointer — so resolve it once, here,
+    // before any of them run. Resolving outside the curriculum branch matters:
+    // a class created with no curriculum tags used to skip the wait entirely
+    // and carry the placeholder all the way to setActiveCourse.
+    var canonicalCid = await _awaitCanonicalCourse(course.id, 10000);
+    if (canonicalCid && canonicalCid !== course.id) course.id = canonicalCid;
+
     var cc = getCourseConfig(course.id);
     cc.calcMethod = cwStep2Calc;
     cc.decayWeight = parseInt(cwStep2Decay, 10) / 100;
@@ -2016,26 +2060,16 @@ window.DashClassManager = (function () {
       if (map) {
         saveLearningMap(course.id, map);
         updateCourse(course.id, { curriculumTags: cwSelectedTags.slice() });
-        // _dispatchMapToV2 short-circuits on a non-canonical course id
-        // (createCourse fires create_course async; the rekey to a UUID
-        // hasn't landed yet at this point). Wait for the canonical id,
-        // mirror the learning map under it, then dispatch.
-        var canonicalCid = await _awaitCanonicalCourse(course.id, 10000);
-        if (canonicalCid && canonicalCid !== course.id) {
-          saveLearningMap(canonicalCid, map);
-          course.id = canonicalCid;
-        }
-        if (canonicalCid) {
-          dispatchOk = await _dispatchMapToV2(canonicalCid, map, false);
-        } else {
-          dispatchOk = false;
-        }
+        // _dispatchMapToV2 short-circuits on a non-canonical course id, so a
+        // create whose RPC never landed leaves the curriculum unsynced.
+        dispatchOk = canonicalCid ? await _dispatchMapToV2(canonicalCid, map, false) : false;
       }
     }
 
     cmSelectedCourse = course.id;
     cmMode = 'edit';
     _activeCourse = course.id;
+    _activeCourseChanged = true;
     setActiveCourse(course.id);
     renderClassManager();
 
@@ -2738,6 +2772,7 @@ window.DashClassManager = (function () {
       });
       if (nextActive) {
         _activeCourse = nextActive;
+        _activeCourseChanged = true;
         setActiveCourse(nextActive);
       }
     }
@@ -3652,6 +3687,7 @@ window.DashClassManager = (function () {
       classManagerOpen = false;
       cmMode = 'edit';
       cmSelectedCourse = _activeCourse;
+      _activeCourseChanged = false;
       cmEditingStudentId = null;
       cmBulkMode = false;
       cmBulkSelected = new Set();
