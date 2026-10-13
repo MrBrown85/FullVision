@@ -2043,7 +2043,7 @@ async function _hydrateAssessmentDetails(cid) {
         var status = cell.score && cell.score.status;
         if (status) statuses[sid + ':' + merged.id] = status;
 
-        var tagScores = cell.tag_scores || cell.tagScores || [];
+        var tagScores = merged.scoreMode === 'points' ? [] : cell.tag_scores || cell.tagScores || [];
         (tagScores || []).forEach(function (tagScore) {
           var tagId = tagScore && (tagScore.tag_id || tagScore.tagId);
           if (!tagId) return;
@@ -3198,6 +3198,15 @@ function upsertScore(cid, sid, aid, tid, scoreVal, date, type, note) {
   return lsOk;
 }
 
+/* Score writes used to fail with only a console warning, so the teacher saw
+   the typed number and lost it on the next reload. Surface the failure. */
+function _reportScoreWriteFailure(rpc, error) {
+  console.warn(rpc + ' failed:', error);
+  if (typeof showSyncToast === 'function') {
+    showSyncToast('A score did not save. Re-enter it, and reload if this keeps happening.', 'error');
+  }
+}
+
 /* v2 per-cell / per-tag / per-criterion score write. Rubric grading UI writes
    linked competency tag ids, while rubric_score requires criterion ids. Keep
    tag writes authoritative for UI hydration and mirror to rubric_score only
@@ -3224,13 +3233,14 @@ function _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note) {
     var criterionForTag = criterion ? null : _rubricCriterionForTag(cid, assessment, tid);
     var assessmentTagIds = (assessment && (assessment.tagIds || assessment.tag_ids)) || [];
     var isAssessmentTag = assessmentTagIds.indexOf(tid) >= 0;
+    var isPoints = assessment && (assessment.scoreMode || assessment.score_mode) === 'points';
     var ops = [];
     if (criterion) {
       ops.push({
         rpc: 'upsert_rubric_score',
         params: { p_enrollment_id: sid, p_assessment_id: aid, p_criterion_id: tid, p_value: intVal },
       });
-    } else if (assessment && !isAssessmentTag && !criterionForTag) {
+    } else if (isPoints || (assessment && !isAssessmentTag && !criterionForTag)) {
       ops.push({
         rpc: 'upsert_score',
         params: { p_enrollment_id: sid, p_assessment_id: aid, p_value: intVal },
@@ -3250,7 +3260,7 @@ function _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note) {
     ops.forEach(function (op) {
       _trackPendingSync(
         sb.rpc(op.rpc, op.params).then(function (res) {
-          if (res.error) console.warn(op.rpc + ' failed:', res.error);
+          if (res.error) _reportScoreWriteFailure(op.rpc, res.error);
         }),
       );
     });
@@ -3337,7 +3347,7 @@ window.upsertCellScore = function (cid, enrollmentId, assessmentId, value) {
         p_value: v,
       })
       .then(function (res) {
-        if (res.error) console.warn('upsert_score failed:', res.error);
+        if (res.error) _reportScoreWriteFailure('upsert_score', res.error);
         return res;
       }),
   );
@@ -4253,6 +4263,10 @@ function getModuleById(cid, moduleId) {
 }
 
 var _learningMapSaveQueue = {};
+// Local id -> server UUID re-keys learned by earlier learning-map saves, per
+// course. A save queued before an earlier one resolved still holds the local
+// ids; without applying these it inserts a second copy of every row.
+var _learningMapIdRemap = {};
 
 function _mapItemsById(items) {
   var out = {};
@@ -4384,6 +4398,12 @@ function _persistLearningMapToCanonical(cid, prevMap, nextMap) {
   var tail = _learningMapSaveQueue[cid] || Promise.resolve();
   var next = tail.then(async function () {
     var map = structuredClone(nextMap || { subjects: [], sections: [] });
+    var known = _learningMapIdRemap[cid] || (_learningMapIdRemap[cid] = { subject: {}, group: {}, section: {}, tag: {} });
+    ['group', 'subject', 'section', 'tag'].forEach(function (kind) {
+      Object.keys(known[kind]).forEach(function (oldId) {
+        _patchLearningMapEntityId(map, kind, oldId, known[kind][oldId]);
+      });
+    });
     var idMaps = { subject: {}, group: {}, section: {}, tag: {} };
     var opsToDelete = [];
 
@@ -4403,6 +4423,7 @@ function _persistLearningMapToCanonical(cid, prevMap, nextMap) {
         if (groupRes && groupRes.error) throw groupRes.error;
         if (groupRes && groupRes.data && groupRes.data !== oldGroupId) {
           idMaps.group[oldGroupId] = groupRes.data;
+          known.group[oldGroupId] = groupRes.data;
           _patchLearningMapEntityId(map, 'group', oldGroupId, groupRes.data);
         }
       }
@@ -4423,6 +4444,7 @@ function _persistLearningMapToCanonical(cid, prevMap, nextMap) {
       if (subjectRes && subjectRes.error) throw subjectRes.error;
       if (subjectRes && subjectRes.data && subjectRes.data !== oldSubjectId) {
         idMaps.subject[oldSubjectId] = subjectRes.data;
+        known.subject[oldSubjectId] = subjectRes.data;
         _patchLearningMapEntityId(map, 'subject', oldSubjectId, subjectRes.data);
       }
     }
@@ -4443,6 +4465,7 @@ function _persistLearningMapToCanonical(cid, prevMap, nextMap) {
       if (sectionRes && sectionRes.error) throw sectionRes.error;
       if (sectionRes && sectionRes.data && sectionRes.data !== oldSectionId) {
         idMaps.section[oldSectionId] = sectionRes.data;
+        known.section[oldSectionId] = sectionRes.data;
         _patchLearningMapEntityId(map, 'section', oldSectionId, sectionRes.data);
       }
       var tags = section.tags || (section.outcome ? [section.outcome] : []);
@@ -4461,6 +4484,7 @@ function _persistLearningMapToCanonical(cid, prevMap, nextMap) {
         if (tagRes && tagRes.error) throw tagRes.error;
         if (tagRes && tagRes.data && tagRes.data !== oldTagId) {
           idMaps.tag[oldTagId] = tagRes.data;
+          known.tag[oldTagId] = tagRes.data;
           _patchLearningMapEntityId(map, 'tag', oldTagId, tagRes.data);
         }
       }

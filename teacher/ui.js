@@ -871,7 +871,12 @@ function deleteStudent(cid, sid) {
     window.v2 &&
     typeof window.v2.deleteStudent === 'function'
   ) {
-    window.v2.deleteStudent(sid);
+    // sid is the enrollment id; delete_student needs the person's student id.
+    window.v2.deleteStudent((student && student.personId) || sid).then(function (res) {
+      if (res && res.error && typeof showSyncToast === 'function') {
+        showSyncToast('The student was not deleted on the server. Reload and try again.', 'error');
+      }
+    });
   }
 
   return snapshot;

@@ -180,6 +180,24 @@ describe('v2 scoring-dispatch', () => {
     });
   });
 
+  describe('points assessments', () => {
+    const AID_PTS = '88888888-8888-4888-8888-888888888888';
+
+    it('writes the raw points to upsert_score, never upsert_tag_score (tag_score is 1-4)', () => {
+      _cache.v2Gradebook[CID].assessments.push({ id: AID_PTS, score_mode: 'points', tag_ids: [TAG_ID] });
+      _persistScoreToCanonical(CID, ENR, AID_PTS, TAG_ID, 6, '');
+      expect(
+        client.calls.find(function (c) {
+          return c.name === 'upsert_tag_score';
+        }),
+      ).toBeUndefined();
+      const call = client.calls.find(function (c) {
+        return c.name === 'upsert_score';
+      });
+      expect(call && call.payload).toEqual({ p_enrollment_id: ENR, p_assessment_id: AID_PTS, p_value: 6 });
+    });
+  });
+
   describe('persistScoreDiffToCanonical', () => {
     // Same dispatch refactor as the four sibling tests above — pending.
     it.skip('dispatches changed rows and zeroes removed rows after a bulk local restore', () => {
