@@ -542,7 +542,8 @@ window.DashClassManager = (function () {
     cwStep2Desc = '';
   var cwStep2Grading = 'proficiency',
     cwStep2Calc = 'mostRecent',
-    cwStep2Decay = '65';
+    cwStep2Decay = '65',
+    cwStep2LatePolicy = '';
 
   function deleteStudentUI(sid) {
     // The roster is rendered for cmSelectedCourse, which is not always the
@@ -1825,7 +1826,9 @@ window.DashClassManager = (function () {
       '<div style="display:flex;gap:16px"><div class="cm-field" style="flex:1"><label class="cm-label">Grade Level</label><input class="cm-input" id="cm-new-grade" value="' +
       esc(preGrade) +
       '" placeholder="e.g. 8, 10-12"></div></div>' +
-      '<div class="cm-field"><label class="cm-label">Description</label><textarea class="cm-textarea" id="cm-new-desc" placeholder="Optional"></textarea></div></div>';
+      '<div class="cm-field"><label class="cm-label">Description</label><textarea class="cm-textarea" id="cm-new-desc" placeholder="Optional">' +
+      esc(cwStep2Desc) +
+      '</textarea></div></div>';
 
     html +=
       '<div class="cm-section"><div class="cm-section-title">Grading &amp; Calculation</div>' +
@@ -1839,6 +1842,9 @@ window.DashClassManager = (function () {
       '<button class="cm-seg-btn cm-seg-btn-disabled" data-val="both" disabled title="Add a category in Course Settings first \u2192">Both</button>' +
       '</div>' +
       '<div class="cm-hint cm-seg-hint-locked">Create categories in Course Settings to unlock Letter and Both.</div>' +
+      '<div class="cm-hint" style="margin-top:6px">' +
+      _cmGradingSystemDescription('proficiency') +
+      '</div>' +
       '</div>' +
       '<div class="cm-field"><label class="cm-label">Calculation Method</label>' +
       '<div class="cm-seg" id="cm-cg-calc">' +
@@ -1864,8 +1870,19 @@ window.DashClassManager = (function () {
       '<div id="cm-cg-decay" class="cm-field" style="' +
       (cwStep2Calc === 'decayingAvg' ? '' : 'display:none') +
       '"><label class="cm-label">Decay Weight</label>' +
-      '<div class="cm-slider-row"><input type="range" min="10" max="95" value="65" id="cm-cg-decay-slider" style="flex:1"><span class="cm-slider-label">65%</span></div>' +
+      '<div class="cm-slider-row"><input type="range" min="10" max="95" value="' +
+      esc(cwStep2Decay) +
+      '" id="cm-cg-decay-slider" data-action-input="cmCreateDecaySlider" style="flex:1"><span class="cm-slider-label" id="cm-cg-decay-val">' +
+      esc(cwStep2Decay) +
+      '%</span></div>' +
       '<div class="cm-hint">Higher values weight recent scores more heavily.</div></div>' +
+      '<div class="cm-field">' +
+      '<label class="cm-label" for="cm-new-late-policy">Late Work Policy</label>' +
+      '<textarea class="cm-textarea" id="cm-new-late-policy" rows="2" placeholder="e.g. Late assignments lose 10% per day, up to 3 days." aria-label="Late work policy">' +
+      esc(cwStep2LatePolicy) +
+      '</textarea>' +
+      '<div class="cm-hint">Optional. If set, this text appears on the Score Distribution section of printed progress reports.</div>' +
+      '</div>' +
       '</div>';
 
     html +=
@@ -1880,6 +1897,12 @@ window.DashClassManager = (function () {
 
     var className = document.getElementById('cm-new-name')?.value || cwGetPreName();
     var gradeLevel = document.getElementById('cm-new-grade')?.value || (cwSelectedGrade ? String(cwSelectedGrade) : '');
+    var gradingLabel = { proficiency: 'Proficiency', letter: 'Letter', both: 'Both' }[cwStep2Grading] || 'Proficiency';
+    var calcLabel = (
+      CALC_METHODS.find(function (m) {
+        return m.value === cwStep2Calc;
+      }) || CALC_METHODS[0]
+    ).label;
 
     html +=
       '<div class="cm-section"><div class="cm-section-title">Review</div>' +
@@ -1888,6 +1911,16 @@ window.DashClassManager = (function () {
       '</div></div>' +
       '<div class="cm-field"><label class="cm-label">Grade</label><div style="font-size:var(--text-md);color:var(--text-2)">' +
       esc(gradeLevel || '\u2014') +
+      '</div></div>' +
+      '<div class="cm-field"><label class="cm-label">Grading System</label><div style="font-size:var(--text-md);color:var(--text-2)">' +
+      esc(gradingLabel) +
+      '</div></div>' +
+      '<div class="cm-field"><label class="cm-label">Calculation Method</label><div style="font-size:var(--text-md);color:var(--text-2)">' +
+      esc(calcLabel) +
+      (cwStep2Calc === 'decayingAvg' ? ' \u00B7 ' + esc(cwStep2Decay) + '% decay weight' : '') +
+      '</div></div>' +
+      '<div class="cm-field"><label class="cm-label">Late Work Policy</label><div style="font-size:var(--text-md);color:var(--text-2)">' +
+      esc(cwStep2LatePolicy.trim() || '\u2014') +
       '</div></div></div>';
 
     if (cwSelectedTags.length > 0 && CURRICULUM_INDEX) {
@@ -1983,6 +2016,7 @@ window.DashClassManager = (function () {
     cwStep2Grading = (document.querySelector('#cm-cg-grading .cm-seg-btn.active') || {}).dataset?.val || 'proficiency';
     cwStep2Calc = (document.querySelector('#cm-cg-calc .cm-seg-btn.active') || {}).dataset?.val || 'mostRecent';
     cwStep2Decay = document.getElementById('cm-cg-decay-slider')?.value || '65';
+    cwStep2LatePolicy = document.getElementById('cm-new-late-policy')?.value || '';
     cwStep = 3;
     renderClassManager();
   }
@@ -2041,6 +2075,7 @@ window.DashClassManager = (function () {
       gradingSystem: cwStep2Grading,
       calcMethod: cwStep2Calc,
       decayWeight: parseInt(cwStep2Decay, 10) / 100,
+      lateWorkPolicy: cwStep2LatePolicy.trim() || null,
     });
 
     // createCourse fires create_course asynchronously and returns a course
@@ -2100,6 +2135,13 @@ window.DashClassManager = (function () {
     cwSelectedSubject = null;
     cwSelectedTags = [];
     cwLoadError = false;
+    cwStep2Name = '';
+    cwStep2Grade = '';
+    cwStep2Desc = '';
+    cwStep2Grading = 'proficiency';
+    cwStep2Calc = 'mostRecent';
+    cwStep2Decay = '65';
+    cwStep2LatePolicy = '';
     loadCurriculumIndex().then(function (idx) {
       cwCurriculumLoaded = !!idx;
       cwLoadError = !idx;
@@ -3553,6 +3595,11 @@ window.DashClassManager = (function () {
       cmUpdateDecay(el.value);
       return true;
     }
+    if (el.dataset.actionInput === 'cmCreateDecaySlider') {
+      var dv = document.getElementById('cm-cg-decay-val');
+      if (dv) dv.textContent = el.value + '%';
+      return true;
+    }
     if (el.dataset.actionInput === 'cmCatWeightLive') {
       cmCatWeightLive(parseInt(el.dataset.idx, 10), el.value);
       return true;
@@ -3712,6 +3759,7 @@ window.DashClassManager = (function () {
       cwStep2Grading = 'proficiency';
       cwStep2Calc = 'mostRecent';
       cwStep2Decay = '65';
+      cwStep2LatePolicy = '';
       _cmCollapsedStdFolders = {};
       _cmOpenStdCards = {};
     },
