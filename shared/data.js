@@ -1210,6 +1210,71 @@ function _rekeyServerStateRow(field, cid, oldId, patch) {
   });
 }
 
+/* Local → server id swaps made this session, per course. Scores and statuses
+   entered before a new assessment or student got its server id still carry
+   the local id, and a write with a local id is never sent. Every score and
+   status save moves them onto the server id first, so they are sent then;
+   that also catches a click on a page rendered before the swap. */
+var _idRekeys = {}; // cid → { localId: serverId }
+
+function _applyIdRekeysToScores(cid, scores) {
+  var map = _idRekeys[cid];
+  if (!map || !scores) return false;
+  var changed = false;
+  Object.keys(scores).forEach(function (sid) {
+    var entries = scores[sid];
+    if (!Array.isArray(entries)) return;
+    entries.forEach(function (e) {
+      if (e && map[e.assessmentId]) {
+        e.assessmentId = map[e.assessmentId];
+        changed = true;
+      }
+    });
+    if (map[sid]) {
+      scores[map[sid]] = (scores[map[sid]] || []).concat(entries);
+      delete scores[sid];
+      changed = true;
+    }
+  });
+  return changed;
+}
+
+function _applyIdRekeysToStatuses(cid, statuses) {
+  var map = _idRekeys[cid];
+  if (!map || !statuses) return false;
+  var changed = false;
+  Object.keys(statuses).forEach(function (key) {
+    var i = key.indexOf(':');
+    if (i < 0) return;
+    var sid = key.slice(0, i);
+    var aid = key.slice(i + 1);
+    var next = (map[sid] || sid) + ':' + (map[aid] || aid);
+    if (next === key) return;
+    if (statuses[next] === undefined) statuses[next] = statuses[key];
+    delete statuses[key];
+    changed = true;
+  });
+  return changed;
+}
+
+/* Record a swap and send the scores and statuses that were waiting on it. */
+function _rekeyLocalRefs(cid, localId, serverId) {
+  if (!cid || !localId || !serverId || localId === serverId) return;
+  (_idRekeys[cid] = _idRekeys[cid] || {})[localId] = serverId;
+  var scores = getScores(cid);
+  if (_applyIdRekeysToScores(cid, scores)) saveScores(cid, scores);
+  var statuses = getAssignmentStatuses(cid);
+  if (_applyIdRekeysToStatuses(cid, statuses)) saveAssignmentStatuses(cid, statuses);
+  // Pages hold the old id in their state and markup; swap it and render
+  // again, but only when the old id is on screen, so typing isn't disturbed.
+  if (typeof document === 'undefined') return;
+  if (typeof document.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
+    document.dispatchEvent(new CustomEvent('fv:id-rekeyed', { detail: { cid: cid, from: localId, to: serverId } }));
+  }
+  var esc = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(localId) : localId;
+  if (document.querySelector('[data-aid="' + esc + '"], [data-sid="' + esc + '"]')) _invalidateAndRerender();
+}
+
 function _getAssessmentCategoryId(assessment) {
   return (assessment && (assessment.categoryId || assessment.category_id)) || null;
 }
@@ -4236,6 +4301,7 @@ function getAssignmentStatuses(cid) {
   }
 }
 function saveAssignmentStatuses(cid, obj) {
+  _applyIdRekeysToStatuses(cid, obj);
   var prev = _loadPersistedCourseFieldSnapshot('statuses', cid, (_cache.statuses && _cache.statuses[cid]) || {});
   var next = obj || {};
   _saveCourseField('statuses', cid, next);
@@ -4950,6 +5016,7 @@ function _canonicalEnrollStudent(sb, cid, s, idx) {
     if (_cache.students[cid]) {
       _safeLSSet('gb-students-' + cid, JSON.stringify(_cache.students[cid]));
     }
+    if (row.enrollment_id) _rekeyLocalRefs(cid, localId, row.enrollment_id);
   });
 }
 
@@ -5244,6 +5311,7 @@ function _canonicalCreateAssessment(sb, cid, a) {
     if (_cache.assessments[cid]) {
       _safeLSSet('gb-assessments-' + cid, JSON.stringify(_cache.assessments[cid]));
     }
+    if (newId) _rekeyLocalRefs(cid, localId, newId);
     return _persistAssessmentCollab(sb, newId, a);
   });
 }
@@ -5454,6 +5522,7 @@ function getScores(cid) {
   }
 }
 function saveScores(cid, obj) {
+  _applyIdRekeysToScores(cid, obj);
   var prev = _loadPersistedCourseFieldSnapshot('scores', cid, (_cache.scores && _cache.scores[cid]) || {});
   var prevCount = prev ? Object.keys(prev).length : 0;
   var newCount = obj ? Object.keys(obj).length : 0;
@@ -6273,6 +6342,8 @@ window.v2.deleteRubric = function (id) {
    goals / reflections, and a competency_tree (subjects → sections → tags
    with per-section proficiency and per-tag latest_value + coverage_count). */
 window.v2.getStudentProfile = function (enrollmentId) {
+  // Demo Mode and not-yet-saved students have local ids the server can't read.
+  if (!_isUuid(enrollmentId)) return Promise.resolve({ data: null, error: null });
   return _rpcOrNoop('get_student_profile', { p_enrollment_id: enrollmentId });
 };
 

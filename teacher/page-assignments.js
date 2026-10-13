@@ -4366,6 +4366,7 @@ window.PageAssignments = (function () {
     _addDocListener('drop', _handleDrop);
     _addDocListener('mouseover', _handleMouseOver);
     _addDocListener('mouseout', _handleMouseOut);
+    _addDocListener('fv:id-rekeyed', _handleRekey);
 
     render();
 
@@ -4385,6 +4386,17 @@ window.PageAssignments = (function () {
         showNewForm();
       }, 100);
     }
+  }
+
+  // A new assessment or student got its server id (shared/data.js).
+  function _handleRekey(e) {
+    var d = e.detail || {};
+    if (openAssessIds.has(d.from)) {
+      openAssessIds.delete(d.from);
+      openAssessIds.add(d.to);
+    }
+    if (_editingAssessId === d.from) _editingAssessId = d.to;
+    if (focusStudentId === d.from) focusStudentId = d.to;
   }
 
   function destroy() {
