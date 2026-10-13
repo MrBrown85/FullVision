@@ -1,56 +1,67 @@
-// IMPORTANT: Increment the version number when deploying new app code
-// This ensures users get the latest files
-const CACHE_NAME = 'fullvision-v51';
+// scripts/build.sh replaces this with a name built from the deploy's commit,
+// so every deploy starts a fresh cache. This value only applies when the
+// source is served directly (local development).
+const CACHE_NAME = 'fullvision-dev';
 
-// All app files to pre-cache on install
+// Every file the sign-in page, desktop app and mobile app load, exactly as
+// they request it (query strings included). tests/sw-precache.test.js fails
+// if a page loads something that isn't listed here.
 const PRECACHE_URLS = [
   '/',
   '/login.html',
   '/login.css',
   '/login-auth.js',
+  '/manifest.json',
+  '/vendor/supabase.min.js',
+  '/curriculum_by_course.json',
   // Shared modules
+  '/shared/sentry-init.js',
   '/shared/supabase.js',
   '/shared/constants.js',
   '/shared/data.js',
+  '/shared/offline-queue.js',
+  '/shared/demo-seed.js',
   '/shared/calc.js',
-  '/shared/sentry-init.js',
-  // seed-data.js omitted — lazy-loaded on demand for new accounts only
   // Teacher desktop
   '/teacher/app.html',
-  '/teacher/styles.css',
-  '/teacher/router.js',
-  '/teacher/ui.js',
+  '/teacher/styles.css?v=3',
   '/teacher/dashboard.css',
   '/teacher/assignments.css',
   '/teacher/student.css',
   '/teacher/gradebook.css',
   '/teacher/observations.css',
   '/teacher/reports.css',
+  '/teacher/ui.js',
+  '/teacher/report-blocks.js',
+  '/teacher/report-questionnaire.js',
+  '/teacher/report-builder-ui.js',
+  '/teacher/report-preview.js',
+  '/teacher/dash-class-manager.js',
+  '/teacher/dash-overview.js',
+  '/teacher/dash-student-cards.js',
+  '/teacher/assign-collab.js',
+  '/teacher/student-notes.js',
+  '/teacher/student-overrides.js',
   '/teacher/page-dashboard.js',
   '/teacher/page-assignments.js',
   '/teacher/page-student.js',
   '/teacher/page-gradebook.js',
   '/teacher/page-observations.js',
   '/teacher/page-reports.js',
-  '/teacher/report-blocks.js',
-  '/teacher/report-questionnaire.js',
-  '/teacher/dash-class-manager.js',
-  '/teacher/assign-collab.js',
+  '/teacher/router.js',
   // Teacher mobile
   '/teacher-mobile/index.html',
   '/teacher-mobile/styles.css',
-  '/teacher-mobile/shell.js',
   '/teacher-mobile/components.js',
+  '/teacher-mobile/card-widgets.js',
+  '/teacher-mobile/card-widget-editor.js',
+  '/teacher-mobile/card-stack.js',
+  '/teacher-mobile/students-list.js',
+  '/teacher-mobile/student-detail.js',
   '/teacher-mobile/tab-students.js',
   '/teacher-mobile/tab-observe.js',
   '/teacher-mobile/tab-grade.js',
-  '/teacher-mobile/card-stack.js',
-  '/teacher-mobile/card-widgets.js',
-  '/teacher-mobile/card-widget-editor.js',
-  // Vendor & data
-  '/vendor/supabase.min.js',
-  '/curriculum_data.js',
-  '/manifest.json',
+  '/teacher-mobile/shell.js',
 ];
 
 // Install: pre-cache all app files
@@ -72,6 +83,15 @@ self.addEventListener('activate', event => {
       .then(() => self.clients.claim()),
   );
 });
+
+// Store a fresh copy only if it's a real success from this site. Caching an
+// error page (a Netlify 503, a 404) would replace the good copy and serve the
+// error offline, or until the next deploy.
+function cacheIfGood(request, response) {
+  if (!response || !response.ok || response.type !== 'basic') return;
+  const clone = response.clone();
+  caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
+}
 
 // Fetch strategy:
 // - HTML pages: Network first, fall back to cache (always get latest)
@@ -99,9 +119,7 @@ self.addEventListener('fetch', event => {
     event.respondWith(
       fetch(event.request)
         .then(response => {
-          // Cache the fresh copy
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+          cacheIfGood(event.request, response);
           return response;
         })
         .catch(() => {
@@ -124,8 +142,7 @@ self.addEventListener('fetch', event => {
   event.respondWith(
     fetch(event.request)
       .then(response => {
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        cacheIfGood(event.request, response);
         return response;
       })
       .catch(() => {
