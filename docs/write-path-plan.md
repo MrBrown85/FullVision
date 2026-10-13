@@ -1,6 +1,6 @@
 # Write-path rebuild plan
 
-Status: Phase 0 done (#118); Phase 1 in review (2026-10-12). Replaces the whole-array save model in `shared/data.js` with a durable outbox of single-record operations.
+Status: Phases 0–1 done (#118, #119); Phase 2 in review (2026-10-12). Replaces the whole-array save model in `shared/data.js` with a durable outbox of single-record operations.
 
 ## Why
 
@@ -89,21 +89,24 @@ Rebuild `shared/offline-queue.js` as the only path to the server for writes.
 
 **Done when:** the "failed write never retried" and "recovery sends nothing" tests pass, and a manual offline session in demo-off local mode drains on reconnect.
 
-### Phase 2: diff against confirmed server state — medium
+### Phase 2: diff against confirmed server state — medium (done)
 
-- Add `_serverState[cid][field]`, set from hydration (`_persistLoadedField` and the `get_gradebook` load) and updated when operations succeed.
-- `saveX(cid, arr)` keeps its signature but diffs `arr` against `expected = serverState + pending ops`, then pushes the difference as operations. All ~60 UI call sites keep working unchanged.
-- Delete `_loadPersistedCourseFieldSnapshot` and the per-type promise queues (`_studentSaveQueue`, `_assessmentSaveQueue`, `_moduleSaveQueue`, `_categorySaveQueue`, `_noteSaveQueue`, `_customTagSaveQueue`, `_rubricSaveQueue`, `_learningMapSaveQueue`).
-- Learning maps, modules and rubrics stop re-sending every row and send only real differences.
-- Notes: pull `_noteIds` from hydration, not just the current session, so editing an older note replaces it instead of adding a second row.
+- `_serverState[field][cid]` holds what the server is believed to have, in client shape. It's set when a field loads from the server (`_persistLoadedField`) and advanced to the cache's value when a save's diff is dispatched; the outbox retries until the server has it. Re-keys (`_rekeyServerStateRow`) patch it alongside the cache. Wiping a course's local data (`_clearCourseLocalState`, the P6.2 local-id migration) forgets it.
+- Students, assessments, categories, modules, custom tags, notes, the learning map, scores and statuses now diff the live cache against that baseline, not the localStorage copy taken when `saveX` was called. All ~60 UI call sites keep working unchanged.
+- Kept, not deleted: `_loadPersistedCourseFieldSnapshot` is the fallback before the first load (or while degraded) when no baseline exists. The per-type promise queues stay, because they serialize each course's diffs.
+- Modules and the learning map skip rows whose saved fields haven't changed, but only against a real baseline. Without one they still send every row. Rubrics still re-send and reload, as before.
+- Notes: `_noteIds` comes from `get_student_profile` at load time (all ids per enrollment), so editing a note from an earlier session deletes its rows and inserts one replacement instead of adding another row.
+- Categories and modules upsert by id, so they were never prone to duplicates. Only students, assessments and notes needed the fix.
+- The central id map moves to Phase 3, where the scattered re-key code is removed.
 
-**Done when:** the overlapping-save duplicate test passes for students, assessments, categories, modules, notes and the learning map.
+**Done:** the overlapping-save tests for students and assessments and the older-note test pass, and a real-browser run of the overlapping student save sends one enrollment.
 
 ### Phase 3: one writer per record — small to medium
 
 - Remove `_dispatchMapToV2` and `_patchMapId` from `dash-class-manager.js`. The wizard calls `saveLearningMap` once and awaits the outbox drain for that course before continuing.
 - `setAssignmentStatus` and `setPointsScore` each push exactly one operation.
 - Remove the post-sync cache overwrites in the learning-map and rubric paths; the id map's `rekey` replaces them.
+- Add the central id map (moved here from Phases 1–2), replacing the per-path re-key code.
 - Remove the cascading `saveAssessments` and `saveScores` calls triggered by re-keys.
 - Look into the two empty "English Studies 12" classes Brett created on 2026-09-18 next to his real one, in case `createCourse` or the wizard double-submits. Fix that here if so.
 

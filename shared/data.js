@@ -490,6 +490,8 @@ function _migrateCourseDataLocalToCanonical(localId, canonicalId) {
     delete bucket[localId];
     delete bucket[canonicalId];
   });
+  _forgetServerState(localId);
+  _forgetServerState(canonicalId);
   // 3. Replay each entity that had user edits. Each save function diffs
   //    prev=empty (LS cleared above, cache cleared) vs. next=user-edits and
   //    dispatches a full insert through the canonical persist path.
@@ -1212,6 +1214,72 @@ function _persistLoadedField(cid, field, value) {
   _cache[field][cid] = value;
   var key = _DATA_KEYS[field];
   if (key) _safeLSSet('gb-' + key + '-' + cid, JSON.stringify(value));
+  if (_SERVER_STATE_FIELDS[field]) _rememberServerState(field, cid, value);
+}
+
+/* ── Server-state baseline (docs/write-path-plan.md, Phase 2) ──────────────
+   What the server is believed to hold for a course field, in client shape.
+   Saves diff the current cache against this, not against the localStorage
+   copy taken when save() was called. That copy goes stale as soon as an
+   earlier save re-keys a local id, and the next save then re-creates the row.
+
+   Set when a field is loaded from the server, and advanced to the cache's
+   value each time a save's diff is dispatched — the outbox keeps retrying
+   until the server has it. Re-keys patch it alongside the cache. Before the
+   first load (or while degraded, loading from localStorage) there is no
+   baseline and saves fall back to the call-time localStorage copy. */
+var _SERVER_STATE_FIELDS = {
+  students: true,
+  assessments: true,
+  categories: true,
+  modules: true,
+  learningMaps: true,
+  notes: true,
+  customTags: true,
+  scores: true,
+  statuses: true,
+};
+var _serverState = {}; // field → cid → value
+
+function _cloneValue(value) {
+  if (value === undefined) return undefined;
+  try {
+    return structuredClone(value);
+  } catch (e) {
+    return JSON.parse(JSON.stringify(value));
+  }
+}
+
+function _rememberServerState(field, cid, value) {
+  if (!cid) return;
+  if (!_serverState[field]) _serverState[field] = {};
+  _serverState[field][cid] = _cloneValue(value);
+}
+
+function _hasServerState(field, cid) {
+  return !!(_serverState[field] && _serverState[field][cid] !== undefined);
+}
+
+function _serverStateOr(field, cid, fallback) {
+  return _hasServerState(field, cid) ? _serverState[field][cid] : fallback;
+}
+
+/* Drop every baseline for a course whose local data is being wiped, so the
+   next save starts from the fallback (empty) copy. */
+function _forgetServerState(cid) {
+  Object.keys(_serverState).forEach(function (field) {
+    delete _serverState[field][cid];
+  });
+}
+
+/* Apply a local → server id re-key to the baseline row with that id. */
+function _rekeyServerStateRow(field, cid, oldId, patch) {
+  if (!_hasServerState(field, cid)) return;
+  var rows = _serverState[field][cid];
+  if (!Array.isArray(rows)) return;
+  rows.forEach(function (row) {
+    if (row && row.id === oldId) Object.assign(row, patch);
+  });
 }
 
 function _getAssessmentCategoryId(assessment) {
@@ -1307,10 +1375,21 @@ function _applyStudentProfileSummaries(cid, rows) {
   var reflections = {};
   var overrides = {};
   var notes = {};
+  var noteIds = null;
 
   (rows || []).forEach(function (row) {
     var summary = _normalizeStudentProfileSummary(row);
     if (!summary.id) return;
+    // get_student_profile returns note rows with ids; list_course_student_profiles
+    // has no notes at all and must not wipe ids learned earlier.
+    if (row && row.notes !== undefined) {
+      if (!noteIds) noteIds = {};
+      noteIds[summary.id] = (summary.notes || [])
+        .map(function (note) {
+          return note && note.id;
+        })
+        .filter(_isUuid);
+    }
     summaries[summary.id] = summary;
     if (summary.isFlagged) flags[summary.id] = true;
     if (summary.goals && Object.keys(summary.goals).length > 0) goals[summary.id] = summary.goals;
@@ -1357,6 +1436,7 @@ function _applyStudentProfileSummaries(cid, rows) {
   _persistLoadedField(cid, 'reflections', reflections);
   _persistLoadedField(cid, 'overrides', overrides);
   if (Object.keys(notes).length > 0) _persistLoadedField(cid, 'notes', notes);
+  if (noteIds) _noteIds[cid] = Object.assign(_noteIds[cid] || {}, noteIds);
   return summaries;
 }
 
@@ -3124,6 +3204,7 @@ function upsertScore(cid, sid, aid, tid, scoreVal, date, type, note) {
 
   if (_writesEnabled()) {
     _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note);
+    if (_hasServerState('scores', cid)) _rememberServerState('scores', cid, scores);
   }
   _broadcastChange(cid, 'scores');
   return lsOk;
@@ -3858,6 +3939,7 @@ function _clearCourseLocalState(id) {
     'custom-tags',
     'report-config',
   ].forEach(k => localStorage.removeItem('gb-' + k + '-' + id));
+  _forgetServerState(id);
 
   // Clear cache
   for (const field of Object.keys(_DATA_KEYS)) {
@@ -4130,11 +4212,23 @@ function saveModules(cid, arr) {
 /* Per-course save lock — same pattern as students / assessments. */
 var _moduleSaveQueue = {};
 
+function _moduleChanged(before, after, beforeIdx, afterOrder) {
+  var beforeOrder = before.sortOrder != null ? Number(before.sortOrder) : beforeIdx;
+  return (
+    (before.name || '') !== (after.name || '') ||
+    (before.color || null) !== (after.color || null) ||
+    beforeOrder !== afterOrder
+  );
+}
+
 function _persistModulesToCanonical(cid, prev, arr) {
   var sb = getSupabase();
   if (!sb || !window.v2 || !window.v2.upsertModule) return;
   var tail = _moduleSaveQueue[cid] || Promise.resolve();
   var next = tail.then(async function () {
+    var hasBaseline = _hasServerState('modules', cid);
+    prev = _serverStateOr('modules', cid, prev);
+    arr = _cache.modules[cid] || arr;
     var prevById = {};
     prev.forEach(function (m) {
       if (m && m.id) prevById[m.id] = m;
@@ -4149,6 +4243,8 @@ function _persistModulesToCanonical(cid, prev, arr) {
       if (!m || !m.id) return;
       var p = prevById[m.id];
       var displayOrder = m.sortOrder != null ? Number(m.sortOrder) : idx;
+      // Against a confirmed baseline, an unchanged module needs no write.
+      if (hasBaseline && p && _isUuid(m.id) && !_moduleChanged(p, m, prev.indexOf(p), displayOrder)) return;
       ops.push(
         window.v2
           .upsertModule({
@@ -4167,6 +4263,7 @@ function _persistModulesToCanonical(cid, prev, arr) {
             // hit the update branch. Mutates the cached entry directly.
             var canonicalId = res && res.data ? res.data : null;
             if (!p && canonicalId && canonicalId !== m.id) {
+              _rekeyServerStateRow('modules', cid, m.id, { id: canonicalId });
               var cached = (_cache.modules[cid] || []).find(function (c) {
                 return c.id === m.id;
               });
@@ -4198,6 +4295,7 @@ function _persistModulesToCanonical(cid, prev, arr) {
         );
       }
     });
+    _rememberServerState('modules', cid, arr);
     return Promise.all(ops).catch(function (err) {
       console.warn('Module sync to canonical RPCs failed for one or more rows:', err);
     });
@@ -4341,11 +4439,64 @@ function _stringifyICanText(tag) {
   return '';
 }
 
+/* The fields each learning-map row is saved with, as sent to the upsert RPCs,
+   keyed by row id. Two maps with the same signature for a row need no write. */
+function _learningMapSignatures(map) {
+  var out = { group: {}, subject: {}, section: {}, tag: {} };
+  if (!map) return out;
+  (map.competencyGroups || []).forEach(function (g, gi) {
+    if (!g) return;
+    out.group[g.id] = JSON.stringify([
+      g.name || '',
+      g.color || null,
+      g.displayOrder != null ? Number(g.displayOrder) : gi,
+    ]);
+  });
+  (map.subjects || []).forEach(function (sub, si) {
+    if (!sub) return;
+    out.subject[sub.id] = JSON.stringify([
+      sub.name || '',
+      sub.color || null,
+      sub.displayOrder != null ? Number(sub.displayOrder) : Number(sub.sortOrder || si),
+    ]);
+  });
+  (map.sections || []).forEach(function (sec, xi) {
+    if (!sec) return;
+    out.section[sec.id] = JSON.stringify([
+      sec.subject,
+      sec.name || sec.shortName || '',
+      sec.color || null,
+      sec.groupId || sec.competencyGroupId || null,
+      sec.displayOrder != null ? Number(sec.displayOrder) : Number(sec.sortOrder || xi),
+    ]);
+    (sec.tags || (sec.outcome ? [sec.outcome] : [])).forEach(function (tag, ti) {
+      if (!tag) return;
+      out.tag[tag.id] = JSON.stringify([
+        sec.id,
+        tag.label || tag.name || sec.name || '',
+        tag.code || tag.shortName || '',
+        _stringifyICanText(tag),
+        tag.displayOrder != null ? Number(tag.displayOrder) : Number(tag.sortOrder || ti),
+      ]);
+    });
+  });
+  return out;
+}
+
 function _persistLearningMapToCanonical(cid, prevMap, nextMap) {
   if (!window.v2 || !window.v2.upsertSubject || !window.v2.upsertSection || !window.v2.upsertTag) return;
   var tail = _learningMapSaveQueue[cid] || Promise.resolve();
   var next = tail.then(async function () {
     var map = structuredClone(nextMap || { subjects: [], sections: [] });
+    // Against a confirmed baseline, rows whose saved fields haven't changed
+    // are skipped; without one, every row is sent as before.
+    var hasBaseline = _hasServerState('learningMaps', cid);
+    var baseline = _serverStateOr('learningMaps', cid, prevMap);
+    var sent = hasBaseline ? _learningMapSignatures(baseline) : null;
+    var current = hasBaseline ? _learningMapSignatures(map) : null;
+    function unchanged(kind, id) {
+      return !!(sent && _isUuid(id) && sent[kind][id] !== undefined && sent[kind][id] === current[kind][id]);
+    }
     if (!_learningMapIdRemap[cid]) _learningMapIdRemap[cid] = { subject: {}, group: {}, section: {}, tag: {} };
     var known = _learningMapIdRemap[cid];
     ['group', 'subject', 'section', 'tag'].forEach(function (kind) {
@@ -4361,6 +4512,7 @@ function _persistLearningMapToCanonical(cid, prevMap, nextMap) {
       for (var gi = 0; gi < groups.length; gi++) {
         var group = groups[gi];
         if (!group) continue;
+        if (unchanged('group', group.id)) continue;
         var oldGroupId = group.id;
         var groupRes = await window.v2.upsertCompetencyGroup({
           id: _isUuid(oldGroupId) ? oldGroupId : null,
@@ -4382,6 +4534,7 @@ function _persistLearningMapToCanonical(cid, prevMap, nextMap) {
     for (var si = 0; si < subjects.length; si++) {
       var subject = subjects[si];
       if (!subject) continue;
+      if (unchanged('subject', subject.id)) continue;
       var oldSubjectId = subject.id;
       var subjectRes = await window.v2.upsertSubject({
         id: _isUuid(oldSubjectId) ? oldSubjectId : null,
@@ -4403,14 +4556,16 @@ function _persistLearningMapToCanonical(cid, prevMap, nextMap) {
       var section = sections[xi];
       if (!section) continue;
       var oldSectionId = section.id;
-      var sectionRes = await window.v2.upsertSection({
-        id: _isUuid(oldSectionId) ? oldSectionId : null,
-        subjectId: idMaps.subject[section.subject] || section.subject,
-        name: section.name || section.shortName || '',
-        color: section.color || null,
-        competencyGroupId: idMaps.group[section.groupId] || section.groupId || section.competencyGroupId || null,
-        displayOrder: section.displayOrder != null ? Number(section.displayOrder) : Number(section.sortOrder || xi),
-      });
+      var sectionRes = unchanged('section', section.id)
+        ? null
+        : await window.v2.upsertSection({
+            id: _isUuid(oldSectionId) ? oldSectionId : null,
+            subjectId: idMaps.subject[section.subject] || section.subject,
+            name: section.name || section.shortName || '',
+            color: section.color || null,
+            competencyGroupId: idMaps.group[section.groupId] || section.groupId || section.competencyGroupId || null,
+            displayOrder: section.displayOrder != null ? Number(section.displayOrder) : Number(section.sortOrder || xi),
+          });
       if (sectionRes && sectionRes.error) throw sectionRes.error;
       if (sectionRes && sectionRes.data && sectionRes.data !== oldSectionId) {
         idMaps.section[oldSectionId] = sectionRes.data;
@@ -4421,6 +4576,7 @@ function _persistLearningMapToCanonical(cid, prevMap, nextMap) {
       for (var ti = 0; ti < tags.length; ti++) {
         var tag = tags[ti];
         if (!tag) continue;
+        if (unchanged('tag', tag.id)) continue;
         var oldTagId = tag.id;
         var tagRes = await window.v2.upsertTag({
           id: _isUuid(oldTagId) ? oldTagId : null,
@@ -4447,11 +4603,11 @@ function _persistLearningMapToCanonical(cid, prevMap, nextMap) {
         return entry.tag;
       }),
     );
-    var prevSubjects = _mapItemsById((prevMap && prevMap.subjects) || []);
-    var prevGroups = _mapItemsById((prevMap && prevMap.competencyGroups) || []);
-    var prevSections = _mapItemsById((prevMap && prevMap.sections) || []);
+    var prevSubjects = _mapItemsById((baseline && baseline.subjects) || []);
+    var prevGroups = _mapItemsById((baseline && baseline.competencyGroups) || []);
+    var prevSections = _mapItemsById((baseline && baseline.sections) || []);
     var prevTags = _mapItemsById(
-      _learningMapTags(prevMap || {}).map(function (entry) {
+      _learningMapTags(baseline || {}).map(function (entry) {
         return entry.tag;
       }),
     );
@@ -4476,6 +4632,8 @@ function _persistLearningMapToCanonical(cid, prevMap, nextMap) {
         });
       }),
     );
+
+    _rememberServerState('learningMaps', cid, map);
 
     if (
       Object.keys(idMaps.subject).length ||
@@ -4513,6 +4671,8 @@ function _persistCategoriesToCanonical(cid, prev, arr) {
   if (!window.v2 || !window.v2.upsertCategory) return;
   var tail = _categorySaveQueue[cid] || Promise.resolve();
   var next = tail.then(function () {
+    prev = _serverStateOr('categories', cid, prev);
+    arr = _cache.categories[cid] || arr;
     var prevById = {};
     (prev || []).forEach(function (category) {
       if (category && category.id) prevById[category.id] = category;
@@ -4546,6 +4706,7 @@ function _persistCategoriesToCanonical(cid, prev, arr) {
             var canonicalId = res && res.data ? res.data : null;
             if (canonicalId && category.id !== canonicalId) {
               idMap[category.id] = canonicalId;
+              _rekeyServerStateRow('categories', cid, category.id, { id: canonicalId });
               var cached = (_cache.categories[cid] || []).find(function (c) {
                 return c.id === category.id;
               });
@@ -4560,6 +4721,7 @@ function _persistCategoriesToCanonical(cid, prev, arr) {
         ops.push(window.v2.deleteCategory(category.id));
       }
     });
+    _rememberServerState('categories', cid, arr);
     var reorderIds = (arr || [])
       .map(function (category) {
         return category && category.id;
@@ -4645,7 +4807,8 @@ function saveAssignmentStatuses(cid, obj) {
   var next = obj || {};
   _saveCourseField('statuses', cid, next);
   if (!_writesEnabled() || !_isUuid(cid)) return;
-  _persistStatusDiffToCanonical(prev, next);
+  _persistStatusDiffToCanonical(_serverStateOr('statuses', cid, prev), next);
+  _rememberServerState('statuses', cid, next);
 }
 function getAssignmentStatus(cid, sid, aid) {
   return getAssignmentStatuses(cid)[sid + ':' + aid] || null;
@@ -5222,34 +5385,36 @@ function _persistStudentsToCanonical(cid, prev, arr) {
   if (!sb) return;
   var tail = _studentSaveQueue[cid] || Promise.resolve();
   var next = tail.then(function () {
+    var before = _serverStateOr('students', cid, prev);
+    var after = _cache.students[cid] || arr;
     var prevById = {};
-    prev.forEach(function (s) {
+    before.forEach(function (s) {
       if (s && s.id) prevById[s.id] = s;
     });
     var arrById = {};
-    arr.forEach(function (s) {
+    after.forEach(function (s) {
       if (s && s.id) arrById[s.id] = s;
     });
 
     var ops = [];
 
     // Adds (any id not in prev)
-    arr.forEach(function (s, idx) {
+    after.forEach(function (s, idx) {
       if (s && s.id && !prevById[s.id]) {
         ops.push(_canonicalEnrollStudent(sb, cid, s, idx));
       }
     });
     // Withdrawals (in prev, not in arr) — only if we have a canonical enrollment id
-    prev.forEach(function (s) {
+    before.forEach(function (s) {
       if (s && s.id && !arrById[s.id] && _isUuid(s.id)) {
         ops.push(_canonicalWithdrawEnrollment(sb, s.id));
       }
     });
     // Updates (in both, with field changes)
-    arr.forEach(function (s, idx) {
+    after.forEach(function (s, idx) {
       var p = s && s.id ? prevById[s.id] : null;
       if (!p || !_isUuid(s.id)) return;
-      if (_studentEnrollmentChanged(p, s) || _studentRosterPositionChanged(idx, prev, p, s)) {
+      if (_studentEnrollmentChanged(p, s) || _studentRosterPositionChanged(idx, before, p, s)) {
         ops.push(_canonicalUpdateEnrollment(sb, s.id, s, idx));
       }
       if (_studentIdentityChanged(p, s) && _isUuid(s.personId)) {
@@ -5257,6 +5422,7 @@ function _persistStudentsToCanonical(cid, prev, arr) {
       }
     });
 
+    _rememberServerState('students', cid, after);
     return Promise.all(ops).catch(function (err) {
       console.warn('Student sync to canonical RPCs failed for one or more rows:', err);
     });
@@ -5294,6 +5460,7 @@ function _studentIdentityChanged(a, b) {
    p_preferred_name, p_pronouns, p_student_number, p_email, p_date_of_birth,
    p_designations, p_existing_student_id) → { student_id, enrollment_id } */
 function _canonicalEnrollStudent(sb, cid, s, idx) {
+  var localId = s.id;
   var existingStudentId = _isUuid(s.personId) ? s.personId : null;
   return _writeRpc(
     'create_student_and_enroll',
@@ -5316,12 +5483,15 @@ function _canonicalEnrollStudent(sb, cid, s, idx) {
     }
     var row = res.data || {};
     var cached = (_cache.students[cid] || []).find(function (c) {
-      return c.id === s.id;
+      return c.id === localId;
     });
     if (cached && row.enrollment_id) {
       cached.id = row.enrollment_id;
       cached.personId = row.student_id;
       cached.rosterPosition = idx;
+    }
+    if (row.enrollment_id) {
+      _rekeyServerStateRow('students', cid, localId, { id: row.enrollment_id, personId: row.student_id });
     }
     if (_cache.students[cid]) {
       _safeLSSet('gb-students-' + cid, JSON.stringify(_cache.students[cid]));
@@ -5476,31 +5646,33 @@ function _persistAssessmentsToCanonical(cid, prev, arr) {
   if (!sb) return;
   var tail = _assessmentSaveQueue[cid] || Promise.resolve();
   var next = tail.then(function () {
+    var before = _serverStateOr('assessments', cid, prev);
+    var after = _cache.assessments[cid] || arr;
     var prevById = {};
-    prev.forEach(function (a) {
+    before.forEach(function (a) {
       if (a && a.id) prevById[a.id] = a;
     });
     var arrById = {};
-    arr.forEach(function (a) {
+    after.forEach(function (a) {
       if (a && a.id) arrById[a.id] = a;
     });
 
     var ops = [];
 
     // Adds
-    arr.forEach(function (a) {
+    after.forEach(function (a) {
       if (a && a.id && !prevById[a.id]) {
         ops.push(_canonicalCreateAssessment(sb, cid, a));
       }
     });
     // Deletes (canonical-id removals only)
-    prev.forEach(function (a) {
+    before.forEach(function (a) {
       if (a && a.id && !arrById[a.id] && _isUuid(a.id)) {
         ops.push(_canonicalDeleteAssessment(sb, cid, a.id));
       }
     });
     // Updates
-    arr.forEach(function (a) {
+    after.forEach(function (a) {
       var p = a && a.id ? prevById[a.id] : null;
       if (!p || !_isUuid(a.id)) return;
       if (_assessmentChanged(p, a)) {
@@ -5508,6 +5680,7 @@ function _persistAssessmentsToCanonical(cid, prev, arr) {
       }
     });
 
+    _rememberServerState('assessments', cid, after);
     return Promise.all(ops).catch(function (err) {
       console.warn('Assessment sync to canonical RPCs failed for one or more rows:', err);
     });
@@ -5600,6 +5773,7 @@ function _persistAssessmentCollab(sb, assessmentId, a) {
    Returns the new assessment id; client patches its cached row to swap in the
    canonical uuid so subsequent saves hit update_assessment, not re-create. */
 function _canonicalCreateAssessment(sb, cid, a) {
+  var localId = a.id;
   var tagIds = (a.tagIds || []).filter(_isUuid);
   var params = {
     p_course_id: cid,
@@ -5623,9 +5797,10 @@ function _canonicalCreateAssessment(sb, cid, a) {
     }
     var newId = res.data;
     var cached = (_cache.assessments[cid] || []).find(function (c) {
-      return c.id === a.id;
+      return c.id === localId;
     });
     if (cached && newId) cached.id = newId;
+    if (newId) _rekeyServerStateRow('assessments', cid, localId, { id: newId });
     if (_cache.assessments[cid]) {
       _safeLSSet('gb-assessments-' + cid, JSON.stringify(_cache.assessments[cid]));
     }
@@ -5752,10 +5927,11 @@ function getNotes(cid) {
     return {};
   }
 }
-/* Per-course note ID registry: maps enrollmentId → most-recently-written
-   note UUID for the current session. Populated by upsert_note responses so
-   that a subsequent edit can delete the old row before inserting the new one
-   (notes are schema-immutable; "edit" = delete + insert). */
+/* Per-course note ids: enrollmentId → [note uuid, …]. The client keeps one
+   note body per student, but the server stores note rows (schema-immutable;
+   "edit" = delete + insert). Ids come from get_student_profile at load time
+   and from upsert_note responses, so editing a note loaded in an earlier
+   session replaces its rows instead of adding another. */
 var _noteIds = {};
 var _noteSaveQueue = {};
 
@@ -5772,34 +5948,41 @@ function _persistNotesToCanonical(cid, prev, obj) {
   if (!sb || !window.v2 || !window.v2.addNote) return;
   var tail = _noteSaveQueue[cid] || Promise.resolve();
   var next = tail.then(function () {
-    var ops = [];
-    var existingIds = _noteIds[cid] || {};
+    var before = _serverStateOr('notes', cid, prev) || {};
+    var after = _cache.notes[cid] || obj;
+    _rememberServerState('notes', cid, after);
+    if (!_noteIds[cid]) _noteIds[cid] = {};
+    var ids = _noteIds[cid];
 
-    // Added or changed notes
-    Object.keys(obj || {}).forEach(function (eid) {
+    function removeExisting(eid) {
+      var existing = (ids[eid] || []).filter(_isUuid);
+      delete ids[eid];
+      return Promise.all(
+        existing.map(function (id) {
+          return window.v2.deleteNote(id);
+        }),
+      );
+    }
+
+    var ops = [];
+    var eids = {};
+    Object.keys(before).forEach(function (eid) {
+      eids[eid] = true;
+    });
+    Object.keys(after || {}).forEach(function (eid) {
+      eids[eid] = true;
+    });
+    Object.keys(eids).forEach(function (eid) {
       if (!_isUuid(eid)) return;
-      var body = obj[eid];
-      if (body === prev[eid]) return; // unchanged
-      if (!body || !body.trim()) return; // empty string treated as delete (handled below)
-      var existingId = existingIds[eid];
-      var op;
-      if (existingId && _isUuid(existingId)) {
-        op = window.v2.deleteNote(existingId).then(function () {
+      var body = (after || {})[eid];
+      if (body === before[eid]) return; // unchanged
+      var op = removeExisting(eid);
+      if (body && body.trim()) {
+        op = op.then(function () {
           return window.v2.addNote(eid, body).then(function (res) {
             var id = res && res.data;
-            if (id) {
-              if (!_noteIds[cid]) _noteIds[cid] = {};
-              _noteIds[cid][eid] = id;
-            }
+            if (id) ids[eid] = [id];
           });
-        });
-      } else {
-        op = window.v2.addNote(eid, body).then(function (res) {
-          var id = res && res.data;
-          if (id) {
-            if (!_noteIds[cid]) _noteIds[cid] = {};
-            _noteIds[cid][eid] = id;
-          }
         });
       }
       ops.push(
@@ -5807,24 +5990,6 @@ function _persistNotesToCanonical(cid, prev, obj) {
           console.warn('Note sync failed for enrollment', eid, ':', err);
         }),
       );
-    });
-
-    // Deleted notes (present in prev, absent in obj)
-    Object.keys(prev || {}).forEach(function (eid) {
-      if (obj[eid] !== undefined) return;
-      var existingId = existingIds[eid];
-      if (existingId && _isUuid(existingId)) {
-        ops.push(
-          window.v2
-            .deleteNote(existingId)
-            .then(function () {
-              if (_noteIds[cid]) delete _noteIds[cid][eid];
-            })
-            .catch(function (err) {
-              console.warn('Note delete failed for enrollment', eid, ':', err);
-            }),
-        );
-      }
     });
 
     return Promise.all(ops);
@@ -5884,7 +6049,10 @@ function saveScores(cid, obj) {
     return false;
   }
   var lsOk = _saveCourseField('scores', cid, obj);
-  persistScoreDiffToCanonical(cid, prev, obj || {});
+  if (_writesEnabled()) {
+    persistScoreDiffToCanonical(cid, _serverStateOr('scores', cid, prev), obj || {});
+    _rememberServerState('scores', cid, obj || {});
+  }
   return lsOk;
 }
 
@@ -6980,6 +7148,9 @@ function _persistCustomTagsToCanonical(cid, prev, arr) {
   if (!sb) return;
   var tail = _customTagSaveQueue[cid] || Promise.resolve();
   var next = tail.then(function () {
+    prev = _serverStateOr('customTags', cid, prev);
+    arr = _cache.customTags[cid] || arr;
+    _rememberServerState('customTags', cid, arr);
     var prevSet = {};
     (prev || []).forEach(function (l) {
       prevSet[l] = true;

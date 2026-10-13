@@ -7,6 +7,7 @@ import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 import { runInThisContext } from 'vm';
+import { beforeEach } from 'vitest';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -159,3 +160,9 @@ load('teacher/router.js');
 
 // Restore real setTimeout after loading (tests may need it)
 globalThis.setTimeout = _realSetTimeout;
+
+// The server-state baseline (shared/data.js) is per-session memory; each test
+// starts a fresh session alongside its cleared localStorage and cache.
+beforeEach(() => {
+  _serverState = {};
+});
