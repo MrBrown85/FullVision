@@ -1,9 +1,50 @@
 /* gb-seed-data.js — Demo seed data for FullVision (extracted from gb-common.js) */
 
+/* The demo class is written as one school term ending SEED_LAST_DAY. When it
+   is seeded, every date moves by the same number of days so SEED_LAST_DAY
+   lands on yesterday and the class always looks current. No date in this
+   file may be later than SEED_LAST_DAY. */
+const SEED_LAST_DAY = '2026-03-21';
+const _DATE_RE = /^\d{4}-\d{2}-\d{2}(T[\d:.]+Z?)?$/;
+
+function _seedShiftDays() {
+  var today = Date.parse(getTodayStr() + 'T00:00:00Z');
+  var last = Date.parse(SEED_LAST_DAY + 'T00:00:00Z');
+  return Math.round((today - last) / 86400000) - 1;
+}
+
+// A deep copy of value with every date string moved by days.
+function shiftSeedDates(value, days) {
+  if (typeof value === 'string') {
+    if (!_DATE_RE.test(value)) return value;
+    if (value.length === 10) {
+      return new Date(Date.parse(value + 'T00:00:00Z') + days * 86400000).toISOString().slice(0, 10);
+    }
+    return new Date(Date.parse(value) + days * 86400000).toISOString();
+  }
+  if (Array.isArray(value)) {
+    return value.map(function (v) {
+      return shiftSeedDates(v, days);
+    });
+  }
+  if (value && typeof value === 'object') {
+    var out = {};
+    Object.keys(value).forEach(function (k) {
+      out[k] = shiftSeedDates(value[k], days);
+    });
+    return out;
+  }
+  return value;
+}
+
 function seedIfNeeded() {
   // Don't re-seed if user deliberately deleted all data
   if (localStorage.getItem('gb-data-wiped') === '1') return;
   var _didSeed = false;
+  var shift = _seedShiftDays();
+  var current = function (value) {
+    return shiftSeedDates(value, shift);
+  };
   /* ────────────────────────────────────────────────────────────
      Student roster: Science 8
      ──────────────────────────────────────────────────────────── */
@@ -434,7 +475,7 @@ function seedIfNeeded() {
         date: s.date,
       });
     });
-    return obs;
+    return current(obs);
   }
 
   /* ════════════════════════════════════════════════════════════
@@ -447,7 +488,7 @@ function seedIfNeeded() {
   }
   if (COURSES.sci8 && getStudents('sci8').length === 0) {
     _didSeed = true;
-    saveStudents('sci8', structuredClone(SHARED_ROSTER));
+    saveStudents('sci8', current(SHARED_ROSTER));
     // Seed the learning map from built-in constants
     if (LEARNING_MAP && LEARNING_MAP.sci8) {
       saveLearningMap('sci8', structuredClone(LEARNING_MAP.sci8));
@@ -919,7 +960,7 @@ function seedIfNeeded() {
       },
     );
     const sci8SeedAssessments = normalizeSci8Assessments(sci8Assessments);
-    saveAssessments('sci8', sci8SeedAssessments);
+    saveAssessments('sci8', current(sci8SeedAssessments));
 
     /* ── Science 8 Rubrics ── */
     const sci8Rubrics = [
@@ -1362,7 +1403,7 @@ function seedIfNeeded() {
         ],
       },
     );
-    saveRubrics('sci8', sci8Rubrics);
+    saveRubrics('sci8', current(sci8Rubrics));
 
     //  Distribution: Extending(st2,st9,st13), Proficient(st1,st3,st4,st5,st7,st8,st10,st11,st14,st17,st19,st20), Developing(st6,st12,st15,st16,st18), Emerging(st3 early only — shows growth)
     //  0 = not yet assessed (blank)
@@ -1415,9 +1456,10 @@ function seedIfNeeded() {
       ],
       sci8t5: [65, 76, 53, 67, 67, 42, 57, 68, 77, 65, 59, 0, 75, 64, 44, 42, 58, 0, 65, 62, 66, 53, 75, 56, 67, 0, 62],
     };
-    saveScores('sci8', buildScores(STIDS, sci8SeedAssessments, sci8ScoreMap));
+    saveScores('sci8', current(buildScores(STIDS, sci8SeedAssessments, sci8ScoreMap)));
 
-    // Score-level notes (assignment-level comments)
+    // Score-level notes (assignment-level comments). These edit the saved,
+    // already-shifted scores, so they are saved as they are.
     const sci8ScoreNotes = getScores('sci8');
     // Cece (st1) on Disease Research Poster
     (sci8ScoreNotes['st1'] || [])
@@ -1861,7 +1903,7 @@ function seedIfNeeded() {
         },
         {
           sid: 'st5',
-          date: '2026-03-12',
+          date: '2026-03-17',
           text: "Mateo's mid-year lab skills check was solid \u2014 he moved carefully and recorded data with attention to units and precision.",
           dims: ['selfRegulation'],
           sentiment: 'strength',
@@ -1893,7 +1935,7 @@ function seedIfNeeded() {
         },
         {
           sid: 'st6',
-          date: '2026-03-14',
+          date: '2026-03-19',
           text: 'Ethan completed the mid-year lab skills check with focus and care \u2014 a real shift from earlier in the year.',
           dims: ['engagement', 'resilience'],
           sentiment: 'growth',
@@ -2021,7 +2063,7 @@ function seedIfNeeded() {
         },
         {
           sid: 'st10',
-          date: '2026-03-12',
+          date: '2026-03-17',
           text: "Jordan's lab technique has become noticeably more confident this term. He moves with purpose and records data efficiently.",
           dims: ['engagement'],
           sentiment: 'growth',
@@ -2061,7 +2103,7 @@ function seedIfNeeded() {
         },
         {
           sid: 'st11',
-          date: '2026-03-14',
+          date: '2026-03-19',
           text: 'Ines consistently follows safety procedures without reminders and helps peers remember theirs. Reliable lab partner.',
           dims: ['selfRegulation', 'respect'],
           sentiment: 'strength',
@@ -2165,7 +2207,7 @@ function seedIfNeeded() {
         },
         {
           sid: 'st14',
-          date: '2026-03-14',
+          date: '2026-03-19',
           text: "Sofia's lab skills check was solid across all criteria. Consistent, reliable student.",
           dims: ['engagement', 'selfRegulation'],
           sentiment: 'strength',
@@ -2253,7 +2295,7 @@ function seedIfNeeded() {
         },
         {
           sid: 'st17',
-          date: '2026-03-12',
+          date: '2026-03-17',
           text: 'Olivia volunteered to demonstrate proper pipetting technique for the class. Clear and confident.',
           dims: ['engagement', 'collaboration'],
           sentiment: 'strength',
@@ -2437,7 +2479,7 @@ function seedIfNeeded() {
         },
         {
           sid: 'st22',
-          date: '2026-03-14',
+          date: '2026-03-19',
           text: "Darius's lab technique has improved significantly \u2014 he measures carefully now and records data in an organized table.",
           dims: ['selfRegulation', 'resilience'],
           sentiment: 'growth',
@@ -2477,7 +2519,7 @@ function seedIfNeeded() {
         },
         {
           sid: 'st23',
-          date: '2026-03-14',
+          date: '2026-03-19',
           text: 'Mei helped calibrate the equipment during the lab skills check and explained the process to two classmates. Natural leader in the lab.',
           dims: ['collaboration', 'engagement'],
           sentiment: 'strength',
@@ -2517,7 +2559,7 @@ function seedIfNeeded() {
         },
         {
           sid: 'st24',
-          date: '2026-03-14',
+          date: '2026-03-19',
           text: "Caleb's lab skills have steadily improved. He's more careful with measurements and his technique is becoming reliable.",
           dims: ['resilience', 'selfRegulation'],
           sentiment: 'growth',
@@ -2557,7 +2599,7 @@ function seedIfNeeded() {
         },
         {
           sid: 'st25',
-          date: '2026-03-14',
+          date: '2026-03-19',
           text: "Anisa's lab technique is consistently precise. She models good practice for the students around her.",
           dims: ['selfRegulation', 'engagement'],
           sentiment: 'strength',
@@ -2637,7 +2679,7 @@ function seedIfNeeded() {
         },
         {
           sid: 'st27',
-          date: '2026-03-14',
+          date: '2026-03-19',
           text: "Tessa volunteered to demonstrate lab safety procedures for the class. She's becoming a real leader in the lab.",
           dims: ['engagement', 'collaboration'],
           sentiment: 'strength',
@@ -3080,7 +3122,7 @@ function seedIfNeeded() {
         modified: new Date('2026-03-20').toISOString(),
       },
     };
-    saveTermRatings('sci8', sci8TR);
+    saveTermRatings('sci8', current(sci8TR));
   }
 
   // ── Migrate old gb-notes into gb-quick-obs (one-time) ──
