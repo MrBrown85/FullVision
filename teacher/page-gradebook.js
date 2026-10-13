@@ -895,7 +895,12 @@ window.PageGradebook = (function () {
           });
           var score = entry ? entry.score : 0;
           var assigned = assess && (assess.tagIds || []).includes(col.tagId);
-          var content = score > 0 ? score : assigned ? '<span class="gb-unscored">\u00B7</span>' : '\u2014';
+          var content =
+            score > 0
+              ? formatScoreLevel(score, entry.mod)
+              : assigned
+                ? '<span class="gb-unscored">\u00B7</span>'
+                : '\u2014';
           html +=
             '<td class="gb-score' +
             startClass +
@@ -937,7 +942,7 @@ window.PageGradebook = (function () {
           var entry = ss.find(function (e) {
             return e.assessmentId === col.assessmentId && e.tagId === col.tagId;
           });
-          return entry && entry.score > 0 ? entry.score : null;
+          return entry && entry.score > 0 ? scoreModValue(entry) : null;
         })
         .filter(function (v) {
           return v !== null;
@@ -1121,7 +1126,7 @@ window.PageGradebook = (function () {
             var entry = studentScores.find(function (e) {
               return e.assessmentId === a.id && e.tagId === tid;
             });
-            return entry ? entry.score : 0;
+            return entry ? scoreModValue(entry) : 0;
           })
           .filter(function (v) {
             return v > 0;
@@ -1315,11 +1320,11 @@ window.PageGradebook = (function () {
         var mid = Math.floor(allSc.length / 2);
         var earlyAvg =
           allSc.slice(0, mid).reduce(function (a, b) {
-            return a + b.score;
+            return a + scoreModValue(b);
           }, 0) / mid;
         var lateAvg =
           allSc.slice(mid).reduce(function (a, b) {
-            return a + b.score;
+            return a + scoreModValue(b);
           }, 0) /
           (allSc.length - mid);
         if (lateAvg > earlyAvg + 0.2) trendIcon = '<span style="color:var(--score-3);font-size:1rem">↑</span>';
@@ -1558,7 +1563,7 @@ window.PageGradebook = (function () {
           var entry = ss.find(function (e) {
             return e.assessmentId === col.assessmentId && e.tagId === col.tagId;
           });
-          return entry && entry.score > 0 ? entry.score : null;
+          return entry && entry.score > 0 ? scoreModValue(entry) : null;
         })
         .filter(function (v) {
           return v !== null;
@@ -1632,7 +1637,7 @@ window.PageGradebook = (function () {
               var e = ss.find(function (e) {
                 return e.assessmentId === aid && e.tagId === tid;
               });
-              return e ? e.score : 0;
+              return e ? scoreModValue(e) : 0;
             })
             .filter(function (v) {
               return v > 0;
@@ -1688,6 +1693,43 @@ window.PageGradebook = (function () {
     } else {
       span.innerHTML = '<span class="gb-unscored">·</span>';
     }
+    updateRowSummary(cid, sid, td.closest('tr'));
+    refreshSidebar();
+  }
+
+  // + / − on the focused cell's level; pressing the same key again clears it.
+  function toggleCellMod(td, mod) {
+    var cid = activeCourse;
+    var aid = td.dataset.aid;
+    var tid = td.dataset.tid;
+    var sid = td.dataset.sid;
+    if (!aid || !tid || !sid) return;
+    var entry = (getScores(cid)[sid] || []).find(function (e) {
+      return e.assessmentId === aid && e.tagId === tid;
+    });
+    if (!entry || !(entry.score > 0)) return;
+    var current = normalizeScoreMod(entry.score, entry.mod);
+    var next = current === mod ? 0 : mod;
+    if (normalizeScoreMod(entry.score, next) !== next) return;
+    var assess = getAssessments(cid).find(function (a) {
+      return a.id === aid;
+    });
+    _undoStack.push({ cid: cid, sid: sid, aid: aid, tagIds: [tid], prevEntries: [structuredClone(entry)] });
+    while (_undoStack.length > 50) _undoStack.shift();
+    var level = entry.score;
+    upsertScore(
+      cid,
+      sid,
+      aid,
+      tid,
+      level,
+      assess ? assess.date : courseToday(cid),
+      assess ? assess.type : 'summative',
+      entry.note || '',
+      next,
+    );
+    var span = td.querySelector('.gb-score-val');
+    if (span) span.textContent = formatScoreLevel(level, next);
     updateRowSummary(cid, sid, td.closest('tr'));
     refreshSidebar();
   }
@@ -1984,7 +2026,7 @@ window.PageGradebook = (function () {
             var e = ss.find(function (e) {
               return e.assessmentId === a.id && e.tagId === tid;
             });
-            return e ? e.score : 0;
+            return e ? scoreModValue(e) : 0;
           })
           .filter(function (v) {
             return v > 0;
@@ -2219,7 +2261,7 @@ window.PageGradebook = (function () {
         var e = studentScores.find(function (e) {
           return e.assessmentId === aid && e.tagId === tid;
         });
-        return e ? e.score : 0;
+        return e ? scoreModValue(e) : 0;
       })
       .filter(function (v) {
         return v > 0;
@@ -2484,6 +2526,10 @@ window.PageGradebook = (function () {
       return;
     } else if (e.key === 'Escape') {
       focused.classList.remove('gb-focus');
+      return;
+    } else if (['+', '=', '-', '_'].includes(e.key)) {
+      e.preventDefault();
+      if (focused.dataset.pts !== '1') toggleCellMod(focused, e.key === '+' || e.key === '=' ? 1 : -1);
       return;
     } else if (['1', '2', '3', '4', '5', '6', '7', '8', '9'].includes(e.key)) {
       var ptsAssess = focused.dataset.aid

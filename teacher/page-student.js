@@ -672,7 +672,7 @@ window.PageStudent = (function () {
       var rowAvg =
         scoredEntries.length > 0
           ? scoredEntries.reduce(function (sum, s) {
-              return sum + s.score;
+              return sum + scoreModValue(s);
             }, 0) / scoredEntries.length
           : 0;
       var rowAvgR = Math.round(rowAvg);
@@ -859,7 +859,7 @@ window.PageStudent = (function () {
         } else {
           tagScores.forEach(function (sc) {
             var assess = assessMap[sc.assessmentId];
-            var sColor = PROF_COLORS[sc.score] || PROF_COLORS[0];
+            var sColor = PROF_COLORS[sc.level || sc.score] || PROF_COLORS[0];
             var href = assess ? '#/assignments?course=' + cid + '&open=' + assess.id + '&student=' + studentId : '';
             var title = assess ? esc(assess.title) : 'Unknown';
             html +=
@@ -869,7 +869,7 @@ window.PageStudent = (function () {
               '<span class="tag-assess-pip" style="background:' +
               sColor +
               '">' +
-              (sc.score || '\u2014') +
+              (sc.level ? formatScoreLevel(sc.level, sc.mod) : sc.score || '\u2014') +
               '</span>' +
               '<span class="tag-assess-title">' +
               title +
@@ -1108,7 +1108,7 @@ window.PageStudent = (function () {
       if (aScores.length === 0) return;
       var avg =
         aScores.reduce(function (sum, s) {
-          return sum + s.score;
+          return sum + scoreModValue(s);
         }, 0) / aScores.length;
       if (avg < 2)
         attentionItems.push({ type: 'low', assess: assess, detail: 'Avg ' + avg.toFixed(1) + ' — needs support' });

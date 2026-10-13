@@ -2357,6 +2357,44 @@
   background-color: var(--score-1);
 }
 
+/* + / − beside the levels */
+.rsg-mods,
+.rsg-header-mod-spacer {
+  width: 64px;
+  flex-shrink: 0;
+}
+.rsg-mods {
+  display: flex;
+  border-left: 1px solid var(--divider-subtle);
+}
+.rsg-mod {
+  flex: 1;
+  border: none;
+  border-left: 1px solid var(--divider-subtle);
+  background: transparent;
+  font-family: inherit;
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: var(--text-3);
+  cursor: pointer;
+  transition: all 0.12s var(--ease-out);
+}
+.rsg-mod:first-child {
+  border-left: none;
+}
+.rsg-mod:hover:not(:disabled):not(.active) {
+  background: var(--overlay-hover);
+  color: var(--text);
+}
+.rsg-mod.active {
+  background: var(--text);
+  color: var(--surface);
+}
+.rsg-mod:disabled {
+  color: var(--divider-subtle);
+  cursor: default;
+}
+
 /* Student assignment status toggles (excused / not submitted) */
 .student-status-toggles {
   display: flex;

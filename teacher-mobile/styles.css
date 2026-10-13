@@ -1585,6 +1585,35 @@ body.fv-switching-course::after {
   background: var(--score-4);
 }
 
+/* + / − under the levels */
+.m-score-mods {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 10px;
+}
+.m-mod-btn {
+  width: 52px;
+  height: 36px;
+  border-radius: 18px;
+  border: 2px solid var(--border);
+  background: var(--surface);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-2);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.m-mod-btn.m-mod-active {
+  background: var(--text);
+  border-color: transparent;
+  color: var(--surface);
+}
+.m-mod-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 /* Status toggles */
 .m-status-row {
   display: flex;

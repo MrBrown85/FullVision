@@ -167,7 +167,9 @@ function getAssessmentOverallScore(cid, studentId, assessmentId) {
       return entry.assessmentId === assessmentId;
     })
     .map(function (entry) {
-      return _normalizeAssessmentEntryValue(assessment, entry.score);
+      // A proficiency level counts with its + or − (3+ = 3.33).
+      var raw = assessment.scoreMode === 'points' ? entry.score : entry.score > 0 ? scoreModValue(entry) : entry.score;
+      return _normalizeAssessmentEntryValue(assessment, raw);
     })
     .filter(function (value) {
       return value != null;
@@ -407,6 +409,11 @@ function getTagScores(cid, studentId, tagId) {
     const assess = assessMap.get(s.assessmentId);
     if (assess && assess.scoreMode === 'points' && assess.maxPoints > 0) {
       return { ...s, rawPoints: s.score, score: pointsToProf(s.score, assess.maxPoints, scale) };
+    }
+    // A + or − counts in every calculation (3+ = 3.33). `level` keeps the
+    // whole-number level for display.
+    if (s.score > 0 && normalizeScoreMod(s.score, s.mod)) {
+      return { ...s, level: s.score, score: scoreModValue(s) };
     }
     return s;
   });

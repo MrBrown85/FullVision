@@ -1805,6 +1805,7 @@ window.PageAssignments = (function () {
         row.querySelectorAll('.score-opt, .rsg-level').forEach(function (el) {
           el.classList.remove('active', 'mixed');
         });
+        row.querySelectorAll('.rsg-criterion-row').forEach(syncModRow);
         if (ptsInput) {
           ptsInput.value = '';
           var ps = row.querySelector('.gb-pts-live-pct');
@@ -1815,11 +1816,85 @@ window.PageAssignments = (function () {
     refreshSidebar();
   }
 
-  function setScore(cid, sid, aid, tagId, value) {
+  function setScore(cid, sid, aid, tagId, value, mod) {
     var assess = getAssessments(cid).find(function (a) {
       return a.id === aid;
     });
-    upsertScore(cid, sid, aid, tagId, value, assess ? assess.date : '', assess ? assess.type : 'summative', '');
+    upsertScore(cid, sid, aid, tagId, value, assess ? assess.date : '', assess ? assess.type : 'summative', '', mod);
+  }
+
+  /* ── + / − on a proficiency level ───────────────────────── */
+  // The level and modifier a grading row's entries share. A rubric criterion
+  // whose tags disagree is mixed and takes no +/−.
+  function rowScoreState(row) {
+    var aid = row.dataset.assess;
+    var tagIds = [];
+    if (row.dataset.tag) tagIds = [row.dataset.tag];
+    else {
+      var crit = getRubricCriterion(aid, row.dataset.criterion);
+      if (crit) tagIds = crit.tagIds || [];
+    }
+    var entries = getScores(activeCourse)[row.dataset.student] || [];
+    var states = [];
+    tagIds.forEach(function (tid) {
+      var e = entries.find(function (s) {
+        return s.assessmentId === aid && s.tagId === tid;
+      });
+      if (e && e.score > 0) states.push({ level: e.score, mod: normalizeScoreMod(e.score, e.mod) });
+    });
+    var mixed = states.some(function (st) {
+      return st.level !== states[0].level || st.mod !== states[0].mod;
+    });
+    var shared = states.length && !mixed ? states[0] : { level: 0, mod: 0 };
+    return { level: shared.level, mod: shared.mod, mixed: mixed, tagIds: tagIds };
+  }
+
+  function scoreModButtonsHtml(level, mod) {
+    return [-1, 1]
+      .map(function (m) {
+        var allowed = level > 0 && normalizeScoreMod(level, m) === m;
+        return (
+          '<button type="button" class="rsg-mod' +
+          (allowed && mod === m ? ' active' : '') +
+          '" data-action="setScoreMod" data-mod="' +
+          m +
+          '" aria-label="' +
+          (m > 0 ? 'Plus' : 'Minus') +
+          '" title="' +
+          (m > 0 ? 'Plus (+)' : 'Minus (\u2212)') +
+          '"' +
+          (allowed ? '' : ' disabled') +
+          '>' +
+          scoreModSuffix(m) +
+          '</button>'
+        );
+      })
+      .join('');
+  }
+
+  function syncModRow(row) {
+    if (!row) return;
+    var st = rowScoreState(row);
+    var box = row.querySelector('.rsg-mods');
+    if (box) box.innerHTML = scoreModButtonsHtml(st.level, st.mod);
+  }
+
+  function syncModRows(selector) {
+    document.querySelectorAll(selector).forEach(syncModRow);
+  }
+
+  function setScoreMod(el, mod) {
+    var row = el.closest('.rsg-criterion-row');
+    if (!row) return;
+    var st = rowScoreState(row);
+    if (!st.level) return;
+    var next = st.mod === mod ? 0 : mod;
+    if (normalizeScoreMod(st.level, next) !== next) return;
+    st.tagIds.forEach(function (tid) {
+      setScore(activeCourse, row.dataset.student, row.dataset.assess, tid, st.level, next);
+    });
+    syncModRow(row);
+    refreshSidebar();
   }
 
   function updateGroupUI(group, value) {
@@ -1840,6 +1915,7 @@ window.PageAssignments = (function () {
       o.classList.remove('active');
     });
     if (!wasActive) el.classList.add('active');
+    syncModRow(el.closest('.rsg-criterion-row'));
     refreshSidebar();
   }
 
@@ -1933,6 +2009,7 @@ window.PageAssignments = (function () {
     document.querySelectorAll(selector).forEach(function (g) {
       updateGroupUI(g, value);
     });
+    syncModRows('.rsg-criterion-row[data-assess="' + aid + '"]');
     refreshSidebar();
     showUndoToast(toastMsg, function () {
       var beforeScores = getScores(cid);
@@ -1967,6 +2044,7 @@ window.PageAssignments = (function () {
       o.classList.remove('active', 'mixed');
     });
     if (!wasActive) el.classList.add('active');
+    syncModRow(el.closest('.rsg-criterion-row'));
     refreshSidebar();
   }
   function updateRubricRowUI(row, value) {
@@ -2029,6 +2107,7 @@ window.PageAssignments = (function () {
     document.querySelectorAll(selector).forEach(function (row) {
       updateRubricRowUI(row, value);
     });
+    syncModRows('.rsg-criterion-row[data-assess="' + aid + '"]');
     refreshSidebar();
     showUndoToast(toastMsg, function () {
       var beforeScores = getScores(cid);
@@ -2071,7 +2150,7 @@ window.PageAssignments = (function () {
       '<div class="rsg-header-level hl1" data-action="confirmFillAll" data-aid="' +
       a.id +
       '" data-score="1" data-label="Emerging" title="Fill all Emerging">Emerging</div>' +
-      '</div></div><div class="rsg-header-action"></div></div>';
+      '</div><div class="rsg-header-mod-spacer"></div></div><div class="rsg-header-action"></div></div>';
     var statuses = getAssignmentStatuses(cid);
     students.forEach(function (st) {
       var studentScores = scores[st.id] || [];
@@ -2095,6 +2174,7 @@ window.PageAssignments = (function () {
           return s.assessmentId === a.id && s.tagId === tag.id;
         });
         var score = entry ? entry.score : 0;
+        var mod = entry ? normalizeScoreMod(score, entry.mod) : 0;
         html +=
           '<div class="rsg-criterion-row is-tag" data-student="' +
           st.id +
@@ -2145,6 +2225,8 @@ window.PageAssignments = (function () {
           '" data-tagid="' +
           tag.id +
           '" role="button" tabindex="0">Emerging</div>' +
+          '</div><div class="rsg-mods">' +
+          scoreModButtonsHtml(score, mod) +
           '</div></div>';
       });
       html +=
@@ -2214,7 +2296,7 @@ window.PageAssignments = (function () {
       '<div class="rsg-header-level hl1" data-action="confirmFillRubricAll" data-aid="' +
       a.id +
       '" data-score="1" data-label="Emerging" title="Fill all Emerging">Emerging</div>' +
-      '</div></div><div class="rsg-header-action"></div></div>';
+      '</div><div class="rsg-header-mod-spacer"></div></div><div class="rsg-header-action"></div></div>';
 
     var statuses = getAssignmentStatuses(cid);
     students.forEach(function (st) {
@@ -2235,10 +2317,12 @@ window.PageAssignments = (function () {
         renderStatusToggles(a.id, st.id, stStatus) +
         '</div><div class="rsg-criteria">';
       criteria.forEach(function (crit) {
+        var tagMods = [];
         var tagScores = (crit.tagIds || []).map(function (tid) {
           var entry = studentScores.find(function (s) {
             return s.assessmentId === a.id && s.tagId === tid;
           });
+          if (entry && entry.score > 0) tagMods.push(normalizeScoreMod(entry.score, entry.mod));
           return entry ? entry.score : 0;
         });
         var nonZero = tagScores.filter(function (s) {
@@ -2251,6 +2335,20 @@ window.PageAssignments = (function () {
           });
         var displayScore = nonZero.length === 0 ? 0 : allSame ? nonZero[0] : Math.min.apply(null, nonZero);
         var isMixed = nonZero.length > 0 && !allSame;
+        var critMod =
+          !isMixed &&
+          tagMods.every(function (m) {
+            return m === tagMods[0];
+          })
+            ? tagMods[0] || 0
+            : 0;
+        var modLevel =
+          isMixed ||
+          tagMods.some(function (m) {
+            return m !== tagMods[0];
+          })
+            ? 0
+            : displayScore;
         html +=
           '<div class="rsg-criterion-row" data-student="' +
           st.id +
@@ -2300,6 +2398,8 @@ window.PageAssignments = (function () {
           '" data-critid="' +
           crit.id +
           '" role="button" tabindex="0">Emerging</div>' +
+          '</div><div class="rsg-mods">' +
+          scoreModButtonsHtml(modLevel, critMod) +
           '</div></div>';
       });
       html +=
@@ -3665,6 +3765,9 @@ window.PageAssignments = (function () {
       selectRubricScore: function () {
         selectRubricScore(el, parseInt(el.dataset.level, 10), el.dataset.aid, el.dataset.sid, el.dataset.critid);
       },
+      setScoreMod: function () {
+        setScoreMod(el, parseInt(el.dataset.mod, 10));
+      },
       toggleScoreMenu: function () {
         toggleScoreMenu(el);
       },
@@ -3894,6 +3997,11 @@ window.PageAssignments = (function () {
         if (lvl) lvl.click();
       }
       navigateKb('down');
+      return;
+    }
+    if (['+', '=', '-', '_'].includes(key) && _kbFocusEl.classList.contains('rsg-criterion-row')) {
+      e.preventDefault();
+      setScoreMod(_kbFocusEl, key === '+' || key === '=' ? 1 : -1);
       return;
     }
     if (key === '0' || key === 'Backspace' || key === 'Delete') {
