@@ -372,7 +372,7 @@ Remaining agent work:
 - Decisions owed:
   1. Adopt a migration tool (Supabase CLI migrations? Flyway? Stay with hand-numbered `migrations/*.sql` + forward-only convention?). Affects every future DB change.
   2. Rollback policy: forward-only with fix-up migrations, or reversible up/down pairs?
-  3. Service worker contract: does a schema change auto-bump `CACHE_NAME` in the build step, or is it always manual?
+  3. ~~Service worker contract~~ — settled 2026-10-12: `scripts/build.sh` stamps `CACHE_NAME` from the deploy's commit on every build.
 - Once decided (agent-ready follow-ups): deploy runbook in codex.md, district-onboarding runbook in codex.md, SW cache-bust hook in [scripts/build.sh](scripts/build.sh).
 
 ### P5.11 · Soft-delete on assessment / score / observation `[needs-design]` — MEDIUM

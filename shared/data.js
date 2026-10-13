@@ -4062,7 +4062,7 @@ async function loadCurriculumIndex() {
     try {
       await new Promise((resolve, reject) => {
         const script = document.createElement('script');
-        script.src = 'curriculum_data.js';
+        script.src = '/curriculum_data.js';
         script.onload = resolve;
         script.onerror = reject;
         document.head.appendChild(script);
