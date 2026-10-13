@@ -1857,8 +1857,13 @@ window.DashClassManager = (function () {
           '</button>'
         );
       }).join('') +
+      '</div>' +
+      '<div class="cm-hint" id="cm-cg-calc-desc" style="margin-top:6px">' +
+      _cmCalcMethodDescription(cwStep2Calc || 'mostRecent') +
       '</div></div>' +
-      '<div id="cm-cg-decay" class="cm-field" style="display:none"><label class="cm-label">Decay Weight</label>' +
+      '<div id="cm-cg-decay" class="cm-field" style="' +
+      (cwStep2Calc === 'decayingAvg' ? '' : 'display:none') +
+      '"><label class="cm-label">Decay Weight</label>' +
       '<div class="cm-slider-row"><input type="range" min="10" max="95" value="65" id="cm-cg-decay-slider" style="flex:1"><span class="cm-slider-label">65%</span></div>' +
       '<div class="cm-hint">Higher values weight recent scores more heavily.</div></div>' +
       '</div>';
@@ -2114,6 +2119,10 @@ window.DashClassManager = (function () {
       b.classList.remove('active');
     });
     btn.classList.add('active');
+    if (containerId === 'cm-cg-calc') {
+      var desc = document.getElementById('cm-cg-calc-desc');
+      if (desc) desc.innerHTML = _cmCalcMethodDescription(btn.dataset.val);
+    }
   }
 
   /* ── CM Edit Actions ────────────────────────────────────── */
