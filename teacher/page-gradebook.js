@@ -543,7 +543,11 @@ window.PageGradebook = (function () {
       d.date +
       '</span>' +
       '</div>' +
-      (d.isScoreOnly ? '<div class="gb-hover-row">Score: / ' + d.maxPoints + '</div>' : '') +
+      (d.isCompletion
+        ? '<div class="gb-hover-row">Complete / Incomplete</div>'
+        : d.isScoreOnly
+          ? '<div class="gb-hover-row">Score: / ' + d.maxPoints + '</div>'
+          : '') +
       (d.weight && d.weight !== 1 ? '<div class="gb-hover-row">Weight: ' + d.weight + 'x</div>' : '') +
       (d.secNames.length ? '<div class="gb-hover-row">Group: ' + esc(d.secNames.join(', ')) + '</div>' : '') +
       (d.tagNames.length && !d.isScoreOnly
@@ -613,13 +617,13 @@ window.PageGradebook = (function () {
       }
       if (tagIds.length === 0) return;
       var start = cols.length;
-      if (a.scoreMode === 'points') {
+      if (isPointsScored(a)) {
         var sec = getSectionForTag(cid, tagIds[0]);
         cols.push({
           assessmentId: a.id,
           tagId: '__pts__',
           isPointsCol: true,
-          tagCode: '/' + (a.maxPoints || 100),
+          tagCode: isCompletionScored(a) ? '\u2713/\u2717' : '/' + (a.maxPoints || 100),
           sectionColor: sec ? sec.color : 'var(--text-3)',
           tagText: a.title,
         });
@@ -675,7 +679,9 @@ window.PageGradebook = (function () {
         .filter(Boolean);
       var stripeColor = tagSecs.length > 0 ? tagSecs[0].color : 'var(--border)';
       var badges = '';
-      if (a.scoreMode === 'points') badges += '<span class="gb-assess-badge">/ ' + (a.maxPoints || 100) + '</span>';
+      if (isCompletionScored(a)) badges += '<span class="gb-assess-badge">\u2713/\u2717</span>';
+      else if (a.scoreMode === 'points')
+        badges += '<span class="gb-assess-badge">/ ' + (a.maxPoints || 100) + '</span>';
       if (a.weight && a.weight !== 1) badges += '<span class="gb-assess-badge">' + a.weight + 'x</span>';
       var _catId = _getAssessmentCategoryId(a);
       var _catIdx = _catId
@@ -789,7 +795,24 @@ window.PageGradebook = (function () {
         var assess = assessments.find(function (a) {
           return a.id === col.assessmentId;
         });
-        if (col.isPointsCol) {
+        if (col.isPointsCol && isCompletionScored(assess)) {
+          var mark = getCompletionMark(cid, s.id, col.assessmentId);
+          html +=
+            '<td class="gb-score gb-score-pts' +
+            startClass +
+            altClass +
+            '"' +
+            cellStyle +
+            ' data-aid="' +
+            col.assessmentId +
+            '" data-pts="1" data-cmp="1" data-sid="' +
+            s.id +
+            '" data-action="cycleScore" title="' +
+            (mark ? (mark === 'complete' ? 'Complete' : 'Incomplete') : '') +
+            '">' +
+            completionCellHtml(mark) +
+            '</td>';
+        } else if (col.isPointsCol) {
           var max = assess.maxPoints || 100;
           var score = getPointsScore(cid, s.id, col.assessmentId);
           var pct = score > 0 ? ((score / max) * 100).toFixed(1) : '0.0';
@@ -943,7 +966,7 @@ window.PageGradebook = (function () {
       var categoryId = _getAssessmentCategoryId(a);
       var categoryName = _getCategoryName(cid, categoryId);
       var typeClass = _getAssessmentAccentClass(a, 'gb-scores');
-      var isScoreOnly = a.scoreMode === 'points';
+      var isScoreOnly = isPointsScored(a);
       var maxPts = isScoreOnly ? ' / ' + (a.maxPoints || 100) : '';
       var tagSecs = (a.tagIds || [])
         .map(function (tid) {
@@ -971,6 +994,7 @@ window.PageGradebook = (function () {
         categoryName: categoryName,
         date: formatDate(a.date),
         isScoreOnly: isScoreOnly,
+        isCompletion: isCompletionScored(a),
         maxPoints: a.maxPoints || 100,
         weight: a.weight,
         secNames: secNames,
@@ -1070,11 +1094,16 @@ window.PageGradebook = (function () {
                 return x + y;
               }, 0) / tagScores.length
             : 0;
-        var isPoints = a.scoreMode === 'points';
+        var isPoints = isPointsScored(a);
         var display,
           cellStyle,
           cellClass = '';
-        if (val > 0) {
+        var cmpMark = isCompletionScored(a) ? getCompletionMark(cid, s.id, a.id) : null;
+        if (cmpMark) {
+          cellStyle = cmpMark === 'complete' ? 'color:var(--score-3)' : 'color:var(--score-1)';
+          display = cmpMark === 'complete' ? '\u2713' : '\u2717';
+          val = cmpMark === 'complete' ? 1 : 0;
+        } else if (val > 0) {
           var r = Math.round(val);
           cellStyle = 'background:' + PROF_TINT[r] + ';color:' + PROF_COLORS[r];
           display = isPoints ? val.toFixed(0) : val.toFixed(1);
@@ -1110,7 +1139,13 @@ window.PageGradebook = (function () {
           ', ' +
           esc(a.title) +
           ': ' +
-          (val > 0 ? display.replace(/<[^>]*>/g, '') : 'no score') +
+          (cmpMark
+            ? cmpMark === 'complete'
+              ? 'Complete'
+              : 'Incomplete'
+            : val > 0
+              ? display.replace(/<[^>]*>/g, '')
+              : 'no score') +
           '" data-action="editScoreCell" data-aid="' +
           a.id +
           '" data-sid="' +
@@ -1591,6 +1626,55 @@ window.PageGradebook = (function () {
     });
   }
 
+  /* ── Complete / Incomplete cells ───────────────────────── */
+  function completionCellHtml(mark) {
+    if (mark === 'complete') return '<span class="gb-cmp gb-cmp-complete">\u2713</span>';
+    if (mark === 'incomplete') return '<span class="gb-cmp gb-cmp-incomplete">\u2717</span>';
+    return '<span class="gb-pts-empty">\u00B7</span>';
+  }
+
+  // Click order: unmarked → Complete → Incomplete → unmarked.
+  function nextCompletionMark(mark) {
+    return mark === 'complete' ? 'incomplete' : mark === 'incomplete' ? null : 'complete';
+  }
+
+  function setCellCompletion(td, mark) {
+    var cid = activeCourse;
+    var sid = td.dataset.sid;
+    var aid = td.dataset.aid;
+    var prevEntries = (getScores(cid)[sid] || [])
+      .filter(function (e) {
+        return e.assessmentId === aid;
+      })
+      .map(function (e) {
+        return structuredClone(e);
+      });
+    var assess = getAssessments(cid).find(function (a) {
+      return a.id === aid;
+    });
+    var tagIds = (assess && assess.tagIds) || [];
+    _undoStack.push({
+      cid: cid,
+      sid: sid,
+      aid: aid,
+      tagIds: tagIds,
+      prevEntries: tagIds.map(function (tid) {
+        return (
+          prevEntries.find(function (e) {
+            return e.tagId === tid;
+          }) || null
+        );
+      }),
+    });
+    while (_undoStack.length > 50) _undoStack.shift();
+    setCompletionMark(cid, sid, aid, mark);
+    clearProfCache();
+    td.innerHTML = completionCellHtml(mark);
+    td.title = mark ? (mark === 'complete' ? 'Complete' : 'Incomplete') : '';
+    updateRowSummary(cid, sid, td.closest('tr'));
+    refreshSidebar();
+  }
+
   /* ── Score cycling ──────────────────────────────────────── */
   var seq = [3, 4, 0, 1, 2];
   function cycleScore(td) {
@@ -1601,6 +1685,10 @@ window.PageGradebook = (function () {
     var assess = getAssessments(cid).find(function (a) {
       return a.id === aid;
     });
+    if (isCompletionScored(assess)) {
+      setCellCompletion(td, nextCompletionMark(getCompletionMark(cid, sid, aid)));
+      return;
+    }
     if (assess && assess.scoreMode === 'points') {
       showPointsInput(td, assess);
       return;
@@ -1791,7 +1879,7 @@ window.PageGradebook = (function () {
       '</select></div>' +
       '</div>' +
       '<div class="gb-add-row">' +
-      '<div class="gb-add-field"><label>Score Mode</label><select id="gb-new-scoremode"><option value="proficiency">Proficiency (1-4)</option><option value="points">Points</option></select></div>' +
+      '<div class="gb-add-field"><label>Score Mode</label><select id="gb-new-scoremode"><option value="proficiency">Proficiency (1-4)</option><option value="points">Points</option><option value="complete">Complete/Incomplete</option></select></div>' +
       '<div class="gb-add-field" id="gb-new-pts-wrap" style="display:none"><label>Max Points</label><input type="number" id="gb-new-maxpts" value="100" min="1"></div>' +
       '</div>' +
       (categories.length === 0
@@ -1887,6 +1975,9 @@ window.PageGradebook = (function () {
     if (scoreMode === 'points') {
       newAssess.scoreMode = 'points';
       newAssess.maxPoints = maxPoints;
+    } else if (scoreMode === 'complete') {
+      newAssess.scoreMode = 'complete';
+      newAssess.maxPoints = COMPLETE_MAX_POINTS;
     }
     assessments.push(newAssess);
     saveAssessments(cid, assessments);
@@ -2186,6 +2277,12 @@ window.PageGradebook = (function () {
       return a.id === aid;
     });
     if (!assess) return;
+    if (isCompletionScored(assess)) {
+      setCompletionMark(cid, sid, aid, nextCompletionMark(getCompletionMark(cid, sid, aid)));
+      clearProfCache();
+      render();
+      return;
+    }
     var tagIds = assess.tagIds || [];
     var studentScores = getScores(cid)[sid] || [];
     // Get current average for display
@@ -2464,6 +2561,12 @@ window.PageGradebook = (function () {
       e.preventDefault();
       if (focused.dataset.pts !== '1') toggleCellMod(focused, e.key === '+' || e.key === '=' ? 1 : -1);
       return;
+    } else if (focused.dataset.cmp === '1' && ['c', 'C', '1', 'i', 'I', 'x', 'X'].includes(e.key)) {
+      // Complete/Incomplete cell: C or 1 marks Complete, I or X marks Incomplete.
+      e.preventDefault();
+      setCellCompletion(focused, ['c', 'C', '1'].includes(e.key) ? 'complete' : 'incomplete');
+      kbAdvanceDown(table, focused);
+      return;
     } else if (['1', '2', '3', '4', '5', '6', '7', '8', '9'].includes(e.key)) {
       var ptsAssess = focused.dataset.aid
         ? getAssessments(activeCourse).find(function (a) {
@@ -2519,6 +2622,10 @@ window.PageGradebook = (function () {
       var aid = focused.dataset.aid;
       var tid = focused.dataset.tid;
       var sid = focused.dataset.sid;
+      if (aid && sid && focused.dataset.cmp === '1') {
+        setCellCompletion(focused, null);
+        return;
+      }
       if (aid && sid) {
         if (focused.dataset.pts === '1') {
           setPointsScore(activeCourse, sid, aid, 0);

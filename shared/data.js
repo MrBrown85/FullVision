@@ -1793,7 +1793,7 @@ async function _hydrateAssessmentDetails(cid) {
         var status = cell.score && cell.score.status;
         if (status) statuses[sid + ':' + merged.id] = status;
 
-        var tagScores = merged.scoreMode === 'points' ? [] : cell.tag_scores || cell.tagScores || [];
+        var tagScores = isPointsScored(merged) ? [] : cell.tag_scores || cell.tagScores || [];
         (tagScores || []).forEach(function (tagScore) {
           var tagId = tagScore && (tagScore.tag_id || tagScore.tagId);
           if (!tagId) return;
@@ -1815,7 +1815,7 @@ async function _hydrateAssessmentDetails(cid) {
             );
           });
         });
-        if (cell.score && cell.score.value != null && (tagScores.length === 0 || merged.scoreMode === 'points')) {
+        if (cell.score && cell.score.value != null && (tagScores.length === 0 || isPointsScored(merged))) {
           var fallbackTag = (merged.tagIds && merged.tagIds[0]) || '';
           _pushHydratedScore(
             scores,
@@ -2003,8 +2003,8 @@ function _v2GradebookToCache(cid, payload) {
       tag_ids: tIds,
       scoreMode: sMode,
       score_mode: sMode,
-      maxPoints: maxPts,
-      max_points: maxPts,
+      maxPoints: sMode === 'complete' ? COMPLETE_MAX_POINTS : maxPts,
+      max_points: sMode === 'complete' ? COMPLETE_MAX_POINTS : maxPts,
       weight: a.weight != null ? Number(a.weight) : 1,
       evidenceType: a.evidence_type || '',
       rubricId: a.rubric_id || '',
@@ -2584,7 +2584,7 @@ function _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note, mod) {
     var criterionForTag = criterion ? null : _rubricCriterionForTag(cid, assessment, tid);
     var assessmentTagIds = (assessment && (assessment.tagIds || assessment.tag_ids)) || [];
     var isAssessmentTag = assessmentTagIds.indexOf(tid) >= 0;
-    var isPoints = assessment && (assessment.scoreMode || assessment.score_mode) === 'points';
+    var isPoints = isPointsScored(assessment);
     var ops = [];
     var modifier = normalizeScoreMod(intVal, mod);
     if (criterion) {
@@ -2676,7 +2676,7 @@ function persistScoreDiffToCanonical(cid, prevBlob, nextBlob) {
   var pointsCellsSent = {};
   function firstForPointsCell(sid, aid) {
     var a = _assessmentById(cid, aid);
-    if (!a || (a.scoreMode || a.score_mode) !== 'points') return true;
+    if (!isPointsScored(a)) return true;
     var cell = sid + ':' + aid;
     if (pointsCellsSent[cell]) return false;
     pointsCellsSent[cell] = true;
@@ -2703,6 +2703,12 @@ function persistScoreDiffToCanonical(cid, prevBlob, nextBlob) {
     if (nextByKey[key]) return;
     var prev = prevByKey[key];
     if (!firstForPointsCell(prev.sid, prev.entry.assessmentId)) return;
+    // On a Complete/Incomplete assessment 0 means Incomplete, so a removed
+    // mark clears the value instead.
+    if (isCompletionScored(_assessmentById(cid, prev.entry.assessmentId))) {
+      window.upsertCellScore(cid, prev.sid, prev.entry.assessmentId, null);
+      return;
+    }
     _persistScoreToCanonical(cid, prev.sid, prev.entry.assessmentId, prev.entry.tagId, 0, '');
   });
 }
@@ -5497,6 +5503,21 @@ function getPointsScore(cid, sid, aid) {
   const entry = entries.find(e => e.assessmentId === aid && e.score > 0);
   return entry ? entry.score : 0;
 }
+/* Complete/Incomplete marks: 'complete', 'incomplete', or null when unmarked. */
+function getCompletionMark(cid, sid, aid) {
+  const entry = (getScores(cid)[sid] || []).find(e => e.assessmentId === aid);
+  if (!entry || entry.score == null) return null;
+  return Number(entry.score) > 0 ? 'complete' : 'incomplete';
+}
+function setCompletionMark(cid, sid, aid, mark) {
+  if (mark === 'complete') return setPointsScore(cid, sid, aid, COMPLETE_MAX_POINTS);
+  if (mark === 'incomplete') return setPointsScore(cid, sid, aid, 0);
+  const scores = getScores(cid);
+  const before = (scores[sid] || []).length;
+  scores[sid] = (scores[sid] || []).filter(e => e.assessmentId !== aid);
+  if (scores[sid].length !== before) saveScores(cid, scores);
+  return scores;
+}
 function setPointsScore(cid, sid, aid, rawScore) {
   const assess = getAssessments(cid).find(a => a.id === aid);
   if (!assess) return;
@@ -6945,6 +6966,8 @@ window.GB = {
   persistScoreDiffToCanonical,
   getPointsScore,
   setPointsScore,
+  getCompletionMark,
+  setCompletionMark,
   getActiveCourse,
   setActiveCourse,
   getFlags,

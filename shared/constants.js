@@ -323,6 +323,28 @@ function formatScoreLevel(level, mod) {
   return String(level) + scoreModSuffix(normalizeScoreMod(level, mod));
 }
 
+/* Complete/Incomplete assessments are scored like a 1-point assessment:
+   Complete = 1 (100%), Incomplete = 0 (0%), unmarked = no score. Every
+   calculation that handles points handles them through isPointsScored. */
+const COMPLETE_MAX_POINTS = 1;
+
+function isCompletionScored(assessment) {
+  return !!assessment && (assessment.scoreMode || assessment.score_mode) === 'complete';
+}
+
+function isPointsScored(assessment) {
+  var mode = assessment && (assessment.scoreMode || assessment.score_mode);
+  return mode === 'points' || mode === 'complete';
+}
+
+// Whether an entry counts as graded. Incomplete is stored as 0, which on
+// other assessments means no score.
+function isScoreEntered(assessment, entry) {
+  if (!entry) return false;
+  if (isCompletionScored(assessment)) return entry.score != null && entry.score !== '';
+  return Number(entry.score) > 0;
+}
+
 /* Category pill tint — soft pastel chip palette assigned by index.
    Categories rotate through CATEGORY_PALETTE in the order they were created
    (1st category → palette[0], 2nd → palette[1], …, 11th → palette[0] again).

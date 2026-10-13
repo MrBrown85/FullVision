@@ -2357,6 +2357,57 @@
   background-color: var(--score-1);
 }
 
+/* Complete / Incomplete marks */
+.cmp-col-header {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.cmp-fill-all {
+  margin-left: auto;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  cursor: pointer;
+}
+.cmp-cell {
+  flex: 1;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.cmp-btn {
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: all 0.12s var(--ease-out);
+}
+.cmp-btn.cmp-complete.active {
+  background: var(--score-3);
+  border-color: transparent;
+  color: #fff;
+}
+.cmp-btn.cmp-incomplete.active {
+  background: var(--score-1);
+  border-color: transparent;
+  color: #fff;
+}
+.score-row.has-status .cmp-cell {
+  opacity: 0.2;
+  pointer-events: none;
+}
+
 /* + / − beside the levels */
 .rsg-mods,
 .rsg-header-mod-spacer {

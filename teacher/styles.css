@@ -1958,6 +1958,16 @@ body.offline-active #app-dock {
   font-weight: 500;
   line-height: 1;
 }
+.gb-cmp {
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+.gb-cmp-complete {
+  color: var(--score-3);
+}
+.gb-cmp-incomplete {
+  color: var(--score-1);
+}
 .gb-pts-empty {
   font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
   color: var(--text-3);

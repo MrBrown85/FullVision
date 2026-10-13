@@ -325,7 +325,9 @@ window.ReportQuestionnaire = (function () {
         if (overall == null) return null;
         const r = Math.round(overall);
         let level;
-        if (a.scoreMode === 'points' && a.maxPoints > 0) {
+        if (isCompletionScored(a)) {
+          level = overall > 0 ? 'complete' : 'incomplete';
+        } else if (a.scoreMode === 'points' && a.maxPoints > 0) {
           const raw = studentScores
             .filter(sc => sc.assessmentId === aId && sc.score != null && sc.score !== '' && isFinite(Number(sc.score)))
             .map(sc => Number(sc.score));
@@ -1190,7 +1192,9 @@ window.ReportQuestionnaire = (function () {
             : null;
         if (overall == null) return null;
         let displayLabel;
-        if (a.scoreMode === 'points' && a.maxPoints > 0) {
+        if (isCompletionScored(a)) {
+          displayLabel = overall > 0 ? 'Complete' : 'Incomplete';
+        } else if (a.scoreMode === 'points' && a.maxPoints > 0) {
           const raw = studentScoresForPerf
             .filter(s => s.assessmentId === a.id && s.score != null && s.score !== '' && isFinite(Number(s.score)))
             .map(s => Number(s.score));

@@ -488,7 +488,7 @@ window.PageAssignments = (function () {
               var unscoredCount = students.filter(function (st) {
                 var sc = scores[st.id] || [];
                 return !sc.some(function (s) {
-                  return s.assessmentId === a.id && s.score > 0;
+                  return s.assessmentId === a.id && isScoreEntered(a, s);
                 });
               }).length;
               if (unscoredCount > 0)
@@ -551,16 +551,18 @@ window.PageAssignments = (function () {
                 return st.id === focusStudentId;
               })
             : students;
-          return a.scoreMode === 'points'
-            ? renderPointsGrid(cid, a, gridStudents, scores)
-            : a.rubricId && getRubricById(cid, a.rubricId)
-              ? (function () {
-                  var showRubric = rubricViewStates[a.id] !== undefined ? rubricViewStates[a.id] : true;
-                  return showRubric
-                    ? renderRubricGradingView(cid, a, gridStudents, scores)
-                    : renderTagGrid(cid, a, tagObjs, gridStudents, scores);
-                })()
-              : renderTagGrid(cid, a, tagObjs, gridStudents, scores);
+          return isCompletionScored(a)
+            ? renderCompletionGrid(cid, a, gridStudents)
+            : a.scoreMode === 'points'
+              ? renderPointsGrid(cid, a, gridStudents, scores)
+              : a.rubricId && getRubricById(cid, a.rubricId)
+                ? (function () {
+                    var showRubric = rubricViewStates[a.id] !== undefined ? rubricViewStates[a.id] : true;
+                    return showRubric
+                      ? renderRubricGradingView(cid, a, gridStudents, scores)
+                      : renderTagGrid(cid, a, tagObjs, gridStudents, scores);
+                  })()
+                : renderTagGrid(cid, a, tagObjs, gridStudents, scores);
         })() +
         '</div>' +
         '</div>';
@@ -765,7 +767,7 @@ window.PageAssignments = (function () {
           var sc = scores[st.id] || [];
           return !(a.tagIds || []).every(function (tid) {
             return sc.some(function (s) {
-              return s.assessmentId === a.id && s.tagId === tid && s.score > 0;
+              return s.assessmentId === a.id && s.tagId === tid && isScoreEntered(a, s);
             });
           });
         });
@@ -1016,6 +1018,9 @@ window.PageAssignments = (function () {
       '<button type="button" class="af-type-btn af-scoremode-btn' +
       (scoreMode === 'points' ? ' active' : '') +
       '" data-mode="points" data-action="setScoreMode">Points</button>' +
+      '<button type="button" class="af-type-btn af-scoremode-btn' +
+      (scoreMode === 'complete' ? ' active' : '') +
+      '" data-mode="complete" data-action="setScoreMode">Complete/Incomplete</button>' +
       '</div>' +
       '</div>' +
       '<div class="af-field" id="af-maxpoints-wrap" style="flex:0 0 auto;' +
@@ -1382,6 +1387,9 @@ window.PageAssignments = (function () {
       }
       newAssess.scoreMode = 'points';
       newAssess.maxPoints = mp;
+    } else if (scoreModeVal === 'complete') {
+      newAssess.scoreMode = 'complete';
+      newAssess.maxPoints = COMPLETE_MAX_POINTS;
     }
     var assessWeight = parseFloat((document.getElementById('af-weight') || {}).value) || 1;
     if (assessWeight !== 1) newAssess.weight = assessWeight;
@@ -1480,6 +1488,9 @@ window.PageAssignments = (function () {
       }
       assessments[idx].scoreMode = 'points';
       assessments[idx].maxPoints = mp;
+    } else if (scoreModeVal === 'complete') {
+      assessments[idx].scoreMode = 'complete';
+      assessments[idx].maxPoints = COMPLETE_MAX_POINTS;
     } else {
       assessments[idx].scoreMode = undefined;
       assessments[idx].maxPoints = undefined;
@@ -1600,6 +1611,104 @@ window.PageAssignments = (function () {
   }
 
   /* ── Scoring Functions ──────────────────────────────────── */
+  function completionButtonsHtml(aid, sid, mark) {
+    return ['complete', 'incomplete']
+      .map(function (m) {
+        return (
+          '<button type="button" class="cmp-btn cmp-' +
+          m +
+          (mark === m ? ' active' : '') +
+          '" data-action="setCompletion" data-mark="' +
+          m +
+          '" data-aid="' +
+          aid +
+          '" data-sid="' +
+          sid +
+          '">' +
+          (m === 'complete' ? '\u2713 Complete' : '\u2717 Incomplete') +
+          '</button>'
+        );
+      })
+      .join('');
+  }
+
+  function renderCompletionGrid(cid, a, students) {
+    var statuses = getAssignmentStatuses(cid);
+    var html =
+      '<div class="score-grid cmp-grid">' +
+      '<div class="score-grid-header">' +
+      '<div class="score-grid-header-name">Student</div>' +
+      '<div class="score-col-header cmp-col-header"><span class="score-col-header-id">Mark</span>' +
+      '<button type="button" class="cmp-fill-all" data-action="confirmFillCompletion" data-aid="' +
+      a.id +
+      '">Mark the rest Complete</button></div>' +
+      '<div class="score-row-action"></div>' +
+      '</div>';
+    students.forEach(function (st) {
+      var stStatus = statuses[st.id + ':' + a.id] || null;
+      var disableRow = stStatus && stStatus !== 'LATE';
+      html +=
+        '<div class="score-row' +
+        (disableRow ? ' has-status' : '') +
+        (stStatus === 'LATE' ? ' has-late' : '') +
+        '" data-status-student="' +
+        st.id +
+        '" data-status-assess="' +
+        a.id +
+        '">' +
+        '<span class="score-name">' +
+        esc(displayName(st)) +
+        renderStatusToggles(a.id, st.id, stStatus) +
+        '</span>' +
+        '<div class="cmp-cell">' +
+        completionButtonsHtml(a.id, st.id, getCompletionMark(cid, st.id, a.id)) +
+        '</div>' +
+        '<div class="score-row-action"></div>' +
+        '</div>';
+    });
+    html += '</div>';
+    return html;
+  }
+
+  // Clicking the active mark again clears it.
+  function setCompletion(el) {
+    var cid = activeCourse;
+    var aid = el.dataset.aid;
+    var sid = el.dataset.sid;
+    var next = getCompletionMark(cid, sid, aid) === el.dataset.mark ? null : el.dataset.mark;
+    setCompletionMark(cid, sid, aid, next);
+    var cell = el.closest('.cmp-cell');
+    if (cell) cell.innerHTML = completionButtonsHtml(aid, sid, next);
+    refreshSidebar();
+  }
+
+  function confirmFillCompletion(aid) {
+    showConfirm(
+      'Mark the Rest Complete',
+      'Mark every unmarked student Complete?',
+      'Mark Complete',
+      'primary',
+      function () {
+        var cid = activeCourse;
+        var prevScores = structuredClone(getScores(cid));
+        var statuses = getAssignmentStatuses(cid);
+        getStudents(cid).forEach(function (st) {
+          if (statuses[st.id + ':' + aid] || getCompletionMark(cid, st.id, aid)) return;
+          setCompletionMark(cid, st.id, aid, 'complete');
+        });
+        render();
+        refreshSidebar();
+        showUndoToast('Marked Complete', function () {
+          var beforeScores = getScores(cid);
+          saveScores(cid, prevScores);
+          if (getScores(cid) === prevScores) persistScoreDiffToCanonical(cid, beforeScores, prevScores);
+          render();
+          refreshSidebar();
+        });
+      },
+    );
+  }
+
   function renderPointsGrid(cid, a, students, scores) {
     var max = a.maxPoints || 100;
     var statuses = getAssignmentStatuses(cid);
@@ -1802,7 +1911,7 @@ window.PageAssignments = (function () {
       var ptsInput = row.querySelector('.gb-pts-input');
       if (ptsInput) ptsInput.disabled = disableScoring;
       if (newStatus === 'NS') {
-        row.querySelectorAll('.score-opt, .rsg-level').forEach(function (el) {
+        row.querySelectorAll('.score-opt, .rsg-level, .cmp-btn').forEach(function (el) {
           el.classList.remove('active', 'mixed');
         });
         row.querySelectorAll('.rsg-criterion-row').forEach(syncModRow);
@@ -3767,6 +3876,12 @@ window.PageAssignments = (function () {
       },
       setScoreMod: function () {
         setScoreMod(el, parseInt(el.dataset.mod, 10));
+      },
+      setCompletion: function () {
+        setCompletion(el);
+      },
+      confirmFillCompletion: function () {
+        confirmFillCompletion(el.dataset.aid);
       },
       toggleScoreMenu: function () {
         toggleScoreMenu(el);
