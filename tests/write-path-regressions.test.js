@@ -17,6 +17,8 @@
  *                                   saveLearningMap only
  *   Phase 4 (realtime)            — a refresh waits for in-flight writes and
  *                                   never overwrites an edit made during it
+ *   Phase 5 (sends)               — only changed rubrics are sent; unchanged
+ *                                   categories and their order aren't re-sent
  */
 import './setup.js';
 import { beforeEach, afterEach, describe, expect, it } from 'vitest';
@@ -42,6 +44,8 @@ const TAG1 = '77777777-7777-4777-8777-777777777777';
 const TAG2 = '88888888-8888-4888-8888-888888888888';
 const NOTE = '99999999-9999-4999-8999-999999999999';
 const AID2 = 'abababab-abab-4bab-8bab-abababababab';
+const CAT1 = 'dededede-dede-4ede-8ede-dededededed1';
+const CAT2 = 'dededede-dede-4ede-8ede-dededededed2';
 
 function seed(field, value) {
   _cache[field][CID] = value;
@@ -423,5 +427,53 @@ describe('write-path regressions (Phase 0)', () => {
     await _handleExternalCourseUpdate(CID, 'gradebook');
 
     expect(getAssessments(CID).map(a => a.title)).toEqual(['Added on another device']);
+  });
+  // ── Phase 5 ────────────────────────────────────────────────────────────
+
+  const RUB1 = 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdc1';
+  const RUB2 = 'cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdc2';
+  const CRIT1 = 'cececece-cece-4ece-8ece-cececececec1';
+  const CRIT2 = 'cececece-cece-4ece-8ece-cececececec2';
+
+  function rubric(id, critId, name) {
+    return { id: id, name: name, criteria: [{ id: critId, name: 'Evidence', levels: { 4: 'Strong' }, tagIds: [] }] };
+  }
+
+  it('sends only the rubric that changed, without reloading', async () => {
+    _persistLoadedField(CID, 'rubrics', [rubric(RUB1, CRIT1, 'Lab'), rubric(RUB2, CRIT2, 'Essay')]);
+    var rubrics = structuredClone(getRubrics(CID));
+    rubrics[1].name = 'Persuasive essay';
+
+    await saveRubrics(CID, rubrics);
+
+    expect(fake.count('upsert_rubric')).toBe(1);
+    expect(fake.calls.find(c => c.name === 'upsert_rubric').params.p_id).toBe(RUB2);
+  });
+
+  it('does not re-send unchanged categories or their order', async () => {
+    var rows = [
+      { id: CAT1, name: 'Tests', weight: 60, displayOrder: 0 },
+      { id: CAT2, name: 'Labs', weight: 40, displayOrder: 1 },
+    ];
+    _persistLoadedField(CID, 'categories', rows);
+
+    saveCategories(CID, structuredClone(rows));
+    await settle();
+    expect(fake.calls).toHaveLength(0);
+
+    var reordered = [structuredClone(rows[1]), structuredClone(rows[0])];
+    saveCategories(CID, reordered);
+    await settle();
+    expect(fake.count('reorder_categories')).toBe(1);
+  });
+
+  it('takes class-manager category rows into the cache without sending them again', async () => {
+    var rows = [{ id: CAT1, name: 'Tests', weight: 100, displayOrder: 0 }];
+    adoptCategoriesFromServer(CID, rows);
+    saveCategories(CID, structuredClone(rows));
+    await settle();
+
+    expect(getCategories(CID)).toEqual(rows);
+    expect(fake.calls).toHaveLength(0);
   });
 });

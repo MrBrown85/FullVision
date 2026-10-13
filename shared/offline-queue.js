@@ -319,6 +319,15 @@
     }
   }
 
+  /* A delete whose row is already gone (deleted elsewhere, or by an earlier
+     attempt whose response was lost) has done its job. Seed observation
+     templates also report "not found" but genuinely can't be deleted. */
+  function _isGoneOnDelete(entry, res) {
+    var err = res && res.error;
+    if (!err || !/^delete_/.test(entry.endpoint) || entry.endpoint === 'delete_observation_template') return false;
+    return err.code === 'P0002' || /not found/i.test(err.message || '');
+  }
+
   function _errorText(res) {
     var err = res && res.error;
     if (!err) return 'unknown error';
@@ -345,6 +354,7 @@
   function _settle(entry, res) {
     delete _inFlight[entry.id];
     _counts.processed++;
+    if (_isGoneOnDelete(entry, res)) res = { data: null, error: null };
     if (res && !res.error) {
       var q = _removeEntry(entry.id);
       q.last_flush_at = new Date().toISOString();

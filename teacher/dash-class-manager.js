@@ -2196,8 +2196,10 @@ window.DashClassManager = (function () {
   // page-gradebook / shared/calc.js all read from. Without this, a category
   // added or deleted in the same session is invisible to those readers
   // until the next sign-in (which re-hydrates via get_gradebook).
+  // The class manager is the one writer for its category edits; this only
+  // brings the cache in line with what it already sent.
   function _cmMirrorCategoriesToCache(cid) {
-    if (!cid || typeof saveCategories !== 'function') return;
+    if (!cid || typeof adoptCategoriesFromServer !== 'function') return;
     var st = _cmCatState(cid);
     var camelRows = (st.rows || []).map(function (r) {
       return {
@@ -2207,7 +2209,7 @@ window.DashClassManager = (function () {
         displayOrder: Number(r.display_order) || 0,
       };
     });
-    saveCategories(cid, camelRows);
+    adoptCategoriesFromServer(cid, camelRows);
   }
 
   function _cmLoadCategories(cid) {

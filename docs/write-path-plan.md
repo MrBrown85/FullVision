@@ -1,6 +1,6 @@
 # Write-path rebuild plan
 
-Status: Phases 0–3 done (#118–#121); Phase 4 in review (2026-10-12). Replaces the whole-array save model in `shared/data.js` with a durable outbox of single-record operations.
+Status: Phases 0–4 done (#118–#122); Phase 5 in review (2026-10-12). Replaces the whole-array save model in `shared/data.js` with a durable outbox of single-record operations.
 
 ## Why
 
@@ -124,22 +124,16 @@ Rebuild `shared/offline-queue.js` as the only path to the server for writes.
 
 **Done:** a score entered while a refresh is fetching survives it and reaches the server, and the test fails with the guard disabled. A refresh waits for in-flight writes. A refresh with no local edits applies the server's changes.
 
-### Phase 5: explicit actions per data type — large, incremental
+### Phase 5: stop the remaining over-sends — small (done; scope changed)
 
-Replace `saveX(cid, wholeArray)` call sites with actions that push one operation each (`addStudent`, `updateStudent`, `renameSection`, `moveSectionToGroup` …). Order by risk and call-site count:
+The original goal was to replace every `saveX(cid, wholeArray)` call with explicit per-row actions, mainly to cut traffic. Phases 2–3 already did most of that. Each save of students, assessments, modules, categories, notes, the learning map, scores or statuses now diffs against the server baseline and sends only the rows that changed. Rewriting ~60 call sites into explicit actions would change the code's shape without reducing traffic or fixing a bug, so it isn't planned. Phase 5 instead fixed the places that still sent more than they changed:
 
-| Order | Data type       | Call sites                                | Notes                                                                              |
-| ----- | --------------- | ----------------------------------------- | ---------------------------------------------------------------------------------- |
-| 1     | Learning map    | 26, almost all in `dash-class-manager.js` | Heaviest traffic; each blur currently diffs the whole map                          |
-| 2     | Students        | 5 UI, 4 shared                            | Add, edit, bulk edit, import, delete                                               |
-| 3     | Assessments     | 11 UI, 7 shared                           | Includes collab, tags and rubric links                                             |
-| 4     | Modules         | 6                                         | Create, rename, recolour, reorder, merge, delete                                   |
-| 5     | Rubrics         | 1 UI, 4 shared                            | Criteria edits become per-criterion operations                                     |
-| 6     | Categories      | 1 UI, 3 shared                            | Weight edits and reorder                                                           |
-| 7     | Statuses, notes | 3 + 1                                     | Already close to per-action                                                        |
-| 8     | Scores          | 9 UI                                      | `upsertScore` is already per-action; route through the outbox, serialized per cell |
+- **Rubrics.** Every rubric save re-sent every rubric in the course (each `upsert_rubric` rewrites its criteria and criterion-tag links), then reloaded them all. Against a baseline, only changed rubrics are sent, and the reload runs only when something was inserted (a new rubric or criterion needs its server id).
+- **Categories in the class manager.** These were written twice, like the learning map was. The class manager wrote each edit directly, then `saveCategories` sent it again, and a delete ran twice. It's now the only writer; `adoptCategoriesFromServer` updates the cache and baseline without sending.
+- **Category order.** `saveCategories` sent `reorder_categories` on every save, including each time the class manager loaded categories. It now does so only when the order changed.
+- **Deletes.** Since Phase 1, a delete whose row was already gone (deleted elsewhere, or a retry after a lost response) landed in the failed list. The outbox now treats "not found" on a `delete_*` as done. The exception is seed observation templates, which report "not found" because they can't be deleted.
 
-As each data type finishes, delete its `saveX` shim and diff code. Flags, goals, reflections, overrides and observations already write per action; they only need moving onto the outbox in Phase 1.
+**Done:** tests cover the single-rubric save, unchanged categories and order, class-manager categories not being re-sent, and idempotent deletes. In a real browser, opening class-manager categories sent no writes, and a weight edit sent one `upsert_category`.
 
 ### Phase 6: cleanup — small
 
