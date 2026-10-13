@@ -11,23 +11,6 @@
 
 /* Sidebar toggle hidden via JS in page-gradebook.js init() */
 
-.gb-welcome-banner {
-  gap: 12px;
-  flex-shrink: 0;
-}
-
-.gb-welcome-banner .focus-banner-label {
-  flex: 1;
-  line-height: 1.4;
-}
-
-.gb-welcome-banner-dismiss {
-  min-width: 34px;
-  padding: 4px 10px;
-  font-size: 20px;
-  line-height: 1;
-}
-
 /* ── Oversized course selector (replaces sidebar on gradebook) ── */
 .gb-course-select {
   font-family: var(--font-base);

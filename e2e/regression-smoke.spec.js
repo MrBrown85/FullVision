@@ -11,9 +11,7 @@ test.describe('Regression smoke (P1.2)', () => {
     await mockPersistentAuthFlow(page);
   });
 
-  test('sign-up -> sign-in -> welcome class -> enter score -> sign-out -> sign-in -> score survives', async ({
-    page,
-  }) => {
+  test('sign-up -> sign-in -> class -> enter score -> sign-out -> sign-in -> score survives', async ({ page }) => {
     const email = `smoke-${Date.now()}@example.com`;
     const password = 'test1234!';
     const teacherName = 'Smoke Tester';
@@ -42,11 +40,10 @@ test.describe('Regression smoke (P1.2)', () => {
     await page.locator('#form-signin button[type="submit"]').click();
 
     await page.waitForURL(/\/teacher\/app/);
-    await expect(page.getByRole('combobox', { name: 'Select course' })).toHaveValue(SMOKE_WELCOME_COURSE.id);
-
     await page.evaluate(courseId => {
       window.location.hash = '#/gradebook?course=' + courseId;
     }, SMOKE_WELCOME_COURSE.id);
+    await expect(page.getByRole('combobox', { name: 'Select course' })).toHaveValue(SMOKE_WELCOME_COURSE.id);
     await expect(scoreCell).toBeVisible();
 
     await scoreCell.click();

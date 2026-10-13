@@ -508,6 +508,9 @@ window.PageDashboard = (function () {
     CM.initDrag();
 
     render();
+    // A teacher with no classes yet starts in the class manager's
+    // "Create a Class" screen.
+    if (!activeCourse && Object.keys(COURSES).length === 0) CM.openClassManager();
 
     // Ensure page starts at top
     requestAnimationFrame(function () {

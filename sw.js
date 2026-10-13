@@ -20,7 +20,6 @@ const PRECACHE_URLS = [
   '/shared/constants.js',
   '/shared/data.js',
   '/shared/offline-queue.js',
-  '/shared/demo-seed.js',
   '/shared/calc.js',
   // Teacher desktop
   '/teacher/app.html',

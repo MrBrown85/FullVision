@@ -42,17 +42,6 @@ window.Router = (function () {
   var _currentPage = null;
   var _booted = false;
 
-  function _consumeBootstrapRoute() {
-    try {
-      var hinted = localStorage.getItem('gb-post-bootstrap-route');
-      if (!hinted) return null;
-      localStorage.removeItem('gb-post-bootstrap-route');
-      return hinted.charAt(0) === '#' ? hinted.slice(1) : hinted;
-    } catch (e) {
-      return null;
-    }
-  }
-
   function _flushPendingEdits() {
     var active = document.activeElement;
     if (!active || typeof active.blur !== 'function') return;
@@ -206,7 +195,7 @@ window.Router = (function () {
 
     // Set default hash if none, then trigger initial route
     if (!location.hash || location.hash === '#' || location.hash === '#/') {
-      navigate(_consumeBootstrapRoute() || '/dashboard', true);
+      navigate('/dashboard', true);
     } else {
       _onRoute();
     }
