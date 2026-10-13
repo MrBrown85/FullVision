@@ -550,6 +550,7 @@ window.MGrade = (function () {
         return s.assessmentId === assessment.id && s.tagId === tid;
       });
       var current = existing.length ? existing[existing.length - 1].score : null;
+      var currentMod = existing.length ? normalizeScoreMod(current, existing[existing.length - 1].mod) : 0;
 
       if (isPoints && assessment.maxPoints) {
         // Points mode
@@ -630,6 +631,15 @@ window.MGrade = (function () {
           '">' +
           btns +
           '</div>' +
+          '<div class="m-score-mods" data-sid="' +
+          st.id +
+          '" data-aid="' +
+          assessment.id +
+          '" data-tid="' +
+          tid +
+          '">' +
+          _modBtnsHtml(current, currentMod) +
+          '</div>' +
           '</div>';
       }
     });
@@ -672,6 +682,67 @@ window.MGrade = (function () {
       statusRow +
       '</div></div>'
     );
+  }
+
+  /* ── + / − on a level ──────────────────────────────────────── */
+  function _modBtnsHtml(level, mod) {
+    return [-1, 1]
+      .map(function (m) {
+        var allowed = level > 0 && normalizeScoreMod(level, m) === m;
+        return (
+          '<button class="m-mod-btn' +
+          (allowed && mod === m ? ' m-mod-active' : '') +
+          '" data-action="m-grade-mod" data-mod="' +
+          m +
+          '" aria-label="' +
+          (m > 0 ? 'Plus' : 'Minus') +
+          '"' +
+          (allowed ? '' : ' disabled') +
+          '>' +
+          scoreModSuffix(m) +
+          '</button>'
+        );
+      })
+      .join('');
+  }
+
+  function _currentEntry(cid, sid, aid, tid) {
+    var matches = (getScores(cid)[sid] || []).filter(function (s) {
+      return s.assessmentId === aid && s.tagId === tid;
+    });
+    return matches.length ? matches[matches.length - 1] : null;
+  }
+
+  function _syncModBtns(cid, sid, aid, tid) {
+    var box = document.querySelector(
+      '.m-swiper-card[data-sid="' + sid + '"] .m-score-mods[data-aid="' + aid + '"][data-tid="' + tid + '"]',
+    );
+    if (!box) return;
+    var e = _currentEntry(cid, sid, aid, tid);
+    var level = e ? e.score : 0;
+    box.innerHTML = _modBtnsHtml(level, e ? normalizeScoreMod(level, e.mod) : 0);
+  }
+
+  // Tapping the active + or − again clears it.
+  function setScoreMod(cid, sid, aid, tid, mod) {
+    var e = _currentEntry(cid, sid, aid, tid);
+    if (!e || !(e.score > 0)) return;
+    var next = normalizeScoreMod(e.score, e.mod) === mod ? 0 : mod;
+    if (normalizeScoreMod(e.score, next) !== next) return;
+    _undoStack.push({ cid: cid, sid: sid, aid: aid, tid: tid, prev: [JSON.parse(JSON.stringify(e))] });
+    if (_undoStack.length > 20) _undoStack.shift();
+    var assessment = getAssessments(cid).find(function (a) {
+      return a.id === aid;
+    });
+    var type = assessment
+      ? getAssessmentCategoryId(assessment)
+        ? 'summative'
+        : assessment.type || 'formative'
+      : 'summative';
+    upsertScore(cid, sid, aid, tid, e.score, assessment ? assessment.date : getTodayStr(), type, e.note || '', next);
+    clearProfCache();
+    MC.haptic();
+    _syncModBtns(cid, sid, aid, tid);
   }
 
   /* ── Score a student (auto-save) ────────────────────────────── */
@@ -717,6 +788,7 @@ window.MGrade = (function () {
         btn.classList.toggle('m-score-active', parseInt(btn.getAttribute('data-score')) === score);
       });
     }
+    _syncModBtns(cid, sid, aid, tid);
 
     // Update thumbnail graded state
     _updateThumbGraded(cid, aid);
@@ -781,6 +853,9 @@ window.MGrade = (function () {
         card.querySelectorAll('.m-score-btn[data-aid="' + aid + '"]').forEach(function (btn) {
           btn.classList.remove('m-score-active');
         });
+        card.querySelectorAll('.m-score-mods[data-aid="' + aid + '"]').forEach(function (box) {
+          box.innerHTML = _modBtnsHtml(0, 0);
+        });
       }
       // Dim the score rows when the assessment is flagged NS or EXC (not
       // LATE, which doesn't disable grading). Mirrors desktop .has-status.
@@ -825,6 +900,7 @@ window.MGrade = (function () {
         btn.classList.toggle('m-score-active', lastScore !== null && Math.round(lastScore) === lvl);
       });
     }
+    _syncModBtns(entry.cid, entry.sid, entry.aid, entry.tid);
     _updateThumbGraded(entry.cid, entry.aid);
     MC.showToast('Score reverted');
   }
@@ -920,6 +996,7 @@ window.MGrade = (function () {
     clearFilterSheet: clearFilterSheet,
     renderSwiper: renderSwiper,
     setScore: setScore,
+    setScoreMod: setScoreMod,
     setStatus: setStatus,
     adjustPointsScore: adjustPointsScore,
     undoLastScore: undoLastScore,

@@ -61,9 +61,9 @@ window.MStudentDetail = (function () {
         timelineHtml +=
           '<div class="m-sec-tl-item">' +
           '<div class="m-sec-tl-dot" style="background:' +
-          MC.profBg(s.score) +
+          MC.profBg(s.level || s.score) +
           '">' +
-          s.score +
+          (s.level ? formatScoreLevel(s.level, s.mod) : s.score) +
           '</div>' +
           '<div class="m-sec-tl-info">' +
           '<div class="m-sec-tl-name">' +
@@ -72,7 +72,7 @@ window.MStudentDetail = (function () {
           '<div class="m-sec-tl-date">' +
           shortDate +
           ' · ' +
-          PROF_LABELS[s.score] +
+          PROF_LABELS[Math.round(s.score)] +
           '</div>' +
           '</div>' +
           '</div>';
@@ -90,23 +90,23 @@ window.MStudentDetail = (function () {
       if (allSame) {
         insightHtml =
           '<div class="m-sec-insight">Consistently <strong>' +
-          PROF_LABELS[first] +
+          PROF_LABELS[Math.round(first)] +
           '</strong> across ' +
           allEvidenceScores.length +
           ' assessments</div>';
       } else if (last > first) {
         insightHtml =
           '<div class="m-sec-insight m-sec-insight-up">Improving from <strong>' +
-          PROF_LABELS[first] +
+          PROF_LABELS[Math.round(first)] +
           '</strong> → <strong>' +
-          PROF_LABELS[last] +
+          PROF_LABELS[Math.round(last)] +
           '</strong></div>';
       } else if (last < first) {
         insightHtml =
           '<div class="m-sec-insight m-sec-insight-down">Dropped from <strong>' +
-          PROF_LABELS[first] +
+          PROF_LABELS[Math.round(first)] +
           '</strong> → <strong>' +
-          PROF_LABELS[last] +
+          PROF_LABELS[Math.round(last)] +
           '</strong></div>';
       }
     } else if (allEvidenceScores.length === 0) {

@@ -56,11 +56,11 @@ window.DashStudentCards = (function () {
           var mid = Math.floor(allSc.length / 2);
           var earlyAvg =
             allSc.slice(0, mid).reduce(function (a, b) {
-              return a + b.score;
+              return a + scoreModValue(b);
             }, 0) / mid;
           var lateAvg =
             allSc.slice(mid).reduce(function (a, b) {
-              return a + b.score;
+              return a + scoreModValue(b);
             }, 0) /
             (allSc.length - mid);
           if (lateAvg > earlyAvg + 0.2) trend = 'up';

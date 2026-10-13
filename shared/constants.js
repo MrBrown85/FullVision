@@ -289,6 +289,40 @@ const BC_DESIGNATIONS = {
 
 const PROF_LABELS = { 0: 'No Evidence', 1: 'Emerging', 2: 'Developing', 3: 'Proficient', 4: 'Extending' };
 
+/* ── + and − on proficiency levels ───────────────────────────────────────
+   A score entry keeps its whole-number level in `score` and its + or − in
+   `mod` (1 or −1). A + or − is worth a third of a level (3+ = 3.33); 1− and
+   4+ don't exist, so values stay within 1–4. */
+const SCORE_MOD_STEP = 1 / 3;
+
+// The modifier a level can actually carry: −1, 0 or 1, never on 0, 1− or 4+.
+function normalizeScoreMod(level, mod) {
+  var m = Number(mod) > 0 ? 1 : Number(mod) < 0 ? -1 : 0;
+  var lv = Number(level);
+  if (!m || !(lv >= 1 && lv <= 4)) return 0;
+  if ((lv === 1 && m < 0) || (lv === 4 && m > 0)) return 0;
+  return m;
+}
+
+// The value an entry counts as in averages. Entries from getTagScores already
+// carry it in `score` (with the whole level in `level`).
+function scoreModValue(entry) {
+  if (!entry) return 0;
+  if (entry.level != null) return Number(entry.score) || 0;
+  var level = Number(entry.score) || 0;
+  return level + normalizeScoreMod(level, entry.mod) * SCORE_MOD_STEP;
+}
+
+function scoreModSuffix(mod) {
+  return mod > 0 ? '+' : mod < 0 ? '\u2212' : '';
+}
+
+// "3+", "2−", "4" — the level as teachers write it.
+function formatScoreLevel(level, mod) {
+  if (!(level > 0)) return '';
+  return String(level) + scoreModSuffix(normalizeScoreMod(level, mod));
+}
+
 /* Category pill tint — soft pastel chip palette assigned by index.
    Categories rotate through CATEGORY_PALETTE in the order they were created
    (1st category → palette[0], 2nd → palette[1], …, 11th → palette[0] again).

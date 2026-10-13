@@ -263,7 +263,7 @@ window.MCardWidgets = (function () {
       return (
         '<div class="m-wdg-growth">' +
         '<span class="m-wdg-growth-label">' +
-        (PROF_LABELS[onlyScore] || 'No Evidence') +
+        (PROF_LABELS[Math.round(onlyScore)] || 'No Evidence') +
         '</span>' +
         '<span class="m-wdg-growth-meta"> \u2014 1 assessment</span>' +
         '</div>'
@@ -287,7 +287,7 @@ window.MCardWidgets = (function () {
     return (
       '<div class="m-wdg-growth">' +
       '<span class="m-wdg-growth-label">' +
-      (PROF_LABELS[firstScore] || 'No Evidence') +
+      (PROF_LABELS[Math.round(firstScore)] || 'No Evidence') +
       '</span>' +
       '<span class="m-wdg-growth-arrow" style="color:' +
       arrowColor +
@@ -295,7 +295,7 @@ window.MCardWidgets = (function () {
       arrowChar +
       '</span>' +
       '<span class="m-wdg-growth-label">' +
-      (PROF_LABELS[lastScore] || 'No Evidence') +
+      (PROF_LABELS[Math.round(lastScore)] || 'No Evidence') +
       '</span>' +
       '<span class="m-wdg-growth-meta"> (' +
       allEvidenceScores.length +

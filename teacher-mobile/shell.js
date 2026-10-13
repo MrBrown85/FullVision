@@ -770,6 +770,18 @@
         return;
       }
 
+      if (action === 'm-grade-mod') {
+        var modBox = target.closest('.m-score-mods');
+        MGrade.setScoreMod(
+          _cid,
+          modBox.getAttribute('data-sid'),
+          modBox.getAttribute('data-aid'),
+          modBox.getAttribute('data-tid'),
+          parseInt(target.closest('[data-mod]').getAttribute('data-mod'), 10),
+        );
+        return;
+      }
+
       if (action === 'm-grade-points-inc' || action === 'm-grade-points-dec') {
         var pBtn = target.closest('[data-sid]');
         var delta = action === 'm-grade-points-inc' ? 1 : -1;

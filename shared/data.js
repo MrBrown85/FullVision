@@ -2010,8 +2010,8 @@ function _pushHydratedScore(scores, sid, entry) {
   else scores[sid].push(entry);
 }
 
-function _scoreEntryFromCanonical(cid, assessment, tagId, value, comment) {
-  return {
+function _scoreEntryFromCanonical(cid, assessment, tagId, value, comment, modifier) {
+  var entry = {
     id: [assessment.id, tagId || 'overall', Date.now().toString(36)].join(':'),
     assessmentId: assessment.id,
     tagId: tagId || '',
@@ -2021,6 +2021,9 @@ function _scoreEntryFromCanonical(cid, assessment, tagId, value, comment) {
     note: comment || '',
     created: new Date().toISOString(),
   };
+  var mod = normalizeScoreMod(entry.score, modifier);
+  if (mod) entry.mod = mod;
+  return entry;
 }
 
 function _assessmentById(cid, aid) {
@@ -2119,14 +2122,22 @@ async function _hydrateAssessmentDetails(cid) {
         (tagScores || []).forEach(function (tagScore) {
           var tagId = tagScore && (tagScore.tag_id || tagScore.tagId);
           if (!tagId) return;
-          _pushHydratedScore(scores, sid, _scoreEntryFromCanonical(cid, merged, tagId, tagScore.value, comment));
+          _pushHydratedScore(
+            scores,
+            sid,
+            _scoreEntryFromCanonical(cid, merged, tagId, tagScore.value, comment, tagScore.modifier),
+          );
         });
         var rubricScores = cell.rubric_scores || cell.rubricScores || [];
         (rubricScores || []).forEach(function (rubricScore) {
           var criterionId = rubricScore && (rubricScore.criterion_id || rubricScore.criterionId);
           if (!criterionId) return;
           _rubricCriterionTagIds(cid, merged, criterionId).forEach(function (tagId) {
-            _pushHydratedScore(scores, sid, _scoreEntryFromCanonical(cid, merged, tagId, rubricScore.value, comment));
+            _pushHydratedScore(
+              scores,
+              sid,
+              _scoreEntryFromCanonical(cid, merged, tagId, rubricScore.value, comment, rubricScore.modifier),
+            );
           });
         });
         if (cell.score && cell.score.value != null && (tagScores.length === 0 || merged.scoreMode === 'points')) {
@@ -2384,13 +2395,21 @@ function _gradebookCellsToScoreCache(cid, assessments, cells) {
       (cell.tag_scores || cell.tagScores || []).forEach(function (tagScore) {
         var tagId = tagScore && (tagScore.tag_id || tagScore.tagId);
         if (!tagId) return;
-        _pushHydratedScore(scores, sid, _scoreEntryFromCanonical(cid, assessment, tagId, tagScore.value, comment));
+        _pushHydratedScore(
+          scores,
+          sid,
+          _scoreEntryFromCanonical(cid, assessment, tagId, tagScore.value, comment, tagScore.modifier),
+        );
       });
       (cell.rubric_scores || cell.rubricScores || []).forEach(function (rubricScore) {
         var criterionId = rubricScore && (rubricScore.criterion_id || rubricScore.criterionId);
         if (!criterionId) return;
         _rubricCriterionTagIds(cid, assessment, criterionId).forEach(function (tagId) {
-          _pushHydratedScore(scores, sid, _scoreEntryFromCanonical(cid, assessment, tagId, rubricScore.value, comment));
+          _pushHydratedScore(
+            scores,
+            sid,
+            _scoreEntryFromCanonical(cid, assessment, tagId, rubricScore.value, comment, rubricScore.modifier),
+          );
         });
       });
       var hasAssessmentEntry =
@@ -3225,7 +3244,10 @@ function _termRatingsRowsToBlob(rows) {
 }
 
 /* Efficient single-score write — upserts one row to scores table + updates cache */
-function upsertScore(cid, sid, aid, tid, scoreVal, date, type, note) {
+/* `mod` is the level's + or − (1 or −1). Leaving it out means none, so
+   picking a level clears a + or − it had before. */
+function upsertScore(cid, sid, aid, tid, scoreVal, date, type, note, mod) {
+  var nextMod = normalizeScoreMod(scoreVal, mod);
   // Update cache blob
   const scores = getScores(cid);
   if (!scores[sid]) scores[sid] = [];
@@ -3233,12 +3255,14 @@ function upsertScore(cid, sid, aid, tid, scoreVal, date, type, note) {
     return e.assessmentId === aid && e.tagId === tid;
   });
   if (existing) {
-    if (existing.score === scoreVal) return true; // no change
+    if (existing.score === scoreVal && (existing.mod || 0) === nextMod) return true; // no change
     existing.score = scoreVal;
+    if (nextMod) existing.mod = nextMod;
+    else delete existing.mod;
     if (date) existing.date = date;
     if (note !== undefined) existing.note = note;
   } else {
-    scores[sid].push({
+    var entry = {
       id: sid + ':' + aid + ':' + tid,
       assessmentId: aid,
       tagId: tid,
@@ -3247,7 +3271,9 @@ function upsertScore(cid, sid, aid, tid, scoreVal, date, type, note) {
       type: type || 'summative',
       note: note || '',
       created: new Date().toISOString(),
-    });
+    };
+    if (nextMod) entry.mod = nextMod;
+    scores[sid].push(entry);
   }
   _cache.scores[cid] = scores;
   if (typeof clearProfCache === 'function') clearProfCache();
@@ -3256,7 +3282,7 @@ function upsertScore(cid, sid, aid, tid, scoreVal, date, type, note) {
   _markLocalWrite('scores', cid);
 
   if (_writesEnabled()) {
-    _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note);
+    _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note, nextMod);
     if (_hasServerState('scores', cid)) _rememberServerState('scores', cid, scores);
   }
   _broadcastChange(cid, 'scores');
@@ -3286,7 +3312,7 @@ function _reportScoreWriteFailure(rpc, error) {
    when intVal is null (only reachable from non-UI callers with explicit
    nulls, e.g. test fixtures) there's no value to write. Both conditions
    together represent "skip dispatch, but cache + LS still wrote correctly". */
-function _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note) {
+function _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note, mod) {
   if (!_isUuid(sid) || !_isUuid(aid)) return;
   var sb = getSupabase();
   if (!sb) return;
@@ -3300,10 +3326,17 @@ function _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note) {
     var isAssessmentTag = assessmentTagIds.indexOf(tid) >= 0;
     var isPoints = assessment && (assessment.scoreMode || assessment.score_mode) === 'points';
     var ops = [];
+    var modifier = normalizeScoreMod(intVal, mod);
     if (criterion) {
       ops.push({
         rpc: 'upsert_rubric_score',
-        params: { p_enrollment_id: sid, p_assessment_id: aid, p_criterion_id: tid, p_value: intVal },
+        params: {
+          p_enrollment_id: sid,
+          p_assessment_id: aid,
+          p_criterion_id: tid,
+          p_value: intVal,
+          p_modifier: modifier,
+        },
       });
     } else if (isPoints || (assessment && !isAssessmentTag && !criterionForTag)) {
       ops.push({
@@ -3313,12 +3346,18 @@ function _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note) {
     } else {
       ops.push({
         rpc: 'upsert_tag_score',
-        params: { p_enrollment_id: sid, p_assessment_id: aid, p_tag_id: tid, p_value: intVal },
+        params: { p_enrollment_id: sid, p_assessment_id: aid, p_tag_id: tid, p_value: intVal, p_modifier: modifier },
       });
       if (criterionForTag && _isUuid(criterionForTag.id)) {
         ops.push({
           rpc: 'upsert_rubric_score',
-          params: { p_enrollment_id: sid, p_assessment_id: aid, p_criterion_id: criterionForTag.id, p_value: intVal },
+          params: {
+            p_enrollment_id: sid,
+            p_assessment_id: aid,
+            p_criterion_id: criterionForTag.id,
+            p_value: intVal,
+            p_modifier: modifier,
+          },
         });
       }
     }
@@ -3354,7 +3393,7 @@ function _scoreEntryKey(sid, entry) {
 
 function _scoreEntryRemoteChanged(a, b) {
   if (!a || !b) return true;
-  return (a.score || 0) !== (b.score || 0) || (a.note || '') !== (b.note || '');
+  return (a.score || 0) !== (b.score || 0) || (a.mod || 0) !== (b.mod || 0) || (a.note || '') !== (b.note || '');
 }
 
 function _scoreEntriesByKey(blob) {
@@ -3396,6 +3435,7 @@ function persistScoreDiffToCanonical(cid, prevBlob, nextBlob) {
       next.entry.tagId,
       next.entry.score,
       next.entry.note || '',
+      next.entry.mod,
     );
   });
 
