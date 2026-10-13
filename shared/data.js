@@ -4398,7 +4398,8 @@ function _persistLearningMapToCanonical(cid, prevMap, nextMap) {
   var tail = _learningMapSaveQueue[cid] || Promise.resolve();
   var next = tail.then(async function () {
     var map = structuredClone(nextMap || { subjects: [], sections: [] });
-    var known = _learningMapIdRemap[cid] || (_learningMapIdRemap[cid] = { subject: {}, group: {}, section: {}, tag: {} });
+    if (!_learningMapIdRemap[cid]) _learningMapIdRemap[cid] = { subject: {}, group: {}, section: {}, tag: {} };
+    var known = _learningMapIdRemap[cid];
     ['group', 'subject', 'section', 'tag'].forEach(function (kind) {
       Object.keys(known[kind]).forEach(function (oldId) {
         _patchLearningMapEntityId(map, kind, oldId, known[kind][oldId]);
