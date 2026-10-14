@@ -34,7 +34,7 @@ export default async function handler(request, context) {
   // across all regions (including EU's ingest.de.sentry.io).
   const csp = [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' https://cdn.jsdelivr.net https://js.sentry-cdn.com https://browser.sentry-cdn.com`,
+    `script-src 'self' 'nonce-${nonce}' https://js.sentry-cdn.com https://browser.sentry-cdn.com`,
     `style-src 'self' 'unsafe-inline'`,
     "img-src 'self' data: blob:",
     "font-src 'self'",
