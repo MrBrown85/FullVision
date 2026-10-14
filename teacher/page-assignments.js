@@ -1741,11 +1741,11 @@ window.PageAssignments = (function () {
         renderStatusToggles(a.id, st.id, stStatus) +
         '</span>' +
         '<div class="pts-input-cell">' +
-        '<input type="number" class="gb-pts-input" min="0" max="' +
+        '<input type="number" class="gb-pts-input" min="0" step="any" max="' +
         max +
-        '" inputmode="numeric"' +
+        '" inputmode="decimal"' +
         ' value="' +
-        (raw > 0 ? raw : '') +
+        (raw > 0 ? formatPoints(raw) : '') +
         '" data-sid="' +
         st.id +
         '" data-aid="' +
@@ -1772,19 +1772,18 @@ window.PageAssignments = (function () {
   }
 
   function livePointsUpdate(inp) {
-    var v = parseInt(inp.value, 10);
-    var max = parseInt(inp.dataset.max, 10) || 100;
+    var max = parseFloat(inp.dataset.max) || 100;
+    var v = parsePointsInput(inp.value, max);
     var pctSpan = inp.closest('.score-row').querySelector('.gb-pts-live-pct');
-    if (pctSpan) pctSpan.textContent = !isNaN(v) && v >= 0 ? Math.round((Math.min(v, max) / max) * 100) + '%' : '';
+    if (pctSpan) pctSpan.textContent = inp.value !== '' ? Math.round((v / max) * 100) + '%' : '';
   }
   function commitPointsScore(inp) {
     var cid = activeCourse;
     var sid = inp.dataset.sid;
     var aid = inp.dataset.aid;
-    var max = parseInt(inp.dataset.max, 10) || 100;
-    var val = parseInt(inp.value, 10);
-    var raw = isNaN(val) ? 0 : Math.max(0, Math.min(max, val));
-    inp.value = raw > 0 ? raw : '';
+    var max = parseFloat(inp.dataset.max) || 100;
+    var raw = parsePointsInput(inp.value, max);
+    inp.value = raw > 0 ? formatPoints(raw) : '';
     // Leaving a field without changing it saves nothing; an untouched blank
     // field used to write a 0.
     if (raw === getPointsScore(cid, sid, aid)) return;
@@ -1808,7 +1807,7 @@ window.PageAssignments = (function () {
       }
     } else if (e.key === 'Escape') {
       var raw = getPointsScore(activeCourse, inp.dataset.sid, inp.dataset.aid);
-      inp.value = raw > 0 ? raw : '';
+      inp.value = raw > 0 ? formatPoints(raw) : '';
       inp.blur();
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();

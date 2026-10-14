@@ -345,6 +345,24 @@ function isScoreEntered(assessment, entry) {
   return Number(entry.score) > 0;
 }
 
+/* Points scores take decimals (33.5 / 40). A typed value is kept to two
+   decimal places and held between 0 and the assessment's maximum; blank or
+   unreadable input is 0, which counts as no score. A comma works as the
+   decimal point too. */
+function parsePointsInput(text, max) {
+  var n = parseFloat(String(text == null ? '' : text).replace(',', '.'));
+  if (!isFinite(n) || n <= 0) return 0;
+  if (max > 0) n = Math.min(max, n);
+  return Math.round(n * 100) / 100;
+}
+
+/* A points score as people write it: 33.5, 8, 12.25 — never 33.50 or 8.00. */
+function formatPoints(n) {
+  var v = Number(n);
+  if (!isFinite(v)) return '';
+  return String(Math.round(v * 100) / 100);
+}
+
 /* Category pill tint — soft pastel chip palette assigned by index.
    Categories rotate through CATEGORY_PALETTE in the order they were created
    (1st category → palette[0], 2nd → palette[1], …, 11th → palette[0] again).

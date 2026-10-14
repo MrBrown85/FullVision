@@ -15,15 +15,19 @@
     skipSetCommits = true
     deployPreviews = false
 
+# Scripts and styles have no version in their names, so browsers must check
+# for a new copy on every load (a quick 304 when unchanged). With an hour of
+# caching, a browser could run a new page script against an old
+# shared/constants.js after a deploy and break.
 [[headers]]
   for = "/**/*.js"
   [headers.values]
-    Cache-Control = "public, max-age=3600"
+    Cache-Control = "public, max-age=0, must-revalidate"
 
 [[headers]]
   for = "/**/*.css"
   [headers.values]
-    Cache-Control = "public, max-age=3600"
+    Cache-Control = "public, max-age=0, must-revalidate"
 
 [[headers]]
   for = "/**/*.json"
