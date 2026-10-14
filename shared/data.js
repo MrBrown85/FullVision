@@ -991,11 +991,57 @@ async function initAllCourses() {
   _initVisibilityRefresh();
 }
 
+/* True while the teacher is typing in a field on the page. Re-rendering then
+   replaces the field mid-entry: Chrome fires blur on the removed input, its
+   handler saves the half-typed value ("1" of "16"), and the new input shows
+   that value, so the number appears to jump around. */
+function _isEditingField() {
+  var el = typeof document !== 'undefined' ? document.activeElement : null;
+  if (!el || el === document.body) return false;
+  return el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName);
+}
+
+var _rerenderDeferred = false;
+
+/* Scrolling over a focused number box changes its value in Chrome, one step
+   per scroll tick: a teacher who typed 6 and then moved a trackpad or Magic
+   Mouse saw it run to 1 or 9, and that number was saved when she left the
+   box. Leave the box instead, keeping the typed value, and let the page
+   scroll. */
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+  document.addEventListener(
+    'wheel',
+    function (e) {
+      var el = e.target;
+      if (el && el.tagName === 'INPUT' && el.type === 'number' && el === document.activeElement) el.blur();
+    },
+    { passive: true, capture: true },
+  );
+}
+
 /** Shared cache invalidation + re-render for both Realtime and visibility refresh */
 function _invalidateAndRerender() {
   if (typeof clearProfCache === 'function') clearProfCache();
   _allTagsCache = {};
   _tagToSectionCache = {};
+  // Wait until the teacher leaves the field, and check again a tick later:
+  // Enter or Tab moves focus straight into the next field.
+  if (_isEditingField()) {
+    if (!_rerenderDeferred) {
+      _rerenderDeferred = true;
+      document.addEventListener(
+        'focusout',
+        function () {
+          setTimeout(function () {
+            _rerenderDeferred = false;
+            _invalidateAndRerender();
+          }, 0);
+        },
+        { once: true },
+      );
+    }
+    return;
+  }
   // Re-render current page (desktop)
   var currentPage = typeof Router !== 'undefined' && Router.getCurrentPage ? Router.getCurrentPage() : null;
   if (currentPage && currentPage.render) {

@@ -1785,6 +1785,9 @@ window.PageAssignments = (function () {
     var val = parseInt(inp.value, 10);
     var raw = isNaN(val) ? 0 : Math.max(0, Math.min(max, val));
     inp.value = raw > 0 ? raw : '';
+    // Leaving a field without changing it saves nothing; an untouched blank
+    // field used to write a 0.
+    if (raw === getPointsScore(cid, sid, aid)) return;
     setScore(cid, sid, aid, aid, raw);
     setPointsScore(cid, sid, aid, raw);
     var pctSpan = inp.closest('.score-row').querySelector('.gb-pts-live-pct');
@@ -4082,8 +4085,10 @@ window.PageAssignments = (function () {
       updateCritLevelValue(parseInt(el.dataset.crit, 10), parseInt(el.dataset.level, 10), el.value);
       return;
     }
-    // Points input commit on blur
+    // Points input commit on blur. A re-render that removes the input also
+    // blurs it; that is not the teacher leaving the field.
     if (el.classList.contains('gb-pts-input')) {
+      if (!el.isConnected) return;
       commitPointsScore(el);
       return;
     }
