@@ -471,13 +471,15 @@
 
       // Settings sheet (course switcher + sign out + switch to desktop)
       if (action === 'm-settings') {
-        var courseOpts = Object.keys(COURSES)
-          .map(function (id) {
-            var c = COURSES[id];
-            return '<option value="' + id + '"' + (id === _cid ? ' selected' : '') + '>' + MC.esc(c.name) + '</option>';
+        var pickerCourses = getPickerCourses(_cid);
+        var courseOpts = pickerCourses
+          .map(function (c) {
+            return (
+              '<option value="' + c.id + '"' + (c.id === _cid ? ' selected' : '') + '>' + MC.esc(c.name) + '</option>'
+            );
           })
           .join('');
-        var hasCourses = Object.keys(COURSES).length > 1;
+        var hasCourses = pickerCourses.length > 1;
         var lastSyncedAt = window.GB ? window.GB.getLastSyncedAt() : null;
         var syncLine =
           '<div style="font-size:13px;color:var(--text-3);text-align:center;margin-bottom:16px">' +

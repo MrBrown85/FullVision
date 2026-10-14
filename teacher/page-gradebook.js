@@ -205,9 +205,11 @@ window.PageGradebook = (function () {
     var activeFilterCount = filterCategories.length + filterSections.length + filterModules.length;
 
     html += '<div class="gb-toolbar">';
-    var courseOpts = Object.values(COURSES)
+    var courseOpts = getPickerCourses(activeCourse)
       .map(function (c) {
-        return '<option value="' + c.id + '"' + (c.id === activeCourse ? ' selected' : '') + '>' + c.name + '</option>';
+        return (
+          '<option value="' + c.id + '"' + (c.id === activeCourse ? ' selected' : '') + '>' + esc(c.name) + '</option>'
+        );
       })
       .join('');
     html +=
