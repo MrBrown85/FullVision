@@ -616,6 +616,9 @@ window.PageGradebook = (function () {
           var sec = getSectionForTag(cid, tid);
           return sec && filterSections.includes(sec.id);
         });
+      } else if (tagIds.length === 0) {
+        // Not linked to a competency: one overall column.
+        tagIds = [UNLINKED_TAG_ID];
       }
       if (tagIds.length === 0) return;
       var start = cols.length;
@@ -636,9 +639,9 @@ window.PageGradebook = (function () {
           cols.push({
             assessmentId: a.id,
             tagId: tagId,
-            tagCode: tag ? tag.id : tagId,
+            tagCode: tag ? tag.id : isUnlinkedTag(tagId) ? 'Overall' : tagId,
             sectionColor: sec ? sec.color : 'var(--text-3)',
-            tagText: tag ? tag.text : '',
+            tagText: tag ? tag.text : isUnlinkedTag(tagId) ? 'Not linked to a competency' : '',
           });
         });
       }
@@ -852,7 +855,7 @@ window.PageGradebook = (function () {
             return e.assessmentId === col.assessmentId && e.tagId === col.tagId;
           });
           var score = entry ? entry.score : 0;
-          var assigned = assess && (assess.tagIds || []).includes(col.tagId);
+          var assigned = assess && scoreTagIds(assess).includes(col.tagId);
           var content =
             score > 0
               ? formatScoreLevel(score, entry.mod)
@@ -1078,7 +1081,7 @@ window.PageGradebook = (function () {
       // Score cells per assignment
       sortedAssess.forEach(function (a) {
         var studentScores = scores[s.id] || [];
-        var tagIds = a.tagIds || [];
+        var tagIds = scoreTagIds(a);
         // Get average score across all tags in this assessment for this student
         var tagScores = tagIds
           .map(function (tid) {
@@ -1599,7 +1602,7 @@ window.PageGradebook = (function () {
         var assess = getAssessments(cid).find(function (a) {
           return a.id === aid;
         });
-        var tagIds = assess ? assess.tagIds || [] : [];
+        var tagIds = assess ? scoreTagIds(assess) : [];
         var getAvg = function (sid) {
           var ss = sc[sid] || [];
           var ts = tagIds
@@ -1654,7 +1657,7 @@ window.PageGradebook = (function () {
     var assess = getAssessments(cid).find(function (a) {
       return a.id === aid;
     });
-    var tagIds = (assess && assess.tagIds) || [];
+    var tagIds = assess ? scoreTagIds(assess) : [];
     _undoStack.push({
       cid: cid,
       sid: sid,
@@ -1726,7 +1729,7 @@ window.PageGradebook = (function () {
     var aid = td.dataset.aid;
     var tid = td.dataset.tid;
     var sid = td.dataset.sid;
-    if (!aid || !tid || !sid) return;
+    if (!aid || !tid || !sid || isUnlinkedTag(tid)) return;
     var entry = (getScores(cid)[sid] || []).find(function (e) {
       return e.assessmentId === aid && e.tagId === tid;
     });
@@ -1802,7 +1805,7 @@ window.PageGradebook = (function () {
     function commit() {
       var raw = parsePointsInput(inp.value, max);
       // Snapshot for undo
-      var tagIds = isPtsCol ? assess.tagIds || [] : [td.dataset.tid];
+      var tagIds = isPtsCol ? scoreTagIds(assess) : [td.dataset.tid];
       var prevEntries = tagIds.map(function (tid) {
         var e = (getScores(cid)[sid] || []).find(function (e) {
           return e.assessmentId === aid && e.tagId === tid;
@@ -1887,7 +1890,7 @@ window.PageGradebook = (function () {
       (categories.length === 0
         ? '<div class="gb-add-field"><div style="font-size:0.8rem;color:var(--text-3)">No grading categories are configured for this course yet.</div></div>'
         : '') +
-      '<div class="gb-add-field"><label>Standards <span style="font-weight:400;color:var(--text-3)">(select at least one)</span></label>' +
+      '<div class="gb-add-field"><label>Standards <span style="font-weight:400;color:var(--text-3)">(optional)</span></label>' +
       '<div class="gb-add-tags">' +
       sections
         .map(function (sec) {
@@ -1957,7 +1960,6 @@ window.PageGradebook = (function () {
     var tagIds = Array.from(document.querySelectorAll('.gb-add-tag input:checked')).map(function (cb) {
       return cb.value;
     });
-    if (tagIds.length === 0) return;
 
     var assessments = getAssessments(cid);
     var newAssess = {
@@ -2047,7 +2049,7 @@ window.PageGradebook = (function () {
       // Assessment scores
       assessments.forEach(function (a) {
         var ss = scores[s.id] || [];
-        var tagScores = (a.tagIds || [])
+        var tagScores = scoreTagIds(a)
           .map(function (tid) {
             var e = ss.find(function (e) {
               return e.assessmentId === a.id && e.tagId === tid;
@@ -2119,7 +2121,7 @@ window.PageGradebook = (function () {
           return a.id === aid;
         });
         if (assess && scores[sid]) {
-          (assess.tagIds || []).forEach(function (tid) {
+          scoreTagIds(assess).forEach(function (tid) {
             var idx = scores[sid].findIndex(function (e) {
               return e.assessmentId === aid && e.tagId === tid;
             });
@@ -2285,7 +2287,7 @@ window.PageGradebook = (function () {
       render();
       return;
     }
-    var tagIds = assess.tagIds || [];
+    var tagIds = scoreTagIds(assess);
     var studentScores = getScores(cid)[sid] || [];
     // Get current average for display
     var tagScores = tagIds

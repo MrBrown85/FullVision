@@ -645,7 +645,7 @@ window.PageStudent = (function () {
       var scoredCount = assessScores.filter(function (s) {
         return s.score > 0;
       }).length;
-      var totalTags = (assess.tagIds || []).length;
+      var totalTags = scoreTagIds(assess).length;
       var allScored = totalTags > 0 && scoredCount >= totalTags;
       var noneScored = scoredCount === 0;
       var isLate = assess.dueDate && new Date(assess.dueDate) < new Date() && noneScored;
@@ -1091,8 +1091,7 @@ window.PageStudent = (function () {
       var aScores = allScores.filter(function (s) {
         return s.assessmentId === assess.id && s.score > 0;
       });
-      var totalT = (assess.tagIds || []).length;
-      if (totalT === 0) return;
+      var totalT = scoreTagIds(assess).length;
       if (aScores.length === 0) attentionItems.push({ type: 'missing', assess: assess, detail: 'No scores entered' });
       else if (aScores.length < totalT)
         attentionItems.push({
