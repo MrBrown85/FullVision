@@ -45,6 +45,54 @@
       tracesSampleRate: 0,
       replaysSessionSampleRate: 0,
       replaysOnErrorSampleRate: 0,
+      sendDefaultPii: false,
+      beforeBreadcrumb: scrubBreadcrumb,
+      beforeSend: scrubEvent,
     });
   };
+
+  /* Reports go to Sentry's EU region, so student data must not ride along.
+     Console breadcrumbs are dropped: the app's warnings log whole records
+     (names, notes, observation text). What's left keeps only the error and
+     where it happened, with email addresses masked. */
+  var EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
+
+  function mask(text) {
+    return typeof text === 'string' ? text.replace(EMAIL_RE, '[email]') : text;
+  }
+
+  function scrubBreadcrumb(crumb) {
+    if (!crumb || crumb.category === 'console') return null;
+    crumb.message = mask(crumb.message);
+    if (crumb.data) {
+      // Keep the request's method, URL and status; drop anything else.
+      var keep = {};
+      ['method', 'url', 'status_code'].forEach(function (k) {
+        if (crumb.data[k] !== undefined) keep[k] = k === 'url' ? mask(crumb.data[k]) : crumb.data[k];
+      });
+      crumb.data = keep;
+    }
+    return crumb;
+  }
+
+  function scrubEvent(event) {
+    if (!event) return event;
+    delete event.user;
+    delete event.extra;
+    if (event.request) {
+      delete event.request.data;
+      delete event.request.cookies;
+      delete event.request.headers;
+      // Keep the page; drop the query, including the student id in the hash.
+      if (event.request.url) event.request.url = mask(event.request.url.split('?')[0]);
+      delete event.request.query_string;
+    }
+    event.message = mask(event.message);
+    if (event.exception && event.exception.values) {
+      event.exception.values.forEach(function (ex) {
+        ex.value = mask(ex.value);
+      });
+    }
+    return event;
+  }
 })();
