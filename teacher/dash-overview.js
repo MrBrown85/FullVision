@@ -204,6 +204,8 @@ window.DashOverview = (function () {
       '</div>' +
       '</div>';
 
+    // The list scrolls past six competencies so the card keeps its size.
+    html += '<div class="dash-outcome-list" tabindex="0" aria-label="Curricular competencies">';
     sectionClassAvgs.forEach(function (item) {
       var sec = item.section;
       var avg = item.avg;
@@ -243,6 +245,7 @@ window.DashOverview = (function () {
         '</span>' +
         '</div>';
     });
+    html += '</div>';
 
     html +=
       '<div style="margin-top:10px">' +
