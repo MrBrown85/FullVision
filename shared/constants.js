@@ -345,6 +345,23 @@ function isScoreEntered(assessment, entry) {
   return Number(entry.score) > 0;
 }
 
+/* An assessment linked to no competency keeps its score under this key in
+   place of a competency id (the server stores it as the assessment's single
+   score). It counts toward the assessment and the course grade, never toward
+   a competency. Scores hydrated before this key existed used ''. */
+const UNLINKED_TAG_ID = 'overall';
+
+function isUnlinkedTag(tagId) {
+  return tagId === UNLINKED_TAG_ID || tagId === '';
+}
+
+/* The keys an assessment's scores are stored under: its competencies, or the
+   one unlinked key when it has none. */
+function scoreTagIds(assessment) {
+  var ids = assessment && (assessment.tagIds || assessment.tag_ids);
+  return ids && ids.length ? ids : [UNLINKED_TAG_ID];
+}
+
 /* Points scores take decimals (33.5 / 40). A typed value is kept to two
    decimal places and held between 0 and the assessment's maximum; blank or
    unreadable input is 0, which counts as no score. A comma works as the

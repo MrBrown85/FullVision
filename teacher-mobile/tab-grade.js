@@ -550,10 +550,10 @@ window.MGrade = (function () {
         _completionBtnsHtml(getCompletionMark(cid, st.id, assessment.id)) +
         '</div>';
     }
-    (isCompletionScored(assessment) ? [] : assessment.tagIds || []).forEach(function (tid, tagIdx) {
+    (isCompletionScored(assessment) ? [] : scoreTagIds(assessment)).forEach(function (tid, tagIdx) {
       var tag = getTagById(cid, tid);
       var sec = getSectionForTag(cid, tid);
-      var tagLabel = tag ? tag.label || tag.name || tag.id : tid;
+      var tagLabel = tag ? tag.label || tag.name || tag.id : isUnlinkedTag(tid) ? 'Overall' : tid;
       var tagColor = sec ? sec.color : '#888';
 
       // Current score for this tag
@@ -650,7 +650,7 @@ window.MGrade = (function () {
           '" data-tid="' +
           tid +
           '">' +
-          _modBtnsHtml(current, currentMod) +
+          (isUnlinkedTag(tid) ? '' : _modBtnsHtml(current, currentMod)) +
           '</div>' +
           '</div>';
       }
@@ -726,6 +726,7 @@ window.MGrade = (function () {
   }
 
   function _syncModBtns(cid, sid, aid, tid) {
+    if (isUnlinkedTag(tid)) return;
     var box = document.querySelector(
       '.m-swiper-card[data-sid="' + sid + '"] .m-score-mods[data-aid="' + aid + '"][data-tid="' + tid + '"]',
     );
@@ -837,7 +838,7 @@ window.MGrade = (function () {
         return a.id === aid;
       });
       if (assess) {
-        (assess.tagIds || []).forEach(function (tagId) {
+        scoreTagIds(assess).forEach(function (tagId) {
           upsertScore(
             cid,
             sid,

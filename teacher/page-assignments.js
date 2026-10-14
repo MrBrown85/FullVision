@@ -408,6 +408,8 @@ window.PageAssignments = (function () {
           return getTagById(cid, tid);
         })
         .filter(Boolean);
+      // An assessment with no competencies is graded as one overall score.
+      if (!tagObjs.length) tagObjs = [{ id: UNLINKED_TAG_ID, label: 'Overall', text: 'Not linked to a competency' }];
       var categoryId = _getAssessmentCategoryId(a);
       var categoryName = _getCategoryName(cid, categoryId);
       var c =
@@ -765,7 +767,7 @@ window.PageAssignments = (function () {
       assessments = assessments.filter(function (a) {
         return students.some(function (st) {
           var sc = scores[st.id] || [];
-          return !(a.tagIds || []).every(function (tid) {
+          return !scoreTagIds(a).every(function (tid) {
             return sc.some(function (s) {
               return s.assessmentId === a.id && s.tagId === tid && isScoreEntered(a, s);
             });
@@ -1329,14 +1331,6 @@ window.PageAssignments = (function () {
     var tagIds = Array.from(document.querySelectorAll('.af-tag-cb:checked')).map(function (cb) {
       return cb.value;
     });
-    if (tagIds.length === 0) {
-      var tagsContainer = document.querySelector('.af-tags-container');
-      if (tagsContainer) {
-        tagsContainer.style.border = '2px solid var(--score-1)';
-        tagsContainer.scrollIntoView({ behavior: 'smooth' });
-      }
-      return;
-    }
     var evidence = (document.getElementById('af-evidence') || {}).value;
     var categoryId = (document.getElementById('af-category') || {}).value || '';
     var moduleId = (document.getElementById('af-module') || {}).value || '';
@@ -1439,14 +1433,6 @@ window.PageAssignments = (function () {
     var tagIds = Array.from(document.querySelectorAll('.af-tag-cb:checked')).map(function (cb) {
       return cb.value;
     });
-    if (tagIds.length === 0) {
-      var tc = document.querySelector('.af-tags-container');
-      if (tc) {
-        tc.style.border = '2px solid var(--score-1)';
-        tc.scrollIntoView({ behavior: 'smooth' });
-      }
-      return;
-    }
     var evidence = (document.getElementById('af-evidence') || {}).value;
     var categoryId = (document.getElementById('af-category') || {}).value || '';
     var assessments = getAssessments(activeCourse);
@@ -1889,7 +1875,7 @@ window.PageAssignments = (function () {
         return a.id === aid;
       });
       if (assess) {
-        (assess.tagIds || []).forEach(function (tagId) {
+        scoreTagIds(assess).forEach(function (tagId) {
           upsertScore(cid, sid, aid, tagId, 0, assess.date || '', assess.type || 'summative', '');
         });
       }
@@ -1984,7 +1970,7 @@ window.PageAssignments = (function () {
   }
 
   function syncModRow(row) {
-    if (!row) return;
+    if (!row || isUnlinkedTag(row.dataset.tag)) return;
     var st = rowScoreState(row);
     var box = row.querySelector('.rsg-mods');
     if (box) box.innerHTML = scoreModButtonsHtml(st.level, st.mod);
@@ -2101,7 +2087,7 @@ window.PageAssignments = (function () {
       if (!assess) return;
       var sid = tagId;
       if (!statuses[sid + ':' + aid])
-        (assess.tagIds || []).forEach(function (tid) {
+        scoreTagIds(assess).forEach(function (tid) {
           setScore(cid, sid, aid, tid, value);
         });
       selector = '.score-group[data-assess="' + aid + '"][data-student="' + sid + '"]';
@@ -2110,7 +2096,7 @@ window.PageAssignments = (function () {
       if (!assess) return;
       students.forEach(function (st) {
         if (statuses[st.id + ':' + aid]) return;
-        (assess.tagIds || []).forEach(function (tid) {
+        scoreTagIds(assess).forEach(function (tid) {
           setScore(cid, st.id, aid, tid, value);
         });
       });
@@ -2337,7 +2323,7 @@ window.PageAssignments = (function () {
           tag.id +
           '" role="button" tabindex="0">Emerging</div>' +
           '</div><div class="rsg-mods">' +
-          scoreModButtonsHtml(score, mod) +
+          (isUnlinkedTag(tag.id) ? '' : scoreModButtonsHtml(score, mod)) +
           '</div></div>';
       });
       html +=
@@ -3599,7 +3585,7 @@ window.PageAssignments = (function () {
       assessments.forEach(function (a) {
         var stStatus = statuses[st.id + ':' + a.id] || '';
         var categoryName = _getCategoryName(cid, _getAssessmentCategoryId(a));
-        (a.tagIds || []).forEach(function (tid) {
+        scoreTagIds(a).forEach(function (tid) {
           var tag = getTagById(cid, tid);
           var entry = (scores[st.id] || []).find(function (s) {
             return s.assessmentId === a.id && s.tagId === tid;
@@ -3615,9 +3601,9 @@ window.PageAssignments = (function () {
             '","' +
             categoryName.replace(/"/g, '""') +
             '","' +
-            tid +
+            (isUnlinkedTag(tid) ? '' : tid) +
             '","' +
-            (tag ? tag.label.replace(/"/g, '""') : '') +
+            (tag ? tag.label.replace(/"/g, '""') : isUnlinkedTag(tid) ? 'Overall' : '') +
             '","' +
             score +
             '","' +

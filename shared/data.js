@@ -1777,7 +1777,10 @@ function _assessmentFromDetail(existing, detail) {
     if (a.collab_config.groups) next.groups = a.collab_config.groups;
     if (a.collab_config.excludedStudents) next.excludedStudents = a.collab_config.excludedStudents;
   }
-  if (tagIds.length || !Array.isArray(next.tagIds)) {
+  // The server's list is the truth, empty included: an assessment whose last
+  // competency was unlinked has none.
+  var sentTags = detail && (Array.isArray(detail.linked_tags) || Array.isArray(detail.linkedTags));
+  if (tagIds.length || sentTags || !Array.isArray(next.tagIds)) {
     next.tagIds = tagIds;
     next.tag_ids = tagIds;
   }
@@ -1927,7 +1930,7 @@ async function _hydrateAssessmentDetails(cid) {
           });
         });
         if (cell.score && cell.score.value != null && (tagScores.length === 0 || isPointsScored(merged))) {
-          var fallbackTag = (merged.tagIds && merged.tagIds[0]) || '';
+          var fallbackTag = scoreTagIds(merged)[0];
           _pushHydratedScore(
             scores,
             sid,
@@ -2056,13 +2059,7 @@ function _gradebookCellsToScoreCache(cid, assessments, cells) {
         _pushHydratedScore(
           scores,
           sid,
-          _scoreEntryFromCanonical(
-            cid,
-            assessment,
-            (assessment.tagIds && assessment.tagIds[0]) || '',
-            cell.score.value,
-            comment,
-          ),
+          _scoreEntryFromCanonical(cid, assessment, scoreTagIds(assessment)[0], cell.score.value, comment),
         );
       }
     });
@@ -2689,7 +2686,7 @@ function _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note, mod) {
   if (!sb) return;
   var intVal = scoreVal === '' || scoreVal == null ? null : Number(scoreVal);
 
-  if (_isUuid(tid) && intVal != null) {
+  if ((_isUuid(tid) || isUnlinkedTag(tid)) && intVal != null) {
     var assessment = _assessmentById(cid, aid);
     var criterion = _rubricCriterionById(cid, assessment, tid);
     var criterionForTag = criterion ? null : _rubricCriterionForTag(cid, assessment, tid);
@@ -2709,10 +2706,13 @@ function _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note, mod) {
           p_modifier: modifier,
         },
       });
-    } else if (isPoints || (assessment && !isAssessmentTag && !criterionForTag)) {
+    } else if (isPoints || isUnlinkedTag(tid) || (assessment && !isAssessmentTag && !criterionForTag)) {
+      // An unlinked assessment's single score; 0 clears it (Incomplete is
+      // the only 0 that is a score).
+      var cellValue = isUnlinkedTag(tid) && intVal === 0 && !isCompletionScored(assessment) ? null : intVal;
       ops.push({
         rpc: 'upsert_score',
-        params: { p_enrollment_id: sid, p_assessment_id: aid, p_value: intVal },
+        params: { p_enrollment_id: sid, p_assessment_id: aid, p_value: cellValue },
       });
     } else {
       ops.push({
@@ -5636,7 +5636,7 @@ function setCompletionMark(cid, sid, aid, mark) {
 function setPointsScore(cid, sid, aid, rawScore) {
   const assess = getAssessments(cid).find(a => a.id === aid);
   if (!assess) return;
-  const tagIds = assess.tagIds || [];
+  const tagIds = scoreTagIds(assess);
   const scores = getScores(cid);
   if (!scores[sid]) scores[sid] = [];
   let changed = false;
