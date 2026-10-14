@@ -9,19 +9,10 @@ window.DashOverview = (function () {
     var showFlaggedOnly = opts.showFlaggedOnly;
     var students = opts.students;
     var flagCount = opts.flagCount;
-    var courseOptions = Object.keys(COURSES)
-      .filter(function (cid) {
-        return !isCourseArchived(cid);
-      })
-      .map(function (cid) {
+    var courseOptions = getPickerCourses(activeCourse)
+      .map(function (c) {
         return (
-          '<option value="' +
-          cid +
-          '"' +
-          (cid === activeCourse ? ' selected' : '') +
-          '>' +
-          esc(COURSES[cid].name) +
-          '</option>'
+          '<option value="' + c.id + '"' + (c.id === activeCourse ? ' selected' : '') + '>' + esc(c.name) + '</option>'
         );
       })
       .join('');

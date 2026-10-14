@@ -218,7 +218,7 @@ window.PageAssignments = (function () {
 
   /* ── Toolbar ────────────────────────────────────────────── */
   function renderAssessToolbar(cid, method, dw, assessments) {
-    var courseOptions = Object.values(COURSES)
+    var courseOptions = getPickerCourses(cid)
       .map(function (c) {
         return '<option value="' + c.id + '"' + (c.id === cid ? ' selected' : '') + '>' + esc(c.name) + '</option>';
       })

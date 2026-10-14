@@ -5690,6 +5690,20 @@ function isCourseArchived(cid) {
   return !!(cid && COURSES && COURSES[cid] && COURSES[cid].archived);
 }
 
+/* The classes a class menu lists: every class that isn't archived, plus the
+   open one even if it is, so the menu always names the class on screen.
+   Archived copies used to appear beside the real class under the same name,
+   and picking one opened an empty class. */
+function getPickerCourses(activeCid) {
+  return Object.keys(COURSES || {})
+    .filter(function (cid) {
+      return !isCourseArchived(cid) || cid === activeCid;
+    })
+    .map(function (cid) {
+      return { id: cid, name: COURSES[cid].name || '' };
+    });
+}
+
 /* ── Flags ──────────────────────────────────────────────────── */
 function getFlags(cid) {
   if (_cache.flags[cid] !== undefined) return _cache.flags[cid];
