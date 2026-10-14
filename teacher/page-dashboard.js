@@ -435,10 +435,9 @@ window.PageDashboard = (function () {
         showFlaggedOnly = !showFlaggedOnly;
         render();
       },
-      dashSort: function () {
-        sortMode = el.value;
-        render();
-      },
+      // The sort menu is handled on change (_handleChange). Handling it on
+      // click too re-rendered the toolbar as the menu opened, which closed it
+      // before an option could be picked.
     };
     if (handlers[action]) {
       if (el.tagName !== 'SELECT') e.preventDefault();
