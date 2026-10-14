@@ -6,13 +6,12 @@
   Referrer-Policy: strict-origin-when-cross-origin
   Strict-Transport-Security: max-age=31536000; includeSubDomains
 
-# Cache JS files for 1 hour
+# JS and CSS: check for a new copy on every load (see netlify.toml)
 /**/*.js
-  Cache-Control: public, max-age=3600
+  Cache-Control: public, max-age=0, must-revalidate
 
-# Cache CSS for 1 hour
 /**/*.css
-  Cache-Control: public, max-age=3600
+  Cache-Control: public, max-age=0, must-revalidate
 
 # HTML pages — don't cache
 /**/*.html
