@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="How FullVision collects, stores, protects and deletes teacher and student information."
+    />
+    <title>Privacy Policy — FullVision</title>
+    <meta name="theme-color" content="#007AFF" />
+    <link rel="stylesheet" href="teacher/styles.css?v=3" />
+    <style>
+      body {
+        margin: 0;
+        background: var(--bg);
+        font-family: var(--font-base);
+        color: var(--text);
+        line-height: 1.6;
+      }
+      .policy {
+        background: var(--surface);
+        max-width: 760px;
+        margin: 32px auto;
+        padding: 40px 48px 48px;
+        border-radius: 16px;
+        box-shadow: var(--shadow-lg);
+      }
+      .policy h1 {
+        font-size: var(--text-2xl);
+        margin: 0 0 4px;
+        letter-spacing: -0.02em;
+      }
+      .policy .updated {
+        color: var(--text-2);
+        margin: 0 0 28px;
+      }
+      .policy h2 {
+        font-size: var(--text-lg);
+        margin: 32px 0 8px;
+      }
+      .policy p,
+      .policy li {
+        font-size: var(--text-md);
+      }
+      .policy ul {
+        padding-left: 22px;
+      }
+      .policy li {
+        margin-bottom: 6px;
+      }
+      .policy table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 8px 0 16px;
+        font-size: var(--text-base);
+      }
+      .policy th,
+      .policy td {
+        text-align: left;
+        vertical-align: top;
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--border);
+      }
+      .policy th {
+        color: var(--text-2);
+        font-weight: 600;
+      }
+      .policy a {
+        color: var(--active);
+      }
+      .policy .back {
+        display: inline-block;
+        margin-bottom: 20px;
+        font-size: var(--text-base);
+      }
+      @media (max-width: 600px) {
+        .policy {
+          margin: 0;
+          border-radius: 0;
+          padding: 24px 16px 32px;
+        }
+        .policy table,
+        .policy tbody,
+        .policy tr,
+        .policy td {
+          display: block;
+        }
+        .policy thead {
+          display: none;
+        }
+        .policy td:first-child {
+          font-weight: 600;
+          border-bottom: none;
+          padding-bottom: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="policy">
+      <a class="back" href="login.html">← Back to FullVision</a>
+      <h1>Privacy Policy</h1>
+      <p class="updated">Last updated: October 13, 2026</p>
+
+      <p>
+        FullVision is a gradebook and learning-profile tool for teachers in British Columbia. This page explains what
+        information FullVision stores, where it is kept, who can see it, and how it is deleted.
+      </p>
+
+      <h2>Who runs FullVision</h2>
+      <p>
+        FullVision is built and run by Colin Brown, a teacher in British Columbia. It is an independent tool. It is not
+        run by a school district or the Ministry of Education and Child Care. Questions about privacy go to
+        <a href="mailto:colin.brown04@gmail.com">colin.brown04@gmail.com</a>.
+      </p>
+
+      <h2>Who uses it</h2>
+      <p>
+        Only teachers sign in. Students and parents do not have accounts, and FullVision never contacts them. Teachers
+        enter student information themselves, so each teacher decides what goes in. Before entering student information,
+        a teacher should confirm that their school district allows it.
+      </p>
+
+      <h2>What FullVision stores</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>About</th>
+            <th>Information</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Teachers</td>
+            <td>
+              Email address, display name, password (stored only as a one-way hash), and display settings. The sign-in
+              service also records the time and IP address of each sign-in.
+            </td>
+          </tr>
+          <tr>
+            <td>Students</td>
+            <td>
+              Name, preferred name, pronouns, student number, email address, date of birth, and learning designations
+              (such as an IEP). Only a first name is required; the teacher chooses whether to add the rest.
+            </td>
+          </tr>
+          <tr>
+            <td>Learning records</td>
+            <td>
+              Scores, proficiency levels and comments on assignments; observations; notes; goals and reflections;
+              attendance; term ratings and report-card comments; and flags the teacher sets.
+            </td>
+          </tr>
+          <tr>
+            <td>Classes</td>
+            <td>Class names, competencies, assignments, rubrics and categories the teacher creates.</td>
+          </tr>
+          <tr>
+            <td>Change history</td>
+            <td>When a score or term rating changes, the old and new values and the time of the change.</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        FullVision does not use advertising, analytics or tracking cookies. It does not sell, rent or share information
+        for marketing. It does not send student information to artificial-intelligence services.
+      </p>
+
+      <h2>Where it is stored</h2>
+      <ul>
+        <li>
+          <strong>The database is in Canada.</strong> All teacher and student information is stored by Supabase in its
+          Montreal data centre (AWS ca-central-1).
+        </li>
+        <li>
+          <strong>Web pages</strong> are delivered by Netlify, which serves them from data centres around the world.
+          Netlify handles page requests, including your IP address, but does not receive the information in your
+          gradebook.
+        </li>
+        <li>
+          <strong>Error reports</strong> go to Sentry, which stores them in Germany. When the app hits an error, it
+          sends the error message, where in the code it happened, the page, and the browser type. Before a report is
+          sent, FullVision removes the app's log messages, form contents and the part of the page address that
+          identifies a student, and masks email addresses, so reports do not carry student information.
+        </li>
+        <li>
+          <strong>Your own device.</strong> FullVision keeps a copy of your classes in your browser so it works offline,
+          along with changes waiting to be saved. Signing out removes this copy. On a shared computer, always sign out.
+        </li>
+      </ul>
+
+      <h2>Who can see it</h2>
+      <ul>
+        <li>
+          <strong>You.</strong> Each teacher sees only their own classes and students. The database enforces this on
+          every request; signed-in teachers cannot read another teacher's data, and people who are not signed in cannot
+          read or run anything.
+        </li>
+        <li>
+          <strong>The operator.</strong> Colin Brown has administrator access to the database. He uses it only to keep
+          FullVision running and to fix problems, such as a save that failed, and does not look at student information
+          for any other reason.
+        </li>
+        <li>
+          <strong>Service providers.</strong> Supabase, Netlify and Sentry run the systems described above. They process
+          information only to provide their service to FullVision.
+        </li>
+      </ul>
+      <p>FullVision does not give information to anyone else unless the law requires it.</p>
+
+      <h2>How long it is kept</h2>
+      <ul>
+        <li>Information stays until the teacher deletes it.</li>
+        <li>
+          <strong>Deleting a class</strong> hides it right away and permanently deletes it, with its students' records,
+          after 30 days. Until then, it can be restored by contacting the operator.
+        </li>
+        <li>
+          <strong>Deleting your account</strong> (Delete Account in the account menu) does the same for everything you
+          stored: it is permanently deleted after 30 days. Signing back in during that time lets you cancel the
+          deletion.
+        </li>
+        <li>A student who no longer belongs to any class is deleted along with that class.</li>
+        <li>Change history for scores and term ratings is kept for 2 years, or until its class is deleted.</li>
+        <li>
+          <strong>Backups.</strong> Supabase makes a daily backup of the database and keeps each one for 7 days. A
+          deleted item can remain in backups for up to 7 days after it is deleted.
+        </li>
+      </ul>
+
+      <h2>How it is protected</h2>
+      <ul>
+        <li>All connections use HTTPS encryption.</li>
+        <li>Supabase encrypts the stored data and backups.</li>
+        <li>Passwords are stored only as one-way hashes and are never visible to the operator.</li>
+        <li>Database rules restrict every request to the signed-in teacher's own data.</li>
+        <li>The pages only run scripts from FullVision itself and from Sentry's error-reporting service.</li>
+      </ul>
+
+      <h2>If something goes wrong</h2>
+      <p>
+        If information in FullVision is lost, or seen by someone who should not see it, the operator will tell the
+        affected teachers as soon as possible and say what happened, what information was involved, and what is being
+        done. Teachers can then inform their school or district as their own policies require.
+      </p>
+
+      <h2>Your choices</h2>
+      <ul>
+        <li>
+          <strong>Teachers</strong> can view, correct and delete their information and their students' information at
+          any time in the app, and can delete their account.
+        </li>
+        <li>
+          <strong>Students and parents</strong> who want to see, correct or remove information should ask the teacher or
+          school, who control the records. The operator will help a teacher respond to a request.
+        </li>
+        <li>
+          For any other privacy question or request, email
+          <a href="mailto:colin.brown04@gmail.com">colin.brown04@gmail.com</a>.
+        </li>
+      </ul>
+
+      <h2>Changes to this policy</h2>
+      <p>
+        If this policy changes, the date at the top changes too. Changes that affect how student information is stored
+        or shared will be sent to teachers by email before they take effect.
+      </p>
+    </main>
+  </body>
+</html>

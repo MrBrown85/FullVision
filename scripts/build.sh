@@ -4,7 +4,7 @@ rm -rf dist
 mkdir -p dist
 
 # Root-level public files
-cp index.html login.html login.css login-auth.js dist/
+cp index.html login.html login.css login-auth.js privacy.html dist/
 cp manifest.json sw.js dist/
 [ -f favicon.svg ] && cp favicon.svg dist/ || true
 [ -f robots.txt ] && cp robots.txt dist/ || true
