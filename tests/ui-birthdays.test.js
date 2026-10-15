@@ -80,3 +80,37 @@ describe('getUpcomingBirthdays', () => {
     expect(getUpcomingBirthdays(CID)).toEqual([]);
   });
 });
+
+describe('date-only birth dates in Pacific time', () => {
+  // new Date('YYYY-MM-DD') parses as UTC midnight, which is the previous
+  // evening in Vancouver. Node honours a runtime TZ change.
+  const origTZ = process.env.TZ;
+  beforeAll(() => {
+    process.env.TZ = 'America/Vancouver';
+  });
+  afterAll(() => {
+    if (origTZ === undefined) delete process.env.TZ;
+    else process.env.TZ = origTZ;
+  });
+
+  it('formatDate shows the stored day, not the day before', () => {
+    expect(formatDate('2012-11-04')).toBe(
+      new Date(2012, 10, 4).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })
+    );
+    expect(formatDate('2012-11-04')).toMatch(/Nov\.? 4, 2012/);
+  });
+
+  it('parseLocalDate keeps the calendar day for date-only strings', () => {
+    const d = parseLocalDate('2012-11-04');
+    expect([d.getFullYear(), d.getMonth(), d.getDate()]).toEqual([2012, 10, 4]);
+  });
+
+  it('getUpcomingBirthdays counts a plain YYYY-MM-DD birthday today as 0 days', () => {
+    const today = new Date();
+    const dob = `2010-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    mockStudents([{ id: 's1', firstName: 'BdayToday', dateOfBirth: dob }]);
+    const result = getUpcomingBirthdays(CID);
+    expect(result[0].daysUntil).toBe(0);
+    expect(result[0].nextBday.getDate()).toBe(today.getDate());
+  });
+});

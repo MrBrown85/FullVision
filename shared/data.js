@@ -3186,9 +3186,19 @@ function formatTs(ts) {
     d.toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' })
   );
 }
+/* Parse a date-only 'YYYY-MM-DD' string as a local calendar date.
+   new Date('YYYY-MM-DD') is read as UTC midnight, which lands on the
+   previous day in Pacific time. Anything else goes to new Date as-is. */
+function parseLocalDate(v) {
+  if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v)) {
+    const p = v.split('-');
+    return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+  }
+  return new Date(v);
+}
 function formatDate(ts) {
   if (!ts) return '';
-  return new Date(ts).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' });
+  return parseLocalDate(ts).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 function uid() {
   return 's' + Date.now() + Math.random().toString(36).slice(2, 10);

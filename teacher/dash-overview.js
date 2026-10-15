@@ -305,8 +305,8 @@ window.DashOverview = (function () {
     if (upcomingBdays.length > 0) {
       html += '<div style="margin-top:14px">' + '<div class="dash-section-title">Upcoming Birthdays</div>';
       upcomingBdays.forEach(function (b) {
-        var dob = new Date(b.student.dateOfBirth);
-        var monthDay = dob.toLocaleDateString('en-CA', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+        var dob = parseLocalDate(b.student.dateOfBirth);
+        var monthDay = dob.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
         var countdown =
           b.daysUntil === 0
             ? '<span style="color:var(--score-3);font-weight:600">Today!</span>'
@@ -394,7 +394,7 @@ window.DashOverview = (function () {
     if (upcomingBdays.length === 0) return '';
     var html = '<div class="dash-birthday-box">' + '<div class="dash-section-title">Upcoming Birthdays</div>';
     upcomingBdays.forEach(function (b) {
-      var dob = new Date(b.student.dateOfBirth);
+      var dob = parseLocalDate(b.student.dateOfBirth);
       var monthDay = dob.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
       var countdown =
         b.daysUntil === 0
