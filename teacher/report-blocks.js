@@ -654,7 +654,10 @@ window.ReportBlocks = (function () {
       .map(a => {
         const aScores = allScores.filter(s => s.assessmentId === a.id && s.score > 0);
         if (aScores.length === 0) return null;
-        const avg = aScores.reduce((s, x) => s + scoreModValue(x), 0) / aScores.length;
+        let avg = aScores.reduce((s, x) => s + scoreModValue(x), 0) / aScores.length;
+        // Rubric work counts each criterion once, at its weight.
+        const rubricAvg = getRubricAssessmentScore(cid, a, aScores);
+        if (rubricAvg != null) avg = rubricAvg;
         return { title: a.title, avg, r: Math.round(avg), type: a.type, id: a.id };
       })
       .filter(Boolean);
@@ -841,7 +844,9 @@ window.ReportBlocks = (function () {
           scoreDisplay = `<td style="text-align:center;font-weight:600;font-size:1rem">${formatPoints(rawAvg)}<span style="color:var(--text-3);font-weight:400">/${max}</span></td>`;
           profDisplay = `<td style="text-align:center"><span data-prof="${profLevel}" data-prof-bg="${profLevel}" style="display:inline-block;padding:2px 10px;border-radius:6px;font-size:0.74rem;font-weight:600;background:${PROF_TINT[profLevel] || 'transparent'};color:${color}">${profLabel(profLevel)} <span style="font-weight:400;opacity:0.7">${pct}%</span></span></td>`;
         } else {
-          const avg = aScores.reduce((s, x) => s + scoreModValue(x), 0) / aScores.length;
+          let avg = aScores.reduce((s, x) => s + scoreModValue(x), 0) / aScores.length;
+          const rubricAvg = getRubricAssessmentScore(cid, a, aScores);
+          if (rubricAvg != null) avg = rubricAvg;
           const r = Math.round(avg);
           const color = PROF_COLORS[r] || 'var(--text-3)';
           scoreDisplay = `<td data-prof="${r}" style="text-align:center;font-weight:600;font-size:1rem;color:${color}">${r}<span style="color:var(--text-3);font-weight:400">/4</span></td>`;
@@ -886,7 +891,9 @@ window.ReportBlocks = (function () {
       const ccIds = a.coreCompetencyIds || [];
       if (ccIds.length === 0) return;
       const aScores = scores.filter(s => s.assessmentId === a.id && s.score > 0);
-      const avg = aScores.length > 0 ? aScores.reduce((sum, s) => sum + scoreModValue(s), 0) / aScores.length : 0;
+      let avg = aScores.length > 0 ? aScores.reduce((sum, s) => sum + scoreModValue(s), 0) / aScores.length : 0;
+      const rubricAvg = getRubricAssessmentScore(cid, a, aScores);
+      if (rubricAvg != null) avg = rubricAvg;
       ccIds.forEach(ccId => {
         if (compData[ccId]) {
           compData[ccId].count++;

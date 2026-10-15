@@ -173,6 +173,16 @@ describe('rubric assessment overall', () => {
     expect(letter.R).toBe(Math.round(qToPercentage(2.5) * 10) / 10);
   });
 
+  it('gives the gradebook and report views the same weighted value', () => {
+    seed({
+      criteria: [crit('A', ['t1'], 1), crit('B', ['t2'], 3)],
+      scores: [score('t1', 4), score('t2', 2), { ...score('t1', 1), assessmentId: 'other' }],
+    });
+    expect(getRubricAssessmentScore(CID, assessment, _cache.scores[CID][SID])).toBeCloseTo(2.5, 5);
+    expect(getRubricAssessmentScore(CID, assessment, [])).toBeNull();
+    expect(getRubricAssessmentScore(CID, { id: 'a2', tagIds: ['t1'] }, _cache.scores[CID][SID])).toBeUndefined();
+  });
+
   it('leaves non-rubric assessments as a plain average', () => {
     const plain = { id: 'a1', title: 'Quiz', tagIds: ['t1', 't2'], type: 'summative' };
     seed({

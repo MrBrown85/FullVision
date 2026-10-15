@@ -1099,6 +1099,9 @@ window.PageGradebook = (function () {
                 return x + y;
               }, 0) / tagScores.length
             : 0;
+        // Rubric work counts each criterion once, at its weight.
+        var rubricVal = getRubricAssessmentScore(cid, a, studentScores);
+        if (rubricVal !== undefined) val = rubricVal || 0;
         var isPoints = isPointsScored(a);
         var display,
           cellStyle,
@@ -1615,6 +1618,8 @@ window.PageGradebook = (function () {
             .filter(function (v) {
               return v > 0;
             });
+          var rubricVal = getRubricAssessmentScore(cid, assess, ss);
+          if (rubricVal !== undefined) return rubricVal || 0;
           return ts.length > 0
             ? ts.reduce(function (x, y) {
                 return x + y;
@@ -2065,6 +2070,8 @@ window.PageGradebook = (function () {
                 return x + y;
               }, 0) / tagScores.length
             : 0;
+        var rubricVal = getRubricAssessmentScore(cid, a, ss);
+        if (rubricVal !== undefined) avg = rubricVal || 0;
         row.push(avg > 0 ? avg.toFixed(1) : '');
       });
       rows.push(row);

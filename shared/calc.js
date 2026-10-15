@@ -148,10 +148,12 @@ function _rubricLevelValue(criterion, level, mod) {
    the server). Scores are stored per competency, so each criterion is the
    average of its competencies' scores and counts once. Criteria combine by
    weight; unscored criteria and weight-0 criteria are left out (all scored
-   criteria at 0 count equally). Kept on the 0–4 scale. Returns undefined
-   when the assessment isn't rubric-scored, so the caller averages entries. */
-function _rubricOverallScore(cid, assessment, entries) {
-  var rubricId = assessment.rubricId || assessment.rubric_id;
+   criteria at 0 count equally). Kept on the 0–4 scale. `entries` may hold
+   the student's other scores too. Statuses are not applied. Returns null when
+   no criterion is scored, and undefined when the assessment isn't
+   rubric-scored, so the caller averages its entries as before. */
+function getRubricAssessmentScore(cid, assessment, entries) {
+  var rubricId = assessment && (assessment.rubricId || assessment.rubric_id);
   if (!rubricId || isPointsScored(assessment) || typeof getRubricById !== 'function') return undefined;
   var rubric = getRubricById(cid, rubricId);
   var criteria = (rubric && rubric.criteria) || [];
@@ -162,9 +164,9 @@ function _rubricOverallScore(cid, assessment, entries) {
     if (!criterion) return;
     // A criterion with no competencies stores its score under its own id.
     var tagIds = criterion.tagIds && criterion.tagIds.length ? criterion.tagIds : [criterion.id];
-    var values = entries
+    var values = (entries || [])
       .filter(function (entry) {
-        return tagIds.indexOf(entry.tagId) >= 0;
+        return entry.assessmentId === assessment.id && tagIds.indexOf(entry.tagId) >= 0;
       })
       .map(function (entry) {
         return _rubricLevelValue(criterion, entry.score, entry.mod);
@@ -218,7 +220,7 @@ function getAssessmentOverallScore(cid, studentId, assessmentId) {
   var entries = (getScores(cid)[studentId] || []).filter(function (entry) {
     return entry.assessmentId === assessmentId;
   });
-  var rubricResult = _rubricOverallScore(cid, assessment, entries);
+  var rubricResult = getRubricAssessmentScore(cid, assessment, entries);
   if (rubricResult !== undefined) {
     _assessmentOverallCache[cacheKey] = rubricResult;
     return rubricResult;
@@ -912,6 +914,7 @@ window.Calc = {
   getCategoryWeights,
   getAssessmentWeight,
   getAssessmentOverallScore,
+  getRubricAssessmentScore,
   getCategoryAverage,
   qToPercentage,
   percentageToLetter,

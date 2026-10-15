@@ -1129,6 +1129,8 @@ window.PageStudent = (function () {
         aScores.reduce(function (sum, s) {
           return sum + scoreModValue(s);
         }, 0) / aScores.length;
+      var rubricAvg = getRubricAssessmentScore(cid, assess, aScores);
+      if (rubricAvg != null) avg = rubricAvg;
       if (avg < 2)
         attentionItems.push({ type: 'low', assess: assess, detail: 'Avg ' + avg.toFixed(1) + ' — needs support' });
     });
