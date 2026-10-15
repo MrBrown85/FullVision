@@ -158,9 +158,8 @@ describe('saving a rubric criterion score with no competency', () => {
     seed('scores', {});
     upsertScore(CID, ENR, AID, TAGLESS_CRIT, 3, '2026-10-15', 'summative', '');
     await settle();
-    expect(
-      fake.committedCount('upsert_rubric_score', p => p.p_criterion_id === TAGLESS_CRIT && p.p_value === 3),
-    ).toBe(1);
+    const sent = fake.committedCount('upsert_rubric_score', p => p.p_criterion_id === TAGLESS_CRIT && p.p_value === 3);
+    expect(sent).toBe(1);
     expect(fake.count('upsert_score')).toBe(0);
     expect(fake.count('upsert_tag_score')).toBe(0);
   });
