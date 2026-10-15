@@ -287,6 +287,25 @@ const BC_DESIGNATIONS = {
   },
 };
 
+/* ── Support flags ──────────────────────────────────────────────
+   Supports that aren't ministry special-ed designations. They're stored in
+   the same enrollment.designations array (as 'ELL'), but kept out of
+   BC_DESIGNATIONS so they never count toward IEP or Modified. */
+const SUPPORT_FLAGS = {
+  ELL: {
+    name: 'English Language Learner',
+    desc: 'Receives English language learning support',
+    level: 0,
+    iep: false,
+    modified: false,
+  },
+};
+
+// Lookup for any code in student.designations, designation or support flag.
+function designationInfo(code) {
+  return BC_DESIGNATIONS[code] || SUPPORT_FLAGS[code] || null;
+}
+
 const PROF_LABELS = { 0: 'No Evidence', 1: 'Emerging', 2: 'Developing', 3: 'Proficient', 4: 'Extending' };
 
 /* ── + and − on proficiency levels ───────────────────────────────────────

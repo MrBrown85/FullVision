@@ -117,7 +117,7 @@ window.DashStudentCards = (function () {
                 var hasIep = false;
                 var hasMod = false;
                 (st.designations || []).forEach(function (code) {
-                  var d = BC_DESIGNATIONS[code];
+                  var d = designationInfo(code);
                   if (!d) return;
                   dh +=
                     '<span class="dash-desig-badge' +

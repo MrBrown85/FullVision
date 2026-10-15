@@ -18,6 +18,7 @@ window.MStudents = (function () {
         var des = BC_DESIGNATIONS[code];
         if (des && des.iep) badges += '<span class="m-badge m-badge-iep">IEP</span>';
         if (des && des.modified) badges += '<span class="m-badge m-badge-mod">MOD</span>';
+        if (code === 'ELL') badges += '<span class="m-badge m-badge-ell">ELL</span>';
       });
     }
     return badges;

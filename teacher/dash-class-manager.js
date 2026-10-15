@@ -1103,7 +1103,7 @@ window.DashClassManager = (function () {
           (pref ? '<span class="cm-student-pref">"' + esc(pref) + '"</span>' : '') +
           (st.designations || [])
             .map(function (code) {
-              var d = BC_DESIGNATIONS[code];
+              var d = designationInfo(code);
               if (!d) return '';
               return (
                 '<span class="cm-desig-badge' +
@@ -1208,6 +1208,27 @@ window.DashClassManager = (function () {
       '<div class="cm-field" style="grid-column:1/-1"><label class="cm-label">Designations</label>' +
       '<div class="desig-check-grid">' +
       Object.entries(BC_DESIGNATIONS)
+        .map(function (entry) {
+          var k = entry[0],
+            v = entry[1];
+          return (
+            '<label class="desig-check-item" title="' +
+            esc(v.desc) +
+            '"><input type="checkbox" class="cm-desig-check" value="' +
+            k +
+            '"><span class="desig-check-code">' +
+            k +
+            '</span><span class="desig-check-name">' +
+            esc(v.name) +
+            '</span></label>'
+          );
+        })
+        .join('') +
+      '</div>' +
+      '</div>' +
+      '<div class="cm-field" style="grid-column:1/-1"><label class="cm-label">Language Support</label>' +
+      '<div class="desig-check-grid">' +
+      Object.entries(SUPPORT_FLAGS)
         .map(function (entry) {
           var k = entry[0],
             v = entry[1];

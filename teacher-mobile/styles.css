@@ -467,6 +467,10 @@ body.fv-switching-course::after {
   background: rgba(88, 86, 214, 0.15);
   color: var(--mod-badge);
 }
+.m-badge-ell {
+  background: rgba(0, 122, 255, 0.15);
+  color: var(--active);
+}
 
 /* ── Student Detail — Hero ─────────────────────────────────── */
 .m-hero {

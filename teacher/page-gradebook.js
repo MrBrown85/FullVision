@@ -1040,7 +1040,7 @@ window.PageGradebook = (function () {
       var fr = Math.round(overall);
       var desTags = (s.designations || [])
         .map(function (code) {
-          var d = BC_DESIGNATIONS[code];
+          var d = designationInfo(code);
           if (!d) return '';
           return (
             '<span class="gb-des-tag" title="' +
