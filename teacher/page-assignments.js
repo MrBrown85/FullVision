@@ -94,7 +94,6 @@ window.PageAssignments = (function () {
   var _editingRubric = null;
   var _rubricDirty = false;
   var _rubricAutoTags = [];
-  var _critTagSection = {};
   var _expandedCriterion = 0;
 
   // Comment popover state
@@ -2596,8 +2595,7 @@ window.PageAssignments = (function () {
           ';color:' +
           color +
           '">' +
-          esc(tid) +
-          (tag ? ' \u00B7 ' + esc(tag.label) : '') +
+          esc(_rubricTagName(tag, sec)) +
           '</span>'
         );
       })
@@ -2701,11 +2699,38 @@ window.PageAssignments = (function () {
       '</div></div><div class="rubric-editor-footer"><button class="rubric-add-criterion-btn" data-action="addCriterion">+ Add Criterion</button>' +
       '<button class="btn btn-ghost" data-action="cancelRubricEdit">Cancel</button><button class="btn btn-primary" data-action="saveRubricEdit">Save Rubric</button></div></div></div>';
     document.body.insertAdjacentHTML('beforeend', html);
-    _critTagSection = {};
     setTimeout(function () {
       var inp = document.getElementById('re-name');
       if (inp) inp.focus();
     }, 50);
+  }
+  var RUBRIC_LEVELS = [
+    { n: 4, name: 'Extending' },
+    { n: 3, name: 'Proficient' },
+    { n: 2, name: 'Developing' },
+    { n: 1, name: 'Emerging' },
+  ];
+  // A tag's teacher-facing name. Never the id: real tag ids are UUIDs.
+  function _rubricTagName(tag, sec) {
+    return (tag && (tag.label || tag.name)) || (sec && sec.name) || (tag && tag.code) || '';
+  }
+  // Sections split into the course's competency groups, if it has any.
+  function _rubricTagGroups(sections) {
+    var lm = getLearningMap(activeCourse);
+    var groups = (lm && lm.competencyGroups) || [];
+    if (!groups.length) return [{ name: '', secs: sections }];
+    var byId = {};
+    var out = groups.map(function (g) {
+      return (byId[g.id] = { name: g.name, secs: [] });
+    });
+    var rest = { name: 'Other', secs: [] };
+    sections.forEach(function (sec) {
+      (sec.groupId && byId[sec.groupId] ? byId[sec.groupId] : rest).secs.push(sec);
+    });
+    out.push(rest);
+    return out.filter(function (g) {
+      return g.secs.length;
+    });
   }
   function renderCriterionBlock(ci, crit, allCriteria, sections) {
     var otherUsed = {};
@@ -2716,25 +2741,21 @@ window.PageAssignments = (function () {
         });
     });
     var selectedTagIds = new Set(crit.tagIds || []);
-    var openSecId = _critTagSection[ci] || (sections[0] ? sections[0].id : '');
-    var openSec =
-      sections.find(function (s) {
-        return s.id === openSecId;
-      }) || sections[0];
     var isCollapsed = ci !== _expandedCriterion;
+    // Collapsed summary: the competency names this criterion assesses.
     var headerChips = '';
     (crit.tagIds || []).forEach(function (tid) {
+      var tag = getTagById(activeCourse, tid);
       var sec = getSectionForTag(activeCourse, tid);
-      var color = sec ? sec.color : 'var(--text-3)';
+      var name = _rubricTagName(tag, sec);
+      if (!name) return;
       headerChips +=
-        '<span class="rubric-header-chip" style="background:' +
-        color +
-        '20;color:' +
-        color +
-        ';border:1px solid ' +
-        color +
-        '30">' +
-        esc(tid) +
+        '<span class="rubric-header-chip" style="--sec:' +
+        cssColor(sec && sec.color) +
+        '" title="' +
+        esc(name) +
+        '">' +
+        esc(name) +
         '</span>';
     });
     // T-UI-09 · per-criterion weight. Any positive number; normalized at read-time (Pass D §1.1).
@@ -2747,166 +2768,93 @@ window.PageAssignments = (function () {
       '"><div class="rubric-criterion-header" data-action="toggleCriterionExpand" data-index="' +
       ci +
       '">' +
+      '<span class="rubric-criterion-chevron" aria-hidden="true">▾</span>' +
       '<span class="rubric-criterion-num">' +
       (ci + 1) +
       '</span><input class="rubric-criterion-name" value="' +
       esc(crit.name) +
       '" data-action-blur="critName" data-crit-idx="' +
       ci +
-      '" data-stop-prop="true" placeholder="Criterion name">' +
-      '<label class="rubric-criterion-weight-label" data-stop-prop="true" title="Relative weight of this criterion (normalized across the rubric).">Weight <input class="rubric-criterion-weight" type="number" min="0" step="0.5" value="' +
+      '" data-stop-prop="true" placeholder="Criterion name" aria-label="Criterion name">' +
+      '<div class="rubric-header-chips">' +
+      headerChips +
+      '</div>' +
+      '<label class="rubric-criterion-weight-label" data-stop-prop="true" title="How much this criterion counts compared with the others.">Weight <input class="rubric-criterion-weight" type="number" min="0" step="0.5" value="' +
       critWeight +
       '" data-action-blur="critWeight" data-action-input="critWeightLive" data-crit-idx="' +
       ci +
       '" data-stop-prop="true" aria-label="Criterion weight"></label>' +
-      '<div class="rubric-header-chips">' +
-      headerChips +
-      '</div><span class="rubric-criterion-chevron">\u25BC</span>' +
       '<button class="rubric-criterion-delete" data-action="removeCriterion" data-index="' +
       ci +
-      '" data-stop-prop="true" title="Remove criterion">\u2715</button></div>' +
-      '<div class="rubric-criterion-body"><div class="rubric-selected-tags" id="re-sel-' +
-      ci +
-      '"><span class="rubric-selected-tags-label">Tags:</span>';
-    if (selectedTagIds.size === 0) html += '<span class="rubric-no-tags">Click tags below to add them</span>';
-    else
-      (crit.tagIds || []).forEach(function (tid) {
-        var tag = getTagById(activeCourse, tid);
-        var sec = getSectionForTag(activeCourse, tid);
-        if (tag)
-          html +=
-            '<span class="rubric-selected-chip" style="border-left:3px solid ' +
-            (sec ? sec.color : 'var(--text-3)') +
-            '" data-action="toggleCritTag" data-index="' +
-            ci +
-            '" data-tagid="' +
-            tid +
-            '" title="Click to remove"><strong>' +
-            esc(tid) +
-            '</strong> <span class="chip-label">' +
-            esc(tag.label) +
-            '</span></span>';
-      });
-    html += '</div><div class="rubric-tag-picker"><div class="rubric-tag-sections">';
-    sections.forEach(function (sec) {
-      var countInCrit = sec.tags.filter(function (t) {
-        return selectedTagIds.has(t.id);
-      }).length;
-      html +=
-        '<button class="rubric-tag-sec-btn' +
-        (sec.id === openSecId ? ' active' : '') +
-        '" data-action="switchCritSection" data-index="' +
-        ci +
-        '" data-secid="' +
-        sec.id +
-        '"><span class="rubric-tag-sec-dot" style="background:' +
-        sec.color +
-        '"></span>' +
-        esc(sec.shortName || sec.name) +
-        (countInCrit > 0
-          ? '<span class="rubric-tag-sec-count" style="color:' +
-            sec.color +
-            ';font-weight:700">' +
-            countInCrit +
-            '</span>'
-          : '') +
-        '</button>';
-    });
-    html += '</div><div class="rubric-tag-list" id="re-tags-' + ci + '">';
-    if (openSec)
-      openSec.tags.forEach(function (tag) {
-        var inThis = selectedTagIds.has(tag.id);
-        var inOtherName = otherUsed[tag.id];
-        var disabled = !!inOtherName;
-        html +=
-          '<div class="rubric-tag-item' +
-          (inThis ? ' selected' : '') +
-          (disabled ? ' disabled' : '') +
-          '" data-action="' +
-          (disabled ? '' : 'toggleCritTag') +
-          '" data-index="' +
-          ci +
-          '" data-tagid="' +
-          tag.id +
-          '"><input type="checkbox" class="rubric-tag-cb" ' +
-          (inThis ? 'checked' : '') +
-          ' ' +
-          (disabled ? 'disabled' : '') +
-          '><span class="rubric-tag-id" style="color:' +
-          openSec.color +
-          '">' +
-          esc(tag.code || tag.shortName || '') +
-          '</span><span class="rubric-tag-label">' +
-          esc(tag.label) +
-          '</span>' +
-          (disabled ? '<span class="rubric-tag-used-by">in ' + esc(inOtherName) + '</span>' : '') +
-          '</div>';
-      });
-    html +=
-      '</div></div></div><div class="rubric-levels">' +
-      '<div class="rubric-level-card"><div class="rubric-level-header"><span class="rubric-level-dot" style="background:var(--score-4)"></span> <span style="color:var(--score-4)">4 \u2014 Extending</span></div><textarea class="rubric-level-text" data-crit="' +
-      ci +
-      '" data-level="4" data-action-blur="critLevel" placeholder="What does extending look like?">' +
-      esc((crit.levels && crit.levels[4]) || '') +
-      '</textarea></div>' +
-      '<div class="rubric-level-card"><div class="rubric-level-header"><span class="rubric-level-dot" style="background:var(--score-3)"></span> <span style="color:var(--score-3)">3 \u2014 Proficient</span></div><textarea class="rubric-level-text" data-crit="' +
-      ci +
-      '" data-level="3" data-action-blur="critLevel" placeholder="What does proficient look like?">' +
-      esc((crit.levels && crit.levels[3]) || '') +
-      '</textarea></div>' +
-      '<div class="rubric-level-card"><div class="rubric-level-header"><span class="rubric-level-dot" style="background:var(--score-2)"></span> <span style="color:var(--score-2)">2 \u2014 Developing</span></div><textarea class="rubric-level-text" data-crit="' +
-      ci +
-      '" data-level="2" data-action-blur="critLevel" placeholder="What does developing look like?">' +
-      esc((crit.levels && crit.levels[2]) || '') +
-      '</textarea></div>' +
-      '<div class="rubric-level-card"><div class="rubric-level-header"><span class="rubric-level-dot" style="background:var(--score-1)"></span> <span style="color:var(--score-1)">1 \u2014 Emerging</span></div><textarea class="rubric-level-text" data-crit="' +
-      ci +
-      '" data-level="1" data-action-blur="critLevel" placeholder="What does emerging look like?">' +
-      esc((crit.levels && crit.levels[1]) || '') +
-      '</textarea></div>' +
-      '</div>' +
-      // T-UI-10 · per-level point value overrides. Defaults closed; 95% of teachers
-      // never need this. Overrides are optional — null levelValues means use 4/3/2/1.
-      (function () {
-        var lv = crit.levelValues || {};
-        var v4 = lv[4] != null ? lv[4] : 4;
-        var v3 = lv[3] != null ? lv[3] : 3;
-        var v2 = lv[2] != null ? lv[2] : 2;
-        var v1 = lv[1] != null ? lv[1] : 1;
-        var customized = crit.levelValues && Object.keys(crit.levelValues).length > 0;
-        return (
-          '<details class="rubric-level-values"' +
-          (customized ? ' open' : '') +
-          ' data-crit-idx="' +
-          ci +
-          '" data-stop-prop="true">' +
-          '<summary class="rubric-level-values-summary" data-stop-prop="true">Customise point values</summary>' +
-          '<div class="rubric-level-values-grid">' +
-          '<label class="rubric-level-value-label">L4 <input class="rubric-level-value" type="number" step="0.5" value="' +
-          v4 +
-          '" data-crit="' +
-          ci +
-          '" data-level="4" data-action-blur="critLevelValue" data-stop-prop="true" aria-label="Level 4 value"></label>' +
-          '<label class="rubric-level-value-label">L3 <input class="rubric-level-value" type="number" step="0.5" value="' +
-          v3 +
-          '" data-crit="' +
-          ci +
-          '" data-level="3" data-action-blur="critLevelValue" data-stop-prop="true" aria-label="Level 3 value"></label>' +
-          '<label class="rubric-level-value-label">L2 <input class="rubric-level-value" type="number" step="0.5" value="' +
-          v2 +
-          '" data-crit="' +
-          ci +
-          '" data-level="2" data-action-blur="critLevelValue" data-stop-prop="true" aria-label="Level 2 value"></label>' +
-          '<label class="rubric-level-value-label">L1 <input class="rubric-level-value" type="number" step="0.5" value="' +
-          v1 +
-          '" data-crit="' +
-          ci +
-          '" data-level="1" data-action-blur="critLevelValue" data-stop-prop="true" aria-label="Level 1 value"></label>' +
-          '</div>' +
-          '</details>'
-        );
-      })() +
+      '" data-stop-prop="true" title="Remove criterion" aria-label="Remove criterion">✕</button></div>' +
+      '<div class="rubric-criterion-body">' +
+      '<div class="rubric-part"><div class="rubric-part-label">Competencies assessed' +
+      (selectedTagIds.size === 0 ? '<span class="rubric-part-hint">Choose at least one</span>' : '') +
       '</div>';
+    _rubricTagGroups(sections).forEach(function (g) {
+      if (g.name) html += '<div class="rubric-comp-group">' + esc(g.name) + '</div>';
+      html += '<div class="rubric-comp-chips">';
+      g.secs.forEach(function (sec) {
+        (sec.tags || []).forEach(function (tag) {
+          var inThis = selectedTagIds.has(tag.id);
+          var usedBy = otherUsed[tag.id];
+          var name = _rubricTagName(tag, sec);
+          html +=
+            '<button type="button" class="rubric-comp-chip' +
+            (inThis ? ' selected' : '') +
+            '" style="--sec:' +
+            cssColor(sec.color) +
+            '" aria-pressed="' +
+            inThis +
+            '"' +
+            (usedBy
+              ? ' disabled title="Already used in ' + esc(usedBy) + '"'
+              : ' data-action="toggleCritTag" data-index="' + ci + '" data-tagid="' + esc(tag.id) + '"') +
+            '><span class="rubric-comp-mark" aria-hidden="true">' +
+            (inThis ? '✓' : '') +
+            '</span>' +
+            esc(name) +
+            (usedBy ? '<span class="rubric-comp-used">' + esc(usedBy) + '</span>' : '') +
+            '</button>';
+        });
+      });
+      html += '</div>';
+    });
+    // T-UI-10 · per-level point values sit in each level's header.
+    // levelValues stays null unless a value differs from 4/3/2/1.
+    var lv = crit.levelValues || {};
+    html +=
+      '</div><div class="rubric-part"><div class="rubric-part-label">Level descriptors</div><div class="rubric-levels">';
+    RUBRIC_LEVELS.forEach(function (L) {
+      var pts = lv[L.n] != null ? lv[L.n] : L.n;
+      html +=
+        '<div class="rubric-level-card" style="--lvl:var(--score-' +
+        L.n +
+        ')"><div class="rubric-level-header"><span class="rubric-level-name">' +
+        L.name +
+        '</span><label class="rubric-level-pts" title="Points for ' +
+        L.name +
+        '"><input class="rubric-level-value" type="number" step="0.5" min="0" value="' +
+        pts +
+        '" data-crit="' +
+        ci +
+        '" data-level="' +
+        L.n +
+        '" data-action-blur="critLevelValue" aria-label="' +
+        L.name +
+        ' points"> pts</label></div><textarea class="rubric-level-text" data-crit="' +
+        ci +
+        '" data-level="' +
+        L.n +
+        '" data-action-blur="critLevel" placeholder="What does ' +
+        L.name.toLowerCase() +
+        ' look like?" aria-label="' +
+        L.name +
+        ' descriptor">' +
+        esc((crit.levels && crit.levels[L.n]) || '') +
+        '</textarea></div>';
+    });
+    html += '</div></div></div></div>';
     return html;
   }
   function toggleCriterionExpand(idx) {
@@ -2962,10 +2910,6 @@ window.PageAssignments = (function () {
     var i = crit.tagIds.indexOf(tagId);
     if (i >= 0) crit.tagIds.splice(i, 1);
     else crit.tagIds.push(tagId);
-    _refreshCriterionDOM(critIdx);
-  }
-  function switchCritSection(critIdx, secId) {
-    _critTagSection[critIdx] = secId;
     _refreshCriterionDOM(critIdx);
   }
   function _refreshCriterionDOM(ci) {
@@ -3957,9 +3901,6 @@ window.PageAssignments = (function () {
       },
       toggleCritTag: function () {
         toggleCritTag(parseInt(el.dataset.index, 10), el.dataset.tagid);
-      },
-      switchCritSection: function () {
-        switchCritSection(parseInt(el.dataset.index, 10), el.dataset.secid);
       },
       resetGradingScale: function () {
         resetGradingScale();
