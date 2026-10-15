@@ -125,6 +125,75 @@ function _normalizeAssessmentEntryValue(assessment, rawScore) {
   return num;
 }
 
+/* A rubric level's value on one criterion: its custom point value, or the
+   level itself. A + or − moves a third of the way to the next level's value,
+   as fv_rubric_level_value does on the server. Null for anything but 1–4
+   (0 is a cleared score). */
+function _rubricLevelValue(criterion, level, mod) {
+  var n = Number(level);
+  if (!(n === 1 || n === 2 || n === 3 || n === 4)) return null;
+  var custom = (criterion && criterion.levelValues) || {};
+  function valueOf(l) {
+    var v = custom[l] != null && custom[l] !== '' ? Number(custom[l]) : NaN;
+    return isFinite(v) ? v : l;
+  }
+  var value = valueOf(n);
+  var m = normalizeScoreMod(n, mod);
+  if (m > 0) return value + (valueOf(n + 1) - value) * SCORE_MOD_STEP;
+  if (m < 0) return value - (value - valueOf(n - 1)) * SCORE_MOD_STEP;
+  return value;
+}
+
+/* A rubric assessment's overall (read-paths §1.1, fv_assessment_overall on
+   the server). Scores are stored per competency, so each criterion is the
+   average of its competencies' scores and counts once. Criteria combine by
+   weight; unscored criteria and weight-0 criteria are left out (all scored
+   criteria at 0 count equally). Kept on the 0–4 scale. `entries` may hold
+   the student's other scores too. Statuses are not applied. Returns null when
+   no criterion is scored, and undefined when the assessment isn't
+   rubric-scored, so the caller averages its entries as before. */
+function getRubricAssessmentScore(cid, assessment, entries) {
+  var rubricId = assessment && (assessment.rubricId || assessment.rubric_id);
+  if (!rubricId || isPointsScored(assessment) || typeof getRubricById !== 'function') return undefined;
+  var rubric = getRubricById(cid, rubricId);
+  var criteria = (rubric && rubric.criteria) || [];
+  if (criteria.length === 0) return undefined;
+
+  var scored = [];
+  criteria.forEach(function (criterion) {
+    if (!criterion) return;
+    // A criterion with no competencies stores its score under its own id.
+    var tagIds = criterion.tagIds && criterion.tagIds.length ? criterion.tagIds : [criterion.id];
+    var values = (entries || [])
+      .filter(function (entry) {
+        return entry.assessmentId === assessment.id && tagIds.indexOf(entry.tagId) >= 0;
+      })
+      .map(function (entry) {
+        return _rubricLevelValue(criterion, entry.score, entry.mod);
+      })
+      .filter(function (value) {
+        return value != null;
+      });
+    if (values.length === 0) return;
+    var avg =
+      values.reduce(function (sum, value) {
+        return sum + value;
+      }, 0) / values.length;
+    var weight = criterion.weight == null || criterion.weight === '' ? 1 : Number(criterion.weight);
+    scored.push({ value: avg, weight: isFinite(weight) && weight >= 0 ? weight : 1 });
+  });
+  if (scored.length === 0) return null;
+
+  var totalWeight = scored.reduce(function (sum, c) {
+    return sum + c.weight;
+  }, 0);
+  var weightedSum = scored.reduce(function (sum, c) {
+    return sum + (totalWeight > 0 ? c.weight : 1) * c.value;
+  }, 0);
+  var result = weightedSum / (totalWeight > 0 ? totalWeight : scored.length);
+  return Math.max(0, Math.min(4, result));
+}
+
 function getAssessmentOverallScore(cid, studentId, assessmentId) {
   var cacheKey = cid + ':' + studentId + ':' + assessmentId;
   if (_assessmentOverallCache[cacheKey] !== undefined) return _assessmentOverallCache[cacheKey];
@@ -148,11 +217,16 @@ function getAssessmentOverallScore(cid, studentId, assessmentId) {
     return 0;
   }
 
-  var studentScores = getScores(cid)[studentId] || [];
-  var values = studentScores
-    .filter(function (entry) {
-      return entry.assessmentId === assessmentId;
-    })
+  var entries = (getScores(cid)[studentId] || []).filter(function (entry) {
+    return entry.assessmentId === assessmentId;
+  });
+  var rubricResult = getRubricAssessmentScore(cid, assessment, entries);
+  if (rubricResult !== undefined) {
+    _assessmentOverallCache[cacheKey] = rubricResult;
+    return rubricResult;
+  }
+
+  var values = entries
     .map(function (entry) {
       // A points score of 0 counts as ungraded (see getTagScores).
       if (isPointsScored(assessment) && !isCompletionScored(assessment) && !(Number(entry.score) > 0)) return null;
@@ -840,6 +914,7 @@ window.Calc = {
   getCategoryWeights,
   getAssessmentWeight,
   getAssessmentOverallScore,
+  getRubricAssessmentScore,
   getCategoryAverage,
   qToPercentage,
   percentageToLetter,
