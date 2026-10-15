@@ -458,7 +458,7 @@ function getUpcomingBirthdays(cid) {
   return students
     .filter(s => s.dateOfBirth)
     .map(s => {
-      const dob = new Date(s.dateOfBirth);
+      const dob = parseLocalDate(s.dateOfBirth);
       let nextBday = new Date(thisYear, dob.getMonth(), dob.getDate());
       nextBday.setHours(0, 0, 0, 0);
       if (nextBday < today) nextBday.setFullYear(thisYear + 1);
