@@ -116,6 +116,28 @@ describe('grades with a rubric criterion that has no competency', () => {
     expect(getTagScores(CID, ENR, TAG).map(s => s.score)).toEqual([4]);
   });
 
+  it('weights the criterion and uses its level values like any other', () => {
+    seed('rubrics', [
+      {
+        id: RUBRIC,
+        name: 'Lab report',
+        criteria: [
+          { id: LINKED_CRIT, name: 'Analysis', tagIds: [TAG], weight: 1 },
+          { id: TAGLESS_CRIT, name: 'Neatness', tagIds: [], weight: 3, levelValues: { 2: 2.5 } },
+        ],
+      },
+    ]);
+    scoreWith([
+      { assessmentId: AID, tagId: TAG, score: 4, date: '2026-10-15' },
+      { assessmentId: AID, tagId: TAGLESS_CRIT, score: 2, date: '2026-10-15' },
+    ]);
+    // (1 × 4 + 3 × 2.5) / 4 — unweighted at the plain level it would be 3.
+    expect(getAssessmentOverallScore(CID, ENR, AID)).toBeCloseTo(2.875, 5);
+    expect(getCourseLetterData(CID, ENR).Q).toBeCloseTo(2.875, 5);
+    expect(getSectionProficiency(CID, ENR, SEC)).toBe(4);
+    expect(getTagScores(CID, ENR, TAG).map(s => s.score)).toEqual([4]);
+  });
+
   it('does not also count a leftover overall score', () => {
     seed('rubrics', [{ id: RUBRIC, name: 'Effort', criteria: [{ id: TAGLESS_CRIT, name: 'Effort', tagIds: [] }] }]);
     seed('assessments', [{ id: AID, title: 'Effort', type: 'summative', rubricId: RUBRIC, tagIds: [] }]);
