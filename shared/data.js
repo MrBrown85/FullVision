@@ -2292,7 +2292,16 @@ function _loadCoursesFromLS() {
 }
 
 /* Fields that affect proficiency calculations */
-const _PROF_FIELDS = ['scores', 'categories', 'assessments', 'overrides', 'statuses', 'courseConfigs', 'learningMaps'];
+const _PROF_FIELDS = [
+  'scores',
+  'categories',
+  'assessments',
+  'overrides',
+  'statuses',
+  'courseConfigs',
+  'learningMaps',
+  'rubrics',
+];
 
 /* Blob→rows converters for generic bulk sync (delete-all + insert pattern) */
 const _BULK_SYNC_CONVERTERS = {
