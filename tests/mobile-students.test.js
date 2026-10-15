@@ -101,6 +101,17 @@ describe('MStudents.renderList', () => {
     expect(html).toContain('m-badge-mod');
   });
 
+  it('shows an ELL badge, not IEP, for an ELL-only student', () => {
+    mockDataLayer({
+      getStudents: () => [
+        { id: 'stu1', firstName: 'Ana', lastName: 'Ruiz', preferred: '', pronouns: '', designations: ['ELL'] },
+      ],
+    });
+    const html = MStudents.renderList(CID);
+    expect(html).toContain('m-badge-ell');
+    expect(html).not.toContain('m-badge-iep');
+  });
+
   it('shows proficiency badge with correct value', () => {
     mockDataLayer({ getOverallProficiency: (cid, sid) => (sid === 'stu1' ? 3.5 : 2.0) });
     const html = MStudents.renderList(CID);

@@ -261,6 +261,26 @@ window.PageStudent = (function () {
         })
         .join('') +
       '</div></div>' +
+      '<div class="cm-field" style="grid-column:1/-1"><label class="cm-label">Language Support</label><div class="desig-check-grid">' +
+      Object.entries(SUPPORT_FLAGS)
+        .map(function (e) {
+          var checked = (st.designations || []).indexOf(e[0]) >= 0 ? ' checked' : '';
+          return (
+            '<label class="desig-check-item" title="' +
+            esc(e[1].desc || '') +
+            '"><input type="checkbox" class="desig-check" value="' +
+            e[0] +
+            '"' +
+            checked +
+            '><span class="desig-check-code">' +
+            e[0] +
+            '</span><span class="desig-check-name">' +
+            esc(e[1].name) +
+            '</span></label>'
+          );
+        })
+        .join('') +
+      '</div></div>' +
       '</div>' +
       '<div class="edit-modal-actions">' +
       '<button class="btn-ghost" data-action="closeEditStudent">Cancel</button>' +

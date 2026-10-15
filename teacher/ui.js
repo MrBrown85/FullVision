@@ -603,7 +603,7 @@ function renderStudentHeader(cid, sid, opts) {
   let hasIep = false,
     hasMod = false;
   desigs.forEach(code => {
-    const d = BC_DESIGNATIONS[code];
+    const d = designationInfo(code);
     if (!d) return;
     chips.push(
       `<span class="sh-chip sh-chip-desig${d.level > 0 ? ' low-inc' : ''}" title="${code} \u2014 ${d.name}${d.iep ? ' \u00b7 IEP Required' : ''}${d.modified ? ' \u00b7 Modified Program' : ''}"><strong>${code}</strong> ${d.name}</span>`,
