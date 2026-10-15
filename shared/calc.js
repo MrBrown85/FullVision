@@ -163,7 +163,7 @@ function getRubricAssessmentScore(cid, assessment, entries) {
   criteria.forEach(function (criterion) {
     if (!criterion) return;
     // A criterion with no competencies stores its score under its own id.
-    var tagIds = criterion.tagIds && criterion.tagIds.length ? criterion.tagIds : [criterion.id];
+    var tagIds = rubricCriterionScoreKeys(criterion);
     var values = (entries || [])
       .filter(function (entry) {
         return entry.assessmentId === assessment.id && tagIds.indexOf(entry.tagId) >= 0;
@@ -226,7 +226,13 @@ function getAssessmentOverallScore(cid, studentId, assessmentId) {
     return rubricResult;
   }
 
+  // A leftover overall score (from before the assessment was linked to a
+  // competency) must not count beside the new scores.
+  var countsOverallKey = isPointsScored(assessment) || isUnlinkedTag(scoreTagIds(assessment, cid)[0]);
   var values = entries
+    .filter(function (entry) {
+      return countsOverallKey || !isUnlinkedTag(entry.tagId);
+    })
     .map(function (entry) {
       // A points score of 0 counts as ungraded (see getTagScores).
       if (isPointsScored(assessment) && !isCompletionScored(assessment) && !(Number(entry.score) > 0)) return null;

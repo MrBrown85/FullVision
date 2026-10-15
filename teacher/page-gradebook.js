@@ -610,15 +610,13 @@ window.PageGradebook = (function () {
     var groups = [];
     var groupIdx = 0;
     assessments.forEach(function (a) {
-      var tagIds = a.tagIds || [];
+      // Competencies, rubric criteria with none, or one overall column.
+      var tagIds = scoreTagIds(a, cid);
       if (filterSections.length > 0) {
         tagIds = tagIds.filter(function (tid) {
           var sec = getSectionForTag(cid, tid);
           return sec && filterSections.includes(sec.id);
         });
-      } else if (tagIds.length === 0) {
-        // Not linked to a competency: one overall column.
-        tagIds = [UNLINKED_TAG_ID];
       }
       if (tagIds.length === 0) return;
       var start = cols.length;
@@ -634,14 +632,14 @@ window.PageGradebook = (function () {
         });
       } else {
         tagIds.forEach(function (tagId) {
-          var tag = getTagById(cid, tagId);
+          var key = scoreKeyInfo(cid, a, tagId);
           var sec = getSectionForTag(cid, tagId);
           cols.push({
             assessmentId: a.id,
             tagId: tagId,
-            tagCode: tag ? tag.id : isUnlinkedTag(tagId) ? 'Overall' : tagId,
+            tagCode: key && key.tag ? key.tag.id : key ? key.label : tagId,
             sectionColor: sec ? sec.color : 'var(--text-3)',
-            tagText: tag ? tag.text : isUnlinkedTag(tagId) ? 'Not linked to a competency' : '',
+            tagText: key ? key.text : '',
           });
         });
       }
@@ -855,7 +853,7 @@ window.PageGradebook = (function () {
             return e.assessmentId === col.assessmentId && e.tagId === col.tagId;
           });
           var score = entry ? entry.score : 0;
-          var assigned = assess && scoreTagIds(assess).includes(col.tagId);
+          var assigned = assess && scoreTagIds(assess, cid).includes(col.tagId);
           var content =
             score > 0
               ? formatScoreLevel(score, entry.mod)
@@ -1081,7 +1079,7 @@ window.PageGradebook = (function () {
       // Score cells per assignment
       sortedAssess.forEach(function (a) {
         var studentScores = scores[s.id] || [];
-        var tagIds = scoreTagIds(a);
+        var tagIds = scoreTagIds(a, cid);
         // Get average score across all tags in this assessment for this student
         var tagScores = tagIds
           .map(function (tid) {
@@ -1605,7 +1603,7 @@ window.PageGradebook = (function () {
         var assess = getAssessments(cid).find(function (a) {
           return a.id === aid;
         });
-        var tagIds = assess ? scoreTagIds(assess) : [];
+        var tagIds = assess ? scoreTagIds(assess, cid) : [];
         var getAvg = function (sid) {
           var ss = sc[sid] || [];
           var ts = tagIds
@@ -1662,7 +1660,7 @@ window.PageGradebook = (function () {
     var assess = getAssessments(cid).find(function (a) {
       return a.id === aid;
     });
-    var tagIds = assess ? scoreTagIds(assess) : [];
+    var tagIds = assess ? scoreTagIds(assess, cid) : [];
     _undoStack.push({
       cid: cid,
       sid: sid,
@@ -1810,7 +1808,7 @@ window.PageGradebook = (function () {
     function commit() {
       var raw = parsePointsInput(inp.value, max);
       // Snapshot for undo
-      var tagIds = isPtsCol ? scoreTagIds(assess) : [td.dataset.tid];
+      var tagIds = isPtsCol ? scoreTagIds(assess, cid) : [td.dataset.tid];
       var prevEntries = tagIds.map(function (tid) {
         var e = (getScores(cid)[sid] || []).find(function (e) {
           return e.assessmentId === aid && e.tagId === tid;
@@ -2054,7 +2052,7 @@ window.PageGradebook = (function () {
       // Assessment scores
       assessments.forEach(function (a) {
         var ss = scores[s.id] || [];
-        var tagScores = scoreTagIds(a)
+        var tagScores = scoreTagIds(a, cid)
           .map(function (tid) {
             var e = ss.find(function (e) {
               return e.assessmentId === a.id && e.tagId === tid;
@@ -2128,7 +2126,7 @@ window.PageGradebook = (function () {
           return a.id === aid;
         });
         if (assess && scores[sid]) {
-          scoreTagIds(assess).forEach(function (tid) {
+          scoreTagIds(assess, cid).forEach(function (tid) {
             var idx = scores[sid].findIndex(function (e) {
               return e.assessmentId === aid && e.tagId === tid;
             });
@@ -2294,7 +2292,7 @@ window.PageGradebook = (function () {
       render();
       return;
     }
-    var tagIds = scoreTagIds(assess);
+    var tagIds = scoreTagIds(assess, cid);
     var studentScores = getScores(cid)[sid] || [];
     // Get current average for display
     var tagScores = tagIds

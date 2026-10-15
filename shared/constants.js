@@ -374,11 +374,38 @@ function isUnlinkedTag(tagId) {
   return tagId === UNLINKED_TAG_ID || tagId === '';
 }
 
-/* The keys an assessment's scores are stored under: its competencies, or the
-   one unlinked key when it has none. */
-function scoreTagIds(assessment) {
-  var ids = assessment && (assessment.tagIds || assessment.tag_ids);
-  return ids && ids.length ? ids : [UNLINKED_TAG_ID];
+/* A rubric criterion's scores are kept under its competencies, or under the
+   criterion's own id when it has none. That key counts toward the
+   assessment and the course grade, never toward a competency. */
+function rubricCriterionScoreKeys(criterion) {
+  if (!criterion) return [];
+  var ids = criterion.tagIds || [];
+  return ids.length ? ids : [criterion.id];
+}
+
+/* The keys an assessment's scores are stored under: its competencies, plus
+   the id of each rubric criterion that has none, or the one unlinked key
+   when there are neither. Rubric criteria are only found when `cid` is
+   given. An assessment graded by criterion ids never uses the unlinked key
+   as well, so one score is never counted twice. */
+function scoreTagIds(assessment, cid) {
+  var ids = (assessment && (assessment.tagIds || assessment.tag_ids)) || [];
+  var rubricId = assessment && (assessment.rubricId || assessment.rubric_id);
+  var rubric = null;
+  if (cid && rubricId && !isPointsScored(assessment) && typeof getRubricById === 'function') {
+    rubric = getRubricById(cid, rubricId);
+  }
+  if (rubric) {
+    var criterionIds = (rubric.criteria || [])
+      .filter(function (c) {
+        return c && c.id && !(c.tagIds && c.tagIds.length) && ids.indexOf(c.id) < 0;
+      })
+      .map(function (c) {
+        return c.id;
+      });
+    if (criterionIds.length) ids = ids.concat(criterionIds);
+  }
+  return ids.length ? ids : [UNLINKED_TAG_ID];
 }
 
 /* Points scores take decimals (33.5 / 40). A typed value is kept to two

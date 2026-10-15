@@ -551,10 +551,11 @@ window.MGrade = (function () {
         _completionBtnsHtml(getCompletionMark(cid, st.id, assessment.id)) +
         '</div>';
     }
-    (isCompletionScored(assessment) ? [] : scoreTagIds(assessment)).forEach(function (tid, tagIdx) {
+    (isCompletionScored(assessment) ? [] : scoreTagIds(assessment, cid)).forEach(function (tid, tagIdx) {
       var tag = getTagById(cid, tid);
       var sec = getSectionForTag(cid, tid);
-      var tagLabel = tag ? tag.label || tag.name || tag.id : isUnlinkedTag(tid) ? 'Overall' : tid;
+      var key = tag ? null : scoreKeyInfo(cid, assessment, tid);
+      var tagLabel = tag ? tag.label || tag.name || tag.id : key ? key.label : tid;
       var tagColor = sec ? sec.color : '#888';
 
       // Current score for this tag
@@ -839,7 +840,7 @@ window.MGrade = (function () {
         return a.id === aid;
       });
       if (assess) {
-        scoreTagIds(assess).forEach(function (tagId) {
+        scoreTagIds(assess, cid).forEach(function (tagId) {
           upsertScore(
             cid,
             sid,
