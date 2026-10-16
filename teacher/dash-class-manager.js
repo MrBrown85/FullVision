@@ -3784,6 +3784,17 @@ window.DashClassManager = (function () {
     return false;
   }
 
+  // Enter in an Add/Edit Student field saves, as the Save button does.
+  function handleKeydown(e) {
+    if (e.key !== 'Enter' || e.isComposing) return false;
+    var el = e.target;
+    if (!el || el.tagName !== 'INPUT' || el.type === 'checkbox') return false;
+    if (!el.closest || !el.closest('#cm-add-student-form')) return false;
+    e.preventDefault();
+    cmSaveStudent();
+    return true;
+  }
+
   function handleBlur(el) {
     if (el.dataset.actionBlur === 'cmUpdateName') {
       cmUpdateField('name', el.value, el);
@@ -3860,6 +3871,7 @@ window.DashClassManager = (function () {
     handleInput: handleInput,
     handleChange: handleChange,
     handleBlur: handleBlur,
+    handleKeydown: handleKeydown,
     initDrag: function () {
       _initCmStdDrag();
       _initCmCatDrag();
