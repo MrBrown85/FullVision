@@ -25,9 +25,10 @@ describe('parsePointsInput', () => {
     expect(parsePointsInput('33,5', 40)).toBe(33.5);
   });
 
-  it('rounds to two places and holds the value between 0 and the maximum', () => {
+  it('rounds to two places and holds the value between 0 and twice the maximum', () => {
     expect(parsePointsInput('7.126', 10)).toBe(7.13);
-    expect(parsePointsInput('45', 40)).toBe(40);
+    expect(parsePointsInput('45', 40)).toBe(45);
+    expect(parsePointsInput('95', 40)).toBe(80);
     expect(parsePointsInput('-2', 40)).toBe(0);
   });
 

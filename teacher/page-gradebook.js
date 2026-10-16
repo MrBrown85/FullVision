@@ -1791,22 +1791,21 @@ window.PageGradebook = (function () {
     inp.type = 'number';
     inp.min = '0';
     inp.step = 'any';
-    inp.max = String(max);
+    inp.max = String(max * POINTS_EXTRA_CREDIT_FACTOR);
     inp.inputMode = 'decimal';
     var hasCurrent = isPtsCol ? current != null : current > 0;
     inp.value = hasCurrent ? formatPoints(current) : '';
     inp.className = 'gb-pts-input';
     var pctLabel = document.createElement('span');
     pctLabel.className = 'gb-pts-live-pct';
-    pctLabel.textContent = hasCurrent ? ((current / max) * 100).toFixed(1) + '%' : '';
+    pctLabel.innerHTML = hasCurrent ? pointsPctHtml(current, max, 1) : '';
     wrap.appendChild(inp);
     wrap.appendChild(pctLabel);
     td.appendChild(wrap);
     inp.focus();
     inp.select();
     inp.addEventListener('input', function () {
-      var v = parsePointsInput(inp.value, max);
-      pctLabel.textContent = v != null ? ((v / max) * 100).toFixed(1) + '%' : '';
+      pctLabel.innerHTML = pointsPctHtml(parsePointsInput(inp.value, max), max, 1);
     });
     function commit() {
       var raw = parsePointsInput(inp.value, max);
@@ -2327,7 +2326,7 @@ window.PageGradebook = (function () {
     inp.type = 'number';
     inp.step = isPts ? 'any' : '0.1';
     inp.min = '0';
-    inp.max = isPts ? String(maxPts) : '4';
+    inp.max = isPts ? String(maxPts * POINTS_EXTRA_CREDIT_FACTOR) : '4';
     if (isPts) inp.inputMode = 'decimal';
     inp.className = 'gb-scores-input';
     var currentPts = isPts ? getPointsScore(cid, sid, aid) : null;
