@@ -68,6 +68,11 @@ window.DashClassManager = (function () {
     { value: 'mode', label: 'Mode' },
     { value: 'decayingAvg', label: 'Decaying Avg' },
   ];
+  var GRADING_SYSTEMS = [
+    { value: 'proficiency', label: 'Proficiency' },
+    { value: 'letter', label: 'Letter' },
+    { value: 'both', label: 'Both' },
+  ];
 
   var classManagerOpen = false;
   var cmSelectedCourse = null;
@@ -460,8 +465,9 @@ window.DashClassManager = (function () {
   var cwStep2Name = '',
     cwStep2Grade = '',
     cwStep2Desc = '';
-  var cwStep2Grading = 'proficiency',
-    cwStep2Calc = 'mostRecent',
+  // '' = not chosen yet; the wizard fills in the grade-level default.
+  var cwStep2Grading = '',
+    cwStep2Calc = '',
     cwStep2Decay = '65',
     cwStep2LatePolicy = '';
 
@@ -1264,11 +1270,9 @@ window.DashClassManager = (function () {
 
     // Section 3: Grading & Calculation (still in left column)
     // T-UI-02 — grading_system segmented control. Three segments:
-    //   proficiency / letter / both. letter+both require at least one
-    //   assessment Category (T-UI-12) — disabled with tooltip otherwise.
+    //   proficiency / letter / both. Letter works without categories:
+    //   getCourseLetterData falls back to total points across all work.
     var gs = course.gradingSystem || _cmDefaultGradingSystem(course);
-    var hasCats = _cmHasCategories(cmSelectedCourse);
-    var gradeLockReason = hasCats ? '' : 'Create a category first \u2192';
     html +=
       '<div class="cm-section">' +
       '<div class="cm-section-title">Grading &amp; Calculation</div>' +
@@ -1282,26 +1286,15 @@ window.DashClassManager = (function () {
       '" data-action="cmSetGradingSystem" data-value="proficiency">Proficiency</button>' +
       '<button class="cm-seg-btn' +
       (gs === 'letter' ? ' active' : '') +
-      (hasCats ? '' : ' cm-seg-btn-disabled') +
       '" role="radio" aria-checked="' +
       (gs === 'letter') +
-      '" aria-disabled="' +
-      !hasCats +
-      '"' +
-      (hasCats ? '' : ' title="' + gradeLockReason + '"') +
-      ' data-action="cmSetGradingSystem" data-value="letter">Letter</button>' +
+      '" data-action="cmSetGradingSystem" data-value="letter">Letter</button>' +
       '<button class="cm-seg-btn' +
       (gs === 'both' ? ' active' : '') +
-      (hasCats ? '' : ' cm-seg-btn-disabled') +
       '" role="radio" aria-checked="' +
       (gs === 'both') +
-      '" aria-disabled="' +
-      !hasCats +
-      '"' +
-      (hasCats ? '' : ' title="' + gradeLockReason + '"') +
-      ' data-action="cmSetGradingSystem" data-value="both">Both</button>' +
+      '" data-action="cmSetGradingSystem" data-value="both">Both</button>' +
       '</div>' +
-      (hasCats ? '' : '<div class="cm-hint cm-seg-hint-locked">' + esc(gradeLockReason) + '</div>') +
       // Contextual grading-system description — mirrors the Phoneox React
       // pattern at src/components/courses/grading-config.tsx:56-70.
       '<div class="cm-hint" style="margin-top:6px">' +
@@ -1760,6 +1753,9 @@ window.DashClassManager = (function () {
       preName = names.join(' / ');
       preGrade = cwSelectedGrade ? String(cwSelectedGrade) : '';
     }
+    if (cwStep2Grade) preGrade = cwStep2Grade;
+    var grading = cwStep2Grading || _cmDefaultGradingSystem({ gradeLevel: preGrade });
+    var calc = cwStep2Calc || _cmDefaultCalcMethod(preGrade);
 
     var html = '<div class="cm-detail-inner" style="display:block">';
     html += renderCwStepBar();
@@ -1771,7 +1767,7 @@ window.DashClassManager = (function () {
       '" placeholder="e.g. English 10" autofocus></div>' +
       '<div style="display:flex;gap:16px"><div class="cm-field" style="flex:1"><label class="cm-label">Grade Level</label><input class="cm-input" id="cm-new-grade" value="' +
       esc(preGrade) +
-      '" placeholder="e.g. 8, 10-12"></div></div>' +
+      '" placeholder="e.g. 8, 10-12" data-action-input="cwGradeInput"></div></div>' +
       '<div class="cm-field"><label class="cm-label">Description</label><textarea class="cm-textarea" id="cm-new-desc" placeholder="Optional">' +
       esc(cwStep2Desc) +
       '</textarea></div></div>';
@@ -1779,24 +1775,30 @@ window.DashClassManager = (function () {
     html +=
       '<div class="cm-section"><div class="cm-section-title">Grading &amp; Calculation</div>' +
       '<div class="cm-field"><label class="cm-label">Grading System</label>' +
-      // T-UI-02 · wizard grading_system picker. Letter/Both are hidden in
-      // the create wizard (no categories exist yet) — teacher picks them
-      // later in Course Settings after adding at least one category.
+      // T-UI-02 · wizard grading_system picker. Grades 10–12 default to
+      // Letter; with no categories, letter grades use total points.
       '<div class="cm-seg" id="cm-cg-grading">' +
-      '<button class="cm-seg-btn active" data-val="proficiency" data-action="cmCreateToggle" data-group="cm-cg-grading">Proficiency</button>' +
-      '<button class="cm-seg-btn cm-seg-btn-disabled" data-val="letter" disabled title="Add a category in Course Settings first \u2192">Letter</button>' +
-      '<button class="cm-seg-btn cm-seg-btn-disabled" data-val="both" disabled title="Add a category in Course Settings first \u2192">Both</button>' +
+      GRADING_SYSTEMS.map(function (g) {
+        return (
+          '<button class="cm-seg-btn' +
+          (grading === g.value ? ' active' : '') +
+          '" data-val="' +
+          g.value +
+          '" data-action="cmCreateToggle" data-group="cm-cg-grading">' +
+          g.label +
+          '</button>'
+        );
+      }).join('') +
       '</div>' +
-      '<div class="cm-hint cm-seg-hint-locked">Create categories in Course Settings to unlock Letter and Both.</div>' +
-      '<div class="cm-hint" style="margin-top:6px">' +
-      _cmGradingSystemDescription('proficiency') +
+      '<div class="cm-hint" id="cm-cg-grading-desc" style="margin-top:6px">' +
+      _cmGradingSystemDescription(grading) +
       '</div>' +
       '</div>' +
       '<div class="cm-field"><label class="cm-label">Calculation Method</label>' +
       '<div class="cm-seg" id="cm-cg-calc">' +
       CALC_METHODS.map(function (m) {
         var action = m.value === 'decayingAvg' ? 'cmCreateToggleDecay' : 'cmCreateToggle';
-        var isActive = m.value === (cwStep2Calc || 'mostRecent');
+        var isActive = m.value === calc;
         return (
           '<button class="cm-seg-btn' +
           (isActive ? ' active' : '') +
@@ -1811,10 +1813,10 @@ window.DashClassManager = (function () {
       }).join('') +
       '</div>' +
       '<div class="cm-hint" id="cm-cg-calc-desc" style="margin-top:6px">' +
-      _cmCalcMethodDescription(cwStep2Calc || 'mostRecent') +
+      _cmCalcMethodDescription(calc) +
       '</div></div>' +
       '<div id="cm-cg-decay" class="cm-field" style="' +
-      (cwStep2Calc === 'decayingAvg' ? '' : 'display:none') +
+      (calc === 'decayingAvg' ? '' : 'display:none') +
       '"><label class="cm-label">Decay Weight</label>' +
       '<div class="cm-slider-row"><input type="range" min="10" max="95" value="' +
       esc(cwStep2Decay) +
@@ -1926,6 +1928,9 @@ window.DashClassManager = (function () {
   /* ── Wizard navigation ──────────────────────────────────── */
   function cwSelectGrade(g) {
     cwSelectedGrade = g;
+    cwStep2Grade = '';
+    cwStep2Grading = '';
+    cwStep2Calc = '';
     cwSelectedSubject = null;
     cwSelectedTags = [];
     renderClassManager();
@@ -1959,8 +1964,12 @@ window.DashClassManager = (function () {
     cwStep2Name = document.getElementById('cm-new-name')?.value || '';
     cwStep2Grade = document.getElementById('cm-new-grade')?.value || '';
     cwStep2Desc = document.getElementById('cm-new-desc')?.value || '';
-    cwStep2Grading = (document.querySelector('#cm-cg-grading .cm-seg-btn.active') || {}).dataset?.val || 'proficiency';
-    cwStep2Calc = (document.querySelector('#cm-cg-calc .cm-seg-btn.active') || {}).dataset?.val || 'mostRecent';
+    cwStep2Grading =
+      (document.querySelector('#cm-cg-grading .cm-seg-btn.active') || {}).dataset?.val ||
+      _cmDefaultGradingSystem({ gradeLevel: cwStep2Grade });
+    cwStep2Calc =
+      (document.querySelector('#cm-cg-calc .cm-seg-btn.active') || {}).dataset?.val ||
+      _cmDefaultCalcMethod(cwStep2Grade);
     cwStep2Decay = document.getElementById('cm-cg-decay-slider')?.value || '65';
     cwStep2LatePolicy = document.getElementById('cm-new-late-policy')?.value || '';
     cwStep = 3;
@@ -2085,8 +2094,8 @@ window.DashClassManager = (function () {
     cwStep2Name = '';
     cwStep2Grade = '';
     cwStep2Desc = '';
-    cwStep2Grading = 'proficiency';
-    cwStep2Calc = 'mostRecent';
+    cwStep2Grading = '';
+    cwStep2Calc = '';
     cwStep2Decay = '65';
     cwStep2LatePolicy = '';
     loadCurriculumIndex().then(function (idx) {
@@ -2109,8 +2118,36 @@ window.DashClassManager = (function () {
     });
     btn.classList.add('active');
     if (containerId === 'cm-cg-calc') {
+      cwStep2Calc = btn.dataset.val;
       var desc = document.getElementById('cm-cg-calc-desc');
       if (desc) desc.innerHTML = _cmCalcMethodDescription(btn.dataset.val);
+    }
+    if (containerId === 'cm-cg-grading') {
+      cwStep2Grading = btn.dataset.val;
+      var gdesc = document.getElementById('cm-cg-grading-desc');
+      if (gdesc) gdesc.innerHTML = _cmGradingSystemDescription(btn.dataset.val);
+    }
+  }
+
+  // Typing a grade level re-applies the grade defaults to any picker the
+  // teacher hasn't chosen yet.
+  function cwGradeInput(value) {
+    if (!cwStep2Grading) {
+      var gs = _cmDefaultGradingSystem({ gradeLevel: value });
+      var gbtn = document.querySelector('#cm-cg-grading .cm-seg-btn[data-val="' + gs + '"]');
+      if (gbtn) {
+        cmCreateToggle(gbtn, 'cm-cg-grading');
+        cwStep2Grading = '';
+      }
+    }
+    if (!cwStep2Calc) {
+      var cbtn = document.querySelector('#cm-cg-calc .cm-seg-btn[data-val="' + _cmDefaultCalcMethod(value) + '"]');
+      if (cbtn) {
+        cmCreateToggle(cbtn, 'cm-cg-calc');
+        cwStep2Calc = '';
+        var dp = document.getElementById('cm-cg-decay');
+        if (dp) dp.style.display = 'none';
+      }
     }
   }
 
@@ -2140,6 +2177,11 @@ window.DashClassManager = (function () {
     var gl = parseInt((course && course.gradeLevel) || '', 10);
     if (!isNaN(gl) && gl >= 10 && gl <= 12) return 'letter';
     return 'proficiency';
+  }
+
+  // Default calc_method by grade level: 10–12 → mean, otherwise most recent.
+  function _cmDefaultCalcMethod(gradeLevel) {
+    return _cmDefaultGradingSystem({ gradeLevel: gradeLevel }) === 'letter' ? 'average' : 'mostRecent';
   }
 
   // Calculation-method descriptions (verbatim from Project Phoneox React build
@@ -2174,36 +2216,9 @@ window.DashClassManager = (function () {
         'Students are scored on a 1\u20134 scale: 1 (Beginning), 2 (Developing), 3 (Proficient), 4 (Extending). This is the standard scale used across BC K\u201312 classrooms and aligns directly with BC report card requirements.',
       letter:
         'Students receive letter grades (A, B, C+, C, C\u2013, F) using BC Ministry of Education percentage cutoffs and conversion tables. All calculations follow the official BC grading scale, so report cards are generated correctly without manual conversion.',
-      both: 'Both pipelines run side by side: proficiency (1\u20134) drives the competency view and the dashboard overview; letter + percentage (derived from categories and the BC conversion tables) drive reports for grades 10\u201312. Useful when a teacher wants the competency lens day-to-day but the parent-facing report card still needs letter grades.',
+      both: 'Both pipelines run side by side: proficiency (1\u20134) drives the competency view and the dashboard overview; letter + percentage (from points earned, weighted by category if any, and the BC conversion tables) drive reports for grades 10\u201312. Useful when a teacher wants the competency lens day-to-day but the parent-facing report card still needs letter grades.',
     };
     return esc(map[gs] || map.proficiency);
-  }
-
-  // Does the course have at least one assessment Category (T-UI-12)?
-  // After T-UI-12, _cmCategoryState is the source of truth. Falls back to
-  // _cache.v2Gradebook.categories / assessment.category_id so the disabled
-  // state is correct even before list_categories has resolved.
-  function _cmHasCategories(cid) {
-    if (!cid) return false;
-    try {
-      // Only count SAVED rows (rows with a server-issued id). Transient
-      // blank rows from a recent "+ Add category" click don't count —
-      // otherwise the Letter/Both segments would enable immediately on
-      // click, before the teacher has typed anything meaningful.
-      var rows = (_cmCategoryState[cid] && _cmCategoryState[cid].rows) || [];
-      for (var j = 0; j < rows.length; j++) {
-        if (rows[j].id && (rows[j].name || '').trim()) return true;
-      }
-      var gb = (typeof _cache !== 'undefined' && _cache.v2Gradebook && _cache.v2Gradebook[cid]) || null;
-      if (gb && Array.isArray(gb.categories) && gb.categories.length > 0) return true;
-      var assArr = typeof getAssessments === 'function' ? getAssessments(cid) : [];
-      for (var i = 0; i < (assArr || []).length; i++) {
-        if (assArr[i] && assArr[i].category_id) return true;
-      }
-    } catch (e) {
-      /* best-effort detection */
-    }
-    return false;
   }
 
   // T-UI-12 · Category management inline row.
@@ -2299,7 +2314,7 @@ window.DashClassManager = (function () {
       '<div class="cm-cat-list">';
     if (rows.length === 0) {
       html +=
-        '<div class="cm-hint" style="padding:6px 0">No categories yet. Add one to weight assessments and unlock Letter / Both grading.</div>';
+        '<div class="cm-hint" style="padding:6px 0">No categories yet. Letter grades use total points earned out of total points possible. Add categories to weight groups of assessments.</div>';
     }
     rows.forEach(function (row, idx) {
       html +=
@@ -2486,14 +2501,6 @@ window.DashClassManager = (function () {
 
   function cmSetGradingSystem(val) {
     if (!cmSelectedCourse) return;
-    // Block letter / both when the course has no assessment categories —
-    // INSTRUCTIONS.md §12.9 / §2.1 U2 / Q11=A. Proficiency always writes.
-    if ((val === 'letter' || val === 'both') && !_cmHasCategories(cmSelectedCourse)) {
-      if (typeof showSyncToast === 'function') {
-        showSyncToast('Create a category first — Letter and Both require at least one assessment category.', 'info');
-      }
-      return;
-    }
     updateCourse(cmSelectedCourse, { gradingSystem: val });
     renderClassManager();
   }
@@ -3473,6 +3480,10 @@ window.DashClassManager = (function () {
       cmUpdateDecay(el.value);
       return true;
     }
+    if (el.dataset.actionInput === 'cwGradeInput') {
+      cwGradeInput(el.value);
+      return true;
+    }
     if (el.dataset.actionInput === 'cmCreateDecaySlider') {
       var dv = document.getElementById('cm-cg-decay-val');
       if (dv) dv.textContent = el.value + '%';
@@ -3634,8 +3645,8 @@ window.DashClassManager = (function () {
       cwStep2Name = '';
       cwStep2Grade = '';
       cwStep2Desc = '';
-      cwStep2Grading = 'proficiency';
-      cwStep2Calc = 'mostRecent';
+      cwStep2Grading = '';
+      cwStep2Calc = '';
       cwStep2Decay = '65';
       cwStep2LatePolicy = '';
       _cmCollapsedStdFolders = {};
