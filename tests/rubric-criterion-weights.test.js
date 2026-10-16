@@ -201,4 +201,53 @@ describe('rubric assessment overall', () => {
     expect(getTagScores(CID, SID, 't1').map(s => s.score)).toEqual([4]);
     expect(getTagScores(CID, SID, 't2').map(s => s.score)).toEqual([2]);
   });
+
+  describe('custom level points', () => {
+    const tenPoint = crit('A', ['t1'], 1, { 4: 10, 3: 8, 2: 6, 1: 4 });
+
+    it('counts a level as its share of the top value on the 0–4 scale', () => {
+      seed({ criteria: [tenPoint], scores: [score('t1', 2)] });
+      // 6 of 10 points = 2.4; it was clamped to 4 before.
+      expect(getAssessmentOverallScore(CID, SID, 'a1')).toBeCloseTo(2.4, 5);
+    });
+
+    it('counts rubric points in the course %', () => {
+      seed({ criteria: [tenPoint], scores: [score('t1', 2)] });
+      expect(getCourseLetterData(CID, SID).R).toBe(60);
+    });
+
+    it('pools rubric points with points work', () => {
+      const quiz = { id: 'q1', title: 'Quiz', scoreMode: 'points', maxPoints: 10, tagIds: ['t2'], type: 'summative' };
+      seed({
+        assessments: [assessment, quiz],
+        criteria: [tenPoint],
+        scores: [score('t1', 2), { ...score('t2', 8), assessmentId: 'q1' }],
+      });
+      // (6 + 8) / (10 + 10)
+      expect(getCourseLetterData(CID, SID).R).toBe(70);
+    });
+
+    it('weights criteria points by criterion weight', () => {
+      seed({
+        criteria: [tenPoint, crit('B', ['t2'], 3)],
+        scores: [score('t1', 2), score('t2', 4)],
+      });
+      // (1 × 6 + 3 × 4) / (1 × 10 + 3 × 4) = 18 / 22
+      expect(getCourseLetterData(CID, SID).R).toBe(81.8);
+    });
+
+    it('counts not submitted as 0 of the full rubric and leaves excused out', () => {
+      const quiz = { id: 'q1', title: 'Quiz', scoreMode: 'points', maxPoints: 10, tagIds: ['t2'], type: 'summative' };
+      const base = {
+        assessments: [assessment, quiz],
+        criteria: [tenPoint],
+        scores: [{ ...score('t2', 8), assessmentId: 'q1' }],
+      };
+      seed({ ...base, statuses: { [SID + ':a1']: 'NS' } });
+      // 8 / (10 + 10)
+      expect(getCourseLetterData(CID, SID).R).toBe(40);
+      seed({ ...base, statuses: { [SID + ':a1']: 'EXC' } });
+      expect(getCourseLetterData(CID, SID).R).toBe(80);
+    });
+  });
 });

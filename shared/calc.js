@@ -144,15 +144,26 @@ function _rubricLevelValue(criterion, level, mod) {
   return value;
 }
 
-/* A rubric assessment's overall (read-paths §1.1, fv_assessment_overall on
-   the server). Scores are stored per competency, so each criterion is the
-   average of its competencies' scores and counts once. Criteria combine by
-   weight; unscored criteria and weight-0 criteria are left out (all scored
-   criteria at 0 count equally). Kept on the 0–4 scale. `entries` may hold
-   the student's other scores too. Statuses are not applied. Returns null when
-   no criterion is scored, and undefined when the assessment isn't
-   rubric-scored, so the caller averages its entries as before. */
-function getRubricAssessmentScore(cid, assessment, entries) {
+// A criterion's top value: the most any level is worth (4 by default).
+function _rubricCriterionMax(criterion) {
+  var max = 0;
+  [1, 2, 3, 4].forEach(function (l) {
+    var v = _rubricLevelValue(criterion, l, 0);
+    if (v > max) max = v;
+  });
+  return max;
+}
+
+function _rubricCriterionWeight(criterion) {
+  var weight = criterion.weight == null || criterion.weight === '' ? 1 : Number(criterion.weight);
+  return isFinite(weight) && weight >= 0 ? weight : 1;
+}
+
+/* A rubric assessment's scored criteria: { value, max, weight } each, where
+   value is the average of the criterion's competency scores in its own
+   points. Undefined when the assessment isn't rubric-scored, null when no
+   criterion is scored. When every criterion weighs 0 they count equally. */
+function _rubricScoredCriteria(cid, assessment, entries) {
   var rubricId = assessment && (assessment.rubricId || assessment.rubric_id);
   if (!rubricId || isPointsScored(assessment) || typeof getRubricById !== 'function') return undefined;
   var rubric = getRubricById(cid, rubricId);
@@ -179,19 +190,71 @@ function getRubricAssessmentScore(cid, assessment, entries) {
       values.reduce(function (sum, value) {
         return sum + value;
       }, 0) / values.length;
-    var weight = criterion.weight == null || criterion.weight === '' ? 1 : Number(criterion.weight);
-    scored.push({ value: avg, weight: isFinite(weight) && weight >= 0 ? weight : 1 });
+    scored.push({ value: avg, max: _rubricCriterionMax(criterion), weight: _rubricCriterionWeight(criterion) });
   });
   if (scored.length === 0) return null;
-
   var totalWeight = scored.reduce(function (sum, c) {
     return sum + c.weight;
   }, 0);
-  var weightedSum = scored.reduce(function (sum, c) {
-    return sum + (totalWeight > 0 ? c.weight : 1) * c.value;
-  }, 0);
-  var result = weightedSum / (totalWeight > 0 ? totalWeight : scored.length);
-  return Math.max(0, Math.min(4, result));
+  if (!(totalWeight > 0))
+    scored.forEach(function (c) {
+      c.weight = 1;
+    });
+  return scored;
+}
+
+/* A rubric assessment's overall on the 0–4 scale (read-paths §1.1,
+   fv_assessment_overall on the server). Scores are stored per competency,
+   so each criterion is the average of its competencies' scores and counts
+   once, as a share of its top value (6 of 10 points = 2.4). Criteria combine
+   by weight; unscored criteria and weight-0 criteria are left out (all
+   scored criteria at 0 count equally). `entries` may hold the student's
+   other scores too. Statuses are not applied. Returns null when no criterion
+   is scored, and undefined when the assessment isn't rubric-scored, so the
+   caller averages its entries as before. */
+function getRubricAssessmentScore(cid, assessment, entries) {
+  var scored = _rubricScoredCriteria(cid, assessment, entries);
+  if (!scored) return scored;
+  var totalWeight = 0;
+  var weightedSum = 0;
+  scored.forEach(function (c) {
+    totalWeight += c.weight;
+    weightedSum += c.weight * (c.max > 0 ? (c.value / c.max) * 4 : 0);
+  });
+  return Math.max(0, Math.min(4, weightedSum / totalWeight));
+}
+
+/* A rubric assessment's points for one student, for the course %: each
+   scored criterion's value out of its top value, times its weight. Excused
+   is null; not submitted is 0 out of every criterion's top value.
+   Undefined when the assessment isn't rubric-scored. */
+function _rubricAssessmentPoints(cid, studentId, assessment) {
+  var entries = (getScores(cid)[studentId] || []).filter(function (entry) {
+    return entry.assessmentId === assessment.id;
+  });
+  var scored = _rubricScoredCriteria(cid, assessment, entries);
+  if (scored === undefined) return undefined;
+  var status = getAssignmentStatus(cid, studentId, assessment.id);
+  if (status === 'EXC') return null;
+  if (status === 'NS') {
+    var criteria = getRubricById(cid, assessment.rubricId || assessment.rubric_id).criteria.filter(Boolean);
+    var weights = criteria.map(_rubricCriterionWeight);
+    var anyWeight = weights.some(function (w) {
+      return w > 0;
+    });
+    var full = criteria.reduce(function (sum, c, i) {
+      return sum + (anyWeight ? weights[i] : 1) * _rubricCriterionMax(c);
+    }, 0);
+    return full > 0 ? { earned: 0, possible: full } : null;
+  }
+  if (!scored) return null;
+  var earned = 0;
+  var possible = 0;
+  scored.forEach(function (c) {
+    earned += c.weight * c.value;
+    possible += c.weight * c.max;
+  });
+  return possible > 0 ? { earned: earned, possible: possible } : null;
 }
 
 function getAssessmentOverallScore(cid, studentId, assessmentId) {
@@ -321,8 +384,10 @@ function _assessmentPoints(cid, studentId, assessment) {
 /* A student's percentage on a group of assessments (one category, or the
    whole class when it has none), counted like a traditional gradebook:
    points earned out of points possible. Points-scored work counts its own
-   points, so 2.75/6 + 14.25/24 is 17/30 = 56.7%. A proficiency level counts
-   as that many points out of 4 (3 = 75%, 3+ = 83.3%). Returns { pct, count }
+   points, so 2.75/6 + 14.25/24 is 17/30 = 56.7%. Rubric work counts its
+   criteria's points, like Schoology and Teams (four 4-point criteria = 16).
+   A proficiency level counts as that many points out of 4 (3 = 75%,
+   3+ = 83.3%). Returns { pct, count }
    (count = graded assessments), or null when nothing in the group is graded. */
 function getAssessmentGroupPercentage(cid, studentId, assessments) {
   var earned = 0;
@@ -335,6 +400,15 @@ function getAssessmentGroupPercentage(cid, studentId, assessments) {
       earned += pts.earned;
       possible += pts.possible;
     } else {
+      // Rubric work counts its own points (6 of 10 = 60%), not a level.
+      var rubricPts = _rubricAssessmentPoints(cid, studentId, assessment);
+      if (rubricPts !== undefined) {
+        if (!rubricPts) return;
+        earned += rubricPts.earned;
+        possible += rubricPts.possible;
+        count++;
+        return;
+      }
       var level = getAssessmentOverallScore(cid, studentId, assessment.id);
       if (level == null) return;
       earned += Math.max(0, Math.min(4, level));
