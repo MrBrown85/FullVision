@@ -110,19 +110,31 @@ window.ReportBlocks = (function () {
     const overallRound = Math.round(overall);
     const cc = getCourseConfig(cid);
     const usePercentage = cc.reportAsPercentage || false;
+    const course = COURSES[cid];
+    const isLetter = courseShowsLetterGrades(course);
     const letterData = getCourseLetterData(cid, student.id);
+    const profDisplay = overall > 0 ? PROF_LABELS[overallRound] : 'No Evidence';
     let overallDisplay, overallHeading;
-    if (usePercentage && (overall > 0 || (letterData && letterData.R != null))) {
+    // Letter and Both classes lead with the letter and %, as Class Summary
+    // does ("A (97%)"). Both also keeps the proficiency word under it.
+    let profLine = '';
+    if (isLetter) {
+      overallHeading = 'Overall Grade';
+      overallDisplay = letterData && letterData.S ? `${letterData.S} (${letterData.R}%)` : 'No Evidence';
+      if (course.gradingSystem === 'both') {
+        profLine = `<div class="report-overall-label" style="margin-top:6px">Overall Proficiency: ${profDisplay}</div>`;
+      }
+    } else if (usePercentage && (overall > 0 || (letterData && letterData.R != null))) {
       overallDisplay = letterData && letterData.R != null ? letterData.R + '%' : Math.round((overall / 4) * 100) + '%';
       overallHeading = 'Overall Grade';
     } else {
-      overallDisplay = overall > 0 ? PROF_LABELS[overallRound] : 'No Evidence';
+      overallDisplay = profDisplay;
       overallHeading = 'Overall Proficiency';
     }
     let html = `<div class="report-overall">
     <div class="report-overall-main">
       <div class="report-overall-label">${overallHeading}</div>
-      <div class="report-overall-word">${overallDisplay}</div>
+      <div class="report-overall-word">${overallDisplay}</div>${profLine}
     </div>
     <div class="report-overall-sections">`;
     const _rptGrouped = getGroupedSections(cid);
