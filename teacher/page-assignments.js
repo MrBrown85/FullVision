@@ -3029,7 +3029,9 @@ window.PageAssignments = (function () {
     _rubricDirty = false;
     var modal = document.getElementById('rubric-modal');
     if (modal) modal.remove();
-    render();
+    // "+ New Rubric" opens over a half-filled assessment form: keep it.
+    if (_showingNewForm) rerenderKeeping('new-assess-form', render);
+    else render();
     Promise.resolve(savePromise).then(function (result) {
       setTimeout(function () {
         var dd = document.getElementById('af-rubric');
@@ -3907,6 +3909,8 @@ window.PageAssignments = (function () {
         addCriterion();
       },
       toggleCriterionExpand: function () {
+        // A click into the name or weight field edits it; it doesn't fold the criterion.
+        if (e.target !== el && e.target.closest('input, textarea, select, label')) return;
         toggleCriterionExpand(parseInt(el.dataset.index, 10));
       },
       removeCriterion: function () {
