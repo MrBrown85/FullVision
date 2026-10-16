@@ -3234,7 +3234,8 @@ window.PageAssignments = (function () {
   }
   function resetGradingScale() {
     var cc = getCourseConfig(activeCourse);
-    delete cc.gradingScale;
+    // Saved, not deleted: other devices only take a scale the server has.
+    cc.gradingScale = structuredClone(DEFAULT_GRADING_SCALE);
     saveCourseConfig(activeCourse, cc);
     render();
   }
