@@ -417,6 +417,25 @@ function getAssessmentGroupPercentage(cid, studentId, assessments) {
   return count > 0 && possible > 0 ? { pct: (earned / possible) * 100, count: count } : null;
 }
 
+/* Whether a class shows its course % as a whole number (86%) rather than
+   to one decimal (85.9%). A class setting, like Schoology's; unset, it is on
+   for grades 10–12, whose BC report cards show a whole %. */
+function getRoundWholePercent(cid) {
+  var cc = getCourseConfig(cid) || {};
+  if (typeof cc.roundPercent === 'boolean') return cc.roundPercent;
+  var course = (typeof COURSES !== 'undefined' && COURSES && COURSES[cid]) || {};
+  var m = String(course.gradeLevel || '').match(/\d+/);
+  var grade = m ? parseInt(m[0], 10) : NaN;
+  return grade >= 10 && grade <= 12;
+}
+
+/* R to `digits` decimal places. toPrecision drops float noise (85.94999…)
+   before rounding. */
+function _roundPercent(R, digits) {
+  var f = Math.pow(10, digits);
+  return Math.round(Number((R * f).toPrecision(12))) / f;
+}
+
 function getCourseLetterData(cid, studentId) {
   var cacheKey = cid + ':' + studentId;
   if (_courseLetterCache[cacheKey]) return _courseLetterCache[cacheKey];
@@ -469,9 +488,9 @@ function getCourseLetterData(cid, studentId) {
     if (all) R = all.pct;
   }
 
-  // The letter comes from the % as shown, so 85.95 shows as 86% and an A.
-  // toPrecision drops float noise (85.94999…) before rounding.
-  var shown = R == null ? null : Math.round(Number((R * 10).toPrecision(12))) / 10;
+  // The letter comes from the % as shown, so 85.95 shows as 86% and an A,
+  // and in a class that rounds to a whole %, 85.5 does too.
+  var shown = R == null ? null : _roundPercent(R, getRoundWholePercent(cid) ? 0 : 1);
   var result = {
     Q: Q,
     R: shown,

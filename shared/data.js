@@ -2559,7 +2559,7 @@ function _bundleToCache(cid, bundle) {
     );
   }
   if (Array.isArray(bundle.custom_tags)) _persistLoadedField(cid, 'customTags', bundle.custom_tags.slice());
-  _applyBundleCourseConfig(cid, bundle.course_config);
+  _applyBundleCourseConfig(cid, bundle.course_config, bundle.gradebook && bundle.gradebook.course);
 
   // A field skipped because the teacher edited it mid-load is fetched again;
   // until then the cache isn't the server's version, so don't claim it is.
@@ -2817,7 +2817,7 @@ function _applyBundleTermRatings(cid, rows) {
    default scale, never null, so a null on the server always means "never
    saved". */
 var _COURSE_CONFIG_COLUMNS = { gradingScale: 'grading_scale', categoryWeights: 'category_weights' };
-function _applyBundleCourseConfig(cid, row) {
+function _applyBundleCourseConfig(cid, row, courseRow) {
   if (!row || typeof row !== 'object') return;
   var config = Object.assign({}, getCourseConfig(cid) || {});
   var missing = {};
@@ -2827,6 +2827,12 @@ function _applyBundleCourseConfig(cid, row) {
     if (onServer && typeof onServer === 'object') config[field] = _cloneValue(onServer);
     else if (config[field] != null) missing[column] = config[field];
   });
+  // "Round to a whole %" comes on the course row. Null there means the class
+  // never chose, so it follows its grade level.
+  if (courseRow && typeof courseRow === 'object' && 'round_percent' in courseRow) {
+    if (typeof courseRow.round_percent === 'boolean') config.roundPercent = courseRow.round_percent;
+    else if (typeof config.roundPercent === 'boolean') missing.round_percent = config.roundPercent;
+  }
   _persistLoadedField(cid, 'courseConfigs', config);
 
   if (!Object.keys(missing).length || !_writesEnabled() || !_isUuid(cid)) return;
@@ -5628,6 +5634,7 @@ function saveCourseConfig(cid, obj) {
       if (obj.lateWorkPolicy != null) patch.late_work_policy = obj.lateWorkPolicy;
       if (obj.gradingScale != null) patch.grading_scale = obj.gradingScale;
       if (obj.categoryWeights != null) patch.category_weights = obj.categoryWeights;
+      if (typeof obj.roundPercent === 'boolean') patch.round_percent = obj.roundPercent;
       if (Object.keys(patch).length > 0) {
         _trackPendingSync(
           _writeRpc('update_course', { p_course_id: cid, p_patch: patch }).then(function (res) {
