@@ -101,6 +101,8 @@ function reloadPage() {
 
 describe('write-path audit: data layer', () => {
   var fake;
+  var originalShowSyncToast;
+  var originalDismissSyncToast;
   var originalGetSupabase;
   var originalUseSupabase;
 
@@ -116,14 +118,23 @@ describe('write-path audit: data layer', () => {
     _supabaseDegraded = false;
     _teacherId = 'teacher-uuid';
     COURSES = {};
+    originalShowSyncToast = globalThis.showSyncToast;
+    originalDismissSyncToast = globalThis.dismissSyncToast;
+    globalThis.showSyncToast = () => {};
+    globalThis.dismissSyncToast = () => {};
     setOnline(true);
     window.v2Queue.clear();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     window.v2Queue.clear();
     window.v2Queue = ORIGINAL_QUEUE;
     window.v2Queue.clear();
+    // Clearing the outbox fails the writes still waiting; let their handlers
+    // run (they may show a sync toast) before the real toast is put back.
+    await settle(5);
+    globalThis.showSyncToast = originalShowSyncToast;
+    globalThis.dismissSyncToast = originalDismissSyncToast;
     globalThis.getSupabase = originalGetSupabase;
     _useSupabase = originalUseSupabase;
     setOnline(false);
