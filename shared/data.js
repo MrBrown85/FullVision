@@ -2363,8 +2363,16 @@ async function _doInitData(cid) {
         _courseLoadFailed(cid, bundleRes && bundleRes.error);
         return;
       } else {
-        delete _loadError[cid];
-        _bundleToCache(cid, _rpcObject(bundleRes.data) || {});
+        try {
+          _bundleToCache(cid, _rpcObject(bundleRes.data) || {});
+          delete _loadError[cid];
+        } catch (e) {
+          // A payload this code can't read must not leave the class half
+          // applied with no word to the teacher.
+          console.error('get_class_bundle could not be applied for ' + cid + ':', e);
+          if (window.Sentry && typeof window.Sentry.captureException === 'function') window.Sentry.captureException(e);
+          _courseLoadFailed(cid, e);
+        }
         return;
       }
     }
@@ -2507,15 +2515,19 @@ function _bundleToCache(cid, bundle) {
    does (calc.js). */
 function _fillOverrideCalculated(cid) {
   var overrides = _cache.overrides[cid];
-  if (!overrides || typeof getSectionProficiencyRaw !== 'function') return;
+  if (!overrides || typeof getSectionProficiencyRaw !== 'function' || !COURSES[cid]) return;
   if (typeof clearProfCache === 'function') clearProfCache();
   var changed = false;
   Object.keys(overrides).forEach(function (sid) {
     Object.keys(overrides[sid] || {}).forEach(function (sectionId) {
       var o = overrides[sid][sectionId];
       if (!o || o.calculated != null) return;
-      o.calculated = Math.round(getSectionProficiencyRaw(cid, sid, sectionId) * 10) / 10;
-      changed = true;
+      try {
+        o.calculated = Math.round(getSectionProficiencyRaw(cid, sid, sectionId) * 10) / 10;
+        changed = true;
+      } catch (e) {
+        console.warn('Could not work out the calculated level for an override:', e);
+      }
     });
   });
   if (changed) _persistLoadedField(cid, 'overrides', overrides);
