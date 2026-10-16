@@ -15,6 +15,12 @@
  * Key: the record the write touches (see _entryKey). Entries with the same
  *   key are sent one at a time, in order; different keys go in parallel.
  *
+ * Barrier: a write to a whole column (clear_column_scores, delete_assessment)
+ *   has no cell key. It waits for every earlier entry that names its
+ *   assessment, and every later entry that names it waits for the barrier
+ *   (see _pump). Cell writes in one column still run in parallel with each
+ *   other.
+ *
  * Blocked: an entry whose payload names a record the server doesn't have yet
  *   (a local id whose create is still queued) carries those ids in
  *   blocked_on and is held, with everything behind it on its key. When the
@@ -110,6 +116,21 @@
     if (payload.p_course_id) return 'course:' + payload.p_course_id;
     if (payload.p_enrollment_id) return 'enrollment:' + payload.p_enrollment_id;
     return null;
+  }
+
+  /* Writes that act on a whole assessment column. */
+  var BARRIER_ENDPOINTS = { clear_column_scores: true, delete_assessment: true };
+
+  /* The assessment an entry touches, or null. Read from the payload each time
+     (not stored) so a local id that rewrite() replaces is followed. */
+  function _assessmentOf(entry) {
+    var p = entry.payload || {};
+    if (entry.endpoint === 'delete_assessment') return p.p_id || p.p_assessment_id || null;
+    return p.p_assessment_id || null;
+  }
+
+  function _isBarrier(entry) {
+    return !!BARRIER_ENDPOINTS[entry.endpoint];
   }
 
   function _isTransient(res) {
@@ -366,8 +387,12 @@
     if (!entry.key || !COALESCE_ENDPOINTS[entry.endpoint]) return -1;
     var target = _target(entry.endpoint, entry.payload);
     if (!target) return -1;
+    var assessment = _assessmentOf(entry);
     for (var i = entries.length - 1; i >= 0; i--) {
       var e = entries[i];
+      // A column write between the two keeps them apart: the later score must
+      // not move to before it.
+      if (assessment && _isBarrier(e) && _assessmentOf(e) === assessment) return -1;
       if (e.key !== entry.key) continue;
       if (_inFlight[e.id] || e.endpoint !== entry.endpoint || e.owner !== entry.owner) return -1;
       if (_target(e.endpoint, e.payload) !== target) return -1;
@@ -582,18 +607,29 @@
 
   /* Start every entry that may go now: the first for its key, due, owned by
      whoever is signed in, not waiting on a local id. `force` ignores backoff
-     (an explicit flush). */
+     (an explicit flush). A column write goes only when no earlier entry names
+     its assessment; an entry behind a column write waits for it. */
   function _pump(force) {
     if (_signedOut || _isPaused() || !navigator.onLine) return;
     var owner = currentOwner();
     var now = Date.now();
     var busyKeys = {};
+    var touched = {}; // assessment → an earlier entry names it
+    var barred = {}; // assessment → an earlier column write is still queued
     var entries = _readQueue().entries;
     for (var i = 0; i < entries.length; i++) {
       var entry = entries[i];
       var key = entry.key || entry.id;
+      var assessment = _assessmentOf(entry);
+      var barrier = _isBarrier(entry);
+      var gated = !!assessment && (barrier ? touched[assessment] : barred[assessment]);
+      if (assessment) {
+        touched[assessment] = true;
+        if (barrier) barred[assessment] = true;
+      }
       if (busyKeys[key]) continue;
       busyKeys[key] = true;
+      if (gated) continue;
       if (_inFlight[entry.id]) continue;
       if (_isBlocked(entry)) continue;
       if (_isForeign(entry, owner)) continue;

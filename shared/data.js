@@ -7101,23 +7101,46 @@ window.saveCollab = function (assessmentId, mode, config) {
   });
 };
 
+/* Drop the scores and statuses of assessments that are gone. The server
+   removes them with the assessment (delete_assessment cascades), so nothing
+   is sent: one clear per student would only race the delete and fail on the
+   foreign key. The local copy and the baseline both lose the rows, so the
+   next save sees no difference. */
 function _cleanOrphanedScores(cid, validArr) {
   var validIds = new Set(
     validArr.map(function (a) {
       return a.id;
     }),
   );
-  var scores = getScores(cid);
-  var changed = false;
-  Object.keys(scores).forEach(function (sid) {
-    if (!Array.isArray(scores[sid])) return;
-    var before = scores[sid].length;
-    scores[sid] = scores[sid].filter(function (e) {
-      return validIds.has(e.assessmentId);
+  function dropScores(blob) {
+    var changed = false;
+    Object.keys(blob || {}).forEach(function (sid) {
+      if (!Array.isArray(blob[sid])) return;
+      var before = blob[sid].length;
+      blob[sid] = blob[sid].filter(function (e) {
+        return validIds.has(e.assessmentId);
+      });
+      if (blob[sid].length !== before) changed = true;
     });
-    if (scores[sid].length !== before) changed = true;
-  });
-  if (changed) saveScores(cid, scores);
+    return changed;
+  }
+  function dropStatuses(blob) {
+    var changed = false;
+    Object.keys(blob || {}).forEach(function (key) {
+      var aid = key.split(':').slice(1).join(':');
+      if (aid && !validIds.has(aid)) {
+        delete blob[key];
+        changed = true;
+      }
+    });
+    return changed;
+  }
+  var scores = getScores(cid);
+  if (dropScores(scores)) _saveCourseField('scores', cid, scores);
+  var statuses = getAssignmentStatuses(cid);
+  if (dropStatuses(statuses)) _saveCourseField('statuses', cid, statuses);
+  if (_hasServerState('scores', cid)) dropScores(_serverState.scores[cid]);
+  if (_hasServerState('statuses', cid)) dropStatuses(_serverState.statuses[cid]);
 }
 function getOverrides(cid) {
   if (_cache.overrides[cid] !== undefined) return _cache.overrides[cid];
