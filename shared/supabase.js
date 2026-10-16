@@ -186,6 +186,25 @@
    * @param {{force?: boolean, keepQueue?: boolean}} [opts]
    * @returns {Promise<void|{unsent: number}>}
    */
+  function _isNetworkAuthError(error) {
+    if (!error) return false;
+    if (error.name === 'AuthRetryableFetchError' || error.status === 0) return true;
+    return /fetch|network|offline/i.test(error.message || '');
+  }
+
+  function _removeSavedClassData() {
+    try {
+      const keys = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('gb-') || key.startsWith('gb_'))) keys.push(key);
+      }
+      keys.forEach(k => localStorage.removeItem(k));
+    } catch (e) {
+      console.warn('Could not clear saved class data:', e);
+    }
+  }
+
   window.signOut = async function (opts) {
     opts = opts || {};
     const sb = getSupabase();
@@ -320,6 +339,10 @@
         try {
           const { data, error } = await sb.auth.getUser();
           if (error || !data || !data.user) {
+            // The session is gone (expired or revoked), not just unreachable:
+            // remove saved class data so it isn't left on a shared computer.
+            // A network failure keeps it, and the outbox (fv-*) always stays.
+            if (!_isNetworkAuthError(error)) _removeSavedClassData();
             window.location.href = '/login.html';
             return new Promise(function () {});
           }

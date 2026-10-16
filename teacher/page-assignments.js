@@ -123,8 +123,7 @@ window.PageAssignments = (function () {
   /* ── switchCourse ───────────────────────────────────────── */
   async function switchCourse(cid) {
     activeCourse = cid;
-    setActiveCourse(cid);
-    await withSwitchingLock(() => initData(cid));
+    if (!(await switchActiveCourse(cid))) return;
     filterCategories = [];
     assessSearch = '';
     showUngraded = false;

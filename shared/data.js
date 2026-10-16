@@ -658,8 +658,10 @@ async function _runCourseRefresh(cid, st) {
       st.snapshot = Object.assign({}, (_localWrites[cid] && _localWrites[cid].fields) || {});
       st.skipped = false;
       try {
-        if (kind === 'student-records') await loadStudentProfileSummaries(cid);
-        else await initData(cid);
+        if (kind === 'student-records') {
+          // Observations bump the same timestamp, so reload them too.
+          await Promise.all([loadStudentProfileSummaries(cid), _hydrateObservations(cid)]);
+        } else await initData(cid);
       } catch (e) {
         console.warn('Realtime refresh failed for ' + cid + ':', e);
       } finally {
@@ -677,7 +679,7 @@ async function _runCourseRefresh(cid, st) {
    local edit for _REFRESH_QUIET_MS. */
 async function _waitForQuietCourse(cid) {
   while (true) {
-    if (_pendingSyncs > 0) {
+    if (_hasUnsentWrites()) {
       await new Promise(function (resolve) {
         setTimeout(resolve, 250);
       });
@@ -794,11 +796,16 @@ function _initCrossTab() {
   } catch (e) {
     // BroadcastChannel not supported — fall back to storage event
   }
-  // Fallback: storage event fires cross-tab when localStorage changes
+  // Fallback for browsers without BroadcastChannel: the storage event fires
+  // when another tab writes localStorage. Only the open class's keys count.
+  // With both listeners, every load in one tab (which writes localStorage)
+  // made the other tab reload, and that reload made the first one reload.
+  if (_crossTabChannel) return;
   window.addEventListener('storage', function (e) {
-    if (e.key && e.key.startsWith('gb-') && !_crossTabAlerted) {
+    var cid = getActiveCourse();
+    if (e.key && cid && e.key.startsWith('gb-') && e.key.endsWith('-' + cid) && !_crossTabAlerted) {
       _crossTabAlerted = true;
-      _handleExternalCourseUpdate(getActiveCourse(), 'gradebook').finally(function () {
+      _handleExternalCourseUpdate(cid, 'gradebook').finally(function () {
         _crossTabAlerted = false;
       });
     }
@@ -890,6 +897,55 @@ function _migrateAssignmentStatusFormat() {
 }
 
 /** Load global data (courses + config). Call before initData(). */
+/* Saved class data belongs to one teacher. If someone else signed in on
+   this browser last (a shared computer whose previous user's session
+   expired without signing out), their saved classes are removed before
+   anything reads them. The outbox (fv-*) is left alone: its entries carry
+   their own owner and are filtered by v2Queue. */
+function _scopeLocalDataToTeacher(uid) {
+  if (!uid) return;
+  var owner = null;
+  try {
+    owner = localStorage.getItem('gb-owner');
+  } catch (e) {
+    return;
+  }
+  if (owner && owner !== uid) {
+    _removeLocalKeys(function (key) {
+      return key.startsWith('gb-') || key.startsWith('gb_');
+    });
+    Object.keys(_DATA_KEYS).forEach(function (field) {
+      _cache[field] = {};
+    });
+  }
+  _safeLSSet('gb-owner', uid);
+}
+
+/* Remove saved data for classes the server no longer lists, e.g. a class
+   deleted on another device. */
+function _purgeUnlistedCourseData(courses) {
+  var listed = courses || {};
+  _removeLocalKeys(function (key) {
+    var m = key.match(/^gb-.+-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i);
+    return !!m && !listed[m[1]];
+  });
+}
+
+function _removeLocalKeys(test) {
+  try {
+    var keys = [];
+    for (var i = 0; i < localStorage.length; i++) {
+      var key = localStorage.key(i);
+      if (key && test(key)) keys.push(key);
+    }
+    keys.forEach(function (key) {
+      localStorage.removeItem(key);
+    });
+  } catch (e) {
+    console.warn('Could not clear saved class data:', e);
+  }
+}
+
 async function initAllCourses() {
   // Run one-time LS format migrations before any read of cached data.
   _migrateAssignmentStatusFormat();
@@ -916,6 +972,7 @@ async function initAllCourses() {
         if (session && session.user) {
           _useSupabase = true;
           _teacherId = session.user.id;
+          _scopeLocalDataToTeacher(session.user.id);
         }
       } catch (e) {
         console.warn('Supabase session check failed, falling back to localStorage:', e);
@@ -957,6 +1014,7 @@ async function initAllCourses() {
       // can boot from cache instead of starting empty.
       _safeLSSet('gb-courses', JSON.stringify(_cache.courses));
       _safeLSSet('gb-config', JSON.stringify(_cache.config));
+      _purgeUnlistedCourseData(_cache.courses);
       _syncStatus = 'idle';
       _updateSyncIndicator();
     } catch (e) {
@@ -1086,14 +1144,63 @@ async function initData(cid) {
   // Avoid duplicate concurrent loads for same course
   if (_initPromise && _initPromise._cid === cid) return _initPromise;
 
+  // Writes still waiting to be sent aren't in the server's copy yet, so
+  // applying it now would show the class without them. Keep the copy this
+  // device has and refresh once the writes have landed.
+  if (_hasUnsentWrites() && _hasLocalCopy(cid) && !(_refreshState[cid] && _refreshState[cid].snapshot)) {
+    if (_cache.students[cid] === undefined) _loadCourseFromLS(cid);
+    _handleExternalCourseUpdate(cid, 'gradebook');
+    if (cid === getActiveCourse()) await _subscribeCourseSyncCursor(cid);
+    return;
+  }
+
+  // Every load, not only realtime refreshes, must leave alone a field the
+  // teacher edits while it is fetching (see _refreshMustSkip).
+  var st = _refreshState[cid] || (_refreshState[cid] = {});
+  var ownSnapshot = !st.snapshot;
+  if (ownSnapshot) {
+    st.snapshot = Object.assign({}, (_localWrites[cid] && _localWrites[cid].fields) || {});
+    st.skipped = false;
+  }
+
   const p = _doInitData(cid);
   p._cid = cid;
   _initPromise = p;
   try {
     await p;
-    await _subscribeCourseSyncCursor(cid);
+    // A slower load for a class the teacher has already left must not take
+    // the realtime channel from the class on screen.
+    if (cid === getActiveCourse()) await _subscribeCourseSyncCursor(cid);
   } finally {
     if (_initPromise === p) _initPromise = null;
+    if (ownSnapshot) {
+      var skipped = st.skipped;
+      st.snapshot = null;
+      if (skipped) _handleExternalCourseUpdate(cid, 'gradebook');
+    }
+  }
+}
+
+/* Writes made this session that haven't finished, or entries left in the
+   outbox by an earlier session. Dead-lettered entries won't be sent, so they
+   don't count. */
+function _hasUnsentWrites() {
+  if (_pendingSyncs > 0) return true;
+  var q = window.v2Queue;
+  if (!q || typeof q.stats !== 'function') return false;
+  try {
+    return (q.stats().queued || 0) > 0;
+  } catch (e) {
+    return false;
+  }
+}
+
+function _hasLocalCopy(cid) {
+  if (_cache.students[cid] !== undefined) return true;
+  try {
+    return localStorage.getItem('gb-students-' + cid) !== null;
+  } catch (e) {
+    return false;
   }
 }
 
@@ -1185,11 +1292,31 @@ function _rpcObject(data) {
   return _plainObject(data) ? data : null;
 }
 
+/* Fill a course field from this device's saved copy, or a default, without
+   writing localStorage or the server baseline. */
+function _keepOrDefaultField(cid, field, fallback) {
+  if (_cache[field][cid] !== undefined) return;
+  var key = _DATA_KEYS[field];
+  _cache[field][cid] = key ? _safeParseLS('gb-' + key + '-' + cid, fallback) : fallback;
+}
+
 function _persistLoadedField(cid, field, value) {
   if (_refreshMustSkip(cid, field)) return;
   _cache[field][cid] = value;
   var key = _DATA_KEYS[field];
-  if (key) _safeLSSet('gb-' + key + '-' + cid, JSON.stringify(value));
+  if (key) {
+    // Unchanged data isn't rewritten, so a reload that changed nothing
+    // doesn't look like an edit to other tabs or cost a quota write.
+    var lsKey = 'gb-' + key + '-' + cid;
+    var json = JSON.stringify(value);
+    var same = false;
+    try {
+      same = localStorage.getItem(lsKey) === json;
+    } catch (e) {
+      same = false;
+    }
+    if (!same) _safeLSSet(lsKey, json);
+  }
   if (_SERVER_STATE_FIELDS[field]) _rememberServerState(field, cid, value);
 }
 
@@ -1804,14 +1931,17 @@ function _pushHydratedScore(scores, sid, entry) {
 
 function _scoreEntryFromCanonical(cid, assessment, tagId, value, comment, modifier) {
   var entry = {
-    id: [assessment.id, tagId || 'overall', Date.now().toString(36)].join(':'),
+    // Deterministic, so loading the same server data twice writes the same
+    // localStorage string: a changing value here made every load look like an
+    // edit to other tabs, which then reloaded too.
+    id: [assessment.id, tagId || 'overall'].join(':'),
     assessmentId: assessment.id,
     tagId: tagId || '',
     score: value == null || value === '' ? 0 : Number(value),
     date: assessment.date || assessment.assigned_at || courseToday(cid),
     type: assessment.type || 'summative',
     note: comment || '',
-    created: new Date().toISOString(),
+    created: assessment.date || assessment.assigned_at || '',
   };
   var mod = normalizeScoreMod(entry.score, modifier);
   if (mod) entry.mod = mod;
@@ -1975,9 +2105,9 @@ async function _hydrateLearningMap(cid) {
     var res = await window.v2.getLearningMap(cid);
     if (res && res.error) throw res.error;
     var map = _canonicalLearningMapToCache(cid, res && res.data !== undefined ? res.data : res);
-    if ((map.subjects && map.subjects.length) || (map.sections && map.sections.length)) {
-      _persistLoadedField(cid, 'learningMaps', map);
-    }
+    var empty = !(map.subjects && map.subjects.length) && !(map.sections && map.sections.length);
+    if (empty) map = (typeof LEARNING_MAP !== 'undefined' && LEARNING_MAP[cid]) || map;
+    _persistLoadedField(cid, 'learningMaps', map);
   } catch (e) {
     console.warn('get_learning_map failed for ' + cid + '; keeping existing learning map:', e);
   }
@@ -2174,23 +2304,25 @@ function _v2GradebookToCache(cid, payload) {
   _persistLoadedField(cid, 'scores', cellCache.scores);
   _persistLoadedField(cid, 'statuses', cellCache.statuses);
 
-  // These fields hydrate through follow-up canonical reads in _doInitData().
-  // Keep safe defaults here so a failed secondary read still leaves a valid
-  // cache object for callers.
-  _persistLoadedField(cid, 'observations', {});
-  _persistLoadedField(cid, 'courseConfigs', {});
-  _persistLoadedField(cid, 'reportConfig', null);
-  _persistLoadedField(
+  // These fields come from follow-up reads in _doInitData(), and term ratings,
+  // report config and course config aren't read from the server at all yet.
+  // Keep what this device already has and default only what it doesn't:
+  // blanking them here erased local report-card work on every load, and left
+  // fields empty whenever a follow-up read failed.
+  _keepOrDefaultField(cid, 'observations', {});
+  _keepOrDefaultField(cid, 'courseConfigs', {});
+  _keepOrDefaultField(cid, 'reportConfig', null);
+  _keepOrDefaultField(
     cid,
     'learningMaps',
     (typeof LEARNING_MAP !== 'undefined' && LEARNING_MAP[cid]) || { subjects: [], sections: [] },
   );
-  _persistLoadedField(cid, 'termRatings', {});
-  _persistLoadedField(cid, 'flags', {});
-  _persistLoadedField(cid, 'goals', {});
-  _persistLoadedField(cid, 'reflections', {});
-  _persistLoadedField(cid, 'overrides', {});
-  _persistLoadedField(cid, 'studentProfileSummaries', {});
+  _keepOrDefaultField(cid, 'termRatings', {});
+  _keepOrDefaultField(cid, 'flags', {});
+  _keepOrDefaultField(cid, 'goals', {});
+  _keepOrDefaultField(cid, 'reflections', {});
+  _keepOrDefaultField(cid, 'overrides', {});
+  _keepOrDefaultField(cid, 'studentProfileSummaries', {});
 
   _cache.notes[cid] = _safeParseLS('gb-notes-' + cid, {});
   _cache.modules[cid] = _safeParseLS('gb-modules-' + cid, _safeParseLS('gb-units-' + cid, [])) || [];
@@ -2213,22 +2345,54 @@ async function _doInitData(cid) {
       return;
     }
 
+    var gbRes;
     try {
-      var gbRes = await sb.rpc('get_gradebook', { p_course_id: cid });
-      if (gbRes.error) throw gbRes.error;
-      _v2GradebookToCache(cid, gbRes.data || {});
-      await _hydrateCanonicalDetails(cid);
-      await loadStudentProfileSummaries(cid);
-      return;
+      gbRes = await _callRpcWithAuthGuard('get_gradebook', { p_course_id: cid }, { suppressSessionExpiredModal: true });
     } catch (e) {
-      console.warn('get_gradebook failed for ' + cid + '; falling back to empty cache:', e);
-      _v2GradebookToCache(cid, { categories: [], students: [], assessments: [], cells: {}, row_summaries: {} });
+      gbRes = { error: e };
+    }
+    if (!gbRes || gbRes.error) {
+      _courseLoadFailed(cid, gbRes && gbRes.error);
       return;
     }
+    delete _loadError[cid];
+    _v2GradebookToCache(cid, gbRes.data || {});
+    await _hydrateCanonicalDetails(cid);
+    await loadStudentProfileSummaries(cid);
+    return;
   }
 
   // localStorage path
   _loadCourseFromLS(cid);
+}
+
+/* A class load failed. Nothing is written: the copy this device already has
+   (memory, else localStorage) stays on screen, with a message and a retry.
+   This used to write an empty class over localStorage and the server
+   baseline, so one failed request blanked the class and the next save
+   diffed against "the server has nothing". */
+var _loadError = {}; // cid → { at, message }
+function _courseLoadFailed(cid, error) {
+  var message = (error && (error.message || error.details)) || String(error || 'unknown error');
+  // A class deleted on another device is removed when the class list loads,
+  // not here: an unauthenticated call also reads as "not found".
+  console.warn('get_gradebook failed for ' + cid + '; keeping the saved copy:', error);
+  _loadError[cid] = { at: Date.now(), message: message };
+  if (_cache.students[cid] === undefined) _loadCourseFromLS(cid);
+  if (typeof showSyncToast === 'function') {
+    showSyncToast("Couldn't load the latest data for this class. Showing your saved copy.", 'load-failed');
+  }
+}
+
+function retryActiveCourseLoad() {
+  var cid = getActiveCourse();
+  if (cid) return _handleExternalCourseUpdate(cid, 'gradebook');
+  return Promise.resolve();
+}
+window.retryActiveCourseLoad = retryActiveCourseLoad;
+
+function courseLoadFailed(cid) {
+  return !!(cid && _loadError[cid]);
 }
 
 function _loadCourseFromLS(cid) {
@@ -3457,6 +3621,8 @@ function _clearCourseLocalState(id) {
     'reflections',
     'custom-tags',
     'report-config',
+    'categories',
+    'student-profile-summaries',
   ].forEach(k => localStorage.removeItem('gb-' + k + '-' + id));
   _forgetServerState(id);
 
@@ -5722,6 +5888,53 @@ function setActiveCourse(cid) {
   saveConfig({ ...getConfig(), activeCourse: _resolveCanonicalCourseId(cid) || cid || null });
 }
 
+/* Every class picker switches through here. A generation number makes the
+   last switch win: when the teacher picks A then B, A's slower load must not
+   render after B's. Resolves true when this switch is still the current one
+   and the page should render. */
+var _switchGeneration = 0;
+async function switchActiveCourse(cid) {
+  var gen = ++_switchGeneration;
+  var started = _perfNow();
+  setActiveCourse(cid);
+  var load = function () {
+    return initData(cid);
+  };
+  if (typeof withSwitchingLock === 'function') {
+    await withSwitchingLock(load);
+  } else {
+    // The mobile shell has no withSwitchingLock.
+    var body = document.body;
+    if (body) body.classList.add('fv-switching-course');
+    try {
+      await load();
+    } finally {
+      if (body && gen === _switchGeneration) body.classList.remove('fv-switching-course');
+    }
+  }
+  recordLoadTiming('class.switch', cid, _perfNow() - started);
+  return gen === _switchGeneration;
+}
+
+/* Class load timings, kept so changes to the load path can be measured on a
+   real device. window.__fvPerf holds the last 50; set localStorage
+   'fv-perf' to '1' to also log each one. */
+function _perfNow() {
+  return typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now();
+}
+function recordLoadTiming(name, cid, ms) {
+  var entry = { name: name, cid: cid, ms: Math.round(ms), at: new Date().toISOString() };
+  var buf = (window.__fvPerf = window.__fvPerf || []);
+  buf.push(entry);
+  if (buf.length > 50) buf.shift();
+  try {
+    if (localStorage.getItem('fv-perf') === '1') console.info('[fv-perf] ' + name + ' ' + entry.ms + ' ms');
+  } catch (e) {
+    /* storage blocked */
+  }
+  return entry;
+}
+
 function isCourseArchived(cid) {
   return !!(cid && COURSES && COURSES[cid] && COURSES[cid].archived);
 }
@@ -5849,6 +6062,7 @@ function addQuickOb(cid, sid, text, dims, sentiment, context, assignmentContext)
   all[sid].push(entry);
   _cache.observations[cid] = all;
   var lsOk = _safeLSSet('gb-quick-obs-' + cid, JSON.stringify(all));
+  _markLocalWrite('observations', cid);
   if (_writesEnabled()) {
     _persistObservationCreate(cid, sid, entry);
   }
@@ -5862,6 +6076,7 @@ function deleteQuickOb(cid, sid, obId) {
   all[sid] = all[sid].filter(o => o.id !== obId);
   _cache.observations[cid] = all;
   _safeLSSet('gb-quick-obs-' + cid, JSON.stringify(all));
+  _markLocalWrite('observations', cid);
   if (_writesEnabled()) {
     _persistObservationDelete(cid, obId);
   }
@@ -5918,6 +6133,7 @@ function updateQuickOb(cid, sid, obId, updates) {
   ob.modified = new Date().toISOString();
   _cache.observations[cid] = all;
   var lsOk = _safeLSSet('gb-quick-obs-' + cid, JSON.stringify(all));
+  _markLocalWrite('observations', cid);
   if (_writesEnabled()) {
     _persistObservationUpdate(cid, ob);
   }
@@ -6908,24 +7124,47 @@ function upsertTermRating(cid, sid, termId, data) {
   // window.v2.saveTermRating helper handles the camelCase → snake_case
   // payload translation.
   if (_writesEnabled() && _isUuid(sid) && window.v2 && window.v2.saveTermRating) {
-    var t = Number(termId);
-    if (t >= 1 && t <= 6) {
-      var blob = all[sid][termId] || {};
-      window.v2.saveTermRating(sid, t, {
-        narrativeHtml: blob.narrative,
-        workHabitsRating: blob.workHabits,
-        participationRating: blob.participation,
-        socialTraits: blob.socialTraits,
-        // dims / strengths / growthAreas / mention* on the blob are already
-        // structured per the v2 helper's contract; passing as-is when present.
-        dimensions: blob.dimensions,
-        strengthTagIds: blob.strengths,
-        growthTagIds: blob.growthAreas,
-        mentionAssessmentIds: blob.mentionAssessments,
-        mentionObservationIds: blob.mentionObs,
-      });
-    }
+    var t = _termNumber(termId);
+    var payload = _termRatingPatch(data);
+    if (t >= 1 && t <= 6 && Object.keys(payload).length > 0) window.v2.saveTermRating(sid, t, payload);
   }
+}
+
+/* save_term_rating treats every key it receives as "set this field", so only
+   the fields the caller changed are sent. Sending the whole local blob erased
+   the saved narrative and social traits whenever the blob was incomplete,
+   which it always is after a reload: term ratings aren't read back yet. A
+   rating of 0 means "cleared", which the server stores as null. */
+// The Reports page names terms 'term-1'…'term-6'; the server stores 1…6.
+// Number('term-1') is NaN, so until this mapping every questionnaire save
+// stayed in the browser.
+function _termNumber(termId) {
+  if (typeof termId === 'number') return termId;
+  var m = String(termId || '').match(/(\d+)$/);
+  return m ? Number(m[1]) : NaN;
+}
+
+var _TERM_RATING_WIRE = {
+  narrative: 'narrativeHtml',
+  workHabits: 'workHabitsRating',
+  participation: 'participationRating',
+  socialTraits: 'socialTraits',
+  dimensions: 'dimensions',
+  strengths: 'strengthTagIds',
+  growthAreas: 'growthTagIds',
+  mentionAssessments: 'mentionAssessmentIds',
+  mentionObs: 'mentionObservationIds',
+};
+function _termRatingPatch(data) {
+  var payload = {};
+  Object.keys(data || {}).forEach(function (key) {
+    var wireKey = _TERM_RATING_WIRE[key];
+    if (!wireKey) return;
+    var value = data[key];
+    if ((key === 'workHabits' || key === 'participation') && !value) value = null;
+    payload[wireKey] = value;
+  });
+  return payload;
 }
 
 /* ── Report Config ─────────────────────────────────────────── */
@@ -7137,6 +7376,7 @@ window.GB = {
   setCompletionMark,
   getActiveCourse,
   setActiveCourse,
+  switchActiveCourse,
   getFlags,
   saveFlags,
   isStudentFlagged,

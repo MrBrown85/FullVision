@@ -64,8 +64,7 @@ window.PageGradebook = (function () {
   async function switchCourse(cid) {
     _flushActiveScoreEditor();
     activeCourse = cid;
-    setActiveCourse(cid);
-    await withSwitchingLock(() => initData(cid));
+    if (!(await switchActiveCourse(cid))) return;
     filterSections = [];
     filterModules = [];
     filterCategories = [];

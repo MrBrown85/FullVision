@@ -24,16 +24,28 @@ function sanitizeHtml(raw) {
 }
 
 /* ── Course-switch input lock (P7.3) ───────────────────────── */
+/* While a class loads, the previous class is still on screen. The page is
+   made inert, which blocks the keyboard as well as the mouse, so nothing can
+   be typed into the old class while activeCourse already names the new one.
+   Overlapping switches share the lock until the last one finishes. */
+let _switchLocks = 0;
 async function withSwitchingLock(fn) {
   const body = document.body;
   if (!body) return await fn();
+  const main = document.getElementById('main');
+  _switchLocks++;
   body.setAttribute('aria-busy', 'true');
   body.classList.add('fv-switching-course');
+  if (main) main.inert = true;
   try {
     return await fn();
   } finally {
-    body.removeAttribute('aria-busy');
-    body.classList.remove('fv-switching-course');
+    _switchLocks = Math.max(0, _switchLocks - 1);
+    if (_switchLocks === 0) {
+      body.removeAttribute('aria-busy');
+      body.classList.remove('fv-switching-course');
+      if (main) main.inert = false;
+    }
   }
 }
 window.withSwitchingLock = withSwitchingLock;
@@ -946,6 +958,9 @@ function showSyncToast(message, type) {
   toast.setAttribute('aria-live', 'assertive');
   if (type === 'degraded') {
     toast.innerHTML = `<span>${esc(message)}</span><button class="sync-toast-btn" data-action="retry-supabase-recovery">Retry Now</button>`;
+  } else if (type === 'load-failed') {
+    toast.className = 'sync-toast error';
+    toast.innerHTML = `<span>${esc(message)}</span><button class="sync-toast-btn" data-action="retry-course-load">Retry</button>`;
   } else if (type === 'error') {
     toast.innerHTML = `<span>${esc(message)}</span><button class="sync-toast-btn" data-action="retry-sync">Retry Now</button>`;
   } else {
@@ -1204,6 +1219,10 @@ document.addEventListener('click', function (e) {
     case 'retry-sync':
       retrySyncQueue();
       dismissSyncToast();
+      break;
+    case 'retry-course-load':
+      dismissSyncToast();
+      if (typeof window.retryActiveCourseLoad === 'function') window.retryActiveCourseLoad();
       break;
     case 'retry-supabase-recovery':
       if (window.GB && typeof window.GB.retrySupabaseRecovery === 'function') {

@@ -141,14 +141,15 @@
     // Also flush any pending failed syncs — pull-to-refresh is the mobile recovery trigger
     if (window.GB && window.GB.retrySyncs) window.GB.retrySyncs();
     try {
-      if (window.GB && window.GB.refreshFromSupabase) {
-        var timeout = new Promise(function (_, reject) {
-          setTimeout(function () {
-            reject(new Error('timeout'));
-          }, 8000);
-        });
-        await Promise.race([window.GB.refreshFromSupabase(), timeout]);
-      }
+      // refreshFromSupabase was removed, so this used to reload nothing and
+      // still say "Synced". It now reloads the class and reports the result.
+      var timeout = new Promise(function (_, reject) {
+        setTimeout(function () {
+          reject(new Error('timeout'));
+        }, 8000);
+      });
+      await Promise.race([retryActiveCourseLoad(), timeout]);
+      if (courseLoadFailed(getActiveCourse())) throw new Error('could not reach the server');
       MC.showToast('Synced just now');
     } catch (e) {
       console.warn('Pull-to-refresh error:', e);
@@ -526,15 +527,19 @@
             var newCid = this.value;
             if (newCid && newCid !== _cid) {
               _cid = newCid;
-              setActiveCourse(newCid);
               document.body.setAttribute('aria-busy', 'true');
-              document.body.classList.add('fv-switching-course');
-              initData(newCid).finally(function () {
-                document.body.removeAttribute('aria-busy');
-                document.body.classList.remove('fv-switching-course');
-                MC.dismissSheet();
-                _renderTab(_activeTab);
-              });
+              switchActiveCourse(newCid).then(
+                function (current) {
+                  if (!current) return;
+                  document.body.removeAttribute('aria-busy');
+                  MC.dismissSheet();
+                  _renderTab(_activeTab);
+                },
+                function () {
+                  document.body.removeAttribute('aria-busy');
+                  _renderTab(_activeTab);
+                },
+              );
             }
           });
         }

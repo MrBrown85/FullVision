@@ -48,8 +48,7 @@ window.PageStudent = (function () {
 
   /* ── switchCourse ───────────────────────────────────────── */
   async function switchCourse(cid) {
-    setActiveCourse(cid);
-    await withSwitchingLock(() => initData(cid));
+    if (!(await switchActiveCourse(cid))) return;
     Router.navigate('#/dashboard');
   }
 
