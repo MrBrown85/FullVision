@@ -1877,7 +1877,10 @@ window.PageGradebook = (function () {
       '<div class="gb-add-field"><label>Date</label><input type="date" id="gb-new-date" value="' +
       today +
       '"></div>' +
-      '<div class="gb-add-field"><label>Category</label><select id="gb-new-category"><option value="">No Category</option>' +
+      // A class with categories needs one on every assessment, or the work
+      // counts toward no letter grade (Schoology and Teams both require it).
+      '<div class="gb-add-field"><label>Category</label><select id="gb-new-category">' +
+      (categories.length === 0 ? '<option value="">No Category</option>' : '') +
       categories
         .map(function (category) {
           return '<option value="' + category.id + '">' + esc(category.name) + '</option>';

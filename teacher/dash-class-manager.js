@@ -2317,6 +2317,10 @@ window.DashClassManager = (function () {
         '<div class="cm-hint" style="padding:6px 0">No categories yet. Letter grades use total points earned out of total points possible. Add categories to weight groups of assessments.</div>';
     }
     rows.forEach(function (row, idx) {
+      if (st.moving && st.moving.idx === idx) {
+        html += _cmRenderCatMove(cid, row, idx);
+        return;
+      }
       html +=
         '<div class="cm-cat-row"' +
         (row.id ? ' draggable="true" data-cat-drag="' + row.id + '"' : '') +
@@ -2340,6 +2344,7 @@ window.DashClassManager = (function () {
     });
     html +=
       '</div>' +
+      _cmRenderUncategorized(cid) +
       '<div class="cm-cat-footer">' +
       '<button class="cm-add-link" data-action="cmCatAdd">+ Add category</button>' +
       '<div class="' +
@@ -2408,14 +2413,156 @@ window.DashClassManager = (function () {
     _cmCatPersist(cmSelectedCourse, row);
   }
 
+  function _cmAssessmentCategoryId(a) {
+    return (a && (a.categoryId || a.category_id)) || '';
+  }
+
+  function _cmAssessmentsInCategory(cid, categoryId) {
+    return getAssessments(cid).filter(function (a) {
+      return _cmAssessmentCategoryId(a) === categoryId;
+    });
+  }
+
+  // Assessments that count toward no letter grade: no category, or one that
+  // no longer exists, in a class that has categories.
+  function _cmUncategorizedAssessments(cid) {
+    var ids = _cmCatState(cid)
+      .rows.filter(function (r) {
+        return r.id;
+      })
+      .map(function (r) {
+        return r.id;
+      });
+    if (ids.length === 0) return [];
+    return getAssessments(cid).filter(function (a) {
+      return ids.indexOf(_cmAssessmentCategoryId(a)) < 0;
+    });
+  }
+
+  function _cmCategoryOptions(cid, exceptId) {
+    return _cmCatState(cid)
+      .rows.filter(function (r) {
+        return r.id && r.id !== exceptId;
+      })
+      .map(function (r) {
+        return '<option value="' + r.id + '">' + esc(r.name || 'Unnamed') + '</option>';
+      })
+      .join('');
+  }
+
+  function _cmRenderCatMove(cid, row, idx) {
+    var n = _cmAssessmentsInCategory(cid, row.id).length;
+    return (
+      '<div class="cm-cat-row cm-cat-move">' +
+      '<span class="cm-hint">Move ' +
+      n +
+      (n === 1 ? ' assessment' : ' assessments') +
+      ' in ' +
+      esc(row.name || 'this category') +
+      ' to</span>' +
+      '<select class="cm-input" id="cm-cat-move-target" aria-label="Move to category">' +
+      _cmCategoryOptions(cid, row.id) +
+      '</select>' +
+      '<button class="btn btn-ghost" data-action="cmCatMoveCancel">Cancel</button>' +
+      '<button class="btn btn-primary" data-action="cmCatMoveDelete" data-idx="' +
+      idx +
+      '">Move and delete</button>' +
+      '</div>'
+    );
+  }
+
+  function _cmRenderUncategorized(cid) {
+    var n = _cmUncategorizedAssessments(cid).length;
+    if (n === 0) return '';
+    return (
+      '<div class="cm-cat-row cm-cat-move">' +
+      '<span class="cm-hint">' +
+      n +
+      (n === 1 ? ' assessment has' : ' assessments have') +
+      ' no category, so ' +
+      (n === 1 ? 'it doesn\u2019t' : 'they don\u2019t') +
+      ' count toward the letter grade. Move to</span>' +
+      '<select class="cm-input" id="cm-cat-uncat-target" aria-label="Move to category">' +
+      _cmCategoryOptions(cid, null) +
+      '</select>' +
+      '<button class="btn btn-primary" data-action="cmCatAssignUncategorized">Move</button>' +
+      '</div>'
+    );
+  }
+
+  // Give assessments a category and wait until the server has the change.
+  function _cmMoveAssessments(cid, moving, categoryId) {
+    var ids = moving.map(function (a) {
+      return a.id;
+    });
+    var arr = getAssessments(cid).map(function (a) {
+      if (ids.indexOf(a.id) < 0) return a;
+      return Object.assign({}, a, { categoryId: categoryId, category_id: categoryId });
+    });
+    saveAssessments(cid, arr);
+    if (typeof clearProfCache === 'function') clearProfCache();
+    var pending = typeof _assessmentSaveQueue !== 'undefined' && _assessmentSaveQueue[cid];
+    return Promise.resolve(pending);
+  }
+
+  function _cmDeleteCategoryRow(cid, row) {
+    var st = _cmCatState(cid);
+    var i = st.rows.indexOf(row);
+    if (i >= 0) st.rows.splice(i, 1);
+    _cmMirrorCategoriesToCache(cid);
+    renderClassManager();
+    return row.id && window.v2 && window.v2.deleteCategory ? window.v2.deleteCategory(row.id) : Promise.resolve();
+  }
+
+  // A category whose work would be left with no category is moved first, as
+  // Schoology requires. The last category can go: with none, the letter grade
+  // counts all work by total points.
   function cmCatDelete(idx) {
     if (!cmSelectedCourse) return;
-    var st = _cmCatState(cmSelectedCourse);
+    var cid = cmSelectedCourse;
+    var st = _cmCatState(cid);
     var row = st.rows[idx];
     if (!row) return;
-    st.rows.splice(idx, 1);
-    if (row.id && window.v2 && window.v2.deleteCategory) window.v2.deleteCategory(row.id);
-    _cmMirrorCategoriesToCache(cmSelectedCourse);
+    var inUse = row.id ? _cmAssessmentsInCategory(cid, row.id).length : 0;
+    var others = st.rows.filter(function (r) {
+      return r !== row && r.id;
+    });
+    if (inUse > 0 && others.length > 0) {
+      st.moving = { idx: idx };
+      renderClassManager();
+      return;
+    }
+    _cmDeleteCategoryRow(cid, row);
+  }
+
+  function cmCatMoveCancel() {
+    if (!cmSelectedCourse) return;
+    _cmCatState(cmSelectedCourse).moving = null;
+    renderClassManager();
+  }
+
+  function cmCatMoveDelete(idx) {
+    if (!cmSelectedCourse) return;
+    var cid = cmSelectedCourse;
+    var st = _cmCatState(cid);
+    var row = st.rows[idx];
+    var target = (document.getElementById('cm-cat-move-target') || {}).value;
+    st.moving = null;
+    if (!row || !target) {
+      renderClassManager();
+      return;
+    }
+    _cmMoveAssessments(cid, _cmAssessmentsInCategory(cid, row.id), target).then(function () {
+      return _cmDeleteCategoryRow(cid, row);
+    });
+  }
+
+  function cmCatAssignUncategorized() {
+    if (!cmSelectedCourse) return;
+    var cid = cmSelectedCourse;
+    var target = (document.getElementById('cm-cat-uncat-target') || {}).value;
+    if (!target) return;
+    _cmMoveAssessments(cid, _cmUncategorizedAssessments(cid), target);
     renderClassManager();
   }
 
@@ -3358,6 +3505,15 @@ window.DashClassManager = (function () {
       cmCatDelete: function () {
         cmCatDelete(parseInt(el.dataset.idx, 10));
       },
+      cmCatMoveCancel: function () {
+        cmCatMoveCancel();
+      },
+      cmCatMoveDelete: function () {
+        cmCatMoveDelete(parseInt(el.dataset.idx, 10));
+      },
+      cmCatAssignUncategorized: function () {
+        cmCatAssignUncategorized();
+      },
       cmToggleColorPalette: function () {
         cmToggleColorPalette(el);
       },
@@ -3651,6 +3807,7 @@ window.DashClassManager = (function () {
       cwStep2LatePolicy = '';
       _cmCollapsedStdFolders = {};
       _cmOpenStdCards = {};
+      _cmCategoryState = {};
     },
   };
 })();
