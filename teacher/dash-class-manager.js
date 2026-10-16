@@ -1560,6 +1560,11 @@ window.DashClassManager = (function () {
       '">' +
       (isArchived ? '\uD83D\uDCE6 Unarchive Class' : '\uD83D\uDCE6 Archive Class') +
       '</button>' +
+      (isArchived
+        ? '<button class="cm-action-btn cm-action-btn-danger" data-action="cmDeleteCourse" data-cid="' +
+          cid +
+          '">Delete Class</button>'
+        : '') +
       '</div>';
 
     html += '</div>'; // close cm-detail-inner
@@ -2772,6 +2777,38 @@ window.DashClassManager = (function () {
     renderClassManager();
   }
 
+  // Only archived classes can be deleted, so a class is always archived (and
+  // out of every class menu) before it can go. delete_course hides it now and
+  // fv_retention_cleanup erases it 30 days later.
+  function cmDeleteCourse(cid) {
+    var course = COURSES[cid];
+    if (!course || !isCourseArchived(cid)) return;
+    showConfirm(
+      'Delete Class',
+      'Permanently delete ' +
+        course.name +
+        ' with all its students, assessments, and scores? It disappears now and is erased for good after 30 days.',
+      'Delete Class',
+      'danger',
+      async function () {
+        try {
+          await deleteCourseData(cid);
+        } catch (err) {
+          console.error('deleteCourseData failed:', err);
+          showSyncToast('Delete class failed. Try again.', 'error');
+          return;
+        }
+        if (_activeCourse === cid) {
+          var nextActive = getActiveCourse();
+          _activeCourse = nextActive;
+          if (nextActive) _activeCourseChanged = true;
+        }
+        if (cmSelectedCourse === cid) cmSelectedCourse = _activeCourse;
+        renderClassManager();
+      },
+    );
+  }
+
   function cmDuplicateCourse(sourceCid) {
     var src = COURSES[sourceCid];
     if (!src) return;
@@ -3355,6 +3392,9 @@ window.DashClassManager = (function () {
       },
       cmToggleArchive: function () {
         cmToggleArchive(el.dataset.cid);
+      },
+      cmDeleteCourse: function () {
+        cmDeleteCourse(el.dataset.cid);
       },
       cwSelectGrade: function () {
         cwSelectGrade(parseInt(el.dataset.grade, 10));
