@@ -561,7 +561,8 @@ function _calcGroup(scores, method, decayWeight, assessmentWeights) {
         sum += s.score * w;
         weightSum += w;
       });
-      return weightSum > 0 ? Math.round(sum / weightSum) : 0;
+      // Not rounded: 3+ and 3 average to 3.17, not 3.
+      return weightSum > 0 ? sum / weightSum : 0;
     }
     case 'median': {
       // Sorted-middle — robust against one unusually low/high score.
@@ -570,21 +571,23 @@ function _calcGroup(scores, method, decayWeight, assessmentWeights) {
       const sorted = valid.map(s => s.score).sort((a, b) => a - b);
       const n = sorted.length;
       if (n % 2 === 1) return sorted[(n - 1) / 2];
-      return Math.round((sorted[n / 2 - 1] + sorted[n / 2]) / 2);
+      return (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
     }
     case 'mode': {
+      // Counted by whole level, so a 3+ and a 3 are both a 3. The result is
+      // the most recent score at the most common level, keeping its + or −.
+      const levelOf = s => (s.level != null ? Number(s.level) : Math.round(s.score));
       const freq = {};
       valid.forEach(s => {
         const w = (assessmentWeights && assessmentWeights[s.assessmentId]) || 1;
-        freq[s.score] = (freq[s.score] || 0) + w;
+        freq[levelOf(s)] = (freq[levelOf(s)] || 0) + w;
       });
       const maxFreq = Math.max(...Object.values(freq)); // safe: freq is non-empty since valid.length > 0
       const modes = Object.keys(freq)
         .filter(k => freq[k] === maxFreq)
         .map(Number);
-      if (modes.length === 1) return modes[0];
       for (let i = valid.length - 1; i >= 0; i--) {
-        if (modes.includes(valid[i].score)) return valid[i].score;
+        if (modes.includes(levelOf(valid[i]))) return valid[i].score;
       }
       return modes[0];
     }
@@ -596,7 +599,7 @@ function _calcGroup(scores, method, decayWeight, assessmentWeights) {
         const denom = 1 - dw + dw * w;
         avg = (avg * (1 - dw) + valid[i].score * dw * w) / denom;
       }
-      return Math.round(avg);
+      return avg;
     }
     default:
       return valid[valid.length - 1].score;
@@ -633,7 +636,7 @@ function calcProficiency(scores, method, decayWeight, opts) {
   const weightTotal = summW + formW;
   if (weightTotal <= 0) return summProf || formProf || 0;
   const raw = (summProf * summW + formProf * formW) / weightTotal;
-  return Math.min(4, Math.round(raw));
+  return Math.min(4, raw);
 }
 
 /** Get all score entries for a student on a specific tag, excluding excused and converting points-mode scores.

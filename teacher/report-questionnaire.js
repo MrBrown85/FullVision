@@ -1216,12 +1216,13 @@ window.ReportQuestionnaire = (function () {
     const tagProfs = allTags
       .map(t => ({ tag: t, prof: getTagProficiency(cid, sid, t.id), section: getSectionForTag(cid, t.id) }))
       .filter(t => t.prof > 0);
+    // By the level shown (2.5 reads as Proficient), like the report.
     const strengths = tagProfs
-      .filter(t => t.prof >= 3)
+      .filter(t => Math.round(t.prof) >= 3)
       .sort((a, b) => b.prof - a.prof)
       .slice(0, 6);
     const growthAreas = tagProfs
-      .filter(t => t.prof > 0 && t.prof < 3)
+      .filter(t => t.prof > 0 && Math.round(t.prof) < 3)
       .sort((a, b) => a.prof - b.prof)
       .slice(0, 6);
 
