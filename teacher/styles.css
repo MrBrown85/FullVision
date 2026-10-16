@@ -277,6 +277,25 @@ body.fv-switching-course::after {
   pointer-events: none;
 }
 
+/* A saved copy waiting for the server's answer: the page is inert (set in
+   shared/data.js), and fv-checking-slow adds this note after 400 ms. */
+body.fv-checking-slow:not(.fv-switching-course)::after {
+  content: 'Checking for updates…';
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: calc(var(--z-popover) + 5);
+  background: var(--surface, #fff);
+  color: var(--text-2, #444);
+  border: 1px solid var(--border, #ddd);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: var(--text-sm);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+  pointer-events: none;
+}
+
 /* ── Unified Toolbar — macOS-native title bar + controls ───── */
 #app-dock {
   position: fixed;

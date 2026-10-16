@@ -386,7 +386,12 @@ window.PageReports = (function () {
         renderReports();
       },
       printReports: function () {
-        window.print();
+        // Print what the server has, not a saved copy it may have replaced.
+        ensureClassFresh(activeCourse).then(function (fresh) {
+          if (fresh || window.confirm("Couldn't confirm this class is up to date. Print the saved copy anyway?")) {
+            window.print();
+          }
+        });
       },
       rbApplyPreset: function () {
         rbApplyPreset(el.dataset.preset);

@@ -713,3 +713,8 @@ const FV_IDEMPOTENT_RPCS = {
   upsert_subject: true,
   upsert_tag: true,
 };
+
+/* Open a class from this device's saved copy and check the server in the
+   background (docs/class-loading-plan.md, Phase 4). false loads every class
+   from the server first, as before. */
+const FV_CACHE_FIRST = true;

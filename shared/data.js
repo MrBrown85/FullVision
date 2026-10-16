@@ -152,6 +152,7 @@ function _markLocalWrite(field, cid) {
   var w = _localWrites[cid] || (_localWrites[cid] = { at: 0, fields: {} });
   w.at = Date.now();
   w.fields[field] = (w.fields[field] || 0) + 1;
+  _markSavedCopyDirty(cid);
 }
 
 function _localWriteCount(cid, field) {
@@ -657,6 +658,7 @@ async function _runCourseRefresh(cid, st) {
       st.kind = null;
       st.snapshot = Object.assign({}, (_localWrites[cid] && _localWrites[cid].fields) || {});
       st.skipped = false;
+      var versionBefore = _classVersion[cid];
       try {
         if (kind === 'student-records' && !_classBundleEnabled()) {
           // Observations bump the same timestamp, so reload them too.
@@ -667,7 +669,10 @@ async function _runCourseRefresh(cid, st) {
       } finally {
         st.snapshot = null;
       }
-      _invalidateAndRerender();
+      // A check that found nothing new leaves the page as it is: re-rendering
+      // would reset scroll position and open menus for no reason.
+      var changed = !_classBundleEnabled() || _classVersion[cid] !== versionBefore || st.skipped;
+      if (changed) _invalidateAndRerender();
       if (st.skipped && !st.kind) st.kind = kind;
     }
   } finally {
@@ -749,6 +754,7 @@ async function _subscribeCourseSyncCursor(cid) {
   }
 
   _courseSyncCourseId = cid;
+  var joined = false;
   _courseSyncChannel = sb
     .channel('course-sync-' + cid)
     .on(
@@ -763,6 +769,12 @@ async function _subscribeCourseSyncCursor(cid) {
         var next = (payload && payload.new) || {};
         var prev = _courseSyncState[cid] || {};
         _updateCourseSyncState(cid, next);
+        // The version moves on every change to the class; the timestamps are
+        // for clients from before it existed.
+        if (next.version != null && _classBundleEnabled()) {
+          if (Number(next.version) !== _classVersion[cid]) _handleExternalCourseUpdate(cid, 'gradebook');
+          return;
+        }
         if (next.gradebook_updated_at && next.gradebook_updated_at !== prev.gradebookUpdatedAt) {
           _handleExternalCourseUpdate(cid, 'gradebook');
           return;
@@ -775,6 +787,12 @@ async function _subscribeCourseSyncCursor(cid) {
     .subscribe(function (status) {
       if (status === 'CHANNEL_ERROR') {
         console.warn('course_sync_cursor subscription failed for', cid);
+      }
+      // Events sent while the channel was down are not replayed, so check
+      // the class again when it reconnects.
+      if (status === 'SUBSCRIBED') {
+        if (joined) _revalidateActiveClass();
+        joined = true;
       }
     });
 }
@@ -1015,6 +1033,7 @@ async function initAllCourses() {
       _safeLSSet('gb-courses', JSON.stringify(_cache.courses));
       _safeLSSet('gb-config', JSON.stringify(_cache.config));
       _purgeUnlistedCourseData(_cache.courses);
+      _purgeStaleSavedCopies();
       _syncStatus = 'idle';
       _updateSyncIndicator();
     } catch (e) {
@@ -1128,14 +1147,29 @@ function _invalidateAndRerender() {
    This is the most reliable cross-device sync mechanism.
    ══════════════════════════════════════════════════════════════════ */
 var _lastVisibilityRefresh = 0;
-var _VISIBILITY_DEBOUNCE = 3000; // Don't re-fetch more than once per 3 seconds
+var _VISIBILITY_DEBOUNCE = 30000;
 
+/* Coming back to the tab, or back online, checks the open class: realtime
+   events can be missed while a laptop sleeps. At most once per 30 seconds;
+   an unchanged class costs one small request. */
+var _visibilityBound = false;
 function _initVisibilityRefresh() {
-  // v2: visibility-refresh now lives in _doInitData (it re-runs get_gradebook
-  // when the active course is reloaded). The legacy per-table refetch was
-  // removed with the dropped public-schema tables.
-  var _ = _lastVisibilityRefresh;
-  _ = _VISIBILITY_DEBOUNCE; // reference to keep linter happy; vars preserved
+  if (_visibilityBound || typeof document === 'undefined' || !document.addEventListener) return;
+  _visibilityBound = true;
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState !== 'visible') return;
+    if (Date.now() - _lastVisibilityRefresh < _VISIBILITY_DEBOUNCE) return;
+    _revalidateActiveClass();
+  });
+  if (typeof window.addEventListener === 'function') window.addEventListener('online', _revalidateActiveClass);
+}
+
+function _revalidateActiveClass() {
+  if (!_useSupabase || !_classBundleEnabled()) return;
+  var cid = getActiveCourse();
+  if (!cid || !_isUuid(cid)) return;
+  _lastVisibilityRefresh = Date.now();
+  _handleExternalCourseUpdate(cid, 'gradebook');
 }
 
 /** Load all data for a specific course into the cache. */
@@ -1143,6 +1177,20 @@ async function initData(cid) {
   if (!cid) return;
   // Avoid duplicate concurrent loads for same course
   if (_initPromise && _initPromise._cid === cid) return _initPromise;
+
+  // Saved copy first: show the copy this device has, then ask the server
+  // whether it changed. Not while a refresh is running: that is the check.
+  var refreshing = !!(_refreshState[cid] && _refreshState[cid].snapshot);
+  if (!refreshing && _useSupabase && _cacheFirstEnabled() && _classBundleEnabled() && _isUuid(cid)) {
+    var inMemory = _cache.students[cid] !== undefined && _classVersion[cid] != null;
+    if (inMemory || _savedCopyUsable(cid)) {
+      if (!inMemory) _loadSavedCopy(cid);
+      _saveClassMeta(cid, { lastOpenedAt: Date.now() });
+      _startClassCheck(cid);
+      if (cid === getActiveCourse()) _subscribeCourseSyncCursor(cid);
+      return;
+    }
+  }
 
   // Writes still waiting to be sent aren't in the server's copy yet, so
   // applying it now would show the class without them. Keep the copy this
@@ -2348,9 +2396,11 @@ async function _doInitData(cid) {
     if (_classBundleEnabled()) {
       var bundleRes;
       try {
+        // Only a class already in memory can be "not modified".
+        var knownVersion = _cache.students[cid] !== undefined && _classVersion[cid] != null ? _classVersion[cid] : null;
         bundleRes = await _callRpcWithAuthGuard(
           'get_class_bundle',
-          { p_course_id: cid, p_if_version: null },
+          { p_course_id: cid, p_if_version: knownVersion },
           { suppressSessionExpiredModal: true },
         );
       } catch (e) {
@@ -2363,8 +2413,14 @@ async function _doInitData(cid) {
         _courseLoadFailed(cid, bundleRes && bundleRes.error);
         return;
       } else {
+        var bundle = _rpcObject(bundleRes.data) || {};
+        if (bundle.not_modified) {
+          delete _loadError[cid];
+          _classFresh[cid] = true;
+          return;
+        }
         try {
-          _bundleToCache(cid, _rpcObject(bundleRes.data) || {});
+          _bundleToCache(cid, bundle);
           delete _loadError[cid];
         } catch (e) {
           // A payload this code can't read must not leave the class half
@@ -2507,7 +2563,183 @@ function _bundleToCache(cid, bundle) {
   // A field skipped because the teacher edited it mid-load is fetched again;
   // until then the cache isn't the server's version, so don't claim it is.
   var st = _refreshState[cid];
-  if (!(st && st.skipped) && bundle.version != null) _classVersion[cid] = Number(bundle.version);
+  if (!(st && st.skipped) && bundle.version != null) {
+    _classVersion[cid] = Number(bundle.version);
+    _classFresh[cid] = true;
+    _dirtyMarked[cid] = false;
+    var now = Date.now();
+    _saveClassMeta(cid, {
+      version: _classVersion[cid],
+      savedAt: now,
+      lastOpenedAt: now,
+      owner: _teacherId,
+      schema: _BUNDLE_SCHEMA,
+      dirty: false,
+    });
+  }
+}
+
+/* ── Saved copy first (docs/class-loading-plan.md, Phase 4) ───────────────
+   A class this device has saved opens from that copy at once; a request
+   carrying its version then asks whether anything changed, and only a
+   changed class is downloaded. gb-bundle-meta-<cid> records the copy's
+   version, owner and age. FV_CACHE_FIRST (constants.js) or
+   window.__FV_CACHE_FIRST = false turns this off. */
+var _BUNDLE_SCHEMA = 2;
+var _SAVED_COPY_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
+var _classFresh = {}; // cid → the server confirmed or replaced this copy since it was shown
+var _dirtyMarked = {}; // cid → the saved copy has been flagged as holding local edits
+
+function _cacheFirstEnabled() {
+  if (window.__FV_CACHE_FIRST === false) return false;
+  return typeof FV_CACHE_FIRST === 'undefined' || !!FV_CACHE_FIRST;
+}
+
+function _classMeta(cid) {
+  return _safeParseLS('gb-bundle-meta-' + cid, null);
+}
+
+function _saveClassMeta(cid, patch) {
+  var meta = Object.assign({}, _classMeta(cid) || {}, patch);
+  _safeLSSet('gb-bundle-meta-' + cid, JSON.stringify(meta));
+  return meta;
+}
+
+/* A saved copy is used only for the teacher who saved it, in the shape this
+   code reads, and within 14 days of last being opened. */
+function _savedCopyUsable(cid) {
+  var meta = _classMeta(cid);
+  if (!meta || meta.schema !== _BUNDLE_SCHEMA || !meta.owner || meta.owner !== _teacherId) return false;
+  if (Date.now() - (meta.lastOpenedAt || meta.savedAt || 0) > _SAVED_COPY_MAX_AGE_MS) return false;
+  return _hasLocalCopy(cid);
+}
+
+/* The copy becomes the server baseline only when it holds no local edits:
+   with edits it isn't what the server has, and diffing against it would
+   hide them. Without a baseline (or a version) the check downloads the
+   class again instead of answering "not modified". */
+function _loadSavedCopy(cid) {
+  var meta = _classMeta(cid) || {};
+  _loadCourseFromLS(cid);
+  _cache.categories[cid] = _safeParseLS('gb-categories-' + cid, []);
+  if (meta.dirty) return;
+  Object.keys(_SERVER_STATE_FIELDS).forEach(function (field) {
+    if (_cache[field][cid] !== undefined) _rememberServerState(field, cid, _cache[field][cid]);
+  });
+  if (meta.version != null) _classVersion[cid] = Number(meta.version);
+}
+
+function _markSavedCopyDirty(cid) {
+  if (_dirtyMarked[cid]) return;
+  _dirtyMarked[cid] = true;
+  if (_classMeta(cid)) _saveClassMeta(cid, { dirty: true });
+}
+
+/* Ask the server whether the class on screen changed. Editing waits for the
+   answer (usually 100-200 ms) so nothing is typed into data another device
+   has replaced; after 3 seconds, or offline, it unlocks anyway and the
+   saved copy stays on screen. */
+function _startClassCheck(cid) {
+  _classFresh[cid] = false;
+  var offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+  if (!offline) setPageLock('checking', true);
+  var body = typeof document !== 'undefined' ? document.body : null;
+  var noteTimer = setTimeout(function () {
+    if (!released && !offline && body && body.classList) body.classList.add('fv-checking-slow');
+  }, 400);
+  var released = false;
+  function release() {
+    clearTimeout(noteTimer);
+    if (body && body.classList) body.classList.remove('fv-checking-slow');
+    if (released || offline) return;
+    released = true;
+    setPageLock('checking', false);
+  }
+  var timer = setTimeout(release, 3000);
+  return _handleExternalCourseUpdate(cid, 'gradebook').finally(function () {
+    clearTimeout(timer);
+    release();
+  });
+}
+
+/* Print and export use the server's current data: wait for the check, and
+   report whether the class is known to be current. */
+function ensureClassFresh(cid) {
+  if (!cid || !_useSupabase || !_classBundleEnabled() || _classFresh[cid]) return Promise.resolve(true);
+  return _handleExternalCourseUpdate(cid, 'gradebook').then(function () {
+    return !!_classFresh[cid];
+  });
+}
+
+/* Page locks. "switching" covers a class loading with nothing to show yet
+   (the old class stays on screen); "checking" covers a saved copy waiting
+   for the server's answer. While either holds, #main is inert, which blocks
+   the keyboard as well as the mouse. */
+var _pageLocks = { switching: 0, checking: 0 };
+function setPageLock(kind, on) {
+  _pageLocks[kind] = Math.max(0, (_pageLocks[kind] || 0) + (on ? 1 : -1));
+  var body = typeof document !== 'undefined' ? document.body : null;
+  if (!body || !body.classList) return;
+  var cls = kind === 'switching' ? 'fv-switching-course' : 'fv-checking-class';
+  if (_pageLocks[kind] > 0) body.classList.add(cls);
+  else body.classList.remove(cls);
+  var locked = _pageLocks.switching > 0 || _pageLocks.checking > 0;
+  if (body.setAttribute) {
+    if (locked) body.setAttribute('aria-busy', 'true');
+    else body.removeAttribute('aria-busy');
+  }
+  var main = document.getElementById && document.getElementById('main');
+  if (main) main.inert = locked;
+}
+
+/* Saved copies not opened for 14 days are removed at sign-in. */
+function _purgeStaleSavedCopies() {
+  var stale = {};
+  try {
+    for (var i = 0; i < localStorage.length; i++) {
+      var key = localStorage.key(i);
+      var m = key && key.match(/^gb-bundle-meta-(.+)$/);
+      if (!m) continue;
+      var meta = _safeParseLS(key, null) || {};
+      if (Date.now() - (meta.lastOpenedAt || meta.savedAt || 0) > _SAVED_COPY_MAX_AGE_MS) stale[m[1]] = true;
+    }
+  } catch (e) {
+    return;
+  }
+  _removeLocalKeys(function (key) {
+    var m = key.match(/^gb-.+-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i);
+    return !!m && !!stale[m[1]];
+  });
+}
+
+/* Browser storage is full: remove the saved copy opened longest ago, never
+   the open class, and never while writes wait in the outbox (it shares the
+   same storage). Returns true when something was removed. */
+function _evictOldestSavedCopy(keepCid) {
+  if (_hasUnsentWrites()) return false;
+  var oldest = null;
+  var oldestAt = Infinity;
+  try {
+    for (var i = 0; i < localStorage.length; i++) {
+      var key = localStorage.key(i);
+      var m = key && key.match(/^gb-bundle-meta-(.+)$/);
+      if (!m || m[1] === keepCid || m[1] === getActiveCourse()) continue;
+      var meta = _safeParseLS(key, null) || {};
+      var at = meta.lastOpenedAt || meta.savedAt || 0;
+      if (at < oldestAt) {
+        oldestAt = at;
+        oldest = m[1];
+      }
+    }
+  } catch (e) {
+    return false;
+  }
+  if (!oldest) return false;
+  _removeLocalKeys(function (key) {
+    return key.startsWith('gb-') && key.endsWith('-' + oldest);
+  });
+  delete _classVersion[oldest];
+  return true;
 }
 
 /* get_class_bundle doesn't compute grades, including the "calculated" level
@@ -2594,11 +2826,22 @@ function _courseLoadFailed(cid, error) {
   // The message must never be what breaks a load.
   try {
     if (typeof showSyncToast === 'function') {
-      showSyncToast("Couldn't load the latest data for this class. Showing your saved copy.", 'load-failed');
+      showSyncToast("Couldn't load the latest data for this class. " + _savedCopyDescription(cid), 'load-failed');
     }
   } catch (e) {
     console.warn('Could not show the load-failed message:', e);
   }
+}
+
+function _savedCopyDescription(cid) {
+  var meta = typeof _classMeta === 'function' ? _classMeta(cid) : null;
+  if (!meta || !meta.savedAt) return 'Showing your saved copy.';
+  var saved = new Date(meta.savedAt);
+  var sameDay = saved.toDateString() === new Date().toDateString();
+  var when = sameDay
+    ? saved.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    : saved.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  return 'Showing your copy saved ' + (sameDay ? 'at ' : 'on ') + when + '.';
 }
 
 function retryActiveCourseLoad() {
@@ -2666,6 +2909,15 @@ function _safeLSSet(key, value) {
     localStorage.setItem(key, value);
     return true;
   } catch (e) {
+    var keyClass = /^gb-/.test(key) && key.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i);
+    if (e.name === 'QuotaExceededError' && /^gb-/.test(key) && _evictOldestSavedCopy(keyClass ? keyClass[1] : null)) {
+      try {
+        localStorage.setItem(key, value);
+        return true;
+      } catch (retryError) {
+        e = retryError;
+      }
+    }
     console.warn('localStorage write failed (' + key + '):', e);
     if (e.name === 'QuotaExceededError') {
       // P7.1: surface every quota event, not just the first \u2014 teacher needs to
@@ -3840,8 +4092,10 @@ function _clearCourseLocalState(id) {
     'report-config',
     'categories',
     'student-profile-summaries',
+    'bundle-meta',
   ].forEach(k => localStorage.removeItem('gb-' + k + '-' + id));
   _forgetServerState(id);
+  delete _classVersion[id];
 
   // Clear cache
   for (const field of Object.keys(_DATA_KEYS)) {
@@ -6136,17 +6390,11 @@ async function switchActiveCourse(cid) {
   var load = function () {
     return initData(cid);
   };
-  if (typeof withSwitchingLock === 'function') {
-    await withSwitchingLock(load);
-  } else {
-    // The mobile shell has no withSwitchingLock.
-    var body = document.body;
-    if (body) body.classList.add('fv-switching-course');
-    try {
-      await load();
-    } finally {
-      if (body && gen === _switchGeneration) body.classList.remove('fv-switching-course');
-    }
+  setPageLock('switching', true);
+  try {
+    await load();
+  } finally {
+    setPageLock('switching', false);
   }
   recordLoadTiming('class.switch', cid, _perfNow() - started);
   return gen === _switchGeneration;
