@@ -1959,6 +1959,15 @@
   border-color: var(--text-3);
   color: var(--text);
 }
+.cm-action-btn-danger {
+  color: var(--priority);
+  border-color: rgba(255, 59, 48, 0.25);
+}
+.cm-action-btn-danger:hover {
+  background: rgba(255, 59, 48, 0.06);
+  border-color: var(--priority);
+  color: var(--priority);
+}
 
 .cm-empty {
   display: flex;
