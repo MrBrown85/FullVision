@@ -112,7 +112,7 @@ window.ReportBlocks = (function () {
     const usePercentage = cc.reportAsPercentage || false;
     const letterData = getCourseLetterData(cid, student.id);
     let overallDisplay, overallHeading;
-    if (usePercentage && overall > 0) {
+    if (usePercentage && (overall > 0 || (letterData && letterData.R != null))) {
       overallDisplay = letterData && letterData.R != null ? letterData.R + '%' : Math.round((overall / 4) * 100) + '%';
       overallHeading = 'Overall Grade';
     } else {

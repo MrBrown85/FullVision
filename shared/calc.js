@@ -397,10 +397,13 @@ function getCourseLetterData(cid, studentId) {
     if (all) R = all.pct;
   }
 
+  // The letter comes from the % as shown, so 85.95 shows as 86% and an A.
+  // toPrecision drops float noise (85.94999…) before rounding.
+  var shown = R == null ? null : Math.round(Number((R * 10).toPrecision(12))) / 10;
   var result = {
     Q: Q,
-    R: R == null ? null : Math.round(R * 10) / 10,
-    S: percentageToLetter(R),
+    R: shown,
+    S: percentageToLetter(shown),
   };
   _courseLetterCache[cacheKey] = result;
   return result;
