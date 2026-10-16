@@ -111,7 +111,7 @@ describe('desktop sync status UI', () => {
     expect(elements['tb-sync-popover'].innerHTML).toContain('data-action="retrySyncDeadLetter" data-id="dead-1"');
     expect(elements['tb-sync-popover'].innerHTML).toContain('data-action="dismissSyncDeadLetter" data-id="dead-1"');
     // A failed write outranks being offline in the banner.
-    expect(elements['offline-banner'].innerHTML).toContain("1 change couldn't be saved.");
+    expect(elements['offline-banner'].innerHTML).toContain('1 change couldn&#39;t be saved.');
     expect(elements['sync-indicator-dot'].className).toBe('tb-sync-dot error');
   });
 
