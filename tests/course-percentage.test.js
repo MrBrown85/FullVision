@@ -120,6 +120,12 @@ describe('course percentage', () => {
     expect(getCourseLetterData(CID, SID).R).toBe(56.7);
   });
 
+  it('counts a typed 0 as 0 points', () => {
+    seed({ categories: [], assessments: [points('a', 10), points('b', 10)], scores: [score('a', 8), score('b', 0)] });
+    // 8 / 20; a 0 used to count as blank, giving 80%.
+    expect(getCourseLetterData(CID, SID).R).toBe(40);
+  });
+
   it('takes the letter from the % as shown', () => {
     // 171.9 / 200 = 85.95 shows as 86%, so the letter is an A, not a B.
     seed({ categories: [], assessments: [points('t', 200)], scores: [score('t', 171.9)] });

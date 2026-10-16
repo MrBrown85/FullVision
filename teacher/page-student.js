@@ -1108,7 +1108,7 @@ window.PageStudent = (function () {
     var attentionItems = [];
     sortedAssessments.forEach(function (assess) {
       var aScores = allScores.filter(function (s) {
-        return s.assessmentId === assess.id && s.score > 0;
+        return s.assessmentId === assess.id && isScoreEntered(assess, s);
       });
       var totalT = scoreTagIds(assess, cid).length;
       if (aScores.length === 0) attentionItems.push({ type: 'missing', assess: assess, detail: 'No scores entered' });

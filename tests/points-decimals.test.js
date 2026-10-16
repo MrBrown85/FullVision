@@ -31,9 +31,11 @@ describe('parsePointsInput', () => {
     expect(parsePointsInput('-2', 40)).toBe(0);
   });
 
-  it('reads blank or unreadable input as no score', () => {
-    expect(parsePointsInput('', 40)).toBe(0);
-    expect(parsePointsInput('abc', 40)).toBe(0);
+  it('reads blank or unreadable input as no score, and a typed 0 as 0', () => {
+    expect(parsePointsInput('', 40)).toBeNull();
+    expect(parsePointsInput('  ', 40)).toBeNull();
+    expect(parsePointsInput('abc', 40)).toBeNull();
+    expect(parsePointsInput('0', 40)).toBe(0);
   });
 });
 

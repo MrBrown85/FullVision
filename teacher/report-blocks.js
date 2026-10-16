@@ -670,7 +670,7 @@ window.ReportBlocks = (function () {
 
     // Missing assignments (no scores at all for this student)
     const missing = assessments.filter(a => {
-      const aScores = allScores.filter(s => s.assessmentId === a.id && s.score > 0);
+      const aScores = allScores.filter(s => s.assessmentId === a.id && isScoreEntered(a, s));
       return aScores.length === 0;
     });
 
@@ -798,7 +798,7 @@ window.ReportBlocks = (function () {
       let rows = '';
       list.forEach(a => {
         const cmpEntry = isCompletionScored(a) ? scores.find(s => s.assessmentId === a.id && s.score != null) : null;
-        const aScores = cmpEntry ? [cmpEntry] : scores.filter(s => s.assessmentId === a.id && s.score > 0);
+        const aScores = cmpEntry ? [cmpEntry] : scores.filter(s => s.assessmentId === a.id && isScoreEntered(a, s));
         const isPoints = a.scoreMode === 'points';
         const max = a.maxPoints || 100;
         const weightLabel =
