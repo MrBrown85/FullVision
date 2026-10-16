@@ -152,6 +152,20 @@ describe('active-course placeholder guard', () => {
       });
     });
 
+    // The pending-id migration cleared every _cache bucket for both ids,
+    // and _cache.courses is COURSES, so the new class vanished right after
+    // the re-key and the class wizard never found its uuid.
+    it('keeps the re-keyed class in COURSES', async () => {
+      var course = createCourse({ name: 'Humanities 8' });
+      await waitForPendingSyncs();
+
+      expect(COURSES[CANONICAL]).toBeDefined();
+      expect(COURSES[CANONICAL].name).toBe('Humanities 8');
+      expect(COURSES[CANONICAL].__pendingLocalId).toBe(course.id);
+      expect(COURSES[course.id]).toBeUndefined();
+      expect(_resolveCanonicalCourseId(course.id)).toBe(CANONICAL);
+    });
+
     it('sends a uuid idempotency key with create_course', () => {
       createCourse({ name: 'Humanities 8' });
 
