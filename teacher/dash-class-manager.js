@@ -496,42 +496,86 @@ window.DashClassManager = (function () {
       function () {
         var snapshot = deleteStudent(cid, sid);
         renderClassManager();
-        showUndoToast('Student deleted', function () {
-          var sts = getStudents(cid);
-          sts.push(snapshot.student);
-          saveStudents(cid, sts);
-          var sc = getScores(cid);
-          sc[sid] = snapshot.scores;
-          saveScores(cid, sc);
-          if (snapshot.goals !== undefined) {
-            var g = getGoals(cid);
-            g[sid] = snapshot.goals;
-            saveGoals(cid, g);
-          }
-          if (snapshot.reflections !== undefined) {
-            var r = getReflections(cid);
-            r[sid] = snapshot.reflections;
-            saveReflections(cid, r);
-          }
-          if (snapshot.notes !== undefined) {
-            var n = getNotes(cid);
-            n[sid] = snapshot.notes;
-            saveNotes(cid, n);
-          }
-          if (snapshot.flagged) {
-            var f = getFlags(cid);
-            f[sid] = true;
-            saveFlags(cid, f);
-          }
-          if (snapshot.statuses) {
-            var s = getAssignmentStatuses(cid);
-            Object.assign(s, snapshot.statuses);
-            saveAssignmentStatuses(cid, s);
-          }
-          renderClassManager();
-        });
+        showUndoToast(
+          'Student deleted',
+          function () {
+            // The server delete waits for the toast, so Undo finds everything
+            // still there and only the local copy comes back. Without a held
+            // delete (demo mode, a student not yet on the server) the save
+            // functions put it back. A delete that already went cannot be
+            // undone: re-enrolling a deleted person would fail.
+            if (!restoreDeletedStudent(cid, snapshot)) {
+              if (snapshot.heldDelete) return;
+              restoreDeletedStudentLocally(cid, snapshot);
+            }
+            var collabIds = Object.keys(snapshot.collab || {});
+            if (collabIds.length) {
+              var assessments = getAssessments(cid);
+              assessments.forEach(function (a) {
+                var saved = snapshot.collab[a.id];
+                if (!saved) return;
+                ['excludedStudents', 'pairs', 'groups'].forEach(function (k) {
+                  if (saved[k] === undefined) delete a[k];
+                  else a[k] = saved[k];
+                });
+              });
+              saveAssessments(cid, assessments);
+            }
+            renderClassManager();
+          },
+          function () {
+            releaseHeldStudentDeletes(sid);
+          },
+        );
       },
     );
+  }
+
+  /* Undo after the server delete already went (or without the server): put
+     the local copy back through the save functions, as before. */
+  function restoreDeletedStudentLocally(cid, snapshot) {
+    var sid = snapshot.student.id;
+    var sts = getStudents(cid);
+    sts.push(snapshot.student);
+    saveStudents(cid, sts);
+    var sc = getScores(cid);
+    sc[sid] = snapshot.scores;
+    saveScores(cid, sc);
+    if (snapshot.goals !== undefined) {
+      var g = getGoals(cid);
+      g[sid] = snapshot.goals;
+      saveGoals(cid, g);
+    }
+    if (snapshot.reflections !== undefined) {
+      var r = getReflections(cid);
+      r[sid] = snapshot.reflections;
+      saveReflections(cid, r);
+    }
+    if (snapshot.notes !== undefined) {
+      var n = getNotes(cid);
+      n[sid] = snapshot.notes;
+      saveNotes(cid, n);
+    }
+    if (snapshot.flagged) {
+      var f = getFlags(cid);
+      f[sid] = true;
+      saveFlags(cid, f);
+    }
+    if (snapshot.statuses) {
+      var s = getAssignmentStatuses(cid);
+      Object.assign(s, snapshot.statuses);
+      saveAssignmentStatuses(cid, s);
+    }
+    if (snapshot.quickObs !== undefined) {
+      var o = getQuickObs(cid);
+      o[sid] = snapshot.quickObs;
+      saveQuickObs(cid, o);
+    }
+    if (snapshot.termRatings !== undefined) {
+      var t = getTermRatings(cid);
+      t[sid] = snapshot.termRatings;
+      saveTermRatings(cid, t);
+    }
   }
 
   /* ── Class Manager Student Functions ────────────────────── */

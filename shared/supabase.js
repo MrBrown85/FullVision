@@ -211,6 +211,8 @@
     opts = opts || {};
     const sb = getSupabase();
     if (!sb) return;
+    // A student delete waiting out its undo toast goes now.
+    if (typeof releaseHeldStudentDeletes === 'function') releaseHeldStudentDeletes();
     // Give in-flight writes a moment to land. Anything still unsent after
     // that sits in the outbox, which the check below reports.
     if (typeof waitForPendingSyncs === 'function') {

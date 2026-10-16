@@ -830,30 +830,29 @@ window.MGrade = (function () {
     MC.haptic();
 
     // NS auto-zero: match desktop behaviour (page-assignments.js
-    // toggleStudentStatus). Setting NS on an assessment zeroes every tag
-    // score under it, because "not submitted" means the student scored 0
-    // on every demonstrated outcome. Clearing NS does NOT auto-restore —
-    // the teacher has to re-score.
-    var assess = null;
-    if (newStatus === 'NS') {
-      assess = getAssessments(cid).find(function (a) {
-        return a.id === aid;
+    // toggleStudentStatus). Setting NS on proficiency work zeroes every tag
+    // score under it (0 deletes a tag score). Clearing NS does NOT
+    // auto-restore — the teacher has to re-score. On points and
+    // Complete/Incomplete work 0 is a real score that would outlive the NS,
+    // and calc.js already counts NS as 0, so the score is left alone.
+    var assess = getAssessments(cid).find(function (a) {
+      return a.id === aid;
+    });
+    var clearsScores = !!assess && !isPointsScored(assess);
+    if (newStatus === 'NS' && clearsScores) {
+      scoreTagIds(assess, cid).forEach(function (tagId) {
+        upsertScore(
+          cid,
+          sid,
+          aid,
+          tagId,
+          0,
+          assess.date || (typeof courseToday === 'function' ? courseToday(cid) : ''),
+          assess.type || 'summative',
+          '',
+        );
       });
-      if (assess) {
-        scoreTagIds(assess, cid).forEach(function (tagId) {
-          upsertScore(
-            cid,
-            sid,
-            aid,
-            tagId,
-            0,
-            assess.date || (typeof courseToday === 'function' ? courseToday(cid) : ''),
-            assess.type || 'summative',
-            '',
-          );
-        });
-        clearProfCache();
-      }
+      clearProfCache();
     }
 
     // Update pill states
@@ -864,7 +863,7 @@ window.MGrade = (function () {
       });
       // After auto-zero, deactivate every score button under this (sid, aid)
       // so the UI reflects the zeroed state (no button matches score=0).
-      if (newStatus === 'NS') {
+      if (newStatus === 'NS' && clearsScores) {
         card.querySelectorAll('.m-score-btn[data-aid="' + aid + '"]').forEach(function (btn) {
           btn.classList.remove('m-score-active');
         });
@@ -883,7 +882,7 @@ window.MGrade = (function () {
 
     // Update thumbnail graded state so the per-student dot reflects the new
     // zero-scored (i.e., no longer "graded") state.
-    if (newStatus === 'NS') {
+    if (newStatus === 'NS' && clearsScores) {
       _updateThumbGraded(cid, aid);
     }
   }
