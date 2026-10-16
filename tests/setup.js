@@ -111,6 +111,9 @@ globalThis.getSupabase = () => ({
   }),
 });
 globalThis.showSyncToast = () => {};
+// Tests mock the separate reads; tests/data-class-bundle.test.js turns the
+// single get_class_bundle request on.
+globalThis.__FV_CLASS_BUNDLE = false;
 // Override setTimeout to prevent gb-ui.js _populateDockUser from firing
 const _realSetTimeout = globalThis.setTimeout;
 globalThis.setTimeout = (fn, ms) => {

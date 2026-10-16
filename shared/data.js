@@ -658,7 +658,7 @@ async function _runCourseRefresh(cid, st) {
       st.snapshot = Object.assign({}, (_localWrites[cid] && _localWrites[cid].fields) || {});
       st.skipped = false;
       try {
-        if (kind === 'student-records') {
+        if (kind === 'student-records' && !_classBundleEnabled()) {
           // Observations bump the same timestamp, so reload them too.
           await Promise.all([loadStudentProfileSummaries(cid), _hydrateObservations(cid)]);
         } else await initData(cid);
@@ -2345,6 +2345,30 @@ async function _doInitData(cid) {
       return;
     }
 
+    if (_classBundleEnabled()) {
+      var bundleRes;
+      try {
+        bundleRes = await _callRpcWithAuthGuard(
+          'get_class_bundle',
+          { p_course_id: cid, p_if_version: null },
+          { suppressSessionExpiredModal: true },
+        );
+      } catch (e) {
+        bundleRes = { error: e };
+      }
+      if (bundleRes && bundleRes.error && _isMissingRpcError(bundleRes.error)) {
+        // Server without the migration yet: use the separate reads below.
+        _classBundleMissing = true;
+      } else if (!bundleRes || bundleRes.error) {
+        _courseLoadFailed(cid, bundleRes && bundleRes.error);
+        return;
+      } else {
+        delete _loadError[cid];
+        _bundleToCache(cid, _rpcObject(bundleRes.data) || {});
+        return;
+      }
+    }
+
     var gbRes;
     try {
       gbRes = await _callRpcWithAuthGuard('get_gradebook', { p_course_id: cid }, { suppressSessionExpiredModal: true });
@@ -2364,6 +2388,180 @@ async function _doInitData(cid) {
 
   // localStorage path
   _loadCourseFromLS(cid);
+}
+
+/* ── One request per class (docs/class-loading-plan.md, Phase 3) ──────────
+   get_class_bundle returns what the separate reads above returned, in one
+   response. Each section keeps the shape of the call it replaces and goes
+   through the same converter. window.__FV_CLASS_BUNDLE = false switches back
+   to the separate reads. */
+var _classBundleMissing = false;
+var _classVersion = {}; // cid → version of the data in the cache
+
+function _classBundleEnabled() {
+  return window.__FV_CLASS_BUNDLE !== false && !_classBundleMissing;
+}
+
+/* Scores arrive as compact rows that point into the roster, assessment, tag
+   and criterion lists by position. Rebuild get_gradebook's cells from them,
+   sorted so the same data always produces the same cache. */
+function _bundleCells(gb) {
+  var students = gb.students || [];
+  var assessments = gb.assessments || [];
+  var tags = gb.tag_index || [];
+  var criteria = gb.criterion_index || [];
+  var cells = {};
+  function cellFor(si, ai) {
+    var sid = students[si] && students[si].enrollment_id;
+    var aid = assessments[ai] && assessments[ai].id;
+    if (!sid || !aid) return null;
+    var row = cells[sid] || (cells[sid] = {});
+    return row[aid] || (row[aid] = { score: null, tag_scores: [], rubric_scores: [] });
+  }
+  function sorted(rows) {
+    return (rows || []).slice().sort(function (a, b) {
+      return a[0] - b[0] || a[1] - b[1] || (a[2] || 0) - (b[2] || 0);
+    });
+  }
+  sorted(gb.score_rows).forEach(function (r) {
+    var cell = cellFor(r[0], r[1]);
+    if (cell) cell.score = { value: r[2], status: r[3], comment: r[4] };
+  });
+  sorted(gb.tag_rows).forEach(function (r) {
+    var cell = cellFor(r[0], r[1]);
+    if (cell && tags[r[2]]) cell.tag_scores.push({ tag_id: tags[r[2]], value: r[3], modifier: r[4] });
+  });
+  sorted(gb.criterion_rows).forEach(function (r) {
+    var cell = cellFor(r[0], r[1]);
+    if (cell && criteria[r[2]]) cell.rubric_scores.push({ criterion_id: criteria[r[2]], value: r[3], modifier: r[4] });
+  });
+  // A points-scored assessment is scored as a whole; get_assessment_detail
+  // ignored any competency scores left on it, and so does this.
+  assessments.forEach(function (a) {
+    if (!a || a.score_mode !== 'points') return;
+    Object.keys(cells).forEach(function (sid) {
+      if (cells[sid][a.id]) cells[sid][a.id].tag_scores = [];
+    });
+  });
+  return cells;
+}
+
+function _bundleToCache(cid, bundle) {
+  var gb = bundle.gradebook || {};
+
+  // Rubrics first: rubric scores are mapped to competencies through them.
+  var rb = bundle.rubrics || {};
+  _persistLoadedField(cid, 'rubrics', _canonicalRubricRowsToCache(rb.rubrics, rb.criteria, rb.criterion_tags));
+
+  var map = _canonicalLearningMapToCache(cid, bundle.learning_map || {});
+  var emptyMap = !(map.subjects && map.subjects.length) && !(map.sections && map.sections.length);
+  if (emptyMap) map = (typeof LEARNING_MAP !== 'undefined' && LEARNING_MAP[cid]) || map;
+  _persistLoadedField(cid, 'learningMaps', map);
+
+  _v2GradebookToCache(cid, Object.assign({}, gb, { cells: _bundleCells(gb) }));
+  // The fields get_assessment_detail used to add (due date, collaboration).
+  var rawById = {};
+  (gb.assessments || []).forEach(function (a) {
+    if (a && a.id) rawById[a.id] = a;
+  });
+  _persistLoadedField(
+    cid,
+    'assessments',
+    (_cache.assessments[cid] || []).map(function (assessment) {
+      var raw = rawById[assessment.id];
+      if (!raw) return assessment;
+      var tagIds = raw.tag_ids || [];
+      return _assessmentFromDetail(assessment, {
+        assessment: raw,
+        linked_tags: tagIds.map(function (id) {
+          return { id: id };
+        }),
+      });
+    }),
+  );
+
+  _persistLoadedField(cid, 'observations', _observationsPayloadToBlob(bundle.observations || {}));
+  _applyStudentProfileSummaries(cid, bundle.profiles || []);
+  _fillOverrideCalculated(cid);
+  _applyBundleTermRatings(cid, bundle.term_ratings || []);
+  if (bundle.report_config) {
+    var rc = bundle.report_config;
+    _persistLoadedField(
+      cid,
+      'reportConfig',
+      Object.assign({}, rc.blocks_config || {}, rc.preset ? { _preset: rc.preset } : {}),
+    );
+  }
+  if (Array.isArray(bundle.custom_tags)) _persistLoadedField(cid, 'customTags', bundle.custom_tags.slice());
+
+  // A field skipped because the teacher edited it mid-load is fetched again;
+  // until then the cache isn't the server's version, so don't claim it is.
+  var st = _refreshState[cid];
+  if (!(st && st.skipped) && bundle.version != null) _classVersion[cid] = Number(bundle.version);
+}
+
+/* get_class_bundle doesn't compute grades, including the "calculated" level
+   shown beside a teacher override. Work it out here, as setting an override
+   does (calc.js). */
+function _fillOverrideCalculated(cid) {
+  var overrides = _cache.overrides[cid];
+  if (!overrides || typeof getSectionProficiencyRaw !== 'function') return;
+  if (typeof clearProfCache === 'function') clearProfCache();
+  var changed = false;
+  Object.keys(overrides).forEach(function (sid) {
+    Object.keys(overrides[sid] || {}).forEach(function (sectionId) {
+      var o = overrides[sid][sectionId];
+      if (!o || o.calculated != null) return;
+      o.calculated = Math.round(getSectionProficiencyRaw(cid, sid, sectionId) * 10) / 10;
+      changed = true;
+    });
+  });
+  if (changed) _persistLoadedField(cid, 'overrides', overrides);
+}
+
+/* Term ratings from the server, merged into this device's copy. The server's
+   fields win; "dims" isn't stored on the server, so this device keeps its
+   own. A rating this device has and the server doesn't was written while
+   saves never reached the server (term ids read as NaN until Oct 2026): it
+   is sent now, once. */
+function _applyBundleTermRatings(cid, rows) {
+  var local = _cloneValue(getTermRatings(cid) || {}) || {};
+  var onServer = {};
+  rows.forEach(function (r) {
+    if (!r || !r.enrollment_id || !r.term) return;
+    var termId = 'term-' + r.term;
+    onServer[r.enrollment_id + '|' + termId] = true;
+    if (!local[r.enrollment_id]) local[r.enrollment_id] = {};
+    var prev = local[r.enrollment_id][termId] || { dims: Object.fromEntries(OBS_DIMS.map(d => [d, 0])) };
+    local[r.enrollment_id][termId] = Object.assign({}, prev, {
+      narrative: r.narrative_html || '',
+      workHabits: r.work_habits_rating || 0,
+      participation: r.participation_rating || 0,
+      socialTraits: r.social_traits || [],
+      strengths: r.strength_tags || [],
+      growthAreas: r.growth_tags || [],
+      mentionAssessments: r.mention_assessments || [],
+      mentionObs: r.mention_observations || [],
+      created: r.created_at || prev.created,
+      modified: r.updated_at || prev.modified,
+    });
+  });
+  _persistLoadedField(cid, 'termRatings', local);
+
+  if (!_writesEnabled() || !window.v2 || typeof window.v2.saveTermRating !== 'function') return;
+  Object.keys(local).forEach(function (sid) {
+    if (!_isUuid(sid)) return;
+    Object.keys(local[sid] || {}).forEach(function (termId) {
+      if (onServer[sid + '|' + termId]) return;
+      var t = _termNumber(termId);
+      var payload = _termRatingPatch(local[sid][termId]);
+      var hasContent = Object.keys(payload).some(function (k) {
+        var v = payload[k];
+        return Array.isArray(v) ? v.length > 0 : !!v;
+      });
+      if (t >= 1 && t <= 6 && hasContent) window.v2.saveTermRating(sid, t, payload);
+    });
+  });
 }
 
 /* A class load failed. Nothing is written: the copy this device already has
@@ -4663,6 +4861,24 @@ async function _loadCanonicalRubrics(cid) {
     criterionTagRows = tagsRes.data || [];
   }
 
+  return _canonicalRubricRowsToCache(rubricRows, criterionRows, criterionTagRows);
+}
+
+/* rubric, criterion and criterion_tag rows → the client's rubric list. Used
+   by the table reads above and by get_class_bundle. */
+function _canonicalRubricRowsToCache(rubricRows, criterionRows, criterionTagRows) {
+  rubricRows = (rubricRows || []).slice().sort(function (a, b) {
+    var aKey = a.created_at || a.id || '';
+    var bKey = b.created_at || b.id || '';
+    return aKey < bKey ? -1 : aKey > bKey ? 1 : 0;
+  });
+  criterionRows = (criterionRows || []).slice().sort(function (a, b) {
+    var ao = Number(a.display_order || 0);
+    var bo = Number(b.display_order || 0);
+    if (ao !== bo) return ao - bo;
+    return (a.id || '') < (b.id || '') ? -1 : 1;
+  });
+  criterionTagRows = criterionTagRows || [];
   var tagsByCriterion = {};
   criterionTagRows.forEach(function (row) {
     if (!row || !row.criterion_id || !row.tag_id) return;
@@ -4709,6 +4925,7 @@ async function _loadCanonicalRubrics(cid) {
     };
   });
 }
+
 function _reconcileCanonicalRubrics(localArr, canonicalArr, idMap) {
   localArr = localArr || [];
   canonicalArr = canonicalArr || [];
