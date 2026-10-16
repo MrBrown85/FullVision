@@ -2059,7 +2059,9 @@ window.DashClassManager = (function () {
         // A class whose create never landed has no server id, so its
         // curriculum can't be sent yet. Otherwise wait for the map to reach
         // the server, within reason: offline, the outbox keeps it for later.
-        dispatchOk = canonicalCid ? await _resolvesTrueWithin(mapSaved, 15000) : false;
+        // Demo Mode has no server, so its map is saved once it's cached.
+        var localOnly = typeof _writesEnabled === 'function' && !_writesEnabled();
+        dispatchOk = canonicalCid || localOnly ? await _resolvesTrueWithin(mapSaved, 15000) : false;
       }
     }
 

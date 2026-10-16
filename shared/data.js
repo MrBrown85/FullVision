@@ -6880,7 +6880,7 @@ function _queueLongFormSessionRetry(name, params, options, sourceError) {
 async function _callRpcWithAuthGuard(name, params, options) {
   options = options || {};
   var sb = getSupabase();
-  if (!sb) return { data: null, error: null };
+  if (!sb || _isDemoSession()) return { data: null, error: null };
 
   // Before either retry below can fire, so every attempt at this write carries
   // the same key and the server returns the first result instead of inserting
@@ -6950,6 +6950,13 @@ function _writesEnabled() {
   return (_useSupabase || _supabaseDegraded) && localStorage.getItem('gb-demo-mode') !== '1';
 }
 
+/* Demo Mode stays on this computer: no RPC reaches Supabase and nothing
+   waits in the outbox. The anon client still exists there, so a
+   getSupabase() check alone lets calls through (and they fail as anon). */
+function _isDemoSession() {
+  return typeof isDemoMode === 'function' && isDemoMode();
+}
+
 var _outboxConfigured = false;
 function _outbox() {
   var q = window.v2Queue;
@@ -6975,6 +6982,7 @@ function _outbox() {
    final { data, error }. Without the outbox (unit tests that don't load it)
    the write is sent directly. */
 function _writeRpc(name, params, options) {
+  if (_isDemoSession()) return Promise.resolve({ data: null, error: null });
   params = params || {};
   _stampIdempotencyKey(name, params);
   var outbox = _outbox();
@@ -6986,7 +6994,7 @@ function _writeRpc(name, params, options) {
 
 function _rpcOrNoop(name, params, options) {
   var sb = getSupabase();
-  if (!sb) return Promise.resolve({ data: null, error: null });
+  if (!sb || _isDemoSession()) return Promise.resolve({ data: null, error: null });
   var call = _isReadRpc(name) ? _callRpcWithAuthGuard(name, params, options) : _writeRpc(name, params, options);
   return _trackWriteSync(
     name,
