@@ -41,6 +41,14 @@ window.ReportBlocks = (function () {
     return sanitizeHtml(raw);
   }
 
+  /* A student's scores as levels: points work becomes its level on the
+     grading scale (18/20 is Extending, not level 18), a + or − is counted in
+     (3+ = 3.33), and excused work is left out. Same as the proficiency calc. */
+  function _levelScores(cid, sid) {
+    const tagIds = [...new Set((getScores(cid)[sid] || []).map(s => s.tagId))];
+    return tagIds.flatMap(tagId => getTagScores(cid, sid, tagId));
+  }
+
   const OBS_DESCRIPTORS = {
     // Learning Dispositions
     engagement: {
@@ -276,12 +284,13 @@ window.ReportBlocks = (function () {
         const tint = PROF_TINT[r] || PROF_TINT[0];
         const label = prof > 0 ? PROF_LABELS[r] : 'Not yet assessed';
         const barPct = prof > 0 ? (prof / 4) * 100 : 0;
-        // Gather per-tag assessment evidence
-        const tagScores = allScores.filter(s => s.tagId === tag.id && s.score > 0);
+        // Gather per-tag assessment evidence. getTagScores turns points into
+        // a level (18/20 is Extending, not level 18) and leaves out excused work.
+        const tagScores = getTagScores(cid, student.id, tag.id).filter(s => s.score > 0);
         const evidenceMap = {};
         tagScores.forEach(s => {
           if (!evidenceMap[s.assessmentId]) evidenceMap[s.assessmentId] = [];
-          evidenceMap[s.assessmentId].push(scoreModValue(s));
+          evidenceMap[s.assessmentId].push(s.score);
         });
         const evidence = Object.keys(evidenceMap)
           .map(aId => {
@@ -503,6 +512,7 @@ window.ReportBlocks = (function () {
     const sections = getSections(cid);
     const assessments = getAssessments(cid);
     const allScores = getScores(cid)[student.id] || [];
+    const levelScores = _levelScores(cid, student.id);
     let html = `<div class="report-block-box report-section-chart">
     <div class="report-block-title">Section Proficiency Breakdown</div>`;
 
@@ -524,7 +534,7 @@ window.ReportBlocks = (function () {
 
       // Assessments that touched this section + student performance
       const secTagIds = new Set(sec.tags.map(t => t.id));
-      const secScores = allScores.filter(s => secTagIds.has(s.tagId) && s.score > 0);
+      const secScores = levelScores.filter(s => secTagIds.has(s.tagId) && s.score > 0);
       const touchedAssessIds = new Set(secScores.map(s => s.assessmentId));
       const touchedAssess = assessments.filter(a => touchedAssessIds.has(a.id));
       // Per-assessment avg for this section's tags
@@ -532,7 +542,7 @@ window.ReportBlocks = (function () {
         .map(a => {
           const aScores = secScores.filter(s => s.assessmentId === a.id);
           if (aScores.length === 0) return null;
-          const avg = aScores.reduce((s, x) => s + scoreModValue(x), 0) / aScores.length;
+          const avg = aScores.reduce((s, x) => s + x.score, 0) / aScores.length;
           return { title: a.title, avg, r: Math.round(avg) };
         })
         .filter(Boolean)
@@ -635,13 +645,14 @@ window.ReportBlocks = (function () {
   function renderBlockScoreDistribution(cid, student) {
     const allScores = getScores(cid)[student.id] || [];
     const assessments = getAssessments(cid);
-    const scored = allScores.filter(s => s.score > 0);
+    const scored = _levelScores(cid, student.id).filter(s => s.score > 0);
     if (scored.length === 0) return '';
 
     // Count by proficiency level
     const counts = { 1: 0, 2: 0, 3: 0, 4: 0 };
     scored.forEach(s => {
-      if (s.score >= 1 && s.score <= 4) counts[s.score]++;
+      const level = Math.round(s.score);
+      if (level >= 1 && level <= 4) counts[level]++;
     });
     const total = scored.length;
     const rawColors = { 1: 'var(--score-1)', 2: 'var(--score-2)', 3: 'var(--score-3)', 4: 'var(--score-4)' };
@@ -667,11 +678,12 @@ window.ReportBlocks = (function () {
     // Per-assessment averages for top/bottom
     const assessAvgs = assessments
       .map(a => {
-        const aScores = allScores.filter(s => s.assessmentId === a.id && s.score > 0);
+        const aScores = scored.filter(s => s.assessmentId === a.id);
         if (aScores.length === 0) return null;
-        let avg = aScores.reduce((s, x) => s + scoreModValue(x), 0) / aScores.length;
+        let avg = aScores.reduce((s, x) => s + x.score, 0) / aScores.length;
         // Rubric work counts each criterion once, at its weight.
-        const rubricAvg = getRubricAssessmentScore(cid, a, aScores);
+        const rawScores = allScores.filter(s => s.assessmentId === a.id && s.score > 0);
+        const rubricAvg = getRubricAssessmentScore(cid, a, rawScores);
         if (rubricAvg != null) avg = rubricAvg;
         return { title: a.title, avg, r: Math.round(avg), type: a.type, id: a.id };
       })
