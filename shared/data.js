@@ -482,7 +482,10 @@ function _migrateCourseDataLocalToCanonical(localId, canonicalId) {
   });
   // 2. Clear cache for BOTH the local id (no longer valid) and the canonical
   //    id (so the next save's prev-snapshot lookup falls through to empty).
+  //    courses and config are global, not keyed by course id: courses is
+  //    COURSES itself, so clearing it here deleted the class just created.
   Object.keys(_cache).forEach(function (field) {
+    if (field === 'courses' || field === 'config') return;
     var bucket = _cache[field];
     if (!bucket || typeof bucket !== 'object' || Array.isArray(bucket)) return;
     delete bucket[localId];
