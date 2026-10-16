@@ -361,7 +361,7 @@ window.DashOverview = (function () {
     });
     html += '</div>';
 
-    html += '<div style="margin-top:14px"><div class="dash-section-title">Next Steps</div>';
+    html += '<div class="dash-next-steps"><div class="dash-section-title">Next Steps</div>';
 
     if (actionItems.length === 0) {
       html +=
@@ -372,7 +372,9 @@ window.DashOverview = (function () {
         html +=
           '<div class="dash-action-item">' +
           '<span class="dash-action-dot"></span>' +
-          '<span class="dash-action-text">' +
+          '<span class="dash-action-text" title="' +
+          esc(item.text) +
+          '">' +
           esc(item.text) +
           '</span>' +
           (item.link
