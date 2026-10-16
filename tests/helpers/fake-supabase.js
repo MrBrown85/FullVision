@@ -5,7 +5,8 @@
  *   recorded in `committed`.
  * - create_* / duplicate_* return a fresh UUID; create_student_and_enroll
  *   returns { student_id, enrollment_id }; upsert_* return p_id when given,
- *   otherwise a fresh UUID — the same shapes the real RPCs return.
+ *   otherwise a fresh UUID; save_categories returns each row's id, a fresh
+ *   UUID for new rows — the same shapes the real RPCs return.
  * - failNext(name, n) makes the next n calls to `name` fail with a network
  *   error.
  * - hold() parks every call until release(), so a test can start a save,
@@ -50,6 +51,14 @@ export function makeFakeSupabase() {
     }
     if (/^(create|duplicate)_/.test(name)) return { data: newId(), error: null };
     if (/^upsert_/.test(name)) return { data: (params && params.p_id) || newId(), error: null };
+    if (name === 'save_categories') {
+      return {
+        data: (params.p_categories || []).map(function (c) {
+          return c.id || newId();
+        }),
+        error: null,
+      };
+    }
     return { data: null, error: null };
   }
 

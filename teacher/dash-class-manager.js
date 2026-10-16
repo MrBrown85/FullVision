@@ -2257,8 +2257,18 @@ window.DashClassManager = (function () {
     if (!cid) return;
     var st = _cmCatState(cid);
     if (st.loaded || st.loading) return;
+    // Without a server (Demo Mode) the class's categories are the cached ones.
     if (!window.v2 || !window.v2.listCategories || !_useSupabase) {
       st.loaded = true;
+      st.rows = (getCategories(cid) || []).map(function (c, i) {
+        return {
+          id: c.id,
+          name: c.name || '',
+          weight: Number(c.weight) || 0,
+          display_order: c.displayOrder != null ? Number(c.displayOrder) : i,
+        };
+      });
+      if (st.rows.length) renderClassManager();
       return;
     }
     st.loading = window.v2
@@ -2296,6 +2306,48 @@ window.DashClassManager = (function () {
     return s;
   }
 
+  // Weights must total exactly 100, as in Teams (a class with no categories
+  // counts all work by total points). Edits stay on this screen until Save
+  // sends the whole list at once: going from 50/50 to 60/40 one row at a time
+  // would pass through 110 or 90, which the server refuses.
+  function _cmCatSumOk(cid) {
+    var rows = _cmCatState(cid).rows;
+    return rows.length === 0 || Math.abs(_cmCatSum(cid) - 100) < 1e-9;
+  }
+
+  function _cmCatNamesOk(cid) {
+    return _cmCatState(cid).rows.every(function (r) {
+      return (r.name || '').trim() !== '';
+    });
+  }
+
+  function _cmCatCanSave(cid) {
+    return !!_cmCatState(cid).dirty && _cmCatSumOk(cid) && _cmCatNamesOk(cid);
+  }
+
+  function _cmCatSumClass(cid) {
+    return _cmCatSumOk(cid) ? 'cm-cat-sum' : 'cm-cat-sum cm-cat-sum-over';
+  }
+
+  function _cmCatSumHtml(cid) {
+    var html = 'Total: <strong>' + _cmCatSum(cid) + '</strong> / 100%';
+    if (!_cmCatSumOk(cid)) html += ' <span class="cm-cat-sum-warn">(weights must total 100)</span>';
+    else if (!_cmCatNamesOk(cid)) html += ' <span class="cm-cat-sum-warn">(every category needs a name)</span>';
+    return html;
+  }
+
+  // Update the total and the Save button without re-rendering, so typing
+  // keeps focus.
+  function _cmCatRefreshFooter(cid) {
+    var sumEl = document.getElementById('cm-cat-sum-' + cid);
+    if (sumEl) {
+      sumEl.className = _cmCatSumClass(cid);
+      sumEl.innerHTML = _cmCatSumHtml(cid);
+    }
+    var saveEl = document.getElementById('cm-cat-save-' + cid);
+    if (saveEl) saveEl.disabled = !_cmCatCanSave(cid);
+  }
+
   function _cmRenderCategoriesField(cid) {
     if (!cid) return '';
     var st = _cmCatState(cid);
@@ -2305,9 +2357,6 @@ window.DashClassManager = (function () {
       }, 0);
 
     var rows = st.rows || [];
-    var sum = _cmCatSum(cid);
-    var over = sum > 100;
-    var sumClass = over ? 'cm-cat-sum cm-cat-sum-over' : 'cm-cat-sum';
     var html =
       '<div class="cm-field cm-cat-field">' +
       '<label class="cm-label">Categories</label>' +
@@ -2328,12 +2377,12 @@ window.DashClassManager = (function () {
         '<span class="cm-cat-handle" aria-hidden="true">\u22EE\u22EE</span>' +
         '<input class="cm-input cm-cat-name" value="' +
         esc(row.name) +
-        '" placeholder="Category name" data-action-blur="cmCatName" data-idx="' +
+        '" placeholder="Category name" data-action-input="cmCatNameLive" data-idx="' +
         idx +
         '">' +
         '<input class="cm-input cm-cat-weight" type="number" min="0" max="100" step="1" value="' +
         (row.weight != null ? row.weight : '') +
-        '" data-action-blur="cmCatWeight" data-action-input="cmCatWeightLive" data-idx="' +
+        '" data-action-input="cmCatWeightLive" data-idx="' +
         idx +
         '" aria-label="Weight percent">' +
         '<span class="cm-cat-pct">%</span>' +
@@ -2348,15 +2397,17 @@ window.DashClassManager = (function () {
       '<div class="cm-cat-footer">' +
       '<button class="cm-add-link" data-action="cmCatAdd">+ Add category</button>' +
       '<div class="' +
-      sumClass +
+      _cmCatSumClass(cid) +
       '" id="cm-cat-sum-' +
       cid +
       '">' +
-      'Sum: <strong>' +
-      sum +
-      '</strong> / 100%' +
-      (over ? ' <span class="cm-cat-sum-warn">(reduce weights to save)</span>' : '') +
+      _cmCatSumHtml(cid) +
       '</div>' +
+      '<button class="btn btn-primary cm-cat-save" id="cm-cat-save-' +
+      cid +
+      '" data-action="cmCatSave"' +
+      (_cmCatCanSave(cid) ? '' : ' disabled') +
+      '>Save categories</button>' +
       '</div>' +
       '</div>';
     return html;
@@ -2366,18 +2417,18 @@ window.DashClassManager = (function () {
     if (!cmSelectedCourse) return;
     var st = _cmCatState(cmSelectedCourse);
     st.rows.push({ id: null, name: '', weight: 0, display_order: st.rows.length });
+    st.dirty = true;
     renderClassManager();
   }
 
-  function cmCatName(idx, value) {
+  function cmCatNameLive(idx, value) {
     if (!cmSelectedCourse) return;
     var st = _cmCatState(cmSelectedCourse);
     var row = st.rows[idx];
     if (!row) return;
-    var name = (value || '').trim();
-    if (!name) return;
-    row.name = name;
-    _cmCatPersist(cmSelectedCourse, row);
+    row.name = value || '';
+    st.dirty = true;
+    _cmCatRefreshFooter(cmSelectedCourse);
   }
 
   function cmCatWeightLive(idx, value) {
@@ -2386,31 +2437,9 @@ window.DashClassManager = (function () {
     var row = st.rows[idx];
     if (!row) return;
     var v = parseFloat(value);
-    row.weight = isNaN(v) ? 0 : Math.max(0, v); // no hard-clamp to 100 per §12.7
-    var sumEl = document.getElementById('cm-cat-sum-' + cmSelectedCourse);
-    if (sumEl) {
-      var sum = _cmCatSum(cmSelectedCourse);
-      var over = sum > 100;
-      sumEl.className = over ? 'cm-cat-sum cm-cat-sum-over' : 'cm-cat-sum';
-      sumEl.innerHTML =
-        'Sum: <strong>' +
-        sum +
-        '</strong> / 100%' +
-        (over ? ' <span class="cm-cat-sum-warn">(reduce weights to save)</span>' : '');
-    }
-  }
-
-  function cmCatWeight(idx /* , value */) {
-    if (!cmSelectedCourse) return;
-    var st = _cmCatState(cmSelectedCourse);
-    var row = st.rows[idx];
-    if (!row || !row.name) return;
-    if (_cmCatSum(cmSelectedCourse) > 100) {
-      if (typeof showSyncToast === 'function')
-        showSyncToast('Category weights exceed 100% — reduce before saving.', 'info');
-      return;
-    }
-    _cmCatPersist(cmSelectedCourse, row);
+    row.weight = isNaN(v) ? 0 : Math.max(0, v);
+    st.dirty = true;
+    _cmCatRefreshFooter(cmSelectedCourse);
   }
 
   function _cmAssessmentCategoryId(a) {
@@ -2505,13 +2534,13 @@ window.DashClassManager = (function () {
     return Promise.resolve(pending);
   }
 
+  // The row leaves the list; Save deletes it on the server.
   function _cmDeleteCategoryRow(cid, row) {
     var st = _cmCatState(cid);
     var i = st.rows.indexOf(row);
     if (i >= 0) st.rows.splice(i, 1);
-    _cmMirrorCategoriesToCache(cid);
+    st.dirty = true;
     renderClassManager();
-    return row.id && window.v2 && window.v2.deleteCategory ? window.v2.deleteCategory(row.id) : Promise.resolve();
   }
 
   // A category whose work would be left with no category is moved first, as
@@ -2552,9 +2581,8 @@ window.DashClassManager = (function () {
       renderClassManager();
       return;
     }
-    _cmMoveAssessments(cid, _cmAssessmentsInCategory(cid, row.id), target).then(function () {
-      return _cmDeleteCategoryRow(cid, row);
-    });
+    _cmMoveAssessments(cid, _cmAssessmentsInCategory(cid, row.id), target);
+    _cmDeleteCategoryRow(cid, row);
   }
 
   function cmCatAssignUncategorized() {
@@ -2566,25 +2594,41 @@ window.DashClassManager = (function () {
     renderClassManager();
   }
 
-  function _cmCatPersist(cid, row) {
-    if (!window.v2 || !window.v2.upsertCategory) {
-      renderClassManager();
-      return;
+  // Send the whole list in one call. Work moved out of a deleted category
+  // must reach the server first, or the delete is refused.
+  function cmCatSave() {
+    if (!cmSelectedCourse) return Promise.resolve();
+    var cid = cmSelectedCourse;
+    var st = _cmCatState(cid);
+    if (!_cmCatCanSave(cid)) {
+      if (typeof showSyncToast === 'function' && !_cmCatSumOk(cid))
+        showSyncToast('Category weights must total 100% to save.', 'info');
+      return Promise.resolve();
     }
-    window.v2
-      .upsertCategory({
-        id: row.id,
-        courseId: cid,
-        name: row.name,
-        weight: row.weight,
-        displayOrder: row.display_order,
+    var rows = st.rows.slice();
+    rows.forEach(function (r, i) {
+      r.name = (r.name || '').trim();
+      r.display_order = i;
+    });
+    var pending = typeof _assessmentSaveQueue !== 'undefined' && _assessmentSaveQueue[cid];
+    return Promise.resolve(pending)
+      .then(function () {
+        return window.v2.saveCategories(cid, rows);
       })
       .then(function (res) {
-        if (res && !res.error) {
-          if (!row.id && res.data) row.id = res.data;
-          _cmMirrorCategoriesToCache(cid);
-          renderClassManager();
+        if (res && res.error) {
+          if (typeof showSyncToast === 'function')
+            showSyncToast('Categories not saved: ' + (res.error.message || 'server error'), 'error');
+          return;
         }
+        var ids = (res && Array.isArray(res.data) && res.data) || [];
+        rows.forEach(function (r, i) {
+          // Without a server (Demo Mode) a new row keeps a local id.
+          r.id = ids[i] || r.id || uid();
+        });
+        st.dirty = false;
+        _cmMirrorCategoriesToCache(cid);
+        renderClassManager();
       });
   }
 
@@ -3502,6 +3546,9 @@ window.DashClassManager = (function () {
       cmCatAdd: function () {
         cmCatAdd();
       },
+      cmCatSave: function () {
+        cmCatSave();
+      },
       cmCatDelete: function () {
         cmCatDelete(parseInt(el.dataset.idx, 10));
       },
@@ -3649,6 +3696,10 @@ window.DashClassManager = (function () {
       cmCatWeightLive(parseInt(el.dataset.idx, 10), el.value);
       return true;
     }
+    if (el.dataset.actionInput === 'cmCatNameLive') {
+      cmCatNameLive(parseInt(el.dataset.idx, 10), el.value);
+      return true;
+    }
     // T-UI-02 retired: cmCwRange (legacy summative/formative slider).
     return false;
   }
@@ -3712,14 +3763,6 @@ window.DashClassManager = (function () {
     if (el.dataset.actionBlur === 'cmLateWorkPolicy') {
       var _lp = (el.value || '').trim();
       cmUpdateField('lateWorkPolicy', _lp || null);
-      return true;
-    }
-    if (el.dataset.actionBlur === 'cmCatName') {
-      cmCatName(parseInt(el.dataset.idx, 10), el.value);
-      return true;
-    }
-    if (el.dataset.actionBlur === 'cmCatWeight') {
-      cmCatWeight(parseInt(el.dataset.idx, 10), el.value);
       return true;
     }
     if (el.dataset.actionBlur === 'cmCompGroupName') {

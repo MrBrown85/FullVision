@@ -14,7 +14,7 @@ const CID = 'course-cats';
 describe('category integrity', () => {
   var originalV2;
   var originalGetById;
-  var deleted;
+  var saved;
   var moveTarget;
 
   beforeEach(async () => {
@@ -26,9 +26,9 @@ describe('category integrity', () => {
       { id: 'x3', title: 'Old work', tagIds: [] },
       { id: 'x4', title: 'Homework 1', categoryId: 'k2', tagIds: [] },
     ];
-    deleted = [];
+    saved = [];
     moveTarget = 'k2';
-    originalV2 = { list: window.v2.listCategories, del: window.v2.deleteCategory };
+    originalV2 = { list: window.v2.listCategories, save: window.v2.saveCategories };
     window.v2.listCategories = () =>
       Promise.resolve({
         data: [
@@ -36,9 +36,9 @@ describe('category integrity', () => {
           { id: 'k2', name: 'Homework', weight: 40, display_order: 1 },
         ],
       });
-    window.v2.deleteCategory = id => {
-      deleted.push(id);
-      return Promise.resolve({ data: null, error: null });
+    window.v2.saveCategories = (cid, rows) => {
+      saved.push(rows.map(r => r.id));
+      return Promise.resolve({ data: rows.map(r => r.id), error: null });
     };
     originalGetById = document.getElementById;
     document.getElementById = id =>
@@ -54,32 +54,42 @@ describe('category integrity', () => {
 
   afterEach(() => {
     window.v2.listCategories = originalV2.list;
-    window.v2.deleteCategory = originalV2.del;
+    window.v2.saveCategories = originalV2.save;
     document.getElementById = originalGetById;
     DashClassManager.resetState();
   });
 
   const categoryOf = id => getAssessments(CID).find(a => a.id === id).categoryId;
 
+  // Weights must total 100 (D1), so the remaining category takes the
+  // deleted one's share before Save sends the list without it.
+  const giveAllWeightTo = idx =>
+    DashClassManager.handleInput({ dataset: { actionInput: 'cmCatWeightLive', idx: String(idx) }, value: '100' });
+
   it('moves a category’s work before deleting it', async () => {
     DashClassManager.handleAction('cmCatDelete', { dataset: { idx: '0' } });
-    // Nothing is deleted until the teacher picks where the work goes.
-    expect(deleted).toEqual([]);
+    // Nothing is moved until the teacher picks where the work goes.
+    expect(categoryOf('x1')).toBe('k1');
 
     DashClassManager.handleAction('cmCatMoveDelete', { dataset: { idx: '0' } });
-    await new Promise(r => setTimeout(r, 20));
-
     expect(categoryOf('x1')).toBe('k2');
     expect(categoryOf('x2')).toBe('k2');
-    expect(deleted).toEqual(['k1']);
+
+    giveAllWeightTo(0);
+    DashClassManager.handleAction('cmCatSave', { dataset: {} });
+    await new Promise(r => setTimeout(r, 20));
+
+    expect(saved).toEqual([['k2']]);
     expect(getCategories(CID).map(c => c.id)).toEqual(['k2']);
   });
 
-  it('deletes an unused category straight away', async () => {
+  it('deletes an unused category without asking where its work goes', async () => {
     _cache.assessments[CID] = _cache.assessments[CID].filter(a => a.categoryId !== 'k1');
     DashClassManager.handleAction('cmCatDelete', { dataset: { idx: '0' } });
+    giveAllWeightTo(0);
+    DashClassManager.handleAction('cmCatSave', { dataset: {} });
     await new Promise(r => setTimeout(r, 20));
-    expect(deleted).toEqual(['k1']);
+    expect(saved).toEqual([['k2']]);
   });
 
   it('gives work with no category the one the teacher picks', () => {

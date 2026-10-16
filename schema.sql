@@ -136,7 +136,7 @@ create table category (
   id            uuid        not null primary key,
   course_id     uuid        not null references course(id) on delete cascade,
   name          text        not null,
-  weight        numeric     not null,                              -- sum per course must be ≤100 (fv_check_category_weight_sum trigger)
+  weight        numeric     not null,                              -- ≤100 per course (deferred trigger); save_categories requires exactly 100
   display_order integer     not null default 0,
   created_at   timestamptz  not null default now(),
   updated_at   timestamptz  not null default now()
@@ -475,7 +475,8 @@ create table fv_idempotency (
 --   _term_rating_audit_field(p_tr_id uuid, p_field text, p_old text, p_new text)
 --   fv_owns_course(cid uuid) / fv_owns_assessment(aid uuid) / fv_owns_enrollment(eid uuid)
 --     / fv_owns_term_rating(trid uuid) — RLS predicates.
---   fv_check_category_weight_sum() — trigger enforcing per-course ≤100% cap.
+--   fv_check_category_weight_sum() — deferred trigger enforcing per-course ≤100% cap
+--     (save_categories requires exactly 100).
 --   fv_retention_cleanup() — cron entry point (30d course + teacher purge + 2yr audit purge).
 --   fv_idem_check(p_key uuid, p_endpoint text) / fv_idem_store(...) — write-path
 --     idempotency helpers (migration 20260423_write_path_idempotency). Teacher_id
@@ -501,7 +502,7 @@ create table fv_idempotency (
 --   upsert_section / delete_section / reorder_sections(p_ids uuid[])
 --   upsert_tag / delete_tag / reorder_tags(p_ids uuid[])
 --   upsert_module / delete_module / reorder_modules(p_ids uuid[])
---   upsert_category / delete_category
+--   save_categories / upsert_category / delete_category
 --   upsert_rubric(p_id, p_course_id, p_name, p_criteria jsonb) / delete_rubric
 --
 -- Student + enrollment:
@@ -599,7 +600,7 @@ create table fv_idempotency (
 --   fv_tag_score_for_assessment(p_enrollment_id uuid, p_assessment_id uuid, p_tag_id uuid)
 
 -- ─── Triggers ───────────────────────────────────────────────────────────────
--- `category_weight_sum_trigger` before insert/update on category → fv_check_category_weight_sum()
+-- `category_weight_sum_check(_update)` deferred constraint triggers on category → fv_check_category_weight_sum()
 -- `score_audit_trigger`         after  update on score          → _score_audit_diff(...)
 -- `term_rating_audit_trigger`   after  update on term_rating    → _term_rating_audit_field(...)
 

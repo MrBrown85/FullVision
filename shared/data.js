@@ -4907,96 +4907,65 @@ function _categoryChanged(a, b, idx) {
   );
 }
 
+/* Categories go up as one list (save_categories): weights must total 100,
+   which a row-at-a-time save can't keep while weights change. */
 function _persistCategoriesToCanonical(cid, prev, arr) {
-  if (!window.v2 || !window.v2.upsertCategory) return;
+  if (!window.v2 || !window.v2.saveCategories) return;
   var tail = _categorySaveQueue[cid] || Promise.resolve();
   var next = tail.then(function () {
     prev = _serverStateOr('categories', cid, prev);
-    arr = _cache.categories[cid] || arr;
+    arr = (_cache.categories[cid] || arr || []).filter(Boolean);
     var prevById = {};
     (prev || []).forEach(function (category) {
       if (category && category.id) prevById[category.id] = category;
     });
-    var nextById = {};
-    (arr || []).forEach(function (category) {
-      if (category && category.id) nextById[category.id] = category;
-    });
-    var ops = [];
-    var idMap = {};
-    (arr || []).forEach(function (category, idx) {
-      if (!category) return;
-      var existing = category.id ? prevById[category.id] : null;
-      if (existing && !_categoryChanged(existing, category, idx)) return;
-      ops.push(
-        window.v2
-          .upsertCategory({
-            id: _isUuid(category.id) ? category.id : null,
-            courseId: cid,
-            name: category.name || '',
-            weight: category.weight != null ? Number(category.weight) : 0,
-            displayOrder:
-              category.displayOrder != null
-                ? Number(category.displayOrder)
-                : category.display_order != null
-                  ? Number(category.display_order)
-                  : idx,
-          })
-          .then(function (res) {
-            if (res && res.error) throw res.error;
-            var canonicalId = res && res.data ? res.data : null;
-            if (canonicalId && category.id !== canonicalId) {
-              idMap[category.id] = canonicalId;
-              _rekeyServerStateRow('categories', cid, category.id, { id: canonicalId });
-              var cached = (_cache.categories[cid] || []).find(function (c) {
-                return c.id === category.id;
-              });
-              if (cached) cached.id = canonicalId;
-              _safeLSSet('gb-categories-' + cid, JSON.stringify(_cache.categories[cid] || []));
-            }
-          }),
-      );
-    });
-    (prev || []).forEach(function (category) {
-      if (category && _isUuid(category.id) && !nextById[category.id] && window.v2.deleteCategory) {
-        ops.push(window.v2.deleteCategory(category.id));
-      }
-    });
-    _rememberServerState('categories', cid, arr);
-    var reorderIds = (arr || [])
+    var prevIds = (prev || [])
+      .filter(Boolean)
       .map(function (category) {
-        return category && category.id;
+        return category.id;
       })
-      .filter(_isUuid);
-    var prevOrder = (prev || [])
-      .map(function (category) {
-        return category && category.id;
-      })
-      .filter(_isUuid)
       .join(',');
-    if (reorderIds.length > 1 && reorderIds.join(',') !== prevOrder && window.v2.reorderCategories) {
-      ops.push(window.v2.reorderCategories(reorderIds));
-    }
-    return Promise.all(
-      ops.map(function (op) {
-        return op.then(function (res) {
-          if (res && res.error) throw res.error;
+    var nextIds = arr
+      .map(function (category) {
+        return category.id;
+      })
+      .join(',');
+    var changed =
+      prevIds !== nextIds ||
+      arr.some(function (category, idx) {
+        return _categoryChanged(prevById[category.id], category, idx);
+      });
+    if (!changed) return;
+    _rememberServerState('categories', cid, arr);
+    return window.v2.saveCategories(cid, arr).then(function (res) {
+      if (res && res.error) throw res.error;
+      var ids = (res && Array.isArray(res.data) && res.data) || [];
+      var idMap = {};
+      arr.forEach(function (category, idx) {
+        var canonicalId = ids[idx];
+        if (!canonicalId || category.id === canonicalId) return;
+        idMap[category.id] = canonicalId;
+        _rekeyServerStateRow('categories', cid, category.id, { id: canonicalId });
+        var cached = (_cache.categories[cid] || []).find(function (c) {
+          return c.id === category.id;
         });
-      }),
-    ).then(function () {
+        if (cached) cached.id = canonicalId;
+      });
       var localIds = Object.keys(idMap);
       if (localIds.length === 0) return;
+      _safeLSSet('gb-categories-' + cid, JSON.stringify(_cache.categories[cid] || []));
       var assessments = structuredClone(getAssessments(cid) || []);
-      var changed = false;
+      var moved = false;
       assessments.forEach(function (assessment) {
         if (!assessment) return;
         var categoryId = assessment.categoryId || assessment.category_id;
         if (categoryId && idMap[categoryId]) {
           assessment.categoryId = idMap[categoryId];
           assessment.category_id = idMap[categoryId];
-          changed = true;
+          moved = true;
         }
       });
-      if (changed) saveAssessments(cid, assessments);
+      if (moved) saveAssessments(cid, assessments);
     });
   });
   _categorySaveQueue[cid] = _trackPendingSync(
@@ -5907,8 +5876,8 @@ function saveCategories(cid, arr) {
   if (!_writesEnabled() || !_isUuid(cid)) return;
   _persistCategoriesToCanonical(cid, prev, next);
 }
-/* The class manager writes categories itself (upsert_category,
-   delete_category, reorder_categories) and hands the resulting rows here.
+/* The class manager writes categories itself (save_categories,
+   reorder_categories) and hands the resulting rows here.
    Cache, localStorage and the server baseline take them without sending
    anything a second time. */
 function adoptCategoriesFromServer(cid, rows) {
@@ -7114,7 +7083,9 @@ window.v2.reorderModules = function (ids) {
   return _rpcOrNoop('reorder_modules', { p_ids: (ids || []).filter(_isUuid) });
 };
 
-/* Category — assessment weighting bucket (weight-cap trigger enforces ≤100). */
+/* Category — assessment weighting bucket. Weights must total 100; the
+   server checks at commit, so save the whole list with saveCategories.
+   upsertCategory is kept for renames that leave weights alone. */
 window.v2.upsertCategory = function (params) {
   params = params || {};
   return _rpcOrNoop('upsert_category', {
@@ -7133,6 +7104,19 @@ window.v2.listCategories = function (courseId) {
 };
 window.v2.reorderCategories = function (ids) {
   return _rpcOrNoop('reorder_categories', { p_ids: (ids || []).filter(_isUuid) });
+};
+/* rows: [{ id?, name, weight }] in display order. Rows without a uuid are
+   created; the class's other categories are deleted. Resolves with the ids
+   in the same order. */
+window.v2.saveCategories = function (courseId, rows) {
+  return _rpcOrNoop('save_categories', {
+    p_course_id: courseId,
+    p_categories: (rows || []).map(function (r) {
+      var row = { name: (r.name || '').trim(), weight: r.weight != null ? Number(r.weight) : 0 };
+      if (_isUuid(r.id)) row.id = r.id;
+      return row;
+    }),
+  });
 };
 
 /* Rubric — composite save: rubric row + criteria diff + criterion_tag replace,
