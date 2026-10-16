@@ -942,6 +942,17 @@ function dismissSyncToast() {
   if (el) el.remove();
 }
 
+/* Re-render a page but keep one element as it is, so a form the teacher is
+   filling in keeps what they typed. renderFn rebuilds the page, including a
+   fresh copy of the element; the kept one goes back in its place. */
+function rerenderKeeping(id, renderFn) {
+  var kept = document.getElementById(id);
+  renderFn();
+  if (!kept) return;
+  var fresh = document.getElementById(id);
+  if (fresh && fresh !== kept) fresh.replaceWith(kept);
+}
+
 /* ── Confirm Modal ────────────────────────────────────────── */
 function showConfirm(title, message, okLabel, okStyle, onConfirm) {
   var triggerEl = document.activeElement;
