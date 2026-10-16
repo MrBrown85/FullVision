@@ -365,7 +365,9 @@ window.PageStudent = (function () {
       if (sections.length === 0) return;
       out += '<div class="ct-subject"><div class="ct-subject-name">' + esc(subj.name) + '</div>';
       sections.forEach(function (sec) {
-        var prof = sec.proficiency;
+        // The level comes from shared/calc.js like everywhere else, not from
+        // the server's old calculation (archived in fv_legacy).
+        var prof = getSectionProficiency(activeCourse, studentId, sec.id) || null;
         var profRounded = prof != null ? Math.round(prof) : 0;
         var tags = sec.tags || [];
         out +=
