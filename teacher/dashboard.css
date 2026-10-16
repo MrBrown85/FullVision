@@ -568,7 +568,16 @@
   flex: 1;
   min-width: 0;
 }
+/* Designation and ELL badges sit on the name's line; a long name
+   truncates before they do. */
+.dash-card-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
 .dash-card-name {
+  min-width: 0;
   font-family: var(--font-base);
   font-size: var(--text-lg);
   font-weight: 600;
@@ -693,7 +702,7 @@
   display: flex;
   align-items: center;
   gap: 3px;
-  margin-top: 1px;
+  flex-shrink: 0;
 }
 .dash-desig-badge {
   display: inline-flex;
