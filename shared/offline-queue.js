@@ -33,8 +33,10 @@
  *   the entry counts as slow (stats().slow) so the page can say so. Anything
  *   else (validation, permission, not found) is moved to the dead letter at
  *   once; retrying would only fail again. A dead-lettered entry doesn't block
- *   the rest of the queue (offline-sync.md decision #2). The teacher retries
- *   or discards it (retryDeadLetter / dismissDeadLetter).
+ *   the rest of the queue (offline-sync.md decision #2). On the next page
+ *   load each one is sent once more (a record deleted elsewhere, a stale
+ *   copy and the like can have changed by then); one rejected again is
+ *   dropped and reported to Sentry, so a dead letter never outlives a load.
  * Signed out: an expired session that a token refresh could not fix pauses
  *   the whole queue instead of failing the entry. Nothing is sent until
  *   resume(), which shared/supabase.js calls on SIGNED_IN.
@@ -513,11 +515,13 @@
     }
 
     // One failed write per target: a newer failure replaces an older one.
+    // The last try after a reload is dropped instead.
     var target = _target(entry.endpoint, entry.payload);
     var dead = _readDead().filter(function (e) {
       return !target || _target(e.endpoint, e.payload) !== target;
     });
-    dead.push(entry);
+    if (entry.last_try) _reportDropped(entry);
+    else dead.push(entry);
     _writeDead(dead);
     _writeQueue(_removeEntry(entry.id));
     _counts.deadLettered++;
@@ -530,6 +534,15 @@
     });
     _resolveWaiters(entry.id, res);
     _pump(false);
+  }
+
+  /* A write the server rejected twice, given up on. The endpoint and the
+     server's message only: the payload holds student data. */
+  function _reportDropped(entry) {
+    console.warn('[v2Queue] dropped ' + entry.endpoint + ' after a second rejection: ' + entry.last_error);
+    if (window.Sentry && typeof window.Sentry.captureMessage === 'function') {
+      window.Sentry.captureMessage('Outbox dropped ' + entry.endpoint + ': ' + entry.last_error, 'warning');
+    }
   }
 
   /* Write a settled entry back in its place in the queue. */
@@ -772,54 +785,45 @@
     return flush();
   }
 
-  /* Put a failed write back in the queue to send again. If a newer write to
-     the same target is already queued, that one wins and the failed one is
-     just dropped. Returns false when there is no such entry. */
-  function retryDeadLetter(id) {
+  /* Once per page load: send the signed-in teacher's failed writes once
+     more, at the end of the queue. A write to a record that a newer queued
+     write also sets is out of date, and one that adds a row or waited on a
+     create that failed has nothing to retry against; those are dropped and
+     reported. Another teacher's stay for _discardForeign. */
+  function _retryDeadOnLoad() {
+    var owner = currentOwner();
+    if (!owner) return;
     var dead = _readDead();
-    var entry = null;
-    var keep = dead.filter(function (e) {
-      if (e.id !== id) return true;
-      entry = e;
-      return false;
-    });
-    if (!entry) return false;
-    var target = _target(entry.endpoint, entry.payload);
+    if (!dead.length) return;
     var q = _readQueue();
-    var newer = false;
-    if (target) {
-      newer = q.entries.some(function (e) {
-        return _target(e.endpoint, e.payload) === target;
-      });
-    }
-    if (!newer) {
-      if (q.entries.length >= MAX_ENTRIES) return false;
-      entry.attempts = 0;
-      entry.last_error = null;
-      delete entry.next_at;
-      // Failed while waiting on a create that never landed: send it as it
-      // is and let the server answer, rather than wait forever.
-      delete entry.blocked_on;
-      q.entries.push(entry);
-      try {
-        _writeQueue(q);
-      } catch (e) {
-        return false;
+    var keep = [];
+    dead.forEach(function (entry) {
+      if (_isForeign(entry, owner)) {
+        keep.push(entry);
+        return;
       }
+      var target = _target(entry.endpoint, entry.payload);
+      var drop = !target || entry.last_try || entry.blocked_on || q.entries.length >= MAX_ENTRIES;
+      if (!drop) {
+        drop = q.entries.some(function (e) {
+          return _target(e.endpoint, e.payload) === target;
+        });
+      }
+      if (drop) {
+        _reportDropped(entry);
+        return;
+      }
+      entry.attempts = 0;
+      entry.last_try = true;
+      delete entry.next_at;
+      q.entries.push(entry);
+    });
+    try {
+      _writeQueue(q);
+    } catch (e) {
+      return;
     }
     _writeDead(keep);
-    _notify('dead-letter:retry', { id: id, endpoint: entry.endpoint, dropped: newer });
-    _pump(true);
-    return true;
-  }
-
-  /* Retry every failed write of the signed-in user. */
-  function retryDeadLetters() {
-    var n = 0;
-    deadLetter().forEach(function (e) {
-      if (retryDeadLetter(e.id)) n++;
-    });
-    return n;
   }
 
   function dismissDeadLetter(id) {
@@ -898,6 +902,7 @@
       }
     }, AUTO_FLUSH_MS);
   }
+  _retryDeadOnLoad();
   // Initial drain attempt on load if already online
   if (navigator.onLine) setTimeout(flush, 2000);
 
@@ -913,8 +918,6 @@
     dropBlockedOn: dropBlockedOn,
     deadLetter: deadLetter,
     dismissDeadLetter: dismissDeadLetter,
-    retryDeadLetter: retryDeadLetter,
-    retryDeadLetters: retryDeadLetters,
     resume: resume,
     clear: clear,
     currentOwner: currentOwner,
