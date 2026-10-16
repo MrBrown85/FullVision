@@ -2559,6 +2559,7 @@ function _bundleToCache(cid, bundle) {
     );
   }
   if (Array.isArray(bundle.custom_tags)) _persistLoadedField(cid, 'customTags', bundle.custom_tags.slice());
+  _applyBundleCourseConfig(cid, bundle.course_config);
 
   // A field skipped because the teacher edited it mid-load is fetched again;
   // until then the cache isn't the server's version, so don't claim it is.
@@ -2585,7 +2586,7 @@ function _bundleToCache(cid, bundle) {
    changed class is downloaded. gb-bundle-meta-<cid> records the copy's
    version, owner and age. FV_CACHE_FIRST (constants.js) or
    window.__FV_CACHE_FIRST = false turns this off. */
-var _BUNDLE_SCHEMA = 2;
+var _BUNDLE_SCHEMA = 3;
 var _SAVED_COPY_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 var _classFresh = {}; // cid → the server confirmed or replaced this copy since it was shown
 var _dirtyMarked = {}; // cid → the saved copy has been flagged as holding local edits
@@ -2808,6 +2809,32 @@ function _applyBundleTermRatings(cid, rows) {
       if (t >= 1 && t <= 6 && hasContent) window.v2.saveTermRating(sid, t, payload);
     });
   });
+}
+
+/* The grading scale and category weights saved on the server replace this
+   device's. One only this device has was saved before the server stored
+   them, so it is sent up rather than dropped: a reset elsewhere saves the
+   default scale, never null, so a null on the server always means "never
+   saved". */
+var _COURSE_CONFIG_COLUMNS = { gradingScale: 'grading_scale', categoryWeights: 'category_weights' };
+function _applyBundleCourseConfig(cid, row) {
+  if (!row || typeof row !== 'object') return;
+  var config = Object.assign({}, getCourseConfig(cid) || {});
+  var missing = {};
+  Object.keys(_COURSE_CONFIG_COLUMNS).forEach(function (field) {
+    var column = _COURSE_CONFIG_COLUMNS[field];
+    var onServer = row[column];
+    if (onServer && typeof onServer === 'object') config[field] = _cloneValue(onServer);
+    else if (config[field] != null) missing[column] = config[field];
+  });
+  _persistLoadedField(cid, 'courseConfigs', config);
+
+  if (!Object.keys(missing).length || !_writesEnabled() || !_isUuid(cid)) return;
+  _trackPendingSync(
+    _writeRpc('update_course', { p_course_id: cid, p_patch: missing }).then(function (res) {
+      if (res.error) console.warn('update_course (course config upload) failed:', res.error);
+    }),
+  );
 }
 
 /* A class load failed. Nothing is written: the copy this device already has
@@ -5597,6 +5624,8 @@ function saveCourseConfig(cid, obj) {
       if (obj.decayWeight != null) patch.decay_weight = obj.decayWeight;
       if (obj.timezone != null) patch.timezone = obj.timezone;
       if (obj.lateWorkPolicy != null) patch.late_work_policy = obj.lateWorkPolicy;
+      if (obj.gradingScale != null) patch.grading_scale = obj.gradingScale;
+      if (obj.categoryWeights != null) patch.category_weights = obj.categoryWeights;
       if (Object.keys(patch).length > 0) {
         _trackPendingSync(
           _writeRpc('update_course', { p_course_id: cid, p_patch: patch }).then(function (res) {
