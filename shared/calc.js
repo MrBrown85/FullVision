@@ -384,6 +384,33 @@ function _assessmentPoints(cid, studentId, assessment) {
   return { earned: Math.max(0, Math.min(cap, Number(entry.score) || 0)), possible: possible };
 }
 
+/* The class average on one points or Complete/Incomplete assessment,
+   counted as the course % counts it: not submitted is 0, excused and
+   ungraded work is left out, extra credit counts up to its cap. Returns
+   { avg (points), pct, count }, or null when nobody has a grade. */
+function getClassPointsAverage(cid, students, assessment) {
+  var earned = 0;
+  var possible = 0;
+  var count = 0;
+  (students || []).forEach(function (s) {
+    var pts = _assessmentPoints(cid, s.id, assessment);
+    if (!pts) return;
+    earned += pts.earned;
+    possible += pts.possible;
+    count++;
+  });
+  return count ? { avg: earned / count, pct: (earned / possible) * 100, count: count } : null;
+}
+
+/* Whether a score is above what its assessment allows: 4 on proficiency
+   work, Complete (1) on Complete/Incomplete work, and twice the maximum on
+   points work, which can earn extra credit. */
+function isScoreOutOfRange(assessment, value) {
+  if (isCompletionScored(assessment)) return value > COMPLETE_MAX_POINTS;
+  if (isPointsScored(assessment)) return value > (Number(assessment.maxPoints) || 100) * POINTS_EXTRA_CREDIT_FACTOR;
+  return value > 4;
+}
+
 /* A student's percentage on a group of assessments (one category, or the
    whole class when it has none), counted like a traditional gradebook:
    points earned out of points possible. Points-scored work counts its own
@@ -988,6 +1015,8 @@ function renderGrowthSparkline(points) {
 /* ── Namespace ──────────────────────────────────────────────── */
 window.Calc = {
   clearProfCache,
+  getClassPointsAverage,
+  isScoreOutOfRange,
   courseShowsLetterGrades,
   pointsToProf,
   getCategoryWeights,

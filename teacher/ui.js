@@ -942,6 +942,15 @@ function dismissSyncToast() {
   if (el) el.remove();
 }
 
+/* The mark a gradebook cell shows for a status that replaces its score:
+   NS (not submitted, counts as 0) or EXC (excused, not counted). Empty for
+   no status or Late, which keeps its score. */
+function scoreStatusMarker(status) {
+  if (status === 'NS') return '<span class="gb-status gb-status-ns" title="Not submitted: counts as 0">NS</span>';
+  if (status === 'EXC') return '<span class="gb-status gb-status-exc" title="Excused: not counted">EXC</span>';
+  return '';
+}
+
 /* ── Confirm Modal ────────────────────────────────────────── */
 function showConfirm(title, message, okLabel, okStyle, onConfirm) {
   var triggerEl = document.activeElement;

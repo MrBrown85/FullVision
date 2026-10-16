@@ -797,6 +797,8 @@ window.PageGradebook = (function () {
         var assess = assessments.find(function (a) {
           return a.id === col.assessmentId;
         });
+        // Not submitted and Excused replace the score.
+        var statusMark = scoreStatusMarker(getAssignmentStatus(cid, s.id, col.assessmentId));
         if (col.isPointsCol && isCompletionScored(assess)) {
           var mark = getCompletionMark(cid, s.id, col.assessmentId);
           html +=
@@ -812,7 +814,7 @@ window.PageGradebook = (function () {
             '" data-action="cycleScore" title="' +
             (mark ? (mark === 'complete' ? 'Complete' : 'Incomplete') : '') +
             '">' +
-            completionCellHtml(mark) +
+            (statusMark || completionCellHtml(mark)) +
             '</td>';
         } else if (col.isPointsCol) {
           var max = assess.maxPoints || 100;
@@ -844,7 +846,7 @@ window.PageGradebook = (function () {
             '" data-action="cycleScore" title="' +
             title +
             '">' +
-            cellContent +
+            (statusMark || cellContent) +
             '</td>';
         } else {
           var studentScores = scores[s.id] || [];
@@ -853,8 +855,9 @@ window.PageGradebook = (function () {
           });
           var score = entry ? entry.score : 0;
           var assigned = assess && scoreTagIds(assess, cid).includes(col.tagId);
-          var content =
-            score > 0
+          var content = statusMark
+            ? statusMark
+            : score > 0
               ? formatScoreLevel(score, entry.mod)
               : assigned
                 ? '<span class="gb-unscored">\u00B7</span>'
@@ -894,6 +897,10 @@ window.PageGradebook = (function () {
       var altClass = g && g.groupIdx % 2 === 1 ? ' gb-group-alt' : '';
       var cellW = col.colWidth || 54;
       var wStyle = cellW !== 54 ? 'min-width:' + cellW + 'px;width:' + cellW + 'px;' : '';
+      if (col.isPointsCol) {
+        html += _pointsAverageCell(cid, sortedStudents, col, startClass + altClass, wStyle);
+        return;
+      }
       var vals = sortedStudents
         .map(function (s) {
           var ss = scores[s.id] || [];
@@ -1107,7 +1114,13 @@ window.PageGradebook = (function () {
           cellStyle,
           cellClass = '';
         var cmpMark = isCompletionScored(a) ? getCompletionMark(cid, s.id, a.id) : null;
-        if (cmpMark) {
+        var cellStatus = getAssignmentStatus(cid, s.id, a.id);
+        var statusMark = scoreStatusMarker(cellStatus);
+        if (statusMark) {
+          // Not submitted and Excused replace the score.
+          cellStyle = 'color:var(--text-3)';
+          display = statusMark;
+        } else if (cmpMark) {
           cellStyle = cmpMark === 'complete' ? 'color:var(--score-3)' : 'color:var(--score-1)';
           display = cmpMark === 'complete' ? '\u2713' : '\u2717';
           val = cmpMark === 'complete' ? 1 : 0;
@@ -1115,9 +1128,9 @@ window.PageGradebook = (function () {
           var r = pointsVal != null ? pointsToProf(val, a.maxPoints || 100, getGradingScale(cid)) : Math.round(val);
           cellStyle = 'background:' + PROF_TINT[r] + ';color:' + PROF_COLORS[r];
           display = isPoints ? formatPoints(val) : val.toFixed(1);
-          // Warning for out-of-range (>4 for proficiency, >maxPoints for points)
-          var maxVal = isPoints ? a.maxPoints || 100 : 4;
-          if (val > maxVal) cellClass = ' gb-scores-warning';
+          // Warning for out-of-range: above 4 on proficiency work, above the
+          // extra-credit cap (twice the maximum) on points work.
+          if (isScoreOutOfRange(a, val)) cellClass = ' gb-scores-warning';
         } else {
           // Check zero policy for missing scores
           var missingPolicy = a.missingPolicy || cc.missingPolicy || 'exclude';
@@ -1147,13 +1160,17 @@ window.PageGradebook = (function () {
           ', ' +
           esc(a.title) +
           ': ' +
-          (cmpMark
-            ? cmpMark === 'complete'
-              ? 'Complete'
-              : 'Incomplete'
-            : val > 0
-              ? display.replace(/<[^>]*>/g, '')
-              : 'no score') +
+          (statusMark
+            ? cellStatus === 'NS'
+              ? 'Not submitted'
+              : 'Excused'
+            : cmpMark
+              ? cmpMark === 'complete'
+                ? 'Complete'
+                : 'Incomplete'
+              : val > 0
+                ? display.replace(/<[^>]*>/g, '')
+                : 'no score') +
           '" data-action="editScoreCell" data-aid="' +
           a.id +
           '" data-sid="' +
@@ -1637,6 +1654,33 @@ window.PageGradebook = (function () {
   }
 
   /* ── Complete / Incomplete cells ───────────────────────── */
+  // Class Average for a points or Complete/Incomplete column: the average
+  // points (or % complete), as the course % counts them.
+  function _pointsAverageCell(cid, students, col, classes, wStyle) {
+    var assess = getAssessments(cid).find(function (a) {
+      return a.id === col.assessmentId;
+    });
+    var stats = assess ? getClassPointsAverage(cid, students, assess) : null;
+    var open = '<td class="gb-score' + classes + '" style="' + wStyle + 'cursor:default">';
+    if (!stats) return open + '<span class="gb-score-val s0" style="background:transparent">\u2014</span></td>';
+    var r = pointsToProf(stats.pct, 100, getGradingScale(cid));
+    var text = isCompletionScored(assess)
+      ? Math.round(stats.pct) + '%'
+      : formatPoints(Math.round(stats.avg * 10) / 10) + '/' + (assess.maxPoints || 100);
+    return (
+      open +
+      '<span class="gb-avg-val" style="color:' +
+      PROF_COLORS[r] +
+      ';font-weight:700" title="' +
+      stats.pct.toFixed(1) +
+      '% across ' +
+      stats.count +
+      ' graded">' +
+      text +
+      '</span></td>'
+    );
+  }
+
   function completionCellHtml(mark) {
     if (mark === 'complete') return '<span class="gb-cmp gb-cmp-complete">\u2713</span>';
     if (mark === 'incomplete') return '<span class="gb-cmp gb-cmp-incomplete">\u2717</span>';
