@@ -935,7 +935,9 @@ window.PageAssignments = (function () {
       '<div class="af-field" style="flex:1">' +
       '<label class="af-label">Category</label>' +
       '<select class="af-input" id="af-category">' +
-      '<option value="">No Category</option>' +
+      // A class with categories needs one on every assessment, or the work
+      // counts toward no letter grade (Schoology and Teams both require it).
+      (categories.length === 0 ? '<option value="">No Category</option>' : '') +
       categories
         .map(function (category) {
           return (
