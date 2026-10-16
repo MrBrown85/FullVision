@@ -506,8 +506,12 @@ function renderStudentHeader(cid, sid, opts) {
     <div class="overall-val" style="color:${profColor}">${overall > 0 ? overall.toFixed(1) : '\u2014'}</div>
     <div class="overall-word" style="color:${profColor}">${PROF_LABELS[overallRounded] || 'No Evidence'}</div>
   </div>`;
-  if (typeof getCourseLetterData === 'function' && courseShowsLetterGrades(course) && overall > 0) {
-    const lg = getCourseLetterData(cid, student.id);
+  // A points class with no linked competencies has a % but no proficiency.
+  const lg =
+    typeof getCourseLetterData === 'function' && courseShowsLetterGrades(course)
+      ? getCourseLetterData(cid, student.id)
+      : null;
+  if (lg && (lg.R != null || overall > 0)) {
     html += `<div class="letter-card">
       <div class="letter-val">${lg && lg.S ? lg.S : '—'}</div>
       <div class="letter-pct">${lg && lg.R != null ? lg.R + '%' : '—'}</div>

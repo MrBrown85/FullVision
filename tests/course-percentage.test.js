@@ -119,4 +119,33 @@ describe('course percentage', () => {
     seed({ ...brett, categories: [], assessments: [points('ann', 6), points('qs', 24)] });
     expect(getCourseLetterData(CID, SID).R).toBe(56.7);
   });
+
+  it('takes the letter from the % as shown', () => {
+    // 171.9 / 200 = 85.95 shows as 86%, so the letter is an A, not a B.
+    seed({ categories: [], assessments: [points('t', 200)], scores: [score('t', 171.9)] });
+    expect(getCourseLetterData(CID, SID)).toMatchObject({ R: 86, S: 'A' });
+    // 36.98 / 43 is 85.99999… in floating point; shows as 86% and an A.
+    seed({ categories: [], assessments: [points('t', 43)], scores: [score('t', 36.98)] });
+    expect(getCourseLetterData(CID, SID)).toMatchObject({ R: 86, S: 'A' });
+    // 49.95 shows as 50%, a C-.
+    seed({ categories: [], assessments: [points('t', 200)], scores: [score('t', 99.9)] });
+    expect(getCourseLetterData(CID, SID)).toMatchObject({ R: 50, S: 'C-' });
+  });
+
+  it('shows the letter card for a points class with no linked competencies', () => {
+    seed({
+      categories: [],
+      assessments: [{ ...points('t', 20), tagIds: [] }],
+      scores: [{ assessmentId: 't', tagId: 'overall', score: 15, date: '2026-10-10' }],
+    });
+    _cache.students[CID] = [{ id: SID, firstName: 'Ana', lastName: 'Lee' }];
+    if (typeof COURSES === 'undefined') globalThis.COURSES = {};
+    COURSES[CID] = { id: CID, name: 'Math 10', gradingSystem: 'letter' };
+    expect(getOverallProficiency(CID, SID)).toBe(0);
+    const html = renderStudentHeader(CID, SID);
+    expect(html).toContain('letter-card');
+    expect(html).toContain('75%');
+    delete COURSES[CID];
+    delete _cache.students[CID];
+  });
 });
