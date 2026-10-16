@@ -1708,7 +1708,9 @@ function _overrideMapFromCompetencyTree(tree) {
         level: override.level || 0,
         reason: override.reason || '',
         date: override.updated_at || override.date || '',
-        calculated: section.proficiency || 0,
+        // Worked out on the client (_fillOverrideCalculated); the server no
+        // longer calculates levels.
+        calculated: null,
       };
     });
   });

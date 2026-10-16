@@ -252,7 +252,10 @@ window.ReportBlocks = (function () {
       }
       html += `</div>`;
       if (secOverride) {
-        html += `<div style="font-size:0.62rem;color:var(--text-3);font-style:italic;margin:2px 0 6px;padding-left:2px">Teacher override (calculated: ${secOverride.calculated} ${PROF_LABELS[Math.round(secOverride.calculated)] || ''}): ${esc(secOverride.reason)}</div>`;
+        // The level the scores give now, worked out here rather than taken
+        // from the server.
+        const calculated = Math.round(getSectionProficiencyRaw(cid, student.id, sec.id) * 10) / 10;
+        html += `<div style="font-size:0.62rem;color:var(--text-3);font-style:italic;margin:2px 0 6px;padding-left:2px">Teacher override (calculated: ${calculated} ${PROF_LABELS[Math.round(calculated)] || ''}): ${esc(secOverride.reason)}</div>`;
       }
       sec.tags.forEach(tag => {
         const prof = getTagProficiency(cid, student.id, tag.id);
