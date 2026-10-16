@@ -56,6 +56,7 @@
     if (typeof migrateAllStudents === 'function') migrateAllStudents();
 
     MC.setupOfflineDetection();
+    _initSyncBanner();
     _renderTab('students');
     _bindEvents();
 
@@ -68,6 +69,58 @@
         _renderTab(_activeTab);
       });
     }
+  }
+
+  /* ── Failed-save banner ─────────────────────────────────────── */
+  /* Writes the server rejected, or held because the session expired, stay
+     on screen until the teacher acts (write-path audit §3, §12). Tapping
+     the banner sends the failed ones again; discarding them is done on a
+     computer, where the sync menu lists each one. */
+  function _changes(n) {
+    return n === 1 ? '1 change' : n + ' changes';
+  }
+
+  function _updateSyncBanner() {
+    var banner = document.getElementById('m-sync-banner');
+    var q = window.v2Queue;
+    if (!banner || !q || typeof q.stats !== 'function') return;
+    var stats = q.stats();
+    var html = '';
+    if (stats.deadLettered > 0) {
+      html =
+        '<span>' +
+        _changes(stats.deadLettered) +
+        " couldn't be saved.</span>" +
+        '<button class="m-sync-banner-btn" data-action="retry-failed-saves">Try again</button>';
+    } else if (stats.signedOut && stats.queued > 0) {
+      html =
+        "<span>You're signed out. " +
+        _changes(stats.queued) +
+        ' are waiting.</span>' +
+        '<button class="m-sync-banner-btn" data-action="go-login">Sign in</button>';
+    }
+    banner.innerHTML = html;
+    banner.hidden = !html;
+  }
+
+  function _initSyncBanner() {
+    if (document.getElementById('m-sync-banner')) return;
+    var banner = document.createElement('div');
+    banner.id = 'm-sync-banner';
+    banner.className = 'm-sync-banner';
+    banner.setAttribute('role', 'alert');
+    banner.hidden = true;
+    banner.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-action="retry-failed-saves"]');
+      if (!btn || !window.v2Queue) return;
+      window.v2Queue.retryDeadLetters();
+      _updateSyncBanner();
+    });
+    document.body.appendChild(banner);
+    if (window.v2Queue && typeof window.v2Queue.subscribe === 'function') {
+      window.v2Queue.subscribe(_updateSyncBanner);
+    }
+    _updateSyncBanner();
   }
 
   /* ── Pull to refresh ───────────────────────────────────────── */

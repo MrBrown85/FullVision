@@ -104,10 +104,14 @@ describe('desktop sync status UI', () => {
     expect(elements['offline-banner'].hidden).toBe(false);
     expect(document.body.classList.contains('offline-active')).toBe(true);
     expect(elements['tb-sync-badge'].hidden).toBe(false);
-    expect(elements['tb-sync-badge'].textContent).toBe('2');
-    expect(elements['tb-sync-popover'].innerHTML).toContain('2 unsynced');
-    // Failed writes are hidden from teachers.
-    expect(elements['tb-sync-popover'].innerHTML).not.toContain('assessment not found');
+    expect(elements['tb-sync-badge'].textContent).toBe('3');
+    expect(elements['tb-sync-popover'].innerHTML).toContain('3 unsynced');
+    // Each failed write is listed with the server's message, Try again and Discard.
+    expect(elements['tb-sync-popover'].innerHTML).toContain('The server said: assessment not found');
+    expect(elements['tb-sync-popover'].innerHTML).toContain('data-action="retrySyncDeadLetter" data-id="dead-1"');
+    expect(elements['tb-sync-popover'].innerHTML).toContain('data-action="dismissSyncDeadLetter" data-id="dead-1"');
+    // A failed write outranks being offline in the banner.
+    expect(elements['offline-banner'].innerHTML).toContain("1 change couldn't be saved.");
     expect(elements['sync-indicator-dot'].className).toBe('tb-sync-dot error');
   });
 

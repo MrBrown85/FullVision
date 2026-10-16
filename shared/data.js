@@ -1229,15 +1229,17 @@ async function initData(cid) {
   }
 }
 
-/* Writes made this session that haven't finished, or entries left in the
-   outbox by an earlier session. Dead-lettered entries won't be sent, so they
-   don't count. */
+/* Writes made this session that haven't finished, entries left in the
+   outbox by an earlier session, and writes the server rejected that the
+   teacher hasn't retried or discarded. Rejected ones count because the
+   screen still shows them, and a refresh would remove them without a word. */
 function _hasUnsentWrites() {
   if (_pendingSyncs > 0) return true;
   var q = window.v2Queue;
   if (!q || typeof q.stats !== 'function') return false;
   try {
-    return (q.stats().queued || 0) > 0;
+    var stats = q.stats();
+    return (stats.queued || 0) + (stats.deadLettered || 0) > 0;
   } catch (e) {
     return false;
   }
@@ -1376,9 +1378,11 @@ function _persistLoadedField(cid, field, value) {
 
    Set when a field is loaded from the server, and advanced to the cache's
    value each time a save's diff is dispatched — the outbox keeps retrying
-   until the server has it. Re-keys patch it alongside the cache. Before the
-   first load (or while degraded, loading from localStorage) there is no
-   baseline and saves fall back to the call-time localStorage copy. */
+   until the server has it. If the server rejects the write instead, or the
+   outbox has no room for it, the row goes back (see _baselineUndo below).
+   Re-keys patch it alongside the cache. Before the first load (or while
+   degraded, loading from localStorage) there is no baseline and saves fall
+   back to the call-time localStorage copy. */
 var _SERVER_STATE_FIELDS = {
   students: true,
   assessments: true,
@@ -1422,6 +1426,136 @@ function _forgetServerState(cid) {
   Object.keys(_serverState).forEach(function (field) {
     delete _serverState[field][cid];
   });
+}
+
+/* ── Rejected writes and the baseline (write-path audit §3, §5) ───────────
+   A save advances the baseline as it dispatches its diff, so a write the
+   server rejects (dead letter) or the outbox refuses (full) would never be
+   diffed again. Each write therefore remembers the baseline row it was
+   diffed against, and a rejection puts that row back: the next save of the
+   field sends it again. Rows of students, assessments, scores and statuses;
+   categories go up as one list and handle it in their own save. Other
+   fields' failed writes wait in the failed list for Retry. In memory only:
+   after a reload the baseline comes from the server again. */
+var _baselineUndo = {}; // outbox entry id → { field, cid, match?, prev }
+
+/* Which baseline row a write sets, from its RPC name and params. */
+function _baselineRowOf(name, params) {
+  params = params || {};
+  switch (name) {
+    case 'update_assessment':
+    case 'save_assessment_tags':
+    case 'save_collab':
+    case 'delete_assessment':
+      return { field: 'assessments', match: 'id', id: params.p_id };
+    case 'update_enrollment':
+    case 'withdraw_enrollment':
+      return { field: 'students', match: 'id', id: params.p_id };
+    case 'update_student':
+      return { field: 'students', match: 'personId', id: params.p_id };
+    case 'upsert_score':
+    case 'upsert_tag_score':
+    case 'upsert_rubric_score':
+    case 'save_score_comment':
+    case 'clear_score':
+      return { field: 'scores', sid: params.p_enrollment_id, aid: params.p_assessment_id };
+    case 'set_score_status':
+      return { field: 'statuses', sid: params.p_enrollment_id, aid: params.p_assessment_id };
+  }
+  return null;
+}
+
+/* The course whose baseline holds that row. Score and status writes carry
+   no course id, so the course is the one whose assessments include it. */
+function _baselineCidOf(row) {
+  var byCid = _serverState[row.field] || {};
+  var cids = Object.keys(byCid);
+  for (var i = 0; i < cids.length; i++) {
+    var value = byCid[cids[i]];
+    if (row.match) {
+      if (Array.isArray(value) && value.some(r => r && r[row.match] === row.id)) return cids[i];
+    } else if (_assessmentById(cids[i], row.aid) || (value && value[row.sid])) {
+      return cids[i];
+    }
+  }
+  return null;
+}
+
+/* What the baseline holds for the row now, before the save advances it. */
+function _snapshotBaselineRow(name, params) {
+  var row = _baselineRowOf(name, params);
+  if (!row || (row.match ? !row.id : !row.sid || !row.aid)) return null;
+  var cid = _baselineCidOf(row);
+  if (!cid) return null;
+  var value = _serverState[row.field][cid];
+  var prev;
+  if (row.match) {
+    prev = _cloneValue(value.find(r => r && r[row.match] === row.id));
+  } else if (row.field === 'scores') {
+    prev = _cloneValue((value[row.sid] || []).filter(e => e && e.assessmentId === row.aid));
+  } else {
+    prev = value[row.sid + ':' + row.aid];
+  }
+  return { field: row.field, cid: cid, match: row.match, prev: prev };
+}
+
+/* Put a rejected write's row back as it was before the write was diffed.
+   The ids come from the entry as it is now, so a re-key since the snapshot
+   is kept. */
+function _revertBaselineRow(undo, name, params) {
+  if (!undo || !_hasServerState(undo.field, undo.cid)) return;
+  var row = _baselineRowOf(name, params);
+  if (!row) return;
+  var value = _serverState[undo.field][undo.cid];
+  if (undo.match) {
+    if (!Array.isArray(value) || !row.id) return;
+    var at = value.findIndex(r => r && r[undo.match] === row.id);
+    if (undo.prev === undefined) return;
+    var prev = _cloneValue(undo.prev);
+    prev[undo.match] = row.id;
+    if (at >= 0) value[at] = prev;
+    else value.push(prev);
+    return;
+  }
+  if (undo.field === 'scores') {
+    var entries = (value[row.sid] || []).filter(e => e && e.assessmentId !== row.aid);
+    (undo.prev || []).forEach(function (e) {
+      entries.push(Object.assign(_cloneValue(e), { assessmentId: row.aid }));
+    });
+    if (entries.length) value[row.sid] = entries;
+    else delete value[row.sid];
+    return;
+  }
+  var key = row.sid + ':' + row.aid;
+  if (undo.prev === undefined) delete value[key];
+  else value[key] = undo.prev;
+}
+
+/* Pushes the outbox refused, counted so a save can tell its own write was
+   refused (it happens synchronously, inside the save). */
+var _writeRefusals = 0;
+var _refusalToastAt = 0;
+
+function _onWriteRefused(name, params, undo, reason, entryId) {
+  _writeRefusals++;
+  console.warn(name + ' not queued (' + reason + '): the outbox has no room');
+  // A refused create is forgotten, and its row leaves the baseline, so the
+  // next save of the field creates it again.
+  var creates = _pendingCreatesByEntry(entryId);
+  if (creates.length) _onCreateAbandoned(entryId, false);
+  // After the save that dispatched it has advanced the baseline.
+  Promise.resolve().then(function () {
+    _revertBaselineRow(undo, name, params);
+    creates.forEach(function (rec) {
+      var field = rec.kind === 'student' ? 'students' : rec.kind === 'assessment' ? 'assessments' : null;
+      if (!field || !_hasServerState(field, rec.cid)) return;
+      _serverState[field][rec.cid] = _serverState[field][rec.cid].filter(r => !r || r.id !== rec.localId);
+    });
+  });
+  if (Date.now() - _refusalToastAt > 5000 && typeof showSyncToast === 'function') {
+    _refusalToastAt = Date.now();
+    showSyncToast('Local storage full \u2014 your changes may not save offline', 'error');
+  }
 }
 
 /* Local → server id swaps made this session, per course. Scores and statuses
@@ -2171,10 +2305,25 @@ function _onCreateAbandoned(entryId, failed, error) {
 
 function _onOutboxEvent(evt) {
   var meta = evt && evt.meta;
-  if (!meta || !meta.id) return;
-  if (evt.kind === 'flush:success') _onCreateLanded(meta.id, meta.data);
-  else if (evt.kind === 'flush:dead-letter') _onCreateAbandoned(meta.id, true, meta.error);
-  else if (evt.kind === 'remove') _onCreateAbandoned(meta.id, false);
+  if (!meta) return;
+  if (evt.kind === 'coalesce') {
+    // The replaced write was diffed against the older baseline row; keep it.
+    if (_baselineUndo[meta.from]) _baselineUndo[meta.to] = _baselineUndo[meta.from];
+    delete _baselineUndo[meta.from];
+    return;
+  }
+  if (!meta.id) return;
+  if (evt.kind === 'flush:success') {
+    delete _baselineUndo[meta.id];
+    _onCreateLanded(meta.id, meta.data);
+  } else if (evt.kind === 'flush:dead-letter') {
+    _revertBaselineRow(_baselineUndo[meta.id], meta.endpoint, meta.payload);
+    delete _baselineUndo[meta.id];
+    _onCreateAbandoned(meta.id, true, meta.error);
+  } else if (evt.kind === 'remove') {
+    delete _baselineUndo[meta.id];
+    _onCreateAbandoned(meta.id, false);
+  }
 }
 
 /* Once per page: forget records whose entry is gone (sent, dead-lettered or
@@ -3641,6 +3790,22 @@ function retryActiveCourseLoad() {
 }
 window.retryActiveCourseLoad = retryActiveCourseLoad;
 
+/* The teacher gives up on a write the server rejected. Once none is left,
+   the open class is downloaded again so the screen shows what the server
+   has: the server's version didn't change, so a plain check would answer
+   "not modified" and keep the edit on screen. */
+function discardFailedWrite(id) {
+  var q = window.v2Queue;
+  if (!q || typeof q.dismissDeadLetter !== 'function') return Promise.resolve();
+  q.dismissDeadLetter(id);
+  if (q.deadLetter().length > 0) return Promise.resolve();
+  var cid = getActiveCourse();
+  if (!cid) return Promise.resolve();
+  delete _classVersion[cid];
+  return _handleExternalCourseUpdate(cid, 'gradebook');
+}
+window.discardFailedWrite = discardFailedWrite;
+
 function courseLoadFailed(cid) {
   return !!(cid && _loadError[cid]);
 }
@@ -4098,12 +4263,31 @@ function upsertScore(cid, sid, aid, tid, scoreVal, date, type, note, mod) {
   // A realtime refresh that started before this edit must not overwrite it.
   _markLocalWrite('scores', cid);
 
+  var refusals = _writeRefusals;
   if (_writesEnabled()) {
     _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note, nextMod);
-    if (_hasServerState('scores', cid)) _rememberServerState('scores', cid, scores);
+    // The outbox had no room: the server won't get this score, so the
+    // baseline mustn't say it has, and the caller hears it didn't save.
+    if (_writeRefusals !== refusals) return false;
+    _rememberScoreCell(cid, sid, aid, tid, scores);
   }
   _broadcastChange(cid, 'scores');
   return lsOk;
+}
+
+/* Advance the scores baseline for one cell only. Taking the whole cache
+   would also mark as sent any other cell whose write was rejected. */
+function _rememberScoreCell(cid, sid, aid, tid, scores) {
+  if (!_hasServerState('scores', cid)) return;
+  var base = _serverState.scores[cid];
+  var entries = (base[sid] || []).filter(function (e) {
+    return !(e && e.assessmentId === aid && e.tagId === tid);
+  });
+  (scores[sid] || []).forEach(function (e) {
+    if (e && e.assessmentId === aid && e.tagId === tid) entries.push(_cloneValue(e));
+  });
+  if (entries.length) base[sid] = entries;
+  else delete base[sid];
 }
 
 /* A toast here confused teachers more than it helped (Oct 2026); failed
@@ -5629,6 +5813,7 @@ function _persistCategoriesToCanonical(cid, prev, arr) {
         return _categoryChanged(prevById[category.id], category, idx);
       });
     if (!changed) return;
+    var before = _cloneValue(prev);
     _rememberServerState('categories', cid, arr);
     // One save creates every new row; the server answers with the ids in
     // list order, so each new row's record remembers its position.
@@ -5642,6 +5827,9 @@ function _persistCategoriesToCanonical(cid, prev, arr) {
       if (rec && !entryId) entryId = rec.entryId;
     });
     return window.v2.saveCategories(cid, arr, { entryId: entryId || undefined }).then(function (res) {
+      // Rejected or refused: the server still has the old list, so the
+      // next save sends the whole list again.
+      if (res && res.error && !res.error.cancelled) _rememberServerState('categories', cid, before);
       if (res && res.error) throw res.error;
       // Re-keys the rows and the assessments that point at them (already
       // done when the outbox reported success).
@@ -5702,9 +5890,12 @@ function saveAssignmentStatuses(cid, obj) {
   var prev = _loadPersistedCourseFieldSnapshot('statuses', cid, (_cache.statuses && _cache.statuses[cid]) || {});
   var next = obj || {};
   _saveCourseField('statuses', cid, next);
-  if (!_writesEnabled() || !_isUuid(cid)) return;
+  if (!_writesEnabled() || !_isUuid(cid)) return true;
+  var refusals = _writeRefusals;
   _persistStatusDiffToCanonical(_serverStateOr('statuses', cid, prev), next);
   _rememberServerState('statuses', cid, next);
+  // A refused write's cell goes back in the baseline (_onWriteRefused).
+  return _writeRefusals === refusals;
 }
 function getAssignmentStatus(cid, sid, aid) {
   return getAssignmentStatuses(cid)[sid + ':' + aid] || null;
@@ -5715,7 +5906,7 @@ function setAssignmentStatus(cid, sid, aid, status) {
   if (status) st[key] = status;
   else delete st[key];
   // saveAssignmentStatuses' diff sends the one set_score_status for this cell.
-  saveAssignmentStatuses(cid, st);
+  return saveAssignmentStatuses(cid, st);
 }
 
 /* ── Rubrics ───────────────────────────────────────────────── */
@@ -7081,8 +7272,11 @@ function saveScores(cid, obj) {
   }
   var lsOk = _saveCourseField('scores', cid, obj);
   if (_writesEnabled()) {
+    var refusals = _writeRefusals;
     persistScoreDiffToCanonical(cid, _serverStateOr('scores', cid, prev), obj || {});
     _rememberServerState('scores', cid, obj || {});
+    // A refused write's cell goes back in the baseline (_onWriteRefused).
+    if (_writeRefusals !== refusals) return false;
   }
   return lsOk;
 }
@@ -7629,6 +7823,9 @@ function _buildLongFormRetryKey(name, options) {
   return options.retryKey || [name, options.retryId || ''].filter(Boolean).join(':');
 }
 
+/* A write from the outbox stays queued while the session is expired (the
+   outbox pauses), so signing in again resumes the outbox rather than sending
+   the write a second time beside it. */
 function _queueLongFormSessionRetry(name, params, options, sourceError) {
   var ctx = getLongFormAuthContext();
   if (!ctx || !window.UI || typeof window.UI.queueSessionExpiredRetry !== 'function') {
@@ -7638,6 +7835,12 @@ function _queueLongFormSessionRetry(name, params, options, sourceError) {
     key: _buildLongFormRetryKey(name, options),
     getDraftText: ctx.getDraftText,
     retry: function () {
+      var q = window.v2Queue;
+      if (options && options.viaOutbox && q && typeof q.resume === 'function') {
+        return q.resume().then(function () {
+          return { data: null, error: null };
+        });
+      }
       return _callRpcWithAuthGuard(name, params, Object.assign({}, options, { suppressSessionExpiredModal: true }));
     },
   });
@@ -7734,7 +7937,7 @@ function _outbox() {
     q.configure({
       send: function (name, params, options) {
         if (!getSupabase()) return { data: null, error: { message: 'no_supabase' } };
-        return _callRpcWithAuthGuard(name, params, options);
+        return _callRpcWithAuthGuard(name, params, Object.assign({}, options, { viaOutbox: true }));
       },
       isPaused: function () {
         return _supabaseDegraded;
@@ -7759,7 +7962,11 @@ function _outbox() {
    it; for idempotent endpoints it is the idempotency key too). A payload
    naming a local id whose create is still queued is held behind that
    create and re-keyed when it lands; without the outbox such a write has
-   nothing to wait in, so it is dropped with a warning. */
+   nothing to wait in, so it is dropped with a warning.
+
+   Every entry remembers the baseline row its write was diffed against, so
+   a rejection can put it back (_baselineUndo). A write the outbox refuses
+   (full) resolves { error: { refused } } and counts in _writeRefusals. */
 function _writeRpc(name, params, options) {
   if (_isDemoSession()) return Promise.resolve({ data: null, error: null });
   params = params || {};
@@ -7772,7 +7979,15 @@ function _writeRpc(name, params, options) {
   var blockedOn = _blockedLocalIds(name, params);
   var outbox = _outbox();
   if (outbox) {
-    var pushed = outbox.push(name, params, { id: options.entryId, blockedOn: blockedOn, sendOptions: options });
+    var entryId = options.entryId || params.p_idempotency_key || _idempotencyKey() || uid();
+    var undo = _snapshotBaselineRow(name, params);
+    var pushed = outbox.push(name, params, { id: entryId, blockedOn: blockedOn, sendOptions: options });
+    if (pushed && pushed.refused) {
+      _onWriteRefused(name, params, undo, pushed.refused, options.entryId);
+      return pushed;
+    }
+    // A cell write that replaced a queued one already holds the older row.
+    if (undo && !_baselineUndo[entryId]) _baselineUndo[entryId] = undo;
     if (options.entryId) _markPendingQueued(options.entryId);
     return pushed;
   }

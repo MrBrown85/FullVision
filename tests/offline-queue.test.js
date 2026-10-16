@@ -3,7 +3,7 @@
  *
  * Covers window.v2Queue surface:
  *   enqueue           — basic add, invalid-endpoint reject, queue-cap enforcement
- *   flush             — success path, failure→backoff, dead-letter after MAX_ATTEMPTS
+ *   flush             — success path, failure→backoff, dead-letter on a rejection
  *   stats             — queued/deadLettered/online snapshot
  *   deadLetter        — returns current dead list
  *   dismissDeadLetter — removes one entry
@@ -155,7 +155,7 @@ describe('v2Queue (offline write queue)', () => {
       ).toEqual(['rpc1', 'rpc2']);
     });
 
-    it('dead-letters an entry after MAX_ATTEMPTS failures', async () => {
+    it('dead-letters an entry the server rejects', async () => {
       Q.enqueue('bad_rpc', {});
       setOnline(true);
       globalThis.getSupabase = () => ({
@@ -163,12 +163,7 @@ describe('v2Queue (offline write queue)', () => {
           return Promise.resolve({ data: null, error: { message: 'boom' } });
         },
       });
-      // Each flush() attempt increments; when attempts === MAX_ATTEMPTS (3)
-      // the entry is moved to dead-letter. We drive the attempts manually so
-      // we don't wait for the real backoff delays.
-      for (var i = 0; i < Q.MAX_ATTEMPTS; i++) {
-        await Q.flush();
-      }
+      await Q.flush();
       expect(Q.stats().queued).toBe(0);
       expect(Q.stats().deadLettered).toBe(1);
       expect(Q.deadLetter()[0].last_error).toBe('boom');
@@ -187,8 +182,8 @@ describe('v2Queue (offline write queue)', () => {
           return Promise.resolve({ data: 'ok', error: null });
         },
       });
-      // Force the failing entry through its 3 attempts
-      for (var i = 0; i < Q.MAX_ATTEMPTS; i++) await Q.flush();
+      // The failing entry is rejected at once
+      await Q.flush();
       // Now the 'works' entry should be processed on the next flush
       await Q.flush();
       expect(Q.stats().queued).toBe(0);
@@ -205,7 +200,7 @@ describe('v2Queue (offline write queue)', () => {
           return Promise.resolve({ data: null, error: { message: 'x' } });
         },
       });
-      for (var i = 0; i < Q.MAX_ATTEMPTS; i++) await Q.flush();
+      await Q.flush();
       var dead = Q.deadLetter();
       expect(dead).toHaveLength(1);
       var remaining = Q.dismissDeadLetter(dead[0].id);
@@ -565,7 +560,203 @@ describe('v2Queue (offline write queue)', () => {
       });
       await Q.push('create_assessment', { p_course_id: 'c', p_title: 'Lab' }, { id: 'entry-2' });
       off();
-      expect(seen).toEqual([{ id: 'entry-2', endpoint: 'create_assessment', data: 'ok' }]);
+      expect(seen).toHaveLength(1);
+      expect(seen[0]).toMatchObject({ id: 'entry-2', endpoint: 'create_assessment', data: 'ok' });
+      expect(seen[0].payload).toEqual({ p_course_id: 'c', p_title: 'Lab' });
+    });
+  });
+
+  // Write-path audit §5: a cell edited several times offline holds one entry.
+  describe('coalescing', () => {
+    function cell(value, tag) {
+      return { p_enrollment_id: 'e', p_assessment_id: 'a', p_tag_id: tag || 't', p_value: value };
+    }
+    function queued() {
+      return JSON.parse(localStorage.getItem('fv-sync-queue-v1')).entries;
+    }
+
+    it('keeps one entry for a cell edited three times while offline', async () => {
+      var first = Q.push('upsert_tag_score', cell(1));
+      Q.push('upsert_tag_score', cell(2));
+      Q.push('upsert_tag_score', cell(3));
+      expect(queued()).toHaveLength(1);
+      expect(queued()[0].payload.p_value).toBe(3);
+
+      setOnline(true);
+      await Q.flush();
+      expect(calls.map(c => c.payload.p_value)).toEqual([3]);
+      // The first caller hears the final answer too.
+      expect(await first).toEqual({ data: 'ok', error: null });
+    });
+
+    it('keeps the replaced write in its place among writes to other records', () => {
+      Q.push('upsert_tag_score', cell(1));
+      Q.push('update_student', { p_id: 'st-1', p_patch: {} });
+      Q.push('upsert_tag_score', cell(2));
+      expect(queued().map(e => e.endpoint)).toEqual(['upsert_tag_score', 'update_student']);
+      expect(queued()[0].payload.p_value).toBe(2);
+    });
+
+    it('does not replace a different tag, endpoint, or a write with something behind it on its key', () => {
+      Q.push('upsert_tag_score', cell(1, 't1'));
+      Q.push('upsert_tag_score', cell(1, 't2'));
+      Q.push('set_score_status', { p_enrollment_id: 'e', p_assessment_id: 'a', p_status: 'excused' });
+      Q.push('upsert_tag_score', cell(2, 't1'));
+      expect(queued()).toHaveLength(4);
+    });
+
+    it('does not replace a write waiting on a different local id', () => {
+      Q.push('upsert_tag_score', { p_enrollment_id: 'e', p_assessment_id: 'sA', p_value: 1 }, { blockedOn: ['sA'] });
+      Q.push('upsert_tag_score', { p_enrollment_id: 'e', p_assessment_id: 'sA', p_value: 2 }, { blockedOn: ['sA'] });
+      expect(queued()).toHaveLength(1);
+      expect(queued()[0].blocked_on).toEqual(['sA']);
+      Q.push('upsert_tag_score', { p_enrollment_id: 'e', p_assessment_id: 'sA', p_value: 3 });
+      expect(queued()).toHaveLength(2);
+    });
+
+    it('does not replace a write already being sent', async () => {
+      setOnline(true);
+      var release;
+      globalThis.getSupabase = () => ({
+        rpc(name, payload) {
+          calls.push({ name: name, payload: payload });
+          if (payload.p_value === 1) {
+            return new Promise(function (resolve) {
+              release = function () {
+                resolve({ data: 'ok', error: null });
+              };
+            });
+          }
+          return Promise.resolve({ data: 'ok', error: null });
+        },
+      });
+      Q.push('upsert_tag_score', cell(1));
+      Q.push('upsert_tag_score', cell(2));
+      expect(queued()).toHaveLength(2);
+      release();
+      await Q.flush();
+      expect(calls.map(c => c.payload.p_value)).toEqual([1, 2]);
+    });
+
+    it('takes an edit to a queued cell even when the outbox is full', () => {
+      Q.push('upsert_tag_score', cell(1));
+      for (var i = 1; i < Q.MAX_ENTRIES; i++) Q.enqueue('rpc', { i: i });
+      expect(Q.push('upsert_tag_score', cell(1, 'other')).refused).toBe('queue_full');
+      expect(Q.push('upsert_tag_score', cell(2)).refused).toBeUndefined();
+      expect(queued()[0].payload.p_value).toBe(2);
+    });
+  });
+
+  // Write-path audit §5: a write the outbox can't hold is refused, not sent.
+  describe('refused writes', () => {
+    it('refuses a write when the outbox is full and sends nothing', async () => {
+      setOnline(true);
+      for (var i = 0; i < Q.MAX_ENTRIES; i++) Q.enqueue('rpc', { i: i }, { noFlush: true });
+      var p = Q.push('update_student', { p_id: 'st-1', p_patch: {} });
+      expect(p.refused).toBe('queue_full');
+      expect(await p).toEqual({ data: null, error: { message: 'queue_full', refused: 'queue_full' } });
+      expect(calls.filter(c => c.name === 'update_student')).toHaveLength(0);
+    });
+  });
+
+  // Write-path audit §12: an expired session pauses the outbox.
+  describe('signed out', () => {
+    afterEach(async () => {
+      globalThis.getSupabase = () => ({
+        rpc() {
+          return Promise.resolve({ data: 'ok', error: null });
+        },
+      });
+      await Q.resume();
+    });
+
+    it('holds every write while the session is expired and sends them on resume', async () => {
+      setOnline(true);
+      var expired = true;
+      globalThis.getSupabase = () => ({
+        rpc(name, payload) {
+          calls.push({ name: name, payload: payload });
+          if (expired) return Promise.resolve({ data: null, error: { status: 401, message: 'JWT expired' } });
+          return Promise.resolve({ data: 'ok', error: null });
+        },
+      });
+      var p = Q.push('update_student', { p_id: 'st-1', p_patch: {} });
+      await Q.flush();
+      expect(Q.stats()).toMatchObject({ queued: 1, deadLettered: 0, signedOut: true });
+
+      Q.push('update_student', { p_id: 'st-2', p_patch: {} });
+      expect((await Q.flush()).note).toBe('signed-out');
+      expect(calls).toHaveLength(1);
+
+      expired = false;
+      await Q.resume();
+      expect(await p).toEqual({ data: 'ok', error: null });
+      expect(Q.stats()).toMatchObject({ queued: 0, deadLettered: 0, signedOut: false });
+      expect(calls).toHaveLength(3);
+    });
+  });
+
+  // Write-path audit §3: failed writes can be retried or are replaced by
+  // newer writes to the same record.
+  describe('retrying failed writes', () => {
+    function rejectOnce() {
+      var n = 0;
+      globalThis.getSupabase = () => ({
+        rpc(name, payload) {
+          calls.push({ name: name, payload: payload });
+          n++;
+          if (n === 1) return Promise.resolve({ data: null, error: { code: 'P0001', message: 'rejected' } });
+          return Promise.resolve({ data: 'ok', error: null });
+        },
+      });
+    }
+
+    it('sends a failed write again on retryDeadLetter', async () => {
+      setOnline(true);
+      rejectOnce();
+      Q.push('update_assessment', { p_id: 'a1', p_patch: { title: 'Lab' } });
+      await Q.flush();
+      var dead = Q.deadLetter();
+      expect(dead).toHaveLength(1);
+      expect(Q.retryDeadLetter(dead[0].id)).toBe(true);
+      await Q.flush();
+      expect(Q.stats()).toMatchObject({ queued: 0, deadLettered: 0 });
+      expect(calls).toHaveLength(2);
+    });
+
+    it('drops a failed write once a newer write to the same record lands', async () => {
+      setOnline(true);
+      rejectOnce();
+      Q.push('update_assessment', { p_id: 'a1', p_patch: { title: 'Lab' } });
+      await Q.flush();
+      expect(Q.stats().deadLettered).toBe(1);
+      await Q.push('update_assessment', { p_id: 'a1', p_patch: { title: 'Lab 1' } });
+      expect(Q.stats().deadLettered).toBe(0);
+    });
+
+    it('keeps one failed write per record', async () => {
+      setOnline(true);
+      globalThis.getSupabase = () => ({
+        rpc() {
+          return Promise.resolve({ data: null, error: { code: 'P0002', message: 'assessment not found' } });
+        },
+      });
+      await Q.push('update_assessment', { p_id: 'a1', p_patch: { title: 'Lab' } });
+      await Q.push('update_assessment', { p_id: 'a1', p_patch: { title: 'Lab 1' } });
+      await Q.push('update_assessment', { p_id: 'a2', p_patch: { title: 'Quiz' } });
+      expect(Q.deadLetter().map(e => e.payload.p_patch.title)).toEqual(['Lab 1', 'Quiz']);
+    });
+
+    it('never treats two new rows as the same record', async () => {
+      setOnline(true);
+      globalThis.getSupabase = () => ({
+        rpc() {
+          return Promise.resolve({ data: null, error: { code: 'P0001', message: 'rejected' } });
+        },
+      });
+      await Q.push('create_observation', { p_course_id: 'c', p_body: 'one' });
+      await Q.push('create_observation', { p_course_id: 'c', p_body: 'two' });
+      expect(Q.deadLetter()).toHaveLength(2);
     });
   });
 });

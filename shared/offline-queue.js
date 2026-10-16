@@ -7,7 +7,7 @@
  *
  * Storage:
  *   fv-sync-queue-v1          — { entries:[...], last_flush_at:iso }
- *   fv-sync-dead-letter-v1    — entries that exceeded the retry cap
+ *   fv-sync-dead-letter-v1    — entries the server rejected
  *
  * Entry shape:
  *   { id, created_at, owner, key, endpoint, payload, attempts, last_error, next_at, blocked_on }
@@ -28,13 +28,21 @@
  *   else is discarded. Entries queued before owners existed have none and are
  *   sent under whoever is signed in.
  *
- * Retry policy: network errors, timeouts, 5xx and expired sessions retry
- *   with backoff 1s / 5s / 30s / 60s, up to MAX_ATTEMPTS. Anything else
- *   (validation, permission, not found) is moved to the dead letter at once;
- *   retrying would only fail again. A dead-lettered entry doesn't block the
- *   rest of the queue (offline-sync.md decision #2).
- * Cap: 500 entries or ~5 MB serialized, whichever first. Over-cap writes
- *   are rejected and returned to the caller.
+ * Retry policy: network errors, timeouts and 5xx retry with backoff
+ *   1s / 5s / 30s / 60s for as long as it takes; after SLOW_AFTER attempts
+ *   the entry counts as slow (stats().slow) so the page can say so. Anything
+ *   else (validation, permission, not found) is moved to the dead letter at
+ *   once; retrying would only fail again. A dead-lettered entry doesn't block
+ *   the rest of the queue (offline-sync.md decision #2). The teacher retries
+ *   or discards it (retryDeadLetter / dismissDeadLetter).
+ * Signed out: an expired session that a token refresh could not fix pauses
+ *   the whole queue instead of failing the entry. Nothing is sent until
+ *   resume(), which shared/supabase.js calls on SIGNED_IN.
+ * Cap: 500 entries or ~5 MB serialized, whichever first. An over-cap write
+ *   is refused: push() resolves { error: { refused } } and sends nothing.
+ * Coalescing: a cell write (COALESCE_ENDPOINTS) replaces a queued, unsent
+ *   write to the same target when nothing else on its key is behind it, so a
+ *   cell edited three times offline holds one entry.
  *
  * Everything here is a window.v2Queue.* public surface; no new globals.
  */
@@ -45,7 +53,7 @@
   var DEAD_KEY = 'fv-sync-dead-letter-v1';
   var MAX_ENTRIES = 500;
   var MAX_BYTES = 5 * 1024 * 1024;
-  var MAX_ATTEMPTS = 20;
+  var SLOW_AFTER = 5; // attempts before an entry counts as slow
   var BACKOFF_MS = [1000, 5000, 30000, 60000];
   var MAX_PARALLEL = 6;
   var AUTO_FLUSH_MS = 60000; // periodic retry while online
@@ -75,6 +83,7 @@
   var _isPaused = function () {
     return false;
   };
+  var _signedOut = false; // paused until resume(): the session expired
   var _inFlight = {}; // entry id → Promise of its settle
   var _waiters = {}; // entry id → [resolve] for push() callers
   var _sendOptions = {}; // entry id → options for _send (not persisted)
@@ -105,14 +114,55 @@
     if (!res) return true;
     var err = res.error;
     if (!err) return false;
-    // The long-form editor has taken this write over and retries it itself.
-    if (err.handledSessionExpired) return false;
     var status = Number(res.status || err.status || err.statusCode || 0);
     if (status >= 500 || status === 401 || status === 408 || status === 429) return true;
     var text = [err.code, err.message, err.name, typeof err === 'string' ? err : ''].join(' ');
     return /network|fetch|failed to connect|ECONNREFUSED|timed? ?out|load failed|no_supabase|jwt expired|PGRST301/i.test(
       text,
     );
+  }
+
+  /* An expired session the auth guard could not refresh. Retrying won't help
+     until the teacher signs in again, so the queue pauses instead. */
+  function _isSessionExpired(res) {
+    var err = res && res.error;
+    if (!err) return false;
+    if (err.handledSessionExpired) return true;
+    var status = Number(res.status || err.status || err.statusCode || 0);
+    if (status === 401) return true;
+    var text = [err.code, err.message].join(' ');
+    return /jwt expired|PGRST301|session_expired/i.test(text);
+  }
+
+  /* Cell writes where a later write replaces an earlier one outright. */
+  var COALESCE_ENDPOINTS = {
+    upsert_score: true,
+    upsert_tag_score: true,
+    upsert_rubric_score: true,
+    set_score_status: true,
+    save_score_comment: true,
+  };
+
+  /* The record and field a write sets: endpoint plus every id param. Two
+     writes with the same target set the same thing, so the later one
+     replaces the earlier. Writes that add rows (create, duplicate, import,
+     bulk) have no target: two of them are two rows. */
+  function _target(endpoint, payload) {
+    if (!endpoint || /^(create|duplicate|import|bulk|restore|relink|apply)_/.test(endpoint)) return null;
+    payload = payload || {};
+    var keys = Object.keys(payload).sort();
+    var ids = [];
+    keys.forEach(function (k) {
+      if (k !== 'p_idempotency_key' && /^p_(.+_)?ids?$/.test(k)) ids.push(k + '=' + JSON.stringify(payload[k]));
+    });
+    if (!ids.length) return null;
+    return endpoint + '|' + ids.join('&');
+  }
+
+  function _sameSet(a, b) {
+    a = Array.isArray(a) ? a.slice().sort() : [];
+    b = Array.isArray(b) ? b.slice().sort() : [];
+    return a.join('\u0000') === b.join('\u0000');
   }
 
   function _uuid4() {
@@ -254,16 +304,14 @@
      explicit id is how callOrEnqueue threads the key it used for the
      failed online attempt into the queued retry so both the direct call
      and the retry share a single key.
-     Returns { ok, id, reason? }.  Caller should update its optimistic
-     cache AFTER receiving ok:true. */
+     Returns { ok, id, reason?, replaced? }. Caller should update its
+     optimistic cache AFTER receiving ok:true. `replaced` names the entry a
+     cell write took the place of (see _coalesceIndex). */
   function enqueue(endpoint, payload, opts) {
     if (!endpoint || typeof endpoint !== 'string') {
       return { ok: false, reason: 'invalid_endpoint' };
     }
     var q = _readQueue();
-    if (q.entries.length >= MAX_ENTRIES) {
-      return { ok: false, reason: 'queue_full' };
-    }
     var entry = {
       id: (opts && opts.id) || _uuid4(),
       created_at: new Date().toISOString(),
@@ -275,23 +323,66 @@
       last_error: null,
     };
     if (opts && Array.isArray(opts.blockedOn) && opts.blockedOn.length) entry.blocked_on = opts.blockedOn.slice();
-    q.entries.push(entry);
+    // A replacement doesn't grow the queue, so a full queue still takes it.
+    var at = _coalesceIndex(q.entries, entry);
+    var replaced = at >= 0 ? q.entries[at] : null;
+    if (!replaced && q.entries.length >= MAX_ENTRIES) {
+      return { ok: false, reason: 'queue_full' };
+    }
+    if (replaced) {
+      // The replacement keeps its own id: the old one may already have
+      // reached the server on an attempt whose answer was lost, and an
+      // idempotency key can't carry a new value.
+      q.entries[at] = entry;
+    } else {
+      q.entries.push(entry);
+    }
     try {
       _writeQueue(q);
     } catch (e) {
       return { ok: false, reason: 'storage_full' };
     }
+    if (replaced) {
+      if (_waiters[replaced.id]) {
+        _waiters[entry.id] = _waiters[replaced.id].concat(_waiters[entry.id] || []);
+        delete _waiters[replaced.id];
+      }
+      delete _sendOptions[replaced.id];
+      _notify('coalesce', { from: replaced.id, to: entry.id, endpoint: entry.endpoint });
+    }
     _notify('enqueue', { id: entry.id, endpoint: entry.endpoint });
     // Kick off a flush attempt if we came online.
     if (navigator.onLine && !(opts && opts.noFlush)) setTimeout(flush, 0);
-    return { ok: true, id: entry.id };
+    return replaced ? { ok: true, id: entry.id, replaced: replaced.id } : { ok: true, id: entry.id };
+  }
+
+  /* Where a new cell write can take the place of a queued one: the last
+     entry on its key, not started, same endpoint and target, waiting on the
+     same local ids. Replacing the last entry on a key in place sends the
+     same thing in the same order as appending after it. -1 when none. */
+  function _coalesceIndex(entries, entry) {
+    if (!entry.key || !COALESCE_ENDPOINTS[entry.endpoint]) return -1;
+    var target = _target(entry.endpoint, entry.payload);
+    if (!target) return -1;
+    for (var i = entries.length - 1; i >= 0; i--) {
+      var e = entries[i];
+      if (e.key !== entry.key) continue;
+      if (_inFlight[e.id] || e.endpoint !== entry.endpoint || e.owner !== entry.owner) return -1;
+      if (_target(e.endpoint, e.payload) !== target) return -1;
+      if (!_sameSet(e.blocked_on, entry.blocked_on)) return -1;
+      return i;
+    }
+    return -1;
   }
 
   /* The write path. Queues the write and sends it as soon as nothing ahead of
      it touches the same record. Resolves with the server's final answer —
      after any retries — so callers can act on the real outcome (for example
-     re-keying a local id). While offline or paused it stays pending. If the
-     entry can't be stored, the write is sent directly instead.
+     re-keying a local id). While offline or paused it stays pending.
+     If the outbox is full (or storage is), nothing is sent: a direct send
+     would skip the per-record order and fail anyway offline. The promise
+     resolves { error: { refused } } and carries .refused synchronously, so
+     the caller can refuse the edit before it claims the server has it.
      opts.id names the entry (the caller's pending-create record uses it);
      opts.blockedOn lists local ids the payload still carries. */
   function push(endpoint, payload, opts) {
@@ -299,7 +390,14 @@
     payload = payload || {};
     var id = opts.id || payload.p_idempotency_key || _uuid4();
     var queued = enqueue(endpoint, payload, { id: id, key: opts.key, blockedOn: opts.blockedOn, noFlush: true });
-    if (!queued.ok) return _sendNow(endpoint, payload, opts.sendOptions);
+    if (!queued.ok) {
+      var refused = Promise.resolve({
+        data: null,
+        error: { message: queued.reason, refused: queued.reason },
+      });
+      refused.refused = queued.reason;
+      return refused;
+    }
     if (opts.sendOptions) _sendOptions[id] = opts.sendOptions;
     return new Promise(function (resolve) {
       (_waiters[id] = _waiters[id] || []).push(resolve);
@@ -370,24 +468,40 @@
       q.last_flush_at = new Date().toISOString();
       _writeQueue(q);
       _counts.succeeded++;
+      _dropDeadFor(_target(entry.endpoint, entry.payload));
       // Listeners see the result before the push() caller does, so a re-key
       // driven from here is finished by the time the caller's .then runs.
-      _notify('flush:success', { id: entry.id, endpoint: entry.endpoint, data: res.data });
+      _notify('flush:success', {
+        id: entry.id,
+        endpoint: entry.endpoint,
+        key: entry.key,
+        payload: entry.payload,
+        data: res.data,
+      });
       _resolveWaiters(entry.id, res);
       _pump(false);
       return;
     }
 
+    // Signed out: hold this entry and everything else until resume(). The
+    // write isn't wrong, the session is.
+    if (_isSessionExpired(res)) {
+      entry.last_error = _errorText(res);
+      delete entry.next_at;
+      _replaceEntry(entry);
+      if (!_signedOut) {
+        _signedOut = true;
+        _notify('paused:auth', { id: entry.id, endpoint: entry.endpoint });
+      }
+      return;
+    }
+
     entry.attempts = (entry.attempts || 0) + 1;
     entry.last_error = _errorText(res);
-    if (_isTransient(res) && entry.attempts < MAX_ATTEMPTS) {
+    if (_isTransient(res)) {
       var delay = BACKOFF_MS[Math.min(entry.attempts, BACKOFF_MS.length) - 1];
       entry.next_at = new Date(Date.now() + delay).toISOString();
-      var qr = _readQueue();
-      qr.entries = qr.entries.map(function (e) {
-        return e.id === entry.id ? entry : e;
-      });
-      _writeQueue(qr);
+      _replaceEntry(entry);
       _notify('flush:retry', {
         id: entry.id,
         endpoint: entry.endpoint,
@@ -398,14 +512,48 @@
       return;
     }
 
-    var dead = _readDead();
+    // One failed write per target: a newer failure replaces an older one.
+    var target = _target(entry.endpoint, entry.payload);
+    var dead = _readDead().filter(function (e) {
+      return !target || _target(e.endpoint, e.payload) !== target;
+    });
     dead.push(entry);
     _writeDead(dead);
     _writeQueue(_removeEntry(entry.id));
     _counts.deadLettered++;
-    _notify('flush:dead-letter', { id: entry.id, endpoint: entry.endpoint, error: entry.last_error });
+    _notify('flush:dead-letter', {
+      id: entry.id,
+      endpoint: entry.endpoint,
+      key: entry.key,
+      payload: entry.payload,
+      error: entry.last_error,
+    });
     _resolveWaiters(entry.id, res);
     _pump(false);
+  }
+
+  /* Write a settled entry back in its place in the queue. */
+  function _replaceEntry(entry) {
+    var q = _readQueue();
+    q.entries = q.entries.map(function (e) {
+      return e.id === entry.id ? entry : e;
+    });
+    _writeQueue(q);
+  }
+
+  /* A write to this target landed, so older failed writes to it are out of
+     date: retrying one would put back the value it replaced. */
+  function _dropDeadFor(target) {
+    if (!target) return;
+    var dead = _readDead();
+    var keep = dead.filter(function (e) {
+      return _target(e.endpoint, e.payload) !== target;
+    });
+    if (keep.length === dead.length) return;
+    _writeDead(keep);
+    dead.forEach(function (e) {
+      if (keep.indexOf(e) < 0) _notify('dead-letter:dismiss', { id: e.id, superseded: true });
+    });
   }
 
   function _start(entry) {
@@ -423,7 +571,7 @@
      whoever is signed in, not waiting on a local id. `force` ignores backoff
      (an explicit flush). */
   function _pump(force) {
-    if (_isPaused() || !navigator.onLine) return;
+    if (_signedOut || _isPaused() || !navigator.onLine) return;
     var owner = currentOwner();
     var now = Date.now();
     var busyKeys = {};
@@ -478,6 +626,7 @@
   async function flush() {
     if (!navigator.onLine) return { processed: 0, succeeded: 0, deadLettered: 0, note: 'offline' };
     if (_isPaused()) return { processed: 0, succeeded: 0, deadLettered: 0, note: 'paused' };
+    if (_signedOut) return { processed: 0, succeeded: 0, deadLettered: 0, note: 'signed-out' };
     var before = { processed: _counts.processed, succeeded: _counts.succeeded, deadLettered: _counts.deadLettered };
     _flushing = true;
     _notify('flush:start');
@@ -510,6 +659,10 @@
     return {
       queued: q.entries.length,
       blocked: q.entries.filter(_isBlocked).length,
+      slow: q.entries.filter(function (e) {
+        return (e.attempts || 0) >= SLOW_AFTER;
+      }).length,
+      signedOut: _signedOut,
       deadLettered: d.length,
       lastFlushAt: q.last_flush_at,
       online: !!navigator.onLine,
@@ -610,6 +763,65 @@
     });
   }
 
+  /* Signed in again: send what waited. */
+  function resume() {
+    if (_signedOut) {
+      _signedOut = false;
+      _notify('resume');
+    }
+    return flush();
+  }
+
+  /* Put a failed write back in the queue to send again. If a newer write to
+     the same target is already queued, that one wins and the failed one is
+     just dropped. Returns false when there is no such entry. */
+  function retryDeadLetter(id) {
+    var dead = _readDead();
+    var entry = null;
+    var keep = dead.filter(function (e) {
+      if (e.id !== id) return true;
+      entry = e;
+      return false;
+    });
+    if (!entry) return false;
+    var target = _target(entry.endpoint, entry.payload);
+    var q = _readQueue();
+    var newer = false;
+    if (target) {
+      newer = q.entries.some(function (e) {
+        return _target(e.endpoint, e.payload) === target;
+      });
+    }
+    if (!newer) {
+      if (q.entries.length >= MAX_ENTRIES) return false;
+      entry.attempts = 0;
+      entry.last_error = null;
+      delete entry.next_at;
+      // Failed while waiting on a create that never landed: send it as it
+      // is and let the server answer, rather than wait forever.
+      delete entry.blocked_on;
+      q.entries.push(entry);
+      try {
+        _writeQueue(q);
+      } catch (e) {
+        return false;
+      }
+    }
+    _writeDead(keep);
+    _notify('dead-letter:retry', { id: id, endpoint: entry.endpoint, dropped: newer });
+    _pump(true);
+    return true;
+  }
+
+  /* Retry every failed write of the signed-in user. */
+  function retryDeadLetters() {
+    var n = 0;
+    deadLetter().forEach(function (e) {
+      if (retryDeadLetter(e.id)) n++;
+    });
+    return n;
+  }
+
   function dismissDeadLetter(id) {
     var d = _readDead().filter(function (e) {
       return e.id !== id;
@@ -701,11 +913,14 @@
     dropBlockedOn: dropBlockedOn,
     deadLetter: deadLetter,
     dismissDeadLetter: dismissDeadLetter,
+    retryDeadLetter: retryDeadLetter,
+    retryDeadLetters: retryDeadLetters,
+    resume: resume,
     clear: clear,
     currentOwner: currentOwner,
     callOrEnqueue: callOrEnqueue,
     subscribe: subscribe,
     MAX_ENTRIES: MAX_ENTRIES,
-    MAX_ATTEMPTS: MAX_ATTEMPTS,
+    SLOW_AFTER: SLOW_AFTER,
   };
 })();

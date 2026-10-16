@@ -194,9 +194,9 @@ describe('write-path audit: data layer', () => {
     expect(window.v2Queue.stats().queued).toBe(3);
   });
 
-  // Finding 3. The baseline is advanced when the diff is dispatched, so a
-  // write the server rejects (dead letter) is never diffed again.
-  it.fails('re-sends an assessment edit whose first write was rejected by the server', async () => {
+  // Finding 3 (fixed: a dead letter puts the baseline row back, so the next
+  // save diffs it again).
+  it('re-sends an assessment edit whose first write was rejected by the server', async () => {
     seed('students', [studentY()]);
     seed('assessments', [{ id: AID, title: 'Lab', type: 'summative', tagIds: [TAG1] }]);
     _rememberServerState('assessments', CID, getAssessments(CID));
@@ -245,10 +245,9 @@ describe('write-path audit: data layer', () => {
     expect(deleted === 0 || restored > 0).toBe(true);
   });
 
-  // Finding 5. When the outbox refuses a write, push() falls back to one
-  // direct send. Here that send fails, as it does offline; the data layer
-  // still reports success and advances the server baseline.
-  it.fails('does not pretend a write landed when the outbox is full', async () => {
+  // Finding 5 (fixed: a refused push is refused at the data layer; nothing
+  // is sent directly and the baseline stays put).
+  it('does not pretend a write landed when the outbox is full', async () => {
     seed('students', [studentY()]);
     seed('assessments', [{ id: AID, tagIds: [TAG1], type: 'summative' }]);
     seed('scores', {});
@@ -484,14 +483,14 @@ describe('write-path audit: outbox', () => {
     setOnline(false);
   });
 
-  // Finding 2. MAX_ATTEMPTS applies to network errors too, so about 17 minutes
-  // of failing while online dead-letters every queued write.
-  it.fails('keeps retrying a transient failure past MAX_ATTEMPTS instead of dead-lettering', async () => {
+  // Finding 2 (fixed: no attempt cap for transient errors). The old cap was
+  // 20 attempts, about 17 minutes of failing while online.
+  it('keeps retrying a transient failure past the old attempt cap instead of dead-lettering', async () => {
     setOnline(true);
     Q.configure({ send: () => ({ data: null, error: { message: 'failed to fetch' } }) });
     Q.push('upsert_score', { p_enrollment_id: 'e', p_assessment_id: 'a', p_value: 3 });
 
-    for (var i = 0; i < Q.MAX_ATTEMPTS + 5; i++) await Q.flush();
+    for (var i = 0; i < 25; i++) await Q.flush();
 
     expect(Q.stats().deadLettered).toBe(0);
     expect(Q.stats().queued).toBe(1);
@@ -519,22 +518,22 @@ describe('write-path audit: outbox', () => {
     expect(sent).toEqual([3, 4]);
   });
 
-  // Finding 12, no long-form editor open: a 401 the refresh could not fix
-  // counts toward MAX_ATTEMPTS like any other transient error.
-  it.fails('keeps a write queued, not dead-lettered, when the session expired', async () => {
+  // Finding 12, no long-form editor open (fixed: a 401 the refresh could
+  // not fix pauses the outbox until the teacher signs in again).
+  it('keeps a write queued, not dead-lettered, when the session expired', async () => {
     setOnline(true);
     Q.configure({ send: () => ({ data: null, error: { status: 401, message: 'jwt expired' } }) });
     Q.push('create_observation', { p_course_id: 'c', p_body: 'x', p_enrollment_ids: ['e'] });
 
-    for (var i = 0; i < Q.MAX_ATTEMPTS + 1; i++) await Q.flush();
+    for (var i = 0; i < 21; i++) await Q.flush();
 
     expect(Q.stats().queued).toBe(1);
     expect(Q.stats().deadLettered).toBe(0);
   });
 
-  // Finding 12, long-form editor open: the auth guard returns
-  // handledSessionExpired, which the outbox treats as final.
-  it.fails('keeps a write queued when the long-form editor took over a session expiry', async () => {
+  // Finding 12, long-form editor open (fixed: handledSessionExpired pauses
+  // the outbox like any other expired session).
+  it('keeps a write queued when the long-form editor took over a session expiry', async () => {
     setOnline(true);
     Q.configure({
       send: () => ({ data: null, error: { message: 'session_expired', status: 401, handledSessionExpired: true } }),
