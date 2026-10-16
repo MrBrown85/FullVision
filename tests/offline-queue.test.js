@@ -491,4 +491,81 @@ describe('v2Queue (offline write queue)', () => {
       expect(calls[0].payload).toEqual({ old: true });
     });
   });
+
+  // A write naming a record the server does not have yet (a local id whose
+  // create is still queued) waits in the outbox until rewrite() puts the
+  // server id in; shared/data.js drives that from the create's success.
+  describe('blocked entries', () => {
+    it('holds a blocked entry, and everything behind it on its key, until it is rewritten', async () => {
+      setOnline(true);
+      Q.push(
+        'upsert_tag_score',
+        { p_enrollment_id: 'e', p_assessment_id: 'sLOCAL', p_value: 3 },
+        { blockedOn: ['sLOCAL'] },
+      );
+      Q.push('upsert_tag_score', { p_enrollment_id: 'e', p_assessment_id: 'sLOCAL', p_value: 4 });
+      await Q.flush();
+      expect(calls).toHaveLength(0);
+      expect(Q.stats()).toMatchObject({ queued: 2, blocked: 1 });
+
+      var rewritten = Q.rewrite(function (entry) {
+        if (entry.payload.p_assessment_id !== 'sLOCAL') return null;
+        return { payload: Object.assign({}, entry.payload, { p_assessment_id: 'A1' }), blockedOn: [] };
+      });
+      await Q.flush();
+
+      expect(rewritten).toBe(2);
+      expect(calls.map(c => c.payload.p_value)).toEqual([3, 4]);
+      expect(calls[0].payload.p_assessment_id).toBe('A1');
+      expect(Q.stats()).toMatchObject({ queued: 0, blocked: 0 });
+    });
+
+    it('derives the key again from the rewritten payload', () => {
+      Q.push(
+        'upsert_tag_score',
+        { p_enrollment_id: 'e', p_assessment_id: 'sLOCAL', p_value: 3 },
+        { blockedOn: ['sLOCAL'] },
+      );
+      Q.rewrite(function (entry) {
+        return { payload: Object.assign({}, entry.payload, { p_assessment_id: 'A1' }), blockedOn: [] };
+      });
+      var stored = JSON.parse(localStorage.getItem('fv-sync-queue-v1'));
+      expect(stored.entries[0].key).toBe('cell:e:A1');
+      expect(stored.entries[0].blocked_on).toBeUndefined();
+    });
+
+    it('remove() drops a queued entry and tells its caller it was cancelled', async () => {
+      var res = null;
+      Q.push('create_assessment', { p_course_id: 'c', p_title: 'Oops' }, { id: 'entry-1' }).then(function (r) {
+        res = r;
+      });
+      expect(Q.has('entry-1')).toBe(true);
+      expect(Q.remove('entry-1')).toBe(true);
+      await Promise.resolve();
+      expect(res).toEqual({ data: null, error: { message: 'cancelled', cancelled: true } });
+      expect(Q.has('entry-1')).toBe(false);
+      expect(Q.remove('entry-1')).toBe(false);
+    });
+
+    it('dropBlockedOn() removes the writes waiting on a local id, dead-lettering them when asked', () => {
+      Q.push('upsert_tag_score', { p_enrollment_id: 'e', p_assessment_id: 'sA', p_value: 3 }, { blockedOn: ['sA'] });
+      Q.push('upsert_tag_score', { p_enrollment_id: 'e', p_assessment_id: 'sB', p_value: 3 }, { blockedOn: ['sB'] });
+      expect(Q.dropBlockedOn('sA')).toBe(1);
+      expect(Q.stats()).toMatchObject({ queued: 1, deadLettered: 0 });
+      expect(Q.dropBlockedOn('sB', { deadLetter: true, error: 'create failed' })).toBe(1);
+      expect(Q.stats()).toMatchObject({ queued: 0, deadLettered: 1 });
+      expect(Q.deadLetter()[0].last_error).toBe('create failed');
+    });
+
+    it('reports the result data with flush:success', async () => {
+      setOnline(true);
+      var seen = [];
+      var off = Q.subscribe(function (evt) {
+        if (evt.kind === 'flush:success') seen.push(evt.meta);
+      });
+      await Q.push('create_assessment', { p_course_id: 'c', p_title: 'Lab' }, { id: 'entry-2' });
+      off();
+      expect(seen).toEqual([{ id: 'entry-2', endpoint: 'create_assessment', data: 'ok' }]);
+    });
+  });
 });

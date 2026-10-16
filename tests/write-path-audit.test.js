@@ -82,6 +82,8 @@ function resetSession() {
   _refreshState = {};
   _pendingSyncs = 0;
   _pendingLocalCids.clear();
+  _idmapRaw = null;
+  _idmapCache = null;
   // The next write configures whichever queue copy is current.
   _outboxConfigured = false;
 }
@@ -140,12 +142,12 @@ describe('write-path audit: data layer', () => {
     setOnline(false);
   });
 
-  // Finding 1. The create's in-memory continuation is what swaps the id and
-  // sends the scores that were waiting on it; a reload loses it. Offline, the
-  // create cannot resolve before a reload, so the test goes offline instead
-  // of holding the request: a held request would still resolve the old
-  // page's continuation when released, which a real reload does not.
-  it.fails(
+  // Finding 1 (fixed: fv-idmap-v1 + _rekey from the outbox's success event).
+  // Offline, the create cannot resolve before a reload, so the test goes
+  // offline instead of holding the request: a held request would still
+  // resolve the old page's continuation when released, which a real reload
+  // does not.
+  it(
     'sends scores entered on a new assessment even when the page reloads before the create resolves',
     async () => {
       seed('students', [studentY()]);
@@ -180,9 +182,9 @@ describe('write-path audit: data layer', () => {
     },
   );
 
-  // Finding 1, second half: the learning map is sent one RPC at a time, each
-  // awaited, so offline only the first row is in the outbox.
-  it.fails('queues every learning-map row, not just the first, while offline', async () => {
+  // Finding 1, second half (fixed: every row is pushed before any is awaited;
+  // a row under a parent with a local id waits in the outbox behind it).
+  it('queues every learning-map row, not just the first, while offline', async () => {
     seed('learningMaps', { subjects: [], sections: [] });
     setOnline(false);
 
@@ -280,10 +282,9 @@ describe('write-path audit: data layer', () => {
     expect(created === 0 || deleted === 1).toBe(true);
   });
 
-  // Finding 6, reload variant. Offline: add an assessment, delete it. The
-  // delete waits in memory behind the create, so a reload loses it and the
-  // queued create lands.
-  it.fails('does not resurrect an assessment deleted offline before a reload', async () => {
+  // Finding 6, reload variant (fixed: removing a row whose create is still
+  // queued removes the create from the outbox).
+  it('does not resurrect an assessment deleted offline before a reload', async () => {
     seed('assessments', []);
     setOnline(false);
     var a = getAssessments(CID);
@@ -303,9 +304,9 @@ describe('write-path audit: data layer', () => {
     expect(created === 0 || deleted === 1).toBe(true);
   });
 
-  // Finding 7. Only scores and statuses are re-keyed when a new student gets
-  // a server id; an observation written in the meantime is skipped.
-  it.fails('sends an observation written before the student had a server id', async () => {
+  // Finding 7 (fixed: a write naming a pending local id waits in the outbox
+  // behind the create and is re-keyed with it).
+  it('sends an observation written before the student had a server id', async () => {
     seed('students', []);
     seed('observations', {});
     fake.hold();
@@ -356,10 +357,9 @@ describe('write-path audit: data layer', () => {
     expect(Object.keys(patch)).toEqual(['title']);
   });
 
-  // Finding 11. The wizard's roster is saved under the local course id. After
-  // a reload nothing remembers that id belongs to the class create_course is
-  // about to make, so the data is never moved onto the new class.
-  it.fails('replays wizard data after a reload once create_course lands', async () => {
+  // Finding 11 (fixed: the create_course record in fv-idmap-v1 outlives the
+  // page, so the migration runs from the outbox's success event).
+  it('replays wizard data after a reload once create_course lands', async () => {
     fake.on('create_course', () => ({ data: NEW_CID, error: null }));
     setOnline(false);
 
@@ -380,6 +380,84 @@ describe('write-path audit: data layer', () => {
 
     expect(fake.count('create_course')).toBe(1);
     expect(fake.count('create_student_and_enroll', p => p.p_course_id === NEW_CID)).toBe(1);
+  });
+
+  // The flat learning map gives a new standard's section and tag the same
+  // local id (cmAddStd). Each must get its own server id, with the goals
+  // following the section and the scores following the tag.
+  it('re-keys a section and a tag that share a local id to their own server ids', async () => {
+    const SUBJ = '55555555-5555-4555-8555-555555555555';
+    seed('students', [studentY()]);
+    seed('assessments', []);
+    seed('scores', {});
+    seed('goals', {});
+    seed('learningMaps', {
+      subjects: [{ id: SUBJ, name: 'Science', color: '#6366f1' }],
+      sections: [],
+      _customized: true,
+      _version: 1,
+      _flatVersion: 2,
+    });
+    _rememberServerState('learningMaps', CID, getLearningMap(CID));
+    var SEC_ID = '77777777-7777-4777-8777-777777777771';
+    var TAG_ID = '77777777-7777-4777-8777-777777777772';
+    fake.on('upsert_section', () => ({ data: SEC_ID, error: null }));
+    fake.on('upsert_tag', () => ({ data: TAG_ID, error: null }));
+    setOnline(false);
+
+    var map = getLearningMap(CID);
+    map.sections.push({
+      id: 'SNEW1',
+      subject: SUBJ,
+      name: 'New Standard',
+      shortName: 'New',
+      tags: [{ id: 'SNEW1', label: 'New Standard', subject: SUBJ, name: 'New Standard', shortName: 'New' }],
+    });
+    saveLearningMap(CID, map);
+    var goals = getGoals(CID);
+    goals[ENR_Y] = { SNEW1: 'Ask better questions' };
+    saveGoals(CID, goals);
+    var assessments = getAssessments(CID);
+    assessments.push({ id: AID, title: 'Lab', type: 'summative', tagIds: ['SNEW1'] });
+    saveAssessments(CID, assessments);
+    var scores = getScores(CID);
+    scores[ENR_Y] = [{ id: 'e1', assessmentId: AID, tagId: 'SNEW1', score: 3, date: '2026-10-13' }];
+    saveScores(CID, scores);
+    await settle();
+    expect(window.v2Queue.stats().queued).toBeGreaterThanOrEqual(3);
+
+    var queue = reloadPage();
+    setOnline(true);
+    await queue.flush();
+    await settle();
+
+    var section = getLearningMap(CID).sections[0];
+    expect(section.id).toBe(SEC_ID);
+    expect(section.tags[0].id).toBe(TAG_ID);
+    expect(getGoals(CID)[ENR_Y]).toEqual({ [SEC_ID]: 'Ask better questions' });
+    expect(getScores(CID)[ENR_Y][0].tagId).toBe(TAG_ID);
+    expect(fake.count('upsert_tag', p => p.p_section_id === SEC_ID)).toBe(1);
+    expect(fake.committedCount('upsert_tag_score', p => p.p_tag_id === TAG_ID && p.p_value === 3)).toBe(1);
+  });
+
+  // Finding 6, in flight: the create was already sent when the row was
+  // removed, so the delete goes out with the server id once it is known.
+  it('deletes an assessment removed while its create was in flight', async () => {
+    seed('assessments', []);
+    fake.hold();
+    var a = getAssessments(CID);
+    a.push({ id: 'sLOCAL', title: 'Oops', type: 'summative', tagIds: [TAG1] });
+    saveAssessments(CID, a);
+    await settle();
+    saveAssessments(CID, []);
+    await settle();
+    await fake.release();
+    await settle();
+
+    var created = fake.committed.find(c => c.name === 'create_assessment');
+    expect(created).toBeTruthy();
+    var newId = fake.committedCount('delete_assessment', p => _isUuid(p.p_id));
+    expect(newId).toBe(1);
   });
 });
 

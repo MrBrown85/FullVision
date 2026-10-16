@@ -1424,16 +1424,6 @@ function _forgetServerState(cid) {
   });
 }
 
-/* Apply a local → server id re-key to the baseline row with that id. */
-function _rekeyServerStateRow(field, cid, oldId, patch) {
-  if (!_hasServerState(field, cid)) return;
-  var rows = _serverState[field][cid];
-  if (!Array.isArray(rows)) return;
-  rows.forEach(function (row) {
-    if (row && row.id === oldId) Object.assign(row, patch);
-  });
-}
-
 /* Local → server id swaps made this session, per course. Scores and statuses
    entered before a new assessment or student got its server id still carry
    the local id, and a write with a local id is never sent. Every score and
@@ -1481,22 +1471,787 @@ function _applyIdRekeysToStatuses(cid, statuses) {
   return changed;
 }
 
-/* Record a swap and send the scores and statuses that were waiting on it. */
-function _rekeyLocalRefs(cid, localId, serverId) {
-  if (!cid || !localId || !serverId || localId === serverId) return;
-  (_idRekeys[cid] = _idRekeys[cid] || {})[localId] = serverId;
-  var scores = getScores(cid);
-  if (_applyIdRekeysToScores(cid, scores)) saveScores(cid, scores);
-  var statuses = getAssignmentStatuses(cid);
-  if (_applyIdRekeysToStatuses(cid, statuses)) saveAssignmentStatuses(cid, statuses);
+/* ── Pending creates and re-keys (docs/write-path-audit-2026-10.md §1, 6, 7, 11)
+
+   A row the teacher adds gets a local id until its create_* / upsert_* lands
+   and the server names it. Until then every write that mentions the row
+   (a score on a new assessment, a note on a new student, a tag under a new
+   section) is queued in the outbox with the local id in its payload and
+   blocked_on that id, so it waits behind the create and survives a reload.
+
+   fv-idmap-v1 remembers which outbox entry creates which local id:
+     { [cid]: { "<kind>:<localId>": { entryId, endpoint, kind, localId, cid,
+                                      queued, at, index?, parent?, row? } } }
+   Keys carry the kind because the flat learning map gives a section and its
+   tag the same local id. It is read through on every access, so two tabs and
+   a reloaded page see the same map.
+
+   When the entry succeeds (the outbox's flush:success, which fires after a
+   reload too), _onCreateLanded reads the server id from the result and
+   _rekey rewrites the cache, the gb-* copy, the server baseline and the
+   queued payloads, then the held writes go out. The creates' own .then
+   callbacks call the same function, for the direct-send path without the
+   outbox; the second caller finds nothing left to do. */
+var _IDMAP_KEY = 'fv-idmap-v1';
+var _idmapRaw = null;
+var _idmapCache = null;
+
+function _idmap() {
+  var raw = null;
+  try {
+    raw = localStorage.getItem(_IDMAP_KEY);
+  } catch (e) {
+    raw = null;
+  }
+  if (raw !== _idmapRaw || !_idmapCache) {
+    _idmapRaw = raw;
+    try {
+      _idmapCache = (raw && JSON.parse(raw)) || {};
+    } catch (e) {
+      _idmapCache = {};
+    }
+    if (!_idmapCache || typeof _idmapCache !== 'object' || Array.isArray(_idmapCache)) _idmapCache = {};
+  }
+  return _idmapCache;
+}
+
+function _writeIdmap(map) {
+  var raw = JSON.stringify(map);
+  _idmapCache = map;
+  _idmapRaw = raw;
+  if (raw === '{}') {
+    try {
+      localStorage.removeItem(_IDMAP_KEY);
+    } catch (e) {
+      /* ignore */
+    }
+    _idmapRaw = null;
+    return;
+  }
+  _safeLSSet(_IDMAP_KEY, raw);
+}
+
+function _newEntryId() {
+  var key = _idempotencyKey();
+  if (key) return key;
+  // RFC 4122 v4 from Math.random: the server wants a uuid, and an entry id
+  // doubles as the idempotency key.
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+    var r = (Math.random() * 16) | 0;
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
+function _pendingKey(kind, localId) {
+  return kind + ':' + localId;
+}
+
+/* Remember that `localId` (of `kind`, in course `cid`) is created by the
+   outbox entry the record names. Returns the existing record when there
+   already is one. extra: { index } for a row inside save_categories,
+   { parent, index } for a criterion inside upsert_rubric, { row } for a
+   course (so the class can be put back after a reload). */
+function _registerPendingCreate(cid, kind, localId, endpoint, extra) {
+  if (!cid || !kind || !localId || _isUuid(localId)) return null;
+  var map = _idmap();
+  var course = map[cid] || (map[cid] = {});
+  var key = _pendingKey(kind, localId);
+  if (course[key]) return course[key];
+  var rec = {
+    entryId: (extra && extra.entryId) || _newEntryId(),
+    cid: cid,
+    kind: kind,
+    localId: localId,
+    endpoint: endpoint || null,
+    queued: false,
+    at: Date.now(),
+  };
+  if (extra) {
+    Object.keys(extra).forEach(function (k) {
+      if (k !== 'entryId' && extra[k] !== undefined) rec[k] = extra[k];
+    });
+  }
+  course[key] = rec;
+  _writeIdmap(map);
+  return rec;
+}
+
+function _unregisterPendingCreate(rec) {
+  if (!rec) return;
+  var map = _idmap();
+  var course = map[rec.cid];
+  if (!course || !course[_pendingKey(rec.kind, rec.localId)]) return;
+  delete course[_pendingKey(rec.kind, rec.localId)];
+  if (Object.keys(course).length === 0) delete map[rec.cid];
+  _writeIdmap(map);
+}
+
+function _markPendingQueued(entryId) {
+  if (!entryId) return;
+  var map = _idmap();
+  var changed = false;
+  Object.keys(map).forEach(function (cid) {
+    Object.keys(map[cid]).forEach(function (key) {
+      var rec = map[cid][key];
+      if (rec.entryId === entryId && !rec.queued) {
+        rec.queued = true;
+        changed = true;
+      }
+    });
+  });
+  if (changed) _writeIdmap(map);
+}
+
+function _pendingCreateFor(kind, localId) {
+  if (!localId || _isUuid(localId)) return null;
+  var map = _idmap();
+  var key = _pendingKey(kind, localId);
+  var cids = Object.keys(map);
+  for (var i = 0; i < cids.length; i++) {
+    if (map[cids[i]][key]) return map[cids[i]][key];
+  }
+  return null;
+}
+
+function _pendingCreatesByEntry(entryId) {
+  var out = [];
+  if (!entryId) return out;
+  var map = _idmap();
+  Object.keys(map).forEach(function (cid) {
+    Object.keys(map[cid]).forEach(function (key) {
+      if (map[cid][key].entryId === entryId) out.push(map[cid][key]);
+    });
+  });
+  return out;
+}
+
+/* Pending local ids of every kind but course: a write under a local course
+   id is replayed by _migrateCourseDataLocalToCanonical, not re-keyed. */
+function _isPendingLocalId(id) {
+  if (!id || typeof id !== 'string' || _isUuid(id)) return false;
+  var map = _idmap();
+  var cids = Object.keys(map);
+  for (var i = 0; i < cids.length; i++) {
+    var course = map[cids[i]];
+    var keys = Object.keys(course);
+    for (var j = 0; j < keys.length; j++) {
+      if (course[keys[j]].localId === id && course[keys[j]].kind !== 'course') return true;
+    }
+  }
+  return false;
+}
+
+/* An id a write may carry: the server's, or a local one whose create is
+   queued (the write waits behind it and is re-keyed when it lands). */
+function _isSendableId(id) {
+  return _isUuid(id) || _isPendingLocalId(id);
+}
+
+/* Which record kind each id-bearing RPC parameter names. p_id depends on
+   the endpoint (_P_ID_KINDS). p_course_id is left out on purpose. */
+var _ID_PARAM_KINDS = {
+  p_enrollment_id: 'student',
+  p_enrollment_ids: 'student',
+  p_assessment_id: 'assessment',
+  p_tag_id: 'tag',
+  p_tag_ids: 'tag',
+  p_section_id: 'section',
+  p_subject_id: 'subject',
+  p_competency_group_id: 'group',
+  p_rubric_id: 'rubric',
+  p_criterion_id: 'criterion',
+  p_module_id: 'module',
+  p_category_id: 'category',
+};
+var _P_ID_KINDS = {
+  update_assessment: 'assessment',
+  delete_assessment: 'assessment',
+  save_collab: 'assessment',
+  save_assessment_tags: 'assessment',
+  update_enrollment: 'student',
+  withdraw_enrollment: 'student',
+  upsert_subject: 'subject',
+  delete_subject: 'subject',
+  upsert_competency_group: 'group',
+  delete_competency_group: 'group',
+  upsert_section: 'section',
+  delete_section: 'section',
+  upsert_tag: 'tag',
+  delete_tag: 'tag',
+  upsert_rubric: 'rubric',
+  delete_rubric: 'rubric',
+  upsert_module: 'module',
+  delete_module: 'module',
+  upsert_category: 'category',
+  delete_category: 'category',
+  update_observation: 'observation',
+  delete_observation: 'observation',
+};
+var _LEARNING_MAP_KINDS = { subject: true, group: true, section: true, tag: true };
+
+function _paramKind(endpoint, name) {
+  return name === 'p_id' ? _P_ID_KINDS[endpoint] || null : _ID_PARAM_KINDS[name] || null;
+}
+
+/* Walk a payload's id parameters: visit(kind, value) returns the value to
+   keep. Returns the (possibly new) payload and whether anything changed. */
+function _mapIdParams(endpoint, params, visit) {
+  var changed = false;
+  var next = {};
+  Object.keys(params || {}).forEach(function (name) {
+    var value = params[name];
+    var kind = _paramKind(endpoint, name);
+    if (kind) {
+      if (Array.isArray(value)) {
+        var arr = value.map(function (v) {
+          var out = typeof v === 'string' ? visit(kind, v) : v;
+          if (out !== v) changed = true;
+          return out;
+        });
+        value = arr;
+      } else if (typeof value === 'string') {
+        var out = visit(kind, value);
+        if (out !== value) changed = true;
+        value = out;
+      }
+    }
+    next[name] = value;
+  });
+  return { payload: next, changed: changed };
+}
+
+/* Local ids in this payload whose create is still pending. */
+function _blockedLocalIds(endpoint, params) {
+  var ids = [];
+  _mapIdParams(endpoint, params, function (kind, value) {
+    if (!_isUuid(value) && _pendingCreateFor(kind, value) && ids.indexOf(value) < 0) ids.push(value);
+    return value;
+  });
+  return ids;
+}
+
+/* A swap this page already knows for an id of this kind, or the id. Pages
+   rendered before the swap still send the old id. */
+function _resolveKnownId(kind, id) {
+  if (!id || _isUuid(id)) return id;
+  var cids, i;
+  if (_LEARNING_MAP_KINDS[kind]) {
+    cids = Object.keys(_learningMapIdRemap);
+    for (i = 0; i < cids.length; i++) {
+      var known = _learningMapIdRemap[cids[i]];
+      if (known && known[kind] && known[kind][id]) return known[kind][id];
+    }
+    return id;
+  }
+  cids = Object.keys(_idRekeys);
+  for (i = 0; i < cids.length; i++) {
+    if (_idRekeys[cids[i]] && _idRekeys[cids[i]][id]) return _idRekeys[cids[i]][id];
+  }
+  return id;
+}
+
+function _applyKnownRekeys(endpoint, params) {
+  var mapped = _mapIdParams(endpoint, params, _resolveKnownId);
+  if (mapped.changed) {
+    Object.keys(mapped.payload).forEach(function (name) {
+      params[name] = mapped.payload[name];
+    });
+  }
+  return params;
+}
+
+/* Put the server id into every queued payload still naming the local id, and
+   release the entries that were waiting only on it. */
+function _rewriteQueuedIds(kind, localId, serverId) {
+  var q = window.v2Queue;
+  if (!q || typeof q.rewrite !== 'function') return;
+  q.rewrite(function (entry) {
+    var mapped = _mapIdParams(entry.endpoint, entry.payload, function (k, value) {
+      return k === kind && value === localId ? serverId : value;
+    });
+    var waiting = Array.isArray(entry.blocked_on) && entry.blocked_on.indexOf(localId) >= 0;
+    if (!mapped.changed && !waiting) return null;
+    return { payload: mapped.payload, blockedOn: _blockedLocalIds(entry.endpoint, mapped.payload) };
+  });
+}
+
+/* ── Rewriting the local copies ─────────────────────────────────────────── */
+
+function _readFieldForRekey(field, cid) {
+  if (_cache[field] && _cache[field][cid] !== undefined) return _cache[field][cid];
+  var dataKey = _DATA_KEYS[field];
+  if (!dataKey) return undefined;
+  var raw = _safeParseLS('gb-' + dataKey + '-' + cid, undefined);
+  return raw === null ? undefined : raw;
+}
+
+/* Apply transform(value) → changed to a field's cache + gb-* copy and to its
+   server baseline. Nothing is diffed or sent: writes that mention the row
+   are already in the outbox and are re-keyed there. */
+function _rekeyField(field, cid, transform) {
+  var value = _readFieldForRekey(field, cid);
+  if (value !== undefined && transform(value)) {
+    _cache[field][cid] = value;
+    var dataKey = _DATA_KEYS[field];
+    if (dataKey) _safeLSSet('gb-' + dataKey + '-' + cid, JSON.stringify(value));
+    _markLocalWrite(field, cid);
+    _broadcastChange(cid, field);
+  }
+  if (_hasServerState(field, cid)) transform(_serverState[field][cid]);
+}
+
+function _rekeyRowId(rows, localId, serverId, patch) {
+  var changed = false;
+  (Array.isArray(rows) ? rows : []).forEach(function (row) {
+    if (row && row.id === localId) {
+      row.id = serverId;
+      if (patch) Object.assign(row, patch);
+      changed = true;
+    }
+  });
+  return changed;
+}
+
+/* Move obj[localId] to obj[serverId]. Two lists are joined; otherwise the
+   server-keyed value wins. */
+function _rekeyObjectKey(obj, localId, serverId) {
+  if (!obj || typeof obj !== 'object' || obj[localId] === undefined) return false;
+  var moving = obj[localId];
+  delete obj[localId];
+  if (obj[serverId] === undefined) obj[serverId] = moving;
+  else if (Array.isArray(obj[serverId]) && Array.isArray(moving)) obj[serverId] = obj[serverId].concat(moving);
+  return true;
+}
+
+function _rekeyStatusKeys(statuses, localId, serverId) {
+  if (!statuses) return false;
+  var changed = false;
+  Object.keys(statuses).forEach(function (key) {
+    var i = key.indexOf(':');
+    if (i < 0) return;
+    var sid = key.slice(0, i);
+    var aid = key.slice(i + 1);
+    var next = (sid === localId ? serverId : sid) + ':' + (aid === localId ? serverId : aid);
+    if (next === key) return;
+    if (statuses[next] === undefined) statuses[next] = statuses[key];
+    delete statuses[key];
+    changed = true;
+  });
+  return changed;
+}
+
+function _rekeyScoreEntries(scores, prop, localId, serverId) {
+  var changed = false;
+  Object.keys(scores || {}).forEach(function (sid) {
+    (Array.isArray(scores[sid]) ? scores[sid] : []).forEach(function (e) {
+      if (e && e[prop] === localId) {
+        e[prop] = serverId;
+        changed = true;
+      }
+    });
+  });
+  return changed;
+}
+
+/* goals / reflections / overrides are { sid: { sectionId: … } }. */
+function _rekeyInnerKeys(obj, localId, serverId) {
+  var changed = false;
+  Object.keys(obj || {}).forEach(function (sid) {
+    if (_rekeyObjectKey(obj[sid], localId, serverId)) changed = true;
+  });
+  return changed;
+}
+
+function _rekeyStudentRefs(cid, localId, serverId) {
+  ['scores', 'observations', 'notes', 'flags', 'termRatings', 'goals', 'reflections', 'overrides'].forEach(
+    function (field) {
+      _rekeyField(field, cid, function (obj) {
+        return _rekeyObjectKey(obj, localId, serverId);
+      });
+    },
+  );
+  _rekeyField('studentProfileSummaries', cid, function (obj) {
+    if (!_rekeyObjectKey(obj, localId, serverId)) return false;
+    var row = obj[serverId];
+    if (row && typeof row === 'object') {
+      row.id = serverId;
+      if (row.student) row.student.id = serverId;
+      if (row.enrollment) row.enrollment.id = serverId;
+    }
+    return true;
+  });
+  _rekeyField('statuses', cid, function (statuses) {
+    return _rekeyStatusKeys(statuses, localId, serverId);
+  });
+}
+
+function _rekeyAssessmentRefs(cid, localId, serverId) {
+  _rekeyField('scores', cid, function (scores) {
+    return _rekeyScoreEntries(scores, 'assessmentId', localId, serverId);
+  });
+  _rekeyField('statuses', cid, function (statuses) {
+    return _rekeyStatusKeys(statuses, localId, serverId);
+  });
+  _rekeyField('observations', cid, function (obs) {
+    var changed = false;
+    Object.keys(obs || {}).forEach(function (sid) {
+      (Array.isArray(obs[sid]) ? obs[sid] : []).forEach(function (o) {
+        if (o && o.assignmentContext && o.assignmentContext.assessmentId === localId) {
+          o.assignmentContext.assessmentId = serverId;
+          changed = true;
+        }
+      });
+    });
+    return changed;
+  });
+}
+
+/* Fields on assessments that point at other rows. The cache is patched and
+   saveAssessments runs, so rows the server already has get an
+   update_assessment with the new reference; the baseline keeps the old one
+   until that diff is dispatched. */
+function _rekeyAssessmentReference(cid, kind, localId, serverId) {
+  var assessments = structuredClone(getAssessments(cid) || []);
+  var changed = false;
+  assessments.forEach(function (a) {
+    if (!a) return;
+    if (kind === 'tag' && Array.isArray(a.tagIds) && a.tagIds.indexOf(localId) >= 0) {
+      a.tagIds = a.tagIds.map(function (id) {
+        return id === localId ? serverId : id;
+      });
+      a.tag_ids = a.tagIds;
+      changed = true;
+    }
+    if (kind === 'rubric' && a.rubricId === localId) {
+      a.rubricId = serverId;
+      changed = true;
+    }
+    if (kind === 'module' && a.moduleId === localId) {
+      a.moduleId = serverId;
+      changed = true;
+    }
+    if (kind === 'category' && (a.categoryId === localId || a.category_id === localId)) {
+      a.categoryId = serverId;
+      a.category_id = serverId;
+      changed = true;
+    }
+  });
+  if (changed) saveAssessments(cid, assessments);
+}
+
+/* The one re-key. Rewrites every local copy that names the row, the queued
+   writes that were waiting on it, and tells pages holding the old id. */
+function _rekey(cid, kind, localId, serverId, extra) {
+  if (!cid || !kind || !localId || !serverId || localId === serverId) return;
+  extra = extra || {};
+  if (_LEARNING_MAP_KINDS[kind]) {
+    if (!_learningMapIdRemap[cid]) _learningMapIdRemap[cid] = { subject: {}, group: {}, section: {}, tag: {} };
+    _learningMapIdRemap[cid][kind][localId] = serverId;
+  } else {
+    (_idRekeys[cid] = _idRekeys[cid] || {})[localId] = serverId;
+  }
+
+  if (kind === 'student') {
+    var patch = { rosterPosition: extra.rosterPosition };
+    if (_isUuid(extra.personId)) patch.personId = extra.personId;
+    if (patch.rosterPosition === undefined) delete patch.rosterPosition;
+    _rekeyField('students', cid, function (rows) {
+      return _rekeyRowId(rows, localId, serverId, patch);
+    });
+    _rekeyStudentRefs(cid, localId, serverId);
+  } else if (kind === 'assessment') {
+    _rekeyField('assessments', cid, function (rows) {
+      return _rekeyRowId(rows, localId, serverId);
+    });
+    _rekeyAssessmentRefs(cid, localId, serverId);
+  } else if (_LEARNING_MAP_KINDS[kind]) {
+    _rekeyField('learningMaps', cid, function (map) {
+      return _patchLearningMapEntityId(map, kind, localId, serverId);
+    });
+    delete _allTagsCache[cid];
+    delete _tagToSectionCache[cid];
+    if (kind === 'section') {
+      ['goals', 'reflections', 'overrides'].forEach(function (field) {
+        _rekeyField(field, cid, function (obj) {
+          return _rekeyInnerKeys(obj, localId, serverId);
+        });
+      });
+    }
+    if (kind === 'tag') {
+      _rekeyField('scores', cid, function (scores) {
+        return _rekeyScoreEntries(scores, 'tagId', localId, serverId);
+      });
+      _rekeyField('rubrics', cid, function (rubrics) {
+        var changed = false;
+        (rubrics || []).forEach(function (r) {
+          ((r && r.criteria) || []).forEach(function (c) {
+            if (c && Array.isArray(c.tagIds) && c.tagIds.indexOf(localId) >= 0) {
+              c.tagIds = c.tagIds.map(function (id) {
+                return id === localId ? serverId : id;
+              });
+              changed = true;
+            }
+          });
+        });
+        return changed;
+      });
+      _rekeyAssessmentReference(cid, 'tag', localId, serverId);
+    }
+  } else if (kind === 'rubric') {
+    _rekeyField('rubrics', cid, function (rows) {
+      return _rekeyRowId(rows, localId, serverId);
+    });
+    _rekeyAssessmentReference(cid, 'rubric', localId, serverId);
+  } else if (kind === 'criterion') {
+    _rekeyField('rubrics', cid, function (rubrics) {
+      var changed = false;
+      (rubrics || []).forEach(function (r) {
+        if (_rekeyRowId(r && r.criteria, localId, serverId)) changed = true;
+      });
+      return changed;
+    });
+    _rekeyField('scores', cid, function (scores) {
+      return _rekeyScoreEntries(scores, 'tagId', localId, serverId);
+    });
+  } else if (kind === 'module') {
+    _rekeyField('modules', cid, function (rows) {
+      return _rekeyRowId(rows, localId, serverId);
+    });
+    _rekeyAssessmentReference(cid, 'module', localId, serverId);
+  } else if (kind === 'category') {
+    _rekeyField('categories', cid, function (rows) {
+      return _rekeyRowId(rows, localId, serverId);
+    });
+    _rekeyAssessmentReference(cid, 'category', localId, serverId);
+  } else if (kind === 'observation') {
+    _rekeyField('observations', cid, function (obs) {
+      var changed = false;
+      Object.keys(obs || {}).forEach(function (sid) {
+        if (_rekeyRowId(obs[sid], localId, serverId)) changed = true;
+      });
+      return changed;
+    });
+  }
+  if (typeof clearProfCache === 'function') clearProfCache();
+
+  _rewriteQueuedIds(kind, localId, serverId);
+
   // Pages hold the old id in their state and markup; swap it and render
   // again, but only when the old id is on screen, so typing isn't disturbed.
   if (typeof document === 'undefined') return;
   if (typeof document.dispatchEvent === 'function' && typeof CustomEvent === 'function') {
-    document.dispatchEvent(new CustomEvent('fv:id-rekeyed', { detail: { cid: cid, from: localId, to: serverId } }));
+    document.dispatchEvent(
+      new CustomEvent('fv:id-rekeyed', { detail: { cid: cid, kind: kind, from: localId, to: serverId } }),
+    );
   }
   var esc = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(localId) : localId;
   if (document.querySelector('[data-aid="' + esc + '"], [data-sid="' + esc + '"]')) _invalidateAndRerender();
+}
+
+/* ── Landing a create ───────────────────────────────────────────────────── */
+
+function _serverIdFrom(rec, data) {
+  if (data == null) return null;
+  if (rec.endpoint === 'create_student_and_enroll') return (data && data.enrollment_id) || null;
+  if (rec.index != null && Array.isArray(data)) return data[rec.index] || null;
+  if (typeof data === 'string') return data;
+  if (data && typeof data === 'object' && typeof data.id === 'string') return data.id;
+  return null;
+}
+
+/* The outbox entry `entryId` succeeded with `data`: re-key every local id it
+   created. Safe to call twice; the second call finds no record. */
+function _onCreateLanded(entryId, data) {
+  var recs = _pendingCreatesByEntry(entryId);
+  if (!recs.length) return;
+  var rubricIds = {};
+  recs.forEach(function (rec) {
+    if (rec.kind === 'criterion') return; // resolved once its rubric is known
+    var serverId = _serverIdFrom(rec, data);
+    if (!serverId || serverId === rec.localId) {
+      _unregisterPendingCreate(rec);
+      return;
+    }
+    if (rec.kind === 'course') {
+      _onCourseCreated(rec, serverId);
+      return;
+    }
+    _unregisterPendingCreate(rec);
+    var extra = null;
+    if (rec.kind === 'student') extra = { personId: data && data.student_id, rosterPosition: rec.rosterPosition };
+    _rekey(rec.cid, rec.kind, rec.localId, serverId, extra);
+    if (rec.kind === 'rubric') rubricIds[rec.localId] = serverId;
+  });
+  recs.forEach(function (rec) {
+    if (rec.kind !== 'criterion') return;
+    var serverRubricId = rubricIds[rec.parent] || _resolveKnownId('rubric', rec.parent);
+    if (!_isUuid(serverRubricId)) {
+      _unregisterPendingCreate(rec);
+      return;
+    }
+    rec._serverRubricId = serverRubricId;
+  });
+  var criteria = recs.filter(function (rec) {
+    return rec.kind === 'criterion' && rec._serverRubricId;
+  });
+  return criteria.length ? _resolveRubricCriteria(criteria) : undefined;
+}
+
+/* upsert_rubric answers with the rubric id only; the criteria ids come from
+   the rubric tables. Pair the local criteria with the server's by position
+   (display order), the order the upsert sent them in. */
+function _resolveRubricCriteria(recs) {
+  var cid = recs[0].cid;
+  var serverRubricId = recs[0]._serverRubricId;
+  function giveUp(reason) {
+    recs.forEach(function (rec) {
+      _unregisterPendingCreate(rec);
+      var q = window.v2Queue;
+      if (q && typeof q.dropBlockedOn === 'function') q.dropBlockedOn(rec.localId, { deadLetter: true, error: reason });
+    });
+  }
+  return Promise.resolve()
+    .then(function () {
+      return _loadCanonicalRubrics(cid);
+    })
+    .then(function (canonical) {
+      var rubric = (canonical || []).find(function (r) {
+        return r && r.id === serverRubricId;
+      });
+      if (!rubric) return giveUp('rubric criteria could not be read back');
+      recs.forEach(function (rec) {
+        var crit = (rubric.criteria || [])[rec.index];
+        _unregisterPendingCreate(rec);
+        if (crit && _isUuid(crit.id)) _rekey(cid, 'criterion', rec.localId, crit.id);
+        else {
+          var q = window.v2Queue;
+          if (q && typeof q.dropBlockedOn === 'function') {
+            q.dropBlockedOn(rec.localId, { deadLetter: true, error: 'rubric criterion was not created' });
+          }
+        }
+      });
+    })
+    .catch(function (err) {
+      console.warn('Could not read back rubric criteria:', err);
+      giveUp('rubric criteria could not be read back');
+    });
+}
+
+/* create_course landed: the class moves to its server id and everything the
+   wizard saved under the local id is replayed (P6.2). After a reload COURSES
+   no longer holds the local row, so the record keeps a copy. */
+function _onCourseCreated(rec, canonicalId) {
+  var localId = rec.localId;
+  var course = Object.assign({}, COURSES[localId] || rec.row || { name: 'Untitled Class' }, { id: canonicalId });
+  if (!course.__pendingLocalId) course.__pendingLocalId = localId;
+  delete COURSES[localId];
+  COURSES[canonicalId] = course;
+  _cache.courses = COURSES;
+  _safeLSSet('gb-courses', JSON.stringify(COURSES));
+  _unregisterPendingCreate(rec);
+  _migrateCourseDataLocalToCanonical(localId, canonicalId);
+  _pendingLocalCids.delete(localId);
+}
+
+/* A create that will never land: forget it, and drop the writes waiting on
+   it. `failed` dead-letters them so the loss is visible. */
+function _onCreateAbandoned(entryId, failed, error) {
+  var q = window.v2Queue;
+  _pendingCreatesByEntry(entryId).forEach(function (rec) {
+    _unregisterPendingCreate(rec);
+    if (rec.kind === 'course') {
+      _pendingLocalCids.delete(rec.localId);
+      return;
+    }
+    if (q && typeof q.dropBlockedOn === 'function') {
+      q.dropBlockedOn(rec.localId, failed ? { deadLetter: true, error: error || 'its record was not created' } : {});
+    }
+  });
+}
+
+function _onOutboxEvent(evt) {
+  var meta = evt && evt.meta;
+  if (!meta || !meta.id) return;
+  if (evt.kind === 'flush:success') _onCreateLanded(meta.id, meta.data);
+  else if (evt.kind === 'flush:dead-letter') _onCreateAbandoned(meta.id, true, meta.error);
+  else if (evt.kind === 'remove') _onCreateAbandoned(meta.id, false);
+}
+
+/* Once per page: forget records whose entry is gone (sent, dead-lettered or
+   cleared by an earlier session before it could re-key) and records a
+   chain never got to push, then let the queue re-check what is blocked. */
+function _prunePendingCreates(q) {
+  var map = _idmap();
+  var now = Date.now();
+  var changed = false;
+  Object.keys(map).forEach(function (cid) {
+    Object.keys(map[cid]).forEach(function (key) {
+      var rec = map[cid][key];
+      var stale = rec.queued ? !q.has(rec.entryId) : now - (rec.at || 0) > 5 * 60 * 1000;
+      if (!stale) return;
+      delete map[cid][key];
+      changed = true;
+    });
+    if (Object.keys(map[cid]).length === 0) delete map[cid];
+  });
+  if (changed) _writeIdmap(map);
+  if (typeof q.rewrite === 'function') {
+    q.rewrite(function (entry) {
+      if (!Array.isArray(entry.blocked_on) || !entry.blocked_on.length) return null;
+      return { payload: entry.payload, blockedOn: _blockedLocalIds(entry.endpoint, entry.payload) };
+    });
+  }
+}
+
+/* Rows in a saved array that still have local ids and no pending create get
+   one now, before the save's chain runs, so a write made in the same tick
+   already waits on them. */
+function _registerLocalRows(cid, kind, rows, endpoint) {
+  if (!_isUuid(cid)) return;
+  (rows || []).forEach(function (row, idx) {
+    if (!row || !row.id || _isUuid(row.id)) return;
+    if (_resolveKnownId(kind, row.id) !== row.id) return;
+    _registerPendingCreate(cid, kind, row.id, endpoint, kind === 'student' ? { rosterPosition: idx } : null);
+  });
+}
+
+function _registerLearningMapRows(cid, map) {
+  if (!_isUuid(cid) || !map) return;
+  _registerLocalRows(cid, 'group', map.competencyGroups, 'upsert_competency_group');
+  _registerLocalRows(cid, 'subject', map.subjects, 'upsert_subject');
+  _registerLocalRows(cid, 'section', map.sections, 'upsert_section');
+  _registerLocalRows(
+    cid,
+    'tag',
+    _learningMapTags(map).map(function (entry) {
+      return entry.tag;
+    }),
+    'upsert_tag',
+  );
+}
+
+function _registerRubricRows(cid, rubrics) {
+  if (!_isUuid(cid)) return;
+  (rubrics || []).forEach(function (rubric) {
+    if (!rubric || !rubric.id) return;
+    var rec = null;
+    if (!_isUuid(rubric.id) && _resolveKnownId('rubric', rubric.id) === rubric.id) {
+      rec = _registerPendingCreate(cid, 'rubric', rubric.id, 'upsert_rubric');
+    }
+    // A criterion is created inside its rubric's upsert, new rubric or not;
+    // a new rubric's criteria share its entry, an existing rubric's get one.
+    var entryId = rec ? rec.entryId : null;
+    (rubric.criteria || []).forEach(function (crit, idx) {
+      if (!crit || !crit.id || _isUuid(crit.id)) return;
+      if (_resolveKnownId('criterion', crit.id) !== crit.id) return;
+      var critRec = _registerPendingCreate(cid, 'criterion', crit.id, 'upsert_rubric', {
+        entryId: entryId,
+        parent: rubric.id,
+        index: idx,
+      });
+      if (!entryId && critRec) entryId = critRec.entryId;
+    });
+  });
 }
 
 function _getAssessmentCategoryId(assessment) {
@@ -3372,12 +4127,14 @@ function _reportScoreWriteFailure(rpc, error) {
    nulls, e.g. test fixtures) there's no value to write. Both conditions
    together represent "skip dispatch, but cache + LS still wrote correctly". */
 function _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note, mod) {
-  if (!_isUuid(sid) || !_isUuid(aid)) return;
+  // A local id whose create is queued is sent too: the write waits behind
+  // the create in the outbox and is re-keyed when it lands.
+  if (!_isSendableId(sid) || !_isSendableId(aid)) return;
   var sb = getSupabase();
   if (!sb) return;
   var intVal = scoreVal === '' || scoreVal == null ? null : Number(scoreVal);
 
-  if ((_isUuid(tid) || isUnlinkedTag(tid)) && intVal != null) {
+  if ((_isSendableId(tid) || isUnlinkedTag(tid)) && intVal != null) {
     var assessment = _assessmentById(cid, aid);
     var criterion = _rubricCriterionById(cid, assessment, tid);
     var criterionForTag = criterion ? null : _rubricCriterionForTag(cid, assessment, tid);
@@ -3415,7 +4172,7 @@ function _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note, mod) {
           params: { p_enrollment_id: sid, p_assessment_id: aid, p_tag_id: tid, p_value: intVal, p_modifier: modifier },
         });
       }
-      if (criterionForTag && _isUuid(criterionForTag.id)) {
+      if (criterionForTag && _isSendableId(criterionForTag.id)) {
         ops.push({
           rpc: 'upsert_rubric_score',
           params: {
@@ -3524,7 +4281,7 @@ function persistScoreDiffToCanonical(cid, prevBlob, nextBlob) {
    Used by UI paths that enter a top-level proficiency/points value for a
    (student, assessment) cell, independent of tag/criterion breakdown. */
 window.upsertCellScore = function (cid, enrollmentId, assessmentId, value) {
-  if (!_isUuid(enrollmentId) || !_isUuid(assessmentId)) return Promise.resolve();
+  if (!_isSendableId(enrollmentId) || !_isSendableId(assessmentId)) return Promise.resolve();
   var sb = getSupabase();
   if (!sb) return Promise.resolve();
   var v = value === '' || value == null ? null : Number(value);
@@ -4010,11 +4767,14 @@ function createCourse(data) {
       // into the course table per ERD "Merged CoursePolicy into Course".
       // Mark this id as pending so any course-level edits made during the
       // create_course round-trip can be migrated + replayed when the
-      // canonical UUID arrives (P6.2).
+      // canonical UUID arrives (P6.2). The record outlives this page: a
+      // create that lands after a reload still re-keys and replays
+      // (_onCourseCreated, driven from the outbox's success event).
       _pendingLocalCids.add(localId);
+      var rec = _registerPendingCreate(localId, 'course', localId, 'create_course', { row: course });
       var createPromise = _writeRpc(
         'create_course',
-        _stampIdempotencyKey('create_course', {
+        {
           p_name: course.name,
           p_grade_level: course.gradeLevel || null,
           p_description: course.description || null,
@@ -4023,32 +4783,23 @@ function createCourse(data) {
           p_decay_weight: course.decayWeight != null ? Number(course.decayWeight) : null,
           p_timezone: course.timezone,
           p_late_work_policy: course.lateWorkPolicy || null,
-        }),
+        },
+        { entryId: rec ? rec.entryId : undefined },
       )
         .then(function (res) {
           if (res.error) {
-            console.warn('create_course RPC failed:', res.error);
+            if (!res.error.cancelled) console.warn('create_course RPC failed:', res.error);
+            _onCreateAbandoned(rec && rec.entryId, false);
             _pendingLocalCids.delete(localId);
             return;
           }
-          const canonicalId = res.data;
-          if (!canonicalId || canonicalId === localId) {
-            _pendingLocalCids.delete(localId);
-            return;
-          }
-          // Re-key under the canonical UUID so subsequent saves hit update_course.
-          const migrated = Object.assign({}, course, { id: canonicalId });
-          delete COURSES[localId];
-          COURSES[canonicalId] = migrated;
-          _cache.courses = COURSES;
-          _safeLSSet('gb-courses', JSON.stringify(COURSES));
-          // Migrate course-scoped LS + replay any user edits made during the
-          // in-flight window so they land in the canonical store (P6.2).
-          _migrateCourseDataLocalToCanonical(localId, canonicalId);
+          // Usually already done from the outbox event; a no-op then.
+          _onCreateLanded(rec && rec.entryId, res.data);
           _pendingLocalCids.delete(localId);
         })
         .catch(function (err) {
           console.warn('create_course threw:', err);
+          _onCreateAbandoned(rec && rec.entryId, false);
           _pendingLocalCids.delete(localId);
         });
       _trackPendingSync(createPromise);
@@ -4354,6 +5105,7 @@ function saveLearningMap(cid, map) {
   map._version = (map._version || 0) + 1;
   _saveCourseField('learningMaps', cid, map); // derived tag/section caches auto-invalidate via mapRef check
   if (!_writesEnabled() || !_isUuid(cid)) return Promise.resolve(true);
+  _registerLearningMapRows(cid, map);
   return _persistLearningMapToCanonical(cid, prev, map);
 }
 /* A copy of a learning map with every subject, group, section and tag given a
@@ -4430,6 +5182,7 @@ function saveModules(cid, arr) {
   _saveCourseField('modules', cid, arr);
   if (!_writesEnabled() || !_isUuid(cid)) return;
   if (!cid || !arr) return;
+  _registerLocalRows(cid, 'module', arr, 'upsert_module');
   _persistModulesToCanonical(cid, prev, arr);
 }
 
@@ -4469,43 +5222,27 @@ function _persistModulesToCanonical(cid, prev, arr) {
       var displayOrder = m.sortOrder != null ? Number(m.sortOrder) : idx;
       // Against a confirmed baseline, an unchanged module needs no write.
       if (hasBaseline && p && _isUuid(m.id) && !_moduleChanged(p, m, prev.indexOf(p), displayOrder)) return;
+      var rec = _isUuid(m.id) ? null : _registerPendingCreate(cid, 'module', m.id, 'upsert_module');
       ops.push(
         window.v2
-          .upsertModule({
-            id: _isUuid(m.id) ? m.id : null,
-            courseId: cid,
-            name: m.name || '',
-            color: m.color || null,
-            displayOrder: displayOrder,
-          })
+          .upsertModule(
+            {
+              id: _isUuid(m.id) ? m.id : null,
+              courseId: cid,
+              name: m.name || '',
+              color: m.color || null,
+              displayOrder: displayOrder,
+            },
+            { entryId: rec ? rec.entryId : undefined },
+          )
           .then(function (res) {
             if (res && res.error) {
-              console.warn('upsert_module failed:', res.error, m);
+              if (!res.error.cancelled) console.warn('upsert_module failed:', res.error, m);
               return;
             }
-            // If insert, swap local id → canonical so subsequent saves
-            // hit the update branch. Mutates the cached entry directly.
-            var canonicalId = res && res.data ? res.data : null;
-            if (!p && canonicalId && canonicalId !== m.id) {
-              _rekeyServerStateRow('modules', cid, m.id, { id: canonicalId });
-              var cached = (_cache.modules[cid] || []).find(function (c) {
-                return c.id === m.id;
-              });
-              if (cached) cached.id = canonicalId;
-              if (_cache.modules[cid]) {
-                _safeLSSet('gb-modules-' + cid, JSON.stringify(_cache.modules[cid]));
-              }
-              // Re-key any assessment that references the old local id.
-              var assessments = _cache.assessments[cid] || [];
-              var assessChanged = false;
-              assessments.forEach(function (a) {
-                if (a.moduleId === m.id) {
-                  a.moduleId = canonicalId;
-                  assessChanged = true;
-                }
-              });
-              if (assessChanged) _safeLSSet('gb-assessments-' + cid, JSON.stringify(assessments));
-            }
+            // An insert re-keys the module and the assessments that point
+            // at it (already done when the outbox reported success).
+            if (rec) _onCreateLanded(rec.entryId, res && res.data);
           }),
       );
     });
@@ -4565,38 +5302,48 @@ function _learningMapTags(map) {
   return out;
 }
 
+/* Swap one id of one kind inside a learning map. Returns whether anything
+   changed. Kind matters: in the flat map a section and its tag share an id. */
 function _patchLearningMapEntityId(map, kind, oldId, newId) {
-  if (!map || !oldId || !newId || oldId === newId) return;
+  if (!map || !oldId || !newId || oldId === newId) return false;
+  var changed = false;
+  function swap(obj, prop) {
+    if (obj && obj[prop] === oldId) {
+      obj[prop] = newId;
+      changed = true;
+    }
+  }
   if (kind === 'subject') {
     (map.subjects || []).forEach(function (subject) {
-      if (subject.id === oldId) subject.id = newId;
+      swap(subject, 'id');
     });
     (map.sections || []).forEach(function (section) {
-      if (section.subject === oldId) section.subject = newId;
+      swap(section, 'subject');
       (section.tags || []).forEach(function (tag) {
-        if (tag.subject === oldId) tag.subject = newId;
+        swap(tag, 'subject');
       });
     });
   } else if (kind === 'group') {
     (map.competencyGroups || []).forEach(function (group) {
-      if (group.id === oldId) group.id = newId;
+      swap(group, 'id');
     });
     (map.sections || []).forEach(function (section) {
-      if (section.groupId === oldId) section.groupId = newId;
-      if (section.competencyGroupId === oldId) section.competencyGroupId = newId;
+      swap(section, 'groupId');
+      swap(section, 'competencyGroupId');
     });
   } else if (kind === 'section') {
     (map.sections || []).forEach(function (section) {
-      if (section.id === oldId) section.id = newId;
+      swap(section, 'id');
     });
   } else if (kind === 'tag') {
     (map.sections || []).forEach(function (section) {
-      if (section.outcome && section.outcome.id === oldId) section.outcome.id = newId;
+      swap(section.outcome, 'id');
       (section.tags || []).forEach(function (tag) {
-        if (tag.id === oldId) tag.id = newId;
+        swap(tag, 'id');
       });
     });
   }
+  return changed;
 }
 
 function _patchObjectKeys(obj, idMap) {
@@ -4610,55 +5357,6 @@ function _patchObjectKeys(obj, idMap) {
     changed = true;
   });
   return changed;
-}
-
-function _patchLearningMapReferences(cid, idMaps) {
-  idMaps = idMaps || {};
-  var tagMap = idMaps.tag || {};
-  var sectionMap = idMaps.section || {};
-  var changedAssessments = false;
-  var assessments = structuredClone(getAssessments(cid) || []);
-  assessments.forEach(function (assessment) {
-    if (!assessment || !Array.isArray(assessment.tagIds)) return;
-    var nextTagIds = assessment.tagIds.map(function (id) {
-      return tagMap[id] || id;
-    });
-    if (JSON.stringify(nextTagIds) !== JSON.stringify(assessment.tagIds)) {
-      assessment.tagIds = nextTagIds;
-      assessment.tag_ids = nextTagIds;
-      changedAssessments = true;
-    }
-  });
-  if (changedAssessments) saveAssessments(cid, assessments);
-
-  var scores = structuredClone(getScores(cid) || {});
-  var changedScores = false;
-  Object.keys(scores).forEach(function (sid) {
-    (scores[sid] || []).forEach(function (entry) {
-      if (entry && tagMap[entry.tagId]) {
-        entry.tagId = tagMap[entry.tagId];
-        changedScores = true;
-      }
-    });
-  });
-  if (changedScores) saveScores(cid, scores);
-
-  var goals = structuredClone(getGoals(cid) || {});
-  if (_patchObjectKeys(goals, sectionMap)) {
-    _saveCourseField('goals', cid, goals);
-  }
-  var reflections = structuredClone(getReflections(cid) || {});
-  if (_patchObjectKeys(reflections, sectionMap)) {
-    _saveCourseField('reflections', cid, reflections);
-  }
-  var overrides = structuredClone(getOverrides(cid) || {});
-  var changedOverrides = false;
-  Object.keys(overrides || {}).forEach(function (sid) {
-    if (_patchObjectKeys(overrides[sid], sectionMap)) changedOverrides = true;
-  });
-  if (changedOverrides) {
-    _saveCourseField('overrides', cid, overrides);
-  }
 }
 
 function _stringifyICanText(tag) {
@@ -4731,102 +5429,106 @@ function _persistLearningMapToCanonical(cid, prevMap, nextMap) {
     }
     if (!_learningMapIdRemap[cid]) _learningMapIdRemap[cid] = { subject: {}, group: {}, section: {}, tag: {} };
     var known = _learningMapIdRemap[cid];
-    ['group', 'subject', 'section', 'tag'].forEach(function (kind) {
-      Object.keys(known[kind]).forEach(function (oldId) {
-        _patchLearningMapEntityId(map, kind, oldId, known[kind][oldId]);
+    function applyKnown(target) {
+      ['group', 'subject', 'section', 'tag'].forEach(function (kind) {
+        Object.keys(known[kind]).forEach(function (oldId) {
+          _patchLearningMapEntityId(target, kind, oldId, known[kind][oldId]);
+        });
       });
-    });
-    var idMaps = { subject: {}, group: {}, section: {}, tag: {} };
-    var opsToDelete = [];
+    }
+    applyKnown(map);
+    // Every row is pushed before any is awaited, so an offline save leaves
+    // the whole map in the outbox, not just its first row. A row that names
+    // a parent still on a local id (a section under a new subject, a tag
+    // under a new section) waits in the outbox behind that parent's insert
+    // and is re-keyed when it lands; nothing here threads ids by hand.
+    var ops = [];
+    function upsert(kind, localId, send) {
+      var rec = _isUuid(localId) ? null : _pendingCreateFor(kind, localId);
+      ops.push(
+        send({ entryId: rec ? rec.entryId : undefined }).then(function (res) {
+          if (res && res.error) {
+            if (res.error.cancelled) return;
+            throw res.error;
+          }
+          if (rec) _onCreateLanded(rec.entryId, res && res.data);
+        }),
+      );
+    }
 
     var groups = map.competencyGroups || [];
     if (window.v2.upsertCompetencyGroup) {
-      for (var gi = 0; gi < groups.length; gi++) {
-        var group = groups[gi];
-        if (!group) continue;
-        if (unchanged('group', group.id)) continue;
-        var oldGroupId = group.id;
-        var groupRes = await window.v2.upsertCompetencyGroup({
-          id: _isUuid(oldGroupId) ? oldGroupId : null,
-          courseId: cid,
-          name: group.name || '',
-          color: group.color || null,
-          displayOrder: group.displayOrder != null ? Number(group.displayOrder) : gi,
+      groups.forEach(function (group, gi) {
+        if (!group || unchanged('group', group.id)) return;
+        upsert('group', group.id, function (options) {
+          return window.v2.upsertCompetencyGroup(
+            {
+              id: _isUuid(group.id) ? group.id : null,
+              courseId: cid,
+              name: group.name || '',
+              color: group.color || null,
+              displayOrder: group.displayOrder != null ? Number(group.displayOrder) : gi,
+            },
+            options,
+          );
         });
-        if (groupRes && groupRes.error) throw groupRes.error;
-        if (groupRes && groupRes.data && groupRes.data !== oldGroupId) {
-          idMaps.group[oldGroupId] = groupRes.data;
-          known.group[oldGroupId] = groupRes.data;
-          _patchLearningMapEntityId(map, 'group', oldGroupId, groupRes.data);
-        }
-      }
-    }
-
-    var subjects = map.subjects || [];
-    for (var si = 0; si < subjects.length; si++) {
-      var subject = subjects[si];
-      if (!subject) continue;
-      if (unchanged('subject', subject.id)) continue;
-      var oldSubjectId = subject.id;
-      var subjectRes = await window.v2.upsertSubject({
-        id: _isUuid(oldSubjectId) ? oldSubjectId : null,
-        courseId: cid,
-        name: subject.name || '',
-        color: subject.color || null,
-        displayOrder: subject.displayOrder != null ? Number(subject.displayOrder) : Number(subject.sortOrder || si),
       });
-      if (subjectRes && subjectRes.error) throw subjectRes.error;
-      if (subjectRes && subjectRes.data && subjectRes.data !== oldSubjectId) {
-        idMaps.subject[oldSubjectId] = subjectRes.data;
-        known.subject[oldSubjectId] = subjectRes.data;
-        _patchLearningMapEntityId(map, 'subject', oldSubjectId, subjectRes.data);
-      }
     }
 
-    var sections = map.sections || [];
-    for (var xi = 0; xi < sections.length; xi++) {
-      var section = sections[xi];
-      if (!section) continue;
-      var oldSectionId = section.id;
-      var sectionRes = unchanged('section', section.id)
-        ? null
-        : await window.v2.upsertSection({
-            id: _isUuid(oldSectionId) ? oldSectionId : null,
-            subjectId: idMaps.subject[section.subject] || section.subject,
-            name: section.name || section.shortName || '',
-            color: section.color || null,
-            competencyGroupId: idMaps.group[section.groupId] || section.groupId || section.competencyGroupId || null,
-            displayOrder: section.displayOrder != null ? Number(section.displayOrder) : Number(section.sortOrder || xi),
-          });
-      if (sectionRes && sectionRes.error) throw sectionRes.error;
-      if (sectionRes && sectionRes.data && sectionRes.data !== oldSectionId) {
-        idMaps.section[oldSectionId] = sectionRes.data;
-        known.section[oldSectionId] = sectionRes.data;
-        _patchLearningMapEntityId(map, 'section', oldSectionId, sectionRes.data);
+    (map.subjects || []).forEach(function (subject, si) {
+      if (!subject || unchanged('subject', subject.id)) return;
+      upsert('subject', subject.id, function (options) {
+        return window.v2.upsertSubject(
+          {
+            id: _isUuid(subject.id) ? subject.id : null,
+            courseId: cid,
+            name: subject.name || '',
+            color: subject.color || null,
+            displayOrder: subject.displayOrder != null ? Number(subject.displayOrder) : Number(subject.sortOrder || si),
+          },
+          options,
+        );
+      });
+    });
+
+    (map.sections || []).forEach(function (section, xi) {
+      if (!section) return;
+      if (!unchanged('section', section.id)) {
+        upsert('section', section.id, function (options) {
+          return window.v2.upsertSection(
+            {
+              id: _isUuid(section.id) ? section.id : null,
+              subjectId: section.subject,
+              name: section.name || section.shortName || '',
+              color: section.color || null,
+              competencyGroupId: section.groupId || section.competencyGroupId || null,
+              displayOrder:
+                section.displayOrder != null ? Number(section.displayOrder) : Number(section.sortOrder || xi),
+            },
+            options,
+          );
+        });
       }
       var tags = section.tags || (section.outcome ? [section.outcome] : []);
-      for (var ti = 0; ti < tags.length; ti++) {
-        var tag = tags[ti];
-        if (!tag) continue;
-        if (unchanged('tag', tag.id)) continue;
-        var oldTagId = tag.id;
-        var tagRes = await window.v2.upsertTag({
-          id: _isUuid(oldTagId) ? oldTagId : null,
-          sectionId: section.id,
-          label: tag.label || tag.name || section.name || '',
-          code: tag.code || tag.shortName || '',
-          iCanText: _stringifyICanText(tag),
-          displayOrder: tag.displayOrder != null ? Number(tag.displayOrder) : Number(tag.sortOrder || ti),
+      tags.forEach(function (tag, ti) {
+        if (!tag || unchanged('tag', tag.id)) return;
+        upsert('tag', tag.id, function (options) {
+          return window.v2.upsertTag(
+            {
+              id: _isUuid(tag.id) ? tag.id : null,
+              sectionId: section.id,
+              label: tag.label || tag.name || section.name || '',
+              code: tag.code || tag.shortName || '',
+              iCanText: _stringifyICanText(tag),
+              displayOrder: tag.displayOrder != null ? Number(tag.displayOrder) : Number(tag.sortOrder || ti),
+            },
+            options,
+          );
         });
-        if (tagRes && tagRes.error) throw tagRes.error;
-        if (tagRes && tagRes.data && tagRes.data !== oldTagId) {
-          idMaps.tag[oldTagId] = tagRes.data;
-          known.tag[oldTagId] = tagRes.data;
-          _patchLearningMapEntityId(map, 'tag', oldTagId, tagRes.data);
-        }
-      }
-    }
+      });
+    });
 
+    var opsToDelete = [];
     var nextSubjects = _mapItemsById(map.subjects || []);
     var nextGroups = _mapItemsById(map.competencyGroups || []);
     var nextSections = _mapItemsById(map.sections || []);
@@ -4844,51 +5546,34 @@ function _persistLearningMapToCanonical(cid, prevMap, nextMap) {
       }),
     );
 
-    Object.keys(prevTags).forEach(function (id) {
-      if (!nextTags[id] && _isUuid(id) && window.v2.deleteTag) opsToDelete.push(window.v2.deleteTag(id));
+    // A row removed while its insert is still queued is simply not inserted;
+    // one whose insert was sent is deleted by its server id.
+    [
+      ['tag', prevTags, nextTags, window.v2.deleteTag],
+      ['section', prevSections, nextSections, window.v2.deleteSection],
+      ['group', prevGroups, nextGroups, window.v2.deleteCompetencyGroup],
+      ['subject', prevSubjects, nextSubjects, window.v2.deleteSubject],
+    ].forEach(function (pair) {
+      Object.keys(pair[1]).forEach(function (id) {
+        if (pair[2][id]) return;
+        var gone = _cancelPendingCreateOrResolve(cid, pair[0], id);
+        if (gone && pair[3]) opsToDelete.push(pair[3](gone));
+      });
     });
-    Object.keys(prevSections).forEach(function (id) {
-      if (!nextSections[id] && _isUuid(id) && window.v2.deleteSection) opsToDelete.push(window.v2.deleteSection(id));
-    });
-    Object.keys(prevGroups).forEach(function (id) {
-      if (!nextGroups[id] && _isUuid(id) && window.v2.deleteCompetencyGroup)
-        opsToDelete.push(window.v2.deleteCompetencyGroup(id));
-    });
-    Object.keys(prevSubjects).forEach(function (id) {
-      if (!nextSubjects[id] && _isUuid(id) && window.v2.deleteSubject) opsToDelete.push(window.v2.deleteSubject(id));
-    });
-    await Promise.all(
-      opsToDelete.map(function (op) {
-        return op.then(function (res) {
+    opsToDelete.forEach(function (op) {
+      ops.push(
+        op.then(function (res) {
           if (res && res.error) throw res.error;
-        });
-      }),
-    );
+        }),
+      );
+    });
+    await Promise.all(ops);
 
+    // Inserts re-keyed the live map as they landed (_rekey). The baseline is
+    // this save's copy with those ids, not the live map: replacing it with
+    // the live one would hide anything edited while the sync was running.
+    applyKnown(map);
     _rememberServerState('learningMaps', cid, map);
-
-    if (
-      Object.keys(idMaps.subject).length ||
-      Object.keys(idMaps.group).length ||
-      Object.keys(idMaps.section).length ||
-      Object.keys(idMaps.tag).length
-    ) {
-      // Patch the new ids into the live map. Replacing it with this save's
-      // copy would revert anything edited while the sync was running.
-      var live = _cache.learningMaps[cid];
-      if (live) {
-        ['group', 'subject', 'section', 'tag'].forEach(function (kind) {
-          Object.keys(idMaps[kind]).forEach(function (oldId) {
-            _patchLearningMapEntityId(live, kind, oldId, idMaps[kind][oldId]);
-          });
-        });
-        delete _allTagsCache[cid];
-        delete _tagToSectionCache[cid];
-        if (typeof clearProfCache === 'function') clearProfCache();
-        _safeLSSet('gb-learningmap-' + cid, JSON.stringify(live));
-      }
-      _patchLearningMapReferences(cid, idMaps);
-    }
     return true;
   });
   // Resolves true once the map reached the server, false if it failed.
@@ -4945,35 +5630,22 @@ function _persistCategoriesToCanonical(cid, prev, arr) {
       });
     if (!changed) return;
     _rememberServerState('categories', cid, arr);
-    return window.v2.saveCategories(cid, arr).then(function (res) {
+    // One save creates every new row; the server answers with the ids in
+    // list order, so each new row's record remembers its position.
+    var entryId = null;
+    arr.forEach(function (category, idx) {
+      if (_isUuid(category.id) || _resolveKnownId('category', category.id) !== category.id) return;
+      var rec = _registerPendingCreate(cid, 'category', category.id, 'save_categories', {
+        entryId: entryId,
+        index: idx,
+      });
+      if (rec && !entryId) entryId = rec.entryId;
+    });
+    return window.v2.saveCategories(cid, arr, { entryId: entryId || undefined }).then(function (res) {
       if (res && res.error) throw res.error;
-      var ids = (res && Array.isArray(res.data) && res.data) || [];
-      var idMap = {};
-      arr.forEach(function (category, idx) {
-        var canonicalId = ids[idx];
-        if (!canonicalId || category.id === canonicalId) return;
-        idMap[category.id] = canonicalId;
-        _rekeyServerStateRow('categories', cid, category.id, { id: canonicalId });
-        var cached = (_cache.categories[cid] || []).find(function (c) {
-          return c.id === category.id;
-        });
-        if (cached) cached.id = canonicalId;
-      });
-      var localIds = Object.keys(idMap);
-      if (localIds.length === 0) return;
-      _safeLSSet('gb-categories-' + cid, JSON.stringify(_cache.categories[cid] || []));
-      var assessments = structuredClone(getAssessments(cid) || []);
-      var moved = false;
-      assessments.forEach(function (assessment) {
-        if (!assessment) return;
-        var categoryId = assessment.categoryId || assessment.category_id;
-        if (categoryId && idMap[categoryId]) {
-          assessment.categoryId = idMap[categoryId];
-          assessment.category_id = idMap[categoryId];
-          moved = true;
-        }
-      });
-      if (moved) saveAssessments(cid, assessments);
+      // Re-keys the rows and the assessments that point at them (already
+      // done when the outbox reported success).
+      if (entryId) _onCreateLanded(entryId, res && res.data);
     });
   });
   _categorySaveQueue[cid] = _trackPendingSync(
@@ -5002,7 +5674,7 @@ function _persistStatusDiffToCanonical(prev, next) {
     if (parts.length < 2) return;
     var enrollmentId = parts[0];
     var assessmentId = parts.slice(1).join(':');
-    if (!_isUuid(enrollmentId) || !_isUuid(assessmentId)) return;
+    if (!_isSendableId(enrollmentId) || !_isSendableId(assessmentId)) return;
     _trackPendingSync(
       _writeRpc('set_score_status', {
         p_enrollment_id: enrollmentId,
@@ -5239,22 +5911,24 @@ function _reconcileCanonicalRubrics(localArr, canonicalArr, idMap) {
   });
   return merged;
 }
-function _patchAssessmentRubricIds(cid, idMap) {
-  var localIds = Object.keys(idMap || {});
-  if (localIds.length === 0) return;
-  var assessments = structuredClone(getAssessments(cid) || []);
-  var changed = false;
-  assessments.forEach(function (assessment) {
-    if (assessment && assessment.rubricId && idMap[assessment.rubricId]) {
-      assessment.rubricId = idMap[assessment.rubricId];
-      changed = true;
-    }
-  });
-  if (changed) saveAssessments(cid, assessments);
-}
 /* The fields a rubric is saved with; equal signatures need no write. */
 function _rubricSignature(rubric) {
   return JSON.stringify([_rubricName(rubric), _rubricCriteriaPayload(rubric)]);
+}
+/* What the teacher typed, ids left out: a save in progress re-keys ids. */
+function _rubricsContentSignature(rubrics) {
+  return JSON.stringify(
+    (rubrics || []).map(function (rubric) {
+      return [
+        _rubricName(rubric),
+        _rubricCriteriaPayload(rubric).map(function (c) {
+          var copy = Object.assign({}, c);
+          delete copy.id;
+          return copy;
+        }),
+      ];
+    }),
+  );
 }
 
 function _persistRubricsToCanonical(cid, prev, arr) {
@@ -5270,18 +5944,19 @@ function _persistRubricsToCanonical(cid, prev, arr) {
       previous.forEach(function (r) {
         if (r && _isUuid(r.id)) sentById[r.id] = _rubricSignature(r);
       });
-      var startedWith = JSON.stringify(target);
+      var startedWith = _rubricsContentSignature(target);
       var idMap = {};
       var keptCanonicalIds = {};
       var insertedRows = false;
+      // Every upsert is pushed before any is awaited, so an offline save
+      // leaves them all in the outbox.
+      var ops = [];
+      var landed = [];
 
-      for (var i = 0; i < target.length; i++) {
-        var rubric = target[i];
-        if (!rubric) continue;
-        if (hasBaseline && _isUuid(rubric.id) && sentById[rubric.id] === _rubricSignature(rubric)) {
-          keptCanonicalIds[rubric.id] = true;
-          continue;
-        }
+      target.forEach(function (rubric) {
+        if (!rubric) return;
+        if (_isUuid(rubric.id)) keptCanonicalIds[rubric.id] = true;
+        if (hasBaseline && _isUuid(rubric.id) && sentById[rubric.id] === _rubricSignature(rubric)) return;
         if (
           !_isUuid(rubric.id) ||
           (rubric.criteria || []).some(function (c) {
@@ -5290,26 +5965,57 @@ function _persistRubricsToCanonical(cid, prev, arr) {
         ) {
           insertedRows = true;
         }
-        var res = await window.v2.upsertRubric({
-          id: rubric.id,
-          courseId: cid,
-          name: _rubricName(rubric),
-          criteria: _rubricCriteriaPayload(rubric),
-        });
-        if (res && res.error) throw res.error;
-        var canonicalId = res && res.data ? res.data : _isUuid(rubric.id) ? rubric.id : null;
-        if (canonicalId) {
-          keptCanonicalIds[canonicalId] = true;
-          if (rubric.id && rubric.id !== canonicalId) idMap[rubric.id] = canonicalId;
+        // The rubric's own record, or a new criterion's inside an existing
+        // rubric: either names the entry this upsert is.
+        var rec = _isUuid(rubric.id) ? null : _pendingCreateFor('rubric', rubric.id);
+        if (!rec) {
+          (rubric.criteria || []).some(function (c) {
+            rec = c && !_isUuid(c.id) ? _pendingCreateFor('criterion', c.id) : null;
+            return !!rec;
+          });
         }
-      }
+        ops.push(
+          window.v2
+            .upsertRubric(
+              {
+                id: rubric.id,
+                courseId: cid,
+                name: _rubricName(rubric),
+                criteria: _rubricCriteriaPayload(rubric),
+              },
+              { entryId: rec ? rec.entryId : undefined },
+            )
+            .then(function (res) {
+              if (res && res.error) {
+                if (res.error.cancelled) return;
+                throw res.error;
+              }
+              var canonicalId = res && res.data ? res.data : _isUuid(rubric.id) ? rubric.id : null;
+              if (canonicalId) {
+                keptCanonicalIds[canonicalId] = true;
+                if (rubric.id && rubric.id !== canonicalId) idMap[rubric.id] = canonicalId;
+              }
+              // Re-keys the rubric, then reads the criteria ids back
+              // (already done when the outbox reported success).
+              if (rec) landed.push(_onCreateLanded(rec.entryId, res && res.data));
+            }),
+        );
+      });
 
-      for (var j = 0; j < previous.length; j++) {
-        var oldRubric = previous[j];
-        if (!oldRubric || !_isUuid(oldRubric.id) || keptCanonicalIds[oldRubric.id]) continue;
-        var deleteRes = await window.v2.deleteRubric(oldRubric.id);
-        if (deleteRes && deleteRes.error) throw deleteRes.error;
-      }
+      // A rubric removed while its insert is still queued is simply not
+      // inserted; one whose insert was sent is deleted by its server id.
+      previous.forEach(function (oldRubric) {
+        if (!oldRubric || !oldRubric.id || keptCanonicalIds[oldRubric.id]) return;
+        var gone = _cancelPendingCreateOrResolve(cid, 'rubric', oldRubric.id);
+        if (!gone) return;
+        ops.push(
+          window.v2.deleteRubric(gone).then(function (res) {
+            if (res && res.error) throw res.error;
+          }),
+        );
+      });
+      await Promise.all(ops);
+      await Promise.all(landed);
 
       if (!insertedRows) {
         // Nothing new was created, so every id the cache holds is already the
@@ -5323,9 +6029,12 @@ function _persistRubricsToCanonical(cid, prev, arr) {
       _rememberServerState('rubrics', cid, reconciled);
       // Only adopt the server's copy if nothing was edited while this ran; a
       // newer edit has its own save queued, which reconciles after it.
+      // _rekey already swapped the new ids into the live copy, so compare
+      // with those applied.
       var live = _cache.rubrics[cid];
-      if (live === target && JSON.stringify(live) === startedWith) _saveCourseField('rubrics', cid, reconciled);
-      _patchAssessmentRubricIds(cid, idMap);
+      if (live === target && _rubricsContentSignature(live) === startedWith) {
+        _saveCourseField('rubrics', cid, reconciled);
+      }
       return { rubrics: reconciled, idMap: idMap };
     })
     .catch(function (err) {
@@ -5345,6 +6054,7 @@ function saveRubrics(cid, arr) {
   if (!_writesEnabled() || !_isUuid(cid)) {
     return Promise.resolve({ rubrics: nextArr, idMap: {} });
   }
+  _registerRubricRows(cid, nextArr);
   return _persistRubricsToCanonical(cid, prev, nextArr);
 }
 function getRubricById(cid, rubricId) {
@@ -5628,9 +6338,13 @@ function getStudents(cid) {
 function saveStudents(cid, arr) {
   var prev = _loadPersistedCourseFieldSnapshot('students', cid, _cache.students[cid] || []).map(migrateStudent);
   _saveCourseField('students', cid, arr);
-  // Demo mode and offline both stay local-only.
-  if (!_writesEnabled()) return;
+  // Demo mode and offline both stay local-only. A class that has no server
+  // id yet is replayed by _migrateCourseDataLocalToCanonical when it gets one.
+  if (!_writesEnabled() || !_isUuid(cid)) return;
   if (!cid || !arr) return;
+  // New rows get their pending-create record now, so a score or note
+  // entered before the enrol is even pushed already waits on it.
+  _registerLocalRows(cid, 'student', arr, 'create_student_and_enroll');
   return _persistStudentsToCanonical(cid, prev, arr);
 }
 
@@ -5669,18 +6383,22 @@ function _persistStudentsToCanonical(cid, prev, arr) {
     after.forEach(function (s, idx) {
       if (s && s.id && !prevById[s.id]) {
         ops.push(_canonicalEnrollStudent(sb, cid, s, idx));
-      }
+      } else if (s && s.id) _dropUnqueuedPending('student', s.id);
     });
-    // Withdrawals (in prev, not in arr) — only if we have a canonical enrollment id
+    // Withdrawals (in prev, not in arr). A row whose enrol is still queued
+    // is simply not created; one already sent is withdrawn by its server id
+    // once that is known.
     before.forEach(function (s) {
-      if (s && s.id && !arrById[s.id] && _isUuid(s.id)) {
-        ops.push(_canonicalWithdrawEnrollment(sb, s.id));
-      }
+      if (!s || !s.id || arrById[s.id]) return;
+      var target = _cancelPendingCreateOrResolve(cid, 'student', s.id);
+      if (target) ops.push(_canonicalWithdrawEnrollment(sb, target));
     });
-    // Updates (in both, with field changes)
+    // Updates (in both, with field changes). A row whose enrol is still
+    // queued gets its patch queued behind it; identity edits need the
+    // person id, which only the enrol returns.
     after.forEach(function (s, idx) {
       var p = s && s.id ? prevById[s.id] : null;
-      if (!p || !_isUuid(s.id)) return;
+      if (!p || !_isSendableId(s.id)) return;
       if (_studentEnrollmentChanged(p, s) || _studentRosterPositionChanged(idx, before, p, s)) {
         ops.push(_canonicalUpdateEnrollment(sb, s.id, s, idx));
       }
@@ -5729,9 +6447,10 @@ function _studentIdentityChanged(a, b) {
 function _canonicalEnrollStudent(sb, cid, s, idx) {
   var localId = s.id;
   var existingStudentId = _isUuid(s.personId) ? s.personId : null;
+  var rec = _registerPendingCreate(cid, 'student', localId, 'create_student_and_enroll', { rosterPosition: idx });
   return _writeRpc(
     'create_student_and_enroll',
-    _stampIdempotencyKey('create_student_and_enroll', {
+    {
       p_course_id: cid,
       p_first_name: s.firstName || '',
       p_last_name: s.lastName || null,
@@ -5742,29 +6461,46 @@ function _canonicalEnrollStudent(sb, cid, s, idx) {
       p_date_of_birth: s.dateOfBirth || null,
       p_designations: s.designations || [],
       p_existing_student_id: existingStudentId,
-    }),
+    },
+    { entryId: rec ? rec.entryId : undefined },
   ).then(function (res) {
     if (res.error) {
-      console.warn('create_student_and_enroll failed:', res.error, s);
+      if (!res.error.cancelled) console.warn('create_student_and_enroll failed:', res.error, s);
       return;
     }
-    var row = res.data || {};
-    var cached = (_cache.students[cid] || []).find(function (c) {
-      return c.id === localId;
-    });
-    if (cached && row.enrollment_id) {
-      cached.id = row.enrollment_id;
-      cached.personId = row.student_id;
-      cached.rosterPosition = idx;
-    }
-    if (row.enrollment_id) {
-      _rekeyServerStateRow('students', cid, localId, { id: row.enrollment_id, personId: row.student_id });
-    }
-    if (_cache.students[cid]) {
-      _safeLSSet('gb-students-' + cid, JSON.stringify(_cache.students[cid]));
-    }
-    if (row.enrollment_id) _rekeyLocalRefs(cid, localId, row.enrollment_id);
+    // Re-keys cache, gb-students, baseline, scores, notes… and sends what
+    // waited on the local id. Already done when the outbox reported success.
+    if (rec) _onCreateLanded(rec.entryId, res.data);
   });
+}
+
+/* A save registered this local row, but the diff found it already in the
+   baseline, so no create goes out: the row is a leftover from before the
+   id map. Forget the record, or writes on the row would wait forever. */
+function _dropUnqueuedPending(kind, localId) {
+  if (_isUuid(localId)) return;
+  var rec = _pendingCreateFor(kind, localId);
+  if (rec && !rec.queued) _onCreateAbandoned(rec.entryId, false);
+}
+
+/* A removed row still has a local id. If its create is still queued, cancel
+   it (and the writes waiting on it) and return null: nothing to delete. If
+   the create was sent, return the id to delete by: the server id when
+   known, else the local id, which the outbox re-keys when the create lands. */
+function _cancelPendingCreateOrResolve(cid, kind, localId) {
+  if (_isUuid(localId)) return localId;
+  var known = _resolveKnownId(kind, localId);
+  if (known !== localId) return known;
+  var rec = _pendingCreateFor(kind, localId);
+  if (!rec) return null;
+  var q = window.v2Queue;
+  if (!rec.queued || !q || typeof q.remove !== 'function') {
+    _onCreateAbandoned(rec.entryId, false);
+    return null;
+  }
+  // remove() tells _onOutboxEvent, which drops the record and the dependents.
+  if (q.remove(rec.entryId)) return null;
+  return localId;
 }
 
 /* v2 update_enrollment(p_id, p_patch jsonb) — jsonb patch.
@@ -5851,7 +6587,7 @@ window.importRosterCsv = function (cid, rows) {
 window.setEnrollmentFlag = function (enrollmentId, flagged) {
   var sb = getSupabase();
   if (!sb) return Promise.resolve();
-  if (!_isUuid(enrollmentId)) return Promise.resolve();
+  if (!_isSendableId(enrollmentId)) return Promise.resolve();
   return _writeRpc('update_enrollment', {
     p_id: enrollmentId,
     p_patch: { is_flagged: !!flagged },
@@ -5908,8 +6644,11 @@ function saveAssessments(cid, arr) {
     (_cache.assessments && _cache.assessments[cid]) || [],
   );
   _saveCourseField('assessments', cid, arr);
+  if (_writesEnabled() && _isUuid(cid)) _registerLocalRows(cid, 'assessment', arr, 'create_assessment');
   if (arr.length < prev.length) _cleanOrphanedScores(cid, arr);
-  if (!_writesEnabled()) return;
+  // A class that has no server id yet is replayed by
+  // _migrateCourseDataLocalToCanonical when it gets one.
+  if (!_writesEnabled() || !_isUuid(cid)) return;
   if (!cid || !arr) return;
   _persistAssessmentsToCanonical(cid, prev, arr);
 }
@@ -5939,18 +6678,19 @@ function _persistAssessmentsToCanonical(cid, prev, arr) {
     after.forEach(function (a) {
       if (a && a.id && !prevById[a.id]) {
         ops.push(_canonicalCreateAssessment(sb, cid, a));
-      }
+      } else if (a && a.id) _dropUnqueuedPending('assessment', a.id);
     });
-    // Deletes (canonical-id removals only)
+    // Deletes. A row whose create is still queued is simply not created; one
+    // already sent is deleted by its server id once that is known.
     before.forEach(function (a) {
-      if (a && a.id && !arrById[a.id] && _isUuid(a.id)) {
-        ops.push(_canonicalDeleteAssessment(sb, cid, a.id));
-      }
+      if (!a || !a.id || arrById[a.id]) return;
+      var target = _cancelPendingCreateOrResolve(cid, 'assessment', a.id);
+      if (target) ops.push(_canonicalDeleteAssessment(sb, cid, target));
     });
-    // Updates
+    // Updates. An edit to a row whose create is still queued waits behind it.
     after.forEach(function (a) {
       var p = a && a.id ? prevById[a.id] : null;
-      if (!p || !_isUuid(a.id)) return;
+      if (!p || !_isSendableId(a.id)) return;
       if (_assessmentChanged(p, a)) {
         ops.push(_canonicalUpdateAssessment(sb, cid, a.id, a));
       }
@@ -6014,7 +6754,7 @@ function _collabConfigFromAssessment(a) {
 }
 
 function _persistAssessmentCollab(sb, assessmentId, a) {
-  if (!sb || !_isUuid(assessmentId)) return Promise.resolve();
+  if (!sb || !_isSendableId(assessmentId)) return Promise.resolve();
   var mode = _canonicalCollabModeFromAssessment(a);
   var config = mode === 'none' ? null : _collabConfigFromAssessment(a);
   return _writeRpc('save_collab', { p_id: assessmentId, p_mode: mode, p_config: config }).then(function (res) {
@@ -6044,23 +6784,24 @@ function _canonicalCreateAssessment(sb, cid, a) {
     p_module_id: _isUuid(a.moduleId) ? a.moduleId : null,
     p_tag_ids: tagIds,
   };
-  return _writeRpc('create_assessment', _stampIdempotencyKey('create_assessment', params)).then(function (res) {
+  var rec = _registerPendingCreate(cid, 'assessment', localId, 'create_assessment');
+  var created = _writeRpc('create_assessment', params, { entryId: rec ? rec.entryId : undefined }).then(function (res) {
     if (res.error) {
-      console.warn('create_assessment failed:', res.error, a);
+      if (!res.error.cancelled) console.warn('create_assessment failed:', res.error, a);
       return;
     }
-    var newId = res.data;
-    var cached = (_cache.assessments[cid] || []).find(function (c) {
-      return c.id === localId;
-    });
-    if (cached && newId) cached.id = newId;
-    if (newId) _rekeyServerStateRow('assessments', cid, localId, { id: newId });
-    if (_cache.assessments[cid]) {
-      _safeLSSet('gb-assessments-' + cid, JSON.stringify(_cache.assessments[cid]));
-    }
-    if (newId) _rekeyLocalRefs(cid, localId, newId);
-    return _persistAssessmentCollab(sb, newId, a);
+    // Re-keys cache, gb-assessments, baseline, scores, statuses… and sends
+    // what waited on the local id. Already done when the outbox reported
+    // success.
+    if (rec) _onCreateLanded(rec.entryId, res.data);
   });
+  // Collaboration settings go right behind the create, re-keyed when it
+  // lands, so they are not lost with this page. create_assessment defaults
+  // to no collaboration, so only a real mode is sent.
+  if (_canonicalCollabModeFromAssessment(a) !== 'none' && rec) {
+    return Promise.all([created, _persistAssessmentCollab(sb, localId, a)]);
+  }
+  return created;
 }
 
 /* v2 update_assessment(p_id, p_patch jsonb, p_tag_ids uuid[]).
@@ -6228,17 +6969,21 @@ function _persistNotesToCanonical(cid, prev, obj) {
       eids[eid] = true;
     });
     Object.keys(eids).forEach(function (eid) {
-      if (!_isUuid(eid)) return;
+      // A note on a student whose enrol is still queued waits behind it.
+      if (!_isSendableId(eid)) return;
       var body = (after || {})[eid];
       if (body === before[eid]) return; // unchanged
+      // The delete and the insert touch different rows, so both are pushed
+      // now; awaiting the delete first left the insert out of the outbox.
       var op = removeExisting(eid);
       if (body && body.trim()) {
-        op = op.then(function () {
-          return window.v2.addNote(eid, body).then(function (res) {
+        op = Promise.all([
+          op,
+          window.v2.addNote(eid, body).then(function (res) {
             var id = res && res.data;
             if (id) ids[eid] = [id];
-          });
-        });
+          }),
+        ]);
       }
       ops.push(
         op.catch(function (err) {
@@ -6484,7 +7229,7 @@ function toggleFlag(cid, sid) {
     _persistLoadedField(cid, 'studentProfileSummaries', summaries);
   }
   _markLocalWrite('studentProfileSummaries', cid);
-  if (_writesEnabled() && _isUuid(sid)) {
+  if (_writesEnabled() && _isSendableId(sid)) {
     return window.setEnrollmentFlag(sid, nextFlagged).then(function (res) {
       if (res && res.error) console.warn('setEnrollmentFlag failed:', res.error);
       return nextFlagged;
@@ -6647,7 +7392,10 @@ function updateQuickOb(cid, sid, obId, updates) {
    p_assessment_id, p_enrollment_ids uuid[], p_tag_ids uuid[],
    p_custom_tag_ids uuid[]) → uuid */
 function _persistObservationCreate(cid, sid, entry) {
-  if (!_isUuid(cid) || !_isUuid(sid)) return;
+  if (!_isUuid(cid) || !_isSendableId(sid)) return;
+  // The observation's own local id is re-keyed when the create lands, so an
+  // edit or delete made before then waits for it instead of being dropped.
+  var rec = _registerPendingCreate(cid, 'observation', entry.id, 'create_observation');
   var ctxAsmt =
     entry.assignmentContext && _isUuid(entry.assignmentContext.assessmentId)
       ? entry.assignmentContext.assessmentId
@@ -6670,26 +7418,15 @@ function _persistObservationCreate(cid, sid, entry) {
       },
       {
         retryKey: 'create_observation:' + entry.id,
-        onSuccess: function (res) {
-          var newId = res.data;
-          var arr = (_cache.observations[cid] || {})[sid];
-          if (Array.isArray(arr)) {
-            var cached = arr.find(function (o) {
-              return o.id === entry.id;
-            });
-            if (cached && newId) {
-              cached.id = newId;
-              _safeLSSet('gb-quick-obs-' + cid, JSON.stringify(_cache.observations[cid]));
-            }
-          }
-        },
+        entryId: rec ? rec.entryId : undefined,
       },
     ).then(function (res) {
       if (res.error) {
-        if (res.error.handledSessionExpired) return;
+        if (res.error.handledSessionExpired || res.error.cancelled) return;
         console.warn('create_observation failed:', res.error);
         return;
       }
+      if (rec) _onCreateLanded(rec.entryId, res.data);
     }),
   );
 }
@@ -6699,7 +7436,7 @@ function _persistObservationCreate(cid, sid, entry) {
    array wipes it. Here we always pass null so we don't disturb membership
    unless the caller explicitly wants to. */
 function _persistObservationUpdate(cid, ob) {
-  if (!_isUuid(ob.id)) return;
+  if (!_isSendableId(ob.id)) return;
   var patch = {
     body: ob.text || '',
     sentiment: ob.sentiment || null,
@@ -6730,7 +7467,7 @@ function _persistObservationUpdate(cid, ob) {
 /* v2 delete_observation(p_id). FK cascade handles observation_student /
    observation_tag / observation_custom_tag / term_rating_observation. */
 function _persistObservationDelete(cid, obId) {
-  if (!_isUuid(obId)) return;
+  if (!_isSendableId(obId)) return;
   var sb = getSupabase();
   if (!sb) return;
   _trackPendingSync(
@@ -6958,6 +7695,7 @@ function _isDemoSession() {
 }
 
 var _outboxConfigured = false;
+var _outboxUnsubscribe = null;
 function _outbox() {
   var q = window.v2Queue;
   if (!q || typeof q.push !== 'function') return null;
@@ -6972,6 +7710,11 @@ function _outbox() {
         return _supabaseDegraded;
       },
     });
+    // Creates are re-keyed from the outbox's own events, so a create that
+    // lands after a reload (no .then waiting for it) still re-keys.
+    if (typeof _outboxUnsubscribe === 'function') _outboxUnsubscribe();
+    _outboxUnsubscribe = typeof q.subscribe === 'function' ? q.subscribe(_onOutboxEvent) : null;
+    if (typeof q.has === 'function') _prunePendingCreates(q);
   }
   return q;
 }
@@ -6980,15 +7723,36 @@ function _outbox() {
    (shared/offline-queue.js), which keeps writes to one record in order and
    retries network failures until the server accepts them. Resolves with the
    final { data, error }. Without the outbox (unit tests that don't load it)
-   the write is sent directly. */
+   the write is sent directly.
+
+   options.entryId names the outbox entry (a pending create's record uses
+   it; for idempotent endpoints it is the idempotency key too). A payload
+   naming a local id whose create is still queued is held behind that
+   create and re-keyed when it lands; without the outbox such a write has
+   nothing to wait in, so it is dropped with a warning. */
 function _writeRpc(name, params, options) {
   if (_isDemoSession()) return Promise.resolve({ data: null, error: null });
   params = params || {};
+  options = options || {};
+  if (options.entryId && typeof FV_IDEMPOTENT_RPCS !== 'undefined' && FV_IDEMPOTENT_RPCS[name]) {
+    params.p_idempotency_key = options.entryId;
+  }
   _stampIdempotencyKey(name, params);
+  _applyKnownRekeys(name, params);
+  var blockedOn = _blockedLocalIds(name, params);
   var outbox = _outbox();
-  if (outbox) return outbox.push(name, params, options ? { sendOptions: options } : null);
+  if (outbox) {
+    var pushed = outbox.push(name, params, { id: options.entryId, blockedOn: blockedOn, sendOptions: options });
+    if (options.entryId) _markPendingQueued(options.entryId);
+    return pushed;
+  }
+  if (blockedOn.length) {
+    console.warn(name + ' not sent: waits on a record with no server id yet (' + blockedOn.join(', ') + ')');
+    return Promise.resolve({ data: null, error: { message: 'blocked on local id', blocked: true } });
+  }
   var sb = getSupabase();
   if (!sb) return Promise.resolve({ data: null, error: null });
+  if (options.entryId) _markPendingQueued(options.entryId);
   return _callRpcWithAuthGuard(name, params, options);
 }
 
@@ -7009,15 +7773,19 @@ function _rpcOrNoop(name, params, options) {
 }
 
 /* Subject: upsert (p_id null for new), delete, reorder. */
-window.v2.upsertSubject = function (params) {
+window.v2.upsertSubject = function (params, options) {
   params = params || {};
-  return _rpcOrNoop('upsert_subject', {
-    p_id: _isUuid(params.id) ? params.id : null,
-    p_course_id: params.courseId,
-    p_name: params.name || '',
-    p_color: params.color || null,
-    p_display_order: params.displayOrder != null ? Number(params.displayOrder) : null,
-  });
+  return _rpcOrNoop(
+    'upsert_subject',
+    {
+      p_id: _isUuid(params.id) ? params.id : null,
+      p_course_id: params.courseId,
+      p_name: params.name || '',
+      p_color: params.color || null,
+      p_display_order: params.displayOrder != null ? Number(params.displayOrder) : null,
+    },
+    options,
+  );
 };
 window.v2.deleteSubject = function (id) {
   return _rpcOrNoop('delete_subject', { p_id: id });
@@ -7027,15 +7795,19 @@ window.v2.reorderSubjects = function (ids) {
 };
 
 /* CompetencyGroup. */
-window.v2.upsertCompetencyGroup = function (params) {
+window.v2.upsertCompetencyGroup = function (params, options) {
   params = params || {};
-  return _rpcOrNoop('upsert_competency_group', {
-    p_id: _isUuid(params.id) ? params.id : null,
-    p_course_id: params.courseId,
-    p_name: params.name || '',
-    p_color: params.color || null,
-    p_display_order: params.displayOrder != null ? Number(params.displayOrder) : null,
-  });
+  return _rpcOrNoop(
+    'upsert_competency_group',
+    {
+      p_id: _isUuid(params.id) ? params.id : null,
+      p_course_id: params.courseId,
+      p_name: params.name || '',
+      p_color: params.color || null,
+      p_display_order: params.displayOrder != null ? Number(params.displayOrder) : null,
+    },
+    options,
+  );
 };
 window.v2.deleteCompetencyGroup = function (id) {
   return _rpcOrNoop('delete_competency_group', { p_id: id });
@@ -7045,16 +7817,20 @@ window.v2.reorderCompetencyGroups = function (ids) {
 };
 
 /* Section — course_id is auto-inferred from the owning subject. */
-window.v2.upsertSection = function (params) {
+window.v2.upsertSection = function (params, options) {
   params = params || {};
-  return _rpcOrNoop('upsert_section', {
-    p_id: _isUuid(params.id) ? params.id : null,
-    p_subject_id: params.subjectId,
-    p_name: params.name || '',
-    p_color: params.color || null,
-    p_competency_group_id: _isUuid(params.competencyGroupId) ? params.competencyGroupId : null,
-    p_display_order: params.displayOrder != null ? Number(params.displayOrder) : null,
-  });
+  return _rpcOrNoop(
+    'upsert_section',
+    {
+      p_id: _isUuid(params.id) ? params.id : null,
+      p_subject_id: params.subjectId,
+      p_name: params.name || '',
+      p_color: params.color || null,
+      p_competency_group_id: _isSendableId(params.competencyGroupId) ? params.competencyGroupId : null,
+      p_display_order: params.displayOrder != null ? Number(params.displayOrder) : null,
+    },
+    options,
+  );
 };
 window.v2.deleteSection = function (id) {
   return _rpcOrNoop('delete_section', { p_id: id });
@@ -7064,16 +7840,20 @@ window.v2.reorderSections = function (ids) {
 };
 
 /* Tag. */
-window.v2.upsertTag = function (params) {
+window.v2.upsertTag = function (params, options) {
   params = params || {};
-  return _rpcOrNoop('upsert_tag', {
-    p_id: _isUuid(params.id) ? params.id : null,
-    p_section_id: params.sectionId,
-    p_label: params.label || '',
-    p_code: params.code || null,
-    p_i_can_text: params.iCanText || null,
-    p_display_order: params.displayOrder != null ? Number(params.displayOrder) : null,
-  });
+  return _rpcOrNoop(
+    'upsert_tag',
+    {
+      p_id: _isUuid(params.id) ? params.id : null,
+      p_section_id: params.sectionId,
+      p_label: params.label || '',
+      p_code: params.code || null,
+      p_i_can_text: params.iCanText || null,
+      p_display_order: params.displayOrder != null ? Number(params.displayOrder) : null,
+    },
+    options,
+  );
 };
 window.v2.deleteTag = function (id) {
   return _rpcOrNoop('delete_tag', { p_id: id });
@@ -7083,15 +7863,19 @@ window.v2.reorderTags = function (ids) {
 };
 
 /* Module. */
-window.v2.upsertModule = function (params) {
+window.v2.upsertModule = function (params, options) {
   params = params || {};
-  return _rpcOrNoop('upsert_module', {
-    p_id: _isUuid(params.id) ? params.id : null,
-    p_course_id: params.courseId,
-    p_name: params.name || '',
-    p_color: params.color || null,
-    p_display_order: params.displayOrder != null ? Number(params.displayOrder) : null,
-  });
+  return _rpcOrNoop(
+    'upsert_module',
+    {
+      p_id: _isUuid(params.id) ? params.id : null,
+      p_course_id: params.courseId,
+      p_name: params.name || '',
+      p_color: params.color || null,
+      p_display_order: params.displayOrder != null ? Number(params.displayOrder) : null,
+    },
+    options,
+  );
 };
 window.v2.deleteModule = function (id) {
   return _rpcOrNoop('delete_module', { p_id: id });
@@ -7125,15 +7909,19 @@ window.v2.reorderCategories = function (ids) {
 /* rows: [{ id?, name, weight }] in display order. Rows without a uuid are
    created; the class's other categories are deleted. Resolves with the ids
    in the same order. */
-window.v2.saveCategories = function (courseId, rows) {
-  return _rpcOrNoop('save_categories', {
-    p_course_id: courseId,
-    p_categories: (rows || []).map(function (r) {
-      var row = { name: (r.name || '').trim(), weight: r.weight != null ? Number(r.weight) : 0 };
-      if (_isUuid(r.id)) row.id = r.id;
-      return row;
-    }),
-  });
+window.v2.saveCategories = function (courseId, rows, options) {
+  return _rpcOrNoop(
+    'save_categories',
+    {
+      p_course_id: courseId,
+      p_categories: (rows || []).map(function (r) {
+        var row = { name: (r.name || '').trim(), weight: r.weight != null ? Number(r.weight) : 0 };
+        if (_isUuid(r.id)) row.id = r.id;
+        return row;
+      }),
+    },
+    options,
+  );
 };
 
 /* Rubric — composite save: rubric row + criteria diff + criterion_tag replace,
@@ -7142,7 +7930,7 @@ window.v2.saveCategories = function (courseId, rows) {
         weight?, display_order?, linked_tag_ids?: uuid[] }, …]
    Criteria present in the array are upserted; criteria absent are deleted
    (cascades criterion_tag + rubric_score). */
-window.v2.upsertRubric = function (params) {
+window.v2.upsertRubric = function (params, options) {
   params = params || {};
   var criteria = (params.criteria || []).map(function (c) {
     var payload = {
@@ -7162,12 +7950,16 @@ window.v2.upsertRubric = function (params) {
     if (_isUuid(c.id)) payload.id = c.id;
     return payload;
   });
-  return _rpcOrNoop('upsert_rubric', {
-    p_id: _isUuid(params.id) ? params.id : null,
-    p_course_id: params.courseId,
-    p_name: params.name || '',
-    p_criteria: criteria,
-  });
+  return _rpcOrNoop(
+    'upsert_rubric',
+    {
+      p_id: _isUuid(params.id) ? params.id : null,
+      p_course_id: params.courseId,
+      p_name: params.name || '',
+      p_criteria: criteria,
+    },
+    options,
+  );
 };
 window.v2.deleteRubric = function (id) {
   return _rpcOrNoop('delete_rubric', { p_id: id });
@@ -7370,6 +8162,13 @@ window.v2.getReport = function (enrollmentId, term) {
    notes + goals + reflections + overrides + attendance + term ratings).
    Courses survive untouched. */
 window.v2.deleteStudent = function (studentId) {
+  // A student whose enrol is still queued (the roster passes the enrollment
+  // id then) is simply not created.
+  if (!_isUuid(studentId) && _pendingCreateFor('student', studentId)) {
+    var rec = _pendingCreateFor('student', studentId);
+    _cancelPendingCreateOrResolve(rec.cid, 'student', studentId);
+    return Promise.resolve({ data: null, error: null });
+  }
   return _rpcOrNoop('delete_student', { p_id: studentId });
 };
 
@@ -7648,7 +8447,7 @@ function upsertTermRating(cid, sid, termId, data) {
   // `sid` IS the enrollment_id (see _canonicalRosterRowsToStudents); the
   // window.v2.saveTermRating helper handles the camelCase → snake_case
   // payload translation.
-  if (_writesEnabled() && _isUuid(sid) && window.v2 && window.v2.saveTermRating) {
+  if (_writesEnabled() && _isSendableId(sid) && window.v2 && window.v2.saveTermRating) {
     var t = _termNumber(termId);
     var payload = _termRatingPatch(data);
     if (t >= 1 && t <= 6 && Object.keys(payload).length > 0) window.v2.saveTermRating(sid, t, payload);
@@ -7801,7 +8600,7 @@ function clearCardWidgetConfig() {
 var _mobileRerender = null;
 
 function hasPendingLocalCid(cid) {
-  return !!cid && _pendingLocalCids.has(cid);
+  return !!cid && (_pendingLocalCids.has(cid) || !!_pendingCreateFor('course', cid));
 }
 
 window.GB = {
