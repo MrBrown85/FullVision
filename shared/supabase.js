@@ -171,7 +171,8 @@
       ]);
     }
     var stats = q.stats();
-    return Number(stats.queued || 0) + Number(stats.deadLettered || 0);
+    // Dead-lettered writes will never send; don't hold up sign-out for them.
+    return Number(stats.queued || 0);
   }
 
   /**

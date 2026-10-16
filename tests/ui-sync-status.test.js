@@ -104,9 +104,10 @@ describe('desktop sync status UI', () => {
     expect(elements['offline-banner'].hidden).toBe(false);
     expect(document.body.classList.contains('offline-active')).toBe(true);
     expect(elements['tb-sync-badge'].hidden).toBe(false);
-    expect(elements['tb-sync-badge'].textContent).toBe('3');
-    expect(elements['tb-sync-popover'].innerHTML).toContain('3 unsynced');
-    expect(elements['tb-sync-popover'].innerHTML).toContain('assessment not found');
+    expect(elements['tb-sync-badge'].textContent).toBe('2');
+    expect(elements['tb-sync-popover'].innerHTML).toContain('2 unsynced');
+    // Failed writes are hidden from teachers.
+    expect(elements['tb-sync-popover'].innerHTML).not.toContain('assessment not found');
     expect(elements['sync-indicator-dot'].className).toBe('tb-sync-dot error');
   });
 

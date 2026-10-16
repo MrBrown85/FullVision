@@ -88,7 +88,7 @@ describe('signOut and unsent offline changes', () => {
   it('stops and reports unsent changes instead of wiping them', async () => {
     loadSupabase({ queued: 2, deadLettered: 1 });
     const res = await window.signOut();
-    expect(res).toEqual({ unsent: 3 });
+    expect(res).toEqual({ unsent: 2 });
     expect(localStorage.getItem('fv-sync-queue-v1')).not.toBeNull();
     expect(localStorage.getItem('gb-students-c1')).not.toBeNull();
     expect(window.location.href).toBe('');

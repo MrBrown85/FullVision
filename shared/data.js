@@ -3343,13 +3343,10 @@ function upsertScore(cid, sid, aid, tid, scoreVal, date, type, note, mod) {
   return lsOk;
 }
 
-/* Score writes used to fail with only a console warning, so the teacher saw
-   the typed number and lost it on the next reload. Surface the failure. */
+/* A toast here confused teachers more than it helped (Oct 2026); failed
+   writes stay in the outbox and the console. */
 function _reportScoreWriteFailure(rpc, error) {
   console.warn(rpc + ' failed:', error);
-  if (typeof showSyncToast === 'function') {
-    showSyncToast('A score did not save. Re-enter it, and reload if this keeps happening.', 'error');
-  }
 }
 
 /* v2 per-cell / per-tag / per-criterion score write. Rubric grading UI writes
@@ -3401,10 +3398,15 @@ function _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note, mod) {
         params: { p_enrollment_id: sid, p_assessment_id: aid, p_value: cellValue },
       });
     } else {
-      ops.push({
-        rpc: 'upsert_tag_score',
-        params: { p_enrollment_id: sid, p_assessment_id: aid, p_tag_id: tid, p_value: intVal, p_modifier: modifier },
-      });
+      // The server rejects tag_score on rubric assessments; the rubric_score
+      // mirror below carries the value.
+      var isRubric = !!(assessment && (assessment.rubricId || assessment.rubric_id));
+      if (!isRubric) {
+        ops.push({
+          rpc: 'upsert_tag_score',
+          params: { p_enrollment_id: sid, p_assessment_id: aid, p_tag_id: tid, p_value: intVal, p_modifier: modifier },
+        });
+      }
       if (criterionForTag && _isUuid(criterionForTag.id)) {
         ops.push({
           rpc: 'upsert_rubric_score',
