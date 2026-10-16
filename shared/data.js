@@ -1229,17 +1229,17 @@ async function initData(cid) {
   }
 }
 
-/* Writes made this session that haven't finished, entries left in the
-   outbox by an earlier session, and writes the server rejected that the
-   teacher hasn't retried or discarded. Rejected ones count because the
-   screen still shows them, and a refresh would remove them without a word. */
+/* Writes made this session that haven't finished, or entries left in the
+   outbox by an earlier session. Writes the server rejected don't count:
+   nothing would ever clear them, so every refresh would wait for good. The
+   outbox tries each of them once more on the next page load and then drops
+   it with a Sentry report; until then the sync dot shows the failure. */
 function _hasUnsentWrites() {
   if (_pendingSyncs > 0) return true;
   var q = window.v2Queue;
   if (!q || typeof q.stats !== 'function') return false;
   try {
-    var stats = q.stats();
-    return (stats.queued || 0) + (stats.deadLettered || 0) > 0;
+    return (q.stats().queued || 0) > 0;
   } catch (e) {
     return false;
   }
@@ -1435,8 +1435,8 @@ function _forgetServerState(cid) {
    diffed against, and a rejection puts that row back: the next save of the
    field sends it again. Rows of students, assessments, scores and statuses;
    categories go up as one list and handle it in their own save. Other
-   fields' failed writes wait in the failed list for Retry. In memory only:
-   after a reload the baseline comes from the server again. */
+   fields rely on the outbox's one retry on the next page load. In memory
+   only: after a reload the baseline comes from the server again. */
 var _baselineUndo = {}; // outbox entry id → { field, cid, match?, prev }
 
 /* Which baseline row a write sets, from its RPC name and params. */
@@ -3789,22 +3789,6 @@ function retryActiveCourseLoad() {
   return Promise.resolve();
 }
 window.retryActiveCourseLoad = retryActiveCourseLoad;
-
-/* The teacher gives up on a write the server rejected. Once none is left,
-   the open class is downloaded again so the screen shows what the server
-   has: the server's version didn't change, so a plain check would answer
-   "not modified" and keep the edit on screen. */
-function discardFailedWrite(id) {
-  var q = window.v2Queue;
-  if (!q || typeof q.dismissDeadLetter !== 'function') return Promise.resolve();
-  q.dismissDeadLetter(id);
-  if (q.deadLetter().length > 0) return Promise.resolve();
-  var cid = getActiveCourse();
-  if (!cid) return Promise.resolve();
-  delete _classVersion[cid];
-  return _handleExternalCourseUpdate(cid, 'gradebook');
-}
-window.discardFailedWrite = discardFailedWrite;
 
 function courseLoadFailed(cid) {
   return !!(cid && _loadError[cid]);

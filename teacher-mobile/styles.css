@@ -1733,36 +1733,6 @@ body.fv-switching-course::after {
   font-weight: 500;
 }
 
-/* Rejected or held writes: above the offline banner, which it covers. */
-.m-sync-banner {
-  position: fixed;
-  top: env(safe-area-inset-top, 0px);
-  left: 0;
-  right: 0;
-  z-index: calc(var(--z-banner) + 1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  background: var(--score-1);
-  color: #fff;
-  padding: 6px 16px;
-  font-size: 13px;
-  font-weight: 500;
-}
-.m-sync-banner[hidden] {
-  display: none;
-}
-.m-sync-banner-btn {
-  border: 1px solid #fff;
-  background: transparent;
-  color: #fff;
-  border-radius: 6px;
-  padding: 2px 10px;
-  font: inherit;
-  font-weight: 600;
-}
-
 /* ── Empty State ───────────────────────────────────────────── */
 .m-empty {
   display: flex;

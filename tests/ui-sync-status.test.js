@@ -104,15 +104,39 @@ describe('desktop sync status UI', () => {
     expect(elements['offline-banner'].hidden).toBe(false);
     expect(document.body.classList.contains('offline-active')).toBe(true);
     expect(elements['tb-sync-badge'].hidden).toBe(false);
-    expect(elements['tb-sync-badge'].textContent).toBe('3');
-    expect(elements['tb-sync-popover'].innerHTML).toContain('3 unsynced');
-    // Each failed write is listed with the server's message, Try again and Discard.
-    expect(elements['tb-sync-popover'].innerHTML).toContain('The server said: assessment not found');
-    expect(elements['tb-sync-popover'].innerHTML).toContain('data-action="retrySyncDeadLetter" data-id="dead-1"');
-    expect(elements['tb-sync-popover'].innerHTML).toContain('data-action="dismissSyncDeadLetter" data-id="dead-1"');
-    // A failed write outranks being offline in the banner.
-    expect(elements['offline-banner'].innerHTML).toContain('1 change couldn&#39;t be saved.');
+    expect(elements['tb-sync-badge'].textContent).toBe('2');
+    expect(elements['tb-sync-popover'].innerHTML).toContain('2 unsynced');
+    // Failed writes are hidden from teachers.
+    expect(elements['tb-sync-popover'].innerHTML).not.toContain('assessment not found');
     expect(elements['sync-indicator-dot'].className).toBe('tb-sync-dot error');
+  });
+
+  it('turns the dot red while a write the server rejected remains', () => {
+    var elements = {
+      'offline-banner': createElementStub(),
+      'tb-sync-badge': createElementStub(),
+      'tb-sync-popover': createElementStub(),
+      'sync-indicator-dot': createElementStub(),
+    };
+    document.getElementById = function (id) {
+      return elements[id] || null;
+    };
+    document.body = { classList: createClassList() };
+    window.v2Queue = {
+      stats() {
+        return { queued: 0, deadLettered: 1, lastFlushAt: null, online: true, flushing: false };
+      },
+      deadLetter() {
+        return [{ id: 'dead-1', endpoint: 'update_assessment', last_error: 'assessment not found' }];
+      },
+    };
+
+    refreshSyncStatusUI();
+
+    expect(elements['offline-banner'].hidden).toBe(true);
+    expect(elements['sync-indicator-dot'].className).toBe('tb-sync-dot error');
+    expect(elements['sync-indicator-dot'].title).toBe("Some changes couldn't be saved");
+    expect(elements['tb-sync-popover'].innerHTML).not.toContain('assessment not found');
   });
 
   it('returns to the idle state when no sync work remains', () => {
