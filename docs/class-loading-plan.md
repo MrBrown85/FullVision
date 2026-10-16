@@ -76,7 +76,7 @@ attributes:
 **Not shipped:** reviving the Playwright suite. It mocks retired tables, and
 `build-e2e.sh` uses macOS-only `sed`, so it is its own task.
 
-## Phase 1: Load-path safety (client only)
+## Phase 1: Load-path safety (shipped, #155)
 
 Every item here is a defect that cache-first loading would make worse.
 
@@ -153,7 +153,13 @@ Every item here is a defect that cache-first loading would make worse.
 
 **Rollback:** revert.
 
-## Phase 2: Class version the database maintains
+## Phase 2: Class version the database maintains (shipped)
+
+Applied 2026-10-15 as `course_sync_version`. It keeps the existing per-row
+triggers rather than statement-level ones: equality checks only need the
+version to change, and a bulk write bumping it once per row costs nothing
+measurable. A rolled-back test as a teacher confirmed every table below
+bumps only its own class.
 
 **Problems with today's change signal (`course_sync_cursor`):**
 
