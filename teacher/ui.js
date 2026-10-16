@@ -24,28 +24,16 @@ function sanitizeHtml(raw) {
 }
 
 /* ── Course-switch input lock (P7.3) ───────────────────────── */
-/* While a class loads, the previous class is still on screen. The page is
-   made inert, which blocks the keyboard as well as the mouse, so nothing can
-   be typed into the old class while activeCourse already names the new one.
-   Overlapping switches share the lock until the last one finishes. */
-let _switchLocks = 0;
+/* While a class loads, the previous class is still on screen. setPageLock
+   (shared/data.js) makes the page inert, which blocks the keyboard as well
+   as the mouse, so nothing can be typed into the old class while
+   activeCourse already names the new one. */
 async function withSwitchingLock(fn) {
-  const body = document.body;
-  if (!body) return await fn();
-  const main = document.getElementById('main');
-  _switchLocks++;
-  body.setAttribute('aria-busy', 'true');
-  body.classList.add('fv-switching-course');
-  if (main) main.inert = true;
+  setPageLock('switching', true);
   try {
     return await fn();
   } finally {
-    _switchLocks = Math.max(0, _switchLocks - 1);
-    if (_switchLocks === 0) {
-      body.removeAttribute('aria-busy');
-      body.classList.remove('fv-switching-course');
-      if (main) main.inert = false;
-    }
+    setPageLock('switching', false);
   }
 }
 window.withSwitchingLock = withSwitchingLock;

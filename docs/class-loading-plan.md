@@ -190,7 +190,16 @@ bumps only its own class.
 
 **Rollback:** a forward migration that restores the per-row triggers.
 
-## Phase 3: One request per class
+## Phase 3: One request per class (shipped, #157)
+
+Shipped as `get_class_bundle`, SECURITY DEFINER after an ownership check:
+under row-level security, reading 24,000 tag scores took 496 ms instead of
+12 ms. Scores travel as compact rows that point into the roster, assessment,
+tag and criterion lists. Measured: a 24-student class 16 ms warm; a synthetic
+40 × 150 × 4 class 0.6 s and about 1 MB, where `get_gradebook` hit the
+statement timeout. Found on the way: the separate reads' first load on a
+device keyed a rubric score by its criterion id, because rubrics arrived
+after the scores.
 
 1. Commit a snapshot of the live read functions to
    `docs/backend-design/live-snapshot-2026-10-15.sql`. Some function bodies were
@@ -229,7 +238,7 @@ bumps only its own class.
 4. **Tests:** a golden test feeds one fixture through the old and new paths and
    expects identical getters and identical `calc.js` results.
 
-## Phase 4: Show the saved copy first, then check
+## Phase 4: Show the saved copy first, then check (with Phase 5, #158)
 
 1. **A `gb-bundle-meta-<cid>` key stores:**
    - `version`
