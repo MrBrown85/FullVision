@@ -455,6 +455,11 @@ window.PageReports = (function () {
     if (sel && sel.anchorNode && editor.contains(sel.anchorNode)) tqUpdateToolbar();
   }
 
+  // The CSP blocks inline on* attributes, so the narrative's dirty flag is set here.
+  function _handleNarrativeInput(e) {
+    if (e.target && e.target.id === 'tq-narrative') RQ.tqNarrativeDirty = true;
+  }
+
   function _handleKeyup(e) {
     var editor = document.getElementById('tq-narrative');
     if (editor && editor.contains(e.target)) tqUpdateToolbar();
@@ -564,6 +569,7 @@ window.PageReports = (function () {
     _addDocListener('click', _handleClick);
     _addDocListener('selectionchange', _handleSelectionChange);
     _addDocListener('keyup', _handleKeyup);
+    _addDocListener('input', _handleNarrativeInput);
     _addDocListener('focusin', _handleLatePolicyFocus);
     _addDocListener('focusout', _handleLatePolicyBlur);
   }
@@ -595,7 +601,6 @@ window.PageReports = (function () {
     delete window.rbDragOver;
     delete window.rbDragLeave;
     delete window.rbDrop;
-    delete window._tqMarkDirty;
   }
 
   /* -- Toolbar HTML (rendered into main on init) ---------- */
@@ -608,9 +613,6 @@ window.PageReports = (function () {
   window.rbDragOver = rbDragOver;
   window.rbDragLeave = rbDragLeave;
   window.rbDrop = rbDrop;
-  window._tqMarkDirty = function () {
-    RQ.tqNarrativeDirty = true;
-  };
 
   /* -- Public API ----------------------------------------- */
   return {
