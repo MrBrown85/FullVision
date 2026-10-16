@@ -121,10 +121,19 @@ describe('_calcGroup', () => {
       const weights = { heavy: 3, light: 1, light2: 1 };
       expect(_calcGroup(scores, 'mode', 0.65, weights)).toBe(2);
     });
+
+    it('counts a 3+ and a 3 as the same level and keeps the newest one', () => {
+      // Levels 3, 3, 2: the most common level is 3; the newest 3 is the 3+
+      const scores = [s(3, '2025-01-01'), s(2, '2025-02-01'), s(10 / 3, '2025-03-01', { level: 3 })];
+      expect(_calcGroup(scores, 'mode', 0.65)).toBeCloseTo(10 / 3, 5);
+      // Newest 3 is a 3−
+      const minus = [s(10 / 3, '2025-01-01', { level: 3 }), s(8 / 3, '2025-02-01', { level: 3 }), s(4, '2025-03-01')];
+      expect(_calcGroup(minus, 'mode', 0.65)).toBeCloseTo(8 / 3, 5);
+    });
   });
 
   describe('average', () => {
-    it('returns the unweighted mean, rounded', () => {
+    it('returns the unweighted mean', () => {
       // 2 + 3 + 4 = 9 / 3 = 3
       expect(_calcGroup([s(2), s(3), s(4)], 'average', 0.65)).toBe(3);
     });
@@ -133,18 +142,26 @@ describe('_calcGroup', () => {
       expect(_calcGroup([s(4)], 'average', 0.65)).toBe(4);
     });
 
-    it('rounds .5 to nearest integer', () => {
-      // (2+3) / 2 = 2.5 → rounds to 3 (JS Math.round)
-      expect(_calcGroup([s(2), s(3)], 'average', 0.65)).toBe(3);
+    it('keeps the fraction instead of rounding to a whole level', () => {
+      // (2+3) / 2 = 2.5
+      expect(_calcGroup([s(2), s(3)], 'average', 0.65)).toBe(2.5);
+    });
+
+    it('keeps a + or − in the mean', () => {
+      // 3+ (3.33) and 3 average to 3.17, which used to show as 3.0
+      expect(_calcGroup([s(10 / 3, '2025-01-01', { level: 3 }), s(3, '2025-02-01')], 'average', 0.65)).toBeCloseTo(
+        19 / 6,
+        5,
+      );
     });
 
     it('respects per-assessment weights', () => {
-      // (2*3 + 4*1) / 4 = 10/4 = 2.5 → rounds to 3
+      // (2*3 + 4*1) / 4 = 10/4 = 2.5
       const scores = [
         { score: 2, date: '2025-01-01', assessmentId: 'heavy' },
         { score: 4, date: '2025-02-01', assessmentId: 'light' },
       ];
-      expect(_calcGroup(scores, 'average', 0.65, { heavy: 3, light: 1 })).toBe(3);
+      expect(_calcGroup(scores, 'average', 0.65, { heavy: 3, light: 1 })).toBe(2.5);
     });
   });
 
@@ -156,6 +173,8 @@ describe('_calcGroup', () => {
     it('averages the two middle values for an even-length list', () => {
       // (2+4)/2 = 3
       expect(_calcGroup([s(1), s(2), s(4), s(4)], 'median', 0.65)).toBe(3);
+      // (2+3)/2 = 2.5, not rounded
+      expect(_calcGroup([s(1), s(2), s(3), s(4)], 'median', 0.65)).toBe(2.5);
     });
 
     it('is insensitive to an unusually low outlier', () => {
@@ -174,18 +193,18 @@ describe('_calcGroup', () => {
     });
 
     it('weights recent scores higher', () => {
-      // avg = 2*0.35 + 4*0.65 = 0.7 + 2.6 = 3.3 → rounds to 3
-      expect(_calcGroup([s(2, '2025-01-01'), s(4, '2025-02-01')], 'decayingAvg', 0.65)).toBe(3);
+      // avg = 2*0.35 + 4*0.65 = 0.7 + 2.6 = 3.3
+      expect(_calcGroup([s(2, '2025-01-01'), s(4, '2025-02-01')], 'decayingAvg', 0.65)).toBeCloseTo(3.3, 5);
     });
 
     it('uses high decay weight correctly', () => {
-      // avg = 1*0.1 + 4*0.9 = 0.1 + 3.6 = 3.7 → rounds to 4
-      expect(_calcGroup([s(1, '2025-01-01'), s(4, '2025-02-01')], 'decayingAvg', 0.9)).toBe(4);
+      // avg = 1*0.1 + 4*0.9 = 0.1 + 3.6 = 3.7
+      expect(_calcGroup([s(1, '2025-01-01'), s(4, '2025-02-01')], 'decayingAvg', 0.9)).toBeCloseTo(3.7, 5);
     });
 
     it('penalizes declining performance', () => {
-      // avg = 4*0.35 + 1*0.65 = 1.4 + 0.65 = 2.05 → rounds to 2
-      expect(_calcGroup([s(4, '2025-01-01'), s(1, '2025-02-01')], 'decayingAvg', 0.65)).toBe(2);
+      // avg = 4*0.35 + 1*0.65 = 1.4 + 0.65 = 2.05
+      expect(_calcGroup([s(4, '2025-01-01'), s(1, '2025-02-01')], 'decayingAvg', 0.65)).toBeCloseTo(2.05, 5);
     });
   });
 
@@ -226,12 +245,12 @@ describe('calcProficiency', () => {
 
   it('blends summative and formative with weights', () => {
     const scores = [s(4, '2025-01-01', { type: 'summative' }), s(2, '2025-02-01', { type: 'formative' })];
-    // 4*0.7 + 2*0.3 = 2.8 + 0.6 = 3.4 → rounds to 3
+    // 4*0.7 + 2*0.3 = 2.8 + 0.6 = 3.4, not rounded
     expect(
       calcProficiency(scores, 'mostRecent', 0.65, {
         categoryWeights: { summative: 0.7, formative: 0.3 },
       }),
-    ).toBe(3);
+    ).toBeCloseTo(3.4, 5);
   });
 
   it('uses only formative when no summative evidence', () => {
