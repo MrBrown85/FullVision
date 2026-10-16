@@ -319,46 +319,30 @@ function _assessmentPoints(cid, studentId, assessment) {
 }
 
 /* A student's percentage on a group of assessments (one category, or the
-   whole class when it has none). Points-scored work counts as points earned
-   out of points possible, so 2.75/6 + 14.25/24 is 17/30 = 56.7%.
-   Proficiency-scored work keeps the proficiency scale: its levels are
-   averaged, then converted (qToPercentage). A group holding both blends the
-   two parts by how many assessments each has. Returns { pct, points } (points
-   = how many points-scored assessments counted), or null when nothing in
-   the group is graded. */
+   whole class when it has none), counted like a traditional gradebook:
+   points earned out of points possible. Points-scored work counts its own
+   points, so 2.75/6 + 14.25/24 is 17/30 = 56.7%. A proficiency level counts
+   as that many points out of 4 (3 = 75%, 3+ = 83.3%). Returns { pct, count }
+   (count = graded assessments), or null when nothing in the group is graded. */
 function getAssessmentGroupPercentage(cid, studentId, assessments) {
   var earned = 0;
   var possible = 0;
-  var pointsCount = 0;
-  var levels = [];
+  var count = 0;
   (assessments || []).forEach(function (assessment) {
     if (isPointsScored(assessment)) {
       var pts = _assessmentPoints(cid, studentId, assessment);
       if (!pts) return;
       earned += pts.earned;
       possible += pts.possible;
-      pointsCount++;
     } else {
       var level = getAssessmentOverallScore(cid, studentId, assessment.id);
       if (level == null) return;
-      levels.push(level);
+      earned += Math.max(0, Math.min(4, level));
+      possible += 4;
     }
+    count++;
   });
-  var total = 0;
-  var count = 0;
-  if (pointsCount > 0 && possible > 0) {
-    total += (earned / possible) * 100 * pointsCount;
-    count += pointsCount;
-  }
-  if (levels.length > 0) {
-    var avgLevel =
-      levels.reduce(function (sum, level) {
-        return sum + level;
-      }, 0) / levels.length;
-    total += qToPercentage(avgLevel) * levels.length;
-    count += levels.length;
-  }
-  return count > 0 ? { pct: total / count, points: pointsCount } : null;
+  return count > 0 && possible > 0 ? { pct: (earned / possible) * 100, count: count } : null;
 }
 
 function getCourseLetterData(cid, studentId) {
@@ -369,9 +353,6 @@ function getCourseLetterData(cid, studentId) {
   var assessments = getAssessments(cid);
   var Q = null;
   var R = null;
-  // A class with no graded points work keeps the proficiency scale exactly
-  // as before: weighted levels first, converted once.
-  var pointsCounted = 0;
 
   if (categories.length > 0) {
     var weightedSum = 0;
@@ -395,10 +376,9 @@ function getCourseLetterData(cid, studentId) {
       if (pct == null) return;
       pctSum += weight * pct.pct;
       pctWeight += weight;
-      if (weight > 0) pointsCounted += pct.points;
     });
     if (weightTotal > 0) Q = weightedSum / weightTotal;
-    if (pointsCounted > 0 && pctWeight > 0) R = pctSum / pctWeight;
+    if (pctWeight > 0) R = pctSum / pctWeight;
   } else {
     var values = getAssessments(cid)
       .map(function (assessment) {
@@ -414,12 +394,8 @@ function getCourseLetterData(cid, studentId) {
         }, 0) / values.length;
     }
     var all = getAssessmentGroupPercentage(cid, studentId, assessments);
-    if (all && all.points > 0) {
-      R = all.pct;
-      pointsCounted = all.points;
-    }
+    if (all) R = all.pct;
   }
-  if (!pointsCounted) R = qToPercentage(Q);
 
   var result = {
     Q: Q,

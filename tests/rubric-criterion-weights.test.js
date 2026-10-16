@@ -170,7 +170,7 @@ describe('rubric assessment overall', () => {
     });
     const letter = getCourseLetterData(CID, SID);
     expect(letter.Q).toBeCloseTo(2.5, 5);
-    expect(letter.R).toBe(Math.round(qToPercentage(2.5) * 10) / 10);
+    expect(letter.R).toBe(62.5);
   });
 
   it('gives the gradebook and report views the same weighted value', () => {
