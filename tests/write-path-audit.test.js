@@ -147,40 +147,37 @@ describe('write-path audit: data layer', () => {
   // offline instead of holding the request: a held request would still
   // resolve the old page's continuation when released, which a real reload
   // does not.
-  it(
-    'sends scores entered on a new assessment even when the page reloads before the create resolves',
-    async () => {
-      seed('students', [studentY()]);
-      seed('assessments', []);
-      seed('scores', {});
-      setOnline(false);
+  it('sends scores entered on a new assessment even when the page reloads before the create resolves', async () => {
+    seed('students', [studentY()]);
+    seed('assessments', []);
+    seed('scores', {});
+    setOnline(false);
 
-      var assessments = getAssessments(CID);
-      assessments.push({ id: 'sLOCALASSESS1', title: 'Lab', type: 'summative', tagIds: [TAG1] });
-      saveAssessments(CID, assessments);
-      var scores = getScores(CID);
-      scores[ENR_Y] = [{ id: 'e1', assessmentId: 'sLOCALASSESS1', tagId: TAG1, score: 3, date: '2026-10-13' }];
-      saveScores(CID, scores);
-      await settle();
-      expect(window.v2Queue.stats().queued).toBeGreaterThan(0);
-      expect(fake.count('create_assessment')).toBe(0);
+    var assessments = getAssessments(CID);
+    assessments.push({ id: 'sLOCALASSESS1', title: 'Lab', type: 'summative', tagIds: [TAG1] });
+    saveAssessments(CID, assessments);
+    var scores = getScores(CID);
+    scores[ENR_Y] = [{ id: 'e1', assessmentId: 'sLOCALASSESS1', tagId: TAG1, score: 3, date: '2026-10-13' }];
+    saveScores(CID, scores);
+    await settle();
+    expect(window.v2Queue.stats().queued).toBeGreaterThan(0);
+    expect(fake.count('create_assessment')).toBe(0);
 
-      var queue = reloadPage();
-      setOnline(true);
-      await queue.flush();
-      await settle();
+    var queue = reloadPage();
+    setOnline(true);
+    await queue.flush();
+    await settle();
 
-      expect(fake.committedCount('create_assessment')).toBe(1);
-      var newId = getAssessments(CID)[0].id;
-      expect(_isUuid(newId)).toBe(true);
-      expect(
-        fake.committedCount(
-          'upsert_tag_score',
-          p => p.p_assessment_id === newId && p.p_tag_id === TAG1 && p.p_value === 3,
-        ),
-      ).toBe(1);
-    },
-  );
+    expect(fake.committedCount('create_assessment')).toBe(1);
+    var newId = getAssessments(CID)[0].id;
+    expect(_isUuid(newId)).toBe(true);
+    expect(
+      fake.committedCount(
+        'upsert_tag_score',
+        p => p.p_assessment_id === newId && p.p_tag_id === TAG1 && p.p_value === 3,
+      ),
+    ).toBe(1);
+  });
 
   // Finding 1, second half (fixed: every row is pushed before any is awaited;
   // a row under a parent with a local id waits in the outbox behind it).
