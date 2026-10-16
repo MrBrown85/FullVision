@@ -402,12 +402,12 @@ window.PageAssignments = (function () {
           ? !_collapsedIds.has(a.id)
           : openAssessIds.has(a.id)
         : openAssessIds.has(a.id);
-      var tagObjs = (a.tagIds || [])
-        .map(function (tid) {
-          return getTagById(cid, tid);
+      // Competencies, rubric criteria with none, or one overall score.
+      var tagObjs = scoreTagIds(a, cid)
+        .map(function (key) {
+          return scoreKeyInfo(cid, a, key);
         })
         .filter(Boolean);
-      // An assessment with no competencies is graded as one overall score.
       if (!tagObjs.length) tagObjs = [{ id: UNLINKED_TAG_ID, label: 'Overall', text: 'Not linked to a competency' }];
       var categoryId = _getAssessmentCategoryId(a);
       var categoryName = _getCategoryName(cid, categoryId);
@@ -766,7 +766,7 @@ window.PageAssignments = (function () {
       assessments = assessments.filter(function (a) {
         return students.some(function (st) {
           var sc = scores[st.id] || [];
-          return !scoreTagIds(a).every(function (tid) {
+          return !scoreTagIds(a, cid).every(function (tid) {
             return sc.some(function (s) {
               return s.assessmentId === a.id && s.tagId === tid && isScoreEntered(a, s);
             });
@@ -1874,7 +1874,7 @@ window.PageAssignments = (function () {
         return a.id === aid;
       });
       if (assess) {
-        scoreTagIds(assess).forEach(function (tagId) {
+        scoreTagIds(assess, cid).forEach(function (tagId) {
           upsertScore(cid, sid, aid, tagId, 0, assess.date || '', assess.type || 'summative', '');
         });
       }
@@ -1928,7 +1928,7 @@ window.PageAssignments = (function () {
     if (row.dataset.tag) tagIds = [row.dataset.tag];
     else {
       var crit = getRubricCriterion(aid, row.dataset.criterion);
-      if (crit) tagIds = crit.tagIds || [];
+      if (crit) tagIds = rubricCriterionScoreKeys(crit);
     }
     var entries = getScores(activeCourse)[row.dataset.student] || [];
     var states = [];
@@ -2086,7 +2086,7 @@ window.PageAssignments = (function () {
       if (!assess) return;
       var sid = tagId;
       if (!statuses[sid + ':' + aid])
-        scoreTagIds(assess).forEach(function (tid) {
+        scoreTagIds(assess, cid).forEach(function (tid) {
           setScore(cid, sid, aid, tid, value);
         });
       selector = '.score-group[data-assess="' + aid + '"][data-student="' + sid + '"]';
@@ -2095,7 +2095,7 @@ window.PageAssignments = (function () {
       if (!assess) return;
       students.forEach(function (st) {
         if (statuses[st.id + ':' + aid]) return;
-        scoreTagIds(assess).forEach(function (tid) {
+        scoreTagIds(assess, cid).forEach(function (tid) {
           setScore(cid, st.id, aid, tid, value);
         });
       });
@@ -2133,7 +2133,7 @@ window.PageAssignments = (function () {
     if (!crit) return;
     var wasActive = el.classList.contains('active');
     var next = wasActive ? 0 : value;
-    (crit.tagIds || []).forEach(function (tagId) {
+    rubricCriterionScoreKeys(crit).forEach(function (tagId) {
       setScore(activeCourse, sid, aid, tagId, next);
     });
     el.parentElement.querySelectorAll('.rsg-level').forEach(function (o) {
@@ -2166,7 +2166,7 @@ window.PageAssignments = (function () {
       if (!crit) return;
       students.forEach(function (st) {
         if (statuses[st.id + ':' + aid]) return;
-        (crit.tagIds || []).forEach(function (tagId) {
+        rubricCriterionScoreKeys(crit).forEach(function (tagId) {
           setScore(cid, st.id, aid, tagId, value);
         });
       });
@@ -2179,7 +2179,7 @@ window.PageAssignments = (function () {
       var sid = critId;
       if (!statuses[sid + ':' + aid])
         rubric.criteria.forEach(function (crit) {
-          (crit.tagIds || []).forEach(function (tagId) {
+          rubricCriterionScoreKeys(crit).forEach(function (tagId) {
             setScore(cid, sid, aid, tagId, value);
           });
         });
@@ -2192,7 +2192,7 @@ window.PageAssignments = (function () {
       students.forEach(function (st) {
         if (statuses[st.id + ':' + aid]) return;
         rubric.criteria.forEach(function (crit) {
-          (crit.tagIds || []).forEach(function (tagId) {
+          rubricCriterionScoreKeys(crit).forEach(function (tagId) {
             setScore(cid, st.id, aid, tagId, value);
           });
         });
@@ -2414,7 +2414,7 @@ window.PageAssignments = (function () {
         '</div><div class="rsg-criteria">';
       criteria.forEach(function (crit) {
         var tagMods = [];
-        var tagScores = (crit.tagIds || []).map(function (tid) {
+        var tagScores = rubricCriterionScoreKeys(crit).map(function (tid) {
           var entry = studentScores.find(function (s) {
             return s.assessmentId === a.id && s.tagId === tid;
           });
@@ -2600,6 +2600,7 @@ window.PageAssignments = (function () {
         );
       })
       .join('');
+    if (!tagsHtml) tagsHtml = '<span class="rsg-descriptor-tag rsg-descriptor-tag-overall">Overall grade only</span>';
     bar.querySelector('.rsg-descriptor-tags').innerHTML = tagsHtml;
     bar.querySelector('.rsg-descriptor-text').textContent = crit.levels[level];
   }
@@ -2758,6 +2759,12 @@ window.PageAssignments = (function () {
         esc(name) +
         '</span>';
     });
+    // No competency: the criterion counts toward the overall grade only.
+    var compNote = '';
+    if (!selectedTagIds.size) {
+      headerChips += '<span class="rubric-header-chip rubric-header-chip-overall">Overall grade only</span>';
+      compNote = '<p class="rubric-part-note">Counts toward the overall grade only, not toward a competency.</p>';
+    }
     // T-UI-09 · per-criterion weight. Any positive number; normalized at read-time (Pass D §1.1).
     var critWeight = crit.weight != null && !isNaN(Number(crit.weight)) ? Number(crit.weight) : 1;
     var html =
@@ -2789,8 +2796,8 @@ window.PageAssignments = (function () {
       '" data-stop-prop="true" title="Remove criterion" aria-label="Remove criterion">✕</button></div>' +
       '<div class="rubric-criterion-body">' +
       '<div class="rubric-part"><div class="rubric-part-label">Competencies assessed' +
-      (selectedTagIds.size === 0 ? '<span class="rubric-part-hint">Choose at least one</span>' : '') +
-      '</div>';
+      '<span class="rubric-part-hint">Optional</span></div>' +
+      compNote;
     _rubricTagGroups(sections).forEach(function (g) {
       if (g.name) html += '<div class="rubric-comp-group">' + esc(g.name) + '</div>';
       html += '<div class="rubric-comp-chips">';
@@ -2992,12 +2999,8 @@ window.PageAssignments = (function () {
       alert('Add at least one criterion.');
       return;
     }
-    for (var i = 0; i < _editingRubric.criteria.length; i++) {
-      if (!_editingRubric.criteria[i].tagIds || _editingRubric.criteria[i].tagIds.length === 0) {
-        alert('Criterion "' + _editingRubric.criteria[i].name + '" needs at least one tag.');
-        return;
-      }
-    }
+    // A criterion with no competency is allowed: it counts toward the
+    // overall grade only.
     var cid = activeCourse;
     var rubrics = structuredClone(getRubrics(cid));
     var isNew = _editingRubric._isNew;
@@ -3529,8 +3532,8 @@ window.PageAssignments = (function () {
       assessments.forEach(function (a) {
         var stStatus = statuses[st.id + ':' + a.id] || '';
         var categoryName = _getCategoryName(cid, _getAssessmentCategoryId(a));
-        scoreTagIds(a).forEach(function (tid) {
-          var tag = getTagById(cid, tid);
+        scoreTagIds(a, cid).forEach(function (tid) {
+          var key = scoreKeyInfo(cid, a, tid);
           var entry = (scores[st.id] || []).find(function (s) {
             return s.assessmentId === a.id && s.tagId === tid;
           });
@@ -3545,9 +3548,9 @@ window.PageAssignments = (function () {
             '","' +
             categoryName.replace(/"/g, '""') +
             '","' +
-            (isUnlinkedTag(tid) ? '' : tid) +
+            (key && key.tag ? tid : '') +
             '","' +
-            (tag ? tag.label.replace(/"/g, '""') : isUnlinkedTag(tid) ? 'Overall' : '') +
+            (key ? String(key.label || '').replace(/"/g, '""') : '') +
             '","' +
             score +
             '","' +

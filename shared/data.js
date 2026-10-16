@@ -1858,8 +1858,22 @@ function _rubricCriterionForTag(cid, assessment, tagId) {
 
 function _rubricCriterionTagIds(cid, assessment, criterionId) {
   var criterion = _rubricCriterionById(cid, assessment, criterionId);
-  if (criterion && criterion.tagIds && criterion.tagIds.length) return criterion.tagIds;
-  return [criterionId];
+  return criterion ? rubricCriterionScoreKeys(criterion) : [criterionId];
+}
+
+/* What a score key names, for column headers and grading rows: a
+   competency, a rubric criterion with no competency, or the one overall
+   score. `tag` is set only for a competency. */
+function scoreKeyInfo(cid, assessment, key) {
+  var tag = getTagById(cid, key);
+  if (tag) return { id: key, label: tag.label, text: tag.text, tag: tag };
+  if (isUnlinkedTag(key)) return { id: key, label: 'Overall', text: 'Not linked to a competency' };
+  var criterion = _rubricCriterionById(cid, assessment, key);
+  if (criterion) {
+    var name = criterion.name || 'Criterion';
+    return { id: key, label: name, text: name + ': counts toward the overall grade only' };
+  }
+  return null;
 }
 
 async function _hydrateAssessmentDetails(cid) {
