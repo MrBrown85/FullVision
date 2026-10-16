@@ -98,6 +98,7 @@ window.DashStudentCards = (function () {
           (flagged ? '\u2691' : '\u2690') +
           '</button>' +
           '<div class="dash-card-info">' +
+          '<div class="dash-card-name-row">' +
           '<a class="dash-card-name" href="#/student?id=' +
           st.id +
           '&course=' +
@@ -105,12 +106,6 @@ window.DashStudentCards = (function () {
           '" data-stop-prop="true">' +
           esc(displayName(st)) +
           '</a>' +
-          (st.pronouns ? '<div class="dash-card-pronouns">' + esc(st.pronouns) + '</div>' : '') +
-          (st.studentNumber
-            ? '<div style="font-size:0.6rem;color:var(--text-3);font-family:\'SF Mono\',ui-monospace,monospace">#' +
-              esc(st.studentNumber) +
-              '</div>'
-            : '') +
           ((st.designations || []).length > 0
             ? (function () {
                 var dh = '<div class="dash-desig-wrap">';
@@ -137,6 +132,13 @@ window.DashStudentCards = (function () {
                 dh += '</div>';
                 return dh;
               })()
+            : '') +
+          '</div>' +
+          (st.pronouns ? '<div class="dash-card-pronouns">' + esc(st.pronouns) + '</div>' : '') +
+          (st.studentNumber
+            ? '<div style="font-size:0.6rem;color:var(--text-3);font-family:\'SF Mono\',ui-monospace,monospace">#' +
+              esc(st.studentNumber) +
+              '</div>'
             : '') +
           '</div>' +
           '<div class="dash-card-badge" style="background:' +
