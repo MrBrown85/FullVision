@@ -136,7 +136,7 @@ create table category (
   id            uuid        not null primary key,
   course_id     uuid        not null references course(id) on delete cascade,
   name          text        not null,
-  weight        numeric     not null,                              -- ≤100 per course (deferred trigger); save_categories requires exactly 100
+  weight        numeric     not null,                              -- sum per course must be 100 (fv_check_category_weight_sum, deferred)
   display_order integer     not null default 0,
   created_at   timestamptz  not null default now(),
   updated_at   timestamptz  not null default now()
@@ -475,8 +475,7 @@ create table fv_idempotency (
 --   _term_rating_audit_field(p_tr_id uuid, p_field text, p_old text, p_new text)
 --   fv_owns_course(cid uuid) / fv_owns_assessment(aid uuid) / fv_owns_enrollment(eid uuid)
 --     / fv_owns_term_rating(trid uuid) — RLS predicates.
---   fv_check_category_weight_sum() — deferred trigger enforcing per-course ≤100% cap
---     (save_categories requires exactly 100).
+--   fv_check_category_weight_sum() — deferred trigger: a course's weights total 100, or it has none.
 --   fv_retention_cleanup() — cron entry point (30d course + teacher purge + 2yr audit purge).
 --   fv_idem_check(p_key uuid, p_endpoint text) / fv_idem_store(...) — write-path
 --     idempotency helpers (migration 20260423_write_path_idempotency). Teacher_id
