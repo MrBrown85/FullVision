@@ -636,12 +636,12 @@ function renderSidebar(activeCourse, selectedStudentId, onStudentClick) {
 
   let html = `<aside id="gb-sidebar" aria-label="Student roster">
     <div id="gb-sidebar-top">
-      <select id="gb-course-select" onchange="if(window._pageSwitchCourse)window._pageSwitchCourse(this.value)" aria-label="Select course">
+      <select id="gb-course-select" data-action="sidebarSwitchCourse" aria-label="Select course">
         ${getPickerCourses(cid)
           .map(c => `<option value="${c.id}"${c.id === cid ? ' selected' : ''}>${esc(c.name)}</option>`)
           .join('')}
       </select>
-      <input id="gb-roster-search" type="text" placeholder="Search..." oninput="filterRoster()" aria-label="Search students">
+      <input id="gb-roster-search" type="text" placeholder="Search..." aria-label="Search students">
     </div>
     <div id="gb-roster-list" role="list">`;
 
@@ -701,6 +701,17 @@ function filterRoster() {
     row.style.display = !q || name.includes(q) ? '' : 'none';
   });
 }
+
+/* The CSP blocks inline on* attributes, so the sidebar's class picker and
+   roster search are wired here, once, by delegation. */
+document.addEventListener('change', function (e) {
+  if (e.target.matches('[data-action="sidebarSwitchCourse"]') && window._pageSwitchCourse) {
+    window._pageSwitchCourse(e.target.value);
+  }
+});
+document.addEventListener('input', function (e) {
+  if (e.target.id === 'gb-roster-search') filterRoster();
+});
 
 /* ── Proficiency badge HTML ─────────────────────────────────── */
 function profBadge(score, size) {

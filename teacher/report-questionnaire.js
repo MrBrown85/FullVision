@@ -56,8 +56,11 @@ window.ReportQuestionnaire = (function () {
     const termId = getTermId();
     const existing = getStudentTermRating(_activeCourse, sid, termId);
     const el = document.getElementById('tq-narrative');
-    if (el && existing) {
+    // A typed narrative is saved even before the student has a rating, so a
+    // first comment isn't dropped when the teacher leaves the page.
+    if (el && (existing || tqNarrativeDirty)) {
       upsertTermRating(_activeCourse, sid, termId, { narrative: sanitizeHtml(el.innerHTML.trim()) });
+      tqNarrativeDirty = false;
     }
   }
 
@@ -1484,8 +1487,7 @@ window.ReportQuestionnaire = (function () {
         </button>
       </div>
       <div class="tq-narrative-editor" id="tq-narrative" contenteditable="true"
-        data-placeholder="Write about ${esc(name)}'s learning dispositions, work habits, and growth…"
-        oninput="window._tqMarkDirty&&window._tqMarkDirty()">${sanitizeHtml(narrative || '')}</div>
+        data-placeholder="Write about ${esc(name)}'s learning dispositions, work habits, and growth…">${sanitizeHtml(narrative || '')}</div>
     </div>
   </div>`; // close narrative-comment panel
 
