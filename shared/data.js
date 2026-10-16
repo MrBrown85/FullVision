@@ -2643,8 +2643,14 @@ function _startClassCheck(cid) {
   _classFresh[cid] = false;
   var offline = typeof navigator !== 'undefined' && navigator.onLine === false;
   if (!offline) setPageLock('checking', true);
+  var body = typeof document !== 'undefined' ? document.body : null;
+  var noteTimer = setTimeout(function () {
+    if (!released && !offline && body && body.classList) body.classList.add('fv-checking-slow');
+  }, 400);
   var released = false;
   function release() {
+    clearTimeout(noteTimer);
+    if (body && body.classList) body.classList.remove('fv-checking-slow');
     if (released || offline) return;
     released = true;
     setPageLock('checking', false);
