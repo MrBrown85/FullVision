@@ -356,11 +356,12 @@ function isPointsScored(assessment) {
   return mode === 'points' || mode === 'complete';
 }
 
-// Whether an entry counts as graded. Incomplete is stored as 0, which on
-// other assessments means no score.
+// Whether an entry counts as graded. On points and Complete/Incomplete work
+// a 0 is a score (Incomplete is stored as 0); on proficiency work 0 means no
+// score.
 function isScoreEntered(assessment, entry) {
   if (!entry) return false;
-  if (isCompletionScored(assessment)) return entry.score != null && entry.score !== '';
+  if (isPointsScored(assessment)) return entry.score != null && entry.score !== '' && isFinite(Number(entry.score));
   return Number(entry.score) > 0;
 }
 
@@ -409,12 +410,15 @@ function scoreTagIds(assessment, cid) {
 }
 
 /* Points scores take decimals (33.5 / 40). A typed value is kept to two
-   decimal places and held between 0 and the assessment's maximum; blank or
-   unreadable input is 0, which counts as no score. A comma works as the
-   decimal point too. */
+   decimal places and held between 0 and the assessment's maximum. A typed 0
+   is a score of 0; blank or unreadable input is null, no score. A comma
+   works as the decimal point too. */
 function parsePointsInput(text, max) {
-  var n = parseFloat(String(text == null ? '' : text).replace(',', '.'));
-  if (!isFinite(n) || n <= 0) return 0;
+  var str = String(text == null ? '' : text).trim();
+  if (str === '') return null;
+  var n = parseFloat(str.replace(',', '.'));
+  if (!isFinite(n)) return null;
+  n = Math.max(0, n);
   if (max > 0) n = Math.min(max, n);
   return Math.round(n * 100) / 100;
 }

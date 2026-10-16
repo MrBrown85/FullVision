@@ -595,7 +595,7 @@ window.MGrade = (function () {
           '-' +
           assessment.id +
           '">' +
-          (rawScore != null ? rawScore : '0') +
+          (rawScore != null ? rawScore : '\u2014') +
           '</span>' +
           '<span style="font-size:15px;color:var(--text-3)"> / ' +
           assessment.maxPoints +

@@ -3390,9 +3390,9 @@ function _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note, mod) {
         },
       });
     } else if (isPoints || isUnlinkedTag(tid) || (assessment && !isAssessmentTag && !criterionForTag)) {
-      // An unlinked assessment's single score; 0 clears it (Incomplete is
-      // the only 0 that is a score).
-      var cellValue = isUnlinkedTag(tid) && intVal === 0 && !isCompletionScored(assessment) ? null : intVal;
+      // An unlinked assessment's single score. On proficiency work 0 clears
+      // it; on points and Complete/Incomplete work 0 is a score.
+      var cellValue = isUnlinkedTag(tid) && intVal === 0 && !isPointsScored(assessment) ? null : intVal;
       ops.push({
         rpc: 'upsert_score',
         params: { p_enrollment_id: sid, p_assessment_id: aid, p_value: cellValue },
@@ -3502,9 +3502,9 @@ function persistScoreDiffToCanonical(cid, prevBlob, nextBlob) {
     if (nextByKey[key]) return;
     var prev = prevByKey[key];
     if (!firstForPointsCell(prev.sid, prev.entry.assessmentId)) return;
-    // On a Complete/Incomplete assessment 0 means Incomplete, so a removed
-    // mark clears the value instead.
-    if (isCompletionScored(_assessmentById(cid, prev.entry.assessmentId))) {
+    // On points and Complete/Incomplete work 0 is a score (Incomplete is
+    // 0), so a removed score clears the value instead.
+    if (isPointsScored(_assessmentById(cid, prev.entry.assessmentId))) {
       window.upsertCellScore(cid, prev.sid, prev.entry.assessmentId, null);
       return;
     }
@@ -6335,11 +6335,12 @@ function saveScores(cid, obj) {
 }
 
 /* ── Points-mode helpers: one score → all tags ──────────────── */
+// A cell's points, or null when it has no score. A 0 is a score.
 function getPointsScore(cid, sid, aid) {
   const scores = getScores(cid);
   const entries = scores[sid] || [];
-  const entry = entries.find(e => e.assessmentId === aid && e.score > 0);
-  return entry ? entry.score : 0;
+  const entry = entries.find(e => e.assessmentId === aid && e.score != null && e.score !== '');
+  return entry ? Number(entry.score) : null;
 }
 /* Complete/Incomplete marks: 'complete', 'incomplete', or null when unmarked. */
 function getCompletionMark(cid, sid, aid) {
@@ -6356,12 +6357,20 @@ function setCompletionMark(cid, sid, aid, mark) {
   if (scores[sid].length !== before) saveScores(cid, scores);
   return scores;
 }
+// rawScore null clears the cell; 0 is a score of 0.
 function setPointsScore(cid, sid, aid, rawScore) {
   const assess = getAssessments(cid).find(a => a.id === aid);
   if (!assess) return;
   const tagIds = scoreTagIds(assess);
   const scores = getScores(cid);
   if (!scores[sid]) scores[sid] = [];
+  if (rawScore == null || rawScore === '') {
+    const kept = scores[sid].filter(e => e.assessmentId !== aid);
+    if (kept.length === scores[sid].length) return scores;
+    scores[sid] = kept;
+    saveScores(cid, scores);
+    return scores;
+  }
   let changed = false;
   tagIds.forEach(tid => {
     const entry = scores[sid].find(e => e.assessmentId === aid && e.tagId === tid);

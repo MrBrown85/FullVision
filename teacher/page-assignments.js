@@ -1710,7 +1710,7 @@ window.PageAssignments = (function () {
       '</div>';
     students.forEach(function (st) {
       var raw = getPointsScore(cid, st.id, a.id);
-      var pct = raw > 0 ? Math.round((raw / max) * 100) : '';
+      var pct = raw != null ? Math.round((raw / max) * 100) : '';
       var stStatus = statuses[st.id + ':' + a.id] || null;
       var disableRow = stStatus && stStatus !== 'LATE';
       html +=
@@ -1731,7 +1731,7 @@ window.PageAssignments = (function () {
         max +
         '" inputmode="decimal"' +
         ' value="' +
-        (raw > 0 ? formatPoints(raw) : '') +
+        (raw != null ? formatPoints(raw) : '') +
         '" data-sid="' +
         st.id +
         '" data-aid="' +
@@ -1761,7 +1761,7 @@ window.PageAssignments = (function () {
     var max = parseFloat(inp.dataset.max) || 100;
     var v = parsePointsInput(inp.value, max);
     var pctSpan = inp.closest('.score-row').querySelector('.gb-pts-live-pct');
-    if (pctSpan) pctSpan.textContent = inp.value !== '' ? Math.round((v / max) * 100) + '%' : '';
+    if (pctSpan) pctSpan.textContent = v != null ? Math.round((v / max) * 100) + '%' : '';
   }
   function commitPointsScore(inp) {
     var cid = activeCourse;
@@ -1769,14 +1769,14 @@ window.PageAssignments = (function () {
     var aid = inp.dataset.aid;
     var max = parseFloat(inp.dataset.max) || 100;
     var raw = parsePointsInput(inp.value, max);
-    inp.value = raw > 0 ? formatPoints(raw) : '';
+    inp.value = raw != null ? formatPoints(raw) : '';
     // Leaving a field without changing it saves nothing; an untouched blank
-    // field used to write a 0.
+    // field used to write a 0. A typed 0 is a score; blank clears.
     if (raw === getPointsScore(cid, sid, aid)) return;
-    setScore(cid, sid, aid, aid, raw);
+    if (raw != null) setScore(cid, sid, aid, aid, raw);
     setPointsScore(cid, sid, aid, raw);
     var pctSpan = inp.closest('.score-row').querySelector('.gb-pts-live-pct');
-    if (pctSpan) pctSpan.textContent = raw > 0 ? Math.round((raw / max) * 100) + '%' : '';
+    if (pctSpan) pctSpan.textContent = raw != null ? Math.round((raw / max) * 100) + '%' : '';
   }
   function handlePointsKey(e, inp) {
     if (e.key === 'Enter') {
@@ -1793,7 +1793,7 @@ window.PageAssignments = (function () {
       }
     } else if (e.key === 'Escape') {
       var raw = getPointsScore(activeCourse, inp.dataset.sid, inp.dataset.aid);
-      inp.value = raw > 0 ? formatPoints(raw) : '';
+      inp.value = raw != null ? formatPoints(raw) : '';
       inp.blur();
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();

@@ -4,8 +4,8 @@
  * - Scores and statuses entered before a new assessment or student gets its
  *   server id move to that id and are sent; before, a write with a local id
  *   was dropped and never sent.
- * - A points score of 0 (a cleared cell) is no evidence; pointsToProf used to
- *   turn it into a 1.
+ * - A cleared points cell is no evidence. (Until 2026-10-16 a cleared cell
+ *   was stored as 0; a 0 is now a real score.)
  * - Demo Mode student ids never reach get_student_profile.
  */
 import './setup.js';
@@ -165,10 +165,19 @@ describe('cleared points scores', () => {
     clearProfCache();
   });
 
-  it('counts a points score of 0 as no evidence', () => {
+  // Since 2026-10-16 a typed 0 is a score and a cleared cell has no entry
+  // (docs/grading-compliance-plan.md 1.5).
+  it('counts a points score of 0 as a score of 0', () => {
     _cache.scores[CID] = { [ENR_Y]: [{ assessmentId: AID, tagId: TAG1, score: 0, date: '2026-10-13' }] };
     clearProfCache();
-    expect(getTagScores(CID, ENR_Y, TAG1)[0].score).toBe(0);
+    expect(getTagScores(CID, ENR_Y, TAG1)[0].score).toBe(1);
+    expect(getAssessmentOverallScore(CID, ENR_Y, AID)).toBe(0);
+  });
+
+  it('counts a cleared points cell as no evidence', () => {
+    _cache.scores[CID] = { [ENR_Y]: [] };
+    clearProfCache();
+    expect(getTagScores(CID, ENR_Y, TAG1)).toEqual([]);
     expect(getAssessmentOverallScore(CID, ENR_Y, AID)).toBeNull();
   });
 

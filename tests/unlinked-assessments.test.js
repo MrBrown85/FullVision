@@ -98,6 +98,22 @@ describe('unlinked assessments', () => {
     expect(fake.committedCount('upsert_score', p => p.p_value === 7.5)).toBe(1);
   });
 
+  it('sends a typed 0 as 0 and a cleared cell as no score', async () => {
+    seed('assessments', [
+      { id: AID, title: 'Quiz', type: 'summative', tagIds: [], scoreMode: 'points', maxPoints: 10 },
+    ]);
+    seed('scores', {});
+    setPointsScore(CID, ENR, AID, 0);
+    expect(getPointsScore(CID, ENR, AID)).toBe(0);
+    await settle();
+    expect(fake.committedCount('upsert_score', p => p.p_assessment_id === AID && p.p_value === 0)).toBe(1);
+
+    setPointsScore(CID, ENR, AID, null);
+    expect(getPointsScore(CID, ENR, AID)).toBeNull();
+    await settle();
+    expect(fake.committedCount('upsert_score', p => p.p_assessment_id === AID && p.p_value === null)).toBe(1);
+  });
+
   it('sends Incomplete as 0', async () => {
     seed('assessments', [
       { id: AID, title: 'Homework', type: 'summative', tagIds: [], scoreMode: 'complete', maxPoints: 1 },

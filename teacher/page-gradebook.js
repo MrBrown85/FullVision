@@ -817,10 +817,10 @@ window.PageGradebook = (function () {
         } else if (col.isPointsCol) {
           var max = assess.maxPoints || 100;
           var score = getPointsScore(cid, s.id, col.assessmentId);
-          var pct = score > 0 ? ((score / max) * 100).toFixed(1) : '0.0';
-          var title = score > 0 ? formatPoints(score) + '/' + max + ' (' + pct + '%)' : '';
+          var pct = score != null ? ((score / max) * 100).toFixed(1) : '0.0';
+          var title = score != null ? formatPoints(score) + '/' + max + ' (' + pct + '%)' : '';
           var cellContent =
-            score > 0
+            score != null
               ? '<div class="gb-pts-display"><span class="gb-pts-score">' +
                 formatPoints(score) +
                 '<span class="gb-pts-max">/' +
@@ -1100,6 +1100,9 @@ window.PageGradebook = (function () {
         var rubricVal = getRubricAssessmentScore(cid, a, studentScores);
         if (rubricVal !== undefined) val = rubricVal || 0;
         var isPoints = isPointsScored(a);
+        // A points 0 is a score; on proficiency work 0 is none.
+        var pointsVal = isPoints && !isCompletionScored(a) ? getPointsScore(cid, s.id, a.id) : null;
+        if (pointsVal != null) val = pointsVal;
         var display,
           cellStyle,
           cellClass = '';
@@ -1108,8 +1111,8 @@ window.PageGradebook = (function () {
           cellStyle = cmpMark === 'complete' ? 'color:var(--score-3)' : 'color:var(--score-1)';
           display = cmpMark === 'complete' ? '\u2713' : '\u2717';
           val = cmpMark === 'complete' ? 1 : 0;
-        } else if (val > 0) {
-          var r = Math.round(val);
+        } else if (val > 0 || pointsVal != null) {
+          var r = pointsVal != null ? pointsToProf(val, a.maxPoints || 100, getGradingScale(cid)) : Math.round(val);
           cellStyle = 'background:' + PROF_TINT[r] + ';color:' + PROF_COLORS[r];
           display = isPoints ? formatPoints(val) : val.toFixed(1);
           // Warning for out-of-range (>4 for proficiency, >maxPoints for points)
@@ -1790,11 +1793,12 @@ window.PageGradebook = (function () {
     inp.step = 'any';
     inp.max = String(max);
     inp.inputMode = 'decimal';
-    inp.value = current > 0 ? formatPoints(current) : '';
+    var hasCurrent = isPtsCol ? current != null : current > 0;
+    inp.value = hasCurrent ? formatPoints(current) : '';
     inp.className = 'gb-pts-input';
     var pctLabel = document.createElement('span');
     pctLabel.className = 'gb-pts-live-pct';
-    pctLabel.textContent = current > 0 ? ((current / max) * 100).toFixed(1) + '%' : '';
+    pctLabel.textContent = hasCurrent ? ((current / max) * 100).toFixed(1) + '%' : '';
     wrap.appendChild(inp);
     wrap.appendChild(pctLabel);
     td.appendChild(wrap);
@@ -1802,7 +1806,7 @@ window.PageGradebook = (function () {
     inp.select();
     inp.addEventListener('input', function () {
       var v = parsePointsInput(inp.value, max);
-      pctLabel.textContent = inp.value !== '' ? ((v / max) * 100).toFixed(1) + '%' : '';
+      pctLabel.textContent = v != null ? ((v / max) * 100).toFixed(1) + '%' : '';
     });
     function commit() {
       var raw = parsePointsInput(inp.value, max);
@@ -1820,11 +1824,11 @@ window.PageGradebook = (function () {
         setPointsScore(cid, sid, aid, raw);
       } else {
         var tidVal = td.dataset.tid;
-        upsertScore(cid, sid, aid, tidVal, raw, assess.date || courseToday(cid), assess.type || 'summative');
+        upsertScore(cid, sid, aid, tidVal, raw || 0, assess.date || courseToday(cid), assess.type || 'summative');
       }
       wrap.remove();
       if (existing) existing.remove();
-      if (raw > 0) {
+      if (raw != null && (isPtsCol || raw > 0)) {
         var pctV = ((raw / max) * 100).toFixed(1);
         td.innerHTML =
           '<div class="gb-pts-display"><span class="gb-pts-score">' +
@@ -2326,8 +2330,8 @@ window.PageGradebook = (function () {
     inp.max = isPts ? String(maxPts) : '4';
     if (isPts) inp.inputMode = 'decimal';
     inp.className = 'gb-scores-input';
-    var currentPts = isPts ? getPointsScore(cid, sid, aid) : 0;
-    if (isPts) inp.value = currentPts > 0 ? formatPoints(currentPts) : '';
+    var currentPts = isPts ? getPointsScore(cid, sid, aid) : null;
+    if (isPts) inp.value = currentPts != null ? formatPoints(currentPts) : '';
     else inp.value = currentVal > 0 ? currentVal.toFixed(1) : '';
     td.appendChild(inp);
     inp.focus();
@@ -2335,7 +2339,8 @@ window.PageGradebook = (function () {
 
     function commit(navDir) {
       var val = isPts ? parsePointsInput(inp.value, maxPts) : parseFloat(inp.value);
-      if (inp.value === '' || isNaN(val)) val = 0;
+      // Blank clears: null for points (where 0 is a score), 0 for levels.
+      if (!isPts && (inp.value === '' || isNaN(val))) val = 0;
       // Save undo
       // Save full entries for undo (deep copy)
       var prevEntries = tagIds.map(function (tid) {
@@ -2659,7 +2664,7 @@ window.PageGradebook = (function () {
       }
       if (aid && sid) {
         if (focused.dataset.pts === '1') {
-          setPointsScore(activeCourse, sid, aid, 0);
+          setPointsScore(activeCourse, sid, aid, null);
         } else if (tid) {
           var assess = getAssessments(activeCourse).find(function (a) {
             return a.id === aid;

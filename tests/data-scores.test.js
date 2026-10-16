@@ -38,14 +38,14 @@ describe('getPointsScore', () => {
     expect(getPointsScore(CID, 'stu1', 'a1')).toBe(85);
   });
 
-  it('returns 0 when no scores exist for student', () => {
+  it('returns null when no scores exist for student', () => {
     saveScores(CID, {});
-    expect(getPointsScore(CID, 'stu1', 'a1')).toBe(0);
+    expect(getPointsScore(CID, 'stu1', 'a1')).toBeNull();
   });
 
-  it('returns 0 for missing student', () => {
+  it('returns null for missing student', () => {
     saveScores(CID, {});
-    expect(getPointsScore(CID, 'nobody', 'a1')).toBe(0);
+    expect(getPointsScore(CID, 'nobody', 'a1')).toBeNull();
   });
 
   it('returns 0 when score is 0', () => {

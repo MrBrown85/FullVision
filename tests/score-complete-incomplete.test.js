@@ -25,9 +25,11 @@ describe('helpers', () => {
     expect(isPointsScored({ scoreMode: 'proficiency' })).toBe(false);
   });
 
-  it('counts Incomplete as graded only on Complete/Incomplete assessments', () => {
+  it('counts a 0 as graded on points and Complete/Incomplete work only', () => {
     expect(isScoreEntered({ scoreMode: 'complete' }, { score: 0 })).toBe(true);
-    expect(isScoreEntered({ scoreMode: 'points' }, { score: 0 })).toBe(false);
+    expect(isScoreEntered({ scoreMode: 'points' }, { score: 0 })).toBe(true);
+    expect(isScoreEntered({ scoreMode: 'points' }, { score: null })).toBe(false);
+    expect(isScoreEntered({ scoreMode: 'proficiency' }, { score: 0 })).toBe(false);
     expect(isScoreEntered({ scoreMode: 'complete' }, null)).toBe(false);
   });
 });
