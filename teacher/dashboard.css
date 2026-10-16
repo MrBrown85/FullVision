@@ -57,6 +57,15 @@
   border-radius: 12px;
   overflow: visible;
   box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+/* The Curricular Competencies card has a fixed height, and it sets the
+   row's height. The other two cards take that height instead of growing
+   with their content; Next Steps scrolls inside its card. */
+.dash-overview-section + .dash-overview-section {
+  contain: size;
 }
 .page-dashboard .dash-section-title {
   font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
@@ -133,10 +142,11 @@
   flex-shrink: 0;
 }
 
-/* Six competencies show; a longer list scrolls, so the card keeps its size
-   however many competencies a class has. Six rows = 6 × (18px row + 6px gap). */
+/* Six competencies show; a longer list scrolls and a shorter one leaves the
+   space, so the card is one size for every class. Six rows = 6 × (18px row +
+   6px gap). */
 .dash-outcome-list {
-  max-height: 144px;
+  height: 144px;
   overflow-y: auto;
   overscroll-behavior: contain;
   margin-right: -8px;
@@ -204,11 +214,21 @@
 }
 
 /* Action items */
+.dash-next-steps {
+  margin-top: 14px;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
 .dash-action-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
   margin-top: 4px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .dash-action-item {
   display: flex;
@@ -218,6 +238,7 @@
   border: 1px solid var(--divider-subtle);
   border-radius: var(--radius-sm);
   background: var(--overlay-hover);
+  flex-shrink: 0;
 }
 .dash-action-dot {
   width: 6px;
@@ -232,6 +253,10 @@
   font-size: var(--text-sm);
   color: var(--text-2);
   line-height: 1.4;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 .dash-action-link {
   font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
