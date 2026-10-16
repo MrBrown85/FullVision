@@ -203,6 +203,13 @@ describe('class load safety', () => {
   });
 
   it('lets the last of two overlapping switches win', async () => {
+    var originalBody = document.body;
+    document.body = {
+      appendChild() {},
+      setAttribute() {},
+      removeAttribute() {},
+      classList: { add() {}, remove() {} },
+    };
     saveCourses({ [CID]: { id: CID, name: 'A' }, [OTHER_CID]: { id: OTHER_CID, name: 'B' } });
     var gate = deferred();
     useServer({
@@ -222,6 +229,7 @@ describe('class load safety', () => {
     gate.resolve();
     expect(await first).toBe(false);
     expect(getActiveCourse()).toBe(OTHER_CID);
+    document.body = originalBody;
   });
 });
 

@@ -2379,8 +2379,13 @@ function _courseLoadFailed(cid, error) {
   console.warn('get_gradebook failed for ' + cid + '; keeping the saved copy:', error);
   _loadError[cid] = { at: Date.now(), message: message };
   if (_cache.students[cid] === undefined) _loadCourseFromLS(cid);
-  if (typeof showSyncToast === 'function') {
-    showSyncToast("Couldn't load the latest data for this class. Showing your saved copy.", 'load-failed');
+  // The message must never be what breaks a load.
+  try {
+    if (typeof showSyncToast === 'function') {
+      showSyncToast("Couldn't load the latest data for this class. Showing your saved copy.", 'load-failed');
+    }
+  } catch (e) {
+    console.warn('Could not show the load-failed message:', e);
   }
 }
 
