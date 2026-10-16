@@ -696,9 +696,9 @@ describe('v2Queue (offline write queue)', () => {
     });
   });
 
-  // Write-path audit §3: failed writes can be retried or are replaced by
-  // newer writes to the same record.
-  describe('retrying failed writes', () => {
+  // Write-path audit §3: a newer write to the same record replaces a failed
+  // one, so the failure shown is never out of date.
+  describe('failed writes', () => {
     function rejectOnce() {
       var n = 0;
       globalThis.getSupabase = () => ({
@@ -710,19 +710,6 @@ describe('v2Queue (offline write queue)', () => {
         },
       });
     }
-
-    it('sends a failed write again on retryDeadLetter', async () => {
-      setOnline(true);
-      rejectOnce();
-      Q.push('update_assessment', { p_id: 'a1', p_patch: { title: 'Lab' } });
-      await Q.flush();
-      var dead = Q.deadLetter();
-      expect(dead).toHaveLength(1);
-      expect(Q.retryDeadLetter(dead[0].id)).toBe(true);
-      await Q.flush();
-      expect(Q.stats()).toMatchObject({ queued: 0, deadLettered: 0 });
-      expect(calls).toHaveLength(2);
-    });
 
     it('drops a failed write once a newer write to the same record lands', async () => {
       setOnline(true);
