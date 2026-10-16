@@ -474,6 +474,10 @@ window.PageDashboard = (function () {
     CM.handleBlur(e.target);
   }
 
+  function _handleKeydown(e) {
+    CM.handleKeydown(e);
+  }
+
   /* ── init / destroy ─────────────────────────────────────── */
   function init(params) {
     // Reset state
@@ -503,6 +507,7 @@ window.PageDashboard = (function () {
     _addDocListener('input', _handleInput);
     _addDocListener('change', _handleChange);
     _addDocListener('blur', _handleBlur, true); // blur doesn't bubble, use capture
+    _addDocListener('keydown', _handleKeydown);
     CM.initDrag();
 
     render();
