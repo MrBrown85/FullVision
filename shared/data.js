@@ -2484,12 +2484,14 @@ function _bundleToCache(cid, bundle) {
   _applyStudentProfileSummaries(cid, bundle.profiles || []);
   _fillOverrideCalculated(cid);
   _applyBundleTermRatings(cid, bundle.term_ratings || []);
-  if (bundle.report_config) {
-    var rc = bundle.report_config;
+  // A course's report_config row exists from creation with no blocks; only
+  // a saved layout replaces the default one the Reports page builds.
+  var rc = bundle.report_config;
+  if (rc && rc.blocks_config && typeof rc.blocks_config === 'object' && Object.keys(rc.blocks_config).length > 0) {
     _persistLoadedField(
       cid,
       'reportConfig',
-      Object.assign({}, rc.blocks_config || {}, rc.preset ? { _preset: rc.preset } : {}),
+      Object.assign({}, rc.blocks_config, rc.preset ? { _preset: rc.preset } : {}),
     );
   }
   if (Array.isArray(bundle.custom_tags)) _persistLoadedField(cid, 'customTags', bundle.custom_tags.slice());
