@@ -1054,8 +1054,10 @@ window.PageAssignments = (function () {
       '</div>' +
       '</div>' +
       '</div>' +
-      '<div class="af-field" style="flex:0 0 auto">' +
-      '<label class="af-label">Weight</label>' +
+      '<div class="af-field" id="af-weight-wrap" style="flex:0 0 auto;' +
+      (scoreMode === 'proficiency' ? '' : 'display:none') +
+      '" title="How much this counts toward competency proficiency, compared with other assessments. It doesn\u2019t change the course %.">' +
+      '<label class="af-label" for="af-weight">Proficiency weight</label>' +
       '<select class="af-input" id="af-weight" style="width:80px">' +
       [0.5, 1, 1.5, 2, 3]
         .map(function (w) {
@@ -1246,6 +1248,14 @@ window.PageAssignments = (function () {
     if (el) el.value = mode;
     var wrap = document.getElementById('af-maxpoints-wrap');
     if (wrap) wrap.style.display = mode === 'points' ? '' : 'none';
+    var weightWrap = document.getElementById('af-weight-wrap');
+    if (weightWrap) weightWrap.style.display = mode === 'proficiency' ? '' : 'none';
+  }
+
+  // The proficiency weight only applies to proficiency work (D2).
+  function _formAssessWeight(scoreModeVal) {
+    if (scoreModeVal !== 'proficiency') return 1;
+    return parseFloat((document.getElementById('af-weight') || {}).value) || 1;
   }
 
   /* ── Assessment CRUD ────────────────────────────────────── */
@@ -1385,7 +1395,7 @@ window.PageAssignments = (function () {
       newAssess.scoreMode = 'complete';
       newAssess.maxPoints = COMPLETE_MAX_POINTS;
     }
-    var assessWeight = parseFloat((document.getElementById('af-weight') || {}).value) || 1;
+    var assessWeight = _formAssessWeight(scoreModeVal);
     if (assessWeight !== 1) newAssess.weight = assessWeight;
     assessments.push(newAssess);
     saveAssessments(activeCourse, assessments);
@@ -1481,7 +1491,7 @@ window.PageAssignments = (function () {
       assessments[idx].scoreMode = undefined;
       assessments[idx].maxPoints = undefined;
     }
-    var assessWeight = parseFloat((document.getElementById('af-weight') || {}).value) || 1;
+    var assessWeight = _formAssessWeight(scoreModeVal);
     assessments[idx].weight = assessWeight !== 1 ? assessWeight : undefined;
     saveAssessments(activeCourse, assessments);
     openAssessIds.add(aid);

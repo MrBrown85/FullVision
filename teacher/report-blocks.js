@@ -802,7 +802,7 @@ window.ReportBlocks = (function () {
         const isPoints = a.scoreMode === 'points';
         const max = a.maxPoints || 100;
         const weightLabel =
-          a.weight && a.weight !== 1
+          getAssessmentWeight(a) !== 1
             ? ` <span style="font-size:0.62rem;color:var(--text-3);font-weight:400">${a.weight}×</span>`
             : '';
         const dateStr = a.date

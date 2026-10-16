@@ -38,7 +38,7 @@ function _getAW(cid) {
   var assessments = getAssessments(cid);
   var aw = {};
   assessments.forEach(function (a) {
-    aw[a.id] = a.weight || 1;
+    aw[a.id] = getAssessmentWeight(a);
   });
   _awCache[cid] = aw;
   return aw;
@@ -92,12 +92,15 @@ function getCategoryWeights(cid) {
   const cc = getCourseConfig(cid);
   return cc.categoryWeights || { summative: 1.0, formative: 0.0 };
 }
-/** Get the weight multiplier for an assessment.
+/** Get the proficiency weight multiplier for an assessment. Points and
+ * Complete/Incomplete work always counts 1: the control is hidden there, as
+ * in Schoology and Teams, where a teacher changes max points instead.
  * @param {Object} assessment - Assessment object
  * @param {number} [assessment.weight] - Weight value, defaults to 1
  * @returns {number} Assessment weight
  */
 function getAssessmentWeight(assessment) {
+  if (!assessment || isPointsScored(assessment)) return 1;
   return assessment.weight || 1;
 }
 
