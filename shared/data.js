@@ -967,6 +967,9 @@ function _removeLocalKeys(test) {
 async function initAllCourses() {
   // Run one-time LS format migrations before any read of cached data.
   _migrateAssignmentStatusFormat();
+  // A student delete held for an undo toast on a page that has since closed:
+  // that toast is gone, so the delete goes.
+  releaseHeldStudentDeletes();
 
   // Demo mode: hard-skip Supabase, force local-only, ensure seed data exists.
   // Set by the "Try Demo Mode" button on the login page. Gated on the
@@ -1161,7 +1164,13 @@ function _initVisibilityRefresh() {
     if (Date.now() - _lastVisibilityRefresh < _VISIBILITY_DEBOUNCE) return;
     _revalidateActiveClass();
   });
-  if (typeof window.addEventListener === 'function') window.addEventListener('online', _revalidateActiveClass);
+  if (typeof window.addEventListener === 'function') {
+    window.addEventListener('online', _revalidateActiveClass);
+    // A student delete waiting out its undo toast goes when the page does.
+    window.addEventListener('pagehide', function () {
+      releaseHeldStudentDeletes();
+    });
+  }
 }
 
 function _revalidateActiveClass() {
@@ -6582,6 +6591,9 @@ function _persistStudentsToCanonical(cid, prev, arr) {
     // Adds (any id not in prev)
     after.forEach(function (s, idx) {
       if (s && s.id && !prevById[s.id]) {
+        // Undo of a delete still held in the outbox: the server never lost
+        // the enrollment.
+        if (cancelHeldStudentDelete(s.id)) return;
         ops.push(_canonicalEnrollStudent(sb, cid, s, idx));
       } else if (s && s.id) _dropUnqueuedPending('student', s.id);
     });
@@ -7981,6 +7993,7 @@ function _writeRpc(name, params, options) {
   if (outbox) {
     var entryId = options.entryId || params.p_idempotency_key || _idempotencyKey() || uid();
     var undo = _snapshotBaselineRow(name, params);
+    if (options.holdForUndo) blockedOn.push(_HELD_FOR_UNDO);
     var pushed = outbox.push(name, params, { id: entryId, blockedOn: blockedOn, sendOptions: options });
     if (pushed && pushed.refused) {
       _onWriteRefused(name, params, undo, pushed.refused, options.entryId);
@@ -8416,6 +8429,125 @@ window.v2.deleteStudent = function (studentId) {
   }
   return _rpcOrNoop('delete_student', { p_id: studentId });
 };
+
+/* Deleting a student waits out the undo toast (audit finding 4).
+   delete_student is a hard delete, so it is queued held: stored in the
+   outbox, which keeps it across a reload, but not sent. Closing the toast,
+   leaving the page, signing out or the next page load releases it; Undo
+   takes it back out. Without the outbox it is sent at once. */
+var _HELD_FOR_UNDO = 'undo-window';
+var _heldStudentDeletes = {}; // enrollment id → outbox entry id, this page only
+
+function holdStudentDelete(enrollmentId, studentId) {
+  if (!_outbox() || !_isUuid(studentId)) return window.v2.deleteStudent(studentId);
+  var entryId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : uid();
+  _heldStudentDeletes[enrollmentId] = entryId;
+  return _writeRpc('delete_student', { p_id: studentId }, { entryId: entryId, holdForUndo: true }).then(function (res) {
+    if (_heldStudentDeletes[enrollmentId] === entryId) delete _heldStudentDeletes[enrollmentId];
+    return res;
+  });
+}
+
+function isStudentDeleteHeld(enrollmentId) {
+  return !!_heldStudentDeletes[enrollmentId];
+}
+
+/* Undo: true when the delete had not gone yet, so the server still has the
+   student and everything they had. */
+function cancelHeldStudentDelete(enrollmentId) {
+  var entryId = _heldStudentDeletes[enrollmentId];
+  var q = window.v2Queue;
+  if (!entryId || !q || typeof q.remove !== 'function') return false;
+  delete _heldStudentDeletes[enrollmentId];
+  return q.remove(entryId);
+}
+
+/* Sends one student's held delete (their toast closed), or every held
+   delete when no enrollment id is given (the page is going away). */
+function releaseHeldStudentDeletes(enrollmentId) {
+  var entryId = enrollmentId ? _heldStudentDeletes[enrollmentId] : null;
+  if (enrollmentId && !entryId) return;
+  if (enrollmentId) delete _heldStudentDeletes[enrollmentId];
+  else _heldStudentDeletes = {};
+  var q = window.v2Queue;
+  if (!q || typeof q.rewrite !== 'function') return;
+  q.rewrite(function (entry) {
+    var held = Array.isArray(entry.blocked_on) ? entry.blocked_on : [];
+    if (held.indexOf(_HELD_FOR_UNDO) < 0 || (entryId && entry.id !== entryId)) return null;
+    return {
+      payload: entry.payload,
+      blockedOn: held.filter(function (id) {
+        return id !== _HELD_FOR_UNDO;
+      }),
+    };
+  });
+}
+
+/* deleteStudent takes the student out of the server baselines as well as
+   the local copy: delete_student removes them on the server, so a later
+   roster or score save must not withdraw the enrollment or clear their
+   scores itself. */
+function forgetStudentServerState(cid, sid) {
+  if (Array.isArray(_serverStateOr('students', cid, null))) {
+    _serverState.students[cid] = _serverState.students[cid].filter(function (s) {
+      return !s || s.id !== sid;
+    });
+  }
+  ['scores', 'notes'].forEach(function (field) {
+    var base = _serverStateOr(field, cid, null);
+    if (base) delete base[sid];
+  });
+  var statuses = _serverStateOr('statuses', cid, null);
+  if (statuses) {
+    Object.keys(statuses).forEach(function (key) {
+      if (key.indexOf(sid + ':') === 0) delete statuses[key];
+    });
+  }
+}
+
+/* Undo for deleteStudent (teacher/ui.js). When the held delete is taken
+   back, the server still has the student and everything they had, so the
+   local copy and the baselines are put back and nothing is sent. Returns
+   false when the delete had already gone. */
+function restoreDeletedStudent(cid, snapshot) {
+  var sid = snapshot && snapshot.student && snapshot.student.id;
+  if (!sid || !cancelHeldStudentDelete(sid)) return false;
+  var students = getStudents(cid).filter(function (s) {
+    return s.id !== sid;
+  });
+  var at = snapshot.index >= 0 && snapshot.index <= students.length ? snapshot.index : students.length;
+  students.splice(at, 0, snapshot.student);
+  _saveCourseField('students', cid, students);
+  [
+    ['scores', getScores, snapshot.scores],
+    ['goals', getGoals, snapshot.goals],
+    ['reflections', getReflections, snapshot.reflections],
+    ['notes', getNotes, snapshot.notes],
+    ['flags', getFlags, snapshot.flagged ? true : undefined],
+    ['observations', getQuickObs, snapshot.quickObs],
+    ['termRatings', getTermRatings, snapshot.termRatings],
+  ].forEach(function (f) {
+    if (f[2] === undefined) return;
+    var all = f[1](cid);
+    all[sid] = f[2];
+    _saveCourseField(f[0], cid, all);
+  });
+  var statuses = getAssignmentStatuses(cid);
+  Object.assign(statuses, snapshot.statuses || {});
+  _saveCourseField('statuses', cid, statuses);
+
+  var baseStudents = _serverStateOr('students', cid, null);
+  if (Array.isArray(baseStudents) && !baseStudents.some(s => s && s.id === sid)) {
+    baseStudents.splice(Math.min(at, baseStudents.length), 0, _cloneValue(snapshot.student));
+  }
+  var baseScores = _serverStateOr('scores', cid, null);
+  if (baseScores && snapshot.scores && snapshot.scores.length) baseScores[sid] = _cloneValue(snapshot.scores);
+  var baseNotes = _serverStateOr('notes', cid, null);
+  if (baseNotes && snapshot.notes !== undefined) baseNotes[sid] = _cloneValue(snapshot.notes);
+  var baseStatuses = _serverStateOr('statuses', cid, null);
+  if (baseStatuses) Object.assign(baseStatuses, snapshot.statuses || {});
+  return true;
+}
 
 /* §15.4 — post-import reconciliation: merge a duplicate "ghost" student
    into a canonical record. Same-course enrollments merge (designations

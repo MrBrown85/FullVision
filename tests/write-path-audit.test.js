@@ -26,6 +26,8 @@ const STU_Y = '33333333-3333-4333-8333-333333333333';
 const AID = '44444444-4444-4444-8444-444444444444';
 const TAG1 = '77777777-7777-4777-8777-777777777777';
 const NEW_CID = '55555555-5555-4555-8555-555555555555';
+const ENR_Z = 'abababab-abab-4bab-8bab-abababababab';
+const STU_Z = '99999999-9999-4999-8999-999999999999';
 
 function setOnline(value) {
   Object.defineProperty(navigator, 'onLine', {
@@ -78,6 +80,7 @@ function resetSession() {
   _noteSaveQueue = {};
   _serverState = {};
   _idRekeys = {};
+  _heldStudentDeletes = {};
   _localWrites = {};
   _refreshState = {};
   _pendingSyncs = 0;
@@ -220,11 +223,9 @@ describe('write-path audit: data layer', () => {
     expect(fake.count('update_assessment', p => p.p_patch.title === 'Lab 1')).toBeGreaterThanOrEqual(2);
   });
 
-  // Finding 4. deleteStudent sends delete_student at once and only edits the
-  // local copy. Undo puts the local copy back, but the server baseline still
-  // lists the student, so no enrol is sent. Either fix passes: do not send the
-  // delete until the undo window closes, or restore the student on Undo.
-  it.fails('does not leave a student deleted on the server after Undo', async () => {
+  // Finding 4 (fixed: delete_student waits in the outbox, held, until the
+  // undo toast closes; Undo takes it back out).
+  it('does not leave a student deleted on the server after Undo', async () => {
     seed('students', [studentY()]);
     seed('scores', {});
     _rememberServerState('students', CID, getStudents(CID));
@@ -243,6 +244,120 @@ describe('write-path audit: data layer', () => {
     var deleted = fake.count('delete_student');
     var restored = fake.count('create_student_and_enroll') + fake.count('restore_student');
     expect(deleted === 0 || restored > 0).toBe(true);
+  });
+
+  // Finding 4, the class manager's Undo: everything comes back locally and in
+  // the baselines, and nothing is sent, because the server never lost it.
+  it('restores a deleted student and their records on Undo without sending anything', async () => {
+    var score = { id: 'sc1', assessmentId: AID, tagId: TAG1, score: 3, type: 'summative' };
+    seed('students', [studentY()]);
+    seed('scores', { [ENR_Y]: [score] });
+    seed('statuses', { [ENR_Y + ':' + AID]: 'LATE' });
+    seed('observations', { [ENR_Y]: [{ id: 'ob1', text: 'Asked a great question' }] });
+    seed('termRatings', { [ENR_Y]: { 1: { dims: {}, narrative: 'Term 1' } } });
+    _rememberServerState('students', CID, getStudents(CID));
+    _rememberServerState('scores', CID, getScores(CID));
+    _rememberServerState('statuses', CID, getAssignmentStatuses(CID));
+
+    var snapshot = deleteStudent(CID, ENR_Y);
+    await settle();
+    expect(_serverState.scores[CID][ENR_Y]).toBeUndefined();
+
+    expect(restoreDeletedStudent(CID, snapshot)).toBe(true);
+    await settle();
+
+    expect(getStudents(CID).map(s => s.id)).toEqual([ENR_Y]);
+    expect(getScores(CID)[ENR_Y]).toEqual([score]);
+    expect(getAssignmentStatuses(CID)[ENR_Y + ':' + AID]).toBe('LATE');
+    expect(getQuickObs(CID)[ENR_Y]).toHaveLength(1);
+    expect(getTermRatings(CID)[ENR_Y]).toBeDefined();
+    expect(_serverState.students[CID].map(s => s.id)).toEqual([ENR_Y]);
+    expect(_serverState.scores[CID][ENR_Y]).toEqual([score]);
+    expect(fake.calls).toHaveLength(0);
+    expect(window.v2Queue.stats().queued).toBe(0);
+  });
+
+  // Finding 4: closing the toast sends the delete, once.
+  it('sends the held delete when the undo window closes', async () => {
+    seed('students', [studentY()]);
+    _rememberServerState('students', CID, getStudents(CID));
+
+    deleteStudent(CID, ENR_Y);
+    await settle();
+    expect(fake.count('delete_student')).toBe(0);
+
+    releaseHeldStudentDeletes();
+    await settle();
+    expect(fake.committedCount('delete_student', p => p.p_id === STU_Y)).toBe(1);
+  });
+
+  // Finding 4: a second delete closes the first toast, which sends only the
+  // first student's delete; the second can still be undone.
+  it('releases only the delete whose toast closed', async () => {
+    var other = {
+      id: ENR_Z,
+      personId: STU_Z,
+      firstName: 'Zed',
+      lastName: 'Zane',
+      designations: [],
+      sortName: 'Zane Zed',
+    };
+    seed('students', [studentY(), other]);
+    _rememberServerState('students', CID, getStudents(CID));
+
+    deleteStudent(CID, ENR_Y);
+    var second = deleteStudent(CID, ENR_Z);
+    releaseHeldStudentDeletes(ENR_Y);
+    await settle();
+    expect(restoreDeletedStudent(CID, second)).toBe(true);
+    await settle();
+
+    expect(fake.committedCount('delete_student', p => p.p_id === STU_Y)).toBe(1);
+    expect(fake.count('delete_student', p => p.p_id === STU_Z)).toBe(0);
+    expect(getStudents(CID).map(s => s.id)).toEqual([ENR_Z]);
+  });
+
+  // Finding 4: a roster save while the toast is up must not withdraw the
+  // enrollment the held delete is about to remove.
+  it('does not withdraw a deleted enrollment on a later roster save', async () => {
+    var other = {
+      id: ENR_Z,
+      personId: STU_Z,
+      firstName: 'Zed',
+      lastName: 'Zane',
+      designations: [],
+      sortName: 'Zane Zed',
+    };
+    seed('students', [studentY(), other]);
+    _rememberServerState('students', CID, getStudents(CID));
+
+    deleteStudent(CID, ENR_Y);
+    await settle();
+    var students = getStudents(CID);
+    students[0] = Object.assign({}, students[0], { preferred: 'Z' });
+    saveStudents(CID, students);
+    releaseHeldStudentDeletes();
+    await settle();
+
+    expect(fake.count('withdraw_enrollment')).toBe(0);
+    expect(fake.committedCount('delete_student')).toBe(1);
+  });
+
+  // Finding 4: the page closes while the toast is up. The held delete is in
+  // localStorage, and the next page sends it.
+  it('sends a held delete after a reload', async () => {
+    seed('students', [studentY()]);
+    _rememberServerState('students', CID, getStudents(CID));
+    setOnline(false);
+    deleteStudent(CID, ENR_Y);
+    await settle();
+
+    var queue = reloadPage();
+    setOnline(true);
+    await queue.flush();
+    await settle();
+
+    expect(fake.committedCount('delete_student', p => p.p_id === STU_Y)).toBe(1);
   });
 
   // Finding 5 (fixed: a refused push is refused at the data layer; nothing
@@ -320,9 +435,9 @@ describe('write-path audit: data layer', () => {
     expect(fake.committedCount('create_observation', p => p.p_enrollment_ids[0] === enr)).toBe(1);
   });
 
-  // Finding 9, through the phone grader's NS button (teacher-mobile/
-  // tab-grade.js), which zeroes every score key of the assessment.
-  it.fails('does not store a points score of 0 when a cell is marked NS', async () => {
+  // Finding 9, through the phone grader's NS button (fixed: teacher-mobile/
+  // tab-grade.js and page-assignments.js zero only proficiency work).
+  it('does not store a points score of 0 when a cell is marked NS', async () => {
     seed('students', [studentY()]);
     seed('assessments', [
       { id: AID, title: 'Quiz', scoreMode: 'points', maxPoints: 10, tagIds: [TAG1], type: 'summative' },

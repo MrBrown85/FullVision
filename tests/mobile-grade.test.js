@@ -557,6 +557,30 @@ describe('MGrade.setStatus', () => {
     expect(a2t1.score).toBe(2); // untouched — different assessment
   });
 
+  it('NS leaves a points or Complete/Incomplete score alone (0 would be a real score)', () => {
+    ['points', 'complete'].forEach(mode => {
+      let store = {
+        stu1: [{ id: 's1', assessmentId: 'a1', tagId: 't1', score: 7, type: 'summative', date: '2025-03-20' }],
+      };
+      let saved = 0;
+      mockDataLayer({
+        getScores: () => store,
+        saveScores: () => {
+          saved++;
+        },
+        getAssignmentStatus: () => null,
+        setAssignmentStatus: () => {},
+        getAssessments: () => [
+          { id: 'a1', type: 'summative', date: '2025-03-20', tagIds: ['t1'], scoreMode: mode, maxPoints: 10 },
+        ],
+      });
+      MGrade.setStatus(CID, 'stu1', 'a1', 'NS');
+      expect(store.stu1[0].score).toBe(7);
+      expect(saved).toBe(0);
+      restoreDataLayer();
+    });
+  });
+
   it('EXC does NOT auto-zero (only NS has that semantic)', () => {
     let store = {
       stu1: [{ id: 's1', assessmentId: 'a1', tagId: 't1', score: 3, type: 'summative', date: '2025-03-20' }],

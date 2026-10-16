@@ -894,6 +894,7 @@ function deleteStudent(cid, sid) {
   // Save snapshot for undo
   const snapshot = {
     student,
+    index: students.indexOf(student),
     scores: scores[sid] ? structuredClone(scores[sid]) : [],
     goals: goals[sid] ? structuredClone(goals[sid]) : undefined,
     reflections: reflections[sid] ? structuredClone(reflections[sid]) : undefined,
@@ -938,45 +939,54 @@ function deleteStudent(cid, sid) {
   // Clean student from assignment collaboration data (pairs, groups,
   // excludedStudents). These edits MUST go through saveAssessments because
   // they update assessment.collab_config server-side — the cascade chain
-  // can't reach JSONB columns on assessment rows that survive.
+  // can't reach JSONB columns on assessment rows that survive. Undo puts
+  // the snapshot back the same way.
   const assessments = getAssessments(cid);
-  let changed = false;
+  const named = list => Array.isArray(list) && list.some(item => (Array.isArray(item) ? item : [item]).includes(sid));
+  snapshot.collab = {};
   assessments.forEach(a => {
+    if (!named(a.excludedStudents) && !named(a.pairs) && !named(a.groups)) return;
+    snapshot.collab[a.id] = structuredClone({
+      excludedStudents: a.excludedStudents,
+      pairs: a.pairs,
+      groups: a.groups,
+    });
     if (a.excludedStudents) {
       a.excludedStudents = a.excludedStudents.filter(id => id !== sid);
       if (a.excludedStudents.length === 0) delete a.excludedStudents;
-      changed = true;
     }
     if (a.pairs) {
       a.pairs = a.pairs.map(p => p.filter(id => id !== sid)).filter(p => p.length > 0);
       if (a.pairs.length === 0) delete a.pairs;
-      changed = true;
     }
     if (a.groups) {
       a.groups = a.groups.map(g => g.filter(id => id !== sid)).filter(g => g.length > 0);
       if (a.groups.length === 0) delete a.groups;
-      changed = true;
     }
   });
-  if (changed) saveAssessments(cid, assessments);
+  if (Object.keys(snapshot.collab).length) saveAssessments(cid, assessments);
 
-  // Fire the canonical hard-delete. Schema FK cascade through enrollment
-  // handles every per-enrollment dependent table. Skipped in demo mode and
-  // when Supabase is degraded/disabled — LS cleanup above is the only state
-  // that matters in those modes.
+  // The canonical hard-delete. Schema FK cascade through enrollment handles
+  // every per-enrollment dependent table. It is held in the outbox until the
+  // undo toast closes (holdStudentDelete), and the server baselines drop the
+  // student now so no later save withdraws the enrollment or clears their
+  // scores in the meantime. Skipped in demo mode and when Supabase is
+  // degraded/disabled — LS cleanup above is the only state that matters in
+  // those modes.
   if (
     typeof _useSupabase !== 'undefined' &&
     _useSupabase &&
     localStorage.getItem('gb-demo-mode') !== '1' &&
-    window.v2 &&
-    typeof window.v2.deleteStudent === 'function'
+    typeof holdStudentDelete === 'function'
   ) {
+    forgetStudentServerState(cid, sid);
     // sid is the enrollment id; delete_student needs the person's student id.
-    window.v2.deleteStudent((student && student.personId) || sid).then(function (res) {
-      if (res && res.error && typeof showSyncToast === 'function') {
+    holdStudentDelete(sid, (student && student.personId) || sid).then(function (res) {
+      if (res && res.error && !res.error.cancelled && typeof showSyncToast === 'function') {
         showSyncToast('The student was not deleted on the server. Reload and try again.', 'error');
       }
     });
+    snapshot.heldDelete = isStudentDeleteHeld(sid);
   }
 
   return snapshot;
@@ -986,11 +996,13 @@ function deleteStudent(cid, sid) {
 let _undoState = null;
 let _undoTimer = null;
 
-function showUndoToast(message, undoFn) {
+/* commitFn runs when the toast closes without Undo: it times out, another
+   toast replaces it, or it is dismissed. */
+function showUndoToast(message, undoFn, commitFn) {
   // Clear any existing toast
   dismissUndoToast();
 
-  _undoState = { fn: undoFn };
+  _undoState = { fn: undoFn, commit: commitFn };
 
   const toast = document.createElement('div');
   toast.className = 'undo-toast';
@@ -1004,17 +1016,20 @@ function showUndoToast(message, undoFn) {
 }
 
 function executeUndo() {
-  if (_undoState && _undoState.fn) {
-    _undoState.fn();
-  }
+  const state = _undoState;
+  // Undo taken: the toast closes without committing.
+  _undoState = null;
+  if (state && state.fn) state.fn();
   dismissUndoToast();
 }
 
 function dismissUndoToast() {
   clearTimeout(_undoTimer);
+  const state = _undoState;
   _undoState = null;
   const el = document.getElementById('undo-toast');
   if (el) el.remove();
+  if (state && state.commit) state.commit();
 }
 
 /* ── Sync Toast ──────────────────────────────────────────── */
