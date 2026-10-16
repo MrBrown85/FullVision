@@ -96,8 +96,10 @@ function _getQueueStats() {
   };
 }
 
+// Failed (dead-lettered) writes are not shown to teachers: they confused more
+// than they helped (Oct 2026). They stay in the outbox for debugging.
 function _getUnsyncedCount(stats) {
-  return Number(stats.queued || 0) + Number(stats.deadLettered || 0);
+  return Number(stats.queued || 0);
 }
 
 function _formatRelativeTime(iso) {
@@ -123,29 +125,11 @@ function _humanizeEndpoint(endpoint) {
     });
 }
 
-function _renderSyncDeadEntry(entry) {
-  var label = _humanizeEndpoint(entry && entry.endpoint);
-  var error = (entry && entry.last_error) || 'Retry failed';
-  return `<div class="tb-sync-dead-item">
-    <div class="tb-sync-dead-copy">
-      <div class="tb-sync-dead-title">${esc(label)}</div>
-      <div class="tb-sync-dead-error">${esc(error)}</div>
-    </div>
-    <button class="tb-sync-dead-dismiss" data-action="dismissSyncDeadLetter" data-id="${esc((entry && entry.id) || '')}">Dismiss</button>
-  </div>`;
-}
-
 function _renderSyncPopoverContent(stats) {
   var total = _getUnsyncedCount(stats);
-  var dead = window.v2Queue && typeof window.v2Queue.deadLetter === 'function' ? window.v2Queue.deadLetter() : [];
   var summary = total > 0 ? total + ' unsynced' : 'All changes saved';
   var pendingCopy = stats.queued === 1 ? '1 pending write' : stats.queued + ' pending writes';
-  var deadCopy = stats.deadLettered === 1 ? '1 needs attention' : stats.deadLettered + ' need attention';
   var meta = [pendingCopy];
-  if (stats.deadLettered > 0) meta.push(deadCopy);
-  var deadHtml = dead.length
-    ? `<div class="tb-sync-dead-list">${dead.map(_renderSyncDeadEntry).join('')}</div>`
-    : `<div class="tb-sync-empty">No failed sync items.</div>`;
   return `<div class="tb-sync-popover-card">
     <div class="tb-sync-popover-header">
       <div>
@@ -162,8 +146,6 @@ function _renderSyncPopoverContent(stats) {
       <span>Last sync</span>
       <strong>${esc(_formatRelativeTime(stats.lastFlushAt))}</strong>
     </div>
-    <div class="tb-sync-popover-section">Needs attention</div>
-    ${deadHtml}
   </div>`;
 }
 
@@ -198,9 +180,6 @@ function refreshSyncStatusUI() {
 
   if (badge) {
     var label = total === 1 ? '1 unsynced change' : total + ' unsynced changes';
-    if (stats.deadLettered > 0) {
-      label += ' including ' + (stats.deadLettered === 1 ? '1 failed item' : stats.deadLettered + ' failed items');
-    }
     badge.hidden = total <= 0;
     badge.textContent = total > 99 ? '99+' : String(total);
     badge.title = label;
@@ -214,11 +193,7 @@ function refreshSyncStatusUI() {
   if (dot) {
     var dotStatus = 'idle';
     var dotTitle = 'All changes saved';
-    if (stats.deadLettered > 0) {
-      dotStatus = 'error';
-      dotTitle =
-        stats.deadLettered === 1 ? '1 sync item needs attention' : stats.deadLettered + ' sync items need attention';
-    } else if (!stats.online && total > 0) {
+    if (!stats.online && total > 0) {
       dotStatus = 'error';
       dotTitle = total === 1 ? 'Offline — 1 change queued' : 'Offline — ' + total + ' changes queued';
     } else if (stats.flushing || (stats.online && stats.queued > 0)) {
@@ -248,8 +223,7 @@ async function retrySyncQueue() {
   var result = await window.v2Queue.flush();
   refreshSyncStatusUI();
   if (typeof showSyncToast === 'function') {
-    if (result && result.deadLettered > 0) showSyncToast('Some queued changes still need attention.', 'error');
-    else if (result && result.succeeded > 0) showSyncToast('Queued changes synced.', 'success');
+    if (result && result.succeeded > 0) showSyncToast('Queued changes synced.', 'success');
   }
 }
 
