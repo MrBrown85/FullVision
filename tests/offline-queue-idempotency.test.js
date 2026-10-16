@@ -155,21 +155,25 @@ describe('offline-queue idempotency key', () => {
       expect(calls[0].payload.p_idempotency_key).toBe(calls[1].payload.p_idempotency_key);
     });
 
-    it('sends the same key on every retry until the entry is dead-lettered', async () => {
-      rpcImpl = () => Promise.resolve({ data: null, error: { message: 'network: failed to fetch' } });
+    it('sends the same key on every retry until the write lands', async () => {
+      var failures = 0;
+      rpcImpl = () => {
+        if (failures++ < 3) return Promise.resolve({ data: null, error: { message: 'network: failed to fetch' } });
+        return Promise.resolve({ data: { id: 'row' }, error: null });
+      };
 
-      const enq = Q.enqueue('create_observation', { p_body: 'permanently-broken' });
+      const enq = Q.enqueue('create_observation', { p_body: 'flaky-network' });
       setOnline(true);
 
-      // A network error retries (setTimeout is immediate here) until
-      // MAX_ATTEMPTS, then the entry is dead-lettered.
+      // A network error retries (setTimeout is immediate here) for as long as
+      // it takes; nothing is dead-lettered.
       await Q.flush();
 
-      expect(calls.length).toBeGreaterThanOrEqual(3);
+      expect(calls).toHaveLength(4);
       const keys = calls.map(c => c.payload.p_idempotency_key);
       const uniq = Array.from(new Set(keys));
       expect(uniq).toEqual([enq.id]);
-      expect(Q.stats().deadLettered).toBe(1);
+      expect(Q.stats()).toMatchObject({ queued: 0, deadLettered: 0 });
     });
   });
 

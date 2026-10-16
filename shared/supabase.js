@@ -171,8 +171,9 @@
       ]);
     }
     var stats = q.stats();
-    // Dead-lettered writes will never send; don't hold up sign-out for them.
-    return Number(stats.queued || 0);
+    // Failed writes count too: signing out wipes them, and with them the
+    // teacher's last chance to retry them.
+    return Number(stats.queued || 0) + Number(stats.deadLettered || 0);
   }
 
   /**
@@ -357,8 +358,14 @@
     return _authCheckPromise;
   };
 
-  // Listen for auth state changes — notify on mid-session expiry
+  // Listen for auth state changes — notify on mid-session expiry, and send
+  // what the outbox held while signed out once there is a session again.
   window.onAuthChange(function (user, event) {
+    if (user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
+      if (window.v2Queue && typeof window.v2Queue.resume === 'function' && window.v2Queue.stats().signedOut) {
+        window.v2Queue.resume();
+      }
+    }
     if (event === 'TOKEN_REFRESHED' && !user) {
       if (typeof isLongFormAuthContextActive === 'function' && isLongFormAuthContextActive()) {
         if (typeof markLongFormSessionExpired === 'function') markLongFormSessionExpired();

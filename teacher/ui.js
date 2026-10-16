@@ -84,22 +84,65 @@ function renderDock(activePage, rightHTML) {
 
 function _getQueueStats() {
   if (!window.v2Queue || typeof window.v2Queue.stats !== 'function') {
-    return { queued: 0, deadLettered: 0, lastFlushAt: null, online: navigator.onLine !== false, flushing: false };
+    return {
+      queued: 0,
+      deadLettered: 0,
+      slow: 0,
+      signedOut: false,
+      lastFlushAt: null,
+      online: navigator.onLine !== false,
+      flushing: false,
+    };
   }
   var stats = window.v2Queue.stats() || {};
   return {
     queued: Number(stats.queued || 0),
     deadLettered: Number(stats.deadLettered || 0),
+    slow: Number(stats.slow || 0),
+    signedOut: !!stats.signedOut,
     lastFlushAt: stats.lastFlushAt || null,
     online: stats.online !== false,
     flushing: !!stats.flushing,
   };
 }
 
-// Failed (dead-lettered) writes are not shown to teachers: they confused more
-// than they helped (Oct 2026). They stay in the outbox for debugging.
+// Failed writes count and are listed (write-path audit §3): hiding them in
+// Oct 2026 meant a rejected edit vanished on the next refresh unseen.
 function _getUnsyncedCount(stats) {
-  return Number(stats.queued || 0);
+  return Number(stats.queued || 0) + Number(stats.deadLettered || 0);
+}
+
+function _syncChanges(n) {
+  return n === 1 ? '1 change' : n + ' changes';
+}
+
+/* The one banner under the dock, most urgent first: failed writes, signed
+   out with writes waiting, offline, writes the server hasn't taken for a
+   while. null when there is nothing to say. */
+function _syncBannerState(stats) {
+  if (stats.deadLettered > 0) {
+    return {
+      tone: 'error',
+      text: _syncChanges(stats.deadLettered) + " couldn't be saved.",
+      button: '<button class="offline-banner-btn" data-action="openSyncPopover">Review</button>',
+    };
+  }
+  if (stats.signedOut && stats.queued > 0) {
+    return {
+      tone: 'error',
+      text: "You're signed out. " + _syncChanges(stats.queued) + ' are waiting. Sign in to save them.',
+      button: '<button class="offline-banner-btn" data-action="go-login">Sign in</button>',
+    };
+  }
+  if (!stats.online) return { tone: 'offline', text: OFFLINE_BANNER_COPY, button: '' };
+  if (stats.slow > 0) {
+    return {
+      tone: 'offline',
+      text: _syncChanges(stats.slow) + " haven't reached the server yet. FullVision keeps trying.",
+      button: '',
+    };
+  }
+  return null;
 }
 
 function _formatRelativeTime(iso) {
@@ -116,7 +159,36 @@ function _formatRelativeTime(iso) {
   return diffDay === 1 ? '1 day ago' : diffDay + ' days ago';
 }
 
+/* What a failed write was, in a teacher's words. */
+var _SYNC_WRITE_LABELS = {
+  upsert_score: 'A score',
+  upsert_tag_score: 'A score',
+  upsert_rubric_score: 'A score',
+  fill_rubric: 'A score',
+  save_score_comment: 'A score comment',
+  set_score_status: 'An excused or not-submitted mark',
+  clear_score: 'Clearing a score',
+  clear_row_scores: "Clearing a student's scores",
+  clear_column_scores: "Clearing an assessment's scores",
+  create_assessment: 'A new assessment',
+  update_assessment: 'Changes to an assessment',
+  save_assessment_tags: 'Changes to an assessment',
+  save_collab: 'Changes to an assessment',
+  delete_assessment: 'Deleting an assessment',
+  create_student_and_enroll: 'A new student',
+  update_enrollment: 'Changes to a student',
+  update_student: 'Changes to a student',
+  withdraw_enrollment: 'Removing a student',
+  delete_student: 'Removing a student',
+  create_observation: 'An observation',
+  update_observation: 'An observation',
+  upsert_note: 'A note',
+  save_term_rating: 'A term rating',
+  save_categories: 'Grading categories',
+};
+
 function _humanizeEndpoint(endpoint) {
+  if (_SYNC_WRITE_LABELS[endpoint]) return _SYNC_WRITE_LABELS[endpoint];
   return (endpoint || 'queued write')
     .replace(/^v2\./, '')
     .replace(/_/g, ' ')
@@ -125,11 +197,34 @@ function _humanizeEndpoint(endpoint) {
     });
 }
 
+function _renderSyncDeadEntry(entry) {
+  var label = _humanizeEndpoint(entry && entry.endpoint);
+  var error = (entry && entry.last_error) || 'no reason given';
+  var id = esc((entry && entry.id) || '');
+  return `<div class="tb-sync-dead-item">
+    <div class="tb-sync-dead-copy">
+      <div class="tb-sync-dead-title">${esc(label)}</div>
+      <div class="tb-sync-dead-error">The server said: ${esc(error)}</div>
+    </div>
+    <div class="tb-sync-dead-actions">
+      <button class="tb-sync-dead-dismiss" data-action="retrySyncDeadLetter" data-id="${id}">Try again</button>
+      <button class="tb-sync-dead-dismiss" data-action="dismissSyncDeadLetter" data-id="${id}">Discard</button>
+    </div>
+  </div>`;
+}
+
 function _renderSyncPopoverContent(stats) {
   var total = _getUnsyncedCount(stats);
+  var dead = window.v2Queue && typeof window.v2Queue.deadLetter === 'function' ? window.v2Queue.deadLetter() : [];
   var summary = total > 0 ? total + ' unsynced' : 'All changes saved';
-  var pendingCopy = stats.queued === 1 ? '1 pending write' : stats.queued + ' pending writes';
+  var pendingCopy = stats.queued === 1 ? '1 waiting to send' : stats.queued + ' waiting to send';
   var meta = [pendingCopy];
+  if (stats.deadLettered > 0) meta.push(stats.deadLettered + " couldn't be saved");
+  var deadHtml = dead.length
+    ? `<div class="tb-sync-popover-section">Not saved</div>
+    <div class="tb-sync-empty">Try again sends it once more. Discard keeps what the server has.</div>
+    <div class="tb-sync-dead-list">${dead.map(_renderSyncDeadEntry).join('')}</div>`
+    : '';
   return `<div class="tb-sync-popover-card">
     <div class="tb-sync-popover-header">
       <div>
@@ -146,6 +241,7 @@ function _renderSyncPopoverContent(stats) {
       <span>Last sync</span>
       <strong>${esc(_formatRelativeTime(stats.lastFlushAt))}</strong>
     </div>
+    ${deadHtml}
   </div>`;
 }
 
@@ -171,15 +267,20 @@ function refreshSyncStatusUI() {
   var dot = document.getElementById('sync-indicator-dot');
   var body = document.body;
 
+  var bannerState = _syncBannerState(stats);
   if (banner) {
-    banner.hidden = !!stats.online;
+    banner.hidden = !bannerState;
+    banner.className = 'offline-banner' + (bannerState && bannerState.tone === 'error' ? ' sync-failed' : '');
+    banner.setAttribute('role', bannerState && bannerState.tone === 'error' ? 'alert' : 'status');
+    banner.innerHTML = bannerState ? `<span>${esc(bannerState.text)}</span>${bannerState.button}` : '';
   }
   if (body && body.classList && typeof body.classList.toggle === 'function') {
-    body.classList.toggle('offline-active', !stats.online);
+    body.classList.toggle('offline-active', !!bannerState);
   }
 
   if (badge) {
     var label = total === 1 ? '1 unsynced change' : total + ' unsynced changes';
+    if (stats.deadLettered > 0) label += ', ' + stats.deadLettered + " couldn't be saved";
     badge.hidden = total <= 0;
     badge.textContent = total > 99 ? '99+' : String(total);
     badge.title = label;
@@ -193,7 +294,13 @@ function refreshSyncStatusUI() {
   if (dot) {
     var dotStatus = 'idle';
     var dotTitle = 'All changes saved';
-    if (!stats.online && total > 0) {
+    if (stats.deadLettered > 0) {
+      dotStatus = 'error';
+      dotTitle = _syncChanges(stats.deadLettered) + " couldn't be saved";
+    } else if (stats.signedOut && stats.queued > 0) {
+      dotStatus = 'error';
+      dotTitle = 'Signed out — ' + _syncChanges(stats.queued) + ' waiting';
+    } else if (!stats.online && total > 0) {
       dotStatus = 'error';
       dotTitle = total === 1 ? 'Offline — 1 change queued' : 'Offline — ' + total + ' changes queued';
     } else if (stats.flushing || (stats.online && stats.queued > 0)) {
@@ -219,11 +326,13 @@ function _ensureSyncStatusUI() {
 }
 
 async function retrySyncQueue() {
-  if (!window.v2Queue || typeof window.v2Queue.flush !== 'function') return;
-  var result = await window.v2Queue.flush();
+  var q = window.v2Queue;
+  if (!q || typeof q.flush !== 'function') return;
+  var result = typeof q.resume === 'function' ? await q.resume() : await q.flush();
   refreshSyncStatusUI();
   if (typeof showSyncToast === 'function') {
-    if (result && result.succeeded > 0) showSyncToast('Queued changes synced.', 'success');
+    if (result && result.deadLettered > 0) showSyncToast("Some changes couldn't be saved.", 'error');
+    else if (result && result.succeeded > 0) showSyncToast('Queued changes synced.', 'success');
   }
 }
 
@@ -1170,9 +1279,17 @@ document.addEventListener('click', function (e) {
     retrySyncQueue: async function () {
       await retrySyncQueue();
     },
+    openSyncPopover: function () {
+      _setSyncPopoverOpen(true);
+    },
+    retrySyncDeadLetter: function () {
+      if (!window.v2Queue || typeof window.v2Queue.retryDeadLetter !== 'function') return;
+      window.v2Queue.retryDeadLetter(el.dataset.id);
+      refreshSyncStatusUI();
+    },
     dismissSyncDeadLetter: function () {
-      if (!window.v2Queue || typeof window.v2Queue.dismissDeadLetter !== 'function') return;
-      window.v2Queue.dismissDeadLetter(el.dataset.id);
+      if (typeof window.discardFailedWrite !== 'function') return;
+      window.discardFailedWrite(el.dataset.id);
       refreshSyncStatusUI();
     },
   };

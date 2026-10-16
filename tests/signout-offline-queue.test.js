@@ -85,10 +85,10 @@ describe('signOut and unsent offline changes', () => {
     delete globalThis.v2Queue;
   });
 
-  it('stops and reports unsent changes instead of wiping them', async () => {
+  it('stops and reports unsent and failed changes instead of wiping them', async () => {
     loadSupabase({ queued: 2, deadLettered: 1 });
     const res = await window.signOut();
-    expect(res).toEqual({ unsent: 2 });
+    expect(res).toEqual({ unsent: 3 });
     expect(localStorage.getItem('fv-sync-queue-v1')).not.toBeNull();
     expect(localStorage.getItem('gb-students-c1')).not.toBeNull();
     expect(window.location.href).toBe('');
