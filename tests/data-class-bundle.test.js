@@ -378,6 +378,10 @@ describe('get_class_bundle', () => {
     resetClass();
     globalThis.__FV_CLASS_BUNDLE = false;
     globalThis.getSupabase = legacyServer;
+    // Twice: on a device's first load the separate reads map rubric scores
+    // before the rubrics arrive and key one by its criterion id. The second
+    // load is their steady state.
+    await initData(CID);
     await initData(CID);
     var legacy = snapshot();
 
@@ -402,6 +406,18 @@ describe('get_class_bundle', () => {
     expect(bundled.overrides).toEqual(legacy.overrides);
     expect(bundled.overall).toEqual(legacy.overall);
     expect(bundled.tagProficiency).toEqual(legacy.tagProficiency);
+  });
+
+  it('maps rubric scores through the rubrics on the very first load', async () => {
+    resetClass();
+    globalThis.__FV_CLASS_BUNDLE = true;
+    globalThis.getSupabase = bundleServer;
+    await initData(CID);
+    var keys = (getScores(CID)[E1] || []).map(function (e) {
+      return e.tagId;
+    });
+    expect(keys).toContain(T1);
+    expect(keys).not.toContain(C1);
   });
 
   it('loads a class in one request and records its version', async () => {
