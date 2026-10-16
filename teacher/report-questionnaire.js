@@ -180,6 +180,46 @@ window.ReportQuestionnaire = (function () {
     rerender();
   }
 
+  /* Generated text is stitched from fragments, some of which start
+     lowercase ("the Map Quiz and the Essay were…"). Capitalize each sentence
+     start and close up doubled spaces. A teacher's note quoted in "…" is
+     left as written. */
+  function _tidyNarrative(text) {
+    let out = '';
+    let capNext = true;
+    let inQuote = false;
+    for (const ch of text) {
+      if (ch === '"') inQuote = !inQuote;
+      else if (!/\s/.test(ch)) {
+        out += capNext && !inQuote && /[a-z]/.test(ch) ? ch.toUpperCase() : ch;
+        capNext = /[.!?]/.test(ch);
+        continue;
+      }
+      out += ch;
+    }
+    return out.replace(/ {2,}/g, ' ').trim();
+  }
+
+  /* An opening sentence with the student's name taken out, to compare one
+     student's report with another's. */
+  function _openingShape(text, name) {
+    const plain = String(text || '')
+      .replace(/<[^>]*>/g, ' ')
+      .trim();
+    const m = plain.match(/^[\s\S]*?[.!?](?=\s|$)/);
+    const first = m ? m[0] : plain;
+    return (name ? first.split(name).join('\u0001') : first).toLowerCase().trim();
+  }
+
+  /* The openings no other student's report this term already starts with,
+     so two students with similar profiles don't read the same. All of them
+     when every opening has been used. */
+  function _unusedOpenings(candidates, name, otherNarratives) {
+    const used = new Set(otherNarratives.map(o => _openingShape(o.narrative, o.name)));
+    const fresh = candidates.filter(c => !used.has(_openingShape(c + '.', name)));
+    return fresh.length ? fresh : candidates;
+  }
+
   function tqAutoNarrative(sid) {
     const cid = _activeCourse;
     const student = getStudents(cid).find(s => s.id === sid);
@@ -284,9 +324,12 @@ window.ReportQuestionnaire = (function () {
     const savedGrowth = (rating.growthAreas || []).map(id => allTags.find(t => t.id === id)?.label).filter(Boolean);
 
     // Section proficiencies
+    // Full names ("Cause and Consequence", not the short "Cause"). A class
+    // has one section per competency, so a name can repeat; say it once.
     const sectionData = sections
-      .map(sec => ({ name: sec.shortName || sec.name, prof: getSectionProficiency(cid, sid, sec.id) }))
+      .map(sec => ({ name: sec.name || sec.shortName, prof: getSectionProficiency(cid, sid, sec.id) }))
       .filter(sec => sec.prof > 0);
+    const secNames = (list, n) => [...new Set(list.map(sec => sec.name.toLowerCase()))].slice(0, n);
     sectionData.sort((a, b) => b.prof - a.prof);
     const topSecs = sectionData.filter(sec => sec.prof >= 3);
     const lowSecs = sectionData.filter(sec => sec.prof > 0 && sec.prof < 2.5);
@@ -420,7 +463,14 @@ window.ReportQuestionnaire = (function () {
           `We're in the early stages with ${name} in ${courseName}, but I'm already starting to see some of who ${s} ${is_} as a learner`,
         ],
       };
-      p1 += pick(openings[archetype]) + '. ';
+      const classmates = getStudents(cid)
+        .filter(st => st.id !== sid)
+        .map(st => ({
+          name: displayNameFirst(st),
+          narrative: (getStudentTermRating(cid, st.id, termId) || {}).narrative || '',
+        }))
+        .filter(o => o.narrative);
+      p1 += pick(_unusedOpenings(openings[archetype], name, classmates)) + '. ';
 
       // Weave in dispositions + traits as CHARACTER, not a list
       if (allDimStrengths.length > 0 && posTraits.length > 0) {
@@ -453,9 +503,9 @@ window.ReportQuestionnaire = (function () {
           ]);
         } else {
           p1 += pick([
-            `In the classroom, ${name} ${nis} ${oxList(mainTraits)}. ${P} ${oxList(allDimStrengths.slice(0, 3))} ${allDimStrengths.length === 1 ? `${is_} a` : 'are'} particular standout${allDimStrengths.length === 1 ? '' : 's'}. `,
+            `In the classroom, ${name} ${nis} ${oxList(mainTraits)}. ${P} ${oxList(allDimStrengths.slice(0, 3))} ${allDimStrengths.length === 1 ? 'is a' : 'are'} particular standout${allDimStrengths.length === 1 ? '' : 's'}. `,
             `${name} ${nis} ${oxList(mainTraits)}, and that translates into real strength across ${p} ${oxList(allDimStrengths.slice(0, 3))}. `,
-            `As a person, ${name} ${nis} ${oxList(mainTraits)}. As a learner, that means ${p} ${oxList(allDimStrengths.slice(0, 3))} ${allDimStrengths.length === 1 ? `${is_}` : 'are'} really strong. `,
+            `As a person, ${name} ${nis} ${oxList(mainTraits)}. As a learner, that means ${p} ${oxList(allDimStrengths.slice(0, 3))} ${allDimStrengths.length === 1 ? 'is' : 'are'} really strong. `,
           ]);
         }
         if (extraTraits.length > 0) {
@@ -532,7 +582,7 @@ window.ReportQuestionnaire = (function () {
       if (wh > 0 && pa > 0) {
         const whpa = {
           '4,4': [
-            `${name} comes prepared every day and ${is_} always an active, thoughtful voice in our discussions. That combination of preparation and engagement makes a real difference in ${p} learning.`,
+            `${name} comes prepared every day and ${nis} always an active, thoughtful voice in our discussions. That combination of preparation and engagement makes a real difference in ${p} learning.`,
             `${P} work ethic is excellent, and ${s} bring${v} that same energy to class conversations — always engaged, always contributing. It's the kind of consistency that sets a great example.`,
             `On the day-to-day, ${name} ${nis} exactly where I want ${o} to be — consistently prepared, consistently engaged, and always willing to share ${p} thinking with the class.`,
           ],
@@ -547,7 +597,7 @@ window.ReportQuestionnaire = (function () {
             `${name}'s assignments are consistently strong, which tells me ${s} really understand${v} the material. I'd like to see ${o} share that understanding more during our group discussions.`,
           ],
           '4,1': [
-            `${name} does excellent work on ${p} own, but ${is_} quite reserved in class. I'd really like to hear ${p} ideas more often — when ${s} ${does} share, it's always insightful.`,
+            `${name} does excellent work on ${p} own, but ${nis} quite reserved in class. I'd really like to hear ${p} ideas more often — when ${s} ${does} share, it's always insightful.`,
             `The quality of ${name}'s independent work is impressive, but ${s} rarely speak${v} up in group settings. I genuinely believe the class would benefit from hearing ${p} perspective more.`,
           ],
           '3,4': [
@@ -641,7 +691,7 @@ window.ReportQuestionnaire = (function () {
           ],
           1: [
             `I'd really like to see ${name} participate more in class — ${p} ideas matter, and the class would be better for hearing them.`,
-            `Participation has been a real challenge — ${name} rarely speak${v} up, and I want to find ways to make ${o} feel more comfortable contributing.`,
+            `Participation has been a real challenge — ${name} rarely speaks up, and I want to find ways to make ${o} feel more comfortable contributing.`,
           ],
         };
         p1 += pick(paOnly[pa]) + ' ';
@@ -657,16 +707,16 @@ window.ReportQuestionnaire = (function () {
       if (overall > 0) {
         // Open with academic standing + sections
         if (topSecs.length > 0 && lowSecs.length > 0) {
-          const topNames = topSecs.slice(0, 2).map(sec => sec.name.toLowerCase());
-          const lowNames = lowSecs.slice(0, 2).map(sec => sec.name.toLowerCase());
+          const topNames = secNames(topSecs, 2);
+          const lowNames = secNames(lowSecs, 2);
           p2 += pick([
-            `Academically, ${name} is working at a ${overallLabel} level overall. ${S} ${does} particularly well in ${oxList(topNames)}, while ${oxList(lowNames)} ${lowSecs.length === 1 ? 'is' : 'are'} where ${s} need${v} more development.`,
+            `Academically, ${name} is working at a ${overallLabel} level overall. ${S} ${does} particularly well in ${oxList(topNames)}, while ${oxList(lowNames)} ${lowNames.length === 1 ? 'is' : 'are'} where ${s} need${v} more development.`,
             `On the academic side, ${name} is at ${overallLabel}. ${P} strongest work has been in ${oxList(topNames)}, and ${s}${ve} got room to grow in ${oxList(lowNames)}.`,
             `Looking at the academics, ${name} ${nis} performing at a ${overallLabel} level. ${S} ${is_} doing ${p} best work in ${oxList(topNames)} and could use more support in ${oxList(lowNames)}.`,
-            `${name}'s overall standing is ${overallLabel}. There's a nice split here: ${oxList(topNames)} ${topSecs.length === 1 ? 'is' : 'are'} clearly ${p} strong suit, while ${oxList(lowNames)} will need more attention going forward.`,
+            `${name}'s overall standing is ${overallLabel}. There's a nice split here: ${oxList(topNames)} ${topNames.length === 1 ? 'is' : 'are'} clearly ${p} strong suit, while ${oxList(lowNames)} will need more attention going forward.`,
           ]);
         } else if (topSecs.length > 0) {
-          const topNames = topSecs.slice(0, 3).map(sec => sec.name.toLowerCase());
+          const topNames = secNames(topSecs, 3);
           p2 += pick([
             `Academically, ${name} is working at a ${overallLabel} level, with strong results in ${oxList(topNames)}.`,
             `${S}${ve} been performing at ${overallLabel} overall — ${p} work in ${oxList(topNames)} has been especially solid.`,
@@ -675,7 +725,7 @@ window.ReportQuestionnaire = (function () {
           ]);
         } else if (sectionData.length > 0) {
           // All sections middling — still interesting to comment on
-          const allNames = sectionData.slice(0, 3).map(sec => sec.name.toLowerCase());
+          const allNames = secNames(sectionData, 3);
           p2 += pick([
             `Academically, ${name} is working at a ${overallLabel} level across ${oxList(allNames)}.`,
             `${name}'s academic work sits at ${overallLabel} overall, with fairly even performance across ${p} sections.`,
@@ -930,39 +980,39 @@ window.ReportQuestionnaire = (function () {
             .slice(0, 2)
             .map(([secId]) => {
               const sec = sections.find(sec2 => sec2.id === secId);
-              return sec ? (sec.shortName || sec.name).toLowerCase() : '';
+              return sec ? (sec.name || sec.shortName).toLowerCase() : '';
             })
             .filter(Boolean);
           const lNames = lowConfidence
             .slice(0, 2)
             .map(([secId]) => {
               const sec = sections.find(sec2 => sec2.id === secId);
-              return sec ? (sec.shortName || sec.name).toLowerCase() : '';
+              return sec ? (sec.name || sec.shortName).toLowerCase() : '';
             })
             .filter(Boolean);
           p3 += pick([
             `${p3.trim() ? '' : 'In ' + p + ' own self-assessment, '}${name} feels confident about ${oxList(hNames)} but less sure about ${oxList(lNames)} — that self-awareness is really valuable and shows maturity as a learner. `,
             `${p3.trim() ? '' : 'Interestingly, '}${name}'s self-reflection shows ${s} feel${v} strong in ${oxList(hNames)} but recognize${v} ${s} need${v} growth in ${oxList(lNames)}. I appreciate that honesty — being able to identify your own growth areas is a skill in itself. `,
-            `${name} feel${v} good about ${p} work in ${oxList(hNames)} while acknowledging that ${oxList(lNames)} need${v} more work. That kind of self-awareness is something I really value. `,
+            `${name} feels good about ${p} work in ${oxList(hNames)} while acknowledging that ${oxList(lNames)} ${lNames.length === 1 ? 'needs' : 'need'} more work. That kind of self-awareness is something I really value. `,
           ]);
         } else if (highConfidence.length > 0) {
           const hNames = highConfidence
             .slice(0, 2)
             .map(([secId]) => {
               const sec = sections.find(sec2 => sec2.id === secId);
-              return sec ? (sec.shortName || sec.name).toLowerCase() : '';
+              return sec ? (sec.name || sec.shortName).toLowerCase() : '';
             })
             .filter(Boolean);
           p3 += pick([
             `${name}'s own self-assessment shows ${s} feel${v} confident in ${oxList(hNames)}, which aligns with what I'm seeing in ${p} work. `,
-            `${name} feel${v} strong in ${oxList(hNames)}, and the data backs that up — ${p} self-perception matches the academic picture nicely. `,
+            `${name} feels strong in ${oxList(hNames)}, and the data backs that up — ${p} self-perception matches the academic picture nicely. `,
           ]);
         } else if (lowConfidence.length > 0) {
           const lNames = lowConfidence
             .slice(0, 2)
             .map(([secId]) => {
               const sec = sections.find(sec2 => sec2.id === secId);
-              return sec ? (sec.shortName || sec.name).toLowerCase() : '';
+              return sec ? (sec.name || sec.shortName).toLowerCase() : '';
             })
             .filter(Boolean);
           p3 += pick([
@@ -1039,7 +1089,7 @@ window.ReportQuestionnaire = (function () {
         savedGrowth.length === 0 &&
         !paras.some(pp => lowSecs.some(sec => pp.toLowerCase().includes(sec.name.toLowerCase())))
       ) {
-        const sNames = lowSecs.slice(0, 2).map(sec => sec.name.toLowerCase());
+        const sNames = secNames(lowSecs, 2);
         p4 += pick([
           `Going forward, we'll be focusing on building ${p} skills in ${oxList(sNames)}. I have a clear plan for how to support ${o}. `,
           `The plan for next term is to put more energy into ${oxList(sNames)}. These are areas where focused effort can make a meaningful difference. `,
@@ -1076,7 +1126,7 @@ window.ReportQuestionnaire = (function () {
           `${name} ${nis} in a good place and I'm looking forward to seeing ${p} continued progress. The foundation is solid.`,
           `Solid work this term. The pieces are there — it's about putting them all together, and I'm optimistic about what's next.`,
           `${name} ${nis} building something here, step by step. I want ${o} to know that steady progress is still progress, and it matters.`,
-          `I see a student who ${is_} capable of more and ${is_} getting closer to that potential every day. Keep it up, ${name}.`,
+          `I see a student who is capable of more and is getting closer to that potential every day. Keep it up, ${name}.`,
         ],
         building: [
           `I believe in ${name}'s potential and I'm committed to helping ${o} get there. Let's work on this together — I'm in ${p} corner.`,
@@ -1098,7 +1148,7 @@ window.ReportQuestionnaire = (function () {
 
     // ═══ ASSEMBLE ═══
     // Use <p> tags for contenteditable editor; fallback plain-text also works
-    const html = paras.map(p => `<p>${p}</p>`).join('');
+    const html = paras.map(p => `<p>${_tidyNarrative(p)}</p>`).join('');
     upsertTermRating(cid, sid, termId, { narrative: html });
     rerender();
   }
@@ -1519,6 +1569,8 @@ window.ReportQuestionnaire = (function () {
     tqToggleAssignment: tqToggleAssignment,
     tqToggleOb: tqToggleOb,
     tqAutoNarrative: tqAutoNarrative,
+    _tidyNarrative: _tidyNarrative,
+    _unusedOpenings: _unusedOpenings,
     tqSelectStudent: tqSelectStudent,
     renderTermQuestionnaire: renderTermQuestionnaire,
     get tqStudentIndex() {
