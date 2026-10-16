@@ -464,7 +464,44 @@ describe('write-path regressions (Phase 0)', () => {
     var reordered = [structuredClone(rows[1]), structuredClone(rows[0])];
     saveCategories(CID, reordered);
     await settle();
-    expect(fake.count('reorder_categories')).toBe(1);
+    expect(fake.count('save_categories')).toBe(1);
+    expect(fake.calls[0].params.p_categories.map(c => c.id)).toEqual([CAT2, CAT1]);
+  });
+
+  it('sends re-weighted categories as one list, so the total never leaves 100', async () => {
+    var rows = [
+      { id: CAT1, name: 'Tests', weight: 60, displayOrder: 0 },
+      { id: CAT2, name: 'Labs', weight: 40, displayOrder: 1 },
+    ];
+    _persistLoadedField(CID, 'categories', rows);
+
+    var next = structuredClone(rows);
+    next[0].weight = 70;
+    next[1].weight = 30;
+    saveCategories(CID, next);
+    await settle();
+
+    expect(fake.calls.map(c => c.name)).toEqual(['save_categories']);
+    expect(fake.calls[0].params).toEqual({
+      p_course_id: CID,
+      p_categories: [
+        { id: CAT1, name: 'Tests', weight: 70 },
+        { id: CAT2, name: 'Labs', weight: 30 },
+      ],
+    });
+  });
+
+  it('gives a new category its server id', async () => {
+    _persistLoadedField(CID, 'categories', [{ id: CAT1, name: 'Tests', weight: 100, displayOrder: 0 }]);
+
+    saveCategories(CID, [
+      { id: CAT1, name: 'Tests', weight: 80, displayOrder: 0 },
+      { id: 'local-cat', name: 'Labs', weight: 20, displayOrder: 1 },
+    ]);
+    await settle();
+
+    expect(fake.calls[0].params.p_categories[1]).toEqual({ name: 'Labs', weight: 20 });
+    expect(getCategories(CID)[1].id).toMatch(/^aaaaaaaa-/);
   });
 
   it('takes class-manager category rows into the cache without sending them again', async () => {
