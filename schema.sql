@@ -586,17 +586,19 @@ create table fv_idempotency (
 --   get_learning_map(p_course_id uuid)
 --
 -- Analytics (fv_*):
+--   fv_status_counts(p_enrollment_id uuid, p_course_id uuid)
+--
+-- Retired grade calculation (migration 20261016_isolate_server_grade_calc).
+-- Grades are calculated in shared/calc.js. These five stay in public as
+-- stubs that return null, so the read RPCs above keep their shape:
 --   fv_assessment_overall(p_enrollment_id uuid, p_assessment_id uuid)
---   fv_category_average(p_enrollment_id uuid, p_category_id uuid)
 --   fv_course_letter_pipeline(p_enrollment_id uuid, p_course_id uuid)
---   fv_decaying_avg(vals numeric[], dates date[], dw numeric)
---   fv_group_rollup(p_enrollment_id uuid, p_group_id uuid)
 --   fv_overall_proficiency(p_enrollment_id uuid, p_course_id uuid)
---   fv_percentage_to_letter(r numeric)
 --   fv_q_to_percentage(q numeric)
 --   fv_section_proficiency(p_enrollment_id uuid, p_section_id uuid)
---   fv_status_counts(p_enrollment_id uuid, p_course_id uuid)
---   fv_tag_score_for_assessment(p_enrollment_id uuid, p_assessment_id uuid, p_tag_id uuid)
+-- Their old bodies, and these six helpers, live in schema fv_legacy (no
+-- client access): fv_category_average, fv_decaying_avg, fv_group_rollup,
+-- fv_percentage_to_letter, fv_rubric_level_value, fv_tag_score_for_assessment.
 
 -- ─── Triggers ───────────────────────────────────────────────────────────────
 -- `category_weight_sum_check(_update)` deferred constraint triggers on category → fv_check_category_weight_sum()
