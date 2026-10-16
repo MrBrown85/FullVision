@@ -2059,7 +2059,9 @@ window.DashClassManager = (function () {
         // A class whose create never landed has no server id, so its
         // curriculum can't be sent yet. Otherwise wait for the map to reach
         // the server, within reason: offline, the outbox keeps it for later.
-        dispatchOk = canonicalCid ? await _resolvesTrueWithin(mapSaved, 15000) : false;
+        // Demo Mode has no server, so its map is saved once it's cached.
+        var localOnly = typeof _writesEnabled === 'function' && !_writesEnabled();
+        dispatchOk = canonicalCid || localOnly ? await _resolvesTrueWithin(mapSaved, 15000) : false;
       }
     }
 
@@ -3782,6 +3784,17 @@ window.DashClassManager = (function () {
     return false;
   }
 
+  // Enter in an Add/Edit Student field saves, as the Save button does.
+  function handleKeydown(e) {
+    if (e.key !== 'Enter' || e.isComposing) return false;
+    var el = e.target;
+    if (!el || el.tagName !== 'INPUT' || el.type === 'checkbox') return false;
+    if (!el.closest || !el.closest('#cm-add-student-form')) return false;
+    e.preventDefault();
+    cmSaveStudent();
+    return true;
+  }
+
   function handleBlur(el) {
     if (el.dataset.actionBlur === 'cmUpdateName') {
       cmUpdateField('name', el.value, el);
@@ -3858,6 +3871,7 @@ window.DashClassManager = (function () {
     handleInput: handleInput,
     handleChange: handleChange,
     handleBlur: handleBlur,
+    handleKeydown: handleKeydown,
     initDrag: function () {
       _initCmStdDrag();
       _initCmCatDrag();
