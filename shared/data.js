@@ -6354,8 +6354,16 @@ function _isUuid(v) {
   return typeof v === 'string' && _UUID_RE.test(v);
 }
 
-/* Per-course save lock so rapid saves don't double-enroll the same student */
-var _studentSaveQueue = {}; // cid → Promise tail
+/* Per-course save lock so rapid saves don't double-enroll the same student.
+   A save's diff waits only for the earlier save's diff to be dispatched, not
+   for the server's answer: the baseline is advanced at dispatch, and a new
+   row's pending-create record keeps the next diff from creating it again.
+   Waiting for the answer stranded every later save behind one that could not
+   be sent offline, so a row removed before its create landed came back after
+   a reload. _studentSaveQueue still settles when every save so far has
+   landed, for callers that need the server to have them. */
+var _studentSaveQueue = {}; // cid → Promise of every save so far landing
+var _studentDispatchQueue = {}; // cid → Promise of the last diff being dispatched
 
 /* Diff arr vs prev and translate to canonical RPC calls.
    - student.id matching UUID → already enrolled → update_enrollment + update_student
@@ -6364,8 +6372,9 @@ var _studentSaveQueue = {}; // cid → Promise tail
 function _persistStudentsToCanonical(cid, prev, arr) {
   var sb = getSupabase();
   if (!sb) return;
-  var tail = _studentSaveQueue[cid] || Promise.resolve();
-  var next = tail.then(function () {
+  var tail = _studentDispatchQueue[cid] || Promise.resolve();
+  var landed = null;
+  var dispatched = tail.then(function () {
     var before = _serverStateOr('students', cid, prev);
     var after = _cache.students[cid] || arr;
     var prevById = {};
@@ -6408,11 +6417,20 @@ function _persistStudentsToCanonical(cid, prev, arr) {
     });
 
     _rememberServerState('students', cid, after);
-    return Promise.all(ops).catch(function (err) {
+    landed = Promise.all(ops).catch(function (err) {
       console.warn('Student sync to canonical RPCs failed for one or more rows:', err);
     });
   });
-  _studentSaveQueue[cid] = _trackPendingSync(next);
+  _studentDispatchQueue[cid] = dispatched;
+  var earlier = _studentSaveQueue[cid] || Promise.resolve();
+  _studentSaveQueue[cid] = _trackPendingSync(
+    Promise.all([
+      earlier,
+      dispatched.then(function () {
+        return landed;
+      }),
+    ]).then(function () {}),
+  );
   return _studentSaveQueue[cid];
 }
 
@@ -6653,14 +6671,17 @@ function saveAssessments(cid, arr) {
   _persistAssessmentsToCanonical(cid, prev, arr);
 }
 
-/* Per-course save lock for assessments */
-var _assessmentSaveQueue = {};
+/* Per-course save lock for assessments; see _studentSaveQueue for why the
+   diff waits for the earlier dispatch, not the earlier answer. */
+var _assessmentSaveQueue = {}; // cid → Promise of every save so far landing
+var _assessmentDispatchQueue = {}; // cid → Promise of the last diff being dispatched
 
 function _persistAssessmentsToCanonical(cid, prev, arr) {
   var sb = getSupabase();
   if (!sb) return;
-  var tail = _assessmentSaveQueue[cid] || Promise.resolve();
-  var next = tail.then(function () {
+  var tail = _assessmentDispatchQueue[cid] || Promise.resolve();
+  var landed = null;
+  var dispatched = tail.then(function () {
     var before = _serverStateOr('assessments', cid, prev);
     var after = _cache.assessments[cid] || arr;
     var prevById = {};
@@ -6697,11 +6718,20 @@ function _persistAssessmentsToCanonical(cid, prev, arr) {
     });
 
     _rememberServerState('assessments', cid, after);
-    return Promise.all(ops).catch(function (err) {
+    landed = Promise.all(ops).catch(function (err) {
       console.warn('Assessment sync to canonical RPCs failed for one or more rows:', err);
     });
   });
-  _assessmentSaveQueue[cid] = _trackPendingSync(next);
+  _assessmentDispatchQueue[cid] = dispatched;
+  var earlier = _assessmentSaveQueue[cid] || Promise.resolve();
+  _assessmentSaveQueue[cid] = _trackPendingSync(
+    Promise.all([
+      earlier,
+      dispatched.then(function () {
+        return landed;
+      }),
+    ]).then(function () {}),
+  );
   return _assessmentSaveQueue[cid];
 }
 
