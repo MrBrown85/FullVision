@@ -86,6 +86,14 @@ window.Router = (function () {
     if (window.UI && typeof window.UI.refreshSyncStatusUI === 'function') window.UI.refreshSyncStatusUI();
   }
 
+  function _needsCourseLoad(cid) {
+    // getActiveCourse() never returns an archived class, so one is never
+    // "loaded" and would loop here.
+    return (
+      !!cid && typeof COURSES !== 'undefined' && !!COURSES[cid] && !isCourseArchived(cid) && cid !== getActiveCourse()
+    );
+  }
+
   /* ── Route handler ───────────────────────────────────────── */
   function _onRoute() {
     var parsed = _parseHash(location.hash);
@@ -93,6 +101,15 @@ window.Router = (function () {
     var params = parsed.params;
 
     _flushPendingEdits();
+
+    // A link to another class (?course=X) loads that class before the page
+    // renders; pages used to show whatever localStorage held for X.
+    if (_needsCourseLoad(params.course)) {
+      switchActiveCourse(params.course).then(function (current) {
+        if (current) _onRoute();
+      });
+      return;
+    }
 
     // Determine which dock tab is active
     var dockPage = 'dashboard';
@@ -165,8 +182,13 @@ window.Router = (function () {
 
     await requireAuth();
     await initAllCourses();
+    // Open the class a deep link names, not the last one used.
+    var linked = _parseHash(location.hash).params.course;
+    if (_needsCourseLoad(linked)) setActiveCourse(linked);
     var cid = getActiveCourse();
+    var loadStarted = performance.now();
     await initData(cid);
+    recordLoadTiming('class.boot', cid, performance.now() - loadStarted);
     // Seed demo data if no courses/students exist — lazy-loads seed-data.js on demand
     await loadSeedIfNeeded();
     migrateAllStudents();
