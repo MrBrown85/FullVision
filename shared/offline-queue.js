@@ -10,10 +10,17 @@
  *   fv-sync-dead-letter-v1    — entries that exceeded the retry cap
  *
  * Entry shape:
- *   { id, created_at, owner, key, endpoint, payload, attempts, last_error, next_at }
+ *   { id, created_at, owner, key, endpoint, payload, attempts, last_error, next_at, blocked_on }
  *
  * Key: the record the write touches (see _entryKey). Entries with the same
  *   key are sent one at a time, in order; different keys go in parallel.
+ *
+ * Blocked: an entry whose payload names a record the server doesn't have yet
+ *   (a local id whose create is still queued) carries those ids in
+ *   blocked_on and is held, with everything behind it on its key. When the
+ *   create lands, shared/data.js calls rewrite() to put the server id into
+ *   the waiting payloads and clear blocked_on; the held entries then go.
+ *   A reload keeps all of this, because it is in the entry, not in memory.
  *
  * Owner: the signed-in user's id when the entry was queued. The queue lives
  *   in localStorage, so on a shared computer it can outlast a sign-out. An
@@ -267,6 +274,7 @@
       attempts: 0,
       last_error: null,
     };
+    if (opts && Array.isArray(opts.blockedOn) && opts.blockedOn.length) entry.blocked_on = opts.blockedOn.slice();
     q.entries.push(entry);
     try {
       _writeQueue(q);
@@ -283,12 +291,14 @@
      it touches the same record. Resolves with the server's final answer —
      after any retries — so callers can act on the real outcome (for example
      re-keying a local id). While offline or paused it stays pending. If the
-     entry can't be stored, the write is sent directly instead. */
+     entry can't be stored, the write is sent directly instead.
+     opts.id names the entry (the caller's pending-create record uses it);
+     opts.blockedOn lists local ids the payload still carries. */
   function push(endpoint, payload, opts) {
     opts = opts || {};
     payload = payload || {};
-    var id = payload.p_idempotency_key || _uuid4();
-    var queued = enqueue(endpoint, payload, { id: id, key: opts.key, noFlush: true });
+    var id = opts.id || payload.p_idempotency_key || _uuid4();
+    var queued = enqueue(endpoint, payload, { id: id, key: opts.key, blockedOn: opts.blockedOn, noFlush: true });
     if (!queued.ok) return _sendNow(endpoint, payload, opts.sendOptions);
     if (opts.sendOptions) _sendOptions[id] = opts.sendOptions;
     return new Promise(function (resolve) {
@@ -360,7 +370,9 @@
       q.last_flush_at = new Date().toISOString();
       _writeQueue(q);
       _counts.succeeded++;
-      _notify('flush:success', { id: entry.id, endpoint: entry.endpoint });
+      // Listeners see the result before the push() caller does, so a re-key
+      // driven from here is finished by the time the caller's .then runs.
+      _notify('flush:success', { id: entry.id, endpoint: entry.endpoint, data: res.data });
       _resolveWaiters(entry.id, res);
       _pump(false);
       return;
@@ -403,8 +415,13 @@
     _inFlight[entry.id] = p;
   }
 
+  function _isBlocked(entry) {
+    return !!(entry && Array.isArray(entry.blocked_on) && entry.blocked_on.length);
+  }
+
   /* Start every entry that may go now: the first for its key, due, owned by
-     whoever is signed in. `force` ignores backoff (an explicit flush). */
+     whoever is signed in, not waiting on a local id. `force` ignores backoff
+     (an explicit flush). */
   function _pump(force) {
     if (_isPaused() || !navigator.onLine) return;
     var owner = currentOwner();
@@ -417,6 +434,7 @@
       if (busyKeys[key]) continue;
       busyKeys[key] = true;
       if (_inFlight[entry.id]) continue;
+      if (_isBlocked(entry)) continue;
       if (_isForeign(entry, owner)) continue;
       // An owned entry with nobody signed in waits for its owner.
       if (entry.owner && !owner) continue;
@@ -491,11 +509,98 @@
     });
     return {
       queued: q.entries.length,
+      blocked: q.entries.filter(_isBlocked).length,
       deadLettered: d.length,
       lastFlushAt: q.last_flush_at,
       online: !!navigator.onLine,
       flushing: _flushing,
     };
+  }
+
+  /* Is this entry still waiting to be sent (queued or in flight)? */
+  function has(id) {
+    if (_inFlight[id]) return true;
+    return _readQueue().entries.some(function (e) {
+      return e.id === id;
+    });
+  }
+
+  /* Let the caller change queued payloads, for example to put a server id
+     where a local id was. fn(entry) returns { payload, blockedOn } or null
+     to leave the entry alone. Entries in flight are skipped. A key that was
+     derived from the old payload is derived again from the new one. */
+  function rewrite(fn) {
+    var q = _readQueue();
+    var changed = 0;
+    q.entries.forEach(function (entry) {
+      if (_inFlight[entry.id]) return;
+      var next = fn(entry);
+      if (!next) return;
+      var derived = entry.key === _entryKey(entry.endpoint, entry.payload);
+      if (next.payload) entry.payload = next.payload;
+      if (derived) entry.key = _entryKey(entry.endpoint, entry.payload);
+      if (Array.isArray(next.blockedOn) && next.blockedOn.length) entry.blocked_on = next.blockedOn.slice();
+      else delete entry.blocked_on;
+      changed++;
+    });
+    if (changed) {
+      _writeQueue(q);
+      _notify('rewrite', { count: changed });
+      _pump(false);
+    }
+    return changed;
+  }
+
+  /* Drop a queued entry that hasn't been sent, for example a create whose row
+     was removed again. Its push() caller gets { error: { cancelled } }. */
+  function remove(id) {
+    if (_inFlight[id]) return false;
+    var q = _readQueue();
+    var before = q.entries.length;
+    q.entries = q.entries.filter(function (e) {
+      return e.id !== id;
+    });
+    if (q.entries.length === before) return false;
+    _writeQueue(q);
+    _resolveWaiters(id, { data: null, error: { message: 'cancelled', cancelled: true } });
+    _notify('remove', { id: id });
+    _pump(false);
+    return true;
+  }
+
+  /* Drop every queued entry waiting on a local id whose create will never
+     land: removed again (silently) or failed (opts.deadLetter, with its
+     error, so the loss is visible). Returns how many were dropped. */
+  function dropBlockedOn(localId, opts) {
+    opts = opts || {};
+    var q = _readQueue();
+    var dropped = [];
+    q.entries = q.entries.filter(function (e) {
+      var hit = !_inFlight[e.id] && _isBlocked(e) && e.blocked_on.indexOf(localId) >= 0;
+      if (hit) dropped.push(e);
+      return !hit;
+    });
+    if (!dropped.length) return 0;
+    _writeQueue(q);
+    if (opts.deadLetter) {
+      var dead = _readDead();
+      dropped.forEach(function (e) {
+        e.last_error = opts.error || 'the record it belongs to was not created';
+        dead.push(e);
+      });
+      _writeDead(dead);
+      _counts.deadLettered += dropped.length;
+    }
+    dropped.forEach(function (e) {
+      _resolveWaiters(e.id, { data: null, error: { message: 'cancelled', cancelled: true } });
+      _notify(opts.deadLetter ? 'flush:dead-letter' : 'remove', {
+        id: e.id,
+        endpoint: e.endpoint,
+        error: e.last_error,
+      });
+    });
+    _pump(false);
+    return dropped.length;
   }
 
   function deadLetter() {
@@ -590,6 +695,10 @@
     enqueue: enqueue,
     flush: flush,
     stats: stats,
+    has: has,
+    rewrite: rewrite,
+    remove: remove,
+    dropBlockedOn: dropBlockedOn,
     deadLetter: deadLetter,
     dismissDeadLetter: dismissDeadLetter,
     clear: clear,
