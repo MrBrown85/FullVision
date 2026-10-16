@@ -409,18 +409,32 @@ function scoreTagIds(assessment, cid) {
   return ids.length ? ids : [UNLINKED_TAG_ID];
 }
 
+/* Extra credit: a points score can go up to twice the maximum (12/10), as
+   Schoology allows. The course % can then pass 100. */
+const POINTS_EXTRA_CREDIT_FACTOR = 2;
+
 /* Points scores take decimals (33.5 / 40). A typed value is kept to two
-   decimal places and held between 0 and the assessment's maximum. A typed 0
-   is a score of 0; blank or unreadable input is null, no score. A comma
-   works as the decimal point too. */
+   decimal places and held between 0 and twice the assessment's maximum. A
+   typed 0 is a score of 0; blank or unreadable input is null, no score. A
+   comma works as the decimal point too. */
 function parsePointsInput(text, max) {
   var str = String(text == null ? '' : text).trim();
   if (str === '') return null;
   var n = parseFloat(str.replace(',', '.'));
   if (!isFinite(n)) return null;
   n = Math.max(0, n);
-  if (max > 0) n = Math.min(max, n);
+  if (max > 0) n = Math.min(max * POINTS_EXTRA_CREDIT_FACTOR, n);
   return Math.round(n * 100) / 100;
+}
+
+/* The % beside a points input, marked "bonus" above the maximum. `digits`
+   is the decimal places (0 rounds to a whole %). Returns HTML; empty when
+   there is no score. */
+function pointsPctHtml(v, max, digits) {
+  if (v == null || !(max > 0)) return '';
+  var pct = (v / max) * 100;
+  var html = (digits ? pct.toFixed(digits) : String(Math.round(pct))) + '%';
+  return v > max ? html + '<span class="gb-pts-bonus">bonus</span>' : html;
 }
 
 /* A points score as people write it: 33.5, 8, 12.25 — never 33.50 or 8.00. */

@@ -1710,7 +1710,6 @@ window.PageAssignments = (function () {
       '</div>';
     students.forEach(function (st) {
       var raw = getPointsScore(cid, st.id, a.id);
-      var pct = raw != null ? Math.round((raw / max) * 100) : '';
       var stStatus = statuses[st.id + ':' + a.id] || null;
       var disableRow = stStatus && stStatus !== 'LATE';
       html +=
@@ -1728,7 +1727,7 @@ window.PageAssignments = (function () {
         '</span>' +
         '<div class="pts-input-cell">' +
         '<input type="number" class="gb-pts-input" min="0" step="any" max="' +
-        max +
+        max * POINTS_EXTRA_CREDIT_FACTOR +
         '" inputmode="decimal"' +
         ' value="' +
         (raw != null ? formatPoints(raw) : '') +
@@ -1747,7 +1746,7 @@ window.PageAssignments = (function () {
         '</div>' +
         '<div class="pts-pct-cell">' +
         '<span class="gb-pts-live-pct">' +
-        (pct ? pct + '%' : '') +
+        pointsPctHtml(raw, max, 0) +
         '</span>' +
         '</div>' +
         '<div class="score-row-action"></div>' +
@@ -1759,9 +1758,8 @@ window.PageAssignments = (function () {
 
   function livePointsUpdate(inp) {
     var max = parseFloat(inp.dataset.max) || 100;
-    var v = parsePointsInput(inp.value, max);
     var pctSpan = inp.closest('.score-row').querySelector('.gb-pts-live-pct');
-    if (pctSpan) pctSpan.textContent = v != null ? Math.round((v / max) * 100) + '%' : '';
+    if (pctSpan) pctSpan.innerHTML = pointsPctHtml(parsePointsInput(inp.value, max), max, 0);
   }
   function commitPointsScore(inp) {
     var cid = activeCourse;
@@ -1776,7 +1774,7 @@ window.PageAssignments = (function () {
     if (raw != null) setScore(cid, sid, aid, aid, raw);
     setPointsScore(cid, sid, aid, raw);
     var pctSpan = inp.closest('.score-row').querySelector('.gb-pts-live-pct');
-    if (pctSpan) pctSpan.textContent = raw != null ? Math.round((raw / max) * 100) + '%' : '';
+    if (pctSpan) pctSpan.innerHTML = pointsPctHtml(raw, max, 0);
   }
   function handlePointsKey(e, inp) {
     if (e.key === 'Enter') {

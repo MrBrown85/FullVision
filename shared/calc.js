@@ -365,7 +365,8 @@ function percentageToLetter(R) {
 }
 
 /* A points-scored assessment's points for one student, or null when it
-   doesn't count: excused, or not graded yet. Not submitted counts as 0. */
+   doesn't count: excused, or not graded yet. Not submitted counts as 0.
+   Points work can earn extra credit up to twice its maximum. */
 function _assessmentPoints(cid, studentId, assessment) {
   var status = getAssignmentStatus(cid, studentId, assessment.id);
   if (status === 'EXC') return null;
@@ -376,7 +377,8 @@ function _assessmentPoints(cid, studentId, assessment) {
     return e.assessmentId === assessment.id && e.score != null && e.score !== '';
   });
   if (!isScoreEntered(assessment, entry)) return null;
-  return { earned: Math.max(0, Math.min(possible, Number(entry.score) || 0)), possible: possible };
+  var cap = isCompletionScored(assessment) ? possible : possible * POINTS_EXTRA_CREDIT_FACTOR;
+  return { earned: Math.max(0, Math.min(cap, Number(entry.score) || 0)), possible: possible };
 }
 
 /* A student's percentage on a group of assessments (one category, or the

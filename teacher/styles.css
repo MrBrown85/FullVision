@@ -2043,6 +2043,16 @@ body.offline-active #app-dock {
   line-height: 1;
   min-height: 0.58rem;
 }
+/* Extra credit: a score above the maximum. */
+.gb-pts-bonus {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
 
 /* ── Points grid on assignments page ────────────────────── */
 .pts-grid .score-grid-header {
