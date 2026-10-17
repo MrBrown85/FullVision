@@ -269,9 +269,7 @@ window.ReportQuestionnaire = (function () {
     // ("a B (78%)"), not a proficiency word.
     const letterData = courseGradeMode(cid) === 'letter' ? getCourseLetterData(cid, sid) : null;
     const letterStanding =
-      letterData && letterData.S
-        ? `${/^[AF]/.test(letterData.S) ? 'an' : 'a'} ${letterData.S} (${letterData.R}%)`
-        : '';
+      letterData && letterData.S ? `${/^[AF]/.test(letterData.S) ? 'an' : 'a'} ${letterData.S} (${letterData.R}%)` : '';
     const sections = getSections(cid);
     const allTags = getAllTags(cid);
     const allObs = getStudentQuickObs(cid, sid);
