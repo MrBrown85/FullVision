@@ -438,6 +438,45 @@ describe('get_class_bundle', () => {
     expect(_classVersion[CID]).toBe(7);
   });
 
+  it('adds the observations older than the bundle carries', async () => {
+    resetClass();
+    globalThis.__FV_CLASS_BUNDLE = true;
+    var OB2 = 'c0000000-0000-4000-8000-000000000082';
+    var OB3 = 'c0000000-0000-4000-8000-000000000083';
+    function older(id, day) {
+      return Object.assign({}, observations.observations[0], { id: id, created_at: '2026-09-' + day + 'T10:00:00Z' });
+    }
+    var pages = [];
+    globalThis.getSupabase = function () {
+      var server = bundleServer();
+      return {
+        rpc(name, payload) {
+          if (name === 'get_class_bundle') {
+            return server.rpc(name, payload).then(function (res) {
+              // The newest one is in the bundle; the class has three.
+              res.data.observations = Object.assign({}, observations, { total: 3 });
+              return res;
+            });
+          }
+          if (name === 'get_observations') {
+            pages.push(payload.p_page);
+            var rows = [observations.observations[0], older(OB2, '20'), older(OB3, '10')];
+            return Promise.resolve({ data: { observations: rows, total: 3, has_more: false }, error: null });
+          }
+          return server.rpc(name, payload);
+        },
+      };
+    };
+    await initData(CID);
+    await _olderObservationsLoading[CID];
+
+    expect(pages).toEqual([1]);
+    var ids = getQuickObs(CID)[E1].map(function (o) {
+      return o.id;
+    });
+    expect(ids.sort()).toEqual([OB1, OB2, OB3].sort());
+  });
+
   it('works out the calculated level shown beside an override', async () => {
     resetClass();
     globalThis.__FV_CLASS_BUNDLE = true;
