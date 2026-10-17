@@ -396,7 +396,7 @@ window.PageStudent = (function () {
               '<span class="ct-tag-val" style="color:' +
               lvColor +
               '">' +
-              (lv != null ? lv.toFixed(1) : '\u2014') +
+              formatLevel(activeCourse, lv) +
               '</span>' +
               '<span class="ct-tag-cov" title="' +
               (tag.coverage_count || 0) +
@@ -514,7 +514,7 @@ window.PageStudent = (function () {
         '<div class="section-mini-val" style="color:' +
         (sp > 0 ? sec.color : 'var(--text-3)') +
         '">' +
-        (sp > 0 ? sp.toFixed(1) : '\u2014') +
+        formatLevel(cid, sp) +
         '</div>' +
         '<div class="section-mini-label">' +
         esc(sec.name) +
@@ -549,7 +549,7 @@ window.PageStudent = (function () {
           '<div class="section-mini-val" style="color:' +
           (gp > 0 ? gi.group.color : 'var(--text-3)') +
           '">' +
-          (gp > 0 ? gp.toFixed(1) : '\u2014') +
+          formatLevel(cid, gp) +
           '</div>' +
           '<div class="section-mini-label">' +
           esc(gi.group.name) +
@@ -772,7 +772,7 @@ window.PageStudent = (function () {
       html +=
         '<td class="gt-cell-avg">' +
         (rowAvg > 0
-          ? '<span style="color:' + PROF_COLORS[rowAvgR] + ';font-weight:700">' + rowAvg.toFixed(1) + '</span>'
+          ? '<span style="color:' + PROF_COLORS[rowAvgR] + ';font-weight:700">' + formatLevel(cid, rowAvg) + '</span>'
           : '<span style="color:var(--text-3)">—</span>') +
         '</td>';
       html += '</tr>';
@@ -1034,7 +1034,7 @@ window.PageStudent = (function () {
         '<span class="gp-section-val" style="color:' +
         color +
         '">' +
-        (prof > 0 ? prof.toFixed(1) : '—') +
+        formatLevel(cid, prof) +
         '</span>' +
         '<span class="gp-section-trend" style="color:' +
         tColor +
@@ -1133,7 +1133,11 @@ window.PageStudent = (function () {
       var rubricAvg = getRubricAssessmentScore(cid, assess, aScores);
       if (rubricAvg != null) avg = rubricAvg;
       if (avg < 2)
-        attentionItems.push({ type: 'low', assess: assess, detail: 'Avg ' + avg.toFixed(1) + ' — needs support' });
+        attentionItems.push({
+          type: 'low',
+          assess: assess,
+          detail: 'Avg ' + formatLevel(cid, avg) + ' — needs support',
+        });
     });
     if (attentionItems.length === 0) {
       html += '<div class="attention-empty">✓ All caught up — no issues flagged.</div>';

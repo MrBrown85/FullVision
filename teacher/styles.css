@@ -788,6 +788,11 @@ body.offline-active #app-dock {
 .student-row-sub {
   display: none;
 }
+.student-row-grades {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
 .student-row-prof {
   font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
   font-size: var(--text-xs);

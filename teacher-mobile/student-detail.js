@@ -150,7 +150,7 @@ window.MStudentDetail = (function () {
       '<span class="m-section-prof" style="color:' +
       MC.profBg(profRounded) +
       '">' +
-      (prof > 0 ? prof.toFixed(1) : '—') +
+      formatLevel(cid, prof) +
       '</span>' +
       '</div>' +
       '<div class="m-section-detail">' +
@@ -176,6 +176,9 @@ window.MStudentDetail = (function () {
     var initials = MC.avatarInitials(st);
     var overall = getOverallProficiency(cid, sid);
     var rounded = Math.round(overall);
+    // The overall grade as the class is set to grade (level, letter, or both).
+    var grade = studentGradeSummary(cid, sid);
+    var gradeText = grade.text || '—';
     var nav = MC.navBar({ id: 'student-detail', title: name, backLabel: 'Students' });
     var badges = renderBadges(st);
 
@@ -191,13 +194,15 @@ window.MStudentDetail = (function () {
       '</div>' +
       (st.pronouns ? '<div class="m-hero-pronouns">' + MC.esc(st.pronouns) + '</div>' : '') +
       (badges ? '<div class="m-hero-badges">' + badges + '</div>' : '') +
-      '<div class="m-hero-prof" style="background:' +
-      MC.profBg(rounded) +
+      '<div class="m-hero-prof' +
+      (gradeText.length > 4 ? ' m-hero-grade-pill' : '') +
+      '" style="background:' +
+      MC.profBg(grade.level) +
       '">' +
-      (overall > 0 ? overall.toFixed(1) : '—') +
+      MC.esc(gradeText) +
       '</div>' +
       '<div class="m-hero-prof-label">' +
-      (PROF_LABELS[rounded] || 'No Evidence') +
+      (courseGradeMode(cid) === 'letter' ? 'Course grade' : PROF_LABELS[rounded] || 'No Evidence') +
       '</div>' +
       '</div>';
 
@@ -218,7 +223,7 @@ window.MStudentDetail = (function () {
 
     var stats =
       '<div class="m-stats-strip">' +
-      _statCard(overall > 0 ? overall.toFixed(1) : '—', 'Overall') +
+      _statCard(MC.esc(gradeText), 'Overall') +
       _statCard(Math.round(completionPct) + '%', 'Complete') +
       _statCard(assessed + '/' + allTags.length, 'Assessed') +
       (missingCount > 0 ? _statCard(missingCount, 'Missing', 'color:var(--priority)') : '') +
@@ -250,7 +255,7 @@ window.MStudentDetail = (function () {
           '<span class="m-focus-prof" style="color:' +
           MC.profBg(Math.round(f.prof)) +
           '">' +
-          (f.prof > 0 ? f.prof.toFixed(1) : 'No evidence') +
+          formatLevel(cid, f.prof, 'No evidence') +
           '</span>' +
           '</div>';
       });
@@ -271,7 +276,7 @@ window.MStudentDetail = (function () {
           '<span class="m-group-prof" style="color:' +
           MC.profBg(groupRounded) +
           '">' +
-          (groupProf > 0 ? groupProf.toFixed(1) : '—') +
+          formatLevel(cid, groupProf) +
           '</span>' +
           '</div>';
         gi.sections.forEach(function (sec) {
@@ -329,7 +334,7 @@ window.MStudentDetail = (function () {
             '<span class="m-assess-score-val" style="color:' +
             MC.profBg(Math.round(val || 0)) +
             '">' +
-            (val != null ? val.toFixed(1) : '—') +
+            formatLevel(cid, val) +
             '</span>' +
             '</span>';
         });
