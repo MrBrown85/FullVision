@@ -27,12 +27,16 @@ function setOnline(value) {
   });
 }
 
-// A page load: a fresh copy of the module over the same localStorage. Offline
-// while it loads, so its start-up flush stays quiet.
+// A page load: a fresh copy of the module over the same localStorage. The
+// page before is gone, so its copy lets go of the queue first. Offline while
+// it loads, so its start-up flush stays quiet.
+var page = null;
 function loadPage() {
+  if (page) page.release();
   setOnline(false);
   runInThisContext(QUEUE_SOURCE, { filename: 'shared/offline-queue.js' });
-  return window.v2Queue;
+  page = window.v2Queue;
+  return page;
 }
 
 function dead(id, endpoint, payload, extra) {

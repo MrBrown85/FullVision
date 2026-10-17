@@ -621,7 +621,7 @@ describe('write-path audit: data layer', () => {
     expect(fake.committedCount('create_assessment')).toBe(1);
     var newId = getAssessments(CID)[0].id;
     expect(newId).not.toBe('sLOCALASSESS1');
-    expect(fake.committedCount('upsert_score', p => p.p_assessment_id === newId)).toBe(1);
+    expect(fake.committedCount('upsert_tag_score', p => p.p_assessment_id === newId && p.p_value === 3)).toBe(1);
     expect(tabB.stats().queued).toBe(0);
   });
 
