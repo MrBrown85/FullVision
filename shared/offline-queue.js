@@ -1222,6 +1222,9 @@
   window.addEventListener('pageshow', claim);
   _retryDeadOnLoad();
   _openChannel();
+  // A page loads this file once. A test loading it again stands for a
+  // reload: the old copy's page is gone, so it lets go of the queue.
+  if (window.v2Queue && typeof window.v2Queue.release === 'function') window.v2Queue.release();
   // Try to become the owner; the owner flushes once the page has booted.
   claim();
 

@@ -50,8 +50,10 @@ var TABS = [];
  * so its start-up flush stays quiet; the caller goes online when it is ready.
  */
 function loadQueueModule() {
-  if (window.v2Queue && typeof window.v2Queue.release === 'function') window.v2Queue.release();
-  return openTab();
+  setOnline(false);
+  runInThisContext(QUEUE_SOURCE, { filename: 'shared/offline-queue.js' });
+  TABS.push(window.v2Queue);
+  return window.v2Queue;
 }
 
 /**
@@ -60,14 +62,22 @@ function loadQueueModule() {
  * at the new copy (the page whose data layer the test drives) and returns it.
  */
 function openTab() {
-  setOnline(false);
-  runInThisContext(QUEUE_SOURCE, { filename: 'shared/offline-queue.js' });
-  TABS.push(window.v2Queue);
-  return window.v2Queue;
+  // The module lets go of the copy it finds in window.v2Queue (a reload);
+  // hide it so this copy loads beside it instead.
+  window.v2Queue = undefined;
+  return loadQueueModule();
 }
 
 // The copy every test file in this process shares; each test starts on it.
 const ORIGINAL_QUEUE = loadQueueModule();
+
+// Close the last test's tabs and give the queue back to the shared copy.
+beforeEach(() => {
+  TABS.forEach(tab => tab.release());
+  TABS = [ORIGINAL_QUEUE];
+  window.v2Queue = ORIGINAL_QUEUE;
+  ORIGINAL_QUEUE.claim();
+});
 
 function seed(field, value) {
   _cache[field][CID] = value;
@@ -129,11 +139,6 @@ describe('write-path audit: data layer', () => {
   beforeEach(() => {
     localStorage.clear();
     resetSession();
-    // Close the last test's tabs and give the queue back to the shared copy.
-    TABS.forEach(tab => tab.release());
-    TABS = [ORIGINAL_QUEUE];
-    window.v2Queue = ORIGINAL_QUEUE;
-    ORIGINAL_QUEUE.claim();
     fake = makeFakeSupabase();
     originalGetSupabase = globalThis.getSupabase;
     originalUseSupabase = _useSupabase;
@@ -589,6 +594,75 @@ describe('write-path audit: data layer', () => {
     var newId = fake.committedCount('delete_assessment', p => _isUuid(p.p_id));
     expect(newId).toBe(1);
   });
+
+  // Finding 8: the tab that queued a create is not the one that sends it. The
+  // sending tab's success event reaches this page's data layer, which
+  // re-keys the new assessment and frees the score waiting on it.
+  it('re-keys a create in the tab that queued it when another tab sends it', async () => {
+    var tabA = loadQueueModule();
+    var tabB = openTab();
+    window.v2Queue = tabB;
+    _outbox();
+    tabA.configure({ send: (name, params) => fake.rpc(name, params) });
+    await settle(1); // tab A holds the lock
+    seed('students', [studentY()]);
+    seed('assessments', []);
+    seed('scores', {});
+    setOnline(true);
+
+    var assessments = getAssessments(CID);
+    assessments.push({ id: 'sLOCALASSESS1', title: 'Lab', type: 'summative', tagIds: [TAG1] });
+    saveAssessments(CID, assessments);
+    var scores = getScores(CID);
+    scores[ENR_Y] = [{ id: 'e1', assessmentId: 'sLOCALASSESS1', tagId: TAG1, score: 3, date: '2026-10-13' }];
+    saveScores(CID, scores);
+    await settle();
+
+    expect(fake.committedCount('create_assessment')).toBe(1);
+    var newId = getAssessments(CID)[0].id;
+    expect(newId).not.toBe('sLOCALASSESS1');
+    expect(fake.committedCount('upsert_score', p => p.p_assessment_id === newId)).toBe(1);
+    expect(tabB.stats().queued).toBe(0);
+  });
+
+  // Finding 8: a landed create tells the other tabs the new id, and a tab
+  // told brings its own memory in line without touching the shared copy.
+  it('tells other tabs the new id when a create lands', async () => {
+    _initCrossTab();
+    var heard = [];
+    var other = new BroadcastChannel('td-data-sync');
+    other.onmessage = e => heard.push(e.data);
+    seed('assessments', [{ id: 'sLOCALASSESS1', title: 'Lab', type: 'summative', tagIds: [TAG1] }]);
+
+    _rekey(CID, 'assessment', 'sLOCALASSESS1', AID);
+    await settle(1);
+    other.close();
+
+    expect(heard).toContainEqual(
+      expect.objectContaining({ type: 'rekey', cid: CID, kind: 'assessment', localId: 'sLOCALASSESS1', serverId: AID }),
+    );
+  });
+
+  it('applies a new id announced by another tab', async () => {
+    _initCrossTab();
+    seed('assessments', [{ id: 'sLOCALASSESS1', title: 'Lab', type: 'summative', tagIds: [TAG1] }]);
+    var scores = {};
+    scores[ENR_Y] = [{ id: 'e1', assessmentId: 'sLOCALASSESS1', tagId: TAG1, score: 3, date: '2026-10-13' }];
+    seed('scores', scores);
+    var savedKey = 'gb-' + _DATA_KEYS.assessments + '-' + CID;
+    var savedBefore = localStorage.getItem(savedKey);
+    var other = new BroadcastChannel('td-data-sync');
+
+    other.postMessage({ type: 'rekey', cid: CID, kind: 'assessment', localId: 'sLOCALASSESS1', serverId: AID });
+    await settle(1);
+    other.close();
+
+    expect(getAssessments(CID)[0].id).toBe(AID);
+    expect(getScores(CID)[ENR_Y][0].assessmentId).toBe(AID);
+    expect(_idRekeys[CID]['sLOCALASSESS1']).toBe(AID);
+    // The other tab wrote the shared copy; this one leaves it alone.
+    expect(localStorage.getItem(savedKey)).toBe(savedBefore);
+  });
 });
 
 describe('write-path audit: outbox', () => {
@@ -644,6 +718,7 @@ describe('write-path audit: outbox', () => {
     };
     tabA.configure({ send: rpc });
     tabB.configure({ send: rpc });
+    await settle(1); // tab A holds the lock
     setOnline(true);
 
     tabA.push('upsert_score', { p_enrollment_id: 'e', p_assessment_id: 'a', p_value: 3 });
@@ -665,6 +740,7 @@ describe('write-path audit: outbox', () => {
         throw new Error('tab B must not send');
       },
     });
+    await settle(1); // tab A holds the lock
     setOnline(true);
 
     var res = await tabB.push('upsert_note', { p_course_id: CID, p_body: 'x' });
@@ -735,74 +811,6 @@ describe('write-path audit: outbox', () => {
     } finally {
       Object.defineProperty(navigator, 'locks', { value: locks, configurable: true, writable: true });
     }
-  });
-
-  // Finding 8: the tab that queued a create is not the one that sends it. The
-  // sending tab's success event reaches this page's data layer, which
-  // re-keys the new assessment and frees the score waiting on it.
-  it('re-keys a create in the tab that queued it when another tab sends it', async () => {
-    var tabA = loadQueueModule();
-    var tabB = openTab();
-    window.v2Queue = tabB;
-    _outbox();
-    tabA.configure({ send: (name, params) => fake.rpc(name, params) });
-    seed('students', [studentY()]);
-    seed('assessments', []);
-    seed('scores', {});
-    setOnline(true);
-
-    var assessments = getAssessments(CID);
-    assessments.push({ id: 'sLOCALASSESS1', title: 'Lab', type: 'summative', tagIds: [TAG1] });
-    saveAssessments(CID, assessments);
-    var scores = getScores(CID);
-    scores[ENR_Y] = [{ id: 'e1', assessmentId: 'sLOCALASSESS1', tagId: TAG1, score: 3, date: '2026-10-13' }];
-    saveScores(CID, scores);
-    await settle();
-
-    expect(fake.committedCount('create_assessment')).toBe(1);
-    var newId = getAssessments(CID)[0].id;
-    expect(newId).not.toBe('sLOCALASSESS1');
-    expect(fake.committedCount('upsert_score', p => p.p_assessment_id === newId)).toBe(1);
-    expect(tabB.stats().queued).toBe(0);
-  });
-
-  // Finding 8: a landed create tells the other tabs the new id, and a tab
-  // told brings its own memory in line without touching the shared copy.
-  it('tells other tabs the new id when a create lands', async () => {
-    _initCrossTab();
-    var heard = [];
-    var other = new BroadcastChannel('td-data-sync');
-    other.onmessage = e => heard.push(e.data);
-    seed('assessments', [{ id: 'sLOCALASSESS1', title: 'Lab', type: 'summative', tagIds: [TAG1] }]);
-
-    _rekey(CID, 'assessment', 'sLOCALASSESS1', AID);
-    await settle(1);
-    other.close();
-
-    expect(heard).toContainEqual(
-      expect.objectContaining({ type: 'rekey', cid: CID, kind: 'assessment', localId: 'sLOCALASSESS1', serverId: AID }),
-    );
-  });
-
-  it('applies a new id announced by another tab', async () => {
-    _initCrossTab();
-    seed('assessments', [{ id: 'sLOCALASSESS1', title: 'Lab', type: 'summative', tagIds: [TAG1] }]);
-    var scores = {};
-    scores[ENR_Y] = [{ id: 'e1', assessmentId: 'sLOCALASSESS1', tagId: TAG1, score: 3, date: '2026-10-13' }];
-    seed('scores', scores);
-    var savedKey = 'gb-' + _DATA_KEYS.assessments + '-' + CID;
-    var savedBefore = localStorage.getItem(savedKey);
-    var other = new BroadcastChannel('td-data-sync');
-
-    other.postMessage({ type: 'rekey', cid: CID, kind: 'assessment', localId: 'sLOCALASSESS1', serverId: AID });
-    await settle(1);
-    other.close();
-
-    expect(getAssessments(CID)[0].id).toBe(AID);
-    expect(getScores(CID)[ENR_Y][0].assessmentId).toBe(AID);
-    expect(_idRekeys[CID]['sLOCALASSESS1']).toBe(AID);
-    // The other tab wrote the shared copy; this one leaves it alone.
-    expect(localStorage.getItem(savedKey)).toBe(savedBefore);
   });
 
   // Finding 12, no long-form editor open (fixed: a 401 the refresh could
