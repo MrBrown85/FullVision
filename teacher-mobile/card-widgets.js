@@ -480,14 +480,18 @@ window.MCardWidgets = (function () {
   _renderers.growthAreas = function (st, cid, data) {
     var rating = data.termRating;
     if (!rating || !rating.growthAreas || !rating.growthAreas.length) return '';
-    var areas = rating.growthAreas;
+    // A competency removed from the learning map has no name to show.
+    var areas = rating.growthAreas.filter(function (tid) {
+      return !!getTagById(cid, tid);
+    });
+    if (!areas.length) return '';
     var sections = data.sections;
     var shown = areas.slice(0, 3);
     var overflow = areas.length - shown.length;
     var chips = shown
       .map(function (tid) {
         var tag = getTagById(cid, tid);
-        var label = tag ? tag.shortName || tag.label || tag.name || tid : tid;
+        var label = tag.shortName || tag.label || tag.name || tag.code || '';
         var dotColor = '';
         if (tag && tag.sectionId) {
           var sec = sections.find(function (s) {

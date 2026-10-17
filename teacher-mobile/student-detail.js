@@ -238,7 +238,7 @@ window.MStudentDetail = (function () {
       focusHTML = '<div class="m-list-inset-header">Focus Areas</div>';
       focusAreas.forEach(function (f) {
         var secColor = f.section ? f.section.color : '#888';
-        var label = f.tag.label || f.tag.name || f.tag.id;
+        var label = f.tag.label || f.tag.name || f.tag.shortName || f.tag.code || '';
         focusHTML +=
           '<div class="m-focus-row">' +
           '<span class="m-section-dot" style="background:' +
@@ -320,7 +320,7 @@ window.MStudentDetail = (function () {
           });
           var latest = tagScores.length ? tagScores[tagScores.length - 1] : null;
           var val = latest ? latest.score : null;
-          var label = tag ? tag.shortName || tag.label || tag.id : tid;
+          var label = tag ? tag.shortName || tag.label || tag.code || '' : '?';
           scoreChips +=
             '<span class="m-assess-score-chip">' +
             '<span style="font-size:11px;color:var(--text-3)">' +
