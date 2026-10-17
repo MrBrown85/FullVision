@@ -725,6 +725,50 @@ function profLabelBadge(score) {
   return `<span class="prof-label prof-${s}">${s > 0 ? PROF_LABELS[s] : '\u2014'}</span>`;
 }
 
+/* The roster keeps its scroll position when the sidebar is drawn again.
+   Pages replace the whole sidebar on almost every change (picking a student
+   on Assignments, a score landing, moving between students), and a new
+   list starts at the top, so clicking a student low in the list threw the
+   teacher back to the first name. The position is remembered as the
+   teacher scrolls and put back, before the browser paints, whenever the
+   sidebar is replaced with the same class's roster. Switching class starts
+   at the top. */
+var _rosterScroll = { course: null, top: 0 };
+
+function _rosterCourse() {
+  var sel = document.getElementById('gb-course-select');
+  return sel ? sel.value : null;
+}
+
+function _rememberRosterScroll(e) {
+  var target = e && e.target;
+  var list = target && target.closest ? target.closest('#gb-roster-list') : null;
+  if (!list) return;
+  _rosterScroll = { course: _rosterCourse(), top: list.scrollTop };
+}
+
+function _restoreRosterScroll() {
+  var list = document.getElementById('gb-roster-list');
+  if (!list || !_rosterScroll.top || _rosterCourse() !== _rosterScroll.course) return;
+  if (list.scrollTop !== _rosterScroll.top) list.scrollTop = _rosterScroll.top;
+}
+
+function _keepRosterScroll() {
+  // Scroll events don't bubble, so listen in the capture phase. A click on
+  // a student is captured too: it runs before the page redraws the sidebar,
+  // so the position is right even if no scroll event has arrived yet.
+  document.addEventListener('scroll', _rememberRosterScroll, true);
+  document.addEventListener('click', _rememberRosterScroll, true);
+  var mount = document.getElementById('sidebar-mount');
+  if (mount && typeof MutationObserver === 'function') {
+    new MutationObserver(_restoreRosterScroll).observe(mount, { childList: true });
+  }
+}
+if (typeof document !== 'undefined' && document.addEventListener) {
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _keepRosterScroll);
+  else _keepRosterScroll();
+}
+
 // Refresh sidebar in place (call after score changes)
 function refreshSidebar() {
   const mount = document.getElementById('sidebar-mount');
