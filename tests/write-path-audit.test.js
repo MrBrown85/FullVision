@@ -453,9 +453,10 @@ describe('write-path audit: data layer', () => {
     expect(getPointsScore(CID, ENR_Y, AID)).toBeNull();
   });
 
-  // Finding 10. update_assessment takes a jsonb patch, but the whole row goes
-  // in it, so a stale copy reverts fields the teacher did not touch.
-  it.fails('sends only the fields that changed when renaming an assessment', async () => {
+  // Finding 10 (fixed: patches hold only the fields that differ from the
+  // server baseline, so a stale copy can't revert fields the teacher did not
+  // touch).
+  it('sends only the fields that changed when renaming an assessment', async () => {
     seed('assessments', [{ id: AID, title: 'Lab', dueDate: '2026-10-20', type: 'summative', tagIds: [TAG1] }]);
     _rememberServerState('assessments', CID, getAssessments(CID));
 
@@ -464,8 +465,70 @@ describe('write-path audit: data layer', () => {
     saveAssessments(CID, a);
     await settle();
 
-    var patch = fake.committed.find(c => c.name === 'update_assessment').params.p_patch;
-    expect(Object.keys(patch)).toEqual(['title']);
+    var params = fake.committed.find(c => c.name === 'update_assessment').params;
+    expect(Object.keys(params.p_patch)).toEqual(['title']);
+    expect('p_tag_ids' in params).toBe(false);
+    expect(fake.committedCount('save_collab')).toBe(0);
+  });
+
+  it('sends only the fields that changed when editing a student', async () => {
+    seed('students', [studentY()]);
+    _rememberServerState('students', CID, getStudents(CID));
+
+    var students = getStudents(CID);
+    students[0].firstName = 'Yasmin';
+    saveStudents(CID, students);
+    await settle();
+
+    var call = fake.committed.find(c => c.name === 'update_student');
+    expect(call.params).toEqual({ p_id: STU_Y, p_patch: { first_name: 'Yasmin' } });
+    expect(fake.committedCount('update_enrollment')).toBe(0);
+  });
+
+  it('sends only the tag list when only the tags changed', async () => {
+    var TAG2 = '88888888-8888-4888-8888-888888888888';
+    seed('assessments', [{ id: AID, title: 'Lab', dueDate: '2026-10-20', type: 'summative', tagIds: [TAG1] }]);
+    _rememberServerState('assessments', CID, getAssessments(CID));
+
+    var a = getAssessments(CID);
+    a[0].tagIds = [TAG1, TAG2];
+    saveAssessments(CID, a);
+    await settle();
+
+    var call = fake.committed.find(c => c.name === 'update_assessment');
+    expect(call.params).toEqual({ p_id: AID, p_patch: {}, p_tag_ids: [TAG1, TAG2] });
+    expect(fake.committedCount('save_collab')).toBe(0);
+  });
+
+  it('sends only save_collab when only the collaboration changed', async () => {
+    seed('assessments', [{ id: AID, title: 'Lab', dueDate: '2026-10-20', type: 'summative', tagIds: [TAG1] }]);
+    _rememberServerState('assessments', CID, getAssessments(CID));
+
+    var a = getAssessments(CID);
+    a[0].collaboration = 'pair';
+    a[0].pairs = [[ENR_Y, ENR_Z]];
+    saveAssessments(CID, a);
+    await settle();
+
+    expect(fake.committedCount('update_assessment')).toBe(0);
+    var call = fake.committed.find(c => c.name === 'save_collab');
+    expect(call.params).toEqual({ p_id: AID, p_mode: 'pairs', p_config: { pairs: [[ENR_Y, ENR_Z]] } });
+  });
+
+  it('sends nothing for a row whose server fields did not change', async () => {
+    seed('students', [studentY()]);
+    seed('assessments', [{ id: AID, title: 'Lab', dueDate: '2026-10-20', type: 'summative', tagIds: [TAG1] }]);
+    _rememberServerState('students', CID, getStudents(CID));
+    _rememberServerState('assessments', CID, getAssessments(CID));
+
+    // A field with no server column of its own.
+    var students = getStudents(CID);
+    students[0].enrolledDate = '2026-09-03';
+    saveStudents(CID, students);
+    saveAssessments(CID, getAssessments(CID));
+    await settle();
+
+    expect(fake.committed).toEqual([]);
   });
 
   // Finding 11 (fixed: the create_course record in fv-idmap-v1 outlives the
