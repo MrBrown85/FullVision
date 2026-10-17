@@ -8,7 +8,6 @@
  *   deadLetter        — returns current dead list
  *   dismissDeadLetter — removes one entry
  *   clear             — wipes both stores
- *   callOrEnqueue     — online-direct, network-error-fallback-to-enqueue, offline-enqueue
  */
 import './setup.js';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
@@ -215,59 +214,6 @@ describe('v2Queue (offline write queue)', () => {
       Q.clear();
       expect(Q.stats().queued).toBe(0);
       expect(Q.stats().deadLettered).toBe(0);
-    });
-  });
-
-  describe('callOrEnqueue', () => {
-    it('calls the RPC directly when online and succeeds', async () => {
-      setOnline(true);
-      var res = await Q.callOrEnqueue('rpc', { x: 1 });
-      expect(res.ok).toBe(true);
-      expect(res.enqueued).toBe(false);
-      expect(calls).toEqual([{ name: 'rpc', payload: { x: 1 } }]);
-      expect(Q.stats().queued).toBe(0);
-    });
-
-    it('enqueues when offline', async () => {
-      setOnline(false);
-      var res = await Q.callOrEnqueue('rpc', { x: 1 });
-      expect(res.ok).toBe(false);
-      expect(res.enqueued).toBe(true);
-      expect(res.reason).toBe('offline');
-      expect(Q.stats().queued).toBe(1);
-    });
-
-    it('enqueues on network-shaped error from the RPC', async () => {
-      setOnline(true);
-      globalThis.getSupabase = () => ({
-        rpc() {
-          return Promise.resolve({ data: null, error: { message: 'network: failed to fetch' } });
-        },
-      });
-      var res = await Q.callOrEnqueue('rpc', {});
-      expect(res.ok).toBe(false);
-      expect(res.enqueued).toBe(true);
-      expect(res.reason).toBe('network');
-    });
-
-    it('returns ok:false without enqueueing on non-network errors (validation/auth)', async () => {
-      setOnline(true);
-      globalThis.getSupabase = () => ({
-        rpc() {
-          return Promise.resolve({ data: null, error: { message: 'row-level security violation' } });
-        },
-      });
-      var res = await Q.callOrEnqueue('rpc', {});
-      expect(res.ok).toBe(false);
-      expect(res.enqueued).toBe(false);
-    });
-
-    it('enqueues when Supabase is unavailable even if navigator.onLine is true', async () => {
-      setOnline(true);
-      globalThis.getSupabase = () => null;
-      var res = await Q.callOrEnqueue('rpc', {});
-      expect(res.enqueued).toBe(true);
-      expect(res.reason).toBe('offline');
     });
   });
 

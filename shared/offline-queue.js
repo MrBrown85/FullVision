@@ -621,10 +621,7 @@
 
   /* Enqueue a write. endpoint = RPC name, payload = RPC params object.
      If opts.id is provided it is used as the entry id (and therefore the
-     idempotency key); otherwise a fresh UUID is generated. Passing an
-     explicit id is how callOrEnqueue threads the key it used for the
-     failed online attempt into the queued retry so both the direct call
-     and the retry share a single key.
+     idempotency key); otherwise a fresh UUID is generated.
      Returns { ok, id, reason?, replaced? }. Caller should update its
      optimistic cache AFTER receiving ok:true. `replaced` names the entry a
      cell write took the place of (see _coalesceIndex). */
@@ -1211,44 +1208,6 @@
     _notify('clear');
   }
 
-  /* One-shot convenience: call the RPC directly if online, else enqueue.
-     Resolves to { ok, data?, enqueued, reason? }.
-
-     For endpoints that support idempotency, we generate a key up front and
-     pass it to both the direct call and any fallback enqueue. That way, if
-     the direct call's network leg fails after the server committed, the
-     queued retry sends the same key and the server returns the cached row
-     id instead of inserting a second row. */
-  function callOrEnqueue(endpoint, payload) {
-    var idemKey = IDEMPOTENT_ENDPOINTS[endpoint] ? _uuid4() : null;
-    if (navigator.onLine && typeof getSupabase === 'function' && getSupabase()) {
-      return getSupabase()
-        .rpc(endpoint, _withIdemKey(endpoint, payload, idemKey))
-        .then(function (res) {
-          if (res && res.error) {
-            // Treat non-2xx network failures as "enqueue and retry" — but
-            // return ok:false for semantic (validation/auth) errors so the
-            // caller can decide. The heuristic: a message mentioning 'fetch'
-            // or 'network' enqueues; everything else is a real error.
-            var msg = (res.error.message || '') + '';
-            if (/network|fetch|failed to connect|ECONNREFUSED/i.test(msg)) {
-              var q = enqueue(endpoint, payload, idemKey ? { id: idemKey } : null);
-              return { ok: false, enqueued: q.ok, reason: 'network', error: msg };
-            }
-            return { ok: false, enqueued: false, error: msg };
-          }
-          return { ok: true, enqueued: false, data: res && res.data };
-        })
-        .catch(function (e) {
-          var q = enqueue(endpoint, payload, idemKey ? { id: idemKey } : null);
-          return { ok: false, enqueued: q.ok, reason: 'exception', error: (e && e.message) || String(e) };
-        });
-    }
-    // Offline or Supabase unavailable
-    var q = enqueue(endpoint, payload, idemKey ? { id: idemKey } : null);
-    return Promise.resolve({ ok: false, enqueued: q.ok, reason: q.ok ? 'offline' : q.reason });
-  }
-
   /* Wire listeners — flush on reconnect, periodic retry while online. */
   window.addEventListener('online', function () {
     _notify('network', { online: true });
@@ -1294,7 +1253,6 @@
     claim: claim,
     release: release,
     currentOwner: currentOwner,
-    callOrEnqueue: callOrEnqueue,
     subscribe: subscribe,
     MAX_ENTRIES: MAX_ENTRIES,
     SLOW_AFTER: SLOW_AFTER,
