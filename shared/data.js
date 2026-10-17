@@ -658,6 +658,9 @@ async function _runCourseRefresh(cid, st) {
       st.kind = null;
       st.snapshot = Object.assign({}, (_localWrites[cid] && _localWrites[cid].fields) || {});
       st.skipped = false;
+      // The outbox has drained, so what this fetch brings back includes
+      // everything sent so far.
+      _echoNeedsReload = false;
       var versionBefore = _classVersion[cid];
       try {
         if (kind === 'student-records' && !_classBundleEnabled()) {
@@ -707,6 +710,50 @@ function _refreshMustSkip(cid, field) {
   if (_localWriteCount(cid, field) === (st.snapshot[field] || 0)) return false;
   st.skipped = true;
   return true;
+}
+
+/* Realtime reports this page's own changes too. Downloading the whole class
+   again for each one (after every burst of grading) is wasted: this page
+   already holds the change. A version is this page's own echo when the
+   database recorded this page's client id (x-fv-client, shared/supabase.js)
+   on exactly the next version, and nothing this page sent since the last
+   load comes back changed by the server: a create gets a server id and
+   position, a delete cascades, and a write relayed from another tab isn't
+   in this page's copy. Anything else reloads as before. */
+var _ECHO_SAFE_RPCS = {
+  upsert_score: true,
+  upsert_tag_score: true,
+  upsert_rubric_score: true,
+  set_score_status: true,
+  save_score_comment: true,
+  clear_score: true,
+  update_assessment: true,
+  save_collab: true,
+  save_assessment_tags: true,
+  update_student: true,
+  update_enrollment: true,
+  update_observation: true,
+  delete_observation: true,
+  upsert_goal: true,
+  upsert_reflection: true,
+  upsert_section_override: true,
+  clear_section_override: true,
+  save_term_rating: true,
+  save_report_config: true,
+  update_course: true,
+  archive_course: true,
+};
+var _echoNeedsReload = false;
+
+function _noteOutboxSend(info) {
+  if (!info || !info.fromThisTab || !_ECHO_SAFE_RPCS[info.endpoint]) _echoNeedsReload = true;
+}
+
+function _isOwnChangeEcho(cid, row, version) {
+  var me = typeof window !== 'undefined' ? window.__fvClientId : null;
+  if (!me || !row || row.last_client !== me) return false;
+  if (_echoNeedsReload || _classVersion[cid] == null) return false;
+  return version === _classVersion[cid] + 1;
 }
 
 function _unsubscribeCourseSyncCursor() {
@@ -772,7 +819,13 @@ async function _subscribeCourseSyncCursor(cid) {
         // The version moves on every change to the class; the timestamps are
         // for clients from before it existed.
         if (next.version != null && _classBundleEnabled()) {
-          if (Number(next.version) !== _classVersion[cid]) _handleExternalCourseUpdate(cid, 'gradebook');
+          var version = Number(next.version);
+          if (version === _classVersion[cid]) return;
+          if (_isOwnChangeEcho(cid, next, version)) {
+            _classVersion[cid] = version;
+            return;
+          }
+          _handleExternalCourseUpdate(cid, 'gradebook');
           return;
         }
         if (next.gradebook_updated_at && next.gradebook_updated_at !== prev.gradebookUpdatedAt) {
@@ -8059,6 +8112,7 @@ function _outbox() {
       isPaused: function () {
         return _supabaseDegraded;
       },
+      onSend: _noteOutboxSend,
     });
     // Creates are re-keyed from the outbox's own events, so a create that
     // lands after a reload (no .then waiting for it) still re-keys.

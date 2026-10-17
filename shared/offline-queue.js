@@ -120,6 +120,7 @@
   var _loadedAt = Date.now();
   var _tabId = _uuid4();
   var _owner = false;
+  var _onSend = null; // told about each entry as it goes out (see configure)
   var _released = false; // the page is going away: claim nothing until claim()
   var _usingLocks =
     typeof navigator !== 'undefined' && !!navigator.locks && typeof navigator.locks.request === 'function';
@@ -135,6 +136,7 @@
     opts = opts || {};
     if (typeof opts.send === 'function') _send = opts.send;
     if (typeof opts.isPaused === 'function') _isPaused = opts.isPaused;
+    if (typeof opts.onSend === 'function') _onSend = opts.onSend;
   }
 
   /* The record a write touches, so writes to one record stay in order. */
@@ -635,6 +637,7 @@
       id: (opts && opts.id) || _uuid4(),
       created_at: new Date().toISOString(),
       owner: currentOwner(),
+      tab: _tabId,
       key: (opts && opts.key) || _entryKey(endpoint, payload),
       endpoint: endpoint,
       payload: payload || {},
@@ -900,6 +903,15 @@
       _replaceEntry(entry);
     } catch (e) {
       /* storage full: the entry still goes */
+    }
+    // Before it goes, so the data layer knows before realtime can report it
+    // whether the change was made in this tab.
+    if (_onSend) {
+      try {
+        _onSend({ endpoint: entry.endpoint, fromThisTab: entry.tab === _tabId });
+      } catch (e) {
+        console.warn('[v2Queue] onSend failed:', e);
+      }
     }
     var p = _runEntry(entry).then(function (res) {
       _settle(entry, res);

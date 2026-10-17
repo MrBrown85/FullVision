@@ -39,8 +39,19 @@
       console.error('Supabase credentials missing. Check environment variables.');
       return null;
     }
-    window._supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    // One random id per page load, sent with every request. The database
+    // records it against each change to a class, so this page can tell its
+    // own changes from another device's when realtime reports them.
+    window.__fvClientId = window.__fvClientId || _randomClientId();
+    window._supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+      global: { headers: { 'x-fv-client': window.__fvClientId } },
+    });
     return window._supabase;
+  }
+
+  function _randomClientId() {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+    return 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
   }
 
   // Initialize immediately (CDN script should already be loaded synchronously)
