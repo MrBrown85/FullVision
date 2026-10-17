@@ -363,6 +363,40 @@ describe('v2Queue (offline write queue)', () => {
     });
   });
 
+  describe('onSend', () => {
+    it('says whether each entry it sends was queued in this tab', async () => {
+      var seen = [];
+      Q.configure({
+        onSend: function (info) {
+          seen.push(info);
+        },
+      });
+      try {
+        setOnline(false);
+        Q.enqueue('update_student', { p_id: 'st-1', p_patch: {} });
+        // An entry another tab queued.
+        var stored = JSON.parse(localStorage.getItem('fv-sync-queue-v1'));
+        stored.entries.push(
+          Object.assign({}, stored.entries[0], {
+            id: 'other-tab-entry',
+            tab: 'some-other-tab',
+            key: 'id:st-2',
+            payload: { p_id: 'st-2', p_patch: {} },
+          }),
+        );
+        localStorage.setItem('fv-sync-queue-v1', JSON.stringify(stored));
+        setOnline(true);
+        await Q.flush();
+        expect(seen).toEqual([
+          { endpoint: 'update_student', fromThisTab: true },
+          { endpoint: 'update_student', fromThisTab: false },
+        ]);
+      } finally {
+        Q.configure({ onSend: function () {} });
+      }
+    });
+  });
+
   // The queue lives in localStorage, so on a shared Chromebook it can outlast
   // a sign-out. One teacher's queued writes must never be sent under another
   // teacher's session.
