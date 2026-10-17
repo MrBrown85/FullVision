@@ -1265,22 +1265,7 @@ document.addEventListener('click', function (e) {
   }
 });
 
-// Check for Service Worker updates on page load
-if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    var el = document.getElementById('sync-toast');
-    if (el) el.remove();
-    var toast = document.createElement('div');
-    toast.className = 'sync-toast success';
-    toast.id = 'sync-toast';
-    toast.setAttribute('role', 'alert');
-    toast.innerHTML =
-      '<span>Update available</span><button class="sync-toast-btn" data-action="reload-page">Refresh</button>';
-    document.body.appendChild(toast);
-  });
-}
-
-// Delegated click handler for sync toast and SW update buttons
+// Delegated click handler for sync toast buttons
 document.addEventListener('click', function (e) {
   var btn = e.target.closest('[data-action]');
   if (!btn) return;
@@ -1308,9 +1293,6 @@ document.addEventListener('click', function (e) {
         }
       });
       dismissSyncToast();
-      break;
-    case 'reload-page':
-      window.location.reload();
       break;
     case 'copy-student-email':
       _handleCopyStudentEmail(btn);
