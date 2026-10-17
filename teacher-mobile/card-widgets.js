@@ -56,6 +56,9 @@ window.MCardWidgets = (function () {
   _renderers.hero = function (st, cid, data) {
     var overall = getOverallProficiency(cid, st.id);
     var rounded = Math.round(overall);
+    // The overall grade as the class is set to grade (level, letter, or both).
+    var grade = studentGradeSummary(cid, st.id);
+    var gradeText = grade.text || '\u2014';
     var color = MC.avatarColor(st.id);
     var initials = MC.avatarInitials(st);
     var name = displayName(st);
@@ -83,13 +86,15 @@ window.MCardWidgets = (function () {
       (badges ? '<div class="m-scard-badges">' + badges + '</div>' : '') +
       '</div>' +
       '<div class="m-scard-prof">' +
-      '<div class="m-scard-prof-val" style="color:' +
-      MC.profBg(rounded) +
+      '<div class="m-scard-prof-val' +
+      (gradeText.length > 4 ? ' m-scard-prof-long' : '') +
+      '" style="color:' +
+      MC.profBg(grade.level) +
       '">' +
-      (overall > 0 ? overall.toFixed(1) : '\u2014') +
+      MC.esc(gradeText) +
       '</div>' +
       '<div class="m-scard-prof-label">' +
-      (PROF_LABELS[rounded] || 'No Evidence') +
+      (courseGradeMode(cid) === 'letter' ? 'Course grade' : PROF_LABELS[rounded] || 'No Evidence') +
       '</div>' +
       '</div>' +
       '</div>'

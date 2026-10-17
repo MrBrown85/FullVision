@@ -518,16 +518,21 @@ function renderStudentHeader(cid, sid, opts) {
       ${student.pronouns ? `<div class="student-pronouns">${esc(student.pronouns)}</div>` : ''}
     </div>
   </div>`;
-  html += `<div class="overall-card">
+  // A Letter class shows only the letter grade; Proficiency only the level;
+  // Both shows both (courseGradeMode).
+  const letterOnly = courseGradeMode(cid) === 'letter';
+  if (!letterOnly) {
+    html += `<div class="overall-card">
     <div class="overall-val" style="color:${profColor}">${overall > 0 ? overall.toFixed(1) : '\u2014'}</div>
     <div class="overall-word" style="color:${profColor}">${PROF_LABELS[overallRounded] || 'No Evidence'}</div>
   </div>`;
+  }
   // A points class with no linked competencies has a % but no proficiency.
   const lg =
     typeof getCourseLetterData === 'function' && courseShowsLetterGrades(course)
       ? getCourseLetterData(cid, student.id)
       : null;
-  if (lg && (lg.R != null || overall > 0)) {
+  if (lg && (lg.R != null || overall > 0 || letterOnly)) {
     html += `<div class="letter-card">
       <div class="letter-val">${lg && lg.S ? lg.S : '—'}</div>
       <div class="letter-pct">${lg && lg.R != null ? lg.R + '%' : '—'}</div>
@@ -652,7 +657,7 @@ function renderSidebar(activeCourse, selectedStudentId, onStudentClick) {
       <div class="student-info">
         <div class="student-row-name">${flagged ? '<span style="color:var(--priority);margin-right:3px">\u2691</span>' : ''}${esc(fullName(s))}</div>
       </div>
-      <div class="student-row-prof" data-prof-sid="${s.id}"></div>
+      <div class="student-row-grades" data-prof-sid="${s.id}"></div>
     </a>`;
   });
 
@@ -672,18 +677,21 @@ function renderSidebar(activeCourse, selectedStudentId, onStudentClick) {
   return html;
 }
 
-/** Fill sidebar proficiency badges asynchronously after sidebar is mounted. */
+/* The grade beside each name, as the class is set to grade
+   (studentGradeBadges): level out of 4, letter and %, or both. */
+function _sidebarGradeBadge(part) {
+  var color = PROF_COLORS[part.level] || PROF_COLORS[0];
+  var tint = PROF_TINT[part.level] || 'transparent';
+  return `<span class="student-row-prof" style="color:${color};background:${tint}">${esc(part.text)}</span>`;
+}
+
+/** Fill sidebar grade badges asynchronously after sidebar is mounted. */
 function fillSidebarBadges(cid) {
   requestAnimationFrame(function () {
     document.querySelectorAll('[data-prof-sid]').forEach(function (el) {
-      var sid = el.getAttribute('data-prof-sid');
-      var overall = getOverallProficiency(cid, sid);
-      if (overall > 0) {
-        var r = Math.round(overall);
-        el.style.color = PROF_COLORS[r] || PROF_COLORS[0];
-        el.style.background = PROF_TINT[r] || 'transparent';
-        el.textContent = overall.toFixed(1);
-      }
+      var badges = studentGradeBadges(cid, el.getAttribute('data-prof-sid'));
+      el.innerHTML =
+        (badges.prof ? _sidebarGradeBadge(badges.prof) : '') + (badges.letter ? _sidebarGradeBadge(badges.letter) : '');
     });
   });
 }

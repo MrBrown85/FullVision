@@ -75,8 +75,13 @@ window.DashOverview = (function () {
     var sections = opts.sections;
     var allStudents = opts.allStudents;
     var assessments = opts.assessments;
-    var classAvg = opts.classAvg;
-    var classR = opts.classR;
+    // The class average as this class shows grades (level, letter, or both).
+    var classGrade = classGradeSummary(
+      cid,
+      (allStudents || []).map(function (s) {
+        return s.id;
+      }),
+    );
     var tagCoveragePct = opts.tagCoveragePct;
     var sectionClassAvgs = opts.sectionClassAvgs;
     var tagsWithEvidence = opts.tagsWithEvidence;
@@ -182,9 +187,9 @@ window.DashOverview = (function () {
       '<div class="dash-quick-stats">' +
       '<div class="dash-mini-stat">' +
       '<div class="dash-mini-stat-val" style="color:' +
-      (classAvg > 0 ? PROF_COLORS[classR] : 'var(--text-3)') +
+      (classGrade.level > 0 ? PROF_COLORS[classGrade.level] : 'var(--text-3)') +
       '">' +
-      (classAvg > 0 ? classAvg.toFixed(1) : '\u2014') +
+      (classGrade.text || '\u2014') +
       '</div>' +
       '<div class="dash-mini-stat-label">Class Avg</div>' +
       '</div>' +
@@ -241,7 +246,7 @@ window.DashOverview = (function () {
         '<span class="dash-outcome-val" style="color:' +
         color +
         '">' +
-        (avg > 0 ? avg.toFixed(1) : '\u2014') +
+        formatLevel(cid, avg) +
         '</span>' +
         '</div>';
     });

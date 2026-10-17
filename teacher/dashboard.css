@@ -668,6 +668,21 @@
   font-weight: 700;
   line-height: 1.2;
 }
+/* Letter and Both classes show a % ("100%", "2.8 · 70%"), wider than a level
+   ("4.0"). Their tiles wrap onto a second row rather than squeeze, and the
+   value shrinks to the tile instead of running into the next one. */
+.dash-card-sections-pct .dash-section-mini {
+  min-width: 52px;
+  container-type: inline-size;
+}
+.dash-card-sections-pct .dash-section-val {
+  font-size: clamp(11px, 30cqi, var(--text-lg));
+}
+
+.dash-section-val .dash-pct {
+  font-size: 0.65em;
+  font-weight: 600;
+}
 
 /* Card Footer */
 .dash-card-footer {

@@ -8,6 +8,12 @@ window.DashStudentCards = (function () {
     flat: '<span style="color:var(--text-3);font-size:0.85rem">&#x2192;</span>',
   };
 
+  // A competency or group value in a small tile, as the class shows grades
+  // (formatLevel). The % sign is set smaller so "100%" fits where "4.0" did.
+  function _tileValue(cid, value) {
+    return esc(formatLevel(cid, value)).replace(/%/g, '<span class="dash-pct">%</span>');
+  }
+
   function standardLabel(sec) {
     var tag = sec && sec.tags && sec.tags[0];
     return (tag && (tag.code || tag.label || tag.shortName || tag.name)) || (sec && (sec.shortName || sec.name)) || '';
@@ -33,7 +39,9 @@ window.DashStudentCards = (function () {
       html += '<div class="dash-grid">';
       students.forEach(function (st) {
         var overall = getOverallProficiency(cid, st.id);
-        var op = Math.round(overall);
+        // The badge shows the grade as the class is set to grade.
+        var grade = studentGradeSummary(cid, st.id);
+        var op = grade.level;
         var flagged = isStudentFlagged(cid, st.id);
         var pct = getCompletionPct(cid, st.id);
 
@@ -147,12 +155,12 @@ window.DashStudentCards = (function () {
           '<div class="dash-card-badge-num" style="color:' +
           PROF_COLORS[op] +
           '">' +
-          (overall > 0 ? overall.toFixed(1) : '\u2014') +
+          (grade.text || '\u2014') +
           '</div>' +
           '<div class="dash-card-badge-label" style="color:' +
           PROF_COLORS[op] +
           '">' +
-          (overall > 0 ? PROF_LABELS[op] : '') +
+          levelWord(cid, overall) +
           '</div>' +
           '</div>' +
           (missingCount > 0
@@ -164,7 +172,10 @@ window.DashStudentCards = (function () {
             : '') +
           '</div>';
 
-        html += '<div class="dash-card-sections">';
+        html +=
+          '<div class="dash-card-sections' +
+          (courseGradeMode(cid) === 'proficiency' ? '' : ' dash-card-sections-pct') +
+          '">';
         var grouped = getGroupedSections(cid);
         if (grouped.groups.length > 0) {
           grouped.groups.forEach(function (gi) {
@@ -184,7 +195,7 @@ window.DashStudentCards = (function () {
               '<div class="dash-section-val" style="color:' +
               PROF_COLORS[gr] +
               '">' +
-              (groupVal > 0 ? groupVal.toFixed(1) : '\u2014') +
+              _tileValue(cid, groupVal) +
               '</div>' +
               '</div>';
           });
@@ -205,7 +216,7 @@ window.DashStudentCards = (function () {
               '<div class="dash-section-val" style="color:' +
               PROF_COLORS[sr] +
               '">' +
-              (secVal > 0 ? secVal.toFixed(1) : '\u2014') +
+              _tileValue(cid, secVal) +
               '</div>' +
               '</div>';
           });
@@ -227,7 +238,7 @@ window.DashStudentCards = (function () {
               '<div class="dash-section-val" style="color:' +
               PROF_COLORS[secRounded] +
               '">' +
-              (secVal > 0 ? secVal.toFixed(1) : '\u2014') +
+              _tileValue(cid, secVal) +
               '</div>' +
               '</div>';
           });

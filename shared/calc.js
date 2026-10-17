@@ -1005,6 +1005,116 @@ function getSectionGrowthData(cid, studentId, sectionId) {
  * @param {Array<{date: string, prof: number}>} points - Growth data from getSectionGrowthData
  * @returns {string} HTML string for the sparkline element
  */
+/* ── Showing grades the way the class is set to grade ─────────────────
+   A class grades by Proficiency (levels out of 4), Letter (letter grade and
+   course %), or Both. Every screen shows grades through these helpers, so a
+   class reads the same everywhere:
+   - a student's overall grade: "3.0", "B 82%", or "3.0 · B 82%";
+   - a competency, group or class average: "2.8", "70%" (level ÷ 4, the
+     course's rule for a level as a %), or "2.8 · 70%".
+   `level` (1-4) picks the colour; a % uses the band its letter falls in
+   (A 4, B 3, C+ and C 2, C- and F 1). */
+function courseGradeMode(cid) {
+  var course = (typeof COURSES !== 'undefined' && COURSES[cid]) || {};
+  if (course.gradingSystem === 'letter') return 'letter';
+  if (course.gradingSystem === 'both') return 'both';
+  return 'proficiency';
+}
+
+function _percentLevel(pct) {
+  return pct >= 86 ? 4 : pct >= 73 ? 3 : pct >= 60 ? 2 : 1;
+}
+
+/* A level from 0 to 4 as the class shows it; `empty` (default "—") when
+   there is none. */
+function formatLevel(cid, value, empty) {
+  if (!(value > 0)) return empty === undefined ? '\u2014' : empty;
+  var mode = courseGradeMode(cid);
+  var num = Number(value).toFixed(1);
+  var pct = Math.round((value / 4) * 100) + '%';
+  if (mode === 'letter') return pct;
+  if (mode === 'both') return num + ' \u00B7 ' + pct;
+  return num;
+}
+
+/* The proficiency word shown under a level ("Proficient"). Letter classes
+   don't use proficiency words. */
+function levelWord(cid, value) {
+  if (!(value > 0) || courseGradeMode(cid) === 'letter') return '';
+  return PROF_LABELS[Math.round(value)] || '';
+}
+
+/* A student's overall grade in parts: `prof` (the level out of 4) unless the
+   class is Letter, `letter` (letter and %) unless it is Proficiency. Each is
+   null when the student has nothing to show yet. */
+function studentGradeBadges(cid, sid) {
+  var mode = courseGradeMode(cid);
+  var out = { prof: null, letter: null };
+  if (mode !== 'letter') {
+    var overall = getOverallProficiency(cid, sid);
+    if (overall > 0) out.prof = { text: overall.toFixed(1), level: Math.round(overall) };
+  }
+  if (mode !== 'proficiency') {
+    var lg = getCourseLetterData(cid, sid);
+    if (lg && lg.R != null) out.letter = { text: (lg.S ? lg.S + ' ' : '') + lg.R + '%', level: _percentLevel(lg.R) };
+  }
+  return out;
+}
+
+/* A student's overall grade as one line, and the level its colour comes
+   from (the letter's in a Letter class, else the proficiency's). */
+function studentGradeSummary(cid, sid) {
+  var b = studentGradeBadges(cid, sid);
+  var parts = [b.prof, b.letter].filter(Boolean);
+  var lead = courseGradeMode(cid) === 'letter' ? b.letter : b.prof || b.letter;
+  return {
+    text: parts
+      .map(function (p) {
+        return p.text;
+      })
+      .join(' \u00B7 '),
+    level: lead ? lead.level : 0,
+  };
+}
+
+/* The class average of the students' overall grades, as the class shows
+   them. */
+function classGradeSummary(cid, studentIds) {
+  var mode = courseGradeMode(cid);
+  var profs = [];
+  var pcts = [];
+  (studentIds || []).forEach(function (sid) {
+    if (mode !== 'letter') {
+      var overall = getOverallProficiency(cid, sid);
+      if (overall > 0) profs.push(overall);
+    }
+    if (mode !== 'proficiency') {
+      var lg = getCourseLetterData(cid, sid);
+      if (lg && lg.R != null) pcts.push(lg.R);
+    }
+  });
+  function mean(list) {
+    return (
+      list.reduce(function (a, b) {
+        return a + b;
+      }, 0) / list.length
+    );
+  }
+  var parts = [];
+  var level = 0;
+  if (profs.length) {
+    var prof = mean(profs);
+    parts.push(prof.toFixed(1));
+    level = Math.round(prof);
+  }
+  if (pcts.length) {
+    var pct = _roundPercent(mean(pcts), getRoundWholePercent(cid) ? 0 : 1);
+    parts.push(percentageToLetter(pct) + ' ' + pct + '%');
+    if (mode === 'letter') level = _percentLevel(pct);
+  }
+  return { text: parts.join(' \u00B7 '), level: level };
+}
+
 function renderGrowthSparkline(points) {
   if (!points || points.length === 0) return '<span style="font-size:0.65rem;color:var(--text-3)">No data yet</span>';
   return `<div class="growth-sparkline">${points
@@ -1030,6 +1140,12 @@ window.Calc = {
   qToPercentage,
   percentageToLetter,
   getCourseLetterData,
+  courseGradeMode,
+  formatLevel,
+  levelWord,
+  studentGradeBadges,
+  studentGradeSummary,
+  classGradeSummary,
   getAssessmentGroupPercentage,
   calcProficiency,
   getTagScores,

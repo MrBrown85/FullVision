@@ -4,11 +4,33 @@ window.MStudentsList = (function () {
 
   var MC = window.MComponents;
 
+  // The grade beside each name, as the class is set to grade (see
+  // studentGradeBadges): level out of 4, letter and %, or both.
+  function _gradeBadgesHtml(grades) {
+    var html = '';
+    if (grades.prof) {
+      html +=
+        '<div class="m-prof-badge" style="background:' +
+        MC.profBg(grades.prof.level) +
+        '">' +
+        grades.prof.text +
+        '</div>';
+    }
+    if (grades.letter) {
+      html +=
+        '<div class="m-prof-badge m-grade-pill" style="background:' +
+        MC.profBg(grades.letter.level) +
+        '">' +
+        MC.esc(grades.letter.text) +
+        '</div>';
+    }
+    return html || '<div class="m-prof-badge" style="background:' + MC.profBg(0) + '">—</div>';
+  }
+
   function buildCells(students, cid, allStatuses, allAssessments, renderBadges) {
     var html = '';
     students.forEach(function (st) {
-      var overall = getOverallProficiency(cid, st.id);
-      var rounded = Math.round(overall);
+      var grades = studentGradeBadges(cid, st.id);
       var color = MC.avatarColor(st.id);
       var initials = MC.avatarInitials(st);
       var name = displayName(st);
@@ -40,11 +62,7 @@ window.MStudentsList = (function () {
         (subtitle ? '<div class="m-cell-subtitle">' + subtitle + '</div>' : '') +
         '</div>' +
         '<div class="m-cell-accessory">' +
-        '<div class="m-prof-badge" style="background:' +
-        MC.profBg(rounded) +
-        '">' +
-        (overall > 0 ? overall.toFixed(1) : '—') +
-        '</div>' +
+        _gradeBadgesHtml(grades) +
         MC.ICONS.chevronRight +
         '</div></div>';
     });
