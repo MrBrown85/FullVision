@@ -207,7 +207,11 @@ function countCalls(calls, table) {
 
 // ── Tests ────────────────────────────────────────────────────────────
 
-test.describe('Sync Loop Detection', () => {
+// Skipped: the mock below counts upserts to the retired teacher_config /
+// course_data tables and has no rpc(). The v2 app writes through RPCs and the
+// outbox (shared/offline-queue.js), so these tests can no longer see a retry
+// loop; they need porting to count RPC writes instead.
+test.describe.skip('Sync Loop Detection', () => {
   test.beforeEach(async ({ page }) => {
     await mockAuthWithSyncTracking(page);
     await seedTestData(page);
