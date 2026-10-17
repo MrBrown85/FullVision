@@ -6591,15 +6591,19 @@ function _persistStudentsToCanonical(cid, prev, arr) {
     });
     // Updates (in both, with field changes). A row whose enrol is still
     // queued gets its patch queued behind it; identity edits need the
-    // person id, which only the enrol returns.
+    // person id, which only the enrol returns. Each patch holds only the
+    // fields that differ from the server baseline, so a stale copy can't
+    // revert another device's edits; without a baseline, the whole row.
+    var hasBase = _hasServerState('students', cid);
     after.forEach(function (s, idx) {
       var p = s && s.id ? prevById[s.id] : null;
       if (!p || !_isSendableId(s.id)) return;
-      if (_studentEnrollmentChanged(p, s) || _studentRosterPositionChanged(idx, before, p, s)) {
-        ops.push(_canonicalUpdateEnrollment(sb, s.id, s, idx));
+      var moved = _studentRosterPositionChanged(idx, before, p, s);
+      if (moved || Object.keys(_changedPatch(_enrollmentPatchOf(s, idx), _enrollmentPatchOf(p, idx))).length) {
+        ops.push(_canonicalUpdateEnrollment(sb, s.id, s, idx, hasBase ? p : null, moved));
       }
-      if (_studentIdentityChanged(p, s) && _isUuid(s.personId)) {
-        ops.push(_canonicalUpdateStudent(sb, s.personId, s));
+      if (_isUuid(s.personId) && Object.keys(_changedPatch(_studentPatchOf(s), _studentPatchOf(p))).length) {
+        ops.push(_canonicalUpdateStudent(sb, s.personId, s, hasBase ? p : null));
       }
     });
 
@@ -6621,29 +6625,12 @@ function _persistStudentsToCanonical(cid, prev, arr) {
   return _studentSaveQueue[cid];
 }
 
-function _studentEnrollmentChanged(a, b) {
-  return (
-    (a.studentNumber || '') !== (b.studentNumber || '') ||
-    (a.enrolledDate || '') !== (b.enrolledDate || '') ||
-    JSON.stringify(a.designations || []) !== JSON.stringify(b.designations || [])
-  );
-}
 function _studentRosterPositionChanged(idx, prevArr, prevStudent, newStudent) {
   // Detect a real reorder: prev index of this student differs from new index
   var prevIdx = prevArr.findIndex(function (p) {
     return p && p.id === newStudent.id;
   });
   return prevIdx !== -1 && prevIdx !== idx;
-}
-function _studentIdentityChanged(a, b) {
-  return (
-    (a.firstName || '') !== (b.firstName || '') ||
-    (a.lastName || '') !== (b.lastName || '') ||
-    (a.preferred || '') !== (b.preferred || '') ||
-    (a.pronouns || '') !== (b.pronouns || '') ||
-    (a.email || '') !== (b.email || '') ||
-    (a.dateOfBirth || '') !== (b.dateOfBirth || '')
-  );
 }
 
 /* v2 create_student_and_enroll(p_course_id, p_first_name, p_last_name,
@@ -6709,23 +6696,50 @@ function _cancelPendingCreateOrResolve(cid, kind, localId) {
 }
 
 /* v2 update_enrollment(p_id, p_patch jsonb) — jsonb patch.
-   Accepted keys: designations (text[]), is_flagged, roster_position, withdrawn_at. */
-function _canonicalUpdateEnrollment(sb, enrollmentId, s, idx) {
-  var patch = {
-    designations: s.designations || [],
-    roster_position: idx,
-  };
-  if (typeof s.isFlagged === 'boolean') patch.is_flagged = s.isFlagged;
+   Accepted keys: designations (text[]), is_flagged, roster_position, withdrawn_at.
+   The server leaves alone every key left out. With `base` (the server
+   baseline row) only the keys that differ from it are sent, plus
+   roster_position when `moved`. Without `base`, all of them. */
+function _canonicalUpdateEnrollment(sb, enrollmentId, s, idx, base, moved) {
+  var patch = _enrollmentPatchOf(s, idx);
+  if (base) {
+    // Both sides take idx, so roster_position never differs here.
+    patch = _changedPatch(patch, _enrollmentPatchOf(base, idx));
+    if (moved) patch.roster_position = idx;
+    if (!Object.keys(patch).length) return Promise.resolve();
+  }
   return _writeRpc('update_enrollment', { p_id: enrollmentId, p_patch: patch }).then(function (res) {
     if (res.error) console.warn('update_enrollment failed:', res.error, enrollmentId);
   });
 }
 
+function _enrollmentPatchOf(s, idx) {
+  var patch = {
+    designations: s.designations || [],
+    roster_position: idx,
+  };
+  if (typeof s.isFlagged === 'boolean') patch.is_flagged = s.isFlagged;
+  return patch;
+}
+
 /* v2 update_student(p_id, p_patch jsonb).
    Accepted keys: first_name, last_name, preferred_name, pronouns,
-   student_number, email, date_of_birth. */
-function _canonicalUpdateStudent(sb, studentId, s) {
-  var patch = {
+   student_number, email, date_of_birth. The server leaves alone every key
+   left out. With `base` (the server baseline row) only the keys that differ
+   from it are sent; without it, all of them. */
+function _canonicalUpdateStudent(sb, studentId, s, base) {
+  var patch = _studentPatchOf(s);
+  if (base) {
+    patch = _changedPatch(patch, _studentPatchOf(base));
+    if (!Object.keys(patch).length) return Promise.resolve();
+  }
+  return _writeRpc('update_student', { p_id: studentId, p_patch: patch }).then(function (res) {
+    if (res.error) console.warn('update_student failed:', res.error, studentId);
+  });
+}
+
+function _studentPatchOf(s) {
+  return {
     first_name: s.firstName || '',
     last_name: s.lastName || null,
     preferred_name: s.preferred || null,
@@ -6734,9 +6748,6 @@ function _canonicalUpdateStudent(sb, studentId, s) {
     email: s.email || null,
     date_of_birth: s.dateOfBirth || null,
   };
-  return _writeRpc('update_student', { p_id: studentId, p_patch: patch }).then(function (res) {
-    if (res.error) console.warn('update_student failed:', res.error, studentId);
-  });
 }
 
 /* v2 withdraw_enrollment(p_id) — sets withdrawn_at = now(). */
@@ -6896,11 +6907,14 @@ function _persistAssessmentsToCanonical(cid, prev, arr) {
       if (target) ops.push(_canonicalDeleteAssessment(sb, cid, target));
     });
     // Updates. An edit to a row whose create is still queued waits behind it.
+    // Against a server baseline only the changed fields go, so a stale copy
+    // can't revert another device's edits; without one, the whole row.
+    var hasBase = _hasServerState('assessments', cid);
     after.forEach(function (a) {
       var p = a && a.id ? prevById[a.id] : null;
       if (!p || !_isSendableId(a.id)) return;
       if (_assessmentChanged(p, a)) {
-        ops.push(_canonicalUpdateAssessment(sb, cid, a.id, a));
+        ops.push(_canonicalUpdateAssessment(sb, cid, a.id, a, hasBase ? p : null));
       }
     });
 
@@ -7021,12 +7035,51 @@ function _canonicalCreateAssessment(sb, cid, a) {
   return created;
 }
 
+/* The keys of `patch` whose value differs from `basePatch`'s. */
+function _changedPatch(patch, basePatch) {
+  var out = {};
+  Object.keys(patch).forEach(function (k) {
+    if (JSON.stringify(patch[k]) !== JSON.stringify(basePatch[k])) out[k] = patch[k];
+  });
+  return out;
+}
+
 /* v2 update_assessment(p_id, p_patch jsonb, p_tag_ids uuid[]).
-   Full field replace via jsonb patch; when tag_ids is passed, fully replaces
-   the assessment_tag join set. */
-function _canonicalUpdateAssessment(sb, cid, assessmentId, a) {
+   The server leaves alone every patch key left out, and the tag set when
+   p_tag_ids is left out. With `base` (the server baseline row) only what
+   differs from it is sent: changed patch keys, the tag list if it changed,
+   and save_collab if collaboration changed. Nothing changed, nothing sent.
+   Without `base`, everything. */
+function _canonicalUpdateAssessment(sb, cid, assessmentId, a, base) {
   var tagIds = (a.tagIds || []).filter(_isUuid);
-  var patch = {
+  var patch = _assessmentPatchOf(a);
+  var sendTags = true;
+  var sendCollab = true;
+  if (base) {
+    patch = _changedPatch(patch, _assessmentPatchOf(base));
+    sendTags = JSON.stringify(tagIds) !== JSON.stringify((base.tagIds || []).filter(_isUuid));
+    sendCollab =
+      _canonicalCollabModeFromAssessment(a) !== _canonicalCollabModeFromAssessment(base) ||
+      JSON.stringify(_collabConfigFromAssessment(a)) !== JSON.stringify(_collabConfigFromAssessment(base));
+  }
+  var ops = [];
+  if (Object.keys(patch).length || sendTags) {
+    var params = { p_id: assessmentId, p_patch: patch };
+    if (sendTags) params.p_tag_ids = tagIds;
+    var updated = _writeRpc('update_assessment', params).then(function (res) {
+      if (res.error) console.warn('update_assessment failed:', res.error, assessmentId);
+      return res;
+    });
+    ops.push(updated);
+  }
+  // Sent alongside, not after the update lands: it sets other columns, and a
+  // reload before the update landed would lose it.
+  if (sendCollab) ops.push(_persistAssessmentCollab(sb, assessmentId, a));
+  return Promise.all(ops);
+}
+
+function _assessmentPatchOf(a) {
+  return {
     title: a.title || '',
     description: a.description || '',
     category_id: _isUuid(a.categoryId) ? a.categoryId : null,
@@ -7039,13 +7092,6 @@ function _canonicalUpdateAssessment(sb, cid, assessmentId, a) {
     rubric_id: _isUuid(a.rubricId) ? a.rubricId : null,
     module_id: _isUuid(a.moduleId) ? a.moduleId : null,
   };
-  return _writeRpc('update_assessment', { p_id: assessmentId, p_patch: patch, p_tag_ids: tagIds }).then(function (res) {
-    if (res.error) {
-      console.warn('update_assessment failed:', res.error, assessmentId);
-      return res;
-    }
-    return _persistAssessmentCollab(sb, assessmentId, a);
-  });
 }
 
 /* v2 delete_assessment(p_id).  FK cascade handles scores/rubric_scores/
