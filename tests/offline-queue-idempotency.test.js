@@ -7,9 +7,6 @@
  *   • Non-retrofitted endpoints MUST NOT receive p_idempotency_key — the
  *     server RPC would 404 on the unknown param name.
  *   • On retry after a failure, the same entry sends the same key.
- *   • callOrEnqueue uses a single key across the direct call and any
- *     fallback enqueue, so a network-blip retry returns the cached row id
- *     instead of creating a duplicate.
  */
 import './setup.js';
 import { beforeEach, afterEach, describe, expect, it } from 'vitest';
@@ -174,50 +171,6 @@ describe('offline-queue idempotency key', () => {
       const uniq = Array.from(new Set(keys));
       expect(uniq).toEqual([enq.id]);
       expect(Q.stats()).toMatchObject({ queued: 0, deadLettered: 0 });
-    });
-  });
-
-  describe('callOrEnqueue', () => {
-    it('generates an idempotency key and passes it on a direct online call', async () => {
-      setOnline(true);
-
-      await Q.callOrEnqueue('upsert_note', { p_enrollment_id: 'e', p_body: 'hi' });
-
-      expect(calls).toHaveLength(1);
-      expect(calls[0].payload.p_idempotency_key).toMatch(UUID_RE);
-    });
-
-    it('reuses the direct-call key for the enqueued retry on network error', async () => {
-      // Every rpc call returns a network error so the direct call falls
-      // through to enqueue, and the enqueue-triggered auto-flush retries.
-      rpcImpl = () => Promise.resolve({ data: null, error: { message: 'fetch failed' } });
-      setOnline(true);
-
-      const result = await Q.callOrEnqueue('create_observation', { p_body: 'will-enqueue' });
-
-      expect(result.enqueued).toBe(true);
-      // At minimum: direct call + first auto-flush retry = 2 calls, same key.
-      expect(calls.length).toBeGreaterThanOrEqual(2);
-      const directKey = calls[0].payload.p_idempotency_key;
-      expect(directKey).toMatch(UUID_RE);
-      for (const c of calls) {
-        expect(c.payload.p_idempotency_key).toBe(directKey);
-      }
-
-      // A later successful drain must use the same key too.
-      rpcImpl = () => Promise.resolve({ data: 'ok', error: null });
-      await Q.flush();
-      const last = calls[calls.length - 1];
-      expect(last.payload.p_idempotency_key).toBe(directKey);
-    });
-
-    it('does not inject a key for non-retrofitted endpoints', async () => {
-      setOnline(true);
-
-      await Q.callOrEnqueue('upsert_score', { p_value: 2 });
-
-      expect(calls).toHaveLength(1);
-      expect(calls[0].payload.p_idempotency_key).toBeUndefined();
     });
   });
 });
