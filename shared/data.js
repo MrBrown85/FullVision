@@ -649,10 +649,12 @@ function _handleExternalCourseUpdate(cid, kind) {
 
 async function _runCourseRefresh(cid, st) {
   try {
-    // Bounded: a field skipped because of a newer local edit is retried, but
-    // a teacher who never pauses shouldn't keep this loop alive; the next
-    // server change starts it again.
-    for (var attempt = 0; attempt < 3 && st.kind; attempt++) {
+    // Runs until a pass applies everything. A field skipped because of a
+    // newer local edit is fetched again, after the next pause: each pass
+    // waits for quiet first, so a teacher who keeps typing costs one fetch
+    // per pause, not a busy loop. This used to stop after three passes and
+    // leave the class stale until another server change arrived.
+    while (st.kind) {
       await _waitForQuietCourse(cid);
       var kind = st.kind;
       st.kind = null;

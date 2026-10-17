@@ -180,6 +180,25 @@ describe('class load safety', () => {
     await _refreshState[CID].running;
   });
 
+  it('keeps refreshing until a pass is not interrupted by an edit', async () => {
+    useServer({ get_gradebook: { data: gradebookPayload(3), error: null } });
+    await initData(CID);
+
+    // The teacher edits scores during each of the first four fetches.
+    var fetches = 0;
+    useServer({
+      get_gradebook() {
+        fetches += 1;
+        if (fetches <= 4) _markLocalWrite('scores', CID);
+        return { data: gradebookPayload(fetches <= 4 ? 1 : 2), error: null };
+      },
+    });
+    await _handleExternalCourseUpdate(CID, 'gradebook');
+
+    expect(fetches).toBe(5);
+    expect(getScores(CID)[ENROLLMENT_ID][0].score).toBe(2);
+  });
+
   it('keeps the saved copy while earlier writes are still unsent', async () => {
     useServer({ get_gradebook: { data: gradebookPayload(3), error: null } });
     await initData(CID);
