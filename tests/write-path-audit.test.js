@@ -211,7 +211,10 @@ describe('write-path audit: data layer', () => {
     _rememberServerState('scores', CID, getScores(CID));
     _rememberServerState('statuses', CID, getAssignmentStatuses(CID));
 
-    saveAssessments(CID, getAssessments(CID).filter(a => a.id !== AID));
+    saveAssessments(
+      CID,
+      getAssessments(CID).filter(a => a.id !== AID),
+    );
     // What the delete handlers on the assignments and gradebook pages do next.
     var scores = getScores(CID);
     Object.keys(scores).forEach(sid => {
