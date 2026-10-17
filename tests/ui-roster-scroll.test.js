@@ -13,7 +13,14 @@ describe('roster scroll position', () => {
 
   function roster(course) {
     select = { value: course };
-    list = { id: 'gb-roster-list', scrollTop: 0 };
+    list = {
+      id: 'gb-roster-list',
+      scrollTop: 0,
+      // Like a real element, the list matches its own selector.
+      closest: function (sel) {
+        return sel === '#gb-roster-list' ? list : null;
+      },
+    };
   }
   function rowIn(theList) {
     return {
