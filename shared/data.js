@@ -3154,19 +3154,66 @@ function _observationsPayloadToBlob(payload) {
   return blob;
 }
 
+/* get_observations returns at most 200 a page, newest first, and says
+   whether more follow. Asking for a bigger page still gets 200. */
+var _OBSERVATION_PAGE = 200;
+async function _fetchObservationPages(cid, firstPage) {
+  var rows = [];
+  for (var page = firstPage; page < firstPage + 500; page++) {
+    var res = await window.v2.getObservations(cid, { filters: {}, page: page, pageSize: _OBSERVATION_PAGE });
+    if (res && res.error) throw res.error;
+    var data = _rpcObject(res && res.data !== undefined ? res.data : res) || {};
+    rows = rows.concat(data.observations || []);
+    if (!data.has_more) break;
+  }
+  return rows;
+}
+
 async function _hydrateObservations(cid) {
   if (!window.v2 || typeof window.v2.getObservations !== 'function') return;
   try {
-    var res = await window.v2.getObservations(cid, { filters: {}, page: 1, pageSize: 1000 });
-    if (res && res.error) throw res.error;
-    _persistLoadedField(
-      cid,
-      'observations',
-      _observationsPayloadToBlob(res && res.data !== undefined ? res.data : res),
-    );
+    var rows = await _fetchObservationPages(cid, 1);
+    _persistLoadedField(cid, 'observations', _observationsPayloadToBlob({ observations: rows }));
   } catch (e) {
     console.warn('get_observations failed for ' + cid + '; keeping existing observations:', e);
   }
+}
+
+/* The class bundle carries the newest 500 observations and the total. The
+   older ones are fetched after the class is on screen and added to what is
+   there, so an observation written in the meantime is kept. */
+var _olderObservationsLoading = {};
+function _loadOlderObservations(cid, loadedCount) {
+  if (_olderObservationsLoading[cid] || !window.v2 || typeof window.v2.getObservations !== 'function') return;
+  var firstPage = Math.floor(loadedCount / _OBSERVATION_PAGE) + 1;
+  _olderObservationsLoading[cid] = _fetchObservationPages(cid, firstPage)
+    .then(function (rows) {
+      var current = _cloneValue(getQuickObs(cid) || {}) || {};
+      var have = {};
+      Object.keys(current).forEach(function (sid) {
+        (current[sid] || []).forEach(function (ob) {
+          if (ob && ob.id) have[sid + '|' + ob.id] = true;
+        });
+      });
+      var older = _observationsPayloadToBlob({ observations: rows });
+      var added = false;
+      Object.keys(older).forEach(function (sid) {
+        older[sid].forEach(function (ob) {
+          if (have[sid + '|' + ob.id]) return;
+          (current[sid] = current[sid] || []).push(ob);
+          added = true;
+        });
+      });
+      if (!added) return;
+      _persistLoadedField(cid, 'observations', current);
+      if (cid === getActiveCourse()) _invalidateAndRerender();
+    })
+    .catch(function (e) {
+      console.warn('Older observations failed to load for ' + cid + ':', e);
+    })
+    .finally(function () {
+      delete _olderObservationsLoading[cid];
+    });
 }
 
 async function _hydrateCanonicalDetails(cid) {
@@ -3513,7 +3560,10 @@ function _bundleToCache(cid, bundle) {
     }),
   );
 
-  _persistLoadedField(cid, 'observations', _observationsPayloadToBlob(bundle.observations || {}));
+  var observationPayload = bundle.observations || {};
+  _persistLoadedField(cid, 'observations', _observationsPayloadToBlob(observationPayload));
+  var observationsLoaded = (observationPayload.observations || []).length;
+  if (Number(observationPayload.total) > observationsLoaded) _loadOlderObservations(cid, observationsLoaded);
   _applyStudentProfileSummaries(cid, bundle.profiles || []);
   _fillOverrideCalculated(cid);
   _applyBundleTermRatings(cid, bundle.term_ratings || []);
