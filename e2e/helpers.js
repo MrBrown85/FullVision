@@ -253,6 +253,9 @@ export const SMOKE_WELCOME_LEARNING_MAP = {
  * Sign in a fake teacher and stand in for Supabase with a fake server that
  * answers the v2 RPCs the app calls: bootstrap_teacher, list_teacher_courses
  * and get_class_bundle. Writes succeed and change nothing on the server.
+ * A spec can make writes fail like a 504 (window.__e2eFailWrites = true) or
+ * answer late (window.__e2eWriteDelayMs); window.__e2eRpcLog records every
+ * call with its time.
  *
  * The server's data is whatever the seed helpers (seedCourse, seedStudents,
  * …) or a spec's own addInitScript put in localStorage, read once when the
@@ -609,9 +612,22 @@ export async function mockAuth(page) {
 
     // Every RPC the fake server was asked for, for specs to inspect.
     window.__e2eRpcLog = [];
+    window.__e2eFailWrites = false;
+    window.__e2eWriteDelayMs = 0;
+
+    // A write as the server would answer it, with the failure switch and
+    // delay read when the call is made.
+    function fakeWrite() {
+      const res = window.__e2eFailWrites
+        ? { data: null, error: { message: 'simulated 504 timeout', code: '504' }, status: 504 }
+        : { data: null, error: null };
+      const delay = window.__e2eWriteDelayMs || 0;
+      if (!delay) return Promise.resolve(res);
+      return new Promise(resolve => setTimeout(() => resolve(res), delay));
+    }
 
     function fakeRpc(name, params) {
-      window.__e2eRpcLog.push({ name, params: params || null });
+      window.__e2eRpcLog.push({ name, params: params || null, at: Date.now() });
       let res;
       if (name === 'bootstrap_teacher') {
         const { config } = serverDb();
@@ -636,9 +652,11 @@ export async function mockAuth(page) {
         res = { data: courseRows() };
       } else if (name === 'get_class_bundle') {
         res = classBundle(params && params.p_course_id, params && params.p_if_version);
-      } else {
-        // Writes and the reads the bundle replaced: succeed with nothing.
+      } else if (/^(get|list)_/.test(name)) {
+        // Reads the bundle replaced: nothing.
         res = { data: null };
+      } else {
+        return fakeWrite();
       }
       return Promise.resolve({ data: res.data === undefined ? null : res.data, error: res.error || null });
     }
