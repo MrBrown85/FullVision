@@ -265,6 +265,11 @@ window.ReportQuestionnaire = (function () {
     const overall = getOverallProficiency(cid, sid);
     const overallR = Math.round(overall);
     const overallLabel = (PROF_LABELS[overallR] || '').toLowerCase();
+    // A Letter class gives the student's standing as a letter grade
+    // ("a B (78%)"), not a proficiency word.
+    const letterData = courseGradeMode(cid) === 'letter' ? getCourseLetterData(cid, sid) : null;
+    const letterStanding =
+      letterData && letterData.S ? `${/^[AF]/.test(letterData.S) ? 'an' : 'a'} ${letterData.S} (${letterData.R}%)` : '';
     const sections = getSections(cid);
     const allTags = getAllTags(cid);
     const allObs = getStudentQuickObs(cid, sid);
@@ -704,35 +709,63 @@ window.ReportQuestionnaire = (function () {
     {
       let p2 = '';
 
-      if (overall > 0) {
+      if (overall > 0 && (!letterData || letterStanding)) {
         // Open with academic standing + sections
         if (topSecs.length > 0 && lowSecs.length > 0) {
           const topNames = secNames(topSecs, 2);
           const lowNames = secNames(lowSecs, 2);
-          p2 += pick([
-            `Academically, ${name} is working at a ${overallLabel} level overall. ${S} ${does} particularly well in ${oxList(topNames)}, while ${oxList(lowNames)} ${lowNames.length === 1 ? 'is' : 'are'} where ${s} need${v} more development.`,
-            `On the academic side, ${name} is at ${overallLabel}. ${P} strongest work has been in ${oxList(topNames)}, and ${s}${ve} got room to grow in ${oxList(lowNames)}.`,
-            `Looking at the academics, ${name} ${nis} performing at a ${overallLabel} level. ${S} ${is_} doing ${p} best work in ${oxList(topNames)} and could use more support in ${oxList(lowNames)}.`,
-            `${name}'s overall standing is ${overallLabel}. There's a nice split here: ${oxList(topNames)} ${topNames.length === 1 ? 'is' : 'are'} clearly ${p} strong suit, while ${oxList(lowNames)} will need more attention going forward.`,
-          ]);
+          p2 += pick(
+            letterData
+              ? [
+                  `Academically, ${name} has ${letterStanding} overall. ${S} ${does} particularly well in ${oxList(topNames)}, while ${oxList(lowNames)} ${lowNames.length === 1 ? 'is' : 'are'} where ${s} need${v} more development.`,
+                  `On the academic side, ${name} has ${letterStanding} so far. ${P} strongest work has been in ${oxList(topNames)}, and ${s}${ve} got room to grow in ${oxList(lowNames)}.`,
+                  `Looking at the academics, ${name} has earned ${letterStanding} overall. ${S} ${is_} doing ${p} best work in ${oxList(topNames)} and could use more support in ${oxList(lowNames)}.`,
+                  `${name}'s overall grade is ${letterStanding}. There's a nice split here: ${oxList(topNames)} ${topNames.length === 1 ? 'is' : 'are'} clearly ${p} strong suit, while ${oxList(lowNames)} will need more attention going forward.`,
+                ]
+              : [
+                  `Academically, ${name} is working at a ${overallLabel} level overall. ${S} ${does} particularly well in ${oxList(topNames)}, while ${oxList(lowNames)} ${lowNames.length === 1 ? 'is' : 'are'} where ${s} need${v} more development.`,
+                  `On the academic side, ${name} is at ${overallLabel}. ${P} strongest work has been in ${oxList(topNames)}, and ${s}${ve} got room to grow in ${oxList(lowNames)}.`,
+                  `Looking at the academics, ${name} ${nis} performing at a ${overallLabel} level. ${S} ${is_} doing ${p} best work in ${oxList(topNames)} and could use more support in ${oxList(lowNames)}.`,
+                  `${name}'s overall standing is ${overallLabel}. There's a nice split here: ${oxList(topNames)} ${topNames.length === 1 ? 'is' : 'are'} clearly ${p} strong suit, while ${oxList(lowNames)} will need more attention going forward.`,
+                ],
+          );
         } else if (topSecs.length > 0) {
           const topNames = secNames(topSecs, 3);
-          p2 += pick([
-            `Academically, ${name} is working at a ${overallLabel} level, with strong results in ${oxList(topNames)}.`,
-            `${S}${ve} been performing at ${overallLabel} overall — ${p} work in ${oxList(topNames)} has been especially solid.`,
-            `${name}'s academic profile is looking strong at ${overallLabel}, with particularly impressive results in ${oxList(topNames)}.`,
-            `On the academic front, ${name} ${nis} at ${overallLabel}. ${P} work in ${oxList(topNames)} has been a real standout.`,
-          ]);
+          p2 += pick(
+            letterData
+              ? [
+                  `Academically, ${name} has ${letterStanding} overall, with strong results in ${oxList(topNames)}.`,
+                  `${S}${ve} earned ${letterStanding} overall — ${p} work in ${oxList(topNames)} has been especially solid.`,
+                  `${name}'s overall grade is ${letterStanding}, with particularly impressive results in ${oxList(topNames)}.`,
+                  `On the academic front, ${name} has ${letterStanding}. ${P} work in ${oxList(topNames)} has been a real standout.`,
+                ]
+              : [
+                  `Academically, ${name} is working at a ${overallLabel} level, with strong results in ${oxList(topNames)}.`,
+                  `${S}${ve} been performing at ${overallLabel} overall — ${p} work in ${oxList(topNames)} has been especially solid.`,
+                  `${name}'s academic profile is looking strong at ${overallLabel}, with particularly impressive results in ${oxList(topNames)}.`,
+                  `On the academic front, ${name} ${nis} at ${overallLabel}. ${P} work in ${oxList(topNames)} has been a real standout.`,
+                ],
+          );
         } else if (sectionData.length > 0) {
           // All sections middling — still interesting to comment on
           const allNames = secNames(sectionData, 3);
-          p2 += pick([
-            `Academically, ${name} is working at a ${overallLabel} level across ${oxList(allNames)}.`,
-            `${name}'s academic work sits at ${overallLabel} overall, with fairly even performance across ${p} sections.`,
-          ]);
+          p2 += pick(
+            letterData
+              ? [
+                  `Academically, ${name} has ${letterStanding} overall, with similar results across ${oxList(allNames)}.`,
+                  `${name}'s overall grade is ${letterStanding}, with fairly even performance across ${p} sections.`,
+                ]
+              : [
+                  `Academically, ${name} is working at a ${overallLabel} level across ${oxList(allNames)}.`,
+                  `${name}'s academic work sits at ${overallLabel} overall, with fairly even performance across ${p} sections.`,
+                ],
+          );
           p2 += ' ';
         } else {
-          p2 += `Academically, ${name} is working at a ${overallLabel} level${completion > 0 ? ` with ${Math.round(completion)}% of assessments completed` : ''}. `;
+          const done = completion > 0 ? ` with ${Math.round(completion)}% of assessments completed` : '';
+          p2 += letterData
+            ? `Academically, ${name} has ${letterStanding} overall${done}. `
+            : `Academically, ${name} is working at a ${overallLabel} level${done}. `;
         }
         p2 += ' ';
 
@@ -1453,19 +1486,28 @@ window.ReportQuestionnaire = (function () {
     html += `</div>`; // close observations panel
 
     // ══ ROW 3: Academic Snapshot (span 6) + Narrative (span 6) ══
+    // Overall as the class grades: the proficiency word, the letter and %
+    // ("B 78%"), or both. A competency shows its word, or in a Letter class
+    // its % (level ÷ 4).
+    const gradeMode = courseGradeMode(cid);
+    const letterGrade = studentGradeBadges(cid, sid).letter;
+    const overallParts = [];
+    if (gradeMode !== 'letter' && overall > 0) overallParts.push(PROF_LABELS[Math.round(overall)]);
+    if (letterGrade) overallParts.push(letterGrade.text);
+    const overallLevel = studentGradeSummary(cid, sid).level;
     html += `<div class="tq-panel" data-panel-id="academic-snapshot">
     <div class="tq-panel-title">Academic Snapshot <span class="tq-panel-badge">${assignmentPerf.length} assessed</span></div>
     <div class="tq-snapshot-grid">
       <div class="tq-snapshot-item overall">
         <div class="tq-snapshot-item-label">Overall</div>
-        <div class="tq-snapshot-item-value" style="color:${PROF_COLORS[Math.round(overall)] || 'var(--text-3)'};background:${PROF_TINT[Math.round(overall)] || 'transparent'}">${overall > 0 ? PROF_LABELS[Math.round(overall)] : 'No data'}</div>
+        <div class="tq-snapshot-item-value" style="color:${PROF_COLORS[overallLevel] || 'var(--text-3)'};background:${PROF_TINT[overallLevel] || 'transparent'}">${overallParts.length ? overallParts.join(' \u00B7 ') : 'No data'}</div>
       </div>`;
     sections.forEach(sec => {
       const prof = getSectionProficiency(cid, sid, sec.id);
       const sr = Math.round(prof);
       html += `<div class="tq-snapshot-item">
       <div class="tq-snapshot-item-label">${esc(sec.shortName || sec.name)}</div>
-      <div class="tq-snapshot-item-value" style="color:${PROF_COLORS[sr] || 'var(--text-3)'};background:${PROF_TINT[sr] || 'transparent'}">${prof > 0 ? PROF_LABELS[sr] : '—'}</div>
+      <div class="tq-snapshot-item-value" style="color:${PROF_COLORS[sr] || 'var(--text-3)'};background:${PROF_TINT[sr] || 'transparent'}">${levelWord(cid, prof) || formatLevel(cid, prof)}</div>
     </div>`;
     });
     html += `</div>`;

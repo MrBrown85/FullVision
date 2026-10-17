@@ -1115,6 +1115,46 @@ function classGradeSummary(cid, studentIds) {
   return { text: parts.join(' \u00B7 '), level: level };
 }
 
+/* How many students sit at each grade, best first: by letter grade (A to F)
+   in a Letter class, else by proficiency level (Extending to Emerging).
+   A Both class counts by level, the grade it shows first. Each band has the
+   `level` its colour comes from and the `ids` of its students; students
+   with nothing to show yet aren't counted. */
+var _LETTER_BANDS = [
+  { label: 'A', min: 86 },
+  { label: 'B', min: 73 },
+  { label: 'C+', min: 67 },
+  { label: 'C', min: 60 },
+  { label: 'C-', min: 50 },
+  { label: 'F', min: 0 },
+];
+
+function classGradeDistribution(cid, studentIds) {
+  var bands;
+  if (courseGradeMode(cid) === 'letter') {
+    bands = _LETTER_BANDS.map(function (b) {
+      return { label: b.label, level: _percentLevel(b.min), ids: [] };
+    });
+    (studentIds || []).forEach(function (sid) {
+      var lg = getCourseLetterData(cid, sid);
+      if (!lg || lg.R == null) return;
+      var letter = percentageToLetter(lg.R);
+      bands.forEach(function (b) {
+        if (b.label === letter) b.ids.push(sid);
+      });
+    });
+  } else {
+    bands = [4, 3, 2, 1].map(function (level) {
+      return { label: PROF_LABELS[level], level: level, ids: [] };
+    });
+    (studentIds || []).forEach(function (sid) {
+      var level = Math.round(getOverallProficiency(cid, sid));
+      if (level >= 1 && level <= 4) bands[4 - level].ids.push(sid);
+    });
+  }
+  return bands;
+}
+
 function renderGrowthSparkline(points) {
   if (!points || points.length === 0) return '<span style="font-size:0.65rem;color:var(--text-3)">No data yet</span>';
   return `<div class="growth-sparkline">${points
@@ -1146,6 +1186,7 @@ window.Calc = {
   studentGradeBadges,
   studentGradeSummary,
   classGradeSummary,
+  classGradeDistribution,
   getAssessmentGroupPercentage,
   calcProficiency,
   getTagScores,

@@ -100,73 +100,71 @@ window.DashOverview = (function () {
 
     html += '<div class="dash-overview-section">';
 
-    var distrib = { 1: 0, 2: 0, 3: 0, 4: 0 };
-    var distribStudents = { 1: [], 2: [], 3: [], 4: [] };
+    // By letter grade in a Letter class, by proficiency level otherwise.
+    var nameById = {};
     allStudents.forEach(function (s) {
-      var p = Math.round(getOverallProficiency(cid, s.id));
-      if (p >= 1 && p <= 4) {
-        distrib[p]++;
-        distribStudents[p].push(displayName(s));
-      }
+      nameById[s.id] = displayName(s);
     });
-    var totalWithProf = distrib[1] + distrib[2] + distrib[3] + distrib[4];
+    var studentIds = allStudents.map(function (s) {
+      return s.id;
+    });
+    var distribData = classGradeDistribution(cid, studentIds).filter(function (d) {
+      return d.ids.length > 0;
+    });
+    var totalWithProf = distribData.reduce(function (sum, d) {
+      return sum + d.ids.length;
+    }, 0);
 
     html += '<div class="dash-section-title">Class Distribution</div>';
     if (totalWithProf > 0) {
       html += '<div style="display:flex;height:28px;gap:2px">';
-      var distribData = [
-        { level: 4, label: 'Extending', color: 'var(--score-4)', tint: 'var(--score-4-bg)' },
-        { level: 3, label: 'Proficient', color: 'var(--score-3)', tint: 'var(--score-3-bg)' },
-        { level: 2, label: 'Developing', color: 'var(--score-2)', tint: 'var(--score-2-bg)' },
-        { level: 1, label: 'Emerging', color: 'var(--score-1)', tint: 'var(--score-1-bg)' },
-      ];
       distribData.forEach(function (d) {
-        var pct = (distrib[d.level] / totalWithProf) * 100;
-        if (pct > 0) {
-          var names = distribStudents[d.level]
-            .sort()
-            .map(function (n) {
-              return '<div class="dist-tip-name">' + esc(n) + '</div>';
-            })
-            .join('');
-          html +=
-            '<div class="dist-seg" style="flex:' +
-            distrib[d.level] +
-            ';background:' +
-            d.tint +
-            ';display:flex;align-items:center;justify-content:center;min-width:' +
-            (pct > 8 ? '0' : '28px') +
-            ';transition:flex 0.3s var(--ease-out)">' +
-            '<span style="font-family:var(--font-base);font-size:' +
-            (pct > 15 ? '0.78rem' : '0.65rem') +
-            ';font-weight:700;color:' +
-            d.color +
-            '">' +
-            distrib[d.level] +
-            '</span>' +
-            '<div class="dist-tip">' +
-            '<div class="dist-tip-title">' +
-            d.label +
-            '</div>' +
-            names +
-            '</div>' +
-            '</div>';
-        }
+        var count = d.ids.length;
+        var pct = (count / totalWithProf) * 100;
+        var names = d.ids
+          .map(function (id) {
+            return nameById[id];
+          })
+          .sort()
+          .map(function (n) {
+            return '<div class="dist-tip-name">' + esc(n) + '</div>';
+          })
+          .join('');
+        html +=
+          '<div class="dist-seg" style="flex:' +
+          count +
+          ';background:var(--score-' +
+          d.level +
+          '-bg);display:flex;align-items:center;justify-content:center;min-width:' +
+          (pct > 8 ? '0' : '28px') +
+          ';transition:flex 0.3s var(--ease-out)">' +
+          '<span style="font-family:var(--font-base);font-size:' +
+          (pct > 15 ? '0.78rem' : '0.65rem') +
+          ';font-weight:700;color:var(--score-' +
+          d.level +
+          ')">' +
+          count +
+          '</span>' +
+          '<div class="dist-tip">' +
+          '<div class="dist-tip-title">' +
+          esc(d.label) +
+          '</div>' +
+          names +
+          '</div>' +
+          '</div>';
       });
       html += '</div>';
       html += '<div style="display:flex;gap:12px;margin-top:6px;justify-content:center">';
       distribData.forEach(function (d) {
-        if (distrib[d.level] > 0) {
-          html +=
-            '<div style="display:flex;align-items:center;gap:4px">' +
-            '<div style="width:8px;height:8px;border-radius:2px;background:' +
-            d.color +
-            '"></div>' +
-            '<span style="font-family:var(--font-base);font-size:0.65rem;color:var(--text-2)">' +
-            d.label +
-            '</span>' +
-            '</div>';
-        }
+        html +=
+          '<div style="display:flex;align-items:center;gap:4px">' +
+          '<div style="width:8px;height:8px;border-radius:2px;background:var(--score-' +
+          d.level +
+          ')"></div>' +
+          '<span style="font-family:var(--font-base);font-size:0.65rem;color:var(--text-2)">' +
+          esc(d.label) +
+          '</span>' +
+          '</div>';
       });
       html += '</div>';
     } else {
