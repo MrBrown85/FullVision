@@ -555,7 +555,11 @@ window.MGrade = (function () {
       var tag = getTagById(cid, tid);
       var sec = getSectionForTag(cid, tid);
       var key = tag ? null : scoreKeyInfo(cid, assessment, tid);
-      var tagLabel = tag ? tag.label || tag.name || tag.id : key ? key.label : tid;
+      var tagLabel = tag
+        ? tag.label || tag.name || tag.shortName || tag.code || ''
+        : key
+          ? key.label
+          : 'No longer in the learning map';
       var tagColor = sec ? sec.color : '#888';
 
       // Current score for this tag
