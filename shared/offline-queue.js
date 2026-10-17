@@ -8,9 +8,22 @@
  * Storage:
  *   fv-sync-queue-v1          — { entries:[...], last_flush_at:iso }
  *   fv-sync-dead-letter-v1    — entries the server rejected
+ *   fv-sync-owner-v1          — { tab, at }: which tab sends (fallback only, see Tabs)
  *
  * Entry shape:
- *   { id, created_at, owner, key, endpoint, payload, attempts, last_error, next_at, blocked_on }
+ *   { id, created_at, owner, key, endpoint, payload, attempts, last_error, next_at, blocked_on, sent_at }
+ *
+ * Tabs: every tab shares the queue, but only one tab — the owner — sends.
+ *   The owner holds the Web Lock fv-sync-queue-v1 for as long as it is open;
+ *   the browser hands the lock to the next tab when the owner closes, reloads
+ *   or is discarded. Where Web Locks are missing, the owner keeps a lease in
+ *   fv-sync-owner-v1 alive with a heartbeat and another tab takes a stale one.
+ *   The other tabs only queue; they ask the owner to send over the
+ *   BroadcastChannel fv-sync-queue-v1 and hear back through the owner's
+ *   events, which it posts to every tab, so push() callers, listeners (the
+ *   sync dot, shared/data.js's re-keys) and stats() see the same thing in
+ *   every tab. sent_at marks an entry the owner has started, so another tab
+ *   never replaces or edits it; a new owner clears the marks it inherits.
  *
  * Key: the record the write touches (see _entryKey). Entries with the same
  *   key are sent one at a time, in order; different keys go in parallel.
@@ -65,6 +78,11 @@
   var BACKOFF_MS = [1000, 5000, 30000, 60000];
   var MAX_PARALLEL = 6;
   var AUTO_FLUSH_MS = 60000; // periodic retry while online
+  var LOCK_NAME = 'fv-sync-queue-v1'; // Web Lock and BroadcastChannel name
+  var LEASE_KEY = 'fv-sync-owner-v1';
+  var LEASE_STALE_MS = 15000; // a lease this old belongs to a tab that is gone
+  var HEARTBEAT_MS = 5000;
+  var FLUSH_REPLY_MS = 10000; // how long a tab waits for the owner to finish a flush
 
   /* Endpoints that accept `p_idempotency_key` on the server side. The list
    * lives in shared/constants.js (FV_IDEMPOTENT_RPCS) so the queued-write and
@@ -97,6 +115,19 @@
   var _sendOptions = {}; // entry id → options for _send (not persisted)
   var _retryTimer = null;
   var _counts = { processed: 0, succeeded: 0, deadLettered: 0 };
+
+  // Which tab sends (Tabs, above). Only the owner starts entries.
+  var _loadedAt = Date.now();
+  var _tabId = _uuid4();
+  var _owner = false;
+  var _released = false; // the page is going away: claim nothing until claim()
+  var _usingLocks =
+    typeof navigator !== 'undefined' && !!navigator.locks && typeof navigator.locks.request === 'function';
+  var _lockAbort = null; // AbortController of a Web Locks request still waiting
+  var _lockRelease = null; // resolves the held lock's callback, letting it go
+  var _heartbeat = null; // lease refresh / takeover timer (fallback only)
+  var _channel = null; // BroadcastChannel to the other tabs
+  var _flushReplies = {}; // request id → resolve for a flush() another tab ran
 
   /* Called once by shared/data.js: how to send (with its session handling)
      and when to hold off (cloud sync paused). */
@@ -296,7 +327,7 @@
     }
   }
 
-  function _notify(kind, meta) {
+  function _notifyLocal(kind, meta) {
     var snapshot = stats();
     _listeners.slice().forEach(function (listener) {
       try {
@@ -308,6 +339,271 @@
       } catch (e) {
         console.warn('[v2Queue] subscriber failed:', e);
       }
+    });
+  }
+
+  /* Events any tab may raise, and every other tab needs to hear: they change
+     queued entries or settle push() callers in the tab that queued them. The
+     owner's events all go out; a follower's enqueue stays local, the owner
+     learns of it from the flush request that follows. */
+  var ANY_TAB_EVENTS = { coalesce: true, clear: true, remove: true, rewrite: true, 'dead-letter:dismiss': true };
+
+  function _notify(kind, meta) {
+    _notifyLocal(kind, meta);
+    if (_owner || ANY_TAB_EVENTS[kind]) _post({ type: 'event', kind: kind || 'update', meta: meta || null });
+  }
+
+  /* ── Tabs ─────────────────────────────────────────────────────────────── */
+
+  function _post(msg) {
+    if (!_channel) return;
+    try {
+      _channel.postMessage(msg);
+    } catch (e) {
+      /* channel closed */
+    }
+  }
+
+  function _openChannel() {
+    if (typeof BroadcastChannel === 'undefined') return;
+    try {
+      _channel = new BroadcastChannel(LOCK_NAME);
+      _channel.onmessage = function (event) {
+        _onMessage(event && event.data);
+      };
+    } catch (e) {
+      _channel = null;
+    }
+  }
+
+  function _onMessage(msg) {
+    if (!msg || !msg.type) return;
+    if (msg.type === 'event') {
+      _onRemoteEvent(msg.kind, msg.meta);
+    } else if (msg.type === 'flushed') {
+      var reply = _flushReplies[msg.req];
+      if (reply) {
+        delete _flushReplies[msg.req];
+        reply(msg.result);
+      }
+    } else if (msg.type === 'released') {
+      if (!_owner && !_released) claim();
+    } else if (msg.type === 'flush' && _owner) {
+      if (msg.req) {
+        flush().then(function (result) {
+          _post({ type: 'flushed', req: msg.req, result: result });
+        });
+      } else {
+        _pump(!!msg.force);
+      }
+    } else if (msg.type === 'resume' && _owner) {
+      resume();
+    }
+  }
+
+  /* Something happened in another tab's copy of the queue: the owner sent an
+     entry, or a tab replaced, removed or cleared one. Mirror what this tab's
+     listeners and push() callers would have seen had it happened here. */
+  function _onRemoteEvent(kind, meta) {
+    meta = meta || {};
+    if (kind === 'flush:start') _flushing = true;
+    else if (kind === 'flush:end') _flushing = false;
+    else if (kind === 'paused:auth') _signedOut = true;
+    else if (kind === 'resume') _signedOut = false;
+    else if (kind === 'coalesce' && meta.from && meta.to && _waiters[meta.from]) {
+      _waiters[meta.to] = _waiters[meta.from].concat(_waiters[meta.to] || []);
+      delete _waiters[meta.from];
+      delete _sendOptions[meta.from];
+    }
+    _notifyLocal(kind, meta);
+    if (kind === 'flush:success') {
+      _resolveWaiters(meta.id, { data: meta.data === undefined ? null : meta.data, error: null });
+    } else if (kind === 'flush:dead-letter') {
+      _resolveWaiters(meta.id, meta.result || { data: null, error: { message: meta.error } });
+    } else if (kind === 'remove') {
+      _resolveWaiters(meta.id, { data: null, error: { message: 'cancelled', cancelled: true } });
+    } else if (kind === 'clear') {
+      Object.keys(_waiters).forEach(function (id) {
+        _resolveWaiters(id, { data: null, error: { message: 'outbox cleared' } });
+      });
+    } else if (kind === 'rewrite' && _owner) {
+      _pump(false);
+    }
+  }
+
+  /* Become the tab that sends, now or when the current owner lets go. Called
+     at load and on pageshow; tests call it to hand the queue back. */
+  function claim() {
+    _released = false;
+    if (_owner) return;
+    if (!_usingLocks) {
+      _startHeartbeat();
+      _claimLease();
+      return;
+    }
+    if (_lockAbort) return; // already waiting for the lock
+    var controller = typeof AbortController === 'function' ? new AbortController() : { abort: function () {} };
+    _lockAbort = controller;
+    navigator.locks
+      .request(LOCK_NAME, controller.signal ? { signal: controller.signal } : {}, function () {
+        if (_lockAbort === controller) _lockAbort = null;
+        if (_released) return; // pagehide got here first: give it straight back
+        _becomeOwner();
+        return new Promise(function (resolve) {
+          _lockRelease = resolve;
+        });
+      })
+      .catch(function () {
+        // Aborted by release() before it was granted.
+        if (_lockAbort === controller) _lockAbort = null;
+      });
+  }
+
+  /* This tab stops sending (pagehide, or a test closing a tab): the lock or
+     lease goes to the next tab. Entries already in flight still settle. */
+  function release() {
+    _released = true;
+    _owner = false;
+    if (_lockAbort) {
+      _lockAbort.abort();
+      _lockAbort = null;
+    }
+    if (_lockRelease) {
+      _lockRelease();
+      _lockRelease = null;
+    }
+    if (_heartbeat) {
+      clearInterval(_heartbeat);
+      _heartbeat = null;
+    }
+    if (_leaseIsMine()) {
+      try {
+        localStorage.removeItem(LEASE_KEY);
+      } catch (e) {
+        /* ignore */
+      }
+      _post({ type: 'released' });
+    }
+  }
+
+  function _becomeOwner() {
+    _owner = true;
+    _clearSentMarks();
+    // A flush() this tab asked the old owner for is now its own to run.
+    var asked = _flushReplies;
+    _flushReplies = {};
+    var reqs = Object.keys(asked);
+    if (reqs.length) {
+      flush().then(function (result) {
+        reqs.forEach(function (req) {
+          asked[req](result);
+        });
+      });
+      return;
+    }
+    // The first flush waits for the page to finish booting (shared/data.js
+    // configures the outbox then); a takeover later on sends at once.
+    if (navigator.onLine) setTimeout(flush, Math.max(0, 2000 - (Date.now() - _loadedAt)));
+  }
+
+  /* Marks left by an owner that closed mid-send; this owner has nothing in
+     flight yet, so every entry is free to go again. */
+  function _clearSentMarks() {
+    var q = _readQueue();
+    var changed = false;
+    q.entries.forEach(function (e) {
+      if (e.sent_at) {
+        delete e.sent_at;
+        changed = true;
+      }
+    });
+    if (!changed) return;
+    try {
+      _writeQueue(q);
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  /* Started by the owner, in this tab (its promise) or another (its mark). */
+  function _isInFlight(entry) {
+    return !!(entry && (_inFlight[entry.id] || (!_owner && entry.sent_at)));
+  }
+
+  /* Lease fallback for browsers without Web Locks. */
+  function _readLease() {
+    try {
+      return JSON.parse(localStorage.getItem(LEASE_KEY)) || null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function _leaseIsMine() {
+    var lease = _readLease();
+    return !!(lease && lease.tab === _tabId);
+  }
+
+  function _leaseIsStale() {
+    var lease = _readLease();
+    return !lease || !(Date.now() - (lease.at || 0) < LEASE_STALE_MS);
+  }
+
+  function _writeLease() {
+    try {
+      localStorage.setItem(LEASE_KEY, JSON.stringify({ tab: _tabId, at: Date.now() }));
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  /* Take the lease when nobody holds it or its holder stopped refreshing. */
+  function _claimLease() {
+    if (_released) return false;
+    if (!_leaseIsMine() && !_leaseIsStale()) return false;
+    _writeLease();
+    if (!_owner) _becomeOwner();
+    return true;
+  }
+
+  function _startHeartbeat() {
+    if (_heartbeat) return;
+    _heartbeat = setInterval(function () {
+      if (_owner) {
+        if (_leaseIsMine()) _writeLease();
+        else _owner = false; // another tab took over while this one slept
+      } else if (_leaseIsStale() && _readLease()) {
+        _claimLease();
+      }
+    }, HEARTBEAT_MS);
+  }
+
+  /* A tab that doesn't send asks the owner to. */
+  function _askOwner(force) {
+    if (!_usingLocks) _claimLease();
+    if (_owner) return _pump(force);
+    _post({ type: 'flush', force: !!force });
+  }
+
+  /* flush() from a tab that doesn't send: the owner runs it and reports
+     back; if no owner answers (none yet, or it just closed), give up after
+     FLUSH_REPLY_MS so a sign-out isn't held up. */
+  function _delegateFlush() {
+    var none = { processed: 0, succeeded: 0, deadLettered: 0 };
+    if (!navigator.onLine) return Promise.resolve(Object.assign({ note: 'offline' }, none));
+    if (!_usingLocks && _claimLease()) return flush();
+    if (!_readQueue().entries.length) return Promise.resolve(Object.assign({ note: 'empty' }, none));
+    var req = _uuid4();
+    return new Promise(function (resolve) {
+      var timer = setTimeout(function () {
+        delete _flushReplies[req];
+        resolve(Object.assign({ note: 'delegated' }, none));
+      }, FLUSH_REPLY_MS);
+      _flushReplies[req] = function (result) {
+        clearTimeout(timer);
+        resolve(result || Object.assign({ note: 'delegated' }, none));
+      };
+      _post({ type: 'flush', force: true, req: req });
     });
   }
 
@@ -394,7 +690,7 @@
       // not move to before it.
       if (assessment && _isBarrier(e) && _assessmentOf(e) === assessment) return -1;
       if (e.key !== entry.key) continue;
-      if (_inFlight[e.id] || e.endpoint !== entry.endpoint || e.owner !== entry.owner) return -1;
+      if (_isInFlight(e) || e.endpoint !== entry.endpoint || e.owner !== entry.owner) return -1;
       if (_target(e.endpoint, e.payload) !== target) return -1;
       if (!_sameSet(e.blocked_on, entry.blocked_on)) return -1;
       return i;
@@ -515,6 +811,7 @@
     if (_isSessionExpired(res)) {
       entry.last_error = _errorText(res);
       delete entry.next_at;
+      delete entry.sent_at;
       _replaceEntry(entry);
       if (!_signedOut) {
         _signedOut = true;
@@ -528,6 +825,7 @@
     if (_isTransient(res)) {
       var delay = BACKOFF_MS[Math.min(entry.attempts, BACKOFF_MS.length) - 1];
       entry.next_at = new Date(Date.now() + delay).toISOString();
+      delete entry.sent_at;
       _replaceEntry(entry);
       _notify('flush:retry', {
         id: entry.id,
@@ -556,6 +854,7 @@
       key: entry.key,
       payload: entry.payload,
       error: entry.last_error,
+      result: res,
     });
     _resolveWaiters(entry.id, res);
     _pump(false);
@@ -595,6 +894,13 @@
   }
 
   function _start(entry) {
+    // Marked in storage so the other tabs leave it alone while it is out.
+    entry.sent_at = new Date().toISOString();
+    try {
+      _replaceEntry(entry);
+    } catch (e) {
+      /* storage full: the entry still goes */
+    }
     var p = _runEntry(entry).then(function (res) {
       _settle(entry, res);
     });
@@ -608,8 +914,11 @@
   /* Start every entry that may go now: the first for its key, due, owned by
      whoever is signed in, not waiting on a local id. `force` ignores backoff
      (an explicit flush). A column write goes only when no earlier entry names
-     its assessment; an entry behind a column write waits for it. */
+     its assessment; an entry behind a column write waits for it. A tab that
+     isn't the owner asks the owner instead. */
   function _pump(force) {
+    if (_owner && !_usingLocks && !_leaseIsMine()) _owner = false; // replaced while asleep
+    if (!_owner) return _askOwner(force);
     if (_signedOut || _isPaused() || !navigator.onLine) return;
     var owner = currentOwner();
     var now = Date.now();
@@ -673,6 +982,8 @@
   /* Send everything that can go now, ignoring backoff, and wait until it has
      settled. Returns this flush's { processed, succeeded, deadLettered }. */
   async function flush() {
+    if (_owner && !_usingLocks && !_leaseIsMine()) _owner = false;
+    if (!_owner) return _delegateFlush();
     if (!navigator.onLine) return { processed: 0, succeeded: 0, deadLettered: 0, note: 'offline' };
     if (_isPaused()) return { processed: 0, succeeded: 0, deadLettered: 0, note: 'paused' };
     if (_signedOut) return { processed: 0, succeeded: 0, deadLettered: 0, note: 'signed-out' };
@@ -716,6 +1027,7 @@
       lastFlushAt: q.last_flush_at,
       online: !!navigator.onLine,
       flushing: _flushing,
+      owner: _owner,
     };
   }
 
@@ -735,7 +1047,7 @@
     var q = _readQueue();
     var changed = 0;
     q.entries.forEach(function (entry) {
-      if (_inFlight[entry.id]) return;
+      if (_isInFlight(entry)) return;
       var next = fn(entry);
       if (!next) return;
       var derived = entry.key === _entryKey(entry.endpoint, entry.payload);
@@ -760,7 +1072,7 @@
     var q = _readQueue();
     var before = q.entries.length;
     q.entries = q.entries.filter(function (e) {
-      return e.id !== id;
+      return e.id !== id || _isInFlight(e);
     });
     if (q.entries.length === before) return false;
     _writeQueue(q);
@@ -778,7 +1090,7 @@
     var q = _readQueue();
     var dropped = [];
     q.entries = q.entries.filter(function (e) {
-      var hit = !_inFlight[e.id] && _isBlocked(e) && e.blocked_on.indexOf(localId) >= 0;
+      var hit = !_isInFlight(e) && _isBlocked(e) && e.blocked_on.indexOf(localId) >= 0;
       if (hit) dropped.push(e);
       return !hit;
     });
@@ -794,11 +1106,13 @@
       _counts.deadLettered += dropped.length;
     }
     dropped.forEach(function (e) {
-      _resolveWaiters(e.id, { data: null, error: { message: 'cancelled', cancelled: true } });
+      var res = { data: null, error: { message: 'cancelled', cancelled: true } };
+      _resolveWaiters(e.id, res);
       _notify(opts.deadLetter ? 'flush:dead-letter' : 'remove', {
         id: e.id,
         endpoint: e.endpoint,
         error: e.last_error,
+        result: res,
       });
     });
     _pump(false);
@@ -818,6 +1132,7 @@
       _signedOut = false;
       _notify('resume');
     }
+    if (!_owner) _post({ type: 'resume' });
     return flush();
   }
 
@@ -932,15 +1247,23 @@
   });
   if (!_autoTimer) {
     _autoTimer = setInterval(function () {
-      if (navigator.onLine) {
+      if (_owner && navigator.onLine) {
         var q = _readQueue();
         if (q.entries.length > 0) flush();
       }
     }, AUTO_FLUSH_MS);
   }
+  // A tab that is going away lets the next one send; one shown again from
+  // the back-forward cache asks for the queue back.
+  window.addEventListener('pagehide', release);
+  window.addEventListener('pageshow', claim);
   _retryDeadOnLoad();
-  // Initial drain attempt on load if already online
-  if (navigator.onLine) setTimeout(flush, 2000);
+  _openChannel();
+  // A page loads this file once. A test loading it again stands for a
+  // reload: the old copy's page is gone, so it lets go of the queue.
+  if (window.v2Queue && typeof window.v2Queue.release === 'function') window.v2Queue.release();
+  // Try to become the owner; the owner flushes once the page has booted.
+  claim();
 
   window.v2Queue = {
     configure: configure,
@@ -956,6 +1279,8 @@
     dismissDeadLetter: dismissDeadLetter,
     resume: resume,
     clear: clear,
+    claim: claim,
+    release: release,
     currentOwner: currentOwner,
     callOrEnqueue: callOrEnqueue,
     subscribe: subscribe,

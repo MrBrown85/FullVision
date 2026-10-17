@@ -804,6 +804,7 @@ function _initCrossTab() {
     _crossTabChannel = new BroadcastChannel('td-data-sync');
     _crossTabChannel.onmessage = function (event) {
       var msg = event && event.data;
+      if (msg && msg.type === 'rekey') return _applyRemoteRekey(msg);
       if (!msg || !msg.cid || msg.cid !== getActiveCourse()) return;
       if (_isGradebookField(msg.field)) {
         _handleExternalCourseUpdate(msg.cid, 'gradebook');
@@ -837,6 +838,49 @@ function _broadcastChange(cid, field) {
     } catch (e) {
       /* fire-and-forget — channel may be closed */
     }
+  }
+}
+
+/* A create landed here and its local id became a server id. The outbox is
+   shared, so the tab that queued the create is often not the one that sent
+   it; every tab holding the local id in memory needs the new one. */
+function _broadcastRekey(cid, kind, localId, serverId, extra) {
+  if (!_crossTabChannel) return;
+  try {
+    _crossTabChannel.postMessage({
+      type: 'rekey',
+      cid: cid,
+      kind: kind,
+      localId: localId,
+      serverId: serverId,
+      extra: extra || null,
+    });
+  } catch (e) {
+    /* fire-and-forget */
+  }
+}
+
+/* The other tab already rewrote the shared gb-* copy, the outbox and the
+   server; this tab only brings its memory in line (_applyingRemoteRekey
+   keeps _rekeyField off localStorage). A course moves in COURSES only: the
+   wizard's replay (_migrateCourseDataLocalToCanonical) ran in the other tab. */
+var _applyingRemoteRekey = false;
+function _applyRemoteRekey(msg) {
+  if (!msg || !msg.cid || !msg.kind || !msg.localId || !msg.serverId) return;
+  if (msg.kind === 'course') {
+    var saved = _safeParseLS('gb-courses', null);
+    if (saved && typeof saved === 'object') {
+      COURSES = saved;
+      _cache.courses = COURSES;
+    }
+    _pendingLocalCids.delete(msg.localId);
+    return;
+  }
+  _applyingRemoteRekey = true;
+  try {
+    _rekey(msg.cid, msg.kind, msg.localId, msg.serverId, Object.assign({}, msg.extra || {}, { remote: true }));
+  } finally {
+    _applyingRemoteRekey = false;
   }
 }
 
@@ -1065,6 +1109,9 @@ async function initAllCourses() {
 
   // Start cross-tab conflict detection
   _initCrossTab();
+  // Wire the outbox now, not at the first write: whichever tab owns the
+  // sending must send through the auth guard and re-key the creates it lands.
+  _outbox();
 
   // v2: Realtime / cross-device sync removed with the legacy public-schema
   // tables. The canonical v2 schema has its own publication strategy to be
@@ -1936,9 +1983,12 @@ function _rekeyField(field, cid, transform) {
   if (value !== undefined && transform(value)) {
     _cache[field][cid] = value;
     var dataKey = _DATA_KEYS[field];
-    if (dataKey) _safeLSSet('gb-' + dataKey + '-' + cid, JSON.stringify(value));
-    _markLocalWrite(field, cid);
-    _broadcastChange(cid, field);
+    // A re-key from another tab: it wrote the shared copy already.
+    if (dataKey && !_applyingRemoteRekey) _safeLSSet('gb-' + dataKey + '-' + cid, JSON.stringify(value));
+    if (!_applyingRemoteRekey) {
+      _markLocalWrite(field, cid);
+      _broadcastChange(cid, field);
+    }
   }
   if (_hasServerState(field, cid)) transform(_serverState[field][cid]);
 }
@@ -2178,6 +2228,7 @@ function _rekey(cid, kind, localId, serverId, extra) {
   if (typeof clearProfCache === 'function') clearProfCache();
 
   _rewriteQueuedIds(kind, localId, serverId);
+  if (!extra.remote) _broadcastRekey(cid, kind, localId, serverId, extra);
 
   // Pages hold the old id in their state and markup; swap it and render
   // again, but only when the old id is on screen, so typing isn't disturbed.
@@ -2294,6 +2345,7 @@ function _onCourseCreated(rec, canonicalId) {
   _unregisterPendingCreate(rec);
   _migrateCourseDataLocalToCanonical(localId, canonicalId);
   _pendingLocalCids.delete(localId);
+  _broadcastRekey(localId, 'course', localId, canonicalId);
 }
 
 /* A create that will never land: forget it, and drop the writes waiting on

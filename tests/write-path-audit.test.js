@@ -38,21 +38,46 @@ function setOnline(value) {
   });
 }
 
+// Every copy of the queue module loaded so far; each test starts by closing
+// the tabs the last one opened.
+var TABS = [];
+
 /**
- * Loads shared/offline-queue.js again. A second browser tab, or the same tab
- * after a reload, gets its own copy of the module: new in-memory state, the
- * same localStorage. Leaves window.v2Queue pointing at the new copy and
- * returns it. The page is offline while the module loads so its 2-second
- * start-up flush stays quiet; the caller goes online when it is ready.
+ * Loads shared/offline-queue.js again, as a reload does: the copy that was
+ * current gives up the queue (its page is gone) and the new one takes it.
+ * New in-memory state, the same localStorage. Leaves window.v2Queue pointing
+ * at the new copy and returns it. The page is offline while the module loads
+ * so its start-up flush stays quiet; the caller goes online when it is ready.
  */
 function loadQueueModule() {
   setOnline(false);
   runInThisContext(QUEUE_SOURCE, { filename: 'shared/offline-queue.js' });
+  TABS.push(window.v2Queue);
   return window.v2Queue;
+}
+
+/**
+ * Loads shared/offline-queue.js as a second tab would: the current copy keeps
+ * the queue and the new one waits behind it. Leaves window.v2Queue pointing
+ * at the new copy (the page whose data layer the test drives) and returns it.
+ */
+function openTab() {
+  // The module lets go of the copy it finds in window.v2Queue (a reload);
+  // hide it so this copy loads beside it instead.
+  window.v2Queue = undefined;
+  return loadQueueModule();
 }
 
 // The copy every test file in this process shares; each test starts on it.
 const ORIGINAL_QUEUE = loadQueueModule();
+
+// Close the last test's tabs and give the queue back to the shared copy.
+beforeEach(() => {
+  TABS.forEach(tab => tab.release());
+  TABS = [ORIGINAL_QUEUE];
+  window.v2Queue = ORIGINAL_QUEUE;
+  ORIGINAL_QUEUE.claim();
+});
 
 function seed(field, value) {
   _cache[field][CID] = value;
@@ -114,7 +139,6 @@ describe('write-path audit: data layer', () => {
   beforeEach(() => {
     localStorage.clear();
     resetSession();
-    window.v2Queue = ORIGINAL_QUEUE;
     fake = makeFakeSupabase();
     originalGetSupabase = globalThis.getSupabase;
     originalUseSupabase = _useSupabase;
@@ -685,6 +709,75 @@ describe('write-path audit: data layer', () => {
     var newId = fake.committedCount('delete_assessment', p => _isUuid(p.p_id));
     expect(newId).toBe(1);
   });
+
+  // Finding 8: the tab that queued a create is not the one that sends it. The
+  // sending tab's success event reaches this page's data layer, which
+  // re-keys the new assessment and frees the score waiting on it.
+  it('re-keys a create in the tab that queued it when another tab sends it', async () => {
+    var tabA = loadQueueModule();
+    var tabB = openTab();
+    window.v2Queue = tabB;
+    _outbox();
+    tabA.configure({ send: (name, params) => fake.rpc(name, params) });
+    await settle(1); // tab A holds the lock
+    seed('students', [studentY()]);
+    seed('assessments', []);
+    seed('scores', {});
+    setOnline(true);
+
+    var assessments = getAssessments(CID);
+    assessments.push({ id: 'sLOCALASSESS1', title: 'Lab', type: 'summative', tagIds: [TAG1] });
+    saveAssessments(CID, assessments);
+    var scores = getScores(CID);
+    scores[ENR_Y] = [{ id: 'e1', assessmentId: 'sLOCALASSESS1', tagId: TAG1, score: 3, date: '2026-10-13' }];
+    saveScores(CID, scores);
+    await settle();
+
+    expect(fake.committedCount('create_assessment')).toBe(1);
+    var newId = getAssessments(CID)[0].id;
+    expect(newId).not.toBe('sLOCALASSESS1');
+    expect(fake.committedCount('upsert_tag_score', p => p.p_assessment_id === newId && p.p_value === 3)).toBe(1);
+    expect(tabB.stats().queued).toBe(0);
+  });
+
+  // Finding 8: a landed create tells the other tabs the new id, and a tab
+  // told brings its own memory in line without touching the shared copy.
+  it('tells other tabs the new id when a create lands', async () => {
+    _initCrossTab();
+    var heard = [];
+    var other = new BroadcastChannel('td-data-sync');
+    other.onmessage = e => heard.push(e.data);
+    seed('assessments', [{ id: 'sLOCALASSESS1', title: 'Lab', type: 'summative', tagIds: [TAG1] }]);
+
+    _rekey(CID, 'assessment', 'sLOCALASSESS1', AID);
+    await settle(1);
+    other.close();
+
+    expect(heard).toContainEqual(
+      expect.objectContaining({ type: 'rekey', cid: CID, kind: 'assessment', localId: 'sLOCALASSESS1', serverId: AID }),
+    );
+  });
+
+  it('applies a new id announced by another tab', async () => {
+    _initCrossTab();
+    seed('assessments', [{ id: 'sLOCALASSESS1', title: 'Lab', type: 'summative', tagIds: [TAG1] }]);
+    var scores = {};
+    scores[ENR_Y] = [{ id: 'e1', assessmentId: 'sLOCALASSESS1', tagId: TAG1, score: 3, date: '2026-10-13' }];
+    seed('scores', scores);
+    var savedKey = 'gb-' + _DATA_KEYS.assessments + '-' + CID;
+    var savedBefore = localStorage.getItem(savedKey);
+    var other = new BroadcastChannel('td-data-sync');
+
+    other.postMessage({ type: 'rekey', cid: CID, kind: 'assessment', localId: 'sLOCALASSESS1', serverId: AID });
+    await settle(1);
+    other.close();
+
+    expect(getAssessments(CID)[0].id).toBe(AID);
+    expect(getScores(CID)[ENR_Y][0].assessmentId).toBe(AID);
+    expect(_idRekeys[CID]['sLOCALASSESS1']).toBe(AID);
+    // The other tab wrote the shared copy; this one leaves it alone.
+    expect(localStorage.getItem(savedKey)).toBe(savedBefore);
+  });
 });
 
 describe('write-path audit: outbox', () => {
@@ -726,11 +819,13 @@ describe('write-path audit: outbox', () => {
     expect(Q.stats().queued).toBe(1);
   });
 
-  // Finding 8. Two tabs share one localStorage queue but not _inFlight, so
-  // both send the first entry and the stale copy can land after the second.
-  it.fails('sends each entry from one tab only, in order per key', async () => {
+  // Finding 8 (fixed: one tab owns the queue and sends; the others ask it
+  // to). Two tabs share one localStorage queue but not _inFlight, so both
+  // used to send the first entry and the stale copy could land after the
+  // second.
+  it('sends each entry from one tab only, in order per key', async () => {
     var tabA = loadQueueModule();
-    var tabB = loadQueueModule();
+    var tabB = openTab();
     var sent = [];
     var rpc = (name, p) => {
       sent.push(p.p_value);
@@ -738,6 +833,7 @@ describe('write-path audit: outbox', () => {
     };
     tabA.configure({ send: rpc });
     tabB.configure({ send: rpc });
+    await settle(1); // tab A holds the lock
     setOnline(true);
 
     tabA.push('upsert_score', { p_enrollment_id: 'e', p_assessment_id: 'a', p_value: 3 });
@@ -746,6 +842,90 @@ describe('write-path audit: outbox', () => {
     await settle();
 
     expect(sent).toEqual([3, 4]);
+  });
+
+  // Finding 8: a write queued in a tab that doesn't send still resolves there
+  // with the server's answer, relayed by the tab that sent it.
+  it('resolves a write queued in one tab when another tab sends it', async () => {
+    var tabA = loadQueueModule();
+    var tabB = openTab();
+    tabA.configure({ send: () => Promise.resolve({ data: { id: 'row-1' }, error: null }) });
+    tabB.configure({
+      send: () => {
+        throw new Error('tab B must not send');
+      },
+    });
+    await settle(1); // tab A holds the lock
+    setOnline(true);
+
+    var res = await tabB.push('upsert_note', { p_course_id: CID, p_body: 'x' });
+
+    expect(res).toEqual({ data: { id: 'row-1' }, error: null });
+    expect(tabA.stats().owner).toBe(true);
+    expect(tabB.stats().owner).toBe(false);
+    expect(tabB.stats().queued).toBe(0);
+  });
+
+  // Finding 8: when the sending tab closes, the next tab takes the queue
+  // (the Web Lock passes to it) and sends what is waiting.
+  it('hands the outbox to another tab when the owner closes', async () => {
+    var tabA = loadQueueModule();
+    var tabB = openTab();
+    var sentBy = [];
+    var rpcFor = tab => (name, p) => {
+      sentBy.push(tab + ':' + p.p_value);
+      return settle(3).then(() => ({ data: null, error: null }));
+    };
+    tabA.configure({ send: rpcFor('A') });
+    tabB.configure({ send: rpcFor('B') });
+    await settle(1);
+    expect(tabA.stats().owner).toBe(true);
+    expect(tabB.stats().owner).toBe(false);
+
+    tabB.push('upsert_score', { p_enrollment_id: 'e', p_assessment_id: 'a', p_value: 3 });
+    tabB.push('upsert_score', { p_enrollment_id: 'e', p_assessment_id: 'b', p_value: 4 });
+    tabA.release();
+    setOnline(true);
+    await tabB.flush();
+    await settle();
+
+    expect(sentBy).toEqual(['B:3', 'B:4']);
+    expect(tabB.stats().owner).toBe(true);
+    expect(tabA.stats().queued).toBe(0);
+    expect(tabB.stats().queued).toBe(0);
+  });
+
+  // Finding 8, without Web Locks: the owner keeps a lease in localStorage;
+  // letting go of it hands the queue over the same way.
+  it('hands the outbox over through the lease when Web Locks are missing', async () => {
+    var locks = navigator.locks;
+    Object.defineProperty(navigator, 'locks', { value: undefined, configurable: true, writable: true });
+    try {
+      var tabA = loadQueueModule();
+      var tabB = openTab();
+      var sentBy = [];
+      var rpcFor = tab => (name, p) => {
+        sentBy.push(tab + ':' + p.p_value);
+        return settle(3).then(() => ({ data: null, error: null }));
+      };
+      tabA.configure({ send: rpcFor('A') });
+      tabB.configure({ send: rpcFor('B') });
+      expect(tabA.stats().owner).toBe(true);
+      expect(tabB.stats().owner).toBe(false);
+
+      tabB.push('upsert_score', { p_enrollment_id: 'e', p_assessment_id: 'a', p_value: 3 });
+      tabB.push('upsert_score', { p_enrollment_id: 'e', p_assessment_id: 'b', p_value: 4 });
+      tabA.release();
+      setOnline(true);
+      await tabB.flush();
+      await settle();
+
+      expect(sentBy).toEqual(['B:3', 'B:4']);
+      expect(tabB.stats().owner).toBe(true);
+      expect(tabB.stats().queued).toBe(0);
+    } finally {
+      Object.defineProperty(navigator, 'locks', { value: locks, configurable: true, writable: true });
+    }
   });
 
   // Finding 12, no long-form editor open (fixed: a 401 the refresh could
