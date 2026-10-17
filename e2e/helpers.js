@@ -250,8 +250,15 @@ export const SMOKE_WELCOME_LEARNING_MAP = {
 // ── Mock auth ─────────────────────────────────────────────────
 
 /**
- * Inject fake Supabase session and stub auth functions so the app
- * boots without hitting a real Supabase instance.
+ * Sign in a fake teacher and stand in for Supabase with a fake server that
+ * answers the v2 RPCs the app calls: bootstrap_teacher, list_teacher_courses
+ * and get_class_bundle. Writes succeed and change nothing on the server.
+ *
+ * The server's data is whatever the seed helpers (seedCourse, seedStudents,
+ * …) or a spec's own addInitScript put in localStorage, read once when the
+ * app first talks to Supabase. Seeds are written in the app's own cache
+ * shape; the server converts them to the bundle shape, so the app runs its
+ * real load path (_bundleToCache) on them.
  */
 export async function mockAuth(page) {
   await page.addInitScript(teacher => {
@@ -268,15 +275,374 @@ export async function mockAuth(page) {
       },
     };
 
-    // 1) Seed localStorage BEFORE any script runs.
-    //    requireAuth's fast path reads this synchronously.
+    // requireAuth's fast path reads this synchronously.
     localStorage.setItem('sb-novsfeqjhbleyyaztmlh-auth-token', JSON.stringify(fakeSession));
-
-    // Prevent demo data seeding (seedIfNeeded checks this flag)
+    // Stops loadSeedIfNeeded from adding Demo Mode data.
     localStorage.setItem('gb-data-wiped', '1');
 
-    // 2) Provide a fake `supabase` global so gb-supabase.js _initClient() succeeds.
-    //    This must exist before the <script src="vendor/supabase.min.js"> tag runs.
+    // ── The fake server's data ──
+    // Read once, on the first call: every init script (the seeds) has run by
+    // then, and the app hasn't yet replaced the seeded keys with what the
+    // server sends.
+    let db = null;
+    function readLS(key, fallback) {
+      try {
+        const raw = localStorage.getItem(key);
+        return raw == null ? fallback : JSON.parse(raw);
+      } catch (e) {
+        return fallback;
+      }
+    }
+    function serverDb() {
+      if (db) return db;
+      const courses = readLS('gb-courses', {}) || {};
+      const config = readLS('gb-config', {}) || {};
+      const perCourse = {};
+      Object.keys(courses).forEach(cid => {
+        const get = (field, fallback) => readLS('gb-' + field + '-' + cid, fallback);
+        perCourse[cid] = {
+          students: get('students', []) || [],
+          assessments: get('assessments', []) || [],
+          scores: get('scores', {}) || {},
+          statuses: get('statuses', {}) || {},
+          learningMap: get('learningMaps', {}) || {},
+          categories: get('categories', []) || [],
+          modules: get('modules', []) || [],
+          rubrics: get('rubrics', []) || [],
+          observations: get('observations', {}) || {},
+          flags: get('flags', {}) || {},
+          goals: get('goals', {}) || {},
+          reflections: get('reflections', {}) || {},
+          overrides: get('overrides', {}) || {},
+          notes: get('notes', {}) || {},
+          termRatings: get('termRatings', {}) || {},
+          customTags: get('customTags', []) || [],
+          reportConfig: get('reportConfig', {}) || {},
+          courseConfig: get('courseConfigs', {}) || {},
+        };
+      });
+      db = { courses, config, perCourse, versions: {} };
+      return db;
+    }
+
+    // ── Converters: app cache shape → v2 RPC shape ──
+    function courseRows() {
+      const { courses } = serverDb();
+      return Object.keys(courses).map((cid, i) => {
+        const c = courses[cid] || {};
+        return {
+          id: cid,
+          name: c.name || '',
+          grade_level: c.gradeLevel || '',
+          description: c.description || '',
+          color: c.color || '',
+          is_archived: !!c.archived,
+          display_order: c.displayOrder != null ? c.displayOrder : i,
+          grading_system: c.gradingSystem || null,
+          calc_method: c.calcMethod || null,
+          decay_weight: c.decayWeight != null ? c.decayWeight : null,
+          timezone: c.timezone || null,
+          late_work_policy: c.lateWorkPolicy || null,
+          created_at: '2026-09-01T00:00:00Z',
+          updated_at: '2026-09-01T00:00:00Z',
+        };
+      });
+    }
+
+    function learningMapPayload(map) {
+      const sections = (map && map.sections) || [];
+      const subjects = ((map && map.subjects) || []).map((subj, si) => ({
+        id: subj.id,
+        name: subj.name || '',
+        color: subj.color || null,
+        display_order: si,
+        sections: sections
+          .filter(sec => sec.subject === subj.id)
+          .map((sec, ci) => ({
+            id: sec.id,
+            name: sec.name || '',
+            short_name: sec.shortName || '',
+            color: sec.color || null,
+            display_order: ci,
+            competency_group_id: sec.groupId || null,
+            tags: (sec.tags || []).map((tag, ti) => ({
+              id: tag.id,
+              code: tag.code || tag.id,
+              label: tag.label || '',
+              i_can_text: tag.text || '',
+              i_can_statements: tag.i_can_statements || [],
+              color: tag.color || null,
+              display_order: ti,
+            })),
+          })),
+      }));
+      return { competency_groups: [], subjects };
+    }
+
+    function rubricsPayload(rubrics) {
+      const out = { rubrics: [], criteria: [], criterion_tags: [] };
+      (rubrics || []).forEach((r, ri) => {
+        out.rubrics.push({ id: r.id, name: r.name || '', created_at: '2026-09-01T00:00:' + String(10 + ri) + 'Z' });
+        (r.criteria || []).forEach((c, ci) => {
+          const levels = c.levels || {};
+          const values = c.levelValues || {};
+          out.criteria.push({
+            id: c.id,
+            rubric_id: r.id,
+            name: c.name || c.label || '',
+            level_4_descriptor: levels[4] || '',
+            level_3_descriptor: levels[3] || '',
+            level_2_descriptor: levels[2] || '',
+            level_1_descriptor: levels[1] || '',
+            level_4_value: values[4] != null ? values[4] : 4,
+            level_3_value: values[3] != null ? values[3] : 3,
+            level_2_value: values[2] != null ? values[2] : 2,
+            level_1_value: values[1] != null ? values[1] : 1,
+            weight: c.weight != null ? c.weight : 1,
+            display_order: c.displayOrder != null ? c.displayOrder : ci,
+          });
+          (c.tagIds || []).forEach(tagId => out.criterion_tags.push({ criterion_id: c.id, tag_id: tagId }));
+        });
+      });
+      return out;
+    }
+
+    function observationsPayload(blob) {
+      const byId = {};
+      Object.keys(blob || {}).forEach(sid => {
+        (Array.isArray(blob[sid]) ? blob[sid] : []).forEach((ob, i) => {
+          const id = ob.id || 'ob-' + sid + '-' + i;
+          if (!byId[id]) {
+            byId[id] = {
+              id,
+              body: ob.text || '',
+              sentiment: ob.sentiment || null,
+              context_type: ob.context || null,
+              assessment_id: (ob.assignmentContext && ob.assignmentContext.assessmentId) || null,
+              created_at: ob.created || '2026-09-01T00:00:00Z',
+              enrollment_ids: [],
+              tag_ids: [],
+              custom_tag_ids: [],
+            };
+          }
+          byId[id].enrollment_ids.push(sid);
+        });
+      });
+      const observations = Object.values(byId);
+      return { observations, total: observations.length };
+    }
+
+    function gradebookPayload(cid, data) {
+      const students = data.students.map((s, i) => ({
+        enrollment_id: s.id,
+        student_id: s.personId || s.id,
+        first_name: s.firstName || '',
+        last_name: s.lastName || '',
+        preferred_name: s.preferred || '',
+        pronouns: s.pronouns || '',
+        student_number: s.studentNumber || '',
+        email: s.email || '',
+        date_of_birth: s.dateOfBirth || null,
+        designations: s.designations || [],
+        roster_position: i + 1,
+        is_flagged: !!data.flags[s.id],
+      }));
+      const assessments = data.assessments.map((a, i) => ({
+        id: a.id,
+        title: a.title || '',
+        description: a.description || '',
+        assessment_kind: a.type || null,
+        category_id: a.categoryId || null,
+        score_mode: a.scoreMode || 'proficiency',
+        max_points: a.maxPoints || null,
+        weight: a.weight != null ? a.weight : 1,
+        evidence_type: a.evidenceType || '',
+        rubric_id: a.rubricId || null,
+        module_id: a.moduleId || null,
+        collab_mode: null,
+        collab_config: {
+          pairs: a.pairs || [],
+          groups: a.groups || [],
+          excludedStudents: a.excludedStudents || [],
+        },
+        has_rubric: !!a.rubricId,
+        date_assigned: a.date || null,
+        due_date: a.dueDate || null,
+        display_order: i,
+        tag_ids: a.tagIds || [],
+      }));
+      const sIndex = {};
+      students.forEach((s, i) => (sIndex[s.enrollment_id] = i));
+      const aIndex = {};
+      assessments.forEach((a, i) => (aIndex[a.id] = i));
+      const tagIndex = [];
+      const tIndex = {};
+      const tagRows = [];
+      const scoreCells = {};
+      function scoreCell(si, ai) {
+        const key = si + ':' + ai;
+        return scoreCells[key] || (scoreCells[key] = [si, ai, null, null, '']);
+      }
+      Object.keys(data.scores).forEach(sid => {
+        (data.scores[sid] || []).forEach(entry => {
+          const si = sIndex[sid];
+          const ai = aIndex[entry.assessmentId];
+          if (si == null || ai == null) return;
+          const mode = assessments[ai].score_mode;
+          if (mode === 'points' || !entry.tagId) {
+            const cell = scoreCell(si, ai);
+            cell[2] = entry.score;
+            cell[4] = entry.note || '';
+            return;
+          }
+          if (tIndex[entry.tagId] == null) {
+            tIndex[entry.tagId] = tagIndex.length;
+            tagIndex.push(entry.tagId);
+          }
+          tagRows.push([si, ai, tIndex[entry.tagId], entry.score, entry.mod || 0]);
+          if (entry.note) scoreCell(si, ai)[4] = entry.note;
+        });
+      });
+      Object.keys(data.statuses).forEach(key => {
+        const parts = key.split(':');
+        const si = sIndex[parts[0]];
+        const ai = aIndex[parts[1]];
+        if (si == null || ai == null) return;
+        scoreCell(si, ai)[3] = data.statuses[key];
+      });
+      return {
+        course: { id: cid },
+        students,
+        assessments,
+        categories: data.categories.map((c, i) => ({
+          id: c.id,
+          name: c.name || '',
+          weight: c.weight || 0,
+          display_order: c.displayOrder != null ? c.displayOrder : i,
+        })),
+        modules: data.modules.map((m, i) => ({
+          id: m.id,
+          course_id: cid,
+          name: m.name || '',
+          color: m.color || null,
+          display_order: m.sortOrder != null ? m.sortOrder : i,
+        })),
+        tag_index: tagIndex,
+        criterion_index: [],
+        score_rows: Object.values(scoreCells),
+        tag_rows: tagRows,
+        criterion_rows: [],
+      };
+    }
+
+    function profilesPayload(data) {
+      return data.students.map((s, i) => ({
+        student: {
+          id: s.personId || s.id,
+          first_name: s.firstName || '',
+          last_name: s.lastName || '',
+          preferred_name: s.preferred || '',
+          pronouns: s.pronouns || '',
+          student_number: s.studentNumber || '',
+          email: s.email || '',
+        },
+        enrollment: { id: s.id, roster_position: i + 1, designations: s.designations || [] },
+        goals: data.goals[s.id] || {},
+        reflections: data.reflections[s.id] || {},
+        section_overrides: data.overrides[s.id] || {},
+        is_flagged: !!data.flags[s.id],
+        recent_observations: [],
+        notes: data.notes[s.id] ? [{ id: 'note-' + s.id, body: data.notes[s.id] }] : [],
+      }));
+    }
+
+    function termRatingRows(blob) {
+      const rows = [];
+      Object.keys(blob || {}).forEach(sid => {
+        Object.keys(blob[sid] || {}).forEach(termId => {
+          const t = blob[sid][termId] || {};
+          const term = Number(String(termId).replace(/^term-/, ''));
+          if (!term) return;
+          rows.push({
+            enrollment_id: sid,
+            term,
+            narrative_html: t.narrative || '',
+            work_habits_rating: t.workHabits || 0,
+            participation_rating: t.participation || 0,
+            social_traits: t.socialTraits || [],
+            strength_tags: t.strengths || [],
+            growth_tags: t.growthAreas || [],
+            mention_assessments: t.mentionAssessments || [],
+            mention_observations: t.mentionObs || [],
+          });
+        });
+      });
+      return rows;
+    }
+
+    function classBundle(cid, ifVersion) {
+      const store = serverDb();
+      const data = store.perCourse[cid];
+      if (!data) return { error: { message: 'course not found', code: 'P0002' } };
+      const version = store.versions[cid] || (store.versions[cid] = 1);
+      if (ifVersion != null && Number(ifVersion) === version) {
+        return { data: { not_modified: true, version } };
+      }
+      const { _preset, ...blocks } = data.reportConfig || {};
+      const cc = data.courseConfig || {};
+      return {
+        data: {
+          bundle_schema: 3,
+          version,
+          gradebook: gradebookPayload(cid, data),
+          learning_map: learningMapPayload(data.learningMap),
+          rubrics: rubricsPayload(data.rubrics),
+          observations: observationsPayload(data.observations),
+          profiles: profilesPayload(data),
+          term_ratings: termRatingRows(data.termRatings),
+          report_config: Object.keys(blocks).length > 0 ? { blocks_config: blocks, preset: _preset || null } : null,
+          custom_tags: data.customTags,
+          course_config: { grading_scale: cc.gradingScale || null, category_weights: cc.categoryWeights || null },
+        },
+      };
+    }
+
+    // Every RPC the fake server was asked for, for specs to inspect.
+    window.__e2eRpcLog = [];
+
+    function fakeRpc(name, params) {
+      window.__e2eRpcLog.push({ name, params: params || null });
+      let res;
+      if (name === 'bootstrap_teacher') {
+        const { config } = serverDb();
+        const rows = courseRows();
+        res = {
+          data: {
+            id: teacher.id,
+            email: teacher.email,
+            display_name: teacher.display_name,
+            created_at: '2026-09-01T00:00:00Z',
+            deleted_at: null,
+            preferences: {
+              active_course_id: config.activeCourse || (rows[0] && rows[0].id) || null,
+              view_mode: config.viewMode || null,
+              mobile_view_mode: null,
+              mobile_sort_mode: null,
+              card_widget_config: null,
+            },
+          },
+        };
+      } else if (name === 'list_teacher_courses') {
+        res = { data: courseRows() };
+      } else if (name === 'get_class_bundle') {
+        res = classBundle(params && params.p_course_id, params && params.p_if_version);
+      } else {
+        // Writes and the reads the bundle replaced: succeed with nothing.
+        res = { data: null };
+      }
+      return Promise.resolve({ data: res.data === undefined ? null : res.data, error: res.error || null });
+    }
+
     const noopPromise = val => Promise.resolve(val);
     const makeFakeClient = () => ({
       auth: {
@@ -286,77 +652,36 @@ export async function mockAuth(page) {
           setTimeout(() => cb('SIGNED_IN', { ...fakeSession, user: fakeSession.user }), 50);
           return { data: { subscription: { unsubscribe: () => {} } } };
         },
-        signOut: () => noopPromise({}),
-        resetPasswordForEmail: () => noopPromise({}),
+        refreshSession: () => noopPromise({ data: { session: { ...fakeSession } }, error: null }),
+        signOut: () => noopPromise({ error: null }),
+        resetPasswordForEmail: () => noopPromise({ data: {}, error: null }),
         signInWithPassword: () => noopPromise({ data: fakeSession, error: null }),
         signUp: () => noopPromise({ data: fakeSession, error: null }),
       },
-      from: table => {
-        // For teacher_config: return courses + config from localStorage
-        // For course_data: return per-course data from localStorage
-        const _eqs = {};
+      rpc: fakeRpc,
+      // Table reads the v2 app still makes (rubric fallback, sync cursor).
+      from: () => {
         const chain = {
           select: () => chain,
-          eq: (col, val) => {
-            _eqs[col] = val;
-            return chain;
-          },
+          eq: () => chain,
           neq: () => chain,
           in: () => chain,
           order: () => chain,
           limit: () => chain,
           single: () => noopPromise({ data: null, error: null }),
-          upsert: () => noopPromise({ error: null }),
+          maybeSingle: () => noopPromise({ data: null, error: null }),
+          upsert: () => noopPromise({ data: [], error: null }),
           insert: () => noopPromise({ data: [], error: null }),
           update: () => chain,
           delete: () => chain,
-          then: resolve => {
-            if (table === 'teacher_config') {
-              const courses = JSON.parse(localStorage.getItem('gb-courses') || 'null');
-              const config = JSON.parse(localStorage.getItem('gb-config') || '{}');
-              const rows = [];
-              if (courses) rows.push({ config_key: 'courses', data: courses });
-              if (config) rows.push({ config_key: 'config', data: config });
-              return resolve({ data: rows, error: null });
-            }
-            if (table === 'course_data') {
-              const cid = _eqs['course_id'] || 'sci8';
-              const dataKeys = [
-                'students',
-                'assessments',
-                'scores',
-                'learningMaps',
-                'modules',
-                'rubrics',
-                'flags',
-                'goals',
-                'reflections',
-                'overrides',
-                'statuses',
-                'observations',
-                'notes',
-                'termRatings',
-                'customTags',
-                'courseConfigs',
-                'reportConfig',
-                'gradingScales',
-              ];
-              const rows = [];
-              for (const dk of dataKeys) {
-                const val = localStorage.getItem('gb-' + dk + '-' + cid);
-                if (val) rows.push({ data_key: dk, data: JSON.parse(val) });
-              }
-              return resolve({ data: rows, error: null });
-            }
-            return resolve({ data: [], error: null });
-          },
+          then: resolve => resolve({ data: [], error: null }),
         };
         return chain;
       },
     });
 
-    // Pin the fake Supabase client so later scripts cannot swap in a real one.
-    var fakeSupabase = { createClient: () => window._supabase || makeFakeClient() };
+    // Pin the fake client so the real one can't replace it.
+    const fakeSupabase = { createClient: () => window._supabase || makeFakeClient() };
     window._supabase = makeFakeClient();
     Object.defineProperty(window, 'supabase', {
       configurable: true,
@@ -368,36 +693,14 @@ export async function mockAuth(page) {
       },
     });
 
-    // Also set __ENV so gb-supabase.js doesn't log errors
     window.__ENV = { SUPABASE_URL: 'https://fake.supabase.co', SUPABASE_KEY: 'fake-key' };
 
-    // Prevent idle-timeout from firing during tests
+    // Keep the idle timeout from signing the test out.
     window._idleTimeout = null;
     window._resetIdleTimer = () => {};
-
-    // Prevent demo seed from overwriting test data
-    // seedIfNeeded is defined in gb-seed-data.js; we stub it after it loads
-    const _seedObserver = new MutationObserver(() => {
-      if (typeof window.seedIfNeeded === 'function' && !window._seedStubbed) {
-        window._seedStubbed = true;
-        window.seedIfNeeded = async () => {};
-        window.migrateAllStudents = async () => {};
-      }
-    });
-    _seedObserver.observe(document.documentElement, { childList: true, subtree: true });
-    // Also try directly in case script already loaded
-    setTimeout(() => {
-      if (typeof window.seedIfNeeded === 'function') {
-        window.seedIfNeeded = async () => {};
-      }
-      if (typeof window.migrateAllStudents === 'function') {
-        window.migrateAllStudents = async () => {};
-      }
-      _seedObserver.disconnect();
-    }, 3000);
   }, TEACHER);
 
-  // Block the real Supabase CDN script from loading (we already injected a fake)
+  // The fake client above stands in for the real library.
   await page.route('**/vendor/supabase.min.js', route =>
     route.fulfill({
       status: 200,

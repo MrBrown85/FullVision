@@ -203,6 +203,8 @@ test.describe('Mobile: Sidebar Toggle', () => {
     await page.setViewportSize(SMALL_TABLET);
     await gotoApp(page, '/dashboard');
     const toggle = page.locator('[data-action="toggleSidebar"]');
+    // Fail fast on the known bug rather than wait out the test timeout.
+    await expect(toggle).toBeVisible({ timeout: 5_000 });
     await toggle.click();
     await page.waitForTimeout(300);
     await expect(page.locator('#gb-sidebar')).toBeVisible();
@@ -583,9 +585,7 @@ test.describe('Mobile: Page Rendering', () => {
     await assertNoOverflow(page);
   });
 
-  // BUG: Gradebook renders empty #main at mobile viewport
   test('Gradebook should render content at 375px', async ({ page }) => {
-    test.fail(); // known bug: gradebook empty at mobile
     await page.setViewportSize(MOBILE);
     await gotoApp(page, '/gradebook');
     await waitForMainContent(page);
@@ -687,9 +687,7 @@ test.describe('Mobile: Edge Cases', () => {
     expect(body).toContain('Comprehensive');
   });
 
-  // BUG: Gradebook renders empty at small mobile
   test('score values should be readable at 320px', async ({ page }) => {
-    test.fail(); // known bug: gradebook renders empty at mobile
     await mockAuth(page);
     await seedCourse(page);
     await seedStudents(page);
