@@ -144,13 +144,6 @@ window.Router = (function () {
       _currentPage.destroy();
     }
 
-    // Keep the roster list where it was when the next page shows the same
-    // class's sidebar (e.g. clicking another student on the student page).
-    var oldRoster = document.getElementById('gb-roster-list');
-    var oldCourseSel = document.getElementById('gb-course-select');
-    var rosterScroll = oldRoster ? oldRoster.scrollTop : 0;
-    var rosterCourse = oldCourseSel ? oldCourseSel.value : null;
-
     // Clear DOM mounts
     document.getElementById('main').innerHTML = '';
     document.getElementById('page-toolbar-mount').innerHTML = '';
@@ -165,12 +158,6 @@ window.Router = (function () {
     _currentPage = module;
     if (module && module.init) {
       module.init(params);
-    }
-
-    var newRoster = document.getElementById('gb-roster-list');
-    var newCourseSel = document.getElementById('gb-course-select');
-    if (rosterScroll > 0 && newRoster && newCourseSel && newCourseSel.value === rosterCourse) {
-      newRoster.scrollTop = rosterScroll;
     }
 
     // Update page title for browser tab, history, and screen readers
