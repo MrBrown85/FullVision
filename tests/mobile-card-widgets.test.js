@@ -823,6 +823,17 @@ describe('Integration — Full Card Render Cycle', () => {
       ]),
     );
     localStorage.setItem('gb-tags-course-1', JSON.stringify([{ id: 't1', name: 'Tag1', sectionId: 'sec1' }]));
+    // The learning map the app reads competencies from. A growth area has to
+    // be a competency in it to be shown.
+    localStorage.setItem(
+      'gb-learningmap-course-1',
+      JSON.stringify({
+        _customized: true,
+        _flatVersion: 2,
+        subjects: [],
+        sections: [{ id: 'sec1', name: 'Questioning', color: '#4A90D9', tags: [{ id: 't1', label: 'Tag1' }] }],
+      }),
+    );
     localStorage.setItem(
       'gb-scores-course-1',
       JSON.stringify({
