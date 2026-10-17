@@ -197,6 +197,58 @@ describe('write-path audit: data layer', () => {
     expect(window.v2Queue.stats().queued).toBe(3);
   });
 
+  // Finding 14, second half: the server removes an assessment's scores and
+  // statuses with the assessment, so deleting it sends one delete and no
+  // per-student clears (they raced the delete and were dead-lettered).
+  it('sends one delete_assessment and no per-cell clears when an assessment is deleted', async () => {
+    seed('students', [studentY()]);
+    seed('assessments', [{ id: AID, title: 'Lab', type: 'summative', tagIds: [TAG1] }]);
+    seed('scores', {
+      [ENR_Y]: [{ id: 'e1', assessmentId: AID, tagId: TAG1, score: 3, date: '2026-10-13' }],
+    });
+    seed('statuses', { [ENR_Y + ':' + AID]: 'NS' });
+    _rememberServerState('assessments', CID, getAssessments(CID));
+    _rememberServerState('scores', CID, getScores(CID));
+    _rememberServerState('statuses', CID, getAssignmentStatuses(CID));
+
+    saveAssessments(
+      CID,
+      getAssessments(CID).filter(a => a.id !== AID),
+    );
+    // What the delete handlers on the assignments and gradebook pages do next.
+    var scores = getScores(CID);
+    Object.keys(scores).forEach(sid => {
+      scores[sid] = scores[sid].filter(s => s.assessmentId !== AID);
+    });
+    saveScores(CID, scores);
+    var statuses = getAssignmentStatuses(CID);
+    delete statuses[ENR_Y + ':' + AID];
+    saveAssignmentStatuses(CID, statuses);
+    await settle();
+
+    expect(fake.committedCount('delete_assessment', p => p.p_id === AID)).toBe(1);
+    expect(fake.calls.map(c => c.name)).toEqual(['delete_assessment']);
+    expect(getScores(CID)[ENR_Y]).toEqual([]);
+    expect(getAssignmentStatuses(CID)[ENR_Y + ':' + AID]).toBeUndefined();
+  });
+
+  it('sends no cell clears when the deleted assessment is a points assessment', async () => {
+    seed('students', [studentY()]);
+    seed('assessments', [
+      { id: AID, title: 'Quiz', type: 'summative', scoreMode: 'points', maxPoints: 10, tagIds: [TAG1] },
+    ]);
+    seed('scores', {
+      [ENR_Y]: [{ id: 'e1', assessmentId: AID, tagId: TAG1, score: 7, date: '2026-10-13' }],
+    });
+    _rememberServerState('assessments', CID, getAssessments(CID));
+    _rememberServerState('scores', CID, getScores(CID));
+
+    saveAssessments(CID, []);
+    await settle();
+
+    expect(fake.calls.map(c => c.name)).toEqual(['delete_assessment']);
+  });
+
   // Finding 3 (fixed: a dead letter puts the baseline row back, so the next
   // save diffs it again).
   it('re-sends an assessment edit whose first write was rejected by the server', async () => {
@@ -724,10 +776,10 @@ describe('write-path audit: outbox', () => {
     expect(Q.stats().deadLettered).toBe(0);
   });
 
-  // Finding 14. clear_column_scores names only the assessment, so its key is
-  // null and it runs beside every cell write on that column. A score typed
-  // after "Reset this column" must not start before the clear has finished.
-  it.fails('runs a column clear and a later score on that column in order', async () => {
+  // Finding 14 (fixed: a column write is a barrier for its assessment). A
+  // score typed after "Reset this column" must not start before the clear has
+  // finished.
+  it('runs a column clear and a later score on that column in order', async () => {
     var log = [];
     var finish = {};
     Q.configure({
@@ -757,6 +809,107 @@ describe('write-path audit: outbox', () => {
       'start upsert_score',
       'end upsert_score',
     ]);
+  });
+
+  it('still sends cell writes in one column at the same time', async () => {
+    var started = [];
+    var finish = [];
+    Q.configure({
+      send: (name, payload) => {
+        started.push(payload.p_enrollment_id);
+        return new Promise(resolve => finish.push(() => resolve({ data: null, error: null })));
+      },
+    });
+    setOnline(true);
+
+    Q.push('upsert_score', { p_enrollment_id: 'e1', p_assessment_id: 'a', p_value: 1 });
+    Q.push('upsert_score', { p_enrollment_id: 'e2', p_assessment_id: 'a', p_value: 2 });
+    Q.push('upsert_tag_score', { p_enrollment_id: 'e3', p_assessment_id: 'a', p_tag_id: 't', p_value: 3 });
+    await settle();
+
+    expect(started).toEqual(['e1', 'e2', 'e3']);
+    finish.forEach(f => f());
+    await Q.flush();
+  });
+
+  it('holds a column clear until the earlier scores on that column have finished', async () => {
+    var log = [];
+    var finish = {};
+    Q.configure({
+      send: (name, payload) => {
+        var who = name + ' ' + (payload.p_enrollment_id || payload.p_assessment_id);
+        log.push('start ' + who);
+        return new Promise(resolve => {
+          finish[who] = () => {
+            log.push('end ' + who);
+            resolve({ data: null, error: null });
+          };
+        });
+      },
+    });
+    setOnline(true);
+
+    Q.push('upsert_score', { p_enrollment_id: 'e', p_assessment_id: 'a', p_value: 3 });
+    Q.push('clear_column_scores', { p_assessment_id: 'a' });
+    Q.push('upsert_score', { p_enrollment_id: 'other', p_assessment_id: 'b', p_value: 1 });
+    await settle();
+    // The other column is not held; this column's clear is.
+    expect(log).toEqual(['start upsert_score e', 'start upsert_score other']);
+
+    finish['upsert_score e']();
+    await settle();
+    expect(log).toContain('start clear_column_scores a');
+    finish['upsert_score other']();
+    finish['clear_column_scores a']();
+    await Q.flush();
+  });
+
+  it('keeps a score typed after a column clear behind the clear, not merged into the score before it', async () => {
+    var sent = [];
+    Q.configure({
+      send: (name, payload) => {
+        sent.push(name + ':' + (payload.p_value === undefined ? '' : payload.p_value));
+        return { data: null, error: null };
+      },
+    });
+    setOnline(false);
+
+    Q.push('upsert_score', { p_enrollment_id: 'e', p_assessment_id: 'a', p_value: 1 });
+    Q.push('clear_column_scores', { p_assessment_id: 'a' });
+    Q.push('upsert_score', { p_enrollment_id: 'e', p_assessment_id: 'a', p_value: 3 });
+    setOnline(true);
+    await Q.flush();
+    await Q.flush();
+
+    expect(sent).toEqual(['upsert_score:1', 'clear_column_scores:', 'upsert_score:3']);
+  });
+
+  it('runs delete_assessment after the scores on that assessment, and later scores after it', async () => {
+    var log = [];
+    var finish = {};
+    Q.configure({
+      send: name => {
+        log.push('start ' + name);
+        return new Promise(resolve => {
+          finish[name] = () => {
+            log.push('end ' + name);
+            resolve({ data: null, error: null });
+          };
+        });
+      },
+    });
+    setOnline(true);
+
+    Q.push('upsert_score', { p_enrollment_id: 'e', p_assessment_id: 'a', p_value: 3 });
+    Q.push('delete_assessment', { p_id: 'a' });
+    await settle();
+    expect(log).toEqual(['start upsert_score']);
+
+    finish.upsert_score();
+    await settle();
+    expect(log).toEqual(['start upsert_score', 'end upsert_score', 'start delete_assessment']);
+    finish.delete_assessment();
+    await Q.flush();
   });
 });
 
