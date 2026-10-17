@@ -922,15 +922,16 @@
 
   /* Start every entry that may go now: the first for its key, due, owned by
      whoever is signed in, not waiting on a local id. `force` ignores backoff
-     (an explicit flush). A column write goes only when no earlier entry names
-     its assessment; an entry behind a column write waits for it. A tab that
-     isn't the owner asks the owner instead. */
-  function _pump(force) {
+     (an explicit flush). `dueBy` counts entries due by then as due now, for
+     a retry timer that fires a little early. A column write goes only when
+     no earlier entry names its assessment; an entry behind a column write
+     waits for it. A tab that isn't the owner asks the owner instead. */
+  function _pump(force, dueBy) {
     if (_owner && !_usingLocks && !_leaseIsMine()) _owner = false; // replaced while asleep
     if (!_owner) return _askOwner(force);
     if (_signedOut || _isPaused() || !navigator.onLine) return;
     var owner = currentOwner();
-    var now = Date.now();
+    var now = Math.max(Date.now(), dueBy || 0);
     var busyKeys = {};
     var touched = {}; // assessment → an earlier entry names it
     var barred = {}; // assessment → an earlier column write is still queued
@@ -959,19 +960,27 @@
     }
   }
 
-  function _scheduleRetry() {
-    if (_retryTimer) return;
+  /* Wake when the next entry in backoff is due and send the entries due by
+     then, each on its own backoff, then wait for the next one. A failure
+     that comes due sooner moves the wake earlier. `after` skips entries due
+     at or before it: the last wake already tried them, and one that could
+     not go then (offline, held, all slots busy) goes when that changes. */
+  function _scheduleRetry(after) {
+    if (_retryTimer) clearTimeout(_retryTimer);
+    _retryTimer = null;
     var next = null;
     _readQueue().entries.forEach(function (e) {
       if (_inFlight[e.id] || !e.next_at) return;
       var t = Date.parse(e.next_at);
+      if (after !== undefined && t <= after) return;
       if (next === null || t < next) next = t;
     });
     if (next === null) return;
     _retryTimer = setTimeout(
       function () {
         _retryTimer = null;
-        _pump(true);
+        _pump(false, next);
+        _scheduleRetry(next);
       },
       Math.max(0, next - Date.now()),
     );
