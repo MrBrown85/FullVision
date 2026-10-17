@@ -601,6 +601,14 @@ window.PageGradebook = (function () {
     requestAnimationFrame(update);
   }
 
+  /* The short code teachers know a competency by ("QAP1"). Tags loaded from
+     the server have a long random id, so the id is used only when it is a
+     readable code itself, as in Demo Mode. */
+  function _tagShortCode(tag) {
+    if (!tag) return '';
+    return tag.code || (!_isUuid(tag.id) && tag.id) || tag.shortName || tag.label || '';
+  }
+
   /* ══════════════════════════════════════════════════════════
      DETAILED VIEW
      ══════════════════════════════════════════════════════════ */
@@ -636,9 +644,11 @@ window.PageGradebook = (function () {
           cols.push({
             assessmentId: a.id,
             tagId: tagId,
-            tagCode: key && key.tag ? key.tag.id : key ? key.label : tagId,
+            // A competency's short code, never its server id; a criterion's
+            // name; '?' for one no longer in the learning map.
+            tagCode: key && key.tag ? _tagShortCode(key.tag) || key.label : key ? key.label : '?',
             sectionColor: sec ? sec.color : 'var(--text-3)',
-            tagText: key ? key.text : '',
+            tagText: key ? key.text || key.label : 'No longer in the learning map',
           });
         });
       }
@@ -985,10 +995,12 @@ window.PageGradebook = (function () {
       var stripeColor = tagSecs.length > 0 ? tagSecs[0].color : 'var(--border)';
       var fillColor = isScoreOnly ? 'var(--surface)' : stripeColor;
       var stripeBottom = isScoreOnly ? 'var(--border)' : stripeColor;
-      var tagNames = (a.tagIds || []).map(function (tid) {
-        var t = getTagById(cid, tid);
-        return t ? t.text || t.id : tid;
-      });
+      var tagNames = (a.tagIds || [])
+        .map(function (tid) {
+          var t = getTagById(cid, tid);
+          return t ? t.text || t.label || t.code : '';
+        })
+        .filter(Boolean);
       var secNames = tagSecs
         .map(function (s) {
           return s.name;
