@@ -433,6 +433,8 @@ window.PageStudent = (function () {
       return;
     }
 
+    // Every grade on this page follows the class's chosen reporting term.
+    if (typeof activateSavedTerm === 'function') activateSavedTerm(cid);
     var sections = getSections(cid);
     var allTags = getAllTags(cid);
     var assessments = getAssessments(cid);
@@ -465,6 +467,7 @@ window.PageStudent = (function () {
       '<div class="student-toolbar">' +
       '<a class="tb-back-btn" href="#/dashboard">&larr; Dashboard</a>' +
       '<button class="tb-edit-btn" data-action="openEditStudent">Edit Student</button>' +
+      (typeof renderTermPicker === 'function' ? renderTermPicker(cid) : '') +
       '</div>';
 
     html += '<div class="student-scroll"><div style="padding:16px 20px">';

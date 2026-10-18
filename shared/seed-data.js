@@ -510,6 +510,16 @@ function seedIfNeeded() {
       saveLearningMap('sci8', structuredClone(LEARNING_MAP.sci8));
     }
     saveCategories('sci8', structuredClone(SCI8_CATEGORIES));
+    // Two reporting terms, so the term picker visibly changes the grades.
+    saveCourseConfig(
+      'sci8',
+      Object.assign({}, getCourseConfig('sci8') || {}, {
+        reportingTerms: current([
+          { ordinal: 1, label: 'Term 1', starts_on: '2025-09-01', ends_on: '2025-11-30' },
+          { ordinal: 2, label: 'Term 2', starts_on: '2025-12-01', ends_on: SEED_LAST_DAY },
+        ]),
+      }),
+    );
 
     const sci8Assessments = [
       {

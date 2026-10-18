@@ -177,9 +177,27 @@ window.PageReports = (function () {
   }
 
   /* ── Main render ─────────────────────────────────────────────── */
+  /* A report for Report N shows the grades of reporting term N when the
+     class has one (docs/DECISIONS.md, "Reporting periods"); otherwise all
+     time. This never changes the term chosen on the other pages. */
+  function _applyReportTerm() {
+    if (typeof setActiveTerm !== 'function') return;
+    const cid = activeCourse;
+    const period = (document.getElementById('report-period')?.value || '').match(/Report\s+(\d+)/i);
+    const n = period ? Number(period[1]) : null;
+    const has =
+      n != null &&
+      typeof getReportingTerms === 'function' &&
+      getReportingTerms(cid).some(function (t) {
+        return t.ordinal === n;
+      });
+    setActiveTerm(cid, has ? n : null);
+  }
+
   function renderReports() {
     const cid = activeCourse;
     const output = document.getElementById('report-output');
+    _applyReportTerm();
 
     if (activeTab === 'summary') {
       _syncLongFormAuthContext();

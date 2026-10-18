@@ -40,3 +40,15 @@ Context: `STUDENT-VOICE-PLAN.md`.
 7. **The teacher's term questionnaire stays as is** until phase 5.
 8. **Backend:** no anon-callable database functions. One Supabase Edge Function in `ca-central-1` fronts the student form, calling `student_submit` schema functions granted to the service role only; short-lived tokens, rate limiting, append-only responses.
 9. **UI:** the student page reuses the teacher mobile app's stylesheets and components; reuse is one-way.
+
+## Reporting periods (2026-10-17)
+
+Context: `ROADMAP.md` 1.2; `migrations/20261017_course_reporting_terms.sql`; `fullvision-myed-integration.md` §4.2 (MyEd terms will use the same ordinals).
+
+1. **A class has up to six reporting terms** with a label, a start date and an end date, stored as `course.reporting_terms` (jsonb), edited in Class Management, numbered 1..n by start date. Term N is what the Reports page calls Report N.
+2. **A term counts the assessments whose assigned date falls inside it.** An undated assessment is in no term; the gradebook says how many it left out.
+3. **All time is the default view.** The term picker on the gradebook, dashboard and student pages remembers the choice per class on this device, and every grade on those pages follows it. The Reports page follows the report's own period instead.
+4. **A competency override applies in every term that has evidence**, as it does all time. With no evidence in the term the level is "no evidence", override or not.
+5. **No overlap, no gaps required.** Terms may leave gaps; they may not overlap. The server enforces the shape and date order; overlap is a client rule.
+6. **Duplicate Class does not copy terms.** Dates belong to one school year.
+7. **Mobile stays all-time** until its grade filter uses real terms.

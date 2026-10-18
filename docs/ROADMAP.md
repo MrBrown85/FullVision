@@ -9,7 +9,7 @@ FullVision won't win by matching Schoology or Teams feature for feature. Both ar
 Without these, no feature set will hold a $120 price.
 
 1. **Roster import from MyEducation BC.** Schoology and Teams get rosters automatically. A teacher typing 150 students by hand will quit on day one. Accept MyEd BC's class-list export as is: map its columns, match on student number, and add students who are already in another class without making duplicate records.
-2. **Reporting periods.** BC reports several times a year, so a course % that covers the whole year doesn't match how teachers report. Add terms with dates to each class, and filter the gradebook, the proficiency results and the reports by term. This is the biggest structural gap from the comparison.
+2. **Reporting periods.** Done 2026-10-17 (`docs/DECISIONS.md`, "Reporting periods"): up to six dated terms per class in Class Management, a term picker on the gradebook, dashboard and student pages, and reports that follow Report N. Still to do: the mobile grade filter's "term" means the last 90 days, not a real term.
 3. **Safe student handling.** Removing a student should withdraw them, not delete them. Add a Withdrawn list, a re-enrol button and Restore for deleted classes. Districts and parents will ask "what happens to my child's record?"
 4. **Rolling over to next year.** Duplicate Class has to copy categories, rubrics and assessments (with no scores). Teams' Import settings is the feature teachers with several sections use most.
 5. **Trust basics:** closed signup or SSO, a real privacy page, and full data export. A teacher paying personally needs to know they can leave with their data.
