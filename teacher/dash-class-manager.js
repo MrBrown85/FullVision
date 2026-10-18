@@ -2093,6 +2093,9 @@ window.DashClassManager = (function () {
     var cc = getCourseConfig(course.id);
     cc.calcMethod = cwStep2Calc;
     cc.decayWeight = parseInt(cwStep2Decay, 10) / 100;
+    var defaultTerms = _cmDefaultReportingTerms(course.id);
+    if (defaultTerms && !(Array.isArray(cc.reportingTerms) && cc.reportingTerms.length))
+      cc.reportingTerms = defaultTerms;
     saveCourseConfig(course.id, cc);
 
     var dispatchOk = true;
@@ -2860,6 +2863,57 @@ window.DashClassManager = (function () {
     if (saveEl) saveEl.disabled = !_cmTermCanSave(cid);
   }
 
+  // The Surrey secondary school whose published dates fill the rows
+  // (shared/reporting-term-presets.js). Grandview Heights unless changed.
+  var _cmTermSchool = null;
+
+  function _cmTermSchoolId() {
+    return (
+      _cmTermSchool || (typeof REPORTING_TERM_PRESETS !== 'undefined' ? REPORTING_TERM_PRESETS.defaultSchool : null)
+    );
+  }
+
+  function _cmRenderSchoolPreset(cid, hasRows) {
+    if (typeof reportingTermSchools !== 'function') return '';
+    var schools = reportingTermSchools();
+    if (!schools.length) return '';
+    var chosen = _cmTermSchoolId();
+    var available = typeof reportingTermPreset === 'function' && !!reportingTermPreset(chosen, courseToday(cid));
+    var school = schools.find(function (s) {
+      return s.id === chosen;
+    });
+    var html = '<div class="cm-term-school">';
+    html +=
+      '<select class="cm-input cm-term-school-select" data-action-change="cmTermSchool" aria-label="Surrey secondary school">' +
+      schools
+        .map(function (s) {
+          return (
+            '<option value="' + esc(s.id) + '"' + (s.id === chosen ? ' selected' : '') + '>' + esc(s.name) + '</option>'
+          );
+        })
+        .join('') +
+      '</select>';
+    if (available) {
+      html +=
+        '<button class="btn btn-primary cm-term-school-btn" data-action="cmTermSchoolPreset">' +
+        (hasRows ? 'Replace with this school’s dates' : 'Use this school’s dates') +
+        '</button>';
+    }
+    html += '</div>';
+    if (!available) {
+      html +=
+        '<div class="cm-hint">School dates are loaded for ' +
+        esc(REPORTING_TERM_PRESETS.schoolYear) +
+        ' only. Use a generic preset or type the dates.</div>';
+    } else if (school && school.assumed) {
+      html +=
+        '<div class="cm-hint">' +
+        esc(school.name) +
+        ' has not published its semester turnaround, so Semester 2 starts Feb 1. Adjust if yours differs.</div>';
+    }
+    return html;
+  }
+
   function _cmRenderReportingTermsField(cid) {
     if (!cid) return '';
     var st = _cmTermRows(cid);
@@ -2867,7 +2921,8 @@ window.DashClassManager = (function () {
     var html =
       '<div class="cm-field cm-cat-field">' +
       '<label class="cm-label">Reporting terms</label>' +
-      '<div class="cm-hint" style="margin-bottom:8px">The gradebook, dashboard and student pages can show one term at a time. A term counts the assessments dated inside it. Up to six.</div>';
+      '<div class="cm-hint" style="margin-bottom:8px">The gradebook, dashboard and student pages can show one term at a time. A term counts the assessments dated inside it. Up to six. Surrey secondary dates come from each school’s published calendar; a term ends on the day its report is published.</div>';
+    html += _cmRenderSchoolPreset(cid, rows.length > 0);
     if (rows.length === 0) {
       html +=
         '<div class="cm-term-presets">' +
@@ -2929,6 +2984,30 @@ window.DashClassManager = (function () {
     st.rows = _cmTermPresetRows(cmSelectedCourse, name);
     st.dirty = true;
     renderClassManager();
+  }
+
+  function cmTermSchool(id) {
+    _cmTermSchool = id || null;
+    renderClassManager();
+  }
+
+  function cmTermSchoolPreset() {
+    if (!cmSelectedCourse || typeof reportingTermPreset !== 'function') return;
+    var rows = reportingTermPreset(_cmTermSchoolId(), courseToday(cmSelectedCourse));
+    if (!rows) return;
+    var st = _cmTermRows(cmSelectedCourse);
+    st.rows = rows.map(function (r) {
+      return { label: r.label, starts_on: r.starts_on, ends_on: r.ends_on };
+    });
+    st.dirty = true;
+    renderClassManager();
+  }
+
+  /* A new class starts with the default Surrey secondary school's terms
+     for the current school year, when the presets cover it. */
+  function _cmDefaultReportingTerms(cid) {
+    if (typeof reportingTermPreset !== 'function') return null;
+    return reportingTermPreset(null, courseToday(cid));
   }
 
   function cmTermAdd() {
@@ -3837,6 +3916,9 @@ window.DashClassManager = (function () {
       cmTermPreset: function () {
         cmTermPreset(el.dataset.value);
       },
+      cmTermSchoolPreset: function () {
+        cmTermSchoolPreset();
+      },
       cmTermAdd: function () {
         cmTermAdd();
       },
@@ -4014,6 +4096,10 @@ window.DashClassManager = (function () {
   function handleChange(el) {
     if (el.dataset.actionChange === 'cmCSV') {
       cmHandleCSV(el);
+      return true;
+    }
+    if (el.dataset.actionChange === 'cmTermSchool') {
+      cmTermSchool(el.value);
       return true;
     }
     // T-UI-02 retired: cmCwEnabled + cmReportPct (deleted 2026-04-21).

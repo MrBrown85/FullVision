@@ -217,6 +217,7 @@ function load(file) {
 }
 
 load('shared/constants.js');
+load('shared/reporting-term-presets.js');
 load('shared/data.js');
 load('shared/calc.js');
 load('teacher/ui.js');
