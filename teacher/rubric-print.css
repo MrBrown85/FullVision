@@ -3,8 +3,8 @@
    The sheets render into #rubric-print-root, kept off screen so they can be
    measured, and become the only thing on the page while
    body.rubric-print-active is set. Sheet boxes are sized in inches to match
-   the @page rule rubric-print.js injects per layout. Colours are fixed hex
-   values: the handout prints the same in dark mode. */
+   the @page rule rubric-print.js injects per layout. Everything is black,
+   white and grey: the handouts are photocopied. */
 
 #rubric-print-root {
   position: absolute;
@@ -197,23 +197,14 @@
   position: relative;
   color: #222;
 }
+/* Black and white only: the handouts go through the photocopier. The
+   scored cell is a light grey fill, a heavy border and a ✓ mark. */
 .rubric-cell.is-scored {
   color: #000;
-  font-weight: 500;
-  outline: 2px solid #000;
-  outline-offset: -2px;
-}
-.rubric-cell.is-scored.l4 {
-  background: #dbeafe;
-}
-.rubric-cell.is-scored.l3 {
-  background: #bbf7d0;
-}
-.rubric-cell.is-scored.l2 {
-  background: #fef3c7;
-}
-.rubric-cell.is-scored.l1 {
-  background: #fee2e2;
+  font-weight: 600;
+  background: #e2e2e2;
+  outline: 2.5px solid #000;
+  outline-offset: -2.5px;
 }
 .rubric-mark {
   float: right;

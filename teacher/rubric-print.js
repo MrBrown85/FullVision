@@ -2,7 +2,8 @@
 
    A teacher scores a rubric assessment once in the grid, then prints a
    student-facing rubric per student: the four level descriptors, the chosen
-   level shaded with its ± mark, the comment on each criterion, the
+   level in grey with a heavy border and its ± mark (black and white only:
+   the sheets are photocopied), the comment on each criterion, the
    assessment feedback and the overall level. Stapled to the work, it is the
    feedback the student takes home, while the score keeps feeding the
    student profile.
