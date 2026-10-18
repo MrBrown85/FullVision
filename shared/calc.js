@@ -20,6 +20,88 @@ var _assessmentOverallCache = {};
 var _categoryAvgCache = {};
 var _courseLetterCache = {};
 
+/* ── Reporting term scope ──────────────────────────────────────
+   A class can be viewed in one reporting term (docs/DECISIONS.md,
+   "Reporting periods"). While a term is active for a class, every grade
+   counts only the assessments whose assigned date falls inside it. With no
+   term active (the default, "All time") nothing here changes a result.
+   Cache keys carry the term, so switching terms never needs a cache clear. */
+var _activeTerm = {}; // cid → { ordinal, label, startsOn, endsOn } | undefined
+
+/** Make one reporting term (by ordinal) the scope for a class, or null for all time. */
+function setActiveTerm(cid, ordinal) {
+  if (ordinal == null || ordinal === '' || ordinal === 'all') {
+    delete _activeTerm[cid];
+    return null;
+  }
+  var terms = typeof getReportingTerms === 'function' ? getReportingTerms(cid) : [];
+  var term = terms.find(function (t) {
+    return Number(t.ordinal) === Number(ordinal);
+  });
+  if (!term) {
+    delete _activeTerm[cid];
+    return null;
+  }
+  _activeTerm[cid] = {
+    ordinal: Number(term.ordinal),
+    label: term.label,
+    startsOn: term.startsOn || term.starts_on,
+    endsOn: term.endsOn || term.ends_on,
+  };
+  return _activeTerm[cid];
+}
+
+/** The reporting term a class is being viewed in, or null for all time. */
+function getActiveTerm(cid) {
+  return _activeTerm[cid] || null;
+}
+
+/** Apply the term the teacher last chose for this class on this device. */
+function activateSavedTerm(cid) {
+  var saved = typeof getSelectedTermOrdinal === 'function' ? getSelectedTermOrdinal(cid) : null;
+  return setActiveTerm(cid, saved);
+}
+
+function _termKey(cid) {
+  var t = _activeTerm[cid];
+  return t ? '@' + t.ordinal : '';
+}
+
+/* Cache key prefix for a class: the class id plus the active term. */
+function _ck(cid) {
+  return cid + _termKey(cid);
+}
+
+function _assessmentDate(a) {
+  return (a && (a.date || a.dateAssigned || a.assigned_at || a.date_assigned)) || '';
+}
+
+/** Whether an assessment is dated inside the active term (true when no term is active). */
+function assessmentInActiveTerm(cid, a) {
+  var t = _activeTerm[cid];
+  if (!t) return true;
+  var d = _assessmentDate(a);
+  if (!d) return false;
+  return d >= t.startsOn && d <= t.endsOn;
+}
+
+/* The class's assessments inside the active term; all of them when none is active. */
+function _scopedAssessments(cid) {
+  var all = getAssessments(cid);
+  if (!_activeTerm[cid]) return all;
+  return all.filter(function (a) {
+    return assessmentInActiveTerm(cid, a);
+  });
+}
+
+/** Assessments the active term leaves out because they have no date. */
+function undatedAssessmentCount(cid) {
+  if (!_activeTerm[cid]) return 0;
+  return getAssessments(cid).filter(function (a) {
+    return !_assessmentDate(a);
+  }).length;
+}
+
 /** Clear all proficiency caches. Call when scores, assessments, overrides, or statuses change. */
 function clearProfCache() {
   _tagScoresCache = {};
@@ -34,25 +116,28 @@ function clearProfCache() {
 
 /** Get or build assessment weights map for a course. */
 function _getAW(cid) {
-  if (_awCache[cid]) return _awCache[cid];
-  var assessments = getAssessments(cid);
+  var key = _ck(cid);
+  if (_awCache[key]) return _awCache[key];
+  var assessments = _scopedAssessments(cid);
   var aw = {};
   assessments.forEach(function (a) {
     aw[a.id] = getAssessmentWeight(a);
   });
-  _awCache[cid] = aw;
+  _awCache[key] = aw;
   return aw;
 }
 
-/** Get or build a Map<assessmentId, assessment> for O(1) lookups instead of O(n) find(). */
+/** Get or build a Map<assessmentId, assessment> for O(1) lookups instead of O(n) find().
+ * Holds only the assessments in the active term, so an id missing here is out of scope. */
 function _getAssessMap(cid) {
-  if (_assessMapCache[cid]) return _assessMapCache[cid];
+  var key = _ck(cid);
+  if (_assessMapCache[key]) return _assessMapCache[key];
   var m = new Map(
-    getAssessments(cid).map(function (a) {
+    _scopedAssessments(cid).map(function (a) {
       return [a.id, a];
     }),
   );
-  _assessMapCache[cid] = m;
+  _assessMapCache[key] = m;
   return m;
 }
 
@@ -261,7 +346,7 @@ function _rubricAssessmentPoints(cid, studentId, assessment) {
 }
 
 function getAssessmentOverallScore(cid, studentId, assessmentId) {
-  var cacheKey = cid + ':' + studentId + ':' + assessmentId;
+  var cacheKey = _ck(cid) + ':' + studentId + ':' + assessmentId;
   if (_assessmentOverallCache[cacheKey] !== undefined) return _assessmentOverallCache[cacheKey];
 
   var assessment = _getAssessMap(cid).get(assessmentId);
@@ -322,10 +407,10 @@ function getAssessmentOverallScore(cid, studentId, assessmentId) {
 }
 
 function getCategoryAverage(cid, studentId, categoryId) {
-  var cacheKey = cid + ':' + studentId + ':' + categoryId;
+  var cacheKey = _ck(cid) + ':' + studentId + ':' + categoryId;
   if (_categoryAvgCache[cacheKey] !== undefined) return _categoryAvgCache[cacheKey];
 
-  var values = getAssessments(cid)
+  var values = _scopedAssessments(cid)
     .filter(function (assessment) {
       return (assessment.categoryId || assessment.category_id || null) === categoryId;
     })
@@ -469,11 +554,11 @@ function _roundPercent(R, digits) {
 }
 
 function getCourseLetterData(cid, studentId) {
-  var cacheKey = cid + ':' + studentId;
+  var cacheKey = _ck(cid) + ':' + studentId;
   if (_courseLetterCache[cacheKey]) return _courseLetterCache[cacheKey];
 
   var categories = getCategories(cid) || [];
-  var assessments = getAssessments(cid);
+  var assessments = _scopedAssessments(cid);
   var Q = null;
   var R = null;
 
@@ -503,7 +588,7 @@ function getCourseLetterData(cid, studentId) {
     if (weightTotal > 0) Q = weightedSum / weightTotal;
     if (pctWeight > 0) R = pctSum / pctWeight;
   } else {
-    var values = getAssessments(cid)
+    var values = assessments
       .map(function (assessment) {
         return getAssessmentOverallScore(cid, studentId, assessment.id);
       })
@@ -646,21 +731,25 @@ function calcProficiency(scores, method, decayWeight, opts) {
  * @returns {Score[]} Filtered and converted score entries
  */
 function getTagScores(cid, studentId, tagId) {
-  var cacheKey = cid + ':' + studentId + ':' + tagId;
+  var cacheKey = _ck(cid) + ':' + studentId + ':' + tagId;
   if (_tagScoresCache[cacheKey]) return _tagScoresCache[cacheKey];
 
   const allScores = getScores(cid);
   const studentScores = allScores[studentId] || [];
   const statuses = getAssignmentStatuses(cid);
+  // Use Map for O(1) lookup instead of O(n) find() per score entry
+  const assessMap = _getAssessMap(cid);
+  // In a term, a score only counts when its assessment is dated inside it.
+  // All time keeps every score, including one whose assessment is gone.
+  const termActive = !!_activeTerm[cid];
   const filtered = studentScores.filter(s => {
     if (s.tagId !== tagId) return false;
+    if (termActive && !assessMap.has(s.assessmentId)) return false;
     const status = statuses[studentId + ':' + s.assessmentId];
     if (status === 'EXC') return false;
     return true;
   });
   // Convert points-mode scores to proficiency
-  // Use Map for O(1) lookup instead of O(n) find() per score entry
-  const assessMap = _getAssessMap(cid);
   const scale = getGradingScale(cid);
   var result = filtered.map(s => {
     const assess = assessMap.get(s.assessmentId);
@@ -687,7 +776,7 @@ function getTagScores(cid, studentId, tagId) {
  * @returns {number} Proficiency level (0-4)
  */
 function getTagProficiency(cid, studentId, tagId) {
-  var cacheKey = cid + ':' + studentId + ':' + tagId;
+  var cacheKey = _ck(cid) + ':' + studentId + ':' + tagId;
   if (_tagProfCache[cacheKey] !== undefined) return _tagProfCache[cacheKey];
 
   const cc = getCourseConfig(cid);
@@ -1168,6 +1257,11 @@ function renderGrowthSparkline(points) {
 /* ── Namespace ──────────────────────────────────────────────── */
 window.Calc = {
   clearProfCache,
+  setActiveTerm,
+  getActiveTerm,
+  activateSavedTerm,
+  assessmentInActiveTerm,
+  undatedAssessmentCount,
   getClassPointsAverage,
   isScoreOutOfRange,
   courseShowsLetterGrades,

@@ -77,6 +77,8 @@ window.PageDashboard = (function () {
       }
     }
     var cid = activeCourse;
+    // Every grade on this page follows the class's chosen reporting term.
+    if (typeof activateSavedTerm === 'function') activateSavedTerm(cid);
     var sections = getSections(cid);
     var students = getStudents(cid);
     var flags = getFlags(cid);

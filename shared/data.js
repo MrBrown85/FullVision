@@ -3888,7 +3888,11 @@ function _applyBundleTermRatings(cid, rows) {
    them, so it is sent up rather than dropped: a reset elsewhere saves the
    default scale, never null, so a null on the server always means "never
    saved". */
-var _COURSE_CONFIG_COLUMNS = { gradingScale: 'grading_scale', categoryWeights: 'category_weights' };
+var _COURSE_CONFIG_COLUMNS = {
+  gradingScale: 'grading_scale',
+  categoryWeights: 'category_weights',
+  reportingTerms: 'reporting_terms',
+};
 function _applyBundleCourseConfig(cid, row, courseRow) {
   if (!row || typeof row !== 'object') return;
   var config = Object.assign({}, getCourseConfig(cid) || {});
@@ -5252,6 +5256,125 @@ async function deleteCourseData(id) {
 function getGradingScale(cid) {
   const cc = getCourseConfig(cid);
   return cc.gradingScale || DEFAULT_GRADING_SCALE;
+}
+
+/* ── Reporting terms ───────────────────────────────────────────
+   Up to six per class, stored on the course row as reporting_terms and
+   carried in the course config blob with the server's keys:
+   { ordinal: 1..6, label, starts_on: 'YYYY-MM-DD', ends_on: 'YYYY-MM-DD' }.
+   docs/DECISIONS.md, "Reporting periods". */
+var REPORTING_TERMS_MAX = 6;
+var _DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** The class's reporting terms, sorted by ordinal. Empty when it has none. */
+function getReportingTerms(cid) {
+  var cc = getCourseConfig(cid) || {};
+  var terms = Array.isArray(cc.reportingTerms) ? cc.reportingTerms : [];
+  return terms
+    .map(function (t) {
+      return {
+        ordinal: Number(t.ordinal),
+        label: String(t.label || ''),
+        starts_on: String(t.starts_on || t.startsOn || ''),
+        ends_on: String(t.ends_on || t.endsOn || ''),
+      };
+    })
+    .sort(function (a, b) {
+      return a.ordinal - b.ordinal;
+    });
+}
+
+/** Why a list of terms can't be saved, or null when it can. The server's
+ * check constraint enforces the same rules except overlap. */
+function reportingTermsError(terms) {
+  if (!Array.isArray(terms)) return 'Terms must be a list.';
+  if (terms.length > REPORTING_TERMS_MAX) return 'A class can have up to ' + REPORTING_TERMS_MAX + ' terms.';
+  var seen = {};
+  for (var i = 0; i < terms.length; i++) {
+    var t = terms[i] || {};
+    var n = Number(t.ordinal);
+    if (!Number.isInteger(n) || n < 1 || n > REPORTING_TERMS_MAX) return 'Each term needs a number from 1 to 6.';
+    if (seen[n]) return 'Two terms have the same number.';
+    seen[n] = true;
+    if (!String(t.label || '').trim()) return 'Every term needs a name.';
+    if (!_DATE_ONLY_RE.test(t.starts_on || '') || !_DATE_ONLY_RE.test(t.ends_on || ''))
+      return 'Every term needs a start date and an end date.';
+    if (t.starts_on > t.ends_on) return (t.label || 'A term') + ' ends before it starts.';
+  }
+  var sorted = terms.slice().sort(function (a, b) {
+    return a.starts_on < b.starts_on ? -1 : a.starts_on > b.starts_on ? 1 : 0;
+  });
+  for (var j = 1; j < sorted.length; j++) {
+    if (sorted[j].starts_on <= sorted[j - 1].ends_on)
+      return (sorted[j - 1].label || 'A term') + ' and ' + (sorted[j].label || 'the next term') + ' overlap.';
+  }
+  return null;
+}
+
+/** Save the class's terms. Ordinals are assigned 1..n by start date.
+ * Returns the error text if the list is invalid; nothing is saved then. */
+function saveReportingTerms(cid, terms) {
+  var clean = (terms || []).map(function (t) {
+    return {
+      ordinal: Number(t.ordinal),
+      label: String(t.label || '').trim(),
+      starts_on: String(t.starts_on || ''),
+      ends_on: String(t.ends_on || ''),
+    };
+  });
+  clean.sort(function (a, b) {
+    return a.starts_on < b.starts_on ? -1 : a.starts_on > b.starts_on ? 1 : 0;
+  });
+  clean.forEach(function (t, i) {
+    t.ordinal = i + 1;
+  });
+  var err = reportingTermsError(clean);
+  if (err) return err;
+  var cc = Object.assign({}, getCourseConfig(cid) || {});
+  cc.reportingTerms = clean;
+  saveCourseConfig(cid, cc);
+  // A chosen term that no longer exists falls back to all time.
+  var chosen = getSelectedTermOrdinal(cid);
+  if (chosen != null && chosen > clean.length) setSelectedTermOrdinal(cid, null);
+  if (typeof clearProfCache === 'function') clearProfCache();
+  return null;
+}
+
+/** The term whose dates contain a date (default today in the class's timezone), or null. */
+function reportingTermOn(cid, date) {
+  var d = date || courseToday(cid);
+  return (
+    getReportingTerms(cid).find(function (t) {
+      return d >= t.starts_on && d <= t.ends_on;
+    }) || null
+  );
+}
+
+/* The term the teacher chose to view a class in, per device. Null is all
+   time, the default. gb- keys are wiped at sign-out. */
+function getSelectedTermOrdinal(cid) {
+  try {
+    var raw = localStorage.getItem('gb-term-' + cid);
+    if (raw == null || raw === '') return null;
+    var n = Number(raw);
+    if (!Number.isInteger(n)) return null;
+    return getReportingTerms(cid).some(function (t) {
+      return t.ordinal === n;
+    })
+      ? n
+      : null;
+  } catch (e) {
+    return null;
+  }
+}
+function setSelectedTermOrdinal(cid, ordinal) {
+  try {
+    if (ordinal == null || ordinal === '' || ordinal === 'all') localStorage.removeItem('gb-term-' + cid);
+    else localStorage.setItem('gb-term-' + cid, String(Number(ordinal)));
+  } catch (e) {
+    // localStorage unavailable: the choice lasts for this page only.
+  }
+  if (typeof setActiveTerm === 'function') setActiveTerm(cid, ordinal);
 }
 
 /* ══════════════════════════════════════════════════════════════════
@@ -6657,6 +6780,7 @@ function saveCourseConfig(cid, obj) {
       if (obj.gradingScale != null) patch.grading_scale = obj.gradingScale;
       if (obj.categoryWeights != null) patch.category_weights = obj.categoryWeights;
       if (typeof obj.roundPercent === 'boolean') patch.round_percent = obj.roundPercent;
+      if (Array.isArray(obj.reportingTerms)) patch.reporting_terms = obj.reportingTerms;
       if (Object.keys(patch).length > 0) {
         _trackPendingSync(
           _writeRpc('update_course', { p_course_id: cid, p_patch: patch }).then(function (res) {
@@ -9230,6 +9354,12 @@ window.GB = {
   updateCourse,
   deleteCourseData,
   getGradingScale,
+  getReportingTerms,
+  reportingTermsError,
+  saveReportingTerms,
+  reportingTermOn,
+  getSelectedTermOrdinal,
+  setSelectedTermOrdinal,
   loadCurriculumIndex,
   getCoursesByGrade,
   getSubjectsByGrade,

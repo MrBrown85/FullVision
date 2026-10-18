@@ -1347,6 +1347,7 @@ window.DashClassManager = (function () {
       '</div>' +
       _cmRenderCategoriesField(cmSelectedCourse) +
       _cmRenderRoundPercentField(cmSelectedCourse) +
+      _cmRenderReportingTermsField(cmSelectedCourse) +
       '<div class="cm-field">' +
       '<label class="cm-label">Calculation Method</label>' +
       '<div class="cm-seg">' +
@@ -2776,6 +2777,213 @@ window.DashClassManager = (function () {
     renderClassManager();
   }
 
+  /* ── Reporting terms ─────────────────────────────────────────
+     Up to six dated terms per class (docs/DECISIONS.md, "Reporting
+     periods"). Edited like categories: rows change live, Save sends the
+     whole list through saveReportingTerms, which numbers them by start
+     date. */
+  var _cmTermState = {}; // cid → { rows: [{label, starts_on, ends_on}], dirty }
+
+  function _cmTermRows(cid) {
+    if (!_cmTermState[cid]) {
+      _cmTermState[cid] = {
+        rows: getReportingTerms(cid).map(function (t) {
+          return { label: t.label, starts_on: t.starts_on, ends_on: t.ends_on };
+        }),
+        dirty: false,
+      };
+    }
+    return _cmTermState[cid];
+  }
+
+  // The school year a class is in: September of this year from August on,
+  // else September of last year.
+  function _cmSchoolYearStart(cid) {
+    var today = typeof courseToday === 'function' ? courseToday(cid) : new Date().toISOString().slice(0, 10);
+    var y = parseInt(today.slice(0, 4), 10);
+    var m = parseInt(today.slice(5, 7), 10);
+    return m >= 8 ? y : y - 1;
+  }
+
+  var _CM_TERM_PRESETS = {
+    quarters: [
+      ['Term 1', '09-01', '11-15', 0, 0],
+      ['Term 2', '11-16', '01-31', 0, 1],
+      ['Term 3', '02-01', '04-15', 1, 1],
+      ['Term 4', '04-16', '06-30', 1, 1],
+    ],
+    trimesters: [
+      ['Term 1', '09-01', '11-30', 0, 0],
+      ['Term 2', '12-01', '03-15', 0, 1],
+      ['Term 3', '03-16', '06-30', 1, 1],
+    ],
+    semesters: [
+      ['Term 1', '09-01', '01-31', 0, 1],
+      ['Term 2', '02-01', '06-30', 1, 1],
+    ],
+  };
+
+  function _cmTermPresetRows(cid, name) {
+    var y = _cmSchoolYearStart(cid);
+    return (_CM_TERM_PRESETS[name] || []).map(function (p) {
+      return { label: p[0], starts_on: y + p[3] + '-' + p[1], ends_on: y + p[4] + '-' + p[2] };
+    });
+  }
+
+  function _cmTermError(cid) {
+    var rows = _cmTermRows(cid).rows.map(function (r, i) {
+      return { ordinal: i + 1, label: r.label, starts_on: r.starts_on, ends_on: r.ends_on };
+    });
+    return reportingTermsError(rows);
+  }
+
+  function _cmTermCanSave(cid) {
+    return !!_cmTermRows(cid).dirty && !_cmTermError(cid);
+  }
+
+  function _cmTermFooterHtml(cid) {
+    var err = _cmTermError(cid);
+    if (err) return '<span class="cm-cat-sum cm-cat-sum-over">' + esc(err) + '</span>';
+    var n = _cmTermRows(cid).rows.length;
+    if (n === 0) return '<span class="cm-cat-sum">No terms: every page shows the whole year.</span>';
+    return (
+      '<span class="cm-cat-sum">Terms are numbered by start date. Report ' +
+      (n === 1 ? '1' : '1–' + n) +
+      ' on the Reports page match them.</span>'
+    );
+  }
+
+  function _cmTermRefreshFooter(cid) {
+    var foot = document.getElementById('cm-term-foot-' + cid);
+    if (foot) foot.innerHTML = _cmTermFooterHtml(cid);
+    var saveEl = document.getElementById('cm-term-save-' + cid);
+    if (saveEl) saveEl.disabled = !_cmTermCanSave(cid);
+  }
+
+  function _cmRenderReportingTermsField(cid) {
+    if (!cid) return '';
+    var st = _cmTermRows(cid);
+    var rows = st.rows;
+    var html =
+      '<div class="cm-field cm-cat-field">' +
+      '<label class="cm-label">Reporting terms</label>' +
+      '<div class="cm-hint" style="margin-bottom:8px">The gradebook, dashboard and student pages can show one term at a time. A term counts the assessments dated inside it. Up to six.</div>';
+    if (rows.length === 0) {
+      html +=
+        '<div class="cm-term-presets">' +
+        '<button class="cm-add-link" data-action="cmTermPreset" data-value="quarters">Quarters (4)</button>' +
+        '<button class="cm-add-link" data-action="cmTermPreset" data-value="trimesters">Trimesters (3)</button>' +
+        '<button class="cm-add-link" data-action="cmTermPreset" data-value="semesters">Semesters (2)</button>' +
+        '<button class="cm-add-link" data-action="cmTermAdd">Custom</button>' +
+        '</div>';
+    }
+    html += '<div class="cm-cat-list">';
+    rows.forEach(function (row, idx) {
+      html +=
+        '<div class="cm-cat-row cm-term-row">' +
+        '<input class="cm-input cm-term-label" value="' +
+        esc(row.label) +
+        '" placeholder="Term name" data-action-input="cmTermLive" data-field="label" data-idx="' +
+        idx +
+        '" aria-label="Term name">' +
+        '<input class="cm-input cm-term-date" type="date" value="' +
+        esc(row.starts_on) +
+        '" data-action-input="cmTermLive" data-field="starts_on" data-idx="' +
+        idx +
+        '" aria-label="Start date">' +
+        '<span class="cm-cat-pct">to</span>' +
+        '<input class="cm-input cm-term-date" type="date" value="' +
+        esc(row.ends_on) +
+        '" data-action-input="cmTermLive" data-field="ends_on" data-idx="' +
+        idx +
+        '" aria-label="End date">' +
+        '<button class="cm-delete-mini" data-action="cmTermDelete" data-idx="' +
+        idx +
+        '" title="Remove term" aria-label="Remove term">✕</button>' +
+        '</div>';
+    });
+    html += '</div>';
+    html +=
+      '<div class="cm-cat-footer">' +
+      (rows.length > 0 && rows.length < REPORTING_TERMS_MAX
+        ? '<button class="cm-add-link" data-action="cmTermAdd">+ Add term</button>'
+        : '<span></span>') +
+      '<div id="cm-term-foot-' +
+      cid +
+      '">' +
+      _cmTermFooterHtml(cid) +
+      '</div>' +
+      '<button class="btn btn-primary cm-cat-save" id="cm-term-save-' +
+      cid +
+      '" data-action="cmTermSave"' +
+      (_cmTermCanSave(cid) ? '' : ' disabled') +
+      '>Save terms</button>' +
+      '</div>' +
+      '</div>';
+    return html;
+  }
+
+  function cmTermPreset(name) {
+    if (!cmSelectedCourse) return;
+    var st = _cmTermRows(cmSelectedCourse);
+    st.rows = _cmTermPresetRows(cmSelectedCourse, name);
+    st.dirty = true;
+    renderClassManager();
+  }
+
+  function cmTermAdd() {
+    if (!cmSelectedCourse) return;
+    var st = _cmTermRows(cmSelectedCourse);
+    if (st.rows.length >= REPORTING_TERMS_MAX) return;
+    var last = st.rows[st.rows.length - 1];
+    st.rows.push({ label: 'Term ' + (st.rows.length + 1), starts_on: '', ends_on: '' });
+    if (last && last.ends_on) {
+      // Start the day after the previous term ends.
+      var d = new Date(last.ends_on + 'T12:00:00Z');
+      d.setUTCDate(d.getUTCDate() + 1);
+      st.rows[st.rows.length - 1].starts_on = d.toISOString().slice(0, 10);
+    }
+    st.dirty = true;
+    renderClassManager();
+  }
+
+  function cmTermDelete(idx) {
+    if (!cmSelectedCourse) return;
+    var st = _cmTermRows(cmSelectedCourse);
+    st.rows.splice(idx, 1);
+    st.dirty = true;
+    renderClassManager();
+  }
+
+  function cmTermLive(idx, field, value) {
+    if (!cmSelectedCourse) return;
+    var st = _cmTermRows(cmSelectedCourse);
+    var row = st.rows[idx];
+    if (!row || ['label', 'starts_on', 'ends_on'].indexOf(field) < 0) return;
+    row[field] = value;
+    st.dirty = true;
+    _cmTermRefreshFooter(cmSelectedCourse);
+  }
+
+  function cmTermSave() {
+    if (!cmSelectedCourse) return;
+    var cid = cmSelectedCourse;
+    var st = _cmTermRows(cid);
+    if (!_cmTermCanSave(cid)) return;
+    var err = saveReportingTerms(
+      cid,
+      st.rows.map(function (r, i) {
+        return { ordinal: i + 1, label: r.label, starts_on: r.starts_on, ends_on: r.ends_on };
+      }),
+    );
+    if (err) {
+      if (typeof showSyncToast === 'function') showSyncToast('Terms not saved: ' + err, 'error');
+      return;
+    }
+    delete _cmTermState[cid];
+    renderClassManager();
+  }
+
   function cmSetCalcMethod(val) {
     if (!cmSelectedCourse) return;
     var cc = getCourseConfig(cmSelectedCourse);
@@ -3626,6 +3834,18 @@ window.DashClassManager = (function () {
       cmSetRoundPercent: function () {
         cmSetRoundPercent(el.dataset.value);
       },
+      cmTermPreset: function () {
+        cmTermPreset(el.dataset.value);
+      },
+      cmTermAdd: function () {
+        cmTermAdd();
+      },
+      cmTermDelete: function () {
+        cmTermDelete(parseInt(el.dataset.idx, 10));
+      },
+      cmTermSave: function () {
+        cmTermSave();
+      },
       cmCatAdd: function () {
         cmCatAdd();
       },
@@ -3783,6 +4003,10 @@ window.DashClassManager = (function () {
       cmCatNameLive(parseInt(el.dataset.idx, 10), el.value);
       return true;
     }
+    if (el.dataset.actionInput === 'cmTermLive') {
+      cmTermLive(parseInt(el.dataset.idx, 10), el.dataset.field, el.value);
+      return true;
+    }
     // T-UI-02 retired: cmCwRange (legacy summative/formative slider).
     return false;
   }
@@ -3912,6 +4136,11 @@ window.DashClassManager = (function () {
     closeClassManager: closeClassManager,
     renderClassManager: renderClassManager,
     handleAction: handleAction,
+    // The reporting terms draft as the editor holds it (tests).
+    reportingTermsDraft: function (cid) {
+      var st = _cmTermRows(cid || cmSelectedCourse);
+      return { rows: st.rows.slice(), dirty: st.dirty, error: _cmTermError(cid || cmSelectedCourse) };
+    },
     handleInput: handleInput,
     handleChange: handleChange,
     handleBlur: handleBlur,

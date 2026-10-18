@@ -155,11 +155,18 @@ window.PageGradebook = (function () {
   function render() {
     var cid = activeCourse;
     var students = sortStudents(getStudents(cid), 'lastName');
-    var allAssessments = getAssessments(cid)
-      .slice()
+    // The class's chosen reporting term scopes the columns and every grade
+    // on this page (calc.js). All time shows everything.
+    var term = typeof activateSavedTerm === 'function' ? activateSavedTerm(cid) : null;
+    var everyAssessment = getAssessments(cid);
+    var allAssessments = everyAssessment
+      .filter(function (a) {
+        return !term || assessmentInActiveTerm(cid, a);
+      })
       .sort(function (a, b) {
         return (a.date || '').localeCompare(b.date || '');
       });
+    var undatedCount = term ? undatedAssessmentCount(cid) : 0;
     var sections = getSections(cid);
     var course = COURSES[cid];
     var isLetter = courseShowsLetterGrades(course);
@@ -235,6 +242,8 @@ window.PageGradebook = (function () {
       '">Summary</button>' +
       '</div>';
 
+    html += typeof renderTermPicker === 'function' ? renderTermPicker(cid) : '';
+
     html +=
       '<button class="gb-filter-trigger' +
       (activeFilterCount > 0 ? ' has-filters' : '') +
@@ -260,7 +269,13 @@ window.PageGradebook = (function () {
         : allAssessments.length) +
       ' ASSIGNMENTS \u00b7 ' +
       students.length +
-      ' STUDENTS</span>' +
+      ' STUDENTS' +
+      (undatedCount > 0
+        ? ' \u00b7 <span title="These assessments have no date, so no term can include them. Give them a date on the Assessments page.">' +
+          undatedCount +
+          ' UNDATED NOT SHOWN</span>'
+        : '') +
+      '</span>' +
       (viewMode === 'scores'
         ? '<button class="tb-toggle-btn" data-action="exportScoresCSV" title="Export CSV">\u2913 Export</button>'
         : '') +
@@ -2064,8 +2079,12 @@ window.PageGradebook = (function () {
   function exportScoresCSV() {
     var cid = activeCourse;
     var students = sortStudents(getStudents(cid), 'lastName');
+    // The export matches the page: the chosen reporting term's assessments and grades.
+    var term = typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
     var assessments = getAssessments(cid)
-      .slice()
+      .filter(function (a) {
+        return !term || assessmentInActiveTerm(cid, a);
+      })
       .sort(function (a, b) {
         return (b.date || '').localeCompare(a.date || '');
       });
@@ -2156,7 +2175,10 @@ window.PageGradebook = (function () {
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url;
-    a.download = (COURSES[cid] ? COURSES[cid].name : 'gradebook') + '_scores.csv';
+    a.download =
+      (COURSES[cid] ? COURSES[cid].name : 'gradebook') +
+      (term ? '_' + String(term.label || 'term').replace(/[^\w-]+/g, '_') : '') +
+      '_scores.csv';
     a.click();
     URL.revokeObjectURL(url);
   }

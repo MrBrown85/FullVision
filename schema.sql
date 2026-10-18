@@ -71,6 +71,10 @@ create table course (
   decay_weight     numeric,                                        -- only used when calc_method = 'decaying_avg'
   timezone         text        not null default 'America/Vancouver',
   late_work_policy text,
+  grading_scale    jsonb,                                           -- points→level boundaries (20261015_course_grading_config)
+  category_weights jsonb,                                           -- summative/formative weights (20261015_course_grading_config)
+  round_percent    boolean,                                         -- whole-number course % (20261016_course_round_percent)
+  reporting_terms  jsonb,                                           -- up to six {ordinal,label,starts_on,ends_on} (20261017_course_reporting_terms)
   grading_scale    jsonb       check (grading_scale is null or jsonb_typeof(grading_scale) = 'object'),      -- {boundaries:[{min, proficiency}], labels} (20261015_course_grading_config)
   category_weights jsonb       check (category_weights is null or jsonb_typeof(category_weights) = 'object'), -- legacy {summative, formative}; real weights live on `category` (20261015_course_grading_config)
   round_percent    boolean,                                        -- true whole %, false one decimal, null follow grade level (20261016_course_round_percent)

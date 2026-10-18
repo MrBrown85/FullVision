@@ -569,6 +569,33 @@ body.offline-active #app-dock {
 }
 
 /* Toolbar accent button — blue CTA used across pages */
+/* Reporting term picker (renderTermPicker in ui.js), shared by the
+   gradebook, dashboard and student toolbars. */
+.term-select {
+  font-family: var(--font-base);
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 28px 6px 10px;
+  cursor: pointer;
+  background: var(--surface)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888' stroke-width='1.5' fill='none'/%3E%3C/svg%3E")
+    no-repeat right 10px center;
+  transition: border 0.12s;
+  -webkit-appearance: none;
+  appearance: none;
+  max-width: 260px;
+}
+.term-select:hover {
+  border-color: var(--text-3);
+}
+.term-select:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: -1px;
+}
+
 .tb-action-btn {
   padding: 8px 16px;
   min-height: 32px;

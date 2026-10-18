@@ -1225,6 +1225,21 @@
   cursor: not-allowed;
 }
 
+/* Reporting terms editor (same row model as categories) */
+.cm-term-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-bottom: 6px;
+}
+.cm-term-label {
+  flex: 1;
+  min-width: 100px;
+}
+.cm-term-date {
+  width: 140px;
+}
+
 /* ── Curriculum Wizard ── */
 .cw-steps {
   display: flex;
