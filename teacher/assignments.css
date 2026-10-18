@@ -3175,3 +3175,11 @@
   text-transform: uppercase;
   color: var(--text-3);
 }
+.rubric-list-item .rubric-copy-badge {
+  margin-left: 6px;
+  white-space: nowrap;
+}
+.rubric-linked-removal {
+  margin-top: 4px;
+  color: var(--text-2);
+}

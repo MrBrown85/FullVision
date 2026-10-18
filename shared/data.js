@@ -6452,12 +6452,14 @@ function _canonicalRubricRowsToCache(rubricRows, criterionRows, criterionTagRows
   });
 
   return rubricRows.map(function (row) {
-    return {
+    var rubric = {
       id: row.id,
       name: row.name || '',
       title: row.name || '',
       criteria: criteriaByRubric[row.id] || [],
     };
+    if (row.copy_group) rubric.copyGroup = row.copy_group;
+    return rubric;
   });
 }
 
@@ -6502,7 +6504,7 @@ function _reconcileCanonicalRubrics(localArr, canonicalArr, idMap) {
 }
 /* The fields a rubric is saved with; equal signatures need no write. */
 function _rubricSignature(rubric) {
-  return JSON.stringify([_rubricName(rubric), _rubricCriteriaPayload(rubric)]);
+  return JSON.stringify([_rubricName(rubric), _rubricCriteriaPayload(rubric), (rubric && rubric.copyGroup) || null]);
 }
 /* What the teacher typed, ids left out: a save in progress re-keys ids. */
 function _rubricsContentSignature(rubrics) {
@@ -6571,6 +6573,7 @@ function _persistRubricsToCanonical(cid, prev, arr) {
                 courseId: cid,
                 name: _rubricName(rubric),
                 criteria: _rubricCriteriaPayload(rubric),
+                copyGroup: rubric.copyGroup || null,
               },
               { entryId: rec ? rec.entryId : undefined },
             )
@@ -8693,9 +8696,14 @@ window.v2.upsertRubric = function (params, options) {
       p_course_id: params.courseId,
       p_name: params.name || '',
       p_criteria: criteria,
+      p_copy_group: _isUuid(params.copyGroup) ? params.copyGroup : null,
     },
     options,
   );
+};
+window.v2.listRubricCopies = function (copyGroup) {
+  if (!_isUuid(copyGroup)) return Promise.resolve({ data: [], error: null });
+  return _rpcOrNoop('list_rubric_copies', { p_copy_group: copyGroup });
 };
 window.v2.deleteRubric = function (id) {
   return _rpcOrNoop('delete_rubric', { p_id: id });

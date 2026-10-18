@@ -349,6 +349,7 @@ window.PageAssignments = (function () {
         '<span class="rubric-list-count">' +
         r.criteria.length +
         ' criteria</span>' +
+        (window.RubricLibrary ? RubricLibrary.renderCopies(cid, r) : '') +
         '<button class="rubric-list-btn" data-action="editRubricUI" data-rid="' +
         r.id +
         '" title="Edit">\u270E</button>' +
@@ -2759,6 +2760,7 @@ window.PageAssignments = (function () {
           linked +
           ' assessment(s). They will lose their rubric link. Delete anyway?'
         : 'Delete rubric "' + rubric.name + '"?';
+    if (window.RubricLibrary) msg += RubricLibrary.deleteNote(activeCourse, rubric);
     showConfirm('Delete Rubric', msg, 'Delete', 'danger', function () {
       deleteRubric(activeCourse, rubricId);
       render();
@@ -3134,6 +3136,9 @@ window.PageAssignments = (function () {
     var savedId = _editingRubric.id;
     var criteriaCount = (_editingRubric.criteria || []).length;
     var savePromise = saveRubrics(cid, rubrics);
+    // The rubric as it was and as saved, for "Update the other classes too?".
+    var linkedBefore = _rubricBefore;
+    var linkedAfter = structuredClone(_editingRubric);
     _editingRubric = null;
     _rubricBefore = null;
     _rubricScored = {};
@@ -3144,6 +3149,16 @@ window.PageAssignments = (function () {
     if (_showingNewForm) rerenderKeeping('new-assess-form', render);
     else render();
     Promise.resolve(savePromise).then(function (result) {
+      if (linkedBefore && linkedAfter.copyGroup && window.RubricLibrary) {
+        var finalId = result && result.idMap && result.idMap[savedId] ? result.idMap[savedId] : savedId;
+        var saved =
+          (result && Array.isArray(result.rubrics) ? result.rubrics : getRubrics(cid)).find(function (r) {
+            return r.id === finalId;
+          }) || linkedAfter;
+        RubricLibrary.offerLinkedEdit(cid, linkedBefore, saved).then(function (names) {
+          if (names && names.length) render();
+        });
+      }
       setTimeout(function () {
         var dd = document.getElementById('af-rubric');
         if (!dd) return;
@@ -4590,6 +4605,15 @@ window.PageAssignments = (function () {
     _addDocListener('fv:id-rekeyed', _handleRekey);
 
     render();
+
+    // "Also in …" chips read the other classes, which load after the first
+    // render; draw them once those classes are here.
+    if (window.RubricLibrary) {
+      var warmedFor = activeCourse;
+      RubricLibrary.warmCopies(activeCourse).then(function (loaded) {
+        if (loaded && activeCourse === warmedFor && document.getElementById('tb-rubrics-panel')) render();
+      });
+    }
 
     // Auto-scroll to open card if arriving via ?open= param
     if (params && params.open) {
