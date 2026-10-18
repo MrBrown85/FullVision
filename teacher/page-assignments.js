@@ -291,6 +291,10 @@ window.PageAssignments = (function () {
       (_rubricsPanelOpen ? ' open' : '') +
       '" id="tb-rubrics-panel"></div>' +
       '</div>' +
+      (window.AssessmentCopy &&
+      (AssessmentCopy.copyTargets(cid).sameCourse.length || AssessmentCopy.copyTargets(cid).other.length)
+        ? '<button class="tb-action-btn tb-action-secondary" data-action="addFromClass">Add from another class</button>'
+        : '') +
       '<button class="tb-action-btn" data-action="showNewForm">+ New Assessment</button>' +
       '</div>' +
       '</div>';
@@ -1214,6 +1218,9 @@ window.PageAssignments = (function () {
     });
     html += '</div></div>';
 
+    // The same assessment in the teacher's other classes (Teams' "Assign to").
+    if (window.AssessmentCopy) html += AssessmentCopy.renderAlsoAddTo(cid, assess);
+
     // Actions
     html +=
       '<div class="af-actions">' +
@@ -1397,6 +1404,10 @@ window.PageAssignments = (function () {
     }
     var assessWeight = _formAssessWeight(scoreModeVal);
     if (assessWeight !== 1) newAssess.weight = assessWeight;
+    // Read before render() replaces the form.
+    var copyTargets = window.AssessmentCopy ? AssessmentCopy.readTargets() : [];
+    if (copyTargets.length) newAssess.copyGroup = AssessmentCopy.newCopyGroup();
+    var srcCid = activeCourse;
     assessments.push(newAssess);
     saveAssessments(activeCourse, assessments);
     openAssessIds.clear();
@@ -1404,6 +1415,7 @@ window.PageAssignments = (function () {
     _showingNewForm = false;
     _editingAssessId = null;
     render();
+    if (copyTargets.length) AssessmentCopy.copyToClasses(srcCid, newAssess, copyTargets);
   }
 
   function editAssess(aid) {
@@ -1422,6 +1434,7 @@ window.PageAssignments = (function () {
       form.innerHTML = renderAssessForm(cid, assess);
       form.scrollIntoView({ behavior: 'smooth' });
       renderCollabPanel();
+      if (window.AssessmentCopy) AssessmentCopy.markExistingCopies(cid, assess);
     }
   }
 
@@ -1450,6 +1463,7 @@ window.PageAssignments = (function () {
       return a.id === aid;
     });
     if (idx < 0) return;
+    var before = structuredClone(assessments[idx]);
     assessments[idx].title = title;
     assessments[idx].date = date;
     assessments[idx].dateAssigned = dateAssigned;
@@ -1493,10 +1507,23 @@ window.PageAssignments = (function () {
     }
     var assessWeight = _formAssessWeight(scoreModeVal);
     assessments[idx].weight = assessWeight !== 1 ? assessWeight : undefined;
+    // Read before hideNewForm()/render() replace the form.
+    var copyTargets = window.AssessmentCopy ? AssessmentCopy.readTargets() : [];
+    if (copyTargets.length && !assessments[idx].copyGroup) assessments[idx].copyGroup = AssessmentCopy.newCopyGroup();
+    var after = structuredClone(assessments[idx]);
+    var srcCid = activeCourse;
     saveAssessments(activeCourse, assessments);
     openAssessIds.add(aid);
     hideNewForm();
     render();
+    if (window.AssessmentCopy && (before.copyGroup || copyTargets.length)) {
+      // One dialog at a time: the edit offer first, then any new copies.
+      Promise.resolve(before.copyGroup ? AssessmentCopy.offerLinkedEdit(srcCid, before, after) : null).then(
+        function () {
+          if (copyTargets.length) return AssessmentCopy.copyToClasses(srcCid, after, copyTargets);
+        },
+      );
+    }
   }
 
   function dupeAssess(aid) {
@@ -1509,6 +1536,8 @@ window.PageAssignments = (function () {
     var id = uid();
     var dupe = structuredClone(orig);
     dupe.id = id;
+    // A duplicate in the same class is new work, not a linked copy.
+    delete dupe.copyGroup;
     dupe.title = orig.title + ' (Copy)';
     dupe.created = new Date().toISOString();
     assessments.push(dupe);
@@ -3704,6 +3733,9 @@ window.PageAssignments = (function () {
       showNewForm: function () {
         showNewForm();
       },
+      addFromClass: function () {
+        if (window.AssessmentCopy) AssessmentCopy.openAddFromClass(activeCourse, render);
+      },
       hideNewForm: function () {
         hideNewForm();
       },
@@ -3998,6 +4030,10 @@ window.PageAssignments = (function () {
     }
     if (el.dataset.actionChange === 'collabToggleStudent') {
       collabToggleStudent(el.dataset.sid, el.checked);
+      return;
+    }
+    if (el.dataset.actionChange === 'copyTargetsChanged') {
+      if (window.AssessmentCopy) AssessmentCopy.onTargetsChanged();
       return;
     }
   }
