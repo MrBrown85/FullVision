@@ -2726,6 +2726,7 @@ window.PageAssignments = (function () {
   }
   function newRubricUI() {
     _closeRubricsPanel();
+    _whenWordingLoaded();
     _rubricBefore = null;
     _editingRubric = {
       id: uid(),
@@ -2741,6 +2742,7 @@ window.PageAssignments = (function () {
     var rubric = getRubricById(activeCourse, rubricId);
     if (!rubric) return;
     _closeRubricsPanel();
+    _whenWordingLoaded();
     _rubricBefore = structuredClone(rubric);
     _rubricScored = RubricGuard.scoredStudentsByCriterion(activeCourse, rubric);
     _editingRubric = structuredClone(rubric);
@@ -2935,13 +2937,16 @@ window.PageAssignments = (function () {
       var draftTag = getTagById(activeCourse, crit.tagIds[0]);
       if (draftTag) {
         var generic = !RubricDraft.statementsOf(draftTag).length;
+        var ownWording = !!_savedWording(draftTag);
         draftBtn =
           '<button type="button" class="rubric-draft-btn" data-action="draftCriterion" data-index="' +
           ci +
           '" title="' +
-          (generic
-            ? 'This competency has no I-can statements, so the draft uses the proficiency scale wording only.'
-            : 'Write the four descriptors from this competency\u2019s I-can statements.') +
+          (ownWording
+            ? 'Uses your own wording for this competency from an earlier rubric.'
+            : generic
+              ? 'This competency has no I-can statements, so the draft uses the proficiency scale wording only.'
+              : 'Write the four descriptors from this competency\u2019s I-can statements.') +
           '">Draft from ' +
           esc(_rubricTagName(draftTag, getSectionForTag(activeCourse, draftTag.id))) +
           '</button>';
@@ -3070,6 +3075,18 @@ window.PageAssignments = (function () {
     _refreshCriterionDOM(_expandedCriterion);
   }
   /* ── Criteria from competencies (shared/rubric-draft.js) ─── */
+  /* The teacher's own wording for a competency, from earlier rubrics. */
+  function _savedWording(tag) {
+    if (typeof getCompetencyDescriptor !== 'function' || !window.RubricDraft) return null;
+    return getCompetencyDescriptor(RubricDraft.competencyKey(tag));
+  }
+  function _whenWordingLoaded() {
+    return Promise.resolve(typeof loadCompetencyDescriptors === 'function' ? loadCompetencyDescriptors() : null).catch(
+      function () {
+        return null;
+      },
+    );
+  }
   /* Pick competencies; each becomes a criterion named after it, linked to
      it, with its descriptors drafted. A competency already on a criterion of
      this rubric can't be picked, as in the criterion block. */
@@ -3106,7 +3123,7 @@ window.PageAssignments = (function () {
       chips += '</div>';
     });
     var html = any
-      ? '<div class="copy-review-note">Each competency you pick becomes a criterion. Its descriptors are drafted from the competency\u2019s I-can statements; change any of them before you save.</div>' +
+      ? '<div class="copy-review-note">Each competency you pick becomes a criterion. Its descriptors are drafted from the competency\u2019s I-can statements, or use your own wording if you have rewritten them in an earlier rubric; change any of them before you save.</div>' +
         chips
       : '<div class="copy-review-note">This class has no competencies yet. Add them in Class Management first.</div>';
     function updateOk(root) {
@@ -3138,7 +3155,10 @@ window.PageAssignments = (function () {
           return b.dataset.pickTag;
         });
         if (!ids.length) return false;
-        addCriteriaFromTags(ids);
+        var editing = _editingRubric;
+        _whenWordingLoaded().then(function () {
+          if (_editingRubric === editing) addCriteriaFromTags(ids);
+        });
         return true;
       },
     });
@@ -3158,7 +3178,7 @@ window.PageAssignments = (function () {
       var tag = getTagById(activeCourse, id);
       if (!tag) return;
       used[id] = true;
-      added.push(RubricDraft.draftCriterion(tag, uid));
+      added.push(RubricDraft.draftCriterion(tag, uid, _savedWording(tag)));
     });
     if (!added.length) return;
     // A new rubric's untouched first criterion is replaced, not left beside.
@@ -3182,24 +3202,30 @@ window.PageAssignments = (function () {
     var tag = getTagById(activeCourse, crit.tagIds[0]);
     if (!tag) return;
     var tagName = _rubricTagName(tag, getSectionForTag(activeCourse, tag.id));
+    var editing = _editingRubric;
     function apply() {
-      var c = _editingRubric && _editingRubric.criteria[idx];
-      if (!c) return;
-      c.levels = RubricDraft.draftLevels(tag).levels;
+      // The wording may load after the editor closed or moved on.
+      if (_editingRubric !== editing) return;
+      var c = _editingRubric.criteria[idx];
+      if (!c || c !== crit) return;
+      c.levels = RubricDraft.draftLevels(tag, _savedWording(tag)).levels;
       if (RubricDraft.isDefaultName(c.name)) c.name = tagName || c.name;
       _rubricDirty = true;
       _expandedCriterion = idx;
       _refreshCriterionDOM(idx);
     }
     if (!RubricDraft.hasDescriptors(crit)) {
-      apply();
+      _whenWordingLoaded().then(apply);
       return;
     }
     showConfirm(
       'Replace the descriptors?',
       'Your descriptors for "' +
         crit.name +
-        '" will be replaced with a draft from the competency\u2019s I-can statements.',
+        '" will be replaced with ' +
+        (_savedWording(tag)
+          ? 'your own wording for this competency from an earlier rubric.'
+          : 'a draft from the competency\u2019s I-can statements.'),
       'Replace',
       'primary',
       apply,
@@ -3302,6 +3328,18 @@ window.PageAssignments = (function () {
     var savedId = _editingRubric.id;
     var criteriaCount = (_editingRubric.criteria || []).length;
     var savePromise = saveRubrics(cid, rubrics);
+    // The teacher's own wording for a competency starts its next draft.
+    if (window.RubricDraft && typeof saveCompetencyDescriptors === 'function') {
+      saveCompetencyDescriptors(
+        RubricDraft.savedEntries(
+          _editingRubric,
+          function (id) {
+            return getTagById(cid, id);
+          },
+          getCompetencyDescriptor,
+        ),
+      );
+    }
     // The rubric as it was and as saved, for "Update the other classes too?".
     var linkedBefore = _rubricBefore;
     var linkedAfter = structuredClone(_editingRubric);

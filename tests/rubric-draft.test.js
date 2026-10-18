@@ -76,3 +76,53 @@ describe('rubric draft from a competency', () => {
     expect(RubricDraft.hasDescriptors({ levels: { 2: ' some ' } })).toBe(true);
   });
 });
+
+describe('a teacher’s own wording for a competency', () => {
+  const q8 = { id: 'a-t1', label: 'Question and Predict', i_can_statements: ['I can ask questions', 'I can predict'] };
+
+  it('keys a competency by label and I-can text, never by tag id', () => {
+    const otherClass = { ...q8, id: 'b-t9' };
+    expect(RubricDraft.competencyKey(q8)).toBe(RubricDraft.competencyKey(otherClass));
+    expect(RubricDraft.competencyKey(q8)).toMatch(/^question and predict#[0-9a-z]+$/);
+    const grade9 = { ...q8, i_can_statements: ['I can ask testable questions'] };
+    expect(RubricDraft.competencyKey(grade9)).not.toBe(RubricDraft.competencyKey(q8));
+    // The server keeps the statements as one text; the key is the same.
+    expect(
+      RubricDraft.competencyKey({
+        id: 'x',
+        label: 'Question and Predict',
+        i_can_text: 'I can ask questions\nI can predict.',
+      }),
+    ).toBe(RubricDraft.competencyKey(q8));
+    expect(RubricDraft.competencyKey({ id: 'x', label: 'Collaboration' })).toBe('collaboration');
+    expect(RubricDraft.competencyKey({ id: 'x' })).toBe('');
+  });
+
+  it('uses saved wording level by level and says so', () => {
+    const d = RubricDraft.draftLevels(q8, { 4: 'Mine for extending', 2: '  ' });
+    expect(d.fromSaved).toBe(true);
+    expect(d.levels[4]).toBe('Mine for extending');
+    expect(d.levels[2]).toBe('In familiar situations and with some help, I can ask questions.');
+    expect(RubricDraft.draftLevels(q8, null).fromSaved).toBe(false);
+    expect(RubricDraft.draftCriterion(q8, () => 'c1', { 1: 'Starting out' }).levels[1]).toBe('Starting out');
+  });
+
+  it('learns only the teacher’s own text from a saved rubric', () => {
+    const plain = RubricDraft.draftLevels(q8).levels;
+    const key = RubricDraft.competencyKey(q8);
+    const rubric = {
+      criteria: [
+        { id: 'c1', tagIds: ['a-t1'], levels: { 4: 'Rewritten', 3: plain[3], 2: 'Already saved', 1: '' } },
+        { id: 'c2', tagIds: ['a-t1', 'a-t2'], levels: { 4: 'Two competencies: skipped' } },
+        { id: 'c3', tagIds: [], levels: { 4: 'No competency: skipped' } },
+      ],
+    };
+    const tags = { 'a-t1': q8 };
+    const entries = RubricDraft.savedEntries(
+      rubric,
+      id => tags[id],
+      k => (k === key ? { 2: 'Already saved' } : null),
+    );
+    expect(entries).toEqual([{ key, level: 4, text: 'Rewritten' }]);
+  });
+});

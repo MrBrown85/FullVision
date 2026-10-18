@@ -7,7 +7,9 @@
  * I-can statements themselves, since they describe meeting the expectation;
  * the other three put the first statement into the scale's words. Everything
  * is in the student's voice, because the descriptors print on the rubric
- * handout. Pure functions: no data is read or written here.
+ * handout. A teacher's own wording for a competency, saved from earlier
+ * rubrics (competency_descriptor), replaces the drafted text level by level.
+ * Pure functions: no data is read or written here.
  */
 window.RubricDraft = (function () {
   'use strict';
@@ -50,10 +52,31 @@ window.RubricDraft = (function () {
     return s.charAt(0).toUpperCase() + s.slice(1) + '.';
   }
 
+  /* Overlay a teacher's saved wording ({ 1..4: text }) on drafted levels. */
+  function _withSaved(draft, saved) {
+    var used = false;
+    if (saved) {
+      [1, 2, 3, 4].forEach(function (l) {
+        var t = String(saved[l] || '').trim();
+        if (t) {
+          draft.levels[l] = t;
+          used = true;
+        }
+      });
+    }
+    draft.fromSaved = used;
+    return draft;
+  }
+
   /* The four descriptors for a competency, keyed 4 (Extending) to 1
      (Emerging). `generic` is true when the competency has no I-can
-     statements and the draft could only use the scale's words. */
-  function draftLevels(tag) {
+     statements and the draft could only use the scale's words; `fromSaved`
+     when the teacher's own wording replaced any level. */
+  function draftLevels(tag, saved) {
+    return _withSaved(_drafted(tag), saved);
+  }
+
+  function _drafted(tag) {
     var statements = statementsOf(tag);
     if (!statements.length) {
       return {
@@ -90,8 +113,8 @@ window.RubricDraft = (function () {
 
   /* A new criterion for one competency. `newId` makes the id (uid() in the
      app) so this stays pure. */
-  function draftCriterion(tag, newId) {
-    var d = draftLevels(tag);
+  function draftCriterion(tag, newId, saved) {
+    var d = draftLevels(tag, saved);
     return {
       id: newId(),
       name: _tagName(tag),
@@ -121,8 +144,58 @@ window.RubricDraft = (function () {
     });
   }
 
+  function _norm(s) {
+    return _clean(s).toLowerCase();
+  }
+
+  // FNV-1a, 32 bits, base 36: short and the same in every browser.
+  function _hash(s) {
+    var h = 0x811c9dc5;
+    for (var i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    return h.toString(36);
+  }
+
+  /* The key a teacher's wording for a competency is saved under: its short
+     label and a hash of its I-can text, so the same competency in another
+     section or next year's class finds it, and a same-named competency with
+     different statements (Science 8 vs Science 9) doesn't. Never a tag id,
+     which differs in every class. */
+  function competencyKey(tag) {
+    var label = _norm((tag && (tag.label || tag.name || tag.code)) || '');
+    if (!label) return '';
+    var statements = statementsOf(tag).map(_norm);
+    return (label + (statements.length ? '#' + _hash(statements.join('|')) : '')).slice(0, 400);
+  }
+
+  /* What saving `rubric` teaches the bank: for each criterion with exactly
+     one competency, every level whose text is the teacher's own (not the
+     plain draft, not already saved). `getTag(id)` and `getSaved(key)` look
+     things up so this stays pure. Returns [{ key, level, text }]. */
+  function savedEntries(rubric, getTag, getSaved) {
+    var out = [];
+    ((rubric && rubric.criteria) || []).forEach(function (crit) {
+      if (!crit || (crit.tagIds || []).length !== 1) return;
+      var tag = getTag(crit.tagIds[0]);
+      var key = competencyKey(tag);
+      if (!key) return;
+      var plain = _drafted(tag).levels;
+      var saved = getSaved(key) || {};
+      [1, 2, 3, 4].forEach(function (l) {
+        var text = String((crit.levels && crit.levels[l]) || '').trim();
+        if (!text || text === plain[l] || text === String(saved[l] || '').trim()) return;
+        out.push({ key: key, level: l, text: text });
+      });
+    });
+    return out;
+  }
+
   return {
     MAX_PROFICIENT: MAX_PROFICIENT,
+    competencyKey: competencyKey,
+    savedEntries: savedEntries,
     statementsOf: statementsOf,
     actionOf: actionOf,
     draftLevels: draftLevels,

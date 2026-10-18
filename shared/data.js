@@ -6652,6 +6652,99 @@ function saveRubrics(cid, arr) {
 function getRubricById(cid, rubricId) {
   return getRubrics(cid).find(r => r.id === rubricId);
 }
+
+/* ── Competency descriptors (one teacher's own wording) ──────────────
+   { competencyKey: { 1: text, 2: text, 3: text, 4: text } }, the start of a
+   "From competency" draft (RubricDraft.competencyKey makes the keys). Per
+   teacher, not per class: loaded once a session, kept in localStorage so
+   it works offline and in Demo Mode, written through the outbox. */
+var _competencyDescriptors = null;
+var _competencyDescriptorsLoad = null;
+function getCompetencyDescriptors() {
+  if (!_competencyDescriptors) {
+    var stored = _safeParseLS('gb-competency-descriptors', {});
+    _competencyDescriptors = stored && typeof stored === 'object' ? stored : {};
+  }
+  return _competencyDescriptors;
+}
+function getCompetencyDescriptor(key) {
+  return (key && getCompetencyDescriptors()[key]) || null;
+}
+/* entries: [{ key, level, text }]; an empty text forgets that level. Only
+   real changes are kept and sent. */
+function saveCompetencyDescriptors(entries) {
+  var bank = getCompetencyDescriptors();
+  var sent = [];
+  (entries || []).forEach(function (e) {
+    var level = e ? Number(e.level) : 0;
+    if (!e || !e.key || !(level >= 1 && level <= 4)) return;
+    var text = String(e.text == null ? '' : e.text)
+      .trim()
+      .slice(0, 2000);
+    var row = bank[e.key] || {};
+    if ((row[level] || '') === text) return;
+    if (text) row[level] = text;
+    else delete row[level];
+    if (Object.keys(row).length) bank[e.key] = row;
+    else delete bank[e.key];
+    sent.push({ key: e.key, level: level, text: text });
+  });
+  if (!sent.length) return Promise.resolve({ data: 0, error: null });
+  _safeLSSet('gb-competency-descriptors', JSON.stringify(bank));
+  if (!_writesEnabled()) return Promise.resolve({ data: sent.length, error: null });
+  return _writeRpc('save_competency_descriptors', { p_entries: sent });
+}
+/* The texts in saves still waiting in the outbox, which a load must not
+   overwrite with the server's older copy. */
+function _pendingCompetencyDescriptors() {
+  var out = {};
+  try {
+    var q = JSON.parse(localStorage.getItem('fv-sync-queue-v1') || '{}');
+    (q.entries || []).forEach(function (entry) {
+      if (!entry || entry.endpoint !== 'save_competency_descriptors') return;
+      ((entry.payload && entry.payload.p_entries) || []).forEach(function (e) {
+        if (e && e.key) out[e.key + '|' + e.level] = e;
+      });
+    });
+  } catch (err) {
+    /* an unreadable queue only means nothing is known to be pending */
+  }
+  return out;
+}
+/* Fetch the signed-in teacher's descriptors once a session. Resolves to the
+   bank either way; offline or in Demo Mode it is the stored copy. */
+function loadCompetencyDescriptors() {
+  if (_competencyDescriptorsLoad) return _competencyDescriptorsLoad;
+  if (!_writesEnabled() || typeof getSupabase !== 'function' || !getSupabase()) {
+    _competencyDescriptorsLoad = Promise.resolve(getCompetencyDescriptors());
+    return _competencyDescriptorsLoad;
+  }
+  _competencyDescriptorsLoad = _rpcOrNoop('list_competency_descriptors', {}).then(function (res) {
+    if (!res || res.error || !Array.isArray(res.data)) {
+      _competencyDescriptorsLoad = null; // try again next time
+      return getCompetencyDescriptors();
+    }
+    var bank = {};
+    res.data.forEach(function (r) {
+      if (!r || !r.competency_key || !r.text) return;
+      if (!bank[r.competency_key]) bank[r.competency_key] = {};
+      bank[r.competency_key][Number(r.level)] = r.text;
+    });
+    var pending = _pendingCompetencyDescriptors();
+    Object.keys(pending).forEach(function (k) {
+      var e = pending[k];
+      var row = bank[e.key] || {};
+      if (e.text) row[e.level] = e.text;
+      else delete row[e.level];
+      if (Object.keys(row).length) bank[e.key] = row;
+      else delete bank[e.key];
+    });
+    _competencyDescriptors = bank;
+    _safeLSSet('gb-competency-descriptors', JSON.stringify(bank));
+    return bank;
+  });
+  return _competencyDescriptorsLoad;
+}
 function deleteRubric(cid, rubricId) {
   var savePromise = saveRubrics(
     cid,
