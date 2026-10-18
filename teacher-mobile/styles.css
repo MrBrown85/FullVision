@@ -1055,6 +1055,16 @@ body.fv-switching-course::after {
 .m-filter-sheet-section .m-segmented {
   margin: 0;
   padding: 0;
+  /* The date range row holds the fixed ranges plus one option per
+     reporting term, so it wraps three to a row. */
+  flex-wrap: wrap;
+  gap: 2px;
+}
+.m-filter-sheet-section .m-seg-btn {
+  flex: 1 1 calc(33.333% - 2px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .m-filter-sheet-footer {
   display: flex;
