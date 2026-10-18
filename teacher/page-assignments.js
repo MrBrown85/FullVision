@@ -3429,6 +3429,50 @@ window.PageAssignments = (function () {
     _commentPopoverState = { cid: cid, sid: sid, aid: aid };
     renderCommentPopover();
   }
+  function _commentEntriesHtml(cid, sid, aid) {
+    var obs = getAssignmentObs(cid, sid, aid);
+    if (obs.length === 0) return '<div class="comment-popover-empty">No comments yet</div>';
+    return (
+      '<div class="comment-popover-entries">' +
+      obs
+        .map(function (o) {
+          var d = new Date(o.created);
+          var ds = d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
+          var sent = o.sentiment && OBS_SENTIMENTS[o.sentiment];
+          var pills =
+            (sent
+              ? '<span class="obs-pill obs-pill-type" data-sentiment="' +
+                o.sentiment +
+                '">' +
+                esc(sent.label) +
+                '</span>'
+              : '') +
+            (o.dims || [])
+              .map(function (t) {
+                return '<span class="obs-pill">' + esc(resolveTag(t).label) + '</span>';
+              })
+              .join('') +
+            ObsCapture.linkPillsHtml(cid, o);
+          return (
+            '<div class="comment-entry"><span class="comment-entry-date">' +
+            ds +
+            '</span><span class="comment-entry-main"><span class="comment-entry-text">' +
+            esc(o.text) +
+            '</span>' +
+            (pills ? '<span class="comment-entry-pills">' + pills + '</span>' : '') +
+            '</span><button class="comment-entry-del" data-action="deleteComment" data-obid="' +
+            o.id +
+            '" data-stop-prop="true" title="Delete" aria-label="Delete comment">\u2715</button></div>'
+          );
+        })
+        .join('') +
+      '</div>'
+    );
+  }
+  /* The comment box is the shared capture strip, with the student and the
+     assessment fixed. The overlay is built once per student and assessment
+     so the strip keeps its state; adding or deleting redraws the list. */
+  var _commentCapture = null;
   function renderCommentPopover() {
     if (!_commentPopoverState) return;
     var cid = _commentPopoverState.cid,
@@ -3441,29 +3485,6 @@ window.PageAssignments = (function () {
       return s.id === sid;
     });
     if (!assess || !student) return;
-    var obs = getAssignmentObs(cid, sid, aid);
-    var entriesHtml = '';
-    if (obs.length === 0) entriesHtml = '<div class="comment-popover-empty">No comments yet</div>';
-    else {
-      entriesHtml =
-        '<div class="comment-popover-entries">' +
-        obs
-          .map(function (o) {
-            var d = new Date(o.created);
-            var ds = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-            return (
-              '<div class="comment-entry"><span class="comment-entry-date">' +
-              ds +
-              '</span><span class="comment-entry-text">' +
-              esc(o.text) +
-              '</span><button class="comment-entry-del" data-action="deleteComment" data-obid="' +
-              o.id +
-              '" data-stop-prop="true" title="Delete">\u2715</button></div>'
-            );
-          })
-          .join('') +
-        '</div>';
-    }
     var overlay = document.getElementById('comment-popover-overlay');
     if (!overlay) {
       overlay = document.createElement('div');
@@ -3472,38 +3493,44 @@ window.PageAssignments = (function () {
       overlay.onclick = function (e) {
         if (e.target === this) closeCommentPopover();
       };
+      // A modal: keys typed in it are not scoring shortcuts. Escape closes it.
+      overlay.addEventListener('keydown', function (e) {
+        e.stopPropagation();
+        if (e.key === 'Escape' && !e.defaultPrevented) closeCommentPopover();
+      });
       document.body.appendChild(overlay);
     }
-    overlay.innerHTML =
-      '<div class="comment-popover"><div class="comment-popover-header"><div><div class="comment-popover-title">' +
-      esc(displayName(student)) +
-      '</div><div class="comment-popover-subtitle">' +
-      esc(assess.title) +
-      '</div></div><button class="comment-popover-close" data-action="closeCommentPopover" aria-label="Close">\u2715</button></div><div class="comment-popover-body">' +
-      entriesHtml +
-      '</div><div class="comment-popover-footer"><input class="comment-popover-input" id="comment-input" placeholder="Add a comment\u2026" autofocus><button class="comment-popover-submit" data-action="submitComment">Add</button></div></div>';
+    var key = cid + '|' + sid + '|' + aid;
+    if (overlay.dataset.key !== key || !_commentCapture) {
+      if (_commentCapture) _commentCapture.destroy();
+      overlay.dataset.key = key;
+      overlay.innerHTML =
+        '<div class="comment-popover" role="dialog" aria-labelledby="comment-popover-title"><div class="comment-popover-header"><div><div class="comment-popover-title" id="comment-popover-title">' +
+        esc(displayName(student)) +
+        '</div><div class="comment-popover-subtitle">' +
+        esc(assess.title) +
+        '</div></div><button class="comment-popover-close" data-action="closeCommentPopover" aria-label="Close">\u2715</button></div><div class="comment-popover-body"></div><div class="comment-popover-footer comment-popover-capture"></div></div>';
+      _commentCapture = ObsCapture.create({
+        cid: cid,
+        idPrefix: 'asg-',
+        students: [sid],
+        lockStudents: true,
+        assessmentId: aid,
+        lockAssessment: true,
+        draftKey: 'asg-comment|' + sid + '|' + aid,
+        placeholder: 'Add a comment\u2026',
+        onAdd: function () {
+          renderCommentPopover();
+          updateCommentBadge(sid, aid);
+        },
+      });
+      _commentCapture.mount(overlay.querySelector('.comment-popover-capture'));
+      setTimeout(function () {
+        if (_commentCapture) _commentCapture.focus();
+      }, 50);
+    }
+    overlay.querySelector('.comment-popover-body').innerHTML = _commentEntriesHtml(cid, sid, aid);
     overlay.style.display = 'flex';
-    setTimeout(function () {
-      var inp = document.getElementById('comment-input');
-      if (inp) inp.focus();
-    }, 50);
-  }
-  function submitComment() {
-    if (!_commentPopoverState) return;
-    var cid = _commentPopoverState.cid,
-      sid = _commentPopoverState.sid,
-      aid = _commentPopoverState.aid;
-    var inp = document.getElementById('comment-input');
-    if (!inp) return;
-    var text = inp.value.trim();
-    if (!text) return;
-    var assess = getAssessments(cid).find(function (a) {
-      return a.id === aid;
-    });
-    if (!assess) return;
-    addQuickOb(cid, sid, text, [], null, null, { assessmentId: aid, assessmentTitle: assess.title });
-    renderCommentPopover();
-    updateCommentBadge(sid, aid);
   }
   function deleteComment(obId) {
     if (!_commentPopoverState) return;
@@ -3516,8 +3543,14 @@ window.PageAssignments = (function () {
   }
   function closeCommentPopover() {
     _commentPopoverState = null;
+    if (_commentCapture) _commentCapture.destroy();
+    _commentCapture = null;
     var overlay = document.getElementById('comment-popover-overlay');
-    if (overlay) overlay.style.display = 'none';
+    if (overlay) {
+      overlay.style.display = 'none';
+      overlay.innerHTML = '';
+      delete overlay.dataset.key;
+    }
   }
   function updateCommentBadge(sid, aid) {
     var cid = activeCourse;
@@ -4323,9 +4356,6 @@ window.PageAssignments = (function () {
       closeCommentPopover: function () {
         closeCommentPopover();
       },
-      submitComment: function () {
-        submitComment();
-      },
       deleteComment: function () {
         deleteComment(el.dataset.obid);
       },
@@ -4528,11 +4558,6 @@ window.PageAssignments = (function () {
 
   function _handleKeydown(e) {
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
-      // Handle comment input Enter key
-      if (e.key === 'Enter' && document.activeElement.id === 'comment-input') {
-        e.preventDefault();
-        submitComment();
-      }
       if (e.key === 'Enter' && document.activeElement.id === 'crit-comment-input') {
         e.preventDefault();
         saveCriterionComment();
@@ -4893,6 +4918,8 @@ window.PageAssignments = (function () {
     if (modal) modal.remove();
 
     // Clean up comment popover (appended to body)
+    if (_commentCapture) _commentCapture.destroy();
+    _commentCapture = null;
     var overlay = document.getElementById('comment-popover-overlay');
     if (overlay) overlay.remove();
     var critOverlay = document.getElementById('crit-comment-overlay');

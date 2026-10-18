@@ -11,13 +11,11 @@ window.PageObservations = (function () {
 
   /* ── State variables ────────────────────────────────────── */
   var activeCourse;
-  var selectedStudents = [];
   var filterStudents = [];
   var filterTags = [];
   var searchQuery = '';
-  var activeTags = [];
-  var activeSentiment = null;
-  var activeContext = null;
+  /* The shared capture strip (teacher/obs-capture.js). */
+  var _capture = null;
   var filterSentiment = null;
   var filterContext = null;
   var filterDate = null; // 'week' | 'term' | 'custom'
@@ -58,34 +56,8 @@ window.PageObservations = (function () {
     '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
   var TRASH_SVG =
     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>';
-  var TAG_SVG =
-    '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>';
 
   var tagColor = obsTagColor;
-
-  function buildTagMenuItems() {
-    var items = [];
-    items.push({ type: 'section', label: 'Learning dispositions' });
-    LEARNING_DIMS.forEach(function (d) {
-      items.push({ key: d, label: OBS_LABELS[d], color: tagColor(d) });
-    });
-    items.push({ type: 'section', label: 'Relational and identity' });
-    RELATIONAL_DIMS.forEach(function (d) {
-      items.push({ key: d, label: OBS_LABELS[d], color: tagColor(d) });
-    });
-    items.push({ type: 'section', label: 'Core competencies' });
-    CORE_COMPETENCIES.forEach(function (cc) {
-      items.push({ key: 'cc:' + cc.id, label: cc.label, color: OBS_CC_COLOR });
-    });
-    var custom = getCustomTags(activeCourse);
-    if (custom.length > 0) {
-      items.push({ type: 'section', label: 'Custom tags' });
-      custom.forEach(function (t) {
-        items.push({ key: 'tag:' + t, label: t, color: OBS_CUSTOM_COLOR });
-      });
-    }
-    return items;
-  }
 
   /* ── Pure helpers (exported for tests) ──────────────────── */
   function _pad2(n) {
@@ -233,11 +205,23 @@ window.PageObservations = (function () {
     if (!(await switchActiveCourse(cid))) return;
     document.getElementById('sidebar-mount').innerHTML = renderSidebar(cid);
     refreshStudentCache();
-    selectedStudents = [];
     resetFilters();
-    activeTags = [];
+    makeCapture([]);
     render();
     overrideSidebarLinks();
+  }
+
+  function makeCapture(students) {
+    if (_capture) _capture.destroy();
+    _capture = ObsCapture.create({
+      cid: activeCourse,
+      students: students,
+      defaultAssessment: true,
+      draftKey: 'obs-page',
+      onAdd: function () {
+        refreshFeedAndCount();
+      },
+    });
   }
 
   function overrideSidebarLinks() {
@@ -246,14 +230,15 @@ window.PageObservations = (function () {
         a.addEventListener('click', function (e) {
           e.preventDefault();
           var sid = new URLSearchParams((a.getAttribute('href') || '').split('?')[1] || '').get('id');
-          if (sid) {
-            selectedStudents = [sid];
-            filterStudents = [sid];
+          if (sid && _capture) {
+            // Click picks the student; shift-click adds them to the group.
+            _capture.pickStudent(sid, e.shiftKey);
+            filterStudents = _capture.getStudents();
             render();
             document.querySelectorAll('.student-row').forEach(function (r) {
-              r.classList.remove('selected');
+              var rid = new URLSearchParams((r.getAttribute('href') || '').split('?')[1] || '').get('id');
+              r.classList.toggle('selected', filterStudents.indexOf(rid) >= 0);
             });
-            a.classList.add('selected');
           }
         });
       });
@@ -264,45 +249,10 @@ window.PageObservations = (function () {
      RENDER
      ══════════════════════════════════════════════════════════ */
   function render() {
-    var btnLabel = 'Select students\u2026';
-    if (selectedStudents.length === 1) {
-      var s = _studentsById[selectedStudents[0]];
-      btnLabel = s ? displayName(s) : btnLabel;
-    } else if (selectedStudents.length > 1) btnLabel = selectedStudents.length + ' students';
-    var hasSel = selectedStudents.length > 0;
-
     var h = '';
 
-    // Capture bar
-    h +=
-      '<div class="obs-capture" id="obs-capture"><div class="obs-capture-row">' +
-      '<div class="obs-capture-student"><button class="obs-capture-student-btn' +
-      (hasSel ? ' has-selection' : '') +
-      '" data-action="openPopover" data-popover="students" id="student-btn" aria-label="Select student" aria-expanded="false" aria-haspopup="listbox">' +
-      esc(btnLabel) +
-      ' <span class="obs-btn-arrow" aria-hidden="true"></span></button>' +
-      renderStudentPopover('student-dropdown', selectedStudents, 'toggleCaptureStudent', 'filterCaptureStudents') +
-      '</div>' +
-      '<div class="obs-tag-trigger-wrap"><button class="obs-tag-trigger' +
-      (activeTags.length > 0 || activeSentiment || activeContext ? ' has-tags' : '') +
-      '" data-action="openPopover" data-popover="tags" id="tag-btn" aria-label="Select tags" aria-expanded="false" aria-haspopup="true"><span class="tag-icon">' +
-      TAG_SVG +
-      '</span>Tags' +
-      (activeTags.length + (activeSentiment ? 1 : 0) + (activeContext ? 1 : 0) > 0
-        ? ' <span class="obs-badge">' +
-          (activeTags.length + (activeSentiment ? 1 : 0) + (activeContext ? 1 : 0)) +
-          '</span>'
-        : '') +
-      '</button>' +
-      renderTagPopoverWithEnrichments('tag-dropdown', activeTags, 'toggleCaptureTag') +
-      '</div>' +
-      '<textarea class="obs-capture-input" id="capture-input" rows="2" placeholder="What did you notice?" autocomplete="off" aria-label="Observation note"></textarea>' +
-      '<button class="obs-capture-add" id="capture-add-btn" data-action="submitOb" ' +
-      (!hasSel ? 'disabled' : '') +
-      ' aria-label="Add observation" title="Enter adds it. Shift+Enter starts a new line.">+ Add</button>' +
-      '</div>' +
-      renderCaptureSecondary() +
-      '</div>';
+    // Capture strip, mounted after the page markup is in place
+    h += '<div class="obs-capture-host" id="obs-capture-host"></div>';
 
     // Toolbar
     var allObs = visibleObs(getAllQuickObs(activeCourse));
@@ -335,8 +285,8 @@ window.PageObservations = (function () {
     h += '<div class="' + feedClass() + '" id="obs-feed">' + renderFeedHtml(filtered) + '</div>';
 
     document.getElementById('main').innerHTML = h;
+    if (_capture) _capture.mount(document.getElementById('obs-capture-host'));
     wireSearch();
-    updateAddBtn();
   }
 
   /* ── Popover builders ───────────────────────────────────── */
@@ -374,89 +324,8 @@ window.PageObservations = (function () {
     return h;
   }
 
-  function renderTagPopoverWithEnrichments(id, selectedArr, toggleFn) {
-    var items = buildTagMenuItems();
-    var h =
-      '<div class="obs-popover" id="' +
-      id +
-      '" style="width:280px">' +
-      '<input class="obs-popover-search" type="text" placeholder="Search tags\u2026" data-action-input="tagPopoverSearch" data-popover-id="' +
-      id +
-      '" autocomplete="off">' +
-      '<div class="obs-popover-list">';
-
-    h += '<div class="obs-popover-section" data-section>Type</div>';
-    Object.entries(OBS_SENTIMENTS).forEach(function (entry) {
-      var key = entry[0],
-        s = entry[1];
-      var active = activeSentiment === key;
-      h +=
-        '<div class="obs-popover-item' +
-        (active ? ' selected' : '') +
-        '" data-tag="' +
-        key +
-        '" data-action="toggleSentiment" data-value="' +
-        key +
-        '"><span class="obs-popover-check">' +
-        (active ? '✓' : '') +
-        '</span><span class="obs-type-dot" data-sentiment="' +
-        key +
-        '"></span>' +
-        s.label +
-        '</div>';
-    });
-
-    h += '<div class="obs-popover-section" data-section>Context</div>';
-    Object.entries(OBS_CONTEXTS).forEach(function (entry) {
-      var key = entry[0],
-        c = entry[1];
-      var active = activeContext === key;
-      h +=
-        '<div class="obs-popover-item' +
-        (active ? ' selected' : '') +
-        '" data-tag="' +
-        key +
-        '" data-action="toggleContext" data-value="' +
-        key +
-        '"><span class="obs-popover-check">' +
-        (active ? '✓' : '') +
-        '</span>' +
-        c.label +
-        '</div>';
-    });
-
-    items.forEach(function (item) {
-      if (item.type === 'section') {
-        h += '<div class="obs-popover-section" data-section>' + esc(item.label) + '</div>';
-      } else {
-        var isSel = selectedArr.includes(item.key);
-        h +=
-          '<div class="obs-popover-item' +
-          (isSel ? ' selected' : '') +
-          '" data-tag="' +
-          esc(item.key) +
-          '" data-action="popoverToggle" data-toggle-fn="' +
-          toggleFn +
-          '" data-value="' +
-          esc(item.key) +
-          '"><span class="obs-popover-check">' +
-          (isSel ? '✓' : '') +
-          '</span><span class="obs-tag-dot" style="background:' +
-          item.color +
-          '"></span>' +
-          esc(item.label) +
-          '</div>';
-      }
-    });
-    h += '</div>';
-    h +=
-      '<div class="obs-popover-add-row"><input class="obs-popover-add-input" id="custom-tag-input" type="text" placeholder="New custom tag\u2026"><button class="obs-popover-add-btn" data-action="addNewCustomTag">+ Add</button></div>';
-    h += '</div>';
-    return h;
-  }
-
   function renderTagPopover(id, selectedArr, toggleFn) {
-    var items = buildTagMenuItems();
+    var items = ObsCapture.tagMenuItems(activeCourse);
     var h =
       '<div class="obs-popover right-align" id="' +
       id +
@@ -489,40 +358,6 @@ window.PageObservations = (function () {
       }
     });
     h += '</div></div>';
-    return h;
-  }
-
-  function renderCaptureSecondary() {
-    var hasTokens = selectedStudents.length > 1 || activeTags.length > 0;
-    var h = '<div class="obs-capture-secondary">';
-    if (hasTokens) {
-      h += '<div class="obs-capture-tokens">';
-      if (selectedStudents.length > 1) {
-        selectedStudents.forEach(function (sid) {
-          var s = _studentsById[sid];
-          if (!s) return;
-          h +=
-            '<span class="obs-token">' +
-            esc(displayNameFirst(s)) +
-            '<span class="obs-token-x" data-action="removeCaptureStudent" data-sid="' +
-            sid +
-            '">&times;</span></span>';
-        });
-      }
-      activeTags.forEach(function (t) {
-        var info = resolveTag(t);
-        h +=
-          '<span class="obs-tag-pill"><span class="pill-dot" style="background:' +
-          tagColor(t) +
-          '"></span>' +
-          esc(info.label) +
-          '<span class="obs-tag-pill-x" data-action="removeCaptureTag" data-value="' +
-          esc(t) +
-          '">&times;</span></span>';
-      });
-      h += '</div>';
-    }
-    h += '</div>';
     return h;
   }
 
@@ -918,6 +753,7 @@ window.PageObservations = (function () {
       typePillHtml(ob.sentiment) +
       (ctxInfo ? '<span class="obs-pill obs-pill-context">' + esc(ctxInfo.label) + '</span>' : '') +
       (aTitle ? '<span class="obs-pill obs-pill-assessment">' + esc(aTitle) + '</span>' : '') +
+      ObsCapture.linkPillsHtml(activeCourse, ob) +
       '</div>' +
       '<span class="obs-card-header-actions">' +
       (quoted ? '<span class="obs-card-quoted">' + esc(quoted) + '</span>' : '') +
@@ -1000,8 +836,6 @@ window.PageObservations = (function () {
 
   /* ── Popover management ─────────────────────────────────── */
   var POPOVER_IDS = {
-    students: 'student-dropdown',
-    tags: 'tag-dropdown',
     filterStudents: 'filter-student-dropdown',
     filterTags: 'filter-tag-dropdown',
     filterType: 'filter-type-dropdown',
@@ -1038,79 +872,6 @@ window.PageObservations = (function () {
       var el = document.getElementById(id);
       if (el) el.classList.remove('open');
     });
-  }
-
-  /* ── Capture bar: students ──────────────────────────────── */
-  function toggleCaptureStudent(sid) {
-    var idx = selectedStudents.indexOf(sid);
-    if (idx >= 0) selectedStudents.splice(idx, 1);
-    else selectedStudents.push(sid);
-    syncPopoverChecks('student-dropdown', selectedStudents, 'data-sid');
-    updateCaptureStudentBtn();
-    updateCaptureSecondary();
-    updateAddBtn();
-  }
-  function removeCaptureStudent(sid) {
-    selectedStudents = selectedStudents.filter(function (s) {
-      return s !== sid;
-    });
-    updateCaptureStudentBtn();
-    updateCaptureSecondary();
-    updateAddBtn();
-  }
-  function updateCaptureStudentBtn() {
-    var btn = document.getElementById('student-btn');
-    if (!btn) return;
-    var label = 'Select students\u2026';
-    if (selectedStudents.length === 1) {
-      var s = _studentsById[selectedStudents[0]];
-      label = s ? displayName(s) : label;
-    } else if (selectedStudents.length > 1) label = selectedStudents.length + ' students';
-    btn.innerHTML = esc(label) + ' <span class="obs-btn-arrow"></span>';
-    btn.classList.toggle('has-selection', selectedStudents.length > 0);
-  }
-
-  /* ── Capture bar: tags ──────────────────────────────────── */
-  function toggleCaptureTag(key) {
-    var idx = activeTags.indexOf(key);
-    if (idx >= 0) activeTags.splice(idx, 1);
-    else activeTags.push(key);
-    syncPopoverChecks('tag-dropdown', activeTags, 'data-tag');
-    var btn = document.getElementById('tag-btn');
-    var totalCount = activeTags.length + (activeSentiment ? 1 : 0) + (activeContext ? 1 : 0);
-    if (btn) {
-      btn.classList.toggle('has-tags', totalCount > 0);
-      btn.innerHTML =
-        '<span class="tag-icon">' +
-        TAG_SVG +
-        '</span>Tags' +
-        (totalCount > 0 ? ' <span class="obs-badge">' + totalCount + '</span>' : '');
-    }
-    updateCaptureSecondary();
-  }
-  function removeCaptureTag(key) {
-    activeTags = activeTags.filter(function (t) {
-      return t !== key;
-    });
-    updateCaptureSecondary();
-    var btn = document.getElementById('tag-btn');
-    var totalCount = activeTags.length + (activeSentiment ? 1 : 0) + (activeContext ? 1 : 0);
-    if (btn) {
-      btn.classList.toggle('has-tags', totalCount > 0);
-      btn.innerHTML =
-        '<span class="tag-icon">' +
-        TAG_SVG +
-        '</span>Tags' +
-        (totalCount > 0 ? ' <span class="obs-badge">' + totalCount + '</span>' : '');
-    }
-  }
-  function updateCaptureSecondary() {
-    var cap = document.getElementById('obs-capture');
-    if (!cap) return;
-    var sec = cap.querySelector('.obs-capture-secondary');
-    var html = renderCaptureSecondary();
-    if (sec) sec.outerHTML = html;
-    else cap.querySelector('.obs-capture-row').insertAdjacentHTML('afterend', html);
   }
 
   /* ── Filter strip: students ─────────────────────────────── */
@@ -1185,94 +946,6 @@ window.PageObservations = (function () {
     var strip = document.getElementById('obs-filter-strip');
     if (strip) strip.innerHTML = renderFilterRow();
     refreshFeedAndCount();
-  }
-
-  function submitOb() {
-    var input = document.getElementById('capture-input');
-    if (!input) return;
-    var text = input.value.trim();
-    if (selectedStudents.length === 0) {
-      // Say why nothing happened: open the student picker.
-      if (text) openPopover('students');
-      return;
-    }
-    if (!text) {
-      input.style.border = '2px solid var(--score-1)';
-      input.placeholder = 'Enter an observation';
-      input.oninput = function () {
-        this.style.border = '';
-      };
-      input.focus();
-      return;
-    }
-    selectedStudents.forEach(function (sid) {
-      addQuickOb(activeCourse, sid, text, activeTags.slice(), activeSentiment, activeContext);
-    });
-    input.value = '';
-    activeTags = [];
-    activeSentiment = null;
-    activeContext = null;
-    render();
-    requestAnimationFrame(function () {
-      var inp = document.getElementById('capture-input');
-      if (inp) inp.focus();
-    });
-  }
-
-  function toggleSentiment(val) {
-    activeSentiment = activeSentiment === val ? null : val;
-    var wasOpen = _openPopover;
-    var captureVal = (document.getElementById('capture-input') || {}).value || '';
-    render();
-    var inp2 = document.getElementById('capture-input');
-    if (inp2 && captureVal) inp2.value = captureVal;
-    if (wasOpen === 'tags')
-      requestAnimationFrame(function () {
-        openPopover('tags');
-      });
-    else
-      requestAnimationFrame(function () {
-        var inp = document.getElementById('capture-input');
-        if (inp) inp.focus();
-      });
-  }
-
-  function toggleContext(val) {
-    activeContext = activeContext === val ? null : val;
-    var wasOpen = _openPopover;
-    var captureVal = (document.getElementById('capture-input') || {}).value || '';
-    render();
-    var inp2 = document.getElementById('capture-input');
-    if (inp2 && captureVal) inp2.value = captureVal;
-    if (wasOpen === 'tags')
-      requestAnimationFrame(function () {
-        openPopover('tags');
-      });
-    else
-      requestAnimationFrame(function () {
-        var inp = document.getElementById('capture-input');
-        if (inp) inp.focus();
-      });
-  }
-
-  function updateAddBtn() {
-    var btn = document.getElementById('capture-add-btn');
-    var input = document.getElementById('capture-input');
-    if (btn && input) btn.disabled = selectedStudents.length === 0 || !input.value.trim();
-  }
-
-  function addNewCustomTag() {
-    var input = document.getElementById('custom-tag-input');
-    if (!input) return;
-    var label = input.value.trim();
-    if (!label) return;
-    addCustomTag(activeCourse, label);
-    var key = 'tag:' + label;
-    if (!activeTags.includes(key)) activeTags.push(key);
-    render();
-    requestAnimationFrame(function () {
-      openPopover('tags');
-    });
   }
 
   function wireSearch() {
@@ -1711,13 +1384,7 @@ window.PageObservations = (function () {
       var pop = document.getElementById('focus-tag-dropdown');
       if (pop) pop.classList.remove('open');
     }
-    if (
-      _openPopover &&
-      !e.target.closest('.obs-popover') &&
-      !e.target.closest('.obs-capture-student-btn') &&
-      !e.target.closest('.obs-tag-trigger') &&
-      !e.target.closest('.obs-filter-chip')
-    ) {
+    if (_openPopover && !e.target.closest('.obs-popover') && !e.target.closest('.obs-filter-chip')) {
       closeAllPopovers();
     }
   }
@@ -1728,7 +1395,6 @@ window.PageObservations = (function () {
   }
 
   function _handleInput(e) {
-    if (e.target.id === 'capture-input') updateAddBtn();
     // Popover search inputs
     if (e.target.matches('[data-action-input="popoverSearch"]')) {
       filterPopoverItems(e.target.dataset.popoverId, e.target.value);
@@ -1754,8 +1420,6 @@ window.PageObservations = (function () {
 
     // Map toggle function names to actual functions
     var toggleFns = {
-      toggleCaptureStudent: toggleCaptureStudent,
-      toggleCaptureTag: toggleCaptureTag,
       toggleFilterStudent: toggleFilterStudent,
       toggleFilterTag: toggleFilterTag,
       toggleFocusDim: toggleFocusDim,
@@ -1765,9 +1429,6 @@ window.PageObservations = (function () {
       openPopover: function () {
         openPopover(el.dataset.popover);
       },
-      submitOb: function () {
-        submitOb();
-      },
       toggleView: function () {
         toggleView();
       },
@@ -1776,21 +1437,6 @@ window.PageObservations = (function () {
       },
       clearAllFilters: function () {
         clearAllFilters();
-      },
-      addNewCustomTag: function () {
-        addNewCustomTag();
-      },
-      removeCaptureStudent: function () {
-        removeCaptureStudent(el.dataset.sid);
-      },
-      removeCaptureTag: function () {
-        removeCaptureTag(el.dataset.value);
-      },
-      toggleSentiment: function () {
-        toggleSentiment(el.dataset.value);
-      },
-      toggleContext: function () {
-        toggleContext(el.dataset.value);
       },
       deleteOb: function () {
         deleteOb(el.dataset.sid, el.dataset.obid);
@@ -1837,13 +1483,6 @@ window.PageObservations = (function () {
         return;
       }
     }
-    // Enter sends (Cmd+Enter too); Shift+Enter adds a line. Not while an
-    // IME is composing.
-    if (e.target.id === 'capture-input' && e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
-      e.preventDefault();
-      submitOb();
-      return;
-    }
     // A focused card opens with Enter or Space, like a button.
     if (
       !_focusBackdropEl &&
@@ -1859,22 +1498,13 @@ window.PageObservations = (function () {
       closeAllPopovers();
       return;
     }
-    // Custom tag input Enter
-    if (e.target.id === 'custom-tag-input' && e.key === 'Enter') {
-      e.preventDefault();
-      addNewCustomTag();
-    }
   }
 
   /* ── init / destroy ─────────────────────────────────────── */
   function init(params) {
     activeCourse = params.course || getActiveCourse();
     setActiveCourse(activeCourse);
-    selectedStudents = [];
     resetFilters();
-    activeTags = [];
-    activeSentiment = null;
-    activeContext = null;
     _openPopover = null;
     _viewMode = loadViewMode();
     _alive = true;
@@ -1890,10 +1520,12 @@ window.PageObservations = (function () {
     refreshStudentCache();
 
     // The dashboard's coverage grid opens this page with one student selected.
+    var preset = [];
     if (params.student && _studentsById[params.student]) {
-      selectedStudents = [params.student];
+      preset = [params.student];
       filterStudents = [params.student];
     }
+    makeCapture(preset);
 
     _addDocListener('click', _handleClick);
     _addDocListener('mousedown', _handleMousedown);
@@ -1941,6 +1573,8 @@ window.PageObservations = (function () {
     _alive = false;
     _students = [];
     _studentsById = {};
+    if (_capture) _capture.destroy();
+    _capture = null;
     closeAllPopovers();
     if (typeof clearLongFormAuthContext === 'function') clearLongFormAuthContext('observation-capture');
     delete window._pageSwitchCourse;

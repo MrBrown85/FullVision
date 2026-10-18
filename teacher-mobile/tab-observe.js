@@ -152,7 +152,7 @@ window.MObserve = (function () {
         return s.id === ob.studentId;
       });
       var stName = st ? displayName(st) : 'Unknown';
-      var tags = tagChips(ob.dims);
+      var tags = ObsCapture.linkPillsHtml(cid, ob, 'm-obs-tag-chip') + tagChips(ob.dims);
 
       var avatarColor = st ? MC.avatarColor(st.id) : '#888';
       var avatarInitials = st ? MC.avatarInitials(st) : '?';
@@ -267,21 +267,25 @@ window.MObserve = (function () {
         .join('') +
       '</div>' +
       '<div class="m-sheet-label">Tags</div>' +
-      '<div class="m-dim-strip">' +
-      OBS_DIMS.map(function (dim) {
-        return (
-          '<button class="m-dim-chip' +
-          ((opts.dims || []).indexOf(dim) >= 0 ? ' m-selected' : '') +
-          '" data-action="m-obs-dim" data-val="' +
-          dim +
-          '"><span class="m-obs-tag-dot" style="background:' +
-          obsTagColor(dim) +
-          '"></span>' +
-          MC.esc(OBS_LABELS[dim] || dim) +
-          '</button>'
-        );
-      }).join('') +
-      '</div>' +
+      ObsCapture.tagMenuItems(opts.cid)
+        .map(function (item) {
+          if (item.type === 'section') return '<div class="m-dim-section">' + MC.esc(item.label) + '</div>';
+          return (
+            '<button class="m-dim-chip' +
+            ((opts.dims || []).indexOf(item.key) >= 0 ? ' m-selected' : '') +
+            '" data-action="m-obs-dim" data-val="' +
+            MC.esc(item.key) +
+            '"><span class="m-obs-tag-dot" style="background:' +
+            item.color +
+            '"></span>' +
+            MC.esc(item.label) +
+            '</button>'
+          );
+        })
+        .join('')
+        .replace(/(<button[\s\S]*?<\/button>)+/g, function (run) {
+          return '<div class="m-dim-strip">' + run + '</div>';
+        }) +
       '<button class="m-btn-primary" id="m-obs-submit" data-action="m-obs-save"' +
       (opts.submitDisabled ? ' disabled' : '') +
       '>' +
@@ -299,46 +303,50 @@ window.MObserve = (function () {
     }, 400);
   }
 
-  function presentNewObsSheet(cid) {
-    var students = getStudents(cid);
-    students = sortStudents(students.slice(), 'alpha');
-    var studentHtml =
-      '<div class="m-sheet-label">Student</div>' +
-      '<div class="m-student-picker" data-action="m-obs-pick-student" id="m-obs-student-picker">' +
-      '<span class="m-student-picker-placeholder">Select student...</span>' +
-      '</div>' +
-      '<div id="m-obs-student-list-wrap" style="display:none">' +
-      '<div class="m-picker-list">' +
-      '<input class="m-picker-search" type="search" placeholder="Search..." data-action="m-obs-student-search">' +
-      '<div id="m-obs-student-options">' +
-      students
-        .map(function (st) {
-          return (
-            '<div class="m-picker-item" data-action="m-obs-select-student" data-sid="' +
-            st.id +
-            '">' +
-            '<span class="m-picker-check"></span>' +
-            '<span>' +
-            MC.esc(displayName(st)) +
-            '</span>' +
-            '</div>'
-          );
-        })
-        .join('') +
-      '</div>' +
-      '</div>' +
-      '</div>';
-    _presentSheetAndFocus(
-      _buildObsFormHtml({
-        studentHtml: studentHtml,
-        text: '',
-        sentiment: null,
-        context: null,
-        dims: [],
-        submitLabel: 'Add observation',
-        submitDisabled: true,
-      }),
+  /* The new-observation sheet is the shared capture strip
+     (teacher/obs-capture.js) in its sheet layout: students, type, context,
+     the full tag menu (dispositions, Core Competencies, custom tags), an
+     assessment, a competency and level. */
+  var _capture = null;
+  function presentNewObsSheet(cid, presetSid) {
+    if (_capture) _capture.destroy();
+    MC.presentSheet(
+      '<div class="m-sheet-title" id="m-obs-sheet-title">New observation</div><div id="m-obs-capture-mount"></div>',
+      {
+        onClose: function () {
+          if (_capture) _capture.destroy();
+          _capture = null;
+          resetSheetState();
+        },
+      },
     );
+    _capture = ObsCapture.create({
+      cid: cid,
+      idPrefix: 'm-',
+      layout: 'sheet',
+      students: presetSid ? [presetSid] : [],
+      defaultAssessment: true,
+      draftKey: 'phone-sheet',
+      onAdd: function (info) {
+        MC.haptic();
+        _refreshFeed(cid, true);
+        if (!info.ok) return;
+        // Stay open to offer the flag on a concern; otherwise done.
+        if (_capture && _capture.getState().flagOffer.length) return;
+        MC.dismissSheet();
+        MC.showToast('Observation saved');
+      },
+      onFlag: function () {
+        if (_capture && !_capture.getState().flagOffer.length) {
+          MC.dismissSheet();
+          MC.showToast('Observation saved and student flagged');
+        }
+      },
+    });
+    _capture.mount(document.getElementById('m-obs-capture-mount'));
+    setTimeout(function () {
+      if (_capture) _capture.focus();
+    }, 400);
   }
 
   /* ── Edit Observation Sheet ──────────────────────────────────── */
@@ -368,6 +376,7 @@ window.MObserve = (function () {
 
     _presentSheetAndFocus(
       _buildObsFormHtml({
+        cid: cid,
         studentHtml: studentHtml,
         text: MC.esc(ob.text),
         sentiment: _selectedSentiment,
