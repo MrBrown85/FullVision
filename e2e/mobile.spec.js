@@ -488,11 +488,11 @@ test.describe('Mobile: Form Interactions', () => {
   test('observation capture area is usable at 375px', async ({ page }) => {
     await page.setViewportSize(MOBILE);
     await gotoApp(page, '/observations');
-    const captureArea = page.locator('.obs-capture');
+    const captureArea = page.locator('#obs-capture');
     if (await captureArea.isVisible()) {
-      const input = page.locator('.obs-capture-input');
+      const input = page.locator('#capture-input');
       await expect(input).toBeVisible();
-      const addBtn = page.locator('.obs-capture-add');
+      const addBtn = page.locator('#capture-add-btn');
       await expect(addBtn).toBeVisible();
       await assertNoOverflow(page);
     }

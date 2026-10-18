@@ -2244,6 +2244,18 @@ function _rekey(cid, kind, localId, serverId, extra) {
         return changed;
       });
       _rekeyAssessmentReference(cid, 'tag', localId, serverId);
+      _rekeyField('observations', cid, function (obs) {
+        var changed = false;
+        Object.keys(obs || {}).forEach(function (sid) {
+          (Array.isArray(obs[sid]) ? obs[sid] : []).forEach(function (o) {
+            if (o && o.competencyId === localId) {
+              o.competencyId = serverId;
+              changed = true;
+            }
+          });
+        });
+        return changed;
+      });
     }
   } else if (kind === 'rubric') {
     _rekeyField('rubrics', cid, function (rows) {
@@ -3210,6 +3222,21 @@ function _observationDims(dims) {
   return out;
 }
 
+/* An observation's optional level on its linked competency: 1-4 (Emerging,
+   Developing, Proficient, Extending) or null. It is evidence only; no grade
+   reads it (docs/DECISIONS.md, "Observations (2026-10-18)"). */
+function _observationLevel(v) {
+  var n = typeof v === 'string' && v !== '' ? Number(v) : v;
+  return typeof n === 'number' && n >= 1 && n <= 4 && Math.floor(n) === n ? n : null;
+}
+
+/* The competency (one learning-map tag id) an observation links to, as the
+   p_tag_ids array: empty when there is none or the id is neither the
+   server's nor a local one whose create is queued (rule 6). */
+function _observationTagIds(competencyId) {
+  return competencyId && _isSendableId(competencyId) ? [competencyId] : [];
+}
+
 /* The server stores only an observation's assessment_id. The title the
    badge shows comes from the course's assessments, so it is filled in here;
    an assessment that is gone or not loaded leaves the title empty. */
@@ -3246,6 +3273,10 @@ function _observationsPayloadToBlob(payload, cid) {
         created: ob.created_at || ob.created || new Date().toISOString(),
         date: _dateOnly(ob.observed_at || ob.created_at || ob.created),
       };
+      var tagIds = ob.tag_ids || ob.tagIds || [];
+      if (tagIds.length && tagIds[0]) entry.competencyId = tagIds[0];
+      var level = _observationLevel(ob.level);
+      if (level) entry.level = level;
       if (ob.assessment_id) {
         if (!titles) titles = _observationAssessmentTitles(cid);
         entry.assignmentContext = { assessmentId: ob.assessment_id, assessmentTitle: titles[ob.assessment_id] || '' };
@@ -4441,8 +4472,17 @@ function _termRatingsRowsToBlob(rows) {
 /* Efficient single-score write — upserts one row to scores table + updates cache */
 /* `mod` is the level's + or − (1 or −1). Leaving it out means none, so
    picking a level clears a + or − it had before. */
+/* The assessment last scored in each class this session, with the day, so
+   the observation capture strip can pre-fill it (teacher/obs-capture.js). */
+var _lastScored = {};
+function getLastScoredAssessment(cid) {
+  var rec = _lastScored[cid];
+  return rec && rec.day === courseToday(cid) ? rec.aid : null;
+}
+
 function upsertScore(cid, sid, aid, tid, scoreVal, date, type, note, mod) {
   var nextMod = normalizeScoreMod(scoreVal, mod);
+  if (aid) _lastScored[cid] = { aid: aid, day: courseToday(cid) };
   // Update cache blob
   const scores = getScores(cid);
   if (!scores[sid]) scores[sid] = [];
@@ -8130,7 +8170,9 @@ function getAllQuickObs(cid) {
   return flat.sort((a, b) => (b.created || '').localeCompare(a.created || ''));
 }
 
-function addQuickOb(cid, sid, text, dims, sentiment, context, assignmentContext) {
+/* link: optional { competencyId, level } — one learning-map tag id and a
+   1-4 level on it. */
+function addQuickOb(cid, sid, text, dims, sentiment, context, assignmentContext, link) {
   const all = getQuickObs(cid);
   if (!all[sid]) all[sid] = [];
   const entry = {
@@ -8143,6 +8185,11 @@ function addQuickOb(cid, sid, text, dims, sentiment, context, assignmentContext)
   if (sentiment) entry.sentiment = sentiment;
   if (context) entry.context = context;
   if (assignmentContext) entry.assignmentContext = assignmentContext;
+  if (link && link.competencyId) {
+    entry.competencyId = link.competencyId;
+    var level = _observationLevel(link.level);
+    if (level) entry.level = level;
+  }
   all[sid].push(entry);
   _cache.observations[cid] = all;
   var lsOk = _safeLSSet('gb-quick-obs-' + cid, JSON.stringify(all));
@@ -8214,12 +8261,26 @@ function updateQuickOb(cid, sid, obId, updates) {
   if (updates.dims !== undefined) ob.dims = updates.dims;
   if (updates.sentiment !== undefined) ob.sentiment = updates.sentiment || null;
   if (updates.context !== undefined) ob.context = updates.context || null;
+  var competencyChanged = false;
+  if (updates.competencyId !== undefined) {
+    var nextComp = updates.competencyId || null;
+    competencyChanged = nextComp !== (ob.competencyId || null);
+    if (nextComp) ob.competencyId = nextComp;
+    else delete ob.competencyId;
+  }
+  if (updates.level !== undefined) {
+    var nextLevel = _observationLevel(updates.level);
+    if (nextLevel) ob.level = nextLevel;
+    else delete ob.level;
+  }
+  // A level belongs to a competency.
+  if (!ob.competencyId) delete ob.level;
   ob.modified = new Date().toISOString();
   _cache.observations[cid] = all;
   var lsOk = _safeLSSet('gb-quick-obs-' + cid, JSON.stringify(all));
   _markLocalWrite('observations', cid);
   if (_writesEnabled()) {
-    _persistObservationUpdate(cid, ob);
+    _persistObservationUpdate(cid, ob, { competencyChanged: competencyChanged });
   }
   _broadcastChange(cid, 'observations');
   return lsOk;
@@ -8227,7 +8288,8 @@ function updateQuickOb(cid, sid, obId, updates) {
 
 /* v2 create_observation(p_course_id, p_body, p_sentiment, p_context_type,
    p_assessment_id, p_enrollment_ids uuid[], p_tag_ids uuid[],
-   p_custom_tag_ids uuid[], p_idempotency_key, p_dims text[]) → uuid */
+   p_custom_tag_ids uuid[], p_idempotency_key, p_dims text[],
+   p_level smallint) → uuid */
 function _persistObservationCreate(cid, sid, entry) {
   if (!_isUuid(cid) || !_isSendableId(sid)) return;
   // The observation's own local id is re-keyed when the create lands, so an
@@ -8238,7 +8300,9 @@ function _persistObservationCreate(cid, sid, entry) {
       ? entry.assignmentContext.assessmentId
       : null;
   // entry.dims are string keys, not learning-map tag ids, so they go in
-  // p_dims (observation.dims) rather than the uuid join tables.
+  // p_dims (observation.dims). The linked competency is a learning-map tag
+  // and goes in p_tag_ids (observation_tag).
+  var tagIds = _observationTagIds(entry.competencyId);
   _trackPendingSync(
     _writeRpc(
       'create_observation',
@@ -8249,9 +8313,10 @@ function _persistObservationCreate(cid, sid, entry) {
         p_context_type: entry.context || null,
         p_assessment_id: ctxAsmt,
         p_enrollment_ids: [sid],
-        p_tag_ids: [],
+        p_tag_ids: tagIds,
         p_custom_tag_ids: [],
         p_dims: _observationDims(entry.dims),
+        p_level: tagIds.length ? _observationLevel(entry.level) : null,
       },
       {
         retryKey: 'create_observation:' + entry.id,
@@ -8271,15 +8336,19 @@ function _persistObservationCreate(cid, sid, entry) {
 /* v2 update_observation(p_id, p_patch jsonb, p_enrollment_ids, p_tag_ids,
    p_custom_tag_ids). Null join-array params leave that set alone; empty
    array wipes it. Here we always pass null so we don't disturb membership
-   unless the caller explicitly wants to. The dims always go in the patch,
-   so removing the last tag clears them on the server too. */
-function _persistObservationUpdate(cid, ob) {
+   unless the caller explicitly wants to. The dims and level always go in
+   the patch, so removing the last tag clears them on the server too. The
+   competency (p_tag_ids) is sent only when it changed, so a learning-map
+   link made elsewhere is left alone otherwise. */
+function _persistObservationUpdate(cid, ob, opts) {
   if (!_isSendableId(ob.id)) return;
+  var tagIds = _observationTagIds(ob.competencyId);
   var patch = {
     body: ob.text || '',
     sentiment: ob.sentiment || null,
     context_type: ob.context || null,
     dims: _observationDims(ob.dims),
+    level: tagIds.length ? _observationLevel(ob.level) : null,
   };
   if (ob.assignmentContext && _isUuid(ob.assignmentContext.assessmentId)) {
     patch.assessment_id = ob.assignmentContext.assessmentId;
@@ -8291,7 +8360,7 @@ function _persistObservationUpdate(cid, ob) {
         p_id: ob.id,
         p_patch: patch,
         p_enrollment_ids: null,
-        p_tag_ids: null,
+        p_tag_ids: opts && opts.competencyChanged ? tagIds : null,
         p_custom_tag_ids: null,
       },
       {
@@ -9691,6 +9760,7 @@ window.GB = {
   getScores,
   saveScores,
   upsertScore,
+  getLastScoredAssessment,
   persistScoreDiffToCanonical,
   getPointsScore,
   setPointsScore,

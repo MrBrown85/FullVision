@@ -1,0 +1,505 @@
+/* obs-capture.css — the shared observation capture strip (teacher/obs-capture.js).
+   Loaded by the desktop app and the phone app. App tokens only. */
+
+.obsc {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 10px);
+  min-width: 0;
+}
+
+.obsc-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.obsc-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.obsc-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  margin: 0 2px;
+}
+
+.obsc-spacer {
+  flex: 1 1 auto;
+}
+
+/* ── Chips ───────────────────────────────────────────────── */
+.obsc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  max-width: 100%;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm, 13px);
+  font-weight: 500;
+  line-height: 1.3;
+  white-space: nowrap;
+  cursor: pointer;
+}
+button.obsc-chip:hover,
+.obsc-chip-label:hover {
+  background: var(--overlay-hover);
+}
+.obsc-chip:focus-visible,
+.obsc-chip-label:focus-visible,
+.obsc-x:focus-visible,
+.obsc-add:focus-visible,
+.obsc-flag-btn:focus-visible,
+.obsc-flag-dismiss:focus-visible,
+.obsc-item:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 1px;
+}
+
+.obsc-chip-add {
+  border-style: dashed;
+  color: var(--text-2);
+}
+.obsc-chip-prompt {
+  border-style: solid;
+  color: var(--text);
+}
+
+.obsc-chip-picked {
+  padding: 0 4px 0 10px;
+  cursor: default;
+}
+.obsc-chip-label {
+  border: 0;
+  background: none;
+  padding: 3px 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 260px;
+  border-radius: 999px;
+}
+span.obsc-chip-label {
+  cursor: default;
+}
+.obsc-x {
+  border: 0;
+  background: none;
+  color: var(--text-2);
+  font-size: 15px;
+  line-height: 1;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  cursor: pointer;
+  padding: 0;
+}
+.obsc-x:hover {
+  background: var(--overlay-pressed);
+  color: var(--text);
+}
+
+.obsc-chip-student {
+  border-color: transparent;
+  background: var(--active-light);
+  color: var(--active);
+  font-weight: 600;
+}
+.obsc-chip-student .obsc-x {
+  color: var(--active);
+}
+
+.obsc-chip-type[data-sentiment='strength'].is-on {
+  border-color: transparent;
+  color: var(--score-3);
+  background: color-mix(in srgb, var(--score-3) 14%, transparent);
+  font-weight: 600;
+}
+.obsc-chip-type[data-sentiment='growth'].is-on {
+  border-color: transparent;
+  color: var(--active);
+  background: color-mix(in srgb, var(--active) 14%, transparent);
+  font-weight: 600;
+}
+.obsc-chip-type[data-sentiment='concern'].is-on {
+  border-color: transparent;
+  color: var(--score-2);
+  background: color-mix(in srgb, var(--score-2) 16%, transparent);
+  font-weight: 600;
+}
+.obsc-chip-type:not(.is-on) {
+  border-style: dashed;
+  color: var(--text-2);
+}
+
+.obsc-chip-competency,
+.obsc-chip-level.is-on {
+  border-color: transparent;
+  background: var(--active-light);
+  color: var(--active);
+}
+.obsc-chip-competency .obsc-x {
+  color: var(--active);
+}
+
+.obsc-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+
+/* ── Text box ────────────────────────────────────────────── */
+.obsc-input-wrap {
+  display: flex;
+  min-width: 0;
+}
+.obsc-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  min-height: 52px;
+  resize: vertical;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-secondary);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-base, 14px);
+  line-height: 1.45;
+}
+.obsc-input:focus {
+  outline: none;
+  border-color: var(--active);
+  background: var(--surface);
+}
+.obsc-input::placeholder {
+  color: var(--text-3);
+}
+.obsc-input.obsc-input-empty {
+  border-color: var(--score-1);
+}
+
+.obsc-hint {
+  font-size: var(--text-xs, 12px);
+  color: var(--text-3);
+}
+
+/* ── Add, keep tags ──────────────────────────────────────── */
+.obsc-keep {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--text-sm, 13px);
+  color: var(--text-2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.obsc-keep input {
+  margin: 0;
+  accent-color: var(--active);
+}
+.obsc-add {
+  min-height: 32px;
+  padding: 5px 16px;
+  border: 0;
+  border-radius: var(--radius-md, 8px);
+  background: var(--active);
+  color: #fff;
+  font: inherit;
+  font-size: var(--text-sm, 13px);
+  font-weight: 600;
+  cursor: pointer;
+}
+.obsc-add:hover {
+  background: var(--btn-hover-blue);
+}
+.obsc-add:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ── Flag offer and errors ───────────────────────────────── */
+.obsc-flag:empty {
+  display: none;
+}
+.obsc-flag {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-sm, 13px);
+  color: var(--text-2);
+}
+.obsc-flag-btn,
+.obsc-flag-dismiss {
+  min-height: 28px;
+  padding: 3px 12px;
+  border-radius: var(--radius-md, 8px);
+  font: inherit;
+  font-size: var(--text-sm, 13px);
+  cursor: pointer;
+}
+.obsc-flag-btn {
+  border: 1px solid var(--score-2);
+  background: color-mix(in srgb, var(--score-2) 12%, transparent);
+  color: var(--score-2-dark, var(--score-2));
+  font-weight: 600;
+}
+.obsc-flag-dismiss {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-2);
+}
+.obsc-error {
+  color: var(--danger);
+}
+
+/* ── Menus ───────────────────────────────────────────────── */
+.obsc-slot {
+  position: relative;
+  height: 0;
+}
+.obsc-slot:empty {
+  display: none;
+}
+/* A floating menu's slot takes no room, so cancel the flex gap it adds. */
+.obsc:not(.obsc--sheet) > .obsc-slot {
+  margin-top: -8px;
+}
+.obsc-menu {
+  position: absolute;
+  top: 2px;
+  left: 0;
+  z-index: 60;
+  width: 280px;
+  max-width: 100%;
+  max-height: 340px;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+  box-shadow: 0 8px 24px var(--divider-strong);
+  overflow: hidden;
+}
+.obsc-menu-search,
+.obsc-menu-add-input {
+  margin: 8px 8px 4px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm, 13px);
+  min-width: 0;
+}
+.obsc-menu-search:focus,
+.obsc-menu-add-input:focus {
+  outline: none;
+  border-color: var(--active);
+}
+.obsc-menu-list {
+  overflow-y: auto;
+  padding: 4px 0;
+  flex: 1 1 auto;
+}
+.obsc-menu-section {
+  padding: 8px 12px 2px;
+  font-size: var(--text-xs, 12px);
+  font-weight: 600;
+  color: var(--text-3);
+}
+.obsc-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  font-size: var(--text-sm, 13px);
+  color: var(--text);
+  cursor: pointer;
+}
+.obsc-item:hover,
+.obsc-item.is-active {
+  background: var(--overlay-hover);
+}
+.obsc-item.selected {
+  color: var(--active);
+  font-weight: 600;
+}
+.obsc-check {
+  width: 12px;
+  flex: none;
+  color: var(--active);
+}
+.obsc-item-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.obsc-menu-empty,
+.obsc-menu-note {
+  padding: 8px 12px;
+  font-size: var(--text-sm, 13px);
+  color: var(--text-2);
+}
+.obsc-menu-note {
+  border-bottom: 1px solid var(--divider-subtle);
+}
+.obsc-menu-add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-top: 1px solid var(--divider-subtle);
+  padding-right: 8px;
+}
+.obsc-menu-add-input {
+  flex: 1 1 auto;
+  margin: 8px 0 8px 8px;
+}
+.obsc-menu-add-btn {
+  border: 0;
+  background: none;
+  color: var(--active);
+  font: inherit;
+  font-size: var(--text-sm, 13px);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.obsc-suggest {
+  width: 260px;
+}
+
+/* ── Pills on cards ──────────────────────────────────────── */
+.obsc-pill-competency {
+  border-color: transparent;
+  background: var(--active-light);
+  color: var(--active);
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.obsc-pill-level {
+  color: var(--text-2);
+}
+
+/* ── Sheet layout (phone, dialogs): menus in the flow ────── */
+.obsc--sheet {
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+.obsc--sheet .obsc-slot {
+  height: auto;
+}
+.obsc--sheet .obsc-menu {
+  position: static;
+  width: 100%;
+  max-height: 260px;
+  box-shadow: none;
+}
+.obsc--sheet .obsc-chip,
+.obsc--sheet .obsc-add,
+.obsc--sheet .obsc-flag-btn,
+.obsc--sheet .obsc-flag-dismiss {
+  min-height: 36px;
+}
+.obsc--sheet .obsc-item {
+  min-height: 40px;
+}
+.obsc--sheet .obsc-input {
+  min-height: 84px;
+  font-size: 16px;
+}
+.obsc--sheet .obsc-hint {
+  display: none;
+}
+.obsc--sheet .obsc-add {
+  flex: 1 1 100%;
+  min-height: 44px;
+}
+
+@media (max-width: 600px) {
+  .obsc-sep {
+    display: none;
+  }
+  .obsc-hint {
+    display: none;
+  }
+  .obsc-menu {
+    width: 100%;
+  }
+}
+
+/* ── Dialog (gradebook cell menu) ────────────────────────── */
+.obsc-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 10vh 16px 16px;
+  background: rgba(0, 0, 0, 0.32);
+}
+.obsc-dialog {
+  width: 560px;
+  max-width: 100%;
+  background: var(--surface);
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.24);
+  padding: 14px 16px 16px;
+}
+.obsc-dialog-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.obsc-dialog-title {
+  font-weight: 700;
+  color: var(--text);
+}
+.obsc-dialog-sub {
+  font-size: var(--text-sm, 13px);
+  color: var(--text-2);
+}
+.obsc-dialog-close {
+  border: 0;
+  background: none;
+  color: var(--text-2);
+  font-size: 16px;
+  cursor: pointer;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+}
+.obsc-dialog-close:hover {
+  background: var(--overlay-hover);
+}
+.obsc-dialog .obsc {
+  border: 0;
+  padding: 0;
+}

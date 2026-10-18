@@ -15,7 +15,7 @@ window.StudentNotes = (function () {
     if (obs.length === 0) {
       container.innerHTML =
         '<div class="notes-empty">' +
-        'No notes or observations yet.<br>Add one below or capture from the <a href="#/observations?course=' +
+        'No notes or observations yet.<br>Add one above or capture from the <a href="#/observations?course=' +
         cid +
         '" style="color:var(--active);text-decoration:none">Observations</a> page.' +
         '</div>';
@@ -57,6 +57,7 @@ window.StudentNotes = (function () {
               (n.assignmentContext.proficiencyLevel ? ' · ' + esc(n.assignmentContext.proficiencyLevel) : '') +
               '</span>'
             : '') +
+          ObsCapture.linkPillsHtml(cid, n) +
           (n.dims || [])
             .map(function (t, i) {
               return (
@@ -87,15 +88,37 @@ window.StudentNotes = (function () {
     });
   }
 
-  function addNote(cid, studentId) {
-    var input = document.getElementById('note-input');
-    var text = (input.value || '').trim();
-    if (!text) return false;
-    addQuickOb(cid, studentId, text, []);
-    input.value = '';
-    input.focus();
-    renderNotes(cid, studentId);
-    return true;
+  /* The note box is the shared capture strip with this student fixed. One
+     strip per student, kept across page re-renders so its state and draft
+     survive. */
+  var _capture = null;
+  var _captureKey = null;
+  function mountCapture(cid, studentId, container) {
+    if (!container || typeof ObsCapture === 'undefined') return null;
+    var key = cid + '|' + studentId;
+    if (!_capture || _captureKey !== key) {
+      destroyCapture();
+      _capture = ObsCapture.create({
+        cid: cid,
+        idPrefix: 'note-',
+        students: [studentId],
+        lockStudents: true,
+        defaultAssessment: true,
+        draftKey: 'student|' + studentId,
+        placeholder: 'Add an observation\u2026',
+        onAdd: function () {
+          renderNotes(cid, studentId);
+        },
+      });
+      _captureKey = key;
+    }
+    _capture.mount(container);
+    return _capture;
+  }
+  function destroyCapture() {
+    if (_capture) _capture.destroy();
+    _capture = null;
+    _captureKey = null;
   }
 
   /* One click hides the note and offers Undo for six seconds; the delete
@@ -127,7 +150,8 @@ window.StudentNotes = (function () {
   return {
     renderNotes: renderNotes,
     filterNotes: filterNotes,
-    addNote: addNote,
+    mountCapture: mountCapture,
+    destroyCapture: destroyCapture,
     deleteNote: deleteNote,
   };
 })();

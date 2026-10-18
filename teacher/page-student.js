@@ -142,10 +142,6 @@ window.PageStudent = (function () {
     Notes.filterNotes(query);
   }
 
-  function addNote() {
-    Notes.addNote(activeCourse, studentId);
-  }
-
   /* ── Goal editing ───────────────────────────────────────── */
   function editGoal(secId) {
     document.getElementById('goal-edit-' + secId).style.display = '';
@@ -1201,9 +1197,9 @@ window.PageStudent = (function () {
     // 3. Notes & Observations
     html +=
       '<div class="insight-card notes-panel"><div class="insight-title">Notes & Observations</div>' +
+      '<div class="note-capture" id="note-capture"></div>' +
       '<input type="text" class="note-search-input" id="note-search" placeholder="Search…" aria-label="Search notes">' +
       '<div class="notes-scroll"><div class="notes-list" id="notes-list"></div></div>' +
-      '<div class="note-add-row"><input class="note-add-input" id="note-input" placeholder="Add a note\u2026" aria-label="Add a note"><button class="note-add-btn" data-action="addNote">Add</button></div>' +
       '</div>';
 
     html += '</div>'; // end insights-grid
@@ -1282,16 +1278,7 @@ window.PageStudent = (function () {
       });
     }
 
-    // Wire note input Enter key
-    var noteInputEl = document.getElementById('note-input');
-    if (noteInputEl) {
-      noteInputEl.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter') {
-          addNote();
-          e.preventDefault();
-        }
-      });
-    }
+    Notes.mountCapture(activeCourse, studentId, document.getElementById('note-capture'));
   }
 
   /* ── Delegated click handler ──────────────────────────────── */
@@ -1342,9 +1329,6 @@ window.PageStudent = (function () {
       },
       cancelReflEdit: function () {
         cancelReflEdit(el.dataset.secid);
-      },
-      addNote: function () {
-        addNote();
       },
       closeOverridePanel: function () {
         closeOverridePanel(el.dataset.secid);
@@ -1422,6 +1406,7 @@ window.PageStudent = (function () {
     _listeners = [];
     // Clean up any open edit modal
     closeEditStudent();
+    Notes.destroyCapture();
     delete window._pageSwitchCourse;
   }
 

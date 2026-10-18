@@ -2323,13 +2323,16 @@ window.PageGradebook = (function () {
       '<div class="gb-ctx-item" data-ctx="clearCell">Clear Score</div>' +
       '<div class="gb-ctx-divider"></div>' +
       '<div class="gb-ctx-item" data-ctx="markMissing">Mark Missing</div>' +
-      '<div class="gb-ctx-item" data-ctx="excuseCell">Excuse</div>';
+      '<div class="gb-ctx-item" data-ctx="excuseCell">Excuse</div>' +
+      '<div class="gb-ctx-divider"></div>' +
+      '<div class="gb-ctx-item" data-ctx="addObservation">Add observation</div>';
     document.body.appendChild(menu);
     menu.addEventListener('click', function (ev) {
       var item = ev.target.closest('[data-ctx]');
       if (!item) return;
       var action = item.dataset.ctx;
       if (action === 'editCell') startCellEdit(cell);
+      else if (action === 'addObservation') openObservationDialog(sid, aid);
       else if (action === 'clearCell') {
         var cid = activeCourse;
         var scores = getScores(cid);
@@ -2354,6 +2357,29 @@ window.PageGradebook = (function () {
     setTimeout(function () {
       document.addEventListener('click', _dismissContextMenu, { once: true });
     }, 0);
+  }
+
+  /* The shared capture strip in a dialog, with this cell's student and
+     assessment fixed. */
+  function openObservationDialog(sid, aid) {
+    var cid = activeCourse;
+    var student = getStudents(cid).find(function (s) {
+      return s.id === sid;
+    });
+    var assess = getAssessments(cid).find(function (a) {
+      return a.id === aid;
+    });
+    if (!student || !assess) return;
+    ObsCapture.openDialog({
+      cid: cid,
+      title: 'Add observation',
+      subtitle: displayName(student) + ' \u00b7 ' + (assess.title || 'Assessment'),
+      students: [sid],
+      lockStudents: true,
+      assessmentId: aid,
+      lockAssessment: true,
+      draftKey: 'gb-cell|' + sid + '|' + aid,
+    });
   }
 
   function showHeaderContextMenu(e, header) {
@@ -3115,6 +3141,7 @@ window.PageGradebook = (function () {
   }
 
   function destroy() {
+    ObsCapture.closeDialog();
     _flushActiveScoreEditor();
     if (_scoreMode) exitScoreMode();
     _listeners.forEach(function (l) {

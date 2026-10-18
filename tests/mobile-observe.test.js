@@ -6,6 +6,7 @@
  */
 
 import './setup-mobile.js';
+import { parseHTML } from 'linkedom';
 
 const CID = 'test';
 const originals = {};
@@ -41,6 +42,36 @@ afterEach(() => {
   restoreDataLayer();
   MObserve.resetSheetState();
 });
+
+/* The new-observation sheet mounts the shared capture strip, which needs a
+   real DOM: run it in linkedom with presentSheet writing into a container. */
+function withSheet(fn) {
+  const dom = parseHTML('<!doctype html><html><body><div id="sheet"></div></body></html>');
+  const origDoc = globalThis.document;
+  const origPresent = MComponents.presentSheet;
+  let opts = null;
+  globalThis.document = dom.document;
+  MComponents.presentSheet = (html, o) => {
+    opts = o;
+    dom.document.getElementById('sheet').innerHTML = html;
+  };
+  try {
+    return fn(dom.document.getElementById('sheet'), () => opts, dom);
+  } finally {
+    if (opts && opts.onClose) opts.onClose();
+    globalThis.document = origDoc;
+    MComponents.presentSheet = origPresent;
+  }
+}
+
+const EDIT_OB = {
+  id: 'ob1',
+  text: 'Great work',
+  sentiment: null,
+  context: null,
+  dims: [],
+  created: '2026-10-18T10:00:00Z',
+};
 
 /* ── renderFeed ─────────────────────────────────────────────── */
 describe('MObserve.renderFeed', () => {
@@ -203,43 +234,40 @@ describe('Sheet state management', () => {
   });
 });
 
-/* ── Sentiment ARIA (radiogroup pattern) ────────────────────── */
+/* ── Sentiment ARIA on the edit sheet (radiogroup pattern) ─── */
 describe('Sentiment button accessibility', () => {
-  it('renders sentiment buttons with role="radio" and aria-checked', () => {
-    mockDataLayer({});
-    // presentNewObsSheet builds the HTML — we capture it via the MComponents.presentSheet spy
-    // Instead, test the expected pattern in renderFeed's sheet template
-    // The sheet HTML is generated in presentNewObsSheet — we need to mock presentSheet
+  function editHtml() {
     let capturedHTML = '';
     const origPresent = MComponents.presentSheet;
     MComponents.presentSheet = html => {
       capturedHTML = html;
     };
-
-    MObserve.presentNewObsSheet(CID);
-
-    expect(capturedHTML).toContain('role="radiogroup"');
-    expect(capturedHTML).toContain('aria-label="Observation type"');
-    expect(capturedHTML).toContain('role="radio"');
-    expect(capturedHTML).toContain('aria-checked="false"');
-
+    mockDataLayer({ getStudentQuickObs: () => [EDIT_OB] });
+    MObserve.presentEditObsSheet(CID, 'stu1', 'ob1');
     MComponents.presentSheet = origPresent;
+    return capturedHTML;
+  }
+
+  it('renders sentiment buttons with role="radio" and aria-checked', () => {
+    const html = editHtml();
+    expect(html).toContain('role="radiogroup"');
+    expect(html).toContain('aria-label="Observation type"');
+    expect(html).toContain('role="radio"');
+    expect(html).toContain('aria-checked="false"');
   });
 
   it('renders textarea with proper <label> element', () => {
-    let capturedHTML = '';
-    const origPresent = MComponents.presentSheet;
-    MComponents.presentSheet = html => {
-      capturedHTML = html;
-    };
+    const html = editHtml();
+    expect(html).toContain('<label');
+    expect(html).toContain('for="m-obs-text"');
+  });
 
-    mockDataLayer({});
-    MObserve.presentNewObsSheet(CID);
-
-    expect(capturedHTML).toContain('<label');
-    expect(capturedHTML).toContain('for="m-obs-text"');
-
-    MComponents.presentSheet = origPresent;
+  it('offers Core Competencies and custom tags, not just dispositions', () => {
+    globalThis.getCustomTags = () => ['Lab safety'];
+    const html = editHtml();
+    expect(html).toContain('Core competencies');
+    expect(html).toContain('data-val="tag:Lab safety"');
+    expect(html).toContain('m-dim-chip');
   });
 });
 
@@ -312,19 +340,12 @@ describe('Form selection toggles', () => {
 /* ── Sheet onClose callback ─────────────────────────────────── */
 describe('Sheet form cleanup on dismiss', () => {
   it('passes onClose callback to presentSheet', () => {
-    let receivedOpts = null;
-    const origPresent = MComponents.presentSheet;
-    MComponents.presentSheet = (html, opts) => {
-      receivedOpts = opts;
-    };
-
     mockDataLayer({});
-    MObserve.presentNewObsSheet(CID);
-
-    expect(receivedOpts).not.toBeNull();
-    expect(typeof receivedOpts.onClose).toBe('function');
-
-    MComponents.presentSheet = origPresent;
+    withSheet((sheet, getOpts) => {
+      MObserve.presentNewObsSheet(CID);
+      expect(getOpts()).not.toBeNull();
+      expect(typeof getOpts().onClose).toBe('function');
+    });
   });
 });
 
@@ -442,114 +463,93 @@ describe('Observation feed edge cases', () => {
   });
 });
 
-/* ── Sheet form content ─────────────────────────────────────── */
+/* ── Sheet form content: the shared capture strip ──────────── */
 describe('New observation sheet content', () => {
-  it('includes student picker', () => {
-    let capturedHTML = '';
-    const origPresent = MComponents.presentSheet;
-    MComponents.presentSheet = html => {
-      capturedHTML = html;
-    };
+  it('is the shared capture strip in its sheet layout', () => {
     mockDataLayer({});
-    MObserve.presentNewObsSheet(CID);
-    expect(capturedHTML).toContain('m-student-picker');
-    expect(capturedHTML).toContain('Select student...');
-    MComponents.presentSheet = origPresent;
+    withSheet(sheet => {
+      MObserve.presentNewObsSheet(CID);
+      expect(sheet.textContent).toContain('New observation');
+      expect(sheet.querySelector('.obsc.obsc--sheet')).toBeTruthy();
+      expect(sheet.querySelector('#m-capture-input').getAttribute('placeholder')).toBe('What did you notice?');
+      expect(sheet.querySelector('#m-capture-add-btn').disabled).toBe(true);
+    });
   });
 
-  it('includes textarea for observation text', () => {
-    let capturedHTML = '';
-    const origPresent = MComponents.presentSheet;
-    MComponents.presentSheet = html => {
-      capturedHTML = html;
-    };
+  it('renders the three types, context and tags as text, with no emoji', () => {
     mockDataLayer({});
-    MObserve.presentNewObsSheet(CID);
-    expect(capturedHTML).toContain('m-sheet-textarea');
-    expect(capturedHTML).toContain('What did you notice?');
-    MComponents.presentSheet = origPresent;
+    withSheet(sheet => {
+      MObserve.presentNewObsSheet(CID);
+      const types = Array.from(sheet.querySelectorAll('.obsc-chip-type')).map(b => b.textContent);
+      expect(types).toEqual(['Strength', 'Growth', 'Concern']);
+      expect(sheet.textContent).toContain('Context');
+      expect(sheet.textContent).toContain('+ Tag');
+      expect(sheet.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
+    });
   });
 
-  it('includes all context options', () => {
-    let capturedHTML = '';
-    const origPresent = MComponents.presentSheet;
-    MComponents.presentSheet = html => {
-      capturedHTML = html;
-    };
+  it('lists every student in a searchable picker', () => {
     mockDataLayer({});
-    MObserve.presentNewObsSheet(CID);
-    expect(capturedHTML).toContain('m-context-btn');
-    MComponents.presentSheet = origPresent;
+    withSheet((sheet, getOpts, dom) => {
+      MObserve.presentNewObsSheet(CID);
+      sheet.querySelector('#m-student-btn').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+      const menu = sheet.querySelector('#m-student-dropdown');
+      expect(menu.querySelector('.obsc-menu-search')).toBeTruthy();
+      expect(menu.textContent).toContain('Cece Adams');
+      expect(menu.textContent).toContain('Noor Khan');
+    });
   });
 
-  it('includes dimension tag chips', () => {
-    let capturedHTML = '';
-    const origPresent = MComponents.presentSheet;
-    MComponents.presentSheet = html => {
-      capturedHTML = html;
-    };
-    mockDataLayer({});
-    MObserve.presentNewObsSheet(CID);
-    expect(capturedHTML).toContain('m-dim-chip');
-    MComponents.presentSheet = origPresent;
+  it('offers Core Competencies and custom tags, which the phone lacked before', () => {
+    mockDataLayer({ getCustomTags: () => ['Lab safety'] });
+    withSheet((sheet, getOpts, dom) => {
+      MObserve.presentNewObsSheet(CID);
+      sheet.querySelector('#m-tag-btn').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+      const menu = sheet.querySelector('#m-tag-dropdown');
+      expect(menu.textContent).toContain('Core competencies');
+      expect(menu.textContent).toContain('Custom tags');
+      expect(menu.textContent).toContain('Lab safety');
+    });
   });
 
-  it('includes disabled submit button', () => {
-    let capturedHTML = '';
-    const origPresent = MComponents.presentSheet;
-    MComponents.presentSheet = html => {
-      capturedHTML = html;
-    };
+  it('a quick-compose student is pre-selected', () => {
     mockDataLayer({});
-    MObserve.presentNewObsSheet(CID);
-    expect(capturedHTML).toContain('disabled');
-    expect(capturedHTML).toContain('Add observation');
-    MComponents.presentSheet = origPresent;
+    withSheet(sheet => {
+      MObserve.presentNewObsSheet(CID, 'stu2');
+      expect(sheet.querySelector('.obsc-chip-student').textContent).toContain('Noor Khan');
+    });
   });
 
-  it('renders all three sentiment options', () => {
-    let capturedHTML = '';
-    const origPresent = MComponents.presentSheet;
-    MComponents.presentSheet = html => {
-      capturedHTML = html;
-    };
-    mockDataLayer({});
-    MObserve.presentNewObsSheet(CID);
-    expect(capturedHTML).toContain('Strength');
-    expect(capturedHTML).toContain('Growth');
-    expect(capturedHTML).toContain('Concern');
-    MComponents.presentSheet = origPresent;
-  });
-
-  it('renders type, context and tags as text, with no emoji', () => {
-    let capturedHTML = '';
-    const origPresent = MComponents.presentSheet;
-    MComponents.presentSheet = html => {
-      capturedHTML = html;
-    };
-    mockDataLayer({});
-    MObserve.presentNewObsSheet(CID);
-    expect(capturedHTML).toContain('>Strength</button>');
-    expect(capturedHTML).toContain('Whole class');
-    expect(capturedHTML).toMatch(/m-obs-tag-dot/);
-    expect(capturedHTML).not.toMatch(/\p{Extended_Pictographic}/u);
-    MComponents.presentSheet = origPresent;
-  });
-
-  it('includes searchable student list', () => {
-    let capturedHTML = '';
-    const origPresent = MComponents.presentSheet;
-    MComponents.presentSheet = html => {
-      capturedHTML = html;
-    };
-    mockDataLayer({});
-    MObserve.presentNewObsSheet(CID);
-    expect(capturedHTML).toContain('m-picker-search');
-    expect(capturedHTML).toContain('m-picker-item');
-    // Should list all students
-    expect(capturedHTML).toContain('Cece Adams');
-    expect(capturedHTML).toContain('Noor Khan');
-    MComponents.presentSheet = origPresent;
+  it('saving writes through addQuickOb with the type and tags', () => {
+    const added = [];
+    mockDataLayer({
+      addQuickOb: (cid, sid, text, dims, sentiment) => {
+        added.push({ sid, text, dims, sentiment });
+        return true;
+      },
+    });
+    const origDismiss = MComponents.dismissSheet;
+    const origToast = MComponents.showToast;
+    MComponents.dismissSheet = () => {};
+    MComponents.showToast = () => {};
+    try {
+      withSheet((sheet, getOpts, dom) => {
+        MObserve.presentNewObsSheet(CID, 'stu1');
+        sheet
+          .querySelector('[data-obsc="type"][data-value="strength"]')
+          .dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+        const input = sheet.querySelector('#m-capture-input');
+        input.value = 'Asked a sharp question #engagement';
+        sheet.querySelector('#m-capture-add-btn').disabled = false;
+        sheet.querySelector('#m-capture-add-btn').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+      });
+    } finally {
+      MComponents.dismissSheet = origDismiss;
+      MComponents.showToast = origToast;
+    }
+    expect(added).toEqual([
+      { sid: 'stu1', text: 'Asked a sharp question', dims: ['engagement'], sentiment: 'strength' },
+    ]);
   });
 });
 
