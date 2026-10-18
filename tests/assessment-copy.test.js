@@ -267,3 +267,83 @@ describe('copy_group on the server write path', () => {
     expect(next.copyGroup).toBe('11111111-2222-4333-8444-555555555555');
   });
 });
+
+describe('the Classes row, card chips and sibling toggle', () => {
+  const A = 'cls-eng9-a';
+  const B = 'cls-eng9-b';
+  const H = 'cls-hist12';
+
+  beforeEach(() => {
+    localStorage.clear();
+    saveCourses({
+      [A]: { id: A, name: 'English 9 - Block A' },
+      [B]: { id: B, name: 'English 9 B' },
+      [H]: { id: H, name: 'History 12' },
+    });
+    _cache.assessments[A] = [{ id: 'a1', title: 'Essay', copyGroup: 'g1', tagIds: [] }];
+    _cache.assessments[B] = [{ id: 'b1', title: 'Essay', copyGroup: 'g1', tagIds: [] }];
+    _cache.assessments[H] = [];
+    [A, B, H].forEach(cid => {
+      _cache.categories[cid] = [];
+      _cache.rubrics[cid] = [];
+      _cache.modules[cid] = [];
+      _cache.learningMaps[cid] = { subjects: [], sections: [], _customized: true, _version: 1 };
+    });
+  });
+
+  it('labels a section by what is left after the course name', () => {
+    expect(AssessmentCopy.sectionLabel('English 9 - Block A')).toBe('Block A');
+    expect(AssessmentCopy.sectionLabel('English 9 B')).toBe('B');
+    expect(AssessmentCopy.sectionLabel('English 9 (Period 3)')).toBe('Period 3');
+    expect(AssessmentCopy.sectionLabel('History 12')).toBe('History 12');
+  });
+
+  it('remembers the classes ticked last time, dropping ones that are gone', () => {
+    AssessmentCopy.rememberTargets(A, [B, 'cls-deleted']);
+    expect(AssessmentCopy.rememberedTargets(A)).toEqual([B]);
+    AssessmentCopy.rememberTargets(A, []);
+    expect(AssessmentCopy.rememberedTargets(A)).toEqual([]);
+  });
+
+  it('pre-ticks remembered classes for a new assessment but not when editing', () => {
+    AssessmentCopy.rememberTargets(A, [B]);
+    var fresh = AssessmentCopy.renderClassesField(A, null);
+    expect(fresh).toMatch(/data-cid="cls-eng9-b" aria-pressed="true"/);
+    var editing = AssessmentCopy.renderClassesField(A, { id: 'a1', title: 'Essay' });
+    expect(editing).toMatch(/data-cid="cls-eng9-b" aria-pressed="false"/);
+    expect(fresh).toMatch(/English 9 - Block A/);
+    expect(fresh).toMatch(/More classes/);
+  });
+
+  it('finds local copies and builds the card chip, delete note and sibling toggle', () => {
+    var copies = AssessmentCopy.localCopies(A, _cache.assessments[A][0]);
+    expect(copies).toEqual([{ cid: B, assessmentId: 'b1', className: 'English 9 B' }]);
+    var chip = AssessmentCopy.renderCardCopies(A, _cache.assessments[A][0]);
+    expect(chip).toMatch(/data-action="openCopyIn"/);
+    expect(chip).toMatch(/data-aid="b1"/);
+    expect(chip).toMatch(/Also in B/);
+    expect(AssessmentCopy.deleteNote(A, _cache.assessments[A][0])).toMatch(/also in English 9 B; that copy stays/);
+    expect(AssessmentCopy.deleteNote(H, { id: 'x' })).toBe('');
+    var toggle = AssessmentCopy.renderSiblingToggle(A);
+    expect(toggle).toMatch(/Block A/);
+    expect(toggle).toMatch(/data-cid="cls-eng9-b"/);
+    expect(AssessmentCopy.renderSiblingToggle(H)).toBe('');
+  });
+
+  it('describes a linked edit in plain words', () => {
+    _cache.categories[B] = [{ id: 'bc', name: 'Essays', weight: 100, displayOrder: 0 }];
+    var lines = AssessmentCopy.describePatch(B, {
+      title: 'Essay (final)',
+      dueDate: '2026-10-30',
+      categoryId: 'bc',
+      scoreMode: 'points',
+      maxPoints: 20,
+      rubricId: undefined,
+    });
+    expect(lines).toContain('Title → Essay (final)');
+    expect(lines.some(l => /^Due date → /.test(l))).toBe(true);
+    expect(lines).toContain('Category → Essays');
+    expect(lines).toContain('Scoring → Points out of 20');
+    expect(lines).toContain('Rubric → none');
+  });
+});
