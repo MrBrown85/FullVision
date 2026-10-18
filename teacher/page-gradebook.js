@@ -12,6 +12,16 @@ window.PageGradebook = (function () {
   /* ── State variables ────────────────────────────────────── */
   var activeCourse;
   var viewMode = localStorage.getItem('gb_viewMode') || 'detailed';
+  /* The Competencies view shows a rubric assessment as one column per
+     competency ('competencies', the default) or one per criterion
+     ('criteria'). Remembered per class on this device. */
+  function rubricColumnsMode(cid) {
+    return localStorage.getItem('gb_rubricColumns_' + cid) === 'criteria' ? 'criteria' : 'competencies';
+  }
+  function setRubricColumns(mode) {
+    localStorage.setItem('gb_rubricColumns_' + activeCourse, mode === 'criteria' ? 'criteria' : 'competencies');
+    render();
+  }
   var _pinnedCols = { name: true, final: true }; // pinnable: name, categories, final
   var _undoStack = [];
   var _scoreMode = null; // null or { assessmentId, studentIdx }
@@ -241,6 +251,28 @@ window.PageGradebook = (function () {
       (viewMode === 'summary') +
       '">Summary</button>' +
       '</div>';
+
+    var hasRubricAssessment = allAssessments.some(function (a) {
+      return rubricCriterionColumns(a, cid).length > 0;
+    });
+    if (viewMode === 'detailed' && hasRubricAssessment) {
+      var rubricCols = rubricColumnsMode(cid);
+      html +=
+        '<div class="gb-rubric-cols">' +
+        '<span class="gb-rubric-cols-label" id="gb-rubric-cols-label">Rubric columns</span>' +
+        '<div class="gb-seg-control" role="tablist" aria-labelledby="gb-rubric-cols-label">' +
+        '<button class="gb-seg-btn' +
+        (rubricCols === 'competencies' ? ' active' : '') +
+        '" data-action="setRubricColumns" data-mode="competencies" role="tab" aria-selected="' +
+        (rubricCols === 'competencies') +
+        '" title="One column per competency the rubric scores">Competencies</button>' +
+        '<button class="gb-seg-btn' +
+        (rubricCols === 'criteria' ? ' active' : '') +
+        '" data-action="setRubricColumns" data-mode="criteria" role="tab" aria-selected="' +
+        (rubricCols === 'criteria') +
+        '" title="One column per rubric criterion">Criteria</button>' +
+        '</div></div>';
+    }
 
     html += typeof renderTermPicker === 'function' ? renderTermPicker(cid) : '';
 
@@ -627,10 +659,46 @@ window.PageGradebook = (function () {
   /* ══════════════════════════════════════════════════════════
      DETAILED VIEW
      ══════════════════════════════════════════════════════════ */
+  /* The columns a rubric assessment gets in Criteria mode: one per
+     criterion, showing the score under the criterion's first key (its first
+     competency, or its own id when it has none). `tagIds` are the keys left
+     after the section filter; a criterion none of whose keys survive is
+     left out. Empty when the assessment has no rubric. */
+  function _criterionColumns(cid, a, tagIds) {
+    return rubricCriterionColumns(a, cid)
+      .filter(function (c) {
+        return c.keys.some(function (key) {
+          return tagIds.indexOf(key) >= 0;
+        });
+      })
+      .map(function (c) {
+        var codes = c.keys
+          .map(function (key) {
+            var info = scoreKeyInfo(cid, a, key);
+            return info && info.tag ? _tagShortCode(info.tag) || info.label : '';
+          })
+          .filter(Boolean);
+        var sec = getSectionForTag(cid, c.keys[0]);
+        var name = c.criterion.name || 'Criterion';
+        return {
+          assessmentId: a.id,
+          tagId: c.keys[0],
+          tagIds: c.keys,
+          isCriterionCol: true,
+          tagCode: name,
+          sectionColor: sec ? sec.color : 'var(--text-3)',
+          tagText: codes.length
+            ? name + ' \u00b7 ' + codes.join(', ')
+            : name + ': counts toward the overall grade only',
+        };
+      });
+  }
+
   function renderDetailedTable(cid, students, assessments, sections, isLetter, scores) {
     var cols = [];
     var groups = [];
     var groupIdx = 0;
+    var byCriterion = rubricColumnsMode(cid) === 'criteria';
     assessments.forEach(function (a) {
       // Competencies, rubric criteria with none, or one overall column.
       var tagIds = scoreTagIds(a, cid);
@@ -642,7 +710,12 @@ window.PageGradebook = (function () {
       }
       if (tagIds.length === 0) return;
       var start = cols.length;
-      if (isPointsScored(a)) {
+      var criterionCols = byCriterion && !isPointsScored(a) ? _criterionColumns(cid, a, tagIds) : [];
+      if (criterionCols.length > 0) {
+        criterionCols.forEach(function (col) {
+          cols.push(col);
+        });
+      } else if (isPointsScored(a)) {
         var sec = getSectionForTag(cid, tagIds[0]);
         cols.push({
           assessmentId: a.id,
@@ -668,8 +741,9 @@ window.PageGradebook = (function () {
         });
       }
       var colCount = cols.length - start;
-      var groupW = Math.max(120, colCount * 54);
-      var colW = colCount === 1 ? groupW : 54;
+      var unitW = criterionCols.length > 0 ? 96 : 54;
+      var groupW = Math.max(120, colCount * unitW);
+      var colW = colCount === 1 ? groupW : unitW;
       // Set colWidth on each column in this group
       for (var ci = start; ci < cols.length; ci++) cols[ci].colWidth = colW;
       groups.push({ assessment: a, startIdx: start, count: colCount, groupIdx: groupIdx++, groupW: groupW });
@@ -765,6 +839,7 @@ window.PageGradebook = (function () {
       html +=
         '<div class="gb-grid-tag-header' +
         altClass +
+        (col.isCriterionCol ? ' gb-grid-tag-header-crit' : '') +
         '" style="flex:0 0 ' +
         tagW +
         'px;width:' +
@@ -897,6 +972,7 @@ window.PageGradebook = (function () {
             col.assessmentId +
             '" data-tid="' +
             col.tagId +
+            (col.tagIds && col.tagIds.length > 1 ? '" data-tids="' + esc(col.tagIds.join(',')) : '') +
             '" data-sid="' +
             s.id +
             '" data-action="cycleScore"><span class="gb-score-val s' +
@@ -1765,6 +1841,13 @@ window.PageGradebook = (function () {
 
   /* ── Score cycling ──────────────────────────────────────── */
   var seq = [3, 4, 0, 1, 2];
+  /* The score keys a Competencies-view cell writes: its one key, or every
+     key of its rubric criterion (data-tids) in Criteria mode. */
+  function _cellScoreKeys(td) {
+    var tids = (td.dataset.tids || '').split(',').filter(Boolean);
+    return tids.length ? tids : [td.dataset.tid];
+  }
+
   function cycleScore(td) {
     var cid = activeCourse;
     var aid = td.dataset.aid;
@@ -1786,15 +1869,38 @@ window.PageGradebook = (function () {
     var entry = scores[sid].find(function (e) {
       return e.assessmentId === aid && e.tagId === tid;
     });
-    var prevEntry = entry ? structuredClone(entry) : null;
     var current = entry ? entry.score : 0;
     var next = seq[(seq.indexOf(current) + 1) % seq.length];
-    _undoStack.push({ cid: cid, sid: sid, aid: aid, tagIds: [tid], prevEntries: [prevEntry] });
+    // A criterion cell (Rubric columns: Criteria) scores every competency
+    // the criterion feeds, as the rubric scorer does.
+    var tids = _cellScoreKeys(td);
+    _undoStack.push({
+      cid: cid,
+      sid: sid,
+      aid: aid,
+      tagIds: tids,
+      prevEntries: tids.map(function (key) {
+        var e = scores[sid].find(function (x) {
+          return x.assessmentId === aid && x.tagId === key;
+        });
+        return e ? structuredClone(e) : null;
+      }),
+    });
     while (_undoStack.length > 50) _undoStack.shift();
     // Use single-row upsert instead of full DELETE+INSERT bulk sync —
     // the bulk pattern is non-transactional and can lose data if INSERT
     // fails after DELETE succeeds.
-    upsertScore(cid, sid, aid, tid, next, assess ? assess.date : courseToday(cid), assess ? assess.type : 'summative');
+    tids.forEach(function (key) {
+      upsertScore(
+        cid,
+        sid,
+        aid,
+        key,
+        next,
+        assess ? assess.date : courseToday(cid),
+        assess ? assess.type : 'summative',
+      );
+    });
     var span = td.querySelector('.gb-score-val');
     span.className = 'gb-score-val s' + next;
     if (next > 0) {
@@ -1823,20 +1929,35 @@ window.PageGradebook = (function () {
     var assess = getAssessments(cid).find(function (a) {
       return a.id === aid;
     });
-    _undoStack.push({ cid: cid, sid: sid, aid: aid, tagIds: [tid], prevEntries: [structuredClone(entry)] });
+    var tids = _cellScoreKeys(td);
+    var entries = getScores(cid)[sid] || [];
+    _undoStack.push({
+      cid: cid,
+      sid: sid,
+      aid: aid,
+      tagIds: tids,
+      prevEntries: tids.map(function (key) {
+        var e = entries.find(function (x) {
+          return x.assessmentId === aid && x.tagId === key;
+        });
+        return e ? structuredClone(e) : null;
+      }),
+    });
     while (_undoStack.length > 50) _undoStack.shift();
     var level = entry.score;
-    upsertScore(
-      cid,
-      sid,
-      aid,
-      tid,
-      level,
-      assess ? assess.date : courseToday(cid),
-      assess ? assess.type : 'summative',
-      entry.note || '',
-      next,
-    );
+    tids.forEach(function (key) {
+      upsertScore(
+        cid,
+        sid,
+        aid,
+        key,
+        level,
+        assess ? assess.date : courseToday(cid),
+        assess ? assess.type : 'summative',
+        entry.note || '',
+        next,
+      );
+    });
     var span = td.querySelector('.gb-score-val');
     if (span) span.textContent = formatScoreLevel(level, next);
     updateRowSummary(cid, sid, td.closest('tr'));
@@ -2871,6 +2992,9 @@ window.PageGradebook = (function () {
     var handlers = {
       setView: function () {
         setView(el.dataset.mode);
+      },
+      setRubricColumns: function () {
+        setRubricColumns(el.dataset.mode);
       },
       toggleFilterStrip: function () {
         toggleFilterStrip();

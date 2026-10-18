@@ -409,6 +409,26 @@ function scoreTagIds(assessment, cid) {
   return ids.length ? ids : [UNLINKED_TAG_ID];
 }
 
+/* A rubric assessment's criteria as gradebook columns, one per criterion:
+   { criterion, keys } where keys are the score keys the criterion stores
+   under (its competencies, or its own id when it has none). The first key
+   is the one a cell shows. Empty for a points assessment or one with no
+   rubric, so the caller falls back to one column per competency. */
+function rubricCriterionColumns(assessment, cid) {
+  var rubricId = assessment && (assessment.rubricId || assessment.rubric_id);
+  if (!cid || !rubricId || isPointsScored(assessment) || typeof getRubricById !== 'function') return [];
+  var rubric = getRubricById(cid, rubricId);
+  var criteria = (rubric && rubric.criteria) || [];
+  var out = [];
+  criteria.forEach(function (criterion) {
+    if (!criterion || !criterion.id) return;
+    var keys = rubricCriterionScoreKeys(criterion);
+    if (!keys.length) return;
+    out.push({ criterion: criterion, keys: keys });
+  });
+  return out;
+}
+
 /* Extra credit: a points score can go up to twice the maximum (12/10), as
    Schoology allows. The course % can then pass 100. */
 const POINTS_EXTRA_CREDIT_FACTOR = 2;

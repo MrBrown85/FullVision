@@ -577,6 +577,11 @@ window.PageStudent = (function () {
         html += _renderSecMini(sec);
       });
     }
+    // How the levels above are worked out (the class's setting).
+    html +=
+      '<div class="student-calc-method" title="How each competency level is worked out from the scores. Change it in Class Management.">Competency levels: ' +
+      esc(describeCalcMethod(cid)) +
+      '</div>';
     html += '</div>';
 
     // ── Assessment Grades Table ──

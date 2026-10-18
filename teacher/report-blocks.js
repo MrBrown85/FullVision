@@ -259,7 +259,8 @@ window.ReportBlocks = (function () {
     const assessments = getAssessments(cid);
     const allScores = getScores(cid)[student.id] || [];
     let html = `<div class="report-block-box">
-    <div class="report-block-title">Learning Outcomes</div>`;
+    <div class="report-block-title">Learning Outcomes</div>
+    <div style="font-size:0.62rem;color:var(--text-3);margin:-2px 0 6px">Competency levels: ${esc(describeCalcMethod(cid))}</div>`;
     sections.forEach(sec => {
       const secProf = getSectionProficiency(cid, student.id, sec.id);
       const sr = Math.round(secProf);

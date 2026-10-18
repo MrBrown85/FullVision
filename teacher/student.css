@@ -40,6 +40,15 @@
   font-weight: 700;
 }
 
+/* One muted line under the section cards: the class's calculation method */
+.student-calc-method {
+  flex: 1 1 100%;
+  padding: 5px 20px;
+  font-family: var(--font-base);
+  font-size: var(--text-xs);
+  color: var(--text-3);
+}
+
 /* Mini section stat cards — equal size, wrap to rows */
 .section-mini-card {
   flex: 1 1 0;
