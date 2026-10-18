@@ -17,7 +17,7 @@ window.MGrade = (function () {
   var _FILTER_DEFAULTS = {
     category: [],
     module: [],
-    dateRange: 'all', //  'all' | 'week' | '30d' | 'term'
+    dateRange: 'all', //  'all' | 'week' | '30d' | 'term:<ordinal>' (a reporting term)
     gradedStatus: 'all', //  'all' | 'has-ungraded' | 'fully-graded'
   };
   var _filters = _cloneFilters(_FILTER_DEFAULTS);
@@ -37,13 +37,42 @@ window.MGrade = (function () {
     };
   }
 
+  /* The class's reporting terms (shared/data.js). Empty when it has none. */
+  function _terms(cid) {
+    return typeof getReportingTerms === 'function' ? getReportingTerms(cid) || [] : [];
+  }
+
+  /* The dateRange value for a term: 'term:<ordinal>'. */
+  function _termValue(term) {
+    return 'term:' + term.ordinal;
+  }
+
+  /* The term a dateRange value names, or null for the fixed ranges. */
+  function _termForValue(cid, value) {
+    if (typeof value !== 'string' || value.indexOf('term:') !== 0) return null;
+    var ordinal = Number(value.slice(5));
+    return (
+      _terms(cid).find(function (t) {
+        return t.ordinal === ordinal;
+      }) || null
+    );
+  }
+
+  /* A saved dateRange is kept only if it is still an option. The old
+   * 'term' value (last 90 days) and a term the class no longer has fall
+   * back to all time. */
+  function _validDateRange(cid, value) {
+    if (['all', 'week', '30d'].indexOf(value) >= 0) return value;
+    return _termForValue(cid, value) ? value : 'all';
+  }
+
   function _loadFilters(cid) {
     var raw = typeof _safeParseLS === 'function' ? _safeParseLS('gb-grade-filters-' + cid, null) : null;
     if (!raw || typeof raw !== 'object') return _cloneFilters(_FILTER_DEFAULTS);
     return {
       category: Array.isArray(raw.category) ? raw.category.slice() : [],
       module: Array.isArray(raw.module) ? raw.module.slice() : [],
-      dateRange: ['all', 'week', '30d', 'term'].indexOf(raw.dateRange) >= 0 ? raw.dateRange : 'all',
+      dateRange: _validDateRange(cid, raw.dateRange),
       gradedStatus: ['all', 'has-ungraded', 'fully-graded'].indexOf(raw.gradedStatus) >= 0 ? raw.gradedStatus : 'all',
     };
   }
@@ -230,8 +259,15 @@ window.MGrade = (function () {
     }
     // Date range: segment === 'recent' already applied above, don't double-cut.
     if (_segmentMode !== 'recent' && _filters.dateRange !== 'all') {
-      var cutoff = ctx.dateCutoffs[_filters.dateRange];
-      if (cutoff && new Date(a.date) < cutoff) return false;
+      if (ctx.term) {
+        // A reporting term keeps the assessments dated inside it. An
+        // undated assessment is in no term (docs/DECISIONS.md, "Reporting
+        // periods" item 2).
+        if (!a.date || a.date < ctx.term.starts_on || a.date > ctx.term.ends_on) return false;
+      } else {
+        var cutoff = ctx.dateCutoffs[_filters.dateRange];
+        if (cutoff && new Date(a.date) < cutoff) return false;
+      }
     }
     // Graded status.
     if (_filters.gradedStatus !== 'all') {
@@ -258,8 +294,8 @@ window.MGrade = (function () {
       dateCutoffs: {
         week: new Date(now.getTime() - 7 * 86400000),
         '30d': new Date(now.getTime() - 30 * 86400000),
-        term: new Date(now.getTime() - 90 * 86400000),
       },
+      term: _termForValue(cid, _filters.dateRange),
     };
 
     // Update segmented control active state
@@ -350,16 +386,18 @@ window.MGrade = (function () {
         '</div>';
     }
 
-    var dateSeg = seg(
-      'dateRange',
-      [
-        { val: 'all', label: 'All time' },
-        { val: 'week', label: 'This week' },
-        { val: '30d', label: 'Last 30 days' },
-        { val: 'term', label: 'Last term' },
-      ],
-      _sheetStaged.dateRange,
+    // One option per reporting term, after the fixed ranges. The list on
+    // this screen follows the term; grades on mobile stay all-time.
+    var dateOptions = [
+      { val: 'all', label: 'All time' },
+      { val: 'week', label: 'This week' },
+      { val: '30d', label: 'Last 30 days' },
+    ].concat(
+      _terms(cid).map(function (t) {
+        return { val: _termValue(t), label: t.label };
+      }),
     );
+    var dateSeg = seg('dateRange', dateOptions, _sheetStaged.dateRange);
 
     var statusSeg = seg(
       'gradedStatus',

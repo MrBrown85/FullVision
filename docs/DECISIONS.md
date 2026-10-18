@@ -51,4 +51,4 @@ Context: `ROADMAP.md` 1.2; `migrations/20261017_course_reporting_terms.sql`; `fu
 4. **A competency override applies in every term that has evidence**, as it does all time. With no evidence in the term the level is "no evidence", override or not.
 5. **No overlap, no gaps required.** Terms may leave gaps; they may not overlap. The server enforces the shape and date order; overlap is a client rule.
 6. **Duplicate Class does not copy terms.** Dates belong to one school year.
-7. **Mobile stays all-time** until its grade filter uses real terms.
+7. **Mobile grades stay all-time.** The grade list's date filter offers each reporting term by name and keeps the assessments dated inside it (undated ones drop out), but it is a list filter only: nothing on mobile sets the active term, so every grade there is all-time.
