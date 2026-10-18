@@ -12,21 +12,22 @@ Live at fullvision.ca. Owner: Colin Brown, a Surrey (SD36) teacher. Read `docs/R
 
 ## Where things live
 
-| Path                        | What it is                                                                                                                                          |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `shared/calc.js`            | All grade math. Course %, letters, proficiency roll-ups, `formatLevel`, `studentGradeSummary`, `courseGradeMode`. Nothing else computes a grade.    |
-| `shared/data.js`            | The data layer: in-memory cache, localStorage, RPC dispatch, offline outbox, local-id → UUID rekeying, class bundle loading.                        |
-| `shared/constants.js`       | Scales, dimensions, labels, BC designations.                                                                                                        |
-| `shared/offline-queue.js`   | `window.v2Queue`: queued writes, retry, dead letters.                                                                                               |
-| `shared/seed-data.js`       | Demo Mode's sample class (Science 8). The only sample data.                                                                                         |
-| `shared/supabase.js`        | Auth, session, sign-out wipe.                                                                                                                       |
-| `teacher/`                  | Desktop SPA: `app.html`, `router.js`, `page-*.js`, `ui.js`, `dash-class-manager.js`, reports.                                                       |
-| `teacher-mobile/`           | Phone PWA: `index.html`, `shell.js`, `tab-*.js`, `components.js`. Loads `teacher/styles.css` for tokens.                                            |
-| `migrations/`               | Applied SQL, one file per change, each with a comment saying what broke and why.                                                                    |
-| `schema.sql`                | Readable snapshot of the database, not a replayable log.                                                                                            |
-| `curriculum_by_course.json` | BC curriculum index: 223 courses, competencies, I-can statements. Reference data.                                                                   |
-| `tests/`                    | Vitest. `e2e/` Playwright against the static build. `e2e-real/` Playwright against a live account.                                                  |
-| `docs/`                     | `ARCHITECTURE.md` (shape), `ROADMAP.md`, `STUDENT-VOICE-PLAN.md`, `DECISIONS.md`, `grading-compliance-plan.md`, `backend-design/` (design history). |
+| Path                               | What it is                                                                                                                                          |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `shared/calc.js`                   | All grade math. Course %, letters, proficiency roll-ups, `formatLevel`, `studentGradeSummary`, `courseGradeMode`. Nothing else computes a grade.    |
+| `shared/data.js`                   | The data layer: in-memory cache, localStorage, RPC dispatch, offline outbox, local-id → UUID rekeying, class bundle loading.                        |
+| `shared/constants.js`              | Scales, dimensions, labels, BC designations.                                                                                                        |
+| `shared/reporting-term-presets.js` | Surrey secondary schools' reporting periods per school year; Grandview Heights is the default. Refresh each August.                                 |
+| `shared/offline-queue.js`          | `window.v2Queue`: queued writes, retry, dead letters.                                                                                               |
+| `shared/seed-data.js`              | Demo Mode's sample class (Science 8). The only sample data.                                                                                         |
+| `shared/supabase.js`               | Auth, session, sign-out wipe.                                                                                                                       |
+| `teacher/`                         | Desktop SPA: `app.html`, `router.js`, `page-*.js`, `ui.js`, `dash-class-manager.js`, reports.                                                       |
+| `teacher-mobile/`                  | Phone PWA: `index.html`, `shell.js`, `tab-*.js`, `components.js`. Loads `teacher/styles.css` for tokens.                                            |
+| `migrations/`                      | Applied SQL, one file per change, each with a comment saying what broke and why.                                                                    |
+| `schema.sql`                       | Readable snapshot of the database, not a replayable log.                                                                                            |
+| `curriculum_by_course.json`        | BC curriculum index: 223 courses, competencies, I-can statements. Reference data.                                                                   |
+| `tests/`                           | Vitest. `e2e/` Playwright against the static build. `e2e-real/` Playwright against a live account.                                                  |
+| `docs/`                            | `ARCHITECTURE.md` (shape), `ROADMAP.md`, `STUDENT-VOICE-PLAN.md`, `DECISIONS.md`, `grading-compliance-plan.md`, `backend-design/` (design history). |
 
 ## Running things
 

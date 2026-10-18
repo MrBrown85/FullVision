@@ -18,6 +18,7 @@ const PRECACHE_URLS = [
   '/shared/sentry-init.js',
   '/shared/supabase.js',
   '/shared/constants.js',
+  '/shared/reporting-term-presets.js',
   '/shared/data.js',
   '/shared/offline-queue.js',
   '/shared/auto-update.js',
