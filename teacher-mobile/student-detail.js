@@ -361,33 +361,38 @@ window.MStudentDetail = (function () {
     }
 
     var obs = getStudentQuickObs(cid, sid).slice(-3).reverse();
-    var obsCards = '<div class="m-list-inset-header">Recent Observations</div>';
+    var obsCards = '<div class="m-list-inset-header">Recent observations</div>';
     if (!obs.length) {
       obsCards +=
         '<div class="m-empty" style="padding:20px"><div class="m-empty-subtitle">No observations yet</div></div>';
     } else {
       obs.forEach(function (ob) {
-        var sentiment = OBS_SENTIMENTS[ob.sentiment] || {};
-        var context = OBS_CONTEXTS[ob.context] || {};
-        var tagChips = '';
-        if (ob.dims && ob.dims.length) {
-          ob.dims.forEach(function (dim) {
-            var label = OBS_LABELS[dim] || dim;
-            var icon = OBS_ICONS[dim] || '';
-            tagChips += '<span class="m-obs-tag-chip">' + icon + ' ' + MC.esc(label) + '</span>';
-          });
-        }
+        var sentiment = OBS_SENTIMENTS[ob.sentiment];
+        var context = OBS_CONTEXTS[ob.context];
+        var tagChips = (ob.dims || [])
+          .map(function (dim) {
+            return (
+              '<span class="m-obs-tag-chip"><span class="m-obs-tag-dot" style="background:' +
+              obsTagColor(dim) +
+              '"></span>' +
+              MC.esc(resolveTag(dim).label) +
+              '</span>'
+            );
+          })
+          .join('');
         obsCards +=
           '<div class="m-obs-card" data-sentiment="' +
           (ob.sentiment || '') +
           '">' +
           '<div class="m-obs-header">' +
-          '<span class="m-obs-sentiment-icon">' +
-          (sentiment.icon || '') +
-          '</span>' +
-          (context.label
-            ? '<span class="m-obs-context">' + (context.icon || '') + ' ' + context.label + '</span>'
+          (sentiment
+            ? '<span class="m-obs-type-pill" data-sentiment="' +
+              ob.sentiment +
+              '">' +
+              MC.esc(sentiment.label) +
+              '</span>'
             : '') +
+          (context ? '<span class="m-obs-context">' + MC.esc(context.label) + '</span>' : '') +
           '<span class="m-obs-time">' +
           MC.relativeTime(ob.created) +
           '</span>' +

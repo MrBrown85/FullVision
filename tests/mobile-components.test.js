@@ -213,9 +213,9 @@ describe('MComponents.dateGroupLabel', () => {
     expect(MComponents.dateGroupLabel(yesterday)).toBe('Yesterday');
   });
 
-  it('returns "This Week" for 3 days ago', () => {
+  it('returns "This week" for 3 days ago', () => {
     const threeDays = new Date(Date.now() - 3 * 86400000).toISOString().substring(0, 10);
-    expect(MComponents.dateGroupLabel(threeDays)).toBe('This Week');
+    expect(MComponents.dateGroupLabel(threeDays)).toBe('This week');
   });
 
   it('returns "Earlier" for old dates', () => {
@@ -228,7 +228,10 @@ describe('MComponents.haptic', () => {
   it('calls navigator.vibrate', () => {
     let vibrated = false;
     const origVibrate = navigator.vibrate;
-    navigator.vibrate = () => { vibrated = true; return true; };
+    navigator.vibrate = () => {
+      vibrated = true;
+      return true;
+    };
     MComponents.haptic();
     expect(vibrated).toBe(true);
     navigator.vibrate = origVibrate;
@@ -269,7 +272,13 @@ describe('MComponents sheet', () => {
 
   it('presentSheet accepts onClose callback', () => {
     let closed = false;
-    expect(() => MComponents.presentSheet('<div>Content</div>', { onClose: () => { closed = true; } })).not.toThrow();
+    expect(() =>
+      MComponents.presentSheet('<div>Content</div>', {
+        onClose: () => {
+          closed = true;
+        },
+      }),
+    ).not.toThrow();
   });
 });
 
@@ -432,15 +441,14 @@ describe('MComponents.dateGroupLabel edge cases', () => {
     vi.useRealTimers();
   });
 
-
-  it('returns "This Week" for 2 days ago', () => {
+  it('returns "This week" for 2 days ago', () => {
     const twoDays = new Date(Date.now() - 2 * 86400000).toISOString().substring(0, 10);
-    expect(MComponents.dateGroupLabel(twoDays)).toBe('This Week');
+    expect(MComponents.dateGroupLabel(twoDays)).toBe('This week');
   });
 
-  it('returns "This Week" for 6 days ago', () => {
+  it('returns "This week" for 6 days ago', () => {
     const sixDays = new Date(Date.now() - 6 * 86400000).toISOString().substring(0, 10);
-    expect(MComponents.dateGroupLabel(sixDays)).toBe('This Week');
+    expect(MComponents.dateGroupLabel(sixDays)).toBe('This week');
   });
 
   it('returns "Earlier" for 7 days ago', () => {

@@ -1446,11 +1446,11 @@ window.ReportQuestionnaire = (function () {
     <div class="tq-panel-title spread">
       <span>Observations <span class="tq-panel-badge">${obsCount}</span></span>
       <div class="tq-obs-summary">`;
-    if (sentimentCounts.strength > 0) html += `<div class="tq-obs-stat">✅ ${sentimentCounts.strength}</div>`;
-    if (sentimentCounts.growth > 0) html += `<div class="tq-obs-stat">🔄 ${sentimentCounts.growth}</div>`;
-    if (sentimentCounts.concern > 0) html += `<div class="tq-obs-stat">⚠️ ${sentimentCounts.concern}</div>`;
-    if (topContext)
-      html += `<div class="tq-obs-stat">${OBS_CONTEXTS[topContext[0]]?.icon || ''} ${OBS_CONTEXTS[topContext[0]]?.label || topContext[0]}</div>`;
+    ['strength', 'growth', 'concern'].forEach(k => {
+      if (sentimentCounts[k] > 0)
+        html += `<span class="obs-pill obs-pill-type" data-sentiment="${k}">${OBS_SENTIMENTS[k].label} ${sentimentCounts[k]}</span>`;
+    });
+    if (topContext) html += `<span class="obs-pill">${esc(OBS_CONTEXTS[topContext[0]]?.label || topContext[0])}</span>`;
     html += `</div></div>`;
 
     if (recentObs.length > 0) {
@@ -1471,11 +1471,14 @@ window.ReportQuestionnaire = (function () {
       filteredObs.forEach(ob => {
         const d = new Date(ob.created);
         const dateStr = d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
-        const sentIcon = ob.sentiment ? (OBS_SENTIMENTS[ob.sentiment]?.icon || '') + ' ' : '';
+        const sent = ob.sentiment && OBS_SENTIMENTS[ob.sentiment];
+        const typePill = sent
+          ? `<span class="obs-pill obs-pill-type" data-sentiment="${ob.sentiment}">${sent.label}</span> `
+          : '';
         const selected = mentionObs.includes(ob.id);
         html += `<div class="tq-evidence-item${selected ? ' selected' : ''}" data-action="tqToggleOb" data-sid="${sid}" data-obid="${ob.id}">
         <span class="tq-tag-check"></span>
-        <span class="tq-evidence-text"><span class="tq-evidence-sentiment">${sentIcon}</span>${ob.assignmentContext ? `<span class="tq-obs-assign-tag">${esc(ob.assignmentContext.assessmentTitle)}</span>` : ''}${esc(ob.text)}</span>
+        <span class="tq-evidence-text"><span class="tq-evidence-sentiment">${typePill}</span>${ob.assignmentContext ? `<span class="tq-obs-assign-tag">${esc(ob.assignmentContext.assessmentTitle)}</span>` : ''}${esc(ob.text)}</span>
         <span class="tq-obs-wide-date">${dateStr}</span>
       </div>`;
       });

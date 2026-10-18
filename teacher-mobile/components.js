@@ -254,7 +254,7 @@ window.MComponents = (function () {
     var diff = Math.round((today - d) / 86400000);
     if (diff === 0) return 'Today';
     if (diff === 1) return 'Yesterday';
-    if (diff < 7) return 'This Week';
+    if (diff < 7) return 'This week';
     return 'Earlier';
   }
 

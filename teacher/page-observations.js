@@ -19,10 +19,25 @@ window.PageObservations = (function () {
   var activeSentiment = null;
   var activeContext = null;
   var filterSentiment = null;
+  var filterContext = null;
+  var filterDate = null; // 'week' | 'term' | 'custom'
+  var filterDateFrom = '';
+  var filterDateTo = '';
+  var filterAssessment = null; // 'linked' | 'unlinked'
+  var filterQuoted = null; // 'quoted' | 'unquoted'
   var _openPopover = null;
-  var _filterStripOpen = false;
   var _searchDebounce = null;
-  var _deleteTimers = {};
+  var _alive = false;
+
+  /* Card list by default; the sticky-note grid is a toggle remembered per
+     device. */
+  var VIEW_KEY = 'fv-obs-view';
+  var _viewMode = 'list';
+
+  /* Deleted observations stay in the data layer until their Undo toast
+     closes; until then the feed hides them. obId → { cid, sid }. */
+  var _pendingDeletes = {};
+  var UNDO_MS = 6000;
 
   var _students = [];
   var _studentsById = {};
@@ -41,48 +56,134 @@ window.PageObservations = (function () {
 
   var SEARCH_SVG =
     '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
+  var TRASH_SVG =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>';
   var TAG_SVG =
     '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>';
 
-  var DIM_COLORS = {
-    engagement: '#3b82f6',
-    curiosity: '#9333ea',
-    selfRegulation: '#f59e0b',
-    resilience: '#ef4444',
-    belonging: '#0ea5e9',
-    identity: '#d946ef',
-    collaboration: '#22c55e',
-    respect: '#059669',
-    responsibility: '#84cc16',
-  };
-  var CC_COLOR = '#e67700';
-  var CUSTOM_COLOR = '#8b5cf6';
-  function tagColor(t) {
-    return t.startsWith('cc:') ? CC_COLOR : t.startsWith('tag:') ? CUSTOM_COLOR : DIM_COLORS[t] || '#999';
-  }
+  var tagColor = obsTagColor;
 
   function buildTagMenuItems() {
     var items = [];
-    items.push({ type: 'section', label: 'Learning Dispositions' });
+    items.push({ type: 'section', label: 'Learning dispositions' });
     LEARNING_DIMS.forEach(function (d) {
-      items.push({ key: d, label: OBS_LABELS[d], color: DIM_COLORS[d] || '#999' });
+      items.push({ key: d, label: OBS_LABELS[d], color: tagColor(d) });
     });
-    items.push({ type: 'section', label: 'Relational & Identity' });
+    items.push({ type: 'section', label: 'Relational and identity' });
     RELATIONAL_DIMS.forEach(function (d) {
-      items.push({ key: d, label: OBS_LABELS[d], color: DIM_COLORS[d] || '#999' });
+      items.push({ key: d, label: OBS_LABELS[d], color: tagColor(d) });
     });
-    items.push({ type: 'section', label: 'Core Competencies' });
+    items.push({ type: 'section', label: 'Core competencies' });
     CORE_COMPETENCIES.forEach(function (cc) {
-      items.push({ key: 'cc:' + cc.id, label: cc.label, color: CC_COLOR });
+      items.push({ key: 'cc:' + cc.id, label: cc.label, color: OBS_CC_COLOR });
     });
     var custom = getCustomTags(activeCourse);
     if (custom.length > 0) {
-      items.push({ type: 'section', label: 'Custom Tags' });
+      items.push({ type: 'section', label: 'Custom tags' });
       custom.forEach(function (t) {
-        items.push({ key: 'tag:' + t, label: t, color: CUSTOM_COLOR });
+        items.push({ key: 'tag:' + t, label: t, color: OBS_CUSTOM_COLOR });
       });
     }
     return items;
+  }
+
+  /* ── Pure helpers (exported for tests) ──────────────────── */
+  function _pad2(n) {
+    return String(n).padStart(2, '0');
+  }
+  function _ymd(d) {
+    return d.getFullYear() + '-' + _pad2(d.getMonth() + 1) + '-' + _pad2(d.getDate());
+  }
+  function obDay(ob) {
+    return ob.date || (ob.created || '').slice(0, 10);
+  }
+
+  /* Monday of the week holding todayStr (YYYY-MM-DD), through todayStr. */
+  function weekRange(todayStr) {
+    var d = new Date(todayStr + 'T12:00:00');
+    var back = (d.getDay() + 6) % 7;
+    d.setDate(d.getDate() - back);
+    return { from: _ymd(d), to: todayStr };
+  }
+
+  /* The reporting term holding todayStr, else the latest one that has
+     started, else null. */
+  function termRange(terms, todayStr) {
+    var started = (terms || []).filter(function (t) {
+      return t.starts_on && t.starts_on <= todayStr;
+    });
+    if (!started.length) return null;
+    var inside = started.filter(function (t) {
+      return !t.ends_on || t.ends_on >= todayStr;
+    });
+    var t = (inside.length ? inside : started).sort(function (a, b) {
+      return a.starts_on < b.starts_on ? 1 : -1;
+    })[0];
+    return { from: t.starts_on, to: t.ends_on || todayStr };
+  }
+
+  /* sid|obId → sorted term numbers whose rating quotes that observation
+     (term ratings are keyed 'term-N'; mentionObs holds observation ids). */
+  function quotedIndex(termRatings) {
+    var out = {};
+    Object.keys(termRatings || {}).forEach(function (sid) {
+      var byTerm = termRatings[sid] || {};
+      Object.keys(byTerm).forEach(function (termId) {
+        var ids = (byTerm[termId] && byTerm[termId].mentionObs) || [];
+        var m = String(termId).match(/(\d+)$/);
+        var n = m ? Number(m[1]) : null;
+        ids.forEach(function (id) {
+          var k = sid + '|' + id;
+          if (!out[k]) out[k] = [];
+          if (n != null && out[k].indexOf(n) < 0) out[k].push(n);
+        });
+      });
+    });
+    Object.keys(out).forEach(function (k) {
+      out[k].sort(function (a, b) {
+        return a - b;
+      });
+    });
+    return out;
+  }
+
+  /* "Quoted in Report 1", "Quoted in Reports 1 and 2", or "Quoted" when the
+     class has no reporting terms. Null when not quoted. */
+  function quotedLabel(termNums, hasTerms) {
+    if (!termNums) return null;
+    if (!hasTerms || !termNums.length) return 'Quoted';
+    if (termNums.length === 1) return 'Quoted in Report ' + termNums[0];
+    return 'Quoted in Reports ' + termNums.slice(0, -1).join(', ') + ' and ' + termNums[termNums.length - 1];
+  }
+
+  /* A multi-student capture is one row per student with the same text and
+     the same minute. Key → student ids, in feed order. */
+  function captureKey(ob) {
+    return (ob.text || '').trim() + '|' + (ob.created || '').slice(0, 16);
+  }
+  function sameCaptureIndex(obs) {
+    var out = {};
+    obs.forEach(function (ob) {
+      var k = captureKey(ob);
+      if (!out[k]) out[k] = [];
+      if (out[k].indexOf(ob.studentId) < 0) out[k].push(ob.studentId);
+    });
+    return out;
+  }
+
+  /* "with Sofia Bianchi", "with Sofia Bianchi and Ines Lamba",
+     "with Sofia Bianchi, Ines Lamba and 2 others". */
+  function withLabel(names) {
+    if (!names.length) return '';
+    if (names.length === 1) return 'with ' + names[0];
+    if (names.length === 2) return 'with ' + names[0] + ' and ' + names[1];
+    if (names.length === 3) return 'with ' + names[0] + ', ' + names[1] + ' and ' + names[2];
+    return 'with ' + names[0] + ', ' + names[1] + ' and ' + (names.length - 2) + ' others';
+  }
+
+  function isLinked(ob) {
+    var ac = ob.assignmentContext;
+    return !!(ac && (ac.assessmentId || ac.assessmentTitle));
   }
 
   function refreshStudentCache() {
@@ -94,7 +195,36 @@ window.PageObservations = (function () {
   }
 
   function activeFilterCount() {
-    return filterStudents.length + filterTags.length + (filterSentiment ? 1 : 0);
+    return (
+      filterStudents.length +
+      filterTags.length +
+      (filterSentiment ? 1 : 0) +
+      (filterContext ? 1 : 0) +
+      (filterDate ? 1 : 0) +
+      (filterAssessment ? 1 : 0) +
+      (filterQuoted ? 1 : 0)
+    );
+  }
+
+  function resetFilters() {
+    filterStudents = [];
+    filterTags = [];
+    filterSentiment = null;
+    filterContext = null;
+    filterDate = null;
+    filterDateFrom = '';
+    filterDateTo = '';
+    filterAssessment = null;
+    filterQuoted = null;
+    searchQuery = '';
+  }
+
+  function loadViewMode() {
+    try {
+      return localStorage.getItem(VIEW_KEY) === 'sticky' ? 'sticky' : 'list';
+    } catch (e) {
+      return 'list';
+    }
   }
 
   /* ── Course switch ──────────────────────────────────────── */
@@ -104,9 +234,7 @@ window.PageObservations = (function () {
     document.getElementById('sidebar-mount').innerHTML = renderSidebar(cid);
     refreshStudentCache();
     selectedStudents = [];
-    filterStudents = [];
-    filterTags = [];
-    searchQuery = '';
+    resetFilters();
     activeTags = [];
     render();
     overrideSidebarLinks();
@@ -121,7 +249,6 @@ window.PageObservations = (function () {
           if (sid) {
             selectedStudents = [sid];
             filterStudents = [sid];
-            if (!_filterStripOpen) _filterStripOpen = true;
             render();
             document.querySelectorAll('.student-row').forEach(function (r) {
               r.classList.remove('selected');
@@ -172,93 +299,40 @@ window.PageObservations = (function () {
       '<textarea class="obs-capture-input" id="capture-input" rows="2" placeholder="What did you notice?" autocomplete="off" aria-label="Observation note"></textarea>' +
       '<button class="obs-capture-add" id="capture-add-btn" data-action="submitOb" ' +
       (!hasSel ? 'disabled' : '') +
-      ' aria-label="Add observation">+ Add</button>' +
+      ' aria-label="Add observation" title="Enter adds it. Shift+Enter starts a new line.">+ Add</button>' +
       '</div>' +
       renderCaptureSecondary() +
       '</div>';
 
     // Toolbar
-    var afc = activeFilterCount();
-    var allObs = getAllQuickObs(activeCourse);
+    var allObs = visibleObs(getAllQuickObs(activeCourse));
     var filtered = applyFilters(allObs);
 
     h +=
       '<div class="obs-toolbar" id="obs-toolbar">' +
-      '<button class="obs-filter-trigger' +
-      (afc > 0 ? ' has-filters' : '') +
-      '" data-action="toggleFilterStrip" id="filter-trigger-btn" aria-expanded="' +
-      _filterStripOpen +
-      '" aria-label="Toggle filters' +
-      (afc > 0 ? ', ' + afc + ' active' : '') +
-      '"><span class="filter-icon" aria-hidden="true">☰</span> Filters' +
-      (afc > 0 ? ' <span class="obs-badge">' + afc + '</span>' : '') +
-      '</button>' +
       '<div class="obs-search-wrap"><span class="obs-search-icon">' +
       SEARCH_SVG +
       '</span><input class="obs-search-input" type="text" placeholder="Search\u2026" id="obs-search-input" value="' +
       esc(searchQuery) +
       '" aria-label="Search observations"></div>' +
       '<span class="obs-toolbar-count" id="obs-count">' +
-      filtered.length +
-      (filtered.length !== allObs.length ? ' of ' + allObs.length : '') +
-      ' observations</span>' +
+      countText(filtered.length, allObs.length) +
+      '</span>' +
+      '<button type="button" class="obs-view-toggle' +
+      (_viewMode === 'sticky' ? ' active' : '') +
+      '" id="obs-view-toggle" data-action="toggleView" aria-pressed="' +
+      (_viewMode === 'sticky') +
+      '">Sticky notes</button>' +
       '</div>';
 
-    // Filter strip
+    // Filter chips, one row
     h +=
-      '<div class="obs-filter-strip' +
-      (_filterStripOpen ? ' open' : '') +
-      '" id="obs-filter-strip">' +
-      '<span class="obs-filter-strip-label">Student</span>' +
-      '<div class="obs-strip-popover-wrap"><button class="obs-strip-trigger' +
-      (filterStudents.length > 0 ? ' active' : '') +
-      '" data-action="openPopover" data-popover="filterStudents" id="filter-student-btn">' +
-      (filterStudents.length === 0
-        ? 'All Students'
-        : filterStudents.length === 1
-          ? esc(_studentsById[filterStudents[0]] ? displayName(_studentsById[filterStudents[0]]) : '1 student')
-          : filterStudents.length + ' students') +
-      ' <span class="obs-btn-arrow"></span></button>' +
-      renderStudentPopover('filter-student-dropdown', filterStudents, 'toggleFilterStudent', 'filterFilterStudents') +
-      '</div>' +
-      '<div class="obs-filter-strip-divider"></div><span class="obs-filter-strip-label">Tags</span>' +
-      '<div class="obs-strip-popover-wrap"><button class="obs-strip-trigger' +
-      (filterTags.length > 0 ? ' active' : '') +
-      '" data-action="openPopover" data-popover="filterTags" id="filter-tag-btn">' +
-      (filterTags.length === 0 ? 'All Tags' : filterTags.length + ' tag' + (filterTags.length > 1 ? 's' : '')) +
-      ' <span class="obs-btn-arrow"></span></button>' +
-      renderTagPopover('filter-tag-dropdown', filterTags, 'toggleFilterTag') +
-      '</div>' +
-      '<div class="obs-filter-strip-divider"></div><span class="obs-filter-strip-label">Sentiment</span>' +
-      '<div style="display:flex;gap:4px">' +
-      Object.entries(OBS_SENTIMENTS)
-        .map(function (entry) {
-          var key = entry[0],
-            s = entry[1];
-          return (
-            '<button class="obs-sentiment-pill' +
-            (filterSentiment === key ? ' active' : '') +
-            '" style="' +
-            (filterSentiment === key
-              ? 'background:' + s.tint + ';border-color:' + s.border + ';color:' + s.border
-              : '') +
-            '" data-action="setFilterSentiment" data-sentiment="' +
-            key +
-            '">' +
-            s.icon +
-            ' ' +
-            s.label +
-            '</button>'
-          );
-        })
-        .join('') +
-      '</div>' +
-      (afc > 0 ? renderFilterPills() : '') +
-      (afc > 0 ? '<button class="obs-filter-clear" data-action="clearAllFilters">Clear all</button>' : '') +
+      '<div class="obs-filter-strip" id="obs-filter-strip" role="toolbar" aria-label="Filter observations">' +
+      renderFilterRow() +
       '</div>';
 
     // Feed
-    h += '<div class="obs-feed view-sticky" id="obs-feed">' + renderFeedHtml(filtered) + '</div>';
+    h += '<div class="' + feedClass() + '" id="obs-feed">' + renderFeedHtml(filtered) + '</div>';
 
     document.getElementById('main').innerHTML = h;
     wireSearch();
@@ -325,9 +399,9 @@ window.PageObservations = (function () {
         key +
         '"><span class="obs-popover-check">' +
         (active ? '✓' : '') +
-        '</span><span style="font-size:var(--text-sm)">' +
-        s.icon +
-        '</span>' +
+        '</span><span class="obs-type-dot" data-sentiment="' +
+        key +
+        '"></span>' +
         s.label +
         '</div>';
     });
@@ -346,8 +420,6 @@ window.PageObservations = (function () {
         key +
         '"><span class="obs-popover-check">' +
         (active ? '✓' : '') +
-        '</span><span style="font-size:var(--text-sm)">' +
-        c.icon +
         '</span>' +
         c.label +
         '</div>';
@@ -454,88 +526,279 @@ window.PageObservations = (function () {
     return h;
   }
 
-  function renderFilterPills() {
-    var h = '<div class="obs-filter-pills" id="filter-pills">';
-    filterStudents.forEach(function (sid) {
-      var s = _studentsById[sid];
-      if (!s) return;
+  /* ── Filter chips ───────────────────────────────────────── */
+  var TYPE_OPTIONS = Object.keys(OBS_SENTIMENTS).map(function (k) {
+    return { value: k, label: OBS_SENTIMENTS[k].label };
+  });
+  var CONTEXT_OPTIONS = Object.keys(OBS_CONTEXTS).map(function (k) {
+    return { value: k, label: OBS_CONTEXTS[k].label };
+  });
+  var ASSESSMENT_OPTIONS = [
+    { value: 'linked', label: 'Linked to an assessment' },
+    { value: 'unlinked', label: 'Not linked' },
+  ];
+  var QUOTED_OPTIONS = [
+    { value: 'quoted', label: 'Quoted in a report' },
+    { value: 'unquoted', label: 'Not yet quoted' },
+  ];
+  function dateOptions() {
+    var opts = [{ value: 'week', label: 'This week' }];
+    if (getReportingTerms(activeCourse).length) opts.push({ value: 'term', label: 'This term' });
+    opts.push({ value: 'custom', label: 'Custom dates' });
+    return opts;
+  }
+
+  function _optionLabel(options, value) {
+    for (var i = 0; i < options.length; i++) if (options[i].value === value) return options[i].label;
+    return value;
+  }
+  function _shortDate(ymd) {
+    return new Date(ymd + 'T12:00:00').toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
+  }
+
+  var FILTER_CHIPS = {
+    filterStudents: { id: 'filter-student-btn', name: 'Student' },
+    filterTags: { id: 'filter-tag-btn', name: 'Tag' },
+    filterType: { id: 'filter-type-btn', name: 'Type', key: 'type' },
+    filterContext: { id: 'filter-context-btn', name: 'Context', key: 'context' },
+    filterDate: { id: 'filter-date-btn', name: 'Date', key: 'date' },
+    filterAssessment: { id: 'filter-assessment-btn', name: 'Assessment', key: 'assessment' },
+    filterQuoted: { id: 'filter-quoted-btn', name: 'Quoted', key: 'quoted' },
+  };
+
+  function chipState(popoverName) {
+    switch (popoverName) {
+      case 'filterStudents':
+        if (!filterStudents.length) return null;
+        if (filterStudents.length > 1) return filterStudents.length + ' students';
+        return _studentsById[filterStudents[0]] ? displayName(_studentsById[filterStudents[0]]) : '1 student';
+      case 'filterTags':
+        if (!filterTags.length) return null;
+        return filterTags.length === 1 ? resolveTag(filterTags[0]).label : filterTags.length + ' tags';
+      case 'filterType':
+        return filterSentiment ? _optionLabel(TYPE_OPTIONS, filterSentiment) : null;
+      case 'filterContext':
+        return filterContext ? _optionLabel(CONTEXT_OPTIONS, filterContext) : null;
+      case 'filterDate':
+        if (!filterDate) return null;
+        if (filterDate !== 'custom') return _optionLabel(dateOptions(), filterDate);
+        if (filterDateFrom && filterDateTo) return _shortDate(filterDateFrom) + ' – ' + _shortDate(filterDateTo);
+        if (filterDateFrom) return 'From ' + _shortDate(filterDateFrom);
+        if (filterDateTo) return 'Until ' + _shortDate(filterDateTo);
+        return 'Custom dates';
+      case 'filterAssessment':
+        return filterAssessment ? _optionLabel(ASSESSMENT_OPTIONS, filterAssessment) : null;
+      case 'filterQuoted':
+        return filterQuoted ? _optionLabel(QUOTED_OPTIONS, filterQuoted) : null;
+    }
+    return null;
+  }
+
+  function chipInnerHtml(popoverName) {
+    var st = chipState(popoverName);
+    return esc(st || FILTER_CHIPS[popoverName].name) + ' <span class="obs-btn-arrow" aria-hidden="true"></span>';
+  }
+
+  function renderChip(popoverName, popoverHtml) {
+    var chip = FILTER_CHIPS[popoverName];
+    var st = chipState(popoverName);
+    return (
+      '<div class="obs-strip-popover-wrap"><button type="button" class="obs-filter-chip' +
+      (st ? ' active' : '') +
+      '" data-action="openPopover" data-popover="' +
+      popoverName +
+      '" id="' +
+      chip.id +
+      '" aria-haspopup="true" aria-expanded="false" aria-label="' +
+      esc(chip.name + (st ? ': ' + st : '')) +
+      '">' +
+      chipInnerHtml(popoverName) +
+      '</button>' +
+      popoverHtml +
+      '</div>'
+    );
+  }
+
+  function renderOptionPopover(popoverName, options, current, extraHtml) {
+    var key = FILTER_CHIPS[popoverName].key;
+    var h = '<div class="obs-popover obs-option-popover" id="' + POPOVER_IDS[popoverName] + '" role="listbox">';
+    h += '<div class="obs-popover-list">';
+    options.forEach(function (o) {
+      var sel = current === o.value;
       h +=
-        '<span class="obs-filter-pill" data-action="removeFilterStudent" data-sid="' +
-        sid +
-        '">' +
-        esc(displayNameFirst(s)) +
-        '<span class="obs-filter-pill-x">&times;</span></span>';
+        '<div class="obs-popover-item' +
+        (sel ? ' selected' : '') +
+        '" role="option" aria-selected="' +
+        sel +
+        '" data-action="setFilterOption" data-filter="' +
+        key +
+        '" data-value="' +
+        o.value +
+        '"><span class="obs-popover-check">' +
+        (sel ? '✓' : '') +
+        '</span>' +
+        esc(o.label) +
+        '</div>';
     });
-    filterTags.forEach(function (t) {
-      var info = resolveTag(t);
-      h +=
-        '<span class="obs-filter-pill" data-action="removeFilterTag" data-value="' +
-        esc(t) +
-        '"><span class="pill-dot" style="background:' +
-        tagColor(t) +
-        '"></span>' +
-        esc(info.label) +
-        '<span class="obs-filter-pill-x">&times;</span></span>';
-    });
-    h += '</div>';
+    h += '</div>' + (extraHtml || '') + '</div>';
+    return h;
+  }
+
+  function renderDateInputs() {
+    return (
+      '<div class="obs-popover-date-row">' +
+      '<label>From <input type="date" id="filter-date-from" value="' +
+      esc(filterDateFrom) +
+      '"></label>' +
+      '<label>To <input type="date" id="filter-date-to" value="' +
+      esc(filterDateTo) +
+      '"></label>' +
+      '</div>'
+    );
+  }
+
+  function renderFilterRow() {
+    var h =
+      renderChip(
+        'filterStudents',
+        renderStudentPopover('filter-student-dropdown', filterStudents, 'toggleFilterStudent', 'filterFilterStudents'),
+      ) +
+      renderChip('filterTags', renderTagPopover('filter-tag-dropdown', filterTags, 'toggleFilterTag')) +
+      renderChip('filterType', renderOptionPopover('filterType', TYPE_OPTIONS, filterSentiment)) +
+      renderChip('filterContext', renderOptionPopover('filterContext', CONTEXT_OPTIONS, filterContext)) +
+      renderChip('filterDate', renderOptionPopover('filterDate', dateOptions(), filterDate, renderDateInputs())) +
+      renderChip('filterAssessment', renderOptionPopover('filterAssessment', ASSESSMENT_OPTIONS, filterAssessment)) +
+      renderChip('filterQuoted', renderOptionPopover('filterQuoted', QUOTED_OPTIONS, filterQuoted));
+    if (activeFilterCount() > 0)
+      h += '<button type="button" class="obs-filter-clear" data-action="clearAllFilters">Clear all</button>';
     return h;
   }
 
   /* ── Partial updates ────────────────────────────────────── */
+  function countText(shown, total) {
+    if (shown !== total) return shown + ' of ' + total + ' observation' + (total === 1 ? '' : 's');
+    return total + ' observation' + (total === 1 ? '' : 's');
+  }
+
+  function feedClass() {
+    return 'obs-feed ' + (_viewMode === 'sticky' ? 'view-sticky' : 'view-list');
+  }
+
   function refreshFeedAndCount() {
-    var allObs = getAllQuickObs(activeCourse);
+    var allObs = visibleObs(getAllQuickObs(activeCourse));
     var filtered = applyFilters(allObs);
     var feedEl = document.getElementById('obs-feed');
     if (feedEl) feedEl.innerHTML = renderFeedHtml(filtered);
     var countEl = document.getElementById('obs-count');
-    if (countEl)
-      countEl.textContent =
-        filtered.length + (filtered.length !== allObs.length ? ' of ' + allObs.length : '') + ' observations';
-    var afc = activeFilterCount();
-    var trigBtn = document.getElementById('filter-trigger-btn');
-    if (trigBtn) {
-      trigBtn.classList.toggle('has-filters', afc > 0);
-      trigBtn.innerHTML =
-        '<span class="filter-icon">☰</span> Filters' + (afc > 0 ? ' <span class="obs-badge">' + afc + '</span>' : '');
+    if (countEl) countEl.textContent = countText(filtered.length, allObs.length);
+  }
+
+  /* Updates chip labels, option checks and the Clear button in place, so an
+     open multi-select popover stays open with its search text. */
+  function refreshFilterStrip() {
+    Object.keys(FILTER_CHIPS).forEach(function (name) {
+      var chip = FILTER_CHIPS[name];
+      var btn = document.getElementById(chip.id);
+      if (!btn) return;
+      var st = chipState(name);
+      btn.classList.toggle('active', !!st);
+      btn.innerHTML = chipInnerHtml(name);
+      btn.setAttribute('aria-label', chip.name + (st ? ': ' + st : ''));
+      if (!chip.key) return;
+      var current = filterValue(chip.key);
+      document.querySelectorAll('#' + POPOVER_IDS[name] + ' .obs-popover-item').forEach(function (el) {
+        var sel = el.dataset.value === current;
+        el.classList.toggle('selected', sel);
+        el.setAttribute('aria-selected', String(sel));
+        var chk = el.querySelector('.obs-popover-check');
+        if (chk) chk.textContent = sel ? '✓' : '';
+      });
+    });
+    var strip = document.getElementById('obs-filter-strip');
+    if (!strip) return;
+    var clear = strip.querySelector('.obs-filter-clear');
+    if (activeFilterCount() > 0 && !clear) {
+      strip.insertAdjacentHTML(
+        'beforeend',
+        '<button type="button" class="obs-filter-clear" data-action="clearAllFilters">Clear all</button>',
+      );
+    } else if (activeFilterCount() === 0 && clear) {
+      clear.remove();
     }
   }
 
-  function refreshFilterStrip() {
-    var afc = activeFilterCount();
-    var sb = document.getElementById('filter-student-btn');
-    if (sb) {
-      sb.classList.toggle('active', filterStudents.length > 0);
-      sb.innerHTML =
-        (filterStudents.length === 0
-          ? 'All Students'
-          : filterStudents.length === 1
-            ? esc(_studentsById[filterStudents[0]] ? displayName(_studentsById[filterStudents[0]]) : '1 student')
-            : filterStudents.length + ' students') + ' <span class="obs-btn-arrow"></span>';
-    }
-    var tb = document.getElementById('filter-tag-btn');
-    if (tb) {
-      tb.classList.toggle('active', filterTags.length > 0);
-      tb.innerHTML =
-        (filterTags.length === 0 ? 'All Tags' : filterTags.length + ' tag' + (filterTags.length > 1 ? 's' : '')) +
-        ' <span class="obs-btn-arrow"></span>';
-    }
-    var strip = document.getElementById('obs-filter-strip');
-    if (strip) {
-      var oldPills = document.getElementById('filter-pills');
-      var oldClear = strip.querySelector('.obs-filter-clear');
-      if (oldPills) oldPills.remove();
-      if (oldClear) oldClear.remove();
-      if (afc > 0) {
-        strip.insertAdjacentHTML('beforeend', renderFilterPills());
-        strip.insertAdjacentHTML(
-          'beforeend',
-          '<button class="obs-filter-clear" data-action="clearAllFilters">Clear all</button>',
-        );
+  function filterValue(key) {
+    return {
+      type: filterSentiment,
+      context: filterContext,
+      date: filterDate,
+      assessment: filterAssessment,
+      quoted: filterQuoted,
+    }[key];
+  }
+
+  function setFilterOption(key, value) {
+    var next = filterValue(key) === value ? null : value;
+    if (key === 'type') filterSentiment = next;
+    else if (key === 'context') filterContext = next;
+    else if (key === 'assessment') filterAssessment = next;
+    else if (key === 'quoted') filterQuoted = next;
+    else if (key === 'date') {
+      filterDate = next;
+      if (next !== 'custom') {
+        filterDateFrom = '';
+        filterDateTo = '';
+        var f = document.getElementById('filter-date-from');
+        var t = document.getElementById('filter-date-to');
+        if (f) f.value = '';
+        if (t) t.value = '';
+      }
+      if (next === 'custom') {
+        refreshFilterStrip();
+        refreshFeedAndCount();
+        var from = document.getElementById('filter-date-from');
+        if (from) from.focus();
+        return;
       }
     }
+    closeAllPopovers();
+    refreshFilterStrip();
+    refreshFeedAndCount();
+  }
+
+  function setCustomDate(which, value) {
+    if (which === 'from') filterDateFrom = value || '';
+    else filterDateTo = value || '';
+    filterDate = filterDateFrom || filterDateTo ? 'custom' : filterDate;
+    refreshFilterStrip();
+    refreshFeedAndCount();
   }
 
   /* ── Apply filters ──────────────────────────────────────── */
+  function visibleObs(allObs) {
+    return allObs.filter(function (o) {
+      return !_pendingDeletes[o.id];
+    });
+  }
+
+  function assessmentTitle(ob) {
+    var ac = ob.assignmentContext;
+    if (!ac) return '';
+    if (ac.assessmentTitle) return ac.assessmentTitle;
+    if (!ac.assessmentId) return '';
+    var a = (getAssessments(activeCourse) || []).find(function (x) {
+      return x.id === ac.assessmentId;
+    });
+    return a ? a.title || '' : '';
+  }
+
+  function dateBounds() {
+    if (filterDate === 'week') return weekRange(getTodayStr());
+    if (filterDate === 'term') return termRange(getReportingTerms(activeCourse), getTodayStr());
+    if (filterDate === 'custom') return { from: filterDateFrom || '', to: filterDateTo || '' };
+    return null;
+  }
+
   function applyFilters(allObs) {
     var f = allObs;
     if (filterStudents.length > 0)
@@ -552,55 +815,119 @@ window.PageObservations = (function () {
       f = f.filter(function (o) {
         return o.sentiment === filterSentiment;
       });
+    if (filterContext)
+      f = f.filter(function (o) {
+        return o.context === filterContext;
+      });
+    var b = dateBounds();
+    if (b)
+      f = f.filter(function (o) {
+        var d = obDay(o);
+        return (!b.from || d >= b.from) && (!b.to || d <= b.to);
+      });
+    if (filterAssessment)
+      f = f.filter(function (o) {
+        return isLinked(o) === (filterAssessment === 'linked');
+      });
+    if (filterQuoted) {
+      var qi = quotedIndex(getTermRatings(activeCourse));
+      f = f.filter(function (o) {
+        return !!qi[o.studentId + '|' + o.id] === (filterQuoted === 'quoted');
+      });
+    }
     if (searchQuery) {
       var q = searchQuery.toLowerCase();
       f = f.filter(function (o) {
         var sn = _studentsById[o.studentId] ? displayName(_studentsById[o.studentId]) : '';
-        return o.text.toLowerCase().includes(q) || sn.toLowerCase().includes(q);
+        if ((o.text || '').toLowerCase().includes(q) || sn.toLowerCase().includes(q)) return true;
+        var tagHit = (o.dims || []).some(function (t) {
+          return String(resolveTag(t).label || '')
+            .toLowerCase()
+            .includes(q);
+        });
+        if (tagHit) return true;
+        var ctx = o.context && OBS_CONTEXTS[o.context];
+        if (ctx && ctx.label.toLowerCase().includes(q)) return true;
+        return assessmentTitle(o).toLowerCase().includes(q);
       });
     }
     return f;
   }
 
   /* ── Feed HTML ──────────────────────────────────────────── */
-  function renderObsCardHtml(ob) {
+  /* Everything a card needs that depends on the whole class: which
+     observations a report quotes, and which were one capture for several
+     students. Built once per feed render. */
+  function feedContext() {
+    return {
+      quoted: quotedIndex(getTermRatings(activeCourse)),
+      hasTerms: getReportingTerms(activeCourse).length > 0,
+      sameCapture: sameCaptureIndex(visibleObs(getAllQuickObs(activeCourse))),
+    };
+  }
+
+  function cardWhen(ob) {
+    var d = new Date(ob.created || obDay(ob) + 'T12:00:00');
+    var opts = { weekday: 'short', month: 'short', day: 'numeric' };
+    if (d.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
+    return (
+      d.toLocaleDateString('en-CA', opts) +
+      ' · ' +
+      d.toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' })
+    );
+  }
+
+  function typePillHtml(sentiment) {
+    var s = sentiment && OBS_SENTIMENTS[sentiment];
+    if (!s) return '';
+    return '<span class="obs-pill obs-pill-type" data-sentiment="' + sentiment + '">' + esc(s.label) + '</span>';
+  }
+
+  function renderObsCardHtml(ob, ctx) {
+    ctx = ctx || feedContext();
     var s = _studentsById[ob.studentId];
     var sn = s ? displayName(s) : ob.studentId;
-    var tm = new Date(ob.created).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' });
-    var ft = (ob.dims && ob.dims[0]) || null;
-    var sent = ob.sentiment && OBS_SENTIMENTS[ob.sentiment];
-    var bc = sent ? sent.border : ft ? tagColor(ft) : 'var(--border)';
+    var others = (ctx.sameCapture[captureKey(ob)] || [])
+      .filter(function (sid) {
+        return sid !== ob.studentId;
+      })
+      .map(function (sid) {
+        return _studentsById[sid] ? displayName(_studentsById[sid]) : null;
+      })
+      .filter(Boolean);
+    var quoted = quotedLabel(ctx.quoted[ob.studentId + '|' + ob.id], ctx.hasTerms);
+    var ctxInfo = ob.context && OBS_CONTEXTS[ob.context];
+    var aTitle = isLinked(ob) ? assessmentTitle(ob) || 'Assessment' : '';
+
     var out =
-      '<div class="obs-card" data-action="openFocus" data-sid="' +
+      '<div class="obs-card" data-action="openFocus" tabindex="0" data-sid="' +
       ob.studentId +
       '" data-obid="' +
       ob.id +
       '"' +
       (ob.sentiment ? ' data-sentiment="' + ob.sentiment + '"' : '') +
-      ' style="border-left-color:' +
-      bc +
-      '">' +
-      '<div class="obs-card-header"><span>' +
-      (sent ? '<span class="obs-card-sentiment">' + sent.icon + '</span>' : '') +
+      '>' +
+      '<div class="obs-card-header"><div class="obs-card-meta">' +
       '<span class="obs-card-student">' +
       esc(sn) +
-      '</span><span class="obs-card-time">' +
-      tm +
       '</span>' +
-      (ob.context && OBS_CONTEXTS[ob.context]
-        ? '<span class="obs-card-context">' +
-          OBS_CONTEXTS[ob.context].icon +
-          ' ' +
-          OBS_CONTEXTS[ob.context].label +
-          '</span>'
-        : '') +
+      (others.length ? '<span class="obs-card-with">' + esc(withLabel(others)) + '</span>' : '') +
+      '<span class="obs-card-time">' +
+      esc(cardWhen(ob)) +
       '</span>' +
+      typePillHtml(ob.sentiment) +
+      (ctxInfo ? '<span class="obs-pill obs-pill-context">' + esc(ctxInfo.label) + '</span>' : '') +
+      (aTitle ? '<span class="obs-pill obs-pill-assessment">' + esc(aTitle) + '</span>' : '') +
+      '</div>' +
       '<span class="obs-card-header-actions">' +
-      '<button class="obs-card-delete" data-action="deleteOb" data-sid="' +
+      (quoted ? '<span class="obs-card-quoted">' + esc(quoted) + '</span>' : '') +
+      '<button type="button" class="obs-card-delete" data-action="deleteOb" data-sid="' +
       ob.studentId +
       '" data-obid="' +
       ob.id +
-      '" data-stop-prop="true" title="Delete">🗑</button></span></div>' +
+      '" data-stop-prop="true" title="Delete" aria-label="Delete observation">' +
+      TRASH_SVG +
+      '</button></span></div>' +
       '<div class="obs-card-text">' +
       esc(ob.text) +
       '</div>';
@@ -623,9 +950,9 @@ window.PageObservations = (function () {
 
   function renderFeedHtml(filtered) {
     if (filtered.length === 0) {
-      var n = getAllQuickObs(activeCourse).length;
+      var n = visibleObs(getAllQuickObs(activeCourse)).length;
       return (
-        '<div class="obs-empty"><div class="obs-empty-icon">👁</div><div class="obs-empty-title">' +
+        '<div class="obs-empty"><div class="obs-empty-title">' +
         (n === 0 ? 'No observations yet' : 'No matching observations') +
         '</div><div class="obs-empty-sub">' +
         (n === 0 ? 'Select a student and capture what you notice' : 'Try adjusting your filters') +
@@ -645,6 +972,7 @@ window.PageObservations = (function () {
         d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
       );
     })();
+    var ctx = feedContext();
     var out = '';
     Object.keys(groups)
       .sort(function (a, b) {
@@ -663,7 +991,7 @@ window.PageObservations = (function () {
                 });
         out += '<div class="obs-feed-date-group"><div class="obs-feed-date-label">' + lbl + '</div>';
         groups[ds].forEach(function (ob) {
-          out += renderObsCardHtml(ob);
+          out += renderObsCardHtml(ob, ctx);
         });
         out += '</div>';
       });
@@ -676,6 +1004,11 @@ window.PageObservations = (function () {
     tags: 'tag-dropdown',
     filterStudents: 'filter-student-dropdown',
     filterTags: 'filter-tag-dropdown',
+    filterType: 'filter-type-dropdown',
+    filterContext: 'filter-context-dropdown',
+    filterDate: 'filter-date-dropdown',
+    filterAssessment: 'filter-assessment-dropdown',
+    filterQuoted: 'filter-quoted-dropdown',
   };
   function openPopover(name) {
     if (_openPopover === name) {
@@ -684,6 +1017,8 @@ window.PageObservations = (function () {
     }
     closeAllPopovers();
     _openPopover = name;
+    var trig = document.querySelector('[data-action="openPopover"][data-popover="' + name + '"]');
+    if (trig) trig.setAttribute('aria-expanded', 'true');
     var el = document.getElementById(POPOVER_IDS[name]);
     if (el) {
       el.classList.add('open');
@@ -696,6 +1031,9 @@ window.PageObservations = (function () {
   }
   function closeAllPopovers() {
     _openPopover = null;
+    document.querySelectorAll('[data-action="openPopover"][aria-expanded="true"]').forEach(function (b) {
+      b.setAttribute('aria-expanded', 'false');
+    });
     Object.values(POPOVER_IDS).forEach(function (id) {
       var el = document.getElementById(id);
       if (el) el.classList.remove('open');
@@ -784,13 +1122,6 @@ window.PageObservations = (function () {
     refreshFilterStrip();
     refreshFeedAndCount();
   }
-  function removeFilterStudent(sid) {
-    filterStudents = filterStudents.filter(function (s) {
-      return s !== sid;
-    });
-    refreshFilterStrip();
-    refreshFeedAndCount();
-  }
 
   /* ── Filter strip: tags ─────────────────────────────────── */
   function toggleFilterTag(key) {
@@ -798,13 +1129,6 @@ window.PageObservations = (function () {
     if (idx >= 0) filterTags.splice(idx, 1);
     else filterTags.push(key);
     syncPopoverChecks('filter-tag-dropdown', filterTags, 'data-tag');
-    refreshFilterStrip();
-    refreshFeedAndCount();
-  }
-  function removeFilterTag(key) {
-    filterTags = filterTags.filter(function (t) {
-      return t !== key;
-    });
     refreshFilterStrip();
     refreshFeedAndCount();
   }
@@ -836,23 +1160,30 @@ window.PageObservations = (function () {
   }
 
   /* ── Other actions ──────────────────────────────────────── */
-  function toggleFilterStrip() {
-    _filterStripOpen = !_filterStripOpen;
-    var strip = document.getElementById('obs-filter-strip');
-    if (strip) strip.classList.toggle('open', _filterStripOpen);
+  function toggleView() {
+    _viewMode = _viewMode === 'sticky' ? 'list' : 'sticky';
+    try {
+      localStorage.setItem(VIEW_KEY, _viewMode);
+    } catch (e) {}
+    var feed = document.getElementById('obs-feed');
+    if (feed) feed.className = feedClass();
+    var btn = document.getElementById('obs-view-toggle');
+    if (btn) {
+      btn.classList.toggle('active', _viewMode === 'sticky');
+      btn.setAttribute('aria-pressed', String(_viewMode === 'sticky'));
+    }
   }
 
   function clearAllFilters() {
-    filterStudents = [];
-    filterTags = [];
-    filterSentiment = null;
-    searchQuery = '';
+    resetFilters();
     var searchEl = document.getElementById('obs-search-input');
     if (searchEl) searchEl.value = '';
     document.querySelectorAll('.student-row').forEach(function (r) {
       r.classList.remove('selected');
     });
-    refreshFilterStrip();
+    closeAllPopovers();
+    var strip = document.getElementById('obs-filter-strip');
+    if (strip) strip.innerHTML = renderFilterRow();
     refreshFeedAndCount();
   }
 
@@ -860,7 +1191,11 @@ window.PageObservations = (function () {
     var input = document.getElementById('capture-input');
     if (!input) return;
     var text = input.value.trim();
-    if (selectedStudents.length === 0) return;
+    if (selectedStudents.length === 0) {
+      // Say why nothing happened: open the student picker.
+      if (text) openPopover('students');
+      return;
+    }
     if (!text) {
       input.style.border = '2px solid var(--score-1)';
       input.placeholder = 'Enter an observation';
@@ -920,14 +1255,6 @@ window.PageObservations = (function () {
       });
   }
 
-  function setFilterSentiment(val) {
-    filterSentiment = filterSentiment === val ? null : val;
-    var captureVal = (document.getElementById('capture-input') || {}).value || '';
-    render();
-    var inp2 = document.getElementById('capture-input');
-    if (inp2 && captureVal) inp2.value = captureVal;
-  }
-
   function updateAddBtn() {
     var btn = document.getElementById('capture-add-btn');
     var input = document.getElementById('capture-input');
@@ -961,21 +1288,39 @@ window.PageObservations = (function () {
       });
   }
 
-  function deleteOb(sid, obId, btn) {
-    var key = sid + '-' + obId;
-    if (!btn.classList.contains('confirming')) {
-      btn.classList.add('confirming');
-      btn.textContent = 'Delete?';
-      _deleteTimers[key] = setTimeout(function () {
-        btn.classList.remove('confirming');
-        btn.textContent = '🗑';
-      }, 3000);
-    } else {
-      clearTimeout(_deleteTimers[key]);
-      deleteQuickOb(activeCourse, sid, obId);
-      refreshFeedAndCount();
-    }
+  /* One click hides the card and offers Undo for six seconds. The delete
+     reaches the data layer only when the toast closes without Undo (it times
+     out, another toast replaces it, or the page is left). */
+  function deleteOb(sid, obId) {
+    if (!sid || !obId || _pendingDeletes[obId]) return;
+    var cid = activeCourse;
+    _pendingDeletes[obId] = { cid: cid, sid: sid };
+    refreshFeedAndCount();
+    var settled = false;
+    showUndoToast(
+      'Observation deleted',
+      function () {
+        if (settled) return;
+        settled = true;
+        delete _pendingDeletes[obId];
+        if (_alive && activeCourse === cid) refreshFeedAndCount();
+      },
+      function () {
+        if (settled) return;
+        settled = true;
+        delete _pendingDeletes[obId];
+        deleteQuickOb(cid, sid, obId);
+        if (_alive && activeCourse === cid) refreshFeedAndCount();
+      },
+      UNDO_MS,
+    );
   }
+
+  // Closing the tab inside the undo window still deletes.
+  if (typeof window.addEventListener === 'function')
+    window.addEventListener('pagehide', function () {
+      if (Object.keys(_pendingDeletes).length && typeof dismissUndoToast === 'function') dismissUndoToast();
+    });
 
   /* ══════════════════════════════════════════════════════════
      FOCUS CARD — click-to-expand inline editor
@@ -1088,7 +1433,7 @@ window.PageObservations = (function () {
   function _renderFocusCardHtml(ob) {
     var s = _studentsById[ob.studentId];
     var sn = s ? displayName(s) : ob.studentId;
-    var tm = new Date(ob.created).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' });
+    var tm = cardWhen(ob);
     var sentAttr = _focusDraft.sentiment ? ' data-sentiment="' + _focusDraft.sentiment + '"' : '';
 
     var sentimentPills = Object.entries(OBS_SENTIMENTS)
@@ -1104,8 +1449,6 @@ window.PageObservations = (function () {
           '" data-action="focusToggleSentiment" data-value="' +
           key +
           '">' +
-          v.icon +
-          ' ' +
           esc(v.label) +
           '</button>'
         );
@@ -1123,8 +1466,6 @@ window.PageObservations = (function () {
           '" data-action="focusToggleContext" data-value="' +
           key +
           '">' +
-          v.icon +
-          ' ' +
           esc(v.label) +
           '</button>'
         );
@@ -1138,7 +1479,7 @@ window.PageObservations = (function () {
       '<div class="obs-focus-header"><span><span class="obs-focus-student">' +
       esc(sn) +
       '</span><span class="obs-focus-time">' +
-      tm +
+      esc(tm) +
       '</span></span>' +
       '<button type="button" class="obs-focus-close" aria-label="Close" data-action="closeFocus">&times;</button>' +
       '</div>' +
@@ -1375,10 +1716,15 @@ window.PageObservations = (function () {
       !e.target.closest('.obs-popover') &&
       !e.target.closest('.obs-capture-student-btn') &&
       !e.target.closest('.obs-tag-trigger') &&
-      !e.target.closest('.obs-strip-trigger')
+      !e.target.closest('.obs-filter-chip')
     ) {
       closeAllPopovers();
     }
+  }
+
+  function _handleChange(e) {
+    if (e.target.id === 'filter-date-from') setCustomDate('from', e.target.value);
+    else if (e.target.id === 'filter-date-to') setCustomDate('to', e.target.value);
   }
 
   function _handleInput(e) {
@@ -1422,11 +1768,11 @@ window.PageObservations = (function () {
       submitOb: function () {
         submitOb();
       },
-      toggleFilterStrip: function () {
-        toggleFilterStrip();
+      toggleView: function () {
+        toggleView();
       },
-      setFilterSentiment: function () {
-        setFilterSentiment(el.dataset.sentiment);
+      setFilterOption: function () {
+        setFilterOption(el.dataset.filter, el.dataset.value);
       },
       clearAllFilters: function () {
         clearAllFilters();
@@ -1440,12 +1786,6 @@ window.PageObservations = (function () {
       removeCaptureTag: function () {
         removeCaptureTag(el.dataset.value);
       },
-      removeFilterStudent: function () {
-        removeFilterStudent(el.dataset.sid);
-      },
-      removeFilterTag: function () {
-        removeFilterTag(el.dataset.value);
-      },
       toggleSentiment: function () {
         toggleSentiment(el.dataset.value);
       },
@@ -1453,7 +1793,7 @@ window.PageObservations = (function () {
         toggleContext(el.dataset.value);
       },
       deleteOb: function () {
-        deleteOb(el.dataset.sid, el.dataset.obid, el);
+        deleteOb(el.dataset.sid, el.dataset.obid);
       },
       popoverToggle: function () {
         var fn = toggleFns[el.dataset.toggleFn];
@@ -1497,9 +1837,27 @@ window.PageObservations = (function () {
         return;
       }
     }
-    if (e.target.id === 'capture-input' && e.metaKey && e.key === 'Enter') {
+    // Enter sends (Cmd+Enter too); Shift+Enter adds a line. Not while an
+    // IME is composing.
+    if (e.target.id === 'capture-input' && e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
       submitOb();
+      return;
+    }
+    // A focused card opens with Enter or Space, like a button.
+    if (
+      !_focusBackdropEl &&
+      e.target.classList &&
+      e.target.classList.contains('obs-card') &&
+      (e.key === 'Enter' || e.key === ' ')
+    ) {
+      e.preventDefault();
+      openFocus(e.target.dataset.sid, e.target.dataset.obid);
+      return;
+    }
+    if (e.key === 'Escape' && _openPopover) {
+      closeAllPopovers();
+      return;
     }
     // Custom tag input Enter
     if (e.target.id === 'custom-tag-input' && e.key === 'Enter') {
@@ -1513,15 +1871,13 @@ window.PageObservations = (function () {
     activeCourse = params.course || getActiveCourse();
     setActiveCourse(activeCourse);
     selectedStudents = [];
-    filterStudents = [];
-    filterTags = [];
-    searchQuery = '';
+    resetFilters();
     activeTags = [];
     activeSentiment = null;
     activeContext = null;
-    filterSentiment = null;
     _openPopover = null;
-    _filterStripOpen = false;
+    _viewMode = loadViewMode();
+    _alive = true;
 
     // Show sidebar
     document.getElementById('sidebar-mount').style.display = '';
@@ -1536,6 +1892,7 @@ window.PageObservations = (function () {
     _addDocListener('click', _handleClick);
     _addDocListener('mousedown', _handleMousedown);
     _addDocListener('input', _handleInput);
+    _addDocListener('change', _handleChange);
     _addDocListener('keydown', _handleKeydown);
 
     render();
@@ -1575,10 +1932,7 @@ window.PageObservations = (function () {
     _focusFocusables = null;
     _focusLastActiveEl = null;
     _focusTagPopoverOpen = false;
-    Object.keys(_deleteTimers).forEach(function (k) {
-      clearTimeout(_deleteTimers[k]);
-    });
-    _deleteTimers = {};
+    _alive = false;
     _students = [];
     _studentsById = {};
     closeAllPopovers();
@@ -1592,5 +1946,15 @@ window.PageObservations = (function () {
     destroy: destroy,
     render: render,
     switchCourse: switchCourse,
+    _helpers: {
+      weekRange: weekRange,
+      termRange: termRange,
+      quotedIndex: quotedIndex,
+      quotedLabel: quotedLabel,
+      sameCaptureIndex: sameCaptureIndex,
+      captureKey: captureKey,
+      withLabel: withLabel,
+      isLinked: isLinked,
+    },
   };
 })();

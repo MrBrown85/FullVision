@@ -816,8 +816,6 @@ body.fv-switching-course::after {
   font-size: 13px;
   font-weight: 600;
   color: var(--text-3);
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
 }
 .m-obs-card {
   background: var(--surface);
@@ -829,13 +827,13 @@ body.fv-switching-course::after {
   overflow: hidden;
 }
 .m-obs-card[data-sentiment='strength'] {
-  border-left-color: #2e7d32;
+  border-left-color: var(--score-3);
 }
 .m-obs-card[data-sentiment='growth'] {
-  border-left-color: #007aff;
+  border-left-color: var(--active);
 }
 .m-obs-card[data-sentiment='concern'] {
-  border-left-color: #c07a00;
+  border-left-color: var(--score-2);
 }
 
 .m-obs-header {
@@ -844,8 +842,28 @@ body.fv-switching-course::after {
   gap: 6px;
   margin-bottom: 6px;
 }
-.m-obs-sentiment-icon {
-  font-size: 14px;
+.m-obs-type-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 1px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+  color: var(--text-2);
+  background: var(--overlay-hover);
+}
+.m-obs-type-pill[data-sentiment='strength'] {
+  color: var(--score-3);
+  background: color-mix(in srgb, var(--score-3) 12%, transparent);
+}
+.m-obs-type-pill[data-sentiment='growth'] {
+  color: var(--active);
+  background: color-mix(in srgb, var(--active) 12%, transparent);
+}
+.m-obs-type-pill[data-sentiment='concern'] {
+  color: var(--score-2);
+  background: color-mix(in srgb, var(--score-2) 14%, transparent);
 }
 .m-obs-student-fixed {
   padding: 8px 12px;
@@ -893,10 +911,11 @@ body.fv-switching-course::after {
 }
 .m-obs-context {
   font-size: 12px;
-  color: var(--text-3);
-  background: var(--overlay-hover);
-  padding: 2px 6px;
-  border-radius: 4px;
+  color: var(--text-2);
+  border: 1px solid var(--border);
+  padding: 0 7px;
+  border-radius: 10px;
+  white-space: nowrap;
 }
 .m-obs-time {
   font-size: 12px;
@@ -1278,6 +1297,9 @@ body.fv-switching-course::after {
 
 .m-dim-chip {
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 10px 14px;
   min-height: 44px;
   border-radius: 22px;
@@ -2772,8 +2794,9 @@ body.fv-switching-course::after {
 }
 .m-post-meta-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 4px 8px;
   margin-top: 2px;
 }
 .m-post-body {
@@ -2789,13 +2812,7 @@ body.fv-switching-course::after {
 }
 .m-post .m-obs-tag-chip {
   font-size: 13px;
-  color: var(--active);
   font-weight: 500;
-}
-.m-post-sentiment {
-  font-size: 20px;
-  flex-shrink: 0;
-  margin-left: auto;
 }
 
 /* Date group dividers (social style) */
@@ -2805,8 +2822,6 @@ body.fv-switching-course::after {
   font-size: 12px;
   color: var(--text-3);
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
   padding: 16px 0 8px;
 }
 
@@ -2919,8 +2934,8 @@ body.fv-switching-course::after {
 .m-quick-template:active {
   background: var(--active-light);
 }
-.m-quick-template-icon {
-  font-size: 20px;
+.m-quick-template .m-obs-type-pill {
+  margin-left: auto;
   flex-shrink: 0;
 }
 .m-quick-compose {

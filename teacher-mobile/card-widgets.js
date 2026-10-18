@@ -155,8 +155,12 @@ window.MCardWidgets = (function () {
       return '<div class="m-scard-obs-empty"><em>No observations yet</em></div>';
     }
     var latest = obs[0];
+    var sent = OBS_SENTIMENTS[latest.sentiment];
     return (
       '<div class="m-scard-obs">' +
+      (sent
+        ? '<span class="m-obs-type-pill" data-sentiment="' + latest.sentiment + '">' + MC.esc(sent.label) + '</span> '
+        : '') +
       '<span style="color:var(--text-3);font-size:12px">' +
       MC.relativeTime(latest.created) +
       '</span> ' +
