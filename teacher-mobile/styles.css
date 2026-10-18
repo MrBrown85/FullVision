@@ -2952,6 +2952,11 @@ body.fv-switching-course::after {
   margin-left: auto;
   flex-shrink: 0;
 }
+.m-quick-note {
+  margin: 2px 4px 8px;
+  font-size: 13px;
+  color: var(--text-2);
+}
 .m-quick-compose {
   width: 100%;
   padding: 14px 0;

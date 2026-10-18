@@ -557,45 +557,39 @@ window.MObserve = (function () {
     });
   }
 
-  /* ── Quick-Post Templates ──────────────────────────────────── */
-  var QUICK_TEMPLATES = [
-    {
-      key: 'collab',
-      text: 'Strong collaboration with peers',
-      sentiment: 'strength',
-      dims: ['collaboration'],
-    },
-    {
-      key: 'question',
-      text: 'Asked a great question in class',
-      sentiment: 'strength',
-      dims: ['curiosity'],
-    },
-    {
-      key: 'focus',
-      text: 'Focused and on-task during independent work',
-      sentiment: 'strength',
-      dims: ['selfRegulation'],
-    },
-    {
-      key: 'support',
-      text: 'Needed additional support to stay on task',
-      sentiment: 'growth',
-      dims: ['selfRegulation'],
-    },
-    {
-      key: 'resilience',
-      text: 'Showed resilience working through a challenge',
-      sentiment: 'strength',
-      dims: ['resilience'],
-    },
-    {
-      key: 'respect',
-      text: 'Demonstrated respect for diverse perspectives',
-      sentiment: 'strength',
-      dims: ['respect'],
-    },
-  ];
+  /* ── Quick-post starters ───────────────────────────────────── */
+  /* The class's sentence starters (edited in Class Management on a
+     computer). A class with none gets the six suggestions, which work the
+     same way but are never saved as the class's own.
+     → { items: [{ key, text, sentiment, context, dims }], suggested } */
+  function quickStarters(cid) {
+    var own = (typeof getObservationTemplates === 'function' ? getObservationTemplates(cid) : []).filter(function (t) {
+      return t && t.text;
+    });
+    if (own.length) {
+      return {
+        suggested: false,
+        items: own.map(function (t) {
+          return { key: t.id, text: t.text, sentiment: t.sentiment, context: t.context, dims: t.dims || [] };
+        }),
+      };
+    }
+    var six = typeof OBS_STARTER_SUGGESTIONS !== 'undefined' ? OBS_STARTER_SUGGESTIONS : [];
+    return {
+      suggested: true,
+      items: six.map(function (t, i) {
+        return { key: 'suggested-' + i, text: t.text, sentiment: t.sentiment, context: t.context, dims: t.dims || [] };
+      }),
+    };
+  }
+
+  function _findQuickStarter(cid, key) {
+    var items = quickStarters(cid).items;
+    var want = typeof resolveObservationTemplateId === 'function' ? resolveObservationTemplateId(cid, key) : key;
+    return items.find(function (t) {
+      return t.key === key || t.key === want;
+    });
+  }
 
   function presentQuickMenu(cid, sid) {
     var students = getStudents(cid);
@@ -620,12 +614,13 @@ window.MObserve = (function () {
       '</div>' +
       '</div>';
 
-    QUICK_TEMPLATES.forEach(function (tmpl) {
+    var starters = quickStarters(cid);
+    starters.items.forEach(function (tmpl) {
       html +=
         '<button class="m-quick-template" data-action="m-obs-quick-post" data-sid="' +
         sid +
         '" data-template="' +
-        tmpl.key +
+        MC.esc(tmpl.key) +
         '">' +
         '<span>' +
         MC.esc(tmpl.text) +
@@ -633,6 +628,9 @@ window.MObserve = (function () {
         typePill(tmpl.sentiment) +
         '</button>';
     });
+    if (starters.suggested) {
+      html += '<div class="m-quick-note">Add your own in Class Management on a computer.</div>';
+    }
 
     html +=
       '<button class="m-quick-compose" data-action="m-obs-quick-compose" data-sid="' +
@@ -643,13 +641,11 @@ window.MObserve = (function () {
   }
 
   function quickPost(cid, sid, templateKey) {
-    var tmpl = QUICK_TEMPLATES.find(function (t) {
-      return t.key === templateKey;
-    });
+    var tmpl = _findQuickStarter(cid, templateKey);
     if (!tmpl) return;
 
     try {
-      addQuickOb(cid, sid, tmpl.text, tmpl.dims, tmpl.sentiment, null);
+      addQuickOb(cid, sid, tmpl.text, (tmpl.dims || []).slice(), tmpl.sentiment || null, tmpl.context || null);
     } catch (e) {
       MC.dismissSheet();
       MC.showToast('Failed to save \u2014 try again');
@@ -691,5 +687,6 @@ window.MObserve = (function () {
     presentEditObsSheet: presentEditObsSheet,
     presentQuickMenu: presentQuickMenu,
     quickPost: quickPost,
+    quickStarters: quickStarters,
   };
 })();

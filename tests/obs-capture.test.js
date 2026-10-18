@@ -73,6 +73,34 @@ describe('parseShorthand', () => {
   });
 });
 
+describe('starter helpers', () => {
+  const list = [
+    { id: 'a', text: 'Asked a great question' },
+    { id: 'b', text: 'Explained the question clearly' },
+    { id: 'c', text: 'Unrequested help' },
+  ];
+  it('matchStarters keeps every starter for an empty query, in order', () => {
+    expect(H.matchStarters('', list).map(t => t.id)).toEqual(['a', 'b', 'c']);
+  });
+  it('matchStarters puts a word-start match before a match inside a word', () => {
+    expect(H.matchStarters('quest', list).map(t => t.id)).toEqual(['a', 'b', 'c']);
+    expect(H.matchStarters('QUESTION', list).map(t => t.id)).toEqual(['a', 'b']);
+    expect(H.matchStarters('nope', list)).toEqual([]);
+  });
+  it('applyStarter fills only an empty type and context and merges tags', () => {
+    const st = { sentiment: null, context: 'discussion', dims: ['engagement'] };
+    H.applyStarter(st, { sentiment: 'growth', context: 'independent', dims: ['engagement', 'curiosity'] });
+    expect(st).toEqual({ sentiment: 'growth', context: 'discussion', dims: ['engagement', 'curiosity'] });
+    H.applyStarter(st, { sentiment: 'strength', context: null, dims: [] });
+    expect(st.sentiment).toBe('growth');
+  });
+  it('insertText adds a space only where words would touch', () => {
+    expect(H.insertText('', 'Hi there', 0, 0)).toEqual({ value: 'Hi there', caret: 8 });
+    expect(H.insertText('Today /hi', 'Hi there', 6, 9)).toEqual({ value: 'Today Hi there', caret: 14 });
+    expect(H.insertText('Done.Next', 'Hi', 5, 5)).toEqual({ value: 'Done. Hi Next', caret: 9 });
+  });
+});
+
 describe('tokenAt', () => {
   it('finds the token the caret is in', () => {
     expect(H.tokenAt('Hello @Me', 9)).toEqual({ kind: '@', query: 'Me', start: 6, end: 9 });
@@ -244,10 +272,141 @@ describe('capture strip', () => {
     expect(added[0]).toMatchObject({ sid: 's3', text: 'Left the data table blank', sentiment: 'concern' });
   });
 
-  it('a slash shows an empty starters menu until the starters bank exists', () => {
+  /* ── Sentence starters ── */
+  const STARTERS = [
+    { id: 'ot1', text: 'Asked a great question in class', sentiment: 'strength', context: null, dims: ['curiosity'] },
+    {
+      id: 'ot2',
+      text: 'Needed additional support to stay on task',
+      sentiment: 'growth',
+      context: 'independent',
+      dims: ['selfRegulation', 'engagement'],
+    },
+    { id: 'ot3', text: 'Explained the question to a partner', sentiment: null, context: 'small-group', dims: [] },
+  ];
+  function withStarters(list) {
+    setGlobal('getObservationTemplates', cid => (cid === CID ? list || STARTERS : []));
+  }
+  function suggestLabels(cap) {
+    return Array.from(cap.el.querySelectorAll('#capture-suggest .obsc-item .obsc-item-label')).map(e => e.textContent);
+  }
+
+  it('a slash with no starters says so, offers Edit starters…, and Enter still adds', () => {
+    withStarters([]);
+    const cap = mount({ students: ['s1'] });
+    type(cap, 'Done early /');
+    const box = cap.el.querySelector('#capture-suggest');
+    expect(box.textContent).toContain('This class has no sentence starters yet.');
+    expect(suggestLabels(cap)).toEqual(['Edit starters…']);
+    const navigated = [];
+    setGlobal('Router', { navigate: h => navigated.push(h) });
+    press(cap, 'Enter');
+    expect(navigated).toEqual([]);
+    expect(added).toHaveLength(1);
+  });
+
+  it('a slash lists the class starters, filtered by what follows it', () => {
+    withStarters();
     const cap = mount({ students: ['s1'] });
     type(cap, '/');
-    expect(cap.el.querySelector('#capture-suggest').textContent).toContain('No sentence starters yet.');
+    expect(suggestLabels(cap)).toEqual([...STARTERS.map(t => t.text), 'Edit starters…']);
+    type(cap, '/quest');
+    // A word starting with the query comes before one that only contains it.
+    expect(suggestLabels(cap)).toEqual([
+      'Asked a great question in class',
+      'Explained the question to a partner',
+      'Edit starters…',
+    ]);
+    type(cap, '/zzz');
+    expect(cap.el.querySelector('#capture-suggest').textContent).toContain('No starter matches “zzz”.');
+  });
+
+  it('picking a starter replaces the /token and sets type, context and tags', () => {
+    withStarters();
+    const cap = mount({ students: ['s1'] });
+    type(cap, '/support');
+    press(cap, 'Enter');
+    expect(added).toHaveLength(0);
+    expect(cap.getText()).toBe('Needed additional support to stay on task');
+    const st = cap.getState();
+    expect(st.sentiment).toBe('growth');
+    expect(st.context).toBe('independent');
+    expect(st.dims).toEqual(['selfRegulation', 'engagement']);
+    cap.submit();
+    expect(added[0]).toMatchObject({
+      text: 'Needed additional support to stay on task',
+      sentiment: 'growth',
+      context: 'independent',
+      dims: ['selfRegulation', 'engagement'],
+    });
+  });
+
+  it('a starter keeps the type and context already chosen and adds its tags to the picked ones', () => {
+    withStarters();
+    const cap = mount({ students: ['s1'] });
+    click(cap.el.querySelector('[data-obsc="type"][data-value="concern"]'));
+    click(cap.el.querySelector('#context-btn'));
+    click(cap.el.querySelector('[data-obsc="setContext"][data-value="discussion"]'));
+    click(cap.el.querySelector('#tag-btn'));
+    click(cap.el.querySelector('[data-obsc="toggleTag"][data-value="engagement"]'));
+    type(cap, 'Today /support');
+    click(cap.el.querySelector('#capture-suggest [data-obsc="pickSuggest"][data-value="0"]'));
+    expect(cap.getText()).toBe('Today Needed additional support to stay on task');
+    const st = cap.getState();
+    expect(st.sentiment).toBe('concern');
+    expect(st.context).toBe('discussion');
+    expect(st.dims).toEqual(['engagement', 'selfRegulation']);
+  });
+
+  it('the arrows reach Edit starters…, and it opens Class Management', () => {
+    withStarters();
+    const navigated = [];
+    setGlobal('Router', { navigate: h => navigated.push(h) });
+    const cap = mount({ students: ['s1'] });
+    type(cap, '/quest');
+    press(cap, 'ArrowDown');
+    press(cap, 'ArrowDown');
+    expect(cap.el.querySelector('#capture-suggest .is-active').textContent).toBe('Edit starters…');
+    press(cap, 'Enter');
+    expect(navigated).toEqual(['/dashboard?manage=starters']);
+    expect(added).toHaveLength(0);
+  });
+
+  it('+ Starter opens the same list and inserts at the caret', () => {
+    withStarters();
+    const cap = mount({ students: ['s1'] });
+    const input = type(cap, 'Before.');
+    input.selectionStart = input.selectionEnd = 7;
+    click(cap.el.querySelector('#starter-btn'));
+    const menu = cap.el.querySelector('#starter-dropdown');
+    expect(menu).toBeTruthy();
+    const rows = Array.from(menu.querySelectorAll('.obsc-item')).map(e => e.textContent);
+    expect(rows[rows.length - 1]).toBe('Edit starters…');
+    expect(menu.querySelector('[data-obsc="pickStarter"][data-value="ot1"] .obsc-item-hint').textContent).toBe(
+      'Strength',
+    );
+    click(menu.querySelector('[data-obsc="pickStarter"][data-value="ot3"]'));
+    expect(cap.getText()).toBe('Before. Explained the question to a partner');
+    expect(cap.getState().context).toBe('small-group');
+    expect(cap.getState().sentiment).toBeNull();
+    expect(cap.el.querySelector('#starter-dropdown')).toBeNull();
+  });
+
+  it('a host can handle Edit starters…; with no way to edit (the phone) it says where to', () => {
+    withStarters();
+    const asked = [];
+    const cap = mount({ students: ['s1'], onEditStarters: cid => asked.push(cid) });
+    click(cap.el.querySelector('#starter-btn'));
+    click(cap.el.querySelector('#starter-dropdown [data-obsc="editStarters"]'));
+    expect(asked).toEqual([CID]);
+    cap.destroy();
+
+    setGlobal('Router', undefined);
+    const phone = mount({ students: ['s1'], layout: 'sheet' });
+    click(phone.el.querySelector('#starter-btn'));
+    const menu = phone.el.querySelector('#starter-dropdown');
+    expect(menu.querySelector('[data-obsc="editStarters"]')).toBeNull();
+    expect(menu.textContent).toContain('Add your own in Class Management on a computer.');
   });
 
   it('with no student, Add opens the student menu instead of saving', () => {
