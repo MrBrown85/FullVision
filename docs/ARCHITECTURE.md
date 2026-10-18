@@ -68,16 +68,16 @@ Shared runtime modules load before desktop or mobile page modules:
 3. `shared/constants.js`
 4. `shared/data.js`
 5. `shared/offline-queue.js`
-6. `shared/demo-seed.js`
+6. `shared/auto-update.js`
 7. `shared/calc.js`
 
 Desktop or mobile modules then layer on top of that shared runtime.
 
 ### Static and lazy-loaded assets
 
-- `curriculum_data.js` is a large static curriculum index and should be treated as reference data, not core boot state.
-- `shared/demo-seed.js` defines the current Welcome Class seed payload builder.
-- `shared/seed-data.js` remains part of the Demo Mode path.
+- `curriculum_data.js` and `curriculum_by_course.json` are the static BC curriculum index and should be treated as reference data, not core boot state.
+- `shared/seed-data.js` builds the Demo Mode sample class.
+- `shared/auto-update.js` reloads a long-open tab after a deploy at a safe moment, without a prompt.
 
 ## Boot and session flow
 
@@ -221,17 +221,9 @@ Current desktop grading behavior is category-driven:
 
 This means the older “summative/formative is the primary grading architecture” framing is no longer accurate as a system-level description.
 
-## Welcome Class and demo data
+## Demo data
 
-There are two distinct sample-data paths:
-
-- Welcome Class seeding for signed-in first-time teacher bootstrap
-- Demo Mode for local-only exploration without Supabase
-
-`shared/demo-seed.js` defines the canonical Welcome Class payload builder.
-`shared/seed-data.js` still powers the existing Demo Mode seed flow.
-
-These paths are related, but they are not yet the same runtime implementation.
+Demo Mode is the only sample data. `shared/seed-data.js` builds the Science 8 sample class, local-only, without Supabase. Signed-in teachers start with no classes; the Welcome Class bootstrap was removed on 2026-10-13 (`migrations/20261013_bootstrap_without_welcome_class.sql`).
 
 ## Deployment architecture
 
@@ -260,8 +252,9 @@ These paths are related, but they are not yet the same runtime implementation.
 This file is intentionally high-level. For authoritative detail, use:
 
 - [`README.md`](../README.md) for repo entry and run instructions
-- [`docs/backend-design/HANDOFF.md`](backend-design/HANDOFF.md) for current live state and discovered gaps
-- [`codex.md`](../codex.md) for the live open-work list
+- [`CLAUDE.md`](../CLAUDE.md) for the working rules every session follows
+- [`docs/ROADMAP.md`](ROADMAP.md) for the open-work list and [`docs/DECISIONS.md`](DECISIONS.md) for settled decisions
+- [`docs/backend-design/HANDOFF.md`](backend-design/HANDOFF.md) and [`codex.md`](../codex.md) for history (not maintained)
 - [`schema.sql`](../schema.sql) and [`docs/backend-design/rls-policies.sql`](backend-design/rls-policies.sql) for deployed reference artifacts
 - [`docs/backend-design/read-paths.md`](backend-design/read-paths.md) and [`docs/backend-design/write-paths.md`](backend-design/write-paths.md) for backend design detail
 

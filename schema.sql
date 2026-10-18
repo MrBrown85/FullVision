@@ -3,6 +3,11 @@
 -- ----------------------------------------------------------------------------
 -- Regenerated 2026-04-20 from gradebook-prod (novsfeqjhbleyyaztmlh) via
 -- Supabase MCP execute_sql against information_schema + pg_proc.
+-- Updated 2026-10-17 by hand from migrations/2026101[2-6]_*.sql: course
+-- grading_scale / category_weights / round_percent / deleted_at, tag_score and
+-- rubric_score modifier, course_sync_cursor version, the term 1..6 note, and
+-- the score_mode values. Function signatures below were not re-read from the
+-- database on that date; check pg_proc before relying on a parameter list.
 --
 -- This is a READABLE SNAPSHOT, not a replayable migration log. It documents
 -- the current shape of the database so client code can be cross-referenced
@@ -66,9 +71,12 @@ create table course (
   decay_weight     numeric,                                        -- only used when calc_method = 'decaying_avg'
   timezone         text        not null default 'America/Vancouver',
   late_work_policy text,
+  grading_scale    jsonb       check (grading_scale is null or jsonb_typeof(grading_scale) = 'object'),      -- {boundaries:[{min, proficiency}], labels} (20261015_course_grading_config)
+  category_weights jsonb       check (category_weights is null or jsonb_typeof(category_weights) = 'object'), -- legacy {summative, formative}; real weights live on `category` (20261015_course_grading_config)
+  round_percent    boolean,                                        -- true whole %, false one decimal, null follow grade level (20261016_course_round_percent)
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now(),
-  deleted_at       timestamptz                                         -- soft-delete marker; hidden immediately, purged after 30d by fv_retention_cleanup
+  deleted_at       timestamptz                                         -- soft-delete marker; hidden immediately, purged after 30d by fv_retention_cleanup (20261012_course_soft_delete)
 );
 
 create table subject (
@@ -212,7 +220,7 @@ create table assessment (
   description    text,
   date_assigned  date,
   due_date       date,
-  score_mode     text        not null,                              -- scale | rubric | points
+  score_mode     text        not null,                              -- scale | rubric | points | complete (20261013_complete_incomplete_scoring)
   max_points     numeric,
   weight         numeric     not null,
   evidence_type  text,
@@ -250,6 +258,7 @@ create table tag_score (
   assessment_id uuid        not null references assessment(id) on delete cascade,
   tag_id        uuid        not null references tag(id)        on delete cascade,
   value         integer     not null,                                -- proficiency 1..4
+  modifier      smallint    not null default 0,                      -- −1 | 0 | +1, a third of a level; no 1− or 4+ (20261013_proficiency_plus_minus)
   updated_at    timestamptz not null default now(),
   unique (enrollment_id, assessment_id, tag_id)
 );
@@ -260,6 +269,7 @@ create table rubric_score (
   assessment_id uuid        not null references assessment(id) on delete cascade,
   criterion_id  uuid        not null references criterion(id)  on delete cascade,
   value         integer     not null,                                -- 1..4
+  modifier      smallint    not null default 0,                      -- −1 | 0 | +1, as tag_score (20261013_proficiency_plus_minus)
   updated_at    timestamptz not null default now(),
   unique (enrollment_id, assessment_id, criterion_id)
 );
@@ -377,7 +387,7 @@ create table attendance (
 create table term_rating (
   id                    uuid        not null primary key,
   enrollment_id         uuid        not null references enrollment(id) on delete cascade,
-  term                  integer     not null,                         -- 1 | 2 | 3
+  term                  integer     not null,                         -- 1..6; the Reports page offers Report 1–6 and maps "Report N" → N
   narrative_html        text,
   work_habits_rating    integer,
   participation_rating  integer,
@@ -440,7 +450,8 @@ create table report_config (
 create table course_sync_cursor (
   course_id                   uuid        not null primary key references course(id) on delete cascade,
   gradebook_updated_at        timestamptz not null default now(),
-  student_records_updated_at  timestamptz not null default now()
+  student_records_updated_at  timestamptz not null default now(),
+  version                     bigint      not null default 0        -- bumped on every class change; get_class_bundle(p_if_version) short-circuits on a match (20261015_course_sync_version)
 );
 
 -- Idempotency guard for offline-queue retries (migration 20260423_write_path_idempotency).
