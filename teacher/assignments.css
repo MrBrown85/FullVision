@@ -3155,3 +3155,23 @@
   color: var(--text);
   border-color: var(--text-3);
 }
+
+/* Rubric copy dialogs: a class or rubric row with its match summary under it. */
+.rubric-copy-row {
+  margin-top: 4px;
+}
+.rubric-copy-row-name {
+  font-weight: 600;
+}
+.rubric-copy-summary {
+  padding-left: 22px;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+}
+.rubric-copy-group {
+  margin-top: 8px;
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}

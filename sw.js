@@ -47,6 +47,7 @@ const PRECACHE_URLS = [
   '/teacher/student-notes.js',
   '/teacher/student-overrides.js',
   '/teacher/rubric-print.js',
+  '/teacher/rubric-library.js',
   '/teacher/page-dashboard.js',
   '/teacher/page-assignments.js',
   '/teacher/page-student.js',

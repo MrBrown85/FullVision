@@ -285,14 +285,7 @@ window.AssessmentCopy = (function () {
   }
 
   function _cloneRubric(srcCid, dstCid, rubric) {
-    var clone = structuredClone(rubric);
-    clone.id = uid();
-    clone.criteria = (clone.criteria || []).map(function (c) {
-      var next = Object.assign({}, c, { id: uid() });
-      next.tagIds = mapTags(srcCid, dstCid, c.tagIds || []).ids;
-      return next;
-    });
-    return clone;
+    return RubricLibrary.cloneRubric(srcCid, dstCid, rubric);
   }
 
   /* Save one planned copy into its class. */
@@ -1284,6 +1277,7 @@ window.AssessmentCopy = (function () {
     renderSiblingToggle: renderSiblingToggle,
     deleteNote: deleteNote,
     openAddFromClass: openAddFromClass,
+    dialog: _dialog,
     _courseKey: _courseKey,
   };
 })();

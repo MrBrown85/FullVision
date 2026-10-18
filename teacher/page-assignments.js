@@ -352,6 +352,9 @@ window.PageAssignments = (function () {
         '<button class="rubric-list-btn" data-action="editRubricUI" data-rid="' +
         r.id +
         '" title="Edit">\u270E</button>' +
+        '<button class="rubric-list-btn" data-action="copyRubricUI" data-rid="' +
+        r.id +
+        '" title="Copy to another class" aria-label="Copy rubric to another class">\u29C9</button>' +
         '<button class="rubric-list-btn delete" data-action="deleteRubricUI" data-rid="' +
         r.id +
         '" title="Delete" aria-label="Delete rubric">\u2715</button>' +
@@ -916,6 +919,7 @@ window.PageAssignments = (function () {
         .join('') +
       '</select>' +
       '<button type="button" class="btn btn-ghost" data-action="newRubricFromForm" style="white-space:nowrap;font-size:0.78rem;padding:7px 12px">+ New Rubric</button>' +
+      '<button type="button" class="btn btn-ghost" data-action="rubricFromClass" style="white-space:nowrap;font-size:0.78rem;padding:7px 12px">From another class</button>' +
       '</div>' +
       (selRubricId
         ? '<div class="af-rubric-info">Rubric tags are auto-selected below. You can add additional tags.</div>'
@@ -3174,6 +3178,25 @@ window.PageAssignments = (function () {
   function newRubricFromForm() {
     newRubricUI();
   }
+  /* Copy a rubric from another class into this one and select it on the form. */
+  function rubricFromClass() {
+    if (!window.RubricLibrary) return;
+    RubricLibrary.openPickDialog(activeCourse, function (rubric) {
+      var dd = document.getElementById('af-rubric');
+      if (!dd) return;
+      dd.innerHTML =
+        '<option value="">None</option>' +
+        getRubrics(activeCourse)
+          .map(function (r) {
+            return (
+              '<option value="' + esc(r.id) + '">' + esc(r.name) + ' (' + r.criteria.length + ' criteria)</option>'
+            );
+          })
+          .join('');
+      dd.value = rubric.id;
+      onRubricSelect(rubric.id);
+    });
+  }
 
   /* ── Comment Popover ────────────────────────────────────── */
   function openCommentPopover(cid, sid, aid) {
@@ -3973,6 +3996,12 @@ window.PageAssignments = (function () {
       },
       newRubricFromForm: function () {
         newRubricFromForm();
+      },
+      rubricFromClass: function () {
+        rubricFromClass();
+      },
+      copyRubricUI: function () {
+        if (window.RubricLibrary) RubricLibrary.openCopyDialog(activeCourse, el.dataset.rid, render);
       },
       setCollaboration: function () {
         setCollaboration(el.dataset.collab);
