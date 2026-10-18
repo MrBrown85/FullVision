@@ -160,6 +160,7 @@ create table rubric (
   id         uuid        not null primary key,
   course_id  uuid        not null references course(id) on delete cascade,
   name       text        not null,
+  copy_group uuid,                                                    -- shared by a rubric and its copies in the teacher's other classes; null = never copied (20261018_rubric_copy_group)
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -520,7 +521,8 @@ create table fv_idempotency (
 --   upsert_tag / delete_tag / reorder_tags(p_ids uuid[])
 --   upsert_module / delete_module / reorder_modules(p_ids uuid[])
 --   save_categories / upsert_category / delete_category
---   upsert_rubric(p_id, p_course_id, p_name, p_criteria jsonb) / delete_rubric
+--   upsert_rubric(p_id, p_course_id, p_name, p_criteria jsonb, p_copy_group uuid) / delete_rubric
+--   list_rubric_copies(p_copy_group uuid)                             -- (2026-10-18) live copies across the teacher's classes
 --
 -- Student + enrollment:
 --   create_student_and_enroll(p_course_id, p_first_name, p_last_name, p_preferred_name,

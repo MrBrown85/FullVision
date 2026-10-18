@@ -129,6 +129,107 @@ describe('rubric library', () => {
     expect(getRubrics(A)[0].criteria[0].tagIds).toEqual(['a-t1', 'a-t2']);
   });
 
+  it('links the source and its copies with one copy group', async () => {
+    const done = await RubricLibrary.copyTo(A, labRubric(), [B]);
+    const src = getRubrics(A)[0];
+    expect(src.copyGroup).toMatch(/^[0-9a-f-]{36}$/);
+    expect(done[0].rubric.copyGroup).toBe(src.copyGroup);
+    expect(getRubrics(B)[0].copyGroup).toBe(src.copyGroup);
+    expect(RubricLibrary.localCopies(A, src)).toEqual([
+      { cid: B, rubricId: getRubrics(B)[0].id, className: 'Science 8 B' },
+    ]);
+    expect(RubricLibrary.deleteNote(A, src)).toBe(' It is also in Science 8 B; that copy stays.');
+    expect(RubricLibrary.renderCopies(A, src)).toContain('Also in');
+    // A second copy joins the same group.
+    await RubricLibrary.copyTo(A, getRubrics(A)[0], [H]);
+    expect(getRubrics(H)[1].copyGroup).toBe(src.copyGroup);
+    const copies = await RubricLibrary.findCopies(A, getRubrics(A)[0]);
+    expect(copies.map(c => c.cid).sort()).toEqual([B, H].sort());
+  });
+
+  describe('linked edit', () => {
+    let before, copy;
+    beforeEach(async () => {
+      await RubricLibrary.copyTo(A, labRubric(), [B]);
+      before = structuredClone(getRubrics(A)[0]);
+      copy = getRubrics(B)[0];
+    });
+
+    it('carries descriptor, value, weight and name changes the copy still shares', () => {
+      const after = structuredClone(before);
+      after.name = 'Lab rubric v2';
+      after.criteria[0].levels[4] = 'Designs independently';
+      after.criteria[0].levelValues = { 4: 10 };
+      after.criteria[1].weight = 2;
+      const plan = RubricLibrary.planLinkedEdit(A, before, after, B, copy);
+      expect(plan.changed).toBe(true);
+      expect(plan.next.name).toBe('Lab rubric v2');
+      expect(plan.next.criteria[0].levels[4]).toBe('Designs independently');
+      expect(plan.next.criteria[0].levelValues).toEqual({ 4: 10 });
+      expect(plan.next.criteria[1].weight).toBe(2);
+      expect(plan.next.criteria[0].tagIds).toEqual(['b-t1', 'b-t2']);
+      expect(plan.lines).toEqual([
+        'Name → Lab rubric v2',
+        'Descriptors of “Scientific inquiry” updated',
+        'Point values of “Scientific inquiry” updated',
+        'Weight of “Neatness” → 2',
+      ]);
+      expect(plan.skipped).toEqual([]);
+    });
+
+    it('leaves alone what the other class changed on its own', () => {
+      copy.criteria[0].levels[4] = 'Their own wording';
+      copy.name = 'Lab rubric (B)';
+      const after = structuredClone(before);
+      after.name = 'Lab rubric v2';
+      after.criteria[0].levels[4] = 'Designs independently';
+      after.criteria[0].levels[3] = 'Plans carefully';
+      const plan = RubricLibrary.planLinkedEdit(A, before, after, B, copy);
+      expect(plan.changed).toBe(false);
+      expect(plan.next.criteria[0].levels[4]).toBe('Their own wording');
+      expect(plan.skipped).toEqual(['name', 'the descriptors of “Scientific inquiry”']);
+    });
+
+    it('adds a new criterion with matched competencies and removes an unscored one', () => {
+      const after = structuredClone(before);
+      after.criteria.splice(1, 1); // Neatness removed, no scores in B
+      after.criteria.push({
+        id: 'a-c3',
+        name: 'Safety',
+        tagIds: ['a-t2'],
+        weight: 1,
+        levels: { 4: 'x', 3: '', 2: '', 1: '' },
+      });
+      const plan = RubricLibrary.planLinkedEdit(A, before, after, B, copy);
+      expect(plan.lines).toEqual(['Remove criterion “Neatness”', 'Add criterion “Safety”']);
+      expect(plan.next.criteria.map(c => c.name)).toEqual(['Scientific inquiry', 'Safety']);
+      expect(plan.next.criteria[1].tagIds).toEqual(['b-t2']);
+      expect(plan.next.criteria[1].id).not.toBe('a-c3');
+      expect(plan.removals).toEqual([{ id: copy.criteria[1].id, name: 'Neatness', students: 0, index: 0 }]);
+    });
+
+    it('keeps a scored criterion in the copy unless the teacher removes it too', () => {
+      _cache.assessments[B] = [{ id: 'b-a1', name: 'Lab 1', rubricId: copy.id }];
+      _cache.scores[B] = { st1: [{ assessmentId: 'b-a1', tagId: copy.criteria[1].id, score: 3 }] };
+      const after = structuredClone(before);
+      after.criteria.splice(1, 1);
+      const plan = RubricLibrary.planLinkedEdit(A, before, after, B, copy);
+      expect(plan.changed).toBe(true);
+      expect(plan.lines).toEqual([]);
+      expect(plan.next.criteria.map(c => c.name)).toEqual(['Scientific inquiry', 'Neatness']);
+      expect(plan.removals[0]).toMatchObject({ name: 'Neatness', students: 1 });
+    });
+
+    it('matches a renamed criterion by position when names differ', () => {
+      copy.criteria[0].name = 'Inquiry (B)';
+      const after = structuredClone(before);
+      after.criteria[0].levels[2] = 'Follows with help';
+      const plan = RubricLibrary.planLinkedEdit(A, before, after, B, copy);
+      expect(plan.next.criteria[0].levels[2]).toBe('Follows with help');
+      expect(plan.lines).toEqual(['Descriptors of “Scientific inquiry” updated']);
+    });
+  });
+
   it('skips the source class and ignores unknown targets', async () => {
     const done = await RubricLibrary.copyTo(A, labRubric(), [A, '', B]);
     expect(done.map(d => d.dstCid)).toEqual([B]);

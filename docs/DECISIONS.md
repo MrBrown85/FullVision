@@ -96,3 +96,12 @@ Context: a rubric belongs to one class, so a teacher with two sections, or the s
 3. **Competencies are matched by name** in the target (short label, then full text, same section preferred, as assessment copies do). A competency with no match is listed before the copy is made and the criterion keeps its descriptors. When more than half have no match the dialog says the class teaches a different course.
 4. **A same-named rubric in the target is never replaced**; the copy is named "Name (2)". Replacing criteria would delete scored ones.
 5. **Copies are independent.** Each has its own criteria ids, so scores never move. Linking copies and offering "Update the other classes too?" is phase 2 of the plan.
+
+## Linked rubric copies (2026-10-18)
+
+Context: phase 2 of the rubric library plan. `migrations/20261018_rubric_copy_group.sql`; `teacher/rubric-library.js`.
+
+1. **Copies share `rubric.copy_group`**, set on the source the first time it is copied. It links the rows only; each class keeps its own criteria and scores.
+2. **Saving a rubric that has copies offers "Update the other classes too?"**, listing per class what would change: renamed, re-described, re-valued or re-weighted criteria, added criteria with their competency matches, removed criteria. Only what the copy still shared with the saved rubric changes; a field the other class changed on its own stays and is named.
+3. **A scored criterion is never removed from a copy by that offer** unless its own box, unticked by default, is ticked; the box says how many students have a score on it.
+4. **The Rubric Bank shows "Also in …" on a linked rubric**, the copy dialog marks classes that already hold a copy, and the delete confirmation says the copy stays.
