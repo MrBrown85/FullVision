@@ -86,3 +86,13 @@ Context: every gradebook compared in the rubrics review returns the rubric to th
 3. **Three layouts:** full page, half sheet (two per landscape page) and quarter sheet (four per page), cut lines between. Text shrinks by layout, and shrinks further by steps to fit; a sheet that still does not fit is clipped and the dialog says so before printing.
 4. **One comment per criterion**, stored on `rubric_score.comment`, entered from an icon on the criterion row. It cannot exist without a level on the server, so a comment typed first waits on the device and goes up with the level.
 5. **Unscored students print a blank rubric.** Not submitted and Excused print as such in place of the overall level.
+
+## One rubric in several classes (2026-10-18)
+
+Context: a rubric belongs to one class, so a teacher with two sections, or the same course next year, built it twice. Schoology copies rubrics from Resources into courses, Teams keeps one list per teacher, Classroom reuses from any class as a copy; none of them sync copies. Plan at `~/fullvision-rubric-library-plan.md`; `teacher/rubric-library.js`.
+
+1. **Rubrics stay per class.** `rubric.course_id` is kept; RLS, the class bundle, Demo Mode and the outbox all assume it. Duplicate Class already carries rubrics into next year.
+2. **Copy on demand.** "Copy to another class" on the Rubric Bank and "From another class" on the assessment form copy a rubric, criteria and descriptors included, into another live class.
+3. **Competencies are matched by name** in the target (short label, then full text, same section preferred, as assessment copies do). A competency with no match is listed before the copy is made and the criterion keeps its descriptors. When more than half have no match the dialog says the class teaches a different course.
+4. **A same-named rubric in the target is never replaced**; the copy is named "Name (2)". Replacing criteria would delete scored ones.
+5. **Copies are independent.** Each has its own criteria ids, so scores never move. Linking copies and offering "Update the other classes too?" is phase 2 of the plan.
