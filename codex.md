@@ -1,3 +1,5 @@
+> **Superseded (2026-10-17).** The open-work list is now `docs/ROADMAP.md`; decisions are in `docs/DECISIONS.md`. This file is kept for history and is not maintained.
+
 # FullVision Open Work
 
 This is the only active work list for the repo. All pending work, design

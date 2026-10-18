@@ -1,38 +1,60 @@
-# FullVision Backend Design — Charter
+# FullVision
 
-**Status:** Design phase complete (Passes A–D). Backend implementation and client port are merged onto `main` and live against `gradebook-prod`. Remaining work is tracked in [HANDOFF.md](docs/backend-design/HANDOFF.md) and [codex.md](codex.md).
+A gradebook and report writer for BC classroom teachers. Proficiency scale (Emerging, Developing, Proficient, Extending, with + and −) and letter/percent for grades 10–12, a learning map built from the BC curriculum, an observation log, student goals and reflections, a term questionnaire, and printed reports. Teacher-only: no student or parent logins.
 
-This worktree originally designed the backend **from scratch** from the user inputs inventory. That phase is done. Partway through Pass D the charter shifted to **"match the UI the user already has."** UI references in design docs are intentional and welcome.
+Live at fullvision.ca. Owner: Colin Brown, a Surrey (SD36) teacher. Read `docs/ROADMAP.md` for where the product is going and `docs/DECISIONS.md` before changing grading or student-facing behaviour.
 
-## Hard rules (still in force)
+## Stack
 
-- **Source of truth for feature coverage:** `fullvision-user-inputs.xlsx`. Every row worth persisting maps to exactly one entity.
-- **Ignore the `Persistence` column** (LS / SB / LS pref / EPH / Mixed). Treat every row that represents real user-authored data as "must persist." The existing split is an implementation artifact, not a domain fact.
-- **Ignore rows that are pure UI state:** search boxes, filter toggles, modal open/close, sort toggles, sheet open/close, drag reorders of UI-only elements, tab switches, sidebar toggles. These are client concerns, not backend entities.
-- **Collapse mobile + desktop rows** for the same action into one write path. `m-grade-score` and `cycleScore` are the same write.
+- **Database:** Supabase project `gradebook-prod` (`novsfeqjhbleyyaztmlh`, `ca-central-1`). Every write goes through a `public` RPC; RLS is on every table through `fv_owns_course` / `fv_owns_enrollment` / `fv_owns_assessment` / `fv_owns_term_rating`. The anon role can run no functions (`migrations/20261013_revoke_anon_function_execute.sql`). Student data must stay in Canada.
+- **Front end:** plain JavaScript, no bundler. Browser-global IIFE modules loaded by `<script>` tags. Deployed as a static site on Netlify; `netlify/edge-functions/inject-env.js` injects the Supabase URL and key and sets a per-request CSP nonce.
+- **Errors:** Sentry (`shared/sentry-init.js`).
 
-## Retired rules (design-phase only; no longer in force)
+## Where things live
 
-- ~~"Do not read files outside this worktree."~~ The rebuild charter is explicitly "match the existing UI," so referencing UI code is expected. Pass C §8.1 cites UI file paths on purpose.
-- ~~"No Supabase-specific assumptions."~~ The design Q&A committed to Supabase full-stack; Supabase patterns (RLS, Edge Functions, refresh tokens) are now in scope.
-- ~~"Ignore existing RPC names."~~ Post-fold, the implementation layer can align with existing RPC names where the UI already calls them.
+| Path                        | What it is                                                                                                                                          |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `shared/calc.js`            | All grade math. Course %, letters, proficiency roll-ups, `formatLevel`, `studentGradeSummary`, `courseGradeMode`. Nothing else computes a grade.    |
+| `shared/data.js`            | The data layer: in-memory cache, localStorage, RPC dispatch, offline outbox, local-id → UUID rekeying, class bundle loading.                        |
+| `shared/constants.js`       | Scales, dimensions, labels, BC designations.                                                                                                        |
+| `shared/offline-queue.js`   | `window.v2Queue`: queued writes, retry, dead letters.                                                                                               |
+| `shared/seed-data.js`       | Demo Mode's sample class (Science 8). The only sample data.                                                                                         |
+| `shared/supabase.js`        | Auth, session, sign-out wipe.                                                                                                                       |
+| `teacher/`                  | Desktop SPA: `app.html`, `router.js`, `page-*.js`, `ui.js`, `dash-class-manager.js`, reports.                                                       |
+| `teacher-mobile/`           | Phone PWA: `index.html`, `shell.js`, `tab-*.js`, `components.js`. Loads `teacher/styles.css` for tokens.                                            |
+| `migrations/`               | Applied SQL, one file per change, each with a comment saying what broke and why.                                                                    |
+| `schema.sql`                | Readable snapshot of the database, not a replayable log.                                                                                            |
+| `curriculum_by_course.json` | BC curriculum index: 223 courses, competencies, I-can statements. Reference data.                                                                   |
+| `tests/`                    | Vitest. `e2e/` Playwright against the static build. `e2e-real/` Playwright against a live account.                                                  |
+| `docs/`                     | `ARCHITECTURE.md` (shape), `ROADMAP.md`, `STUDENT-VOICE-PLAN.md`, `DECISIONS.md`, `grading-compliance-plan.md`, `backend-design/` (design history). |
 
-## Three-pass workflow (complete)
+## Running things
 
-- **Pass A — ERD.** `docs/backend-design/erd.md`. Final state includes the Pass D amendment folded in (2026-04-19).
-- **Pass B — Write paths.** `docs/backend-design/write-paths.md`.
-- **Pass C — Auth & session lifecycle.** `docs/backend-design/auth-lifecycle.md`.
-- **Pass D — Read paths + computations.** `docs/backend-design/read-paths.md`.
+```bash
+npm test                 # vitest
+npm run test:e2e         # playwright, static build
+npm run dev              # serve on :8347; Demo Mode from login.html
+npm run dev:local        # same, with Supabase env injected like Netlify
+npm run format:check     # prettier; CI enforces it
+```
 
-## Deliverable conventions
+Demo Mode (`login.html` → Try Demo Mode, or `/login.html?demo=1`) runs local-only with no Supabase. Every feature must work there.
 
-- Mermaid for diagrams (renders in GitHub).
-- One markdown file per pass — no sprawl.
-- Entity dictionary columns: name, purpose, key attributes, owning actor, cardinality notes.
-- When an input doesn't fit cleanly into an entity, flag it in a `## Open questions` section rather than forcing a fit.
+## Rules
 
-## What "done" looks like for Pass A
+1. **Never test a migration against `gradebook-prod`.** Use a Supabase branch or `begin … rollback`. Show the user the SQL before anything is applied to prod, and apply only on their OK.
+2. **Grade math changes and anything that deletes data need the user's review.** Say so in the PR.
+3. **Grades always follow the class's grading-style setting** (Proficiency / Letter / Both) through `calc.js` (`formatLevel`, `studentGradeSummary`). Never `toFixed` a level or format a grade outside `calc.js`.
+4. **Demo Mode is the only sample data.** No Welcome Class, no seeded rows for signed-in teachers.
+5. **Sync failures show only on the sync dot.** No banners, toasts or failed-item lists for sync problems.
+6. **Client ids:** `createCourse` and friends return a local id (`c` + base36 timestamp) and re-key to the server UUID when the RPC resolves. A local-shaped id reaching the database is a bug.
+7. **Every write RPC is idempotent** through `p_idempotency_key` (`fv_idem_check`). Keep that when adding one.
+8. **One PR per change.** CI green (vitest, prettier, Playwright) before merge. End commit messages with the attribution line the session gives you.
+9. **Plain language in the UI:** sentence case, no jargon without a legend, no all-caps prompts.
+10. **Don't touch** `fullvision-user-inputs.xlsx`, `fullvision-documentation-inventory.xlsx`, or the gradebook site's CSS from classroom-content work.
 
-- Every non-ephemeral row in `All Inputs` maps to exactly one entity (or is explicitly flagged as ambiguous).
-- No entity exists that isn't backed by at least one input row.
-- FKs form a connected graph rooted at Course + Student.
+## Current state (2026-10-17)
+
+- Grading compliance with Schoology/Teams (`docs/grading-compliance-plan.md`): Phase 1 and Phase 2 are implemented and live.
+- Course soft-delete with 30-day purge is live; student delete is still a hard delete (planned change: withdraw instead).
+- `codex.md` is historical; the open-work list is `docs/ROADMAP.md`.

@@ -1,6 +1,25 @@
 # Grade calculation: bug fixes and Schoology/Teams compliance
 
-Written 2026-10-16. Decisions D1–D7 accepted as recommended the same day. Phase 1 in progress.
+Written 2026-10-16. Decisions D1–D7 accepted as recommended the same day.
+
+**Status (2026-10-17): Phase 1 and Phase 2 are implemented and live.**
+
+| Item                                           | Where                                                                                                                                                                                           |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.1 Letter from the shown %                    | `shared/calc.js` `_roundPercent` and `getCourseLetterData` (`shown` → `percentageToLetter(shown)`)                                                                                              |
+| 1.2 Grade shown whenever a % exists            | `teacher/ui.js` student header gates on `R != null`; `teacher/report-blocks.js` summary likewise                                                                                                |
+| 1.3 Rubric custom points                       | `shared/calc.js` `_rubricAssessmentPoints`, used by `getAssessmentGroupPercentage`                                                                                                              |
+| 1.4 Category required when categories exist    | `teacher/page-assignments.js` ("No Category" offered only when the class has none); move-then-delete in `teacher/dash-class-manager.js`; `migrations/20261016_delete_category_in_use_guard.sql` |
+| 1.5 Typed 0 is a score                         | `shared/constants.js` `parsePointsInput` (blank → null, "0" → 0); `migrations/20261016_points_zero_was_cleared.sql`                                                                             |
+| D1 Weights total exactly 100                   | `migrations/20261016_category_weights_exactly_100.sql`; class manager saves the whole list and blocks Save until 100                                                                            |
+| D2 Per-assessment weight hidden on points work | `shared/calc.js` `getAssessmentWeight` returns 1 for points and Complete/Incomplete                                                                                                             |
+| D3 Level ÷ 4                                   | `shared/calc.js` `getAssessmentGroupPercentage`                                                                                                                                                 |
+| D4 Extra credit to 2× max                      | `shared/constants.js` `POINTS_EXTRA_CREDIT_FACTOR = 2`; `shared/calc.js` `_assessmentPoints`                                                                                                    |
+| D5 Drop lowest                                 | skipped, as decided                                                                                                                                                                             |
+| D6 Round to whole %                            | `migrations/20261016_course_round_percent.sql`; `shared/calc.js` `getRoundWholePercent`; class manager "Course %" control                                                                       |
+| D7 Missing = 0                                 | kept; `shared/calc.js` `_assessmentPoints` (`NS` → 0)                                                                                                                                           |
+
+Phase 3 golden tests: see `tests/course-percentage.test.js` and related; confirm `tests/grade-reference.test.js` exists before claiming the Schoology and Teams worked examples are covered.
 
 ## Reference behaviour
 
