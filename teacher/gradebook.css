@@ -1172,6 +1172,18 @@ th.gb-group-alt {
 .gb-grid-colheads-row2 {
   display: flex;
 }
+/* Rubric columns: Competencies | Criteria (Competencies view only) */
+.gb-rubric-cols {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.gb-rubric-cols-label {
+  font-family: var(--font-base);
+  font-size: var(--text-xs);
+  color: var(--text-3);
+  white-space: nowrap;
+}
 .gb-grid-tag-header {
   flex: 0 0 54px;
   width: 54px;
@@ -1186,6 +1198,15 @@ th.gb-group-alt {
   border-bottom: 2px solid; /* color set inline */
   background: var(--surface);
   box-sizing: border-box;
+}
+/* A criterion column's header is its name, not a competency code */
+.gb-grid-tag-header-crit {
+  text-transform: none;
+  letter-spacing: 0;
+  font-family: var(--font-base);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .gb-grid-rowhead-comp {
   display: flex;

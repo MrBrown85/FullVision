@@ -1027,6 +1027,32 @@ function completionRing(pct, color) {
   </div>`;
 }
 
+/* How this class works out a competency level from a student's scores, in
+   plain words ("Most recent score", "Decaying average: newer work counts
+   more (65%)"). The same method and decay weight getTagProficiency uses. */
+function describeCalcMethod(cid) {
+  var cc = getCourseConfig(cid) || {};
+  var course = (typeof COURSES !== 'undefined' && COURSES && COURSES[cid]) || {};
+  var method = cc.calcMethod || course.calcMethod || 'mostRecent';
+  var dw = cc.decayWeight != null ? cc.decayWeight : course.decayWeight || 0.65;
+  switch (method) {
+    case 'highest':
+      return 'Highest score';
+    case 'average':
+      return 'Average of all scores';
+    case 'median':
+      return 'Median score';
+    case 'mode':
+      return 'Most common score';
+    case 'decayingAvg': {
+      var pct = Math.round(Math.max(0.01, Math.min(1, Number(dw) || 0.65)) * 100);
+      return 'Decaying average: newer work counts more (' + pct + '%)';
+    }
+    default:
+      return 'Most recent score';
+  }
+}
+
 /* ── Growth Sparkline Data ────────────────────────────────── */
 /** Build chronological growth data for a section by calculating running proficiency at each score date.
  * @param {string} cid - Course ID
@@ -1285,6 +1311,7 @@ window.Calc = {
   calcProficiency,
   getTagScores,
   getTagProficiency,
+  describeCalcMethod,
   getSectionProficiency,
   getSectionProficiencyRaw,
   getSectionOverride,
