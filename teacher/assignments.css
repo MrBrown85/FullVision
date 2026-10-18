@@ -2499,7 +2499,7 @@
 .comment-popover {
   background: var(--surface);
   border-radius: 14px;
-  width: 420px;
+  width: 560px;
   max-width: 90vw;
   box-shadow:
     0 20px 60px rgba(0, 0, 0, 0.2),
@@ -2614,39 +2614,25 @@
   padding: 12px 20px 16px;
   border-top: 1px solid var(--border);
 }
-.comment-popover-input {
+.comment-popover-capture {
+  display: block;
+  padding: 10px 16px 14px;
+}
+.comment-popover-capture .obsc {
+  border: 0;
+  padding: 0;
+}
+.comment-entry-main {
   flex: 1;
-  padding: 8px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
-  font-size: var(--text-base);
-  font-family: var(--font-base);
-  outline: none;
-  color: var(--text);
-  transition: border-color 0.15s;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
 }
-.comment-popover-input:focus {
-  border-color: var(--active);
-  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.08);
-}
-.comment-popover-input::placeholder {
-  color: var(--text-3);
-}
-.comment-popover-submit {
-  padding: 8px 18px;
-  border-radius: var(--radius);
-  border: none;
-  background: var(--active);
-  color: #fff;
-  font-family: var(--font-base);
-  font-size: var(--text-base);
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-.comment-popover-submit:hover {
-  background: var(--btn-hover-blue);
+.comment-entry-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 /* ── Descriptor bar — slim frosted glass toolbar ─────────── */

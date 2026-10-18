@@ -1,55 +1,17 @@
 /* observations.css — Observations page styles */
 
-/* ══════════════════════════════════════════════════════════════
-   CAPTURE BAR
-   ══════════════════════════════════════════════════════════════ */
-.obs-capture {
+/* Capture strip host; the strip itself is in obs-capture.css. */
+.obs-capture-host {
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   padding: 10px 16px;
   flex-shrink: 0;
 }
-.obs-capture-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
+.obs-capture-host .obsc {
+  border: 0;
+  padding: 0;
 }
 
-.obs-capture-student {
-  position: relative;
-  flex-shrink: 0;
-}
-.obs-capture-student-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 12px;
-  font-size: var(--text-base);
-  font-weight: 500;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--text-2);
-  cursor: pointer;
-  min-width: 140px;
-  text-align: left;
-  transition: all 0.15s;
-  white-space: nowrap;
-}
-.obs-capture-student-btn:hover {
-  border-color: var(--text-3);
-  color: var(--text);
-}
-.obs-capture-student-btn:focus {
-  border-color: var(--active);
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
-}
-.obs-capture-student-btn.has-selection {
-  border-color: var(--active);
-  color: var(--active);
-  font-weight: 600;
-}
 .obs-btn-arrow {
   background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23999'/%3E%3C/svg%3E")
     no-repeat center;
@@ -62,130 +24,6 @@
 .has-tags .obs-btn-arrow,
 .active .obs-btn-arrow {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23007AFF'/%3E%3C/svg%3E");
-}
-
-.obs-capture-input {
-  flex: 1;
-  font-family: var(--font-base);
-  font-size: var(--text-base);
-  padding: 8px 12px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: var(--overlay-hover);
-  color: var(--text);
-  outline: none;
-  transition: all 0.2s;
-  min-width: 0;
-  resize: none;
-  line-height: 1.4;
-}
-.obs-capture-input:focus {
-  background: var(--surface);
-  border-color: var(--active);
-  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.12);
-}
-.obs-capture-input::placeholder {
-  color: var(--text-3);
-}
-
-.obs-capture-add {
-  padding: 5px 14px;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  border-radius: 8px;
-  background: var(--active);
-  color: #fff;
-  border: none;
-  cursor: pointer;
-  transition: all 0.15s;
-  flex-shrink: 0;
-  white-space: nowrap;
-}
-.obs-capture-add:hover {
-  background: var(--btn-hover-blue);
-  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.2);
-}
-.obs-capture-add:active {
-  transform: scale(0.97);
-}
-.obs-capture-add:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-  box-shadow: none;
-}
-
-.obs-capture-secondary {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 8px;
-}
-.obs-capture-tokens {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-.obs-enrichment-row {
-  display: flex;
-  gap: 5px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-.obs-enrichment-sep {
-  width: 1px;
-  height: 16px;
-  background: var(--border);
-  margin: 0 4px;
-}
-.obs-token {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 2px 7px 2px 8px;
-  border-radius: var(--radius-xl);
-  background: rgba(0, 122, 255, 0.08);
-  color: var(--active);
-  font-size: var(--text-sm);
-  font-weight: 600;
-}
-.obs-token-x {
-  cursor: pointer;
-  font-size: var(--text-xs);
-  color: var(--active);
-  opacity: 0.5;
-  transition: opacity 0.1s;
-}
-.obs-token-x:hover {
-  opacity: 1;
-}
-
-.obs-tag-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 2px 7px 2px 5px;
-  border-radius: var(--radius-xl);
-  font-size: var(--text-sm);
-  font-weight: 500;
-  background: var(--divider-subtle);
-  color: var(--text-2);
-}
-.obs-tag-pill .pill-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-}
-.obs-tag-pill-x {
-  cursor: pointer;
-  font-size: var(--text-2xs);
-  color: var(--text-3);
-  opacity: 0.6;
-  margin-left: 1px;
-}
-.obs-tag-pill-x:hover {
-  opacity: 1;
-  color: var(--priority);
 }
 
 /* ── Popover (shared) ──────────────────────────────────────── */
@@ -283,83 +121,8 @@
   border-radius: 50%;
   flex-shrink: 0;
 }
-.obs-popover-add-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border-top: 1px solid var(--border);
-}
-.obs-popover-add-input {
-  flex: 1;
-  font-size: var(--text-sm);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 4px 8px;
-  outline: none;
-  color: var(--text);
-}
-.obs-popover-add-input:focus {
-  border-color: var(--active);
-}
-.obs-popover-add-input::placeholder {
-  color: var(--text-3);
-}
-.obs-popover-add-btn {
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--active);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 4px 6px;
-  border-radius: 4px;
-  white-space: nowrap;
-}
-.obs-popover-add-btn:hover {
-  background: rgba(0, 122, 255, 0.08);
-}
-
 /* ── Tag trigger button ──────────────────────────────────────── */
-.obs-tag-trigger-wrap {
-  position: relative;
-  flex-shrink: 0;
-}
-.obs-tag-trigger {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 12px;
-  font-size: var(--text-sm);
-  font-weight: 500;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--text-2);
-  cursor: pointer;
-  transition: all 0.15s;
-  white-space: nowrap;
-}
-.obs-tag-trigger:hover {
-  border-color: var(--text-3);
-  color: var(--text);
-}
-.obs-tag-trigger.has-tags {
-  border-color: var(--active);
-  color: var(--active);
-  font-weight: 600;
-}
-.obs-tag-trigger .tag-icon {
-  width: 14px;
-  height: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.obs-tag-trigger .tag-icon svg {
-  width: 14px;
-  height: 14px;
-}
+
 .obs-badge {
   display: inline-flex;
   align-items: center;

@@ -411,49 +411,11 @@
   color: var(--danger);
   background: rgba(198, 40, 40, 0.08);
 }
-.note-add-row {
-  display: flex;
-  gap: 8px;
-  padding-top: 10px;
-  border-top: 1px solid var(--divider-subtle);
+.note-capture {
+  margin: 4px 0 10px;
 }
-.note-add-input {
-  flex: 1;
-  font-family: var(--font-base);
-  font-size: var(--text-md);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 8px 12px;
-  background: var(--bg);
-  color: var(--text);
-  outline: none;
-  transition: all 0.15s;
-}
-.note-add-input:focus {
-  border-color: var(--active);
-  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.08);
-}
-.note-add-input::placeholder {
-  color: var(--text-3);
-}
-.note-add-btn {
-  font-family: var(--font-base);
-  font-size: var(--text-base);
-  font-weight: 600;
-  padding: 8px 16px;
-  border-radius: var(--radius);
-  border: none;
-  background: var(--active);
-  color: #fff;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: all 0.15s;
-}
-.note-add-btn:hover {
-  background: rgba(0, 100, 210, 1);
-}
-.note-add-btn:active {
-  transform: scale(0.97);
+.note-capture .obsc {
+  padding: 8px 10px;
 }
 
 /* Note search input */

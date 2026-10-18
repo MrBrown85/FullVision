@@ -644,9 +644,7 @@
         MC.dismissSheet();
         setTimeout(function () {
           MObserve.resetSheetState();
-          MObserve.presentNewObsSheet(_cid);
-          // Pre-select the student
-          MObserve.selectStudent(qcSid);
+          MObserve.presentNewObsSheet(_cid, qcSid);
         }, 400);
         return;
       }

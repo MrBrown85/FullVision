@@ -1295,6 +1295,20 @@ body.fv-switching-course::after {
   display: none;
 }
 
+.m-dim-section {
+  margin: 10px 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-3);
+}
+
+.m-sheet-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 10px;
+}
+
 .m-dim-chip {
   flex: 0 0 auto;
   display: inline-flex;

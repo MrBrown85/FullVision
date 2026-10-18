@@ -81,6 +81,7 @@ describe('v2 observation / template / custom-tag dispatch', () => {
         p_tag_ids: [],
         p_custom_tag_ids: [],
         p_dims: [],
+        p_level: null,
         p_idempotency_key: expect.any(String),
       });
     });
@@ -154,6 +155,7 @@ describe('v2 observation / template / custom-tag dispatch', () => {
         sentiment: 'growth',
         context_type: 'lab',
         dims: [],
+        level: null,
       });
       expect(call.payload.p_enrollment_ids).toBeNull();
       expect(call.payload.p_tag_ids).toBeNull();
@@ -268,6 +270,147 @@ describe('v2 observation / template / custom-tag dispatch', () => {
       );
       expect(blob[ENR][0].assignmentContext).toEqual({ assessmentId: AID, assessmentTitle: 'Lab report 2' });
       delete _cache.assessments[CID];
+    });
+  });
+
+  describe('competency and level', () => {
+    function lastCall(name) {
+      return client.calls
+        .filter(function (c) {
+          return c.name === name;
+        })
+        .pop();
+    }
+    function tick() {
+      return new Promise(function (r) {
+        setTimeout(r, 0);
+      });
+    }
+
+    it('create sends the competency in p_tag_ids and the level in p_level', async () => {
+      _cache.observations[CID] = {};
+      addQuickOb(CID, ENR, 'Planned the variables first', [], 'strength', null, null, {
+        competencyId: TAG1,
+        level: 3,
+      });
+      await tick();
+      var call = lastCall('create_observation');
+      expect(call.payload.p_tag_ids).toEqual([TAG1]);
+      expect(call.payload.p_level).toBe(3);
+      expect(call.payload.p_dims).toEqual([]);
+      var stored = _cache.observations[CID][ENR][0];
+      expect(stored.competencyId).toBe(TAG1);
+      expect(stored.level).toBe(3);
+    });
+
+    it('keeps Core Competency keys in dims beside a learning-map competency', async () => {
+      _cache.observations[CID] = {};
+      addQuickOb(CID, ENR, 't', ['cc:3'], null, null, null, { competencyId: TAG1 });
+      await tick();
+      var call = lastCall('create_observation');
+      expect(call.payload.p_dims).toEqual(['cc:3']);
+      expect(call.payload.p_tag_ids).toEqual([TAG1]);
+      expect(call.payload.p_level).toBeNull();
+    });
+
+    it('a level outside 1-4 is not stored or sent', async () => {
+      _cache.observations[CID] = {};
+      addQuickOb(CID, ENR, 't', [], null, null, null, { competencyId: TAG1, level: 7 });
+      await tick();
+      expect(lastCall('create_observation').payload.p_level).toBeNull();
+      expect(_cache.observations[CID][ENR][0].level).toBeUndefined();
+    });
+
+    it('never sends a local learning-map id the server has not seen (rule 6)', async () => {
+      _cache.observations[CID] = {};
+      addQuickOb(CID, ENR, 't', [], null, null, null, { competencyId: 'tag_local_123', level: 2 });
+      await tick();
+      var call = lastCall('create_observation');
+      expect(call.payload.p_tag_ids).toEqual([]);
+      expect(call.payload.p_level).toBeNull();
+    });
+
+    it('update sends the level in the patch; the competency only when it changed', async () => {
+      _cache.observations[CID] = {
+        [ENR]: [{ id: OB_ID, text: 't', dims: [], competencyId: TAG1, level: 2, created: '2026-10-18T15:00:00Z' }],
+      };
+      updateQuickOb(CID, ENR, OB_ID, { text: 'edited' });
+      await tick();
+      var first = lastCall('update_observation');
+      expect(first.payload.p_patch.level).toBe(2);
+      expect(first.payload.p_tag_ids).toBeNull();
+
+      updateQuickOb(CID, ENR, OB_ID, { level: 4 });
+      await tick();
+      expect(lastCall('update_observation').payload.p_patch.level).toBe(4);
+
+      updateQuickOb(CID, ENR, OB_ID, { competencyId: null });
+      await tick();
+      var cleared = lastCall('update_observation');
+      expect(cleared.payload.p_tag_ids).toEqual([]);
+      expect(cleared.payload.p_patch.level).toBeNull();
+      expect(_cache.observations[CID][ENR][0].competencyId).toBeUndefined();
+      expect(_cache.observations[CID][ENR][0].level).toBeUndefined();
+    });
+
+    it('a competency-linked observation round-trips the server', async () => {
+      _cache.observations[CID] = {};
+      client = makeRecordingClient({ create_observation: { data: OB_ID, error: null } });
+      globalThis.getSupabase = () => client;
+      addQuickOb(CID, ENR, 'Explained the process to two classmates', ['collaboration'], 'strength', null, null, {
+        competencyId: TAG1,
+        level: 3,
+      });
+      await tick();
+      var create = lastCall('create_observation');
+
+      // What the server stores and returns on the row.
+      var row = {
+        id: OB_ID,
+        body: create.payload.p_body,
+        sentiment: create.payload.p_sentiment,
+        context_type: null,
+        assessment_id: null,
+        created_at: '2026-10-18T15:00:00Z',
+        enrollment_ids: [ENR],
+        tag_ids: create.payload.p_tag_ids,
+        custom_tag_ids: [],
+        dims: create.payload.p_dims,
+        level: create.payload.p_level,
+      };
+      var blob = _observationsPayloadToBlob({ observations: [row] }, CID);
+      expect(blob[ENR][0]).toMatchObject({
+        id: OB_ID,
+        text: 'Explained the process to two classmates',
+        dims: ['collaboration'],
+        sentiment: 'strength',
+        competencyId: TAG1,
+        level: 3,
+      });
+    });
+
+    it('a competency with a local id is re-keyed when its tag reaches the server', () => {
+      _cache.observations[CID] = {
+        [ENR]: [
+          { id: OB_ID, text: 't', dims: [], competencyId: 'tLOCALTAG1', level: 3, created: '2026-10-18T15:00:00Z' },
+        ],
+      };
+      _rekey(CID, 'tag', 'tLOCALTAG1', TAG1);
+      expect(getQuickObs(CID)[ENR][0].competencyId).toBe(TAG1);
+      expect(getQuickObs(CID)[ENR][0].level).toBe(3);
+    });
+
+    it('a row without a level or tag loads without them', () => {
+      var blob = _observationsPayloadToBlob(
+        {
+          observations: [
+            { id: OB_ID, body: 'b', created_at: '2026-10-18T15:00:00Z', enrollment_ids: [ENR], dims: [], level: null },
+          ],
+        },
+        CID,
+      );
+      expect(blob[ENR][0].competencyId).toBeUndefined();
+      expect(blob[ENR][0].level).toBeUndefined();
     });
   });
 

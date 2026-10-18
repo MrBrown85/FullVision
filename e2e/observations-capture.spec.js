@@ -7,7 +7,7 @@ import { mockAuth, seedCourse, seedStudents, gotoApp, TEST_COURSE } from './help
 
 async function pickStudent(page, name) {
   await page.locator('#student-btn').click();
-  await page.locator('#student-dropdown .obs-popover-item', { hasText: name }).click();
+  await page.locator('#student-dropdown .obsc-item', { hasText: name }).click();
   await page.locator('#capture-input').click();
 }
 
@@ -93,7 +93,7 @@ test.describe('Observations — keyboard, undo and views', () => {
   test('a student link from the dashboard picks and filters to that student', async ({ page }) => {
     await page.goto(`/teacher/app.html#/observations?course=${TEST_COURSE.id}&student=stu-002`);
     await page.waitForSelector('#capture-input');
-    await expect(page.locator('#student-btn')).toContainText('Bob');
+    await expect(page.locator('#obs-capture .obsc-chip-student')).toContainText('Bob');
     await expect(page.locator('#filter-student-btn')).toHaveClass(/active/);
     await expect(page.locator('#filter-student-btn')).toContainText('Bob');
   });
