@@ -73,7 +73,10 @@ test.describe('Observation capture strip', () => {
     await input.pressSequentially('Did not start the task !conc');
     // Enter on a suggestion picks it; the next Enter sends.
     await page.keyboard.press('Enter');
-    await expect(page.locator('#obs-capture .obsc-chip-type[data-value="concern"]')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.locator('#obs-capture .obsc-chip-type[data-value="concern"]')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
     await expect(input).toHaveValue('Did not start the task ');
     await page.keyboard.press('Enter');
 
@@ -85,7 +88,10 @@ test.describe('Observation capture strip', () => {
     await expect(offer).toContainText('Not now');
     await offer.getByRole('button', { name: /^Flag Bob/ }).click();
     await expect(offer).toBeEmpty();
-    const flagged = await page.evaluate(cid => JSON.parse(localStorage.getItem('gb-flags-' + cid) || '{}'), TEST_COURSE.id);
+    const flagged = await page.evaluate(
+      cid => JSON.parse(localStorage.getItem('gb-flags-' + cid) || '{}'),
+      TEST_COURSE.id,
+    );
     expect(flagged['stu-002']).toBe(true);
     // Students stay picked after Add.
     await expect(page.locator('#obs-capture .obsc-chip-student')).toContainText('Bob');
