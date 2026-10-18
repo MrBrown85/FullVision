@@ -1945,19 +1945,7 @@ window.PageAssignments = (function () {
     var cid = activeCourse;
     var current = getAssignmentStatus(cid, sid, aid);
     var newStatus = current === status ? null : status;
-    setAssignmentStatus(cid, sid, aid, newStatus);
-    var assess = getAssessments(cid).find(function (a) {
-      return a.id === aid;
-    });
-    // NS clears the proficiency levels (0 deletes a tag score). On points and
-    // Complete/Incomplete work 0 is a real score that would outlive the NS,
-    // and calc.js already counts NS as 0, so the score is left alone.
-    var clearsScores = !!assess && !isPointsScored(assess);
-    if (newStatus === 'NS' && clearsScores) {
-      scoreTagIds(assess, cid).forEach(function (tagId) {
-        upsertScore(cid, sid, aid, tagId, 0, assess.date || '', assess.type || 'summative', '');
-      });
-    }
+    var clearedScores = applyAssignmentStatus(cid, sid, aid, newStatus);
     var row =
       document.querySelector('.score-row[data-status-student="' + sid + '"][data-status-assess="' + aid + '"]') ||
       document.querySelector('.rsg-student[data-status-student="' + sid + '"][data-status-assess="' + aid + '"]');
@@ -1976,7 +1964,7 @@ window.PageAssignments = (function () {
       else row.classList.remove('has-late');
       var ptsInput = row.querySelector('.gb-pts-input');
       if (ptsInput) ptsInput.disabled = disableScoring;
-      if (newStatus === 'NS' && clearsScores) {
+      if (clearedScores) {
         row.querySelectorAll('.score-opt, .rsg-level, .cmp-btn').forEach(function (el) {
           el.classList.remove('active', 'mixed');
         });

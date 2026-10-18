@@ -2314,16 +2314,21 @@ window.PageGradebook = (function () {
     _dismissContextMenu();
     var aid = cell.dataset.aid;
     var sid = cell.dataset.sid;
+    var status = getAssignmentStatus(activeCourse, sid, aid);
     var menu = document.createElement('div');
     menu.className = 'gb-ctx-menu';
     menu.style.left = e.clientX + 'px';
     menu.style.top = e.clientY + 'px';
     menu.innerHTML =
-      '<div class="gb-ctx-item" data-ctx="editCell">Edit Score</div>' +
-      '<div class="gb-ctx-item" data-ctx="clearCell">Clear Score</div>' +
+      '<div class="gb-ctx-item" data-ctx="editCell">Edit score</div>' +
+      '<div class="gb-ctx-item" data-ctx="clearCell">Clear score</div>' +
       '<div class="gb-ctx-divider"></div>' +
-      '<div class="gb-ctx-item" data-ctx="markMissing">Mark Missing</div>' +
-      '<div class="gb-ctx-item" data-ctx="excuseCell">Excuse</div>';
+      '<div class="gb-ctx-item" data-ctx="markMissing">' +
+      (status === 'NS' ? 'Undo missing' : 'Mark missing') +
+      '</div>' +
+      '<div class="gb-ctx-item" data-ctx="excuseCell">' +
+      (status === 'EXC' ? 'Undo excuse' : 'Excuse') +
+      '</div>';
     document.body.appendChild(menu);
     menu.addEventListener('click', function (ev) {
       var item = ev.target.closest('[data-ctx]');
@@ -2348,6 +2353,13 @@ window.PageGradebook = (function () {
           render();
           window.clearScore(sid, aid);
         }
+      } else if (action === 'markMissing' || action === 'excuseCell') {
+        // Same path as the Assignments page's NS / EXC buttons; picking the
+        // cell's current status again takes it off.
+        var next = action === 'markMissing' ? 'NS' : 'EXC';
+        applyAssignmentStatus(activeCourse, sid, aid, status === next ? null : next);
+        clearProfCache();
+        render();
       }
       _dismissContextMenu();
     });

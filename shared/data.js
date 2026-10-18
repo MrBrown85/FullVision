@@ -6340,6 +6340,22 @@ function setAssignmentStatus(cid, sid, aid, status) {
   // saveAssignmentStatuses' diff sends the one set_score_status for this cell.
   return saveAssignmentStatuses(cid, st);
 }
+// Sets a cell's status the way a teacher means it: NS also clears the
+// proficiency levels (0 deletes a tag score). On points and
+// Complete/Incomplete work 0 is a real score that would outlive the NS, and
+// calc.js already counts NS as 0, so the score is left alone. Returns true
+// when the NS cleared scores, so callers can reset their score controls.
+function applyAssignmentStatus(cid, sid, aid, status) {
+  setAssignmentStatus(cid, sid, aid, status);
+  var assess = getAssessments(cid).find(function (a) {
+    return a.id === aid;
+  });
+  if (status !== 'NS' || !assess || isPointsScored(assess)) return false;
+  scoreTagIds(assess, cid).forEach(function (tagId) {
+    upsertScore(cid, sid, aid, tagId, 0, assess.date || '', assess.type || 'summative', '');
+  });
+  return true;
+}
 
 /* ── Rubrics ───────────────────────────────────────────────── */
 function getRubrics(cid) {
@@ -9662,6 +9678,7 @@ window.GB = {
   saveAssignmentStatuses,
   getAssignmentStatus,
   setAssignmentStatus,
+  applyAssignmentStatus,
   getRubrics,
   saveRubrics,
   getRubricById,
