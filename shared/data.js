@@ -2970,6 +2970,7 @@ function _assessmentFromDetail(existing, detail) {
   }
   if (a.rubric_id !== undefined) next.rubricId = a.rubric_id || '';
   if (a.module_id !== undefined) next.moduleId = a.module_id || '';
+  if (a.copy_group !== undefined) next.copyGroup = a.copy_group || null;
   if (a.evidence_type !== undefined) next.evidenceType = a.evidence_type || '';
   if (a.collab_mode !== undefined) next.collaboration = _localCollabModeFromCanonical(a.collab_mode || 'individual');
   if (a.collab_config !== undefined && a.collab_config) {
@@ -3381,6 +3382,7 @@ function _v2GradebookToCache(cid, payload) {
       evidenceType: a.evidence_type || '',
       rubricId: a.rubric_id || '',
       moduleId: a.module_id || '',
+      copyGroup: a.copy_group || null,
       has_rubric: !!a.has_rubric,
       due_date: _dateOnly(a.due_date),
       assigned_at: _dateOnly(a.date_assigned),
@@ -7237,6 +7239,7 @@ function _assessmentChanged(a, b) {
     (a.notes || '') !== (b.notes || '') ||
     (a.rubricId || '') !== (b.rubricId || '') ||
     (a.moduleId || '') !== (b.moduleId || '') ||
+    (a.copyGroup || '') !== (b.copyGroup || '') ||
     JSON.stringify(a.tagIds || []) !== JSON.stringify(b.tagIds || [])
   );
 }
@@ -7296,6 +7299,9 @@ function _canonicalCreateAssessment(sb, cid, a) {
     p_module_id: _isUuid(a.moduleId) ? a.moduleId : null,
     p_tag_ids: tagIds,
   };
+  // Only sent when set, so a page from before copies existed (and the
+  // function before migration 20261018) keeps working unchanged.
+  if (_isUuid(a.copyGroup)) params.p_copy_group = a.copyGroup;
   var rec = _registerPendingCreate(cid, 'assessment', localId, 'create_assessment');
   var created = _writeRpc('create_assessment', params, { entryId: rec ? rec.entryId : undefined }).then(function (res) {
     if (res.error) {
@@ -7360,6 +7366,14 @@ function _canonicalUpdateAssessment(sb, cid, assessmentId, a, base) {
 }
 
 function _assessmentPatchOf(a) {
+  var patch = _assessmentFieldsPatchOf(a);
+  // Never sent as null: a stale copy of a row from before it was linked
+  // must not unlink it.
+  if (_isUuid(a.copyGroup)) patch.copy_group = a.copyGroup;
+  return patch;
+}
+
+function _assessmentFieldsPatchOf(a) {
   return {
     title: a.title || '',
     description: a.description || '',
@@ -8495,6 +8509,12 @@ window.v2.deleteCategory = function (id) {
 };
 window.v2.listCategories = function (courseId) {
   return _rpcOrNoop('list_categories', { p_course_id: courseId });
+};
+/* The copies of one assessment across the teacher's live classes:
+   [{ assessment_id, course_id, course_name, title }]. */
+window.v2.listAssessmentCopies = function (copyGroup) {
+  if (!_isUuid(copyGroup)) return Promise.resolve({ data: [], error: null });
+  return _rpcOrNoop('list_assessment_copies', { p_copy_group: copyGroup });
 };
 window.v2.reorderCategories = function (ids) {
   return _rpcOrNoop('reorder_categories', { p_ids: (ids || []).filter(_isUuid) });

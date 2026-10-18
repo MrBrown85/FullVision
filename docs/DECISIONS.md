@@ -53,3 +53,15 @@ Context: `ROADMAP.md` 1.2; `migrations/20261017_course_reporting_terms.sql`; `fu
 6. **Duplicate Class does not copy terms.** Dates belong to one school year.
 7. **Mobile grades stay all-time.** The grade list's date filter offers each reporting term by name and keeps the assessments dated inside it (undated ones drop out), but it is a list filter only: nothing on mobile sets the active term, so every grade there is all-time.
 8. **Surrey secondary schools' reporting periods are built in** (`shared/reporting-term-presets.js`, 2026-10-17). Each listed school's four terms come from its published 2026-27 calendar: Term 1 ends the day its first report is published, Term 2 ends with Semester 1, Term 3 ends on the Semester 2 mid-term report, Term 4 on the final. Where a school hasn't published its semester turnaround, Feb 1 is used and the editor says so. **Grandview Heights Secondary is the default:** a class created in the wizard starts with its terms for the current school year, and Class Management can swap in any listed school's dates. Schools with no published dates are not listed. The file is per school year and needs refreshing each August.
+
+## One assessment in several classes (2026-10-18)
+
+Context: a teacher with two sections of a course (English 9 in blocks A and B) wants to make an assessment once. Researched against Teams, Google Classroom, Schoology, MyEd's Aspen gradebook, JumpRope, PowerTeacher Pro and Canvas. `migrations/20261018_assessment_copy_group.sql`; `teacher/assessment-copy.js`.
+
+1. **Each section stays its own class.** No blocks or sections inside a class, and no linked-section syncing (Schoology's linking replaces child data; Canvas's model needs a sections layer MyEd doesn't use).
+2. **"Also add to" on the assessment form** copies the assessment into other classes when it is saved, as Teams' "Assign to" does. Classes for the same course are listed first (shared curriculum tags, or the same name once "Block A", "(B)", "Period 3" and a trailing letter are dropped).
+3. **"Set dates per class"** gives each class its own assigned and due date.
+4. **Matched by name in the other class:** category, competencies (short label, then full text), rubric, module. A missing category is chosen by the teacher; a missing rubric is copied with its competencies matched; missing competencies are left off and listed. Nothing is dropped without the teacher seeing it first. Pairs and groups are not copied: they are per class.
+5. **"Add from another class"** copies chosen assessments from another class later, like Teams' Duplicate and JumpRope's bank.
+6. **Copies are linked, not synced.** They share `assessment.copy_group`. Editing one offers "Update the other classes too?" and changes only the fields the other copy still shared; a field that class had changed on its own (its own due date) stays. Scores are never copied or moved.
+7. **A duplicate inside the same class is not a linked copy.**

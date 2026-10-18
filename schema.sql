@@ -232,6 +232,7 @@ create table assessment (
   module_id      uuid                references module(id) on delete set null,
   collab_mode    text        not null default 'none',               -- none | pairs | groups
   collab_config  jsonb,
+  copy_group     uuid,                                              -- shared by an assessment and its copies in the teacher's other classes; null = never copied (20261018_assessment_copy_group)
   display_order  integer     not null default 0,
   created_at     timestamptz not null default now(),
   updated_at     timestamptz not null default now()
@@ -535,9 +536,11 @@ create table fv_idempotency (
 -- Assessment CRUD:
 --   create_assessment(p_course_id, p_title, p_category_id, p_description, p_date_assigned,
 --                     p_due_date, p_score_mode, p_max_points, p_weight, p_evidence_type,
---                     p_rubric_id, p_module_id, p_tag_ids uuid[])
+--                     p_rubric_id, p_module_id, p_tag_ids uuid[], p_copy_group uuid,
+--                     p_idempotency_key uuid)
 --   update_assessment(p_id uuid, p_patch jsonb, p_tag_ids uuid[])
 --   duplicate_assessment(p_src_id uuid)
+--   list_assessment_copies(p_copy_group uuid)                         -- (2026-10-18) live copies across the teacher's classes
 --   delete_assessment(p_id uuid)
 --   save_assessment_tags(p_id uuid, p_tag_ids uuid[])
 --   save_collab(p_id uuid, p_mode text, p_config jsonb)

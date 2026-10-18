@@ -2787,3 +2787,134 @@
     grid-template-columns: 1fr !important;
   }
 }
+
+/* ── One assessment in several classes (assessment-copy.js) ── */
+.tb-action-btn.tb-action-secondary {
+  background: var(--bg-2, transparent);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.tb-action-btn.tb-action-secondary:hover {
+  filter: none;
+  box-shadow: none;
+  background: var(--overlay-hover);
+}
+.af-copy-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  align-items: center;
+}
+.af-copy-item,
+.af-copy-perclass,
+.copy-review-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-md);
+  color: var(--text);
+  cursor: pointer;
+}
+.af-copy-item input,
+.af-copy-perclass input,
+.copy-review-check input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--text);
+  flex-shrink: 0;
+}
+.af-copy-item.af-copy-has,
+.copy-review-check.af-copy-has {
+  color: var(--text-3);
+  cursor: default;
+}
+.af-copy-more {
+  flex-basis: 100%;
+  font-size: var(--text-md);
+}
+.af-copy-more summary {
+  cursor: pointer;
+  color: var(--text-2);
+  margin-bottom: 4px;
+}
+.af-copy-more .af-copy-item {
+  margin-right: 16px;
+}
+.af-copy-perclass {
+  margin-top: 8px;
+}
+.af-copy-perclass[hidden] {
+  display: none;
+}
+#af-copy-dates {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+.af-copy-date-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  font-size: var(--text-md);
+}
+.af-copy-date-name {
+  min-width: 140px;
+  font-weight: 600;
+}
+.af-copy-date-row label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.af-copy-date-row .af-input {
+  width: auto;
+}
+.copy-dialog .copy-dialog-card {
+  max-width: 560px;
+  width: calc(100% - 32px);
+  text-align: left;
+}
+.copy-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 10px 0 16px;
+  max-height: 60vh;
+  overflow-y: auto;
+  font-size: var(--text-md);
+  color: var(--text);
+}
+.copy-review-class {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.copy-review-name {
+  font-weight: 600;
+}
+.copy-review-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.copy-review-field .af-input {
+  width: auto;
+  min-width: 180px;
+}
+.copy-review-note {
+  line-height: 1.4;
+}
+.copy-review-muted {
+  color: var(--text-3);
+}
+.copy-from-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
