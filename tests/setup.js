@@ -233,6 +233,7 @@ load('teacher/assessment-copy.js');
 load('teacher/rubric-guard.js');
 load('teacher/student-notes.js');
 load('teacher/student-overrides.js');
+load('teacher/rubric-print.js');
 load('teacher/router.js');
 
 // Restore real setTimeout after loading (tests may need it)

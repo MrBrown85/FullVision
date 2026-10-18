@@ -1,0 +1,344 @@
+/* Printable graded rubric handouts (teacher/rubric-print.js).
+
+   The sheets render into #rubric-print-root, kept off screen so they can be
+   measured, and become the only thing on the page while
+   body.rubric-print-active is set. Sheet boxes are sized in inches to match
+   the @page rule rubric-print.js injects per layout. Everything is black,
+   white and grey: the handouts are photocopied. */
+
+#rubric-print-root {
+  position: absolute;
+  top: 0;
+  left: -30000px;
+  width: 11in;
+  pointer-events: none;
+  background: #fff;
+  color: #000;
+  font-family: var(--font-base, system-ui, sans-serif);
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
+/* ── Pages and sheets ─────────────────────────────────────── */
+.rubric-page {
+  display: grid;
+  box-sizing: border-box;
+  overflow: hidden;
+  break-after: page;
+  page-break-after: always;
+  break-inside: avoid;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+.rubric-page:last-child {
+  break-after: auto;
+  page-break-after: auto;
+}
+.rubric-page.layout-full {
+  width: 7.5in;
+  height: 10in;
+  grid-template-columns: 1fr;
+}
+.rubric-page.layout-half {
+  width: 10.2in;
+  height: 7.7in;
+  grid-template-columns: 1fr 1fr;
+}
+.rubric-page.layout-quarter {
+  width: 7.7in;
+  height: 10.2in;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+.rubric-sheet {
+  box-sizing: border-box;
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  line-height: 1.3;
+}
+.layout-half .rubric-sheet,
+.layout-quarter .rubric-sheet {
+  padding: 0.12in;
+  line-height: 1.22;
+}
+/* Smaller sheets: tighter cells, narrower criterion column */
+.layout-half .rubric-table th,
+.layout-half .rubric-table td,
+.layout-quarter .rubric-table th,
+.layout-quarter .rubric-table td {
+  padding: 0.28em 0.32em;
+}
+.layout-half .rubric-crit-head,
+.layout-quarter .rubric-crit-head {
+  width: 17%;
+}
+.layout-half .rubric-sheet-inner,
+.layout-quarter .rubric-sheet-inner {
+  gap: 0.4em;
+}
+.layout-half .rubric-head,
+.layout-quarter .rubric-head {
+  padding-bottom: 0.3em;
+}
+.layout-quarter .rubric-crit-codes {
+  display: none;
+}
+/* Cut lines between sheets */
+.layout-half .rubric-sheet:first-child {
+  border-right: 1px dashed #9a9a9a;
+}
+.layout-quarter .rubric-sheet:nth-child(odd) {
+  border-right: 1px dashed #9a9a9a;
+}
+.layout-quarter .rubric-sheet:nth-child(-n + 2) {
+  border-bottom: 1px dashed #9a9a9a;
+}
+.rubric-sheet-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6em;
+}
+
+/* ── Header ───────────────────────────────────────────────── */
+.rubric-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1em;
+  padding-bottom: 0.45em;
+  border-bottom: 2px solid #000;
+}
+.rubric-head-main {
+  min-width: 0;
+}
+.rubric-student {
+  font-size: 1.5em;
+  font-weight: 700;
+  line-height: 1.15;
+}
+.rubric-meta {
+  font-size: 0.9em;
+  color: #333;
+  margin-top: 0.2em;
+}
+.rubric-overall {
+  flex-shrink: 0;
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.15;
+}
+.rubric-overall-value {
+  font-size: 1.5em;
+  font-weight: 700;
+}
+.rubric-overall-word,
+.rubric-status {
+  font-size: 0.9em;
+  color: #333;
+}
+.rubric-label {
+  display: block;
+  font-size: 0.72em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #555;
+}
+.rubric-comment-row .rubric-label,
+.rubric-feedback .rubric-label {
+  display: inline;
+  margin-right: 0.6em;
+}
+
+/* ── Rubric grid ──────────────────────────────────────────── */
+.rubric-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 1em;
+}
+.rubric-table th,
+.rubric-table td {
+  border: 1px solid #000;
+  padding: 0.4em 0.45em;
+  vertical-align: top;
+  text-align: left;
+  overflow-wrap: break-word;
+}
+.rubric-crit-head {
+  width: 19%;
+  font-size: 0.85em;
+  font-weight: 700;
+}
+.rubric-level-head {
+  font-size: 0.95em;
+  font-weight: 700;
+  text-align: center !important;
+  background: #f1f1f1;
+}
+.rubric-crit {
+  background: #f7f7f7;
+  font-weight: 700;
+}
+.rubric-crit-name {
+  font-weight: 700;
+}
+.rubric-crit-codes {
+  margin-top: 0.3em;
+  font-size: 0.78em;
+  font-weight: 400;
+  color: #555;
+}
+.rubric-cell {
+  position: relative;
+  color: #222;
+}
+/* Black and white only: the handouts go through the photocopier. The
+   scored cell is a light grey fill, a heavy border and a ✓ mark. */
+.rubric-cell.is-scored {
+  color: #000;
+  font-weight: 600;
+  background: #e2e2e2;
+  outline: 2.5px solid #000;
+  outline-offset: -2.5px;
+}
+.rubric-mark {
+  float: right;
+  margin: -0.1em -0.1em 0.1em 0.4em;
+  padding: 0 0.35em;
+  border-radius: 0.3em;
+  background: #000;
+  color: #fff;
+  font-size: 0.95em;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.rubric-comment-row td {
+  background: #fff;
+  border-top: none;
+  font-size: 0.92em;
+  padding-top: 0.3em;
+  padding-bottom: 0.35em;
+}
+
+/* ── Feedback ─────────────────────────────────────────────── */
+.rubric-feedback {
+  border: 1px solid #000;
+  padding: 0.4em 0.5em;
+  font-size: 0.95em;
+  line-height: 1.35;
+}
+.rubric-feedback.is-empty {
+  min-height: 6em;
+}
+.layout-half .rubric-feedback.is-empty {
+  min-height: 4em;
+}
+.layout-quarter .rubric-feedback.is-empty {
+  min-height: 2.6em;
+}
+
+/* ── Overflow marker (screen only, for the dialog's count) ────── */
+.rubric-sheet.is-overflowing {
+  outline: 2px solid #d32f2f;
+}
+
+/* ── Options dialog ───────────────────────────────────────── */
+.rubric-print-card {
+  max-width: 460px;
+}
+.rp-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.rp-group {
+  border: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.rp-group legend {
+  font-family: var(--font-base);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-3);
+  padding: 0;
+  margin-bottom: 6px;
+}
+.rp-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  font-family: var(--font-base);
+  font-size: var(--text-base);
+  color: var(--text);
+  cursor: pointer;
+}
+.rp-option input {
+  margin: 0;
+  accent-color: var(--active);
+}
+.rp-help {
+  color: var(--text-3);
+}
+.rp-pick {
+  max-height: 180px;
+  overflow-y: auto;
+  margin: 4px 0 0 24px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 8px;
+}
+.rp-pick-option {
+  font-size: var(--text-sm);
+  padding: 2px 0;
+}
+.rp-status {
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  line-height: 1.45;
+  margin-bottom: 16px;
+  min-height: 1.4em;
+}
+.rp-status.is-warning {
+  color: var(--score-1-text, #991b1b);
+}
+.rubric-print-overlay .confirm-ok:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ── Print ────────────────────────────────────────────────── */
+@media print {
+  body.rubric-print-active {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+  body.rubric-print-active > :not(#rubric-print-root) {
+    display: none !important;
+  }
+  body.rubric-print-active #rubric-print-root {
+    position: static;
+    left: auto;
+    width: auto;
+    pointer-events: auto;
+  }
+  body.rubric-print-active .rubric-sheet.is-overflowing {
+    outline: none;
+  }
+}

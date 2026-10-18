@@ -101,6 +101,7 @@ window.PageAssignments = (function () {
 
   // Comment popover state
   var _commentPopoverState = null;
+  var _critCommentState = null; // { cid, sid, aid, critId } while the criterion comment popover is open
 
   // Keyboard navigation state
   var _kbFocusEl = null;
@@ -543,7 +544,10 @@ window.PageAssignments = (function () {
                 '" data-action="setRubricView" data-aid="' +
                 a.id +
                 '" data-rubric="true">Rubric</button>' +
-                '</div>'
+                '</div>' +
+                '<button class="rubric-print-btn" data-action="printRubrics" data-aid="' +
+                a.id +
+                '" title="Print a graded rubric for each student">Print rubrics</button>'
               );
             })()
           : '') +
@@ -2520,8 +2524,10 @@ window.PageAssignments = (function () {
           '">' +
           '<div class="rsg-criterion-label" title="' +
           esc(crit.name) +
-          '">' +
+          '"><span class="rsg-criterion-name">' +
           esc(crit.name) +
+          '</span>' +
+          criterionCommentButtonHtml(a.id, st.id, crit) +
           '</div><div class="rsg-levels">' +
           '<div class="rsg-level l4' +
           (displayScore === 4 ? (isMixed ? ' active mixed' : ' active') : '') +
@@ -3280,6 +3286,103 @@ window.PageAssignments = (function () {
     });
   }
 
+  /* ── Criterion comment ──────────────────────────────────── */
+  // One short note per rubric criterion, printed under its row on the rubric
+  // handout. The grid shows only an icon so scoring stays compact.
+  function criterionCommentButtonHtml(aid, sid, crit) {
+    var note = getRubricCriterionComment(activeCourse, sid, aid, crit);
+    return (
+      '<button type="button" class="rsg-crit-comment' +
+      (note ? ' has-comment' : '') +
+      '" tabindex="-1" data-action="openCriterionComment" data-aid="' +
+      aid +
+      '" data-sid="' +
+      sid +
+      '" data-critid="' +
+      crit.id +
+      '" data-stop-prop="true" aria-label="Comment on this criterion" title="' +
+      (note ? esc(note) : 'Comment on this criterion') +
+      '"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z"/></svg></button>'
+    );
+  }
+  function openCriterionComment(aid, sid, critId) {
+    var cid = activeCourse;
+    var crit = getRubricCriterion(aid, critId);
+    var student = getStudents(cid).find(function (s) {
+      return s.id === sid;
+    });
+    if (!crit || !student) return;
+    _critCommentState = { cid: cid, sid: sid, aid: aid, critId: critId };
+    renderCriterionCommentPopover();
+  }
+  function renderCriterionCommentPopover() {
+    if (!_critCommentState) return;
+    var cid = _critCommentState.cid,
+      sid = _critCommentState.sid,
+      aid = _critCommentState.aid,
+      critId = _critCommentState.critId;
+    var assess = getAssessments(cid).find(function (a) {
+      return a.id === aid;
+    });
+    var student = getStudents(cid).find(function (s) {
+      return s.id === sid;
+    });
+    var crit = getRubricCriterion(aid, critId);
+    if (!assess || !student || !crit) return;
+    var note = getRubricCriterionComment(cid, sid, aid, crit);
+    var overlay = document.getElementById('crit-comment-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'crit-comment-overlay';
+      overlay.className = 'comment-popover-overlay';
+      overlay.onclick = function (e) {
+        if (e.target === this) closeCriterionComment();
+      };
+      document.body.appendChild(overlay);
+    }
+    overlay.innerHTML =
+      '<div class="comment-popover crit-comment-popover" role="dialog" aria-labelledby="crit-comment-title"><div class="comment-popover-header"><div><div class="comment-popover-title" id="crit-comment-title">' +
+      esc(displayName(student)) +
+      '</div><div class="comment-popover-subtitle">' +
+      esc(crit.name) +
+      ' \u00B7 ' +
+      esc(assess.title) +
+      '</div></div><button class="comment-popover-close" data-action="closeCriterionComment" aria-label="Close">\u2715</button></div>' +
+      '<div class="comment-popover-body"><div class="crit-comment-help">Printed under this criterion on the rubric handout.</div></div>' +
+      '<div class="comment-popover-footer"><input class="comment-popover-input" id="crit-comment-input" placeholder="Add a comment\u2026" value="' +
+      esc(note) +
+      '" maxlength="500"><button class="comment-popover-submit" data-action="saveCriterionComment">Save</button></div></div>';
+    overlay.style.display = 'flex';
+    setTimeout(function () {
+      var inp = document.getElementById('crit-comment-input');
+      if (inp) {
+        inp.focus();
+        inp.setSelectionRange(inp.value.length, inp.value.length);
+      }
+    }, 50);
+  }
+  function saveCriterionComment() {
+    if (!_critCommentState) return;
+    var st = _critCommentState;
+    var inp = document.getElementById('crit-comment-input');
+    if (!inp) return;
+    var text = inp.value.trim();
+    saveRubricCriterionComment(st.cid, st.sid, st.aid, st.critId, text);
+    var btn = document.querySelector(
+      '.rsg-crit-comment[data-aid="' + st.aid + '"][data-sid="' + st.sid + '"][data-critid="' + st.critId + '"]',
+    );
+    if (btn) {
+      btn.classList.toggle('has-comment', !!text);
+      btn.title = text || 'Comment on this criterion';
+    }
+    closeCriterionComment();
+  }
+  function closeCriterionComment() {
+    _critCommentState = null;
+    var overlay = document.getElementById('crit-comment-overlay');
+    if (overlay) overlay.style.display = 'none';
+  }
+
   /* ── Advanced settings ──────────────────────────────────── */
   function updateCalc(val) {
     var cc = getCourseConfig(activeCourse);
@@ -3978,6 +4081,18 @@ window.PageAssignments = (function () {
       deleteComment: function () {
         deleteComment(el.dataset.obid);
       },
+      openCriterionComment: function () {
+        openCriterionComment(el.dataset.aid, el.dataset.sid, el.dataset.critid);
+      },
+      saveCriterionComment: function () {
+        saveCriterionComment();
+      },
+      closeCriterionComment: function () {
+        closeCriterionComment();
+      },
+      printRubrics: function () {
+        if (window.RubricPrint) RubricPrint.open(activeCourse, el.dataset.aid);
+      },
       toggleSectionTags: function () {
         toggleSectionTags(el.dataset.secid);
       },
@@ -4163,6 +4278,14 @@ window.PageAssignments = (function () {
       if (e.key === 'Enter' && document.activeElement.id === 'comment-input') {
         e.preventDefault();
         submitComment();
+      }
+      if (e.key === 'Enter' && document.activeElement.id === 'crit-comment-input') {
+        e.preventDefault();
+        saveCriterionComment();
+      }
+      if (e.key === 'Escape' && _critCommentState) {
+        e.preventDefault();
+        closeCriterionComment();
       }
       // Handle points keyboard navigation
       if (document.activeElement.classList.contains('gb-pts-input')) {
@@ -4397,6 +4520,7 @@ window.PageAssignments = (function () {
     _rubricDirty = false;
     _rubricAutoTags = [];
     _commentPopoverState = null;
+    _critCommentState = null;
     _kbFocusEl = null;
     _statusDebounce = {};
     _searchTimer = null;
@@ -4492,6 +4616,9 @@ window.PageAssignments = (function () {
     // Clean up comment popover (appended to body)
     var overlay = document.getElementById('comment-popover-overlay');
     if (overlay) overlay.remove();
+    var critOverlay = document.getElementById('crit-comment-overlay');
+    if (critOverlay) critOverlay.remove();
+    if (window.RubricPrint) RubricPrint.destroy();
 
     // Remove globals
     delete window._pageSwitchCourse;
