@@ -23,6 +23,7 @@ const PRECACHE_URLS = [
   '/shared/offline-queue.js',
   '/shared/auto-update.js',
   '/shared/calc.js',
+  '/shared/rubric-draft.js',
   // Teacher desktop
   '/teacher/app.html',
   '/teacher/styles.css?v=3',

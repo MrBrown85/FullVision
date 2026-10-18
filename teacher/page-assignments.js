@@ -2466,7 +2466,7 @@ window.PageAssignments = (function () {
       '<div class="rsg-header-level hl1" data-action="confirmFillRubricAll" data-aid="' +
       a.id +
       '" data-score="1" data-label="Emerging" title="Fill all Emerging">Emerging</div>' +
-      '</div><div class="rsg-header-mod-spacer"></div></div><div class="rsg-header-action"></div></div>';
+      '</div><div class="rsg-header-mod-spacer"></div><div class="rsg-header-comment-spacer"></div></div><div class="rsg-header-action"></div></div>';
 
     var statuses = getAssignmentStatuses(cid);
     students.forEach(function (st) {
@@ -2531,9 +2531,7 @@ window.PageAssignments = (function () {
           esc(crit.name) +
           '"><span class="rsg-criterion-name">' +
           esc(crit.name) +
-          '</span>' +
-          criterionCommentButtonHtml(a.id, st.id, crit) +
-          '</div><div class="rsg-levels">' +
+          '</span></div><div class="rsg-levels">' +
           '<div class="rsg-level l4' +
           (displayScore === 4 ? (isMixed ? ' active mixed' : ' active') : '') +
           '" data-action="selectRubricScore" data-level="4" data-aid="' +
@@ -2572,6 +2570,9 @@ window.PageAssignments = (function () {
           '" role="button" tabindex="0">Emerging</div>' +
           '</div><div class="rsg-mods">' +
           scoreModButtonsHtml(modLevel, critMod) +
+          // Its own cell: .rsg-mods is redrawn on every score change.
+          '</div><div class="rsg-comment-cell">' +
+          criterionCommentButtonHtml(a.id, st.id, crit) +
           '</div></div>';
       });
       html +=
@@ -2787,6 +2788,7 @@ window.PageAssignments = (function () {
     });
     html +=
       '</div></div><div class="rubric-editor-footer"><button class="rubric-add-criterion-btn" data-action="addCriterion">+ Add Criterion</button>' +
+      '<button class="rubric-add-criterion-btn" data-action="criterionFromCompetency" title="Add criteria for competencies, with their descriptors drafted">+ From competency</button>' +
       '<button class="btn btn-ghost" data-action="cancelRubricEdit">Cancel</button><button class="btn btn-primary" data-action="saveRubricEdit">Save Rubric</button></div></div></div>';
     document.body.insertAdjacentHTML('beforeend', html);
     setTimeout(function () {
@@ -2801,6 +2803,14 @@ window.PageAssignments = (function () {
     { n: 1, name: 'Emerging' },
   ];
   // A tag's teacher-facing name. Never the id: real tag ids are UUIDs.
+  /* How a chip names the criterion that already uses its competency: by
+     number when the criterion is named after the competency. */
+  function _usedByLabel(crit, idx, tagId) {
+    var tag = getTagById(activeCourse, tagId);
+    var tagName = _rubricTagName(tag, getSectionForTag(activeCourse, tagId));
+    var name = (crit && crit.name) || '';
+    return name && name.trim().toLowerCase() !== String(tagName).trim().toLowerCase() ? name : 'criterion ' + (idx + 1);
+  }
   function _rubricTagName(tag, sec) {
     return (tag && (tag.label || tag.name)) || (sec && sec.name) || (tag && tag.code) || '';
   }
@@ -2827,7 +2837,7 @@ window.PageAssignments = (function () {
     allCriteria.forEach(function (c, i) {
       if (i !== ci)
         (c.tagIds || []).forEach(function (t) {
-          otherUsed[t] = c.name;
+          otherUsed[t] = _usedByLabel(c, i, t);
         });
     });
     var selectedTagIds = new Set(crit.tagIds || []);
@@ -2919,8 +2929,28 @@ window.PageAssignments = (function () {
     // T-UI-10 · per-level point values sit in each level's header.
     // levelValues stays null unless a value differs from 4/3/2/1.
     var lv = crit.levelValues || {};
+    // One competency: its I-can statements can draft the four descriptors.
+    var draftBtn = '';
+    if (window.RubricDraft && (crit.tagIds || []).length === 1) {
+      var draftTag = getTagById(activeCourse, crit.tagIds[0]);
+      if (draftTag) {
+        var generic = !RubricDraft.statementsOf(draftTag).length;
+        draftBtn =
+          '<button type="button" class="rubric-draft-btn" data-action="draftCriterion" data-index="' +
+          ci +
+          '" title="' +
+          (generic
+            ? 'This competency has no I-can statements, so the draft uses the proficiency scale wording only.'
+            : 'Write the four descriptors from this competency\u2019s I-can statements.') +
+          '">Draft from ' +
+          esc(_rubricTagName(draftTag, getSectionForTag(activeCourse, draftTag.id))) +
+          '</button>';
+      }
+    }
     html +=
-      '</div><div class="rubric-part"><div class="rubric-part-label">Level descriptors</div><div class="rubric-levels">';
+      '</div><div class="rubric-part"><div class="rubric-part-label">Level descriptors' +
+      draftBtn +
+      '</div><div class="rubric-levels">';
     RUBRIC_LEVELS.forEach(function (L) {
       var pts = lv[L.n] != null ? lv[L.n] : L.n;
       html +=
@@ -3038,6 +3068,142 @@ window.PageAssignments = (function () {
     });
     _expandedCriterion = _editingRubric.criteria.length - 1;
     _refreshCriterionDOM(_expandedCriterion);
+  }
+  /* ── Criteria from competencies (shared/rubric-draft.js) ─── */
+  /* Pick competencies; each becomes a criterion named after it, linked to
+     it, with its descriptors drafted. A competency already on a criterion of
+     this rubric can't be picked, as in the criterion block. */
+  function openCriterionFromCompetency() {
+    if (!_editingRubric || !window.RubricDraft || !window.AssessmentCopy) return;
+    var used = {};
+    _editingRubric.criteria.forEach(function (c) {
+      (c.tagIds || []).forEach(function (t) {
+        used[t] = _usedByLabel(c, _editingRubric.criteria.indexOf(c), t);
+      });
+    });
+    var chips = '';
+    var any = false;
+    _rubricTagGroups(getSections(activeCourse)).forEach(function (g) {
+      if (g.name) chips += '<div class="rubric-comp-group">' + esc(g.name) + '</div>';
+      chips += '<div class="rubric-comp-chips">';
+      g.secs.forEach(function (sec) {
+        (sec.tags || []).forEach(function (tag) {
+          any = true;
+          var usedBy = used[tag.id];
+          chips +=
+            '<button type="button" class="rubric-comp-chip" style="--sec:' +
+            cssColor(sec.color) +
+            '" aria-pressed="false"' +
+            (usedBy
+              ? ' disabled title="Already used in ' + esc(usedBy) + '"'
+              : ' data-pick-tag="' + esc(tag.id) + '"') +
+            '><span class="rubric-comp-mark" aria-hidden="true"></span>' +
+            esc(_rubricTagName(tag, sec)) +
+            (usedBy ? '<span class="rubric-comp-used">' + esc(usedBy) + '</span>' : '') +
+            '</button>';
+        });
+      });
+      chips += '</div>';
+    });
+    var html = any
+      ? '<div class="copy-review-note">Each competency you pick becomes a criterion. Its descriptors are drafted from the competency\u2019s I-can statements; change any of them before you save.</div>' +
+        chips
+      : '<div class="copy-review-note">This class has no competencies yet. Add them in Class Management first.</div>';
+    function updateOk(root) {
+      var n = root.querySelectorAll('[data-pick-tag][aria-pressed="true"]').length;
+      var ok = root.querySelector('[data-copy-ok]');
+      if (!ok) return;
+      ok.disabled = !n;
+      ok.textContent = n ? 'Add ' + n + (n === 1 ? ' criterion' : ' criteria') : 'Add';
+    }
+    AssessmentCopy.dialog({
+      title: 'Criteria from competencies',
+      html: html,
+      okLabel: 'Add',
+      onOpen: function (root) {
+        root.classList.add('crit-from-comp-dialog');
+        updateOk(root);
+        root.addEventListener('click', function (e) {
+          var chip = e.target.closest('[data-pick-tag]');
+          if (!chip) return;
+          var on = chip.getAttribute('aria-pressed') !== 'true';
+          chip.setAttribute('aria-pressed', on ? 'true' : 'false');
+          chip.classList.toggle('selected', on);
+          chip.querySelector('.rubric-comp-mark').textContent = on ? '\u2713' : '';
+          updateOk(root);
+        });
+      },
+      onOk: function (root) {
+        var ids = Array.from(root.querySelectorAll('[data-pick-tag][aria-pressed="true"]')).map(function (b) {
+          return b.dataset.pickTag;
+        });
+        if (!ids.length) return false;
+        addCriteriaFromTags(ids);
+        return true;
+      },
+    });
+  }
+  function addCriteriaFromTags(tagIds) {
+    if (!_editingRubric) return;
+    var crits = _editingRubric.criteria;
+    var used = {};
+    crits.forEach(function (c) {
+      (c.tagIds || []).forEach(function (t) {
+        used[t] = true;
+      });
+    });
+    var added = [];
+    (tagIds || []).forEach(function (id) {
+      if (used[id]) return;
+      var tag = getTagById(activeCourse, id);
+      if (!tag) return;
+      used[id] = true;
+      added.push(RubricDraft.draftCriterion(tag, uid));
+    });
+    if (!added.length) return;
+    // A new rubric's untouched first criterion is replaced, not left beside.
+    if (crits.length === 1 && RubricDraft.isBlankCriterion(crits[0]) && !_rubricScored[crits[0].id]) crits.splice(0, 1);
+    added.forEach(function (c) {
+      crits.push(c);
+    });
+    _rubricDirty = true;
+    _expandedCriterion = crits.indexOf(added[0]);
+    _refreshCriterionDOM(_expandedCriterion);
+    _updateGuardNote();
+    var first = document.querySelector('.rubric-criterion[data-crit-idx="' + _expandedCriterion + '"]');
+    if (first) first.scrollIntoView({ block: 'nearest' });
+  }
+  /* Draft the four descriptors of a criterion with one competency. Typed
+     descriptors are only replaced after the teacher says so. */
+  function draftCriterionDescriptors(idx) {
+    if (!_editingRubric || !window.RubricDraft) return;
+    var crit = _editingRubric.criteria[idx];
+    if (!crit || (crit.tagIds || []).length !== 1) return;
+    var tag = getTagById(activeCourse, crit.tagIds[0]);
+    if (!tag) return;
+    var tagName = _rubricTagName(tag, getSectionForTag(activeCourse, tag.id));
+    function apply() {
+      var c = _editingRubric && _editingRubric.criteria[idx];
+      if (!c) return;
+      c.levels = RubricDraft.draftLevels(tag).levels;
+      if (RubricDraft.isDefaultName(c.name)) c.name = tagName || c.name;
+      _rubricDirty = true;
+      _expandedCriterion = idx;
+      _refreshCriterionDOM(idx);
+    }
+    if (!RubricDraft.hasDescriptors(crit)) {
+      apply();
+      return;
+    }
+    showConfirm(
+      'Replace the descriptors?',
+      'Your descriptors for "' +
+        crit.name +
+        '" will be replaced with a draft from the competency\u2019s I-can statements.',
+      'Replace',
+      'primary',
+      apply,
+    );
   }
   function removeCriterion(idx) {
     if (!_editingRubric) return;
@@ -3338,8 +3504,8 @@ window.PageAssignments = (function () {
       sid +
       '" data-critid="' +
       crit.id +
-      '" data-stop-prop="true" aria-label="Comment on this criterion" title="' +
-      (note ? esc(note) : 'Comment on this criterion') +
+      '" data-stop-prop="true" aria-label="Comment on this criterion" aria-keyshortcuts="C" title="' +
+      (note ? esc(note) : 'Comment on this criterion (C)') +
       '"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z"/></svg></button>'
     );
   }
@@ -3411,7 +3577,7 @@ window.PageAssignments = (function () {
     );
     if (btn) {
       btn.classList.toggle('has-comment', !!text);
-      btn.title = text || 'Comment on this criterion';
+      btn.title = text || 'Comment on this criterion (C)';
     }
     closeCriterionComment();
   }
@@ -4183,6 +4349,12 @@ window.PageAssignments = (function () {
       addCriterion: function () {
         addCriterion();
       },
+      criterionFromCompetency: function () {
+        openCriterionFromCompetency();
+      },
+      draftCriterion: function () {
+        draftCriterionDescriptors(parseInt(el.dataset.index, 10));
+      },
       toggleCriterionExpand: function () {
         // A click into the name or weight field edits it; it doesn't fold the criterion.
         if (e.target !== el && e.target.closest('input, textarea, select, label')) return;
@@ -4347,6 +4519,22 @@ window.PageAssignments = (function () {
         if (lvl) lvl.click();
       }
       navigateKb('down');
+      return;
+    }
+    if (
+      (key === 'c' || key === 'C') &&
+      !e.metaKey &&
+      !e.ctrlKey &&
+      !e.altKey &&
+      _kbFocusEl.classList.contains('rsg-criterion-row') &&
+      !document.getElementById('rubric-modal') &&
+      !document.querySelector('.confirm-overlay')
+    ) {
+      var commentBtn = _kbFocusEl.querySelector('.rsg-crit-comment');
+      if (commentBtn) {
+        e.preventDefault();
+        commentBtn.click();
+      }
       return;
     }
     if (['+', '=', '-', '_'].includes(key) && _kbFocusEl.classList.contains('rsg-criterion-row')) {
