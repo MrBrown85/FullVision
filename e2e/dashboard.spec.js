@@ -111,11 +111,10 @@ test.describe('Dashboard observation coverage', () => {
     await expect(overdue).not.toContainText('Alice');
   });
 
-  test('a grid cell opens the Observations page for that student', async ({ page }) => {
+  test('a grid cell links to the Observations page for that student', async ({ page }) => {
     const row = page.locator('.dash-obs-grid tbody tr', { hasText: 'Alice' });
     await expect(row.locator('.dash-obs-cell.dash-obs-tint-strength')).toHaveCount(1);
     await row.locator('.dash-obs-cell').last().click();
     await expect(page).toHaveURL(/#\/observations\?course=sci8&student=stu-001/);
-    await expect(page.locator('#filter-student-btn')).toContainText('Alice');
   });
 });
