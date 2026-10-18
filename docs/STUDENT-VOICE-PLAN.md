@@ -33,13 +33,13 @@ Source: `OneDrive - School District No. 36 (Surrey)/Core Competency Reflecting B
 
 Themes by grade and period:
 
-| Grade | November | March | June |
-|---|---|---|---|
-| 8 | Self-awareness and goal setting | Growth in communication skills | Reflecting on teamwork and collaboration |
-| 9 | Personal strengths and identity | Creative thinking and problem-solving | Responsibility in learning and community involvement |
-| 10 | Resilience and adapting to change | Critical thinking in academics | Contributions to the school community and future goals |
-| 11 | Personal values and self-regulation | Balancing perspectives in decision-making | Social responsibility and leadership roles |
-| 12 | Exploring purpose and direction | Ethical judgment and cultural awareness | Preparedness for post-secondary life and career exploration |
+| Grade | November                            | March                                     | June                                                        |
+| ----- | ----------------------------------- | ----------------------------------------- | ----------------------------------------------------------- |
+| 8     | Self-awareness and goal setting     | Growth in communication skills            | Reflecting on teamwork and collaboration                    |
+| 9     | Personal strengths and identity     | Creative thinking and problem-solving     | Responsibility in learning and community involvement        |
+| 10    | Resilience and adapting to change   | Critical thinking in academics            | Contributions to the school community and future goals      |
+| 11    | Personal values and self-regulation | Balancing perspectives in decision-making | Social responsibility and leadership roles                  |
+| 12    | Exploring purpose and direction     | Ethical judgment and cultural awareness   | Preparedness for post-secondary life and career exploration |
 
 Period headings in the file: November = Self-Awareness, Identify Values; March = Communication, Thinking, Decision-Making; June = Collaboration, Responsibility, Future Planning.
 
