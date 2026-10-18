@@ -166,3 +166,88 @@ describe('hasAssignmentFeedback', () => {
     expect(hasAssignmentFeedback(CID, 'stu1', 'a1')).toBe(false);
   });
 });
+
+describe('loading observations from the server', () => {
+  const AID = '55555555-5555-5555-5555-555555555555';
+
+  afterEach(() => {
+    delete _cache.assessments[CID];
+  });
+
+  it('restores the tags on each observation row', () => {
+    const blob = _observationsPayloadToBlob({
+      observations: [
+        {
+          id: 'ob1',
+          body: 'Helped a partner',
+          enrollment_ids: ['stu1', 'stu2'],
+          dims: ['collaboration', 'cc:5', 'tag:Lab safety'],
+          created_at: '2026-10-18T10:00:00Z',
+        },
+      ],
+    });
+    expect(blob.stu1[0].dims).toEqual(['collaboration', 'cc:5', 'tag:Lab safety']);
+    expect(blob.stu2[0].dims).toEqual(['collaboration', 'cc:5', 'tag:Lab safety']);
+  });
+
+  it('gives an empty tag list to rows saved before tags were stored', () => {
+    const blob = _observationsPayloadToBlob({
+      observations: [{ id: 'ob1', body: 'x', enrollment_ids: ['stu1'], created_at: '2026-10-18T10:00:00Z' }],
+    });
+    expect(blob.stu1[0].dims).toEqual([]);
+  });
+
+  it('fills in the assessment title from the course assessments', () => {
+    _cache.assessments[CID] = [{ id: AID, title: 'Cell model' }];
+    const blob = _observationsPayloadToBlob(
+      {
+        observations: [
+          { id: 'ob1', body: 'x', assessment_id: AID, enrollment_ids: ['stu1'], created_at: '2026-10-18T10:00:00Z' },
+        ],
+      },
+      CID,
+    );
+    expect(blob.stu1[0].assignmentContext).toEqual({ assessmentId: AID, assessmentTitle: 'Cell model' });
+  });
+
+  it('leaves the title empty when the assessment is not in the course', () => {
+    _cache.assessments[CID] = [];
+    const blob = _observationsPayloadToBlob(
+      {
+        observations: [
+          { id: 'ob1', body: 'x', assessment_id: AID, enrollment_ids: ['stu1'], created_at: '2026-10-18T10:00:00Z' },
+        ],
+      },
+      CID,
+    );
+    expect(blob.stu1[0].assignmentContext).toEqual({ assessmentId: AID, assessmentTitle: '' });
+  });
+
+  it('the bundle load restores tags and the assessment title', () => {
+    _bundleToCache(CID, {
+      gradebook: {
+        course: { id: CID },
+        students: [],
+        assessments: [{ id: AID, title: 'Cell model', score_mode: 'proficiency' }],
+        categories: [],
+        modules: [],
+      },
+      observations: {
+        observations: [
+          {
+            id: 'ob1',
+            body: 'Careful drawing',
+            assessment_id: AID,
+            enrollment_ids: ['stu1'],
+            dims: ['engagement'],
+            created_at: '2026-10-18T10:00:00Z',
+          },
+        ],
+        total: 1,
+      },
+    });
+    const ob = getStudentQuickObs(CID, 'stu1')[0];
+    expect(ob.dims).toEqual(['engagement']);
+    expect(ob.assignmentContext.assessmentTitle).toBe('Cell model');
+  });
+});

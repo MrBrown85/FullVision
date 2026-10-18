@@ -313,6 +313,7 @@ create table observation (
   sentiment     text,                                                -- positive | neutral | concern
   context_type  text,                                                -- assessment | general | interaction …
   assessment_id uuid                references assessment(id) on delete set null,
+  dims          text[]      not null default '{}',                 -- tag keys: 'engagement', 'cc:<id>', 'tag:<label>'
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()
 );
@@ -577,9 +578,10 @@ create table fv_idempotency (
 --
 -- Observations + templates + custom tags:
 --   create_observation(p_course_id, p_body, p_sentiment, p_context_type, p_assessment_id,
---                      p_enrollment_ids uuid[], p_tag_ids uuid[], p_custom_tag_ids uuid[])
+--                      p_enrollment_ids uuid[], p_tag_ids uuid[], p_custom_tag_ids uuid[],
+--                      p_idempotency_key uuid, p_dims text[])
 --   update_observation(p_id, p_patch jsonb, p_enrollment_ids uuid[], p_tag_ids uuid[],
---                      p_custom_tag_ids uuid[])
+--                      p_custom_tag_ids uuid[])   -- p_patch 'dims' (array) replaces dims
 --   delete_observation(p_id uuid)
 --   upsert_observation_template(p_id, p_course_id, p_body, p_default_sentiment,
 --                               p_default_context_type, p_display_order)
