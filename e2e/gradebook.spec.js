@@ -7,6 +7,7 @@ import {
   seedScores,
   gotoApp,
   TEST_ASSESSMENT,
+  TEST_COURSE,
   TEST_STUDENTS,
 } from './helpers.js';
 
@@ -98,6 +99,45 @@ test.describe('Gradebook — Spreadsheet View', () => {
     expect(body).toContain('Alice');
     // Verify the Scores tab is now active
     await expect(scoresBtn).toHaveClass(/active/);
+  });
+
+  test('cell menu marks a score missing and excused', async ({ page }) => {
+    await seedStudents(page);
+    await seedAssessments(page);
+    await seedScores(page, {
+      'stu-001': { 'assess-001': { QAP: 3 } },
+      'stu-002': { 'assess-001': { QAP: 2 } },
+    });
+    await gotoApp(page, '/gradebook');
+    await page.locator('[data-action="setView"][data-mode="scores"]').click();
+
+    const cell = page.locator('.gb-scores-cell[data-sid="stu-001"][data-aid="assess-001"]');
+    const statuses = () =>
+      page.evaluate(cid => JSON.parse(localStorage.getItem('gb-statuses-' + cid) || '{}'), TEST_COURSE.id);
+    const pick = async label => {
+      await cell.click({ button: 'right' });
+      await page.locator('.gb-ctx-menu .gb-ctx-item', { hasText: label }).click();
+    };
+
+    await pick('Mark missing');
+    expect((await statuses())['stu-001:assess-001']).toBe('NS');
+    await expect(cell).toContainText('NS');
+    // NS clears the proficiency score, as on the Assignments page.
+    const scores = await page.evaluate(
+      cid => JSON.parse(localStorage.getItem('gb-scores-' + cid) || '{}'),
+      TEST_COURSE.id,
+    );
+    expect((scores['stu-001'] || []).filter(e => e.assessmentId === 'assess-001' && e.score > 0)).toHaveLength(0);
+
+    await pick('Excuse');
+    expect((await statuses())['stu-001:assess-001']).toBe('EXC');
+    await expect(cell).toContainText('EXC');
+
+    await pick('Undo excuse');
+    expect((await statuses())['stu-001:assess-001']).toBeUndefined();
+    await expect(cell).not.toContainText('EXC');
+    // The other student's cell is untouched.
+    expect((await statuses())['stu-002:assess-001']).toBeUndefined();
   });
 
   test('clicking Summary tab renders Summary view without crashing', async ({ page }) => {
