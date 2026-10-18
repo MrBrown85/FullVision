@@ -220,6 +220,7 @@ load('shared/constants.js');
 load('shared/reporting-term-presets.js');
 load('shared/data.js');
 load('shared/calc.js');
+load('shared/rubric-draft.js');
 load('teacher/ui.js');
 load('teacher/report-blocks.js');
 load('teacher/report-questionnaire.js');

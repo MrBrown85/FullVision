@@ -1971,6 +1971,10 @@
   cursor: pointer;
   transition: all 0.1s;
 }
+/* Two add buttons sit together on the left; the second takes the gap. */
+.rubric-add-criterion-btn:has(+ .rubric-add-criterion-btn) {
+  margin-right: 0;
+}
 .rubric-add-criterion-btn:hover {
   border-color: var(--active);
   color: var(--text);
@@ -3091,36 +3095,39 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.rsg-crit-comment {
+/* The criterion comment: a speech bubble after −/+, always visible, filled
+   when the criterion has a comment. C opens it on the focused row. */
+.rsg-comment-cell,
+.rsg-header-comment-spacer {
+  width: 36px;
   flex-shrink: 0;
-  width: 20px;
-  height: 20px;
-  padding: 2px;
+}
+.rsg-comment-cell {
+  display: flex;
+  align-items: stretch;
+  border-left: 1px solid var(--divider-subtle);
+}
+.rsg-crit-comment {
+  flex: 1;
+  padding: 0;
   border: none;
-  border-radius: 5px;
   background: transparent;
   color: var(--text-3);
   cursor: pointer;
-  opacity: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   transition:
-    opacity 0.15s,
-    background 0.15s;
+    color 0.12s var(--ease-out),
+    background 0.12s var(--ease-out);
 }
 .rsg-crit-comment svg {
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
 }
-.rsg-criterion-row:hover .rsg-crit-comment,
-.rsg-criterion-row.kb-focus .rsg-crit-comment,
-.rsg-crit-comment:focus-visible,
-.rsg-crit-comment.has-comment {
-  opacity: 1;
-}
-.rsg-crit-comment:hover {
-  background: var(--divider-subtle);
+.rsg-crit-comment:hover,
+.rsg-crit-comment:focus-visible {
+  background: var(--overlay-hover);
   color: var(--text);
 }
 .rsg-crit-comment.has-comment {
@@ -3182,4 +3189,31 @@
 .rubric-linked-removal {
   margin-top: 4px;
   color: var(--text-2);
+}
+
+/* Rubric editor: "Draft from …" beside the Level descriptors label, and the
+   competency picker behind "+ From competency". */
+.rubric-draft-btn {
+  margin-left: 10px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-2);
+  font-family: var(--font-base);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+  cursor: pointer;
+}
+.rubric-draft-btn:hover {
+  border-color: var(--text-3);
+  color: var(--text);
+}
+.crit-from-comp-dialog .copy-dialog-card {
+  max-width: 720px;
+}
+.crit-from-comp-dialog .rubric-comp-group {
+  margin-top: 4px;
 }

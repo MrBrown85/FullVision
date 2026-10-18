@@ -105,3 +105,13 @@ Context: phase 2 of the rubric library plan. `migrations/20261018_rubric_copy_gr
 2. **Saving a rubric that has copies offers "Update the other classes too?"**, listing per class what would change: renamed, re-described, re-valued or re-weighted criteria, added criteria with their competency matches, removed criteria. Only what the copy still shared with the saved rubric changes; a field the other class changed on its own stays and is named.
 3. **A scored criterion is never removed from a copy by that offer** unless its own box, unticked by default, is ticked; the box says how many students have a score on it.
 4. **The Rubric Bank shows "Also in …" on a linked rubric**, the copy dialog marks classes that already hold a copy, and the delete confirmation says the copy stays.
+
+## A criterion from a competency (2026-10-18)
+
+Context: building a rubric meant typing every descriptor by hand. Canvas creates a criterion from an outcome with the outcome's own scale; JumpRope keeps I-can descriptors on the standard; Teams drafts a whole rubric with AI. Plan at `~/fullvision-criterion-from-competency-plan.md`; `shared/rubric-draft.js`.
+
+1. **"+ From competency" in the rubric editor** turns each picked competency into a criterion: named after it, linked to it, descriptors drafted. A competency already on a criterion of the rubric can't be picked. A new rubric's untouched first criterion is replaced, not left beside the new ones.
+2. **The draft is deterministic and needs no backend.** Proficient is the competency's I-can statements (at most three, so half and quarter-sheet handouts still fit); Extending, Developing and Emerging put the first statement into the BC scale's words ("Independently and in new situations…", "In familiar situations and with some help…", "With support, I am beginning to…"). Written in the student's voice because it prints on the handout. A competency with no I-can text gets the scale wording alone.
+3. **"Draft from …" beside Level descriptors** drafts a criterion that has exactly one competency. Typed descriptors are only replaced after the teacher confirms.
+4. **The criterion comment is a speech-bubble cell after −/+**, always visible, filled when there is a comment, with C as the shortcut on the focused row. It is its own cell because the −/+ group is redrawn on every score change.
+5. **Later:** a per-teacher descriptor bank so reworded drafts carry to the next class (one migration), then an optional AI rewrite through a ca-central-1 Edge Function.
