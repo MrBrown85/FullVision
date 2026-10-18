@@ -393,8 +393,6 @@ window.PageDashboard = (function () {
       assessedCCs: assessedCCs,
       ccCounts: ccCounts,
       ccAssessments: ccAssessments,
-      recentObsCount: recentObsCount,
-      flagCount: flagCount,
       actionItems: actionItems,
     });
 

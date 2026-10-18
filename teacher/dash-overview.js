@@ -91,8 +91,6 @@ window.DashOverview = (function () {
     var assessedCCs = opts.assessedCCs;
     var ccCounts = opts.ccCounts;
     var ccAssessments = opts.ccAssessments;
-    var recentObsCount = opts.recentObsCount;
-    var flagCount = opts.flagCount;
     var actionItems = opts.actionItems;
     var html = '';
 
@@ -276,34 +274,8 @@ window.DashOverview = (function () {
     html += '</div>';
 
     html += '<div class="dash-overview-section">';
-    html +=
-      '<div style="margin-top:0">' +
-      '<div class="dash-section-title">Observations' +
-      '<a href="#/observations">Record \u2192</a>' +
-      '</div>' +
-      '<div class="dash-quick-stats">' +
-      '<div class="dash-mini-stat">' +
-      '<div class="dash-mini-stat-val" style="color:var(--active)">' +
-      recentObsCount +
-      '</div>' +
-      '<div class="dash-mini-stat-label">This Week</div>' +
-      '</div>' +
-      '<div class="dash-mini-stat">' +
-      '<div class="dash-mini-stat-val" style="color:' +
-      (flagCount > 0 ? 'var(--priority)' : 'var(--text-3)') +
-      '">' +
-      flagCount +
-      '</div>' +
-      '<div class="dash-mini-stat-label">Flagged</div>' +
-      '</div>' +
-      '<div class="dash-mini-stat">' +
-      '<div class="dash-mini-stat-val">' +
-      allStudents.length +
-      '</div>' +
-      '<div class="dash-mini-stat-label">Students</div>' +
-      '</div>' +
-      '</div>' +
-      '</div>';
+    var obsCoverage = obsCoverageData(cid, allStudents);
+    html += renderObsOverdue(cid, allStudents, obsCoverage);
 
     var upcomingBdays = getUpcomingBirthdays(cid);
     if (upcomingBdays.length > 0) {
@@ -392,6 +364,294 @@ window.DashOverview = (function () {
     html += '</div>';
     html += '</div>';
 
+    // The coverage grid takes a full-width row under the three cards.
+    var grid = renderObsCoverageGrid(cid, obsCoverage);
+    if (grid) html += '<div class="dash-overview-section dash-obs-coverage">' + grid + '</div>';
+
+    return html;
+  }
+
+  /* ── Observation coverage ───────────────────────────────────
+     Who has gone 3+ weeks without an observation, and a students-by-week
+     grid of observation counts tinted by type. The calculations are pure
+     and take today's date as 'YYYY-MM-DD' so tests can pin it. */
+  var OBS_OVERDUE_DAYS = 21;
+  var OBS_DEFAULT_WEEKS = 8;
+  var DAY_MS = 86400000;
+
+  function _dayNum(dateStr) {
+    return Math.floor(Date.parse(String(dateStr).slice(0, 10) + 'T00:00:00Z') / DAY_MS);
+  }
+
+  function _isDateStr(d) {
+    return typeof d === 'string' && /^\d{4}-\d{2}-\d{2}/.test(d) && !isNaN(Date.parse(d.slice(0, 10)));
+  }
+
+  function _dayStr(n) {
+    return new Date(n * DAY_MS).toISOString().slice(0, 10);
+  }
+
+  /** Monday of the ISO week that contains a 'YYYY-MM-DD' date. */
+  function obsWeekStart(dateStr) {
+    var n = _dayNum(dateStr);
+    var mondayOffset = (new Date(n * DAY_MS).getUTCDay() + 6) % 7;
+    return _dayStr(n - mondayOffset);
+  }
+
+  /** The term the grid covers: the picker's term, else the one today falls in, else null. */
+  function obsCoverageTerm(terms, activeTerm, todayStr) {
+    if (activeTerm && activeTerm.startsOn && activeTerm.endsOn) return activeTerm;
+    var current = (terms || []).find(function (t) {
+      var s = t.startsOn || t.starts_on;
+      var e = t.endsOn || t.ends_on;
+      return s && e && s <= todayStr && todayStr <= e;
+    });
+    if (!current) return null;
+    return {
+      ordinal: current.ordinal,
+      label: current.label,
+      startsOn: current.startsOn || current.starts_on,
+      endsOn: current.endsOn || current.ends_on,
+    };
+  }
+
+  /** Mondays of the grid's columns: the term's weeks up to today, or the last 8 weeks with no term. */
+  function obsCoverageWeeks(todayStr, term) {
+    var first, last;
+    if (term && term.startsOn && term.endsOn) {
+      var end = todayStr < term.endsOn ? todayStr : term.endsOn;
+      if (end < term.startsOn) end = term.startsOn;
+      first = _dayNum(obsWeekStart(term.startsOn));
+      last = _dayNum(obsWeekStart(end));
+    } else {
+      last = _dayNum(obsWeekStart(todayStr));
+      first = last - (OBS_DEFAULT_WEEKS - 1) * 7;
+    }
+    var weeks = [];
+    for (var n = first; n <= last; n += 7) weeks.push(_dayStr(n));
+    return weeks;
+  }
+
+  /** The latest observation date in a list, or '' when there is none. */
+  function obsLastDate(obs) {
+    return (obs || []).reduce(function (latest, o) {
+      var d = o && _isDateStr(o.date) ? o.date.slice(0, 10) : '';
+      return d > latest ? d : latest;
+    }, '');
+  }
+
+  /** True when a student has no observation in the last 3 weeks (or none at all). */
+  function obsIsOverdue(obs, todayStr) {
+    var last = obsLastDate(obs);
+    if (!last) return true;
+    return _dayNum(todayStr) - _dayNum(last) >= OBS_OVERDUE_DAYS;
+  }
+
+  /** A week's tint: the type that has the most observations; 'mixed' on a tie, 'neutral' when none is typed. */
+  function obsCellTint(obs) {
+    if (!obs || obs.length === 0) return 'empty';
+    var counts = { strength: 0, growth: 0, concern: 0 };
+    obs.forEach(function (o) {
+      if (o && counts.hasOwnProperty(o.sentiment)) counts[o.sentiment]++;
+    });
+    var max = Math.max(counts.strength, counts.growth, counts.concern);
+    if (max === 0) return 'neutral';
+    var top = Object.keys(counts).filter(function (k) {
+      return counts[k] === max;
+    });
+    return top.length === 1 ? top[0] : 'mixed';
+  }
+
+  /** One row per student, in the order given: overdue flag and one cell per week. */
+  function obsCoverageRows(students, obsBySid, weeks, todayStr) {
+    var index = {};
+    weeks.forEach(function (w, i) {
+      index[w] = i;
+    });
+    return (students || []).map(function (s) {
+      var obs = obsBySid[s.id] || [];
+      var byWeek = weeks.map(function () {
+        return [];
+      });
+      obs.forEach(function (o) {
+        if (!o || !_isDateStr(o.date)) return;
+        var i = index[obsWeekStart(o.date)];
+        if (i !== undefined) byWeek[i].push(o);
+      });
+      return {
+        student: s,
+        overdue: obsIsOverdue(obs, todayStr),
+        lastDate: obsLastDate(obs),
+        cells: weeks.map(function (w, i) {
+          return { week: w, obs: byWeek[i], tint: obsCellTint(byWeek[i]) };
+        }),
+      };
+    });
+  }
+
+  function _weekLabel(week) {
+    return new Date(_dayNum(week) * DAY_MS).toLocaleDateString('en-CA', {
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'UTC',
+    });
+  }
+
+  function _obsCellTitle(name, week, obs) {
+    var head = name + ', week of ' + _weekLabel(week) + ': ';
+    if (obs.length === 0) return head + 'no observations';
+    var lines = obs
+      .slice()
+      .sort(function (a, b) {
+        return (a.date || '').localeCompare(b.date || '');
+      })
+      .slice(0, 6)
+      .map(function (o) {
+        var t = String(o.text || '').replace(/\s+/g, ' ');
+        return '\u2013 ' + (t.length > 100 ? t.slice(0, 99) + '\u2026' : t);
+      });
+    if (obs.length > 6) lines.push('and ' + (obs.length - 6) + ' more');
+    return head + obs.length + (obs.length === 1 ? ' observation' : ' observations') + '\n' + lines.join('\n');
+  }
+
+  /* The overdue list and the grid for a class, for today and the term in view. */
+  function obsCoverageData(cid, students) {
+    var today = getTodayStr();
+    var terms = typeof getReportingTerms === 'function' ? getReportingTerms(cid) : [];
+    var active = typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
+    var term = obsCoverageTerm(terms, active, today);
+    var weeks = obsCoverageWeeks(today, term);
+    var obsBySid = {};
+    students.forEach(function (s) {
+      obsBySid[s.id] = getStudentQuickObs(cid, s.id);
+    });
+    var rows = obsCoverageRows(students, obsBySid, weeks, today);
+    return {
+      term: term,
+      weeks: weeks,
+      rows: rows,
+      overdue: rows.filter(function (r) {
+        return r.overdue;
+      }),
+    };
+  }
+
+  /* Headline and chips: who has no observation in 3+ weeks. */
+  function renderObsOverdue(cid, students, data) {
+    var overdue = data.overdue;
+    var html =
+      '<div class="dash-section-title">Observations' +
+      '<a href="#/observations?course=' +
+      encodeURIComponent(cid) +
+      '">Record \u2192</a>' +
+      '</div>';
+
+    if (students.length === 0) {
+      return html + '<div class="dash-obs-headline">No students yet</div>';
+    }
+
+    if (overdue.length > 0) {
+      html +=
+        '<div class="dash-obs-headline is-overdue">' +
+        overdue.length +
+        (overdue.length === 1 ? ' student has' : ' students have') +
+        ' no observation in 3+ weeks</div>' +
+        '<div class="dash-obs-overdue" aria-label="Students with no observation in 3 or more weeks">';
+      overdue.forEach(function (r) {
+        var s = r.student;
+        html +=
+          '<a class="dash-obs-chip" href="#/student?id=' +
+          encodeURIComponent(s.id) +
+          '&course=' +
+          encodeURIComponent(cid) +
+          '" title="' +
+          esc(
+            r.lastDate
+              ? 'Last observed ' +
+                  parseLocalDate(r.lastDate).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })
+              : 'No observations yet',
+          ) +
+          '">' +
+          esc(displayName(s)) +
+          '</a>';
+      });
+      html += '</div>';
+    } else {
+      html += '<div class="dash-obs-headline">Everyone observed in the last 3 weeks</div>';
+    }
+
+    return html;
+  }
+
+  /* Students-by-week grid of observation counts, tinted by type. */
+  function renderObsCoverageGrid(cid, data) {
+    var term = data.term;
+    var weeks = data.weeks;
+    var rows = data.rows;
+    if (rows.length === 0) return '';
+    var title = term
+      ? 'Observations by week, ' + (term.label || 'this term')
+      : 'Observations by week, last ' + OBS_DEFAULT_WEEKS + ' weeks';
+    var html =
+      '<div class="dash-section-title">' +
+      esc(title) +
+      '</div>' +
+      '<div class="dash-obs-grid-wrap" tabindex="0" role="region" aria-label="Observations by student and week">' +
+      '<table class="dash-obs-grid">' +
+      '<thead><tr><th scope="col" class="dash-obs-grid-name">Student</th>';
+    var prevMonth = '';
+    weeks.forEach(function (w) {
+      var d = new Date(_dayNum(w) * DAY_MS);
+      var month = d.toLocaleDateString('en-CA', { month: 'short', timeZone: 'UTC' });
+      html +=
+        '<th scope="col" title="Week of ' +
+        esc(_weekLabel(w)) +
+        '"><span class="dash-obs-grid-month">' +
+        (month !== prevMonth ? esc(month) : '') +
+        '</span>' +
+        d.getUTCDate() +
+        '</th>';
+      prevMonth = month;
+    });
+    html += '</tr></thead><tbody>';
+    rows.forEach(function (r) {
+      var s = r.student;
+      var name = displayName(s);
+      var obsHref = '#/observations?course=' + encodeURIComponent(cid) + '&student=' + encodeURIComponent(s.id);
+      html +=
+        '<tr><th scope="row" class="dash-obs-grid-name' +
+        (r.overdue ? ' is-overdue' : '') +
+        '"><a href="#/student?id=' +
+        encodeURIComponent(s.id) +
+        '&course=' +
+        encodeURIComponent(cid) +
+        '"' +
+        (r.overdue ? ' title="No observation in 3+ weeks"' : '') +
+        '>' +
+        esc(name) +
+        '</a></th>';
+      r.cells.forEach(function (c) {
+        html +=
+          '<td><a class="dash-obs-cell dash-obs-tint-' +
+          c.tint +
+          '" href="' +
+          obsHref +
+          '" title="' +
+          esc(_obsCellTitle(name, c.week, c.obs)) +
+          '">' +
+          (c.obs.length || '') +
+          '</a></td>';
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+    html +=
+      '<div class="dash-obs-legend">' +
+      '<span><i class="dash-obs-tint-strength"></i>Strengths</span>' +
+      '<span><i class="dash-obs-tint-growth"></i>Growth</span>' +
+      '<span><i class="dash-obs-tint-concern"></i>Concerns</span>' +
+      '<span><i class="dash-obs-tint-empty"></i>None</span>' +
+      '</div>';
     return html;
   }
 
@@ -434,5 +694,15 @@ window.DashOverview = (function () {
     renderDashToolbar: renderDashToolbar,
     renderOverviewPanel: renderOverviewPanel,
     renderBirthdayWidget: renderBirthdayWidget,
+    renderObsOverdue: renderObsOverdue,
+    renderObsCoverageGrid: renderObsCoverageGrid,
+    obsCoverageData: obsCoverageData,
+    obsWeekStart: obsWeekStart,
+    obsCoverageTerm: obsCoverageTerm,
+    obsCoverageWeeks: obsCoverageWeeks,
+    obsLastDate: obsLastDate,
+    obsIsOverdue: obsIsOverdue,
+    obsCellTint: obsCellTint,
+    obsCoverageRows: obsCoverageRows,
   };
 })();
