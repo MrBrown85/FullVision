@@ -2799,58 +2799,123 @@
   box-shadow: none;
   background: var(--overlay-hover);
 }
-.af-copy-list {
+
+/* Classes row on the form: this class fixed, the others as toggle chips */
+.af-copy-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 16px;
   align-items: center;
+  gap: 8px;
 }
-.af-copy-item,
-.af-copy-perclass,
-.copy-review-check {
+.af-copy-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: var(--text-md);
-  color: var(--text);
+  padding: 6px 12px;
+  font-family: var(--font-base);
+  font-size: var(--text-base);
+  font-weight: 500;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  color: var(--text-2);
   cursor: pointer;
+  transition: all 0.12s;
+  white-space: nowrap;
 }
-.af-copy-item input,
-.af-copy-perclass input,
-.copy-review-check input {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--text);
+.af-copy-chip-mark {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
   flex-shrink: 0;
+  position: relative;
+  transition: all 0.12s;
 }
-.af-copy-item.af-copy-has,
-.copy-review-check.af-copy-has {
-  color: var(--text-3);
+.af-copy-chip:hover:not(:disabled) {
+  border-color: var(--active);
+  color: var(--text);
+}
+.af-copy-chip.active,
+.af-copy-chip.af-copy-this {
+  border-color: var(--active);
+  background: rgba(0, 122, 255, 0.08);
+  color: var(--text);
+}
+.af-copy-chip.active .af-copy-chip-mark,
+.af-copy-chip.af-copy-this .af-copy-chip-mark {
+  background: var(--active);
+  border-color: var(--active);
+}
+.af-copy-chip.active .af-copy-chip-mark::after,
+.af-copy-chip.af-copy-this .af-copy-chip-mark::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 3px;
+  height: 7px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.af-copy-chip.af-copy-this {
   cursor: default;
 }
+.af-copy-chip:disabled,
+.af-copy-chip.af-copy-has {
+  opacity: 0.55;
+  cursor: default;
+}
+.af-copy-chip:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
 .af-copy-more {
-  flex-basis: 100%;
   font-size: var(--text-md);
 }
 .af-copy-more summary {
   cursor: pointer;
   color: var(--text-2);
-  margin-bottom: 4px;
+  padding: 6px 4px;
+  list-style: none;
 }
-.af-copy-more .af-copy-item {
-  margin-right: 16px;
+.af-copy-more summary::before {
+  content: '\25B8 ';
 }
-.af-copy-perclass {
-  margin-top: 8px;
+.af-copy-more[open] summary::before {
+  content: '\25BE ';
 }
-.af-copy-perclass[hidden] {
+.af-copy-more .af-copy-chips {
+  padding: 4px 0 2px;
+}
+.af-copy-dates-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  font-size: var(--text-md);
+}
+.af-copy-dates-bar[hidden] {
   display: none;
+}
+.af-copy-dates-label {
+  color: var(--text-2);
+  font-weight: 600;
+}
+.af-copy-dates-mode .af-type-btn {
+  font-size: var(--text-sm);
+  padding: 5px 10px;
+  white-space: nowrap;
 }
 #af-copy-dates {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-top: 6px;
+  margin-top: 8px;
+}
+#af-copy-dates:empty {
+  display: none;
 }
 .af-copy-date-row {
   display: flex;
@@ -2871,6 +2936,70 @@
 .af-copy-date-row .af-input {
   width: auto;
 }
+
+/* "Also in Block B" on an assessment card */
+.copy-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  color: var(--text-2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.copy-badge:hover {
+  border-color: var(--active);
+  color: var(--active);
+}
+.copy-badge:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 1px;
+}
+
+/* Section toggle beside the course picker */
+.assess-sibling-toggle {
+  display: inline-flex;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface);
+}
+.assess-sibling-btn {
+  padding: 6px 12px;
+  font-family: var(--font-base);
+  font-size: var(--text-base);
+  font-weight: 500;
+  border: none;
+  border-right: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.assess-sibling-btn:last-child {
+  border-right: none;
+}
+.assess-sibling-btn.active {
+  background: var(--active);
+  color: #fff;
+}
+.assess-sibling-btn:hover:not(.active) {
+  background: var(--overlay-hover);
+  color: var(--text);
+}
+.assess-sibling-btn:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: -2px;
+}
+
+/* Dialogs */
 .copy-dialog .copy-dialog-card {
   max-width: 560px;
   width: calc(100% - 32px);
@@ -2907,11 +3036,35 @@
   width: auto;
   min-width: 180px;
 }
+.copy-review-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-md);
+  color: var(--text);
+  cursor: pointer;
+}
+.copy-review-check input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--text);
+  flex-shrink: 0;
+}
+.copy-review-check.af-copy-has {
+  color: var(--text-3);
+  cursor: default;
+}
 .copy-review-note {
   line-height: 1.4;
 }
 .copy-review-muted {
   color: var(--text-3);
+}
+.copy-change-list {
+  margin: 0;
+  padding-left: 26px;
+  color: var(--text-2);
+  line-height: 1.5;
 }
 .copy-from-list {
   display: flex;

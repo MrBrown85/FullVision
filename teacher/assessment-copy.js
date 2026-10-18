@@ -543,7 +543,11 @@ window.AssessmentCopy = (function () {
       }
     });
     if (opts.onOpen) opts.onOpen(overlay);
-    var focusEl = overlay.querySelector('[data-copy-ok]');
+    // Land on the first thing to decide (a category picker, a class to
+    // untick); OK only when there is nothing to decide.
+    var focusEl =
+      overlay.querySelector('.copy-dialog-body select, .copy-dialog-body input:not(:disabled)') ||
+      overlay.querySelector('[data-copy-ok]');
     if (focusEl) focusEl.focus();
     return overlay;
   }
@@ -694,17 +698,29 @@ window.AssessmentCopy = (function () {
             '. Make the same change there?</div>' +
             actionable
               .map(function (r, i) {
+                var lines = describePatch(r.copy.cid, r.patch);
                 return (
+                  '<div class="copy-review-class">' +
                   '<label class="copy-review-check"><input type="checkbox" checked data-copy-row="' +
                   i +
                   '"> ' +
                   esc(r.copy.className) +
                   '</label>' +
+                  (lines.length
+                    ? '<ul class="copy-change-list">' +
+                      lines
+                        .map(function (l) {
+                          return '<li>' + esc(l) + '</li>';
+                        })
+                        .join('') +
+                      '</ul>'
+                    : '') +
                   (r.skipped.length
                     ? '<div class="copy-review-note copy-review-muted">Its own ' +
                       esc(_listNames(r.skipped)) +
                       ' stays as it is.</div>'
-                    : '')
+                    : '') +
+                  '</div>'
                 );
               })
               .join('');
@@ -733,45 +749,213 @@ window.AssessmentCopy = (function () {
     });
   }
 
-  /* ── The form's "Also add to" section ──────────────────────── */
-  function renderAlsoAddTo(cid, assess) {
-    var targets = copyTargets(cid);
-    if (!targets.sameCourse.length && !targets.other.length) return '';
-    function box(t) {
-      return (
-        '<label class="af-copy-item" data-copy-cid="' +
-        esc(t.id) +
-        '"><input type="checkbox" class="af-copy-cb" value="' +
-        esc(t.id) +
-        '" data-action-change="copyTargetsChanged"> <span>' +
-        esc(t.name) +
-        '</span></label>'
+  /* ── Describing a linked edit ─────────────────────────────── */
+  function _fmtDate(d) {
+    if (!d) return 'none';
+    return typeof formatDate === 'function' ? formatDate(d) : d;
+  }
+
+  /* "Title → Density lab report", one line per field the patch changes,
+     in the words of the class it lands in. */
+  function describePatch(dstCid, patch) {
+    var out = [];
+    if ('title' in patch) out.push('Title → ' + patch.title);
+    if ('description' in patch) out.push(patch.description ? 'Description updated' : 'Description cleared');
+    if ('dateAssigned' in patch) out.push('Date assigned → ' + _fmtDate(patch.dateAssigned));
+    if ('dueDate' in patch) out.push('Due date → ' + _fmtDate(patch.dueDate));
+    if ('scoreMode' in patch) {
+      var modeWords = { points: 'Points', complete: 'Complete/Incomplete', proficiency: 'Proficiency' };
+      out.push(
+        'Scoring → ' +
+          (modeWords[patch.scoreMode] || patch.scoreMode || 'Proficiency') +
+          (patch.scoreMode === 'points' && patch.maxPoints != null ? ' out of ' + patch.maxPoints : ''),
       );
     }
+    if ('weight' in patch) out.push('Proficiency weight → ' + (patch.weight || 1) + 'x');
+    if ('evidenceType' in patch) out.push('Evidence type → ' + (patch.evidenceType || 'none'));
+    if ('categoryId' in patch) {
+      var cat = (getCategories(dstCid) || []).find(function (c) {
+        return c.id === patch.categoryId;
+      });
+      out.push('Category → ' + (cat ? cat.name : 'none'));
+    }
+    if ('rubricId' in patch) {
+      var rub = patch.rubricId
+        ? (getRubrics(dstCid) || []).find(function (r) {
+            return r.id === patch.rubricId;
+          })
+        : null;
+      out.push('Rubric → ' + (rub ? rub.name : 'none'));
+    }
+    if ('moduleId' in patch) {
+      var mod = patch.moduleId
+        ? (getModules(dstCid) || []).find(function (m) {
+            return m.id === patch.moduleId;
+          })
+        : null;
+      out.push('Module → ' + (mod ? mod.name : 'none'));
+    }
+    if ('tagIds' in patch) {
+      var idx = _tagIndex(dstCid);
+      var names = (patch.tagIds || [])
+        .map(function (id) {
+          return idx.byId[id] ? idx.byId[id].label : '';
+        })
+        .filter(Boolean);
+      out.push('Competencies → ' + (names.length ? names.join(', ') : 'none'));
+    }
+    return out;
+  }
+
+  /* ── Remembering the classes a teacher adds to ─────────────── */
+  function _rememberKey(cid) {
+    return 'gb-copy-targets-' + cid;
+  }
+
+  /* The classes the teacher ticked last time they made an assessment in
+     this class, on this device. Only live classes count. */
+  function rememberedTargets(cid) {
+    try {
+      var raw = localStorage.getItem(_rememberKey(cid));
+      var ids = raw ? JSON.parse(raw) : [];
+      return Array.isArray(ids)
+        ? ids.filter(function (id) {
+            return id !== cid && _isLive(id);
+          })
+        : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function rememberTargets(cid, ids) {
+    try {
+      if (!ids || !ids.length) localStorage.removeItem(_rememberKey(cid));
+      else localStorage.setItem(_rememberKey(cid), JSON.stringify(ids));
+    } catch (e) {
+      /* no storage: remembered for this page only */
+    }
+  }
+
+  /* "Block A" from "English 9 - Block A"; the whole name when nothing is
+     left over, so two sections always get distinct labels. */
+  function sectionLabel(name) {
+    var n = String(name || '').trim();
+    var key = _courseKey(n);
+    var rest = _norm(n)
+      .replace(/[-–—:|/]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (key && rest.indexOf(key) === 0) rest = rest.slice(key.length).trim();
+    rest = rest.replace(/^[()\s]+|[()\s]+$/g, '');
+    if (!rest) return n;
+    // Give the words back their capitals from the original name.
+    var i = _norm(n).lastIndexOf(rest);
+    return i >= 0 ? n.slice(i, i + rest.length).replace(/^[()\s]+|[()\s]+$/g, '') || n : n;
+  }
+
+  /* ── The form's Classes field ──────────────────────────────── */
+  function _chip(t, active, disabled) {
+    return (
+      '<button type="button" class="af-copy-chip' +
+      (active ? ' active' : '') +
+      '" data-action="copyTargetToggle" data-cid="' +
+      esc(t.id) +
+      '" aria-pressed="' +
+      (active ? 'true' : 'false') +
+      '"' +
+      (disabled ? ' disabled' : '') +
+      '><span class="af-copy-chip-mark" aria-hidden="true"></span>' +
+      esc(t.name) +
+      '</button>'
+    );
+  }
+
+  /* The Classes row: this class, then the other sections of the same course
+     as toggle chips, then any other classes behind "More". A new assessment
+     starts with the classes ticked last time; an edit starts with none. */
+  function renderClassesField(cid, assess) {
+    var targets = copyTargets(cid);
+    if (!targets.sameCourse.length && !targets.other.length) return '';
+    var pre = assess ? [] : rememberedTargets(cid);
     var html =
       '<div class="af-field af-copy-field" id="af-copy-field">' +
-      '<label class="af-label">Also add to</label>' +
-      '<div class="af-copy-list">';
-    html += targets.sameCourse.map(box).join('');
+      '<label class="af-label">Classes</label>' +
+      '<div class="af-copy-chips" role="group" aria-label="Classes this assessment goes to">' +
+      '<span class="af-copy-chip af-copy-this" aria-current="true"><span class="af-copy-chip-mark" aria-hidden="true"></span>' +
+      esc(_className(cid)) +
+      '</span>' +
+      targets.sameCourse
+        .map(function (t) {
+          return _chip(t, pre.indexOf(t.id) >= 0, false);
+        })
+        .join('');
     if (targets.other.length) {
+      var anyPre = targets.other.some(function (t) {
+        return pre.indexOf(t.id) >= 0;
+      });
       html +=
         '<details class="af-copy-more"' +
-        (targets.sameCourse.length ? '' : ' open') +
+        (anyPre || !targets.sameCourse.length ? ' open' : '') +
         '><summary>' +
-        (targets.sameCourse.length ? 'Other classes' : 'Your other classes') +
-        '</summary>' +
-        targets.other.map(box).join('') +
-        '</details>';
+        (targets.sameCourse.length ? 'More classes' : 'Other classes') +
+        '</summary><div class="af-copy-chips">' +
+        targets.other
+          .map(function (t) {
+            return _chip(t, pre.indexOf(t.id) >= 0, false);
+          })
+          .join('') +
+        '</div></details>';
     }
     html +=
       '</div>' +
       '<div class="af-rubric-info" id="af-copy-existing"' +
       (assess && assess.copyGroup ? '' : ' hidden') +
       '></div>' +
-      '<label class="af-copy-perclass" hidden><input type="checkbox" id="af-copy-perclass" data-action-change="copyTargetsChanged"> Set dates per class</label>' +
+      '<div class="af-copy-dates-bar" id="af-copy-dates-bar" hidden>' +
+      '<span class="af-copy-dates-label">Dates</span>' +
+      '<div class="af-type-toggle af-copy-dates-mode">' +
+      '<button type="button" class="af-type-btn active" data-action="copyDatesMode" data-mode="same" aria-pressed="true">Same for every class</button>' +
+      '<button type="button" class="af-type-btn" data-action="copyDatesMode" data-mode="per" aria-pressed="false">Set per class</button>' +
+      '</div>' +
+      '</div>' +
       '<div id="af-copy-dates"></div>' +
       '</div>';
     return html;
+  }
+
+  /* Kept for callers from before the chips. */
+  function renderAlsoAddTo(cid, assess) {
+    return renderClassesField(cid, assess);
+  }
+
+  function _activeChips() {
+    return Array.from(document.querySelectorAll('.af-copy-chip.active[data-cid]'));
+  }
+
+  function toggleTarget(el) {
+    if (!el || el.disabled) return;
+    var on = !el.classList.contains('active');
+    el.classList.toggle('active', on);
+    el.setAttribute('aria-pressed', on ? 'true' : 'false');
+    onTargetsChanged();
+  }
+
+  function setDatesMode(el) {
+    var bar = document.getElementById('af-copy-dates-bar');
+    if (!bar) return;
+    bar.querySelectorAll('[data-mode]').forEach(function (b) {
+      var on = b === el;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    onTargetsChanged();
+  }
+
+  function _perClassDates() {
+    var bar = document.getElementById('af-copy-dates-bar');
+    var per = bar && bar.querySelector('[data-mode="per"]');
+    return !!(per && per.classList.contains('active'));
   }
 
   /* Mark classes that already hold a copy of the assessment being edited. */
@@ -780,34 +964,33 @@ window.AssessmentCopy = (function () {
     return findCopies(cid, assess).then(function (copies) {
       var names = [];
       copies.forEach(function (c) {
-        var item = document.querySelector('.af-copy-item[data-copy-cid="' + c.cid + '"]');
-        if (item) {
-          var cb = item.querySelector('input');
-          if (cb) {
-            cb.checked = false;
-            cb.disabled = true;
-          }
-          item.classList.add('af-copy-has');
+        var chip = document.querySelector('.af-copy-chip[data-cid="' + c.cid + '"]');
+        if (chip) {
+          chip.classList.remove('active');
+          chip.classList.add('af-copy-has');
+          chip.setAttribute('aria-pressed', 'false');
+          chip.disabled = true;
+          chip.title = 'Already in this class';
         }
         names.push(c.className);
       });
       var line = document.getElementById('af-copy-existing');
       if (line && names.length) {
         line.hidden = false;
-        line.textContent = 'Already in ' + _listNames(names) + '.';
+        line.textContent = 'Already in ' + _listNames(names) + '. Saving offers to update those copies too.';
       }
+      onTargetsChanged();
     });
   }
 
-  /* Redraw the per-class date rows when the ticked classes change. */
+  /* Redraw the dates bar and per-class date rows for the ticked classes. */
   function onTargetsChanged() {
-    var ticked = Array.from(document.querySelectorAll('.af-copy-cb:checked'));
-    var perWrap = document.querySelector('.af-copy-perclass');
-    var perClass = document.getElementById('af-copy-perclass');
+    var ticked = _activeChips();
+    var bar = document.getElementById('af-copy-dates-bar');
     var mount = document.getElementById('af-copy-dates');
-    if (perWrap) perWrap.hidden = ticked.length === 0;
+    if (bar) bar.hidden = ticked.length === 0;
     if (!mount) return;
-    if (!ticked.length || !perClass || !perClass.checked) {
+    if (!ticked.length || !_perClassDates()) {
       mount.innerHTML = '';
       return;
     }
@@ -821,13 +1004,14 @@ window.AssessmentCopy = (function () {
       };
     });
     mount.innerHTML = ticked
-      .map(function (cb) {
-        var keep = existing[cb.value] || {};
+      .map(function (chip) {
+        var id = chip.dataset.cid;
+        var keep = existing[id] || {};
         return (
           '<div class="af-copy-date-row" data-cid="' +
-          esc(cb.value) +
+          esc(id) +
           '"><span class="af-copy-date-name">' +
-          esc(_className(cb.value)) +
+          esc(_className(id)) +
           '</span><label>Assigned <input class="af-input" type="date" data-copy-assigned value="' +
           esc(keep.a || assigned) +
           '"></label><label>Due <input class="af-input" type="date" data-copy-due value="' +
@@ -838,14 +1022,14 @@ window.AssessmentCopy = (function () {
       .join('');
   }
 
-  /* The ticked classes with their dates: [{ cid, dateAssigned, dueDate }]. */
-  function readTargets() {
-    var perClass = document.getElementById('af-copy-perclass');
-    var useRows = !!(perClass && perClass.checked);
-    return Array.from(document.querySelectorAll('.af-copy-cb:checked')).map(function (cb) {
-      var t = { cid: cb.value };
-      if (useRows) {
-        var row = document.querySelector('.af-copy-date-row[data-cid="' + cb.value + '"]');
+  /* The ticked classes with their dates: [{ cid, dateAssigned, dueDate }].
+     Also remembers the choice for the next assessment in this class. */
+  function readTargets(cid) {
+    var perClass = _perClassDates();
+    var targets = _activeChips().map(function (chip) {
+      var t = { cid: chip.dataset.cid };
+      if (perClass) {
+        var row = document.querySelector('.af-copy-date-row[data-cid="' + chip.dataset.cid + '"]');
         if (row) {
           t.dateAssigned = (row.querySelector('[data-copy-assigned]') || {}).value || undefined;
           t.dueDate = (row.querySelector('[data-copy-due]') || {}).value || '';
@@ -853,6 +1037,101 @@ window.AssessmentCopy = (function () {
       }
       return t;
     });
+    if (cid && document.getElementById('af-copy-field')) {
+      rememberTargets(
+        cid,
+        targets.map(function (t) {
+          return t.cid;
+        }),
+      );
+    }
+    return targets;
+  }
+
+  /* ── On the assessment card and in the toolbar ─────────────── */
+  /* The other classes on this device that hold a copy of `a`:
+     [{ cid, assessmentId, className }]. Reads only what is already loaded
+     or saved locally, so it is synchronous. */
+  function localCopies(cid, a) {
+    if (!a || !a.copyGroup) return [];
+    var out = [];
+    Object.keys(COURSES || {}).forEach(function (id) {
+      if (id === cid || !_isLive(id)) return;
+      var list;
+      try {
+        list = getAssessments(id) || [];
+      } catch (e) {
+        list = [];
+      }
+      list.forEach(function (x) {
+        if (x.copyGroup === a.copyGroup) out.push({ cid: id, assessmentId: x.id, className: _className(id) });
+      });
+    });
+    return out;
+  }
+
+  /* "Also in Block B" chips for an assessment card; each opens that copy. */
+  function renderCardCopies(cid, a) {
+    return localCopies(cid, a)
+      .map(function (c) {
+        return (
+          '<button type="button" class="copy-badge" data-action="openCopyIn" data-cid="' +
+          esc(c.cid) +
+          '" data-aid="' +
+          esc(c.assessmentId) +
+          '" data-stop-prop="true" title="Open this assessment in ' +
+          esc(c.className) +
+          '">⇄ Also in ' +
+          esc(sectionLabel(c.className)) +
+          '</button>'
+        );
+      })
+      .join('');
+  }
+
+  /* One-click switching between sections of the same course. Returns ''
+     unless the class has one to three siblings. */
+  function renderSiblingToggle(cid) {
+    var sibs = copyTargets(cid).sameCourse;
+    if (!sibs.length || sibs.length > 3) return '';
+    var all = [{ id: cid, name: _className(cid) }].concat(sibs);
+    return (
+      '<div class="assess-sibling-toggle" role="group" aria-label="Sections of this course">' +
+      all
+        .map(function (c) {
+          var on = c.id === cid;
+          return (
+            '<button type="button" class="assess-sibling-btn' +
+            (on ? ' active' : '') +
+            '" data-action="switchToClass" data-cid="' +
+            esc(c.id) +
+            '" aria-pressed="' +
+            (on ? 'true' : 'false') +
+            '" title="' +
+            esc(c.name) +
+            '">' +
+            esc(sectionLabel(c.name)) +
+            '</button>'
+          );
+        })
+        .join('') +
+      '</div>'
+    );
+  }
+
+  /* A line for the delete confirmation when copies exist elsewhere. */
+  function deleteNote(cid, a) {
+    var copies = localCopies(cid, a);
+    if (!copies.length) return '';
+    return (
+      ' It is also in ' +
+      _listNames(
+        copies.map(function (c) {
+          return c.className;
+        }),
+      ) +
+      '; that copy stays.'
+    );
   }
 
   /* ── Add from another class ────────────────────────────────── */
@@ -990,9 +1269,20 @@ window.AssessmentCopy = (function () {
     copyToClasses: copyToClasses,
     offerLinkedEdit: offerLinkedEdit,
     renderAlsoAddTo: renderAlsoAddTo,
+    renderClassesField: renderClassesField,
     markExistingCopies: markExistingCopies,
     onTargetsChanged: onTargetsChanged,
+    toggleTarget: toggleTarget,
+    setDatesMode: setDatesMode,
     readTargets: readTargets,
+    rememberedTargets: rememberedTargets,
+    rememberTargets: rememberTargets,
+    describePatch: describePatch,
+    sectionLabel: sectionLabel,
+    localCopies: localCopies,
+    renderCardCopies: renderCardCopies,
+    renderSiblingToggle: renderSiblingToggle,
+    deleteNote: deleteNote,
     openAddFromClass: openAddFromClass,
     _courseKey: _courseKey,
   };

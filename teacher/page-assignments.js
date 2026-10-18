@@ -138,6 +138,19 @@ window.PageAssignments = (function () {
     render();
   }
 
+  /* The copy of an assessment in another class: switch there and open it. */
+  function openCopyIn(cid, aid) {
+    if (!cid || !aid) return;
+    var done = cid === activeCourse ? Promise.resolve() : switchCourse(cid);
+    Promise.resolve(done).then(function () {
+      openAssessIds.add(aid);
+      render();
+      var card = document.getElementById('ac-' + aid);
+      if (card && typeof card.scrollIntoView === 'function')
+        card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+
   /* ── Focus Student ─────────────────────────────────────── */
   function toggleFocusStudent(sid) {
     if (focusStudentId === sid) {
@@ -227,6 +240,7 @@ window.PageAssignments = (function () {
       '<select class="assess-course-select" data-action="assessSwitchCourse" aria-label="Select course">' +
       courseOptions +
       '</select>' +
+      (window.AssessmentCopy ? AssessmentCopy.renderSiblingToggle(cid) : '') +
       (function () {
         var sortedCats = _getSortedCategories(cid);
         if (!sortedCats.length) return '';
@@ -481,6 +495,7 @@ window.PageAssignments = (function () {
             a.collaboration.slice(1) +
             '</span>'
           : '') +
+        (window.AssessmentCopy ? AssessmentCopy.renderCardCopies(cid, a) : '') +
         '<span class="assess-date">' +
         (a.dateAssigned ? formatDate(a.dateAssigned) + ' \u2192 ' : '') +
         formatDate(a.date) +
@@ -864,6 +879,10 @@ window.PageAssignments = (function () {
       '</textarea>' +
       '</div>';
 
+    // Which classes this assessment goes to (Teams' "Assign to"), right
+    // under the title so it is seen before the details are filled in.
+    if (window.AssessmentCopy) html += AssessmentCopy.renderClassesField(cid, assess);
+
     // Rubric selector
     var rubricsList = getRubrics(cid);
     var selRubricId = assess ? assess.rubricId || '' : '';
@@ -1218,9 +1237,6 @@ window.PageAssignments = (function () {
     });
     html += '</div></div>';
 
-    // The same assessment in the teacher's other classes (Teams' "Assign to").
-    if (window.AssessmentCopy) html += AssessmentCopy.renderAlsoAddTo(cid, assess);
-
     // Actions
     html +=
       '<div class="af-actions">' +
@@ -1405,7 +1421,7 @@ window.PageAssignments = (function () {
     var assessWeight = _formAssessWeight(scoreModeVal);
     if (assessWeight !== 1) newAssess.weight = assessWeight;
     // Read before render() replaces the form.
-    var copyTargets = window.AssessmentCopy ? AssessmentCopy.readTargets() : [];
+    var copyTargets = window.AssessmentCopy ? AssessmentCopy.readTargets(activeCourse) : [];
     if (copyTargets.length) newAssess.copyGroup = AssessmentCopy.newCopyGroup();
     var srcCid = activeCourse;
     assessments.push(newAssess);
@@ -1415,7 +1431,8 @@ window.PageAssignments = (function () {
     _showingNewForm = false;
     _editingAssessId = null;
     render();
-    if (copyTargets.length) AssessmentCopy.copyToClasses(srcCid, newAssess, copyTargets);
+    // Once the copies exist, the card can show "Also in …".
+    if (copyTargets.length) AssessmentCopy.copyToClasses(srcCid, newAssess, copyTargets).then(render);
   }
 
   function editAssess(aid) {
@@ -1508,7 +1525,7 @@ window.PageAssignments = (function () {
     var assessWeight = _formAssessWeight(scoreModeVal);
     assessments[idx].weight = assessWeight !== 1 ? assessWeight : undefined;
     // Read before hideNewForm()/render() replace the form.
-    var copyTargets = window.AssessmentCopy ? AssessmentCopy.readTargets() : [];
+    var copyTargets = window.AssessmentCopy ? AssessmentCopy.readTargets(activeCourse) : [];
     if (copyTargets.length && !assessments[idx].copyGroup) assessments[idx].copyGroup = AssessmentCopy.newCopyGroup();
     var after = structuredClone(assessments[idx]);
     var srcCid = activeCourse;
@@ -1518,11 +1535,11 @@ window.PageAssignments = (function () {
     render();
     if (window.AssessmentCopy && (before.copyGroup || copyTargets.length)) {
       // One dialog at a time: the edit offer first, then any new copies.
-      Promise.resolve(before.copyGroup ? AssessmentCopy.offerLinkedEdit(srcCid, before, after) : null).then(
-        function () {
+      Promise.resolve(before.copyGroup ? AssessmentCopy.offerLinkedEdit(srcCid, before, after) : null)
+        .then(function () {
           if (copyTargets.length) return AssessmentCopy.copyToClasses(srcCid, after, copyTargets);
-        },
-      );
+        })
+        .then(render);
     }
   }
 
@@ -1547,39 +1564,49 @@ window.PageAssignments = (function () {
   }
 
   function deleteAssess(aid) {
-    showConfirm('Delete Assessment', 'Delete this assessment and all its scores?', 'Delete', 'danger', function () {
-      var cid = activeCourse;
-      saveAssessments(
-        cid,
-        getAssessments(cid).filter(function (a) {
-          return a.id !== aid;
-        }),
-      );
-      var scores = getScores(cid);
-      Object.keys(scores).forEach(function (sid) {
-        scores[sid] = (scores[sid] || []).filter(function (s) {
-          return s.assessmentId !== aid;
-        });
-      });
-      saveScores(cid, scores);
-      var statuses = getAssignmentStatuses(cid);
-      var statusChanged = false;
-      Object.keys(statuses).forEach(function (k) {
-        if (k.endsWith(':' + aid)) {
-          delete statuses[k];
-          statusChanged = true;
-        }
-      });
-      if (statusChanged) saveAssignmentStatuses(cid, statuses);
-      // P6.5: dispatch delete_observation RPC for each linked observation
-      // before clearing LS. Replaces a bare saveQuickObs call that left
-      // server rows orphaned with stale assignmentContext.assessmentId.
-      deleteAssessmentObservations(cid, aid);
-      openAssessIds.delete(aid);
-      _collapsedIds.delete(aid);
-      render();
-      refreshSidebar();
+    var target = getAssessments(activeCourse).find(function (a) {
+      return a.id === aid;
     });
+    var note = window.AssessmentCopy && target ? AssessmentCopy.deleteNote(activeCourse, target) : '';
+    showConfirm(
+      'Delete Assessment',
+      'Delete this assessment and all its scores?' + note,
+      'Delete',
+      'danger',
+      function () {
+        var cid = activeCourse;
+        saveAssessments(
+          cid,
+          getAssessments(cid).filter(function (a) {
+            return a.id !== aid;
+          }),
+        );
+        var scores = getScores(cid);
+        Object.keys(scores).forEach(function (sid) {
+          scores[sid] = (scores[sid] || []).filter(function (s) {
+            return s.assessmentId !== aid;
+          });
+        });
+        saveScores(cid, scores);
+        var statuses = getAssignmentStatuses(cid);
+        var statusChanged = false;
+        Object.keys(statuses).forEach(function (k) {
+          if (k.endsWith(':' + aid)) {
+            delete statuses[k];
+            statusChanged = true;
+          }
+        });
+        if (statusChanged) saveAssignmentStatuses(cid, statuses);
+        // P6.5: dispatch delete_observation RPC for each linked observation
+        // before clearing LS. Replaces a bare saveQuickObs call that left
+        // server rows orphaned with stale assignmentContext.assessmentId.
+        deleteAssessmentObservations(cid, aid);
+        openAssessIds.delete(aid);
+        _collapsedIds.delete(aid);
+        render();
+        refreshSidebar();
+      },
+    );
   }
 
   /* ── Expand/Collapse ────────────────────────────────────── */
@@ -3735,6 +3762,18 @@ window.PageAssignments = (function () {
       },
       addFromClass: function () {
         if (window.AssessmentCopy) AssessmentCopy.openAddFromClass(activeCourse, render);
+      },
+      copyTargetToggle: function () {
+        if (window.AssessmentCopy) AssessmentCopy.toggleTarget(el);
+      },
+      copyDatesMode: function () {
+        if (window.AssessmentCopy) AssessmentCopy.setDatesMode(el);
+      },
+      switchToClass: function () {
+        if (el.dataset.cid && el.dataset.cid !== activeCourse) switchCourse(el.dataset.cid);
+      },
+      openCopyIn: function () {
+        openCopyIn(el.dataset.cid, el.dataset.aid);
       },
       hideNewForm: function () {
         hideNewForm();
