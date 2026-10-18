@@ -3081,6 +3081,7 @@
   color: var(--text-1);
   font-size: var(--text-sm);
   line-height: 1.4;
+}
 
 /* ── Criterion comment icon + Print rubrics (rubric handouts) ─────── */
 .rsg-criterion-name {

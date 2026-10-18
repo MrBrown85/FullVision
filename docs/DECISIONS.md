@@ -76,3 +76,13 @@ Context: rubric scores are stored per criterion and projected onto the criterion
 2. **Removing a criterion that has scores asks first**, naming the criterion and how many students have a score on it, with "Remove and drop scores" as the only way through.
 3. **Changing a scored criterion's top value shows a note** in the editor: past scores keep their level, overall grades on assessments using the rubric will change.
 4. **The rubric list closes when the editor opens from it**, so the editor is never covered.
+
+## Graded rubric handouts (2026-10-18)
+
+Context: every gradebook compared in the rubrics review returns the rubric to the student; FullVision's scoring grid shows only the four level buttons. `migrations/20261018_rubric_score_comment.sql`; `teacher/rubric-print.js`.
+
+1. **Descriptors stay off the scoring grid.** Teachers grade for speed and know their rubrics; the descriptor belongs on the thing the student gets. Hover still shows it.
+2. **The handout is the feedback.** "Print rubrics" on a rubric assessment prints one student-facing rubric per student: the descriptors, the chosen level shaded with its ± mark, a short comment per criterion, the assessment comments and the overall level. The teacher scores once, prints, staples it to the work; the score still feeds the student profile.
+3. **Three layouts:** full page, half sheet (two per landscape page) and quarter sheet (four per page), cut lines between. Text shrinks by layout, and shrinks further by steps to fit; a sheet that still does not fit is clipped and the dialog says so before printing.
+4. **One comment per criterion**, stored on `rubric_score.comment`, entered from an icon on the criterion row. It cannot exist without a level on the server, so a comment typed first waits on the device and goes up with the level.
+5. **Unscored students print a blank rubric.** Not submitted and Excused print as such in place of the overall level.
