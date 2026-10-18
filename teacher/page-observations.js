@@ -1889,6 +1889,12 @@ window.PageObservations = (function () {
 
     refreshStudentCache();
 
+    // The dashboard's coverage grid opens this page with one student selected.
+    if (params.student && _studentsById[params.student]) {
+      selectedStudents = [params.student];
+      filterStudents = [params.student];
+    }
+
     _addDocListener('click', _handleClick);
     _addDocListener('mousedown', _handleMousedown);
     _addDocListener('input', _handleInput);

@@ -90,6 +90,14 @@ test.describe('Observations — keyboard, undo and views', () => {
     await expect(page.locator('#obs-count')).toHaveText('0 observations');
   });
 
+  test('a student link from the dashboard picks and filters to that student', async ({ page }) => {
+    await page.goto(`/teacher/app.html#/observations?course=${TEST_COURSE.id}&student=stu-002`);
+    await page.waitForSelector('#capture-input');
+    await expect(page.locator('#student-btn')).toContainText('Bob');
+    await expect(page.locator('#filter-student-btn')).toHaveClass(/active/);
+    await expect(page.locator('#filter-student-btn')).toContainText('Bob');
+  });
+
   test('card list by default; the sticky-note view is remembered', async ({ page }) => {
     await expect(page.locator('#obs-feed')).toHaveClass(/view-list/);
     const toggle = page.getByRole('button', { name: 'Sticky notes' });
