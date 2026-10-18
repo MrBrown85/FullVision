@@ -303,6 +303,169 @@
   margin-top: 1px;
 }
 
+/* Observation coverage: who has gone 3+ weeks without an observation, and a
+   students-by-week grid. The grid scrolls inside the card both ways, so a
+   long term or a big class never widens the page or grows the card. */
+.dash-obs-headline {
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-3);
+  margin-bottom: 6px;
+}
+.dash-obs-headline.is-overdue {
+  color: var(--score-2);
+}
+.dash-obs-overdue {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  max-height: 76px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  flex-shrink: 0;
+}
+.dash-obs-chip {
+  font-family: var(--font-base);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--score-2);
+  background: var(--score-2-bg);
+  border-radius: 999px;
+  padding: 2px 8px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.dash-obs-chip:hover {
+  text-decoration: underline;
+}
+.dash-overview-section.dash-obs-coverage {
+  grid-column: 1 / -1;
+  contain: none;
+}
+.dash-obs-grid-wrap {
+  max-width: 100%;
+  max-height: 320px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.dash-obs-grid-wrap:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.dash-obs-grid {
+  border-collapse: separate;
+  border-spacing: 2px;
+  font-family: var(--font-base);
+}
+.dash-obs-grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
+  font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
+  font-size: var(--text-2xs);
+  font-weight: 500;
+  color: var(--text-3);
+  text-align: center;
+  line-height: 1.2;
+  padding: 0 0 2px;
+  vertical-align: bottom;
+}
+.dash-obs-grid-month {
+  display: block;
+  min-height: 1.2em;
+}
+.dash-obs-grid th.dash-obs-grid-name {
+  position: sticky;
+  left: 0;
+  background: var(--surface);
+  text-align: left;
+  font-family: var(--font-base);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  max-width: 110px;
+  padding: 0 6px 0 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dash-obs-grid thead th.dash-obs-grid-name {
+  z-index: 2;
+  color: var(--text-3);
+}
+.dash-obs-grid-name a {
+  color: var(--text);
+  text-decoration: none;
+}
+.dash-obs-grid-name a:hover {
+  text-decoration: underline;
+}
+.dash-obs-grid-name.is-overdue a {
+  color: var(--score-2);
+}
+.dash-obs-grid td {
+  padding: 0;
+}
+.dash-obs-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 18px;
+  box-sizing: border-box;
+  border-radius: 4px;
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  text-decoration: none;
+}
+.dash-obs-cell:hover {
+  outline: 2px solid var(--active);
+  outline-offset: -1px;
+}
+.dash-obs-tint-strength {
+  background: var(--score-3-bg);
+  color: var(--score-3);
+}
+.dash-obs-tint-growth {
+  background: var(--score-4-bg);
+  color: var(--score-4);
+}
+.dash-obs-tint-concern {
+  background: var(--score-2-bg);
+  color: var(--score-2);
+}
+.dash-obs-tint-mixed,
+.dash-obs-tint-neutral {
+  background: var(--divider-medium);
+  color: var(--text-2);
+}
+.dash-obs-tint-empty {
+  border: 1px dashed var(--border);
+}
+.dash-obs-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 6px;
+  flex-shrink: 0;
+  font-family: var(--font-base);
+  font-size: var(--text-2xs);
+  color: var(--text-3);
+}
+.dash-obs-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.dash-obs-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  box-sizing: border-box;
+}
+
 /* ── Birthday Widget ─────────────────────────────────────── */
 .dash-birthday-box {
   margin-top: 12px;

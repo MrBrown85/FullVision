@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { mockAuth, seedCourse, gotoApp, navigateTo } from './helpers.js';
+import { mockAuth, seedCourse, seedStudents, gotoApp, navigateTo } from './helpers.js';
 
 test.describe('Dashboard & Navigation', () => {
   test.beforeEach(async ({ page }) => {
@@ -70,5 +70,51 @@ test.describe('Dashboard & Navigation', () => {
     // The dock should show user info somewhere
     const dock = page.locator('#dock-mount');
     await expect(dock).toContainText('Test Teacher');
+  });
+});
+
+test.describe('Dashboard observation coverage', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockAuth(page);
+    await seedCourse(page);
+    await seedStudents(page);
+    await page.addInitScript(() => {
+      const day = n => {
+        const d = new Date();
+        d.setDate(d.getDate() - n);
+        return (
+          d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+        );
+      };
+      const ob = (id, n, sentiment) => ({
+        id,
+        text: 'Observed ' + id,
+        dims: [],
+        sentiment,
+        context: null,
+        created: day(n) + 'T12:00:00.000Z',
+        date: day(n),
+      });
+      localStorage.setItem(
+        'gb-observations-sci8',
+        JSON.stringify({ 'stu-001': [ob('o1', 2, 'strength')], 'stu-002': [ob('o2', 40, 'concern')] }),
+      );
+    });
+    await gotoApp(page, '/dashboard');
+  });
+
+  test('names students with no observation in 3+ weeks', async ({ page }) => {
+    await expect(page.locator('.dash-obs-headline')).toContainText('2 students have no observation in 3+ weeks');
+    const overdue = page.locator('.dash-obs-overdue');
+    await expect(overdue).toContainText('Bob');
+    await expect(overdue).toContainText('Charlie');
+    await expect(overdue).not.toContainText('Alice');
+  });
+
+  test('a grid cell links to the Observations page for that student', async ({ page }) => {
+    const row = page.locator('.dash-obs-grid tbody tr', { hasText: 'Alice' });
+    await expect(row.locator('.dash-obs-cell.dash-obs-tint-strength')).toHaveCount(1);
+    await row.locator('.dash-obs-cell').last().click();
+    await expect(page).toHaveURL(/#\/observations\?course=sci8&student=stu-001/);
   });
 });
