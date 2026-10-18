@@ -3072,6 +3072,16 @@
   gap: 6px;
 }
 
+/* Rubric editor: note about scored criteria whose top value changed. */
+.rubric-guard-note {
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--score-2-bg);
+  color: var(--text-1);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+
 /* ── Criterion comment icon + Print rubrics (rubric handouts) ─────── */
 .rsg-criterion-name {
   flex: 1;

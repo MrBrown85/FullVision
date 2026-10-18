@@ -67,3 +67,12 @@ Context: a teacher with two sections of a course (English 9 in blocks A and B) w
 7. **A duplicate inside the same class is not a linked copy.**
 8. **The form's Classes row** (2026-10-18 follow-up) sits under the title as chips: this class fixed, the other sections of the course as toggles, other classes behind "More classes". A new assessment starts with the classes ticked last time in that class (remembered per class on this device); an edit starts with none. Dates are "Same for every class" unless "Set per class" is chosen.
 9. **Linked copies are visible where the teacher works:** an "Also in …" chip on the assessment card opens that copy in its class; a section toggle beside the course picker switches between sections of the same course; the delete confirmation says a copy stays elsewhere; the "Update the other classes too?" dialog lists exactly what will change in each class.
+
+## Editing a rubric that already has scores (2026-10-18)
+
+Context: rubric scores are stored per criterion and projected onto the criterion's competencies at read time, so a rubric edit can change past grades. Canvas locks a rubric once it is on more than one assignment; Google Classroom locks once grading starts; Aspen warns. `teacher/rubric-guard.js`.
+
+1. **Nothing is locked.** A teacher can always fix a rubric.
+2. **Removing a criterion that has scores asks first**, naming the criterion and how many students have a score on it, with "Remove and drop scores" as the only way through.
+3. **Changing a scored criterion's top value shows a note** in the editor: past scores keep their level, overall grades on assessments using the rubric will change.
+4. **The rubric list closes when the editor opens from it**, so the editor is never covered.

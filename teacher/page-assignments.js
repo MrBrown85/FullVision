@@ -93,6 +93,9 @@ window.PageAssignments = (function () {
   // Rubric editor state
   var _editingRubric = null;
   var _rubricDirty = false;
+  // The rubric as saved and its scored-student counts, for the edit guard.
+  var _rubricBefore = null;
+  var _rubricScored = {};
   var _rubricAutoTags = [];
   var _expandedCriterion = 0;
 
@@ -2708,7 +2711,16 @@ window.PageAssignments = (function () {
   }
 
   /* ── Rubric Builder UI ──────────────────────────────────── */
+  /* The toolbar's rubric list sits above the editor modal, so it closes when
+     the editor opens from it. */
+  function _closeRubricsPanel() {
+    _rubricsPanelOpen = false;
+    var rp = document.getElementById('tb-rubrics-panel');
+    if (rp) rp.classList.remove('open');
+  }
   function newRubricUI() {
+    _closeRubricsPanel();
+    _rubricBefore = null;
     _editingRubric = {
       id: uid(),
       name: 'New Rubric',
@@ -2722,6 +2734,9 @@ window.PageAssignments = (function () {
   function editRubricUI(rubricId) {
     var rubric = getRubricById(activeCourse, rubricId);
     if (!rubric) return;
+    _closeRubricsPanel();
+    _rubricBefore = structuredClone(rubric);
+    _rubricScored = RubricGuard.scoredStudentsByCriterion(activeCourse, rubric);
     _editingRubric = structuredClone(rubric);
     _rubricDirty = false;
     renderRubricEditor();
@@ -2758,7 +2773,7 @@ window.PageAssignments = (function () {
       (r._isNew ? 'New Rubric' : 'Edit Rubric') +
       '</h2>' +
       '<button class="rubric-editor-close" data-action="cancelRubricEdit" title="Close" aria-label="Close">\u2715</button></div>' +
-      '<div class="rubric-editor-body"><input class="rubric-name-input" id="re-name" value="' +
+      '<div class="rubric-editor-body"><p class="rubric-guard-note" id="re-guard-note" hidden></p><input class="rubric-name-input" id="re-name" value="' +
       esc(r.name) +
       '" placeholder="Rubric name\u2026" aria-label="Rubric name"><div id="re-criteria">';
     r.criteria.forEach(function (crit, ci) {
@@ -2976,6 +2991,7 @@ window.PageAssignments = (function () {
       crit.levelValues[lvl] = v;
     }
     _rubricDirty = true;
+    _updateGuardNote();
   }
   function toggleCritTag(critIdx, tagId) {
     if (!_editingRubric) return;
@@ -3023,17 +3039,47 @@ window.PageAssignments = (function () {
       alert('A rubric needs at least one criterion.');
       return;
     }
-    _rubricDirty = true;
-    _editingRubric.criteria.splice(idx, 1);
-    if (idx < _expandedCriterion) _expandedCriterion--;
-    else if (idx === _expandedCriterion) _expandedCriterion = -1;
-    _refreshCriterionDOM(0);
+    var crit = _editingRubric.criteria[idx];
+    function _doRemove() {
+      if (!_editingRubric) return;
+      _rubricDirty = true;
+      _editingRubric.criteria.splice(idx, 1);
+      if (idx < _expandedCriterion) _expandedCriterion--;
+      else if (idx === _expandedCriterion) _expandedCriterion = -1;
+      _refreshCriterionDOM(0);
+      _updateGuardNote();
+    }
+    // A criterion with scores is removed only after the teacher says so.
+    var students = crit ? _rubricScored[crit.id] || 0 : 0;
+    if (!students) {
+      _doRemove();
+      return;
+    }
+    showConfirm(
+      'Remove a scored criterion?',
+      RubricGuard.removeMessage(crit, students),
+      'Remove and drop scores',
+      'danger',
+      _doRemove,
+    );
+  }
+  /* Shows or hides the note about changed top values on scored criteria. */
+  function _updateGuardNote() {
+    var note = document.getElementById('re-guard-note');
+    if (!note) return;
+    var text = _rubricBefore
+      ? RubricGuard.topChangeNote(RubricGuard.reviewEdit(_rubricBefore, _editingRubric, _rubricScored))
+      : '';
+    note.textContent = text;
+    note.hidden = !text;
   }
   function cancelRubricEdit() {
     // P7.8: route through the in-app confirm dialog so it matches the rest of
     // the destructive-action UX (focus trap, Esc handling, restored focus).
     function _doCancel() {
       _editingRubric = null;
+      _rubricBefore = null;
+      _rubricScored = {};
       _rubricDirty = false;
       var modal = document.getElementById('rubric-modal');
       if (modal) modal.remove();
@@ -3085,6 +3131,8 @@ window.PageAssignments = (function () {
     var criteriaCount = (_editingRubric.criteria || []).length;
     var savePromise = saveRubrics(cid, rubrics);
     _editingRubric = null;
+    _rubricBefore = null;
+    _rubricScored = {};
     _rubricDirty = false;
     var modal = document.getElementById('rubric-modal');
     if (modal) modal.remove();
