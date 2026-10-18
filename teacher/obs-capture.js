@@ -8,9 +8,13 @@
    The strip: student chips (+ Student), type chips (Strength / Growth /
    Concern, one at a time), a context chip, tag pills (+ Tag: dispositions,
    Core Competencies, custom tags), + Assessment, + Competency (one
-   learning-map tag) with an optional Level, the text box and Add.
-   Shorthand in the box: @name, #tag, !strength|growth|concern, / starters.
+   learning-map tag) with an optional Level, + Starter, the text box and Add.
+   Shorthand in the box: @name, #tag, !strength|growth|concern, /starter.
    Enter sends, Shift+Enter adds a line.
+
+   Starters are the class's sentence starters (getObservationTemplates).
+   Picking one puts its text in the box and sets its type and context only
+   where none is chosen yet; its tags are added to the ones already picked.
 
    The level is evidence only. Nothing here or in calc.js turns it into a
    grade. */
@@ -209,6 +213,58 @@ window.ObsCapture = (function () {
     return best && exists(best.assessmentId) ? best.assessmentId : null;
   }
 
+  /* ── Sentence starters ──────────────────────────────────── */
+
+  function starterList(cid) {
+    return ((typeof getObservationTemplates === 'function' && getObservationTemplates(cid)) || []).filter(function (t) {
+      return t && t.text;
+    });
+  }
+
+  /* Starters whose text holds the query, the ones with a word starting
+     with it first. An empty query keeps them all, in the class's order. */
+  function matchStarters(query, starters) {
+    var q = _norm(query);
+    if (!q) return starters.slice();
+    var lead = [];
+    var rest = [];
+    starters.forEach(function (t) {
+      if (_norm(t.text).indexOf(q) < 0) return;
+      var word = String(t.text)
+        .split(/\s+/)
+        .some(function (w) {
+          return _norm(w).indexOf(q) === 0;
+        });
+      (word ? lead : rest).push(t);
+    });
+    return lead.concat(rest);
+  }
+
+  /* What a picked starter does to the strip's state: type and context only
+     where none is chosen, tags merged. Changes `state` in place. */
+  function applyStarter(state, starter) {
+    if (!starter) return state;
+    if (!state.sentiment && starter.sentiment) state.sentiment = starter.sentiment;
+    if (!state.context && starter.context) state.context = starter.context;
+    (starter.dims || []).forEach(function (k) {
+      if (state.dims.indexOf(k) < 0) state.dims.push(k);
+    });
+    return state;
+  }
+
+  /* Put `insert` in `value` over [start, end) (the /token, or the caret when
+     start === end), with a space either side where words would touch.
+     → { value, caret } */
+  function insertText(value, insert, start, end) {
+    value = String(value || '');
+    var before = value.slice(0, start);
+    var after = value.slice(end);
+    var text = String(insert || '');
+    if (before && !/\s$/.test(before)) text = ' ' + text;
+    if (after && !/^\s/.test(after)) text += ' ';
+    return { value: before + text + after, caret: before.length + text.length };
+  }
+
   /* ── Shorthand ──────────────────────────────────────────── */
 
   /* The shorthand token the caret is in: @name, #tag, !type or /starter.
@@ -275,8 +331,8 @@ window.ObsCapture = (function () {
 
   /* Turn every shorthand token in `text` that names exactly one student,
      tag or type into a pick, and take it out of the text. Tokens that match
-     nothing, or more than one thing, stay as typed. '/' tokens always stay
-     (starters arrive with the starters bank).
+     nothing, or more than one thing, stay as typed. '/' tokens always stay:
+     a starter is picked from the menu, never on its own.
        lists: { students: [{ id, name, first, last }], tags: [{ key, label }] }
      → { text, studentIds, dims, sentiment } */
   function parseShorthand(text, lists) {
@@ -402,7 +458,7 @@ window.ObsCapture = (function () {
       '<div class="obsc-slot" data-slot="links"></div>' +
       '<div class="obsc-hint" id="' +
       p +
-      'capture-hint">Enter adds it. Shift+Enter starts a new line. Type @ for a student, # for a tag, ! for the type.</div>' +
+      'capture-hint">Enter adds it. Shift+Enter starts a new line. Type @ for a student, # for a tag, ! for the type, / for a starter.</div>' +
       '<div class="obsc-flag" data-part="flag" aria-live="polite"></div>';
 
     var input = root.querySelector('textarea');
@@ -514,7 +570,12 @@ window.ObsCapture = (function () {
     }
 
     function renderLinks() {
-      var h = '';
+      var h = chip('menu', '+ Starter', {
+        value: 'starters',
+        menu: 'starters',
+        cls: 'obsc-chip-add obsc-chip-starter',
+        id: p + 'starter-btn',
+      });
       state.dims.forEach(function (k) {
         var label = tagLabel(k);
         h += removable(_esc(label), 'removeTag', k, {
@@ -603,6 +664,7 @@ window.ObsCapture = (function () {
 
     /* ── menus ─────────────────────────────────────────── */
     var MENU_ROW = {
+      starters: 'links',
       students: 'who',
       context: 'who',
       tags: 'links',
@@ -611,6 +673,7 @@ window.ObsCapture = (function () {
       level: 'links',
     };
     var MENU_LABEL = {
+      starters: 'Sentence starters',
       students: 'Students',
       context: 'Context',
       tags: 'Tags',
@@ -619,6 +682,7 @@ window.ObsCapture = (function () {
       level: 'Level',
     };
     var MENU_TRIGGER = {
+      starters: 'starter-btn',
       students: 'student-btn',
       context: 'context-btn',
       tags: 'tag-btn',
@@ -665,10 +729,49 @@ window.ObsCapture = (function () {
       );
     }
 
+    /* Where starters are edited: Class Management on a computer. A host can
+       pass onEditStarters; the phone, which cannot edit them, says so. */
+    function canEditStarters() {
+      return typeof opts.onEditStarters === 'function' || (typeof Router !== 'undefined' && !!Router.navigate);
+    }
+    function editStarters() {
+      clearMenus();
+      if (typeof opts.onEditStarters === 'function') {
+        opts.onEditStarters(cid);
+        return;
+      }
+      closeDialog();
+      if (typeof Router !== 'undefined' && Router.navigate) Router.navigate('/dashboard?manage=starters');
+    }
+    function starterFooterHtml() {
+      if (canEditStarters()) {
+        return (
+          '<div class="obsc-item obsc-item-edit" role="option" tabindex="-1" aria-selected="false" data-obsc="editStarters">' +
+          '<span class="obsc-check" aria-hidden="true"></span><span class="obsc-item-label">Edit starters…</span></div>'
+        );
+      }
+      return '<div class="obsc-menu-note">Add your own in Class Management on a computer.</div>';
+    }
+    function starterHint(t) {
+      var info = t.sentiment && typeof OBS_SENTIMENTS !== 'undefined' && OBS_SENTIMENTS[t.sentiment];
+      return info ? info.label : '';
+    }
+
     function menuHtml(name) {
       var h = '';
       var id = '';
-      if (name === 'students') {
+      if (name === 'starters') {
+        id = p + 'starter-dropdown';
+        var starters = starterList(cid);
+        if (starters.length) h += search('Search starters…');
+        h += '<div class="obsc-menu-list">';
+        if (!starters.length) h += '<div class="obsc-menu-empty">This class has no sentence starters yet.</div>';
+        starters.forEach(function (t) {
+          h += item('pickStarter', t.id, t.text, { search: t.text, hint: starterHint(t) });
+        });
+        h += starterFooterHtml();
+        h += '</div>';
+      } else if (name === 'students') {
         id = p + 'student-dropdown';
         h += search('Search students…') + '<div class="obsc-menu-list">';
         studentList(cid).forEach(function (s) {
@@ -739,7 +842,35 @@ window.ObsCapture = (function () {
       if (!sg) return '';
       var h = '';
       if (sg.kind === '/') {
-        h += '<div class="obsc-menu-empty">No sentence starters yet.</div>';
+        if (!sg.items.length) {
+          h += starterList(cid).length
+            ? '<div class="obsc-menu-empty">No starter matches “' + _esc(sg.query) + '”.</div>'
+            : '<div class="obsc-menu-empty">This class has no sentence starters yet.</div>';
+        }
+        sg.items.forEach(function (it, i) {
+          h +=
+            '<div class="obsc-item' +
+            (i === sg.index ? ' is-active' : '') +
+            '" role="option" aria-selected="' +
+            (i === sg.index) +
+            '" data-obsc="pickSuggest" data-value="' +
+            i +
+            '"><span class="obsc-item-label">' +
+            _esc(it.label) +
+            '</span>' +
+            (it.hint ? '<span class="obsc-item-hint">' + _esc(it.hint) + '</span>' : '') +
+            '</div>';
+        });
+        if (canEditStarters()) {
+          h +=
+            '<div class="obsc-item obsc-item-edit' +
+            (sg.index === sg.items.length ? ' is-active' : '') +
+            '" role="option" aria-selected="' +
+            (sg.index === sg.items.length) +
+            '" data-obsc="editStarters"><span class="obsc-item-label">Edit starters…</span></div>';
+        } else {
+          h += '<div class="obsc-menu-note">Add your own in Class Management on a computer.</div>';
+        }
       } else if (!sg.items.length) {
         return '';
       } else {
@@ -759,7 +890,9 @@ window.ObsCapture = (function () {
         });
       }
       return (
-        '<div class="obsc-menu obsc-suggest" id="' +
+        '<div class="obsc-menu obsc-suggest' +
+        (sg.kind === '/' ? ' obsc-suggest-starters' : '') +
+        '" id="' +
         p +
         'capture-suggest"><div class="obsc-menu-list" role="listbox" aria-label="Suggestions">' +
         h +
@@ -895,10 +1028,45 @@ window.ObsCapture = (function () {
         items = matchTypes(tok.query).map(function (k) {
           return { label: OBS_SENTIMENTS[k] ? OBS_SENTIMENTS[k].label : k, value: k };
         });
+      } else if (tok.kind === '/') {
+        items = matchStarters(tok.query, starterList(cid))
+          .slice(0, 8)
+          .map(function (t) {
+            return { label: t.text, value: t.id, hint: starterHint(t) };
+          });
       }
       state.menu = null;
-      state.suggest = { kind: tok.kind, start: tok.start, end: tok.end, items: items, index: 0 };
+      // With no starter to pick, nothing is highlighted, so Enter still adds
+      // the observation instead of leaving for Class Management.
+      var index = tok.kind === '/' && !items.length ? -1 : 0;
+      state.suggest = { kind: tok.kind, query: tok.query, start: tok.start, end: tok.end, items: items, index: index };
       render();
+    }
+
+    /* The starter replaces the /token, or goes in at the caret. */
+    function useStarter(starterId, range) {
+      var t = starterList(cid).find(function (x) {
+        return x.id === starterId;
+      });
+      if (!t) return;
+      applyStarter(state, t);
+      var caret = typeof input.selectionStart === 'number' ? input.selectionStart : input.value.length;
+      var start = range ? range.start : caret;
+      var end = range ? range.end : typeof input.selectionEnd === 'number' ? input.selectionEnd : caret;
+      var out = insertText(input.value, t.text, start, end);
+      input.value = out.value;
+      input.classList.remove('obsc-input-empty');
+      input.removeAttribute('aria-invalid');
+      state.suggest = null;
+      state.menu = null;
+      saveDraft();
+      render();
+      _focus(input);
+      try {
+        input.setSelectionRange(out.caret, out.caret);
+      } catch (e) {
+        /* not focusable yet */
+      }
     }
 
     function applyPick(kind, value) {
@@ -914,7 +1082,16 @@ window.ObsCapture = (function () {
 
     function pickSuggest(i) {
       var sg = state.suggest;
-      if (!sg || !sg.items[i]) return;
+      if (!sg) return;
+      if (sg.kind === '/' && i === sg.items.length && canEditStarters()) {
+        editStarters();
+        return;
+      }
+      if (!sg.items[i]) return;
+      if (sg.kind === '/') {
+        useStarter(sg.items[i].value, { start: sg.start, end: sg.end });
+        return;
+      }
       applyPick(sg.kind, sg.items[i].value);
       var v = input.value;
       var before = v.slice(0, sg.start);
@@ -1098,6 +1275,8 @@ window.ObsCapture = (function () {
         state.level = val ? Number(val) : null;
         closeMenu(true);
       } else if (act === 'pickSuggest') pickSuggest(Number(val));
+      else if (act === 'pickStarter') useStarter(val, null);
+      else if (act === 'editStarters') editStarters();
       else if (act === 'add') submit();
       else if (act === 'flag') {
         if (typeof isStudentFlagged === 'function' && !isStudentFlagged(cid, val) && typeof toggleFlag === 'function') {
@@ -1164,15 +1343,18 @@ window.ObsCapture = (function () {
     function onKeydown(e) {
       if (e.target === input) {
         var sg = state.suggest;
-        if (sg && sg.items.length) {
+        // The '/' list ends with "Edit starters…", which the arrows reach too.
+        var rows = sg ? sg.items.length + (sg.kind === '/' && canEditStarters() ? 1 : 0) : 0;
+        if (sg && rows) {
           if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
             e.preventDefault();
             e.stopPropagation();
-            sg.index = (sg.index + (e.key === 'ArrowDown' ? 1 : -1) + sg.items.length) % sg.items.length;
+            var from = sg.index < 0 ? (e.key === 'ArrowDown' ? -1 : 0) : sg.index;
+            sg.index = (from + (e.key === 'ArrowDown' ? 1 : -1) + rows) % rows;
             render();
             return;
           }
-          if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Tab') {
+          if (((e.key === 'Enter' && !e.shiftKey) || e.key === 'Tab') && sg.index >= 0) {
             if (!e.isComposing) {
               e.preventDefault();
               e.stopPropagation();
@@ -1397,7 +1579,11 @@ window.ObsCapture = (function () {
     competencyItems: competencyItems,
     competencyLabel: competencyLabel,
     levelLabel: levelLabel,
+    starterList: starterList,
     _helpers: {
+      matchStarters: matchStarters,
+      applyStarter: applyStarter,
+      insertText: insertText,
       parseShorthand: parseShorthand,
       tokenAt: tokenAt,
       matchStudents: matchStudents,

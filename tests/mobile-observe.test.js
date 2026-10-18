@@ -619,3 +619,87 @@ describe('MObserve feed pills and Undo', () => {
     vi.useRealTimers();
   });
 });
+
+/* ── Quick menu: the class's sentence starters ─────────────── */
+describe('Quick menu starters', () => {
+  const STARTERS = [
+    {
+      id: 'ot1',
+      text: 'Explained a model to the table',
+      sentiment: 'strength',
+      context: 'small-group',
+      dims: ['cc:1'],
+    },
+    { id: 'ot2', text: 'Needed a reminder to start', sentiment: 'growth', context: null, dims: ['tag:Lab safety'] },
+  ];
+
+  // A tap closes the sheet and shows a toast; neither matters here.
+  function tap(cid, key) {
+    const keep = {
+      dismissSheet: MComponents.dismissSheet,
+      showToast: MComponents.showToast,
+      haptic: MComponents.haptic,
+    };
+    Object.assign(MComponents, { dismissSheet() {}, showToast() {}, haptic() {} });
+    try {
+      withSheet(() => MObserve.quickPost(cid, 'stu1', key));
+    } finally {
+      Object.assign(MComponents, keep);
+    }
+  }
+
+  function menuHtml(cid) {
+    let html = '';
+    withSheet(sheet => {
+      MObserve.presentQuickMenu(cid, 'stu1');
+      html = sheet.innerHTML;
+    });
+    return html;
+  }
+
+  it('lists the class starters in order instead of the fixed six', () => {
+    mockDataLayer({ getObservationTemplates: () => STARTERS });
+    const html = menuHtml(CID);
+    const texts = [...html.matchAll(/data-template="([^"]+)"><span>([^<]+)<\/span>/g)].map(m => [m[1], m[2]]);
+    expect(texts).toEqual([
+      ['ot1', 'Explained a model to the table'],
+      ['ot2', 'Needed a reminder to start'],
+    ]);
+    expect(html).not.toContain('Strong collaboration with peers');
+    expect(html).not.toContain('Add your own in Class Management');
+  });
+
+  it('a tap saves at once with the starter type, context and tags', () => {
+    const added = [];
+    mockDataLayer({
+      getObservationTemplates: () => STARTERS,
+      addQuickOb: (cid, sid, text, dims, sentiment, context) =>
+        added.push({ cid, sid, text, dims, sentiment, context }),
+    });
+    tap(CID, 'ot1');
+    expect(added).toEqual([
+      {
+        cid: CID,
+        sid: 'stu1',
+        text: 'Explained a model to the table',
+        dims: ['cc:1'],
+        sentiment: 'strength',
+        context: 'small-group',
+      },
+    ]);
+  });
+
+  it('a class with no starters gets the six suggestions and a line saying where to add more', () => {
+    const added = [];
+    mockDataLayer({
+      getObservationTemplates: () => [],
+      addQuickOb: (cid, sid, text, dims, sentiment) => added.push({ text, dims, sentiment }),
+    });
+    const html = menuHtml(CID);
+    OBS_STARTER_SUGGESTIONS.forEach(t => expect(html).toContain(t.text));
+    expect(html).toContain('Add your own in Class Management on a computer.');
+    expect(MObserve.quickStarters(CID).suggested).toBe(true);
+    tap(CID, 'suggested-1');
+    expect(added).toEqual([{ text: 'Asked a great question in class', dims: ['curiosity'], sentiment: 'strength' }]);
+  });
+});

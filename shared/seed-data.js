@@ -3163,6 +3163,23 @@ function seedIfNeeded() {
     saveTermRatings('sci8', current(sci8TR));
   }
 
+  // Science 8 has the six suggested sentence starters as its own bank. A
+  // demo saved before the bank existed gets them once; a demo teacher who
+  // deletes them all keeps an empty list.
+  if (
+    COURSES.sci8 &&
+    typeof saveObservationTemplates === 'function' &&
+    typeof OBS_STARTER_SUGGESTIONS !== 'undefined' &&
+    localStorage.getItem('gb-obs-templates-sci8') === null
+  ) {
+    saveObservationTemplates(
+      'sci8',
+      OBS_STARTER_SUGGESTIONS.map(function (t, i) {
+        return Object.assign({}, structuredClone(t), { id: 'ot-sci8-' + (i + 1) });
+      }),
+    );
+  }
+
   // ── Migrate old gb-notes into gb-quick-obs (one-time) ──
   Object.keys(COURSES).forEach(cid => {
     const oldNotes = getNotes(cid);

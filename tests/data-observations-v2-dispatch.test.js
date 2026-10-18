@@ -502,6 +502,7 @@ describe('v2 observation / template / custom-tag dispatch', () => {
         p_default_sentiment: 'strength',
         p_default_context_type: 'class',
         p_display_order: 2,
+        p_default_dims: null,
         p_idempotency_key: expect.any(String),
       });
     });

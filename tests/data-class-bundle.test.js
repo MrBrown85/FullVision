@@ -238,6 +238,12 @@ function legacyServer() {
   };
 }
 
+// Sentence starters, in the order the server sends them (display_order).
+// null = a server from before the starters bank, which sends no list.
+const TPL1 = 'c0000000-0000-4000-8000-000000000091';
+const TPL2 = 'c0000000-0000-4000-8000-000000000092';
+var bundleTemplates = null;
+
 function bundleServer() {
   return {
     rpc(name) {
@@ -288,6 +294,7 @@ function bundleServer() {
           term_ratings: [],
           report_config: null,
           custom_tags: [],
+          observation_templates: bundleTemplates,
         },
       });
     },
@@ -507,6 +514,61 @@ describe('get_class_bundle', () => {
     expect(saves).toHaveLength(1);
     expect(saves[0].p_term).toBe(1);
     expect(saves[0].p_payload.narrative_html).toBe('<p>Curious and kind.</p>');
+  });
+
+  it('loads the class sentence starters, in order, with their tags', async () => {
+    resetClass();
+    globalThis.__FV_CLASS_BUNDLE = true;
+    globalThis.getSupabase = bundleServer;
+    bundleTemplates = [
+      {
+        id: TPL1,
+        body: 'Asked a great question',
+        default_sentiment: 'strength',
+        default_context_type: null,
+        default_dims: ['curiosity'],
+        display_order: 0,
+      },
+      {
+        id: TPL2,
+        body: 'Needed a reminder to start',
+        default_sentiment: 'growth',
+        default_context_type: 'independent',
+        default_dims: [],
+        display_order: 1,
+      },
+    ];
+    try {
+      await initData(CID);
+    } finally {
+      bundleTemplates = null;
+    }
+    expect(getObservationTemplates(CID)).toEqual([
+      { id: TPL1, text: 'Asked a great question', sentiment: 'strength', context: null, dims: ['curiosity'] },
+      { id: TPL2, text: 'Needed a reminder to start', sentiment: 'growth', context: 'independent', dims: [] },
+    ]);
+    expect(JSON.parse(localStorage.getItem('gb-obs-templates-' + CID))).toHaveLength(2);
+    // The loaded list is the baseline: saving it again sends nothing.
+    var sent = [];
+    globalThis.getSupabase = () => ({
+      rpc(name, payload) {
+        sent.push(name);
+        return Promise.resolve({ data: null, error: null });
+      },
+    });
+    saveObservationTemplates(CID, getObservationTemplates(CID));
+    await new Promise(r => setTimeout(r, 0));
+    expect(sent).toEqual([]);
+  });
+
+  it('keeps this device’s starters when the server sends no list', async () => {
+    resetClass();
+    var local = [{ id: TPL1, text: 'Saved here', sentiment: null, context: null, dims: [] }];
+    localStorage.setItem('gb-obs-templates-' + CID, JSON.stringify(local));
+    globalThis.__FV_CLASS_BUNDLE = true;
+    globalThis.getSupabase = bundleServer;
+    await initData(CID);
+    expect(getObservationTemplates(CID)).toEqual(local);
   });
 
   it('falls back to the separate reads when the server lacks the function', async () => {

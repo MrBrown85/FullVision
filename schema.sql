@@ -350,6 +350,7 @@ create table observation_template (
   body                  text        not null,
   default_sentiment     text,
   default_context_type  text,
+  default_dims          text[]      not null default '{}',           -- tag keys the starter adds, as observation.dims
   is_seed               boolean     not null default false,         -- seeds are immutable
   display_order         integer     not null default 0,
   created_at            timestamptz not null default now(),
@@ -586,7 +587,9 @@ create table fv_idempotency (
 --                                                 -- 'level' sets it, null clears, absent keeps
 --   delete_observation(p_id uuid)
 --   upsert_observation_template(p_id, p_course_id, p_body, p_default_sentiment,
---                               p_default_context_type, p_display_order)
+--                               p_default_context_type, p_display_order,
+--                               p_idempotency_key uuid, p_default_dims text[])
+--                               -- null p_default_dims keeps the saved tags on update
 --   delete_observation_template(p_id uuid)
 --   create_custom_tag(p_course_id uuid, p_label text)
 --
@@ -618,6 +621,7 @@ create table fv_idempotency (
 -- Reads (hot path):
 --   list_teacher_courses()
 --   get_gradebook(p_course_id uuid)                                    -- the single boot-path RPC
+--   get_class_bundle(p_course_id uuid, p_if_version bigint)            -- one class in one call; includes observation_templates (20261019)
 --   get_class_dashboard(p_course_id uuid)
 --   get_student_profile(p_enrollment_id uuid)
 --   list_course_student_profiles(p_course_id uuid)

@@ -636,6 +636,24 @@ const OBS_CONTEXTS = {
   discussion: { icon: '💬', label: 'Discussion' },
 };
 
+/* The six sentence starters offered to a class that has none, and Demo
+   Mode's Science 8 bank. They reach a teacher's class only when the teacher
+   presses "Add these to this class" (docs/DECISIONS.md, "Observations
+   (2026-10-18)"). Copy before changing. */
+const OBS_STARTER_SUGGESTIONS = [
+  { text: 'Strong collaboration with peers', sentiment: 'strength', context: null, dims: ['collaboration'] },
+  { text: 'Asked a great question in class', sentiment: 'strength', context: null, dims: ['curiosity'] },
+  {
+    text: 'Focused and on-task during independent work',
+    sentiment: 'strength',
+    context: null,
+    dims: ['selfRegulation'],
+  },
+  { text: 'Needed additional support to stay on task', sentiment: 'growth', context: null, dims: ['selfRegulation'] },
+  { text: 'Showed resilience working through a challenge', sentiment: 'strength', context: null, dims: ['resilience'] },
+  { text: 'Demonstrated respect for diverse perspectives', sentiment: 'strength', context: null, dims: ['respect'] },
+];
+
 /* Observation UI shows type, context and tags as text pills. The icon fields
    above and OBS_ICONS are kept for now but no longer rendered
    (docs/DECISIONS.md, "Observations (2026-10-18)"). Tag pills keep a colour

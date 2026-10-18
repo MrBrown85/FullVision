@@ -79,6 +79,7 @@ const _cache = {
   observations: {}, // keyed by cid
   termRatings: {}, // keyed by cid
   customTags: {}, // keyed by cid
+  observationTemplates: {}, // keyed by cid — sentence starters
   notes: {}, // keyed by cid
   reportConfig: {}, // keyed by cid
   studentProfileSummaries: {}, // keyed by cid
@@ -103,6 +104,7 @@ const _DATA_KEYS = {
   observations: 'quick-obs',
   termRatings: 'term-ratings',
   customTags: 'custom-tags',
+  observationTemplates: 'obs-templates',
   notes: 'notes',
   reportConfig: 'report-config',
   studentProfileSummaries: 'student-profile-summaries',
@@ -575,6 +577,13 @@ function _migrateCourseDataLocalToCanonical(localId, canonicalId) {
       saveCustomTags(canonicalId, userEdits.customTags);
     } catch (e) {
       console.warn('Pending-cid replay saveCustomTags failed', e);
+    }
+  }
+  if (userEdits.observationTemplates) {
+    try {
+      saveObservationTemplates(canonicalId, userEdits.observationTemplates);
+    } catch (e) {
+      console.warn('Pending-cid replay saveObservationTemplates failed', e);
     }
   }
   // Goals/reflections/observations/flags currently have LS-only bulk saves
@@ -1502,6 +1511,7 @@ var _SERVER_STATE_FIELDS = {
   learningMaps: true,
   notes: true,
   customTags: true,
+  observationTemplates: true,
   scores: true,
   statuses: true,
   rubrics: true,
@@ -1931,6 +1941,8 @@ var _P_ID_KINDS = {
   delete_category: 'category',
   update_observation: 'observation',
   delete_observation: 'observation',
+  upsert_observation_template: 'observationTemplate',
+  delete_observation_template: 'observationTemplate',
 };
 var _LEARNING_MAP_KINDS = { subject: true, group: true, section: true, tag: true };
 
@@ -2290,6 +2302,10 @@ function _rekey(cid, kind, localId, serverId, extra) {
         if (_rekeyRowId(obs[sid], localId, serverId)) changed = true;
       });
       return changed;
+    });
+  } else if (kind === 'observationTemplate') {
+    _rekeyField('observationTemplates', cid, function (rows) {
+      return _rekeyRowId(rows, localId, serverId);
     });
   }
   if (typeof clearProfCache === 'function') clearProfCache();
@@ -3529,6 +3545,7 @@ function _v2GradebookToCache(cid, payload) {
   _keepOrDefaultField(cid, 'reflections', {});
   _keepOrDefaultField(cid, 'overrides', {});
   _keepOrDefaultField(cid, 'studentProfileSummaries', {});
+  _keepOrDefaultField(cid, 'observationTemplates', []);
 
   _cache.notes[cid] = _safeParseLS('gb-notes-' + cid, {});
   _cache.modules[cid] = _safeParseLS('gb-modules-' + cid, _safeParseLS('gb-units-' + cid, [])) || [];
@@ -3721,6 +3738,10 @@ function _bundleToCache(cid, bundle) {
     );
   }
   if (Array.isArray(bundle.custom_tags)) _persistLoadedField(cid, 'customTags', bundle.custom_tags.slice());
+  // A server without the starters bank sends no list; keep this device's.
+  if (Array.isArray(bundle.observation_templates)) {
+    _persistLoadedField(cid, 'observationTemplates', _observationTemplatesFromServer(bundle.observation_templates));
+  }
   _applyBundleCourseConfig(cid, bundle.course_config, bundle.gradebook && bundle.gradebook.course);
 
   // A field skipped because the teacher edited it mid-load is fetched again;
@@ -4067,6 +4088,7 @@ function _loadCourseFromLS(cid) {
   _cache.observations[cid] = _safeParseLS('gb-quick-obs-' + cid, {});
   _cache.termRatings[cid] = _safeParseLS('gb-term-ratings-' + cid, {});
   _cache.customTags[cid] = _safeParseLS('gb-custom-tags-' + cid, []);
+  _cache.observationTemplates[cid] = _safeParseLS('gb-obs-templates-' + cid, []);
   _cache.courseConfigs[cid] = _safeParseLS('gb-courseconfig-' + cid, {});
   _cache.reportConfig[cid] = _safeParseLS('gb-report-config-' + cid, null);
   _cache.studentProfileSummaries[cid] = _safeParseLS('gb-student-profile-summaries-' + cid, {});
@@ -5414,6 +5436,7 @@ function _clearCourseLocalState(id) {
     'goals',
     'reflections',
     'custom-tags',
+    'obs-templates',
     'report-config',
     'categories',
     'student-profile-summaries',
@@ -8440,9 +8463,228 @@ window.updateObservationRich = function (obId, patch, joins) {
   );
 };
 
-/* Observation templates — seeds (is_seed=true) are immutable; these helpers
-   only touch teacher-owned custom templates (Q4). */
-window.upsertObservationTemplate = function (cid, payload) {
+/* ── Sentence starters (observation_template) ─────────────────────────────
+   A class's bank of starters for the capture strip's "/" menu and
+   "+ Starter" chip, and the phone's quick menu (docs/DECISIONS.md,
+   "Observations (2026-10-18)", item 3). A row is
+   { id, text, sentiment, context, dims }; the list order is the display
+   order. The list loads with the class bundle and saves like modules: it is
+   diffed against the server baseline and each changed row goes out through
+   the outbox. A new row has a local id ('ot…') until its upsert lands. */
+var _TEMPLATE_SENTIMENTS = { strength: true, growth: true, concern: true };
+
+function _cleanObservationTemplate(row) {
+  row = row || {};
+  var dims = [];
+  (Array.isArray(row.dims) ? row.dims : []).forEach(function (k) {
+    if (k && typeof k === 'string' && dims.indexOf(k) < 0) dims.push(k);
+  });
+  return {
+    id: row.id,
+    text: String(row.text || '').trim(),
+    sentiment: _TEMPLATE_SENTIMENTS[row.sentiment] ? row.sentiment : null,
+    context: row.context || null,
+    dims: dims,
+  };
+}
+
+function _observationTemplatesFromServer(rows) {
+  return (rows || [])
+    .filter(function (r) {
+      return r && r.id;
+    })
+    .map(function (r) {
+      return _cleanObservationTemplate({
+        id: r.id,
+        text: r.body,
+        sentiment: r.default_sentiment,
+        context: r.default_context_type,
+        dims: r.default_dims,
+      });
+    });
+}
+
+function getObservationTemplates(cid) {
+  if (_cache.observationTemplates[cid] !== undefined) return _cache.observationTemplates[cid] || [];
+  return _safeParseLS('gb-obs-templates-' + cid, []) || [];
+}
+
+/* Returns false when this device's storage refused the list. */
+function saveObservationTemplates(cid, arr) {
+  arr = (arr || []).map(_cleanObservationTemplate);
+  var prev = _loadPersistedCourseFieldSnapshot(
+    'observationTemplates',
+    cid,
+    (_cache.observationTemplates && _cache.observationTemplates[cid]) || [],
+  );
+  var lsOk = _saveCourseField('observationTemplates', cid, arr);
+  if (!_writesEnabled() || !_isUuid(cid)) return lsOk;
+  _registerLocalRows(cid, 'observationTemplate', arr, 'upsert_observation_template');
+  _persistObservationTemplatesToCanonical(cid, prev, arr);
+  return lsOk;
+}
+
+var _templateSaveQueue = {};
+
+function _observationTemplateChanged(before, after, beforeIdx, afterIdx) {
+  return (
+    (before.text || '') !== (after.text || '') ||
+    (before.sentiment || null) !== (after.sentiment || null) ||
+    (before.context || null) !== (after.context || null) ||
+    JSON.stringify(before.dims || []) !== JSON.stringify(after.dims || []) ||
+    beforeIdx !== afterIdx
+  );
+}
+
+function _persistObservationTemplatesToCanonical(cid, prev, arr) {
+  if (!getSupabase()) return;
+  var tail = _templateSaveQueue[cid] || Promise.resolve();
+  var next = tail.then(function () {
+    var hasBaseline = _hasServerState('observationTemplates', cid);
+    prev = _serverStateOr('observationTemplates', cid, prev) || [];
+    arr = _cache.observationTemplates[cid] || arr;
+    var prevIdx = {};
+    prev.forEach(function (t, i) {
+      if (t && t.id) prevIdx[_resolveKnownId('observationTemplate', t.id)] = i;
+    });
+    var kept = {};
+    var ops = [];
+    arr.forEach(function (t, idx) {
+      if (!t || !t.id) return;
+      var id = _resolveKnownId('observationTemplate', t.id);
+      kept[id] = true;
+      var pi = prevIdx[id];
+      var p = pi != null ? prev[pi] : null;
+      var rec = _isUuid(id)
+        ? null
+        : _registerPendingCreate(cid, 'observationTemplate', id, 'upsert_observation_template');
+      var landedOrQueued = !rec || rec.queued;
+      // Against a confirmed baseline, an unchanged starter needs no write.
+      if (hasBaseline && p && landedOrQueued && !_observationTemplateChanged(p, t, pi, idx)) return;
+      var payload = {
+        id: id,
+        body: t.text,
+        defaultSentiment: t.sentiment,
+        defaultContextType: t.context,
+        defaultDims: t.dims || [],
+        displayOrder: idx,
+      };
+      if (rec && !rec.queued) {
+        // The create. Edits made before it lands go out as updates naming the
+        // local id; they wait behind it and are re-keyed when it lands.
+        payload.id = null;
+        ops.push(
+          window.upsertObservationTemplate(cid, payload, { entryId: rec.entryId }).then(function (res) {
+            if (res && !res.error) _onCreateLanded(rec.entryId, res.data);
+          }),
+        );
+      } else {
+        ops.push(window.upsertObservationTemplate(cid, payload));
+      }
+    });
+    prev.forEach(function (t) {
+      if (!t || !t.id) return;
+      var id = _resolveKnownId('observationTemplate', t.id);
+      if (kept[id]) return;
+      if (_isUuid(id)) {
+        ops.push(window.deleteObservationTemplate(id));
+        return;
+      }
+      var rec = _pendingCreateFor('observationTemplate', id);
+      if (rec && rec.queued) ops.push(window.deleteObservationTemplate(id));
+    });
+    // A starter removed before its create was sent: nothing to undo on the
+    // server, so forget its local id.
+    var pending = _idmap()[cid] || {};
+    Object.keys(pending).forEach(function (key) {
+      var rec = pending[key];
+      if (rec && rec.kind === 'observationTemplate' && !rec.queued && !kept[rec.localId]) _unregisterPendingCreate(rec);
+    });
+    _rememberServerState('observationTemplates', cid, arr);
+    return Promise.all(ops).catch(function (err) {
+      console.warn('Sentence starter sync failed for one or more rows:', err);
+    });
+  });
+  _templateSaveQueue[cid] = _trackPendingSync(next);
+  return _templateSaveQueue[cid];
+}
+
+function _newObservationTemplateId() {
+  return 'ot' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+/* Add starters at the end of the class's list. rows: [{ text, sentiment,
+   context, dims }]. Returns the new rows, or null when storage refused. */
+function addObservationTemplates(cid, rows) {
+  var added = (rows || [])
+    .map(function (r) {
+      return _cleanObservationTemplate(Object.assign({}, r, { id: _newObservationTemplateId() }));
+    })
+    .filter(function (t) {
+      return t.text;
+    });
+  if (!added.length) return [];
+  var ok = saveObservationTemplates(cid, getObservationTemplates(cid).concat(added));
+  return ok === false ? null : added;
+}
+
+function addObservationTemplate(cid, row) {
+  var added = addObservationTemplates(cid, [row]);
+  return added && added.length ? added[0] : null;
+}
+
+function _templateIndex(list, cid, id) {
+  var want = _resolveKnownId('observationTemplate', id);
+  for (var i = 0; i < list.length; i++) {
+    if (list[i].id === id || list[i].id === want || _resolveKnownId('observationTemplate', list[i].id) === want)
+      return i;
+  }
+  return -1;
+}
+
+function updateObservationTemplate(cid, id, patch) {
+  var list = getObservationTemplates(cid).slice();
+  var i = _templateIndex(list, cid, id);
+  if (i < 0) return false;
+  list[i] = _cleanObservationTemplate(Object.assign({}, list[i], patch || {}, { id: list[i].id }));
+  return saveObservationTemplates(cid, list);
+}
+
+function removeObservationTemplate(cid, id) {
+  var list = getObservationTemplates(cid).slice();
+  var i = _templateIndex(list, cid, id);
+  if (i < 0) return false;
+  list.splice(i, 1);
+  return saveObservationTemplates(cid, list);
+}
+
+/* dir -1 moves the starter up one place, +1 down. */
+function moveObservationTemplate(cid, id, dir) {
+  var list = getObservationTemplates(cid).slice();
+  var i = _templateIndex(list, cid, id);
+  var j = i + (dir < 0 ? -1 : 1);
+  if (i < 0 || j < 0 || j >= list.length) return false;
+  var t = list[i];
+  list[i] = list[j];
+  list[j] = t;
+  return saveObservationTemplates(cid, list);
+}
+
+/* The current id of a starter a page may still hold by its local id. */
+function resolveObservationTemplateId(cid, id) {
+  return _resolveKnownId('observationTemplate', id);
+}
+
+/* Duplicate Class: the copy gets the source's starters as new rows. */
+function copyObservationTemplates(srcCid, dstCid) {
+  var rows = getObservationTemplates(srcCid).map(function (t) {
+    return { text: t.text, sentiment: t.sentiment, context: t.context, dims: (t.dims || []).slice() };
+  });
+  return rows.length ? addObservationTemplates(dstCid, rows) : [];
+}
+
+/* The RPCs. p_default_dims null leaves a starter's tags alone on update. */
+window.upsertObservationTemplate = function (cid, payload, options) {
   var sb = getSupabase();
   if (!sb) return Promise.resolve();
   if (!_isUuid(cid)) return Promise.resolve();
@@ -8450,15 +8692,18 @@ window.upsertObservationTemplate = function (cid, payload) {
   return _writeRpc(
     'upsert_observation_template',
     _stampIdempotencyKey('upsert_observation_template', {
-      p_id: _isUuid(payload.id) ? payload.id : null,
+      p_id: _isSendableId(payload.id) ? payload.id : null,
       p_course_id: cid,
       p_body: payload.body || '',
       p_default_sentiment: payload.defaultSentiment || null,
       p_default_context_type: payload.defaultContextType || null,
       p_display_order: payload.displayOrder != null ? Number(payload.displayOrder) : null,
+      p_default_dims: Array.isArray(payload.defaultDims) ? payload.defaultDims.slice() : null,
     }),
+    options,
   ).then(function (res) {
-    if (res.error) console.warn('upsert_observation_template failed:', res.error);
+    if (res && res.error && !res.error.handledSessionExpired)
+      console.warn('upsert_observation_template failed:', res.error);
     return res;
   });
 };
@@ -8466,9 +8711,10 @@ window.upsertObservationTemplate = function (cid, payload) {
 window.deleteObservationTemplate = function (tplId) {
   var sb = getSupabase();
   if (!sb) return Promise.resolve();
-  if (!_isUuid(tplId)) return Promise.resolve();
+  if (!_isSendableId(tplId)) return Promise.resolve();
   return _writeRpc('delete_observation_template', { p_id: tplId }).then(function (res) {
-    if (res.error) console.warn('delete_observation_template failed:', res.error);
+    if (res && res.error && !res.error.handledSessionExpired)
+      console.warn('delete_observation_template failed:', res.error);
     return res;
   });
 };
@@ -9827,7 +10073,7 @@ window.loadSeedIfNeeded = function () {
   // Lazy-load the script, then seed
   return new Promise(function (resolve) {
     var s = document.createElement('script');
-    s.src = '/shared/seed-data.js?v=42';
+    s.src = '/shared/seed-data.js?v=43';
     s.onload = function () {
       if (typeof seedIfNeeded === 'function') seedIfNeeded();
       resolve();

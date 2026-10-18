@@ -390,6 +390,23 @@ span.obsc-chip-label {
 .obsc-suggest {
   width: 260px;
 }
+.obsc-suggest-starters,
+.obsc-menu[data-menu='starters'] {
+  width: 360px;
+  max-width: 100%;
+}
+.obsc-item-hint {
+  margin-left: auto;
+  padding-left: 8px;
+  flex: none;
+  font-size: var(--text-xs, 12px);
+  color: var(--text-3);
+}
+.obsc-item-edit {
+  border-top: 1px solid var(--divider-subtle);
+  color: var(--active);
+  font-weight: 600;
+}
 
 /* ── Pills on cards ──────────────────────────────────────── */
 .obsc-pill-competency {
