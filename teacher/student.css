@@ -332,7 +332,17 @@
   align-items: flex-start;
   padding: 10px 12px;
   border-radius: var(--radius);
+  border-left: 3px solid transparent;
   transition: background 0.15s;
+}
+.note-inline[data-sentiment='strength'] {
+  border-left-color: var(--score-3);
+}
+.note-inline[data-sentiment='growth'] {
+  border-left-color: var(--active);
+}
+.note-inline[data-sentiment='concern'] {
+  border-left-color: var(--score-2);
 }
 .note-inline:hover {
   background: rgba(0, 122, 255, 0.03);
@@ -347,11 +357,9 @@
   padding-top: 2px;
 }
 .note-inline-date {
-  font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
-  font-size: var(--text-2xs);
+  font-size: var(--text-xs);
   color: var(--text-3);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wide);
+  font-variant-numeric: tabular-nums;
 }
 .note-inline-body {
   flex: 1;
@@ -365,26 +373,12 @@
 }
 .note-inline-dims {
   display: flex;
-  gap: 3px;
+  gap: 4px;
   margin-top: 4px;
   flex-wrap: wrap;
 }
-.note-dim-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 1px 6px;
-  border-radius: var(--radius);
-  font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
-  font-size: var(--text-2xs);
-  font-weight: 600;
-  text-transform: uppercase;
-  background: var(--overlay-hover);
-  color: var(--text-3);
-}
-.note-dim-tag-icon {
-  font-size: var(--text-xs);
-  line-height: 1;
+.note-inline-dims:empty {
+  display: none;
 }
 .note-assign-badge {
   display: inline-flex;
@@ -489,11 +483,6 @@
   color: var(--text-3);
   font-size: var(--text-base);
   line-height: 1.5;
-}
-.notes-empty-icon {
-  font-size: var(--text-3xl);
-  margin-bottom: 6px;
-  opacity: 0.5;
 }
 
 /* Tag expand chevron */

@@ -116,3 +116,17 @@ Context: building a rubric meant typing every descriptor by hand. Canvas creates
 4. **The criterion comment is a speech-bubble cell after −/+**, always visible, filled when there is a comment, with C as the shortcut on the focused row. It is its own cell because the −/+ group is redrawn on every score change.
 5. **A teacher's own wording carries to the next draft** (`migrations/20261018_competency_descriptor.sql`). Saving a rubric keeps, for each criterion with one competency, any level the teacher wrote themselves (not the plain draft), per teacher and competency. The next "From competency" or "Draft from …" for that competency, in any class, starts from it level by level. The key is the competency's short label plus a hash of its I-can text, never a tag id, so another section or next year's class finds it and a same-named competency in another grade doesn't. The last save wins. Stored on the device for Demo Mode and offline; sent through the outbox when signed in; a load never overwrites a save still in the outbox.
 6. **No AI rewrite of descriptors.** Ruled out on 2026-10-18. Descriptors come only from the I-can draft and the teacher's own saved wording.
+
+## Observations (2026-10-18)
+
+Context: a review of observation capture and display across desktop, phone, student page, dashboard and reports (`~/fullvision-observations-ux-review.md`). Build plan at `~/fullvision-observations-plan.md`.
+
+1. **Tags are stored as `observation.dims text[]`**, the same string keys the client already uses (`engagement`, `cc:3`, `tag:Lab safety`). Not the join tables: `observation_tag` points at the learning map and `custom_tag` is the teacher's tag library. `migrations/20261018_observation_dims.sql`.
+2. **The feed's default is a card list** with a coloured type rail, the date on each card and text pills. The sticky-note grid stays as a view toggle, remembered per device.
+3. **Capture is roster-first, with one chip strip on every surface** (Observations page, Assignments comment popover, student page, gradebook cell, phone sheet). Inline shorthand (`@name`, `#tag`, `!type`, `/starter`). Sentence starters are a per-class bank in `observation_template`, editable, and replace the phone's six fixed lines. The phone gets a class-sweep screen.
+4. **The dashboard's Observations widget becomes "N students have no observation in 3+ weeks"** with their names, plus a students-by-week coverage grid. The three numbers go.
+5. **An observation can link to a learning-map competency** (`observation_tag`) **with an optional level** ("looks Proficient"). The level is evidence only and never enters a grade. The competency card gets an evidence drawer listing scores and observations on one dated list.
+6. **The student page gets one Evidence panel** (tabs All / By competency / Assessments / Concerns) with the shared capture strip and a timeline strip above it. It replaces "Assignment Feedback" and "Notes & Observations".
+7. **Text pills replace emoji** for type, context and tags on desktop and phone. **Enter sends, Shift+Enter adds a line. Delete shows an Undo toast** instead of a two-click confirm. **Cards show "Quoted in Report N"** when a term rating quotes them, with a "not yet quoted" filter. **A concern observation offers to flag the student.**
+8. **No dictation and no photo attachments this round.**
+9. **Not decided:** whether a multi-student capture becomes one server row. The client keeps fanning out to one row per student until it is; the feed shows "with …" on each.

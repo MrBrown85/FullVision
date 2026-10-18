@@ -6,6 +6,37 @@ window.MObserve = (function () {
   var MC = window.MComponents;
   var _activeFilter = 'all'; // 'all', student id, sentiment, or dimension
 
+  /* Deleted observations stay in the data layer until their Undo toast
+     times out; until then the feed hides them. obId → timer. */
+  var _pendingDeletes = {};
+  var UNDO_MS = 6000;
+
+  /* Type, context and tags render as text pills; tags keep their colour
+     dot. */
+  function typePill(sentiment) {
+    var s = OBS_SENTIMENTS[sentiment];
+    if (!s) return '';
+    return '<span class="m-obs-type-pill" data-sentiment="' + sentiment + '">' + MC.esc(s.label) + '</span>';
+  }
+  function contextPill(context) {
+    var c = OBS_CONTEXTS[context];
+    return c ? '<span class="m-obs-context">' + MC.esc(c.label) + '</span>' : '';
+  }
+  function tagChips(dims) {
+    return (dims || [])
+      .map(function (dim) {
+        var label = typeof resolveTag === 'function' ? resolveTag(dim).label : OBS_LABELS[dim] || dim;
+        return (
+          '<span class="m-obs-tag-chip"><span class="m-obs-tag-dot" style="background:' +
+          obsTagColor(dim) +
+          '"></span>' +
+          MC.esc(label) +
+          '</span>'
+        );
+      })
+      .join('');
+  }
+
   /* ── Observation Feed Screen ────────────────────────────────── */
   function renderFeed(cid) {
     var nav = MC.navBar({ id: 'obs-feed', title: 'Observations' });
@@ -22,8 +53,6 @@ window.MObserve = (function () {
         '<button class="m-filter-pill" data-action="m-obs-filter" data-filter="sentiment:' +
         key +
         '">' +
-        s.icon +
-        ' ' +
         s.label +
         '</button>';
     });
@@ -77,22 +106,24 @@ window.MObserve = (function () {
 
   function _renderObsCards(cid, allObs, filter) {
     var students = getStudents(cid);
-    var filtered = allObs;
+    var filtered = allObs.filter(function (ob) {
+      return !_pendingDeletes[ob.id];
+    });
 
     if (filter && filter !== 'all') {
       if (filter.indexOf('student:') === 0) {
         var sid = filter.substring(8);
-        filtered = allObs.filter(function (ob) {
+        filtered = filtered.filter(function (ob) {
           return ob.studentId === sid;
         });
       } else if (filter.indexOf('sentiment:') === 0) {
         var sent = filter.substring(10);
-        filtered = allObs.filter(function (ob) {
+        filtered = filtered.filter(function (ob) {
           return ob.sentiment === sent;
         });
       } else if (filter.indexOf('dim:') === 0) {
         var dim = filter.substring(4);
-        filtered = allObs.filter(function (ob) {
+        filtered = filtered.filter(function (ob) {
           return ob.dims && ob.dims.indexOf(dim) >= 0;
         });
       }
@@ -104,7 +135,7 @@ window.MObserve = (function () {
     });
 
     if (!filtered.length) {
-      return '<div class="m-empty"><div class="m-empty-icon">📝</div><div class="m-empty-title">No Observations</div><div class="m-empty-subtitle">Tap + to record one</div></div>';
+      return '<div class="m-empty"><div class="m-empty-title">No observations</div><div class="m-empty-subtitle">Tap + to record one</div></div>';
     }
 
     var html = '';
@@ -121,18 +152,7 @@ window.MObserve = (function () {
         return s.id === ob.studentId;
       });
       var stName = st ? displayName(st) : 'Unknown';
-      var sentiment = OBS_SENTIMENTS[ob.sentiment] || {};
-      var context = OBS_CONTEXTS[ob.context] || {};
-
-      // Dimension tags
-      var tagChips = '';
-      if (ob.dims && ob.dims.length) {
-        ob.dims.forEach(function (dim) {
-          var label = OBS_LABELS[dim] || dim;
-          var icon = OBS_ICONS[dim] || '';
-          tagChips += '<span class="m-obs-tag-chip">' + icon + ' ' + MC.esc(label) + '</span>';
-        });
-      }
+      var tags = tagChips(ob.dims);
 
       var avatarColor = st ? MC.avatarColor(st.id) : '#888';
       var avatarInitials = st ? MC.avatarInitials(st) : '?';
@@ -161,12 +181,10 @@ window.MObserve = (function () {
         '<span class="m-obs-time">' +
         MC.relativeTime(ob.created) +
         '</span>' +
-        (context.label ? '<span class="m-obs-context">' + (context.icon || '') + ' ' + context.label + '</span>' : '') +
+        typePill(ob.sentiment) +
+        contextPill(ob.context) +
         '</div>' +
         '</div>' +
-        '<span class="m-obs-sentiment-icon m-post-sentiment">' +
-        (sentiment.icon || '') +
-        '</span>' +
         '<button class="m-obs-edit-btn" data-action="m-obs-edit" data-obid="' +
         ob.id +
         '" data-sid="' +
@@ -181,7 +199,7 @@ window.MObserve = (function () {
         '<div class="m-obs-text m-post-body">' +
         MC.esc(ob.text) +
         '</div>' +
-        (tagChips ? '<div class="m-obs-tags m-post-tags">' + tagChips + '</div>' : '') +
+        (tags ? '<div class="m-obs-tags m-post-tags">' + tags + '</div>' : '') +
         '</div>';
     });
 
@@ -219,17 +237,17 @@ window.MObserve = (function () {
       (opts.sentiment === 'strength' ? ' m-selected' : '') +
       '" role="radio" aria-checked="' +
       (opts.sentiment === 'strength') +
-      '" data-action="m-obs-sentiment" data-val="strength">✅ Strength</button>' +
+      '" data-action="m-obs-sentiment" data-val="strength">Strength</button>' +
       '<button class="m-sentiment-btn' +
       (opts.sentiment === 'growth' ? ' m-selected' : '') +
       '" role="radio" aria-checked="' +
       (opts.sentiment === 'growth') +
-      '" data-action="m-obs-sentiment" data-val="growth">🔄 Growth</button>' +
+      '" data-action="m-obs-sentiment" data-val="growth">Growth</button>' +
       '<button class="m-sentiment-btn' +
       (opts.sentiment === 'concern' ? ' m-selected' : '') +
       '" role="radio" aria-checked="' +
       (opts.sentiment === 'concern') +
-      '" data-action="m-obs-sentiment" data-val="concern">⚠️ Concern</button>' +
+      '" data-action="m-obs-sentiment" data-val="concern">Concern</button>' +
       '</div>' +
       '<div class="m-sheet-label">Context</div>' +
       '<div class="m-context-row" style="flex-wrap:wrap">' +
@@ -242,9 +260,7 @@ window.MObserve = (function () {
             '" data-action="m-obs-context" data-val="' +
             key +
             '">' +
-            ctx.icon +
-            ' ' +
-            ctx.label +
+            MC.esc(ctx.label) +
             '</button>'
           );
         })
@@ -258,10 +274,10 @@ window.MObserve = (function () {
           ((opts.dims || []).indexOf(dim) >= 0 ? ' m-selected' : '') +
           '" data-action="m-obs-dim" data-val="' +
           dim +
-          '">' +
-          (OBS_ICONS[dim] || '') +
-          ' ' +
-          (OBS_LABELS[dim] || dim) +
+          '"><span class="m-obs-tag-dot" style="background:' +
+          obsTagColor(dim) +
+          '"></span>' +
+          MC.esc(OBS_LABELS[dim] || dim) +
           '</button>'
         );
       }).join('') +
@@ -319,7 +335,7 @@ window.MObserve = (function () {
         sentiment: null,
         context: null,
         dims: [],
-        submitLabel: 'Add Observation',
+        submitLabel: 'Add observation',
         submitDisabled: true,
       }),
     );
@@ -357,7 +373,7 @@ window.MObserve = (function () {
         sentiment: _selectedSentiment,
         context: _selectedContext,
         dims: _selectedDims,
-        submitLabel: 'Update Observation',
+        submitLabel: 'Update observation',
         submitDisabled: false,
       }),
     );
@@ -508,51 +524,64 @@ window.MObserve = (function () {
 
   function deleteObservation(cid, sid, obId) {
     deleteQuickOb(cid, sid, obId);
-    MC.haptic();
     _refreshFeed(cid, false);
-    MC.showToast('Observation deleted');
+  }
+
+  /* One tap hides the card and offers Undo for six seconds; the delete
+     reaches the data layer when that time is up. */
+  function holdDelete(cid, sid, obId) {
+    if (!obId || !sid || _pendingDeletes[obId]) return;
+    MC.haptic();
+    _pendingDeletes[obId] = setTimeout(function () {
+      delete _pendingDeletes[obId];
+      deleteObservation(cid, sid, obId);
+    }, UNDO_MS);
+    _refreshFeed(cid, false);
+    MC.showToast('Observation deleted', {
+      duration: UNDO_MS,
+      onUndo: function () {
+        if (!_pendingDeletes[obId]) return;
+        clearTimeout(_pendingDeletes[obId]);
+        delete _pendingDeletes[obId];
+        _refreshFeed(cid, false);
+      },
+    });
   }
 
   /* ── Quick-Post Templates ──────────────────────────────────── */
   var QUICK_TEMPLATES = [
     {
       key: 'collab',
-      icon: '🤝',
       text: 'Strong collaboration with peers',
       sentiment: 'strength',
       dims: ['collaboration'],
     },
     {
       key: 'question',
-      icon: '💡',
       text: 'Asked a great question in class',
       sentiment: 'strength',
       dims: ['curiosity'],
     },
     {
       key: 'focus',
-      icon: '🎯',
       text: 'Focused and on-task during independent work',
       sentiment: 'strength',
       dims: ['selfRegulation'],
     },
     {
       key: 'support',
-      icon: '🔄',
       text: 'Needed additional support to stay on task',
       sentiment: 'growth',
       dims: ['selfRegulation'],
     },
     {
       key: 'resilience',
-      icon: '💪',
       text: 'Showed resilience working through a challenge',
       sentiment: 'strength',
       dims: ['resilience'],
     },
     {
       key: 'respect',
-      icon: '🙏',
       text: 'Demonstrated respect for diverse perspectives',
       sentiment: 'strength',
       dims: ['respect'],
@@ -589,12 +618,10 @@ window.MObserve = (function () {
         '" data-template="' +
         tmpl.key +
         '">' +
-        '<span class="m-quick-template-icon">' +
-        tmpl.icon +
-        '</span>' +
         '<span>' +
         MC.esc(tmpl.text) +
         '</span>' +
+        typePill(tmpl.sentiment) +
         '</button>';
     });
 
@@ -651,6 +678,7 @@ window.MObserve = (function () {
     updateSubmitState: _updateSubmitState,
     saveObservation: saveObservation,
     deleteObservation: deleteObservation,
+    holdDelete: holdDelete,
     presentEditObsSheet: presentEditObsSheet,
     presentQuickMenu: presentQuickMenu,
     quickPost: quickPost,

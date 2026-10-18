@@ -16,8 +16,8 @@ function mockDataLayer(overrides) {
       { id: 'stu1', firstName: 'Cece', lastName: 'Adams', preferred: '', pronouns: 'she/her', designations: [] },
       { id: 'stu2', firstName: 'Noor', lastName: 'Khan', preferred: 'Noor', pronouns: '', designations: [] },
     ],
-    sortStudents: (arr) => arr,
-    displayName: (st) => (st.preferred || st.firstName) + ' ' + st.lastName,
+    sortStudents: arr => arr,
+    displayName: st => (st.preferred || st.firstName) + ' ' + st.lastName,
     getAllQuickObs: () => [],
     getStudentQuickObs: () => [],
     addQuickOb: () => {},
@@ -54,15 +54,29 @@ describe('MObserve.renderFeed', () => {
   it('shows empty state when no observations', () => {
     mockDataLayer({});
     const html = MObserve.renderFeed(CID);
-    expect(html).toContain('No Observations');
+    expect(html).toContain('No observations');
     expect(html).toContain('Tap + to record one');
   });
 
   it('renders observation cards grouped by date', () => {
     mockDataLayer({
       getAllQuickObs: () => [
-        { id: 'ob1', studentId: 'stu1', text: 'Great work', sentiment: 'strength', created: new Date().toISOString(), dims: [] },
-        { id: 'ob2', studentId: 'stu2', text: 'Needs support', sentiment: 'concern', created: '2025-01-01T10:00:00Z', dims: [] },
+        {
+          id: 'ob1',
+          studentId: 'stu1',
+          text: 'Great work',
+          sentiment: 'strength',
+          created: new Date().toISOString(),
+          dims: [],
+        },
+        {
+          id: 'ob2',
+          studentId: 'stu2',
+          text: 'Needs support',
+          sentiment: 'concern',
+          created: '2025-01-01T10:00:00Z',
+          dims: [],
+        },
       ],
     });
     const html = MObserve.renderFeed(CID);
@@ -91,7 +105,14 @@ describe('MObserve.renderFeed', () => {
   it('shows student name filters for students with observations', () => {
     mockDataLayer({
       getAllQuickObs: () => [
-        { id: 'ob1', studentId: 'stu1', text: 'test', sentiment: 'strength', created: '2025-03-01T10:00:00Z', dims: [] },
+        {
+          id: 'ob1',
+          studentId: 'stu1',
+          text: 'test',
+          sentiment: 'strength',
+          created: '2025-03-01T10:00:00Z',
+          dims: [],
+        },
       ],
     });
     const html = MObserve.renderFeed(CID);
@@ -101,7 +122,14 @@ describe('MObserve.renderFeed', () => {
   it('shows dimension tags on observation cards', () => {
     mockDataLayer({
       getAllQuickObs: () => [
-        { id: 'ob1', studentId: 'stu1', text: 'test', sentiment: 'strength', dims: ['engagement', 'self-regulation'], created: '2025-03-01T10:00:00Z' },
+        {
+          id: 'ob1',
+          studentId: 'stu1',
+          text: 'test',
+          sentiment: 'strength',
+          dims: ['engagement', 'self-regulation'],
+          created: '2025-03-01T10:00:00Z',
+        },
       ],
     });
     const html = MObserve.renderFeed(CID);
@@ -111,7 +139,15 @@ describe('MObserve.renderFeed', () => {
   it('shows context label on observation cards', () => {
     mockDataLayer({
       getAllQuickObs: () => [
-        { id: 'ob1', studentId: 'stu1', text: 'test', context: 'small-group', sentiment: 'growth', dims: [], created: '2025-03-01T10:00:00Z' },
+        {
+          id: 'ob1',
+          studentId: 'stu1',
+          text: 'test',
+          context: 'small-group',
+          sentiment: 'growth',
+          dims: [],
+          created: '2025-03-01T10:00:00Z',
+        },
       ],
     });
     const html = MObserve.renderFeed(CID);
@@ -121,8 +157,22 @@ describe('MObserve.renderFeed', () => {
   it('renders sentiment-colored card borders', () => {
     mockDataLayer({
       getAllQuickObs: () => [
-        { id: 'ob1', studentId: 'stu1', text: 'test', sentiment: 'strength', created: '2025-03-01T10:00:00Z', dims: [] },
-        { id: 'ob2', studentId: 'stu2', text: 'test2', sentiment: 'concern', created: '2025-03-01T10:00:00Z', dims: [] },
+        {
+          id: 'ob1',
+          studentId: 'stu1',
+          text: 'test',
+          sentiment: 'strength',
+          created: '2025-03-01T10:00:00Z',
+          dims: [],
+        },
+        {
+          id: 'ob2',
+          studentId: 'stu2',
+          text: 'test2',
+          sentiment: 'concern',
+          created: '2025-03-01T10:00:00Z',
+          dims: [],
+        },
       ],
     });
     const html = MObserve.renderFeed(CID);
@@ -162,7 +212,9 @@ describe('Sentiment button accessibility', () => {
     // The sheet HTML is generated in presentNewObsSheet — we need to mock presentSheet
     let capturedHTML = '';
     const origPresent = MComponents.presentSheet;
-    MComponents.presentSheet = (html) => { capturedHTML = html; };
+    MComponents.presentSheet = html => {
+      capturedHTML = html;
+    };
 
     MObserve.presentNewObsSheet(CID);
 
@@ -177,7 +229,9 @@ describe('Sentiment button accessibility', () => {
   it('renders textarea with proper <label> element', () => {
     let capturedHTML = '';
     const origPresent = MComponents.presentSheet;
-    MComponents.presentSheet = (html) => { capturedHTML = html; };
+    MComponents.presentSheet = html => {
+      capturedHTML = html;
+    };
 
     mockDataLayer({});
     MObserve.presentNewObsSheet(CID);
@@ -260,7 +314,9 @@ describe('Sheet form cleanup on dismiss', () => {
   it('passes onClose callback to presentSheet', () => {
     let receivedOpts = null;
     const origPresent = MComponents.presentSheet;
-    MComponents.presentSheet = (html, opts) => { receivedOpts = opts; };
+    MComponents.presentSheet = (html, opts) => {
+      receivedOpts = opts;
+    };
 
     mockDataLayer({});
     MObserve.presentNewObsSheet(CID);
@@ -277,7 +333,14 @@ describe('Observation feed edge cases', () => {
   it('handles observation with no sentiment', () => {
     mockDataLayer({
       getAllQuickObs: () => [
-        { id: 'ob1', studentId: 'stu1', text: 'No sentiment', sentiment: null, created: '2025-03-14T10:00:00Z', dims: [] },
+        {
+          id: 'ob1',
+          studentId: 'stu1',
+          text: 'No sentiment',
+          sentiment: null,
+          created: '2025-03-14T10:00:00Z',
+          dims: [],
+        },
       ],
     });
     const html = MObserve.renderFeed(CID);
@@ -288,7 +351,14 @@ describe('Observation feed edge cases', () => {
   it('handles observation with no dims', () => {
     mockDataLayer({
       getAllQuickObs: () => [
-        { id: 'ob1', studentId: 'stu1', text: 'test', sentiment: 'strength', created: '2025-03-14T10:00:00Z', dims: null },
+        {
+          id: 'ob1',
+          studentId: 'stu1',
+          text: 'test',
+          sentiment: 'strength',
+          created: '2025-03-14T10:00:00Z',
+          dims: null,
+        },
       ],
     });
     const html = MObserve.renderFeed(CID);
@@ -298,7 +368,14 @@ describe('Observation feed edge cases', () => {
   it('handles observation with empty dims array', () => {
     mockDataLayer({
       getAllQuickObs: () => [
-        { id: 'ob1', studentId: 'stu1', text: 'test', sentiment: 'strength', created: '2025-03-14T10:00:00Z', dims: [] },
+        {
+          id: 'ob1',
+          studentId: 'stu1',
+          text: 'test',
+          sentiment: 'strength',
+          created: '2025-03-14T10:00:00Z',
+          dims: [],
+        },
       ],
     });
     const html = MObserve.renderFeed(CID);
@@ -308,7 +385,15 @@ describe('Observation feed edge cases', () => {
   it('handles observation with no context', () => {
     mockDataLayer({
       getAllQuickObs: () => [
-        { id: 'ob1', studentId: 'stu1', text: 'test', sentiment: 'strength', context: null, created: '2025-03-14T10:00:00Z', dims: [] },
+        {
+          id: 'ob1',
+          studentId: 'stu1',
+          text: 'test',
+          sentiment: 'strength',
+          context: null,
+          created: '2025-03-14T10:00:00Z',
+          dims: [],
+        },
       ],
     });
     const html = MObserve.renderFeed(CID);
@@ -318,7 +403,14 @@ describe('Observation feed edge cases', () => {
   it('handles observation for unknown student', () => {
     mockDataLayer({
       getAllQuickObs: () => [
-        { id: 'ob1', studentId: 'deleted-student', text: 'test', sentiment: 'strength', created: '2025-03-14T10:00:00Z', dims: [] },
+        {
+          id: 'ob1',
+          studentId: 'deleted-student',
+          text: 'test',
+          sentiment: 'strength',
+          created: '2025-03-14T10:00:00Z',
+          dims: [],
+        },
       ],
     });
     const html = MObserve.renderFeed(CID);
@@ -355,7 +447,9 @@ describe('New observation sheet content', () => {
   it('includes student picker', () => {
     let capturedHTML = '';
     const origPresent = MComponents.presentSheet;
-    MComponents.presentSheet = (html) => { capturedHTML = html; };
+    MComponents.presentSheet = html => {
+      capturedHTML = html;
+    };
     mockDataLayer({});
     MObserve.presentNewObsSheet(CID);
     expect(capturedHTML).toContain('m-student-picker');
@@ -366,7 +460,9 @@ describe('New observation sheet content', () => {
   it('includes textarea for observation text', () => {
     let capturedHTML = '';
     const origPresent = MComponents.presentSheet;
-    MComponents.presentSheet = (html) => { capturedHTML = html; };
+    MComponents.presentSheet = html => {
+      capturedHTML = html;
+    };
     mockDataLayer({});
     MObserve.presentNewObsSheet(CID);
     expect(capturedHTML).toContain('m-sheet-textarea');
@@ -377,7 +473,9 @@ describe('New observation sheet content', () => {
   it('includes all context options', () => {
     let capturedHTML = '';
     const origPresent = MComponents.presentSheet;
-    MComponents.presentSheet = (html) => { capturedHTML = html; };
+    MComponents.presentSheet = html => {
+      capturedHTML = html;
+    };
     mockDataLayer({});
     MObserve.presentNewObsSheet(CID);
     expect(capturedHTML).toContain('m-context-btn');
@@ -387,7 +485,9 @@ describe('New observation sheet content', () => {
   it('includes dimension tag chips', () => {
     let capturedHTML = '';
     const origPresent = MComponents.presentSheet;
-    MComponents.presentSheet = (html) => { capturedHTML = html; };
+    MComponents.presentSheet = html => {
+      capturedHTML = html;
+    };
     mockDataLayer({});
     MObserve.presentNewObsSheet(CID);
     expect(capturedHTML).toContain('m-dim-chip');
@@ -397,18 +497,22 @@ describe('New observation sheet content', () => {
   it('includes disabled submit button', () => {
     let capturedHTML = '';
     const origPresent = MComponents.presentSheet;
-    MComponents.presentSheet = (html) => { capturedHTML = html; };
+    MComponents.presentSheet = html => {
+      capturedHTML = html;
+    };
     mockDataLayer({});
     MObserve.presentNewObsSheet(CID);
     expect(capturedHTML).toContain('disabled');
-    expect(capturedHTML).toContain('Add Observation');
+    expect(capturedHTML).toContain('Add observation');
     MComponents.presentSheet = origPresent;
   });
 
   it('renders all three sentiment options', () => {
     let capturedHTML = '';
     const origPresent = MComponents.presentSheet;
-    MComponents.presentSheet = (html) => { capturedHTML = html; };
+    MComponents.presentSheet = html => {
+      capturedHTML = html;
+    };
     mockDataLayer({});
     MObserve.presentNewObsSheet(CID);
     expect(capturedHTML).toContain('Strength');
@@ -417,22 +521,27 @@ describe('New observation sheet content', () => {
     MComponents.presentSheet = origPresent;
   });
 
-  it('renders sentiment emojis', () => {
+  it('renders type, context and tags as text, with no emoji', () => {
     let capturedHTML = '';
     const origPresent = MComponents.presentSheet;
-    MComponents.presentSheet = (html) => { capturedHTML = html; };
+    MComponents.presentSheet = html => {
+      capturedHTML = html;
+    };
     mockDataLayer({});
     MObserve.presentNewObsSheet(CID);
-    expect(capturedHTML).toContain('✅');
-    expect(capturedHTML).toContain('🔄');
-    expect(capturedHTML).toContain('⚠️');
+    expect(capturedHTML).toContain('>Strength</button>');
+    expect(capturedHTML).toContain('Whole class');
+    expect(capturedHTML).toMatch(/m-obs-tag-dot/);
+    expect(capturedHTML).not.toMatch(/\p{Extended_Pictographic}/u);
     MComponents.presentSheet = origPresent;
   });
 
   it('includes searchable student list', () => {
     let capturedHTML = '';
     const origPresent = MComponents.presentSheet;
-    MComponents.presentSheet = (html) => { capturedHTML = html; };
+    MComponents.presentSheet = html => {
+      capturedHTML = html;
+    };
     mockDataLayer({});
     MObserve.presentNewObsSheet(CID);
     expect(capturedHTML).toContain('m-picker-search');
@@ -441,5 +550,72 @@ describe('New observation sheet content', () => {
     expect(capturedHTML).toContain('Cece Adams');
     expect(capturedHTML).toContain('Noor Khan');
     MComponents.presentSheet = origPresent;
+  });
+});
+
+/* ── Text pills and delete with Undo ───────────────────────── */
+describe('MObserve feed pills and Undo', () => {
+  const ob = {
+    id: 'ob1',
+    studentId: 'stu1',
+    text: 'Explained the method to her group',
+    sentiment: 'strength',
+    context: 'small-group',
+    dims: ['collaboration', 'cc:COM'],
+    created: '2025-03-01T10:00:00Z',
+  };
+
+  it('renders type, context and tags as text with no emoji', () => {
+    mockDataLayer({ getAllQuickObs: () => [ob] });
+    const html = MObserve.renderFeed(CID);
+    expect(html).toContain('m-obs-type-pill');
+    expect(html).toContain('Small group');
+    expect(html).toContain('Collaboration');
+    expect(html).not.toMatch(/\p{Extended_Pictographic}/u);
+  });
+
+  it('hides a deleted card for six seconds, then deletes it', () => {
+    vi.useFakeTimers();
+    const deleted = [];
+    let toastOpts = null;
+    const origToast = MComponents.showToast;
+    MComponents.showToast = (msg, opts) => {
+      toastOpts = { msg, ...opts };
+    };
+    mockDataLayer({
+      getAllQuickObs: () => [ob],
+      deleteQuickOb: (cid, sid, id) => deleted.push(id),
+    });
+    MObserve.holdDelete(CID, 'stu1', 'ob1');
+    expect(toastOpts.msg).toBe('Observation deleted');
+    expect(toastOpts.duration).toBe(6000);
+    expect(MObserve.renderFeed(CID)).not.toContain('Explained the method');
+    vi.advanceTimersByTime(5900);
+    expect(deleted).toEqual([]);
+    vi.advanceTimersByTime(200);
+    expect(deleted).toEqual(['ob1']);
+    MComponents.showToast = origToast;
+    vi.useRealTimers();
+  });
+
+  it('Undo brings the card back and never deletes', () => {
+    vi.useFakeTimers();
+    const deleted = [];
+    let toastOpts = null;
+    const origToast = MComponents.showToast;
+    MComponents.showToast = (msg, opts) => {
+      toastOpts = opts;
+    };
+    mockDataLayer({
+      getAllQuickObs: () => [ob],
+      deleteQuickOb: (cid, sid, id) => deleted.push(id),
+    });
+    MObserve.holdDelete(CID, 'stu1', 'ob1');
+    toastOpts.onUndo();
+    expect(MObserve.renderFeed(CID)).toContain('Explained the method');
+    vi.advanceTimersByTime(10000);
+    expect(deleted).toEqual([]);
+    MComponents.showToast = origToast;
+    vi.useRealTimers();
   });
 });

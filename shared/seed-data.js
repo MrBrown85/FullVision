@@ -489,6 +489,9 @@ function seedIfNeeded() {
         context: s.context || null,
         created: ts.toISOString(),
         date: s.date,
+        ...(s.assessmentId
+          ? { assignmentContext: { assessmentId: s.assessmentId, assessmentTitle: s.assessmentTitle } }
+          : {}),
       });
     });
     return current(obs);
@@ -2516,6 +2519,8 @@ function seedIfNeeded() {
         {
           sid: 'st23',
           date: '2025-10-03',
+          assessmentId: 'sci8a1',
+          assessmentTitle: 'Cell Microscope Lab',
           text: "Mei's microscope work was exceptional \u2014 she found and sketched cell structures that other students missed entirely.",
           dims: ['engagement', 'curiosity'],
           sentiment: 'strength',
@@ -2548,6 +2553,8 @@ function seedIfNeeded() {
         {
           sid: 'st23',
           date: '2026-03-19',
+          assessmentId: 'sci8a10',
+          assessmentTitle: 'Mid-Year Lab Skills Check',
           text: 'Mei helped calibrate the equipment during the lab skills check and explained the process to two classmates. Natural leader in the lab.',
           dims: ['collaboration', 'engagement'],
           sentiment: 'strength',
@@ -2723,6 +2730,8 @@ function seedIfNeeded() {
         dims: { engagement: 4, collaboration: 3, selfRegulation: 4, resilience: 3, curiosity: 3, respect: 4 },
         narrative:
           'Cece is a consistent, dependable student who takes care with her lab work and asks clarifying questions. She would benefit from taking more risks in class discussions and sharing her ideas more freely.',
+        // Observations this report quotes; the Observations page marks them.
+        mentionObs: ['qo_seed_st1_0', 'qo_seed_st1_1'],
         created: new Date('2025-12-20').toISOString(),
         modified: new Date('2025-12-20').toISOString(),
       },
@@ -2730,6 +2739,7 @@ function seedIfNeeded() {
         dims: { engagement: 4, collaboration: 4, selfRegulation: 4, resilience: 4, curiosity: 4, respect: 4 },
         narrative:
           'Cece has grown noticeably more confident this term. She volunteers to present, helps organize group work, and her written analysis has become more detailed and evidence-based.',
+        mentionObs: ['qo_seed_st1_3'],
         created: new Date('2026-03-20').toISOString(),
         modified: new Date('2026-03-20').toISOString(),
       },

@@ -629,12 +629,37 @@ const OBS_SENTIMENTS = {
 };
 
 const OBS_CONTEXTS = {
-  'whole-class': { icon: '👥', label: 'Whole Class' },
-  'small-group': { icon: '👫', label: 'Small Group' },
+  'whole-class': { icon: '👥', label: 'Whole class' },
+  'small-group': { icon: '👫', label: 'Small group' },
   independent: { icon: '🧑‍💻', label: 'Independent' },
   presentation: { icon: '🎤', label: 'Presentation' },
   discussion: { icon: '💬', label: 'Discussion' },
 };
+
+/* Observation UI shows type, context and tags as text pills. The icon fields
+   above and OBS_ICONS are kept for now but no longer rendered
+   (docs/DECISIONS.md, "Observations (2026-10-18)"). Tag pills keep a colour
+   dot: one colour per disposition, one for Core Competencies, one for custom
+   tags. */
+const OBS_TAG_COLORS = {
+  engagement: '#3b82f6',
+  curiosity: '#9333ea',
+  selfRegulation: '#f59e0b',
+  resilience: '#ef4444',
+  belonging: '#0ea5e9',
+  identity: '#d946ef',
+  collaboration: '#22c55e',
+  respect: '#059669',
+  responsibility: '#84cc16',
+};
+const OBS_CC_COLOR = '#e67700';
+const OBS_CUSTOM_COLOR = '#8b5cf6';
+function obsTagColor(key) {
+  var k = String(key || '');
+  if (k.indexOf('cc:') === 0) return OBS_CC_COLOR;
+  if (k.indexOf('tag:') === 0) return OBS_CUSTOM_COLOR;
+  return OBS_TAG_COLORS[k] || '#999';
+}
 
 /* ── Card Widget Registry ─────────────────────────────────── */
 const WIDGET_REGISTRY = [

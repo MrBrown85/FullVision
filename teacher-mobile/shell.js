@@ -661,22 +661,7 @@
       if (action === 'm-obs-delete') {
         var obId = target.getAttribute('data-obid');
         var obSid = target.getAttribute('data-sid');
-        if (!obId || !obSid) return;
-        // Hide card immediately, delete after undo window
-        var card = target.closest('.m-obs-card');
-        if (card) card.style.display = 'none';
-        MC.showToast('Observation deleted', {
-          onUndo: function () {
-            // Undo: restore the card
-            if (card) card.style.display = '';
-          },
-        });
-        // Delete after toast auto-dismisses (5s)
-        setTimeout(function () {
-          if (card && card.style.display === 'none') {
-            MObserve.deleteObservation(_cid, obSid, obId);
-          }
-        }, 5500);
+        if (obId && obSid) MObserve.holdDelete(_cid, obSid, obId);
         return;
       }
 

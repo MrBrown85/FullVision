@@ -15,8 +15,12 @@ test.describe('Observations — Quick Capture', () => {
 
   test('shows observation input area', async ({ page }) => {
     // Should have a text area or input for observation text
-    const textarea = page.locator('textarea, [contenteditable="true"], input[placeholder*="observation" i], input[placeholder*="note" i]').first();
-    const submitBtn = page.locator('[data-action="submitOb"], button:has-text("Add"), button:has-text("Save"), button:has-text("Submit")').first();
+    const textarea = page
+      .locator('textarea, [contenteditable="true"], input[placeholder*="observation" i], input[placeholder*="note" i]')
+      .first();
+    const submitBtn = page
+      .locator('[data-action="submitOb"], button:has-text("Add"), button:has-text("Save"), button:has-text("Submit")')
+      .first();
     // At least one of these must be visible
     const inputCount = await textarea.count();
     const submitCount = await submitBtn.count();
@@ -37,11 +41,10 @@ test.describe('Observations — Quick Capture', () => {
     expect(hasStudents || hasSelector).toBeTruthy();
   });
 
-  test('sentiment buttons exist', async ({ page }) => {
-    // Should have positive/neutral/constructive sentiment options
-    const sentimentBtns = page.locator('[data-action="setSentiment"], .ob-sentiment-btn, button:has-text("Strength"), button:has-text("Growth"), button:has-text("Concern")');
-    const count = await sentimentBtns.count();
-    expect(count).toBeGreaterThanOrEqual(1);
+  test('type filter offers strength, growth and concern', async ({ page }) => {
+    await page.getByRole('button', { name: 'Type' }).click();
+    const options = page.locator('#filter-type-dropdown [role="option"]');
+    await expect(options).toHaveText(['Strength', 'Growth', 'Concern']);
   });
 
   test('observation list shows empty state initially', async ({ page }) => {

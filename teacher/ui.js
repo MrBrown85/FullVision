@@ -1011,8 +1011,8 @@ let _undoState = null;
 let _undoTimer = null;
 
 /* commitFn runs when the toast closes without Undo: it times out, another
-   toast replaces it, or it is dismissed. */
-function showUndoToast(message, undoFn, commitFn) {
+   toast replaces it, or it is dismissed. durationMs defaults to 5 seconds. */
+function showUndoToast(message, undoFn, commitFn, durationMs) {
   // Clear any existing toast
   dismissUndoToast();
 
@@ -1026,7 +1026,7 @@ function showUndoToast(message, undoFn, commitFn) {
   toast.innerHTML = `<span>${esc(message)}</span><button class="undo-toast-btn" data-action="executeUndo">Undo</button>`;
   document.body.appendChild(toast);
 
-  _undoTimer = setTimeout(dismissUndoToast, 5000);
+  _undoTimer = setTimeout(dismissUndoToast, durationMs || 5000);
 }
 
 function executeUndo() {
