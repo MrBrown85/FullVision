@@ -3071,3 +3071,76 @@
   flex-direction: column;
   gap: 6px;
 }
+
+/* ── Criterion comment icon + Print rubrics (rubric handouts) ─────── */
+.rsg-criterion-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rsg-crit-comment {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  padding: 2px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  opacity: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    opacity 0.15s,
+    background 0.15s;
+}
+.rsg-crit-comment svg {
+  width: 14px;
+  height: 14px;
+}
+.rsg-criterion-row:hover .rsg-crit-comment,
+.rsg-criterion-row.kb-focus .rsg-crit-comment,
+.rsg-crit-comment:focus-visible,
+.rsg-crit-comment.has-comment {
+  opacity: 1;
+}
+.rsg-crit-comment:hover {
+  background: var(--divider-subtle);
+  color: var(--text);
+}
+.rsg-crit-comment.has-comment {
+  color: var(--active);
+}
+.rsg-crit-comment.has-comment svg {
+  fill: currentColor;
+  fill-opacity: 0.18;
+}
+.crit-comment-help {
+  font-size: var(--text-sm);
+  color: var(--text-3);
+  line-height: 1.45;
+}
+.rubric-print-btn {
+  padding: 3px 9px;
+  margin-right: 4px;
+  font-family: var(--font-base);
+  font-size: var(--text-xs);
+  font-weight: 510;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-2);
+  cursor: pointer;
+  line-height: 1.2;
+  letter-spacing: var(--tracking-tight);
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.rubric-print-btn:hover {
+  color: var(--text);
+  border-color: var(--text-3);
+}

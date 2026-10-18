@@ -6,7 +6,8 @@
 -- Updated 2026-10-17 by hand from migrations/2026101[2-6]_*.sql: course
 -- grading_scale / category_weights / round_percent / deleted_at, tag_score and
 -- rubric_score modifier, course_sync_cursor version, the term 1..6 note, and
--- the score_mode values. Function signatures below were not re-read from the
+-- the score_mode values. 2026-10-18: rubric_score.comment
+-- (20261018_rubric_score_comment). Function signatures below were not re-read from the
 -- database on that date; check pg_proc before relying on a parameter list.
 --
 -- This is a READABLE SNAPSHOT, not a replayable migration log. It documents
@@ -275,6 +276,7 @@ create table rubric_score (
   criterion_id  uuid        not null references criterion(id)  on delete cascade,
   value         integer     not null,                                -- 1..4
   modifier      smallint    not null default 0,                      -- −1 | 0 | +1, as tag_score (20261013_proficiency_plus_minus)
+  comment       text,                                                -- the teacher's note on this criterion, printed on the rubric handout (20261018_rubric_score_comment)
   updated_at    timestamptz not null default now(),
   unique (enrollment_id, assessment_id, criterion_id)
 );
@@ -551,7 +553,8 @@ create table fv_idempotency (
 --   save_score_comment(p_enrollment_id uuid, p_assessment_id uuid, p_comment text)
 --   upsert_tag_score(p_enrollment_id uuid, p_assessment_id uuid, p_tag_id uuid, p_value integer)
 --   upsert_rubric_score(p_enrollment_id uuid, p_assessment_id uuid, p_criterion_id uuid,
---                       p_value integer)
+--                       p_value integer, p_modifier smallint default 0, p_comment text default null)
+--                       -- null p_comment keeps the saved comment, '' clears it; 0/null value deletes the row
 --   fill_rubric(p_enrollment_id uuid, p_assessment_id uuid, p_value integer)
 --   clear_score(p_enrollment_id uuid, p_assessment_id uuid)
 --   clear_row_scores(p_enrollment_id uuid, p_course_id uuid)

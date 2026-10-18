@@ -2996,11 +2996,14 @@ function _pushHydratedScore(scores, sid, entry) {
   var existing = scores[sid].find(function (candidate) {
     return candidate.assessmentId === entry.assessmentId && (candidate.tagId || '') === keyTag;
   });
-  if (existing) Object.assign(existing, entry);
-  else scores[sid].push(entry);
+  if (existing) {
+    // A criterion comment the server no longer has is gone here too.
+    if (!entry.critNote) delete existing.critNote;
+    Object.assign(existing, entry);
+  } else scores[sid].push(entry);
 }
 
-function _scoreEntryFromCanonical(cid, assessment, tagId, value, comment, modifier) {
+function _scoreEntryFromCanonical(cid, assessment, tagId, value, comment, modifier, criterionComment) {
   var entry = {
     // Deterministic, so loading the same server data twice writes the same
     // localStorage string: a changing value here made every load look like an
@@ -3016,6 +3019,9 @@ function _scoreEntryFromCanonical(cid, assessment, tagId, value, comment, modifi
   };
   var mod = normalizeScoreMod(entry.score, modifier);
   if (mod) entry.mod = mod;
+  // The teacher's note on a rubric criterion, printed on the rubric handout.
+  // It is set on every score key the criterion fans out to.
+  if (criterionComment) entry.critNote = String(criterionComment);
   return entry;
 }
 
@@ -3143,7 +3149,15 @@ async function _hydrateAssessmentDetails(cid) {
             _pushHydratedScore(
               scores,
               sid,
-              _scoreEntryFromCanonical(cid, merged, tagId, rubricScore.value, comment, rubricScore.modifier),
+              _scoreEntryFromCanonical(
+                cid,
+                merged,
+                tagId,
+                rubricScore.value,
+                comment,
+                rubricScore.modifier,
+                rubricScore.comment,
+              ),
             );
           });
         });
@@ -3311,7 +3325,15 @@ function _gradebookCellsToScoreCache(cid, assessments, cells) {
           _pushHydratedScore(
             scores,
             sid,
-            _scoreEntryFromCanonical(cid, assessment, tagId, rubricScore.value, comment, rubricScore.modifier),
+            _scoreEntryFromCanonical(
+              cid,
+              assessment,
+              tagId,
+              rubricScore.value,
+              comment,
+              rubricScore.modifier,
+              rubricScore.comment,
+            ),
           );
         });
       });
@@ -3568,7 +3590,8 @@ function _bundleCells(gb) {
   });
   sorted(gb.criterion_rows).forEach(function (r) {
     var cell = cellFor(r[0], r[1]);
-    if (cell && criteria[r[2]]) cell.rubric_scores.push({ criterion_id: criteria[r[2]], value: r[3], modifier: r[4] });
+    if (cell && criteria[r[2]])
+      cell.rubric_scores.push({ criterion_id: criteria[r[2]], value: r[3], modifier: r[4], comment: r[5] || null });
   });
   // A points-scored assessment is scored as a whole; get_assessment_detail
   // ignored any competency scores left on it, and so does this.
@@ -4483,6 +4506,9 @@ function _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note, mod) {
     var isPoints = isPointsScored(assessment);
     var ops = [];
     var modifier = normalizeScoreMod(intVal, mod);
+    // A criterion comment typed before the level was chosen waits in the
+    // cache; it goes up with the level. Null leaves the server's comment.
+    var criterionComment = _rubricCriterionCommentFor(cid, sid, aid, tid) || null;
     if (criterion) {
       ops.push({
         rpc: 'upsert_rubric_score',
@@ -4492,6 +4518,7 @@ function _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note, mod) {
           p_criterion_id: tid,
           p_value: intVal,
           p_modifier: modifier,
+          p_comment: criterionComment,
         },
       });
     } else if (isPoints || isUnlinkedTag(tid) || (assessment && !isAssessmentTag && !criterionForTag)) {
@@ -4521,6 +4548,7 @@ function _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note, mod) {
             p_criterion_id: criterionForTag.id,
             p_value: intVal,
             p_modifier: modifier,
+            p_comment: criterionComment,
           },
         });
       }
@@ -4550,6 +4578,96 @@ function _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note, mod) {
   }
 }
 
+/* ── Rubric criterion comments ─────────────────────────────────────────
+   A short note on one criterion of a rubric assessment, printed under that
+   row on the rubric handout (teacher/rubric-print.js). It lives on
+   rubric_score.comment and, in the cache, as `critNote` on each score key
+   the criterion fans out to. */
+
+/* The cached comment for the criterion holding score key `tid`. */
+function _rubricCriterionCommentFor(cid, sid, aid, tid) {
+  var entries = getScores(cid)[sid] || [];
+  var entry = entries.find(function (e) {
+    return e && e.assessmentId === aid && e.tagId === tid;
+  });
+  return entry && entry.critNote ? entry.critNote : '';
+}
+
+/* The criterion's comment, from whichever of its keys holds one. */
+function getRubricCriterionComment(cid, sid, aid, criterion) {
+  var keys = rubricCriterionScoreKeys(criterion);
+  for (var i = 0; i < keys.length; i++) {
+    var note = _rubricCriterionCommentFor(cid, sid, aid, keys[i]);
+    if (note) return note;
+  }
+  return '';
+}
+
+/* Save (or clear, with '') the comment on one criterion. The cache changes
+   at once; the server row is updated when the criterion has a level, and
+   otherwise the comment goes up with the level when one is chosen (a
+   rubric_score row cannot exist without a value). */
+function saveRubricCriterionComment(cid, sid, aid, criterionId, text) {
+  var assessment = _assessmentById(cid, aid);
+  var criterion = _rubricCriterionById(cid, assessment, criterionId);
+  if (!criterion) return false;
+  var note = (text == null ? '' : String(text)).trim();
+  var scores = getScores(cid);
+  if (!scores[sid]) scores[sid] = [];
+  var level = 0;
+  var mod = 0;
+  var changed = false;
+  rubricCriterionScoreKeys(criterion).forEach(function (tid) {
+    var entry = scores[sid].find(function (e) {
+      return e && e.assessmentId === aid && e.tagId === tid;
+    });
+    if (!entry) {
+      if (!note) return;
+      entry = {
+        id: sid + ':' + aid + ':' + tid,
+        assessmentId: aid,
+        tagId: tid,
+        score: 0,
+        date: (assessment && assessment.date) || courseToday(cid),
+        type: (assessment && assessment.type) || 'summative',
+        note: '',
+        created: new Date().toISOString(),
+      };
+      scores[sid].push(entry);
+    }
+    if ((entry.critNote || '') !== note) changed = true;
+    if (note) entry.critNote = note;
+    else delete entry.critNote;
+    if (Number(entry.score) > 0 && !level) {
+      level = Number(entry.score);
+      mod = normalizeScoreMod(level, entry.mod);
+    }
+  });
+  if (!changed) return true;
+  _cache.scores[cid] = scores;
+  var lsOk = _safeLSSet('gb-scores-' + cid, JSON.stringify(scores));
+  _markLocalWrite('scores', cid);
+  if (_writesEnabled() && level > 0 && _isSendableId(sid) && _isSendableId(aid) && _isSendableId(criterionId)) {
+    _trackPendingSync(
+      _writeRpc('upsert_rubric_score', {
+        p_enrollment_id: sid,
+        p_assessment_id: aid,
+        p_criterion_id: criterionId,
+        p_value: level,
+        p_modifier: mod,
+        p_comment: note,
+      }).then(function (res) {
+        if (res.error) _reportScoreWriteFailure('upsert_rubric_score', res.error);
+      }),
+    );
+    rubricCriterionScoreKeys(criterion).forEach(function (tid) {
+      _rememberScoreCell(cid, sid, aid, tid, scores);
+    });
+  }
+  _broadcastChange(cid, 'scores');
+  return lsOk;
+}
+
 function _scoreEntryKey(sid, entry) {
   if (!sid || !entry || !entry.assessmentId) return null;
   return [sid, entry.assessmentId, entry.tagId || ''].join(':');
@@ -4557,7 +4675,12 @@ function _scoreEntryKey(sid, entry) {
 
 function _scoreEntryRemoteChanged(a, b) {
   if (!a || !b) return true;
-  return (a.score || 0) !== (b.score || 0) || (a.mod || 0) !== (b.mod || 0) || (a.note || '') !== (b.note || '');
+  return (
+    (a.score || 0) !== (b.score || 0) ||
+    (a.mod || 0) !== (b.mod || 0) ||
+    (a.note || '') !== (b.note || '') ||
+    (a.critNote || '') !== (b.critNote || '')
+  );
 }
 
 function _scoreEntriesByKey(blob) {
