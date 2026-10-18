@@ -8,11 +8,11 @@ Four instruments, all optional per class, all feeding one learner profile and th
 
 1. **About Me** (September): the student introduces themselves. Includes a teacher-only private box.
 2. **Core competency reflection** (each reporting period): a different form for each grade and each reporting period, seeded from your own grade-by-period matrix (see "The question bank" below). Three short written prompts on that period's theme, plus a quick self-rating on the nine dimensions. This is the Ministry's required student self-reflection, and it produces the MyEd comment that goes with it.
-2b. **Curricular self-assessment** (optional, per period): the student rates the course's curricular competencies using the learning map's own "I can…" statements, with one sentence of evidence each. Separate from the core reflection so neither form gets long.
+   2b. **Curricular self-assessment** (optional, per period): the student rates the course's curricular competencies using the learning map's own "I can…" statements, with one sentence of evidence each. Separate from the core reflection so neither form gets long.
 3. **Goal check-in** (mid-term): how the goal is going, what's next. Reflections become a dated history.
 4. **Interview** (reporting week, teacher-led): two to four minutes per student, three generated questions, answers typed or tapped on the spot.
 
-Everything a student or an interview produces is a dated *conversation* record tied to the student and a competency, next to the teacher's observations and scores. The report can then quote it, show the Ministry self-assessment section, use it when drafting comments, and show September-to-June growth in the student's words.
+Everything a student or an interview produces is a dated _conversation_ record tied to the student and a competency, next to the teacher's observations and scores. The report can then quote it, show the Ministry self-assessment section, use it when drafting comments, and show September-to-June growth in the student's words.
 
 Nothing here requires student accounts, photos, or a parent portal.
 
@@ -61,7 +61,7 @@ Templates are the teacher's starting point, not a cage: a teacher can edit promp
 Per competency, three questions, in plain grade-level language:
 
 1. **Rating:** the competency's I-can statements, each on the four-point scale (these exist already; nothing to write).
-2. **Evidence:** "Tell about one time this term you [did the competency]. What did you do?" written for the subject, not generic. Computer Studies 10 "Computational Problem Solving": *Tell about a problem you broke into smaller parts this term. What were the parts?*
+2. **Evidence:** "Tell about one time this term you [did the competency]. What did you do?" written for the subject, not generic. Computer Studies 10 "Computational Problem Solving": _Tell about a problem you broke into smaller parts this term. What were the parts?_
 3. **Next step:** "What would you try next time to get better at this?" with a sentence starter.
 
 One bank file, `shared/curriculum-questions.json`, keyed by course short tag → competency id → questions, with a `curriculum_year`. About 6,000 written questions. Generated in batches by Claude from the `raw` competency text and the I-can statements, one subject at a time, then checked by a teacher-reading pass that enforces the house rules: no jargon, no all-caps, sentence case, a Grade 8 reading level for grades 8–9 and Grade 10 for 10–12, no question a student could answer with "yes." A script, `scripts/build_question_bank.py`, does the batching so a curriculum update regenerates only the changed competencies.
@@ -80,9 +80,9 @@ The rule: no new top-level tab. Student voice appears where the teacher already 
 - A **"Student voice"** strip under the questionnaire: the student's latest goal check-in, their proudest-work pick, and interview notes if any, each with a date. One "Use in comment" toggle per item.
 - A **Questionnaires** button in the toolbar (next to the Report period select) opens a side panel: which instruments are open for this class and period, response counts, Print code sheet, Close, Import Forms CSV, Paper entry.
 - **Progress Reports tab:** three new report blocks in the existing block registry, toggled per class like the others:
-  - *Core competency reflection* (the Ministry section): the period's theme, the student's answers, and the template's MyEd comment line; prints blank with the prompts if there is no response, exactly as today's blank blocks do.
-  - *In the student's words*: one or two chosen quotes with dates.
-  - *Then and now*: September answer beside the current answer for the three repeated questions.
+  - _Core competency reflection_ (the Ministry section): the period's theme, the student's answers, and the template's MyEd comment line; prints blank with the prompts if there is no response, exactly as today's blank blocks do.
+  - _In the student's words_: one or two chosen quotes with dates.
+  - _Then and now_: September answer beside the current answer for the three repeated questions.
 - **Class Summary tab:** one card, "How the class sees itself": self-rating distribution per dimension, common goals, what students said they're nervous about, anonymous and aggregate.
 
 ### Student page
@@ -193,7 +193,7 @@ No names, no student numbers, no free text that identifies anyone (the private A
 ## Build order and size
 
 1. **Core reflection + code sheet + two-column questionnaire.** Convert the Brainstorm file into `shared/questionnaire-templates.json` (15 templates, plus the MyEd comment per template), new tables and RPCs, the student page, the Reports two-column view, the readable Ministry block. Large: four or five sessions. Ship before the next written Learning Update.
-1b. **Curricular self-assessment** from the I-can statements, reusing everything from 1. Small.
+   1b. **Curricular self-assessment** from the I-can statements, reusing everything from 1. Small.
 2. **Report blocks and draft switch.** Quotes, then-and-now, the de-identified payload. Medium.
 3. **About Me + learner profile card + private box.** Medium.
 4. **Interview mode** on Observations and mobile, with generated questions. Medium.
