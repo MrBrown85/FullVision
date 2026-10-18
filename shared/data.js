@@ -3198,9 +3198,40 @@ async function _hydrateLearningMap(cid) {
   }
 }
 
-function _observationsPayloadToBlob(payload) {
+/* An observation's `dims` are plain string keys: a disposition code
+   ('engagement'), a Core Competency ('cc:<id>') or a custom tag
+   ('tag:<label>'). They travel to and from the server as observation.dims
+   (text[]), so keep only non-empty strings, once each, in order. */
+function _observationDims(dims) {
+  var out = [];
+  (Array.isArray(dims) ? dims : []).forEach(function (d) {
+    if (typeof d === 'string' && d && out.indexOf(d) === -1) out.push(d);
+  });
+  return out;
+}
+
+/* The server stores only an observation's assessment_id. The title the
+   badge shows comes from the course's assessments, so it is filled in here;
+   an assessment that is gone or not loaded leaves the title empty. */
+function _observationAssessmentTitles(cid) {
+  var titles = {};
+  if (!cid) return titles;
+  var list = [];
+  try {
+    list = getAssessments(cid) || [];
+  } catch (e) {
+    list = [];
+  }
+  list.forEach(function (a) {
+    if (a && a.id) titles[a.id] = a.title || '';
+  });
+  return titles;
+}
+
+function _observationsPayloadToBlob(payload, cid) {
   payload = _rpcObject(payload) || payload || {};
   var blob = {};
+  var titles = null;
   (payload.observations || []).forEach(function (ob) {
     var enrollmentIds = ob.enrollment_ids || ob.enrollmentIds || [];
     enrollmentIds.forEach(function (sid) {
@@ -3209,13 +3240,16 @@ function _observationsPayloadToBlob(payload) {
       var entry = {
         id: ob.id,
         text: ob.body || ob.text || '',
-        dims: [],
+        dims: _observationDims(ob.dims),
         sentiment: ob.sentiment || null,
         context: ob.context_type || ob.context || null,
         created: ob.created_at || ob.created || new Date().toISOString(),
         date: _dateOnly(ob.observed_at || ob.created_at || ob.created),
       };
-      if (ob.assessment_id) entry.assignmentContext = { assessmentId: ob.assessment_id };
+      if (ob.assessment_id) {
+        if (!titles) titles = _observationAssessmentTitles(cid);
+        entry.assignmentContext = { assessmentId: ob.assessment_id, assessmentTitle: titles[ob.assessment_id] || '' };
+      }
       blob[sid].push(entry);
     });
   });
@@ -3241,7 +3275,7 @@ async function _hydrateObservations(cid) {
   if (!window.v2 || typeof window.v2.getObservations !== 'function') return;
   try {
     var rows = await _fetchObservationPages(cid, 1);
-    _persistLoadedField(cid, 'observations', _observationsPayloadToBlob({ observations: rows }));
+    _persistLoadedField(cid, 'observations', _observationsPayloadToBlob({ observations: rows }, cid));
   } catch (e) {
     console.warn('get_observations failed for ' + cid + '; keeping existing observations:', e);
   }
@@ -3263,7 +3297,7 @@ function _loadOlderObservations(cid, loadedCount) {
           if (ob && ob.id) have[sid + '|' + ob.id] = true;
         });
       });
-      var older = _observationsPayloadToBlob({ observations: rows });
+      var older = _observationsPayloadToBlob({ observations: rows }, cid);
       var added = false;
       Object.keys(older).forEach(function (sid) {
         older[sid].forEach(function (ob) {
@@ -3639,7 +3673,7 @@ function _bundleToCache(cid, bundle) {
   );
 
   var observationPayload = bundle.observations || {};
-  _persistLoadedField(cid, 'observations', _observationsPayloadToBlob(observationPayload));
+  _persistLoadedField(cid, 'observations', _observationsPayloadToBlob(observationPayload, cid));
   var observationsLoaded = (observationPayload.observations || []).length;
   if (Number(observationPayload.total) > observationsLoaded) _loadOlderObservations(cid, observationsLoaded);
   _applyStudentProfileSummaries(cid, bundle.profiles || []);
@@ -8193,7 +8227,7 @@ function updateQuickOb(cid, sid, obId, updates) {
 
 /* v2 create_observation(p_course_id, p_body, p_sentiment, p_context_type,
    p_assessment_id, p_enrollment_ids uuid[], p_tag_ids uuid[],
-   p_custom_tag_ids uuid[]) → uuid */
+   p_custom_tag_ids uuid[], p_idempotency_key, p_dims text[]) → uuid */
 function _persistObservationCreate(cid, sid, entry) {
   if (!_isUuid(cid) || !_isSendableId(sid)) return;
   // The observation's own local id is re-keyed when the create lands, so an
@@ -8203,9 +8237,8 @@ function _persistObservationCreate(cid, sid, entry) {
     entry.assignmentContext && _isUuid(entry.assignmentContext.assessmentId)
       ? entry.assignmentContext.assessmentId
       : null;
-  // entry.dims is an array of dimension codes (text labels) — not UUIDs in the
-  // legacy store. Passing [] here; tag linkage lands in Phase 4.5 once the
-  // learning map port carries real tag ids through to observation capture.
+  // entry.dims are string keys, not learning-map tag ids, so they go in
+  // p_dims (observation.dims) rather than the uuid join tables.
   _trackPendingSync(
     _writeRpc(
       'create_observation',
@@ -8218,6 +8251,7 @@ function _persistObservationCreate(cid, sid, entry) {
         p_enrollment_ids: [sid],
         p_tag_ids: [],
         p_custom_tag_ids: [],
+        p_dims: _observationDims(entry.dims),
       },
       {
         retryKey: 'create_observation:' + entry.id,
@@ -8237,13 +8271,15 @@ function _persistObservationCreate(cid, sid, entry) {
 /* v2 update_observation(p_id, p_patch jsonb, p_enrollment_ids, p_tag_ids,
    p_custom_tag_ids). Null join-array params leave that set alone; empty
    array wipes it. Here we always pass null so we don't disturb membership
-   unless the caller explicitly wants to. */
+   unless the caller explicitly wants to. The dims always go in the patch,
+   so removing the last tag clears them on the server too. */
 function _persistObservationUpdate(cid, ob) {
   if (!_isSendableId(ob.id)) return;
   var patch = {
     body: ob.text || '',
     sentiment: ob.sentiment || null,
     context_type: ob.context || null,
+    dims: _observationDims(ob.dims),
   };
   if (ob.assignmentContext && _isUuid(ob.assignmentContext.assessmentId)) {
     patch.assessment_id = ob.assignmentContext.assessmentId;

@@ -80,8 +80,27 @@ describe('v2 observation / template / custom-tag dispatch', () => {
         p_enrollment_ids: [ENR],
         p_tag_ids: [],
         p_custom_tag_ids: [],
+        p_dims: [],
         p_idempotency_key: expect.any(String),
       });
+    });
+
+    it('sends the tags as p_dims string keys', async () => {
+      _persistObservationCreate(CID, ENR, {
+        id: 'temp-id',
+        text: 't',
+        dims: ['engagement', 'cc:3', 'tag:Lab safety', 'engagement', '', null],
+      });
+      await new Promise(function (r) {
+        setTimeout(r, 0);
+      });
+      var call = client.calls.find(function (c) {
+        return c.name === 'create_observation';
+      });
+      expect(call.payload.p_dims).toEqual(['engagement', 'cc:3', 'tag:Lab safety']);
+      // Tag keys are not learning-map or custom_tag ids.
+      expect(call.payload.p_tag_ids).toEqual([]);
+      expect(call.payload.p_custom_tag_ids).toEqual([]);
     });
 
     it('passes p_assessment_id when assignmentContext has a UUID', async () => {
@@ -134,10 +153,33 @@ describe('v2 observation / template / custom-tag dispatch', () => {
         body: 'Updated',
         sentiment: 'growth',
         context_type: 'lab',
+        dims: [],
       });
       expect(call.payload.p_enrollment_ids).toBeNull();
       expect(call.payload.p_tag_ids).toBeNull();
       expect(call.payload.p_custom_tag_ids).toBeNull();
+    });
+
+    it('sends the current tags in the patch', async () => {
+      _persistObservationUpdate(CID, { id: OB_ID, text: 'x', dims: ['collaboration', 'cc:7'] });
+      await new Promise(function (r) {
+        setTimeout(r, 0);
+      });
+      var call = client.calls.find(function (c) {
+        return c.name === 'update_observation';
+      });
+      expect(call.payload.p_patch.dims).toEqual(['collaboration', 'cc:7']);
+    });
+
+    it('sends an empty dims list when the last tag is removed', async () => {
+      _persistObservationUpdate(CID, { id: OB_ID, text: 'x', dims: [] });
+      await new Promise(function (r) {
+        setTimeout(r, 0);
+      });
+      var call = client.calls.find(function (c) {
+        return c.name === 'update_observation';
+      });
+      expect(call.payload.p_patch.dims).toEqual([]);
     });
 
     it('adds assessment_id to patch when assignmentContext is a UUID', async () => {
@@ -149,6 +191,83 @@ describe('v2 observation / template / custom-tag dispatch', () => {
         return c.name === 'update_observation';
       });
       expect(call.payload.p_patch.assessment_id).toBe(AID);
+    });
+  });
+
+  describe('round trip to a second device', () => {
+    it('a tag added on one device shows after another device loads the class', async () => {
+      // Device A: post an observation with tags, then edit its tags.
+      _cache.observations[CID] = {};
+      client = makeRecordingClient({ create_observation: { data: OB_ID, error: null } });
+      globalThis.getSupabase = () => client;
+      addQuickOb(CID, ENR, 'Asked a strong question', ['engagement', 'cc:3'], 'strength', null);
+      await new Promise(function (r) {
+        setTimeout(r, 0);
+      });
+      updateQuickOb(CID, ENR, OB_ID, { dims: ['engagement', 'cc:3', 'tag:Lab safety'] });
+      await new Promise(function (r) {
+        setTimeout(r, 0);
+      });
+      var create = client.calls.find(function (c) {
+        return c.name === 'create_observation';
+      });
+      var update = client.calls.find(function (c) {
+        return c.name === 'update_observation';
+      });
+      expect(create.payload.p_dims).toEqual(['engagement', 'cc:3']);
+      expect(update.payload.p_patch.dims).toEqual(['engagement', 'cc:3', 'tag:Lab safety']);
+
+      // The server stores what was sent and returns it on the row.
+      var row = {
+        id: OB_ID,
+        body: create.payload.p_body,
+        sentiment: create.payload.p_sentiment,
+        context_type: null,
+        assessment_id: null,
+        created_at: '2026-10-18T15:00:00Z',
+        enrollment_ids: [ENR],
+        tag_ids: [],
+        custom_tag_ids: [],
+        dims: update.payload.p_patch.dims,
+      };
+
+      // Device B: load the class from the server.
+      var blob = _observationsPayloadToBlob({ observations: [row] }, CID);
+      expect(blob[ENR][0].dims).toEqual(['engagement', 'cc:3', 'tag:Lab safety']);
+    });
+
+    it('an Assignments-page comment keeps its assessment title after reload', async () => {
+      _cache.assessments[CID] = [{ id: AID, title: 'Lab report 2' }];
+      _cache.observations[CID] = {};
+      addQuickOb(CID, ENR, 'Clear method section', [], null, null, {
+        assessmentId: AID,
+        assessmentTitle: 'Lab report 2',
+      });
+      await new Promise(function (r) {
+        setTimeout(r, 0);
+      });
+      var create = client.calls.find(function (c) {
+        return c.name === 'create_observation';
+      });
+      expect(create.payload.p_assessment_id).toBe(AID);
+
+      var blob = _observationsPayloadToBlob(
+        {
+          observations: [
+            {
+              id: OB_ID,
+              body: create.payload.p_body,
+              assessment_id: create.payload.p_assessment_id,
+              created_at: '2026-10-18T15:00:00Z',
+              enrollment_ids: [ENR],
+              dims: [],
+            },
+          ],
+        },
+        CID,
+      );
+      expect(blob[ENR][0].assignmentContext).toEqual({ assessmentId: AID, assessmentTitle: 'Lab report 2' });
+      delete _cache.assessments[CID];
     });
   });
 
