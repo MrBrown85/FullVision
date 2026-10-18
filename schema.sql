@@ -282,6 +282,18 @@ create table rubric_score (
   unique (enrollment_id, assessment_id, criterion_id)
 );
 
+-- A teacher's own wording for a competency's rubric levels: where "From
+-- competency" drafts start (20261018_competency_descriptor). Keyed by the
+-- client's competency key (label + I-can text), never a tag id.
+create table competency_descriptor (
+  teacher_id     uuid        not null references teacher(id) on delete cascade,
+  competency_key text        not null,                               -- 1..400 chars
+  level          smallint    not null,                               -- 1..4
+  text           text        not null,                               -- 1..2000 chars
+  updated_at     timestamptz not null default now(),
+  primary key (teacher_id, competency_key, level)
+);
+
 create table score_audit (
   id         uuid        not null primary key,
   score_id   uuid        not null references score(id)   on delete cascade,
@@ -523,6 +535,7 @@ create table fv_idempotency (
 --   save_categories / upsert_category / delete_category
 --   upsert_rubric(p_id, p_course_id, p_name, p_criteria jsonb, p_copy_group uuid) / delete_rubric
 --   list_rubric_copies(p_copy_group uuid)                             -- (2026-10-18) live copies across the teacher's classes
+--   save_competency_descriptors(p_entries jsonb) / list_competency_descriptors()  -- (2026-10-18) the teacher's own level wording per competency
 --
 -- Student + enrollment:
 --   create_student_and_enroll(p_course_id, p_first_name, p_last_name, p_preferred_name,
