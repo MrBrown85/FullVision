@@ -3138,10 +3138,130 @@
   fill: currentColor;
   fill-opacity: 0.18;
 }
-.crit-comment-help {
+/* Criterion comment box: one comment per rubric criterion, printed on the
+   handout. Header names the student, criterion, assessment and chosen level. */
+.crit-comment-popover {
+  width: 520px;
+}
+.crit-comment-heading {
+  min-width: 0;
+}
+.crit-comment-context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-top: 3px;
   font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.crit-comment-crit {
+  font-weight: 600;
+  color: var(--text);
+}
+.crit-comment-assess::before {
+  content: '\00B7';
+  margin-right: 8px;
   color: var(--text-3);
+}
+.crit-comment-level {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  font-weight: 650;
+  color: var(--text-2);
+  background: var(--divider-subtle);
+}
+.crit-comment-level.l4 {
+  color: var(--score-4-text);
+  background: var(--score-4-bg);
+}
+.crit-comment-level.l3 {
+  color: var(--score-3-text);
+  background: var(--score-3-bg);
+}
+.crit-comment-level.l2 {
+  color: var(--score-2-text);
+  background: var(--score-2-bg);
+}
+.crit-comment-level.l1 {
+  color: var(--score-1-text);
+  background: var(--score-1-bg);
+}
+.crit-comment-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 20px 4px;
+}
+.crit-comment-label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+.crit-comment-input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 76px;
+  max-height: 220px;
+  resize: none;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-base);
   line-height: 1.45;
+}
+.crit-comment-input:focus {
+  outline: none;
+  border-color: var(--active);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--active) 22%, transparent);
+}
+.crit-comment-meta {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.crit-comment-hint {
+  flex: 1;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  line-height: 1.4;
+}
+.crit-comment-count {
+  flex-shrink: 0;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+}
+.crit-comment-count.is-long {
+  color: #a15c00;
+  font-weight: 600;
+}
+@media (prefers-color-scheme: dark) {
+  .crit-comment-count.is-long {
+    color: #ffb340;
+  }
+}
+.crit-comment-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 20px 18px;
+}
+.crit-comment-spacer {
+  flex: 1;
+}
+.crit-comment-actions .crit-comment-remove {
+  padding-left: 0;
+  padding-right: 0;
+}
+.crit-comment-actions .btn-primary:disabled {
+  opacity: 0.45;
+  cursor: default;
+  filter: none;
 }
 .rubric-print-btn {
   padding: 3px 9px;

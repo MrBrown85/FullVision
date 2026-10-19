@@ -3581,6 +3581,35 @@ window.PageAssignments = (function () {
     _critCommentState = { cid: cid, sid: sid, aid: aid, critId: critId };
     renderCriterionCommentPopover();
   }
+  // About two printed lines of a criterion comment on a quarter-sheet
+  // handout. Sheets clip anything taller, so the count turns amber past it.
+  var CRIT_COMMENT_QUARTER_FIT = 140;
+  var CRIT_COMMENT_MAX = 500;
+  var CRIT_LEVEL_NAMES = { 4: 'Extending', 3: 'Proficient', 2: 'Developing', 1: 'Emerging' };
+
+  function _critCommentLevelHtml(cid, sid, aid, crit) {
+    if (!window.RubricPrint || typeof RubricPrint.criterionLevel !== 'function') return '';
+    var lv = RubricPrint.criterionLevel(getScores(cid)[sid] || [], aid, crit);
+    if (!lv || !lv.level) return '';
+    var text = CRIT_LEVEL_NAMES[lv.level] + (lv.mod > 0 ? ' +' : lv.mod < 0 ? ' −' : '');
+    return '<span class="crit-comment-level l' + lv.level + '">' + esc(text) + '</span>';
+  }
+  // The next criterion comment button on the grid, in reading order: the
+  // same student's next criterion, then the next student's first.
+  function _nextCriterionCommentButton(st) {
+    var btns = Array.prototype.slice.call(document.querySelectorAll('.rsg-crit-comment[data-aid="' + st.aid + '"]'));
+    var at = -1;
+    btns.forEach(function (b, i) {
+      if (b.dataset.sid === st.sid && b.dataset.critid === st.critId) at = i;
+    });
+    if (at < 0) return null;
+    for (var i = at + 1; i < btns.length; i++) {
+      if (btns[i].closest('.rsg-student.has-status')) continue;
+      if (!btns[i].getClientRects().length) continue;
+      return btns[i];
+    }
+    return null;
+  }
   function renderCriterionCommentPopover() {
     if (!_critCommentState) return;
     var cid = _critCommentState.cid,
@@ -3596,6 +3625,10 @@ window.PageAssignments = (function () {
     var crit = getRubricCriterion(aid, critId);
     if (!assess || !student || !crit) return;
     var note = getRubricCriterionComment(cid, sid, aid, crit);
+    _critCommentState.original = note;
+    var name = displayName(student);
+    var next = _nextCriterionCommentButton(_critCommentState);
+    var nextLabel = next ? (next.dataset.sid === sid ? 'Save and next criterion' : 'Save and next student') : '';
     var overlay = document.getElementById('crit-comment-overlay');
     if (!overlay) {
       overlay = document.createElement('div');
@@ -3607,33 +3640,66 @@ window.PageAssignments = (function () {
       document.body.appendChild(overlay);
     }
     overlay.innerHTML =
-      '<div class="comment-popover crit-comment-popover" role="dialog" aria-labelledby="crit-comment-title"><div class="comment-popover-header"><div><div class="comment-popover-title" id="crit-comment-title">' +
-      esc(displayName(student)) +
-      '</div><div class="comment-popover-subtitle">' +
+      '<div class="comment-popover crit-comment-popover" role="dialog" aria-modal="true" aria-labelledby="crit-comment-title"><div class="comment-popover-header"><div class="crit-comment-heading"><div class="comment-popover-title" id="crit-comment-title">' +
+      esc(name) +
+      '</div><div class="crit-comment-context"><span class="crit-comment-crit">' +
       esc(crit.name) +
-      ' \u00B7 ' +
+      '</span><span class="crit-comment-assess">' +
       esc(assess.title) +
-      '</div></div><button class="comment-popover-close" data-action="closeCriterionComment" aria-label="Close">\u2715</button></div>' +
-      '<div class="comment-popover-body"><div class="crit-comment-help">Printed under this criterion on the rubric handout.</div></div>' +
-      '<div class="comment-popover-footer"><input class="comment-popover-input" id="crit-comment-input" placeholder="Add a comment\u2026" value="' +
+      '</span>' +
+      _critCommentLevelHtml(cid, sid, aid, crit) +
+      '</div></div><button class="comment-popover-close" data-action="closeCriterionComment" aria-label="Close">✕</button></div>' +
+      '<div class="crit-comment-body"><label class="crit-comment-label" for="crit-comment-input">Comment for ' +
+      esc(name) +
+      '</label><textarea class="crit-comment-input" id="crit-comment-input" rows="3" maxlength="' +
+      CRIT_COMMENT_MAX +
+      '" aria-describedby="crit-comment-hint crit-comment-count">' +
       esc(note) +
-      '" maxlength="500"><button class="comment-popover-submit" data-action="saveCriterionComment">Save</button></div></div>';
+      '</textarea><div class="crit-comment-meta"><div class="crit-comment-hint" id="crit-comment-hint">Prints under this criterion on the rubric handout. About ' +
+      CRIT_COMMENT_QUARTER_FIT +
+      ' characters fit in two lines on a quarter sheet.</div><div class="crit-comment-count" id="crit-comment-count" aria-live="polite"></div></div></div>' +
+      '<div class="crit-comment-actions">' +
+      (note
+        ? '<button type="button" class="btn btn-danger crit-comment-remove" data-action="removeCriterionComment">Remove comment</button>'
+        : '') +
+      '<span class="crit-comment-spacer"></span><button type="button" class="btn btn-ghost" data-action="closeCriterionComment">Cancel</button>' +
+      (next
+        ? '<button type="button" class="btn btn-ghost crit-comment-next" data-action="saveCriterionCommentNext" aria-keyshortcuts="Meta+Enter Control+Enter">' +
+          nextLabel +
+          '</button>'
+        : '') +
+      '<button type="button" class="btn btn-primary crit-comment-save" data-action="saveCriterionComment" aria-keyshortcuts="Enter">Save</button></div></div>';
     overlay.style.display = 'flex';
+    var inp = document.getElementById('crit-comment-input');
+    if (inp) inp.addEventListener('input', _syncCriterionCommentInput);
+    _syncCriterionCommentInput();
     setTimeout(function () {
-      var inp = document.getElementById('crit-comment-input');
-      if (inp) {
+      if (inp && inp.isConnected) {
         inp.focus();
         inp.setSelectionRange(inp.value.length, inp.value.length);
       }
     }, 50);
   }
-  function saveCriterionComment() {
-    if (!_critCommentState) return;
-    var st = _critCommentState;
+  // Grow the box with the text, update the count, and enable Save only
+  // when the comment has changed.
+  function _syncCriterionCommentInput() {
     var inp = document.getElementById('crit-comment-input');
-    if (!inp) return;
-    var text = inp.value.trim();
-    saveRubricCriterionComment(st.cid, st.sid, st.aid, st.critId, text);
+    if (!inp || !_critCommentState) return;
+    inp.style.height = 'auto';
+    inp.style.height = Math.min(inp.scrollHeight + 2, 220) + 'px';
+    var len = inp.value.trim().length;
+    var count = document.getElementById('crit-comment-count');
+    if (count) {
+      count.textContent = len + ' / ' + CRIT_COMMENT_MAX;
+      count.classList.toggle('is-long', len > CRIT_COMMENT_QUARTER_FIT);
+    }
+    var save = document.querySelector('#crit-comment-overlay .crit-comment-save');
+    if (save) save.disabled = inp.value.trim() === (_critCommentState.original || '');
+  }
+  function _commitCriterionComment(text) {
+    var st = _critCommentState;
+    if (!st) return;
+    if (text !== (st.original || '')) saveRubricCriterionComment(st.cid, st.sid, st.aid, st.critId, text);
     var btn = document.querySelector(
       '.rsg-crit-comment[data-aid="' + st.aid + '"][data-sid="' + st.sid + '"][data-critid="' + st.critId + '"]',
     );
@@ -3641,12 +3707,55 @@ window.PageAssignments = (function () {
       btn.classList.toggle('has-comment', !!text);
       btn.title = text || 'Comment on this criterion (C)';
     }
+  }
+  function saveCriterionComment() {
+    if (!_critCommentState) return;
+    var inp = document.getElementById('crit-comment-input');
+    if (!inp) return;
+    _commitCriterionComment(inp.value.trim());
     closeCriterionComment();
+  }
+  function saveCriterionCommentNext() {
+    if (!_critCommentState) return;
+    var inp = document.getElementById('crit-comment-input');
+    if (!inp) return;
+    var next = _nextCriterionCommentButton(_critCommentState);
+    _commitCriterionComment(inp.value.trim());
+    if (!next) {
+      closeCriterionComment();
+      return;
+    }
+    next.scrollIntoView({ block: 'nearest' });
+    openCriterionComment(next.dataset.aid, next.dataset.sid, next.dataset.critid);
+  }
+  function removeCriterionComment() {
+    if (!_critCommentState) return;
+    _commitCriterionComment('');
+    closeCriterionComment();
+  }
+  function _trapCriterionCommentTab(e, dialog) {
+    var items = Array.prototype.slice.call(dialog.querySelectorAll('textarea, button:not([disabled])'));
+    if (!items.length) return;
+    var first = items[0],
+      last = items[items.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    } else if (!dialog.contains(document.activeElement)) {
+      e.preventDefault();
+      first.focus();
+    }
   }
   function closeCriterionComment() {
     _critCommentState = null;
     var overlay = document.getElementById('crit-comment-overlay');
-    if (overlay) overlay.style.display = 'none';
+    if (overlay) {
+      overlay.style.display = 'none';
+      overlay.innerHTML = '';
+    }
   }
 
   /* ── Advanced settings ──────────────────────────────────── */
@@ -4356,6 +4465,12 @@ window.PageAssignments = (function () {
       saveCriterionComment: function () {
         saveCriterionComment();
       },
+      saveCriterionCommentNext: function () {
+        saveCriterionCommentNext();
+      },
+      removeCriterionComment: function () {
+        removeCriterionComment();
+      },
       closeCriterionComment: function () {
         closeCriterionComment();
       },
@@ -4548,10 +4663,33 @@ window.PageAssignments = (function () {
   }
 
   function _handleKeydown(e) {
-    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
-      if (e.key === 'Enter' && document.activeElement.id === 'crit-comment-input') {
+    // While the criterion comment box is open, keys stay inside it: Escape
+    // closes, Tab cycles its controls, and scoring keys never reach the grid.
+    if (_critCommentState && document.activeElement.id !== 'crit-comment-input') {
+      var critDialog = document.querySelector('#crit-comment-overlay .crit-comment-popover');
+      if (e.key === 'Escape') {
         e.preventDefault();
-        saveCriterionComment();
+        closeCriterionComment();
+        return;
+      }
+      if (e.key === 'Tab' && critDialog) {
+        _trapCriterionCommentTab(e, critDialog);
+        return;
+      }
+      if (critDialog) return;
+    }
+    if (document.activeElement.id === 'crit-comment-input' && e.key === 'Tab') {
+      var dlg = document.querySelector('#crit-comment-overlay .crit-comment-popover');
+      if (dlg) _trapCriterionCommentTab(e, dlg);
+      return;
+    }
+    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
+      // Criterion comment: Enter saves, Cmd/Ctrl+Enter saves and moves on,
+      // Shift+Enter is a new line.
+      if (e.key === 'Enter' && !e.shiftKey && document.activeElement.id === 'crit-comment-input') {
+        e.preventDefault();
+        if (e.metaKey || e.ctrlKey) saveCriterionCommentNext();
+        else saveCriterionComment();
       }
       if (e.key === 'Escape' && _critCommentState) {
         e.preventDefault();
