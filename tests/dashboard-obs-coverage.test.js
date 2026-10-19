@@ -1,4 +1,5 @@
 import './setup.js';
+import { PdtDate } from './helpers/pdt-date.js';
 
 const ob = (date, sentiment = null, text = 'note') => ({ date, sentiment, text });
 
@@ -217,5 +218,24 @@ describe('DashStudentCards observation line', () => {
 
   it('is not amber for a student with no observations', () => {
     expect(DashStudentCards.obsSummary([], today, null)).toMatchObject({ daysSince: null, overdue: false, count: 0 });
+  });
+});
+
+describe('days since an evening observation after a reload', () => {
+  beforeEach(() => {
+    vi.stubGlobal('Date', PdtDate);
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('says yesterday the next day, not today', () => {
+    // 6:30 pm PDT on Oct 18; the UTC day is already Oct 19.
+    const blob = _observationsPayloadToBlob({
+      observations: [{ id: 'ob1', body: 'Evening note', enrollment_ids: ['stu1'], created_at: '2026-10-19T01:30:00Z' }],
+    });
+    const s = DashStudentCards.obsSummary(blob.stu1, '2026-10-19', null);
+    expect(s.daysSince).toBe(1);
+    expect(DashStudentCards.obsWhenText(s.daysSince)).toBe('Last observed yesterday');
   });
 });

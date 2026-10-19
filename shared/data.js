@@ -1384,6 +1384,18 @@ function _dateOnly(value) {
   }
 }
 
+/* The local calendar day of a server timestamp. created_at is UTC, so
+ * slicing it gives tomorrow's date for anything written after 5 pm
+ * Pacific; observations created on this device get getTodayStr() (local),
+ * and hydrated rows must agree. A date-only string passes through as is. */
+function _localDayOf(value) {
+  if (!value) return '';
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  var d = new Date(value);
+  if (isNaN(d)) return '';
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
 /* Returns today's date in YYYY-MM-DD format, computed in the course's
  * timezone (not the browser's). This matters for reports: a Vancouver
  * teacher grading at 11 pm PST would see UTC midnight fall on the next
@@ -2572,7 +2584,7 @@ function _normalizeProfileObservations(observations) {
         sentiment: ob.sentiment || null,
         context: ob.context || null,
         created: ob.created || ob.created_at || ob.observed_at || new Date().toISOString(),
-        date: _dateOnly(ob.date || ob.observed_at || ob.created || ob.created_at),
+        date: _localDayOf(ob.date || ob.observed_at || ob.created || ob.created_at),
       };
     })
     .filter(function (ob) {
@@ -3287,7 +3299,7 @@ function _observationsPayloadToBlob(payload, cid) {
         sentiment: ob.sentiment || null,
         context: ob.context_type || ob.context || null,
         created: ob.created_at || ob.created || new Date().toISOString(),
-        date: _dateOnly(ob.observed_at || ob.created_at || ob.created),
+        date: _localDayOf(ob.observed_at || ob.created_at || ob.created),
       };
       var tagIds = ob.tag_ids || ob.tagIds || [];
       if (tagIds.length && tagIds[0]) entry.competencyId = tagIds[0];

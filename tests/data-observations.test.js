@@ -3,6 +3,8 @@
  * Tests CRUD and filtering for quick observations.
  */
 
+import { PdtDate, runnerLocalDay } from './helpers/pdt-date.js';
+
 const CID = 'test';
 
 beforeEach(() => {
@@ -249,5 +251,76 @@ describe('loading observations from the server', () => {
     const ob = getStudentQuickObs(CID, 'stu1')[0];
     expect(ob.dims).toEqual(['engagement']);
     expect(ob.assignmentContext.assessmentTitle).toBe('Cell model');
+  });
+});
+
+describe('observation dates use the local day of created_at', () => {
+  // A row written after 5 pm PDT has created_at on the next UTC day. A
+  // reload must keep it on the day it was written. Date reads as PDT here
+  // whatever zone the runner is in.
+  beforeEach(() => {
+    vi.stubGlobal('Date', PdtDate);
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('hydrates a 6:30 pm PDT row (01:30 UTC next day) to the day it was written', () => {
+    const blob = _observationsPayloadToBlob({
+      observations: [
+        {
+          id: 'ob1',
+          body: 'Evening note',
+          enrollment_ids: ['stu1'],
+          created_at: '2026-10-19T01:30:00Z',
+          observed_at: '2026-10-19T01:30:00Z',
+        },
+      ],
+    });
+    expect(blob.stu1[0].date).toBe('2026-10-18');
+  });
+
+  it('hydrates a 23:30 UTC row to the Pacific day it was written', () => {
+    const blob = _observationsPayloadToBlob({
+      observations: [
+        {
+          id: 'ob1',
+          body: 'Evening note',
+          enrollment_ids: ['stu1'],
+          created_at: '2026-10-18T23:30:00Z',
+          observed_at: '2026-10-18T23:30:00Z',
+        },
+      ],
+    });
+    expect(blob.stu1[0].date).toBe('2026-10-18');
+    expect(blob.stu1[0].created).toBe('2026-10-18T23:30:00Z');
+  });
+
+  it('dates profile recent_observations by the local day too', () => {
+    const obs = _normalizeProfileObservations([
+      { id: 'ob1', text: 'Evening note', created_at: '2026-10-19T01:30:00Z', observed_at: '2026-10-19T01:30:00Z' },
+    ]);
+    expect(obs[0].date).toBe('2026-10-18');
+  });
+
+  it('keeps a date-only value as given', () => {
+    expect(_localDayOf('2026-10-18')).toBe('2026-10-18');
+    expect(
+      _normalizeProfileObservations([{ text: 'x', date: '2026-10-19', created_at: '2026-10-18T23:30:00Z' }])[0].date,
+    ).toBe('2026-10-19');
+  });
+
+  it('leaves assessment dates untouched', () => {
+    expect(_dateOnly('2026-10-18')).toBe('2026-10-18');
+  });
+});
+
+describe('observation dates in the runner zone', () => {
+  it('match the local day of created_at', () => {
+    const iso = '2026-10-19T01:30:00Z';
+    const blob = _observationsPayloadToBlob({
+      observations: [{ id: 'ob1', body: 'x', enrollment_ids: ['stu1'], created_at: iso }],
+    });
+    expect(blob.stu1[0].date).toBe(runnerLocalDay(iso));
   });
 });
