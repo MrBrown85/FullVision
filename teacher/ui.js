@@ -509,6 +509,28 @@ if (typeof document !== 'undefined' && !window._termPickerWired) {
   });
 }
 
+/* ── Breadcrumb ────────────────────────────────────────────────
+   Screens that belong to the dashboard (a student page, Class Management)
+   keep "Dashboard" lit in the top nav and show where they are at the left
+   of their toolbar: "Dashboard › Mei Wong". The first part links back.
+   parentAction is a data-action for screens that close in place. */
+function renderBreadcrumb(parentLabel, parentHref, currentLabel, parentAction) {
+  return (
+    '<nav class="tb-breadcrumb" aria-label="Breadcrumb"><ol>' +
+    '<li><a href="' +
+    esc(parentHref) +
+    '"' +
+    (parentAction ? ' data-action="' + esc(parentAction) + '"' : '') +
+    '>' +
+    esc(parentLabel) +
+    '</a></li>' +
+    '<li><span aria-current="page">' +
+    esc(currentLabel) +
+    '</span></li>' +
+    '</ol></nav>'
+  );
+}
+
 function renderStudentHeader(cid, sid, opts) {
   opts = opts || {};
   const course = COURSES[cid];
@@ -631,7 +653,10 @@ function renderStudentHeader(cid, sid, opts) {
   }
   html += `</div>`; // end sh-stats
   if (opts.buttonLabel && opts.buttonHref) {
-    html += `<a class="page-toggle-btn" href="${opts.buttonHref}">${esc(opts.buttonLabel)}</a>`;
+    // A link to another screen is navigation, so it is secondary unless it is
+    // the screen's main action (docs/DECISIONS.md, "Buttons").
+    const btnCls = 'page-toggle-btn' + (opts.buttonSecondary ? ' page-toggle-btn--secondary' : '');
+    html += `<a class="${btnCls}" href="${opts.buttonHref}">${esc(opts.buttonLabel)}</a>`;
   }
   html += `</div>`; // end sh-row1
 

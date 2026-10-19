@@ -2162,6 +2162,7 @@
   width: 13px;
   height: 13px;
 }
+/* Generate is secondary: Save & Next is this screen's main action. */
 .tq-tb-btn.tq-tb-auto {
   width: auto;
   padding: 4px 14px;
@@ -2172,17 +2173,18 @@
   letter-spacing: var(--tracking-wide);
   margin-left: auto;
   border-radius: var(--radius-sm);
-  background: var(--active);
-  color: #fff;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
 }
 .tq-tb-btn.tq-tb-auto:hover {
-  background: var(--btn-hover-blue, #0066dd);
-  color: #fff;
+  background: var(--overlay-hover);
+  color: var(--text);
 }
 .tq-tb-btn.tq-tb-auto svg {
   width: 13px;
   height: 13px;
-  fill: #fff;
+  fill: currentColor;
 }
 .tq-tb-btn.tq-tb-copy {
   width: auto;

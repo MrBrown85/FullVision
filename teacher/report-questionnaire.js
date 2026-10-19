@@ -1323,6 +1323,7 @@ window.ReportQuestionnaire = (function () {
     html += renderStudentHeader(cid, sid, {
       buttonLabel: 'Student Dashboard',
       buttonHref: `#/student?course=${cid}&id=${sid}`,
+      buttonSecondary: true,
     });
 
     // ══ ROW 1: Dispositions + Quick Profile (4/4/4) ══

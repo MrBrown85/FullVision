@@ -1086,6 +1086,66 @@ body.offline-active #app-dock {
 .page-toggle-btn:active {
   transform: scale(0.97);
 }
+/* A link to another screen that is not this screen's main action. */
+.page-toggle-btn.page-toggle-btn--secondary {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+.page-toggle-btn.page-toggle-btn--secondary:hover {
+  filter: none;
+  background: var(--overlay-hover);
+  border-color: var(--text-3);
+  box-shadow: none;
+}
+
+/* ── Breadcrumb (renderBreadcrumb in ui.js) ── */
+.tb-breadcrumb {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.tb-breadcrumb ol {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-base);
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+.tb-breadcrumb li {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  white-space: nowrap;
+}
+.tb-breadcrumb li + li::before {
+  content: '\203A';
+  padding: 0 8px;
+  color: var(--text-3);
+  font-weight: 400;
+}
+.tb-breadcrumb a {
+  color: var(--active);
+  text-decoration: none;
+  border-radius: 4px;
+}
+.tb-breadcrumb a:hover {
+  text-decoration: underline;
+}
+.tb-breadcrumb a:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+.tb-breadcrumb [aria-current='page'] {
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 /* ── Letter grade card (shared, used by renderStudentHeader) ── */
 .letter-card {

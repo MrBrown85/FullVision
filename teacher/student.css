@@ -734,30 +734,8 @@
   overflow-y: auto;
   overscroll-behavior: contain;
 }
-.student-toolbar .tb-back-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 16px;
-  border-radius: 8px;
-  font-size: var(--text-base);
-  font-weight: 600;
-  background: var(--active);
-  color: #fff;
-  text-decoration: none;
-  border: none;
-  cursor: pointer;
-  letter-spacing: 0.01em;
-  box-shadow: 0 1px 4px rgba(0, 122, 255, 0.12);
-  flex-shrink: 0;
-}
-.student-toolbar .tb-back-btn:hover {
-  background: var(--btn-hover-blue);
-  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.25);
-}
-.student-toolbar .tb-back-btn:active {
-  transform: scale(0.97);
-}
+/* Edit Student is settings, so it is secondary (outline); the page's main
+   action is Term Questionnaire (docs/DECISIONS.md, "Buttons"). */
 .student-toolbar .tb-edit-btn {
   display: inline-flex;
   align-items: center;
@@ -766,24 +744,32 @@
   border-radius: 8px;
   font-size: var(--text-base);
   font-weight: 600;
-  background: var(--active);
-  color: #fff;
+  background: var(--surface);
+  color: var(--text);
   text-decoration: none;
-  border: none;
+  border: 1px solid var(--border);
   cursor: pointer;
   letter-spacing: 0.01em;
-  box-shadow: 0 1px 4px rgba(0, 122, 255, 0.12);
   transition:
     background 0.15s,
-    box-shadow 0.15s,
+    border-color 0.15s,
     transform 0.1s;
 }
 .student-toolbar .tb-edit-btn:hover {
-  background: var(--btn-hover-blue);
-  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.25);
+  background: var(--overlay-hover);
+  border-color: var(--text-3);
 }
 .student-toolbar .tb-edit-btn:active {
   transform: scale(0.97);
+}
+/* The note box's Add on this page is secondary too: one solid button per screen. */
+#note-capture .obsc-add {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+#note-capture .obsc-add:hover {
+  background: var(--overlay-hover);
 }
 
 /* ── Edit Student Modal ──────────────────────────────────── */
