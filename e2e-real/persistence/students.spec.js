@@ -7,7 +7,7 @@ import { makeStudent } from '../helpers/fixtures.js';
 /**
  * Students — production write path is window.saveStudents(cid, arr) which
  * queues canonical create_student_and_enroll / update_enrollment /
- * update_student / withdraw_enrollment RPCs through _persistStudentsToCanonical.
+ * update_student / withdraw_student RPCs through _persistStudentsToCanonical.
  *
  * Every test drives that helper directly (the same way cmSaveStudent does
  * inside the class manager) — never the underlying RPC.
@@ -90,7 +90,7 @@ test.describe('Students — persistence across sign-out', () => {
     await page.waitForTimeout(1000);
 
     // Wait for canonical IDs to land on both students before removing one;
-    // otherwise saveStudents can't fire withdraw_enrollment for a student
+    // otherwise saveStudents can't fire withdraw_student for a student
     // whose id is still the local placeholder.
     await page.waitForFunction(
       cid => {
@@ -105,7 +105,7 @@ test.describe('Students — persistence across sign-out', () => {
     expect(beforeDelete.enrollments).toBeGreaterThanOrEqual(2);
 
     // Drop one — saveStudents detects the removal and queues
-    // withdraw_enrollment for the missing UUID.
+    // withdraw_student for the missing UUID.
     await page.evaluate(cid => {
       const students = window.getStudents(cid).filter(s => s.firstName !== 'Drop');
       window.saveStudents(cid, students);
@@ -113,7 +113,7 @@ test.describe('Students — persistence across sign-out', () => {
     await page.waitForTimeout(800);
 
     await recycleSession(page);
-    // withdraw_enrollment is a soft delete — sets withdrawn_at, doesn't
+    // withdraw_student is a soft delete — sets withdrawn_at, doesn't
     // remove the row. So readCourseRowCounts (which filters
     // withdrawn_at IS NULL via enrollment FK) will still see it. We assert
     // against the active enrollment count returned by list_teacher_courses
@@ -169,7 +169,7 @@ test.describe('Students — persistence across sign-out', () => {
 
     // Scope the lookup via enrollment.course_id so prior runs' orphaned
     // "Round Trip" student rows (the student table isn't course-scoped;
-    // withdraw_enrollment is a soft-delete that leaves student rows behind)
+    // withdraw_student is a soft delete that leaves student rows behind)
     // don't make this query ambiguous.
     const row = await page.evaluate(async cid => {
       const sb = window._supabase;
