@@ -5,7 +5,7 @@
  *   _canonicalEnrollStudent        → create_student_and_enroll
  *   _canonicalUpdateStudent        → update_student
  *   _canonicalUpdateEnrollment     → update_enrollment
- *   _canonicalWithdrawEnrollment   → withdraw_enrollment
+ *   _canonicalWithdrawEnrollment   → withdraw_student
  *   window.reorderRoster           → reorder_roster
  *   window.bulkApplyPronouns       → bulk_apply_pronouns
  *   window.importRosterCsv         → import_roster_csv

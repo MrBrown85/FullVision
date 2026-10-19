@@ -424,17 +424,20 @@ describe('write-path audit: data layer', () => {
     expect(reenrolStudent(CID, ENR_Y)).toBe(false);
   });
 
-  // The previous version held a hard delete in the outbox until its Undo
-  // toast closed. One left there is still sent on the next page load.
-  it('still sends a hard delete the previous version held for Undo', async () => {
+  // The client before withdrawal held a hard delete in the outbox until its
+  // Undo toast closed. delete_student is gone from the server, so one left
+  // there is dropped, not sent, and doesn't keep the outbox busy.
+  it('drops a hard delete the previous client held for Undo', async () => {
     window.v2Queue.push('delete_student', { p_id: STU_Y }, { blockedOn: ['undo-window'] });
     await settle();
-    expect(fake.count('delete_student')).toBe(0);
+    expect(window.v2Queue.stats().queued).toBe(1);
 
-    releaseHeldStudentDeletes();
+    dropHeldStudentDeletes();
     await window.v2Queue.flush();
     await settle();
-    expect(fake.committedCount('delete_student', p => p.p_id === STU_Y)).toBe(1);
+    expect(fake.count('delete_student')).toBe(0);
+    expect(window.v2Queue.stats().queued).toBe(0);
+    expect(window.v2Queue.stats().deadLettered).toBe(0);
   });
 
   // Finding 5 (fixed: a refused push is refused at the data layer; nothing

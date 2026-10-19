@@ -1077,9 +1077,8 @@ function _removeLocalKeys(test) {
 async function initAllCourses() {
   // Run one-time LS format migrations before any read of cached data.
   _migrateAssignmentStatusFormat();
-  // A student delete held for an undo toast on a page that has since closed:
-  // that toast is gone, so the delete goes.
-  releaseHeldStudentDeletes();
+  // A student delete the old client held for its Undo toast can't be sent.
+  dropHeldStudentDeletes();
 
   // Demo mode: hard-skip Supabase, force local-only, ensure seed data exists.
   // Set by the "Try Demo Mode" button on the login page. Gated on the
@@ -1279,10 +1278,6 @@ function _initVisibilityRefresh() {
   });
   if (typeof window.addEventListener === 'function') {
     window.addEventListener('online', _revalidateActiveClass);
-    // A student delete waiting out its undo toast goes when the page does.
-    window.addEventListener('pagehide', function () {
-      releaseHeldStudentDeletes();
-    });
   }
 }
 
@@ -1584,7 +1579,6 @@ function _baselineRowOf(name, params) {
     case 'delete_assessment':
       return { field: 'assessments', match: 'id', id: params.p_id };
     case 'update_enrollment':
-    case 'withdraw_enrollment':
       return { field: 'students', match: 'id', id: params.p_id };
     case 'withdraw_student':
       return { field: 'students', match: 'id', id: params.p_enrollment_id };
@@ -1940,7 +1934,6 @@ var _P_ID_KINDS = {
   save_collab: 'assessment',
   save_assessment_tags: 'assessment',
   update_enrollment: 'student',
-  withdraw_enrollment: 'student',
   upsert_subject: 'subject',
   delete_subject: 'subject',
   upsert_competency_group: 'group',
@@ -9732,25 +9725,16 @@ function forgetStudentServerState(cid, sid) {
   }
 }
 
-/* Clients before withdrawal held a student's hard delete in the outbox
-   until its Undo toast closed. One may still be waiting there from before
-   this version: page loads, sign-out and leaving the page send it, as
-   they did then. */
-var _HELD_FOR_UNDO = 'undo-window';
-
-function releaseHeldStudentDeletes() {
+/* Clients before withdrawal held a student's hard delete (delete_student)
+   in the outbox until its Undo toast closed. That RPC is gone
+   (20261020_drop_old_student_delete), so one still waiting from that client
+   is dropped: the student stays on the roster, and withdrawing them is the
+   way to remove them now. Left alone it would wait forever and keep the
+   outbox busy. */
+function dropHeldStudentDeletes() {
   var q = window.v2Queue;
-  if (!q || typeof q.rewrite !== 'function') return;
-  q.rewrite(function (entry) {
-    var held = Array.isArray(entry.blocked_on) ? entry.blocked_on : [];
-    if (held.indexOf(_HELD_FOR_UNDO) < 0) return null;
-    return {
-      payload: entry.payload,
-      blockedOn: held.filter(function (id) {
-        return id !== _HELD_FOR_UNDO;
-      }),
-    };
-  });
+  if (!q || typeof q.dropBlockedOn !== 'function') return;
+  q.dropBlockedOn('undo-window');
 }
 
 /* ── v2 write RPCs from Phase 5.5 ─────────────────────────────────────── */
