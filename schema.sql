@@ -76,6 +76,7 @@ create table course (
   category_weights jsonb,                                           -- summative/formative weights (20261015_course_grading_config)
   round_percent    boolean,                                         -- whole-number course % (20261016_course_round_percent)
   reporting_terms  jsonb,                                           -- up to six {ordinal,label,starts_on,ends_on} (20261017_course_reporting_terms)
+  block            text        check (block is null or char_length(block) between 1 and 24), -- "A"–"E", "X" or a short label (20261020_course_block)
   grading_scale    jsonb       check (grading_scale is null or jsonb_typeof(grading_scale) = 'object'),      -- {boundaries:[{min, proficiency}], labels} (20261015_course_grading_config)
   category_weights jsonb       check (category_weights is null or jsonb_typeof(category_weights) = 'object'), -- legacy {summative, formative}; real weights live on `category` (20261015_course_grading_config)
   round_percent    boolean,                                        -- true whole %, false one decimal, null follow grade level (20261016_course_round_percent)
@@ -523,7 +524,8 @@ create table fv_idempotency (
 --
 -- Course CRUD:
 --   create_course(p_name, p_grade_level, p_description, p_color, p_grading_system,
---                 p_calc_method, p_decay_weight, p_timezone, p_late_work_policy, p_subjects text[])
+--                 p_calc_method, p_decay_weight, p_timezone, p_late_work_policy, p_subjects text[],
+--                 p_idempotency_key, p_block)                         -- p_block (20261020_course_block)
 --   update_course(p_course_id uuid, p_patch jsonb)
 --   archive_course(p_course_id uuid, p_archived boolean)
 --   duplicate_course(p_src_id uuid)
@@ -620,7 +622,7 @@ create table fv_idempotency (
 --   import_json_restore(p_payload jsonb)
 --
 -- Reads (hot path):
---   list_teacher_courses()
+--   list_teacher_courses()                                             -- includes block (20261020_course_block)
 --   get_gradebook(p_course_id uuid)                                    -- the single boot-path RPC
 --   get_class_bundle(p_course_id uuid, p_if_version bigint)            -- one class in one call; includes observation_templates and withdrawn_students (20261019)
 --   get_class_dashboard(p_course_id uuid)

@@ -347,6 +347,7 @@ export async function mockAuth(page) {
           decay_weight: c.decayWeight != null ? c.decayWeight : null,
           timezone: c.timezone || null,
           late_work_policy: c.lateWorkPolicy || null,
+          block: c.block || null,
           created_at: '2026-09-01T00:00:00Z',
           updated_at: '2026-09-01T00:00:00Z',
         };

@@ -34,6 +34,12 @@ function stubEl(dataset) {
   return { dataset: dataset };
 }
 
+/* Duplicate Class asks for the new class's block in a dialog (covered in
+   e2e/class-block.spec.js), then runs this copy step. */
+function duplicate(block) {
+  DashClassManager.duplicateCourse(SRC, block || '');
+}
+
 function newCid() {
   return Object.keys(COURSES).find(id => id !== SRC);
 }
@@ -90,7 +96,7 @@ describe('class manager — duplicate class', () => {
   });
 
   it('copies categories as new rows in order and leaves reporting terms behind', () => {
-    DashClassManager.handleAction('cmDuplicateCourse', stubEl({ cid: SRC }));
+    duplicate();
     const cid = newCid();
     expect(COURSES[cid].name).toBe('Science 8 (Copy)');
 
@@ -112,9 +118,17 @@ describe('class manager — duplicate class', () => {
     expect(getCourseConfig(SRC).reportingTerms).toEqual(TERMS);
   });
 
+  it('with a block chosen, keeps the class name and sets the block', () => {
+    duplicate('B');
+    const cid = newCid();
+    expect(COURSES[cid].name).toBe('Science 8');
+    expect(COURSES[cid].block).toBe('B');
+    expect(courseDisplayName(COURSES[cid])).toBe('Block B \u00B7 Science 8');
+  });
+
   it('copies nothing into categories when the source has none', () => {
     _cache.categories[SRC] = [];
-    DashClassManager.handleAction('cmDuplicateCourse', stubEl({ cid: SRC }));
+    duplicate();
     expect(getCategories(newCid())).toEqual([]);
   });
 
@@ -127,7 +141,7 @@ describe('class manager — duplicate class', () => {
     _teacherId = 'teacher-uuid';
     Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => true });
 
-    DashClassManager.handleAction('cmDuplicateCourse', stubEl({ cid: SRC }));
+    duplicate();
     await settle();
 
     const saves = fake.committed.filter(c => c.name === 'save_categories');

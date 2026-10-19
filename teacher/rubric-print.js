@@ -90,7 +90,8 @@
   function _courseName(cid) {
     var course = typeof COURSES !== 'undefined' && COURSES ? COURSES[cid] : null;
     if (!course && typeof loadCourses === 'function') course = (loadCourses() || {})[cid];
-    return (course && course.name) || '';
+    if (!course) return '';
+    return typeof courseDisplayName === 'function' ? courseDisplayName(course) : course.name || '';
   }
 
   function _assessment(cid, aid) {

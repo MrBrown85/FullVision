@@ -19,7 +19,7 @@ window.RubricLibrary = (function () {
   }
 
   function _className(cid) {
-    return (COURSES[cid] && COURSES[cid].name) || 'another class';
+    return (COURSES[cid] && courseDisplayName(COURSES[cid])) || 'another class';
   }
 
   function _labelOf(cid, tagId) {
