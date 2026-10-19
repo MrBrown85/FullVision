@@ -200,11 +200,6 @@ span.obsc-chip-label {
   border-color: var(--score-1);
 }
 
-.obsc-hint {
-  font-size: var(--text-xs, 12px);
-  color: var(--text-3);
-}
-
 /* ── Add, keep tags ──────────────────────────────────────── */
 .obsc-keep {
   display: inline-flex;
@@ -449,9 +444,6 @@ span.obsc-chip-label {
   min-height: 84px;
   font-size: 16px;
 }
-.obsc--sheet .obsc-hint {
-  display: none;
-}
 .obsc--sheet .obsc-add {
   flex: 1 1 100%;
   min-height: 44px;
@@ -459,9 +451,6 @@ span.obsc-chip-label {
 
 @media (max-width: 600px) {
   .obsc-sep {
-    display: none;
-  }
-  .obsc-hint {
     display: none;
   }
   .obsc-menu {
