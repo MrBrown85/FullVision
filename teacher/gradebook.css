@@ -412,6 +412,7 @@
   font-size: var(--text-2xs);
   color: var(--text-3);
   letter-spacing: var(--tracking-wide);
+  white-space: nowrap;
 }
 .gb-assess-type-pill {
   font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
@@ -741,7 +742,7 @@ th.gb-group-alt {
 }
 #gb-tooltip.dark {
   background: var(--text);
-  color: #fff;
+  color: var(--surface);
   border: none;
   padding: 6px 10px;
   font-size: var(--text-sm);
@@ -1115,6 +1116,11 @@ th.gb-group-alt {
   flex-direction: column;
   justify-content: flex-end;
 }
+/* Sort toggle sits in the empty top of the corner, above Student / Overall. */
+.gb-grid-corner-comp .gb-newest-first {
+  align-self: flex-start;
+  margin-bottom: auto;
+}
 .gb-grid-corner-row1 {
   display: flex;
   justify-content: space-between;
@@ -1142,25 +1148,39 @@ th.gb-group-alt {
   position: relative;
   overflow: hidden;
 }
+/* Title clamps to two lines; hover or focus shows the whole title
+   (_showAssessTitleTip in page-gradebook.js). */
 .gb-grid-assess-group .gb-assess-title {
   font-size: var(--text-sm);
   font-weight: 600;
+  line-height: 1.25;
   color: var(--text);
   text-decoration: none;
-  display: block;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  white-space: normal;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .gb-grid-assess-group .gb-assess-title:hover {
   color: var(--active);
 }
 .gb-grid-assess-group .gb-assess-meta {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
+  gap: 2px 4px;
   justify-content: center;
   margin-top: 2px;
+}
+/* In a narrow column the pill, date and badges wrap as whole pieces. */
+.gb-grid-assess-group .gb-assess-type-pill {
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .gb-grid-assess-group .gb-assess-stripe {
   position: absolute;

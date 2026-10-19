@@ -229,3 +229,24 @@ describe('formatDate', () => {
     expect(formatDate(undefined)).toBe('');
   });
 });
+
+/* ── formatShortDate ──────────────────────────────────────── */
+describe('formatShortDate', () => {
+  it('leaves the year off dates in the current school year', () => {
+    expect(formatShortDate('2026-04-25', '2026-05-01')).toBe('Apr 25');
+    expect(formatShortDate('2025-09-03', '2026-06-20')).toBe('Sep 3');
+    expect(formatShortDate('2026-08-01', '2026-10-19')).toBe('Aug 1');
+  });
+
+  it('adds the year to dates in another school year', () => {
+    expect(formatShortDate('2026-04-25', '2026-10-19')).toBe('Apr 25, 2026');
+    expect(formatShortDate('2026-07-31', '2026-08-01')).toBe('Jul 31, 2026');
+    expect(formatShortDate('2027-09-10', '2026-10-19')).toBe('Sep 10, 2027');
+  });
+
+  it('returns empty string for missing or bad input', () => {
+    expect(formatShortDate('', '2026-10-19')).toBe('');
+    expect(formatShortDate(null)).toBe('');
+    expect(formatShortDate('not a date')).toBe('');
+  });
+});

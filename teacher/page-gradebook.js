@@ -22,6 +22,23 @@ window.PageGradebook = (function () {
     localStorage.setItem('gb_rubricColumns_' + activeCourse, mode === 'criteria' ? 'criteria' : 'competencies');
     render();
   }
+  /* "Newest first" puts the Competencies view's latest assessments on the
+     left. Remembered on this device; the Scores view is always newest first. */
+  var _newestFirst = false;
+  try {
+    _newestFirst = localStorage.getItem('gb_newestFirst') === '1';
+  } catch (e) {
+    /* storage blocked: oldest first */
+  }
+  function toggleNewestFirst() {
+    _newestFirst = !_newestFirst;
+    try {
+      localStorage.setItem('gb_newestFirst', _newestFirst ? '1' : '0');
+    } catch (e) {
+      /* storage blocked: the order still changes until the page reloads */
+    }
+    render();
+  }
   var _pinnedCols = { name: true, final: true }; // pinnable: name, categories, final
   var _undoStack = [];
   var _scoreMode = null; // null or { assessmentId, studentIdx }
@@ -176,6 +193,7 @@ window.PageGradebook = (function () {
       .sort(function (a, b) {
         return (a.date || '').localeCompare(b.date || '');
       });
+    if (viewMode === 'detailed' && _newestFirst) allAssessments.reverse();
     var undatedCount = term ? undatedAssessmentCount(cid) : 0;
     var sections = getSections(cid);
     var course = COURSES[cid];
@@ -761,6 +779,11 @@ window.PageGradebook = (function () {
     // Q1: Corner (Student + Overall labels)
     html +=
       '<div class="gb-grid-corner gb-grid-corner-comp">' +
+      '<button class="tb-toggle-btn gb-newest-first' +
+      (_newestFirst ? ' active' : '') +
+      '" data-action="toggleNewestFirst" aria-pressed="' +
+      _newestFirst +
+      '" title="Put the latest assessments on the left">Newest first</button>' +
       '<div class="gb-grid-corner-row1"><span class="gb-grid-corner-label">Student</span><span class="gb-grid-corner-label">Overall</span></div>' +
       '</div>';
 
@@ -797,15 +820,11 @@ window.PageGradebook = (function () {
         typeClass +
         '" style="width:' +
         g.groupW +
-        'px" title="' +
-        esc(a.title) +
-        '">' +
+        'px">' +
         '<a class="gb-assess-title" href="#/assignments?course=' +
         cid +
         '&open=' +
         a.id +
-        '" title="' +
-        esc(a.title) +
         '">' +
         esc(a.title) +
         '</a>' +
@@ -820,7 +839,7 @@ window.PageGradebook = (function () {
         '">' +
         esc(categoryName) +
         '</span><span class="gb-assess-date">' +
-        formatDate(a.date) +
+        formatShortDate(a.date) +
         '</span>' +
         badges +
         '</div>' +
@@ -1127,7 +1146,7 @@ window.PageGradebook = (function () {
         esc(a.title) +
         '</span>' +
         '<span class="gb-scores-assess-meta">' +
-        formatDate(a.date) +
+        formatShortDate(a.date) +
         maxPts +
         '</span>' +
         '</div>' +
@@ -2971,6 +2990,11 @@ window.PageGradebook = (function () {
       gbTip.style.top = top + 'px';
       return;
     }
+    var assessGroup = e.target.closest('.gb-grid-assess-group');
+    if (assessGroup) {
+      _showAssessTitleTip(assessGroup);
+      return;
+    }
     var tagTh = e.target.closest('.gb-tag-header');
     if (tagTh) {
       var tip = tagTh.querySelector('.gb-tag-tip');
@@ -2993,17 +3017,46 @@ window.PageGradebook = (function () {
     }
   }
 
+  /* A Competencies-view header clamps its title to two lines; hovering the
+     header or focusing its link shows the whole title. */
+  function _showAssessTitleTip(group) {
+    var gbTip = document.getElementById('gb-tooltip');
+    var link = group.querySelector('.gb-assess-title');
+    if (!gbTip || !link || link.scrollHeight <= link.clientHeight + 1) return;
+    gbTip.className = 'dark';
+    gbTip.textContent = link.textContent;
+    gbTip.style.display = 'block';
+    _tipSource = group;
+    var rect = group.getBoundingClientRect();
+    var left = rect.left + rect.width / 2 - gbTip.offsetWidth / 2;
+    if (left < 8) left = 8;
+    if (left + gbTip.offsetWidth > window.innerWidth - 8) left = window.innerWidth - gbTip.offsetWidth - 8;
+    gbTip.style.left = left + 'px';
+    gbTip.style.top = rect.bottom + 6 + 'px';
+  }
+
+  function _hideTip() {
+    var gbTip = document.getElementById('gb-tooltip');
+    if (gbTip) {
+      gbTip.style.display = 'none';
+      gbTip.className = '';
+    }
+    _tipSource = null;
+  }
+
+  function _handleFocusin(e) {
+    var link = e.target.closest && e.target.closest('.gb-grid-assess-group .gb-assess-title');
+    if (link) _showAssessTitleTip(link.closest('.gb-grid-assess-group'));
+  }
+
+  function _handleFocusout(e) {
+    if (_tipSource && _tipSource.contains(e.target)) _hideTip();
+  }
+
   function _handleMouseout(e) {
     if (_tipSource) {
       var related = e.relatedTarget;
-      if (!related || !_tipSource.contains(related)) {
-        var gbTip = document.getElementById('gb-tooltip');
-        if (gbTip) {
-          gbTip.style.display = 'none';
-          gbTip.className = '';
-        }
-        _tipSource = null;
-      }
+      if (!related || !_tipSource.contains(related)) _hideTip();
     }
   }
 
@@ -3031,6 +3084,7 @@ window.PageGradebook = (function () {
       setView: function () {
         setView(el.dataset.mode);
       },
+      toggleNewestFirst: toggleNewestFirst,
       setRubricColumns: function () {
         setRubricColumns(el.dataset.mode);
       },
@@ -3144,6 +3198,8 @@ window.PageGradebook = (function () {
     _addDocListener('keydown', _handleKeydown);
     _addDocListener('mouseover', _handleMouseover);
     _addDocListener('mouseout', _handleMouseout);
+    _addDocListener('focusin', _handleFocusin);
+    _addDocListener('focusout', _handleFocusout);
 
     render();
 

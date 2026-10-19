@@ -5224,6 +5224,19 @@ function formatDate(ts) {
   if (!ts) return '';
   return parseLocalDate(ts).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' });
 }
+/* Short date for gradebook column headers: "Apr 25" in the current school
+   year, "Apr 25, 2025" otherwise. A school year runs August to July, the
+   same boundary as reportingSchoolYear. `today` is for tests. */
+function formatShortDate(ts, today) {
+  if (!ts) return '';
+  const d = parseLocalDate(ts);
+  if (isNaN(d.getTime())) return '';
+  const now = today ? parseLocalDate(today) : new Date();
+  const schoolYear = x => (x.getMonth() >= 7 ? x.getFullYear() : x.getFullYear() - 1);
+  const opts = { month: 'short', day: 'numeric' };
+  if (schoolYear(d) !== schoolYear(now)) opts.year = 'numeric';
+  return d.toLocaleDateString('en-CA', opts);
+}
 function uid() {
   return 's' + Date.now() + Math.random().toString(36).slice(2, 10);
 }
