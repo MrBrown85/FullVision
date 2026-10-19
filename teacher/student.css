@@ -1366,3 +1366,204 @@
   color: var(--text-3);
   text-align: right;
 }
+
+/* ── Competency card evidence drawer (teacher/competency-evidence.js) ── */
+button.dash-tag-row {
+  display: block;
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--overlay-hover);
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  /* The row lays itself out by its own width (narrow cards below). */
+  container-type: inline-size;
+}
+button.dash-tag-row:hover {
+  width: calc(100% + 16px);
+}
+.dash-tag-row:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 1px;
+  border-radius: var(--radius-sm);
+}
+.dash-tag-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dash-tag-inner .dash-tag-evidence {
+  width: auto;
+  white-space: nowrap;
+  text-align: right;
+}
+/* A narrow card puts the count on its own line under the badge and label
+   and drops the bar, which repeats the badge. */
+@container (max-width: 520px) {
+  .dash-tag-inner {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      'badge label chevron'
+      'count count chevron';
+    column-gap: 8px;
+    row-gap: 1px;
+  }
+  .dash-tag-inner > .prof-label {
+    grid-area: badge;
+  }
+  .dash-tag-inner .dash-tag-label {
+    grid-area: label;
+    line-height: 1.3;
+  }
+  .dash-tag-inner .dash-tag-bar {
+    display: none;
+  }
+  .dash-tag-inner .dash-tag-evidence {
+    grid-area: count;
+    text-align: left;
+    white-space: normal;
+  }
+  .dash-tag-inner .dash-tag-chevron {
+    grid-area: chevron;
+  }
+}
+.ced-explain {
+  padding: 2px 8px 6px;
+  font-size: var(--text-xs);
+  line-height: 1.45;
+  color: var(--text-2);
+}
+.ced-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  /* About ten rows, then the list scrolls inside the card. */
+  max-height: 320px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.ced-item {
+  border-bottom: 1px solid var(--overlay-hover);
+}
+.ced-item:last-child {
+  border-bottom: none;
+}
+.ced-item .tag-assess-row {
+  border-bottom: none;
+}
+.ced-empty {
+  font-size: var(--text-xs);
+  color: var(--text-3);
+  padding: 4px 8px;
+}
+button.ced-obs-row {
+  width: 100%;
+  border: none;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ced-obs-row:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: -2px;
+}
+.ced-obs-mark {
+  justify-self: center;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--ced-mark, var(--text-3));
+}
+.ced-obs-row[data-sentiment='strength'] {
+  --ced-mark: var(--score-3);
+}
+.ced-obs-row[data-sentiment='growth'] {
+  --ced-mark: var(--active);
+}
+.ced-obs-row[data-sentiment='concern'] {
+  --ced-mark: var(--score-2);
+}
+.ced-obs-main {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.ced-obs-main .obs-pill {
+  flex-shrink: 0;
+}
+.ced-obs-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ced-obs-full {
+  display: none;
+}
+/* Focus shows the whole note. */
+.ced-obs-row:focus-visible .ced-obs-main {
+  flex-wrap: wrap;
+}
+.ced-obs-row:focus-visible .ced-obs-text {
+  white-space: pre-line;
+  flex-basis: 100%;
+  order: 2;
+}
+.ced-obs-row:focus-visible .ced-obs-first {
+  display: none;
+}
+.ced-obs-row:focus-visible .ced-obs-full {
+  display: inline;
+}
+.ced-obs-row:hover .ced-obs-text {
+  color: var(--active);
+}
+.ced-capture:not(:empty) {
+  padding: 8px 8px 0;
+}
+/* The strip's menus float; let them past the card's edge while it is open,
+   without the card widening its grid column. */
+.dash-section:has(.ced-capture .obsc) {
+  overflow: visible;
+  min-width: 0;
+}
+.dash-section:has(.ced-capture .obsc) .dash-section-stripe {
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+.ced-foot {
+  display: flex;
+  justify-content: flex-end;
+  padding: 6px 8px 0;
+}
+.ced-add-btn,
+.ced-done-btn {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-2);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  min-height: 30px;
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.ced-add-btn:hover,
+.ced-done-btn:hover {
+  color: var(--active);
+  border-color: var(--active);
+}
+.ced-add-btn:focus-visible,
+.ced-done-btn:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 1px;
+}
+.ced-add-btn[hidden],
+.ced-done-btn[hidden] {
+  display: none;
+}
