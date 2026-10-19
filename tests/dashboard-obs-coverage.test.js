@@ -1,4 +1,5 @@
 import './setup.js';
+import { PdtDate } from './helpers/pdt-date.js';
 
 const ob = (date, sentiment = null, text = 'note') => ({ date, sentiment, text });
 
@@ -221,13 +222,11 @@ describe('DashStudentCards observation line', () => {
 });
 
 describe('days since an evening observation after a reload', () => {
-  const origTZ = process.env.TZ;
-  beforeAll(() => {
-    process.env.TZ = 'America/Los_Angeles';
+  beforeEach(() => {
+    vi.stubGlobal('Date', PdtDate);
   });
-  afterAll(() => {
-    if (origTZ === undefined) delete process.env.TZ;
-    else process.env.TZ = origTZ;
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('says yesterday the next day, not today', () => {

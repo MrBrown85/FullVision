@@ -12,6 +12,7 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { runInThisContext } from 'vm';
 import { parseHTML } from 'linkedom';
+import { PdtDate } from './helpers/pdt-date.js';
 
 runInThisContext(readFileSync(resolve(__dirname, '..', 'teacher-mobile/sweep.js'), 'utf-8'), {
   filename: 'teacher-mobile/sweep.js',
@@ -258,13 +259,11 @@ describe('sweep screen', () => {
 });
 
 describe('sweep after a reload in the evening', () => {
-  const origTZ = process.env.TZ;
-  beforeAll(() => {
-    process.env.TZ = 'America/Los_Angeles';
+  beforeEach(() => {
+    vi.stubGlobal('Date', PdtDate);
   });
-  afterAll(() => {
-    if (origTZ === undefined) delete process.env.TZ;
-    else process.env.TZ = origTZ;
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   afterEach(() => {

@@ -3,6 +3,8 @@
  * Tests CRUD and filtering for quick observations.
  */
 
+import { PdtDate, runnerLocalDay } from './helpers/pdt-date.js';
+
 const CID = 'test';
 
 beforeEach(() => {
@@ -254,14 +256,13 @@ describe('loading observations from the server', () => {
 
 describe('observation dates use the local day of created_at', () => {
   // A row written after 5 pm PDT has created_at on the next UTC day. A
-  // reload must keep it on the day it was written.
-  const origTZ = process.env.TZ;
-  beforeAll(() => {
-    process.env.TZ = 'America/Los_Angeles';
+  // reload must keep it on the day it was written. Date reads as PDT here
+  // whatever zone the runner is in.
+  beforeEach(() => {
+    vi.stubGlobal('Date', PdtDate);
   });
-  afterAll(() => {
-    if (origTZ === undefined) delete process.env.TZ;
-    else process.env.TZ = origTZ;
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it('hydrates a 6:30 pm PDT row (01:30 UTC next day) to the day it was written', () => {
@@ -311,5 +312,15 @@ describe('observation dates use the local day of created_at', () => {
 
   it('leaves assessment dates untouched', () => {
     expect(_dateOnly('2026-10-18')).toBe('2026-10-18');
+  });
+});
+
+describe('observation dates in the runner zone', () => {
+  it('match the local day of created_at', () => {
+    const iso = '2026-10-19T01:30:00Z';
+    const blob = _observationsPayloadToBlob({
+      observations: [{ id: 'ob1', body: 'x', enrollment_ids: ['stu1'], created_at: iso }],
+    });
+    expect(blob.stu1[0].date).toBe(runnerLocalDay(iso));
   });
 });
