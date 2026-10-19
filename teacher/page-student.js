@@ -14,6 +14,7 @@ window.PageStudent = (function () {
   var activeCourse;
   var activeSectionFilters = new Set();
   var _expandedGroups = new Set();
+  var _openTags = new Set(); // competency cards whose evidence drawer is open
   var _overrideSelectedLevel = 0;
   var _profileData = null;
   var Evidence = StudentEvidence;
@@ -130,7 +131,13 @@ window.PageStudent = (function () {
 
   /* ── Tag detail toggle ──────────────────────────────────── */
   function toggleTag(row) {
-    row.classList.toggle('open');
+    var open = row.classList.toggle('open');
+    row.setAttribute('aria-expanded', String(open));
+    var tagId = row.dataset.tagid;
+    if (tagId) {
+      if (open) _openTags.add(tagId);
+      else _openTags.delete(tagId);
+    }
   }
 
   /* ── Goal editing ───────────────────────────────────────── */
@@ -843,12 +850,18 @@ window.PageStudent = (function () {
       var tag = sec.tags[0];
       if (tag) {
         var tp = getTagProficiency(cid, studentId, tag.id);
-        var tagScores = getTagScores(cid, studentId, tag.id).filter(function (s) {
-          return s.score > 0;
-        });
-        var evidenceCount = tagScores.length;
+        var drawerId = 'ced-' + sec.id;
+        var tagOpen = _openTags.has(tag.id);
         html +=
-          '<div class="dash-tag-row" data-action="toggleTag">' +
+          '<button type="button" class="dash-tag-row' +
+          (tagOpen ? ' open' : '') +
+          '" data-action="toggleTag" data-tagid="' +
+          esc(tag.id) +
+          '" aria-expanded="' +
+          tagOpen +
+          '" aria-controls="' +
+          esc(drawerId) +
+          '"><span class="dash-tag-inner">' +
           profLabelBadge(tp) +
           '<span class="dash-tag-label">' +
           esc(tag.label) +
@@ -857,42 +870,11 @@ window.PageStudent = (function () {
           profBar(tp, 4, sec.color) +
           '</span>' +
           '<span class="dash-tag-evidence">' +
-          evidenceCount +
+          esc(CompetencyEvidence.rowCount(cid, studentId, tag.id)) +
           '</span>' +
-          '<span class="dash-tag-chevron">&#9654;</span>' +
-          '</div>' +
-          '<div class="tag-detail">';
-
-        tagScores.sort(function (a, b) {
-          return (b.date || '').localeCompare(a.date || '');
-        });
-        if (tagScores.length === 0) {
-          html += '<div style="font-size:0.75rem;color:var(--text-3);padding:4px 0;">No evidence yet</div>';
-        } else {
-          tagScores.forEach(function (sc) {
-            var assess = assessMap[sc.assessmentId];
-            var sColor = PROF_COLORS[sc.level || sc.score] || PROF_COLORS[0];
-            var href = assess ? '#/assignments?course=' + cid + '&open=' + assess.id + '&student=' + studentId : '';
-            var title = assess ? esc(assess.title) : 'Unknown';
-            html +=
-              '<a class="tag-assess-row"' +
-              (href ? ' href="' + href + '"' : '') +
-              ' title="Open in Assignments">' +
-              '<span class="tag-assess-pip" style="background:' +
-              sColor +
-              '">' +
-              (sc.level ? formatScoreLevel(sc.level, sc.mod) : sc.score || '\u2014') +
-              '</span>' +
-              '<span class="tag-assess-title">' +
-              title +
-              '</span>' +
-              '<span class="tag-assess-date">' +
-              formatDate(sc.date) +
-              '</span>' +
-              '</a>';
-          });
-        }
-        html += '</div>';
+          '<span class="dash-tag-chevron" aria-hidden="true">&#9654;</span>' +
+          '</span></button>' +
+          CompetencyEvidence.drawerHtml(cid, studentId, sec, tag, drawerId);
       }
 
       // Goal section
@@ -1237,8 +1219,12 @@ window.PageStudent = (function () {
     }
 
     html += '</div></div>'; // close padding wrapper + scroll wrapper
-    document.getElementById('main').innerHTML = html;
-    Evidence.mount(activeCourse, studentId);
+    var main = document.getElementById('main');
+    main.innerHTML = html;
+    // The Evidence panel and the competency drawers show the same
+    // observations; a change in one redraws the other.
+    Evidence.mount(activeCourse, studentId, { onChange: CompetencyEvidence.refresh });
+    CompetencyEvidence.mount(activeCourse, studentId, main, { onAdd: Evidence.refresh });
   }
 
   /* ── Delegated click handler ──────────────────────────────── */
@@ -1321,6 +1307,7 @@ window.PageStudent = (function () {
     setActiveCourse(activeCourse);
     studentId = params.id;
     activeSectionFilters = new Set();
+    _openTags = new Set();
     _overrideSelectedLevel = 0;
 
     // Show sidebar with student roster
@@ -1364,6 +1351,7 @@ window.PageStudent = (function () {
     // Clean up any open edit modal
     closeEditStudent();
     Evidence.destroy();
+    CompetencyEvidence.destroy();
     delete window._pageSwitchCourse;
   }
 

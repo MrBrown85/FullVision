@@ -235,6 +235,7 @@ load('teacher/rubric-guard.js');
 load('teacher/obs-capture.js');
 load('teacher/obs-card.js');
 load('teacher/student-evidence.js');
+load('teacher/competency-evidence.js');
 load('teacher/student-overrides.js');
 load('teacher/rubric-print.js');
 load('teacher/rubric-library.js');

@@ -6,6 +6,7 @@
  * panel itself in a DOM: tabs, cards, add and Undo delete.
  */
 import './setup.js';
+import { vi } from 'vitest';
 
 const H = StudentEvidence._helpers;
 const ob = (id, date, extra = {}) => ({ id, date, created: date + 'T15:00:00.000Z', text: 'Note ' + id, ...extra });
@@ -289,6 +290,21 @@ describe('Evidence panel in the page', () => {
     expect(cardIds()[0]).toBe('o4');
     expect($('.ev-tl-mark[data-obid="o4"]')).toBeTruthy();
     expect(tabText()[0]).toBe('All 4');
+  });
+
+  it('tells the page after an add, a delete and an Undo, and reports a pending delete', () => {
+    const onChange = vi.fn();
+    StudentEvidence.mount('c1', 's1', { onChange });
+    const cap = StudentEvidence.mountCapture('c1', 's1', $('#note-capture'));
+    cap.setText('Helped a partner');
+    cap.submit();
+    expect(onChange).toHaveBeenCalledTimes(1);
+    $('#ev-list .obs-card[data-obid="o2"] .obs-card-delete').click();
+    expect(onChange).toHaveBeenCalledTimes(2);
+    expect(StudentEvidence.isPending('o2')).toBe(true);
+    toast.undo();
+    expect(onChange).toHaveBeenCalledTimes(3);
+    expect(StudentEvidence.isPending('o2')).toBe(false);
   });
 
   it('says so in a sentence when there is nothing yet', () => {

@@ -238,6 +238,17 @@ window.StudentEvidence = (function () {
   var _pending = {};
   var _root = null;
   var _hitTimer = null;
+  var _onChange = null;
+
+  /* After an add, a delete or an Undo here, tell the page (the competency
+     drawers list the same observations). */
+  function changed() {
+    if (typeof _onChange === 'function') _onChange();
+  }
+
+  function isPending(obId) {
+    return !!_pending[obId];
+  }
 
   /* The student's observations, newest first, each carrying its studentId
      as the Observations page's do (the card's "with …" line needs it). */
@@ -596,8 +607,10 @@ window.StudentEvidence = (function () {
     }
   }
 
-  /* Fill the panel panelHtml() wrote. Called after every page render. */
-  function mount(cid, studentId) {
+  /* Fill the panel panelHtml() wrote. Called after every page render.
+     opts.onChange runs after an observation is added or deleted here. */
+  function mount(cid, studentId, opts) {
+    _onChange = (opts && opts.onChange) || null;
     if (_cid !== cid || _sid !== studentId) {
       _tab = 'all';
       _query = '';
@@ -638,7 +651,10 @@ window.StudentEvidence = (function () {
         draftKey: 'student|' + studentId,
         placeholder: 'Add an observation…',
         onAdd: function () {
-          if (_cid === cid && _sid === studentId) refresh();
+          if (_cid === cid && _sid === studentId) {
+            refresh();
+            changed();
+          }
         },
       });
       _captureKey = key;
@@ -656,6 +672,7 @@ window.StudentEvidence = (function () {
     destroyCapture();
     clearTimeout(_hitTimer);
     _root = null;
+    _onChange = null;
   }
 
   /* One click hides the card and offers Undo for six seconds; the delete
@@ -666,6 +683,7 @@ window.StudentEvidence = (function () {
     var sid = _sid;
     _pending[obId] = true;
     refresh();
+    changed();
     var settled = false;
     showUndoToast(
       'Observation deleted',
@@ -673,14 +691,20 @@ window.StudentEvidence = (function () {
         if (settled) return;
         settled = true;
         delete _pending[obId];
-        if (_cid === cid && _sid === sid) refresh();
+        if (_cid === cid && _sid === sid) {
+          refresh();
+          changed();
+        }
       },
       function () {
         if (settled) return;
         settled = true;
         delete _pending[obId];
         deleteQuickOb(cid, sid, obId);
-        if (_cid === cid && _sid === sid) refresh();
+        if (_cid === cid && _sid === sid) {
+          refresh();
+          changed();
+        }
       },
       6000,
     );
@@ -696,6 +720,7 @@ window.StudentEvidence = (function () {
     deleteOb: deleteOb,
     jumpTo: jumpTo,
     setTab: setTab,
+    isPending: isPending,
     _helpers: {
       timelineLayout: timelineLayout,
       tabFilter: tabFilter,
