@@ -189,7 +189,6 @@ window.ReportBlocks = (function () {
       const color = val > 0 ? OBS_LEVEL_COLORS[val] : 'var(--text-3)';
       const info = OBS_DESCRIPTORS[dim] || {};
       html += `<div class="report-learner-dim">
-      <span class="report-learner-dim-icon">${OBS_ICONS[dim]}</span>
       <div class="report-learner-dim-info">
         <div class="report-learner-dim-label">${OBS_LABELS[dim]}</div>
         <div class="report-dim-desc">${info.desc || ''}</div>
@@ -210,8 +209,8 @@ window.ReportBlocks = (function () {
     const rating = getStudentTermRating(cid, student.id, termId);
     if (!rating) return '';
     let html = `<div class="report-learner-profile">`;
-    html += _renderDimGroup(LEARNING_DIMS, rating, '📐 Learning Dispositions');
-    html += _renderDimGroup(RELATIONAL_DIMS, rating, '🤝 Relational & Identity');
+    html += _renderDimGroup(LEARNING_DIMS, rating, 'Learning Dispositions');
+    html += _renderDimGroup(RELATIONAL_DIMS, rating, 'Relational & Identity');
     html += `</div>`;
     return html;
   }
@@ -234,7 +233,7 @@ window.ReportBlocks = (function () {
     const recentObs = quickObs.slice(0, 5);
     if (recentObs.length === 0) return '';
     let html = `<div class="report-learner-profile">`;
-    html += `<div class="report-learner-title">📝 Observation Evidence</div>`;
+    html += `<div class="report-learner-title">Observation Evidence</div>`;
     html += `<div class="report-obs-notes">`;
     recentObs.forEach(ob => {
       const dimPills = (ob.dims || [])
@@ -428,7 +427,6 @@ window.ReportBlocks = (function () {
       dims.forEach(dim => {
         const info = OBS_DESCRIPTORS[dim];
         html += `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--divider-subtle)">
-        <span style="font-size:1.1rem;flex-shrink:0">${OBS_ICONS[dim]}</span>
         <div style="flex:1;min-width:0">
           <div style="font-size:0.82rem;font-weight:700;color:var(--text)">${OBS_LABELS[dim]}</div>
           <div style="font-size:0.7rem;color:var(--text-2);font-style:italic;line-height:1.3">${info.prompt}</div>
@@ -456,23 +454,23 @@ window.ReportBlocks = (function () {
   function renderBlockStudentReflectionHabits(cid, student) {
     const name = esc(displayNameFirst(student));
     const habits = [
-      { icon: '📅', text: 'I arrive to class on time' },
-      { icon: '📋', text: 'I come prepared with materials' },
-      { icon: '✋', text: 'I participate in class discussions' },
-      { icon: '📝', text: 'I hand in assignments on time' },
-      { icon: '🔄', text: 'When I miss class, I check in and catch up' },
-      { icon: '🤝', text: 'I am respectful to classmates and teachers' },
-      { icon: '📱', text: 'I manage distractions (phone, talking, etc.)' },
-      { icon: '💪', text: 'I put my best effort into my work' },
+      { text: 'I arrive to class on time' },
+      { text: 'I come prepared with materials' },
+      { text: 'I participate in class discussions' },
+      { text: 'I hand in assignments on time' },
+      { text: 'When I miss class, I check in and catch up' },
+      { text: 'I am respectful to classmates and teachers' },
+      { text: 'I manage distractions (phone, talking, etc.)' },
+      { text: 'I put my best effort into my work' },
     ];
     const scale = ['Needs Work', 'Getting There', 'Good', 'Great'];
     const checks = [
-      { text: 'Missed more than 3 classes', icon: '📉' },
-      { text: 'Was late more than 3 times', icon: '⏰' },
-      { text: 'Had missing assignments', icon: '📂' },
-      { text: 'Asked for help when I needed it', icon: '🙋' },
-      { text: 'Used feedback to improve my work', icon: '🔁' },
-      { text: 'Set a goal and worked toward it', icon: '🎯' },
+      { text: 'Missed more than 3 classes' },
+      { text: 'Was late more than 3 times' },
+      { text: 'Had missing assignments' },
+      { text: 'Asked for help when I needed it' },
+      { text: 'Used feedback to improve my work' },
+      { text: 'Set a goal and worked toward it' },
     ];
     let html = `<div class="report-block-box" style="page-break-inside:avoid">`;
     html += `<div class="report-block-title">My Classroom Habits & Responsibilities</div>`;
@@ -484,7 +482,7 @@ window.ReportBlocks = (function () {
     });
     html += `</tr></thead><tbody>`;
     habits.forEach(h => {
-      html += `<tr><td>${h.icon} ${h.text}</td>`;
+      html += `<tr><td>${h.text}</td>`;
       scale.forEach(() => {
         html += `<td><span class="report-habits-bubble"></span></td>`;
       });
@@ -496,7 +494,7 @@ window.ReportBlocks = (function () {
     <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-2);margin-bottom:10px">This term, I…</div>
     <div class="report-habits-checks">`;
     checks.forEach(c => {
-      html += `<div class="report-parent-check"><span class="report-parent-checkbox"></span> ${c.icon} ${c.text}</div>`;
+      html += `<div class="report-parent-check"><span class="report-parent-checkbox"></span> ${c.text}</div>`;
     });
     html += `</div></div>`;
     // Open response

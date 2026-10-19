@@ -298,7 +298,7 @@ window.StudentEvidence = (function () {
       '<div class="ev-timeline" id="ev-timeline"></div>' +
       '<div class="note-capture" id="note-capture"></div>' +
       '<div class="ev-toolbar">' +
-      '<div class="ev-tabs" role="tablist" aria-label="Show evidence" id="ev-tabs"></div>' +
+      '<div class="seg seg-sm ev-tabs" role="tablist" aria-label="Show evidence" id="ev-tabs"></div>' +
       '<input type="search" class="note-search-input ev-search" id="ev-search" placeholder="Search evidence" aria-label="Search evidence">' +
       '</div>' +
       '<div class="ev-list" id="ev-list" role="tabpanel" aria-labelledby="ev-tab-' +
@@ -312,7 +312,7 @@ window.StudentEvidence = (function () {
     return TABS.map(function (t) {
       var on = t.key === _tab;
       return (
-        '<button type="button" role="tab" class="ev-tab' +
+        '<button type="button" role="tab" class="seg-btn ev-tab' +
         (on ? ' active' : '') +
         '" id="ev-tab-' +
         t.key +

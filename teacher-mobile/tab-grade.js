@@ -154,7 +154,7 @@ window.MGrade = (function () {
     var cells = '';
     if (!sorted.length) {
       cells =
-        '<div class="m-empty"><div class="m-empty-icon">📋</div><div class="m-empty-title">No Assessments</div><div class="m-empty-subtitle">Create assessments on the desktop app</div></div>';
+        '<div class="m-empty"><div class="m-empty-title">No Assessments</div><div class="m-empty-subtitle">Create assessments on the desktop app</div></div>';
     } else {
       cells = '<div class="m-list" id="m-grade-list">';
       sorted.forEach(function (a) {

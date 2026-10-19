@@ -68,7 +68,7 @@ window.MCardWidgets = (function () {
     var flagHTML = '';
     var config = data.widgetConfig;
     if (config.order.indexOf('flagStatus') >= 0 && isStudentFlagged(cid, st.id)) {
-      flagHTML = '<span class="m-scard-flag" title="Flagged" aria-label="Flagged">&#x1F6A9;</span>';
+      flagHTML = '<span class="m-scard-flag" title="Flagged" aria-label="Flagged">\u2691</span>';
     }
 
     return (
@@ -358,7 +358,7 @@ window.MCardWidgets = (function () {
     if (!entry) return '';
     return (
       '<div class="m-wdg-reflection">' +
-      '<div class="m-wdg-reflection-label">\ud83c\udfaf Student voice</div>' +
+      '<div class="m-wdg-reflection-label">Student voice</div>' +
       '<div class="m-wdg-reflection-text">' +
       MC.esc(_trunc(entry.text, 60)) +
       '</div>' +

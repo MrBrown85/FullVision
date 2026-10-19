@@ -907,9 +907,9 @@ window.AssessmentCopy = (function () {
       '></div>' +
       '<div class="af-copy-dates-bar" id="af-copy-dates-bar" hidden>' +
       '<span class="af-copy-dates-label">Dates</span>' +
-      '<div class="af-type-toggle af-copy-dates-mode">' +
-      '<button type="button" class="af-type-btn active" data-action="copyDatesMode" data-mode="same" aria-pressed="true">Same for every class</button>' +
-      '<button type="button" class="af-type-btn" data-action="copyDatesMode" data-mode="per" aria-pressed="false">Set per class</button>' +
+      '<div class="seg seg-sm af-type-toggle af-copy-dates-mode" role="group" aria-label="Dates">' +
+      '<button type="button" class="seg-btn af-type-btn active" data-action="copyDatesMode" data-mode="same" aria-pressed="true">Same for every class</button>' +
+      '<button type="button" class="seg-btn af-type-btn" data-action="copyDatesMode" data-mode="per" aria-pressed="false">Set per class</button>' +
       '</div>' +
       '</div>' +
       '<div id="af-copy-dates"></div>' +
@@ -1089,12 +1089,12 @@ window.AssessmentCopy = (function () {
     if (!sibs.length || sibs.length > 3) return '';
     var all = [{ id: cid, name: _className(cid) }].concat(sibs);
     return (
-      '<div class="assess-sibling-toggle" role="group" aria-label="Sections of this course">' +
+      '<div class="seg assess-sibling-toggle" role="group" aria-label="Sections of this course">' +
       all
         .map(function (c) {
           var on = c.id === cid;
           return (
-            '<button type="button" class="assess-sibling-btn' +
+            '<button type="button" class="seg-btn assess-sibling-btn' +
             (on ? ' active' : '') +
             '" data-action="switchToClass" data-cid="' +
             esc(c.id) +

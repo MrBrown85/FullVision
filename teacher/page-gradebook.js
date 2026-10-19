@@ -252,18 +252,18 @@ window.PageGradebook = (function () {
       '</select>';
 
     html +=
-      '<div class="gb-seg-control" role="tablist" aria-label="View mode">' +
-      '<button class="gb-seg-btn' +
+      '<div class="seg gb-seg-control" role="tablist" aria-label="View mode">' +
+      '<button class="seg-btn gb-seg-btn' +
       (viewMode === 'detailed' ? ' active' : '') +
       '" data-action="setView" data-mode="detailed" role="tab" aria-selected="' +
       (viewMode === 'detailed') +
       '">Competencies</button>' +
-      '<button class="gb-seg-btn' +
+      '<button class="seg-btn gb-seg-btn' +
       (viewMode === 'scores' ? ' active' : '') +
       '" data-action="setView" data-mode="scores" role="tab" aria-selected="' +
       (viewMode === 'scores') +
       '">Scores</button>' +
-      '<button class="gb-seg-btn' +
+      '<button class="seg-btn gb-seg-btn' +
       (viewMode === 'summary' ? ' active' : '') +
       '" data-action="setView" data-mode="summary" role="tab" aria-selected="' +
       (viewMode === 'summary') +
@@ -278,13 +278,13 @@ window.PageGradebook = (function () {
       html +=
         '<div class="gb-rubric-cols">' +
         '<span class="gb-rubric-cols-label" id="gb-rubric-cols-label">Rubric columns</span>' +
-        '<div class="gb-seg-control" role="tablist" aria-labelledby="gb-rubric-cols-label">' +
-        '<button class="gb-seg-btn' +
+        '<div class="seg gb-seg-control" role="tablist" aria-labelledby="gb-rubric-cols-label">' +
+        '<button class="seg-btn gb-seg-btn' +
         (rubricCols === 'competencies' ? ' active' : '') +
         '" data-action="setRubricColumns" data-mode="competencies" role="tab" aria-selected="' +
         (rubricCols === 'competencies') +
         '" title="One column per competency the rubric scores">Competencies</button>' +
-        '<button class="gb-seg-btn' +
+        '<button class="seg-btn gb-seg-btn' +
         (rubricCols === 'criteria' ? ' active' : '') +
         '" data-action="setRubricColumns" data-mode="criteria" role="tab" aria-selected="' +
         (rubricCols === 'criteria') +
@@ -307,7 +307,9 @@ window.PageGradebook = (function () {
       '</button>';
 
     html +=
-      '<div class="gb-search-wrap"><span class="gb-search-icon">🔍</span><input class="gb-search-input" type="text" placeholder="Search…" value="' +
+      '<div class="gb-search-wrap"><span class="gb-search-icon">' +
+      LINE_ICONS.search +
+      '</span><input class="gb-search-input" type="text" placeholder="Search…" value="' +
       esc(searchQuery) +
       '" data-action-input="gbSearch" aria-label="Search students"></div>';
 
@@ -406,7 +408,6 @@ window.PageGradebook = (function () {
       var secLabel = filterSections.length > 0 ? ' in the selected sections' : '';
       html +=
         '<div style="text-align:center;padding:60px 20px;color:var(--text-3)">' +
-        '<div style="font-size:1.5rem;margin-bottom:8px;opacity:0.4">📋</div>' +
         '<div style="font-family:var(--font-base);font-size:0.95rem;margin-bottom:4px">No assignments found' +
         secLabel +
         '.</div>' +

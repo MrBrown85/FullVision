@@ -50,7 +50,8 @@ function renderDock(activePage, rightHTML) {
   _ensureSyncStatusUI();
   const ap = activePage === 'student' ? 'dashboard' : activePage;
   const seg = TB_PAGES.map(
-    p => `<a href="${p.href}" class="tb-seg-link${p.id === ap ? ' tb-seg-active' : ''}">${p.label}</a>`,
+    p =>
+      `<a href="${p.href}" class="seg-btn tb-seg-link${p.id === ap ? ' tb-seg-active" aria-current="page' : ''}">${p.label}</a>`,
   ).join('');
 
   const userMenu = `<div class="tb-user-menu">
@@ -73,7 +74,7 @@ function renderDock(activePage, rightHTML) {
       <button class="tb-btn" data-action="toggleSidebar" title="Toggle Sidebar" aria-label="Toggle Sidebar">${TB_SIDEBAR_SVG}</button>
     </div>
     <div class="tb-group tb-center">
-      <div class="tb-seg">${seg}</div>
+      <div class="seg tb-seg">${seg}</div>
     </div>
     <div class="tb-group tb-right">${rightHTML || ''}<div class="tb-sync" role="status" aria-label="Sync status"><div class="tb-sync-dot idle" id="sync-indicator-dot" title="All changes saved" aria-label="All changes saved"></div></div>${userMenu}</div>
   </nav>`;
@@ -506,6 +507,38 @@ if (typeof document !== 'undefined' && !window._termPickerWired) {
     setSelectedTermOrdinal(cid, el.value === 'all' ? null : Number(el.value));
     var page = typeof Router !== 'undefined' && Router.getCurrentPage ? Router.getCurrentPage() : null;
     if (page && typeof page.render === 'function') page.render();
+  });
+}
+
+/* ── Segmented control (.seg in styles.css) ─────────────────── */
+/* The chosen segment carries the ARIA state its role calls for:
+   aria-selected on a tab, aria-checked on a radio, aria-pressed on a plain
+   button, aria-current on a page link. segAttr() writes it into markup;
+   segSelect() moves it to btn within its .seg, along with the .active class
+   older selectors still read. */
+function _segStateAttr(role, tag) {
+  if (role === 'tab') return 'aria-selected';
+  if (role === 'radio') return 'aria-checked';
+  if (tag === 'A') return 'aria-current';
+  return 'aria-pressed';
+}
+function segAttr(on, role) {
+  var name = _segStateAttr(role, '');
+  return (role ? ' role="' + role + '"' : '') + ' ' + name + '="' + (on ? 'true' : 'false') + '"';
+}
+function segSelect(btn) {
+  var seg = btn && btn.closest('.seg');
+  if (!seg) return;
+  seg.querySelectorAll('.seg-btn').forEach(function (b) {
+    var on = b === btn;
+    var name = _segStateAttr(b.getAttribute('role'), b.tagName);
+    b.classList.toggle('active', on);
+    if (name === 'aria-current') {
+      if (on) b.setAttribute(name, 'page');
+      else b.removeAttribute(name);
+    } else {
+      b.setAttribute(name, on ? 'true' : 'false');
+    }
   });
 }
 

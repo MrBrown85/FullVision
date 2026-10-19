@@ -58,39 +58,6 @@
   border-color: var(--active);
   outline: none;
 }
-/* iOS-style segmented control */
-.report-seg-control {
-  display: flex;
-  gap: 2px;
-  background: var(--divider-subtle);
-  border-radius: 8px;
-  padding: 2px;
-}
-.report-seg-btn {
-  padding: 5px 14px;
-  font-family: var(--font-base);
-  font-size: var(--text-base);
-  font-weight: 500;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-2);
-  cursor: pointer;
-  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
-  white-space: nowrap;
-  line-height: 1.2;
-}
-.report-seg-btn:hover {
-  color: var(--text);
-}
-.report-seg-btn.active {
-  background: var(--surface);
-  color: var(--text);
-  font-weight: 600;
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.1),
-    0 1px 2px rgba(0, 0, 0, 0.06);
-}
 .report-print-btn {
   padding: 5px 14px;
   font-family: var(--font-base);
@@ -798,10 +765,6 @@
   align-items: center;
   gap: 10px;
 }
-.report-learner-dim-icon {
-  font-size: var(--text-xl);
-  flex-shrink: 0;
-}
 .report-learner-dim-info {
   flex: 1;
 }
@@ -1058,6 +1021,8 @@
   width: 14px;
   text-align: center;
   flex-shrink: 0;
+  display: inline-flex;
+  justify-content: center;
 }
 .rb-block.locked .rb-drag-grip {
   cursor: default;
@@ -1631,13 +1596,6 @@
   align-items: center;
   gap: 7px;
 }
-.tq-dim-icon {
-  font-size: var(--text-md);
-  flex-shrink: 0;
-  width: 20px;
-  text-align: center;
-  filter: saturate(0.85);
-}
 .tq-dim-label {
   font-family: var(--font-base);
   font-size: var(--text-sm);
@@ -2096,8 +2054,6 @@
   box-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.06);
 }
 .tq-obs-filter-bar {
-  display: flex;
-  gap: 4px;
   margin-bottom: 6px;
 }
 .tq-obs-hint {
@@ -2125,27 +2081,6 @@
   text-transform: uppercase;
   text-align: center;
   flex: 1;
-}
-.tq-obs-filter-btn {
-  padding: 2px 8px;
-  border: 1px solid var(--border);
-  background: transparent;
-  border-radius: var(--radius-sm);
-  font-size: var(--text-xs);
-  font-weight: 500;
-  color: var(--text-3);
-  cursor: pointer;
-  transition: all 0.15s;
-  font-family: var(--font-base);
-}
-.tq-obs-filter-btn:hover {
-  background: var(--overlay-hover);
-  color: var(--text);
-}
-.tq-obs-filter-btn.active {
-  background: var(--active);
-  color: #fff;
-  border-color: var(--active);
 }
 .tq-tb-btn svg {
   width: 15px;

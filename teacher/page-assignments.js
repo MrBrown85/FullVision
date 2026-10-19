@@ -273,26 +273,26 @@ window.PageAssignments = (function () {
       (showUngraded ? ' active' : '') +
       '" data-action="toggleUngraded" aria-pressed="' +
       showUngraded +
-      '" aria-label="Show ungraded assessments only">\u26A0 Ungraded</button>' +
+      '" aria-label="Show ungraded assessments only">\u26A0\uFE0E Ungraded</button>' +
       '<div class="assess-search-wrap">' +
-      '<span class="assess-search-icon" aria-hidden="true">\uD83D\uDD0D</span>' +
+      '<span class="assess-search-icon" aria-hidden="true">' +
+      LINE_ICONS.search +
+      '</span>' +
       '<input class="assess-search-input" type="text" placeholder="Search\u2026" value="' +
       esc(assessSearch) +
       '" data-action-input="assessSearch" aria-label="Search assessments">' +
       '</div>' +
-      '<div class="assess-seg-control" style="margin-left:4px">' +
-      '<button class="assess-seg-btn' +
-      ((
+      '<div class="seg assess-seg-control" role="group" aria-label="Expand or collapse all assessments">' +
+      '<button class="seg-btn assess-seg-btn"' +
+      segAttr(
         focusStudentId
           ? _allExpanded && _collapsedIds.size === 0
-          : openAssessIds.size > 0 && openAssessIds.size >= getAssessments(activeCourse).length
-      )
-        ? ' active'
-        : '') +
-      '" data-action="expandAllAssess">Expand</button>' +
-      '<button class="assess-seg-btn' +
-      ((focusStudentId ? !_allExpanded && openAssessIds.size === 0 : openAssessIds.size === 0) ? ' active' : '') +
-      '" data-action="collapseAllAssess">Collapse</button>' +
+          : openAssessIds.size > 0 && openAssessIds.size >= getAssessments(activeCourse).length,
+      ) +
+      ' data-action="expandAllAssess">Expand</button>' +
+      '<button class="seg-btn assess-seg-btn"' +
+      segAttr(focusStudentId ? !_allExpanded && openAssessIds.size === 0 : openAssessIds.size === 0) +
+      ' data-action="collapseAllAssess">Collapse</button>' +
       '</div>' +
       (focusStudentId
         ? '<button class="tb-action-btn tb-show-all-btn" data-action="clearFocusStudent">Show All Students</button>'
@@ -480,7 +480,7 @@ window.PageAssignments = (function () {
         (a.rubricId
           ? (function () {
               var r = getRubricById(cid, a.rubricId);
-              return r ? '<span class="rubric-badge">\uD83D\uDCCB ' + esc(r.name) + '</span>' : '';
+              return r ? '<span class="rubric-badge">' + esc(r.name) + '</span>' : '';
             })()
           : '') +
         (a.coreCompetencyIds || [])
@@ -500,10 +500,7 @@ window.PageAssignments = (function () {
           })
           .join('') +
         (a.collaboration && a.collaboration !== 'individual'
-          ? '<span class="collab-badge">\uD83D\uDC65 ' +
-            a.collaboration[0].toUpperCase() +
-            a.collaboration.slice(1) +
-            '</span>'
+          ? '<span class="collab-badge">' + a.collaboration[0].toUpperCase() + a.collaboration.slice(1) + '</span>'
           : '') +
         (window.AssessmentCopy ? AssessmentCopy.renderCardCopies(cid, a) : '') +
         '<span class="assess-date">' +
@@ -524,7 +521,7 @@ window.PageAssignments = (function () {
                 return (
                   "<span style=\"font-family:'SF Mono', ui-monospace, 'Menlo', monospace;font-size:0.6rem;color:var(--priority);margin-left:6px\" title=\"" +
                   unscoredCount +
-                  ' students unscored past due date">\u26A0 ' +
+                  ' students unscored past due date">\u26A0\uFE0E ' +
                   unscoredCount +
                   ' missing</span>'
                 );
@@ -539,15 +536,15 @@ window.PageAssignments = (function () {
           ? (function () {
               var showRubric = rubricViewStates[a.id] !== undefined ? rubricViewStates[a.id] : true;
               return (
-                '<div class="rubric-view-toggle">' +
-                '<button class="rubric-view-btn' +
-                (!showRubric ? ' active' : '') +
-                '" data-action="setRubricView" data-aid="' +
+                '<div class="seg seg-sm rubric-view-toggle" role="group" aria-label="Grade by">' +
+                '<button class="seg-btn rubric-view-btn"' +
+                segAttr(!showRubric) +
+                ' data-action="setRubricView" data-aid="' +
                 a.id +
                 '" data-rubric="false">Tags</button>' +
-                '<button class="rubric-view-btn' +
-                (showRubric ? ' active' : '') +
-                '" data-action="setRubricView" data-aid="' +
+                '<button class="seg-btn rubric-view-btn"' +
+                segAttr(showRubric) +
+                ' data-action="setRubricView" data-aid="' +
                 a.id +
                 '" data-rubric="true">Rubric</button>' +
                 '</div>' +
@@ -559,13 +556,19 @@ window.PageAssignments = (function () {
           : '') +
         '<button class="assess-header-action-btn" data-action="editAssess" data-aid="' +
         a.id +
-        '" title="Edit">\u270F\uFE0F</button>' +
+        '" title="Edit" aria-label="Edit assessment">' +
+        LINE_ICONS.edit +
+        '</button>' +
         '<button class="assess-header-action-btn" data-action="dupeAssess" data-aid="' +
         a.id +
-        '" title="Duplicate">\uD83D\uDCC4</button>' +
+        '" title="Duplicate" aria-label="Duplicate assessment">' +
+        LINE_ICONS.copy +
+        '</button>' +
         '<button class="assess-header-action-btn action-delete" data-action="deleteAssess" data-aid="' +
         a.id +
-        '" title="Delete assessment" aria-label="Delete assessment">\uD83D\uDDD1\uFE0F</button>' +
+        '" title="Delete assessment" aria-label="Delete assessment">' +
+        LINE_ICONS.trash +
+        '</button>' +
         '</div>' +
         '<span class="assess-chevron">' +
         (isOpen ? '\u25BE' : '\u25B8') +
@@ -707,7 +710,6 @@ window.PageAssignments = (function () {
         '" data-module-id="__none__" data-folder-drop="__none__">' +
         '<div class="mod-folder-header" data-action="toggleModuleFolder" data-uid="__none__">' +
         '<span class="mod-folder-chevron">\u25B6</span>' +
-        '<span style="font-size:0.88rem;color:var(--text-3)">\uD83D\uDCC1</span>' +
         '<span class="mod-folder-name" style="font-size:0.95rem;font-weight:500;color:var(--text-3)">Unassigned</span>' +
         '<span class="mod-folder-meta">' +
         ungrouped.length +
@@ -732,14 +734,12 @@ window.PageAssignments = (function () {
     if (assessments.length === 0 && allAssessments.length > 0) {
       html +=
         '<div style="text-align:center;color:var(--text-3);padding:40px 0">' +
-        '<div style="font-size:1.2rem;margin-bottom:6px;opacity:0.4">\uD83D\uDCCB</div>' +
         '<div style="font-size:0.88rem;margin-bottom:4px">No matching assignments.</div>' +
         '<div style="font-size:0.78rem">Try adjusting your filters or <a href="#" data-action="clearAssessFilters" style="color:var(--link)">clear all filters</a>.</div>' +
         '</div>';
     } else if (assessments.length === 0 && allAssessments.length === 0) {
       html +=
         '<div class="empty-state">' +
-        '<div class="empty-state-icon">\uD83D\uDCDD</div>' +
         '<div class="empty-state-title">No assignments yet</div>' +
         '<div class="empty-state-text">Create your first assignment to start grading.</div>' +
         '</div>';
@@ -1014,16 +1014,22 @@ window.PageAssignments = (function () {
       '</div>' +
       '<div class="af-field" style="flex:1.3;min-width:210px">' +
       '<label class="af-label">Collaboration</label>' +
-      '<div class="af-type-toggle">' +
-      '<button class="af-type-btn af-collab-btn' +
+      '<div class="seg af-type-toggle" role="group" aria-label="Collaboration">' +
+      '<button type="button" class="seg-btn af-type-btn af-collab-btn' +
       (collaboration === 'individual' ? ' active' : '') +
-      '" data-collab="individual" data-action="setCollaboration">Individual</button>' +
-      '<button class="af-type-btn af-collab-btn' +
+      '"' +
+      segAttr(collaboration === 'individual') +
+      ' data-collab="individual" data-action="setCollaboration">Individual</button>' +
+      '<button type="button" class="seg-btn af-type-btn af-collab-btn' +
       (collaboration === 'pair' ? ' active' : '') +
-      '" data-collab="pair" data-action="setCollaboration">Pair</button>' +
-      '<button class="af-type-btn af-collab-btn' +
+      '"' +
+      segAttr(collaboration === 'pair') +
+      ' data-collab="pair" data-action="setCollaboration">Pair</button>' +
+      '<button type="button" class="seg-btn af-type-btn af-collab-btn' +
       (collaboration === 'group' ? ' active' : '') +
-      '" data-collab="group" data-action="setCollaboration">Group</button>' +
+      '"' +
+      segAttr(collaboration === 'group') +
+      ' data-collab="group" data-action="setCollaboration">Group</button>' +
       '</div>' +
       '</div>' +
       '<div class="af-field" style="flex:1">' +
@@ -1050,16 +1056,22 @@ window.PageAssignments = (function () {
       '<input type="hidden" id="af-scoremode" value="' +
       scoreMode +
       '">' +
-      '<div class="af-type-toggle">' +
-      '<button type="button" class="af-type-btn af-scoremode-btn' +
+      '<div class="seg af-type-toggle" role="group" aria-label="Scoring mode">' +
+      '<button type="button" class="seg-btn af-type-btn af-scoremode-btn' +
       (scoreMode === 'proficiency' ? ' active' : '') +
-      '" data-mode="proficiency" data-action="setScoreMode">Proficiency</button>' +
-      '<button type="button" class="af-type-btn af-scoremode-btn' +
+      '"' +
+      segAttr(scoreMode === 'proficiency') +
+      ' data-mode="proficiency" data-action="setScoreMode">Proficiency</button>' +
+      '<button type="button" class="seg-btn af-type-btn af-scoremode-btn' +
       (scoreMode === 'points' ? ' active' : '') +
-      '" data-mode="points" data-action="setScoreMode">Points</button>' +
-      '<button type="button" class="af-type-btn af-scoremode-btn' +
+      '"' +
+      segAttr(scoreMode === 'points') +
+      ' data-mode="points" data-action="setScoreMode">Points</button>' +
+      '<button type="button" class="seg-btn af-type-btn af-scoremode-btn' +
       (scoreMode === 'complete' ? ' active' : '') +
-      '" data-mode="complete" data-action="setScoreMode">Complete/Incomplete</button>' +
+      '"' +
+      segAttr(scoreMode === 'complete') +
+      ' data-mode="complete" data-action="setScoreMode">Complete/Incomplete</button>' +
       '</div>' +
       '</div>' +
       '<div class="af-field" id="af-maxpoints-wrap" style="flex:0 0 auto;' +
@@ -1278,9 +1290,7 @@ window.PageAssignments = (function () {
   }
 
   function setScoreMode(mode) {
-    document.querySelectorAll('.af-scoremode-btn').forEach(function (b) {
-      b.classList.toggle('active', b.dataset.mode === mode);
-    });
+    segSelect(document.querySelector('.af-scoremode-btn[data-mode="' + mode + '"]'));
     var el = document.getElementById('af-scoremode');
     if (el) el.value = mode;
     var wrap = document.getElementById('af-maxpoints-wrap');

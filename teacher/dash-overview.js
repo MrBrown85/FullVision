@@ -24,7 +24,9 @@ window.DashOverview = (function () {
       '<button class="dash-add-btn" data-action="openClassManager">Class Management</button>' +
       (typeof renderTermPicker === 'function' ? renderTermPicker(activeCourse) : '') +
       '<div class="dash-search-wrap">' +
-      '<span class="search-icon" aria-hidden="true">\uD83D\uDD0D</span>' +
+      '<span class="search-icon" aria-hidden="true">' +
+      LINE_ICONS.search +
+      '</span>' +
       '<input class="dash-search-input" type="text" placeholder="Search students\u2026" value="' +
       esc(searchQuery) +
       '" data-action-input="dashSearch" aria-label="Search students">' +

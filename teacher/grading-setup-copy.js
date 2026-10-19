@@ -486,9 +486,9 @@ window.GradingSetupCopy = (function () {
     var only = opts.only || null;
     var title = only === 'categories' ? 'Copy categories' : 'Copy grading setup';
     var html =
-      '<div class="cm-seg gsc-mode" role="radiogroup" aria-label="Direction">' +
-      '<button type="button" class="cm-seg-btn" role="radio" data-gsc-mode="to">Copy to other classes</button>' +
-      '<button type="button" class="cm-seg-btn" role="radio" data-gsc-mode="from">Import from another class</button>' +
+      '<div class="seg cm-seg gsc-mode" role="radiogroup" aria-label="Direction">' +
+      '<button type="button" class="seg-btn cm-seg-btn" role="radio" data-gsc-mode="to">Copy to other classes</button>' +
+      '<button type="button" class="seg-btn cm-seg-btn" role="radio" data-gsc-mode="from">Import from another class</button>' +
       '</div>' +
       '<div id="gsc-classes"></div>' +
       '<div class="copy-review-note" id="gsc-groups-title"></div>' +

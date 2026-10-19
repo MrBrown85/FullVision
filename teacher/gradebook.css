@@ -61,40 +61,6 @@
   white-space: nowrap;
 }
 
-/* iOS-style segmented control — frosted track + floating pill */
-.gb-seg-control {
-  display: flex;
-  gap: 2px;
-  background: var(--divider-subtle);
-  border-radius: 8px;
-  padding: 2px;
-}
-.gb-seg-btn {
-  padding: 5px 14px;
-  font-family: var(--font-base);
-  font-size: var(--text-base);
-  font-weight: 500;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-2);
-  cursor: pointer;
-  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
-  white-space: nowrap;
-  line-height: 1.2;
-}
-.gb-seg-btn:hover {
-  color: var(--text);
-}
-.gb-seg-btn.active {
-  background: var(--surface);
-  color: var(--text);
-  font-weight: 600;
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.1),
-    0 1px 2px var(--divider-subtle);
-}
-
 /* Filter trigger button — opens/closes filter strip */
 .gb-filter-trigger {
   display: flex;
@@ -149,7 +115,7 @@
 .gb-search-icon {
   position: absolute;
   left: 9px;
-  font-size: var(--text-xs);
+  display: flex;
   color: var(--text-3);
   pointer-events: none;
 }

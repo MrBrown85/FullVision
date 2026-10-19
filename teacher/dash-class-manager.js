@@ -950,7 +950,6 @@ window.DashClassManager = (function () {
     if (courseIds.length === 0 && cmMode !== 'create') {
       html +=
         '<div class="cm-empty">' +
-        '<div class="cm-empty-icon">\uD83D\uDCDA</div>' +
         '<div class="cm-empty-title">No classes yet</div>' +
         '<div class="cm-empty-text">Create your first class to get started with your gradebook.</div>' +
         '<button class="btn btn-primary" data-action="cmStartCreate" style="margin-top:16px">Create a Class</button>' +
@@ -1331,18 +1330,18 @@ window.DashClassManager = (function () {
       '</div>' +
       '<div class="cm-field">' +
       '<label class="cm-label">Grading System</label>' +
-      '<div class="cm-seg" role="radiogroup" aria-label="Grading system">' +
-      '<button class="cm-seg-btn' +
+      '<div class="seg cm-seg" role="radiogroup" aria-label="Grading system">' +
+      '<button class="seg-btn cm-seg-btn' +
       (gs === 'proficiency' ? ' active' : '') +
       '" role="radio" aria-checked="' +
       (gs === 'proficiency') +
       '" data-action="cmSetGradingSystem" data-value="proficiency">Proficiency</button>' +
-      '<button class="cm-seg-btn' +
+      '<button class="seg-btn cm-seg-btn' +
       (gs === 'letter' ? ' active' : '') +
       '" role="radio" aria-checked="' +
       (gs === 'letter') +
       '" data-action="cmSetGradingSystem" data-value="letter">Letter</button>' +
-      '<button class="cm-seg-btn' +
+      '<button class="seg-btn cm-seg-btn' +
       (gs === 'both' ? ' active' : '') +
       '" role="radio" aria-checked="' +
       (gs === 'both') +
@@ -1359,12 +1358,14 @@ window.DashClassManager = (function () {
       _cmRenderReportingTermsField(cmSelectedCourse) +
       '<div class="cm-field">' +
       '<label class="cm-label">Calculation Method</label>' +
-      '<div class="cm-seg">' +
+      '<div class="seg cm-seg" role="radiogroup" aria-label="Calculation method">' +
       CALC_METHODS.map(function (m) {
         return (
-          '<button class="cm-seg-btn' +
+          '<button class="seg-btn cm-seg-btn' +
           (method === m.value ? ' active' : '') +
-          '" data-action="cmSetCalcMethod" data-value="' +
+          '"' +
+          segAttr(method === m.value, 'radio') +
+          ' data-action="cmSetCalcMethod" data-value="' +
           m.value +
           '">' +
           m.label +
@@ -1468,7 +1469,6 @@ window.DashClassManager = (function () {
     if ((lm.sections || []).length === 0 && compGroups.length === 0) {
       html +=
         '<div class="cm-curriculum-empty">' +
-        '<div class="cm-curriculum-empty-icon">\uD83D\uDCD0</div>' +
         '<div class="cm-curriculum-empty-text">No learning standards yet. Add a standard to start defining your curriculum.</div>' +
         '</div>';
     }
@@ -1538,7 +1538,6 @@ window.DashClassManager = (function () {
         '" data-module-id="__none__" data-folder-drop="__none__">' +
         '<div class="mod-folder-header" data-action="cmToggleStdFolder" data-uid="__none__">' +
         '<span class="mod-folder-chevron">\u25B6</span>' +
-        '<span style="font-size:0.88rem;color:var(--text-3)">\uD83D\uDCC1</span>' +
         '<span class="mod-folder-name" style="font-size:0.95rem;font-weight:500;color:var(--text-3)">Ungrouped</span>' +
         '<span class="mod-folder-meta">' +
         _cmGrouped.ungrouped.length +
@@ -1609,7 +1608,7 @@ window.DashClassManager = (function () {
       '<button class="cm-action-btn" data-action="cmToggleArchive" data-cid="' +
       cid +
       '">' +
-      (isArchived ? '\uD83D\uDCE6 Unarchive Class' : '\uD83D\uDCE6 Archive Class') +
+      (isArchived ? 'Unarchive Class' : 'Archive Class') +
       '</button>' +
       (isArchived
         ? '<button class="cm-action-btn cm-action-btn-danger" data-action="cmDeleteCourse" data-cid="' +
@@ -1835,12 +1834,14 @@ window.DashClassManager = (function () {
       '<div class="cm-field"><label class="cm-label">Grading System</label>' +
       // T-UI-02 · wizard grading_system picker. Grades 10–12 default to
       // Letter; with no categories, letter grades use total points.
-      '<div class="cm-seg" id="cm-cg-grading">' +
+      '<div class="seg cm-seg" id="cm-cg-grading" role="radiogroup" aria-label="Grading system">' +
       GRADING_SYSTEMS.map(function (g) {
         return (
-          '<button class="cm-seg-btn' +
+          '<button class="seg-btn cm-seg-btn' +
           (grading === g.value ? ' active' : '') +
-          '" data-val="' +
+          '"' +
+          segAttr(grading === g.value, 'radio') +
+          ' data-val="' +
           g.value +
           '" data-action="cmCreateToggle" data-group="cm-cg-grading">' +
           g.label +
@@ -1853,14 +1854,16 @@ window.DashClassManager = (function () {
       '</div>' +
       '</div>' +
       '<div class="cm-field"><label class="cm-label">Calculation Method</label>' +
-      '<div class="cm-seg" id="cm-cg-calc">' +
+      '<div class="seg cm-seg" id="cm-cg-calc" role="radiogroup" aria-label="Calculation method">' +
       CALC_METHODS.map(function (m) {
         var action = m.value === 'decayingAvg' ? 'cmCreateToggleDecay' : 'cmCreateToggle';
         var isActive = m.value === calc;
         return (
-          '<button class="cm-seg-btn' +
+          '<button class="seg-btn cm-seg-btn' +
           (isActive ? ' active' : '') +
-          '" data-val="' +
+          '"' +
+          segAttr(isActive, 'radio') +
+          ' data-val="' +
           m.value +
           '" data-action="' +
           action +
@@ -2176,10 +2179,7 @@ window.DashClassManager = (function () {
   }
 
   function cmCreateToggle(btn, containerId) {
-    document.querySelectorAll('#' + containerId + ' .cm-seg-btn').forEach(function (b) {
-      b.classList.remove('active');
-    });
-    btn.classList.add('active');
+    segSelect(btn);
     if (containerId === 'cm-cg-calc') {
       cwStep2Calc = btn.dataset.val;
       var desc = document.getElementById('cm-cg-calc-desc');
@@ -2792,13 +2792,13 @@ window.DashClassManager = (function () {
     return (
       '<div class="cm-field">' +
       '<label class="cm-label">Course %</label>' +
-      '<div class="cm-seg" role="radiogroup" aria-label="Course percentage">' +
-      '<button class="cm-seg-btn' +
+      '<div class="seg cm-seg" role="radiogroup" aria-label="Course percentage">' +
+      '<button class="seg-btn cm-seg-btn' +
       (whole ? ' active' : '') +
       '" role="radio" aria-checked="' +
       whole +
       '" data-action="cmSetRoundPercent" data-value="whole">Whole number (86%)</button>' +
-      '<button class="cm-seg-btn' +
+      '<button class="seg-btn cm-seg-btn' +
       (whole ? '' : ' active') +
       '" role="radio" aria-checked="' +
       !whole +

@@ -138,7 +138,7 @@ window.ReportBuilderUI = (function () {
         '<span class="rb-drag-grip"' +
         (block.locked ? '' : ' data-drag="grip"') +
         '>' +
-        (block.locked ? '\uD83D\uDD12' : '\u283F') +
+        (block.locked ? LINE_ICONS.lock : '\u283F') +
         '</span>' +
         (block.locked
           ? '<span class="rb-block-label">' + esc(block.label) + '</span>'

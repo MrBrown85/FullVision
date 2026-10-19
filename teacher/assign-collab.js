@@ -34,9 +34,7 @@ window.AssignCollab = (function () {
 
   function setCollaboration(mode) {
     newCollaboration = mode;
-    document.querySelectorAll('.af-collab-btn').forEach(function (b) {
-      b.className = 'af-type-btn af-collab-btn' + (b.dataset.collab === mode ? ' active' : '');
-    });
+    segSelect(document.querySelector('.af-collab-btn[data-collab="' + mode + '"]'));
     renderCollabPanel();
   }
 

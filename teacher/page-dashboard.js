@@ -321,7 +321,6 @@ window.PageDashboard = (function () {
         }
       });
       actionItems.push({
-        icon: '\uD83D\uDCCB',
         text:
           uncoveredTags.length +
           ' learning standard' +
@@ -339,7 +338,6 @@ window.PageDashboard = (function () {
     });
     if (uncoveredCCs.length > 0) {
       actionItems.push({
-        icon: '\uD83C\uDFAF',
         text:
           uncoveredCCs.length +
           ' core competenc' +
@@ -360,7 +358,6 @@ window.PageDashboard = (function () {
     });
     if (lowCoverageStudents.length > 0) {
       actionItems.push({
-        icon: '\u26A0\uFE0F',
         text:
           lowCoverageStudents.length +
           ' student' +
@@ -373,7 +370,6 @@ window.PageDashboard = (function () {
 
     if (recentObsCount === 0) {
       actionItems.push({
-        icon: '\uD83D\uDCDD',
         text: 'No observations recorded this week',
         link: '#/observations',
         linkText: 'Observe',
@@ -385,7 +381,6 @@ window.PageDashboard = (function () {
     });
     if (unobservedStudents.length > 0) {
       actionItems.push({
-        icon: '\uD83D\uDC64',
         text:
           unobservedStudents.length +
           ' student' +

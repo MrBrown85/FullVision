@@ -108,7 +108,7 @@ window.MStudentsList = (function () {
     var cells = '';
     if (!students.length) {
       cells =
-        '<div class="m-empty"><div class="m-empty-icon">👤</div><div class="m-empty-title">No Students</div><div class="m-empty-subtitle">Add students on the desktop app</div></div>';
+        '<div class="m-empty"><div class="m-empty-title">No Students</div><div class="m-empty-subtitle">Add students on the desktop app</div></div>';
     } else {
       cells =
         '<div class="m-list" id="m-student-list">' +

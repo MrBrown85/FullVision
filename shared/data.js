@@ -9756,7 +9756,7 @@ function resolveTag(tagStr) {
     return { key: tagStr, label: tagStr.slice(4), group: 'Custom', color: '#8b5cf6', type: 'custom' };
   }
   if (OBS_LABELS[tagStr]) {
-    return { key: tagStr, label: OBS_LABELS[tagStr], icon: OBS_ICONS[tagStr], color: 'var(--text-2)', type: 'dim' };
+    return { key: tagStr, label: OBS_LABELS[tagStr], color: 'var(--text-2)', type: 'dim' };
   }
   return { key: tagStr, label: tagStr, group: '', color: 'var(--text-3)', type: 'unknown' };
 }
