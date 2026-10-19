@@ -942,125 +942,6 @@ function initSidebarToggle() {
   applySidebarState();
 }
 
-/* ── Delete Student (P6.7 hard delete — removes all associated data, returns snapshot for undo) ──
-   Strategy: skip the per-entity dispatch paths (saveX) for LS cleanup and
-   call _saveCourseField directly so we don't fire redundant RPCs against
-   rows that delete_student is about to cascade-delete server-side. The
-   canonical hard-delete RPC at the end does the real work; cascade through
-   enrollment in the FK chain handles every dependent table (note, goal,
-   reflection, section_override, attendance, term_rating, score, tag_score,
-   rubric_score, observation_student). */
-function deleteStudent(cid, sid) {
-  const students = getStudents(cid);
-  const student = students.find(s => s.id === sid);
-  const scores = getScores(cid);
-  const goals = getGoals(cid);
-  const reflections = getReflections(cid);
-  const notes = getNotes(cid);
-  const flags = getFlags(cid);
-  const statuses = getAssignmentStatuses(cid);
-
-  // Save snapshot for undo
-  const snapshot = {
-    student,
-    index: students.indexOf(student),
-    scores: scores[sid] ? structuredClone(scores[sid]) : [],
-    goals: goals[sid] ? structuredClone(goals[sid]) : undefined,
-    reflections: reflections[sid] ? structuredClone(reflections[sid]) : undefined,
-    notes: notes[sid] ? structuredClone(notes[sid]) : undefined,
-    flagged: flags[sid],
-    statuses: {},
-    quickObs: getQuickObs(cid)[sid] ? structuredClone(getQuickObs(cid)[sid]) : undefined,
-    termRatings: getTermRatings(cid)[sid] ? structuredClone(getTermRatings(cid)[sid]) : undefined,
-  };
-  Object.keys(statuses).forEach(k => {
-    if (k.startsWith(sid + ':')) snapshot.statuses[k] = statuses[k];
-  });
-
-  // LS-only cleanup. Each _saveCourseField writes localStorage + cache and
-  // broadcasts the change without touching the canonical store.
-  _saveCourseField(
-    'students',
-    cid,
-    students.filter(s => s.id !== sid),
-  );
-  delete scores[sid];
-  _saveCourseField('scores', cid, scores);
-  delete goals[sid];
-  _saveCourseField('goals', cid, goals);
-  delete reflections[sid];
-  _saveCourseField('reflections', cid, reflections);
-  delete notes[sid];
-  _saveCourseField('notes', cid, notes);
-  delete flags[sid];
-  _saveCourseField('flags', cid, flags);
-  Object.keys(statuses).forEach(k => {
-    if (k.startsWith(sid + ':')) delete statuses[k];
-  });
-  _saveCourseField('statuses', cid, statuses);
-  const obs = getQuickObs(cid);
-  delete obs[sid];
-  _saveCourseField('observations', cid, obs);
-  const tr = getTermRatings(cid);
-  delete tr[sid];
-  _saveCourseField('termRatings', cid, tr);
-
-  // Clean student from assignment collaboration data (pairs, groups,
-  // excludedStudents). These edits MUST go through saveAssessments because
-  // they update assessment.collab_config server-side — the cascade chain
-  // can't reach JSONB columns on assessment rows that survive. Undo puts
-  // the snapshot back the same way.
-  const assessments = getAssessments(cid);
-  const named = list => Array.isArray(list) && list.some(item => (Array.isArray(item) ? item : [item]).includes(sid));
-  snapshot.collab = {};
-  assessments.forEach(a => {
-    if (!named(a.excludedStudents) && !named(a.pairs) && !named(a.groups)) return;
-    snapshot.collab[a.id] = structuredClone({
-      excludedStudents: a.excludedStudents,
-      pairs: a.pairs,
-      groups: a.groups,
-    });
-    if (a.excludedStudents) {
-      a.excludedStudents = a.excludedStudents.filter(id => id !== sid);
-      if (a.excludedStudents.length === 0) delete a.excludedStudents;
-    }
-    if (a.pairs) {
-      a.pairs = a.pairs.map(p => p.filter(id => id !== sid)).filter(p => p.length > 0);
-      if (a.pairs.length === 0) delete a.pairs;
-    }
-    if (a.groups) {
-      a.groups = a.groups.map(g => g.filter(id => id !== sid)).filter(g => g.length > 0);
-      if (a.groups.length === 0) delete a.groups;
-    }
-  });
-  if (Object.keys(snapshot.collab).length) saveAssessments(cid, assessments);
-
-  // The canonical hard-delete. Schema FK cascade through enrollment handles
-  // every per-enrollment dependent table. It is held in the outbox until the
-  // undo toast closes (holdStudentDelete), and the server baselines drop the
-  // student now so no later save withdraws the enrollment or clears their
-  // scores in the meantime. Skipped in demo mode and when Supabase is
-  // degraded/disabled — LS cleanup above is the only state that matters in
-  // those modes.
-  if (
-    typeof _useSupabase !== 'undefined' &&
-    _useSupabase &&
-    localStorage.getItem('gb-demo-mode') !== '1' &&
-    typeof holdStudentDelete === 'function'
-  ) {
-    forgetStudentServerState(cid, sid);
-    // sid is the enrollment id; delete_student needs the person's student id.
-    holdStudentDelete(sid, (student && student.personId) || sid).then(function (res) {
-      if (res && res.error && !res.error.cancelled && typeof showSyncToast === 'function') {
-        showSyncToast('The student was not deleted on the server. Reload and try again.', 'error');
-      }
-    });
-    snapshot.heldDelete = isStudentDeleteHeld(sid);
-  }
-
-  return snapshot;
-}
-
 /* ── Undo Toast ───────────────────────────────────────────── */
 let _undoState = null;
 let _undoTimer = null;
@@ -1512,7 +1393,6 @@ window.UI = {
   toggleSidebar,
   applySidebarState,
   initSidebarToggle,
-  deleteStudent,
   showUndoToast,
   executeUndo,
   dismissUndoToast,

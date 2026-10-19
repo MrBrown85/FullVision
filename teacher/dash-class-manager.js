@@ -471,7 +471,7 @@ window.DashClassManager = (function () {
     cwStep2Decay = '65',
     cwStep2LatePolicy = '';
 
-  function deleteStudentUI(sid) {
+  function withdrawStudentUI(sid) {
     // The roster is rendered for cmSelectedCourse, which is not always the
     // dashboard's active course: cmSelectClass moves the manager's selection
     // on its own, and page-dashboard re-injects its own activeCourse through
@@ -489,93 +489,92 @@ window.DashClassManager = (function () {
     if (!st) return;
     var dname = displayName(st);
     showConfirm(
-      'Delete Student',
-      'Permanently delete ' + dname + ' and all their data? This cannot be undone.',
-      'Delete',
-      'danger',
+      'Withdraw student',
+      'Withdraw ' +
+        dname +
+        ' from this class? They leave the roster, gradebook and reports. Their scores, observations and reports are kept, and you can re-enrol them from the Withdrawn list.',
+      'Withdraw',
+      'primary',
       function () {
-        var snapshot = deleteStudent(cid, sid);
+        if (!withdrawStudent(cid, sid)) return;
         renderClassManager();
-        showUndoToast(
-          'Student deleted',
-          function () {
-            // The server delete waits for the toast, so Undo finds everything
-            // still there and only the local copy comes back. Without a held
-            // delete (demo mode, a student not yet on the server) the save
-            // functions put it back. A delete that already went cannot be
-            // undone: re-enrolling a deleted person would fail.
-            if (!restoreDeletedStudent(cid, snapshot)) {
-              if (snapshot.heldDelete) return;
-              restoreDeletedStudentLocally(cid, snapshot);
-            }
-            var collabIds = Object.keys(snapshot.collab || {});
-            if (collabIds.length) {
-              var assessments = getAssessments(cid);
-              assessments.forEach(function (a) {
-                var saved = snapshot.collab[a.id];
-                if (!saved) return;
-                ['excludedStudents', 'pairs', 'groups'].forEach(function (k) {
-                  if (saved[k] === undefined) delete a[k];
-                  else a[k] = saved[k];
-                });
-              });
-              saveAssessments(cid, assessments);
-            }
-            renderClassManager();
-          },
-          function () {
-            releaseHeldStudentDeletes(sid);
-          },
-        );
+        showUndoToast(dname + ' withdrawn', function () {
+          reenrolStudent(cid, sid);
+          renderClassManager();
+        });
       },
     );
   }
 
-  /* Undo after the server delete already went (or without the server): put
-     the local copy back through the save functions, as before. */
-  function restoreDeletedStudentLocally(cid, snapshot) {
-    var sid = snapshot.student.id;
-    var sts = getStudents(cid);
-    sts.push(snapshot.student);
-    saveStudents(cid, sts);
-    var sc = getScores(cid);
-    sc[sid] = snapshot.scores;
-    saveScores(cid, sc);
-    if (snapshot.goals !== undefined) {
-      var g = getGoals(cid);
-      g[sid] = snapshot.goals;
-      saveGoals(cid, g);
-    }
-    if (snapshot.reflections !== undefined) {
-      var r = getReflections(cid);
-      r[sid] = snapshot.reflections;
-      saveReflections(cid, r);
-    }
-    if (snapshot.notes !== undefined) {
-      var n = getNotes(cid);
-      n[sid] = snapshot.notes;
-      saveNotes(cid, n);
-    }
-    if (snapshot.flagged) {
-      var f = getFlags(cid);
-      f[sid] = true;
-      saveFlags(cid, f);
-    }
-    if (snapshot.statuses) {
-      var s = getAssignmentStatuses(cid);
-      Object.assign(s, snapshot.statuses);
-      saveAssignmentStatuses(cid, s);
-    }
-    if (snapshot.quickObs !== undefined) {
-      var o = getQuickObs(cid);
-      o[sid] = snapshot.quickObs;
-      saveQuickObs(cid, o);
-    }
-    if (snapshot.termRatings !== undefined) {
-      var t = getTermRatings(cid);
-      t[sid] = snapshot.termRatings;
-      saveTermRatings(cid, t);
-    }
+  function cmReenrolStudent(sid) {
+    if (!cmSelectedCourse) return;
+    if (reenrolStudent(cmSelectedCourse, sid)) renderClassManager();
+  }
+
+  /* The second step: only a withdrawn student can be deleted, and the
+     delete cannot be undone, so there is no Undo. */
+  function cmDeleteWithdrawn(sid) {
+    var cid = cmSelectedCourse;
+    if (!cid) return;
+    var entry = getWithdrawnStudents(cid).find(function (w) {
+      return w && w.student && w.student.id === sid;
+    });
+    if (!entry) return;
+    showConfirm(
+      'Delete permanently',
+      'Permanently delete ' +
+        displayName(entry.student) +
+        '? Their scores, observations, goals, reflections and reports in this class are deleted. This cannot be undone.',
+      'Delete permanently',
+      'danger',
+      function () {
+        if (deleteWithdrawnStudent(cid, sid)) renderClassManager();
+      },
+    );
+  }
+
+  /* Withdrawn students, under the roster: when they left, Re-enrol, and
+     the permanent delete. */
+  function renderWithdrawnList(cid) {
+    var list = getWithdrawnStudents(cid).filter(function (w) {
+      return w && w.student && w.student.id;
+    });
+    if (!list.length) return '';
+    var html =
+      '<div class="cm-withdrawn" id="cm-withdrawn">' +
+      '<div class="cm-withdrawn-title">Withdrawn <span class="cm-section-count">(' +
+      list.length +
+      ')</span></div>' +
+      '<p class="cm-withdrawn-help">Their scores, observations and reports are kept. Re-enrol brings everything back.</p>' +
+      '<div class="cm-student-list">';
+    list.forEach(function (w) {
+      var st = w.student;
+      var when = w.withdrawnAt ? _cmWithdrawnDate(w.withdrawnAt) : '';
+      html +=
+        '<div class="cm-student-row cm-withdrawn-row" data-withdrawn-sid="' +
+        esc(st.id) +
+        '">' +
+        '<span class="cm-student-name">' +
+        esc(fullName(st)) +
+        '</span>' +
+        (when ? '<span class="cm-withdrawn-when">Withdrawn ' + esc(when) + '</span>' : '') +
+        '<div class="cm-student-actions">' +
+        '<button class="cm-add-link cm-withdrawn-btn" data-action="cmReenrolStudent" data-sid="' +
+        esc(st.id) +
+        '">Re-enrol</button>' +
+        '<button class="cm-add-link cm-withdrawn-btn cm-withdrawn-delete" data-action="cmDeleteWithdrawn" data-sid="' +
+        esc(st.id) +
+        '">Delete permanently</button>' +
+        '</div>' +
+        '</div>';
+    });
+    return html + '</div></div>';
+  }
+
+  function _cmWithdrawnDate(iso) {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
   /* ── Class Manager Student Functions ────────────────────── */
@@ -706,7 +705,7 @@ window.DashClassManager = (function () {
 
   function cmRemoveStudent(sid) {
     if (!cmSelectedCourse) return;
-    deleteStudentUI(sid);
+    withdrawStudentUI(sid);
   }
 
   /* ── Bulk Edit Mode ─────────────────────────────────────── */
@@ -1197,7 +1196,9 @@ window.DashClassManager = (function () {
           '" title="Edit" style="font-size:0.65rem">\u270E</button>' +
           '<button class="cm-delete-mini" data-action="cmRemoveStudent" data-sid="' +
           st.id +
-          '" title="Remove">\u2715</button>' +
+          '" title="Withdraw" aria-label="Withdraw ' +
+          esc(fullName(st)) +
+          '">\u2715</button>' +
           '</div>' +
           '</div>';
       });
@@ -1314,6 +1315,7 @@ window.DashClassManager = (function () {
       '<input type="file" id="cm-csv-input" accept=".csv,.txt" style="display:none" data-action-change="cmCSV">' +
       '</div>' +
       '<div id="cm-import-preview"></div>' +
+      renderWithdrawnList(cid) +
       '</div>';
 
     // Section 3: Grading & Calculation (still in left column)
@@ -4253,6 +4255,12 @@ window.DashClassManager = (function () {
       },
       cmRemoveStudent: function () {
         cmRemoveStudent(el.dataset.sid);
+      },
+      cmReenrolStudent: function () {
+        cmReenrolStudent(el.dataset.sid);
+      },
+      cmDeleteWithdrawn: function () {
+        cmDeleteWithdrawn(el.dataset.sid);
       },
       cmCancelStudent: function () {
         cmCancelStudent();

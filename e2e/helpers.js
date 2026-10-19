@@ -322,6 +322,7 @@ export async function mockAuth(page) {
           customTags: get('customTags', []) || [],
           reportConfig: get('reportConfig', {}) || {},
           courseConfig: get('courseConfigs', {}) || {},
+          withdrawn: get('withdrawn', []) || [],
         };
       });
       db = { courses, config, perCourse, versions: {} };
@@ -583,6 +584,27 @@ export async function mockAuth(page) {
       return rows;
     }
 
+    // Withdrawn enrollments, as get_class_bundle lists them.
+    function withdrawnRows(list) {
+      return (list || [])
+        .filter(w => w && w.student && w.student.id)
+        .map(w => ({
+          enrollment_id: w.student.id,
+          student_id: w.student.personId || w.student.id,
+          first_name: w.student.firstName || '',
+          last_name: w.student.lastName || '',
+          preferred_name: w.student.preferred || '',
+          pronouns: w.student.pronouns || '',
+          student_number: w.student.studentNumber || '',
+          email: w.student.email || '',
+          date_of_birth: w.student.dateOfBirth || null,
+          designations: w.student.designations || [],
+          roster_position: w.index != null ? w.index + 1 : 0,
+          is_flagged: false,
+          withdrawn_at: w.withdrawnAt || null,
+        }));
+    }
+
     function classBundle(cid, ifVersion) {
       const store = serverDb();
       const data = store.perCourse[cid];
@@ -606,6 +628,7 @@ export async function mockAuth(page) {
           report_config: Object.keys(blocks).length > 0 ? { blocks_config: blocks, preset: _preset || null } : null,
           custom_tags: data.customTags,
           course_config: { grading_scale: cc.gradingScale || null, category_weights: cc.categoryWeights || null },
+          withdrawn_students: withdrawnRows(data.withdrawn),
         },
       };
     }

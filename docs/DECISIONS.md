@@ -23,7 +23,7 @@ Context: `grading-compliance-plan.md`. All implemented; see its status table.
 - **Letter cutoffs are the BC scale,** fixed, not editable schemes.
 - **Overrides are per competency with a required reason.** No course-level final-grade override.
 - **No LMS features:** no assignment submission, content pages, discussions or quizzes. FullVision sits beside the district LMS.
-- **Students are removed by withdrawal, not deletion** (planned; hard delete stays behind a second step).
+- **Students are removed by withdrawal, not deletion** (2026-10-19). The roster's remove button withdraws: the student leaves the roster, gradebook, dashboard, observations, phone app and reports, and their scores, observations and reports stay on the server. Class Management lists them under Withdrawn with Re-enrol. Permanent delete is the second step, only from that list, and only for a withdrawn student (`delete_withdrawn_student`); it has no Undo.
 - **Sync failures show only on the sync dot.** No banners or toasts.
 - **Plain language in the UI:** sentence case, no jargon without a legend.
 

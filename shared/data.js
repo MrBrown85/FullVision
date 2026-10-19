@@ -83,6 +83,7 @@ const _cache = {
   notes: {}, // keyed by cid
   reportConfig: {}, // keyed by cid
   studentProfileSummaries: {}, // keyed by cid
+  withdrawn: {}, // keyed by cid — withdrawn students and their records
   v2Gradebook: {}, // keyed by cid — raw get_gradebook(cid) payload (Phase 3.4+)
 };
 
@@ -108,6 +109,7 @@ const _DATA_KEYS = {
   notes: 'notes',
   reportConfig: 'report-config',
   studentProfileSummaries: 'student-profile-summaries',
+  withdrawn: 'withdrawn',
 };
 
 let _useSupabase = false;
@@ -591,7 +593,7 @@ function _migrateCourseDataLocalToCanonical(localId, canonicalId) {
   // anything written via the bulk save during the pending window stays local
   // until P6.6 wires those bulk fallbacks. Migrate cache+LS for parity even
   // though no canonical dispatch fires today.
-  ['goals', 'reflections', 'observations', 'flags', 'overrides', 'termRatings', 'reportConfig'].forEach(
+  ['goals', 'reflections', 'observations', 'flags', 'overrides', 'termRatings', 'reportConfig', 'withdrawn'].forEach(
     function (field) {
       if (userEdits[field] !== undefined && _cache[field]) {
         _cache[field][canonicalId] = userEdits[field];
@@ -625,7 +627,7 @@ let _courseSyncCourseId = null;
 let _courseSyncState = {};
 
 function _isGradebookField(field) {
-  return ['students', 'categories', 'assessments', 'scores'].indexOf(field) >= 0;
+  return ['students', 'categories', 'assessments', 'scores', 'withdrawn'].indexOf(field) >= 0;
 }
 
 function _isStudentRecordField(field) {
@@ -1584,6 +1586,8 @@ function _baselineRowOf(name, params) {
     case 'update_enrollment':
     case 'withdraw_enrollment':
       return { field: 'students', match: 'id', id: params.p_id };
+    case 'withdraw_student':
+      return { field: 'students', match: 'id', id: params.p_enrollment_id };
     case 'update_student':
       return { field: 'students', match: 'personId', id: params.p_id };
     case 'upsert_score':
@@ -2070,6 +2074,30 @@ function _rekeyField(field, cid, transform) {
     }
   }
   if (_hasServerState(field, cid)) transform(_serverState[field][cid]);
+  if (field === 'statuses' || _WITHDRAWN_RECORD_FIELDS[field]) _rekeyWithdrawnRecords(field, cid, transform);
+}
+
+/* A withdrawn student's records (getWithdrawnStudents) hold the same values
+   as the class's maps, for one student. Each is re-keyed by the transform
+   the map got, as a one-student map; statuses are keyed 'sid:aid' already. */
+function _rekeyWithdrawnRecords(field, cid, transform) {
+  _rekeyField('withdrawn', cid, function (list) {
+    var changed = false;
+    (Array.isArray(list) ? list : []).forEach(function (w) {
+      var records = w && w.records;
+      if (!records || records[field] === undefined) return;
+      if (field === 'statuses') {
+        if (transform(records.statuses)) changed = true;
+        return;
+      }
+      var one = {};
+      one[w.student && w.student.id] = records[field];
+      if (!transform(one)) return;
+      records[field] = one[Object.keys(one)[0]];
+      changed = true;
+    });
+    return changed;
+  });
 }
 
 function _rekeyRowId(rows, localId, serverId, patch) {
@@ -2229,6 +2257,16 @@ function _rekey(cid, kind, localId, serverId, extra) {
     if (patch.rosterPosition === undefined) delete patch.rosterPosition;
     _rekeyField('students', cid, function (rows) {
       return _rekeyRowId(rows, localId, serverId, patch);
+    });
+    _rekeyField('withdrawn', cid, function (list) {
+      return _rekeyRowId(
+        (Array.isArray(list) ? list : []).map(function (w) {
+          return w && w.student;
+        }),
+        localId,
+        serverId,
+        _isUuid(patch.personId) ? { personId: patch.personId } : null,
+      );
     });
     _rekeyStudentRefs(cid, localId, serverId);
   } else if (kind === 'assessment') {
@@ -3287,10 +3325,12 @@ function _observationsPayloadToBlob(payload, cid) {
   payload = _rpcObject(payload) || payload || {};
   var blob = {};
   var titles = null;
+  // A withdrawn student's observations stay on the server, out of the class.
+  var withdrawn = cid ? _withdrawnIds(cid) : {};
   (payload.observations || []).forEach(function (ob) {
     var enrollmentIds = ob.enrollment_ids || ob.enrollmentIds || [];
     enrollmentIds.forEach(function (sid) {
-      if (!sid) return;
+      if (!sid || withdrawn[sid]) return;
       if (!blob[sid]) blob[sid] = [];
       var entry = {
         id: ob.id,
@@ -3711,6 +3751,8 @@ function _bundleToCache(cid, bundle) {
   _persistLoadedField(cid, 'learningMaps', map);
 
   _v2GradebookToCache(cid, Object.assign({}, gb, { cells: _bundleCells(gb) }));
+  // Before observations and term ratings, which name withdrawn students too.
+  _applyBundleWithdrawn(cid, bundle.withdrawn_students);
   // The fields get_assessment_detail used to add (due date, collaboration).
   var rawById = {};
   (gb.assessments || []).forEach(function (a) {
@@ -3969,8 +4011,12 @@ function _fillOverrideCalculated(cid) {
 function _applyBundleTermRatings(cid, rows) {
   var local = _cloneValue(getTermRatings(cid) || {}) || {};
   var onServer = {};
+  var withdrawn = _withdrawnIds(cid);
+  Object.keys(withdrawn).forEach(function (sid) {
+    delete local[sid];
+  });
   rows.forEach(function (r) {
-    if (!r || !r.enrollment_id || !r.term) return;
+    if (!r || !r.enrollment_id || !r.term || withdrawn[r.enrollment_id]) return;
     var termId = 'term-' + r.term;
     onServer[r.enrollment_id + '|' + termId] = true;
     if (!local[r.enrollment_id]) local[r.enrollment_id] = {};
@@ -4104,6 +4150,7 @@ function _loadCourseFromLS(cid) {
   _cache.courseConfigs[cid] = _safeParseLS('gb-courseconfig-' + cid, {});
   _cache.reportConfig[cid] = _safeParseLS('gb-report-config-' + cid, null);
   _cache.studentProfileSummaries[cid] = _safeParseLS('gb-student-profile-summaries-' + cid, {});
+  _cache.withdrawn[cid] = _safeParseLS('gb-withdrawn-' + cid, []);
   _cache.rubrics[cid] = _safeParseLS('gb-rubrics-' + cid, []);
 
   // Learning map: check localStorage first, then fall back to LEARNING_MAP constant
@@ -5465,6 +5512,7 @@ function _clearCourseLocalState(id) {
     'report-config',
     'categories',
     'student-profile-summaries',
+    'withdrawn',
     'bundle-meta',
   ].forEach(k => localStorage.removeItem('gb-' + k + '-' + id));
   _forgetServerState(id);
@@ -7192,7 +7240,8 @@ var _studentDispatchQueue = {}; // cid → Promise of the last diff being dispat
 /* Diff arr vs prev and translate to canonical RPC calls.
    - student.id matching UUID → already enrolled → update_enrollment + update_student
    - student.id local (uid) → new → enroll_student → patches local cache id to canonical
-   - prev student missing from arr → withdraw_enrollment */
+   - prev student missing from arr → withdraw_student (Class Management
+     withdraws through withdrawStudent, which keeps the baseline in step) */
 function _persistStudentsToCanonical(cid, prev, arr) {
   var sb = getSupabase();
   if (!sb) return;
@@ -7215,9 +7264,6 @@ function _persistStudentsToCanonical(cid, prev, arr) {
     // Adds (any id not in prev)
     after.forEach(function (s, idx) {
       if (s && s.id && !prevById[s.id]) {
-        // Undo of a delete still held in the outbox: the server never lost
-        // the enrollment.
-        if (cancelHeldStudentDelete(s.id)) return;
         ops.push(_canonicalEnrollStudent(sb, cid, s, idx));
       } else if (s && s.id) _dropUnqueuedPending('student', s.id);
     });
@@ -7390,10 +7436,10 @@ function _studentPatchOf(s) {
   };
 }
 
-/* v2 withdraw_enrollment(p_id) — sets withdrawn_at = now(). */
+/* v2 withdraw_student(p_enrollment_id) — sets withdrawn_at; nothing is deleted. */
 function _canonicalWithdrawEnrollment(sb, enrollmentId) {
-  return _writeRpc('withdraw_enrollment', { p_id: enrollmentId }).then(function (res) {
-    if (res.error) console.warn('withdraw_enrollment failed:', res.error, enrollmentId);
+  return _writeRpc('withdraw_student', { p_enrollment_id: enrollmentId }).then(function (res) {
+    if (res.error) console.warn('withdraw_student failed:', res.error, enrollmentId);
   });
 }
 
@@ -8959,7 +9005,6 @@ function _writeRpc(name, params, options) {
   if (outbox) {
     var entryId = options.entryId || params.p_idempotency_key || _idempotencyKey() || uid();
     var undo = _snapshotBaselineRow(name, params);
-    if (options.holdForUndo) blockedOn.push(_HELD_FOR_UNDO);
     var pushed = outbox.push(name, params, { id: entryId, blockedOn: blockedOn, sendOptions: options });
     if (pushed && pushed.refused) {
       _onWriteRefused(name, params, undo, pushed.refused, options.entryId);
@@ -9391,79 +9436,284 @@ window.v2.getReport = function (enrollmentId, term) {
   return _rpcOrNoop('get_report', params);
 };
 
-/* ── v2 write RPCs from Phase 5.5 ─────────────────────────────────────── */
+/* ── Withdrawn students (docs/DECISIONS.md: "Students are removed by
+   withdrawal, not deletion") ─────────────────────────────────────────────
+   Removing a student from a class withdraws them. On the server the
+   enrollment keeps every score, observation and report and only gets
+   withdrawn_at (withdraw_student); get_class_bundle leaves it out of the
+   roster, scores and profiles and lists it under withdrawn_students.
 
-/* §4.5 — full cascade delete of a student (all their enrollments + scores +
-   notes + goals + reflections + overrides + attendance + term ratings).
-   Courses survive untouched. */
-window.v2.deleteStudent = function (studentId) {
-  // A student whose enrol is still queued (the roster passes the enrollment
-  // id then) is simply not created.
-  if (!_isUuid(studentId) && _pendingCreateFor('student', studentId)) {
-    var rec = _pendingCreateFor('student', studentId);
-    _cancelPendingCreateOrResolve(rec.cid, 'student', studentId);
-    return Promise.resolve({ data: null, error: null });
-  }
-  return _rpcOrNoop('delete_student', { p_id: studentId });
+   On this device the student leaves the roster and every per-student
+   record moves out of the class's maps into their entry here, so nothing
+   that reads the roster or the maps (grades, class averages, the
+   dashboard, observations, the phone app, reports) can see them.
+   Re-enrol puts it all back. In Demo Mode this list is the only copy.
+
+   _cache.withdrawn[cid] = [{ student, withdrawnAt, index, records }]
+     student   the roster row, as it was
+     index     where it sat in the roster, so re-enrol puts it back there
+     records   { scores, goals, reflections, notes, flags, observations,
+                 termRatings, overrides, studentProfileSummaries } values
+               for this student, and statuses { 'sid:aid': status }.
+               Missing after a reload that came from the server: the
+               server still has them, and the refresh that follows a
+               re-enrol brings them back.
+
+   Permanent delete (delete_withdrawn_student) is the second step and only
+   takes a withdrawn student. */
+var _WITHDRAWN_RECORD_FIELDS = {
+  scores: getScores,
+  goals: getGoals,
+  reflections: getReflections,
+  notes: getNotes,
+  flags: getFlags,
+  observations: getQuickObs,
+  termRatings: getTermRatings,
+  overrides: getOverrides,
+  studentProfileSummaries: getStudentProfileSummaries,
 };
 
-/* Deleting a student waits out the undo toast (audit finding 4).
-   delete_student is a hard delete, so it is queued held: stored in the
-   outbox, which keeps it across a reload, but not sent. Closing the toast,
-   leaving the page, signing out or the next page load releases it; Undo
-   takes it back out. Without the outbox it is sent at once. */
-var _HELD_FOR_UNDO = 'undo-window';
-var _heldStudentDeletes = {}; // enrollment id → outbox entry id, this page only
+function getWithdrawnStudents(cid) {
+  if (_cache.withdrawn[cid] !== undefined) return _cache.withdrawn[cid];
+  var list = _safeParseLS('gb-withdrawn-' + cid, []);
+  return Array.isArray(list) ? list : [];
+}
 
-function holdStudentDelete(enrollmentId, studentId) {
-  if (!_outbox() || !_isUuid(studentId)) return window.v2.deleteStudent(studentId);
-  var entryId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : uid();
-  _heldStudentDeletes[enrollmentId] = entryId;
-  return _writeRpc('delete_student', { p_id: studentId }, { entryId: entryId, holdForUndo: true }).then(function (res) {
-    if (_heldStudentDeletes[enrollmentId] === entryId) delete _heldStudentDeletes[enrollmentId];
-    return res;
+function _saveWithdrawn(cid, list) {
+  _saveCourseField('withdrawn', cid, list);
+}
+
+function _withdrawnIds(cid) {
+  var ids = {};
+  getWithdrawnStudents(cid).forEach(function (w) {
+    if (w && w.student && w.student.id) ids[w.student.id] = true;
   });
+  return ids;
 }
 
-function isStudentDeleteHeld(enrollmentId) {
-  return !!_heldStudentDeletes[enrollmentId];
-}
-
-/* Undo: true when the delete had not gone yet, so the server still has the
-   student and everything they had. */
-function cancelHeldStudentDelete(enrollmentId) {
-  var entryId = _heldStudentDeletes[enrollmentId];
-  var q = window.v2Queue;
-  if (!entryId || !q || typeof q.remove !== 'function') return false;
-  delete _heldStudentDeletes[enrollmentId];
-  return q.remove(entryId);
-}
-
-/* Sends one student's held delete (their toast closed), or every held
-   delete when no enrollment id is given (the page is going away). */
-function releaseHeldStudentDeletes(enrollmentId) {
-  var entryId = enrollmentId ? _heldStudentDeletes[enrollmentId] : null;
-  if (enrollmentId && !entryId) return;
-  if (enrollmentId) delete _heldStudentDeletes[enrollmentId];
-  else _heldStudentDeletes = {};
-  var q = window.v2Queue;
-  if (!q || typeof q.rewrite !== 'function') return;
-  q.rewrite(function (entry) {
-    var held = Array.isArray(entry.blocked_on) ? entry.blocked_on : [];
-    if (held.indexOf(_HELD_FOR_UNDO) < 0 || (entryId && entry.id !== entryId)) return null;
-    return {
-      payload: entry.payload,
-      blockedOn: held.filter(function (id) {
-        return id !== _HELD_FOR_UNDO;
-      }),
-    };
+/* Take one student's records out of the class's maps and return them.
+   Local copy and the server baselines only: nothing is sent. Dropping the
+   baselines keeps a later save from clearing their scores on the server. */
+function _takeStudentRecords(cid, sid) {
+  var records = {};
+  Object.keys(_WITHDRAWN_RECORD_FIELDS).forEach(function (field) {
+    var all = _WITHDRAWN_RECORD_FIELDS[field](cid) || {};
+    if (all[sid] === undefined) return;
+    records[field] = _cloneValue(all[sid]);
+    delete all[sid];
+    _saveCourseField(field, cid, all);
   });
+  var statuses = getAssignmentStatuses(cid) || {};
+  var taken = {};
+  Object.keys(statuses).forEach(function (key) {
+    if (key.indexOf(sid + ':') !== 0) return;
+    taken[key] = statuses[key];
+    delete statuses[key];
+  });
+  if (Object.keys(taken).length) {
+    records.statuses = taken;
+    _saveCourseField('statuses', cid, statuses);
+  }
+  forgetStudentServerState(cid, sid);
+  return records;
 }
 
-/* deleteStudent takes the student out of the server baselines as well as
-   the local copy: delete_student removes them on the server, so a later
-   roster or score save must not withdraw the enrollment or clear their
-   scores itself. */
+/* Put records back. A value the class already has (a refresh brought it
+   from the server) wins over the saved copy. The server has these rows,
+   so the baselines get them too. */
+function _putStudentRecords(cid, sid, records) {
+  records = records || {};
+  Object.keys(_WITHDRAWN_RECORD_FIELDS).forEach(function (field) {
+    if (records[field] === undefined) return;
+    var all = _WITHDRAWN_RECORD_FIELDS[field](cid) || {};
+    if (all[sid] !== undefined) return;
+    all[sid] = records[field];
+    _saveCourseField(field, cid, all);
+  });
+  if (records.statuses) {
+    var statuses = getAssignmentStatuses(cid) || {};
+    Object.keys(records.statuses).forEach(function (key) {
+      if (statuses[key] === undefined) statuses[key] = records.statuses[key];
+    });
+    _saveCourseField('statuses', cid, statuses);
+  }
+  var baseScores = _serverStateOr('scores', cid, null);
+  if (baseScores && records.scores && records.scores.length && !baseScores[sid]) {
+    baseScores[sid] = _cloneValue(records.scores);
+  }
+  var baseNotes = _serverStateOr('notes', cid, null);
+  if (baseNotes && records.notes !== undefined && baseNotes[sid] === undefined) {
+    baseNotes[sid] = _cloneValue(records.notes);
+  }
+  var baseStatuses = _serverStateOr('statuses', cid, null);
+  if (baseStatuses && records.statuses) {
+    Object.keys(records.statuses).forEach(function (key) {
+      if (baseStatuses[key] === undefined) baseStatuses[key] = records.statuses[key];
+    });
+  }
+}
+
+/* The id a write about this student can carry: the server's, or a local
+   one whose enrol is queued (the write waits behind it). Null when the
+   student was never sent (a class not on the server yet). */
+function _studentWriteId(cid, sid) {
+  if (_isUuid(sid)) return sid;
+  var known = _resolveKnownId('student', sid);
+  if (_isUuid(known)) return known;
+  return _isPendingLocalId(sid) ? sid : null;
+}
+
+/* Withdraw: the remove action in Class Management. Returns the entry (for
+   Undo), or null when the student isn't on the roster. */
+function withdrawStudent(cid, sid) {
+  var students = getStudents(cid);
+  var index = students.findIndex(function (s) {
+    return s && s.id === sid;
+  });
+  if (index < 0) return null;
+  var student = students[index];
+  var records = _takeStudentRecords(cid, sid);
+  _saveCourseField(
+    'students',
+    cid,
+    students.filter(function (s) {
+      return s && s.id !== sid;
+    }),
+  );
+  var entry = { student: student, withdrawnAt: new Date().toISOString(), index: index, records: records };
+  var list = getWithdrawnStudents(cid).filter(function (w) {
+    return w && w.student && w.student.id !== sid;
+  });
+  list.unshift(entry);
+  _saveWithdrawn(cid, list);
+
+  var writeId = _writesEnabled() && _isUuid(cid) ? _studentWriteId(cid, sid) : null;
+  if (writeId) _rpcOrNoop('withdraw_student', { p_enrollment_id: writeId });
+  return entry;
+}
+
+/* Re-enrol a withdrawn student: back on the roster where they were, with
+   everything they had. Returns false when they aren't in the list. */
+function reenrolStudent(cid, sid) {
+  var list = getWithdrawnStudents(cid);
+  var entry = list.find(function (w) {
+    return w && w.student && w.student.id === sid;
+  });
+  if (!entry) return false;
+  _saveWithdrawn(
+    cid,
+    list.filter(function (w) {
+      return w !== entry;
+    }),
+  );
+  var student = Object.assign({}, entry.student);
+  var students = getStudents(cid).filter(function (s) {
+    return s && s.id !== sid;
+  });
+  var at = entry.index >= 0 && entry.index <= students.length ? entry.index : students.length;
+  students.splice(at, 0, student);
+  _putStudentRecords(cid, sid, entry.records);
+
+  var live = _writesEnabled() && _isUuid(cid);
+  var writeId = live ? _studentWriteId(cid, sid) : null;
+  if (live && !writeId) {
+    // Never reached the server: the roster save enrols them now.
+    saveStudents(cid, students);
+    saveScores(cid, getScores(cid));
+    return true;
+  }
+  _saveCourseField('students', cid, students);
+  var baseStudents = _serverStateOr('students', cid, null);
+  if (writeId && Array.isArray(baseStudents) && !baseStudents.some(s => s && s.id === sid)) {
+    baseStudents.splice(Math.min(at, baseStudents.length), 0, _cloneValue(student));
+  }
+  if (writeId) _rpcOrNoop('reenrol_student', { p_enrollment_id: writeId });
+  return true;
+}
+
+/* The second step: delete a withdrawn student for good, with every score,
+   observation and report they had in this class. The person goes too
+   when this was their only class. Cannot be undone. */
+function deleteWithdrawnStudent(cid, sid) {
+  var list = getWithdrawnStudents(cid);
+  var entry = list.find(function (w) {
+    return w && w.student && w.student.id === sid;
+  });
+  if (!entry) return false;
+  _saveWithdrawn(
+    cid,
+    list.filter(function (w) {
+      return w !== entry;
+    }),
+  );
+  // Pairs, groups and exclusions live on the assessment rows, which the
+  // delete doesn't reach.
+  var assessments = getAssessments(cid);
+  var named = l => Array.isArray(l) && l.some(item => (Array.isArray(item) ? item : [item]).includes(sid));
+  var changed = false;
+  assessments.forEach(function (a) {
+    if (!named(a.excludedStudents) && !named(a.pairs) && !named(a.groups)) return;
+    changed = true;
+    if (a.excludedStudents) {
+      a.excludedStudents = a.excludedStudents.filter(id => id !== sid);
+      if (a.excludedStudents.length === 0) delete a.excludedStudents;
+    }
+    if (a.pairs) {
+      a.pairs = a.pairs.map(p => p.filter(id => id !== sid)).filter(p => p.length > 0);
+      if (a.pairs.length === 0) delete a.pairs;
+    }
+    if (a.groups) {
+      a.groups = a.groups.map(g => g.filter(id => id !== sid)).filter(g => g.length > 0);
+      if (a.groups.length === 0) delete a.groups;
+    }
+  });
+  if (changed) saveAssessments(cid, assessments);
+
+  if (!_writesEnabled() || !_isUuid(cid)) return true;
+  // An enrol still queued is simply not sent (with the withdraw behind it).
+  var target = _isUuid(sid) ? sid : _cancelPendingCreateOrResolve(cid, 'student', sid);
+  if (target) _rpcOrNoop('delete_withdrawn_student', { p_enrollment_id: target });
+  return true;
+}
+
+/* get_class_bundle's withdrawn_students. The server's list wins; an entry
+   this device already had keeps its records and roster index. A student
+   withdrawn before they ever reached the server stays as it is. */
+function _applyBundleWithdrawn(cid, rows) {
+  if (!Array.isArray(rows)) return;
+  var at = {};
+  rows.forEach(function (r) {
+    if (r && r.enrollment_id) at[r.enrollment_id] = r.withdrawn_at || null;
+  });
+  var saved = _safeParseLS('gb-withdrawn-' + cid, null);
+  var local = Array.isArray(saved) ? saved : getWithdrawnStudents(cid);
+  var localById = {};
+  local.forEach(function (w) {
+    if (w && w.student && w.student.id) localById[w.student.id] = w;
+  });
+  var list = _canonicalRosterRowsToStudents(rows)
+    .map(function (student) {
+      var prev = localById[student.id];
+      var entry = { student: migrateStudent(student), withdrawnAt: at[student.id], index: student.rosterPosition };
+      if (prev) {
+        if (prev.index != null) entry.index = prev.index;
+        if (prev.records) entry.records = prev.records;
+      }
+      return entry;
+    })
+    .sort(function (a, b) {
+      return String(b.withdrawnAt || '').localeCompare(String(a.withdrawnAt || ''));
+    });
+  local.forEach(function (w) {
+    if (w && w.student && !_isUuid(w.student.id)) list.push(w);
+  });
+  _persistLoadedField(cid, 'withdrawn', list);
+}
+
+/* A withdrawn student leaves the server baselines as well as the local
+   copy: withdraw_student keeps their rows on the server, so a later roster
+   or score save must not withdraw the enrollment again or clear their
+   scores. */
 function forgetStudentServerState(cid, sid) {
   if (Array.isArray(_serverStateOr('students', cid, null))) {
     _serverState.students[cid] = _serverState.students[cid].filter(function (s) {
@@ -9482,49 +9732,28 @@ function forgetStudentServerState(cid, sid) {
   }
 }
 
-/* Undo for deleteStudent (teacher/ui.js). When the held delete is taken
-   back, the server still has the student and everything they had, so the
-   local copy and the baselines are put back and nothing is sent. Returns
-   false when the delete had already gone. */
-function restoreDeletedStudent(cid, snapshot) {
-  var sid = snapshot && snapshot.student && snapshot.student.id;
-  if (!sid || !cancelHeldStudentDelete(sid)) return false;
-  var students = getStudents(cid).filter(function (s) {
-    return s.id !== sid;
-  });
-  var at = snapshot.index >= 0 && snapshot.index <= students.length ? snapshot.index : students.length;
-  students.splice(at, 0, snapshot.student);
-  _saveCourseField('students', cid, students);
-  [
-    ['scores', getScores, snapshot.scores],
-    ['goals', getGoals, snapshot.goals],
-    ['reflections', getReflections, snapshot.reflections],
-    ['notes', getNotes, snapshot.notes],
-    ['flags', getFlags, snapshot.flagged ? true : undefined],
-    ['observations', getQuickObs, snapshot.quickObs],
-    ['termRatings', getTermRatings, snapshot.termRatings],
-  ].forEach(function (f) {
-    if (f[2] === undefined) return;
-    var all = f[1](cid);
-    all[sid] = f[2];
-    _saveCourseField(f[0], cid, all);
-  });
-  var statuses = getAssignmentStatuses(cid);
-  Object.assign(statuses, snapshot.statuses || {});
-  _saveCourseField('statuses', cid, statuses);
+/* Clients before withdrawal held a student's hard delete in the outbox
+   until its Undo toast closed. One may still be waiting there from before
+   this version: page loads, sign-out and leaving the page send it, as
+   they did then. */
+var _HELD_FOR_UNDO = 'undo-window';
 
-  var baseStudents = _serverStateOr('students', cid, null);
-  if (Array.isArray(baseStudents) && !baseStudents.some(s => s && s.id === sid)) {
-    baseStudents.splice(Math.min(at, baseStudents.length), 0, _cloneValue(snapshot.student));
-  }
-  var baseScores = _serverStateOr('scores', cid, null);
-  if (baseScores && snapshot.scores && snapshot.scores.length) baseScores[sid] = _cloneValue(snapshot.scores);
-  var baseNotes = _serverStateOr('notes', cid, null);
-  if (baseNotes && snapshot.notes !== undefined) baseNotes[sid] = _cloneValue(snapshot.notes);
-  var baseStatuses = _serverStateOr('statuses', cid, null);
-  if (baseStatuses) Object.assign(baseStatuses, snapshot.statuses || {});
-  return true;
+function releaseHeldStudentDeletes() {
+  var q = window.v2Queue;
+  if (!q || typeof q.rewrite !== 'function') return;
+  q.rewrite(function (entry) {
+    var held = Array.isArray(entry.blocked_on) ? entry.blocked_on : [];
+    if (held.indexOf(_HELD_FOR_UNDO) < 0) return null;
+    return {
+      payload: entry.payload,
+      blockedOn: held.filter(function (id) {
+        return id !== _HELD_FOR_UNDO;
+      }),
+    };
+  });
 }
+
+/* ── v2 write RPCs from Phase 5.5 ─────────────────────────────────────── */
 
 /* §15.4 — post-import reconciliation: merge a duplicate "ghost" student
    into a canonical record. Same-course enrollments merge (designations
