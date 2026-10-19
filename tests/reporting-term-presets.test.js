@@ -10,6 +10,47 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 const tick = (ms = 20) => new Promise(r => setTimeout(r, ms));
 const IN_YEAR = '2026-10-17';
 
+describe('report names for the Term Questionnaire picker', () => {
+  it("names each report in the school's words when a class uses that school's terms", () => {
+    const rows = reportingTermPreset('grandviewheights', IN_YEAR);
+    expect(reportingTermReportNames(rows)).toEqual([
+      'Nov report card',
+      'Feb report card',
+      'Apr report card',
+      'Jun report card',
+    ]);
+  });
+
+  it('leaves a term with no published report blank', () => {
+    const rows = reportingTermPreset('earlmarriott', IN_YEAR);
+    expect(reportingTermReportNames(rows)).toEqual([
+      'Nov learning update',
+      '',
+      'Apr learning update',
+      'Jun learning update',
+    ]);
+  });
+
+  it('every report name starts with its month and the month is when the term ends or just after', () => {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    REPORTING_TERM_PRESETS.schools.forEach(school => {
+      school.terms.forEach(t => {
+        if (!t.report) return;
+        const m = months.indexOf(t.report.slice(0, 3));
+        const end = Number(t.ends_on.slice(5, 7)) - 1;
+        expect([end, (end + 1) % 12], school.id + ' ' + t.report).toContain(m);
+      });
+    });
+  });
+
+  it('returns null for terms that match no school', () => {
+    const rows = reportingTermPreset('grandviewheights', IN_YEAR);
+    rows[0] = Object.assign({}, rows[0], { ends_on: '2026-10-30' });
+    expect(reportingTermReportNames(rows)).toBeNull();
+    expect(reportingTermReportNames([])).toBeNull();
+  });
+});
+
 describe('the preset data', () => {
   it('covers 2026-2027 with Grandview Heights first and as the default', () => {
     expect(REPORTING_TERM_PRESETS.schoolYear).toBe('2026-2027');

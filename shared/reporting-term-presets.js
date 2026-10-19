@@ -21,7 +21,12 @@
    To refresh for a new school year: each school site serves an iCal feed of
    its "Report Cards" category at
    https://www.surreyschools.ca/<site>/_ci/calendar/subscription/YWzv
-   and the whole calendar at the same path with the all-categories id. */
+   and the whole calendar at the same path with the all-categories id.
+
+   `report` names the report that closes a term, in the school's own words
+   and month ("Nov report card", "Apr learning update"). The Term
+   Questionnaire's report picker shows it when a class uses that school's
+   terms. A term with no published report has none. */
 
 var REPORTING_TERM_PRESETS = {
   schoolYear: '2026-2027',
@@ -33,10 +38,10 @@ var REPORTING_TERM_PRESETS = {
       id: 'grandviewheights',
       name: 'Grandview Heights Secondary',
       terms: [
-        { label: 'Term 1', starts_on: '2026-09-08', ends_on: '2026-11-27' },
-        { label: 'Term 2', starts_on: '2026-11-28', ends_on: '2027-01-26' },
-        { label: 'Term 3', starts_on: '2027-01-27', ends_on: '2027-04-23' },
-        { label: 'Term 4', starts_on: '2027-04-24', ends_on: '2027-06-24' },
+        { label: 'Term 1', starts_on: '2026-09-08', ends_on: '2026-11-27', report: 'Nov report card' },
+        { label: 'Term 2', starts_on: '2026-11-28', ends_on: '2027-01-26', report: 'Feb report card' },
+        { label: 'Term 3', starts_on: '2027-01-27', ends_on: '2027-04-23', report: 'Apr report card' },
+        { label: 'Term 4', starts_on: '2027-04-24', ends_on: '2027-06-24', report: 'Jun report card' },
       ],
       notes: 'Report cards Nov 27, Feb 5, Apr 23, Jun 24. Semester completion Jan 25-26; Semester 2 begins Jan 27.',
     },
@@ -44,10 +49,10 @@ var REPORTING_TERM_PRESETS = {
       id: 'earlmarriott',
       name: 'Earl Marriott Secondary',
       terms: [
-        { label: 'Term 1', starts_on: '2026-09-08', ends_on: '2026-11-19' },
+        { label: 'Term 1', starts_on: '2026-09-08', ends_on: '2026-11-19', report: 'Nov learning update' },
         { label: 'Term 2', starts_on: '2026-11-20', ends_on: '2027-01-29' },
-        { label: 'Term 3', starts_on: '2027-01-30', ends_on: '2027-04-22' },
-        { label: 'Term 4', starts_on: '2027-04-23', ends_on: '2027-06-24' },
+        { label: 'Term 3', starts_on: '2027-01-30', ends_on: '2027-04-22', report: 'Apr learning update' },
+        { label: 'Term 4', starts_on: '2027-04-23', ends_on: '2027-06-24', report: 'Jun learning update' },
       ],
       notes:
         'Learning updates Nov 19, Apr 22, Jun 24. Last day of Semester 1 classes Jan 27, completion Jan 28-29, Semester 2 begins Feb 1.',
@@ -56,9 +61,9 @@ var REPORTING_TERM_PRESETS = {
       id: 'envercreek',
       name: 'Enver Creek Secondary',
       terms: [
-        { label: 'Term 1', starts_on: '2026-09-08', ends_on: '2026-11-18' },
-        { label: 'Term 2', starts_on: '2026-11-19', ends_on: '2027-01-29' },
-        { label: 'Term 3', starts_on: '2027-01-30', ends_on: '2027-04-14' },
+        { label: 'Term 1', starts_on: '2026-09-08', ends_on: '2026-11-18', report: 'Nov mid-term marks' },
+        { label: 'Term 2', starts_on: '2026-11-19', ends_on: '2027-01-29', report: 'Feb Semester 1 final marks' },
+        { label: 'Term 3', starts_on: '2027-01-30', ends_on: '2027-04-14', report: 'Apr report card' },
         { label: 'Term 4', starts_on: '2027-04-15', ends_on: '2027-06-24' },
       ],
       notes:
@@ -69,10 +74,10 @@ var REPORTING_TERM_PRESETS = {
       name: 'Frank Hurt Secondary',
       assumed: 'semester turnaround',
       terms: [
-        { label: 'Term 1', starts_on: '2026-09-08', ends_on: '2026-11-19' },
-        { label: 'Term 2', starts_on: '2026-11-20', ends_on: '2027-01-29' },
-        { label: 'Term 3', starts_on: '2027-01-30', ends_on: '2027-04-29' },
-        { label: 'Term 4', starts_on: '2027-04-30', ends_on: '2027-06-25' },
+        { label: 'Term 1', starts_on: '2026-09-08', ends_on: '2026-11-19', report: 'Nov report card' },
+        { label: 'Term 2', starts_on: '2026-11-20', ends_on: '2027-01-29', report: 'Feb report card' },
+        { label: 'Term 3', starts_on: '2027-01-30', ends_on: '2027-04-29', report: 'Apr report card' },
+        { label: 'Term 4', starts_on: '2027-04-30', ends_on: '2027-06-25', report: 'Jun report card' },
       ],
       notes: 'Report cards Nov 19, Feb 4, Apr 29, Jun 25. Semester turnaround not published; Feb 1 assumed.',
     },
@@ -80,10 +85,10 @@ var REPORTING_TERM_PRESETS = {
       id: 'fraserheights',
       name: 'Fraser Heights Secondary',
       terms: [
-        { label: 'Term 1', starts_on: '2026-09-08', ends_on: '2026-11-23' },
-        { label: 'Term 2', starts_on: '2026-11-24', ends_on: '2027-01-29' },
-        { label: 'Term 3', starts_on: '2027-01-30', ends_on: '2027-04-26' },
-        { label: 'Term 4', starts_on: '2027-04-27', ends_on: '2027-06-25' },
+        { label: 'Term 1', starts_on: '2026-09-08', ends_on: '2026-11-23', report: 'Nov learning update' },
+        { label: 'Term 2', starts_on: '2026-11-24', ends_on: '2027-01-29', report: 'Feb learning update' },
+        { label: 'Term 3', starts_on: '2027-01-30', ends_on: '2027-04-26', report: 'Apr learning update' },
+        { label: 'Term 4', starts_on: '2027-04-27', ends_on: '2027-06-25', report: 'Jun learning update' },
       ],
       notes: 'Learning updates posted Nov 23, Feb 8, Apr 26, Jun 25. Start of Semester 2 Feb 1.',
     },
@@ -92,10 +97,10 @@ var REPORTING_TERM_PRESETS = {
       name: 'Guildford Park Secondary',
       assumed: 'semester turnaround',
       terms: [
-        { label: 'Term 1', starts_on: '2026-09-08', ends_on: '2026-11-06' },
-        { label: 'Term 2', starts_on: '2026-11-07', ends_on: '2027-01-29' },
-        { label: 'Term 3', starts_on: '2027-01-30', ends_on: '2027-04-16' },
-        { label: 'Term 4', starts_on: '2027-04-17', ends_on: '2027-06-25' },
+        { label: 'Term 1', starts_on: '2026-09-08', ends_on: '2026-11-06', report: 'Nov report card' },
+        { label: 'Term 2', starts_on: '2026-11-07', ends_on: '2027-01-29', report: 'Feb report card' },
+        { label: 'Term 3', starts_on: '2027-01-30', ends_on: '2027-04-16', report: 'Apr report card' },
+        { label: 'Term 4', starts_on: '2027-04-17', ends_on: '2027-06-25', report: 'Jun report card' },
       ],
       notes: 'Report cards Nov 6, Feb 4, Apr 16, Jun 25. Semester turnaround not published; Feb 1 assumed.',
     },
@@ -104,10 +109,10 @@ var REPORTING_TERM_PRESETS = {
       name: 'Panorama Ridge Secondary',
       assumed: 'semester turnaround',
       terms: [
-        { label: 'Term 1', starts_on: '2026-09-08', ends_on: '2026-11-20' },
-        { label: 'Term 2', starts_on: '2026-11-21', ends_on: '2027-01-29' },
-        { label: 'Term 3', starts_on: '2027-01-30', ends_on: '2027-04-23' },
-        { label: 'Term 4', starts_on: '2027-04-24', ends_on: '2027-06-25' },
+        { label: 'Term 1', starts_on: '2026-09-08', ends_on: '2026-11-20', report: 'Nov Semester 1 mid-term report' },
+        { label: 'Term 2', starts_on: '2026-11-21', ends_on: '2027-01-29', report: 'Feb Semester 1 report' },
+        { label: 'Term 3', starts_on: '2027-01-30', ends_on: '2027-04-23', report: 'Apr Semester 2 mid-term report' },
+        { label: 'Term 4', starts_on: '2027-04-24', ends_on: '2027-06-25', report: 'Jun final report' },
       ],
       notes:
         'Semester 1 mid-term report Nov 20, Semester 1 report Feb 8, Semester 2 mid-term Apr 23, final Jun 25. Semester turnaround not published; Feb 1 assumed.',
@@ -116,10 +121,10 @@ var REPORTING_TERM_PRESETS = {
       id: 'salish',
       name: 'Salish Secondary',
       terms: [
-        { label: 'Term 1', starts_on: '2026-09-08', ends_on: '2026-11-17' },
-        { label: 'Term 2', starts_on: '2026-11-18', ends_on: '2027-01-29' },
-        { label: 'Term 3', starts_on: '2027-01-30', ends_on: '2027-04-20' },
-        { label: 'Term 4', starts_on: '2027-04-21', ends_on: '2027-06-25' },
+        { label: 'Term 1', starts_on: '2026-09-08', ends_on: '2026-11-17', report: 'Nov learning update' },
+        { label: 'Term 2', starts_on: '2026-11-18', ends_on: '2027-01-29', report: 'Feb learning update' },
+        { label: 'Term 3', starts_on: '2027-01-30', ends_on: '2027-04-20', report: 'Apr learning update' },
+        { label: 'Term 4', starts_on: '2027-04-21', ends_on: '2027-06-25', report: 'Jun Semester 2 summary' },
       ],
       notes:
         'Learning updates Nov 17, Feb 5, Apr 20; Semester 2 summary Jun 25. Last day of Semester 1 Jan 27, completion Jan 28-29, Semester 2 starts Feb 1.',
@@ -129,10 +134,10 @@ var REPORTING_TERM_PRESETS = {
       name: 'Sullivan Heights Secondary',
       assumed: 'semester turnaround',
       terms: [
-        { label: 'Term 1', starts_on: '2026-09-08', ends_on: '2026-11-18' },
-        { label: 'Term 2', starts_on: '2026-11-19', ends_on: '2027-01-29' },
-        { label: 'Term 3', starts_on: '2027-01-30', ends_on: '2027-04-23' },
-        { label: 'Term 4', starts_on: '2027-04-24', ends_on: '2027-06-24' },
+        { label: 'Term 1', starts_on: '2026-09-08', ends_on: '2026-11-18', report: 'Nov learning update' },
+        { label: 'Term 2', starts_on: '2026-11-19', ends_on: '2027-01-29', report: 'Feb learning update' },
+        { label: 'Term 3', starts_on: '2027-01-30', ends_on: '2027-04-23', report: 'Apr learning update' },
+        { label: 'Term 4', starts_on: '2027-04-24', ends_on: '2027-06-24', report: 'Jun learning update' },
       ],
       notes: 'Learning updates Nov 18, Feb 3, Apr 23, Jun 24. Semester turnaround not published; Feb 1 assumed.',
     },
@@ -179,9 +184,29 @@ function reportingTermPreset(schoolId, date) {
   });
 }
 
+/** The report name for each of a class's terms when they are exactly one
+ * school's preset (same count and dates), else null. Entries are '' for a
+ * term with no published report. */
+function reportingTermReportNames(terms) {
+  if (!Array.isArray(terms) || !terms.length) return null;
+  var school = REPORTING_TERM_PRESETS.schools.find(function (s) {
+    return (
+      s.terms.length === terms.length &&
+      s.terms.every(function (t, i) {
+        return t.starts_on === terms[i].starts_on && t.ends_on === terms[i].ends_on;
+      })
+    );
+  });
+  if (!school) return null;
+  return school.terms.map(function (t) {
+    return t.report || '';
+  });
+}
+
 if (typeof window !== 'undefined') {
   window.REPORTING_TERM_PRESETS = REPORTING_TERM_PRESETS;
   window.reportingSchoolYear = reportingSchoolYear;
   window.reportingTermSchools = reportingTermSchools;
   window.reportingTermPreset = reportingTermPreset;
+  window.reportingTermReportNames = reportingTermReportNames;
 }

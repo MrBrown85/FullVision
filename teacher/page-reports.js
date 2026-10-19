@@ -187,6 +187,56 @@ window.PageReports = (function () {
     setActiveTerm(cid, has ? n : null);
   }
 
+  /* The report picker lists the class's reporting terms. A class on a
+     school's preset terms sees that school's report names ("Nov report
+     card"); other classes see their own term names; a class with no terms
+     keeps Report 1–6. Values stay "Report N" so saved questionnaire data
+     (term-N) lines up. Keeps the current choice when it still exists,
+     otherwise picks the term that contains today. */
+  function populateReportPeriods(keepChoice) {
+    const sel = document.getElementById('report-period');
+    if (!sel) return;
+    const prev = keepChoice ? sel.value : '';
+    const terms = typeof getReportingTerms === 'function' ? getReportingTerms(activeCourse) : [];
+    const names =
+      terms.length && typeof reportingTermReportNames === 'function' ? reportingTermReportNames(terms) : null;
+    let opts;
+    if (!terms.length) {
+      opts = [1, 2, 3, 4, 5, 6].map(function (n) {
+        return { n: n, label: 'Report ' + n };
+      });
+    } else {
+      opts = terms.map(function (t, i) {
+        let label = t.label || 'Report ' + t.ordinal;
+        if (names) label = names[i] || label + ' (no report published)';
+        return { n: t.ordinal, label: label };
+      });
+    }
+    sel.innerHTML = opts
+      .map(function (o) {
+        return '<option value="Report ' + o.n + '">' + esc(o.label) + '</option>';
+      })
+      .join('');
+    const values = opts.map(function (o) {
+      return 'Report ' + o.n;
+    });
+    if (prev && values.indexOf(prev) >= 0) {
+      sel.value = prev;
+      return;
+    }
+    const today = typeof courseToday === 'function' ? courseToday(activeCourse) : '';
+    let pick = terms.find(function (t) {
+      return today && t.starts_on <= today && today <= t.ends_on;
+    });
+    if (!pick && today)
+      pick = terms
+        .filter(function (t) {
+          return t.starts_on <= today;
+        })
+        .pop();
+    sel.value = pick ? 'Report ' + pick.ordinal : values[0];
+  }
+
   function renderReports() {
     const cid = activeCourse;
     const output = document.getElementById('report-output');
@@ -299,6 +349,7 @@ window.PageReports = (function () {
     reportConfig = Builder.getReportConfigWrapped(cid);
     _configureQuestionnaire();
     populateStudentSelect();
+    populateReportPeriods(false);
     renderReports();
     document.getElementById('sidebar-mount').innerHTML = renderSidebar(cid, null);
   }
@@ -553,6 +604,7 @@ window.PageReports = (function () {
     document.getElementById('main').innerHTML = TOOLBAR_HTML;
 
     // Wire report-period change
+    populateReportPeriods(false);
     var reportPeriodEl = document.getElementById('report-period');
     if (reportPeriodEl) reportPeriodEl.addEventListener('change', _handleReportPeriodChange);
 
@@ -620,7 +672,7 @@ window.PageReports = (function () {
 
   /* -- Toolbar HTML (rendered into main on init) ---------- */
   var TOOLBAR_HTML =
-    '<div class="report-toolbar no-print">\n      <div class="seg report-seg-control" role="tablist" aria-label="Report type">\n        <button class="seg-btn report-seg-btn active" data-action="switchTab" data-tab="questionnaire" role="tab" aria-selected="true">Term Questionnaire</button>\n        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="progress" role="tab" aria-selected="false">Progress Reports</button>\n        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="summary" role="tab" aria-selected="false">Class Summary</button>\n      </div>\n      <div class="student-picker" id="student-picker">\n        <button class="student-picker-btn" data-action="toggleStudentPicker" aria-label="Select students" aria-expanded="false" aria-haspopup="listbox">\n          <span id="picker-label">All Students</span>\n          <span class="arrow" aria-hidden="true">\u25bc</span>\n        </button>\n        <div class="student-picker-dropdown" id="picker-dropdown"></div>\n      </div>\n      <div class="tq-student-nav" id="tq-student-nav" style="display:none">\n        <button class="tq-toolbar-arrow" data-action="tqPrevStudent" title="Previous student" aria-label="Previous student">\n          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>\n        </button>\n        <span class="tq-student-name" id="tq-student-name"></span>\n        <button class="tq-toolbar-arrow" data-action="tqNextStudent" title="Next student" aria-label="Next student">\n          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>\n        </button>\n        <div class="tq-progress-ring" id="tq-progress-ring">\n          <svg width="30" height="30" viewBox="0 0 30 30">\n            <circle class="ring-bg" cx="15" cy="15" r="12"/>\n            <circle class="ring-fill" id="tq-ring-fill" cx="15" cy="15" r="12" stroke-dasharray="75.4" stroke-dashoffset="75.4"/>\n          </svg>\n          <span class="tq-progress-label" id="tq-progress-label"></span>\n        </div>\n      </div>\n      <select id="report-period" class="report-term-select" aria-label="Reporting period">\n        <option value="Report 1">Report 1</option>\n        <option value="Report 2">Report 2</option>\n        <option value="Report 3">Report 3</option>\n        <option value="Report 4">Report 4</option>\n        <option value="Report 5">Report 5</option>\n        <option value="Report 6">Report 6</option>\n      </select>\n      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">\n        <button class="tb-toggle-btn" id="tb-anon-btn" style="display:none" data-action="toggleAnon">\n          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>\n          Anonymize\n        </button>\n        <button class="tb-action-btn" id="tb-print-btn" data-action="printReports">Print Reports</button>\n      </div>\n    </div>\n    <div id="report-output" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto"></div>';
+    '<div class="report-toolbar no-print">\n      <div class="seg report-seg-control" role="tablist" aria-label="Report type">\n        <button class="seg-btn report-seg-btn active" data-action="switchTab" data-tab="questionnaire" role="tab" aria-selected="true">Term Questionnaire</button>\n        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="progress" role="tab" aria-selected="false">Progress Reports</button>\n        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="summary" role="tab" aria-selected="false">Class Summary</button>\n      </div>\n      <div class="student-picker" id="student-picker">\n        <button class="student-picker-btn" data-action="toggleStudentPicker" aria-label="Select students" aria-expanded="false" aria-haspopup="listbox">\n          <span id="picker-label">All Students</span>\n          <span class="arrow" aria-hidden="true">\u25bc</span>\n        </button>\n        <div class="student-picker-dropdown" id="picker-dropdown"></div>\n      </div>\n      <div class="tq-student-nav" id="tq-student-nav" style="display:none">\n        <button class="tq-toolbar-arrow" data-action="tqPrevStudent" title="Previous student" aria-label="Previous student">\n          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>\n        </button>\n        <span class="tq-student-name" id="tq-student-name"></span>\n        <button class="tq-toolbar-arrow" data-action="tqNextStudent" title="Next student" aria-label="Next student">\n          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>\n        </button>\n        <div class="tq-progress-ring" id="tq-progress-ring">\n          <svg width="30" height="30" viewBox="0 0 30 30">\n            <circle class="ring-bg" cx="15" cy="15" r="12"/>\n            <circle class="ring-fill" id="tq-ring-fill" cx="15" cy="15" r="12" stroke-dasharray="75.4" stroke-dashoffset="75.4"/>\n          </svg>\n          <span class="tq-progress-label" id="tq-progress-label"></span>\n        </div>\n      </div>\n      <select id="report-period" class="report-term-select" aria-label="Report"></select>\n      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">\n        <button class="tb-toggle-btn" id="tb-anon-btn" style="display:none" data-action="toggleAnon">\n          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>\n          Anonymize\n        </button>\n        <button class="tb-action-btn" id="tb-print-btn" data-action="printReports">Print Reports</button>\n      </div>\n    </div>\n    <div id="report-output" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto"></div>';
 
   /* -- Expose handlers for inline event attributes --------- */
   window.rbDragStart = rbDragStart;
