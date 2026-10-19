@@ -1329,17 +1329,24 @@ window.PageStudent = (function () {
     _profileData = null;
     render();
 
+    // "&ob=<id>" (a week on the dashboard's Observations card): show that
+    // observation in the Evidence panel once the page has settled.
+    var jumpOb = params.ob ? resolveObservationId(activeCourse, params.ob) : null;
+    var jumpSid = studentId;
+
     if (window.v2 && window.v2.getStudentProfile) {
       window.v2.getStudentProfile(studentId).then(function (res) {
         if (res && res.data) {
           _profileData = res.data;
           render();
+          if (jumpOb && studentId === jumpSid) Evidence.jumpTo(jumpOb);
         }
       });
     }
 
     requestAnimationFrame(function () {
       document.getElementById('main').scrollTop = 0;
+      if (jumpOb && studentId === jumpSid) Evidence.jumpTo(jumpOb);
     });
   }
 
