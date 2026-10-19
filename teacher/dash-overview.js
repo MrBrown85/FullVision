@@ -94,10 +94,12 @@ window.DashOverview = (function () {
     var actionItems = opts.actionItems;
     var html = '';
 
-    html += '<div class="dash-section">';
-    html += '<div class="dash-overview">';
+    // Row 1: Class Distribution (one third) and Observations (two thirds),
+    // the same height. Row 2: Core Competencies and Upcoming Birthdays.
+    html += '<div class="dash-section dash-overview">';
+    html += '<div class="dash-overview-row dash-overview-top">';
 
-    html += '<div class="dash-overview-section">';
+    html += '<div class="dash-overview-section dash-dist-card">';
 
     // By letter grade in a Letter class, by proficiency level otherwise.
     var nameById = {};
@@ -273,44 +275,19 @@ window.DashOverview = (function () {
     html += '</div></div>';
     html += '</div>';
 
-    html += '<div class="dash-overview-section">';
-    var obsCoverage = obsCoverageData(cid, allStudents);
-    html += renderObsOverdue(cid, allStudents, obsCoverage);
-
-    var upcomingBdays = getUpcomingBirthdays(cid);
-    if (upcomingBdays.length > 0) {
-      html += '<div style="margin-top:14px">' + '<div class="dash-section-title">Upcoming Birthdays</div>';
-      upcomingBdays.forEach(function (b) {
-        var dob = parseLocalDate(b.student.dateOfBirth);
-        var monthDay = dob.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
-        var countdown =
-          b.daysUntil === 0
-            ? '<span style="color:var(--score-3);font-weight:600">Today!</span>'
-            : b.daysUntil === 1
-              ? '<span style="color:var(--score-2);font-weight:600">Tomorrow</span>'
-              : '<span style="color:var(--text-3)">in ' + b.daysUntil + ' days</span>';
-        html +=
-          '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:0.82rem">' +
-          '<div class="bday-avatar">' +
-          initials(b.student) +
-          '</div>' +
-          '<span style="font-weight:500;color:var(--text)">' +
-          esc(displayName(b.student)) +
-          '</span>' +
-          '<span style="font-size:0.75rem;color:var(--text-3)">' +
-          monthDay +
-          '</span>' +
-          '<span style="margin-left:auto;font-size:0.75rem">' +
-          countdown +
-          '</span>' +
-          '</div>';
-      });
-      html += '</div>';
-    }
-
+    // The Observations card. page-dashboard.js re-renders only its inside
+    // for tab, flag and Hide names clicks.
+    html +=
+      '<section class="dash-overview-section dash-ob2" id="dash-obs-card" aria-labelledby="dash-ob2-title">' +
+      DashObservations.renderCard(cid, allStudents, opts.obs || {}) +
+      '</section>';
     html += '</div>';
 
-    html += '<div class="dash-overview-section">' + '<div class="dash-section-title">Core Competencies</div>';
+    var upcomingBdays = getUpcomingBirthdays(cid);
+    html += '<div class="dash-overview-row dash-overview-second' + (upcomingBdays.length ? '' : ' is-single') + '">';
+
+    html +=
+      '<div class="dash-overview-section dash-cc-card">' + '<div class="dash-section-title">Core Competencies</div>';
 
     html += '<div class="dash-cc-grid">';
     CORE_COMPETENCIES.forEach(function (cc) {
@@ -364,17 +341,48 @@ window.DashOverview = (function () {
     html += '</div>';
     html += '</div>';
 
-    // The coverage grid takes a full-width row under the three cards.
-    var grid = renderObsCoverageGrid(cid, obsCoverage);
-    if (grid) html += '<div class="dash-overview-section dash-obs-coverage">' + grid + '</div>';
+    if (upcomingBdays.length > 0) {
+      html +=
+        '<div class="dash-overview-section dash-bday-card">' +
+        '<div class="dash-section-title">Upcoming Birthdays</div>';
+      upcomingBdays.forEach(function (b) {
+        var dob = parseLocalDate(b.student.dateOfBirth);
+        var monthDay = dob.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
+        var countdown =
+          b.daysUntil === 0
+            ? '<span style="color:var(--score-3);font-weight:600">Today!</span>'
+            : b.daysUntil === 1
+              ? '<span style="color:var(--score-2);font-weight:600">Tomorrow</span>'
+              : '<span style="color:var(--text-3)">in ' + b.daysUntil + ' days</span>';
+        html +=
+          '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:0.82rem">' +
+          '<div class="bday-avatar">' +
+          initials(b.student) +
+          '</div>' +
+          '<span class="dash-bday-name" style="font-weight:500;color:var(--text)">' +
+          esc(displayName(b.student)) +
+          '</span>' +
+          '<span style="font-size:0.75rem;color:var(--text-3)">' +
+          monthDay +
+          '</span>' +
+          '<span style="margin-left:auto;font-size:0.75rem">' +
+          countdown +
+          '</span>' +
+          '</div>';
+      });
+      html += '</div>';
+    }
+
+    html += '</div>'; // row 2
+    html += '</div>'; // dash-section
 
     return html;
   }
 
-  /* ── Observation coverage ───────────────────────────────────
-     Who has gone 3+ weeks without an observation, and a students-by-week
-     grid of observation counts tinted by type. The calculations are pure
-     and take today's date as 'YYYY-MM-DD' so tests can pin it. */
+  /* ── Observation weeks and overdue ──────────────────────────
+     The Observations card (dash-observations.js) and the student cards use
+     these. They are pure and take today's date as 'YYYY-MM-DD' so tests can
+     pin it. */
   var OBS_OVERDUE_DAYS = 21;
   var OBS_DEFAULT_WEEKS = 8;
   var DAY_MS = 86400000;
@@ -396,23 +404,6 @@ window.DashOverview = (function () {
     var n = _dayNum(dateStr);
     var mondayOffset = (new Date(n * DAY_MS).getUTCDay() + 6) % 7;
     return _dayStr(n - mondayOffset);
-  }
-
-  /** The term the grid covers: the picker's term, else the one today falls in, else null. */
-  function obsCoverageTerm(terms, activeTerm, todayStr) {
-    if (activeTerm && activeTerm.startsOn && activeTerm.endsOn) return activeTerm;
-    var current = (terms || []).find(function (t) {
-      var s = t.startsOn || t.starts_on;
-      var e = t.endsOn || t.ends_on;
-      return s && e && s <= todayStr && todayStr <= e;
-    });
-    if (!current) return null;
-    return {
-      ordinal: current.ordinal,
-      label: current.label,
-      startsOn: current.startsOn || current.starts_on,
-      endsOn: current.endsOn || current.ends_on,
-    };
   }
 
   /** Mondays of the grid's columns: the term's weeks up to today, or the last 8 weeks with no term. */
@@ -445,214 +436,6 @@ window.DashOverview = (function () {
     var last = obsLastDate(obs);
     if (!last) return true;
     return _dayNum(todayStr) - _dayNum(last) >= OBS_OVERDUE_DAYS;
-  }
-
-  /** A week's tint: the type that has the most observations; 'mixed' on a tie, 'neutral' when none is typed. */
-  function obsCellTint(obs) {
-    if (!obs || obs.length === 0) return 'empty';
-    var counts = { strength: 0, growth: 0, concern: 0 };
-    obs.forEach(function (o) {
-      if (o && counts.hasOwnProperty(o.sentiment)) counts[o.sentiment]++;
-    });
-    var max = Math.max(counts.strength, counts.growth, counts.concern);
-    if (max === 0) return 'neutral';
-    var top = Object.keys(counts).filter(function (k) {
-      return counts[k] === max;
-    });
-    return top.length === 1 ? top[0] : 'mixed';
-  }
-
-  /** One row per student, in the order given: overdue flag and one cell per week. */
-  function obsCoverageRows(students, obsBySid, weeks, todayStr) {
-    var index = {};
-    weeks.forEach(function (w, i) {
-      index[w] = i;
-    });
-    return (students || []).map(function (s) {
-      var obs = obsBySid[s.id] || [];
-      var byWeek = weeks.map(function () {
-        return [];
-      });
-      obs.forEach(function (o) {
-        if (!o || !_isDateStr(o.date)) return;
-        var i = index[obsWeekStart(o.date)];
-        if (i !== undefined) byWeek[i].push(o);
-      });
-      return {
-        student: s,
-        overdue: obsIsOverdue(obs, todayStr),
-        lastDate: obsLastDate(obs),
-        cells: weeks.map(function (w, i) {
-          return { week: w, obs: byWeek[i], tint: obsCellTint(byWeek[i]) };
-        }),
-      };
-    });
-  }
-
-  function _weekLabel(week) {
-    return new Date(_dayNum(week) * DAY_MS).toLocaleDateString('en-CA', {
-      month: 'short',
-      day: 'numeric',
-      timeZone: 'UTC',
-    });
-  }
-
-  function _obsCellTitle(name, week, obs) {
-    var head = name + ', week of ' + _weekLabel(week) + ': ';
-    if (obs.length === 0) return head + 'no observations';
-    var lines = obs
-      .slice()
-      .sort(function (a, b) {
-        return (a.date || '').localeCompare(b.date || '');
-      })
-      .slice(0, 6)
-      .map(function (o) {
-        var t = String(o.text || '').replace(/\s+/g, ' ');
-        return '\u2013 ' + (t.length > 100 ? t.slice(0, 99) + '\u2026' : t);
-      });
-    if (obs.length > 6) lines.push('and ' + (obs.length - 6) + ' more');
-    return head + obs.length + (obs.length === 1 ? ' observation' : ' observations') + '\n' + lines.join('\n');
-  }
-
-  /* The overdue list and the grid for a class, for today and the term in view. */
-  function obsCoverageData(cid, students) {
-    var today = getTodayStr();
-    var terms = typeof getReportingTerms === 'function' ? getReportingTerms(cid) : [];
-    var active = typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
-    var term = obsCoverageTerm(terms, active, today);
-    var weeks = obsCoverageWeeks(today, term);
-    var obsBySid = {};
-    students.forEach(function (s) {
-      obsBySid[s.id] = getStudentQuickObs(cid, s.id);
-    });
-    var rows = obsCoverageRows(students, obsBySid, weeks, today);
-    return {
-      term: term,
-      weeks: weeks,
-      rows: rows,
-      overdue: rows.filter(function (r) {
-        return r.overdue;
-      }),
-    };
-  }
-
-  /* Headline and chips: who has no observation in 3+ weeks. */
-  function renderObsOverdue(cid, students, data) {
-    var overdue = data.overdue;
-    var html =
-      '<div class="dash-section-title">Observations' +
-      '<a href="#/observations?course=' +
-      encodeURIComponent(cid) +
-      '">Record \u2192</a>' +
-      '</div>';
-
-    if (students.length === 0) {
-      return html + '<div class="dash-obs-headline">No students yet</div>';
-    }
-
-    if (overdue.length > 0) {
-      html +=
-        '<div class="dash-obs-headline is-overdue">' +
-        overdue.length +
-        (overdue.length === 1 ? ' student has' : ' students have') +
-        ' no observation in 3+ weeks</div>' +
-        '<div class="dash-obs-overdue" aria-label="Students with no observation in 3 or more weeks">';
-      overdue.forEach(function (r) {
-        var s = r.student;
-        html +=
-          '<a class="dash-obs-chip" href="#/student?id=' +
-          encodeURIComponent(s.id) +
-          '&course=' +
-          encodeURIComponent(cid) +
-          '" title="' +
-          esc(
-            r.lastDate
-              ? 'Last observed ' +
-                  parseLocalDate(r.lastDate).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })
-              : 'No observations yet',
-          ) +
-          '">' +
-          esc(displayName(s)) +
-          '</a>';
-      });
-      html += '</div>';
-    } else {
-      html += '<div class="dash-obs-headline">Everyone observed in the last 3 weeks</div>';
-    }
-
-    return html;
-  }
-
-  /* Students-by-week grid of observation counts, tinted by type. */
-  function renderObsCoverageGrid(cid, data) {
-    var term = data.term;
-    var weeks = data.weeks;
-    var rows = data.rows;
-    if (rows.length === 0) return '';
-    var title = term
-      ? 'Observations by week, ' + (term.label || 'this term')
-      : 'Observations by week, last ' + OBS_DEFAULT_WEEKS + ' weeks';
-    var html =
-      '<div class="dash-section-title">' +
-      esc(title) +
-      '</div>' +
-      '<div class="dash-obs-grid-wrap" tabindex="0" role="region" aria-label="Observations by student and week">' +
-      '<table class="dash-obs-grid">' +
-      '<thead><tr><th scope="col" class="dash-obs-grid-name">Student</th>';
-    var prevMonth = '';
-    weeks.forEach(function (w) {
-      var d = new Date(_dayNum(w) * DAY_MS);
-      var month = d.toLocaleDateString('en-CA', { month: 'short', timeZone: 'UTC' });
-      html +=
-        '<th scope="col" title="Week of ' +
-        esc(_weekLabel(w)) +
-        '"><span class="dash-obs-grid-month">' +
-        (month !== prevMonth ? esc(month) : '') +
-        '</span>' +
-        d.getUTCDate() +
-        '</th>';
-      prevMonth = month;
-    });
-    html += '</tr></thead><tbody>';
-    rows.forEach(function (r) {
-      var s = r.student;
-      var name = displayName(s);
-      var obsHref = '#/observations?course=' + encodeURIComponent(cid) + '&student=' + encodeURIComponent(s.id);
-      html +=
-        '<tr><th scope="row" class="dash-obs-grid-name' +
-        (r.overdue ? ' is-overdue' : '') +
-        '"><a href="#/student?id=' +
-        encodeURIComponent(s.id) +
-        '&course=' +
-        encodeURIComponent(cid) +
-        '"' +
-        (r.overdue ? ' title="No observation in 3+ weeks"' : '') +
-        '>' +
-        esc(name) +
-        '</a></th>';
-      r.cells.forEach(function (c) {
-        html +=
-          '<td><a class="dash-obs-cell dash-obs-tint-' +
-          c.tint +
-          '" href="' +
-          obsHref +
-          '" title="' +
-          esc(_obsCellTitle(name, c.week, c.obs)) +
-          '">' +
-          (c.obs.length || '') +
-          '</a></td>';
-      });
-      html += '</tr>';
-    });
-    html += '</tbody></table></div>';
-    html +=
-      '<div class="dash-obs-legend">' +
-      '<span><i class="dash-obs-tint-strength"></i>Strengths</span>' +
-      '<span><i class="dash-obs-tint-growth"></i>Growth</span>' +
-      '<span><i class="dash-obs-tint-concern"></i>Concerns</span>' +
-      '<span><i class="dash-obs-tint-empty"></i>None</span>' +
-      '</div>';
-    return html;
   }
 
   function renderBirthdayWidget(cid) {
@@ -694,15 +477,9 @@ window.DashOverview = (function () {
     renderDashToolbar: renderDashToolbar,
     renderOverviewPanel: renderOverviewPanel,
     renderBirthdayWidget: renderBirthdayWidget,
-    renderObsOverdue: renderObsOverdue,
-    renderObsCoverageGrid: renderObsCoverageGrid,
-    obsCoverageData: obsCoverageData,
     obsWeekStart: obsWeekStart,
-    obsCoverageTerm: obsCoverageTerm,
     obsCoverageWeeks: obsCoverageWeeks,
     obsLastDate: obsLastDate,
     obsIsOverdue: obsIsOverdue,
-    obsCellTint: obsCellTint,
-    obsCoverageRows: obsCoverageRows,
   };
 })();

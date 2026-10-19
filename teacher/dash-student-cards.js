@@ -208,7 +208,7 @@ window.DashStudentCards = (function () {
           '</div>' +
           (st.pronouns ? '<div class="dash-card-pronouns">' + esc(st.pronouns) + '</div>' : '') +
           (st.studentNumber
-            ? '<div style="font-size:0.6rem;color:var(--text-3);font-family:\'SF Mono\',ui-monospace,monospace">#' +
+            ? '<div class="dash-card-stunum" style="font-size:0.6rem;color:var(--text-3);font-family:\'SF Mono\',ui-monospace,monospace">#' +
               esc(st.studentNumber) +
               '</div>'
             : '') +

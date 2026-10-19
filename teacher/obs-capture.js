@@ -1517,6 +1517,7 @@ window.ObsCapture = (function () {
       '</div><button type="button" class="obsc-dialog-close" aria-label="Close">✕</button></div>' +
       '<div class="obsc-dialog-body"></div></div>';
     var userOnAdd = opts.onAdd;
+    var userOnFlag = opts.onFlag;
     var capture = create(
       Object.assign({}, opts, {
         idPrefix: opts.idPrefix || 'dlg-',
@@ -1526,7 +1527,8 @@ window.ObsCapture = (function () {
           var st = capture.getState();
           if (!st.flagOffer.length && info.ok) closeDialog();
         },
-        onFlag: function () {
+        onFlag: function (sid) {
+          if (typeof userOnFlag === 'function') userOnFlag(sid);
           if (!capture.getState().flagOffer.length) closeDialog();
         },
       }),
