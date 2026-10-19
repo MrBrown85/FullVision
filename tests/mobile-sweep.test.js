@@ -256,3 +256,29 @@ describe('sweep screen', () => {
     expect(q('.m-sweep-finished-title').textContent).toBe('No one left. 2 students skipped for today.');
   });
 });
+
+describe('sweep after a reload in the evening', () => {
+  const origTZ = process.env.TZ;
+  beforeAll(() => {
+    process.env.TZ = 'America/Los_Angeles';
+  });
+  afterAll(() => {
+    if (origTZ === undefined) delete process.env.TZ;
+    else process.env.TZ = origTZ;
+  });
+
+  afterEach(() => {
+    _cache.observations[CID] = undefined;
+    localStorage.clear();
+  });
+
+  it('counts an observation written at 6:30 pm PDT as done that day', () => {
+    // 6:30 pm PDT on Oct 18; the UTC day is already Oct 19.
+    const blob = _observationsPayloadToBlob({
+      observations: [{ id: 'ob1', body: 'Evening note', enrollment_ids: ['s1'], created_at: '2026-10-19T01:30:00Z' }],
+    });
+    saveQuickObs(CID, blob);
+    expect(H.doneSet(getAllQuickObs(CID), '2026-10-18')).toEqual({ s1: true });
+    expect(H.doneSet(getAllQuickObs(CID), '2026-10-19')).toEqual({});
+  });
+});
