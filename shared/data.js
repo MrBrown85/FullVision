@@ -5603,10 +5603,12 @@ function reportingTermsError(terms) {
   return null;
 }
 
-/** Save the class's terms. Ordinals are assigned 1..n by start date.
- * Returns the error text if the list is invalid; nothing is saved then. */
-function saveReportingTerms(cid, terms) {
-  var clean = (terms || []).map(function (t) {
+/** Number a list of terms in start-date order. Terms keep the numbers they
+ * have when those rise with the dates, so a Semester 2 class keeps the
+ * school's Terms 3 and 4 (DECISIONS, Reporting periods 9); a term without one
+ * takes the next number. Numbers out of date order, or past 6, give 1..n. */
+function normalizeTermOrdinals(terms) {
+  var rows = (terms || []).map(function (t) {
     return {
       ordinal: Number(t.ordinal),
       label: String(t.label || '').trim(),
@@ -5614,12 +5616,86 @@ function saveReportingTerms(cid, terms) {
       ends_on: String(t.ends_on || ''),
     };
   });
-  clean.sort(function (a, b) {
+  rows.sort(function (a, b) {
     return a.starts_on < b.starts_on ? -1 : a.starts_on > b.starts_on ? 1 : 0;
   });
-  clean.forEach(function (t, i) {
-    t.ordinal = i + 1;
+  // Numbers already given must rise with the dates; if they don't, they are
+  // stale and every term is renumbered 1..n.
+  var given = rows
+    .map(function (t) {
+      return t.ordinal;
+    })
+    .filter(function (n) {
+      return Number.isInteger(n) && n >= 1;
+    });
+  var keep = given.every(function (n, i) {
+    return i === 0 || n > given[i - 1];
   });
+  var prev = 0;
+  rows.forEach(function (t) {
+    t.ordinal = keep && Number.isInteger(t.ordinal) && t.ordinal > prev ? t.ordinal : prev + 1;
+    prev = t.ordinal;
+  });
+  if (prev > REPORTING_TERMS_MAX)
+    rows.forEach(function (t, i) {
+      t.ordinal = i + 1;
+    });
+  return rows;
+}
+
+/* ── Which part of the year a class runs ────────────────────────
+   Full year, Semester 1 or Semester 2. Not stored: it is read off the
+   terms the class carries, split at the day Semester 2 starts. */
+var TERM_SPANS = [
+  { value: 'full', label: 'Full year' },
+  { value: 's1', label: 'Semester 1' },
+  { value: 's2', label: 'Semester 2' },
+];
+
+/** The day Semester 2 starts for a set of terms: Term 3's start when they are
+ * a Surrey school's preset terms, else Feb 1 of their school year. */
+function semesterTwoStart(terms, fallbackDate) {
+  var match = typeof reportingTermsSchoolMatch === 'function' ? reportingTermsSchoolMatch(terms) : null;
+  if (match && match.school.terms[2]) return match.school.terms[2].starts_on;
+  var first = (terms || [])
+    .map(function (t) {
+      return t.starts_on;
+    })
+    .filter(Boolean)
+    .sort()[0];
+  var d = String(first || fallbackDate || '');
+  var y = parseInt(d.slice(0, 4), 10);
+  var m = parseInt(d.slice(5, 7), 10);
+  if (!y || !m) return null;
+  return (m >= 8 ? y + 1 : y) + '-02-01';
+}
+
+/** The terms of `rows` that fall in a span: Semester 1 is every term that
+ * ends before `sem2Start`, Semester 2 every term that starts on or after it.
+ * A term that runs across the turnaround belongs to neither. */
+function termsInSpan(rows, span, sem2Start) {
+  if (span !== 's1' && span !== 's2') return (rows || []).slice();
+  if (!sem2Start) return (rows || []).slice();
+  return (rows || []).filter(function (r) {
+    return span === 's1' ? r.ends_on < sem2Start : r.starts_on >= sem2Start;
+  });
+}
+
+/** 'full', 's1' or 's2' for the terms a class carries. No terms is full. */
+function termSpanOf(terms, sem2Start) {
+  var list = terms || [];
+  if (!list.length || !sem2Start) return 'full';
+  var inS1 = termsInSpan(list, 's1', sem2Start).length;
+  var inS2 = termsInSpan(list, 's2', sem2Start).length;
+  if (inS1 === list.length) return 's1';
+  if (inS2 === list.length) return 's2';
+  return 'full';
+}
+
+/** Save the class's terms, numbered by normalizeTermOrdinals. Returns the
+ * error text if the list is invalid; nothing is saved then. */
+function saveReportingTerms(cid, terms) {
+  var clean = normalizeTermOrdinals(terms);
   var err = reportingTermsError(clean);
   if (err) return err;
   var cc = Object.assign({}, getCourseConfig(cid) || {});
@@ -5627,7 +5703,13 @@ function saveReportingTerms(cid, terms) {
   saveCourseConfig(cid, cc);
   // A chosen term that no longer exists falls back to all time.
   var chosen = getSelectedTermOrdinal(cid);
-  if (chosen != null && chosen > clean.length) setSelectedTermOrdinal(cid, null);
+  if (
+    chosen != null &&
+    !clean.some(function (t) {
+      return t.ordinal === chosen;
+    })
+  )
+    setSelectedTermOrdinal(cid, null);
   if (typeof clearProfCache === 'function') clearProfCache();
   return null;
 }

@@ -465,7 +465,8 @@ window.DashClassManager = (function () {
   var cwStep2Name = '',
     cwStep2Grade = '',
     cwStep2Desc = '',
-    cwStep2Block = '';
+    cwStep2Block = '',
+    cwStep2Span = 'full';
   // '' = not chosen yet; the wizard fills in the grade-level default.
   var cwStep2Grading = '',
     cwStep2Calc = '',
@@ -1912,6 +1913,23 @@ window.DashClassManager = (function () {
       '<div class="cm-field"><label class="cm-label" id="cm-new-block-label">Block</label>' +
       blockPickerHtml('cm-new-block', cwStep2Block) +
       '</div>' +
+      '<div class="cm-field"><label class="cm-label" id="cm-cg-span-label">This class runs</label>' +
+      '<div class="seg seg-sm cm-seg" id="cm-cg-span" role="radiogroup" aria-labelledby="cm-cg-span-label">' +
+      TERM_SPANS.map(function (o) {
+        var on = cwStep2Span === o.value;
+        return (
+          '<button type="button" class="seg-btn cm-seg-btn' +
+          (on ? ' active' : '') +
+          '"' +
+          segAttr(on, 'radio') +
+          ' data-val="' +
+          o.value +
+          '" data-action="cmCreateToggle" data-group="cm-cg-span">' +
+          o.label +
+          '</button>'
+        );
+      }).join('') +
+      '</div></div>' +
       '<div style="display:flex;gap:16px"><div class="cm-field" style="flex:1"><label class="cm-label">Grade Level</label><input class="cm-input" id="cm-new-grade" value="' +
       esc(preGrade) +
       '" placeholder="e.g. 8, 10-12" data-action-input="cwGradeInput"></div></div>' +
@@ -2010,6 +2028,15 @@ window.DashClassManager = (function () {
       '</div></div>' +
       '<div class="cm-field"><label class="cm-label">Block</label><div style="font-size:var(--text-md);color:var(--text-2)">' +
       esc(courseBlockLabel({ block: cwStep2Block }) || '\u2014') +
+      '</div></div>' +
+      '<div class="cm-field"><label class="cm-label">Runs</label><div style="font-size:var(--text-md);color:var(--text-2)">' +
+      esc(
+        (
+          TERM_SPANS.find(function (o) {
+            return o.value === cwStep2Span;
+          }) || TERM_SPANS[0]
+        ).label,
+      ) +
       '</div></div>' +
       '<div class="cm-field"><label class="cm-label">Grade</label><div style="font-size:var(--text-md);color:var(--text-2)">' +
       esc(gradeLevel || '\u2014') +
@@ -2117,6 +2144,7 @@ window.DashClassManager = (function () {
   function cwGoToStep3() {
     cwStep2Name = document.getElementById('cm-new-name')?.value || '';
     cwStep2Block = readBlockPicker('cm-new-block');
+    cwStep2Span = (document.querySelector('#cm-cg-span .cm-seg-btn.active') || {}).dataset?.val || 'full';
     cwStep2Grade = document.getElementById('cm-new-grade')?.value || '';
     cwStep2Desc = document.getElementById('cm-new-desc')?.value || '';
     cwStep2Grading =
@@ -2203,7 +2231,7 @@ window.DashClassManager = (function () {
     var cc = getCourseConfig(course.id);
     cc.calcMethod = cwStep2Calc;
     cc.decayWeight = parseInt(cwStep2Decay, 10) / 100;
-    var defaultTerms = _cmDefaultReportingTerms(course.id);
+    var defaultTerms = _cmDefaultReportingTerms(course.id, cwStep2Span);
     if (defaultTerms && !(Array.isArray(cc.reportingTerms) && cc.reportingTerms.length))
       cc.reportingTerms = defaultTerms;
     saveCourseConfig(course.id, cc);
@@ -2256,6 +2284,7 @@ window.DashClassManager = (function () {
     cwStep2Grade = '';
     cwStep2Desc = '';
     cwStep2Block = '';
+    cwStep2Span = 'full';
     cwStep2Grading = '';
     cwStep2Calc = '';
     cwStep2Decay = '65';
@@ -3247,16 +3276,20 @@ window.DashClassManager = (function () {
      periods"). Edited like categories: rows change live, Save sends the
      whole list through saveReportingTerms, which numbers them by start
      date. */
-  var _cmTermState = {}; // cid → { rows: [{label, starts_on, ends_on}], dirty }
+  var _cmTermState = {}; // cid → { rows: [{ordinal?, label, starts_on, ends_on}], span, dirty }
 
   function _cmTermRows(cid) {
     if (!_cmTermState[cid]) {
+      var saved = getReportingTerms(cid);
       _cmTermState[cid] = {
-        rows: getReportingTerms(cid).map(function (t) {
-          return { label: t.label, starts_on: t.starts_on, ends_on: t.ends_on };
+        rows: saved.map(function (t) {
+          return { ordinal: t.ordinal, label: t.label, starts_on: t.starts_on, ends_on: t.ends_on };
         }),
+        span: 'full',
         dirty: false,
       };
+      var template = _cmTermTemplate(cid, _cmTermState[cid].rows);
+      if (template) _cmTermState[cid].span = termSpanOf(saved, semesterTwoStart(template));
     }
     return _cmTermState[cid];
   }
@@ -3290,16 +3323,36 @@ window.DashClassManager = (function () {
 
   function _cmTermPresetRows(cid, name) {
     var y = _cmSchoolYearStart(cid);
-    return (_CM_TERM_PRESETS[name] || []).map(function (p) {
-      return { label: p[0], starts_on: y + p[3] + '-' + p[1], ends_on: y + p[4] + '-' + p[2] };
+    return (_CM_TERM_PRESETS[name] || []).map(function (p, i) {
+      return { ordinal: i + 1, label: p[0], starts_on: y + p[3] + '-' + p[1], ends_on: y + p[4] + '-' + p[2] };
     });
   }
 
+  /* The whole-year terms the class's rows were cut from: a Surrey school's
+     preset or a generic one, matched term by term on number and dates. Null
+     for typed terms. Lets "This class runs" go back to Full year. */
+  function _cmTermTemplate(cid, rows) {
+    if (!rows.length) return null;
+    var match = typeof reportingTermsSchoolMatch === 'function' ? reportingTermsSchoolMatch(rows) : null;
+    if (match) {
+      return match.school.terms.map(function (t, i) {
+        return { ordinal: i + 1, label: t.label, starts_on: t.starts_on, ends_on: t.ends_on };
+      });
+    }
+    var names = Object.keys(_CM_TERM_PRESETS);
+    for (var k = 0; k < names.length; k++) {
+      var full = _cmTermPresetRows(cid, names[k]);
+      var fits = rows.every(function (r) {
+        var t = full[Number(r.ordinal) - 1];
+        return !!t && t.starts_on === r.starts_on && t.ends_on === r.ends_on;
+      });
+      if (fits) return full;
+    }
+    return null;
+  }
+
   function _cmTermError(cid) {
-    var rows = _cmTermRows(cid).rows.map(function (r, i) {
-      return { ordinal: i + 1, label: r.label, starts_on: r.starts_on, ends_on: r.ends_on };
-    });
-    return reportingTermsError(rows);
+    return reportingTermsError(normalizeTermOrdinals(_cmTermRows(cid).rows));
   }
 
   function _cmTermCanSave(cid) {
@@ -3309,12 +3362,20 @@ window.DashClassManager = (function () {
   function _cmTermFooterHtml(cid) {
     var err = _cmTermError(cid);
     if (err) return '<span class="cm-cat-sum cm-cat-sum-over">' + esc(err) + '</span>';
-    var n = _cmTermRows(cid).rows.length;
-    if (n === 0) return '<span class="cm-cat-sum">No terms: every page shows the whole year.</span>';
+    var ords = normalizeTermOrdinals(_cmTermRows(cid).rows).map(function (t) {
+      return t.ordinal;
+    });
+    if (ords.length === 0) return '<span class="cm-cat-sum">No terms: every page shows the whole year.</span>';
+    var first = ords[0],
+      last = ords[ords.length - 1];
+    var contiguous = last - first === ords.length - 1;
+    var nums = ords.length === 1 ? String(first) : contiguous ? first + '–' + last : ords.join(', ');
     return (
-      '<span class="cm-cat-sum">Terms are numbered by start date. Report ' +
-      (n === 1 ? '1' : '1–' + n) +
-      ' on the Reports page match them.</span>'
+      '<span class="cm-cat-sum">Report ' +
+      nums +
+      ' on the Reports page ' +
+      (ords.length === 1 ? 'matches' : 'match') +
+      ' these terms.</span>'
     );
   }
 
@@ -3384,6 +3445,7 @@ window.DashClassManager = (function () {
       '<div class="cm-field cm-cat-field">' +
       '<label class="cm-label">Reporting terms</label>' +
       '<div class="cm-hint" style="margin-bottom:8px">The gradebook, dashboard and student pages can show one term at a time. A term counts the assessments dated inside it. Up to six. Surrey secondary dates come from each school’s published calendar; a term ends on the day its report is published.</div>';
+    html += _cmRenderTermSpan(cid);
     html += _cmRenderSchoolPreset(cid, rows.length > 0);
     if (rows.length === 0) {
       html +=
@@ -3440,10 +3502,72 @@ window.DashClassManager = (function () {
     return html;
   }
 
+  /* "This class runs": Full year, Semester 1 or Semester 2. A semester class
+     carries only that semester's terms and keeps their school numbers. */
+  function _cmRenderTermSpan(cid) {
+    var st = _cmTermRows(cid);
+    // Typed terms are the class's own; the choice is for preset terms.
+    if (st.rows.length > 0 && !_cmTermTemplate(cid, st.rows)) return '';
+    var html =
+      '<div class="cm-term-span"><span class="cm-term-span-label" id="cm-term-span-label-' +
+      cid +
+      '">This class runs</span>' +
+      '<div class="seg seg-sm cm-seg" role="radiogroup" aria-labelledby="cm-term-span-label-' +
+      cid +
+      '">' +
+      TERM_SPANS.map(function (o) {
+        var on = st.span === o.value;
+        return (
+          '<button type="button" class="seg-btn cm-seg-btn' +
+          (on ? ' active' : '') +
+          '"' +
+          segAttr(on, 'radio') +
+          ' data-action="cmTermSpan" data-value="' +
+          o.value +
+          '">' +
+          o.label +
+          '</button>'
+        );
+      }).join('') +
+      '</div></div>';
+    if (st.span !== 'full')
+      html +=
+        '<div class="cm-hint">A ' +
+        (st.span === 's1' ? 'Semester 1' : 'Semester 2') +
+        ' class keeps only that semester’s terms, with the school’s numbers' +
+        (st.span === 's2' ? ' (Terms 3 and 4 stay Report 3 and 4)' : '') +
+        '.</div>';
+    return html;
+  }
+
+  function cmTermSpan(span) {
+    if (!cmSelectedCourse || ['full', 's1', 's2'].indexOf(span) < 0) return;
+    var cid = cmSelectedCourse;
+    var st = _cmTermRows(cid);
+    if (st.span === span) return;
+    if (!st.rows.length) {
+      // No terms yet: the choice applies when a preset fills them.
+      st.span = span;
+      renderClassManager();
+      return;
+    }
+    var template = _cmTermTemplate(cid, st.rows);
+    if (!template) return;
+    var next = termsInSpan(template, span, semesterTwoStart(template));
+    if (!next.length) return;
+    st.rows = next.map(function (r) {
+      return Object.assign({}, r);
+    });
+    st.span = span;
+    st.dirty = true;
+    renderClassManager();
+  }
+
   function cmTermPreset(name) {
     if (!cmSelectedCourse) return;
     var st = _cmTermRows(cmSelectedCourse);
-    st.rows = _cmTermPresetRows(cmSelectedCourse, name);
+    var full = _cmTermPresetRows(cmSelectedCourse, name);
+    st.rows = termsInSpan(full, st.span, semesterTwoStart(full));
     st.dirty = true;
     renderClassManager();
   }
@@ -3458,18 +3582,22 @@ window.DashClassManager = (function () {
     var rows = reportingTermPreset(_cmTermSchoolId(), courseToday(cmSelectedCourse));
     if (!rows) return;
     var st = _cmTermRows(cmSelectedCourse);
-    st.rows = rows.map(function (r) {
-      return { label: r.label, starts_on: r.starts_on, ends_on: r.ends_on };
+    var full = rows.map(function (r) {
+      return { ordinal: r.ordinal, label: r.label, starts_on: r.starts_on, ends_on: r.ends_on };
     });
+    st.rows = termsInSpan(full, st.span, semesterTwoStart(full));
     st.dirty = true;
     renderClassManager();
   }
 
   /* A new class starts with the default Surrey secondary school's terms
-     for the current school year, when the presets cover it. */
-  function _cmDefaultReportingTerms(cid) {
+     for the current school year, when the presets cover it: all four for a
+     full-year class, or one semester's two, keeping their numbers. */
+  function _cmDefaultReportingTerms(cid, span) {
     if (typeof reportingTermPreset !== 'function') return null;
-    return reportingTermPreset(null, courseToday(cid));
+    var full = reportingTermPreset(null, courseToday(cid));
+    if (!full) return null;
+    return termsInSpan(full, span || 'full', semesterTwoStart(full));
   }
 
   function cmTermAdd() {
@@ -3511,12 +3639,7 @@ window.DashClassManager = (function () {
     var cid = cmSelectedCourse;
     var st = _cmTermRows(cid);
     if (!_cmTermCanSave(cid)) return;
-    var err = saveReportingTerms(
-      cid,
-      st.rows.map(function (r, i) {
-        return { ordinal: i + 1, label: r.label, starts_on: r.starts_on, ends_on: r.ends_on };
-      }),
-    );
+    var err = saveReportingTerms(cid, st.rows);
     if (err) {
       if (typeof showSyncToast === 'function') showSyncToast('Terms not saved: ' + err, 'error');
       return;
@@ -4460,6 +4583,9 @@ window.DashClassManager = (function () {
       cmSetRoundPercent: function () {
         cmSetRoundPercent(el.dataset.value);
       },
+      cmTermSpan: function () {
+        cmTermSpan(el.dataset.value);
+      },
       cmTermPreset: function () {
         cmTermPreset(el.dataset.value);
       },
@@ -4877,6 +5003,7 @@ window.DashClassManager = (function () {
       cwStep2Grade = '';
       cwStep2Desc = '';
       cwStep2Block = '';
+      cwStep2Span = 'full';
       cwStep2Grading = '';
       cwStep2Calc = '';
       cwStep2Decay = '65';
