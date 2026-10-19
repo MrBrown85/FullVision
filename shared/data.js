@@ -8240,6 +8240,12 @@ function addQuickOb(cid, sid, text, dims, sentiment, context, assignmentContext,
   return lsOk;
 }
 
+/* The current id of an observation a page may still hold by its local id
+   (the create may have landed and re-keyed it since). */
+function resolveObservationId(cid, id) {
+  return _resolveKnownId('observation', id);
+}
+
 function deleteQuickOb(cid, sid, obId) {
   const all = getQuickObs(cid);
   if (!all[sid]) return;

@@ -92,6 +92,7 @@ window.MObserve = (function () {
       nav +
       '<div class="m-screen-content" id="m-obs-feed-content">' +
       MC.largeTitleHTML('Observations') +
+      '<div class="m-sweep-start-wrap"><button class="m-sweep-start" data-action="m-sweep-start">Start a sweep</button></div>' +
       quickBar +
       filters +
       '<div id="m-obs-cards">' +
@@ -688,5 +689,10 @@ window.MObserve = (function () {
     presentQuickMenu: presentQuickMenu,
     quickPost: quickPost,
     quickStarters: quickStarters,
+    typePill: typePill,
+    tagChips: tagChips,
+    refreshFeed: function (cid) {
+      _refreshFeed(cid, false);
+    },
   };
 })();
