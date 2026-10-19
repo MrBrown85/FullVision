@@ -521,6 +521,35 @@
 .dash-ob2-pane.is-scroll-x {
   overflow-x: auto;
 }
+/* Scrolling sideways, the "+", marker and name stay put so every row keeps
+   its name. The name's background and shadows cover the gaps beside it
+   (and the "+" when it is hidden); the "+" and marker sit above that. */
+.dash-ob2-pane.is-scroll-x .dash-ob2-add,
+.dash-ob2-pane.is-scroll-x .dash-ob2-markslot {
+  position: sticky;
+  z-index: 2;
+}
+.dash-ob2-pane.is-scroll-x .dash-ob2-add {
+  left: 0;
+}
+.dash-ob2-pane.is-scroll-x .dash-ob2-markslot {
+  left: 21px;
+}
+.dash-ob2-pane.is-scroll-x .dash-ob2-name,
+.dash-ob2-pane.is-scroll-x .dash-ob2-row.is-head > :nth-child(3) {
+  position: sticky;
+  left: 36px;
+  z-index: 1;
+  align-self: stretch;
+  line-height: 22px;
+  background: var(--surface);
+  box-shadow:
+    -36px 0 0 var(--surface),
+    3px 0 0 var(--surface);
+}
+.dash-ob2-pane.is-scroll-x .dash-ob2-row.is-head {
+  z-index: 3;
+}
 .dash-ob2-blocks {
   display: flex;
   flex-wrap: wrap;
@@ -648,9 +677,16 @@
   background: transparent;
   cursor: pointer;
 }
+/* 5px keeps the untyped mark's 1.5px outline hollow. MIN_CELL.week in
+   dash-observations.js is wide enough for 3 marks and "+N"; if a font is
+   wider still, the marks overflow on the left so "+N" is never cut. */
+.dash-ob2-cell.has-more {
+  gap: 1px;
+  justify-content: flex-end;
+}
 .dash-ob2-cell i {
   flex: 1;
-  min-width: 3px;
+  min-width: 5px;
   border-radius: 3px;
 }
 .dash-ob2-more {
@@ -659,7 +695,7 @@
   font-size: 9px;
   line-height: 16px;
   color: var(--text-2);
-  padding: 0 1px;
+  padding: 0 0 0 1px;
 }
 
 /* By competency: level and evidence count; dashed "none" with no evidence. */
@@ -807,12 +843,18 @@ body.fv-names-hidden .page-dashboard .dash-desig-wrap,
 body.fv-names-hidden .page-dashboard .dist-seg .dist-tip-name,
 body.fv-names-hidden .page-dashboard .bday-avatar,
 body.fv-names-hidden .page-dashboard .dash-bday-name,
-body.fv-names-hidden .dash-search-input,
 body.fv-names-hidden .obsc-dialog .obsc-dialog-sub,
 body.fv-names-hidden .obsc-dialog .obsc-chip-student,
 body.fv-names-hidden .obsc-dialog .obsc-flag-btn {
   filter: blur(0.4em);
   user-select: none;
+}
+/* The search box stays a control: only a typed name is blurred, not the
+   border or the placeholder. */
+body.fv-names-hidden .dash-search-input:not(:placeholder-shown) {
+  color: transparent;
+  caret-color: var(--text);
+  text-shadow: 0 0 0.4em var(--text);
 }
 
 /* ── Birthday Widget ─────────────────────────────────────── */

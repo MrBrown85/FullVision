@@ -128,6 +128,26 @@ describe('Observations card rendering', () => {
     expect(DashObservations.popoverHtml('s1', 7)).toContain('Click to open in Ada’s Evidence panel');
   });
 
+  it('a busy week shows 3 marks and "+N" in a cell wide enough to hold them', () => {
+    obs = {
+      s1: Array.from({ length: 5 }, (_, i) => ({
+        id: 'ob-' + i,
+        date: '2026-10-14',
+        created: '2026-10-14T15:0' + i + ':00Z',
+        sentiment: 'strength',
+        text: 'n',
+      })),
+    };
+    const html = DashObservations.renderCard(CID, students, { tab: 'week', width: 2000 });
+    const cell = html.match(/<a class="dash-ob2-cell has has-more"[^>]*>(.*?)<\/a>/);
+    expect(cell).toBeTruthy();
+    expect(cell[1].match(/<i /g)).toHaveLength(3);
+    expect(cell[1]).toContain('<span class="dash-ob2-more">+2</span>');
+    // 3 marks of 5px, 1px gaps, "+N" or "9+" at 9px, a 1px border each side.
+    expect(DashObservations.MIN_CELL.week).toBeGreaterThanOrEqual(34);
+    expect(DashObservations.lastModel().minCell).toBe(DashObservations.MIN_CELL.week);
+  });
+
   it('says so when nobody is overdue or short of a strength', () => {
     obs = {
       s1: [{ id: 'a', date: '2026-10-16', sentiment: 'strength', text: 'n' }],

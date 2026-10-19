@@ -461,7 +461,12 @@ window.PageDashboard = (function () {
     return Math.max(0, Math.floor(w - 42));
   }
 
+  /* The width the student columns get: the grid pane's inner width, so a
+     scrollbar in the pane is taken off; the card's inner width when there
+     is no grid (empty states). */
   function _measureObsWidth(card) {
+    var pane = card.querySelector('.dash-ob2-pane');
+    if (pane && pane.clientWidth > 0) return Math.floor(pane.clientWidth);
     var cs = window.getComputedStyle(card);
     return Math.floor(card.clientWidth - parseFloat(cs.paddingLeft || 0) - parseFloat(cs.paddingRight || 0));
   }
@@ -471,24 +476,27 @@ window.PageDashboard = (function () {
   }
 
   /* Re-render only the Observations card (tabs, flags, Hide names). */
-  function renderObsCard(focusKey) {
+  function renderObsCard(focusKey, depth) {
     var card = _obsCard();
     if (!card) return;
     _hidePop();
     var st = _obsState();
     card.innerHTML = DashObservations.renderCard(activeCourse, getStudents(activeCourse), st);
     obsHighlight = st.highlight;
-    _afterObsRender(focusKey, 1);
+    _afterObsRender(focusKey, (depth || 0) + 1);
   }
 
-  /* After the card is drawn: measure it, redraw once if the number of
-     student columns should change, then set the roving tab stop. */
+  /* After the card is drawn: measure it, redraw if the number of student
+     columns or the sideways scroll should change, then set the roving tab
+     stop. A redraw can add or remove the pane's scrollbar and so change the
+     width again: a second corrective pass is allowed, never more. */
+  var OBS_MAX_PASSES = 2;
   function _afterObsRender(focusKey, depth) {
     var card = _obsCard();
     if (!card) return;
     var m = DashObservations.lastModel();
     var w = _measureObsWidth(card);
-    if (m && w > 0 && w !== _obsWidth) {
+    if (m && w > 0) {
       _obsWidth = w;
       var cols =
         m.tab === 'competency' && m.sections.length > 7
@@ -501,8 +509,8 @@ window.PageDashboard = (function () {
               fixed: m.fixed,
             });
       var scrollX = cols === 1 && m.blockMin > w;
-      if (!depth && (cols !== m.cols || scrollX !== m.scrollX)) {
-        renderObsCard(focusKey);
+      if ((depth || 0) < OBS_MAX_PASSES && (cols !== m.cols || scrollX !== m.scrollX)) {
+        renderObsCard(focusKey, depth);
         return;
       }
     }
@@ -735,6 +743,15 @@ window.PageDashboard = (function () {
       draftKey: 'dash|' + sid,
       onAdd: refresh,
       onFlag: refresh,
+      // Closed without Add or Flag (Escape, ✕ or the backdrop), e.g. after
+      // "Not now" on the concern flag offer. A save may have redrawn the
+      // card behind the dialog, so the "+" it would refocus is gone: put
+      // focus back on this row's new "+".
+      onClose: function () {
+        setTimeout(function () {
+          if (_obsCard()) _focusKey('nav:' + sid + ':0');
+        }, 0);
+      },
     });
   }
 

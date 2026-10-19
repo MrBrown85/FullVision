@@ -39,7 +39,9 @@ window.DashObservations = (function () {
     week: 18 + 12 + 72 + 22 + 30,
     competency: 18 + 12 + 72 + 30 + 48,
   };
-  var MIN_CELL = { week: 20, level: 44, both: 76 };
+  // A week cell must hold 3 marks (5px each) and "+N" or "9+" without
+  // clipping; 34px leaves a margin for wider fonts.
+  var MIN_CELL = { week: 34, level: 44, both: 76 };
 
   var DIAMOND =
     '<svg viewBox="0 0 12 12" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><path d="M6 1.2 10.8 6 6 10.8 1.2 6Z"/></svg>';
@@ -673,7 +675,9 @@ window.DashObservations = (function () {
       })
       .join('');
     return (
-      '<a class="dash-ob2-cell has" href="' +
+      '<a class="dash-ob2-cell has' +
+      (c.marks.moreLabel ? ' has-more' : '') +
+      '" href="' +
       _studentHref(m.cid, r.student.id, c.obs[0].id) +
       '" data-sid="' +
       esc(r.student.id) +

@@ -104,6 +104,14 @@ test.describe('Dashboard Observations card', () => {
     expect(await blur(page.locator('.dash-card-name').first())).toMatch(/blur/);
     // Grades stay readable.
     expect(await blur(page.locator('.dash-card-badge-num').first())).toBe('none');
+    // The search box stays a control: only a typed name is blurred.
+    const search = page.locator('.dash-search-input');
+    expect(await blur(search)).toBe('none');
+    await search.fill('a');
+    expect(await search.evaluate(el => getComputedStyle(el).color)).toBe('rgba(0, 0, 0, 0)');
+    expect(await search.evaluate(el => getComputedStyle(el).textShadow)).toMatch(/px/);
+    expect(await blur(search)).toBe('none');
+    await search.fill('');
     // The week popover stays closed while names are hidden.
     await card(page).locator('.dash-ob2-cell.has').first().hover();
     await expect(page.locator('#dash-ob2-pop')).toBeHidden();
@@ -155,6 +163,74 @@ test.describe('Dashboard Observations card', () => {
     await expect(after.locator('.dash-ob2-total')).toHaveText(String(before + 1));
     await expect(after.locator('.dash-ob2-add')).toBeFocused();
     await expect(after.locator('.dash-ob2-days')).toHaveText('');
+  });
+
+  test('closing the "+" dialog at the concern flag offer puts focus back on the row', async ({ page }) => {
+    await enterDemo(page);
+    await openDashboard(page);
+    const sid = await page.evaluate(() => {
+      const flags = getFlags('sci8') || {};
+      return getStudents('sci8').find(s => !flags[s.id]).id;
+    });
+    const add = () => card(page).locator('.dash-ob2-row[data-sid="' + sid + '"] .dash-ob2-add');
+    const dialog = page.getByRole('dialog');
+    const saveConcern = async text => {
+      await add().focus();
+      await add().click();
+      await expect(dialog).toBeVisible();
+      await dialog.locator('.obsc-chip-type[data-value="concern"]').click();
+      await dialog.locator('textarea').fill(text);
+      await page.keyboard.press('Enter');
+      // The dialog stays open to offer the flag; the card behind it redraws.
+      await expect(dialog.locator('[data-part="flag"]')).toContainText('Not now');
+    };
+    // "Not now", then Escape.
+    await saveConcern('Did not start the lab');
+    await dialog.getByRole('button', { name: 'Not now' }).click();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await expect(add()).toBeFocused();
+    // The close button straight from the offer.
+    await saveConcern('Left the lab bench untidy');
+    await dialog.getByRole('button', { name: 'Close' }).click();
+    await expect(dialog).toBeHidden();
+    await expect(add()).toBeFocused();
+  });
+
+  test('a busy week keeps three marks and its whole "+N" at every width', async ({ page }) => {
+    await enterDemo(page);
+    await openDashboard(page);
+    const [few, many] = await page.evaluate(() => {
+      const st = getStudents('sci8');
+      for (let i = 0; i < 5; i++) addQuickOb('sci8', st[0].id, 'Busy week ' + i, [], 'strength', null);
+      for (let i = 0; i < 13; i++) addQuickOb('sci8', st[1].id, 'Busy week ' + i, [], null, null);
+      return [st[0].id, st[1].id];
+    });
+    for (const width of [1150, 1280, 1440, 1600]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.evaluate(() => PageDashboard.render());
+      const measure = sid =>
+        card(page)
+          .locator('.dash-ob2-cell.has-more[data-sid="' + sid + '"]')
+          .last()
+          .evaluate(cell => {
+            const c = cell.getBoundingClientRect();
+            const more = cell.querySelector('.dash-ob2-more');
+            const r = more.getBoundingClientRect();
+            return {
+              fits: cell.scrollWidth <= cell.clientWidth && r.left >= c.left && r.right <= c.right + 0.5,
+              label: more.textContent,
+              marks: [...cell.querySelectorAll('i')].map(i => i.getBoundingClientRect().width),
+            };
+          });
+      for (const sid of [few, many]) {
+        await expect.poll(async () => (await measure(sid)).fits, `"+N" cut at ${width}`).toBe(true);
+        const m = await measure(sid);
+        expect(m.marks).toHaveLength(3);
+        for (const w of m.marks) expect(w, `mark width at ${width}`).toBeGreaterThanOrEqual(5);
+      }
+      expect((await measure(many)).label).toBe('9+');
+    }
   });
 
   test('a week links to the observation on the student page', async ({ page }) => {
