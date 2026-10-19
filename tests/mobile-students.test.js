@@ -606,6 +606,29 @@ describe('Student detail recent assessments', () => {
     const html = MStudents.renderDetail(CID, 'stu1');
     expect(html).toContain('No observations yet');
   });
+  it('shows the three newest observations, newest first, with text pills', () => {
+    // getStudentQuickObs is newest first.
+    mockDataLayer({
+      getStudentQuickObs: () => [
+        { id: 'o5', text: 'Fifth note', created: '2026-10-15T10:00:00Z', sentiment: 'strength', context: 'discussion' },
+        { id: 'o4', text: 'Fourth note', created: '2026-10-12T10:00:00Z', sentiment: 'concern' },
+        { id: 'o3', text: 'Third note', created: '2026-10-09T10:00:00Z' },
+        { id: 'o2', text: 'Second note', created: '2026-10-05T10:00:00Z' },
+        { id: 'o1', text: 'First note', created: '2026-10-01T10:00:00Z' },
+      ],
+    });
+    const html = MStudents.renderDetail(CID, 'stu1');
+    const recent = html.slice(html.indexOf('Recent observations'));
+    expect(recent).toContain('Fifth note');
+    expect(recent).toContain('Fourth note');
+    expect(recent).toContain('Third note');
+    expect(recent).not.toContain('Second note');
+    expect(recent).not.toContain('First note');
+    expect(recent.indexOf('Fifth note')).toBeLessThan(recent.indexOf('Fourth note'));
+    expect(recent.indexOf('Fourth note')).toBeLessThan(recent.indexOf('Third note'));
+    expect(recent).toContain('<span class="m-obs-type-pill" data-sentiment="strength">Strength</span>');
+    expect(recent).toContain('<span class="m-obs-context">');
+  });
 });
 
 /* ── Detail screen: score chips on assessments ──────────────── */

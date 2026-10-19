@@ -171,3 +171,51 @@ describe('DashOverview observation coverage', () => {
     });
   });
 });
+
+describe('DashStudentCards observation line', () => {
+  const o = (date, sentiment) => ({ date, created: date + 'T15:00:00.000Z', sentiment, text: 'n' });
+  const today = '2026-10-18';
+
+  it('shows the three newest types, newest first', () => {
+    const s = DashStudentCards.obsSummary(
+      [o('2026-10-16', 'concern'), o('2026-10-10', null), o('2026-10-01', 'strength'), o('2026-09-01', 'growth')],
+      today,
+      null,
+    );
+    expect(s.dots).toEqual(['concern', 'none', 'strength']);
+  });
+
+  it('counts days since the last observation, amber at 21 and not at 20', () => {
+    expect(DashStudentCards.obsSummary([o('2026-09-28')], today, null)).toMatchObject({
+      daysSince: 20,
+      overdue: false,
+    });
+    expect(DashStudentCards.obsSummary([o('2026-09-27')], today, null)).toMatchObject({
+      daysSince: 21,
+      overdue: true,
+    });
+  });
+
+  it('counts this term when a term is active, all time when none is', () => {
+    const obs = [o('2026-10-16'), o('2026-09-10'), o('2026-06-01')];
+    const term = { startsOn: '2026-09-01', endsOn: '2026-11-30' };
+    expect(DashStudentCards.obsSummary(obs, today, term)).toMatchObject({ count: 2, inTerm: true });
+    expect(DashStudentCards.obsSummary(obs, today, null)).toMatchObject({ count: 3, inTerm: false });
+  });
+
+  it('reads the day from created when an observation has no date', () => {
+    const s = DashStudentCards.obsSummary([{ created: '2026-10-17T20:00:00.000Z', text: 'n' }], today, null);
+    expect(s.daysSince).toBe(1);
+  });
+
+  it('words the line plainly', () => {
+    expect(DashStudentCards.obsWhenText(null)).toBe('No observations yet');
+    expect(DashStudentCards.obsWhenText(0)).toBe('Last observed today');
+    expect(DashStudentCards.obsWhenText(1)).toBe('Last observed yesterday');
+    expect(DashStudentCards.obsWhenText(5)).toBe('Last observed 5 days ago');
+  });
+
+  it('is not amber for a student with no observations', () => {
+    expect(DashStudentCards.obsSummary([], today, null)).toMatchObject({ daysSince: null, overdue: false, count: 0 });
+  });
+});
