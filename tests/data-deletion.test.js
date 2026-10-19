@@ -1,6 +1,7 @@
 /**
  * Deletion and cascade tests — gb-data.js
- * Tests deleteStudent cascade, deleteRubric on nonexistent,
+ * Tests withdrawStudent taking a student out of the class, deleteRubric on
+ * nonexistent,
  * and clearing data via save with empty values.
  */
 
@@ -20,13 +21,14 @@ beforeEach(() => {
   _cache.termRatings[CID] = undefined;
   _cache.overrides[CID] = undefined;
   _cache.courseConfigs[CID] = undefined;
+  _cache.withdrawn[CID] = undefined;
   localStorage.clear();
   globalThis.COURSES = {
     test: { id: 'test', name: 'Test', calcMethod: 'mostRecent', decayWeight: 0.65 },
   };
 });
 
-describe('deleteStudent', () => {
+describe('withdrawStudent', () => {
   it('removes student from getStudents', () => {
     saveStudents(CID, [
       { id: 's1', firstName: 'Alice', lastName: 'A', designations: [], sortName: 'A Alice' },
@@ -40,17 +42,15 @@ describe('deleteStudent', () => {
     saveAssignmentStatuses(CID, {});
     saveQuickObs(CID, {});
 
-    deleteStudent(CID, 's1');
+    withdrawStudent(CID, 's1');
 
     const students = getStudents(CID);
     expect(students).toHaveLength(1);
     expect(students[0].id).toBe('s2');
   });
 
-  it('removes deleted student scores from getScores', () => {
-    saveStudents(CID, [
-      { id: 's1', firstName: 'Alice', lastName: 'A', designations: [], sortName: 'A Alice' },
-    ]);
+  it("takes the withdrawn student's scores out of getScores and keeps them", () => {
+    saveStudents(CID, [{ id: 's1', firstName: 'Alice', lastName: 'A', designations: [], sortName: 'A Alice' }]);
     saveScores(CID, {
       s1: [{ id: 'e1', assessmentId: 'a1', tagId: 't1', score: 3, date: '2025-01-01', type: 'summative' }],
     });
@@ -61,10 +61,11 @@ describe('deleteStudent', () => {
     saveAssignmentStatuses(CID, {});
     saveQuickObs(CID, {});
 
-    deleteStudent(CID, 's1');
+    withdrawStudent(CID, 's1');
 
     const scores = getScores(CID);
     expect(scores['s1']).toBeUndefined();
+    expect(getWithdrawnStudents(CID)[0].records.scores).toHaveLength(1);
   });
 });
 
@@ -80,9 +81,7 @@ describe('deleteRubric on nonexistent ID', () => {
 
 describe('orphaned score cleanup on assessment removal', () => {
   it('scores for removed assessments are cleaned up by saveAssessments', () => {
-    saveAssessments(CID, [
-      { id: 'a1', title: 'Quiz', date: '2025-01-15', type: 'summative', tagIds: ['t1'] },
-    ]);
+    saveAssessments(CID, [{ id: 'a1', title: 'Quiz', date: '2025-01-15', type: 'summative', tagIds: ['t1'] }]);
     saveScores(CID, {
       stu1: [{ id: 'e1', assessmentId: 'a1', tagId: 't1', score: 85, date: '2025-01-15', type: 'summative' }],
     });
@@ -107,9 +106,7 @@ describe('orphaned score cleanup on assessment removal', () => {
     });
 
     // Remove only a1 — a2 scores should remain
-    saveAssessments(CID, [
-      { id: 'a2', title: 'Quiz 2', date: '2025-01-20', type: 'summative', tagIds: ['t1'] },
-    ]);
+    saveAssessments(CID, [{ id: 'a2', title: 'Quiz 2', date: '2025-01-20', type: 'summative', tagIds: ['t1'] }]);
 
     const scores = getScores(CID);
     expect(scores['stu1']).toHaveLength(1);

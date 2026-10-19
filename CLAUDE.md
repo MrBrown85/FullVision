@@ -57,5 +57,5 @@ Demo Mode (`login.html` → Try Demo Mode, or `/login.html?demo=1`) runs local-o
 ## Current state (2026-10-17)
 
 - Grading compliance with Schoology/Teams (`docs/grading-compliance-plan.md`): Phase 1 and Phase 2 are implemented and live.
-- Course soft-delete with 30-day purge is live; student delete is still a hard delete (planned change: withdraw instead).
+- Course soft-delete with 30-day purge is live. Removing a student withdraws them (`migrations/20261019_withdraw_students.sql`); permanent delete is a second step from the Withdrawn list in Class Management.
 - `codex.md` is historical; the open-work list is `docs/ROADMAP.md`.

@@ -505,7 +505,8 @@ function seedIfNeeded() {
     Object.assign(COURSES, structuredClone(DEFAULT_COURSES));
     saveCourses(COURSES);
   }
-  if (COURSES.sci8 && getStudents('sci8').length === 0) {
+  // A class whose students were all withdrawn is not empty.
+  if (COURSES.sci8 && getStudents('sci8').length === 0 && getWithdrawnStudents('sci8').length === 0) {
     _didSeed = true;
     saveStudents('sci8', current(SHARED_ROSTER));
     // Seed the learning map from built-in constants

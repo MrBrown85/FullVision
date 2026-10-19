@@ -787,11 +787,13 @@ const FV_IDEMPOTENT_RPCS = {
   create_custom_tag: true,
   create_observation: true,
   create_student_and_enroll: true,
+  delete_withdrawn_student: true,
   duplicate_assessment: true,
   duplicate_course: true,
   import_json_restore: true,
   import_roster_csv: true,
   import_teams_class: true,
+  reenrol_student: true,
   upsert_category: true,
   upsert_competency_group: true,
   upsert_module: true,
@@ -801,6 +803,7 @@ const FV_IDEMPOTENT_RPCS = {
   upsert_section: true,
   upsert_subject: true,
   upsert_tag: true,
+  withdraw_student: true,
 };
 
 /* Open a class from this device's saved copy and check the server in the

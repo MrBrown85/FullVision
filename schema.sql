@@ -545,10 +545,13 @@ create table fv_idempotency (
 --                             p_pronouns, p_student_number, p_email, p_date_of_birth,
 --                             p_designations text[], p_existing_student_id uuid)
 --   update_student(p_id uuid, p_patch jsonb)
---   delete_student(p_id uuid)                                          -- (2026-04-20 addition)
+--   delete_student(p_id uuid)                                          -- (2026-04-20 addition) the app no longer calls it (20261019)
 --   relink_student(p_ghost_student_id uuid, p_canonical_student_id uuid)
 --   update_enrollment(p_id uuid, p_patch jsonb)
---   withdraw_enrollment(p_id uuid)
+--   withdraw_enrollment(p_id uuid)                                     -- superseded by withdraw_student; kept for open tabs of the old client
+--   withdraw_student(p_enrollment_id uuid, p_idempotency_key uuid)      -- (20261019) sets withdrawn_at; deletes nothing
+--   reenrol_student(p_enrollment_id uuid, p_idempotency_key uuid)       -- (20261019) clears withdrawn_at
+--   delete_withdrawn_student(p_enrollment_id uuid, p_idempotency_key uuid) -- (20261019) permanent delete, withdrawn only
 --   reorder_roster(p_ids uuid[])
 --   bulk_apply_pronouns(p_student_ids uuid[], p_pronouns text)
 --   import_roster_csv(p_course_id uuid, p_rows jsonb)
@@ -621,7 +624,7 @@ create table fv_idempotency (
 -- Reads (hot path):
 --   list_teacher_courses()
 --   get_gradebook(p_course_id uuid)                                    -- the single boot-path RPC
---   get_class_bundle(p_course_id uuid, p_if_version bigint)            -- one class in one call; includes observation_templates (20261019)
+--   get_class_bundle(p_course_id uuid, p_if_version bigint)            -- one class in one call; includes observation_templates and withdrawn_students (20261019)
 --   get_class_dashboard(p_course_id uuid)
 --   get_student_profile(p_enrollment_id uuid)
 --   list_course_student_profiles(p_course_id uuid)

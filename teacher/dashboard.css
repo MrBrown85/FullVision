@@ -2846,6 +2846,47 @@ body.fv-names-hidden .dash-search-input:not(:placeholder-shown) {
   gap: 2px;
   flex-shrink: 0;
 }
+/* Withdrawn students, under the roster */
+.cm-withdrawn {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.cm-withdrawn-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-2);
+}
+.cm-withdrawn-help {
+  margin: 2px 0 8px;
+  font-size: var(--text-sm);
+  color: var(--text-3);
+}
+/* Name and date on the first line, the two actions under them: the
+   roster column is too narrow for all four on one line. */
+.cm-withdrawn-row {
+  flex-wrap: wrap;
+  row-gap: 0;
+}
+.cm-withdrawn-row .cm-student-name {
+  flex: 1 1 auto;
+  color: var(--text-2);
+}
+.cm-withdrawn-when {
+  color: var(--text-3);
+  font-size: var(--text-sm);
+  flex-shrink: 0;
+}
+.cm-withdrawn-row .cm-student-actions {
+  flex-basis: 100%;
+  gap: 16px;
+}
+.cm-withdrawn-btn {
+  padding: 2px 0;
+}
+.cm-withdrawn-delete {
+  color: var(--danger);
+}
 .cm-bulk-check {
   width: 16px;
   height: 16px;

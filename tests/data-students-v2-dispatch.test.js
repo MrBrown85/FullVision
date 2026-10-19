@@ -186,13 +186,14 @@ describe('v2 student/enrollment CRUD dispatch', () => {
   });
 
   describe('_canonicalWithdrawEnrollment', () => {
-    it('calls withdraw_enrollment with the enrollment id', async () => {
+    it('calls withdraw_student with the enrollment id', async () => {
       await _canonicalWithdrawEnrollment(client, ENR);
       var call = client.calls.find(function (c) {
-        return c.name === 'withdraw_enrollment';
+        return c.name === 'withdraw_student';
       });
       expect(call).toBeDefined();
-      expect(call.payload).toEqual({ p_id: ENR });
+      expect(call.payload.p_enrollment_id).toBe(ENR);
+      expect(client.calls.find(c => c.name === 'withdraw_enrollment')).toBeUndefined();
     });
   });
 
