@@ -600,7 +600,7 @@ window.PageStudent = (function () {
       '<div class="grades-header">' +
       '<div class="insight-title" style="margin-bottom:0">Assessment Grades' +
       (activeSectionFilters.size > 0
-        ? ' <span style="font-family:var(--font-base);font-size:0.72rem;font-weight:500;color:var(--text-3);text-transform:none;letter-spacing:0">(filtered — <a href="#" data-action="clearSectionFilters" style="color:var(--active);text-decoration:none">show all</a>)</span>'
+        ? ' <span style="font-family:var(--font-base);font-size:0.72rem;font-weight:500;color:var(--text-3);text-transform:none;letter-spacing:0">(filtered — <a href="#" data-action="clearSectionFilters" style="color:var(--link);text-decoration:none">show all</a>)</span>'
         : '') +
       '</div>' +
       '<div class="grades-legend">' +
@@ -648,7 +648,7 @@ window.PageStudent = (function () {
       if (tag)
         html +=
           '<th class="gt-col-score" style="color:' +
-          g.sec.color +
+          tintText(g.sec.color) +
           '" title="' +
           esc(tag.text || tag.label) +
           '">' +
@@ -756,8 +756,8 @@ window.PageStudent = (function () {
           var score = entry ? entry.score : 0;
           if (score > 0) {
             html +=
-              '<td class="gt-cell-score"><span class="gt-score-pip" style="background:' +
-              PROF_COLORS[score] +
+              '<td class="gt-cell-score"><span class="gt-score-pip' +
+              (PROF_COLORS[score] ? '" style="background:' + PROF_COLORS[score] : ' gt-score-pip-plain') +
               '">' +
               score +
               '</span></td>';
@@ -990,7 +990,7 @@ window.PageStudent = (function () {
       var pct = prof > 0 ? (prof / 4) * 100 : 0;
       var color = prof > 0 ? PROF_COLORS[Math.round(prof)] : 'var(--text-3)';
       var tIcon = trend === 'up' ? '↑' : trend === 'down' ? '↓' : '';
-      var tColor = trend === 'up' ? 'var(--score-3)' : trend === 'down' ? 'var(--priority)' : '';
+      var tColor = trend === 'up' ? 'var(--score-3)' : trend === 'down' ? 'var(--danger)' : '';
       var shortLabel = sec.name.length > 14 ? sec.name.slice(0, 13) + '…' : sec.name;
       html +=
         '<div class="gp-section-row">' +
@@ -1193,7 +1193,7 @@ window.PageStudent = (function () {
           ccs = entry[1];
         html +=
           '<div class="cc-group"><div class="cc-group-label" style="color:' +
-          ccs[0].color +
+          tintText(ccs[0].color) +
           '">' +
           esc(group) +
           '</div>';
@@ -1208,7 +1208,7 @@ window.PageStudent = (function () {
             '%;background:' +
             cc.color +
             '"></div></div><span class="cc-bar-count" style="color:' +
-            (count > 0 ? cc.color : 'var(--text-3)') +
+            (count > 0 ? tintText(cc.color) : 'var(--text-3)') +
             '">' +
             count +
             '</span></div>';

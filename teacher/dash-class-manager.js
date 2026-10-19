@@ -998,7 +998,7 @@ window.DashClassManager = (function () {
     if (cmMode === 'create') {
       html +=
         '<div class="cm-class-item cm-create-active">' +
-        '<div class="cm-class-name" style="color:var(--active)">New Class</div>' +
+        '<div class="cm-class-name" style="color:var(--link)">New Class</div>' +
         '<div class="cm-class-meta">Setting up\u2026</div>' +
         '</div>';
     }

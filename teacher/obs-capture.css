@@ -121,11 +121,11 @@ span.obsc-chip-label {
 .obsc-chip-student {
   border-color: transparent;
   background: var(--active-light);
-  color: var(--active);
+  color: var(--link);
   font-weight: 600;
 }
 .obsc-chip-student .obsc-x {
-  color: var(--active);
+  color: var(--link);
 }
 
 .obsc-chip-type[data-sentiment='strength'].is-on {
@@ -136,7 +136,7 @@ span.obsc-chip-label {
 }
 .obsc-chip-type[data-sentiment='growth'].is-on {
   border-color: transparent;
-  color: var(--active);
+  color: var(--link);
   background: color-mix(in srgb, var(--active) 14%, transparent);
   font-weight: 600;
 }
@@ -155,10 +155,10 @@ span.obsc-chip-label {
 .obsc-chip-level.is-on {
   border-color: transparent;
   background: var(--active-light);
-  color: var(--active);
+  color: var(--link);
 }
 .obsc-chip-competency .obsc-x {
-  color: var(--active);
+  color: var(--link);
 }
 
 .obsc-dot {
@@ -340,13 +340,13 @@ span.obsc-chip-label {
   background: var(--overlay-hover);
 }
 .obsc-item.selected {
-  color: var(--active);
+  color: var(--link);
   font-weight: 600;
 }
 .obsc-check {
   width: 12px;
   flex: none;
-  color: var(--active);
+  color: var(--link);
 }
 .obsc-item-label {
   overflow: hidden;
@@ -375,7 +375,7 @@ span.obsc-chip-label {
 .obsc-menu-add-btn {
   border: 0;
   background: none;
-  color: var(--active);
+  color: var(--link);
   font: inherit;
   font-size: var(--text-sm, 13px);
   font-weight: 600;
@@ -399,7 +399,7 @@ span.obsc-chip-label {
 }
 .obsc-item-edit {
   border-top: 1px solid var(--divider-subtle);
-  color: var(--active);
+  color: var(--link);
   font-weight: 600;
 }
 
@@ -407,7 +407,7 @@ span.obsc-chip-label {
 .obsc-pill-competency {
   border-color: transparent;
   background: var(--active-light);
-  color: var(--active);
+  color: var(--link);
   max-width: 260px;
   overflow: hidden;
   text-overflow: ellipsis;

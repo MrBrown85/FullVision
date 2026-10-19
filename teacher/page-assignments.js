@@ -492,7 +492,7 @@ window.PageAssignments = (function () {
                   '" style="border-color:' +
                   cc.color +
                   ';color:' +
-                  cc.color +
+                  tintText(cc.color) +
                   '">' +
                   esc(cc.id) +
                   '</span>'
@@ -734,7 +734,7 @@ window.PageAssignments = (function () {
         '<div style="text-align:center;color:var(--text-3);padding:40px 0">' +
         '<div style="font-size:1.2rem;margin-bottom:6px;opacity:0.4">\uD83D\uDCCB</div>' +
         '<div style="font-size:0.88rem;margin-bottom:4px">No matching assignments.</div>' +
-        '<div style="font-size:0.78rem">Try adjusting your filters or <a href="#" data-action="clearAssessFilters" style="color:var(--active)">clear all filters</a>.</div>' +
+        '<div style="font-size:0.78rem">Try adjusting your filters or <a href="#" data-action="clearAssessFilters" style="color:var(--link)">clear all filters</a>.</div>' +
         '</div>';
     } else if (assessments.length === 0 && allAssessments.length === 0) {
       html +=
@@ -2015,6 +2015,7 @@ window.PageAssignments = (function () {
         var allowed = level > 0 && normalizeScoreMod(level, m) === m;
         return (
           '<button type="button" class="rsg-mod' +
+          (level > 0 ? ' l' + level : '') +
           (allowed && mod === m ? ' active' : '') +
           '" data-action="setScoreMod" data-mod="' +
           m +

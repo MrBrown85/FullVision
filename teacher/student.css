@@ -223,7 +223,7 @@
 }
 .gp-dim-pip.active {
   background: rgba(0, 122, 255, 0.08);
-  color: var(--active);
+  color: var(--link);
 }
 .gp-dim-pip.inactive {
   background: rgba(0, 0, 0, 0.03);
@@ -390,7 +390,7 @@
   background: var(--overlay-hover);
 }
 .ev-tab.active {
-  color: var(--active);
+  color: var(--link);
   background: var(--active-light);
   border-color: var(--active);
 }
@@ -521,7 +521,7 @@
   top: -2px;
   right: 3px;
   font-size: var(--text-2xs);
-  color: var(--active);
+  color: var(--link);
   white-space: nowrap;
 }
 .ev-tl-gap {
@@ -875,7 +875,7 @@
 .desig-check-code {
   font-family: 'SF Mono', ui-monospace, monospace;
   font-weight: 700;
-  color: var(--active);
+  color: var(--link);
   font-size: var(--text-sm);
 }
 .desig-check-name {
@@ -946,7 +946,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: var(--tracking-wide);
-  color: var(--active);
+  color: var(--link);
   background: none;
   border: none;
   cursor: pointer;
@@ -1035,7 +1035,7 @@
   text-decoration: none;
 }
 .gt-title-text:hover {
-  color: var(--active);
+  color: var(--link);
 }
 .gt-module-dot {
   width: 8px;
@@ -1060,7 +1060,7 @@
 }
 .gt-tag-exc {
   background: rgba(0, 122, 255, 0.08);
-  color: var(--active);
+  color: var(--link);
 }
 .gt-tag-late {
   background: rgba(255, 149, 0, 0.1);
@@ -1099,6 +1099,11 @@
   font-weight: 700;
   color: #fff;
 }
+/* A score with no level colour (points) */
+.gt-score-pip-plain {
+  background: var(--surface-2);
+  color: var(--text);
+}
 .gt-score-empty {
   font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
   font-size: var(--text-sm);
@@ -1125,18 +1130,18 @@
   gap: 4px;
 }
 .override-btn:hover {
-  color: var(--active);
+  color: var(--link);
   background: var(--active-light);
 }
 .override-btn.active {
-  color: var(--active);
+  color: var(--link);
 }
 .override-label {
   font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
   font-size: 0.688rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--active);
+  color: var(--link);
   font-weight: 600;
   font-style: italic;
 }
@@ -1508,7 +1513,7 @@ button.ced-obs-row {
   display: inline;
 }
 .ced-obs-row:hover .ced-obs-text {
-  color: var(--active);
+  color: var(--link);
 }
 .ced-capture:not(:empty) {
   padding: 8px 8px 0;
@@ -1541,7 +1546,7 @@ button.ced-obs-row {
 }
 .ced-add-btn:hover,
 .ced-done-btn:hover {
-  color: var(--active);
+  color: var(--link);
   border-color: var(--active);
 }
 .ced-add-btn:focus-visible,

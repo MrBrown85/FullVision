@@ -917,7 +917,7 @@
   font-weight: 600;
 }
 .class-summary-name a:hover {
-  color: var(--active) !important;
+  color: var(--link) !important;
   text-decoration: underline;
 }
 
@@ -1607,7 +1607,7 @@
   padding: 2px 7px;
   border-radius: var(--radius-xs);
   background: var(--overlay-hover);
-  color: var(--text-3);
+  color: var(--text-2);
 }
 
 /* (Old column wrappers .tq-col-rate-top/.tq-col-rate-bottom removed —
@@ -1795,23 +1795,33 @@
 }
 .tq-trait-chip.active {
   background: rgba(52, 199, 89, 0.14);
-  color: rgb(36, 138, 61);
+  color: #1f7a35;
   font-weight: 600;
   box-shadow: inset 0 0 0 1px rgba(52, 199, 89, 0.2);
 }
 .tq-trait-chip.concern {
   background: var(--overlay-hover);
-  color: rgba(160, 100, 0, 0.65);
+  color: #955a00;
 }
 .tq-trait-chip.concern:hover {
   background: rgba(255, 149, 0, 0.08);
-  color: rgba(160, 100, 0, 0.9);
+  color: #955a00;
 }
 .tq-trait-chip.concern.active {
   background: rgba(255, 149, 0, 0.12);
-  color: rgb(175, 82, 0);
+  color: #9c4a00;
   font-weight: 600;
   box-shadow: inset 0 0 0 1px rgba(255, 149, 0, 0.2);
+}
+@media (prefers-color-scheme: dark) {
+  .tq-trait-chip.active {
+    color: #4ade80;
+  }
+  .tq-trait-chip.concern,
+  .tq-trait-chip.concern:hover,
+  .tq-trait-chip.concern.active {
+    color: #ffb340;
+  }
 }
 .tq-trait-divider {
   width: 100%;
@@ -2082,7 +2092,7 @@
 }
 .tq-tb-btn.active {
   background: rgba(0, 122, 255, 0.12);
-  color: var(--active);
+  color: var(--link);
   box-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.06);
 }
 .tq-obs-filter-bar {
@@ -2105,7 +2115,7 @@
 .tq-obs-assign-tag {
   font-size: 0.5rem;
   font-weight: 600;
-  color: var(--active);
+  color: var(--link);
   margin-right: 3px;
 }
 .tq-nav-counter {
@@ -2199,7 +2209,7 @@
 }
 .tq-tb-btn.tq-tb-copy:hover {
   background: rgba(0, 122, 255, 0.08);
-  color: var(--active);
+  color: var(--link);
 }
 .tq-tb-btn.tq-tb-copy.copied {
   background: rgba(52, 199, 89, 0.12);
@@ -2272,7 +2282,7 @@
 }
 .tq-auto-btn:hover {
   border-color: var(--active);
-  color: var(--active);
+  color: var(--link);
   background: rgba(0, 122, 255, 0.04);
 }
 

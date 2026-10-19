@@ -315,7 +315,7 @@ window.MStudentDetail = (function () {
           statusBadge =
             ' <span class="m-badge" style="background:var(--priority-light);color:var(--priority)">NS</span>';
         if (status === 'EXC')
-          statusBadge = ' <span class="m-badge" style="background:var(--active-light);color:var(--active)">EXC</span>';
+          statusBadge = ' <span class="m-badge" style="background:var(--active-light);color:var(--link)">EXC</span>';
 
         var scoreChips = '';
         (a.tagIds || []).forEach(function (tid) {

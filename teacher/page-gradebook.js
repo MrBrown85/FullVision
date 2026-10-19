@@ -412,7 +412,7 @@ window.PageGradebook = (function () {
         '.</div>' +
         '<div style="font-family:var(--font-base);font-size:0.82rem">Try adjusting your filters or <a href="#/assignments?course=' +
         cid +
-        '" style="color:var(--active)">create a new assessment</a>.</div>' +
+        '" style="color:var(--link)">create a new assessment</a>.</div>' +
         '</div>';
     } else if (viewMode === 'scores') {
       html += renderScoresTable(cid, students, assessments, sections, isLetter, scores);

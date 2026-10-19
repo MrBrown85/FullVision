@@ -73,7 +73,7 @@
   transition: color 0.15s;
 }
 .assess-card.open .assess-chevron {
-  color: var(--active);
+  color: var(--link);
 }
 .assess-header-action-btn {
   width: 32px;
@@ -121,7 +121,7 @@
 .focus-banner-btn {
   background: none;
   border: 1px solid var(--active);
-  color: var(--active);
+  color: var(--link);
   padding: 4px 12px;
   border-radius: var(--radius);
   cursor: pointer;
@@ -374,7 +374,7 @@
 }
 .row-fill-btn:hover {
   border-color: var(--active);
-  color: var(--active);
+  color: var(--link);
   background: var(--surface);
 }
 
@@ -584,7 +584,7 @@
 }
 .collab-panel-btn:hover {
   border-color: var(--active);
-  color: var(--active);
+  color: var(--link);
   background: rgba(0, 122, 255, 0.04);
 }
 .collab-panel-btn.active {
@@ -828,7 +828,7 @@
 .af-select-all {
   font-family: var(--font-base);
   font-size: var(--text-sm);
-  color: var(--active);
+  color: var(--link);
   background: none;
   border: none;
   cursor: pointer;
@@ -1294,7 +1294,7 @@
   border-radius: var(--radius-sm);
   padding: 12px;
   text-align: center;
-  color: var(--active);
+  color: var(--link);
   font-size: var(--text-base);
   margin: 4px 0;
   display: none;
@@ -1373,7 +1373,7 @@
 }
 .add-module-btn:hover {
   border-color: var(--active);
-  color: var(--active);
+  color: var(--link);
   background: rgba(0, 122, 255, 0.03);
 }
 /* No-module section (ungrouped) */
@@ -1491,7 +1491,7 @@
 }
 .rubric-list-btn:hover {
   border-color: var(--active);
-  color: var(--active);
+  color: var(--link);
 }
 .rubric-list-btn.delete:hover {
   border-color: var(--score-1);
@@ -2230,7 +2230,7 @@
   font-weight: 500;
   cursor: pointer;
   transition: all 0.12s var(--ease-out);
-  color: var(--divider-strong);
+  color: var(--text-2);
   border-left: 1px solid var(--divider-subtle);
   user-select: none;
   display: flex;
@@ -2241,7 +2241,7 @@
   border-left: none;
 }
 .rsg-level:hover:not(.active) {
-  color: var(--text-2);
+  color: var(--text);
 }
 /* Active level states */
 .rsg-level.active.l4 {
@@ -2384,9 +2384,24 @@
   background: var(--overlay-hover);
   color: var(--text);
 }
+/* Chosen sign: an outline and sign in the row's level colour, so the filled
+   level cell stays the strongest thing in the row. */
 .rsg-mod.active {
-  background: var(--text);
-  color: var(--surface);
+  background: transparent;
+  box-shadow: inset 0 0 0 2px currentColor;
+  border-radius: var(--radius-xs);
+}
+.rsg-mod.active.l4 {
+  color: var(--score-4-dark);
+}
+.rsg-mod.active.l3 {
+  color: var(--score-3-dark);
+}
+.rsg-mod.active.l2 {
+  color: var(--score-2-dark);
+}
+.rsg-mod.active.l1 {
+  color: var(--score-1-dark);
 }
 .rsg-mod:disabled {
   color: var(--divider-subtle);
@@ -2476,7 +2491,7 @@
   background: var(--btn-hover-blue);
 }
 .comment-btn .comment-count {
-  background: rgba(255, 255, 255, 0.25);
+  background: rgba(0, 0, 0, 0.2);
   padding: 0 5px;
   border-radius: var(--radius);
   font-size: var(--text-2xs);
@@ -2945,7 +2960,7 @@
 }
 .copy-badge:hover {
   border-color: var(--active);
-  color: var(--active);
+  color: var(--link);
 }
 .copy-badge:focus-visible {
   outline: 2px solid var(--active);
@@ -3117,7 +3132,7 @@
   color: var(--text);
 }
 .rsg-crit-comment.has-comment {
-  color: var(--active);
+  color: var(--link);
 }
 .rsg-crit-comment.has-comment svg {
   fill: currentColor;
