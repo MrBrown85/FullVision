@@ -676,7 +676,7 @@ window.PageStudent = (function () {
           : allScored
             ? 'var(--score-3)'
             : '#e65100';
-      var statusIcon = isLate ? '⚠' : noneScored ? '○' : allScored ? '●' : '◐';
+      var statusIcon = isLate ? '\u26A0\uFE0E' : noneScored ? '○' : allScored ? '●' : '◐';
       var statusTitle = isLate
         ? 'Past due — not scored'
         : noneScored
@@ -789,7 +789,7 @@ window.PageStudent = (function () {
 
     if (scoredAssessments.size === 0) {
       html +=
-        '<div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-title">No scores yet</div><div class="empty-state-text">Grade assignments in the Assignments tab to see results here.</div></div>';
+        '<div class="empty-state"><div class="empty-state-title">No scores yet</div><div class="empty-state-text">Grade assignments in the Assignments tab to see results here.</div></div>';
     }
 
     html += '</div>';

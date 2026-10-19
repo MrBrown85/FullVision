@@ -96,14 +96,12 @@ window.DashStudentCards = (function () {
     if (students.length === 0 && allStudents.length === 0) {
       html +=
         '<div class="dash-empty">' +
-        '<div class="dash-empty-icon">\uD83D\uDC69\u200D\uD83C\uDFEB</div>' +
         '<div class="dash-empty-title">No students yet</div>' +
         '<div class="dash-empty-text">Add your first student or import a class roster to get started.</div>' +
         '</div>';
     } else if (students.length === 0) {
       html +=
         '<div class="dash-empty">' +
-        '<div class="dash-empty-icon">\uD83D\uDD0D</div>' +
         '<div class="dash-empty-title">No matches</div>' +
         '<div class="dash-empty-text">Try adjusting your search or filters.</div>' +
         '</div>';
@@ -230,7 +228,7 @@ window.DashStudentCards = (function () {
           (missingCount > 0
             ? '<span class="dash-card-missing" title="' +
               missingCount +
-              ' past-due unscored">\u26A0' +
+              ' past-due unscored">\u26A0\uFE0E' +
               missingCount +
               '</span>'
             : '') +

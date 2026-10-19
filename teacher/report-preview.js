@@ -91,7 +91,7 @@ window.ReportPreview = (function () {
     });
     if (!hasAnyScores) {
       preview.innerHTML =
-        '<div class="empty-state"><div class="empty-state-icon">📄</div><div class="empty-state-title">No report data yet</div><div class="empty-state-text">Score some assignments to generate progress reports.</div></div>';
+        '<div class="empty-state"><div class="empty-state-title">No report data yet</div><div class="empty-state-text">Score some assignments to generate progress reports.</div></div>';
     } else if (students.length === 0) {
       preview.innerHTML =
         '<div style="text-align:center;color:var(--text-3);padding:40px 0;font-size:0.95rem">Select students above to generate reports.</div>';

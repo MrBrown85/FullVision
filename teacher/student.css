@@ -371,32 +371,7 @@
   margin-top: 4px;
 }
 .ev-tabs {
-  display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-}
-.ev-tab {
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  font-weight: 500;
-  color: var(--text-2);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl);
-  padding: 4px 10px;
-  cursor: pointer;
-}
-.ev-tab:hover {
-  background: var(--overlay-hover);
-}
-.ev-tab.active {
-  color: var(--link);
-  background: var(--active-light);
-  border-color: var(--active);
-}
-.ev-tab:focus-visible {
-  outline: 2px solid var(--active);
-  outline-offset: 2px;
 }
 .ev-tab-count {
   font-weight: 600;

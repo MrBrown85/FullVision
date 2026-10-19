@@ -68,6 +68,10 @@
   --divider-strong: rgba(0, 0, 0, 0.12);
   --divider-heavy: rgba(0, 0, 0, 0.14);
 
+  /* Segmented control (.seg): the track and the selected segment */
+  --seg-track: rgba(118, 118, 128, 0.12);
+  --seg-thumb: #ffffff;
+
   /* Accent / UI colors (used in assignments, reports, toasts) */
   --score-1-dark: #b71c1c;
   --score-2-dark: #a06800;
@@ -171,7 +175,6 @@ textarea:focus {
 .tb-btn:focus-visible,
 .tb-action-btn:focus-visible,
 .tb-toggle-btn:focus-visible,
-.tb-seg a:focus-visible,
 .student-row:focus-visible,
 .dash-card:focus-visible,
 .hm-row:focus-visible,
@@ -660,38 +663,71 @@ body.offline-active #app-dock {
   background: var(--toggle-hover-dark);
 }
 
-/* Segmented control — macOS Finder-style view switcher */
-.tb-seg {
+/* ── Segmented control ─────────────────────────────────────── */
+/* One switch for the whole desktop app: a grey track with the chosen
+   segment raised on it. Markup: <div class="seg"> with <button
+   class="seg-btn"> children (or <a> for page links). The chosen segment is
+   marked by its ARIA state, never a class: aria-selected on tabs,
+   aria-checked on radios, aria-pressed on toggle buttons, aria-current on
+   links. segSelect() in ui.js moves it. Sizes: md (default) and .seg-sm.
+   The phone keeps its own control (.m-seg-btn). */
+.seg {
   display: inline-flex;
   align-items: center;
-  background: var(--divider-subtle);
-  border-radius: var(--radius-sm);
-  padding: 3px;
+  flex-shrink: 0;
   gap: 2px;
+  padding: 2px;
+  background: var(--seg-track);
+  border-radius: var(--radius-sm);
 }
-.tb-seg a {
-  padding: 6px 16px;
-  border-radius: 6px;
-  border: none;
-  background: transparent;
+.seg-btn {
+  padding: 5px 14px;
   font-family: var(--font-base);
   font-size: var(--text-base);
   font-weight: 500;
-  color: var(--text-3);
-  cursor: pointer;
+  line-height: 1.2;
   white-space: nowrap;
-  transition: all var(--duration-micro) ease;
-  line-height: 1;
+  text-align: center;
   text-decoration: none;
+  color: var(--text-2);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition:
+    background-color var(--duration-micro) ease,
+    color var(--duration-micro) ease,
+    box-shadow var(--duration-micro) ease;
 }
-.tb-seg a:hover:not(.tb-seg-active) {
+.seg-btn:hover {
   color: var(--text);
 }
-.tb-seg a.tb-seg-active {
-  background: var(--surface);
+.seg-btn[aria-selected='true'],
+.seg-btn[aria-checked='true'],
+.seg-btn[aria-pressed='true'],
+.seg-btn[aria-current='page'] {
+  background: var(--seg-thumb);
   color: var(--text);
   font-weight: 600;
   box-shadow: var(--shadow-sm);
+}
+.seg-btn:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 0;
+}
+.seg-btn:disabled,
+.seg-btn[aria-disabled='true'] {
+  color: var(--text-3);
+  cursor: not-allowed;
+}
+.seg-sm {
+  gap: 1px;
+  border-radius: 6px;
+}
+.seg-sm .seg-btn {
+  padding: 3px 9px;
+  font-size: var(--text-sm);
+  border-radius: 4px;
 }
 
 /* ── Layout ─────────────────────────────────────────────────── */
@@ -2751,11 +2787,6 @@ body.offline-active #app-dock {
   padding: 60px 20px;
   color: var(--text-3);
 }
-.empty-state-icon {
-  font-size: var(--text-4xl);
-  margin-bottom: 12px;
-  opacity: 0.5;
-}
 .empty-state-title {
   font-family: var(--font-base);
   font-size: var(--text-xl);
@@ -3291,6 +3322,8 @@ body.offline-active #app-dock {
     --overlay-hover: rgba(255, 255, 255, 0.06);
     --overlay-pressed: rgba(255, 255, 255, 0.1);
     --divider-subtle: rgba(255, 255, 255, 0.06);
+    --seg-track: rgba(118, 118, 128, 0.24);
+    --seg-thumb: #636366;
     --divider-medium: rgba(255, 255, 255, 0.1);
     --divider-strong: rgba(255, 255, 255, 0.15);
     --divider-heavy: rgba(255, 255, 255, 0.2);

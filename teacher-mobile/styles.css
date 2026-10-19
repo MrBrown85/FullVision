@@ -1795,11 +1795,6 @@ body.fv-switching-course::after {
   text-align: center;
   color: var(--text-3);
 }
-.m-empty-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
-  opacity: 0.5;
-}
 .m-empty-title {
   font-size: 17px;
   font-weight: 600;
@@ -2434,7 +2429,7 @@ body.fv-switching-course::after {
 
 /* Flag icon inside hero */
 .m-scard-flag {
-  color: #f5a623;
+  color: var(--priority);
   font-size: 16px;
   margin-left: 4px;
 }

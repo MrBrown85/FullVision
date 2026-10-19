@@ -1338,7 +1338,6 @@ window.ReportQuestionnaire = (function () {
         const val = dims[dim] || 0;
         html += `<div class="tq-dim-row${val > 0 ? ' rated' : ''}">
         <div class="tq-dim-header">
-          <span class="tq-dim-icon">${OBS_ICONS[dim]}</span>
           <span class="tq-dim-label">${OBS_LABELS[dim]}</span>
         </div>
         <div class="tq-dim-pills">`;
@@ -1458,10 +1457,10 @@ window.ReportQuestionnaire = (function () {
       const hasAssignObs = recentObs.some(o => o.assignmentContext);
       const hasGenObs = recentObs.some(o => !o.assignmentContext);
       if (hasAssignObs && hasGenObs) {
-        html += `<div class="tq-obs-filter-bar">
-        <button class="tq-obs-filter-btn${_tqObsFilter === 'all' ? ' active' : ''}" data-action="tqObsFilter" data-filter="all">All</button>
-        <button class="tq-obs-filter-btn${_tqObsFilter === 'general' ? ' active' : ''}" data-action="tqObsFilter" data-filter="general">General</button>
-        <button class="tq-obs-filter-btn${_tqObsFilter === 'assignment' ? ' active' : ''}" data-action="tqObsFilter" data-filter="assignment">Assignment</button>
+        html += `<div class="seg seg-sm tq-obs-filter-bar" role="group" aria-label="Show observations">
+        <button type="button" class="seg-btn tq-obs-filter-btn"${segAttr(_tqObsFilter === 'all')} data-action="tqObsFilter" data-filter="all">All</button>
+        <button type="button" class="seg-btn tq-obs-filter-btn"${segAttr(_tqObsFilter === 'general')} data-action="tqObsFilter" data-filter="general">General</button>
+        <button type="button" class="seg-btn tq-obs-filter-btn"${segAttr(_tqObsFilter === 'assignment')} data-action="tqObsFilter" data-filter="assignment">Assignment</button>
       </div>`;
       }
       const filteredObs = recentObs.filter(o =>

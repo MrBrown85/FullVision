@@ -12,8 +12,7 @@ import { findLowContrastText } from './contrast-check.js';
      gradebook and level colours stay as they are (Colin, 2026-10-19).
    - White text on a solid --active fill (primary buttons, selected pills):
      the plan keeps --active for fills.
-   - The gradebook table (.gb-grid): its tiles keep their colours, as above.
-   - The toolbar view switch (.tb-seg), restyled with the toolbar buttons. */
+   - The gradebook table (.gb-grid): its tiles keep their colours, as above. */
 
 const LEVEL_TOKENS = [0, 1, 2, 3, 4].flatMap(n => [
   `--score-${n}`,
@@ -23,7 +22,7 @@ const LEVEL_TOKENS = [0, 1, 2, 3, 4].flatMap(n => [
 ]);
 
 const OPTIONS = {
-  skip: ['.gb-grid', '.tb-seg'],
+  skip: ['.gb-grid'],
   textTokens: LEVEL_TOKENS,
   fillTokens: [...LEVEL_TOKENS, '--active'],
 };

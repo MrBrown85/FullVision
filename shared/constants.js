@@ -609,17 +609,6 @@ const OBS_SHORT = {
   respect: 'Respect',
   responsibility: 'Respons.',
 };
-const OBS_ICONS = {
-  engagement: '🎯',
-  curiosity: '🔍',
-  selfRegulation: '🧘',
-  resilience: '💪',
-  belonging: '🤝',
-  identity: '🪞',
-  collaboration: '👥',
-  respect: '🙏',
-  responsibility: '🌱',
-};
 const OBS_LEVEL_LABELS = { 0: 'Not Assessed', 1: 'Needs Support', 2: 'Developing', 3: 'Growing', 4: 'Thriving' };
 const OBS_LEVEL_COLORS = {
   0: 'var(--text-3)',
@@ -630,17 +619,17 @@ const OBS_LEVEL_COLORS = {
 };
 
 const OBS_SENTIMENTS = {
-  strength: { icon: '✅', label: 'Strength', color: 'var(--score-3)', tint: 'rgba(46,125,50,0.08)', border: '#2e7d32' },
-  growth: { icon: '🔄', label: 'Growth', color: 'var(--active)', tint: 'rgba(0,122,255,0.08)', border: '#007AFF' },
-  concern: { icon: '⚠️', label: 'Concern', color: 'var(--score-2)', tint: 'rgba(192,122,0,0.08)', border: '#c07a00' },
+  strength: { label: 'Strength', color: 'var(--score-3)', tint: 'rgba(46,125,50,0.08)', border: '#2e7d32' },
+  growth: { label: 'Growth', color: 'var(--active)', tint: 'rgba(0,122,255,0.08)', border: '#007AFF' },
+  concern: { label: 'Concern', color: 'var(--score-2)', tint: 'rgba(192,122,0,0.08)', border: '#c07a00' },
 };
 
 const OBS_CONTEXTS = {
-  'whole-class': { icon: '👥', label: 'Whole class' },
-  'small-group': { icon: '👫', label: 'Small group' },
-  independent: { icon: '🧑‍💻', label: 'Independent' },
-  presentation: { icon: '🎤', label: 'Presentation' },
-  discussion: { icon: '💬', label: 'Discussion' },
+  'whole-class': { label: 'Whole class' },
+  'small-group': { label: 'Small group' },
+  independent: { label: 'Independent' },
+  presentation: { label: 'Presentation' },
+  discussion: { label: 'Discussion' },
 };
 
 /* The six sentence starters offered to a class that has none, and Demo
@@ -661,8 +650,7 @@ const OBS_STARTER_SUGGESTIONS = [
   { text: 'Demonstrated respect for diverse perspectives', sentiment: 'strength', context: null, dims: ['respect'] },
 ];
 
-/* Observation UI shows type, context and tags as text pills. The icon fields
-   above and OBS_ICONS are kept for now but no longer rendered
+/* Observation UI shows type, context and tags as text pills, with no emoji
    (docs/DECISIONS.md, "Observations (2026-10-18)"). Tag pills keep a colour
    dot: one colour per disposition, one for Core Competencies, one for custom
    tags. */
@@ -754,6 +742,19 @@ const SOCIAL_TRAITS_CONCERN_IDS = new Set(
 
 /* ── Shared HTML: Unified Toolbar ──────────────────────────── */
 const TB_SIDEBAR_SVG = `<svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="2.5" width="13" height="11" rx="2"/><line x1="5.5" y1="2.5" x2="5.5" y2="13.5"/></svg>`;
+/* Line icons for buttons and search fields. The app uses no emoji: text
+   labels first, these where a control needs a glyph. */
+const _LINE_SVG =
+  '<svg aria-hidden="true" focusable="false" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">';
+const LINE_ICONS = {
+  search: _LINE_SVG + '<circle cx="7" cy="7" r="4.5"/><line x1="10.5" y1="10.5" x2="14" y2="14"/></svg>',
+  edit: _LINE_SVG + '<path d="M11.5 1.5l3 3L5 14H2v-3L11.5 1.5z"/></svg>',
+  copy:
+    _LINE_SVG +
+    '<rect x="5.5" y="5.5" width="8.5" height="8.5" rx="1.5"/><path d="M10.5 5.5V3a1.5 1.5 0 0 0-1.5-1.5H3A1.5 1.5 0 0 0 1.5 3v6A1.5 1.5 0 0 0 3 10.5h2.5"/></svg>',
+  trash: _LINE_SVG + '<path d="M2 4h12"/><path d="M5.5 4V2.5h5V4"/><path d="M3.5 4l.8 9.5h7.4l.8-9.5"/></svg>',
+  lock: _LINE_SVG + '<rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>',
+};
 const TB_PAGES = [
   { id: 'dashboard', label: 'Dashboard', href: 'index.html' },
   { id: 'assignments', label: 'Assignments', href: 'settings.html' },

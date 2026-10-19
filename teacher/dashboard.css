@@ -350,13 +350,6 @@
   flex-wrap: wrap;
   gap: 8px 12px;
 }
-.dash-ob2-tabs {
-  display: inline-flex;
-  border: 1px solid var(--divider-strong);
-  border-radius: 7px;
-  overflow: hidden;
-}
-.dash-ob2-tab,
 .dash-ob2-tool {
   font-family: var(--font-base);
   font-size: var(--text-sm);
@@ -364,17 +357,6 @@
   background: var(--surface);
   cursor: pointer;
   padding: 4px 10px;
-}
-.dash-ob2-tab {
-  border: 0;
-}
-.dash-ob2-tab + .dash-ob2-tab {
-  border-left: 1px solid var(--divider-strong);
-}
-.dash-ob2-tab[aria-selected='true'] {
-  background: var(--active-light);
-  color: var(--link);
-  font-weight: 600;
 }
 .dash-ob2-tool {
   border: 1px solid var(--divider-strong);
@@ -409,9 +391,6 @@
 .dash-ob2 :focus-visible {
   outline: 2px solid var(--active);
   outline-offset: 1px;
-}
-.dash-ob2-tab:focus-visible {
-  outline-offset: -2px;
 }
 
 /* Flags: click to highlight; the other students dim in place. */
@@ -954,7 +933,7 @@ body.fv-names-hidden .dash-search-input:not(:placeholder-shown) {
   left: 10px;
   top: 50%;
   transform: translateY(-50%);
-  font-size: var(--text-sm);
+  display: flex;
   color: var(--text-3);
   pointer-events: none;
 }
@@ -1359,11 +1338,6 @@ body.fv-names-hidden .dash-search-input:not(:placeholder-shown) {
   padding: 80px 20px;
   color: var(--text-3);
 }
-.dash-empty-icon {
-  font-size: var(--text-4xl);
-  margin-bottom: 8px;
-  opacity: 0.4;
-}
 .dash-empty-title {
   font-family: var(--font-base);
   font-size: var(--text-lg);
@@ -1668,47 +1642,14 @@ body.fv-names-hidden .dash-search-input:not(:placeholder-shown) {
   flex: 1;
 }
 
+/* Class Management segments (.seg) sit in a narrow column: they wrap
+   onto a second row instead of pushing the last segment out of view. */
 .cm-seg {
-  display: inline-flex;
-  gap: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  background: var(--bg);
+  flex-wrap: wrap;
+  max-width: 100%;
 }
-.cm-seg-btn {
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  font-weight: 500;
-  padding: 6px 14px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  color: var(--text-2);
-  transition: all 0.12s;
-  border-right: 1px solid var(--border);
-}
-.cm-seg-btn:last-child {
-  border-right: none;
-}
-.cm-seg-btn:hover {
-  background: var(--overlay-hover);
-}
-.cm-seg-btn.active {
-  background: var(--active);
-  color: #fff;
-}
-/* T-UI-02 · disabled segment (letter/both when no categories) */
-.cm-seg-btn.cm-seg-btn-disabled {
-  color: var(--text-3);
-  cursor: not-allowed;
-  background: transparent;
-  text-decoration: line-through;
-  text-decoration-color: var(--text-3);
-}
-.cm-seg-btn.cm-seg-btn-disabled:hover {
-  background: transparent;
-  color: var(--text-3);
+.cm-seg .seg-btn {
+  white-space: normal;
 }
 .cm-seg-hint-locked {
   color: var(--text-3);
@@ -2751,11 +2692,6 @@ body.fv-names-hidden .dash-search-input:not(:placeholder-shown) {
   text-align: center;
   flex: 1;
 }
-.cm-empty-icon {
-  font-size: var(--text-4xl);
-  margin-bottom: 12px;
-  opacity: 0.35;
-}
 .cm-empty-title {
   font-size: var(--text-lg);
   font-weight: 600;
@@ -3003,11 +2939,6 @@ body.fv-names-hidden .dash-search-input:not(:placeholder-shown) {
   color: var(--text-3);
   border: 1.5px dashed var(--border);
   border-radius: var(--radius-sm);
-}
-.cm-curriculum-empty-icon {
-  font-size: var(--text-2xl);
-  margin-bottom: 6px;
-  opacity: 0.4;
 }
 .cm-curriculum-empty-text {
   font-size: var(--text-base);

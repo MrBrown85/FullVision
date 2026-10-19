@@ -477,14 +477,14 @@ window.DashObservations = (function () {
         : '') +
       '</div><div class="dash-ob2-tools">';
     if (m && students > 0) {
-      h += '<div class="dash-ob2-tabs" role="tablist" aria-label="Observations view">';
+      h += '<div class="seg seg-sm dash-ob2-tabs" role="tablist" aria-label="Observations view">';
       [
         ['week', 'By week'],
         ['competency', 'By competency'],
       ].forEach(function (t) {
         var on = m.tab === t[0];
         h +=
-          '<button type="button" class="dash-ob2-tab" role="tab" id="dash-ob2-tab-' +
+          '<button type="button" class="seg-btn dash-ob2-tab" role="tab" id="dash-ob2-tab-' +
           t[0] +
           '" aria-selected="' +
           on +
