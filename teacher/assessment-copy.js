@@ -30,7 +30,7 @@ window.AssessmentCopy = (function () {
   }
 
   function _className(cid) {
-    return (COURSES[cid] && COURSES[cid].name) || 'another class';
+    return (COURSES[cid] && courseDisplayName(COURSES[cid])) || 'another class';
   }
 
   function _isLive(cid) {
@@ -834,6 +834,9 @@ window.AssessmentCopy = (function () {
      left over, so two sections always get distinct labels. */
   function sectionLabel(name) {
     var n = String(name || '').trim();
+    // A class with a block reads "Block A · English 9" (courseDisplayName).
+    var dot = n.indexOf(' \u00B7 ');
+    if (dot > 0) return n.slice(0, dot);
     var key = _courseKey(n);
     var rest = _norm(n)
       .replace(/[-–—:|/]/g, ' ')

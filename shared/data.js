@@ -4352,6 +4352,7 @@ function _canonicalCoursesToBlob(rows) {
       decayWeight: r.decay_weight,
       timezone: r.timezone || null,
       lateWorkPolicy: r.late_work_policy || null,
+      block: r.block || '',
     };
   });
   return out;
@@ -5375,6 +5376,7 @@ function createCourse(data) {
     gradeLevel: data.gradeLevel || '',
     timezone: data.timezone || 'America/Vancouver',
     lateWorkPolicy: data.lateWorkPolicy || null,
+    block: normalizeCourseBlock(data.block),
   };
   COURSES[localId] = course;
   _safeLSSet('gb-courses', JSON.stringify(COURSES));
@@ -5407,6 +5409,7 @@ function createCourse(data) {
           p_decay_weight: course.decayWeight != null ? Number(course.decayWeight) : null,
           p_timezone: course.timezone,
           p_late_work_policy: course.lateWorkPolicy || null,
+          p_block: course.block || null,
         },
         { entryId: rec ? rec.entryId : undefined },
       )
@@ -5453,6 +5456,7 @@ function updateCourse(id, updates) {
       if (updates.decayWeight !== undefined) patch.decay_weight = updates.decayWeight;
       if (updates.timezone !== undefined) patch.timezone = updates.timezone;
       if (updates.lateWorkPolicy !== undefined) patch.late_work_policy = updates.lateWorkPolicy;
+      if (updates.block !== undefined) patch.block = updates.block || null;
       if (Object.keys(patch).length > 0 && _isUuid(id)) {
         _trackPendingSync(
           _writeRpc('update_course', { p_course_id: id, p_patch: patch }).then(function (res) {
@@ -8170,14 +8174,71 @@ function isCourseArchived(cid) {
    open one even if it is, so the menu always names the class on screen.
    Archived copies used to appear beside the real class under the same name,
    and picking one opened an empty class. */
+/* ── Blocks ─────────────────────────────────────────────────────
+   A class can name its block: one of a school's lettered blocks ("A"–"E"),
+   an X block, or a short label for anything else ("Lunch club"). Two
+   sections of one course then read differently in every class picker.
+   Stored on the course row (migrations/20261020_course_block.sql). */
+var COURSE_BLOCK_CHOICES = ['A', 'B', 'C', 'D', 'E', 'X'];
+var COURSE_BLOCK_MAX = 24;
+
+/** Trimmed block text, letters/digits of one or two characters upper-cased. */
+function normalizeCourseBlock(value) {
+  var b = String(value == null ? '' : value)
+    .trim()
+    .slice(0, COURSE_BLOCK_MAX);
+  return /^[a-z0-9]{1,2}$/i.test(b) ? b.toUpperCase() : b;
+}
+
+/** "Block A" for a short code, the text itself for a longer label, '' for none. */
+function courseBlockLabel(course) {
+  var b = normalizeCourseBlock(course && course.block);
+  if (!b) return '';
+  return /^[A-Z0-9]{1,2}$/.test(b) ? 'Block ' + b : b;
+}
+
+/** The class as menus show it: "Block A · Philosophy 12". The name alone when
+ * there is no block or the name already says it. */
+function courseDisplayName(course) {
+  var name = (course && course.name) || '';
+  var label = courseBlockLabel(course);
+  if (!label || name.toLowerCase().indexOf(label.toLowerCase()) >= 0) return name;
+  return label + ' \u00B7 ' + name;
+}
+
+/** Sort key: lettered and numbered blocks in order, then labels, then none. */
+function _courseBlockRank(course) {
+  var b = normalizeCourseBlock(course && course.block);
+  if (!b) return '3';
+  if (/^[A-Z0-9]{1,2}$/.test(b)) return '1' + (b.length === 1 ? ' ' + b : b);
+  return '2' + b.toLowerCase();
+}
+
+/** Classes in block order; classes without a block keep their own order after. */
+function sortCoursesByBlock(courses) {
+  return (courses || [])
+    .map(function (c, i) {
+      return { c: c, i: i, k: _courseBlockRank(c) };
+    })
+    .sort(function (a, b) {
+      return a.k < b.k ? -1 : a.k > b.k ? 1 : a.i - b.i;
+    })
+    .map(function (x) {
+      return x.c;
+    });
+}
+
 function getPickerCourses(activeCid) {
-  return Object.keys(COURSES || {})
+  var list = Object.keys(COURSES || {})
     .filter(function (cid) {
       return !isCourseArchived(cid) || cid === activeCid;
     })
     .map(function (cid) {
-      return { id: cid, name: COURSES[cid].name || '' };
+      return Object.assign({}, COURSES[cid], { id: cid });
     });
+  return sortCoursesByBlock(list).map(function (c) {
+    return { id: c.id, name: courseDisplayName(c) };
+  });
 }
 
 /* ── Flags ──────────────────────────────────────────────────── */

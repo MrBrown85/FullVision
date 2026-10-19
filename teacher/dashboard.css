@@ -2985,3 +2985,19 @@ body.fv-names-hidden .dash-search-input:not(:placeholder-shown) {
   font-size: var(--text-base);
   line-height: 1.4;
 }
+
+/* Block picker: None, A–E, X chips, then an "Other" label box. */
+.cm-block-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.cm-block-picker .cm-block-other {
+  flex: 1 1 160px;
+  min-width: 140px;
+}
+.cm-dup-card .cm-field {
+  margin: 12px 0 4px;
+  text-align: left;
+}

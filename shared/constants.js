@@ -41,6 +41,7 @@ const DEFAULT_COURSES = {
   sci8: {
     id: 'sci8',
     name: 'Science 8',
+    block: 'A',
     gradingSystem: 'proficiency',
     calcMethod: 'mostRecent',
     decayWeight: 0.65,

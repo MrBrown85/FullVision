@@ -464,7 +464,8 @@ window.DashClassManager = (function () {
 
   var cwStep2Name = '',
     cwStep2Grade = '',
-    cwStep2Desc = '';
+    cwStep2Desc = '',
+    cwStep2Block = '';
   // '' = not chosen yet; the wizard fills in the grade-level default.
   var cwStep2Grading = '',
     cwStep2Calc = '',
@@ -920,6 +921,78 @@ window.DashClassManager = (function () {
     if (_onRender) _onRender();
   }
 
+  /* ── Block picker ──────────────────────────────────────────────
+     None, A–E, X, or "Other" text. Used in Details, the new-class wizard
+     and Duplicate Class. */
+  function blockPickerHtml(id, value) {
+    var v = normalizeCourseBlock(value);
+    var isChoice = v === '' || COURSE_BLOCK_CHOICES.indexOf(v) >= 0;
+    return (
+      '<div class="cm-block-picker" id="' +
+      id +
+      '">' +
+      '<div class="seg seg-sm cm-seg" role="radiogroup" aria-labelledby="' +
+      id +
+      '-label">' +
+      ['']
+        .concat(COURSE_BLOCK_CHOICES)
+        .map(function (b) {
+          var on = isChoice && v === b;
+          return (
+            '<button type="button" class="seg-btn cm-seg-btn' +
+            (on ? ' active' : '') +
+            '"' +
+            segAttr(on, 'radio') +
+            ' data-action="cmBlockChip" data-picker="' +
+            id +
+            '" data-val="' +
+            b +
+            '">' +
+            (b || 'None') +
+            '</button>'
+          );
+        })
+        .join('') +
+      '</div>' +
+      '<input class="cm-input cm-block-other" id="' +
+      id +
+      '-other" maxlength="' +
+      COURSE_BLOCK_MAX +
+      '" placeholder="Other, e.g. Lunch club" aria-label="Other block or group" value="' +
+      (isChoice ? '' : esc(v)) +
+      '" data-picker="' +
+      id +
+      '" data-action-input="cmBlockOtherInput"' +
+      (id === 'cm-block' ? ' data-action-blur="cmBlockOtherBlur"' : '') +
+      '>' +
+      '</div>'
+    );
+  }
+  function readBlockPicker(id) {
+    var other = document.getElementById(id + '-other');
+    var typed = other ? normalizeCourseBlock(other.value) : '';
+    if (typed) return typed;
+    var on = document.querySelector('#' + id + ' .seg-btn.active');
+    return on ? on.dataset.val || '' : '';
+  }
+  function blockChipSelect(btn) {
+    segSelect(btn);
+    var other = document.getElementById(btn.dataset.picker + '-other');
+    if (other) other.value = '';
+  }
+  // Typing an "Other" label clears the chips; clearing it selects None.
+  function blockOtherInput(input) {
+    var picker = document.getElementById(input.dataset.picker);
+    if (!picker) return;
+    var typed = input.value.trim();
+    var none = picker.querySelector('.seg-btn[data-val=""]');
+    picker.querySelectorAll('.seg-btn').forEach(function (b) {
+      var on = !typed && b === none;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-checked', on ? 'true' : 'false');
+    });
+  }
+
   function renderClassManager() {
     var courseIds = Object.keys(COURSES);
     var html = '';
@@ -1000,8 +1073,16 @@ window.DashClassManager = (function () {
         '<div class="cm-class-meta">Setting up\u2026</div>' +
         '</div>';
     }
-    var activeCids = courseIds.filter(function (cid) {
-      return !isCourseArchived(cid);
+    var activeCids = sortCoursesByBlock(
+      courseIds
+        .filter(function (cid) {
+          return !isCourseArchived(cid);
+        })
+        .map(function (cid) {
+          return Object.assign({}, COURSES[cid], { id: cid });
+        }),
+    ).map(function (c) {
+      return c.id;
     });
     var archivedCids = courseIds.filter(function (cid) {
       return isCourseArchived(cid);
@@ -1018,7 +1099,7 @@ window.DashClassManager = (function () {
         cid +
         '">' +
         '<div class="cm-class-name">' +
-        esc(c.name) +
+        esc(courseDisplayName(c)) +
         '</div>' +
         '<div class="cm-class-meta">' +
         gs +
@@ -1043,7 +1124,7 @@ window.DashClassManager = (function () {
           cid +
           '" style="opacity:0.5">' +
           '<div class="cm-class-name">' +
-          esc(c.name) +
+          esc(courseDisplayName(c)) +
           '</div>' +
           '<div class="cm-class-meta">' +
           sc +
@@ -1083,6 +1164,10 @@ window.DashClassManager = (function () {
       '<input class="cm-input" id="cm-name" value="' +
       esc(course.name) +
       '" data-action-blur="cmUpdateName">' +
+      '</div>' +
+      '<div class="cm-field">' +
+      '<label class="cm-label" id="cm-block-label">Block</label>' +
+      blockPickerHtml('cm-block', course.block) +
       '</div>' +
       '<div class="cm-row">' +
       '<div class="cm-field">' +
@@ -1824,6 +1909,9 @@ window.DashClassManager = (function () {
       '<div class="cm-field"><label class="cm-label">Class Name</label><input class="cm-input" id="cm-new-name" value="' +
       esc(preName) +
       '" placeholder="e.g. English 10" autofocus></div>' +
+      '<div class="cm-field"><label class="cm-label" id="cm-new-block-label">Block</label>' +
+      blockPickerHtml('cm-new-block', cwStep2Block) +
+      '</div>' +
       '<div style="display:flex;gap:16px"><div class="cm-field" style="flex:1"><label class="cm-label">Grade Level</label><input class="cm-input" id="cm-new-grade" value="' +
       esc(preGrade) +
       '" placeholder="e.g. 8, 10-12" data-action-input="cwGradeInput"></div></div>' +
@@ -1919,6 +2007,9 @@ window.DashClassManager = (function () {
       '<div class="cm-section"><div class="cm-section-title">Review</div>' +
       '<div class="cm-field"><label class="cm-label">Class Name</label><div style="font-size:var(--text-lg);font-weight:600;color:var(--text)">' +
       esc(className || 'Untitled') +
+      '</div></div>' +
+      '<div class="cm-field"><label class="cm-label">Block</label><div style="font-size:var(--text-md);color:var(--text-2)">' +
+      esc(courseBlockLabel({ block: cwStep2Block }) || '\u2014') +
       '</div></div>' +
       '<div class="cm-field"><label class="cm-label">Grade</label><div style="font-size:var(--text-md);color:var(--text-2)">' +
       esc(gradeLevel || '\u2014') +
@@ -2025,6 +2116,7 @@ window.DashClassManager = (function () {
 
   function cwGoToStep3() {
     cwStep2Name = document.getElementById('cm-new-name')?.value || '';
+    cwStep2Block = readBlockPicker('cm-new-block');
     cwStep2Grade = document.getElementById('cm-new-grade')?.value || '';
     cwStep2Desc = document.getElementById('cm-new-desc')?.value || '';
     cwStep2Grading =
@@ -2088,6 +2180,7 @@ window.DashClassManager = (function () {
 
     var course = createCourse({
       name: name.trim(),
+      block: cwStep2Block,
       gradeLevel: (cwStep2Grade || (cwSelectedGrade ? String(cwSelectedGrade) : '')).trim(),
       description: (cwStep2Desc || '').trim(),
       gradingSystem: cwStep2Grading,
@@ -2162,6 +2255,7 @@ window.DashClassManager = (function () {
     cwStep2Name = '';
     cwStep2Grade = '';
     cwStep2Desc = '';
+    cwStep2Block = '';
     cwStep2Grading = '';
     cwStep2Calc = '';
     cwStep2Decay = '65';
@@ -2230,9 +2324,10 @@ window.DashClassManager = (function () {
       }
       return;
     }
-    updateCourse(cmSelectedCourse, { [field]: value.trim() });
+    updateCourse(cmSelectedCourse, { [field]: field === 'block' ? normalizeCourseBlock(value) : value.trim() });
     var nameEl = document.querySelector('.cm-class-item.selected .cm-class-name');
-    if (field === 'name' && nameEl) nameEl.textContent = value.trim();
+    if ((field === 'name' || field === 'block') && nameEl)
+      nameEl.textContent = courseDisplayName(COURSES[cmSelectedCourse]);
   }
 
   // T-UI-02 helpers ──────────────────────────────────────────────────
@@ -3741,11 +3836,75 @@ window.DashClassManager = (function () {
     );
   }
 
+  // Duplicate Class asks which block the copy is for. With a block, the copy
+  // keeps the class name ("Philosophy 12", Block B); without one it is
+  // "Philosophy 12 (Copy)" as before.
   function cmDuplicateCourse(sourceCid) {
     var src = COURSES[sourceCid];
     if (!src) return;
+    var triggerEl = document.activeElement;
+    var overlay = document.createElement('div');
+    overlay.className = 'confirm-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-labelledby', 'cm-dup-title');
+    overlay.innerHTML =
+      '<div class="confirm-card cm-dup-card">' +
+      '<div class="confirm-title" id="cm-dup-title">Duplicate ' +
+      esc(courseDisplayName(src)) +
+      '</div>' +
+      '<div class="confirm-message">Settings, curriculum, categories and sentence starters are copied. Students, assessments and rubrics are not.</div>' +
+      '<div class="cm-field"><label class="cm-label" id="cm-dup-block-label">Block for the new class</label>' +
+      blockPickerHtml('cm-dup-block', '') +
+      '</div>' +
+      '<div class="confirm-actions">' +
+      '<button class="confirm-cancel" id="cm-dup-cancel">Cancel</button>' +
+      '<button class="confirm-ok primary" id="cm-dup-ok">Duplicate</button>' +
+      '</div></div>';
+    document.body.appendChild(overlay);
+    function close() {
+      overlay.remove();
+      document.removeEventListener('keydown', onKey, true);
+      try {
+        if (triggerEl && typeof triggerEl.focus === 'function') triggerEl.focus();
+      } catch (e) {
+        /* the trigger may be gone after a re-render */
+      }
+    }
+    function onKey(e) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        close();
+      }
+    }
+    document.addEventListener('keydown', onKey, true);
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay || e.target.id === 'cm-dup-cancel') return close();
+      var chip = e.target.closest('[data-action="cmBlockChip"]');
+      if (chip) {
+        e.stopPropagation();
+        blockChipSelect(chip);
+        return;
+      }
+      if (e.target.id === 'cm-dup-ok') {
+        var block = readBlockPicker('cm-dup-block');
+        close();
+        _cmDuplicateCourse(sourceCid, block);
+      }
+    });
+    overlay.addEventListener('input', function (e) {
+      if (e.target.classList.contains('cm-block-other')) blockOtherInput(e.target);
+    });
+    var first = overlay.querySelector('.cm-block-picker .seg-btn');
+    if (first) first.focus();
+  }
+
+  function _cmDuplicateCourse(sourceCid, block) {
+    var src = COURSES[sourceCid];
+    if (!src) return;
     var newCourse = createCourse({
-      name: src.name + ' (Copy)',
+      block: block,
+      name: block ? src.name : src.name + ' (Copy)',
       gradeLevel: src.gradeLevel || '',
       description: src.description || '',
       gradingSystem: src.gradingSystem || 'proficiency',
@@ -4449,6 +4608,10 @@ window.DashClassManager = (function () {
         var inp = el.querySelector('input[type="color"]');
         if (inp) inp.click();
       },
+      cmBlockChip: function () {
+        blockChipSelect(el);
+        if (el.dataset.picker === 'cm-block') cmUpdateField('block', el.dataset.val || '');
+      },
       cmCreateToggle: function () {
         cmCreateToggle(el, el.dataset.group);
         var dp = document.getElementById('cm-cg-decay');
@@ -4482,6 +4645,10 @@ window.DashClassManager = (function () {
   }
 
   function handleInput(el) {
+    if (el.dataset.actionInput === 'cmBlockOtherInput') {
+      blockOtherInput(el);
+      return true;
+    }
     if (el.dataset.actionInput === 'cmDecaySlider') {
       cmUpdateDecay(el.value);
       return true;
@@ -4593,6 +4760,15 @@ window.DashClassManager = (function () {
   }
 
   function handleBlur(el) {
+    if (el.dataset.actionBlur === 'cmBlockOtherBlur') {
+      var typed = normalizeCourseBlock(el.value);
+      var cur = normalizeCourseBlock(COURSES[cmSelectedCourse] && COURSES[cmSelectedCourse].block);
+      var isChip = COURSE_BLOCK_CHOICES.indexOf(cur) >= 0;
+      // Leaving the box empty keeps a chosen chip; a typed label replaces it.
+      if (typed) cmUpdateField('block', typed);
+      else if (!isChip && cur) cmUpdateField('block', '');
+      return true;
+    }
     if (el.dataset.actionBlur === 'cmUpdateName') {
       cmUpdateField('name', el.value, el);
       return true;
@@ -4665,6 +4841,8 @@ window.DashClassManager = (function () {
     openStarters: openStarters,
     closeClassManager: closeClassManager,
     renderClassManager: renderClassManager,
+    // The copy step behind the Duplicate Class dialog (block '' = none).
+    duplicateCourse: _cmDuplicateCourse,
     handleAction: handleAction,
     // The reporting terms draft as the editor holds it (tests).
     reportingTermsDraft: function (cid) {
@@ -4698,6 +4876,7 @@ window.DashClassManager = (function () {
       cwStep2Name = '';
       cwStep2Grade = '';
       cwStep2Desc = '';
+      cwStep2Block = '';
       cwStep2Grading = '';
       cwStep2Calc = '';
       cwStep2Decay = '65';
