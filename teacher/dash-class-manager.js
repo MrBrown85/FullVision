@@ -932,15 +932,19 @@ window.DashClassManager = (function () {
         : cmSelectedCourse && COURSES[cmSelectedCourse]
           ? COURSES[cmSelectedCourse].name
           : 'Class Management';
-    html +=
-      '<div class="cm-topbar">' +
-      '<button class="cm-back-btn" data-action="closeClassManager">\u2190 Dashboard</button>' +
-      '<span class="cm-topbar-title">Class Management</span>' +
-      '<span class="cm-topbar-spacer"></span>' +
-      '<span style="font-size:0.75rem;color:var(--text-3)">' +
-      esc(detailTitle) +
-      '</span>' +
-      '</div>';
+    // Class Management belongs to the dashboard: its toolbar is a breadcrumb
+    // back to it in place of the dashboard's own toolbar.
+    var toolbarMount = document.getElementById('page-toolbar-mount');
+    if (toolbarMount) {
+      toolbarMount.innerHTML =
+        '<div class="dash-toolbar cm-toolbar">' +
+        renderBreadcrumb('Dashboard', '#/dashboard', 'Class Management', 'closeClassManager') +
+        '<span class="dash-toolbar-spacer"></span>' +
+        '<span class="cm-toolbar-detail">' +
+        esc(detailTitle) +
+        '</span>' +
+        '</div>';
+    }
 
     // Empty state
     if (courseIds.length === 0 && cmMode !== 'create') {
