@@ -1322,6 +1322,10 @@ window.DashClassManager = (function () {
       '<div class="cm-section">' +
       '<div class="cm-section-title">Grading &amp; Calculation</div>' +
       '<div class="cm-field">' +
+      '<button class="cm-add-link" data-action="cmCopySetup">Copy grading setup\u2026</button>' +
+      '<div class="cm-hint">Copy this class\u2019s grading system, categories and other settings to your other classes, or import them from one.</div>' +
+      '</div>' +
+      '<div class="cm-field">' +
       '<label class="cm-label">Grading System</label>' +
       '<div class="cm-seg" role="radiogroup" aria-label="Grading system">' +
       '<button class="cm-seg-btn' +
@@ -2451,6 +2455,7 @@ window.DashClassManager = (function () {
       _cmRenderUncategorized(cid) +
       '<div class="cm-cat-footer">' +
       '<button class="cm-add-link" data-action="cmCatAdd">+ Add category</button>' +
+      '<button class="cm-add-link" data-action="cmCatCopyFrom">Copy from another class</button>' +
       '<div class="' +
       _cmCatSumClass(cid) +
       '" id="cm-cat-sum-' +
@@ -2685,6 +2690,31 @@ window.DashClassManager = (function () {
         _cmMirrorCategoriesToCache(cid);
         renderClassManager();
       });
+  }
+
+  // Grading setup copied to or from another class (teacher/grading-setup-copy.js).
+  // Unsaved category or term edits would be lost under the copy, so they
+  // are saved or undone first.
+  function cmOpenSetupCopy(opts) {
+    if (!cmSelectedCourse || !window.GradingSetupCopy) return;
+    var cid = cmSelectedCourse;
+    if (_cmCatState(cid).dirty || (_cmTermState[cid] && _cmTermState[cid].dirty)) {
+      if (typeof showSyncToast === 'function')
+        showSyncToast('Save or undo your changes to categories and terms first.', 'info');
+      return;
+    }
+    window.GradingSetupCopy.openDialog(
+      cid,
+      Object.assign({}, opts, {
+        onDone: function (cids) {
+          (cids || []).forEach(function (c) {
+            delete _cmCategoryState[c];
+            delete _cmTermState[c];
+          });
+          renderClassManager();
+        },
+      }),
+    );
   }
 
   // Drag-reorder using delegated document listeners. Drop on another row → move.
@@ -4263,6 +4293,12 @@ window.DashClassManager = (function () {
       },
       cmCatAdd: function () {
         cmCatAdd();
+      },
+      cmCatCopyFrom: function () {
+        cmOpenSetupCopy({ mode: 'from', only: 'categories' });
+      },
+      cmCopySetup: function () {
+        cmOpenSetupCopy({});
       },
       cmCatSave: function () {
         cmCatSave();

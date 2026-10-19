@@ -240,6 +240,7 @@ load('teacher/competency-evidence.js');
 load('teacher/student-overrides.js');
 load('teacher/rubric-print.js');
 load('teacher/rubric-library.js');
+load('teacher/grading-setup-copy.js');
 load('teacher/router.js');
 
 // Restore real setTimeout after loading (tests may need it)
