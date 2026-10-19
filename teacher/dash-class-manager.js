@@ -3746,10 +3746,23 @@ window.DashClassManager = (function () {
       calcMethod: src.calcMethod || 'mostRecent',
       decayWeight: src.decayWeight || 0.65,
     });
-    var srcCC = getCourseConfig(sourceCid);
-    if (Object.keys(srcCC).length > 0) {
-      saveCourseConfig(newCourse.id, structuredClone(srcCC));
-    }
+    // Reporting terms stay behind: their dates belong to one school year
+    // (DECISIONS, Reporting periods 6).
+    var cc = structuredClone(getCourseConfig(sourceCid));
+    delete cc.reportingTerms;
+    if (Object.keys(cc).length > 0) saveCourseConfig(newCourse.id, cc);
+    // Categories and weights, as new rows. They go up through save_categories
+    // once the class has its server id.
+    var cats = getCategories(sourceCid)
+      .filter(Boolean)
+      .slice()
+      .sort(function (a, b) {
+        return (Number(a.displayOrder) || 0) - (Number(b.displayOrder) || 0);
+      })
+      .map(function (c, i) {
+        return { id: uid(), name: c.name, weight: c.weight, displayOrder: i };
+      });
+    if (cats.length) saveCategories(newCourse.id, cats);
     var srcMap = getLearningMap(sourceCid);
     if (srcMap && (srcMap.subjects?.length || srcMap.sections?.length)) {
       // Fresh local ids: the copy is new rows for the new class, not an
