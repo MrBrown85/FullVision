@@ -185,7 +185,7 @@ window.MStudents = (function () {
     var labels = { alpha: 'Name', proficiency: 'Proficiency', missing: 'Missing Work', lastObserved: 'Last Observed' };
     var opts = ['alpha', 'proficiency', 'missing', 'lastObserved']
       .map(function (m) {
-        var check = _sortMode === m ? ' <span style="color:var(--active)">✓</span>' : '';
+        var check = _sortMode === m ? ' <span style="color:var(--link)">✓</span>' : '';
         return (
           '<button class="m-sheet-row-btn" data-action="m-set-sort" data-mode="' +
           m +

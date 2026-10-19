@@ -37,6 +37,12 @@
   --text-3: #58585d;
   --active: #007aff;
   --active-light: rgba(0, 122, 255, 0.08);
+  /* Blue for text (links, "→" actions, blue labels and counts). --active stays
+     for fills, focus rings, selected states and icons; as text it is under
+     4.5:1. --link is the nearest shade that passes on --surface, --bg and
+     --active-light; --link-inverse is for blue text on a dark toast. */
+  --link: #0066cc;
+  --link-inverse: #5ca9ff;
   --late: #ff9500;
   --priority: #ff3b30;
   --priority-light: rgba(255, 59, 48, 0.08);
@@ -784,7 +790,7 @@ body.offline-active #app-dock {
   background: var(--active-light);
 }
 .student-row.selected .student-row-name {
-  color: var(--active);
+  color: var(--link);
   font-weight: 600;
 }
 .student-avatar {
@@ -849,7 +855,7 @@ body.offline-active #app-dock {
   transition: color var(--duration-micro);
 }
 #gb-sidebar-foot button:hover {
-  color: var(--active);
+  color: var(--link);
 }
 #gb-sidebar-foot .sb-count {
   font-size: var(--text-xs);
@@ -1018,11 +1024,11 @@ body.offline-active #app-dock {
 }
 .sh-chip-email:hover {
   background: var(--overlay-active);
-  color: var(--active);
+  color: var(--link);
 }
 .sh-chip-desig {
   background: rgba(0, 122, 255, 0.08);
-  color: var(--active);
+  color: var(--link);
   font-weight: 600;
 }
 .sh-chip-desig.low-inc {
@@ -1569,7 +1575,7 @@ body.offline-active #app-dock {
 }
 .tag-assess-row:hover .tag-assess-title {
   text-decoration: underline;
-  color: var(--active);
+  color: var(--link);
 }
 .tag-assess-pip {
   display: inline-flex;
@@ -1669,7 +1675,7 @@ body.offline-active #app-dock {
 }
 .edit-btn-inline {
   font-size: var(--text-sm);
-  color: var(--active);
+  color: var(--link);
   cursor: pointer;
   border: none;
   background: none;
@@ -1801,7 +1807,7 @@ body.offline-active #app-dock {
   font-weight: 500;
 }
 .evidence-accordion-header:hover {
-  color: var(--active);
+  color: var(--link);
 }
 .evidence-accordion-body {
   display: none;
@@ -1976,7 +1982,7 @@ body.offline-active #app-dock {
   padding: 4px 0;
 }
 .btn-back:hover {
-  color: var(--active);
+  color: var(--link);
 }
 
 /* ── Points-mode cells (shared: assignments + gradebook) ── */
@@ -2070,7 +2076,7 @@ body.offline-active #app-dock {
 .gb-pts-live-pct {
   font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
   font-size: var(--text-xs);
-  color: var(--active);
+  color: var(--link);
   font-weight: 600;
   line-height: 1;
   min-height: 0.58rem;
@@ -2438,7 +2444,7 @@ body.offline-active #app-dock {
 .tag-assess-title:hover,
 .evidence-accordion-header a:hover {
   text-decoration: underline;
-  color: var(--active) !important;
+  color: var(--link) !important;
 }
 
 .module-badge {
@@ -2631,7 +2637,7 @@ body.offline-active #app-dock {
 }
 .lo-add-btn:hover {
   border-color: var(--active);
-  color: var(--active);
+  color: var(--link);
 }
 .lo-reset-btn {
   font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
@@ -2952,7 +2958,7 @@ body.offline-active #app-dock {
   opacity: 0;
   font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
   font-size: var(--text-xs);
-  color: var(--active);
+  color: var(--link);
   text-transform: uppercase;
   letter-spacing: var(--tracking-wide);
   transition: opacity var(--duration-micro);
@@ -3198,6 +3204,7 @@ body.offline-active #app-dock {
     --text-3: #98989d;
     --active: #0a84ff;
     --active-light: rgba(10, 132, 255, 0.18);
+    --link: #5ca9ff;
     --priority: #ff453a;
     --priority-light: rgba(255, 69, 58, 0.18);
     --late: #ff9f0a;

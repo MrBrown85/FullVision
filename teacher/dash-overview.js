@@ -231,7 +231,7 @@ window.DashOverview = (function () {
       html +=
         '<div class="dash-outcome-row">' +
         '<span class="dash-outcome-label" style="color:' +
-        sec.color +
+        tintText(sec.color) +
         '">' +
         esc(sec.shortName || sec.name) +
         '</span>' +
@@ -299,8 +299,8 @@ window.DashOverview = (function () {
         })
         .join('');
       html +=
-        '<div class="dash-cc-pill" style="' +
-        (!assessed ? 'opacity:0.4' : '') +
+        '<div class="dash-cc-pill' +
+        (!assessed ? ' is-unassessed' : '') +
         '">' +
         '<div class="dash-cc-dot" style="background:' +
         (assessed ? cc.color : 'var(--border)') +

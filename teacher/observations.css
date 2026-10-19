@@ -217,7 +217,7 @@
 .obs-view-toggle.active {
   border-color: var(--active);
   background: var(--active-light);
-  color: var(--active);
+  color: var(--link);
   font-weight: 600;
 }
 
@@ -258,7 +258,7 @@
 .obs-filter-chip.active {
   border-color: var(--active);
   background: var(--active-light);
-  color: var(--active);
+  color: var(--link);
   font-weight: 600;
 }
 .obs-filter-chip .obs-btn-arrow {
@@ -444,7 +444,7 @@
   background: color-mix(in srgb, var(--score-3) 12%, transparent);
 }
 .obs-pill-type[data-sentiment='growth'] {
-  color: var(--active);
+  color: var(--link);
   background: color-mix(in srgb, var(--active) 12%, transparent);
 }
 .obs-pill-type[data-sentiment='concern'] {
@@ -773,7 +773,7 @@
 }
 .obs-focus-pill.active:not([data-sentiment]) {
   background: var(--active-light);
-  color: var(--active);
+  color: var(--link);
   border-color: var(--active);
 }
 

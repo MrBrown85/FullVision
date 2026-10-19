@@ -244,7 +244,7 @@ window.ReportBlocks = (function () {
         })
         .join('');
       const assignPill = ob.assignmentContext
-        ? `<span style="font-size:0.55rem;font-weight:600;color:var(--active);background:rgba(0,122,255,0.08);padding:1px 6px;border-radius:8px;margin-right:4px">${esc(ob.assignmentContext.assessmentTitle)}</span>`
+        ? `<span style="font-size:0.55rem;font-weight:600;color:var(--link);background:rgba(0,122,255,0.08);padding:1px 6px;border-radius:8px;margin-right:4px">${esc(ob.assignmentContext.assessmentTitle)}</span>`
         : '';
       html += `<div class="report-obs-note">${assignPill}${esc(ob.text)}${dimPills}
       <div class="report-obs-note-date">${formatDate(ob.created || ob.date)}</div>

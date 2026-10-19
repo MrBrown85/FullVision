@@ -99,7 +99,7 @@ body.fv-switching-course::after {
   transition: color 0.15s;
 }
 .m-tab-item.m-tab-active {
-  color: var(--active);
+  color: var(--link);
 }
 .m-tab-icon {
   width: 25px;
@@ -227,7 +227,7 @@ body.fv-switching-course::after {
   gap: 4px;
   background: none;
   border: none;
-  color: var(--active);
+  color: var(--link);
   font-size: 17px;
   cursor: pointer;
   padding: 8px 8px 8px 0;
@@ -265,7 +265,7 @@ body.fv-switching-course::after {
 .m-nav-bar-action {
   background: none;
   border: none;
-  color: var(--active);
+  color: var(--link);
   cursor: pointer;
   padding: 8px;
   min-width: 44px;
@@ -476,7 +476,7 @@ body.fv-switching-course::after {
 }
 .m-badge-ell {
   background: rgba(0, 122, 255, 0.15);
-  color: var(--active);
+  color: var(--link);
 }
 
 /* ── Student Detail — Hero ─────────────────────────────────── */
@@ -858,7 +858,7 @@ body.fv-switching-course::after {
   background: color-mix(in srgb, var(--score-3) 12%, transparent);
 }
 .m-obs-type-pill[data-sentiment='growth'] {
-  color: var(--active);
+  color: var(--link);
   background: color-mix(in srgb, var(--active) 12%, transparent);
 }
 .m-obs-type-pill[data-sentiment='concern'] {
@@ -879,7 +879,7 @@ body.fv-switching-course::after {
   background: none;
   border: none;
   cursor: pointer;
-  color: var(--text-3);
+  color: var(--text-2);
   font-size: 16px;
   min-width: 44px;
   min-height: 44px;
@@ -887,21 +887,20 @@ body.fv-switching-course::after {
   display: flex;
   align-items: center;
   justify-content: center;
-  opacity: 0.4;
-  transition: opacity 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
   -webkit-tap-highlight-color: transparent;
 }
 .m-obs-edit-btn:hover,
 .m-obs-delete-btn:hover {
-  opacity: 0.7;
+  background: var(--overlay-hover);
 }
 .m-obs-edit-btn:active {
-  opacity: 1;
-  color: var(--active);
+  color: var(--link);
 }
 .m-obs-delete-btn:active {
-  opacity: 1;
-  color: var(--priority);
+  color: var(--danger);
 }
 .m-obs-student-name {
   font-size: 15px;
@@ -1236,7 +1235,7 @@ body.fv-switching-course::after {
   padding: 4px 10px;
   border-radius: 16px;
   background: var(--active-light);
-  color: var(--active);
+  color: var(--link);
   font-size: 14px;
   font-weight: 500;
 }
@@ -1280,7 +1279,7 @@ body.fv-switching-course::after {
 .m-context-btn.m-selected {
   border-color: var(--active);
   background: var(--active-light);
-  color: var(--active);
+  color: var(--link);
 }
 
 /* Dimension tag strip */
@@ -1330,7 +1329,7 @@ body.fv-switching-course::after {
 .m-dim-chip.m-selected {
   border-color: var(--active);
   background: var(--active-light);
-  color: var(--active);
+  color: var(--link);
 }
 
 /* Full-width submit button */
@@ -1362,7 +1361,7 @@ body.fv-switching-course::after {
   border: none;
   background: none;
   font-size: 17px;
-  color: var(--active);
+  color: var(--link);
   font-family: inherit;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
@@ -1751,7 +1750,7 @@ body.fv-switching-course::after {
   animation: m-toast-in 0.3s ease-out;
 }
 .m-toast-undo {
-  color: var(--active);
+  color: var(--link-inverse);
   background: none;
   border: none;
   font-size: 15px;
@@ -1843,7 +1842,7 @@ body.fv-switching-course::after {
   background: var(--overlay-hover);
 }
 .m-picker-item.m-picker-selected {
-  color: var(--active);
+  color: var(--link);
 }
 .m-picker-check {
   width: 20px;
@@ -1965,7 +1964,7 @@ body.fv-switching-course::after {
 }
 .m-auth-forgot a {
   font-size: 15px;
-  color: var(--active);
+  color: var(--link);
   text-decoration: none;
   font-weight: 500;
 }
@@ -2370,7 +2369,7 @@ body.fv-switching-course::after {
 }
 .m-scard-btn-observe {
   background: var(--active-light);
-  color: var(--active);
+  color: var(--link);
 }
 .m-scard-btn-view {
   background: var(--bg-secondary);
@@ -2555,7 +2554,7 @@ body.fv-switching-course::after {
 }
 .m-wdg-chip-positive {
   background: var(--active-light);
-  color: var(--active);
+  color: var(--link);
 }
 .m-wdg-chip-concern {
   background: var(--priority-light);
@@ -2651,7 +2650,7 @@ body.fv-switching-course::after {
 .m-wdg-editor-done {
   font-size: 15px;
   font-weight: 600;
-  color: var(--active);
+  color: var(--link);
   background: none;
   border: none;
   padding: 4px 8px;
@@ -2797,7 +2796,7 @@ body.fv-switching-course::after {
 }
 .m-post-username {
   font-weight: 600;
-  color: var(--active);
+  color: var(--link);
   background: none;
   border: none;
   font-size: 15px;
@@ -2964,7 +2963,7 @@ body.fv-switching-course::after {
   background: none;
   font-size: 15px;
   font-weight: 600;
-  color: var(--active);
+  color: var(--link);
   cursor: pointer;
   text-align: center;
   margin-top: 4px;
@@ -3011,7 +3010,7 @@ body.fv-switching-course::after {
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--surface);
-  color: var(--active);
+  color: var(--link);
   font-size: 16px;
   font-weight: 600;
   font-family: inherit;

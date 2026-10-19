@@ -569,7 +569,7 @@ th.gb-group-alt {
   text-decoration: none;
 }
 .gb-name a:hover {
-  color: var(--active);
+  color: var(--link);
 }
 .gb-corner {
   position: sticky;

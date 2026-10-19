@@ -511,6 +511,12 @@ if (typeof window !== 'undefined') {
   window.categoryTintByIndex = categoryTintByIndex;
 }
 const PROF_COLORS = { 0: '#bbb', 1: 'var(--score-1)', 2: 'var(--score-2)', 3: 'var(--score-3)', 4: 'var(--score-4)' };
+
+// A section, subject or competency colour used as text: the same hue mixed
+// with the text colour, so small labels stay readable in light and dark mode.
+function tintText(color) {
+  return 'color-mix(in srgb, ' + color + ' 65%, var(--text))';
+}
 const PROF_TINT = {
   0: 'rgba(187,187,187,0.12)',
   1: 'rgba(211,47,47,0.10)',
@@ -553,19 +559,20 @@ const SUBJECT_COLOURS = {
   'Social Studies': '#dc2626',
 };
 
-// Stable avatar colors — hash student ID to a color
+// Stable avatar colors — hash student ID to a color. Each passes 4.5:1 with
+// the white initials drawn on it.
 const _AVATAR_COLORS = [
   '#2e7d32',
   '#1565c0',
   '#7b1fa2',
   '#c62828',
-  '#e65100',
+  '#c54600',
   '#283593',
   '#00695c',
   '#ad1457',
   '#4e342e',
   '#00838f',
-  '#558b2f',
+  '#4a7c2a',
   '#6a1b9a',
   '#bf360c',
   '#1a237e',

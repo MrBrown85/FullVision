@@ -165,7 +165,7 @@ window.DashStudentCards = (function () {
           '" data-sid="' +
           st.id +
           '" data-stop-prop="true" title="Flag student" aria-label="Flag student" style="color:' +
-          (flagged ? 'var(--priority)' : 'var(--border-2)') +
+          (flagged ? 'var(--priority)' : 'var(--text-2)') +
           '">' +
           (flagged ? '\u2691' : '\u2690') +
           '</button>' +
