@@ -449,16 +449,11 @@ window.ObsCapture = (function () {
       p +
       'capture-input" rows="2" autocomplete="off" aria-label="Observation note" placeholder="' +
       _esc(opts.placeholder || 'What did you notice?') +
-      '" aria-describedby="' +
-      p +
-      'capture-hint"></textarea>' +
+      '"></textarea>' +
       '</div>' +
       '<div class="obsc-slot" data-slot="input"></div>' +
       '<div class="obsc-row obsc-links" data-part="links"></div>' +
       '<div class="obsc-slot" data-slot="links"></div>' +
-      '<div class="obsc-hint" id="' +
-      p +
-      'capture-hint">Enter adds it. Shift+Enter starts a new line. Type @ for a student, # for a tag, ! for the type, / for a starter.</div>' +
       '<div class="obsc-flag" data-part="flag" aria-live="polite"></div>';
 
     var input = root.querySelector('textarea');
