@@ -455,7 +455,7 @@ window.PageStudent = (function () {
     // ── Toolbar ──
     var html =
       '<div class="student-toolbar">' +
-      '<a class="tb-back-btn" href="#/dashboard">&larr; Dashboard</a>' +
+      renderBreadcrumb('Dashboard', '#/dashboard', fullName(student) || displayName(student)) +
       '<button class="tb-edit-btn" data-action="openEditStudent">Edit Student</button>' +
       (typeof renderTermPicker === 'function' ? renderTermPicker(cid) : '') +
       '</div>';

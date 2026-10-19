@@ -147,3 +147,11 @@ Context: a review of observation capture and display across desktop, phone, stud
 7. **Text pills replace emoji** for type, context and tags on desktop and phone. **Enter sends, Shift+Enter adds a line. Delete shows an Undo toast** instead of a two-click confirm. **Cards show "Quoted in Report N"** when a term rating quotes them, with a "not yet quoted" filter. **A concern observation offers to flag the student.**
 8. **No dictation and no photo attachments this round.**
 9. **Not decided:** whether a multi-student capture becomes one server row. The client keeps fanning out to one row per student until it is; the feed shows "with …" on each.
+
+## Buttons and breadcrumbs (2026-10-19)
+
+Context: a UI/UX sweep found solid blue spent on navigation ("Class Management", "← Dashboard", "Edit Student") beside the real action. Plan at `~/fullvision-design-fixes-plan.md`, PR B.
+
+1. **One primary action per screen; navigation and settings are secondary.** Solid blue marks the screen's main action only: + New Assessment (Assignments, Gradebook), Add in the capture strip (Observations), Print Reports (Progress Reports, Class Summary), Save & Next (Term Questionnaire), Term Questionnaire (student page), and Save in forms and dialogs. Links to other screens and settings (Class Management, Edit Student, Student Dashboard, Generate) use an outline button. A screen with no single main action, such as the dashboard, has no solid button.
+2. **Screens under the dashboard keep "Dashboard" lit in the top nav** and show a breadcrumb at the left of their toolbar: "Dashboard › Mei Wong" on a student page, "Dashboard › Class Management". "Dashboard" links back; there is no separate back button. `renderBreadcrumb` in `teacher/ui.js`.
+3. **No page titles on the five top-level pages.** The nav pill already names them.

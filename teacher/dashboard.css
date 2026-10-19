@@ -1033,6 +1033,8 @@ body.fv-names-hidden .dash-search-input:not(:placeholder-shown) {
   border-color: var(--text-3);
   color: var(--text);
 }
+/* Class Management is settings, so it is a secondary (outline) button:
+   solid blue is kept for a screen's main action (docs/DECISIONS.md). */
 .dash-add-btn {
   padding: 6px 14px;
   font-family: var(--font-base);
@@ -1040,15 +1042,15 @@ body.fv-names-hidden .dash-search-input:not(:placeholder-shown) {
   font-weight: 600;
   border-radius: 8px;
   white-space: nowrap;
-  background: var(--active);
-  color: #fff;
-  border: none;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
   cursor: pointer;
   transition: all 0.15s;
 }
 .dash-add-btn:hover {
-  background: var(--btn-hover-blue);
-  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.2);
+  background: var(--overlay-hover);
+  border-color: var(--text-3);
 }
 .dash-toolbar-spacer {
   flex: 1;
@@ -1469,38 +1471,9 @@ body.fv-names-hidden .dash-search-input:not(:placeholder-shown) {
   background: var(--bg);
 }
 
-.cm-topbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 20px;
-  background: var(--surface);
-  border-bottom: 0.5px solid var(--divider-medium);
-}
-.cm-back-btn {
-  font-family: var(--font-base);
-  font-size: var(--text-base);
-  font-weight: 500;
-  color: var(--link);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 4px 0;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.cm-back-btn:hover {
-  text-decoration: underline;
-}
-.cm-topbar-title {
-  font-family: var(--font-base);
-  font-size: var(--text-md);
-  font-weight: 600;
-  color: var(--text);
-}
-.cm-topbar-spacer {
-  flex: 1;
+.cm-toolbar-detail {
+  font-size: var(--text-sm);
+  color: var(--text-3);
 }
 
 .cm-layout {
