@@ -103,18 +103,20 @@ test.describe('Dashboard observation coverage', () => {
     await gotoApp(page, '/dashboard');
   });
 
-  test('names students with no observation in 3+ weeks', async ({ page }) => {
-    await expect(page.locator('.dash-obs-headline')).toContainText('2 students have no observation in 3+ weeks');
-    const overdue = page.locator('.dash-obs-overdue');
-    await expect(overdue).toContainText('Bob');
-    await expect(overdue).toContainText('Charlie');
-    await expect(overdue).not.toContainText('Alice');
+  test('flags and marks students with no observation in 3+ weeks', async ({ page }) => {
+    const card = page.locator('#dash-obs-card');
+    await expect(card.locator('.dash-ob2-flag[data-flag="overdue"]')).toHaveText('2 not observed in 3+ weeks');
+    await expect(card.locator('.dash-ob2-name.is-overdue')).toHaveText(['Bob B.', 'Charlie C.']);
+    const bob = card.locator('.dash-ob2-row[data-sid="stu-002"]');
+    await expect(bob.locator('.dash-ob2-days')).toHaveText('40d');
+    await expect(card.locator('.dash-ob2-row[data-sid="stu-003"] .dash-ob2-days')).toHaveText('none');
+    await expect(card.locator('.dash-ob2-row[data-sid="stu-001"] .dash-ob2-name')).not.toHaveClass(/is-overdue/);
   });
 
-  test('a grid cell links to the Observations page for that student', async ({ page }) => {
-    const row = page.locator('.dash-obs-grid tbody tr', { hasText: 'Alice' });
-    await expect(row.locator('.dash-obs-cell.dash-obs-tint-strength')).toHaveCount(1);
-    await row.locator('.dash-obs-cell').last().click();
-    await expect(page).toHaveURL(/#\/observations\?course=sci8&student=stu-001/);
+  test('a week cell opens the student page at that observation', async ({ page }) => {
+    const row = page.locator('#dash-obs-card .dash-ob2-row[data-sid="stu-001"]');
+    await expect(row.locator('.dash-ob2-cell.has i[data-type="strength"]')).toHaveCount(1);
+    await row.locator('.dash-ob2-cell.has').click();
+    await expect(page).toHaveURL(/#\/student\?id=stu-001&course=sci8&ob=o1/);
   });
 });
