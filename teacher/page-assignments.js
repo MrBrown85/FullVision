@@ -392,7 +392,9 @@ window.PageAssignments = (function () {
       '<div class="settings-row"><label>Export Summary</label><button class="btn btn-primary" data-action="exportSummaryCSV">Export Summary CSV</button></div>' +
       '<div class="settings-row"><label>Delete class</label><button class="btn btn-danger" data-action="clearData">Delete</button></div>' +
       '<div class="settings-title" style="margin-top:16px;padding-top:12px;border-top:0.5px solid var(--divider-subtle)">Demo</div>' +
-      '<div class="settings-row"><label>Reset to demo data</label><button class="btn btn-danger" data-action="resetDemoData">Reset Demo</button></div>';
+      '<div class="settings-row"><label>Reset to demo data</label><button class="btn btn-danger" data-action="resetDemoData">Reset Demo</button></div>' +
+      '<div class="settings-title" style="margin-top:16px;padding-top:12px;border-top:0.5px solid var(--divider-subtle)">Account</div>' +
+      '<div class="settings-row"><label>Delete your account</label><button class="btn btn-danger" data-action="deleteAccount">Delete Account</button></div>';
 
     return { toolbarHtml: toolbarHtml, rubHtml: rubHtml, advHtml: advHtml };
   }

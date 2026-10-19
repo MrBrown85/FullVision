@@ -64,9 +64,6 @@ function renderDock(activePage, rightHTML) {
     </button>
     <div class="tb-user-dropdown">
       <button class="tb-user-signout" data-action="signOut">Sign Out</button>
-      <div style="border-top:1px solid var(--border);margin-top:4px;padding-top:4px">
-        <button class="tb-user-delete" data-action="deleteAccount" style="font-size:var(--text-xs);color:var(--score-1);background:none;border:none;cursor:pointer;padding:4px 8px;width:100%;text-align:left">Delete Account</button>
-      </div>
     </div>
   </div>`;
 

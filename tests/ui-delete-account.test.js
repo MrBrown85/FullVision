@@ -1,5 +1,10 @@
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { readFileSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 describe('delete-account desktop flow', () => {
   var originalGetCurrentUser;
@@ -22,10 +27,18 @@ describe('delete-account desktop flow', () => {
     window.v2.softDeleteTeacher = originalSoftDeleteTeacher;
   });
 
-  it('labels the toolbar action as Delete Account', () => {
+  it('keeps Delete Account out of the account menu', () => {
     var html = renderDock('dashboard');
-    expect(html).toContain('Delete Account');
-    expect(html).not.toContain('Clear This Device');
+    expect(html).toContain('Sign Out');
+    expect(html).not.toContain('Delete Account');
+    expect(html).not.toContain('data-action="deleteAccount"');
+  });
+
+  it('puts Delete Account last in the Assignments Advanced menu', () => {
+    var src = readFileSync(resolve(root, 'teacher/page-assignments.js'), 'utf8');
+    var adv = src.slice(src.indexOf('var advHtml ='), src.indexOf('return { toolbarHtml: toolbarHtml'));
+    expect(adv).toContain('data-action="deleteAccount"');
+    expect(adv.lastIndexOf('data-action=')).toBe(adv.indexOf('data-action="deleteAccount"'));
   });
 
   it('reauthenticates, soft-deletes, and signs out when confirmation matches', async () => {
