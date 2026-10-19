@@ -68,6 +68,18 @@ Context: a teacher with two sections of a course (English 9 in blocks A and B) w
 8. **The form's Classes row** (2026-10-18 follow-up) sits under the title as chips: this class fixed, the other sections of the course as toggles, other classes behind "More classes". A new assessment starts with the classes ticked last time in that class (remembered per class on this device); an edit starts with none. Dates are "Same for every class" unless "Set per class" is chosen.
 9. **Linked copies are visible where the teacher works:** an "Also in …" chip on the assessment card opens that copy in its class; a section toggle beside the course picker switches between sections of the same course; the delete confirmation says a copy stays elsewhere; the "Update the other classes too?" dialog lists exactly what will change in each class.
 
+## Copying a class's grading setup (2026-10-18)
+
+Context: a teacher asked for Teams' "Import settings": set up grading once and use it in every section. `teacher/grading-setup-copy.js`. No database change; categories go through `save_categories`.
+
+1. **One dialog, two directions.** "Copy grading setup…" in Class Management copies this class's setup to other classes (several at once, same course first) or imports it from one. "Copy from another class" beside the categories opens the same dialog with only categories ticked.
+2. **What copies:** grading system, categories and weights, calculation method (with decay weight), course % rounding and late work policy, each its own checkbox, all ticked. Reporting terms are listed unticked: dates belong to one school year, as with Duplicate Class.
+3. **Categories match by name** (case and spacing ignored). A matched category keeps its id, so its assessments stay in it, and takes the source's name, weight and order. Unmatched source categories are added. A target category the source lacks is removed; if it has assessments the teacher picks where they move first (defaulting to a category sharing its first word). Work with no category is offered a category too, or can be left.
+4. **A source with no categories never clears the target's.** The option is greyed out.
+5. **A review step lists every change per class** before anything is saved, and what is already the same. Unsaved category or term edits in Class Management block the dialog until saved or undone.
+6. **Copies are not linked** and scores are never touched. Grades in the target classes follow the new setup.
+7. **Signed in, removed categories with work stay at 0% until the work has moved,** then a second save deletes them (the server refuses to delete a category in use). If the new categories haven't reached the server (offline, refused), the work stays where it is and Class Management offers the move later.
+
 ## Editing a rubric that already has scores (2026-10-18)
 
 Context: rubric scores are stored per criterion and projected onto the criterion's competencies at read time, so a rubric edit can change past grades. Canvas locks a rubric once it is on more than one assignment; Google Classroom locks once grading starts; Aspen warns. `teacher/rubric-guard.js`.
