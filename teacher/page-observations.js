@@ -54,9 +54,6 @@ window.PageObservations = (function () {
 
   var SEARCH_SVG =
     '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
-  var TRASH_SVG =
-    '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>';
-
   var tagColor = obsTagColor;
 
   /* ── Pure helpers (exported for tests) ──────────────────── */
@@ -94,69 +91,10 @@ window.PageObservations = (function () {
     return { from: t.starts_on, to: t.ends_on || todayStr };
   }
 
-  /* sid|obId → sorted term numbers whose rating quotes that observation
-     (term ratings are keyed 'term-N'; mentionObs holds observation ids). */
-  function quotedIndex(termRatings) {
-    var out = {};
-    Object.keys(termRatings || {}).forEach(function (sid) {
-      var byTerm = termRatings[sid] || {};
-      Object.keys(byTerm).forEach(function (termId) {
-        var ids = (byTerm[termId] && byTerm[termId].mentionObs) || [];
-        var m = String(termId).match(/(\d+)$/);
-        var n = m ? Number(m[1]) : null;
-        ids.forEach(function (id) {
-          var k = sid + '|' + id;
-          if (!out[k]) out[k] = [];
-          if (n != null && out[k].indexOf(n) < 0) out[k].push(n);
-        });
-      });
-    });
-    Object.keys(out).forEach(function (k) {
-      out[k].sort(function (a, b) {
-        return a - b;
-      });
-    });
-    return out;
-  }
-
-  /* "Quoted in Report 1", "Quoted in Reports 1 and 2", or "Quoted" when the
-     class has no reporting terms. Null when not quoted. */
-  function quotedLabel(termNums, hasTerms) {
-    if (!termNums) return null;
-    if (!hasTerms || !termNums.length) return 'Quoted';
-    if (termNums.length === 1) return 'Quoted in Report ' + termNums[0];
-    return 'Quoted in Reports ' + termNums.slice(0, -1).join(', ') + ' and ' + termNums[termNums.length - 1];
-  }
-
-  /* A multi-student capture is one row per student with the same text and
-     the same minute. Key → student ids, in feed order. */
-  function captureKey(ob) {
-    return (ob.text || '').trim() + '|' + (ob.created || '').slice(0, 16);
-  }
-  function sameCaptureIndex(obs) {
-    var out = {};
-    obs.forEach(function (ob) {
-      var k = captureKey(ob);
-      if (!out[k]) out[k] = [];
-      if (out[k].indexOf(ob.studentId) < 0) out[k].push(ob.studentId);
-    });
-    return out;
-  }
-
-  /* "with Sofia Bianchi", "with Sofia Bianchi and Ines Lamba",
-     "with Sofia Bianchi, Ines Lamba and 2 others". */
-  function withLabel(names) {
-    if (!names.length) return '';
-    if (names.length === 1) return 'with ' + names[0];
-    if (names.length === 2) return 'with ' + names[0] + ' and ' + names[1];
-    if (names.length === 3) return 'with ' + names[0] + ', ' + names[1] + ' and ' + names[2];
-    return 'with ' + names[0] + ', ' + names[1] + ' and ' + (names.length - 2) + ' others';
-  }
-
-  function isLinked(ob) {
-    var ac = ob.assignmentContext;
-    return !!(ac && (ac.assessmentId || ac.assessmentTitle));
-  }
+  var Card = window.ObsCard;
+  var quotedIndex = Card.quotedIndex;
+  var sameCaptureIndex = Card.sameCaptureIndex;
+  var isLinked = Card.isLinked;
 
   function refreshStudentCache() {
     _students = sortStudents(getStudents(activeCourse), 'lastName');
@@ -617,14 +555,7 @@ window.PageObservations = (function () {
   }
 
   function assessmentTitle(ob) {
-    var ac = ob.assignmentContext;
-    if (!ac) return '';
-    if (ac.assessmentTitle) return ac.assessmentTitle;
-    if (!ac.assessmentId) return '';
-    var a = (getAssessments(activeCourse) || []).find(function (x) {
-      return x.id === ac.assessmentId;
-    });
-    return a ? a.title || '' : '';
+    return Card.assessmentTitle(activeCourse, ob);
   }
 
   function dateBounds() {
@@ -690,98 +621,12 @@ window.PageObservations = (function () {
   }
 
   /* ── Feed HTML ──────────────────────────────────────────── */
-  /* Everything a card needs that depends on the whole class: which
-     observations a report quotes, and which were one capture for several
-     students. Built once per feed render. */
   function feedContext() {
-    return {
-      quoted: quotedIndex(getTermRatings(activeCourse)),
-      hasTerms: getReportingTerms(activeCourse).length > 0,
-      sameCapture: sameCaptureIndex(visibleObs(getAllQuickObs(activeCourse))),
-    };
-  }
-
-  function cardWhen(ob) {
-    var d = new Date(ob.created || obDay(ob) + 'T12:00:00');
-    var opts = { weekday: 'short', month: 'short', day: 'numeric' };
-    if (d.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
-    return (
-      d.toLocaleDateString('en-CA', opts) +
-      ' · ' +
-      d.toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' })
-    );
-  }
-
-  function typePillHtml(sentiment) {
-    var s = sentiment && OBS_SENTIMENTS[sentiment];
-    if (!s) return '';
-    return '<span class="obs-pill obs-pill-type" data-sentiment="' + sentiment + '">' + esc(s.label) + '</span>';
+    return Card.context(activeCourse, { hidden: _pendingDeletes });
   }
 
   function renderObsCardHtml(ob, ctx) {
-    ctx = ctx || feedContext();
-    var s = _studentsById[ob.studentId];
-    var sn = s ? displayName(s) : ob.studentId;
-    var others = (ctx.sameCapture[captureKey(ob)] || [])
-      .filter(function (sid) {
-        return sid !== ob.studentId;
-      })
-      .map(function (sid) {
-        return _studentsById[sid] ? displayName(_studentsById[sid]) : null;
-      })
-      .filter(Boolean);
-    var quoted = quotedLabel(ctx.quoted[ob.studentId + '|' + ob.id], ctx.hasTerms);
-    var ctxInfo = ob.context && OBS_CONTEXTS[ob.context];
-    var aTitle = isLinked(ob) ? assessmentTitle(ob) || 'Assessment' : '';
-
-    var out =
-      '<div class="obs-card" data-action="openFocus" tabindex="0" data-sid="' +
-      ob.studentId +
-      '" data-obid="' +
-      ob.id +
-      '"' +
-      (ob.sentiment ? ' data-sentiment="' + ob.sentiment + '"' : '') +
-      '>' +
-      '<div class="obs-card-header"><div class="obs-card-meta">' +
-      '<span class="obs-card-student">' +
-      esc(sn) +
-      '</span>' +
-      (others.length ? '<span class="obs-card-with">' + esc(withLabel(others)) + '</span>' : '') +
-      '<span class="obs-card-time">' +
-      esc(cardWhen(ob)) +
-      '</span>' +
-      typePillHtml(ob.sentiment) +
-      (ctxInfo ? '<span class="obs-pill obs-pill-context">' + esc(ctxInfo.label) + '</span>' : '') +
-      (aTitle ? '<span class="obs-pill obs-pill-assessment">' + esc(aTitle) + '</span>' : '') +
-      ObsCapture.linkPillsHtml(activeCourse, ob) +
-      '</div>' +
-      '<span class="obs-card-header-actions">' +
-      (quoted ? '<span class="obs-card-quoted">' + esc(quoted) + '</span>' : '') +
-      '<button type="button" class="obs-card-delete" data-action="deleteOb" data-sid="' +
-      ob.studentId +
-      '" data-obid="' +
-      ob.id +
-      '" data-stop-prop="true" title="Delete" aria-label="Delete observation">' +
-      TRASH_SVG +
-      '</button></span></div>' +
-      '<div class="obs-card-text">' +
-      esc(ob.text) +
-      '</div>';
-    if (ob.dims && ob.dims.length > 0) {
-      out += '<div class="obs-card-dims">';
-      ob.dims.forEach(function (t) {
-        var info = resolveTag(t);
-        out +=
-          '<span class="obs-card-dim"><span class="dim-dot" style="background:' +
-          tagColor(t) +
-          '"></span>' +
-          esc(info.label) +
-          '</span>';
-      });
-      out += '</div>';
-    }
-    out += '</div>';
-    return out;
+    return Card.html(ob, ctx || feedContext());
   }
 
   function renderFeedHtml(filtered) {
@@ -1106,7 +951,7 @@ window.PageObservations = (function () {
   function _renderFocusCardHtml(ob) {
     var s = _studentsById[ob.studentId];
     var sn = s ? displayName(s) : ob.studentId;
-    var tm = cardWhen(ob);
+    var tm = Card.cardWhen(ob);
     var sentAttr = _focusDraft.sentiment ? ' data-sentiment="' + _focusDraft.sentiment + '"' : '';
 
     var sentimentPills = Object.entries(OBS_SENTIMENTS)
@@ -1589,12 +1434,12 @@ window.PageObservations = (function () {
     _helpers: {
       weekRange: weekRange,
       termRange: termRange,
-      quotedIndex: quotedIndex,
-      quotedLabel: quotedLabel,
-      sameCaptureIndex: sameCaptureIndex,
-      captureKey: captureKey,
-      withLabel: withLabel,
-      isLinked: isLinked,
+      quotedIndex: Card.quotedIndex,
+      quotedLabel: Card.quotedLabel,
+      sameCaptureIndex: Card.sameCaptureIndex,
+      captureKey: Card.captureKey,
+      withLabel: Card.withLabel,
+      isLinked: Card.isLinked,
     },
   };
 })();

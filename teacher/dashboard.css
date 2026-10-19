@@ -866,13 +866,46 @@
 .dash-card-obs {
   flex: 1;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
   font-family: var(--font-base);
   font-size: var(--text-sm);
   color: var(--text-3);
   white-space: nowrap;
   overflow: hidden;
+}
+.dash-obs-dots {
+  display: inline-flex;
+  gap: 3px;
+  flex-shrink: 0;
+}
+.dash-obs-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-3);
+}
+.dash-obs-dot[data-type='strength'] {
+  background: var(--score-3);
+}
+.dash-obs-dot[data-type='growth'] {
+  background: var(--active);
+}
+.dash-obs-dot[data-type='concern'] {
+  background: var(--score-2);
+}
+.dash-obs-when {
+  overflow: hidden;
   text-overflow: ellipsis;
-  text-align: right;
+}
+.dash-obs-when.is-overdue {
+  color: var(--score-2);
+  font-weight: 600;
+}
+.dash-obs-count {
+  flex-shrink: 0;
 }
 
 /* ── Dashboard Designation Badges ───────────────────────────── */

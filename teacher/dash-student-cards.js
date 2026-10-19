@@ -19,6 +19,78 @@ window.DashStudentCards = (function () {
     return (tag && (tag.code || tag.label || tag.shortName || tag.name)) || (sec && (sec.shortName || sec.name)) || '';
   }
 
+  var DAY_MS = 86400000;
+  function _dayNum(dateStr) {
+    return Math.floor(Date.parse(String(dateStr).slice(0, 10) + 'T00:00:00Z') / DAY_MS);
+  }
+  function _obDay(o) {
+    return (o && (o.date || (o.created || '').slice(0, 10))) || '';
+  }
+
+  /* The card's observation line: the three newest types, days since the
+     last one (amber at 3+ weeks, the dashboard's overdue rule), and how many
+     this term, or in all, when no term is active.
+       obs    the student's observations, newest first
+       term   getActiveTerm(cid): { startsOn, endsOn } or null */
+  function obsSummary(obs, todayStr, term) {
+    obs = obs || [];
+    var dated = obs.map(function (o) {
+      return Object.assign({}, o, { date: _obDay(o) });
+    });
+    var last = DashOverview.obsLastDate(dated);
+    var inTerm =
+      term && term.startsOn && term.endsOn
+        ? dated.filter(function (o) {
+            return o.date >= term.startsOn && o.date <= term.endsOn;
+          })
+        : dated;
+    return {
+      dots: obs.slice(0, 3).map(function (o) {
+        return o.sentiment && OBS_SENTIMENTS[o.sentiment] ? o.sentiment : 'none';
+      }),
+      daysSince: last ? Math.max(0, _dayNum(todayStr) - _dayNum(last)) : null,
+      overdue: obs.length > 0 && DashOverview.obsIsOverdue(dated, todayStr),
+      count: inTerm.length,
+      inTerm: !!(term && term.startsOn && term.endsOn),
+    };
+  }
+
+  function obsWhenText(daysSince) {
+    if (daysSince == null) return 'No observations yet';
+    if (daysSince === 0) return 'Last observed today';
+    if (daysSince === 1) return 'Last observed yesterday';
+    return 'Last observed ' + daysSince + ' days ago';
+  }
+
+  function obsLineHtml(sum) {
+    if (sum.daysSince == null) return '<span class="dash-obs-when">No observations yet</span>';
+    var label = sum.dots
+      .map(function (t) {
+        return t === 'none' ? 'no type' : OBS_SENTIMENTS[t].label.toLowerCase();
+      })
+      .join(', ');
+    return (
+      '<span class="dash-obs-dots" role="img" aria-label="Newest: ' +
+      esc(label) +
+      '">' +
+      sum.dots
+        .map(function (t) {
+          return '<span class="dash-obs-dot" data-type="' + t + '"></span>';
+        })
+        .join('') +
+      '</span>' +
+      '<span class="dash-obs-when' +
+      (sum.overdue ? ' is-overdue' : '') +
+      '">' +
+      esc(obsWhenText(sum.daysSince)) +
+      '</span>' +
+      '<span class="dash-obs-count">\u00b7 ' +
+      sum.count +
+      (sum.inTerm ? ' this term' : ' in all') +
+      '</span>'
+    );
+  }
+
   function renderStudentCards(cid, students, allStudents, sections, assessments, allScores, flags) {
     var html = '<div class="dash-section">';
     if (students.length === 0 && allStudents.length === 0) {
@@ -75,15 +147,7 @@ window.DashStudentCards = (function () {
           else if (lateAvg < earlyAvg - 0.2) trend = 'down';
         }
 
-        var obs = getStudentQuickObs(cid, st.id);
-        var lastObs = obs.length > 0 ? obs[0] : null;
-        var obsText = '';
-        if (lastObs) {
-          var snippet = lastObs.text.length > 45 ? lastObs.text.slice(0, 45) + '\u2026' : lastObs.text;
-          obsText = '\uD83D\uDCDD "' + esc(snippet) + '"';
-        } else {
-          obsText = '<span style="color:var(--text-3)">No observations</span>';
-        }
+        var obsText = obsLineHtml(obsSummary(getStudentQuickObs(cid, st.id), getTodayStr(), getActiveTerm(cid)));
 
         html +=
           '<div class="dash-card' +
@@ -270,5 +334,7 @@ window.DashStudentCards = (function () {
 
   return {
     renderStudentCards: renderStudentCards,
+    obsSummary: obsSummary,
+    obsWhenText: obsWhenText,
   };
 })();

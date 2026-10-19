@@ -16,7 +16,7 @@ window.PageStudent = (function () {
   var _expandedGroups = new Set();
   var _overrideSelectedLevel = 0;
   var _profileData = null;
-  var Notes = StudentNotes;
+  var Evidence = StudentEvidence;
   var Overrides = StudentOverrides;
 
   function _assessmentCategoryLabel(cid, assessment) {
@@ -133,15 +133,6 @@ window.PageStudent = (function () {
     row.classList.toggle('open');
   }
 
-  /* ── Notes & Observations ───────────────────────────────── */
-  function renderNotes() {
-    Notes.renderNotes(activeCourse, studentId);
-  }
-
-  function filterNotes(query) {
-    Notes.filterNotes(query);
-  }
-
   /* ── Goal editing ───────────────────────────────────────── */
   function editGoal(secId) {
     document.getElementById('goal-edit-' + secId).style.display = '';
@@ -186,10 +177,6 @@ window.PageStudent = (function () {
       await window.v2.saveReflection(studentId, secId, text, conf || null);
     }
     render();
-  }
-
-  function deleteNote(noteId) {
-    Notes.deleteNote(activeCourse, studentId, noteId);
   }
 
   /* ── Edit Student Modal ─────────────────────────────────── */
@@ -1008,7 +995,7 @@ window.PageStudent = (function () {
     html += '</div>';
 
     // ── Insights grid ──
-    // (Growth Profile, Needs Attention, Assignment Feedback, Notes & Observations, Focus Areas, Core Competencies)
+    // (Growth Profile, Needs Attention), then the Evidence panel
     // This is large but identical to student.html render logic — included inline
     html += '<div class="insights-grid">';
 
@@ -1070,21 +1057,29 @@ window.PageStudent = (function () {
         '</span>';
     });
     html += '</div>';
-    var gpStrengths = gpObs.filter(function (o) {
-      return o.sentiment === 'strength';
-    }).length;
-    var gpGrowth = gpObs.filter(function (o) {
-      return o.sentiment === 'growth';
-    }).length;
-    var gpConcerns = gpObs.filter(function (o) {
-      return o.sentiment === 'concern';
-    }).length;
+    // Observations by type, as text pills.
     if (gpObs.length > 0) {
-      var parts = [gpObs.length + ' observation' + (gpObs.length !== 1 ? 's' : '')];
-      if (gpStrengths) parts.push(gpStrengths + ' strength' + (gpStrengths !== 1 ? 's' : ''));
-      if (gpGrowth) parts.push(gpGrowth + ' growth');
-      if (gpConcerns) parts.push(gpConcerns + ' concern' + (gpConcerns !== 1 ? 's' : ''));
-      html += '<div class="gp-obs-stat">' + parts.join(' · ') + '</div>';
+      html +=
+        '<div class="gp-obs-stat">' +
+        ['strength', 'growth', 'concern']
+          .map(function (key) {
+            var n = gpObs.filter(function (o) {
+              return o.sentiment === key;
+            }).length;
+            return (
+              '<span class="obs-pill obs-pill-type' +
+              (n ? '' : ' gp-obs-zero') +
+              '" data-sentiment="' +
+              key +
+              '">' +
+              esc(OBS_SENTIMENTS[key].label) +
+              ' ' +
+              n +
+              '</span>'
+            );
+          })
+          .join('') +
+        '</div>';
     } else {
       html += '<div class="gp-obs-stat">No observations yet</div>';
     }
@@ -1174,35 +1169,10 @@ window.PageStudent = (function () {
     }
     html += '</div>';
 
-    // 2b. Assignment Feedback
-    var assignFeedback = getStudentAssignmentFeedback(cid, studentId);
-    if (assignFeedback.length > 0) {
-      html += '<div class="insight-card"><div class="insight-title">Assignment Feedback</div><div class="notes-list">';
-      assignFeedback.slice(0, 5).forEach(function (fb) {
-        var d = new Date(fb.created);
-        var ds = d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
-        html +=
-          '<div class="note-inline"><div class="note-inline-left"><span class="note-inline-date">' +
-          ds +
-          '</span></div><div class="note-inline-body"><span class="note-assign-badge">' +
-          esc(fb.assignmentContext.assessmentTitle) +
-          (fb.assignmentContext.proficiencyLevel ? ' · ' + fb.assignmentContext.proficiencyLevel : '') +
-          '</span><div class="note-inline-text">' +
-          esc(fb.text) +
-          '</div></div></div>';
-      });
-      html += '</div></div>';
-    }
-
-    // 3. Notes & Observations
-    html +=
-      '<div class="insight-card notes-panel"><div class="insight-title">Notes & Observations</div>' +
-      '<div class="note-capture" id="note-capture"></div>' +
-      '<input type="text" class="note-search-input" id="note-search" placeholder="Search…" aria-label="Search notes">' +
-      '<div class="notes-scroll"><div class="notes-list" id="notes-list"></div></div>' +
-      '</div>';
-
     html += '</div>'; // end insights-grid
+
+    // 3. Evidence: timeline, capture strip, tabs and cards
+    html += Evidence.panelHtml();
 
     if (_profileData && _profileData.competency_tree) {
       html += _renderCompetencyTree(_profileData.competency_tree);
@@ -1268,17 +1238,7 @@ window.PageStudent = (function () {
 
     html += '</div></div>'; // close padding wrapper + scroll wrapper
     document.getElementById('main').innerHTML = html;
-    renderNotes();
-
-    // Wire note search
-    var noteSearchEl = document.getElementById('note-search');
-    if (noteSearchEl) {
-      noteSearchEl.addEventListener('input', function () {
-        filterNotes(this.value);
-      });
-    }
-
-    Notes.mountCapture(activeCourse, studentId, document.getElementById('note-capture'));
+    Evidence.mount(activeCourse, studentId);
   }
 
   /* ── Delegated click handler ──────────────────────────────── */
@@ -1342,9 +1302,6 @@ window.PageStudent = (function () {
       saveOverride: function () {
         saveOverride(el.dataset.secid);
       },
-      deleteNote: function () {
-        deleteNote(el.dataset.noteid);
-      },
       closeEditStudent: function () {
         closeEditStudent();
       },
@@ -1406,7 +1363,7 @@ window.PageStudent = (function () {
     _listeners = [];
     // Clean up any open edit modal
     closeEditStudent();
-    Notes.destroyCapture();
+    Evidence.destroy();
     delete window._pageSwitchCourse;
   }
 

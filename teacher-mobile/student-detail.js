@@ -360,7 +360,8 @@ window.MStudentDetail = (function () {
       });
     }
 
-    var obs = getStudentQuickObs(cid, sid).slice(-3).reverse();
+    // Newest first already; the three newest.
+    var obs = getStudentQuickObs(cid, sid).slice(0, 3);
     var obsCards = '<div class="m-list-inset-header">Recent observations</div>';
     if (!obs.length) {
       obsCards +=
