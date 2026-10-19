@@ -71,6 +71,7 @@ const PRECACHE_URLS = [
   '/teacher-mobile/student-detail.js',
   '/teacher-mobile/tab-students.js',
   '/teacher-mobile/tab-observe.js',
+  '/teacher-mobile/sweep.js',
   '/teacher-mobile/tab-grade.js',
   '/teacher-mobile/shell.js',
 ];

@@ -19,7 +19,12 @@
     var hasSession = false;
     try {
       var sb = typeof getSupabase === 'function' ? getSupabase() : null;
-      if (sb) {
+      // Demo Mode runs local-only, like the desktop app's requireAuth: with
+      // Supabase configured it used to land on the sign-in screen.
+      if (typeof isDemoMode === 'function' && isDemoMode()) {
+        hasSession = true;
+        _userName = 'Demo Teacher';
+      } else if (sb) {
         var result = await sb.auth.getSession();
         hasSession = !!(result && result.data && result.data.session);
         if (hasSession && result.data.session.user) {
@@ -65,6 +70,11 @@
     // Register mobile re-render callback for cross-device sync
     if (window.GB && window.GB.registerMobileRerender) {
       window.GB.registerMobileRerender(function () {
+        // A sweep in progress redraws in place instead of losing its place.
+        if (_activeTab === 'observe' && MSweep.isOpen()) {
+          MSweep.refresh();
+          return;
+        }
         _renderTab(_activeTab);
       });
     }
@@ -441,6 +451,7 @@
         top.remove();
         below.classList.remove('m-pop-enter-active');
         _navStacks[_activeTab].pop();
+        if (top.id === 'm-screen-obs-sweep') MSweep.close();
       }, 360);
     });
   }
@@ -623,6 +634,21 @@
       if (action === 'm-obs-new') {
         MObserve.resetSheetState();
         MObserve.presentNewObsSheet(_cid);
+        return;
+      }
+
+      if (action === 'm-sweep-start') {
+        _pushScreen(MSweep.render(_cid));
+        return;
+      }
+
+      if (action === 'm-sweep-done') {
+        _popScreen();
+        return;
+      }
+
+      if (action.indexOf('m-sweep-') === 0) {
+        MSweep.handleAction(action, target);
         return;
       }
 
