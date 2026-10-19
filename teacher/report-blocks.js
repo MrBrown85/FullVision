@@ -104,7 +104,9 @@ window.ReportBlocks = (function () {
    ══════════════════════════════════════════════════════════════ */
   function renderBlockHeader(cid, student) {
     const course = COURSES[cid];
-    const period = document.getElementById('report-period').value;
+    const sel = document.getElementById('report-period');
+    const opt = sel && sel.options[sel.selectedIndex];
+    const period = opt ? opt.text : '';
     return `<div class="report-header">
     <div class="report-course-title">${esc(course.name)} Student Learning Report</div>
     <div class="report-student-name">${esc(fullName(student))}${student.studentNumber ? ` <span style="font-size:0.7em;color:var(--text-3);font-weight:400">(${esc(student.studentNumber)})</span>` : ''}</div>
