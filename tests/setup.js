@@ -228,6 +228,7 @@ load('teacher/report-builder-ui.js');
 load('teacher/report-preview.js');
 load('teacher/dash-class-manager.js');
 load('teacher/dash-overview.js');
+load('teacher/dash-observations.js');
 load('teacher/dash-student-cards.js');
 load('teacher/assign-collab.js');
 load('teacher/assessment-copy.js');

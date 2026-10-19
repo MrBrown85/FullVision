@@ -40,15 +40,29 @@
 }
 
 /* ── Class Overview Panel ──────────────────────────────────── */
-.dash-overview {
+/* Row 1: Class Distribution (one third) and Observations (two thirds), the
+   same height. Row 2: Core Competencies with Next Steps, and Upcoming
+   Birthdays when there are any. Both rows stack below 1100 px. */
+.dash-overview-row {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
   gap: 12px;
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  overflow: visible;
-  box-shadow: none;
+  align-items: stretch;
+}
+.dash-overview-top {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+}
+.dash-overview-second {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  margin-top: 12px;
+}
+.dash-overview-second.is-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (max-width: 1100px) {
+  .dash-overview-top,
+  .dash-overview-second {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .dash-overview-section {
   padding: 16px 20px;
@@ -60,12 +74,6 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-}
-/* The Curricular Competencies card has a fixed height, and it sets the
-   row's height. The other two cards take that height instead of growing
-   with their content; Next Steps scrolls inside its card. */
-.dash-overview-section + .dash-overview-section {
-  contain: size;
 }
 .page-dashboard .dash-section-title {
   font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
@@ -142,11 +150,12 @@
   flex-shrink: 0;
 }
 
-/* Six competencies show; a longer list scrolls and a shorter one leaves the
-   space, so the card is one size for every class. Six rows = 6 × (18px row +
-   6px gap). */
+/* At least six competencies show (6 × (18px row + 6px gap)); the list
+   takes whatever height the row has beside the Observations card and
+   scrolls past that. */
 .dash-outcome-list {
-  height: 144px;
+  flex: 1 1 0;
+  min-height: 144px;
   overflow-y: auto;
   overscroll-behavior: contain;
   margin-right: -8px;
@@ -227,6 +236,7 @@
   gap: 8px;
   margin-top: 4px;
   min-height: 0;
+  max-height: 220px;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -303,167 +313,506 @@
   margin-top: 1px;
 }
 
-/* Observation coverage: who has gone 3+ weeks without an observation, and a
-   students-by-week grid. The grid scrolls inside the card both ways, so a
-   long term or a big class never widens the page or grows the card. */
-.dash-obs-headline {
+/* ── Observations card (dash-observations.js) ─────────────────
+   Two tabs on one card: By week (one mark per observation, coloured by
+   type) and By competency (level and evidence count per competency). The
+   grid scrolls inside the card; it never widens the page. */
+.dash-ob2 {
+  min-width: 0;
+}
+.dash-ob2-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-bottom: 10px;
+}
+.page-dashboard .dash-ob2-head .dash-section-title {
+  margin-bottom: 0;
+}
+.dash-ob2-window {
   font-family: var(--font-base);
   font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--text-3);
-  margin-bottom: 6px;
-}
-.dash-obs-headline.is-overdue {
-  color: var(--score-2);
-}
-.dash-obs-overdue {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  max-height: 76px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  flex-shrink: 0;
-}
-.dash-obs-chip {
-  font-family: var(--font-base);
-  font-size: var(--text-xs);
+  text-transform: none;
+  letter-spacing: 0;
   font-weight: 500;
-  color: var(--score-2);
-  background: var(--score-2-bg);
-  border-radius: 999px;
-  padding: 2px 8px;
+  color: var(--text-3);
+}
+.dash-ob2-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+.dash-ob2-tabs {
+  display: inline-flex;
+  border: 1px solid var(--divider-strong);
+  border-radius: 7px;
+  overflow: hidden;
+}
+.dash-ob2-tab,
+.dash-ob2-tool {
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  background: var(--surface);
+  cursor: pointer;
+  padding: 4px 10px;
+}
+.dash-ob2-tab {
+  border: 0;
+}
+.dash-ob2-tab + .dash-ob2-tab {
+  border-left: 1px solid var(--divider-strong);
+}
+.dash-ob2-tab[aria-selected='true'] {
+  background: var(--active-light);
+  color: var(--active);
+  font-weight: 600;
+}
+.dash-ob2-tool {
+  border: 1px solid var(--divider-strong);
+  border-radius: 7px;
+}
+.dash-ob2-tool[aria-pressed='true'] {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--surface);
+}
+.dash-ob2-record,
+.dash-ob2-clear a,
+.dash-ob2-linkbtn {
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--active);
   text-decoration: none;
   white-space: nowrap;
 }
-.dash-obs-chip:hover {
+.dash-ob2-linkbtn {
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+.dash-ob2-record:hover,
+.dash-ob2-clear a:hover,
+.dash-ob2-linkbtn:hover {
   text-decoration: underline;
 }
-.dash-overview-section.dash-obs-coverage {
-  grid-column: 1 / -1;
-  contain: none;
+.dash-ob2 :focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 1px;
 }
-.dash-obs-grid-wrap {
-  max-width: 100%;
-  max-height: 320px;
-  overflow: auto;
+.dash-ob2-tab:focus-visible {
+  outline-offset: -2px;
+}
+
+/* Flags: click to highlight; the other students dim in place. */
+.dash-ob2-flags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+.dash-ob2-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--divider-strong);
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 3px 11px;
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  cursor: pointer;
+}
+.dash-ob2-flag b {
+  color: var(--text);
+}
+.dash-ob2-flag[aria-pressed='true'] {
+  background: var(--active-light);
+  border-color: var(--active);
+  color: var(--active);
+}
+.dash-ob2-flag[aria-pressed='true'] b {
+  color: var(--active);
+}
+.dash-ob2-clear {
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.dash-ob2-gapicon {
+  width: 11px;
+  height: 11px;
+  border: 1.5px dashed var(--score-2);
+  border-radius: 3px;
+  box-sizing: border-box;
+}
+
+/* The key line under the flags. */
+.dash-ob2-key {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin-bottom: 10px;
+  font-family: var(--font-base);
+  font-size: var(--text-xs);
+  color: var(--text-2);
+  flex-shrink: 0;
+}
+.dash-ob2-key > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.dash-ob2-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  box-sizing: border-box;
+}
+
+/* Marks, by type: the same four everywhere on the page. */
+.dash-ob2-swatch[data-type='strength'],
+.dash-ob2-cell i[data-type='strength'] {
+  background: var(--score-3);
+}
+.dash-ob2-swatch[data-type='growth'],
+.dash-ob2-cell i[data-type='growth'] {
+  background: var(--active);
+}
+.dash-ob2-swatch[data-type='concern'],
+.dash-ob2-cell i[data-type='concern'] {
+  background: var(--score-2);
+}
+.dash-ob2-swatch[data-type='none'],
+.dash-ob2-cell i[data-type='none'] {
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1.5px var(--text-3);
+}
+.dash-ob2-swatch.is-gap {
+  background: var(--surface);
+  border: 1.5px dashed var(--score-2);
+}
+.dash-ob2-mark,
+.dash-ob2-markslot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-purple);
+}
+
+/* The grid pane: at most about 15 rows, then it scrolls inside the card. */
+.dash-ob2-pane {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
   overscroll-behavior: contain;
 }
-.dash-obs-grid-wrap:focus-visible {
-  outline: 2px solid var(--active);
-  outline-offset: 2px;
-  border-radius: 4px;
+.dash-ob2-pane.is-scroll-x {
+  overflow-x: auto;
 }
-.dash-obs-grid {
-  border-collapse: separate;
-  border-spacing: 2px;
-  font-family: var(--font-base);
+.dash-ob2-blocks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px 24px;
 }
-.dash-obs-grid thead th {
+.dash-ob2-block {
+  flex: 1 1 0;
+}
+.dash-ob2-pane.is-comp .dash-ob2-block {
+  padding-right: 48px;
+}
+.dash-ob2-row {
+  display: grid;
+  grid-template-columns: var(--ob2-cols);
+  column-gap: 3px;
+  align-items: center;
+  height: 22px;
+  border-radius: 5px;
+  transition: opacity 0.15s;
+}
+.dash-ob2-row:not(.is-head):not(.is-pad):hover {
+  background: var(--overlay-hover);
+}
+.dash-ob2-row.is-dim {
+  opacity: 0.28;
+}
+.dash-ob2-row.is-head {
   position: sticky;
   top: 0;
   z-index: 1;
+  height: 30px;
+  align-items: end;
+  padding-bottom: 3px;
   background: var(--surface);
-  font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
+}
+.dash-ob2-row.is-head.is-angled {
+  height: 100px;
+}
+.dash-ob2-wk {
+  font-family: var(--font-base);
   font-size: var(--text-2xs);
-  font-weight: 500;
   color: var(--text-3);
   text-align: center;
-  line-height: 1.2;
-  padding: 0 0 2px;
-  vertical-align: bottom;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
 }
-.dash-obs-grid-month {
+.dash-ob2-wk-m {
   display: block;
-  min-height: 1.2em;
+  min-height: 1.15em;
 }
-.dash-obs-grid th.dash-obs-grid-name {
-  position: sticky;
-  left: 0;
+.dash-ob2-add {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--active);
   background: var(--surface);
-  text-align: left;
+  color: var(--active);
+  font-size: 13px;
+  line-height: 15px;
+  text-align: center;
+  padding: 0;
+  cursor: pointer;
+  opacity: 0;
+}
+.dash-ob2-row:hover .dash-ob2-add,
+.dash-ob2-add:focus {
+  opacity: 1;
+}
+@media (hover: none) {
+  .dash-ob2-add {
+    opacity: 1;
+  }
+}
+.dash-ob2-name {
   font-family: var(--font-base);
-  font-size: var(--text-xs);
-  font-weight: 500;
-  max-width: 110px;
-  padding: 0 6px 0 0;
+  font-size: var(--text-sm);
+  color: var(--text);
+  text-decoration: none;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
 }
-.dash-obs-grid thead th.dash-obs-grid-name {
-  z-index: 2;
+.dash-ob2-name:hover {
+  color: var(--active);
+}
+.dash-ob2-name.is-overdue {
+  color: var(--score-2-text);
+  font-weight: 700;
+}
+.dash-ob2-total {
+  font-family: var(--font-base);
+  font-size: var(--text-xs);
   color: var(--text-3);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
-.dash-obs-grid-name a {
-  color: var(--text);
+.dash-ob2-days,
+.dash-ob2-gaps {
+  font-family: var(--font-base);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--score-2-text);
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* A week: white with a hairline when empty, otherwise one mark per note. */
+.dash-ob2-cell {
+  display: flex;
+  gap: 2px;
+  height: 16px;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--divider-strong);
+  border-radius: 4px;
+  background: var(--surface);
+  overflow: hidden;
   text-decoration: none;
 }
-.dash-obs-grid-name a:hover {
-  text-decoration: underline;
+.dash-ob2-cell.has {
+  border-color: transparent;
+  background: transparent;
+  cursor: pointer;
 }
-.dash-obs-grid-name.is-overdue a {
-  color: var(--score-2);
+.dash-ob2-cell i {
+  flex: 1;
+  min-width: 3px;
+  border-radius: 3px;
 }
-.dash-obs-grid td {
+.dash-ob2-more {
+  flex: 0 0 auto;
+  font-family: var(--font-base);
+  font-size: 9px;
+  line-height: 16px;
+  color: var(--text-2);
+  padding: 0 1px;
+}
+
+/* By competency: level and evidence count; dashed "none" with no evidence. */
+.dash-ob2-ch {
+  position: relative;
+  height: 100%;
+  min-width: 0;
+  border: 0;
   padding: 0;
+  background: none;
+  cursor: default;
+  font: inherit;
 }
-.dash-obs-cell {
+.dash-ob2-ch > span {
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  transform-origin: bottom left;
+  transform: rotate(-45deg);
+  white-space: nowrap;
+  font-family: var(--font-base);
+  font-size: var(--text-2xs);
+  color: var(--text-2);
+}
+.dash-ob2-ch.is-gaps > span {
+  left: 30%;
+}
+.dash-ob2-lv {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
+  gap: 3px;
   height: 18px;
+  min-width: 0;
   box-sizing: border-box;
   border-radius: 4px;
-  font-size: var(--text-2xs);
-  font-weight: 700;
-  text-decoration: none;
+  font-family: var(--font-base);
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
 }
-.dash-obs-cell:hover {
-  outline: 2px solid var(--active);
-  outline-offset: -1px;
+.dash-ob2-lv small {
+  font-size: 9.5px;
+  font-weight: 500;
+  opacity: 0.75;
 }
-.dash-obs-tint-strength {
-  background: var(--score-3-bg);
-  color: var(--score-3);
+.dash-ob2-lv.lv-1,
+.dash-ob2-swatch.lv-1 {
+  background: var(--score-1-bg);
+  color: var(--score-1-text);
 }
-.dash-obs-tint-growth {
-  background: var(--score-4-bg);
-  color: var(--score-4);
-}
-.dash-obs-tint-concern {
+.dash-ob2-lv.lv-2,
+.dash-ob2-swatch.lv-2 {
   background: var(--score-2-bg);
-  color: var(--score-2);
+  color: var(--score-2-text);
 }
-.dash-obs-tint-mixed,
-.dash-obs-tint-neutral {
-  background: var(--divider-medium);
+.dash-ob2-lv.lv-3,
+.dash-ob2-swatch.lv-3 {
+  background: var(--score-3-bg);
+  color: var(--score-3-text);
+}
+.dash-ob2-lv.lv-4,
+.dash-ob2-swatch.lv-4 {
+  background: var(--score-4-bg);
+  color: var(--score-4-text);
+}
+.dash-ob2-lv.is-neutral {
+  background: var(--overlay-hover);
   color: var(--text-2);
 }
-.dash-obs-tint-empty {
-  border: 1px dashed var(--border);
+.dash-ob2-lv.is-gap {
+  background: var(--surface);
+  border: 1.5px dashed var(--score-2);
+  color: var(--score-2-text);
 }
-.dash-obs-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 10px;
-  margin-top: 6px;
-  flex-shrink: 0;
+
+/* The week popover and the competency name tooltip. */
+.dash-ob2-pop {
+  position: fixed;
+  z-index: var(--z-fab);
+  width: 280px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--divider-strong);
+  border-radius: 10px;
+  box-shadow: var(--shadow-md);
   font-family: var(--font-base);
-  font-size: var(--text-2xs);
+  font-size: var(--text-sm);
+  color: var(--text);
+  pointer-events: none;
+}
+.dash-ob2-pop[hidden] {
+  display: none;
+}
+.dash-ob2-pop.is-tip {
+  width: auto;
+  max-width: 260px;
+  padding: 6px 10px;
+}
+.dash-ob2-pop-head {
+  margin-bottom: 4px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.dash-ob2-pop-note {
+  display: grid;
+  grid-template-columns: 58px 1fr;
+  gap: 6px;
+  padding: 4px 0;
+  border-top: 1px solid var(--divider-subtle);
+}
+.dash-ob2-pop-type {
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.dash-ob2-pop-type[data-type='strength'] {
+  color: var(--score-3-text);
+}
+.dash-ob2-pop-type[data-type='growth'] {
+  color: var(--active);
+}
+.dash-ob2-pop-type[data-type='concern'] {
+  color: var(--score-2-text);
+}
+.dash-ob2-pop-type[data-type='none'] {
   color: var(--text-3);
 }
-.dash-obs-legend span {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+.dash-ob2-pop-more {
+  padding-top: 4px;
+  color: var(--text-3);
 }
-.dash-obs-legend i {
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
-  box-sizing: border-box;
+.dash-ob2-pop-foot {
+  margin-top: 6px;
+  color: var(--active);
+}
+
+/* Hide names: every student name on the dashboard is blurred, for when the
+   screen is on the classroom TV. Grades stay visible. */
+body.fv-names-hidden .page-dashboard .dash-ob2-name,
+body.fv-names-hidden .page-dashboard .dash-card-name,
+body.fv-names-hidden .page-dashboard .dash-card-pronouns,
+body.fv-names-hidden .page-dashboard .dash-card-stunum,
+body.fv-names-hidden .page-dashboard .dash-desig-wrap,
+body.fv-names-hidden .page-dashboard .dist-seg .dist-tip-name,
+body.fv-names-hidden .page-dashboard .bday-avatar,
+body.fv-names-hidden .page-dashboard .dash-bday-name,
+body.fv-names-hidden .dash-search-input,
+body.fv-names-hidden .obsc-dialog .obsc-dialog-sub,
+body.fv-names-hidden .obsc-dialog .obsc-chip-student,
+body.fv-names-hidden .obsc-dialog .obsc-flag-btn {
+  filter: blur(0.4em);
+  user-select: none;
 }
 
 /* ── Birthday Widget ─────────────────────────────────────── */
@@ -895,6 +1244,11 @@
 }
 .dash-obs-dot[data-type='concern'] {
   background: var(--score-2);
+}
+/* An untyped note is an outline here too, as on the Observations card. */
+.dash-obs-dot[data-type='none'] {
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1.5px var(--text-3);
 }
 .dash-obs-when {
   overflow: hidden;
