@@ -391,8 +391,12 @@ window.PageAssignments = (function () {
       '<div class="settings-row"><label>Export Scores</label><button class="btn btn-primary" data-action="exportScoresCSV">Export Scores CSV</button></div>' +
       '<div class="settings-row"><label>Export Summary</label><button class="btn btn-primary" data-action="exportSummaryCSV">Export Summary CSV</button></div>' +
       '<div class="settings-row"><label>Delete class</label><button class="btn btn-danger" data-action="clearData">Delete</button></div>' +
-      '<div class="settings-title" style="margin-top:16px;padding-top:12px;border-top:0.5px solid var(--divider-subtle)">Demo</div>' +
-      '<div class="settings-row"><label>Reset to demo data</label><button class="btn btn-danger" data-action="resetDemoData">Reset Demo</button></div>' +
+      // Reset Demo deletes every class before reseeding, so it exists only in
+      // Demo Mode, never for a signed-in teacher.
+      (_isDemo()
+        ? '<div class="settings-title" style="margin-top:16px;padding-top:12px;border-top:0.5px solid var(--divider-subtle)">Demo</div>' +
+          '<div class="settings-row"><label>Reset to demo data</label><button class="btn btn-danger" data-action="resetDemoData">Reset Demo</button></div>'
+        : '') +
       '<div class="settings-title" style="margin-top:16px;padding-top:12px;border-top:0.5px solid var(--divider-subtle)">Account</div>' +
       '<div class="settings-row"><label>Delete your account</label><button class="btn btn-danger" data-action="deleteAccount">Delete Account</button></div>';
 
@@ -4208,7 +4212,12 @@ window.PageAssignments = (function () {
       },
     );
   }
+  function _isDemo() {
+    return typeof isDemoMode === 'function' && isDemoMode();
+  }
+
   function resetDemoData() {
+    if (!_isDemo()) return;
     showConfirm(
       'Reset Demo Data',
       'Reset ALL data to demo defaults? This cannot be undone.',
