@@ -1356,10 +1356,10 @@ window.ReportQuestionnaire = (function () {
     // Quick Profile
     const RATE_LABELS = { 1: 'Rarely', 2: 'Sometimes', 3: 'Usually', 4: 'Consistently' };
     html += `<div class="tq-panel" data-panel-id="quick-profile">
-    <div class="tq-panel-title">Quick Profile</div>`;
+    <div class="tq-panel-title">Quick profile</div>`;
     ['workHabits', 'participation'].forEach(field => {
       const val = rating[field] || 0;
-      const label = field === 'workHabits' ? 'Work Habits' : 'Participation';
+      const label = field === 'workHabits' ? 'Work habits' : 'Participation';
       html += `<div class="tq-rate-row">
       <span class="tq-rate-label">${label}</span>
       <div class="tq-rate-pills">`;
@@ -1499,7 +1499,7 @@ window.ReportQuestionnaire = (function () {
     if (letterGrade) overallParts.push(letterGrade.text);
     const overallLevel = studentGradeSummary(cid, sid).level;
     html += `<div class="tq-panel" data-panel-id="academic-snapshot">
-    <div class="tq-panel-title">Academic Snapshot <span class="tq-panel-badge">${assignmentPerf.length} assessed</span></div>
+    <div class="tq-panel-title">Academic snapshot <span class="tq-panel-badge">${assignmentPerf.length} assessed</span></div>
     <div class="tq-snapshot-grid">
       <div class="tq-snapshot-item overall">
         <div class="tq-snapshot-item-label">Overall</div>
@@ -1554,7 +1554,7 @@ window.ReportQuestionnaire = (function () {
     html += `</div>`; // close academic-snapshot panel
 
     html += `<div class="tq-panel" data-panel-id="narrative-comment">
-    <div class="tq-panel-title">Narrative Comment</div>
+    <div class="tq-panel-title">Narrative comment</div>
     <div class="tq-editor-wrap">
       <div class="tq-toolbar">
         <div class="tq-toolbar-group">

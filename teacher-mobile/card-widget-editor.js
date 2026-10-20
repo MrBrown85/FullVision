@@ -1,24 +1,27 @@
 /* card-widget-editor.js — Long-press edit mode for student card widgets */
 
-window.MCardWidgetEditor = (function() {
+window.MCardWidgetEditor = (function () {
   'use strict';
 
   var MC = window.MComponents;
   var _registryMap = {};
-  WIDGET_REGISTRY.forEach(function(w) { _registryMap[w.key] = w; });
+  WIDGET_REGISTRY.forEach(function (w) {
+    _registryMap[w.key] = w;
+  });
 
   function buildEditorHTML() {
     var config = getCardWidgetConfig();
-    var html = '<div class="m-wdg-editor">' +
+    var html =
+      '<div class="m-wdg-editor">' +
       '<div class="m-wdg-editor-header">' +
-        '<div class="m-wdg-editor-title">Customize Card</div>' +
-        '<button class="m-wdg-editor-done" data-action="m-dismiss-sheet">Done</button>' +
+      '<div class="m-wdg-editor-title">Customize Card</div>' +
+      '<button class="m-wdg-editor-done" data-action="m-dismiss-sheet">Done</button>' +
       '</div>';
 
     // Enabled widgets
     html += '<div class="m-wdg-editor-section-label">Visible</div>';
     html += '<div class="m-wdg-editor-list" id="m-wdg-enabled-list">';
-    config.order.forEach(function(key) {
+    config.order.forEach(function (key) {
       var w = _registryMap[key];
       if (!w) return;
       var noDrag = key === 'flagStatus';
@@ -27,9 +30,9 @@ window.MCardWidgetEditor = (function() {
     html += '</div>';
 
     // Disabled widgets
-    html += '<div class="m-wdg-editor-section-label">More Widgets</div>';
+    html += '<div class="m-wdg-editor-section-label">More widgets</div>';
     html += '<div class="m-wdg-editor-list" id="m-wdg-disabled-list">';
-    config.disabled.forEach(function(key) {
+    config.disabled.forEach(function (key) {
       var w = _registryMap[key];
       if (!w) return;
       html += _editorRow(w, false, false);
@@ -42,13 +45,27 @@ window.MCardWidgetEditor = (function() {
   }
 
   function _editorRow(widget, enabled, noDrag) {
-    return '<div class="m-wdg-editor-row" data-widget="' + widget.key + '" data-enabled="' + enabled + '">' +
-      (noDrag ? '<div class="m-wdg-editor-drag-spacer"></div>' : '<div class="m-wdg-editor-drag" data-action="m-wdg-drag">\u2630</div>') +
-      '<div class="m-wdg-editor-label">' + widget.label + '</div>' +
-      '<button class="m-wdg-editor-toggle' + (enabled ? ' m-wdg-toggle-on' : '') + '" data-action="m-wdg-toggle" data-widget="' + widget.key + '">' +
-        '<div class="m-wdg-toggle-knob"></div>' +
+    return (
+      '<div class="m-wdg-editor-row" data-widget="' +
+      widget.key +
+      '" data-enabled="' +
+      enabled +
+      '">' +
+      (noDrag
+        ? '<div class="m-wdg-editor-drag-spacer"></div>'
+        : '<div class="m-wdg-editor-drag" data-action="m-wdg-drag">\u2630</div>') +
+      '<div class="m-wdg-editor-label">' +
+      widget.label +
+      '</div>' +
+      '<button class="m-wdg-editor-toggle' +
+      (enabled ? ' m-wdg-toggle-on' : '') +
+      '" data-action="m-wdg-toggle" data-widget="' +
+      widget.key +
+      '">' +
+      '<div class="m-wdg-toggle-knob"></div>' +
       '</button>' +
-    '</div>';
+      '</div>'
+    );
   }
 
   function toggleWidget(key) {
@@ -103,7 +120,7 @@ window.MCardWidgetEditor = (function() {
         el.textContent = 'Reset card layout?';
         el.dataset.confirm = 'yes';
         el.classList.add('m-wdg-editor-reset-confirm');
-        setTimeout(function() {
+        setTimeout(function () {
           el.textContent = 'Reset to Defaults';
           delete el.dataset.confirm;
           el.classList.remove('m-wdg-editor-reset-confirm');
@@ -127,34 +144,42 @@ window.MCardWidgetEditor = (function() {
 
     var _dragState = null;
 
-    container.addEventListener('touchstart', function(e) {
-      var drag = e.target.closest('[data-action="m-wdg-drag"]');
-      if (!drag) return;
-      var row = drag.closest('.m-wdg-editor-row');
-      if (!row) return;
-      e.preventDefault();
-      var touch = e.touches[0];
-      var rect = row.getBoundingClientRect();
-      _dragState = {
-        key: row.dataset.widget,
-        el: row,
-        startY: touch.clientY,
-        offsetY: touch.clientY - rect.top,
-        rowHeight: rect.height
-      };
-      row.classList.add('m-wdg-row-dragging');
-      MC.haptic();
-    }, { passive: false });
+    container.addEventListener(
+      'touchstart',
+      function (e) {
+        var drag = e.target.closest('[data-action="m-wdg-drag"]');
+        if (!drag) return;
+        var row = drag.closest('.m-wdg-editor-row');
+        if (!row) return;
+        e.preventDefault();
+        var touch = e.touches[0];
+        var rect = row.getBoundingClientRect();
+        _dragState = {
+          key: row.dataset.widget,
+          el: row,
+          startY: touch.clientY,
+          offsetY: touch.clientY - rect.top,
+          rowHeight: rect.height,
+        };
+        row.classList.add('m-wdg-row-dragging');
+        MC.haptic();
+      },
+      { passive: false },
+    );
 
-    container.addEventListener('touchmove', function(e) {
-      if (!_dragState) return;
-      e.preventDefault();
-      var touch = e.touches[0];
-      var dy = touch.clientY - _dragState.startY;
-      _dragState.el.style.transform = 'translateY(' + dy + 'px)';
-    }, { passive: false });
+    container.addEventListener(
+      'touchmove',
+      function (e) {
+        if (!_dragState) return;
+        e.preventDefault();
+        var touch = e.touches[0];
+        var dy = touch.clientY - _dragState.startY;
+        _dragState.el.style.transform = 'translateY(' + dy + 'px)';
+      },
+      { passive: false },
+    );
 
-    container.addEventListener('touchend', function() {
+    container.addEventListener('touchend', function () {
       if (!_dragState) return;
       var el = _dragState.el;
       var dy = parseFloat(el.style.transform.replace('translateY(', '').replace('px)', '')) || 0;
@@ -181,6 +206,6 @@ window.MCardWidgetEditor = (function() {
     moveWidget: moveWidget,
     resetToDefaults: resetToDefaults,
     show: show,
-    handleAction: handleAction
+    handleAction: handleAction,
   };
 })();

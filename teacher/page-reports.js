@@ -67,8 +67,8 @@ window.PageReports = (function () {
     </div>`;
     });
     html += `<div class="student-picker-actions">
-    <button class="student-picker-action" data-action="selectAllStudents">Select All</button>
-    <button class="student-picker-action" data-action="selectNoneStudents">Deselect All</button>
+    <button class="student-picker-action" data-action="selectAllStudents">Select all</button>
+    <button class="student-picker-action" data-action="selectNoneStudents">Deselect all</button>
   </div>`;
     dd.innerHTML = html;
     updatePickerLabel();

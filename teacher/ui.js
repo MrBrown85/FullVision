@@ -669,7 +669,7 @@ function renderStudentHeader(cid, sid, opts) {
   if (nsAssignments.length > 0) {
     html += `<div class="sh-stat" title="${nsAssignments.map(t => esc(t)).join('\n')}">
       <div class="sh-stat-val" style="color:var(--score-1)">${nsAssignments.length}</div>
-      <div class="sh-stat-label">Not Submitted</div>
+      <div class="sh-stat-label">Not submitted</div>
     </div>`;
   }
   if (excAssignments.length > 0) {

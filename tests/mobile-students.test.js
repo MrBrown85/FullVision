@@ -306,7 +306,7 @@ describe('Focus areas card', () => {
       ],
     });
     const html = MStudents.renderDetail(CID, 'stu1');
-    expect(html).toContain('Focus Areas');
+    expect(html).toContain('Focus areas');
     expect(html).toContain('Questioning');
     expect(html).toContain('1.5');
     expect(html).toContain('No evidence');

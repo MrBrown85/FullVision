@@ -67,7 +67,7 @@ window.PageStudent = (function () {
     var arrow = document.getElementById('grades-toggle-arrow');
     if (!wrap) return;
     var isCollapsed = wrap.classList.toggle('collapsed');
-    if (text) text.textContent = isCollapsed ? 'Show All Assignments' : 'Show Less';
+    if (text) text.textContent = isCollapsed ? 'Show all assignments' : 'Show less';
     if (arrow) arrow.textContent = isCollapsed ? '▼' : '▲';
   }
 
@@ -209,27 +209,27 @@ window.PageStudent = (function () {
       '<div class="edit-modal">' +
       '<h2 class="edit-modal-title" id="edit-modal-heading">Edit Student</h2>' +
       '<div class="edit-modal-form">' +
-      '<div class="cm-field"><label class="cm-label" for="edit-first">First Name *</label><input class="cm-input" id="edit-first" value="' +
+      '<div class="cm-field"><label class="cm-label" for="edit-first">First name *</label><input class="cm-input" id="edit-first" value="' +
       esc(st.firstName || '') +
-      '" aria-required="true" style="font-size:0.82rem;padding:6px 10px"></div>' +
-      '<div class="cm-field"><label class="cm-label" for="edit-last">Last Name</label><input class="cm-input" id="edit-last" value="' +
+      '" aria-required="true" style="font-size:0.875rem;padding:6px 10px"></div>' +
+      '<div class="cm-field"><label class="cm-label" for="edit-last">Last name</label><input class="cm-input" id="edit-last" value="' +
       esc(st.lastName || '') +
-      '" style="font-size:0.82rem;padding:6px 10px"></div>' +
-      '<div class="cm-field"><label class="cm-label" for="edit-pref">Preferred Name</label><input class="cm-input" id="edit-pref" value="' +
+      '" style="font-size:0.875rem;padding:6px 10px"></div>' +
+      '<div class="cm-field"><label class="cm-label" for="edit-pref">Preferred name</label><input class="cm-input" id="edit-pref" value="' +
       esc(st.preferred || '') +
-      '" style="font-size:0.82rem;padding:6px 10px"></div>' +
+      '" style="font-size:0.875rem;padding:6px 10px"></div>' +
       '<div class="cm-field"><label class="cm-label" for="edit-pro">Pronouns</label>' +
       pronounsSelect('edit-pro', st.pronouns || '') +
       '</div>' +
-      '<div class="cm-field"><label class="cm-label" for="edit-num">Student Number</label><input class="cm-input" id="edit-num" value="' +
+      '<div class="cm-field"><label class="cm-label" for="edit-num">Student number</label><input class="cm-input" id="edit-num" value="' +
       esc(st.studentNumber || '') +
-      '" placeholder="e.g. STU-101" style="font-size:0.82rem;padding:6px 10px"></div>' +
+      '" placeholder="e.g. STU-101" style="font-size:0.875rem;padding:6px 10px"></div>' +
       '<div class="cm-field"><label class="cm-label" for="edit-email">Email</label><input class="cm-input" id="edit-email" type="email" value="' +
       esc(st.email || '') +
-      '" placeholder="student@school.edu" style="font-size:0.82rem;padding:6px 10px"></div>' +
-      '<div class="cm-field"><label class="cm-label" for="edit-dob">Date of Birth</label><input class="cm-input" id="edit-dob" type="date" value="' +
+      '" placeholder="student@school.edu" style="font-size:0.875rem;padding:6px 10px"></div>' +
+      '<div class="cm-field"><label class="cm-label" for="edit-dob">Date of birth</label><input class="cm-input" id="edit-dob" type="date" value="' +
       (st.dateOfBirth || '') +
-      '" style="font-size:0.82rem;padding:6px 10px"></div>' +
+      '" style="font-size:0.875rem;padding:6px 10px"></div>' +
       '<div class="cm-field" style="grid-column:1/-1"><label class="cm-label">Designations</label><div class="desig-check-grid">' +
       Object.entries(BC_DESIGNATIONS)
         .map(function (e) {
@@ -250,7 +250,7 @@ window.PageStudent = (function () {
         })
         .join('') +
       '</div></div>' +
-      '<div class="cm-field" style="grid-column:1/-1"><label class="cm-label">Language Support</label><div class="desig-check-grid">' +
+      '<div class="cm-field" style="grid-column:1/-1"><label class="cm-label">Language support</label><div class="desig-check-grid">' +
       Object.entries(SUPPORT_FLAGS)
         .map(function (e) {
           var checked = (st.designations || []).indexOf(e[0]) >= 0 ? ' checked' : '';
@@ -349,7 +349,7 @@ window.PageStudent = (function () {
     if (!tree) return '';
     var subjects = tree.subjects || [];
     if (subjects.length === 0) return '';
-    var out = '<div class="ct-wrap"><div class="ct-title">Competency Profile</div>';
+    var out = '<div class="ct-wrap"><div class="ct-title">Competency profile</div>';
     subjects.forEach(function (subj) {
       var sections = subj.sections || [];
       if (sections.length === 0) return;
@@ -598,9 +598,9 @@ window.PageStudent = (function () {
     html +=
       '<div class="grades-section">' +
       '<div class="grades-header">' +
-      '<div class="insight-title" style="margin-bottom:0">Assessment Grades' +
+      '<div class="insight-title" style="margin-bottom:0">Assessment grades' +
       (activeSectionFilters.size > 0
-        ? ' <span style="font-family:var(--font-base);font-size:0.72rem;font-weight:500;color:var(--text-3);text-transform:none;letter-spacing:0">(filtered — <a href="#" data-action="clearSectionFilters" style="color:var(--link);text-decoration:none">show all</a>)</span>'
+        ? ' <span style="font-family:var(--font-base);font-size:0.75rem;font-weight:500;color:var(--text-3);text-transform:none;letter-spacing:0">(filtered — <a href="#" data-action="clearSectionFilters" style="color:var(--link);text-decoration:none">show all</a>)</span>'
         : '') +
       '</div>' +
       '<div class="grades-legend">' +
@@ -780,9 +780,9 @@ window.PageStudent = (function () {
     if (sortedAssessments.length > 8) {
       html +=
         '<div style="text-align:center"><button class="grades-toggle-btn" data-action="toggleGradesView">' +
-        '<span id="grades-toggle-text">Show All ' +
+        '<span id="grades-toggle-text">Show all ' +
         sortedAssessments.length +
-        ' Assignments</span>' +
+        ' assignments</span>' +
         '<span id="grades-toggle-arrow">▼</span>' +
         '</button></div>';
     }
@@ -842,7 +842,7 @@ window.PageStudent = (function () {
       if (growthData.length > 0) {
         html +=
           '<div style="margin-bottom:8px;">' +
-          "<span style=\"font-family:'SF Mono', ui-monospace, 'Menlo', monospace;font-size:0.5rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-3);margin-right:6px;\">Growth</span>" +
+          '<span style="font-size:0.75rem;color:var(--text-3);margin-right:6px;">Growth</span>' +
           renderGrowthSparkline(growthData) +
           '</div>';
       }
@@ -932,9 +932,7 @@ window.PageStudent = (function () {
         (refl.text ? esc(refl.text) : '') +
         '</div>' +
         (refl.date
-          ? "<div style=\"font-family:'SF Mono', ui-monospace, 'Menlo', monospace;font-size:0.5rem;color:var(--text-3);margin-top:2px;\">" +
-            formatDate(refl.date) +
-            '</div>'
+          ? '<div style="font-size:0.75rem;color:var(--text-3);margin-top:2px;">' + formatDate(refl.date) + '</div>'
           : '') +
         '<div class="inline-edit-area" id="refl-edit-' +
         sec.id +
@@ -982,7 +980,7 @@ window.PageStudent = (function () {
     html += '<div class="insights-grid">';
 
     // 1. Growth Profile
-    html += '<div class="insight-card"><div class="insight-title">Growth Profile</div>';
+    html += '<div class="insight-card"><div class="insight-title">Growth profile</div>';
     var gpSections = getSections(cid);
     gpSections.forEach(function (sec) {
       var prof = getSectionProficiency(cid, studentId, sec.id);
@@ -1087,7 +1085,7 @@ window.PageStudent = (function () {
     html += '</div>';
 
     // 2. Needs Attention
-    html += '<div class="insight-card"><div class="insight-title">Needs Attention</div>';
+    html += '<div class="insight-card"><div class="insight-title">Needs attention</div>';
     var attentionItems = [];
     sortedAssessments.forEach(function (assess) {
       var aScores = allScores.filter(function (s) {
@@ -1182,7 +1180,7 @@ window.PageStudent = (function () {
 
     if (anyCC) {
       html +=
-        '<div class="cc-profile"><div class="cc-profile-title">Core Competencies</div><div class="cc-profile-grid">';
+        '<div class="cc-profile"><div class="cc-profile-title">Core competencies</div><div class="cc-profile-grid">';
       var groups = {};
       CORE_COMPETENCIES.forEach(function (cc) {
         if (!groups[cc.group]) groups[cc.group] = [];

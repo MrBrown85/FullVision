@@ -338,7 +338,7 @@ window.PageAssignments = (function () {
     var rubrics = getRubrics(cid);
     var rubHtml = '<div class="settings-title">Rubrics</div><ul class="rubric-list">';
     if (rubrics.length === 0) {
-      rubHtml += '<li style="font-size:0.82rem;color:var(--text-3);padding:8px 10px">No rubrics yet.</li>';
+      rubHtml += '<li style="font-size:0.875rem;color:var(--text-3);padding:8px 10px">No rubrics yet.</li>';
     }
     rubrics.forEach(function (r) {
       rubHtml +=
@@ -362,7 +362,7 @@ window.PageAssignments = (function () {
         '</li>';
     });
     rubHtml +=
-      '</ul><button class="lo-add-btn" data-action="newRubricUI" style="display:block;width:100%">+ New Rubric</button>';
+      '</ul><button class="lo-add-btn" data-action="newRubricUI" style="display:block;width:100%">+ New rubric</button>';
 
     // Advanced dropdown content
     var advHtml =
@@ -523,7 +523,7 @@ window.PageAssignments = (function () {
               }).length;
               if (unscoredCount > 0)
                 return (
-                  "<span style=\"font-family:'SF Mono', ui-monospace, 'Menlo', monospace;font-size:0.6rem;color:var(--priority);margin-left:6px\" title=\"" +
+                  '<span style="font-size:0.75rem;color:var(--priority);margin-left:6px" title="' +
                   unscoredCount +
                   ' students unscored past due date">\u26A0\uFE0E ' +
                   unscoredCount +
@@ -580,7 +580,7 @@ window.PageAssignments = (function () {
         '</div>' +
         '<div class="assess-body">' +
         (a.description
-          ? '<div style="font-size:0.88rem;color:var(--text-2);margin:8px 0 12px;line-height:1.5;padding:10px 14px;background:var(--bg);border-radius:var(--radius-sm)">' +
+          ? '<div style="font-size:0.9375rem;color:var(--text-2);margin:8px 0 12px;line-height:1.5;padding:10px 14px;background:var(--bg);border-radius:var(--radius-sm)">' +
             esc(a.description) +
             '</div>'
           : '') +
@@ -738,8 +738,8 @@ window.PageAssignments = (function () {
     if (assessments.length === 0 && allAssessments.length > 0) {
       html +=
         '<div style="text-align:center;color:var(--text-3);padding:40px 0">' +
-        '<div style="font-size:0.88rem;margin-bottom:4px">No matching assignments.</div>' +
-        '<div style="font-size:0.78rem">Try adjusting your filters or <a href="#" data-action="clearAssessFilters" style="color:var(--link)">clear all filters</a>.</div>' +
+        '<div style="font-size:0.9375rem;margin-bottom:4px">No matching assignments.</div>' +
+        '<div style="font-size:0.8125rem">Try adjusting your filters or <a href="#" data-action="clearAssessFilters" style="color:var(--link)">clear all filters</a>.</div>' +
         '</div>';
     } else if (assessments.length === 0 && allAssessments.length === 0) {
       html +=
@@ -881,7 +881,7 @@ window.PageAssignments = (function () {
     // Title
     html +=
       '<div class="af-field">' +
-      '<label class="af-label">Assignment Title</label>' +
+      '<label class="af-label">Assignment title</label>' +
       '<input class="af-input" id="af-title" type="text" value="' +
       esc(title) +
       '" placeholder="e.g. Persuasive Essay \u2014 Rights & Freedoms">' +
@@ -925,8 +925,8 @@ window.PageAssignments = (function () {
         })
         .join('') +
       '</select>' +
-      '<button type="button" class="btn btn-ghost" data-action="newRubricFromForm" style="white-space:nowrap;font-size:0.78rem;padding:7px 12px">+ New Rubric</button>' +
-      '<button type="button" class="btn btn-ghost" data-action="rubricFromClass" style="white-space:nowrap;font-size:0.78rem;padding:7px 12px">From another class</button>' +
+      '<button type="button" class="btn btn-ghost" data-action="newRubricFromForm" style="white-space:nowrap;font-size:0.8125rem;padding:7px 12px">+ New Rubric</button>' +
+      '<button type="button" class="btn btn-ghost" data-action="rubricFromClass" style="white-space:nowrap;font-size:0.8125rem;padding:7px 12px">From another class</button>' +
       '</div>' +
       (selRubricId
         ? '<div class="af-rubric-info">Rubric tags are auto-selected below. You can add additional tags.</div>'
@@ -951,19 +951,19 @@ window.PageAssignments = (function () {
     html +=
       '<div class="af-row" style="align-items:end">' +
       '<div class="af-field" style="flex:0 0 auto">' +
-      '<label class="af-label">Today\'s Date</label>' +
-      '<div style="font-family:var(--font-base);font-size:0.88rem;font-weight:500;color:var(--text);padding:8px 0;white-space:nowrap">' +
+      '<label class="af-label">Today\'s date</label>' +
+      '<div style="font-family:var(--font-base);font-size:0.9375rem;font-weight:500;color:var(--text);padding:8px 0;white-space:nowrap">' +
       todayFormatted +
       '</div>' +
       '</div>' +
       '<div class="af-field" style="flex:1;max-width:200px">' +
-      '<label class="af-label">Date Assigned</label>' +
+      '<label class="af-label">Date assigned</label>' +
       '<input class="af-input" id="af-date-assigned" type="date" value="' +
       dateAssigned +
       '" data-action-change="autoSetDueDate">' +
       '</div>' +
       '<div class="af-field" style="flex:1;max-width:200px">' +
-      '<label class="af-label">Due Date (optional)</label>' +
+      '<label class="af-label">Due date (optional)</label>' +
       '<input class="af-input" id="af-due" type="date" value="' +
       defaultDue +
       '">' +
@@ -998,7 +998,7 @@ window.PageAssignments = (function () {
         : '') +
       '</div>' +
       '<div class="af-field" style="flex:1">' +
-      '<label class="af-label">Evidence Type</label>' +
+      '<label class="af-label">Evidence type</label>' +
       '<select class="af-input" id="af-evidence">' +
       ['written', 'observation', 'audio', 'video', 'photo', 'conversation']
         .map(function (t) {
@@ -1056,7 +1056,7 @@ window.PageAssignments = (function () {
     html +=
       '<div class="af-row" style="align-items:end">' +
       '<div class="af-field" style="flex:0 0 auto">' +
-      '<label class="af-label">Scoring Mode</label>' +
+      '<label class="af-label">Scoring mode</label>' +
       '<input type="hidden" id="af-scoremode" value="' +
       scoreMode +
       '">' +
@@ -1081,7 +1081,7 @@ window.PageAssignments = (function () {
       '<div class="af-field" id="af-maxpoints-wrap" style="flex:0 0 auto;' +
       (scoreMode === 'points' ? '' : 'display:none') +
       '">' +
-      '<label class="af-label">Max Points</label>' +
+      '<label class="af-label">Max points</label>' +
       '<div style="display:flex;gap:6px;align-items:center">' +
       '<input class="af-input" id="af-maxpoints" type="number" min="1" max="9999" value="' +
       maxPoints +
@@ -1094,7 +1094,7 @@ window.PageAssignments = (function () {
             (maxPoints === v ? ' active' : '') +
             '" data-action="setMaxPoints" data-value="' +
             v +
-            '" style="padding:4px 8px;font-size:0.72rem;border-radius:6px;border:1px solid var(--border);background:' +
+            '" style="padding:4px 8px;font-size:0.75rem;border-radius:6px;border:1px solid var(--border);background:' +
             (maxPoints === v ? 'var(--primary)' : 'var(--bg-2)') +
             ';color:' +
             (maxPoints === v ? '#fff' : 'var(--text-2)') +
@@ -1124,7 +1124,7 @@ window.PageAssignments = (function () {
     // Tags — grouped by competency group
     html +=
       '<div class="af-field">' +
-      '<label class="af-label">Curricular Competencies</label>' +
+      '<label class="af-label">Curricular competencies</label>' +
       '<div class="af-tags-container">';
     var lm = getLearningMap(cid);
     var compGroups = (lm && lm.competencyGroups) || [];
@@ -1147,7 +1147,7 @@ window.PageAssignments = (function () {
           '<span style="width:8px;height:8px;border-radius:50%;background:' +
           g.color +
           ';flex-shrink:0"></span>' +
-          '<span style="font-size:var(--text-xs);font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:var(--tracking-wide)">' +
+          '<span style="font-size:var(--text-xs);font-weight:600;color:var(--text-2);">' +
           esc(g.name) +
           '</span></div>';
         gi.secs.forEach(function (sec) {
@@ -1247,7 +1247,7 @@ window.PageAssignments = (function () {
     // Core Competencies
     var selCC = assess ? assess.coreCompetencyIds || [] : [];
     html +=
-      '<div class="af-field">' + '<label class="af-label">Core Competencies</label>' + '<div class="af-cc-chips">';
+      '<div class="af-field">' + '<label class="af-label">Core competencies</label>' + '<div class="af-cc-chips">';
     CORE_COMPETENCIES.forEach(function (cc) {
       var sel = selCC.includes(cc.id);
       html +=
@@ -2614,7 +2614,7 @@ window.PageAssignments = (function () {
     if (extraTagObjs.length > 0) {
       html +=
         '<div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">' +
-        "<div style=\"font-family:'SF Mono', ui-monospace, 'Menlo', monospace;font-size:0.6rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-3);font-weight:600;margin-bottom:6px\">Additional Tags (not in rubric)</div>";
+        '<div style="font-size:0.75rem;color:var(--text-3);font-weight:600;margin-bottom:6px">Additional Tags (not in rubric)</div>';
       html += renderTagGrid(cid, a, extraTagObjs, students, scores);
       html += '</div>';
     }
@@ -3793,7 +3793,7 @@ window.PageAssignments = (function () {
     var labels = scale.labels || [null, null, null, null];
     var defaultLabels = ['Emerging', 'Developing', 'Proficient', 'Extending'];
     var html =
-      '<div class="settings-title" style="margin-top:16px;padding-top:12px;border-top:0.5px solid var(--divider-subtle)">Grading Scale</div><div style="font-size:0.72rem;color:var(--text-3);margin-bottom:8px">Set % boundaries for points \u2192 proficiency conversion</div><table style="width:100%;border-collapse:collapse;font-size:0.8rem"><thead><tr style="text-align:left;color:var(--text-3);font-size:0.68rem;text-transform:uppercase;letter-spacing:0.04em"><th style="padding:4px 8px;width:40px">Level</th><th style="padding:4px 8px">Label</th><th style="padding:4px 8px;width:70px">Min %</th></tr></thead><tbody>';
+      '<div class="settings-title" style="margin-top:16px;padding-top:12px;border-top:0.5px solid var(--divider-subtle)">Grading scale</div><div style="font-size:0.75rem;color:var(--text-3);margin-bottom:8px">Set % boundaries for points \u2192 proficiency conversion</div><table style="width:100%;border-collapse:collapse;font-size:0.875rem"><thead><tr style="text-align:left;color:var(--text-3);font-size:0.75rem;"><th style="padding:4px 8px;width:40px">Level</th><th style="padding:4px 8px">Label</th><th style="padding:4px 8px;width:70px">Min %</th></tr></thead><tbody>';
     for (var i = 0; i < b.length; i++) {
       var prof = b[i].proficiency;
       var label = (labels && labels[prof - 1]) || defaultLabels[prof - 1];
@@ -3805,18 +3805,18 @@ window.PageAssignments = (function () {
         prof +
         '" value="' +
         esc(label) +
-        '" data-action-change="saveGradingScale" style="font-size:0.8rem;padding:4px 8px"></td><td style="padding:6px 8px">' +
+        '" data-action-change="saveGradingScale" style="font-size:0.875rem;padding:4px 8px"></td><td style="padding:6px 8px">' +
         (isBottom
           ? '<span style="color:var(--text-3)">0</span>'
           : '<input class="af-input gs-min" data-idx="' +
             i +
             '" type="number" min="1" max="99" value="' +
             b[i].min +
-            '" data-action-change="saveGradingScale" style="font-size:0.8rem;padding:4px 8px;width:60px;text-align:center">') +
+            '" data-action-change="saveGradingScale" style="font-size:0.875rem;padding:4px 8px;width:60px;text-align:center">') +
         '</td></tr>';
     }
     html +=
-      '</tbody></table><button class="btn btn-ghost" data-action="resetGradingScale" style="font-size:0.72rem;margin-top:6px;padding:4px 10px">Reset to Defaults</button>';
+      '</tbody></table><button class="btn btn-ghost" data-action="resetGradingScale" style="font-size:0.75rem;margin-top:6px;padding:4px 10px">Reset to Defaults</button>';
     return html;
   }
   function saveGradingScale() {
@@ -3850,13 +3850,13 @@ window.PageAssignments = (function () {
     var summPct = Math.round((cw.summative || 1) * 100);
     var formPct = Math.round((cw.formative || 0) * 100);
     return (
-      '<div class="settings-title" style="margin-top:16px;padding-top:12px;border-top:0.5px solid var(--divider-subtle)">Category Weights</div>' +
-      '<div class="settings-row" style="align-items:center;gap:8px"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.82rem"><input type="checkbox" id="cw-enabled" ' +
+      '<div class="settings-title" style="margin-top:16px;padding-top:12px;border-top:0.5px solid var(--divider-subtle)">Category weights</div>' +
+      '<div class="settings-row" style="align-items:center;gap:8px"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.875rem"><input type="checkbox" id="cw-enabled" ' +
       (enabled ? 'checked' : '') +
       ' data-action-change="toggleCategoryWeights" style="width:16px;height:16px"> Weight formative assessments</label></div>' +
       '<div id="cw-sliders" style="display:' +
       (enabled ? '' : 'none') +
-      ';margin-top:8px"><div style="display:flex;gap:16px;align-items:center;font-size:0.82rem"><div style="flex:1"><label style="color:var(--text-2)">Summative</label><div style="display:flex;align-items:center;gap:6px"><input type="range" id="cw-range" min="0" max="100" value="' +
+      ';margin-top:8px"><div style="display:flex;gap:16px;align-items:center;font-size:0.875rem"><div style="flex:1"><label style="color:var(--text-2)">Summative</label><div style="display:flex;align-items:center;gap:6px"><input type="range" id="cw-range" min="0" max="100" value="' +
       summPct +
       '" data-action-input="updateCategoryWeightsSlider" style="flex:1"><span id="cw-summ-val" style="width:36px;text-align:right;font-weight:600">' +
       summPct +

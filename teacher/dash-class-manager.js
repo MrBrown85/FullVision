@@ -141,14 +141,14 @@ window.DashClassManager = (function () {
       '</div>' +
       '<div class="cm-std-body">' +
       '<div class="cm-std-edit-row-wide">' +
-      '<div style="flex:1"><label class="cm-label">Standard Name</label>' +
+      '<div style="flex:1"><label class="cm-label">Standard name</label>' +
       '<input class="cm-input" value="' +
       esc(sec.name) +
-      '" style="font-weight:600;font-size:0.82rem" data-stop-prop="true" data-action-blur="cmStdName" data-secid="' +
+      '" style="font-weight:600;font-size:0.875rem" data-stop-prop="true" data-action-blur="cmStdName" data-secid="' +
       sec.id +
       '"></div>' +
       '<div style="min-width:100px"><label class="cm-label">Subject</label>' +
-      '<select class="cm-input" style="font-size:0.78rem" data-stop-prop="true" data-action-change="cmStdSubject" data-secid="' +
+      '<select class="cm-input" style="font-size:0.8125rem" data-stop-prop="true" data-action-change="cmStdSubject" data-secid="' +
       sec.id +
       '">' +
       (lm.subjects || [])
@@ -161,7 +161,7 @@ window.DashClassManager = (function () {
       '</select></div>' +
       (compGroups.length > 0
         ? '<div style="min-width:90px"><label class="cm-label">Group</label>' +
-          '<select class="cm-input" style="font-size:0.78rem" data-stop-prop="true" data-action-change="cmStdGroup" data-secid="' +
+          '<select class="cm-input" style="font-size:0.8125rem" data-stop-prop="true" data-action-change="cmStdGroup" data-secid="' +
           sec.id +
           '">' +
           '<option value="">None</option>' +
@@ -196,21 +196,21 @@ window.DashClassManager = (function () {
       '" title="Delete standard" style="width:32px;height:32px;align-self:flex-end">\u2715</button>' +
       '</div>' +
       '<div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:8px">' +
-      '<div style="flex:0 0 120px"><label class="cm-label">Tag Code</label>' +
+      '<div style="flex:0 0 120px"><label class="cm-label">Tag code</label>' +
       '<input class="cm-input" value="' +
       esc(tag.code || tag.shortName || '') +
-      '" placeholder="e.g. RD1" maxlength="10" style="padding:5px 8px;font-size:0.82rem;font-weight:600;font-family:monospace;text-transform:uppercase" data-stop-prop="true" data-action-blur="cmStdCode" data-secid="' +
+      '" placeholder="e.g. RD1" maxlength="10" style="padding:5px 8px;font-size:0.875rem;font-weight:600;font-family:monospace;text-transform:uppercase" data-stop-prop="true" data-action-blur="cmStdCode" data-secid="' +
       sec.id +
       '"></div>' +
-      '<div style="flex:1"><label class="cm-label">Short Label</label>' +
+      '<div style="flex:1"><label class="cm-label">Short label</label>' +
       '<input class="cm-input" value="' +
       esc(tag.label) +
-      '" placeholder="Short label" style="padding:5px 8px;font-size:0.82rem;font-weight:500" data-action-blur="cmStdLabel" data-secid="' +
+      '" placeholder="Short label" style="padding:5px 8px;font-size:0.875rem;font-weight:500" data-action-blur="cmStdLabel" data-secid="' +
       sec.id +
       '"></div>' +
       '</div>' +
-      '<label class="cm-label">I can\u2026 Statement</label>' +
-      '<textarea class="cm-textarea" placeholder="I can\u2026 statement" style="min-height:34px;padding:5px 8px;font-size:0.78rem" data-action-blur="cmStdText" data-secid="' +
+      '<label class="cm-label">I can\u2026 statement</label>' +
+      '<textarea class="cm-textarea" placeholder="I can\u2026 statement" style="min-height:34px;padding:5px 8px;font-size:0.8125rem" data-action-blur="cmStdText" data-secid="' +
       sec.id +
       '">' +
       esc(tag.text || '') +
@@ -820,13 +820,13 @@ window.DashClassManager = (function () {
     });
     var html =
       '<div style="border:1px solid var(--active);border-radius:var(--radius-sm);padding:10px 12px;margin-top:8px;background:rgba(0,122,255,0.02)">' +
-      '<div class="cm-label" style="margin-bottom:6px">Import Preview \u2014 ' +
+      '<div class="cm-label" style="margin-bottom:6px">Import preview \u2014 ' +
       parsed.length +
       ' student' +
       (parsed.length !== 1 ? 's' : '') +
       ' found</div>' +
       '<div style="max-height:180px;overflow-y:auto;margin-bottom:8px">' +
-      '<table style="width:100%;border-collapse:collapse;font-size:0.78rem">' +
+      '<table style="width:100%;border-collapse:collapse;font-size:0.8125rem">' +
       '<thead><tr style="border-bottom:1px solid var(--border)">' +
       '<th style="text-align:left;padding:3px 6px" class="cm-label">First</th>' +
       '<th style="text-align:left;padding:3px 6px" class="cm-label">Last</th>' +
@@ -849,7 +849,7 @@ window.DashClassManager = (function () {
         '<td style="padding:3px 6px">' +
         esc(p.pronouns || '') +
         '</td>' +
-        '<td style="padding:3px 6px;font-size:0.65rem;font-weight:600;color:' +
+        '<td style="padding:3px 6px;font-size:0.75rem;font-weight:600;color:' +
         (dupe ? 'var(--priority)' : 'var(--score-3)') +
         '">' +
         (dupe ? 'SKIP' : 'NEW') +
@@ -859,8 +859,8 @@ window.DashClassManager = (function () {
     html +=
       '</tbody></table></div>' +
       '<div style="display:flex;gap:8px">' +
-      '<button class="btn btn-primary" style="font-size:0.78rem;padding:6px 14px" data-action="cmConfirmImport">Import</button>' +
-      '<button class="btn btn-ghost" style="font-size:0.78rem;padding:6px 10px" data-action="cmCancelImport">Cancel</button>' +
+      '<button class="btn btn-primary" style="font-size:0.8125rem;padding:6px 14px" data-action="cmConfirmImport">Import</button>' +
+      '<button class="btn btn-ghost" style="font-size:0.8125rem;padding:6px 10px" data-action="cmCancelImport">Cancel</button>' +
       '</div>' +
       '</div>';
     var el = document.getElementById('cm-import-preview');
@@ -1061,7 +1061,7 @@ window.DashClassManager = (function () {
       '<div class="cm-sidebar-header">' +
       '<span class="cm-sidebar-label">' +
       courseIds.length +
-      ' Class' +
+      ' class' +
       (courseIds.length !== 1 ? 'es' : '') +
       '</span>' +
       '<button class="cm-new-btn" data-action="cmStartCreate">+ New</button>' +
@@ -1113,7 +1113,7 @@ window.DashClassManager = (function () {
     });
     if (archivedCids.length > 0) {
       html +=
-        '<div style="padding:8px 12px 4px;font-size:0.6rem;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:0.05em;margin-top:8px;border-top:1px solid var(--border)">Archived</div>';
+        '<div style="padding:8px 12px 4px;font-size:0.75rem;font-weight:600;color:var(--text-3);margin-top:8px;border-top:1px solid var(--border)">Archived</div>';
       archivedCids.forEach(function (cid) {
         var c = COURSES[cid];
         var sc = getStudents(cid).length;
@@ -1159,9 +1159,9 @@ window.DashClassManager = (function () {
     // Section 1: Class Details
     html +=
       '<div class="cm-section">' +
-      '<div class="cm-section-title">Class Details</div>' +
+      '<div class="cm-section-title">Class details</div>' +
       '<div class="cm-field">' +
-      '<label class="cm-label">Class Name</label>' +
+      '<label class="cm-label">Class name</label>' +
       '<input class="cm-input" id="cm-name" value="' +
       esc(course.name) +
       '" data-action-blur="cmUpdateName">' +
@@ -1172,14 +1172,14 @@ window.DashClassManager = (function () {
       '</div>' +
       '<div class="cm-row">' +
       '<div class="cm-field">' +
-      '<label class="cm-label">Grade Level</label>' +
+      '<label class="cm-label">Grade level</label>' +
       '<input class="cm-input" id="cm-grade" value="' +
       esc(course.gradeLevel || '') +
-      '" placeholder="e.g. 8, 10-12" data-action-blur="cmUpdateGrade">' +
+      '" placeholder="e.g. 10-12" data-action-blur="cmUpdateGrade">' +
       '</div>' +
       '<div class="cm-field">' +
       '<label class="cm-label">Stats</label>' +
-      '<div style="display:flex;gap:12px;padding:7px 0;font-size:0.78rem;color:var(--text-2)">' +
+      '<div style="display:flex;gap:12px;padding:7px 0;font-size:0.8125rem;color:var(--text-2)">' +
       '<span><strong>' +
       studentCount +
       '</strong> student' +
@@ -1215,7 +1215,7 @@ window.DashClassManager = (function () {
       students.length +
       ')</span></span>' +
       (students.length > 1
-        ? '<button class="cm-add-link" data-action="cmToggleBulk" style="font-size:0.7rem;padding:2px 8px;border-radius:4px;' +
+        ? '<button class="cm-add-link" data-action="cmToggleBulk" style="font-size:0.75rem;padding:2px 8px;border-radius:4px;' +
           (cmBulkMode ? 'background:var(--active);color:white' : '') +
           '">' +
           (cmBulkMode ? 'Exit Bulk Edit' : 'Bulk Edit') +
@@ -1272,14 +1272,14 @@ window.DashClassManager = (function () {
           })() +
           (st.pronouns ? '<span class="cm-student-pronouns">' + esc(st.pronouns) + '</span>' : '') +
           (st.studentNumber
-            ? '<span style="font-size:0.65rem;color:var(--text-3);font-family:\'SF Mono\',monospace">#' +
+            ? '<span style="font-size:0.75rem;color:var(--text-3);font-family:\'SF Mono\',monospace">#' +
               esc(st.studentNumber) +
               '</span>'
             : '') +
           '<div class="cm-student-actions">' +
           '<button class="cm-delete-mini" data-action="cmEditStudent" data-sid="' +
           st.id +
-          '" title="Edit" style="font-size:0.65rem">\u270E</button>' +
+          '" title="Edit" style="font-size:0.75rem">\u270E</button>' +
           '<button class="cm-delete-mini" data-action="cmRemoveStudent" data-sid="' +
           st.id +
           '" title="Withdraw" aria-label="Withdraw ' +
@@ -1291,7 +1291,7 @@ window.DashClassManager = (function () {
       html += '</div>';
     } else {
       html +=
-        '<div style="text-align:center;padding:16px;color:var(--text-3);font-size:0.82rem;border:1.5px dashed var(--border);border-radius:var(--radius-sm)">' +
+        '<div style="text-align:center;padding:16px;color:var(--text-3);font-size:0.875rem;border:1.5px dashed var(--border);border-radius:var(--radius-sm)">' +
         'No students yet. Add students individually or import a CSV roster.' +
         '</div>';
     }
@@ -1300,24 +1300,24 @@ window.DashClassManager = (function () {
       html +=
         '<div class="cm-bulk-panel">' +
         '<div style="display:flex;gap:8px;margin-bottom:8px">' +
-        '<button class="cm-add-link" data-action="cmBulkSelectAll" style="font-size:0.7rem">Select All</button>' +
-        '<button class="cm-add-link" data-action="cmBulkDeselectAll" style="font-size:0.7rem">Deselect All</button>' +
-        '<span style="font-size:0.7rem;color:var(--text-3);margin-left:auto">' +
+        '<button class="cm-add-link" data-action="cmBulkSelectAll" style="font-size:0.75rem">Select All</button>' +
+        '<button class="cm-add-link" data-action="cmBulkDeselectAll" style="font-size:0.75rem">Deselect All</button>' +
+        '<span style="font-size:0.75rem;color:var(--text-3);margin-left:auto">' +
         cmBulkSelected.size +
         ' selected</span>' +
         '</div>' +
         '<div class="cm-student-form" style="gap:8px 12px">' +
         '<div class="cm-field">' +
-        '<label class="cm-label">Set Pronouns</label>' +
+        '<label class="cm-label">Set pronouns</label>' +
         pronounsSelect('cm-bulk-pro', '') +
         '</div>' +
         '<div class="cm-field">' +
-        '<label class="cm-label">Add Attendance</label>' +
+        '<label class="cm-label">Add attendance</label>' +
         '<div style="display:flex;gap:6px">' +
         '<input type="date" class="cm-input" id="cm-bulk-att-date" value="' +
         getTodayStr() +
-        '" style="font-size:0.78rem;flex:1">' +
-        '<select class="cm-input" id="cm-bulk-att-status" style="font-size:0.78rem;flex:1">' +
+        '" style="font-size:0.8125rem;flex:1">' +
+        '<select class="cm-input" id="cm-bulk-att-status" style="font-size:0.8125rem;flex:1">' +
         '<option value="present">Present</option>' +
         '<option value="absent">Absent</option>' +
         '<option value="late">Late</option>' +
@@ -1327,7 +1327,7 @@ window.DashClassManager = (function () {
         '</div>' +
         '</div>' +
         '<div style="display:flex;gap:8px;margin-top:8px">' +
-        '<button class="btn btn-primary" data-action="cmApplyBulk" style="font-size:0.78rem;padding:6px 14px" ' +
+        '<button class="btn btn-primary" data-action="cmApplyBulk" style="font-size:0.8125rem;padding:6px 14px" ' +
         (cmBulkSelected.size === 0 ? 'disabled' : '') +
         '>Apply to Selected</button>' +
         '</div>' +
@@ -1337,15 +1337,15 @@ window.DashClassManager = (function () {
     html +=
       '<div id="cm-add-student-form" style="display:none" class="cm-add-student-form">' +
       '<div class="cm-student-form">' +
-      '<div class="cm-field"><label class="cm-label">First Name *</label><input class="cm-input" id="cm-add-first" placeholder="e.g. Amara" style="font-size:0.82rem;padding:6px 10px"></div>' +
-      '<div class="cm-field"><label class="cm-label">Last Name</label><input class="cm-input" id="cm-add-last" placeholder="e.g. Osei" style="font-size:0.82rem;padding:6px 10px"></div>' +
-      '<div class="cm-field"><label class="cm-label">Preferred Name</label><input class="cm-input" id="cm-add-pref" placeholder="e.g. Amara" style="font-size:0.82rem;padding:6px 10px"></div>' +
+      '<div class="cm-field"><label class="cm-label">First name *</label><input class="cm-input" id="cm-add-first" placeholder="e.g. Amara" style="font-size:0.875rem;padding:6px 10px"></div>' +
+      '<div class="cm-field"><label class="cm-label">Last name</label><input class="cm-input" id="cm-add-last" placeholder="e.g. Osei" style="font-size:0.875rem;padding:6px 10px"></div>' +
+      '<div class="cm-field"><label class="cm-label">Preferred name</label><input class="cm-input" id="cm-add-pref" placeholder="e.g. Amara" style="font-size:0.875rem;padding:6px 10px"></div>' +
       '<div class="cm-field"><label class="cm-label">Pronouns</label>' +
       pronounsSelect('cm-add-pro', '') +
       '</div>' +
-      '<div class="cm-field"><label class="cm-label">Student Number</label><input class="cm-input" id="cm-add-num" placeholder="e.g. STU-101" style="font-size:0.82rem;padding:6px 10px"></div>' +
-      '<div class="cm-field"><label class="cm-label">Email</label><input class="cm-input" id="cm-add-email" type="email" placeholder="student@school.edu" style="font-size:0.82rem;padding:6px 10px"></div>' +
-      '<div class="cm-field"><label class="cm-label">Date of Birth</label><input class="cm-input" id="cm-add-dob" type="date" style="font-size:0.82rem;padding:6px 10px"></div>' +
+      '<div class="cm-field"><label class="cm-label">Student number</label><input class="cm-input" id="cm-add-num" placeholder="e.g. STU-101" style="font-size:0.875rem;padding:6px 10px"></div>' +
+      '<div class="cm-field"><label class="cm-label">Email</label><input class="cm-input" id="cm-add-email" type="email" placeholder="student@school.edu" style="font-size:0.875rem;padding:6px 10px"></div>' +
+      '<div class="cm-field"><label class="cm-label">Date of birth</label><input class="cm-input" id="cm-add-dob" type="date" style="font-size:0.875rem;padding:6px 10px"></div>' +
       '<div class="cm-field" style="grid-column:1/-1"><label class="cm-label">Designations</label>' +
       '<div class="desig-check-grid">' +
       Object.entries(BC_DESIGNATIONS)
@@ -1367,7 +1367,7 @@ window.DashClassManager = (function () {
         .join('') +
       '</div>' +
       '</div>' +
-      '<div class="cm-field" style="grid-column:1/-1"><label class="cm-label">Language Support</label>' +
+      '<div class="cm-field" style="grid-column:1/-1"><label class="cm-label">Language support</label>' +
       '<div class="desig-check-grid">' +
       Object.entries(SUPPORT_FLAGS)
         .map(function (entry) {
@@ -1389,8 +1389,8 @@ window.DashClassManager = (function () {
       '</div>' +
       '</div>' +
       '<div class="cm-field" style="grid-column:1/-1;display:flex;align-items:flex-end;gap:8px;justify-content:flex-end">' +
-      '<button class="btn btn-ghost" data-action="cmCancelStudent" style="padding:6px 10px;font-size:0.78rem">Cancel</button>' +
-      '<button class="btn btn-primary" id="cm-save-btn" data-action="cmSaveStudent" style="padding:6px 14px;font-size:0.78rem">Save</button>' +
+      '<button class="btn btn-ghost" data-action="cmCancelStudent" style="padding:6px 10px;font-size:0.8125rem">Cancel</button>' +
+      '<button class="btn btn-primary" id="cm-save-btn" data-action="cmSaveStudent" style="padding:6px 14px;font-size:0.8125rem">Save</button>' +
       '</div>' +
       '</div>' +
       '</div>' +
@@ -1411,13 +1411,13 @@ window.DashClassManager = (function () {
     var gs = course.gradingSystem || _cmDefaultGradingSystem(course);
     html +=
       '<div class="cm-section">' +
-      '<div class="cm-section-title">Grading &amp; Calculation</div>' +
+      '<div class="cm-section-title">Grading &amp; calculation</div>' +
       '<div class="cm-field">' +
       '<button class="cm-add-link" data-action="cmCopySetup">Copy grading setup\u2026</button>' +
       '<div class="cm-hint">Copy this class\u2019s grading system, categories and other settings to your other classes, or import them from one.</div>' +
       '</div>' +
       '<div class="cm-field">' +
-      '<label class="cm-label">Grading System</label>' +
+      '<label class="cm-label">Grading system</label>' +
       '<div class="seg cm-seg" role="radiogroup" aria-label="Grading system">' +
       '<button class="seg-btn cm-seg-btn' +
       (gs === 'proficiency' ? ' active' : '') +
@@ -1445,7 +1445,7 @@ window.DashClassManager = (function () {
       _cmRenderRoundPercentField(cmSelectedCourse) +
       _cmRenderReportingTermsField(cmSelectedCourse) +
       '<div class="cm-field">' +
-      '<label class="cm-label">Calculation Method</label>' +
+      '<label class="cm-label">Calculation method</label>' +
       '<div class="seg cm-seg" role="radiogroup" aria-label="Calculation method">' +
       CALC_METHODS.map(function (m) {
         return (
@@ -1471,7 +1471,7 @@ window.DashClassManager = (function () {
       '<div class="cm-field" style="' +
       (method === 'decayingAvg' ? '' : 'display:none') +
       '">' +
-      '<label class="cm-label">Decay Weight</label>' +
+      '<label class="cm-label">Decay weight</label>' +
       '<div class="cm-slider-row">' +
       '<input type="range" min="10" max="95" value="' +
       Math.round(dw * 100) +
@@ -1486,7 +1486,7 @@ window.DashClassManager = (function () {
       // src/components/courses/grading-config.tsx:204-222. Surfaced on the
       // Score Distribution section of printed progress reports when set.
       '<div class="cm-field">' +
-      '<label class="cm-label" for="cm-late-policy">Late Work Policy</label>' +
+      '<label class="cm-label" for="cm-late-policy">Late work policy</label>' +
       '<textarea class="cm-textarea" id="cm-late-policy" rows="2" placeholder="e.g. Late assignments lose 10% per day, up to 3 days." data-action-blur="cmLateWorkPolicy" aria-label="Late work policy">' +
       esc(course.lateWorkPolicy || '') +
       '</textarea>' +
@@ -1552,7 +1552,7 @@ window.DashClassManager = (function () {
       return _cmGroupMap[g.id];
     });
 
-    html += '<div class="cm-field"><label class="cm-label">Learning Standards</label>';
+    html += '<div class="cm-field"><label class="cm-label">Learning standards</label>';
 
     if ((lm.sections || []).length === 0 && compGroups.length === 0) {
       html +=
@@ -1655,7 +1655,7 @@ window.DashClassManager = (function () {
 
     // Section 4: BC Curriculum Link
     var linkedTags = course.curriculumTags || [];
-    html += '<div class="cm-section">' + '<div class="cm-section-title">BC Curriculum Link</div>';
+    html += '<div class="cm-section">' + '<div class="cm-section-title">BC curriculum link</div>';
     if (linkedTags.length > 0) {
       linkedTags.forEach(function (tag) {
         var courseData = CURRICULUM_INDEX ? CURRICULUM_INDEX[tag] : null;
@@ -1749,7 +1749,7 @@ window.DashClassManager = (function () {
     html += renderCwStepBar();
 
     if (!cwCurriculumLoaded && !cwLoadError) {
-      html += '<div class="cm-section"><div class="cw-empty-msg">Loading BC Curriculum data\u2026</div></div>';
+      html += '<div class="cm-section"><div class="cw-empty-msg">Loading BC curriculum data\u2026</div></div>';
       html += '<div class="cw-footer"><button class="btn btn-ghost" data-action="cmCancelCreate">Cancel</button></div>';
       html += '</div>';
       return html;
@@ -1906,8 +1906,8 @@ window.DashClassManager = (function () {
     html += renderCwStepBar();
 
     html +=
-      '<div class="cm-section"><div class="cm-section-title">Class Details</div>' +
-      '<div class="cm-field"><label class="cm-label">Class Name</label><input class="cm-input" id="cm-new-name" value="' +
+      '<div class="cm-section"><div class="cm-section-title">Class details</div>' +
+      '<div class="cm-field"><label class="cm-label">Class name</label><input class="cm-input" id="cm-new-name" value="' +
       esc(preName) +
       '" placeholder="e.g. English 10" autofocus></div>' +
       '<div class="cm-field"><label class="cm-label" id="cm-new-block-label">Block</label>' +
@@ -1930,7 +1930,7 @@ window.DashClassManager = (function () {
         );
       }).join('') +
       '</div></div>' +
-      '<div style="display:flex;gap:16px"><div class="cm-field" style="flex:1"><label class="cm-label">Grade Level</label><input class="cm-input" id="cm-new-grade" value="' +
+      '<div style="display:flex;gap:16px"><div class="cm-field" style="flex:1"><label class="cm-label">Grade level</label><input class="cm-input" id="cm-new-grade" value="' +
       esc(preGrade) +
       '" placeholder="e.g. 8, 10-12" data-action-input="cwGradeInput"></div></div>' +
       '<div class="cm-field"><label class="cm-label">Description</label><textarea class="cm-textarea" id="cm-new-desc" placeholder="Optional">' +
@@ -1938,8 +1938,8 @@ window.DashClassManager = (function () {
       '</textarea></div></div>';
 
     html +=
-      '<div class="cm-section"><div class="cm-section-title">Grading &amp; Calculation</div>' +
-      '<div class="cm-field"><label class="cm-label">Grading System</label>' +
+      '<div class="cm-section"><div class="cm-section-title">Grading &amp; calculation</div>' +
+      '<div class="cm-field"><label class="cm-label">Grading system</label>' +
       // T-UI-02 · wizard grading_system picker. Grades 10–12 default to
       // Letter; with no categories, letter grades use total points.
       '<div class="seg cm-seg" id="cm-cg-grading" role="radiogroup" aria-label="Grading system">' +
@@ -1961,7 +1961,7 @@ window.DashClassManager = (function () {
       _cmGradingSystemDescription(grading) +
       '</div>' +
       '</div>' +
-      '<div class="cm-field"><label class="cm-label">Calculation Method</label>' +
+      '<div class="cm-field"><label class="cm-label">Calculation method</label>' +
       '<div class="seg cm-seg" id="cm-cg-calc" role="radiogroup" aria-label="Calculation method">' +
       CALC_METHODS.map(function (m) {
         var action = m.value === 'decayingAvg' ? 'cmCreateToggleDecay' : 'cmCreateToggle';
@@ -1986,7 +1986,7 @@ window.DashClassManager = (function () {
       '</div></div>' +
       '<div id="cm-cg-decay" class="cm-field" style="' +
       (calc === 'decayingAvg' ? '' : 'display:none') +
-      '"><label class="cm-label">Decay Weight</label>' +
+      '"><label class="cm-label">Decay weight</label>' +
       '<div class="cm-slider-row"><input type="range" min="10" max="95" value="' +
       esc(cwStep2Decay) +
       '" id="cm-cg-decay-slider" data-action-input="cmCreateDecaySlider" style="flex:1"><span class="cm-slider-label" id="cm-cg-decay-val">' +
@@ -1994,7 +1994,7 @@ window.DashClassManager = (function () {
       '%</span></div>' +
       '<div class="cm-hint">Higher values weight recent scores more heavily.</div></div>' +
       '<div class="cm-field">' +
-      '<label class="cm-label" for="cm-new-late-policy">Late Work Policy</label>' +
+      '<label class="cm-label" for="cm-new-late-policy">Late work policy</label>' +
       '<textarea class="cm-textarea" id="cm-new-late-policy" rows="2" placeholder="e.g. Late assignments lose 10% per day, up to 3 days." aria-label="Late work policy">' +
       esc(cwStep2LatePolicy) +
       '</textarea>' +
@@ -2023,7 +2023,7 @@ window.DashClassManager = (function () {
 
     html +=
       '<div class="cm-section"><div class="cm-section-title">Review</div>' +
-      '<div class="cm-field"><label class="cm-label">Class Name</label><div style="font-size:var(--text-lg);font-weight:600;color:var(--text)">' +
+      '<div class="cm-field"><label class="cm-label">Class name</label><div style="font-size:var(--text-lg);font-weight:600;color:var(--text)">' +
       esc(className || 'Untitled') +
       '</div></div>' +
       '<div class="cm-field"><label class="cm-label">Block</label><div style="font-size:var(--text-md);color:var(--text-2)">' +
@@ -2041,14 +2041,14 @@ window.DashClassManager = (function () {
       '<div class="cm-field"><label class="cm-label">Grade</label><div style="font-size:var(--text-md);color:var(--text-2)">' +
       esc(gradeLevel || '\u2014') +
       '</div></div>' +
-      '<div class="cm-field"><label class="cm-label">Grading System</label><div style="font-size:var(--text-md);color:var(--text-2)">' +
+      '<div class="cm-field"><label class="cm-label">Grading system</label><div style="font-size:var(--text-md);color:var(--text-2)">' +
       esc(gradingLabel) +
       '</div></div>' +
-      '<div class="cm-field"><label class="cm-label">Calculation Method</label><div style="font-size:var(--text-md);color:var(--text-2)">' +
+      '<div class="cm-field"><label class="cm-label">Calculation method</label><div style="font-size:var(--text-md);color:var(--text-2)">' +
       esc(calcLabel) +
       (cwStep2Calc === 'decayingAvg' ? ' \u00B7 ' + esc(cwStep2Decay) + '% decay weight' : '') +
       '</div></div>' +
-      '<div class="cm-field"><label class="cm-label">Late Work Policy</label><div style="font-size:var(--text-md);color:var(--text-2)">' +
+      '<div class="cm-field"><label class="cm-label">Late work policy</label><div style="font-size:var(--text-md);color:var(--text-2)">' +
       esc(cwStep2LatePolicy.trim() || '\u2014') +
       '</div></div></div>';
 
@@ -3761,10 +3761,10 @@ window.DashClassManager = (function () {
     var html = '';
 
     if (cmRelinkStep === 1) {
-      html += '<div class="cm-section"><div class="cm-section-title">Re-link to BC Curriculum</div>';
+      html += '<div class="cm-section"><div class="cm-section-title">Re-link to BC curriculum</div>';
 
       if (!cwCurriculumLoaded && !cwLoadError) {
-        html += '<div class="cw-empty-msg">Loading BC Curriculum data\u2026</div>';
+        html += '<div class="cw-empty-msg">Loading BC curriculum data\u2026</div>';
       } else if (cwLoadError) {
         html += '<div class="cw-empty-msg">Could not load BC Curriculum data.</div>';
       } else {
@@ -3874,9 +3874,9 @@ window.DashClassManager = (function () {
       var existingTags = course.curriculumTags || [];
       var tagCount = getAllTags(cid).length;
 
-      html += '<div class="cm-section"><div class="cm-section-title">Confirm Curriculum Change</div>';
+      html += '<div class="cm-section"><div class="cm-section-title">Confirm curriculum change</div>';
 
-      html += '<div class="cm-field"><label class="cm-label">New Curriculum Link</label>';
+      html += '<div class="cm-field"><label class="cm-label">New curriculum link</label>';
       cwSelectedTags.forEach(function (tag) {
         var courseData = CURRICULUM_INDEX ? CURRICULUM_INDEX[tag] : null;
         html +=

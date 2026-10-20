@@ -240,7 +240,7 @@ window.MStudentDetail = (function () {
         return f.prof === 0;
       });
     if (hasFocus) {
-      focusHTML = '<div class="m-list-inset-header">Focus Areas</div>';
+      focusHTML = '<div class="m-list-inset-header">Focus areas</div>';
       focusAreas.forEach(function (f) {
         var secColor = f.section ? f.section.color : '#888';
         var label = f.tag.label || f.tag.name || f.tag.shortName || f.tag.code || '';
@@ -301,7 +301,7 @@ window.MStudentDetail = (function () {
       })
       .slice(0, 5);
 
-    var assessCards = '<div class="m-list-inset-header">Recent Assessments</div>';
+    var assessCards = '<div class="m-list-inset-header">Recent assessments</div>';
     if (!recentAssess.length) {
       assessCards +=
         '<div class="m-empty" style="padding:20px"><div class="m-empty-subtitle">No assessments yet</div></div>';
@@ -328,7 +328,7 @@ window.MStudentDetail = (function () {
           var label = tag ? tag.shortName || tag.label || tag.code || '' : '?';
           scoreChips +=
             '<span class="m-assess-score-chip">' +
-            '<span style="font-size:11px;color:var(--text-3)">' +
+            '<span style="font-size:12px;color:var(--text-3)">' +
             MC.esc(label.substring(0, 8)) +
             '</span>' +
             '<span class="m-assess-score-val" style="color:' +

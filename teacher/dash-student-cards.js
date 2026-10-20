@@ -3,9 +3,9 @@ window.DashStudentCards = (function () {
   'use strict';
 
   var trendIcon = {
-    up: '<span style="color:var(--score-3);font-size:0.85rem">&#x2191;</span>',
-    down: '<span style="color:var(--score-1);font-size:0.85rem">&#x2193;</span>',
-    flat: '<span style="color:var(--text-3);font-size:0.85rem">&#x2192;</span>',
+    up: '<span style="color:var(--score-3);font-size:0.9375rem">&#x2191;</span>',
+    down: '<span style="color:var(--score-1);font-size:0.9375rem">&#x2193;</span>',
+    flat: '<span style="color:var(--text-3);font-size:0.9375rem">&#x2192;</span>',
   };
 
   // A competency or group value in a small tile, as the class shows grades
@@ -14,9 +14,17 @@ window.DashStudentCards = (function () {
     return esc(formatLevel(cid, value)).replace(/%/g, '<span class="dash-pct">%</span>');
   }
 
+  // A tile names its competency by the section's short name ("Questioning"),
+  // which fits on the tile; the full name is the tile's tooltip.
   function standardLabel(sec) {
     var tag = sec && sec.tags && sec.tags[0];
-    return (tag && (tag.code || tag.label || tag.shortName || tag.name)) || (sec && (sec.shortName || sec.name)) || '';
+    return (sec && sec.shortName) || (tag && (tag.label || tag.code || tag.name)) || (sec && sec.name) || '';
+  }
+  function standardTitle(sec) {
+    var tag = sec && sec.tags && sec.tags[0];
+    var name = (sec && sec.name) || '';
+    var label = tag && tag.label && tag.label !== name ? tag.label : '';
+    return label ? name + ' \u2014 ' + label : name;
   }
 
   var DAY_MS = 86400000;
@@ -206,7 +214,7 @@ window.DashStudentCards = (function () {
           '</div>' +
           (st.pronouns ? '<div class="dash-card-pronouns">' + esc(st.pronouns) + '</div>' : '') +
           (st.studentNumber
-            ? '<div class="dash-card-stunum" style="font-size:0.6rem;color:var(--text-3);font-family:\'SF Mono\',ui-monospace,monospace">#' +
+            ? '<div class="dash-card-stunum" style="font-size:0.75rem;color:var(--text-3);font-family:\'SF Mono\',ui-monospace,monospace">#' +
               esc(st.studentNumber) +
               '</div>'
             : '') +
@@ -245,7 +253,9 @@ window.DashStudentCards = (function () {
             var groupVal = getGroupProficiency(cid, st.id, gi.group.id);
             var gr = Math.round(groupVal);
             html +=
-              '<div class="dash-section-mini" style="background:' +
+              '<div class="dash-section-mini" title="' +
+              esc(gi.group.name) +
+              '" style="background:' +
               PROF_TINT[gr] +
               '">' +
               '<div style="position:absolute;top:0;left:4px;right:4px;height:3px;border-radius:2px;background:' +
@@ -266,7 +276,9 @@ window.DashStudentCards = (function () {
             var sr = Math.round(secVal);
             var secLabel = standardLabel(sec);
             html +=
-              '<div class="dash-section-mini" style="background:' +
+              '<div class="dash-section-mini" title="' +
+              esc(standardTitle(sec)) +
+              '" style="background:' +
               PROF_TINT[sr] +
               '">' +
               '<div style="position:absolute;top:0;left:4px;right:4px;height:3px;border-radius:2px;background:' +
@@ -288,7 +300,9 @@ window.DashStudentCards = (function () {
             var secRounded = Math.round(secVal);
             var secLabel = standardLabel(sec);
             html +=
-              '<div class="dash-section-mini" style="background:' +
+              '<div class="dash-section-mini" title="' +
+              esc(standardTitle(sec)) +
+              '" style="background:' +
               PROF_TINT[secRounded] +
               '">' +
               '<div style="position:absolute;top:0;left:4px;right:4px;height:3px;border-radius:2px;background:' +

@@ -187,13 +187,13 @@ window.MCardWidgets = (function () {
   _renderers.completion = function (st, cid) {
     var pct = getCompletionPct(cid, st.id);
     var color = pct >= 80 ? 'var(--score-3)' : pct >= 50 ? 'var(--score-2)' : 'var(--score-1)';
-    var r = 11,
-      cx = 14,
-      cy = 14,
+    var r = 16,
+      cx = 19,
+      cy = 19,
       circ = 2 * Math.PI * r;
     var offset = circ * (1 - pct / 100);
     var svg =
-      '<svg class="m-wdg-arc" width="28" height="28" viewBox="0 0 28 28">' +
+      '<svg class="m-wdg-arc" width="38" height="38" viewBox="0 0 38 38">' +
       '<circle cx="' +
       cx +
       '" cy="' +
@@ -223,7 +223,7 @@ window.MCardWidgets = (function () {
       cx +
       '" y="' +
       cy +
-      '" text-anchor="middle" dominant-baseline="central" font-size="9" font-weight="700" fill="' +
+      '" text-anchor="middle" dominant-baseline="central" font-size="12" font-weight="700" fill="' +
       color +
       '">' +
       Math.round(pct) +
@@ -473,7 +473,7 @@ window.MCardWidgets = (function () {
       '<div class="m-wdg-pips">' +
       renderPips(wh) +
       '</div>' +
-      '<div class="m-wdg-tile-label">Work Habits</div>' +
+      '<div class="m-wdg-tile-label">Work habits</div>' +
       '</div>' +
       '<div class="m-wdg-habit-col">' +
       '<div class="m-wdg-pips">' +
@@ -515,7 +515,7 @@ window.MCardWidgets = (function () {
     if (overflow > 0) chips += '<span class="m-wdg-chip m-wdg-chip-more">+' + overflow + '</span>';
     return (
       '<div class="m-wdg-growth-areas">' +
-      '<div class="m-wdg-section-label">Growth Areas</div>' +
+      '<div class="m-wdg-section-label">Growth areas</div>' +
       '<div class="m-wdg-chips">' +
       chips +
       '</div>' +
@@ -531,7 +531,7 @@ window.MCardWidgets = (function () {
     if (!raw) return '';
     return (
       '<div class="m-wdg-narrative">' +
-      '<div class="m-wdg-section-label">Term Report</div>' +
+      '<div class="m-wdg-section-label">Term report</div>' +
       '<div class="m-wdg-narrative-text">' +
       MC.esc(_trunc(raw, 80)) +
       '</div>' +

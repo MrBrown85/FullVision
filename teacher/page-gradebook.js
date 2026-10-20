@@ -317,15 +317,15 @@ window.PageGradebook = (function () {
       '<div style="margin-left:auto;display:flex;align-items:center;gap:12px">' +
       '<span class="gb-toolbar-label">' +
       (assessments.length !== allAssessments.length
-        ? assessments.length + ' OF ' + allAssessments.length
+        ? assessments.length + ' of ' + allAssessments.length
         : allAssessments.length) +
-      ' ASSIGNMENTS \u00b7 ' +
+      ' assignments \u00b7 ' +
       students.length +
-      ' STUDENTS' +
+      ' students' +
       (undatedCount > 0
         ? ' \u00b7 <span title="These assessments have no date, so no term can include them. Give them a date on the Assessments page.">' +
           undatedCount +
-          ' UNDATED NOT SHOWN</span>'
+          ' undated not shown</span>'
         : '') +
       '</span>' +
       (viewMode === 'scores'
@@ -411,7 +411,7 @@ window.PageGradebook = (function () {
         '<div style="font-family:var(--font-base);font-size:0.95rem;margin-bottom:4px">No assignments found' +
         secLabel +
         '.</div>' +
-        '<div style="font-family:var(--font-base);font-size:0.82rem">Try adjusting your filters or <a href="#/assignments?course=' +
+        '<div style="font-family:var(--font-base);font-size:0.875rem">Try adjusting your filters or <a href="#/assignments?course=' +
         cid +
         '" style="color:var(--link)">create a new assessment</a>.</div>' +
         '</div>';
@@ -2102,7 +2102,7 @@ window.PageGradebook = (function () {
       // A class with categories needs one on every assessment, or the work
       // counts toward no letter grade (Schoology and Teams both require it).
       '<div class="gb-add-field"><label>Category</label><select id="gb-new-category">' +
-      (categories.length === 0 ? '<option value="">No Category</option>' : '') +
+      (categories.length === 0 ? '<option value="">No category</option>' : '') +
       categories
         .map(function (category) {
           return '<option value="' + category.id + '">' + esc(category.name) + '</option>';
@@ -2111,11 +2111,11 @@ window.PageGradebook = (function () {
       '</select></div>' +
       '</div>' +
       '<div class="gb-add-row">' +
-      '<div class="gb-add-field"><label>Score Mode</label><select id="gb-new-scoremode"><option value="proficiency">Proficiency (1-4)</option><option value="points">Points</option><option value="complete">Complete/Incomplete</option></select></div>' +
-      '<div class="gb-add-field" id="gb-new-pts-wrap" style="display:none"><label>Max Points</label><input type="number" id="gb-new-maxpts" value="100" min="1"></div>' +
+      '<div class="gb-add-field"><label>Score mode</label><select id="gb-new-scoremode"><option value="proficiency">Proficiency (1-4)</option><option value="points">Points</option><option value="complete">Complete/Incomplete</option></select></div>' +
+      '<div class="gb-add-field" id="gb-new-pts-wrap" style="display:none"><label>Max points</label><input type="number" id="gb-new-maxpts" value="100" min="1"></div>' +
       '</div>' +
       (categories.length === 0
-        ? '<div class="gb-add-field"><div style="font-size:0.8rem;color:var(--text-3)">No grading categories are configured for this course yet.</div></div>'
+        ? '<div class="gb-add-field"><div style="font-size:0.875rem;color:var(--text-3)">No grading categories are configured for this course yet.</div></div>'
         : '') +
       '<div class="gb-add-field"><label>Standards <span style="font-weight:400;color:var(--text-3)">(optional)</span></label>' +
       '<div class="gb-add-tags">' +
