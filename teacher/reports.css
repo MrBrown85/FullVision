@@ -2241,30 +2241,25 @@
   #tb-rail-btn {
     display: inline-flex;
   }
-  .rb-layout {
+  .studio {
     position: relative;
-    flex-direction: column;
+    grid-template-columns: 1fr;
   }
-  .rb-panel,
-  .rb-panel:has(.rb-form-editing) {
+  .studio-palette,
+  .studio-inspector {
     display: none;
-    width: auto;
   }
-  .rb-layout.rail-open .rb-panel {
-    display: flex;
+  .studio.rail-open .studio-palette {
+    display: block;
     position: absolute;
     top: 0;
     left: 0;
-    right: 0;
-    max-height: 60%;
+    bottom: 0;
+    width: min(320px, 90vw);
     z-index: 5;
-    border-right: 0;
-    border-bottom: 1px solid var(--border);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.18);
   }
-  .rb-preview {
-    padding: 12px 12px 24px;
-  }
+
   .report-fitmap .sheet-student {
     width: calc(50% - 9px);
   }
@@ -3505,4 +3500,335 @@
   font-size: var(--text-2xs);
   color: var(--text-2);
   margin-top: 1px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   PAGE STUDIO — palette · pages · inspector (report-studio.js)
+   ══════════════════════════════════════════════════════════════ */
+#report-output:has(.studio) {
+  overflow: hidden;
+}
+.studio {
+  display: grid;
+  grid-template-columns: 272px minmax(0, 1fr) 300px;
+  height: 100%;
+  min-height: 0;
+}
+.studio-palette {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 14px 14px 20px;
+  overflow-y: auto;
+}
+.studio-tabs {
+  display: flex;
+  width: 100%;
+  margin-bottom: 4px;
+}
+.studio-tabs .seg-btn {
+  flex: 1;
+  text-align: center;
+}
+.studio-palette h4 {
+  font-family: var(--font-base);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-3);
+  margin: 14px 0 6px;
+}
+.studio-blk {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 9px;
+  margin-bottom: 5px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.studio-blk:hover {
+  border-color: var(--active);
+}
+.studio-blk.placed {
+  opacity: 0.45;
+}
+.studio-blk.placed:hover {
+  opacity: 0.75;
+}
+.studio-grip {
+  color: #b4bcc7;
+  font-size: 14px;
+  width: 12px;
+  flex: 0 0 12px;
+}
+.studio-blk-name {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.studio-sz {
+  margin-left: auto;
+  font-family: var(--font-mono, ui-monospace, Menlo, monospace);
+  font-size: 11px;
+  color: var(--text-3);
+}
+.studio-empty {
+  font-size: 12px;
+  color: var(--text-3);
+  padding: 4px 2px 8px;
+}
+.studio-canvas {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: #e9ecf0;
+}
+.studio-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 14px;
+  font-size: 12px;
+  color: var(--text-2);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+.studio-hint-text {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.studio-view {
+  flex: 0 0 auto;
+}
+.rb-preview.studio-pages {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 22px 24px 40px;
+  background: #e9ecf0;
+}
+/* One student: the pages side by side, scaled to the canvas with a
+   transform, not zoom: a transform leaves layout alone, so a page measures
+   on screen exactly as the engine measured it (zoom re-wraps text in
+   WebKit). The wrapper takes the scaled size so the pages sit together. */
+.rb-preview.studio-pages:not(.studio-all) .sheet-student {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 22px;
+  justify-content: center;
+  align-items: flex-start;
+}
+.rb-preview.studio-pages:not(.studio-all) .sheet-zoom {
+  zoom: 1;
+  margin: 0;
+  position: relative;
+  width: calc(8.5in * var(--sheet-zoom));
+  height: calc(11in * var(--sheet-zoom) + 24px);
+}
+.rb-preview.studio-pages:not(.studio-all) .sheet-zoom:has(.report-sheet[data-paper='legal']) {
+  height: calc(14in * var(--sheet-zoom) + 24px);
+}
+.rb-preview.studio-pages:not(.studio-all) .sheet-zoom > .report-sheet {
+  transform: scale(var(--sheet-zoom));
+  transform-origin: top left;
+}
+.rb-preview.studio-pages:not(.studio-all) .sheet-student-head,
+.rb-preview.studio-pages .sheet-note {
+  display: none;
+}
+.rb-preview.studio-pages .sheet-label {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-3);
+  margin: 0 0 6px;
+}
+/* The fill bar on each page's right edge. */
+.rb-preview.studio-pages:not(.studio-all) .report-sheet::after {
+  content: '';
+  position: absolute;
+  right: -16px;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  border-radius: 3px;
+  background: #dfe3e8;
+  background-image: linear-gradient(#15803d, #15803d);
+  background-repeat: no-repeat;
+  background-size: 100% var(--fill, 0%);
+  background-position: bottom;
+}
+.rb-preview.studio-pages:not(.studio-all) .report-sheet.sheet-overflow::after {
+  background-image: linear-gradient(#b45309, #b45309);
+}
+.rb-preview.studio-pages .report-sheet {
+  overflow: visible;
+}
+.rb-preview.studio-pages .report-sheet .sheet-body {
+  overflow: hidden;
+}
+/* Selection on the page. */
+.sheet-cell {
+  position: relative;
+  display: flow-root;
+  border-radius: 6px;
+}
+.studio-pages .sheet-cell {
+  cursor: pointer;
+}
+.studio-pages .sheet-cell.studio-sel {
+  outline: 2px solid var(--active);
+  outline-offset: 1px;
+}
+.studio-pages .sheet-cell.studio-sel::after {
+  content: '';
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  width: 9px;
+  height: 9px;
+  background: #fff;
+  border: 2px solid var(--active);
+  border-radius: 2px;
+}
+.sheet-row {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+}
+.sheet-row > .sheet-cell {
+  min-width: 0;
+}
+.sheet-row > .sheet-cell > .report-block-box {
+  height: 100%;
+  box-sizing: border-box;
+}
+.studio-inspector {
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  padding: 16px;
+  overflow-y: auto;
+}
+.studio-insp-title {
+  font-family: var(--font-base);
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 2px;
+}
+.studio-insp-sub {
+  font-size: 12px;
+  color: var(--text-3);
+  margin-bottom: 14px;
+}
+.studio-field {
+  margin-bottom: 14px;
+}
+.studio-field > label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-2);
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+.studio-remove {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--danger);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+.studio-remove:hover {
+  border-color: var(--danger);
+}
+.studio-stats {
+  margin-top: 18px;
+}
+.studio-stat {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  padding: 6px 0;
+  border-top: 1px solid var(--divider-subtle, #eef0f3);
+}
+.studio-stat b {
+  font-family: var(--font-mono, ui-monospace, Menlo, monospace);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.report-text-body {
+  font-size: var(--text-base);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+.tb-count {
+  font-family: var(--font-mono, ui-monospace, Menlo, monospace);
+  font-size: 11.5px;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.tb-label {
+  font-size: 11.5px;
+  color: var(--text-3);
+  margin-left: 2px;
+}
+.tb-divider {
+  color: var(--border);
+  font-size: 12px;
+}
+@media (max-width: 1520px) {
+  .report-toolbar .tb-label,
+  .report-toolbar .tb-divider {
+    display: none !important;
+  }
+}
+@media (max-width: 1320px) {
+  .report-toolbar .tb-count {
+    display: none !important;
+  }
+  .report-toolbar .report-seg-btn {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+}
+@media print {
+  .studio {
+    display: block;
+    height: auto;
+  }
+  .studio-canvas {
+    display: block;
+    background: none;
+  }
+  .rb-preview.studio-pages {
+    padding: 0;
+    overflow: visible;
+    background: none;
+  }
+  .rb-preview.studio-pages:not(.studio-all) .sheet-student {
+    display: block;
+  }
+  .rb-preview.studio-pages .report-sheet {
+    overflow: hidden;
+  }
+  .rb-preview.studio-pages .report-sheet::after {
+    content: none;
+  }
 }

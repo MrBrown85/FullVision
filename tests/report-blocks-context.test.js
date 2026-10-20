@@ -63,7 +63,7 @@ describe('report block renderers take the term as context', () => {
   });
 
   it('every block renders with a context and no page', () => {
-    const ids = ReportBuilderUI.DEFAULT_BLOCKS.map(b => b.id);
+    const ids = Object.keys(ReportSheets.BLOCKS);
     for (const id of ids) {
       expect(() => ReportBlocks.renderReportBlock(id, CID, STUDENT, ctx), id).not.toThrow();
     }

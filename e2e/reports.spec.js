@@ -4,10 +4,11 @@ import { mockAuth, seedCourse, seedStudents, seedAssessments, seedScores, gotoAp
 async function openProgressReports(page) {
   const progressTab = page.getByRole('tab', { name: 'Progress Reports' });
   await expect(progressTab).toBeVisible();
+  await page.locator('#report-output > *').first().waitFor();
   await progressTab.click();
 }
 
-test.describe('Reports — Report Builder', () => {
+test.describe('Reports — Page Studio', () => {
   test.beforeEach(async ({ page }) => {
     await mockAuth(page);
     await seedCourse(page);
@@ -27,26 +28,12 @@ test.describe('Reports — Report Builder', () => {
     expect(hasReportUI).toBeTruthy();
   });
 
-  test('has report preset buttons', async ({ page }) => {
+  test('the Studio offers a palette of blocks', async ({ page }) => {
     await gotoApp(page, '/reports');
     await openProgressReports(page);
-    const presetBtns = page.locator('[data-action="rbApplyPreset"]');
-    const count = await presetBtns.count();
-    expect(count).toBeGreaterThanOrEqual(1);
-  });
-
-  test('report blocks can be toggled', async ({ page }) => {
-    await gotoApp(page, '/reports');
-    await openProgressReports(page);
-    // The Report Card form has no toggles; Detailed keeps the block list.
-    await page.locator('[data-action="rbApplyPreset"][data-preset="detailed"]').click();
-    const toggleBtns = page.locator('[data-action="rbToggleBlock"]');
-    const count = await toggleBtns.count();
-    expect(count).toBeGreaterThanOrEqual(1);
-    await toggleBtns.first().click();
-    await page.waitForTimeout(300);
-    const main = page.locator('#main');
-    await expect(main).not.toBeEmpty();
+    const blocks = page.locator('[data-action="studioBlock"]');
+    expect(await blocks.count()).toBeGreaterThanOrEqual(10);
+    await expect(page.locator('#studio-inspector')).toContainText('Longest report in class');
   });
 
   test('shows student names with seeded data', async ({ page }) => {
@@ -82,6 +69,7 @@ test.describe('Reports — Report Builder', () => {
   test('print button exists when students are loaded', async ({ page }) => {
     await seedStudents(page);
     await gotoApp(page, '/reports');
+    await openProgressReports(page);
     await openProgressReports(page);
 
     const printBtn = page

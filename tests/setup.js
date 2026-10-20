@@ -226,7 +226,7 @@ load('teacher/report-blocks.js');
 load('teacher/report-sheets.js');
 load('teacher/report-issues.js');
 load('teacher/report-questionnaire.js');
-load('teacher/report-builder-ui.js');
+load('teacher/report-studio.js');
 load('teacher/report-preview.js');
 load('teacher/dash-class-manager.js');
 load('teacher/dash-overview.js');

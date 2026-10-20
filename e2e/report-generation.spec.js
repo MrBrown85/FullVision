@@ -1,5 +1,15 @@
 import { test, expect } from '@playwright/test';
-import { mockAuth, seedCourse, seedStudents, seedAssessments, seedScores, gotoApp, TEST_COURSE, TEST_STUDENTS, TEST_ASSESSMENT } from './helpers.js';
+import {
+  mockAuth,
+  seedCourse,
+  seedStudents,
+  seedAssessments,
+  seedScores,
+  gotoApp,
+  TEST_COURSE,
+  TEST_STUDENTS,
+  TEST_ASSESSMENT,
+} from './helpers.js';
 
 test.describe('Report Generation', () => {
   test.beforeEach(async ({ page }) => {
@@ -35,26 +45,22 @@ test.describe('Report Generation', () => {
     await expect(main).not.toBeEmpty();
   });
 
-  test('report preset buttons exist', async ({ page }) => {
+  test('the palette lists the blocks', async ({ page }) => {
+    const errors = [];
+    page.on('pageerror', e => errors.push(e.message));
     await gotoApp(page, '/reports');
-    await page.waitForTimeout(500);
-    // Should have Brief, Standard, Detailed preset buttons
-    const presetBtns = page.locator('[data-action="rbApplyPreset"]');
-    const count = await presetBtns.count();
-    if (count > 0) {
-      expect(count).toBeGreaterThanOrEqual(2);
-    } else {
-      // Preset buttons might not render until report panel is visible
-      const body = await page.locator('body').textContent();
-      const hasPresets = body.includes('Brief') || body.includes('Standard') || body.includes('Detailed');
-      // Page should at least render
-      const main = page.locator('#main');
-      await expect(main).not.toBeEmpty();
-    }
+    // The Reports page binds its clicks once it has rendered the questionnaire.
+    await page.locator('#report-output > *').first().waitFor();
+    await page.getByRole('tab', { name: 'Progress Reports' }).click();
+    await page.waitForTimeout(1500);
+    expect(errors).toEqual([]);
+    await expect(page.locator('[data-action="studioBlock"]').first()).toBeVisible();
   });
 
   test('print button exists', async ({ page }) => {
     await gotoApp(page, '/reports');
+    await page.locator('#report-output > *').first().waitFor();
+    await page.getByRole('tab', { name: 'Progress Reports' }).click();
     await page.waitForTimeout(500);
     // Print button should be in the toolbar
     const printBtn = page.locator('#tb-print-btn, [data-action="printReports"], button:has-text("Print")').first();
@@ -73,8 +79,11 @@ test.describe('Report Generation', () => {
     if (visible) {
       const nameText = await studentName.textContent();
       // Should contain one of our test students
-      const hasName = nameText.includes('Alice') || nameText.includes('Anderson') ||
-                      nameText.includes('Bob') || nameText.includes('Charlie');
+      const hasName =
+        nameText.includes('Alice') ||
+        nameText.includes('Anderson') ||
+        nameText.includes('Bob') ||
+        nameText.includes('Charlie');
       expect(hasName).toBeTruthy();
     } else {
       // Student name may be rendered differently — verify page has student data

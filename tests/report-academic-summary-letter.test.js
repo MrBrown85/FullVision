@@ -68,10 +68,8 @@ describe('Academic Summary overall grade', () => {
     expect(html).toContain('Overall Proficiency: Proficient');
   });
 
-  it('matches the Class Summary letter cell', () => {
+  it('shows the letter and percent for a Letter class', () => {
     seed('letter', [score('a', 10), score('b', 9)]);
-    const classSummary = ReportPreview.renderClassSummary(CID, false);
-    expect(classSummary).toContain('A (95%)');
     expect(summary()).toContain('A (95%)');
   });
 

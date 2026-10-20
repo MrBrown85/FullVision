@@ -1131,9 +1131,24 @@ window.ReportBlocks = (function () {
   /* ── Block dispatcher ── */
   /* ctx is { termId, termLabel }. Callers on the Reports page build it once
      with reportContext() and pass it for every student. */
-  function renderReportBlock(blockId, cid, student, ctx) {
+  /* A block the teacher writes once for every student: a title and a few
+     lines. Empty until the Studio's inspector gives it text (options.text). */
+  function renderBlockText(options) {
+    const text = String((options && options.text) || '').trim();
+    if (!text) return '';
+    const title = String((options && options.title) || '').trim();
+    const body = esc(text).replace(/\n/g, '<br>');
+    return `<div class="report-block-box report-text-block">${title ? `<div class="report-block-title">${esc(title)}</div>` : ''}<div class="report-text-body">${body}</div></div>`;
+  }
+
+  /* options: the cell's options from the form (report-sheets.js), read by
+     the renderers that offer choices; the rest ignore it. */
+  function renderReportBlock(blockId, cid, student, ctx, options) {
     ctx = ctx || reportContext();
+    options = options || {};
     switch (blockId) {
+      case 'text-block':
+        return renderBlockText(options);
       case 'header':
         return renderBlockHeader(cid, student, ctx);
       case 'academic-summary':

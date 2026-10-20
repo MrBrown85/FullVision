@@ -332,14 +332,14 @@ window.ReportIssues = (function () {
     });
   }
 
-  /** "Issued Oct 20, 3:40 p.m."; the year is added when it is not this year. */
+  /** "Printed Oct 20, 3:40 p.m."; the year is added when it is not this year. */
   function label(entry, now) {
     if (!entry || !entry.issuedAt) return '';
     var d = new Date(entry.issuedAt);
     var ref = now ? new Date(now) : new Date();
     var opts = { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' };
     if (d.getFullYear() !== ref.getFullYear()) opts.year = 'numeric';
-    return 'Issued ' + d.toLocaleString('en-CA', opts);
+    return 'Printed ' + d.toLocaleString('en-CA', opts);
   }
 
   return {
