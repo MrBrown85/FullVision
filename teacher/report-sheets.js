@@ -371,6 +371,13 @@ window.ReportSheets = (function () {
     return st ? normalizeForm(Object.assign({}, st.form, { id: st.id, name: st.name })) : null;
   }
 
+  /* ── Your Library ────────────────────────────────────────────────
+     The teacher's saved forms live in report_template on the server
+     (migrations/20261020_report_template.sql, v2.saveReportTemplate and
+     friends). This device keeps a copy in localStorage so the list is there
+     at once, works in Demo Mode, and holds a form saved offline until the
+     outbox sends it. templates() reads the copy; syncTemplates() refreshes
+     it from the server; saveTemplate and removeTemplate change both. */
   var LIBRARY_KEY = 'gb-report-templates';
   function templates() {
     try {
@@ -384,9 +391,68 @@ window.ReportSheets = (function () {
     try {
       localStorage.setItem(LIBRARY_KEY, JSON.stringify(list));
     } catch (e) {
-      /* the library is a convenience on this device */
+      /* the copy is a convenience; the server row is the record */
     }
   }
+  function _isUuidId(id) {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(id || ''));
+  }
+  function _sameName(a, b) {
+    return (
+      String(a || '')
+        .trim()
+        .toLowerCase() ===
+      String(b || '')
+        .trim()
+        .toLowerCase()
+    );
+  }
+  /* A server row as the device keeps it. */
+  function _fromRow(row) {
+    return {
+      id: row.id,
+      name: row.name,
+      savedAt: row.updated_at || row.created_at || new Date().toISOString(),
+      form: normalizeForm(Object.assign({}, row.form, { name: row.name })),
+    };
+  }
+  function _v2(name) {
+    return typeof window !== 'undefined' && window.v2 && typeof window.v2[name] === 'function' ? window.v2[name] : null;
+  }
+  /* Refresh the device copy from the server. Resolves true when the list
+     changed. With no server (Demo Mode, signed out, offline) the copy stays
+     as it is; a form saved here that the server has not confirmed yet (a
+     non-UUID id) is kept in front of the server's rows. */
+  function syncTemplates() {
+    var list = _v2('listReportTemplates');
+    if (!list) return Promise.resolve(false);
+    return list().then(
+      function (res) {
+        if (!res || !Array.isArray(res.data)) return false;
+        var before = JSON.stringify(templates());
+        var pending = templates().filter(function (t) {
+          return !_isUuidId(t.id);
+        });
+        var rows = res.data.map(_fromRow);
+        var merged = pending
+          .filter(function (p) {
+            return !rows.some(function (r) {
+              return _sameName(r.name, p.name);
+            });
+          })
+          .concat(rows);
+        _writeTemplates(merged);
+        return JSON.stringify(merged) !== before;
+      },
+      function () {
+        return false;
+      },
+    );
+  }
+  /* Saves to the device now and to the server; the entry is returned at
+     once with a local id, which the server's id replaces when the save
+     lands (template() and removeTemplate() answer to either). The same name
+     replaces the earlier form, as the server does. */
   function saveTemplate(name, f) {
     name = String(name || '').trim();
     if (!name) return null;
@@ -396,20 +462,56 @@ window.ReportSheets = (function () {
       savedAt: new Date().toISOString(),
       form: normalizeForm(Object.assign({}, _clone(f), { name: name })),
     };
-    _writeTemplates([entry].concat(templates()).slice(0, 30));
+    var existing = templates().find(function (t) {
+      return _sameName(t.name, name);
+    });
+    if (existing && _isUuidId(existing.id)) entry.id = existing.id;
+    _writeTemplates(
+      [entry]
+        .concat(
+          templates().filter(function (t) {
+            return !_sameName(t.name, name);
+          }),
+        )
+        .slice(0, 30),
+    );
+    var save = _v2('saveReportTemplate');
+    if (save) {
+      var localId = entry.id;
+      save({ id: _isUuidId(entry.id) ? entry.id : null, name: name, form: entry.form }).then(
+        function (res) {
+          var row = res && res.data && res.data.id ? res.data : null;
+          if (!row || _isUuidId(localId)) return;
+          _writeTemplates(
+            templates().map(function (t) {
+              return t.id === localId ? Object.assign({}, t, { id: row.id, localId: localId }) : t;
+            }),
+          );
+        },
+        function () {
+          /* the device copy stands; the outbox retries the write */
+        },
+      );
+    }
     return entry;
   }
+  function _find(id) {
+    return templates().find(function (t) {
+      return t.id === id || t.localId === id;
+    });
+  }
   function removeTemplate(id) {
+    var t = _find(id);
     _writeTemplates(
-      templates().filter(function (t) {
-        return t.id !== id;
+      templates().filter(function (x) {
+        return x !== t && x.id !== id && x.localId !== id;
       }),
     );
+    var del = _v2('deleteReportTemplate');
+    if (t && del && _isUuidId(t.id)) del(t.id);
   }
   function template(id) {
-    var t = templates().find(function (x) {
-      return x.id === id;
-    });
+    var t = _find(id);
     return t ? normalizeForm(t.form) : null;
   }
 
@@ -912,6 +1014,7 @@ window.ReportSheets = (function () {
     starters: starters,
     starter: starter,
     templates: templates,
+    syncTemplates: syncTemplates,
     saveTemplate: saveTemplate,
     removeTemplate: removeTemplate,
     template: template,

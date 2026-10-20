@@ -9506,6 +9506,15 @@ window.v2.toggleReportBlock = function (courseId, blockKey, enabled) {
    Issue Reports still keep their device copies (gb-report-templates,
    IndexedDB fv-report-issues); these are the server calls they move to. */
 
+/* A list read's { data, error }: data is the rows, or null when nothing was
+   read (Demo Mode, signed out, or an error), so a caller keeps its device
+   copy rather than mistaking "no server" for "no rows". */
+function _listResult(res) {
+  var error = (res && res.error) || null;
+  var data = res && res.data != null && !error ? _rpcRows(res.data) : null;
+  return { data: data, error: error };
+}
+
 /* A saved form: { id?, name, form }. Same name (case-insensitive) updates
    that row; an id renames. Resolves with the row as the server has it. */
 window.v2.saveReportTemplate = function (params, options) {
@@ -9521,9 +9530,7 @@ window.v2.saveReportTemplate = function (params, options) {
   );
 };
 window.v2.listReportTemplates = function () {
-  return _rpcOrNoop('list_report_templates', {}).then(function (res) {
-    return { data: _rpcRows(res && res.data), error: (res && res.error) || null };
-  });
+  return _rpcOrNoop('list_report_templates', {}).then(_listResult);
 };
 window.v2.deleteReportTemplate = function (id) {
   if (!_isUuid(id)) return Promise.resolve({ data: null, error: null });
@@ -9579,9 +9586,7 @@ window.v2.createReportIssue = function (params) {
 window.v2.listReportIssues = function (courseId, term) {
   var params = { p_course_id: courseId };
   if (term != null) params.p_term = Number(term);
-  return _rpcOrNoop('list_report_issues', params).then(function (res) {
-    return { data: _rpcRows(res && res.data), error: (res && res.error) || null };
-  });
+  return _rpcOrNoop('list_report_issues', params).then(_listResult);
 };
 /* One issue with every student's HTML, in roster order. */
 window.v2.getReportIssue = function (issueId) {
@@ -9623,9 +9628,7 @@ window.v2.deleteGuardian = function (id) {
 };
 /* Every guardian of every enrolled student, each row carrying enrollment_id. */
 window.v2.listCourseGuardians = function (courseId) {
-  return _rpcOrNoop('list_course_guardians', { p_course_id: courseId }).then(function (res) {
-    return { data: _rpcRows(res && res.data), error: (res && res.error) || null };
-  });
+  return _rpcOrNoop('list_course_guardians', { p_course_id: courseId }).then(_listResult);
 };
 
 /* Teacher preferences — jsonb patch; omitted keys unchanged. */

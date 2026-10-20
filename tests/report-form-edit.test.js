@@ -151,6 +151,12 @@ describe('ReportSheets reorder, pairs, starters and the library', () => {
 
   it('saves, lists, applies and removes a form in the library', () => {
     localStorage.clear();
+    // The device copy alone; the server path is tests/report-library-server.test.js.
+    const noServer = () => Promise.resolve({ data: null, error: null });
+    const v2 = window.v2;
+    const kept = { save: v2.saveReportTemplate, del: v2.deleteReportTemplate };
+    v2.saveReportTemplate = noServer;
+    v2.deleteReportTemplate = noServer;
     expect(ReportSheets.saveTemplate('   ', base())).toBeNull();
     const entry = ReportSheets.saveTemplate('Humanities 8 · Report Card', ReportSheets.setType(base(), 'compact'));
     expect(ReportSheets.templates().map(t => t.name)).toEqual(['Humanities 8 · Report Card']);
@@ -158,5 +164,7 @@ describe('ReportSheets reorder, pairs, starters and the library', () => {
     expect(ReportSheets.template(entry.id).name).toBe('Humanities 8 · Report Card');
     ReportSheets.removeTemplate(entry.id);
     expect(ReportSheets.templates()).toEqual([]);
+    v2.saveReportTemplate = kept.save;
+    v2.deleteReportTemplate = kept.del;
   });
 });
