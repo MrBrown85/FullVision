@@ -1163,9 +1163,18 @@
     gap: 4px 10px !important;
   }
   /* Three dimensions per row in print; two left a third of the width empty
-     and pushed the block onto a third page. */
+     and pushed the block onto a third page. The description line stays on
+     screen and is left off paper: with the wider fonts of Linux and Windows
+     it tipped three students onto a third page. */
   .report-learner-dim {
     flex: 1 1 30% !important;
+  }
+  .report-dim-desc {
+    display: none !important;
+  }
+  .report-section-chart > div[style*='margin-top:12px'] {
+    margin-top: 7px !important;
+    padding-top: 6px !important;
   }
   .report-learner-dim-label {
     font-size: var(--text-sm) !important;
