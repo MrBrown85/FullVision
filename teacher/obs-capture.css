@@ -776,3 +776,233 @@ span.obsc-chip-label {
   border-radius: 0 0 5px 5px;
   color: var(--text-2);
 }
+
+/* ── Editor pieces: the edit window and the strip share these ── */
+/* The folder band: the three types as tabs on a --bg band, the chosen
+   one filled in its proficiency colour. */
+.obs-band {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 10px 14px 0;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.obs-band-tab {
+  font-family: var(--font-base);
+  font-size: var(--text-sm, 13px);
+  font-weight: 600;
+  padding: 6px 14px;
+  margin-bottom: -1px;
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  background: var(--surface);
+  color: var(--text-2);
+  cursor: pointer;
+}
+.obs-band-tab:hover:not(.on) {
+  color: var(--text);
+}
+.obs-band-tab:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 1px;
+}
+.obs-band-tab.on {
+  color: #fff;
+}
+.obs-band-tab.on[data-sentiment='strength'] {
+  background: var(--score-3);
+  border-color: var(--score-3);
+}
+.obs-band-tab.on[data-sentiment='growth'] {
+  background: var(--score-4);
+  border-color: var(--score-4);
+}
+.obs-band-tab.on[data-sentiment='concern'] {
+  background: var(--score-2);
+  border-color: var(--score-2);
+}
+.obs-band-right {
+  margin-left: auto;
+  align-self: center;
+  padding-bottom: 8px;
+  font-size: var(--text-xs, 12px);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* The note box: plain and bordered, blue while typing. */
+.obs-note-box {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 9px 11px;
+  font-family: var(--font-base);
+  font-size: var(--text-md, 15px);
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--surface);
+  resize: none;
+  outline: none;
+}
+.obs-note-box:focus {
+  border-color: var(--active);
+}
+.obs-note-box::placeholder {
+  color: var(--text-3);
+}
+
+/* One row of labelled controls under the note box. */
+.obs-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+}
+.obs-row-label {
+  font-size: var(--text-sm, 13px);
+  font-weight: 600;
+  color: var(--text);
+  margin-right: 2px;
+}
+.obs-row-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  margin: 0 6px;
+}
+.obs-notice {
+  margin: 0 0 10px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--bg);
+  font-size: var(--text-sm, 13px);
+  color: var(--text-2);
+}
+.obs-notice b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Square chips: a tag with its dot and ×, and the dashed "+ Add" button. */
+.obs-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 4px 3px 9px;
+  border-radius: var(--radius-xs);
+  font-size: var(--text-sm, 13px);
+  background: var(--overlay-hover);
+  color: var(--text-2);
+}
+.obs-tag-chip .dim-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.obs-tag-chip-x {
+  background: none;
+  border: none;
+  padding: 0 4px;
+  font-size: var(--text-sm, 13px);
+  line-height: 1;
+  color: var(--text-3);
+  cursor: pointer;
+}
+.obs-tag-chip-x:hover {
+  color: var(--text);
+}
+.obs-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border: 1px dashed var(--border-2);
+  border-radius: var(--radius-xs);
+  background: none;
+  font-family: var(--font-base);
+  font-size: var(--text-sm, 13px);
+  color: var(--link);
+  cursor: pointer;
+}
+.obs-add:hover {
+  background: var(--overlay-hover);
+}
+
+/* The small context menu. */
+.obs-menu-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.obs-menu-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--surface);
+  font-family: var(--font-base);
+  font-size: var(--text-sm, 13px);
+  color: var(--text);
+  cursor: pointer;
+}
+.obs-menu-btn.empty {
+  border-style: dashed;
+  border-color: var(--border-2);
+  background: none;
+  color: var(--link);
+}
+.obs-menu-car {
+  font-size: var(--text-xs, 12px);
+  color: var(--text-3);
+}
+.obs-menu {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 4px);
+  z-index: 210;
+  min-width: 160px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+}
+.obs-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 5px;
+  background: none;
+  font-family: var(--font-base);
+  font-size: var(--text-base, 14px);
+  color: var(--text);
+  cursor: pointer;
+}
+.obs-menu-item:hover,
+.obs-menu-item:focus-visible {
+  background: var(--overlay-hover);
+  outline: none;
+}
+.obs-menu-item.on {
+  background: var(--active);
+  color: #fff;
+}
+.obs-menu-none {
+  margin-top: 2px;
+  border-top: 1px solid var(--divider-medium);
+  border-radius: 0 0 5px 5px;
+  color: var(--text-2);
+}
