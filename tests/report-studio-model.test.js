@@ -192,3 +192,93 @@ describe('starters', () => {
     expect(S.starter('nope')).toBeNull();
   });
 });
+
+describe('drop slots', () => {
+  const S = ReportSheets;
+  const key = sl => (sl.newPage ? 'new' : `${sl.page}:${sl.row}:${sl.side}`);
+
+  it('lists every place a block can land on the Report Card, once each, in reading order', () => {
+    const slots = S.slotsFor(S.form()).map(key);
+    expect(slots[0]).toBe('0:0:after'); // the letterhead: nothing before it, no column beside it
+    expect(slots).toContain('0:1:left');
+    expect(slots).toContain('0:1:right');
+    expect(slots).not.toContain('0:1:before'); // the same place as 0:0:after
+    expect(slots).toContain('0:4:after');
+    expect(slots).toContain('1:0:before');
+    expect(slots).toContain('1:0:left');
+    // The pinned response: nothing after it and no column beside it; the
+    // place before it is "after row 1".
+    expect(slots).not.toContain('1:1:after');
+    expect(slots).not.toContain('1:1:left');
+    expect(slots).not.toContain('1:1:before');
+    expect(slots).toContain('1:0:after');
+    expect(slots[slots.length - 1]).toBe('new');
+    expect(new Set(slots).size).toBe(slots.length);
+  });
+
+  it('a row with three cells offers no column; a page with no rows offers one place', () => {
+    let f = S.placeBlock(S.form(), 'attendance', { page: 0, row: 3, side: 'right' });
+    f = S.placeBlock(f, 'legend', { page: 0, row: 3, side: 'right' });
+    const slots = S.slotsFor(f).map(key);
+    expect(slots).not.toContain('0:3:left');
+    expect(slots).not.toContain('0:3:right');
+    expect(slots).toContain('0:3:after');
+    const empty = S.normalizeForm({ v: 4, pages: [{ rows: [] }, { rows: [] }] });
+    expect(S.slotsFor(empty).map(key)).toEqual(['0:0:after', 'new']);
+  });
+
+  it('placeAt lands the block at the slot or on a new page, and slotText names the place', () => {
+    const f = S.form();
+    const beside = S.placeAt(f, 'legend', { page: 0, row: 3, side: 'right' });
+    expect(S.positionText(beside, 'legend')).toBe('Page 1 · row 4 · right');
+    const fresh = S.placeAt(f, 'legend', { newPage: true });
+    expect(fresh.pages).toHaveLength(3);
+    expect(S.placeAt(f, 'legend', null)).toEqual(f);
+    expect(S.slotText(f, { page: 0, row: 3, side: 'right' })).toBe('page 1, row 4, right half');
+    expect(S.slotText(beside, { page: 0, row: 3, side: 'left' })).toBe('page 1, row 4, left third');
+    expect(S.slotText(f, { page: 1, row: 1, side: 'before' })).toBe('page 2, before row 2');
+    expect(S.slotText(f, { newPage: true })).toBe('a new page 3');
+  });
+
+  it('spanChoices depends on the row', () => {
+    const f = S.form();
+    expect(S.spanChoices(f, 'competency-table')).toEqual([12]);
+    const two = S.placeBlock(f, 'attendance', { page: 0, row: 3, side: 'right' });
+    expect(S.spanChoices(two, 'competency-table')).toEqual([12, 8, 6, 4]);
+    const three = S.placeBlock(two, 'legend', { page: 0, row: 3, side: 'left' });
+    expect(S.spanChoices(three, 'attendance')).toEqual([4]);
+    expect(S.spanChoices(f, 'nope')).toEqual([]);
+  });
+});
+
+describe('moving a block with placeAt', () => {
+  const S = ReportSheets;
+  const rows = pg => pg.rows.map(r => r.cells.map(c => c.block));
+
+  it('moves a block to a later row without the removed row shifting the target', () => {
+    const f = S.form();
+    // Move the comment (row 3) to after the competency table (row 4): the
+    // target is row 4 before the move and row 3 after it.
+    const moved = S.placeAt(f, 'teacher-narrative', { page: 0, row: 3, side: 'after' });
+    expect(rows(moved.pages[0])).toEqual([
+      ['header'],
+      ['academic-summary'],
+      ['competency-table'],
+      ['teacher-narrative'],
+      ['next-steps'],
+    ]);
+    expect(S.cellOf(moved, 'teacher-narrative')).toMatchObject({ height: 'fixed', lines: 8 });
+  });
+
+  it('dropping a block beside itself or on its own row changes nothing', () => {
+    const f = S.form();
+    expect(S.placeAt(f, 'next-steps', { page: 0, row: 4, side: 'after' })).toEqual(f);
+    expect(S.placeAt(f, 'next-steps', { page: 0, row: 4, side: 'left' })).toEqual(f);
+  });
+
+  it('moves a block from the back beside one on the front', () => {
+    const f = S.placeAt(S.form(), 'learner-dimensions', { page: 0, row: 3, side: 'right' });
+    expect(rows(f.pages[0])[3]).toEqual(['competency-table', 'learner-dimensions']);
+    expect(rows(f.pages[1])).toEqual([['parent-response']]);
+  });
+});

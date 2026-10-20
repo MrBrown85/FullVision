@@ -360,6 +360,7 @@ window.PageReports = (function () {
     output.innerHTML = ReportStudio.layoutHtml({ view: studioView });
     renderStudioPanels();
     renderReportPreview();
+    _mountStudioDrag();
 
     // Highlight selected students in sidebar for progress tab
     if (selectedStudentIds && selectedStudentIds.length > 0) {
@@ -434,11 +435,32 @@ window.PageReports = (function () {
     preview.querySelectorAll('.sheet-cell.studio-sel').forEach(function (el) {
       el.classList.remove('studio-sel');
     });
-    if (!studioSelected) return;
-    preview.querySelectorAll('.sheet-cell[data-block="' + studioSelected + '"]').forEach(function (el) {
-      el.classList.add('studio-sel');
+    preview.querySelectorAll('.studio-handle').forEach(function (el) {
+      el.remove();
     });
+    preview.querySelectorAll('.sheet-cell[data-block]').forEach(function (el) {
+      if (el.dataset.block !== 'header') el.setAttribute('tabindex', '0');
+    });
+    if (!studioSelected) return;
+    var f = _formOf();
+    var resizable = ReportSheets.spanChoices(f, studioSelected).length > 1;
+    preview.querySelectorAll('.sheet-cell[data-block="' + studioSelected + '"]').forEach(function (el, i) {
+      el.classList.add('studio-sel');
+      if (resizable && i === 0) {
+        var h = document.createElement('span');
+        h.className = 'studio-handle';
+        h.dataset.handle = studioSelected;
+        h.setAttribute('aria-hidden', 'true');
+        el.appendChild(h);
+      }
+    });
+    if (_focusBlock) {
+      var target = preview.querySelector('.sheet-cell[data-block="' + _focusBlock + '"]');
+      _focusBlock = null;
+      if (target) target.focus({ preventScroll: true });
+    }
   }
+  var _focusBlock = null;
 
   /* ── The rail: sheets per student ──────────────────────────────
      On the Report Card, each sidebar row shows how many sheets the
@@ -896,6 +918,60 @@ window.PageReports = (function () {
     _renderStudioStats();
   }
 
+  function _announce(text) {
+    var live = document.getElementById('studio-live');
+    if (live) live.textContent = text;
+  }
+
+  function _previewStudent() {
+    return _previewStudents()[0] || null;
+  }
+
+  var _studioDrag = null;
+  function _mountStudioDrag() {
+    if (_studioDrag) _studioDrag.destroy();
+    var root = document.getElementById('studio');
+    if (!root) return;
+    _studioDrag = ReportStudio.initDrag(root, {
+      form: _formOf,
+      setForm: function (f) {
+        if (document.activeElement && document.activeElement.closest && document.activeElement.closest('.sheet-cell')) {
+          _focusBlock = document.activeElement.closest('.sheet-cell').dataset.block;
+        }
+        _setForm(f);
+      },
+      fit: function (slot, id) {
+        var st = _previewStudent();
+        if (!st) return null;
+        try {
+          return ReportSheets.fitAt(activeCourse, st, ReportBlocks.reportContext(), {
+            form: _formOf(),
+            paper: reportPaper,
+            slot: slot,
+            block: id,
+          });
+        } catch (e) {
+          return null;
+        }
+      },
+      announce: _announce,
+      select: _selectBlock,
+      label: function (id) {
+        return ReportSheets.BLOCKS[id] ? ReportSheets.BLOCKS[id].label : id;
+      },
+      span: function (id, span) {
+        _focusBlock = id;
+        _setForm(ReportSheets.setSpan(_formOf(), id, span));
+        _announce(ReportSheets.BLOCKS[id].label + ' is now ' + ReportStudio.spanWord(span) + '.');
+      },
+      remove: function (id) {
+        studioSelected = null;
+        _setForm(ReportSheets.removeCell(_formOf(), id));
+        _announce(ReportSheets.BLOCKS[id].label + ' removed from the report.');
+      },
+    });
+  }
+
   /* ── Course switching ────────────────────────────────────────── */
   async function switchCourse(cid) {
     activeCourse = cid;
@@ -991,7 +1067,7 @@ window.PageReports = (function () {
 
     var cell = e.target.closest('.studio-pages .sheet-cell[data-block]');
     if (cell && studioView === 'one' && !viewingIssue) {
-      _selectBlock(cell.dataset.block);
+      if (!e.target.closest('.studio-handle')) _selectBlock(cell.dataset.block);
       return;
     }
 
@@ -1047,6 +1123,13 @@ window.PageReports = (function () {
           studioSelected = id;
           _setForm(ReportSheets.placeBlock(_formOf(), id));
         }
+      },
+      studioSpan: function () {
+        if (el.disabled) return;
+        _setForm(ReportSheets.setSpan(_formOf(), el.dataset.block, Number(el.dataset.span)));
+      },
+      studioHeight: function () {
+        _setForm(ReportSheets.setHeight(_formOf(), el.dataset.block, el.dataset.height));
       },
       studioRemove: function () {
         var id = el.dataset.block;
@@ -1137,6 +1220,12 @@ window.PageReports = (function () {
     if (handlers[action]) {
       handlers[action]();
     }
+  }
+
+  function _handleStudioChange(e) {
+    var el = e.target;
+    if (!el || !el.dataset || el.dataset.action !== 'studioLines') return;
+    _setForm(ReportSheets.setHeight(_formOf(), el.dataset.block, 'fixed', Number(el.value)));
   }
 
   function _handleSelectionChange() {
@@ -1319,6 +1408,7 @@ window.PageReports = (function () {
     window._pageSwitchCourse = switchCourse;
 
     _addDocListener('click', _handleClick);
+    _addDocListener('change', _handleStudioChange);
     window.addEventListener('resize', _handleResize);
     _addDocListener('selectionchange', _handleSelectionChange);
     _addDocListener('keyup', _handleKeyup);
@@ -1328,6 +1418,10 @@ window.PageReports = (function () {
   }
 
   function destroy() {
+    if (_studioDrag) {
+      _studioDrag.destroy();
+      _studioDrag = null;
+    }
     // Save any unsaved narrative
     if (RQ.tqNarrativeDirty) tqSaveCurrentIfNeeded();
     var paperStyle = document.getElementById(PAPER_STYLE_ID);
