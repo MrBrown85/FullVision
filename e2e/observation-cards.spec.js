@@ -219,7 +219,12 @@ test.describe('Capture strip (D4), desktop', () => {
     await page.goto('/teacher/app.html#/observations');
     const strip = page.locator('#obs-capture');
     await expect(strip.locator('.obs-band')).toHaveCount(0);
-    await expect(strip.locator('[data-part="who"] .obsc-chip-type')).toHaveText(['Strength', 'Growth', 'Concern', 'Note']);
+    await expect(strip.locator('[data-part="who"] .obsc-chip-type')).toHaveText([
+      'Strength',
+      'Growth',
+      'Concern',
+      'Note',
+    ]);
     await expect(strip.locator('.obsc-chip-type.is-on')).toHaveCount(0);
     await expect(strip.locator('[data-part="who"]')).toContainText('Student');
     await expect(strip.locator('[data-part="who"]')).toContainText('or type @name');
