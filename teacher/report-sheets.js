@@ -422,7 +422,14 @@ window.ReportSheets = (function () {
         if (r.sheets > 1) summary.continued.push(fullName(st));
         if (r.over) summary.over.push(fullName(st));
         if (r.noComment) summary.noComment.push(fullName(st));
-        summary.perStudent[st.id] = { sheets: r.sheets, badge: r.badge, reason: r.reason, noComment: r.noComment };
+        summary.perStudent[st.id] = {
+          sheets: r.sheets,
+          badge: r.badge,
+          reason: r.reason,
+          noComment: r.noComment,
+          name: fullName(st),
+          html: r.html,
+        };
         return r.html;
       })
       .join('');
@@ -503,5 +510,6 @@ window.ReportSheets = (function () {
     renderPreview: renderPreview,
     summaryText: summaryText,
     clearPageStyle: clearPageStyle,
+    setPageStyle: _setPageStyle,
   };
 })();

@@ -112,6 +112,33 @@ test.describe('Report Card sheets', () => {
     await expect(page.locator('.sheet-note').first()).toContainText('Comment is');
   });
 
+  test('Issue saves a fixed copy that can be shown and printed again', async ({ page }) => {
+    await openReportCard(page);
+    await expect(page.getByRole('button', { name: 'Issue Reports…' })).toBeVisible();
+    await page.getByRole('button', { name: 'Issue Reports…' }).click();
+    const dialog = page.locator('#issue-overlay');
+    await expect(dialog).toContainText('Issue 27 Reports');
+    await expect(dialog).toContainText('A fixed copy of every report');
+    await expect(dialog.locator('input[name="issue-who"]')).toHaveCount(1);
+    await dialog.locator('#issue-print').uncheck();
+    await expect(dialog.locator('[data-issue="go"]')).toHaveText('Issue');
+    await dialog.locator('[data-issue="go"]').click();
+    await expect(dialog).toHaveCount(0);
+    await expect(page.locator('#rb-form-summary')).toContainText(/Issued .* · 27 reports saved as a fixed copy/);
+    const copies = page.locator('#report-copy');
+    await expect(copies).toBeVisible();
+    await expect(copies.locator('option')).toHaveCount(2);
+    await copies.selectOption({ index: 1 });
+    await expect(page.locator('.report-sheet')).toHaveCount(STUDENTS * 2);
+    await expect(page.getByRole('button', { name: 'Print This Copy' })).toBeVisible();
+    await copies.selectOption({ index: 0 });
+    await expect(page.getByRole('button', { name: 'Issue Reports…' })).toBeVisible();
+    await page.getByRole('button', { name: 'Issue Reports…' }).click();
+    await expect(page.locator('#issue-overlay input[name="issue-who"]')).toHaveCount(2);
+    await expect(page.locator('#issue-overlay')).toContainText('Changed since the last issue');
+    await expect(page.locator('#issue-overlay input[value="changed"]')).toBeDisabled();
+  });
+
   test('Photocopy view turns the levels black on screen', async ({ page }) => {
     await openReportCard(page);
     const chip = page.locator('.report-sheet .report-section-chip-value').first();

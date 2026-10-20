@@ -70,7 +70,9 @@ test.describe('One primary action per screen', () => {
       await page.goto('/teacher/app.html#/reports');
       await page.locator(`.report-seg-btn[data-tab="${tab}"]`).click();
       await expect(page.locator('#tb-print-btn')).toBeVisible();
-      expect(await solidPrimaries(page)).toEqual(['Print Reports']);
+      // The Report Card issues a fixed copy before it prints; the Class
+      // Summary prints.
+      expect(await solidPrimaries(page)).toEqual([tab === 'progress' ? 'Issue Reports…' : 'Print Reports']);
     });
   }
 });
