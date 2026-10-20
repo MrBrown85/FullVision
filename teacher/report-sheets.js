@@ -319,6 +319,102 @@ window.ReportSheets = (function () {
     return f;
   }
 
+  /* ── Setup choices (DECISIONS "Report forms" 8) ────────────────
+     The screen offers a few named choices and the form decides where
+     things go: which form, type size, comment room as a word, and which
+     optional blocks are on. Each optional block has one place. */
+  var ROOM_CHOICES = { short: 5, standard: 8, long: 12 };
+  function roomChoice(f) {
+    var it = f.front.concat(f.back).find(function (q) {
+      return q.block === 'teacher-narrative';
+    });
+    if (!it) return null;
+    var lines = (it.room && it.room.lines) || 8;
+    return lines <= 6 ? 'short' : lines <= 9 ? 'standard' : 'long';
+  }
+  function setRoomChoice(f, choice) {
+    return setRoom(f, ROOM_CHOICES[choice] || ROOM_CHOICES.standard);
+  }
+  var INCLUDES = [
+    { id: 'attendance', label: 'Attendance', blocks: ['attendance'] },
+    { id: 'dispositions', label: 'Learning Dispositions', blocks: ['learner-dimensions'] },
+    {
+      id: 'reflection',
+      label: 'Student Reflection',
+      blocks: ['student-reflection-learning', 'student-reflection-habits'],
+    },
+    { id: 'response', label: 'Parent / Guardian Response', blocks: ['parent-response'] },
+  ];
+  function includes(f) {
+    var on = onForm(f);
+    return INCLUDES.map(function (inc) {
+      return {
+        id: inc.id,
+        label: inc.label,
+        on: inc.blocks.every(function (b) {
+          return on.indexOf(b) >= 0;
+        }),
+      };
+    });
+  }
+  function _removeBlock(f, id) {
+    f = _clone(f);
+    ['front', 'back'].forEach(function (side) {
+      var list = _list(f, side);
+      for (var i = list.length - 1; i >= 0; i--) {
+        if (list[i].pair) {
+          var cells = list[i].pair.filter(function (q) {
+            return q.block !== id;
+          });
+          if (cells.length < 2) list.splice.apply(list, [i, 1].concat(cells));
+        } else if (list[i].block === id) {
+          list.splice(i, 1);
+        }
+      }
+    });
+    return f;
+  }
+  function setInclude(f, id, on) {
+    var inc = INCLUDES.find(function (x) {
+      return x.id === id;
+    });
+    if (!inc) return f;
+    if (!on) {
+      inc.blocks.forEach(function (b) {
+        f = _removeBlock(f, b);
+      });
+      return normalizeForm(f);
+    }
+    if (id === 'attendance') {
+      f = _removeBlock(f, 'attendance');
+      var at = f.front.findIndex(function (q) {
+        return q.block === 'competency-table';
+      });
+      if (at >= 0) {
+        f = _clone(f);
+        f.front.splice(at + 1, 0, _fill({ block: 'attendance' }));
+        f = pairWith(f, 'front', at);
+      } else {
+        f = addBlock(f, 'attendance', 'front');
+      }
+    } else if (id === 'dispositions') {
+      f = addBlock(_removeBlock(f, 'learner-dimensions'), 'learner-dimensions', 'back');
+      f = _clone(f);
+      var i = f.back.findIndex(function (q) {
+        return q.block === 'learner-dimensions';
+      });
+      f.back.unshift(f.back.splice(i, 1)[0]);
+    } else if (id === 'reflection') {
+      inc.blocks.forEach(function (b) {
+        f = addBlock(_removeBlock(f, b), b, 'back');
+      });
+    } else if (id === 'response') {
+      f = addBlock(_removeBlock(f, 'parent-response'), 'parent-response', 'back');
+      f = setPinned(f, 'parent-response', true);
+    }
+    return normalizeForm(f);
+  }
+
   /* ── Starters and the teacher's library ─────────────────────── */
   var STARTERS = [
     {
@@ -952,6 +1048,48 @@ window.ReportSheets = (function () {
     }
   }
 
+  /* Sheets per student on each starter form, for the setup list: what a
+     form costs the class is known before it is chosen. Lays every student
+     out on each form on a stage off-screen; a class of 30 takes well under
+     a second. Returns { formId: { most, max } }, most being the sheet
+     count the largest number of students need. */
+  function sheetsForForms(cid, students, ctx, opts) {
+    opts = opts || {};
+    var paper = PAPER[opts.paper] ? opts.paper : 'letter';
+    var contentW = (PAPER[paper].w - 2 * MARGIN_IN) * PX_PER_IN;
+    var type = opts.type === 'compact' ? 'compact' : 'standard';
+    var out = {};
+    STARTERS.forEach(function (st) {
+      var f = normalizeForm(Object.assign({}, st.form, { id: st.id, name: st.name, type: type }));
+      var stage = _stage(document.body, contentW, f.type);
+      try {
+        var probe = _probe(stage);
+        var counts = {};
+        students.forEach(function (student) {
+          var r = layoutStudent(cid, student, ctx, { form: f, paper: paper, stage: stage, probe: probe });
+          counts[r.sheets] = (counts[r.sheets] || 0) + 1;
+        });
+        var sheets = Object.keys(counts).map(Number);
+        var most = sheets.sort(function (a, b) {
+          return counts[b] - counts[a] || a - b;
+        })[0];
+        out[st.id] = { most: most || 1, max: sheets.length ? Math.max.apply(null, sheets) : 1 };
+      } finally {
+        stage.remove();
+      }
+    });
+    return out;
+  }
+  /* "1 sheet each", "2 sheets each", "Most need 1 sheet; some 2". */
+  function fitLabel(fit) {
+    if (!fit) return '';
+    var word = function (n) {
+      return n + (n === 1 ? ' sheet' : ' sheets');
+    };
+    if (fit.most === fit.max) return word(fit.most) + ' each';
+    return 'Most need ' + word(fit.most) + '; some ' + fit.max;
+  }
+
   /* What the comment box tells the teacher while they write. Never a cap:
      the form never shrinks a student's words. */
   function fitText(r) {
@@ -1013,6 +1151,11 @@ window.ReportSheets = (function () {
     unpair: unpair,
     starters: starters,
     starter: starter,
+    ROOM_CHOICES: ROOM_CHOICES,
+    roomChoice: roomChoice,
+    setRoomChoice: setRoomChoice,
+    includes: includes,
+    setInclude: setInclude,
     templates: templates,
     syncTemplates: syncTemplates,
     saveTemplate: saveTemplate,
@@ -1021,6 +1164,8 @@ window.ReportSheets = (function () {
     pack: pack,
     reasonText: reasonText,
     describeStudent: describeStudent,
+    sheetsForForms: sheetsForForms,
+    fitLabel: fitLabel,
     fitText: fitText,
     paperSize: paperSize,
     layoutStudent: layoutStudent,

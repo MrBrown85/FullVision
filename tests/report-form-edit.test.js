@@ -168,3 +168,75 @@ describe('ReportSheets reorder, pairs, starters and the library', () => {
     v2.deleteReportTemplate = kept.del;
   });
 });
+
+describe('ReportSheets setup choices', () => {
+  const base = () => ReportSheets.normalizeForm(undefined);
+  const blocks = f => ids(f.front).concat(ids(f.back));
+
+  it('reads the comment room as a word and sets it from one', () => {
+    expect(ReportSheets.roomChoice(base())).toBe('standard');
+    const short = ReportSheets.setRoomChoice(base(), 'short');
+    expect(short.front[2].room).toEqual({ lines: 5 });
+    expect(ReportSheets.roomChoice(short)).toBe('short');
+    expect(ReportSheets.roomChoice(ReportSheets.setRoomChoice(base(), 'long'))).toBe('long');
+    expect(ReportSheets.roomChoice(ReportSheets.setRoomChoice(base(), 'nope'))).toBe('standard');
+    const noComment = ReportSheets.normalizeForm({
+      front: [{ block: 'header' }, { block: 'academic-summary' }],
+      back: [],
+    });
+    expect(ReportSheets.roomChoice(noComment)).toBeNull();
+  });
+
+  it('lists the optional blocks with whether each is on', () => {
+    expect(ReportSheets.includes(base())).toEqual([
+      { id: 'attendance', label: 'Attendance', on: true },
+      { id: 'dispositions', label: 'Learning Dispositions', on: true },
+      { id: 'reflection', label: 'Student Reflection', on: false },
+      { id: 'response', label: 'Parent / Guardian Response', on: true },
+    ]);
+    const interim = ReportSheets.starter('interim-update');
+    expect(ReportSheets.includes(interim).map(i => i.on)).toEqual([false, false, false, false]);
+  });
+
+  it('attendance leaves the pair when off and comes back beside the competencies when on', () => {
+    const off = ReportSheets.setInclude(base(), 'attendance', false);
+    expect(ids(off.front)).toEqual([
+      'header',
+      'academic-summary',
+      'teacher-narrative',
+      'competency-table',
+      'next-steps',
+    ]);
+    const on = ReportSheets.setInclude(off, 'attendance', true);
+    expect(ids(on.front)).toEqual(ids(base().front));
+    // Without a competency table it goes on the front by itself.
+    const interim = ReportSheets.setInclude(ReportSheets.starter('interim-update'), 'attendance', true);
+    expect(ids(interim.front).pop()).toBe('attendance');
+  });
+
+  it('dispositions lead the back, the reflection follows them, the response stays pinned last', () => {
+    let f = ReportSheets.starter('interim-update');
+    f = ReportSheets.setInclude(f, 'response', true);
+    f = ReportSheets.setInclude(f, 'reflection', true);
+    f = ReportSheets.setInclude(f, 'dispositions', true);
+    expect(ids(f.back)).toEqual([
+      'learner-dimensions',
+      'student-reflection-learning',
+      'student-reflection-habits',
+      'parent-response',
+    ]);
+    expect(f.back[3].pinned).toBe('bottom');
+    f = ReportSheets.setInclude(f, 'reflection', false);
+    expect(ids(f.back)).toEqual(['learner-dimensions', 'parent-response']);
+    f = ReportSheets.setInclude(f, 'response', false);
+    f = ReportSheets.setInclude(f, 'dispositions', false);
+    expect(f.back).toEqual([]);
+    expect(blocks(f)).toEqual(ids(ReportSheets.starter('interim-update').front));
+  });
+
+  it('turning a block on twice adds it once, and an unknown include changes nothing', () => {
+    const twice = ReportSheets.setInclude(ReportSheets.setInclude(base(), 'reflection', true), 'reflection', true);
+    expect(blocks(twice).filter(b => b.startsWith('student-reflection'))).toHaveLength(2);
+    expect(ReportSheets.setInclude(base(), 'bogus', true)).toEqual(base());
+  });
+});
