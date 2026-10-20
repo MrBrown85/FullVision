@@ -373,7 +373,7 @@ window.PageReports = (function () {
     }
     Preview.renderReportPreview({
       cid: activeCourse,
-      selectedStudentIds: selectedStudentIds,
+      selectedStudentIds: _previewOverride() || selectedStudentIds,
       reportConfig: reportConfig,
       paper: reportPaper,
       onSheets: _rememberSummary,
@@ -441,8 +441,11 @@ window.PageReports = (function () {
   var viewingIssue = null; // the loaded copy while one is shown
 
   function _rememberSummary(summary) {
-    _lastSummary = summary;
-    _annotateSidebar(summary);
+    // A Preview With pick shows one student; the class summary stays.
+    if (!_previewOverride()) {
+      _lastSummary = summary;
+      _annotateSidebar(summary);
+    }
     _populateCopies();
   }
 
@@ -750,6 +753,7 @@ window.PageReports = (function () {
 
   function setEditLayout(on) {
     editLayout = !!on && ReportBuilderUI.usesSheets(reportConfig);
+    if (!editLayout) _previewPick = '';
     var banner = document.getElementById('rb-edit-banner');
     if (banner) banner.hidden = !editLayout;
     var btn = document.getElementById('tb-edit-layout-btn');
@@ -775,11 +779,137 @@ window.PageReports = (function () {
   function _formOf() {
     return ReportSheets.formFor(reportConfig);
   }
+  function _labelAt(f, side, idx) {
+    var it = (side === 'back' ? f.back : f.front)[idx];
+    if (!it) return 'The block';
+    return it.pair
+      ? it.pair
+          .map(function (q) {
+            return q.label;
+          })
+          .join(' and ')
+      : it.label;
+  }
+  function _keyOf(f, side, idx) {
+    var it = (side === 'back' ? f.back : f.front)[idx];
+    if (!it) return '';
+    return it.pair
+      ? it.pair
+          .map(function (q) {
+            return q.block;
+          })
+          .join('+')
+      : it.block;
+  }
+  function _focusGrip(key) {
+    var grip = document.querySelector('.rb-form-block[data-key="' + key + '"] .rb-form-grip');
+    if (grip) grip.focus();
+  }
+
+  /* Arrow keys on a grip move the block; the live region says where it went. */
+  function _handleGripKey(e) {
+    var grip = e.target && e.target.closest ? e.target.closest('.rb-form-grip') : null;
+    if (!grip || !editLayout) return;
+    var side = grip.dataset.side;
+    var idx = Number(grip.dataset.idx);
+    var f = _formOf();
+    var key = _keyOf(f, side, idx);
+    var label = _labelAt(f, side, idx);
+    var next = null;
+    var where = '';
+    if (e.key === 'ArrowUp') {
+      next = ReportSheets.moveItem(f, side, idx, -1);
+      where = 'up';
+    } else if (e.key === 'ArrowDown') {
+      next = ReportSheets.moveItem(f, side, idx, 1);
+      where = 'down';
+    } else if (e.key === 'ArrowLeft' && side === 'back') {
+      next = ReportSheets.moveToSide(f, side, idx);
+      where = 'to the front';
+    } else if (e.key === 'ArrowRight' && side === 'front') {
+      next = ReportSheets.moveToSide(f, side, idx);
+      where = 'to the back';
+    }
+    if (!next) return;
+    e.preventDefault();
+    if (JSON.stringify(next) === JSON.stringify(f)) {
+      _announce(label + ' cannot move ' + where + '.');
+      return;
+    }
+    _setForm(next);
+    var list = where === 'to the back' ? 'back' : where === 'to the front' ? 'front' : side;
+    var at = (list === 'back' ? next.back : next.front).findIndex(function (it) {
+      return (
+        (it.pair
+          ? it.pair
+              .map(function (q) {
+                return q.block;
+              })
+              .join('+')
+          : it.block) === key
+      );
+    });
+    _announce(
+      label +
+        ' moved ' +
+        where +
+        ': position ' +
+        (at + 1) +
+        ' of ' +
+        (list === 'back' ? next.back : next.front).length +
+        ' on the ' +
+        list +
+        '.',
+    );
+    _focusGrip(key);
+  }
+
+  /* Preview With: the longest, a typical and the shortest student in the
+     class, by how much of the form their content fills. */
+  var _previewPick = '';
+  function _previewWith() {
+    var s = _lastSummary && _lastSummary.perStudent;
+    if (!s) return null;
+    var rows = Object.keys(s)
+      .map(function (sid) {
+        return { sid: sid, name: s[sid].name, used: s[sid].used || 0 };
+      })
+      .sort(function (a, b) {
+        return b.used - a.used;
+      });
+    if (rows.length < 2) return null;
+    return { longest: rows[0], typical: rows[Math.floor(rows.length / 2)], shortest: rows[rows.length - 1] };
+  }
+  function _previewOverride() {
+    if (!editLayout || !_previewPick) return null;
+    var pw = _previewWith();
+    return pw && pw[_previewPick] ? [pw[_previewPick].sid] : null;
+  }
+
+  function _announce(text) {
+    var live = document.getElementById('rb-live');
+    if (live) live.textContent = text;
+  }
 
   function renderBuilderBlocks() {
     const container = document.getElementById('rb-blocks');
     if (!container) return;
-    container.innerHTML = Builder.renderBuilderBlocks(reportConfig, editLayout);
+    container.innerHTML = Builder.renderBuilderBlocks(reportConfig, editLayout, {
+      previewWith: _previewWith(),
+      pick: _previewPick,
+    });
+    if (editLayout) {
+      Builder.initFormDrag(container, {
+        onReorder: function (side, from, to) {
+          var f = _formOf();
+          var label = _labelAt(f, side, from);
+          _setForm(ReportSheets.reorder(f, side, from, to));
+          _announce(label + ' moved to position ' + (to + 1) + ' on the ' + side + '.');
+        },
+        onCancel: renderBuilderBlocks,
+      });
+    }
+    if (!editLayout) return;
     Builder.initPointerDrag(container, {
       onReorder: function (startIdx, finalIdx) {
         var moved = reportConfig.blocks.splice(startIdx, 1)[0];
@@ -969,6 +1099,32 @@ window.PageReports = (function () {
       rbFormReset: function () {
         _setForm(ReportSheets.form());
       },
+      rbFormPair: function () {
+        _setForm(ReportSheets.pairWith(_formOf(), el.dataset.side, Number(el.dataset.idx)));
+      },
+      rbFormUnpair: function () {
+        _setForm(ReportSheets.unpair(_formOf(), el.dataset.side, Number(el.dataset.idx)));
+      },
+      rbFormPreviewWith: function () {
+        _previewPick = el.dataset.pick || '';
+        renderBuilderBlocks();
+        renderReportPreview();
+      },
+      rbFormStarter: function () {
+        var f = ReportSheets.starter(el.dataset.starter);
+        if (f) _setForm(f);
+      },
+      rbFormApplyTemplate: function () {
+        var f = ReportSheets.template(el.dataset.id);
+        if (f) _setForm(f);
+      },
+      rbFormDeleteTemplate: function () {
+        ReportSheets.removeTemplate(el.dataset.id);
+        renderBuilderBlocks();
+      },
+      rbFormGrip: function () {
+        /* the grip is for dragging and the arrow keys; a click does nothing */
+      },
       tqSeePage: function () {
         tqSaveCurrentIfNeeded();
         selectedStudentIds = [el.dataset.sid];
@@ -1041,6 +1197,20 @@ window.PageReports = (function () {
     if (handlers[action]) {
       handlers[action]();
     }
+  }
+
+  function _handleFormSubmit(e) {
+    var form = e.target && e.target.closest ? e.target.closest('form[data-action="rbFormSaveTemplate"]') : null;
+    if (!form) return;
+    e.preventDefault();
+    var input = document.getElementById('rb-template-name');
+    var entry = ReportSheets.saveTemplate(input ? input.value : '', _formOf());
+    if (!entry) {
+      if (input) input.focus();
+      return;
+    }
+    renderBuilderBlocks();
+    _announce('Saved ' + entry.name + ' to your library.');
   }
 
   function _handleFormChange(e) {
@@ -1221,6 +1391,8 @@ window.PageReports = (function () {
 
     _addDocListener('click', _handleClick);
     _addDocListener('change', _handleFormChange);
+    _addDocListener('submit', _handleFormSubmit);
+    _addDocListener('keydown', _handleGripKey);
     window.addEventListener('resize', _handleResize);
     _addDocListener('selectionchange', _handleSelectionChange);
     _addDocListener('keyup', _handleKeyup);

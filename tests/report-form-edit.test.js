@@ -95,3 +95,68 @@ describe('ReportSheets editing helpers', () => {
     expect(ReportSheets.setType(f, 'compact').type).toBe('compact');
   });
 });
+
+describe('ReportSheets reorder, pairs, starters and the library', () => {
+  const base = () => ReportSheets.form();
+  const ids = list => list.map(it => (it.pair ? it.pair.map(q => q.block).join('+') : it.block));
+
+  it('reorder drops a block where it is dragged, never above the letterhead or below the pinned block', () => {
+    let f = ReportSheets.reorder(base(), 'front', 4, 1);
+    expect(ids(f.front)).toEqual([
+      'header',
+      'next-steps',
+      'academic-summary',
+      'teacher-narrative',
+      'competency-table+attendance',
+    ]);
+    f = ReportSheets.reorder(base(), 'front', 2, 0);
+    expect(ids(f.front)[0]).toBe('header');
+    expect(ids(f.front)[1]).toBe('teacher-narrative');
+    f = ReportSheets.moveToSide(base(), 'front', 4);
+    f = ReportSheets.reorder(f, 'back', 0, 5);
+    expect(ids(f.back)).toEqual(['next-steps', 'learner-dimensions', 'parent-response']);
+  });
+
+  it('pairs two fixed neighbours and splits a pair', () => {
+    let f = ReportSheets.unpair(base(), 'front', 3);
+    expect(ids(f.front)).toEqual([
+      'header',
+      'academic-summary',
+      'teacher-narrative',
+      'competency-table',
+      'attendance',
+      'next-steps',
+    ]);
+    expect(ReportSheets.canPair(f.front[3], f.front[4])).toBe(true);
+    expect(ReportSheets.canPair(f.front[2], f.front[3])).toBe(false);
+    f = ReportSheets.pairWith(f, 'front', 3);
+    expect(ids(f.front)).toEqual([
+      'header',
+      'academic-summary',
+      'teacher-narrative',
+      'competency-table+attendance',
+      'next-steps',
+    ]);
+  });
+
+  it('starters are whole forms', () => {
+    expect(ReportSheets.starters().map(s => s.id)).toEqual(['report-card', 'interim-update', 'conference-pack']);
+    const interim = ReportSheets.starter('interim-update');
+    expect(ids(interim.front)).toEqual(['header', 'academic-summary', 'teacher-narrative', 'next-steps', 'legend']);
+    expect(interim.front[2].room).toEqual({ lines: 6 });
+    expect(interim.back).toEqual([]);
+    expect(ids(ReportSheets.starter('conference-pack').front)).toContain('grade-table');
+    expect(ReportSheets.starter('nope')).toBeNull();
+  });
+
+  it('saves, lists, applies and removes a form in the library', () => {
+    localStorage.clear();
+    expect(ReportSheets.saveTemplate('   ', base())).toBeNull();
+    const entry = ReportSheets.saveTemplate('Humanities 8 · Report Card', ReportSheets.setType(base(), 'compact'));
+    expect(ReportSheets.templates().map(t => t.name)).toEqual(['Humanities 8 · Report Card']);
+    expect(ReportSheets.template(entry.id).type).toBe('compact');
+    expect(ReportSheets.template(entry.id).name).toBe('Humanities 8 · Report Card');
+    ReportSheets.removeTemplate(entry.id);
+    expect(ReportSheets.templates()).toEqual([]);
+  });
+});

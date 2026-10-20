@@ -2092,6 +2092,127 @@
   border-color: var(--active);
 }
 
+/* The rail widens while editing so a block's name and its controls share a
+   row; when they cannot, the controls wrap under the name. */
+.rb-panel:has(.rb-form-editing) {
+  width: 340px;
+}
+.rb-form-row {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+.rb-form-label {
+  flex: 1 1 120px;
+}
+.rb-form-controls {
+  margin-left: auto;
+}
+
+/* Grip, pairs, starters and the library in Edit Layout. */
+.rb-form-grip {
+  flex-shrink: 0;
+  width: 20px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-3);
+  font-size: var(--text-sm);
+  cursor: grab;
+  border-radius: 4px;
+}
+.rb-form-grip:focus-visible {
+  outline: 2px solid var(--active);
+  color: var(--text);
+}
+.rb-form-block.dragging {
+  opacity: 0.9;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+}
+.rb-form-list {
+  min-height: 8px;
+}
+.rb-form-starters {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 2px 4px;
+}
+.rb-form-starter {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  font: inherit;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+.rb-form-starter:hover {
+  border-color: var(--active);
+}
+.rb-form-starter b {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.rb-form-starter span {
+  font-size: var(--text-2xs);
+  color: var(--text-3);
+  line-height: 1.4;
+}
+.rb-form-library {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 2px 4px;
+}
+.rb-form-template {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.rb-form-apply {
+  flex: 1;
+  text-align: left;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+.rb-form-apply:hover {
+  border-color: var(--active);
+}
+.rb-form-save {
+  display: flex;
+  gap: 6px;
+  padding: 6px 2px 2px;
+}
+.rb-form-text {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: var(--text-sm);
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+.rb-form-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 /* The toolbar's copy picker. */
 #report-copy {
   max-width: 220px;

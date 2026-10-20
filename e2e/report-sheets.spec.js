@@ -171,6 +171,51 @@ test.describe('Report Card sheets', () => {
     await expect(page.locator('.report-sheet.compact')).toHaveCount(0);
   });
 
+  test('Edit Layout: Preview With, pairs, the arrow keys, starters and the library', async ({ page }) => {
+    await openReportCard(page);
+    await page.getByRole('button', { name: 'Edit Layout' }).click();
+    // Preview With shows one student at a time; Everyone brings them back.
+    const group = page.getByRole('radiogroup', { name: 'Preview with' });
+    await expect(group.getByRole('radio')).toHaveCount(4);
+    await group.getByRole('radio', { name: /^Longest/ }).click();
+    await expect(page.locator('.sheet-student')).toHaveCount(1);
+    await group.getByRole('radio', { name: 'Everyone' }).click();
+    await expect(page.locator('.sheet-student')).toHaveCount(STUDENTS);
+    // Unpair the competency table and attendance, then pair them again.
+    const pair = page.locator('.rb-form-block[data-key="competency-table+attendance"]');
+    await pair.getByRole('button', { name: 'Put these blocks one above the other' }).click();
+    await expect(page.locator('.rb-form-block[data-key="competency-table"]')).toHaveCount(1);
+    await page
+      .locator('.rb-form-block[data-key="competency-table"]')
+      .getByRole('button', { name: 'Put this block beside the next one' })
+      .click();
+    await expect(page.locator('.rb-form-block[data-key="competency-table+attendance"]')).toHaveCount(1);
+    // The arrow keys move a block and the live region says so.
+    const grip = page.locator('.rb-form-block[data-key="next-steps"] .rb-form-grip');
+    await grip.focus();
+    await page.keyboard.press('ArrowUp');
+    await expect(page.locator('#rb-live')).toContainText(
+      'Growth and Next Steps moved up: position 4 of 5 on the front.',
+    );
+    await expect(page.locator('.rb-form-block[data-key="next-steps"]')).toHaveAttribute('data-idx', '3');
+    await page.locator('.rb-form-block[data-key="next-steps"] .rb-form-grip').focus();
+    await page.keyboard.press('ArrowRight');
+    await expect(page.locator('#rb-live')).toContainText('moved to the back');
+    await expect(page.locator('.rb-form-block[data-side="back"][data-key="next-steps"]')).toHaveCount(1);
+    // Save to the library, apply a starter, apply the saved form.
+    await page.locator('#rb-template-name').fill('My Science 8 form');
+    await page.getByRole('button', { name: 'Save to Library' }).click();
+    await expect(page.locator('.rb-form-apply', { hasText: 'My Science 8 form' })).toHaveCount(1);
+    await page.locator('.rb-form-starter', { hasText: 'Interim Update' }).click();
+    await expect(page.locator('.rb-form-block[data-key="legend"]')).toHaveCount(1);
+    await expect(page.locator('.rb-form-block[data-side="back"]')).toHaveCount(0);
+    expect(await overflowing(page)).toEqual([]);
+    await page.locator('.rb-form-apply', { hasText: 'My Science 8 form' }).click();
+    await expect(page.locator('.rb-form-block[data-side="back"][data-key="next-steps"]')).toHaveCount(1);
+    await page.getByRole('button', { name: 'Reset to the Report Card' }).click();
+    await page.getByRole('button', { name: 'Done' }).click();
+  });
+
   test('Photocopy view turns the levels black on screen', async ({ page }) => {
     await openReportCard(page);
     const chip = page.locator('.report-sheet .report-section-chip-value').first();

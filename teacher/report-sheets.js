@@ -273,6 +273,146 @@ window.ReportSheets = (function () {
     f.type = type === 'compact' ? 'compact' : 'standard';
     return f;
   }
+  /* Drags: the block at `from` lands at `to` on the same side. */
+  function reorder(f, side, from, to) {
+    f = _clone(f);
+    var list = _list(f, side);
+    if (!list[from] || list[from].locked || list[from].pinned) return f;
+    var min = side === 'front' ? 1 : 0;
+    var max = list.length - 1;
+    if (list[max] && list[max].pinned) max -= 1;
+    to = Math.max(min, Math.min(max, Number(to) || 0));
+    if (from === to) return f;
+    var it = list.splice(from, 1)[0];
+    list.splice(to, 0, it);
+    return f;
+  }
+  /* Two fixed blocks side by side: the block at idx with the one after it. */
+  function pairWith(f, side, idx) {
+    f = _clone(f);
+    var list = _list(f, side);
+    var a = list[idx],
+      b = list[idx + 1];
+    if (!canPair(a, b)) return f;
+    list.splice(idx, 2, { pair: [a, b] });
+    return f;
+  }
+  function canPair(a, b) {
+    return !!(
+      a &&
+      b &&
+      !a.pair &&
+      !b.pair &&
+      a.kind === 'fixed' &&
+      b.kind === 'fixed' &&
+      !a.locked &&
+      !b.locked &&
+      !a.pinned &&
+      !b.pinned
+    );
+  }
+  function unpair(f, side, idx) {
+    f = _clone(f);
+    var list = _list(f, side);
+    if (!list[idx] || !list[idx].pair) return f;
+    list.splice.apply(list, [idx, 1].concat(list[idx].pair));
+    return f;
+  }
+
+  /* ── Starters and the teacher's library ─────────────────────── */
+  var STARTERS = [
+    {
+      id: 'report-card',
+      name: 'Report Card',
+      help: 'Front: grades, comment, competencies, next steps. Back: dispositions and the family response. One sheet, front and back.',
+      form: FORM_REPORT_CARD,
+    },
+    {
+      id: 'interim-update',
+      name: 'Interim Update',
+      help: 'Overall, competencies, a six-line comment, next steps and the legend on one side, for the updates between report cards.',
+      form: {
+        front: [
+          { block: 'header' },
+          { block: 'academic-summary' },
+          { block: 'teacher-narrative', room: { lines: 6 }, whenEmpty: 'box' },
+          { block: 'next-steps', whenEmpty: 'omit' },
+          { block: 'legend' },
+        ],
+        back: [],
+      },
+    },
+    {
+      id: 'conference-pack',
+      name: 'Conference Pack',
+      help: 'The Report Card plus this term\u2019s assignment grades, for parent\u2013teacher conferences. Usually two sheets.',
+      form: {
+        front: [
+          { block: 'header' },
+          { block: 'academic-summary' },
+          { block: 'teacher-narrative', room: { lines: 8 }, whenEmpty: 'box' },
+          { pair: [{ block: 'competency-table' }, { block: 'attendance' }] },
+          { block: 'next-steps', whenEmpty: 'omit' },
+          { block: 'grade-table', whenEmpty: 'omit' },
+        ],
+        back: [{ block: 'learner-dimensions' }, { block: 'parent-response', pinned: 'bottom' }],
+      },
+    },
+  ];
+  function starters() {
+    return STARTERS.map(function (st) {
+      return { id: st.id, name: st.name, help: st.help };
+    });
+  }
+  function starter(id) {
+    var st = STARTERS.find(function (x) {
+      return x.id === id;
+    });
+    return st ? normalizeForm(Object.assign({}, st.form, { id: st.id, name: st.name })) : null;
+  }
+
+  var LIBRARY_KEY = 'gb-report-templates';
+  function templates() {
+    try {
+      var list = JSON.parse(localStorage.getItem(LIBRARY_KEY) || '[]');
+      return Array.isArray(list) ? list : [];
+    } catch (e) {
+      return [];
+    }
+  }
+  function _writeTemplates(list) {
+    try {
+      localStorage.setItem(LIBRARY_KEY, JSON.stringify(list));
+    } catch (e) {
+      /* the library is a convenience on this device */
+    }
+  }
+  function saveTemplate(name, f) {
+    name = String(name || '').trim();
+    if (!name) return null;
+    var entry = {
+      id: 't-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6),
+      name: name,
+      savedAt: new Date().toISOString(),
+      form: normalizeForm(Object.assign({}, _clone(f), { name: name })),
+    };
+    _writeTemplates([entry].concat(templates()).slice(0, 30));
+    return entry;
+  }
+  function removeTemplate(id) {
+    _writeTemplates(
+      templates().filter(function (t) {
+        return t.id !== id;
+      }),
+    );
+  }
+  function template(id) {
+    var t = templates().find(function (x) {
+      return x.id === id;
+    });
+    return t ? normalizeForm(t.form) : null;
+  }
+
   /* Ids on the form, in order. */
   function onForm(f) {
     var ids = [];
@@ -535,9 +675,13 @@ window.ReportSheets = (function () {
     var teacher = (typeof getConfig === 'function' && getConfig().displayName) || '';
     var name = fullName(student);
     var itemHtml = { front: frontHtml, back: backHtml };
+    var used = frontH.concat(backH).reduce(function (a, b) {
+      return a + b;
+    }, pinnedH);
     var result = {
       sheets: sheetCount,
       sides: sides.length,
+      used: used,
       over: false,
       moved: moved,
       continued: continued,
@@ -674,6 +818,7 @@ window.ReportSheets = (function () {
           noComment: r.noComment,
           name: fullName(st),
           html: r.html,
+          used: r.used,
         };
         return r.html;
       })
@@ -760,6 +905,16 @@ window.ReportSheets = (function () {
     setType: setType,
     onForm: onForm,
     available: available,
+    reorder: reorder,
+    pairWith: pairWith,
+    canPair: canPair,
+    unpair: unpair,
+    starters: starters,
+    starter: starter,
+    templates: templates,
+    saveTemplate: saveTemplate,
+    removeTemplate: removeTemplate,
+    template: template,
     pack: pack,
     reasonText: reasonText,
     describeStudent: describeStudent,
