@@ -61,6 +61,8 @@ Built 2026-10-20 as PRs #256 (pure renderers) and #257 (`teacher/report-sheets.j
 - Issue dialog: saves `report_issue` (local in Demo Mode, server row when signed in: migration), "changed since the last issue", before-you-issue list, Print.
 - Layout chooser with Interim Update, Report Card and Conference Pack, recommending only after computing the class's fit.
 
+Built 2026-10-20 as PRs #259 (rail sheet counts with the reason, Fit Map), #260 (the comment box reads the form's room; See the Page) and #261 (Issue Reports…: a fixed copy per student in IndexedDB with a hashed index in localStorage, "changed since the last issue", before-you-issue list, Print; the toolbar's copy picker shows and prints a copy). Not built: the layout chooser (there is one form until Edit Layout) and the server row for issues (`report_issue` needs a migration and an RPC; the copy is local to the browser that issued it until then).
+
 ## Phase 3 · Edit Layout (weeks 4–5)
 
 - Mode banner, Fixed / Flows tags, options panel, Preview With longest / typical / shortest, pairing of fixed blocks, whole-form settings (the reflection and response blocks keep their text), "+ Add a Block", pointer and keyboard drag with live announcements, Save to Library (`report_template`, teacher-level).
