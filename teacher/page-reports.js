@@ -483,7 +483,7 @@ window.PageReports = (function () {
       renderReports();
       return;
     }
-    ReportIssues.load(id).then(function (rec) {
+    ReportIssues.load(id, activeCourse).then(function (rec) {
       if (!rec) {
         viewingIssue = null;
         renderReports();
@@ -727,17 +727,23 @@ window.PageReports = (function () {
       termId: c.ctx.termId,
       termLabel: c.ctx.termLabel,
       paper: reportPaper,
+      form: ReportSheets.normalizeForm(reportConfig.form),
       students: students,
     }).then(function (res) {
       _populateCopies();
       var line = document.getElementById('rb-form-summary');
       if (line) {
+        var where = res.server
+          ? ' saved as a fixed copy to your account.'
+          : res.stored
+            ? ' saved as a fixed copy on this computer.'
+            : ' issued; the copy could not be saved.';
         line.textContent =
           ReportIssues.label(res.entry) +
           ' \u00B7 ' +
           students.length +
           (students.length === 1 ? ' report' : ' reports') +
-          (res.stored ? ' saved as a fixed copy.' : ' issued; this browser could not keep the copy.');
+          where;
       }
       if (doPrint) _printNow();
     });
@@ -973,6 +979,7 @@ window.PageReports = (function () {
     populateStudentSelect();
     populateReportPeriods(false);
     renderReports();
+    _syncFromServer(cid);
     document.getElementById('sidebar-mount').innerHTML = renderSidebar(cid, null);
   }
 
@@ -1305,6 +1312,22 @@ window.PageReports = (function () {
     _showIssue(e.target.value);
   }
 
+  /* The library and the issued copies are kept on the server; this device's
+     copies show at once and are refreshed from it when the page opens or
+     the class changes. Demo Mode and offline keep the device copies. */
+  function _syncFromServer(cid) {
+    if (typeof ReportIssues !== 'undefined' && typeof ReportIssues.sync === 'function') {
+      ReportIssues.sync(cid).then(function (changed) {
+        if (changed && cid === activeCourse) _populateCopies();
+      });
+    }
+    if (typeof ReportSheets.syncTemplates === 'function') {
+      ReportSheets.syncTemplates().then(function (changed) {
+        if (changed && editLayout && activeTab === 'progress') renderBuilderBlocks();
+      });
+    }
+  }
+
   var _resizeTimer = null;
   function _handleResize() {
     if (activeTab !== 'progress' || !ReportBuilderUI.usesSheets(reportConfig)) return;
@@ -1389,6 +1412,7 @@ window.PageReports = (function () {
     if (reportPeriodEl) reportPeriodEl.addEventListener('change', _handleReportPeriodChange);
     var copyEl = document.getElementById('report-copy');
     if (copyEl) copyEl.addEventListener('change', _handleCopyChange);
+    _syncFromServer(activeCourse);
 
     // Wire sidebar clicks
     var sidebarEl = document.getElementById('sidebar-mount');

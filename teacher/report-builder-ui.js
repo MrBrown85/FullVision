@@ -373,7 +373,7 @@ window.ReportBuilderUI = (function () {
         html += '</div>';
       } else {
         html +=
-          '<div class="rb-form-empty">Nothing saved yet. A saved form can be applied to any of your classes on this device.</div>';
+          '<div class="rb-form-empty">Nothing saved yet. A saved form can be applied to any of your classes, on any computer you sign in on.</div>';
       }
       html +=
         '<form class="rb-form-save" data-action="rbFormSaveTemplate"><input type="text" class="rb-form-text" id="rb-template-name" placeholder="Name this form" aria-label="Name for the saved form" maxlength="60"><button type="submit" class="rb-form-reset">Save to Library</button></form>';

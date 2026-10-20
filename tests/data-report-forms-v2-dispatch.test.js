@@ -69,6 +69,21 @@ describe('report forms v2 dispatch', () => {
       expect(client.calls[0].payload.p_id).toBe(TID);
     });
 
+    it('a list read with no rows is an empty array, and a failed one is null', async () => {
+      use({ list_report_templates: [] });
+      expect((await window.v2.listReportTemplates()).data).toEqual([]);
+      client = {
+        calls: [],
+        rpc() {
+          return Promise.resolve({ data: null, error: { message: 'network: failed to fetch' } });
+        },
+      };
+      globalThis.getSupabase = () => client;
+      var res = await window.v2.listReportTemplates();
+      expect(res.data).toBeNull();
+      expect(res.error.message).toMatch(/network/);
+    });
+
     it('listReportTemplates returns the rows as an array', async () => {
       use({ list_report_templates: [{ id: TID, name: 'A', form: FORM }] });
       var res = await window.v2.listReportTemplates();
@@ -227,8 +242,9 @@ describe('report forms v2 dispatch', () => {
     globalThis.isDemoMode = () => true;
     await window.v2.saveReportTemplate({ name: 'X', form: FORM });
     await window.v2.createReportIssue({ courseId: CID, term: 1, students: [{ enrollmentId: ENR, html: 'x' }] });
-    await window.v2.listReportTemplates();
+    var res = await window.v2.listReportTemplates();
     expect(client.calls).toHaveLength(0);
+    expect(res.data).toBeNull();
     delete globalThis.isDemoMode;
   });
 });
