@@ -59,6 +59,7 @@ describe('ReportIssues', () => {
   });
 
   it('labels an issue by when it went home', () => {
-    expect(ReportIssues.label({ issuedAt: '2026-10-20T22:40:00.000Z' })).toMatch(/^Issued Oct 20, 2026/);
+    expect(ReportIssues.label({ issuedAt: '2026-10-20T22:40:00.000Z' }, '2026-11-01')).toMatch(/^Issued Oct 20, \d/);
+    expect(ReportIssues.label({ issuedAt: '2026-10-20T22:40:00.000Z' }, '2027-02-01')).toMatch(/^Issued Oct 20, 2026/);
   });
 });

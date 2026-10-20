@@ -1942,6 +1942,11 @@
   stroke: #c8c8c8 !important;
 }
 
+/* The toolbar's copy picker. */
+#report-copy {
+  max-width: 220px;
+}
+
 /* The Issue dialog (page-reports.js openIssueDialog). */
 .issue-card {
   width: min(640px, calc(100vw - 32px));
