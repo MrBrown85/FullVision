@@ -121,6 +121,9 @@ window.PageReports = (function () {
     if (tbView) tbView.style.display = tab === 'progress' ? '' : 'none';
     const tbFit = document.getElementById('tb-fitmap-btn');
     if (tbFit) tbFit.style.display = tab === 'progress' && ReportBuilderUI.usesSheets(reportConfig) ? '' : 'none';
+    const tbEdit = document.getElementById('tb-edit-layout-btn');
+    if (tbEdit) tbEdit.style.display = tab === 'progress' && ReportBuilderUI.usesSheets(reportConfig) ? '' : 'none';
+    if (tab !== 'progress') editLayout = false;
     if (tab !== 'progress') _restoreSidebarBadges();
     // Show Anonymize button only on class summary
     const tbAnon = document.getElementById('tb-anon-btn');
@@ -388,6 +391,10 @@ window.PageReports = (function () {
       fm.classList.toggle('active', fitMapOn);
       fm.setAttribute('aria-pressed', fitMapOn ? 'true' : 'false');
     }
+    var ed = document.getElementById('tb-edit-layout-btn');
+    if (ed) ed.style.display = activeTab === 'progress' && sheets ? '' : 'none';
+    var banner = document.getElementById('rb-edit-banner');
+    if (banner) banner.hidden = !(editLayout && sheets);
     if (!sheets) _restoreSidebarBadges();
   }
 
@@ -736,10 +743,43 @@ window.PageReports = (function () {
     renderReportPreview();
   }
 
+  /* ── Edit Layout ──────────────────────────────────────────────────
+     A mode, entered on purpose, for changing the class's form. Each
+     change is saved with the report config and the sheets re-lay at once. */
+  var editLayout = false;
+
+  function setEditLayout(on) {
+    editLayout = !!on && ReportBuilderUI.usesSheets(reportConfig);
+    var banner = document.getElementById('rb-edit-banner');
+    if (banner) banner.hidden = !editLayout;
+    var btn = document.getElementById('tb-edit-layout-btn');
+    if (btn) {
+      btn.textContent = editLayout ? 'Done' : 'Edit Layout';
+      btn.classList.toggle('active', editLayout);
+      btn.setAttribute('aria-pressed', editLayout ? 'true' : 'false');
+    }
+    var preview = document.getElementById('rb-preview');
+    if (preview) preview.classList.toggle('report-editing', editLayout);
+    renderBuilderBlocks();
+    renderReportPreview();
+  }
+
+  function _setForm(form) {
+    reportConfig.form = ReportSheets.normalizeForm(form);
+    saveReportConfig(activeCourse, reportConfig);
+    renderBuilderBlocks();
+    renderReportPreview();
+    updateCommentFit();
+  }
+
+  function _formOf() {
+    return ReportSheets.formFor(reportConfig);
+  }
+
   function renderBuilderBlocks() {
     const container = document.getElementById('rb-blocks');
     if (!container) return;
-    container.innerHTML = Builder.renderBuilderBlocks(reportConfig);
+    container.innerHTML = Builder.renderBuilderBlocks(reportConfig, editLayout);
     Builder.initPointerDrag(container, {
       onReorder: function (startIdx, finalIdx) {
         var moved = reportConfig.blocks.splice(startIdx, 1)[0];
@@ -766,6 +806,7 @@ window.PageReports = (function () {
 
   function rbApplyPreset(preset) {
     viewingIssue = null;
+    editLayout = false;
     Builder.applyPreset(reportConfig, preset);
     saveReportConfig(activeCourse, reportConfig);
     renderBuilderBlocks();
@@ -910,6 +951,24 @@ window.PageReports = (function () {
       toggleFitMap: function () {
         toggleFitMap();
       },
+      toggleEditLayout: function () {
+        setEditLayout(!editLayout);
+      },
+      rbFormMove: function () {
+        _setForm(ReportSheets.moveItem(_formOf(), el.dataset.side, Number(el.dataset.idx), Number(el.dataset.dir)));
+      },
+      rbFormSide: function () {
+        _setForm(ReportSheets.moveToSide(_formOf(), el.dataset.side, Number(el.dataset.idx)));
+      },
+      rbFormRemove: function () {
+        _setForm(ReportSheets.removeItem(_formOf(), el.dataset.side, Number(el.dataset.idx)));
+      },
+      rbFormType: function () {
+        _setForm(ReportSheets.setType(_formOf(), el.dataset.type));
+      },
+      rbFormReset: function () {
+        _setForm(ReportSheets.form());
+      },
       tqSeePage: function () {
         tqSaveCurrentIfNeeded();
         selectedStudentIds = [el.dataset.sid];
@@ -984,6 +1043,16 @@ window.PageReports = (function () {
     }
   }
 
+  function _handleFormChange(e) {
+    var el = e.target;
+    if (!el || !el.dataset || !el.closest('#rb-blocks')) return;
+    var action = el.dataset.action;
+    if (action === 'rbFormRoom') _setForm(ReportSheets.setRoom(_formOf(), el.value));
+    else if (action === 'rbFormEmpty') _setForm(ReportSheets.setWhenEmpty(_formOf(), el.dataset.block, el.value));
+    else if (action === 'rbFormPin') _setForm(ReportSheets.setPinned(_formOf(), el.dataset.block, el.checked));
+    else if (action === 'rbFormAdd' && el.value) _setForm(ReportSheets.addBlock(_formOf(), el.value, 'front'));
+  }
+
   function _handleSelectionChange() {
     var editor = document.getElementById('tq-narrative');
     if (!editor) return;
@@ -1020,7 +1089,7 @@ window.PageReports = (function () {
     }
     var ctx = ReportBlocks.reportContext();
     ctx.narrativeOverride = editor.innerHTML;
-    var r = ReportSheets.describeStudent(activeCourse, student, ctx, { paper: reportPaper });
+    var r = ReportSheets.describeStudent(activeCourse, student, ctx, { paper: reportPaper, form: _formOf() });
     text.textContent = ReportSheets.fitText(r);
     line.classList.toggle('over', r.commentLines > r.room);
     line.hidden = !text.textContent;
@@ -1151,6 +1220,7 @@ window.PageReports = (function () {
     window._pageSwitchCourse = switchCourse;
 
     _addDocListener('click', _handleClick);
+    _addDocListener('change', _handleFormChange);
     window.addEventListener('resize', _handleResize);
     _addDocListener('selectionchange', _handleSelectionChange);
     _addDocListener('keyup', _handleKeyup);
@@ -1200,7 +1270,7 @@ window.PageReports = (function () {
 
   /* -- Toolbar HTML (rendered into main on init) ---------- */
   var TOOLBAR_HTML =
-    '<div class="report-toolbar no-print">\n      <div class="seg report-seg-control" role="tablist" aria-label="Report type">\n        <button class="seg-btn report-seg-btn active" data-action="switchTab" data-tab="questionnaire" role="tab" aria-selected="true">Term Questionnaire</button>\n        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="progress" role="tab" aria-selected="false">Progress Reports</button>\n        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="summary" role="tab" aria-selected="false">Class Summary</button>\n      </div>\n      <div class="student-picker" id="student-picker">\n        <button class="student-picker-btn" data-action="toggleStudentPicker" aria-label="Select students" aria-expanded="false" aria-haspopup="listbox">\n          <span id="picker-label">All Students</span>\n          <span class="arrow" aria-hidden="true">\u25bc</span>\n        </button>\n        <div class="student-picker-dropdown" id="picker-dropdown"></div>\n      </div>\n      <div class="tq-student-nav" id="tq-student-nav" style="display:none">\n        <button class="tq-toolbar-arrow" data-action="tqPrevStudent" title="Previous student" aria-label="Previous student">\n          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>\n        </button>\n        <span class="tq-student-name" id="tq-student-name"></span>\n        <button class="tq-toolbar-arrow" data-action="tqNextStudent" title="Next student" aria-label="Next student">\n          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>\n        </button>\n        <div class="tq-progress-ring" id="tq-progress-ring">\n          <svg width="30" height="30" viewBox="0 0 30 30">\n            <circle class="ring-bg" cx="15" cy="15" r="12"/>\n            <circle class="ring-fill" id="tq-ring-fill" cx="15" cy="15" r="12" stroke-dasharray="75.4" stroke-dashoffset="75.4"/>\n          </svg>\n          <span class="tq-progress-label" id="tq-progress-label"></span>\n        </div>\n      </div>\n      <select id="report-period" class="report-term-select" aria-label="Report"></select>\n      <select id="report-copy" class="report-term-select" aria-label="Copy" style="display:none"></select>\n      <div class="seg seg-sm" id="report-paper" role="radiogroup" aria-label="Paper" style="display:none">\n        <button class="seg-btn active" data-action="setPaper" data-paper="letter" role="radio" aria-checked="true">Letter</button>\n        <button class="seg-btn" data-action="setPaper" data-paper="legal" role="radio" aria-checked="false">Legal</button>\n      </div>\n      <div class="seg seg-sm" id="report-view" role="radiogroup" aria-label="View" style="display:none">\n        <button class="seg-btn active" data-action="setView" data-view="screen" role="radio" aria-checked="true">Screen</button>\n        <button class="seg-btn" data-action="setView" data-view="photocopy" role="radio" aria-checked="false">Photocopy</button>\n      </div>\n      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">\n        <button class="tb-toggle-btn" id="tb-anon-btn" style="display:none" data-action="toggleAnon">\n          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>\n          Anonymize\n        </button>\n        <button class="tb-toggle-btn" id="tb-fitmap-btn" style="display:none" data-action="toggleFitMap" aria-pressed="false">Fit Map</button>\n        <button class="tb-action-btn" id="tb-print-btn" data-action="printReports">Print Reports</button>\n      </div>\n    </div>\n    <div id="report-output" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto"></div>';
+    '<div class="report-toolbar no-print">\n      <div class="seg report-seg-control" role="tablist" aria-label="Report type">\n        <button class="seg-btn report-seg-btn active" data-action="switchTab" data-tab="questionnaire" role="tab" aria-selected="true">Term Questionnaire</button>\n        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="progress" role="tab" aria-selected="false">Progress Reports</button>\n        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="summary" role="tab" aria-selected="false">Class Summary</button>\n      </div>\n      <div class="student-picker" id="student-picker">\n        <button class="student-picker-btn" data-action="toggleStudentPicker" aria-label="Select students" aria-expanded="false" aria-haspopup="listbox">\n          <span id="picker-label">All Students</span>\n          <span class="arrow" aria-hidden="true">\u25bc</span>\n        </button>\n        <div class="student-picker-dropdown" id="picker-dropdown"></div>\n      </div>\n      <div class="tq-student-nav" id="tq-student-nav" style="display:none">\n        <button class="tq-toolbar-arrow" data-action="tqPrevStudent" title="Previous student" aria-label="Previous student">\n          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>\n        </button>\n        <span class="tq-student-name" id="tq-student-name"></span>\n        <button class="tq-toolbar-arrow" data-action="tqNextStudent" title="Next student" aria-label="Next student">\n          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>\n        </button>\n        <div class="tq-progress-ring" id="tq-progress-ring">\n          <svg width="30" height="30" viewBox="0 0 30 30">\n            <circle class="ring-bg" cx="15" cy="15" r="12"/>\n            <circle class="ring-fill" id="tq-ring-fill" cx="15" cy="15" r="12" stroke-dasharray="75.4" stroke-dashoffset="75.4"/>\n          </svg>\n          <span class="tq-progress-label" id="tq-progress-label"></span>\n        </div>\n      </div>\n      <select id="report-period" class="report-term-select" aria-label="Report"></select>\n      <select id="report-copy" class="report-term-select" aria-label="Copy" style="display:none"></select>\n      <div class="seg seg-sm" id="report-paper" role="radiogroup" aria-label="Paper" style="display:none">\n        <button class="seg-btn active" data-action="setPaper" data-paper="letter" role="radio" aria-checked="true">Letter</button>\n        <button class="seg-btn" data-action="setPaper" data-paper="legal" role="radio" aria-checked="false">Legal</button>\n      </div>\n      <div class="seg seg-sm" id="report-view" role="radiogroup" aria-label="View" style="display:none">\n        <button class="seg-btn active" data-action="setView" data-view="screen" role="radio" aria-checked="true">Screen</button>\n        <button class="seg-btn" data-action="setView" data-view="photocopy" role="radio" aria-checked="false">Photocopy</button>\n      </div>\n      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">\n        <button class="tb-toggle-btn" id="tb-anon-btn" style="display:none" data-action="toggleAnon">\n          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>\n          Anonymize\n        </button>\n        <button class="tb-toggle-btn" id="tb-edit-layout-btn" style="display:none" data-action="toggleEditLayout" aria-pressed="false">Edit Layout</button>\n        <button class="tb-toggle-btn" id="tb-fitmap-btn" style="display:none" data-action="toggleFitMap" aria-pressed="false">Fit Map</button>\n        <button class="tb-action-btn" id="tb-print-btn" data-action="printReports">Print Reports</button>\n      </div>\n    </div>\n    <div id="report-output" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto"></div>';
 
   /* -- Expose handlers for inline event attributes --------- */
   window.rbDragStart = rbDragStart;

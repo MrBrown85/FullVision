@@ -1942,6 +1942,156 @@
   stroke: #c8c8c8 !important;
 }
 
+/* Compact type: one step down on every size, for a class whose form runs
+   long. A whole-form setting, so every student prints the same. */
+.report-sheet.compact {
+  --text-2xs: 0.5625rem;
+  --text-xs: 0.625rem;
+  --text-sm: 0.6875rem;
+  --text-base: 0.75rem;
+  --text-md: 0.8125rem;
+  font-size: 8.75pt;
+}
+
+/* Edit Layout: the banner over the preview and the rail's controls. */
+.rb-preview-wrap {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.rb-preview-wrap > .rb-preview {
+  flex: 1;
+  min-height: 0;
+}
+.rb-edit-banner {
+  flex: 0 0 auto;
+  padding: 8px 20px;
+  background: rgba(10, 108, 255, 0.08);
+  border-bottom: 1px solid rgba(10, 108, 255, 0.25);
+  color: var(--text);
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+}
+.rb-edit-banner b {
+  color: var(--active);
+}
+.rb-form-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.rb-form-label {
+  flex: 1;
+  min-width: 0;
+}
+.rb-block.rb-form-block {
+  flex-wrap: wrap;
+}
+.rb-block.rb-form-block.editing {
+  cursor: default;
+  background: var(--surface);
+  border-color: var(--border);
+}
+.rb-form-controls {
+  display: inline-flex;
+  gap: 3px;
+  flex-shrink: 0;
+}
+.rb-form-btn {
+  font: inherit;
+  font-size: var(--text-xs);
+  line-height: 1;
+  padding: 4px 6px;
+  min-width: 24px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--text-2);
+  cursor: pointer;
+}
+.rb-form-btn:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--active);
+}
+.rb-form-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.rb-form-opts {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding: 6px 0 2px 2px;
+  font-size: var(--text-xs);
+  color: var(--text-2);
+}
+.rb-form-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.rb-form-num {
+  width: 44px;
+  font: inherit;
+  padding: 2px 4px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+.rb-form-sel {
+  font: inherit;
+  padding: 2px 4px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--surface);
+  max-width: 180px;
+}
+.rb-form-whole {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px 4px 10px;
+  font-size: var(--text-sm);
+}
+.rb-form-whole-k {
+  font-weight: 600;
+  color: var(--text-2);
+}
+.rb-form-empty {
+  font-size: var(--text-xs);
+  color: var(--text-3);
+  padding: 4px 8px 8px;
+}
+.rb-form-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 10px 4px 4px;
+  font-size: var(--text-sm);
+}
+.rb-form-actions {
+  padding: 8px 4px 0;
+}
+.rb-form-reset {
+  font: inherit;
+  font-size: var(--text-xs);
+  color: var(--text-2);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 9px;
+  cursor: pointer;
+}
+.rb-form-reset:hover {
+  color: var(--text);
+  border-color: var(--active);
+}
+
 /* The toolbar's copy picker. */
 #report-copy {
   max-width: 220px;

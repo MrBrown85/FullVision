@@ -120,7 +120,8 @@ window.ReportBuilderUI = (function () {
       '</div>' +
       '<div class="rb-blocks" id="rb-blocks"></div>' +
       '</aside>' +
-      '<div class="rb-preview" id="rb-preview"></div>' +
+      '<div class="rb-preview-wrap"><div class="rb-edit-banner" id="rb-edit-banner" hidden><b>Editing the layout.</b> Every student\u2019s report uses this form. Changes save as you make them; press Done when the form is right.</div>' +
+      '<div class="rb-preview" id="rb-preview"></div></div>' +
       '</div>'
     );
   }
@@ -129,47 +130,157 @@ window.ReportBuilderUI = (function () {
     return !!reportConfig && reportConfig.preset === 'standard' && typeof ReportSheets !== 'undefined';
   }
 
-  /* The Report Card is one form for the class: its blocks are listed, not
-     toggled. Edit Layout (Phase 3) is where a form changes. */
-  function renderFormBlocks(form) {
-    var items = [];
-    var add = function (it) {
-      if (it.pair) {
-        items.push(
-          it.pair
-            .map(function (q) {
-              return q.label;
-            })
-            .join(' + ') + ' <span class="rb-form-kind">Fixed · side by side</span>',
-        );
-        return;
-      }
-      var kind = it.kind === 'flow' ? 'Flows' : it.pinned ? 'Fixed · bottom of the back' : 'Fixed';
-      items.push(esc(it.label) + ' <span class="rb-form-kind">' + kind + '</span>');
+  /* The Report Card is one form for the class. In Review the rail lists its
+     blocks; in Edit Layout each block gets its controls: move up or down,
+     to the other side, remove, and the few options a block has. */
+  function _kindText(it) {
+    if (it.pair) return 'Fixed · side by side';
+    if (it.kind === 'flow') return 'Flows';
+    return it.pinned ? 'Fixed · bottom of the back' : 'Fixed';
+  }
+
+  function _itemLabel(it) {
+    if (it.pair)
+      return it.pair
+        .map(function (q) {
+          return q.label;
+        })
+        .join(' + ');
+    return it.label;
+  }
+
+  function _editControls(it, side, idx, count) {
+    if (it.locked) return '<span class="rb-form-kind">' + LINE_ICONS.lock + ' first on the front</span>';
+    var b = function (action, extra, title, text) {
+      return (
+        '<button type="button" class="rb-form-btn" data-action="' +
+        action +
+        '" data-side="' +
+        side +
+        '" data-idx="' +
+        idx +
+        '"' +
+        (extra || '') +
+        ' title="' +
+        title +
+        '" aria-label="' +
+        title +
+        '">' +
+        text +
+        '</button>'
+      );
     };
-    var html =
-      '<div class="rb-form-note">One form for every student. Fixed blocks print the same for everyone; flowing blocks grow with each student and push what follows down the sheet.</div>';
-    html += '<div class="rb-form-side">Front</div>';
-    form.front.forEach(add);
-    html += items
-      .map(function (t) {
-        return '<div class="rb-block rb-form-block">' + t + '</div>';
-      })
-      .join('');
-    items = [];
-    html += '<div class="rb-form-side">Back</div>';
-    form.back.forEach(add);
-    html += items
-      .map(function (t) {
-        return '<div class="rb-block rb-form-block">' + t + '</div>';
-      })
-      .join('');
+    var html = '<span class="rb-form-controls">';
+    if (!it.pinned) {
+      html += b('rbFormMove', ' data-dir="-1"' + (idx <= 1 ? ' disabled' : ''), 'Move up', '\u2191');
+      html += b('rbFormMove', ' data-dir="1"' + (idx >= count - 1 ? ' disabled' : ''), 'Move down', '\u2193');
+      html += b(
+        'rbFormSide',
+        '',
+        side === 'front' ? 'Move to the back' : 'Move to the front',
+        side === 'front' ? 'Back' : 'Front',
+      );
+    }
+    html += b('rbFormRemove', '', 'Remove from the form', '\u00D7');
+    html += '</span>';
+    return html;
+  }
+
+  function _itemOptions(it) {
+    if (it.pair) return '';
+    var html = '';
+    if (it.block === 'teacher-narrative') {
+      html +=
+        '<label class="rb-form-opt">Room on the front <input type="number" class="rb-form-num" data-action="rbFormRoom" min="1" max="20" value="' +
+        (it.room ? it.room.lines : 8) +
+        '" aria-label="Lines kept for the comment on the front"> lines</label>';
+    }
+    if (it.kind === 'flow') {
+      html +=
+        '<label class="rb-form-opt">When empty <select class="rb-form-sel" data-action="rbFormEmpty" data-block="' +
+        it.block +
+        '" aria-label="When this block is empty"><option value="omit"' +
+        (it.whenEmpty !== 'box' ? ' selected' : '') +
+        '>Leave it out</option><option value="box"' +
+        (it.whenEmpty === 'box' ? ' selected' : '') +
+        '>Print the box with lines</option></select></label>';
+    }
+    if (ReportSheets.BLOCKS[it.block] && ReportSheets.BLOCKS[it.block].pinnable) {
+      html +=
+        '<label class="rb-form-opt rb-form-check"><input type="checkbox" data-action="rbFormPin" data-block="' +
+        it.block +
+        '"' +
+        (it.pinned ? ' checked' : '') +
+        '> Pinned to the bottom of the back</label>';
+    }
+    return html ? '<div class="rb-form-opts">' + html + '</div>' : '';
+  }
+
+  function _sideList(form, side, editing) {
+    var list = side === 'back' ? form.back : form.front;
+    var html = '<div class="rb-form-side">' + (side === 'back' ? 'Back' : 'Front') + '</div>';
+    if (!list.length) html += '<div class="rb-form-empty">Nothing on this side yet.</div>';
+    list.forEach(function (it, idx) {
+      html +=
+        '<div class="rb-block rb-form-block' +
+        (editing ? ' editing' : '') +
+        '" data-side="' +
+        side +
+        '" data-idx="' +
+        idx +
+        '"><div class="rb-form-row"><span class="rb-form-label">' +
+        esc(_itemLabel(it)) +
+        '</span>' +
+        (editing
+          ? _editControls(it, side, idx, list.length)
+          : '<span class="rb-form-kind">' + _kindText(it) + '</span>') +
+        '</div>' +
+        (editing ? _itemOptions(it) : '') +
+        '</div>';
+    });
+    return html;
+  }
+
+  function renderFormBlocks(form, editing) {
+    var html = '';
+    if (editing) {
+      html +=
+        '<div class="rb-form-note rb-form-editing">Every student\u2019s report uses this form. Fixed blocks print the same for everyone; flowing blocks grow with each student and push what follows down the sheet.</div>';
+      html +=
+        '<div class="rb-form-whole"><span class="rb-form-whole-k">Type Size</span><span class="seg seg-sm" role="radiogroup" aria-label="Type size">' +
+        '<button type="button" class="seg-btn' +
+        (form.type !== 'compact' ? ' active' : '') +
+        '" data-action="rbFormType" data-type="standard" role="radio" aria-checked="' +
+        (form.type !== 'compact') +
+        '">Standard</button>' +
+        '<button type="button" class="seg-btn' +
+        (form.type === 'compact' ? ' active' : '') +
+        '" data-action="rbFormType" data-type="compact" role="radio" aria-checked="' +
+        (form.type === 'compact') +
+        '">Compact</button></span><span class="rb-form-kind">applies to every student</span></div>';
+    } else {
+      html +=
+        '<div class="rb-form-note">One form for every student. Fixed blocks print the same for everyone; flowing blocks grow with each student and push what follows down the sheet.</div>';
+    }
+    html += _sideList(form, 'front', editing);
+    html += _sideList(form, 'back', editing);
+    if (editing) {
+      var avail = ReportSheets.available(form);
+      html +=
+        '<div class="rb-form-add"><label class="rb-form-opt">Add a Block <select class="rb-form-sel" data-action="rbFormAdd" aria-label="Add a block to the form"><option value="">Choose\u2026</option>';
+      avail.forEach(function (id) {
+        html += '<option value="' + id + '">' + esc(ReportSheets.BLOCKS[id].label) + '</option>';
+      });
+      html += '</select></label><span class="rb-form-kind">goes to the front; move it after</span></div>';
+      html +=
+        '<div class="rb-form-actions"><button type="button" class="rb-form-reset" data-action="rbFormReset">Reset to the Report Card</button></div>';
+    }
     html += '<div class="rb-form-summary" id="rb-form-summary"></div>';
     return html;
   }
 
-  function renderBuilderBlocks(reportConfig) {
-    if (usesSheets(reportConfig)) return renderFormBlocks(ReportSheets.form());
+  function renderBuilderBlocks(reportConfig, editing) {
+    if (usesSheets(reportConfig)) return renderFormBlocks(ReportSheets.formFor(reportConfig), !!editing);
     var html = '';
     reportConfig.blocks.forEach(function (block, idx) {
       var enabledClass = block.enabled ? ' enabled' : '';

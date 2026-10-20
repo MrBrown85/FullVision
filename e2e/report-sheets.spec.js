@@ -139,6 +139,38 @@ test.describe('Report Card sheets', () => {
     await expect(page.locator('#issue-overlay input[value="changed"]')).toBeDisabled();
   });
 
+  test('Edit Layout changes the form for every student and keeps it', async ({ page }) => {
+    await openReportCard(page);
+    await page.getByRole('button', { name: 'Edit Layout' }).click();
+    await expect(page.locator('#rb-edit-banner')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Done' })).toBeVisible();
+    // Move Growth and Next Steps to the back, add the legend, go Compact.
+    const nextSteps = page.locator('.rb-form-block[data-side="front"]', { hasText: 'Growth and Next Steps' });
+    await nextSteps.getByRole('button', { name: 'Move to the back' }).click();
+    await expect(page.locator('.rb-form-block[data-side="back"]', { hasText: 'Growth and Next Steps' })).toHaveCount(1);
+    await page.locator('select[data-action="rbFormAdd"]').selectOption('legend');
+    await expect(page.locator('.rb-form-block', { hasText: 'Proficiency Legend' })).toHaveCount(1);
+    await expect(page.locator('.report-sheet').first().locator('.report-legend')).toHaveCount(1);
+    await page.getByRole('radio', { name: 'Compact' }).click();
+    await expect(page.locator('.report-sheet.compact')).toHaveCount(STUDENTS * 2);
+    await page.locator('input[data-action="rbFormRoom"]').fill('5');
+    await page.locator('input[data-action="rbFormRoom"]').dispatchEvent('change');
+    await page.getByRole('button', { name: 'Done' }).click();
+    await expect(page.locator('#rb-edit-banner')).toBeHidden();
+    expect(await overflowing(page)).toEqual([]);
+    // The form is the class's: it survives a reload.
+    await page.reload();
+    await page.getByRole('tab', { name: 'Progress Reports' }).click();
+    await expect(page.locator('.report-sheet.compact')).toHaveCount(STUDENTS * 2);
+    await expect(page.locator('.rb-form-block[data-side="back"]', { hasText: 'Growth and Next Steps' })).toHaveCount(1);
+    await expect(page.locator('.rb-form-block', { hasText: 'Proficiency Legend' })).toHaveCount(1);
+    // Reset brings the Report Card back.
+    await page.getByRole('button', { name: 'Edit Layout' }).click();
+    await page.getByRole('button', { name: 'Reset to the Report Card' }).click();
+    await expect(page.locator('.rb-form-block', { hasText: 'Proficiency Legend' })).toHaveCount(0);
+    await expect(page.locator('.report-sheet.compact')).toHaveCount(0);
+  });
+
   test('Photocopy view turns the levels black on screen', async ({ page }) => {
     await openReportCard(page);
     const chip = page.locator('.report-sheet .report-section-chip-value').first();
