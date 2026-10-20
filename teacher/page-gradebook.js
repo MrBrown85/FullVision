@@ -48,6 +48,8 @@ window.PageGradebook = (function () {
   var searchQuery = '';
   var sortCol = null;
   var _filterStripOpen = false;
+  var _printTerm = 'all';
+  var _printShownIds = null;
   var _colHoverData = {}; // assessmentId → { title, isPrimary, date, ... }
   var _colHoverTip = null; // tooltip DOM element
   var _scrollShadowCleanup = null;
@@ -232,6 +234,16 @@ window.PageGradebook = (function () {
       });
     }
 
+    // What Print Grades offers as "Shown in the Gradebook": the columns the
+    // filter chips leave, when any chip is on.
+    _printTerm = term ? term.ordinal : 'all';
+    _printShownIds =
+      filterCategories.length + filterSections.length + filterModules.length > 0
+        ? assessments.map(function (a) {
+            return a.id;
+          })
+        : null;
+
     var html = '';
 
     // ── Toolbar ──
@@ -331,6 +343,7 @@ window.PageGradebook = (function () {
       (viewMode === 'scores'
         ? '<button class="tb-toggle-btn" data-action="exportScoresCSV" title="Export CSV">\u2913 Export</button>'
         : '') +
+      '<button class="tb-action-btn tb-action-secondary" data-action="printGrades">Print Grades</button>' +
       '<a class="tb-action-btn" href="#/assignments?course=' +
       activeCourse +
       '&new=1">+ New Assessment</a>' +
@@ -3099,6 +3112,9 @@ window.PageGradebook = (function () {
       exportScoresCSV: function () {
         exportScoresCSV();
       },
+      printGrades: function () {
+        if (window.GradesPrint) GradesPrint.open(activeCourse, { term: _printTerm, shownIds: _printShownIds });
+      },
       stopPropOnly: function () {
         /* just stop propagation */
       },
@@ -3182,6 +3198,7 @@ window.PageGradebook = (function () {
 
   function destroy() {
     ObsCapture.closeDialog();
+    if (window.GradesPrint) GradesPrint.close();
     _flushActiveScoreEditor();
     if (_scoreMode) exitScoreMode();
     _listeners.forEach(function (l) {

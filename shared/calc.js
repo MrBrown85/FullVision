@@ -1319,6 +1319,61 @@ function classGradeSummary(cid, studentIds) {
   return { text: parts.join(' \u00B7 '), level: level };
 }
 
+/* A student's grade in one category, as the class shows grades: the average
+   level of the category's work (Proficiency), the category's % counted as
+   the course % counts it (Letter), or both. '' when nothing in the category
+   is graded. Follows the active term. */
+function _categoryGradeParts(cid, sid, categoryId) {
+  var mode = courseGradeMode(cid);
+  var out = { level: null, pct: null };
+  if (mode !== 'letter') {
+    var lv = getCategoryAverage(cid, sid, categoryId);
+    if (lv > 0) out.level = lv;
+  }
+  if (mode !== 'proficiency') {
+    var group = getAssessmentGroupPercentage(
+      cid,
+      sid,
+      _scopedAssessments(cid).filter(function (a) {
+        return (a.categoryId || a.category_id || null) === categoryId;
+      }),
+    );
+    if (group) out.pct = group.pct;
+  }
+  return out;
+}
+
+function _categoryGradeJoin(cid, level, pct) {
+  var parts = [];
+  if (level != null) parts.push(level.toFixed(1));
+  if (pct != null) parts.push(_roundPercent(pct, getRoundWholePercent(cid) ? 0 : 1) + '%');
+  return parts.join(' · ');
+}
+
+function categoryGradeText(cid, sid, categoryId) {
+  var p = _categoryGradeParts(cid, sid, categoryId);
+  return _categoryGradeJoin(cid, p.level, p.pct);
+}
+
+/* The class average of categoryGradeText over the given students. */
+function classCategoryGradeText(cid, studentIds, categoryId) {
+  var levels = [];
+  var pcts = [];
+  (studentIds || []).forEach(function (sid) {
+    var p = _categoryGradeParts(cid, sid, categoryId);
+    if (p.level != null) levels.push(p.level);
+    if (p.pct != null) pcts.push(p.pct);
+  });
+  function mean(list) {
+    return list.length
+      ? list.reduce(function (a, b) {
+          return a + b;
+        }, 0) / list.length
+      : null;
+  }
+  return _categoryGradeJoin(cid, mean(levels), mean(pcts));
+}
+
 /* How many students sit at each grade, best first: by letter grade (A to F)
    in a Letter class, else by proficiency level (Extending to Emerging).
    A Both class counts by level, the grade it shows first. Each band has the
@@ -1396,6 +1451,8 @@ window.Calc = {
   studentGradeBadges,
   studentGradeSummary,
   classGradeSummary,
+  categoryGradeText,
+  classCategoryGradeText,
   classGradeDistribution,
   getAssessmentGroupPercentage,
   calcProficiency,
