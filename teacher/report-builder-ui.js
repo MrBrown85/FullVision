@@ -149,7 +149,8 @@ window.ReportBuilderUI = (function () {
     return it.label;
   }
 
-  function _editControls(it, side, idx, count) {
+  function _editControls(it, side, idx, list) {
+    var count = list.length;
     if (it.locked) return '<span class="rb-form-kind">' + LINE_ICONS.lock + ' first on the front</span>';
     var b = function (action, extra, title, text) {
       return (
@@ -172,14 +173,27 @@ window.ReportBuilderUI = (function () {
     };
     var html = '<span class="rb-form-controls">';
     if (!it.pinned) {
-      html += b('rbFormMove', ' data-dir="-1"' + (idx <= 1 ? ' disabled' : ''), 'Move up', '\u2191');
-      html += b('rbFormMove', ' data-dir="1"' + (idx >= count - 1 ? ' disabled' : ''), 'Move down', '\u2193');
+      html += b(
+        'rbFormMove',
+        ' data-dir="-1"' + (idx <= (side === 'front' ? 1 : 0) ? ' disabled' : ''),
+        'Move up',
+        '\u2191',
+      );
+      html += b(
+        'rbFormMove',
+        ' data-dir="1"' + (idx >= count - 1 || (list[idx + 1] && list[idx + 1].pinned) ? ' disabled' : ''),
+        'Move down',
+        '\u2193',
+      );
       html += b(
         'rbFormSide',
         '',
         side === 'front' ? 'Move to the back' : 'Move to the front',
         side === 'front' ? 'Back' : 'Front',
       );
+      if (it.pair) html += b('rbFormUnpair', '', 'Put these blocks one above the other', 'Unpair');
+      else if (ReportSheets.canPair(it, list[idx + 1]))
+        html += b('rbFormPair', '', 'Put this block beside the next one', 'Pair');
     }
     html += b('rbFormRemove', '', 'Remove from the form', '\u00D7');
     html += '</span>';
@@ -216,36 +230,92 @@ window.ReportBuilderUI = (function () {
     return html ? '<div class="rb-form-opts">' + html + '</div>' : '';
   }
 
+  function _itemKey(it) {
+    return it.pair
+      ? it.pair
+          .map(function (q) {
+            return q.block;
+          })
+          .join('+')
+      : it.block;
+  }
+
   function _sideList(form, side, editing) {
     var list = side === 'back' ? form.back : form.front;
     var html = '<div class="rb-form-side">' + (side === 'back' ? 'Back' : 'Front') + '</div>';
-    if (!list.length) html += '<div class="rb-form-empty">Nothing on this side yet.</div>';
+    html += '<div class="rb-form-list" data-side="' + side + '">';
+    if (!list.length)
+      html += '<div class="rb-form-empty">Nothing on this side yet. Move a block here or add one.</div>';
     list.forEach(function (it, idx) {
+      var draggable = editing && !it.locked && !it.pinned;
       html +=
         '<div class="rb-block rb-form-block' +
         (editing ? ' editing' : '') +
+        (it.locked ? ' locked' : '') +
+        (it.pinned ? ' pinned' : '') +
         '" data-side="' +
         side +
         '" data-idx="' +
         idx +
-        '"><div class="rb-form-row"><span class="rb-form-label">' +
+        '" data-key="' +
+        esc(_itemKey(it)) +
+        '"><div class="rb-form-row">' +
+        (draggable
+          ? '<button type="button" class="rb-form-grip" data-action="rbFormGrip" data-drag="grip" data-side="' +
+            side +
+            '" data-idx="' +
+            idx +
+            '" aria-label="Move ' +
+            esc(_itemLabel(it)) +
+            ': arrow keys move it up, down, to the front or the back" title="Drag, or use the arrow keys">\u283F</button>'
+          : '') +
+        '<span class="rb-form-label">' +
         esc(_itemLabel(it)) +
         '</span>' +
-        (editing
-          ? _editControls(it, side, idx, list.length)
-          : '<span class="rb-form-kind">' + _kindText(it) + '</span>') +
+        (editing ? _editControls(it, side, idx, list) : '<span class="rb-form-kind">' + _kindText(it) + '</span>') +
         '</div>' +
         (editing ? _itemOptions(it) : '') +
         '</div>';
     });
+    html += '</div>';
     return html;
   }
 
-  function renderFormBlocks(form, editing) {
+  /* extras: { previewWith: { longest, typical, shortest } of { sid, name }, pick } */
+  function renderFormBlocks(form, editing, extras) {
+    extras = extras || {};
     var html = '';
     if (editing) {
       html +=
         '<div class="rb-form-note rb-form-editing">Every student\u2019s report uses this form. Fixed blocks print the same for everyone; flowing blocks grow with each student and push what follows down the sheet.</div>';
+      if (extras.previewWith) {
+        var pw = extras.previewWith;
+        html +=
+          '<div class="rb-form-whole"><span class="rb-form-whole-k">Preview With</span><span class="seg seg-sm" role="radiogroup" aria-label="Preview with">';
+        ['longest', 'typical', 'shortest'].forEach(function (k) {
+          if (!pw[k]) return;
+          var on = extras.pick === k;
+          html +=
+            '<button type="button" class="seg-btn' +
+            (on ? ' active' : '') +
+            '" data-action="rbFormPreviewWith" data-pick="' +
+            k +
+            '" role="radio" aria-checked="' +
+            on +
+            '">' +
+            k.charAt(0).toUpperCase() +
+            k.slice(1) +
+            ' \u00B7 ' +
+            esc(pw[k].name.split(' ')[0]) +
+            '</button>';
+        });
+        html +=
+          '<button type="button" class="seg-btn' +
+          (!extras.pick ? ' active' : '') +
+          '" data-action="rbFormPreviewWith" data-pick="" role="radio" aria-checked="' +
+          !extras.pick +
+          '">Everyone</button></span></div>';
+      }
       html +=
         '<div class="rb-form-whole"><span class="rb-form-whole-k">Type Size</span><span class="seg seg-sm" role="radiogroup" aria-label="Type size">' +
         '<button type="button" class="seg-btn' +
@@ -272,15 +342,139 @@ window.ReportBuilderUI = (function () {
         html += '<option value="' + id + '">' + esc(ReportSheets.BLOCKS[id].label) + '</option>';
       });
       html += '</select></label><span class="rb-form-kind">goes to the front; move it after</span></div>';
+      html += '<div class="rb-form-side">Starters</div><div class="rb-form-starters">';
+      ReportSheets.starters().forEach(function (st) {
+        html +=
+          '<button type="button" class="rb-form-starter" data-action="rbFormStarter" data-starter="' +
+          st.id +
+          '"><b>' +
+          esc(st.name) +
+          '</b><span>' +
+          esc(st.help) +
+          '</span></button>';
+      });
+      html += '</div>';
+      var lib = ReportSheets.templates();
+      html += '<div class="rb-form-side">Your Library</div>';
+      if (lib.length) {
+        html += '<div class="rb-form-library">';
+        lib.forEach(function (t) {
+          html +=
+            '<div class="rb-form-template"><button type="button" class="rb-form-apply" data-action="rbFormApplyTemplate" data-id="' +
+            esc(t.id) +
+            '">' +
+            esc(t.name) +
+            '</button><button type="button" class="rb-form-btn" data-action="rbFormDeleteTemplate" data-id="' +
+            esc(t.id) +
+            '" title="Remove from the library" aria-label="Remove ' +
+            esc(t.name) +
+            ' from the library">\u00D7</button></div>';
+        });
+        html += '</div>';
+      } else {
+        html +=
+          '<div class="rb-form-empty">Nothing saved yet. A saved form can be applied to any of your classes on this device.</div>';
+      }
+      html +=
+        '<form class="rb-form-save" data-action="rbFormSaveTemplate"><input type="text" class="rb-form-text" id="rb-template-name" placeholder="Name this form" aria-label="Name for the saved form" maxlength="60"><button type="submit" class="rb-form-reset">Save to Library</button></form>';
       html +=
         '<div class="rb-form-actions"><button type="button" class="rb-form-reset" data-action="rbFormReset">Reset to the Report Card</button></div>';
+      html += '<div class="rb-form-live" id="rb-live" aria-live="polite"></div>';
     }
     html += '<div class="rb-form-summary" id="rb-form-summary"></div>';
     return html;
   }
 
-  function renderBuilderBlocks(reportConfig, editing) {
-    if (usesSheets(reportConfig)) return renderFormBlocks(ReportSheets.formFor(reportConfig), !!editing);
+  /* Pointer drag inside one side of the form. The grip picks the block up;
+     it drops where the placeholder is. onReorder(side, from, to). */
+  var _formDragAbort = null;
+  function initFormDrag(root, opts) {
+    if (!root) return;
+    if (_formDragAbort) _formDragAbort.abort();
+    _formDragAbort = new AbortController();
+    var signal = _formDragAbort.signal;
+    var drag = null;
+
+    root.addEventListener(
+      'pointerdown',
+      function (e) {
+        var grip = e.target.closest('[data-drag="grip"]');
+        if (!grip) return;
+        var block = grip.closest('.rb-form-block');
+        var list = grip.closest('.rb-form-list');
+        if (!block || !list) return;
+        e.preventDefault();
+        grip.setPointerCapture(e.pointerId);
+        var rect = block.getBoundingClientRect();
+        drag = {
+          el: block,
+          list: list,
+          side: list.dataset.side,
+          from: Number(block.dataset.idx),
+          offsetY: e.clientY - rect.top,
+          placeholder: document.createElement('div'),
+        };
+        drag.placeholder.className = 'rb-block-placeholder';
+        drag.placeholder.style.height = block.offsetHeight + 'px';
+        block.classList.add('dragging');
+        block.style.position = 'fixed';
+        block.style.top = rect.top + 'px';
+        block.style.left = rect.left + 'px';
+        block.style.width = rect.width + 'px';
+        block.style.zIndex = '1000';
+        block.style.pointerEvents = 'none';
+        list.insertBefore(drag.placeholder, block);
+      },
+      { signal: signal },
+    );
+
+    root.addEventListener(
+      'pointermove',
+      function (e) {
+        if (!drag) return;
+        e.preventDefault();
+        drag.el.style.top = e.clientY - drag.offsetY + 'px';
+        var blocks = Array.from(drag.list.querySelectorAll('.rb-form-block:not(.dragging)'));
+        for (var i = 0; i < blocks.length; i++) {
+          if (blocks[i].classList.contains('locked')) continue;
+          var rect = blocks[i].getBoundingClientRect();
+          if (e.clientY < rect.top + rect.height / 2) {
+            drag.list.insertBefore(drag.placeholder, blocks[i]);
+            return;
+          }
+        }
+        var pinned = drag.list.querySelector('.rb-form-block.pinned:not(.dragging)');
+        if (pinned) drag.list.insertBefore(drag.placeholder, pinned);
+        else drag.list.appendChild(drag.placeholder);
+      },
+      { signal: signal },
+    );
+
+    function finish() {
+      if (!drag) return;
+      var items = Array.from(drag.list.children).filter(function (c) {
+        return c !== drag.el;
+      });
+      var to = items.indexOf(drag.placeholder);
+      var d = drag;
+      drag = null;
+      d.el.classList.remove('dragging');
+      d.el.style.position = '';
+      d.el.style.top = '';
+      d.el.style.left = '';
+      d.el.style.width = '';
+      d.el.style.zIndex = '';
+      d.el.style.pointerEvents = '';
+      if (d.placeholder.parentNode) d.placeholder.parentNode.removeChild(d.placeholder);
+      if (to >= 0 && to !== d.from && opts && typeof opts.onReorder === 'function') opts.onReorder(d.side, d.from, to);
+      else if (opts && typeof opts.onCancel === 'function') opts.onCancel();
+    }
+    root.addEventListener('pointerup', finish, { signal: signal });
+    root.addEventListener('pointercancel', finish, { signal: signal });
+  }
+
+  function renderBuilderBlocks(reportConfig, editing, extras) {
+    if (usesSheets(reportConfig)) return renderFormBlocks(ReportSheets.formFor(reportConfig), !!editing, extras);
     var html = '';
     reportConfig.blocks.forEach(function (block, idx) {
       var enabledClass = block.enabled ? ' enabled' : '';
@@ -450,6 +644,7 @@ window.ReportBuilderUI = (function () {
     renderLayout: renderLayout,
     renderBuilderBlocks: renderBuilderBlocks,
     renderFormBlocks: renderFormBlocks,
+    initFormDrag: initFormDrag,
     usesSheets: usesSheets,
     toggleBlock: toggleBlock,
     applyPreset: applyPreset,
