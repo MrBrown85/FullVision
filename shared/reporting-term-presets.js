@@ -184,22 +184,29 @@ function reportingTermPreset(schoolId, date) {
   });
 }
 
-/** The report name for each of a class's terms when they are exactly one
- * school's preset (same count and dates), else null. Entries are '' for a
- * term with no published report. */
-function reportingTermReportNames(terms) {
+/** The school whose preset a class's terms come from: every term matches the
+ * school's term with the same number (Term 3 is the school's third term), so
+ * a semester class carrying only Terms 3 and 4 still matches. Null when the
+ * terms match no school. */
+function reportingTermsSchoolMatch(terms) {
   if (!Array.isArray(terms) || !terms.length) return null;
   var school = REPORTING_TERM_PRESETS.schools.find(function (s) {
-    return (
-      s.terms.length === terms.length &&
-      s.terms.every(function (t, i) {
-        return t.starts_on === terms[i].starts_on && t.ends_on === terms[i].ends_on;
-      })
-    );
+    return terms.every(function (t) {
+      var st = s.terms[Number(t.ordinal) - 1];
+      return !!st && st.starts_on === t.starts_on && st.ends_on === t.ends_on;
+    });
   });
-  if (!school) return null;
-  return school.terms.map(function (t) {
-    return t.report || '';
+  return school ? { school: school } : null;
+}
+
+/** The report name for each of a class's terms when they are a school's
+ * preset terms (all of them, or one semester's), else null. Entries are ''
+ * for a term with no published report. */
+function reportingTermReportNames(terms) {
+  var match = reportingTermsSchoolMatch(terms);
+  if (!match) return null;
+  return terms.map(function (t) {
+    return match.school.terms[Number(t.ordinal) - 1].report || '';
   });
 }
 
@@ -209,4 +216,5 @@ if (typeof window !== 'undefined') {
   window.reportingTermSchools = reportingTermSchools;
   window.reportingTermPreset = reportingTermPreset;
   window.reportingTermReportNames = reportingTermReportNames;
+  window.reportingTermsSchoolMatch = reportingTermsSchoolMatch;
 }
