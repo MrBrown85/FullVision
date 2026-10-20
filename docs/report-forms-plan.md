@@ -31,19 +31,23 @@ Demo Mode, Science 8, 27 students, Chromium's print engine, Letter.
 
 Small changes to `reports.css` and `report-blocks.js`. No new model.
 
-| PR  | Change                                                                                                                                                                                                                                               | Proves                                                  |
-| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| 0.1 | Page-count test. Equal 0.5 in margins. Unrated dimensions left off. Disposition examples dropped, three per row in print. Chart lists three assessments per competency. Next Steps lists two I-can statements per focus and may break between items. | Standard prints 54 pages, Brief 27, every student 2 / 1 |
-| 0.2 | Letterhead: school, class and block, report name from the term picker, term dates, teacher, student number. Running footer on every page.                                                                                                            | Header text present; footer on page 2                   |
-| 0.3 | Levels as dots and word everywhere a level prints; no colour on levels in print; `print-color-adjust` only where a fill carries meaning.                                                                                                             | Greyscale PDF distinguishes all four levels             |
-| 0.4 | Legal as a paper option on the Progress Reports toolbar, injected as an `@page` rule the way `rubric-print.js` does; remembered per class on the device.                                                                                             | Legal run has a 612 × 1008 pt page box                  |
+| PR  | Change                                                                                                                                                                                                                                                                               | Proves                                                                                |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| 0.1 | Page-count test. Equal 0.5 in margins. Unrated dimensions left off. Disposition examples dropped and descriptions left off paper, three per row in print. Chart lists three assessments per competency. Next Steps lists two I-can statements per focus and may break between items. | Standard prints 54 pages, Brief 27, every student 2 / 1, on Linux CI as well as a Mac |
+| 0.2 | Letterhead: school, class and block, report name from the term picker, term dates, teacher, student number. The running footer waits for Phase 1: a repeating table footer cost five pages across the demo class.                                                                    | Header text present                                                                   |
+| 0.3 | Levels as dots and word everywhere a level prints; no colour on levels in print; `print-color-adjust` only where a fill carries meaning.                                                                                                                                             | Greyscale PDF distinguishes all four levels                                           |
+| 0.4 | Legal as a paper option on the Progress Reports toolbar, injected as an `@page` rule the way `rubric-print.js` does; remembered per class on the device.                                                                                                                             | Legal run has a 612 × 1008 pt page box                                                |
+
+Built 2026-10-20 as PRs #250 (0.1), #254 (0.2, replacing #251), #252 (0.3) and #253 (0.4), stacked in that order.
+
+Lessons from Phase 0: the fit has to hold with the wider fonts of Linux and Windows, not only a Mac (CI's first run printed 57 pages); a `<tfoot>` that repeats per page is not a free running footer; `break-after: right` is not implemented in Chromium, so an even page count has to be built, not requested; deleting a stacked PR's base branch closes the PR above it, so retarget before deleting.
 
 ## Phase 1 · The form engine, one form (weeks 1–2)
 
 - Renderers take `{cid, student, term, termLabel, options}` and return HTML with no DOM reads. Each declares `fixed` or `flow`.
 - Fixed blocks are measured once per class, flowing blocks per student, after fonts load, with a 4% margin on each flow region.
 - Explicit page boxes (`.sheet`) on screen and in print; the preview is the printout.
-- The Report Card form only, replacing the Standard preset: front = letterhead, overall, comment (room 8 lines, grow and push), competency table paired with attendance, next steps; back = dispositions, student reflection, return strip pinned to the bottom. Continued sheets for overrun.
+- The Report Card form only, replacing the Standard preset: front = letterhead, overall, comment (room 8 lines, grow and push), competency table paired with attendance, next steps; back = dispositions, then the existing student reflection and Parent / Guardian Response blocks with their wording unchanged, the response pinned to the bottom below a cut line. Continued sheets for overrun.
 - Layout `blocks_config` v3 (`form`, `sides`, `attachments`) with migration from v1 and a shape check in `save_report_config`.
 - One level helper (dots + word, colour only on screen in Colour mode); inline `PROF_COLORS` removed from the report renderers.
 - Tests: page counts on Chromium and WebKit; a unit test per renderer that it is pure.
@@ -57,7 +61,7 @@ Small changes to `reports.css` and `report-blocks.js`. No new model.
 
 ## Phase 3 · Edit Layout (weeks 4–5)
 
-- Mode banner, Fixed / Flows tags, options panel, Preview With longest / typical / shortest, pairing of fixed blocks, whole-form settings, "+ Add a Block", pointer and keyboard drag with live announcements, Save to Library (`report_template`, teacher-level).
+- Mode banner, Fixed / Flows tags, options panel, Preview With longest / typical / shortest, pairing of fixed blocks, whole-form settings (the reflection and response blocks keep their text), "+ Add a Block", pointer and keyboard drag with live announcements, Save to Library (`report_template`, teacher-level).
 - Phone: Review as a stepper, one page at a time; no editing; a read-only Reports tab in the PWA.
 
 ## Phase 4 · Send (weeks 6–9, after the policy check)
