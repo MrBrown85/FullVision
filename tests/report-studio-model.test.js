@@ -282,3 +282,59 @@ describe('moving a block with placeAt', () => {
     expect(rows(f.pages[1])).toEqual([['parent-response']]);
   });
 });
+
+describe('block options', () => {
+  const S = ReportSheets;
+
+  it('optionsFor fills the registry defaults and adds the no-evidence rule', () => {
+    const f = S.form();
+    expect(S.optionsFor(S.cellOf(f, 'competency-table'))).toEqual({
+      evidence: true,
+      ican: false,
+      assignments: false,
+      noEvidence: 'show',
+    });
+    const g = S.setNoEvidence(S.setOption(f, 'competency-table', 'evidence', false), 'competency-table', 'hide');
+    expect(S.optionsFor(S.cellOf(g, 'competency-table'))).toMatchObject({ evidence: false, noEvidence: 'hide' });
+    expect(S.optionsFor(S.cellOf(f, 'next-steps'))).toEqual({ ican: 2 });
+    expect(S.optionsFor(S.cellOf(f, 'learner-dimensions'))).toEqual({ descriptions: false, examples: false });
+    expect(S.optionsFor(S.cellOf(f, 'teacher-narrative'))).toEqual({});
+  });
+
+  it('every option in the registry has a key, a Title Case label and a default', () => {
+    Object.entries(S.BLOCKS).forEach(([id, def]) => {
+      (def.options || []).forEach(o => {
+        expect(typeof o.key, id).toBe('string');
+        expect(o.label.charAt(0), id + ' ' + o.key).toMatch(/[A-Z]/);
+        expect(o.def, id + ' ' + o.key).not.toBeUndefined();
+      });
+    });
+  });
+});
+
+describe('rendering with options', () => {
+  it('the text block prints its title and text, and nothing when empty', () => {
+    expect(ReportBlocks.renderReportBlock('text-block', 'c1', {}, {}, {})).toBe('');
+    const html = ReportBlocks.renderReportBlock(
+      'text-block',
+      'c1',
+      {},
+      {},
+      {
+        title: 'Upcoming',
+        text: 'Science fair\non Nov 30 <b>',
+      },
+    );
+    expect(html).toContain('Upcoming');
+    expect(html).toContain('Science fair<br>on Nov 30 &lt;b&gt;');
+  });
+});
+
+describe('the letterhead keeps its options', () => {
+  it('through normalizeForm and any later edit', () => {
+    let f = ReportSheets.setOption(ReportSheets.form(), 'header', 'studentNumber', false);
+    expect(ReportSheets.cellOf(f, 'header').options).toEqual({ studentNumber: false });
+    f = ReportSheets.placeBlock(f, 'legend');
+    expect(ReportSheets.cellOf(f, 'header').options).toEqual({ studentNumber: false });
+  });
+});
