@@ -1,0 +1,76 @@
+/**
+ * The Report Card form lays each student into explicit sheets. These checks
+ * run in Chromium and WebKit: the sheet count, that no sheet's content
+ * overflows its box, and that the footer names the student and sheet.
+ * Page counts from Chromium's print engine are in report-print.spec.js.
+ */
+import { test, expect } from '@playwright/test';
+
+const STUDENTS = 27;
+
+async function openReportCard(page) {
+  await page.goto('/login.html?demo=1');
+  await page.waitForURL(/app\.html/, { timeout: 15000 });
+  await page.goto(page.url().replace(/#.*/, '#/reports'));
+  await page.getByRole('tab', { name: 'Progress Reports' }).click();
+  await page.locator('[data-action="rbApplyPreset"][data-preset="standard"]').click();
+  await expect(page.locator('.report-sheet')).toHaveCount(STUDENTS * 2);
+}
+
+async function overflowing(page) {
+  return page
+    .locator('.report-sheet')
+    .evaluateAll(sheets =>
+      sheets
+        .filter(s => s.scrollHeight > s.clientHeight + 1 || s.scrollWidth > s.clientWidth + 1)
+        .map(s => s.querySelector('.sheet-footer')?.textContent || '?'),
+    );
+}
+
+test.describe('Report Card sheets', () => {
+  test.setTimeout(90_000);
+
+  test('every student is one sheet, front and back, and nothing overflows', async ({ page }) => {
+    await openReportCard(page);
+    expect(await overflowing(page), 'sheets whose content overflows the page').toEqual([]);
+    await expect(page.locator('.sheet-overflow')).toHaveCount(0);
+    const first = page.locator('.report-sheet').first();
+    await expect(first.locator('.sheet-footer')).toContainText('Cece Adeyemi · Sheet 1 of 1 · Front');
+    await expect(page.locator('.report-sheet').nth(1).locator('.sheet-footer')).toContainText('Sheet 1 of 1 · Back');
+    await expect(page.locator('#rb-form-summary')).toContainText('every student on one sheet');
+  });
+
+  test('the back carries the dispositions and the response pinned at the bottom, wording intact', async ({ page }) => {
+    await openReportCard(page);
+    const back = page.locator('.report-sheet').nth(1);
+    await expect(back.locator('.report-learner-profile')).toHaveCount(1);
+    await expect(back.locator('.sheet-pinned .report-parent-response')).toHaveCount(1);
+    await expect(back.locator('.sheet-pinned')).toContainText('I have reviewed this report with my child');
+    await expect(back.locator('.sheet-pinned')).toContainText('I would like to schedule a meeting with the teacher');
+    await expect(back.locator('.sheet-pinned')).toContainText(
+      'Please review this report with your child and return this section to the school.',
+    );
+  });
+
+  test('Legal sheets are 14 in tall and still hold every student on one sheet', async ({ page }) => {
+    await openReportCard(page);
+    await page.getByRole('radio', { name: 'Legal' }).click();
+    await expect(page.locator('.report-sheet[data-paper="legal"]')).toHaveCount(STUDENTS * 2);
+    // offsetHeight is in the sheet's own CSS pixels, before the preview's zoom.
+    const h = await page
+      .locator('.report-sheet')
+      .first()
+      .evaluate(el => el.offsetHeight);
+    expect(h).toBe(14 * 96);
+    expect(await overflowing(page)).toEqual([]);
+  });
+
+  test('Photocopy view turns the levels black on screen', async ({ page }) => {
+    await openReportCard(page);
+    const chip = page.locator('.report-sheet .report-section-chip-value').first();
+    const before = await chip.evaluate(el => getComputedStyle(el).color);
+    await page.getByRole('radio', { name: 'Photocopy' }).click();
+    expect(await chip.evaluate(el => getComputedStyle(el).color)).toBe('rgb(0, 0, 0)');
+    expect(before).not.toBe('rgb(0, 0, 0)');
+  });
+});

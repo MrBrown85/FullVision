@@ -223,6 +223,7 @@ load('shared/calc.js');
 load('shared/rubric-draft.js');
 load('teacher/ui.js');
 load('teacher/report-blocks.js');
+load('teacher/report-sheets.js');
 load('teacher/report-questionnaire.js');
 load('teacher/report-builder-ui.js');
 load('teacher/report-preview.js');

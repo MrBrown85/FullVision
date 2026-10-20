@@ -112,6 +112,17 @@ window.ReportPreview = (function () {
     } else if (students.length === 0) {
       preview.innerHTML =
         '<div style="text-align:center;color:var(--text-3);padding:40px 0;font-size:0.95rem">Select students above to generate reports.</div>';
+    } else if (ReportBuilderUI.usesSheets(reportConfig)) {
+      var summary = ReportSheets.renderPreview({
+        cid: cid,
+        students: students,
+        ctx: ReportBlocks.reportContext(),
+        preview: preview,
+        paper: opts.paper || 'letter',
+      });
+      var line = document.getElementById('rb-form-summary');
+      if (line) line.textContent = ReportSheets.summaryText(summary);
+      return;
     } else {
       var ctx = ReportBlocks.reportContext();
       preview.innerHTML = students
@@ -120,6 +131,8 @@ window.ReportPreview = (function () {
         })
         .join('');
     }
+    preview.classList.remove('report-sheets-on');
+    if (typeof ReportSheets !== 'undefined') ReportSheets.clearPageStyle();
   }
 
   return {
