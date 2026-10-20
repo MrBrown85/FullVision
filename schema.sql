@@ -7,7 +7,9 @@
 -- grading_scale / category_weights / round_percent / deleted_at, tag_score and
 -- rubric_score modifier, course_sync_cursor version, the term 1..6 note, and
 -- the score_mode values. 2026-10-18: rubric_score.comment
--- (20261018_rubric_score_comment). Function signatures below were not re-read from the
+-- (20261018_rubric_score_comment). 2026-10-20: report_template, report_issue,
+-- report_issue_student, guardian (20261020_report_template / _report_issue /
+-- _guardian). Function signatures below were not re-read from the
 -- database on that date; check pg_proc before relying on a parameter list.
 --
 -- This is a READABLE SNAPSHOT, not a replayable migration log. It documents
@@ -35,7 +37,7 @@
 -- `projection` were dropped by `fullvision_v2_drop_legacy_schemas` (2026-04-19).
 
 -- ─── Tables (public) ────────────────────────────────────────────────────────
--- 39 tables. Every table has RLS enabled (see rls-policies.sql).
+-- 46 tables. Every table has RLS enabled (see rls-policies.sql).
 -- `created_at`, `updated_at`, `enrolled_at`, `changed_at`, `scored_at` default
 -- to `now()`. Primary keys are uuid `id` unless noted.
 
@@ -492,6 +494,55 @@ create table fv_idempotency (
   primary key (key, teacher_id)
 );
 
+-- Report forms (20261020_report_template / _report_issue / _guardian).
+-- A teacher's saved forms; a fixed copy of every issued report; who a
+-- report goes home to. docs/report-forms-plan.md.
+create table report_template (
+  id          uuid        not null primary key default gen_random_uuid(),
+  teacher_id  uuid        not null references teacher(id) on delete cascade,
+  name        text        not null,                                   -- 1..60 chars; unique per teacher, case-insensitive
+  form        jsonb       not null,                                   -- object with a front array (ReportSheets.normalizeForm fills the rest)
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+create table report_issue (
+  id             uuid        not null primary key default gen_random_uuid(),
+  course_id      uuid        not null references course(id) on delete cascade,
+  term           integer     not null,                                -- 1..6
+  term_label     text,
+  paper          text        not null default 'letter',               -- letter | legal
+  form           jsonb,                                               -- the form as issued
+  issued_at      timestamptz not null default now(),
+  issued_by      uuid        references teacher(id) on delete set null,
+  student_count  integer     not null default 0,
+  created_at     timestamptz not null default now()
+);
+
+create table report_issue_student (
+  issue_id       uuid    not null references report_issue(id) on delete cascade,
+  enrollment_id  uuid    not null references enrollment(id) on delete cascade,
+  sheets         integer not null default 1,                          -- 1..20
+  hash           text    not null,                                    -- client djb2 of html, for "changed since"
+  html           text    not null,                                    -- the sheets as rendered, 15-40 KB
+  primary key (issue_id, enrollment_id)
+);
+
+create table guardian (
+  id              uuid        not null primary key default gen_random_uuid(),
+  student_id      uuid        not null references student(id) on delete cascade,
+  name            text        not null,                               -- 1..120 chars
+  relationship    text,
+  email           text,                                               -- lower-cased; unique per student
+  phone           text,
+  language        text        not null default 'en',
+  consent_at      timestamptz,                                        -- set together with consent_source or not at all
+  consent_source  text,                                               -- form | verbal | roster_import | portal
+  notes           text,
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now()
+);
+
 -- ─── Extensions + cron ──────────────────────────────────────────────────────
 -- pg_cron enabled (migration fullvision_v2_enable_pg_cron).
 -- Job `fv_retention_cleanup_daily` runs at 03:17 UTC calling fv_retention_cleanup().
@@ -616,6 +667,20 @@ create table fv_idempotency (
 --   toggle_report_block(p_course_id uuid, p_block_key text, p_enabled boolean)
 --   save_teacher_preferences(p_patch jsonb)
 --   get_report(p_enrollment_id uuid, p_term integer)
+--
+-- Report forms (20261020):
+--   save_report_template(p_name text, p_form jsonb, p_id uuid, p_idempotency_key uuid)
+--   list_report_templates()
+--   delete_report_template(p_id uuid, p_idempotency_key uuid)
+--   create_report_issue(p_course_id uuid, p_term integer, p_term_label text, p_paper text,
+--                       p_form jsonb, p_students jsonb, p_idempotency_key uuid)
+--   list_report_issues(p_course_id uuid, p_term integer)               -- hashes per enrollment, no html
+--   get_report_issue(p_issue_id uuid)                                  -- with every student's html
+--   delete_report_issue(p_issue_id uuid, p_idempotency_key uuid)
+--   upsert_guardian(p_student_id uuid, p_name text, p_relationship text, p_email text, p_phone text,
+--                   p_language text, p_consent_at timestamptz, p_consent_source text, p_id uuid, p_idempotency_key uuid)
+--   delete_guardian(p_id uuid, p_idempotency_key uuid)
+--   list_course_guardians(p_course_id uuid)
 --
 -- Imports:
 --   import_teams_class(p_payload jsonb)

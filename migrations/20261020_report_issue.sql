@@ -1,5 +1,5 @@
--- DRAFT, not applied. Issued reports: a fixed copy of every report at the
--- moment it went home (2026-10-21).
+-- Issued reports: a fixed copy of every report at the moment it went home
+-- (2026-10-20).
 --
 -- Issue Reports… saves each student's sheets so a reprint in February is the
 -- report that went home in November, not a re-render of today's scores, and

@@ -1,4 +1,4 @@
--- DRAFT, not applied. A teacher's library of report forms (2026-10-21).
+-- A teacher's library of report forms (2026-10-20).
 --
 -- Edit Layout saves a class's form to "Your Library" so another class can
 -- use it. Today the library is localStorage on one device

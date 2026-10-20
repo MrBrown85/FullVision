@@ -1,5 +1,5 @@
--- DRAFT, not applied. Guardians: who a student's report goes home to, and
--- whether they agreed to receive it by email (2026-10-21).
+-- Guardians: who a student's report goes home to, and whether they agreed
+-- to receive it by email (2026-10-20).
 --
 -- Phase 4 (Send) emails a family a link to an issued report. Nothing in the
 -- app does that yet, and nothing should until the district's position on

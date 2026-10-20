@@ -72,7 +72,7 @@ Built 2026-10-20 as PRs #263 (the form as class data, layout v3 in `reportConfig
 
 ## Phase 4 · Send (weeks 6–9, after the policy check)
 
-Draft migrations for review, not applied, in `migrations/drafts/` (`report_template.sql`, `report_issue.sql`, `guardian.sql`, with a README on what to check and the client work that follows each). CI's drift check reads only `migrations/*.sql`, so drafts there do not count as unapplied.
+Applied 2026-10-20 to gradebook-prod: `migrations/20261020_report_template.sql`, `20261020_report_issue.sql`, `20261020_guardian.sql`. Each was first run on a local Postgres 17 stand-in (`migrations/local-test/`, 46 checks, as Supabase branching needs the Pro plan); that run caught a form check that passed when `front` was missing. Client wrappers: `v2.saveReportTemplate` / `listReportTemplates` / `deleteReportTemplate`, `v2.createReportIssue` / `listReportIssues` / `getReportIssue` / `deleteReportIssue`, `v2.upsertGuardian` / `deleteGuardian` / `listCourseGuardians`. The library and Issue Reports still read and write the device copy; moving them to the server rows is the next change. Nothing reads `guardian` until the district policy check.
 
 - `guardian` table with consent; roster import column; Class Management editing.
 - Family view-by-link page with the birth-date check; SES in `ca-central-1`; queue, delivery log, bounce handling.
