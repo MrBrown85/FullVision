@@ -2,10 +2,11 @@
 window.ReportPreview = (function () {
   'use strict';
 
-  function renderStudentReport(cid, student, reportConfig) {
+  function renderStudentReport(cid, student, reportConfig, ctx) {
+    ctx = ctx || ReportBlocks.reportContext();
     var html = '<div class="report-student">';
     reportConfig.blocks.forEach(function (block) {
-      if (block.enabled) html += ReportBlocks.renderReportBlock(block.id, cid, student);
+      if (block.enabled) html += ReportBlocks.renderReportBlock(block.id, cid, student, ctx);
     });
     html += '</div>';
     return html;
@@ -112,9 +113,10 @@ window.ReportPreview = (function () {
       preview.innerHTML =
         '<div style="text-align:center;color:var(--text-3);padding:40px 0;font-size:0.95rem">Select students above to generate reports.</div>';
     } else {
+      var ctx = ReportBlocks.reportContext();
       preview.innerHTML = students
         .map(function (st) {
-          return renderStudentReport(cid, st, reportConfig);
+          return renderStudentReport(cid, st, reportConfig, ctx);
         })
         .join('');
     }

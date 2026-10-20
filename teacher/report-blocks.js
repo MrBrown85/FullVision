@@ -2,9 +2,12 @@
 window.ReportBlocks = (function () {
   'use strict';
 
-  /* ── Term ID helper ──────────────────────────────────────── */
-  function getTermId() {
-    const period = (document.getElementById('report-period')?.value || 'Report 1').trim();
+  /* ── Report context ──────────────────────────────────────────
+     Block renderers are pure: they take the report's term as an argument
+     and never read the page. The one place that reads the term picker is
+     reportContext(), for the Reports page and the questionnaire. */
+  function termIdFromPeriod(period) {
+    period = (period || 'Report 1').trim();
     // Map "Report N" → "term-N" for backwards compatibility with stored data
     const m = period.match(/Report\s+(\d+)/i);
     if (m) return 'term-' + m[1];
@@ -12,6 +15,17 @@ window.ReportBlocks = (function () {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/-+$/, '');
+  }
+
+  /** { termId: 'term-2', termLabel: 'Nov Report Card' } from the term picker. */
+  function reportContext() {
+    const sel = typeof document !== 'undefined' ? document.getElementById('report-period') : null;
+    const opt = sel && sel.options ? sel.options[sel.selectedIndex] : null;
+    return { termId: termIdFromPeriod(sel && sel.value), termLabel: opt ? opt.text : '' };
+  }
+
+  function getTermId() {
+    return reportContext().termId;
   }
 
   /* ── Pronoun helpers ─────────────────────────────────────── */
@@ -124,16 +138,14 @@ window.ReportBlocks = (function () {
   /* The letterhead: school (when the class uses a school's preset terms),
      class and block, the student; then the report by its name, the term's
      dates, the teacher and the student number. DECISIONS.md, "Report forms" 7. */
-  function renderBlockHeader(cid, student) {
+  function renderBlockHeader(cid, student, ctx) {
     const course = COURSES[cid];
-    const sel = document.getElementById('report-period');
-    const opt = sel && sel.options[sel.selectedIndex];
-    const period = opt ? opt.text : '';
+    const period = (ctx && ctx.termLabel) || '';
     const terms = typeof getReportingTerms === 'function' ? getReportingTerms(cid) : [];
     const match =
       terms.length && typeof reportingTermsSchoolMatch === 'function' ? reportingTermsSchoolMatch(terms) : null;
     const school = match && match.school ? match.school.name : '';
-    const n = Number((getTermId().match(/^term-(\d+)$/) || [])[1]);
+    const n = Number((((ctx && ctx.termId) || '').match(/^term-(\d+)$/) || [])[1]);
     const term = terms.find(t => Number(t.ordinal) === n) || null;
     const block = typeof courseBlockLabel === 'function' ? courseBlockLabel(course) : '';
     const teacher = (typeof getConfig === 'function' && getConfig().displayName) || '';
@@ -254,8 +266,8 @@ window.ReportBlocks = (function () {
     return html;
   }
 
-  function renderBlockLearnerDimensions(cid, student) {
-    const termId = getTermId();
+  function renderBlockLearnerDimensions(cid, student, ctx) {
+    const termId = ctx && ctx.termId;
     const rating = getStudentTermRating(cid, student.id, termId);
     if (!rating) return '';
     const groups =
@@ -265,8 +277,8 @@ window.ReportBlocks = (function () {
     return `<div class="report-learner-profile">${groups}</div>`;
   }
 
-  function renderBlockTeacherNarrative(cid, student) {
-    const termId = getTermId();
+  function renderBlockTeacherNarrative(cid, student, ctx) {
+    const termId = ctx && ctx.termId;
     const rating = getStudentTermRating(cid, student.id, termId);
     if (!rating || !rating.narrative || !rating.narrative.trim()) return '';
     const isHtml = /<[a-z][\s\S]*>/i.test(rating.narrative);
@@ -1024,10 +1036,13 @@ window.ReportBlocks = (function () {
   }
 
   /* ── Block dispatcher ── */
-  function renderReportBlock(blockId, cid, student) {
+  /* ctx is { termId, termLabel }. Callers on the Reports page build it once
+     with reportContext() and pass it for every student. */
+  function renderReportBlock(blockId, cid, student, ctx) {
+    ctx = ctx || reportContext();
     switch (blockId) {
       case 'header':
-        return renderBlockHeader(cid, student);
+        return renderBlockHeader(cid, student, ctx);
       case 'academic-summary':
         return renderBlockAcademicSummary(cid, student);
       case 'section-chart':
@@ -1041,9 +1056,9 @@ window.ReportBlocks = (function () {
       case 'core-competencies':
         return renderBlockCoreCompetencies(cid, student);
       case 'learner-dimensions':
-        return renderBlockLearnerDimensions(cid, student);
+        return renderBlockLearnerDimensions(cid, student, ctx);
       case 'teacher-narrative':
-        return renderBlockTeacherNarrative(cid, student);
+        return renderBlockTeacherNarrative(cid, student, ctx);
       case 'observations':
         return renderBlockObservations(cid, student);
       case 'next-steps':
@@ -1064,6 +1079,8 @@ window.ReportBlocks = (function () {
   /* ── Namespace ──────────────────────────────────────────── */
   return {
     getTermId: getTermId,
+    termIdFromPeriod: termIdFromPeriod,
+    reportContext: reportContext,
     levelDots: levelDots,
     getPronouns: getPronouns,
     OBS_DESCRIPTORS: OBS_DESCRIPTORS,
