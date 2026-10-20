@@ -36,6 +36,14 @@ window.ReportBlocks = (function () {
     return { subj, obj, poss, refl, verb, capSubj: subj[0].toUpperCase() + subj.slice(1) };
   }
 
+  /* ●●●○ for level 3: the level as a shape, so a photocopy still reads it
+     (DECISIONS.md, "Report forms" 6). Nothing for no evidence. */
+  function levelDots(level) {
+    const n = Math.max(0, Math.min(4, Math.round(Number(level) || 0)));
+    if (n === 0) return '';
+    return `<span class="report-dots" aria-hidden="true">${'\u25CF'.repeat(n)}${'\u25CB'.repeat(4 - n)}</span>`;
+  }
+
   /* sanitizeNarrativeHtml — delegates to shared sanitizeHtml in gb-ui.js */
   function sanitizeNarrativeHtml(raw) {
     return sanitizeHtml(raw);
@@ -191,7 +199,7 @@ window.ReportBlocks = (function () {
       const scolor = PROF_COLORS[sr] || PROF_COLORS[0];
       return `<div class="report-section-chip">
       <div class="report-section-chip-name" style="color:${cssColor(color)}">${esc(name)}</div>
-      <div class="report-section-chip-value" data-prof="${sr}" style="color:${scolor}">${slabel}</div>
+      <div class="report-section-chip-value" data-prof="${sr}" style="color:${scolor}">${prof > 0 ? levelDots(sr) : ''}${slabel}</div>
     </div>`;
     };
     if (_rptGrouped.groups.some(gi => gi.sections.length > 0)) {
@@ -235,7 +243,7 @@ window.ReportBlocks = (function () {
       <div class="report-learner-dim-info">
         <div class="report-learner-dim-label">${OBS_LABELS[dim]}</div>
         <div class="report-dim-desc">${info.desc || ''}</div>
-        <div class="report-learner-dim-value" data-prof="${val}" style="color:${color};margin-top:4px">${label}</div>
+        <div class="report-learner-dim-value" data-prof="${val}" style="color:${color};margin-top:4px">${levelDots(val)}${label}</div>
         <div class="report-learner-dim-bar">
           <div class="report-learner-dim-fill" data-prof-bg="${val}" style="width:${pct}%;background:${color}"></div>
         </div>
@@ -370,7 +378,7 @@ window.ReportBlocks = (function () {
         html += `</div>
         <div class="report-outcome-status">
           <div class="report-outcome-bar"><div class="report-outcome-bar-fill" data-prof-bg="${r}" style="width:${barPct}%;background:${color}"></div></div>
-          <span class="report-outcome-pill" data-prof="${r}" data-prof-bg="${r}" style="background:${prof > 0 ? tint : 'var(--overlay-hover)'};color:${prof > 0 ? color : 'var(--text-3)'}">${label}</span>
+          <span class="report-outcome-pill report-level-pill" data-prof="${r}" data-prof-bg="${r}" style="background:${prof > 0 ? tint : 'var(--overlay-hover)'};color:${prof > 0 ? color : 'var(--text-3)'}">${prof > 0 ? levelDots(r) : ''}${label}</span>
         </div>
       </div>`;
       });
@@ -413,10 +421,10 @@ window.ReportBlocks = (function () {
 
   function renderBlockLegend() {
     return `<div class="report-legend">
-    <div class="report-legend-item"><span class="report-legend-dot" data-prof-bg="1" style="background:var(--score-1)"></span><div class="report-legend-text"><span class="report-legend-word">Emerging</span><span class="report-legend-desc">Beginning to develop understanding; requires consistent support</span></div></div>
-    <div class="report-legend-item"><span class="report-legend-dot" data-prof-bg="2" style="background:var(--score-2)"></span><div class="report-legend-text"><span class="report-legend-word">Developing</span><span class="report-legend-desc">Growing understanding; demonstrates learning with some support</span></div></div>
-    <div class="report-legend-item"><span class="report-legend-dot" data-prof-bg="3" style="background:var(--score-3)"></span><div class="report-legend-text"><span class="report-legend-word">Proficient</span><span class="report-legend-desc">Solid, independent understanding of grade-level expectations</span></div></div>
-    <div class="report-legend-item"><span class="report-legend-dot" data-prof-bg="4" style="background:var(--score-4)"></span><div class="report-legend-text"><span class="report-legend-word">Extending</span><span class="report-legend-desc">Deep, sophisticated understanding; applies learning in new contexts</span></div></div>
+    <div class="report-legend-item">${levelDots(1)}<div class="report-legend-text"><span class="report-legend-word">Emerging</span><span class="report-legend-desc">Beginning to develop understanding; requires consistent support</span></div></div>
+    <div class="report-legend-item">${levelDots(2)}<div class="report-legend-text"><span class="report-legend-word">Developing</span><span class="report-legend-desc">Growing understanding; demonstrates learning with some support</span></div></div>
+    <div class="report-legend-item">${levelDots(3)}<div class="report-legend-text"><span class="report-legend-word">Proficient</span><span class="report-legend-desc">Solid, independent understanding of grade-level expectations</span></div></div>
+    <div class="report-legend-item">${levelDots(4)}<div class="report-legend-text"><span class="report-legend-word">Extending</span><span class="report-legend-desc">Deep, sophisticated understanding; applies learning in new contexts</span></div></div>
   </div>`;
   }
 
@@ -913,7 +921,7 @@ window.ReportBlocks = (function () {
           const profLevel = pointsToProf(rawAvg, max, scale);
           const color = PROF_COLORS[profLevel] || 'var(--text-3)';
           scoreDisplay = `<td style="text-align:center;font-weight:600;font-size:1rem">${formatPoints(rawAvg)}<span style="color:var(--text-3);font-weight:400">/${max}</span></td>`;
-          profDisplay = `<td style="text-align:center"><span data-prof="${profLevel}" data-prof-bg="${profLevel}" style="display:inline-block;padding:2px 10px;border-radius:6px;font-size:0.74rem;font-weight:600;background:${PROF_TINT[profLevel] || 'transparent'};color:${color}">${profLabel(profLevel)} <span style="font-weight:400;opacity:0.7">${pct}%</span></span></td>`;
+          profDisplay = `<td style="text-align:center"><span class="report-level-pill" data-prof="${profLevel}" data-prof-bg="${profLevel}" style="display:inline-block;padding:2px 10px;border-radius:6px;font-size:0.74rem;font-weight:600;background:${PROF_TINT[profLevel] || 'transparent'};color:${color}">${levelDots(profLevel)}${profLabel(profLevel)} <span style="font-weight:400;opacity:0.7">${pct}%</span></span></td>`;
         } else {
           let avg = aScores.reduce((s, x) => s + scoreModValue(x), 0) / aScores.length;
           const rubricAvg = getRubricAssessmentScore(cid, a, aScores);
@@ -921,7 +929,7 @@ window.ReportBlocks = (function () {
           const r = Math.round(avg);
           const color = PROF_COLORS[r] || 'var(--text-3)';
           scoreDisplay = `<td data-prof="${r}" style="text-align:center;font-weight:600;font-size:1rem;color:${color}">${r}<span style="color:var(--text-3);font-weight:400">/4</span></td>`;
-          profDisplay = `<td style="text-align:center"><span data-prof="${r}" data-prof-bg="${r}" style="display:inline-block;padding:2px 10px;border-radius:6px;font-size:0.74rem;font-weight:600;background:${PROF_TINT[r] || 'transparent'};color:${color}">${profLabel(r)}</span></td>`;
+          profDisplay = `<td style="text-align:center"><span class="report-level-pill" data-prof="${r}" data-prof-bg="${r}" style="display:inline-block;padding:2px 10px;border-radius:6px;font-size:0.74rem;font-weight:600;background:${PROF_TINT[r] || 'transparent'};color:${color}">${levelDots(r)}${profLabel(r)}</span></td>`;
         }
         rows += `<tr>
         <td style="font-weight:500">${esc(a.title)}${weightLabel}</td>
@@ -1001,7 +1009,7 @@ window.ReportBlocks = (function () {
         html += `<div style="margin-bottom:6px">
         <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:2px">
           <span style="font-size:0.75rem;font-weight:500;color:var(--text)">${esc(c.label)}</span>
-          <span data-prof="${r}" style="font-size:0.65rem;font-weight:600;color:${labelColor};white-space:nowrap">${profLabel}</span>
+          <span data-prof="${r}" style="font-size:0.65rem;font-weight:600;color:${labelColor};white-space:nowrap">${avg > 0 ? levelDots(r) : ''}${profLabel}</span>
         </div>
         <div style="height:8px;background:var(--overlay-hover);border-radius:4px;overflow:hidden">
           <div data-prof-bg="${r}" style="height:100%;width:${pct}%;background:${color};border-radius:4px"></div>
@@ -1056,6 +1064,7 @@ window.ReportBlocks = (function () {
   /* ── Namespace ──────────────────────────────────────────── */
   return {
     getTermId: getTermId,
+    levelDots: levelDots,
     getPronouns: getPronouns,
     OBS_DESCRIPTORS: OBS_DESCRIPTORS,
     renderBlockHeader: renderBlockHeader,
