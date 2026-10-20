@@ -154,6 +154,12 @@ Context: a review of observation capture and display across desktop, phone, stud
     - The meta line goes from lightest to most important: the setting in `--text-3`, a linked assessment in link blue, tags with their dots in `--text-2`, and "Quoted in Report N" as a small outlined stamp at the right.
     - Desktop delete shows on hover or keyboard focus only. The phone card has no buttons: a faint › says it opens, the whole card opens the edit sheet (which has Delete Observation), the name still filters the feed, and a left swipe deletes with Undo.
     - **The sticky-note view is gone.** One card style is easier to keep right than two, and the review table leaned toward dropping it.
+11. **The edit window is the same white card** (2026-10-19, mockup D3), replacing the cream lined notebook page:
+    - A folder band (`--bg`, bottom border) holds the three types as tabs, the chosen one filled; clicking it again clears it. The date sits at the band's right. The name follows, then, for a quoted note, "Quoted in Report N. Changes here show in that report."
+    - A plain bordered note box, then one row: Tags (chips with ×, "+ Add Tag" opening the tag popover), then Context as a small menu ("Independent ▾", or a dashed "+ Context") listing the five contexts with None last. Tags come first because they reach the report; context is a note to yourself, and a segmented control made it look required.
+    - **Nothing is written until Save.** Enter saves, Shift+Enter adds a line, Esc and Cancel leave the note as it was; a click outside closes only when nothing changed. The × close is gone (one way out). Delete sits at the left in quiet red and offers Undo.
+    - The phone edit sheet: Cancel / name / Save in the top bar, the type band, the note box, a settings-style "Context · Independent ›" row that opens a picker (None last), tags as chips with "+ Add Tag" opening a tag picker, and a full-width Delete Observation last; every target is 44 px.
+    - The Assignments comment popover keeps its own editor.
 
 ## Buttons and breadcrumbs (2026-10-19)
 

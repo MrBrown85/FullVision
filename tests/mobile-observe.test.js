@@ -234,7 +234,7 @@ describe('Sheet state management', () => {
   });
 });
 
-/* ── Sentiment ARIA on the edit sheet (radiogroup pattern) ─── */
+/* ── The edit sheet (D3) ──────────────────────────────────── */
 describe('Sentiment button accessibility', () => {
   function editHtml() {
     let capturedHTML = '';
@@ -248,26 +248,20 @@ describe('Sentiment button accessibility', () => {
     return capturedHTML;
   }
 
-  it('renders sentiment buttons with role="radio" and aria-checked', () => {
+  it('puts the types in a folder band of toggle tabs', () => {
     const html = editHtml();
-    expect(html).toContain('role="radiogroup"');
-    expect(html).toContain('aria-label="Observation type"');
-    expect(html).toContain('role="radio"');
-    expect(html).toContain('aria-checked="false"');
+    expect(html).toContain('class="obs-band" role="group" aria-label="Type"');
+    expect(html).toMatch(/obs-band-tab[^"]*" data-sentiment="strength" aria-pressed="(true|false)"/);
   });
 
-  it('renders textarea with proper <label> element', () => {
+  it('has Cancel and Save on top, a Context row, tag chips and Delete Observation', () => {
     const html = editHtml();
-    expect(html).toContain('<label');
-    expect(html).toContain('for="m-obs-text"');
-  });
-
-  it('offers Core Competencies and custom tags, not just dispositions', () => {
-    globalThis.getCustomTags = () => ['Lab safety'];
-    const html = editHtml();
-    expect(html).toContain('Core competencies');
-    expect(html).toContain('data-val="tag:Lab safety"');
-    expect(html).toContain('m-dim-chip');
+    expect(html).toContain('>Cancel</button>');
+    expect(html).toContain('id="m-obs-submit" data-action="m-obs-save">Save</button>');
+    expect(html).toContain('id="m-obs-ctx-row"');
+    expect(html).toContain('aria-label="Observation"');
+    expect(html).toContain('+ Add Tag');
+    expect(html).toContain('>Delete Observation</button>');
   });
 });
 

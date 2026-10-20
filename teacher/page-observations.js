@@ -40,9 +40,10 @@ window.PageObservations = (function () {
   var _focusSid = null;
   var _focusEl = null;
   var _focusBackdropEl = null;
-  var _focusDebounce = null;
   var _focusDraft = null;
+  var _focusOriginal = null;
   var _focusTagPopoverOpen = false;
+  var _focusCtxOpen = false;
   var _focusFocusables = null;
   var _focusLastActiveEl = null;
   var _motion = null;
@@ -832,61 +833,53 @@ window.PageObservations = (function () {
     return null;
   }
 
-  function _focusDoSave(patch) {
-    if (!_focusSid || !_focusObId) return;
-    updateQuickOb(activeCourse, _focusSid, _focusObId, patch);
-    // Patch only the affected card, not the whole feed — saving on every
-    // keystroke (after debounce) would otherwise rebuild ~117 cards each time.
-    // The closing path calls refreshFeedAndCount() once to reconcile filters.
-    var card = document.querySelector('.obs-card[data-sid="' + _focusSid + '"][data-obid="' + _focusObId + '"]');
-    if (card) {
-      var fresh = _focusFindOb(_focusSid, _focusObId);
-      if (fresh) card.outerHTML = renderObsCardHtml(fresh);
+  /* The editor keeps a draft; nothing is written until Save (or Enter).
+     Cancel and Esc leave the observation as it was. */
+  function _focusDirty() {
+    if (!_focusDraft || !_focusOriginal) return false;
+    return (
+      _focusDraft.text !== _focusOriginal.text ||
+      _focusDraft.sentiment !== _focusOriginal.sentiment ||
+      _focusDraft.context !== _focusOriginal.context ||
+      _focusDraft.dims.join('|') !== _focusOriginal.dims.join('|')
+    );
+  }
+
+  function focusSave() {
+    if (!_focusDraft || !_focusSid || !_focusObId) return;
+    if (!_focusDraft.text.trim()) {
+      var ta = document.getElementById('focus-textarea');
+      if (ta) ta.focus();
+      return;
     }
-  }
-
-  function _focusScheduleSave(patch) {
-    if (_focusDebounce) clearTimeout(_focusDebounce);
-    _focusDebounce = setTimeout(function () {
-      _focusDebounce = null;
-      _focusDoSave(patch);
-    }, 500);
-  }
-
-  function _focusFlush(patch) {
-    if (_focusDebounce) {
-      clearTimeout(_focusDebounce);
-      _focusDebounce = null;
+    if (_focusDirty()) {
+      updateQuickOb(activeCourse, _focusSid, _focusObId, {
+        text: _focusDraft.text.trim(),
+        sentiment: _focusDraft.sentiment,
+        context: _focusDraft.context,
+        dims: _focusDraft.dims.slice(),
+      });
     }
-    var merged = patch;
-    if (patch && _focusDraft && !('text' in patch)) {
-      merged = Object.assign({}, patch, { text: _focusDraft.text });
-    }
-    _focusDoSave(merged);
+    closeFocus();
   }
 
-  function _focusFlushAll() {
-    if (!_focusDebounce || !_focusDraft) return;
-    clearTimeout(_focusDebounce);
-    _focusDebounce = null;
-    _focusDoSave({
-      text: _focusDraft.text,
-      sentiment: _focusDraft.sentiment,
-      context: _focusDraft.context,
-      dims: _focusDraft.dims,
-    });
+  function focusDelete() {
+    var sid = _focusSid;
+    var obId = _focusObId;
+    closeFocus();
+    deleteOb(sid, obId);
   }
 
-  function _renderFocusDimsRow() {
+  function _renderFocusTagsHtml() {
     var h = '';
     _focusDraft.dims.forEach(function (t) {
       var info = resolveTag(t);
       h +=
-        '<span class="obs-focus-dim"><span class="dim-dot" style="background:' +
+        '<span class="obs-tag-chip"><span class="dim-dot" style="background:' +
         tagColor(t) +
         '"></span>' +
         esc(info.label) +
-        '<button type="button" class="obs-focus-dim-remove" aria-label="Remove ' +
+        '<button type="button" class="obs-tag-chip-x" aria-label="Remove ' +
         esc(info.label) +
         '" data-action="focusRemoveDim" data-value="' +
         esc(t) +
@@ -894,17 +887,34 @@ window.PageObservations = (function () {
     });
     h +=
       '<div class="obs-focus-tag-popover-wrap">' +
-      '<button type="button" class="obs-focus-add-tag" data-action="toggleFocusTagPopover">+ Tag</button>' +
+      '<button type="button" class="obs-add obs-focus-add-tag" data-action="toggleFocusTagPopover">+ Add Tag</button>' +
       renderTagPopover('focus-tag-dropdown', _focusDraft.dims, 'toggleFocusDim') +
       '</div>';
     return h;
   }
 
-  function _refreshFocusDimsRow() {
+  function _focusRowHtml() {
+    return (
+      '<span class="obs-row-label">Tags</span>' +
+      _renderFocusTagsHtml() +
+      '<span class="obs-row-sep" aria-hidden="true"></span>' +
+      '<span class="obs-row-label" id="focus-ctx-label">Context</span>' +
+      Card.contextMenuHtml({
+        id: 'focus-ctx',
+        value: _focusDraft.context,
+        open: _focusCtxOpen,
+        toggleAction: 'focusToggleCtxMenu',
+        pickAction: 'focusPickContext',
+        labelledBy: 'focus-ctx-label',
+      })
+    );
+  }
+
+  function _refreshFocusRow() {
     if (!_focusEl) return;
-    var row = _focusEl.querySelector('.obs-focus-dims');
+    var row = _focusEl.querySelector('.obs-focus-row');
     if (!row) return;
-    row.innerHTML = _renderFocusDimsRow();
+    row.innerHTML = _focusRowHtml();
     _focusFocusables = null;
     if (_focusTagPopoverOpen) {
       var pop = document.getElementById('focus-tag-dropdown');
@@ -912,72 +922,53 @@ window.PageObservations = (function () {
     }
   }
 
-  function _renderFocusCardHtml(ob) {
-    var s = _studentsById[ob.studentId];
-    var sn = s ? displayName(s) : ob.studentId;
-    var tm = Card.cardWhen(ob);
-    var sentAttr = _focusDraft.sentiment ? ' data-sentiment="' + _focusDraft.sentiment + '"' : '';
-
-    var sentimentPills = Object.entries(OBS_SENTIMENTS)
-      .map(function (entry) {
-        var key = entry[0];
-        var v = entry[1];
-        var active = _focusDraft.sentiment === key;
-        return (
-          '<button type="button" class="obs-focus-pill' +
-          (active ? ' active' : '') +
-          '" data-sentiment="' +
-          key +
-          '" data-action="focusToggleSentiment" data-value="' +
-          key +
-          '">' +
-          esc(v.label) +
-          '</button>'
-        );
-      })
-      .join('');
-
-    var contextPills = Object.entries(OBS_CONTEXTS)
-      .map(function (entry) {
-        var key = entry[0];
-        var v = entry[1];
-        var active = _focusDraft.context === key;
-        return (
-          '<button type="button" class="obs-focus-pill' +
-          (active ? ' active' : '') +
-          '" data-action="focusToggleContext" data-value="' +
-          key +
-          '">' +
-          esc(v.label) +
-          '</button>'
-        );
-      })
-      .join('');
-
+  /* "Quoted in Report 1. Changes here show in that report." */
+  function _quotedNotice(label) {
+    if (!label) return '';
+    var several = /Reports /.test(label);
+    var lead = label === 'Quoted' ? 'Quoted in a report.' : label + '.';
     return (
-      '<div class="obs-focus-card" id="obs-focus-card"' +
-      sentAttr +
-      ' role="dialog" aria-modal="true" aria-label="Observation focus" tabindex="-1">' +
-      '<div class="obs-focus-header"><span><span class="obs-focus-student">' +
-      esc(sn) +
-      '</span><span class="obs-focus-time">' +
-      esc(tm) +
-      '</span></span>' +
-      '<button type="button" class="obs-focus-close" aria-label="Close" data-action="closeFocus">&times;</button>' +
+      '<div class="obs-notice" role="note"><b>' +
+      esc(lead) +
+      '</b> Changes here show in ' +
+      (several ? 'those reports.' : 'that report.') +
+      '</div>'
+    );
+  }
+
+  function _renderFocusCardHtml(ob) {
+    var p = Card.parts(ob, Card.context(activeCourse, { hidden: _pendingDeletes }));
+    return (
+      '<div class="obs-focus-card" id="obs-focus-card" role="dialog" aria-modal="true" aria-label="Edit observation for ' +
+      esc(p.name) +
+      '" tabindex="-1">' +
+      Card.typeBandHtml({
+        value: _focusDraft.sentiment,
+        action: 'focusToggleSentiment',
+        right: Card.cardWhen(ob),
+      }) +
+      '<div class="obs-focus-body">' +
+      '<div class="obs-focus-header"><span class="obs-focus-student">' +
+      esc(p.name) +
+      '</span>' +
+      (p.withText ? '<span class="obs-focus-with">' + esc(p.withText) + '</span>' : '') +
       '</div>' +
-      '<div class="obs-focus-sentiments">' +
-      sentimentPills +
-      '</div>' +
-      '<textarea class="obs-focus-textarea" id="focus-textarea" aria-label="Observation text" data-action-input="focusText">' +
+      _quotedNotice(p.quoted) +
+      '<textarea class="obs-note-box obs-focus-textarea" id="focus-textarea" aria-label="Observation text" data-action-input="focusText">' +
       esc(_focusDraft.text) +
       '</textarea>' +
-      '<div class="obs-focus-contexts">' +
-      contextPills +
+      '<div class="obs-row obs-focus-row">' +
+      _focusRowHtml() +
       '</div>' +
-      '<div class="obs-focus-dims">' +
-      _renderFocusDimsRow() +
-      '</div>' +
-      '</div>'
+      '<div class="obs-focus-foot">' +
+      '<button type="button" class="obs-focus-delete" data-action="focusDelete">' +
+      Card.TRASH_SVG +
+      'Delete</button>' +
+      '<span class="obs-focus-hint">Enter saves · Shift+Enter new line · Esc cancels</span>' +
+      '<span class="obs-focus-spacer"></span>' +
+      '<button type="button" class="btn btn-ghost" data-action="closeFocus">Cancel</button>' +
+      '<button type="button" class="btn btn-primary" data-action="focusSave">Save</button>' +
+      '</div></div></div>'
     );
   }
 
@@ -985,7 +976,7 @@ window.PageObservations = (function () {
     var ta = document.getElementById('focus-textarea');
     if (!ta) return;
     ta.style.height = 'auto';
-    ta.style.height = Math.min(280, Math.max(140, ta.scrollHeight)) + 'px';
+    ta.style.height = Math.min(280, Math.max(104, ta.scrollHeight)) + 'px';
   }
 
   async function _animateFocusOpen() {
@@ -1051,7 +1042,9 @@ window.PageObservations = (function () {
       context: ob.context || null,
       dims: (ob.dims || []).slice(),
     };
+    _focusOriginal = Object.assign({}, _focusDraft, { dims: _focusDraft.dims.slice() });
     _focusTagPopoverOpen = false;
+    _focusCtxOpen = false;
     _focusLastActiveEl = document.activeElement;
 
     _focusBackdropEl = document.createElement('div');
@@ -1076,12 +1069,11 @@ window.PageObservations = (function () {
     });
   }
 
+  /* Closes without writing; Save writes first. */
   function closeFocus() {
     if (!_focusBackdropEl) return;
-    _focusFlushAll();
     _focusTagPopoverOpen = false;
-    // Reconcile filters/count once on close — per-keystroke saves only patched
-    // the single edited card.
+    _focusCtxOpen = false;
     refreshFeedAndCount();
     var bd = _focusBackdropEl;
     _animateFocusClose(function () {
@@ -1091,6 +1083,7 @@ window.PageObservations = (function () {
       _focusObId = null;
       _focusSid = null;
       _focusDraft = null;
+      _focusOriginal = null;
       _focusFocusables = null;
       if (_focusLastActiveEl && document.body.contains(_focusLastActiveEl)) {
         try {
@@ -1101,28 +1094,32 @@ window.PageObservations = (function () {
     });
   }
 
+  /* A type tab picks the type; the chosen tab again clears it. */
   function focusToggleSentiment(val) {
     if (!_focusDraft) return;
     _focusDraft.sentiment = _focusDraft.sentiment === val ? null : val;
-    if (_focusEl) {
-      if (_focusDraft.sentiment) _focusEl.setAttribute('data-sentiment', _focusDraft.sentiment);
-      else _focusEl.removeAttribute('data-sentiment');
-      _focusEl.querySelectorAll('.obs-focus-sentiments .obs-focus-pill').forEach(function (b) {
-        b.classList.toggle('active', b.dataset.value === _focusDraft.sentiment);
-      });
-    }
-    _focusFlush({ sentiment: _focusDraft.sentiment });
+    if (_focusEl) Card.syncTypeBand(_focusEl, _focusDraft.sentiment);
   }
 
-  function focusToggleContext(val) {
+  function focusToggleCtxMenu() {
     if (!_focusDraft) return;
-    _focusDraft.context = _focusDraft.context === val ? null : val;
-    if (_focusEl) {
-      _focusEl.querySelectorAll('.obs-focus-contexts .obs-focus-pill').forEach(function (b) {
-        b.classList.toggle('active', b.dataset.value === _focusDraft.context);
-      });
+    _focusCtxOpen = !_focusCtxOpen;
+    _focusTagPopoverOpen = false;
+    _refreshFocusRow();
+    if (_focusCtxOpen) Card.focusContextMenu(_focusEl);
+    else {
+      var btn = _focusEl && _focusEl.querySelector('.obs-menu-btn');
+      if (btn) btn.focus();
     }
-    _focusFlush({ context: _focusDraft.context });
+  }
+
+  function focusPickContext(val) {
+    if (!_focusDraft) return;
+    _focusDraft.context = val || null;
+    _focusCtxOpen = false;
+    _refreshFocusRow();
+    var btn = _focusEl && _focusEl.querySelector('.obs-menu-btn');
+    if (btn) btn.focus();
   }
 
   function focusRemoveDim(t) {
@@ -1130,8 +1127,7 @@ window.PageObservations = (function () {
     _focusDraft.dims = _focusDraft.dims.filter(function (d) {
       return d !== t;
     });
-    _refreshFocusDimsRow();
-    _focusFlush({ dims: _focusDraft.dims });
+    _refreshFocusRow();
   }
 
   function toggleFocusDim(t) {
@@ -1139,14 +1135,18 @@ window.PageObservations = (function () {
     var idx = _focusDraft.dims.indexOf(t);
     if (idx >= 0) _focusDraft.dims.splice(idx, 1);
     else _focusDraft.dims.push(t);
-    _refreshFocusDimsRow();
-    _focusFlush({ dims: _focusDraft.dims });
+    _refreshFocusRow();
   }
 
   function toggleFocusTagPopover() {
     var pop = document.getElementById('focus-tag-dropdown');
     if (!pop) return;
     _focusTagPopoverOpen = !_focusTagPopoverOpen;
+    if (_focusTagPopoverOpen && _focusCtxOpen) {
+      _focusCtxOpen = false;
+      _refreshFocusRow();
+      pop = document.getElementById('focus-tag-dropdown');
+    }
     pop.classList.toggle('open', _focusTagPopoverOpen);
     if (_focusTagPopoverOpen) {
       var s = pop.querySelector('.obs-popover-search');
@@ -1185,8 +1185,13 @@ window.PageObservations = (function () {
   /* ── Click-away for popovers ────────────────────────────── */
   function _handleMousedown(e) {
     if (_focusBackdropEl && e.target === _focusBackdropEl) {
-      closeFocus();
+      // A click outside leaves only when there is nothing to lose.
+      if (!_focusDirty()) closeFocus();
       return;
+    }
+    if (_focusCtxOpen && !e.target.closest('.obs-menu-wrap')) {
+      _focusCtxOpen = false;
+      _refreshFocusRow();
     }
     if (_focusTagPopoverOpen && !e.target.closest('#focus-tag-dropdown') && !e.target.closest('.obs-focus-add-tag')) {
       _focusTagPopoverOpen = false;
@@ -1215,7 +1220,6 @@ window.PageObservations = (function () {
       if (_focusDraft) {
         _focusDraft.text = e.target.value;
         _autosizeFocusTextarea();
-        _focusScheduleSave({ text: e.target.value });
       }
     }
   }
@@ -1260,8 +1264,17 @@ window.PageObservations = (function () {
       focusToggleSentiment: function () {
         focusToggleSentiment(el.dataset.value);
       },
-      focusToggleContext: function () {
-        focusToggleContext(el.dataset.value);
+      focusToggleCtxMenu: function () {
+        focusToggleCtxMenu();
+      },
+      focusPickContext: function () {
+        focusPickContext(el.dataset.value);
+      },
+      focusSave: function () {
+        focusSave();
+      },
+      focusDelete: function () {
+        focusDelete();
       },
       focusRemoveDim: function () {
         focusRemoveDim(el.dataset.value);
@@ -1281,7 +1294,21 @@ window.PageObservations = (function () {
     if (_focusBackdropEl) {
       if (e.key === 'Escape') {
         e.preventDefault();
-        closeFocus();
+        if (_focusCtxOpen) {
+          focusToggleCtxMenu();
+        } else if (_focusTagPopoverOpen) {
+          toggleFocusTagPopover();
+          var addTag = _focusEl && _focusEl.querySelector('.obs-focus-add-tag');
+          if (addTag) addTag.focus();
+        } else {
+          closeFocus();
+        }
+        return;
+      }
+      if (_focusCtxOpen && Card.contextMenuKey(e, _focusEl)) return;
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.target.id === 'focus-textarea') {
+        e.preventDefault();
+        focusSave();
         return;
       }
       if (e.key === 'Tab') {
@@ -1366,8 +1393,6 @@ window.PageObservations = (function () {
     _listeners = [];
     if (_searchDebounce) clearTimeout(_searchDebounce);
     _searchDebounce = null;
-    if (_focusDebounce) clearTimeout(_focusDebounce);
-    _focusDebounce = null;
     if (_focusBackdropEl && _focusBackdropEl.parentNode) {
       _focusBackdropEl.parentNode.removeChild(_focusBackdropEl);
     }
@@ -1376,9 +1401,11 @@ window.PageObservations = (function () {
     _focusObId = null;
     _focusSid = null;
     _focusDraft = null;
+    _focusOriginal = null;
     _focusFocusables = null;
     _focusLastActiveEl = null;
     _focusTagPopoverOpen = false;
+    _focusCtxOpen = false;
     _alive = false;
     _students = [];
     _studentsById = {};
