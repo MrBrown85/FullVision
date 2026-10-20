@@ -107,6 +107,7 @@ window.PageReports = (function () {
   /* ── Tab switching ───────────────────────────────────────────── */
   function switchTab(tab) {
     activeTab = tab;
+    viewingIssue = null;
     segSelect(document.querySelector('.report-seg-btn[data-tab="' + tab + '"]'));
     // Show/hide contextual toolbar elements
     document.getElementById('student-picker').style.display = tab === 'progress' ? '' : 'none';
@@ -363,13 +364,19 @@ window.PageReports = (function () {
    ══════════════════════════════════════════════════════════════ */
   function renderReportPreview() {
     var sheets = ReportBuilderUI.usesSheets(reportConfig);
+    if (viewingIssue && sheets) {
+      _showIssue(viewingIssue.id);
+      return;
+    }
     Preview.renderReportPreview({
       cid: activeCourse,
       selectedStudentIds: selectedStudentIds,
       reportConfig: reportConfig,
       paper: reportPaper,
-      onSheets: _annotateSidebar,
+      onSheets: _rememberSummary,
     });
+    _syncPrintButton();
+    if (!sheets) _populateCopies();
     var preview = document.getElementById('rb-preview');
     if (preview) {
       preview.classList.toggle('report-photocopy', reportView === 'photocopy');
@@ -419,6 +426,309 @@ window.PageReports = (function () {
     _sidebarAnnotated = false;
   }
 
+  /* ── Issued copies ───────────────────────────────────────────────
+     Issue saves a fixed copy of every report (report-issues.js), then
+     prints. The toolbar's copy picker shows the term's issues; choosing
+     one shows and prints that copy instead of the live reports. */
+  var _lastSummary = null;
+  var viewingIssue = null; // the loaded copy while one is shown
+
+  function _rememberSummary(summary) {
+    _lastSummary = summary;
+    _annotateSidebar(summary);
+    _populateCopies();
+  }
+
+  function _populateCopies() {
+    var sel = document.getElementById('report-copy');
+    if (!sel) return;
+    var sheets = ReportBuilderUI.usesSheets(reportConfig) && activeTab === 'progress';
+    var ctx = ReportBlocks.reportContext();
+    var issues = sheets && typeof ReportIssues !== 'undefined' ? ReportIssues.list(activeCourse, ctx.termId) : [];
+    if (!issues.length) {
+      sel.style.display = 'none';
+      sel.innerHTML = '';
+      return;
+    }
+    var current = viewingIssue ? viewingIssue.id : '';
+    sel.innerHTML =
+      '<option value="">Live</option>' +
+      issues
+        .map(function (e) {
+          return '<option value="' + esc(e.id) + '">' + esc(ReportIssues.label(e)) + '</option>';
+        })
+        .join('');
+    sel.value = current;
+    sel.style.display = '';
+  }
+
+  function _showIssue(id) {
+    var preview = document.getElementById('rb-preview');
+    if (!id || !preview) {
+      viewingIssue = null;
+      renderReports();
+      return;
+    }
+    ReportIssues.load(id).then(function (rec) {
+      if (!rec) {
+        viewingIssue = null;
+        renderReports();
+        return;
+      }
+      viewingIssue = rec;
+      preview.innerHTML = rec.students
+        .map(function (s) {
+          return s.html;
+        })
+        .join('');
+      preview.classList.add('report-sheets-on');
+      preview.classList.remove('report-fitmap');
+      preview.classList.toggle('report-photocopy', reportView === 'photocopy');
+      ReportSheets.setPageStyle(rec.paper || 'letter');
+      var line = document.getElementById('rb-form-summary');
+      if (line)
+        line.textContent =
+          ReportIssues.label(rec) +
+          ' · ' +
+          rec.count +
+          ' reports as they went home. Later score changes do not change this copy.';
+      _syncPrintButton();
+    });
+  }
+
+  function _syncPrintButton() {
+    var btn = document.getElementById('tb-print-btn');
+    if (!btn) return;
+    var sheets = ReportBuilderUI.usesSheets(reportConfig) && activeTab === 'progress';
+    if (viewingIssue) btn.textContent = 'Print This Copy';
+    else if (sheets) btn.textContent = 'Issue Reports\u2026';
+    else btn.textContent = 'Print Reports';
+    var fm = document.getElementById('tb-fitmap-btn');
+    if (fm && viewingIssue) fm.style.display = 'none';
+  }
+
+  function _printNow() {
+    ensureClassFresh(activeCourse).then(function (fresh) {
+      if (fresh || window.confirm("Couldn't confirm this class is up to date. Print the saved copy anyway?")) {
+        window.print();
+      }
+    });
+  }
+
+  /* ── The Issue dialog ──────────────────────────────────────────── */
+  var ISSUE_OVERLAY_ID = 'issue-overlay';
+  var _issueState = null;
+
+  function _issueCounts() {
+    var s = _lastSummary || { perStudent: {}, continued: [], noComment: [] };
+    var ids = Object.keys(s.perStudent || {});
+    var sheets = 0;
+    var hashes = {};
+    ids.forEach(function (sid) {
+      sheets += s.perStudent[sid].sheets;
+      hashes[sid] = ReportIssues.hash(s.perStudent[sid].html);
+    });
+    var ctx = ReportBlocks.reportContext();
+    var last = ReportIssues.latest(activeCourse, ctx.termId);
+    var changed = last ? ReportIssues.changedSince(last, hashes) : ids;
+    return { ids: ids, sheets: sheets, hashes: hashes, last: last, changed: changed, ctx: ctx, summary: s };
+  }
+
+  function _issueDialogHtml(c) {
+    var course = COURSES[activeCourse] || {};
+    var n = c.ids.length;
+    var now = new Date();
+    var stamp = now.toLocaleString('en-CA', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+    var subtitle = [
+      c.ctx.termLabel,
+      course.name,
+      typeof courseBlockLabel === 'function' ? courseBlockLabel(course) : '',
+    ]
+      .filter(Boolean)
+      .map(esc)
+      .join(' \u00B7 ');
+    var onOne = n - c.summary.continued.length;
+    var sheetsLine = c.sheets + (c.sheets === 1 ? ' sheet' : ' sheets') + ' \u00B7 ' + onOne + ' on one';
+    if (c.summary.continued.length)
+      sheetsLine += ', ' + c.summary.continued.length + ' on two (' + esc(c.summary.continued.join(', ')) + ')';
+    var html = '<div class="confirm-card issue-card">';
+    html += '<div class="confirm-title" id="issue-title">Issue ' + n + (n === 1 ? ' Report' : ' Reports') + '</div>';
+    html += '<div class="confirm-message">' + subtitle + '</div>';
+    html += '<div class="issue-kv">';
+    html +=
+      '<span class="issue-k">Saved as</span><span><b>' +
+      esc(c.ctx.termLabel) +
+      ' \u00B7 Issued ' +
+      esc(stamp) +
+      '</b><br><span class="issue-help">A fixed copy of every report. Reprints use this copy, not later scores.</span></span>';
+    html +=
+      '<span class="issue-k">Form</span><span>Report Card \u00B7 ' +
+      (reportPaper === 'legal' ? 'Legal' : 'Letter') +
+      ' \u00B7 front and back \u00B7 black and white</span>';
+    html += '<span class="issue-k">Sheets</span><span>' + sheetsLine + '</span>';
+    html += '</div>';
+    html += '<fieldset class="issue-group"><legend>Which Students</legend>';
+    html +=
+      '<label class="issue-option"><input type="radio" name="issue-who" value="all" checked><span>All ' +
+      n +
+      '</span></label>';
+    if (c.last) {
+      html +=
+        '<label class="issue-option"><input type="radio" name="issue-who" value="changed"' +
+        (c.changed.length ? '' : ' disabled') +
+        '><span>Changed since the last issue <span class="issue-help">(' +
+        esc(ReportIssues.label(c.last).replace(/^Issued /, '')) +
+        ' \u00B7 ' +
+        c.changed.length +
+        (c.changed.length === 1 ? ' student' : ' students') +
+        ')</span></span></label>';
+    }
+    html += '</fieldset>';
+    var warn = [];
+    if (c.summary.noComment.length) {
+      warn.push(
+        esc(c.summary.noComment.join(', ')) +
+          (c.summary.noComment.length === 1 ? ' has' : ' have') +
+          ' no Teacher Comment. The box prints with lines. <a href="#" data-issue="write">Write them now</a>',
+      );
+    }
+    if (c.summary.continued.length) {
+      warn.push(
+        esc(c.summary.continued.join(', ')) +
+          (c.summary.continued.length === 1 ? ' needs' : ' need') +
+          ' a second sheet.',
+      );
+    }
+    if (warn.length) {
+      html +=
+        '<div class="issue-warn"><b>Before you issue</b>' +
+        warn
+          .map(function (w) {
+            return '<div>' + w + '</div>';
+          })
+          .join('') +
+        '</div>';
+    }
+    html += '<fieldset class="issue-group"><legend>Then</legend>';
+    html +=
+      '<label class="issue-option"><input type="checkbox" id="issue-print" checked><span>Print <span class="issue-help">\u00B7 set the copier to ' +
+      (reportPaper === 'legal' ? 'Legal' : 'Letter') +
+      ', 2-sided, flip on long edge</span></span></label>';
+    html += '</fieldset>';
+    html +=
+      '<div class="confirm-actions"><button type="button" class="confirm-cancel" data-issue="cancel">Cancel</button>';
+    html += '<button type="button" class="confirm-ok primary" data-issue="go">Issue and Print</button></div>';
+    html += '</div>';
+    return html;
+  }
+
+  function openIssueDialog() {
+    closeIssueDialog();
+    if (!_lastSummary || !Object.keys(_lastSummary.perStudent || {}).length) return;
+    var c = _issueCounts();
+    _issueState = { counts: c, trigger: document.activeElement };
+    var overlay = document.createElement('div');
+    overlay.id = ISSUE_OVERLAY_ID;
+    overlay.className = 'confirm-overlay issue-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-labelledby', 'issue-title');
+    overlay.innerHTML = _issueDialogHtml(c);
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay) {
+        closeIssueDialog();
+        return;
+      }
+      var a = e.target.closest ? e.target.closest('[data-issue]') : null;
+      if (!a) return;
+      e.preventDefault();
+      if (a.dataset.issue === 'cancel') closeIssueDialog();
+      else if (a.dataset.issue === 'go') _issueFromDialog(overlay);
+      else if (a.dataset.issue === 'write') {
+        var names = c.summary.noComment;
+        var first = Object.keys(c.summary.perStudent).find(function (sid) {
+          return c.summary.perStudent[sid].noComment;
+        });
+        closeIssueDialog();
+        if (first) {
+          tqSelectStudent(first);
+          switchTab('questionnaire');
+        }
+      }
+    });
+    overlay.addEventListener('change', function () {
+      var go = overlay.querySelector('[data-issue="go"]');
+      var print = overlay.querySelector('#issue-print');
+      if (go && print) go.textContent = print.checked ? 'Issue and Print' : 'Issue';
+    });
+    _issueState.keyHandler = function (e) {
+      if (e.key === 'Escape') closeIssueDialog();
+    };
+    document.addEventListener('keydown', _issueState.keyHandler);
+    document.body.appendChild(overlay);
+    var first = overlay.querySelector('input');
+    if (first && first.focus) first.focus();
+  }
+
+  function closeIssueDialog() {
+    var overlay = document.getElementById(ISSUE_OVERLAY_ID);
+    if (overlay && overlay.remove) overlay.remove();
+    if (_issueState) {
+      if (_issueState.keyHandler) document.removeEventListener('keydown', _issueState.keyHandler);
+      var trigger = _issueState.trigger;
+      _issueState = null;
+      try {
+        if (trigger && typeof trigger.focus === 'function') trigger.focus();
+      } catch (e) {
+        /* the button may be gone */
+      }
+    }
+  }
+
+  function _issueFromDialog(overlay) {
+    var c = _issueState && _issueState.counts;
+    if (!c) return;
+    var who = (overlay.querySelector('input[name="issue-who"]:checked') || {}).value || 'all';
+    var doPrint = !!(overlay.querySelector('#issue-print') || {}).checked;
+    closeIssueDialog();
+    var ids = who === 'changed' ? c.changed : c.ids;
+    if (who === 'changed') {
+      // Show and print only what changed; the copy keeps every student issued.
+      selectedStudentIds = ids.slice();
+      populateStudentSelect();
+      renderReportPreview();
+    }
+    var students = ids.map(function (sid) {
+      var p = c.summary.perStudent[sid];
+      return { sid: sid, name: p.name, sheets: p.sheets, html: p.html };
+    });
+    ReportIssues.issue({
+      cid: activeCourse,
+      termId: c.ctx.termId,
+      termLabel: c.ctx.termLabel,
+      paper: reportPaper,
+      students: students,
+    }).then(function (res) {
+      _populateCopies();
+      var line = document.getElementById('rb-form-summary');
+      if (line) {
+        line.textContent =
+          ReportIssues.label(res.entry) +
+          ' \u00B7 ' +
+          students.length +
+          (students.length === 1 ? ' report' : ' reports') +
+          (res.stored ? ' saved as a fixed copy.' : ' issued; this browser could not keep the copy.');
+      }
+      if (doPrint) _printNow();
+    });
+  }
+
   /* ── Fit Map: every student's sheets at a glance ─────────────── */
   var fitMapOn = false;
   function toggleFitMap(on) {
@@ -455,6 +765,7 @@ window.PageReports = (function () {
   }
 
   function rbApplyPreset(preset) {
+    viewingIssue = null;
     Builder.applyPreset(reportConfig, preset);
     saveReportConfig(activeCourse, reportConfig);
     renderBuilderBlocks();
@@ -479,6 +790,7 @@ window.PageReports = (function () {
     activeCourse = cid;
     if (!(await switchActiveCourse(cid))) return;
     selectedStudentIds = null; // reset to all
+    viewingIssue = null;
     reportPaper = _loadPaper(cid);
     _applyPaper();
     reportConfig = Builder.getReportConfigWrapped(cid);
@@ -583,12 +895,11 @@ window.PageReports = (function () {
         renderReports();
       },
       printReports: function () {
-        // Print what the server has, not a saved copy it may have replaced.
-        ensureClassFresh(activeCourse).then(function (fresh) {
-          if (fresh || window.confirm("Couldn't confirm this class is up to date. Print the saved copy anyway?")) {
-            window.print();
-          }
-        });
+        // A chosen copy prints as it is. The Report Card issues first, then
+        // prints. Other presets print what the server has.
+        if (viewingIssue) window.print();
+        else if (ReportBuilderUI.usesSheets(reportConfig) && activeTab === 'progress') openIssueDialog();
+        else _printNow();
       },
       setPaper: function () {
         setPaper(el.dataset.paper);
@@ -721,7 +1032,12 @@ window.PageReports = (function () {
   }
 
   function _handleReportPeriodChange() {
+    viewingIssue = null;
     renderReports();
+  }
+
+  function _handleCopyChange(e) {
+    _showIssue(e.target.value);
   }
 
   var _resizeTimer = null;
@@ -806,6 +1122,8 @@ window.PageReports = (function () {
     populateReportPeriods(false);
     var reportPeriodEl = document.getElementById('report-period');
     if (reportPeriodEl) reportPeriodEl.addEventListener('change', _handleReportPeriodChange);
+    var copyEl = document.getElementById('report-copy');
+    if (copyEl) copyEl.addEventListener('change', _handleCopyChange);
 
     // Wire sidebar clicks
     var sidebarEl = document.getElementById('sidebar-mount');
@@ -865,6 +1183,10 @@ window.PageReports = (function () {
     // Clean up report-period and sidebar click listeners
     var reportPeriodEl = document.getElementById('report-period');
     if (reportPeriodEl) reportPeriodEl.removeEventListener('change', _handleReportPeriodChange);
+    var copyEl = document.getElementById('report-copy');
+    if (copyEl) copyEl.removeEventListener('change', _handleCopyChange);
+    closeIssueDialog();
+    viewingIssue = null;
     var sidebarEl = document.getElementById('sidebar-mount');
     if (sidebarEl) sidebarEl.removeEventListener('click', _handleSidebarClick);
 
@@ -878,7 +1200,7 @@ window.PageReports = (function () {
 
   /* -- Toolbar HTML (rendered into main on init) ---------- */
   var TOOLBAR_HTML =
-    '<div class="report-toolbar no-print">\n      <div class="seg report-seg-control" role="tablist" aria-label="Report type">\n        <button class="seg-btn report-seg-btn active" data-action="switchTab" data-tab="questionnaire" role="tab" aria-selected="true">Term Questionnaire</button>\n        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="progress" role="tab" aria-selected="false">Progress Reports</button>\n        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="summary" role="tab" aria-selected="false">Class Summary</button>\n      </div>\n      <div class="student-picker" id="student-picker">\n        <button class="student-picker-btn" data-action="toggleStudentPicker" aria-label="Select students" aria-expanded="false" aria-haspopup="listbox">\n          <span id="picker-label">All Students</span>\n          <span class="arrow" aria-hidden="true">\u25bc</span>\n        </button>\n        <div class="student-picker-dropdown" id="picker-dropdown"></div>\n      </div>\n      <div class="tq-student-nav" id="tq-student-nav" style="display:none">\n        <button class="tq-toolbar-arrow" data-action="tqPrevStudent" title="Previous student" aria-label="Previous student">\n          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>\n        </button>\n        <span class="tq-student-name" id="tq-student-name"></span>\n        <button class="tq-toolbar-arrow" data-action="tqNextStudent" title="Next student" aria-label="Next student">\n          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>\n        </button>\n        <div class="tq-progress-ring" id="tq-progress-ring">\n          <svg width="30" height="30" viewBox="0 0 30 30">\n            <circle class="ring-bg" cx="15" cy="15" r="12"/>\n            <circle class="ring-fill" id="tq-ring-fill" cx="15" cy="15" r="12" stroke-dasharray="75.4" stroke-dashoffset="75.4"/>\n          </svg>\n          <span class="tq-progress-label" id="tq-progress-label"></span>\n        </div>\n      </div>\n      <select id="report-period" class="report-term-select" aria-label="Report"></select>\n      <div class="seg seg-sm" id="report-paper" role="radiogroup" aria-label="Paper" style="display:none">\n        <button class="seg-btn active" data-action="setPaper" data-paper="letter" role="radio" aria-checked="true">Letter</button>\n        <button class="seg-btn" data-action="setPaper" data-paper="legal" role="radio" aria-checked="false">Legal</button>\n      </div>\n      <div class="seg seg-sm" id="report-view" role="radiogroup" aria-label="View" style="display:none">\n        <button class="seg-btn active" data-action="setView" data-view="screen" role="radio" aria-checked="true">Screen</button>\n        <button class="seg-btn" data-action="setView" data-view="photocopy" role="radio" aria-checked="false">Photocopy</button>\n      </div>\n      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">\n        <button class="tb-toggle-btn" id="tb-anon-btn" style="display:none" data-action="toggleAnon">\n          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>\n          Anonymize\n        </button>\n        <button class="tb-toggle-btn" id="tb-fitmap-btn" style="display:none" data-action="toggleFitMap" aria-pressed="false">Fit Map</button>\n        <button class="tb-action-btn" id="tb-print-btn" data-action="printReports">Print Reports</button>\n      </div>\n    </div>\n    <div id="report-output" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto"></div>';
+    '<div class="report-toolbar no-print">\n      <div class="seg report-seg-control" role="tablist" aria-label="Report type">\n        <button class="seg-btn report-seg-btn active" data-action="switchTab" data-tab="questionnaire" role="tab" aria-selected="true">Term Questionnaire</button>\n        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="progress" role="tab" aria-selected="false">Progress Reports</button>\n        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="summary" role="tab" aria-selected="false">Class Summary</button>\n      </div>\n      <div class="student-picker" id="student-picker">\n        <button class="student-picker-btn" data-action="toggleStudentPicker" aria-label="Select students" aria-expanded="false" aria-haspopup="listbox">\n          <span id="picker-label">All Students</span>\n          <span class="arrow" aria-hidden="true">\u25bc</span>\n        </button>\n        <div class="student-picker-dropdown" id="picker-dropdown"></div>\n      </div>\n      <div class="tq-student-nav" id="tq-student-nav" style="display:none">\n        <button class="tq-toolbar-arrow" data-action="tqPrevStudent" title="Previous student" aria-label="Previous student">\n          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>\n        </button>\n        <span class="tq-student-name" id="tq-student-name"></span>\n        <button class="tq-toolbar-arrow" data-action="tqNextStudent" title="Next student" aria-label="Next student">\n          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>\n        </button>\n        <div class="tq-progress-ring" id="tq-progress-ring">\n          <svg width="30" height="30" viewBox="0 0 30 30">\n            <circle class="ring-bg" cx="15" cy="15" r="12"/>\n            <circle class="ring-fill" id="tq-ring-fill" cx="15" cy="15" r="12" stroke-dasharray="75.4" stroke-dashoffset="75.4"/>\n          </svg>\n          <span class="tq-progress-label" id="tq-progress-label"></span>\n        </div>\n      </div>\n      <select id="report-period" class="report-term-select" aria-label="Report"></select>\n      <select id="report-copy" class="report-term-select" aria-label="Copy" style="display:none"></select>\n      <div class="seg seg-sm" id="report-paper" role="radiogroup" aria-label="Paper" style="display:none">\n        <button class="seg-btn active" data-action="setPaper" data-paper="letter" role="radio" aria-checked="true">Letter</button>\n        <button class="seg-btn" data-action="setPaper" data-paper="legal" role="radio" aria-checked="false">Legal</button>\n      </div>\n      <div class="seg seg-sm" id="report-view" role="radiogroup" aria-label="View" style="display:none">\n        <button class="seg-btn active" data-action="setView" data-view="screen" role="radio" aria-checked="true">Screen</button>\n        <button class="seg-btn" data-action="setView" data-view="photocopy" role="radio" aria-checked="false">Photocopy</button>\n      </div>\n      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">\n        <button class="tb-toggle-btn" id="tb-anon-btn" style="display:none" data-action="toggleAnon">\n          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>\n          Anonymize\n        </button>\n        <button class="tb-toggle-btn" id="tb-fitmap-btn" style="display:none" data-action="toggleFitMap" aria-pressed="false">Fit Map</button>\n        <button class="tb-action-btn" id="tb-print-btn" data-action="printReports">Print Reports</button>\n      </div>\n    </div>\n    <div id="report-output" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto"></div>';
 
   /* -- Expose handlers for inline event attributes --------- */
   window.rbDragStart = rbDragStart;

@@ -1942,6 +1942,71 @@
   stroke: #c8c8c8 !important;
 }
 
+/* The Issue dialog (page-reports.js openIssueDialog). */
+.issue-card {
+  width: min(640px, calc(100vw - 32px));
+  text-align: left;
+}
+.issue-kv {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr);
+  gap: 8px 14px;
+  margin: 14px 0 6px;
+  font-size: var(--text-base);
+  color: var(--text);
+  line-height: 1.45;
+}
+.issue-k {
+  color: var(--text-3);
+}
+.issue-help {
+  color: var(--text-3);
+  font-weight: 400;
+}
+.issue-group {
+  border: 0;
+  padding: 0;
+  margin: 12px 0 0;
+}
+.issue-group legend {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-2);
+  padding: 0;
+  margin-bottom: 6px;
+}
+.issue-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: var(--text-base);
+  color: var(--text);
+  cursor: pointer;
+}
+.issue-option input {
+  margin-top: 3px;
+}
+.issue-warn {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid rgba(180, 83, 9, 0.35);
+  border-radius: 9px;
+  background: rgba(180, 83, 9, 0.08);
+  font-size: var(--text-sm);
+  color: var(--text);
+  line-height: 1.5;
+}
+.issue-warn b {
+  display: block;
+  color: var(--score-2);
+  margin-bottom: 4px;
+}
+.issue-warn a {
+  color: var(--active);
+  font-weight: 500;
+}
+
 /* The comment box's fit line (page-reports.js updateCommentFit). */
 .tq-fit {
   display: flex;
