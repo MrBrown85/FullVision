@@ -225,6 +225,16 @@
   color: var(--text);
 }
 
+/* The level as four dots before its word. Inherits the word's colour on
+   screen; black in print. */
+.report-dots {
+  display: inline-block;
+  margin-right: 5px;
+  font-size: 0.8em;
+  letter-spacing: 0.1em;
+  vertical-align: 1px;
+}
+
 /* ── Overall bar ─────────────────────────────────────────────── */
 .report-overall {
   display: flex;
@@ -1283,11 +1293,66 @@
   }
 
   /* ══════════════════════════════════════════════════════════════
-     PRINT COLOURS — preserve screen appearance for colour printers
+     PRINT: BLACK AND WHITE
+     Reports are photocopied. A level is its dots and its word; colour
+     never carries the meaning on paper. Fills print only where the fill
+     is the information (the overall box, bars, numbered bullets).
      ══════════════════════════════════════════════════════════════ */
-  * {
+  [data-prof],
+  .report-section-chip-name,
+  .report-outcome-ev,
+  .report-legend-word {
+    color: #000 !important;
+  }
+  [data-prof-bg] {
+    background: transparent !important;
+  }
+  .report-level-pill {
+    border: 1px solid #000 !important;
+    border-radius: 4px !important;
+  }
+  .report-overall-main,
+  .class-summary-table th {
+    background: #000 !important;
+    color: #fff !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+  .report-overall-label {
+    color: #ddd !important;
+  }
+  .report-learner-dim-fill,
+  .report-outcome-bar-fill,
+  .report-next-step-bullet,
+  [data-prof-bg][style*='height:100%'] {
+    background: #000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  .report-learner-dim-bar,
+  .report-outcome-bar {
+    background: #e2e2e2 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  .report-next-steps {
+    background: #fff !important;
+    border-color: #bbb !important;
+  }
+  .report-next-steps-title {
+    color: #000 !important;
+  }
+  [data-prof-stroke='1'] {
+    stroke: #1a1a1a !important;
+  }
+  [data-prof-stroke='2'] {
+    stroke: #595959 !important;
+  }
+  [data-prof-stroke='3'] {
+    stroke: #8f8f8f !important;
+  }
+  [data-prof-stroke='4'] {
+    stroke: #c8c8c8 !important;
   }
 
   .class-summary-table {

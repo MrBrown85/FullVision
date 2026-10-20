@@ -46,13 +46,29 @@ window.ReportPreview = (function () {
         var sr = Math.round(sp);
         var slabel = sp > 0 ? PROF_LABELS[sr] : '—';
         var scolor = sp > 0 ? PROF_COLORS[sr] : 'var(--text-3)';
-        html += '<td data-prof="' + sr + '" style="color:' + scolor + ';font-weight:600">' + slabel + '</td>';
+        html +=
+          '<td data-prof="' +
+          sr +
+          '" style="color:' +
+          scolor +
+          ';font-weight:600">' +
+          (sp > 0 ? ReportBlocks.levelDots(sr) : '') +
+          slabel +
+          '</td>';
       });
       var op = getOverallProficiency(cid, st.id);
       var or2 = Math.round(op);
       var olabel = op > 0 ? PROF_LABELS[or2] : '—';
       var ocolor = op > 0 ? PROF_COLORS[or2] : 'var(--text-3)';
-      html += '<td data-prof="' + or2 + '" style="color:' + ocolor + ';font-weight:700">' + olabel + '</td>';
+      html +=
+        '<td data-prof="' +
+        or2 +
+        '" style="color:' +
+        ocolor +
+        ';font-weight:700">' +
+        (op > 0 ? ReportBlocks.levelDots(or2) : '') +
+        olabel +
+        '</td>';
       if (isLetter) {
         var letterData = getCourseLetterData(cid, st.id);
         html +=

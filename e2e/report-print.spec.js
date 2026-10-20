@@ -91,6 +91,26 @@ test.describe('Printed progress reports', () => {
     await expect(meta).toContainText('Student No. STU-201');
   });
 
+  test('levels print as dots and a word in black', async ({ page }) => {
+    await openDemoProgressReports(page);
+    await applyPreset(page, 'standard');
+    const first = page.locator('.report-student').first();
+    const chip = first.locator('.report-section-chip-value').first();
+    await expect(chip).toContainText(/[●○]{4}/);
+    await expect(first.locator('.report-learner-dim-value').first()).toContainText(/[●○]{4}/);
+    await page.emulateMedia({ media: 'print' });
+    expect(await chip.evaluate(el => getComputedStyle(el).color)).toBe('rgb(0, 0, 0)');
+    expect(
+      await first
+        .locator('.report-learner-dim-value')
+        .first()
+        .evaluate(el => getComputedStyle(el).color),
+    ).toBe('rgb(0, 0, 0)');
+    await page.emulateMedia({ media: 'screen' });
+    await page.getByRole('tab', { name: 'Class Summary' }).click();
+    await expect(page.locator('.class-summary-table td[data-prof]').first()).toContainText(/[●○]{4}/);
+  });
+
   test('a dimension the teacher did not rate is left off the printed report', async ({ page }) => {
     await openDemoProgressReports(page);
     await applyPreset(page, 'standard');
