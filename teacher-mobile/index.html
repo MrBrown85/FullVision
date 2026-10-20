@@ -11,6 +11,7 @@
     <meta name="theme-color" content="#F2F2F7" />
     <link rel="stylesheet" href="../teacher/styles.css?v=3" />
     <link rel="stylesheet" href="../teacher/obs-capture.css" />
+    <link rel="stylesheet" href="../teacher/reports.css" />
     <link rel="stylesheet" href="../teacher-mobile/styles.css" />
     <script src="../shared/sentry-init.js"></script>
   </head>
@@ -163,6 +164,24 @@
           </svg>
           <span class="m-tab-label">Grade</span>
         </button>
+        <button class="m-tab-item" role="tab" aria-selected="false" data-tab="reports">
+          <svg
+            class="m-tab-icon"
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M6 3h9l4 4v14H6z" />
+            <path d="M15 3v4h4" />
+            <line x1="9" y1="12" x2="15" y2="12" />
+            <line x1="9" y1="16" x2="15" y2="16" />
+          </svg>
+          <span class="m-tab-label">Reports</span>
+        </button>
       </nav>
     </div>
 
@@ -206,7 +225,11 @@
     <script src="../teacher-mobile/tab-students.js"></script>
     <script src="../teacher-mobile/tab-observe.js"></script>
     <script src="../teacher-mobile/sweep.js"></script>
+    <script src="../teacher/report-blocks.js"></script>
+    <script src="../teacher/report-sheets.js"></script>
+    <script src="../teacher/report-issues.js"></script>
     <script src="../teacher-mobile/tab-grade.js"></script>
+    <script src="../teacher-mobile/tab-reports.js"></script>
     <script src="../teacher-mobile/shell.js"></script>
     <script>
       if ('serviceWorker' in navigator) {

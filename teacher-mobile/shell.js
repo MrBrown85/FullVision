@@ -369,6 +369,8 @@
       html = MObserve.renderFeed(_cid);
     } else if (tab === 'grade') {
       html = MGrade.renderPicker(_cid);
+    } else if (tab === 'reports') {
+      html = MReports.renderList(_cid);
     }
 
     stack.innerHTML = html;
@@ -394,6 +396,17 @@
     // Initialize card stack for students tab
     if (tab === 'students' && MStudents.initCardStack) {
       MStudents.initCardStack(_cid);
+    }
+
+    // The issued copies live on the server; refresh the phone's list once
+    // the tab is up (Demo Mode and offline keep what the phone has).
+    if (tab === 'reports' && typeof ReportIssues !== 'undefined' && typeof ReportIssues.sync === 'function') {
+      var cidAtOpen = _cid;
+      ReportIssues.sync(cidAtOpen).then(function (changed) {
+        if (changed && _activeTab === 'reports' && _cid === cidAtOpen && _navStacks.reports.length === 1) {
+          _renderTab('reports');
+        }
+      });
     }
   }
 
@@ -627,6 +640,35 @@
           card.classList.toggle('m-expanded');
           card.setAttribute('aria-expanded', card.classList.contains('m-expanded'));
         }
+        return;
+      }
+
+      // ── Reports tab (read-only) ──
+      if (action === 'm-reports-term') {
+        MReports.setTerm(_cid, target.getAttribute('data-n'));
+        _renderTab('reports');
+        return;
+      }
+
+      if (action === 'm-reports-issue') {
+        var issueId = target.getAttribute('data-id');
+        _pushScreen(MReports.renderIssueScreen(_cid, issueId));
+        MReports.mountIssue(_cid, issueId);
+        return;
+      }
+
+      if (action === 'm-reports-live') {
+        _pushScreen(MReports.renderLiveScreen(_cid, target.getAttribute('data-sid')));
+        setTimeout(function () {
+          MReports.mountLive(_cid);
+        }, 0);
+        return;
+      }
+
+      if (action === 'm-reports-step') {
+        var dir = Number(target.getAttribute('data-dir')) || 1;
+        if (document.getElementById('m-screen-reports-issue')) MReports.stepIssue(dir);
+        else MReports.stepLive(_cid, dir);
         return;
       }
 

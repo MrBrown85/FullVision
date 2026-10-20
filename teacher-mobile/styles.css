@@ -3397,3 +3397,84 @@ body.fv-switching-course::after {
   font-weight: 600;
   color: var(--text);
 }
+
+/* ── Reports tab (read-only; docs/report-forms-plan.md 5.4) ───────── */
+.m-reports-terms {
+  padding: 4px 16px 8px;
+}
+.m-segmented-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.m-segmented-scroll::-webkit-scrollbar {
+  display: none;
+}
+.m-segmented-scroll .m-seg-btn {
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+.m-empty-inline {
+  padding: 16px;
+}
+.m-reports-note {
+  font-size: var(--text-sm);
+  color: var(--text-3);
+  line-height: 1.45;
+  padding: 16px 20px 24px;
+}
+.m-reports-stepper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.m-reports-step {
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.m-reports-step svg {
+  width: 20px;
+  height: 20px;
+}
+.m-reports-who {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+.m-reports-name {
+  font-weight: 600;
+  font-size: var(--text-base);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.m-reports-count {
+  font-size: var(--text-xs);
+  color: var(--text-3);
+}
+.m-reports-sheets {
+  padding: 8px 4px 32px;
+  overflow-x: hidden;
+}
+.m-reports-sheets .sheet-student-head,
+.m-reports-sheets .sheet-note {
+  display: none;
+}
+.m-reports-sheets .sheet-label {
+  font-size: var(--text-xs);
+  color: var(--text-3);
+  padding: 8px 4px 4px;
+}
