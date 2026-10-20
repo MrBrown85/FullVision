@@ -10,7 +10,6 @@ window.PageReports = (function () {
   }
 
   var _beforeUnloadHandler = null;
-  var Builder = ReportBuilderUI;
   var Preview = ReportPreview;
 
   /* ══════════════════════════════════════════════════════════════
@@ -53,7 +52,7 @@ window.PageReports = (function () {
     var style = document.getElementById(PAPER_STYLE_ID);
     // The Report Card form's sheets carry their own margins and set the
     // page size themselves when they render (ReportSheets.renderPreview).
-    var sheets = typeof ReportBuilderUI !== 'undefined' && ReportBuilderUI.usesSheets(reportConfig);
+    var sheets = true;
     if (reportPaper === 'letter' || sheets) {
       if (style) style.remove();
     } else {
@@ -87,20 +86,30 @@ window.PageReports = (function () {
   /* ── View: Screen or Photocopy ──────────────────────────────────
      Photocopy shows the sheets as the copier prints them: black levels,
      no tints. A view, not a setting; it is not remembered. */
-  var reportView = 'screen';
-  function setView(view) {
-    reportView = view === 'photocopy' ? 'photocopy' : 'screen';
-    var preview = document.getElementById('rb-preview');
-    if (preview) preview.classList.toggle('report-photocopy', reportView === 'photocopy');
-    document.querySelectorAll('#report-view .seg-btn').forEach(function (b) {
-      var on = b.dataset.view === reportView;
+  function _syncInkButtons() {
+    document.querySelectorAll('#report-ink .seg-btn').forEach(function (b) {
+      var on = (b.dataset.ink === 'black') === (reportView === 'photocopy');
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-checked', on ? 'true' : 'false');
+    });
+  }
+  function _syncPagesButtons() {
+    var pps = String(_formOf().pagesPerStudent);
+    document.querySelectorAll('#report-pages .seg-btn').forEach(function (b) {
+      var on = b.dataset.pages === pps;
       b.classList.toggle('active', on);
       b.setAttribute('aria-checked', on ? 'true' : 'false');
     });
   }
 
-  /* ── Class Summary ───────────────────────────────────────────── */
-  var classSummaryAnon = false;
+  var reportView = 'screen';
+  function setView(view) {
+    reportView = view === 'photocopy' ? 'photocopy' : 'screen';
+    var preview = document.getElementById('rb-preview');
+    if (preview) preview.classList.toggle('report-photocopy', reportView === 'photocopy');
+    _syncInkButtons();
+  }
+
   var tqIncludeAssignFeedback = true;
   var tqObsFilter = 'all'; // 'all'|'general'|'assignment'
 
@@ -117,18 +126,26 @@ window.PageReports = (function () {
     if (tbPrint) tbPrint.style.display = tab === 'questionnaire' ? 'none' : '';
     const tbPaper = document.getElementById('report-paper');
     if (tbPaper) tbPaper.style.display = tab === 'questionnaire' ? 'none' : '';
-    const tbView = document.getElementById('report-view');
-    if (tbView) tbView.style.display = tab === 'progress' ? '' : 'none';
-    const tbFit = document.getElementById('tb-fitmap-btn');
-    if (tbFit) tbFit.style.display = tab === 'progress' && ReportBuilderUI.usesSheets(reportConfig) ? '' : 'none';
+    ['report-pages', 'report-ink', 'tb-count', 'tb-divider', 'tb-paper-label'].forEach(function (id) {
+      const el = document.getElementById(id);
+      if (el) el.style.display = tab === 'progress' ? '' : 'none';
+    });
+    document.querySelectorAll('.tb-label-progress').forEach(function (el) {
+      el.style.display = tab === 'progress' ? '' : 'none';
+    });
+    const copySel = document.getElementById('report-copy');
+    if (copySel && tab !== 'progress') copySel.style.display = 'none';
+    if (tab === 'progress') {
+      _syncInkButtons();
+      _syncPagesButtons();
+    }
     const tbRail = document.getElementById('tb-rail-btn');
     if (tbRail) tbRail.style.display = tab === 'progress' ? '' : 'none';
     const stepper = document.getElementById('report-stepper');
     if (stepper) stepper.style.display = tab === 'progress' ? '' : 'none';
     if (tab !== 'progress') _restoreSidebarBadges();
-    // Show Anonymize button only on class summary
-    const tbAnon = document.getElementById('tb-anon-btn');
-    if (tbAnon) tbAnon.style.display = tab === 'summary' ? '' : 'none';
+    var layout = document.getElementById('page-layout');
+    if (layout) layout.classList.toggle('sidebar-hidden', tab === 'progress' || !_sidebarVisible);
     renderReports();
   }
 
@@ -322,12 +339,6 @@ window.PageReports = (function () {
     const output = document.getElementById('report-output');
     _applyReportTerm();
 
-    if (activeTab === 'summary') {
-      _syncLongFormAuthContext();
-      output.innerHTML = Preview.renderClassSummary(cid, classSummaryAnon);
-      return;
-    }
-
     if (activeTab === 'questionnaire') {
       output.innerHTML = renderTermQuestionnaire(cid);
       _syncLongFormAuthContext();
@@ -345,10 +356,9 @@ window.PageReports = (function () {
 
     _syncLongFormAuthContext();
 
-    // Progress reports — render two-panel builder layout
-    output.innerHTML = Builder.renderLayout(reportConfig);
-
-    renderBuilderBlocks();
+    // Progress Reports: Page Studio (report-studio.js)
+    output.innerHTML = ReportStudio.layoutHtml({ view: studioView });
+    renderStudioPanels();
     renderReportPreview();
 
     // Highlight selected students in sidebar for progress tab
@@ -366,33 +376,68 @@ window.PageReports = (function () {
   /* ══════════════════════════════════════════════════════════════
    REPORT BUILDER — Interaction functions
    ══════════════════════════════════════════════════════════════ */
+  /* The students the canvas shows: everyone selected in Everyone view, one
+     of them in One Student view (the previewed one, else the first). */
+  function _previewStudents() {
+    var all = sortStudents(getStudents(activeCourse), 'lastName');
+    var chosen =
+      selectedStudentIds === null
+        ? all
+        : all.filter(function (st) {
+            return selectedStudentIds.includes(st.id);
+          });
+    if (studioView === 'all') return chosen;
+    var one = chosen.find(function (st) {
+      return st.id === previewSid;
+    });
+    if (!one) one = chosen[0];
+    previewSid = one ? one.id : null;
+    return one ? [one] : [];
+  }
+
   function renderReportPreview() {
-    var sheets = ReportBuilderUI.usesSheets(reportConfig);
-    if (viewingIssue && sheets) {
+    if (viewingIssue) {
       _showIssue(viewingIssue.id);
       return;
     }
     Preview.renderReportPreview({
       cid: activeCourse,
-      selectedStudentIds: selectedStudentIds,
+      students: _previewStudents(),
       reportConfig: reportConfig,
       paper: reportPaper,
       onSheets: _rememberSummary,
     });
     _syncPrintButton();
-    if (!sheets) _populateCopies();
     var preview = document.getElementById('rb-preview');
     if (preview) {
       preview.classList.toggle('report-photocopy', reportView === 'photocopy');
-      preview.classList.toggle('report-fitmap', sheets && fitMapOn);
+      preview.classList.toggle('report-fitmap', studioView === 'all');
+      preview.classList.toggle('studio-all', studioView === 'all');
+      _applyStudioZoom(preview);
+      _applySelection(preview);
     }
-    var fm = document.getElementById('tb-fitmap-btn');
-    if (fm) {
-      fm.style.display = activeTab === 'progress' && sheets ? '' : 'none';
-      fm.classList.toggle('active', fitMapOn);
-      fm.setAttribute('aria-pressed', fitMapOn ? 'true' : 'false');
+  }
+
+  /* One student's pages scale to the canvas: two side by side when there
+     is room, else one above the other. Everyone keeps the Fit Map's scale. */
+  function _applyStudioZoom(preview) {
+    if (studioView === 'all') {
+      preview.classList.remove('studio-stacked');
+      return;
     }
-    if (!sheets) _restoreSidebarBadges();
+    var z = ReportStudio.fitZoom(preview.clientWidth || 800, reportPaper);
+    preview.style.setProperty('--sheet-zoom', String(z.zoom));
+    preview.classList.toggle('studio-stacked', !!z.stacked);
+  }
+
+  function _applySelection(preview) {
+    preview.querySelectorAll('.sheet-cell.studio-sel').forEach(function (el) {
+      el.classList.remove('studio-sel');
+    });
+    if (!studioSelected) return;
+    preview.querySelectorAll('.sheet-cell[data-block="' + studioSelected + '"]').forEach(function (el) {
+      el.classList.add('studio-sel');
+    });
   }
 
   /* ── The rail: sheets per student ──────────────────────────────
@@ -407,7 +452,11 @@ window.PageReports = (function () {
       var info = cell && summary.perStudent[row.getAttribute('data-sid')];
       if (!info) return;
       if (cell.dataset.gradesHtml === undefined) cell.dataset.gradesHtml = cell.innerHTML;
-      var cls = info.sheets > 1 ? 'over' : info.noComment ? 'none' : 'ok';
+      if (info.sheets <= 1 && !info.noComment) {
+        cell.innerHTML = cell.dataset.gradesHtml;
+        return;
+      }
+      var cls = info.sheets > 1 ? 'over' : 'none';
       cell.innerHTML =
         '<span class="student-row-sheets ' +
         cls +
@@ -441,13 +490,19 @@ window.PageReports = (function () {
     _lastSummary = summary;
     _annotateSidebar(summary);
     _populateCopies();
-    _scheduleFormFits();
+    if (studioView === 'all') {
+      _classFit = summary;
+      _classFitKey = _classFitKeyNow();
+      _renderStudioStats();
+    } else {
+      _scheduleClassFit();
+    }
   }
 
   function _populateCopies() {
     var sel = document.getElementById('report-copy');
     if (!sel) return;
-    var sheets = ReportBuilderUI.usesSheets(reportConfig) && activeTab === 'progress';
+    var sheets = activeTab === 'progress';
     var ctx = ReportBlocks.reportContext();
     var issues = sheets && typeof ReportIssues !== 'undefined' ? ReportIssues.list(activeCourse, ctx.termId) : [];
     if (!issues.length) {
@@ -481,22 +536,24 @@ window.PageReports = (function () {
         return;
       }
       viewingIssue = rec;
-      preview.innerHTML = rec.students
-        .map(function (s) {
-          return s.html;
+      var shown = rec.students;
+      if (studioView !== 'all') {
+        var one = rec.students.find(function (st) {
+          return st.sid === previewSid;
+        });
+        shown = one ? [one] : rec.students.slice(0, 1);
+      }
+      preview.innerHTML = shown
+        .map(function (st) {
+          return st.html;
         })
         .join('');
       preview.classList.add('report-sheets-on');
-      preview.classList.remove('report-fitmap');
+      preview.classList.toggle('report-fitmap', studioView === 'all');
+      preview.classList.toggle('studio-all', studioView === 'all');
       preview.classList.toggle('report-photocopy', reportView === 'photocopy');
       ReportSheets.setPageStyle(rec.paper || 'letter');
-      var line = document.getElementById('rb-form-summary');
-      if (line)
-        line.textContent =
-          ReportIssues.label(rec) +
-          ' · ' +
-          rec.count +
-          ' reports as they went home. Later score changes do not change this copy.';
+      _applyStudioZoom(preview);
       _syncPrintButton();
     });
   }
@@ -504,19 +561,32 @@ window.PageReports = (function () {
   function _syncPrintButton() {
     var btn = document.getElementById('tb-print-btn');
     if (!btn) return;
-    var sheets = ReportBuilderUI.usesSheets(reportConfig) && activeTab === 'progress';
-    if (viewingIssue) btn.textContent = 'Print This Copy';
-    else if (sheets) btn.textContent = 'Issue Reports\u2026';
-    else btn.textContent = 'Print Reports';
-    var fm = document.getElementById('tb-fitmap-btn');
-    if (fm && viewingIssue) fm.style.display = 'none';
+    btn.textContent = viewingIssue ? 'Print This Copy' : 'Print Reports';
   }
 
+  /* Printing takes every selected student, whatever the canvas shows: the
+     canvas switches to Everyone for the print and back afterwards. */
   function _printNow() {
     ensureClassFresh(activeCourse).then(function (fresh) {
-      if (fresh || window.confirm("Couldn't confirm this class is up to date. Print the saved copy anyway?")) {
-        window.print();
+      if (!(fresh || window.confirm("Couldn't confirm this class is up to date. Print the saved copy anyway?"))) return;
+      var wasOne = studioView === 'one' || _restoreOneAfterPrint;
+      _restoreOneAfterPrint = false;
+      if (studioView === 'one') {
+        studioView = 'all';
+        renderReports();
       }
+      var restore = function () {
+        window.removeEventListener('afterprint', restore);
+        if (wasOne) {
+          studioView = 'one';
+          renderReports();
+        }
+      };
+      window.addEventListener('afterprint', restore);
+      window.print();
+      // print() blocks until the dialog closes; a browser that never fires
+      // afterprint (headless WebKit) still gets One Student back.
+      setTimeout(restore, 0);
     });
   }
 
@@ -539,17 +609,9 @@ window.PageReports = (function () {
     return { ids: ids, sheets: sheets, hashes: hashes, last: last, changed: changed, ctx: ctx, summary: s };
   }
 
-  function _issueDialogHtml(c) {
+  function _printDialogHtml(c) {
     var course = COURSES[activeCourse] || {};
     var n = c.ids.length;
-    var now = new Date();
-    var stamp = now.toLocaleString('en-CA', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    });
     var subtitle = [
       c.ctx.termLabel,
       course.name,
@@ -559,24 +621,33 @@ window.PageReports = (function () {
       .map(esc)
       .join(' \u00B7 ');
     var onOne = n - c.summary.continued.length;
-    var sheetsLine = c.sheets + (c.sheets === 1 ? ' sheet' : ' sheets') + ' \u00B7 ' + onOne + ' on one';
-    if (c.summary.continued.length)
-      sheetsLine += ', ' + c.summary.continued.length + ' on two (' + esc(c.summary.continued.join(', ')) + ')';
+    var studentsLine =
+      n +
+      (n === 1 ? ' student' : ' students') +
+      ' \u00B7 ' +
+      (c.summary.continued.length
+        ? onOne + ' on 1 sheet, ' + c.summary.continued.length + ' on 2'
+        : n === 1
+          ? '1 sheet'
+          : '1 sheet each');
+    var form = ReportSheets.formFor(reportConfig);
     var html = '<div class="confirm-card issue-card">';
-    html += '<div class="confirm-title" id="issue-title">Issue ' + n + (n === 1 ? ' Report' : ' Reports') + '</div>';
+    html += '<div class="confirm-title" id="issue-title">Print ' + n + (n === 1 ? ' Report' : ' Reports') + '</div>';
     html += '<div class="confirm-message">' + subtitle + '</div>';
     html += '<div class="issue-kv">';
     html +=
-      '<span class="issue-k">Saved as</span><span><b>' +
-      esc(c.ctx.termLabel) +
-      ' \u00B7 Issued ' +
-      esc(stamp) +
-      '</b><br><span class="issue-help">A fixed copy of every report. Reprints use this copy, not later scores.</span></span>';
-    html +=
-      '<span class="issue-k">Form</span><span>Report Card \u00B7 ' +
+      '<span class="issue-k">Form</span><span>' +
+      esc(form.name) +
+      ' \u00B7 ' +
       (reportPaper === 'legal' ? 'Legal' : 'Letter') +
-      ' \u00B7 front and back \u00B7 black and white</span>';
-    html += '<span class="issue-k">Sheets</span><span>' + sheetsLine + '</span>';
+      ' \u00B7 ' +
+      (reportView === 'photocopy' ? 'black' : 'colour') +
+      '</span>';
+    html += '<span class="issue-k">Sheets</span><span>' + studentsLine + '</span>';
+    html +=
+      '<span class="issue-k">Copier</span><span>' +
+      (reportPaper === 'legal' ? 'Legal' : 'Letter') +
+      ', 2-sided, flip on long edge</span>';
     html += '</div>';
     html += '<fieldset class="issue-group"><legend>Which Students</legend>';
     html +=
@@ -587,8 +658,8 @@ window.PageReports = (function () {
       html +=
         '<label class="issue-option"><input type="radio" name="issue-who" value="changed"' +
         (c.changed.length ? '' : ' disabled') +
-        '><span>Changed since the last issue <span class="issue-help">(' +
-        esc(ReportIssues.label(c.last).replace(/^Issued /, '')) +
+        '><span>Changed since the last print <span class="issue-help">(' +
+        esc(ReportIssues.label(c.last).replace(/^Printed /, '')) +
         ' \u00B7 ' +
         c.changed.length +
         (c.changed.length === 1 ? ' student' : ' students') +
@@ -603,16 +674,12 @@ window.PageReports = (function () {
           ' no Teacher Comment. The box prints with lines. <a href="#" data-issue="write">Write them now</a>',
       );
     }
-    if (c.summary.continued.length) {
-      warn.push(
-        esc(c.summary.continued.join(', ')) +
-          (c.summary.continued.length === 1 ? ' needs' : ' need') +
-          ' a second sheet.',
-      );
+    if (c.summary.over && c.summary.over.length) {
+      warn.push(esc(c.summary.over.join(', ')) + ': a block is taller than a page.');
     }
     if (warn.length) {
       html +=
-        '<div class="issue-warn"><b>Before you issue</b>' +
+        '<div class="issue-warn"><b>Before you print</b>' +
         warn
           .map(function (w) {
             return '<div>' + w + '</div>';
@@ -620,21 +687,23 @@ window.PageReports = (function () {
           .join('') +
         '</div>';
     }
-    html += '<fieldset class="issue-group"><legend>Then</legend>';
-    html +=
-      '<label class="issue-option"><input type="checkbox" id="issue-print" checked><span>Print <span class="issue-help">\u00B7 set the copier to ' +
-      (reportPaper === 'legal' ? 'Legal' : 'Letter') +
-      ', 2-sided, flip on long edge</span></span></label>';
-    html += '</fieldset>';
     html +=
       '<div class="confirm-actions"><button type="button" class="confirm-cancel" data-issue="cancel">Cancel</button>';
-    html += '<button type="button" class="confirm-ok primary" data-issue="go">Issue and Print</button></div>';
+    html += '<button type="button" class="confirm-ok primary" data-issue="go">Print</button></div>';
     html += '</div>';
     return html;
   }
 
+  /* The dialog and the copy take every selected student, so the canvas
+     shows Everyone while it is open; Cancel puts One Student back. */
+  var _restoreOneAfterPrint = false;
   function openIssueDialog() {
     closeIssueDialog();
+    if (studioView === 'one') {
+      studioView = 'all';
+      _restoreOneAfterPrint = true;
+      renderReports();
+    }
     if (!_lastSummary || !Object.keys(_lastSummary.perStudent || {}).length) return;
     var c = _issueCounts();
     _issueState = { counts: c, trigger: document.activeElement };
@@ -644,7 +713,7 @@ window.PageReports = (function () {
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-labelledby', 'issue-title');
-    overlay.innerHTML = _issueDialogHtml(c);
+    overlay.innerHTML = _printDialogHtml(c);
     overlay.addEventListener('click', function (e) {
       if (e.target === overlay) {
         closeIssueDialog();
@@ -667,11 +736,6 @@ window.PageReports = (function () {
         }
       }
     });
-    overlay.addEventListener('change', function () {
-      var go = overlay.querySelector('[data-issue="go"]');
-      var print = overlay.querySelector('#issue-print');
-      if (go && print) go.textContent = print.checked ? 'Issue and Print' : 'Issue';
-    });
     _issueState.keyHandler = function (e) {
       if (e.key === 'Escape') closeIssueDialog();
     };
@@ -681,9 +745,14 @@ window.PageReports = (function () {
     if (first && first.focus) first.focus();
   }
 
-  function closeIssueDialog() {
+  function closeIssueDialog(keepEveryone) {
     var overlay = document.getElementById(ISSUE_OVERLAY_ID);
     if (overlay && overlay.remove) overlay.remove();
+    if (_restoreOneAfterPrint && !keepEveryone) {
+      _restoreOneAfterPrint = false;
+      studioView = 'one';
+      renderReports();
+    }
     if (_issueState) {
       if (_issueState.keyHandler) document.removeEventListener('keydown', _issueState.keyHandler);
       var trigger = _issueState.trigger;
@@ -700,8 +769,8 @@ window.PageReports = (function () {
     var c = _issueState && _issueState.counts;
     if (!c) return;
     var who = (overlay.querySelector('input[name="issue-who"]:checked') || {}).value || 'all';
-    var doPrint = !!(overlay.querySelector('#issue-print') || {}).checked;
-    closeIssueDialog();
+    var doPrint = true;
+    closeIssueDialog(true);
     var ids = who === 'changed' ? c.changed : c.ids;
     if (who === 'changed') {
       // Show and print only what changed; the copy keeps every student issued.
@@ -722,38 +791,27 @@ window.PageReports = (function () {
       students: students,
     }).then(function (res) {
       _populateCopies();
-      var line = document.getElementById('rb-form-summary');
-      if (line) {
-        var where = res.server
-          ? ' saved as a fixed copy to your account.'
-          : res.stored
-            ? ' saved as a fixed copy on this computer.'
-            : ' issued; the copy could not be saved.';
-        line.textContent =
-          ReportIssues.label(res.entry) +
-          ' \u00B7 ' +
-          students.length +
-          (students.length === 1 ? ' report' : ' reports') +
-          where;
+      if (res && res.entry) {
+        var sel = document.getElementById('report-copy');
+        if (sel && sel.querySelector('option[value="' + res.entry.id + '"]')) sel.value = '';
       }
       if (doPrint) _printNow();
     });
   }
 
-  /* ── Fit Map: every student's sheets at a glance ─────────────── */
-  var fitMapOn = false;
-  function toggleFitMap(on) {
-    fitMapOn = on === undefined ? !fitMapOn : !!on;
-    renderReportPreview();
-  }
+  /* ── Page Studio state (report-studio.js) ─────────────────────── */
+  var studioView = 'one'; // 'one' | 'all'
+  var previewSid = null; // the student on the canvas in One Student view
+  var studioSelected = null; // the selected block id
+  var studioTab = 'blocks'; // the palette's tab
+  var _blockSizes = null; // palette badges, measured once per class/paper/type
 
-  /* ── Setup (DECISIONS "Report forms" 8) ──────────────────────────
-     The rail offers a few named choices; each change saves with the
-     class's report config and the sheets re-lay at once. */
   function _setForm(form) {
     reportConfig.form = ReportSheets.normalizeForm(form);
     saveReportConfig(activeCourse, reportConfig);
-    renderBuilderBlocks();
+    if (studioSelected && !ReportSheets.locate(reportConfig.form, studioSelected)) studioSelected = null;
+    _classFitKey = '';
+    renderStudioPanels();
     renderReportPreview();
     updateCommentFit();
   }
@@ -762,67 +820,81 @@ window.PageReports = (function () {
     return ReportSheets.formFor(reportConfig);
   }
 
-  function renderBuilderBlocks() {
-    const container = document.getElementById('rb-blocks');
-    if (!container) return;
-    container.innerHTML = Builder.renderBuilderBlocks(reportConfig, { fits: _formFits });
+  function _loadReportConfig(cid) {
+    var rc = Object.assign({}, (typeof getReportConfig === 'function' && getReportConfig(cid)) || {});
+    rc.form = ReportSheets.formFor(rc);
+    rc.preset = 'standard';
+    return rc;
   }
 
-  /* What each form costs the class, for the setup list: computed once per
-     class, term, paper and type size, after the preview has rendered, and
-     shown on the form cards. */
-  var _formFits = null;
-  var _formFitsKey = '';
-  function _scheduleFormFits() {
-    if (activeTab !== 'progress' || !ReportBuilderUI.usesSheets(reportConfig)) return;
+  function renderStudioPanels() {
+    var palette = document.getElementById('studio-palette');
+    if (palette) {
+      if (_blockSizes === null) _blockSizes = _measureBlockSizes();
+      palette.innerHTML = ReportStudio.paletteHtml(_formOf(), _blockSizes, studioTab, ReportSheets.templates());
+    }
+    _renderStudioStats();
+  }
+
+  function _renderStudioStats() {
+    var insp = document.getElementById('studio-inspector');
+    if (insp) insp.innerHTML = ReportStudio.inspectorHtml(_formOf(), studioSelected, ReportStudio.stats(_classFit));
+    var count = document.getElementById('tb-count');
+    if (count) count.textContent = ReportStudio.countText(_classFit);
+  }
+
+  function _measureBlockSizes() {
+    try {
+      var students = sortStudents(getStudents(activeCourse), 'lastName');
+      var st = students[Math.floor(students.length / 2)];
+      if (!st) return {};
+      return ReportSheets.blockSizes(activeCourse, st, ReportBlocks.reportContext(), {
+        paper: reportPaper,
+        type: _formOf().type,
+      });
+    } catch (e) {
+      return {};
+    }
+  }
+
+  /* The whole class laid out on the form, for the stats and the toolbar
+     count, once per class, report, paper and form, after the canvas has
+     rendered. In Everyone view the canvas render is that summary. */
+  var _classFit = null;
+  var _classFitKey = '';
+  function _classFitKeyNow() {
     var ctx = ReportBlocks.reportContext();
-    var key = [activeCourse, ctx.termId, reportPaper, _formOf().type].join('|');
-    if (key === _formFitsKey) return;
-    _formFitsKey = key;
-    _formFits = null;
+    return [activeCourse, ctx.termId, reportPaper, JSON.stringify(_formOf())].join('|');
+  }
+  function _scheduleClassFit() {
+    if (activeTab !== 'progress') return;
+    var key = _classFitKeyNow();
+    if (key === _classFitKey) {
+      _renderStudioStats();
+      return;
+    }
+    _classFitKey = key;
     setTimeout(function () {
-      if (key !== _formFitsKey || activeTab !== 'progress') return;
+      if (key !== _classFitKey || activeTab !== 'progress') return;
       try {
         var students = sortStudents(getStudents(activeCourse), 'lastName');
-        _formFits = ReportSheets.sheetsForForms(activeCourse, students, ctx, {
+        _classFit = ReportSheets.classSummary(activeCourse, students, ReportBlocks.reportContext(), {
           paper: reportPaper,
-          type: _formOf().type,
+          form: _formOf(),
         });
       } catch (e) {
-        _formFits = null;
+        _classFit = null;
       }
-      renderBuilderBlocks();
+      _renderStudioStats();
     }, 0);
   }
 
-  function rbToggleBlock(blockId) {
-    Builder.toggleBlock(reportConfig, blockId);
-    saveReportConfig(activeCourse, reportConfig);
-    renderBuilderBlocks();
-    renderReportPreview();
-    Builder.updatePresetBtns(reportConfig);
+  function _selectBlock(id) {
+    studioSelected = id || null;
+    var preview = document.getElementById('rb-preview');
+    if (preview) _applySelection(preview);
+    _renderStudioStats();
   }
-
-  function rbApplyPreset(preset) {
-    viewingIssue = null;
-    Builder.applyPreset(reportConfig, preset);
-    saveReportConfig(activeCourse, reportConfig);
-    renderBuilderBlocks();
-    renderReportPreview();
-    Builder.updatePresetBtns(reportConfig);
-  }
-
-  function rbUpdatePresetBtns() {
-    Builder.updatePresetBtns(reportConfig);
-  }
-
-  /* ── Pointer-based drag-and-drop reorder ── */
-  // Legacy stubs (no longer used but kept for safety in case inline attrs remain)
-  function rbDragStart() {}
-  function rbDragEnd() {}
-  function rbDragOver() {}
-  function rbDragLeave() {}
-  function rbDrop() {}
 
   /* ── Course switching ────────────────────────────────────────── */
   async function switchCourse(cid) {
@@ -832,7 +904,11 @@ window.PageReports = (function () {
     viewingIssue = null;
     reportPaper = _loadPaper(cid);
     _applyPaper();
-    reportConfig = Builder.getReportConfigWrapped(cid);
+    reportConfig = _loadReportConfig(cid);
+    _blockSizes = null;
+    _classFitKey = '';
+    previewSid = null;
+    studioSelected = null;
     _configureQuestionnaire();
     populateStudentSelect();
     populateReportPeriods(false);
@@ -913,6 +989,12 @@ window.PageReports = (function () {
       if (dd) dd.classList.remove('open');
     }
 
+    var cell = e.target.closest('.studio-pages .sheet-cell[data-block]');
+    if (cell && studioView === 'one' && !viewingIssue) {
+      _selectBlock(cell.dataset.block);
+      return;
+    }
+
     var el = e.target.closest('[data-action]');
     if (!el) return;
     var action = el.dataset.action;
@@ -929,30 +1011,55 @@ window.PageReports = (function () {
       tqNextStudent: function () {
         tqNextStudent();
       },
-      toggleAnon: function () {
-        classSummaryAnon = !classSummaryAnon;
-        el.classList.toggle('active', classSummaryAnon);
-        renderReports();
-      },
       printReports: function () {
-        // A chosen copy prints as it is. The Report Card issues first, then
-        // prints. Other presets print what the server has.
+        // A chosen copy prints as it is; the live reports save a copy, then print.
         if (viewingIssue) window.print();
-        else if (ReportBuilderUI.usesSheets(reportConfig) && activeTab === 'progress') openIssueDialog();
+        else if (activeTab === 'progress') openIssueDialog();
         else _printNow();
       },
       setPaper: function () {
         setPaper(el.dataset.paper);
+        _blockSizes = null;
+        renderStudioPanels();
       },
-      setView: function () {
-        setView(el.dataset.view);
+      setInk: function () {
+        setView(el.dataset.ink === 'black' ? 'photocopy' : 'screen');
+        _syncInkButtons();
       },
-      toggleFitMap: function () {
-        toggleFitMap();
+      setPages: function () {
+        _setForm(
+          ReportSheets.setPagesPerStudent(_formOf(), el.dataset.pages === 'auto' ? 'auto' : Number(el.dataset.pages)),
+        );
+        _syncPagesButtons();
+      },
+      studioView: function () {
+        studioView = el.dataset.view === 'all' ? 'all' : 'one';
+        renderReports();
+      },
+      studioTab: function () {
+        studioTab = el.dataset.tab === 'templates' ? 'templates' : 'blocks';
+        renderStudioPanels();
+      },
+      studioBlock: function () {
+        var id = el.dataset.block;
+        if (ReportSheets.locate(_formOf(), id)) _selectBlock(id);
+        else {
+          studioSelected = id;
+          _setForm(ReportSheets.placeBlock(_formOf(), id));
+        }
+      },
+      studioRemove: function () {
+        var id = el.dataset.block;
+        studioSelected = null;
+        _setForm(ReportSheets.removeCell(_formOf(), id));
+      },
+      studioTemplate: function () {
+        var f = el.dataset.starter ? ReportSheets.starter(el.dataset.starter) : ReportSheets.template(el.dataset.id);
+        if (f) _setForm(f);
       },
       toggleRail: function () {
-        // Narrow screens hide the builder rail; this opens it over the pages.
-        var layout = document.querySelector('.rb-layout');
+        // Narrow screens hide the palette; this opens it over the pages.
+        var layout = document.getElementById('studio');
         if (!layout) return;
         var open = layout.classList.toggle('rail-open');
         el.classList.toggle('active', open);
@@ -972,16 +1079,6 @@ window.PageReports = (function () {
         populateStudentSelect();
         renderReports();
       },
-      rbSetupForm: function () {
-        var f = ReportSheets.starter(el.dataset.form);
-        if (f) _setForm(f);
-      },
-      rbSetupType: function () {
-        _setForm(ReportSheets.setType(_formOf(), el.dataset.type));
-      },
-      rbSetupRoom: function () {
-        _setForm(ReportSheets.setRoomChoice(_formOf(), el.dataset.room));
-      },
       tqSeePage: function () {
         tqSaveCurrentIfNeeded();
         selectedStudentIds = [el.dataset.sid];
@@ -989,25 +1086,11 @@ window.PageReports = (function () {
         switchTab('progress');
       },
       fitMapPick: function () {
-        // A thumbnail opens that student's pages. Outside the Fit Map the
-        // sheets are ordinary content and a click means nothing.
-        if (!fitMapOn) return;
-        selectedStudentIds = [el.dataset.sid];
-        fitMapOn = false;
-        populateStudentSelect();
+        // In Everyone view a student's thumbnail opens that student.
+        if (studioView !== 'all') return;
+        previewSid = el.dataset.sid;
+        studioView = 'one';
         renderReports();
-      },
-      rbApplyPreset: function () {
-        rbApplyPreset(el.dataset.preset);
-      },
-      rbToggleBlock: function () {
-        e.stopPropagation();
-        rbToggleBlock(el.dataset.blockid);
-      },
-      summaryStudentClick: function () {
-        e.preventDefault();
-        tqSelectStudent(el.dataset.sid);
-        switchTab('questionnaire');
       },
       toggleStudentSelection: function () {
         e.stopPropagation();
@@ -1056,12 +1139,6 @@ window.PageReports = (function () {
     }
   }
 
-  function _handleSetupChange(e) {
-    var el = e.target;
-    if (!el || !el.dataset || el.dataset.action !== 'rbSetupInclude' || !el.closest('#rb-blocks')) return;
-    _setForm(ReportSheets.setInclude(_formOf(), el.dataset.include, el.checked));
-  }
-
   function _handleSelectionChange() {
     var editor = document.getElementById('tq-narrative');
     if (!editor) return;
@@ -1086,7 +1163,7 @@ window.PageReports = (function () {
     var line = document.getElementById('tq-fit');
     var text = document.getElementById('tq-fit-text');
     if (!line || !text) return;
-    if (!ReportBuilderUI.usesSheets(reportConfig) || typeof ReportSheets === 'undefined') {
+    if (typeof ReportSheets === 'undefined') {
       line.hidden = true;
       return;
     }
@@ -1131,7 +1208,7 @@ window.PageReports = (function () {
 
   var _resizeTimer = null;
   function _handleResize() {
-    if (activeTab !== 'progress' || !ReportBuilderUI.usesSheets(reportConfig)) return;
+    if (activeTab !== 'progress') return;
     clearTimeout(_resizeTimer);
     _resizeTimer = setTimeout(renderReportPreview, 150);
   }
@@ -1148,9 +1225,6 @@ window.PageReports = (function () {
       selectedStudentIds = [sid];
       populateStudentSelect();
       renderReports();
-    } else if (activeTab === 'summary') {
-      tqSelectStudent(sid);
-      switchTab('questionnaire');
     } else {
       tqSelectStudent(sid);
     }
@@ -1186,11 +1260,15 @@ window.PageReports = (function () {
     setActiveCourse(activeCourse);
     activeTab = params.tab || 'questionnaire';
     selectedStudentIds = null;
-    classSummaryAnon = false;
     tqIncludeAssignFeedback = true;
     tqObsFilter = 'all';
 
-    reportConfig = Builder.getReportConfigWrapped(activeCourse);
+    reportConfig = _loadReportConfig(activeCourse);
+    _blockSizes = null;
+    _classFitKey = '';
+    _classFit = null;
+    previewSid = null;
+    studioSelected = null;
     _configureQuestionnaire();
     RQ.tqStudentIndex = 0;
     RQ.tqNarrativeDirty = false;
@@ -1241,7 +1319,6 @@ window.PageReports = (function () {
     window._pageSwitchCourse = switchCourse;
 
     _addDocListener('click', _handleClick);
-    _addDocListener('change', _handleSetupChange);
     window.addEventListener('resize', _handleResize);
     _addDocListener('selectionchange', _handleSelectionChange);
     _addDocListener('keyup', _handleKeyup);
@@ -1282,23 +1359,11 @@ window.PageReports = (function () {
     if (sidebarEl) sidebarEl.removeEventListener('click', _handleSidebarClick);
 
     delete window._pageSwitchCourse;
-    delete window.rbDragStart;
-    delete window.rbDragEnd;
-    delete window.rbDragOver;
-    delete window.rbDragLeave;
-    delete window.rbDrop;
   }
 
   /* -- Toolbar HTML (rendered into main on init) ---------- */
   var TOOLBAR_HTML =
-    '<div class="report-toolbar no-print">\n      <div class="seg report-seg-control" role="tablist" aria-label="Report type">\n        <button class="seg-btn report-seg-btn active" data-action="switchTab" data-tab="questionnaire" role="tab" aria-selected="true">Term Questionnaire</button>\n        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="progress" role="tab" aria-selected="false">Progress Reports</button>\n        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="summary" role="tab" aria-selected="false">Class Summary</button>\n      </div>\n      <div class="report-stepper" id="report-stepper" style="display:none">\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="-1" title="Previous student" aria-label="Previous student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="1" title="Next student" aria-label="Next student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n      </div>\n      <div class="student-picker" id="student-picker">\n        <button class="student-picker-btn" data-action="toggleStudentPicker" aria-label="Select students" aria-expanded="false" aria-haspopup="listbox">\n          <span id="picker-label">All Students</span>\n          <span class="arrow" aria-hidden="true">\u25bc</span>\n        </button>\n        <div class="student-picker-dropdown" id="picker-dropdown"></div>\n      </div>\n      <div class="tq-student-nav" id="tq-student-nav" style="display:none">\n        <button class="tq-toolbar-arrow" data-action="tqPrevStudent" title="Previous student" aria-label="Previous student">\n          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>\n        </button>\n        <span class="tq-student-name" id="tq-student-name"></span>\n        <button class="tq-toolbar-arrow" data-action="tqNextStudent" title="Next student" aria-label="Next student">\n          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>\n        </button>\n        <div class="tq-progress-ring" id="tq-progress-ring">\n          <svg width="30" height="30" viewBox="0 0 30 30">\n            <circle class="ring-bg" cx="15" cy="15" r="12"/>\n            <circle class="ring-fill" id="tq-ring-fill" cx="15" cy="15" r="12" stroke-dasharray="75.4" stroke-dashoffset="75.4"/>\n          </svg>\n          <span class="tq-progress-label" id="tq-progress-label"></span>\n        </div>\n      </div>\n      <select id="report-period" class="report-term-select" aria-label="Report"></select>\n      <select id="report-copy" class="report-term-select" aria-label="Copy" style="display:none"></select>\n      <div class="seg seg-sm" id="report-paper" role="radiogroup" aria-label="Paper" style="display:none">\n        <button class="seg-btn active" data-action="setPaper" data-paper="letter" role="radio" aria-checked="true">Letter</button>\n        <button class="seg-btn" data-action="setPaper" data-paper="legal" role="radio" aria-checked="false">Legal</button>\n      </div>\n      <div class="seg seg-sm" id="report-view" role="radiogroup" aria-label="View" style="display:none">\n        <button class="seg-btn active" data-action="setView" data-view="screen" role="radio" aria-checked="true">Screen</button>\n        <button class="seg-btn" data-action="setView" data-view="photocopy" role="radio" aria-checked="false">Photocopy</button>\n      </div>\n      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">\n        <button class="tb-toggle-btn" id="tb-anon-btn" style="display:none" data-action="toggleAnon">\n          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>\n          Anonymize\n        </button>\n        <button class="tb-toggle-btn" id="tb-rail-btn" style="display:none" data-action="toggleRail" aria-pressed="false" aria-controls="rb-panel">Builder</button>\n        <button class="tb-toggle-btn" id="tb-fitmap-btn" style="display:none" data-action="toggleFitMap" aria-pressed="false">Fit Map</button>\n        <button class="tb-action-btn" id="tb-print-btn" data-action="printReports">Print Reports</button>\n      </div>\n    </div>\n    <div id="report-output" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto"></div>';
-
-  /* -- Expose handlers for inline event attributes --------- */
-  window.rbDragStart = rbDragStart;
-  window.rbDragEnd = rbDragEnd;
-  window.rbDragOver = rbDragOver;
-  window.rbDragLeave = rbDragLeave;
-  window.rbDrop = rbDrop;
+    '<div class="report-toolbar no-print">\n      <div class="seg report-seg-control" role="tablist" aria-label="Report type">\n        <button class="seg-btn report-seg-btn active" data-action="switchTab" data-tab="questionnaire" role="tab" aria-selected="true">Term Questionnaire</button>\n        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="progress" role="tab" aria-selected="false">Progress Reports</button>\n      </div>\n      <div class="report-stepper" id="report-stepper" style="display:none">\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="-1" title="Previous student" aria-label="Previous student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="1" title="Next student" aria-label="Next student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n      </div>\n      <div class="student-picker" id="student-picker">\n        <button class="student-picker-btn" data-action="toggleStudentPicker" aria-label="Select students" aria-expanded="false" aria-haspopup="listbox">\n          <span id="picker-label">All Students</span>\n          <span class="arrow" aria-hidden="true">\u25bc</span>\n        </button>\n        <div class="student-picker-dropdown" id="picker-dropdown"></div>\n      </div>\n      <div class="tq-student-nav" id="tq-student-nav" style="display:none">\n        <button class="tq-toolbar-arrow" data-action="tqPrevStudent" title="Previous student" aria-label="Previous student">\n          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>\n        </button>\n        <span class="tq-student-name" id="tq-student-name"></span>\n        <button class="tq-toolbar-arrow" data-action="tqNextStudent" title="Next student" aria-label="Next student">\n          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>\n        </button>\n        <div class="tq-progress-ring" id="tq-progress-ring">\n          <svg width="30" height="30" viewBox="0 0 30 30">\n            <circle class="ring-bg" cx="15" cy="15" r="12"/>\n            <circle class="ring-fill" id="tq-ring-fill" cx="15" cy="15" r="12" stroke-dasharray="75.4" stroke-dashoffset="75.4"/>\n          </svg>\n          <span class="tq-progress-label" id="tq-progress-label"></span>\n        </div>\n      </div>\n      <select id="report-period" class="report-term-select" aria-label="Report"></select>\n      <select id="report-copy" class="report-term-select" aria-label="Copy" style="display:none"></select>\n      <span class="tb-divider" id="tb-divider" aria-hidden="true">\u2502</span>\n      <span class="tb-label" id="tb-paper-label">Paper</span>\n      <div class="seg seg-sm" id="report-paper" role="radiogroup" aria-label="Paper" style="display:none">\n        <button class="seg-btn active" data-action="setPaper" data-paper="letter" role="radio" aria-checked="true">Letter</button>\n        <button class="seg-btn" data-action="setPaper" data-paper="legal" role="radio" aria-checked="false">Legal</button>\n      </div>\n      <span class="tb-label tb-label-progress">Pages</span>\n      <div class="seg seg-sm" id="report-pages" role="radiogroup" aria-label="Pages per student" style="display:none">\n        <button class="seg-btn" data-action="setPages" data-pages="1" role="radio" aria-checked="false">1</button>\n        <button class="seg-btn" data-action="setPages" data-pages="2" role="radio" aria-checked="false">2</button>\n        <button class="seg-btn active" data-action="setPages" data-pages="auto" role="radio" aria-checked="true">Auto</button>\n      </div>\n      <span class="tb-label tb-label-progress">Ink</span>\n      <div class="seg seg-sm" id="report-ink" role="radiogroup" aria-label="Ink" style="display:none">\n        <button class="seg-btn" data-action="setInk" data-ink="black" role="radio" aria-checked="false">Black</button>\n        <button class="seg-btn active" data-action="setInk" data-ink="colour" role="radio" aria-checked="true">Colour</button>\n      </div>\n      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">\n        <span class="tb-count" id="tb-count"></span>\n        <button class="tb-toggle-btn" id="tb-rail-btn" style="display:none" data-action="toggleRail" aria-pressed="false" aria-controls="studio-palette">Blocks</button>\n        <button class="tb-action-btn" id="tb-print-btn" data-action="printReports">Print Reports</button>\n      </div>\n    </div>\n    <div id="report-output" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto"></div>';
 
   /* -- Public API ----------------------------------------- */
   return {

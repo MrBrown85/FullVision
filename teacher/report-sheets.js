@@ -20,247 +20,453 @@ window.ReportSheets = (function () {
   var SAFETY = 0.04;
   var PAGE_STYLE_ID = 'report-sheets-page';
 
-  /* The one form for now. Edit Layout (Phase 3) will make this data a
-     teacher can change; until then it is the Report Card. The Parent /
-     Guardian Response block is placed, never reworded (DECISIONS "Report
-     forms" 5). The student reflection keeps its wording too, and with it
-     stands 795px tall at print size: taller than a Letter back with the
-     response below it. It stays in the Detailed preset and becomes an
-     attachment sheet when Edit Layout arrives. */
+  /* ── The layout model (v4) ────────────────────────────────────
+     A form is pages of rows of cells. A row holds one to three cells whose
+     spans add up to 12 (12; 6+6; 8+4; 4+8; 4+4+4). pages[0] is the front,
+     pages[1] the back, later pages continue. One block may be pinned to the
+     bottom of the last side (the Parent / Guardian Response). perStudent
+     holds exceptions that never change the class layout. The Parent /
+     Guardian Response and the student reflection are placed, never
+     reworded (DECISIONS "Report forms" 5). */
+  var SPANS = [12, 8, 6, 4];
+  function _row(cells) {
+    return { cells: cells.map(_cellSpec) };
+  }
+  function _cellSpec(c) {
+    return typeof c === 'string' ? { block: c } : c;
+  }
   var FORM_REPORT_CARD = {
+    v: 4,
     id: 'report-card',
     name: 'Report Card',
-    front: [
-      { block: 'header', kind: 'fixed', label: 'Letterhead' },
-      { block: 'academic-summary', kind: 'fixed', label: 'Overall and Competencies' },
-      { block: 'teacher-narrative', kind: 'flow', label: 'Teacher Comment', room: { lines: 8 }, whenEmpty: 'box' },
-      { block: 'competency-table', kind: 'fixed', label: 'Curricular Competencies' },
-      { block: 'next-steps', kind: 'flow', label: 'Growth and Next Steps', whenEmpty: 'omit' },
+    type: 'standard',
+    pagesPerStudent: 'auto',
+    pinned: 'parent-response',
+    pages: [
+      {
+        rows: [
+          _row(['header']),
+          _row(['academic-summary']),
+          _row([{ block: 'teacher-narrative', height: 'fixed', lines: 8 }]),
+          _row(['competency-table']),
+          _row(['next-steps']),
+        ],
+      },
+      { rows: [_row(['learner-dimensions']), _row(['parent-response'])] },
     ],
-    back: [
-      { block: 'learner-dimensions', kind: 'fixed', label: 'Learning Dispositions' },
-      { block: 'parent-response', kind: 'fixed', label: 'Parent / Guardian Response', pinned: 'bottom' },
+    perStudent: {},
+  };
+  var FORM_INTERIM = {
+    v: 4,
+    id: 'interim-update',
+    name: 'Interim Update',
+    type: 'standard',
+    pagesPerStudent: 'auto',
+    pinned: null,
+    pages: [
+      {
+        rows: [
+          _row(['header']),
+          _row(['academic-summary']),
+          _row([{ block: 'teacher-narrative', height: 'fixed', lines: 6 }]),
+          _row(['next-steps']),
+          _row(['legend']),
+        ],
+      },
     ],
+    perStudent: {},
+  };
+  var FORM_CONFERENCE = {
+    v: 4,
+    id: 'conference-pack',
+    name: 'Conference Pack',
+    type: 'standard',
+    pagesPerStudent: 'auto',
+    pinned: 'parent-response',
+    pages: [
+      {
+        rows: [
+          _row(['header']),
+          _row(['academic-summary']),
+          _row([{ block: 'teacher-narrative', height: 'fixed', lines: 8 }]),
+          _row(['competency-table']),
+          _row(['next-steps']),
+          _row(['grade-table']),
+        ],
+      },
+      { rows: [_row(['learner-dimensions']), _row(['parent-response'])] },
+    ],
+    perStudent: {},
   };
 
-  /* The Report Card, made whole (labels, kinds and the letterhead's lock
-     come from the registry below). */
+  /* The Report Card, made whole. */
   function form() {
     return normalizeForm(FORM_REPORT_CARD);
   }
 
-  /* Every block a form can hold. Labels and kinds live here, not in the
-     saved form, so a label can change without touching saved layouts. */
+  /* Every block a form can hold. Labels, kinds, the palette group and the
+     options a block offers live here, not in the saved form. `fixed` is
+     the height mode of a block that reserves lines; `flow` blocks grow
+     with the student. */
   var BLOCKS = {
-    header: { label: 'Letterhead', kind: 'fixed', locked: true },
-    'academic-summary': { label: 'Overall and Competencies', kind: 'fixed' },
-    'teacher-narrative': { label: 'Teacher Comment', kind: 'flow', room: 8, whenEmpty: 'box' },
-    'competency-table': { label: 'Curricular Competencies', kind: 'fixed' },
-    attendance: { label: 'Attendance', kind: 'fixed' },
-    'next-steps': { label: 'Growth and Next Steps', kind: 'flow', whenEmpty: 'omit' },
-    'learner-dimensions': { label: 'Learning Dispositions', kind: 'fixed' },
-    'parent-response': { label: 'Parent / Guardian Response', kind: 'fixed', pinnable: true },
-    'student-reflection-learning': { label: 'Student Reflection: My Learning', kind: 'fixed' },
-    'student-reflection-habits': { label: 'Student Reflection: My Habits', kind: 'fixed' },
-    'section-chart': { label: 'Section Proficiency Chart', kind: 'flow' },
-    'grade-table': { label: 'Assignment Grades', kind: 'flow' },
-    'section-outcomes': { label: 'Learning Outcomes', kind: 'flow' },
-    'score-distribution': { label: 'Score Distribution', kind: 'flow' },
-    'core-competencies': { label: 'Core Competencies', kind: 'flow' },
-    observations: { label: 'Observations and Evidence', kind: 'flow' },
-    legend: { label: 'Proficiency Legend', kind: 'fixed' },
+    header: { label: 'Letterhead', kind: 'fixed', locked: true, group: null },
+    'academic-summary': { label: 'Overall and Competencies', kind: 'fixed', group: 'Grades' },
+    'competency-table': { label: 'Competency Table', kind: 'fixed', group: 'Grades', noEvidence: true },
+    'grade-table': { label: 'Assignment Grades', kind: 'flow', group: 'Grades' },
+    'section-outcomes': { label: 'Learning Outcomes', kind: 'flow', group: 'Grades' },
+    'score-distribution': { label: 'Score Distribution', kind: 'flow', group: 'Grades' },
+    'section-chart': { label: 'Section Chart', kind: 'flow', group: 'Grades' },
+    attendance: { label: 'Attendance', kind: 'fixed', group: 'Grades' },
+    'teacher-narrative': {
+      label: 'Teacher Comment',
+      kind: 'flow',
+      group: 'Comments and Evidence',
+      lines: 8,
+      whenEmpty: 'box',
+      sizable: true,
+    },
+    observations: { label: 'Observations', kind: 'flow', group: 'Comments and Evidence' },
+    'next-steps': { label: 'Growth and Next Steps', kind: 'flow', group: 'Comments and Evidence', whenEmpty: 'omit' },
+    'learner-dimensions': { label: 'Learning Dispositions', kind: 'fixed', group: 'Learner Profile', noEvidence: true },
+    'core-competencies': { label: 'Core Competencies', kind: 'flow', group: 'Learner Profile', noEvidence: true },
+    'student-reflection-learning': { label: 'Reflection: My Learning', kind: 'fixed', group: 'Learner Profile' },
+    'student-reflection-habits': { label: 'Reflection: My Habits', kind: 'fixed', group: 'Learner Profile' },
+    'parent-response': {
+      label: 'Parent / Guardian Response',
+      kind: 'fixed',
+      group: 'Family',
+      pinnable: true,
+      sizable: true,
+    },
+    legend: { label: 'Proficiency Legend', kind: 'fixed', group: 'Family' },
+    'text-block': { label: 'Text Block', kind: 'fixed', group: 'Family', sizable: true },
   };
   var BLOCK_ORDER = Object.keys(BLOCKS);
+  var PALETTE_GROUPS = ['Grades', 'Comments and Evidence', 'Learner Profile', 'Family'];
 
-  function _fill(item) {
-    if (!item || typeof item !== 'object') return null;
-    if (Array.isArray(item.pair)) {
-      var cells = item.pair.map(_fill).filter(function (q) {
-        return q && q.kind === 'fixed';
-      });
-      if (cells.length === 2) return { pair: cells };
-      return cells[0] || null;
-    }
-    var def = BLOCKS[item.block];
+  function _cleanCell(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    var def = BLOCKS[raw.block];
     if (!def) return null;
-    var out = { block: item.block, kind: def.kind, label: def.label };
-    if (def.locked) out.locked = true;
-    if (def.kind === 'flow') {
-      var lines = Number(item.room && item.room.lines);
-      if (def.room || lines) out.room = { lines: lines >= 1 && lines <= 20 ? Math.round(lines) : def.room || 0 };
-      if (!out.room || !out.room.lines) delete out.room;
-      out.whenEmpty = item.whenEmpty === 'box' || item.whenEmpty === 'omit' ? item.whenEmpty : def.whenEmpty || 'omit';
+    var cell = { block: raw.block, span: SPANS.indexOf(Number(raw.span)) >= 0 ? Number(raw.span) : 12 };
+    var lines = Number(raw.lines);
+    if (raw.height === 'fixed' && lines >= 1 && lines <= 20) {
+      cell.height = 'fixed';
+      cell.lines = Math.round(lines);
+    } else if (def.lines && raw.height !== 'fit' && raw.height !== 'fixed' && !raw.room) {
+      cell.height = 'fixed';
+      cell.lines = def.lines;
+    } else {
+      cell.height = 'fit';
     }
-    if (item.pinned && def.pinnable) out.pinned = 'bottom';
-    return out;
+    if (def.kind === 'flow' || def.whenEmpty) {
+      cell.whenEmpty = raw.whenEmpty === 'box' || raw.whenEmpty === 'omit' ? raw.whenEmpty : def.whenEmpty || 'omit';
+    }
+    if (raw.options && typeof raw.options === 'object' && !Array.isArray(raw.options)) {
+      cell.options = JSON.parse(JSON.stringify(raw.options));
+    }
+    if (raw.noEvidence === 'hide' || raw.noEvidence === 'show') cell.noEvidence = raw.noEvidence;
+    return cell;
   }
 
-  /* A saved form (any version, any hand) made whole: known blocks only,
-     the letterhead first on the front, at most one block pinned to the
-     bottom of the back, no block twice. Absent → the Report Card. */
-  function normalizeForm(raw) {
-    var base =
-      raw && typeof raw === 'object' && (Array.isArray(raw.front) || Array.isArray(raw.back)) ? raw : FORM_REPORT_CARD;
-    var seen = {};
-    var keep = function (it) {
-      if (!it) return false;
-      var ids = it.pair
-        ? it.pair.map(function (q) {
-            return q.block;
-          })
-        : [it.block];
-      if (
-        ids.some(function (id) {
-          return seen[id];
+  /* Spans in a row always add up to 12. */
+  function _balanceRow(row) {
+    var cells = row.cells;
+    var sum = cells.reduce(function (a, c) {
+      return a + c.span;
+    }, 0);
+    if (sum === 12 && cells.length <= 3) return row;
+    if (cells.length === 1) cells[0].span = 12;
+    else if (cells.length === 2) {
+      if (!(cells[0].span === 8 && cells[1].span === 4) && !(cells[0].span === 4 && cells[1].span === 8)) {
+        cells[0].span = 6;
+        cells[1].span = 6;
+      }
+    } else {
+      cells.forEach(function (c) {
+        c.span = 4;
+      });
+    }
+    return row;
+  }
+
+  function _v3ToPages(raw) {
+    var toRows = function (list) {
+      return (list || [])
+        .map(function (it) {
+          if (!it) return null;
+          if (Array.isArray(it.pair)) {
+            return {
+              cells: it.pair.map(function (q) {
+                return { block: q.block, span: 6 };
+              }),
+            };
+          }
+          var cell = { block: it.block, span: 12 };
+          if (it.room && it.room.lines) {
+            cell.height = 'fixed';
+            cell.lines = it.room.lines;
+          }
+          if (it.whenEmpty) cell.whenEmpty = it.whenEmpty;
+          return { cells: [cell] };
         })
-      )
-        return false;
-      ids.forEach(function (id) {
-        seen[id] = true;
-      });
-      return true;
+        .filter(Boolean);
     };
-    var front = (base.front || []).map(_fill).filter(keep);
-    var back = (base.back || []).map(_fill).filter(keep);
-    // The letterhead leads the front.
-    var all = front.concat(back);
-    var hasHeader = all.some(function (it) {
-      return it.block === 'header';
-    });
-    front = front.filter(function (it) {
-      return it.block !== 'header';
-    });
-    back = back.filter(function (it) {
-      return it.block !== 'header';
-    });
-    front.unshift(_fill({ block: 'header' }));
-    if (!hasHeader) seen.header = true;
-    // One pinned block, on the back, last.
     var pinned = null;
-    var unpin = function (list) {
-      return list.filter(function (it) {
-        if (it.pinned && !pinned) {
-          pinned = it;
-          return false;
-        }
-        if (it.pinned) delete it.pinned;
-        return true;
-      });
-    };
-    front = unpin(front);
-    back = unpin(back);
-    if (pinned) back.push(pinned);
+    (raw.front || []).concat(raw.back || []).forEach(function (it) {
+      if (it && it.pinned) pinned = it.block;
+    });
     return {
-      v: 3,
+      v: 4,
+      id: raw.id,
+      name: raw.name,
+      type: raw.type,
+      pinned: pinned,
+      pages: [{ rows: toRows(raw.front) }, { rows: toRows(raw.back) }],
+    };
+  }
+
+  /* A saved form (any version, any hand) made whole: known blocks only, no
+     block twice, the letterhead first on page 1, spans that add up, at most
+     one pinned block and it on the form, pages trimmed of empty tails but
+     never fewer than one. A v3 form (front/back lists with pairs) and the
+     old presets ({preset, blocks}) migrate here; nothing saved is lost.
+     Absent → the Report Card. */
+  function normalizeForm(raw) {
+    var base = raw && typeof raw === 'object' ? raw : null;
+    if (base && !Array.isArray(base.pages) && (Array.isArray(base.front) || Array.isArray(base.back))) {
+      base = _v3ToPages(base);
+    }
+    if (!base || !Array.isArray(base.pages)) base = FORM_REPORT_CARD;
+    var seen = {};
+    var pages = base.pages
+      .map(function (pg) {
+        var rows = ((pg && pg.rows) || [])
+          .map(function (row) {
+            var cells = ((row && row.cells) || [])
+              .map(_cleanCell)
+              .filter(function (c) {
+                if (!c || seen[c.block]) return false;
+                seen[c.block] = true;
+                return true;
+              })
+              .slice(0, 3);
+            return cells.length ? _balanceRow({ cells: cells }) : null;
+          })
+          .filter(Boolean);
+        return { rows: rows };
+      })
+      .filter(function (pg, i) {
+        return i === 0 || pg.rows.length;
+      });
+    if (!pages.length) pages = [{ rows: [] }];
+    // The letterhead leads page 1, alone on its row.
+    pages.forEach(function (pg) {
+      pg.rows = pg.rows
+        .map(function (row) {
+          row.cells = row.cells.filter(function (c) {
+            return c.block !== 'header';
+          });
+          return row.cells.length ? _balanceRow(row) : null;
+        })
+        .filter(Boolean);
+    });
+    pages[0].rows.unshift({ cells: [{ block: 'header', span: 12, height: 'fit' }] });
+    var pinned =
+      base.pinned && BLOCKS[base.pinned] && BLOCKS[base.pinned].pinnable && seen[base.pinned] ? base.pinned : null;
+    var per = {};
+    if (base.perStudent && typeof base.perStudent === 'object') {
+      Object.keys(base.perStudent).forEach(function (sid) {
+        var e = base.perStudent[sid];
+        var hide = Array.isArray(e && e.hide)
+          ? e.hide.filter(function (id) {
+              return BLOCKS[id] && id !== 'header';
+            })
+          : [];
+        if (hide.length) per[sid] = { hide: hide };
+      });
+    }
+    var pps = base.pagesPerStudent;
+    return {
+      v: 4,
       id: base.id || 'report-card',
       name: base.name || 'Report Card',
       type: base.type === 'compact' ? 'compact' : 'standard',
-      front: front,
-      back: back,
+      pagesPerStudent: pps === 1 || pps === 2 ? pps : 'auto',
+      pinned: pinned,
+      pages: pages,
+      perStudent: per,
     };
   }
 
-  /* The class's form from its report config, the Report Card by default. */
+  /* The class's form from its report config. A class still on the old
+     Brief preset opens on the Interim Update; anything else without a
+     saved form is the Report Card. */
   function formFor(reportConfig) {
-    return normalizeForm(reportConfig && reportConfig.form);
+    if (reportConfig && reportConfig.form) return normalizeForm(reportConfig.form);
+    if (reportConfig && reportConfig.preset === 'brief') return normalizeForm(FORM_INTERIM);
+    return normalizeForm(FORM_REPORT_CARD);
   }
 
   /* ── Editing (pure: each returns a new form) ─────────────────── */
   function _clone(f) {
     return JSON.parse(JSON.stringify(f));
   }
-  function _list(f, side) {
-    return side === 'back' ? f.back : f.front;
-  }
-  function moveItem(f, side, idx, dir) {
-    f = _clone(f);
-    var list = _list(f, side);
-    var j = idx + dir;
-    if (idx < 0 || idx >= list.length || j < 0 || j >= list.length) return f;
-    if (list[idx].locked || list[j].locked) return f;
-    if (list[idx].pinned || list[j].pinned) return f;
-    var t = list[idx];
-    list[idx] = list[j];
-    list[j] = t;
-    return f;
-  }
-  function moveToSide(f, side, idx) {
-    f = _clone(f);
-    var from = _list(f, side);
-    var it = from[idx];
-    if (!it || it.locked || it.pinned) return f;
-    from.splice(idx, 1);
-    var to = _list(f, side === 'back' ? 'front' : 'back');
-    var pinnedAt = to.findIndex(function (q) {
-      return q.pinned;
+  /* Ids on the form, in order. */
+  function onForm(f) {
+    var ids = [];
+    f.pages.forEach(function (pg) {
+      pg.rows.forEach(function (row) {
+        row.cells.forEach(function (c) {
+          ids.push(c.block);
+        });
+      });
     });
-    if (pinnedAt >= 0) to.splice(pinnedAt, 0, it);
-    else to.push(it);
-    return f;
+    return ids;
   }
-  function removeItem(f, side, idx) {
-    f = _clone(f);
-    var list = _list(f, side);
-    if (!list[idx] || list[idx].locked) return f;
-    list.splice(idx, 1);
-    return f;
-  }
-  function addBlock(f, id, side) {
-    if (!BLOCKS[id] || onForm(f).indexOf(id) >= 0) return f;
-    f = _clone(f);
-    var to = _list(f, side === 'back' ? 'back' : 'front');
-    var it = _fill({ block: id });
-    var pinnedAt = to.findIndex(function (q) {
-      return q.pinned;
+  function available(f) {
+    var on = onForm(f);
+    return BLOCK_ORDER.filter(function (id) {
+      return !BLOCKS[id].locked && on.indexOf(id) < 0;
     });
-    if (pinnedAt >= 0) to.splice(pinnedAt, 0, it);
-    else to.push(it);
-    return f;
   }
-  function setRoom(f, lines) {
-    f = _clone(f);
-    f.front.concat(f.back).forEach(function (it) {
-      if (it.block === 'teacher-narrative')
-        it.room = { lines: Math.max(1, Math.min(20, Math.round(Number(lines) || 8))) };
+  /* Where a block is: { page, row, cell } indexes, or null. */
+  function locate(f, id) {
+    for (var p = 0; p < f.pages.length; p++) {
+      var rows = f.pages[p].rows;
+      for (var r = 0; r < rows.length; r++) {
+        for (var c = 0; c < rows[r].cells.length; c++) {
+          if (rows[r].cells[c].block === id) return { page: p, row: r, cell: c };
+        }
+      }
+    }
+    return null;
+  }
+  function cellOf(f, id) {
+    var at = locate(f, id);
+    return at ? f.pages[at.page].rows[at.row].cells[at.cell] : null;
+  }
+  /* "Page 1 · row 3 · left". */
+  function positionText(f, id) {
+    var at = locate(f, id);
+    if (!at) return '';
+    var row = f.pages[at.page].rows[at.row];
+    var side = '';
+    if (row.cells.length === 2) side = at.cell === 0 ? 'left' : 'right';
+    else if (row.cells.length === 3) side = ['left', 'middle', 'right'][at.cell];
+    return 'Page ' + (at.page + 1) + ' · row ' + (at.row + 1) + (side ? ' · ' + side : '');
+  }
+  function _dropEmptyRows(f) {
+    f.pages.forEach(function (pg) {
+      pg.rows = pg.rows
+        .filter(function (row) {
+          return row.cells.length;
+        })
+        .map(_balanceRow);
     });
     return f;
+  }
+  function _newCell(id) {
+    return _cleanCell({ block: id, span: 12 });
+  }
+  /* Puts a block on the form. `at` is { page, row, side } where side is
+     'before' or 'after' (a new full-width row there) or 'left' or 'right'
+     (a cell in that row, which gains a column). Without `at` the block
+     goes on a new row at the end of the last page. */
+  function placeBlock(f, id, at) {
+    if (!BLOCKS[id] || id === 'header') return f;
+    f = removeCell(f, id);
+    var cell = _newCell(id);
+    var page = at && f.pages[at.page] ? f.pages[at.page] : f.pages[f.pages.length - 1];
+    var row = at && page.rows[at.row] ? page.rows[at.row] : null;
+    if (row && (at.side === 'left' || at.side === 'right') && row.cells.length < 3) {
+      if (at.side === 'left') row.cells.unshift(cell);
+      else row.cells.push(cell);
+      _balanceRow(row);
+    } else if (row && at.side === 'before') {
+      page.rows.splice(at.row, 0, { cells: [cell] });
+    } else if (row) {
+      page.rows.splice(at.row + 1, 0, { cells: [cell] });
+    } else {
+      page.rows.push({ cells: [cell] });
+    }
+    return normalizeForm(f);
+  }
+  /* A new page after the last, holding the block. */
+  function placeOnNewPage(f, id) {
+    if (!BLOCKS[id] || id === 'header') return f;
+    f = removeCell(f, id);
+    f.pages.push({ rows: [{ cells: [_newCell(id)] }] });
+    return normalizeForm(f);
+  }
+  function removeCell(f, id) {
+    if (id === 'header') return f;
+    f = _clone(f);
+    var at = locate(f, id);
+    if (!at) return f;
+    f.pages[at.page].rows[at.row].cells.splice(at.cell, 1);
+    if (f.pinned === id) f.pinned = null;
+    return normalizeForm(_dropEmptyRows(f));
+  }
+  function setSpan(f, id, span) {
+    f = _clone(f);
+    var at = locate(f, id);
+    if (!at || SPANS.indexOf(span) < 0) return f;
+    var row = f.pages[at.page].rows[at.row];
+    if (row.cells.length === 1) return f; // alone on its row, a cell is full width
+    if (row.cells.length === 2) {
+      var other = row.cells[1 - at.cell];
+      if (span === 12) {
+        // Full width: the other cell gets its own row after this one.
+        row.cells.splice(1 - at.cell, 1);
+        f.pages[at.page].rows.splice(at.row + 1, 0, { cells: [other] });
+        return normalizeForm(_dropEmptyRows(f));
+      }
+      row.cells[at.cell].span = span === 6 ? 6 : span;
+      other.span = 12 - row.cells[at.cell].span;
+      if (SPANS.indexOf(other.span) < 0) {
+        row.cells[at.cell].span = 6;
+        other.span = 6;
+      }
+    }
+    return normalizeForm(f);
+  }
+  function setHeight(f, id, mode, lines) {
+    f = _clone(f);
+    var cell = cellOf(f, id);
+    if (!cell) return f;
+    if (mode === 'fixed') {
+      cell.height = 'fixed';
+      cell.lines = Math.max(1, Math.min(20, Math.round(Number(lines) || cell.lines || BLOCKS[id].lines || 6)));
+    } else {
+      cell.height = 'fit';
+      delete cell.lines;
+    }
+    return normalizeForm(f);
   }
   function setWhenEmpty(f, id, whenEmpty) {
     f = _clone(f);
-    f.front.concat(f.back).forEach(function (it) {
-      if (it.block === id && it.kind === 'flow') it.whenEmpty = whenEmpty === 'box' ? 'box' : 'omit';
-    });
-    return f;
+    var cell = cellOf(f, id);
+    if (cell) cell.whenEmpty = whenEmpty === 'box' ? 'box' : 'omit';
+    return normalizeForm(f);
   }
-  function setPinned(f, id, on) {
+  function setOption(f, id, key, value) {
     f = _clone(f);
-    var item = null;
-    var fromFront = -1;
-    f.front.forEach(function (it, i) {
-      if (it.block === id) {
-        item = it;
-        fromFront = i;
-      }
-    });
-    f.back.forEach(function (it) {
-      if (it.block === id) item = it;
-    });
-    if (!item || !BLOCKS[id] || !BLOCKS[id].pinnable) return f;
-    f.front.concat(f.back).forEach(function (it) {
-      delete it.pinned;
-    });
-    if (on) {
-      if (fromFront >= 0) {
-        f.front.splice(fromFront, 1);
-        f.back.push(item);
-      } else {
-        f.back = f.back.filter(function (it) {
-          return it !== item;
-        });
-        f.back.push(item);
-      }
-      item.pinned = 'bottom';
-    }
+    var cell = cellOf(f, id);
+    if (!cell) return f;
+    cell.options = cell.options || {};
+    cell.options[key] = value;
+    return normalizeForm(f);
+  }
+  function setNoEvidence(f, id, rule) {
+    f = _clone(f);
+    var cell = cellOf(f, id);
+    if (cell) cell.noEvidence = rule === 'hide' ? 'hide' : 'show';
+    return normalizeForm(f);
+  }
+  function setPinned(f, id) {
+    f = _clone(f);
+    f.pinned = id && BLOCKS[id] && BLOCKS[id].pinnable && locate(f, id) ? id : null;
     return normalizeForm(f);
   }
   function setType(f, type) {
@@ -268,207 +474,46 @@ window.ReportSheets = (function () {
     f.type = type === 'compact' ? 'compact' : 'standard';
     return f;
   }
-  /* Drags: the block at `from` lands at `to` on the same side. */
-  function reorder(f, side, from, to) {
+  function setPagesPerStudent(f, n) {
     f = _clone(f);
-    var list = _list(f, side);
-    if (!list[from] || list[from].locked || list[from].pinned) return f;
-    var min = side === 'front' ? 1 : 0;
-    var max = list.length - 1;
-    if (list[max] && list[max].pinned) max -= 1;
-    to = Math.max(min, Math.min(max, Number(to) || 0));
-    if (from === to) return f;
-    var it = list.splice(from, 1)[0];
-    list.splice(to, 0, it);
+    f.pagesPerStudent = n === 1 || n === 2 ? n : 'auto';
     return f;
   }
-  /* Two fixed blocks side by side: the block at idx with the one after it. */
-  function pairWith(f, side, idx) {
+  /* Hide a block for one student without changing the class layout. */
+  function hideFor(f, sid, id, on) {
     f = _clone(f);
-    var list = _list(f, side);
-    var a = list[idx],
-      b = list[idx + 1];
-    if (!canPair(a, b)) return f;
-    list.splice(idx, 2, { pair: [a, b] });
-    return f;
-  }
-  function canPair(a, b) {
-    return !!(
-      a &&
-      b &&
-      !a.pair &&
-      !b.pair &&
-      a.kind === 'fixed' &&
-      b.kind === 'fixed' &&
-      !a.locked &&
-      !b.locked &&
-      !a.pinned &&
-      !b.pinned
-    );
-  }
-  function unpair(f, side, idx) {
-    f = _clone(f);
-    var list = _list(f, side);
-    if (!list[idx] || !list[idx].pair) return f;
-    list.splice.apply(list, [idx, 1].concat(list[idx].pair));
-    return f;
-  }
-
-  /* ── Setup choices (DECISIONS "Report forms" 8) ────────────────
-     The screen offers a few named choices and the form decides where
-     things go: which form, type size, comment room as a word, and which
-     optional blocks are on. Each optional block has one place. */
-  var ROOM_CHOICES = { short: 5, standard: 8, long: 12 };
-  function roomChoice(f) {
-    var it = f.front.concat(f.back).find(function (q) {
-      return q.block === 'teacher-narrative';
+    var e = f.perStudent[sid] || { hide: [] };
+    e.hide = e.hide.filter(function (x) {
+      return x !== id;
     });
-    if (!it) return null;
-    var lines = (it.room && it.room.lines) || 8;
-    return lines <= 6 ? 'short' : lines <= 9 ? 'standard' : 'long';
-  }
-  function setRoomChoice(f, choice) {
-    return setRoom(f, ROOM_CHOICES[choice] || ROOM_CHOICES.standard);
-  }
-  var INCLUDES = [
-    { id: 'attendance', label: 'Attendance', blocks: ['attendance'] },
-    { id: 'dispositions', label: 'Learning Dispositions', blocks: ['learner-dimensions'] },
-    {
-      id: 'reflection',
-      label: 'Student Reflection',
-      blocks: ['student-reflection-learning', 'student-reflection-habits'],
-    },
-    { id: 'response', label: 'Parent / Guardian Response', blocks: ['parent-response'] },
-  ];
-  function includes(f) {
-    var on = onForm(f);
-    return INCLUDES.map(function (inc) {
-      return {
-        id: inc.id,
-        label: inc.label,
-        on: inc.blocks.every(function (b) {
-          return on.indexOf(b) >= 0;
-        }),
-      };
-    });
-  }
-  function _removeBlock(f, id) {
-    f = _clone(f);
-    ['front', 'back'].forEach(function (side) {
-      var list = _list(f, side);
-      for (var i = list.length - 1; i >= 0; i--) {
-        if (list[i].pair) {
-          var cells = list[i].pair.filter(function (q) {
-            return q.block !== id;
-          });
-          if (cells.length < 2) list.splice.apply(list, [i, 1].concat(cells));
-        } else if (list[i].block === id) {
-          list.splice(i, 1);
-        }
-      }
-    });
-    return f;
-  }
-  function setInclude(f, id, on) {
-    var inc = INCLUDES.find(function (x) {
-      return x.id === id;
-    });
-    if (!inc) return f;
-    if (!on) {
-      inc.blocks.forEach(function (b) {
-        f = _removeBlock(f, b);
-      });
-      return normalizeForm(f);
-    }
-    if (id === 'attendance') {
-      f = _removeBlock(f, 'attendance');
-      var at = f.front.findIndex(function (q) {
-        return q.block === 'competency-table';
-      });
-      if (at >= 0) {
-        f = _clone(f);
-        f.front.splice(at + 1, 0, _fill({ block: 'attendance' }));
-        f = pairWith(f, 'front', at);
-      } else {
-        f = addBlock(f, 'attendance', 'front');
-      }
-    } else if (id === 'dispositions') {
-      f = addBlock(_removeBlock(f, 'learner-dimensions'), 'learner-dimensions', 'back');
-      f = _clone(f);
-      var i = f.back.findIndex(function (q) {
-        return q.block === 'learner-dimensions';
-      });
-      f.back.unshift(f.back.splice(i, 1)[0]);
-    } else if (id === 'reflection') {
-      inc.blocks.forEach(function (b) {
-        f = addBlock(_removeBlock(f, b), b, 'back');
-      });
-    } else if (id === 'response') {
-      f = addBlock(_removeBlock(f, 'parent-response'), 'parent-response', 'back');
-      f = setPinned(f, 'parent-response', true);
-    }
+    if (on) e.hide.push(id);
+    if (e.hide.length) f.perStudent[sid] = e;
+    else delete f.perStudent[sid];
     return normalizeForm(f);
+  }
+  function hiddenFor(f, sid) {
+    var e = f.perStudent && f.perStudent[sid];
+    return e && e.hide ? e.hide.slice() : [];
   }
 
   /* ── Starters and the teacher's library ─────────────────────── */
   var STARTERS = [
-    {
-      id: 'report-card',
-      name: 'Report Card',
-      help: 'Front: grades, comment, competencies, next steps. Back: dispositions and the family response. One sheet, front and back.',
-      form: FORM_REPORT_CARD,
-    },
-    {
-      id: 'interim-update',
-      name: 'Interim Update',
-      help: 'Overall, competencies, a six-line comment, next steps and the legend on one side, for the updates between report cards.',
-      form: {
-        front: [
-          { block: 'header' },
-          { block: 'academic-summary' },
-          { block: 'teacher-narrative', room: { lines: 6 }, whenEmpty: 'box' },
-          { block: 'next-steps', whenEmpty: 'omit' },
-          { block: 'legend' },
-        ],
-        back: [],
-      },
-    },
-    {
-      id: 'conference-pack',
-      name: 'Conference Pack',
-      help: 'The Report Card plus this term\u2019s assignment grades, for parent\u2013teacher conferences. Usually two sheets.',
-      form: {
-        front: [
-          { block: 'header' },
-          { block: 'academic-summary' },
-          { block: 'teacher-narrative', room: { lines: 8 }, whenEmpty: 'box' },
-          { block: 'competency-table' },
-          { block: 'next-steps', whenEmpty: 'omit' },
-          { block: 'grade-table', whenEmpty: 'omit' },
-        ],
-        back: [{ block: 'learner-dimensions' }, { block: 'parent-response', pinned: 'bottom' }],
-      },
-    },
+    { id: 'report-card', name: 'Report Card', form: FORM_REPORT_CARD },
+    { id: 'interim-update', name: 'Interim Update', form: FORM_INTERIM },
+    { id: 'conference-pack', name: 'Conference Pack', form: FORM_CONFERENCE },
   ];
   function starters() {
     return STARTERS.map(function (st) {
-      return { id: st.id, name: st.name, help: st.help };
+      return { id: st.id, name: st.name };
     });
   }
   function starter(id) {
     var st = STARTERS.find(function (x) {
       return x.id === id;
     });
-    return st ? normalizeForm(Object.assign({}, st.form, { id: st.id, name: st.name })) : null;
+    return st ? normalizeForm(st.form) : null;
   }
 
-  /* ── Your Library ────────────────────────────────────────────────
-     The teacher's saved forms live in report_template on the server
-     (migrations/20261020_report_template.sql, v2.saveReportTemplate and
-     friends). This device keeps a copy in localStorage so the list is there
-     at once, works in Demo Mode, and holds a form saved offline until the
-     outbox sends it. templates() reads the copy; syncTemplates() refreshes
-     it from the server; saveTemplate and removeTemplate change both. */
   var LIBRARY_KEY = 'gb-report-templates';
   function templates() {
     try {
@@ -606,25 +651,6 @@ window.ReportSheets = (function () {
     return t ? normalizeForm(t.form) : null;
   }
 
-  /* Ids on the form, in order. */
-  function onForm(f) {
-    var ids = [];
-    f.front.concat(f.back).forEach(function (it) {
-      if (it.pair)
-        it.pair.forEach(function (q) {
-          ids.push(q.block);
-        });
-      else ids.push(it.block);
-    });
-    return ids;
-  }
-  function available(f) {
-    var on = onForm(f);
-    return BLOCK_ORDER.filter(function (id) {
-      return on.indexOf(id) < 0;
-    });
-  }
-
   function paperSize(paper) {
     return (PAPER[paper] || PAPER.letter).size;
   }
@@ -725,29 +751,21 @@ window.ReportSheets = (function () {
     return it;
   }
 
-  function _itemHtml(item, cid, student, ctx, probe) {
-    if (item.pair) {
-      var cells = item.pair
-        .map(function (p) {
-          return _itemHtml(p, cid, student, ctx, probe);
-        })
-        .filter(Boolean);
-      if (!cells.length) return '';
-      if (cells.length === 1) return cells[0];
-      return (
-        '<div class="sheet-pair">' +
-        cells
-          .map(function (c) {
-            return '<div class="sheet-pair-cell">' + c + '</div>';
-          })
-          .join('') +
-        '</div>'
-      );
-    }
-    var html = ReportBlocks.renderReportBlock(item.block, cid, student, ctx);
-    var roomPx = item.room && item.room.lines ? item.room.lines * probe.linePx : 0;
+  /* A comment box with ruled lines for a student with no comment yet. */
+  function _emptyCommentBox(px) {
+    return (
+      '<div class="report-block-box report-comment-box"><div class="report-block-title">Teacher Comment</div>' +
+      '<div class="report-ruled" style="height:' +
+      Math.round(px) +
+      'px"></div></div>'
+    );
+  }
+
+  function _cellHtml(cell, cid, student, ctx, probe) {
+    var html = ReportBlocks.renderReportBlock(cell.block, cid, student, ctx, cell.options || {});
+    var roomPx = cell.height === 'fixed' && cell.lines ? cell.lines * probe.linePx : 0;
     if (!html) {
-      if (item.whenEmpty === 'box' && roomPx) return _emptyCommentBox(roomPx);
+      if (cell.whenEmpty === 'box' && roomPx) return _emptyCommentBox(roomPx);
       return '';
     }
     if (roomPx) {
@@ -760,6 +778,51 @@ window.ReportSheets = (function () {
         '</div>';
     }
     return html;
+  }
+  /* A row as it sits on the sheet: one cell alone, or cells side by side
+     at their spans. Each cell is marked with its block so the Studio can
+     select it. Empty cells take no room; an empty row takes none. */
+  function _rowHtml(row, cid, student, ctx, probe, hidden) {
+    var cells = row.cells
+      .filter(function (c) {
+        return hidden.indexOf(c.block) < 0;
+      })
+      .map(function (c) {
+        return { cell: c, html: _cellHtml(c, cid, student, ctx, probe) };
+      })
+      .filter(function (x) {
+        return !!x.html;
+      });
+    if (!cells.length) return '';
+    if (cells.length === 1 && row.cells.length === 1) {
+      return '<div class="sheet-cell" data-block="' + cells[0].cell.block + '">' + cells[0].html + '</div>';
+    }
+    return (
+      '<div class="sheet-row">' +
+      cells
+        .map(function (x) {
+          return (
+            '<div class="sheet-cell" data-block="' +
+            x.cell.block +
+            '" style="flex:0 0 calc(' +
+            x.cell.span +
+            ' / 12 * (100% - ' +
+            (cells.length - 1) * 12 +
+            'px))">' +
+            x.html +
+            '</div>'
+          );
+        })
+        .join('') +
+      '</div>'
+    );
+  }
+  function _rowLabel(row) {
+    return row.cells
+      .map(function (c) {
+        return BLOCKS[c.block] ? BLOCKS[c.block].label : c.block;
+      })
+      .join(' and ');
   }
 
   /* ── Measuring ──────────────────────────────────────────────── */
@@ -797,9 +860,10 @@ window.ReportSheets = (function () {
   }
 
   /* ── Sheets ─────────────────────────────────────────────────── */
+  /* n and total are pages (sides); `side` is kept for callers but not printed. */
   function _footerHtml(course, report, teacher, student, n, total, side) {
     var left = [course, report, teacher].filter(Boolean).map(esc).join(' · ');
-    var right = esc(student) + ' · Sheet ' + n + ' of ' + total + ' · ' + side;
+    var right = esc(student) + ' · Page ' + n + ' of ' + total;
     return '<div class="sheet-footer"><span>' + left + '</span><span>' + right + '</span></div>';
   }
 
@@ -813,6 +877,7 @@ window.ReportSheets = (function () {
           })
           .join('')
       : '<div class="sheet-blank">This side is left blank.</div>';
+    var fill = side && side.cap ? Math.min(1, side.used / side.cap) : 0;
     return (
       '<div class="report-sheet' +
       (side && side.over ? ' sheet-overflow' : '') +
@@ -820,7 +885,11 @@ window.ReportSheets = (function () {
       (opts && opts.type === 'compact' ? ' compact' : '') +
       '" data-paper="' +
       paper +
-      '">' +
+      '" data-fill="' +
+      Math.round(fill * 100) +
+      '" style="--fill:' +
+      Math.round(fill * 100) +
+      '%">' +
       '<div class="sheet-body">' +
       body +
       '</div>' +
@@ -871,16 +940,6 @@ window.ReportSheets = (function () {
   }
 
   /* Lays one student into sheets. Returns { html, sheets, sides, over }. */
-  function _itemLabel(it) {
-    if (it.pair)
-      return it.pair
-        .map(function (q) {
-          return q.label;
-        })
-        .join(' and ');
-    return it.label || it.block;
-  }
-
   /* One plain sentence or two on why a student's report is the shape it is.
      Empty when everything sits where the form puts it. */
   function reasonText(r) {
@@ -902,25 +961,42 @@ window.ReportSheets = (function () {
     var sideH = (p.h - 2 * MARGIN_IN) * PX_PER_IN;
     var cap = Math.floor((sideH - probe.footerPx) * (1 - SAFETY));
 
-    var commentItem = f.front.find(function (it) {
-      return it.block === 'teacher-narrative';
+    var hidden = hiddenFor(f, student.id);
+    var commentCell = cellOf(f, 'teacher-narrative');
+    var rawComment =
+      commentCell && hidden.indexOf('teacher-narrative') < 0
+        ? ReportBlocks.renderReportBlock('teacher-narrative', cid, student, ctx, commentCell.options || {})
+        : '';
+    // pages[0] is the front; every later page flows on from the back. The
+    // pinned block comes out of its row and sits at the bottom of the back.
+    var isPinned = function (row) {
+      return row.cells.length === 1 && row.cells[0].block === f.pinned;
+    };
+    var frontRows = f.pages[0].rows.filter(function (row) {
+      return !isPinned(row);
     });
-    var rawComment = commentItem ? ReportBlocks.renderReportBlock('teacher-narrative', cid, student, ctx) : '';
-    var frontHtml = f.front.map(function (it) {
-      return _itemHtml(it, cid, student, ctx, probe);
+    var backRows = [];
+    f.pages.slice(1).forEach(function (pg) {
+      pg.rows.forEach(function (row) {
+        if (!isPinned(row)) backRows.push(row);
+      });
     });
-    var frontLabels = f.front.map(_itemLabel);
-    var backItems = f.back.filter(function (it) {
-      return !it.pinned;
+    var pinnedCell = f.pinned && hidden.indexOf(f.pinned) < 0 ? cellOf(f, f.pinned) : null;
+    var frontHtml = frontRows.map(function (row) {
+      return _rowHtml(row, cid, student, ctx, probe, hidden);
     });
-    var pinnedItem = f.back.find(function (it) {
-      return it.pinned;
+    var frontLabels = frontRows.map(_rowLabel);
+    var backHtml = backRows.map(function (row) {
+      return _rowHtml(row, cid, student, ctx, probe, hidden);
     });
-    var backHtml = backItems.map(function (it) {
-      return _itemHtml(it, cid, student, ctx, probe);
+    var backLabels = backRows.map(_rowLabel);
+    var pinnedHtml = pinnedCell ? _rowHtml({ cells: [pinnedCell] }, cid, student, ctx, probe, hidden) : '';
+    var frontSingle = frontRows.map(function (row) {
+      return row.cells.length === 1;
     });
-    var backLabels = backItems.map(_itemLabel);
-    var pinnedHtml = pinnedItem ? _itemHtml(pinnedItem, cid, student, ctx, probe) : '';
+    var backSingle = backRows.map(function (row) {
+      return row.cells.length === 1;
+    });
 
     // Empty blocks take no room at all.
     var frontKeep = [],
@@ -941,16 +1017,16 @@ window.ReportSheets = (function () {
     var pinnedH = pinnedHtml ? heights[frontHtml.length + backHtml.length] : 0;
     var commentH = rawComment ? heights[heights.length - 1] : 0;
     var commentLines = rawComment ? Math.max(1, Math.round((commentH - probe.boxChromePx) / probe.linePx)) : 0;
-    var room = commentItem && commentItem.room ? commentItem.room.lines : 0;
+    var room = commentCell && commentCell.height === 'fixed' ? commentCell.lines : 0;
 
     // A block that may not fit a side gets its row heights, so pack() can
     // cut it where the side ends.
     var backCap = Math.max(0, cap - pinnedH);
     var frontMeta = frontHtml.map(function (h, i) {
-      return frontH[i] > backCap ? _rowsOf(h, frontH[i], opts.stage) : null;
+      return frontH[i] > backCap && frontSingle[frontKeep[i]] ? _rowsOf(h, frontH[i], opts.stage) : null;
     });
     var backMeta = backHtml.map(function (h, i) {
-      return backH[i] > backCap ? _rowsOf(h, backH[i], opts.stage) : null;
+      return backH[i] > backCap && backSingle[backKeep[i]] ? _rowsOf(h, backH[i], opts.stage) : null;
     });
     var sides = pack(frontH, backH, pinnedH, cap, frontMeta, backMeta);
     var sheetCount = Math.ceil(sides.length / 2);
@@ -984,7 +1060,7 @@ window.ReportSheets = (function () {
       continued: continued,
       commentLines: commentLines,
       room: room,
-      noComment: !!commentItem && !rawComment,
+      noComment: !!commentCell && hidden.indexOf('teacher-narrative') < 0 && !rawComment,
     };
     var reason = reasonText(result);
     var badge =
@@ -1003,45 +1079,39 @@ window.ReportSheets = (function () {
       badge +
       '</span></div>' +
       (reason ? '<div class="sheet-note no-print">' + esc(reason) + '</div>' : '');
+    var total = sheetCount * 2;
     var over = false;
     for (var s = 0; s < sheetCount; s++) {
       var front = sides[2 * s];
       var back = sides[2 * s + 1] || null;
       over = over || front.over || (back && back.over);
-      var label = s === 0 ? 'Front' : 'Continued · front';
       html +=
-        '<div class="sheet-zoom"><div class="sheet-label no-print">' +
-        esc(name) +
-        ' · Sheet ' +
-        (s + 1) +
+        '<div class="sheet-zoom"><div class="sheet-label no-print">Page ' +
+        (2 * s + 1) +
         ' of ' +
-        sheetCount +
-        ' · ' +
-        label +
+        total +
         '</div>' +
         _sideHtml(
           front,
           itemHtml,
           '',
-          _footerHtml(course.name, ctx.termLabel, teacher, name, s + 1, sheetCount, s === 0 ? 'Front' : 'Continued'),
+          _footerHtml(course.name, ctx.termLabel, teacher, name, 2 * s + 1, total, 'Front'),
           paper,
           '',
           f,
         ) +
         '</div>';
       html +=
-        '<div class="sheet-zoom"><div class="sheet-label no-print">' +
-        esc(name) +
-        ' · Sheet ' +
-        (s + 1) +
+        '<div class="sheet-zoom"><div class="sheet-label no-print">Page ' +
+        (2 * s + 2) +
         ' of ' +
-        sheetCount +
-        ' · Back</div>' +
+        total +
+        '</div>' +
         _sideHtml(
           back,
           itemHtml,
           s === 0 ? pinnedHtml : '',
-          _footerHtml(course.name, ctx.termLabel, teacher, name, s + 1, sheetCount, 'Back'),
+          _footerHtml(course.name, ctx.termLabel, teacher, name, 2 * s + 2, total, 'Back'),
           paper,
           back ? '' : 'sheet-blank-side',
           f,
@@ -1110,6 +1180,8 @@ window.ReportSheets = (function () {
         if (r.noComment) summary.noComment.push(fullName(st));
         summary.perStudent[st.id] = {
           sheets: r.sheets,
+          sides: r.sides,
+          over: r.over,
           badge: r.badge,
           reason: r.reason,
           noComment: r.noComment,
@@ -1159,7 +1231,7 @@ window.ReportSheets = (function () {
     var type = opts.type === 'compact' ? 'compact' : 'standard';
     var out = {};
     STARTERS.forEach(function (st) {
-      var f = normalizeForm(Object.assign({}, st.form, { id: st.id, name: st.name, type: type }));
+      var f = normalizeForm(Object.assign({}, st.form, { type: type }));
       var stage = _stage(document.body, contentW, f.type);
       try {
         var probe = _probe(stage);
@@ -1179,6 +1251,81 @@ window.ReportSheets = (function () {
     });
     return out;
   }
+  /* The class laid out on the current form, without rendering: the same
+     summary renderPreview returns, minus the HTML. For the Studio's stats
+     and the toolbar count while one student is on screen. */
+  function classSummary(cid, students, ctx, opts) {
+    opts = opts || {};
+    var paper = PAPER[opts.paper] ? opts.paper : 'letter';
+    var contentW = (PAPER[paper].w - 2 * MARGIN_IN) * PX_PER_IN;
+    var formUsed = normalizeForm(opts.form);
+    var stage = _stage(document.body, contentW, formUsed.type);
+    var summary = {
+      students: students.length,
+      sheets: 0,
+      pages: 0,
+      continued: [],
+      over: [],
+      noComment: [],
+      perStudent: {},
+    };
+    try {
+      var probe = _probe(stage);
+      students.forEach(function (st) {
+        var r = layoutStudent(cid, st, ctx, { form: formUsed, paper: paper, stage: stage, probe: probe });
+        summary.sheets += r.sheets;
+        summary.pages += r.sheets * 2;
+        if (r.sheets > 1) summary.continued.push(fullName(st));
+        if (r.over) summary.over.push(fullName(st));
+        if (r.noComment) summary.noComment.push(fullName(st));
+        summary.perStudent[st.id] = {
+          sheets: r.sheets,
+          sides: r.sides,
+          over: r.over,
+          badge: r.badge,
+          reason: r.reason,
+          noComment: r.noComment,
+          name: fullName(st),
+          used: r.used,
+          hash: ReportIssuesHash(r.html),
+        };
+      });
+    } finally {
+      stage.remove();
+    }
+    return summary;
+  }
+  function ReportIssuesHash(html) {
+    return typeof ReportIssues !== 'undefined' && ReportIssues.hash ? ReportIssues.hash(html) : '';
+  }
+
+  /* Each block's height for one student at full width, for the palette's
+     size badges: { blockId: px }. A block that prints nothing for the
+     student is 0. */
+  function blockSizes(cid, student, ctx, opts) {
+    opts = opts || {};
+    var paper = PAPER[opts.paper] ? opts.paper : 'letter';
+    var contentW = (PAPER[paper].w - 2 * MARGIN_IN) * PX_PER_IN;
+    var stage = _stage(document.body, contentW, opts.type === 'compact' ? 'compact' : 'standard');
+    var out = {};
+    try {
+      var probe = _probe(stage);
+      var ids = BLOCK_ORDER.filter(function (id) {
+        return id !== 'text-block';
+      });
+      var htmls = ids.map(function (id) {
+        return _cellHtml(_cleanCell({ block: id, span: 12 }), cid, student, ctx, probe);
+      });
+      var heights = _measureAll(stage, htmls);
+      ids.forEach(function (id, i) {
+        out[id] = htmls[i] ? heights[i] : 0;
+      });
+    } finally {
+      stage.remove();
+    }
+    return out;
+  }
+
   /* "1 sheet each", "2 sheets each", "Most need 1 sheet; some 2". */
   function fitLabel(fit) {
     if (!fit) return '';
@@ -1230,31 +1377,32 @@ window.ReportSheets = (function () {
   return {
     PAPER: PAPER,
     SAFETY: SAFETY,
+    SPANS: SPANS,
     form: form,
     BLOCKS: BLOCKS,
+    PALETTE_GROUPS: PALETTE_GROUPS,
     normalizeForm: normalizeForm,
     formFor: formFor,
-    moveItem: moveItem,
-    moveToSide: moveToSide,
-    removeItem: removeItem,
-    addBlock: addBlock,
-    setRoom: setRoom,
-    setWhenEmpty: setWhenEmpty,
-    setPinned: setPinned,
-    setType: setType,
     onForm: onForm,
     available: available,
-    reorder: reorder,
-    pairWith: pairWith,
-    canPair: canPair,
-    unpair: unpair,
+    locate: locate,
+    cellOf: cellOf,
+    positionText: positionText,
+    placeBlock: placeBlock,
+    placeOnNewPage: placeOnNewPage,
+    removeCell: removeCell,
+    setSpan: setSpan,
+    setHeight: setHeight,
+    setWhenEmpty: setWhenEmpty,
+    setOption: setOption,
+    setNoEvidence: setNoEvidence,
+    setPinned: setPinned,
+    setType: setType,
+    setPagesPerStudent: setPagesPerStudent,
+    hideFor: hideFor,
+    hiddenFor: hiddenFor,
     starters: starters,
     starter: starter,
-    ROOM_CHOICES: ROOM_CHOICES,
-    roomChoice: roomChoice,
-    setRoomChoice: setRoomChoice,
-    includes: includes,
-    setInclude: setInclude,
     templates: templates,
     syncTemplates: syncTemplates,
     saveTemplate: saveTemplate,
@@ -1264,6 +1412,8 @@ window.ReportSheets = (function () {
     reasonText: reasonText,
     describeStudent: describeStudent,
     sheetsForForms: sheetsForForms,
+    classSummary: classSummary,
+    blockSizes: blockSizes,
     fitLabel: fitLabel,
     fitText: fitText,
     paperSize: paperSize,

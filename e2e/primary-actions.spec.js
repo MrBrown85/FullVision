@@ -64,17 +64,13 @@ test.describe('One primary action per screen', () => {
     });
   }
 
-  for (const tab of ['progress', 'summary']) {
-    test('Reports ' + tab, async ({ page }) => {
-      await enterDemo(page);
-      await page.goto('/teacher/app.html#/reports');
-      await page.locator(`.report-seg-btn[data-tab="${tab}"]`).click();
-      await expect(page.locator('#tb-print-btn')).toBeVisible();
-      // The Report Card issues a fixed copy before it prints; the Class
-      // Summary prints.
-      expect(await solidPrimaries(page)).toEqual([tab === 'progress' ? 'Issue Reports…' : 'Print Reports']);
-    });
-  }
+  test('Reports progress', async ({ page }) => {
+    await enterDemo(page);
+    await page.goto('/teacher/app.html#/reports');
+    await page.locator('.report-seg-btn[data-tab="progress"]').click();
+    await expect(page.locator('#tb-print-btn')).toBeVisible();
+    expect(await solidPrimaries(page)).toEqual(['Print Reports']);
+  });
 });
 
 test.describe('Breadcrumb on the dashboard child screens', () => {

@@ -29,12 +29,20 @@ async function openDemoProgressReports(page) {
   await page.waitForURL(/app\.html/, { timeout: 15000 });
   await page.goto(page.url().replace(/#.*/, '#/reports'));
   await page.getByRole('tab', { name: 'Progress Reports' }).click();
-  await expect(page.locator('.report-sheet, .report-student').first()).toBeVisible();
+  await expect(page.locator('.report-sheet').first()).toBeVisible();
 }
 
-async function applyPreset(page, preset) {
-  await page.locator(`[data-action="rbApplyPreset"][data-preset="${preset}"]`).click();
-  await expect(page.locator(`.rb-preset-btn.active[data-preset="${preset}"]`)).toBeVisible();
+/* Everyone: every student's pages on the canvas, which is what prints. */
+async function showEveryone(page) {
+  await page.locator('[data-action="studioView"][data-view="all"]').click();
+  await expect(page.locator('.report-sheet')).toHaveCount(STUDENTS * 2);
+}
+
+/* A template from the palette's Templates tab. */
+async function applyTemplate(page, id) {
+  await page.locator('[data-action="studioTab"][data-tab="templates"]').click();
+  await page.locator(`[data-action="studioTemplate"][data-starter="${id}"]`).click();
+  await page.locator('[data-action="studioTab"][data-tab="blocks"]').click();
 }
 
 async function printToPdf(page) {
@@ -47,9 +55,9 @@ async function printToPdf(page) {
 test.describe('Printed progress reports', () => {
   test.setTimeout(90_000);
 
-  test('Standard prints two Letter pages per student', async ({ page }) => {
+  test('the Report Card prints two Letter pages per student', async ({ page }) => {
     await openDemoProgressReports(page);
-    await applyPreset(page, 'standard');
+    await showEveryone(page);
     const pdf = await printToPdf(page);
     expect(countPages(pdf)).toBe(STUDENTS * 2);
     for (const [w, h] of pageBoxes(pdf)) {
@@ -57,25 +65,24 @@ test.describe('Printed progress reports', () => {
     }
   });
 
-  test('Brief prints one page per student', async ({ page }) => {
+  test('the Interim Update prints one side per student, with its back left blank for duplex', async ({ page }) => {
     await openDemoProgressReports(page);
-    await applyPreset(page, 'brief');
-    expect(countPages(await printToPdf(page))).toBe(STUDENTS);
+    await applyTemplate(page, 'interim-update');
+    await showEveryone(page);
+    expect(countPages(await printToPdf(page))).toBe(STUDENTS * 2);
+    await expect(page.locator('.report-sheet .report-legend')).toHaveCount(STUDENTS);
   });
 
-  test('every Standard report is exactly two pages, including the students with Next Steps', async ({ page }) => {
+  test('every report is exactly one sheet, including the students with Next Steps', async ({ page }) => {
     await openDemoProgressReports(page);
-    await applyPreset(page, 'standard');
-    const rows = page.locator('#gb-sidebar .student-row');
-    const n = await rows.count();
-    const uneven = [];
-    for (let i = 0; i < n; i++) {
-      await rows.nth(i).click();
-      await expect(page.locator('.sheet-label')).toHaveCount(2);
-      const pages = countPages(await printToPdf(page));
-      if (pages !== 2) uneven.push(`${await rows.nth(i).innerText()}: ${pages}`);
-    }
-    expect(uneven, 'students whose report is not two pages').toEqual([]);
+    await showEveryone(page);
+    const sheets = await page.locator('.sheet-student').evaluateAll(els => els.map(el => el.dataset.sheets));
+    expect(sheets).toHaveLength(STUDENTS);
+    expect(
+      sheets.every(n => n === '1'),
+      'students needing more than one sheet',
+    ).toBe(true);
+    expect(countPages(await printToPdf(page))).toBe(STUDENTS * 2);
   });
 
   test('the letterhead names the class, block, report, term dates and student number', async ({ page }) => {
@@ -89,11 +96,13 @@ test.describe('Printed progress reports', () => {
     );
     await expect(meta).toContainText(/\w{3} \d{1,2} – \w{3} \d{1,2}, \d{4}/);
     await expect(meta).toContainText('Student No. STU-201');
+    await expect(page.locator('.report-sheet').first().locator('.sheet-footer')).toContainText(
+      'Cece Adeyemi · Page 1 of 2',
+    );
   });
 
   test('levels print as dots and a word in black', async ({ page }) => {
     await openDemoProgressReports(page);
-    await applyPreset(page, 'standard');
     const chip = page.locator('#rb-preview .report-section-chip-value').first();
     const dim = page.locator('#rb-preview .report-learner-dim-value').first();
     await expect(chip).toContainText(/[●○]{4}/);
@@ -102,13 +111,11 @@ test.describe('Printed progress reports', () => {
     expect(await chip.evaluate(el => getComputedStyle(el).color)).toBe('rgb(0, 0, 0)');
     expect(await dim.evaluate(el => getComputedStyle(el).color)).toBe('rgb(0, 0, 0)');
     await page.emulateMedia({ media: 'screen' });
-    await page.getByRole('tab', { name: 'Class Summary' }).click();
-    await expect(page.locator('.class-summary-table td[data-prof]').first()).toContainText(/[●○]{4}/);
   });
 
   test('Legal paper prints a 14 in page and is remembered for the class on this device', async ({ page }) => {
     await openDemoProgressReports(page);
-    await applyPreset(page, 'standard');
+    await showEveryone(page);
     await page.getByRole('radio', { name: 'Legal' }).click();
     const pdf = await printToPdf(page);
     const boxes = pageBoxes(pdf);
@@ -125,7 +132,6 @@ test.describe('Printed progress reports', () => {
 
   test('a dimension the teacher did not rate is left off the printed report', async ({ page }) => {
     await openDemoProgressReports(page);
-    await applyPreset(page, 'standard');
     await expect(page.locator('#rb-preview')).not.toContainText('Not Assessed');
   });
 });
