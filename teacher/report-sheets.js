@@ -34,12 +34,7 @@ window.ReportSheets = (function () {
       { block: 'header', kind: 'fixed', label: 'Letterhead' },
       { block: 'academic-summary', kind: 'fixed', label: 'Overall and Competencies' },
       { block: 'teacher-narrative', kind: 'flow', label: 'Teacher Comment', room: { lines: 8 }, whenEmpty: 'box' },
-      {
-        pair: [
-          { block: 'competency-table', kind: 'fixed', label: 'Curricular Competencies' },
-          { block: 'attendance', kind: 'fixed', label: 'Attendance' },
-        ],
-      },
+      { block: 'competency-table', kind: 'fixed', label: 'Curricular Competencies' },
       { block: 'next-steps', kind: 'flow', label: 'Growth and Next Steps', whenEmpty: 'omit' },
     ],
     back: [
@@ -447,7 +442,7 @@ window.ReportSheets = (function () {
           { block: 'header' },
           { block: 'academic-summary' },
           { block: 'teacher-narrative', room: { lines: 8 }, whenEmpty: 'box' },
-          { pair: [{ block: 'competency-table' }, { block: 'attendance' }] },
+          { block: 'competency-table' },
           { block: 'next-steps', whenEmpty: 'omit' },
           { block: 'grade-table', whenEmpty: 'omit' },
         ],
