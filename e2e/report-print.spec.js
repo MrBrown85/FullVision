@@ -78,6 +78,19 @@ test.describe('Printed progress reports', () => {
     expect(uneven, 'students whose report is not two pages').toEqual([]);
   });
 
+  test('the letterhead names the class, block, report, term dates and student number', async ({ page }) => {
+    await openDemoProgressReports(page);
+    const header = page.locator('.report-student').first().locator('.report-header');
+    await expect(header.locator('.report-course-title')).toHaveText('Science 8 · Block A');
+    await expect(header.locator('.report-student-name')).toHaveText('Cece Adeyemi');
+    const meta = header.locator('.report-header-meta');
+    await expect(meta.locator('.report-period')).toHaveText(
+      await page.locator('#report-period option:checked').innerText(),
+    );
+    await expect(meta).toContainText(/\w{3} \d{1,2} – \w{3} \d{1,2}, \d{4}/);
+    await expect(meta).toContainText('Student No. STU-201');
+  });
+
   test('a dimension the teacher did not rate is left off the printed report', async ({ page }) => {
     await openDemoProgressReports(page);
     await applyPreset(page, 'standard');

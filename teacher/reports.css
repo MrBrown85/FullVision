@@ -185,29 +185,44 @@
   padding: 24px 28px;
   margin-bottom: 16px;
 }
+/* Letterhead: school, class and block over the student's name on the left;
+   the report, its dates, the teacher and the student number on the right. */
 .report-header {
-  text-align: center;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
   margin-bottom: 20px;
-  padding-bottom: 14px;
+  padding-bottom: 12px;
   border-bottom: 2px solid var(--text);
+}
+.report-header-main {
+  min-width: 0;
 }
 .report-course-title {
   font-family: var(--font-base);
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   color: var(--text-2);
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 .report-student-name {
   font-family: var(--font-base);
   font-size: var(--text-3xl);
   font-weight: 700;
   color: var(--text);
-  margin-bottom: 5px;
+  letter-spacing: -0.01em;
+}
+.report-header-meta {
+  flex-shrink: 0;
+  text-align: right;
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  line-height: 1.5;
 }
 .report-period {
-  font-family: var(--font-base);
-  font-size: var(--text-md);
-  color: var(--text-3);
+  font-weight: 600;
+  color: var(--text);
 }
 
 /* ── Overall bar ─────────────────────────────────────────────── */
@@ -1105,12 +1120,16 @@
   }
 
   /* ── Print density — compact everything ── */
+  .report-header {
+    margin-bottom: 12px !important;
+    padding-bottom: 8px !important;
+  }
   .report-student-name {
     font-size: var(--text-2xl) !important;
-    margin-bottom: 2px !important;
   }
-  .report-period {
-    font-size: var(--text-base) !important;
+  .report-header-meta {
+    font-size: var(--text-xs) !important;
+    line-height: 1.45 !important;
   }
   .report-course-title {
     font-size: var(--text-xs) !important;
