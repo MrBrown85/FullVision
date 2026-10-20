@@ -216,6 +216,36 @@ test.describe('Report Card sheets', () => {
     await page.getByRole('button', { name: 'Done' }).click();
   });
 
+  test('on a phone the sheets fit the width, the rail opens from a button, and the stepper walks the class', async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(browserName !== 'chromium', 'one engine is enough for the layout at phone width');
+    // Demo Mode sends a phone-sized browser to the phone app, so enter at
+    // desktop width and narrow the window afterwards, as a rotated tablet does.
+    await openReportCard(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.waitForTimeout(400);
+    const sheet = page.locator('.report-sheet').first();
+    const box = await sheet.boundingBox();
+    expect(box.width).toBeLessThanOrEqual(390);
+    await expect(page.locator('#rb-panel')).toBeHidden();
+    await page.getByRole('button', { name: 'Builder', exact: true }).click();
+    await expect(page.locator('#rb-panel')).toBeVisible();
+    await page.getByRole('button', { name: 'Builder', exact: true }).click();
+    await expect(page.locator('#rb-panel')).toBeHidden();
+    await page.getByRole('button', { name: 'Next student' }).click();
+    await expect(page.locator('#picker-label')).toHaveText('Cece Adeyemi');
+    await expect(page.locator('.sheet-student')).toHaveCount(1);
+    await page.getByRole('button', { name: 'Next student' }).click();
+    await expect(page.locator('#picker-label')).toHaveText('Noor Al-Rashid');
+    await page.getByRole('button', { name: 'Previous student' }).click();
+    await expect(page.locator('#picker-label')).toHaveText('Cece Adeyemi');
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth),
+    ).toBe(true);
+  });
+
   test('Photocopy view turns the levels black on screen', async ({ page }) => {
     await openReportCard(page);
     const chip = page.locator('.report-sheet .report-section-chip-value').first();

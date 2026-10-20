@@ -2213,6 +2213,69 @@
   white-space: nowrap;
 }
 
+/* Review on a tablet or a phone: the rail hides behind a Layout button and
+   opens over the pages; one student at a time with the stepper; sheets
+   scale to the width (ReportSheets sets --sheet-zoom from the preview). */
+.report-stepper {
+  display: none;
+  align-items: center;
+  gap: 2px;
+}
+#tb-rail-btn {
+  display: none;
+}
+@media (max-width: 900px) {
+  .report-toolbar {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .report-stepper[style*='display: none'] {
+    display: none !important;
+  }
+  .report-stepper {
+    display: inline-flex;
+  }
+  #tb-rail-btn[style*='display: none'] {
+    display: none !important;
+  }
+  #tb-rail-btn {
+    display: inline-flex;
+  }
+  .rb-layout {
+    position: relative;
+    flex-direction: column;
+  }
+  .rb-panel,
+  .rb-panel:has(.rb-form-editing) {
+    display: none;
+    width: auto;
+  }
+  .rb-layout.rail-open .rb-panel {
+    display: flex;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    max-height: 60%;
+    z-index: 5;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  }
+  .rb-preview {
+    padding: 12px 12px 24px;
+  }
+  .report-fitmap .sheet-student {
+    width: calc(50% - 9px);
+  }
+}
+@media (min-width: 901px) {
+  .report-stepper,
+  #tb-rail-btn {
+    display: none !important;
+  }
+}
+
 /* The toolbar's copy picker. */
 #report-copy {
   max-width: 220px;
