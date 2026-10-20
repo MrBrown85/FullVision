@@ -52,6 +52,8 @@ Lessons from Phase 0: the fit has to hold with the wider fonts of Linux and Wind
 - One level helper (dots + word, colour only on screen in Colour mode); inline `PROF_COLORS` removed from the report renderers.
 - Tests: page counts on Chromium and WebKit; a unit test per renderer that it is pure.
 
+Built 2026-10-20 as PRs #256 (pure renderers) and #257 (`teacher/report-sheets.js`, the Report Card form). As built: the Standard preset is the Report Card; front = letterhead, overall, comment (8 lines of room, ruled box when empty), competency table paired with attendance, next steps; back = dispositions, Parent / Guardian Response pinned to the bottom. The student reflection keeps its wording and is 795 px tall at print size, taller than a Letter back with the response below it, so it is not on the default form; it stays in Detailed and becomes an attachment sheet with Edit Layout. Screen / Photocopy control. Measuring runs per student (fixed blocks are not yet cached per class); layout v3 is not persisted (one form, nothing to save); a comment longer than a whole side spills rather than splits. `e2e/report-sheets.spec.js` runs in Chromium and WebKit.
+
 ## Phase 2 · Review mode and Issue (week 3)
 
 - Rail: sheet count per student with the one-line reason; Fit Map.
