@@ -635,13 +635,13 @@ window.ReportSheets = (function () {
      usable height of a side. Blocks keep their order: the first that does
      not fit, and everything after it, moves to the next side. A block
      taller than a whole side gets a side of its own and is flagged. */
-  function pack(front, back, pinned, cap) {
+  function pack(front, back, pinned, cap, frontMeta, backMeta) {
     var sides = [];
     var queue = front.map(function (h, i) {
-      return { from: 'front', i: i, h: h };
+      return _packItem('front', i, h, frontMeta && frontMeta[i]);
     });
     var backQueue = back.map(function (h, i) {
-      return { from: 'back', i: i, h: h };
+      return _packItem('back', i, h, backMeta && backMeta[i]);
     });
     var rest = fill({ kind: 'front', cap: cap, items: [], used: 0, over: false }, queue);
     rest = fill(
@@ -651,30 +651,78 @@ window.ReportSheets = (function () {
     while (rest.length) rest = fill({ kind: 'continued', cap: cap, items: [], used: 0, over: false }, rest);
     return sides;
 
+    function place(side, it, h, rowEnd) {
+      var out = { from: it.from, i: it.i, h: h };
+      if (it.rowStart != null) {
+        out.rowStart = it.rowStart;
+        out.rowEnd = rowEnd;
+      }
+      side.items.push(out);
+      side.used += h;
+      if (h > side.cap) side.over = true;
+    }
+
     function fill(side, items) {
       sides.push(side);
       for (var k = 0; k < items.length; k++) {
         var it = items[k];
-        if (side.used === 0 || side.used + it.h <= side.cap) {
-          side.items.push(it);
-          side.used += it.h;
-          if (it.h > side.cap) side.over = true;
-        } else {
-          return items.slice(k);
+        var room = side.cap - side.used;
+        if (it.h <= room) {
+          place(side, it, it.h, it.rows ? it.rowStart + it.rows.length : undefined);
+          continue;
         }
+        if (it.rows && it.rows.length > 1) {
+          // The rows that fit stay; the rest carry on to the next side. A
+          // row taller than a side goes alone and over, never dropped.
+          var take = 0;
+          var sum = it.chrome;
+          while (take < it.rows.length && sum + it.rows[take] <= room) {
+            sum += it.rows[take];
+            take++;
+          }
+          if (take === 0 && side.used === 0) {
+            sum += it.rows[0];
+            take = 1;
+          }
+          if (take === 0) return items.slice(k);
+          if (take >= it.rows.length) {
+            place(side, it, it.h, it.rowStart + it.rows.length);
+            continue;
+          }
+          place(side, it, sum, it.rowStart + take);
+          var restRows = it.rows.slice(take);
+          var restItem = {
+            from: it.from,
+            i: it.i,
+            rows: restRows,
+            chrome: it.chrome,
+            rowStart: it.rowStart + take,
+            h:
+              it.chrome +
+              restRows.reduce(function (a, b) {
+                return a + b;
+              }, 0),
+          };
+          return [restItem].concat(items.slice(k + 1));
+        }
+        if (side.used === 0) {
+          place(side, it, it.h);
+          continue;
+        }
+        return items.slice(k);
       }
       return [];
     }
   }
 
-  /* ── Block HTML for a form item ─────────────────────────────── */
-  function _emptyCommentBox(px) {
-    return (
-      '<div class="report-block-box report-comment-box"><div class="report-block-title">Teacher Comment</div>' +
-      '<div class="report-ruled" style="height:' +
-      Math.round(px) +
-      'px"></div></div>'
-    );
+  function _packItem(from, i, h, meta) {
+    var it = { from: from, i: i, h: h };
+    if (meta && meta.rows && meta.rows.length > 1) {
+      it.rows = meta.rows;
+      it.chrome = meta.chrome || 0;
+      it.rowStart = 0;
+    }
+    return it;
   }
 
   function _itemHtml(item, cid, student, ctx, probe) {
@@ -759,7 +807,9 @@ window.ReportSheets = (function () {
     var body = side
       ? side.items
           .map(function (it) {
-            return '<div class="sheet-item">' + itemHtml[it.from][it.i] + '</div>';
+            var html = itemHtml[it.from][it.i];
+            if (it.rowStart != null) html = _partHtml(html, it.rowStart, it.rowEnd, it.rowStart > 0);
+            return '<div class="sheet-item">' + html + '</div>';
           })
           .join('')
       : '<div class="sheet-blank">This side is left blank.</div>';
@@ -778,6 +828,46 @@ window.ReportSheets = (function () {
       footer +
       '</div>'
     );
+  }
+
+  /* ── Tall blocks split at row boundaries (plan item 5.6) ──────────
+     A table block taller than the room left on a side (the Assignment
+     Grades table for a student with many assessments) used to be placed
+     alone on a side and spill off it. pack() now cuts such a block at its
+     rows: the rows that fit go on the current side and the rest carry on
+     to the next, each part a copy of the block with that run of rows, the
+     later parts titled "(continued)". */
+
+  /* The row heights and chrome (title, head, padding) of a table block,
+     measured on the stage, or null when the block has no table to cut. */
+  function _rowsOf(html, h, stage) {
+    stage.innerHTML = '<div class="sheet-item">' + html + '</div>';
+    var tbody = stage.querySelector('table tbody');
+    if (!tbody || tbody.rows.length < 2) return null;
+    var rows = Array.prototype.map.call(tbody.rows, function (r) {
+      return r.offsetHeight;
+    });
+    var total = rows.reduce(function (a, b) {
+      return a + b;
+    }, 0);
+    return { rows: rows, chrome: Math.max(0, h - total) };
+  }
+
+  /* The block with only rows [start, end) of its first table body. */
+  function _partHtml(html, start, end, continued) {
+    var tpl = document.createElement('div');
+    tpl.innerHTML = html;
+    var table = tpl.querySelector('table');
+    var body = table && table.tBodies[0];
+    if (!body) return html;
+    Array.prototype.slice.call(body.rows).forEach(function (r, i) {
+      if (i < start || i >= end) r.remove();
+    });
+    if (continued) {
+      var title = tpl.querySelector('.report-block-title');
+      if (title) title.textContent = title.textContent.replace(/\s*\(continued\)$/, '') + ' (continued)';
+    }
+    return tpl.innerHTML;
   }
 
   /* Lays one student into sheets. Returns { html, sheets, sides, over }. */
@@ -853,15 +943,29 @@ window.ReportSheets = (function () {
     var commentLines = rawComment ? Math.max(1, Math.round((commentH - probe.boxChromePx) / probe.linePx)) : 0;
     var room = commentItem && commentItem.room ? commentItem.room.lines : 0;
 
-    var sides = pack(frontH, backH, pinnedH, cap);
+    // A block that may not fit a side gets its row heights, so pack() can
+    // cut it where the side ends.
+    var backCap = Math.max(0, cap - pinnedH);
+    var frontMeta = frontHtml.map(function (h, i) {
+      return frontH[i] > backCap ? _rowsOf(h, frontH[i], opts.stage) : null;
+    });
+    var backMeta = backHtml.map(function (h, i) {
+      return backH[i] > backCap ? _rowsOf(h, backH[i], opts.stage) : null;
+    });
+    var sides = pack(frontH, backH, pinnedH, cap, frontMeta, backMeta);
     var sheetCount = Math.ceil(sides.length / 2);
     var moved = [];
     var continued = [];
+    // A block cut into parts is named once in the reason, by its own name.
+    var nameOnce = function (list, label) {
+      label = label.replace(/ \(continued\)$/, '');
+      if (list.indexOf(label) < 0) list.push(label);
+    };
     sides.forEach(function (side, idx) {
       side.items.forEach(function (it) {
         var label = it.from === 'front' ? frontLabels[frontKeep[it.i]] : backLabels[backKeep[it.i]];
-        if (idx === 1 && it.from === 'front') moved.push(label);
-        if (idx >= 2) continued.push(label);
+        if (idx === 1 && it.from === 'front') nameOnce(moved, label);
+        if (idx >= 2) nameOnce(continued, label);
       });
     });
     var course = COURSES[cid] || {};
