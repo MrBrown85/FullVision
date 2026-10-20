@@ -111,6 +111,23 @@ test.describe('Printed progress reports', () => {
     await expect(page.locator('.class-summary-table td[data-prof]').first()).toContainText(/[●○]{4}/);
   });
 
+  test('Legal paper prints a 14 in page and is remembered for the class on this device', async ({ page }) => {
+    await openDemoProgressReports(page);
+    await applyPreset(page, 'standard');
+    await page.getByRole('radio', { name: 'Legal' }).click();
+    const pdf = await printToPdf(page);
+    const boxes = pageBoxes(pdf);
+    expect(boxes.length).toBeGreaterThan(0);
+    for (const box of boxes) expect(box).toEqual([612, 1008]);
+    expect(countPages(pdf)).toBeLessThanOrEqual(STUDENTS * 2);
+
+    await page.reload();
+    await page.getByRole('tab', { name: 'Progress Reports' }).click();
+    await expect(page.getByRole('radio', { name: 'Legal' })).toHaveAttribute('aria-checked', 'true');
+    await page.getByRole('radio', { name: 'Letter' }).click();
+    for (const box of pageBoxes(await printToPdf(page))) expect(box).toEqual([612, 792]);
+  });
+
   test('a dimension the teacher did not rate is left off the printed report', async ({ page }) => {
     await openDemoProgressReports(page);
     await applyPreset(page, 'standard');
