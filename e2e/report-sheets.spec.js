@@ -139,81 +139,58 @@ test.describe('Report Card sheets', () => {
     await expect(page.locator('#issue-overlay input[value="changed"]')).toBeDisabled();
   });
 
-  test('Edit Layout changes the form for every student and keeps it', async ({ page }) => {
+  test('Setup: the form, type size, comment room and optional blocks, saved for the class', async ({ page }) => {
     await openReportCard(page);
-    await page.getByRole('button', { name: 'Edit Layout' }).click();
-    await expect(page.locator('#rb-edit-banner')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Done' })).toBeVisible();
-    // Move Growth and Next Steps to the back, add the legend, go Compact.
-    const nextSteps = page.locator('.rb-form-block[data-side="front"]', { hasText: 'Growth and Next Steps' });
-    await nextSteps.getByRole('button', { name: 'Move to the back' }).click();
-    await expect(page.locator('.rb-form-block[data-side="back"]', { hasText: 'Growth and Next Steps' })).toHaveCount(1);
-    await page.locator('select[data-action="rbFormAdd"]').selectOption('legend');
-    await expect(page.locator('.rb-form-block', { hasText: 'Proficiency Legend' })).toHaveCount(1);
-    await expect(page.locator('.report-sheet').first().locator('.report-legend')).toHaveCount(1);
-    await page.getByRole('radio', { name: 'Compact' }).click();
+    // No editor: nothing to drag, move, pin or pair.
+    await expect(page.getByRole('button', { name: 'Edit Layout' })).toHaveCount(0);
+    await expect(page.locator('.rb-form-grip, [data-action="rbFormMove"], [data-action="rbFormPin"]')).toHaveCount(0);
+    const setup = page.locator('.rb-setup');
+    await expect(setup.getByRole('radiogroup', { name: 'Form' }).getByRole('radio')).toHaveCount(3);
+    await expect(setup.getByRole('radio', { name: /^Report Card/ })).toHaveAttribute('aria-checked', 'true');
+    await expect(setup.locator('.rb-setup-check')).toHaveCount(4);
+    // Each form says what it costs the class before it is chosen.
+    await expect(setup.locator('.rb-setup-fit')).toHaveCount(3);
+    await expect(setup.getByRole('radio', { name: /^Report Card/ })).toContainText('1 sheet each');
+    // Compact type and a short comment room re-lay every student.
+    await setup.getByRole('radio', { name: 'Compact' }).click();
     await expect(page.locator('.report-sheet.compact')).toHaveCount(STUDENTS * 2);
-    await page.locator('input[data-action="rbFormRoom"]').fill('5');
-    await page.locator('input[data-action="rbFormRoom"]').dispatchEvent('change');
-    await page.getByRole('button', { name: 'Done' }).click();
-    await expect(page.locator('#rb-edit-banner')).toBeHidden();
+    await setup.getByRole('radiogroup', { name: 'Comment room' }).getByRole('radio', { name: 'Short' }).click();
+    await expect(
+      setup.getByRole('radiogroup', { name: 'Comment room' }).getByRole('radio', { name: 'Short' }),
+    ).toHaveAttribute('aria-checked', 'true');
+    // Learning Dispositions off takes them off every back; on puts them back.
+    // (The demo class records no attendance, so that block prints nothing either way.)
+    await expect(page.locator('.report-sheet .report-learner-dim').first()).toBeVisible();
+    await setup.getByLabel('Learning Dispositions').uncheck();
+    await expect(page.locator('.report-sheet .report-learner-dim')).toHaveCount(0);
+    await setup.getByLabel('Learning Dispositions').check();
+    await expect(page.locator('.report-sheet .report-learner-dim').first()).toBeVisible();
+    await setup.getByLabel('Attendance').uncheck();
+    await expect(setup.getByLabel('Attendance')).not.toBeChecked();
     expect(await overflowing(page)).toEqual([]);
-    // The form is the class's: it survives a reload.
+    // The choices are the class's: they survive a reload.
     await page.reload();
     await page.getByRole('tab', { name: 'Progress Reports' }).click();
     await expect(page.locator('.report-sheet.compact')).toHaveCount(STUDENTS * 2);
-    await expect(page.locator('.rb-form-block[data-side="back"]', { hasText: 'Growth and Next Steps' })).toHaveCount(1);
-    await expect(page.locator('.rb-form-block', { hasText: 'Proficiency Legend' })).toHaveCount(1);
-    // Reset brings the Report Card back.
-    await page.getByRole('button', { name: 'Edit Layout' }).click();
-    await page.getByRole('button', { name: 'Reset to the Report Card' }).click();
-    await expect(page.locator('.rb-form-block', { hasText: 'Proficiency Legend' })).toHaveCount(0);
-    await expect(page.locator('.report-sheet.compact')).toHaveCount(0);
-  });
-
-  test('Edit Layout: Preview With, pairs, the arrow keys, starters and the library', async ({ page }) => {
-    await openReportCard(page);
-    await page.getByRole('button', { name: 'Edit Layout' }).click();
-    // Preview With shows one student at a time; Everyone brings them back.
-    const group = page.getByRole('radiogroup', { name: 'Preview with' });
-    await expect(group.getByRole('radio')).toHaveCount(4);
-    await group.getByRole('radio', { name: /^Longest/ }).click();
-    await expect(page.locator('.sheet-student')).toHaveCount(1);
-    await group.getByRole('radio', { name: 'Everyone' }).click();
-    await expect(page.locator('.sheet-student')).toHaveCount(STUDENTS);
-    // Unpair the competency table and attendance, then pair them again.
-    const pair = page.locator('.rb-form-block[data-key="competency-table+attendance"]');
-    await pair.getByRole('button', { name: 'Put these blocks one above the other' }).click();
-    await expect(page.locator('.rb-form-block[data-key="competency-table"]')).toHaveCount(1);
-    await page
-      .locator('.rb-form-block[data-key="competency-table"]')
-      .getByRole('button', { name: 'Put this block beside the next one' })
-      .click();
-    await expect(page.locator('.rb-form-block[data-key="competency-table+attendance"]')).toHaveCount(1);
-    // The arrow keys move a block and the live region says so.
-    const grip = page.locator('.rb-form-block[data-key="next-steps"] .rb-form-grip');
-    await grip.focus();
-    await page.keyboard.press('ArrowUp');
-    await expect(page.locator('#rb-live')).toContainText(
-      'Growth and Next Steps moved up: position 4 of 5 on the front.',
+    await expect(page.locator('.rb-setup').getByRole('radio', { name: 'Compact' })).toHaveAttribute(
+      'aria-checked',
+      'true',
     );
-    await expect(page.locator('.rb-form-block[data-key="next-steps"]')).toHaveAttribute('data-idx', '3');
-    await page.locator('.rb-form-block[data-key="next-steps"] .rb-form-grip').focus();
-    await page.keyboard.press('ArrowRight');
-    await expect(page.locator('#rb-live')).toContainText('moved to the back');
-    await expect(page.locator('.rb-form-block[data-side="back"][data-key="next-steps"]')).toHaveCount(1);
-    // Save to the library, apply a starter, apply the saved form.
-    await page.locator('#rb-template-name').fill('My Science 8 form');
-    await page.getByRole('button', { name: 'Save to Library' }).click();
-    await expect(page.locator('.rb-form-apply', { hasText: 'My Science 8 form' })).toHaveCount(1);
-    await page.locator('.rb-form-starter', { hasText: 'Interim Update' }).click();
-    await expect(page.locator('.rb-form-block[data-key="legend"]')).toHaveCount(1);
-    await expect(page.locator('.rb-form-block[data-side="back"]')).toHaveCount(0);
+    // Interim Update is one side per student with the legend; Report Card brings the back.
+    await page
+      .locator('.rb-setup')
+      .getByRole('radio', { name: /^Interim Update/ })
+      .click();
+    // One side per student with the legend; the back of each sheet stays blank for duplex.
+    await expect(page.locator('.report-sheet .report-legend')).toHaveCount(STUDENTS);
+    await expect(page.locator('.report-sheet .report-learner-dim')).toHaveCount(0);
+    await expect(page.locator('.report-sheet.compact')).toHaveCount(0);
     expect(await overflowing(page)).toEqual([]);
-    await page.locator('.rb-form-apply', { hasText: 'My Science 8 form' }).click();
-    await expect(page.locator('.rb-form-block[data-side="back"][data-key="next-steps"]')).toHaveCount(1);
-    await page.getByRole('button', { name: 'Reset to the Report Card' }).click();
-    await page.getByRole('button', { name: 'Done' }).click();
+    await page
+      .locator('.rb-setup')
+      .getByRole('radio', { name: /^Report Card/ })
+      .click();
+    await expect(page.locator('.report-sheet')).toHaveCount(STUDENTS * 2);
   });
 
   test('on a phone the sheets fit the width, the rail opens from a button, and the stepper walks the class', async ({

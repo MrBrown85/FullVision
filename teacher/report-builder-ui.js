@@ -120,8 +120,7 @@ window.ReportBuilderUI = (function () {
       '</div>' +
       '<div class="rb-blocks" id="rb-blocks"></div>' +
       '</aside>' +
-      '<div class="rb-preview-wrap"><div class="rb-edit-banner" id="rb-edit-banner" hidden><b>Editing the layout.</b> Every student\u2019s report uses this form. Changes save as you make them; press Done when the form is right.</div>' +
-      '<div class="rb-preview" id="rb-preview"></div></div>' +
+      '<div class="rb-preview-wrap"><div class="rb-preview" id="rb-preview"></div></div>' +
       '</div>'
     );
   }
@@ -130,351 +129,105 @@ window.ReportBuilderUI = (function () {
     return !!reportConfig && reportConfig.preset === 'standard' && typeof ReportSheets !== 'undefined';
   }
 
-  /* The Report Card is one form for the class. In Review the rail lists its
-     blocks; in Edit Layout each block gets its controls: move up or down,
-     to the other side, remove, and the few options a block has. */
-  function _kindText(it) {
-    if (it.pair) return 'Fixed · side by side';
-    if (it.kind === 'flow') return 'Flows';
-    return it.pinned ? 'Fixed · bottom of the back' : 'Fixed';
-  }
-
-  function _itemLabel(it) {
-    if (it.pair)
-      return it.pair
-        .map(function (q) {
-          return q.label;
-        })
-        .join(' + ');
-    return it.label;
-  }
-
-  function _editControls(it, side, idx, list) {
-    var count = list.length;
-    if (it.locked) return '<span class="rb-form-kind">' + LINE_ICONS.lock + ' first on the front</span>';
-    var b = function (action, extra, title, text) {
-      return (
-        '<button type="button" class="rb-form-btn" data-action="' +
+  /* The Report Card is one form for the class (report-sheets.js). The rail
+     is a setup list a teacher can read in a breath: which form, type size,
+     comment room and which optional blocks are on. The form decides where
+     everything goes (DECISIONS "Report forms" 8). */
+  function _seg(label, ariaLabel, action, dataKey, choices, current) {
+    var html =
+      '<div class="rb-setup-row"><span class="rb-setup-k">' +
+      label +
+      '</span><span class="seg seg-sm" role="radiogroup" aria-label="' +
+      ariaLabel +
+      '">';
+    choices.forEach(function (c) {
+      var on = c.value === current;
+      html +=
+        '<button type="button" class="seg-btn' +
+        (on ? ' active' : '') +
+        '" data-action="' +
         action +
-        '" data-side="' +
-        side +
-        '" data-idx="' +
-        idx +
-        '"' +
-        (extra || '') +
-        ' title="' +
-        title +
-        '" aria-label="' +
-        title +
+        '" data-' +
+        dataKey +
+        '="' +
+        c.value +
+        '" role="radio" aria-checked="' +
+        on +
         '">' +
-        text +
-        '</button>'
-      );
-    };
-    var html = '<span class="rb-form-controls">';
-    if (!it.pinned) {
-      html += b(
-        'rbFormMove',
-        ' data-dir="-1"' + (idx <= (side === 'front' ? 1 : 0) ? ' disabled' : ''),
-        'Move up',
-        '\u2191',
-      );
-      html += b(
-        'rbFormMove',
-        ' data-dir="1"' + (idx >= count - 1 || (list[idx + 1] && list[idx + 1].pinned) ? ' disabled' : ''),
-        'Move down',
-        '\u2193',
-      );
-      html += b(
-        'rbFormSide',
-        '',
-        side === 'front' ? 'Move to the back' : 'Move to the front',
-        side === 'front' ? 'Back' : 'Front',
-      );
-      if (it.pair) html += b('rbFormUnpair', '', 'Put these blocks one above the other', 'Unpair');
-      else if (ReportSheets.canPair(it, list[idx + 1]))
-        html += b('rbFormPair', '', 'Put this block beside the next one', 'Pair');
-    }
-    html += b('rbFormRemove', '', 'Remove from the form', '\u00D7');
-    html += '</span>';
-    return html;
+        esc(c.label) +
+        '</button>';
+    });
+    return html + '</span></div>';
   }
 
-  function _itemOptions(it) {
-    if (it.pair) return '';
-    var html = '';
-    if (it.block === 'teacher-narrative') {
+  /* fits: { formId: { most, max } } from ReportSheets.sheetsForForms, once known. */
+  function renderSetup(form, fits) {
+    fits = fits || {};
+    var html = '<div class="rb-setup">';
+    html += '<div class="rb-setup-k">Form</div><div class="rb-setup-forms" role="radiogroup" aria-label="Form">';
+    ReportSheets.starters().forEach(function (st) {
+      var on = form.id === st.id;
       html +=
-        '<label class="rb-form-opt">Room on the front <input type="number" class="rb-form-num" data-action="rbFormRoom" min="1" max="20" value="' +
-        (it.room ? it.room.lines : 8) +
-        '" aria-label="Lines kept for the comment on the front"> lines</label>';
-    }
-    if (it.kind === 'flow') {
-      html +=
-        '<label class="rb-form-opt">When empty <select class="rb-form-sel" data-action="rbFormEmpty" data-block="' +
-        it.block +
-        '" aria-label="When this block is empty"><option value="omit"' +
-        (it.whenEmpty !== 'box' ? ' selected' : '') +
-        '>Leave it out</option><option value="box"' +
-        (it.whenEmpty === 'box' ? ' selected' : '') +
-        '>Print the box with lines</option></select></label>';
-    }
-    if (ReportSheets.BLOCKS[it.block] && ReportSheets.BLOCKS[it.block].pinnable) {
-      html +=
-        '<label class="rb-form-opt rb-form-check"><input type="checkbox" data-action="rbFormPin" data-block="' +
-        it.block +
-        '"' +
-        (it.pinned ? ' checked' : '') +
-        '> Pinned to the bottom of the back</label>';
-    }
-    return html ? '<div class="rb-form-opts">' + html + '</div>' : '';
-  }
-
-  function _itemKey(it) {
-    return it.pair
-      ? it.pair
-          .map(function (q) {
-            return q.block;
-          })
-          .join('+')
-      : it.block;
-  }
-
-  function _sideList(form, side, editing) {
-    var list = side === 'back' ? form.back : form.front;
-    var html = '<div class="rb-form-side">' + (side === 'back' ? 'Back' : 'Front') + '</div>';
-    html += '<div class="rb-form-list" data-side="' + side + '">';
-    if (!list.length)
-      html += '<div class="rb-form-empty">Nothing on this side yet. Move a block here or add one.</div>';
-    list.forEach(function (it, idx) {
-      var draggable = editing && !it.locked && !it.pinned;
-      html +=
-        '<div class="rb-block rb-form-block' +
-        (editing ? ' editing' : '') +
-        (it.locked ? ' locked' : '') +
-        (it.pinned ? ' pinned' : '') +
-        '" data-side="' +
-        side +
-        '" data-idx="' +
-        idx +
-        '" data-key="' +
-        esc(_itemKey(it)) +
-        '"><div class="rb-form-row">' +
-        (draggable
-          ? '<button type="button" class="rb-form-grip" data-action="rbFormGrip" data-drag="grip" data-side="' +
-            side +
-            '" data-idx="' +
-            idx +
-            '" aria-label="Move ' +
-            esc(_itemLabel(it)) +
-            ': arrow keys move it up, down, to the front or the back" title="Drag, or use the arrow keys">\u283F</button>'
-          : '') +
-        '<span class="rb-form-label">' +
-        esc(_itemLabel(it)) +
-        '</span>' +
-        (editing ? _editControls(it, side, idx, list) : '<span class="rb-form-kind">' + _kindText(it) + '</span>') +
-        '</div>' +
-        (editing ? _itemOptions(it) : '') +
-        '</div>';
+        '<button type="button" class="rb-setup-form' +
+        (on ? ' active' : '') +
+        '" data-action="rbSetupForm" data-form="' +
+        st.id +
+        '" role="radio" aria-checked="' +
+        on +
+        '"><b>' +
+        esc(st.name) +
+        (fits[st.id] ? '<em class="rb-setup-fit">' + esc(ReportSheets.fitLabel(fits[st.id])) + '</em>' : '') +
+        '</b><span>' +
+        esc(st.help) +
+        '</span></button>';
     });
     html += '</div>';
-    return html;
-  }
-
-  /* extras: { previewWith: { longest, typical, shortest } of { sid, name }, pick } */
-  function renderFormBlocks(form, editing, extras) {
-    extras = extras || {};
-    var html = '';
-    if (editing) {
-      html +=
-        '<div class="rb-form-note rb-form-editing">Every student\u2019s report uses this form. Fixed blocks print the same for everyone; flowing blocks grow with each student and push what follows down the sheet.</div>';
-      if (extras.previewWith) {
-        var pw = extras.previewWith;
-        html +=
-          '<div class="rb-form-whole"><span class="rb-form-whole-k">Preview With</span><span class="seg seg-sm" role="radiogroup" aria-label="Preview with">';
-        ['longest', 'typical', 'shortest'].forEach(function (k) {
-          if (!pw[k]) return;
-          var on = extras.pick === k;
-          html +=
-            '<button type="button" class="seg-btn' +
-            (on ? ' active' : '') +
-            '" data-action="rbFormPreviewWith" data-pick="' +
-            k +
-            '" role="radio" aria-checked="' +
-            on +
-            '">' +
-            k.charAt(0).toUpperCase() +
-            k.slice(1) +
-            ' \u00B7 ' +
-            esc(pw[k].name.split(' ')[0]) +
-            '</button>';
-        });
-        html +=
-          '<button type="button" class="seg-btn' +
-          (!extras.pick ? ' active' : '') +
-          '" data-action="rbFormPreviewWith" data-pick="" role="radio" aria-checked="' +
-          !extras.pick +
-          '">Everyone</button></span></div>';
-      }
-      html +=
-        '<div class="rb-form-whole"><span class="rb-form-whole-k">Type Size</span><span class="seg seg-sm" role="radiogroup" aria-label="Type size">' +
-        '<button type="button" class="seg-btn' +
-        (form.type !== 'compact' ? ' active' : '') +
-        '" data-action="rbFormType" data-type="standard" role="radio" aria-checked="' +
-        (form.type !== 'compact') +
-        '">Standard</button>' +
-        '<button type="button" class="seg-btn' +
-        (form.type === 'compact' ? ' active' : '') +
-        '" data-action="rbFormType" data-type="compact" role="radio" aria-checked="' +
-        (form.type === 'compact') +
-        '">Compact</button></span><span class="rb-form-kind">applies to every student</span></div>';
-    } else {
-      html +=
-        '<div class="rb-form-note">One form for every student. Fixed blocks print the same for everyone; flowing blocks grow with each student and push what follows down the sheet.</div>';
+    html += _seg(
+      'Type Size',
+      'Type size',
+      'rbSetupType',
+      'type',
+      [
+        { value: 'standard', label: 'Standard' },
+        { value: 'compact', label: 'Compact' },
+      ],
+      form.type === 'compact' ? 'compact' : 'standard',
+    );
+    var room = ReportSheets.roomChoice(form);
+    if (room) {
+      html += _seg(
+        'Comment Room',
+        'Comment room',
+        'rbSetupRoom',
+        'room',
+        [
+          { value: 'short', label: 'Short' },
+          { value: 'standard', label: 'Standard' },
+          { value: 'long', label: 'Long' },
+        ],
+        room,
+      );
     }
-    html += _sideList(form, 'front', editing);
-    html += _sideList(form, 'back', editing);
-    if (editing) {
-      var avail = ReportSheets.available(form);
+    html += '<div class="rb-setup-k">Include</div><div class="rb-setup-includes">';
+    ReportSheets.includes(form).forEach(function (inc) {
       html +=
-        '<div class="rb-form-add"><label class="rb-form-opt">Add a Block <select class="rb-form-sel" data-action="rbFormAdd" aria-label="Add a block to the form"><option value="">Choose\u2026</option>';
-      avail.forEach(function (id) {
-        html += '<option value="' + id + '">' + esc(ReportSheets.BLOCKS[id].label) + '</option>';
-      });
-      html += '</select></label><span class="rb-form-kind">goes to the front; move it after</span></div>';
-      html += '<div class="rb-form-side">Starters</div><div class="rb-form-starters">';
-      ReportSheets.starters().forEach(function (st) {
-        html +=
-          '<button type="button" class="rb-form-starter" data-action="rbFormStarter" data-starter="' +
-          st.id +
-          '"><b>' +
-          esc(st.name) +
-          '</b><span>' +
-          esc(st.help) +
-          '</span></button>';
-      });
-      html += '</div>';
-      var lib = ReportSheets.templates();
-      html += '<div class="rb-form-side">Your Library</div>';
-      if (lib.length) {
-        html += '<div class="rb-form-library">';
-        lib.forEach(function (t) {
-          html +=
-            '<div class="rb-form-template"><button type="button" class="rb-form-apply" data-action="rbFormApplyTemplate" data-id="' +
-            esc(t.id) +
-            '">' +
-            esc(t.name) +
-            '</button><button type="button" class="rb-form-btn" data-action="rbFormDeleteTemplate" data-id="' +
-            esc(t.id) +
-            '" title="Remove from the library" aria-label="Remove ' +
-            esc(t.name) +
-            ' from the library">\u00D7</button></div>';
-        });
-        html += '</div>';
-      } else {
-        html +=
-          '<div class="rb-form-empty">Nothing saved yet. A saved form can be applied to any of your classes, on any computer you sign in on.</div>';
-      }
-      html +=
-        '<form class="rb-form-save" data-action="rbFormSaveTemplate"><input type="text" class="rb-form-text" id="rb-template-name" placeholder="Name this form" aria-label="Name for the saved form" maxlength="60"><button type="submit" class="rb-form-reset">Save to Library</button></form>';
-      html +=
-        '<div class="rb-form-actions"><button type="button" class="rb-form-reset" data-action="rbFormReset">Reset to the Report Card</button></div>';
-      html += '<div class="rb-form-live" id="rb-live" aria-live="polite"></div>';
-    }
+        '<label class="rb-setup-check"><input type="checkbox" data-action="rbSetupInclude" data-include="' +
+        inc.id +
+        '"' +
+        (inc.on ? ' checked' : '') +
+        '> ' +
+        esc(inc.label) +
+        '</label>';
+    });
+    html += '</div>';
+    html +=
+      '<div class="rb-form-note">One form for every student. The student list shows how many sheets each needs; Fit Map shows the whole class.</div>';
     html += '<div class="rb-form-summary" id="rb-form-summary"></div>';
-    return html;
+    return html + '</div>';
   }
 
-  /* Pointer drag inside one side of the form. The grip picks the block up;
-     it drops where the placeholder is. onReorder(side, from, to). */
-  var _formDragAbort = null;
-  function initFormDrag(root, opts) {
-    if (!root) return;
-    if (_formDragAbort) _formDragAbort.abort();
-    _formDragAbort = new AbortController();
-    var signal = _formDragAbort.signal;
-    var drag = null;
-
-    root.addEventListener(
-      'pointerdown',
-      function (e) {
-        var grip = e.target.closest('[data-drag="grip"]');
-        if (!grip) return;
-        var block = grip.closest('.rb-form-block');
-        var list = grip.closest('.rb-form-list');
-        if (!block || !list) return;
-        e.preventDefault();
-        grip.setPointerCapture(e.pointerId);
-        var rect = block.getBoundingClientRect();
-        drag = {
-          el: block,
-          list: list,
-          side: list.dataset.side,
-          from: Number(block.dataset.idx),
-          offsetY: e.clientY - rect.top,
-          placeholder: document.createElement('div'),
-        };
-        drag.placeholder.className = 'rb-block-placeholder';
-        drag.placeholder.style.height = block.offsetHeight + 'px';
-        block.classList.add('dragging');
-        block.style.position = 'fixed';
-        block.style.top = rect.top + 'px';
-        block.style.left = rect.left + 'px';
-        block.style.width = rect.width + 'px';
-        block.style.zIndex = '1000';
-        block.style.pointerEvents = 'none';
-        list.insertBefore(drag.placeholder, block);
-      },
-      { signal: signal },
-    );
-
-    root.addEventListener(
-      'pointermove',
-      function (e) {
-        if (!drag) return;
-        e.preventDefault();
-        drag.el.style.top = e.clientY - drag.offsetY + 'px';
-        var blocks = Array.from(drag.list.querySelectorAll('.rb-form-block:not(.dragging)'));
-        for (var i = 0; i < blocks.length; i++) {
-          if (blocks[i].classList.contains('locked')) continue;
-          var rect = blocks[i].getBoundingClientRect();
-          if (e.clientY < rect.top + rect.height / 2) {
-            drag.list.insertBefore(drag.placeholder, blocks[i]);
-            return;
-          }
-        }
-        var pinned = drag.list.querySelector('.rb-form-block.pinned:not(.dragging)');
-        if (pinned) drag.list.insertBefore(drag.placeholder, pinned);
-        else drag.list.appendChild(drag.placeholder);
-      },
-      { signal: signal },
-    );
-
-    function finish() {
-      if (!drag) return;
-      var items = Array.from(drag.list.children).filter(function (c) {
-        return c !== drag.el;
-      });
-      var to = items.indexOf(drag.placeholder);
-      var d = drag;
-      drag = null;
-      d.el.classList.remove('dragging');
-      d.el.style.position = '';
-      d.el.style.top = '';
-      d.el.style.left = '';
-      d.el.style.width = '';
-      d.el.style.zIndex = '';
-      d.el.style.pointerEvents = '';
-      if (d.placeholder.parentNode) d.placeholder.parentNode.removeChild(d.placeholder);
-      if (to >= 0 && to !== d.from && opts && typeof opts.onReorder === 'function') opts.onReorder(d.side, d.from, to);
-      else if (opts && typeof opts.onCancel === 'function') opts.onCancel();
-    }
-    root.addEventListener('pointerup', finish, { signal: signal });
-    root.addEventListener('pointercancel', finish, { signal: signal });
-  }
-
-  function renderBuilderBlocks(reportConfig, editing, extras) {
-    if (usesSheets(reportConfig)) return renderFormBlocks(ReportSheets.formFor(reportConfig), !!editing, extras);
+  function renderBuilderBlocks(reportConfig, extras) {
+    if (usesSheets(reportConfig)) return renderSetup(ReportSheets.formFor(reportConfig), extras && extras.fits);
     var html = '';
     reportConfig.blocks.forEach(function (block, idx) {
       var enabledClass = block.enabled ? ' enabled' : '';
@@ -643,8 +396,7 @@ window.ReportBuilderUI = (function () {
     getReportConfigWrapped: getReportConfigWrapped,
     renderLayout: renderLayout,
     renderBuilderBlocks: renderBuilderBlocks,
-    renderFormBlocks: renderFormBlocks,
-    initFormDrag: initFormDrag,
+    renderSetup: renderSetup,
     usesSheets: usesSheets,
     toggleBlock: toggleBlock,
     applyPreset: applyPreset,

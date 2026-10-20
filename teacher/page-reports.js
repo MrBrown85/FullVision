@@ -121,13 +121,10 @@ window.PageReports = (function () {
     if (tbView) tbView.style.display = tab === 'progress' ? '' : 'none';
     const tbFit = document.getElementById('tb-fitmap-btn');
     if (tbFit) tbFit.style.display = tab === 'progress' && ReportBuilderUI.usesSheets(reportConfig) ? '' : 'none';
-    const tbEdit = document.getElementById('tb-edit-layout-btn');
-    if (tbEdit) tbEdit.style.display = tab === 'progress' && ReportBuilderUI.usesSheets(reportConfig) ? '' : 'none';
     const tbRail = document.getElementById('tb-rail-btn');
     if (tbRail) tbRail.style.display = tab === 'progress' ? '' : 'none';
     const stepper = document.getElementById('report-stepper');
     if (stepper) stepper.style.display = tab === 'progress' ? '' : 'none';
-    if (tab !== 'progress') editLayout = false;
     if (tab !== 'progress') _restoreSidebarBadges();
     // Show Anonymize button only on class summary
     const tbAnon = document.getElementById('tb-anon-btn');
@@ -377,7 +374,7 @@ window.PageReports = (function () {
     }
     Preview.renderReportPreview({
       cid: activeCourse,
-      selectedStudentIds: _previewOverride() || selectedStudentIds,
+      selectedStudentIds: selectedStudentIds,
       reportConfig: reportConfig,
       paper: reportPaper,
       onSheets: _rememberSummary,
@@ -395,10 +392,6 @@ window.PageReports = (function () {
       fm.classList.toggle('active', fitMapOn);
       fm.setAttribute('aria-pressed', fitMapOn ? 'true' : 'false');
     }
-    var ed = document.getElementById('tb-edit-layout-btn');
-    if (ed) ed.style.display = activeTab === 'progress' && sheets ? '' : 'none';
-    var banner = document.getElementById('rb-edit-banner');
-    if (banner) banner.hidden = !(editLayout && sheets);
     if (!sheets) _restoreSidebarBadges();
   }
 
@@ -445,12 +438,10 @@ window.PageReports = (function () {
   var viewingIssue = null; // the loaded copy while one is shown
 
   function _rememberSummary(summary) {
-    // A Preview With pick shows one student; the class summary stays.
-    if (!_previewOverride()) {
-      _lastSummary = summary;
-      _annotateSidebar(summary);
-    }
+    _lastSummary = summary;
+    _annotateSidebar(summary);
     _populateCopies();
+    _scheduleFormFits();
   }
 
   function _populateCopies() {
@@ -756,28 +747,9 @@ window.PageReports = (function () {
     renderReportPreview();
   }
 
-  /* ── Edit Layout ──────────────────────────────────────────────────
-     A mode, entered on purpose, for changing the class's form. Each
-     change is saved with the report config and the sheets re-lay at once. */
-  var editLayout = false;
-
-  function setEditLayout(on) {
-    editLayout = !!on && ReportBuilderUI.usesSheets(reportConfig);
-    if (!editLayout) _previewPick = '';
-    var banner = document.getElementById('rb-edit-banner');
-    if (banner) banner.hidden = !editLayout;
-    var btn = document.getElementById('tb-edit-layout-btn');
-    if (btn) {
-      btn.textContent = editLayout ? 'Done' : 'Edit Layout';
-      btn.classList.toggle('active', editLayout);
-      btn.setAttribute('aria-pressed', editLayout ? 'true' : 'false');
-    }
-    var preview = document.getElementById('rb-preview');
-    if (preview) preview.classList.toggle('report-editing', editLayout);
-    renderBuilderBlocks();
-    renderReportPreview();
-  }
-
+  /* ── Setup (DECISIONS "Report forms" 8) ──────────────────────────
+     The rail offers a few named choices; each change saves with the
+     class's report config and the sheets re-lay at once. */
   function _setForm(form) {
     reportConfig.form = ReportSheets.normalizeForm(form);
     saveReportConfig(activeCourse, reportConfig);
@@ -789,151 +761,38 @@ window.PageReports = (function () {
   function _formOf() {
     return ReportSheets.formFor(reportConfig);
   }
-  function _labelAt(f, side, idx) {
-    var it = (side === 'back' ? f.back : f.front)[idx];
-    if (!it) return 'The block';
-    return it.pair
-      ? it.pair
-          .map(function (q) {
-            return q.label;
-          })
-          .join(' and ')
-      : it.label;
-  }
-  function _keyOf(f, side, idx) {
-    var it = (side === 'back' ? f.back : f.front)[idx];
-    if (!it) return '';
-    return it.pair
-      ? it.pair
-          .map(function (q) {
-            return q.block;
-          })
-          .join('+')
-      : it.block;
-  }
-  function _focusGrip(key) {
-    var grip = document.querySelector('.rb-form-block[data-key="' + key + '"] .rb-form-grip');
-    if (grip) grip.focus();
-  }
-
-  /* Arrow keys on a grip move the block; the live region says where it went. */
-  function _handleGripKey(e) {
-    var grip = e.target && e.target.closest ? e.target.closest('.rb-form-grip') : null;
-    if (!grip || !editLayout) return;
-    var side = grip.dataset.side;
-    var idx = Number(grip.dataset.idx);
-    var f = _formOf();
-    var key = _keyOf(f, side, idx);
-    var label = _labelAt(f, side, idx);
-    var next = null;
-    var where = '';
-    if (e.key === 'ArrowUp') {
-      next = ReportSheets.moveItem(f, side, idx, -1);
-      where = 'up';
-    } else if (e.key === 'ArrowDown') {
-      next = ReportSheets.moveItem(f, side, idx, 1);
-      where = 'down';
-    } else if (e.key === 'ArrowLeft' && side === 'back') {
-      next = ReportSheets.moveToSide(f, side, idx);
-      where = 'to the front';
-    } else if (e.key === 'ArrowRight' && side === 'front') {
-      next = ReportSheets.moveToSide(f, side, idx);
-      where = 'to the back';
-    }
-    if (!next) return;
-    e.preventDefault();
-    if (JSON.stringify(next) === JSON.stringify(f)) {
-      _announce(label + ' cannot move ' + where + '.');
-      return;
-    }
-    _setForm(next);
-    var list = where === 'to the back' ? 'back' : where === 'to the front' ? 'front' : side;
-    var at = (list === 'back' ? next.back : next.front).findIndex(function (it) {
-      return (
-        (it.pair
-          ? it.pair
-              .map(function (q) {
-                return q.block;
-              })
-              .join('+')
-          : it.block) === key
-      );
-    });
-    _announce(
-      label +
-        ' moved ' +
-        where +
-        ': position ' +
-        (at + 1) +
-        ' of ' +
-        (list === 'back' ? next.back : next.front).length +
-        ' on the ' +
-        list +
-        '.',
-    );
-    _focusGrip(key);
-  }
-
-  /* Preview With: the longest, a typical and the shortest student in the
-     class, by how much of the form their content fills. */
-  var _previewPick = '';
-  function _previewWith() {
-    var s = _lastSummary && _lastSummary.perStudent;
-    if (!s) return null;
-    var rows = Object.keys(s)
-      .map(function (sid) {
-        return { sid: sid, name: s[sid].name, used: s[sid].used || 0 };
-      })
-      .sort(function (a, b) {
-        return b.used - a.used;
-      });
-    if (rows.length < 2) return null;
-    return { longest: rows[0], typical: rows[Math.floor(rows.length / 2)], shortest: rows[rows.length - 1] };
-  }
-  function _previewOverride() {
-    if (!editLayout || !_previewPick) return null;
-    var pw = _previewWith();
-    return pw && pw[_previewPick] ? [pw[_previewPick].sid] : null;
-  }
-
-  function _announce(text) {
-    var live = document.getElementById('rb-live');
-    if (live) live.textContent = text;
-  }
 
   function renderBuilderBlocks() {
     const container = document.getElementById('rb-blocks');
     if (!container) return;
-    container.innerHTML = Builder.renderBuilderBlocks(reportConfig, editLayout, {
-      previewWith: _previewWith(),
-      pick: _previewPick,
-    });
-    if (editLayout) {
-      Builder.initFormDrag(container, {
-        onReorder: function (side, from, to) {
-          var f = _formOf();
-          var label = _labelAt(f, side, from);
-          _setForm(ReportSheets.reorder(f, side, from, to));
-          _announce(label + ' moved to position ' + (to + 1) + ' on the ' + side + '.');
-        },
-        onCancel: renderBuilderBlocks,
-      });
-    }
-    if (!editLayout) return;
-    Builder.initPointerDrag(container, {
-      onReorder: function (startIdx, finalIdx) {
-        var moved = reportConfig.blocks.splice(startIdx, 1)[0];
-        reportConfig.blocks.splice(finalIdx, 0, moved);
-        reportConfig.preset = 'custom';
-        saveReportConfig(activeCourse, reportConfig);
-        renderBuilderBlocks();
-        renderReportPreview();
-        Builder.updatePresetBtns(reportConfig);
-      },
-      onCancel: function () {
-        renderBuilderBlocks();
-      },
-    });
+    container.innerHTML = Builder.renderBuilderBlocks(reportConfig, { fits: _formFits });
+  }
+
+  /* What each form costs the class, for the setup list: computed once per
+     class, term, paper and type size, after the preview has rendered, and
+     shown on the form cards. */
+  var _formFits = null;
+  var _formFitsKey = '';
+  function _scheduleFormFits() {
+    if (activeTab !== 'progress' || !ReportBuilderUI.usesSheets(reportConfig)) return;
+    var ctx = ReportBlocks.reportContext();
+    var key = [activeCourse, ctx.termId, reportPaper, _formOf().type].join('|');
+    if (key === _formFitsKey) return;
+    _formFitsKey = key;
+    _formFits = null;
+    setTimeout(function () {
+      if (key !== _formFitsKey || activeTab !== 'progress') return;
+      try {
+        var students = sortStudents(getStudents(activeCourse), 'lastName');
+        _formFits = ReportSheets.sheetsForForms(activeCourse, students, ctx, {
+          paper: reportPaper,
+          type: _formOf().type,
+        });
+      } catch (e) {
+        _formFits = null;
+      }
+      renderBuilderBlocks();
+    }, 0);
   }
 
   function rbToggleBlock(blockId) {
@@ -946,7 +805,6 @@ window.PageReports = (function () {
 
   function rbApplyPreset(preset) {
     viewingIssue = null;
-    editLayout = false;
     Builder.applyPreset(reportConfig, preset);
     saveReportConfig(activeCourse, reportConfig);
     renderBuilderBlocks();
@@ -1114,49 +972,15 @@ window.PageReports = (function () {
         populateStudentSelect();
         renderReports();
       },
-      toggleEditLayout: function () {
-        setEditLayout(!editLayout);
+      rbSetupForm: function () {
+        var f = ReportSheets.starter(el.dataset.form);
+        if (f) _setForm(f);
       },
-      rbFormMove: function () {
-        _setForm(ReportSheets.moveItem(_formOf(), el.dataset.side, Number(el.dataset.idx), Number(el.dataset.dir)));
-      },
-      rbFormSide: function () {
-        _setForm(ReportSheets.moveToSide(_formOf(), el.dataset.side, Number(el.dataset.idx)));
-      },
-      rbFormRemove: function () {
-        _setForm(ReportSheets.removeItem(_formOf(), el.dataset.side, Number(el.dataset.idx)));
-      },
-      rbFormType: function () {
+      rbSetupType: function () {
         _setForm(ReportSheets.setType(_formOf(), el.dataset.type));
       },
-      rbFormReset: function () {
-        _setForm(ReportSheets.form());
-      },
-      rbFormPair: function () {
-        _setForm(ReportSheets.pairWith(_formOf(), el.dataset.side, Number(el.dataset.idx)));
-      },
-      rbFormUnpair: function () {
-        _setForm(ReportSheets.unpair(_formOf(), el.dataset.side, Number(el.dataset.idx)));
-      },
-      rbFormPreviewWith: function () {
-        _previewPick = el.dataset.pick || '';
-        renderBuilderBlocks();
-        renderReportPreview();
-      },
-      rbFormStarter: function () {
-        var f = ReportSheets.starter(el.dataset.starter);
-        if (f) _setForm(f);
-      },
-      rbFormApplyTemplate: function () {
-        var f = ReportSheets.template(el.dataset.id);
-        if (f) _setForm(f);
-      },
-      rbFormDeleteTemplate: function () {
-        ReportSheets.removeTemplate(el.dataset.id);
-        renderBuilderBlocks();
-      },
-      rbFormGrip: function () {
-        /* the grip is for dragging and the arrow keys; a click does nothing */
+      rbSetupRoom: function () {
+        _setForm(ReportSheets.setRoomChoice(_formOf(), el.dataset.room));
       },
       tqSeePage: function () {
         tqSaveCurrentIfNeeded();
@@ -1232,28 +1056,10 @@ window.PageReports = (function () {
     }
   }
 
-  function _handleFormSubmit(e) {
-    var form = e.target && e.target.closest ? e.target.closest('form[data-action="rbFormSaveTemplate"]') : null;
-    if (!form) return;
-    e.preventDefault();
-    var input = document.getElementById('rb-template-name');
-    var entry = ReportSheets.saveTemplate(input ? input.value : '', _formOf());
-    if (!entry) {
-      if (input) input.focus();
-      return;
-    }
-    renderBuilderBlocks();
-    _announce('Saved ' + entry.name + ' to your library.');
-  }
-
-  function _handleFormChange(e) {
+  function _handleSetupChange(e) {
     var el = e.target;
-    if (!el || !el.dataset || !el.closest('#rb-blocks')) return;
-    var action = el.dataset.action;
-    if (action === 'rbFormRoom') _setForm(ReportSheets.setRoom(_formOf(), el.value));
-    else if (action === 'rbFormEmpty') _setForm(ReportSheets.setWhenEmpty(_formOf(), el.dataset.block, el.value));
-    else if (action === 'rbFormPin') _setForm(ReportSheets.setPinned(_formOf(), el.dataset.block, el.checked));
-    else if (action === 'rbFormAdd' && el.value) _setForm(ReportSheets.addBlock(_formOf(), el.value, 'front'));
+    if (!el || !el.dataset || el.dataset.action !== 'rbSetupInclude' || !el.closest('#rb-blocks')) return;
+    _setForm(ReportSheets.setInclude(_formOf(), el.dataset.include, el.checked));
   }
 
   function _handleSelectionChange() {
@@ -1312,18 +1118,13 @@ window.PageReports = (function () {
     _showIssue(e.target.value);
   }
 
-  /* The library and the issued copies are kept on the server; this device's
-     copies show at once and are refreshed from it when the page opens or
-     the class changes. Demo Mode and offline keep the device copies. */
+  /* The issued copies are kept on the server; this device's copies show at
+     once and are refreshed from it when the page opens or the class
+     changes. Demo Mode and offline keep the device copies. */
   function _syncFromServer(cid) {
     if (typeof ReportIssues !== 'undefined' && typeof ReportIssues.sync === 'function') {
       ReportIssues.sync(cid).then(function (changed) {
         if (changed && cid === activeCourse) _populateCopies();
-      });
-    }
-    if (typeof ReportSheets.syncTemplates === 'function') {
-      ReportSheets.syncTemplates().then(function (changed) {
-        if (changed && editLayout && activeTab === 'progress') renderBuilderBlocks();
       });
     }
   }
@@ -1440,9 +1241,7 @@ window.PageReports = (function () {
     window._pageSwitchCourse = switchCourse;
 
     _addDocListener('click', _handleClick);
-    _addDocListener('change', _handleFormChange);
-    _addDocListener('submit', _handleFormSubmit);
-    _addDocListener('keydown', _handleGripKey);
+    _addDocListener('change', _handleSetupChange);
     window.addEventListener('resize', _handleResize);
     _addDocListener('selectionchange', _handleSelectionChange);
     _addDocListener('keyup', _handleKeyup);
@@ -1492,7 +1291,7 @@ window.PageReports = (function () {
 
   /* -- Toolbar HTML (rendered into main on init) ---------- */
   var TOOLBAR_HTML =
-    '<div class="report-toolbar no-print">\n      <div class="seg report-seg-control" role="tablist" aria-label="Report type">\n        <button class="seg-btn report-seg-btn active" data-action="switchTab" data-tab="questionnaire" role="tab" aria-selected="true">Term Questionnaire</button>\n        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="progress" role="tab" aria-selected="false">Progress Reports</button>\n        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="summary" role="tab" aria-selected="false">Class Summary</button>\n      </div>\n      <div class="report-stepper" id="report-stepper" style="display:none">\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="-1" title="Previous student" aria-label="Previous student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="1" title="Next student" aria-label="Next student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n      </div>\n      <div class="student-picker" id="student-picker">\n        <button class="student-picker-btn" data-action="toggleStudentPicker" aria-label="Select students" aria-expanded="false" aria-haspopup="listbox">\n          <span id="picker-label">All Students</span>\n          <span class="arrow" aria-hidden="true">\u25bc</span>\n        </button>\n        <div class="student-picker-dropdown" id="picker-dropdown"></div>\n      </div>\n      <div class="tq-student-nav" id="tq-student-nav" style="display:none">\n        <button class="tq-toolbar-arrow" data-action="tqPrevStudent" title="Previous student" aria-label="Previous student">\n          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>\n        </button>\n        <span class="tq-student-name" id="tq-student-name"></span>\n        <button class="tq-toolbar-arrow" data-action="tqNextStudent" title="Next student" aria-label="Next student">\n          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>\n        </button>\n        <div class="tq-progress-ring" id="tq-progress-ring">\n          <svg width="30" height="30" viewBox="0 0 30 30">\n            <circle class="ring-bg" cx="15" cy="15" r="12"/>\n            <circle class="ring-fill" id="tq-ring-fill" cx="15" cy="15" r="12" stroke-dasharray="75.4" stroke-dashoffset="75.4"/>\n          </svg>\n          <span class="tq-progress-label" id="tq-progress-label"></span>\n        </div>\n      </div>\n      <select id="report-period" class="report-term-select" aria-label="Report"></select>\n      <select id="report-copy" class="report-term-select" aria-label="Copy" style="display:none"></select>\n      <div class="seg seg-sm" id="report-paper" role="radiogroup" aria-label="Paper" style="display:none">\n        <button class="seg-btn active" data-action="setPaper" data-paper="letter" role="radio" aria-checked="true">Letter</button>\n        <button class="seg-btn" data-action="setPaper" data-paper="legal" role="radio" aria-checked="false">Legal</button>\n      </div>\n      <div class="seg seg-sm" id="report-view" role="radiogroup" aria-label="View" style="display:none">\n        <button class="seg-btn active" data-action="setView" data-view="screen" role="radio" aria-checked="true">Screen</button>\n        <button class="seg-btn" data-action="setView" data-view="photocopy" role="radio" aria-checked="false">Photocopy</button>\n      </div>\n      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">\n        <button class="tb-toggle-btn" id="tb-anon-btn" style="display:none" data-action="toggleAnon">\n          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>\n          Anonymize\n        </button>\n        <button class="tb-toggle-btn" id="tb-rail-btn" style="display:none" data-action="toggleRail" aria-pressed="false" aria-controls="rb-panel">Builder</button>\n        <button class="tb-toggle-btn" id="tb-edit-layout-btn" style="display:none" data-action="toggleEditLayout" aria-pressed="false">Edit Layout</button>\n        <button class="tb-toggle-btn" id="tb-fitmap-btn" style="display:none" data-action="toggleFitMap" aria-pressed="false">Fit Map</button>\n        <button class="tb-action-btn" id="tb-print-btn" data-action="printReports">Print Reports</button>\n      </div>\n    </div>\n    <div id="report-output" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto"></div>';
+    '<div class="report-toolbar no-print">\n      <div class="seg report-seg-control" role="tablist" aria-label="Report type">\n        <button class="seg-btn report-seg-btn active" data-action="switchTab" data-tab="questionnaire" role="tab" aria-selected="true">Term Questionnaire</button>\n        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="progress" role="tab" aria-selected="false">Progress Reports</button>\n        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="summary" role="tab" aria-selected="false">Class Summary</button>\n      </div>\n      <div class="report-stepper" id="report-stepper" style="display:none">\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="-1" title="Previous student" aria-label="Previous student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="1" title="Next student" aria-label="Next student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n      </div>\n      <div class="student-picker" id="student-picker">\n        <button class="student-picker-btn" data-action="toggleStudentPicker" aria-label="Select students" aria-expanded="false" aria-haspopup="listbox">\n          <span id="picker-label">All Students</span>\n          <span class="arrow" aria-hidden="true">\u25bc</span>\n        </button>\n        <div class="student-picker-dropdown" id="picker-dropdown"></div>\n      </div>\n      <div class="tq-student-nav" id="tq-student-nav" style="display:none">\n        <button class="tq-toolbar-arrow" data-action="tqPrevStudent" title="Previous student" aria-label="Previous student">\n          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>\n        </button>\n        <span class="tq-student-name" id="tq-student-name"></span>\n        <button class="tq-toolbar-arrow" data-action="tqNextStudent" title="Next student" aria-label="Next student">\n          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>\n        </button>\n        <div class="tq-progress-ring" id="tq-progress-ring">\n          <svg width="30" height="30" viewBox="0 0 30 30">\n            <circle class="ring-bg" cx="15" cy="15" r="12"/>\n            <circle class="ring-fill" id="tq-ring-fill" cx="15" cy="15" r="12" stroke-dasharray="75.4" stroke-dashoffset="75.4"/>\n          </svg>\n          <span class="tq-progress-label" id="tq-progress-label"></span>\n        </div>\n      </div>\n      <select id="report-period" class="report-term-select" aria-label="Report"></select>\n      <select id="report-copy" class="report-term-select" aria-label="Copy" style="display:none"></select>\n      <div class="seg seg-sm" id="report-paper" role="radiogroup" aria-label="Paper" style="display:none">\n        <button class="seg-btn active" data-action="setPaper" data-paper="letter" role="radio" aria-checked="true">Letter</button>\n        <button class="seg-btn" data-action="setPaper" data-paper="legal" role="radio" aria-checked="false">Legal</button>\n      </div>\n      <div class="seg seg-sm" id="report-view" role="radiogroup" aria-label="View" style="display:none">\n        <button class="seg-btn active" data-action="setView" data-view="screen" role="radio" aria-checked="true">Screen</button>\n        <button class="seg-btn" data-action="setView" data-view="photocopy" role="radio" aria-checked="false">Photocopy</button>\n      </div>\n      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">\n        <button class="tb-toggle-btn" id="tb-anon-btn" style="display:none" data-action="toggleAnon">\n          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>\n          Anonymize\n        </button>\n        <button class="tb-toggle-btn" id="tb-rail-btn" style="display:none" data-action="toggleRail" aria-pressed="false" aria-controls="rb-panel">Builder</button>\n        <button class="tb-toggle-btn" id="tb-fitmap-btn" style="display:none" data-action="toggleFitMap" aria-pressed="false">Fit Map</button>\n        <button class="tb-action-btn" id="tb-print-btn" data-action="printReports">Print Reports</button>\n      </div>\n    </div>\n    <div id="report-output" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto"></div>';
 
   /* -- Expose handlers for inline event attributes --------- */
   window.rbDragStart = rbDragStart;
