@@ -1,0 +1,358 @@
+/* Print Grades: the class grade sheet (teacher/grades-print.js).
+
+   The pages render into #grades-print-root, kept off screen, and become the
+   only thing on the page while body.grades-print-active is set. Every page
+   is a box the size of the paper's printable area, landscape, in inches, so
+   the arithmetic in grades-print.js is the layout. Black and white only:
+   the sheet is printed and photocopied. */
+
+#grades-print-root {
+  position: absolute;
+  top: 0;
+  left: -30000px;
+  pointer-events: none;
+  background: #fff;
+  color: #000;
+}
+
+/* ── Page ─────────────────────────────────────────────────── */
+.gp-page {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fff;
+  color: #000;
+  font-family: Arial, Helvetica, 'Liberation Sans', sans-serif;
+  line-height: 1.2;
+  break-after: page;
+  page-break-after: always;
+  break-inside: avoid;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+.gp-page:last-child {
+  break-after: auto;
+  page-break-after: auto;
+}
+
+/* ── Header band ──────────────────────────────────────────── */
+.gp-head {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.3in;
+  padding-bottom: 0.06in;
+  font-size: 7.5pt;
+  line-height: 1.3;
+  overflow: hidden;
+}
+.gp-head-left,
+.gp-head-right {
+  min-width: 0;
+}
+.gp-head-right {
+  text-align: right;
+}
+.gp-head-title {
+  font-size: 9.5pt;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.gp-head div {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Grid ─────────────────────────────────────────────────── */
+.gp-grid {
+  flex: 0 0 auto;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.gp-grid th,
+.gp-grid td {
+  box-sizing: border-box;
+  border: 0.5pt solid #555;
+  padding: 0 0.03in;
+  overflow: hidden;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+/* The band of categories over the columns. */
+.gp-band th {
+  padding: 0 0.04in;
+  font-size: var(--gp-head-pt);
+  font-weight: 700;
+  text-align: left;
+  border-top: 1pt solid #000;
+  text-overflow: ellipsis;
+}
+.gp-band .gp-corner {
+  border-top: none;
+  border-left: none;
+}
+
+/* Column heads: number, title, date and out of, bottom-aligned. */
+.gp-colhead th {
+  padding: 0;
+  vertical-align: bottom;
+  font-size: var(--gp-head-pt);
+  font-weight: 400;
+  border-bottom: 1pt solid #000;
+}
+.gp-ch-in {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  height: 100%;
+  padding: 0.02in 0.03in;
+  line-height: 1.05;
+  text-align: center;
+}
+.gp-ch-num {
+  font-weight: 700;
+}
+.gp-ch-title div {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gp-ch-date,
+.gp-ch-out {
+  min-height: 1.05em;
+}
+.gp-sum-title {
+  font-weight: 700;
+}
+.gp-rh {
+  padding: 0 0.04in 0.03in !important;
+  text-align: left;
+  font-weight: 700 !important;
+}
+.gp-rh-num {
+  text-align: right !important;
+}
+
+/* Student rows. */
+.gp-row td,
+.gp-avg td {
+  height: var(--gp-row);
+  line-height: calc(var(--gp-row) - 1pt);
+}
+.gp-num {
+  text-align: right;
+}
+.gp-name,
+.gp-no {
+  text-overflow: ellipsis;
+}
+.gp-cell {
+  text-align: right;
+}
+.gp-mark {
+  text-align: center;
+}
+.gp-late {
+  margin-left: 0.02in;
+  font-size: 0.85em;
+  font-weight: 700;
+}
+.gp-sum {
+  text-align: center;
+}
+.gp-overall {
+  font-weight: 700;
+}
+/* A heavier rule after every fifth student, as in a record book. */
+.gp-row:nth-child(5n) td {
+  border-bottom: 1pt solid #000;
+}
+
+/* Points and levels: two lines in each row. */
+.gp-two-line .gp-row td,
+.gp-two-line .gp-avg td {
+  line-height: calc(var(--gp-row) / 2 - 0.5pt);
+}
+.gp-sub {
+  font-size: 0.85em;
+}
+
+/* The class average row. */
+.gp-avg td {
+  border-top: 1pt solid #000;
+  font-weight: 700;
+}
+.gp-avg-label {
+  text-align: left;
+}
+
+/* Heavier verticals between blocks and before the summary. */
+.gp-grid .gp-block-start {
+  border-left: 1pt solid #000;
+}
+.gp-grid .gp-cat-start {
+  border-left: 0.9pt solid #000;
+}
+.gp-grid .gp-summary-start {
+  border-left: 1.5pt solid #000;
+}
+
+/* ── Key and footer ───────────────────────────────────────── */
+.gp-foot {
+  margin-top: auto;
+  flex: 0 0 auto;
+  font-size: 6.5pt;
+  line-height: 1.35;
+}
+.gp-compact .gp-foot {
+  font-size: 6pt;
+}
+.gp-key {
+  overflow: hidden;
+}
+.gp-key-titles {
+  display: grid;
+  column-gap: 0.15in;
+}
+.gp-key-titles div,
+.gp-key-marks {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gp-foot-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  border-top: 0.5pt solid #000;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* ── Options dialog ───────────────────────────────────────── */
+.grades-print-card {
+  max-width: 600px;
+  max-height: 92vh;
+  overflow-y: auto;
+}
+.gp-groups {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 24px;
+  margin-bottom: 12px;
+}
+.gp-col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.gp-group {
+  border: none;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.gp-group legend {
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-2);
+  padding: 0;
+  margin-bottom: 6px;
+}
+.gp-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  font-family: var(--font-base);
+  font-size: var(--text-base);
+  color: var(--text);
+  cursor: pointer;
+}
+.gp-option input {
+  margin: 0;
+  accent-color: var(--active);
+}
+.gp-option.is-disabled {
+  color: var(--text-3);
+  cursor: default;
+}
+.gp-help {
+  color: var(--text-3);
+  font-size: var(--text-sm);
+}
+.gp-note {
+  margin-top: 4px;
+}
+.gp-dates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0 4px 24px;
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.gp-dates input {
+  font: inherit;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 2px 4px;
+  background: var(--surface);
+}
+.gp-pick {
+  max-height: 180px;
+  overflow-y: auto;
+  margin: 4px 0 0 24px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.gp-pick-option {
+  font-size: var(--text-sm);
+  padding: 2px 0;
+}
+.gp-status {
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  min-height: 1.4em;
+  margin-bottom: 16px;
+}
+.grades-print-overlay .confirm-ok:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+@media (max-width: 640px) {
+  .gp-groups {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Print ────────────────────────────────────────────────── */
+@media print {
+  body.grades-print-active {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+  body.grades-print-active > :not(#grades-print-root) {
+    display: none !important;
+  }
+  body.grades-print-active #grades-print-root {
+    position: static;
+    left: auto;
+    pointer-events: auto;
+  }
+}
