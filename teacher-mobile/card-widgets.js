@@ -358,7 +358,7 @@ window.MCardWidgets = (function () {
     if (!entry) return '';
     return (
       '<div class="m-wdg-reflection">' +
-      '<div class="m-wdg-reflection-label">Student voice</div>' +
+      '<div class="m-wdg-reflection-label">Student Voice</div>' +
       '<div class="m-wdg-reflection-text">' +
       MC.esc(_trunc(entry.text, 60)) +
       '</div>' +
@@ -473,7 +473,7 @@ window.MCardWidgets = (function () {
       '<div class="m-wdg-pips">' +
       renderPips(wh) +
       '</div>' +
-      '<div class="m-wdg-tile-label">Work habits</div>' +
+      '<div class="m-wdg-tile-label">Work Habits</div>' +
       '</div>' +
       '<div class="m-wdg-habit-col">' +
       '<div class="m-wdg-pips">' +
@@ -515,7 +515,7 @@ window.MCardWidgets = (function () {
     if (overflow > 0) chips += '<span class="m-wdg-chip m-wdg-chip-more">+' + overflow + '</span>';
     return (
       '<div class="m-wdg-growth-areas">' +
-      '<div class="m-wdg-section-label">Growth areas</div>' +
+      '<div class="m-wdg-section-label">Growth Areas</div>' +
       '<div class="m-wdg-chips">' +
       chips +
       '</div>' +
@@ -531,7 +531,7 @@ window.MCardWidgets = (function () {
     if (!raw) return '';
     return (
       '<div class="m-wdg-narrative">' +
-      '<div class="m-wdg-section-label">Term report</div>' +
+      '<div class="m-wdg-section-label">Term Report</div>' +
       '<div class="m-wdg-narrative-text">' +
       MC.esc(_trunc(raw, 80)) +
       '</div>' +

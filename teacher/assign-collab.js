@@ -47,7 +47,7 @@ window.AssignCollab = (function () {
       var html =
         '<div class="collab-panel">' +
         '<div class="collab-panel-header">' +
-        '<span class="collab-panel-title">Assign to students</span>' +
+        '<span class="collab-panel-title">Assign to Students</span>' +
         '<div class="collab-panel-actions">' +
         '<button class="collab-panel-btn" data-action="collabCheckAll">Check All</button>' +
         '<button class="collab-panel-btn" data-action="collabCheckNone">Check None</button>' +
@@ -84,7 +84,7 @@ window.AssignCollab = (function () {
       var html =
         '<div class="collab-panel">' +
         '<div class="collab-panel-header">' +
-        '<span class="collab-panel-title">Pair students</span>' +
+        '<span class="collab-panel-title">Pair Students</span>' +
         '<div class="collab-panel-actions">' +
         '<button class="collab-panel-btn' +
         (collabPairMode === 'random' ? ' active' : '') +
@@ -153,7 +153,7 @@ window.AssignCollab = (function () {
       var html =
         '<div class="collab-panel">' +
         '<div class="collab-panel-header">' +
-        '<span class="collab-panel-title">Group students</span>' +
+        '<span class="collab-panel-title">Group Students</span>' +
         '<div class="collab-panel-actions">' +
         '<button class="collab-panel-btn' +
         (collabGroupMode === 'random' ? ' active' : '') +

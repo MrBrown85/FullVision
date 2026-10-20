@@ -66,7 +66,7 @@ window.DashOverview = (function () {
       '<div class="dash-toolbar-spacer"></div>' +
       '<span class="dash-toolbar-label">' +
       students.length +
-      ' student' +
+      ' Student' +
       (students.length !== 1 ? 's' : '') +
       '</span>' +
       '</div>'
@@ -118,7 +118,7 @@ window.DashOverview = (function () {
       return sum + d.ids.length;
     }, 0);
 
-    html += '<div class="dash-section-title">Class distribution</div>';
+    html += '<div class="dash-section-title">Class Distribution</div>';
     if (totalWithProf > 0) {
       html += '<div style="display:flex;height:28px;gap:2px">';
       distribData.forEach(function (d) {
@@ -178,7 +178,7 @@ window.DashOverview = (function () {
     }
 
     html +=
-      '<div style="margin-top:14px"><div class="dash-section-title">Curricular competencies' +
+      '<div style="margin-top:14px"><div class="dash-section-title">Curricular Competencies' +
       '<a href="#/gradebook?course=' +
       cid +
       '">View Gradebook \u2192</a>' +
@@ -192,7 +192,7 @@ window.DashOverview = (function () {
       '">' +
       (classGrade.text || '\u2014') +
       '</div>' +
-      '<div class="dash-mini-stat-label">Class average</div>' +
+      '<div class="dash-mini-stat-label">Class Avg</div>' +
       '</div>' +
       '<div class="dash-mini-stat">' +
       '<div class="dash-mini-stat-val" style="color:' +
@@ -200,7 +200,7 @@ window.DashOverview = (function () {
       '">' +
       tagCoveragePct +
       '%</div>' +
-      '<div class="dash-mini-stat-label">Standards covered</div>' +
+      '<div class="dash-mini-stat-label">Standards Covered</div>' +
       '</div>' +
       '<div class="dash-mini-stat">' +
       '<div class="dash-mini-stat-val">' +
@@ -259,7 +259,7 @@ window.DashOverview = (function () {
       tagsWithEvidence +
       ' of ' +
       allTags.length +
-      ' standards assessed</div>' +
+      ' Standards Assessed</div>' +
       '<div class="dash-tag-grid">';
     sections.forEach(function (sec) {
       sec.tags.forEach(function (tag) {
@@ -289,7 +289,7 @@ window.DashOverview = (function () {
     html += '<div class="dash-overview-row dash-overview-second' + (upcomingBdays.length ? '' : ' is-single') + '">';
 
     html +=
-      '<div class="dash-overview-section dash-cc-card">' + '<div class="dash-section-title">Core competencies</div>';
+      '<div class="dash-overview-section dash-cc-card">' + '<div class="dash-section-title">Core Competencies</div>';
 
     html += '<div class="dash-cc-grid">';
     CORE_COMPETENCIES.forEach(function (cc) {
@@ -316,7 +316,7 @@ window.DashOverview = (function () {
     });
     html += '</div>';
 
-    html += '<div class="dash-next-steps"><div class="dash-section-title">Next steps</div>';
+    html += '<div class="dash-next-steps"><div class="dash-section-title">Next Steps</div>';
 
     if (actionItems.length === 0) {
       html +=
@@ -346,7 +346,7 @@ window.DashOverview = (function () {
     if (upcomingBdays.length > 0) {
       html +=
         '<div class="dash-overview-section dash-bday-card">' +
-        '<div class="dash-section-title">Upcoming birthdays</div>';
+        '<div class="dash-section-title">Upcoming Birthdays</div>';
       upcomingBdays.forEach(function (b) {
         var dob = parseLocalDate(b.student.dateOfBirth);
         var monthDay = dob.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
@@ -443,7 +443,7 @@ window.DashOverview = (function () {
   function renderBirthdayWidget(cid) {
     var upcomingBdays = getUpcomingBirthdays(cid);
     if (upcomingBdays.length === 0) return '';
-    var html = '<div class="dash-birthday-box">' + '<div class="dash-section-title">Upcoming birthdays</div>';
+    var html = '<div class="dash-birthday-box">' + '<div class="dash-section-title">Upcoming Birthdays</div>';
     upcomingBdays.forEach(function (b) {
       var dob = parseLocalDate(b.student.dateOfBirth);
       var monthDay = dob.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });

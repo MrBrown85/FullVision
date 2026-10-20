@@ -112,7 +112,7 @@ window.ReportBuilderUI = (function () {
     return (
       '<div class="rb-layout">' +
       '<aside class="rb-panel no-print" id="rb-panel">' +
-      '<div class="rb-panel-header"><div class="rb-panel-title">Report builder</div></div>' +
+      '<div class="rb-panel-header"><div class="rb-panel-title">Report Builder</div></div>' +
       '<div class="rb-presets">' +
       presetBtns +
       '</div>' +

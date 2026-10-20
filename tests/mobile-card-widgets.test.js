@@ -458,7 +458,7 @@ describe('MCardWidgets.render reflection', () => {
     expect(html).toContain('m-wdg-reflection');
     expect(html).toContain('m-wdg-reflection-label');
     expect(html).toContain('m-wdg-reflection-text');
-    expect(html).toContain('Student voice');
+    expect(html).toContain('Student Voice');
     expect(html).toContain('I really enjoyed');
   });
 
@@ -583,7 +583,7 @@ describe('MCardWidgets.render workHabits', () => {
     expect(html).toContain('m-wdg-habit-col');
     expect(html).toContain('m-wdg-pips');
     expect(html).toContain('m-wdg-pip');
-    expect(html).toContain('Work habits');
+    expect(html).toContain('Work Habits');
     expect(html).toContain('Participation');
   });
 
@@ -633,7 +633,7 @@ describe('MCardWidgets.render growthAreas', () => {
     const html = MCardWidgets.render('growthAreas', STUDENT, CID, d);
     expect(html).toContain('m-wdg-growth-areas');
     expect(html).toContain('m-wdg-section-label');
-    expect(html).toContain('Growth areas');
+    expect(html).toContain('Growth Areas');
     expect(html).toContain('m-wdg-chip-neutral');
     expect(html).toContain('Crit Think');
     expect(html).toContain('m-wdg-chip-dot');
@@ -659,7 +659,7 @@ describe('MCardWidgets.render narrative', () => {
     const html = MCardWidgets.render('narrative', STUDENT, CID, d);
     expect(html).toContain('m-wdg-narrative');
     expect(html).toContain('m-wdg-section-label');
-    expect(html).toContain('Term report');
+    expect(html).toContain('Term Report');
     expect(html).toContain('m-wdg-narrative-text');
     // HTML tags should be stripped
     expect(html).not.toContain('<p>');

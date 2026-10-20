@@ -240,7 +240,7 @@ window.MStudentDetail = (function () {
         return f.prof === 0;
       });
     if (hasFocus) {
-      focusHTML = '<div class="m-list-inset-header">Focus areas</div>';
+      focusHTML = '<div class="m-list-inset-header">Focus Areas</div>';
       focusAreas.forEach(function (f) {
         var secColor = f.section ? f.section.color : '#888';
         var label = f.tag.label || f.tag.name || f.tag.shortName || f.tag.code || '';
@@ -301,7 +301,7 @@ window.MStudentDetail = (function () {
       })
       .slice(0, 5);
 
-    var assessCards = '<div class="m-list-inset-header">Recent assessments</div>';
+    var assessCards = '<div class="m-list-inset-header">Recent Assessments</div>';
     if (!recentAssess.length) {
       assessCards +=
         '<div class="m-empty" style="padding:20px"><div class="m-empty-subtitle">No assessments yet</div></div>';
@@ -362,7 +362,7 @@ window.MStudentDetail = (function () {
 
     // Newest first already; the three newest.
     var obs = getStudentQuickObs(cid, sid).slice(0, 3);
-    var obsCards = '<div class="m-list-inset-header">Recent observations</div>';
+    var obsCards = '<div class="m-list-inset-header">Recent Observations</div>';
     if (!obs.length) {
       obsCards +=
         '<div class="m-empty" style="padding:20px"><div class="m-empty-subtitle">No observations yet</div></div>';

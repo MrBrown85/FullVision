@@ -108,7 +108,7 @@ window.ReportBlocks = (function () {
     const opt = sel && sel.options[sel.selectedIndex];
     const period = opt ? opt.text : '';
     return `<div class="report-header">
-    <div class="report-course-title">${esc(course.name)} student learning report</div>
+    <div class="report-course-title">${esc(course.name)} Student Learning Report</div>
     <div class="report-student-name">${esc(fullName(student))}${student.studentNumber ? ` <span style="font-size:0.7em;color:var(--text-3);font-weight:400">(${esc(student.studentNumber)})</span>` : ''}</div>
     <div class="report-period">${esc(period)}</div>
   </div>`;
@@ -129,17 +129,17 @@ window.ReportBlocks = (function () {
     // does ("A (97%)"). Both also keeps the proficiency word under it.
     let profLine = '';
     if (isLetter) {
-      overallHeading = 'Overall grade';
+      overallHeading = 'Overall Grade';
       overallDisplay = letterData && letterData.S ? `${letterData.S} (${letterData.R}%)` : 'No Evidence';
       if (course.gradingSystem === 'both') {
-        profLine = `<div class="report-overall-label" style="margin-top:6px">Overall proficiency: ${profDisplay}</div>`;
+        profLine = `<div class="report-overall-label" style="margin-top:6px">Overall Proficiency: ${profDisplay}</div>`;
       }
     } else if (usePercentage && (overall > 0 || (letterData && letterData.R != null))) {
       overallDisplay = letterData && letterData.R != null ? letterData.R + '%' : Math.round((overall / 4) * 100) + '%';
-      overallHeading = 'Overall grade';
+      overallHeading = 'Overall Grade';
     } else {
       overallDisplay = profDisplay;
-      overallHeading = 'Overall proficiency';
+      overallHeading = 'Overall Proficiency';
     }
     let html = `<div class="report-overall">
     <div class="report-overall-main">
@@ -224,7 +224,7 @@ window.ReportBlocks = (function () {
     const isHtml = /<[a-z][\s\S]*>/i.test(rating.narrative);
     const content = isHtml ? sanitizeNarrativeHtml(rating.narrative.trim()) : esc(rating.narrative.trim());
     let html = `<div class="report-block-box" style="page-break-inside:avoid">`;
-    html += `<div class="report-block-title">Teacher comment</div>`;
+    html += `<div class="report-block-title">Teacher Comment</div>`;
     html += `<div style="font-size:0.88rem;color:var(--text);line-height:1.6;padding:4px 0">${content}</div>`;
     html += `</div>`;
     return html;
@@ -235,7 +235,7 @@ window.ReportBlocks = (function () {
     const recentObs = quickObs.slice(0, 5);
     if (recentObs.length === 0) return '';
     let html = `<div class="report-learner-profile">`;
-    html += `<div class="report-learner-title">Observation evidence</div>`;
+    html += `<div class="report-learner-title">Observation Evidence</div>`;
     html += `<div class="report-obs-notes">`;
     recentObs.forEach(ob => {
       const dimPills = (ob.dims || [])
@@ -260,7 +260,7 @@ window.ReportBlocks = (function () {
     const assessments = getAssessments(cid);
     const allScores = getScores(cid)[student.id] || [];
     let html = `<div class="report-block-box">
-    <div class="report-block-title">Learning outcomes</div>
+    <div class="report-block-title">Learning Outcomes</div>
     <div style="font-size:0.62rem;color:var(--text-3);margin:-2px 0 6px">Competency levels: ${esc(describeCalcMethod(cid))}</div>`;
     sections.forEach(sec => {
       const secProf = getSectionProficiency(cid, student.id, sec.id);
@@ -344,7 +344,7 @@ window.ReportBlocks = (function () {
     const focusAreas = getFocusAreas(cid, student.id, 3);
     const realFocus = focusAreas.filter(f => f.prof <= 2);
     if (realFocus.length === 0) return '';
-    let html = `<div class="report-next-steps"><div class="report-next-steps-title">Suggested next steps</div>`;
+    let html = `<div class="report-next-steps"><div class="report-next-steps-title">Suggested Next Steps</div>`;
     realFocus.forEach((f, i) => {
       const secName = f.section ? f.section.name : '';
       const profLabel = f.prof > 0 ? PROF_LABELS[Math.round(f.prof)] : 'No Evidence';
@@ -383,7 +383,7 @@ window.ReportBlocks = (function () {
   function renderBlockParentResponse(cid, student) {
     const name = esc(displayNameFirst(student));
     let html = `<div class="report-block-box report-parent-response">`;
-    html += `<div class="report-block-title">Parent / guardian response</div>`;
+    html += `<div class="report-block-title">Parent / Guardian Response</div>`;
     html += `<div style="font-size:0.78rem;color:var(--text-2);margin-bottom:14px;line-height:1.5">Please review this report with your child and return this section to the school.</div>`;
     // Signature + Date
     html += `<div class="report-parent-lines">
@@ -415,7 +415,7 @@ window.ReportBlocks = (function () {
     const name = esc(displayNameFirst(student));
     const scale = ['Rarely', 'Sometimes', 'Usually', 'Consistently'];
     let html = `<div class="report-block-box" style="page-break-inside:avoid">`;
-    html += `<div class="report-block-title">How I see myself as a learner</div>`;
+    html += `<div class="report-block-title">How I See Myself as a Learner</div>`;
     html += `<div style="font-size:0.76rem;color:var(--text-2);margin-bottom:12px">${name}, rate yourself honestly on each learning disposition. Fill in one circle per row.</div>`;
     // Scale header
     html += `<div style="display:flex;justify-content:flex-end;gap:0;margin-bottom:4px;padding-right:4px">`;
@@ -475,7 +475,7 @@ window.ReportBlocks = (function () {
       { text: 'Set a goal and worked toward it' },
     ];
     let html = `<div class="report-block-box" style="page-break-inside:avoid">`;
-    html += `<div class="report-block-title">My classroom habits & responsibilities</div>`;
+    html += `<div class="report-block-title">My Classroom Habits & Responsibilities</div>`;
     html += `<div style="font-size:0.76rem;color:var(--text-2);margin-bottom:12px">${name}, think honestly about your habits this term. Fill in one circle per row.</div>`;
     // Rating table
     html += `<table class="report-habits-table"><thead><tr><th></th>`;
@@ -515,7 +515,7 @@ window.ReportBlocks = (function () {
     const allScores = getScores(cid)[student.id] || [];
     const levelScores = _levelScores(cid, student.id);
     let html = `<div class="report-block-box report-section-chart">
-    <div class="report-block-title">Section proficiency breakdown</div>`;
+    <div class="report-block-title">Section Proficiency Breakdown</div>`;
 
     sections.forEach((sec, si) => {
       const secProf = getSectionProficiency(cid, student.id, sec.id);
@@ -591,7 +591,7 @@ window.ReportBlocks = (function () {
 
       // Col 2: Growth
       html += `<div style="flex:1;min-width:0">`;
-      html += `<div style="font-weight:700;font-size:0.6rem;color:var(--text-2);margin-bottom:2px">Areas for growth</div>`;
+      html += `<div style="font-weight:700;font-size:0.6rem;color:var(--text-2);margin-bottom:2px">Areas for Growth</div>`;
       if (growth.length > 0) {
         growth.forEach(t => {
           html += `<div style="display:flex;align-items:baseline;gap:4px;color:var(--text)">
@@ -710,7 +710,7 @@ window.ReportBlocks = (function () {
     const gaugeDash = gaugeCirc * (profPct / 100);
 
     let html = `<div class="report-block-box" style="page-break-inside:avoid">
-    <div class="report-block-title">Score distribution & highlights</div>
+    <div class="report-block-title">Score Distribution & Highlights</div>
     <div style="display:flex;gap:16px;padding:4px 0">`;
 
     // LEFT HALF: donut + bars
@@ -738,7 +738,7 @@ window.ReportBlocks = (function () {
 
     // Top assignments
     if (top.length > 0) {
-      html += `<div style="font-weight:700;font-size:0.56rem;color:var(--text-2);margin:6px 0 3px">Top assignments</div>`;
+      html += `<div style="font-weight:700;font-size:0.56rem;color:var(--text-2);margin:6px 0 3px">Top Assignments</div>`;
       top.forEach(a => {
         html += `<div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;line-height:1.6">
         <span data-prof="${a.r}" style="font-weight:600;color:${PROF_COLORS[a.r]};font-size:0.64rem;width:14px;flex-shrink:0">${(PROF_LABELS[a.r] || '?')[0]}</span>
@@ -748,7 +748,7 @@ window.ReportBlocks = (function () {
     }
     // Bottom assignments
     if (bottom.length > 0) {
-      html += `<div style="font-weight:700;font-size:0.56rem;color:var(--text-2);margin:6px 0 3px">Needs improvement</div>`;
+      html += `<div style="font-weight:700;font-size:0.56rem;color:var(--text-2);margin:6px 0 3px">Needs Improvement</div>`;
       bottom.forEach(a => {
         html += `<div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;line-height:1.6">
         <span data-prof="${a.r}" style="font-weight:600;color:${PROF_COLORS[a.r]};font-size:0.64rem;width:14px;flex-shrink:0">${(PROF_LABELS[a.r] || '?')[0]}</span>
@@ -787,7 +787,7 @@ window.ReportBlocks = (function () {
     // Missing assignments — 2-column grid
     if (missing.length > 0) {
       html += `<div style="padding-top:8px;border-top:1px solid var(--border)">
-      <div class="report-missing-title" style="font-weight:700;font-size:0.56rem;color:var(--score-1);margin-bottom:4px">Missing assignments (${missing.length})</div>
+      <div class="report-missing-title" style="font-weight:700;font-size:0.56rem;color:var(--score-1);margin-bottom:4px">Missing Assignments (${missing.length})</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 16px">`;
       missing.forEach(a => {
         html += `<div style="font-size:0.68rem;color:var(--text);line-height:1.6;display:flex;align-items:baseline;gap:4px;min-width:0">
@@ -891,7 +891,7 @@ window.ReportBlocks = (function () {
     }
 
     let html = `<div class="report-block-box" style="page-break-inside:avoid">
-    <div class="report-block-title">Assignment grades</div>
+    <div class="report-block-title">Assignment Grades</div>
     <table class="report-tag-table report-grade-table" style="margin-top:4px">
       <thead><tr>
         <th style="width:36%;text-align:left">Assignment</th>
@@ -941,7 +941,7 @@ window.ReportBlocks = (function () {
       groups[c.group].push(c);
     });
     let html = `<div class="report-block-box" style="page-break-inside:avoid">
-    <div class="report-block-title">Core competencies</div>
+    <div class="report-block-title">Core Competencies</div>
     <div style="font-size:0.7rem;color:var(--text-2);margin:-2px 0 8px;line-height:1.35">Core competencies are the skills, habits, and dispositions students develop across all areas of learning. Progress is based on observations from classroom assessments.</div>
     <div style="display:flex;flex-wrap:wrap;gap:16px;padding:2px 0">`;
     Object.entries(groups).forEach(([groupName, comps]) => {

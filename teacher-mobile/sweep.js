@@ -402,7 +402,7 @@ window.MSweep = (function () {
       '<div class="m-sweep-actions">' +
       '<button class="m-btn-primary" id="m-sweep-save" data-action="m-sweep-save"' +
       (draft.text ? '' : ' disabled') +
-      '>Save and next</button>' +
+      '>Save and Next</button>' +
       '<button class="m-btn-ghost m-sweep-skip" data-action="m-sweep-skip">' +
       (_s.skipped[_s.sid] ? 'Undo skip' : 'Skip') +
       '</button>' +

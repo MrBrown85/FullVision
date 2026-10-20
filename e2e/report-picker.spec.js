@@ -31,10 +31,10 @@ test.describe('Report picker', () => {
     await gotoApp(page, '/reports');
     const sel = page.locator('#report-period');
     await expect(sel.locator('option')).toHaveText([
-      'Nov report card',
-      'Feb report card',
-      'Apr report card',
-      'Jun report card',
+      'Nov Report Card',
+      'Feb Report Card',
+      'Apr Report Card',
+      'Jun Report Card',
     ]);
     expect(await sel.locator('option').first().getAttribute('value')).toBe('Report 1');
   });

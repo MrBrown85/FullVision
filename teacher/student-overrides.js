@@ -24,7 +24,7 @@ window.StudentOverrides = (function () {
 
     var html =
       '<div class="override-panel-header">' +
-      '<span class="override-panel-title">Override proficiency</span>' +
+      '<span class="override-panel-title">Override Proficiency</span>' +
       '<button class="override-panel-close" data-action="closeOverridePanel" data-secid="' +
       secId +
       '">&times;</button>' +

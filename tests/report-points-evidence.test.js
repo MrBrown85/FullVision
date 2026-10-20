@@ -74,7 +74,7 @@ describe('report evidence for points work', () => {
     });
     const html = ReportBlocks.renderBlockScoreDistribution(CID, STUDENT);
     expect(html).not.toMatch(/>\?</);
-    expect(html).toContain('Top assignments');
+    expect(html).toContain('Top Assignments');
     expect(html).toMatch(/>E<\/span>\s*<span[^>]*>Essay/);
     expect(html).toMatch(/>P<\/span>\s*<span[^>]*>Seminar/);
   });

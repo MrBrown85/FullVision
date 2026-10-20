@@ -30,7 +30,7 @@ window.MCardWidgetEditor = (function () {
     html += '</div>';
 
     // Disabled widgets
-    html += '<div class="m-wdg-editor-section-label">More widgets</div>';
+    html += '<div class="m-wdg-editor-section-label">More Widgets</div>';
     html += '<div class="m-wdg-editor-list" id="m-wdg-disabled-list">';
     config.disabled.forEach(function (key) {
       var w = _registryMap[key];

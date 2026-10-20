@@ -362,7 +362,7 @@ window.PageAssignments = (function () {
         '</li>';
     });
     rubHtml +=
-      '</ul><button class="lo-add-btn" data-action="newRubricUI" style="display:block;width:100%">+ New rubric</button>';
+      '</ul><button class="lo-add-btn" data-action="newRubricUI" style="display:block;width:100%">+ New Rubric</button>';
 
     // Advanced dropdown content
     var advHtml =
@@ -395,7 +395,7 @@ window.PageAssignments = (function () {
       // Demo Mode, never for a signed-in teacher.
       (_isDemo()
         ? '<div class="settings-title" style="margin-top:16px;padding-top:12px;border-top:0.5px solid var(--divider-subtle)">Demo</div>' +
-          '<div class="settings-row"><label>Reset to demo data</label><button class="btn btn-danger" data-action="resetDemoData">Reset Demo</button></div>'
+          '<div class="settings-row"><label>Reset to Demo Data</label><button class="btn btn-danger" data-action="resetDemoData">Reset Demo</button></div>'
         : '') +
       '<div class="settings-title" style="margin-top:16px;padding-top:12px;border-top:0.5px solid var(--divider-subtle)">Account</div>' +
       '<div class="settings-row"><label>Delete your account</label><button class="btn btn-danger" data-action="deleteAccount">Delete Account</button></div>';
@@ -665,7 +665,7 @@ window.PageAssignments = (function () {
         '">' +
         '<span class="mod-folder-meta">' +
         items.length +
-        ' assignment' +
+        ' Assignment' +
         (items.length !== 1 ? 's' : '') +
         '</span>' +
         '<div class="mod-folder-actions" data-stop-prop="true">' +
@@ -881,7 +881,7 @@ window.PageAssignments = (function () {
     // Title
     html +=
       '<div class="af-field">' +
-      '<label class="af-label">Assignment title</label>' +
+      '<label class="af-label">Assignment Title</label>' +
       '<input class="af-input" id="af-title" type="text" value="' +
       esc(title) +
       '" placeholder="e.g. Persuasive Essay \u2014 Rights & Freedoms">' +
@@ -951,19 +951,19 @@ window.PageAssignments = (function () {
     html +=
       '<div class="af-row" style="align-items:end">' +
       '<div class="af-field" style="flex:0 0 auto">' +
-      '<label class="af-label">Today\'s date</label>' +
+      '<label class="af-label">Today\'s Date</label>' +
       '<div style="font-family:var(--font-base);font-size:0.9375rem;font-weight:500;color:var(--text);padding:8px 0;white-space:nowrap">' +
       todayFormatted +
       '</div>' +
       '</div>' +
       '<div class="af-field" style="flex:1;max-width:200px">' +
-      '<label class="af-label">Date assigned</label>' +
+      '<label class="af-label">Date Assigned</label>' +
       '<input class="af-input" id="af-date-assigned" type="date" value="' +
       dateAssigned +
       '" data-action-change="autoSetDueDate">' +
       '</div>' +
       '<div class="af-field" style="flex:1;max-width:200px">' +
-      '<label class="af-label">Due date (optional)</label>' +
+      '<label class="af-label">Due Date (optional)</label>' +
       '<input class="af-input" id="af-due" type="date" value="' +
       defaultDue +
       '">' +
@@ -998,7 +998,7 @@ window.PageAssignments = (function () {
         : '') +
       '</div>' +
       '<div class="af-field" style="flex:1">' +
-      '<label class="af-label">Evidence type</label>' +
+      '<label class="af-label">Evidence Type</label>' +
       '<select class="af-input" id="af-evidence">' +
       ['written', 'observation', 'audio', 'video', 'photo', 'conversation']
         .map(function (t) {
@@ -1056,7 +1056,7 @@ window.PageAssignments = (function () {
     html +=
       '<div class="af-row" style="align-items:end">' +
       '<div class="af-field" style="flex:0 0 auto">' +
-      '<label class="af-label">Scoring mode</label>' +
+      '<label class="af-label">Scoring Mode</label>' +
       '<input type="hidden" id="af-scoremode" value="' +
       scoreMode +
       '">' +
@@ -1081,7 +1081,7 @@ window.PageAssignments = (function () {
       '<div class="af-field" id="af-maxpoints-wrap" style="flex:0 0 auto;' +
       (scoreMode === 'points' ? '' : 'display:none') +
       '">' +
-      '<label class="af-label">Max points</label>' +
+      '<label class="af-label">Max Points</label>' +
       '<div style="display:flex;gap:6px;align-items:center">' +
       '<input class="af-input" id="af-maxpoints" type="number" min="1" max="9999" value="' +
       maxPoints +
@@ -1110,7 +1110,7 @@ window.PageAssignments = (function () {
       '<div class="af-field" id="af-weight-wrap" style="flex:0 0 auto;' +
       (scoreMode === 'proficiency' ? '' : 'display:none') +
       '" title="How much this counts toward competency proficiency, compared with other assessments. It doesn\u2019t change the course %.">' +
-      '<label class="af-label" for="af-weight">Proficiency weight</label>' +
+      '<label class="af-label" for="af-weight">Proficiency Weight</label>' +
       '<select class="af-input" id="af-weight" style="width:80px">' +
       [0.5, 1, 1.5, 2, 3]
         .map(function (w) {
@@ -1124,7 +1124,7 @@ window.PageAssignments = (function () {
     // Tags — grouped by competency group
     html +=
       '<div class="af-field">' +
-      '<label class="af-label">Curricular competencies</label>' +
+      '<label class="af-label">Curricular Competencies</label>' +
       '<div class="af-tags-container">';
     var lm = getLearningMap(cid);
     var compGroups = (lm && lm.competencyGroups) || [];
@@ -1247,7 +1247,7 @@ window.PageAssignments = (function () {
     // Core Competencies
     var selCC = assess ? assess.coreCompetencyIds || [] : [];
     html +=
-      '<div class="af-field">' + '<label class="af-label">Core competencies</label>' + '<div class="af-cc-chips">';
+      '<div class="af-field">' + '<label class="af-label">Core Competencies</label>' + '<div class="af-cc-chips">';
     CORE_COMPETENCIES.forEach(function (cc) {
       var sel = selCC.includes(cc.id);
       html +=
@@ -3642,7 +3642,7 @@ window.PageAssignments = (function () {
     _critCommentState.original = note;
     var name = displayName(student);
     var next = _nextCriterionCommentButton(_critCommentState);
-    var nextLabel = next ? (next.dataset.sid === sid ? 'Save and next criterion' : 'Save and next student') : '';
+    var nextLabel = next ? (next.dataset.sid === sid ? 'Save and Next Criterion' : 'Save and Next Student') : '';
     var overlay = document.getElementById('crit-comment-overlay');
     if (!overlay) {
       overlay = document.createElement('div');
@@ -3674,7 +3674,7 @@ window.PageAssignments = (function () {
       ' characters fit in two lines on a quarter sheet.</div><div class="crit-comment-count" id="crit-comment-count" aria-live="polite"></div></div></div>' +
       '<div class="crit-comment-actions">' +
       (note
-        ? '<button type="button" class="btn btn-danger crit-comment-remove" data-action="removeCriterionComment">Remove comment</button>'
+        ? '<button type="button" class="btn btn-danger crit-comment-remove" data-action="removeCriterionComment">Remove Comment</button>'
         : '') +
       '<span class="crit-comment-spacer"></span><button type="button" class="btn btn-ghost" data-action="closeCriterionComment">Cancel</button>' +
       (next
@@ -3793,7 +3793,7 @@ window.PageAssignments = (function () {
     var labels = scale.labels || [null, null, null, null];
     var defaultLabels = ['Emerging', 'Developing', 'Proficient', 'Extending'];
     var html =
-      '<div class="settings-title" style="margin-top:16px;padding-top:12px;border-top:0.5px solid var(--divider-subtle)">Grading scale</div><div style="font-size:0.75rem;color:var(--text-3);margin-bottom:8px">Set % boundaries for points \u2192 proficiency conversion</div><table style="width:100%;border-collapse:collapse;font-size:0.875rem"><thead><tr style="text-align:left;color:var(--text-3);font-size:0.75rem;"><th style="padding:4px 8px;width:40px">Level</th><th style="padding:4px 8px">Label</th><th style="padding:4px 8px;width:70px">Min %</th></tr></thead><tbody>';
+      '<div class="settings-title" style="margin-top:16px;padding-top:12px;border-top:0.5px solid var(--divider-subtle)">Grading Scale</div><div style="font-size:0.75rem;color:var(--text-3);margin-bottom:8px">Set % boundaries for points \u2192 proficiency conversion</div><table style="width:100%;border-collapse:collapse;font-size:0.875rem"><thead><tr style="text-align:left;color:var(--text-3);font-size:0.75rem;"><th style="padding:4px 8px;width:40px">Level</th><th style="padding:4px 8px">Label</th><th style="padding:4px 8px;width:70px">Min %</th></tr></thead><tbody>';
     for (var i = 0; i < b.length; i++) {
       var prof = b[i].proficiency;
       var label = (labels && labels[prof - 1]) || defaultLabels[prof - 1];
@@ -3850,7 +3850,7 @@ window.PageAssignments = (function () {
     var summPct = Math.round((cw.summative || 1) * 100);
     var formPct = Math.round((cw.formative || 0) * 100);
     return (
-      '<div class="settings-title" style="margin-top:16px;padding-top:12px;border-top:0.5px solid var(--divider-subtle)">Category weights</div>' +
+      '<div class="settings-title" style="margin-top:16px;padding-top:12px;border-top:0.5px solid var(--divider-subtle)">Category Weights</div>' +
       '<div class="settings-row" style="align-items:center;gap:8px"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.875rem"><input type="checkbox" id="cw-enabled" ' +
       (enabled ? 'checked' : '') +
       ' data-action-change="toggleCategoryWeights" style="width:16px;height:16px"> Weight formative assessments</label></div>' +

@@ -99,7 +99,7 @@ describe('class grade distribution', () => {
       flagCount: 0,
       actionItems: [],
     });
-    return html.slice(html.indexOf('Class distribution'), html.indexOf('Curricular competencies'));
+    return html.slice(html.indexOf('Class Distribution'), html.indexOf('Curricular Competencies'));
   }
 
   it('shows letter grades on the dashboard bar in a Letter class', () => {

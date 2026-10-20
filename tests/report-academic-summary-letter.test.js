@@ -56,16 +56,16 @@ describe('Academic Summary overall grade', () => {
   it('shows the letter and % for a Letter class', () => {
     seed('letter', [score('a', 10), score('b', 9)]);
     const html = summary();
-    expect(html).toContain('Overall grade');
+    expect(html).toContain('Overall Grade');
     expect(html).toContain('A (95%)');
-    expect(html).not.toContain('Overall proficiency');
+    expect(html).not.toContain('Overall Proficiency');
   });
 
   it('shows the letter and % with the proficiency word for a Both class', () => {
     seed('both', [score('a', 7), score('b', 7)]);
     const html = summary();
     expect(html).toContain('C+ (70%)');
-    expect(html).toContain('Overall proficiency: Proficient');
+    expect(html).toContain('Overall Proficiency: Proficient');
   });
 
   it('matches the Class Summary letter cell', () => {
@@ -83,7 +83,7 @@ describe('Academic Summary overall grade', () => {
   it('keeps the proficiency word for a Proficiency class', () => {
     seed('proficiency', [score('a', 10), score('b', 9)]);
     const html = summary();
-    expect(html).toContain('Overall proficiency');
+    expect(html).toContain('Overall Proficiency');
     expect(html).toContain('Proficient');
     expect(html).not.toContain('A (95%)');
   });

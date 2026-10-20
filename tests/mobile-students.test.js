@@ -306,7 +306,7 @@ describe('Focus areas card', () => {
       ],
     });
     const html = MStudents.renderDetail(CID, 'stu1');
-    expect(html).toContain('Focus areas');
+    expect(html).toContain('Focus Areas');
     expect(html).toContain('Questioning');
     expect(html).toContain('1.5');
     expect(html).toContain('No evidence');
@@ -618,7 +618,7 @@ describe('Student detail recent assessments', () => {
       ],
     });
     const html = MStudents.renderDetail(CID, 'stu1');
-    const recent = html.slice(html.indexOf('Recent observations'));
+    const recent = html.slice(html.indexOf('Recent Observations'));
     expect(recent).toContain('Fifth note');
     expect(recent).toContain('Fourth note');
     expect(recent).toContain('Third note');

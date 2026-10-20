@@ -24,7 +24,7 @@ describe('StudentOverrides helpers', () => {
 
     expect(selected).toBe(3);
     expect(globalThis._overridePanel.style.display).toBe('');
-    expect(globalThis._overridePanel.innerHTML).toContain('Override proficiency');
+    expect(globalThis._overridePanel.innerHTML).toContain('Override Proficiency');
     expect(globalThis._overridePanel.innerHTML).toContain('Observed growth');
   });
 

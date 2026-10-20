@@ -22,7 +22,7 @@ describe('semester spans', () => {
   it('a semester subset still matches its school, so Semester 2 reads Apr and Jun', () => {
     const sem2 = termsInSpan(grandview(), 's2', '2027-01-27');
     expect(semesterTwoStart(sem2)).toBe('2027-01-27');
-    expect(reportingTermReportNames(sem2)).toEqual(['Apr report card', 'Jun report card']);
+    expect(reportingTermReportNames(sem2)).toEqual(['Apr Report Card', 'Jun Report Card']);
   });
 
   it('reads the span back off the terms a class carries', () => {

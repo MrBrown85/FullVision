@@ -420,11 +420,11 @@ window.MGrade = (function () {
       '</div>' +
       modSection +
       '<div class="m-filter-sheet-section">' +
-      '<div class="m-filter-sheet-title">Date range</div>' +
+      '<div class="m-filter-sheet-title">Date Range</div>' +
       dateSeg +
       '</div>' +
       '<div class="m-filter-sheet-section">' +
-      '<div class="m-filter-sheet-title">Graded status</div>' +
+      '<div class="m-filter-sheet-title">Graded Status</div>' +
       statusSeg +
       '</div>' +
       '<div class="m-filter-sheet-footer">' +

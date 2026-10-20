@@ -737,8 +737,8 @@ describe('MGrade filter sheet', () => {
     MGrade.openFilterSheet(CID);
 
     expect(capturedHtml).toContain('Category');
-    expect(capturedHtml).toContain('Date range');
-    expect(capturedHtml).toContain('Graded status');
+    expect(capturedHtml).toContain('Date Range');
+    expect(capturedHtml).toContain('Graded Status');
     expect(capturedHtml).toContain('Labs'); // the one category chip
     expect(capturedHtml).toContain('No Category');
     expect(capturedHtml).not.toContain('m-filter-sheet-title">Module'); // Module section hidden
