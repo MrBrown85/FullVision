@@ -3,8 +3,9 @@
  * (27 students, 37 assessments) through Chromium's print engine.
  * teacher/grades-print.js; docs/DECISIONS.md "Printed class grade sheet".
  *
+ * Portrait, laid out like MyEd's class list with grid, filling the page.
  * The page counts are the dialog's arithmetic, held against the PDF: 3
- * Letter pages and 2 Legal pages at Normal size, all time.
+ * Letter or Legal pages at Normal size, 2 at Compact, all time.
  */
 import { test, expect } from '@playwright/test';
 
@@ -105,7 +106,9 @@ test.describe('Print Grades', () => {
     await expect(dialog).toHaveCount(0);
   });
 
-  test('Letter prints 3 landscape pages, each with every student and the header', async ({ page }) => {
+  test('Letter prints 3 portrait pages, each with every student and the header, filled to the edges', async ({
+    page,
+  }) => {
     await openDemoGradebook(page);
     const dialog = await openDialog(page);
     await dialog.getByLabel('All Time').check();
@@ -119,47 +122,47 @@ test.describe('Print Grades', () => {
     for (let i = 0; i < expected; i++) {
       const p = pages.nth(i);
       await expect(p.locator('.gp-row')).toHaveCount(STUDENTS);
-      await expect(p.locator('.gp-head')).toContainText('Science 8 · Block A');
-      await expect(p.locator('.gp-head')).toContainText('Printed');
-      await expect(p.locator('.gp-foot-line')).toContainText(`Page ${i + 1} of ${expected}`);
-      // Nothing runs past the page box.
+      const head = p.locator('.gp-head');
+      await expect(head).toContainText('Class Grade Sheet');
+      await expect(head).toContainText('Class: Science 8');
+      await expect(head).toContainText('Block: A');
+      await expect(head.locator('.gp-head-line')).toContainText(`Page ${i + 1} of ${expected}`);
+      await expect(p.locator('th.gp-rh')).toHaveText(['Pupil #', 'Name']);
+      // The grid runs to the foot and the right edge, and nothing runs past the page.
       const fit = await p.evaluate(el => {
         const box = el.getBoundingClientRect();
         const grid = el.querySelector('.gp-grid').getBoundingClientRect();
-        const foot = el.querySelector('.gp-foot').getBoundingClientRect();
+        const key = el.querySelector('.gp-key').getBoundingClientRect();
+        const inch = 96;
         return {
-          gridOk: grid.right <= box.right + 0.5 && grid.bottom <= foot.top + 0.5,
-          footOk: foot.bottom <= box.bottom + 0.5,
+          inside: grid.right <= box.right + 0.5 && grid.bottom <= key.top + 0.5 && key.bottom <= box.bottom + 0.5,
+          toFoot: key.top - grid.bottom < 0.2 * inch,
+          toEdge: box.right - grid.right < 0.2 * inch,
         };
       });
-      expect(fit).toEqual({ gridOk: true, footOk: true });
+      expect(fit).toEqual({ inside: true, toFoot: true, toEdge: true });
     }
-    // The summary sits on the last page only.
-    await expect(pages.nth(0).locator('.gp-sum')).toHaveCount(0);
-    await expect(
-      pages
-        .nth(expected - 1)
-        .locator('th.gp-sum')
-        .last(),
-    ).toHaveText('Overall');
+    // Assignments only: no category or overall grades.
+    await expect(page.locator('#grades-print-root')).not.toContainText('Overall');
+    await expect(page.locator('#grades-print-root')).not.toContainText('Category Averages');
     // Every column prints once.
     expect(await page.locator('#grades-print-root th.gp-ch[data-col]').count()).toBe(37);
 
     const pdf = await pdfOfStaged(page);
     expect(countPages(pdf)).toBe(expected);
-    for (const box of pageBoxes(pdf)) expect(box).toEqual([792, 612]);
+    for (const box of pageBoxes(pdf)) expect(box).toEqual([612, 792]);
   });
 
-  test('Legal prints 2 wider pages and is remembered for the class', async ({ page }) => {
+  test('Legal prints 3 taller pages and is remembered for the class', async ({ page }) => {
     await openDemoGradebook(page);
     let dialog = await openDialog(page);
     await dialog.getByLabel('All Time').check();
     await dialog.getByLabel('Legal').check();
-    expect(await pagesInStatus(dialog)).toBe(2);
+    expect(await pagesInStatus(dialog)).toBe(3);
     await stageFromDialog(page, dialog);
     const pdf = await pdfOfStaged(page);
-    expect(countPages(pdf)).toBe(2);
-    for (const box of pageBoxes(pdf)) expect(box).toEqual([1008, 612]);
+    expect(countPages(pdf)).toBe(3);
+    for (const box of pageBoxes(pdf)) expect(box).toEqual([612, 1008]);
 
     await page.reload();
     await expect(page.getByRole('button', { name: 'Print Grades' })).toBeVisible();

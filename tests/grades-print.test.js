@@ -159,39 +159,6 @@ describe('columnsFor', () => {
   });
 });
 
-describe('summaryColumnsFor', () => {
-  it('has a category average per category and the overall grade', () => {
-    const s = GP.summaryColumnsFor(CID, GP.normalizeOptions({}));
-    expect(s.map(c => c.label)).toEqual(['Labs', 'Quizzes', 'Overall']);
-  });
-
-  it('is empty for a custom range or a blank sheet, and follows the switches', () => {
-    expect(
-      GP.summaryColumnsFor(CID, GP.normalizeOptions({ term: 'custom', from: '2026-09-01', to: '2026-12-01' })),
-    ).toEqual([]);
-    expect(GP.summaryColumnsFor(CID, GP.normalizeOptions({ blank: true }))).toEqual([]);
-    expect(GP.summaryColumnsFor(CID, GP.normalizeOptions({ categoryAverages: false })).map(c => c.kind)).toEqual([
-      'overall',
-    ]);
-  });
-
-  it('widens the overall column for a class that shows letters', () => {
-    const prof = GP.summaryColumnsFor(CID, GP.normalizeOptions({})).pop().w;
-    seed({ course: { gradingSystem: 'letter' } });
-    const letter = GP.summaryColumnsFor(CID, GP.normalizeOptions({})).pop().w;
-    expect(letter).toBeGreaterThan(prof);
-  });
-
-  it('prints a class that shows both grades on two-line rows, the level over the %', () => {
-    seed({ course: { gradingSystem: 'both' } });
-    const model = GP.buildModel(CID, {});
-    expect(model.layout.twoLine).toBe(true);
-    const html = GP.renderPages(model);
-    expect(html).toContain('gp-two-line');
-    expect(html).toMatch(/3\.3<div class="gp-sub">83%<\/div>/);
-  });
-});
-
 describe('cellText', () => {
   const col = id => GP.columnsFor(CID, GP.normalizeOptions({})).find(c => c.id === id);
 
@@ -228,68 +195,72 @@ describe('cellText', () => {
   });
 });
 
-describe('pageCapacity and paginate', () => {
-  const summary3 = [{ w: 0.5 }, { w: 0.5 }, { w: 0.5 }, { w: 0.45 }];
-
-  it('fits more columns on Legal than Letter and more at Compact than Normal', () => {
-    const letter = GP.pageCapacity(GP.normalizeOptions({}), summary3);
-    const legal = GP.pageCapacity(GP.normalizeOptions({ paper: 'legal' }), summary3);
-    const compact = GP.pageCapacity(GP.normalizeOptions({ size: 'compact' }), summary3);
-    expect(letter).toMatchObject({ full: 15, withSummary: 11 });
-    expect(legal).toMatchObject({ full: 21, withSummary: 17 });
-    expect(compact.full).toBeGreaterThan(letter.full);
-    expect(GP.pageCapacity(GP.normalizeOptions({ studentNumbers: true }), summary3).full).toBeLessThan(letter.full);
+describe('page geometry', () => {
+  it('holds more columns at Compact, fewer with pupil numbers, the same on Legal', () => {
+    const letter = GP.pageCapacity(GP.normalizeOptions({}));
+    expect(letter.full).toBe(16);
+    expect(GP.pageCapacity(GP.normalizeOptions({ paper: 'legal' })).full).toBe(16);
+    expect(GP.pageCapacity(GP.normalizeOptions({ size: 'compact' })).full).toBe(19);
+    expect(GP.pageCapacity(GP.normalizeOptions({ studentNumbers: false })).full).toBe(18);
   });
 
-  it('fits fewer rows when the key needs more lines and when rows hold two lines', () => {
+  it('holds more rows on Legal and at Compact, fewer when rows hold two lines', () => {
     const opts = GP.normalizeOptions({});
-    expect(GP.rowCapacity(opts, 1, false)).toBeGreaterThan(GP.rowCapacity(opts, 4, false));
-    expect(GP.rowCapacity(opts, 1, true)).toBeLessThan(GP.rowCapacity(opts, 1, false));
-    expect(GP.rowCapacity(GP.normalizeOptions({ size: 'compact' }), 1, false)).toBeGreaterThan(
-      GP.rowCapacity(opts, 1, false),
+    expect(GP.rowCapacity(opts, false)).toBe(32);
+    expect(GP.rowCapacity(GP.normalizeOptions({ paper: 'legal' }), false)).toBe(46);
+    expect(GP.rowCapacity(opts, true)).toBeLessThan(GP.rowCapacity(opts, false));
+    expect(GP.rowCapacity(GP.normalizeOptions({ size: 'compact' }), false)).toBeGreaterThan(
+      GP.rowCapacity(opts, false),
     );
   });
 
-  it('puts every column on exactly one page, the summary beside the last', () => {
-    [0, 1, 11, 12, 15, 26, 37, 60].forEach(n => {
-      const blocks = GP.columnBlocks(n, 15, 11, true);
-      const total = blocks.reduce((t, b) => t + b.count, 0);
-      expect(total).toBe(n);
-      blocks.slice(0, -1).forEach(b => expect(b.count).toBeLessThanOrEqual(15));
-      expect(blocks[blocks.length - 1].count).toBeLessThanOrEqual(11);
-      blocks.forEach((b, i) => i && expect(b.start).toBe(blocks[i - 1].start + blocks[i - 1].count));
+  it('stretches items to fill a space, adding blank ones past their most', () => {
+    expect(GP.fill(7, 28, 0.3)).toEqual({ size: 0.25, blank: 0 });
+    expect(GP.fill(6, 4, 0.3)).toEqual({ size: 0.3, blank: 16 });
+    expect(GP.fill(5, 0, 0.5)).toEqual({ size: 0.5, blank: 10 });
+  });
+
+  it('pages the demo-sized class: 27 students and 37 columns on 3 Letter pages, 2 at Compact', () => {
+    const cols = Array.from({ length: 37 }, (_, i) => ({ n: i + 1, outOf: null }));
+    const letter = GP.paginate(cols, 27, GP.normalizeOptions({}));
+    expect(letter.pages.map(p => p.cols.count)).toEqual([13, 13, 11]);
+    expect(GP.paginate(cols, 27, GP.normalizeOptions({ paper: 'legal' })).pages).toHaveLength(3);
+    expect(GP.paginate(cols, 27, GP.normalizeOptions({ size: 'compact' })).pages).toHaveLength(2);
+  });
+
+  it('fills every page to its foot and right edge', () => {
+    const opts = GP.normalizeOptions({});
+    const cols = Array.from({ length: 37 }, (_, i) => ({ n: i + 1, outOf: null }));
+    const out = GP.paginate(cols, 27, opts);
+    const width = GP.pageCapacity(opts).width;
+    out.pages.forEach(p => {
+      const rows = p.students.count + p.blankRows + 1;
+      expect(rows * p.rowH).toBeCloseTo(out.gridH, 1);
+      expect((p.cols.count + p.blankCols) * p.colW).toBeCloseTo(width, 1);
     });
   });
 
-  it('gives the summary its own page when it leaves no room for a column', () => {
-    expect(GP.columnBlocks(5, 5, 0, true)).toEqual([
-      { start: 0, count: 5 },
-      { start: 5, count: 0 },
-    ]);
-  });
-
-  it('pages the demo-sized class: 27 students, 37 columns, Letter and Legal', () => {
-    const cols = Array.from({ length: 37 }, (_, i) => ({ n: i + 1, cut: false, outOf: null }));
-    const letter = GP.paginate(cols, summary3, 27, GP.normalizeOptions({}));
-    expect(letter.pages).toHaveLength(3);
-    expect(letter.pages.filter(p => p.summary)).toHaveLength(1);
-    expect(letter.pages[2].summary).toBe(true);
-    const legal = GP.paginate(cols, summary3, 27, GP.normalizeOptions({ paper: 'legal' }));
-    expect(legal.pages).toHaveLength(2);
+  it('adds blank rows and columns when the class is small', () => {
+    const cols = Array.from({ length: 3 }, (_, i) => ({ n: i + 1, outOf: null }));
+    const [page] = GP.paginate(cols, 3, GP.normalizeOptions({})).pages;
+    expect(page.blankRows).toBeGreaterThan(0);
+    expect(page.blankCols).toBeGreaterThan(0);
+    expect(page.rowH).toBeLessThanOrEqual(0.31);
+    expect(page.colW).toBeLessThanOrEqual(0.51);
   });
 
   it('runs every column page of one student block before the next block', () => {
-    const cols = Array.from({ length: 20 }, (_, i) => ({ n: i + 1, cut: false, outOf: null }));
-    const out = GP.paginate(cols, summary3, 70, GP.normalizeOptions({}));
+    const cols = Array.from({ length: 20 }, (_, i) => ({ n: i + 1, outOf: null }));
+    const out = GP.paginate(cols, 70, GP.normalizeOptions({}));
     const order = out.pages.map(p => p.students.start + ':' + p.cols.start);
-    expect(out.pages.length).toBe(6);
     expect(order).toEqual(['0:0', '0:10', '24:0', '24:10', '48:0', '48:10']);
-    expect(out.pages.filter(p => p.summary)).toHaveLength(3);
+    // Every column page of a student block shares its row height.
+    expect(out.pages[0].rowH).toBe(out.pages[1].rowH);
   });
 });
 
 describe('buildModel', () => {
-  it('reads term grades and puts the gradebook term back', () => {
+  it('reads the term and puts the gradebook term back', () => {
     setActiveTerm(CID, 2);
     const model = GP.buildModel(CID, { term: '1' });
     expect(getActiveTerm(CID).ordinal).toBe(2);
@@ -300,21 +271,31 @@ describe('buildModel', () => {
   it('carries the class header and only the marks it uses', () => {
     getConfig().displayName = 'Colin Brown';
     const model = GP.buildModel(CID, {});
-    expect(model.header.title).toBe('Science 8 · Block A');
-    expect(model.header.teacher).toBe('Colin Brown');
-    expect(model.header.counts).toBe('3 Students · 5 Assessments · Scores as Entered');
+    expect(model.header).toMatchObject({
+      className: 'Science 8',
+      block: 'A',
+      teacher: 'Colin Brown',
+      students: '3',
+      scores: 'As Entered',
+    });
+    expect(model.header.printed).toMatch(/\d{4}, \d{1,2}:\d{2}/);
     expect(model.marks.map(m => m.key).sort()).toEqual(['L', 'NS', '—', '✓', '✗'].sort());
   });
 
-  it('prints overall grades and averages through calc.js', () => {
+  it('prints assignments only: no category or overall grades', () => {
     const model = GP.buildModel(CID, {});
-    const overallIdx = model.summary.findIndex(s => s.kind === 'overall');
-    model.rows.forEach(r => {
-      expect(r.summary[overallIdx]).toBe(studentGradeSummary(CID, r.id).text || '—');
-    });
-    expect(model.averages.summary[overallIdx]).toBe(classGradeSummary(CID, ['s3', 's1', 's2']).text);
+    expect(model.summary).toBeUndefined();
+    const html = GP.renderPages(model);
+    expect(html).not.toContain('Category Averages');
+    expect(html).not.toContain('Overall');
+  });
+
+  it('averages each assignment through calc.js', () => {
+    const model = GP.buildModel(CID, {});
     const quiz = model.columns.findIndex(c => c.id === 'q1');
     expect(model.averages.cells[quiz]).toBe('7.7');
+    const lab = model.columns.findIndex(c => c.id === 'l1');
+    expect(model.averages.cells[lab]).toBe(formatLevel(CID, (3 + 1 / 3 + 4) / 2));
   });
 
   it('sorts by last name as "Last, First", or by first name', () => {
@@ -326,16 +307,6 @@ describe('buildModel', () => {
     ]);
   });
 
-  it('lists the cut titles of a page in its key', () => {
-    const model = GP.buildModel(CID, {});
-    const key = GP.keyLines(model, model.pages[0]);
-    expect(key.titles.map(t => t.text)).toEqual([
-      'Photosynthesis vs Respiration Comparison (Nov 20, 2026)',
-      'Undated Reflection',
-    ]);
-    expect(key.marks[0]).toMatch(/^\S+ [A-Z]/);
-  });
-
   it('has a status line with students, columns and pages', () => {
     expect(GP.statusText(GP.buildModel(CID, {}))).toBe('3 students · 5 columns · 1 page.');
     expect(GP.statusText(GP.buildModel(CID, { assessments: 'pick', picked: [] }))).toBe('No assessments to print.');
@@ -343,14 +314,33 @@ describe('buildModel', () => {
 });
 
 describe('renderPages', () => {
-  it('draws one page per page of the model with Title Case labels and no sentences', () => {
-    const model = GP.buildModel(CID, { studentNumbers: true });
+  it('draws a MyEd-style header and grid with Title Case labels and no sentences', () => {
+    getConfig().displayName = 'Colin Brown';
+    const model = GP.buildModel(CID, {});
     const html = GP.renderPages(model);
     expect((html.match(/class="gp-page/g) || []).length).toBe(model.pages.length);
-    expect(html).toContain('Category Averages');
-    expect(html).toContain('Class Average');
-    expect(html).toContain('Student No.');
+    expect(html).toContain('Class Grade Sheet');
     expect(html).toContain('Page 1 of 1');
-    expect(html).not.toMatch(/toFixed|NaN|undefined/);
+    for (const label of ['Class:', 'Teacher:', 'Block:', 'Term:', 'Students:', 'Scores:', 'Pupil #', 'Name']) {
+      expect(html).toContain(label);
+    }
+    expect(html).toContain('Class Average');
+    expect(html).toContain('Photosynthesis vs Respiration');
+    expect(html).not.toMatch(/NaN|undefined/);
+  });
+
+  it('keeps every header field in its place when one is empty', () => {
+    getConfig().displayName = '';
+    const html = GP.renderPages(GP.buildModel(CID, {}));
+    expect(html).toContain('<b>Teacher:</b>');
+  });
+
+  it('prints a class that shows both grades on two-line rows, the level over the %', () => {
+    seed({ course: { gradingSystem: 'both' } });
+    const model = GP.buildModel(CID, {});
+    expect(model.layout.twoLine).toBe(true);
+    const html = GP.renderPages(model);
+    expect(html).toContain('gp-two-line');
+    expect(html).toMatch(/3\.3<div class="gp-sub">83%<\/div>/);
   });
 });
