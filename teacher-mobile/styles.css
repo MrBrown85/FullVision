@@ -803,37 +803,197 @@ body.fv-switching-course::after {
 }
 
 /* ── Observation Cards ─────────────────────────────────────── */
+/* The desktop card's vocabulary (teacher/observations.css): a solid type
+   block in a fixed width so names line up, the time under a day header,
+   a meta line, and a faint chevron; the whole card opens the edit sheet. */
 .m-obs-date-group {
-  padding: 16px 16px 6px;
+  text-align: center;
+  padding: 16px 0 8px;
   font-size: 13px;
   font-weight: 600;
   color: var(--text-3);
 }
+#m-obs-cards {
+  overflow-x: clip;
+}
 .m-obs-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 14px;
+  gap: 0 8px;
+  align-items: start;
   background: var(--surface);
   border-radius: 12px;
   margin: 0 16px 8px;
-  padding: 14px 16px;
-  border-left: 4px solid var(--text-3);
+  padding: 12px 12px 12px 14px;
   position: relative;
-  overflow: hidden;
+  touch-action: pan-y;
+  transition: transform 0.2s ease-out;
+  -webkit-tap-highlight-color: transparent;
 }
-.m-obs-card[data-sentiment='strength'] {
-  border-left-color: var(--score-3);
+.m-obs-card[data-action] {
+  cursor: pointer;
 }
-.m-obs-card[data-sentiment='growth'] {
-  border-left-color: var(--active);
+.m-obs-card:not([data-action]) {
+  grid-template-columns: minmax(0, 1fr);
 }
-.m-obs-card[data-sentiment='concern'] {
-  border-left-color: var(--score-2);
+.m-obs-card.m-obs-swiping {
+  transition: none;
 }
-
-.m-obs-header {
+/* Revealed at the right edge as the card slides left. */
+.m-obs-card[data-action]::after {
+  content: 'Delete';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(100% + 16px);
+  width: 100vw;
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-bottom: 6px;
+  padding-left: 20px;
+  border-radius: 12px;
+  background: var(--priority);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
 }
+.m-obs-main {
+  min-width: 0;
+}
+.m-obs-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+.m-obs-type {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 74px;
+  height: 22px;
+  border-radius: var(--radius-xs, 4px);
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+.m-obs-type[data-sentiment='strength'] {
+  background: var(--score-3);
+}
+.m-obs-type[data-sentiment='growth'] {
+  background: var(--score-4);
+}
+.m-obs-type[data-sentiment='concern'] {
+  background: var(--score-2);
+}
+.m-obs-type-none {
+  border: 1px dashed var(--border-2);
+}
+.m-obs-student-name {
+  font-size: 16px;
+  font-weight: 650;
+  color: var(--text);
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.m-obs-with {
+  font-size: 13px;
+  color: var(--text-2);
+}
+.m-obs-time {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.m-obs-text {
+  font-size: 16px;
+  color: var(--text);
+  line-height: 1.45;
+  margin-top: 6px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+.m-obs-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin-top: 6px;
+  font-size: 13px;
+}
+.m-obs-context {
+  color: var(--text-3);
+}
+.m-obs-assessment {
+  color: var(--link);
+  font-weight: 500;
+}
+.m-obs-meta .m-obs-link {
+  color: var(--text-2);
+}
+.m-obs-meta .obsc-pill-competency {
+  background: none;
+  color: var(--link);
+  font-weight: 500;
+}
+/* The tags flow on the meta line with the context. */
+.m-obs-tags {
+  display: contents;
+}
+/* A tag: a chip on other screens (the sweep), plain text with its dot on
+   the card. */
+.m-obs-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--overlay-hover);
+  color: var(--text-2);
+}
+.m-obs-meta .m-obs-tag-chip {
+  gap: 5px;
+  font-size: inherit;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  white-space: nowrap;
+}
+.m-obs-tag-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.m-obs-quoted {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs, 4px);
+  padding: 0 6px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+.m-obs-chev {
+  align-self: center;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text-3);
+  font-size: 20px;
+  line-height: 1;
+  opacity: 0.6;
+  cursor: pointer;
+}
+/* Type pills elsewhere on the phone (sweep, card widgets, starters). */
 .m-obs-type-pill {
   display: inline-flex;
   align-items: center;
@@ -866,95 +1026,17 @@ body.fv-switching-course::after {
   color: var(--text);
   margin-bottom: 12px;
 }
-.m-obs-edit-btn,
-.m-obs-delete-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--text-2);
-  font-size: 16px;
-  min-width: 44px;
+.m-obs-sheet-delete {
+  display: block;
+  width: 100%;
   min-height: 44px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition:
-    background 0.15s,
-    color 0.15s;
-  -webkit-tap-highlight-color: transparent;
-}
-.m-obs-edit-btn:hover,
-.m-obs-delete-btn:hover {
-  background: var(--overlay-hover);
-}
-.m-obs-edit-btn:active {
-  color: var(--link);
-}
-.m-obs-delete-btn:active {
-  color: var(--danger);
-}
-.m-obs-student-name {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--text);
-  flex: 1;
-}
-.m-obs-context {
-  font-size: 12px;
-  color: var(--text-2);
+  margin-top: 12px;
   border: 1px solid var(--border);
-  padding: 0 7px;
-  border-radius: 10px;
-  white-space: nowrap;
-}
-.m-obs-time {
-  font-size: 12px;
-  color: var(--text-3);
-}
-.m-obs-text {
+  border-radius: 8px;
+  background: none;
+  color: var(--priority);
   font-size: 15px;
-  color: var(--text);
-  line-height: 1.4;
-  margin-bottom: 8px;
-}
-.m-obs-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-.m-obs-tag-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 12px;
-  padding: 2px 8px;
-  border-radius: 10px;
-  background: var(--overlay-hover);
-  color: var(--text-2);
-}
-.m-obs-tag-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-}
-
-/* Swipe to delete */
-.m-obs-card .m-swipe-delete {
-  position: absolute;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  width: 80px;
-  background: var(--priority);
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  font-weight: 600;
-  transform: translateX(80px);
-  transition: transform 0.2s;
+  cursor: pointer;
 }
 
 /* ── Filter Pills ──────────────────────────────────────────── */
@@ -2007,9 +2089,6 @@ body.fv-switching-course::after {
     box-shadow: 0 2px 16px rgba(0, 0, 0, 0.25);
     border: 1px solid var(--border);
   }
-  .m-post {
-    border: 1px solid var(--border);
-  }
   .m-grade-card-surface {
     box-shadow: 0 2px 16px rgba(0, 0, 0, 0.2);
     border: 1px solid var(--border);
@@ -2733,82 +2812,6 @@ body.fv-switching-course::after {
   background: var(--priority-light);
   font-weight: 700;
   border-radius: 10px;
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   SOCIAL MEDIA POST CARDS — Observation feed
-   ═══════════════════════════════════════════════════════════════ */
-.m-post {
-  border-radius: 16px;
-  margin: 8px 16px;
-  padding: 14px 16px;
-  background: var(--surface);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-}
-.m-post-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  margin-bottom: 8px;
-}
-.m-post-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  font-weight: 600;
-  flex-shrink: 0;
-}
-.m-post-meta {
-  flex: 1;
-  min-width: 0;
-}
-.m-post-username {
-  font-weight: 600;
-  color: var(--link);
-  background: none;
-  border: none;
-  font-size: 15px;
-  padding: 0;
-  text-align: left;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-.m-post-meta-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 8px;
-  margin-top: 2px;
-}
-.m-post-body {
-  font-size: 16px;
-  line-height: 1.5;
-  color: var(--text);
-  margin-bottom: 8px;
-}
-.m-post-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.m-post .m-obs-tag-chip {
-  font-size: 13px;
-  font-weight: 500;
-}
-
-/* Date group dividers (social style) */
-.m-obs-card.m-post + .m-obs-date-group,
-.m-obs-date-group {
-  text-align: center;
-  font-size: 12px;
-  color: var(--text-3);
-  font-weight: 600;
-  padding: 16px 0 8px;
 }
 
 /* Post flash animation for new observations */

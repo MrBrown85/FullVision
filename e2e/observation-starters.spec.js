@@ -71,8 +71,8 @@ test.describe('Sentence starters', () => {
 
     const card = page.locator('.obs-card', { hasText: 'Measured twice before pouring' });
     await expect(card).toBeVisible();
-    await expect(card.locator('.obs-pill-type')).toHaveText('Strength');
-    await expect(card.locator('.obs-pill-context')).toHaveText('Small group');
+    await expect(card.locator('.obs-type')).toHaveText('Strength');
+    await expect(card.locator('.obs-card-context')).toHaveText('Small group');
     await expect(card.locator('.obs-card-dim')).toHaveText('Engagement');
   });
 

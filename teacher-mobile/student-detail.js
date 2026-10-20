@@ -367,42 +367,13 @@ window.MStudentDetail = (function () {
       obsCards +=
         '<div class="m-empty" style="padding:20px"><div class="m-empty-subtitle">No observations yet</div></div>';
     } else {
+      var obsCtx = ObsCard.context(cid);
       obs.forEach(function (ob) {
-        var sentiment = OBS_SENTIMENTS[ob.sentiment];
-        var context = OBS_CONTEXTS[ob.context];
-        var tagChips = (ob.dims || [])
-          .map(function (dim) {
-            return (
-              '<span class="m-obs-tag-chip"><span class="m-obs-tag-dot" style="background:' +
-              obsTagColor(dim) +
-              '"></span>' +
-              MC.esc(resolveTag(dim).label) +
-              '</span>'
-            );
-          })
-          .join('');
-        obsCards +=
-          '<div class="m-obs-card" data-sentiment="' +
-          (ob.sentiment || '') +
-          '">' +
-          '<div class="m-obs-header">' +
-          (sentiment
-            ? '<span class="m-obs-type-pill" data-sentiment="' +
-              ob.sentiment +
-              '">' +
-              MC.esc(sentiment.label) +
-              '</span>'
-            : '') +
-          (context ? '<span class="m-obs-context">' + MC.esc(context.label) + '</span>' : '') +
-          '<span class="m-obs-time">' +
-          MC.relativeTime(ob.created) +
-          '</span>' +
-          '</div>' +
-          '<div class="m-obs-text">' +
-          MC.esc(ob.text) +
-          '</div>' +
-          (tagChips ? '<div class="m-obs-tags">' + tagChips + '</div>' : '') +
-          '</div>';
+        obsCards += MObserve.cardHtml(cid, Object.assign({ studentId: sid }, ob), obsCtx, {
+          showStudent: false,
+          when: 'date',
+          editable: false,
+        });
       });
     }
 

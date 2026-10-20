@@ -59,8 +59,8 @@ test.describe('Observation capture strip', () => {
     await page.goto(`/teacher/app.html#/observations?course=${TEST_COURSE.id}`);
     const card = page.locator('.obs-card', { hasText: 'Explained the method to her group' });
     await expect(card).toBeVisible();
-    await expect(card.locator('.obs-pill-type')).toHaveText('Strength');
-    await expect(card.locator('.obs-pill-assessment')).toHaveText('Lab Report 1');
+    await expect(card.locator('.obs-type')).toHaveText('Strength');
+    await expect(card.locator('.obs-card-assessment')).toHaveText('Lab Report 1');
     await expect(card.locator('.obs-card-dim')).toHaveText('Collaboration');
   });
 
@@ -82,7 +82,7 @@ test.describe('Observation capture strip', () => {
 
     const card = page.locator('.obs-card', { hasText: 'Did not start the task' });
     await expect(card).toBeVisible();
-    await expect(card.locator('.obs-pill-type')).toHaveText('Concern');
+    await expect(card.locator('.obs-type')).toHaveText('Concern');
 
     const offer = page.locator('#obs-capture [data-part="flag"]');
     await expect(offer).toContainText('Not now');

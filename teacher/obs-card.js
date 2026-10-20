@@ -93,21 +93,50 @@ window.ObsCard = (function () {
 
   /* ── Card pieces ────────────────────────────────────────── */
 
+  function _date(ob) {
+    return new Date(ob.created || obDay(ob) + 'T12:00:00');
+  }
+
+  /* "12:00 p.m." The feed's day header carries the date. */
+  function cardTime(ob) {
+    if (!ob.created) return '';
+    return _date(ob).toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' });
+  }
+
+  /* "Fri, Oct 16 · 12:00 p.m." for lists without day headers. */
   function cardWhen(ob) {
-    var d = new Date(ob.created || obDay(ob) + 'T12:00:00');
+    var d = _date(ob);
     var opts = { weekday: 'short', month: 'short', day: 'numeric' };
     if (d.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
-    return (
-      d.toLocaleDateString('en-CA', opts) +
-      ' · ' +
-      d.toLocaleTimeString('en-CA', { hour: 'numeric', minute: '2-digit' })
-    );
+    var day = d.toLocaleDateString('en-CA', opts);
+    var t = cardTime(ob);
+    return t ? day + ' · ' + t : day;
+  }
+
+  /* The type as a solid word block in the proficiency colours, a fixed
+     74 px column so names line up. An untyped note is an empty outline. */
+  function typeBlockHtml(sentiment) {
+    var s = sentiment && OBS_SENTIMENTS[sentiment];
+    if (!s) return '<span class="obs-type obs-type-none" aria-hidden="true"></span>';
+    return '<span class="obs-type" data-sentiment="' + sentiment + '">' + esc(s.label) + '</span>';
   }
 
   function typePillHtml(sentiment) {
     var s = sentiment && OBS_SENTIMENTS[sentiment];
     if (!s) return '';
     return '<span class="obs-pill obs-pill-type" data-sentiment="' + sentiment + '">' + esc(s.label) + '</span>';
+  }
+
+  /* "Friday, Oct 16" (or Today / Yesterday) and the day's count. */
+  function dayHeaderHtml(label, count) {
+    return (
+      '<div class="obs-feed-date-label"><span>' +
+      esc(label) +
+      '</span><span class="obs-feed-date-count">' +
+      count +
+      (count === 1 ? ' observation' : ' observations') +
+      '</span></div>'
+    );
   }
 
   /* opts.hidden: obId → truthy for observations the list is hiding (a
@@ -132,17 +161,11 @@ window.ObsCard = (function () {
     };
   }
 
-  /* opts:
-       showStudent   the student's name leads the card (default true)
-       action        data-action on the card ('openFocus' by default; null for none) */
-  function html(ob, ctx, opts) {
-    opts = opts || {};
-    var showStudent = opts.showStudent !== false;
-    var action = opts.action === undefined ? 'openFocus' : opts.action;
-    var cid = ctx.cid;
+  /* Everything a card shows besides the type block and the note, so the
+     desktop and phone cards read the same. */
+  function parts(ob, ctx) {
     var byId = ctx.studentsById || {};
     var s = byId[ob.studentId];
-    var sn = s ? displayName(s) : ob.studentId;
     var others = (ctx.sameCapture[captureKey(ob)] || [])
       .filter(function (sid) {
         return sid !== ob.studentId;
@@ -151,11 +174,52 @@ window.ObsCard = (function () {
         return byId[sid] ? displayName(byId[sid]) : null;
       })
       .filter(Boolean);
-    var quoted = quotedLabel(ctx.quoted[ob.studentId + '|' + ob.id], ctx.hasTerms);
     var ctxInfo = ob.context && OBS_CONTEXTS[ob.context];
-    var aTitle = isLinked(ob) ? assessmentTitle(cid, ob) || 'Assessment' : '';
+    return {
+      name: s ? displayName(s) : ob.studentId,
+      withText: withLabel(others),
+      quoted: quotedLabel(ctx.quoted[ob.studentId + '|' + ob.id], ctx.hasTerms),
+      context: ctxInfo ? ctxInfo.label : '',
+      assessment: isLinked(ob) ? assessmentTitle(ctx.cid, ob) || 'Assessment' : '',
+    };
+  }
 
+  /* The meta line: context (lightest), a linked assessment, a linked
+     competency, the tags with their dots, and "Quoted in Report N" as a
+     stamp at the right. Empty when there is nothing to show. */
+  function metaHtml(ob, ctx, p) {
+    var tags = (ob.dims || [])
+      .map(function (t) {
+        return (
+          '<span class="obs-card-dim"><span class="dim-dot" style="background:' +
+          obsTagColor(t) +
+          '"></span>' +
+          esc(resolveTag(t).label) +
+          '</span>'
+        );
+      })
+      .join('');
     var out =
+      (p.context ? '<span class="obs-card-context">' + esc(p.context) + '</span>' : '') +
+      (p.assessment ? '<span class="obs-card-assessment">' + esc(p.assessment) + '</span>' : '') +
+      ObsCapture.linkPillsHtml(ctx.cid, ob, 'obs-card-link') +
+      (tags ? '<span class="obs-card-dims">' + tags + '</span>' : '') +
+      (p.quoted ? '<span class="obs-card-quoted">' + esc(p.quoted) + '</span>' : '');
+    return out ? '<div class="obs-card-meta">' + out + '</div>' : '';
+  }
+
+  /* opts:
+       showStudent   the student's name leads the card (default true)
+       action        data-action on the card ('openFocus' by default; null for none)
+       when          'time' (default; under a day header) or 'date' (date and time) */
+  function html(ob, ctx, opts) {
+    opts = opts || {};
+    var showStudent = opts.showStudent !== false;
+    var action = opts.action === undefined ? 'openFocus' : opts.action;
+    var p = parts(ob, ctx);
+    var when = opts.when === 'date' ? cardWhen(ob) : cardTime(ob);
+
+    return (
       '<div class="obs-card"' +
       (action ? ' data-action="' + action + '" tabindex="0"' : ' tabindex="-1"') +
       ' data-sid="' +
@@ -165,50 +229,36 @@ window.ObsCard = (function () {
       '"' +
       (ob.sentiment ? ' data-sentiment="' + ob.sentiment + '"' : '') +
       '>' +
-      '<div class="obs-card-header"><div class="obs-card-meta">' +
-      (showStudent ? '<span class="obs-card-student">' + esc(sn) + '</span>' : '') +
-      (others.length ? '<span class="obs-card-with">' + esc(withLabel(others)) + '</span>' : '') +
-      '<span class="obs-card-time">' +
-      esc(cardWhen(ob)) +
-      '</span>' +
-      typePillHtml(ob.sentiment) +
-      (ctxInfo ? '<span class="obs-pill obs-pill-context">' + esc(ctxInfo.label) + '</span>' : '') +
-      (aTitle ? '<span class="obs-pill obs-pill-assessment">' + esc(aTitle) + '</span>' : '') +
-      ObsCapture.linkPillsHtml(cid, ob) +
+      typeBlockHtml(ob.sentiment) +
+      '<div class="obs-card-main"><div class="obs-card-header">' +
+      (showStudent ? '<span class="obs-card-student">' + esc(p.name) + '</span>' : '') +
+      (p.withText ? '<span class="obs-card-with">' + esc(p.withText) + '</span>' : '') +
+      (when ? '<span class="obs-card-time">' + esc(when) + '</span>' : '') +
       '</div>' +
-      '<span class="obs-card-header-actions">' +
-      (quoted ? '<span class="obs-card-quoted">' + esc(quoted) + '</span>' : '') +
+      '<div class="obs-card-text">' +
+      esc(ob.text) +
+      '</div>' +
+      metaHtml(ob, ctx, p) +
+      '</div>' +
       '<button type="button" class="obs-card-delete" data-action="deleteOb" data-sid="' +
       ob.studentId +
       '" data-obid="' +
       ob.id +
       '" data-stop-prop="true" title="Delete" aria-label="Delete observation">' +
       TRASH_SVG +
-      '</button></span></div>' +
-      '<div class="obs-card-text">' +
-      esc(ob.text) +
-      '</div>';
-    if (ob.dims && ob.dims.length > 0) {
-      out += '<div class="obs-card-dims">';
-      ob.dims.forEach(function (t) {
-        var info = resolveTag(t);
-        out +=
-          '<span class="obs-card-dim"><span class="dim-dot" style="background:' +
-          obsTagColor(t) +
-          '"></span>' +
-          esc(info.label) +
-          '</span>';
-      });
-      out += '</div>';
-    }
-    out += '</div>';
-    return out;
+      '</button></div>'
+    );
   }
 
   return {
     html: html,
     context: context,
     typePillHtml: typePillHtml,
+    typeBlockHtml: typeBlockHtml,
+    dayHeaderHtml: dayHeaderHtml,
+    parts: parts,
+    metaHtml: metaHtml,
+    cardTime: cardTime,
     cardWhen: cardWhen,
     assessmentTitle: assessmentTitle,
     isLinked: isLinked,

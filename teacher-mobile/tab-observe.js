@@ -11,16 +11,18 @@ window.MObserve = (function () {
   var _pendingDeletes = {};
   var UNDO_MS = 6000;
 
-  /* Type, context and tags render as text pills; tags keep their colour
-     dot. */
+  /* Type, context and tags render as text; tags keep their colour dot. */
   function typePill(sentiment) {
     var s = OBS_SENTIMENTS[sentiment];
     if (!s) return '';
     return '<span class="m-obs-type-pill" data-sentiment="' + sentiment + '">' + MC.esc(s.label) + '</span>';
   }
-  function contextPill(context) {
-    var c = OBS_CONTEXTS[context];
-    return c ? '<span class="m-obs-context">' + MC.esc(c.label) + '</span>' : '';
+  /* The card's type: a solid word block in a fixed width so names line
+     up. An untyped note is an empty outline. */
+  function typeBlock(sentiment) {
+    var s = OBS_SENTIMENTS[sentiment];
+    if (!s) return '<span class="m-obs-type m-obs-type-none" aria-hidden="true"></span>';
+    return '<span class="m-obs-type" data-sentiment="' + sentiment + '">' + MC.esc(s.label) + '</span>';
   }
   function tagChips(dims) {
     return (dims || [])
@@ -35,6 +37,68 @@ window.MObserve = (function () {
         );
       })
       .join('');
+  }
+
+  /* "Today", "Yesterday", else "Fri, Oct 16". */
+  function dayLabel(ymd) {
+    var g = MC.dateGroupLabel(ymd);
+    if (g === 'Today' || g === 'Yesterday') return g;
+    var d = new Date(ymd + 'T12:00:00');
+    var o = { weekday: 'short', month: 'short', day: 'numeric' };
+    if (d.getFullYear() !== new Date().getFullYear()) o.year = 'numeric';
+    return d.toLocaleDateString('en-CA', o);
+  }
+
+  /* One observation card, as the desktop feed draws it (teacher/obs-card.js):
+     type block, name, time, the note, and a meta line of context, linked
+     assessment or competency, tags, and "Quoted in Report N". The whole
+     card opens the edit sheet; the name filters the feed to that student.
+     opts: showStudent (default true), when ('time' | 'date'),
+           editable (default true: tap opens the sheet, swipe deletes). */
+  function cardHtml(cid, ob, ctx, opts) {
+    opts = opts || {};
+    var p = ObsCard.parts(ob, ctx);
+    var st = ctx.studentsById[ob.studentId];
+    var editable = opts.editable !== false;
+    var when = opts.when === 'date' ? ObsCard.cardWhen(ob) : ObsCard.cardTime(ob);
+    var tags = tagChips(ob.dims);
+    var meta =
+      (p.context ? '<span class="m-obs-context">' + MC.esc(p.context) + '</span>' : '') +
+      (p.assessment ? '<span class="m-obs-assessment">' + MC.esc(p.assessment) + '</span>' : '') +
+      ObsCapture.linkPillsHtml(cid, ob, 'm-obs-link') +
+      (tags ? '<span class="m-obs-tags">' + tags + '</span>' : '') +
+      (p.quoted ? '<span class="m-obs-quoted">' + MC.esc(p.quoted) + '</span>' : '');
+    var ids = ' data-obid="' + ob.id + '" data-sid="' + ob.studentId + '"';
+    return (
+      '<div class="m-obs-card"' +
+      (editable ? ' data-action="m-obs-edit"' : '') +
+      ' data-sentiment="' +
+      (ob.sentiment || '') +
+      '"' +
+      ids +
+      '><div class="m-obs-main"><div class="m-obs-header">' +
+      typeBlock(ob.sentiment) +
+      (opts.showStudent === false
+        ? ''
+        : '<button type="button" class="m-obs-student-name" data-action="m-obs-filter" data-filter="student:' +
+          ob.studentId +
+          '">' +
+          MC.esc(st ? displayName(st) : 'Unknown') +
+          '</button>') +
+      (p.withText ? '<span class="m-obs-with">' + MC.esc(p.withText) + '</span>' : '') +
+      (when ? '<span class="m-obs-time">' + MC.esc(when) + '</span>' : '') +
+      '</div><div class="m-obs-text">' +
+      MC.esc(ob.text) +
+      '</div>' +
+      (meta ? '<div class="m-obs-meta">' + meta + '</div>' : '') +
+      '</div>' +
+      (editable
+        ? '<button type="button" class="m-obs-chev" data-action="m-obs-edit"' +
+          ids +
+          ' aria-label="Edit observation">\u203a</button>'
+        : '') +
+      '</div>'
+    );
   }
 
   /* ── Observation Feed Screen ────────────────────────────────── */
@@ -106,7 +170,6 @@ window.MObserve = (function () {
   }
 
   function _renderObsCards(cid, allObs, filter) {
-    var students = getStudents(cid);
     var filtered = allObs.filter(function (ob) {
       return !_pendingDeletes[ob.id];
     });
@@ -139,69 +202,16 @@ window.MObserve = (function () {
       return '<div class="m-empty"><div class="m-empty-title">No observations</div><div class="m-empty-subtitle">Tap + to record one</div></div>';
     }
 
+    var ctx = ObsCard.context(cid, { hidden: _pendingDeletes });
     var html = '';
     var lastGroup = '';
     filtered.forEach(function (ob) {
-      var dateStr = ob.created ? ob.created.substring(0, 10) : '';
-      var group = MC.dateGroupLabel(dateStr);
+      var group = dayLabel(ObsCard.obDay(ob));
       if (group !== lastGroup) {
-        html += '<div class="m-obs-date-group">' + group + '</div>';
+        html += '<div class="m-obs-date-group">' + MC.esc(group) + '</div>';
         lastGroup = group;
       }
-
-      var st = students.find(function (s) {
-        return s.id === ob.studentId;
-      });
-      var stName = st ? displayName(st) : 'Unknown';
-      var tags = ObsCapture.linkPillsHtml(cid, ob, 'm-obs-tag-chip') + tagChips(ob.dims);
-
-      var avatarColor = st ? MC.avatarColor(st.id) : '#888';
-      var avatarInitials = st ? MC.avatarInitials(st) : '?';
-
-      html +=
-        '<div class="m-obs-card m-post" data-sentiment="' +
-        (ob.sentiment || '') +
-        '" data-obid="' +
-        ob.id +
-        '" data-sid="' +
-        ob.studentId +
-        '">' +
-        '<div class="m-obs-header m-post-header">' +
-        '<div class="m-post-avatar" style="background:' +
-        avatarColor +
-        '">' +
-        avatarInitials +
-        '</div>' +
-        '<div class="m-post-meta">' +
-        '<button class="m-obs-student-name m-post-username" data-action="m-obs-filter" data-filter="student:' +
-        ob.studentId +
-        '">' +
-        MC.esc(stName) +
-        '</button>' +
-        '<div class="m-post-meta-row">' +
-        '<span class="m-obs-time">' +
-        MC.relativeTime(ob.created) +
-        '</span>' +
-        typePill(ob.sentiment) +
-        contextPill(ob.context) +
-        '</div>' +
-        '</div>' +
-        '<button class="m-obs-edit-btn" data-action="m-obs-edit" data-obid="' +
-        ob.id +
-        '" data-sid="' +
-        ob.studentId +
-        '" title="Edit" aria-label="Edit observation">&#9998;</button>' +
-        '<button class="m-obs-delete-btn" data-action="m-obs-delete" data-obid="' +
-        ob.id +
-        '" data-sid="' +
-        ob.studentId +
-        '" title="Delete" aria-label="Delete observation">&times;</button>' +
-        '</div>' +
-        '<div class="m-obs-text m-post-body">' +
-        MC.esc(ob.text) +
-        '</div>' +
-        (tags ? '<div class="m-obs-tags m-post-tags">' + tags + '</div>' : '') +
-        '</div>';
+      html += cardHtml(cid, ob, ctx);
     });
 
     return html;
@@ -292,6 +302,7 @@ window.MObserve = (function () {
       '>' +
       opts.submitLabel +
       '</button>' +
+      (opts.deleteHtml || '') +
       '</div>'
     );
   }
@@ -385,6 +396,12 @@ window.MObserve = (function () {
         dims: _selectedDims,
         submitLabel: 'Update observation',
         submitDisabled: false,
+        deleteHtml:
+          '<button class="m-obs-sheet-delete" data-action="m-obs-delete" data-obid="' +
+          obId +
+          '" data-sid="' +
+          sid +
+          '">Delete Observation</button>',
       }),
     );
   }
@@ -658,6 +675,64 @@ window.MObserve = (function () {
     MC.showToast('Observation added');
   }
 
+  /* Swipe a card left to delete it (with the same Undo toast). A short
+     swipe springs back. */
+  var _swipe = null;
+  var _swipeEndedAt = 0;
+  function _swipeStart(e) {
+    var card = e.target.closest && e.target.closest('#m-obs-cards .m-obs-card[data-action]');
+    if (!card || e.touches.length !== 1) return;
+    _swipe = { card: card, x: e.touches[0].clientX, y: e.touches[0].clientY, dx: 0, on: false };
+  }
+  function _swipeMove(e) {
+    if (!_swipe) return;
+    var dx = e.touches[0].clientX - _swipe.x;
+    var dy = e.touches[0].clientY - _swipe.y;
+    if (!_swipe.on) {
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+      if (Math.abs(dy) > Math.abs(dx) || dx > 0) {
+        _swipe = null;
+        return;
+      }
+      _swipe.on = true;
+      _swipe.card.classList.add('m-obs-swiping');
+    }
+    _swipe.dx = Math.min(0, dx);
+    _swipe.card.style.transform = 'translateX(' + _swipe.dx + 'px)';
+  }
+  function _swipeEnd() {
+    if (!_swipe) return;
+    var sw = _swipe;
+    _swipe = null;
+    if (!sw.on) return;
+    _swipeEndedAt = Date.now();
+    sw.card.classList.remove('m-obs-swiping');
+    if (-sw.dx > sw.card.offsetWidth * 0.35) {
+      sw.card.style.transform = 'translateX(-110%)';
+      var sid = sw.card.getAttribute('data-sid');
+      var obId = sw.card.getAttribute('data-obid');
+      setTimeout(function () {
+        holdDelete(getActiveCourse(), sid, obId);
+      }, 150);
+    } else {
+      sw.card.style.transform = '';
+    }
+  }
+  // The tap that ends a swipe must not also open the card.
+  function _swipeClick(e) {
+    if (Date.now() - _swipeEndedAt < 400 && e.target.closest && e.target.closest('#m-obs-cards')) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+  }
+  if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+    document.addEventListener('touchstart', _swipeStart, { passive: true });
+    document.addEventListener('touchmove', _swipeMove, { passive: true });
+    document.addEventListener('touchend', _swipeEnd);
+    document.addEventListener('touchcancel', _swipeEnd);
+    document.addEventListener('click', _swipeClick, true);
+  }
+
   function _refreshFeed(cid, highlightFirst) {
     var allObs = getAllQuickObs(cid);
     var container = document.getElementById('m-obs-cards');
@@ -690,7 +765,10 @@ window.MObserve = (function () {
     quickPost: quickPost,
     quickStarters: quickStarters,
     typePill: typePill,
+    typeBlock: typeBlock,
     tagChips: tagChips,
+    cardHtml: cardHtml,
+    dayLabel: dayLabel,
     refreshFeed: function (cid) {
       _refreshFeed(cid, false);
     },

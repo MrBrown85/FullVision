@@ -626,7 +626,7 @@ describe('Student detail recent assessments', () => {
     expect(recent).not.toContain('First note');
     expect(recent.indexOf('Fifth note')).toBeLessThan(recent.indexOf('Fourth note'));
     expect(recent.indexOf('Fourth note')).toBeLessThan(recent.indexOf('Third note'));
-    expect(recent).toContain('<span class="m-obs-type-pill" data-sentiment="strength">Strength</span>');
+    expect(recent).toContain('<span class="m-obs-type" data-sentiment="strength">Strength</span>');
     expect(recent).toContain('<span class="m-obs-context">');
   });
 });
