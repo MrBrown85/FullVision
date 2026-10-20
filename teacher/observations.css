@@ -696,7 +696,7 @@
   color: var(--text);
 }
 .obs-focus-time {
-  font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
+  font-family: var(--font-base);
   font-size: var(--text-2xs);
   color: var(--text-3);
   margin-left: 8px;

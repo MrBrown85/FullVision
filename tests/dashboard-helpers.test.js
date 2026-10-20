@@ -23,7 +23,7 @@ describe('DashOverview.renderDashToolbar', () => {
     expect(html).toContain('value="overall-desc" selected');
     expect(html).toContain('value="noor"');
     expect(html).toContain('Flagged (3)');
-    expect(html).toContain('2 students');
+    expect(html).toContain('2 Students');
   });
 });
 

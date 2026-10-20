@@ -211,25 +211,25 @@ window.PageStudent = (function () {
       '<div class="edit-modal-form">' +
       '<div class="cm-field"><label class="cm-label" for="edit-first">First Name *</label><input class="cm-input" id="edit-first" value="' +
       esc(st.firstName || '') +
-      '" aria-required="true" style="font-size:0.82rem;padding:6px 10px"></div>' +
+      '" aria-required="true" style="font-size:0.875rem;padding:6px 10px"></div>' +
       '<div class="cm-field"><label class="cm-label" for="edit-last">Last Name</label><input class="cm-input" id="edit-last" value="' +
       esc(st.lastName || '') +
-      '" style="font-size:0.82rem;padding:6px 10px"></div>' +
+      '" style="font-size:0.875rem;padding:6px 10px"></div>' +
       '<div class="cm-field"><label class="cm-label" for="edit-pref">Preferred Name</label><input class="cm-input" id="edit-pref" value="' +
       esc(st.preferred || '') +
-      '" style="font-size:0.82rem;padding:6px 10px"></div>' +
+      '" style="font-size:0.875rem;padding:6px 10px"></div>' +
       '<div class="cm-field"><label class="cm-label" for="edit-pro">Pronouns</label>' +
       pronounsSelect('edit-pro', st.pronouns || '') +
       '</div>' +
       '<div class="cm-field"><label class="cm-label" for="edit-num">Student Number</label><input class="cm-input" id="edit-num" value="' +
       esc(st.studentNumber || '') +
-      '" placeholder="e.g. STU-101" style="font-size:0.82rem;padding:6px 10px"></div>' +
+      '" placeholder="e.g. STU-101" style="font-size:0.875rem;padding:6px 10px"></div>' +
       '<div class="cm-field"><label class="cm-label" for="edit-email">Email</label><input class="cm-input" id="edit-email" type="email" value="' +
       esc(st.email || '') +
-      '" placeholder="student@school.edu" style="font-size:0.82rem;padding:6px 10px"></div>' +
+      '" placeholder="student@school.edu" style="font-size:0.875rem;padding:6px 10px"></div>' +
       '<div class="cm-field"><label class="cm-label" for="edit-dob">Date of Birth</label><input class="cm-input" id="edit-dob" type="date" value="' +
       (st.dateOfBirth || '') +
-      '" style="font-size:0.82rem;padding:6px 10px"></div>' +
+      '" style="font-size:0.875rem;padding:6px 10px"></div>' +
       '<div class="cm-field" style="grid-column:1/-1"><label class="cm-label">Designations</label><div class="desig-check-grid">' +
       Object.entries(BC_DESIGNATIONS)
         .map(function (e) {
@@ -481,12 +481,12 @@ window.PageStudent = (function () {
       scoredAssessments.size +
       '/' +
       assessments.length +
-      '</strong> assessed</div>' +
+      '</strong> Assessed</div>' +
       '<div class="completion-stat"><strong>' +
       coveredTags +
       '/' +
       allTags.length +
-      '</strong> tags covered</div>' +
+      '</strong> Tags Covered</div>' +
       '</div>' +
       '</div>';
     var _stGrouped = getGroupedSections(cid);
@@ -600,7 +600,7 @@ window.PageStudent = (function () {
       '<div class="grades-header">' +
       '<div class="insight-title" style="margin-bottom:0">Assessment Grades' +
       (activeSectionFilters.size > 0
-        ? ' <span style="font-family:var(--font-base);font-size:0.72rem;font-weight:500;color:var(--text-3);text-transform:none;letter-spacing:0">(filtered — <a href="#" data-action="clearSectionFilters" style="color:var(--link);text-decoration:none">show all</a>)</span>'
+        ? ' <span style="font-family:var(--font-base);font-size:0.75rem;font-weight:500;color:var(--text-3);text-transform:none;letter-spacing:0">(filtered — <a href="#" data-action="clearSectionFilters" style="color:var(--link);text-decoration:none">show all</a>)</span>'
         : '') +
       '</div>' +
       '<div class="grades-legend">' +
@@ -842,7 +842,7 @@ window.PageStudent = (function () {
       if (growthData.length > 0) {
         html +=
           '<div style="margin-bottom:8px;">' +
-          "<span style=\"font-family:'SF Mono', ui-monospace, 'Menlo', monospace;font-size:0.5rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-3);margin-right:6px;\">Growth</span>" +
+          '<span style="font-size:0.75rem;color:var(--text-3);margin-right:6px;">Growth</span>' +
           renderGrowthSparkline(growthData) +
           '</div>';
       }
@@ -932,9 +932,7 @@ window.PageStudent = (function () {
         (refl.text ? esc(refl.text) : '') +
         '</div>' +
         (refl.date
-          ? "<div style=\"font-family:'SF Mono', ui-monospace, 'Menlo', monospace;font-size:0.5rem;color:var(--text-3);margin-top:2px;\">" +
-            formatDate(refl.date) +
-            '</div>'
+          ? '<div style="font-size:0.75rem;color:var(--text-3);margin-top:2px;">' + formatDate(refl.date) + '</div>'
           : '') +
         '<div class="inline-edit-area" id="refl-edit-' +
         sec.id +

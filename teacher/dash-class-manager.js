@@ -144,11 +144,11 @@ window.DashClassManager = (function () {
       '<div style="flex:1"><label class="cm-label">Standard Name</label>' +
       '<input class="cm-input" value="' +
       esc(sec.name) +
-      '" style="font-weight:600;font-size:0.82rem" data-stop-prop="true" data-action-blur="cmStdName" data-secid="' +
+      '" style="font-weight:600;font-size:0.875rem" data-stop-prop="true" data-action-blur="cmStdName" data-secid="' +
       sec.id +
       '"></div>' +
       '<div style="min-width:100px"><label class="cm-label">Subject</label>' +
-      '<select class="cm-input" style="font-size:0.78rem" data-stop-prop="true" data-action-change="cmStdSubject" data-secid="' +
+      '<select class="cm-input" style="font-size:0.8125rem" data-stop-prop="true" data-action-change="cmStdSubject" data-secid="' +
       sec.id +
       '">' +
       (lm.subjects || [])
@@ -161,7 +161,7 @@ window.DashClassManager = (function () {
       '</select></div>' +
       (compGroups.length > 0
         ? '<div style="min-width:90px"><label class="cm-label">Group</label>' +
-          '<select class="cm-input" style="font-size:0.78rem" data-stop-prop="true" data-action-change="cmStdGroup" data-secid="' +
+          '<select class="cm-input" style="font-size:0.8125rem" data-stop-prop="true" data-action-change="cmStdGroup" data-secid="' +
           sec.id +
           '">' +
           '<option value="">None</option>' +
@@ -199,18 +199,18 @@ window.DashClassManager = (function () {
       '<div style="flex:0 0 120px"><label class="cm-label">Tag Code</label>' +
       '<input class="cm-input" value="' +
       esc(tag.code || tag.shortName || '') +
-      '" placeholder="e.g. RD1" maxlength="10" style="padding:5px 8px;font-size:0.82rem;font-weight:600;font-family:monospace;text-transform:uppercase" data-stop-prop="true" data-action-blur="cmStdCode" data-secid="' +
+      '" placeholder="e.g. RD1" maxlength="10" style="padding:5px 8px;font-size:0.875rem;font-weight:600;font-family:monospace;text-transform:uppercase" data-stop-prop="true" data-action-blur="cmStdCode" data-secid="' +
       sec.id +
       '"></div>' +
       '<div style="flex:1"><label class="cm-label">Short Label</label>' +
       '<input class="cm-input" value="' +
       esc(tag.label) +
-      '" placeholder="Short label" style="padding:5px 8px;font-size:0.82rem;font-weight:500" data-action-blur="cmStdLabel" data-secid="' +
+      '" placeholder="Short label" style="padding:5px 8px;font-size:0.875rem;font-weight:500" data-action-blur="cmStdLabel" data-secid="' +
       sec.id +
       '"></div>' +
       '</div>' +
       '<label class="cm-label">I can\u2026 Statement</label>' +
-      '<textarea class="cm-textarea" placeholder="I can\u2026 statement" style="min-height:34px;padding:5px 8px;font-size:0.78rem" data-action-blur="cmStdText" data-secid="' +
+      '<textarea class="cm-textarea" placeholder="I can\u2026 statement" style="min-height:34px;padding:5px 8px;font-size:0.8125rem" data-action-blur="cmStdText" data-secid="' +
       sec.id +
       '">' +
       esc(tag.text || '') +
@@ -826,7 +826,7 @@ window.DashClassManager = (function () {
       (parsed.length !== 1 ? 's' : '') +
       ' found</div>' +
       '<div style="max-height:180px;overflow-y:auto;margin-bottom:8px">' +
-      '<table style="width:100%;border-collapse:collapse;font-size:0.78rem">' +
+      '<table style="width:100%;border-collapse:collapse;font-size:0.8125rem">' +
       '<thead><tr style="border-bottom:1px solid var(--border)">' +
       '<th style="text-align:left;padding:3px 6px" class="cm-label">First</th>' +
       '<th style="text-align:left;padding:3px 6px" class="cm-label">Last</th>' +
@@ -849,7 +849,7 @@ window.DashClassManager = (function () {
         '<td style="padding:3px 6px">' +
         esc(p.pronouns || '') +
         '</td>' +
-        '<td style="padding:3px 6px;font-size:0.65rem;font-weight:600;color:' +
+        '<td style="padding:3px 6px;font-size:0.75rem;font-weight:600;color:' +
         (dupe ? 'var(--priority)' : 'var(--score-3)') +
         '">' +
         (dupe ? 'SKIP' : 'NEW') +
@@ -859,8 +859,8 @@ window.DashClassManager = (function () {
     html +=
       '</tbody></table></div>' +
       '<div style="display:flex;gap:8px">' +
-      '<button class="btn btn-primary" style="font-size:0.78rem;padding:6px 14px" data-action="cmConfirmImport">Import</button>' +
-      '<button class="btn btn-ghost" style="font-size:0.78rem;padding:6px 10px" data-action="cmCancelImport">Cancel</button>' +
+      '<button class="btn btn-primary" style="font-size:0.8125rem;padding:6px 14px" data-action="cmConfirmImport">Import</button>' +
+      '<button class="btn btn-ghost" style="font-size:0.8125rem;padding:6px 10px" data-action="cmCancelImport">Cancel</button>' +
       '</div>' +
       '</div>';
     var el = document.getElementById('cm-import-preview');
@@ -1113,7 +1113,7 @@ window.DashClassManager = (function () {
     });
     if (archivedCids.length > 0) {
       html +=
-        '<div style="padding:8px 12px 4px;font-size:0.6rem;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:0.05em;margin-top:8px;border-top:1px solid var(--border)">Archived</div>';
+        '<div style="padding:8px 12px 4px;font-size:0.75rem;font-weight:600;color:var(--text-3);margin-top:8px;border-top:1px solid var(--border)">Archived</div>';
       archivedCids.forEach(function (cid) {
         var c = COURSES[cid];
         var sc = getStudents(cid).length;
@@ -1175,24 +1175,24 @@ window.DashClassManager = (function () {
       '<label class="cm-label">Grade Level</label>' +
       '<input class="cm-input" id="cm-grade" value="' +
       esc(course.gradeLevel || '') +
-      '" placeholder="e.g. 8, 10-12" data-action-blur="cmUpdateGrade">' +
+      '" placeholder="e.g. 10-12" data-action-blur="cmUpdateGrade">' +
       '</div>' +
       '<div class="cm-field">' +
       '<label class="cm-label">Stats</label>' +
-      '<div style="display:flex;gap:12px;padding:7px 0;font-size:0.78rem;color:var(--text-2)">' +
+      '<div style="display:flex;gap:12px;padding:7px 0;font-size:0.8125rem;color:var(--text-2)">' +
       '<span><strong>' +
       studentCount +
-      '</strong> student' +
+      '</strong> Student' +
       (studentCount !== 1 ? 's' : '') +
       '</span>' +
       '<span><strong>' +
       assessCount +
-      '</strong> assessment' +
+      '</strong> Assessment' +
       (assessCount !== 1 ? 's' : '') +
       '</span>' +
       '<span><strong>' +
       tagCount +
-      '</strong> standard' +
+      '</strong> Standard' +
       (tagCount !== 1 ? 's' : '') +
       '</span>' +
       '</div>' +
@@ -1215,7 +1215,7 @@ window.DashClassManager = (function () {
       students.length +
       ')</span></span>' +
       (students.length > 1
-        ? '<button class="cm-add-link" data-action="cmToggleBulk" style="font-size:0.7rem;padding:2px 8px;border-radius:4px;' +
+        ? '<button class="cm-add-link" data-action="cmToggleBulk" style="font-size:0.75rem;padding:2px 8px;border-radius:4px;' +
           (cmBulkMode ? 'background:var(--active);color:white' : '') +
           '">' +
           (cmBulkMode ? 'Exit Bulk Edit' : 'Bulk Edit') +
@@ -1272,14 +1272,14 @@ window.DashClassManager = (function () {
           })() +
           (st.pronouns ? '<span class="cm-student-pronouns">' + esc(st.pronouns) + '</span>' : '') +
           (st.studentNumber
-            ? '<span style="font-size:0.65rem;color:var(--text-3);font-family:\'SF Mono\',monospace">#' +
+            ? '<span style="font-size:0.75rem;color:var(--text-3);font-family:\'SF Mono\',monospace">#' +
               esc(st.studentNumber) +
               '</span>'
             : '') +
           '<div class="cm-student-actions">' +
           '<button class="cm-delete-mini" data-action="cmEditStudent" data-sid="' +
           st.id +
-          '" title="Edit" style="font-size:0.65rem">\u270E</button>' +
+          '" title="Edit" style="font-size:0.75rem">\u270E</button>' +
           '<button class="cm-delete-mini" data-action="cmRemoveStudent" data-sid="' +
           st.id +
           '" title="Withdraw" aria-label="Withdraw ' +
@@ -1291,7 +1291,7 @@ window.DashClassManager = (function () {
       html += '</div>';
     } else {
       html +=
-        '<div style="text-align:center;padding:16px;color:var(--text-3);font-size:0.82rem;border:1.5px dashed var(--border);border-radius:var(--radius-sm)">' +
+        '<div style="text-align:center;padding:16px;color:var(--text-3);font-size:0.875rem;border:1.5px dashed var(--border);border-radius:var(--radius-sm)">' +
         'No students yet. Add students individually or import a CSV roster.' +
         '</div>';
     }
@@ -1300,9 +1300,9 @@ window.DashClassManager = (function () {
       html +=
         '<div class="cm-bulk-panel">' +
         '<div style="display:flex;gap:8px;margin-bottom:8px">' +
-        '<button class="cm-add-link" data-action="cmBulkSelectAll" style="font-size:0.7rem">Select All</button>' +
-        '<button class="cm-add-link" data-action="cmBulkDeselectAll" style="font-size:0.7rem">Deselect All</button>' +
-        '<span style="font-size:0.7rem;color:var(--text-3);margin-left:auto">' +
+        '<button class="cm-add-link" data-action="cmBulkSelectAll" style="font-size:0.75rem">Select All</button>' +
+        '<button class="cm-add-link" data-action="cmBulkDeselectAll" style="font-size:0.75rem">Deselect All</button>' +
+        '<span style="font-size:0.75rem;color:var(--text-3);margin-left:auto">' +
         cmBulkSelected.size +
         ' selected</span>' +
         '</div>' +
@@ -1316,8 +1316,8 @@ window.DashClassManager = (function () {
         '<div style="display:flex;gap:6px">' +
         '<input type="date" class="cm-input" id="cm-bulk-att-date" value="' +
         getTodayStr() +
-        '" style="font-size:0.78rem;flex:1">' +
-        '<select class="cm-input" id="cm-bulk-att-status" style="font-size:0.78rem;flex:1">' +
+        '" style="font-size:0.8125rem;flex:1">' +
+        '<select class="cm-input" id="cm-bulk-att-status" style="font-size:0.8125rem;flex:1">' +
         '<option value="present">Present</option>' +
         '<option value="absent">Absent</option>' +
         '<option value="late">Late</option>' +
@@ -1327,7 +1327,7 @@ window.DashClassManager = (function () {
         '</div>' +
         '</div>' +
         '<div style="display:flex;gap:8px;margin-top:8px">' +
-        '<button class="btn btn-primary" data-action="cmApplyBulk" style="font-size:0.78rem;padding:6px 14px" ' +
+        '<button class="btn btn-primary" data-action="cmApplyBulk" style="font-size:0.8125rem;padding:6px 14px" ' +
         (cmBulkSelected.size === 0 ? 'disabled' : '') +
         '>Apply to Selected</button>' +
         '</div>' +
@@ -1337,15 +1337,15 @@ window.DashClassManager = (function () {
     html +=
       '<div id="cm-add-student-form" style="display:none" class="cm-add-student-form">' +
       '<div class="cm-student-form">' +
-      '<div class="cm-field"><label class="cm-label">First Name *</label><input class="cm-input" id="cm-add-first" placeholder="e.g. Amara" style="font-size:0.82rem;padding:6px 10px"></div>' +
-      '<div class="cm-field"><label class="cm-label">Last Name</label><input class="cm-input" id="cm-add-last" placeholder="e.g. Osei" style="font-size:0.82rem;padding:6px 10px"></div>' +
-      '<div class="cm-field"><label class="cm-label">Preferred Name</label><input class="cm-input" id="cm-add-pref" placeholder="e.g. Amara" style="font-size:0.82rem;padding:6px 10px"></div>' +
+      '<div class="cm-field"><label class="cm-label">First Name *</label><input class="cm-input" id="cm-add-first" placeholder="e.g. Amara" style="font-size:0.875rem;padding:6px 10px"></div>' +
+      '<div class="cm-field"><label class="cm-label">Last Name</label><input class="cm-input" id="cm-add-last" placeholder="e.g. Osei" style="font-size:0.875rem;padding:6px 10px"></div>' +
+      '<div class="cm-field"><label class="cm-label">Preferred Name</label><input class="cm-input" id="cm-add-pref" placeholder="e.g. Amara" style="font-size:0.875rem;padding:6px 10px"></div>' +
       '<div class="cm-field"><label class="cm-label">Pronouns</label>' +
       pronounsSelect('cm-add-pro', '') +
       '</div>' +
-      '<div class="cm-field"><label class="cm-label">Student Number</label><input class="cm-input" id="cm-add-num" placeholder="e.g. STU-101" style="font-size:0.82rem;padding:6px 10px"></div>' +
-      '<div class="cm-field"><label class="cm-label">Email</label><input class="cm-input" id="cm-add-email" type="email" placeholder="student@school.edu" style="font-size:0.82rem;padding:6px 10px"></div>' +
-      '<div class="cm-field"><label class="cm-label">Date of Birth</label><input class="cm-input" id="cm-add-dob" type="date" style="font-size:0.82rem;padding:6px 10px"></div>' +
+      '<div class="cm-field"><label class="cm-label">Student Number</label><input class="cm-input" id="cm-add-num" placeholder="e.g. STU-101" style="font-size:0.875rem;padding:6px 10px"></div>' +
+      '<div class="cm-field"><label class="cm-label">Email</label><input class="cm-input" id="cm-add-email" type="email" placeholder="student@school.edu" style="font-size:0.875rem;padding:6px 10px"></div>' +
+      '<div class="cm-field"><label class="cm-label">Date of Birth</label><input class="cm-input" id="cm-add-dob" type="date" style="font-size:0.875rem;padding:6px 10px"></div>' +
       '<div class="cm-field" style="grid-column:1/-1"><label class="cm-label">Designations</label>' +
       '<div class="desig-check-grid">' +
       Object.entries(BC_DESIGNATIONS)
@@ -1389,8 +1389,8 @@ window.DashClassManager = (function () {
       '</div>' +
       '</div>' +
       '<div class="cm-field" style="grid-column:1/-1;display:flex;align-items:flex-end;gap:8px;justify-content:flex-end">' +
-      '<button class="btn btn-ghost" data-action="cmCancelStudent" style="padding:6px 10px;font-size:0.78rem">Cancel</button>' +
-      '<button class="btn btn-primary" id="cm-save-btn" data-action="cmSaveStudent" style="padding:6px 14px;font-size:0.78rem">Save</button>' +
+      '<button class="btn btn-ghost" data-action="cmCancelStudent" style="padding:6px 10px;font-size:0.8125rem">Cancel</button>' +
+      '<button class="btn btn-primary" id="cm-save-btn" data-action="cmSaveStudent" style="padding:6px 14px;font-size:0.8125rem">Save</button>' +
       '</div>' +
       '</div>' +
       '</div>' +
@@ -1595,7 +1595,7 @@ window.DashClassManager = (function () {
         '">' +
         '<span class="mod-folder-meta">' +
         secs.length +
-        ' standard' +
+        ' Standard' +
         (secs.length !== 1 ? 's' : '') +
         '</span>' +
         '<div class="mod-folder-actions" data-stop-prop="true">' +
@@ -1629,7 +1629,7 @@ window.DashClassManager = (function () {
         '<span class="mod-folder-name" style="font-size:0.95rem;font-weight:500;color:var(--text-3)">Ungrouped</span>' +
         '<span class="mod-folder-meta">' +
         _cmGrouped.ungrouped.length +
-        ' standard' +
+        ' Standard' +
         (_cmGrouped.ungrouped.length !== 1 ? 's' : '') +
         '</span>' +
         '</div>' +
@@ -1842,9 +1842,9 @@ window.DashClassManager = (function () {
             '</span>' +
             '<span class="cw-course-count">' +
             catCount +
-            ' categories \u00B7 ' +
+            ' Categories \u00B7 ' +
             compCount +
-            ' standards</span>' +
+            ' Standards</span>' +
             '</div>';
         });
         html += '</div>';
@@ -1913,7 +1913,7 @@ window.DashClassManager = (function () {
       '<div class="cm-field"><label class="cm-label" id="cm-new-block-label">Block</label>' +
       blockPickerHtml('cm-new-block', cwStep2Block) +
       '</div>' +
-      '<div class="cm-field"><label class="cm-label" id="cm-cg-span-label">This class runs</label>' +
+      '<div class="cm-field"><label class="cm-label" id="cm-cg-span-label">This Class Runs</label>' +
       '<div class="seg seg-sm cm-seg" id="cm-cg-span" role="radiogroup" aria-labelledby="cm-cg-span-label">' +
       TERM_SPANS.map(function (o) {
         var on = cwStep2Span === o.value;
@@ -2089,7 +2089,7 @@ window.DashClassManager = (function () {
             esc(cat.name) +
             '<span class="cw-review-sec-count">' +
             compCount +
-            ' standard' +
+            ' Standard' +
             (compCount !== 1 ? 's' : '') +
             '</span></div>';
         });
@@ -3090,7 +3090,7 @@ window.DashClassManager = (function () {
     var editing = _cmStarterEdit && _cmStarterEdit.cid === cid ? _cmStarterEdit : null;
     var html =
       '<div class="cm-section" id="cm-starters">' +
-      '<div class="cm-section-title">Sentence starters' +
+      '<div class="cm-section-title">Sentence Starters' +
       (list.length ? ' <span class="cm-section-count">(' + list.length + ')</span>' : '') +
       '</div>';
     if (!list.length) {
@@ -3443,7 +3443,7 @@ window.DashClassManager = (function () {
     var rows = st.rows;
     var html =
       '<div class="cm-field cm-cat-field">' +
-      '<label class="cm-label">Reporting terms</label>' +
+      '<label class="cm-label">Reporting Terms</label>' +
       '<div class="cm-hint" style="margin-bottom:8px">The gradebook, dashboard and student pages can show one term at a time. A term counts the assessments dated inside it. Up to six. Surrey secondary dates come from each school’s published calendar; a term ends on the day its report is published.</div>';
     html += _cmRenderTermSpan(cid);
     html += _cmRenderSchoolPreset(cid, rows.length > 0);
@@ -3511,7 +3511,7 @@ window.DashClassManager = (function () {
     var html =
       '<div class="cm-term-span"><span class="cm-term-span-label" id="cm-term-span-label-' +
       cid +
-      '">This class runs</span>' +
+      '">This Class Runs</span>' +
       '<div class="seg seg-sm cm-seg" role="radiogroup" aria-labelledby="cm-term-span-label-' +
       cid +
       '">' +
@@ -3832,9 +3832,9 @@ window.DashClassManager = (function () {
                 '</span>' +
                 '<span class="cw-course-count">' +
                 catCount +
-                ' categories \u00B7 ' +
+                ' Categories \u00B7 ' +
                 compCount +
-                ' standards</span>' +
+                ' Standards</span>' +
                 '</div>';
             });
             html += '</div></div>';
@@ -3977,7 +3977,7 @@ window.DashClassManager = (function () {
       esc(courseDisplayName(src)) +
       '</div>' +
       '<div class="confirm-message">Settings, curriculum, categories and sentence starters are copied. Students, assessments and rubrics are not.</div>' +
-      '<div class="cm-field"><label class="cm-label" id="cm-dup-block-label">Block for the new class</label>' +
+      '<div class="cm-field"><label class="cm-label" id="cm-dup-block-label">Block for the New Class</label>' +
       blockPickerHtml('cm-dup-block', '') +
       '</div>' +
       '<div class="confirm-actions">' +

@@ -51,7 +51,7 @@ Demo Mode (`login.html` → Try Demo Mode, or `/login.html?demo=1`) runs local-o
 6. **Client ids:** `createCourse` and friends return a local id (`c` + base36 timestamp) and re-key to the server UUID when the RPC resolves. A local-shaped id reaching the database is a bug.
 7. **Every write RPC is idempotent** through `p_idempotency_key` (`fv_idem_check`). Keep that when adding one.
 8. **One PR per change.** CI green (vitest, prettier, Playwright) before merge. End commit messages with the attribution line the session gives you.
-9. **Plain language in the UI:** sentence case, no jargon without a legend, no all-caps prompts.
+9. **Plain language in the UI:** Title Case for labels, headings, buttons and tabs; plain sentences for hints and messages. No jargon without a legend, no all-caps prompts.
 10. **Don't touch** `fullvision-user-inputs.xlsx`, `fullvision-documentation-inventory.xlsx`, or the gradebook site's CSS from classroom-content work.
 
 ## Current state (2026-10-17)

@@ -66,7 +66,7 @@ window.DashOverview = (function () {
       '<div class="dash-toolbar-spacer"></div>' +
       '<span class="dash-toolbar-label">' +
       students.length +
-      ' student' +
+      ' Student' +
       (students.length !== 1 ? 's' : '') +
       '</span>' +
       '</div>'
@@ -142,7 +142,7 @@ window.DashOverview = (function () {
           (pct > 8 ? '0' : '28px') +
           ';transition:flex 0.3s var(--ease-out)">' +
           '<span style="font-family:var(--font-base);font-size:' +
-          (pct > 15 ? '0.78rem' : '0.65rem') +
+          (pct > 15 ? '0.875rem' : '0.75rem') +
           ';font-weight:700;color:var(--score-' +
           d.level +
           ')">' +
@@ -164,7 +164,7 @@ window.DashOverview = (function () {
           '<div style="width:8px;height:8px;border-radius:2px;background:var(--score-' +
           d.level +
           ')"></div>' +
-          '<span style="font-family:var(--font-base);font-size:0.65rem;color:var(--text-2)">' +
+          '<span style="font-family:var(--font-base);font-size:0.75rem;color:var(--text-2)">' +
           esc(d.label) +
           '</span>' +
           '</div>';
@@ -173,7 +173,7 @@ window.DashOverview = (function () {
     } else {
       html +=
         '<div style="height:28px;border-radius:8px;background:var(--overlay-hover);display:flex;align-items:center;justify-content:center">' +
-        '<span style="font-family:var(--font-base);font-size:0.72rem;color:var(--text-3)">No data yet</span>' +
+        '<span style="font-family:var(--font-base);font-size:0.75rem;color:var(--text-3)">No data yet</span>' +
         '</div>';
     }
 
@@ -255,11 +255,11 @@ window.DashOverview = (function () {
 
     html +=
       '<div style="margin-top:10px">' +
-      "<div style=\"font-family:'SF Mono', ui-monospace, 'Menlo', monospace;font-size:0.52rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-3);margin-bottom:4px\">" +
+      '<div style="font-size:0.75rem;color:var(--text-3);margin-bottom:4px">' +
       tagsWithEvidence +
       ' of ' +
       allTags.length +
-      ' standards assessed</div>' +
+      ' Standards Assessed</div>' +
       '<div class="dash-tag-grid">';
     sections.forEach(function (sec) {
       sec.tags.forEach(function (tag) {
@@ -357,17 +357,17 @@ window.DashOverview = (function () {
               ? '<span style="color:var(--score-2);font-weight:600">Tomorrow</span>'
               : '<span style="color:var(--text-3)">in ' + b.daysUntil + ' days</span>';
         html +=
-          '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:0.82rem">' +
+          '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:0.875rem">' +
           '<div class="bday-avatar">' +
           initials(b.student) +
           '</div>' +
           '<span class="dash-bday-name" style="font-weight:500;color:var(--text)">' +
           esc(displayName(b.student)) +
           '</span>' +
-          '<span style="font-size:0.75rem;color:var(--text-3)">' +
+          '<span style="font-size:0.8125rem;color:var(--text-3)">' +
           monthDay +
           '</span>' +
-          '<span style="margin-left:auto;font-size:0.75rem">' +
+          '<span style="margin-left:auto;font-size:0.8125rem">' +
           countdown +
           '</span>' +
           '</div>';

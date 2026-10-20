@@ -103,7 +103,7 @@ test.describe('Criterion comment box', () => {
     await commentButton(page, 'stu-001', 'crit-hyp').click();
     const dialog = page.getByRole('dialog');
     await dialog.getByLabel(/Comment for/).fill('Good hypothesis.');
-    await dialog.getByRole('button', { name: 'Save and next criterion' }).click();
+    await dialog.getByRole('button', { name: 'Save and Next Criterion' }).click();
     await expect(dialog.locator('.crit-comment-crit')).toHaveText('Data Collection');
     await expect(commentButton(page, 'stu-001', 'crit-hyp')).toHaveClass(/has-comment/);
 
@@ -128,7 +128,7 @@ test.describe('Criterion comment box', () => {
     await dialog.getByRole('button', { name: 'Cancel' }).focus();
     await page.keyboard.press('3');
     await expect(page.locator('.rsg-level.active')).toHaveCount(0);
-    await dialog.getByRole('button', { name: 'Remove comment' }).click();
+    await dialog.getByRole('button', { name: 'Remove Comment' }).click();
     await expect(dialog).toBeHidden();
     await expect(commentButton(page, 'stu-001', 'crit-hyp')).not.toHaveClass(/has-comment/);
 

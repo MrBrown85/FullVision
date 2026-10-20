@@ -618,7 +618,7 @@ describe('Student detail recent assessments', () => {
       ],
     });
     const html = MStudents.renderDetail(CID, 'stu1');
-    const recent = html.slice(html.indexOf('Recent observations'));
+    const recent = html.slice(html.indexOf('Recent Observations'));
     expect(recent).toContain('Fifth note');
     expect(recent).toContain('Fourth note');
     expect(recent).toContain('Third note');

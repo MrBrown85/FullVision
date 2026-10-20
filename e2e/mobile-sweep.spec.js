@@ -31,7 +31,7 @@ test.describe('Phone class sweep', () => {
     const firstSid = await first.getAttribute('data-sid');
     await first.click();
     await expect(panel.locator('.m-sweep-panel-name')).toBeVisible();
-    const save = panel.getByRole('button', { name: 'Save and next' });
+    const save = panel.getByRole('button', { name: 'Save and Next' });
     await expect(save).toBeDisabled();
     await panel.locator('.m-sweep-starter', { hasText: 'Strong collaboration with peers' }).click();
     await expect(panel.locator('.m-sweep-type.m-selected')).toHaveText('Strength');
@@ -46,7 +46,7 @@ test.describe('Phone class sweep', () => {
     const secondSid = await second.getAttribute('data-sid');
     expect(secondSid).not.toBe(firstSid);
     await panel.locator('.m-sweep-starter', { hasText: 'Asked a great question in class' }).click();
-    await panel.getByRole('button', { name: 'Save and next' }).click();
+    await panel.getByRole('button', { name: 'Save and Next' }).click();
     await expect(page.locator('#m-sweep-count')).toHaveText(`${start + 2} of 27 observed today`);
     const secondTile = page.locator(`.m-sweep-tile[data-sid="${secondSid}"]`);
     await expect(secondTile).toHaveAttribute('data-state', 'done');

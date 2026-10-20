@@ -420,12 +420,12 @@ window.ReportBlocks = (function () {
     // Scale header
     html += `<div style="display:flex;justify-content:flex-end;gap:0;margin-bottom:4px;padding-right:4px">`;
     scale.forEach(s => {
-      html += `<span style="width:68px;text-align:center;font-size:0.56rem;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:var(--text-3)">${s}</span>`;
+      html += `<span style="width:68px;text-align:center;font-size:0.56rem;font-weight:700;color:var(--text-3)">${s}</span>`;
     });
     html += `</div>`;
     // Disposition rows — grouped
     const _reflectGroup = (dims, title) => {
-      html += `<div style="font-size:0.72rem;font-weight:700;color:var(--text-2);text-transform:uppercase;letter-spacing:0.04em;padding:10px 0 2px;border-top:1.5px solid var(--border)">${title}</div>`;
+      html += `<div style="font-size:0.72rem;font-weight:700;color:var(--text-2);padding:10px 0 2px;border-top:1.5px solid var(--border)">${title}</div>`;
       dims.forEach(dim => {
         const info = OBS_DESCRIPTORS[dim];
         html += `<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--divider-subtle)">
@@ -493,7 +493,7 @@ window.ReportBlocks = (function () {
     html += `</tbody></table>`;
     // Quick-check section
     html += `<div style="margin-top:14px;padding-top:12px;border-top:1.5px solid var(--border)">
-    <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-2);margin-bottom:10px">This term, I…</div>
+    <div style="font-size:0.72rem;font-weight:700;color:var(--text-2);margin-bottom:10px">This term, I…</div>
     <div class="report-habits-checks">`;
     checks.forEach(c => {
       html += `<div class="report-parent-check"><span class="report-parent-checkbox"></span> ${c.text}</div>`;
@@ -576,7 +576,7 @@ window.ReportBlocks = (function () {
 
       // Col 1: Strengths
       html += `<div style="flex:1;min-width:0">`;
-      html += `<div style="font-weight:700;font-size:0.6rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-2);margin-bottom:2px">Strengths</div>`;
+      html += `<div style="font-weight:700;font-size:0.6rem;color:var(--text-2);margin-bottom:2px">Strengths</div>`;
       if (strengths.length > 0) {
         strengths.forEach(t => {
           html += `<div style="display:flex;align-items:baseline;gap:4px;color:var(--text)">
@@ -591,7 +591,7 @@ window.ReportBlocks = (function () {
 
       // Col 2: Growth
       html += `<div style="flex:1;min-width:0">`;
-      html += `<div style="font-weight:700;font-size:0.6rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-2);margin-bottom:2px">Areas for Growth</div>`;
+      html += `<div style="font-weight:700;font-size:0.6rem;color:var(--text-2);margin-bottom:2px">Areas for Growth</div>`;
       if (growth.length > 0) {
         growth.forEach(t => {
           html += `<div style="display:flex;align-items:baseline;gap:4px;color:var(--text)">
@@ -609,7 +609,7 @@ window.ReportBlocks = (function () {
 
       // Col 3: Assessments & Evidence
       html += `<div style="flex:1;min-width:0">`;
-      html += `<div style="font-weight:700;font-size:0.6rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-2);margin-bottom:2px">Assessments</div>`;
+      html += `<div style="font-weight:700;font-size:0.6rem;color:var(--text-2);margin-bottom:2px">Assessments</div>`;
       if (assessPerf.length > 0) {
         assessPerf.slice(0, 4).forEach(a => {
           html += `<div style="display:flex;align-items:baseline;gap:4px;color:var(--text)">
@@ -720,7 +720,7 @@ window.ReportBlocks = (function () {
         ${arcs}
         <circle cx="${cx}" cy="${cy}" r="${inner}" fill="var(--surface)"/>
         <text x="${cx}" y="${cy - 3}" text-anchor="middle" style="font-size:16px;font-weight:800;fill:var(--text)">${total}</text>
-        <text x="${cx}" y="${cy + 8}" text-anchor="middle" style="font-size:6.5px;fill:var(--text-3);text-transform:uppercase;letter-spacing:0.5px">scores</text>
+        <text x="${cx}" y="${cy + 8}" text-anchor="middle" style="font-size:6.5px;fill:var(--text-3);">scores</text>
       </svg>
       <div style="display:flex;flex-direction:column;gap:4px;flex:1">`;
     [4, 3, 2, 1].forEach(level => {
@@ -738,7 +738,7 @@ window.ReportBlocks = (function () {
 
     // Top assignments
     if (top.length > 0) {
-      html += `<div style="font-weight:700;font-size:0.56rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-2);margin:6px 0 3px">Top Assignments</div>`;
+      html += `<div style="font-weight:700;font-size:0.56rem;color:var(--text-2);margin:6px 0 3px">Top Assignments</div>`;
       top.forEach(a => {
         html += `<div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;line-height:1.6">
         <span data-prof="${a.r}" style="font-weight:600;color:${PROF_COLORS[a.r]};font-size:0.64rem;width:14px;flex-shrink:0">${(PROF_LABELS[a.r] || '?')[0]}</span>
@@ -748,7 +748,7 @@ window.ReportBlocks = (function () {
     }
     // Bottom assignments
     if (bottom.length > 0) {
-      html += `<div style="font-weight:700;font-size:0.56rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-2);margin:6px 0 3px">Needs Improvement</div>`;
+      html += `<div style="font-weight:700;font-size:0.56rem;color:var(--text-2);margin:6px 0 3px">Needs Improvement</div>`;
       bottom.forEach(a => {
         html += `<div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;line-height:1.6">
         <span data-prof="${a.r}" style="font-weight:600;color:${PROF_COLORS[a.r]};font-size:0.64rem;width:14px;flex-shrink:0">${(PROF_LABELS[a.r] || '?')[0]}</span>
@@ -770,8 +770,8 @@ window.ReportBlocks = (function () {
         stroke-dasharray="${gaugeDash} ${gaugeCirc - gaugeDash}" stroke-dashoffset="${gaugeCirc * 0.25}"
         stroke-linecap="round"/>
       <text x="50" y="46" text-anchor="middle" style="font-size:22px;font-weight:800;fill:var(--text)">${profPct}%</text>
-      <text x="50" y="60" text-anchor="middle" style="font-size:6px;fill:var(--text-3);text-transform:uppercase;letter-spacing:0.5px">at or above</text>
-      <text x="50" y="68" text-anchor="middle" style="font-size:6px;fill:var(--text-3);text-transform:uppercase;letter-spacing:0.5px">proficient</text>
+      <text x="50" y="60" text-anchor="middle" style="font-size:6px;fill:var(--text-3);">at or above</text>
+      <text x="50" y="68" text-anchor="middle" style="font-size:6px;fill:var(--text-3);">proficient</text>
     </svg>
   </div>`;
     // Late policy note (configurable per course)
@@ -787,7 +787,7 @@ window.ReportBlocks = (function () {
     // Missing assignments — 2-column grid
     if (missing.length > 0) {
       html += `<div style="padding-top:8px;border-top:1px solid var(--border)">
-      <div class="report-missing-title" style="font-weight:700;font-size:0.56rem;text-transform:uppercase;letter-spacing:0.04em;color:var(--score-1);margin-bottom:4px">Missing Assignments (${missing.length})</div>
+      <div class="report-missing-title" style="font-weight:700;font-size:0.56rem;color:var(--score-1);margin-bottom:4px">Missing Assignments (${missing.length})</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 16px">`;
       missing.forEach(a => {
         html += `<div style="font-size:0.68rem;color:var(--text);line-height:1.6;display:flex;align-items:baseline;gap:4px;min-width:0">
@@ -946,7 +946,7 @@ window.ReportBlocks = (function () {
     <div style="display:flex;flex-wrap:wrap;gap:16px;padding:2px 0">`;
     Object.entries(groups).forEach(([groupName, comps]) => {
       html += `<div style="flex:1;min-width:180px">
-      <div style="font-size:0.62rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-3);font-weight:600;margin-bottom:6px">${esc(groupName)}</div>`;
+      <div style="font-size:0.62rem;color:var(--text-3);font-weight:600;margin-bottom:6px">${esc(groupName)}</div>`;
       comps.forEach(c => {
         const d = compData[c.id];
         const avg = d.scored > 0 ? d.totalScore / d.scored : 0;

@@ -458,7 +458,7 @@ describe('MCardWidgets.render reflection', () => {
     expect(html).toContain('m-wdg-reflection');
     expect(html).toContain('m-wdg-reflection-label');
     expect(html).toContain('m-wdg-reflection-text');
-    expect(html).toContain('Student voice');
+    expect(html).toContain('Student Voice');
     expect(html).toContain('I really enjoyed');
   });
 

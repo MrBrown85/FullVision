@@ -1271,7 +1271,7 @@ function classGradeDistribution(cid, studentIds) {
 }
 
 function renderGrowthSparkline(points) {
-  if (!points || points.length === 0) return '<span style="font-size:0.65rem;color:var(--text-3)">No data yet</span>';
+  if (!points || points.length === 0) return '<span style="font-size:0.75rem;color:var(--text-3)">No data yet</span>';
   return `<div class="growth-sparkline">${points
     .map((p, i) => {
       const color = PROF_COLORS[Math.round(p.prof)] || PROF_COLORS[0];

@@ -1499,7 +1499,7 @@ window.ReportQuestionnaire = (function () {
     if (letterGrade) overallParts.push(letterGrade.text);
     const overallLevel = studentGradeSummary(cid, sid).level;
     html += `<div class="tq-panel" data-panel-id="academic-snapshot">
-    <div class="tq-panel-title">Academic Snapshot <span class="tq-panel-badge">${assignmentPerf.length} assessed</span></div>
+    <div class="tq-panel-title">Academic Snapshot <span class="tq-panel-badge">${assignmentPerf.length} Assessed</span></div>
     <div class="tq-snapshot-grid">
       <div class="tq-snapshot-item overall">
         <div class="tq-snapshot-item-label">Overall</div>

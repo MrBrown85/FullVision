@@ -5647,7 +5647,7 @@ function normalizeTermOrdinals(terms) {
    Full year, Semester 1 or Semester 2. Not stored: it is read off the
    terms the class carries, split at the day Semester 2 starts. */
 var TERM_SPANS = [
-  { value: 'full', label: 'Full year' },
+  { value: 'full', label: 'Full Year' },
   { value: 's1', label: 'Semester 1' },
   { value: 's2', label: 'Semester 2' },
 ];

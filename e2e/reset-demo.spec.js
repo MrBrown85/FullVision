@@ -20,7 +20,7 @@ test('a signed-in teacher has no Reset Demo in Advanced', async ({ page }) => {
   const panel = await openAdvanced(page);
   await expect(panel.getByRole('button', { name: 'Delete Account' })).toBeVisible();
   await expect(panel.getByRole('button', { name: 'Reset Demo' })).toHaveCount(0);
-  await expect(panel).not.toContainText('Reset to demo data');
+  await expect(panel).not.toContainText('Reset to Demo Data');
 });
 
 test('Demo Mode keeps Reset Demo in Advanced', async ({ page }) => {

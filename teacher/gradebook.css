@@ -42,8 +42,9 @@
 /* ── Layer 1: Primary bar ──────────────────────────────────── */
 .gb-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 8px 12px;
   padding: 10px 20px;
   background: var(--surface);
   border-bottom: 0.5px solid var(--divider-medium);
@@ -52,10 +53,8 @@
   z-index: 1;
 }
 .gb-toolbar-label {
-  font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
+  font-family: var(--font-base);
   font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wide);
   color: var(--text-3);
   font-weight: 500;
   white-space: nowrap;
@@ -188,10 +187,8 @@
   }
 }
 .gb-filter-strip-label {
-  font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
+  font-family: var(--font-base);
   font-size: var(--text-2xs);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wide);
   color: var(--text-3);
   font-weight: 500;
   flex-shrink: 0;
@@ -248,7 +245,7 @@
 /* Type chips — uppercase mono */
 .gb-type-chip {
   padding: 3px 10px;
-  font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
+  font-family: var(--font-base);
   font-size: var(--text-xs);
   font-weight: 600;
   border: 1px solid var(--border);
@@ -257,8 +254,6 @@
   color: var(--text-2);
   cursor: pointer;
   transition: all 0.12s;
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wide);
 }
 .gb-type-chip:hover {
   border-color: var(--text-3);
@@ -374,18 +369,15 @@
   justify-content: center;
 }
 .gb-assess-date {
-  font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
+  font-family: var(--font-base);
   font-size: var(--text-2xs);
   color: var(--text-3);
-  letter-spacing: var(--tracking-wide);
   white-space: nowrap;
 }
 .gb-assess-type-pill {
-  font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
+  font-family: var(--font-base);
   font-size: var(--text-2xs);
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wide);
   padding: 1px 6px;
   border-radius: var(--radius);
   line-height: 1.4;
@@ -544,11 +536,9 @@ th.gb-group-alt {
   z-index: 10;
   background: var(--bg);
   padding: 8px 12px 8px 16px;
-  font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
+  font-family: var(--font-base);
   font-size: var(--text-sm);
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wide);
   color: var(--text-2);
   width: 160px;
   min-width: 160px;
@@ -576,11 +566,9 @@ th.gb-group-alt {
   background: var(--bg);
   text-align: center;
   padding: 8px 8px;
-  font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
+  font-family: var(--font-base);
   font-size: var(--text-sm);
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wide);
   color: var(--text-2);
   border-bottom: none;
   border-right: 1px solid var(--divider-strong);
@@ -598,8 +586,6 @@ th.gb-group-alt {
   font-family: var(--font-base);
   font-size: var(--text-2xs);
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wide);
   margin-top: 1px;
   line-height: 1;
 }
@@ -628,11 +614,9 @@ th.gb-group-alt {
   text-align: center;
   padding: 6px 5px;
   background: var(--surface);
-  font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
+  font-family: var(--font-base);
   font-size: var(--text-xs);
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wide);
   border-bottom: 1px solid var(--divider-strong);
   width: 88px;
   min-width: 88px;
@@ -682,8 +666,6 @@ th.gb-group-alt {
   display: block;
   font-family: var(--font-base);
   font-size: var(--text-xs);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-wide);
   margin-top: 2px;
   line-height: 1;
   font-weight: 500;
@@ -868,10 +850,8 @@ th.gb-group-alt {
   border-top-left-radius: var(--qr);
 }
 .gb-grid-corner-inner {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
   color: var(--text-2);
 }
 /* Q2: Column headers — scrolls horizontally via JS transform on inner div.
@@ -1017,7 +997,7 @@ th.gb-group-alt {
   margin-top: 6px;
 }
 .gb-hover-tag {
-  font-size: 10px;
+  font-size: 12px;
   padding: 1px 6px;
   border-radius: var(--radius-sm);
   background: var(--overlay-hover);
@@ -1028,7 +1008,7 @@ th.gb-group-alt {
 .gb-des-tag {
   display: inline-block;
   font-family: 'SF Mono', ui-monospace, monospace;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 700;
   line-height: 1;
   padding: 1px 4px;
@@ -1062,6 +1042,7 @@ th.gb-group-alt {
   background: rgba(0, 0, 0, 0.015);
 }
 .gb-grid-rowhead-name {
+  font-size: var(--text-base);
   font-weight: 500;
   color: var(--text);
   white-space: nowrap;
@@ -1093,10 +1074,8 @@ th.gb-group-alt {
   gap: 16px;
 }
 .gb-grid-corner-label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
   color: var(--text-2);
 }
 .gb-grid-colheads-comp {
@@ -1212,10 +1191,8 @@ th.gb-group-alt {
 }
 .gb-grid-rowhead-overall small {
   display: block;
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
 }
 /* Row hover sync — applied by JS across Q3 and Q4 */
 .gb-grid-rowhead.gb-row-hover {
@@ -1296,13 +1273,13 @@ th.gb-group-alt {
 
 /* Column header text styles (shared between old table and new grid) */
 .gb-scores-assess-name {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text);
   line-height: 1.2;
 }
 .gb-scores-assess-meta {
-  font-size: 9px;
+  font-size: 12px;
   color: var(--text-3);
   font-weight: 400;
 }
@@ -1485,8 +1462,6 @@ th.gb-group-alt {
   font-size: var(--text-xs);
   font-weight: 600;
   color: var(--text-2);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
   margin-bottom: 4px;
 }
 .gb-add-field input,
@@ -1600,7 +1575,7 @@ th.gb-group-alt {
   position: absolute;
   top: 1px;
   right: 2px;
-  font-size: 9px;
+  font-size: 12px;
   color: var(--late);
 }
 

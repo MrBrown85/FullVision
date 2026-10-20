@@ -519,7 +519,7 @@
             syncLine +
             (hasCourses
               ? '<div style="margin-bottom:16px">' +
-                '<div style="font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-3);margin-bottom:6px">Active Class</div>' +
+                '<div style="font-size:13px;font-weight:600;color:var(--text-3);margin-bottom:6px">Active Class</div>' +
                 '<select id="m-course-select" style="width:100%;padding:12px;border-radius:10px;border:1px solid var(--border);font-size:17px;font-family:inherit;background:var(--surface);color:var(--text)">' +
                 courseOpts +
                 '</select>' +

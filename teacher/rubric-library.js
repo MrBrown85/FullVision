@@ -597,7 +597,7 @@ window.RubricLibrary = (function () {
             parts.push(row(c, planCopy(srcCid, rubric, c.id)));
           });
           if (targets.sameCourse.length && targets.other.length)
-            parts.push('<div class="rubric-copy-group">Other classes</div>');
+            parts.push('<div class="rubric-copy-group">Other Classes</div>');
           targets.other.forEach(function (c) {
             parts.push(row(c, planCopy(srcCid, rubric, c.id)));
           });

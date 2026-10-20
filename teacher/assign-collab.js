@@ -72,7 +72,7 @@ window.AssignCollab = (function () {
       });
       html +=
         '</div>' +
-        '<div style="margin-top:8px;font-family:\'SF Mono\',monospace;font-size:0.6rem;color:var(--text-3)">' +
+        '<div style="margin-top:8px;font-size:0.75rem;color:var(--text-3)">' +
         (students.length - collabExcluded.size) +
         ' of ' +
         students.length +
@@ -96,7 +96,7 @@ window.AssignCollab = (function () {
         '</div>';
       if (collabPairs.length === 0) {
         html +=
-          '<div style="text-align:center;padding:20px;color:var(--text-3);font-size:0.82rem">' +
+          '<div style="text-align:center;padding:20px;color:var(--text-3);font-size:0.875rem">' +
           'Click <strong>Random Pairs</strong> to auto-pair, or <strong>Manual</strong> to drag students into pairs.' +
           '</div>';
       } else {
@@ -180,7 +180,7 @@ window.AssignCollab = (function () {
         '</div>';
       if (collabGroups.length === 0) {
         html +=
-          '<div style="text-align:center;padding:20px;color:var(--text-3);font-size:0.82rem">' +
+          '<div style="text-align:center;padding:20px;color:var(--text-3);font-size:0.875rem">' +
           'Click <strong>Randomize</strong> to auto-assign groups, or <strong>Manual</strong> to drag students.' +
           '</div>';
       } else {

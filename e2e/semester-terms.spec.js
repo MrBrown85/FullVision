@@ -16,7 +16,7 @@ const GRANDVIEW = [
 async function openTerms(page) {
   await gotoApp(page, '/dashboard');
   await page.getByRole('button', { name: 'Class Management' }).first().click();
-  const span = page.getByRole('radiogroup', { name: 'This class runs' });
+  const span = page.getByRole('radiogroup', { name: 'This Class Runs' });
   await expect(span).toBeVisible();
   return span;
 }
@@ -36,7 +36,7 @@ test.describe('Semester classes', () => {
 
   test('Semester 2 keeps Terms 3 and 4 as Report 3 and 4, and Full year brings 1 and 2 back', async ({ page }) => {
     const span = await openTerms(page);
-    await expect(span.getByRole('radio', { name: 'Full year' })).toHaveAttribute('aria-checked', 'true');
+    await expect(span.getByRole('radio', { name: 'Full Year' })).toHaveAttribute('aria-checked', 'true');
     await expect(termLabels(page)).toHaveCount(4);
 
     await span.getByRole('radio', { name: 'Semester 2' }).click();
@@ -46,7 +46,7 @@ test.describe('Semester classes', () => {
     await expect(page.locator('[id^="cm-term-foot-"]')).toContainText('Report 3–4');
     expect(await page.evaluate(cid => getReportingTerms(cid).map(t => t.ordinal), TEST_COURSE.id)).toEqual([3, 4]);
 
-    await page.getByRole('radiogroup', { name: 'This class runs' }).getByRole('radio', { name: 'Full year' }).click();
+    await page.getByRole('radiogroup', { name: 'This Class Runs' }).getByRole('radio', { name: 'Full Year' }).click();
     await expect(termLabels(page)).toHaveCount(4);
   });
 
@@ -57,7 +57,7 @@ test.describe('Semester classes', () => {
     );
     await gotoApp(page, '/reports');
     const opts = page.locator('#report-period option');
-    await expect(opts).toHaveText(['Apr report card', 'Jun report card']);
+    await expect(opts).toHaveText(['Apr Report Card', 'Jun Report Card']);
     expect(await opts.first().getAttribute('value')).toBe('Report 3');
   });
 });

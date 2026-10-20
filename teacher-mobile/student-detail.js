@@ -328,7 +328,7 @@ window.MStudentDetail = (function () {
           var label = tag ? tag.shortName || tag.label || tag.code || '' : '?';
           scoreChips +=
             '<span class="m-assess-score-chip">' +
-            '<span style="font-size:11px;color:var(--text-3)">' +
+            '<span style="font-size:12px;color:var(--text-3)">' +
             MC.esc(label.substring(0, 8)) +
             '</span>' +
             '<span class="m-assess-score-val" style="color:' +
@@ -362,7 +362,7 @@ window.MStudentDetail = (function () {
 
     // Newest first already; the three newest.
     var obs = getStudentQuickObs(cid, sid).slice(0, 3);
-    var obsCards = '<div class="m-list-inset-header">Recent observations</div>';
+    var obsCards = '<div class="m-list-inset-header">Recent Observations</div>';
     if (!obs.length) {
       obsCards +=
         '<div class="m-empty" style="padding:20px"><div class="m-empty-subtitle">No observations yet</div></div>';

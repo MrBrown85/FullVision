@@ -470,7 +470,7 @@ window.GradingSetupCopy = (function () {
     };
     var parts = targets.sameCourse.map(row);
     if (targets.sameCourse.length && targets.other.length)
-      parts.push('<div class="rubric-copy-group">Other classes</div>');
+      parts.push('<div class="rubric-copy-group">Other Classes</div>');
     return parts.concat(targets.other.map(row)).join('');
   }
 

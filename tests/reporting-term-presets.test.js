@@ -14,20 +14,20 @@ describe('report names for the Term Questionnaire picker', () => {
   it("names each report in the school's words when a class uses that school's terms", () => {
     const rows = reportingTermPreset('grandviewheights', IN_YEAR);
     expect(reportingTermReportNames(rows)).toEqual([
-      'Nov report card',
-      'Feb report card',
-      'Apr report card',
-      'Jun report card',
+      'Nov Report Card',
+      'Feb Report Card',
+      'Apr Report Card',
+      'Jun Report Card',
     ]);
   });
 
   it('leaves a term with no published report blank', () => {
     const rows = reportingTermPreset('earlmarriott', IN_YEAR);
     expect(reportingTermReportNames(rows)).toEqual([
-      'Nov learning update',
+      'Nov Learning Update',
       '',
-      'Apr learning update',
-      'Jun learning update',
+      'Apr Learning Update',
+      'Jun Learning Update',
     ]);
   });
 

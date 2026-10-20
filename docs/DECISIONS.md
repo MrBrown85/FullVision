@@ -25,7 +25,7 @@ Context: `grading-compliance-plan.md`. All implemented; see its status table.
 - **No LMS features:** no assignment submission, content pages, discussions or quizzes. FullVision sits beside the district LMS.
 - **Students are removed by withdrawal, not deletion** (2026-10-19). The roster's remove button withdraws: the student leaves the roster, gradebook, dashboard, observations, phone app and reports, and their scores, observations and reports stay on the server. Class Management lists them under Withdrawn with Re-enrol. Permanent delete is the second step, only from that list, and only for a withdrawn student (`delete_withdrawn_student`); it has no Undo.
 - **Sync failures show only on the sync dot.** No banners or toasts.
-- **Plain language in the UI:** sentence case, no jargon without a legend.
+- **Plain language in the UI:** no jargon without a legend. Casing: see "Text size and casing" (2026-10-19).
 
 ## Student voice (2026-10-17)
 
@@ -156,3 +156,11 @@ Context: a UI/UX sweep found solid blue spent on navigation ("Class Management",
 1. **One primary action per screen; navigation and settings are secondary.** Solid blue marks the screen's main action only: + New Assessment (Assignments, Gradebook), Add in the capture strip (Observations), Print Reports (Progress Reports, Class Summary), Save & Next (Term Questionnaire), Term Questionnaire (student page), and Save in forms and dialogs. Links to other screens and settings (Class Management, Edit Student, Student Dashboard, Generate) use an outline button. A screen with no single main action, such as the dashboard, has no solid button.
 2. **Screens under the dashboard keep "Dashboard" lit in the top nav** and show a breadcrumb at the left of their toolbar: "Dashboard › Mei Wong" on a student page, "Dashboard › Class Management". "Dashboard" links back; there is no separate back button. `renderBreadcrumb` in `teacher/ui.js`.
 3. **No page titles on the five top-level pages.** The nav pill already names them.
+
+## Text size and casing (2026-10-19)
+
+Context: a UI/UX sweep found text too small and too much uppercase monospace (253 of ~650 dashboard text elements at 10–11 px).
+
+1. **12 px minimum on screen, 14 px body text.** Printed sheets (progress reports, rubric handouts) keep their own print sizes; the progress report preview matches the printout.
+2. **Title Case for labels, headings, buttons, tabs and menu options** ("Class Details", "Upcoming Birthdays", "Save and Next Criterion"), with short words (a, and, for, of, the, to…) lower case. Hints, messages and full sentences stay sentences. This supersedes "sentence case" in Product shape (2026-10-17).
+3. **No uppercase or monospace labels.** Monospace is only for numbers that line up (scores, percentages, counts, student numbers) and codes (QAP, CRT, SCI8).
