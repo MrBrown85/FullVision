@@ -65,6 +65,32 @@ test.describe('Report Card sheets', () => {
     expect(await overflowing(page)).toEqual([]);
   });
 
+  test('the rail says how many sheets each student needs, and why', async ({ page }) => {
+    await openReportCard(page);
+    const badges = page.locator('#gb-sidebar .student-row-sheets');
+    await expect(badges).toHaveCount(STUDENTS);
+    for (const text of await badges.allTextContents()) expect(text).toMatch(/^(1 sheet|\d sheets|No comment)$/);
+    await expect(page.locator('.sheet-student').first().locator('.sheet-badge')).toHaveText('1 sheet');
+    // A note explains any report that is not the plain form.
+    const notes = page.locator('.sheet-note');
+    if (await notes.count()) await expect(notes.first()).toContainText(/moved to the back|second sheet|No comment/);
+    // Leaving the Report Card brings the grade badges back.
+    await page.locator('[data-action="rbApplyPreset"][data-preset="brief"]').click();
+    await expect(page.locator('#gb-sidebar .student-row-sheets')).toHaveCount(0);
+    await expect(page.locator('#gb-sidebar .student-row-prof').first()).toBeVisible();
+  });
+
+  test('Fit Map shows every student at a glance and a thumbnail opens that student', async ({ page }) => {
+    await openReportCard(page);
+    await page.getByRole('button', { name: 'Fit Map' }).click();
+    await expect(page.locator('#rb-preview')).toHaveClass(/report-fitmap/);
+    await expect(page.locator('.sheet-student')).toHaveCount(STUDENTS);
+    await page.locator('.sheet-student').nth(2).click();
+    await expect(page.locator('#rb-preview')).not.toHaveClass(/report-fitmap/);
+    await expect(page.locator('.sheet-student')).toHaveCount(1);
+    await expect(page.locator('#picker-label')).toHaveText('Hannah Berg');
+  });
+
   test('Photocopy view turns the levels black on screen', async ({ page }) => {
     await openReportCard(page);
     const chip = page.locator('.report-sheet .report-section-chip-value').first();

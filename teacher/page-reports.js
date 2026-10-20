@@ -118,6 +118,9 @@ window.PageReports = (function () {
     if (tbPaper) tbPaper.style.display = tab === 'questionnaire' ? 'none' : '';
     const tbView = document.getElementById('report-view');
     if (tbView) tbView.style.display = tab === 'progress' ? '' : 'none';
+    const tbFit = document.getElementById('tb-fitmap-btn');
+    if (tbFit) tbFit.style.display = tab === 'progress' && ReportBuilderUI.usesSheets(reportConfig) ? '' : 'none';
+    if (tab !== 'progress') _restoreSidebarBadges();
     // Show Anonymize button only on class summary
     const tbAnon = document.getElementById('tb-anon-btn');
     if (tbAnon) tbAnon.style.display = tab === 'summary' ? '' : 'none';
@@ -358,14 +361,68 @@ window.PageReports = (function () {
    REPORT BUILDER — Interaction functions
    ══════════════════════════════════════════════════════════════ */
   function renderReportPreview() {
+    var sheets = ReportBuilderUI.usesSheets(reportConfig);
     Preview.renderReportPreview({
       cid: activeCourse,
       selectedStudentIds: selectedStudentIds,
       reportConfig: reportConfig,
       paper: reportPaper,
+      onSheets: _annotateSidebar,
     });
     var preview = document.getElementById('rb-preview');
-    if (preview) preview.classList.toggle('report-photocopy', reportView === 'photocopy');
+    if (preview) {
+      preview.classList.toggle('report-photocopy', reportView === 'photocopy');
+      preview.classList.toggle('report-fitmap', sheets && fitMapOn);
+    }
+    var fm = document.getElementById('tb-fitmap-btn');
+    if (fm) {
+      fm.style.display = activeTab === 'progress' && sheets ? '' : 'none';
+      fm.classList.toggle('active', fitMapOn);
+      fm.setAttribute('aria-pressed', fitMapOn ? 'true' : 'false');
+    }
+    if (!sheets) _restoreSidebarBadges();
+  }
+
+  /* ── The rail: sheets per student ──────────────────────────────
+     On the Report Card, each sidebar row shows how many sheets the
+     student needs ("1 sheet", "2 sheets") or "No comment", with the reason
+     as its title. The grade badges come back on any other tab or preset. */
+  var _sidebarAnnotated = false;
+  function _annotateSidebar(summary) {
+    if (!summary || !summary.perStudent) return;
+    document.querySelectorAll('#gb-sidebar .student-row[data-sid]').forEach(function (row) {
+      var cell = row.querySelector('.student-row-grades');
+      var info = cell && summary.perStudent[row.getAttribute('data-sid')];
+      if (!info) return;
+      if (cell.dataset.gradesHtml === undefined) cell.dataset.gradesHtml = cell.innerHTML;
+      var cls = info.sheets > 1 ? 'over' : info.noComment ? 'none' : 'ok';
+      cell.innerHTML =
+        '<span class="student-row-sheets ' +
+        cls +
+        '"' +
+        (info.reason ? ' title="' + esc(info.reason) + '"' : '') +
+        '>' +
+        esc(info.badge) +
+        '</span>';
+    });
+    _sidebarAnnotated = true;
+  }
+  function _restoreSidebarBadges() {
+    if (!_sidebarAnnotated) return;
+    document.querySelectorAll('#gb-sidebar .student-row-grades').forEach(function (cell) {
+      if (cell.dataset.gradesHtml !== undefined) {
+        cell.innerHTML = cell.dataset.gradesHtml;
+        delete cell.dataset.gradesHtml;
+      }
+    });
+    _sidebarAnnotated = false;
+  }
+
+  /* ── Fit Map: every student's sheets at a glance ─────────────── */
+  var fitMapOn = false;
+  function toggleFitMap(on) {
+    fitMapOn = on === undefined ? !fitMapOn : !!on;
+    renderReportPreview();
   }
 
   function renderBuilderBlocks() {
@@ -537,6 +594,18 @@ window.PageReports = (function () {
       },
       setView: function () {
         setView(el.dataset.view);
+      },
+      toggleFitMap: function () {
+        toggleFitMap();
+      },
+      fitMapPick: function () {
+        // A thumbnail opens that student's pages. Outside the Fit Map the
+        // sheets are ordinary content and a click means nothing.
+        if (!fitMapOn) return;
+        selectedStudentIds = [el.dataset.sid];
+        fitMapOn = false;
+        populateStudentSelect();
+        renderReports();
       },
       rbApplyPreset: function () {
         rbApplyPreset(el.dataset.preset);
@@ -741,6 +810,7 @@ window.PageReports = (function () {
     var paperStyle = document.getElementById(PAPER_STYLE_ID);
     if (paperStyle) paperStyle.remove();
     if (typeof ReportSheets !== 'undefined') ReportSheets.clearPageStyle();
+    _restoreSidebarBadges();
     if (typeof clearLongFormAuthContext === 'function') clearLongFormAuthContext('term-rating');
 
     _listeners.forEach(function (l) {
@@ -770,7 +840,7 @@ window.PageReports = (function () {
 
   /* -- Toolbar HTML (rendered into main on init) ---------- */
   var TOOLBAR_HTML =
-    '<div class="report-toolbar no-print">\n      <div class="seg report-seg-control" role="tablist" aria-label="Report type">\n        <button class="seg-btn report-seg-btn active" data-action="switchTab" data-tab="questionnaire" role="tab" aria-selected="true">Term Questionnaire</button>\n        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="progress" role="tab" aria-selected="false">Progress Reports</button>\n        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="summary" role="tab" aria-selected="false">Class Summary</button>\n      </div>\n      <div class="student-picker" id="student-picker">\n        <button class="student-picker-btn" data-action="toggleStudentPicker" aria-label="Select students" aria-expanded="false" aria-haspopup="listbox">\n          <span id="picker-label">All Students</span>\n          <span class="arrow" aria-hidden="true">\u25bc</span>\n        </button>\n        <div class="student-picker-dropdown" id="picker-dropdown"></div>\n      </div>\n      <div class="tq-student-nav" id="tq-student-nav" style="display:none">\n        <button class="tq-toolbar-arrow" data-action="tqPrevStudent" title="Previous student" aria-label="Previous student">\n          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>\n        </button>\n        <span class="tq-student-name" id="tq-student-name"></span>\n        <button class="tq-toolbar-arrow" data-action="tqNextStudent" title="Next student" aria-label="Next student">\n          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>\n        </button>\n        <div class="tq-progress-ring" id="tq-progress-ring">\n          <svg width="30" height="30" viewBox="0 0 30 30">\n            <circle class="ring-bg" cx="15" cy="15" r="12"/>\n            <circle class="ring-fill" id="tq-ring-fill" cx="15" cy="15" r="12" stroke-dasharray="75.4" stroke-dashoffset="75.4"/>\n          </svg>\n          <span class="tq-progress-label" id="tq-progress-label"></span>\n        </div>\n      </div>\n      <select id="report-period" class="report-term-select" aria-label="Report"></select>\n      <div class="seg seg-sm" id="report-paper" role="radiogroup" aria-label="Paper" style="display:none">\n        <button class="seg-btn active" data-action="setPaper" data-paper="letter" role="radio" aria-checked="true">Letter</button>\n        <button class="seg-btn" data-action="setPaper" data-paper="legal" role="radio" aria-checked="false">Legal</button>\n      </div>\n      <div class="seg seg-sm" id="report-view" role="radiogroup" aria-label="View" style="display:none">\n        <button class="seg-btn active" data-action="setView" data-view="screen" role="radio" aria-checked="true">Screen</button>\n        <button class="seg-btn" data-action="setView" data-view="photocopy" role="radio" aria-checked="false">Photocopy</button>\n      </div>\n      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">\n        <button class="tb-toggle-btn" id="tb-anon-btn" style="display:none" data-action="toggleAnon">\n          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>\n          Anonymize\n        </button>\n        <button class="tb-action-btn" id="tb-print-btn" data-action="printReports">Print Reports</button>\n      </div>\n    </div>\n    <div id="report-output" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto"></div>';
+    '<div class="report-toolbar no-print">\n      <div class="seg report-seg-control" role="tablist" aria-label="Report type">\n        <button class="seg-btn report-seg-btn active" data-action="switchTab" data-tab="questionnaire" role="tab" aria-selected="true">Term Questionnaire</button>\n        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="progress" role="tab" aria-selected="false">Progress Reports</button>\n        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="summary" role="tab" aria-selected="false">Class Summary</button>\n      </div>\n      <div class="student-picker" id="student-picker">\n        <button class="student-picker-btn" data-action="toggleStudentPicker" aria-label="Select students" aria-expanded="false" aria-haspopup="listbox">\n          <span id="picker-label">All Students</span>\n          <span class="arrow" aria-hidden="true">\u25bc</span>\n        </button>\n        <div class="student-picker-dropdown" id="picker-dropdown"></div>\n      </div>\n      <div class="tq-student-nav" id="tq-student-nav" style="display:none">\n        <button class="tq-toolbar-arrow" data-action="tqPrevStudent" title="Previous student" aria-label="Previous student">\n          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>\n        </button>\n        <span class="tq-student-name" id="tq-student-name"></span>\n        <button class="tq-toolbar-arrow" data-action="tqNextStudent" title="Next student" aria-label="Next student">\n          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>\n        </button>\n        <div class="tq-progress-ring" id="tq-progress-ring">\n          <svg width="30" height="30" viewBox="0 0 30 30">\n            <circle class="ring-bg" cx="15" cy="15" r="12"/>\n            <circle class="ring-fill" id="tq-ring-fill" cx="15" cy="15" r="12" stroke-dasharray="75.4" stroke-dashoffset="75.4"/>\n          </svg>\n          <span class="tq-progress-label" id="tq-progress-label"></span>\n        </div>\n      </div>\n      <select id="report-period" class="report-term-select" aria-label="Report"></select>\n      <div class="seg seg-sm" id="report-paper" role="radiogroup" aria-label="Paper" style="display:none">\n        <button class="seg-btn active" data-action="setPaper" data-paper="letter" role="radio" aria-checked="true">Letter</button>\n        <button class="seg-btn" data-action="setPaper" data-paper="legal" role="radio" aria-checked="false">Legal</button>\n      </div>\n      <div class="seg seg-sm" id="report-view" role="radiogroup" aria-label="View" style="display:none">\n        <button class="seg-btn active" data-action="setView" data-view="screen" role="radio" aria-checked="true">Screen</button>\n        <button class="seg-btn" data-action="setView" data-view="photocopy" role="radio" aria-checked="false">Photocopy</button>\n      </div>\n      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">\n        <button class="tb-toggle-btn" id="tb-anon-btn" style="display:none" data-action="toggleAnon">\n          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>\n          Anonymize\n        </button>\n        <button class="tb-toggle-btn" id="tb-fitmap-btn" style="display:none" data-action="toggleFitMap" aria-pressed="false">Fit Map</button>\n        <button class="tb-action-btn" id="tb-print-btn" data-action="printReports">Print Reports</button>\n      </div>\n    </div>\n    <div id="report-output" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto"></div>';
 
   /* -- Expose handlers for inline event attributes --------- */
   window.rbDragStart = rbDragStart;

@@ -122,6 +122,7 @@ window.ReportPreview = (function () {
       });
       var line = document.getElementById('rb-form-summary');
       if (line) line.textContent = ReportSheets.summaryText(summary);
+      if (typeof opts.onSheets === 'function') opts.onSheets(summary);
       return;
     } else {
       var ctx = ReportBlocks.reportContext();
