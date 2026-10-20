@@ -1,6 +1,6 @@
 # Draft migrations: report forms, Phase 4 groundwork
 
-Drafts for review. **Nothing here has been run anywhere.** They live in
+Drafts for review. **Run only on a local throwaway Postgres (see `test/`), never on `gradebook-prod`.** They live in
 `migrations/drafts/` so CI's drift check (which reads only
 `migrations/*.sql`) does not count them as unapplied. When one is approved:
 test it on a Supabase branch or inside `begin … rollback`, move it to

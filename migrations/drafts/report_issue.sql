@@ -38,7 +38,7 @@ create table if not exists public.report_issue (
   term           integer     not null check (term between 1 and 6),
   term_label     text,
   paper          text        not null default 'letter' check (paper in ('letter', 'legal')),
-  form           jsonb       check (form is null or (jsonb_typeof(form) = 'object' and jsonb_typeof(form->'front') = 'array')),
+  form           jsonb       check (form is null or (jsonb_typeof(form) = 'object' and coalesce(jsonb_typeof(form->'front'), '') = 'array')),
   issued_at      timestamptz not null default now(),
   issued_by      uuid        references public.teacher(id) on delete set null,
   student_count  integer     not null default 0,

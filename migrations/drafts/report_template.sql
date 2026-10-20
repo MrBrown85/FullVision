@@ -21,7 +21,7 @@ create table if not exists public.report_template (
   id          uuid        primary key default gen_random_uuid(),
   teacher_id  uuid        not null references public.teacher(id) on delete cascade,
   name        text        not null check (char_length(btrim(name)) between 1 and 60),
-  form        jsonb       not null check (jsonb_typeof(form) = 'object' and jsonb_typeof(form->'front') = 'array'),
+  form        jsonb       not null check (jsonb_typeof(form) = 'object' and coalesce(jsonb_typeof(form->'front'), '') = 'array'),
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
