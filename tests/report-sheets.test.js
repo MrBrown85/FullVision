@@ -43,3 +43,28 @@ describe('ReportSheets.pack', () => {
     expect(kinds(ReportSheets.pack([], [], 0, 700))).toEqual(['front', 'back']);
   });
 });
+
+describe('ReportSheets.reasonText', () => {
+  it('is empty when everything sits where the form puts it', () => {
+    expect(ReportSheets.reasonText({ commentLines: 6, room: 8, moved: [], continued: [], noComment: false })).toBe('');
+  });
+
+  it('names the comment, what moved to the back, and what went to a second sheet', () => {
+    const text = ReportSheets.reasonText({
+      commentLines: 12,
+      room: 8,
+      moved: ['Growth and Next Steps'],
+      continued: ['Learning Dispositions'],
+      noComment: false,
+    });
+    expect(text).toBe(
+      'Comment is 12 lines; the form keeps 8 on the front. Growth and Next Steps moved to the back. Learning Dispositions on a second sheet.',
+    );
+  });
+
+  it('says when there is no comment yet', () => {
+    expect(ReportSheets.reasonText({ commentLines: 0, room: 8, moved: [], continued: [], noComment: true })).toBe(
+      'No comment yet; the box prints with lines.',
+    );
+  });
+});

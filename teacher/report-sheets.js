@@ -207,6 +207,29 @@ window.ReportSheets = (function () {
   }
 
   /* Lays one student into sheets. Returns { html, sheets, sides, over }. */
+  function _itemLabel(it) {
+    if (it.pair)
+      return it.pair
+        .map(function (q) {
+          return q.label;
+        })
+        .join(' and ');
+    return it.label || it.block;
+  }
+
+  /* One plain sentence or two on why a student's report is the shape it is.
+     Empty when everything sits where the form puts it. */
+  function reasonText(r) {
+    var parts = [];
+    if (r.room && r.commentLines > r.room) {
+      parts.push('Comment is ' + r.commentLines + ' lines; the form keeps ' + r.room + ' on the front.');
+    }
+    if (r.moved && r.moved.length) parts.push(r.moved.join(' and ') + ' moved to the back.');
+    if (r.continued && r.continued.length) parts.push(r.continued.join(' and ') + ' on a second sheet.');
+    if (r.noComment) parts.push('No comment yet; the box prints with lines.');
+    return parts.join(' ');
+  }
+
   function layoutStudent(cid, student, ctx, opts) {
     var f = opts.form || FORM_REPORT_CARD;
     var probe = opts.probe;
@@ -215,9 +238,14 @@ window.ReportSheets = (function () {
     var sideH = (p.h - 2 * MARGIN_IN) * PX_PER_IN;
     var cap = Math.floor((sideH - probe.footerPx) * (1 - SAFETY));
 
+    var commentItem = f.front.find(function (it) {
+      return it.block === 'teacher-narrative';
+    });
+    var rawComment = commentItem ? ReportBlocks.renderReportBlock('teacher-narrative', cid, student, ctx) : '';
     var frontHtml = f.front.map(function (it) {
       return _itemHtml(it, cid, student, ctx, probe);
     });
+    var frontLabels = f.front.map(_itemLabel);
     var backItems = f.back.filter(function (it) {
       return !it.pinned;
     });
@@ -227,6 +255,7 @@ window.ReportSheets = (function () {
     var backHtml = backItems.map(function (it) {
       return _itemHtml(it, cid, student, ctx, probe);
     });
+    var backLabels = backItems.map(_itemLabel);
     var pinnedHtml = pinnedItem ? _itemHtml(pinnedItem, cid, student, ctx, probe) : '';
 
     // Empty blocks take no room at all.
@@ -241,18 +270,57 @@ window.ReportSheets = (function () {
       return !!h;
     });
 
-    var heights = _measureAll(opts.stage, frontHtml.concat(backHtml, pinnedHtml ? [pinnedHtml] : []));
+    var extra = (pinnedHtml ? [pinnedHtml] : []).concat(rawComment ? [rawComment] : []);
+    var heights = _measureAll(opts.stage, frontHtml.concat(backHtml, extra));
     var frontH = heights.slice(0, frontHtml.length);
     var backH = heights.slice(frontHtml.length, frontHtml.length + backHtml.length);
-    var pinnedH = pinnedHtml ? heights[heights.length - 1] : 0;
+    var pinnedH = pinnedHtml ? heights[frontHtml.length + backHtml.length] : 0;
+    var commentH = rawComment ? heights[heights.length - 1] : 0;
+    var commentLines = rawComment ? Math.max(1, Math.round((commentH - probe.boxChromePx) / probe.linePx)) : 0;
+    var room = commentItem && commentItem.room ? commentItem.room.lines : 0;
 
     var sides = pack(frontH, backH, pinnedH, cap);
     var sheetCount = Math.ceil(sides.length / 2);
+    var moved = [];
+    var continued = [];
+    sides.forEach(function (side, idx) {
+      side.items.forEach(function (it) {
+        var label = it.from === 'front' ? frontLabels[frontKeep[it.i]] : backLabels[backKeep[it.i]];
+        if (idx === 1 && it.from === 'front') moved.push(label);
+        if (idx >= 2) continued.push(label);
+      });
+    });
     var course = COURSES[cid] || {};
     var teacher = (typeof getConfig === 'function' && getConfig().displayName) || '';
     var name = fullName(student);
     var itemHtml = { front: frontHtml, back: backHtml };
-    var html = '';
+    var result = {
+      sheets: sheetCount,
+      sides: sides.length,
+      over: false,
+      moved: moved,
+      continued: continued,
+      commentLines: commentLines,
+      room: room,
+      noComment: !!commentItem && !rawComment,
+    };
+    var reason = reasonText(result);
+    var badge =
+      result.noComment && sheetCount === 1 ? 'No comment' : sheetCount === 1 ? '1 sheet' : sheetCount + ' sheets';
+    var html =
+      '<div class="sheet-student" data-action="fitMapPick" data-sid="' +
+      esc(student.id) +
+      '" data-sheets="' +
+      sheetCount +
+      '">' +
+      '<div class="sheet-student-head no-print"><span class="sheet-student-name">' +
+      esc(name) +
+      '</span><span class="sheet-badge ' +
+      (sheetCount > 1 ? 'over' : result.noComment ? 'none' : 'ok') +
+      '">' +
+      badge +
+      '</span></div>' +
+      (reason ? '<div class="sheet-note no-print">' + esc(reason) + '</div>' : '');
     var over = false;
     for (var s = 0; s < sheetCount; s++) {
       var front = sides[2 * s];
@@ -295,7 +363,12 @@ window.ReportSheets = (function () {
         ) +
         '</div>';
     }
-    return { html: html, sheets: sheetCount, sides: sides.length, over: over };
+    html += '</div>';
+    result.html = html;
+    result.over = over;
+    result.reason = reason;
+    result.badge = badge;
+    return result;
   }
 
   /* ── Preview ────────────────────────────────────────────────── */
@@ -332,7 +405,15 @@ window.ReportSheets = (function () {
     var contentW = (p.w - 2 * MARGIN_IN) * PX_PER_IN;
     var stage = _stage(preview, contentW);
     var probe = _probe(stage);
-    var summary = { students: opts.students.length, sheets: 0, pages: 0, continued: [], over: [] };
+    var summary = {
+      students: opts.students.length,
+      sheets: 0,
+      pages: 0,
+      continued: [],
+      over: [],
+      noComment: [],
+      perStudent: {},
+    };
     var html = opts.students
       .map(function (st) {
         var r = layoutStudent(opts.cid, st, opts.ctx, { form: opts.form, paper: paper, stage: stage, probe: probe });
@@ -340,6 +421,8 @@ window.ReportSheets = (function () {
         summary.pages += r.sheets * 2;
         if (r.sheets > 1) summary.continued.push(fullName(st));
         if (r.over) summary.over.push(fullName(st));
+        if (r.noComment) summary.noComment.push(fullName(st));
+        summary.perStudent[st.id] = { sheets: r.sheets, badge: r.badge, reason: r.reason, noComment: r.noComment };
         return r.html;
       })
       .join('');
@@ -355,9 +438,12 @@ window.ReportSheets = (function () {
   function summaryText(s) {
     if (!s || !s.students) return '';
     var one = s.students - s.continued.length;
-    var t = s.students + ' students · ' + s.pages + ' pages · ';
-    if (!s.continued.length) t += 'every student on one sheet';
+    var t = s.students + (s.students === 1 ? ' student · ' : ' students · ') + s.pages + ' pages · ';
+    if (!s.continued.length) t += s.students === 1 ? 'one sheet' : 'every student on one sheet';
     else t += one + ' on one sheet, ' + s.continued.length + ' need a second (' + s.continued.join(', ') + ')';
+    if (s.noComment && s.noComment.length) {
+      t += ' · ' + s.noComment.length + ' with no comment yet (' + s.noComment.join(', ') + ')';
+    }
     if (s.over.length) t += ' · a block is taller than a side for ' + s.over.join(', ');
     return t;
   }
@@ -367,6 +453,7 @@ window.ReportSheets = (function () {
     SAFETY: SAFETY,
     form: form,
     pack: pack,
+    reasonText: reasonText,
     paperSize: paperSize,
     layoutStudent: layoutStudent,
     renderPreview: renderPreview,
