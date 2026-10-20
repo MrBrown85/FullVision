@@ -2539,6 +2539,10 @@
   display: block;
   padding: 10px 16px 14px;
 }
+.comment-popover-capture .obsc {
+  border: 0;
+  padding: 0;
+}
 .comment-entry-main {
   flex: 1;
   display: flex;

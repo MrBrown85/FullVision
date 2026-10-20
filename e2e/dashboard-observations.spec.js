@@ -178,7 +178,7 @@ test.describe('Dashboard Observations card', () => {
       await add().focus();
       await add().click();
       await expect(dialog).toBeVisible();
-      await dialog.locator('.obs-band-tab[data-value="concern"]').click();
+      await dialog.locator('.obsc-chip-type[data-value="concern"]').click();
       await dialog.locator('textarea').fill(text);
       await page.keyboard.press('Enter');
       // The dialog stays open to offer the flag; the card behind it redraws.

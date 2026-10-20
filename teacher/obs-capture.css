@@ -1,25 +1,17 @@
 /* obs-capture.css — the shared observation capture strip (teacher/obs-capture.js).
    Loaded by the desktop app and the phone app. App tokens only. */
 
-/* The strip is the edit window's twin: a folder band of type tabs, a
-   Student line, the note box and one row of controls. */
+/* The strip: a Student line with the type chips, the note box and one
+   row of controls. */
 .obsc {
   position: relative;
   display: flex;
   flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 8px);
-  min-width: 0;
-}
-.obsc > [data-part='band'] .obs-band {
-  border-radius: var(--radius-sm, 8px) var(--radius-sm, 8px) 0 0;
-}
-.obsc-body {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 12px 14px;
+  border-radius: var(--radius-lg, 10px);
   min-width: 0;
 }
 
@@ -32,6 +24,17 @@
 }
 .obsc-row .obs-row-sep {
   margin: 0 4px;
+}
+.obsc-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.obsc-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+  margin: 0 2px;
 }
 .obsc-spacer {
   flex: 1 1 auto;
@@ -125,6 +128,30 @@ span.obsc-chip-label {
 .obsc-x:hover {
   background: var(--overlay-pressed);
   color: var(--text);
+}
+
+/* The type: dashed until chosen, then tinted in its colour. */
+.obsc-chip-type:not(.is-on) {
+  border-style: dashed;
+  color: var(--text-2);
+}
+.obsc-chip-type[data-sentiment='strength'].is-on {
+  border-color: transparent;
+  color: var(--score-3);
+  background: color-mix(in srgb, var(--score-3) 14%, transparent);
+  font-weight: 600;
+}
+.obsc-chip-type[data-sentiment='growth'].is-on {
+  border-color: transparent;
+  color: var(--link);
+  background: color-mix(in srgb, var(--active) 14%, transparent);
+  font-weight: 600;
+}
+.obsc-chip-type[data-sentiment='concern'].is-on {
+  border-color: transparent;
+  color: var(--score-2);
+  background: color-mix(in srgb, var(--score-2) 16%, transparent);
+  font-weight: 600;
 }
 
 /* A student: initial avatar, name, ×. */
@@ -293,8 +320,8 @@ span.obsc-chip-label {
   display: none;
 }
 /* A floating menu's slot takes no room, so cancel the flex gap it adds. */
-.obsc:not(.obsc--sheet) .obsc-body > .obsc-slot {
-  margin-top: -10px;
+.obsc:not(.obsc--sheet) > .obsc-slot {
+  margin-top: -8px;
 }
 .obsc-menu {
   position: absolute;
@@ -518,6 +545,10 @@ span.obsc-chip-label {
 }
 .obsc-dialog-close:hover {
   background: var(--overlay-hover);
+}
+.obsc-dialog .obsc {
+  border: 0;
+  padding: 0;
 }
 
 /* ── Editor pieces: the edit window and the strip share these ── */
@@ -747,6 +778,11 @@ span.obsc-chip-label {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+}
+/* In the strip, which sits at the top of its host, the menu opens down. */
+.obsc .obs-menu {
+  top: calc(100% + 4px);
+  bottom: auto;
 }
 .obs-menu-item {
   display: block;

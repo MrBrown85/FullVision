@@ -214,20 +214,20 @@ test.describe('Observation editor (D3), phone', () => {
 });
 
 test.describe('Capture strip (D4), desktop', () => {
-  test('type tabs start unpicked; Student line, Context menu with None, + Link, Add waits', async ({ page }) => {
+  test('type chips start unpicked beside the student; Context menu with None, + Link, Add waits', async ({ page }) => {
     await enterDemo(page);
     await page.goto('/teacher/app.html#/observations');
     const strip = page.locator('#obs-capture');
-    await expect(strip.locator('.obs-band-tab')).toHaveText(['Strength', 'Growth', 'Concern']);
-    await expect(strip.locator('.obs-band-tab.on')).toHaveCount(0);
-    await expect(strip.locator('.obs-band-right')).toHaveText('New observation · today');
+    await expect(strip.locator('.obs-band')).toHaveCount(0);
+    await expect(strip.locator('[data-part="who"] .obsc-chip-type')).toHaveText(['Strength', 'Growth', 'Concern']);
+    await expect(strip.locator('.obsc-chip-type.is-on')).toHaveCount(0);
     await expect(strip.locator('[data-part="who"]')).toContainText('Student');
     await expect(strip.locator('[data-part="who"]')).toContainText('or type @name');
     const add = strip.locator('#capture-add-btn');
     await expect(add).toBeDisabled();
 
     await strip.getByRole('button', { name: 'Growth' }).click();
-    await expect(strip.locator('.obs-band-tab.on')).toHaveText('Growth');
+    await expect(strip.locator('.obsc-chip-type.is-on')).toHaveText('Growth');
 
     await strip.locator('#context-btn').click();
     await expect(strip.locator('.obs-menu .obs-menu-item')).toHaveText([
