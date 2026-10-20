@@ -73,7 +73,7 @@ test.describe('Observation capture strip', () => {
     await input.pressSequentially('Did not start the task !conc');
     // Enter on a suggestion picks it; the next Enter sends.
     await page.keyboard.press('Enter');
-    await expect(page.locator('#obs-capture .obs-band-tab[data-value="concern"]')).toHaveAttribute(
+    await expect(page.locator('#obs-capture .obsc-chip-type[data-value="concern"]')).toHaveAttribute(
       'aria-pressed',
       'true',
     );

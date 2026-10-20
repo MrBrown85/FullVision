@@ -198,15 +198,16 @@ describe('capture strip', () => {
     return Array.from(cap.el.querySelectorAll('.obsc-chip')).map(c => c.textContent.replace('×', '').trim());
   }
 
-  it('is the edit window twin: type tabs in a band, a Student line, one row of controls, no emoji', () => {
+  it('has a Student line with the type chips beside it, one row of controls, no emoji', () => {
     const cap = mount();
     const text = cap.el.textContent;
-    const tabs = Array.from(cap.el.querySelectorAll('.obs-band-tab')).map(t => t.textContent);
-    expect(tabs).toEqual(['Strength', 'Growth', 'Concern']);
-    expect(cap.el.querySelectorAll('.obs-band-tab.on')).toHaveLength(0);
-    expect(cap.el.querySelector('.obs-band-right').textContent).toBe('New observation · today');
-    expect(cap.el.querySelector('[data-part="who"]').textContent).toBe('Student+ Studentor type @name');
-    expect(chipText(cap)).toEqual(['+ Student', '+ Starter', '+ Add Tag', '+ Link▾']);
+    expect(cap.el.querySelector('.obs-band')).toBeNull();
+    const who = cap.el.querySelector('[data-part="who"]');
+    const types = Array.from(who.querySelectorAll('.obsc-chip-type')).map(t => t.textContent);
+    expect(types).toEqual(['Strength', 'Growth', 'Concern']);
+    expect(cap.el.querySelectorAll('.obsc-chip-type.is-on')).toHaveLength(0);
+    expect(who.textContent).toBe('Student+ Studentor type @nameStrengthGrowthConcern');
+    expect(chipText(cap)).toEqual(['+ Student', 'Strength', 'Growth', 'Concern', '+ Starter', '+ Add Tag', '+ Link▾']);
     expect(cap.el.querySelector('#context-btn').textContent).toBe('+ Context▾');
     expect(cap.el.querySelector('.obsc-keep').textContent.trim()).toBe('Keep Tags');
     expect(text).not.toMatch(/\p{Extended_Pictographic}/u);

@@ -5,9 +5,9 @@
    and the phone sheet (docs/DECISIONS.md, "Observations (2026-10-18)"). Each
    host pre-fills what it knows and locks what it cannot change.
 
-   The strip is the edit window's twin (docs/DECISIONS.md, "Observations",
-   item 12): a folder band with the three types as tabs (none chosen until
-   picked), a Student line (chips, + Student), the note box, then one row:
+   The strip (docs/DECISIONS.md, "Observations", item 12): a Student line
+   (chips, + Student) with the three type chips beside it (none chosen
+   until picked), the note box, then one row:
    + Starter, Tags (+ Add Tag: dispositions, Core Competencies, custom
    tags), the Context menu, + Link (an assessment, or one learning-map
    competency with an optional Level), Keep Tags and Add.
@@ -444,8 +444,6 @@ window.ObsCapture = (function () {
     var _destroyed = false;
 
     root.innerHTML =
-      '<div data-part="band"></div>' +
-      '<div class="obsc-body">' +
       '<div class="obsc-row obsc-who" data-part="who"></div>' +
       '<div class="obsc-slot" data-slot="who"></div>' +
       '<div class="obsc-input-wrap">' +
@@ -458,8 +456,7 @@ window.ObsCapture = (function () {
       '<div class="obsc-slot" data-slot="input"></div>' +
       '<div class="obsc-row obsc-links" data-part="links"></div>' +
       '<div class="obsc-slot" data-slot="links"></div>' +
-      '<div class="obsc-flag" data-part="flag" aria-live="polite"></div>' +
-      '</div>';
+      '<div class="obsc-flag" data-part="flag" aria-live="polite"></div>';
 
     var input = root.querySelector('textarea');
     input.value = _drafts[draftKey] || '';
@@ -513,16 +510,6 @@ window.ObsCapture = (function () {
       );
     }
 
-    function renderBand() {
-      return ObsCard.typeBandHtml({
-        value: state.sentiment,
-        right: 'New observation · today',
-        tabAttrs: function (k) {
-          return 'data-obsc="type" data-value="' + k + '"';
-        },
-      });
-    }
-
     function avatarHtml(s) {
       var color =
         typeof _avatarColor === 'function'
@@ -561,6 +548,18 @@ window.ObsCapture = (function () {
         });
         h += '<span class="obsc-hint">or type @name</span>';
       }
+      h += '<span class="obsc-sep" aria-hidden="true"></span><span class="obsc-group" role="group" aria-label="Type">';
+      TYPE_KEYS.forEach(function (k) {
+        var info = (typeof OBS_SENTIMENTS !== 'undefined' && OBS_SENTIMENTS[k]) || { label: k };
+        h += chip('type', _esc(info.label), {
+          value: k,
+          on: state.sentiment === k,
+          pressed: state.sentiment === k,
+          cls: 'obsc-chip-type',
+          attrs: ' data-sentiment="' + k + '"',
+        });
+      });
+      h += '</span>';
       return h;
     }
 
@@ -954,7 +953,6 @@ window.ObsCapture = (function () {
       var openSearch = root.querySelector('.obsc-menu [data-obsc-search]');
       var searchVal = openSearch ? openSearch.value : '';
       var searchFocused = openSearch && document.activeElement === openSearch;
-      root.querySelector('[data-part="band"]').innerHTML = renderBand();
       root.querySelector('[data-part="who"]').innerHTML = renderWho();
       root.querySelector('[data-part="links"]').innerHTML = renderLinks();
       root.querySelector('[data-part="flag"]').innerHTML = renderFlag();

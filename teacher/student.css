@@ -309,6 +309,9 @@
 .note-capture {
   margin: 4px 0 10px;
 }
+.note-capture .obsc {
+  padding: 8px 10px;
+}
 
 /* Note search input */
 .note-search-input {
