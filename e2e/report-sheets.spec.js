@@ -91,6 +91,27 @@ test.describe('Report Card sheets', () => {
     await expect(page.locator('#picker-label')).toHaveText('Hannah Berg');
   });
 
+  test('the comment box says how the draft sits on the form, as it is typed', async ({ page }) => {
+    await page.goto('/login.html?demo=1');
+    await page.waitForURL(/app\.html/, { timeout: 15000 });
+    await page.goto(page.url().replace(/#.*/, '#/reports'));
+    const fit = page.locator('#tq-fit-text');
+    await expect(fit).toContainText(/Fits the front\. \d+ lines?; room for \d+ more/);
+    const editor = page.locator('#tq-narrative');
+    await editor.click();
+    await page.keyboard.press('End');
+    for (let i = 0; i < 12; i++)
+      await page.keyboard.type(
+        ' She keeps asking questions that move the whole class forward and writes it all down with care.',
+      );
+    await expect(fit).toContainText(/past the front’s room/);
+    await expect(fit).toContainText('Nothing is cut.');
+    await page.getByRole('button', { name: 'See the Page' }).click();
+    await expect(page.getByRole('tab', { name: 'Progress Reports' })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('#picker-label')).toHaveText('Cece Adeyemi');
+    await expect(page.locator('.sheet-note').first()).toContainText('Comment is');
+  });
+
   test('Photocopy view turns the levels black on screen', async ({ page }) => {
     await openReportCard(page);
     const chip = page.locator('.report-sheet .report-section-chip-value').first();

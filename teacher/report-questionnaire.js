@@ -1584,6 +1584,10 @@ window.ReportQuestionnaire = (function () {
       </div>
       <div class="tq-narrative-editor" id="tq-narrative" contenteditable="true"
         data-placeholder="Write about ${esc(name)}'s learning dispositions, work habits, and growth…">${sanitizeHtml(narrative || '')}</div>
+      <div class="tq-fit" id="tq-fit" hidden>
+        <span class="tq-fit-text" id="tq-fit-text"></span>
+        <button type="button" class="tq-fit-btn" data-action="tqSeePage" data-sid="${sid}">See the Page</button>
+      </div>
     </div>
   </div>`; // close narrative-comment panel
 

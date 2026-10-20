@@ -68,3 +68,33 @@ describe('ReportSheets.reasonText', () => {
     );
   });
 });
+
+describe('ReportSheets.fitText', () => {
+  it('says the comment fits and how much room is left', () => {
+    expect(ReportSheets.fitText({ room: 8, commentLines: 6, moved: [], continued: [] })).toBe(
+      'Fits the front. 6 lines; room for 2 more before anything moves.',
+    );
+    expect(ReportSheets.fitText({ room: 8, commentLines: 8, moved: [], continued: [] })).toBe(
+      'Fits the front. 8 lines; the front is full.',
+    );
+  });
+
+  it('says what a long comment moves, and that nothing is cut', () => {
+    expect(
+      ReportSheets.fitText({
+        room: 8,
+        commentLines: 12,
+        moved: ['Growth and Next Steps'],
+        continued: ['Learning Dispositions'],
+      }),
+    ).toBe(
+      '12 lines, 4 past the front’s room. Growth and Next Steps moves to the back. Learning Dispositions on a second sheet. Nothing is cut.',
+    );
+  });
+
+  it('explains the empty box', () => {
+    expect(ReportSheets.fitText({ room: 8, commentLines: 0, noComment: true })).toBe(
+      'No comment yet. The form keeps 8 lines on the front; an empty box prints with lines.',
+    );
+  });
+});

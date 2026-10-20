@@ -1389,6 +1389,13 @@
   margin: 0 0 6px 2px;
 }
 .report-sheet {
+  /* The print sizes, on the sheet itself, so a sheet measures the same
+     wherever it is rendered (the preview, or a stage on <body>). */
+  --text-2xs: 0.625rem;
+  --text-xs: 0.6875rem;
+  --text-sm: 0.75rem;
+  --text-base: 0.8125rem;
+  --text-md: 0.875rem;
   position: relative;
   box-sizing: border-box;
   display: flex;
@@ -1933,6 +1940,52 @@
 }
 .report-photocopy [data-prof-stroke='4'] {
   stroke: #c8c8c8 !important;
+}
+
+/* The comment box's fit line (page-reports.js updateCommentFit). */
+.tq-fit {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  line-height: 1.45;
+}
+.tq-fit-text {
+  flex: 1;
+  min-width: 0;
+}
+.tq-fit-text::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--score-3);
+  margin-right: 8px;
+  vertical-align: 1px;
+}
+.tq-fit.over .tq-fit-text::before {
+  background: var(--score-2);
+}
+.tq-fit-btn {
+  flex-shrink: 0;
+  font: inherit;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.tq-fit-btn:hover {
+  border-color: var(--active);
 }
 
 /* ── Term Questionnaire styles ─────────────────────────────── */

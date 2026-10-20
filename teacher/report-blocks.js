@@ -289,10 +289,18 @@ window.ReportBlocks = (function () {
 
   function renderBlockTeacherNarrative(cid, student, ctx) {
     const termId = ctx && ctx.termId;
-    const rating = getStudentTermRating(cid, student.id, termId);
-    if (!rating || !rating.narrative || !rating.narrative.trim()) return '';
-    const isHtml = /<[a-z][\s\S]*>/i.test(rating.narrative);
-    const content = isHtml ? sanitizeNarrativeHtml(rating.narrative.trim()) : esc(rating.narrative.trim());
+    // ctx.narrativeOverride is the questionnaire's unsaved draft, so the
+    // editor can say how the comment will sit on the form while it is typed.
+    let narrative;
+    if (ctx && ctx.narrativeOverride != null) narrative = ctx.narrativeOverride;
+    else {
+      const rating = getStudentTermRating(cid, student.id, termId);
+      narrative = rating && rating.narrative;
+    }
+    if (!narrative || !String(narrative).trim()) return '';
+    narrative = String(narrative);
+    const isHtml = /<[a-z][\s\S]*>/i.test(narrative);
+    const content = isHtml ? sanitizeNarrativeHtml(narrative.trim()) : esc(narrative.trim());
     return renderCommentBox(content);
   }
 
