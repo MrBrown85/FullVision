@@ -68,6 +68,8 @@ Built 2026-10-20 as PRs #259 (rail sheet counts with the reason, Fit Map), #260 
 - Mode banner, Fixed / Flows tags, options panel, Preview With longest / typical / shortest, pairing of fixed blocks, whole-form settings (the reflection and response blocks keep their text), "+ Add a Block", pointer and keyboard drag with live announcements, Save to Library (`report_template`, teacher-level).
 - Phone: Review as a stepper, one page at a time; no editing; a read-only Reports tab in the PWA.
 
+Built 2026-10-20 as PRs #263 (the form as class data, layout v3 in `reportConfig.form`, Edit Layout mode with move, side, remove, add, room, empty rule, pin and Standard / Compact type), #264 (Preview With longest / typical / shortest, pairs, grip drag and arrow keys with a live region, starters Report Card / Interim Update / Conference Pack, a library on the device) and #265 (below 900 px: Builder button, student stepper, wrapping toolbar). Not built: the server-side library (`report_template` needs a migration and an RPC) and a read-only Reports tab in the phone app.
+
 ## Phase 4 · Send (weeks 6–9, after the policy check)
 
 - `guardian` table with consent; roster import column; Class Management editing.
