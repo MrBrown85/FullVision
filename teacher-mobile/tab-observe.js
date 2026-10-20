@@ -232,87 +232,197 @@ window.MObserve = (function () {
     }
   }
 
-  /* ── New Observation Sheet ──────────────────────────────────── */
-  /* ── Shared form builder for new + edit sheets ──────────────── */
-  function _buildObsFormHtml(opts) {
+  /* ── The edit sheet (D3) ──────────────────────────────────────
+     An iOS form sheet: Cancel / name / Save in the top bar, the types as
+     tabs in a folder band, the note box, a settings-style Context row that
+     opens a picker, tags as chips with "+ Add Tag", and Delete Observation
+     last. The pickers replace the form inside the same sheet. */
+  function shortName(st) {
+    if (!st) return 'Student';
+    var first = st.preferred || st.firstName || displayName(st);
+    return st.lastName ? first + ' ' + st.lastName.charAt(0) + '.' : first;
+  }
+
+  function _quotedNoticeHtml(label) {
+    if (!label) return '';
+    var lead = label === 'Quoted' ? 'Quoted in a report.' : label + '.';
     return (
-      '<div id="m-obs-form">' +
-      opts.studentHtml +
-      '<label class="m-sheet-label" for="m-obs-text">Observation</label>' +
-      '<textarea class="m-sheet-textarea" id="m-obs-text" placeholder="What did you notice?" rows="3">' +
-      (opts.text || '') +
-      '</textarea>' +
-      '<div class="m-sheet-label">Type</div>' +
-      '<div class="m-sentiment-row" role="radiogroup" aria-label="Observation type">' +
-      '<button class="m-sentiment-btn' +
-      (opts.sentiment === 'strength' ? ' m-selected' : '') +
-      '" role="radio" aria-checked="' +
-      (opts.sentiment === 'strength') +
-      '" data-action="m-obs-sentiment" data-val="strength">Strength</button>' +
-      '<button class="m-sentiment-btn' +
-      (opts.sentiment === 'growth' ? ' m-selected' : '') +
-      '" role="radio" aria-checked="' +
-      (opts.sentiment === 'growth') +
-      '" data-action="m-obs-sentiment" data-val="growth">Growth</button>' +
-      '<button class="m-sentiment-btn' +
-      (opts.sentiment === 'concern' ? ' m-selected' : '') +
-      '" role="radio" aria-checked="' +
-      (opts.sentiment === 'concern') +
-      '" data-action="m-obs-sentiment" data-val="concern">Concern</button>' +
-      '</div>' +
-      '<div class="m-sheet-label">Context</div>' +
-      '<div class="m-context-row" style="flex-wrap:wrap">' +
-      Object.keys(OBS_CONTEXTS)
-        .map(function (key) {
-          var ctx = OBS_CONTEXTS[key];
-          return (
-            '<button class="m-context-btn' +
-            (opts.context === key ? ' m-selected' : '') +
-            '" data-action="m-obs-context" data-val="' +
-            key +
-            '">' +
-            MC.esc(ctx.label) +
-            '</button>'
-          );
-        })
-        .join('') +
-      '</div>' +
-      '<div class="m-sheet-label">Tags</div>' +
-      ObsCapture.tagMenuItems(opts.cid)
-        .map(function (item) {
-          if (item.type === 'section') return '<div class="m-dim-section">' + MC.esc(item.label) + '</div>';
-          return (
-            '<button class="m-dim-chip' +
-            ((opts.dims || []).indexOf(item.key) >= 0 ? ' m-selected' : '') +
-            '" data-action="m-obs-dim" data-val="' +
-            MC.esc(item.key) +
-            '"><span class="m-obs-tag-dot" style="background:' +
-            item.color +
-            '"></span>' +
-            MC.esc(item.label) +
-            '</button>'
-          );
-        })
-        .join('')
-        .replace(/(<button[\s\S]*?<\/button>)+/g, function (run) {
-          return '<div class="m-dim-strip">' + run + '</div>';
-        }) +
-      '<button class="m-btn-primary" id="m-obs-submit" data-action="m-obs-save"' +
-      (opts.submitDisabled ? ' disabled' : '') +
-      '>' +
-      opts.submitLabel +
-      '</button>' +
-      (opts.deleteHtml || '') +
+      '<div class="obs-notice" role="note"><b>' +
+      MC.esc(lead) +
+      '</b> Changes here show in ' +
+      (/Reports /.test(label) ? 'those reports.' : 'that report.') +
       '</div>'
     );
   }
 
-  function _presentSheetAndFocus(html) {
-    MC.presentSheet(html, { onClose: resetSheetState });
-    setTimeout(function () {
-      var ta = document.getElementById('m-obs-text');
-      if (ta) ta.focus();
-    }, 400);
+  function _contextRowHtml() {
+    var c = _selectedContext && OBS_CONTEXTS[_selectedContext];
+    return (
+      '<button type="button" class="m-edit-row" id="m-obs-ctx-row" data-action="m-obs-ctx-picker">' +
+      '<span class="m-edit-row-k">Context</span><span class="m-edit-row-v' +
+      (c ? '' : ' empty') +
+      '">' +
+      (c ? MC.esc(c.label) : 'None') +
+      '<span class="m-edit-row-car" aria-hidden="true">\u203a</span></span></button>'
+    );
+  }
+
+  function _tagLabel(t) {
+    return typeof resolveTag === 'function' ? resolveTag(t).label : OBS_LABELS[t] || t;
+  }
+
+  function _tagChipsHtml() {
+    return (
+      _selectedDims
+        .map(function (t) {
+          return (
+            '<span class="obs-tag-chip m-edit-tag"><span class="dim-dot" style="background:' +
+            obsTagColor(t) +
+            '"></span>' +
+            MC.esc(_tagLabel(t)) +
+            '<button type="button" class="obs-tag-chip-x" data-action="m-obs-dim" data-val="' +
+            MC.esc(t) +
+            '" aria-label="Remove ' +
+            MC.esc(_tagLabel(t)) +
+            '">&times;</button></span>'
+          );
+        })
+        .join('') + '<button type="button" class="obs-add m-edit-tag" data-action="m-obs-tag-picker">+ Add Tag</button>'
+    );
+  }
+
+  function _editSheetHtml(cid, ob, st, quoted) {
+    return (
+      '<div class="m-obs-edit" id="m-obs-edit">' +
+      '<div class="m-edit-form">' +
+      '<div class="m-edit-top">' +
+      '<button type="button" class="m-edit-cancel" data-action="m-obs-edit-cancel">Cancel</button>' +
+      '<div class="m-edit-title">' +
+      MC.esc(shortName(st)) +
+      '</div>' +
+      '<button type="button" class="m-edit-save" id="m-obs-submit" data-action="m-obs-save">Save</button>' +
+      '</div>' +
+      ObsCard.typeBandHtml({
+        value: _selectedSentiment,
+        tabAttrs: function (k) {
+          return 'data-action="m-obs-sentiment" data-val="' + k + '"';
+        },
+      }) +
+      '<div class="m-edit-body">' +
+      _quotedNoticeHtml(quoted) +
+      '<textarea class="obs-note-box m-edit-text" id="m-obs-text" aria-label="Observation" placeholder="What did you notice?" rows="3">' +
+      MC.esc(ob.text || '') +
+      '</textarea>' +
+      _contextRowHtml() +
+      '<div class="m-edit-label" id="m-obs-tags-label">Tags</div>' +
+      '<div class="m-edit-tags" id="m-obs-edit-tags" role="group" aria-labelledby="m-obs-tags-label">' +
+      _tagChipsHtml() +
+      '</div>' +
+      '<button type="button" class="m-obs-sheet-delete" data-action="m-obs-delete" data-obid="' +
+      ob.id +
+      '" data-sid="' +
+      ob.studentId +
+      '">Delete Observation</button>' +
+      '</div></div>' +
+      '<div class="m-edit-picker" id="m-obs-edit-picker" hidden></div>' +
+      '</div>'
+    );
+  }
+
+  /* A picker inside the sheet: Context (one choice, None last) or Tags
+     (several, in the tag menu's sections). */
+  function openPicker(kind) {
+    var form = document.querySelector('#m-obs-edit .m-edit-form');
+    var pick = document.getElementById('m-obs-edit-picker');
+    if (!form || !pick) return;
+    var cid = getActiveCourse();
+    var rows = '';
+    if (kind === 'context') {
+      Object.keys(OBS_CONTEXTS)
+        .concat([''])
+        .forEach(function (k) {
+          var on = k ? _selectedContext === k : !_selectedContext;
+          rows +=
+            '<button type="button" class="m-pick-row' +
+            (k ? '' : ' m-pick-none') +
+            '" role="menuitemradio" aria-checked="' +
+            on +
+            '" data-action="m-obs-pick-context" data-val="' +
+            k +
+            '"><span>' +
+            (k ? MC.esc(OBS_CONTEXTS[k].label) : 'None') +
+            '</span><span class="m-pick-check" aria-hidden="true">' +
+            (on ? '\u2713' : '') +
+            '</span></button>';
+        });
+    } else {
+      ObsCapture.tagMenuItems(cid).forEach(function (item) {
+        if (item.type === 'section') {
+          rows += '<div class="m-pick-section">' + MC.esc(item.label) + '</div>';
+          return;
+        }
+        var on = _selectedDims.indexOf(item.key) >= 0;
+        rows +=
+          '<button type="button" class="m-pick-row" role="menuitemcheckbox" aria-checked="' +
+          on +
+          '" data-action="m-obs-pick-tag" data-val="' +
+          MC.esc(item.key) +
+          '"><span><span class="dim-dot" style="background:' +
+          item.color +
+          '"></span>' +
+          MC.esc(item.label) +
+          '</span><span class="m-pick-check" aria-hidden="true">' +
+          (on ? '\u2713' : '') +
+          '</span></button>';
+      });
+    }
+    pick.innerHTML =
+      '<div class="m-edit-top">' +
+      '<button type="button" class="m-edit-cancel" data-action="m-obs-picker-back">\u2039 Back</button>' +
+      '<div class="m-edit-title">' +
+      (kind === 'context' ? 'Context' : 'Tags') +
+      '</div>' +
+      (kind === 'context'
+        ? '<span class="m-edit-top-sp"></span>'
+        : '<button type="button" class="m-edit-save" data-action="m-obs-picker-back">Done</button>') +
+      '</div><div class="m-pick-list" role="menu">' +
+      rows +
+      '</div>';
+    form.hidden = true;
+    pick.hidden = false;
+    var first = pick.querySelector('[aria-checked="true"]') || pick.querySelector('.m-pick-row');
+    if (first) first.focus();
+  }
+
+  function closePicker() {
+    var form = document.querySelector('#m-obs-edit .m-edit-form');
+    var pick = document.getElementById('m-obs-edit-picker');
+    if (!form || !pick) return;
+    pick.hidden = true;
+    pick.innerHTML = '';
+    form.hidden = false;
+  }
+
+  function pickContext(val) {
+    _selectedContext = val || null;
+    var row = document.getElementById('m-obs-ctx-row');
+    if (row) row.outerHTML = _contextRowHtml();
+    closePicker();
+  }
+
+  function _refreshEditTags() {
+    var tags = document.getElementById('m-obs-edit-tags');
+    if (tags) tags.innerHTML = _tagChipsHtml();
+  }
+
+  function pickTag(val, btn) {
+    toggleDim(val);
+    if (btn) {
+      var on = _selectedDims.indexOf(val) >= 0;
+      btn.setAttribute('aria-checked', String(on));
+      var chk = btn.querySelector('.m-pick-check');
+      if (chk) chk.textContent = on ? '\u2713' : '';
+    }
   }
 
   /* The new-observation sheet is the shared capture strip
@@ -379,31 +489,16 @@ window.MObserve = (function () {
     _selectedContext = ob.context || null;
     _selectedDims = (ob.dims || []).slice();
 
+    var full = Object.assign({ studentId: sid }, ob);
     var student = getStudents(cid).find(function (s) {
       return s.id === sid;
     });
-    var studentName = student ? displayName(student) : 'Student';
-    var studentHtml =
-      '<div class="m-sheet-label">Student</div>' + '<div class="m-obs-student-fixed">' + MC.esc(studentName) + '</div>';
-
-    _presentSheetAndFocus(
-      _buildObsFormHtml({
-        cid: cid,
-        studentHtml: studentHtml,
-        text: MC.esc(ob.text),
-        sentiment: _selectedSentiment,
-        context: _selectedContext,
-        dims: _selectedDims,
-        submitLabel: 'Update observation',
-        submitDisabled: false,
-        deleteHtml:
-          '<button class="m-obs-sheet-delete" data-action="m-obs-delete" data-obid="' +
-          obId +
-          '" data-sid="' +
-          sid +
-          '">Delete Observation</button>',
-      }),
-    );
+    var quoted = ObsCard.parts(full, ObsCard.context(cid)).quoted;
+    MC.presentSheet(_editSheetHtml(cid, full, student, quoted), { onClose: resetSheetState });
+    setTimeout(function () {
+      var ta = document.getElementById('m-obs-text');
+      if (ta) ta.focus();
+    }, 400);
   }
 
   /* ── Sheet state management ─────────────────────────────────── */
@@ -483,27 +578,21 @@ window.MObserve = (function () {
 
   function setSentiment(val) {
     _selectedSentiment = _selectedSentiment === val ? null : val;
-    document.querySelectorAll('.m-sentiment-btn').forEach(function (btn) {
-      var isSelected = btn.getAttribute('data-val') === _selectedSentiment;
-      btn.classList.toggle('m-selected', isSelected);
-      btn.setAttribute('aria-checked', isSelected ? 'true' : 'false');
-    });
+    var sheet = document.getElementById('m-obs-edit');
+    if (sheet) ObsCard.syncTypeBand(sheet, _selectedSentiment);
   }
 
   function setContext(val) {
     _selectedContext = _selectedContext === val ? null : val;
-    document.querySelectorAll('.m-context-btn').forEach(function (btn) {
-      btn.classList.toggle('m-selected', btn.getAttribute('data-val') === _selectedContext);
-    });
+    var row = document.getElementById('m-obs-ctx-row');
+    if (row) row.outerHTML = _contextRowHtml();
   }
 
   function toggleDim(val) {
     var idx = _selectedDims.indexOf(val);
     if (idx >= 0) _selectedDims.splice(idx, 1);
     else _selectedDims.push(val);
-    document.querySelectorAll('.m-dim-chip').forEach(function (chip) {
-      chip.classList.toggle('m-selected', _selectedDims.indexOf(chip.getAttribute('data-val')) >= 0);
-    });
+    _refreshEditTags();
   }
 
   function _updateSubmitState() {
@@ -761,6 +850,11 @@ window.MObserve = (function () {
     deleteObservation: deleteObservation,
     holdDelete: holdDelete,
     presentEditObsSheet: presentEditObsSheet,
+    openPicker: openPicker,
+    closePicker: closePicker,
+    pickContext: pickContext,
+    pickTag: pickTag,
+    shortName: shortName,
     presentQuickMenu: presentQuickMenu,
     quickPost: quickPost,
     quickStarters: quickStarters,

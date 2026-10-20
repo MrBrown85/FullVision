@@ -732,6 +732,36 @@
         return;
       }
 
+      if (action === 'm-obs-edit-cancel') {
+        MC.dismissSheet();
+        return;
+      }
+
+      if (action === 'm-obs-ctx-picker') {
+        MObserve.openPicker('context');
+        return;
+      }
+
+      if (action === 'm-obs-tag-picker') {
+        MObserve.openPicker('tags');
+        return;
+      }
+
+      if (action === 'm-obs-picker-back') {
+        MObserve.closePicker();
+        return;
+      }
+
+      if (action === 'm-obs-pick-context') {
+        MObserve.pickContext(target.getAttribute('data-val'));
+        return;
+      }
+
+      if (action === 'm-obs-pick-tag') {
+        MObserve.pickTag(target.getAttribute('data-val'), target);
+        return;
+      }
+
       if (action === 'm-obs-save') {
         MObserve.saveObservation(_cid);
         return;

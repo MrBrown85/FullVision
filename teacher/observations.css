@@ -596,25 +596,17 @@
   transition: opacity 0.2s;
 }
 
+/* The edit window: the feed card grown, with the types in a folder band. */
 .obs-focus-card {
   width: 680px;
   max-width: calc(100% - 48px);
   max-height: calc(100vh - 80px);
   overflow: visible;
-  border-radius: 14px;
-  padding: 20px 24px 24px;
   position: relative;
-  box-shadow:
-    0 8px 40px rgba(0, 0, 0, 0.12),
-    0 2px 8px rgba(0, 0, 0, 0.06);
-  background-image: repeating-linear-gradient(
-    to bottom,
-    transparent,
-    transparent 27px,
-    rgba(180, 160, 130, 0.18) 27px,
-    rgba(180, 160, 130, 0.18) 28px
-  );
-  background-position: 0 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.16);
   opacity: 0;
   transform: scale(0.96);
 }
@@ -625,199 +617,60 @@
     opacity 0.2s,
     transform 0.2s;
 }
-.obs-focus-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 60px;
-  width: 1px;
-  background: rgba(200, 80, 80, 0.2);
-  pointer-events: none;
+.obs-focus-card > .obs-band {
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
 }
-.obs-focus-card[data-sentiment='strength'] {
-  background-color: #eef5e8;
+.obs-focus-body {
+  padding: 14px 18px 16px;
 }
-.obs-focus-card[data-sentiment='growth'] {
-  background-color: #eef2f8;
-}
-.obs-focus-card[data-sentiment='concern'] {
-  background-color: #f5efe0;
-}
-.obs-focus-card:not([data-sentiment]) {
-  background-color: #fff8e7;
-}
-
 .obs-focus-header {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 10px;
 }
 .obs-focus-student {
-  font-size: var(--text-2xl);
-  font-weight: 700;
-  color: var(--text);
-}
-.obs-focus-time {
-  font-family: var(--font-base);
-  font-size: var(--text-2xs);
-  color: var(--text-3);
-  margin-left: 8px;
-}
-
-.obs-focus-close {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(0, 0, 0, 0.06);
-  color: var(--text-2);
-  font-size: var(--text-sm);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  transition:
-    background 0.12s,
-    color 0.12s;
-}
-.obs-focus-close:hover {
-  background: rgba(0, 0, 0, 0.12);
-  color: var(--text);
-}
-
-.obs-focus-sentiments,
-.obs-focus-contexts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.obs-focus-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 5px 12px;
-  border-radius: 20px;
-  border: 1px solid var(--border);
-  background: transparent;
-  font-family: var(--font-base);
-  font-size: var(--text-xs);
-  font-weight: 500;
-  color: var(--text-2);
-  cursor: pointer;
-  transition:
-    background 0.12s,
-    border-color 0.12s,
-    color 0.12s;
-}
-.obs-focus-pill:hover {
-  background: var(--overlay-hover);
-}
-.obs-focus-pill.active {
-  border-color: currentColor;
-}
-.obs-focus-pill.active[data-sentiment='strength'] {
-  background: rgba(46, 125, 50, 0.12);
-  color: #2e7d32;
-  border-color: #2e7d32;
-}
-.obs-focus-pill.active[data-sentiment='growth'] {
-  background: rgba(0, 122, 255, 0.12);
-  color: #007aff;
-  border-color: #007aff;
-}
-.obs-focus-pill.active[data-sentiment='concern'] {
-  background: rgba(192, 122, 0, 0.12);
-  color: #c07a00;
-  border-color: #c07a00;
-}
-.obs-focus-pill.active:not([data-sentiment]) {
-  background: var(--active-light);
-  color: var(--link);
-  border-color: var(--active);
-}
-
-.obs-focus-textarea {
-  width: 100%;
-  border: none;
-  background: transparent;
-  font-family: var(--font-base);
   font-size: var(--text-lg);
-  line-height: 28px;
+  font-weight: 650;
   color: var(--text);
-  resize: none;
-  outline: none;
-  padding: 0;
-  margin-bottom: 12px;
-  min-height: 140px;
+}
+.obs-focus-with {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.obs-focus-textarea {
+  min-height: 104px;
   max-height: 280px;
   overflow-y: auto;
-  field-sizing: content;
 }
-
-.obs-focus-dims {
+.obs-focus-foot {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
-  margin-top: 4px;
+  margin-top: 16px;
 }
-.obs-focus-dim {
+.obs-focus-delete {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 4px 10px 4px 8px;
-  border-radius: 20px;
-  font-size: var(--text-2xs);
-  font-weight: 500;
-  background: var(--overlay-hover);
-  color: var(--text-2);
+  gap: 6px;
+  padding: 6px 4px;
   border: none;
-  cursor: default;
-}
-.obs-focus-dim .dim-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.obs-focus-dim-remove {
   background: none;
-  border: none;
-  cursor: pointer;
-  color: var(--text-3);
-  font-size: var(--text-2xs);
-  padding: 0 0 0 4px;
-  line-height: 1;
-  transition: color 0.12s;
-}
-.obs-focus-dim-remove:hover {
-  color: var(--text);
-}
-
-.obs-focus-add-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 4px 10px;
-  border-radius: 20px;
-  font-size: var(--text-2xs);
-  font-weight: 500;
-  background: transparent;
-  color: var(--text-3);
-  border: 1px dashed var(--border);
-  cursor: pointer;
   font-family: var(--font-base);
-  transition:
-    background 0.12s,
-    color 0.12s;
+  font-size: var(--text-base);
+  color: var(--danger);
+  cursor: pointer;
 }
-.obs-focus-add-tag:hover {
-  background: var(--overlay-hover);
-  color: var(--text-2);
+.obs-focus-delete:hover {
+  text-decoration: underline;
+}
+.obs-focus-hint {
+  margin-left: 12px;
+  font-size: var(--text-xs);
+  color: var(--text-3);
+}
+.obs-focus-spacer {
+  flex: 1;
 }
 
 .obs-focus-tag-popover-wrap {

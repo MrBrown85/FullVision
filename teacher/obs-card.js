@@ -139,6 +139,109 @@ window.ObsCard = (function () {
     );
   }
 
+  /* ── Editor pieces (the edit window and the capture strip) ── */
+
+  /* The folder band: the three types as tabs, the chosen one filled, and
+     a note at the right. Clicking the chosen tab again clears it.
+     opts: value, action (data-action on each tab), right (text),
+           tabAttrs(key) (extra attributes per tab, replacing action). */
+  function typeBandHtml(opts) {
+    var out = '<div class="obs-band" role="group" aria-label="Type">';
+    Object.keys(OBS_SENTIMENTS).forEach(function (k) {
+      var on = opts.value === k;
+      out +=
+        '<button type="button" class="obs-band-tab' +
+        (on ? ' on' : '') +
+        '" data-sentiment="' +
+        k +
+        '" aria-pressed="' +
+        on +
+        '" ' +
+        (opts.tabAttrs ? opts.tabAttrs(k) : 'data-action="' + opts.action + '" data-value="' + k + '"') +
+        '>' +
+        esc(OBS_SENTIMENTS[k].label) +
+        '</button>';
+    });
+    if (opts.right) out += '<span class="obs-band-right">' + esc(opts.right) + '</span>';
+    return out + '</div>';
+  }
+
+  function syncTypeBand(root, value) {
+    if (!root || !root.querySelectorAll) return;
+    root.querySelectorAll('.obs-band-tab').forEach(function (b) {
+      var on = b.getAttribute('data-sentiment') === value;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', String(on));
+    });
+  }
+
+  /* The context menu: "Independent ▾" when set, "+ Context ▾" when not;
+     open, a short list of the five contexts with None last.
+     opts: id, value, open, labelledBy, toggleAction, pickAction,
+           toggleAttrs / pickAttrs(key) (replacing the actions). */
+  function contextMenuHtml(opts) {
+    var info = opts.value && OBS_CONTEXTS[opts.value];
+    var out =
+      '<div class="obs-menu-wrap"><button type="button" class="obs-menu-btn' +
+      (info ? '' : ' empty') +
+      '" id="' +
+      opts.id +
+      '-btn" aria-haspopup="menu" aria-expanded="' +
+      !!opts.open +
+      '"' +
+      (opts.labelledBy ? ' aria-labelledby="' + opts.labelledBy + ' ' + opts.id + '-btn"' : '') +
+      ' ' +
+      (opts.toggleAttrs || 'data-action="' + opts.toggleAction + '"') +
+      '>' +
+      (info ? esc(info.label) : '+ Context') +
+      '<span class="obs-menu-car" aria-hidden="true">▾</span></button>';
+    if (opts.open) {
+      out += '<div class="obs-menu" role="menu" id="' + opts.id + '-menu">';
+      Object.keys(OBS_CONTEXTS)
+        .concat([''])
+        .forEach(function (k) {
+          var on = k ? opts.value === k : !info;
+          out +=
+            '<button type="button" role="menuitemradio" class="obs-menu-item' +
+            (on ? ' on' : '') +
+            (k ? '' : ' obs-menu-none') +
+            '" aria-checked="' +
+            on +
+            '" tabindex="-1" ' +
+            (opts.pickAttrs ? opts.pickAttrs(k) : 'data-action="' + opts.pickAction + '" data-value="' + k + '"') +
+            '>' +
+            (k ? esc(OBS_CONTEXTS[k].label) : 'None') +
+            '</button>';
+        });
+      out += '</div>';
+    }
+    return out + '</div>';
+  }
+
+  function focusContextMenu(root) {
+    var menu = root && root.querySelector('.obs-menu');
+    if (!menu) return;
+    var item = menu.querySelector('.obs-menu-item.on') || menu.querySelector('.obs-menu-item');
+    if (item) item.focus();
+  }
+
+  /* Arrow keys, Home and End move through an open menu. True if handled. */
+  function contextMenuKey(e, root) {
+    var menu = root && root.querySelector('.obs-menu');
+    if (!menu) return false;
+    var items = Array.prototype.slice.call(menu.querySelectorAll('.obs-menu-item'));
+    var i = items.indexOf(document.activeElement);
+    var next = null;
+    if (e.key === 'ArrowDown') next = items[(i + 1) % items.length];
+    else if (e.key === 'ArrowUp') next = items[(i - 1 + items.length) % items.length];
+    else if (e.key === 'Home') next = items[0];
+    else if (e.key === 'End') next = items[items.length - 1];
+    if (!next) return false;
+    e.preventDefault();
+    next.focus();
+    return true;
+  }
+
   /* opts.hidden: obId → truthy for observations the list is hiding (a
      delete waiting on its Undo toast); they do not count as "with …". */
   function context(cid, opts) {
@@ -251,6 +354,12 @@ window.ObsCard = (function () {
   }
 
   return {
+    TRASH_SVG: TRASH_SVG,
+    typeBandHtml: typeBandHtml,
+    syncTypeBand: syncTypeBand,
+    contextMenuHtml: contextMenuHtml,
+    focusContextMenu: focusContextMenu,
+    contextMenuKey: contextMenuKey,
     html: html,
     context: context,
     typePillHtml: typePillHtml,
