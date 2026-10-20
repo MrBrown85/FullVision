@@ -193,6 +193,27 @@ test.describe('Report Card sheets', () => {
     await expect(page.locator('.report-sheet')).toHaveCount(STUDENTS * 2);
   });
 
+  test('the Conference Pack cuts the grade table at its rows instead of spilling off a side', async ({ page }) => {
+    await openReportCard(page);
+    await page
+      .locator('.rb-setup')
+      .getByRole('radio', { name: /^Conference Pack/ })
+      .click();
+    await expect(page.locator('.report-sheet .report-grade-table').first()).toBeVisible();
+    // Every demo student's table is longer than a side, so each has a continued part.
+    await expect(
+      page.locator('.report-block-title', { hasText: 'Assignment Grades (continued)' }).first(),
+    ).toBeVisible();
+    expect(await overflowing(page)).toEqual([]);
+    await expect(page.locator('.report-sheet.sheet-overflow')).toHaveCount(0);
+    // No row is lost: every student's parts together hold rows.
+    const counts = await page
+      .locator('.sheet-student')
+      .evaluateAll(students => students.map(st => st.querySelectorAll('.report-grade-table tbody tr').length));
+    expect(counts).toHaveLength(STUDENTS);
+    expect(Math.min(...counts)).toBeGreaterThan(0);
+  });
+
   test('on a phone the sheets fit the width, the rail opens from a button, and the stepper walks the class', async ({
     page,
     browserName,

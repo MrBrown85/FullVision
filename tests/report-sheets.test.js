@@ -98,3 +98,44 @@ describe('ReportSheets.fitText', () => {
     );
   });
 });
+
+describe('ReportSheets.pack splits a table block at its rows', () => {
+  const rows = (n, h) => Array(n).fill(h);
+  const parts = sides => sides.map(sd => sd.items.map(it => [it.i, it.h, it.rowStart, it.rowEnd]));
+
+  it('keeps the rows that fit on the current side and carries the rest on, in order', () => {
+    const sides = ReportSheets.pack([100, 1500], [], 0, 700, [null, { rows: rows(15, 100), chrome: 0 }]);
+    expect(parts(sides)).toEqual([
+      [
+        [0, 100, undefined, undefined],
+        [1, 600, 0, 6],
+      ],
+      [[1, 700, 6, 13]],
+      [[1, 200, 13, 15]],
+    ]);
+    expect(sides.map(sd => sd.over)).toEqual([false, false, false]);
+  });
+
+  it('counts the block chrome in every part', () => {
+    const sides = ReportSheets.pack([1050], [], 0, 700, [{ rows: rows(10, 100), chrome: 50 }]);
+    expect(parts(sides)).toEqual([[[0, 650, 0, 6]], [[0, 450, 6, 10]]]);
+  });
+
+  it('a row taller than the side goes alone and over, never dropped', () => {
+    const sides = ReportSheets.pack([900], [], 0, 700, [{ rows: [800, 100], chrome: 0 }]);
+    expect(parts(sides)).toEqual([[[0, 800, 0, 1]], [[0, 100, 1, 2]]]);
+    expect(sides[0].over).toBe(true);
+  });
+
+  it('a block with no rows still moves whole to the next side', () => {
+    const sides = ReportSheets.pack([400, 400], [], 0, 700, [null, null]);
+    expect(parts(sides)).toEqual([[[0, 400, undefined, undefined]], [[1, 400, undefined, undefined]]]);
+  });
+
+  it('the back keeps room for the pinned block when cutting', () => {
+    const sides = ReportSheets.pack([650, 1000], [], 200, 700, [null, { rows: rows(10, 100), chrome: 0 }]);
+    expect(sides[1].kind).toBe('back');
+    expect(parts(sides)[1]).toEqual([[1, 500, 0, 5]]);
+    expect(parts(sides)[2]).toEqual([[1, 500, 5, 10]]);
+  });
+});
