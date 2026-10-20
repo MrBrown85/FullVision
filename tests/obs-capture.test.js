@@ -49,6 +49,14 @@ describe('parseShorthand', () => {
     expect(r.sentiment).toBe('concern');
   });
 
+  it('reads !note and !n as the Note type', () => {
+    expect(H.parseShorthand('Away for the lab !note', lists)).toMatchObject({
+      text: 'Away for the lab',
+      sentiment: 'note',
+    });
+    expect(H.parseShorthand('Away for the lab !n', lists).sentiment).toBe('note');
+  });
+
   it('keeps punctuation after a token', () => {
     const r = H.parseShorthand('Great question from @Sofia.', lists);
     expect(r.studentIds).toEqual(['s2']);
@@ -204,10 +212,19 @@ describe('capture strip', () => {
     expect(cap.el.querySelector('.obs-band')).toBeNull();
     const who = cap.el.querySelector('[data-part="who"]');
     const types = Array.from(who.querySelectorAll('.obsc-chip-type')).map(t => t.textContent);
-    expect(types).toEqual(['Strength', 'Growth', 'Concern']);
+    expect(types).toEqual(['Strength', 'Growth', 'Concern', 'Note']);
     expect(cap.el.querySelectorAll('.obsc-chip-type.is-on')).toHaveLength(0);
-    expect(who.textContent).toBe('Student+ Studentor type @nameStrengthGrowthConcern');
-    expect(chipText(cap)).toEqual(['+ Student', 'Strength', 'Growth', 'Concern', '+ Starter', '+ Add Tag', '+ Link▾']);
+    expect(who.textContent).toBe('Student+ Studentor type @nameStrengthGrowthConcernNote');
+    expect(chipText(cap)).toEqual([
+      '+ Student',
+      'Strength',
+      'Growth',
+      'Concern',
+      'Note',
+      '+ Starter',
+      '+ Add Tag',
+      '+ Link▾',
+    ]);
     expect(cap.el.querySelector('#context-btn').textContent).toBe('+ Context▾');
     expect(cap.el.querySelector('.obsc-keep').textContent.trim()).toBe('Keep Tags');
     expect(text).not.toMatch(/\p{Extended_Pictographic}/u);
@@ -267,6 +284,15 @@ describe('capture strip', () => {
     cap.submit();
     expect(added).toHaveLength(1);
     expect(added[0]).toMatchObject({ sid: 's3', text: 'Left the data table blank', sentiment: 'concern' });
+  });
+
+  it('adds a Note from its type chip', () => {
+    const cap = mount();
+    type(cap, 'Away for the density lab @Ethan');
+    cap.el.querySelector('.obsc-chip-type[data-sentiment="note"]').click();
+    expect(cap.el.querySelector('.obsc-chip-type.is-on').dataset.sentiment).toBe('note');
+    cap.submit();
+    expect(added[0]).toMatchObject({ sid: 's3', text: 'Away for the density lab', sentiment: 'note' });
   });
 
   /* ── Sentence starters ── */

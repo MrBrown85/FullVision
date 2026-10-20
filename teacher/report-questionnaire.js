@@ -1237,7 +1237,7 @@ window.ReportQuestionnaire = (function () {
 
     // Observation insights
     const obsCount = allObs.length;
-    const sentimentCounts = { strength: 0, growth: 0, concern: 0 };
+    const sentimentCounts = { strength: 0, growth: 0, concern: 0, note: 0 };
     const contextCounts = {};
     allObs.forEach(ob => {
       if (ob.sentiment) sentimentCounts[ob.sentiment] = (sentimentCounts[ob.sentiment] || 0) + 1;
@@ -1446,7 +1446,7 @@ window.ReportQuestionnaire = (function () {
     <div class="tq-panel-title spread">
       <span>Observations <span class="tq-panel-badge">${obsCount}</span></span>
       <div class="tq-obs-summary">`;
-    ['strength', 'growth', 'concern'].forEach(k => {
+    Object.keys(OBS_SENTIMENTS).forEach(k => {
       if (sentimentCounts[k] > 0)
         html += `<span class="obs-pill obs-pill-type" data-sentiment="${k}">${OBS_SENTIMENTS[k].label} ${sentimentCounts[k]}</span>`;
     });

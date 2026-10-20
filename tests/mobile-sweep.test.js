@@ -180,6 +180,27 @@ describe('sweep screen', () => {
     expect(q('.m-sweep-panel-name').textContent).toBe('Noor Baker');
   });
 
+  it('offers the four types in order and saves a Note', () => {
+    open();
+    click(tile('s2'));
+    expect(Array.from(dom.document.querySelectorAll('.m-sweep-type')).map(b => b.textContent)).toEqual([
+      'Strength',
+      'Growth',
+      'Concern',
+      'Note',
+    ]);
+    click('[data-action="m-sweep-type"][data-val="note"]');
+    click('[data-action="m-sweep-write"]');
+    const ta = q('#m-sweep-text');
+    ta.value = 'Away for the lab; makes it up Thursday';
+    ta.dispatchEvent(new dom.Event('input'));
+    click('#m-sweep-save');
+    expect(getStudentQuickObs(CID, 's2')[0]).toMatchObject({
+      text: 'Away for the lab; makes it up Thursday',
+      sentiment: 'note',
+    });
+  });
+
   it('Write instead saves the typed text with no starter tags', () => {
     open();
     click(tile('s2'));

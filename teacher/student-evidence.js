@@ -407,6 +407,7 @@ window.StudentEvidence = (function () {
       '<span class="ev-tl-key" data-type="strength">Strength</span>' +
       '<span class="ev-tl-key" data-type="growth">Growth</span>' +
       '<span class="ev-tl-key" data-type="concern">Concern</span>' +
+      '<span class="ev-tl-key" data-type="note">Note</span>' +
       '<span class="ev-tl-key" data-type="none">No type</span>' +
       '<span class="ev-tl-key" data-shape="square">Assessment</span>' +
       '</span></div>' +

@@ -465,7 +465,7 @@ describe('New observation sheet content', () => {
       MObserve.presentNewObsSheet(CID);
       expect(sheet.querySelector('.m-edit-title').textContent).toBe('New Observation');
       const types = Array.from(sheet.querySelectorAll('.obs-band-tab')).map(b => b.textContent);
-      expect(types).toEqual(['Strength', 'Growth', 'Concern']);
+      expect(types).toEqual(['Strength', 'Growth', 'Concern', 'Note']);
       expect(sheet.querySelectorAll('.obs-band-tab.on')).toHaveLength(0);
       const rows = Array.from(sheet.querySelectorAll('.m-edit-row .m-edit-row-k')).map(e => e.textContent);
       expect(rows).toEqual(['Student', 'Context', 'Assessment', 'Competency']);

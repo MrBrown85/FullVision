@@ -153,6 +153,12 @@ span.obsc-chip-label {
   background: color-mix(in srgb, var(--score-2) 16%, transparent);
   font-weight: 600;
 }
+.obsc-chip-type[data-sentiment='note'].is-on {
+  border-color: transparent;
+  color: var(--obs-note-text);
+  background: color-mix(in srgb, var(--obs-note) 24%, transparent);
+  font-weight: 600;
+}
 
 /* A student: initial avatar, name, ×. */
 .obsc-chip-student {
@@ -575,6 +581,10 @@ span.obsc-chip-label {
 .obs-type[data-sentiment='concern'] {
   background: var(--score-2);
 }
+.obs-type[data-sentiment='note'] {
+  background: var(--obs-note);
+  color: var(--obs-note-on);
+}
 .obs-type-none {
   border: 1px dashed var(--border-2);
 }
@@ -623,6 +633,11 @@ span.obsc-chip-label {
 .obs-band-tab.on[data-sentiment='concern'] {
   background: var(--score-2);
   border-color: var(--score-2);
+}
+.obs-band-tab.on[data-sentiment='note'] {
+  background: var(--obs-note);
+  border-color: var(--obs-note);
+  color: var(--obs-note-on);
 }
 .obs-band-right {
   margin-left: auto;

@@ -21,6 +21,16 @@
   --score-4-bg: #dbeafe;
   --score-4-text: #1e40af;
 
+  /* The Note observation type: yellow, beside the three proficiency colours
+     the other types use. Solid blocks, tabs and marks fill with --obs-note
+     and take --obs-note-on text (white on yellow fails contrast). Yellow
+     text on the surface uses --obs-note-text. Small marks get a 1 px
+     --obs-note-edge so they hold their shape on white. */
+  --obs-note: #f2c200;
+  --obs-note-on: #1d1d1f;
+  --obs-note-text: #7a5900;
+  --obs-note-edge: #a88600;
+
   /* Font stack */
   --font-base: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', system-ui, sans-serif;
 
@@ -3275,6 +3285,10 @@ body.offline-active #app-dock {
     --score-3-text: #4ade80;
     --score-4-bg: rgba(10, 132, 255, 0.2);
     --score-4-text: #64b5f6;
+    --obs-note: #ffd60a;
+    --obs-note-on: #1d1d1f;
+    --obs-note-text: #ffd60a;
+    --obs-note-edge: #ffd60a;
     --toolbar-bg-start: #2c2c2e;
     --toolbar-bg-end: #1c1c1e;
     --btn-hover-blue: #409cff;

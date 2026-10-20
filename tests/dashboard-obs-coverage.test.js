@@ -128,6 +128,30 @@ describe('Observations card rendering', () => {
     expect(DashObservations.popoverHtml('s1', 7)).toContain('Click to open in Ada’s Evidence panel');
   });
 
+  it('By week: a Note is a yellow mark and in the legend, and never counts as a strength', () => {
+    obs = {
+      s1: [
+        { id: 'ob-n1', date: '2026-10-14', created: '2026-10-14T15:00:00Z', sentiment: 'note', text: 'Away' },
+        { id: 'ob-n2', date: '2026-10-13', created: '2026-10-13T15:00:00Z', sentiment: null, text: 'Untyped' },
+      ],
+      s2: [{ id: 'ob-s', date: '2026-10-14', created: '2026-10-14T15:00:00Z', sentiment: 'strength', text: 'Good' }],
+    };
+    const html = DashObservations.renderCard(CID, students, { tab: 'week' });
+    const key = html.match(/<div class="dash-ob2-key">.*?<\/div>/)[0];
+    expect(key.match(/data-type="(\w+)"/g)).toEqual([
+      'data-type="strength"',
+      'data-type="growth"',
+      'data-type="concern"',
+      'data-type="note"',
+      'data-type="none"',
+    ]);
+    expect(key).toContain('</i>Note</span>');
+    expect(html).toContain('<i data-type="note"></i><i data-type="none"></i>');
+    expect(html).toContain('1 note, 1 with no type');
+    expect(html).toContain('<b>1</b> with no strength recorded');
+    expect(DashObservations.popoverHtml('s1', 7)).toMatch(/data-type="note"[^>]*>Note</);
+  });
+
   it('a busy week shows 3 marks and "+N" in a cell wide enough to hold them', () => {
     obs = {
       s1: Array.from({ length: 5 }, (_, i) => ({

@@ -16,7 +16,7 @@ test.describe('Observation cards, desktop', () => {
     await page.goto('/teacher/app.html#/observations');
     const cards = page.locator('.obs-card');
     await expect(cards.first()).toBeVisible();
-    await expect(cards.first().locator('.obs-type')).toHaveText(/^(Strength|Growth|Concern)$/);
+    await expect(cards.first().locator('.obs-type')).toHaveText(/^(Strength|Growth|Concern|Note)$/);
     const xs = await page
       .locator('.obs-card-student')
       .evaluateAll(els => els.slice(0, 6).map(e => Math.round(e.getBoundingClientRect().left)));
@@ -101,7 +101,7 @@ test.describe('Observation editor (D3), desktop', () => {
   test('type tabs: the chosen one is filled; clicking it again clears it', async ({ page }) => {
     const { ed } = await openFirst(page);
     const tabs = ed.locator('.obs-band-tab');
-    await expect(tabs).toHaveText(['Strength', 'Growth', 'Concern']);
+    await expect(tabs).toHaveText(['Strength', 'Growth', 'Concern', 'Note']);
     await ed.getByRole('button', { name: 'Concern' }).click();
     await expect(ed.locator('.obs-band-tab.on')).toHaveText('Concern');
     await expect(ed.getByRole('button', { name: 'Concern' })).toHaveAttribute('aria-pressed', 'true');
@@ -219,7 +219,7 @@ test.describe('Capture strip (D4), desktop', () => {
     await page.goto('/teacher/app.html#/observations');
     const strip = page.locator('#obs-capture');
     await expect(strip.locator('.obs-band')).toHaveCount(0);
-    await expect(strip.locator('[data-part="who"] .obsc-chip-type')).toHaveText(['Strength', 'Growth', 'Concern']);
+    await expect(strip.locator('[data-part="who"] .obsc-chip-type')).toHaveText(['Strength', 'Growth', 'Concern', 'Note']);
     await expect(strip.locator('.obsc-chip-type.is-on')).toHaveCount(0);
     await expect(strip.locator('[data-part="who"]')).toContainText('Student');
     await expect(strip.locator('[data-part="who"]')).toContainText('or type @name');
@@ -271,7 +271,7 @@ test.describe('Capture strip (D4), desktop', () => {
     await page.goto('/teacher/app.html#/observations');
     await page.locator('#starter-btn').click();
     const first = page.locator('#starter-dropdown .obsc-starter').first();
-    await expect(first.locator('.obs-type')).toHaveText(/^(Strength|Growth|Concern)$/);
+    await expect(first.locator('.obs-type')).toHaveText(/^(Strength|Growth|Concern|Note)$/);
     await expect(first.locator('.obsc-starter-sets')).not.toBeEmpty();
     await expect(page.locator('#starter-dropdown')).toContainText('Edit starters…');
     await expect(page.locator('#starter-dropdown')).toContainText('A starter fills the type, context and tags');
@@ -286,7 +286,7 @@ test.describe('Phone quick menu (D4)', () => {
     const rows = page.locator('.m-quick-row:not(.m-quick-own)');
     await expect(rows.first()).toBeVisible();
     await expect(page.locator('.m-quick-title')).not.toBeEmpty();
-    await expect(rows.first().locator('.m-obs-type')).toHaveText(/^(Strength|Growth|Concern)$/);
+    await expect(rows.first().locator('.m-obs-type')).toHaveText(/^(Strength|Growth|Concern|Note)$/);
     const box = await rows.first().locator('.m-obs-type').boundingBox();
     expect(Math.round(box.width)).toBe(74);
     await expect(page.locator('.m-quick-row').last()).toHaveText(/Write Your Own…/);
@@ -305,7 +305,7 @@ test.describe('Phone quick menu (D4)', () => {
     const sheet = page.locator('#m-obs-edit');
     await expect(sheet.locator('.m-edit-title')).toContainText(first);
     await expect(sheet.locator('#m-obs-stu-row')).toContainText(first);
-    await expect(sheet.locator('.obs-band-tab')).toHaveText(['Strength', 'Growth', 'Concern']);
+    await expect(sheet.locator('.obs-band-tab')).toHaveText(['Strength', 'Growth', 'Concern', 'Note']);
     const addBtn = sheet.locator('#m-obs-submit');
     await expect(addBtn).toBeDisabled();
     await sheet.getByRole('button', { name: 'Strength' }).click();

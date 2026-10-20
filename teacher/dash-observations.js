@@ -27,10 +27,13 @@ window.DashObservations = (function () {
   var BLOCK_GAP = 24;
   var COL_GAP = 3;
   var LABEL_MAX = 24;
-  var TYPES = ['strength', 'growth', 'concern'];
-  // When a week has more notes than marks, every type present shows first.
-  var MARK_PRIORITY = ['concern', 'growth', 'strength', 'none'];
-  var TYPE_LABEL = { strength: 'Strength', growth: 'Growth', concern: 'Concern', none: 'No type' };
+  var TYPES = ['strength', 'growth', 'concern', 'note'];
+  // The legend and a week's spoken counts: every type, then no type.
+  var KEY_ORDER = TYPES.concat('none');
+  // When a week has more notes than marks, the types present show first in
+  // this order; a neutral Note comes after the three that carry a judgement.
+  var MARK_PRIORITY = ['concern', 'growth', 'strength', 'note', 'none'];
+  var TYPE_LABEL = { strength: 'Strength', growth: 'Growth', concern: 'Concern', note: 'Note', none: 'No type' };
 
   // Width of the parts of a row that are not cells (px): "+", marker, name,
   // then Total and days (By week) or Gaps and room for the angled labels
@@ -64,7 +67,7 @@ window.DashObservations = (function () {
     return _isDateStr(d) ? d.slice(0, 10) : '';
   }
 
-  /** 'strength', 'growth', 'concern', or 'none' for an untyped note. */
+  /** 'strength', 'growth', 'concern', 'note', or 'none' for an untyped note. */
   function obType(o) {
     return o && TYPES.indexOf(o.sentiment) >= 0 ? o.sentiment : 'none';
   }
@@ -120,7 +123,8 @@ window.DashObservations = (function () {
   }
 
   /* The marks for one week: one per observation, up to 3. With more than 3,
-     every type present shows once (concern, growth, strength, then no type)
+     the types present show once (concern, growth, strength, note, then no
+     type) while there is room
      and the rest are the newest; "+N" counts the others ("9+" from 10).
      → { marks: ['concern', …] newest first, more, moreLabel, total } */
   function weekMarks(obs) {
@@ -559,11 +563,9 @@ window.DashObservations = (function () {
     if (m.tab === 'week') {
       return (
         '<div class="dash-ob2-key"><span>Each square is a week. Each mark is one observation:</span>' +
-        ['strength', 'growth', 'concern', 'none']
-          .map(function (t) {
-            return '<span><i class="dash-ob2-swatch" data-type="' + t + '"></i>' + TYPE_LABEL[t] + '</span>';
-          })
-          .join('') +
+        KEY_ORDER.map(function (t) {
+          return '<span><i class="dash-ob2-swatch" data-type="' + t + '"></i>' + TYPE_LABEL[t] + '</span>';
+        }).join('') +
         diamond +
         '</div>'
       );
@@ -651,13 +653,11 @@ window.DashObservations = (function () {
       var t = obType(o);
       types[t] = (types[t] || 0) + 1;
     });
-    var parts = ['strength', 'growth', 'concern', 'none']
-      .filter(function (t) {
-        return types[t];
-      })
-      .map(function (t) {
-        return types[t] + ' ' + (t === 'none' ? 'with no type' : TYPE_LABEL[t].toLowerCase());
-      });
+    var parts = KEY_ORDER.filter(function (t) {
+      return types[t];
+    }).map(function (t) {
+      return types[t] + ' ' + (t === 'none' ? 'with no type' : TYPE_LABEL[t].toLowerCase());
+    });
     var aria =
       name +
       ', ' +

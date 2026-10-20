@@ -44,7 +44,7 @@
  * @property {string} studentId
  * @property {string} text - Observation note text
  * @property {Object} [dims] - Dimension ratings (e.g. { engagement: 'strength' })
- * @property {'strength'|'growth'|'concern'} [sentiment]
+ * @property {'strength'|'growth'|'concern'|'note'} [sentiment]
  * @property {string} [context] - e.g. 'whole-class', 'small-group', 'independent'
  * @property {string} created - ISO timestamp
  */
@@ -8700,7 +8700,7 @@ window.updateObservationRich = function (obId, patch, joins) {
    order. The list loads with the class bundle and saves like modules: it is
    diffed against the server baseline and each changed row goes out through
    the outbox. A new row has a local id ('ot…') until its upsert lands. */
-var _TEMPLATE_SENTIMENTS = { strength: true, growth: true, concern: true };
+var _TEMPLATE_SENTIMENTS = { strength: true, growth: true, concern: true, note: true };
 
 function _cleanObservationTemplate(row) {
   row = row || {};

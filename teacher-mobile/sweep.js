@@ -16,6 +16,7 @@ window.MSweep = (function () {
     { key: 'strength', label: 'Strength' },
     { key: 'growth', label: 'Growth' },
     { key: 'concern', label: 'Concern' },
+    { key: 'note', label: 'Note' },
   ];
 
   /* ── Pure helpers ─────────────────────────────────────────── */
