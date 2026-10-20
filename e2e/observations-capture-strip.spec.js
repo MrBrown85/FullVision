@@ -73,7 +73,7 @@ test.describe('Observation capture strip', () => {
     await input.pressSequentially('Did not start the task !conc');
     // Enter on a suggestion picks it; the next Enter sends.
     await page.keyboard.press('Enter');
-    await expect(page.locator('#obs-capture .obsc-chip-type[data-value="concern"]')).toHaveAttribute(
+    await expect(page.locator('#obs-capture .obs-band-tab[data-value="concern"]')).toHaveAttribute(
       'aria-pressed',
       'true',
     );
@@ -85,7 +85,7 @@ test.describe('Observation capture strip', () => {
     await expect(card.locator('.obs-type')).toHaveText('Concern');
 
     const offer = page.locator('#obs-capture [data-part="flag"]');
-    await expect(offer).toContainText('Not now');
+    await expect(offer).toContainText('Not Now');
     await offer.getByRole('button', { name: /^Flag Bob/ }).click();
     await expect(offer).toBeEmpty();
     const flagged = await page.evaluate(

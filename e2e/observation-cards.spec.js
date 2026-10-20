@@ -212,3 +212,124 @@ test.describe('Observation editor (D3), phone', () => {
     await expect(saved.locator('.m-obs-tag-chip', { hasText: 'Collaboration' })).toBeVisible();
   });
 });
+
+test.describe('Capture strip (D4), desktop', () => {
+  test('type tabs start unpicked; Student line, Context menu with None, + Link, Add waits', async ({ page }) => {
+    await enterDemo(page);
+    await page.goto('/teacher/app.html#/observations');
+    const strip = page.locator('#obs-capture');
+    await expect(strip.locator('.obs-band-tab')).toHaveText(['Strength', 'Growth', 'Concern']);
+    await expect(strip.locator('.obs-band-tab.on')).toHaveCount(0);
+    await expect(strip.locator('.obs-band-right')).toHaveText('New observation · today');
+    await expect(strip.locator('[data-part="who"]')).toContainText('Student');
+    await expect(strip.locator('[data-part="who"]')).toContainText('or type @name');
+    const add = strip.locator('#capture-add-btn');
+    await expect(add).toBeDisabled();
+
+    await strip.getByRole('button', { name: 'Growth' }).click();
+    await expect(strip.locator('.obs-band-tab.on')).toHaveText('Growth');
+
+    await strip.locator('#context-btn').click();
+    await expect(strip.locator('.obs-menu .obs-menu-item')).toHaveText([
+      'Whole class',
+      'Small group',
+      'Independent',
+      'Presentation',
+      'Discussion',
+      'None',
+    ]);
+    await strip.locator('.obs-menu-item', { hasText: 'Presentation' }).click();
+    await expect(strip.locator('#context-btn')).toHaveText(/Presentation/);
+    await strip.locator('#context-btn').click();
+    await strip.locator('.obs-menu-item', { hasText: 'None' }).click();
+    await expect(strip.locator('#context-btn')).toHaveText(/\+ Context/);
+
+    // The strip pre-fills an assessment scored today; clear it so + Link offers both.
+    const prefilled = strip.locator('[data-obsc="clearAssessment"]');
+    if (await prefilled.count()) await prefilled.click();
+    await strip.locator('#link-btn').click();
+    await expect(strip.locator('#link-dropdown .obsc-item-label')).toHaveText(['+ Assessment', '+ Competency']);
+    await strip.locator('#assessment-btn').click();
+    await strip.locator('[data-menu="assessment"] .obsc-item').first().click();
+    await expect(strip.locator('.obsc-chip-assessment')).toBeVisible();
+
+    await strip.locator('#student-btn').click();
+    await strip.locator('#student-dropdown .obsc-item', { hasText: 'Cece' }).click();
+    await strip.locator('#capture-input').click();
+    await expect(strip.locator('.obsc-chip-student .obsc-av')).toHaveText('CA');
+    await expect(add).toBeDisabled();
+    await strip.locator('#capture-input').fill('Presented the lab results clearly');
+    await expect(add).toBeEnabled();
+    await add.click();
+    const card = page.locator('.obs-card', { hasText: 'Presented the lab results clearly' });
+    await expect(card.locator('.obs-type')).toHaveText('Growth');
+    await expect(card.locator('.obs-card-assessment')).toBeVisible();
+  });
+
+  test('the starter menu shows each starter with its type block and what it sets', async ({ page }) => {
+    await enterDemo(page);
+    await page.goto('/teacher/app.html#/observations');
+    await page.locator('#starter-btn').click();
+    const first = page.locator('#starter-dropdown .obsc-starter').first();
+    await expect(first.locator('.obs-type')).toHaveText(/^(Strength|Growth|Concern)$/);
+    await expect(first.locator('.obsc-starter-sets')).not.toBeEmpty();
+    await expect(page.locator('#starter-dropdown')).toContainText('Edit starters…');
+    await expect(page.locator('#starter-dropdown')).toContainText('A starter fills the type, context and tags');
+  });
+});
+
+test.describe('Phone quick menu (D4)', () => {
+  test('a student avatar opens one-tap starter rows; one tap posts', async ({ page }) => {
+    await enterDemo(page, { phone: true });
+    await page.locator('.m-tab-item[data-tab="observe"]').click();
+    await page.locator('.m-quick-avatar').first().click();
+    const rows = page.locator('.m-quick-row:not(.m-quick-own)');
+    await expect(rows.first()).toBeVisible();
+    await expect(page.locator('.m-quick-title')).not.toBeEmpty();
+    await expect(rows.first().locator('.m-obs-type')).toHaveText(/^(Strength|Growth|Concern)$/);
+    const box = await rows.first().locator('.m-obs-type').boundingBox();
+    expect(Math.round(box.width)).toBe(74);
+    await expect(page.locator('.m-quick-row').last()).toHaveText(/Write Your Own…/);
+    const text = await rows.first().locator('.m-quick-row-text').textContent();
+    await rows.first().click();
+    await expect(page.locator('#m-obs-cards .m-obs-card').first()).toContainText(text);
+  });
+
+  test('Write Your Own… opens the observation sheet for that student', async ({ page }) => {
+    await enterDemo(page, { phone: true });
+    await page.locator('.m-tab-item[data-tab="observe"]').click();
+    const avatar = page.locator('.m-quick-avatar').first();
+    const first = (await avatar.locator('.m-quick-name').textContent()).trim();
+    await avatar.click();
+    await page.getByRole('button', { name: 'Write Your Own…' }).click();
+    const sheet = page.locator('#m-obs-edit');
+    await expect(sheet.locator('.m-edit-title')).toContainText(first);
+    await expect(sheet.locator('#m-obs-stu-row')).toContainText(first);
+    await expect(sheet.locator('.obs-band-tab')).toHaveText(['Strength', 'Growth', 'Concern']);
+    const addBtn = sheet.locator('#m-obs-submit');
+    await expect(addBtn).toBeDisabled();
+    await sheet.getByRole('button', { name: 'Strength' }).click();
+    await sheet.locator('#m-obs-text').fill('Cleaned up the whole bench');
+    await expect(addBtn).toBeEnabled();
+    await addBtn.click();
+    const card = page.locator('#m-obs-cards .m-obs-card').first();
+    await expect(card).toContainText('Cleaned up the whole bench');
+    await expect(card.locator('.m-obs-type')).toHaveText('Strength');
+  });
+
+  test('the + button opens the same sheet with a student picker', async ({ page }) => {
+    await enterDemo(page, { phone: true });
+    await page.locator('.m-tab-item[data-tab="observe"]').click();
+    await page.getByRole('button', { name: 'New observation' }).click();
+    const sheet = page.locator('#m-obs-edit');
+    await expect(sheet.locator('.m-edit-title')).toHaveText('New Observation');
+    await sheet.locator('#m-obs-stu-row').click();
+    await sheet.locator('.m-pick-search').fill('noor');
+    await sheet.locator('.m-pick-row:visible').first().click();
+    await sheet.getByRole('button', { name: 'Done' }).click();
+    await expect(sheet.locator('#m-obs-stu-row')).toContainText('Noor');
+    await sheet.locator('#m-obs-text').fill('Asked to borrow a calculator');
+    await sheet.locator('#m-obs-submit').click();
+    await expect(page.locator('#m-obs-cards .m-obs-card').first()).toContainText('Asked to borrow a calculator');
+  });
+});

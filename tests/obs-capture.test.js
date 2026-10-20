@@ -198,21 +198,17 @@ describe('capture strip', () => {
     return Array.from(cap.el.querySelectorAll('.obsc-chip')).map(c => c.textContent.replace('×', '').trim());
   }
 
-  it('renders the chips in plain sentence-case text with no emoji', () => {
+  it('is the edit window twin: type tabs in a band, a Student line, one row of controls, no emoji', () => {
     const cap = mount();
     const text = cap.el.textContent;
-    expect(chipText(cap)).toEqual(
-      expect.arrayContaining([
-        'Select students…',
-        'Strength',
-        'Growth',
-        'Concern',
-        'Context',
-        '+ Tag',
-        '+ Assessment',
-        '+ Competency',
-      ]),
-    );
+    const tabs = Array.from(cap.el.querySelectorAll('.obs-band-tab')).map(t => t.textContent);
+    expect(tabs).toEqual(['Strength', 'Growth', 'Concern']);
+    expect(cap.el.querySelectorAll('.obs-band-tab.on')).toHaveLength(0);
+    expect(cap.el.querySelector('.obs-band-right').textContent).toBe('New observation · today');
+    expect(cap.el.querySelector('[data-part="who"]').textContent).toBe('Student+ Studentor type @name');
+    expect(chipText(cap)).toEqual(['+ Student', '+ Starter', '+ Add Tag', '+ Link▾']);
+    expect(cap.el.querySelector('#context-btn').textContent).toBe('+ Context▾');
+    expect(cap.el.querySelector('.obsc-keep').textContent.trim()).toBe('Keep Tags');
     expect(text).not.toMatch(/\p{Extended_Pictographic}/u);
     expect(cap.el.querySelector('#capture-input')).toBeTruthy();
     expect(cap.el.querySelector('#capture-add-btn').disabled).toBe(true);
@@ -385,6 +381,8 @@ describe('capture strip', () => {
     expect(menu.querySelector('[data-obsc="pickStarter"][data-value="ot1"] .obsc-item-hint').textContent).toBe(
       'Strength',
     );
+    expect(menu.querySelector('[data-obsc="pickStarter"][data-value="ot1"] .obs-type')).toBeTruthy();
+    expect(menu.textContent).toContain('the type, context and tags you haven’t set');
     click(menu.querySelector('[data-obsc="pickStarter"][data-value="ot3"]'));
     expect(cap.getText()).toBe('Before. Explained the question to a partner');
     expect(cap.getState().context).toBe('small-group');
@@ -439,13 +437,13 @@ describe('capture strip', () => {
     const offer = cap.el.querySelector('[data-part="flag"]');
     expect(offer.textContent).toContain('Flag Mei');
     expect(offer.textContent).not.toContain('Flag Sofia');
-    expect(offer.textContent).toContain('Not now');
+    expect(offer.textContent).toContain('Not Now');
     click(offer.querySelector('[data-obsc="flag"]'));
     expect(flagged.s1).toBe(true);
     expect(cap.el.querySelector('[data-part="flag"]').textContent).toBe('');
   });
 
-  it('Not now dismisses the flag offer without flagging', () => {
+  it('Not Now dismisses the flag offer without flagging', () => {
     const cap = mount({ students: ['s1'] });
     click(cap.el.querySelector('[data-obsc="type"][data-value="concern"]'));
     type(cap, 'Off task');
@@ -466,6 +464,7 @@ describe('capture strip', () => {
   it('a competency and its level go with the observation; Level is offered only after a competency', () => {
     const cap = mount({ students: ['s1'] });
     expect(cap.el.querySelector('#level-btn')).toBeNull();
+    click(cap.el.querySelector('#link-btn'));
     click(cap.el.querySelector('#competency-btn'));
     const menu = cap.el.querySelector('[data-menu="competency"]');
     expect(menu.textContent).toContain('Planning and conducting');
@@ -483,6 +482,31 @@ describe('capture strip', () => {
     // Cleared after Add unless Keep tags is on.
     expect(cap.getState().competencyId).toBeNull();
     expect(cap.getState().level).toBeNull();
+  });
+
+  it('the Context menu lists the five contexts with None last; None clears', () => {
+    const cap = mount({ students: ['s1'] });
+    click(cap.el.querySelector('#context-btn'));
+    const items = Array.from(cap.el.querySelectorAll('.obs-menu .obs-menu-item')).map(e => e.textContent);
+    expect(items).toEqual(['Whole class', 'Small group', 'Independent', 'Presentation', 'Discussion', 'None']);
+    click(cap.el.querySelector('[data-obsc="setContext"][data-value="independent"]'));
+    expect(cap.getState().context).toBe('independent');
+    expect(cap.el.querySelector('#context-btn').textContent).toBe('Independent▾');
+    click(cap.el.querySelector('#context-btn'));
+    click(cap.el.querySelector('[data-obsc="setContext"][data-value=""]'));
+    expect(cap.getState().context).toBeNull();
+  });
+
+  it('+ Link holds Assessment and Competency, minus what the host fixed or is already linked', () => {
+    const cap = mount({ students: ['s1'] });
+    click(cap.el.querySelector('#link-btn'));
+    let items = Array.from(cap.el.querySelectorAll('#link-dropdown .obsc-item-label')).map(e => e.textContent);
+    expect(items).toEqual(['+ Assessment', '+ Competency']);
+    cap.destroy();
+    const locked = mount({ students: ['s1'], assessmentId: 'a1', lockAssessment: true });
+    click(locked.el.querySelector('#link-btn'));
+    items = Array.from(locked.el.querySelectorAll('#link-dropdown .obsc-item-label')).map(e => e.textContent);
+    expect(items).toEqual(['+ Competency']);
   });
 
   it('clearing the competency clears its level', () => {
@@ -515,6 +539,7 @@ describe('capture strip', () => {
 
   it('without a score today, + Assessment opens a menu', () => {
     const cap = mount({ defaultAssessment: true });
+    click(cap.el.querySelector('#link-btn'));
     expect(cap.el.querySelector('#assessment-btn')).toBeTruthy();
     click(cap.el.querySelector('#assessment-btn'));
     click(cap.el.querySelector('[data-menu="assessment"] [data-value="a2"]'));

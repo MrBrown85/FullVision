@@ -63,7 +63,7 @@ test.describe('Sentence starters', () => {
     await expect(suggest.locator('.obsc-item').last()).toHaveText('Edit starters…');
     await page.keyboard.press('Enter');
     await expect(input).toHaveValue('Measured twice before pouring');
-    await expect(page.locator('#obs-capture .obsc-chip-type[data-value="strength"]')).toHaveAttribute(
+    await expect(page.locator('#obs-capture .obs-band-tab[data-value="strength"]')).toHaveAttribute(
       'aria-pressed',
       'true',
     );
