@@ -182,19 +182,22 @@ window.ReportBlocks = (function () {
 
   function _renderDimGroup(dimList, rating, groupTitle) {
     const dims = rating.dims || {};
+    // Only the dimensions the teacher rated this term. "Not Assessed" on a
+    // family's copy read as a gap in the teacher's work, not the student's.
+    const rated = dimList.filter(dim => (dims[dim] || 0) > 0);
+    if (rated.length === 0) return '';
     let html = `<div class="report-learner-title">${groupTitle}</div>`;
     html += `<div class="report-learner-dims">`;
-    dimList.forEach(dim => {
-      const val = dims[dim] || 0;
-      const pct = val > 0 ? (val / 4) * 100 : 0;
-      const label = val > 0 ? OBS_LEVEL_LABELS[val] : 'Not Assessed';
-      const color = val > 0 ? OBS_LEVEL_COLORS[val] : 'var(--text-3)';
+    rated.forEach(dim => {
+      const val = dims[dim];
+      const pct = (val / 4) * 100;
+      const label = OBS_LEVEL_LABELS[val];
+      const color = OBS_LEVEL_COLORS[val];
       const info = OBS_DESCRIPTORS[dim] || {};
       html += `<div class="report-learner-dim">
       <div class="report-learner-dim-info">
         <div class="report-learner-dim-label">${OBS_LABELS[dim]}</div>
         <div class="report-dim-desc">${info.desc || ''}</div>
-        <div class="report-dim-example">e.g. ${info.example || ''}</div>
         <div class="report-learner-dim-value" data-prof="${val}" style="color:${color};margin-top:4px">${label}</div>
         <div class="report-learner-dim-bar">
           <div class="report-learner-dim-fill" data-prof-bg="${val}" style="width:${pct}%;background:${color}"></div>
@@ -210,11 +213,11 @@ window.ReportBlocks = (function () {
     const termId = getTermId();
     const rating = getStudentTermRating(cid, student.id, termId);
     if (!rating) return '';
-    let html = `<div class="report-learner-profile">`;
-    html += _renderDimGroup(LEARNING_DIMS, rating, 'Learning Dispositions');
-    html += _renderDimGroup(RELATIONAL_DIMS, rating, 'Relational & Identity');
-    html += `</div>`;
-    return html;
+    const groups =
+      _renderDimGroup(LEARNING_DIMS, rating, 'Learning Dispositions') +
+      _renderDimGroup(RELATIONAL_DIMS, rating, 'Relational & Identity');
+    if (!groups) return '';
+    return `<div class="report-learner-profile">${groups}</div>`;
   }
 
   function renderBlockTeacherNarrative(cid, student) {
@@ -350,11 +353,12 @@ window.ReportBlocks = (function () {
       const profLabel = f.prof > 0 ? PROF_LABELS[Math.round(f.prof)] : 'No Evidence';
       const profColor = PROF_COLORS[Math.round(f.prof)] || PROF_COLORS[0];
       let nextStepDesc = `<strong>${esc(secName)}</strong> &mdash; ${esc(f.tag.label)}: ${esc(profLabel)}.`;
-      // Add I Can statements as actionable goals for improvement
+      // The first two I-can statements as goals. Three focus areas with four
+      // statements each was a third of a page on its own.
       if (f.tag.i_can_statements && f.tag.i_can_statements.length > 0) {
         nextStepDesc += ` <span style="color:var(--text-2)">Focus areas:</span>`;
         nextStepDesc += `<ul class="report-ican-list" style="margin-top:4px">`;
-        f.tag.i_can_statements.forEach(stmt => {
+        f.tag.i_can_statements.slice(0, 2).forEach(stmt => {
           nextStepDesc += `<li class="report-ican-item">${esc(stmt)}</li>`;
         });
         nextStepDesc += `</ul>`;
@@ -611,14 +615,16 @@ window.ReportBlocks = (function () {
       html += `<div style="flex:1;min-width:0">`;
       html += `<div style="font-weight:700;font-size:0.6rem;color:var(--text-2);margin-bottom:2px">Assessments</div>`;
       if (assessPerf.length > 0) {
-        assessPerf.slice(0, 4).forEach(a => {
+        // Three assessments per competency; the rest are counted. With the
+        // flat learning map the same titles repeat under every competency.
+        assessPerf.slice(0, 3).forEach(a => {
           html += `<div style="display:flex;align-items:baseline;gap:4px;color:var(--text)">
           <span style="font-size:0.64rem;font-weight:600;color:var(--text-3);flex-shrink:0">${(PROF_LABELS[a.r] || '?')[0]}</span>
           <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.title)}</span>
         </div>`;
         });
-        if (assessPerf.length > 4) {
-          html += `<div style="font-size:0.64rem;color:var(--text-3);font-style:italic">+${assessPerf.length - 4} more</div>`;
+        if (assessPerf.length > 3) {
+          html += `<div style="font-size:0.64rem;color:var(--text-3);font-style:italic">+${assessPerf.length - 3} more</div>`;
         }
       } else {
         html += `<div style="color:var(--text-3);font-style:italic;font-size:0.72rem">No evidence yet</div>`;
