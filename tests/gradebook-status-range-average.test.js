@@ -97,7 +97,10 @@ describe('gradebook views use them', () => {
   });
 
   it('warns only above the extra-credit cap', () => {
-    expect(src).toContain('isScoreOutOfRange(a, val)');
+    // The Scores view reads the flag from assessmentCellValue (calc.js).
+    const calc = readFileSync(resolve(root, 'shared/calc.js'), 'utf-8');
+    expect(calc).toContain('isScoreOutOfRange(a, val)');
+    expect(src).toContain('cell.outOfRange');
     expect(src).not.toContain('if (val > maxVal)');
   });
 

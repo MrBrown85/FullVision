@@ -1070,7 +1070,6 @@ window.PageGradebook = (function () {
      ══════════════════════════════════════════════════════════ */
   function renderScoresTable(cid, students, assessments, sections, isLetter, scores) {
     var sortedStudents = applySorting(cid, students, sections, isLetter);
-    var cc = getCourseConfig(cid);
     var cw = getCategoryWeights(cid);
     var rowH = '';
 
@@ -1207,67 +1206,39 @@ window.PageGradebook = (function () {
 
       // Score cells per assignment
       sortedAssess.forEach(function (a) {
-        var studentScores = scores[s.id] || [];
-        var tagIds = scoreTagIds(a, cid);
-        // Get average score across all tags in this assessment for this student
-        var tagScores = tagIds
-          .map(function (tid) {
-            var entry = studentScores.find(function (e) {
-              return e.assessmentId === a.id && e.tagId === tid;
-            });
-            return entry ? scoreModValue(entry) : 0;
-          })
-          .filter(function (v) {
-            return v > 0;
-          });
-        var val =
-          tagScores.length > 0
-            ? tagScores.reduce(function (x, y) {
-                return x + y;
-              }, 0) / tagScores.length
-            : 0;
-        // Rubric work counts each criterion once, at its weight.
-        var rubricVal = getRubricAssessmentScore(cid, a, studentScores);
-        if (rubricVal !== undefined) val = rubricVal || 0;
-        var isPoints = isPointsScored(a);
-        // A points 0 is a score; on proficiency work 0 is none.
-        var pointsVal = isPoints && !isCompletionScored(a) ? getPointsScore(cid, s.id, a.id) : null;
-        if (pointsVal != null) val = pointsVal;
+        // What the cell holds comes from calc.js, the same value the printed
+        // grade sheet prints; this view adds only its colours and markup.
+        var cell = assessmentCellValue(cid, s.id, a);
+        var val = cell.value;
         var display,
           cellStyle,
           cellClass = '';
-        var cmpMark = isCompletionScored(a) ? getCompletionMark(cid, s.id, a.id) : null;
-        var cellStatus = getAssignmentStatus(cid, s.id, a.id);
-        var statusMark = scoreStatusMarker(cellStatus);
+        var cmpMark = cell.mark;
+        var cellStatus = cell.status;
+        var statusMark = cell.kind === 'status' ? scoreStatusMarker(cellStatus) : '';
         if (statusMark) {
           // Not submitted and Excused replace the score.
           cellStyle = 'color:var(--text-3)';
           display = statusMark;
         } else if (cmpMark) {
           cellStyle = cmpMark === 'complete' ? 'color:var(--score-3)' : 'color:var(--score-1)';
-          display = cmpMark === 'complete' ? '\u2713' : '\u2717';
-          val = cmpMark === 'complete' ? 1 : 0;
-        } else if (val > 0 || pointsVal != null) {
-          var r = pointsVal != null ? pointsToProf(val, a.maxPoints || 100, getGradingScale(cid)) : Math.round(val);
+          display = cell.text;
+        } else if (cell.kind === 'points' || cell.kind === 'level') {
+          var r = cell.level;
           cellStyle = 'background:' + PROF_TINT[r] + ';color:' + PROF_COLORS[r];
-          display = isPoints ? formatPoints(val) : formatLevel(cid, val);
+          display = cell.text;
           // Warning for out-of-range: above 4 on proficiency work, above the
           // extra-credit cap (twice the maximum) on points work.
-          if (isScoreOutOfRange(a, val)) cellClass = ' gb-scores-warning';
+          if (cell.outOfRange) cellClass = ' gb-scores-warning';
+        } else if (cell.kind === 'missing' && cell.zero) {
+          cellStyle = 'color:var(--score-1)';
+          display = '<span class="gb-scores-zero">0</span>';
+        } else if (cell.kind === 'missing') {
+          cellStyle = 'background:rgba(255,149,0,0.06);color:var(--text-3)';
+          display = '<span class="gb-scores-missing">\u2014</span>';
         } else {
-          // Check zero policy for missing scores
-          var missingPolicy = a.missingPolicy || cc.missingPolicy || 'exclude';
-          var isPastDue = a.dueDate && a.dueDate < new Date().toISOString().slice(0, 10);
-          if (missingPolicy === 'zero' && isPastDue) {
-            cellStyle = 'color:var(--score-1)';
-            display = '<span class="gb-scores-zero">0</span>';
-          } else if (isPastDue) {
-            cellStyle = 'background:rgba(255,149,0,0.06);color:var(--text-3)';
-            display = '<span class="gb-scores-missing">\u2014</span>';
-          } else {
-            cellStyle = 'color:var(--text-3)';
-            display = '\u2014';
-          }
+          cellStyle = 'color:var(--text-3)';
+          display = '\u2014';
         }
         var isScoreModeCell = _scoreMode && _scoreMode.assessmentId === a.id && si === _scoreMode.studentIdx;
         var isScoreModeCol = _scoreMode && _scoreMode.assessmentId === a.id;

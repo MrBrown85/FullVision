@@ -1152,6 +1152,95 @@ function formatLevel(cid, value, empty) {
   return num;
 }
 
+/* What one gradebook cell shows: one student on one assessment, as the
+   Scores view draws it and the printed grade sheet prints it. `today`
+   (YYYY-MM-DD) decides whether a missing score is past due; it defaults to
+   today's date as the Scores view reads it.
+
+   Returns { kind, value, level, text, status, late, mark, outOfRange }:
+   - kind 'status': Not submitted or Excused replaces the score (status 'NS'
+     or 'EXC', text the same).
+   - kind 'complete': a Complete/Incomplete mark (mark 'complete' or
+     'incomplete', value 1 or 0, text ✓ or ✗).
+   - kind 'points' or 'level': a score; value is the points or the level
+     (with its ±), level the 1-4 band the cell's colour comes from, text
+     through formatPoints or formatLevel.
+   - kind 'missing': no score past the due date; text '0' when the missing
+     policy counts it as zero (zero true), else '—'.
+   - kind 'none': no score yet, text '—'.
+   `late` is true when the cell is marked Late (it keeps its score). */
+function assessmentCellValue(cid, sid, assessment, today) {
+  var a = assessment;
+  var entries = getScores(cid)[sid] || [];
+  var tagScores = scoreTagIds(a, cid)
+    .map(function (tid) {
+      var entry = entries.find(function (e) {
+        return e.assessmentId === a.id && e.tagId === tid;
+      });
+      return entry ? scoreModValue(entry) : 0;
+    })
+    .filter(function (v) {
+      return v > 0;
+    });
+  var val =
+    tagScores.length > 0
+      ? tagScores.reduce(function (x, y) {
+          return x + y;
+        }, 0) / tagScores.length
+      : 0;
+  // Rubric work counts each criterion once, at its weight.
+  var rubricVal = getRubricAssessmentScore(cid, a, entries);
+  if (rubricVal !== undefined) val = rubricVal || 0;
+  var isPoints = isPointsScored(a);
+  var isComplete = isCompletionScored(a);
+  // A points 0 is a score; on proficiency work 0 is none.
+  var pointsVal = isPoints && !isComplete ? getPointsScore(cid, sid, a.id) : null;
+  if (pointsVal != null) val = pointsVal;
+  var status = getAssignmentStatus(cid, sid, a.id);
+  var out = {
+    kind: 'none',
+    value: 0,
+    level: 0,
+    text: '—',
+    status: status || null,
+    late: status === 'LATE',
+    mark: null,
+    zero: false,
+    outOfRange: false,
+  };
+  if (status === 'NS' || status === 'EXC') {
+    out.kind = 'status';
+    out.value = val;
+    out.text = status;
+    return out;
+  }
+  var mark = isComplete ? getCompletionMark(cid, sid, a.id) : null;
+  if (mark) {
+    out.kind = 'complete';
+    out.mark = mark;
+    out.value = mark === 'complete' ? 1 : 0;
+    out.text = mark === 'complete' ? '✓' : '✗';
+    return out;
+  }
+  if (val > 0 || pointsVal != null) {
+    out.kind = isPoints ? 'points' : 'level';
+    out.value = val;
+    out.level = pointsVal != null ? pointsToProf(val, a.maxPoints || 100, getGradingScale(cid)) : Math.round(val);
+    out.text = isPoints ? formatPoints(val) : formatLevel(cid, val);
+    out.outOfRange = isScoreOutOfRange(a, val);
+    return out;
+  }
+  var cc = getCourseConfig(cid) || {};
+  var missingPolicy = a.missingPolicy || cc.missingPolicy || 'exclude';
+  var day = today || new Date().toISOString().slice(0, 10);
+  if (a.dueDate && a.dueDate < day) {
+    out.kind = 'missing';
+    out.zero = missingPolicy === 'zero';
+    out.text = out.zero ? '0' : '—';
+  }
+  return out;
+}
+
 /* The proficiency word shown under a level ("Proficient"). Letter classes
    don't use proficiency words. */
 function levelWord(cid, value) {
@@ -1302,6 +1391,7 @@ window.Calc = {
   getCourseLetterData,
   courseGradeMode,
   formatLevel,
+  assessmentCellValue,
   levelWord,
   studentGradeBadges,
   studentGradeSummary,
