@@ -102,15 +102,52 @@ window.ReportBlocks = (function () {
   /* ══════════════════════════════════════════════════════════════
    REPORT BLOCK RENDERERS — Each renders one configurable block
    ══════════════════════════════════════════════════════════════ */
+  /* "Sep 2 – Nov 14, 2026": one year when both dates share it. */
+  function _formatDateRange(a, b) {
+    if (!a || !b) return '';
+    const da = parseLocalDate(a);
+    const db = parseLocalDate(b);
+    const short = { month: 'short', day: 'numeric' };
+    const long = { month: 'short', day: 'numeric', year: 'numeric' };
+    const first = da.toLocaleDateString('en-CA', da.getFullYear() === db.getFullYear() ? short : long);
+    return first + ' \u2013 ' + db.toLocaleDateString('en-CA', long);
+  }
+
+  /* The letterhead: school (when the class uses a school's preset terms),
+     class and block, the student; then the report by its name, the term's
+     dates, the teacher and the student number. DECISIONS.md, "Report forms" 7. */
   function renderBlockHeader(cid, student) {
     const course = COURSES[cid];
     const sel = document.getElementById('report-period');
     const opt = sel && sel.options[sel.selectedIndex];
     const period = opt ? opt.text : '';
+    const terms = typeof getReportingTerms === 'function' ? getReportingTerms(cid) : [];
+    const match =
+      terms.length && typeof reportingTermsSchoolMatch === 'function' ? reportingTermsSchoolMatch(terms) : null;
+    const school = match && match.school ? match.school.name : '';
+    const n = Number((getTermId().match(/^term-(\d+)$/) || [])[1]);
+    const term = terms.find(t => Number(t.ordinal) === n) || null;
+    const block = typeof courseBlockLabel === 'function' ? courseBlockLabel(course) : '';
+    const teacher = (typeof getConfig === 'function' && getConfig().displayName) || '';
+
+    const titleParts = [school, course.name, block].filter(Boolean);
+    let dates = term ? _formatDateRange(term.starts_on, term.ends_on) : '';
+    if (dates && term.label && term.label !== period) dates = esc(term.label) + ' \u00B7 ' + dates;
+    const who = [
+      teacher ? 'Teacher: ' + esc(teacher) : '',
+      student.studentNumber ? 'Student No. ' + esc(student.studentNumber) : '',
+    ]
+      .filter(Boolean)
+      .join(' \u00B7 ');
+
     return `<div class="report-header">
-    <div class="report-course-title">${esc(course.name)} Student Learning Report</div>
-    <div class="report-student-name">${esc(fullName(student))}${student.studentNumber ? ` <span style="font-size:0.7em;color:var(--text-3);font-weight:400">(${esc(student.studentNumber)})</span>` : ''}</div>
-    <div class="report-period">${esc(period)}</div>
+    <div class="report-header-main">
+      <div class="report-course-title">${esc(titleParts.join(' \u00B7 '))}</div>
+      <div class="report-student-name">${esc(fullName(student))}</div>
+    </div>
+    <div class="report-header-meta">
+      <div class="report-period">${esc(period)}</div>${dates ? `<div>${dates}</div>` : ''}${who ? `<div>${who}</div>` : ''}
+    </div>
   </div>`;
   }
 
