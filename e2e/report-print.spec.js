@@ -29,7 +29,7 @@ async function openDemoProgressReports(page) {
   await page.waitForURL(/app\.html/, { timeout: 15000 });
   await page.goto(page.url().replace(/#.*/, '#/reports'));
   await page.getByRole('tab', { name: 'Progress Reports' }).click();
-  await expect(page.locator('.report-student')).toHaveCount(STUDENTS);
+  await expect(page.locator('.report-sheet, .report-student').first()).toBeVisible();
 }
 
 async function applyPreset(page, preset) {
@@ -71,7 +71,7 @@ test.describe('Printed progress reports', () => {
     const uneven = [];
     for (let i = 0; i < n; i++) {
       await rows.nth(i).click();
-      await expect(page.locator('.report-student')).toHaveCount(1);
+      await expect(page.locator('.sheet-label')).toHaveCount(2);
       const pages = countPages(await printToPdf(page));
       if (pages !== 2) uneven.push(`${await rows.nth(i).innerText()}: ${pages}`);
     }
@@ -80,7 +80,7 @@ test.describe('Printed progress reports', () => {
 
   test('the letterhead names the class, block, report, term dates and student number', async ({ page }) => {
     await openDemoProgressReports(page);
-    const header = page.locator('.report-student').first().locator('.report-header');
+    const header = page.locator('.report-sheet, .report-student').first().locator('.report-header');
     await expect(header.locator('.report-course-title')).toHaveText('Science 8 · Block A');
     await expect(header.locator('.report-student-name')).toHaveText('Cece Adeyemi');
     const meta = header.locator('.report-header-meta');
@@ -94,18 +94,13 @@ test.describe('Printed progress reports', () => {
   test('levels print as dots and a word in black', async ({ page }) => {
     await openDemoProgressReports(page);
     await applyPreset(page, 'standard');
-    const first = page.locator('.report-student').first();
-    const chip = first.locator('.report-section-chip-value').first();
+    const chip = page.locator('#rb-preview .report-section-chip-value').first();
+    const dim = page.locator('#rb-preview .report-learner-dim-value').first();
     await expect(chip).toContainText(/[●○]{4}/);
-    await expect(first.locator('.report-learner-dim-value').first()).toContainText(/[●○]{4}/);
+    await expect(dim).toContainText(/[●○]{4}/);
     await page.emulateMedia({ media: 'print' });
     expect(await chip.evaluate(el => getComputedStyle(el).color)).toBe('rgb(0, 0, 0)');
-    expect(
-      await first
-        .locator('.report-learner-dim-value')
-        .first()
-        .evaluate(el => getComputedStyle(el).color),
-    ).toBe('rgb(0, 0, 0)');
+    expect(await dim.evaluate(el => getComputedStyle(el).color)).toBe('rgb(0, 0, 0)');
     await page.emulateMedia({ media: 'screen' });
     await page.getByRole('tab', { name: 'Class Summary' }).click();
     await expect(page.locator('.class-summary-table td[data-prof]').first()).toContainText(/[●○]{4}/);

@@ -37,6 +37,7 @@ const PRECACHE_URLS = [
   '/teacher/rubric-print.css',
   '/teacher/ui.js',
   '/teacher/report-blocks.js',
+  '/teacher/report-sheets.js',
   '/teacher/report-questionnaire.js',
   '/teacher/report-builder-ui.js',
   '/teacher/report-preview.js',

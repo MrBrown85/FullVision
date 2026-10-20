@@ -277,17 +277,102 @@ window.ReportBlocks = (function () {
     return `<div class="report-learner-profile">${groups}</div>`;
   }
 
+  /* The Teacher Comment box around already-safe HTML. The sheet engine
+     measures one line of it to size the room the form reserves. */
+  function renderCommentBox(contentHtml) {
+    let html = `<div class="report-block-box report-comment-box" style="page-break-inside:avoid">`;
+    html += `<div class="report-block-title">Teacher Comment</div>`;
+    html += `<div class="report-comment-text" style="font-size:0.88rem;color:var(--text);line-height:1.6;padding:4px 0">${contentHtml}</div>`;
+    html += `</div>`;
+    return html;
+  }
+
   function renderBlockTeacherNarrative(cid, student, ctx) {
     const termId = ctx && ctx.termId;
     const rating = getStudentTermRating(cid, student.id, termId);
     if (!rating || !rating.narrative || !rating.narrative.trim()) return '';
     const isHtml = /<[a-z][\s\S]*>/i.test(rating.narrative);
     const content = isHtml ? sanitizeNarrativeHtml(rating.narrative.trim()) : esc(rating.narrative.trim());
-    let html = `<div class="report-block-box" style="page-break-inside:avoid">`;
-    html += `<div class="report-block-title">Teacher Comment</div>`;
-    html += `<div style="font-size:0.88rem;color:var(--text);line-height:1.6;padding:4px 0">${content}</div>`;
-    html += `</div>`;
-    return html;
+    return renderCommentBox(content);
+  }
+
+  /* ── Curricular Competencies table ──────────────────────────────
+     One row per competency (grouped when the class groups them), the level
+     as dots and a word that follows the class's grading setting, and how
+     many assessments the level rests on. A fixed block: its rows come from
+     the learning map, so its height is the same for every student. */
+  function renderBlockCompetencyTable(cid, student, ctx) {
+    const grouped = getGroupedSections(cid);
+    const mode = courseGradeMode(cid);
+    const row = sec => {
+      const sp = getSectionProficiency(cid, student.id, sec.id);
+      const r = Math.round(sp);
+      const ids = new Set();
+      (sec.tags || []).forEach(tag => {
+        getTagScores(cid, student.id, tag.id).forEach(sc => {
+          if (sc.score > 0) ids.add(sc.assessmentId);
+        });
+      });
+      let level;
+      if (!(sp > 0)) level = '<span class="report-ct-none">No evidence yet</span>';
+      else if (mode === 'proficiency') level = levelDots(r) + esc(PROF_LABELS[r] || '');
+      else if (mode === 'letter') level = levelDots(r) + esc(formatLevel(cid, sp));
+      else
+        level =
+          levelDots(r) +
+          esc(PROF_LABELS[r] || '') +
+          ' <span class="report-ct-pct">' +
+          esc(formatLevel(cid, sp).split(' \u00B7 ').pop()) +
+          '</span>';
+      return `<tr><td class="report-ct-name">${esc(sec.shortName || sec.name)}</td><td class="report-ct-level" data-prof="${sp > 0 ? r : 0}">${level}</td><td class="report-ct-evidence">${ids.size}</td></tr>`;
+    };
+    let rows = '';
+    if (grouped.groups.some(g => g.sections.length)) {
+      grouped.groups.forEach(g => {
+        if (!g.sections.length) return;
+        rows += `<tr class="report-ct-group"><td colspan="3">${esc(g.group.name)}</td></tr>`;
+        g.sections.forEach(sec => (rows += row(sec)));
+      });
+      grouped.ungrouped.forEach(sec => (rows += row(sec)));
+    } else {
+      getSections(cid).forEach(sec => (rows += row(sec)));
+    }
+    if (!rows) return '';
+    return `<div class="report-block-box report-competency-table">
+    <div class="report-block-title">Curricular Competencies</div>
+    <table class="report-ct"><thead><tr><th>Competency</th><th>Level</th><th class="report-ct-evidence">Evidence</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="report-ct-legend">${levelDots(1)}Emerging &nbsp; ${levelDots(2)}Developing &nbsp; ${levelDots(3)}Proficient &nbsp; ${levelDots(4)}Extending</div>
+  </div>`;
+  }
+
+  /* ── Attendance this term ─────────────────────────────────────
+     Counts from the roster's attendance records inside the report's term
+     (all time when the class has no dated terms). Nothing prints for a
+     class that does not take attendance in FullVision. */
+  function renderBlockAttendance(cid, student, ctx) {
+    const everyone = getStudents(cid);
+    if (!everyone.some(st => (st.attendance || []).length)) return '';
+    const terms = typeof getReportingTerms === 'function' ? getReportingTerms(cid) : [];
+    const n = Number((((ctx && ctx.termId) || '').match(/^term-(\d+)$/) || [])[1]);
+    const term = terms.find(t => Number(t.ordinal) === n) || null;
+    const inTerm = a => !term || !a.date || (a.date >= term.starts_on && a.date <= term.ends_on);
+    const records = (student.attendance || []).filter(inTerm);
+    const count = key =>
+      records.filter(a =>
+        String(a.status || '')
+          .toLowerCase()
+          .startsWith(key),
+      ).length;
+    const rows = [
+      ['Present', count('p')],
+      ['Absent', count('a')],
+      ['Late', count('l')],
+      ['Excused', count('e')],
+    ];
+    return `<div class="report-block-box report-attendance">
+    <div class="report-block-title">Attendance${term ? ' this Term' : ''}</div>
+    <table class="report-ct"><tbody>${rows.map(r => `<tr><td class="report-ct-name">${r[0]}</td><td class="report-ct-evidence">${r[1]}</td></tr>`).join('')}</tbody></table>
+  </div>`;
   }
 
   function renderBlockObservations(cid, student) {
@@ -445,7 +530,7 @@ window.ReportBlocks = (function () {
     const name = esc(displayNameFirst(student));
     let html = `<div class="report-block-box report-parent-response">`;
     html += `<div class="report-block-title">Parent / Guardian Response</div>`;
-    html += `<div style="font-size:0.78rem;color:var(--text-2);margin-bottom:14px;line-height:1.5">Please review this report with your child and return this section to the school.</div>`;
+    html += `<div class="report-parent-intro" style="font-size:0.78rem;color:var(--text-2);margin-bottom:14px;line-height:1.5">Please review this report with your child and return this section to the school.</div>`;
     // Signature + Date
     html += `<div class="report-parent-lines">
     <div class="report-parent-line"><span class="report-parent-label">Signature</span><span class="report-parent-field"></span></div>
@@ -463,9 +548,9 @@ window.ReportBlocks = (function () {
     <div class="report-parent-check"><span class="report-parent-checkbox"></span> I have questions about my child's progress</div>
   </div>`;
     // Comments
-    html += `<div style="margin-top:14px">
+    html += `<div class="report-parent-comments" style="margin-top:14px">
     <div class="report-parent-label" style="margin-bottom:6px">Comments or Questions</div>
-    <div style="border:1.5px solid var(--border);border-radius:8px;min-height:60px;padding:8px"></div>
+    <div class="report-parent-comments-box" style="border:1.5px solid var(--border);border-radius:8px;min-height:60px;padding:8px"></div>
   </div>`;
     html += `</div>`;
     return html;
@@ -1055,6 +1140,10 @@ window.ReportBlocks = (function () {
         return renderBlockSectionOutcomes(cid, student);
       case 'core-competencies':
         return renderBlockCoreCompetencies(cid, student);
+      case 'competency-table':
+        return renderBlockCompetencyTable(cid, student, ctx);
+      case 'attendance':
+        return renderBlockAttendance(cid, student, ctx);
       case 'learner-dimensions':
         return renderBlockLearnerDimensions(cid, student, ctx);
       case 'teacher-narrative':
@@ -1088,6 +1177,9 @@ window.ReportBlocks = (function () {
     renderBlockAcademicSummary: renderBlockAcademicSummary,
     renderBlockLearnerDimensions: renderBlockLearnerDimensions,
     renderBlockTeacherNarrative: renderBlockTeacherNarrative,
+    renderCommentBox: renderCommentBox,
+    renderBlockCompetencyTable: renderBlockCompetencyTable,
+    renderBlockAttendance: renderBlockAttendance,
     renderBlockObservations: renderBlockObservations,
     renderBlockSectionOutcomes: renderBlockSectionOutcomes,
     renderBlockNextSteps: renderBlockNextSteps,

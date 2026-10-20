@@ -94,6 +94,9 @@ window.ReportBuilderUI = (function () {
   }
 
   function renderLayout(reportConfig) {
+    // "standard" is the Report Card form (report-sheets.js); its stored id
+    // stays so saved layouts keep working.
+    var labels = { brief: 'Brief', standard: 'Report Card', detailed: 'Detailed' };
     var presetBtns = ['brief', 'standard', 'detailed']
       .map(function (p) {
         return (
@@ -102,8 +105,7 @@ window.ReportBuilderUI = (function () {
           '" data-preset="' +
           p +
           '" data-action="rbApplyPreset">' +
-          p.charAt(0).toUpperCase() +
-          p.slice(1) +
+          labels[p] +
           '</button>'
         );
       })
@@ -123,7 +125,51 @@ window.ReportBuilderUI = (function () {
     );
   }
 
+  function usesSheets(reportConfig) {
+    return !!reportConfig && reportConfig.preset === 'standard' && typeof ReportSheets !== 'undefined';
+  }
+
+  /* The Report Card is one form for the class: its blocks are listed, not
+     toggled. Edit Layout (Phase 3) is where a form changes. */
+  function renderFormBlocks(form) {
+    var items = [];
+    var add = function (it) {
+      if (it.pair) {
+        items.push(
+          it.pair
+            .map(function (q) {
+              return q.label;
+            })
+            .join(' + ') + ' <span class="rb-form-kind">Fixed · side by side</span>',
+        );
+        return;
+      }
+      var kind = it.kind === 'flow' ? 'Flows' : it.pinned ? 'Fixed · bottom of the back' : 'Fixed';
+      items.push(esc(it.label) + ' <span class="rb-form-kind">' + kind + '</span>');
+    };
+    var html =
+      '<div class="rb-form-note">One form for every student. Fixed blocks print the same for everyone; flowing blocks grow with each student and push what follows down the sheet.</div>';
+    html += '<div class="rb-form-side">Front</div>';
+    form.front.forEach(add);
+    html += items
+      .map(function (t) {
+        return '<div class="rb-block rb-form-block">' + t + '</div>';
+      })
+      .join('');
+    items = [];
+    html += '<div class="rb-form-side">Back</div>';
+    form.back.forEach(add);
+    html += items
+      .map(function (t) {
+        return '<div class="rb-block rb-form-block">' + t + '</div>';
+      })
+      .join('');
+    html += '<div class="rb-form-summary" id="rb-form-summary"></div>';
+    return html;
+  }
+
   function renderBuilderBlocks(reportConfig) {
+    if (usesSheets(reportConfig)) return renderFormBlocks(ReportSheets.form());
     var html = '';
     reportConfig.blocks.forEach(function (block, idx) {
       var enabledClass = block.enabled ? ' enabled' : '';
@@ -292,6 +338,8 @@ window.ReportBuilderUI = (function () {
     getReportConfigWrapped: getReportConfigWrapped,
     renderLayout: renderLayout,
     renderBuilderBlocks: renderBuilderBlocks,
+    renderFormBlocks: renderFormBlocks,
+    usesSheets: usesSheets,
     toggleBlock: toggleBlock,
     applyPreset: applyPreset,
     updatePresetBtns: updatePresetBtns,

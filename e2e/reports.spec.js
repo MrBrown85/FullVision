@@ -38,6 +38,8 @@ test.describe('Reports — Report Builder', () => {
   test('report blocks can be toggled', async ({ page }) => {
     await gotoApp(page, '/reports');
     await openProgressReports(page);
+    // The Report Card form has no toggles; Detailed keeps the block list.
+    await page.locator('[data-action="rbApplyPreset"][data-preset="detailed"]').click();
     const toggleBtns = page.locator('[data-action="rbToggleBlock"]');
     const count = await toggleBtns.count();
     expect(count).toBeGreaterThanOrEqual(1);

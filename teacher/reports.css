@@ -1366,6 +1366,460 @@
   }
 }
 
+/* ══════════════════════════════════════════════════════════════
+   SHEETS — the Report Card form (report-sheets.js)
+   A sheet is a Letter or Legal page drawn at its real size, on screen
+   and on paper, with its own 0.5in padding. Everything inside it uses
+   the print sizes, so what the teacher sees is what the copier gets.
+   ══════════════════════════════════════════════════════════════ */
+.rb-preview.report-sheets-on {
+  --sheet-zoom: 1;
+  background: var(--bg);
+}
+.sheet-zoom {
+  zoom: var(--sheet-zoom);
+  width: 8.5in;
+  margin: 0 auto 22px;
+}
+.sheet-label {
+  font-family: var(--font-base);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-3);
+  margin: 0 0 6px 2px;
+}
+.report-sheet {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: 8.5in;
+  height: 11in;
+  padding: 0.5in;
+  background: #fff;
+  color: #000;
+  font-size: 9.5pt;
+  line-height: 1.4;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+}
+.report-sheet[data-paper='legal'] {
+  height: 14in;
+}
+.report-sheet-measure {
+  box-shadow: none;
+}
+.sheet-body {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.sheet-item {
+  display: flow-root;
+}
+.sheet-pinned {
+  flex: 0 0 auto;
+  margin-top: auto;
+}
+.sheet-footer {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 6px;
+  padding-top: 4px;
+  border-top: 1px solid #bbb;
+  font-family: var(--font-base);
+  font-size: 7.5pt;
+  color: #555;
+}
+.sheet-pair {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+}
+.sheet-pair-cell {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.sheet-pair-cell:first-child {
+  flex: 1.6 1 0;
+}
+.sheet-pair-cell > .report-block-box {
+  height: 100%;
+  box-sizing: border-box;
+}
+.sheet-blank {
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  color: #888;
+  font-size: 8pt;
+}
+.sheet-overflow {
+  outline: 2px solid var(--score-2);
+}
+.sheet-room .report-block-box {
+  min-height: inherit;
+  box-sizing: border-box;
+}
+.report-ruled {
+  background: repeating-linear-gradient(to bottom, transparent 0 21px, #bbb 21px 22px);
+  margin-top: 6px;
+}
+.report-ct {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.report-ct th {
+  text-align: left;
+  font-weight: 600;
+  font-size: var(--text-2xs);
+  color: var(--text-2);
+  border-bottom: 1px solid #000;
+  padding: 3px 4px;
+}
+.report-ct td {
+  padding: 4px 4px;
+  border-bottom: 1px solid #e3e6ea;
+  vertical-align: top;
+}
+.report-ct .report-ct-name {
+  font-weight: 500;
+}
+.report-ct .report-ct-level {
+  white-space: nowrap;
+  font-weight: 600;
+}
+.report-ct .report-ct-evidence,
+.report-ct th.report-ct-evidence {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.report-ct-group td {
+  background: #f1f3f5;
+  font-weight: 600;
+  font-size: var(--text-2xs);
+  color: #333;
+  padding: 3px 4px;
+}
+.report-ct-none {
+  color: var(--text-3);
+  font-weight: 400;
+  font-style: italic;
+}
+.report-ct-pct {
+  font-weight: 400;
+  color: var(--text-2);
+}
+.report-ct-legend {
+  margin-top: 6px;
+  font-size: var(--text-2xs);
+  color: #333;
+}
+.rb-form-note {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  line-height: 1.45;
+  padding: 2px 4px 8px;
+}
+.rb-form-side {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-3);
+  padding: 8px 4px 4px;
+}
+.rb-block.rb-form-block {
+  cursor: default;
+  font-size: var(--text-base);
+  color: var(--text);
+  justify-content: space-between;
+}
+.rb-form-kind {
+  font-size: var(--text-2xs);
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.rb-form-summary {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  line-height: 1.45;
+  padding: 10px 4px 0;
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+}
+@media print {
+  .sheet-zoom {
+    zoom: 1 !important;
+    width: auto !important;
+    margin: 0 !important;
+  }
+  .sheet-label {
+    display: none !important;
+  }
+  .rb-preview.report-sheets-on {
+    background: #fff !important;
+  }
+  .report-sheet {
+    box-shadow: none !important;
+    page-break-after: always;
+    break-after: page;
+  }
+  .sheet-zoom:last-child .report-sheet {
+    page-break-after: auto;
+    break-after: auto;
+  }
+  .sheet-overflow {
+    outline: none !important;
+  }
+}
+
+/* Spacing inside a sheet. The back holds the dispositions and the Parent /
+   Guardian Response together; these tighten gaps only, never text. */
+.report-sheet .report-parent-response {
+  margin-bottom: 0 !important;
+}
+.report-sheet .report-parent-intro {
+  margin-bottom: 8px !important;
+}
+.report-sheet .report-parent-lines {
+  margin-bottom: 10px;
+}
+.report-sheet .report-parent-field {
+  min-height: 20px;
+}
+.report-sheet .report-parent-checks {
+  gap: 6px;
+  margin: 8px 0;
+}
+.report-sheet .report-parent-comments {
+  margin-top: 8px !important;
+}
+.report-sheet .report-parent-comments-box {
+  min-height: 48px !important;
+}
+.report-sheet .report-next-step-item {
+  padding: 3px 0;
+}
+.report-sheet .report-next-steps {
+  padding: 10px 14px !important;
+  margin: 0 0 10px !important;
+}
+.report-sheet .report-learner-profile {
+  margin-bottom: 10px !important;
+}
+
+/* Print sizes inside a sheet, on screen as well as on paper. Generated from
+   the @media print block above: every compaction rule, scoped to .report-sheet,
+   so the preview and the printout share one layout. */
+.report-sheet .report-header {
+  margin-bottom: 12px !important;
+  padding-bottom: 8px !important;
+}
+.report-sheet .report-header-meta {
+  font-size: var(--text-xs) !important;
+  line-height: 1.45 !important;
+}
+.report-sheet .report-course-title {
+  font-size: var(--text-xs) !important;
+}
+.report-sheet .report-overall {
+  margin-bottom: 12px !important;
+}
+.report-sheet .report-overall-main {
+  padding: 10px 14px !important;
+  flex: 0 0 150px !important;
+}
+.report-sheet .report-overall-word {
+  font-size: var(--text-xl) !important;
+}
+.report-sheet .report-overall-label {
+  font-size: var(--text-xs) !important;
+}
+.report-sheet .report-section-chip {
+  padding: 8px 10px !important;
+}
+.report-sheet .report-section-chip-name {
+  font-size: var(--text-2xs) !important;
+}
+.report-sheet .report-section-chip-value {
+  font-size: var(--text-base) !important;
+}
+.report-sheet .report-narrative {
+  padding: 10px 14px !important;
+  margin-bottom: 12px !important;
+  font-size: var(--text-md) !important;
+  line-height: 1.5 !important;
+}
+.report-sheet .report-block-box {
+  padding: 10px 14px !important;
+  margin-bottom: 10px !important;
+}
+.report-sheet .report-block-title {
+  font-size: var(--text-2xs) !important;
+  margin-bottom: 4px !important;
+}
+.report-sheet .report-learner-profile {
+  margin-bottom: 10px !important;
+}
+.report-sheet .report-learner-title {
+  font-size: var(--text-sm) !important;
+  padding: 6px 14px !important;
+}
+.report-sheet .report-learner-dims {
+  padding: 6px 14px !important;
+  gap: 4px 10px !important;
+}
+.report-sheet .report-learner-dim {
+  flex: 1 1 30% !important;
+}
+.report-sheet .report-dim-desc {
+  display: none !important;
+}
+.report-sheet .report-section-chart > div[style*='margin-top:12px'] {
+  margin-top: 7px !important;
+  padding-top: 6px !important;
+}
+.report-sheet .report-learner-dim-label {
+  font-size: var(--text-sm) !important;
+}
+.report-sheet .report-learner-dim-value {
+  font-size: var(--text-sm) !important;
+}
+.report-sheet .report-next-steps {
+  margin-bottom: 10px !important;
+}
+.report-sheet .report-next-steps-title {
+  font-size: var(--text-sm) !important;
+}
+.report-sheet .report-legend {
+  margin-bottom: 10px !important;
+}
+.report-sheet .report-legend-word {
+  font-size: var(--text-sm) !important;
+}
+.report-sheet .report-legend-desc {
+  font-size: var(--text-xs) !important;
+}
+.report-sheet .report-legend-dot {
+  width: 8px !important;
+  height: 8px !important;
+}
+.report-sheet .report-tag-table th {
+  font-size: var(--text-xs) !important;
+  padding: 4px 8px !important;
+}
+.report-sheet .report-tag-table td {
+  font-size: var(--text-sm) !important;
+  padding: 4px 8px !important;
+}
+.report-sheet .report-subject-title {
+  font-size: var(--text-lg) !important;
+  margin: 16px 0 8px !important;
+}
+.report-sheet .report-section-header {
+  font-size: var(--text-sm) !important;
+  padding: 5px 10px !important;
+}
+.report-sheet .report-section-block {
+  page-break-inside: avoid !important;
+}
+.report-sheet .report-section-header {
+  page-break-after: avoid !important;
+}
+.report-sheet .report-subject-title {
+  page-break-after: avoid !important;
+}
+.report-sheet .report-tag-table {
+  page-break-inside: avoid !important;
+}
+.report-sheet .report-block-box {
+  page-break-inside: avoid !important;
+  border-color: #bbb !important;
+}
+.report-sheet .report-block-box.report-section-chart {
+  page-break-inside: auto !important;
+}
+.report-sheet .report-block-title {
+  page-break-after: avoid !important;
+}
+.report-sheet .report-next-steps {
+  page-break-inside: auto !important;
+}
+.report-sheet .report-next-step-item {
+  page-break-inside: avoid;
+}
+.report-sheet .report-next-steps-title {
+  page-break-after: avoid;
+}
+.report-sheet .report-narrative {
+  page-break-inside: avoid !important;
+}
+.report-sheet .report-overall {
+  page-break-inside: avoid !important;
+}
+
+/* The photocopy view: the print block's black-and-white rules applied on
+   screen when the teacher chooses Photocopy. */
+.report-photocopy [data-prof],
+.report-photocopy .report-section-chip-name,
+.report-photocopy .report-outcome-ev,
+.report-photocopy .report-legend-word {
+  color: #000 !important;
+}
+.report-photocopy [data-prof-bg] {
+  background: transparent !important;
+}
+.report-photocopy .report-level-pill {
+  border: 1px solid #000 !important;
+  border-radius: 4px !important;
+}
+.report-photocopy .report-overall-main,
+.report-photocopy .class-summary-table th {
+  background: #000 !important;
+  color: #fff !important;
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+}
+.report-photocopy .report-overall-label {
+  color: #ddd !important;
+}
+.report-photocopy .report-learner-dim-fill,
+.report-photocopy .report-outcome-bar-fill,
+.report-photocopy .report-next-step-bullet,
+.report-photocopy [data-prof-bg][style*='height:100%'] {
+  background: #000 !important;
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+}
+.report-photocopy .report-learner-dim-bar,
+.report-photocopy .report-outcome-bar {
+  background: #e2e2e2 !important;
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+}
+.report-photocopy .report-next-steps {
+  background: #fff !important;
+  border-color: #bbb !important;
+}
+.report-photocopy .report-next-steps-title {
+  color: #000 !important;
+}
+.report-photocopy [data-prof-stroke='1'] {
+  stroke: #1a1a1a !important;
+}
+.report-photocopy [data-prof-stroke='2'] {
+  stroke: #595959 !important;
+}
+.report-photocopy [data-prof-stroke='3'] {
+  stroke: #8f8f8f !important;
+}
+.report-photocopy [data-prof-stroke='4'] {
+  stroke: #c8c8c8 !important;
+}
+
 /* ── Term Questionnaire styles ─────────────────────────────── */
 .tq-student-nav {
   display: flex;
