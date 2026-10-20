@@ -103,3 +103,42 @@ describe('isLinked', () => {
     expect(H.isLinked({})).toBe(false);
   });
 });
+
+describe('the card (D2 redesign)', () => {
+  const C = window.ObsCard;
+  const ctx = { cid: 'c1', quoted: { 's1|o1': [1] }, hasTerms: true, sameCapture: {}, studentsById: {} };
+  const ob = {
+    id: 'o1',
+    studentId: 's1',
+    text: 'Explained the method',
+    sentiment: 'growth',
+    context: 'independent',
+    dims: ['engagement'],
+    created: '2026-10-16T19:00:00.000Z',
+  };
+
+  it('leads with a solid type block, or an empty outline when untyped', () => {
+    expect(C.typeBlockHtml('growth')).toBe('<span class="obs-type" data-sentiment="growth">Growth</span>');
+    expect(C.typeBlockHtml(null)).toContain('obs-type-none');
+  });
+
+  it('shows the time only; the day header carries the date', () => {
+    const html = C.html(ob, ctx);
+    expect(html).toContain('<span class="obs-card-time">' + C.cardTime(ob) + '</span>');
+    expect(C.cardTime(ob)).not.toMatch(/Oct/);
+    expect(C.html(ob, ctx, { when: 'date' })).toMatch(/obs-card-time">[^<]*Oct 16 · /);
+  });
+
+  it('puts context, tags and the quoted stamp on the meta line, with no pills', () => {
+    const html = C.html(ob, ctx);
+    expect(html).toContain('<span class="obs-card-context">Independent</span>');
+    expect(html).toContain('obs-card-dim');
+    expect(html).toContain('<span class="obs-card-quoted">Quoted in Report 1</span>');
+    expect(html).not.toContain('obs-pill');
+  });
+
+  it('counts the day in its header', () => {
+    expect(C.dayHeaderHtml('Today', 1)).toContain('1 observation<');
+    expect(C.dayHeaderHtml('Friday, Oct 16', 3)).toContain('3 observations');
+  });
+});

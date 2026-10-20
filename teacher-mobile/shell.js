@@ -685,6 +685,10 @@
       if (action === 'm-obs-delete') {
         var obId = target.getAttribute('data-obid');
         var obSid = target.getAttribute('data-sid');
+        if (target.closest('.m-sheet')) {
+          MC.dismissSheet();
+          MObserve.resetSheetState();
+        }
         if (obId && obSid) MObserve.holdDelete(_cid, obSid, obId);
         return;
       }

@@ -2,8 +2,9 @@ import { test, expect } from '@playwright/test';
 import { mockAuth, seedCourse, seedStudents, gotoApp, TEST_COURSE } from './helpers.js';
 
 /* Observations page: Enter sends, Shift+Enter adds a line, delete offers
-   Undo for six seconds, and the feed is a card list with a sticky-note
-   toggle. docs/DECISIONS.md, "Observations (2026-10-18)". */
+   Undo for six seconds, and the feed is one card list (the sticky-note
+   view went in the 2026-10-19 card redesign). docs/DECISIONS.md,
+   "Observations". */
 
 async function pickStudent(page, name) {
   await page.locator('#student-btn').click();
@@ -98,17 +99,33 @@ test.describe('Observations — keyboard, undo and views', () => {
     await expect(page.locator('#filter-student-btn')).toContainText('Bob');
   });
 
-  test('card list by default; the sticky-note view is remembered', async ({ page }) => {
-    await expect(page.locator('#obs-feed')).toHaveClass(/view-list/);
-    const toggle = page.getByRole('button', { name: 'Sticky notes' });
-    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  test('one card list with no sticky-note view; the day header counts its notes', async ({ page }) => {
+    await expect(page.getByRole('button', { name: 'Sticky notes' })).toHaveCount(0);
+    await pickStudent(page, 'Alice');
+    await page.locator('#capture-input').fill('Measured the beaker twice');
+    await page.keyboard.press('Enter');
+    await page.locator('#capture-input').fill('Labelled every sample');
+    await page.keyboard.press('Enter');
+    const day = page.locator('.obs-feed-date-group').first();
+    await expect(day.locator('.obs-feed-date-label')).toContainText('Today');
+    await expect(day.locator('.obs-feed-date-count')).toHaveText('2 observations');
+    // Time only on the card; the header carries the date.
+    await expect(day.locator('.obs-card-time').first()).not.toContainText(',');
+  });
 
-    await toggle.click();
-    await expect(page.locator('#obs-feed')).toHaveClass(/view-sticky/);
-    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
-
-    await page.reload();
-    await page.waitForSelector('#obs-feed');
-    await expect(page.locator('#obs-feed')).toHaveClass(/view-sticky/);
+  test('a card shows its delete only on hover or focus', async ({ page }) => {
+    await pickStudent(page, 'Alice');
+    await page.locator('#capture-input').fill('Swept the bench');
+    await page.keyboard.press('Enter');
+    const card = page.locator('.obs-card', { hasText: 'Swept the bench' });
+    const del = card.locator('.obs-card-delete');
+    await page.mouse.move(0, 0);
+    await expect(del).toHaveCSS('opacity', '0');
+    await card.hover();
+    await expect(del).toHaveCSS('opacity', '1');
+    await page.mouse.move(0, 0);
+    await expect(del).toHaveCSS('opacity', '0');
+    await card.focus();
+    await expect(del).toHaveCSS('opacity', '1');
   });
 });

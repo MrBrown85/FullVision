@@ -345,7 +345,7 @@ window.StudentEvidence = (function () {
     }
     var ctx = ObsCard.context(_cid, { hidden: _pending });
     function card(o) {
-      return ObsCard.html(o, ctx, { showStudent: false, action: null });
+      return ObsCard.html(o, ctx, { showStudent: false, action: null, when: 'date' });
     }
     if (_tab !== 'competency') return list.map(card).join('');
     return groupByCompetency(list, ObsCapture.competencyItems(_cid), function (id) {

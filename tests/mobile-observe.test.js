@@ -568,7 +568,7 @@ describe('MObserve feed pills and Undo', () => {
   it('renders type, context and tags as text with no emoji', () => {
     mockDataLayer({ getAllQuickObs: () => [ob] });
     const html = MObserve.renderFeed(CID);
-    expect(html).toContain('m-obs-type-pill');
+    expect(html).toContain('<span class="m-obs-type" data-sentiment="strength">Strength</span>');
     expect(html).toContain('Small group');
     expect(html).toContain('Collaboration');
     expect(html).not.toMatch(/\p{Extended_Pictographic}/u);

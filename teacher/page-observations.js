@@ -27,11 +27,6 @@ window.PageObservations = (function () {
   var _searchDebounce = null;
   var _alive = false;
 
-  /* Card list by default; the sticky-note grid is a toggle remembered per
-     device. */
-  var VIEW_KEY = 'fv-obs-view';
-  var _viewMode = 'list';
-
   /* Deleted observations stay in the data layer until their Undo toast
      closes; until then the feed hides them. obId → { cid, sid }. */
   var _pendingDeletes = {};
@@ -129,14 +124,6 @@ window.PageObservations = (function () {
     searchQuery = '';
   }
 
-  function loadViewMode() {
-    try {
-      return localStorage.getItem(VIEW_KEY) === 'sticky' ? 'sticky' : 'list';
-    } catch (e) {
-      return 'list';
-    }
-  }
-
   /* ── Course switch ──────────────────────────────────────── */
   async function switchCourse(cid) {
     activeCourse = cid;
@@ -206,11 +193,6 @@ window.PageObservations = (function () {
       '<span class="obs-toolbar-count" id="obs-count">' +
       countText(filtered.length, allObs.length) +
       '</span>' +
-      '<button type="button" class="obs-view-toggle' +
-      (_viewMode === 'sticky' ? ' active' : '') +
-      '" id="obs-view-toggle" data-action="toggleView" aria-pressed="' +
-      (_viewMode === 'sticky') +
-      '">Sticky notes</button>' +
       '</div>';
 
     // Filter chips, one row
@@ -220,7 +202,7 @@ window.PageObservations = (function () {
       '</div>';
 
     // Feed
-    h += '<div class="' + feedClass() + '" id="obs-feed">' + renderFeedHtml(filtered) + '</div>';
+    h += '<div class="obs-feed" id="obs-feed">' + renderFeedHtml(filtered) + '</div>';
 
     document.getElementById('main').innerHTML = h;
     if (_capture) _capture.mount(document.getElementById('obs-capture-host'));
@@ -453,10 +435,6 @@ window.PageObservations = (function () {
     return total + ' observation' + (total === 1 ? '' : 's');
   }
 
-  function feedClass() {
-    return 'obs-feed ' + (_viewMode === 'sticky' ? 'view-sticky' : 'view-list');
-  }
-
   function refreshFeedAndCount() {
     var allObs = visibleObs(getAllQuickObs(activeCourse));
     var filtered = applyFilters(allObs);
@@ -670,7 +648,7 @@ window.PageObservations = (function () {
                   month: 'short',
                   day: 'numeric',
                 });
-        out += '<div class="obs-feed-date-group"><div class="obs-feed-date-label">' + lbl + '</div>';
+        out += '<div class="obs-feed-date-group">' + Card.dayHeaderHtml(lbl, groups[ds].length);
         groups[ds].forEach(function (ob) {
           out += renderObsCardHtml(ob, ctx);
         });
@@ -766,20 +744,6 @@ window.PageObservations = (function () {
   }
 
   /* ── Other actions ──────────────────────────────────────── */
-  function toggleView() {
-    _viewMode = _viewMode === 'sticky' ? 'list' : 'sticky';
-    try {
-      localStorage.setItem(VIEW_KEY, _viewMode);
-    } catch (e) {}
-    var feed = document.getElementById('obs-feed');
-    if (feed) feed.className = feedClass();
-    var btn = document.getElementById('obs-view-toggle');
-    if (btn) {
-      btn.classList.toggle('active', _viewMode === 'sticky');
-      btn.setAttribute('aria-pressed', String(_viewMode === 'sticky'));
-    }
-  }
-
   function clearAllFilters() {
     resetFilters();
     var searchEl = document.getElementById('obs-search-input');
@@ -1274,9 +1238,6 @@ window.PageObservations = (function () {
       openPopover: function () {
         openPopover(el.dataset.popover);
       },
-      toggleView: function () {
-        toggleView();
-      },
       setFilterOption: function () {
         setFilterOption(el.dataset.filter, el.dataset.value);
       },
@@ -1351,7 +1312,10 @@ window.PageObservations = (function () {
     setActiveCourse(activeCourse);
     resetFilters();
     _openPopover = null;
-    _viewMode = loadViewMode();
+    // The sticky-note view is gone (2026-10-19); drop its saved setting.
+    try {
+      localStorage.removeItem('fv-obs-view');
+    } catch (e) {}
     _alive = true;
 
     // Show sidebar

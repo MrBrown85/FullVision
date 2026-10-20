@@ -86,7 +86,7 @@ for (const colorScheme of ['light', 'dark']) {
     test('phone Observe', async ({ page }) => {
       await enterDemo(page, { phone: true });
       await page.locator('.m-tab-item[data-tab="observe"]').click();
-      await expect(page.locator('.m-obs-edit-btn').first()).toBeVisible();
+      await expect(page.locator('.m-obs-card').first()).toBeVisible();
       await expectReadable(page);
     });
   });
