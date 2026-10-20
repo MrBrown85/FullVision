@@ -496,6 +496,76 @@ window.ReportSheets = (function () {
     return e && e.hide ? e.hide.slice() : [];
   }
 
+  /* ── Drop slots ─────────────────────────────────────────────────
+     Every place a block can land, in reading order: before or after each
+     row (a new full-width row), left or right of a row with room for a
+     column, and a new page after the last. A slot is { page, row, side }
+     or { newPage: true }. */
+  function slotsFor(f) {
+    var out = [];
+    f.pages.forEach(function (pg, p) {
+      pg.rows.forEach(function (row, r) {
+        var locked = row.cells.length === 1 && row.cells[0].block === 'header';
+        var pinned = row.cells.length === 1 && row.cells[0].block === f.pinned;
+        if (!locked) out.push({ page: p, row: r, side: 'before' });
+        if (!locked && !pinned && row.cells.length < 3) {
+          out.push({ page: p, row: r, side: 'left' });
+          out.push({ page: p, row: r, side: 'right' });
+        }
+        if (!pinned) out.push({ page: p, row: r, side: 'after' });
+      });
+      if (!pg.rows.length) out.push({ page: p, row: 0, side: 'after' });
+    });
+    out.push({ newPage: true });
+    // One slot per distinct place: "after row 2" and "before row 3" are the same.
+    return out.filter(function (sl, i) {
+      if (sl.side !== 'before' || sl.row === 0) return true;
+      return !out.some(function (o) {
+        return o.page === sl.page && o.row === sl.row - 1 && o.side === 'after';
+      });
+    });
+  }
+  /* The form with the block at the slot. A block already on the form is
+     moved: the slot is read against the form as it is, then re-found after
+     the block comes out (its empty row would shift the rows below). */
+  function placeAt(f, id, slot) {
+    if (!slot || !BLOCKS[id] || id === 'header') return f;
+    if (slot.newPage) return placeOnNewPage(f, id);
+    var page = f.pages[slot.page];
+    var row = page && page.rows[slot.row];
+    if (!row) return placeBlock(f, id, slot);
+    var others = row.cells.filter(function (c) {
+      return c.block !== id;
+    });
+    if (!others.length) return f; // its own row, alone: nowhere to go
+    var anchor = others[0].block;
+    var without = removeCell(f, id);
+    var at = locate(without, anchor);
+    if (!at) return placeBlock(f, id, slot);
+    return placeBlock(without, id, { page: at.page, row: at.row, side: slot.side });
+  }
+  /* "page 1, row 3, left half" for the live region. */
+  function slotText(f, slot) {
+    if (!slot) return '';
+    if (slot.newPage) return 'a new page ' + (f.pages.length + 1);
+    var row = f.pages[slot.page] && f.pages[slot.page].rows[slot.row];
+    var n = slot.row + 1;
+    if (slot.side === 'before') return 'page ' + (slot.page + 1) + ', before row ' + n;
+    if (slot.side === 'after') return 'page ' + (slot.page + 1) + ', after row ' + n;
+    var width = row && row.cells.length === 1 ? 'half' : 'third';
+    return 'page ' + (slot.page + 1) + ', row ' + n + ', ' + slot.side + ' ' + width;
+  }
+  /* The spans a cell may take where it is: alone on a row only full;
+     with one neighbour full, two-thirds, half or third; with two, third. */
+  function spanChoices(f, id) {
+    var at = locate(f, id);
+    if (!at) return [];
+    var n = f.pages[at.page].rows[at.row].cells.length;
+    if (n === 1) return [12];
+    if (n === 2) return [12, 8, 6, 4];
+    return [4];
+  }
+
   /* ── Starters and the teacher's library ─────────────────────── */
   var STARTERS = [
     { id: 'report-card', name: 'Report Card', form: FORM_REPORT_CARD },
@@ -1037,12 +1107,23 @@ window.ReportSheets = (function () {
       label = label.replace(/ \(continued\)$/, '');
       if (list.indexOf(label) < 0) list.push(label);
     };
+    // Where each block landed (side index) and how full each side is, for
+    // the Studio's drop zones and fill bars.
+    var placement = {};
     sides.forEach(function (side, idx) {
       side.items.forEach(function (it) {
         var label = it.from === 'front' ? frontLabels[frontKeep[it.i]] : backLabels[backKeep[it.i]];
         if (idx === 1 && it.from === 'front') nameOnce(moved, label);
         if (idx >= 2) nameOnce(continued, label);
+        var row = it.from === 'front' ? frontRows[frontKeep[it.i]] : backRows[backKeep[it.i]];
+        (row ? row.cells : []).forEach(function (c) {
+          if (placement[c.block] == null) placement[c.block] = idx;
+        });
       });
+    });
+    if (pinnedHtml) placement[f.pinned] = 1;
+    var fills = sides.map(function (sd) {
+      return sd.cap ? Math.min(1, sd.used / sd.cap) : 0;
     });
     var course = COURSES[cid] || {};
     var teacher = (typeof getConfig === 'function' && getConfig().displayName) || '';
@@ -1061,6 +1142,8 @@ window.ReportSheets = (function () {
       commentLines: commentLines,
       room: room,
       noComment: !!commentCell && hidden.indexOf('teacher-narrative') < 0 && !rawComment,
+      placement: placement,
+      fills: fills,
     };
     var reason = reasonText(result);
     var badge =
@@ -1217,6 +1300,26 @@ window.ReportSheets = (function () {
     } finally {
       stage.remove();
     }
+  }
+
+  /* The drop zone's answer for one student: would the block, placed at the
+     slot, land on that page? { fits, landsOn (1-based page or null), left
+     (percent of that page still free), form (the candidate) }. */
+  function fitAt(cid, student, ctx, opts) {
+    var candidate = placeAt(normalizeForm(opts.form), opts.block, opts.slot);
+    var r = describeStudent(cid, student, ctx, { form: candidate, paper: opts.paper });
+    var target = opts.slot && opts.slot.newPage ? candidate.pages.length - 1 : opts.slot ? opts.slot.page : 0;
+    var landed = r.placement ? r.placement[opts.block] : null;
+    var fits = landed != null && landed === target && !r.over;
+    var left = landed != null ? Math.round((1 - (r.fills[landed] || 0)) * 100) : 0;
+    return { fits: fits, landsOn: landed != null ? landed + 1 : null, left: left, form: candidate };
+  }
+  /* "Drop here · fits (18% of page left)" / "Doesn't fit here · lands on page 2". */
+  function fitLabelFor(fit) {
+    if (!fit) return '';
+    if (fit.fits) return 'Drop here · fits (' + fit.left + '% of page left)';
+    if (fit.landsOn) return 'Doesn’t fit here · lands on page ' + fit.landsOn;
+    return 'Doesn’t fit here';
   }
 
   /* Sheets per student on each starter form, for the setup list: what a
@@ -1390,6 +1493,10 @@ window.ReportSheets = (function () {
     positionText: positionText,
     placeBlock: placeBlock,
     placeOnNewPage: placeOnNewPage,
+    slotsFor: slotsFor,
+    placeAt: placeAt,
+    slotText: slotText,
+    spanChoices: spanChoices,
     removeCell: removeCell,
     setSpan: setSpan,
     setHeight: setHeight,
@@ -1412,6 +1519,8 @@ window.ReportSheets = (function () {
     reasonText: reasonText,
     describeStudent: describeStudent,
     sheetsForForms: sheetsForForms,
+    fitAt: fitAt,
+    fitLabelFor: fitLabelFor,
     classSummary: classSummary,
     blockSizes: blockSizes,
     fitLabel: fitLabel,
