@@ -434,6 +434,48 @@ window.ReportSheets = (function () {
     return summary;
   }
 
+  /* Lays one student out without rendering, for the questionnaire's
+     comment box. The stage lives on <body>; .report-sheet carries its own
+     sizes, so the measurement matches the preview. */
+  function describeStudent(cid, student, ctx, opts) {
+    opts = opts || {};
+    var paper = PAPER[opts.paper] ? opts.paper : 'letter';
+    var contentW = (PAPER[paper].w - 2 * MARGIN_IN) * PX_PER_IN;
+    var stage = _stage(document.body, contentW);
+    try {
+      var probe = _probe(stage);
+      var r = layoutStudent(cid, student, ctx, { form: opts.form, paper: paper, stage: stage, probe: probe });
+      delete r.html;
+      return r;
+    } finally {
+      stage.remove();
+    }
+  }
+
+  /* What the comment box tells the teacher while they write. Never a cap:
+     the form never shrinks a student's words. */
+  function fitText(r) {
+    if (!r || !r.room) return '';
+    if (r.noComment)
+      return 'No comment yet. The form keeps ' + r.room + ' lines on the front; an empty box prints with lines.';
+    var lines = r.commentLines;
+    if (lines <= r.room) {
+      var left = r.room - lines;
+      return (
+        'Fits the front. ' +
+        lines +
+        (lines === 1 ? ' line' : ' lines') +
+        (left ? '; room for ' + left + ' more before anything moves.' : '; the front is full.')
+      );
+    }
+    var t = lines + ' lines, ' + (lines - r.room) + ' past the front\u2019s room.';
+    if (r.moved && r.moved.length)
+      t += ' ' + r.moved.join(' and ') + (r.moved.length === 1 ? ' moves' : ' move') + ' to the back.';
+    if (r.continued && r.continued.length) t += ' ' + r.continued.join(' and ') + ' on a second sheet.';
+    t += ' Nothing is cut.';
+    return t;
+  }
+
   /* The rail's one-line account of the class. */
   function summaryText(s) {
     if (!s || !s.students) return '';
@@ -454,6 +496,8 @@ window.ReportSheets = (function () {
     form: form,
     pack: pack,
     reasonText: reasonText,
+    describeStudent: describeStudent,
+    fitText: fitText,
     paperSize: paperSize,
     layoutStudent: layoutStudent,
     renderPreview: renderPreview,

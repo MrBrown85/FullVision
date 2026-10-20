@@ -326,6 +326,7 @@ window.PageReports = (function () {
     if (activeTab === 'questionnaire') {
       output.innerHTML = renderTermQuestionnaire(cid);
       _syncLongFormAuthContext();
+      updateCommentFit();
       // Highlight active student in sidebar
       const students = getTqStudents();
       const activeSid = students[RQ.tqStudentIndex]?.id;
@@ -598,6 +599,12 @@ window.PageReports = (function () {
       toggleFitMap: function () {
         toggleFitMap();
       },
+      tqSeePage: function () {
+        tqSaveCurrentIfNeeded();
+        selectedStudentIds = [el.dataset.sid];
+        populateStudentSelect();
+        switchTab('progress');
+      },
       fitMapPick: function () {
         // A thumbnail opens that student's pages. Outside the Fit Map the
         // sheets are ordinary content and a click means nothing.
@@ -675,7 +682,37 @@ window.PageReports = (function () {
 
   // The CSP blocks inline on* attributes, so the narrative's dirty flag is set here.
   function _handleNarrativeInput(e) {
-    if (e.target && e.target.id === 'tq-narrative') RQ.tqNarrativeDirty = true;
+    if (e.target && e.target.id === 'tq-narrative') {
+      RQ.tqNarrativeDirty = true;
+      clearTimeout(_fitTimer);
+      _fitTimer = setTimeout(updateCommentFit, 250);
+    }
+  }
+
+  /* ── The comment box knows the form's room ─────────────────────
+     Under the questionnaire's editor: how the draft sits on the Report
+     Card's front, what it pushes, and a button to the student's pages. */
+  var _fitTimer = null;
+  function updateCommentFit() {
+    var line = document.getElementById('tq-fit');
+    var text = document.getElementById('tq-fit-text');
+    if (!line || !text) return;
+    if (!ReportBuilderUI.usesSheets(reportConfig) || typeof ReportSheets === 'undefined') {
+      line.hidden = true;
+      return;
+    }
+    var student = getTqStudents()[RQ.tqStudentIndex];
+    var editor = document.getElementById('tq-narrative');
+    if (!student || !editor) {
+      line.hidden = true;
+      return;
+    }
+    var ctx = ReportBlocks.reportContext();
+    ctx.narrativeOverride = editor.innerHTML;
+    var r = ReportSheets.describeStudent(activeCourse, student, ctx, { paper: reportPaper });
+    text.textContent = ReportSheets.fitText(r);
+    line.classList.toggle('over', r.commentLines > r.room);
+    line.hidden = !text.textContent;
   }
 
   function _handleKeyup(e) {
@@ -819,6 +856,7 @@ window.PageReports = (function () {
     _listeners = [];
 
     window.removeEventListener('resize', _handleResize);
+    clearTimeout(_fitTimer);
     if (_beforeUnloadHandler) {
       window.removeEventListener('beforeunload', _beforeUnloadHandler);
       _beforeUnloadHandler = null;
