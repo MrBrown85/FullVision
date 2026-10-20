@@ -886,6 +886,10 @@ body.fv-switching-course::after {
 .m-obs-type[data-sentiment='concern'] {
   background: var(--score-2);
 }
+.m-obs-type[data-sentiment='note'] {
+  background: var(--obs-note);
+  color: var(--obs-note-on);
+}
 .m-obs-type-none {
   border: 1px dashed var(--border-2);
 }
@@ -1016,6 +1020,10 @@ body.fv-switching-course::after {
 .m-obs-type-pill[data-sentiment='concern'] {
   color: var(--score-2);
   background: color-mix(in srgb, var(--score-2) 14%, transparent);
+}
+.m-obs-type-pill[data-sentiment='note'] {
+  color: var(--obs-note-text);
+  background: color-mix(in srgb, var(--obs-note) 22%, transparent);
 }
 .m-obs-student-fixed {
   padding: 8px 12px;
@@ -3338,6 +3346,11 @@ body.fv-switching-course::after {
   border-color: var(--score-2);
   background: color-mix(in srgb, var(--score-2) 14%, transparent);
   color: var(--score-2);
+}
+.m-sweep-type.m-selected[data-sentiment='note'] {
+  border-color: var(--obs-note-edge);
+  background: color-mix(in srgb, var(--obs-note) 22%, transparent);
+  color: var(--obs-note-text);
 }
 .m-sweep-starter {
   min-height: 48px;

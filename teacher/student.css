@@ -565,6 +565,18 @@
 .ev-tl-key[data-type='concern'] {
   --ev-mark: var(--score-2);
 }
+.ev-tl-mark[data-type='note'],
+.ev-tl-key[data-type='note'] {
+  --ev-mark: var(--obs-note);
+}
+.ev-tl-key[data-type='note']::before {
+  box-shadow: inset 0 0 0 1px var(--obs-note-edge);
+}
+.ev-tl-mark[data-type='note']::before {
+  box-shadow:
+    inset 0 0 0 1px var(--obs-note-edge),
+    0 0 0 2px var(--surface);
+}
 .ev-tl-tip {
   position: absolute;
   z-index: var(--z-fab);
@@ -1425,6 +1437,12 @@ button.ced-obs-row {
 }
 .ced-obs-row[data-sentiment='concern'] {
   --ced-mark: var(--score-2);
+}
+.ced-obs-row[data-sentiment='note'] {
+  --ced-mark: var(--obs-note);
+}
+.ced-obs-row[data-sentiment='note'] .ced-obs-mark {
+  box-shadow: inset 0 0 0 1px var(--obs-note-edge);
 }
 .ced-obs-main {
   display: flex;

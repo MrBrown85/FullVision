@@ -2721,6 +2721,36 @@ function seedIfNeeded() {
           sentiment: 'strength',
           context: 'whole-class',
         },
+        // Notes: neutral records, neither a strength nor a concern.
+        {
+          sid: 'st2',
+          date: '2026-03-04',
+          text: 'Noor was away for the density lab; she will make it up at lunch on Thursday.',
+          sentiment: 'note',
+          context: null,
+        },
+        {
+          sid: 'st3',
+          date: '2026-03-12',
+          text: 'Sam moved to the front table this week, which suits them better for the board demos.',
+          sentiment: 'note',
+          context: 'whole-class',
+        },
+        {
+          sid: 'st6',
+          date: '2026-03-17',
+          text: 'Checked in with Ethan\u2019s family about the field trip form; it comes back Monday.',
+          sentiment: 'note',
+          context: null,
+        },
+        {
+          sid: 'st1',
+          date: '2026-03-20',
+          text: 'Cece is borrowing the class microscope over spring break for her science fair project.',
+          dims: ['curiosity'],
+          sentiment: 'note',
+          context: 'independent',
+        },
       ]),
     );
 

@@ -89,6 +89,23 @@ describe('DashObservations week marks', () => {
   it('counts an unknown sentiment as untyped', () => {
     expect(D().obType({ sentiment: 'mixed' })).toBe('none');
     expect(D().obType({ sentiment: 'growth' })).toBe('growth');
+    expect(D().obType({ sentiment: 'note' })).toBe('note');
+  });
+
+  it('shows a Note after the three judgement types, before an untyped note', () => {
+    const obs = [
+      ...Array.from({ length: 4 }, (_, i) => ob('2026-10-1' + i, 'strength')),
+      ob('2026-10-09', 'note'),
+      ob('2026-10-08', null),
+    ];
+    expect(D().weekMarks(obs).marks.sort()).toEqual(['none', 'note', 'strength']);
+    const all = [
+      ob('2026-10-16', null),
+      ob('2026-10-15', 'note'),
+      ob('2026-10-14', 'concern'),
+      ob('2026-10-13', 'growth'),
+    ];
+    expect(D().weekMarks(all).marks).toEqual(['note', 'concern', 'growth']);
   });
 });
 
@@ -97,6 +114,11 @@ describe('DashObservations no strength recorded', () => {
     expect(D().noStrength([])).toBe(false);
     expect(D().noStrength([ob('2026-10-12', 'growth'), ob('2026-10-13', null)])).toBe(true);
     expect(D().noStrength([ob('2026-10-12', 'growth'), ob('2026-10-13', 'strength')])).toBe(false);
+  });
+
+  it('never counts a Note as a strength', () => {
+    expect(D().noStrength([ob('2026-10-12', 'note'), ob('2026-10-13', 'note')])).toBe(true);
+    expect(D().noStrength([ob('2026-10-12', 'note'), ob('2026-10-13', 'strength')])).toBe(false);
   });
 });
 

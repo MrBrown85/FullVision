@@ -141,7 +141,7 @@ window.ObsCard = (function () {
 
   /* ── Editor pieces (the edit window and the capture strip) ── */
 
-  /* The folder band: the three types as tabs, the chosen one filled, and
+  /* The folder band: the four types as tabs, the chosen one filled, and
      a note at the right. Clicking the chosen tab again clears it.
      opts: value, action (data-action on each tab), right (text),
            tabAttrs(key) (extra attributes per tab, replacing action). */

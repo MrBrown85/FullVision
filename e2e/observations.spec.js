@@ -41,10 +41,10 @@ test.describe('Observations — Quick Capture', () => {
     expect(hasStudents || hasSelector).toBeTruthy();
   });
 
-  test('type filter offers strength, growth and concern', async ({ page }) => {
+  test('type filter offers Strength, Growth, Concern and Note', async ({ page }) => {
     await page.getByRole('button', { name: 'Type' }).click();
     const options = page.locator('#filter-type-dropdown [role="option"]');
-    await expect(options).toHaveText(['Strength', 'Growth', 'Concern']);
+    await expect(options).toHaveText(['Strength', 'Growth', 'Concern', 'Note']);
   });
 
   test('observation list shows empty state initially', async ({ page }) => {

@@ -311,7 +311,7 @@ create table observation (
   id            uuid        not null primary key,
   course_id     uuid        not null references course(id) on delete cascade,
   body          text        not null,
-  sentiment     text,                                                -- positive | neutral | concern
+  sentiment     text        check (sentiment is null or sentiment in ('strength','growth','concern','note')),
   context_type  text,                                                -- assessment | general | interaction …
   assessment_id uuid                references assessment(id) on delete set null,
   dims          text[]      not null default '{}',                 -- tag keys: 'engagement', 'cc:<id>', 'tag:<label>'
@@ -349,7 +349,7 @@ create table observation_template (
   id                    uuid        not null primary key,
   course_id             uuid        not null references course(id) on delete cascade,
   body                  text        not null,
-  default_sentiment     text,
+  default_sentiment     text        check (default_sentiment is null or default_sentiment in ('strength','growth','concern','note')),
   default_context_type  text,
   default_dims          text[]      not null default '{}',           -- tag keys the starter adds, as observation.dims
   is_seed               boolean     not null default false,         -- seeds are immutable

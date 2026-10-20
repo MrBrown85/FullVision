@@ -11,7 +11,7 @@
    + Starter, Tags (+ Add Tag: dispositions, Core Competencies, custom
    tags), the Context menu, + Link (an assessment, or one learning-map
    competency with an optional Level), Keep Tags and Add.
-   Shorthand in the box: @name, #tag, !strength|growth|concern, /starter.
+   Shorthand in the box: @name, #tag, !strength|growth|concern|note, /starter.
    Enter sends, Shift+Enter adds a line.
 
    Starters are the class's sentence starters (getObservationTemplates).
@@ -23,7 +23,7 @@
 window.ObsCapture = (function () {
   'use strict';
 
-  var TYPE_KEYS = ['strength', 'growth', 'concern'];
+  var TYPE_KEYS = ['strength', 'growth', 'concern', 'note'];
   var KEEP_TAGS_KEY = 'fv-obs-keep-tags';
 
   /* Unsent text per host and course, kept for the session so a route change

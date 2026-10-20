@@ -623,6 +623,9 @@ const OBS_SENTIMENTS = {
   strength: { label: 'Strength', color: 'var(--score-3)', tint: 'rgba(46,125,50,0.08)', border: '#2e7d32' },
   growth: { label: 'Growth', color: 'var(--active)', tint: 'rgba(0,122,255,0.08)', border: '#007AFF' },
   concern: { label: 'Concern', color: 'var(--score-2)', tint: 'rgba(192,122,0,0.08)', border: '#c07a00' },
+  // A neutral note: never counted as a strength. Yellow, with dark text on
+  // the solid block (white on yellow fails contrast).
+  note: { label: 'Note', color: 'var(--obs-note)', tint: 'rgba(242,194,0,0.14)', border: '#f2c200' },
 };
 
 const OBS_CONTEXTS = {

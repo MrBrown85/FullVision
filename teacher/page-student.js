@@ -1041,7 +1041,7 @@ window.PageStudent = (function () {
     if (gpObs.length > 0) {
       html +=
         '<div class="gp-obs-stat">' +
-        ['strength', 'growth', 'concern']
+        Object.keys(OBS_SENTIMENTS)
           .map(function (key) {
             var n = gpObs.filter(function (o) {
               return o.sentiment === key;
