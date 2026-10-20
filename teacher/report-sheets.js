@@ -48,8 +48,248 @@ window.ReportSheets = (function () {
     ],
   };
 
+  /* The Report Card, made whole (labels, kinds and the letterhead's lock
+     come from the registry below). */
   function form() {
-    return FORM_REPORT_CARD;
+    return normalizeForm(FORM_REPORT_CARD);
+  }
+
+  /* Every block a form can hold. Labels and kinds live here, not in the
+     saved form, so a label can change without touching saved layouts. */
+  var BLOCKS = {
+    header: { label: 'Letterhead', kind: 'fixed', locked: true },
+    'academic-summary': { label: 'Overall and Competencies', kind: 'fixed' },
+    'teacher-narrative': { label: 'Teacher Comment', kind: 'flow', room: 8, whenEmpty: 'box' },
+    'competency-table': { label: 'Curricular Competencies', kind: 'fixed' },
+    attendance: { label: 'Attendance', kind: 'fixed' },
+    'next-steps': { label: 'Growth and Next Steps', kind: 'flow', whenEmpty: 'omit' },
+    'learner-dimensions': { label: 'Learning Dispositions', kind: 'fixed' },
+    'parent-response': { label: 'Parent / Guardian Response', kind: 'fixed', pinnable: true },
+    'student-reflection-learning': { label: 'Student Reflection: My Learning', kind: 'fixed' },
+    'student-reflection-habits': { label: 'Student Reflection: My Habits', kind: 'fixed' },
+    'section-chart': { label: 'Section Proficiency Chart', kind: 'flow' },
+    'grade-table': { label: 'Assignment Grades', kind: 'flow' },
+    'section-outcomes': { label: 'Learning Outcomes', kind: 'flow' },
+    'score-distribution': { label: 'Score Distribution', kind: 'flow' },
+    'core-competencies': { label: 'Core Competencies', kind: 'flow' },
+    observations: { label: 'Observations and Evidence', kind: 'flow' },
+    legend: { label: 'Proficiency Legend', kind: 'fixed' },
+  };
+  var BLOCK_ORDER = Object.keys(BLOCKS);
+
+  function _fill(item) {
+    if (!item || typeof item !== 'object') return null;
+    if (Array.isArray(item.pair)) {
+      var cells = item.pair.map(_fill).filter(function (q) {
+        return q && q.kind === 'fixed';
+      });
+      if (cells.length === 2) return { pair: cells };
+      return cells[0] || null;
+    }
+    var def = BLOCKS[item.block];
+    if (!def) return null;
+    var out = { block: item.block, kind: def.kind, label: def.label };
+    if (def.locked) out.locked = true;
+    if (def.kind === 'flow') {
+      var lines = Number(item.room && item.room.lines);
+      if (def.room || lines) out.room = { lines: lines >= 1 && lines <= 20 ? Math.round(lines) : def.room || 0 };
+      if (!out.room || !out.room.lines) delete out.room;
+      out.whenEmpty = item.whenEmpty === 'box' || item.whenEmpty === 'omit' ? item.whenEmpty : def.whenEmpty || 'omit';
+    }
+    if (item.pinned && def.pinnable) out.pinned = 'bottom';
+    return out;
+  }
+
+  /* A saved form (any version, any hand) made whole: known blocks only,
+     the letterhead first on the front, at most one block pinned to the
+     bottom of the back, no block twice. Absent → the Report Card. */
+  function normalizeForm(raw) {
+    var base =
+      raw && typeof raw === 'object' && (Array.isArray(raw.front) || Array.isArray(raw.back)) ? raw : FORM_REPORT_CARD;
+    var seen = {};
+    var keep = function (it) {
+      if (!it) return false;
+      var ids = it.pair
+        ? it.pair.map(function (q) {
+            return q.block;
+          })
+        : [it.block];
+      if (
+        ids.some(function (id) {
+          return seen[id];
+        })
+      )
+        return false;
+      ids.forEach(function (id) {
+        seen[id] = true;
+      });
+      return true;
+    };
+    var front = (base.front || []).map(_fill).filter(keep);
+    var back = (base.back || []).map(_fill).filter(keep);
+    // The letterhead leads the front.
+    var all = front.concat(back);
+    var hasHeader = all.some(function (it) {
+      return it.block === 'header';
+    });
+    front = front.filter(function (it) {
+      return it.block !== 'header';
+    });
+    back = back.filter(function (it) {
+      return it.block !== 'header';
+    });
+    front.unshift(_fill({ block: 'header' }));
+    if (!hasHeader) seen.header = true;
+    // One pinned block, on the back, last.
+    var pinned = null;
+    var unpin = function (list) {
+      return list.filter(function (it) {
+        if (it.pinned && !pinned) {
+          pinned = it;
+          return false;
+        }
+        if (it.pinned) delete it.pinned;
+        return true;
+      });
+    };
+    front = unpin(front);
+    back = unpin(back);
+    if (pinned) back.push(pinned);
+    return {
+      v: 3,
+      id: base.id || 'report-card',
+      name: base.name || 'Report Card',
+      type: base.type === 'compact' ? 'compact' : 'standard',
+      front: front,
+      back: back,
+    };
+  }
+
+  /* The class's form from its report config, the Report Card by default. */
+  function formFor(reportConfig) {
+    return normalizeForm(reportConfig && reportConfig.form);
+  }
+
+  /* ── Editing (pure: each returns a new form) ─────────────────── */
+  function _clone(f) {
+    return JSON.parse(JSON.stringify(f));
+  }
+  function _list(f, side) {
+    return side === 'back' ? f.back : f.front;
+  }
+  function moveItem(f, side, idx, dir) {
+    f = _clone(f);
+    var list = _list(f, side);
+    var j = idx + dir;
+    if (idx < 0 || idx >= list.length || j < 0 || j >= list.length) return f;
+    if (list[idx].locked || list[j].locked) return f;
+    if (list[idx].pinned || list[j].pinned) return f;
+    var t = list[idx];
+    list[idx] = list[j];
+    list[j] = t;
+    return f;
+  }
+  function moveToSide(f, side, idx) {
+    f = _clone(f);
+    var from = _list(f, side);
+    var it = from[idx];
+    if (!it || it.locked || it.pinned) return f;
+    from.splice(idx, 1);
+    var to = _list(f, side === 'back' ? 'front' : 'back');
+    var pinnedAt = to.findIndex(function (q) {
+      return q.pinned;
+    });
+    if (pinnedAt >= 0) to.splice(pinnedAt, 0, it);
+    else to.push(it);
+    return f;
+  }
+  function removeItem(f, side, idx) {
+    f = _clone(f);
+    var list = _list(f, side);
+    if (!list[idx] || list[idx].locked) return f;
+    list.splice(idx, 1);
+    return f;
+  }
+  function addBlock(f, id, side) {
+    if (!BLOCKS[id] || onForm(f).indexOf(id) >= 0) return f;
+    f = _clone(f);
+    var to = _list(f, side === 'back' ? 'back' : 'front');
+    var it = _fill({ block: id });
+    var pinnedAt = to.findIndex(function (q) {
+      return q.pinned;
+    });
+    if (pinnedAt >= 0) to.splice(pinnedAt, 0, it);
+    else to.push(it);
+    return f;
+  }
+  function setRoom(f, lines) {
+    f = _clone(f);
+    f.front.concat(f.back).forEach(function (it) {
+      if (it.block === 'teacher-narrative')
+        it.room = { lines: Math.max(1, Math.min(20, Math.round(Number(lines) || 8))) };
+    });
+    return f;
+  }
+  function setWhenEmpty(f, id, whenEmpty) {
+    f = _clone(f);
+    f.front.concat(f.back).forEach(function (it) {
+      if (it.block === id && it.kind === 'flow') it.whenEmpty = whenEmpty === 'box' ? 'box' : 'omit';
+    });
+    return f;
+  }
+  function setPinned(f, id, on) {
+    f = _clone(f);
+    var item = null;
+    var fromFront = -1;
+    f.front.forEach(function (it, i) {
+      if (it.block === id) {
+        item = it;
+        fromFront = i;
+      }
+    });
+    f.back.forEach(function (it) {
+      if (it.block === id) item = it;
+    });
+    if (!item || !BLOCKS[id] || !BLOCKS[id].pinnable) return f;
+    f.front.concat(f.back).forEach(function (it) {
+      delete it.pinned;
+    });
+    if (on) {
+      if (fromFront >= 0) {
+        f.front.splice(fromFront, 1);
+        f.back.push(item);
+      } else {
+        f.back = f.back.filter(function (it) {
+          return it !== item;
+        });
+        f.back.push(item);
+      }
+      item.pinned = 'bottom';
+    }
+    return normalizeForm(f);
+  }
+  function setType(f, type) {
+    f = _clone(f);
+    f.type = type === 'compact' ? 'compact' : 'standard';
+    return f;
+  }
+  /* Ids on the form, in order. */
+  function onForm(f) {
+    var ids = [];
+    f.front.concat(f.back).forEach(function (it) {
+      if (it.pair)
+        it.pair.forEach(function (q) {
+          ids.push(q.block);
+        });
+      else ids.push(it.block);
+    });
+    return ids;
+  }
+  function available(f) {
+    var on = onForm(f);
+    return BLOCK_ORDER.filter(function (id) {
+      return on.indexOf(id) < 0;
+    });
   }
 
   function paperSize(paper) {
@@ -142,9 +382,9 @@ window.ReportSheets = (function () {
   }
 
   /* ── Measuring ──────────────────────────────────────────────── */
-  function _stage(host, contentW) {
+  function _stage(host, contentW, type) {
     var st = document.createElement('div');
-    st.className = 'report-sheet report-sheet-measure';
+    st.className = 'report-sheet report-sheet-measure' + (type === 'compact' ? ' compact' : '');
     st.setAttribute('aria-hidden', 'true');
     st.style.cssText =
       'position:absolute;left:-10000px;top:0;width:' +
@@ -182,7 +422,7 @@ window.ReportSheets = (function () {
     return '<div class="sheet-footer"><span>' + left + '</span><span>' + right + '</span></div>';
   }
 
-  function _sideHtml(side, itemHtml, pinnedHtml, footer, paper, extraClass) {
+  function _sideHtml(side, itemHtml, pinnedHtml, footer, paper, extraClass, opts) {
     var body = side
       ? side.items
           .map(function (it) {
@@ -194,6 +434,7 @@ window.ReportSheets = (function () {
       '<div class="report-sheet' +
       (side && side.over ? ' sheet-overflow' : '') +
       (extraClass ? ' ' + extraClass : '') +
+      (opts && opts.type === 'compact' ? ' compact' : '') +
       '" data-paper="' +
       paper +
       '">' +
@@ -343,6 +584,8 @@ window.ReportSheets = (function () {
           '',
           _footerHtml(course.name, ctx.termLabel, teacher, name, s + 1, sheetCount, s === 0 ? 'Front' : 'Continued'),
           paper,
+          '',
+          f,
         ) +
         '</div>';
       html +=
@@ -360,6 +603,7 @@ window.ReportSheets = (function () {
           _footerHtml(course.name, ctx.termLabel, teacher, name, s + 1, sheetCount, 'Back'),
           paper,
           back ? '' : 'sheet-blank-side',
+          f,
         ) +
         '</div>';
     }
@@ -403,7 +647,8 @@ window.ReportSheets = (function () {
     var paper = PAPER[opts.paper] ? opts.paper : 'letter';
     var p = PAPER[paper];
     var contentW = (p.w - 2 * MARGIN_IN) * PX_PER_IN;
-    var stage = _stage(preview, contentW);
+    var formUsed = normalizeForm(opts.form);
+    var stage = _stage(preview, contentW, formUsed.type);
     var probe = _probe(stage);
     var summary = {
       students: opts.students.length,
@@ -416,7 +661,7 @@ window.ReportSheets = (function () {
     };
     var html = opts.students
       .map(function (st) {
-        var r = layoutStudent(opts.cid, st, opts.ctx, { form: opts.form, paper: paper, stage: stage, probe: probe });
+        var r = layoutStudent(opts.cid, st, opts.ctx, { form: formUsed, paper: paper, stage: stage, probe: probe });
         summary.sheets += r.sheets;
         summary.pages += r.sheets * 2;
         if (r.sheets > 1) summary.continued.push(fullName(st));
@@ -448,10 +693,11 @@ window.ReportSheets = (function () {
     opts = opts || {};
     var paper = PAPER[opts.paper] ? opts.paper : 'letter';
     var contentW = (PAPER[paper].w - 2 * MARGIN_IN) * PX_PER_IN;
-    var stage = _stage(document.body, contentW);
+    var formUsed = normalizeForm(opts.form);
+    var stage = _stage(document.body, contentW, formUsed.type);
     try {
       var probe = _probe(stage);
-      var r = layoutStudent(cid, student, ctx, { form: opts.form, paper: paper, stage: stage, probe: probe });
+      var r = layoutStudent(cid, student, ctx, { form: formUsed, paper: paper, stage: stage, probe: probe });
       delete r.html;
       return r;
     } finally {
@@ -501,6 +747,19 @@ window.ReportSheets = (function () {
     PAPER: PAPER,
     SAFETY: SAFETY,
     form: form,
+    BLOCKS: BLOCKS,
+    normalizeForm: normalizeForm,
+    formFor: formFor,
+    moveItem: moveItem,
+    moveToSide: moveToSide,
+    removeItem: removeItem,
+    addBlock: addBlock,
+    setRoom: setRoom,
+    setWhenEmpty: setWhenEmpty,
+    setPinned: setPinned,
+    setType: setType,
+    onForm: onForm,
+    available: available,
     pack: pack,
     reasonText: reasonText,
     describeStudent: describeStudent,

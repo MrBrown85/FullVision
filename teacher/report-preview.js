@@ -119,6 +119,7 @@ window.ReportPreview = (function () {
         ctx: ReportBlocks.reportContext(),
         preview: preview,
         paper: opts.paper || 'letter',
+        form: ReportSheets.formFor(reportConfig),
       });
       var line = document.getElementById('rb-form-summary');
       if (line) line.textContent = ReportSheets.summaryText(summary);
