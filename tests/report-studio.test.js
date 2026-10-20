@@ -29,7 +29,7 @@ describe('ReportStudio', () => {
     expect(st.shortest).toMatchObject({ name: 'Ethan Dubois', pages: 2 });
     expect(st.over).toBe(1);
     expect(st.blankBacks).toBe(1);
-    expect(ReportStudio.stats(null)).toEqual({ longest: null, shortest: null, over: 0, blankBacks: 0 });
+    expect(ReportStudio.stats(null)).toEqual({ longest: null, shortest: null, over: 0, blankBacks: 0, cut: 0 });
   });
 
   it('counts the class for the toolbar', () => {

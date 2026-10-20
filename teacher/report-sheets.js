@@ -109,10 +109,42 @@ window.ReportSheets = (function () {
      the height mode of a block that reserves lines; `flow` blocks grow
      with the student. */
   var BLOCKS = {
-    header: { label: 'Letterhead', kind: 'fixed', locked: true, group: null },
+    header: {
+      label: 'Letterhead',
+      kind: 'fixed',
+      locked: true,
+      group: null,
+      options: [
+        { key: 'school', label: 'School', def: true },
+        { key: 'teacher', label: 'Teacher', def: true },
+        { key: 'dates', label: 'Term Dates', def: true },
+        { key: 'studentNumber', label: 'Student Number', def: true },
+      ],
+    },
     'academic-summary': { label: 'Overall and Competencies', kind: 'fixed', group: 'Grades' },
-    'competency-table': { label: 'Competency Table', kind: 'fixed', group: 'Grades', noEvidence: true },
-    'grade-table': { label: 'Assignment Grades', kind: 'flow', group: 'Grades' },
+    'competency-table': {
+      label: 'Competency Table',
+      kind: 'fixed',
+      group: 'Grades',
+      noEvidence: true,
+      options: [
+        { key: 'evidence', label: 'Evidence Count', def: true },
+        { key: 'ican', label: 'I-can Statements', def: false },
+        { key: 'assignments', label: 'Assignment Names', def: false },
+      ],
+    },
+    'grade-table': {
+      label: 'Assignment Grades',
+      kind: 'flow',
+      group: 'Grades',
+      options: [
+        { key: 'date', label: 'Date', def: true },
+        { key: 'category', label: 'Category', def: true },
+        { key: 'area', label: 'Learning Area', def: true },
+        { key: 'score', label: 'Score', def: true },
+        { key: 'level', label: 'Proficiency', def: true },
+      ],
+    },
     'section-outcomes': { label: 'Learning Outcomes', kind: 'flow', group: 'Grades' },
     'score-distribution': { label: 'Score Distribution', kind: 'flow', group: 'Grades' },
     'section-chart': { label: 'Section Chart', kind: 'flow', group: 'Grades' },
@@ -126,9 +158,29 @@ window.ReportSheets = (function () {
       sizable: true,
     },
     observations: { label: 'Observations', kind: 'flow', group: 'Comments and Evidence' },
-    'next-steps': { label: 'Growth and Next Steps', kind: 'flow', group: 'Comments and Evidence', whenEmpty: 'omit' },
-    'learner-dimensions': { label: 'Learning Dispositions', kind: 'fixed', group: 'Learner Profile', noEvidence: true },
-    'core-competencies': { label: 'Core Competencies', kind: 'flow', group: 'Learner Profile', noEvidence: true },
+    'next-steps': {
+      label: 'Growth and Next Steps',
+      kind: 'flow',
+      group: 'Comments and Evidence',
+      whenEmpty: 'omit',
+      options: [{ key: 'ican', label: 'I-can Statements', def: 2, choices: [0, 1, 2, 3] }],
+    },
+    'learner-dimensions': {
+      label: 'Learning Dispositions',
+      kind: 'fixed',
+      group: 'Learner Profile',
+      options: [
+        { key: 'descriptions', label: 'Descriptions', def: false },
+        { key: 'examples', label: 'Examples', def: false },
+      ],
+    },
+    'core-competencies': {
+      label: 'Core Competencies',
+      kind: 'flow',
+      group: 'Learner Profile',
+      noEvidence: true,
+      options: [{ key: 'intro', label: 'Introduction', def: true }],
+    },
     'student-reflection-learning': { label: 'Reflection: My Learning', kind: 'fixed', group: 'Learner Profile' },
     'student-reflection-habits': { label: 'Reflection: My Habits', kind: 'fixed', group: 'Learner Profile' },
     'parent-response': {
@@ -260,18 +312,22 @@ window.ReportSheets = (function () {
         return i === 0 || pg.rows.length;
       });
     if (!pages.length) pages = [{ rows: [] }];
-    // The letterhead leads page 1, alone on its row.
+    // The letterhead leads page 1, alone on its row, keeping its options.
+    var headerCell = null;
     pages.forEach(function (pg) {
       pg.rows = pg.rows
         .map(function (row) {
           row.cells = row.cells.filter(function (c) {
+            if (c.block === 'header') headerCell = headerCell || c;
             return c.block !== 'header';
           });
           return row.cells.length ? _balanceRow(row) : null;
         })
         .filter(Boolean);
     });
-    pages[0].rows.unshift({ cells: [{ block: 'header', span: 12, height: 'fit' }] });
+    var head = { block: 'header', span: 12, height: 'fit' };
+    if (headerCell && headerCell.options) head.options = headerCell.options;
+    pages[0].rows.unshift({ cells: [head] });
     var pinned =
       base.pinned && BLOCKS[base.pinned] && BLOCKS[base.pinned].pinnable && seen[base.pinned] ? base.pinned : null;
     var per = {};
@@ -831,8 +887,23 @@ window.ReportSheets = (function () {
     );
   }
 
+  /* A cell's options with the registry's defaults filled in, plus its
+     no-evidence rule, as the renderer reads them. */
+  function optionsFor(cell) {
+    var def = BLOCKS[cell.block] || {};
+    var out = {};
+    (def.options || []).forEach(function (o) {
+      out[o.key] = o.def;
+    });
+    Object.keys(cell.options || {}).forEach(function (k) {
+      out[k] = cell.options[k];
+    });
+    if (def.noEvidence) out.noEvidence = cell.noEvidence === 'hide' ? 'hide' : 'show';
+    return out;
+  }
+
   function _cellHtml(cell, cid, student, ctx, probe) {
-    var html = ReportBlocks.renderReportBlock(cell.block, cid, student, ctx, cell.options || {});
+    var html = ReportBlocks.renderReportBlock(cell.block, cid, student, ctx, optionsFor(cell));
     var roomPx = cell.height === 'fixed' && cell.lines ? cell.lines * probe.linePx : 0;
     if (!html) {
       if (cell.whenEmpty === 'box' && roomPx) return _emptyCommentBox(roomPx);
@@ -964,6 +1035,9 @@ window.ReportSheets = (function () {
       body +
       '</div>' +
       (pinnedHtml ? '<div class="sheet-pinned">' + pinnedHtml + '</div>' : '') +
+      (side && side.capped && side.capped.length
+        ? '<div class="sheet-capped no-print">Doesn\u2019t fit \u00B7 ' + esc(side.capped.join(', ')) + '</div>'
+        : '') +
       footer +
       '</div>'
     );
@@ -1052,6 +1126,14 @@ window.ReportSheets = (function () {
       });
     });
     var pinnedCell = f.pinned && hidden.indexOf(f.pinned) < 0 ? cellOf(f, f.pinned) : null;
+    // Pages per student (toolbar): 1 puts everything on the front with the
+    // pinned block at its foot; 1 or 2 cut what does not fit and mark it.
+    var pps = f.pagesPerStudent === 1 || f.pagesPerStudent === 2 ? f.pagesPerStudent : null;
+    var pinOnFront = pps === 1;
+    if (pinOnFront) {
+      frontRows = frontRows.concat(backRows);
+      backRows = [];
+    }
     var frontHtml = frontRows.map(function (row) {
       return _rowHtml(row, cid, student, ctx, probe, hidden);
     });
@@ -1098,7 +1180,23 @@ window.ReportSheets = (function () {
     var backMeta = backHtml.map(function (h, i) {
       return backH[i] > backCap && backSingle[backKeep[i]] ? _rowsOf(h, backH[i], opts.stage) : null;
     });
-    var sides = pack(frontH, backH, pinnedH, cap, frontMeta, backMeta);
+    var sides = pinOnFront
+      ? pack(frontH, [], 0, Math.max(0, cap - pinnedH), frontMeta, [])
+      : pack(frontH, backH, pinnedH, cap, frontMeta, backMeta);
+    var labelOf = function (it) {
+      return it.from === 'front' ? frontLabels[frontKeep[it.i]] : backLabels[backKeep[it.i]];
+    };
+    var cutBlocks = [];
+    if (pps && sides.length > pps) {
+      sides.slice(pps).forEach(function (sd) {
+        sd.items.forEach(function (it) {
+          var label = String(labelOf(it) || '').replace(/ \(continued\)$/, '');
+          if (label && cutBlocks.indexOf(label) < 0) cutBlocks.push(label);
+        });
+      });
+      sides = sides.slice(0, pps);
+      sides[sides.length - 1].capped = cutBlocks;
+    }
     var sheetCount = Math.ceil(sides.length / 2);
     var moved = [];
     var continued = [];
@@ -1121,7 +1219,7 @@ window.ReportSheets = (function () {
         });
       });
     });
-    if (pinnedHtml) placement[f.pinned] = 1;
+    if (pinnedHtml) placement[f.pinned] = pinOnFront ? 0 : 1;
     var fills = sides.map(function (sd) {
       return sd.cap ? Math.min(1, sd.used / sd.cap) : 0;
     });
@@ -1144,6 +1242,7 @@ window.ReportSheets = (function () {
       noComment: !!commentCell && hidden.indexOf('teacher-narrative') < 0 && !rawComment,
       placement: placement,
       fills: fills,
+      cut: cutBlocks,
     };
     var reason = reasonText(result);
     var badge =
@@ -1167,7 +1266,7 @@ window.ReportSheets = (function () {
     for (var s = 0; s < sheetCount; s++) {
       var front = sides[2 * s];
       var back = sides[2 * s + 1] || null;
-      over = over || front.over || (back && back.over);
+      over = over || front.over || (back && back.over) || !!front.capped || !!(back && back.capped);
       html +=
         '<div class="sheet-zoom"><div class="sheet-label no-print">Page ' +
         (2 * s + 1) +
@@ -1177,7 +1276,7 @@ window.ReportSheets = (function () {
         _sideHtml(
           front,
           itemHtml,
-          '',
+          s === 0 && pinOnFront ? pinnedHtml : '',
           _footerHtml(course.name, ctx.termLabel, teacher, name, 2 * s + 1, total, 'Front'),
           paper,
           '',
@@ -1193,7 +1292,7 @@ window.ReportSheets = (function () {
         _sideHtml(
           back,
           itemHtml,
-          s === 0 ? pinnedHtml : '',
+          s === 0 && !pinOnFront ? pinnedHtml : '',
           _footerHtml(course.name, ctx.termLabel, teacher, name, 2 * s + 2, total, 'Back'),
           paper,
           back ? '' : 'sheet-blank-side',
@@ -1265,6 +1364,7 @@ window.ReportSheets = (function () {
           sheets: r.sheets,
           sides: r.sides,
           over: r.over,
+          cut: r.cut,
           badge: r.badge,
           reason: r.reason,
           noComment: r.noComment,
@@ -1385,6 +1485,7 @@ window.ReportSheets = (function () {
           sheets: r.sheets,
           sides: r.sides,
           over: r.over,
+          cut: r.cut,
           badge: r.badge,
           reason: r.reason,
           noComment: r.noComment,
@@ -1485,6 +1586,7 @@ window.ReportSheets = (function () {
     BLOCKS: BLOCKS,
     PALETTE_GROUPS: PALETTE_GROUPS,
     normalizeForm: normalizeForm,
+    optionsFor: optionsFor,
     formFor: formFor,
     onForm: onForm,
     available: available,

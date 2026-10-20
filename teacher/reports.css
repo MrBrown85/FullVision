@@ -3976,3 +3976,70 @@
     display: none !important;
   }
 }
+
+/* ── Page Studio stage 3: block options ─────────────────────── */
+.report-ct-note {
+  font-size: 7.5pt;
+  font-weight: 400;
+  color: #444;
+  line-height: 1.35;
+  margin-top: 1px;
+}
+.report-dim-note {
+  font-size: 7.5pt;
+  color: #444;
+  line-height: 1.35;
+  margin-top: 1px;
+}
+.report-dim-example {
+  font-style: italic;
+}
+.sheet-capped {
+  flex: 0 0 auto;
+  margin: 6px 0 0;
+  padding: 6px 10px;
+  border: 1.5px dashed var(--danger);
+  border-radius: 6px;
+  background: #fdecea;
+  color: var(--danger);
+  font-family: var(--font-base);
+  font-size: 8pt;
+  font-weight: 600;
+}
+.studio-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.studio-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+  padding: 3px 0;
+  cursor: pointer;
+}
+.studio-check input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--active);
+}
+.studio-text {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  margin-bottom: 6px;
+}
+textarea.studio-text {
+  min-height: 84px;
+  resize: vertical;
+}

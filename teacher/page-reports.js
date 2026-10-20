@@ -860,7 +860,15 @@ window.PageReports = (function () {
 
   function _renderStudioStats() {
     var insp = document.getElementById('studio-inspector');
-    if (insp) insp.innerHTML = ReportStudio.inspectorHtml(_formOf(), studioSelected, ReportStudio.stats(_classFit));
+    if (insp) {
+      var st = _previewStudents()[0];
+      insp.innerHTML = ReportStudio.inspectorHtml(
+        _formOf(),
+        studioSelected,
+        ReportStudio.stats(_classFit),
+        st && studioView === 'one' ? { id: st.id, name: fullName(st) } : null,
+      );
+    }
     var count = document.getElementById('tb-count');
     if (count) count.textContent = ReportStudio.countText(_classFit);
   }
@@ -1128,6 +1136,12 @@ window.PageReports = (function () {
         if (el.disabled) return;
         _setForm(ReportSheets.setSpan(_formOf(), el.dataset.block, Number(el.dataset.span)));
       },
+      studioChoice: function () {
+        _setForm(ReportSheets.setOption(_formOf(), el.dataset.block, el.dataset.key, Number(el.dataset.value)));
+      },
+      studioNoEvidence: function () {
+        _setForm(ReportSheets.setNoEvidence(_formOf(), el.dataset.block, el.dataset.rule));
+      },
       studioHeight: function () {
         _setForm(ReportSheets.setHeight(_formOf(), el.dataset.block, el.dataset.height));
       },
@@ -1224,8 +1238,15 @@ window.PageReports = (function () {
 
   function _handleStudioChange(e) {
     var el = e.target;
-    if (!el || !el.dataset || el.dataset.action !== 'studioLines') return;
-    _setForm(ReportSheets.setHeight(_formOf(), el.dataset.block, 'fixed', Number(el.value)));
+    if (!el || !el.dataset) return;
+    var a = el.dataset.action;
+    if (a === 'studioLines') _setForm(ReportSheets.setHeight(_formOf(), el.dataset.block, 'fixed', Number(el.value)));
+    else if (a === 'studioOption')
+      _setForm(ReportSheets.setOption(_formOf(), el.dataset.block, el.dataset.key, el.checked));
+    else if (a === 'studioLeaveOff')
+      _setForm(ReportSheets.hideFor(_formOf(), el.dataset.sid, el.dataset.block, el.checked));
+    else if (a === 'studioText')
+      _setForm(ReportSheets.setOption(_formOf(), el.dataset.block, el.dataset.key, el.value));
   }
 
   function _handleSelectionChange() {

@@ -138,24 +138,25 @@ window.ReportBlocks = (function () {
   /* The letterhead: school (when the class uses a school's preset terms),
      class and block, the student; then the report by its name, the term's
      dates, the teacher and the student number. DECISIONS.md, "Report forms" 7. */
-  function renderBlockHeader(cid, student, ctx) {
+  function renderBlockHeader(cid, student, ctx, options) {
+    options = options || {};
     const course = COURSES[cid];
     const period = (ctx && ctx.termLabel) || '';
     const terms = typeof getReportingTerms === 'function' ? getReportingTerms(cid) : [];
     const match =
       terms.length && typeof reportingTermsSchoolMatch === 'function' ? reportingTermsSchoolMatch(terms) : null;
-    const school = match && match.school ? match.school.name : '';
+    const school = options.school !== false && match && match.school ? match.school.name : '';
     const n = Number((((ctx && ctx.termId) || '').match(/^term-(\d+)$/) || [])[1]);
     const term = terms.find(t => Number(t.ordinal) === n) || null;
     const block = typeof courseBlockLabel === 'function' ? courseBlockLabel(course) : '';
     const teacher = (typeof getConfig === 'function' && getConfig().displayName) || '';
 
     const titleParts = [school, course.name, block].filter(Boolean);
-    let dates = term ? _formatDateRange(term.starts_on, term.ends_on) : '';
+    let dates = term && options.dates !== false ? _formatDateRange(term.starts_on, term.ends_on) : '';
     if (dates && term.label && term.label !== period) dates = esc(term.label) + ' \u00B7 ' + dates;
     const who = [
-      teacher ? 'Teacher: ' + esc(teacher) : '',
-      student.studentNumber ? 'Student No. ' + esc(student.studentNumber) : '',
+      teacher && options.teacher !== false ? 'Teacher: ' + esc(teacher) : '',
+      student.studentNumber && options.studentNumber !== false ? 'Student No. ' + esc(student.studentNumber) : '',
     ]
       .filter(Boolean)
       .join(' \u00B7 ');
@@ -237,7 +238,8 @@ window.ReportBlocks = (function () {
 
   // renderBlockNarrative removed — teacher-narrative block now handles all narrative output
 
-  function _renderDimGroup(dimList, rating, groupTitle) {
+  function _renderDimGroup(dimList, rating, groupTitle, options) {
+    options = options || {};
     const dims = rating.dims || {};
     // Only the dimensions the teacher rated this term. "Not Assessed" on a
     // family's copy read as a gap in the teacher's work, not the student's.
@@ -254,7 +256,7 @@ window.ReportBlocks = (function () {
       html += `<div class="report-learner-dim">
       <div class="report-learner-dim-info">
         <div class="report-learner-dim-label">${OBS_LABELS[dim]}</div>
-        <div class="report-dim-desc">${info.desc || ''}</div>
+        ${options.descriptions && info.desc ? `<div class="report-dim-note">${esc(info.desc)}</div>` : ''}${options.examples && info.example ? `<div class="report-dim-note report-dim-example">${esc(info.example)}</div>` : ''}
         <div class="report-learner-dim-value" data-prof="${val}" style="color:${color};margin-top:4px">${levelDots(val)}${label}</div>
         <div class="report-learner-dim-bar">
           <div class="report-learner-dim-fill" data-prof-bg="${val}" style="width:${pct}%;background:${color}"></div>
@@ -266,13 +268,13 @@ window.ReportBlocks = (function () {
     return html;
   }
 
-  function renderBlockLearnerDimensions(cid, student, ctx) {
+  function renderBlockLearnerDimensions(cid, student, ctx, options) {
     const termId = ctx && ctx.termId;
     const rating = getStudentTermRating(cid, student.id, termId);
     if (!rating) return '';
     const groups =
-      _renderDimGroup(LEARNING_DIMS, rating, 'Learning Dispositions') +
-      _renderDimGroup(RELATIONAL_DIMS, rating, 'Relational & Identity');
+      _renderDimGroup(LEARNING_DIMS, rating, 'Learning Dispositions', options) +
+      _renderDimGroup(RELATIONAL_DIMS, rating, 'Relational & Identity', options);
     if (!groups) return '';
     return `<div class="report-learner-profile">${groups}</div>`;
   }
@@ -309,7 +311,13 @@ window.ReportBlocks = (function () {
      as dots and a word that follows the class's grading setting, and how
      many assessments the level rests on. A fixed block: its rows come from
      the learning map, so its height is the same for every student. */
-  function renderBlockCompetencyTable(cid, student, ctx) {
+  function renderBlockCompetencyTable(cid, student, ctx, options) {
+    options = options || {};
+    const showEvidence = options.evidence !== false;
+    const hideEmpty = options.noEvidence === 'hide';
+    const titles = {};
+    if (options.assignments) getAssessments(cid).forEach(a => (titles[a.id] = a.title));
+    const cols = showEvidence ? 3 : 2;
     const grouped = getGroupedSections(cid);
     const mode = courseGradeMode(cid);
     const row = sec => {
@@ -321,6 +329,7 @@ window.ReportBlocks = (function () {
           if (sc.score > 0) ids.add(sc.assessmentId);
         });
       });
+      if (!(sp > 0) && hideEmpty) return '';
       let level;
       if (!(sp > 0)) level = '<span class="report-ct-none">No evidence yet</span>';
       else if (mode === 'proficiency') level = levelDots(r) + esc(PROF_LABELS[r] || '');
@@ -332,13 +341,28 @@ window.ReportBlocks = (function () {
           ' <span class="report-ct-pct">' +
           esc(formatLevel(cid, sp).split(' \u00B7 ').pop()) +
           '</span>';
-      return `<tr><td class="report-ct-name">${esc(sec.shortName || sec.name)}</td><td class="report-ct-level" data-prof="${sp > 0 ? r : 0}">${level}</td><td class="report-ct-evidence">${ids.size}</td></tr>`;
+      let notes = '';
+      if (options.ican) {
+        const icans = (sec.tags || [])
+          .map(t => (t.i_can_statements || [])[0])
+          .filter(Boolean)
+          .slice(0, 3);
+        if (icans.length) notes += `<div class="report-ct-note">${icans.map(esc).join(' \u00B7 ')}</div>`;
+      }
+      if (options.assignments && ids.size) {
+        const names = Array.from(ids)
+          .map(id => titles[id])
+          .filter(Boolean);
+        const shown = names.slice(0, 4).map(esc).join(', ');
+        notes += `<div class="report-ct-note">${shown}${names.length > 4 ? ` and ${names.length - 4} more` : ''}</div>`;
+      }
+      return `<tr><td class="report-ct-name">${esc(sec.shortName || sec.name)}${notes}</td><td class="report-ct-level" data-prof="${sp > 0 ? r : 0}">${level}</td>${showEvidence ? `<td class="report-ct-evidence">${ids.size}</td>` : ''}</tr>`;
     };
     let rows = '';
     if (grouped.groups.some(g => g.sections.length)) {
       grouped.groups.forEach(g => {
         if (!g.sections.length) return;
-        rows += `<tr class="report-ct-group"><td colspan="3">${esc(g.group.name)}</td></tr>`;
+        rows += `<tr class="report-ct-group"><td colspan="${cols}">${esc(g.group.name)}</td></tr>`;
         g.sections.forEach(sec => (rows += row(sec)));
       });
       grouped.ungrouped.forEach(sec => (rows += row(sec)));
@@ -348,7 +372,7 @@ window.ReportBlocks = (function () {
     if (!rows) return '';
     return `<div class="report-block-box report-competency-table">
     <div class="report-block-title">Curricular Competencies</div>
-    <table class="report-ct"><thead><tr><th>Competency</th><th>Level</th><th class="report-ct-evidence">Evidence</th></tr></thead><tbody>${rows}</tbody></table>
+    <table class="report-ct"><thead><tr><th>Competency</th><th>Level</th>${showEvidence ? '<th class="report-ct-evidence">Evidence</th>' : ''}</tr></thead><tbody>${rows}</tbody></table>
     <div class="report-ct-legend">${levelDots(1)}Emerging &nbsp; ${levelDots(2)}Developing &nbsp; ${levelDots(3)}Proficient &nbsp; ${levelDots(4)}Extending</div>
   </div>`;
   }
@@ -493,7 +517,8 @@ window.ReportBlocks = (function () {
     return html;
   }
 
-  function renderBlockNextSteps(cid, student) {
+  function renderBlockNextSteps(cid, student, options) {
+    const icanCount = options && options.ican != null ? Math.max(0, Math.min(3, Number(options.ican))) : 2;
     const focusAreas = getFocusAreas(cid, student.id, 3);
     const realFocus = focusAreas.filter(f => f.prof <= 2);
     if (realFocus.length === 0) return '';
@@ -505,14 +530,14 @@ window.ReportBlocks = (function () {
       let nextStepDesc = `<strong>${esc(secName)}</strong> &mdash; ${esc(f.tag.label)}: ${esc(profLabel)}.`;
       // The first two I-can statements as goals. Three focus areas with four
       // statements each was a third of a page on its own.
-      if (f.tag.i_can_statements && f.tag.i_can_statements.length > 0) {
+      if (icanCount > 0 && f.tag.i_can_statements && f.tag.i_can_statements.length > 0) {
         nextStepDesc += ` <span style="color:var(--text-2)">Focus areas:</span>`;
         nextStepDesc += `<ul class="report-ican-list" style="margin-top:4px">`;
-        f.tag.i_can_statements.slice(0, 2).forEach(stmt => {
+        f.tag.i_can_statements.slice(0, icanCount).forEach(stmt => {
           nextStepDesc += `<li class="report-ican-item">${esc(stmt)}</li>`;
         });
         nextStepDesc += `</ul>`;
-      } else {
+      } else if (icanCount > 0) {
         nextStepDesc += ` Continue building skills in this area.`;
       }
       html += `<div class="report-next-step-item">
@@ -964,7 +989,9 @@ window.ReportBlocks = (function () {
   }
 
   /* ── Assignment Grades Table ── */
-  function renderBlockGradeTable(cid, student) {
+  function renderBlockGradeTable(cid, student, options) {
+    options = options || {};
+    const on = key => options[key] !== false;
     const assessments = getAssessments(cid).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     const scores = getScores(cid)[student.id] || [];
     if (assessments.length === 0) return '';
@@ -1006,12 +1033,13 @@ window.ReportBlocks = (function () {
           )
           .join('<span style="color:var(--text-3);margin:0 2px">·</span>');
         if (aScores.length === 0) {
+          const span = (on('score') ? 1 : 0) + (on('level') ? 1 : 0);
           rows += `<tr>
           <td style="font-weight:500">${esc(a.title)}${weightLabel}</td>
-          <td style="color:var(--text-3);font-size:0.76rem">${dateStr}</td>
-          <td style="font-size:0.68rem;color:var(--text-2)">${esc(categoryLabel)}</td>
-          <td style="font-size:0.68rem">${tagPills}</td>
-          <td style="color:var(--text-3);font-style:italic" colspan="2">Not assessed</td></tr>`;
+          ${on('date') ? `<td style="color:var(--text-3);font-size:0.76rem">${dateStr}</td>` : ''}
+          ${on('category') ? `<td style="font-size:0.68rem;color:var(--text-2)">${esc(categoryLabel)}</td>` : ''}
+          ${on('area') ? `<td style="font-size:0.68rem">${tagPills}</td>` : ''}
+          ${span ? `<td style="color:var(--text-3);font-style:italic" colspan="${span}">Not assessed</td>` : ''}</tr>`;
           return;
         }
         let scoreDisplay, profDisplay;
@@ -1038,10 +1066,10 @@ window.ReportBlocks = (function () {
         }
         rows += `<tr>
         <td style="font-weight:500">${esc(a.title)}${weightLabel}</td>
-        <td style="color:var(--text-3);font-size:0.76rem">${dateStr}</td>
-        <td style="font-size:0.68rem;color:var(--text-2)">${esc(categoryLabel)}</td>
-        <td style="font-size:0.68rem">${tagPills}</td>
-        ${scoreDisplay}${profDisplay}</tr>`;
+        ${on('date') ? `<td style="color:var(--text-3);font-size:0.76rem">${dateStr}</td>` : ''}
+        ${on('category') ? `<td style="font-size:0.68rem;color:var(--text-2)">${esc(categoryLabel)}</td>` : ''}
+        ${on('area') ? `<td style="font-size:0.68rem">${tagPills}</td>` : ''}
+        ${on('score') ? scoreDisplay : ''}${on('level') ? profDisplay : ''}</tr>`;
       });
       return rows;
     }
@@ -1050,12 +1078,12 @@ window.ReportBlocks = (function () {
     <div class="report-block-title">Assignment Grades</div>
     <table class="report-tag-table report-grade-table" style="margin-top:4px">
       <thead><tr>
-        <th style="width:36%;text-align:left">Assignment</th>
-        <th style="width:10%;text-align:left">Date</th>
-        <th style="width:14%;text-align:left">Category</th>
-        <th style="width:18%;text-align:left">Learning Area</th>
-        <th style="width:12%;text-align:center">Score</th>
-        <th style="width:10%;text-align:center">Proficiency</th>
+        <th style="text-align:left">Assignment</th>
+        ${on('date') ? '<th style="width:10%;text-align:left">Date</th>' : ''}
+        ${on('category') ? '<th style="width:14%;text-align:left">Category</th>' : ''}
+        ${on('area') ? '<th style="width:18%;text-align:left">Learning Area</th>' : ''}
+        ${on('score') ? '<th style="width:12%;text-align:center">Score</th>' : ''}
+        ${on('level') ? '<th style="width:12%;text-align:center">Proficiency</th>' : ''}
       </tr></thead><tbody>`;
     html += renderRows(assessments);
     html += `</tbody></table></div>`;
@@ -1063,7 +1091,8 @@ window.ReportBlocks = (function () {
   }
 
   /* ── Core Competencies ── */
-  function renderBlockCoreCompetencies(cid, student) {
+  function renderBlockCoreCompetencies(cid, student, options) {
+    options = options || {};
     const assessments = getAssessments(cid);
     const scores = getScores(cid)[student.id] || [];
     // Count competency exposure: how many assessments touched each competency, and avg score
@@ -1098,7 +1127,7 @@ window.ReportBlocks = (function () {
     });
     let html = `<div class="report-block-box" style="page-break-inside:avoid">
     <div class="report-block-title">Core Competencies</div>
-    <div style="font-size:0.7rem;color:var(--text-2);margin:-2px 0 8px;line-height:1.35">Core competencies are the skills, habits, and dispositions students develop across all areas of learning. Progress is based on observations from classroom assessments.</div>
+    ${options.intro !== false ? '<div style="font-size:0.7rem;color:var(--text-2);margin:-2px 0 8px;line-height:1.35">Core competencies are the skills, habits, and dispositions students develop across all areas of learning. Progress is based on observations from classroom assessments.</div>' : ''}
     <div style="display:flex;flex-wrap:wrap;gap:16px;padding:2px 0">`;
     Object.entries(groups).forEach(([groupName, comps]) => {
       html += `<div style="flex:1;min-width:180px">
@@ -1106,6 +1135,7 @@ window.ReportBlocks = (function () {
       comps.forEach(c => {
         const d = compData[c.id];
         const avg = d.scored > 0 ? d.totalScore / d.scored : 0;
+        if (!(avg > 0) && options.noEvidence === 'hide') return;
         const r = Math.round(avg);
         const pct = avg > 0 ? (avg / 4) * 100 : 0;
         const color = avg > 0 ? PROF_COLORS[r] || 'var(--text-3)' : 'var(--border)';
@@ -1150,7 +1180,7 @@ window.ReportBlocks = (function () {
       case 'text-block':
         return renderBlockText(options);
       case 'header':
-        return renderBlockHeader(cid, student, ctx);
+        return renderBlockHeader(cid, student, ctx, options);
       case 'academic-summary':
         return renderBlockAcademicSummary(cid, student);
       case 'section-chart':
@@ -1158,23 +1188,23 @@ window.ReportBlocks = (function () {
       case 'score-distribution':
         return renderBlockScoreDistribution(cid, student);
       case 'grade-table':
-        return renderBlockGradeTable(cid, student);
+        return renderBlockGradeTable(cid, student, options);
       case 'section-outcomes':
         return renderBlockSectionOutcomes(cid, student);
       case 'core-competencies':
-        return renderBlockCoreCompetencies(cid, student);
+        return renderBlockCoreCompetencies(cid, student, options);
       case 'competency-table':
-        return renderBlockCompetencyTable(cid, student, ctx);
+        return renderBlockCompetencyTable(cid, student, ctx, options);
       case 'attendance':
         return renderBlockAttendance(cid, student, ctx);
       case 'learner-dimensions':
-        return renderBlockLearnerDimensions(cid, student, ctx);
+        return renderBlockLearnerDimensions(cid, student, ctx, options);
       case 'teacher-narrative':
         return renderBlockTeacherNarrative(cid, student, ctx);
       case 'observations':
         return renderBlockObservations(cid, student);
       case 'next-steps':
-        return renderBlockNextSteps(cid, student);
+        return renderBlockNextSteps(cid, student, options);
       case 'legend':
         return renderBlockLegend();
       case 'parent-response':

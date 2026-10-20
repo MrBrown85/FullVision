@@ -126,7 +126,7 @@ window.ReportStudio = (function () {
 
   /* The class fit, for the stats: from ReportSheets.classSummary. */
   function stats(summary) {
-    var out = { longest: null, shortest: null, over: 0, blankBacks: 0 };
+    var out = { longest: null, shortest: null, over: 0, blankBacks: 0, cut: 0 };
     if (!summary || !summary.perStudent) return out;
     Object.keys(summary.perStudent).forEach(function (sid) {
       var p = summary.perStudent[sid];
@@ -139,6 +139,7 @@ window.ReportStudio = (function () {
         out.shortest = Object.assign({ used: p.used }, pages);
       }
       if (p.over) out.over += 1;
+      if (p.cut && p.cut.length) out.cut += 1;
       out.blankBacks += p.sheets * 2 - sides;
     });
     return out;
@@ -170,12 +171,14 @@ window.ReportStudio = (function () {
       '<div class="studio-stat"><span>Blank back pages added</span><b>' +
       st.blankBacks +
       '</b></div>' +
+      (st.cut ? '<div class="studio-stat"><span>Over the page limit</span><b>' + st.cut + '</b></div>' : '') +
       '</div>'
     );
   }
 
-  /* selected: a block id or null. st: stats(). */
-  function inspectorHtml(form, selected, st) {
+  /* selected: a block id or null. st: stats(). who: { id, name } of the
+     student on the canvas, for Leave Off. */
+  function inspectorHtml(form, selected, st, who) {
     var sheets = S();
     var html = '';
     var def = selected && sheets.BLOCKS[selected];
@@ -239,15 +242,118 @@ window.ReportStudio = (function () {
               : '') +
             '</div>';
         }
+        html += _optionsHtml(form, selected, cell, def, who);
         html +=
           '<div class="studio-field"><button type="button" class="studio-remove" data-action="studioRemove" data-block="' +
           selected +
           '">Remove from Report</button></div>';
+      } else if (def.options) {
+        html += _optionsHtml(form, selected, sheets.cellOf(form, selected), def, null);
       }
     } else {
       html += '<h3 class="studio-insp-title">Report</h3><div class="studio-insp-sub">Select a block on the page</div>';
     }
     html += _statRows(st || stats(null));
+    return html;
+  }
+
+  /* Show, No Evidence, the text block's words and Leave Off. */
+  function _optionsHtml(form, id, cell, def, who) {
+    var sheets = S();
+    var opts = sheets.optionsFor(cell);
+    var html = '';
+    if (id === 'text-block') {
+      html +=
+        '<div class="studio-field"><label for="studio-text-title">Title</label>' +
+        '<input type="text" class="studio-text" id="studio-text-title" maxlength="80" data-action="studioText" data-block="text-block" data-key="title" value="' +
+        esc((cell.options && cell.options.title) || '') +
+        '">' +
+        '<label for="studio-text-body">Text</label>' +
+        '<textarea class="studio-text" id="studio-text-body" maxlength="1500" data-action="studioText" data-block="text-block" data-key="text">' +
+        esc((cell.options && cell.options.text) || '') +
+        '</textarea></div>';
+    }
+    var bools = (def.options || []).filter(function (o) {
+      return !o.choices;
+    });
+    if (bools.length) {
+      html += '<div class="studio-field"><label>Show</label><div class="studio-checks">';
+      bools.forEach(function (o) {
+        html +=
+          '<label class="studio-check"><input type="checkbox" data-action="studioOption" data-block="' +
+          id +
+          '" data-key="' +
+          o.key +
+          '"' +
+          (opts[o.key] ? ' checked' : '') +
+          '> ' +
+          esc(o.label) +
+          '</label>';
+      });
+      html += '</div></div>';
+    }
+    (def.options || [])
+      .filter(function (o) {
+        return o.choices;
+      })
+      .forEach(function (o) {
+        html +=
+          '<div class="studio-field"><label>' +
+          esc(o.label) +
+          '</label><span class="seg seg-sm" role="radiogroup" aria-label="' +
+          esc(o.label) +
+          '">';
+        o.choices.forEach(function (c) {
+          var on = Number(opts[o.key]) === c;
+          html +=
+            '<button type="button" class="seg-btn' +
+            (on ? ' active' : '') +
+            '" data-action="studioChoice" data-block="' +
+            id +
+            '" data-key="' +
+            o.key +
+            '" data-value="' +
+            c +
+            '" role="radio" aria-checked="' +
+            on +
+            '">' +
+            (c === 0 ? 'None' : c) +
+            '</button>';
+        });
+        html += '</span></div>';
+      });
+    if (def.noEvidence) {
+      var hide = opts.noEvidence === 'hide';
+      html +=
+        '<div class="studio-field"><label>When a Student Has No Evidence</label><span class="seg seg-sm" role="radiogroup" aria-label="When a student has no evidence">' +
+        '<button type="button" class="seg-btn' +
+        (!hide ? ' active' : '') +
+        '" data-action="studioNoEvidence" data-block="' +
+        id +
+        '" data-rule="show" role="radio" aria-checked="' +
+        !hide +
+        '">Show &ldquo;No Evidence&rdquo;</button>' +
+        '<button type="button" class="seg-btn' +
+        (hide ? ' active' : '') +
+        '" data-action="studioNoEvidence" data-block="' +
+        id +
+        '" data-rule="hide" role="radio" aria-checked="' +
+        hide +
+        '">Hide Row</button></span></div>';
+    }
+    if (who && who.id && id !== 'header') {
+      var off = sheets.hiddenFor(form, who.id).indexOf(id) >= 0;
+      html +=
+        '<div class="studio-field"><label>This Student</label><label class="studio-check"><input type="checkbox" data-action="studioLeaveOff" data-block="' +
+        id +
+        '" data-sid="' +
+        esc(who.id) +
+        '"' +
+        (off ? ' checked' : '') +
+        '> Leave off ' +
+        esc(who.name) +
+        '&rsquo;s report</label></div>';
+    }
     return html;
   }
 
