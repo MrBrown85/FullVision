@@ -9499,6 +9499,135 @@ window.v2.toggleReportBlock = function (courseId, blockKey, enabled) {
   });
 };
 
+/* ── Report forms: the library, issued copies and guardians ─────────────
+   migrations/20261020_report_template.sql, 20261020_report_issue.sql,
+   20261020_guardian.sql; docs/report-forms-plan.md. Every write is
+   idempotent (shared/constants.js FV_IDEMPOTENT_RPCS). The library and
+   Issue Reports still keep their device copies (gb-report-templates,
+   IndexedDB fv-report-issues); these are the server calls they move to. */
+
+/* A saved form: { id?, name, form }. Same name (case-insensitive) updates
+   that row; an id renames. Resolves with the row as the server has it. */
+window.v2.saveReportTemplate = function (params, options) {
+  params = params || {};
+  return _rpcOrNoop(
+    'save_report_template',
+    {
+      p_name: String(params.name == null ? '' : params.name).trim(),
+      p_form: params.form && typeof params.form === 'object' ? params.form : {},
+      p_id: _isUuid(params.id) ? params.id : null,
+    },
+    options,
+  );
+};
+window.v2.listReportTemplates = function () {
+  return _rpcOrNoop('list_report_templates', {}).then(function (res) {
+    return { data: _rpcRows(res && res.data), error: (res && res.error) || null };
+  });
+};
+window.v2.deleteReportTemplate = function (id) {
+  if (!_isUuid(id)) return Promise.resolve({ data: null, error: null });
+  return _rpcOrNoop('delete_report_template', { p_id: id });
+};
+
+/* One Issue: { courseId, term, termLabel, paper, form, students } where
+   students is [{ enrollmentId, sheets, hash, html }]. The HTML of a whole
+   class can run past the outbox's 5 MB cap, so this goes straight to the
+   server rather than through the queue; the Issue dialog reports a failure
+   and keeps its own copy. Only students with a server id are sent. */
+window.v2.createReportIssue = function (params) {
+  params = params || {};
+  var students = (params.students || [])
+    .filter(function (s) {
+      return s && _isUuid(s.enrollmentId);
+    })
+    .map(function (s) {
+      return {
+        enrollment_id: s.enrollmentId,
+        sheets: Math.max(1, Math.min(20, Number(s.sheets) || 1)),
+        hash: String(s.hash == null ? '' : s.hash),
+        html: String(s.html == null ? '' : s.html),
+      };
+    });
+  var rpcParams = {
+    p_course_id: params.courseId,
+    p_term: Number(params.term) || 1,
+    p_term_label: params.termLabel || null,
+    p_paper: params.paper === 'legal' ? 'legal' : 'letter',
+    p_form: params.form && typeof params.form === 'object' ? params.form : null,
+    p_students: students,
+  };
+  if (!_isUuid(params.courseId) || !students.length) {
+    return Promise.resolve({ data: null, error: { message: 'nothing to issue', blocked: true } });
+  }
+  var sb = getSupabase();
+  if (!sb || _isDemoSession()) return Promise.resolve({ data: null, error: null });
+  _stampIdempotencyKey('create_report_issue', rpcParams);
+  return _trackWriteSync(
+    'create_report_issue',
+    _callRpcWithAuthGuard('create_report_issue', rpcParams).then(function (res) {
+      if (res && res.error && !res.error.handledSessionExpired) {
+        if (_isMissingRpcError(res.error)) _reportMissingRpc('create_report_issue', res.error);
+        else console.warn('create_report_issue failed:', res.error);
+      }
+      return { data: _rpcObject(res && res.data), error: (res && res.error) || null };
+    }),
+  );
+};
+/* Issues for a class (one term, or every term when term is null), newest
+   first, each with hashes { enrollmentId: hash } and no HTML. */
+window.v2.listReportIssues = function (courseId, term) {
+  var params = { p_course_id: courseId };
+  if (term != null) params.p_term = Number(term);
+  return _rpcOrNoop('list_report_issues', params).then(function (res) {
+    return { data: _rpcRows(res && res.data), error: (res && res.error) || null };
+  });
+};
+/* One issue with every student's HTML, in roster order. */
+window.v2.getReportIssue = function (issueId) {
+  return _rpcOrNoop('get_report_issue', { p_issue_id: issueId }).then(function (res) {
+    return { data: _rpcObject(res && res.data), error: (res && res.error) || null };
+  });
+};
+window.v2.deleteReportIssue = function (issueId) {
+  if (!_isUuid(issueId)) return Promise.resolve({ data: null, error: null });
+  return _rpcOrNoop('delete_report_issue', { p_issue_id: issueId });
+};
+
+/* A guardian: { id?, studentId, name, relationship, email, phone, language,
+   consentAt, consentSource }. Consent is sent only when both consentAt and
+   consentSource are given; the server refuses one without the other.
+   Nothing in the app calls this until the district policy check is done. */
+window.v2.upsertGuardian = function (params, options) {
+  params = params || {};
+  var consent = params.consentAt && params.consentSource;
+  return _rpcOrNoop(
+    'upsert_guardian',
+    {
+      p_student_id: params.studentId,
+      p_name: String(params.name == null ? '' : params.name).trim(),
+      p_relationship: params.relationship || null,
+      p_email: params.email || null,
+      p_phone: params.phone || null,
+      p_language: params.language || 'en',
+      p_consent_at: consent ? params.consentAt : null,
+      p_consent_source: consent ? params.consentSource : null,
+      p_id: _isUuid(params.id) ? params.id : null,
+    },
+    options,
+  );
+};
+window.v2.deleteGuardian = function (id) {
+  if (!_isUuid(id)) return Promise.resolve({ data: null, error: null });
+  return _rpcOrNoop('delete_guardian', { p_id: id });
+};
+/* Every guardian of every enrolled student, each row carrying enrollment_id. */
+window.v2.listCourseGuardians = function (courseId) {
+  return _rpcOrNoop('list_course_guardians', { p_course_id: courseId }).then(function (res) {
+    return { data: _rpcRows(res && res.data), error: (res && res.error) || null };
+  });
+};
+
 /* Teacher preferences — jsonb patch; omitted keys unchanged. */
 window.v2.saveTeacherPreferences = function (patch) {
   return _rpcOrNoop('save_teacher_preferences', { p_patch: patch || {} });
