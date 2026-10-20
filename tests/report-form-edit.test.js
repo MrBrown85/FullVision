@@ -11,13 +11,7 @@ describe('ReportSheets.normalizeForm', () => {
   it('is the Report Card when nothing is saved', () => {
     const f = ReportSheets.normalizeForm(undefined);
     expect(f.v).toBe(3);
-    expect(ids(f.front)).toEqual([
-      'header',
-      'academic-summary',
-      'teacher-narrative',
-      'competency-table+attendance',
-      'next-steps',
-    ]);
+    expect(ids(f.front)).toEqual(['header', 'academic-summary', 'teacher-narrative', 'competency-table', 'next-steps']);
     expect(ids(f.back)).toEqual(['learner-dimensions', 'parent-response']);
     expect(f.back[1].pinned).toBe('bottom');
     expect(f.type).toBe('standard');
@@ -49,7 +43,8 @@ describe('ReportSheets.normalizeForm', () => {
 });
 
 describe('ReportSheets editing helpers', () => {
-  const base = () => ReportSheets.form();
+  // The Report Card with Attendance ticked on (it is off by default, DECISIONS 12), so a pair is there to move and split.
+  const base = () => ReportSheets.setInclude(ReportSheets.form(), 'attendance', true);
 
   it('moves a block within a side, never past the letterhead or a pinned block', () => {
     let f = ReportSheets.moveItem(base(), 'front', 2, -1);
@@ -97,7 +92,8 @@ describe('ReportSheets editing helpers', () => {
 });
 
 describe('ReportSheets reorder, pairs, starters and the library', () => {
-  const base = () => ReportSheets.form();
+  // The Report Card with Attendance ticked on (it is off by default, DECISIONS 12), so a pair is there to move and split.
+  const base = () => ReportSheets.setInclude(ReportSheets.form(), 'attendance', true);
   const ids = list => list.map(it => (it.pair ? it.pair.map(q => q.block).join('+') : it.block));
 
   it('reorder drops a block where it is dragged, never above the letterhead or below the pinned block', () => {
@@ -189,7 +185,7 @@ describe('ReportSheets setup choices', () => {
 
   it('lists the optional blocks with whether each is on', () => {
     expect(ReportSheets.includes(base())).toEqual([
-      { id: 'attendance', label: 'Attendance', on: true },
+      { id: 'attendance', label: 'Attendance', on: false },
       { id: 'dispositions', label: 'Learning Dispositions', on: true },
       { id: 'reflection', label: 'Student Reflection', on: false },
       { id: 'response', label: 'Parent / Guardian Response', on: true },
@@ -198,17 +194,24 @@ describe('ReportSheets setup choices', () => {
     expect(ReportSheets.includes(interim).map(i => i.on)).toEqual([false, false, false, false]);
   });
 
-  it('attendance leaves the pair when off and comes back beside the competencies when on', () => {
-    const off = ReportSheets.setInclude(base(), 'attendance', false);
-    expect(ids(off.front)).toEqual([
+  it('attendance is off by default, pairs with the competencies when on, and leaves the pair when off', () => {
+    expect(ids(base().front)).toEqual([
       'header',
       'academic-summary',
       'teacher-narrative',
       'competency-table',
       'next-steps',
     ]);
-    const on = ReportSheets.setInclude(off, 'attendance', true);
-    expect(ids(on.front)).toEqual(ids(base().front));
+    const on = ReportSheets.setInclude(base(), 'attendance', true);
+    expect(ids(on.front)).toEqual([
+      'header',
+      'academic-summary',
+      'teacher-narrative',
+      'competency-table+attendance',
+      'next-steps',
+    ]);
+    const off = ReportSheets.setInclude(on, 'attendance', false);
+    expect(ids(off.front)).toEqual(ids(base().front));
     // Without a competency table it goes on the front by itself.
     const interim = ReportSheets.setInclude(ReportSheets.starter('interim-update'), 'attendance', true);
     expect(ids(interim.front).pop()).toBe('attendance');
