@@ -47,7 +47,7 @@ Lessons from Phase 0: the fit has to hold with the wider fonts of Linux and Wind
 - Renderers take `{cid, student, term, termLabel, options}` and return HTML with no DOM reads. Each declares `fixed` or `flow`.
 - Fixed blocks are measured once per class, flowing blocks per student, after fonts load, with a 4% margin on each flow region.
 - Explicit page boxes (`.sheet`) on screen and in print; the preview is the printout.
-- The Report Card form only, replacing the Standard preset: front = letterhead, overall, comment (room 8 lines, grow and push), competency table paired with attendance, next steps; back = dispositions, student reflection, return strip pinned to the bottom. Continued sheets for overrun.
+- The Report Card form only, replacing the Standard preset: front = letterhead, overall, comment (room 8 lines, grow and push), competency table paired with attendance, next steps; back = dispositions, then the existing student reflection and Parent / Guardian Response blocks with their wording unchanged, the response pinned to the bottom below a cut line. Continued sheets for overrun.
 - Layout `blocks_config` v3 (`form`, `sides`, `attachments`) with migration from v1 and a shape check in `save_report_config`.
 - One level helper (dots + word, colour only on screen in Colour mode); inline `PROF_COLORS` removed from the report renderers.
 - Tests: page counts on Chromium and WebKit; a unit test per renderer that it is pure.
@@ -61,7 +61,7 @@ Lessons from Phase 0: the fit has to hold with the wider fonts of Linux and Wind
 
 ## Phase 3 · Edit Layout (weeks 4–5)
 
-- Mode banner, Fixed / Flows tags, options panel, Preview With longest / typical / shortest, pairing of fixed blocks, whole-form settings, "+ Add a Block", pointer and keyboard drag with live announcements, Save to Library (`report_template`, teacher-level).
+- Mode banner, Fixed / Flows tags, options panel, Preview With longest / typical / shortest, pairing of fixed blocks, whole-form settings (the reflection and response blocks keep their text), "+ Add a Block", pointer and keyboard drag with live announcements, Save to Library (`report_template`, teacher-level).
 - Phone: Review as a stepper, one page at a time; no editing; a read-only Reports tab in the PWA.
 
 ## Phase 4 · Send (weeks 6–9, after the policy check)
