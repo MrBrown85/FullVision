@@ -906,8 +906,8 @@ window.PageAssignments = (function () {
     html +=
       '<div class="af-field">' +
       '<label class="af-label">Rubric</label>' +
-      '<div style="display:flex;gap:8px;align-items:center">' +
-      '<select class="af-rubric-select" id="af-rubric" data-action-change="onRubricSelect" style="flex:1">' +
+      '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">' +
+      '<select class="af-rubric-select" id="af-rubric" data-action-change="onRubricSelect" style="flex:1 1 140px;min-width:0">' +
       '<option value="">None</option>' +
       rubricsList
         .map(function (r) {
@@ -1075,7 +1075,7 @@ window.PageAssignments = (function () {
       (scoreMode === 'complete' ? ' active' : '') +
       '"' +
       segAttr(scoreMode === 'complete') +
-      ' data-mode="complete" data-action="setScoreMode">Complete/Incomplete</button>' +
+      ' data-mode="complete" data-action="setScoreMode">Complete/<wbr>Incomplete</button>' +
       '</div>' +
       '</div>' +
       '<div class="af-field" id="af-maxpoints-wrap" style="flex:0 0 auto;' +

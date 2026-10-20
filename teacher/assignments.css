@@ -499,6 +499,12 @@
 }
 .af-type-toggle .seg-btn {
   flex: 1;
+  /* At phone widths a long option ("Complete/Incomplete") wraps inside its
+     segment instead of pushing the form past the screen. */
+  padding-left: 10px;
+  padding-right: 10px;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 /* ── Collaboration panel (expanded below toggle) ────────────── */
@@ -1353,6 +1359,14 @@
   cursor: pointer;
   transition: all 0.12s;
   white-space: nowrap;
+  max-width: 100%;
+}
+/* On a phone-width form a long competency name wraps inside its chip. */
+@media (max-width: 480px) {
+  .af-cc-chip {
+    white-space: normal;
+    text-align: left;
+  }
 }
 .af-cc-chip:hover {
   border-color: var(--cc-color);
