@@ -739,7 +739,7 @@ window.PageDashboard = (function () {
       onAdd: refresh,
       onFlag: refresh,
       // Closed without Add or Flag (Escape, ✕ or the backdrop), e.g. after
-      // "Not now" on the concern flag offer. A save may have redrawn the
+      // "Not Now" on the concern flag offer. A save may have redrawn the
       // card behind the dialog, so the "+" it would refocus is gone: put
       // focus back on this row's new "+".
       onClose: function () {

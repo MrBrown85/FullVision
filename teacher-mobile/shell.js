@@ -737,13 +737,8 @@
         return;
       }
 
-      if (action === 'm-obs-ctx-picker') {
-        MObserve.openPicker('context');
-        return;
-      }
-
-      if (action === 'm-obs-tag-picker') {
-        MObserve.openPicker('tags');
+      if (action === 'm-obs-picker') {
+        MObserve.openPicker(target.getAttribute('data-kind'));
         return;
       }
 
@@ -752,13 +747,23 @@
         return;
       }
 
-      if (action === 'm-obs-pick-context') {
-        MObserve.pickContext(target.getAttribute('data-val'));
+      if (action === 'm-obs-pick') {
+        MObserve.pick(target.getAttribute('data-kind'), target.getAttribute('data-val'), target);
         return;
       }
 
-      if (action === 'm-obs-pick-tag') {
-        MObserve.pickTag(target.getAttribute('data-val'), target);
+      if (action === 'm-obs-flag') {
+        MObserve.flagFromSheet(_cid, target.getAttribute('data-sid'), target);
+        return;
+      }
+
+      if (action === 'm-obs-flag-done') {
+        MObserve.flagDone();
+        return;
+      }
+
+      if (action === 'm-sheet-cancel') {
+        MC.dismissSheet();
         return;
       }
 
@@ -895,6 +900,9 @@
       }
       if (e.target.matches('#m-obs-text')) {
         MObserve.updateSubmitState();
+      }
+      if (e.target.matches('[data-pick-search]')) {
+        MObserve.filterPicker(e.target.value);
       }
     });
 

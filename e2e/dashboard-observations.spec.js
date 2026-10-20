@@ -178,15 +178,15 @@ test.describe('Dashboard Observations card', () => {
       await add().focus();
       await add().click();
       await expect(dialog).toBeVisible();
-      await dialog.locator('.obsc-chip-type[data-value="concern"]').click();
+      await dialog.locator('.obs-band-tab[data-value="concern"]').click();
       await dialog.locator('textarea').fill(text);
       await page.keyboard.press('Enter');
       // The dialog stays open to offer the flag; the card behind it redraws.
-      await expect(dialog.locator('[data-part="flag"]')).toContainText('Not now');
+      await expect(dialog.locator('[data-part="flag"]')).toContainText('Not Now');
     };
-    // "Not now", then Escape.
+    // "Not Now", then Escape.
     await saveConcern('Did not start the lab');
-    await dialog.getByRole('button', { name: 'Not now' }).click();
+    await dialog.getByRole('button', { name: 'Not Now' }).click();
     await page.keyboard.press('Escape');
     await expect(dialog).toBeHidden();
     await expect(add()).toBeFocused();

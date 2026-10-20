@@ -3045,28 +3045,105 @@ body.fv-switching-course::after {
   white-space: nowrap;
 }
 
-/* Quick-post template buttons in half-sheet */
-.m-quick-sheet-header {
+/* The quick menu: the student's name, then one-tap starter rows with the
+   type block in the feed's 74 px column, and "Write Your Own…" last. */
+.m-quick-top {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 4px 0 16px;
+  padding: 0 0 4px;
 }
-.m-quick-sheet-avatar {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  color: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.m-quick-title {
+  flex: 1;
   font-size: 18px;
+  font-weight: 650;
+  color: var(--text);
+}
+.m-quick-cancel {
+  text-align: right;
+}
+.m-quick-sub {
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: var(--text-3);
+}
+.m-quick-row {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr) 14px;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  min-height: 48px;
+  padding: 6px 4px;
+  border: none;
+  border-bottom: 1px solid var(--divider-medium);
+  background: none;
+  font-family: inherit;
+  font-size: 15px;
+  text-align: left;
+  color: var(--text);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.m-quick-row:active {
+  background: var(--overlay-hover);
+}
+.m-quick-row-car {
+  color: var(--text-3);
+  font-size: 20px;
+  line-height: 1;
+}
+.m-quick-own {
+  grid-template-columns: minmax(0, 1fr) 14px;
+  border-bottom: none;
+  color: var(--link);
+  font-weight: 500;
+}
+.m-pick-search {
+  width: 100%;
+  min-height: 40px;
+  margin: 8px 0 4px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  font-family: inherit;
+  font-size: 16px;
+  color: var(--text);
+}
+.m-pick-note {
+  padding: 10px 2px 4px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.m-flag-offer {
+  padding: 8px 16px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.m-flag-offer p {
+  margin: 0 0 4px;
+  font-size: 15px;
+  color: var(--text-2);
+}
+.m-flag-btn,
+.m-flag-not-now {
+  min-height: 44px;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 16px;
+  cursor: pointer;
+}
+.m-flag-btn {
+  border: 1px solid var(--score-2);
+  background: color-mix(in srgb, var(--score-2) 12%, transparent);
+  color: var(--text);
   font-weight: 600;
 }
-.m-quick-sheet-name {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text);
+.m-flag-not-now {
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--text-2);
 }
 .m-quick-template {
   width: 100%;

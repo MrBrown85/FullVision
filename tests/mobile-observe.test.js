@@ -457,92 +457,90 @@ describe('Observation feed edge cases', () => {
   });
 });
 
-/* ── Sheet form content: the shared capture strip ──────────── */
+/* ── The new-observation sheet: the edit sheet with a Student row ── */
 describe('New observation sheet content', () => {
-  it('is the shared capture strip in its sheet layout', () => {
-    mockDataLayer({});
+  it('is the edit sheet: type band, Student row, note, Context, tags and links; Add waits for text', () => {
+    mockDataLayer({ getAssessments: () => [] });
     withSheet(sheet => {
       MObserve.presentNewObsSheet(CID);
-      expect(sheet.textContent).toContain('New observation');
-      expect(sheet.querySelector('.obsc.obsc--sheet')).toBeTruthy();
-      expect(sheet.querySelector('#m-capture-input').getAttribute('placeholder')).toBe('What did you notice?');
-      expect(sheet.querySelector('#m-capture-add-btn').disabled).toBe(true);
-    });
-  });
-
-  it('renders the three types, context and tags as text, with no emoji', () => {
-    mockDataLayer({});
-    withSheet(sheet => {
-      MObserve.presentNewObsSheet(CID);
-      const types = Array.from(sheet.querySelectorAll('.obsc-chip-type')).map(b => b.textContent);
+      expect(sheet.querySelector('.m-edit-title').textContent).toBe('New Observation');
+      const types = Array.from(sheet.querySelectorAll('.obs-band-tab')).map(b => b.textContent);
       expect(types).toEqual(['Strength', 'Growth', 'Concern']);
-      expect(sheet.textContent).toContain('Context');
-      expect(sheet.textContent).toContain('+ Tag');
+      expect(sheet.querySelectorAll('.obs-band-tab.on')).toHaveLength(0);
+      const rows = Array.from(sheet.querySelectorAll('.m-edit-row .m-edit-row-k')).map(e => e.textContent);
+      expect(rows).toEqual(['Student', 'Context', 'Assessment', 'Competency']);
+      expect(sheet.querySelector('#m-obs-text').getAttribute('placeholder')).toBe('What did you notice?');
+      expect(sheet.querySelector('#m-obs-submit').disabled).toBe(true);
+      expect(sheet.textContent).toContain('+ Add Tag');
+      expect(sheet.textContent).not.toContain('Delete Observation');
       expect(sheet.textContent).not.toMatch(/\p{Extended_Pictographic}/u);
     });
   });
 
   it('lists every student in a searchable picker', () => {
-    mockDataLayer({});
-    withSheet((sheet, getOpts, dom) => {
+    mockDataLayer({ getAssessments: () => [] });
+    withSheet(sheet => {
       MObserve.presentNewObsSheet(CID);
-      sheet.querySelector('#m-student-btn').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
-      const menu = sheet.querySelector('#m-student-dropdown');
-      expect(menu.querySelector('.obsc-menu-search')).toBeTruthy();
-      expect(menu.textContent).toContain('Cece Adams');
-      expect(menu.textContent).toContain('Noor Khan');
+      MObserve.openPicker('students');
+      const pick = sheet.querySelector('#m-obs-edit-picker');
+      expect(pick.querySelector('.m-pick-search')).toBeTruthy();
+      expect(pick.textContent).toContain('Cece Adams');
+      expect(pick.textContent).toContain('Noor Khan');
     });
   });
 
-  it('offers Core Competencies and custom tags, which the phone lacked before', () => {
-    mockDataLayer({ getCustomTags: () => ['Lab safety'] });
-    withSheet((sheet, getOpts, dom) => {
+  it('offers Core Competencies and custom tags in the tag picker', () => {
+    mockDataLayer({ getCustomTags: () => ['Lab safety'], getAssessments: () => [] });
+    withSheet(sheet => {
       MObserve.presentNewObsSheet(CID);
-      sheet.querySelector('#m-tag-btn').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
-      const menu = sheet.querySelector('#m-tag-dropdown');
-      expect(menu.textContent).toContain('Core competencies');
-      expect(menu.textContent).toContain('Custom tags');
-      expect(menu.textContent).toContain('Lab safety');
+      MObserve.openPicker('tags');
+      const pick = sheet.querySelector('#m-obs-edit-picker');
+      expect(pick.textContent).toContain('Core competencies');
+      expect(pick.textContent).toContain('Custom tags');
+      expect(pick.textContent).toContain('Lab safety');
     });
   });
 
-  it('a quick-compose student is pre-selected', () => {
-    mockDataLayer({});
+  it('a quick-compose student is pre-selected and named in the title', () => {
+    mockDataLayer({ getAssessments: () => [] });
     withSheet(sheet => {
       MObserve.presentNewObsSheet(CID, 'stu2');
-      expect(sheet.querySelector('.obsc-chip-student').textContent).toContain('Noor Khan');
+      expect(sheet.querySelector('.m-edit-title').textContent).toBe('Noor K.');
+      expect(sheet.querySelector('#m-obs-stu-row').textContent).toContain('Noor K.');
     });
   });
 
-  it('saving writes through addQuickOb with the type and tags', () => {
+  it('Add writes through addQuickOb with the type, tags, context and shorthand', () => {
     const added = [];
     mockDataLayer({
-      addQuickOb: (cid, sid, text, dims, sentiment) => {
-        added.push({ sid, text, dims, sentiment });
+      getAssessments: () => [],
+      addQuickOb: (cid, sid, text, dims, sentiment, context) => {
+        added.push({ sid, text, dims, sentiment, context });
         return true;
       },
     });
-    const origDismiss = MComponents.dismissSheet;
-    const origToast = MComponents.showToast;
-    MComponents.dismissSheet = () => {};
-    MComponents.showToast = () => {};
+    const keep = { dismissSheet: MComponents.dismissSheet, showToast: MComponents.showToast };
+    Object.assign(MComponents, { dismissSheet() {}, showToast() {} });
     try {
-      withSheet((sheet, getOpts, dom) => {
+      withSheet(sheet => {
         MObserve.presentNewObsSheet(CID, 'stu1');
-        sheet
-          .querySelector('[data-obsc="type"][data-value="strength"]')
-          .dispatchEvent(new dom.window.Event('click', { bubbles: true }));
-        const input = sheet.querySelector('#m-capture-input');
-        input.value = 'Asked a sharp question #engagement';
-        sheet.querySelector('#m-capture-add-btn').disabled = false;
-        sheet.querySelector('#m-capture-add-btn').dispatchEvent(new dom.window.Event('click', { bubbles: true }));
+        MObserve.setSentiment('strength');
+        MObserve.openPicker('context');
+        MObserve.pick('context', 'independent');
+        sheet.querySelector('#m-obs-text').value = 'Asked a sharp question #engagement';
+        MObserve.saveObservation(CID);
       });
     } finally {
-      MComponents.dismissSheet = origDismiss;
-      MComponents.showToast = origToast;
+      Object.assign(MComponents, keep);
     }
     expect(added).toEqual([
-      { sid: 'stu1', text: 'Asked a sharp question', dims: ['engagement'], sentiment: 'strength' },
+      {
+        sid: 'stu1',
+        text: 'Asked a sharp question',
+        dims: ['engagement'],
+        sentiment: 'strength',
+        context: 'independent',
+      },
     ]);
   });
 });
@@ -654,11 +652,15 @@ describe('Quick menu starters', () => {
   it('lists the class starters in order instead of the fixed six', () => {
     mockDataLayer({ getObservationTemplates: () => STARTERS });
     const html = menuHtml(CID);
-    const texts = [...html.matchAll(/data-template="([^"]+)"><span>([^<]+)<\/span>/g)].map(m => [m[1], m[2]]);
+    const texts = [...html.matchAll(/data-template="([^"]+)">.*?<span class="m-quick-row-text">([^<]+)<\/span>/g)].map(
+      m => [m[1], m[2]],
+    );
     expect(texts).toEqual([
       ['ot1', 'Explained a model to the table'],
       ['ot2', 'Needed a reminder to start'],
     ]);
+    expect(html).toContain('<span class="m-obs-type" data-sentiment="strength">Strength</span>');
+    expect(html).toMatch(/data-action="m-obs-quick-compose"[^>]*><span class="m-quick-row-text">Write Your Own…</);
     expect(html).not.toContain('Strong collaboration with peers');
     expect(html).not.toContain('Add your own in Class Management');
   });

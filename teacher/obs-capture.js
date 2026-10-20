@@ -5,10 +5,12 @@
    and the phone sheet (docs/DECISIONS.md, "Observations (2026-10-18)"). Each
    host pre-fills what it knows and locks what it cannot change.
 
-   The strip: student chips (+ Student), type chips (Strength / Growth /
-   Concern, one at a time), a context chip, tag pills (+ Tag: dispositions,
-   Core Competencies, custom tags), + Assessment, + Competency (one
-   learning-map tag) with an optional Level, + Starter, the text box and Add.
+   The strip is the edit window's twin (docs/DECISIONS.md, "Observations",
+   item 12): a folder band with the three types as tabs (none chosen until
+   picked), a Student line (chips, + Student), the note box, then one row:
+   + Starter, Tags (+ Add Tag: dispositions, Core Competencies, custom
+   tags), the Context menu, + Link (an assessment, or one learning-map
+   competency with an optional Level), Keep Tags and Add.
    Shorthand in the box: @name, #tag, !strength|growth|concern, /starter.
    Enter sends, Shift+Enter adds a line.
 
@@ -442,10 +444,12 @@ window.ObsCapture = (function () {
     var _destroyed = false;
 
     root.innerHTML =
+      '<div data-part="band"></div>' +
+      '<div class="obsc-body">' +
       '<div class="obsc-row obsc-who" data-part="who"></div>' +
       '<div class="obsc-slot" data-slot="who"></div>' +
       '<div class="obsc-input-wrap">' +
-      '<textarea class="obsc-input" id="' +
+      '<textarea class="obsc-input obs-note-box" id="' +
       p +
       'capture-input" rows="2" autocomplete="off" aria-label="Observation note" placeholder="' +
       _esc(opts.placeholder || 'What did you notice?') +
@@ -454,7 +458,8 @@ window.ObsCapture = (function () {
       '<div class="obsc-slot" data-slot="input"></div>' +
       '<div class="obsc-row obsc-links" data-part="links"></div>' +
       '<div class="obsc-slot" data-slot="links"></div>' +
-      '<div class="obsc-flag" data-part="flag" aria-live="polite"></div>';
+      '<div class="obsc-flag" data-part="flag" aria-live="polite"></div>' +
+      '</div>';
 
     var input = root.querySelector('textarea');
     input.value = _drafts[draftKey] || '';
@@ -508,8 +513,30 @@ window.ObsCapture = (function () {
       );
     }
 
+    function renderBand() {
+      return ObsCard.typeBandHtml({
+        value: state.sentiment,
+        right: 'New observation · today',
+        tabAttrs: function (k) {
+          return 'data-obsc="type" data-value="' + k + '"';
+        },
+      });
+    }
+
+    function avatarHtml(s) {
+      var color =
+        typeof _avatarColor === 'function'
+          ? _avatarColor(s.id)
+          : typeof MComponents !== 'undefined'
+            ? MComponents.avatarColor(s.id)
+            : 'var(--text-3)';
+      var ini = ((s.first || s.name || '?').charAt(0) + (s.last || '').charAt(0)).toUpperCase();
+      return '<i class="obsc-av" style="background:' + color + '" aria-hidden="true">' + _esc(ini) + '</i>';
+    }
+
+    /* The Student line, like an email's To line. */
     function renderWho() {
-      var h = '';
+      var h = '<span class="obs-row-label">Student</span>';
       var byId = {};
       studentList(cid).forEach(function (s) {
         byId[s.id] = s;
@@ -517,7 +544,7 @@ window.ObsCapture = (function () {
       state.students.forEach(function (sid) {
         var s = byId[sid];
         if (!s) return;
-        h += removable(_esc(s.name), 'removeStudent', sid, {
+        h += removable(avatarHtml(s) + _esc(s.name), 'removeStudent', sid, {
           cls: 'obsc-chip-student',
           locked: opts.lockStudents,
           plain: s.name,
@@ -525,52 +552,27 @@ window.ObsCapture = (function () {
         });
       });
       if (!opts.lockStudents) {
-        h += chip('menu', state.students.length ? '+ Student' : 'Select students…', {
+        h += chip('menu', '+ Student', {
           value: 'students',
           id: p + 'student-btn',
           menu: 'students',
-          cls: 'obsc-chip-add' + (state.students.length ? '' : ' obsc-chip-prompt'),
+          cls: 'obs-add obsc-chip-add',
           attrs: ' aria-label="' + (state.students.length ? 'Add a student' : 'Select students') + '"',
         });
-      }
-      h += '<span class="obsc-sep" aria-hidden="true"></span>';
-      h += '<span class="obsc-group" role="group" aria-label="Type">';
-      TYPE_KEYS.forEach(function (k) {
-        var info = (typeof OBS_SENTIMENTS !== 'undefined' && OBS_SENTIMENTS[k]) || { label: k };
-        h += chip('type', _esc(info.label), {
-          value: k,
-          on: state.sentiment === k,
-          pressed: state.sentiment === k,
-          cls: 'obsc-chip-type',
-          attrs: ' data-sentiment="' + k + '"',
-        });
-      });
-      h += '</span>';
-      var ctxInfo = state.context && typeof OBS_CONTEXTS !== 'undefined' && OBS_CONTEXTS[state.context];
-      if (ctxInfo) {
-        h += removable(_esc(ctxInfo.label), 'clearContext', '', {
-          trigger: 'menuContext',
-          plain: ctxInfo.label,
-          cls: 'obsc-chip-context',
-        });
-      } else {
-        h += chip('menu', 'Context', {
-          value: 'context',
-          menu: 'context',
-          cls: 'obsc-chip-add',
-          id: p + 'context-btn',
-        });
+        h += '<span class="obsc-hint">or type @name</span>';
       }
       return h;
     }
 
+    /* One row: + Starter | Tags | Context, + Link, then Keep Tags and Add. */
     function renderLinks() {
       var h = chip('menu', '+ Starter', {
         value: 'starters',
         menu: 'starters',
-        cls: 'obsc-chip-add obsc-chip-starter',
+        cls: 'obs-add obsc-chip-add obsc-chip-starter',
         id: p + 'starter-btn',
       });
+      h += '<span class="obs-row-sep" aria-hidden="true"></span><span class="obs-row-label">Tags</span>';
       state.dims.forEach(function (k) {
         var label = tagLabel(k);
         h += removable(_esc(label), 'removeTag', k, {
@@ -579,7 +581,21 @@ window.ObsCapture = (function () {
           cls: 'obsc-chip-tag',
         });
       });
-      h += chip('menu', '+ Tag', { value: 'tags', menu: 'tags', cls: 'obsc-chip-add', id: p + 'tag-btn' });
+      h += chip('menu', '+ Add Tag', { value: 'tags', menu: 'tags', cls: 'obs-add obsc-chip-add', id: p + 'tag-btn' });
+      h +=
+        '<span class="obs-row-sep" aria-hidden="true"></span><span class="obs-row-label" id="' +
+        p +
+        'context-label">Context</span>';
+      h += ObsCard.contextMenuHtml({
+        id: p + 'context',
+        value: state.context,
+        open: state.menu === 'context',
+        labelledBy: p + 'context-label',
+        toggleAttrs: 'data-obsc="menu" data-value="context"',
+        pickAttrs: function (k) {
+          return 'data-obsc="setContext" data-value="' + k + '"';
+        },
+      });
 
       if (state.assessmentId) {
         var title = _assessmentTitle(cid, state.assessmentId) || 'Assessment';
@@ -589,15 +605,7 @@ window.ObsCapture = (function () {
           plain: 'assessment ' + title,
           cls: 'obsc-chip-assessment',
         });
-      } else if (!opts.lockAssessment) {
-        h += chip('menu', '+ Assessment', {
-          value: 'assessment',
-          menu: 'assessment',
-          cls: 'obsc-chip-add',
-          id: p + 'assessment-btn',
-        });
       }
-
       if (state.competencyId) {
         var cl = competencyLabel(cid, state.competencyId) || 'Competency';
         h += removable('Competency: ' + _esc(cl), 'clearCompetency', '', {
@@ -610,16 +618,17 @@ window.ObsCapture = (function () {
           value: 'level',
           menu: 'level',
           on: !!lv,
-          cls: 'obsc-chip-add obsc-chip-level',
+          cls: 'obsc-chip-level' + (lv ? '' : ' obs-add obsc-chip-add'),
           id: p + 'level-btn',
           attrs: ' title="Evidence only. It never changes a grade."',
         });
-      } else {
-        h += chip('menu', '+ Competency', {
-          value: 'competency',
-          menu: 'competency',
-          cls: 'obsc-chip-add',
-          id: p + 'competency-btn',
+      }
+      if (linkChoices().length) {
+        h += chip('menu', '+ Link<span class="obs-menu-car" aria-hidden="true">▾</span>', {
+          value: 'link',
+          menu: 'link',
+          cls: 'obs-menu-btn empty obsc-link-btn',
+          id: p + 'link-btn',
         });
       }
 
@@ -627,12 +636,22 @@ window.ObsCapture = (function () {
       h +=
         '<label class="obsc-keep"><input type="checkbox" data-obsc="keepTags"' +
         (state.keepTags ? ' checked' : '') +
-        '> Keep tags</label>';
+        '> Keep Tags</label>';
+      h += '<span class="obsc-hint">Enter adds</span>';
       h +=
         '<button type="button" class="obsc-add" id="' +
         p +
         'capture-add-btn" data-obsc="add" aria-label="Add observation">Add</button>';
       return h;
+    }
+
+    /* What + Link still offers: an assessment (unless the host fixed it)
+       and a competency. */
+    function linkChoices() {
+      var out = [];
+      if (!state.assessmentId && !opts.lockAssessment) out.push('assessment');
+      if (!state.competencyId) out.push('competency');
+      return out;
     }
 
     function renderFlag() {
@@ -653,7 +672,7 @@ window.ObsCapture = (function () {
           _esc(s.first || s.name) +
           '</button>';
       });
-      h += '<button type="button" class="obsc-flag-dismiss" data-obsc="notNow">Not now</button>';
+      h += '<button type="button" class="obsc-flag-dismiss" data-obsc="notNow">Not Now</button>';
       return h;
     }
 
@@ -661,7 +680,7 @@ window.ObsCapture = (function () {
     var MENU_ROW = {
       starters: 'links',
       students: 'who',
-      context: 'who',
+      link: 'links',
       tags: 'links',
       assessment: 'links',
       competency: 'links',
@@ -670,7 +689,7 @@ window.ObsCapture = (function () {
     var MENU_LABEL = {
       starters: 'Sentence starters',
       students: 'Students',
-      context: 'Context',
+      link: 'Link',
       tags: 'Tags',
       assessment: 'Assessments',
       competency: 'Competencies',
@@ -680,9 +699,10 @@ window.ObsCapture = (function () {
       starters: 'starter-btn',
       students: 'student-btn',
       context: 'context-btn',
+      link: 'link-btn',
       tags: 'tag-btn',
-      assessment: 'assessment-btn',
-      competency: 'competency-btn',
+      assessment: 'link-btn',
+      competency: 'link-btn',
       level: 'level-btn',
     };
 
@@ -751,6 +771,40 @@ window.ObsCapture = (function () {
       var info = t.sentiment && typeof OBS_SENTIMENTS !== 'undefined' && OBS_SENTIMENTS[t.sentiment];
       return info ? info.label : '';
     }
+    /* What a starter sets besides its text: "Small group · Collaboration". */
+    function starterSets(t) {
+      var bits = [];
+      var c = t.context && typeof OBS_CONTEXTS !== 'undefined' && OBS_CONTEXTS[t.context];
+      if (c) bits.push(c.label);
+      (t.dims || []).forEach(function (k) {
+        bits.push(tagLabel(k));
+      });
+      return bits.join(' · ');
+    }
+    /* A starter row: its type block, the text, and under it what it sets. */
+    function starterItem(t, attrs, on) {
+      var sets = starterSets(t);
+      return (
+        '<div class="obsc-item obsc-starter' +
+        (on ? ' is-active' : '') +
+        '" role="option" tabindex="-1" aria-selected="' +
+        !!on +
+        '" ' +
+        attrs +
+        ' data-search="' +
+        _esc(t.text) +
+        '">' +
+        ObsCard.typeBlockHtml(t.sentiment).replace('class="obs-type', 'class="obs-type obsc-item-hint') +
+        '<span class="obsc-starter-text"><span class="obsc-item-label">' +
+        _esc(t.text) +
+        '</span>' +
+        (sets ? '<small class="obsc-starter-sets">' + _esc(sets) + '</small>' : '') +
+        '</span></div>'
+      );
+    }
+    function starterFootHint() {
+      return '<div class="obsc-menu-note">A starter fills the type, context and tags you haven’t set.</div>';
+    }
 
     function menuHtml(name) {
       var h = '';
@@ -762,10 +816,11 @@ window.ObsCapture = (function () {
         h += '<div class="obsc-menu-list">';
         if (!starters.length) h += '<div class="obsc-menu-empty">This class has no sentence starters yet.</div>';
         starters.forEach(function (t) {
-          h += item('pickStarter', t.id, t.text, { search: t.text, hint: starterHint(t) });
+          h += starterItem(t, 'data-obsc="pickStarter" data-value="' + _esc(t.id) + '"', false);
         });
         h += starterFooterHtml();
         h += '</div>';
+        if (starters.length) h += starterFootHint();
       } else if (name === 'students') {
         id = p + 'student-dropdown';
         h += search('Search students…') + '<div class="obsc-menu-list">';
@@ -773,10 +828,19 @@ window.ObsCapture = (function () {
           h += item('toggleStudent', s.id, s.name, { on: state.students.indexOf(s.id) >= 0, search: s.name });
         });
         h += '</div>';
-      } else if (name === 'context') {
+      } else if (name === 'link') {
+        id = p + 'link-dropdown';
         h += '<div class="obsc-menu-list">';
-        Object.keys(typeof OBS_CONTEXTS !== 'undefined' ? OBS_CONTEXTS : {}).forEach(function (k) {
-          h += item('setContext', k, OBS_CONTEXTS[k].label, { on: state.context === k });
+        linkChoices().forEach(function (k) {
+          h +=
+            '<div class="obsc-item" role="option" tabindex="-1" aria-selected="false" data-obsc="menu" data-value="' +
+            k +
+            '" id="' +
+            p +
+            k +
+            '-btn"><span class="obsc-check" aria-hidden="true"></span><span class="obsc-item-label">' +
+            (k === 'assessment' ? '+ Assessment' : '+ Competency') +
+            '</span></div>';
         });
         h += '</div>';
       } else if (name === 'tags') {
@@ -843,18 +907,7 @@ window.ObsCapture = (function () {
             : '<div class="obsc-menu-empty">This class has no sentence starters yet.</div>';
         }
         sg.items.forEach(function (it, i) {
-          h +=
-            '<div class="obsc-item' +
-            (i === sg.index ? ' is-active' : '') +
-            '" role="option" aria-selected="' +
-            (i === sg.index) +
-            '" data-obsc="pickSuggest" data-value="' +
-            i +
-            '"><span class="obsc-item-label">' +
-            _esc(it.label) +
-            '</span>' +
-            (it.hint ? '<span class="obsc-item-hint">' + _esc(it.hint) + '</span>' : '') +
-            '</div>';
+          h += starterItem(it.starter, 'data-obsc="pickSuggest" data-value="' + i + '"', i === sg.index);
         });
         if (canEditStarters()) {
           h +=
@@ -901,6 +954,7 @@ window.ObsCapture = (function () {
       var openSearch = root.querySelector('.obsc-menu [data-obsc-search]');
       var searchVal = openSearch ? openSearch.value : '';
       var searchFocused = openSearch && document.activeElement === openSearch;
+      root.querySelector('[data-part="band"]').innerHTML = renderBand();
       root.querySelector('[data-part="who"]').innerHTML = renderWho();
       root.querySelector('[data-part="links"]').innerHTML = renderLinks();
       root.querySelector('[data-part="flag"]').innerHTML = renderFlag();
@@ -911,7 +965,7 @@ window.ObsCapture = (function () {
         else if (state.menu && MENU_ROW[state.menu] === slot) html = menuHtml(state.menu);
         el.innerHTML = html;
       });
-      if (state.menu) {
+      if (state.menu && state.menu !== 'context') {
         placeMenu();
         var s = root.querySelector('.obsc-menu [data-obsc-search]');
         if (s && searchVal) {
@@ -972,7 +1026,9 @@ window.ObsCapture = (function () {
       state.menu = state.menu === name ? null : name;
       state.suggest = null;
       render();
-      if (state.menu) {
+      if (state.menu === 'context') {
+        ObsCard.focusContextMenu(root);
+      } else if (state.menu) {
         var s = root.querySelector('.obsc-menu [data-obsc-search]');
         var first = root.querySelector('.obsc-slot .obsc-menu .obsc-item');
         if (s) _focus(s);
@@ -1027,7 +1083,7 @@ window.ObsCapture = (function () {
         items = matchStarters(tok.query, starterList(cid))
           .slice(0, 8)
           .map(function (t) {
-            return { label: t.text, value: t.id, hint: starterHint(t) };
+            return { label: t.text, value: t.id, hint: starterHint(t), starter: t };
           });
       }
       state.menu = null;
@@ -1236,8 +1292,8 @@ window.ObsCapture = (function () {
         studentsChanged();
         render();
       } else if (act === 'setContext') {
-        state.context = state.context === val ? null : val;
-        closeMenu(true);
+        state.context = val || null;
+        closeMenu(false);
       } else if (act === 'clearContext') {
         state.context = null;
         render();
@@ -1374,6 +1430,10 @@ window.ObsCapture = (function () {
         return;
       }
       if (!state.menu) return;
+      if (state.menu === 'context' && ObsCard.contextMenuKey(e, root)) {
+        e.stopPropagation();
+        return;
+      }
       // Keys used inside a menu stay here, so page shortcuts (gradebook cell
       // navigation, for one) do not also act on them.
       if (['Escape', 'Enter', ' ', 'ArrowDown', 'ArrowUp'].indexOf(e.key) >= 0) e.stopPropagation();
@@ -1415,6 +1475,9 @@ window.ObsCapture = (function () {
       Array.prototype.forEach.call(root.querySelectorAll('[data-slot]'), function (el) {
         el.innerHTML = '';
       });
+      Array.prototype.forEach.call(root.querySelectorAll('.obs-menu'), function (el) {
+        el.parentNode.removeChild(el);
+      });
       Array.prototype.forEach.call(root.querySelectorAll('[aria-expanded="true"]'), function (el) {
         el.setAttribute('aria-expanded', 'false');
       });
@@ -1423,7 +1486,13 @@ window.ObsCapture = (function () {
     function onDocMousedown(e) {
       if (!state.menu && !state.suggest) return;
       if (root.contains(e.target)) {
-        if (state.menu && !e.target.closest('.obsc-menu') && !e.target.closest('[data-obsc^="menu"]')) clearMenus();
+        if (
+          state.menu &&
+          !e.target.closest('.obsc-menu') &&
+          !e.target.closest('.obs-menu') &&
+          !e.target.closest('[data-obsc^="menu"]')
+        )
+          clearMenus();
         return;
       }
       clearMenus();
