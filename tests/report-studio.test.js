@@ -1,9 +1,11 @@
 /**
  * Page Studio's pure parts (teacher/report-studio.js): the palette's size
- * badges, the stats strip, the toolbar count and the canvas zoom.
+ * badges, the fit line, the inspector and the canvas zoom.
  */
 import './setup.js';
 import { describe, expect, it } from 'vitest';
+
+const per = list => Object.fromEntries(list.map((p, i) => [`s${i}`, { name: `S ${i}`, pushed: [], cut: [], ...p }]));
 
 describe('ReportStudio', () => {
   it('badges a block by its measured height', () => {
@@ -14,22 +16,16 @@ describe('ReportStudio', () => {
     expect(ReportStudio.sizeBadge(900)).toBe('XL');
   });
 
-  it('reads the longest, the shortest, overflow and blank backs from the class fit', () => {
-    const st = ReportStudio.stats({
-      students: 3,
-      pages: 8,
-      over: ['Priya Kaur'],
-      perStudent: {
-        a: { name: 'Cece Adeyemi', sheets: 1, sides: 2, used: 900, over: false },
-        b: { name: 'Priya Kaur', sheets: 2, sides: 3, used: 1800, over: true },
-        c: { name: 'Ethan Dubois', sheets: 1, sides: 2, used: 700, over: false },
-      },
-    });
-    expect(st.longest).toMatchObject({ name: 'Priya Kaur', pages: 3 });
-    expect(st.shortest).toMatchObject({ name: 'Ethan Dubois', pages: 2 });
-    expect(st.over).toBe(1);
-    expect(st.blankBacks).toBe(1);
-    expect(ReportStudio.stats(null)).toEqual({ longest: null, shortest: null, over: 0, blankBacks: 0, cut: 0 });
+  it('the fit line says the class fits, who is pushed past the page, or who is cut', () => {
+    expect(ReportStudio.fitLineHtml({ perStudent: per([{}, {}, {}]) })).toBe('Fits for 3 of 3 students');
+    const pushed = ReportStudio.fitLineHtml({ perStudent: per([{ pushed: ['next-steps'] }, {}, { pushed: ['x'] }]) });
+    expect(pushed).toContain('Pushes past the page for 2 students');
+    expect(pushed).toContain('data-action="studioView" data-view="all"');
+    expect(ReportStudio.fitLineHtml({ perStudent: per([{ pushed: ['a'] }]) })).toContain('for 1 student<');
+    const cut = ReportStudio.fitLineHtml({ perStudent: per([{ pushed: ['a'], cut: ['Learning Dispositions'] }, {}]) });
+    expect(cut).toContain('Cut for 1 student');
+    expect(cut).not.toContain('Pushes');
+    expect(ReportStudio.fitLineHtml(null)).toBe('');
   });
 
   it('scales two pages side by side when there is room, else one above the other', () => {
@@ -49,15 +45,26 @@ describe('ReportStudio', () => {
     expect(html).not.toContain('data-block="header"');
   });
 
-  it('the inspector names the selected block and its place, and always shows the stats', () => {
+  it('the inspector holds the block’s options, Leave Off and Remove, and nothing about size or place', () => {
     const f = ReportSheets.form();
-    const html = ReportStudio.inspectorHtml(f, 'competency-table', ReportStudio.stats(null));
+    const html = ReportStudio.inspectorHtml(f, 'competency-table', { id: 'st1', name: 'Cece Adeyemi' });
     expect(html).toContain('Competency Table');
-    expect(html).toContain('Page 1 · row 4');
+    expect(html).toContain('Evidence Count');
+    expect(html).toContain('Leave off Cece Adeyemi&rsquo;s report');
     expect(html).toContain('Remove from Report');
-    expect(html).toContain('Longest report in class');
-    const none = ReportStudio.inspectorHtml(f, null, ReportStudio.stats(null));
+    expect(html).not.toMatch(/Width|Height|Lines|Page 1|row \d|Longest|Shortest|overflow|Blank back/);
+    const none = ReportStudio.inspectorHtml(f, null, null);
     expect(none).toContain('Select a block on the page');
-    expect(ReportStudio.inspectorHtml(f, 'header', null)).not.toContain('Remove from Report');
+    const head = ReportStudio.inspectorHtml(f, 'header', null);
+    expect(head).toContain('Student Number');
+    expect(head).not.toContain('Remove from Report');
+  });
+
+  it('the canvas carries the fit line and the view switch, and no hint sentence', () => {
+    const html = ReportStudio.layoutHtml({ view: 'one' });
+    expect(html).toContain('id="studio-fit"');
+    expect(html).toContain('One Student');
+    expect(html).toContain('Everyone');
+    expect(html).not.toContain('Drag a block onto a page');
   });
 });

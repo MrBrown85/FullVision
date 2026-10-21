@@ -1006,9 +1006,9 @@ window.ReportBlocks = (function () {
           const span = (on('score') ? 1 : 0) + (on('level') ? 1 : 0);
           rows += `<tr>
           <td style="font-weight:500">${esc(a.title)}${weightLabel}</td>
-          ${on('date') ? `<td style="color:var(--text-3);font-size:0.76rem">${dateStr}</td>` : ''}
-          ${on('category') ? `<td style="font-size:0.68rem;color:var(--text-2)">${esc(categoryLabel)}</td>` : ''}
-          ${on('area') ? `<td style="font-size:0.68rem">${tagPills}</td>` : ''}
+          ${on('date') ? `<td class="col-date" style="color:var(--text-3);font-size:0.76rem">${dateStr}</td>` : ''}
+          ${on('category') ? `<td class="col-category" style="font-size:0.68rem;color:var(--text-2)">${esc(categoryLabel)}</td>` : ''}
+          ${on('area') ? `<td class="col-area" style="font-size:0.68rem">${tagPills}</td>` : ''}
           ${span ? `<td style="color:var(--text-3);font-style:italic" colspan="${span}">Not assessed</td>` : ''}</tr>`;
           return;
         }
@@ -1036,9 +1036,9 @@ window.ReportBlocks = (function () {
         }
         rows += `<tr>
         <td style="font-weight:500">${esc(a.title)}${weightLabel}</td>
-        ${on('date') ? `<td style="color:var(--text-3);font-size:0.76rem">${dateStr}</td>` : ''}
-        ${on('category') ? `<td style="font-size:0.68rem;color:var(--text-2)">${esc(categoryLabel)}</td>` : ''}
-        ${on('area') ? `<td style="font-size:0.68rem">${tagPills}</td>` : ''}
+        ${on('date') ? `<td class="col-date" style="color:var(--text-3);font-size:0.76rem">${dateStr}</td>` : ''}
+        ${on('category') ? `<td class="col-category" style="font-size:0.68rem;color:var(--text-2)">${esc(categoryLabel)}</td>` : ''}
+        ${on('area') ? `<td class="col-area" style="font-size:0.68rem">${tagPills}</td>` : ''}
         ${on('score') ? scoreDisplay : ''}${on('level') ? profDisplay : ''}</tr>`;
       });
       return rows;
@@ -1049,9 +1049,9 @@ window.ReportBlocks = (function () {
     <table class="report-tag-table report-grade-table" style="margin-top:4px">
       <thead><tr>
         <th style="text-align:left">Assignment</th>
-        ${on('date') ? '<th style="width:10%;text-align:left">Date</th>' : ''}
-        ${on('category') ? '<th style="width:14%;text-align:left">Category</th>' : ''}
-        ${on('area') ? '<th style="width:18%;text-align:left">Learning Area</th>' : ''}
+        ${on('date') ? '<th class="col-date" style="width:10%;text-align:left">Date</th>' : ''}
+        ${on('category') ? '<th class="col-category" style="width:14%;text-align:left">Category</th>' : ''}
+        ${on('area') ? '<th class="col-area" style="width:18%;text-align:left">Learning Area</th>' : ''}
         ${on('score') ? '<th style="width:12%;text-align:center">Score</th>' : ''}
         ${on('level') ? '<th style="width:12%;text-align:center">Proficiency</th>' : ''}
       </tr></thead><tbody>`;

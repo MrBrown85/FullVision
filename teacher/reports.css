@@ -3082,22 +3082,37 @@
   min-height: 0;
   background: #e9ecf0;
 }
-.studio-hint {
+.studio-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 6px 14px;
+  min-height: 34px;
+  padding: 4px 14px;
   font-size: 12px;
   color: var(--text-2);
   border-bottom: 1px solid var(--border);
   background: var(--surface);
 }
-.studio-hint-text {
+.studio-fit {
   min-width: 0;
+  font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.studio-fit.ok {
+  color: #15803d;
+}
+.studio-fit-link {
+  font: inherit;
+  font-weight: 600;
+  color: #b45309;
+  background: none;
+  border: none;
+  padding: 0;
+  text-decoration: underline;
+  cursor: pointer;
 }
 .studio-view {
   flex: 0 0 auto;
@@ -3144,65 +3159,61 @@
   color: var(--text-3);
   margin: 0 0 6px;
 }
-/* The fill bar on each page's right edge. */
-.rb-preview.studio-pages:not(.studio-all) .report-sheet::after {
-  content: '';
-  position: absolute;
-  right: -16px;
-  top: 0;
-  bottom: 0;
-  width: 6px;
-  border-radius: 3px;
-  background: #dfe3e8;
-  background-image: linear-gradient(#15803d, #15803d);
-  background-repeat: no-repeat;
-  background-size: 100% var(--fill, 0%);
-  background-position: bottom;
-}
-.rb-preview.studio-pages:not(.studio-all) .report-sheet.sheet-overflow::after {
-  background-image: linear-gradient(#b45309, #b45309);
-}
 .rb-preview.studio-pages .report-sheet {
   overflow: visible;
 }
 .rb-preview.studio-pages .report-sheet .sheet-body {
   overflow: hidden;
 }
-/* Selection on the page. */
+/* The page grid: every block absolutely at its rectangle, sized by the
+   engine (report-sheets.js). A cell is a size container, so a block lays
+   itself out for the width it is given; the measuring stage uses the same
+   cells, so what is measured is what prints. */
+.report-sheet .sheet-body {
+  position: relative;
+}
 .sheet-cell {
   position: relative;
-  display: flow-root;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  container-type: inline-size;
   border-radius: 6px;
 }
+.sheet-body > .sheet-cell {
+  position: absolute;
+}
+.sheet-fill > .report-block-box {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+.report-ruled-fill {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.report-ruled-empty {
+  min-height: 22px;
+}
+.sheet-fill .report-parent-comments {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+.sheet-fill .report-parent-comments-box {
+  flex: 1 1 auto;
+}
+.sheet-cell svg {
+  max-width: 100%;
+  height: auto;
+}
+/* Selection on the page. */
 .studio-pages .sheet-cell {
   cursor: pointer;
 }
 .studio-pages .sheet-cell.studio-sel {
   outline: 2px solid var(--active);
   outline-offset: 1px;
-}
-.studio-pages .sheet-cell.studio-sel::after {
-  content: '';
-  position: absolute;
-  right: -5px;
-  bottom: -5px;
-  width: 9px;
-  height: 9px;
-  background: #fff;
-  border: 2px solid var(--active);
-  border-radius: 2px;
-}
-.sheet-row {
-  display: flex;
-  gap: 12px;
-  align-items: stretch;
-}
-.sheet-row > .sheet-cell {
-  min-width: 0;
-}
-.sheet-row > .sheet-cell > .report-block-box {
-  height: 100%;
-  box-sizing: border-box;
 }
 .studio-inspector {
   background: var(--surface);
@@ -3244,22 +3255,6 @@
 }
 .studio-remove:hover {
   border-color: var(--danger);
-}
-.studio-stats {
-  margin-top: 18px;
-}
-.studio-stat {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  font-size: 12px;
-  padding: 6px 0;
-  border-top: 1px solid var(--divider-subtle, #eef0f3);
-}
-.studio-stat b {
-  font-family: var(--font-mono, ui-monospace, Menlo, monospace);
-  font-weight: 600;
-  white-space: nowrap;
 }
 .report-text-body {
   font-size: var(--text-base);
@@ -3307,120 +3302,9 @@
   .rb-preview.studio-pages .report-sheet {
     overflow: hidden;
   }
-  .rb-preview.studio-pages .report-sheet::after {
-    content: none;
-  }
 }
 
-/* ── Page Studio: drag and drop ──────────────────────────────── */
-.studio-ghost {
-  position: fixed;
-  z-index: 60;
-  pointer-events: none;
-  font-family: var(--font-base);
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text);
-  background: var(--active-tint, #e8f0ff);
-  border: 1px dashed var(--active);
-  border-radius: 8px;
-  padding: 7px 10px;
-  box-shadow: 0 6px 18px rgba(10, 108, 255, 0.25);
-  transform: rotate(-1.5deg);
-}
-.studio-dragging .sheet-cell {
-  pointer-events: none;
-}
-.studio-dragging .studio-blk {
-  cursor: grabbing;
-}
-.studio-blk,
-.studio-pages .sheet-cell {
-  touch-action: none;
-}
-.studio-drop {
-  position: absolute;
-  z-index: 5;
-  box-sizing: border-box;
-  border: 2px dashed transparent;
-  border-radius: 6px;
-  pointer-events: auto;
-  font-family: var(--font-base);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--active);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  white-space: nowrap;
-}
-.studio-drop-row {
-  border-color: rgba(10, 108, 255, 0.35);
-  background: rgba(10, 108, 255, 0.06);
-}
-.studio-drop-col {
-  border-color: rgba(10, 108, 255, 0.35);
-  background: rgba(10, 108, 255, 0.06);
-  writing-mode: vertical-rl;
-}
-.studio-drop.active {
-  border-color: var(--active);
-  background: var(--active-tint, #e8f0ff);
-  min-height: 44px;
-  z-index: 6;
-}
-.studio-drop-row.active {
-  transform: translateY(-15px);
-}
-.studio-drop.active.no {
-  border-color: var(--danger);
-  background: #fdecea;
-  color: var(--danger);
-}
-.studio-drop-page {
-  position: relative;
-  width: 100%;
-  margin-top: 12px;
-  height: 44px;
-  border-color: rgba(10, 108, 255, 0.35);
-  background: rgba(10, 108, 255, 0.06);
-  flex: 1 1 100%;
-}
-.studio-dragging .studio-pages .sheet-student {
-  padding-bottom: 60px;
-}
-/* The corner handle of the selected block. */
-.studio-handle {
-  position: absolute;
-  right: -7px;
-  bottom: -7px;
-  width: 13px;
-  height: 13px;
-  background: #fff;
-  border: 2px solid var(--active);
-  border-radius: 2px;
-  cursor: ew-resize;
-  z-index: 4;
-}
-.studio-pages .sheet-cell.studio-sel::after {
-  content: none;
-}
-.sheet-cell[data-span-preview]::before {
-  content: attr(data-span-preview);
-  position: absolute;
-  top: -10px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--active);
-  color: #fff;
-  font-family: var(--font-base);
-  font-size: 10px;
-  font-weight: 600;
-  padding: 1px 7px;
-  border-radius: 9px;
-  z-index: 4;
-}
+/* ── Page Studio: keyboard focus and the live region ──────────── */
 .studio-pages .sheet-cell:focus-visible {
   outline: 2px solid var(--active);
   outline-offset: 1px;
@@ -3432,25 +3316,7 @@
   overflow: hidden;
   clip: rect(0 0 0 0);
 }
-.studio-lines {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-left: 10px;
-  font-size: 12px;
-  color: var(--text-2);
-}
-.studio-lines input {
-  width: 52px;
-  font: inherit;
-  padding: 3px 6px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-}
 @media print {
-  .studio-drop,
-  .studio-handle,
-  .studio-ghost,
   .studio-live {
     display: none !important;
   }
@@ -3474,8 +3340,11 @@
   font-style: italic;
 }
 .sheet-capped {
-  flex: 0 0 auto;
-  margin: 6px 0 0;
+  position: absolute;
+  left: 0.5in;
+  right: 0.5in;
+  bottom: calc(0.5in + 28px);
+  z-index: 2;
   padding: 6px 10px;
   border: 1.5px dashed var(--danger);
   border-radius: 6px;
@@ -3598,5 +3467,59 @@ textarea.studio-text {
   .report-toolbar .student-picker-btn {
     min-width: 0;
     max-width: 150px;
+  }
+}
+
+/* ── Page Studio: blocks adapt to their box ────────────────────
+   Each block's cell is a size container (container-type above); what a
+   narrow box cannot hold goes by width, never by student. */
+@container (width < 520px) {
+  .report-sheet .report-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  .report-sheet .report-header-meta {
+    text-align: left;
+  }
+}
+@container (width < 460px) {
+  .report-grade-table .col-area {
+    display: none;
+  }
+  .report-sheet .report-overall {
+    flex-wrap: wrap;
+  }
+  .report-sheet .report-overall-main {
+    flex: 1 1 100% !important;
+  }
+  .report-sheet .report-section-chip {
+    flex: 0 0 50%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+}
+@container (width < 400px) {
+  .report-sheet .report-learner-dim {
+    flex: 1 1 100% !important;
+  }
+}
+@container (width < 380px) {
+  .report-grade-table .col-category {
+    display: none;
+  }
+}
+@container (width < 320px) {
+  .report-ct .report-ct-evidence,
+  .report-ct-legend {
+    display: none;
+  }
+}
+@container (width < 300px) {
+  .report-grade-table .col-date {
+    display: none;
+  }
+  .report-sheet .report-section-chip {
+    flex: 0 0 100%;
   }
 }
