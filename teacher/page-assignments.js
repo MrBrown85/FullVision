@@ -28,11 +28,8 @@ window.PageAssignments = (function () {
   var _dragModuleId = null;
   var _dragSid = null;
   var _dragFromGroup = null;
-  var _mergeTargetId = null;
   var collabPairMode = 'random';
   var collabGroupMode = 'random';
-  var _mergeHoverTimer = null;
-  var _mergeAnimating = false;
   var focusStudentId = null;
   var _searchTimer = null;
   // Collaboration delegation (now in assign-collab.js)
@@ -197,6 +194,17 @@ window.PageAssignments = (function () {
     if (idx >= 0) filterCategories.splice(idx, 1);
     else filterCategories.push(catId);
     render();
+  }
+
+  /* The Assignments list order. A teacher's drag sets display_order 1..n;
+     anything never placed (0, e.g. a new assessment) sits on top, newest first. */
+  function sortAssessmentsForList(arr) {
+    return arr.slice().sort(function (a, b) {
+      var oa = Number(a.display_order || 0);
+      var ob = Number(b.display_order || 0);
+      if (oa !== ob) return oa - ob;
+      return (b.date || '').localeCompare(a.date || '');
+    });
   }
 
   function _getSortedCategories(cid) {
@@ -451,7 +459,9 @@ window.PageAssignments = (function () {
         ' data-assess-drag="' +
         a.id +
         '"' +
-        (isUncategorized ? ' data-assess-card-drop="' + a.id + '"' : '') +
+        ' data-assess-card-drop="' +
+        a.id +
+        '"' +
         '>' +
         '<div class="assess-header" data-action="toggleAssess" data-aid="' +
         a.id +
@@ -762,11 +772,7 @@ window.PageAssignments = (function () {
     var method = cc.calcMethod || course.calcMethod || 'mostRecent';
     var dw = cc.decayWeight != null ? cc.decayWeight : course.decayWeight || 0.65;
     var sections = getSections(cid);
-    var allAssessments = getAssessments(cid)
-      .slice()
-      .sort(function (a, b) {
-        return (b.date || '').localeCompare(a.date || '');
-      });
+    var allAssessments = sortAssessmentsForList(getAssessments(cid));
     var students = sortStudents(getStudents(cid), 'lastName');
     var scores = getScores(cid);
     var modules = getModules(cid);
@@ -1796,27 +1802,6 @@ window.PageAssignments = (function () {
     );
   }
 
-  function ledgerKeysHtml(keys) {
-    return (
-      '<div class="ldg-keys">' +
-      keys
-        .map(function (k) {
-          return (
-            '<span>' +
-            k[0]
-              .map(function (c) {
-                return '<kbd>' + c + '</kbd>';
-              })
-              .join('') +
-            k[1] +
-            '</span>'
-          );
-        })
-        .join('') +
-      '</div>'
-    );
-  }
-
   // Counts read from the rows on screen, so they follow every click without a re-render.
   function refreshLedgerSummary(grid) {
     if (!grid) return;
@@ -1851,7 +1836,7 @@ window.PageAssignments = (function () {
       if (v == null) left++;
       else vals.push(v);
     });
-    var html = '<span><b>' + vals.length + '</b> Marked</span><span><b>' + left + '</b> Left</span>';
+    var html = '<span><b>' + vals.length + '</b> Marked</span><span><b>' + left + '</b> Unmarked</span>';
     var stats = grid.querySelector('.ldg-stats');
     if (vals.length) {
       var sorted = vals.slice().sort(function (x, y) {
@@ -1891,9 +1876,12 @@ window.PageAssignments = (function () {
       a.id +
       '">' +
       '<div class="ldg-bar"><span class="ldg-tally"></span>' +
+      '<div class="ldg-actions"><button type="button" class="ldg-action" data-action="confirmFillNotSubmitted" data-aid="' +
+      a.id +
+      '">Set Unmarked to Not Submitted</button>' +
       '<button type="button" class="ldg-action cmp-fill-all" data-action="confirmFillCompletion" data-aid="' +
       a.id +
-      '">Mark the Rest Complete</button></div>' +
+      '">Set Unmarked to Complete</button></div></div>' +
       '<div class="ldg-head"><span>Student</span><span>Mark</span><span>Status</span><span class="ldg-head-end">Comment</span></div>';
     students.forEach(function (st) {
       var stStatus = statuses[st.id + ':' + a.id] || null;
@@ -1906,14 +1894,7 @@ window.PageAssignments = (function () {
         ledgerCommentHtml(cid, a.id, st.id) +
         '</div>';
     });
-    html +=
-      ledgerKeysHtml([
-        [['\u2191', '\u2193'], 'Student'],
-        [['C'], 'Complete'],
-        [['I'], 'Incomplete'],
-        [['L'], 'Late'],
-        [['M'], 'Comment'],
-      ]) + '</div>';
+    html += '</div>';
     return html;
   }
 
@@ -1960,9 +1941,9 @@ window.PageAssignments = (function () {
 
   function confirmFillCompletion(aid) {
     showConfirm(
-      'Mark the Rest Complete',
-      'Mark every unmarked student Complete?',
-      'Mark Complete',
+      'Set Unmarked to Complete',
+      'Set every unmarked student to Complete?',
+      'Set to Complete',
       'primary',
       function () {
         var cid = activeCourse;
@@ -1974,7 +1955,7 @@ window.PageAssignments = (function () {
         });
         render();
         refreshSidebar();
-        showUndoToast('Marked Complete', function () {
+        showUndoToast('Unmarked students set to Complete', function () {
           var beforeScores = getScores(cid);
           saveScores(cid, prevScores);
           if (getScores(cid) === prevScores) persistScoreDiffToCanonical(cid, beforeScores, prevScores);
@@ -1995,13 +1976,16 @@ window.PageAssignments = (function () {
       max +
       '">' +
       '<div class="ldg-bar"><span class="ldg-tally"></span>' +
+      '<div class="ldg-actions"><button type="button" class="ldg-action" data-action="confirmFillNotSubmitted" data-aid="' +
+      a.id +
+      '">Set Unmarked to Not Submitted</button>' +
       '<button type="button" class="ldg-action" data-action="confirmFillPoints" data-aid="' +
       a.id +
-      '">Fill the Rest ' +
+      '">Set Unmarked to ' +
       max +
       ' / ' +
       max +
-      '</button></div>' +
+      '</button></div></div>' +
       '<div class="ldg-head"><span>Student</span><span>Score</span><span>Status</span><span class="ldg-head-end">Comment</span></div>';
     students.forEach(function (st) {
       var raw = getPointsScore(cid, st.id, a.id);
@@ -2036,16 +2020,38 @@ window.PageAssignments = (function () {
         ledgerCommentHtml(cid, a.id, st.id) +
         '</div>';
     });
-    html +=
-      '<div class="ldg-stats"></div>' +
-      ledgerKeysHtml([
-        [['Enter'], 'Next Student'],
-        [['\u2191', '\u2193'], 'Move'],
-        [['Tab'], 'Status'],
-        [['Esc'], 'Undo Edit'],
-      ]) +
-      '</div>';
+    html += '<div class="ldg-stats"></div>' + '</div>';
     return html;
+  }
+
+  // Every student with no score and no status becomes Not Submitted, with undo.
+  function confirmFillNotSubmitted(aid) {
+    showConfirm(
+      'Set Unmarked to Not Submitted',
+      'Set every unmarked student to Not Submitted?',
+      'Set to Not Submitted',
+      'primary',
+      function () {
+        var cid = activeCourse;
+        var statuses = getAssignmentStatuses(cid);
+        var marked = [];
+        getStudents(cid).forEach(function (st) {
+          if (statuses[st.id + ':' + aid] || getPointsScore(cid, st.id, aid) != null) return;
+          applyAssignmentStatus(cid, st.id, aid, 'NS');
+          marked.push(st.id);
+        });
+        render();
+        refreshSidebar();
+        if (!marked.length) return;
+        showUndoToast('Unmarked students set to Not Submitted', function () {
+          marked.forEach(function (sid) {
+            setAssignmentStatus(cid, sid, aid, null);
+          });
+          render();
+          refreshSidebar();
+        });
+      },
+    );
   }
 
   function confirmFillPoints(aid) {
@@ -2057,22 +2063,22 @@ window.PageAssignments = (function () {
     var max = a.maxPoints || 100;
     var label = max + ' / ' + max;
     showConfirm(
-      'Fill the Rest ' + label,
-      'Give every student without a score ' + label + '?',
-      'Fill',
+      'Set Unmarked to ' + label,
+      'Set every unmarked student to ' + label + '?',
+      'Set to ' + label,
       'primary',
       function () {
         var prevScores = structuredClone(getScores(cid));
         var statuses = getAssignmentStatuses(cid);
         getStudents(cid).forEach(function (st) {
-          // Same rule as Mark the Rest Complete: any status, Late included, is left alone.
+          // Same rule as Set Unmarked to Complete: any status, Late included, is left alone.
           if (statuses[st.id + ':' + aid] || getPointsScore(cid, st.id, aid) != null) return;
           setScore(cid, st.id, aid, aid, max);
           setPointsScore(cid, st.id, aid, max);
         });
         render();
         refreshSidebar();
-        showUndoToast('Filled ' + label, function () {
+        showUndoToast('Unmarked students set to ' + label, function () {
           var beforeScores = getScores(cid);
           saveScores(cid, prevScores);
           if (getScores(cid) === prevScores) persistScoreDiffToCanonical(cid, beforeScores, prevScores);
@@ -2104,19 +2110,38 @@ window.PageAssignments = (function () {
     if (pctSpan) pctSpan.innerHTML = pointsPctHtml(raw, max, 0);
     refreshLedgerSummary(inp.closest('.ldg-grid'));
   }
+  // The next (or previous) score box that is open for typing.
+  function focusPointsBox(row, dir) {
+    var r = row;
+    while ((r = dir > 0 ? r.nextElementSibling : r.previousElementSibling)) {
+      var box = r.querySelector && r.querySelector('.gb-pts-input');
+      if (box && !box.disabled) {
+        box.focus();
+        box.select();
+        return;
+      }
+    }
+  }
+  var POINTS_STATUS_KEYS = { l: 'LATE', e: 'EXC', n: 'NS' };
   function handlePointsKey(e, inp) {
+    var statusKey = !e.metaKey && !e.ctrlKey && !e.altKey && POINTS_STATUS_KEYS[e.key.toLowerCase()];
+    if (statusKey) {
+      // L, E or N in a score box: keep any number typed, then set Late,
+      // Excused or Not Submitted. Excused and Not Submitted lock the box,
+      // so focus moves on to the next open one.
+      e.preventDefault();
+      var srow = inp.closest('.score-row');
+      var chip = srow && srow.querySelector('.ldg-chip[data-status="' + statusKey + '"]');
+      if (!chip) return;
+      commitPointsScore(inp);
+      chip.click();
+      if (inp.disabled) focusPointsBox(srow, 1);
+      return;
+    }
     if (e.key === 'Enter') {
       e.preventDefault();
       commitPointsScore(inp);
-      var row = inp.closest('.score-row');
-      var next = row.nextElementSibling;
-      if (next) {
-        var ni = next.querySelector('.gb-pts-input');
-        if (ni) {
-          ni.focus();
-          ni.select();
-        }
-      }
+      focusPointsBox(inp.closest('.score-row'), 1);
     } else if (e.key === 'Escape') {
       var raw = getPointsScore(activeCourse, inp.dataset.sid, inp.dataset.aid);
       inp.value = raw != null ? formatPoints(raw) : '';
@@ -4258,15 +4283,12 @@ window.PageAssignments = (function () {
   }
   function onAssessDragEnd() {
     _dragAssessId = null;
-    _clearMergeState();
+    _clearDropMarker();
     document.querySelectorAll('.assess-card.dragging').forEach(function (el) {
       el.classList.remove('dragging');
     });
     document.querySelectorAll('.mod-folder.drag-over').forEach(function (el) {
       el.classList.remove('drag-over');
-    });
-    document.querySelectorAll('.assess-card.merge-target').forEach(function (el) {
-      el.classList.remove('merge-target');
     });
   }
   function onFolderDrop(event, targetModuleId) {
@@ -4286,49 +4308,46 @@ window.PageAssignments = (function () {
     _dragAssessId = null;
     render();
   }
-  function _clearMergeState() {
-    if (_mergeHoverTimer) {
-      clearTimeout(_mergeHoverTimer);
-      _mergeHoverTimer = null;
-    }
-    if (_mergeTargetId) {
-      var el = document.getElementById('ac-' + _mergeTargetId);
-      if (el) el.classList.remove('merge-target');
-    }
-    _mergeTargetId = null;
-    _mergeAnimating = false;
+  /* ── Reordering by drag ─────────────────────────────────────
+     Over a card, the top half places the dragged card before it and the
+     bottom half after it; a blue line shows where. */
+  function _clearDropMarker() {
+    document.querySelectorAll('.assess-card.drop-before, .assess-card.drop-after').forEach(function (el) {
+      el.classList.remove('drop-before', 'drop-after');
+    });
   }
-  function mergeToNewModule(draggedId, targetId) {
+  function _setDropMarker(card, after) {
+    var want = after ? 'drop-after' : 'drop-before';
+    if (card.classList.contains(want)) return;
+    _clearDropMarker();
+    card.classList.add(want);
+  }
+  // Moves the dragged assessment before or after the target and numbers the
+  // whole list 1..n. Dropped beside a card in another module, it joins that module.
+  function reorderAssessment(dragId, targetId, after) {
     var cid = activeCourse;
-    var modules = getModules(cid);
-    var idx = modules.length;
-    var color = MODULE_COLORS[idx % MODULE_COLORS.length];
-    var newModule = {
-      id: uid(),
-      name: 'Module ' + (idx + 1),
-      color: color,
-      sortOrder: idx,
-      created: new Date().toISOString(),
-    };
-    modules.push(newModule);
-    saveModules(cid, modules);
     var assessments = getAssessments(cid);
-    [draggedId, targetId].forEach(function (aid) {
-      var a = assessments.find(function (x) {
-        return x.id === aid;
-      });
-      if (a) a.moduleId = newModule.id;
+    var ordered = sortAssessmentsForList(assessments);
+    var dragged = ordered.find(function (x) {
+      return x.id === dragId;
+    });
+    var target = ordered.find(function (x) {
+      return x.id === targetId;
+    });
+    if (!dragged || !target || dragged === target) return;
+    ordered = ordered.filter(function (x) {
+      return x !== dragged;
+    });
+    ordered.splice(ordered.indexOf(target) + (after ? 1 : 0), 0, dragged);
+    if ((dragged.moduleId || '') !== (target.moduleId || '')) {
+      if (target.moduleId) dragged.moduleId = target.moduleId;
+      else delete dragged.moduleId;
+    }
+    ordered.forEach(function (x, i) {
+      x.display_order = i + 1;
     });
     saveAssessments(cid, assessments);
-    collapsedModules[newModule.id] = false;
     render();
-    setTimeout(function () {
-      var input = document.querySelector('.mod-folder[data-module-id="' + newModule.id + '"] .mod-folder-name-input');
-      if (input) {
-        input.focus();
-        input.select();
-      }
-    }, 50);
   }
 
   /* ── Export / Import ────────────────────────────────────── */
@@ -4693,6 +4712,9 @@ window.PageAssignments = (function () {
       },
       confirmFillPoints: function () {
         confirmFillPoints(el.dataset.aid);
+      },
+      confirmFillNotSubmitted: function () {
+        confirmFillNotSubmitted(el.dataset.aid);
       },
       toggleScoreMenu: function () {
         toggleScoreMenu(el);
@@ -5059,31 +5081,21 @@ window.PageAssignments = (function () {
       dropZone.classList.add('drag-over');
       return;
     }
-    // Assess card merge (check BEFORE folder drop — cards are inside folders)
+    // Over a card: reorder (check BEFORE folder drop — cards are inside folders)
     var cardDrop = e.target.closest('[data-assess-card-drop]');
     if (cardDrop && _dragAssessId && !_dragModuleId) {
-      var targetId = cardDrop.dataset.assessCardDrop;
-      if (_dragAssessId === targetId) return;
-      var cid = activeCourse;
-      var assessments = getAssessments(cid);
-      var draggedA = assessments.find(function (x) {
-        return x.id === _dragAssessId;
-      });
-      var targetA = assessments.find(function (x) {
-        return x.id === targetId;
-      });
-      if (!draggedA || draggedA.moduleId || !targetA || targetA.moduleId) return;
       e.preventDefault();
       e.stopPropagation();
       e.dataTransfer.dropEffect = 'move';
-      if (_mergeTargetId === targetId) return;
-      _clearMergeState();
-      _mergeTargetId = targetId;
-      _mergeHoverTimer = setTimeout(function () {
-        _mergeAnimating = true;
-        var el = document.getElementById('ac-' + targetId);
-        if (el) el.classList.add('merge-target');
-      }, 300);
+      document.querySelectorAll('.mod-folder.drag-over').forEach(function (el) {
+        el.classList.remove('drag-over');
+      });
+      if (cardDrop.dataset.assessCardDrop === _dragAssessId) {
+        _clearDropMarker();
+        return;
+      }
+      var rect = cardDrop.getBoundingClientRect();
+      _setDropMarker(cardDrop, e.clientY > rect.top + rect.height / 2);
       return;
     }
     // Folder drop
@@ -5111,9 +5123,8 @@ window.PageAssignments = (function () {
     // Card leave (check before folder — cards are inside folders)
     var cardDrop = e.target.closest('[data-assess-card-drop]');
     if (cardDrop) {
-      var el = document.getElementById('ac-' + cardDrop.dataset.assessCardDrop);
-      if (el && el.contains(e.relatedTarget)) return;
-      if (_mergeTargetId === cardDrop.dataset.assessCardDrop) _clearMergeState();
+      if (cardDrop.contains(e.relatedTarget)) return;
+      cardDrop.classList.remove('drop-before', 'drop-after');
       return;
     }
     var folderDrop = e.target.closest('[data-folder-drop]');
@@ -5134,20 +5145,18 @@ window.PageAssignments = (function () {
       onModuleDropZoneDrop(e, parseInt(dropZone.dataset.dropIndex, 10));
       return;
     }
-    // Assess card merge drop (check before folder — cards are inside folders)
+    // Card drop: reorder (check before folder — cards are inside folders)
     var cardDrop = e.target.closest('[data-assess-card-drop]');
-    if (
-      cardDrop &&
-      _mergeAnimating &&
-      _mergeTargetId === cardDrop.dataset.assessCardDrop &&
-      _dragAssessId &&
-      _dragAssessId !== cardDrop.dataset.assessCardDrop
-    ) {
+    if (cardDrop && _dragAssessId && !_dragModuleId) {
       e.preventDefault();
       e.stopPropagation();
-      mergeToNewModule(_dragAssessId, cardDrop.dataset.assessCardDrop);
-      _clearMergeState();
+      var after = cardDrop.classList.contains('drop-after');
+      var placed = after || cardDrop.classList.contains('drop-before');
+      var dragId = _dragAssessId;
+      _clearDropMarker();
       _dragAssessId = null;
+      if (placed && dragId !== cardDrop.dataset.assessCardDrop)
+        reorderAssessment(dragId, cardDrop.dataset.assessCardDrop, after);
       return;
     }
     // Folder drop
@@ -5201,9 +5210,6 @@ window.PageAssignments = (function () {
     collapsedModules = {};
     _dragAssessId = null;
     _dragModuleId = null;
-    _mergeTargetId = null;
-    _mergeHoverTimer = null;
-    _mergeAnimating = false;
     AC.configure(activeCourse);
     _resetCollabState();
     _editingRubric = null;
@@ -5299,7 +5305,6 @@ window.PageAssignments = (function () {
 
     // Clear timers
     if (_searchTimer) clearTimeout(_searchTimer);
-    if (_mergeHoverTimer) clearTimeout(_mergeHoverTimer);
     Object.keys(_statusDebounce).forEach(function (k) {
       delete _statusDebounce[k];
     });

@@ -7727,6 +7727,7 @@ function _assessmentChanged(a, b) {
     (a.rubricId || '') !== (b.rubricId || '') ||
     (a.moduleId || '') !== (b.moduleId || '') ||
     (a.copyGroup || '') !== (b.copyGroup || '') ||
+    Number(a.display_order || 0) !== Number(b.display_order || 0) ||
     JSON.stringify(a.tagIds || []) !== JSON.stringify(b.tagIds || [])
   );
 }
@@ -7873,6 +7874,7 @@ function _assessmentFieldsPatchOf(a) {
     evidence_type: a.evidenceType || null,
     rubric_id: _isUuid(a.rubricId) ? a.rubricId : null,
     module_id: _isUuid(a.moduleId) ? a.moduleId : null,
+    display_order: Number(a.display_order || 0),
   };
 }
 

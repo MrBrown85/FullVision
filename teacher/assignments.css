@@ -1173,33 +1173,28 @@
     box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.25);
   }
 }
-.assess-card.merge-target {
-  animation: merge-pulse 0.35s ease-out forwards;
-  border-color: var(--mod-badge);
-  border-radius: 14px;
-  background: rgba(99, 102, 241, 0.06);
+/* Reorder by drag: a blue line in the gap above or below the card the
+   dragged one will land beside. Drawn outside the card, so nothing moves. */
+.assess-card.drop-before,
+.assess-card.drop-after {
   position: relative;
-  z-index: 2;
-  transition:
-    border-radius 0.2s,
-    background 0.2s,
-    border-color 0.2s;
 }
-.assess-card.merge-target::after {
-  content: '\01F4C1  Create Module';
+.assess-card.drop-before::before,
+.assess-card.drop-after::after {
+  content: '';
   position: absolute;
-  bottom: -10px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--mod-badge);
-  color: #fff;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  padding: 2px 10px;
-  border-radius: var(--radius);
-  white-space: nowrap;
-  z-index: 3;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--active);
   pointer-events: none;
+}
+.assess-card.drop-before::before {
+  top: -8px;
+}
+.assess-card.drop-after::after {
+  bottom: -8px;
 }
 .mod-folder-drop-zone {
   border: 2px dashed var(--active);
@@ -2213,8 +2208,12 @@
   color: var(--text);
   font-weight: 700;
 }
-.ldg-action {
+.ldg-actions {
+  display: flex;
+  gap: 8px;
   margin-left: auto;
+}
+.ldg-action {
   padding: 6px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -2258,6 +2257,10 @@
   border-left: none;
 }
 .score-row.ldg-row:hover {
+  /* Undo the generic .score-row:hover widening (margin 0 -8px): these rows
+     already carry their padding, so the widening slid every control left. */
+  margin: 0;
+  padding: 4px 8px;
   background: var(--overlay-hover);
 }
 .score-row.ldg-row:focus-visible {
@@ -2441,9 +2444,14 @@
   display: grid;
   grid-template-columns: minmax(160px, 240px) auto auto auto 1fr;
   gap: 16px;
-  padding: 8px;
+  padding: 10px 8px 8px;
+  border-top: 2px solid var(--border);
   font-size: var(--text-xs);
   color: var(--text-3);
+}
+/* The 2px rule above the class line replaces the last student's divider. */
+.score-row.ldg-row:has(+ .ldg-stats:not(:empty)) {
+  border-bottom: none;
 }
 .ldg-stats:empty {
   display: none;
@@ -2456,30 +2464,6 @@
   font-size: var(--text-xs);
   color: var(--text-3);
 }
-.ldg-keys {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 18px;
-  padding: 10px 8px 2px;
-  font-size: var(--text-xs);
-  color: var(--text-3);
-}
-.ldg-keys kbd {
-  display: inline-block;
-  min-width: 18px;
-  margin-right: 4px;
-  padding: 1px 5px;
-  border: 1px solid var(--border-2);
-  border-bottom-width: 2px;
-  border-radius: 5px;
-  background: var(--surface);
-  font-family: inherit;
-  font-size: var(--text-2xs);
-  font-weight: 600;
-  color: var(--text);
-  text-align: center;
-}
-
 /* + / − beside the levels */
 .rsg-mods,
 .rsg-header-mod-spacer {
