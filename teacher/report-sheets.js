@@ -873,6 +873,7 @@ window.ReportSheets = (function () {
         var placed = { id: it.id, x: it.x, w: it.w, y: y, h: h };
         if (part) placed.part = part;
         if (it.pinned) placed.pinned = true;
+        if (it.off) placed.off = true;
         page.items.push(placed);
         if (!positions[it.id]) positions[it.id] = { page: p, y: y };
         if (drawn[it.id] !== p && pushed.indexOf(it.id) < 0) pushed.push(it.id);
@@ -1053,7 +1054,8 @@ window.ReportSheets = (function () {
   }
 
   /* A block's width in px at w columns on a page `contentW` wide, and its
-     left edge at column x. */
+     left edge at column x. The Studio reads the same numbers to snap a
+     drag to the grid. */
   function _colPx(w, contentW) {
     return (w * (contentW + GUTTER)) / COLS - GUTTER;
   }
@@ -1126,8 +1128,11 @@ window.ReportSheets = (function () {
     return tpl.innerHTML;
   }
 
-  /* A placed block, absolutely on the page at its rectangle. */
-  function _placedHtml(it, html, contentW) {
+  /* A placed block, absolutely on the page at its rectangle. A block left
+     off this student's report keeps its place as an empty cell (nothing
+     prints), so the Studio can still select it; a block pushed off the
+     page it was drawn on is marked for the Everyone view. */
+  function _placedHtml(it, html, contentW, pushed) {
     if (it.part) html = _partHtml(html, it.part.start, it.part.end, it.part.start > 0);
     var def = BLOCKS[it.id] || {};
     return (
@@ -1135,6 +1140,8 @@ window.ReportSheets = (function () {
       (def.fill ? ' sheet-fill' : '') +
       (it.pinned ? ' sheet-pinned' : '') +
       (html ? '' : ' sheet-empty') +
+      (it.off ? ' sheet-off' : '') +
+      (pushed && pushed.indexOf(it.id) >= 0 ? ' sheet-pushed' : '') +
       '" data-block="' +
       it.id +
       '" data-x="' +
@@ -1163,7 +1170,7 @@ window.ReportSheets = (function () {
     var body = page
       ? page.items
           .map(function (it) {
-            return _placedHtml(it, cellHtml[it.id] || '', opts.contentW);
+            return _placedHtml(it, cellHtml[it.id] || '', opts.contentW, opts.pushed);
           })
           .join('')
       : '<div class="sheet-blank">This side is left blank.</div>';
@@ -1199,8 +1206,8 @@ window.ReportSheets = (function () {
     var cells = [];
     f.pages.forEach(function (pg, p) {
       pg.blocks.forEach(function (b) {
-        if (hidden.indexOf(b.block) >= 0) return;
-        cells.push({ page: p, b: b, html: _cellHtml(b, cid, student, ctx) });
+        var off = hidden.indexOf(b.block) >= 0;
+        cells.push({ page: p, b: b, off: off, html: off ? '' : _cellHtml(b, cid, student, ctx) });
       });
     });
     _measureCells(opts.stage, cells, contentW);
@@ -1222,6 +1229,7 @@ window.ReportSheets = (function () {
         h: c.b.h != null ? c.b.h : 0,
         need: Math.ceil(c.px / ROW_PX),
         empty: !c.html,
+        off: c.off,
         rows: c.rows,
         chrome: c.chrome,
       });
@@ -1255,6 +1263,10 @@ window.ReportSheets = (function () {
       esc(student.id) +
       '" data-sheets="' +
       sheetCount +
+      '" data-pushed="' +
+      r.pushed.length +
+      '" data-cut="' +
+      r.cut.length +
       '">' +
       '<div class="sheet-student-head no-print"><span class="sheet-student-name">' +
       esc(name) +
@@ -1265,7 +1277,9 @@ window.ReportSheets = (function () {
       '</span></div>';
     for (var s = 0; s < total; s++) {
       html +=
-        '<div class="sheet-zoom"><div class="sheet-label no-print">Page ' +
+        '<div class="sheet-zoom"' +
+        (s < f.pages.length ? ' data-page="' + s + '"' : '') +
+        '><div class="sheet-label no-print">Page ' +
         (s + 1) +
         ' of ' +
         total +
@@ -1275,7 +1289,7 @@ window.ReportSheets = (function () {
           cellHtml,
           _footerHtml(course.name, ctx.termLabel, teacher, name, s + 1, total),
           paper,
-          { type: f.type, contentW: contentW },
+          { type: f.type, contentW: contentW, pushed: r.pushed },
         ) +
         '</div>';
     }
@@ -1355,6 +1369,7 @@ window.ReportSheets = (function () {
     var stage = _stage(preview, contentW, formUsed.type);
     var probe = _probe(stage);
     var summary = _summary(opts.students);
+    summary.rows = pageRows(paper, probe);
     var html = opts.students
       .map(function (st) {
         var r = layoutStudent(opts.cid, st, opts.ctx, { form: formUsed, paper: paper, stage: stage, probe: probe });
@@ -1401,6 +1416,7 @@ window.ReportSheets = (function () {
     var summary = _summary(students);
     try {
       var probe = _probe(stage);
+      summary.rows = pageRows(paper, probe);
       students.forEach(function (st) {
         var r = layoutStudent(cid, st, ctx, { form: formUsed, paper: paper, stage: stage, probe: probe });
         _count(summary, st, r).hash = ReportIssuesHash(r.html);
@@ -1490,6 +1506,11 @@ window.ReportSheets = (function () {
     template: template,
     resolve: resolve,
     pageRows: pageRows,
+    GUTTER: GUTTER,
+    MARGIN_PX: MARGIN_IN * PX_PER_IN,
+    contentWidth: function (paper) {
+      return ((PAPER[paper] || PAPER.letter).w - 2 * MARGIN_IN) * PX_PER_IN;
+    },
     describeStudent: describeStudent,
     classSummary: classSummary,
     blockSizes: blockSizes,
