@@ -2445,9 +2445,14 @@
   display: grid;
   grid-template-columns: minmax(160px, 240px) auto auto auto 1fr;
   gap: 16px;
-  padding: 8px;
+  padding: 10px 8px 8px;
+  border-top: 2px solid var(--border);
   font-size: var(--text-xs);
   color: var(--text-3);
+}
+/* The 2px rule above the class line replaces the last student's divider. */
+.score-row.ldg-row:has(+ .ldg-stats:not(:empty)) {
+  border-bottom: none;
 }
 .ldg-stats:empty {
   display: none;

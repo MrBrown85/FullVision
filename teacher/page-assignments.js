@@ -2036,15 +2036,7 @@ window.PageAssignments = (function () {
         ledgerCommentHtml(cid, a.id, st.id) +
         '</div>';
     });
-    html +=
-      '<div class="ldg-stats"></div>' +
-      ledgerKeysHtml([
-        [['Enter'], 'Next Student'],
-        [['\u2191', '\u2193'], 'Move'],
-        [['Tab'], 'Status'],
-        [['Esc'], 'Undo Edit'],
-      ]) +
-      '</div>';
+    html += '<div class="ldg-stats"></div>' + '</div>';
     return html;
   }
 
