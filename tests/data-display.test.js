@@ -52,6 +52,20 @@ describe('displayNameFirst', () => {
   });
 });
 
+describe('displayNameWithLast', () => {
+  it('puts the preferred name before the last name', () => {
+    expect(displayNameWithLast({ preferred: 'Bobby', firstName: 'Robert', lastName: 'Smith' })).toBe('Bobby Smith');
+  });
+
+  it('uses the first name when there is no preferred name', () => {
+    expect(displayNameWithLast({ firstName: 'Jane', lastName: 'Doe' })).toBe('Jane Doe');
+  });
+
+  it('handles a missing last name', () => {
+    expect(displayNameWithLast({ preferred: 'Cece', firstName: 'Cece', lastName: '' })).toBe('Cece');
+  });
+});
+
 describe('sortStudents', () => {
   const students = [
     { firstName: 'Charlie', lastName: 'Adams' },

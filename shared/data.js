@@ -5066,6 +5066,11 @@ function displayName(st) {
 function displayNameFirst(st) {
   return st.preferred || st.firstName || st.lastName || '';
 }
+/* The name a teacher calls the student by, then the last name: "Cece Adeyemi".
+   Keeps a preferred name ("Bobby Smith" for Robert Smith). */
+function displayNameWithLast(st) {
+  return ((st.preferred || st.firstName || '') + ' ' + (st.lastName || '')).trim();
+}
 
 function sortStudents(arr, mode, cid) {
   var c = arr.slice();

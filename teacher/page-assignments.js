@@ -827,6 +827,7 @@ window.PageAssignments = (function () {
       scores,
       modules,
     );
+    document.querySelectorAll('#main .ldg-grid').forEach(refreshLedgerSummary);
 
     // Show/hide descriptor bar
     var hasActiveRubricView = false;
@@ -1692,62 +1693,255 @@ window.PageAssignments = (function () {
 
   /* ── Scoring Functions ──────────────────────────────────── */
   function completionButtonsHtml(aid, sid, mark) {
-    return ['complete', 'incomplete']
-      .map(function (m) {
+    return (
+      '<span class="ldg-seg" role="group" aria-label="Mark">' +
+      ['complete', 'incomplete']
+        .map(function (m) {
+          return (
+            '<button type="button" class="cmp-btn cmp-' +
+            m +
+            (mark === m ? ' active' : '') +
+            '" aria-pressed="' +
+            (mark === m) +
+            '" tabindex="-1" data-action="setCompletion" data-mark="' +
+            m +
+            '" data-aid="' +
+            aid +
+            '" data-sid="' +
+            sid +
+            '">' +
+            (m === 'complete' ? '\u2713 Complete' : '\u2717 Incomplete') +
+            '</button>'
+          );
+        })
+        .join('') +
+      '</span>'
+    );
+  }
+
+  /* ── Ledger rows (Complete/Incomplete and points) ───────────
+     One line per student: Name · Mark · Status · Comment. The rubric and
+     proficiency grids keep their own layout (renderStatusToggles). */
+  var LEDGER_STATUSES = [
+    ['LATE', 'Late', 'active-late'],
+    ['EXC', 'Excused', 'active-excused'],
+    ['NS', 'Not Submitted', 'active-ns'],
+  ];
+  var LEDGER_COMMENT_ICON =
+    '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" stroke-linejoin="round"/></svg>';
+
+  function ledgerStatusHtml(aid, sid, current) {
+    return (
+      '<div class="ldg-status">' +
+      LEDGER_STATUSES.map(function (s) {
+        var on = current === s[0];
         return (
-          '<button type="button" class="cmp-btn cmp-' +
-          m +
-          (mark === m ? ' active' : '') +
-          '" data-action="setCompletion" data-mark="' +
-          m +
-          '" data-aid="' +
+          '<button type="button" class="ldg-chip' +
+          (on ? ' ' + s[2] : '') +
+          '" aria-pressed="' +
+          on +
+          '" tabindex="-1" data-action="toggleStudentStatus" data-aid="' +
           aid +
           '" data-sid="' +
           sid +
-          '">' +
-          (m === 'complete' ? '\u2713 Complete' : '\u2717 Incomplete') +
+          '" data-status="' +
+          s[0] +
+          '" data-stop-prop="true">' +
+          s[1] +
           '</button>'
         );
-      })
-      .join('');
+      }).join('') +
+      '</div>'
+    );
+  }
+
+  function ledgerCommentInner(count) {
+    return LEDGER_COMMENT_ICON + (count > 0 ? '<span class="ldg-note-count">' + count + '</span>' : '');
+  }
+
+  function ledgerCommentHtml(cid, aid, sid) {
+    var count = getAssignmentObs(cid, sid, aid).length;
+    return (
+      '<div class="ldg-comment"><button type="button" class="ldg-note' +
+      (count > 0 ? ' has' : '') +
+      '" tabindex="-1" data-action="openCommentPopover" data-cid="' +
+      cid +
+      '" data-sid="' +
+      sid +
+      '" data-aid="' +
+      aid +
+      '" data-stop-prop="true" aria-label="Comments" title="Comments">' +
+      ledgerCommentInner(count) +
+      '</button></div>'
+    );
+  }
+
+  function ledgerRowOpen(kind, aid, st, stStatus) {
+    var disableRow = stStatus && stStatus !== 'LATE';
+    return (
+      '<div class="score-row ldg-row ldg-' +
+      kind +
+      (disableRow ? ' has-status' : '') +
+      (stStatus === 'LATE' ? ' has-late' : '') +
+      '"' +
+      (kind === 'cmp' ? ' tabindex="0"' : '') +
+      ' data-status-student="' +
+      st.id +
+      '" data-status-assess="' +
+      aid +
+      '">' +
+      '<span class="ldg-name">' +
+      esc(displayNameWithLast(st)) +
+      '</span>'
+    );
+  }
+
+  function ledgerKeysHtml(keys) {
+    return (
+      '<div class="ldg-keys">' +
+      keys
+        .map(function (k) {
+          return (
+            '<span>' +
+            k[0]
+              .map(function (c) {
+                return '<kbd>' + c + '</kbd>';
+              })
+              .join('') +
+            k[1] +
+            '</span>'
+          );
+        })
+        .join('') +
+      '</div>'
+    );
+  }
+
+  // Counts read from the rows on screen, so they follow every click without a re-render.
+  function refreshLedgerSummary(grid) {
+    if (!grid) return;
+    var rows = grid.querySelectorAll('.ldg-row');
+    var tally = grid.querySelector('.ldg-tally');
+    if (!tally) return;
+    if (grid.classList.contains('cmp-grid')) {
+      var n = { c: 0, i: 0, u: 0 };
+      rows.forEach(function (r) {
+        if (r.classList.contains('has-status')) return;
+        if (r.querySelector('.cmp-complete.active')) n.c++;
+        else if (r.querySelector('.cmp-incomplete.active')) n.i++;
+        else n.u++;
+      });
+      tally.innerHTML =
+        '<span><b>' +
+        n.c +
+        '</b> Complete</span><span><b>' +
+        n.i +
+        '</b> Incomplete</span><span><b>' +
+        n.u +
+        '</b> Unmarked</span>';
+      return;
+    }
+    var max = parseFloat(grid.dataset.max) || 100;
+    var vals = [];
+    var left = 0;
+    rows.forEach(function (r) {
+      if (r.classList.contains('has-status')) return;
+      var inp = r.querySelector('.gb-pts-input');
+      var v = inp ? parsePointsInput(inp.value, max) : null;
+      if (v == null) left++;
+      else vals.push(v);
+    });
+    var html = '<span><b>' + vals.length + '</b> Marked</span><span><b>' + left + '</b> Left</span>';
+    var stats = grid.querySelector('.ldg-stats');
+    if (vals.length) {
+      var sorted = vals.slice().sort(function (x, y) {
+        return x - y;
+      });
+      var sum = vals.reduce(function (x, y) {
+        return x + y;
+      }, 0);
+      var mid =
+        sorted.length % 2
+          ? sorted[(sorted.length - 1) / 2]
+          : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2;
+      html += '<span>Average <b>' + Math.round(((sum / vals.length) * 100) / max) + '%</b></span>';
+      if (stats)
+        stats.innerHTML =
+          '<span class="ldg-name">Class</span><span>Median <b>' +
+          formatPoints(mid) +
+          ' / ' +
+          max +
+          '</b></span><span>Lowest <b>' +
+          formatPoints(sorted[0]) +
+          ' / ' +
+          max +
+          '</b></span><span>Highest <b>' +
+          formatPoints(sorted[sorted.length - 1]) +
+          ' / ' +
+          max +
+          '</b></span>';
+    } else if (stats) stats.innerHTML = '';
+    tally.innerHTML = html;
   }
 
   function renderCompletionGrid(cid, a, students) {
     var statuses = getAssignmentStatuses(cid);
     var html =
-      '<div class="score-grid cmp-grid">' +
-      '<div class="score-grid-header">' +
-      '<div class="score-grid-header-name">Student</div>' +
-      '<div class="score-col-header cmp-col-header"><span class="score-col-header-id">Mark</span>' +
-      '<button type="button" class="cmp-fill-all" data-action="confirmFillCompletion" data-aid="' +
+      '<div class="ldg-grid cmp-grid" data-aid="' +
       a.id +
-      '">Mark the rest Complete</button></div>' +
-      '<div class="score-row-action"></div>' +
-      '</div>';
+      '">' +
+      '<div class="ldg-bar"><span class="ldg-tally"></span>' +
+      '<button type="button" class="ldg-action cmp-fill-all" data-action="confirmFillCompletion" data-aid="' +
+      a.id +
+      '">Mark the Rest Complete</button></div>' +
+      '<div class="ldg-head"><span>Student</span><span>Mark</span><span>Status</span><span class="ldg-head-end">Comment</span></div>';
     students.forEach(function (st) {
       var stStatus = statuses[st.id + ':' + a.id] || null;
-      var disableRow = stStatus && stStatus !== 'LATE';
       html +=
-        '<div class="score-row' +
-        (disableRow ? ' has-status' : '') +
-        (stStatus === 'LATE' ? ' has-late' : '') +
-        '" data-status-student="' +
-        st.id +
-        '" data-status-assess="' +
-        a.id +
-        '">' +
-        '<span class="score-name">' +
-        esc(displayName(st)) +
-        renderStatusToggles(a.id, st.id, stStatus) +
-        '</span>' +
+        ledgerRowOpen('cmp', a.id, st, stStatus) +
         '<div class="cmp-cell">' +
         completionButtonsHtml(a.id, st.id, getCompletionMark(cid, st.id, a.id)) +
         '</div>' +
-        '<div class="score-row-action"></div>' +
+        ledgerStatusHtml(a.id, st.id, stStatus) +
+        ledgerCommentHtml(cid, a.id, st.id) +
         '</div>';
     });
-    html += '</div>';
+    html +=
+      ledgerKeysHtml([
+        [['\u2191', '\u2193'], 'Student'],
+        [['C'], 'Complete'],
+        [['I'], 'Incomplete'],
+        [['L'], 'Late'],
+        [['M'], 'Comment'],
+      ]) + '</div>';
     return html;
+  }
+
+  /* Complete/Incomplete rows answer single keys while the row has focus:
+     C and I mark and move down, L toggles Late, M opens comments, arrows move. */
+  function handleLedgerKey(e, row) {
+    if (e.metaKey || e.ctrlKey || e.altKey) return false;
+    var k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    var step = function (dir) {
+      var n = dir > 0 ? row.nextElementSibling : row.previousElementSibling;
+      if (n && n.classList.contains('ldg-row')) n.focus();
+    };
+    if (k === 'ArrowDown' || k === 'ArrowUp') {
+      e.preventDefault();
+      step(k === 'ArrowDown' ? 1 : -1);
+      return true;
+    }
+    var target = null;
+    if (k === 'c') target = row.querySelector('.cmp-complete');
+    else if (k === 'i') target = row.querySelector('.cmp-incomplete');
+    else if (k === 'l') target = row.querySelector('.ldg-chip[data-status="LATE"]');
+    else if (k === 'm') target = row.querySelector('.ldg-note');
+    if (!target) return false;
+    e.preventDefault();
+    target.click();
+    if (k === 'c' || k === 'i') step(1);
+    else if (k === 'l') row.focus();
+    return true;
   }
 
   // Clicking the active mark again clears it.
@@ -1758,7 +1952,9 @@ window.PageAssignments = (function () {
     var next = getCompletionMark(cid, sid, aid) === el.dataset.mark ? null : el.dataset.mark;
     setCompletionMark(cid, sid, aid, next);
     var cell = el.closest('.cmp-cell');
+    var grid = el.closest('.ldg-grid');
     if (cell) cell.innerHTML = completionButtonsHtml(aid, sid, next);
+    refreshLedgerSummary(grid);
     refreshSidebar();
   }
 
@@ -1793,37 +1989,32 @@ window.PageAssignments = (function () {
     var max = a.maxPoints || 100;
     var statuses = getAssignmentStatuses(cid);
     var html =
-      '<div class="score-grid pts-grid">' +
-      '<div class="score-grid-header">' +
-      '<div class="score-grid-header-name">Student</div>' +
-      '<div class="score-col-header" style="text-align:center"><span class="score-col-header-id">Score</span><span class="score-col-header-name">out of ' +
+      '<div class="ldg-grid pts-grid" data-aid="' +
+      a.id +
+      '" data-max="' +
       max +
-      '</span></div>' +
-      '<div class="score-col-header" style="text-align:center"><span class="score-col-header-id">%</span></div>' +
-      '<div class="score-row-action"></div>' +
-      '</div>';
+      '">' +
+      '<div class="ldg-bar"><span class="ldg-tally"></span>' +
+      '<button type="button" class="ldg-action" data-action="confirmFillPoints" data-aid="' +
+      a.id +
+      '">Fill the Rest ' +
+      max +
+      ' / ' +
+      max +
+      '</button></div>' +
+      '<div class="ldg-head"><span>Student</span><span>Score</span><span>Status</span><span class="ldg-head-end">Comment</span></div>';
     students.forEach(function (st) {
       var raw = getPointsScore(cid, st.id, a.id);
       var stStatus = statuses[st.id + ':' + a.id] || null;
       var disableRow = stStatus && stStatus !== 'LATE';
       html +=
-        '<div class="score-row' +
-        (disableRow ? ' has-status' : '') +
-        (stStatus === 'LATE' ? ' has-late' : '') +
-        '" data-status-student="' +
-        st.id +
-        '" data-status-assess="' +
-        a.id +
-        '">' +
-        '<span class="score-name">' +
-        esc(displayName(st)) +
-        renderStatusToggles(a.id, st.id, stStatus) +
-        '</span>' +
+        ledgerRowOpen('pts', a.id, st, stStatus) +
         '<div class="pts-input-cell">' +
-        '<input type="number" class="gb-pts-input" min="0" step="any" max="' +
+        '<input type="number" class="gb-pts-input ldg-pts-input" min="0" step="any" max="' +
         max * POINTS_EXTRA_CREDIT_FACTOR +
-        '" inputmode="decimal"' +
-        ' value="' +
+        '" inputmode="decimal" aria-label="Score for ' +
+        esc(displayNameWithLast(st)) +
+        '" value="' +
         (raw != null ? formatPoints(raw) : '') +
         '" data-sid="' +
         st.id +
@@ -1834,20 +2025,62 @@ window.PageAssignments = (function () {
         '"' +
         (disableRow ? ' disabled' : '') +
         '>' +
-        '<span class="gb-pts-max">/' +
+        '<span class="gb-pts-max">/ ' +
         max +
         '</span>' +
-        '</div>' +
-        '<div class="pts-pct-cell">' +
         '<span class="gb-pts-live-pct">' +
         pointsPctHtml(raw, max, 0) +
         '</span>' +
         '</div>' +
-        '<div class="score-row-action"></div>' +
+        ledgerStatusHtml(a.id, st.id, stStatus) +
+        ledgerCommentHtml(cid, a.id, st.id) +
         '</div>';
     });
-    html += '</div>';
+    html +=
+      '<div class="ldg-stats"></div>' +
+      ledgerKeysHtml([
+        [['Enter'], 'Next Student'],
+        [['\u2191', '\u2193'], 'Move'],
+        [['Tab'], 'Status'],
+        [['Esc'], 'Undo Edit'],
+      ]) +
+      '</div>';
     return html;
+  }
+
+  function confirmFillPoints(aid) {
+    var cid = activeCourse;
+    var a = getAssessments(cid).find(function (x) {
+      return x.id === aid;
+    });
+    if (!a) return;
+    var max = a.maxPoints || 100;
+    var label = max + ' / ' + max;
+    showConfirm(
+      'Fill the Rest ' + label,
+      'Give every student without a score ' + label + '?',
+      'Fill',
+      'primary',
+      function () {
+        var prevScores = structuredClone(getScores(cid));
+        var statuses = getAssignmentStatuses(cid);
+        getStudents(cid).forEach(function (st) {
+          // Same rule as Mark the Rest Complete: any status, Late included, is left alone.
+          if (statuses[st.id + ':' + aid] || getPointsScore(cid, st.id, aid) != null) return;
+          setScore(cid, st.id, aid, aid, max);
+          setPointsScore(cid, st.id, aid, max);
+        });
+        render();
+        refreshSidebar();
+        showUndoToast('Filled ' + label, function () {
+          var beforeScores = getScores(cid);
+          saveScores(cid, prevScores);
+          if (getScores(cid) === prevScores) persistScoreDiffToCanonical(cid, beforeScores, prevScores);
+          render();
+          refreshSidebar();
+        });
+      },
+    );
   }
 
   function livePointsUpdate(inp) {
@@ -1869,6 +2102,7 @@ window.PageAssignments = (function () {
     setPointsScore(cid, sid, aid, raw);
     var pctSpan = inp.closest('.score-row').querySelector('.gb-pts-live-pct');
     if (pctSpan) pctSpan.innerHTML = pointsPctHtml(raw, max, 0);
+    refreshLedgerSummary(inp.closest('.ldg-grid'));
   }
   function handlePointsKey(e, inp) {
     if (e.key === 'Enter') {
@@ -1966,8 +2200,10 @@ window.PageAssignments = (function () {
       document.querySelector('.score-row[data-status-student="' + sid + '"][data-status-assess="' + aid + '"]') ||
       document.querySelector('.rsg-student[data-status-student="' + sid + '"][data-status-assess="' + aid + '"]');
     if (row) {
-      row.querySelectorAll('.student-status-btn').forEach(function (btn) {
+      row.querySelectorAll('.student-status-btn, .ldg-chip').forEach(function (btn) {
         btn.classList.remove('active-excused', 'active-ns', 'active-late');
+        if (btn.classList.contains('ldg-chip'))
+          btn.setAttribute('aria-pressed', String(btn.dataset.status === newStatus));
       });
       if (newStatus === 'EXC') row.querySelector('[data-status="EXC"]').classList.add('active-excused');
       else if (newStatus === 'NS') row.querySelector('[data-status="NS"]').classList.add('active-ns');
@@ -1986,6 +2222,7 @@ window.PageAssignments = (function () {
         });
         row.querySelectorAll('.rsg-criterion-row').forEach(syncModRow);
       }
+      refreshLedgerSummary(row.closest('.ldg-grid'));
     }
     refreshSidebar();
   }
@@ -2341,7 +2578,7 @@ window.PageAssignments = (function () {
         a.id +
         '">' +
         '<div class="rsg-student-name">' +
-        esc(displayName(st)) +
+        esc(displayNameWithLast(st)) +
         renderStatusToggles(a.id, st.id, stStatus) +
         '</div><div class="rsg-criteria">';
       tagObjs.forEach(function (tag) {
@@ -2488,7 +2725,7 @@ window.PageAssignments = (function () {
         a.id +
         '">' +
         '<div class="rsg-student-name">' +
-        esc(displayName(st)) +
+        esc(displayNameWithLast(st)) +
         renderStatusToggles(a.id, st.id, stStatus) +
         '</div><div class="rsg-criteria">';
       criteria.forEach(function (crit) {
@@ -3564,6 +3801,11 @@ window.PageAssignments = (function () {
       if (btn.dataset.sid === sid && btn.dataset.aid === aid)
         btn.innerHTML = count > 0 ? 'Comment <span class="comment-count">' + count + '</span>' : 'Comment';
     });
+    document.querySelectorAll('.ldg-note').forEach(function (btn) {
+      if (btn.dataset.sid !== sid || btn.dataset.aid !== aid) return;
+      btn.innerHTML = ledgerCommentInner(count);
+      btn.classList.toggle('has', count > 0);
+    });
   }
 
   /* ── Criterion comment ──────────────────────────────────── */
@@ -4449,6 +4691,9 @@ window.PageAssignments = (function () {
       confirmFillCompletion: function () {
         confirmFillCompletion(el.dataset.aid);
       },
+      confirmFillPoints: function () {
+        confirmFillPoints(el.dataset.aid);
+      },
       toggleScoreMenu: function () {
         toggleScoreMenu(el);
       },
@@ -4702,6 +4947,8 @@ window.PageAssignments = (function () {
       if (dlg) _trapCriterionCommentTab(e, dlg);
       return;
     }
+    var ldgRow = document.activeElement.closest && document.activeElement.closest('.ldg-row.ldg-cmp');
+    if (ldgRow && handleLedgerKey(e, ldgRow)) return;
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
       // Criterion comment: Enter saves, Cmd/Ctrl+Enter saves and moves on,
       // Shift+Enter is a new line.
