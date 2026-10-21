@@ -29,8 +29,6 @@ async function openDemoGradebook(page) {
   await expect(page.getByRole('button', { name: 'Print Grades' })).toBeVisible();
 }
 
-/* Opens the dialog, picks the given radios by label, and returns its
-   status line. */
 async function openDialog(page) {
   await page.getByRole('button', { name: 'Print Grades' }).click();
   const dialog = page.getByRole('dialog', { name: 'Print Grades' });
@@ -38,10 +36,24 @@ async function openDialog(page) {
   return dialog;
 }
 
+/* Sets a row's value through its menu: the row's button, then the choice. */
+async function choose(dialog, row, choice) {
+  await dialog.getByRole('button', { name: new RegExp('^' + row + ' ') }).click();
+  const menu = dialog.page().getByRole('menu');
+  await expect(menu).toBeVisible();
+  await menu.getByRole('menuitemradio', { name: choice }).click();
+  await expect(menu).toHaveCount(0);
+}
+
 async function pagesInStatus(dialog) {
-  const text = await dialog.locator('#gp-status').innerText();
-  const m = text.match(/(\d+) pages?\./);
+  const text = await dialog.locator('.gpd-count-pages').innerText();
+  const m = text.match(/^(\d+) pages? · /);
   return m ? Number(m[1]) : 0;
+}
+
+async function expectCount(dialog, pages, detail) {
+  await expect(dialog.locator('.gpd-count-pages')).toHaveText(pages);
+  await expect(dialog.locator('.gpd-count-detail')).toHaveText(detail);
 }
 
 /* Print from the dialog with window.print stubbed. The staged pages are
@@ -87,22 +99,56 @@ test.describe('Print Grades', () => {
     }
   });
 
-  test('the dialog labels are Title Case', async ({ page }) => {
+  test('the dialog has its rows in three groups, Title Case, with a live page count', async ({ page }) => {
     await openDemoGradebook(page);
     const dialog = await openDialog(page);
-    const legends = await dialog.locator('legend').allInnerTexts();
-    expect(legends).toEqual(['Term', 'Assessments', 'Scores', 'Students', 'Sort By', 'Show', 'Paper', 'Text Size']);
-    const labels = await dialog
-      .locator('.gp-option:not(.gp-pick-option) > span')
-      .evaluateAll(els => els.map(el => el.firstChild.textContent.trim()));
-    const small = new Set(['a', 'an', 'and', 'as', 'for', 'in', 'of', 'the', 'to', 'by']);
-    for (const label of labels) {
+    const groups = await dialog.locator('.gpd-group-label').evaluateAll(els => els.map(el => el.textContent));
+    expect(groups).toEqual(['Content', 'Students', 'Page']);
+    const labels = await dialog.locator('.gpd-label').allTextContents();
+    expect(labels).toEqual([
+      'Term',
+      'Assessments',
+      'Scores',
+      'Blank Scores',
+      'Show As',
+      'Sort By',
+      'Final Grade',
+      'Class Average Row',
+      'Late Marks',
+      'Paper',
+      'Text Size',
+    ]);
+    const values = await dialog.locator('.gpd-value').allTextContents();
+    expect(values).toEqual([
+      'All Time',
+      'All Assessments',
+      'As Entered',
+      'Pupil # and Name',
+      'Last Name',
+      'Letter · 8.5 × 11 in',
+      'Normal',
+    ]);
+    const small = new Set(['a', 'an', 'and', 'as', 'for', 'in', 'of', 'the', 'to', 'by', '·', '×', '#']);
+    for (const label of labels.concat(values)) {
       for (const word of label.split(/\s+/)) {
         if (!word || small.has(word) || /^\d/.test(word)) continue;
         expect(word[0], `"${label}"`).toBe(word[0].toUpperCase());
       }
     }
-    await expect(dialog.locator('#gp-status')).toHaveText(`${STUDENTS} students · 37 columns · 3 pages.`);
+    await expect(dialog.getByRole('switch')).toHaveCount(4);
+    await expectCount(dialog, '3 pages · Letter', `${STUDENTS} students · 37 columns`);
+    // The page picture shows the first page's columns and the final grade only on the last.
+    await expect(dialog.locator('.gpd-thumb .gpd-t-colhead .gpd-t-cell')).toHaveCount(14);
+    await expect(dialog.locator('.gpd-thumb .gpd-t-avg')).toHaveCount(1);
+    // A menu closes on Escape first, then the dialog.
+    await dialog.getByRole('button', { name: /^Term / }).click();
+    await expect(page.getByRole('menu')).toBeVisible();
+    await expect(page.getByRole('menuitemradio', { name: 'All Time' })).toBeFocused();
+    await page.keyboard.press('ArrowDown');
+    await expect(page.getByRole('menuitemradio', { name: /^Term 1/ })).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('menu')).toHaveCount(0);
+    await expect(dialog.getByRole('button', { name: /^Term / })).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(dialog).toHaveCount(0);
   });
@@ -112,9 +158,9 @@ test.describe('Print Grades', () => {
   }) => {
     await openDemoGradebook(page);
     const dialog = await openDialog(page);
-    await dialog.getByLabel('All Time').check();
-    await dialog.getByLabel('Letter').check();
-    await dialog.getByLabel('Normal').check();
+    await choose(dialog, 'Term', 'All Time');
+    await choose(dialog, 'Paper', /^Letter/);
+    await choose(dialog, 'Text Size', 'Normal');
     const expected = await pagesInStatus(dialog);
     expect(expected).toBe(3);
     await stageFromDialog(page, dialog);
@@ -164,9 +210,9 @@ test.describe('Print Grades', () => {
   test('Legal prints 3 taller pages and is remembered for the class', async ({ page }) => {
     await openDemoGradebook(page);
     let dialog = await openDialog(page);
-    await dialog.getByLabel('All Time').check();
-    await dialog.getByLabel('Legal').check();
-    expect(await pagesInStatus(dialog)).toBe(3);
+    await choose(dialog, 'Term', 'All Time');
+    await choose(dialog, 'Paper', /^Legal/);
+    await expectCount(dialog, '3 pages · Legal', `${STUDENTS} students · 37 columns`);
     await stageFromDialog(page, dialog);
     // The page rule names the paper and portrait, so the print dialog picks Legal.
     expect(await page.locator('#grades-print-page').textContent()).toContain('size: legal portrait');
@@ -177,15 +223,15 @@ test.describe('Print Grades', () => {
     await page.reload();
     await expect(page.getByRole('button', { name: 'Print Grades' })).toBeVisible();
     dialog = await openDialog(page);
-    await expect(dialog.getByLabel('Legal')).toBeChecked();
-    await dialog.getByLabel('Letter').check();
+    await expect(dialog.getByRole('button', { name: /^Paper / })).toHaveText('Legal · 8.5 × 14 in');
+    await choose(dialog, 'Paper', /^Letter/);
   });
 
   test('Pupil # Only prints numbers and no names', async ({ page }) => {
     await openDemoGradebook(page);
     const dialog = await openDialog(page);
-    await dialog.getByLabel('All Time').check();
-    await dialog.getByLabel('Pupil # Only').check();
+    await choose(dialog, 'Term', 'All Time');
+    await choose(dialog, 'Show As', 'Pupil # Only');
     await stageFromDialog(page, dialog);
     const root = page.locator('#grades-print-root');
     await expect(root.locator('th.gp-rh').first()).toHaveText('Pupil #');
@@ -194,21 +240,21 @@ test.describe('Print Grades', () => {
     await expect(root).toContainText('STU-201');
     await pdfOfStaged(page);
     const reset = await openDialog(page);
-    await reset.getByLabel('Pupil # and Name').check();
+    await choose(reset, 'Show As', 'Pupil # and Name');
     await reset.getByRole('button', { name: 'Cancel' }).click();
   });
 
   test('Compact prints fewer pages than Normal', async ({ page }) => {
     await openDemoGradebook(page);
     const dialog = await openDialog(page);
-    await dialog.getByLabel('All Time').check();
-    await dialog.getByLabel('Letter').check();
-    await dialog.getByLabel('Normal').check();
+    await choose(dialog, 'Term', 'All Time');
+    await choose(dialog, 'Paper', /^Letter/);
+    await choose(dialog, 'Text Size', 'Normal');
     const normal = await pagesInStatus(dialog);
-    await dialog.getByLabel('Compact').check();
+    await choose(dialog, 'Text Size', 'Compact');
     const compact = await pagesInStatus(dialog);
     expect(compact).toBeLessThan(normal);
-    await dialog.getByLabel('Normal').check();
+    await choose(dialog, 'Text Size', 'Normal');
   });
 
   test('a term prints its own columns and leaves the gradebook as it was', async ({ page }) => {
@@ -216,7 +262,8 @@ test.describe('Print Grades', () => {
     const picker = page.locator('#main .term-select');
     const before = await picker.inputValue();
     const dialog = await openDialog(page);
-    await dialog.getByLabel('Term 2', { exact: false }).check();
+    await choose(dialog, 'Term', /^Term 2/);
+    await expect(dialog.getByRole('button', { name: /^Term / })).toHaveText('Term 2');
     await stageFromDialog(page, dialog);
     await expect(page.locator('#grades-print-root .gp-head').first()).toContainText('Term 2');
     expect(countPages(await pdfOfStaged(page))).toBeGreaterThan(0);
@@ -236,10 +283,16 @@ test.describe('Print Grades', () => {
   test('Blank Grid prints the roster on an empty grid', async ({ page }) => {
     await openDemoGradebook(page);
     const dialog = await openDialog(page);
-    await dialog.getByLabel('All Time').check();
-    await dialog.getByLabel('Blank Grid').check();
-    await expect(dialog.locator('#gp-status')).toHaveText(`${STUDENTS} students · Blank Grid · 1 page.`);
-    await expect(dialog.getByLabel('Final Grade')).toBeDisabled();
+    await choose(dialog, 'Term', 'All Time');
+    await expect(dialog.getByRole('textbox', { name: 'Columns' })).toHaveCount(0);
+    await choose(dialog, 'Assessments', 'Blank Grid');
+    await expectCount(dialog, '1 page · Letter', `${STUDENTS} students · Blank Grid · 11 columns`);
+    await expect(dialog.getByRole('textbox', { name: 'Columns' })).toHaveValue('11');
+    for (const label of ['Final Grade', 'Class Average Row', 'Late Marks', 'Blank Scores']) {
+      await expect(dialog.getByLabel(label)).toBeDisabled();
+    }
+    await expect(dialog.getByRole('button', { name: /^Scores / })).toBeDisabled();
+    await expect(dialog.locator('.gpd-thumb .gpd-t-colhead .gpd-t-cell')).toHaveCount(12);
     await stageFromDialog(page, dialog);
     const sheet = page.locator('#grades-print-root .gp-page');
     await expect(sheet).toHaveCount(1);
@@ -249,7 +302,63 @@ test.describe('Print Grades', () => {
     await expect(sheet.locator('.gp-head')).toContainText('Scores: Blank Grid');
     expect(countPages(await pdfOfStaged(page))).toBe(1);
     const reset = await openDialog(page);
-    await reset.getByLabel('All Assessments').check();
+    await choose(reset, 'Assessments', 'All Assessments');
+    await reset.getByRole('button', { name: 'Cancel' }).click();
+  });
+
+  test('Blank Grid prints the number of columns the stepper shows', async ({ page }) => {
+    await openDemoGradebook(page);
+    const dialog = await openDialog(page);
+    await choose(dialog, 'Term', 'All Time');
+    await choose(dialog, 'Assessments', 'Blank Grid');
+    const count = dialog.getByRole('textbox', { name: 'Columns' });
+    await dialog.getByRole('button', { name: 'More Columns' }).click();
+    await expect(count).toHaveValue('12');
+    await expectCount(dialog, '1 page · Letter', `${STUDENTS} students · Blank Grid · 12 columns`);
+    await count.fill('6');
+    await count.press('Enter');
+    await expect(count).toHaveValue('6');
+    await expect(dialog.locator('.gpd-thumb .gpd-t-colhead .gpd-t-cell')).toHaveCount(7);
+    // More than fit across the page stops at the most that do.
+    await count.fill('99');
+    await count.press('Enter');
+    await expect(count).toHaveValue('16');
+    await expect(dialog.getByRole('button', { name: 'More Columns' })).toBeDisabled();
+    await dialog.getByRole('button', { name: 'Fewer Columns' }).click();
+    await expect(count).toHaveValue('15');
+    await stageFromDialog(page, dialog);
+    const sheet = page.locator('#grades-print-root .gp-page');
+    await expect(sheet).toHaveCount(1);
+    await expect(sheet.locator('.gp-row').first().locator('td.gp-blank')).toHaveCount(15);
+    expect(countPages(await pdfOfStaged(page))).toBe(1);
+    const reset = await openDialog(page);
+    await expect(reset.getByRole('textbox', { name: 'Columns' })).toHaveCount(0);
+    await choose(reset, 'Assessments', 'Blank Grid');
+    await expect(reset.getByRole('textbox', { name: 'Columns' })).toHaveValue('15');
+    await choose(reset, 'Assessments', 'All Assessments');
+    await reset.getByRole('button', { name: 'Cancel' }).click();
+    await page.evaluate(() => localStorage.removeItem('grades-print-options'));
+  });
+
+  test('Custom Dates shows From and To, and Pick Assessments its list', async ({ page }) => {
+    await openDemoGradebook(page);
+    const dialog = await openDialog(page);
+    await choose(dialog, 'Term', 'Custom Dates');
+    await dialog.getByRole('textbox', { name: 'From' }).fill('2026-04-01');
+    await dialog.getByRole('textbox', { name: 'To' }).fill('2026-05-10');
+    await expect(dialog.getByLabel('Final Grade')).toBeDisabled();
+    await choose(dialog, 'Assessments', 'Pick Assessments');
+    const pick = dialog.getByRole('group', { name: 'Pick Assessments' });
+    await expect(pick.getByRole('checkbox')).toHaveCount(4);
+    await pick.getByRole('checkbox', { name: /Cell Structure Quiz/ }).check();
+    await pick.getByRole('checkbox', { name: /Periodic Table Quiz/ }).check();
+    await expectCount(dialog, '1 page · Letter', `${STUDENTS} students · 2 columns`);
+    await stageFromDialog(page, dialog);
+    await expect(page.locator('#grades-print-root th.gp-ch[data-col]')).toHaveCount(2);
+    await pdfOfStaged(page);
+    const reset = await openDialog(page);
+    await choose(reset, 'Term', 'All Time');
+    await choose(reset, 'Assessments', 'All Assessments');
     await reset.getByRole('button', { name: 'Cancel' }).click();
   });
 });
@@ -261,7 +370,7 @@ test.describe('Print Grades, class with no assessments', () => {
     await seedStudents(page);
     await gotoApp(page, '/gradebook');
     const dialog = await openDialog(page);
-    await expect(dialog.locator('#gp-status')).toHaveText('3 students · Blank Grid · 1 page.');
+    await expectCount(dialog, '1 page · Letter', '3 students · Blank Grid · 11 columns');
     await expect(dialog.getByRole('button', { name: 'Print', exact: true })).toBeEnabled();
     await stageFromDialog(page, dialog);
     const sheet = page.locator('#grades-print-root .gp-page');

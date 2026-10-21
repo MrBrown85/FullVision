@@ -406,6 +406,30 @@ describe('Blank Grid', () => {
     expect(GP.statusText(model)).toBe('3 students · Blank Grid · 1 page.');
   });
 
+  it('prints the Columns count for Blank Grid, kept to what fits, and fills the page without one', () => {
+    const range = GP.gridColumnRange(GP.normalizeOptions({}));
+    expect(range).toEqual({ auto: 11, min: 1, max: 16 });
+    const filled = GP.buildModel(CID, { assessments: 'blank' });
+    expect(filled.pages[0].blankCols).toBe(11);
+    const six = GP.buildModel(CID, { assessments: 'blank', gridCols: 6 });
+    expect(six.pages[0].blankCols).toBe(6);
+    expect(six.pages[0].colW).toBeCloseTo(filled.layout.capacity.width / 6, 2);
+    expect(GP.buildModel(CID, { assessments: 'blank', gridCols: 99 }).pages[0].blankCols).toBe(16);
+    // The count is Blank Grid's only: other choices print as before.
+    expect(GP.buildModel(CID, { gridCols: 6 }).pages[0].blankCols).toBe(GP.buildModel(CID, {}).pages[0].blankCols);
+  });
+
+  it('gives the dialog its page count and what is on the sheet', () => {
+    expect(GP.previewLines(GP.buildModel(CID, {}))).toEqual({
+      pages: '1 page · Letter',
+      detail: '3 students · 5 columns',
+    });
+    expect(GP.previewLines(GP.buildModel(CID, { assessments: 'blank', gridCols: 12, paper: 'legal' }))).toEqual({
+      pages: '1 page · Legal',
+      detail: '3 students · Blank Grid · 12 columns',
+    });
+  });
+
   it('follows the Students, Sort By, Paper and Text Size choices', () => {
     const numbers = GP.renderPages(GP.buildModel(CID, { assessments: 'blank', students: 'number', sortBy: 'number' }));
     expect(numbers).toContain('Pupil #');

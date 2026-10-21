@@ -114,10 +114,11 @@
     paper: 'letter',
     size: 'normal',
     blank: false,
+    gridCols: 0, // Blank Grid's column count; 0 fills the page as before
   };
   /* The choices remembered on this device. Term, assessments and paper are
      not: the first two follow the gradebook, paper is per class. */
-  var REMEMBERED = ['scoresAs', 'late', 'average', 'students', 'sortBy', 'finalGrade', 'size'];
+  var REMEMBERED = ['scoresAs', 'late', 'average', 'students', 'sortBy', 'finalGrade', 'size', 'gridCols'];
 
   var _state = null;
 
@@ -178,6 +179,7 @@
     if (['last', 'first', 'number'].indexOf(o.sortBy) < 0) o.sortBy = 'last';
     o.term = o.term == null || o.term === '' ? 'all' : String(o.term);
     o.picked = Array.isArray(o.picked) ? o.picked.slice() : [];
+    o.gridCols = Math.max(0, Math.floor(Number(o.gridCols) || 0));
     return o;
   }
 
@@ -499,6 +501,21 @@
     return { size: _round2(space / total), blank: total - Math.max(count, 0) };
   }
 
+  /* Blank Grid's Columns choice: the count that fills the page when none is
+     chosen, and the most that fit across it. */
+  function gridColumnRange(opts) {
+    var size = SIZES[opts.size] || SIZES.normal;
+    var cap = pageCapacity(opts, 0);
+    return { auto: fill(cap.width, 0, size.colMax).blank, min: 1, max: cap.full };
+  }
+
+  /* The blank columns a Blank Grid prints: the chosen count, kept to what
+     fits, or 0 to fill the page. */
+  function _gridCols(columns, opts) {
+    if (columns.length || opts.assessments !== 'blank' || !(opts.gridCols > 0)) return 0;
+    return Math.min(opts.gridCols, gridColumnRange(opts).max);
+  }
+
   /* `n` items into the fewest blocks of at most `max`, as even as they go. */
   function _evenBlocks(n, max) {
     if (n <= 0) return [];
@@ -552,7 +569,10 @@
       var rows = fill(height, sb.count + avg, lim.max);
       blocks.forEach(function (cb, i) {
         var last = hasFinal && i === blocks.length - 1;
-        var cols = fill(last ? cap.widthWithFinal : cap.width, cb.count, size.colMax);
+        var gridCols = _gridCols(columns, opts);
+        var cols = gridCols
+          ? { size: _round2(cap.width / gridCols), blank: gridCols }
+          : fill(last ? cap.widthWithFinal : cap.width, cb.count, size.colMax);
         pages.push({
           students: sb,
           cols: cb,
@@ -1102,33 +1122,147 @@
 
   /* ── Dialog ────────────────────────────────────────────── */
 
-  function _radio(name, value, checked, label, extra) {
+  /* Two panes: at the left the title, a picture of the first page and the
+     page count, with Cancel and Print; at the right the choices as rows in
+     three groups, Content, Students and Page. A row's value opens a small
+     menu of its choices; on or off choices are switches. Every change
+     redraws the rows and the picture. */
+
+  var CHEVRON =
+    '<svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">' +
+    '<path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  /* Each value menu: the option it sets and its choices. */
+  function _menus(cid, opts) {
+    var assessments = [{ value: 'all', label: 'All Assessments' }];
+    if (Array.isArray(opts.shownIds)) assessments.push({ value: 'shown', label: 'Shown in the Gradebook' });
+    assessments.push({ value: 'pick', label: 'Pick Assessments' }, { value: 'blank', label: 'Blank Grid' });
+    return {
+      term: [{ value: 'all', label: 'All Time' }]
+        .concat(
+          getReportingTerms(cid).map(function (t) {
+            return { value: String(t.ordinal), label: t.label, help: _dateRange(t.starts_on, t.ends_on) };
+          }),
+        )
+        .concat([{ value: 'custom', label: 'Custom Dates' }]),
+      assessments: assessments,
+      scoresAs: [
+        { value: 'entered', label: 'As Entered' },
+        { value: 'levels', label: 'Levels Only' },
+        { value: 'both', label: 'Points and Levels' },
+      ],
+      students: [
+        { value: 'both', label: 'Pupil # and Name' },
+        { value: 'name', label: 'Name Only' },
+        { value: 'number', label: 'Pupil # Only' },
+      ],
+      sortBy: [
+        { value: 'last', label: 'Last Name' },
+        { value: 'first', label: 'First Name' },
+        { value: 'number', label: 'Pupil #' },
+      ],
+      paper: [
+        { value: 'letter', label: 'Letter · 8.5 × 11 in' },
+        { value: 'legal', label: 'Legal · 8.5 × 14 in' },
+      ],
+      size: [
+        { value: 'normal', label: 'Normal' },
+        { value: 'compact', label: 'Compact' },
+      ],
+    };
+  }
+
+  function _menuValue(items, value) {
     return (
-      '<label class="gp-option"><input type="radio" name="' +
-      name +
-      '" value="' +
-      _esc(value) +
-      '"' +
-      (checked ? ' checked' : '') +
-      '><span>' +
-      _esc(label) +
-      (extra ? ' <span class="gp-help">' + _esc(extra) + '</span>' : '') +
-      '</span></label>'
+      items.find(function (it) {
+        return it.value === String(value);
+      }) || items[0]
     );
   }
 
-  function _check(key, checked, label, disabled) {
+  /* A row whose value opens a menu. */
+  function _menuRow(menus, opts, key, label, off) {
+    var cur = _menuValue(menus[key], opts[key]);
     return (
-      '<label class="gp-option' +
-      (disabled ? ' is-disabled' : '') +
-      '"><input type="checkbox" data-opt="' +
+      '<div class="gpd-row' +
+      (off ? ' is-off' : '') +
+      '"><span class="gpd-label" id="gpd-l-' +
+      key +
+      '">' +
+      _esc(label) +
+      '</span><button type="button" class="gpd-value" id="gpd-' +
+      key +
+      '" data-menu="' +
+      key +
+      '" aria-haspopup="menu" aria-expanded="false" aria-labelledby="gpd-l-' +
+      key +
+      ' gpd-' +
+      key +
+      '"' +
+      (off ? ' disabled' : '') +
+      '>' +
+      _esc(cur.label) +
+      CHEVRON +
+      '</button></div>'
+    );
+  }
+
+  /* A row with a switch. */
+  function _switchRow(key, checked, label, off, sub) {
+    return (
+      '<div class="gpd-row gpd-row-switch' +
+      (sub ? ' gpd-sub' : '') +
+      (off ? ' is-off' : '') +
+      '"><label class="gpd-label" for="gpd-' +
+      key +
+      '">' +
+      _esc(label) +
+      '</label><span class="gpd-switch"><input type="checkbox" role="switch" id="gpd-' +
+      key +
+      '" data-opt="' +
       key +
       '"' +
       (checked ? ' checked' : '') +
-      (disabled ? ' disabled' : '') +
-      '><span>' +
+      (off ? ' disabled' : '') +
+      '><span class="gpd-switch-ui" aria-hidden="true"></span></span></div>'
+    );
+  }
+
+  function _dateRow(key, label, value) {
+    return (
+      '<div class="gpd-row gpd-sub"><label class="gpd-label" for="gpd-' +
+      key +
+      '">' +
       _esc(label) +
-      '</span></label>'
+      '</label><input type="date" class="gpd-date" id="gpd-' +
+      key +
+      '" data-date="' +
+      key +
+      '" value="' +
+      _esc(value) +
+      '"></div>'
+    );
+  }
+
+  /* The number of blank columns the Columns stepper shows: the chosen count
+     kept to what fits, or the count that fills the page. */
+  function _gridColsShown(opts) {
+    var range = gridColumnRange(opts);
+    return opts.gridCols > 0 ? Math.min(opts.gridCols, range.max) : range.auto;
+  }
+
+  function _stepperRow(opts) {
+    var range = gridColumnRange(opts);
+    var n = _gridColsShown(opts);
+    return (
+      '<div class="gpd-row gpd-sub"><label class="gpd-label" for="gpd-gridCols">Columns</label>' +
+      '<div class="gpd-stepper"><button type="button" data-step="-1" aria-label="Fewer Columns"' +
+      (n <= range.min ? ' disabled' : '') +
+      '>−</button><input type="text" inputmode="numeric" id="gpd-gridCols" data-opt="gridCols" value="' +
+      n +
+      '"><button type="button" data-step="1" aria-label="More Columns"' +
+      (n >= range.max ? ' disabled' : '') +
+      '>+</button></div></div>'
     );
   }
 
@@ -1144,13 +1278,13 @@
       .map(function (a) {
         var d = _assessmentDate(a);
         return (
-          '<label class="gp-option gp-pick-option"><input type="checkbox" data-pick="' +
+          '<label class="gpd-pick-option"><input type="checkbox" data-pick="' +
           _esc(a.id) +
           '"' +
           (opts.picked.indexOf(a.id) >= 0 ? ' checked' : '') +
           '><span>' +
           _esc(a.title || '') +
-          (d ? ' <span class="gp-help">' + _esc(formatShortDate(d)) + '</span>' : '') +
+          (d ? ' <span class="gpd-help">' + _esc(formatShortDate(d)) + '</span>' : '') +
           '</span></label>'
         );
       })
@@ -1163,104 +1297,163 @@
     }).length;
   }
 
+  function _group(label, rows) {
+    return (
+      '<div class="gpd-group"><div class="gpd-group-label">' +
+      _esc(label) +
+      '</div><div class="gpd-list">' +
+      rows +
+      '</div></div>'
+    );
+  }
+
+  /* The right pane: Content, Students and Page. */
+  function _settingsHtml(cid, opts) {
+    var menus = _menus(cid, opts);
+    var period = periodFor(cid, opts);
+    var gridOnly = opts.assessments === 'blank';
+
+    var content = _menuRow(menus, opts, 'term', 'Term');
+    if (opts.term === 'custom') {
+      content += _dateRow('from', 'From', opts.from) + _dateRow('to', 'To', opts.to);
+    }
+    if (period.kind !== 'all' && _undatedCount(cid) > 0) {
+      content += _switchRow('undated', opts.undated, 'Undated Assessments', false, true);
+    }
+    content += _menuRow(menus, opts, 'assessments', 'Assessments');
+    if (gridOnly) content += _stepperRow(opts);
+    if (opts.assessments === 'pick') {
+      content += '<div class="gpd-pick" role="group" aria-label="Pick Assessments">' + _pickList(cid, opts) + '</div>';
+    }
+    content += _menuRow(menus, opts, 'scoresAs', 'Scores', gridOnly);
+    content += _switchRow('blank', opts.blank, 'Blank Scores', gridOnly);
+
+    var students = _menuRow(menus, opts, 'students', 'Show As') + _menuRow(menus, opts, 'sortBy', 'Sort By');
+
+    var page =
+      _switchRow('finalGrade', opts.finalGrade, 'Final Grade', period.kind === 'custom' || opts.blank || gridOnly) +
+      _switchRow('average', opts.average, 'Class Average Row', opts.blank || gridOnly) +
+      _switchRow('late', opts.late, 'Late Marks', opts.blank || gridOnly) +
+      _menuRow(menus, opts, 'paper', 'Paper') +
+      _menuRow(menus, opts, 'size', 'Text Size');
+
+    return _group('Content', content) + _group('Students', students) + _group('Page', page);
+  }
+
+  /* Widths of the name dashes on the picture's rows, in turn. */
+  var THUMB_NAMES = [73, 87, 67, 80, 60, 83, 70, 93, 63, 77, 90, 67, 80, 73, 97, 60, 83, 70, 77, 87, 67, 80];
+  var THUMB_H = 274;
+
+  /* A picture of the first page as the choices print it: the header, the
+     column heads, a row per student and the blank rows under them, the
+     class average row and the final grade column when they print, and
+     marks in the cells unless the scores are blank. Widths follow the
+     page's own, in inches. */
+  function _thumbHtml(model) {
+    var opts = model.opts;
+    var page = model.pages[0];
+    var paper = PAPER[opts.paper] || PAPER.letter;
+    var colCount = page.cols.count + page.blankCols;
+    var final = !!(page.final && model.final);
+    var avg = !!(model.averages && page.students.count);
+    var marked = !opts.blank;
+    var tracks =
+      _round2(_rowHeadWidth(opts)) + 'fr' + (colCount ? ' repeat(' + colCount + ', ' + page.colW + 'fr)' : '');
+    if (final) tracks += ' ' + model.final.w + 'fr';
+    function cells(kind) {
+      var out = '';
+      for (var i = 0; i < colCount; i++) {
+        var scored = marked && i < page.cols.count && kind !== 'blank';
+        out += '<span class="gpd-t-cell">' + (scored ? '<i></i>' : '') + '</span>';
+      }
+      if (final) out += '<span class="gpd-t-cell gpd-t-final">' + (kind !== 'blank' ? '<i></i>' : '') + '</span>';
+      return out;
+    }
+    var rows = '';
+    for (var r = 0; r < page.students.count; r++) {
+      rows +=
+        '<div class="gpd-t-row"><span class="gpd-t-name"><i style="width:' +
+        THUMB_NAMES[r % THUMB_NAMES.length] +
+        '%"></i></span>' +
+        cells('student') +
+        '</div>';
+    }
+    for (var b = 0; b < page.blankRows; b++) {
+      rows += '<div class="gpd-t-row"><span class="gpd-t-name"></span>' + cells('blank') + '</div>';
+    }
+    if (avg) {
+      rows += '<div class="gpd-t-row gpd-t-avg"><span class="gpd-t-name"><i></i></span>' + cells('avg') + '</div>';
+    }
+    var head = '<span class="gpd-t-cell"></span>';
+    for (var h = 0; h < colCount; h++) head += '<span class="gpd-t-cell"></span>';
+    if (final) head += '<span class="gpd-t-cell"></span>';
+    return (
+      '<div class="gpd-thumb" aria-hidden="true" style="width:' +
+      Math.round((THUMB_H * paper.w) / paper.h) +
+      'px;--gpd-t-cols:' +
+      tracks +
+      '">' +
+      '<div class="gpd-t-head"><i class="gpd-t-title"></i><i class="gpd-t-date"></i></div>' +
+      '<div class="gpd-t-row gpd-t-colhead">' +
+      head +
+      '</div>' +
+      '<div class="gpd-t-rows">' +
+      rows +
+      '</div>' +
+      '<div class="gpd-t-foot"><i></i><i></i></div>' +
+      '</div>'
+    );
+  }
+
+  /* "1 page · Letter" over "22 students · Blank Grid · 12 columns". */
+  function previewLines(model) {
+    var p = model.pages.length;
+    var paper = PAPER[model.opts.paper] || PAPER.letter;
+    var first = p + (p === 1 ? ' page' : ' pages') + ' · ' + paper.label;
+    var s = model.rows.length;
+    if (!s) return { pages: first, detail: 'No students to print.' };
+    var c = model.opts.grid ? model.pages[0].blankCols : model.columns.length;
+    return {
+      pages: first,
+      detail:
+        s +
+        (s === 1 ? ' student' : ' students') +
+        ' · ' +
+        (model.opts.grid ? 'Blank Grid · ' : '') +
+        c +
+        (c === 1 ? ' column' : ' columns'),
+    };
+  }
+
+  function _previewHtml(model) {
+    var lines = previewLines(model);
+    return (
+      _thumbHtml(model) +
+      '<div class="gpd-count" id="gp-status" aria-live="polite"><div class="gpd-count-pages">' +
+      _esc(lines.pages) +
+      '</div><div class="gpd-count-detail">' +
+      _esc(lines.detail) +
+      '</div></div>'
+    );
+  }
+
   function _dialogHtml(cid, opts) {
     var course = (typeof COURSES !== 'undefined' && COURSES[cid]) || {};
-    var terms = getReportingTerms(cid);
-    var period = periodFor(cid, opts);
-    var html = '<div class="confirm-card grades-print-card">';
-    html += '<div class="confirm-title" id="gp-title">Print Grades</div>';
-    html +=
-      '<div class="confirm-message">' +
+    return (
+      '<div class="confirm-card grades-print-card">' +
+      '<div class="gpd-side">' +
+      '<div class="gpd-head"><div class="gpd-title" id="gp-title">Print Grades</div><div class="gpd-class">' +
       _esc(typeof courseDisplayName === 'function' ? courseDisplayName(course) : course.name || '') +
-      '</div>';
-    html += '<div class="gp-groups">';
-
-    html += '<div class="gp-col">';
-    html += '<fieldset class="gp-group"><legend>Term</legend>';
-    html += _radio('gp-term', 'all', opts.term === 'all', 'All Time');
-    terms.forEach(function (t) {
-      html += _radio(
-        'gp-term',
-        String(t.ordinal),
-        opts.term === String(t.ordinal),
-        t.label,
-        _dateRange(t.starts_on, t.ends_on),
-      );
-    });
-    html += _radio('gp-term', 'custom', opts.term === 'custom', 'Custom Dates');
-    html +=
-      '<div class="gp-dates"' +
-      (opts.term === 'custom' ? '' : ' hidden') +
-      '><label>From <input type="date" data-date="from" value="' +
-      _esc(opts.from) +
-      '"></label><label>To <input type="date" data-date="to" value="' +
-      _esc(opts.to) +
-      '"></label></div>';
-    if (period.kind !== 'all' && _undatedCount(cid) > 0) {
-      html += _check('undated', opts.undated, 'Undated Assessments');
-    }
-    html += '</fieldset>';
-
-    html += '<fieldset class="gp-group"><legend>Assessments</legend>';
-    html += _radio('gp-assess', 'all', opts.assessments === 'all', 'All Assessments');
-    if (Array.isArray(opts.shownIds)) {
-      html += _radio('gp-assess', 'shown', opts.assessments === 'shown', 'Shown in the Gradebook');
-    }
-    html += _radio('gp-assess', 'pick', opts.assessments === 'pick', 'Pick Assessments');
-    html += _radio('gp-assess', 'blank', opts.assessments === 'blank', 'Blank Grid');
-    html +=
-      '<div class="gp-pick"' + (opts.assessments === 'pick' ? '' : ' hidden') + '>' + _pickList(cid, opts) + '</div>';
-    html += '</fieldset>';
-
-    html += '<fieldset class="gp-group"><legend>Scores</legend>';
-    html += _radio('gp-scores', 'entered', opts.scoresAs === 'entered', 'As Entered');
-    html += _radio('gp-scores', 'levels', opts.scoresAs === 'levels', 'Levels Only');
-    html += _radio('gp-scores', 'both', opts.scoresAs === 'both', 'Points and Levels');
-    var gridOnly = opts.assessments === 'blank';
-    html += _check('blank', opts.blank, 'Blank Scores', gridOnly);
-    html += '</fieldset>';
-    html += '</div>';
-
-    html += '<div class="gp-col">';
-    html += '<fieldset class="gp-group"><legend>Students</legend>';
-    html += _radio('gp-students', 'both', opts.students === 'both', 'Pupil # and Name');
-    html += _radio('gp-students', 'name', opts.students === 'name', 'Name Only');
-    html += _radio('gp-students', 'number', opts.students === 'number', 'Pupil # Only');
-    html += '</fieldset>';
-
-    html += '<fieldset class="gp-group"><legend>Sort By</legend>';
-    html += _radio('gp-sort', 'last', opts.sortBy === 'last', 'Last Name');
-    html += _radio('gp-sort', 'first', opts.sortBy === 'first', 'First Name');
-    html += _radio('gp-sort', 'number', opts.sortBy === 'number', 'Pupil #');
-    html += '</fieldset>';
-
-    html += '<fieldset class="gp-group"><legend>Show</legend>';
-    html += _check('finalGrade', opts.finalGrade, 'Final Grade', period.kind === 'custom' || opts.blank || gridOnly);
-    html += _check('average', opts.average, 'Class Average Row', opts.blank || gridOnly);
-    html += _check('late', opts.late, 'Late Marks', opts.blank || gridOnly);
-    html += '</fieldset>';
-
-    html += '<fieldset class="gp-group"><legend>Paper</legend>';
-    html += _radio('gp-paper', 'letter', opts.paper === 'letter', 'Letter', '8.5 × 11 in');
-    html += _radio('gp-paper', 'legal', opts.paper === 'legal', 'Legal', '8.5 × 14 in');
-    if (opts.paper === 'legal') {
-      html += '<div class="gp-help gp-note">Choose Legal paper in the print window too.</div>';
-    }
-    html += '</fieldset>';
-
-    html += '<fieldset class="gp-group"><legend>Text Size</legend>';
-    html += _radio('gp-size', 'normal', opts.size === 'normal', 'Normal');
-    html += _radio('gp-size', 'compact', opts.size === 'compact', 'Compact');
-    html += '</fieldset>';
-    html += '</div>';
-
-    html += '</div>';
-    html += '<div class="gp-status" id="gp-status" aria-live="polite"></div>';
-    html +=
-      '<div class="confirm-actions"><button type="button" class="confirm-cancel" data-gp="cancel">Cancel</button>' +
-      '<button type="button" class="confirm-ok primary" data-gp="print">Print</button></div>';
-    html += '</div>';
-    return html;
+      '</div></div>' +
+      '<div class="gpd-preview" id="gpd-preview"></div>' +
+      '<div class="gpd-actions"><button type="button" class="confirm-cancel" data-gp="cancel">Cancel</button>' +
+      '<button type="button" class="confirm-ok primary" data-gp="print">Print</button></div>' +
+      '</div>' +
+      '<div class="gpd-settings" id="gpd-settings">' +
+      _settingsHtml(cid, opts) +
+      '</div>' +
+      '</div>'
+    );
   }
 
   /* "27 students · 18 columns · 3 pages." */
@@ -1280,50 +1473,126 @@
     );
   }
 
-  function _refreshStatus() {
+  /* Redraws the picture and the page count, and turns Print off when there
+     is no one to print. */
+  function _refreshPreview() {
     if (!_state) return;
     var model = buildModel(_state.cid, _state.opts);
-    var status = document.getElementById('gp-status');
-    if (status) status.textContent = statusText(model);
+    var preview = document.getElementById('gpd-preview');
+    if (preview) preview.innerHTML = _previewHtml(model);
     var btn = document.querySelector('#' + OVERLAY_ID + ' [data-gp="print"]');
     if (btn) btn.disabled = !model.rows.length;
   }
 
-  function _readDialog(overlay) {
-    var o = _state.opts;
-    var val = function (name) {
-      var el = overlay.querySelector('input[name="' + name + '"]:checked');
-      return el ? el.value : null;
-    };
-    o.term = val('gp-term') || o.term;
-    o.assessments = val('gp-assess') || o.assessments;
-    o.scoresAs = val('gp-scores') || o.scoresAs;
-    o.sortBy = val('gp-sort') || o.sortBy;
-    o.students = val('gp-students') || o.students;
-    o.paper = val('gp-paper') || o.paper;
-    o.size = val('gp-size') || o.size;
-    overlay.querySelectorAll('input[data-opt]').forEach(function (box) {
-      if (!box.disabled) o[box.dataset.opt] = !!box.checked;
-    });
-    overlay.querySelectorAll('input[data-date]').forEach(function (inp) {
-      o[inp.dataset.date] = inp.value || '';
-    });
-    o.picked = [];
-    overlay.querySelectorAll('input[data-pick]:checked').forEach(function (box) {
-      o.picked.push(box.dataset.pick);
-    });
+  /* Redraws the rows after a change, keeping the scroll and the focus. */
+  function _redraw(focusId) {
+    var pane = document.getElementById('gpd-settings');
+    if (!pane) return;
+    var pick = pane.querySelector('.gpd-pick');
+    var pickTop = pick ? pick.scrollTop : 0;
+    var top = pane.scrollTop;
+    pane.innerHTML = _settingsHtml(_state.cid, _state.opts);
+    pane.scrollTop = top;
+    pick = pane.querySelector('.gpd-pick');
+    if (pick) pick.scrollTop = pickTop;
+    var el = focusId ? document.getElementById(focusId) : null;
+    if (el && !el.disabled && el.focus) el.focus();
   }
 
-  /* Redraws the card when a choice changes what the dialog offers (term,
-     assessments, blank); keeps focus on the control that changed. */
-  function _redraw(overlay, focusName, focusValue) {
-    overlay.innerHTML = _dialogHtml(_state.cid, _state.opts);
-    var sel =
-      focusValue != null
-        ? 'input[name="' + focusName + '"][value="' + focusValue + '"]'
-        : 'input[data-opt="' + focusName + '"]';
-    var el = overlay.querySelector(sel);
-    if (el && el.focus) el.focus();
+  function _changed(focusId) {
+    _saveOptions(_state.cid, _state.opts);
+    _redraw(focusId);
+    _refreshPreview();
+  }
+
+  /* ── Value menus ── */
+
+  function _closeMenu(refocus) {
+    var menu = document.getElementById('gpd-menu');
+    if (!menu) return false;
+    var btn = document.getElementById('gpd-' + menu.dataset.for);
+    menu.remove();
+    if (btn) {
+      btn.setAttribute('aria-expanded', 'false');
+      if (refocus) btn.focus();
+    }
+    return true;
+  }
+
+  function _openMenu(overlay, btn) {
+    var key = btn.dataset.menu;
+    _closeMenu(false);
+    var items = _menus(_state.cid, _state.opts)[key];
+    var cur = _menuValue(items, _state.opts[key]);
+    var menu = document.createElement('div');
+    menu.id = 'gpd-menu';
+    menu.className = 'gpd-menu';
+    menu.setAttribute('role', 'menu');
+    menu.setAttribute('aria-labelledby', 'gpd-l-' + key);
+    menu.dataset.for = key;
+    menu.innerHTML = items
+      .map(function (it) {
+        var on = it === cur;
+        return (
+          '<button type="button" role="menuitemradio" class="gpd-menu-item" tabindex="-1" aria-checked="' +
+          on +
+          '" data-menu-item="' +
+          _esc(it.value) +
+          '">' +
+          _esc(it.label) +
+          (it.help ? '<span class="gpd-menu-help">' + _esc(it.help) + '</span>' : '') +
+          '</button>'
+        );
+      })
+      .join('');
+    overlay.appendChild(menu);
+    btn.setAttribute('aria-expanded', 'true');
+    // Under the value, right edges lined up; above it when there is no room below.
+    var r = btn.getBoundingClientRect();
+    var h = menu.offsetHeight;
+    var top = r.bottom + 4;
+    if (top + h > window.innerHeight - 8 && r.top - h - 4 >= 8) top = r.top - h - 4;
+    menu.style.top = Math.round(top) + 'px';
+    menu.style.left = Math.round(Math.max(8, r.right - menu.offsetWidth)) + 'px';
+    var on = menu.querySelector('[aria-checked="true"]') || menu.querySelector('.gpd-menu-item');
+    if (on) on.focus();
+  }
+
+  function _pickMenuItem(item) {
+    var menu = item.closest('.gpd-menu');
+    var key = menu.dataset.for;
+    var o = _state.opts;
+    o[key] = item.dataset.menuItem;
+    _closeMenu(false);
+    _changed('gpd-' + key);
+  }
+
+  /* Arrow keys, Home and End move through an open menu. */
+  function _menuKey(e) {
+    var menu = document.getElementById('gpd-menu');
+    if (!menu) return false;
+    var items = Array.prototype.slice.call(menu.querySelectorAll('.gpd-menu-item'));
+    var i = items.indexOf(document.activeElement);
+    var next = null;
+    if (e.key === 'ArrowDown') next = items[(i + 1) % items.length];
+    else if (e.key === 'ArrowUp') next = items[(i - 1 + items.length) % items.length];
+    else if (e.key === 'Home') next = items[0];
+    else if (e.key === 'End') next = items[items.length - 1];
+    else if (e.key === 'Tab') {
+      _closeMenu(true);
+      return false;
+    }
+    if (!next) return false;
+    e.preventDefault();
+    next.focus();
+    return true;
+  }
+
+  function _setGridCols(n) {
+    var range = gridColumnRange(_state.opts);
+    n = Math.floor(Number(n));
+    if (!isFinite(n) || n < 1) n = _gridColsShown(_state.opts);
+    _state.opts.gridCols = Math.max(range.min, Math.min(range.max, n));
   }
 
   function open(cid, given) {
@@ -1337,11 +1606,43 @@
     overlay.setAttribute('aria-labelledby', 'gp-title');
     overlay.innerHTML = _dialogHtml(cid, _state.opts);
     overlay.addEventListener('click', function (e) {
-      if (e.target === overlay) {
+      var t = e.target;
+      var item = t.closest ? t.closest('[data-menu-item]') : null;
+      if (item) {
+        _pickMenuItem(item);
+        return;
+      }
+      // A click anywhere else closes an open menu first.
+      var menuBtn = t.closest ? t.closest('[data-menu]') : null;
+      var wasOpen = document.getElementById('gpd-menu');
+      var sameBtn = wasOpen && menuBtn && wasOpen.dataset.for === menuBtn.dataset.menu;
+      if (wasOpen && !(t.closest && t.closest('.gpd-menu'))) {
+        _closeMenu(false);
+        if (!menuBtn || sameBtn) return;
+      }
+      if (menuBtn) {
+        _openMenu(overlay, menuBtn);
+        return;
+      }
+      if (t === overlay) {
         close();
         return;
       }
-      var btn = e.target.closest ? e.target.closest('[data-gp]') : null;
+      var step = t.closest ? t.closest('[data-step]') : null;
+      if (step) {
+        _setGridCols(_gridColsShown(_state.opts) + Number(step.dataset.step));
+        _changed(null);
+        // The stepper is redrawn: focus goes back to the same button, or to
+        // the count when that button has reached its end.
+        var again = overlay.querySelector('[data-step="' + step.dataset.step + '"]');
+        if (again && !again.disabled) again.focus();
+        else {
+          var input = document.getElementById('gpd-gridCols');
+          if (input) input.focus();
+        }
+        return;
+      }
+      var btn = t.closest ? t.closest('[data-gp]') : null;
       if (!btn) return;
       if (btn.dataset.gp === 'cancel') close();
       else if (btn.dataset.gp === 'print') _printFromDialog();
@@ -1349,37 +1650,56 @@
     overlay.addEventListener('change', function (e) {
       var t = e.target;
       var o = _state.opts;
-      var before = {
-        term: o.term,
-        assessments: o.assessments,
-        blank: o.blank,
-        from: o.from,
-        to: o.to,
-        paper: o.paper,
-      };
-      _readDialog(overlay);
-      _saveOptions(cid, o);
-      if (
-        o.term !== before.term ||
-        o.assessments !== before.assessments ||
-        o.blank !== before.blank ||
-        o.paper !== before.paper
-      ) {
-        _redraw(overlay, t.name || t.dataset.opt, t.type === 'radio' ? t.value : null);
-      } else if (o.from !== before.from || o.to !== before.to) {
+      if (t.dataset.pick != null) {
+        o.picked = [];
+        overlay.querySelectorAll('input[data-pick]:checked').forEach(function (box) {
+          o.picked.push(box.dataset.pick);
+        });
+        _saveOptions(cid, o);
+        _refreshPreview();
+      } else if (t.dataset.date) {
         // The dates change which assessments can be picked.
-        var pick = overlay.querySelector('.gp-pick');
+        o[t.dataset.date] = t.value || '';
+        var pick = overlay.querySelector('.gpd-pick');
         if (pick) pick.innerHTML = _pickList(cid, o);
+        _saveOptions(cid, o);
+        _refreshPreview();
+      } else if (t.dataset.opt === 'gridCols') {
+        _setGridCols(t.value);
+        _changed(t.id);
+      } else if (t.dataset.opt) {
+        o[t.dataset.opt] = !!t.checked;
+        _changed(t.id);
       }
-      _refreshStatus();
     });
+    overlay.addEventListener('keydown', function (e) {
+      if (_menuKey(e)) return;
+      var t = e.target;
+      if (e.key === 'ArrowDown' && t.dataset && t.dataset.menu) {
+        e.preventDefault();
+        _openMenu(overlay, t);
+      } else if (e.key === 'Enter' && t.dataset && t.dataset.opt === 'gridCols') {
+        e.preventDefault();
+        _setGridCols(t.value);
+        _changed(t.id);
+      }
+    });
+    overlay.addEventListener(
+      'scroll',
+      function () {
+        _closeMenu(false);
+      },
+      true,
+    );
     _state.keyHandler = function (e) {
-      if (e.key === 'Escape') close();
+      if (e.key !== 'Escape') return;
+      if (_closeMenu(true)) return;
+      close();
     };
     document.addEventListener('keydown', _state.keyHandler);
     document.body.appendChild(overlay);
-    _refreshStatus();
-    var first = overlay.querySelector('input[name="gp-term"]:checked') || overlay.querySelector('input');
+    _refreshPreview();
+    var first = overlay.querySelector('[data-menu="term"]');
     if (first && first.focus) first.focus();
   }
 
@@ -1433,10 +1753,12 @@
     gridHeight: gridHeight,
     fill: fill,
     paginate: paginate,
+    gridColumnRange: gridColumnRange,
     headerFields: headerFields,
     buildModel: buildModel,
     keyLines: keyLines,
     statusText: statusText,
+    previewLines: previewLines,
     renderPage: renderPage,
     renderPages: renderPages,
     stage: stage,
