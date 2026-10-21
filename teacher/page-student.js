@@ -600,7 +600,7 @@ window.PageStudent = (function () {
       '<div class="grades-header">' +
       '<div class="insight-title" style="margin-bottom:0">Assessment Grades' +
       (activeSectionFilters.size > 0
-        ? ' <span style="font-family:var(--font-base);font-size:0.75rem;font-weight:500;color:var(--text-3);text-transform:none;letter-spacing:0">(filtered — <a href="#" data-action="clearSectionFilters" style="color:var(--link);text-decoration:none">show all</a>)</span>'
+        ? ' <span style="font-family:var(--font-base);font-size:0.75rem;font-weight:500;color:var(--text-3);text-transform:none;letter-spacing:0">(filtered — <button type="button" data-action="clearSectionFilters" style="font:inherit;color:var(--link);text-decoration:none;background:none;border:0;padding:0;cursor:pointer">show all</button>)</span>'
         : '') +
       '</div>' +
       '<div class="grades-legend">' +

@@ -759,16 +759,17 @@ function renderSidebar(activeCourse, selectedStudentId, onStudentClick) {
     const href = `#/student?id=${s.id}&course=${cid}`;
     const flagged = flags[s.id];
     const avatarBg = _avatarColor(s.id);
-    const clickAttr = onStudentClick
-      ? `href="javascript:void(0)" data-action="sidebarStudentClick" data-sid="${s.id}"`
-      : `href="${href}"`;
-    html += `<a class="student-row${s.id === selectedStudentId ? ' selected' : ''}" ${clickAttr} data-sid="${s.id}">
-      <div class="student-avatar" style="background:${avatarBg}">${initials(s)}</div>
-      <div class="student-info">
-        <div class="student-row-name">${flagged ? '<span style="color:var(--priority);margin-right:3px">\u2691</span>' : ''}${esc(fullName(s))}</div>
-      </div>
-      <div class="student-row-grades" data-prof-sid="${s.id}"></div>
-    </a>`;
+    // A row that runs a page function is a button, so the browser shows no
+    // link target in its status bar; a row that opens the student is a link.
+    const tag = onStudentClick ? 'button' : 'a';
+    const clickAttr = onStudentClick ? `type="button" data-action="sidebarStudentClick"` : `href="${href}"`;
+    html += `<${tag} class="student-row${s.id === selectedStudentId ? ' selected' : ''}" ${clickAttr} data-sid="${s.id}">
+      <span class="student-avatar" style="background:${avatarBg}">${initials(s)}</span>
+      <span class="student-info">
+        <span class="student-row-name">${flagged ? '<span style="color:var(--priority);margin-right:3px">\u2691</span>' : ''}${esc(fullName(s))}</span>
+      </span>
+      <span class="student-row-grades" data-prof-sid="${s.id}"></span>
+    </${tag}>`;
   });
 
   html += `</div>

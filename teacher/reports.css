@@ -1913,9 +1913,15 @@
   color: var(--score-2);
   margin-bottom: 4px;
 }
-.issue-warn a {
+.issue-warn button {
+  font: inherit;
   color: var(--active);
   font-weight: 500;
+  text-decoration: underline;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
 }
 
 /* The comment box's fit line (page-reports.js updateCommentFit). */

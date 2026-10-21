@@ -752,7 +752,7 @@ window.PageAssignments = (function () {
       html +=
         '<div style="text-align:center;color:var(--text-3);padding:40px 0">' +
         '<div style="font-size:0.9375rem;margin-bottom:4px">No matching assignments.</div>' +
-        '<div style="font-size:0.8125rem">Try adjusting your filters or <a href="#" data-action="clearAssessFilters" style="color:var(--link)">clear all filters</a>.</div>' +
+        '<div style="font-size:0.8125rem">Try adjusting your filters or <button type="button" data-action="clearAssessFilters" style="font:inherit;color:var(--link);text-decoration:underline;background:none;border:0;padding:0;cursor:pointer">clear all filters</button>.</div>' +
         '</div>';
     } else if (assessments.length === 0 && allAssessments.length === 0) {
       html +=
