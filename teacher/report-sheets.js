@@ -123,8 +123,12 @@ window.ReportSheets = (function () {
   /* Every block a form can hold. Labels, the palette group, the default
      room (rows: about a typical student's height at full width) and the
      options a block offers live here, not in the saved form. `fill`
-     blocks rule lines into room the content leaves; `table` blocks are cut
-     at their rows when they reach the bottom of a page. */
+     blocks rule lines into room the content leaves, and stretch to the
+     foot of their page when nothing sits under them; `table` blocks are cut
+     at their rows when they reach the bottom of a page. A `retired` block
+     is left out of the palette; a saved layout that has one keeps it. An
+     option's `choices` are numbers or { v, label }; a `text` option is a
+     line the teacher writes. */
   var BLOCKS = {
     header: {
       label: 'Letterhead',
@@ -162,11 +166,24 @@ window.ReportSheets = (function () {
         { key: 'area', label: 'Learning Area', def: true },
         { key: 'score', label: 'Score', def: true },
         { key: 'level', label: 'Proficiency', def: true },
+        {
+          key: 'range',
+          label: 'Assessments',
+          def: 'term',
+          choices: [
+            { v: 'last10', label: 'Last 10' },
+            { v: 'term', label: 'This Term' },
+            { v: 'all', label: 'All' },
+          ],
+        },
       ],
     },
-    'section-outcomes': { label: 'Learning Outcomes', rows: 20, group: 'Grades' },
-    'score-distribution': { label: 'Score Distribution', rows: 14, group: 'Grades' },
-    'section-chart': { label: 'Section Chart', rows: 20, group: 'Grades' },
+    'term-glance': { label: 'This Term at a Glance', rows: 5, group: 'Grades' },
+    growth: { label: 'Growth Since Last Report', rows: 10, table: true, group: 'Grades' },
+    'missing-work': { label: 'Missing Work', rows: 6, table: true, group: 'Grades' },
+    'section-outcomes': { label: 'Learning Outcomes', rows: 20, group: 'Grades', retired: true },
+    'score-distribution': { label: 'Score Distribution', rows: 14, group: 'Grades', retired: true },
+    'section-chart': { label: 'Section Chart', rows: 20, group: 'Grades', retired: true },
     'teacher-narrative': { label: 'Teacher Comment', rows: 8, fill: true, group: 'Comments and Evidence' },
     observations: { label: 'Observations', rows: 16, group: 'Comments and Evidence' },
     'next-steps': {
@@ -201,6 +218,15 @@ window.ReportSheets = (function () {
       pinnable: true,
     },
     legend: { label: 'Proficiency Legend', rows: 6, group: 'Family' },
+    'support-home': {
+      label: 'Ways to Support at Home',
+      rows: 6,
+      group: 'Family',
+      options: [
+        { key: 'lines', label: 'Lines', def: 2, choices: [1, 2, 3] },
+        { key: 'note', label: 'Your Own Line', def: '', text: true },
+      ],
+    },
     'text-block': { label: 'Text Block', rows: 4, fill: true, group: 'Family' },
   };
   var BLOCK_ORDER = Object.keys(BLOCKS);
@@ -963,6 +989,15 @@ window.ReportSheets = (function () {
         next.push(it);
         placed.push({ x: it.x, w: it.w, bottom: Infinity });
       });
+      // A fill block with nothing under it in its columns takes the rest of
+      // the page down to the limit: ruled lines, not blank paper.
+      page.items.forEach(function (pi) {
+        if ((opts.fill || []).indexOf(pi.id) < 0 || pi.pinned || pi.part) return;
+        var under = page.items.some(function (o) {
+          return o !== pi && !o.pinned && _colsMeet(o, pi) && o.y >= pi.y + pi.h;
+        });
+        if (!under && pi.y + pi.h < limit) pi.h = limit - pi.y;
+      });
       out.push(page);
       carry = next;
     }
@@ -1235,7 +1270,10 @@ window.ReportSheets = (function () {
       });
     });
     var pps = f.pagesPerStudent === 1 || f.pagesPerStudent === 2 ? f.pagesPerStudent : null;
-    var r = resolve(pages, { rows: rows, pinned: f.pinned, cap: pps });
+    var fill = BLOCK_ORDER.filter(function (id) {
+      return BLOCKS[id].fill;
+    });
+    var r = resolve(pages, { rows: rows, pinned: f.pinned, cap: pps, fill: fill });
     var labelOf = function (id) {
       return BLOCKS[id] ? BLOCKS[id].label : id;
     };

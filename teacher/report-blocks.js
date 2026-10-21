@@ -311,6 +311,37 @@ window.ReportBlocks = (function () {
      as dots and a word that follows the class's grading setting, and how
      many assessments the level rests on. A fixed block: its rows come from
      the learning map, so its height is the same for every student. */
+  /* A competency's level as the class's grading setting shows it: dots and
+     the word, the letter, or both with the %. Nothing computes a grade
+     here; calc.js does (formatLevel). */
+  function _levelHtml(cid, sp) {
+    const r = Math.round(sp);
+    const mode = courseGradeMode(cid);
+    if (!(sp > 0)) return '<span class="report-ct-none">No evidence yet</span>';
+    if (mode === 'proficiency') return levelDots(r) + esc(PROF_LABELS[r] || '');
+    if (mode === 'letter') return levelDots(r) + esc(formatLevel(cid, sp));
+    return (
+      levelDots(r) +
+      esc(PROF_LABELS[r] || '') +
+      ' <span class="report-ct-pct">' +
+      esc(formatLevel(cid, sp).split(' \u00B7 ').pop()) +
+      '</span>'
+    );
+  }
+
+  /* The class's competencies in report order: grouped sections first, then
+     the ungrouped, else every section. */
+  function _reportSections(cid) {
+    const grouped = getGroupedSections(cid);
+    if (grouped.groups.some(g => g.sections.length)) {
+      const out = [];
+      grouped.groups.forEach(g => g.sections.forEach(sec => out.push(sec)));
+      grouped.ungrouped.forEach(sec => out.push(sec));
+      return out;
+    }
+    return getSections(cid);
+  }
+
   function renderBlockCompetencyTable(cid, student, ctx, options) {
     options = options || {};
     const showEvidence = options.evidence !== false;
@@ -319,7 +350,6 @@ window.ReportBlocks = (function () {
     if (options.assignments) getAssessments(cid).forEach(a => (titles[a.id] = a.title));
     const cols = showEvidence ? 3 : 2;
     const grouped = getGroupedSections(cid);
-    const mode = courseGradeMode(cid);
     const row = sec => {
       const sp = getSectionProficiency(cid, student.id, sec.id);
       const r = Math.round(sp);
@@ -330,17 +360,7 @@ window.ReportBlocks = (function () {
         });
       });
       if (!(sp > 0) && hideEmpty) return '';
-      let level;
-      if (!(sp > 0)) level = '<span class="report-ct-none">No evidence yet</span>';
-      else if (mode === 'proficiency') level = levelDots(r) + esc(PROF_LABELS[r] || '');
-      else if (mode === 'letter') level = levelDots(r) + esc(formatLevel(cid, sp));
-      else
-        level =
-          levelDots(r) +
-          esc(PROF_LABELS[r] || '') +
-          ' <span class="report-ct-pct">' +
-          esc(formatLevel(cid, sp).split(' \u00B7 ').pop()) +
-          '</span>';
+      const level = _levelHtml(cid, sp);
       let notes = '';
       if (options.ican) {
         const icans = (sec.tags || [])
@@ -491,7 +511,7 @@ window.ReportBlocks = (function () {
     const icanCount = options && options.ican != null ? Math.max(0, Math.min(3, Number(options.ican))) : 2;
     const focusAreas = getFocusAreas(cid, student.id, 3);
     const realFocus = focusAreas.filter(f => f.prof <= 2);
-    if (realFocus.length === 0) return '';
+    if (realFocus.length === 0) return _keepGoing(cid, student, icanCount);
     let html = `<div class="report-next-steps"><div class="report-next-steps-title">Suggested Next Steps</div>`;
     realFocus.forEach((f, i) => {
       const secName = f.section ? f.section.name : '';
@@ -517,6 +537,27 @@ window.ReportBlocks = (function () {
     });
     html += `</div>`;
     return html;
+  }
+
+  /* No area under Proficient: the strongest competency and its next I-can
+     statements, so the block always says something true. Nothing when the
+     student has no evidence at all. */
+  function _keepGoing(cid, student, icanCount) {
+    const best = getAllTags(cid)
+      .map(t => ({ tag: t, prof: getTagProficiency(cid, student.id, t.id), section: getSectionForTag(cid, t.id) }))
+      .filter(x => x.prof > 0)
+      .sort((a, b) => b.prof - a.prof)[0];
+    if (!best) return '';
+    const r = Math.round(best.prof);
+    let desc = `<strong>Keep going</strong> &mdash; ${esc(best.section ? best.section.name : '')}: ${esc(best.tag.label)}, ${esc(PROF_LABELS[r] || '')}.`;
+    const stmts = (best.tag.i_can_statements || []).slice(0, icanCount);
+    if (stmts.length) {
+      desc += `<ul class="report-ican-list" style="margin-top:4px">${stmts.map(st => `<li class="report-ican-item">${esc(st)}</li>`).join('')}</ul>`;
+    }
+    return `<div class="report-next-steps"><div class="report-next-steps-title">Suggested Next Steps</div><div class="report-next-step-item">
+      <div class="report-next-step-bullet" data-prof-bg="${r}" style="background:${PROF_COLORS[r] || PROF_COLORS[0]}">1</div>
+      <div>${desc}</div>
+    </div></div>`;
   }
 
   function renderBlockLegend() {
@@ -962,7 +1003,11 @@ window.ReportBlocks = (function () {
   function renderBlockGradeTable(cid, student, options) {
     options = options || {};
     const on = key => options[key] !== false;
-    const assessments = getAssessments(cid).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    // This term by default; the last ten or everything when the teacher says so.
+    const range = options.range === 'all' || options.range === 'last10' ? options.range : 'term';
+    let assessments = getAssessments(cid).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    if (range === 'term') assessments = assessments.filter(a => assessmentInActiveTerm(cid, a));
+    else if (range === 'last10') assessments = assessments.slice(0, 10);
     const scores = getScores(cid)[student.id] || [];
     if (assessments.length === 0) return '';
     const scale = getGradingScale(cid);
@@ -1034,6 +1079,7 @@ window.ReportBlocks = (function () {
           scoreDisplay = `<td data-prof="${r}" style="text-align:center;font-weight:600;font-size:1rem;color:${color}">${r}<span style="color:var(--text-3);font-weight:400">/4</span></td>`;
           profDisplay = `<td style="text-align:center"><span class="report-level-pill" data-prof="${r}" data-prof-bg="${r}" style="display:inline-block;padding:2px 10px;border-radius:6px;font-size:0.74rem;font-weight:600;background:${PROF_TINT[r] || 'transparent'};color:${color}">${levelDots(r)}${profLabel(r)}</span></td>`;
         }
+        scoreDisplay = scoreDisplay.replace('<td ', '<td class="col-score" ');
         rows += `<tr>
         <td style="font-weight:500">${esc(a.title)}${weightLabel}</td>
         ${on('date') ? `<td class="col-date" style="color:var(--text-3);font-size:0.76rem">${dateStr}</td>` : ''}
@@ -1052,7 +1098,7 @@ window.ReportBlocks = (function () {
         ${on('date') ? '<th class="col-date" style="width:10%;text-align:left">Date</th>' : ''}
         ${on('category') ? '<th class="col-category" style="width:14%;text-align:left">Category</th>' : ''}
         ${on('area') ? '<th class="col-area" style="width:18%;text-align:left">Learning Area</th>' : ''}
-        ${on('score') ? '<th style="width:12%;text-align:center">Score</th>' : ''}
+        ${on('score') ? '<th class="col-score" style="width:12%;text-align:center">Score</th>' : ''}
         ${on('level') ? '<th style="width:12%;text-align:center">Proficiency</th>' : ''}
       </tr></thead><tbody>`;
     html += renderRows(assessments);
@@ -1128,6 +1174,142 @@ window.ReportBlocks = (function () {
     return html;
   }
 
+  /* ── Ways to Support at Home ──
+     Lines for the family from the I-can statements of the student's
+     weakest assessed competencies ("I can plan a fair test" becomes "Ask
+     Cece to show you how she can plan a fair test."), and the teacher's
+     own line for the class. Nothing generated beyond that wording. */
+  function _forFamily(student, stmt) {
+    const p = getPronouns(student);
+    const name = displayNameFirst(student);
+    const m = String(stmt || '')
+      .trim()
+      .match(/^I can (.+?)\.?$/i);
+    if (!m) return `Talk with ${name} about this: ${String(stmt).trim()}`;
+    const rest = m[1]
+      .replace(/\bmyself\b/gi, p.refl)
+      .replace(/\bmy\b/gi, p.poss)
+      .replace(/\bme\b/gi, p.obj)
+      .replace(/\bI\b/g, p.subj)
+      .replace(/\bI'm\b/g, p.subj + (p.subj === 'they' ? "'re" : "'s"));
+    return `Ask ${name} to show you how ${p.subj} can ${rest}.`;
+  }
+  function renderBlockSupportHome(cid, student, options) {
+    options = options || {};
+    const count = Math.max(1, Math.min(3, Number(options.lines) || 2));
+    const weakest = getAllTags(cid)
+      .map(t => ({ tag: t, prof: getTagProficiency(cid, student.id, t.id) }))
+      .filter(x => x.prof > 0 && (x.tag.i_can_statements || []).length)
+      .sort((a, b) => a.prof - b.prof)
+      .slice(0, count);
+    const lines = weakest.map(x => _forFamily(student, x.tag.i_can_statements[0]));
+    const note = String(options.note || '').trim();
+    if (note) lines.push(note);
+    if (!lines.length) return '';
+    return `<div class="report-block-box report-support-home">
+    <div class="report-block-title">Ways to Support at Home</div>
+    <ul class="report-support-list">${lines.map(l => `<li>${esc(l)}</li>`).join('')}</ul>
+  </div>`;
+  }
+
+  /* The assessments dated in the report's term (all when no term is
+     active), each with its cell as the Scores view shows it. */
+  function _termCells(cid, student) {
+    return getAssessments(cid)
+      .filter(a => assessmentInActiveTerm(cid, a))
+      .map(a => ({ a: a, cell: assessmentCellValue(cid, student.id, a) }));
+  }
+  function _inActiveTerm(cid, day) {
+    const t = getActiveTerm(cid);
+    if (!t) return true;
+    return !!day && day >= t.startsOn && day <= t.endsOn;
+  }
+
+  /* ── This Term at a Glance ── six figures in a row. */
+  function renderBlockTermGlance(cid, student) {
+    const cells = _termCells(cid, student);
+    if (!cells.length) return '';
+    const assessed = cells.filter(c => ['level', 'points', 'complete'].includes(c.cell.kind)).length;
+    const late = cells.filter(c => c.cell.late).length;
+    const missing = cells.filter(c => c.cell.kind === 'missing' || c.cell.status === 'NS').length;
+    const obs = getStudentQuickObs(cid, student.id).filter(o =>
+      _inActiveTerm(cid, String(o.date || o.created || '').slice(0, 10)),
+    ).length;
+    const levels = _reportSections(cid)
+      .map(sec => ({ sec: sec, sp: getSectionProficiency(cid, student.id, sec.id) }))
+      .filter(x => x.sp > 0)
+      .sort((a, b) => b.sp - a.sp);
+    const name = x => (x ? esc(x.sec.shortName || x.sec.name) : '\u2014');
+    const strongest = levels[0] || null;
+    const growing = levels.length > 1 ? levels[levels.length - 1] : null;
+    const fig = (value, label, word) =>
+      `<div class="report-glance-fig${word ? ' word' : ''}"><div class="report-glance-value">${value}</div><div class="report-glance-label">${label}</div></div>`;
+    return `<div class="report-block-box report-term-glance">
+    <div class="report-block-title">This Term at a Glance</div>
+    <div class="report-glance">${fig(assessed, 'Assessed')}${fig(late, 'Late')}${fig(missing, 'Missing')}${fig(obs, 'Observations')}${fig(name(strongest), 'Strongest', true)}${fig(name(growing), 'Growing', true)}</div>
+  </div>`;
+  }
+
+  /* ── Growth Since Last Report ──
+     Each competency's level in the previous reporting term beside this
+     one. calc.js is scoped to the previous term for the reading and put
+     back after (as Print Grades does). Nothing when there is no previous
+     term or no evidence in it. */
+  function renderBlockGrowth(cid, student) {
+    const now = getActiveTerm(cid);
+    if (!now) return '';
+    const prev = getReportingTerms(cid)
+      .filter(t => t.ordinal < now.ordinal)
+      .pop();
+    if (!prev) return '';
+    const sections = _reportSections(cid);
+    const current = sections.map(sec => getSectionProficiency(cid, student.id, sec.id));
+    let before;
+    try {
+      setActiveTerm(cid, prev.ordinal);
+      before = sections.map(sec => getSectionProficiency(cid, student.id, sec.id));
+    } finally {
+      setActiveTerm(cid, now.ordinal);
+    }
+    if (!before.some(v => v > 0)) return '';
+    const arrow = (a, b) => {
+      if (!(a > 0) || !(b > 0)) return '';
+      const d = Math.round(b) - Math.round(a);
+      if (d > 0) return '<span class="report-growth-up" aria-label="Up">\u2191</span>';
+      if (d < 0) return '<span class="report-growth-down" aria-label="Down">\u2193</span>';
+      return '<span class="report-growth-same" aria-label="Same">\u2192</span>';
+    };
+    const rows = sections
+      .map(
+        (sec, i) =>
+          `<tr><td class="report-ct-name">${esc(sec.shortName || sec.name)}</td><td class="report-ct-level col-before" data-prof="${Math.round(before[i])}">${_levelHtml(cid, before[i])}</td><td class="report-ct-level" data-prof="${Math.round(current[i])}">${_levelHtml(cid, current[i])}</td><td class="report-growth-arrow">${arrow(before[i], current[i])}</td></tr>`,
+      )
+      .join('');
+    return `<div class="report-block-box report-growth">
+    <div class="report-block-title">Growth Since Last Report</div>
+    <table class="report-ct"><thead><tr><th>Competency</th><th class="col-before">${esc(prev.label || 'Last Report')}</th><th>${esc(now.label || 'This Report')}</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+  </div>`;
+  }
+
+  /* ── Missing Work ── this term's assessments past due with no score, or
+     marked not submitted. Nothing for a student with none. */
+  function renderBlockMissingWork(cid, student) {
+    const missing = _termCells(cid, student).filter(c => c.cell.kind === 'missing' || c.cell.status === 'NS');
+    if (!missing.length) return '';
+    const day = d =>
+      d ? new Date(d + 'T00:00:00').toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }) : '\u2014';
+    const rows = missing
+      .map(
+        c =>
+          `<tr><td>${esc(c.a.title)}</td><td class="col-date">${day(c.a.dueDate || c.a.date)}</td><td>${c.cell.status === 'NS' ? 'Not Submitted' : 'Past Due'}</td></tr>`,
+      )
+      .join('');
+    return `<div class="report-block-box report-missing-work">
+    <div class="report-block-title">Missing Work</div>
+    <table class="report-tag-table"><thead><tr><th style="text-align:left">Assignment</th><th class="col-date" style="text-align:left">Due</th><th style="text-align:left">Status</th></tr></thead><tbody>${rows}</tbody></table>
+  </div>`;
+  }
+
   /* ── Block dispatcher ── */
   /* ctx is { termId, termLabel }. Callers on the Reports page build it once
      with reportContext() and pass it for every student. */
@@ -1181,6 +1363,14 @@ window.ReportBlocks = (function () {
         return renderBlockStudentReflectionLearning(cid, student);
       case 'student-reflection-habits':
         return renderBlockStudentReflectionHabits(cid, student);
+      case 'support-home':
+        return renderBlockSupportHome(cid, student, options);
+      case 'term-glance':
+        return renderBlockTermGlance(cid, student);
+      case 'growth':
+        return renderBlockGrowth(cid, student);
+      case 'missing-work':
+        return renderBlockMissingWork(cid, student);
       default:
         return '';
     }
@@ -1211,6 +1401,10 @@ window.ReportBlocks = (function () {
     renderBlockScoreDistribution: renderBlockScoreDistribution,
     renderBlockGradeTable: renderBlockGradeTable,
     renderBlockCoreCompetencies: renderBlockCoreCompetencies,
+    renderBlockSupportHome: renderBlockSupportHome,
+    renderBlockTermGlance: renderBlockTermGlance,
+    renderBlockGrowth: renderBlockGrowth,
+    renderBlockMissingWork: renderBlockMissingWork,
     renderReportBlock: renderReportBlock,
   };
 })();
