@@ -123,9 +123,26 @@ window.PageGradebook = (function () {
     searchQuery = (val || '').toLowerCase().trim();
     render();
   }
+  /* Student name sort cycles on every click and loops:
+     first name A–Z, first Z–A, last name A–Z, last Z–A. */
+  var NAME_SORT_CYCLE = [
+    { by: 'first', dir: 'asc' },
+    { by: 'first', dir: 'desc' },
+    { by: 'last', dir: 'asc' },
+    { by: 'last', dir: 'desc' },
+  ];
   function toggleSort(key) {
     _flushActiveScoreEditor();
-    if (sortCol && sortCol.key === key) sortCol.dir = sortCol.dir === 'asc' ? 'desc' : 'asc';
+    if (key === 'name') {
+      var step = -1;
+      if (sortCol && sortCol.key === 'name') {
+        step = NAME_SORT_CYCLE.findIndex(function (c) {
+          return c.by === sortCol.by && c.dir === sortCol.dir;
+        });
+      }
+      var next = NAME_SORT_CYCLE[(step + 1) % NAME_SORT_CYCLE.length];
+      sortCol = { key: 'name', by: next.by, dir: next.dir };
+    } else if (sortCol && sortCol.key === key) sortCol.dir = sortCol.dir === 'asc' ? 'desc' : 'asc';
     else sortCol = { key: key, dir: 'asc' };
     render();
   }
@@ -750,7 +767,9 @@ window.PageGradebook = (function () {
       '" data-action="toggleNewestFirst" aria-pressed="' +
       _newestFirst +
       '" title="Put the latest assessments on the left">Newest first</button>' +
-      '<div class="gb-grid-corner-row1"><span class="gb-grid-corner-label">Student</span><span class="gb-grid-corner-label">Overall</span></div>' +
+      '<div class="gb-grid-corner-row1"><button type="button" class="gb-grid-corner-label gb-name-sort" data-action="toggleSort" data-sortkey="name">Student' +
+      sortArrow('name') +
+      '</button><span class="gb-grid-corner-label">Overall</span></div>' +
       '</div>';
 
     // Q2: Column headers — assessment names (row 1) + tag codes (row 2)
@@ -1050,7 +1069,10 @@ window.PageGradebook = (function () {
     html += '<div class="gb-grid">';
 
     // Q1: Corner (top-left, fixed)
-    html += '<div class="gb-grid-corner"><div class="gb-grid-corner-inner">Student</div></div>';
+    html +=
+      '<div class="gb-grid-corner"><button type="button" class="gb-grid-corner-inner gb-name-sort" data-action="toggleSort" data-sortkey="name">Student' +
+      sortArrow('name') +
+      '</button></div>';
 
     // Q2: Column headers (top-right, scrolls horizontally)
     html += '<div class="gb-grid-colheads" id="gb-colheads"><div class="gb-grid-colheads-inner">';
@@ -1635,8 +1657,12 @@ window.PageGradebook = (function () {
     return students.slice().sort(function (a, b) {
       var va, vb;
       if (key === 'name') {
-        va = (a.lastName || '').toLowerCase() + ' ' + (a.firstName || '').toLowerCase();
-        vb = (b.lastName || '').toLowerCase() + ' ' + (b.firstName || '').toLowerCase();
+        var af = (a.firstName || '').toLowerCase();
+        var al = (a.lastName || '').toLowerCase();
+        var bf = (b.firstName || '').toLowerCase();
+        var bl = (b.lastName || '').toLowerCase();
+        va = sortCol.by === 'first' ? af + ' ' + al : al + ' ' + af;
+        vb = sortCol.by === 'first' ? bf + ' ' + bl : bl + ' ' + bf;
         return va < vb ? -dir : va > vb ? dir : 0;
       } else if (key === 'overall' && courseGradeMode(cid) === 'letter') {
         va = _getStudentLetterData(cid, a.id).R || 0;
