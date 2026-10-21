@@ -889,111 +889,11 @@
 /* ══════════════════════════════════════════════════════════════
    REPORT BUILDER — Panel + preview layout
    ══════════════════════════════════════════════════════════════ */
-#report-output:has(.rb-layout) {
-  overflow: hidden;
-}
-.rb-layout {
-  display: flex;
-  gap: 0;
-  height: 100%;
-}
-.rb-panel {
-  width: 260px;
-  flex-shrink: 0;
-  background: var(--bg);
-  border-right: 1px solid var(--border);
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-}
+
 .rb-preview {
   flex: 1;
   padding: 20px 28px;
   overflow-y: auto;
-}
-.rb-panel-header {
-  padding: 14px 16px 0;
-}
-.rb-panel-title {
-  font-family: var(--font-base);
-  font-size: var(--text-base);
-  color: var(--text-3);
-  font-weight: 600;
-}
-.rb-presets {
-  display: flex;
-  gap: 2px;
-  background: var(--divider-subtle);
-  border-radius: 8px;
-  padding: 2px;
-  margin: 10px 14px 6px;
-}
-.rb-preset-btn {
-  flex: 1;
-  padding: 5px 6px;
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  font-weight: 500;
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-2);
-  cursor: pointer;
-  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
-  white-space: nowrap;
-  line-height: 1.2;
-}
-.rb-preset-btn:hover {
-  color: var(--text);
-}
-.rb-preset-btn.active {
-  background: var(--surface);
-  color: var(--text);
-  font-weight: 600;
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.1),
-    0 1px 2px rgba(0, 0, 0, 0.06);
-}
-.rb-blocks {
-  padding: 6px 10px 16px;
-  flex: 1;
-}
-.rb-block {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  margin-bottom: 1px;
-  background: var(--surface);
-  border-radius: 8px;
-  cursor: grab;
-  transition: all 0.12s;
-  border: 1.5px solid transparent;
-}
-.rb-block:hover {
-  background: rgba(0, 122, 255, 0.03);
-}
-.rb-block.dragging {
-  opacity: 0.85;
-  transform: scale(0.97);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-  background: var(--surface);
-  z-index: 1000;
-}
-.rb-block.drag-over {
-  border-color: var(--active);
-  box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.1);
-}
-.rb-block-placeholder {
-  border: 2px dashed var(--active);
-  border-radius: 8px;
-  margin-bottom: 1px;
-  opacity: 0.4;
-  background: rgba(0, 122, 255, 0.03);
-}
-.rb-block.locked {
-  cursor: default;
-  opacity: 0.6;
 }
 .rb-drag-grip {
   color: var(--text-3);
@@ -1005,50 +905,6 @@
   flex-shrink: 0;
   display: inline-flex;
   justify-content: center;
-}
-.rb-block.locked .rb-drag-grip {
-  cursor: default;
-  font-size: var(--text-xs);
-}
-.rb-block-label {
-  font-size: var(--text-base);
-  font-weight: 500;
-  color: var(--text);
-  flex: 1;
-  font-family: var(--font-base);
-}
-.rb-block-toggle {
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-.rb-block-switch {
-  width: 30px;
-  height: 17px;
-  border-radius: 9px;
-  position: relative;
-  background: var(--border);
-  transition: background 0.2s;
-  flex-shrink: 0;
-}
-.rb-block-switch::after {
-  content: '';
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 13px;
-  height: 13px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
-  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.rb-block.enabled .rb-block-switch {
-  background: var(--active);
-}
-.rb-block.enabled .rb-block-switch::after {
-  transform: translateX(13px);
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -1076,7 +932,6 @@
   .report-type-tabs,
   .page-layout > aside,
   .sidebar-toggle,
-  .rb-panel,
   .report-toolbar {
     display: none !important;
   }
@@ -1102,10 +957,6 @@
   }
   .page-main {
     padding: 0 !important;
-  }
-  .rb-layout {
-    display: block !important;
-    height: auto !important;
   }
   #report-output {
     overflow: visible !important;
@@ -1526,37 +1377,6 @@
   font-size: var(--text-2xs);
   color: #333;
 }
-.rb-form-note {
-  font-size: var(--text-sm);
-  color: var(--text-2);
-  line-height: 1.45;
-  padding: 2px 4px 8px;
-}
-.rb-form-side {
-  font-size: var(--text-xs);
-  font-weight: 600;
-  color: var(--text-3);
-  padding: 8px 4px 4px;
-}
-.rb-block.rb-form-block {
-  cursor: default;
-  font-size: var(--text-base);
-  color: var(--text);
-  justify-content: space-between;
-}
-.rb-form-kind {
-  font-size: var(--text-2xs);
-  color: var(--text-3);
-  white-space: nowrap;
-}
-.rb-form-summary {
-  font-size: var(--text-sm);
-  color: var(--text-2);
-  line-height: 1.45;
-  padding: 10px 4px 0;
-  border-top: 1px solid var(--border);
-  margin-top: 8px;
-}
 @media print {
   .sheet-zoom {
     zoom: 1 !important;
@@ -1965,253 +1785,11 @@
   flex: 1;
   min-height: 0;
 }
-.rb-edit-banner {
-  flex: 0 0 auto;
-  padding: 8px 20px;
-  background: rgba(10, 108, 255, 0.08);
-  border-bottom: 1px solid rgba(10, 108, 255, 0.25);
-  color: var(--text);
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-}
-.rb-edit-banner b {
-  color: var(--active);
-}
-.rb-form-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-}
-.rb-form-label {
-  flex: 1;
-  min-width: 0;
-}
-.rb-block.rb-form-block {
-  flex-wrap: wrap;
-}
-.rb-block.rb-form-block.editing {
-  cursor: default;
-  background: var(--surface);
-  border-color: var(--border);
-}
-.rb-form-controls {
-  display: inline-flex;
-  gap: 3px;
-  flex-shrink: 0;
-}
-.rb-form-btn {
-  font: inherit;
-  font-size: var(--text-xs);
-  line-height: 1;
-  padding: 4px 6px;
-  min-width: 24px;
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  background: var(--surface);
-  color: var(--text-2);
-  cursor: pointer;
-}
-.rb-form-btn:hover:not(:disabled) {
-  color: var(--text);
-  border-color: var(--active);
-}
-.rb-form-btn:disabled {
-  opacity: 0.35;
-  cursor: default;
-}
-.rb-form-opts {
-  width: 100%;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 14px;
-  padding: 6px 0 2px 2px;
-  font-size: var(--text-xs);
-  color: var(--text-2);
-}
-.rb-form-opt {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-.rb-form-num {
-  width: 44px;
-  font: inherit;
-  padding: 2px 4px;
-  border: 1px solid var(--border);
-  border-radius: 5px;
-}
-.rb-form-sel {
-  font: inherit;
-  padding: 2px 4px;
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  background: var(--surface);
-  max-width: 180px;
-}
-.rb-form-whole {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  padding: 6px 4px 10px;
-  font-size: var(--text-sm);
-}
-.rb-form-whole-k {
-  font-weight: 600;
-  color: var(--text-2);
-}
-.rb-form-empty {
-  font-size: var(--text-xs);
-  color: var(--text-3);
-  padding: 4px 8px 8px;
-}
-.rb-form-add {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 10px;
-  padding: 10px 4px 4px;
-  font-size: var(--text-sm);
-}
-.rb-form-actions {
-  padding: 8px 4px 0;
-}
-.rb-form-reset {
-  font: inherit;
-  font-size: var(--text-xs);
-  color: var(--text-2);
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 4px 9px;
-  cursor: pointer;
-}
-.rb-form-reset:hover {
-  color: var(--text);
-  border-color: var(--active);
-}
 
 /* The rail widens while editing so a block's name and its controls share a
    row; when they cannot, the controls wrap under the name. */
-.rb-panel:has(.rb-form-editing) {
-  width: 340px;
-}
-.rb-form-row {
-  flex-wrap: wrap;
-  row-gap: 4px;
-}
-.rb-form-label {
-  flex: 1 1 120px;
-}
-.rb-form-controls {
-  margin-left: auto;
-}
 
 /* Grip, pairs, starters and the library in Edit Layout. */
-.rb-form-grip {
-  flex-shrink: 0;
-  width: 20px;
-  height: 22px;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--text-3);
-  font-size: var(--text-sm);
-  cursor: grab;
-  border-radius: 4px;
-}
-.rb-form-grip:focus-visible {
-  outline: 2px solid var(--active);
-  color: var(--text);
-}
-.rb-form-block.dragging {
-  opacity: 0.9;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
-}
-.rb-form-list {
-  min-height: 8px;
-}
-.rb-form-starters {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 0 2px 4px;
-}
-.rb-form-starter {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  text-align: left;
-  font: inherit;
-  padding: 7px 9px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--text);
-  cursor: pointer;
-}
-.rb-form-starter:hover {
-  border-color: var(--active);
-}
-.rb-form-starter b {
-  font-size: var(--text-sm);
-  font-weight: 600;
-}
-.rb-form-starter span {
-  font-size: var(--text-2xs);
-  color: var(--text-3);
-  line-height: 1.4;
-}
-.rb-form-library {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 0 2px 4px;
-}
-.rb-form-template {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.rb-form-apply {
-  flex: 1;
-  text-align: left;
-  font: inherit;
-  font-size: var(--text-sm);
-  font-weight: 500;
-  padding: 6px 9px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  background: var(--surface);
-  color: var(--text);
-  cursor: pointer;
-}
-.rb-form-apply:hover {
-  border-color: var(--active);
-}
-.rb-form-save {
-  display: flex;
-  gap: 6px;
-  padding: 6px 2px 2px;
-}
-.rb-form-text {
-  flex: 1;
-  min-width: 0;
-  font: inherit;
-  font-size: var(--text-sm);
-  padding: 5px 8px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-}
-.rb-form-live {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
 
 /* Review on a tablet or a phone: the rail hides behind a Layout button and
    opens over the pages; one student at a time with the stepper; sheets
@@ -3411,96 +2989,6 @@
 }
 
 /* ── Setup list (DECISIONS "Report forms" 8): a few named choices ── */
-.rb-setup {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.rb-setup-k {
-  font-size: var(--text-xs);
-  font-weight: 600;
-  color: var(--text-3);
-  padding: 10px 4px 4px;
-}
-.rb-setup-forms {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 0 2px 4px;
-}
-.rb-setup-form {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  text-align: left;
-  font: inherit;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--text);
-  cursor: pointer;
-}
-.rb-setup-form:hover {
-  border-color: var(--active);
-}
-.rb-setup-form.active {
-  border-color: var(--active);
-  box-shadow: inset 0 0 0 1px var(--active);
-}
-.rb-setup-form b {
-  font-size: var(--text-sm);
-  font-weight: 600;
-}
-.rb-setup-form span {
-  font-size: var(--text-2xs);
-  color: var(--text-3);
-  line-height: 1.4;
-}
-.rb-setup-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
-  padding: 6px 4px;
-  font-size: var(--text-sm);
-}
-.rb-setup-row .rb-setup-k {
-  padding: 0;
-  font-size: var(--text-sm);
-  color: var(--text-2);
-}
-.rb-setup-includes {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 0 4px 6px;
-}
-.rb-setup-check {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: var(--text-sm);
-  color: var(--text);
-  padding: 5px 2px;
-  cursor: pointer;
-}
-.rb-setup-check input {
-  width: 16px;
-  height: 16px;
-  margin: 0;
-  accent-color: var(--active);
-}
-
-.rb-setup-fit {
-  display: block;
-  font-style: normal;
-  font-weight: 500;
-  font-size: var(--text-2xs);
-  color: var(--text-2);
-  margin-top: 1px;
-}
 
 /* ══════════════════════════════════════════════════════════════
    PAGE STUDIO — palette · pages · inspector (report-studio.js)
@@ -3799,7 +3287,7 @@
     display: none !important;
   }
 }
-@media (max-width: 1320px) {
+@media (max-width: 1600px) {
   .report-toolbar .tb-count {
     display: none !important;
   }
@@ -4042,4 +3530,63 @@
 textarea.studio-text {
   min-height: 84px;
   resize: vertical;
+}
+
+/* ── Page Studio stage 4: templates ─────────────────────────── */
+.studio-tpl-row {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  margin-bottom: 5px;
+}
+.studio-tpl-row .studio-blk {
+  margin-bottom: 0;
+  flex: 1;
+  min-width: 0;
+}
+.studio-tpl-del {
+  flex: 0 0 30px;
+  font: inherit;
+  font-size: 15px;
+  color: var(--text-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.studio-tpl-del:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+.studio-save-card {
+  width: min(380px, calc(100vw - 32px));
+}
+.studio-save-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+  margin: 12px 0 5px;
+}
+.studio-save-btn {
+  display: none;
+  width: 100%;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--active);
+  background: var(--surface);
+  border: 1px dashed var(--active);
+  border-radius: 8px;
+  padding: 7px 9px;
+  margin-bottom: 6px;
+  cursor: pointer;
+}
+@media (max-width: 1240px) {
+  .report-toolbar #tb-save-template {
+    display: none !important;
+  }
+  .studio-save-btn {
+    display: block;
+  }
 }

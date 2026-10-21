@@ -17,7 +17,7 @@ export default defineConfig({
     {
       name: 'webkit',
       use: { browserName: 'webkit' },
-      testMatch: /report-(sheets|studio-drag|studio-options)\.spec\.js/,
+      testMatch: /report-(sheets|studio-drag|studio-options|studio-templates)\.spec\.js/,
     },
   ],
   webServer: {

@@ -126,10 +126,12 @@ window.PageReports = (function () {
     if (tbPrint) tbPrint.style.display = tab === 'questionnaire' ? 'none' : '';
     const tbPaper = document.getElementById('report-paper');
     if (tbPaper) tbPaper.style.display = tab === 'questionnaire' ? 'none' : '';
-    ['report-pages', 'report-ink', 'tb-count', 'tb-divider', 'tb-paper-label'].forEach(function (id) {
-      const el = document.getElementById(id);
-      if (el) el.style.display = tab === 'progress' ? '' : 'none';
-    });
+    ['report-pages', 'report-ink', 'tb-count', 'tb-divider', 'tb-paper-label', 'tb-save-template'].forEach(
+      function (id) {
+        const el = document.getElementById(id);
+        if (el) el.style.display = tab === 'progress' ? '' : 'none';
+      },
+    );
     document.querySelectorAll('.tb-label-progress').forEach(function (el) {
       el.style.display = tab === 'progress' ? '' : 'none';
     });
@@ -919,6 +921,64 @@ window.PageReports = (function () {
     }, 0);
   }
 
+  /* Your Templates are the teacher's, on the server (report_template);
+     this device keeps a copy that shows at once. */
+  function _syncTemplates() {
+    if (typeof ReportSheets.syncTemplates !== 'function') return;
+    ReportSheets.syncTemplates().then(function (changed) {
+      if (changed && studioTab === 'templates' && activeTab === 'progress') renderStudioPanels();
+    });
+  }
+
+  var SAVE_TEMPLATE_ID = 'save-template-overlay';
+  function _closeSaveTemplate() {
+    var o = document.getElementById(SAVE_TEMPLATE_ID);
+    if (o) o.remove();
+    var b = document.getElementById('tb-save-template');
+    if (b) b.focus();
+  }
+  function _openSaveTemplate() {
+    _closeSaveTemplate();
+    var form = _formOf();
+    var starter = ReportSheets.starters().some(function (st) {
+      return st.id === form.id && st.name === form.name;
+    });
+    var overlay = document.createElement('div');
+    overlay.id = SAVE_TEMPLATE_ID;
+    overlay.className = 'confirm-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-labelledby', 'save-template-title');
+    overlay.innerHTML =
+      '<form class="confirm-card studio-save-card" id="save-template-form">' +
+      '<div class="confirm-title" id="save-template-title">Save as Template</div>' +
+      '<label class="studio-save-label" for="save-template-name">Name</label>' +
+      '<input type="text" class="studio-text" id="save-template-name" maxlength="60" required value="' +
+      esc(starter ? '' : form.name || '') +
+      '">' +
+      '<div class="confirm-actions"><button type="button" class="confirm-cancel" data-save="cancel">Cancel</button>' +
+      '<button type="submit" class="confirm-ok primary">Save</button></div></form>';
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay || (e.target.closest && e.target.closest('[data-save="cancel"]'))) _closeSaveTemplate();
+    });
+    overlay.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') _closeSaveTemplate();
+    });
+    overlay.querySelector('form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var name = overlay.querySelector('#save-template-name').value.trim();
+      if (!name) return;
+      var entry = ReportSheets.saveTemplate(name, Object.assign({}, _formOf(), { name: name, id: 'custom' }));
+      _closeSaveTemplate();
+      if (!entry) return;
+      studioTab = 'templates';
+      renderStudioPanels();
+    });
+    document.body.appendChild(overlay);
+    var input = overlay.querySelector('#save-template-name');
+    if (input) input.focus();
+  }
+
   function _selectBlock(id) {
     studioSelected = id || null;
     var preview = document.getElementById('rb-preview');
@@ -1123,6 +1183,7 @@ window.PageReports = (function () {
       studioTab: function () {
         studioTab = el.dataset.tab === 'templates' ? 'templates' : 'blocks';
         renderStudioPanels();
+        if (studioTab === 'templates') _syncTemplates();
       },
       studioBlock: function () {
         var id = el.dataset.block;
@@ -1152,7 +1213,33 @@ window.PageReports = (function () {
       },
       studioTemplate: function () {
         var f = el.dataset.starter ? ReportSheets.starter(el.dataset.starter) : ReportSheets.template(el.dataset.id);
-        if (f) _setForm(f);
+        if (!f) return;
+        var before = _formOf();
+        var name = el.textContent.trim();
+        studioSelected = null;
+        _setForm(f);
+        if (typeof showUndoToast === 'function') {
+          showUndoToast('Applied ' + name, function () {
+            _setForm(before);
+          });
+        }
+      },
+      studioTemplateDelete: function () {
+        var t = ReportSheets.templates().find(function (x) {
+          return x.id === el.dataset.id || x.localId === el.dataset.id;
+        });
+        if (!t) return;
+        ReportSheets.removeTemplate(t.id);
+        renderStudioPanels();
+        if (typeof showUndoToast === 'function') {
+          showUndoToast('Deleted ' + t.name, function () {
+            ReportSheets.saveTemplate(t.name, t.form);
+            renderStudioPanels();
+          });
+        }
+      },
+      openSaveTemplate: function () {
+        _openSaveTemplate();
       },
       toggleRail: function () {
         // Narrow screens hide the palette; this opens it over the pages.
@@ -1309,6 +1396,7 @@ window.PageReports = (function () {
      once and are refreshed from it when the page opens or the class
      changes. Demo Mode and offline keep the device copies. */
   function _syncFromServer(cid) {
+    _syncTemplates();
     if (typeof ReportIssues !== 'undefined' && typeof ReportIssues.sync === 'function') {
       ReportIssues.sync(cid).then(function (changed) {
         if (changed && cid === activeCourse) _populateCopies();
@@ -1439,6 +1527,7 @@ window.PageReports = (function () {
   }
 
   function destroy() {
+    _closeSaveTemplate();
     if (_studioDrag) {
       _studioDrag.destroy();
       _studioDrag = null;
@@ -1478,7 +1567,7 @@ window.PageReports = (function () {
 
   /* -- Toolbar HTML (rendered into main on init) ---------- */
   var TOOLBAR_HTML =
-    '<div class="report-toolbar no-print">\n      <div class="seg report-seg-control" role="tablist" aria-label="Report type">\n        <button class="seg-btn report-seg-btn active" data-action="switchTab" data-tab="questionnaire" role="tab" aria-selected="true">Term Questionnaire</button>\n        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="progress" role="tab" aria-selected="false">Progress Reports</button>\n      </div>\n      <div class="report-stepper" id="report-stepper" style="display:none">\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="-1" title="Previous student" aria-label="Previous student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="1" title="Next student" aria-label="Next student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n      </div>\n      <div class="student-picker" id="student-picker">\n        <button class="student-picker-btn" data-action="toggleStudentPicker" aria-label="Select students" aria-expanded="false" aria-haspopup="listbox">\n          <span id="picker-label">All Students</span>\n          <span class="arrow" aria-hidden="true">\u25bc</span>\n        </button>\n        <div class="student-picker-dropdown" id="picker-dropdown"></div>\n      </div>\n      <div class="tq-student-nav" id="tq-student-nav" style="display:none">\n        <button class="tq-toolbar-arrow" data-action="tqPrevStudent" title="Previous student" aria-label="Previous student">\n          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>\n        </button>\n        <span class="tq-student-name" id="tq-student-name"></span>\n        <button class="tq-toolbar-arrow" data-action="tqNextStudent" title="Next student" aria-label="Next student">\n          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>\n        </button>\n        <div class="tq-progress-ring" id="tq-progress-ring">\n          <svg width="30" height="30" viewBox="0 0 30 30">\n            <circle class="ring-bg" cx="15" cy="15" r="12"/>\n            <circle class="ring-fill" id="tq-ring-fill" cx="15" cy="15" r="12" stroke-dasharray="75.4" stroke-dashoffset="75.4"/>\n          </svg>\n          <span class="tq-progress-label" id="tq-progress-label"></span>\n        </div>\n      </div>\n      <select id="report-period" class="report-term-select" aria-label="Report"></select>\n      <select id="report-copy" class="report-term-select" aria-label="Copy" style="display:none"></select>\n      <span class="tb-divider" id="tb-divider" aria-hidden="true">\u2502</span>\n      <span class="tb-label" id="tb-paper-label">Paper</span>\n      <div class="seg seg-sm" id="report-paper" role="radiogroup" aria-label="Paper" style="display:none">\n        <button class="seg-btn active" data-action="setPaper" data-paper="letter" role="radio" aria-checked="true">Letter</button>\n        <button class="seg-btn" data-action="setPaper" data-paper="legal" role="radio" aria-checked="false">Legal</button>\n      </div>\n      <span class="tb-label tb-label-progress">Pages</span>\n      <div class="seg seg-sm" id="report-pages" role="radiogroup" aria-label="Pages per student" style="display:none">\n        <button class="seg-btn" data-action="setPages" data-pages="1" role="radio" aria-checked="false">1</button>\n        <button class="seg-btn" data-action="setPages" data-pages="2" role="radio" aria-checked="false">2</button>\n        <button class="seg-btn active" data-action="setPages" data-pages="auto" role="radio" aria-checked="true">Auto</button>\n      </div>\n      <span class="tb-label tb-label-progress">Ink</span>\n      <div class="seg seg-sm" id="report-ink" role="radiogroup" aria-label="Ink" style="display:none">\n        <button class="seg-btn" data-action="setInk" data-ink="black" role="radio" aria-checked="false">Black</button>\n        <button class="seg-btn active" data-action="setInk" data-ink="colour" role="radio" aria-checked="true">Colour</button>\n      </div>\n      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">\n        <span class="tb-count" id="tb-count"></span>\n        <button class="tb-toggle-btn" id="tb-rail-btn" style="display:none" data-action="toggleRail" aria-pressed="false" aria-controls="studio-palette">Blocks</button>\n        <button class="tb-action-btn" id="tb-print-btn" data-action="printReports">Print Reports</button>\n      </div>\n    </div>\n    <div id="report-output" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto"></div>';
+    '<div class="report-toolbar no-print">\n      <div class="seg report-seg-control" role="tablist" aria-label="Report type">\n        <button class="seg-btn report-seg-btn active" data-action="switchTab" data-tab="questionnaire" role="tab" aria-selected="true">Term Questionnaire</button>\n        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="progress" role="tab" aria-selected="false">Progress Reports</button>\n      </div>\n      <div class="report-stepper" id="report-stepper" style="display:none">\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="-1" title="Previous student" aria-label="Previous student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="1" title="Next student" aria-label="Next student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n      </div>\n      <div class="student-picker" id="student-picker">\n        <button class="student-picker-btn" data-action="toggleStudentPicker" aria-label="Select students" aria-expanded="false" aria-haspopup="listbox">\n          <span id="picker-label">All Students</span>\n          <span class="arrow" aria-hidden="true">\u25bc</span>\n        </button>\n        <div class="student-picker-dropdown" id="picker-dropdown"></div>\n      </div>\n      <div class="tq-student-nav" id="tq-student-nav" style="display:none">\n        <button class="tq-toolbar-arrow" data-action="tqPrevStudent" title="Previous student" aria-label="Previous student">\n          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>\n        </button>\n        <span class="tq-student-name" id="tq-student-name"></span>\n        <button class="tq-toolbar-arrow" data-action="tqNextStudent" title="Next student" aria-label="Next student">\n          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>\n        </button>\n        <div class="tq-progress-ring" id="tq-progress-ring">\n          <svg width="30" height="30" viewBox="0 0 30 30">\n            <circle class="ring-bg" cx="15" cy="15" r="12"/>\n            <circle class="ring-fill" id="tq-ring-fill" cx="15" cy="15" r="12" stroke-dasharray="75.4" stroke-dashoffset="75.4"/>\n          </svg>\n          <span class="tq-progress-label" id="tq-progress-label"></span>\n        </div>\n      </div>\n      <select id="report-period" class="report-term-select" aria-label="Report"></select>\n      <select id="report-copy" class="report-term-select" aria-label="Copy" style="display:none"></select>\n      <span class="tb-divider" id="tb-divider" aria-hidden="true">\u2502</span>\n      <span class="tb-label" id="tb-paper-label">Paper</span>\n      <div class="seg seg-sm" id="report-paper" role="radiogroup" aria-label="Paper" style="display:none">\n        <button class="seg-btn active" data-action="setPaper" data-paper="letter" role="radio" aria-checked="true">Letter</button>\n        <button class="seg-btn" data-action="setPaper" data-paper="legal" role="radio" aria-checked="false">Legal</button>\n      </div>\n      <span class="tb-label tb-label-progress">Pages</span>\n      <div class="seg seg-sm" id="report-pages" role="radiogroup" aria-label="Pages per student" style="display:none">\n        <button class="seg-btn" data-action="setPages" data-pages="1" role="radio" aria-checked="false">1</button>\n        <button class="seg-btn" data-action="setPages" data-pages="2" role="radio" aria-checked="false">2</button>\n        <button class="seg-btn active" data-action="setPages" data-pages="auto" role="radio" aria-checked="true">Auto</button>\n      </div>\n      <span class="tb-label tb-label-progress">Ink</span>\n      <div class="seg seg-sm" id="report-ink" role="radiogroup" aria-label="Ink" style="display:none">\n        <button class="seg-btn" data-action="setInk" data-ink="black" role="radio" aria-checked="false">Black</button>\n        <button class="seg-btn active" data-action="setInk" data-ink="colour" role="radio" aria-checked="true">Colour</button>\n      </div>\n      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">\n        <span class="tb-count" id="tb-count"></span>\n        <button class="tb-toggle-btn" id="tb-rail-btn" style="display:none" data-action="toggleRail" aria-pressed="false" aria-controls="studio-palette">Blocks</button>\n        <button class="tb-toggle-btn" id="tb-save-template" style="display:none" data-action="openSaveTemplate">Save as Template</button>\n        <button class="tb-action-btn" id="tb-print-btn" data-action="printReports">Print Reports</button>\n      </div>\n    </div>\n    <div id="report-output" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto"></div>';
 
   /* -- Public API ----------------------------------------- */
   return {

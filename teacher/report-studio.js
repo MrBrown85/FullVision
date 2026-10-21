@@ -80,7 +80,7 @@ window.ReportStudio = (function () {
       html += '<h4>Starters</h4>';
       sheets.starters().forEach(function (st) {
         html +=
-          '<button type="button" class="studio-blk" data-action="studioTemplate" data-starter="' +
+          '<button type="button" class="studio-blk studio-tpl" data-action="studioTemplate" data-starter="' +
           st.id +
           '"><span class="studio-blk-name">' +
           esc(st.name) +
@@ -88,14 +88,21 @@ window.ReportStudio = (function () {
       });
       var list = templates || [];
       html += '<h4>Your Templates</h4>';
+      html += '<button type="button" class="studio-save-btn" data-action="openSaveTemplate">Save as Template</button>';
       if (!list.length) html += '<div class="studio-empty">None yet</div>';
       list.forEach(function (t) {
         html +=
-          '<button type="button" class="studio-blk" data-action="studioTemplate" data-id="' +
+          '<div class="studio-tpl-row">' +
+          '<button type="button" class="studio-blk studio-tpl" data-action="studioTemplate" data-id="' +
           esc(t.id) +
           '"><span class="studio-blk-name">' +
           esc(t.name) +
-          '</span></button>';
+          '</span></button>' +
+          '<button type="button" class="studio-tpl-del" data-action="studioTemplateDelete" data-id="' +
+          esc(t.id) +
+          '" aria-label="Delete ' +
+          esc(t.name) +
+          '" title="Delete">\u00D7</button></div>';
       });
       return html;
     }
