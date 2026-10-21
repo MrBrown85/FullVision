@@ -2213,8 +2213,12 @@
   color: var(--text);
   font-weight: 700;
 }
-.ldg-action {
+.ldg-actions {
+  display: flex;
+  gap: 8px;
   margin-left: auto;
+}
+.ldg-action {
   padding: 6px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);

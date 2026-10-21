@@ -1870,9 +1870,12 @@ window.PageAssignments = (function () {
       a.id +
       '">' +
       '<div class="ldg-bar"><span class="ldg-tally"></span>' +
+      '<div class="ldg-actions"><button type="button" class="ldg-action" data-action="confirmFillNotSubmitted" data-aid="' +
+      a.id +
+      '">Mark the Rest Not Submitted</button>' +
       '<button type="button" class="ldg-action cmp-fill-all" data-action="confirmFillCompletion" data-aid="' +
       a.id +
-      '">Mark the Rest Complete</button></div>' +
+      '">Mark the Rest Complete</button></div></div>' +
       '<div class="ldg-head"><span>Student</span><span>Mark</span><span>Status</span><span class="ldg-head-end">Comment</span></div>';
     students.forEach(function (st) {
       var stStatus = statuses[st.id + ':' + a.id] || null;
@@ -1967,13 +1970,16 @@ window.PageAssignments = (function () {
       max +
       '">' +
       '<div class="ldg-bar"><span class="ldg-tally"></span>' +
+      '<div class="ldg-actions"><button type="button" class="ldg-action" data-action="confirmFillNotSubmitted" data-aid="' +
+      a.id +
+      '">Mark the Rest Not Submitted</button>' +
       '<button type="button" class="ldg-action" data-action="confirmFillPoints" data-aid="' +
       a.id +
       '">Fill the Rest ' +
       max +
       ' / ' +
       max +
-      '</button></div>' +
+      '</button></div></div>' +
       '<div class="ldg-head"><span>Student</span><span>Score</span><span>Status</span><span class="ldg-head-end">Comment</span></div>';
     students.forEach(function (st) {
       var raw = getPointsScore(cid, st.id, a.id);
@@ -2010,6 +2016,36 @@ window.PageAssignments = (function () {
     });
     html += '<div class="ldg-stats"></div>' + '</div>';
     return html;
+  }
+
+  // Every student with no score and no status becomes Not Submitted, with undo.
+  function confirmFillNotSubmitted(aid) {
+    showConfirm(
+      'Mark the Rest Not Submitted',
+      'Mark every student without a score Not Submitted?',
+      'Mark Not Submitted',
+      'primary',
+      function () {
+        var cid = activeCourse;
+        var statuses = getAssignmentStatuses(cid);
+        var marked = [];
+        getStudents(cid).forEach(function (st) {
+          if (statuses[st.id + ':' + aid] || getPointsScore(cid, st.id, aid) != null) return;
+          applyAssignmentStatus(cid, st.id, aid, 'NS');
+          marked.push(st.id);
+        });
+        render();
+        refreshSidebar();
+        if (!marked.length) return;
+        showUndoToast('Marked Not Submitted', function () {
+          marked.forEach(function (sid) {
+            setAssignmentStatus(cid, sid, aid, null);
+          });
+          render();
+          refreshSidebar();
+        });
+      },
+    );
   }
 
   function confirmFillPoints(aid) {
@@ -2068,19 +2104,38 @@ window.PageAssignments = (function () {
     if (pctSpan) pctSpan.innerHTML = pointsPctHtml(raw, max, 0);
     refreshLedgerSummary(inp.closest('.ldg-grid'));
   }
+  // The next (or previous) score box that is open for typing.
+  function focusPointsBox(row, dir) {
+    var r = row;
+    while ((r = dir > 0 ? r.nextElementSibling : r.previousElementSibling)) {
+      var box = r.querySelector && r.querySelector('.gb-pts-input');
+      if (box && !box.disabled) {
+        box.focus();
+        box.select();
+        return;
+      }
+    }
+  }
+  var POINTS_STATUS_KEYS = { l: 'LATE', e: 'EXC', n: 'NS' };
   function handlePointsKey(e, inp) {
+    var statusKey = !e.metaKey && !e.ctrlKey && !e.altKey && POINTS_STATUS_KEYS[e.key.toLowerCase()];
+    if (statusKey) {
+      // L, E or N in a score box: keep any number typed, then set Late,
+      // Excused or Not Submitted. Excused and Not Submitted lock the box,
+      // so focus moves on to the next open one.
+      e.preventDefault();
+      var srow = inp.closest('.score-row');
+      var chip = srow && srow.querySelector('.ldg-chip[data-status="' + statusKey + '"]');
+      if (!chip) return;
+      commitPointsScore(inp);
+      chip.click();
+      if (inp.disabled) focusPointsBox(srow, 1);
+      return;
+    }
     if (e.key === 'Enter') {
       e.preventDefault();
       commitPointsScore(inp);
-      var row = inp.closest('.score-row');
-      var next = row.nextElementSibling;
-      if (next) {
-        var ni = next.querySelector('.gb-pts-input');
-        if (ni) {
-          ni.focus();
-          ni.select();
-        }
-      }
+      focusPointsBox(inp.closest('.score-row'), 1);
     } else if (e.key === 'Escape') {
       var raw = getPointsScore(activeCourse, inp.dataset.sid, inp.dataset.aid);
       inp.value = raw != null ? formatPoints(raw) : '';
@@ -4657,6 +4712,9 @@ window.PageAssignments = (function () {
       },
       confirmFillPoints: function () {
         confirmFillPoints(el.dataset.aid);
+      },
+      confirmFillNotSubmitted: function () {
+        confirmFillNotSubmitted(el.dataset.aid);
       },
       toggleScoreMenu: function () {
         toggleScoreMenu(el);
