@@ -201,7 +201,7 @@ describe('page geometry', () => {
     expect(letter.full).toBe(16);
     expect(GP.pageCapacity(GP.normalizeOptions({ paper: 'legal' })).full).toBe(16);
     expect(GP.pageCapacity(GP.normalizeOptions({ size: 'compact' })).full).toBe(19);
-    expect(GP.pageCapacity(GP.normalizeOptions({ studentNumbers: false })).full).toBe(18);
+    expect(GP.pageCapacity(GP.normalizeOptions({ students: 'name' })).full).toBe(18);
   });
 
   it('holds more rows on Legal and at Compact, fewer when rows hold two lines', () => {
@@ -282,12 +282,75 @@ describe('buildModel', () => {
     expect(model.marks.map(m => m.key).sort()).toEqual(['L', 'NS', '—', '✓', '✗'].sort());
   });
 
-  it('prints assignments only: no category or overall grades', () => {
+  it('prints no category averages, only the final grade at the right', () => {
     const model = GP.buildModel(CID, {});
-    expect(model.summary).toBeUndefined();
     const html = GP.renderPages(model);
     expect(html).not.toContain('Category Averages');
-    expect(html).not.toContain('Overall');
+    expect(html).toContain('Final Grade');
+    expect(model.final.w).toBe(GP.SIZES.normal.finalW.proficiency);
+    model.rows.forEach(r => expect(r.final).toBe(studentGradeSummary(CID, r.id).text || '\u2014'));
+    expect(model.rows.find(r => r.id === 's3').final).toBe('4.0');
+    expect(model.averages.final).toBe(classGradeSummary(CID, ['s3', 's1', 's2']).text);
+  });
+
+  it('leaves the final grade off when switched off, for custom dates, and on a blank sheet', () => {
+    [{ finalGrade: false }, { term: 'custom', from: '2026-09-01', to: '2026-12-01' }, { blank: true }].forEach(o => {
+      const model = GP.buildModel(CID, o);
+      expect(model.final).toBeNull();
+      expect(GP.renderPages(model)).not.toContain('Final Grade');
+    });
+  });
+
+  it('puts the final grade on the last column page of each student block only', () => {
+    const cols = Array.from({ length: 37 }, (_, i) => ({ n: i + 1, outOf: null }));
+    const out = GP.paginate(cols, 27, GP.normalizeOptions({}), false, 0.5);
+    expect(out.pages.map(p => p.final)).toEqual([false, false, true]);
+    const total = out.pages.reduce((t, p) => t + p.cols.count, 0);
+    expect(total).toBe(37);
+    const last = out.pages[2];
+    expect((last.cols.count + last.blankCols) * last.colW).toBeCloseTo(
+      GP.pageCapacity(GP.normalizeOptions({}), 0.5).widthWithFinal,
+      1,
+    );
+  });
+
+  it('follows a Letter class in the final grade column', () => {
+    seed({ course: { gradingSystem: 'letter' } });
+    const model = GP.buildModel(CID, {});
+    expect(model.rows.find(r => r.id === 's3').final).toMatch(/^[A-F][+-]? \d+%$/);
+    expect(model.final.w).toBe(GP.SIZES.normal.finalW.letter);
+  });
+
+  it('prints names and pupil numbers, names only, or pupil numbers only', () => {
+    const both = GP.renderPages(GP.buildModel(CID, { students: 'both' }));
+    expect(both).toContain('Pupil #');
+    expect(both).toContain('>Name<');
+    const names = GP.renderPages(GP.buildModel(CID, { students: 'name' }));
+    expect(names).not.toContain('Pupil #');
+    expect(names).toContain('Lovelace, Ada');
+    const numbers = GP.renderPages(GP.buildModel(CID, { students: 'number' }));
+    expect(numbers).toContain('Pupil #');
+    expect(numbers).not.toContain('>Name<');
+    expect(numbers).not.toContain('Lovelace');
+    expect(numbers).toContain('1001');
+    // The number column alone is wide enough for "Class Average".
+    expect(GP.pageCapacity(GP.normalizeOptions({ students: 'number' })).width).toBeGreaterThan(
+      GP.pageCapacity(GP.normalizeOptions({ students: 'both' })).width,
+    );
+  });
+
+  it('sorts by pupil number in numeric order', () => {
+    _cache.students[CID] = [
+      { id: 'a', firstName: 'A', lastName: 'A', studentNumber: '10' },
+      { id: 'b', firstName: 'B', lastName: 'B', studentNumber: '9' },
+      { id: 'c', firstName: 'C', lastName: 'C', studentNumber: '100' },
+    ];
+    expect(GP.buildModel(CID, { sortBy: 'number' }).rows.map(r => r.studentNumber)).toEqual(['9', '10', '100']);
+  });
+
+  it('reads the old Pupil Numbers box as Name Only', () => {
+    expect(GP.normalizeOptions({ studentNumbers: false }).students).toBe('name');
+    expect(GP.normalizeOptions({ studentNumbers: true }).students).toBe('both');
   });
 
   it('averages each assignment through calc.js', () => {

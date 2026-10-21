@@ -207,6 +207,14 @@
 .gp-grid .gp-cat-start {
   border-left: 1.25pt solid #000;
 }
+.gp-grid .gp-final {
+  border-left: 2pt solid #000;
+  text-align: center;
+  font-weight: 700;
+}
+.gp-band .gp-final {
+  border-top: none;
+}
 
 /* ── Key ──────────────────────────────────────────────────── */
 .gp-key {

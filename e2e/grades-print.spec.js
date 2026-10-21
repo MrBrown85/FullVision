@@ -90,7 +90,7 @@ test.describe('Print Grades', () => {
     await openDemoGradebook(page);
     const dialog = await openDialog(page);
     const legends = await dialog.locator('legend').allInnerTexts();
-    expect(legends).toEqual(['Term', 'Assessments', 'Scores', 'Show', 'Sort By', 'Paper', 'Text Size']);
+    expect(legends).toEqual(['Term', 'Assessments', 'Scores', 'Students', 'Sort By', 'Show', 'Paper', 'Text Size']);
     const labels = await dialog
       .locator('.gp-option:not(.gp-pick-option) > span')
       .evaluateAll(els => els.map(el => el.firstChild.textContent.trim()));
@@ -142,9 +142,16 @@ test.describe('Print Grades', () => {
       });
       expect(fit).toEqual({ inside: true, toFoot: true, toEdge: true });
     }
-    // Assignments only: no category or overall grades.
-    await expect(page.locator('#grades-print-root')).not.toContainText('Overall');
+    // No category averages; the final grade sits at the right of the last page only.
     await expect(page.locator('#grades-print-root')).not.toContainText('Category Averages');
+    await expect(pages.nth(0).locator('th.gp-final')).toHaveCount(0);
+    await expect(pages.nth(expected - 1).locator('th.gp-final.gp-ch')).toHaveText('Final Grade');
+    await expect(
+      pages
+        .nth(expected - 1)
+        .locator('.gp-row td.gp-final')
+        .first(),
+    ).toHaveText(/^\d\.\d$/);
     // Every column prints once.
     expect(await page.locator('#grades-print-root th.gp-ch[data-col]').count()).toBe(37);
 
@@ -160,6 +167,8 @@ test.describe('Print Grades', () => {
     await dialog.getByLabel('Legal').check();
     expect(await pagesInStatus(dialog)).toBe(3);
     await stageFromDialog(page, dialog);
+    // The page rule names the paper and portrait, so the print dialog picks Legal.
+    expect(await page.locator('#grades-print-page').textContent()).toContain('size: legal portrait');
     const pdf = await pdfOfStaged(page);
     expect(countPages(pdf)).toBe(3);
     for (const box of pageBoxes(pdf)) expect(box).toEqual([612, 1008]);
@@ -169,6 +178,23 @@ test.describe('Print Grades', () => {
     dialog = await openDialog(page);
     await expect(dialog.getByLabel('Legal')).toBeChecked();
     await dialog.getByLabel('Letter').check();
+  });
+
+  test('Pupil # Only prints numbers and no names', async ({ page }) => {
+    await openDemoGradebook(page);
+    const dialog = await openDialog(page);
+    await dialog.getByLabel('All Time').check();
+    await dialog.getByLabel('Pupil # Only').check();
+    await stageFromDialog(page, dialog);
+    const root = page.locator('#grades-print-root');
+    await expect(root.locator('th.gp-rh').first()).toHaveText('Pupil #');
+    await expect(root.locator('td.gp-name')).toHaveCount(0);
+    await expect(root).not.toContainText('Adeyemi');
+    await expect(root).toContainText('STU-201');
+    await pdfOfStaged(page);
+    const reset = await openDialog(page);
+    await reset.getByLabel('Pupil # and Name').check();
+    await reset.getByRole('button', { name: 'Cancel' }).click();
   });
 
   test('Compact prints fewer pages than Normal', async ({ page }) => {
