@@ -1248,17 +1248,26 @@ th.gb-group-alt {
   font-weight: 600;
   font-size: var(--text-sm);
 }
-.gb-scores-focus {
-  outline: 2px solid var(--active);
-  outline-offset: -2px;
-  background: rgba(0, 122, 255, 0.04) !important;
+/* The cell being edited (click, Tab, Enter or score mode): the app's active
+   tint on the cell, and the theme's focus ring on the editor itself. The
+   hover rectangle stays off while the editor is open so the ring is the
+   only outline. The out-of-range warning outline still wins (!important). */
+.gb-scores-focus,
+.gb-scores-cell:focus-within {
+  outline: none;
+  background: var(--active-light) !important;
+  position: relative;
+  z-index: 1;
 }
 
-/* Inline input */
+/* Inline input — a small rounded field on the tinted cell */
 .gb-scores-input {
+  display: block;
   width: 100%;
+  height: 24px;
   border: none;
-  background: transparent;
+  border-radius: var(--radius-xs);
+  background: var(--surface);
   text-align: center;
   font-family: var(--font-base);
   font-size: var(--text-sm);
@@ -1267,6 +1276,14 @@ th.gb-group-alt {
   outline: none;
   padding: 0;
   -moz-appearance: textfield;
+}
+.gb-scores-input:focus {
+  box-shadow:
+    0 0 0 2px var(--active),
+    0 0 0 5px var(--active-light) !important;
+}
+.gb-scores-compact .gb-scores-input {
+  height: 20px;
 }
 .gb-scores-input::-webkit-inner-spin-button,
 .gb-scores-input::-webkit-outer-spin-button {
