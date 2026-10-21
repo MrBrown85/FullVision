@@ -28,6 +28,9 @@ window.PageAssignments = (function () {
   var _dragModuleId = null;
   var _dragSid = null;
   var _dragFromGroup = null;
+  var _mergeTargetId = null;
+  var _mergeHoverTimer = null;
+  var _mergeAnimating = false;
   var collabPairMode = 'random';
   var collabGroupMode = 'random';
   var focusStudentId = null;
@@ -4284,6 +4287,7 @@ window.PageAssignments = (function () {
   function onAssessDragEnd() {
     _dragAssessId = null;
     _clearDropMarker();
+    _clearMergeState();
     document.querySelectorAll('.assess-card.dragging').forEach(function (el) {
       el.classList.remove('dragging');
     });
@@ -4308,9 +4312,66 @@ window.PageAssignments = (function () {
     _dragAssessId = null;
     render();
   }
+  function _clearMergeState() {
+    if (_mergeHoverTimer) {
+      clearTimeout(_mergeHoverTimer);
+      _mergeHoverTimer = null;
+    }
+    if (_mergeTargetId) {
+      var el = document.getElementById('ac-' + _mergeTargetId);
+      if (el) el.classList.remove('merge-target');
+    }
+    _mergeTargetId = null;
+    _mergeAnimating = false;
+  }
+  function mergeToNewModule(draggedId, targetId) {
+    var cid = activeCourse;
+    var modules = getModules(cid);
+    var idx = modules.length;
+    var color = MODULE_COLORS[idx % MODULE_COLORS.length];
+    var newModule = {
+      id: uid(),
+      name: 'Module ' + (idx + 1),
+      color: color,
+      sortOrder: idx,
+      created: new Date().toISOString(),
+    };
+    modules.push(newModule);
+    saveModules(cid, modules);
+    var assessments = getAssessments(cid);
+    [draggedId, targetId].forEach(function (aid) {
+      var a = assessments.find(function (x) {
+        return x.id === aid;
+      });
+      if (a) a.moduleId = newModule.id;
+    });
+    saveAssessments(cid, assessments);
+    collapsedModules[newModule.id] = false;
+    render();
+    setTimeout(function () {
+      var input = document.querySelector('.mod-folder[data-module-id="' + newModule.id + '"] .mod-folder-name-input');
+      if (input) {
+        input.focus();
+        input.select();
+      }
+    }, 50);
+  }
+
   /* ── Reordering by drag ─────────────────────────────────────
-     Over a card, the top half places the dragged card before it and the
-     bottom half after it; a blue line shows where. */
+     Over a card's top or bottom third, a blue line shows where the dragged
+     card will land, before or after it. Held over the middle third of an
+     unfiled card, the two stack into a new module instead. */
+  // Stacking makes a new module, so it only joins two cards that are not in one.
+  function _canStack(dragId, targetId) {
+    var assessments = getAssessments(activeCourse);
+    var a = assessments.find(function (x) {
+      return x.id === dragId;
+    });
+    var b = assessments.find(function (x) {
+      return x.id === targetId;
+    });
+    return !!(a && b && !a.moduleId && !b.moduleId);
+  }
   function _clearDropMarker() {
     document.querySelectorAll('.assess-card.drop-before, .assess-card.drop-after').forEach(function (el) {
       el.classList.remove('drop-before', 'drop-after');
@@ -5090,12 +5151,30 @@ window.PageAssignments = (function () {
       document.querySelectorAll('.mod-folder.drag-over').forEach(function (el) {
         el.classList.remove('drag-over');
       });
-      if (cardDrop.dataset.assessCardDrop === _dragAssessId) {
+      var targetId = cardDrop.dataset.assessCardDrop;
+      if (targetId === _dragAssessId) {
         _clearDropMarker();
+        _clearMergeState();
         return;
       }
       var rect = cardDrop.getBoundingClientRect();
-      _setDropMarker(cardDrop, e.clientY > rect.top + rect.height / 2);
+      var y = e.clientY - rect.top;
+      if (y > rect.height / 3 && y < (rect.height * 2) / 3 && _canStack(_dragAssessId, targetId)) {
+        // Middle third: hold to stack the two into a new module.
+        _clearDropMarker();
+        if (_mergeTargetId === targetId) return;
+        _clearMergeState();
+        _mergeTargetId = targetId;
+        _mergeHoverTimer = setTimeout(function () {
+          _mergeAnimating = true;
+          var el = document.getElementById('ac-' + targetId);
+          if (el) el.classList.add('merge-target');
+        }, 300);
+        return;
+      }
+      // Top or bottom: reorder.
+      if (_mergeTargetId) _clearMergeState();
+      _setDropMarker(cardDrop, y > rect.height / 2);
       return;
     }
     // Folder drop
@@ -5125,6 +5204,7 @@ window.PageAssignments = (function () {
     if (cardDrop) {
       if (cardDrop.contains(e.relatedTarget)) return;
       cardDrop.classList.remove('drop-before', 'drop-after');
+      if (_mergeTargetId === cardDrop.dataset.assessCardDrop) _clearMergeState();
       return;
     }
     var folderDrop = e.target.closest('[data-folder-drop]');
@@ -5150,11 +5230,17 @@ window.PageAssignments = (function () {
     if (cardDrop && _dragAssessId && !_dragModuleId) {
       e.preventDefault();
       e.stopPropagation();
+      var dragId = _dragAssessId;
+      var stackOn = _mergeAnimating && _mergeTargetId === cardDrop.dataset.assessCardDrop;
       var after = cardDrop.classList.contains('drop-after');
       var placed = after || cardDrop.classList.contains('drop-before');
-      var dragId = _dragAssessId;
       _clearDropMarker();
+      _clearMergeState();
       _dragAssessId = null;
+      if (stackOn && dragId !== cardDrop.dataset.assessCardDrop) {
+        mergeToNewModule(dragId, cardDrop.dataset.assessCardDrop);
+        return;
+      }
       if (placed && dragId !== cardDrop.dataset.assessCardDrop)
         reorderAssessment(dragId, cardDrop.dataset.assessCardDrop, after);
       return;
@@ -5210,6 +5296,9 @@ window.PageAssignments = (function () {
     collapsedModules = {};
     _dragAssessId = null;
     _dragModuleId = null;
+    _mergeTargetId = null;
+    _mergeHoverTimer = null;
+    _mergeAnimating = false;
     AC.configure(activeCourse);
     _resetCollabState();
     _editingRubric = null;
@@ -5305,6 +5394,7 @@ window.PageAssignments = (function () {
 
     // Clear timers
     if (_searchTimer) clearTimeout(_searchTimer);
+    if (_mergeHoverTimer) clearTimeout(_mergeHoverTimer);
     Object.keys(_statusDebounce).forEach(function (k) {
       delete _statusDebounce[k];
     });
