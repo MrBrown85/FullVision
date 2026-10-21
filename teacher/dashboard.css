@@ -965,9 +965,9 @@ body.fv-names-hidden .dash-search-input:not(:placeholder-shown) {
   transition: border 0.12s;
   -webkit-appearance: none;
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23999'/%3E%3C/svg%3E");
+  background-image: var(--select-chevron);
   background-repeat: no-repeat;
-  background-position: right 8px center;
+  background-position: right 10px center;
 }
 .dash-sort-select:hover {
   border-color: var(--text-3);
@@ -1406,27 +1406,6 @@ body.fv-names-hidden .dash-search-input:not(:placeholder-shown) {
   font-size: var(--text-sm);
   color: var(--text);
   line-height: 1.6;
-}
-
-.dash-course-select {
-  font-family: var(--font-base);
-  font-size: var(--text-base);
-  font-weight: 600;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 6px 28px 6px 10px;
-  cursor: pointer;
-  background: var(--surface);
-  color: var(--text);
-  transition: border 0.12s;
-  -webkit-appearance: none;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23999'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 8px center;
-}
-.dash-course-select:hover {
-  border-color: var(--text-3);
 }
 
 /* ── Class Manager ──────────────────────────────────────────── */

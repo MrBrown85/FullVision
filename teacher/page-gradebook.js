@@ -274,7 +274,7 @@ window.PageGradebook = (function () {
       })
       .join('');
     html +=
-      '<select class="gb-course-select" data-action="switchCourse" aria-label="Select course">' +
+      '<select class="class-picker gb-course-select" data-action="switchCourse" aria-label="Select course">' +
       courseOpts +
       '</select>';
 
