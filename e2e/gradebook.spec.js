@@ -27,7 +27,7 @@ test.describe('Gradebook — Spreadsheet View', () => {
     await gotoApp(page, '/gradebook');
     const body = await page.locator('body').textContent();
     // Should show Competencies and/or Scores tabs
-    const hasViewTabs = body.includes('Competencies') || body.includes('Scores') || body.includes('Summary');
+    const hasViewTabs = body.includes('Competencies') || body.includes('Scores');
     expect(hasViewTabs).toBeTruthy();
   });
 
@@ -140,26 +140,15 @@ test.describe('Gradebook — Spreadsheet View', () => {
     expect((await statuses())['stu-002:assess-001']).toBeUndefined();
   });
 
-  test('clicking Summary tab renders Summary view without crashing', async ({ page }) => {
+  test('the Summary view is gone and a saved Summary choice opens Competencies', async ({ page }) => {
     await seedStudents(page);
-    await seedAssessments(page);
-    await seedScores(page, {
-      'stu-001': { 'assess-001': { QAP: 3 } },
-      'stu-002': { 'assess-001': { QAP: 2 } },
-      'stu-003': { 'assess-001': { QAP: 4 } },
-    });
+    await page.addInitScript(() => localStorage.setItem('gb_viewMode', 'summary'));
     await gotoApp(page, '/gradebook');
-    // Click the Summary tab
-    const summaryBtn = page.locator('[data-action="setView"][data-mode="summary"]');
-    await summaryBtn.click();
-    await page.waitForTimeout(500);
-    // Verify the view rendered
-    const main = page.locator('#main');
-    await expect(main).not.toBeEmpty();
-    await expect(summaryBtn).toHaveClass(/active/);
+    await expect(page.locator('[data-action="setView"][data-mode="summary"]')).toHaveCount(0);
+    await expect(page.locator('[data-action="setView"][data-mode="detailed"]')).toHaveClass(/active/);
   });
 
-  test('switching between all three tabs does not crash', async ({ page }) => {
+  test('switching between both tabs does not crash', async ({ page }) => {
     await seedStudents(page);
     await seedAssessments(page);
     await seedScores(page, {
@@ -172,11 +161,7 @@ test.describe('Gradebook — Spreadsheet View', () => {
     await page.locator('[data-action="setView"][data-mode="scores"]').click();
     await page.waitForTimeout(300);
     await expect(page.locator('#main')).not.toBeEmpty();
-    // Scores → Summary
-    await page.locator('[data-action="setView"][data-mode="summary"]').click();
-    await page.waitForTimeout(300);
-    await expect(page.locator('#main')).not.toBeEmpty();
-    // Summary → Competencies
+    // Scores → Competencies
     await page.locator('[data-action="setView"][data-mode="detailed"]').click();
     await page.waitForTimeout(300);
     await expect(page.locator('#main')).not.toBeEmpty();

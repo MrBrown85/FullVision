@@ -11,7 +11,7 @@ window.PageGradebook = (function () {
 
   /* ── State variables ────────────────────────────────────── */
   var activeCourse;
-  var viewMode = localStorage.getItem('gb_viewMode') || 'detailed';
+  var viewMode = savedViewMode();
   /* The Competencies view shows a rubric assessment as one column per
      competency ('competencies', the default) or one per criterion
      ('criteria'). Remembered per class on this device. */
@@ -99,6 +99,10 @@ window.PageGradebook = (function () {
   }
 
   /* ── View & filter controls ─────────────────────────────── */
+  // A saved 'summary' (the retired Summary view) falls back to Competencies.
+  function savedViewMode() {
+    return localStorage.getItem('gb_viewMode') === 'scores' ? 'scores' : 'detailed';
+  }
   function setView(mode) {
     _flushActiveScoreEditor();
     viewMode = mode;
@@ -290,11 +294,6 @@ window.PageGradebook = (function () {
       '" data-action="setView" data-mode="scores" role="tab" aria-selected="' +
       (viewMode === 'scores') +
       '">Scores</button>' +
-      '<button class="seg-btn gb-seg-btn' +
-      (viewMode === 'summary' ? ' active' : '') +
-      '" data-action="setView" data-mode="summary" role="tab" aria-selected="' +
-      (viewMode === 'summary') +
-      '">Summary</button>' +
       '</div>';
 
     var hasRubricAssessment = allAssessments.some(function (a) {
@@ -342,19 +341,11 @@ window.PageGradebook = (function () {
 
     html +=
       '<div style="margin-left:auto;display:flex;align-items:center;gap:12px">' +
-      '<span class="gb-toolbar-label">' +
-      (assessments.length !== allAssessments.length
-        ? assessments.length + ' of ' + allAssessments.length
-        : allAssessments.length) +
-      ' Assignments \u00b7 ' +
-      students.length +
-      ' Students' +
       (undatedCount > 0
-        ? ' \u00b7 <span title="These assessments have no date, so no term can include them. Give them a date on the Assessments page.">' +
+        ? '<span class="gb-toolbar-label" title="These assessments have no date, so no term can include them. Give them a date on the Assessments page.">' +
           undatedCount +
           ' Undated Not Shown</span>'
         : '') +
-      '</span>' +
       (viewMode === 'scores'
         ? '<button class="tb-toggle-btn" data-action="exportScoresCSV" title="Export CSV">\u2913 Export</button>'
         : '') +
@@ -430,9 +421,7 @@ window.PageGradebook = (function () {
     html += '</div>';
 
     // ── Table ──
-    if (viewMode === 'summary') {
-      html += renderSummaryTable(cid, students, assessments, sections, isLetter, scores);
-    } else if (assessments.length === 0) {
+    if (assessments.length === 0) {
       var secLabel = filterSections.length > 0 ? ' in the selected sections' : '';
       html +=
         '<div style="text-align:center;padding:60px 20px;color:var(--text-3)">' +
@@ -1245,211 +1234,6 @@ window.PageGradebook = (function () {
     return html;
   }
 
-  /* ══════════════════════════════════════════════════════════
-     SUMMARY VIEW
-     ══════════════════════════════════════════════════════════ */
-  function renderSummaryTable(cid, students, assessments, sections, isLetter, scores) {
-    var sortedStudents = applySorting(cid, students, sections, isLetter);
-    var html = '<div class="gb-scroll-wrap"><div class="gb-scroll"><table class="gb-table">';
-
-    // Build columns: one per group + one per ungrouped section
-    var _gbGrouped = getGroupedSections(cid);
-    var _hasGbGroups = _gbGrouped.groups.some(function (gi) {
-      return gi.sections.length > 0;
-    });
-    var columns = [];
-    if (_hasGbGroups) {
-      _gbGrouped.groups.forEach(function (gi) {
-        if (gi.sections.length === 0) return;
-        columns.push({
-          type: 'group',
-          group: gi.group,
-          sections: gi.sections,
-          id: 'grp-' + gi.group.id,
-          name: gi.group.name,
-          color: gi.group.color,
-        });
-      });
-      _gbGrouped.ungrouped.forEach(function (sec) {
-        columns.push({
-          type: 'section',
-          section: sec,
-          id: 'sec-' + sec.id,
-          name: sec.shortName || sec.name,
-          color: sec.color,
-        });
-      });
-    } else {
-      sections.forEach(function (sec) {
-        columns.push({
-          type: 'section',
-          section: sec,
-          id: 'sec-' + sec.id,
-          name: sec.shortName || sec.name,
-          color: sec.color,
-        });
-      });
-    }
-
-    // Header row
-    html +=
-      '<thead><tr><th class="gb-corner gb-sortable" data-action="toggleSort" data-sortkey="name">Student' +
-      sortArrow('name') +
-      '</th>';
-    html += renderOverallHeader();
-    var showGradeColumn = courseGradeMode(cid) === 'both';
-    if (showGradeColumn)
-      html +=
-        '<th class="gb-summary-header gb-sortable" data-action="toggleSort" data-sortkey="grade">Grade' +
-        sortArrow('grade') +
-        '</th>';
-    columns.forEach(function (col) {
-      html +=
-        '<th class="gb-summary-header gb-sortable" style="border-bottom:3px solid ' +
-        col.color +
-        '" data-action="toggleSort" data-sortkey="' +
-        col.id +
-        '">' +
-        esc(col.name) +
-        sortArrow(col.id) +
-        '</th>';
-    });
-    html +=
-      '<th class="gb-summary-header gb-sortable" data-action="toggleSort" data-sortkey="coverage">Coverage' +
-      sortArrow('coverage') +
-      '</th>';
-    html += '<th class="gb-summary-header">Trend</th>';
-    html += '</tr></thead><tbody>';
-
-    // Data rows
-    sortedStudents.forEach(function (s) {
-      html +=
-        '<tr data-sid="' +
-        s.id +
-        '"><th class="gb-name" scope="row">' +
-        renderNameCell(cid, s, sections, isLetter) +
-        '</th>';
-      html += renderOverallCell(cid, s.id);
-      if (showGradeColumn) html += renderSummaryCell(cid, s.id, { type: 'grade' });
-      columns.forEach(function (col) {
-        if (col.type === 'group') {
-          var gp = getGroupProficiency(cid, s.id, col.group.id);
-          var gr = Math.round(gp);
-          html +=
-            '<td class="gb-summary"' +
-            (gp > 0
-              ? ' style="background:linear-gradient(' + PROF_TINT[gr] + ',' + PROF_TINT[gr] + '),var(--surface)"'
-              : '') +
-            '><span class="gb-summary-val" style="color:' +
-            (gp > 0 ? PROF_COLORS[gr] : 'var(--text-3)') +
-            '">' +
-            formatLevel(cid, gp) +
-            '</span></td>';
-        } else {
-          html += renderSummaryCell(cid, s.id, { type: 'section', section: col.section });
-        }
-      });
-      var pctV = getCompletionPct(cid, s.id);
-      html +=
-        '<td class="gb-summary" style="text-align:center"><span class="gb-summary-val" style="color:' +
-        (pctV >= 75 ? 'var(--score-3)' : pctV >= 50 ? 'var(--score-2)' : 'var(--score-1)') +
-        '">' +
-        pctV +
-        '%</span></td>';
-      var allSc = assessments
-        .map(function (assessment) {
-          var value = getAssessmentOverallScore(cid, s.id, assessment.id);
-          if (value == null) return null;
-          return { score: value, date: assessment.date || '' };
-        })
-        .filter(Boolean);
-      var trendIcon = '<span style="color:var(--text-3)">—</span>';
-      if (allSc.length >= 4) {
-        allSc.sort(function (a, b) {
-          return (a.date || '').localeCompare(b.date || '');
-        });
-        var mid = Math.floor(allSc.length / 2);
-        var earlyAvg =
-          allSc.slice(0, mid).reduce(function (a, b) {
-            return a + scoreModValue(b);
-          }, 0) / mid;
-        var lateAvg =
-          allSc.slice(mid).reduce(function (a, b) {
-            return a + scoreModValue(b);
-          }, 0) /
-          (allSc.length - mid);
-        if (lateAvg > earlyAvg + 0.2) trendIcon = '<span style="color:var(--score-3);font-size:1rem">↑</span>';
-        else if (lateAvg < earlyAvg - 0.2) trendIcon = '<span style="color:var(--score-1);font-size:1rem">↓</span>';
-        else trendIcon = '<span style="color:var(--text-3);font-size:1rem">→</span>';
-      }
-      html += '<td class="gb-summary" style="text-align:center">' + trendIcon + '</td></tr>';
-    });
-
-    // Stats row
-    html += '<tr class="gb-stats-row"><th class="gb-name" scope="row">Class Average</th>';
-    html += renderOverallStatsCell(cid, sortedStudents);
-    if (showGradeColumn) html += '<td class="gb-summary"></td>';
-    columns.forEach(function (col) {
-      var vals;
-      if (col.type === 'group') {
-        vals = sortedStudents
-          .map(function (s) {
-            return getGroupProficiency(cid, s.id, col.group.id);
-          })
-          .filter(function (v) {
-            return v > 0;
-          });
-      } else {
-        vals = sortedStudents
-          .map(function (s) {
-            return getSectionProficiency(cid, s.id, col.section.id);
-          })
-          .filter(function (v) {
-            return v > 0;
-          });
-      }
-      if (!vals.length)
-        html += '<td class="gb-summary"><span class="gb-summary-val" style="color:var(--text-3)">—</span></td>';
-      else {
-        var avg =
-          vals.reduce(function (a, b) {
-            return a + b;
-          }, 0) / vals.length;
-        var ar = Math.round(avg);
-        html +=
-          '<td class="gb-summary" style="background:linear-gradient(' +
-          PROF_TINT[ar] +
-          ',' +
-          PROF_TINT[ar] +
-          '),var(--surface)"><span class="gb-summary-val" style="color:' +
-          PROF_COLORS[ar] +
-          '">' +
-          formatLevel(cid, avg) +
-          '</span></td>';
-      }
-    });
-    var cvgVals = sortedStudents.map(function (s) {
-      return getCompletionPct(cid, s.id);
-    });
-    var cvgAvg =
-      cvgVals.length > 0
-        ? Math.round(
-            cvgVals.reduce(function (a, b) {
-              return a + b;
-            }, 0) / cvgVals.length,
-          )
-        : 0;
-    html +=
-      '<td class="gb-summary" style="text-align:center"><span class="gb-summary-val" style="color:' +
-      (cvgAvg >= 75 ? 'var(--score-3)' : cvgAvg >= 50 ? 'var(--score-2)' : 'var(--score-1)') +
-      '">' +
-      cvgAvg +
-      '%</span></td>';
-    html += '<td class="gb-summary"></td></tr>';
-    html += '</tbody></table></div></div>';
-    return html;
-  }
-
   /* ── Always-visible Overall column ──────────────────────── */
   function renderOverallHeader(rowspan) {
     var rs = rowspan ? ' rowspan="' + rowspan + '"' : '';
@@ -1566,36 +1350,6 @@ window.PageGradebook = (function () {
       '">' +
       esc(displayName(student)) +
       '</a></div>'
-    );
-  }
-
-  function renderSummaryCell(cid, sid, sc) {
-    var display,
-      tint = '';
-    if (sc.type === 'section') {
-      var val = getSectionProficiency(cid, sid, sc.section.id);
-      var r = Math.round(val);
-      var color = PROF_COLORS[r] || PROF_COLORS[0];
-      tint = PROF_TINT[r] || '';
-      display =
-        val > 0
-          ? '<span class="gb-summary-val" style="color:' + color + '">' + formatLevel(cid, val) + '</span>'
-          : '<span class="gb-summary-val" style="color:var(--text-3)">—</span>';
-    } else if (sc.type === 'grade') {
-      var letterData = _getStudentLetterData(cid, sid);
-      if (letterData.S) {
-        display =
-          '<span class="gb-summary-val" style="color:var(--text)">' + letterData.S + ' (' + letterData.R + '%)</span>';
-      } else display = '<span class="gb-summary-val" style="color:var(--text-3)">—</span>';
-    }
-    var bg = tint ? ' style="background:linear-gradient(' + tint + ',' + tint + '),var(--surface)"' : '';
-    return (
-      '<td class="gb-summary"' +
-      (sc.type === 'section' ? ' data-secid="' + sc.section.id + '"' : '') +
-      bg +
-      '>' +
-      display +
-      '</td>'
     );
   }
 
@@ -3095,7 +2849,7 @@ window.PageGradebook = (function () {
   function init(params) {
     activeCourse = params.course || getActiveCourse();
     setActiveCourse(activeCourse);
-    viewMode = localStorage.getItem('gb_viewMode') || 'detailed';
+    viewMode = savedViewMode();
     filterSections = [];
     filterModules = [];
     filterCategories = [];
