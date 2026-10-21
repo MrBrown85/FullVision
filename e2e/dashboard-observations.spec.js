@@ -237,7 +237,7 @@ test.describe('Dashboard Observations card', () => {
     await enterDemo(page);
     await openDashboard(page);
     const cell = card(page).locator('.dash-ob2-cell.has').first();
-    const href = await cell.getAttribute('href');
+    const href = await cell.getAttribute('data-href');
     const obId = new URL('http://x/' + href.replace('#/', '')).searchParams.get('ob');
     expect(obId).toBeTruthy();
     await cell.click();

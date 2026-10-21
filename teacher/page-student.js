@@ -419,7 +419,7 @@ window.PageStudent = (function () {
         '<div style="font-size:2rem;margin-bottom:12px;opacity:0.5">?</div>' +
         '<div style="font-weight:600;font-size:1.1rem;margin-bottom:6px">Student not found</div>' +
         '<div style="color:var(--text-3);margin-bottom:16px">This student may have been removed or the link is outdated.</div>' +
-        '<a href="#/dashboard" class="btn btn-primary">Back to Dashboard</a></div>';
+        '<a role="link" tabindex="0" data-href="#/dashboard" class="btn btn-primary">Back to Dashboard</a></div>';
       return;
     }
 
@@ -712,7 +712,7 @@ window.PageStudent = (function () {
         statusIcon +
         '</span></td>' +
         '<td class="gt-cell-title">' +
-        '<a class="gt-title-text" href="#/assignments?course=' +
+        '<a class="gt-title-text" role="link" tabindex="0" data-href="#/assignments?course=' +
         cid +
         '&open=' +
         assess.id +

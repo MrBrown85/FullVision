@@ -155,14 +155,14 @@ window.PageObservations = (function () {
       document.querySelectorAll('#gb-roster-list .student-row').forEach(function (a) {
         a.addEventListener('click', function (e) {
           e.preventDefault();
-          var sid = new URLSearchParams((a.getAttribute('href') || '').split('?')[1] || '').get('id');
+          var sid = new URLSearchParams((a.getAttribute('data-href') || '').split('?')[1] || '').get('id');
           if (sid && _capture) {
             // Click picks the student; shift-click adds them to the group.
             _capture.pickStudent(sid, e.shiftKey);
             filterStudents = _capture.getStudents();
             render();
             document.querySelectorAll('.student-row').forEach(function (r) {
-              var rid = new URLSearchParams((r.getAttribute('href') || '').split('?')[1] || '').get('id');
+              var rid = new URLSearchParams((r.getAttribute('data-href') || '').split('?')[1] || '').get('id');
               r.classList.toggle('selected', filterStudents.indexOf(rid) >= 0);
             });
           }

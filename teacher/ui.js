@@ -51,7 +51,7 @@ function renderDock(activePage, rightHTML) {
   const ap = activePage === 'student' ? 'dashboard' : activePage;
   const seg = TB_PAGES.map(
     p =>
-      `<a href="${p.href}" class="seg-btn tb-seg-link${p.id === ap ? ' tb-seg-active" aria-current="page' : ''}">${p.label}</a>`,
+      `<a role="link" tabindex="0" data-href="${p.href}" class="seg-btn tb-seg-link${p.id === ap ? ' tb-seg-active" aria-current="page' : ''}">${p.label}</a>`,
   ).join('');
 
   const userMenu = `<div class="tb-user-menu">
@@ -550,7 +550,7 @@ function segSelect(btn) {
 function renderBreadcrumb(parentLabel, parentHref, currentLabel, parentAction) {
   return (
     '<nav class="tb-breadcrumb" aria-label="Breadcrumb"><ol>' +
-    '<li><a href="' +
+    '<li><a role="link" tabindex="0" data-href="' +
     esc(parentHref) +
     '"' +
     (parentAction ? ' data-action="' + esc(parentAction) + '"' : '') +
@@ -689,7 +689,7 @@ function renderStudentHeader(cid, sid, opts) {
     // A link to another screen is navigation, so it is secondary unless it is
     // the screen's main action (docs/DECISIONS.md, "Buttons").
     const btnCls = 'page-toggle-btn' + (opts.buttonSecondary ? ' page-toggle-btn--secondary' : '');
-    html += `<a class="${btnCls}" href="${opts.buttonHref}">${esc(opts.buttonLabel)}</a>`;
+    html += `<a class="${btnCls}" role="link" tabindex="0" data-href="${opts.buttonHref}">${esc(opts.buttonLabel)}</a>`;
   }
   html += `</div>`; // end sh-row1
 
@@ -762,7 +762,9 @@ function renderSidebar(activeCourse, selectedStudentId, onStudentClick) {
     // A row that runs a page function is a button, so the browser shows no
     // link target in its status bar; a row that opens the student is a link.
     const tag = onStudentClick ? 'button' : 'a';
-    const clickAttr = onStudentClick ? `type="button" data-action="sidebarStudentClick"` : `href="${href}"`;
+    const clickAttr = onStudentClick
+      ? `type="button" data-action="sidebarStudentClick"`
+      : `role="link" tabindex="0" data-href="${href}"`;
     html += `<${tag} class="student-row${s.id === selectedStudentId ? ' selected' : ''}" ${clickAttr} data-sid="${s.id}">
       <span class="student-avatar" style="background:${avatarBg}">${initials(s)}</span>
       <span class="student-info">
@@ -903,9 +905,9 @@ function refreshSidebar() {
       const sid = sel.dataset.sid;
       if (sid) {
         selId = sid;
-      } else if (sel.href) {
+      } else if (sel.dataset.href) {
         try {
-          const hrefStr = sel.getAttribute('href') || '';
+          const hrefStr = sel.dataset.href;
           const qIdx = hrefStr.indexOf('?');
           if (qIdx >= 0) {
             selId = new URLSearchParams(hrefStr.substring(qIdx + 1)).get('id');

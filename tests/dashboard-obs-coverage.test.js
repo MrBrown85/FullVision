@@ -120,7 +120,7 @@ describe('Observations card rendering', () => {
     expect(html).toContain('<b>1</b> with no strength recorded');
     expect(html).toMatch(/class="dash-ob2-name is-overdue"[^>]*>Ben N\.<\/a>/);
     expect(html).not.toMatch(/class="dash-ob2-name is-overdue"[^>]*>Ada L\./);
-    expect(html).toContain('href="#/student?id=s1&course=' + CID + '&ob=ob-new"');
+    expect(html).toContain('data-href="#/student?id=s1&course=' + CID + '&ob=ob-new"');
     expect(html).toContain('<i data-type="strength"></i><i data-type="none"></i>');
     expect(html).toContain('47d');
     expect(html).not.toMatch(/\stitle="/);

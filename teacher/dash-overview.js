@@ -179,7 +179,7 @@ window.DashOverview = (function () {
 
     html +=
       '<div style="margin-top:14px"><div class="dash-section-title">Curricular Competencies' +
-      '<a href="#/gradebook?course=' +
+      '<a role="link" tabindex="0" data-href="#/gradebook?course=' +
       cid +
       '">View Gradebook \u2192</a>' +
       '</div></div>';
@@ -333,7 +333,11 @@ window.DashOverview = (function () {
           esc(item.text) +
           '</span>' +
           (item.link
-            ? '<a class="dash-action-link" href="' + item.link + '">' + esc(item.linkText) + ' &rarr;</a>'
+            ? '<a class="dash-action-link" role="link" tabindex="0" data-href="' +
+              item.link +
+              '">' +
+              esc(item.linkText) +
+              ' &rarr;</a>'
             : '') +
           '</div>';
       });
