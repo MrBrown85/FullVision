@@ -377,36 +377,6 @@ window.ReportBlocks = (function () {
   </div>`;
   }
 
-  /* ── Attendance this term ─────────────────────────────────────
-     Counts from the roster's attendance records inside the report's term
-     (all time when the class has no dated terms). Nothing prints for a
-     class that does not take attendance in FullVision. */
-  function renderBlockAttendance(cid, student, ctx) {
-    const everyone = getStudents(cid);
-    if (!everyone.some(st => (st.attendance || []).length)) return '';
-    const terms = typeof getReportingTerms === 'function' ? getReportingTerms(cid) : [];
-    const n = Number((((ctx && ctx.termId) || '').match(/^term-(\d+)$/) || [])[1]);
-    const term = terms.find(t => Number(t.ordinal) === n) || null;
-    const inTerm = a => !term || !a.date || (a.date >= term.starts_on && a.date <= term.ends_on);
-    const records = (student.attendance || []).filter(inTerm);
-    const count = key =>
-      records.filter(a =>
-        String(a.status || '')
-          .toLowerCase()
-          .startsWith(key),
-      ).length;
-    const rows = [
-      ['Present', count('p')],
-      ['Absent', count('a')],
-      ['Late', count('l')],
-      ['Excused', count('e')],
-    ];
-    return `<div class="report-block-box report-attendance">
-    <div class="report-block-title">Attendance${term ? ' this Term' : ''}</div>
-    <table class="report-ct"><tbody>${rows.map(r => `<tr><td class="report-ct-name">${r[0]}</td><td class="report-ct-evidence">${r[1]}</td></tr>`).join('')}</tbody></table>
-  </div>`;
-  }
-
   function renderBlockObservations(cid, student) {
     const quickObs = getStudentQuickObs(cid, student.id);
     const recentObs = quickObs.slice(0, 5);
@@ -1195,8 +1165,6 @@ window.ReportBlocks = (function () {
         return renderBlockCoreCompetencies(cid, student, options);
       case 'competency-table':
         return renderBlockCompetencyTable(cid, student, ctx, options);
-      case 'attendance':
-        return renderBlockAttendance(cid, student, ctx);
       case 'learner-dimensions':
         return renderBlockLearnerDimensions(cid, student, ctx, options);
       case 'teacher-narrative':
@@ -1232,7 +1200,6 @@ window.ReportBlocks = (function () {
     renderBlockTeacherNarrative: renderBlockTeacherNarrative,
     renderCommentBox: renderCommentBox,
     renderBlockCompetencyTable: renderBlockCompetencyTable,
-    renderBlockAttendance: renderBlockAttendance,
     renderBlockObservations: renderBlockObservations,
     renderBlockSectionOutcomes: renderBlockSectionOutcomes,
     renderBlockNextSteps: renderBlockNextSteps,

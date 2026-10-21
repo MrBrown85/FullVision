@@ -45,7 +45,7 @@ test.describe('Page Studio', () => {
 
   test('opens on one student, two pages side by side, with the palette and the inspector', async ({ page }) => {
     await openStudio(page);
-    await expect(page.locator('.studio-palette .studio-blk')).toHaveCount(17);
+    await expect(page.locator('.studio-palette .studio-blk')).toHaveCount(16);
     await expect(page.locator('.studio-blk.placed')).toHaveCount(6);
     await expect(page.locator('.studio-palette')).not.toContainText('Letterhead');
     await expect(page.locator('.sheet-label').first()).toHaveText('Page 1 of 2');
@@ -110,10 +110,10 @@ test.describe('Page Studio', () => {
     await expect(page.locator('[data-action="studioBlock"][data-block="legend"]')).not.toHaveClass(/placed/);
     expect(await overflowing(page)).toEqual([]);
     // The form is the class's: it survives a reload.
-    await page.locator('[data-action="studioBlock"][data-block="attendance"]').click();
+    await page.locator('[data-action="studioBlock"][data-block="observations"]').click();
     await page.reload();
     await page.getByRole('tab', { name: 'Progress Reports' }).click();
-    await expect(page.locator('[data-action="studioBlock"][data-block="attendance"]')).toHaveClass(/placed/);
+    await expect(page.locator('[data-action="studioBlock"][data-block="observations"]')).toHaveClass(/placed/);
   });
 
   test('templates: the Interim Update is one side with the legend; the Conference Pack cuts its grade table at rows', async ({

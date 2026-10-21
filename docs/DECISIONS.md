@@ -203,7 +203,7 @@ Context: a review of the report printer (`~/fullvision-report-printer-review/`, 
 9. **Printing saves a copy.** Print Reports saves a fixed copy of every report (`report_issue`) and then prints; a reprint uses the copy, not later scores. The copy picker lists them as "Printed Oct 20, 2:09 p.m.". There is no separate "Issue" step or word anywhere on the screen. Sending a report by email, later, is a second output of the same copy.
 10. **Sending a report emails a link, not the report.** The copy stays in Canadian storage; the family opens it with the student's birth date for 30 days; the email names the teacher and school and carries no grades. Print stays the default; sending is opt-in per family with a guardian address on file. Built only after the district's position on teacher-to-family email is checked.
 11. **Plain labels:** "1 sheet / 2 sheets", "No comment", "Black / Colour", "Fit Content / Fixed", "Page 1 of 2", "Print Reports". Not "pp", "proof", "fit all" or "issue".
-12. **Attendance is off by default.** The Report Card and the Conference Pack start without it; a teacher ticks Attendance on in Include, and it then sits beside the competency table. A class whose saved form already has it keeps it. Colin's call, 2026-10-20 (Phase 5 item 5.2).
+12. **Reports carry no attendance.** FullVision has no real attendance entry: the one place to record it (Class Management's Bulk Edit) writes only to the computer it was typed on, and attendance lives in MyEd. The Attendance block is gone from the palette and from every saved layout (a layout that had it keeps the competency table alone). Replaces "Attendance is off by default". Colin's call, 2026-10-20.
 
 ## Printed class grade sheet (2026-10-20)
 
