@@ -53,7 +53,9 @@
       colMin: 0.32,
       colMax: 0.5,
       stuNoW: 0.72,
+      stuNoOnlyW: 1.05,
       nameW: 1.85,
+      finalW: { proficiency: 0.5, letter: 0.66, both: 0.6 },
       titleChars: 22,
       pageHeadH: 1.16,
       bandH: 0.18,
@@ -70,7 +72,9 @@
       colMin: 0.28,
       colMax: 0.45,
       stuNoW: 0.66,
+      stuNoOnlyW: 0.95,
       nameW: 1.6,
+      finalW: { proficiency: 0.45, letter: 0.6, both: 0.55 },
       titleChars: 21,
       pageHeadH: 1.1,
       bandH: 0.16,
@@ -104,15 +108,16 @@
     scoresAs: 'entered', // entered | levels | both
     late: true,
     average: true,
-    studentNumbers: true,
-    sortBy: 'last', // last | first
+    students: 'both', // both | name | number: what identifies a student
+    sortBy: 'last', // last | first | number
+    finalGrade: true,
     paper: 'letter',
     size: 'normal',
     blank: false,
   };
   /* The choices remembered on this device. Term, assessments and paper are
      not: the first two follow the gradebook, paper is per class. */
-  var REMEMBERED = ['scoresAs', 'late', 'average', 'studentNumbers', 'sortBy', 'size'];
+  var REMEMBERED = ['scoresAs', 'late', 'average', 'students', 'sortBy', 'finalGrade', 'size'];
 
   var _state = null;
 
@@ -167,7 +172,10 @@
     if (!SIZES[o.size]) o.size = 'normal';
     if (['entered', 'levels', 'both'].indexOf(o.scoresAs) < 0) o.scoresAs = 'entered';
     if (['all', 'shown', 'pick'].indexOf(o.assessments) < 0) o.assessments = 'all';
-    if (o.sortBy !== 'first') o.sortBy = 'last';
+    // Saved before the Students choice: a Pupil Numbers box.
+    if (raw && raw.students == null && raw.studentNumbers === false) o.students = 'name';
+    if (['both', 'name', 'number'].indexOf(o.students) < 0) o.students = 'both';
+    if (['last', 'first', 'number'].indexOf(o.sortBy) < 0) o.sortBy = 'last';
     o.term = o.term == null || o.term === '' ? 'all' : String(o.term);
     o.picked = Array.isArray(o.picked) ? o.picked.slice() : [];
     return o;
@@ -345,9 +353,14 @@
 
   function rowsFor(cid, opts) {
     var students = sortStudents(getStudents(cid), opts.sortBy === 'first' ? 'firstName' : 'lastName');
+    if (opts.sortBy === 'number') {
+      students = students.slice().sort(function (a, b) {
+        return String(a.studentNumber || '').localeCompare(String(b.studentNumber || ''), 'en', { numeric: true });
+      });
+    }
     return students.map(function (s, i) {
       var name =
-        opts.sortBy === 'first'
+        opts.sortBy !== 'last'
           ? fullName(s)
           : [s.lastName, s.firstName].filter(Boolean).join(', ') || fullName(s) || displayName(s);
       return { n: i + 1, id: s.id, name: name, studentNumber: s.studentNumber || '' };
@@ -421,22 +434,44 @@
     return { min: _round2(size.rowMin * f), max: _round2(size.rowMax * f) };
   }
 
-  function _rowHeadWidth(opts) {
-    var size = SIZES[opts.size] || SIZES.normal;
-    return size.nameW + (opts.studentNumbers ? size.stuNoW : 0);
+  function _showsName(opts) {
+    return opts.students !== 'number';
+  }
+  function _showsNumber(opts) {
+    return opts.students !== 'name';
   }
 
-  /* The width left for score columns on a page, and how many columns it
-     holds at their narrowest. */
-  function pageCapacity(opts) {
+  /* The Pupil # column is wider on its own, so "Class Average" fits it. */
+  function _numberWidth(opts) {
+    var size = SIZES[opts.size] || SIZES.normal;
+    return _showsName(opts) ? size.stuNoW : size.stuNoOnlyW;
+  }
+
+  function _rowHeadWidth(opts) {
+    var size = SIZES[opts.size] || SIZES.normal;
+    return (_showsName(opts) ? size.nameW : 0) + (_showsNumber(opts) ? _numberWidth(opts) : 0);
+  }
+
+  /* The final grade prints for a term or all time, never for custom dates
+     (calc.js scopes grades by reporting term) or a blank sheet. */
+  function _finalAllowed(period, opts) {
+    return !!opts.finalGrade && period.kind !== 'custom' && !opts.blank;
+  }
+
+  /* The width left for score columns on a page, without and with the final
+     grade column, and how many columns each holds at their narrowest. */
+  function pageCapacity(opts, finalW) {
     var paper = PAPER[opts.paper] || PAPER.letter;
     var size = SIZES[opts.size] || SIZES.normal;
     var width = _round2((paper.w - 2 * MARGIN) * (1 - SAFETY) - _rowHeadWidth(opts));
+    var widthWithFinal = _round2(width - (finalW || 0));
     return {
       pageW: paper.w - 2 * MARGIN,
       pageH: paper.h - 2 * MARGIN,
       width: width,
+      widthWithFinal: widthWithFinal,
       full: Math.max(1, Math.floor(_round2(width / size.colMin))),
+      withFinal: Math.max(0, Math.floor(_round2(widthWithFinal / size.colMin))),
     };
   }
 
@@ -473,14 +508,39 @@
     return out;
   }
 
-  /* Every page of the sheet: { students, cols, rowH, blankRows, colW,
-     blankCols }. Every column page of a student block shares its row
+  /* Column blocks for one student block: pages of at most `full` columns,
+     the last of at most `withLast` (room left for the final grade). Spread
+     evenly. A final grade that leaves no room for a column gets a page of
+     its own. */
+  function columnBlocks(n, full, withLast, hasLast) {
+    if (!hasLast) return n ? _evenBlocks(n, full) : [{ start: 0, count: 0 }];
+    if (n <= withLast) return [{ start: 0, count: n }];
+    if (withLast < 1) return _evenBlocks(n, full).concat([{ start: n, count: 0 }]);
+    var k = 1 + Math.ceil((n - withLast) / full);
+    var per = Math.ceil(n / k);
+    var out = [];
+    var start = 0;
+    if (per <= withLast) {
+      for (; start < n; start += per) out.push({ start: start, count: Math.min(per, n - start) });
+      return out;
+    }
+    var head = n - withLast;
+    var headPer = Math.ceil(head / (k - 1));
+    for (; start < head; start += headPer) out.push({ start: start, count: Math.min(headPer, head - start) });
+    out.push({ start: head, count: withLast });
+    return out;
+  }
+
+  /* Every page of the sheet: { students, cols, final, rowH, blankRows,
+     colW, blankCols }. The final grade sits on the last column page of each
+     student block. Every column page of a student block shares its row
      height, so the pages line up side by side. */
-  function paginate(columns, rowCount, opts, twoLine) {
+  function paginate(columns, rowCount, opts, twoLine, finalW) {
     var size = SIZES[opts.size] || SIZES.normal;
-    var cap = pageCapacity(opts);
+    var cap = pageCapacity(opts, finalW);
+    var hasFinal = finalW > 0;
     if (twoLine === undefined) twoLine = _isTwoLine(null, opts, columns);
-    var blocks = columns.length ? _evenBlocks(columns.length, cap.full) : [{ start: 0, count: 0 }];
+    var blocks = columnBlocks(columns.length, cap.full, cap.withFinal, hasFinal);
     var lim = _rowLimits(opts, twoLine);
     var height = gridHeight(opts);
     var rowsPer = rowCapacity(opts, twoLine);
@@ -489,11 +549,13 @@
     var pages = [];
     studentBlocks.forEach(function (sb) {
       var rows = fill(height, sb.count + avg, lim.max);
-      blocks.forEach(function (cb) {
-        var cols = fill(cap.width, cb.count, size.colMax);
+      blocks.forEach(function (cb, i) {
+        var last = hasFinal && i === blocks.length - 1;
+        var cols = fill(last ? cap.widthWithFinal : cap.width, cb.count, size.colMax);
         pages.push({
           students: sb,
           cols: cb,
+          final: last,
           rowH: rows.size,
           blankRows: rows.blank,
           colW: cols.size,
@@ -560,7 +622,13 @@
       var students = rows.map(function (r) {
         return { id: r.id };
       });
-      var layout = paginate(columns, rows.length, opts, _isTwoLine(cid, opts, columns));
+      var ids = rows.map(function (r) {
+        return r.id;
+      });
+      var size = SIZES[opts.size] || SIZES.normal;
+      var finalOn = _finalAllowed(period, opts) && rows.length > 0;
+      var finalW = finalOn ? size.finalW[courseGradeMode(cid)] : 0;
+      var layout = paginate(columns, rows.length, opts, _isTwoLine(cid, opts, columns), finalW);
       var marks = {};
       rows.forEach(function (r) {
         r.cells = columns.map(function (c) {
@@ -569,6 +637,7 @@
           if (t.late) marks.L = true;
           return t;
         });
+        if (finalOn) r.final = studentGradeSummary(cid, r.id).text || '\u2014';
       });
       var averages =
         opts.average && !opts.blank
@@ -576,6 +645,7 @@
               cells: columns.map(function (c) {
                 return columnAverageText(cid, students, c, opts);
               }),
+              final: finalOn ? classGradeSummary(cid, ids).text || '\u2014' : '',
             }
           : null;
       return {
@@ -586,6 +656,7 @@
         columns: columns,
         rows: rows,
         averages: averages,
+        final: finalOn ? { w: finalW } : null,
         layout: layout,
         pages: layout.pages,
         marks: MARKS.filter(function (m) {
@@ -655,6 +726,12 @@
     var pageH = paper.h - 2 * MARGIN;
     var blanks = [];
     for (var b = 0; b < page.blankCols; b++) blanks.push(b);
+    var showFinal = !!(page.final && model.final);
+    var showNo = _showsNumber(opts);
+    var showName = _showsName(opts);
+    function finalCell(tag, inner, cls) {
+      return showFinal ? '<' + tag + ' class="gp-final' + (cls || '') + '">' + inner + '</' + tag + '>' : '';
+    }
 
     /* On a two-line sheet "3.0 · 75%" prints as 3.0 over 75%. */
     function two(text) {
@@ -714,8 +791,8 @@
 
     // The grid.
     var widths = [];
-    if (opts.studentNumbers) widths.push(size.stuNoW);
-    widths.push(size.nameW);
+    if (showNo) widths.push(_numberWidth(opts));
+    if (showName) widths.push(size.nameW);
     var rowHeadCols = widths.length;
     cols.forEach(function () {
       widths.push(page.colW);
@@ -723,6 +800,7 @@
     blanks.forEach(function () {
       widths.push(page.colW);
     });
+    if (showFinal) widths.push(model.final.w);
     var tableW = widths.reduce(function (a, w) {
       return a + w;
     }, 0);
@@ -756,12 +834,13 @@
         blanks.length +
         '"></th>';
     }
+    html += finalCell('th', '', ' gp-band-cell');
     html += '</tr>';
 
     // Column heads: titles turned to read up the column.
     html += '<tr class="gp-colhead" style="height:' + size.colHeadH + 'in">';
-    if (opts.studentNumbers) html += '<th class="gp-rh gp-rh-no" scope="col">Pupil #</th>';
-    html += '<th class="gp-rh gp-rh-name" scope="col">Name</th>';
+    if (showNo) html += '<th class="gp-rh gp-rh-no" scope="col">Pupil #</th>';
+    if (showName) html += '<th class="gp-rh gp-rh-name" scope="col">Name</th>';
     var prevCat = null;
     cols.forEach(function (c, i) {
       var start = edge(i, c, prevCat);
@@ -781,6 +860,7 @@
       html +=
         '<th class="gp-ch gp-blank' + (i === 0 ? (cols.length ? ' gp-cat-start' : ' gp-block-start') : '') + '"></th>';
     });
+    html += finalCell('th', _turnedHead(['Final Grade'], ['']), ' gp-ch');
     html += '</tr></thead><tbody>';
 
     function blankCells() {
@@ -798,8 +878,8 @@
     // Student rows.
     rows.forEach(function (r) {
       html += '<tr class="gp-row" data-sid="' + _esc(r.id) + '">';
-      if (opts.studentNumbers) html += '<td class="gp-no">' + _esc(r.studentNumber) + '</td>';
-      html += '<td class="gp-name">' + _esc(r.name) + '</td>';
+      if (showNo) html += '<td class="gp-no">' + _esc(r.studentNumber) + '</td>';
+      if (showName) html += '<td class="gp-name">' + _esc(r.name) + '</td>';
       var prev = null;
       cols.forEach(function (c, i) {
         var t = r.cells[c.n - 1];
@@ -816,20 +896,22 @@
           '</td>';
       });
       html += blankCells();
+      html += finalCell('td', two(r.final), ' gp-cell');
       html += '</tr>';
     });
 
     // Blank rows to the foot of the grid, for writing in.
     for (var br = 0; br < page.blankRows; br++) {
       html += '<tr class="gp-row gp-blank-row">';
-      if (opts.studentNumbers) html += '<td class="gp-no"></td>';
-      html += '<td class="gp-name"></td>';
+      if (showNo) html += '<td class="gp-no"></td>';
+      if (showName) html += '<td class="gp-name"></td>';
       var prevB = null;
       cols.forEach(function (c, i) {
         html += '<td class="gp-cell' + edge(i, c, prevB) + '"></td>';
         prevB = c.catId;
       });
       html += blankCells();
+      html += finalCell('td', '', ' gp-cell');
       html += '</tr>';
     }
 
@@ -844,6 +926,7 @@
         html += '<td class="gp-cell' + start + '">' + two(model.averages.cells[c.n - 1]) + '</td>';
       });
       html += blankCells();
+      html += finalCell('td', two(model.averages.final), ' gp-cell');
       html += '</tr>';
     }
     html += '</tbody></table>';
@@ -880,12 +963,15 @@
     return root;
   }
 
+  /* The page rule: the paper by name and portrait ("legal portrait"), so a
+     browser that matches a named size to the printer's paper picks Legal
+     rather than shrinking the page onto Letter, and offers no landscape
+     choice. reports.css sets its own margins and :left/:right margins for
+     duplex reports; the grade sheet has the same narrow margin all round. */
   function _pageStyle(paperKey) {
     var paper = PAPER[paperKey] || PAPER.letter;
-    var size = paper.w + 'in ' + paper.h + 'in';
+    var size = paper.key + ' portrait';
     var margin = MARGIN + 'in';
-    // reports.css sets its own margins and :left/:right margins for duplex
-    // reports; the grade sheet has the same narrow margin all round.
     return (
       '@page { size: ' +
       size +
@@ -911,14 +997,16 @@
     return model;
   }
 
+  /* The page rule goes last in the document every time, so a page rule the
+     Reports page left behind (its paper, its margins) cannot win. */
   function activatePrintMode(paperKey) {
     var style = document.getElementById(STYLE_ID);
     if (!style) {
       style = document.createElement('style');
       style.id = STYLE_ID;
-      document.head.appendChild(style);
     }
     style.textContent = _pageStyle(paperKey);
+    document.head.appendChild(style);
     document.body.classList.add('grades-print-active');
   }
 
@@ -1123,20 +1211,30 @@
     html += '</div>';
 
     html += '<div class="gp-col">';
-    html += '<fieldset class="gp-group"><legend>Show</legend>';
-    html += _check('late', opts.late, 'Late Marks', opts.blank);
-    html += _check('average', opts.average, 'Class Average Row', opts.blank);
-    html += _check('studentNumbers', opts.studentNumbers, 'Pupil Numbers');
+    html += '<fieldset class="gp-group"><legend>Students</legend>';
+    html += _radio('gp-students', 'both', opts.students === 'both', 'Pupil # and Name');
+    html += _radio('gp-students', 'name', opts.students === 'name', 'Name Only');
+    html += _radio('gp-students', 'number', opts.students === 'number', 'Pupil # Only');
     html += '</fieldset>';
 
     html += '<fieldset class="gp-group"><legend>Sort By</legend>';
     html += _radio('gp-sort', 'last', opts.sortBy === 'last', 'Last Name');
     html += _radio('gp-sort', 'first', opts.sortBy === 'first', 'First Name');
+    html += _radio('gp-sort', 'number', opts.sortBy === 'number', 'Pupil #');
+    html += '</fieldset>';
+
+    html += '<fieldset class="gp-group"><legend>Show</legend>';
+    html += _check('finalGrade', opts.finalGrade, 'Final Grade', period.kind === 'custom' || opts.blank);
+    html += _check('average', opts.average, 'Class Average Row', opts.blank);
+    html += _check('late', opts.late, 'Late Marks', opts.blank);
     html += '</fieldset>';
 
     html += '<fieldset class="gp-group"><legend>Paper</legend>';
     html += _radio('gp-paper', 'letter', opts.paper === 'letter', 'Letter', '8.5 × 11 in');
     html += _radio('gp-paper', 'legal', opts.paper === 'legal', 'Legal', '8.5 × 14 in');
+    if (opts.paper === 'legal') {
+      html += '<div class="gp-help gp-note">Choose Legal paper in the print window too.</div>';
+    }
     html += '</fieldset>';
 
     html += '<fieldset class="gp-group"><legend>Text Size</legend>';
@@ -1192,6 +1290,7 @@
     o.assessments = val('gp-assess') || o.assessments;
     o.scoresAs = val('gp-scores') || o.scoresAs;
     o.sortBy = val('gp-sort') || o.sortBy;
+    o.students = val('gp-students') || o.students;
     o.paper = val('gp-paper') || o.paper;
     o.size = val('gp-size') || o.size;
     overlay.querySelectorAll('input[data-opt]').forEach(function (box) {
@@ -1241,10 +1340,22 @@
     overlay.addEventListener('change', function (e) {
       var t = e.target;
       var o = _state.opts;
-      var before = { term: o.term, assessments: o.assessments, blank: o.blank, from: o.from, to: o.to };
+      var before = {
+        term: o.term,
+        assessments: o.assessments,
+        blank: o.blank,
+        from: o.from,
+        to: o.to,
+        paper: o.paper,
+      };
       _readDialog(overlay);
       _saveOptions(cid, o);
-      if (o.term !== before.term || o.assessments !== before.assessments || o.blank !== before.blank) {
+      if (
+        o.term !== before.term ||
+        o.assessments !== before.assessments ||
+        o.blank !== before.blank ||
+        o.paper !== before.paper
+      ) {
         _redraw(overlay, t.name || t.dataset.opt, t.type === 'radio' ? t.value : null);
       } else if (o.from !== before.from || o.to !== before.to) {
         // The dates change which assessments can be picked.
