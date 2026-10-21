@@ -3590,3 +3590,22 @@ textarea.studio-text {
     display: block;
   }
 }
+/* Laptop widths: the Progress Reports toolbar keeps one row with room to
+   spare for the wider system fonts on Windows and Linux. */
+@media (max-width: 1240px) {
+  .report-toolbar {
+    gap: 8px;
+  }
+  .report-toolbar .report-seg-btn {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+  .report-toolbar .seg-sm .seg-btn {
+    padding-left: 7px;
+    padding-right: 7px;
+  }
+  .report-toolbar .student-picker-btn {
+    min-width: 0;
+    max-width: 150px;
+  }
+}
