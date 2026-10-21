@@ -366,6 +366,7 @@ window.PageReports = (function () {
     }
     renderStudioPanels();
     renderReportPreview();
+    _mountStudioDrag();
 
     // Highlight selected students in sidebar for progress tab
     if (selectedStudentIds && selectedStudentIds.length > 0) {
@@ -383,7 +384,10 @@ window.PageReports = (function () {
    REPORT BUILDER — Interaction functions
    ══════════════════════════════════════════════════════════════ */
   /* The students the canvas shows: everyone selected in Everyone view, one
-     of them in One Student view (the previewed one, else the first). */
+     of them in One Student view: the one the teacher picked, else the one
+     whose report is longest when the class fit first comes in (the teacher
+     designs against the fullest report), else the first. The canvas moves
+     to the longest once; a later edit never moves it under the teacher. */
   function _previewStudents() {
     var all = sortStudents(getStudents(activeCourse), 'lastName');
     var chosen =
@@ -393,6 +397,18 @@ window.PageReports = (function () {
             return selectedStudentIds.includes(st.id);
           });
     if (studioView === 'all') return chosen;
+    if (previewAuto) {
+      var longest = ReportStudio.longestStudent(_classFitKey === _classFitKeyNow() ? _classFit : null);
+      if (
+        longest &&
+        chosen.some(function (st) {
+          return st.id === longest;
+        })
+      ) {
+        previewSid = longest;
+        previewAuto = false;
+      }
+    }
     var one = chosen.find(function (st) {
       return st.id === previewSid;
     });
@@ -420,6 +436,7 @@ window.PageReports = (function () {
       preview.classList.toggle('report-fitmap', studioView === 'all');
       preview.classList.toggle('studio-all', studioView === 'all');
       _applyStudioZoom(preview);
+      _decoratePages(preview);
       _applySelection(preview);
     }
   }
@@ -436,18 +453,97 @@ window.PageReports = (function () {
     preview.classList.toggle('studio-stacked', !!z.stacked);
   }
 
+  /* + Page after the last page; Empty · Remove on an empty page past the
+     second. One Student view only. */
+  function _decoratePages(preview) {
+    if (studioView !== 'one' || viewingIssue) return;
+    var student = preview.querySelector('.sheet-student');
+    if (!student) return;
+    var f = _formOf();
+    f.pages.forEach(function (pg, i) {
+      if (i < 2 || pg.blocks.length) return;
+      var sheet = preview.querySelector('.sheet-zoom[data-page="' + i + '"] .report-sheet');
+      if (!sheet) return;
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'studio-page-empty no-print';
+      b.dataset.action = 'studioRemovePage';
+      b.dataset.page = String(i);
+      b.textContent = 'Empty · Remove';
+      sheet.appendChild(b);
+    });
+    var add = document.createElement('button');
+    add.type = 'button';
+    add.className = 'studio-page-add no-print';
+    add.dataset.action = 'studioAddPage';
+    add.textContent = '+ Page';
+    student.appendChild(add);
+  }
+
+  /* The selected block: a blue outline, its handles, and its toolbar
+     above it (in the canvas, not the scaled page, so it reads at screen
+     size); the Options popover under the toolbar when it is open. */
   function _applySelection(preview) {
     preview.querySelectorAll('.sheet-cell.studio-sel').forEach(function (el) {
       el.classList.remove('studio-sel');
     });
-    preview.querySelectorAll('.sheet-cell[data-block]').forEach(function (el) {
+    preview.querySelectorAll('.studio-handle, .studio-bar, .studio-pop').forEach(function (el) {
+      el.remove();
+    });
+    preview.querySelectorAll('.sheet-body > .sheet-cell[data-block]').forEach(function (el) {
       if (el.dataset.block !== 'header') el.setAttribute('tabindex', '0');
     });
-    if (!studioSelected) return;
-    preview.querySelectorAll('.sheet-cell[data-block="' + studioSelected + '"]').forEach(function (el) {
+    if (_focusBlock) {
+      var target = preview.querySelector('.sheet-body > .sheet-cell[data-block="' + _focusBlock + '"]');
+      _focusBlock = null;
+      if (target) target.focus({ preventScroll: true });
+    }
+    if (!studioSelected || studioView !== 'one' || viewingIssue) return;
+    var cells = preview.querySelectorAll('.sheet-body > .sheet-cell[data-block="' + studioSelected + '"]');
+    if (!cells.length) return;
+    var first = cells[0];
+    var def = ReportSheets.BLOCKS[studioSelected];
+    cells.forEach(function (el) {
       el.classList.add('studio-sel');
     });
+    if (!def.locked) {
+      ['e', 's', 'se'].forEach(function (kind) {
+        var h = document.createElement('span');
+        h.className = 'studio-handle studio-h-' + kind;
+        h.dataset.handle = kind;
+        h.setAttribute('aria-hidden', 'true');
+        first.appendChild(h);
+      });
+    }
+    var st = _previewStudent();
+    var who = st ? { id: st.id, name: fullName(st) } : null;
+    var bar = document.createElement('div');
+    bar.innerHTML = ReportStudio.blockToolbarHtml(_formOf(), studioSelected, who);
+    var barEl = bar.firstElementChild;
+    if (barEl) {
+      preview.appendChild(barEl);
+      var pr = preview.getBoundingClientRect();
+      var cr = first.getBoundingClientRect();
+      barEl.style.left = Math.max(0, cr.left - pr.left + preview.scrollLeft) + 'px';
+      barEl.style.top = Math.max(0, cr.top - pr.top + preview.scrollTop - barEl.offsetHeight - 6) + 'px';
+      if (popoverOpen === studioSelected && ReportStudio.hasOptions(studioSelected)) {
+        var pop = document.createElement('div');
+        pop.innerHTML = ReportStudio.popoverHtml(_formOf(), studioSelected);
+        var popEl = pop.firstElementChild;
+        if (popEl) {
+          preview.appendChild(popEl);
+          popEl.style.left = barEl.style.left;
+          popEl.style.top = parseFloat(barEl.style.top) + barEl.offsetHeight + 4 + 'px';
+          var btn = barEl.querySelector('[data-action="studioOptions"]');
+          if (btn) btn.setAttribute('aria-expanded', 'true');
+        }
+      } else {
+        popoverOpen = null;
+      }
+    }
   }
+  var _focusBlock = null;
+  var popoverOpen = null; // the block whose Options popover is open
 
   /* ── The rail: sheets per student ──────────────────────────────
      On the Report Card, each sidebar row shows how many sheets the
@@ -811,6 +907,7 @@ window.PageReports = (function () {
   /* ── Page Studio state (report-studio.js) ─────────────────────── */
   var studioView = 'one'; // 'one' | 'all'
   var previewSid = null; // the student on the canvas in One Student view
+  var previewAuto = true; // previewSid was chosen for the teacher (the longest report), not by them
   var studioSelected = null; // the selected block id
   var studioTab = 'blocks'; // the palette's tab
   var _blockSizes = null; // palette badges, measured once per class/paper/type
@@ -860,20 +957,7 @@ window.PageReports = (function () {
       if (_blockSizes === null) _blockSizes = _measureBlockSizes();
       palette.innerHTML = ReportStudio.paletteHtml(_formOf(), _blockSizes, studioTab, ReportSheets.templates());
     }
-    _renderInspector();
     _renderFitLine();
-  }
-
-  function _renderInspector() {
-    var insp = document.getElementById('studio-inspector');
-    if (insp) {
-      var st = _previewStudents()[0];
-      insp.innerHTML = ReportStudio.inspectorHtml(
-        _formOf(),
-        studioSelected,
-        st && studioView === 'one' ? { id: st.id, name: fullName(st) } : null,
-      );
-    }
   }
 
   function _renderFitLine() {
@@ -926,6 +1010,17 @@ window.PageReports = (function () {
         _classFit = null;
       }
       _renderFitLine();
+      // The summary names the longest report; the canvas moves to it.
+      if (previewAuto && studioView === 'one') {
+        var longest = ReportStudio.longestStudent(_classFit);
+        if (longest) {
+          previewAuto = false;
+          if (longest !== previewSid) {
+            previewSid = longest;
+            renderReportPreview();
+          }
+        }
+      }
     }, 0);
   }
 
@@ -988,14 +1083,76 @@ window.PageReports = (function () {
   }
 
   function _selectBlock(id) {
+    if (id !== studioSelected) popoverOpen = null;
     studioSelected = id || null;
     var preview = document.getElementById('rb-preview');
     if (preview) _applySelection(preview);
-    _renderInspector();
+  }
+
+  function _announce(text) {
+    var live = document.getElementById('studio-live');
+    if (live) live.textContent = text;
   }
 
   function _previewStudent() {
     return _previewStudents()[0] || null;
+  }
+
+  /* The pointer and keyboard work on the page (report-studio.js). Every
+     edit goes through _setForm, which settles the stored layout to what
+     the canvas shows. */
+  var _studioDrag = null;
+  function _mountStudioDrag() {
+    if (_studioDrag) _studioDrag.destroy();
+    var root = document.getElementById('studio');
+    if (!root) return;
+    var keepFocus = function (id) {
+      if (document.activeElement && document.activeElement.closest && document.activeElement.closest('.sheet-cell')) {
+        _focusBlock = id;
+      }
+    };
+    _studioDrag = ReportStudio.initDrag(root, {
+      form: _formOf,
+      place: function (id, rect) {
+        studioSelected = id;
+        _setForm(ReportSheets.place(_formOf(), id, rect));
+      },
+      move: function (id, to) {
+        keepFocus(id);
+        _setForm(ReportSheets.move(_formOf(), id, to));
+      },
+      resize: function (id, size) {
+        keepFocus(id);
+        _setForm(ReportSheets.resize(_formOf(), id, size));
+      },
+      remove: function (id) {
+        studioSelected = null;
+        popoverOpen = null;
+        _setForm(ReportSheets.removeCell(_formOf(), id));
+      },
+      select: _selectBlock,
+      announce: _announce,
+      html: function (id, w) {
+        var st = _previewStudent();
+        if (!st) return '';
+        var cell = ReportSheets.cellOf(_formOf(), id) || { block: id };
+        try {
+          return ReportBlocks.renderReportBlock(
+            id,
+            activeCourse,
+            st,
+            ReportBlocks.reportContext(),
+            ReportSheets.optionsFor(cell),
+          );
+        } catch (e) {
+          return '';
+        }
+      },
+      rows: function () {
+        var r = _lastSummary && _lastSummary.rows;
+        return r || (reportPaper === 'legal' ? 61 : 46);
+      },
+    });
   }
 
   /* ── Course switching ────────────────────────────────────────── */
@@ -1010,7 +1167,9 @@ window.PageReports = (function () {
     _blockSizes = null;
     _classFitKey = '';
     previewSid = null;
+    previewAuto = true;
     studioSelected = null;
+    popoverOpen = null;
     _configureQuestionnaire();
     populateStudentSelect();
     populateReportPeriods(false);
@@ -1091,9 +1250,17 @@ window.PageReports = (function () {
       if (dd) dd.classList.remove('open');
     }
 
-    var cell = e.target.closest('.studio-pages .sheet-cell[data-block]');
+    // The Options popover closes on a click anywhere outside it and its button.
+    if (popoverOpen && !e.target.closest('.studio-pop, [data-action="studioOptions"]')) {
+      popoverOpen = null;
+      var pv = document.getElementById('rb-preview');
+      if (pv) _applySelection(pv);
+    }
+    var cell = e.target.closest('.studio-pages .sheet-body > .sheet-cell[data-block]');
     if (cell && studioView === 'one' && !viewingIssue) {
-      if (!e.target.closest('.studio-handle')) _selectBlock(cell.dataset.block);
+      if (!e.target.closest('.studio-handle') && !(_studioDrag && _studioDrag.dragging())) {
+        _selectBlock(cell.dataset.block);
+      }
       return;
     }
 
@@ -1144,27 +1311,55 @@ window.PageReports = (function () {
         if (studioTab === 'templates') _syncTemplates();
       },
       studioBlock: function () {
-        // A block not on the form goes full width at the first free row of the last page.
+        // A block not on the form goes full width at the first free row of
+        // the last page; when that page is full, at the top of a new one.
         var id = el.dataset.block;
         var f = _formOf();
         if (ReportSheets.locate(f, id)) _selectBlock(id);
         else {
           var h = ReportSheets.BLOCKS[id].rows;
           var at = ReportSheets.firstFree(f, f.pages.length - 1, ReportSheets.COLS, h);
+          var rows = (_lastSummary && _lastSummary.rows) || 46;
+          if (at.y + h > rows) {
+            f = ReportSheets.addPage(f);
+            at = { page: f.pages.length - 1, x: 0, y: 0 };
+          }
           studioSelected = id;
           _setForm(ReportSheets.place(f, id, { page: at.page, x: at.x, y: at.y, w: ReportSheets.COLS, h: h }));
         }
       },
       studioChoice: function () {
+        popoverOpen = null;
         _setForm(ReportSheets.setOption(_formOf(), el.dataset.block, el.dataset.key, Number(el.dataset.value)));
       },
       studioNoEvidence: function () {
+        popoverOpen = null;
         _setForm(ReportSheets.setNoEvidence(_formOf(), el.dataset.block, el.dataset.rule));
+      },
+      studioOptions: function () {
+        popoverOpen = popoverOpen === el.dataset.block ? null : el.dataset.block;
+        var pv = document.getElementById('rb-preview');
+        if (pv) _applySelection(pv);
+        var pop = document.getElementById('studio-pop');
+        var firstField = pop && pop.querySelector('input, button, textarea');
+        if (firstField) firstField.focus();
+      },
+      studioLeaveOff: function () {
+        var on = el.getAttribute('aria-pressed') !== 'true';
+        _setForm(ReportSheets.hideFor(_formOf(), el.dataset.sid, el.dataset.block, on));
       },
       studioRemove: function () {
         var id = el.dataset.block;
         studioSelected = null;
+        popoverOpen = null;
         _setForm(ReportSheets.removeCell(_formOf(), id));
+        _announce(ReportSheets.BLOCKS[id].label + ' removed from the report.');
+      },
+      studioAddPage: function () {
+        _setForm(ReportSheets.addPage(_formOf()));
+      },
+      studioRemovePage: function () {
+        _setForm(ReportSheets.removePage(_formOf(), Number(el.dataset.page)));
       },
       studioTemplate: function () {
         var f = el.dataset.starter ? ReportSheets.starter(el.dataset.starter) : ReportSheets.template(el.dataset.id);
@@ -1228,6 +1423,7 @@ window.PageReports = (function () {
         // In Everyone view a student's thumbnail opens that student.
         if (studioView !== 'all') return;
         previewSid = el.dataset.sid;
+        previewAuto = false;
         studioView = 'one';
         renderReports();
       },
@@ -1278,13 +1474,21 @@ window.PageReports = (function () {
     }
   }
 
+  /* Escape closes the Options popover and puts focus back on its button. */
+  function _handleStudioKey(e) {
+    if (e.key !== 'Escape' || !popoverOpen) return;
+    popoverOpen = null;
+    var pv = document.getElementById('rb-preview');
+    if (pv) _applySelection(pv);
+    var btn = pv && pv.querySelector('[data-action="studioOptions"]');
+    if (btn) btn.focus();
+  }
+
   function _handleStudioChange(e) {
     var el = e.target;
     if (!el || !el.dataset) return;
     var a = el.dataset.action;
     if (a === 'studioOption') _setForm(ReportSheets.setOption(_formOf(), el.dataset.block, el.dataset.key, el.checked));
-    else if (a === 'studioLeaveOff')
-      _setForm(ReportSheets.hideFor(_formOf(), el.dataset.sid, el.dataset.block, el.checked));
     else if (a === 'studioText')
       _setForm(ReportSheets.setOption(_formOf(), el.dataset.block, el.dataset.key, el.value));
   }
@@ -1471,6 +1675,7 @@ window.PageReports = (function () {
 
     _addDocListener('click', _handleClick);
     _addDocListener('change', _handleStudioChange);
+    _addDocListener('keydown', _handleStudioKey);
     window.addEventListener('resize', _handleResize);
     _addDocListener('selectionchange', _handleSelectionChange);
     _addDocListener('keyup', _handleKeyup);
@@ -1481,6 +1686,10 @@ window.PageReports = (function () {
 
   function destroy() {
     _closeSaveTemplate();
+    if (_studioDrag) {
+      _studioDrag.destroy();
+      _studioDrag = null;
+    }
     // Save any unsaved narrative
     if (RQ.tqNarrativeDirty) tqSaveCurrentIfNeeded();
     var paperStyle = document.getElementById(PAPER_STYLE_ID);
