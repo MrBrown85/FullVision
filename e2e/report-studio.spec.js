@@ -114,7 +114,7 @@ test.describe('Page Studio', () => {
   }) => {
     await openStudio(page);
     await expect(page.locator('.studio-palette .studio-blk')).toHaveCount(16);
-    await expect(page.locator('.studio-blk.placed')).toHaveCount(6);
+    await expect(page.locator('.studio-blk.placed')).toHaveCount(7);
     await expect(page.locator('.studio-palette')).not.toContainText('Letterhead');
     await expect(page.locator('.sheet-label').first()).toHaveText('Page 1 of 2');
     await expect(page.locator('.report-sheet').first().locator('.sheet-footer')).toContainText(
@@ -208,9 +208,15 @@ test.describe('Page Studio', () => {
 
   test('a block is placed from the palette, selected on the page, and removed from the inspector', async ({ page }) => {
     await openStudio(page);
-    // A click puts it at the first free row of the last page: under the dispositions.
-    await page.locator('[data-action="studioBlock"][data-block="legend"]').click();
+    // The legend sits under the dispositions on the back. Remove it: it is back in the palette.
     const legend = page.locator('.report-sheet').nth(1).locator('.sheet-cell[data-block="legend"]');
+    await legend.click();
+    await expect(page.locator('#studio-inspector')).toContainText('Proficiency Legend');
+    await page.locator('[data-action="studioRemove"]').click();
+    await expect(page.locator('.sheet-cell[data-block="legend"]')).toHaveCount(0);
+    await expect(page.locator('[data-action="studioBlock"][data-block="legend"]')).not.toHaveClass(/placed/);
+    // A click puts it at the first free row of the last page: back under the dispositions.
+    await page.locator('[data-action="studioBlock"][data-block="legend"]').click();
     await expect(legend).toHaveCount(1);
     await expect(legend).toHaveAttribute('data-y', '15');
     await expect(legend).toHaveClass(/studio-sel/);
@@ -225,11 +231,6 @@ test.describe('Page Studio', () => {
     await page.locator('.sheet-cell[data-block="header"]').click();
     await expect(page.locator('#studio-inspector')).toContainText('Letterhead');
     await expect(page.locator('[data-action="studioRemove"]')).toHaveCount(0);
-    // Remove the legend; it is back in the palette.
-    await page.locator('.sheet-cell[data-block="legend"]').click();
-    await page.locator('[data-action="studioRemove"]').click();
-    await expect(page.locator('.sheet-cell[data-block="legend"]')).toHaveCount(0);
-    await expect(page.locator('[data-action="studioBlock"][data-block="legend"]')).not.toHaveClass(/placed/);
     expect(await overflowing(page)).toEqual([]);
     // The form is the class's: it survives a reload.
     await page.locator('[data-action="studioBlock"][data-block="observations"]').click();
@@ -335,12 +336,12 @@ test.describe('Page Studio on the grid', () => {
     await openWithForm(page, () => {
       const cid = getActiveCourse();
       let f = ReportSheets.form();
-      f = ReportSheets.place(f, 'grade-table', { page: 1, x: 0, y: 15, w: 6, h: 16 });
-      f = ReportSheets.place(f, 'observations', { page: 1, x: 6, y: 15, w: 6, h: 16 });
+      f = ReportSheets.resize(f, 'competency-table', { w: 6 });
+      f = ReportSheets.place(f, 'grade-table', { page: 0, x: 6, y: 19, w: 6, h: 13 });
       saveReportConfig(cid, { ...(getReportConfig(cid) || {}), form: f });
     });
-    const back = page.locator('.report-sheet').nth(1);
-    const cell = back.locator('.sheet-cell[data-block="grade-table"]').first();
+    const front = page.locator('.report-sheet').first();
+    const cell = front.locator('.sheet-cell[data-block="grade-table"]').first();
     await expect(cell).toHaveAttribute('data-w', '6');
     expect(await cell.evaluate(el => el.offsetWidth)).toBe(354);
     const table = cell.locator('table.report-grade-table');
@@ -398,7 +399,7 @@ test.describe('Page Studio on the grid', () => {
     await openStudio(page);
     const response = page.locator('.report-sheet').nth(1).locator('.sheet-pinned');
     const letterY = Number(await response.getAttribute('data-y'));
-    expect(letterY).toBe(31);
+    expect(letterY).toBe(21);
     await page.getByRole('radio', { name: 'Legal' }).click();
     await expect(page.locator('.report-sheet').first()).toHaveAttribute('data-paper', 'legal');
     const legalY = Number(await page.locator('.report-sheet').nth(1).locator('.sheet-pinned').getAttribute('data-y'));
@@ -499,7 +500,7 @@ test.describe('Page Studio options', () => {
     const front = page.locator('.report-sheet').first();
     await expect(page.locator('.report-sheet').nth(1)).toHaveClass(/sheet-blank-side/);
     await expect(front.locator('.sheet-capped')).toHaveText(
-      'Doesn’t fit · Learning Dispositions, Parent / Guardian Response',
+      'Doesn’t fit · Learning Dispositions, Proficiency Legend, Parent / Guardian Response',
     );
     await expect(page.locator('#studio-fit')).toHaveText('Cut for 27 students');
     await page.getByRole('radio', { name: 'Auto' }).click();
@@ -518,42 +519,49 @@ test.describe('Page Studio templates', () => {
     await expect(palette(page)).toContainText('Your Templates');
     await expect(palette(page)).toContainText('None yet');
     await palette(page).getByRole('button', { name: 'Interim Update', exact: true }).click();
-    await expect(page.locator('.report-sheet .report-legend')).toHaveCount(1);
+    await expect(page.locator('.report-sheet .report-learner-profile')).toHaveCount(0);
     await expect(page.locator('#undo-toast')).toContainText('Applied Interim Update');
     await page.locator('#undo-toast').getByRole('button', { name: 'Undo' }).click();
-    await expect(page.locator('.report-sheet .report-legend')).toHaveCount(0);
     await expect(page.locator('.report-sheet .report-learner-profile')).toHaveCount(1);
   });
 
   test('Save as Template keeps the layout under a name; it applies later and deletes with Undo', async ({ page }) => {
     await openStudio(page);
-    // Change the layout: add the legend.
-    await page.locator('[data-action="studioBlock"][data-block="legend"]').scrollIntoViewIfNeeded();
-    await page.locator('[data-action="studioBlock"][data-block="legend"]').click();
-    await expect(page.locator('.sheet-cell[data-block="legend"]')).toHaveCount(1);
+    // Change the layout: add Core Competencies.
+    await page.locator('[data-action="studioBlock"][data-block="core-competencies"]').scrollIntoViewIfNeeded();
+    await page.locator('[data-action="studioBlock"][data-block="core-competencies"]').click();
+    await expect(page.locator('.sheet-cell[data-block="core-competencies"]')).toHaveCount(1);
     // Save it.
     await page.getByRole('button', { name: 'Save as Template' }).click();
     const dialog = page.getByRole('dialog', { name: 'Save as Template' });
     await expect(dialog).toBeVisible();
-    await dialog.getByLabel('Name').fill('Science 8 with Legend');
+    await dialog.getByLabel('Name').fill('Science 8 with Core Competencies');
     await dialog.getByRole('button', { name: 'Save' }).click();
     await expect(dialog).toHaveCount(0);
-    await expect(palette(page).getByRole('button', { name: 'Science 8 with Legend', exact: true })).toBeVisible();
+    await expect(
+      palette(page).getByRole('button', { name: 'Science 8 with Core Competencies', exact: true }),
+    ).toBeVisible();
     // Apply a starter, then the saved one.
     await palette(page).getByRole('button', { name: 'Report Card', exact: true }).click();
-    await expect(page.locator('.sheet-cell[data-block="legend"]')).toHaveCount(0);
-    await palette(page).getByRole('button', { name: 'Science 8 with Legend', exact: true }).click();
-    await expect(page.locator('.sheet-cell[data-block="legend"]')).toHaveCount(1);
+    await expect(page.locator('.sheet-cell[data-block="core-competencies"]')).toHaveCount(0);
+    await palette(page).getByRole('button', { name: 'Science 8 with Core Competencies', exact: true }).click();
+    await expect(page.locator('.sheet-cell[data-block="core-competencies"]')).toHaveCount(1);
     // It is kept: still listed after a reload.
     await page.reload();
     await page.getByRole('tab', { name: 'Progress Reports' }).click();
     await palette(page).getByRole('tab', { name: 'Templates' }).click();
-    await expect(palette(page).getByRole('button', { name: 'Science 8 with Legend', exact: true })).toBeVisible();
+    await expect(
+      palette(page).getByRole('button', { name: 'Science 8 with Core Competencies', exact: true }),
+    ).toBeVisible();
     // Delete, then Undo.
-    await palette(page).getByRole('button', { name: 'Delete Science 8 with Legend' }).click();
-    await expect(palette(page).getByRole('button', { name: 'Science 8 with Legend', exact: true })).toHaveCount(0);
+    await palette(page).getByRole('button', { name: 'Delete Science 8 with Core Competencies' }).click();
+    await expect(
+      palette(page).getByRole('button', { name: 'Science 8 with Core Competencies', exact: true }),
+    ).toHaveCount(0);
     await page.locator('#undo-toast').getByRole('button', { name: 'Undo' }).click();
-    await expect(palette(page).getByRole('button', { name: 'Science 8 with Legend', exact: true })).toBeVisible();
+    await expect(
+      palette(page).getByRole('button', { name: 'Science 8 with Core Competencies', exact: true }),
+    ).toBeVisible();
   });
 
   test('the dialog cancels with Escape and needs a name', async ({ page }) => {

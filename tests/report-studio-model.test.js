@@ -24,6 +24,7 @@ describe('normalizeForm', () => {
       'competency-table',
       'next-steps',
       'learner-dimensions',
+      'legend',
       'parent-response',
     ]);
     expect(S.cellOf(f, 'teacher-narrative')).toMatchObject({ x: 0, w: 12, h: 8 });
@@ -257,8 +258,8 @@ describe('settle, pages and free room', () => {
 
   it('firstFree finds the first row where a block fits with nothing in the way', () => {
     const f = S.form();
-    expect(S.firstFree(f, 1, 12, 5)).toEqual({ page: 1, x: 0, y: 15 });
-    expect(S.firstFree(f, 1, 12, 30)).toEqual({ page: 1, x: 0, y: 46 });
+    expect(S.firstFree(S.removeCell(f, 'legend'), 1, 12, 5)).toEqual({ page: 1, x: 0, y: 15 });
+    expect(S.firstFree(S.removeCell(f, 'legend'), 1, 12, 7)).toEqual({ page: 1, x: 0, y: 46 });
     expect(S.firstFree(f, 0, 12, 4)).toEqual({ page: 0, x: 0, y: 40 });
     const half = S.resize(f, 'competency-table', { w: 6 });
     expect(S.firstFree(half, 0, 6, 4)).toEqual({ page: 0, x: 6, y: 19 });
@@ -271,7 +272,7 @@ describe('cell settings', () => {
     let f = S.removeCell(S.form(), 'parent-response');
     expect(ids(f)).not.toContain('parent-response');
     expect(f.pinned).toBeNull();
-    f = S.removeCell(f, 'learner-dimensions');
+    f = S.removeCell(S.removeCell(f, 'learner-dimensions'), 'legend');
     expect(f.pages).toHaveLength(2);
     expect(f.pages[1].blocks).toEqual([]);
   });

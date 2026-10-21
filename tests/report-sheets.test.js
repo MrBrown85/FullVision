@@ -97,11 +97,11 @@ describe('ReportSheets.resolve', () => {
         it_('legend', 0, 40, 12, 4, 4),
       ],
     ]);
-    // 16 rows of room = 320 px − 40 px chrome = 7 rows of the table.
-    expect(r.pages[0].items[1]).toMatchObject({ id: 'grades', y: 30, h: 16, part: { start: 0, end: 7 } });
-    expect(r.pages[1].items[0]).toMatchObject({ id: 'grades', y: 0, h: 28, part: { start: 7, end: 20 } });
+    // 16 rows of room = 320 px − 40 px chrome − 1 px slack = 6 rows of the table.
+    expect(r.pages[0].items[1]).toMatchObject({ id: 'grades', y: 30, h: 16, part: { start: 0, end: 6 } });
+    expect(r.pages[1].items[0]).toMatchObject({ id: 'grades', y: 0, h: 30, part: { start: 6, end: 20 } });
     // What came after it in its columns follows it.
-    expect(at(r.pages[1])[1]).toEqual(['legend', 0, 28, 12, 4]);
+    expect(at(r.pages[1])[1]).toEqual(['legend', 0, 30, 12, 4]);
     expect(r.pushed).toEqual(['grades', 'legend']);
     expect(r.positions.grades).toEqual({ page: 0, y: 30 });
   });

@@ -54,7 +54,15 @@ window.ReportSheets = (function () {
           _b('next-steps', 0, 32, 12, 8),
         ],
       },
-      { blocks: [_b('learner-dimensions', 0, 0, 12, 15), _b('parent-response', 0, 31, 12, 15)] },
+      {
+        // The legend reads the dots for families; the response's comments
+        // box takes the rest of the back as room to write.
+        blocks: [
+          _b('learner-dimensions', 0, 0, 12, 15),
+          _b('legend', 0, 15, 12, 6),
+          _b('parent-response', 0, 21, 12, 25),
+        ],
+      },
     ],
     pinned: 'parent-response',
     perStudent: {},
@@ -914,7 +922,8 @@ window.ReportSheets = (function () {
           return;
         }
         if (it.rows && it.rows.length > 1 && y < limit) {
-          var room = (limit - y) * ROW_PX - it.chrome;
+          // A pixel of slack: the part's rendered height rounds up.
+          var room = (limit - y) * ROW_PX - it.chrome - 1;
           var take = 0;
           var used = 0;
           while (take < it.rows.length && used + it.rows[take] <= room) {
@@ -1079,16 +1088,17 @@ window.ReportSheets = (function () {
       if (!c.html || !BLOCKS[c.b.block].table) return;
       var tbody = el.querySelector('table tbody');
       if (!tbody || tbody.rows.length < 2) return;
-      c.rows = Array.prototype.map.call(tbody.rows, function (r) {
-        return r.offsetHeight;
+      // Each row's height is the distance to the next row's top, so the
+      // collapsed borders between rows are counted; the last row reaches
+      // the table body's bottom.
+      var tops = Array.prototype.map.call(tbody.rows, function (r) {
+        return r.getBoundingClientRect().top;
       });
-      c.chrome = Math.max(
-        0,
-        c.px -
-          c.rows.reduce(function (a, b) {
-            return a + b;
-          }, 0),
-      );
+      var bottom = tbody.getBoundingClientRect().bottom;
+      c.rows = tops.map(function (t, i) {
+        return (i + 1 < tops.length ? tops[i + 1] : bottom) - t;
+      });
+      c.chrome = Math.max(0, c.px - (bottom - tops[0]));
     });
   }
 
