@@ -184,6 +184,7 @@ window.PageObservations = (function () {
     var allObs = visibleObs(getAllQuickObs(activeCourse));
     var filtered = applyFilters(allObs);
 
+    // Search, filter chips and count, one row
     h +=
       '<div class="obs-toolbar" id="obs-toolbar">' +
       '<div class="obs-search-wrap"><span class="obs-search-icon">' +
@@ -191,15 +192,12 @@ window.PageObservations = (function () {
       '</span><input class="obs-search-input" type="text" placeholder="Search\u2026" id="obs-search-input" value="' +
       esc(searchQuery) +
       '" aria-label="Search observations"></div>' +
+      '<div class="obs-filter-strip" id="obs-filter-strip" role="toolbar" aria-label="Filter observations">' +
+      renderFilterRow() +
+      '</div>' +
       '<span class="obs-toolbar-count" id="obs-count">' +
       countText(filtered.length, allObs.length) +
       '</span>' +
-      '</div>';
-
-    // Filter chips, one row
-    h +=
-      '<div class="obs-filter-strip" id="obs-filter-strip" role="toolbar" aria-label="Filter observations">' +
-      renderFilterRow() +
       '</div>';
 
     // Feed

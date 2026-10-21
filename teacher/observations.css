@@ -139,13 +139,13 @@
 }
 
 /* ══════════════════════════════════════════════════════════════
-   TOOLBAR — Two-layer
+   TOOLBAR — Search, filter chips and count in one row
    ══════════════════════════════════════════════════════════════ */
 .obs-toolbar {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 16px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
@@ -170,26 +170,27 @@
   height: 13px;
 }
 .obs-search-input {
-  font-size: var(--text-base);
-  padding: 5px 12px 5px 28px;
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  padding: 3px 12px 3px 28px;
   border: 1px solid transparent;
   border-radius: 8px;
   background: var(--overlay-hover);
   color: var(--text);
   outline: none;
-  width: 130px;
+  width: 180px;
   transition: all 0.2s;
 }
 .obs-search-input:focus {
   background: var(--surface);
   border-color: var(--active);
-  width: 200px;
   box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.12);
 }
 .obs-search-input::placeholder {
   color: var(--text-3);
 }
 .obs-toolbar-count {
+  flex-shrink: 0;
   margin-left: auto;
   font-size: var(--text-sm);
   color: var(--text-3);
@@ -197,16 +198,14 @@
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
-/* ── Filter chips: one row ─────────────────────────────────── */
+/* ── Filter chips: between search and count, wrapping in place ── */
 .obs-filter-strip {
   display: flex;
+  flex: 1 1 auto;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  padding: 8px 16px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
+  min-width: 0;
 }
 .obs-strip-popover-wrap {
   position: relative;
