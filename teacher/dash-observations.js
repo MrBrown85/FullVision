@@ -472,7 +472,10 @@ window.DashObservations = (function () {
 
   function _headHtml(m, state, students) {
     var cid = m ? m.cid : state.cid;
-    var record = '<a class="dash-ob2-record" href="#/observations?course=' + encodeURIComponent(cid) + '">Record →</a>';
+    var record =
+      '<a class="dash-ob2-record" role="link" tabindex="0" data-href="#/observations?course=' +
+      encodeURIComponent(cid) +
+      '">Record →</a>';
     var h =
       '<div class="dash-ob2-head">' +
       '<div class="dash-section-title dash-ob2-title"><span id="dash-ob2-title">Observations</span>' +
@@ -521,7 +524,7 @@ window.DashObservations = (function () {
     if (m.tab === 'week' && !m.classObserved) {
       return (
         '<div class="dash-ob2-flags"><span class="dash-ob2-clear">No observations recorded yet. ' +
-        '<a href="#/observations?course=' +
+        '<a role="link" tabindex="0" data-href="#/observations?course=' +
         encodeURIComponent(m.cid) +
         '">Record →</a></span></div>'
       );
@@ -632,7 +635,7 @@ window.DashObservations = (function () {
       '</span>' +
       '<a class="dash-ob2-name' +
       (overdue ? ' is-overdue' : '') +
-      '" href="' +
+      '" role="link" tabindex="0" data-href="' +
       _studentHref(m.cid, st.id) +
       '"' +
       _nav(st.id, 1) +
@@ -677,7 +680,7 @@ window.DashObservations = (function () {
     return (
       '<a class="dash-ob2-cell has' +
       (c.marks.moreLabel ? ' has-more' : '') +
-      '" href="' +
+      '" role="link" tabindex="0" data-href="' +
       _studentHref(m.cid, r.student.id, c.obs[0].id) +
       '" data-sid="' +
       esc(r.student.id) +

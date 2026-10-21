@@ -347,7 +347,7 @@ window.PageReports = (function () {
       const students = getTqStudents();
       const activeSid = students[RQ.tqStudentIndex]?.id;
       document.querySelectorAll('#gb-sidebar .student-row').forEach(row => {
-        const href = row.getAttribute('href') || '';
+        const href = row.getAttribute('data-href') || '';
         const match = href.match(/id=([^&]+)/);
         row.classList.toggle('selected', match && match[1] === activeSid);
       });
@@ -371,7 +371,7 @@ window.PageReports = (function () {
     // Highlight selected students in sidebar for progress tab
     if (selectedStudentIds && selectedStudentIds.length > 0) {
       document.querySelectorAll('#gb-sidebar .student-row').forEach(row => {
-        const href = row.getAttribute('href') || '';
+        const href = row.getAttribute('data-href') || '';
         const match = href.match(/id=([^&]+)/);
         row.classList.toggle('selected', match && selectedStudentIds.includes(match[1]));
       });
@@ -1573,7 +1573,7 @@ window.PageReports = (function () {
     var row = e.target.closest('.student-row');
     if (!row) return;
     e.preventDefault();
-    var href = row.getAttribute('href') || '';
+    var href = row.getAttribute('data-href') || '';
     var match = href.match(/id=([^&]+)/);
     if (!match) return;
     var sid = match[1];

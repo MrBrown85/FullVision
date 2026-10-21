@@ -251,6 +251,16 @@ textarea:focus {
   margin: 0;
   padding: 0;
 }
+/* App links carry their address in data-href, not href, so the browser
+   shows no address box on hover (shared/link-nav.js follows them). Without
+   an href the browser drops its own link look; this gives it back at zero
+   specificity, so every class rule still wins as it did over the
+   browser's. */
+:where(a[data-href]) {
+  color: LinkText;
+  text-decoration: underline;
+  cursor: pointer;
+}
 html,
 body {
   height: 100%;

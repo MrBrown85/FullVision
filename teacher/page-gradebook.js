@@ -350,7 +350,7 @@ window.PageGradebook = (function () {
         ? '<button class="tb-toggle-btn" data-action="exportScoresCSV" title="Export CSV">\u2913 Export</button>'
         : '') +
       '<button class="tb-action-btn tb-action-secondary" data-action="printGrades">Print Grades</button>' +
-      '<a class="tb-action-btn" href="#/assignments?course=' +
+      '<a class="tb-action-btn" role="link" tabindex="0" data-href="#/assignments?course=' +
       activeCourse +
       '&new=1">+ New Assessment</a>' +
       '</div>';
@@ -428,7 +428,7 @@ window.PageGradebook = (function () {
         '<div style="font-family:var(--font-base);font-size:0.95rem;margin-bottom:4px">No assignments found' +
         secLabel +
         '.</div>' +
-        '<div style="font-family:var(--font-base);font-size:0.875rem">Try adjusting your filters or <a href="#/assignments?course=' +
+        '<div style="font-family:var(--font-base);font-size:0.875rem">Try adjusting your filters or <a role="link" tabindex="0" data-href="#/assignments?course=' +
         cid +
         '" style="color:var(--link)">create a new assessment</a>.</div>' +
         '</div>';
@@ -795,7 +795,7 @@ window.PageGradebook = (function () {
         '" style="width:' +
         g.groupW +
         'px">' +
-        '<a class="gb-assess-title" href="#/assignments?course=' +
+        '<a class="gb-assess-title" role="link" tabindex="0" data-href="#/assignments?course=' +
         cid +
         '&open=' +
         a.id +
@@ -1343,7 +1343,7 @@ window.PageGradebook = (function () {
     return (
       '<div class="gb-name-wrap" data-sid="' +
       esc(student.id) +
-      '"><a href="#/student?id=' +
+      '"><a role="link" tabindex="0" data-href="#/student?id=' +
       encodeURIComponent(student.id) +
       '&course=' +
       encodeURIComponent(cid) +

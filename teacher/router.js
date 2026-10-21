@@ -198,9 +198,9 @@ window.Router = (function () {
 
     // Intercept clicks on dock links to use hash navigation
     document.addEventListener('click', function (e) {
-      var link = e.target.closest('#app-dock a[href]');
+      var link = e.target.closest('#app-dock a[data-href]');
       if (!link) return;
-      var href = link.getAttribute('href');
+      var href = link.getAttribute('data-href');
       if (!href || href.charAt(0) === '#') return; // already a hash link
 
       // Check if this href maps to a hash route

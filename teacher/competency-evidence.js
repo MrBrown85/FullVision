@@ -125,7 +125,7 @@ window.CompetencyEvidence = (function () {
     var title = assess ? esc(assess.title) : 'Unknown';
     return (
       '<li class="ced-item"><a class="tag-assess-row"' +
-      (href ? ' href="' + href + '"' : '') +
+      (href ? ' role="link" tabindex="0" data-href="' + href + '"' : '') +
       ' title="Open in Assignments">' +
       '<span class="tag-assess-pip" style="background:' +
       sColor +

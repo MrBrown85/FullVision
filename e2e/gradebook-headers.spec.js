@@ -49,7 +49,7 @@ test.describe('Gradebook column headers', () => {
       return a.id;
     }, LONG_TITLE);
     await openGradebook(page);
-    const link = page.locator('.gb-grid-assess-group .gb-assess-title[href$="open=' + aid + '"]');
+    const link = page.locator('.gb-grid-assess-group .gb-assess-title[data-href$="open=' + aid + '"]');
     await expect(link).toHaveText(LONG_TITLE);
     const box = await link.evaluate(el => ({
       clamped: el.scrollHeight > el.clientHeight + 1,
@@ -75,7 +75,7 @@ test.describe('Gradebook column headers', () => {
     const firstDate = () =>
       page.evaluate(() => {
         const a = document.querySelector('.gb-grid-assess-group .gb-assess-title');
-        const id = new URL(a.href).hash.match(/open=([^&]+)/)[1];
+        const id = new URL(a.dataset.href, location.href).hash.match(/open=([^&]+)/)[1];
         return getAssessments('sci8').find(x => x.id === id).date;
       });
     const dates = await page.evaluate(() =>
