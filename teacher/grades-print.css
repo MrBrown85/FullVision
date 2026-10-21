@@ -233,105 +233,473 @@
 }
 
 /* ── Options dialog ───────────────────────────────────────── */
+/* Two panes: the page picture, count and buttons at the left; the choices
+   as rows in three groups at the right. */
 .grades-print-card {
-  max-width: 600px;
-  max-height: 92vh;
-  overflow-y: auto;
+  display: flex;
+  width: 940px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+  padding: 0;
+  overflow: hidden;
+  font-family: var(--font-base);
+  color: var(--text);
 }
-.gp-groups {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0 24px;
-  margin-bottom: 12px;
-}
-.gp-col {
+
+/* Left pane. */
+.gpd-side {
+  flex: 0 0 320px;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  min-width: 0;
+  padding: 28px;
+  background: var(--bg);
+  border-right: 1px solid var(--divider-strong);
 }
-.gp-group {
-  border: none;
-  margin: 0;
-  padding: 0;
-  min-width: 0;
+.gpd-head {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
-.gp-group legend {
-  font-family: var(--font-base);
+.gpd-title {
+  font-size: var(--text-xl);
+  font-weight: 600;
+  letter-spacing: var(--tracking-tight);
+}
+.gpd-class {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.gpd-preview {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 20px 0;
+}
+.gpd-count {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+}
+.gpd-count-pages {
   font-size: var(--text-sm);
   font-weight: 600;
-  color: var(--text-2);
-  padding: 0;
-  margin-bottom: 6px;
 }
-.gp-option {
+.gpd-count-detail {
+  font-size: var(--text-xs);
+  color: var(--text-2);
+}
+.gpd-actions {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 3px 0;
-  font-family: var(--font-base);
-  font-size: var(--text-base);
+  gap: 10px;
+}
+.gpd-actions .confirm-cancel,
+.gpd-actions .confirm-ok {
+  height: 38px;
+  padding: 0 12px;
+}
+.gpd-actions .confirm-cancel {
+  flex: 1;
   color: var(--text);
-  cursor: pointer;
 }
-.gp-option input {
-  margin: 0;
-  accent-color: var(--active);
-}
-.gp-option.is-disabled {
-  color: var(--text-3);
-  cursor: default;
-}
-.gp-help {
-  color: var(--text-3);
-  font-size: var(--text-sm);
-}
-.gp-note {
-  margin-top: 4px;
-}
-.gp-dates {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 4px 0 4px 24px;
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  color: var(--text-2);
-}
-.gp-dates input {
-  font: inherit;
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 2px 4px;
-  background: var(--surface);
-}
-.gp-pick {
-  max-height: 180px;
-  overflow-y: auto;
-  margin: 4px 0 0 24px;
-  padding: 4px 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-}
-.gp-pick-option {
-  font-size: var(--text-sm);
-  padding: 2px 0;
-}
-.gp-status {
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  color: var(--text-2);
-  min-height: 1.4em;
-  margin-bottom: 16px;
+.gpd-actions .confirm-ok {
+  flex: 1.4;
 }
 .grades-print-overlay .confirm-ok:disabled {
   opacity: 0.5;
   cursor: default;
 }
-@media (max-width: 640px) {
-  .gp-groups {
-    grid-template-columns: 1fr;
+
+/* The page picture. Paper is white in either theme, so its greys are fixed
+   like the printed sheet's. */
+.gpd-thumb {
+  --gpd-ink: #1d1d1f;
+  --gpd-line: #c7c7cc;
+  --gpd-rule: #e5e5ea;
+  --gpd-mark: #8e8e93;
+  --gpd-head: #ececf0;
+  height: 274px;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 14px 14px 12px;
+  background: #fff;
+  box-shadow:
+    0 6px 20px rgba(0, 0, 0, 0.16),
+    0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+.gpd-thumb i {
+  display: block;
+  border-radius: 1px;
+}
+.gpd-t-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.gpd-t-title {
+  width: 40%;
+  height: 5px;
+  background: var(--gpd-ink);
+}
+.gpd-t-date {
+  width: 18%;
+  height: 3px;
+  background: var(--gpd-mark);
+}
+.gpd-t-row {
+  display: grid;
+  grid-template-columns: var(--gpd-t-cols);
+  column-gap: 1px;
+  align-items: center;
+}
+.gpd-t-colhead {
+  margin-top: 4px;
+  column-gap: 2px;
+}
+.gpd-t-colhead .gpd-t-cell {
+  height: 10px;
+  background: var(--gpd-head);
+}
+.gpd-t-rows {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--gpd-line);
+}
+.gpd-t-rows .gpd-t-row {
+  flex: 1 1 0;
+  min-height: 0;
+  border-bottom: 1px solid var(--gpd-rule);
+}
+.gpd-t-cell,
+.gpd-t-name {
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+}
+.gpd-t-name {
+  justify-content: flex-start;
+}
+.gpd-t-name i {
+  height: 3px;
+  background: var(--gpd-mark);
+}
+.gpd-t-cell i {
+  width: 50%;
+  max-width: 5px;
+  height: 2px;
+  background: var(--gpd-line);
+}
+.gpd-t-final i {
+  max-width: 7px;
+  background: var(--gpd-mark);
+}
+.gpd-t-rows .gpd-t-avg {
+  border-top: 1px solid var(--gpd-mark);
+}
+.gpd-t-avg .gpd-t-name i {
+  width: 70%;
+  background: var(--gpd-ink);
+}
+.gpd-t-avg .gpd-t-cell i {
+  background: var(--gpd-mark);
+}
+.gpd-t-foot {
+  display: flex;
+  justify-content: space-between;
+}
+.gpd-t-foot i {
+  width: 28%;
+  height: 3px;
+  background: var(--gpd-line);
+}
+.gpd-t-foot i + i {
+  width: 10%;
+}
+
+/* Right pane. */
+.gpd-settings {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px 28px 26px;
+  overflow-y: auto;
+}
+.gpd-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.gpd-group-label {
+  padding-left: 2px;
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.gpd-list {
+  border: 1px solid var(--divider-strong);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.gpd-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 0 10px 0 16px;
+  border-bottom: 1px solid var(--divider-subtle);
+}
+.gpd-list > :last-child {
+  border-bottom: none;
+}
+.gpd-row-switch {
+  padding-right: 16px;
+}
+/* Rows that belong to the row above: indented and tinted. */
+.gpd-sub,
+.gpd-pick {
+  padding-left: 32px;
+  background: color-mix(in srgb, var(--bg) 50%, var(--surface));
+}
+.gpd-row.is-off {
+  opacity: 0.45;
+}
+.gpd-label {
+  font-size: var(--text-base);
+  color: var(--text);
+}
+
+/* A value that opens a menu. */
+.gpd-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 6px 0 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-family: var(--font-base);
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--link);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.gpd-value:hover:not(:disabled),
+.gpd-value[aria-expanded='true'] {
+  background: var(--overlay-hover);
+}
+.gpd-value:disabled {
+  cursor: default;
+}
+.gpd-value svg {
+  flex: 0 0 auto;
+}
+
+.gpd-menu {
+  position: fixed;
+  z-index: 10003;
+  min-width: 180px;
+  max-width: 320px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+}
+.gpd-menu-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 5px;
+  background: none;
+  font-family: var(--font-base);
+  font-size: var(--text-base);
+  color: var(--text);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.gpd-menu-item:hover,
+.gpd-menu-item:focus-visible {
+  background: var(--overlay-hover);
+  outline: none;
+}
+.gpd-menu-item[aria-checked='true'] {
+  background: var(--active);
+  color: #fff;
+}
+.gpd-menu-help {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.gpd-menu-item[aria-checked='true'] .gpd-menu-help {
+  color: inherit;
+  opacity: 0.85;
+}
+
+/* The switch: one control for every on or off choice here. */
+.gpd-switch {
+  position: relative;
+  flex: 0 0 auto;
+  width: 38px;
+  height: 22px;
+}
+.gpd-switch input {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.gpd-switch input:disabled {
+  cursor: default;
+}
+.gpd-switch-ui {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--border-2);
+  transition: background var(--duration-micro) var(--ease-out);
+  pointer-events: none;
+}
+.gpd-switch-ui::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: transform var(--duration-micro) var(--ease-out);
+}
+.gpd-switch input:checked + .gpd-switch-ui {
+  background: var(--active);
+}
+.gpd-switch input:checked + .gpd-switch-ui::after {
+  transform: translateX(16px);
+}
+.gpd-switch input:focus-visible + .gpd-switch-ui {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+
+/* Blank Grid's Columns stepper. */
+.gpd-stepper {
+  display: flex;
+  align-items: center;
+}
+.gpd-stepper button,
+.gpd-stepper input {
+  box-sizing: border-box;
+  height: 28px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-family: var(--font-base);
+}
+.gpd-stepper button {
+  width: 28px;
+  padding: 0;
+  font-size: var(--text-md);
+  color: var(--text-2);
+  cursor: pointer;
+}
+.gpd-stepper button:first-child {
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+}
+.gpd-stepper button:last-child {
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+.gpd-stepper button:disabled {
+  color: var(--text-3);
+  opacity: 0.5;
+  cursor: default;
+}
+.gpd-stepper input {
+  width: 42px;
+  border-left: 0;
+  border-right: 0;
+  border-radius: 0;
+  text-align: center;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text);
+}
+
+.gpd-date {
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px 6px;
+  background: var(--surface);
+}
+
+/* Pick Assessments: the list under the Assessments row. */
+.gpd-pick {
+  max-height: 180px;
+  overflow-y: auto;
+  padding-top: 6px;
+  padding-bottom: 8px;
+  padding-right: 16px;
+  border-bottom: 1px solid var(--divider-subtle);
+}
+.gpd-pick-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.gpd-pick-option input {
+  margin: 0;
+  accent-color: var(--active);
+}
+.gpd-help {
+  color: var(--text-3);
+}
+
+@media screen and (max-width: 760px) {
+  .grades-print-card {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .gpd-side {
+    flex: 0 0 auto;
+    border-right: none;
+    border-bottom: 1px solid var(--divider-strong);
+  }
+  .gpd-settings {
+    overflow: visible;
   }
 }
 
