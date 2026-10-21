@@ -1796,27 +1796,6 @@ window.PageAssignments = (function () {
     );
   }
 
-  function ledgerKeysHtml(keys) {
-    return (
-      '<div class="ldg-keys">' +
-      keys
-        .map(function (k) {
-          return (
-            '<span>' +
-            k[0]
-              .map(function (c) {
-                return '<kbd>' + c + '</kbd>';
-              })
-              .join('') +
-            k[1] +
-            '</span>'
-          );
-        })
-        .join('') +
-      '</div>'
-    );
-  }
-
   // Counts read from the rows on screen, so they follow every click without a re-render.
   function refreshLedgerSummary(grid) {
     if (!grid) return;
@@ -1906,14 +1885,7 @@ window.PageAssignments = (function () {
         ledgerCommentHtml(cid, a.id, st.id) +
         '</div>';
     });
-    html +=
-      ledgerKeysHtml([
-        [['\u2191', '\u2193'], 'Student'],
-        [['C'], 'Complete'],
-        [['I'], 'Incomplete'],
-        [['L'], 'Late'],
-        [['M'], 'Comment'],
-      ]) + '</div>';
+    html += '</div>';
     return html;
   }
 
