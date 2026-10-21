@@ -41,7 +41,8 @@ describe('normalizeForm', () => {
     });
     expect(f.v).toBe(4);
     expect(f.type).toBe('compact');
-    expect(rows(f.pages[0])).toEqual([['header'], ['teacher-narrative'], ['competency-table:6', 'attendance:6']]);
+    // Attendance is no longer a block: the pair falls back to the competency table alone.
+    expect(rows(f.pages[0])).toEqual([['header'], ['teacher-narrative'], ['competency-table']]);
     expect(rows(f.pages[1])).toEqual([['learner-dimensions'], ['parent-response']]);
     expect(S.cellOf(f, 'teacher-narrative')).toMatchObject({ height: 'fixed', lines: 5 });
     expect(f.pinned).toBe('parent-response');
@@ -53,7 +54,9 @@ describe('normalizeForm', () => {
       pages: [
         { rows: [{ cells: [{ block: 'bogus' }, { block: 'legend', span: 5 }] }, { cells: [{ block: 'header' }] }] },
         {
-          rows: [{ cells: [{ block: 'legend' }, { block: 'next-steps', span: 9 }, { block: 'attendance', span: 1 }] }],
+          rows: [
+            { cells: [{ block: 'legend' }, { block: 'next-steps', span: 9 }, { block: 'core-competencies', span: 1 }] },
+          ],
         },
         { rows: [] },
       ],
@@ -61,7 +64,7 @@ describe('normalizeForm', () => {
       perStudent: { s1: { hide: ['legend', 'header', 'nope'] }, s2: { hide: [] } },
     });
     expect(rows(f.pages[0])).toEqual([['header'], ['legend']]);
-    expect(rows(f.pages[1])).toEqual([['next-steps:6', 'attendance:6']]);
+    expect(rows(f.pages[1])).toEqual([['next-steps:6', 'core-competencies:6']]);
     expect(f.pages).toHaveLength(2);
     expect(f.pinned).toBeNull();
     expect(f.perStudent).toEqual({ s1: { hide: ['legend'] } });
@@ -94,11 +97,11 @@ describe('placing and removing', () => {
   });
 
   it('placeBlock left or right of a row makes a column and balances the spans', () => {
-    let f = S.placeBlock(base(), 'attendance', { page: 0, row: 3, side: 'right' });
-    expect(rows(f.pages[0])[3]).toEqual(['competency-table:6', 'attendance:6']);
-    expect(S.positionText(f, 'attendance')).toBe('Page 1 · row 4 · right');
+    let f = S.placeBlock(base(), 'core-competencies', { page: 0, row: 3, side: 'right' });
+    expect(rows(f.pages[0])[3]).toEqual(['competency-table:6', 'core-competencies:6']);
+    expect(S.positionText(f, 'core-competencies')).toBe('Page 1 · row 4 · right');
     f = S.placeBlock(f, 'legend', { page: 0, row: 3, side: 'left' });
-    expect(rows(f.pages[0])[3]).toEqual(['legend:4', 'competency-table:4', 'attendance:4']);
+    expect(rows(f.pages[0])[3]).toEqual(['legend:4', 'competency-table:4', 'core-competencies:4']);
     // A fourth cell does not fit a row; it goes after it instead.
     f = S.placeBlock(f, 'observations', { page: 0, row: 3, side: 'right' });
     expect(rows(f.pages[0])[4]).toEqual(['observations']);
@@ -124,23 +127,23 @@ describe('placing and removing', () => {
     expect(f.pinned).toBeNull();
     f = S.removeCell(f, 'learner-dimensions');
     expect(f.pages).toHaveLength(1);
-    f = S.placeBlock(base(), 'attendance', { page: 0, row: 3, side: 'right' });
+    f = S.placeBlock(base(), 'core-competencies', { page: 0, row: 3, side: 'right' });
     f = S.removeCell(f, 'competency-table');
-    expect(rows(f.pages[0])[3]).toEqual(['attendance']);
+    expect(rows(f.pages[0])[3]).toEqual(['core-competencies']);
   });
 });
 
 describe('cell settings', () => {
-  const two = () => S.placeBlock(S.form(), 'attendance', { page: 0, row: 3, side: 'right' });
+  const two = () => S.placeBlock(S.form(), 'core-competencies', { page: 0, row: 3, side: 'right' });
 
   it('setSpan on a two-cell row gives the other cell the rest; full width moves the other to its own row', () => {
     let f = S.setSpan(two(), 'competency-table', 8);
-    expect(rows(f.pages[0])[3]).toEqual(['competency-table:8', 'attendance:4']);
-    f = S.setSpan(f, 'attendance', 8);
-    expect(rows(f.pages[0])[3]).toEqual(['competency-table:4', 'attendance:8']);
+    expect(rows(f.pages[0])[3]).toEqual(['competency-table:8', 'core-competencies:4']);
+    f = S.setSpan(f, 'core-competencies', 8);
+    expect(rows(f.pages[0])[3]).toEqual(['competency-table:4', 'core-competencies:8']);
     f = S.setSpan(f, 'competency-table', 12);
     expect(rows(f.pages[0])[3]).toEqual(['competency-table']);
-    expect(rows(f.pages[0])[4]).toEqual(['attendance']);
+    expect(rows(f.pages[0])[4]).toEqual(['core-competencies']);
     expect(S.setSpan(S.form(), 'competency-table', 6)).toEqual(S.form());
   });
 
@@ -217,7 +220,7 @@ describe('drop slots', () => {
   });
 
   it('a row with three cells offers no column; a page with no rows offers one place', () => {
-    let f = S.placeBlock(S.form(), 'attendance', { page: 0, row: 3, side: 'right' });
+    let f = S.placeBlock(S.form(), 'core-competencies', { page: 0, row: 3, side: 'right' });
     f = S.placeBlock(f, 'legend', { page: 0, row: 3, side: 'right' });
     const slots = S.slotsFor(f).map(key);
     expect(slots).not.toContain('0:3:left');
@@ -243,10 +246,10 @@ describe('drop slots', () => {
   it('spanChoices depends on the row', () => {
     const f = S.form();
     expect(S.spanChoices(f, 'competency-table')).toEqual([12]);
-    const two = S.placeBlock(f, 'attendance', { page: 0, row: 3, side: 'right' });
+    const two = S.placeBlock(f, 'core-competencies', { page: 0, row: 3, side: 'right' });
     expect(S.spanChoices(two, 'competency-table')).toEqual([12, 8, 6, 4]);
     const three = S.placeBlock(two, 'legend', { page: 0, row: 3, side: 'left' });
-    expect(S.spanChoices(three, 'attendance')).toEqual([4]);
+    expect(S.spanChoices(three, 'core-competencies')).toEqual([4]);
     expect(S.spanChoices(f, 'nope')).toEqual([]);
   });
 });

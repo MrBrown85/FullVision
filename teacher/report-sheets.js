@@ -148,7 +148,6 @@ window.ReportSheets = (function () {
     'section-outcomes': { label: 'Learning Outcomes', kind: 'flow', group: 'Grades' },
     'score-distribution': { label: 'Score Distribution', kind: 'flow', group: 'Grades' },
     'section-chart': { label: 'Section Chart', kind: 'flow', group: 'Grades' },
-    attendance: { label: 'Attendance', kind: 'fixed', group: 'Grades' },
     'teacher-narrative': {
       label: 'Teacher Comment',
       kind: 'flow',

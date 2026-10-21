@@ -114,5 +114,5 @@ Phase 5's remaining items (5.4 phone tab, parked; 5.5 district questions) stand.
 ## Open
 
 - District position on teacher-to-family email (gates Phase 4).
-- Whether attendance belongs on the Report Card form by default or as an option.
+- ~~Whether attendance belongs on the Report Card form by default or as an option.~~ Decided 2026-10-20: reports carry no attendance (DECISIONS "Report forms" 12).
 - Safari print parity: measured in Phase 1, not assumed.
