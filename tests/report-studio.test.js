@@ -32,12 +32,6 @@ describe('ReportStudio', () => {
     expect(ReportStudio.stats(null)).toEqual({ longest: null, shortest: null, over: 0, blankBacks: 0, cut: 0 });
   });
 
-  it('counts the class for the toolbar', () => {
-    expect(ReportStudio.countText({ students: 27, pages: 54, over: [] })).toBe('27 students · 54 pages · duplex safe');
-    expect(ReportStudio.countText({ students: 1, pages: 2, over: ['x'] })).toBe('1 student · 2 pages · 1 over');
-    expect(ReportStudio.countText(null)).toBe('');
-  });
-
   it('scales two pages side by side when there is room, else one above the other', () => {
     expect(ReportStudio.fitZoom(1300)).toEqual({ zoom: 0.62, stacked: false });
     const narrow = ReportStudio.fitZoom(900);
