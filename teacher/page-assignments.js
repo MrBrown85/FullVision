@@ -1830,7 +1830,7 @@ window.PageAssignments = (function () {
       if (v == null) left++;
       else vals.push(v);
     });
-    var html = '<span><b>' + vals.length + '</b> Marked</span><span><b>' + left + '</b> Left</span>';
+    var html = '<span><b>' + vals.length + '</b> Marked</span><span><b>' + left + '</b> Unmarked</span>';
     var stats = grid.querySelector('.ldg-stats');
     if (vals.length) {
       var sorted = vals.slice().sort(function (x, y) {
@@ -1872,10 +1872,10 @@ window.PageAssignments = (function () {
       '<div class="ldg-bar"><span class="ldg-tally"></span>' +
       '<div class="ldg-actions"><button type="button" class="ldg-action" data-action="confirmFillNotSubmitted" data-aid="' +
       a.id +
-      '">Mark the Rest Not Submitted</button>' +
+      '">Set Unmarked to Not Submitted</button>' +
       '<button type="button" class="ldg-action cmp-fill-all" data-action="confirmFillCompletion" data-aid="' +
       a.id +
-      '">Mark the Rest Complete</button></div></div>' +
+      '">Set Unmarked to Complete</button></div></div>' +
       '<div class="ldg-head"><span>Student</span><span>Mark</span><span>Status</span><span class="ldg-head-end">Comment</span></div>';
     students.forEach(function (st) {
       var stStatus = statuses[st.id + ':' + a.id] || null;
@@ -1935,9 +1935,9 @@ window.PageAssignments = (function () {
 
   function confirmFillCompletion(aid) {
     showConfirm(
-      'Mark the Rest Complete',
-      'Mark every unmarked student Complete?',
-      'Mark Complete',
+      'Set Unmarked to Complete',
+      'Set every unmarked student to Complete?',
+      'Set to Complete',
       'primary',
       function () {
         var cid = activeCourse;
@@ -1949,7 +1949,7 @@ window.PageAssignments = (function () {
         });
         render();
         refreshSidebar();
-        showUndoToast('Marked Complete', function () {
+        showUndoToast('Unmarked students set to Complete', function () {
           var beforeScores = getScores(cid);
           saveScores(cid, prevScores);
           if (getScores(cid) === prevScores) persistScoreDiffToCanonical(cid, beforeScores, prevScores);
@@ -1972,10 +1972,10 @@ window.PageAssignments = (function () {
       '<div class="ldg-bar"><span class="ldg-tally"></span>' +
       '<div class="ldg-actions"><button type="button" class="ldg-action" data-action="confirmFillNotSubmitted" data-aid="' +
       a.id +
-      '">Mark the Rest Not Submitted</button>' +
+      '">Set Unmarked to Not Submitted</button>' +
       '<button type="button" class="ldg-action" data-action="confirmFillPoints" data-aid="' +
       a.id +
-      '">Fill the Rest ' +
+      '">Set Unmarked to ' +
       max +
       ' / ' +
       max +
@@ -2021,9 +2021,9 @@ window.PageAssignments = (function () {
   // Every student with no score and no status becomes Not Submitted, with undo.
   function confirmFillNotSubmitted(aid) {
     showConfirm(
-      'Mark the Rest Not Submitted',
-      'Mark every student without a score Not Submitted?',
-      'Mark Not Submitted',
+      'Set Unmarked to Not Submitted',
+      'Set every unmarked student to Not Submitted?',
+      'Set to Not Submitted',
       'primary',
       function () {
         var cid = activeCourse;
@@ -2037,7 +2037,7 @@ window.PageAssignments = (function () {
         render();
         refreshSidebar();
         if (!marked.length) return;
-        showUndoToast('Marked Not Submitted', function () {
+        showUndoToast('Unmarked students set to Not Submitted', function () {
           marked.forEach(function (sid) {
             setAssignmentStatus(cid, sid, aid, null);
           });
@@ -2057,22 +2057,22 @@ window.PageAssignments = (function () {
     var max = a.maxPoints || 100;
     var label = max + ' / ' + max;
     showConfirm(
-      'Fill the Rest ' + label,
-      'Give every student without a score ' + label + '?',
-      'Fill',
+      'Set Unmarked to ' + label,
+      'Set every unmarked student to ' + label + '?',
+      'Set to ' + label,
       'primary',
       function () {
         var prevScores = structuredClone(getScores(cid));
         var statuses = getAssignmentStatuses(cid);
         getStudents(cid).forEach(function (st) {
-          // Same rule as Mark the Rest Complete: any status, Late included, is left alone.
+          // Same rule as Set Unmarked to Complete: any status, Late included, is left alone.
           if (statuses[st.id + ':' + aid] || getPointsScore(cid, st.id, aid) != null) return;
           setScore(cid, st.id, aid, aid, max);
           setPointsScore(cid, st.id, aid, max);
         });
         render();
         refreshSidebar();
-        showUndoToast('Filled ' + label, function () {
+        showUndoToast('Unmarked students set to ' + label, function () {
           var beforeScores = getScores(cid);
           saveScores(cid, prevScores);
           if (getScores(cid) === prevScores) persistScoreDiffToCanonical(cid, beforeScores, prevScores);
