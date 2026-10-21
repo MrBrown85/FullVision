@@ -1,10 +1,10 @@
-/* report-sheets.js — The Report Card form.
-   One layout for the class, laid into explicit sheets that are the same on
-   screen and on paper. Fixed blocks print the same for every student; the
-   flowing ones (teacher comment, next steps) have reserved room and push
-   what follows down the sheet, onto the back, and onto a Continued sheet.
-   Nothing is shrunk, clipped or hidden per student.
-   docs/DECISIONS.md "Report forms"; docs/report-forms-plan.md Phase 1. */
+/* report-sheets.js — The report form on a page grid.
+   A page is a grid of 12 columns and 20px rows, and every block on the
+   form owns a rectangle on it. A block whose content needs more room than
+   its rectangle grows, and the blocks under it in its columns move down,
+   onto the next page when they pass its last row. Nothing is shrunk,
+   clipped or hidden per student. The same HTML is on screen and on paper.
+   docs/DECISIONS.md "Report forms"; docs/report-forms-plan.md. */
 window.ReportSheets = (function () {
   'use strict';
 
@@ -14,88 +14,96 @@ window.ReportSheets = (function () {
     letter: { w: 8.5, h: 11, size: '8.5in 11in' },
     legal: { w: 8.5, h: 14, size: '8.5in 14in' },
   };
-  /* Held back on every side: fonts differ by machine (the Mac's system font
-     is narrower than Linux's or Windows'), and a side that measures full on
-     one must not overflow on another. */
-  var SAFETY = 0.04;
   var PAGE_STYLE_ID = 'report-sheets-page';
 
-  /* ── The layout model (v4) ────────────────────────────────────
-     A form is pages of rows of cells. A row holds one to three cells whose
-     spans add up to 12 (12; 6+6; 8+4; 4+8; 4+4+4). pages[0] is the front,
-     pages[1] the back, later pages continue. One block may be pinned to the
-     bottom of the last side (the Parent / Guardian Response). perStudent
-     holds exceptions that never change the class layout. The Parent /
-     Guardian Response and the student reflection are placed, never
-     reworded (DECISIONS "Report forms" 5). */
-  var SPANS = [12, 8, 6, 4];
-  function _row(cells) {
-    return { cells: cells.map(_cellSpec) };
-  }
-  function _cellSpec(c) {
-    return typeof c === 'string' ? { block: c } : c;
+  /* ── The layout model (v5) ────────────────────────────────────
+     pages[i].blocks: { block, x, y, w, h, options?, noEvidence? }. x and w
+     are columns of 12 (w at least 3), y and h rows of ROW_PX. h is the
+     room the teacher reserved, never a cap. The letterhead is always
+     { block: 'header', x: 0, y: 0, w: 12 } first on page 1; its height is
+     measured. One block may be pinned: docked to the bottom of its page
+     (the Parent / Guardian Response). perStudent holds blocks left off one
+     student's report. The Parent / Guardian Response and the student
+     reflection are placed, never reworded (DECISIONS "Report forms" 5). */
+  var COLS = 12;
+  var GUTTER = 12;
+  var ROW_PX = 20;
+  var MIN_W = 3;
+  var MIN_H = 2;
+  var MAX_H = 120;
+  /* One comment line and the box around it, for a v4 form's lines. */
+  var LINE_PX = 22;
+  var BOX_PX = 40;
+
+  function _b(block, x, y, w, h) {
+    return { block: block, x: x, y: y, w: w, h: h };
   }
   var FORM_REPORT_CARD = {
-    v: 4,
+    v: 5,
     id: 'report-card',
     name: 'Report Card',
     type: 'standard',
     pagesPerStudent: 'auto',
-    pinned: 'parent-response',
     pages: [
       {
-        rows: [
-          _row(['header']),
-          _row(['academic-summary']),
-          _row([{ block: 'teacher-narrative', height: 'fixed', lines: 8 }]),
-          _row(['competency-table']),
-          _row(['next-steps']),
+        blocks: [
+          { block: 'header', x: 0, y: 0, w: 12 },
+          _b('academic-summary', 0, 5, 12, 6),
+          _b('teacher-narrative', 0, 11, 12, 8),
+          _b('competency-table', 0, 19, 12, 13),
+          _b('next-steps', 0, 32, 12, 8),
         ],
       },
-      { rows: [_row(['learner-dimensions']), _row(['parent-response'])] },
+      { blocks: [_b('learner-dimensions', 0, 0, 12, 15), _b('parent-response', 0, 31, 12, 15)] },
     ],
+    pinned: 'parent-response',
     perStudent: {},
   };
   var FORM_INTERIM = {
-    v: 4,
+    v: 5,
     id: 'interim-update',
     name: 'Interim Update',
     type: 'standard',
     pagesPerStudent: 'auto',
-    pinned: null,
     pages: [
       {
-        rows: [
-          _row(['header']),
-          _row(['academic-summary']),
-          _row([{ block: 'teacher-narrative', height: 'fixed', lines: 6 }]),
-          _row(['next-steps']),
-          _row(['legend']),
+        blocks: [
+          { block: 'header', x: 0, y: 0, w: 12 },
+          _b('academic-summary', 0, 5, 12, 6),
+          _b('teacher-narrative', 0, 11, 12, 8),
+          _b('next-steps', 0, 19, 12, 8),
+          _b('legend', 0, 27, 12, 6),
         ],
       },
     ],
+    pinned: null,
     perStudent: {},
   };
   var FORM_CONFERENCE = {
-    v: 4,
+    v: 5,
     id: 'conference-pack',
     name: 'Conference Pack',
     type: 'standard',
     pagesPerStudent: 'auto',
-    pinned: 'parent-response',
     pages: [
       {
-        rows: [
-          _row(['header']),
-          _row(['academic-summary']),
-          _row([{ block: 'teacher-narrative', height: 'fixed', lines: 8 }]),
-          _row(['competency-table']),
-          _row(['next-steps']),
-          _row(['grade-table']),
+        blocks: [
+          { block: 'header', x: 0, y: 0, w: 12 },
+          _b('academic-summary', 0, 5, 12, 6),
+          _b('teacher-narrative', 0, 11, 12, 8),
+          _b('competency-table', 0, 19, 12, 13),
+          _b('next-steps', 0, 32, 12, 8),
         ],
       },
-      { rows: [_row(['learner-dimensions']), _row(['parent-response'])] },
+      {
+        blocks: [
+          _b('learner-dimensions', 0, 0, 12, 15),
+          _b('grade-table', 0, 15, 12, 16),
+          _b('parent-response', 0, 31, 12, 15),
+        ],
+      },
     ],
+    pinned: 'parent-response',
     perStudent: {},
   };
 
@@ -104,14 +112,15 @@ window.ReportSheets = (function () {
     return normalizeForm(FORM_REPORT_CARD);
   }
 
-  /* Every block a form can hold. Labels, kinds, the palette group and the
-     options a block offers live here, not in the saved form. `fixed` is
-     the height mode of a block that reserves lines; `flow` blocks grow
-     with the student. */
+  /* Every block a form can hold. Labels, the palette group, the default
+     room (rows: about a typical student's height at full width) and the
+     options a block offers live here, not in the saved form. `fill`
+     blocks rule lines into room the content leaves; `table` blocks are cut
+     at their rows when they reach the bottom of a page. */
   var BLOCKS = {
     header: {
       label: 'Letterhead',
-      kind: 'fixed',
+      rows: 5,
       locked: true,
       group: null,
       options: [
@@ -121,10 +130,11 @@ window.ReportSheets = (function () {
         { key: 'studentNumber', label: 'Student Number', def: true },
       ],
     },
-    'academic-summary': { label: 'Overall and Competencies', kind: 'fixed', group: 'Grades' },
+    'academic-summary': { label: 'Overall and Competencies', rows: 6, group: 'Grades' },
     'competency-table': {
       label: 'Competency Table',
-      kind: 'fixed',
+      rows: 13,
+      table: true,
       group: 'Grades',
       noEvidence: true,
       options: [
@@ -135,7 +145,8 @@ window.ReportSheets = (function () {
     },
     'grade-table': {
       label: 'Assignment Grades',
-      kind: 'flow',
+      rows: 20,
+      table: true,
       group: 'Grades',
       options: [
         { key: 'date', label: 'Date', def: true },
@@ -145,28 +156,20 @@ window.ReportSheets = (function () {
         { key: 'level', label: 'Proficiency', def: true },
       ],
     },
-    'section-outcomes': { label: 'Learning Outcomes', kind: 'flow', group: 'Grades' },
-    'score-distribution': { label: 'Score Distribution', kind: 'flow', group: 'Grades' },
-    'section-chart': { label: 'Section Chart', kind: 'flow', group: 'Grades' },
-    'teacher-narrative': {
-      label: 'Teacher Comment',
-      kind: 'flow',
-      group: 'Comments and Evidence',
-      lines: 8,
-      whenEmpty: 'box',
-      sizable: true,
-    },
-    observations: { label: 'Observations', kind: 'flow', group: 'Comments and Evidence' },
+    'section-outcomes': { label: 'Learning Outcomes', rows: 20, group: 'Grades' },
+    'score-distribution': { label: 'Score Distribution', rows: 14, group: 'Grades' },
+    'section-chart': { label: 'Section Chart', rows: 20, group: 'Grades' },
+    'teacher-narrative': { label: 'Teacher Comment', rows: 8, fill: true, group: 'Comments and Evidence' },
+    observations: { label: 'Observations', rows: 16, group: 'Comments and Evidence' },
     'next-steps': {
       label: 'Growth and Next Steps',
-      kind: 'flow',
+      rows: 8,
       group: 'Comments and Evidence',
-      whenEmpty: 'omit',
       options: [{ key: 'ican', label: 'I-can Statements', def: 2, choices: [0, 1, 2, 3] }],
     },
     'learner-dimensions': {
       label: 'Learning Dispositions',
-      kind: 'fixed',
+      rows: 15,
       group: 'Learner Profile',
       options: [
         { key: 'descriptions', label: 'Descriptions', def: false },
@@ -175,70 +178,70 @@ window.ReportSheets = (function () {
     },
     'core-competencies': {
       label: 'Core Competencies',
-      kind: 'flow',
+      rows: 16,
       group: 'Learner Profile',
       noEvidence: true,
       options: [{ key: 'intro', label: 'Introduction', def: true }],
     },
-    'student-reflection-learning': { label: 'Reflection: My Learning', kind: 'fixed', group: 'Learner Profile' },
-    'student-reflection-habits': { label: 'Reflection: My Habits', kind: 'fixed', group: 'Learner Profile' },
+    'student-reflection-learning': { label: 'Reflection: My Learning', rows: 40, group: 'Learner Profile' },
+    'student-reflection-habits': { label: 'Reflection: My Habits', rows: 32, group: 'Learner Profile' },
     'parent-response': {
       label: 'Parent / Guardian Response',
-      kind: 'fixed',
+      rows: 15,
+      fill: true,
       group: 'Family',
       pinnable: true,
-      sizable: true,
     },
-    legend: { label: 'Proficiency Legend', kind: 'fixed', group: 'Family' },
-    'text-block': { label: 'Text Block', kind: 'fixed', group: 'Family', sizable: true },
+    legend: { label: 'Proficiency Legend', rows: 6, group: 'Family' },
+    'text-block': { label: 'Text Block', rows: 4, fill: true, group: 'Family' },
   };
   var BLOCK_ORDER = Object.keys(BLOCKS);
   var PALETTE_GROUPS = ['Grades', 'Comments and Evidence', 'Learner Profile', 'Family'];
 
-  function _cleanCell(raw) {
+  function _clone(f) {
+    return JSON.parse(JSON.stringify(f));
+  }
+  function _int(v, d) {
+    var n = v == null || v === '' ? NaN : Number(v);
+    return isFinite(n) ? Math.round(n) : d;
+  }
+  function _clamp(n, lo, hi) {
+    return Math.max(lo, Math.min(hi, n));
+  }
+  /* The rows a block takes on the stored layout (the letterhead's are
+     measured; its registry default stands in). */
+  function _hOf(b) {
+    return b.h != null ? b.h : BLOCKS[b.block].rows;
+  }
+  /* Letterhead first, then by row, then by column. */
+  function _byPlace(a, b) {
+    if (a.block === 'header' || b.block === 'header') return a.block === 'header' ? -1 : 1;
+    return a.y - b.y || a.x - b.x;
+  }
+  function _colsMeet(a, b) {
+    return a.x < b.x + b.w && b.x < a.x + a.w;
+  }
+  function _overlaps(a, b) {
+    return _colsMeet(a, b) && a.y < b.y + _hOf(b) && b.y < a.y + _hOf(a);
+  }
+
+  function _cleanBlock(raw) {
     if (!raw || typeof raw !== 'object') return null;
     var def = BLOCKS[raw.block];
     if (!def) return null;
-    var cell = { block: raw.block, span: SPANS.indexOf(Number(raw.span)) >= 0 ? Number(raw.span) : 12 };
-    var lines = Number(raw.lines);
-    if (raw.height === 'fixed' && lines >= 1 && lines <= 20) {
-      cell.height = 'fixed';
-      cell.lines = Math.round(lines);
-    } else if (def.lines && raw.height !== 'fit' && raw.height !== 'fixed' && !raw.room) {
-      cell.height = 'fixed';
-      cell.lines = def.lines;
-    } else {
-      cell.height = 'fit';
-    }
-    if (def.kind === 'flow' || def.whenEmpty) {
-      cell.whenEmpty = raw.whenEmpty === 'box' || raw.whenEmpty === 'omit' ? raw.whenEmpty : def.whenEmpty || 'omit';
-    }
+    var w = _clamp(_int(raw.w, COLS), MIN_W, COLS);
+    var b = {
+      block: raw.block,
+      x: _clamp(_int(raw.x, 0), 0, COLS - w),
+      y: Math.max(0, _int(raw.y, 0)),
+      w: w,
+      h: _clamp(_int(raw.h, def.rows), MIN_H, MAX_H),
+    };
     if (raw.options && typeof raw.options === 'object' && !Array.isArray(raw.options)) {
-      cell.options = JSON.parse(JSON.stringify(raw.options));
+      b.options = JSON.parse(JSON.stringify(raw.options));
     }
-    if (raw.noEvidence === 'hide' || raw.noEvidence === 'show') cell.noEvidence = raw.noEvidence;
-    return cell;
-  }
-
-  /* Spans in a row always add up to 12. */
-  function _balanceRow(row) {
-    var cells = row.cells;
-    var sum = cells.reduce(function (a, c) {
-      return a + c.span;
-    }, 0);
-    if (sum === 12 && cells.length <= 3) return row;
-    if (cells.length === 1) cells[0].span = 12;
-    else if (cells.length === 2) {
-      if (!(cells[0].span === 8 && cells[1].span === 4) && !(cells[0].span === 4 && cells[1].span === 8)) {
-        cells[0].span = 6;
-        cells[1].span = 6;
-      }
-    } else {
-      cells.forEach(function (c) {
-        c.span = 4;
-      });
-    }
-    return row;
+    if (def.noEvidence && (raw.noEvidence === 'hide' || raw.noEvidence === 'show')) b.noEvidence = raw.noEvidence;
+    return b;
   }
 
   function _v3ToPages(raw) {
@@ -258,7 +261,6 @@ window.ReportSheets = (function () {
             cell.height = 'fixed';
             cell.lines = it.room.lines;
           }
-          if (it.whenEmpty) cell.whenEmpty = it.whenEmpty;
           return { cells: [cell] };
         })
         .filter(Boolean);
@@ -277,56 +279,116 @@ window.ReportSheets = (function () {
     };
   }
 
+  /* A v4 row's spans, made to add up to 12 as v4 did (12; 6+6; 8+4; 4+8;
+     4+4+4). */
+  function _rowSpans(cells) {
+    var spans = cells.map(function (c) {
+      return [12, 8, 6, 4].indexOf(Number(c.span)) >= 0 ? Number(c.span) : 12;
+    });
+    var sum = spans.reduce(function (a, s) {
+      return a + s;
+    }, 0);
+    if (sum === 12) return spans;
+    if (cells.length === 1) return [12];
+    if (cells.length === 2) return [6, 6];
+    return [4, 4, 4];
+  }
+  /* A v4 cell's room in rows: its lines for the comment, response and text
+     blocks (the comment held 8 unless set to Fit Content), else the
+     block's default. */
+  function _v4Rows(c) {
+    var def = BLOCKS[c.block];
+    var lines = Number(c.lines);
+    if (def.fill && c.height === 'fixed' && lines >= 1) return Math.ceil((lines * LINE_PX + BOX_PX) / ROW_PX);
+    if (c.block === 'teacher-narrative' && c.height !== 'fit') return Math.ceil((8 * LINE_PX + BOX_PX) / ROW_PX);
+    return def.rows;
+  }
+  /* v4 (pages of rows of cells with spans) to v5: each row's cells side by
+     side at the row's running y, x and w from the spans, the row as tall as
+     its tallest cell. settle() then stores where the blocks really land. */
+  function _v4ToV5(base) {
+    var seen = {};
+    var pages = base.pages.map(function (pg) {
+      var y = 0;
+      var blocks = [];
+      ((pg && pg.rows) || []).forEach(function (row) {
+        var cells = ((row && row.cells) || [])
+          .filter(function (c) {
+            if (!c || !BLOCKS[c.block] || seen[c.block]) return false;
+            seen[c.block] = true;
+            return true;
+          })
+          .slice(0, 3);
+        if (!cells.length) return;
+        var spans = _rowSpans(cells);
+        var x = 0;
+        var rowH = 0;
+        cells.forEach(function (c, i) {
+          var h = _v4Rows(c);
+          var b = { block: c.block, x: x, y: y, w: spans[i], h: h };
+          if (c.options) b.options = c.options;
+          if (c.noEvidence) b.noEvidence = c.noEvidence;
+          blocks.push(b);
+          x += spans[i];
+          rowH = Math.max(rowH, h);
+        });
+        y += rowH;
+      });
+      return { blocks: blocks };
+    });
+    return {
+      v: 5,
+      id: base.id,
+      name: base.name,
+      type: base.type,
+      pagesPerStudent: base.pagesPerStudent,
+      pages: pages,
+      pinned: base.pinned,
+      perStudent: base.perStudent,
+    };
+  }
+
   /* A saved form (any version, any hand) made whole: known blocks only, no
-     block twice, the letterhead first on page 1, spans that add up, at most
-     one pinned block and it on the form, pages trimmed of empty tails but
-     never fewer than one. A v3 form (front/back lists with pairs) and the
-     old presets ({preset, blocks}) migrate here; nothing saved is lost.
-     Absent → the Report Card. */
+     block twice, rectangles on the grid, the letterhead first on page 1,
+     at most one pinned block and it on the form, at least one page. Empty
+     pages stay: the teacher gave them. v4 (rows of cells with spans), v3
+     (front/back lists with pairs) and the old presets ({preset, blocks})
+     migrate here; nothing saved is lost. Absent → the Report Card. */
   function normalizeForm(raw) {
     var base = raw && typeof raw === 'object' ? raw : null;
     if (base && !Array.isArray(base.pages) && (Array.isArray(base.front) || Array.isArray(base.back))) {
       base = _v3ToPages(base);
     }
     if (!base || !Array.isArray(base.pages)) base = FORM_REPORT_CARD;
-    var seen = {};
-    var pages = base.pages
-      .map(function (pg) {
-        var rows = ((pg && pg.rows) || [])
-          .map(function (row) {
-            var cells = ((row && row.cells) || [])
-              .map(_cleanCell)
-              .filter(function (c) {
-                if (!c || seen[c.block]) return false;
-                seen[c.block] = true;
-                return true;
-              })
-              .slice(0, 3);
-            return cells.length ? _balanceRow({ cells: cells }) : null;
-          })
-          .filter(Boolean);
-        return { rows: rows };
+    if (
+      base.pages.some(function (pg) {
+        return pg && Array.isArray(pg.rows);
       })
-      .filter(function (pg, i) {
-        return i === 0 || pg.rows.length;
+    ) {
+      base = _v4ToV5(base);
+    }
+    var seen = {};
+    var head = null;
+    var pages = base.pages.map(function (pg) {
+      var blocks = ((pg && pg.blocks) || []).map(_cleanBlock).filter(function (b) {
+        if (!b || seen[b.block]) return false;
+        seen[b.block] = true;
+        if (b.block === 'header') {
+          head = b;
+          return false;
+        }
+        return true;
       });
-    if (!pages.length) pages = [{ rows: [] }];
-    // The letterhead leads page 1, alone on its row, keeping its options.
-    var headerCell = null;
-    pages.forEach(function (pg) {
-      pg.rows = pg.rows
-        .map(function (row) {
-          row.cells = row.cells.filter(function (c) {
-            if (c.block === 'header') headerCell = headerCell || c;
-            return c.block !== 'header';
-          });
-          return row.cells.length ? _balanceRow(row) : null;
-        })
-        .filter(Boolean);
+      return { blocks: blocks };
     });
-    var head = { block: 'header', span: 12, height: 'fit' };
-    if (headerCell && headerCell.options) head.options = headerCell.options;
-    pages[0].rows.unshift({ cells: [head] });
+    if (!pages.length) pages = [{ blocks: [] }];
+    var header = { block: 'header', x: 0, y: 0, w: COLS };
+    if (head && head.options) header.options = head.options;
+    seen.header = true;
+    pages[0].blocks.unshift(header);
+    pages.forEach(function (pg) {
+      pg.blocks.sort(_byPlace);
+    });
     var pinned =
       base.pinned && BLOCKS[base.pinned] && BLOCKS[base.pinned].pinnable && seen[base.pinned] ? base.pinned : null;
     var per = {};
@@ -343,13 +405,13 @@ window.ReportSheets = (function () {
     }
     var pps = base.pagesPerStudent;
     return {
-      v: 4,
+      v: 5,
       id: base.id || 'report-card',
       name: base.name || 'Report Card',
       type: base.type === 'compact' ? 'compact' : 'standard',
       pagesPerStudent: pps === 1 || pps === 2 ? pps : 'auto',
-      pinned: pinned,
       pages: pages,
+      pinned: pinned,
       perStudent: per,
     };
   }
@@ -363,18 +425,13 @@ window.ReportSheets = (function () {
     return normalizeForm(FORM_REPORT_CARD);
   }
 
-  /* ── Editing (pure: each returns a new form) ─────────────────── */
-  function _clone(f) {
-    return JSON.parse(JSON.stringify(f));
-  }
+  /* ── Editing (pure: each returns a new, normalized form) ─────────── */
   /* Ids on the form, in order. */
   function onForm(f) {
     var ids = [];
     f.pages.forEach(function (pg) {
-      pg.rows.forEach(function (row) {
-        row.cells.forEach(function (c) {
-          ids.push(c.block);
-        });
+      pg.blocks.forEach(function (b) {
+        ids.push(b.block);
       });
     });
     return ids;
@@ -385,124 +442,180 @@ window.ReportSheets = (function () {
       return !BLOCKS[id].locked && on.indexOf(id) < 0;
     });
   }
-  /* Where a block is: { page, row, cell } indexes, or null. */
+  /* Where a block is: { page, index }, or null. */
   function locate(f, id) {
     for (var p = 0; p < f.pages.length; p++) {
-      var rows = f.pages[p].rows;
-      for (var r = 0; r < rows.length; r++) {
-        for (var c = 0; c < rows[r].cells.length; c++) {
-          if (rows[r].cells[c].block === id) return { page: p, row: r, cell: c };
-        }
+      var blocks = f.pages[p].blocks;
+      for (var i = 0; i < blocks.length; i++) {
+        if (blocks[i].block === id) return { page: p, index: i };
       }
     }
     return null;
   }
   function cellOf(f, id) {
     var at = locate(f, id);
-    return at ? f.pages[at.page].rows[at.row].cells[at.cell] : null;
+    return at ? f.pages[at.page].blocks[at.index] : null;
   }
-  /* "Page 1 · row 3 · left". */
-  function positionText(f, id) {
-    var at = locate(f, id);
-    if (!at) return '';
-    var row = f.pages[at.page].rows[at.row];
-    var side = '';
-    if (row.cells.length === 2) side = at.cell === 0 ? 'left' : 'right';
-    else if (row.cells.length === 3) side = ['left', 'middle', 'right'][at.cell];
-    return 'Page ' + (at.page + 1) + ' · row ' + (at.row + 1) + (side ? ' · ' + side : '');
+
+  /* One page's blocks moved down until none overlaps another. The blocks
+     named in `first` keep their places, in that order (the letterhead,
+     then the block just placed); the rest follow in (row, column) order,
+     each below every block before it in its columns, and below a first
+     block that started above it or that it would cover. */
+  function _shove(blocks, first) {
+    var fixed = (first || [])
+      .map(function (id) {
+        return blocks.find(function (b) {
+          return b.block === id;
+        });
+      })
+      .filter(Boolean);
+    var rest = blocks
+      .filter(function (b) {
+        return fixed.indexOf(b) < 0;
+      })
+      .sort(_byPlace);
+    var placed = [];
+    fixed.concat(rest).forEach(function (b) {
+      var y = b.y;
+      placed.forEach(function (p) {
+        if (fixed.indexOf(p) < 0 && _colsMeet(p, b)) y = Math.max(y, p.y + _hOf(p));
+      });
+      var moved = true;
+      while (moved) {
+        moved = false;
+        placed.forEach(function (p) {
+          if (fixed.indexOf(p) < 0 || !_colsMeet(p, b) || y >= p.y + _hOf(p)) return;
+          if (p.y <= b.y || y + _hOf(b) > p.y) {
+            y = p.y + _hOf(p);
+            moved = true;
+          }
+        });
+      }
+      b.y = y;
+      placed.push(b);
+    });
+    return blocks;
   }
-  function _dropEmptyRows(f) {
+
+  function _without(f, id) {
     f.pages.forEach(function (pg) {
-      pg.rows = pg.rows
-        .filter(function (row) {
-          return row.cells.length;
-        })
-        .map(_balanceRow);
+      pg.blocks = pg.blocks.filter(function (b) {
+        return b.block !== id;
+      });
     });
     return f;
   }
-  function _newCell(id) {
-    return _cleanCell({ block: id, span: 12 });
-  }
-  /* Puts a block on the form. `at` is { page, row, side } where side is
-     'before' or 'after' (a new full-width row there) or 'left' or 'right'
-     (a cell in that row, which gains a column). Without `at` the block
-     goes on a new row at the end of the last page. */
-  function placeBlock(f, id, at) {
+
+  /* Puts a block (new or moved) at a rectangle { page, x, y, w, h },
+     clamped to the grid; w defaults to 12 and h to the block's default.
+     What it covers on the page moves down out of its way. Without a page,
+     the last one. A moved block keeps its options and its pin. */
+  function place(f, id, rect) {
     if (!BLOCKS[id] || id === 'header') return f;
-    f = removeCell(f, id);
-    var cell = _newCell(id);
-    var page = at && f.pages[at.page] ? f.pages[at.page] : f.pages[f.pages.length - 1];
-    var row = at && page.rows[at.row] ? page.rows[at.row] : null;
-    if (row && (at.side === 'left' || at.side === 'right') && row.cells.length < 3) {
-      if (at.side === 'left') row.cells.unshift(cell);
-      else row.cells.push(cell);
-      _balanceRow(row);
-    } else if (row && at.side === 'before') {
-      page.rows.splice(at.row, 0, { cells: [cell] });
-    } else if (row) {
-      page.rows.splice(at.row + 1, 0, { cells: [cell] });
-    } else {
-      page.rows.push({ cells: [cell] });
-    }
+    rect = rect || {};
+    var old = cellOf(f, id);
+    f = _without(_clone(f), id);
+    var page = _clamp(_int(rect.page, f.pages.length - 1), 0, f.pages.length - 1);
+    var b = _cleanBlock({
+      block: id,
+      x: rect.x,
+      y: rect.y,
+      w: rect.w,
+      h: rect.h,
+      options: old && old.options,
+      noEvidence: old && old.noEvidence,
+    });
+    f.pages[page].blocks.push(b);
+    _shove(f.pages[page].blocks, ['header', id]);
     return normalizeForm(f);
   }
-  /* A new page after the last, holding the block. */
-  function placeOnNewPage(f, id) {
-    if (!BLOCKS[id] || id === 'header') return f;
-    f = removeCell(f, id);
-    f.pages.push({ rows: [{ cells: [_newCell(id)] }] });
-    return normalizeForm(f);
+  function move(f, id, to) {
+    var at = locate(f, id);
+    if (!at || id === 'header') return f;
+    var b = f.pages[at.page].blocks[at.index];
+    to = to || {};
+    return place(f, id, {
+      page: to.page != null ? to.page : at.page,
+      x: to.x != null ? to.x : b.x,
+      y: to.y != null ? to.y : b.y,
+      w: b.w,
+      h: b.h,
+    });
   }
-  function removeCell(f, id) {
+  /* A new width and height; the block keeps its row and stays on the grid. */
+  function resize(f, id, size) {
     if (id === 'header') return f;
     f = _clone(f);
     var at = locate(f, id);
     if (!at) return f;
-    f.pages[at.page].rows[at.row].cells.splice(at.cell, 1);
+    var b = f.pages[at.page].blocks[at.index];
+    size = size || {};
+    b.w = _clamp(_int(size.w, b.w), MIN_W, COLS);
+    b.x = Math.min(b.x, COLS - b.w);
+    b.h = _clamp(_int(size.h, b.h), MIN_H, MAX_H);
+    _shove(f.pages[at.page].blocks, ['header', id]);
+    return normalizeForm(f);
+  }
+  /* The stored layout made what the canvas shows: each block's row (and
+     page) from where the resolver placed it for the previewed student.
+     positions: layoutStudent's { blockId: { page, y } }. A block that
+     landed on a continued page, past the form's own, keeps its place. */
+  function settle(f, positions) {
+    if (!positions) return f;
+    f = _clone(f);
+    var moves = [];
+    f.pages.forEach(function (pg, p) {
+      pg.blocks = pg.blocks.filter(function (b) {
+        var at = positions[b.block];
+        if (!at || b.block === 'header' || at.page >= f.pages.length) return true;
+        b.y = at.y;
+        if (at.page === p) return true;
+        moves.push({ page: at.page, block: b });
+        return false;
+      });
+    });
+    moves.forEach(function (m) {
+      f.pages[m.page].blocks.push(m.block);
+    });
+    return normalizeForm(f);
+  }
+  function addPage(f) {
+    f = _clone(f);
+    f.pages.push({ blocks: [] });
+    return normalizeForm(f);
+  }
+  /* Only an empty page past the second. */
+  function removePage(f, i) {
+    if (i < 2 || !f.pages[i] || f.pages[i].blocks.length) return f;
+    f = _clone(f);
+    f.pages.splice(i, 1);
+    return normalizeForm(f);
+  }
+  /* The first row (and column) on a page where a w × h block fits with
+     no overlap: { page, x, y }. */
+  function firstFree(f, page, w, h) {
+    var pg = f.pages[page];
+    if (!pg) return null;
+    w = _clamp(_int(w, COLS), MIN_W, COLS);
+    h = _clamp(_int(h, MIN_H), MIN_H, MAX_H);
+    for (var y = 0; ; y++) {
+      for (var x = 0; x + w <= COLS; x++) {
+        var r = { block: 'text-block', x: x, y: y, w: w, h: h };
+        if (
+          !pg.blocks.some(function (b) {
+            return _overlaps(b, r);
+          })
+        ) {
+          return { page: page, x: x, y: y };
+        }
+      }
+    }
+  }
+  function removeCell(f, id) {
+    if (id === 'header' || !locate(f, id)) return f;
+    f = _without(_clone(f), id);
     if (f.pinned === id) f.pinned = null;
-    return normalizeForm(_dropEmptyRows(f));
-  }
-  function setSpan(f, id, span) {
-    f = _clone(f);
-    var at = locate(f, id);
-    if (!at || SPANS.indexOf(span) < 0) return f;
-    var row = f.pages[at.page].rows[at.row];
-    if (row.cells.length === 1) return f; // alone on its row, a cell is full width
-    if (row.cells.length === 2) {
-      var other = row.cells[1 - at.cell];
-      if (span === 12) {
-        // Full width: the other cell gets its own row after this one.
-        row.cells.splice(1 - at.cell, 1);
-        f.pages[at.page].rows.splice(at.row + 1, 0, { cells: [other] });
-        return normalizeForm(_dropEmptyRows(f));
-      }
-      row.cells[at.cell].span = span === 6 ? 6 : span;
-      other.span = 12 - row.cells[at.cell].span;
-      if (SPANS.indexOf(other.span) < 0) {
-        row.cells[at.cell].span = 6;
-        other.span = 6;
-      }
-    }
-    return normalizeForm(f);
-  }
-  function setHeight(f, id, mode, lines) {
-    f = _clone(f);
-    var cell = cellOf(f, id);
-    if (!cell) return f;
-    if (mode === 'fixed') {
-      cell.height = 'fixed';
-      cell.lines = Math.max(1, Math.min(20, Math.round(Number(lines) || cell.lines || BLOCKS[id].lines || 6)));
-    } else {
-      cell.height = 'fit';
-      delete cell.lines;
-    }
-    return normalizeForm(f);
-  }
-  function setWhenEmpty(f, id, whenEmpty) {
-    f = _clone(f);
-    var cell = cellOf(f, id);
-    if (cell) cell.whenEmpty = whenEmpty === 'box' ? 'box' : 'omit';
     return normalizeForm(f);
   }
   function setOption(f, id, key, value) {
@@ -549,76 +662,6 @@ window.ReportSheets = (function () {
   function hiddenFor(f, sid) {
     var e = f.perStudent && f.perStudent[sid];
     return e && e.hide ? e.hide.slice() : [];
-  }
-
-  /* ── Drop slots ─────────────────────────────────────────────────
-     Every place a block can land, in reading order: before or after each
-     row (a new full-width row), left or right of a row with room for a
-     column, and a new page after the last. A slot is { page, row, side }
-     or { newPage: true }. */
-  function slotsFor(f) {
-    var out = [];
-    f.pages.forEach(function (pg, p) {
-      pg.rows.forEach(function (row, r) {
-        var locked = row.cells.length === 1 && row.cells[0].block === 'header';
-        var pinned = row.cells.length === 1 && row.cells[0].block === f.pinned;
-        if (!locked) out.push({ page: p, row: r, side: 'before' });
-        if (!locked && !pinned && row.cells.length < 3) {
-          out.push({ page: p, row: r, side: 'left' });
-          out.push({ page: p, row: r, side: 'right' });
-        }
-        if (!pinned) out.push({ page: p, row: r, side: 'after' });
-      });
-      if (!pg.rows.length) out.push({ page: p, row: 0, side: 'after' });
-    });
-    out.push({ newPage: true });
-    // One slot per distinct place: "after row 2" and "before row 3" are the same.
-    return out.filter(function (sl, i) {
-      if (sl.side !== 'before' || sl.row === 0) return true;
-      return !out.some(function (o) {
-        return o.page === sl.page && o.row === sl.row - 1 && o.side === 'after';
-      });
-    });
-  }
-  /* The form with the block at the slot. A block already on the form is
-     moved: the slot is read against the form as it is, then re-found after
-     the block comes out (its empty row would shift the rows below). */
-  function placeAt(f, id, slot) {
-    if (!slot || !BLOCKS[id] || id === 'header') return f;
-    if (slot.newPage) return placeOnNewPage(f, id);
-    var page = f.pages[slot.page];
-    var row = page && page.rows[slot.row];
-    if (!row) return placeBlock(f, id, slot);
-    var others = row.cells.filter(function (c) {
-      return c.block !== id;
-    });
-    if (!others.length) return f; // its own row, alone: nowhere to go
-    var anchor = others[0].block;
-    var without = removeCell(f, id);
-    var at = locate(without, anchor);
-    if (!at) return placeBlock(f, id, slot);
-    return placeBlock(without, id, { page: at.page, row: at.row, side: slot.side });
-  }
-  /* "page 1, row 3, left half" for the live region. */
-  function slotText(f, slot) {
-    if (!slot) return '';
-    if (slot.newPage) return 'a new page ' + (f.pages.length + 1);
-    var row = f.pages[slot.page] && f.pages[slot.page].rows[slot.row];
-    var n = slot.row + 1;
-    if (slot.side === 'before') return 'page ' + (slot.page + 1) + ', before row ' + n;
-    if (slot.side === 'after') return 'page ' + (slot.page + 1) + ', after row ' + n;
-    var width = row && row.cells.length === 1 ? 'half' : 'third';
-    return 'page ' + (slot.page + 1) + ', row ' + n + ', ' + slot.side + ' ' + width;
-  }
-  /* The spans a cell may take where it is: alone on a row only full;
-     with one neighbour full, two-thirds, half or third; with two, third. */
-  function spanChoices(f, id) {
-    var at = locate(f, id);
-    if (!at) return [];
-    var n = f.pages[at.page].rows[at.row].cells.length;
-    if (n === 1) return [12];
-    if (n === 2) return [12, 8, 6, 4];
-    return [4];
   }
 
   /* ── Starters and the teacher's library ─────────────────────── */
@@ -780,110 +823,167 @@ window.ReportSheets = (function () {
     return (PAPER[paper] || PAPER.letter).size;
   }
 
-  /* ── Packing (pure) ─────────────────────────────────────────
-     front, back: item heights in px, in form order. pinned: the height of
-     the block pinned to the bottom of the back (0 for none). cap: the
-     usable height of a side. Blocks keep their order: the first that does
-     not fit, and everything after it, moves to the next side. A block
-     taller than a whole side gets a side of its own and is flagged. */
-  function pack(front, back, pinned, cap, frontMeta, backMeta) {
-    var sides = [];
-    var queue = front.map(function (h, i) {
-      return _packItem('front', i, h, frontMeta && frontMeta[i]);
+  /* ── The grid resolver (pure) ──────────────────────────────────
+     pages: the form's pages, each a list of items { id, x, w, y, h, need,
+     empty?, rows?, chrome? }: need is the rows the student's content takes
+     at the block's width (0 when the block prints nothing), rows and chrome
+     a table's row heights and the rest of it in px. opts: { rows (a page's
+     rows), pinned (id), cap (1 | 2 | null) }.
+     Each page is resolved top to bottom in (row, column) order: a block
+     takes the larger of its room and its content, and sits below every
+     block placed before it in its columns (the shove, which chains). A
+     block that passes the page's last row moves to the top of the next
+     page in the same columns, pushing that page's blocks down; a table
+     that has a row that fits is cut there and continues; whatever came
+     after it in its columns follows it. The pinned block is docked to the
+     bottom of its page, and the row above it is the page's limit. Pages
+     past the form's own are continued pages; a cap drops the pages past it
+     and names what was on them. Returns { pages: [{ items, capped? }],
+     pushed: [id], cut: [id], over, positions: { id: { page, y } } }. */
+  var MAX_PAGES = 30;
+  function resolve(pages, opts) {
+    var rows = opts.rows;
+    var out = [];
+    var carry = [];
+    var positions = {};
+    var drawn = {};
+    var pushed = [];
+    var over = false;
+    pages.forEach(function (pg, p) {
+      pg.forEach(function (it) {
+        drawn[it.id] = p;
+      });
     });
-    var backQueue = back.map(function (h, i) {
-      return _packItem('back', i, h, backMeta && backMeta[i]);
-    });
-    var rest = fill({ kind: 'front', cap: cap, items: [], used: 0, over: false }, queue);
-    rest = fill(
-      { kind: 'back', cap: Math.max(0, cap - (pinned || 0)), items: [], used: 0, over: false },
-      rest.concat(backQueue),
-    );
-    while (rest.length) rest = fill({ kind: 'continued', cap: cap, items: [], used: 0, over: false }, rest);
-    return sides;
-
-    function place(side, it, h, rowEnd) {
-      var out = { from: it.from, i: it.i, h: h };
-      if (it.rowStart != null) {
-        out.rowStart = it.rowStart;
-        out.rowEnd = rowEnd;
+    var sum = function (list) {
+      return list.reduce(function (a, b) {
+        return a + b;
+      }, 0);
+    };
+    for (var p = 0; (p < pages.length || carry.length) && p < MAX_PAGES; p++) {
+      var page = { items: [] };
+      var put = function (it, y, h, part) {
+        var placed = { id: it.id, x: it.x, w: it.w, y: y, h: h };
+        if (part) placed.part = part;
+        if (it.pinned) placed.pinned = true;
+        page.items.push(placed);
+        if (!positions[it.id]) positions[it.id] = { page: p, y: y };
+        if (drawn[it.id] !== p && pushed.indexOf(it.id) < 0) pushed.push(it.id);
+      };
+      var own = (pages[p] || []).slice().sort(function (a, b) {
+        return a.y - b.y || a.x - b.x;
+      });
+      var limit = rows;
+      var pin = own.find(function (it) {
+        return it.id === opts.pinned;
+      });
+      if (pin) {
+        own = own.filter(function (it) {
+          return it !== pin;
+        });
+        var ph = Math.max(pin.h, pin.need);
+        if (ph > rows) over = true;
+        limit = Math.max(0, rows - ph);
+        put(Object.assign({}, pin, { pinned: true }), limit, Math.min(ph, rows));
       }
-      side.items.push(out);
-      side.used += h;
-      if (h > side.cap) side.over = true;
-    }
-
-    function fill(side, items) {
-      sides.push(side);
-      for (var k = 0; k < items.length; k++) {
-        var it = items[k];
-        var room = side.cap - side.used;
-        if (it.h <= room) {
-          place(side, it, it.h, it.rows ? it.rowStart + it.rows.length : undefined);
-          continue;
+      var placed = [];
+      var next = [];
+      var queue = carry
+        .map(function (it) {
+          return Object.assign({}, it, { y: 0, h: 0 });
+        })
+        .concat(own);
+      queue.forEach(function (it) {
+        var y = it.y;
+        placed.forEach(function (pl) {
+          if (_colsMeet(pl, it)) y = Math.max(y, pl.bottom);
+        });
+        var need = Math.max(it.h, it.need);
+        var start = it.start || 0;
+        var part = start > 0 ? { start: start, end: start + it.rows.length } : null;
+        if (y + need <= limit) {
+          put(it, y, need, part);
+          placed.push({ x: it.x, w: it.w, bottom: y + need });
+          return;
         }
-        if (it.rows && it.rows.length > 1) {
-          // The rows that fit stay; the rest carry on to the next side. A
-          // row taller than a side goes alone and over, never dropped.
+        // A block that prints nothing for the student takes no room.
+        if (it.empty) return;
+        // The room runs past the page but the content fits: the room ends there.
+        if (y < limit && y + it.need <= limit) {
+          put(it, y, limit - y, part);
+          placed.push({ x: it.x, w: it.w, bottom: limit });
+          return;
+        }
+        if (it.rows && it.rows.length > 1 && y < limit) {
+          var room = (limit - y) * ROW_PX - it.chrome;
           var take = 0;
-          var sum = it.chrome;
-          while (take < it.rows.length && sum + it.rows[take] <= room) {
-            sum += it.rows[take];
+          var used = 0;
+          while (take < it.rows.length && used + it.rows[take] <= room) {
+            used += it.rows[take];
             take++;
           }
-          if (take === 0 && side.used === 0) {
-            sum += it.rows[0];
-            take = 1;
+          if (take === 0 && y === 0) {
+            take = 1; // a row taller than a page goes alone and over, never dropped
+            over = true;
           }
-          if (take === 0) return items.slice(k);
-          if (take >= it.rows.length) {
-            place(side, it, it.h, it.rowStart + it.rows.length);
-            continue;
+          if (take > 0) {
+            put(it, y, limit - y, { start: start, end: start + take });
+            placed.push({ x: it.x, w: it.w, bottom: Infinity });
+            var rest = it.rows.slice(take);
+            next.push({
+              id: it.id,
+              x: it.x,
+              w: it.w,
+              y: 0,
+              h: 0,
+              rows: rest,
+              chrome: it.chrome,
+              start: start + take,
+              need: Math.ceil((it.chrome + sum(rest)) / ROW_PX),
+            });
+            return;
           }
-          place(side, it, sum, it.rowStart + take);
-          var restRows = it.rows.slice(take);
-          var restItem = {
-            from: it.from,
-            i: it.i,
-            rows: restRows,
-            chrome: it.chrome,
-            rowStart: it.rowStart + take,
-            h:
-              it.chrome +
-              restRows.reduce(function (a, b) {
-                return a + b;
-              }, 0),
-          };
-          return [restItem].concat(items.slice(k + 1));
         }
-        if (side.used === 0) {
-          place(side, it, it.h);
-          continue;
+        // Taller than a whole page: it stays at the top, flagged.
+        if (y === 0 && need > rows) {
+          put(it, 0, need, part);
+          placed.push({ x: it.x, w: it.w, bottom: need });
+          over = true;
+          return;
         }
-        return items.slice(k);
-      }
-      return [];
+        next.push(it);
+        placed.push({ x: it.x, w: it.w, bottom: Infinity });
+      });
+      out.push(page);
+      carry = next;
     }
-  }
-
-  function _packItem(from, i, h, meta) {
-    var it = { from: from, i: i, h: h };
-    if (meta && meta.rows && meta.rows.length > 1) {
-      it.rows = meta.rows;
-      it.chrome = meta.chrome || 0;
-      it.rowStart = 0;
+    var cut = [];
+    if (opts.cap && out.length > opts.cap) {
+      out.slice(opts.cap).forEach(function (pg) {
+        pg.items
+          .slice()
+          .sort(function (a, b) {
+            return a.y - b.y || a.x - b.x;
+          })
+          .forEach(function (it) {
+            if (cut.indexOf(it.id) < 0) cut.push(it.id);
+          });
+      });
+      out = out.slice(0, opts.cap);
+      out[out.length - 1].capped = cut;
     }
-    return it;
+    return { pages: out, pushed: pushed, cut: cut, over: over, positions: positions };
   }
 
   /* A comment box with ruled lines for a student with no comment yet. */
-  function _emptyCommentBox(px) {
+  function _emptyCommentBox() {
     return (
       '<div class="report-block-box report-comment-box"><div class="report-block-title">Teacher Comment</div>' +
-      '<div class="report-ruled" style="height:' +
-      Math.round(px) +
-      'px"></div></div>'
+      '<div class="report-ruled report-ruled-fill report-ruled-empty"></div></div>'
     );
+  }
+  /* Ruled lines into the room a short comment or text leaves. */
+  function _withRuled(html) {
+    return html.replace(/<\/div>\s*$/, '<div class="report-ruled report-ruled-fill"></div></div>');
   }
 
   /* A cell's options with the registry's defaults filled in, plus its
@@ -901,68 +1001,11 @@ window.ReportSheets = (function () {
     return out;
   }
 
-  function _cellHtml(cell, cid, student, ctx, probe) {
+  function _cellHtml(cell, cid, student, ctx) {
     var html = ReportBlocks.renderReportBlock(cell.block, cid, student, ctx, optionsFor(cell));
-    var roomPx = cell.height === 'fixed' && cell.lines ? cell.lines * probe.linePx : 0;
-    if (!html) {
-      if (cell.whenEmpty === 'box' && roomPx) return _emptyCommentBox(roomPx);
-      return '';
-    }
-    if (roomPx) {
-      // Reserve the room so a short comment still leaves the form's shape.
-      html =
-        '<div class="sheet-room" style="min-height:' +
-        Math.round(roomPx + probe.boxChromePx) +
-        'px">' +
-        html +
-        '</div>';
-    }
+    if (cell.block === 'teacher-narrative' && !html) return _emptyCommentBox();
+    if (html && (cell.block === 'teacher-narrative' || cell.block === 'text-block')) html = _withRuled(html);
     return html;
-  }
-  /* A row as it sits on the sheet: one cell alone, or cells side by side
-     at their spans. Each cell is marked with its block so the Studio can
-     select it. Empty cells take no room; an empty row takes none. */
-  function _rowHtml(row, cid, student, ctx, probe, hidden) {
-    var cells = row.cells
-      .filter(function (c) {
-        return hidden.indexOf(c.block) < 0;
-      })
-      .map(function (c) {
-        return { cell: c, html: _cellHtml(c, cid, student, ctx, probe) };
-      })
-      .filter(function (x) {
-        return !!x.html;
-      });
-    if (!cells.length) return '';
-    if (cells.length === 1 && row.cells.length === 1) {
-      return '<div class="sheet-cell" data-block="' + cells[0].cell.block + '">' + cells[0].html + '</div>';
-    }
-    return (
-      '<div class="sheet-row">' +
-      cells
-        .map(function (x) {
-          return (
-            '<div class="sheet-cell" data-block="' +
-            x.cell.block +
-            '" style="flex:0 0 calc(' +
-            x.cell.span +
-            ' / 12 * (100% - ' +
-            (cells.length - 1) * 12 +
-            'px))">' +
-            x.html +
-            '</div>'
-          );
-        })
-        .join('') +
-      '</div>'
-    );
-  }
-  function _rowLabel(row) {
-    return row.cells
-      .map(function (c) {
-        return BLOCKS[c.block] ? BLOCKS[c.block].label : c.block;
-      })
-      .join(' and ');
   }
 
   /* ── Measuring ──────────────────────────────────────────────── */
@@ -989,80 +1032,71 @@ window.ReportSheets = (function () {
     });
   }
 
-  /* One comment line and the box around it, in px, from the real CSS. */
+  /* One comment line and the box around it, and the footer, in px, from
+     the real CSS. */
   function _probe(stage) {
     var one = ReportBlocks.renderCommentBox('A');
     var two = ReportBlocks.renderCommentBox('A<br>A');
-    var footer = _footerHtml('Course', 'Report', 'Teacher', 'Student', 1, 1, 'Front');
+    var footer = _footerHtml('Course', 'Report', 'Teacher', 'Student', 1, 1);
     var h = _measureAll(stage, [one, two, footer]);
     var linePx = Math.max(12, h[1] - h[0]);
     return { linePx: linePx, boxChromePx: Math.max(0, h[0] - linePx), footerPx: h[2] };
   }
 
+  /* A block's width in px at w columns on a page `contentW` wide, and its
+     left edge at column x. */
+  function _colPx(w, contentW) {
+    return (w * (contentW + GUTTER)) / COLS - GUTTER;
+  }
+  function _leftPx(x, contentW) {
+    return (x * (contentW + GUTTER)) / COLS;
+  }
+  /* The rows on one page: the sheet inside its margins, less the footer. */
+  function pageRows(paper, probe) {
+    var p = PAPER[paper] || PAPER.letter;
+    return Math.floor(((p.h - 2 * MARGIN_IN) * PX_PER_IN - probe.footerPx) / ROW_PX);
+  }
+
+  /* Each block rendered for the student and measured at its own width, as
+     it will sit on the page: { px, rows?, chrome? } on each entry. */
+  function _measureCells(stage, cells, contentW) {
+    stage.innerHTML = cells
+      .map(function (c) {
+        return (
+          '<div class="sheet-cell" data-block="' +
+          c.b.block +
+          '" style="width:' +
+          _colPx(c.b.w, contentW) +
+          'px">' +
+          c.html +
+          '</div>'
+        );
+      })
+      .join('');
+    Array.prototype.forEach.call(stage.children, function (el, i) {
+      var c = cells[i];
+      c.px = c.html ? el.offsetHeight : 0;
+      if (!c.html || !BLOCKS[c.b.block].table) return;
+      var tbody = el.querySelector('table tbody');
+      if (!tbody || tbody.rows.length < 2) return;
+      c.rows = Array.prototype.map.call(tbody.rows, function (r) {
+        return r.offsetHeight;
+      });
+      c.chrome = Math.max(
+        0,
+        c.px -
+          c.rows.reduce(function (a, b) {
+            return a + b;
+          }, 0),
+      );
+    });
+  }
+
   /* ── Sheets ─────────────────────────────────────────────────── */
-  /* n and total are pages (sides); `side` is kept for callers but not printed. */
-  function _footerHtml(course, report, teacher, student, n, total, side) {
+  function _footerHtml(course, report, teacher, student, n, total) {
     var left = [course, report, teacher].filter(Boolean).map(esc).join(' · ');
     var right = esc(student) + ' · Page ' + n + ' of ' + total;
     return '<div class="sheet-footer"><span>' + left + '</span><span>' + right + '</span></div>';
-  }
-
-  function _sideHtml(side, itemHtml, pinnedHtml, footer, paper, extraClass, opts) {
-    var body = side
-      ? side.items
-          .map(function (it) {
-            var html = itemHtml[it.from][it.i];
-            if (it.rowStart != null) html = _partHtml(html, it.rowStart, it.rowEnd, it.rowStart > 0);
-            return '<div class="sheet-item">' + html + '</div>';
-          })
-          .join('')
-      : '<div class="sheet-blank">This side is left blank.</div>';
-    var fill = side && side.cap ? Math.min(1, side.used / side.cap) : 0;
-    return (
-      '<div class="report-sheet' +
-      (side && side.over ? ' sheet-overflow' : '') +
-      (extraClass ? ' ' + extraClass : '') +
-      (opts && opts.type === 'compact' ? ' compact' : '') +
-      '" data-paper="' +
-      paper +
-      '" data-fill="' +
-      Math.round(fill * 100) +
-      '" style="--fill:' +
-      Math.round(fill * 100) +
-      '%">' +
-      '<div class="sheet-body">' +
-      body +
-      '</div>' +
-      (pinnedHtml ? '<div class="sheet-pinned">' + pinnedHtml + '</div>' : '') +
-      (side && side.capped && side.capped.length
-        ? '<div class="sheet-capped no-print">Doesn\u2019t fit \u00B7 ' + esc(side.capped.join(', ')) + '</div>'
-        : '') +
-      footer +
-      '</div>'
-    );
-  }
-
-  /* ── Tall blocks split at row boundaries (plan item 5.6) ──────────
-     A table block taller than the room left on a side (the Assignment
-     Grades table for a student with many assessments) used to be placed
-     alone on a side and spill off it. pack() now cuts such a block at its
-     rows: the rows that fit go on the current side and the rest carry on
-     to the next, each part a copy of the block with that run of rows, the
-     later parts titled "(continued)". */
-
-  /* The row heights and chrome (title, head, padding) of a table block,
-     measured on the stage, or null when the block has no table to cut. */
-  function _rowsOf(html, h, stage) {
-    stage.innerHTML = '<div class="sheet-item">' + html + '</div>';
-    var tbody = stage.querySelector('table tbody');
-    if (!tbody || tbody.rows.length < 2) return null;
-    var rows = Array.prototype.map.call(tbody.rows, function (r) {
-      return r.offsetHeight;
-    });
-    var total = rows.reduce(function (a, b) {
-      return a + b;
-    }, 0);
-    return { rows: rows, chrome: Math.max(0, h - total) };
   }
 
   /* The block with only rows [start, end) of its first table body. */
@@ -1082,170 +1116,130 @@ window.ReportSheets = (function () {
     return tpl.innerHTML;
   }
 
-  /* Lays one student into sheets. Returns { html, sheets, sides, over }. */
-  /* One plain sentence or two on why a student's report is the shape it is.
-     Empty when everything sits where the form puts it. */
-  function reasonText(r) {
-    var parts = [];
-    if (r.room && r.commentLines > r.room) {
-      parts.push('Comment is ' + r.commentLines + ' lines; the form keeps ' + r.room + ' on the front.');
-    }
-    if (r.moved && r.moved.length) parts.push(r.moved.join(' and ') + ' moved to the back.');
-    if (r.continued && r.continued.length) parts.push(r.continued.join(' and ') + ' on a second sheet.');
-    if (r.noComment) parts.push('No comment yet; the box prints with lines.');
-    return parts.join(' ');
+  /* A placed block, absolutely on the page at its rectangle. */
+  function _placedHtml(it, html, contentW) {
+    if (it.part) html = _partHtml(html, it.part.start, it.part.end, it.part.start > 0);
+    var def = BLOCKS[it.id] || {};
+    return (
+      '<div class="sheet-cell' +
+      (def.fill ? ' sheet-fill' : '') +
+      (it.pinned ? ' sheet-pinned' : '') +
+      (html ? '' : ' sheet-empty') +
+      '" data-block="' +
+      it.id +
+      '" data-x="' +
+      it.x +
+      '" data-y="' +
+      it.y +
+      '" data-w="' +
+      it.w +
+      '" data-h="' +
+      it.h +
+      '" style="left:' +
+      _leftPx(it.x, contentW) +
+      'px;top:' +
+      it.y * ROW_PX +
+      'px;width:' +
+      _colPx(it.w, contentW) +
+      'px;min-height:' +
+      it.h * ROW_PX +
+      'px">' +
+      html +
+      '</div>'
+    );
   }
 
+  function _pageHtml(page, cellHtml, footer, paper, opts) {
+    var body = page
+      ? page.items
+          .map(function (it) {
+            return _placedHtml(it, cellHtml[it.id] || '', opts.contentW);
+          })
+          .join('')
+      : '<div class="sheet-blank">This side is left blank.</div>';
+    return (
+      '<div class="report-sheet' +
+      (page && page.over ? ' sheet-overflow' : '') +
+      (page ? '' : ' sheet-blank-side') +
+      (opts.type === 'compact' ? ' compact' : '') +
+      '" data-paper="' +
+      paper +
+      '">' +
+      '<div class="sheet-body">' +
+      body +
+      '</div>' +
+      (page && page.capped && page.capped.length
+        ? '<div class="sheet-capped no-print">Doesn’t fit · ' + esc(page.capped.join(', ')) + '</div>'
+        : '') +
+      footer +
+      '</div>'
+    );
+  }
+
+  /* Lays one student onto the form's pages. Returns { html, sheets, sides,
+     pushed: [blockId], cut: [label], over, positions, used, commentLines,
+     room, noComment, badge }. */
   function layoutStudent(cid, student, ctx, opts) {
-    var f = opts.form || FORM_REPORT_CARD;
+    var f = opts.form || normalizeForm(FORM_REPORT_CARD);
     var probe = opts.probe;
-    var paper = opts.paper || 'letter';
-    var p = PAPER[paper] || PAPER.letter;
-    var sideH = (p.h - 2 * MARGIN_IN) * PX_PER_IN;
-    var cap = Math.floor((sideH - probe.footerPx) * (1 - SAFETY));
-
+    var paper = PAPER[opts.paper] ? opts.paper : 'letter';
+    var contentW = (PAPER[paper].w - 2 * MARGIN_IN) * PX_PER_IN;
+    var rows = pageRows(paper, probe);
     var hidden = hiddenFor(f, student.id);
-    var commentCell = cellOf(f, 'teacher-narrative');
-    var rawComment =
-      commentCell && hidden.indexOf('teacher-narrative') < 0
-        ? ReportBlocks.renderReportBlock('teacher-narrative', cid, student, ctx, commentCell.options || {})
-        : '';
-    // pages[0] is the front; every later page flows on from the back. The
-    // pinned block comes out of its row and sits at the bottom of the back.
-    var isPinned = function (row) {
-      return row.cells.length === 1 && row.cells[0].block === f.pinned;
-    };
-    var frontRows = f.pages[0].rows.filter(function (row) {
-      return !isPinned(row);
-    });
-    var backRows = [];
-    f.pages.slice(1).forEach(function (pg) {
-      pg.rows.forEach(function (row) {
-        if (!isPinned(row)) backRows.push(row);
+    var cells = [];
+    f.pages.forEach(function (pg, p) {
+      pg.blocks.forEach(function (b) {
+        if (hidden.indexOf(b.block) >= 0) return;
+        cells.push({ page: p, b: b, html: _cellHtml(b, cid, student, ctx) });
       });
     });
-    var pinnedCell = f.pinned && hidden.indexOf(f.pinned) < 0 ? cellOf(f, f.pinned) : null;
-    // Pages per student (toolbar): 1 puts everything on the front with the
-    // pinned block at its foot; 1 or 2 cut what does not fit and mark it.
+    _measureCells(opts.stage, cells, contentW);
+    var cellHtml = {};
+    var used = 0;
+    var comment = null;
+    var pages = f.pages.map(function () {
+      return [];
+    });
+    cells.forEach(function (c) {
+      cellHtml[c.b.block] = c.html;
+      used += c.px;
+      if (c.b.block === 'teacher-narrative') comment = c;
+      pages[c.page].push({
+        id: c.b.block,
+        x: c.b.x,
+        w: c.b.w,
+        y: c.b.y,
+        h: c.b.h != null ? c.b.h : 0,
+        need: Math.ceil(c.px / ROW_PX),
+        empty: !c.html,
+        rows: c.rows,
+        chrome: c.chrome,
+      });
+    });
     var pps = f.pagesPerStudent === 1 || f.pagesPerStudent === 2 ? f.pagesPerStudent : null;
-    var pinOnFront = pps === 1;
-    if (pinOnFront) {
-      frontRows = frontRows.concat(backRows);
-      backRows = [];
-    }
-    var frontHtml = frontRows.map(function (row) {
-      return _rowHtml(row, cid, student, ctx, probe, hidden);
-    });
-    var frontLabels = frontRows.map(_rowLabel);
-    var backHtml = backRows.map(function (row) {
-      return _rowHtml(row, cid, student, ctx, probe, hidden);
-    });
-    var backLabels = backRows.map(_rowLabel);
-    var pinnedHtml = pinnedCell ? _rowHtml({ cells: [pinnedCell] }, cid, student, ctx, probe, hidden) : '';
-    var frontSingle = frontRows.map(function (row) {
-      return row.cells.length === 1;
-    });
-    var backSingle = backRows.map(function (row) {
-      return row.cells.length === 1;
-    });
-
-    // Empty blocks take no room at all.
-    var frontKeep = [],
-      backKeep = [];
-    frontHtml = frontHtml.filter(function (h, i) {
-      if (h) frontKeep.push(i);
-      return !!h;
-    });
-    backHtml = backHtml.filter(function (h, i) {
-      if (h) backKeep.push(i);
-      return !!h;
-    });
-
-    var extra = (pinnedHtml ? [pinnedHtml] : []).concat(rawComment ? [rawComment] : []);
-    var heights = _measureAll(opts.stage, frontHtml.concat(backHtml, extra));
-    var frontH = heights.slice(0, frontHtml.length);
-    var backH = heights.slice(frontHtml.length, frontHtml.length + backHtml.length);
-    var pinnedH = pinnedHtml ? heights[frontHtml.length + backHtml.length] : 0;
-    var commentH = rawComment ? heights[heights.length - 1] : 0;
-    var commentLines = rawComment ? Math.max(1, Math.round((commentH - probe.boxChromePx) / probe.linePx)) : 0;
-    var room = commentCell && commentCell.height === 'fixed' ? commentCell.lines : 0;
-
-    // A block that may not fit a side gets its row heights, so pack() can
-    // cut it where the side ends.
-    var backCap = Math.max(0, cap - pinnedH);
-    var frontMeta = frontHtml.map(function (h, i) {
-      return frontH[i] > backCap && frontSingle[frontKeep[i]] ? _rowsOf(h, frontH[i], opts.stage) : null;
-    });
-    var backMeta = backHtml.map(function (h, i) {
-      return backH[i] > backCap && backSingle[backKeep[i]] ? _rowsOf(h, backH[i], opts.stage) : null;
-    });
-    var sides = pinOnFront
-      ? pack(frontH, [], 0, Math.max(0, cap - pinnedH), frontMeta, [])
-      : pack(frontH, backH, pinnedH, cap, frontMeta, backMeta);
-    var labelOf = function (it) {
-      return it.from === 'front' ? frontLabels[frontKeep[it.i]] : backLabels[backKeep[it.i]];
+    var r = resolve(pages, { rows: rows, pinned: f.pinned, cap: pps });
+    var labelOf = function (id) {
+      return BLOCKS[id] ? BLOCKS[id].label : id;
     };
-    var cutBlocks = [];
-    if (pps && sides.length > pps) {
-      sides.slice(pps).forEach(function (sd) {
-        sd.items.forEach(function (it) {
-          var label = String(labelOf(it) || '').replace(/ \(continued\)$/, '');
-          if (label && cutBlocks.indexOf(label) < 0) cutBlocks.push(label);
-        });
-      });
-      sides = sides.slice(0, pps);
-      sides[sides.length - 1].capped = cutBlocks;
-    }
-    var sheetCount = Math.ceil(sides.length / 2);
-    var moved = [];
-    var continued = [];
-    // A block cut into parts is named once in the reason, by its own name.
-    var nameOnce = function (list, label) {
-      label = label.replace(/ \(continued\)$/, '');
-      if (list.indexOf(label) < 0) list.push(label);
-    };
-    // Where each block landed (side index) and how full each side is, for
-    // the Studio's drop zones and fill bars.
-    var placement = {};
-    sides.forEach(function (side, idx) {
-      side.items.forEach(function (it) {
-        var label = it.from === 'front' ? frontLabels[frontKeep[it.i]] : backLabels[backKeep[it.i]];
-        if (idx === 1 && it.from === 'front') nameOnce(moved, label);
-        if (idx >= 2) nameOnce(continued, label);
-        var row = it.from === 'front' ? frontRows[frontKeep[it.i]] : backRows[backKeep[it.i]];
-        (row ? row.cells : []).forEach(function (c) {
-          if (placement[c.block] == null) placement[c.block] = idx;
-        });
+    r.pages.forEach(function (pg) {
+      if (pg.capped) pg.capped = pg.capped.map(labelOf);
+      pg.over = pg.items.some(function (it) {
+        return it.y + it.h > rows;
       });
     });
-    if (pinnedHtml) placement[f.pinned] = pinOnFront ? 0 : 1;
-    var fills = sides.map(function (sd) {
-      return sd.cap ? Math.min(1, sd.used / sd.cap) : 0;
-    });
+    // The comment's lines and its box's room, for the questionnaire.
+    var noComment = !!comment && comment.html === _emptyCommentBox();
+    var room = comment ? Math.max(0, Math.floor((comment.b.h * ROW_PX - probe.boxChromePx) / probe.linePx)) : 0;
+    var commentLines =
+      comment && !noComment ? Math.max(1, Math.round((comment.px - probe.boxChromePx) / probe.linePx)) : 0;
+
+    var sides = r.pages.length;
+    var sheetCount = Math.ceil(sides / 2);
+    var badge = noComment && sheetCount === 1 ? 'No comment' : sheetCount === 1 ? '1 sheet' : sheetCount + ' sheets';
     var course = COURSES[cid] || {};
     var teacher = (typeof getConfig === 'function' && getConfig().displayName) || '';
     var name = fullName(student);
-    var itemHtml = { front: frontHtml, back: backHtml };
-    var used = frontH.concat(backH).reduce(function (a, b) {
-      return a + b;
-    }, pinnedH);
-    var result = {
-      sheets: sheetCount,
-      sides: sides.length,
-      used: used,
-      over: false,
-      moved: moved,
-      continued: continued,
-      commentLines: commentLines,
-      room: room,
-      noComment: !!commentCell && hidden.indexOf('teacher-narrative') < 0 && !rawComment,
-      placement: placement,
-      fills: fills,
-      cut: cutBlocks,
-    };
-    var reason = reasonText(result);
-    var badge =
-      result.noComment && sheetCount === 1 ? 'No comment' : sheetCount === 1 ? '1 sheet' : sheetCount + ' sheets';
+    var total = sheetCount * 2;
     var html =
       '<div class="sheet-student" data-action="fitMapPick" data-sid="' +
       esc(student.id) +
@@ -1255,56 +1249,41 @@ window.ReportSheets = (function () {
       '<div class="sheet-student-head no-print"><span class="sheet-student-name">' +
       esc(name) +
       '</span><span class="sheet-badge ' +
-      (sheetCount > 1 ? 'over' : result.noComment ? 'none' : 'ok') +
+      (sheetCount > 1 ? 'over' : noComment ? 'none' : 'ok') +
       '">' +
       badge +
-      '</span></div>' +
-      (reason ? '<div class="sheet-note no-print">' + esc(reason) + '</div>' : '');
-    var total = sheetCount * 2;
-    var over = false;
-    for (var s = 0; s < sheetCount; s++) {
-      var front = sides[2 * s];
-      var back = sides[2 * s + 1] || null;
-      over = over || front.over || (back && back.over) || !!front.capped || !!(back && back.capped);
+      '</span></div>';
+    for (var s = 0; s < total; s++) {
       html +=
         '<div class="sheet-zoom"><div class="sheet-label no-print">Page ' +
-        (2 * s + 1) +
+        (s + 1) +
         ' of ' +
         total +
         '</div>' +
-        _sideHtml(
-          front,
-          itemHtml,
-          s === 0 && pinOnFront ? pinnedHtml : '',
-          _footerHtml(course.name, ctx.termLabel, teacher, name, 2 * s + 1, total, 'Front'),
+        _pageHtml(
+          r.pages[s] || null,
+          cellHtml,
+          _footerHtml(course.name, ctx.termLabel, teacher, name, s + 1, total),
           paper,
-          '',
-          f,
-        ) +
-        '</div>';
-      html +=
-        '<div class="sheet-zoom"><div class="sheet-label no-print">Page ' +
-        (2 * s + 2) +
-        ' of ' +
-        total +
-        '</div>' +
-        _sideHtml(
-          back,
-          itemHtml,
-          s === 0 && !pinOnFront ? pinnedHtml : '',
-          _footerHtml(course.name, ctx.termLabel, teacher, name, 2 * s + 2, total, 'Back'),
-          paper,
-          back ? '' : 'sheet-blank-side',
-          f,
+          { type: f.type, contentW: contentW },
         ) +
         '</div>';
     }
     html += '</div>';
-    result.html = html;
-    result.over = over;
-    result.reason = reason;
-    result.badge = badge;
-    return result;
+    return {
+      html: html,
+      sheets: sheetCount,
+      sides: sides,
+      pushed: r.pushed,
+      cut: r.cut.map(labelOf),
+      over: r.over,
+      positions: r.positions,
+      used: used,
+      commentLines: commentLines,
+      room: room,
+      noComment: noComment,
+      badge: badge,
+    };
   }
 
   /* ── Preview ────────────────────────────────────────────────── */
@@ -1332,45 +1311,44 @@ window.ReportSheets = (function () {
     if (style) style.remove();
   }
 
+  function _summary(students) {
+    return { students: students.length, sheets: 0, pages: 0, continued: [], over: [], noComment: [], perStudent: {} };
+  }
+  function _count(summary, st, r) {
+    summary.sheets += r.sheets;
+    summary.pages += r.sheets * 2;
+    if (r.sheets > 1) summary.continued.push(fullName(st));
+    if (r.over) summary.over.push(fullName(st));
+    if (r.noComment) summary.noComment.push(fullName(st));
+    summary.perStudent[st.id] = {
+      sheets: r.sheets,
+      sides: r.sides,
+      over: r.over,
+      pushed: r.pushed,
+      cut: r.cut,
+      badge: r.badge,
+      noComment: r.noComment,
+      name: fullName(st),
+      used: r.used,
+    };
+    return summary.perStudent[st.id];
+  }
+
   /* Renders every student's sheets into `preview`. Returns a summary
-     { students, sheets, pages, continued: [names], over: [names] }. */
+     { students, sheets, pages, continued: [names], over: [names],
+     noComment: [names], perStudent }. */
   function renderPreview(opts) {
     var preview = opts.preview;
     var paper = PAPER[opts.paper] ? opts.paper : 'letter';
-    var p = PAPER[paper];
-    var contentW = (p.w - 2 * MARGIN_IN) * PX_PER_IN;
+    var contentW = (PAPER[paper].w - 2 * MARGIN_IN) * PX_PER_IN;
     var formUsed = normalizeForm(opts.form);
     var stage = _stage(preview, contentW, formUsed.type);
     var probe = _probe(stage);
-    var summary = {
-      students: opts.students.length,
-      sheets: 0,
-      pages: 0,
-      continued: [],
-      over: [],
-      noComment: [],
-      perStudent: {},
-    };
+    var summary = _summary(opts.students);
     var html = opts.students
       .map(function (st) {
         var r = layoutStudent(opts.cid, st, opts.ctx, { form: formUsed, paper: paper, stage: stage, probe: probe });
-        summary.sheets += r.sheets;
-        summary.pages += r.sheets * 2;
-        if (r.sheets > 1) summary.continued.push(fullName(st));
-        if (r.over) summary.over.push(fullName(st));
-        if (r.noComment) summary.noComment.push(fullName(st));
-        summary.perStudent[st.id] = {
-          sheets: r.sheets,
-          sides: r.sides,
-          over: r.over,
-          cut: r.cut,
-          badge: r.badge,
-          reason: r.reason,
-          noComment: r.noComment,
-          name: fullName(st),
-          html: r.html,
-          used: r.used,
-        };
+        _count(summary, st, r).html = r.html;
         return r.html;
       })
       .join('');
@@ -1383,8 +1361,8 @@ window.ReportSheets = (function () {
   }
 
   /* Lays one student out without rendering, for the questionnaire's
-     comment box. The stage lives on <body>; .report-sheet carries its own
-     sizes, so the measurement matches the preview. */
+     comment box and for settle(). The stage lives on <body>; .report-sheet
+     carries its own sizes, so the measurement matches the preview. */
   function describeStudent(cid, student, ctx, opts) {
     opts = opts || {};
     var paper = PAPER[opts.paper] ? opts.paper : 'letter';
@@ -1401,97 +1379,21 @@ window.ReportSheets = (function () {
     }
   }
 
-  /* The drop zone's answer for one student: would the block, placed at the
-     slot, land on that page? { fits, landsOn (1-based page or null), left
-     (percent of that page still free), form (the candidate) }. */
-  function fitAt(cid, student, ctx, opts) {
-    var candidate = placeAt(normalizeForm(opts.form), opts.block, opts.slot);
-    var r = describeStudent(cid, student, ctx, { form: candidate, paper: opts.paper });
-    var target = opts.slot && opts.slot.newPage ? candidate.pages.length - 1 : opts.slot ? opts.slot.page : 0;
-    var landed = r.placement ? r.placement[opts.block] : null;
-    var fits = landed != null && landed === target && !r.over;
-    var left = landed != null ? Math.round((1 - (r.fills[landed] || 0)) * 100) : 0;
-    return { fits: fits, landsOn: landed != null ? landed + 1 : null, left: left, form: candidate };
-  }
-  /* "Drop here · fits (18% of page left)" / "Doesn't fit here · lands on page 2". */
-  function fitLabelFor(fit) {
-    if (!fit) return '';
-    if (fit.fits) return 'Drop here · fits (' + fit.left + '% of page left)';
-    if (fit.landsOn) return 'Doesn’t fit here · lands on page ' + fit.landsOn;
-    return 'Doesn’t fit here';
-  }
-
-  /* Sheets per student on each starter form, for the setup list: what a
-     form costs the class is known before it is chosen. Lays every student
-     out on each form on a stage off-screen; a class of 30 takes well under
-     a second. Returns { formId: { most, max } }, most being the sheet
-     count the largest number of students need. */
-  function sheetsForForms(cid, students, ctx, opts) {
-    opts = opts || {};
-    var paper = PAPER[opts.paper] ? opts.paper : 'letter';
-    var contentW = (PAPER[paper].w - 2 * MARGIN_IN) * PX_PER_IN;
-    var type = opts.type === 'compact' ? 'compact' : 'standard';
-    var out = {};
-    STARTERS.forEach(function (st) {
-      var f = normalizeForm(Object.assign({}, st.form, { type: type }));
-      var stage = _stage(document.body, contentW, f.type);
-      try {
-        var probe = _probe(stage);
-        var counts = {};
-        students.forEach(function (student) {
-          var r = layoutStudent(cid, student, ctx, { form: f, paper: paper, stage: stage, probe: probe });
-          counts[r.sheets] = (counts[r.sheets] || 0) + 1;
-        });
-        var sheets = Object.keys(counts).map(Number);
-        var most = sheets.sort(function (a, b) {
-          return counts[b] - counts[a] || a - b;
-        })[0];
-        out[st.id] = { most: most || 1, max: sheets.length ? Math.max.apply(null, sheets) : 1 };
-      } finally {
-        stage.remove();
-      }
-    });
-    return out;
-  }
   /* The class laid out on the current form, without rendering: the same
-     summary renderPreview returns, minus the HTML. For the Studio's stats
-     and the toolbar count while one student is on screen. */
+     summary renderPreview returns, minus the HTML. For the fit line while
+     one student is on screen. */
   function classSummary(cid, students, ctx, opts) {
     opts = opts || {};
     var paper = PAPER[opts.paper] ? opts.paper : 'letter';
     var contentW = (PAPER[paper].w - 2 * MARGIN_IN) * PX_PER_IN;
     var formUsed = normalizeForm(opts.form);
     var stage = _stage(document.body, contentW, formUsed.type);
-    var summary = {
-      students: students.length,
-      sheets: 0,
-      pages: 0,
-      continued: [],
-      over: [],
-      noComment: [],
-      perStudent: {},
-    };
+    var summary = _summary(students);
     try {
       var probe = _probe(stage);
       students.forEach(function (st) {
         var r = layoutStudent(cid, st, ctx, { form: formUsed, paper: paper, stage: stage, probe: probe });
-        summary.sheets += r.sheets;
-        summary.pages += r.sheets * 2;
-        if (r.sheets > 1) summary.continued.push(fullName(st));
-        if (r.over) summary.over.push(fullName(st));
-        if (r.noComment) summary.noComment.push(fullName(st));
-        summary.perStudent[st.id] = {
-          sheets: r.sheets,
-          sides: r.sides,
-          over: r.over,
-          cut: r.cut,
-          badge: r.badge,
-          reason: r.reason,
-          noComment: r.noComment,
-          name: fullName(st),
-          used: r.used,
-          hash: ReportIssuesHash(r.html),
-        };
+        _count(summary, st, r).hash = ReportIssuesHash(r.html);
       });
     } finally {
       stage.remove();
@@ -1512,16 +1414,16 @@ window.ReportSheets = (function () {
     var stage = _stage(document.body, contentW, opts.type === 'compact' ? 'compact' : 'standard');
     var out = {};
     try {
-      var probe = _probe(stage);
-      var ids = BLOCK_ORDER.filter(function (id) {
+      var cells = BLOCK_ORDER.filter(function (id) {
         return id !== 'text-block';
+      }).map(function (id) {
+        var b = _cleanBlock({ block: id });
+        var html = ReportBlocks.renderReportBlock(id, cid, student, ctx, optionsFor(b));
+        return { b: b, html: html };
       });
-      var htmls = ids.map(function (id) {
-        return _cellHtml(_cleanCell({ block: id, span: 12 }), cid, student, ctx, probe);
-      });
-      var heights = _measureAll(stage, htmls);
-      ids.forEach(function (id, i) {
-        out[id] = htmls[i] ? heights[i] : 0;
+      _measureCells(stage, cells, contentW);
+      cells.forEach(function (c) {
+        out[c.b.block] = c.px;
       });
     } finally {
       stage.remove();
@@ -1529,58 +1431,21 @@ window.ReportSheets = (function () {
     return out;
   }
 
-  /* "1 sheet each", "2 sheets each", "Most need 1 sheet; some 2". */
-  function fitLabel(fit) {
-    if (!fit) return '';
-    var word = function (n) {
-      return n + (n === 1 ? ' sheet' : ' sheets');
-    };
-    if (fit.most === fit.max) return word(fit.most) + ' each';
-    return 'Most need ' + word(fit.most) + '; some ' + fit.max;
-  }
-
   /* What the comment box tells the teacher while they write. Never a cap:
      the form never shrinks a student's words. */
   function fitText(r) {
     if (!r || !r.room) return '';
-    if (r.noComment)
-      return 'No comment yet. The form keeps ' + r.room + ' lines on the front; an empty box prints with lines.';
-    var lines = r.commentLines;
-    if (lines <= r.room) {
-      var left = r.room - lines;
-      return (
-        'Fits the front. ' +
-        lines +
-        (lines === 1 ? ' line' : ' lines') +
-        (left ? '; room for ' + left + ' more before anything moves.' : '; the front is full.')
-      );
-    }
-    var t = lines + ' lines, ' + (lines - r.room) + ' past the front\u2019s room.';
-    if (r.moved && r.moved.length)
-      t += ' ' + r.moved.join(' and ') + (r.moved.length === 1 ? ' moves' : ' move') + ' to the back.';
-    if (r.continued && r.continued.length) t += ' ' + r.continued.join(' and ') + ' on a second sheet.';
-    t += ' Nothing is cut.';
-    return t;
-  }
-
-  /* The rail's one-line account of the class. */
-  function summaryText(s) {
-    if (!s || !s.students) return '';
-    var one = s.students - s.continued.length;
-    var t = s.students + (s.students === 1 ? ' student · ' : ' students · ') + s.pages + ' pages · ';
-    if (!s.continued.length) t += s.students === 1 ? 'one sheet' : 'every student on one sheet';
-    else t += one + ' on one sheet, ' + s.continued.length + ' need a second (' + s.continued.join(', ') + ')';
-    if (s.noComment && s.noComment.length) {
-      t += ' · ' + s.noComment.length + ' with no comment yet (' + s.noComment.join(', ') + ')';
-    }
-    if (s.over.length) t += ' · a block is taller than a side for ' + s.over.join(', ');
-    return t;
+    if (r.noComment) return 'No comment yet. The box holds ' + r.room + ' lines.';
+    var n = r.commentLines;
+    var word = n === 1 ? ' line' : ' lines';
+    if (n <= r.room) return 'Fits. ' + n + word + '; room for ' + (r.room - n) + ' more.';
+    return n + word + ', ' + (n - r.room) + ' past the box; what is under it moves down. Nothing is cut.';
   }
 
   return {
     PAPER: PAPER,
-    SAFETY: SAFETY,
-    SPANS: SPANS,
+    COLS: COLS,
+    ROW_PX: ROW_PX,
     form: form,
     BLOCKS: BLOCKS,
     PALETTE_GROUPS: PALETTE_GROUPS,
@@ -1591,17 +1456,14 @@ window.ReportSheets = (function () {
     available: available,
     locate: locate,
     cellOf: cellOf,
-    positionText: positionText,
-    placeBlock: placeBlock,
-    placeOnNewPage: placeOnNewPage,
-    slotsFor: slotsFor,
-    placeAt: placeAt,
-    slotText: slotText,
-    spanChoices: spanChoices,
+    place: place,
+    move: move,
+    resize: resize,
+    settle: settle,
+    addPage: addPage,
+    removePage: removePage,
+    firstFree: firstFree,
     removeCell: removeCell,
-    setSpan: setSpan,
-    setHeight: setHeight,
-    setWhenEmpty: setWhenEmpty,
     setOption: setOption,
     setNoEvidence: setNoEvidence,
     setPinned: setPinned,
@@ -1616,20 +1478,15 @@ window.ReportSheets = (function () {
     saveTemplate: saveTemplate,
     removeTemplate: removeTemplate,
     template: template,
-    pack: pack,
-    reasonText: reasonText,
+    resolve: resolve,
+    pageRows: pageRows,
     describeStudent: describeStudent,
-    sheetsForForms: sheetsForForms,
-    fitAt: fitAt,
-    fitLabelFor: fitLabelFor,
     classSummary: classSummary,
     blockSizes: blockSizes,
-    fitLabel: fitLabel,
     fitText: fitText,
     paperSize: paperSize,
     layoutStudent: layoutStudent,
     renderPreview: renderPreview,
-    summaryText: summaryText,
     clearPageStyle: clearPageStyle,
     setPageStyle: _setPageStyle,
   };

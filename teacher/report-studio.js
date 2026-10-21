@@ -1,6 +1,7 @@
 /* report-studio.js — Page Studio: the Progress Reports screen.
    A palette of blocks on the left, the previewed student's pages at paper
-   size in the middle, an inspector for the selected block on the right.
+   size in the middle under the class's fit line, an inspector for the
+   selected block's options on the right.
    This module renders the panes from the form (teacher/report-sheets.js)
    and the class fit; page-reports.js owns the state and the clicks.
    docs/DECISIONS.md "Report forms" 8; docs/report-forms-plan.md Phase 6. */
@@ -17,7 +18,8 @@ window.ReportStudio = (function () {
     });
   }
 
-  /* The three panes. The canvas holds the preview the sheet engine fills. */
+  /* The three panes. The canvas holds the fit line, the view switch and
+     the preview the sheet engine fills. */
   function layoutHtml(opts) {
     opts = opts || {};
     var all = opts.view === 'all';
@@ -25,8 +27,8 @@ window.ReportStudio = (function () {
       '<div class="studio" id="studio">' +
       '<aside class="studio-palette no-print" id="studio-palette" aria-label="Blocks"></aside>' +
       '<div class="studio-canvas">' +
-      '<div class="studio-hint no-print">' +
-      '<span class="studio-hint-text">Drag a block onto a page. Drop beside another block to make a two-column row. Drag the corner handle to change its width.</span>' +
+      '<div class="studio-head no-print">' +
+      '<span class="studio-fit" id="studio-fit"></span>' +
       '<span class="seg seg-sm studio-view" role="radiogroup" aria-label="View">' +
       '<button type="button" class="seg-btn' +
       (all ? '' : ' active') +
@@ -131,136 +133,56 @@ window.ReportStudio = (function () {
     return html;
   }
 
-  /* The class fit, for the stats: from ReportSheets.classSummary. */
-  function stats(summary) {
-    var out = { longest: null, shortest: null, over: 0, blankBacks: 0, cut: 0 };
-    if (!summary || !summary.perStudent) return out;
-    Object.keys(summary.perStudent).forEach(function (sid) {
-      var p = summary.perStudent[sid];
-      var sides = p.sides || p.sheets * 2;
-      var pages = { name: p.name, pages: sides, sheets: p.sheets };
-      if (!out.longest || sides > out.longest.pages || (sides === out.longest.pages && p.used > out.longest.used)) {
-        out.longest = Object.assign({ used: p.used }, pages);
-      }
-      if (!out.shortest || sides < out.shortest.pages || (sides === out.shortest.pages && p.used < out.shortest.used)) {
-        out.shortest = Object.assign({ used: p.used }, pages);
-      }
-      if (p.over) out.over += 1;
-      if (p.cut && p.cut.length) out.cut += 1;
-      out.blankBacks += p.sheets * 2 - sides;
-    });
-    return out;
-  }
-
-  function _shortName(name) {
-    var parts = String(name || '')
-      .trim()
-      .split(/\s+/);
-    if (parts.length < 2) return name || '';
-    return parts[0] + ' ' + parts[parts.length - 1].charAt(0) + '.';
-  }
-
-  function _statRows(st) {
-    var pagesOf = function (x) {
-      return x ? x.pages + (x.pages === 1 ? ' page' : ' pages') + ' · ' + esc(_shortName(x.name)) : '—';
+  /* The class fit in one line, from ReportSheets.classSummary: every
+     student fits, some push a block past its page (a link to Everyone),
+     or, with a Pages cap, some are cut. */
+  function fitLineHtml(summary) {
+    if (!summary || !summary.perStudent) return '';
+    var ids = Object.keys(summary.perStudent);
+    var n = ids.length;
+    var some = function (key) {
+      return ids.filter(function (id) {
+        var list = summary.perStudent[id][key];
+        return list && list.length;
+      }).length;
     };
-    return (
-      '<div class="studio-stats">' +
-      '<div class="studio-stat"><span>Longest report in class</span><b>' +
-      pagesOf(st.longest) +
-      '</b></div>' +
-      '<div class="studio-stat"><span>Shortest</span><b>' +
-      pagesOf(st.shortest) +
-      '</b></div>' +
-      '<div class="studio-stat"><span>Blocks that overflow</span><b>' +
-      st.over +
-      '</b></div>' +
-      '<div class="studio-stat"><span>Blank back pages added</span><b>' +
-      st.blankBacks +
-      '</b></div>' +
-      (st.cut ? '<div class="studio-stat"><span>Over the page limit</span><b>' + st.cut + '</b></div>' : '') +
-      '</div>'
-    );
+    var students = function (k) {
+      return k + (k === 1 ? ' student' : ' students');
+    };
+    var cut = some('cut');
+    if (cut) return '<span class="studio-fit-cut">Cut for ' + students(cut) + '</span>';
+    var pushed = some('pushed');
+    if (pushed) {
+      return (
+        '<button type="button" class="studio-fit-link" data-action="studioView" data-view="all">Pushes past the page for ' +
+        students(pushed) +
+        '</button>'
+      );
+    }
+    return 'Fits for ' + n + ' of ' + students(n);
   }
 
-  /* selected: a block id or null. st: stats(). who: { id, name } of the
-     student on the canvas, for Leave Off. */
-  function inspectorHtml(form, selected, st, who) {
+  /* selected: a block id or null. who: { id, name } of the student on the
+     canvas, for Leave Off. */
+  function inspectorHtml(form, selected, who) {
     var sheets = S();
     var html = '';
     var def = selected && sheets.BLOCKS[selected];
     if (def && sheets.locate(form, selected)) {
-      html +=
-        '<h3 class="studio-insp-title">' +
-        esc(def.label) +
-        '</h3><div class="studio-insp-sub">' +
-        esc(sheets.positionText(form, selected)) +
-        (form.pinned === selected ? ' · pinned to the bottom' : '') +
-        '</div>';
+      html += '<h3 class="studio-insp-title">' + esc(def.label) + '</h3>';
+      var cell = sheets.cellOf(form, selected);
       if (!def.locked) {
-        var cell = sheets.cellOf(form, selected);
-        var choices = sheets.spanChoices(form, selected);
-        var names = { 12: 'Full', 8: 'Two-thirds', 6: 'Half', 4: 'Third' };
-        html +=
-          '<div class="studio-field"><label>Width</label><span class="seg seg-sm" role="radiogroup" aria-label="Width">';
-        [12, 8, 6, 4].forEach(function (span) {
-          var on = cell.span === span;
-          var can = choices.indexOf(span) >= 0;
-          html +=
-            '<button type="button" class="seg-btn' +
-            (on ? ' active' : '') +
-            '" data-action="studioSpan" data-block="' +
-            selected +
-            '" data-span="' +
-            span +
-            '" role="radio" aria-checked="' +
-            on +
-            '"' +
-            (can ? '' : ' disabled') +
-            '>' +
-            names[span] +
-            '</button>';
-        });
-        html += '</span></div>';
-        if (def.sizable) {
-          var fixed = cell.height === 'fixed';
-          html +=
-            '<div class="studio-field"><label>Height</label><span class="seg seg-sm" role="radiogroup" aria-label="Height">' +
-            '<button type="button" class="seg-btn' +
-            (!fixed ? ' active' : '') +
-            '" data-action="studioHeight" data-block="' +
-            selected +
-            '" data-height="fit" role="radio" aria-checked="' +
-            !fixed +
-            '">Fit Content</button>' +
-            '<button type="button" class="seg-btn' +
-            (fixed ? ' active' : '') +
-            '" data-action="studioHeight" data-block="' +
-            selected +
-            '" data-height="fixed" role="radio" aria-checked="' +
-            fixed +
-            '">Fixed</button></span>' +
-            (fixed
-              ? '<label class="studio-lines">Lines <input type="number" min="1" max="20" value="' +
-                (cell.lines || 6) +
-                '" data-action="studioLines" data-block="' +
-                selected +
-                '" aria-label="Lines"></label>'
-              : '') +
-            '</div>';
-        }
         html += _optionsHtml(form, selected, cell, def, who);
         html +=
           '<div class="studio-field"><button type="button" class="studio-remove" data-action="studioRemove" data-block="' +
           selected +
           '">Remove from Report</button></div>';
       } else if (def.options) {
-        html += _optionsHtml(form, selected, sheets.cellOf(form, selected), def, null);
+        html += _optionsHtml(form, selected, cell, def, null);
       }
     } else {
       html += '<h3 class="studio-insp-title">Report</h3><div class="studio-insp-sub">Select a block on the page</div>';
     }
-    html += _statRows(st || stats(null));
     return html;
   }
 
@@ -374,372 +296,12 @@ window.ReportStudio = (function () {
     return { zoom: Math.round(one * 1000) / 1000, stacked: true, paper: paper };
   }
 
-  /* ── Drag and drop ───────────────────────────────────────────────
-     Pointer: a block from the palette, or a block on the page, is picked
-     up after a short move, follows the pointer as a ghost, and drops on a
-     zone drawn over the pages for every slot the form offers. The active
-     zone says whether the block fits there (api.fit). The corner handle of
-     the selected block drags its width to a span. Keyboard: a focused block
-     is picked up with Space, moved between slots with the arrow keys,
-     resized with Shift+arrows, dropped with Enter, let go with Escape; a
-     live region says where it is. api: { form(), setForm(f), fit(slot, id)
-     → { fits, landsOn, left }, announce(text), select(id), span(id, n),
-     label(id), slots() } */
-  var THRESHOLD = 6;
-
-  function initDrag(root, api) {
-    if (!root) return null;
-    var ac = new AbortController();
-    var signal = ac.signal;
-    var sheets = S();
-    var drag = null; // { id, from, x, y, started, ghost, zones, active, fit }
-    var resize = null; // { id, rowRect, cell, start }
-    var kb = null; // { id, slots, i }
-
-    function blockOf(el) {
-      var src = el.closest('.studio-blk[data-block], .studio-pages:not(.studio-all) .sheet-cell[data-block]');
-      if (!src) return null;
-      var id = src.dataset.block;
-      if (id === 'header' || !sheets.BLOCKS[id]) return null;
-      return { id: id, el: src, fromPage: src.classList.contains('sheet-cell') };
-    }
-
-    /* The sheet-item holding a form row, by its first block. */
-    function itemFor(preview, page, row) {
-      var f = api.form();
-      var r = f.pages[page] && f.pages[page].rows[row];
-      if (!r) return null;
-      for (var i = 0; i < r.cells.length; i++) {
-        var cell = preview.querySelector('.sheet-cell[data-block="' + r.cells[i].block + '"]');
-        if (cell) return cell.closest('.sheet-item') || cell;
-      }
-      return null;
-    }
-
-    function sheetScale(sheet) {
-      var rect = sheet.getBoundingClientRect();
-      return rect.width / sheet.offsetWidth || 1;
-    }
-
-    /* Draws a zone per slot over the pages. */
-    function buildZones(id) {
-      var preview = root.querySelector('.rb-preview');
-      if (!preview || preview.classList.contains('studio-all')) return [];
-      var f = api.form();
-      var zones = [];
-      var place = function (sheet, slot, left, top, width, height, cls) {
-        var z = document.createElement('div');
-        z.className = 'studio-drop ' + cls;
-        z.dataset.slot = JSON.stringify(slot);
-        z.style.left = left + 'px';
-        z.style.top = top + 'px';
-        z.style.width = width + 'px';
-        z.style.height = height + 'px';
-        sheet.appendChild(z);
-        zones.push(z);
-      };
-      sheets.slotsFor(f).forEach(function (slot) {
-        if (slot.newPage) return;
-        var item = itemFor(preview, slot.page, slot.row);
-        if (!item) return;
-        var row = f.pages[slot.page].rows[slot.row];
-        var own = row.cells.length === 1 && row.cells[0].block === id;
-        if (own && slot.side !== 'before' && slot.side !== 'after') return;
-        var sheet = item.closest('.report-sheet');
-        if (!sheet) return;
-        var k = sheetScale(sheet);
-        var sr = sheet.getBoundingClientRect();
-        var ir = item.getBoundingClientRect();
-        var left = (ir.left - sr.left) / k;
-        var top = (ir.top - sr.top) / k;
-        var width = ir.width / k;
-        var height = ir.height / k;
-        if (slot.side === 'before') place(sheet, slot, left, top - 9, width, 14, 'studio-drop-row');
-        else if (slot.side === 'after') place(sheet, slot, left, top + height - 5, width, 14, 'studio-drop-row');
-        else if (slot.side === 'left')
-          place(sheet, slot, left - 6, top, Math.min(60, width / 4), height, 'studio-drop-col');
-        else
-          place(
-            sheet,
-            slot,
-            left + width - Math.min(60, width / 4) + 6,
-            top,
-            Math.min(60, width / 4),
-            height,
-            'studio-drop-col',
-          );
-      });
-      // A new page: a strip after the last page.
-      var last = preview.querySelector('.sheet-student');
-      if (last) {
-        var z = document.createElement('div');
-        z.className = 'studio-drop studio-drop-page';
-        z.dataset.slot = JSON.stringify({ newPage: true });
-        z.textContent = 'New page';
-        last.appendChild(z);
-        zones.push(z);
-      }
-      return zones;
-    }
-
-    function clearZones() {
-      root.querySelectorAll('.studio-drop').forEach(function (z) {
-        z.remove();
-      });
-    }
-
-    function setActive(zone) {
-      if (drag.active === zone) return;
-      if (drag.active) {
-        drag.active.classList.remove('active');
-        if (!drag.active.classList.contains('studio-drop-page')) drag.active.textContent = '';
-      }
-      drag.active = zone;
-      drag.fit = null;
-      if (!zone) return;
-      zone.classList.add('active');
-      var slot = JSON.parse(zone.dataset.slot);
-      var fit = api.fit(slot, drag.id);
-      drag.fit = fit;
-      zone.classList.toggle('no', !(fit && fit.fits));
-      if (!zone.classList.contains('studio-drop-page')) zone.textContent = sheets.fitLabelFor(fit);
-      else zone.textContent = fit && fit.fits ? 'New page · fits' : 'New page';
-    }
-
-    function startDrag(e) {
-      drag.started = true;
-      root.classList.add('studio-dragging');
-      var ghost = document.createElement('div');
-      ghost.className = 'studio-ghost';
-      ghost.textContent = api.label(drag.id);
-      document.body.appendChild(ghost);
-      drag.ghost = ghost;
-      drag.zones = buildZones(drag.id);
-      moveGhost(e);
-    }
-
-    function moveGhost(e) {
-      if (!drag.ghost) return;
-      drag.ghost.style.left = e.clientX + 12 + 'px';
-      drag.ghost.style.top = e.clientY + 8 + 'px';
-    }
-
-    function endDrag(drop) {
-      if (!drag) return;
-      var d = drag;
-      drag = null;
-      if (d.ghost) d.ghost.remove();
-      root.classList.remove('studio-dragging');
-      clearZones();
-      if (drop && d.active) {
-        var slot = JSON.parse(d.active.dataset.slot);
-        var next = sheets.placeAt(api.form(), d.id, slot);
-        api.setForm(next);
-        api.select(d.id);
-        api.announce(api.label(d.id) + ' placed on ' + sheets.slotText(next, slot) + '.');
-      }
-    }
-
-    root.addEventListener(
-      'pointerdown',
-      function (e) {
-        if (e.button !== 0) return;
-        var handle = e.target.closest('.studio-handle');
-        if (handle) {
-          var cell = handle.closest('.sheet-cell');
-          var rowEl = cell && cell.closest('.sheet-row');
-          if (!cell || !rowEl) return;
-          resize = {
-            id: handle.dataset.handle,
-            rowRect: rowEl.getBoundingClientRect(),
-            cell: cell,
-            cellRect: cell.getBoundingClientRect(),
-          };
-          e.preventDefault();
-          return;
-        }
-        var b = blockOf(e.target);
-        if (!b) return;
-        drag = { id: b.id, fromPage: b.fromPage, x: e.clientX, y: e.clientY, started: false, active: null };
-      },
-      { signal: signal },
-    );
-
-    document.addEventListener(
-      'pointermove',
-      function (e) {
-        if (resize) {
-          var r = resize.rowRect;
-          var frac = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
-          var onLeft = resize.cellRect.left - r.left < r.width / 2;
-          var span = onLeft
-            ? frac < 0.42
-              ? 4
-              : frac < 0.58
-                ? 6
-                : frac < 0.92
-                  ? 8
-                  : 12
-            : 1 - frac < 0.42
-              ? 4
-              : 1 - frac < 0.58
-                ? 6
-                : 1 - frac < 0.92
-                  ? 8
-                  : 12;
-          resize.span = span;
-          resize.cell.dataset.spanPreview = span;
-          return;
-        }
-        if (!drag) return;
-        if (!drag.started) {
-          if (Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y) < THRESHOLD) return;
-          startDrag(e);
-        }
-        moveGhost(e);
-        var under = document.elementFromPoint(e.clientX, e.clientY);
-        var zone = under && under.closest ? under.closest('.studio-drop') : null;
-        setActive(zone);
-      },
-      { signal: signal },
-    );
-
-    document.addEventListener(
-      'pointerup',
-      function () {
-        if (resize) {
-          var rz = resize;
-          resize = null;
-          delete rz.cell.dataset.spanPreview;
-          if (rz.span) api.span(rz.id, rz.span);
-          return;
-        }
-        if (!drag) return;
-        if (!drag.started) {
-          drag = null;
-          return;
-        }
-        endDrag(true);
-      },
-      { signal: signal },
-    );
-
-    document.addEventListener(
-      'keydown',
-      function (e) {
-        if (e.key === 'Escape' && drag && drag.started) {
-          endDrag(false);
-          api.announce('Let go.');
-          return;
-        }
-        var cell = e.target.closest ? e.target.closest('.studio-pages .sheet-cell[data-block]') : null;
-        if (!cell) return;
-        var id = cell.dataset.block;
-        if (id === 'header') return;
-        var f = api.form();
-        if (kb && kb.id === id) {
-          if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
-            kb.i = Math.min(kb.slots.length - 1, kb.i + 1);
-          } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
-            kb.i = Math.max(0, kb.i - 1);
-          } else if (e.key === 'Enter' || e.key === ' ') {
-            var slot = kb.slots[kb.i];
-            kb = null;
-            var next = sheets.placeAt(f, id, slot);
-            api.setForm(next);
-            api.select(id);
-            api.announce(api.label(id) + ' placed on ' + sheets.slotText(next, slot) + '.');
-            e.preventDefault();
-            return;
-          } else if (e.key === 'Escape') {
-            kb = null;
-            api.announce('Let go. ' + api.label(id) + ' stays on ' + sheets.positionText(f, id).toLowerCase() + '.');
-            e.preventDefault();
-            return;
-          } else return;
-          e.preventDefault();
-          var sl = kb.slots[kb.i];
-          var fit = api.fit(sl, id);
-          api.announce(
-            api.label(id) +
-              ', ' +
-              sheets.slotText(f, sl) +
-              (fit ? (fit.fits ? ', fits' : ', lands on page ' + fit.landsOn) : '') +
-              '.',
-          );
-          return;
-        }
-        if (e.key === ' ') {
-          e.preventDefault();
-          var slots = sheets.slotsFor(f).filter(function (sl) {
-            if (sl.newPage) return true;
-            var row = f.pages[sl.page].rows[sl.row];
-            return !(
-              row.cells.length === 1 &&
-              row.cells[0].block === id &&
-              sl.side !== 'before' &&
-              sl.side !== 'after'
-            );
-          });
-          var at = sheets.locate(f, id);
-          var start = 0;
-          slots.forEach(function (sl, i) {
-            if (!sl.newPage && sl.page === at.page && sl.row === at.row && sl.side === 'after') start = i;
-          });
-          kb = { id: id, slots: slots, i: start };
-          api.announce(
-            'Picked up ' +
-              api.label(id) +
-              '. Arrow keys move it, Shift with an arrow resizes it, Enter drops it, Escape lets go.',
-          );
-          return;
-        }
-        if (e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
-          e.preventDefault();
-          var choices = sheets.spanChoices(f, id);
-          var cur = sheets.cellOf(f, id).span;
-          var idx = choices.indexOf(cur);
-          var ni = e.key === 'ArrowRight' ? Math.min(choices.length - 1, idx + 1) : Math.max(0, idx - 1);
-          // choices run full → third; ArrowRight widens, so step the other way
-          ni = e.key === 'ArrowRight' ? Math.max(0, idx - 1) : Math.min(choices.length - 1, idx + 1);
-          if (choices[ni] !== cur) api.span(id, choices[ni]);
-          else api.announce(api.label(id) + ' is already ' + spanWord(cur) + '.');
-          return;
-        }
-        if (e.key === 'Delete' || e.key === 'Backspace') {
-          e.preventDefault();
-          api.remove(id);
-        }
-      },
-      { signal: signal },
-    );
-
-    return {
-      destroy: function () {
-        ac.abort();
-        clearZones();
-        if (drag && drag.ghost) drag.ghost.remove();
-        drag = null;
-        kb = null;
-      },
-      picking: function () {
-        return kb ? kb.id : null;
-      },
-    };
-  }
-
-  function spanWord(span) {
-    return { 12: 'full width', 8: 'two-thirds', 6: 'half width', 4: 'a third' }[span] || 'full width';
-  }
-
   return {
     layoutHtml: layoutHtml,
     paletteHtml: paletteHtml,
     inspectorHtml: inspectorHtml,
-    stats: stats,
+    fitLineHtml: fitLineHtml,
     sizeBadge: sizeBadge,
     fitZoom: fitZoom,
-    initDrag: initDrag,
-    spanWord: spanWord,
   };
 })();

@@ -358,9 +358,14 @@ window.PageReports = (function () {
 
     // Progress Reports: Page Studio (report-studio.js)
     output.innerHTML = ReportStudio.layoutHtml({ view: studioView });
+    if (_settlePending) {
+      // A form saved before the page grid: store where its blocks land.
+      _settlePending = false;
+      reportConfig.form = _settled(reportConfig.form);
+      saveReportConfig(activeCourse, reportConfig);
+    }
     renderStudioPanels();
     renderReportPreview();
-    _mountStudioDrag();
 
     // Highlight selected students in sidebar for progress tab
     if (selectedStudentIds && selectedStudentIds.length > 0) {
@@ -435,32 +440,14 @@ window.PageReports = (function () {
     preview.querySelectorAll('.sheet-cell.studio-sel').forEach(function (el) {
       el.classList.remove('studio-sel');
     });
-    preview.querySelectorAll('.studio-handle').forEach(function (el) {
-      el.remove();
-    });
     preview.querySelectorAll('.sheet-cell[data-block]').forEach(function (el) {
       if (el.dataset.block !== 'header') el.setAttribute('tabindex', '0');
     });
     if (!studioSelected) return;
-    var f = _formOf();
-    var resizable = ReportSheets.spanChoices(f, studioSelected).length > 1;
-    preview.querySelectorAll('.sheet-cell[data-block="' + studioSelected + '"]').forEach(function (el, i) {
+    preview.querySelectorAll('.sheet-cell[data-block="' + studioSelected + '"]').forEach(function (el) {
       el.classList.add('studio-sel');
-      if (resizable && i === 0) {
-        var h = document.createElement('span');
-        h.className = 'studio-handle';
-        h.dataset.handle = studioSelected;
-        h.setAttribute('aria-hidden', 'true');
-        el.appendChild(h);
-      }
     });
-    if (_focusBlock) {
-      var target = preview.querySelector('.sheet-cell[data-block="' + _focusBlock + '"]');
-      _focusBlock = null;
-      if (target) target.focus({ preventScroll: true });
-    }
   }
-  var _focusBlock = null;
 
   /* ── The rail: sheets per student ──────────────────────────────
      On the Report Card, each sidebar row shows how many sheets the
@@ -515,7 +502,7 @@ window.PageReports = (function () {
     if (studioView === 'all') {
       _classFit = summary;
       _classFitKey = _classFitKeyNow();
-      _renderStudioStats();
+      _renderFitLine();
     } else {
       _scheduleClassFit();
     }
@@ -828,8 +815,10 @@ window.PageReports = (function () {
   var studioTab = 'blocks'; // the palette's tab
   var _blockSizes = null; // palette badges, measured once per class/paper/type
 
+  /* Every edit is stored as the canvas shows it for the previewed student
+     (ReportSheets.settle): each block's row and page where it landed. */
   function _setForm(form) {
-    reportConfig.form = ReportSheets.normalizeForm(form);
+    reportConfig.form = _settled(ReportSheets.normalizeForm(form));
     saveReportConfig(activeCourse, reportConfig);
     if (studioSelected && !ReportSheets.locate(reportConfig.form, studioSelected)) studioSelected = null;
     _classFitKey = '';
@@ -842,8 +831,24 @@ window.PageReports = (function () {
     return ReportSheets.formFor(reportConfig);
   }
 
+  function _settled(form) {
+    var st = _previewStudent();
+    if (!st) return form;
+    try {
+      var r = ReportSheets.describeStudent(activeCourse, st, ReportBlocks.reportContext(), {
+        paper: reportPaper,
+        form: form,
+      });
+      return ReportSheets.settle(form, r.positions);
+    } catch (e) {
+      return form;
+    }
+  }
+
+  var _settlePending = false; // a saved form from before the page grid, settled on first show
   function _loadReportConfig(cid) {
     var rc = Object.assign({}, (typeof getReportConfig === 'function' && getReportConfig(cid)) || {});
+    _settlePending = !!(rc.form && rc.form.v !== 5);
     rc.form = ReportSheets.formFor(rc);
     rc.preset = 'standard';
     return rc;
@@ -855,20 +860,27 @@ window.PageReports = (function () {
       if (_blockSizes === null) _blockSizes = _measureBlockSizes();
       palette.innerHTML = ReportStudio.paletteHtml(_formOf(), _blockSizes, studioTab, ReportSheets.templates());
     }
-    _renderStudioStats();
+    _renderInspector();
+    _renderFitLine();
   }
 
-  function _renderStudioStats() {
+  function _renderInspector() {
     var insp = document.getElementById('studio-inspector');
     if (insp) {
       var st = _previewStudents()[0];
       insp.innerHTML = ReportStudio.inspectorHtml(
         _formOf(),
         studioSelected,
-        ReportStudio.stats(_classFit),
         st && studioView === 'one' ? { id: st.id, name: fullName(st) } : null,
       );
     }
+  }
+
+  function _renderFitLine() {
+    var line = document.getElementById('studio-fit');
+    if (!line) return;
+    line.innerHTML = ReportStudio.fitLineHtml(_classFitKey === _classFitKeyNow() ? _classFit : null);
+    line.classList.toggle('ok', !!line.textContent && !line.firstElementChild);
   }
 
   function _measureBlockSizes() {
@@ -885,9 +897,9 @@ window.PageReports = (function () {
     }
   }
 
-  /* The whole class laid out on the form, for the stats and the toolbar
-     count, once per class, report, paper and form, after the canvas has
-     rendered. In Everyone view the canvas render is that summary. */
+  /* The whole class laid out on the form, for the fit line, once per
+     class, report, paper and form, after the canvas has rendered. In
+     Everyone view the canvas render is that summary. */
   var _classFit = null;
   var _classFitKey = '';
   function _classFitKeyNow() {
@@ -898,7 +910,7 @@ window.PageReports = (function () {
     if (activeTab !== 'progress') return;
     var key = _classFitKeyNow();
     if (key === _classFitKey) {
-      _renderStudioStats();
+      _renderFitLine();
       return;
     }
     _classFitKey = key;
@@ -913,7 +925,7 @@ window.PageReports = (function () {
       } catch (e) {
         _classFit = null;
       }
-      _renderStudioStats();
+      _renderFitLine();
     }, 0);
   }
 
@@ -979,61 +991,11 @@ window.PageReports = (function () {
     studioSelected = id || null;
     var preview = document.getElementById('rb-preview');
     if (preview) _applySelection(preview);
-    _renderStudioStats();
-  }
-
-  function _announce(text) {
-    var live = document.getElementById('studio-live');
-    if (live) live.textContent = text;
+    _renderInspector();
   }
 
   function _previewStudent() {
     return _previewStudents()[0] || null;
-  }
-
-  var _studioDrag = null;
-  function _mountStudioDrag() {
-    if (_studioDrag) _studioDrag.destroy();
-    var root = document.getElementById('studio');
-    if (!root) return;
-    _studioDrag = ReportStudio.initDrag(root, {
-      form: _formOf,
-      setForm: function (f) {
-        if (document.activeElement && document.activeElement.closest && document.activeElement.closest('.sheet-cell')) {
-          _focusBlock = document.activeElement.closest('.sheet-cell').dataset.block;
-        }
-        _setForm(f);
-      },
-      fit: function (slot, id) {
-        var st = _previewStudent();
-        if (!st) return null;
-        try {
-          return ReportSheets.fitAt(activeCourse, st, ReportBlocks.reportContext(), {
-            form: _formOf(),
-            paper: reportPaper,
-            slot: slot,
-            block: id,
-          });
-        } catch (e) {
-          return null;
-        }
-      },
-      announce: _announce,
-      select: _selectBlock,
-      label: function (id) {
-        return ReportSheets.BLOCKS[id] ? ReportSheets.BLOCKS[id].label : id;
-      },
-      span: function (id, span) {
-        _focusBlock = id;
-        _setForm(ReportSheets.setSpan(_formOf(), id, span));
-        _announce(ReportSheets.BLOCKS[id].label + ' is now ' + ReportStudio.spanWord(span) + '.');
-      },
-      remove: function (id) {
-        studioSelected = null;
-        _setForm(ReportSheets.removeCell(_formOf(), id));
-        _announce(ReportSheets.BLOCKS[id].label + ' removed from the report.');
-      },
-    });
   }
 
   /* ── Course switching ────────────────────────────────────────── */
@@ -1182,25 +1144,22 @@ window.PageReports = (function () {
         if (studioTab === 'templates') _syncTemplates();
       },
       studioBlock: function () {
+        // A block not on the form goes full width at the first free row of the last page.
         var id = el.dataset.block;
-        if (ReportSheets.locate(_formOf(), id)) _selectBlock(id);
+        var f = _formOf();
+        if (ReportSheets.locate(f, id)) _selectBlock(id);
         else {
+          var h = ReportSheets.BLOCKS[id].rows;
+          var at = ReportSheets.firstFree(f, f.pages.length - 1, ReportSheets.COLS, h);
           studioSelected = id;
-          _setForm(ReportSheets.placeBlock(_formOf(), id));
+          _setForm(ReportSheets.place(f, id, { page: at.page, x: at.x, y: at.y, w: ReportSheets.COLS, h: h }));
         }
-      },
-      studioSpan: function () {
-        if (el.disabled) return;
-        _setForm(ReportSheets.setSpan(_formOf(), el.dataset.block, Number(el.dataset.span)));
       },
       studioChoice: function () {
         _setForm(ReportSheets.setOption(_formOf(), el.dataset.block, el.dataset.key, Number(el.dataset.value)));
       },
       studioNoEvidence: function () {
         _setForm(ReportSheets.setNoEvidence(_formOf(), el.dataset.block, el.dataset.rule));
-      },
-      studioHeight: function () {
-        _setForm(ReportSheets.setHeight(_formOf(), el.dataset.block, el.dataset.height));
       },
       studioRemove: function () {
         var id = el.dataset.block;
@@ -1323,9 +1282,7 @@ window.PageReports = (function () {
     var el = e.target;
     if (!el || !el.dataset) return;
     var a = el.dataset.action;
-    if (a === 'studioLines') _setForm(ReportSheets.setHeight(_formOf(), el.dataset.block, 'fixed', Number(el.value)));
-    else if (a === 'studioOption')
-      _setForm(ReportSheets.setOption(_formOf(), el.dataset.block, el.dataset.key, el.checked));
+    if (a === 'studioOption') _setForm(ReportSheets.setOption(_formOf(), el.dataset.block, el.dataset.key, el.checked));
     else if (a === 'studioLeaveOff')
       _setForm(ReportSheets.hideFor(_formOf(), el.dataset.sid, el.dataset.block, el.checked));
     else if (a === 'studioText')
@@ -1524,10 +1481,6 @@ window.PageReports = (function () {
 
   function destroy() {
     _closeSaveTemplate();
-    if (_studioDrag) {
-      _studioDrag.destroy();
-      _studioDrag = null;
-    }
     // Save any unsaved narrative
     if (RQ.tqNarrativeDirty) tqSaveCurrentIfNeeded();
     var paperStyle = document.getElementById(PAPER_STYLE_ID);
