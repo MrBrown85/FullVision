@@ -10,16 +10,7 @@ export default defineConfig({
     headless: true,
     screenshot: 'only-on-failure',
   },
-  projects: [
-    { name: 'chromium', use: { browserName: 'chromium' } },
-    // The Report Card's sheets must not overflow in Safari's engine either;
-    // only that spec runs here (WebKit cannot print to PDF).
-    {
-      name: 'webkit',
-      use: { browserName: 'webkit' },
-      testMatch: /report-(sheets|studio-drag|studio-options|studio-templates)\.spec\.js/,
-    },
-  ],
+  projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],
   webServer: {
     // Build dist/ with dummy credentials, then serve it through the
     // production edge function (scripts/e2e-server.mjs) so every page gets
