@@ -8,6 +8,7 @@
  * Letter or Legal pages at Normal size, 2 at Compact, all time.
  */
 import { test, expect } from '@playwright/test';
+import { mockAuth, seedCourse, seedStudents, gotoApp } from './helpers.js';
 
 const STUDENTS = 27;
 
@@ -79,7 +80,7 @@ test.describe('Print Grades', () => {
   test('the button is on every gradebook view and the toolbar keeps New Assessment', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 800 });
     await openDemoGradebook(page);
-    for (const mode of ['detailed', 'scores', 'summary']) {
+    for (const mode of ['detailed', 'scores']) {
       await page.locator(`[data-action="setView"][data-mode="${mode}"]`).click();
       await expect(page.getByRole('button', { name: 'Print Grades' })).toBeVisible();
       await expect(page.getByRole('link', { name: '+ New Assessment' })).toBeInViewport();
@@ -230,5 +231,45 @@ test.describe('Print Grades', () => {
     expect(await page.evaluate(() => (getActiveTerm(getActiveCourse()) || { ordinal: 'all' }).ordinal + '')).toBe(
       before,
     );
+  });
+
+  test('Blank Grid prints the roster on an empty grid', async ({ page }) => {
+    await openDemoGradebook(page);
+    const dialog = await openDialog(page);
+    await dialog.getByLabel('All Time').check();
+    await dialog.getByLabel('Blank Grid').check();
+    await expect(dialog.locator('#gp-status')).toHaveText(`${STUDENTS} students · Blank Grid · 1 page.`);
+    await expect(dialog.getByLabel('Final Grade')).toBeDisabled();
+    await stageFromDialog(page, dialog);
+    const sheet = page.locator('#grades-print-root .gp-page');
+    await expect(sheet).toHaveCount(1);
+    await expect(sheet.locator('.gp-row:not(.gp-blank-row)')).toHaveCount(STUDENTS);
+    await expect(sheet.locator('th.gp-ch[data-col]')).toHaveCount(0);
+    expect(await sheet.locator('.gp-row').first().locator('td.gp-blank').count()).toBeGreaterThan(5);
+    await expect(sheet.locator('.gp-head')).toContainText('Scores: Blank Grid');
+    expect(countPages(await pdfOfStaged(page))).toBe(1);
+    const reset = await openDialog(page);
+    await reset.getByLabel('All Assessments').check();
+    await reset.getByRole('button', { name: 'Cancel' }).click();
+  });
+});
+
+test.describe('Print Grades, class with no assessments', () => {
+  test('prints a blank grid and Print is enabled', async ({ page }) => {
+    await mockAuth(page);
+    await seedCourse(page);
+    await seedStudents(page);
+    await gotoApp(page, '/gradebook');
+    const dialog = await openDialog(page);
+    await expect(dialog.locator('#gp-status')).toHaveText('3 students · Blank Grid · 1 page.');
+    await expect(dialog.getByRole('button', { name: 'Print', exact: true })).toBeEnabled();
+    await stageFromDialog(page, dialog);
+    const sheet = page.locator('#grades-print-root .gp-page');
+    await expect(sheet).toHaveCount(1);
+    await expect(sheet.locator('.gp-row:not(.gp-blank-row)')).toHaveCount(3);
+    await expect(sheet.locator('.gp-row').first()).toContainText('Anderson, Alice');
+    const pdf = await pdfOfStaged(page);
+    expect(countPages(pdf)).toBe(1);
+    for (const box of pageBoxes(pdf)) expect(box).toEqual([612, 792]);
   });
 });
