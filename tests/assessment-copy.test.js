@@ -254,6 +254,13 @@ describe('copy_group on the server write path', () => {
     expect('copy_group' in plain).toBe(false);
   });
 
+  it('sends the Assignments list order and counts a reorder as a change', () => {
+    expect(_assessmentPatchOf({ title: 'x', display_order: 3 }).display_order).toBe(3);
+    expect(_assessmentPatchOf({ title: 'x' }).display_order).toBe(0);
+    expect(_assessmentChanged({ title: 'x', display_order: 1 }, { title: 'x', display_order: 2 })).toBe(true);
+    expect(_assessmentChanged({ title: 'x' }, { title: 'x', display_order: 0 })).toBe(false);
+  });
+
   it('counts a new link as a change to save', () => {
     expect(_assessmentChanged({ title: 'x' }, { title: 'x', copyGroup: 'g' })).toBe(true);
     expect(_assessmentChanged({ title: 'x', copyGroup: 'g' }, { title: 'x', copyGroup: 'g' })).toBe(false);

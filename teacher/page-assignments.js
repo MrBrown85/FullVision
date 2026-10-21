@@ -28,11 +28,8 @@ window.PageAssignments = (function () {
   var _dragModuleId = null;
   var _dragSid = null;
   var _dragFromGroup = null;
-  var _mergeTargetId = null;
   var collabPairMode = 'random';
   var collabGroupMode = 'random';
-  var _mergeHoverTimer = null;
-  var _mergeAnimating = false;
   var focusStudentId = null;
   var _searchTimer = null;
   // Collaboration delegation (now in assign-collab.js)
@@ -197,6 +194,17 @@ window.PageAssignments = (function () {
     if (idx >= 0) filterCategories.splice(idx, 1);
     else filterCategories.push(catId);
     render();
+  }
+
+  /* The Assignments list order. A teacher's drag sets display_order 1..n;
+     anything never placed (0, e.g. a new assessment) sits on top, newest first. */
+  function sortAssessmentsForList(arr) {
+    return arr.slice().sort(function (a, b) {
+      var oa = Number(a.display_order || 0);
+      var ob = Number(b.display_order || 0);
+      if (oa !== ob) return oa - ob;
+      return (b.date || '').localeCompare(a.date || '');
+    });
   }
 
   function _getSortedCategories(cid) {
@@ -451,7 +459,9 @@ window.PageAssignments = (function () {
         ' data-assess-drag="' +
         a.id +
         '"' +
-        (isUncategorized ? ' data-assess-card-drop="' + a.id + '"' : '') +
+        ' data-assess-card-drop="' +
+        a.id +
+        '"' +
         '>' +
         '<div class="assess-header" data-action="toggleAssess" data-aid="' +
         a.id +
@@ -762,11 +772,7 @@ window.PageAssignments = (function () {
     var method = cc.calcMethod || course.calcMethod || 'mostRecent';
     var dw = cc.decayWeight != null ? cc.decayWeight : course.decayWeight || 0.65;
     var sections = getSections(cid);
-    var allAssessments = getAssessments(cid)
-      .slice()
-      .sort(function (a, b) {
-        return (b.date || '').localeCompare(a.date || '');
-      });
+    var allAssessments = sortAssessmentsForList(getAssessments(cid));
     var students = sortStudents(getStudents(cid), 'lastName');
     var scores = getScores(cid);
     var modules = getModules(cid);
@@ -4277,15 +4283,12 @@ window.PageAssignments = (function () {
   }
   function onAssessDragEnd() {
     _dragAssessId = null;
-    _clearMergeState();
+    _clearDropMarker();
     document.querySelectorAll('.assess-card.dragging').forEach(function (el) {
       el.classList.remove('dragging');
     });
     document.querySelectorAll('.mod-folder.drag-over').forEach(function (el) {
       el.classList.remove('drag-over');
-    });
-    document.querySelectorAll('.assess-card.merge-target').forEach(function (el) {
-      el.classList.remove('merge-target');
     });
   }
   function onFolderDrop(event, targetModuleId) {
@@ -4305,49 +4308,46 @@ window.PageAssignments = (function () {
     _dragAssessId = null;
     render();
   }
-  function _clearMergeState() {
-    if (_mergeHoverTimer) {
-      clearTimeout(_mergeHoverTimer);
-      _mergeHoverTimer = null;
-    }
-    if (_mergeTargetId) {
-      var el = document.getElementById('ac-' + _mergeTargetId);
-      if (el) el.classList.remove('merge-target');
-    }
-    _mergeTargetId = null;
-    _mergeAnimating = false;
+  /* ── Reordering by drag ─────────────────────────────────────
+     Over a card, the top half places the dragged card before it and the
+     bottom half after it; a blue line shows where. */
+  function _clearDropMarker() {
+    document.querySelectorAll('.assess-card.drop-before, .assess-card.drop-after').forEach(function (el) {
+      el.classList.remove('drop-before', 'drop-after');
+    });
   }
-  function mergeToNewModule(draggedId, targetId) {
+  function _setDropMarker(card, after) {
+    var want = after ? 'drop-after' : 'drop-before';
+    if (card.classList.contains(want)) return;
+    _clearDropMarker();
+    card.classList.add(want);
+  }
+  // Moves the dragged assessment before or after the target and numbers the
+  // whole list 1..n. Dropped beside a card in another module, it joins that module.
+  function reorderAssessment(dragId, targetId, after) {
     var cid = activeCourse;
-    var modules = getModules(cid);
-    var idx = modules.length;
-    var color = MODULE_COLORS[idx % MODULE_COLORS.length];
-    var newModule = {
-      id: uid(),
-      name: 'Module ' + (idx + 1),
-      color: color,
-      sortOrder: idx,
-      created: new Date().toISOString(),
-    };
-    modules.push(newModule);
-    saveModules(cid, modules);
     var assessments = getAssessments(cid);
-    [draggedId, targetId].forEach(function (aid) {
-      var a = assessments.find(function (x) {
-        return x.id === aid;
-      });
-      if (a) a.moduleId = newModule.id;
+    var ordered = sortAssessmentsForList(assessments);
+    var dragged = ordered.find(function (x) {
+      return x.id === dragId;
+    });
+    var target = ordered.find(function (x) {
+      return x.id === targetId;
+    });
+    if (!dragged || !target || dragged === target) return;
+    ordered = ordered.filter(function (x) {
+      return x !== dragged;
+    });
+    ordered.splice(ordered.indexOf(target) + (after ? 1 : 0), 0, dragged);
+    if ((dragged.moduleId || '') !== (target.moduleId || '')) {
+      if (target.moduleId) dragged.moduleId = target.moduleId;
+      else delete dragged.moduleId;
+    }
+    ordered.forEach(function (x, i) {
+      x.display_order = i + 1;
     });
     saveAssessments(cid, assessments);
-    collapsedModules[newModule.id] = false;
     render();
-    setTimeout(function () {
-      var input = document.querySelector('.mod-folder[data-module-id="' + newModule.id + '"] .mod-folder-name-input');
-      if (input) {
-        input.focus();
-        input.select();
-      }
-    }, 50);
   }
 
   /* ── Export / Import ────────────────────────────────────── */
@@ -5081,31 +5081,21 @@ window.PageAssignments = (function () {
       dropZone.classList.add('drag-over');
       return;
     }
-    // Assess card merge (check BEFORE folder drop — cards are inside folders)
+    // Over a card: reorder (check BEFORE folder drop — cards are inside folders)
     var cardDrop = e.target.closest('[data-assess-card-drop]');
     if (cardDrop && _dragAssessId && !_dragModuleId) {
-      var targetId = cardDrop.dataset.assessCardDrop;
-      if (_dragAssessId === targetId) return;
-      var cid = activeCourse;
-      var assessments = getAssessments(cid);
-      var draggedA = assessments.find(function (x) {
-        return x.id === _dragAssessId;
-      });
-      var targetA = assessments.find(function (x) {
-        return x.id === targetId;
-      });
-      if (!draggedA || draggedA.moduleId || !targetA || targetA.moduleId) return;
       e.preventDefault();
       e.stopPropagation();
       e.dataTransfer.dropEffect = 'move';
-      if (_mergeTargetId === targetId) return;
-      _clearMergeState();
-      _mergeTargetId = targetId;
-      _mergeHoverTimer = setTimeout(function () {
-        _mergeAnimating = true;
-        var el = document.getElementById('ac-' + targetId);
-        if (el) el.classList.add('merge-target');
-      }, 300);
+      document.querySelectorAll('.mod-folder.drag-over').forEach(function (el) {
+        el.classList.remove('drag-over');
+      });
+      if (cardDrop.dataset.assessCardDrop === _dragAssessId) {
+        _clearDropMarker();
+        return;
+      }
+      var rect = cardDrop.getBoundingClientRect();
+      _setDropMarker(cardDrop, e.clientY > rect.top + rect.height / 2);
       return;
     }
     // Folder drop
@@ -5133,9 +5123,8 @@ window.PageAssignments = (function () {
     // Card leave (check before folder — cards are inside folders)
     var cardDrop = e.target.closest('[data-assess-card-drop]');
     if (cardDrop) {
-      var el = document.getElementById('ac-' + cardDrop.dataset.assessCardDrop);
-      if (el && el.contains(e.relatedTarget)) return;
-      if (_mergeTargetId === cardDrop.dataset.assessCardDrop) _clearMergeState();
+      if (cardDrop.contains(e.relatedTarget)) return;
+      cardDrop.classList.remove('drop-before', 'drop-after');
       return;
     }
     var folderDrop = e.target.closest('[data-folder-drop]');
@@ -5156,20 +5145,18 @@ window.PageAssignments = (function () {
       onModuleDropZoneDrop(e, parseInt(dropZone.dataset.dropIndex, 10));
       return;
     }
-    // Assess card merge drop (check before folder — cards are inside folders)
+    // Card drop: reorder (check before folder — cards are inside folders)
     var cardDrop = e.target.closest('[data-assess-card-drop]');
-    if (
-      cardDrop &&
-      _mergeAnimating &&
-      _mergeTargetId === cardDrop.dataset.assessCardDrop &&
-      _dragAssessId &&
-      _dragAssessId !== cardDrop.dataset.assessCardDrop
-    ) {
+    if (cardDrop && _dragAssessId && !_dragModuleId) {
       e.preventDefault();
       e.stopPropagation();
-      mergeToNewModule(_dragAssessId, cardDrop.dataset.assessCardDrop);
-      _clearMergeState();
+      var after = cardDrop.classList.contains('drop-after');
+      var placed = after || cardDrop.classList.contains('drop-before');
+      var dragId = _dragAssessId;
+      _clearDropMarker();
       _dragAssessId = null;
+      if (placed && dragId !== cardDrop.dataset.assessCardDrop)
+        reorderAssessment(dragId, cardDrop.dataset.assessCardDrop, after);
       return;
     }
     // Folder drop
@@ -5223,9 +5210,6 @@ window.PageAssignments = (function () {
     collapsedModules = {};
     _dragAssessId = null;
     _dragModuleId = null;
-    _mergeTargetId = null;
-    _mergeHoverTimer = null;
-    _mergeAnimating = false;
     AC.configure(activeCourse);
     _resetCollabState();
     _editingRubric = null;
@@ -5321,7 +5305,6 @@ window.PageAssignments = (function () {
 
     // Clear timers
     if (_searchTimer) clearTimeout(_searchTimer);
-    if (_mergeHoverTimer) clearTimeout(_mergeHoverTimer);
     Object.keys(_statusDebounce).forEach(function (k) {
       delete _statusDebounce[k];
     });
