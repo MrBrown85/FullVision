@@ -1330,7 +1330,8 @@ window.PageReports = (function () {
       },
       studioChoice: function () {
         popoverOpen = null;
-        _setForm(ReportSheets.setOption(_formOf(), el.dataset.block, el.dataset.key, Number(el.dataset.value)));
+        var v = el.dataset.value;
+        _setForm(ReportSheets.setOption(_formOf(), el.dataset.block, el.dataset.key, /^\d+$/.test(v) ? Number(v) : v));
       },
       studioNoEvidence: function () {
         popoverOpen = null;

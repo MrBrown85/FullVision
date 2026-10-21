@@ -164,7 +164,7 @@ test.describe('Page Studio', () => {
     await openStudio(page);
     await expect(page.locator('#studio > *')).toHaveCount(2);
     await expect(page.locator('#studio-inspector')).toHaveCount(0);
-    await expect(page.locator('.studio-palette .studio-blk')).toHaveCount(16);
+    await expect(page.locator('.studio-palette .studio-blk')).toHaveCount(17);
     await expect(page.locator('.studio-blk.placed')).toHaveCount(7);
     await expect(page.locator('.studio-palette')).not.toContainText('Letterhead');
     await expect(page.locator('.sheet-label').first()).toHaveText('Page 1 of 2');
@@ -303,9 +303,9 @@ test.describe('Page Studio', () => {
     expect(await overlapping(page)).toEqual([]);
     const link = page.locator('#studio-fit .studio-fit-link');
     await expect(link).toHaveText('Pushes past the page for 27 students');
-    // The link opens Everyone: three sheets each, none overflowing, the pushed table outlined.
+    // The link opens Everyone: two sheets each (this term's grades), none overflowing, the pushed table outlined.
     await link.click();
-    await expect(page.locator('.report-sheet')).toHaveCount(STUDENTS * 6, { timeout: 30_000 });
+    await expect(page.locator('.report-sheet')).toHaveCount(STUDENTS * 4, { timeout: 30_000 });
     await expect(page.locator('.report-sheet.sheet-overflow')).toHaveCount(0);
     const marked = page.locator('.sheet-student[data-sid="st1"] .sheet-cell.sheet-pushed');
     expect(await marked.count()).toBeGreaterThan(0);
@@ -363,7 +363,11 @@ test.describe('Page Studio', () => {
     await page.getByRole('button', { name: 'See the Page' }).click();
     await expect(page.getByRole('tab', { name: 'Progress Reports' })).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator('#picker-label')).toHaveText('Cece Adeyemi');
-    await expect(page.locator('.report-sheet')).toHaveCount(2);
+    // The long comment grows its box and pushes what is under it on; nothing is cut.
+    await expect(page.locator('.report-sheet').first().locator('.sheet-footer')).toContainText(
+      'Cece Adeyemi · Page 1 of',
+    );
+    expect(await overflowing(page)).toEqual([]);
   });
 
   test('on a phone the pages fit the width and the palette opens from a button', async ({ page }) => {
@@ -402,7 +406,9 @@ test.describe('Page Studio on the grid', () => {
     await expect(table.locator('th.col-area')).toBeHidden();
     await expect(table.locator('th.col-category')).toBeHidden();
     await expect(table.locator('th.col-date')).toBeVisible();
-    await expect(table.locator('th', { hasText: 'Score' })).toBeVisible();
+    // Half width: title, date and level.
+    await expect(table.locator('th.col-score')).toBeHidden();
+    await expect(table.locator('th', { hasText: 'Proficiency' })).toBeVisible();
     expect(await table.evaluate(t => t.scrollWidth <= t.parentElement.clientWidth + 1)).toBe(true);
     expect(await overflowing(page)).toEqual([]);
     expect(await overlapping(page)).toEqual([]);
@@ -668,6 +674,116 @@ test.describe('Page Studio hands on the page', () => {
     await page.mouse.up();
     await expect(page.locator('.sheet-cell[data-block="legend"]')).toHaveCount(0);
     await expect(page.locator('[data-action="studioBlock"][data-block="legend"]')).not.toHaveClass(/placed/);
+  });
+});
+
+test.describe('Page Studio blocks worth the paper', () => {
+  test.setTimeout(90_000);
+
+  test('the palette offers the new blocks and no longer the old charts', async ({ page }) => {
+    await openStudio(page);
+    for (const id of ['term-glance', 'growth', 'missing-work', 'support-home'])
+      await expect(palette(page).locator(`[data-block="${id}"]`)).toHaveCount(1);
+    for (const id of ['section-outcomes', 'score-distribution', 'section-chart'])
+      await expect(palette(page).locator(`[data-block="${id}"]`)).toHaveCount(0);
+    await expect(palette(page)).toContainText('Ways to Support at Home');
+    await expect(palette(page)).toContainText('This Term at a Glance');
+    await expect(palette(page)).toContainText('Growth Since Last Report');
+  });
+
+  test('Growth and Next Steps always says something: Keep going for a student with nothing under Proficient', async ({
+    page,
+  }) => {
+    await openStudio(page);
+    await showEveryone(page);
+    const steps = page.locator('.sheet-student[data-sid="st1"] .report-next-steps');
+    await expect(steps).toContainText('Keep going');
+    await expect(page.locator('.sheet-student .report-next-steps')).toHaveCount(STUDENTS);
+    await expect(page.locator('#studio-fit')).toHaveText('Fits for 27 of 27 students');
+  });
+
+  test('the new blocks print the class’s data, at full and half width, and spill nowhere', async ({ page }) => {
+    await openWithForm(page, () => {
+      const cid = getActiveCourse();
+      let f = ReportSheets.addPage(ReportSheets.form());
+      f = ReportSheets.place(f, 'term-glance', { page: 2, x: 0, y: 0, w: 12, h: 5 });
+      f = ReportSheets.place(f, 'growth', { page: 2, x: 0, y: 5, w: 6, h: 10 });
+      f = ReportSheets.place(f, 'support-home', { page: 2, x: 6, y: 5, w: 6, h: 10 });
+      saveReportConfig(cid, { ...(getReportConfig(cid) || {}), form: f });
+    });
+    const third = page.locator('.sheet-zoom[data-page="2"] .report-sheet');
+    const glance = third.locator('.report-term-glance');
+    await expect(glance).toContainText('This Term at a Glance');
+    await expect(glance.locator('.report-glance-fig')).toHaveCount(6);
+    await expect(glance).toContainText('Assessed');
+    await expect(glance).toContainText('Strongest');
+    const growth = third.locator('.report-growth');
+    await expect(growth.locator('thead')).toContainText('Term 1');
+    await expect(growth.locator('thead')).toContainText('Term 2');
+    await expect(growth.locator('tbody tr')).not.toHaveCount(0);
+    await expect(third.locator('.report-support-home li').first()).toHaveText(/^Ask Ethan to show you how he can /);
+    expect(await overflowing(page)).toEqual([]);
+    expect(await overlapping(page)).toEqual([]);
+    // Your Own Line, from the popover.
+    const pop = await openOptions(page, 'support-home');
+    await pop.getByLabel('Your Own Line').fill('Read together for twenty minutes each night.');
+    await pop.getByLabel('Your Own Line').dispatchEvent('change');
+    await expect(third.locator('.report-support-home li').last()).toHaveText(
+      'Read together for twenty minutes each night.',
+    );
+  });
+
+  test('Assignment Grades shows this term by default, the last ten or all on request', async ({ page }) => {
+    await openWithForm(page, () => {
+      const cid = getActiveCourse();
+      const f = ReportSheets.place(ReportSheets.addPage(ReportSheets.form()), 'grade-table', {
+        page: 2,
+        x: 0,
+        y: 0,
+        w: 12,
+        h: 20,
+      });
+      saveReportConfig(cid, { ...(getReportConfig(cid) || {}), form: f });
+    });
+    const rows = () => page.locator('.sheet-cell[data-block="grade-table"] table.report-grade-table tbody tr');
+    const term = await rows().count();
+    expect(term).toBeGreaterThan(10);
+    let pop = await openOptions(page, 'grade-table');
+    await expect(pop.getByRole('radio', { name: 'This Term' })).toHaveAttribute('aria-checked', 'true');
+    await pop.getByRole('radio', { name: 'Last 10' }).click();
+    await expect(rows()).toHaveCount(10);
+    pop = await openOptions(page, 'grade-table');
+    await pop.getByRole('radio', { name: 'All', exact: true }).click();
+    expect(await rows().count()).toBeGreaterThan(term);
+    expect(await overflowing(page)).toEqual([]);
+  });
+
+  test('the legend is two by two at half width', async ({ page }) => {
+    await openWithForm(page, () => {
+      const cid = getActiveCourse();
+      const f = ReportSheets.resize(ReportSheets.form(), 'legend', { w: 6 });
+      saveReportConfig(cid, { ...(getReportConfig(cid) || {}), form: f });
+    });
+    const tops = await page
+      .locator('.sheet-cell[data-block="legend"] .report-legend-item')
+      .evaluateAll(els => els.map(el => Math.round(el.getBoundingClientRect().top)));
+    expect(tops).toHaveLength(4);
+    expect(tops[0]).toBe(tops[1]);
+    expect(tops[2]).toBe(tops[3]);
+    expect(tops[2]).toBeGreaterThan(tops[0]);
+  });
+
+  test('a comment with nothing under it rules lines to the foot of its page', async ({ page }) => {
+    await openStudio(page);
+    await applyTemplate(page, 'interim-update');
+    await cellOf(page, 'legend').click();
+    await bar(page).locator('[data-action="studioRemove"]').click();
+    await cellOf(page, 'next-steps').click();
+    await bar(page).locator('[data-action="studioRemove"]').click();
+    const comment = cellOf(page, 'teacher-narrative');
+    await expect(comment).toHaveAttribute('data-h', '35');
+    expect(await comment.locator('.report-ruled-fill').evaluate(el => el.offsetHeight)).toBeGreaterThan(400);
+    expect(await overflowing(page)).toEqual([]);
   });
 });
 

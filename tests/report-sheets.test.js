@@ -144,6 +144,23 @@ describe('ReportSheets.resolve', () => {
     expect(s.pushed).toEqual(['steps']);
   });
 
+  it('a fill block with nothing under it in its columns stretches to the foot of its page', () => {
+    const fill = ['comment'];
+    const r = R([[it_('head', 0, 0, 12, 4, 4), it_('comment', 0, 4, 12, 8, 6)]], { fill });
+    expect(at(r.pages[0])[1]).toEqual(['comment', 0, 4, 12, 42]);
+    // Something under it: it keeps its room.
+    const s = R([[it_('comment', 0, 0, 12, 8, 6), it_('steps', 0, 8, 12, 8, 8)]], { fill });
+    expect(at(s.pages[0])[0]).toEqual(['comment', 0, 0, 12, 8]);
+    // Beside it does not count; a docked block below is the limit.
+    const t = R([[it_('comment', 0, 0, 6, 8, 6), it_('side', 6, 0, 6, 30, 30), it_('resp', 0, 20, 12, 16, 16)]], {
+      fill,
+      pinned: 'resp',
+    });
+    expect(at(t.pages[0]).find(i => i[0] === 'comment')).toEqual(['comment', 0, 0, 6, 30]);
+    // Not a fill block: no stretch.
+    expect(at(R([[it_('steps', 0, 0, 12, 8, 6)]], { fill }).pages[0])[0]).toEqual(['steps', 0, 0, 12, 8]);
+  });
+
   it('every page of the form is a page, empty or not', () => {
     const r = R([[it_('a', 0, 0, 12, 4, 4)], [], []]);
     expect(r.pages).toHaveLength(3);

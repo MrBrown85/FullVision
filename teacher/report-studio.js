@@ -114,6 +114,7 @@ window.ReportStudio = (function () {
         var def = sheets.BLOCKS[id];
         if (def.group !== group) return;
         var placed = on.indexOf(id) >= 0;
+        if (def.retired && !placed) return;
         html +=
           '<button type="button" class="studio-blk' +
           (placed ? ' placed' : '') +
@@ -259,8 +260,29 @@ window.ReportStudio = (function () {
         esc((cell.options && cell.options.text) || '') +
         '</textarea></div>';
     }
+    (def.options || [])
+      .filter(function (o) {
+        return o.text;
+      })
+      .forEach(function (o) {
+        var fid = 'studio-opt-' + id + '-' + o.key;
+        html +=
+          '<div class="studio-field"><label for="' +
+          fid +
+          '">' +
+          esc(o.label) +
+          '</label><input type="text" class="studio-text" id="' +
+          fid +
+          '" maxlength="200" data-action="studioText" data-block="' +
+          id +
+          '" data-key="' +
+          o.key +
+          '" value="' +
+          esc(opts[o.key] || '') +
+          '"></div>';
+      });
     var bools = (def.options || []).filter(function (o) {
-      return !o.choices;
+      return !o.choices && !o.text;
     });
     if (bools.length) {
       html += '<div class="studio-field"><label>Show</label><div class="studio-checks">';
@@ -289,8 +311,10 @@ window.ReportStudio = (function () {
           '</label><span class="seg seg-sm" role="radiogroup" aria-label="' +
           esc(o.label) +
           '">';
-        o.choices.forEach(function (c) {
-          var on = Number(opts[o.key]) === c;
+        o.choices.forEach(function (choice) {
+          var c = typeof choice === 'object' ? choice.v : choice;
+          var text = typeof choice === 'object' ? choice.label : c === 0 ? 'None' : c;
+          var on = String(opts[o.key]) === String(c);
           html +=
             '<button type="button" class="seg-btn' +
             (on ? ' active' : '') +
@@ -303,7 +327,7 @@ window.ReportStudio = (function () {
             '" role="radio" aria-checked="' +
             on +
             '">' +
-            (c === 0 ? 'None' : c) +
+            esc(text) +
             '</button>';
         });
         html += '</span></div>';

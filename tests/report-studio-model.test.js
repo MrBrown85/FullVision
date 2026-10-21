@@ -5,7 +5,7 @@
  * docs/DECISIONS.md "Report forms".
  */
 import './setup.js';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 const S = ReportSheets;
 const rects = pg => pg.blocks.map(b => [b.block, b.x, b.y, b.w, b.h]);
@@ -380,5 +380,172 @@ describe('the letterhead keeps its options', () => {
     expect(ReportSheets.cellOf(f, 'header').options).toEqual({ studentNumber: false });
     f = ReportSheets.place(f, 'legend', { page: 1, y: 12 });
     expect(ReportSheets.cellOf(f, 'header').options).toEqual({ studentNumber: false });
+  });
+});
+
+describe('stage 3 blocks', () => {
+  const CID = 'course-s3';
+  const CECE = { id: 's1', firstName: 'Cece', lastName: 'Adeyemi', pronouns: 'she/her' };
+  const keep = {};
+  const stub = (name, fn) => {
+    if (!(name in keep)) keep[name] = globalThis[name];
+    globalThis[name] = fn;
+  };
+  const text = html =>
+    html
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&mdash;/g, '—')
+      .replace(/\s+/g, ' ')
+      .trim();
+  const tags = [
+    { id: 't1', label: 'Plan', i_can_statements: ['I can plan a fair test with my partner.'] },
+    { id: 't2', label: 'Share', i_can_statements: ['I can explain my thinking to myself and others'] },
+    { id: 't3', label: 'Ask', i_can_statements: ['Asks good questions'] },
+  ];
+  const prof = { t1: 2, t2: 3, t3: 4 };
+  beforeEach(() => {
+    COURSES[CID] = { id: CID, name: 'Science 8', gradingSystem: 'proficiency' };
+    stub('getAllTags', () => tags);
+    stub('getTagProficiency', (cid, sid, tid) => prof[tid] || 0);
+    stub('getSectionForTag', () => ({ name: 'Questioning and Predicting' }));
+  });
+  afterEach(() => {
+    Object.keys(keep).forEach(k => (globalThis[k] = keep[k]));
+    Object.keys(keep).forEach(k => delete keep[k]);
+  });
+
+  it('Ways to Support at Home turns the weakest I-can statements into lines for the family, with the teacher’s own line', () => {
+    const html = ReportBlocks.renderReportBlock(
+      'support-home',
+      CID,
+      CECE,
+      {},
+      { lines: 2, note: 'Read together each night.' },
+    );
+    expect(text(html)).toBe(
+      'Ways to Support at Home Ask Cece to show you how she can plan a fair test with her partner. Ask Cece to show you how she can explain her thinking to herself and others. Read together each night.',
+    );
+    expect(text(ReportBlocks.renderReportBlock('support-home', CID, CECE, {}, { lines: 3 }))).toContain(
+      'Talk with Cece about this: Asks good questions',
+    );
+    stub('getTagProficiency', () => 0);
+    expect(ReportBlocks.renderReportBlock('support-home', CID, CECE, {}, {})).toBe('');
+  });
+
+  it('Growth and Next Steps says Keep going with the strongest competency when nothing is under Proficient', () => {
+    stub('getFocusAreas', () => [{ tag: tags[1], prof: 3, section: { name: 'Questioning and Predicting' } }]);
+    const html = text(ReportBlocks.renderReportBlock('next-steps', CID, CECE, {}, { ican: 1 }));
+    expect(html).toContain('Keep going — Questioning and Predicting: Ask, Extending.');
+    expect(html).toContain('Asks good questions');
+    stub('getTagProficiency', () => 0);
+    expect(ReportBlocks.renderReportBlock('next-steps', CID, CECE, {}, {})).toBe('');
+  });
+
+  it('Missing Work lists this term’s past-due and not-submitted work, and nothing when there is none', () => {
+    const work = [
+      { id: 'a1', title: 'Lab Report', dueDate: '2026-10-02' },
+      { id: 'a2', title: 'Quiz', date: '2026-10-05' },
+      { id: 'a3', title: 'Poster', date: '2026-10-07' },
+    ];
+    stub('getAssessments', () => work);
+    stub('assessmentInActiveTerm', () => true);
+    stub('assessmentCellValue', (cid, sid, a) =>
+      a.id === 'a1' ? { kind: 'missing' } : a.id === 'a2' ? { kind: 'status', status: 'NS' } : { kind: 'level' },
+    );
+    const html = text(ReportBlocks.renderReportBlock('missing-work', CID, CECE, {}, {}));
+    expect(html).toBe('Missing Work Assignment Due Status Lab Report Oct 2 Past Due Quiz Oct 5 Not Submitted');
+    stub('assessmentCellValue', () => ({ kind: 'level' }));
+    expect(ReportBlocks.renderReportBlock('missing-work', CID, CECE, {}, {})).toBe('');
+  });
+
+  it('This Term at a Glance counts the term’s work and names the strongest and growing competency', () => {
+    const work = [{ id: 'a1' }, { id: 'a2' }, { id: 'a3' }, { id: 'a4' }];
+    const cells = {
+      a1: { kind: 'level', late: true },
+      a2: { kind: 'points' },
+      a3: { kind: 'missing' },
+      a4: { kind: 'status', status: 'NS' },
+    };
+    stub('getAssessments', () => work);
+    stub('assessmentInActiveTerm', () => true);
+    stub('assessmentCellValue', (cid, sid, a) => cells[a.id]);
+    stub('getActiveTerm', () => ({ ordinal: 2, startsOn: '2026-09-01', endsOn: '2026-11-30' }));
+    stub('getStudentQuickObs', () => [
+      { date: '2026-10-01' },
+      { created: '2026-09-15T10:00:00Z' },
+      { date: '2026-06-01' },
+    ]);
+    stub('getGroupedSections', () => ({ groups: [], ungrouped: [] }));
+    stub('getSections', () => [
+      { id: 'q', name: 'Questioning' },
+      { id: 'p', name: 'Planning' },
+      { id: 'c', name: 'Communicating', shortName: 'Comm.' },
+    ]);
+    stub('getSectionProficiency', (cid, sid, id) => ({ q: 3, p: 2.2, c: 3.6 })[id]);
+    expect(text(ReportBlocks.renderReportBlock('term-glance', CID, CECE, {}, {}))).toBe(
+      'This Term at a Glance 2 Assessed 1 Late 2 Missing 2 Observations Comm. Strongest Planning Growing',
+    );
+    stub('getAssessments', () => []);
+    expect(ReportBlocks.renderReportBlock('term-glance', CID, CECE, {}, {})).toBe('');
+  });
+
+  it('Growth Since Last Report reads the previous term through calc.js and puts the term back', () => {
+    let term = 2;
+    const set = [];
+    stub('getActiveTerm', () => ({ ordinal: term, label: 'Term ' + term }));
+    stub('setActiveTerm', (cid, n) => {
+      set.push(n);
+      term = n;
+    });
+    stub('getReportingTerms', () => [
+      { ordinal: 1, label: 'Term 1' },
+      { ordinal: 2, label: 'Term 2' },
+    ]);
+    stub('getGroupedSections', () => ({ groups: [], ungrouped: [] }));
+    stub('getSections', () => [
+      { id: 'q', name: 'Questioning' },
+      { id: 'p', name: 'Planning' },
+    ]);
+    stub('getSectionProficiency', (cid, sid, id) => (term === 1 ? { q: 2, p: 3 } : { q: 3, p: 3 })[id]);
+    const html = ReportBlocks.renderReportBlock('growth', CID, CECE, {}, {});
+    expect(set).toEqual([1, 2]);
+    expect(term).toBe(2);
+    expect(text(html)).toBe(
+      'Growth Since Last Report Competency Term 1 Term 2 Questioning ●●○○ Developing ●●●○ Proficient ↑ Planning ●●●○ Proficient ●●●○ Proficient →',
+    );
+    // No earlier term, or nothing in it: nothing prints.
+    term = 1;
+    expect(ReportBlocks.renderReportBlock('growth', CID, CECE, {}, {})).toBe('');
+    term = 2;
+    stub('getSectionProficiency', (cid, sid, id) => (term === 1 ? 0 : 3));
+    expect(ReportBlocks.renderReportBlock('growth', CID, CECE, {}, {})).toBe('');
+  });
+
+  it('retired blocks leave the palette but a saved layout keeps them', () => {
+    const html = ReportStudio.paletteHtml(S.form(), {}, 'blocks', []);
+    ['section-outcomes', 'score-distribution', 'section-chart'].forEach(id =>
+      expect(html).not.toContain(`data-block="${id}"`),
+    );
+    ['support-home', 'term-glance', 'growth', 'missing-work'].forEach(id =>
+      expect(html).toContain(`data-block="${id}"`),
+    );
+    const kept = S.place(S.form(), 'section-chart', { page: 1, y: 40 });
+    expect(S.onForm(kept)).toContain('section-chart');
+    expect(ReportStudio.paletteHtml(kept, {}, 'blocks', [])).toMatch(
+      /class="studio-blk placed"[^>]*data-block="section-chart"/,
+    );
+  });
+
+  it('Assignment Grades offers Last 10, This Term and All; This Term is the default', () => {
+    const f = S.place(S.form(), 'grade-table', { page: 1, y: 40 });
+    expect(S.optionsFor(S.cellOf(f, 'grade-table')).range).toBe('term');
+    const pop = ReportStudio.popoverHtml(f, 'grade-table');
+    expect(pop).toContain('aria-label="Assessments"');
+    expect(pop).toMatch(/data-value="last10"[^>]*>Last 10</);
+    expect(pop).toMatch(/data-value="term" role="radio" aria-checked="true">This Term</);
+    expect(pop).toMatch(/data-value="all"[^>]*>All</);
+    const sup = ReportStudio.popoverHtml(S.place(S.form(), 'support-home', { page: 1, y: 40 }), 'support-home');
+    expect(sup).toContain('Your Own Line');
+    expect(sup).toContain('data-action="studioText" data-block="support-home" data-key="note"');
   });
 });

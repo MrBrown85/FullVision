@@ -3696,7 +3696,8 @@ textarea.studio-text {
   }
 }
 @container (width < 380px) {
-  .report-grade-table .col-category {
+  .report-grade-table .col-category,
+  .report-grade-table .col-score {
     display: none;
   }
 }
@@ -3707,10 +3708,82 @@ textarea.studio-text {
   }
 }
 @container (width < 300px) {
-  .report-grade-table .col-date {
+  .report-grade-table .col-date,
+  .report-growth .col-before {
     display: none;
   }
   .report-sheet .report-section-chip {
     flex: 0 0 100%;
+  }
+}
+
+/* ── Page Studio stage 3: the new blocks and their shapes ──────── */
+.report-support-list {
+  margin: 2px 0 0;
+  padding-left: 18px;
+  font-size: var(--text-base);
+  line-height: 1.5;
+}
+.report-glance {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 1px;
+  background: #ddd;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.report-glance-fig {
+  background: #fff;
+  padding: 6px 8px;
+  min-width: 0;
+}
+.report-glance-value {
+  font-size: var(--text-md);
+  font-weight: 700;
+  line-height: 1.25;
+}
+.report-glance-fig.word .report-glance-value {
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+.report-glance-label {
+  font-size: var(--text-2xs);
+  color: #555;
+}
+.report-growth-arrow {
+  width: 24px;
+  text-align: center;
+  font-weight: 700;
+}
+.report-missing-work td {
+  font-size: var(--text-sm);
+}
+@container (width < 460px) {
+  /* Two levels side by side: the word goes under its dots. */
+  .report-growth .report-ct .report-ct-level {
+    white-space: normal;
+  }
+  .report-growth .report-dots {
+    display: block;
+  }
+  .report-sheet .report-legend {
+    flex-wrap: wrap;
+  }
+  .report-sheet .report-legend-item {
+    flex: 0 0 50%;
+    box-sizing: border-box;
+    border-bottom: 1px solid var(--border);
+  }
+  .report-glance {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@container (width < 300px) {
+  .report-sheet .report-legend-item {
+    flex: 0 0 100%;
+  }
+  .report-glance {
+    grid-template-columns: repeat(2, 1fr);
   }
 }
