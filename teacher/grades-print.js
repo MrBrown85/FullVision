@@ -171,7 +171,7 @@
     if (!PAPER[o.paper]) o.paper = 'letter';
     if (!SIZES[o.size]) o.size = 'normal';
     if (['entered', 'levels', 'both'].indexOf(o.scoresAs) < 0) o.scoresAs = 'entered';
-    if (['all', 'shown', 'pick'].indexOf(o.assessments) < 0) o.assessments = 'all';
+    if (['all', 'shown', 'pick', 'blank'].indexOf(o.assessments) < 0) o.assessments = 'all';
     // Saved before the Students choice: a Pupil Numbers box.
     if (raw && raw.students == null && raw.studentNumbers === false) o.students = 'name';
     if (['both', 'name', 'number'].indexOf(o.students) < 0) o.students = 'both';
@@ -280,6 +280,7 @@
 
   /* The assessments the period and the Assessments choice leave in. */
   function assessmentsFor(cid, opts, period) {
+    if (opts.assessments === 'blank') return [];
     period = period || periodFor(cid, opts);
     var list = getAssessments(cid).filter(function (a) {
       var d = _assessmentDate(a);
@@ -583,13 +584,15 @@
     var block = blockLabel.replace(/^Block /, '');
     var name = course.name || '';
     var teacher = (typeof getConfig === 'function' && getConfig().displayName) || '';
-    var scores = opts.blank
-      ? 'Blank'
-      : opts.scoresAs === 'levels'
-        ? 'Levels Only'
-        : opts.scoresAs === 'both'
-          ? 'Points and Levels'
-          : 'As Entered';
+    var scores = opts.grid
+      ? 'Blank Grid'
+      : opts.blank
+        ? 'Blank'
+        : opts.scoresAs === 'levels'
+          ? 'Levels Only'
+          : opts.scoresAs === 'both'
+            ? 'Points and Levels'
+            : 'As Entered';
     var periodText =
       period.kind === 'all'
         ? 'All Time'
@@ -618,6 +621,12 @@
     var period = periodFor(cid, opts);
     return withPeriod(cid, period, function () {
       var columns = columnsFor(cid, opts, period);
+      // No columns (Blank Grid, or a class with no assessments): the roster
+      // prints on an empty grid that fills the page, for marking by hand.
+      if (!columns.length) {
+        opts.blank = true;
+        opts.grid = true;
+      }
       var rows = rowsFor(cid, opts);
       var students = rows.map(function (r) {
         return { id: r.id };
@@ -829,7 +838,7 @@
     if (blanks.length) {
       html +=
         '<th class="gp-band-cell gp-band-blank' +
-        (cols.length ? ' gp-cat-start' : ' gp-block-start') +
+        (cols.length ? ' gp-cat-start' : '') +
         '" colspan="' +
         blanks.length +
         '"></th>';
@@ -1198,6 +1207,7 @@
       html += _radio('gp-assess', 'shown', opts.assessments === 'shown', 'Shown in the Gradebook');
     }
     html += _radio('gp-assess', 'pick', opts.assessments === 'pick', 'Pick Assessments');
+    html += _radio('gp-assess', 'blank', opts.assessments === 'blank', 'Blank Grid');
     html +=
       '<div class="gp-pick"' + (opts.assessments === 'pick' ? '' : ' hidden') + '>' + _pickList(cid, opts) + '</div>';
     html += '</fieldset>';
@@ -1206,7 +1216,8 @@
     html += _radio('gp-scores', 'entered', opts.scoresAs === 'entered', 'As Entered');
     html += _radio('gp-scores', 'levels', opts.scoresAs === 'levels', 'Levels Only');
     html += _radio('gp-scores', 'both', opts.scoresAs === 'both', 'Points and Levels');
-    html += _check('blank', opts.blank, 'Blank Scores');
+    var gridOnly = opts.assessments === 'blank';
+    html += _check('blank', opts.blank, 'Blank Scores', gridOnly);
     html += '</fieldset>';
     html += '</div>';
 
@@ -1224,9 +1235,9 @@
     html += '</fieldset>';
 
     html += '<fieldset class="gp-group"><legend>Show</legend>';
-    html += _check('finalGrade', opts.finalGrade, 'Final Grade', period.kind === 'custom' || opts.blank);
-    html += _check('average', opts.average, 'Class Average Row', opts.blank);
-    html += _check('late', opts.late, 'Late Marks', opts.blank);
+    html += _check('finalGrade', opts.finalGrade, 'Final Grade', period.kind === 'custom' || opts.blank || gridOnly);
+    html += _check('average', opts.average, 'Class Average Row', opts.blank || gridOnly);
+    html += _check('late', opts.late, 'Late Marks', opts.blank || gridOnly);
     html += '</fieldset>';
 
     html += '<fieldset class="gp-group"><legend>Paper</legend>';
@@ -1254,7 +1265,6 @@
 
   /* "27 students · 18 columns · 3 pages." */
   function statusText(model) {
-    if (!model.columns.length) return 'No assessments to print.';
     if (!model.rows.length) return 'No students to print.';
     var s = model.rows.length;
     var c = model.columns.length;
@@ -1263,8 +1273,7 @@
       s +
       (s === 1 ? ' student' : ' students') +
       ' · ' +
-      c +
-      (c === 1 ? ' column' : ' columns') +
+      (c ? c + (c === 1 ? ' column' : ' columns') : 'Blank Grid') +
       ' · ' +
       p +
       (p === 1 ? ' page.' : ' pages.')
@@ -1277,7 +1286,7 @@
     var status = document.getElementById('gp-status');
     if (status) status.textContent = statusText(model);
     var btn = document.querySelector('#' + OVERLAY_ID + ' [data-gp="print"]');
-    if (btn) btn.disabled = !model.columns.length || !model.rows.length;
+    if (btn) btn.disabled = !model.rows.length;
   }
 
   function _readDialog(overlay) {

@@ -113,10 +113,15 @@
 .gp-band .gp-corner {
   border-top: none;
   border-left: none;
+  border-right: none;
 }
 .gp-band .gp-band-blank {
   border-top: none;
   border-right: none;
+}
+/* Over a grid with no assessments the band row is empty: no rule at all. */
+.gp-band .gp-band-blank:not(.gp-cat-start) {
+  border-left: none;
 }
 
 /* Column heads: the title reads up the column; date and out of below. */

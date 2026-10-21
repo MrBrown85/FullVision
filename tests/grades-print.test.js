@@ -372,7 +372,51 @@ describe('buildModel', () => {
 
   it('has a status line with students, columns and pages', () => {
     expect(GP.statusText(GP.buildModel(CID, {}))).toBe('3 students · 5 columns · 1 page.');
-    expect(GP.statusText(GP.buildModel(CID, { assessments: 'pick', picked: [] }))).toBe('No assessments to print.');
+    expect(GP.statusText(GP.buildModel(CID, { assessments: 'pick', picked: [] }))).toBe(
+      '3 students · Blank Grid · 1 page.',
+    );
+  });
+});
+
+describe('Blank Grid', () => {
+  it('prints the roster on an empty grid that fills the page', () => {
+    const model = GP.buildModel(CID, { assessments: 'blank' });
+    expect(model.columns).toEqual([]);
+    expect(model.rows.map(r => r.name)).toEqual(['Hopper, Grace', 'Lovelace, Ada', 'Turing, Alan']);
+    expect(model.averages).toBeNull();
+    expect(model.final).toBeNull();
+    expect(model.header.scores).toBe('Blank Grid');
+    const [page] = model.pages;
+    expect(page.cols.count).toBe(0);
+    expect(page.blankCols).toBeGreaterThan(0);
+    expect(page.blankCols * page.colW).toBeCloseTo(GP.pageCapacity(model.opts).width, 1);
+    expect((page.students.count + page.blankRows) * page.rowH).toBeCloseTo(model.layout.gridH, 1);
+    const html = GP.renderPages(model);
+    expect(html).toContain('Lovelace, Ada');
+    expect(html).not.toContain('Class Average');
+    expect(html).not.toContain('Final Grade');
+  });
+
+  it('prints a blank grid for a class with no assessments', () => {
+    _cache.assessments[CID] = [];
+    clearProfCache();
+    const model = GP.buildModel(CID, {});
+    expect(model.columns).toEqual([]);
+    expect(model.pages).toHaveLength(1);
+    expect(GP.statusText(model)).toBe('3 students · Blank Grid · 1 page.');
+  });
+
+  it('follows the Students, Sort By, Paper and Text Size choices', () => {
+    const numbers = GP.renderPages(GP.buildModel(CID, { assessments: 'blank', students: 'number', sortBy: 'number' }));
+    expect(numbers).toContain('Pupil #');
+    expect(numbers).not.toContain('Lovelace');
+    const first = GP.buildModel(CID, { assessments: 'blank', sortBy: 'first' });
+    expect(first.rows.map(r => r.name)).toEqual(['Ada Lovelace', 'Alan Turing', 'Grace Hopper']);
+    const legal = GP.buildModel(CID, { assessments: 'blank', paper: 'legal' });
+    expect(legal.layout.gridH).toBeGreaterThan(GP.buildModel(CID, { assessments: 'blank' }).layout.gridH);
+    const compact = GP.buildModel(CID, { assessments: 'blank', size: 'compact' }).pages[0];
+    const normal = GP.buildModel(CID, { assessments: 'blank' }).pages[0];
+    expect(compact.blankCols).toBeGreaterThan(normal.blankCols);
   });
 });
 
