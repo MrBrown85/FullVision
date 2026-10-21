@@ -2258,6 +2258,10 @@
   border-left: none;
 }
 .score-row.ldg-row:hover {
+  /* Undo the generic .score-row:hover widening (margin 0 -8px): these rows
+     already carry their padding, so the widening slid every control left. */
+  margin: 0;
+  padding: 4px 8px;
   background: var(--overlay-hover);
 }
 .score-row.ldg-row:focus-visible {
