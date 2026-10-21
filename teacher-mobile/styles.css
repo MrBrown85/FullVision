@@ -2200,11 +2200,16 @@ body.fv-switching-course::after {
   text-align: center;
   margin-top: 12px;
 }
-.m-auth-forgot a {
+.m-auth-forgot button {
+  font: inherit;
   font-size: 15px;
   color: var(--link);
   text-decoration: none;
   font-weight: 500;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
 }
 .m-auth-error,
 .m-auth-success {

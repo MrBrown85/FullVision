@@ -863,6 +863,12 @@ body.offline-active #app-dock {
   transition: background var(--duration-micro);
   text-decoration: none;
   color: inherit;
+  /* Rows that run a page function are <button>s (renderSidebar). */
+  width: 100%;
+  font: inherit;
+  text-align: left;
+  border: 0;
+  background: none;
 }
 .student-row:hover {
   background: var(--overlay-hover);
@@ -888,10 +894,12 @@ body.offline-active #app-dock {
   flex-shrink: 0;
 }
 .student-info {
+  display: block;
   flex: 1;
   min-width: 0;
 }
 .student-row-name {
+  display: block;
   font-size: var(--text-base);
   font-weight: 500;
   color: var(--text);

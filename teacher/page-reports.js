@@ -776,7 +776,7 @@ window.PageReports = (function () {
       warn.push(
         esc(c.summary.noComment.join(', ')) +
           (c.summary.noComment.length === 1 ? ' has' : ' have') +
-          ' no Teacher Comment. The box prints with lines. <a href="#" data-issue="write">Write them now</a>',
+          ' no Teacher Comment. The box prints with lines. <button type="button" data-issue="write">Write them now</button>',
       );
     }
     if (c.summary.over && c.summary.over.length) {
