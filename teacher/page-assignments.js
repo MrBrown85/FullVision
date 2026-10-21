@@ -241,7 +241,7 @@ window.PageAssignments = (function () {
 
     var toolbarHtml =
       '<div class="assess-toolbar">' +
-      '<select class="assess-course-select" data-action="assessSwitchCourse" aria-label="Select course">' +
+      '<select class="class-picker assess-course-select" data-action="assessSwitchCourse" aria-label="Select course">' +
       courseOptions +
       '</select>' +
       (window.AssessmentCopy ? AssessmentCopy.renderSiblingToggle(cid) : '') +

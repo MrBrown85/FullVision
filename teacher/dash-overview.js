@@ -18,7 +18,7 @@ window.DashOverview = (function () {
       .join('');
     return (
       '<div class="dash-toolbar">' +
-      '<select class="dash-course-select" data-action="dashSwitchCourse" aria-label="Select course">' +
+      '<select class="class-picker dash-course-select" data-action="dashSwitchCourse" aria-label="Select course">' +
       courseOptions +
       '</select>' +
       '<button class="dash-add-btn" data-action="openClassManager">Class Management</button>' +

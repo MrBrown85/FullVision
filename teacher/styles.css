@@ -142,6 +142,9 @@
   --space-12: 48px;
 
   /* ── Border Radius ───────────────────────────────────────── */
+  /* Down chevron for every custom dropdown (class picker, term, sort).
+     Drawn by us, not the browser, so it looks the same on every system. */
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2358585d' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   --radius-xs: 4px;
   --radius-sm: 8px;
   --radius: 12px;
@@ -618,9 +621,7 @@ body.offline-active #app-dock {
   border-radius: 8px;
   padding: 6px 28px 6px 10px;
   cursor: pointer;
-  background: var(--surface)
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888' stroke-width='1.5' fill='none'/%3E%3C/svg%3E")
-    no-repeat right 10px center;
+  background: var(--surface) var(--select-chevron) no-repeat right 10px center;
   transition: border 0.12s;
   -webkit-appearance: none;
   appearance: none;
@@ -632,6 +633,32 @@ body.offline-active #app-dock {
 .term-select:focus-visible {
   outline: 2px solid var(--active);
   outline-offset: -1px;
+}
+
+/* Class picker — one look wherever it appears: the roster sidebar and the
+   Dashboard, Gradebook and Assignments toolbars. Pages add only layout
+   (width, margin). Focus uses the shared input ring above. */
+.class-picker {
+  max-width: 100%;
+  /* Same padding and border as the term, sort and search controls beside
+     it, so every toolbar control is the same height. */
+  padding: 6px 30px 6px 10px;
+  font-family: var(--font-base);
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--surface) var(--select-chevron) no-repeat right 10px center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: border-color 0.12s;
+}
+.class-picker:hover {
+  border-color: var(--text-3);
 }
 
 .tb-action-btn {
@@ -800,15 +827,6 @@ body.offline-active #app-dock {
 }
 #gb-course-select {
   width: 100%;
-  font-family: var(--font-base);
-  font-size: var(--text-base);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 6px 10px;
-  color: var(--text);
-  outline: none;
-  cursor: pointer;
   margin-bottom: 8px;
 }
 #gb-roster-search {

@@ -745,7 +745,7 @@ function renderSidebar(activeCourse, selectedStudentId, onStudentClick) {
 
   let html = `<aside id="gb-sidebar" aria-label="Student roster">
     <div id="gb-sidebar-top">
-      <select id="gb-course-select" data-action="sidebarSwitchCourse" aria-label="Select course">
+      <select id="gb-course-select" class="class-picker" data-action="sidebarSwitchCourse" aria-label="Select course">
         ${getPickerCourses(cid)
           .map(c => `<option value="${c.id}"${c.id === cid ? ' selected' : ''}>${esc(c.name)}</option>`)
           .join('')}
