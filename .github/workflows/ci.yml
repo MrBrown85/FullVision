@@ -1,7 +1,11 @@
 name: CI
 
 on:
+  # A pull request runs the checks once. Pushes to main run them again after
+  # a merge. A push to a PR branch used to start both triggers, so every
+  # check showed twice.
   push:
+    branches: [main]
   pull_request:
 
 jobs:
