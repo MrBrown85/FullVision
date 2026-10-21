@@ -898,23 +898,34 @@ th.gb-group-alt {
   position: relative;
   overflow: visible;
 }
-.gb-grid-colhead .gb-scores-assess-name {
-  position: absolute;
-  bottom: 14px;
-  left: 36px;
-  transform-origin: bottom left;
-  transform: rotate(-45deg);
-  white-space: nowrap;
-  text-align: left;
-}
-.gb-grid-colhead .gb-scores-assess-meta {
+/* Tilted label: one block per column, rotated 45° about its bottom-left
+   corner, with the title and the date stacked inside it so both read along
+   the same slant from the same origin. The block is centred across the
+   slanted band (band is 48px wide at the base; the two lines are ~37px
+   measured the same way), and its length is the header's diagonal so a long
+   title ends in an ellipsis before it reaches the top edge. */
+.gb-grid-colhead-label {
   position: absolute;
   bottom: 0;
-  left: 36px;
+  left: 43px;
+  width: calc(var(--gb-head-h, 200px) * 1.414 - 40px);
   transform-origin: bottom left;
   transform: rotate(-45deg);
-  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
   text-align: left;
+  cursor: default;
+}
+.gb-grid-colhead .gb-scores-assess-name,
+.gb-grid-colhead .gb-scores-assess-meta {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.15;
+}
+.gb-grid-colhead .gb-scores-assess-meta {
+  font-size: 11px;
 }
 /* Subtle color fill behind angled header — inherits section color via inline style */
 .gb-grid-colhead-stripe {
@@ -951,57 +962,6 @@ th.gb-group-alt {
 /* Score-only columns: white fill to match data cell background below */
 .gb-colhead-score-only .gb-grid-colhead-fill {
   opacity: 0.85;
-}
-
-/* Hover card tooltip (appended to body to escape overflow:hidden) */
-.gb-colhead-hover-card {
-  display: none;
-  position: fixed;
-  z-index: var(--z-top);
-  transform: translateX(-50%);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 10px 12px;
-  box-shadow: var(--shadow-lg);
-  min-width: 180px;
-  max-width: 260px;
-  text-align: left;
-  white-space: normal;
-  pointer-events: none;
-}
-.gb-hover-title {
-  font-weight: 700;
-  font-size: var(--text-sm);
-  color: var(--text);
-  margin-bottom: 6px;
-  line-height: 1.3;
-}
-.gb-hover-meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--text-xs);
-  color: var(--text-2);
-  margin-bottom: 6px;
-}
-.gb-hover-row {
-  font-size: var(--text-xs);
-  color: var(--text-2);
-  margin-bottom: 3px;
-}
-.gb-hover-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px;
-  margin-top: 6px;
-}
-.gb-hover-tag {
-  font-size: 12px;
-  padding: 1px 6px;
-  border-radius: var(--radius-sm);
-  background: var(--overlay-hover);
-  color: var(--text-2);
 }
 
 /* Designation tags inline with student name */

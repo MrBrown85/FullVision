@@ -50,8 +50,6 @@ window.PageGradebook = (function () {
   var _filterStripOpen = false;
   var _printTerm = 'all';
   var _printShownIds = null;
-  var _colHoverData = {}; // assessmentId → { title, isPrimary, date, ... }
-  var _colHoverTip = null; // tooltip DOM element
   var _scrollShadowCleanup = null;
   var _tipSource = null;
   /* Name-cell tooltip HTML, keyed on student.id. Populated in renderNameCell,
@@ -544,6 +542,9 @@ window.PageGradebook = (function () {
   }
 
   function applyHeaderHeight() {
+    var container = document.getElementById('gb-colheads');
+    // The tilted label's length is derived from this in gradebook.css.
+    if (container) container.style.setProperty('--gb-head-h', _headerHeight + 'px');
     var colheads = document.querySelectorAll('#gb-colheads .gb-grid-colhead');
     colheads.forEach(function (el) {
       el.style.height = _headerHeight + 'px';
@@ -590,12 +591,9 @@ window.PageGradebook = (function () {
   }
 
   function showColTooltip(colEl, colIdx) {
-    var aid = colEl.dataset.aid;
-    var d = _colHoverData[aid];
-    if (!d) return;
-    // Highlight the skewed column header
+    // Highlight the skewed column header and its score cells; no card, so
+    // nothing covers the scores below.
     colEl.classList.add('gb-col-hover');
-    // Highlight matching data cells in Q4
     var table = document.querySelector('.gb-scores-table');
     if (table) {
       table.querySelectorAll('tbody tr').forEach(function (row) {
@@ -603,56 +601,10 @@ window.PageGradebook = (function () {
         if (cell) cell.classList.add('gb-col-hover');
       });
     }
-    // Show tooltip at bottom of header, above Q4
-    if (!_colHoverTip) {
-      _colHoverTip = document.createElement('div');
-      _colHoverTip.className = 'gb-colhead-hover-card';
-      document.body.appendChild(_colHoverTip);
-    }
-    var html =
-      '<div class="gb-hover-title">' +
-      esc(d.title) +
-      '</div>' +
-      '<div class="gb-hover-meta">' +
-      '<span class="gb-assess-type-pill ' +
-      (d.hasCategory ? 'sum' : 'form') +
-      '">' +
-      esc(d.categoryName) +
-      '</span>' +
-      '<span>' +
-      d.date +
-      '</span>' +
-      '</div>' +
-      (d.isCompletion
-        ? '<div class="gb-hover-row">Complete / Incomplete</div>'
-        : d.isScoreOnly
-          ? '<div class="gb-hover-row">Score: / ' + d.maxPoints + '</div>'
-          : '') +
-      (d.weight && d.weight !== 1 ? '<div class="gb-hover-row">Weight: ' + d.weight + 'x</div>' : '') +
-      (d.secNames.length ? '<div class="gb-hover-row">Group: ' + esc(d.secNames.join(', ')) + '</div>' : '') +
-      (d.tagNames.length && !d.isScoreOnly
-        ? '<div class="gb-hover-tags">' +
-          d.tagNames
-            .map(function (t) {
-              return '<span class="gb-hover-tag">' + esc(t) + '</span>';
-            })
-            .join('') +
-          '</div>'
-        : '');
-    _colHoverTip.innerHTML = html;
-    _colHoverTip.style.display = 'block';
-    // Position just above Q4 data area, centered on column
-    var rect = colEl.getBoundingClientRect();
-    var colheadsEl = document.getElementById('gb-colheads');
-    var q2Bottom = colheadsEl.getBoundingClientRect().bottom;
-    _colHoverTip.style.left = rect.left + rect.width / 2 + 'px';
-    _colHoverTip.style.top = q2Bottom + 2 + 'px';
-    _colHoverTip.style.bottom = 'auto';
   }
 
   function hideColTooltip() {
     _hoveredColIdx = -1;
-    if (_colHoverTip) _colHoverTip.style.display = 'none';
     document.querySelectorAll('.gb-col-hover').forEach(function (el) {
       el.classList.remove('gb-col-hover');
     });
@@ -1102,8 +1054,6 @@ window.PageGradebook = (function () {
 
     // Q2: Column headers (top-right, scrolls horizontally)
     html += '<div class="gb-grid-colheads" id="gb-colheads"><div class="gb-grid-colheads-inner">';
-    // Build hover tooltip data map for JS-driven tooltips
-    _colHoverData = {};
     sortedAssess.forEach(function (a) {
       var categoryId = _getAssessmentCategoryId(a);
       var categoryName = _getCategoryName(cid, categoryId);
@@ -1118,32 +1068,6 @@ window.PageGradebook = (function () {
       var stripeColor = tagSecs.length > 0 ? tagSecs[0].color : 'var(--border)';
       var fillColor = isScoreOnly ? 'var(--surface)' : stripeColor;
       var stripeBottom = isScoreOnly ? 'var(--border)' : stripeColor;
-      var tagNames = (a.tagIds || [])
-        .map(function (tid) {
-          var t = getTagById(cid, tid);
-          return t ? t.text || t.label || t.code : '';
-        })
-        .filter(Boolean);
-      var secNames = tagSecs
-        .map(function (s) {
-          return s.name;
-        })
-        .filter(function (v, i, arr) {
-          return arr.indexOf(v) === i;
-        });
-      // Store hover data for JS tooltip
-      _colHoverData[a.id] = {
-        title: a.title,
-        hasCategory: !!categoryId,
-        categoryName: categoryName,
-        date: formatDate(a.date),
-        isScoreOnly: isScoreOnly,
-        isCompletion: isCompletionScored(a),
-        maxPoints: a.maxPoints || 100,
-        weight: a.weight,
-        secNames: secNames,
-        tagNames: tagNames,
-      };
       html +=
         '<div class="gb-grid-colhead' +
         typeClass +
@@ -1155,6 +1079,9 @@ window.PageGradebook = (function () {
         '<div class="gb-grid-colhead-fill" style="background:' +
         fillColor +
         '"></div>' +
+        '<div class="gb-grid-colhead-label" title="' +
+        esc(a.title) +
+        '">' +
         '<span class="gb-scores-assess-name">' +
         esc(a.title) +
         '</span>' +
@@ -1162,6 +1089,7 @@ window.PageGradebook = (function () {
         formatShortDate(a.date) +
         maxPts +
         '</span>' +
+        '</div>' +
         '</div>' +
         '<div class="gb-grid-colhead-stripe" style="background:' +
         stripeBottom +
@@ -3215,10 +3143,6 @@ window.PageGradebook = (function () {
       gbTip.className = '';
     }
     _tipSource = null;
-    if (_colHoverTip) {
-      _colHoverTip.remove();
-      _colHoverTip = null;
-    }
     delete window._pageSwitchCourse;
   }
 
