@@ -54,7 +54,6 @@ test.describe('Page Studio', () => {
     );
     await expect(page.locator('#studio-inspector')).toContainText('Select a block on the page');
     await expect(page.locator('#studio-inspector')).toContainText('Longest report in class');
-    await expect(page.locator('#tb-count')).toHaveText(/27 students · 54 pages · duplex safe/);
     // No setup list, no presets, no Class Summary, no Issue.
     await expect(page.locator('.rb-setup, [data-action="rbApplyPreset"], .rb-preset-btn')).toHaveCount(0);
     await expect(page.getByRole('tab', { name: 'Class Summary' })).toHaveCount(0);

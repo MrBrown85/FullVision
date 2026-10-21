@@ -364,15 +364,6 @@ window.ReportStudio = (function () {
     return html;
   }
 
-  /* "27 students · 54 pages · duplex safe" for the toolbar. */
-  function countText(summary) {
-    if (!summary || !summary.students) return '';
-    var t = summary.students + (summary.students === 1 ? ' student' : ' students') + ' · ' + summary.pages + ' pages';
-    if (summary.over && summary.over.length) t += ' · ' + summary.over.length + ' over';
-    else t += ' · duplex safe';
-    return t;
-  }
-
   /* The pages scale to the canvas: two side by side at up to 62%, never
      below 45%; narrower than that, one above the other. */
   function fitZoom(canvasWidth, paper) {
@@ -746,7 +737,6 @@ window.ReportStudio = (function () {
     paletteHtml: paletteHtml,
     inspectorHtml: inspectorHtml,
     stats: stats,
-    countText: countText,
     sizeBadge: sizeBadge,
     fitZoom: fitZoom,
     initDrag: initDrag,
