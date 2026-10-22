@@ -234,10 +234,10 @@ window.Router = (function () {
   // The loading screen fades out over the page that is now drawn.
   function _hideLoading() {
     var el = document.getElementById('app-loading');
-    if (!el) return;
+    if (!el || !el.classList) return;
     el.classList.add('is-done');
     setTimeout(function () {
-      el.remove();
+      if (typeof el.remove === 'function') el.remove();
     }, 200);
   }
 
