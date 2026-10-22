@@ -81,6 +81,8 @@ test.describe('Sentence starters', () => {
 
   test('add the suggestions, reorder, edit and delete; Edit My Starters… comes back here', async ({ page }) => {
     const section = await openStarters(page);
+    // No class list on this page, so no sidebar button either.
+    await expect(page.locator('.tb-btn').first()).toBeHidden();
     await section.getByRole('button', { name: 'Add These Starters' }).click();
     await expect(section.locator('.ms-row:not(.ms-row-head)')).toHaveCount(6);
     const texts = () => section.locator('.ms-row-text').allTextContents();
@@ -113,6 +115,9 @@ test.describe('Sentence starters', () => {
     await expect(menu.locator('[data-obsc="pickStarter"]')).toHaveCount(5);
     await menu.getByText('Edit My Starters…').click();
     await expect(page.getByRole('heading', { name: 'My Sentence Starters' })).toBeVisible();
+    // Back on a page with a class list, the button is there again.
+    await page.locator('.tb-breadcrumb a').first().click();
+    await expect(page.locator('.tb-btn').first()).toBeVisible();
   });
 
   test('Save as Starter keeps what is in the box for every class', async ({ page }) => {
@@ -134,5 +139,23 @@ test.describe('Sentence starters', () => {
     // The note itself is still in the box.
     await expect(input).toHaveValue('Explained their reasoning clearly to the group');
     await expect(page.locator('.obs-card', { hasText: 'Explained their reasoning' })).toHaveCount(0);
+  });
+
+  test('Escape in Save as Starter closes only that dialog, not the observation dialog behind it', async ({ page }) => {
+    await gotoApp(page, `/gradebook?course=${TEST_COURSE.id}`);
+    await page.evaluate(cid => {
+      ObsCapture.openDialog({ cid: cid, students: [getStudents(cid)[0].id], title: 'Add observation' });
+    }, TEST_COURSE.id);
+    const box = page.locator('.obsc-dialog textarea');
+    await box.fill('Shared the microscope without being asked');
+    await page.locator('.obsc-dialog .obsc-save-starter').click();
+    await expect(page.getByRole('dialog', { name: 'Save as Starter' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog', { name: 'Save as Starter' })).toHaveCount(0);
+    await expect(page.locator('.obsc-dialog')).toBeVisible();
+    await expect(box).toHaveValue('Shared the microscope without being asked');
+    // A second Escape closes the observation dialog, as before.
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.obsc-dialog')).toHaveCount(0);
   });
 });

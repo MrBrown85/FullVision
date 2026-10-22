@@ -392,6 +392,26 @@ function rubricCriterionScoreKeys(criterion) {
    as well, so one score is never counted twice. */
 function scoreTagIds(assessment, cid) {
   var ids = (assessment && (assessment.tagIds || assessment.tag_ids)) || [];
+  // A competency removed from the class keeps its link to the assessment
+  // (so Re-link can put it back) but is no longer scored or counted
+  // (Colin, 2026-10-22). Only the class's own competencies are listed.
+  // Points work keeps its one score under its first competency, and a
+  // rubric scores through its criteria, so both keep the full list.
+  var rubricLinked = !!(assessment && (assessment.rubricId || assessment.rubric_id));
+  if (
+    cid &&
+    ids.length &&
+    !isPointsScored(assessment) &&
+    !rubricLinked &&
+    typeof getSectionForTag === 'function' &&
+    typeof getAllTags === 'function'
+  ) {
+    if (getAllTags(cid).length > 0) {
+      ids = ids.filter(function (id) {
+        return !!getSectionForTag(cid, id);
+      });
+    }
+  }
   var rubricId = assessment && (assessment.rubricId || assessment.rubric_id);
   var rubric = null;
   if (cid && rubricId && !isPointsScored(assessment) && typeof getRubricById === 'function') {

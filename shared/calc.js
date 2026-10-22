@@ -345,6 +345,14 @@ function _rubricAssessmentPoints(cid, studentId, assessment) {
   return possible > 0 ? { earned: earned, possible: possible } : null;
 }
 
+/* A competency removed from the class (section.removed_at) keeps its scores
+   so it can come back, but they stop counting: only the class's own
+   competencies count toward an assessment and the course % (Colin,
+   2026-10-22). A class with no competencies yet removes nothing. */
+function _isRemovedCompetency(cid, tagId) {
+  return !isUnlinkedTag(tagId) && getAllTags(cid).length > 0 && !getSectionForTag(cid, tagId);
+}
+
 function getAssessmentOverallScore(cid, studentId, assessmentId) {
   var cacheKey = _ck(cid) + ':' + studentId + ':' + assessmentId;
   if (_assessmentOverallCache[cacheKey] !== undefined) return _assessmentOverallCache[cacheKey];
@@ -380,8 +388,12 @@ function getAssessmentOverallScore(cid, studentId, assessmentId) {
   // A leftover overall score (from before the assessment was linked to a
   // competency) must not count beside the new scores.
   var countsOverallKey = isPointsScored(assessment) || isUnlinkedTag(scoreTagIds(assessment, cid)[0]);
+  // A removed competency's scores don't count; a points score is one number
+  // for the assessment, so it always does.
+  var points = isPointsScored(assessment);
   var values = entries
     .filter(function (entry) {
+      if (!points && _isRemovedCompetency(cid, entry.tagId)) return false;
       return countsOverallKey || !isUnlinkedTag(entry.tagId);
     })
     .map(function (entry) {
@@ -1478,10 +1490,56 @@ function previewCalcMethodChange(cid, method, decayWeight, recentLimit) {
   return { changed: changed, total: students.length, example: example };
 }
 
+/* What removing these competencies (section ids) would do to the class:
+   how many students' overall grade changes, as the class shows it, out of
+   how many, and one example. Works out the grades on a copy of the learning
+   map held in memory for the moment, then puts the saved one back; nothing
+   is saved. */
+function previewCompetencyRemoval(cid, sectionIds) {
+  var drop = {};
+  (sectionIds || []).forEach(function (id) {
+    drop[id] = true;
+  });
+  var students = getStudents(cid);
+  var text = function (sid) {
+    return studentGradeSummary(cid, sid).text || '';
+  };
+  var before = students.map(function (s) {
+    return text(s.id);
+  });
+  var saved = _cache.learningMaps[cid];
+  var map = getLearningMap(cid);
+  var after;
+  try {
+    _cache.learningMaps[cid] = Object.assign({}, map, {
+      sections: (map.sections || []).filter(function (sec) {
+        return !drop[sec.id];
+      }),
+    });
+    clearProfCache();
+    after = students.map(function (s) {
+      return text(s.id);
+    });
+  } finally {
+    if (saved === undefined) delete _cache.learningMaps[cid];
+    else _cache.learningMaps[cid] = saved;
+    clearProfCache();
+  }
+  var changed = 0;
+  var example = null;
+  students.forEach(function (s, i) {
+    if (before[i] === after[i]) return;
+    changed++;
+    if (!example && before[i] && after[i]) example = { name: fullName(s), before: before[i], after: after[i] };
+  });
+  return { changed: changed, total: students.length, example: example };
+}
+
 /* ── Namespace ──────────────────────────────────────────────── */
 window.Calc = {
   calcMethodExample,
   getRecentScoreLimit,
+  previewCompetencyRemoval,
   formatCoursePercent,
   previewCalcMethodChange,
   clearProfCache,

@@ -1121,8 +1121,11 @@ window.ObsCapture = (function () {
         '</div></div>';
       var returnFocus = document.activeElement;
       var box = overlay.querySelector('textarea');
+      // Keys go to the window first, so Escape closes this dialog alone and
+      // not a dialog holding the strip (openDialog listens on the document).
+      var keys = document.defaultView || window;
       function close() {
-        document.removeEventListener('keydown', onKey, true);
+        keys.removeEventListener('keydown', onKey, true);
         if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
         if (returnFocus && typeof returnFocus.focus === 'function') returnFocus.focus();
       }
@@ -1168,7 +1171,7 @@ window.ObsCapture = (function () {
       overlay.addEventListener('keydown', function (e) {
         e.stopPropagation();
       });
-      document.addEventListener('keydown', onKey, true);
+      keys.addEventListener('keydown', onKey, true);
       document.body.appendChild(overlay);
       _focus(box);
     }
