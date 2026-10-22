@@ -212,8 +212,27 @@ describe('v2 learning-map structural dispatch (window.v2.*)', () => {
         p_code: 'QAP-1',
         p_i_can_text: 'I can ask questions',
         p_display_order: 0,
+        p_i_can_statements: null,
+        p_source_text: null,
         p_idempotency_key: expect.any(String),
       });
+    });
+
+    it('upsert passes I Can statements and the curriculum wording', async () => {
+      await window.v2.upsertTag({
+        sectionId: SEC_ID,
+        label: 'Text Types',
+        code: 'LS-TG',
+        iCanText: 'Recognize text types.',
+        iCanStatements: ['I can name text types.'],
+        sourceText: 'Recognize text types.',
+        displayOrder: 0,
+      });
+      var call = client.calls.find(function (c) {
+        return c.name === 'upsert_tag';
+      });
+      expect(call.payload.p_i_can_statements).toEqual(['I can name text types.']);
+      expect(call.payload.p_source_text).toBe('Recognize text types.');
     });
 
     it('delete + reorder', async () => {

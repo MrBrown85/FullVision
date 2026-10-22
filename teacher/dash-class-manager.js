@@ -104,14 +104,36 @@ window.DashClassManager = (function () {
   var _cmCollapsedStdFolders = {};
   var _cmOpenStdCards = {};
 
+  // Card state that lives outside the learning map: which cards are editing
+  // their wording, and the I Can statement being dragged.
+  var _cmWordingEdit = {};
+  var _cmIcanDrag = null;
+
+  // The same code the gradebook heads the column with.
+  function _cmStdCode(tag) {
+    if (!tag) return '';
+    return tag.code || (tag.id && !_UUID_RE_CM.test(tag.id) ? tag.id : '') || tag.shortName || '';
+  }
+
+  function _cmStdIsEdited(tag) {
+    return !!(tag && tag.source_text && (tag.text || '').trim() !== tag.source_text.trim());
+  }
+
   function _cmRenderStdCard(sec, lm, compGroups) {
     var tag = sec.tags[0] || {};
-    var sub = (lm.subjects || []).find(function (s) {
+    var subs = lm.subjects || [];
+    var sub = subs.find(function (s) {
       return s.id === sec.subject;
     });
     var subName = sub ? sub.name : '';
     var subColor = sub ? sub.color : 'var(--text-3)';
     var isOpen = _cmOpenStdCards[sec.id];
+    var title = tag.label || sec.shortName || sec.name || '';
+    var code = _cmStdCode(tag);
+    var icans = tag.i_can_statements || [];
+    var edited = _cmStdIsEdited(tag);
+    var editing = !!_cmWordingEdit[sec.id];
+    var chipColor = sec.color || subColor;
     var html =
       '<div class="cm-std-card' +
       (isOpen ? ' open' : '') +
@@ -126,42 +148,143 @@ window.DashClassManager = (function () {
       '<div class="cm-std-color-bar" style="background:' +
       sec.color +
       '"></div>' +
-      '<span class="cm-std-tag">' +
-      esc(tag.code || tag.shortName || '') +
-      '</span>' +
+      (code ? '<span class="cm-std-code" style="--chip:' + chipColor + '">' + esc(code) + '</span>' : '') +
       '<span class="cm-std-label">' +
-      esc(tag.label || sec.shortName || sec.name) +
+      esc(title) +
       '</span>' +
-      '<span class="cm-std-subject"><span class="cm-std-subject-dot" style="background:' +
-      subColor +
-      '"></span>' +
-      esc(subName) +
+      '<span class="cm-std-meta">' +
+      (edited ? '<span class="cm-std-flag">Wording Edited</span>' : '') +
+      (icans.length ? '<span class="cm-std-count">' + icans.length + ' I Can</span>' : '') +
       '</span>' +
-      '<span class="cm-std-chevron">\u25B8</span>' +
+      '<span class="cm-std-tools" data-stop-prop="true">' +
+      '<button type="button" class="cm-std-help-btn" data-action="cmStdHelp" data-secid="' +
+      sec.id +
+      '"><span class="cm-std-help-icon" aria-hidden="true">?</span>Where These Appear</button>' +
+      '<span class="cm-std-menu-wrap">' +
+      '<button type="button" class="cm-std-icon-btn" data-action="cmStdMenu" data-secid="' +
+      sec.id +
+      '" aria-label="More actions for ' +
+      esc(title) +
+      '" aria-haspopup="menu" aria-expanded="false">⋯</button>' +
+      '<div class="cm-std-menu" role="menu" hidden>' +
+      (edited
+        ? '<button type="button" role="menuitem" class="cm-std-menu-item" data-action="cmStdRestoreWording" data-secid="' +
+          sec.id +
+          '">Restore Original Wording</button>'
+        : '') +
+      '<button type="button" role="menuitem" class="cm-std-menu-item danger" data-action="cmDeleteStd" data-secid="' +
+      sec.id +
+      '">Remove from Class…</button>' +
+      '</div>' +
+      '</span>' +
+      '</span>' +
+      '<span class="cm-std-chevron" aria-hidden="true">▸</span>' +
       '</div>' +
       '<div class="cm-std-body">' +
-      '<div class="cm-std-edit-row-wide">' +
-      '<div style="flex:1"><label class="cm-label">Standard Name</label>' +
-      '<input class="cm-input" value="' +
-      esc(sec.name) +
-      '" style="font-weight:600;font-size:0.875rem" data-stop-prop="true" data-action-blur="cmStdName" data-secid="' +
+      '<div class="cm-std-row">' +
+      '<div class="cm-std-field"><label class="cm-label" for="cm-std-title-' +
+      sec.id +
+      '">Title</label>' +
+      '<input class="cm-input cm-std-title-input" id="cm-std-title-' +
+      sec.id +
+      '" value="' +
+      esc(title) +
+      '" data-stop-prop="true" data-action-blur="cmStdLabel" data-secid="' +
       sec.id +
       '"></div>' +
-      '<div style="min-width:100px"><label class="cm-label">Subject</label>' +
-      '<select class="cm-input" style="font-size:0.8125rem" data-stop-prop="true" data-action-change="cmStdSubject" data-secid="' +
+      '<div class="cm-std-field cm-std-field-code"><label class="cm-label" for="cm-std-code-' +
+      sec.id +
+      '">Code</label>' +
+      '<input class="cm-input cm-std-code-input" id="cm-std-code-' +
+      sec.id +
+      '" value="' +
+      esc(code) +
+      '" maxlength="10" style="--chip:' +
+      chipColor +
+      '" data-stop-prop="true" data-action-blur="cmStdCode" data-secid="' +
+      sec.id +
+      '"></div>' +
+      '</div>' +
+      '<div class="cm-std-section">' +
+      '<div class="cm-std-section-head">' +
+      '<span class="cm-label cm-std-section-label" id="cm-std-wording-label-' +
+      sec.id +
+      '">Curricular Competency</span>' +
+      (editing
+        ? ''
+        : '<button type="button" class="cm-std-link" data-action="cmStdEditWording" data-secid="' +
+          sec.id +
+          '">Edit Wording</button>') +
+      '</div>' +
+      (editing
+        ? '<textarea class="cm-textarea cm-std-wording-input" aria-labelledby="cm-std-wording-label-' +
+          sec.id +
+          '" data-stop-prop="true" data-action-blur="cmStdText" data-secid="' +
+          sec.id +
+          '">' +
+          esc(tag.text || '') +
+          '</textarea>'
+        : '<div class="cm-std-wording">' +
+          (tag.text ? '<p>' + esc(tag.text) + '</p>' : '<p class="cm-std-wording-empty">No wording yet.</p>') +
+          '<span class="cm-std-source">' +
+          (tag.source_text ? 'BC Curriculum' : 'Category') +
+          (sec.name ? ' · ' + esc(sec.name) : '') +
+          (edited ? ' · Edited' : '') +
+          '</span>' +
+          '</div>') +
+      '</div>' +
+      '<div class="cm-std-section">' +
+      '<div class="cm-std-section-head"><span class="cm-label cm-std-section-label">I Can Statements</span></div>' +
+      '<div class="cm-ican-list" data-secid="' +
       sec.id +
       '">' +
-      (lm.subjects || [])
-        .map(function (s) {
+      icans
+        .map(function (stmt, i) {
           return (
-            '<option value="' + s.id + '"' + (s.id === sec.subject ? ' selected' : '') + '>' + esc(s.name) + '</option>'
+            '<div class="cm-ican-row" data-idx="' +
+            i +
+            '">' +
+            '<span class="cm-ican-grip" draggable="true" data-secid="' +
+            sec.id +
+            '" data-idx="' +
+            i +
+            '" title="Drag to reorder" aria-hidden="true">⠿</span>' +
+            '<textarea class="cm-ican-text" rows="' +
+            Math.max(1, Math.ceil(String(stmt).length / 80)) +
+            '" aria-label="I Can statement ' +
+            (i + 1) +
+            '" data-stop-prop="true" data-action-blur="cmIcanEdit" data-secid="' +
+            sec.id +
+            '" data-idx="' +
+            i +
+            '">' +
+            esc(stmt) +
+            '</textarea>' +
+            '<button type="button" class="cm-ican-delete" data-action="cmIcanDelete" data-secid="' +
+            sec.id +
+            '" data-idx="' +
+            i +
+            '" aria-label="Delete this statement">✕</button>' +
+            '</div>'
           );
         })
         .join('') +
-      '</select></div>' +
+      '<div class="cm-ican-row cm-ican-add">' +
+      '<span class="cm-ican-plus" aria-hidden="true">+</span>' +
+      '<input class="cm-ican-new" placeholder="Add a statement, then press Enter" aria-label="Add an I Can statement" data-stop-prop="true" data-action-blur="cmIcanAdd" data-secid="' +
+      sec.id +
+      '">' +
+      '</div>' +
+      '</div>' +
+      '</div>' +
+      '<div class="cm-std-foot">' +
       (compGroups.length > 0
-        ? '<div style="min-width:90px"><label class="cm-label">Group</label>' +
-          '<select class="cm-input" style="font-size:0.8125rem" data-stop-prop="true" data-action-change="cmStdGroup" data-secid="' +
+        ? '<label class="cm-label cm-std-foot-label" for="cm-std-folder-' +
+          sec.id +
+          '">Folder</label>' +
+          '<select class="cm-input cm-std-foot-select" id="cm-std-folder-' +
+          sec.id +
+          '" data-stop-prop="true" data-action-change="cmStdGroup" data-secid="' +
           sec.id +
           '">' +
           '<option value="">None</option>' +
@@ -178,45 +301,310 @@ window.DashClassManager = (function () {
               );
             })
             .join('') +
-          '</select></div>'
+          '</select>'
         : '') +
-      '<div><label class="cm-label">Colour</label>' +
-      '<div style="position:relative;margin-top:2px;width:32px;height:32px">' +
-      '<div class="cm-color-swatch-selected" style="background:' +
+      (subs.length > 1
+        ? '<label class="cm-label cm-std-foot-label" for="cm-std-course-' +
+          sec.id +
+          '">Course</label>' +
+          '<select class="cm-input cm-std-foot-select" id="cm-std-course-' +
+          sec.id +
+          '" data-stop-prop="true" data-action-change="cmStdSubject" data-secid="' +
+          sec.id +
+          '">' +
+          subs
+            .map(function (s) {
+              return (
+                '<option value="' +
+                s.id +
+                '"' +
+                (s.id === sec.subject ? ' selected' : '') +
+                '>' +
+                esc(s.name) +
+                '</option>'
+              );
+            })
+            .join('') +
+          '</select>'
+        : '') +
+      '<span class="cm-label cm-std-foot-label">Colour</span>' +
+      '<div class="cm-std-swatch-wrap">' +
+      '<div class="cm-color-swatch-selected cm-std-swatch" style="background:' +
       sec.color +
-      '" data-action="cmToggleColorPalette" data-target="section" data-secid="' +
+      '" role="button" tabindex="0" aria-label="Change colour" data-action="cmToggleColorPalette" data-target="section" data-secid="' +
       sec.id +
       '"></div>' +
       '<div class="cm-color-palette" id="cm-palette-section-' +
       sec.id +
       '"></div>' +
-      '</div></div>' +
-      '<button class="cm-delete-mini" data-action="cmDeleteStd" data-stop-prop="true" data-secid="' +
-      sec.id +
-      '" title="Delete standard" style="width:32px;height:32px;align-self:flex-end">\u2715</button>' +
       '</div>' +
-      '<div style="display:flex;gap:12px;align-items:flex-end;margin-bottom:8px">' +
-      '<div style="flex:0 0 120px"><label class="cm-label">Tag Code</label>' +
-      '<input class="cm-input" value="' +
-      esc(tag.code || tag.shortName || '') +
-      '" placeholder="e.g. RD1" maxlength="10" style="padding:5px 8px;font-size:0.875rem;font-weight:600;font-family:monospace;text-transform:uppercase" data-stop-prop="true" data-action-blur="cmStdCode" data-secid="' +
-      sec.id +
-      '"></div>' +
-      '<div style="flex:1"><label class="cm-label">Short Label</label>' +
-      '<input class="cm-input" value="' +
-      esc(tag.label) +
-      '" placeholder="Short label" style="padding:5px 8px;font-size:0.875rem;font-weight:500" data-action-blur="cmStdLabel" data-secid="' +
-      sec.id +
-      '"></div>' +
       '</div>' +
-      '<label class="cm-label">I can\u2026 Statement</label>' +
-      '<textarea class="cm-textarea" placeholder="I can\u2026 statement" style="min-height:34px;padding:5px 8px;font-size:0.8125rem" data-action-blur="cmStdText" data-secid="' +
-      sec.id +
-      '">' +
-      esc(tag.text || '') +
-      '</textarea>' +
       '</div></div>';
     return html;
+  }
+
+  /* ── Where These Appear: one picture per field, drawn with the app's own
+     gradebook and report styles and this competency's own words. ── */
+  function _cmHelpSiblings(lm, sec) {
+    var out = [];
+    (lm.sections || []).forEach(function (s) {
+      if (s.id === sec.id || out.length >= 3) return;
+      if ((sec.groupId || null) !== (s.groupId || null)) return;
+      if (s.tags && s.tags[0]) out.push(s.tags[0]);
+    });
+    return out;
+  }
+
+  function _cmHelpGradebook(cid, sec, tag, siblings, withTip) {
+    var color = sec.color || 'var(--active)';
+    var cols = [tag].concat(siblings).slice(0, 4);
+    var levels = [3, 2, 4, 3];
+    var head = cols
+      .map(function (t, i) {
+        var c = (i === 0 ? sec.color : null) || color;
+        return (
+          '<div class="gb-grid-tag-header cm-help-col' +
+          (i === 0 ? ' cm-help-hl' : '') +
+          '" style="border-bottom-color:' +
+          c +
+          ';color:' +
+          c +
+          '">' +
+          esc(_cmStdCode(t)) +
+          '</div>'
+        );
+      })
+      .join('');
+    var row = cols
+      .map(function (t, i) {
+        return '<div class="cm-help-cell"><span class="gb-score-val s' + levels[i] + '">' + levels[i] + '</span></div>';
+      })
+      .join('');
+    return (
+      '<div class="cm-help-gb">' +
+      '<div class="cm-help-gb-row"><div class="cm-help-gb-name cm-help-gb-th">Student</div>' +
+      head +
+      '</div>' +
+      '<div class="cm-help-gb-row"><div class="cm-help-gb-name">' +
+      'Student 1' +
+      '</div>' +
+      row +
+      '</div>' +
+      (withTip ? '<div class="cm-help-tip cm-help-hl">' + esc(tag.text || 'Recognize and explain…') + '</div>' : '') +
+      '</div>'
+    );
+  }
+
+  // A sample level worded the way this class's report card words it.
+  function _cmHelpLevel(cid, n) {
+    try {
+      if (courseGradeMode(cid) === 'letter') return formatLevel(cid, n);
+    } catch (e) {
+      /* fall through to the scale name */
+    }
+    return PROF_LABELS[n] || '';
+  }
+
+  function _cmHelpReportTable(cid, sec, tag, siblings) {
+    var rows = [tag].concat(siblings).slice(0, 3);
+    return (
+      '<div class="report-block-box report-competency-table cm-help-report">' +
+      '<div class="report-block-title">Curricular Competencies</div>' +
+      '<table class="report-ct"><thead><tr><th>Competency</th><th>Level</th></tr></thead><tbody>' +
+      rows
+        .map(function (t, i) {
+          var n = [3, 2, 3][i];
+          return (
+            '<tr' +
+            (i === 0 ? ' class="cm-help-hl"' : '') +
+            '><td class="report-ct-name">' +
+            esc(t.label || t.name || '') +
+            '</td><td class="report-ct-level" data-prof="' +
+            n +
+            '"><span class="report-dots" aria-hidden="true">' +
+            '●'.repeat(n) +
+            '○'.repeat(4 - n) +
+            '</span>' +
+            esc(_cmHelpLevel(cid, n)) +
+            '</td></tr>'
+          );
+        })
+        .join('') +
+      '</tbody></table></div>'
+    );
+  }
+
+  function _cmHelpNextSteps(cid, sec, tag) {
+    var icans = tag.i_can_statements || [];
+    if (!icans.length) {
+      return '<p class="cm-help-empty">Add an I Can statement on the card and it appears here.</p>';
+    }
+    return (
+      '<div class="report-block-box cm-help-report">' +
+      '<div class="report-block-title">Suggested Next Steps</div>' +
+      '<div class="report-next-step-item">' +
+      '<div class="report-next-step-bullet" style="background:var(--score-2)">1</div>' +
+      '<div><strong>' +
+      esc(tag.label || '') +
+      '</strong> — ' +
+      esc(_cmHelpLevel(cid, 2)) +
+      '. <span style="color:var(--text-2)">Focus areas:</span>' +
+      '<ul class="report-ican-list cm-help-hl">' +
+      icans
+        .slice(0, 2)
+        .map(function (s) {
+          return '<li class="report-ican-item">' + esc(s) + '</li>';
+        })
+        .join('') +
+      '</ul></div></div></div>'
+    );
+  }
+
+  function cmShowStdHelp(secId) {
+    secId = _currentId('section', secId);
+    var cid = cmSelectedCourse;
+    if (!cid) return;
+    var lm = getLearningMap(cid);
+    var sec = (lm.sections || []).find(function (s) {
+      return s.id === secId;
+    });
+    if (!sec || !sec.tags || !sec.tags[0]) return;
+    var tag = sec.tags[0];
+    var siblings = _cmHelpSiblings(lm, sec);
+    var parts = [
+      {
+        name: 'Title',
+        where: 'Report card',
+        text: 'The competency’s name on report cards and throughout FullVision.',
+        picture: _cmHelpReportTable(cid, sec, tag, siblings),
+      },
+      {
+        name: 'Code',
+        where: 'Gradebook',
+        text: 'Labels the competency’s column in the gradebook.',
+        picture: _cmHelpGradebook(cid, sec, tag, siblings, false),
+      },
+      {
+        name: 'Curricular Competency',
+        where: 'Gradebook',
+        text: 'Appears when you point at the column’s code.',
+        picture: _cmHelpGradebook(cid, sec, tag, siblings, true),
+      },
+      {
+        name: 'I Can Statements',
+        where: 'Report card',
+        text: 'Print as next steps on report cards.',
+        picture: _cmHelpNextSteps(cid, sec, tag),
+      },
+    ];
+    var triggerEl = document.activeElement;
+    var overlay = document.createElement('div');
+    overlay.className = 'confirm-overlay cm-help-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-labelledby', 'cm-help-title');
+    overlay.innerHTML =
+      '<div class="cm-help-card">' +
+      '<div class="cm-help-head">' +
+      '<h2 class="cm-help-title" id="cm-help-title">Where These Appear</h2>' +
+      '<button type="button" class="cm-help-close" aria-label="Close">×</button>' +
+      '</div>' +
+      '<div class="cm-help-body">' +
+      '<div class="cm-help-tabs" role="tablist" aria-orientation="vertical">' +
+      parts
+        .map(function (p, i) {
+          return (
+            '<button type="button" class="cm-help-tab" role="tab" id="cm-help-tab-' +
+            i +
+            '" aria-controls="cm-help-panel" aria-selected="' +
+            (i === 0 ? 'true' : 'false') +
+            '" tabindex="' +
+            (i === 0 ? '0' : '-1') +
+            '" data-idx="' +
+            i +
+            '"><span class="cm-help-tab-name">' +
+            esc(p.name) +
+            '</span><span class="cm-help-tab-where">' +
+            esc(p.where) +
+            '</span></button>'
+          );
+        })
+        .join('') +
+      '</div>' +
+      '<div class="cm-help-panel" id="cm-help-panel" role="tabpanel" aria-labelledby="cm-help-tab-0"></div>' +
+      '</div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    var panel = overlay.querySelector('.cm-help-panel');
+    var tabs = overlay.querySelectorAll('.cm-help-tab');
+    function show(i) {
+      tabs.forEach(function (t, j) {
+        t.setAttribute('aria-selected', j === i ? 'true' : 'false');
+        t.tabIndex = j === i ? 0 : -1;
+      });
+      panel.setAttribute('aria-labelledby', 'cm-help-tab-' + i);
+      panel.innerHTML =
+        '<div class="cm-help-picture" aria-hidden="true">' +
+        parts[i].picture +
+        '</div>' +
+        '<div class="cm-help-caption"><span class="cm-help-caption-name">' +
+        esc(parts[i].name) +
+        '</span><span class="cm-help-caption-text">' +
+        esc(parts[i].text) +
+        '</span></div>';
+    }
+    function close() {
+      overlay.remove();
+      document.removeEventListener('keydown', onKey);
+      try {
+        if (triggerEl && typeof triggerEl.focus === 'function') triggerEl.focus();
+      } catch (e) {
+        /* trigger may be gone after a re-render */
+      }
+    }
+    function onKey(e) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        close();
+        return;
+      }
+      var cur = Array.prototype.indexOf.call(tabs, document.activeElement);
+      if (cur >= 0 && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+        e.preventDefault();
+        var next = (cur + (e.key === 'ArrowDown' ? 1 : tabs.length - 1)) % tabs.length;
+        show(next);
+        tabs[next].focus();
+        return;
+      }
+      if (e.key === 'Tab') {
+        var focusable = [overlay.querySelector('.cm-help-close')].concat(
+          Array.prototype.filter.call(tabs, function (t) {
+            return t.tabIndex === 0;
+          }),
+        );
+        var first = focusable[0];
+        var last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    }
+    tabs.forEach(function (t) {
+      t.addEventListener('click', function () {
+        show(Number(t.dataset.idx));
+      });
+    });
+    overlay.querySelector('.cm-help-close').addEventListener('click', close);
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay) close();
+    });
+    document.addEventListener('keydown', onKey);
+    show(0);
+    tabs[0].focus();
   }
 
   function cmToggleStdCard(secId) {
@@ -352,7 +740,20 @@ window.DashClassManager = (function () {
   }
 
   function _initCmStdDrag() {
+    _addDocListener('click', function (e) {
+      if (!e.target.closest || !e.target.closest('.cm-std-menu-wrap')) _cmCloseStdMenus();
+    });
     _addDocListener('dragstart', function (e) {
+      // An I Can statement's grip reorders it within its own card.
+      var grip = e.target.closest && e.target.closest('.cm-ican-grip');
+      if (grip) {
+        _cmIcanDrag = { secId: grip.dataset.secid, idx: Number(grip.dataset.idx) };
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', 'ican');
+        var row = grip.closest('.cm-ican-row');
+        if (row) row.classList.add('dragging');
+        return;
+      }
       var card = e.target.closest && e.target.closest('.cm-std-card[data-std-drag]');
       if (!card) return;
       _cmDragStdId = card.dataset.stdDrag;
@@ -361,6 +762,19 @@ window.DashClassManager = (function () {
       e.dataTransfer.setData('text/plain', _cmDragStdId);
     });
     _addDocListener('dragover', function (e) {
+      if (_cmIcanDrag) {
+        var over = e.target.closest && e.target.closest('.cm-ican-row[data-idx]');
+        var list = over && over.closest('.cm-ican-list');
+        document.querySelectorAll('.cm-ican-row.drop-target').forEach(function (r) {
+          if (r !== over) r.classList.remove('drop-target');
+        });
+        if (over && list && list.dataset.secid === _cmIcanDrag.secId) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          over.classList.add('drop-target');
+        }
+        return;
+      }
       if (!_cmDragStdId) return;
       var targetCard = e.target.closest && e.target.closest('.cm-std-card[data-std-drag]');
       if (targetCard) {
@@ -410,6 +824,15 @@ window.DashClassManager = (function () {
       if (folder && !folder.contains(e.relatedTarget)) folder.classList.remove('drag-over');
     });
     _addDocListener('drop', function (e) {
+      if (_cmIcanDrag) {
+        var onto = e.target.closest && e.target.closest('.cm-ican-row[data-idx]');
+        var drag = _cmIcanDrag;
+        _cmIcanDrag = null;
+        if (!onto) return;
+        e.preventDefault();
+        cmIcanMove(drag.secId, drag.idx, Number(onto.dataset.idx));
+        return;
+      }
       if (!_cmDragStdId) return;
       var targetCard = e.target.closest && e.target.closest('.cm-std-card[data-std-drag]');
       if (targetCard && _cmMergeAnimating && _cmMergeTargetId === targetCard.dataset.stdDrag) {
@@ -451,6 +874,10 @@ window.DashClassManager = (function () {
       });
     });
     _addDocListener('dragend', function () {
+      _cmIcanDrag = null;
+      document.querySelectorAll('.cm-ican-row.dragging, .cm-ican-row.drop-target').forEach(function (r) {
+        r.classList.remove('dragging', 'drop-target');
+      });
       _cmDragStdId = null;
       _cmClearMerge();
       document.querySelectorAll('.mod-folder.drag-over').forEach(function (f) {
@@ -1552,12 +1979,12 @@ window.DashClassManager = (function () {
       return _cmGroupMap[g.id];
     });
 
-    html += '<div class="cm-field"><label class="cm-label">Learning Standards</label>';
+    html += '<div class="cm-field"><label class="cm-label">Competencies</label>';
 
     if ((lm.sections || []).length === 0 && compGroups.length === 0) {
       html +=
         '<div class="cm-curriculum-empty">' +
-        '<div class="cm-curriculum-empty-text">No learning standards yet. Add a standard to start defining your curriculum.</div>' +
+        '<div class="cm-curriculum-empty-text">No competencies yet. Add one to start building this class\u2019s curriculum.</div>' +
         '</div>';
     }
 
@@ -1595,8 +2022,7 @@ window.DashClassManager = (function () {
         '">' +
         '<span class="mod-folder-meta">' +
         secs.length +
-        ' Standard' +
-        (secs.length !== 1 ? 's' : '') +
+        (secs.length !== 1 ? ' Competencies' : ' Competency') +
         '</span>' +
         '<div class="mod-folder-actions" data-stop-prop="true">' +
         '<button class="mod-folder-action delete" data-action="cmDeleteCompGroup" data-grpid="' +
@@ -1609,7 +2035,7 @@ window.DashClassManager = (function () {
         '<div class="mod-folder-body">';
       if (secs.length === 0) {
         html +=
-          '<div class="mod-folder-empty">Drag standards here or use the group dropdown when editing a standard</div>';
+          '<div class="mod-folder-empty">Drag competencies here, or choose this folder on a competency\u2019s card.</div>';
       }
       secs.forEach(function (sec) {
         html += _cmRenderStdCard(sec, lm, compGroups);
@@ -1629,8 +2055,7 @@ window.DashClassManager = (function () {
         '<span class="mod-folder-name" style="font-size:0.95rem;font-weight:500;color:var(--text-3)">Ungrouped</span>' +
         '<span class="mod-folder-meta">' +
         _cmGrouped.ungrouped.length +
-        ' Standard' +
-        (_cmGrouped.ungrouped.length !== 1 ? 's' : '') +
+        (_cmGrouped.ungrouped.length !== 1 ? ' Competencies' : ' Competency') +
         '</span>' +
         '</div>' +
         '<div class="mod-folder-body">';
@@ -1638,7 +2063,7 @@ window.DashClassManager = (function () {
         html += _cmRenderStdCard(sec, lm, compGroups);
       });
       if (_cmGrouped.ungrouped.length === 0) {
-        html += '<div class="mod-folder-empty">All standards are grouped</div>';
+        html += '<div class="mod-folder-empty">Every competency is in a folder</div>';
       }
       html += '</div></div>';
     } else {
@@ -1650,7 +2075,7 @@ window.DashClassManager = (function () {
 
     // Add buttons
     html += '<button class="add-module-btn" data-action="cmAddCompGroup">+ Add Group</button>';
-    html += '<button class="cm-add-link" data-action="cmAddStd">+ Add Standard</button>';
+    html += '<button class="cm-add-link" data-action="cmAddStd">+ Add Competency</button>';
     html += '</div></div>';
 
     // Section 4: BC Curriculum Link
@@ -4276,7 +4701,7 @@ window.DashClassManager = (function () {
     if (count > 0) {
       showConfirm(
         'Delete Group',
-        count + ' standard(s) will become ungrouped. Delete anyway?',
+        count + ' competencies will leave this folder. Delete anyway?',
         'Delete',
         'danger',
         doDelete,
@@ -4331,17 +4756,17 @@ window.DashClassManager = (function () {
     map.sections.push({
       id: stdId,
       subject: subId,
-      name: 'New Standard',
+      name: 'New Competency',
       shortName: 'New',
       color: colour,
       tags: [
         {
           id: stdId,
-          label: 'New Standard',
+          label: 'New Competency',
           text: '',
           color: colour,
           subject: subId,
-          name: 'New Standard',
+          name: 'New Competency',
           shortName: 'New',
         },
       ],
@@ -4409,9 +4834,9 @@ window.DashClassManager = (function () {
 
   function cmDeleteStd(secId) {
     showConfirm(
-      'Delete Standard',
-      'Delete this learning standard? Existing scores are preserved.',
-      'Delete',
+      'Remove Competency',
+      'Remove this competency from the class? Existing scores are kept.',
+      'Remove',
       'danger',
       function () {
         var cid = cmSelectedCourse;
@@ -4453,6 +4878,124 @@ window.DashClassManager = (function () {
       sec.tags[0].text = val.trim();
       saveLearningMap(cid, map);
     }
+  }
+
+  /* The card's own competency, from a fresh copy of the map. */
+  function _cmStdEntry(secId) {
+    if (!cmSelectedCourse) return null;
+    secId = _currentId('section', secId);
+    var map = ensureCustomLearningMap(cmSelectedCourse);
+    var sec = (map.sections || []).find(function (s) {
+      return s.id === secId;
+    });
+    if (!sec || !sec.tags || !sec.tags[0]) return null;
+    return { map: map, sec: sec, tag: sec.tags[0] };
+  }
+
+  function _cmStdSave(entry, focusSel) {
+    saveLearningMap(cmSelectedCourse, entry.map);
+    renderClassManager();
+    if (!focusSel) return;
+    requestAnimationFrame(function () {
+      var el = document.querySelector('#cm-std-' + entry.sec.id + ' ' + focusSel);
+      if (el) el.focus();
+    });
+  }
+
+  function cmStdEditWording(secId) {
+    var entry = _cmStdEntry(secId);
+    if (!entry) return;
+    _cmWordingEdit[entry.sec.id] = true;
+    renderClassManager();
+    requestAnimationFrame(function () {
+      var el = document.querySelector('#cm-std-' + entry.sec.id + ' .cm-std-wording-input');
+      if (el) {
+        el.focus();
+        el.setSelectionRange(el.value.length, el.value.length);
+      }
+    });
+  }
+
+  function cmStdFinishWording(secId, val) {
+    cmUpdateStdText(secId, val);
+    delete _cmWordingEdit[_currentId('section', secId)];
+    delete _cmWordingEdit[secId];
+    renderClassManager();
+  }
+
+  function cmStdRestoreWording(secId) {
+    var entry = _cmStdEntry(secId);
+    if (!entry || !entry.tag.source_text) return;
+    entry.tag.text = entry.tag.source_text;
+    delete _cmWordingEdit[entry.sec.id];
+    _cmStdSave(entry);
+  }
+
+  function cmStdToggleMenu(btn) {
+    var menu = btn.parentElement.querySelector('.cm-std-menu');
+    if (!menu) return;
+    var open = menu.hidden;
+    _cmCloseStdMenus();
+    if (open) {
+      menu.hidden = false;
+      btn.setAttribute('aria-expanded', 'true');
+      var first = menu.querySelector('.cm-std-menu-item');
+      if (first) first.focus();
+    }
+  }
+
+  function _cmCloseStdMenus() {
+    var any = false;
+    document.querySelectorAll('.cm-std-menu:not([hidden])').forEach(function (m) {
+      m.hidden = true;
+      var btn = m.parentElement.querySelector('[aria-haspopup="menu"]');
+      if (btn) btn.setAttribute('aria-expanded', 'false');
+      any = true;
+    });
+    return any;
+  }
+
+  function cmIcanAdd(secId, val) {
+    var text = String(val || '').trim();
+    if (!text) return;
+    var entry = _cmStdEntry(secId);
+    if (!entry) return;
+    entry.tag.i_can_statements = (entry.tag.i_can_statements || []).concat([text]);
+    _cmStdSave(entry, '.cm-ican-new');
+  }
+
+  function cmIcanEdit(secId, idx, val) {
+    var entry = _cmStdEntry(secId);
+    if (!entry) return;
+    var list = (entry.tag.i_can_statements || []).slice();
+    if (idx < 0 || idx >= list.length) return;
+    var text = String(val || '').trim();
+    if (text === list[idx]) return;
+    if (text) list[idx] = text;
+    else list.splice(idx, 1);
+    entry.tag.i_can_statements = list;
+    _cmStdSave(entry);
+  }
+
+  function cmIcanDelete(secId, idx) {
+    var entry = _cmStdEntry(secId);
+    if (!entry) return;
+    var list = (entry.tag.i_can_statements || []).slice();
+    if (idx < 0 || idx >= list.length) return;
+    list.splice(idx, 1);
+    entry.tag.i_can_statements = list;
+    _cmStdSave(entry);
+  }
+
+  function cmIcanMove(secId, from, to) {
+    var entry = _cmStdEntry(secId);
+    if (!entry) return;
+    var list = (entry.tag.i_can_statements || []).slice();
+    if (from === to || from < 0 || from >= list.length || to < 0 || to >= list.length) return;
+    var moved = list.splice(from, 1)[0];
+    list.splice(to, 0, moved);
+    entry.tag.i_can_statements = list;
+    _cmStdSave(entry);
   }
 
   // Updates the user-facing tag.code (e.g. "RD1", "ENG10A") for a standard.
@@ -4516,6 +5059,8 @@ window.DashClassManager = (function () {
 
   /* ── Action dispatcher (called from parent's _handleClick) ── */
   function handleAction(action, el, e) {
+    // Any click other than on a card's More button closes its open menu.
+    if (action !== 'cmStdMenu') _cmCloseStdMenus();
     var handlers = {
       openClassManager: function () {
         openClassManager();
@@ -4727,6 +5272,21 @@ window.DashClassManager = (function () {
       cmToggleStdCard: function () {
         cmToggleStdCard(el.dataset.secid);
       },
+      cmStdHelp: function () {
+        cmShowStdHelp(el.dataset.secid);
+      },
+      cmStdMenu: function () {
+        cmStdToggleMenu(el);
+      },
+      cmStdEditWording: function () {
+        cmStdEditWording(el.dataset.secid);
+      },
+      cmStdRestoreWording: function () {
+        cmStdRestoreWording(el.dataset.secid);
+      },
+      cmIcanDelete: function () {
+        cmIcanDelete(el.dataset.secid, Number(el.dataset.idx));
+      },
       cmToggleStdFolder: function () {
         cmToggleStdFolder(el.dataset.uid);
       },
@@ -4865,6 +5425,25 @@ window.DashClassManager = (function () {
   // In the starter editor Enter saves and Escape cancels.
   function handleKeydown(e) {
     var el = e.target;
+    if (e.key === 'Escape' && _cmCloseStdMenus()) {
+      e.preventDefault();
+      return true;
+    }
+    if (el && el.classList && !e.isComposing && e.key === 'Enter' && !e.shiftKey) {
+      // Enter adds the typed I Can statement, or ends an edit to one.
+      if (el.classList.contains('cm-ican-new')) {
+        e.preventDefault();
+        var typed = el.value;
+        el.value = ''; // so the blur that follows the redraw adds nothing twice
+        cmIcanAdd(el.dataset.secid, typed);
+        return true;
+      }
+      if (el.classList.contains('cm-ican-text')) {
+        e.preventDefault();
+        el.blur();
+        return true;
+      }
+    }
     if (el && el.id === 'cm-starter-text' && !e.isComposing) {
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -4935,7 +5514,16 @@ window.DashClassManager = (function () {
       return true;
     }
     if (el.dataset.actionBlur === 'cmStdText') {
-      cmUpdateStdText(el.dataset.secid, el.value);
+      cmStdFinishWording(el.dataset.secid, el.value);
+      return true;
+    }
+    if (el.dataset.actionBlur === 'cmIcanAdd') {
+      // Typed but never pressed Enter: keep the statement anyway.
+      if (el.value.trim()) cmIcanAdd(el.dataset.secid, el.value);
+      return true;
+    }
+    if (el.dataset.actionBlur === 'cmIcanEdit') {
+      cmIcanEdit(el.dataset.secid, Number(el.dataset.idx), el.value);
       return true;
     }
     if (el.dataset.actionBlur === 'cmSecName') {

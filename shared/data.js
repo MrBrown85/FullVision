@@ -2952,6 +2952,7 @@ function _canonicalLearningMapToCache(cid, payload) {
           label: label,
           text: tag.i_can_text || tag.iCanText || tag.text || '',
           i_can_statements: tag.i_can_statements || tag.iCanStatements || [],
+          source_text: tag.source_text || null,
           color: tag.color || sectionColor,
           subject: subject.id,
           name: sectionName,
@@ -5869,8 +5870,10 @@ function buildLearningMapFromTags(shortTags) {
         }
         const tag = {
           id: baseId,
+          code: comp.tag,
           label: comp.short_label,
           text: comp.raw,
+          source_text: comp.raw,
           i_can_statements: comp.i_can_statements || [],
           color: colour,
           subject: courseTag,
@@ -6195,6 +6198,18 @@ function _patchObjectKeys(obj, idMap) {
   return changed;
 }
 
+/* A competency's I Can statements as a clean list: trimmed, no blanks. */
+function _iCanStatementsOf(tag) {
+  var list = (tag && (tag.i_can_statements || tag.iCanStatements)) || [];
+  return Array.isArray(list)
+    ? list
+        .map(function (s) {
+          return String(s || '').trim();
+        })
+        .filter(Boolean)
+    : [];
+}
+
 function _stringifyICanText(tag) {
   if (!tag) return '';
   if (typeof tag.text === 'string') return tag.text;
@@ -6242,6 +6257,8 @@ function _learningMapSignatures(map) {
         tag.label || tag.name || sec.name || '',
         tag.code || tag.shortName || '',
         _stringifyICanText(tag),
+        _iCanStatementsOf(tag),
+        tag.source_text || null,
         tag.displayOrder != null ? Number(tag.displayOrder) : Number(tag.sortOrder || ti),
       ]);
     });
@@ -6356,6 +6373,8 @@ function _persistLearningMapToCanonical(cid, prevMap, nextMap) {
               label: tag.label || tag.name || section.name || '',
               code: tag.code || tag.shortName || '',
               iCanText: _stringifyICanText(tag),
+              iCanStatements: _iCanStatementsOf(tag),
+              sourceText: tag.source_text || null,
               displayOrder: tag.displayOrder != null ? Number(tag.displayOrder) : Number(tag.sortOrder || ti),
             },
             options,
@@ -9263,6 +9282,8 @@ window.v2.upsertTag = function (params, options) {
       p_code: params.code || null,
       p_i_can_text: params.iCanText || null,
       p_display_order: params.displayOrder != null ? Number(params.displayOrder) : null,
+      p_i_can_statements: Array.isArray(params.iCanStatements) ? params.iCanStatements : null,
+      p_source_text: params.sourceText || null,
     },
     options,
   );
