@@ -3532,7 +3532,14 @@ function _gradebookCellsToScoreCache(cid, assessments, cells) {
         _pushHydratedScore(
           scores,
           sid,
-          _scoreEntryFromCanonical(cid, assessment, scoreTagIds(assessment)[0], cell.score.value, comment),
+          _scoreEntryFromCanonical(
+            cid,
+            assessment,
+            scoreTagIds(assessment)[0],
+            cell.score.value,
+            comment,
+            isPointsScored(assessment) ? 0 : cell.score.modifier,
+          ),
         );
       }
     });
@@ -3768,7 +3775,8 @@ function _bundleCells(gb) {
   }
   sorted(gb.score_rows).forEach(function (r) {
     var cell = cellFor(r[0], r[1]);
-    if (cell) cell.score = { value: r[2], status: r[3], comment: r[4] };
+    // A sixth value, the + / −, from migrations/20261022_score_modifier.sql.
+    if (cell) cell.score = { value: r[2], status: r[3], comment: r[4], modifier: r[5] || 0 };
   });
   sorted(gb.tag_rows).forEach(function (r) {
     var cell = cellFor(r[0], r[1]);
@@ -4745,10 +4753,11 @@ function _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note, mod) {
       // An unlinked assessment's single score. On proficiency work 0 clears
       // it; on points and Complete/Incomplete work 0 is a score.
       var cellValue = isUnlinkedTag(tid) && intVal === 0 && !isPointsScored(assessment) ? null : intVal;
-      ops.push({
-        rpc: 'upsert_score',
-        params: { p_enrollment_id: sid, p_assessment_id: aid, p_value: cellValue },
-      });
+      // A proficiency score as a whole takes + / − like a competency's
+      // (score.modifier). Points work has none, so it sends none.
+      var scoreParams = { p_enrollment_id: sid, p_assessment_id: aid, p_value: cellValue };
+      if (!isPoints && cellValue != null) scoreParams.p_modifier = modifier;
+      ops.push({ rpc: 'upsert_score', params: scoreParams });
     } else {
       // The server rejects tag_score on rubric assessments; the rubric_score
       // mirror below carries the value.

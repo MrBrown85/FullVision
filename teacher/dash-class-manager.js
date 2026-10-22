@@ -1068,7 +1068,7 @@ window.DashClassManager = (function () {
           day(r.date),
           r.assessment || '',
           '',
-          _cmRecordScoreText(r.score_mode || 'proficiency', r.value, r.max_points, null),
+          _cmRecordScoreText(r.score_mode || 'proficiency', r.value, r.max_points, r.modifier),
           r.status || '',
           r.comment || '',
         ]);
