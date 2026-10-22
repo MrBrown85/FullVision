@@ -13,6 +13,7 @@ Context: `grading-compliance-plan.md`. All implemented; see its status table.
 - **D5 No drop-lowest.** Skipped; low demand.
 - **D6 Rounding:** a class setting, whole number or one decimal; default whole for grades 10–12. The letter always comes from the % as shown.
 - **D7 Missing counts as 0.** No switch to turn it off.
+- **D8 + and − on every proficiency score** (Colin, 2026-10-22: "the plus minus should be consistent"): a competency, a rubric criterion, and an assessment scored as a whole on its Overall row (`score.modifier`, `migrations/20261022_score_modifier.sql`), in Assignments, the gradebook and the phone. A 3+ counts as 3.33 wherever it is.
 
 ## Product shape (2026-10-17)
 

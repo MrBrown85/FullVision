@@ -1622,7 +1622,7 @@ window.PageGradebook = (function () {
     var aid = td.dataset.aid;
     var tid = td.dataset.tid;
     var sid = td.dataset.sid;
-    if (!aid || !tid || !sid || isUnlinkedTag(tid)) return;
+    if (!aid || !tid || !sid) return;
     var entry = (getScores(cid)[sid] || []).find(function (e) {
       return e.assessmentId === aid && e.tagId === tid;
     });

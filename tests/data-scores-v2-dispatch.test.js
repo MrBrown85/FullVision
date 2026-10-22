@@ -198,6 +198,35 @@ describe('v2 scoring-dispatch', () => {
     });
   });
 
+  describe('an assessment scored as a whole (no competency)', () => {
+    const AID_ALL = '99999999-9999-4999-8999-999999999999';
+    it('sends its + / − with the score (score.modifier)', () => {
+      _cache.v2Gradebook[CID].assessments.push({ id: AID_ALL, score_mode: 'proficiency', tag_ids: [] });
+      _persistScoreToCanonical(CID, ENR, AID_ALL, UNLINKED_TAG_ID, 3, '', 1);
+      const call = client.calls.find(function (c) {
+        return c.name === 'upsert_score';
+      });
+      expect(call && call.payload).toEqual({
+        p_enrollment_id: ENR,
+        p_assessment_id: AID_ALL,
+        p_value: 3,
+        p_modifier: 1,
+      });
+    });
+    it('reads the + / − back from the class bundle', () => {
+      const gb = {
+        students: [{ enrollment_id: ENR }],
+        assessments: [{ id: AID_ALL, score_mode: 'proficiency', tag_ids: [] }],
+        score_rows: [[0, 0, 3, null, null, 1]],
+        tag_index: [],
+        criterion_index: [],
+      };
+      const cells = _bundleCells(gb);
+      const cell = cells[ENR] && cells[ENR][AID_ALL];
+      expect(cell.score).toMatchObject({ value: 3, modifier: 1 });
+    });
+  });
+
   describe('persistScoreDiffToCanonical', () => {
     // Same dispatch refactor as the four sibling tests above — pending.
     it.skip('dispatches changed rows and zeroes removed rows after a bulk local restore', () => {
