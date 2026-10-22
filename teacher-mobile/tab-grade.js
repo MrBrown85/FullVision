@@ -694,7 +694,7 @@ window.MGrade = (function () {
           '" data-tid="' +
           tid +
           '">' +
-          (isUnlinkedTag(tid) ? '' : _modBtnsHtml(current, currentMod)) +
+          _modBtnsHtml(current, currentMod) +
           '</div>' +
           '</div>';
       }
@@ -770,7 +770,6 @@ window.MGrade = (function () {
   }
 
   function _syncModBtns(cid, sid, aid, tid) {
-    if (isUnlinkedTag(tid)) return;
     var box = document.querySelector(
       '.m-swiper-card[data-sid="' + sid + '"] .m-score-mods[data-aid="' + aid + '"][data-tid="' + tid + '"]',
     );

@@ -2313,7 +2313,7 @@ window.PageAssignments = (function () {
   }
 
   function syncModRow(row) {
-    if (!row || isUnlinkedTag(row.dataset.tag)) return;
+    if (!row) return;
     var st = rowScoreState(row);
     var box = row.querySelector('.rsg-mods');
     if (box) box.innerHTML = scoreModButtonsHtml(st.level, st.mod);
@@ -2335,16 +2335,6 @@ window.PageAssignments = (function () {
     });
     syncModRow(row);
     refreshSidebar();
-  }
-
-  function updateGroupUI(group, value) {
-    group.querySelectorAll('.score-opt').forEach(function (o) {
-      o.classList.remove('active');
-    });
-    if (value > 0) {
-      var opt = group.querySelector('.s' + value);
-      if (opt) opt.classList.add('active');
-    }
   }
 
   function selectTagLevel(el, value, aid, sid, tagId) {
@@ -2424,7 +2414,7 @@ window.PageAssignments = (function () {
         if (statuses[st.id + ':' + aid]) return;
         setScore(cid, st.id, aid, tagId, value);
       });
-      selector = '.score-group[data-assess="' + aid + '"][data-tag="' + tagId + '"]';
+      selector = '.rsg-criterion-row.is-tag[data-assess="' + aid + '"][data-tag="' + tagId + '"]';
       toastMsg = 'Column filled';
     } else if (scope === 'row') {
       if (!assess) return;
@@ -2433,7 +2423,7 @@ window.PageAssignments = (function () {
         scoreTagIds(assess, cid).forEach(function (tid) {
           setScore(cid, sid, aid, tid, value);
         });
-      selector = '.score-group[data-assess="' + aid + '"][data-student="' + sid + '"]';
+      selector = '.rsg-criterion-row.is-tag[data-assess="' + aid + '"][data-student="' + sid + '"]';
       toastMsg = 'Row filled';
     } else {
       if (!assess) return;
@@ -2443,11 +2433,14 @@ window.PageAssignments = (function () {
           setScore(cid, st.id, aid, tid, value);
         });
       });
-      selector = '.score-group[data-assess="' + aid + '"]';
+      selector = '.rsg-criterion-row.is-tag[data-assess="' + aid + '"]';
       toastMsg = 'All scores filled';
     }
-    document.querySelectorAll(selector).forEach(function (g) {
-      updateGroupUI(g, value);
+    // Each filled row shows its new level at once, drawn from the saved
+    // scores, so a student with a status (skipped) keeps what it had.
+    document.querySelectorAll(selector).forEach(function (row) {
+      var st = rowScoreState(row);
+      updateRubricRowUI(row, st.mixed ? 0 : st.level);
     });
     syncModRows('.rsg-criterion-row[data-assess="' + aid + '"]');
     refreshSidebar();
@@ -2666,7 +2659,7 @@ window.PageAssignments = (function () {
           tag.id +
           '" role="button" tabindex="0">Emerging</div>' +
           '</div><div class="rsg-mods">' +
-          (isUnlinkedTag(tag.id) ? '' : scoreModButtonsHtml(score, mod)) +
+          scoreModButtonsHtml(score, mod) +
           '</div></div>';
       });
       html +=
