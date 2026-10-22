@@ -188,8 +188,10 @@ test.describe('Withdraw students', () => {
 
     await withdrawn(page).getByRole('button', { name: 'Delete permanently' }).click();
     const dialog = page.locator('.confirm-card');
-    await expect(dialog.locator('.confirm-title')).toHaveText('Delete permanently');
+    await expect(dialog.locator('.confirm-title')).toHaveText(/^Delete .+ Permanently\?$/);
     await expect(dialog.locator('.confirm-message')).toContainText('cannot be undone');
+    // A copy of their records is offered before the delete.
+    await expect(dialog.getByRole('button', { name: 'Download Records' })).toBeVisible();
     await dialog.locator('#confirm-ok-btn').click();
 
     await expect(withdrawn(page)).toHaveCount(0);

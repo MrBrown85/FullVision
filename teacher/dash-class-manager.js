@@ -950,17 +950,170 @@ window.DashClassManager = (function () {
       return w && w.student && w.student.id === sid;
     });
     if (!entry) return;
+    var name = fullName(entry.student);
     showConfirm(
-      'Delete permanently',
-      'Permanently delete ' +
-        displayName(entry.student) +
-        '? Their scores, observations, goals, reflections and reports in this class are deleted. This cannot be undone.',
-      'Delete permanently',
+      'Delete ' + name + ' Permanently?',
+      'Their scores, observations, goals, reflections and reports in this class are deleted. This cannot be undone.',
+      'Delete Permanently',
       'danger',
       function () {
         if (deleteWithdrawnStudent(cid, sid)) renderClassManager();
       },
     );
+    // Keep a copy first: a CSV of their scores and observations, offered
+    // inside the dialog before the delete.
+    var overlays = document.querySelectorAll('.confirm-overlay');
+    var card = overlays.length && overlays[overlays.length - 1].querySelector('.confirm-card');
+    var actions = card && card.querySelector('.confirm-actions');
+    if (!actions) return;
+    var keep = document.createElement('div');
+    keep.className = 'cm-keep-copy';
+    keep.innerHTML =
+      '<span class="cm-keep-copy-text"><strong>Keep a copy first</strong><span>A CSV of ' +
+      esc(name) +
+      '’s scores and observations in ' +
+      esc((COURSES[cid] && COURSES[cid].name) || 'this class') +
+      '.</span></span>' +
+      '<button type="button" class="cm-action-btn" id="cm-keep-copy-btn">Download Records</button>';
+    card.insertBefore(keep, actions);
+    keep.querySelector('#cm-keep-copy-btn').addEventListener('click', function (e) {
+      e.preventDefault();
+      _cmDownloadWithdrawnRecords(cid, entry, e.currentTarget);
+    });
+  }
+
+  /* The withdrawn student's records as CSV rows. This device's copy when it
+     has one (it withdrew them, or Demo Mode); else the server's. */
+  function _cmWithdrawnRecordRows(cid, entry) {
+    var rec = entry.records || {};
+    var hasLocal = (rec.scores && rec.scores.length) || (rec.observations && rec.observations.length);
+    if (hasLocal || !window.v2 || !window.v2.getWithdrawnStudentRecords) {
+      var assess = {};
+      getAssessments(cid).forEach(function (a) {
+        assess[a.id] = a;
+      });
+      var tags = {};
+      getAllTags(cid).forEach(function (t) {
+        tags[t.id] = t;
+      });
+      var rows = (rec.scores || []).map(function (sc) {
+        var a = assess[sc.assessmentId] || {};
+        var t = tags[sc.tagId] || {};
+        var status = rec.statuses ? rec.statuses[entry.student.id + ':' + sc.assessmentId] : '';
+        return [
+          'Score',
+          sc.date || a.dueDate || a.date || '',
+          a.title || '',
+          t.label || '',
+          sc.score == null
+            ? ''
+            : isPointsScored(a)
+              ? sc.score + ' / ' + (a.maxPoints || '')
+              : formatScoreLevel(sc.score, sc.mod) || String(sc.score),
+          status || '',
+          sc.comment || '',
+        ];
+      });
+      (rec.observations || []).forEach(function (o) {
+        rows.push([
+          'Observation',
+          o.date || (o.created || '').slice(0, 10),
+          '',
+          '',
+          '',
+          o.sentiment || '',
+          o.text || '',
+        ]);
+      });
+      return Promise.resolve(rows);
+    }
+    return window.v2.getWithdrawnStudentRecords(entry.student.id).then(function (res) {
+      if (res.error || !res.data) throw res.error || new Error('No records came back.');
+      var d = res.data;
+      var day = function (v) {
+        return v ? String(v).slice(0, 10) : '';
+      };
+      var rows = [];
+      (d.scores || []).forEach(function (r) {
+        rows.push([
+          'Score',
+          day(r.date),
+          r.assessment || '',
+          '',
+          r.value == null ? '' : String(r.value),
+          r.status || '',
+          r.comment || '',
+        ]);
+      });
+      (d.tag_scores || []).forEach(function (r) {
+        rows.push([
+          'Competency Score',
+          day(r.date),
+          r.assessment || '',
+          r.competency || '',
+          formatScoreLevel(r.value, r.modifier),
+          '',
+          '',
+        ]);
+      });
+      (d.rubric_scores || []).forEach(function (r) {
+        rows.push([
+          'Rubric Score',
+          day(r.date),
+          r.assessment || '',
+          r.criterion || '',
+          formatScoreLevel(r.value, r.modifier),
+          '',
+          r.comment || '',
+        ]);
+      });
+      (d.observations || []).forEach(function (r) {
+        rows.push(['Observation', day(r.date), '', '', '', r.sentiment || '', r.body || '']);
+      });
+      return rows;
+    });
+  }
+
+  function _cmDownloadWithdrawnRecords(cid, entry, btn) {
+    if (btn) btn.disabled = true;
+    _cmWithdrawnRecordRows(cid, entry)
+      .then(function (rows) {
+        var header = [
+          'Record',
+          'Date',
+          'Assessment',
+          'Competency or Criterion',
+          'Score',
+          'Status or Type',
+          'Comment or Text',
+        ];
+        var csv = [header]
+          .concat(rows)
+          .map(function (r) {
+            return r
+              .map(function (c) {
+                return '"' + String(c == null ? '' : c).replace(/"/g, '""') + '"';
+              })
+              .join(',');
+          })
+          .join('\n');
+        var blob = new Blob([csv], { type: 'text/csv' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download =
+          (fullName(entry.student) + '_' + ((COURSES[cid] && COURSES[cid].name) || 'class')).replace(/[^\w-]+/g, '_') +
+          '_records.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+        if (btn) btn.textContent = 'Downloaded';
+      })
+      .catch(function () {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'Try Again';
+        }
+      });
   }
 
   /* Withdrawn students, under the roster: when they left, Re-enrol, and
@@ -971,7 +1124,7 @@ window.DashClassManager = (function () {
     });
     if (!list.length) return '';
     var html =
-      '<div class="cm-withdrawn" id="cm-withdrawn">' +
+      '<div class="cm-section cm-withdrawn" id="cm-withdrawn">' +
       '<div class="cm-withdrawn-title">Withdrawn <span class="cm-section-count">(' +
       list.length +
       ')</span></div>' +
@@ -987,6 +1140,7 @@ window.DashClassManager = (function () {
         '<span class="cm-student-name">' +
         esc(fullName(st)) +
         '</span>' +
+        (st.studentNumber ? '<span class="cm-roster-num">' + esc(st.studentNumber) + '</span>' : '') +
         (when ? '<span class="cm-withdrawn-when">Withdrawn ' + esc(when) + '</span>' : '') +
         '<div class="cm-student-actions">' +
         '<button class="cm-add-link cm-withdrawn-btn" data-action="cmReenrolStudent" data-sid="' +
@@ -994,7 +1148,7 @@ window.DashClassManager = (function () {
         '">Re-enrol</button>' +
         '<button class="cm-add-link cm-withdrawn-btn cm-withdrawn-delete" data-action="cmDeleteWithdrawn" data-sid="' +
         esc(st.id) +
-        '">Delete permanently</button>' +
+        '">Delete Permanently\u2026</button>' +
         '</div>' +
         '</div>';
     });
@@ -1234,77 +1388,204 @@ window.DashClassManager = (function () {
           });
         }
       }
-      cmShowImportPreview(parsed);
+      cmShowImportPreview(parsed, file.name);
     };
     reader.readAsText(file);
     input.value = '';
   }
 
-  function cmShowImportPreview(parsed) {
-    cmPendingImport = parsed;
+  /* Import review. Rows are matched to the roster by student number, then
+     by name: a matched number with a different name is a name change, and a
+     student the file leaves out is offered for withdrawal (off by default).
+     Nothing changes until Import. */
+  function _cmImportKey(v) {
+    return String(v || '')
+      .trim()
+      .toLowerCase();
+  }
+
+  function cmShowImportPreview(parsed, fileName) {
     var cid = cmSelectedCourse;
-    var existing = getStudents(cid).map(function (s) {
-      return fullName(s).toLowerCase();
+    if (!cid) return;
+    var roster = getStudents(cid);
+    var byNum = {};
+    var byName = {};
+    roster.forEach(function (s) {
+      if (_cmImportKey(s.studentNumber)) byNum[_cmImportKey(s.studentNumber)] = s;
+      byName[_cmImportKey(fullName(s))] = s;
     });
-    var html =
-      '<div style="border:1px solid var(--active);border-radius:var(--radius-sm);padding:10px 12px;margin-top:8px;background:rgba(0,122,255,0.02)">' +
-      '<div class="cm-label" style="margin-bottom:6px">Import Preview \u2014 ' +
-      parsed.length +
-      ' student' +
-      (parsed.length !== 1 ? 's' : '') +
-      ' found</div>' +
-      '<div style="max-height:180px;overflow-y:auto;margin-bottom:8px">' +
-      '<table style="width:100%;border-collapse:collapse;font-size:0.8125rem">' +
-      '<thead><tr style="border-bottom:1px solid var(--border)">' +
-      '<th style="text-align:left;padding:3px 6px" class="cm-label">First</th>' +
-      '<th style="text-align:left;padding:3px 6px" class="cm-label">Last</th>' +
-      '<th style="text-align:left;padding:3px 6px" class="cm-label">Pronouns</th>' +
-      '<th style="text-align:left;padding:3px 6px" class="cm-label">Status</th>' +
-      '</tr></thead><tbody>';
+    var matched = {};
+    var plan = { fileName: fileName || '', total: parsed.length, added: [], renamed: [], missing: [], same: 0 };
     parsed.forEach(function (p) {
-      var fn = ((p.firstName || '') + ' ' + (p.lastName || '')).trim().toLowerCase();
-      var dupe = existing.includes(fn);
-      html +=
-        '<tr style="border-bottom:1px solid var(--divider-subtle)' +
-        (dupe ? ';opacity:0.5' : '') +
-        '">' +
-        '<td style="padding:3px 6px">' +
-        esc(p.firstName || '') +
-        '</td>' +
-        '<td style="padding:3px 6px">' +
-        esc(p.lastName || '') +
-        '</td>' +
-        '<td style="padding:3px 6px">' +
-        esc(p.pronouns || '') +
-        '</td>' +
-        '<td style="padding:3px 6px;font-size:0.75rem;font-weight:600;color:' +
-        (dupe ? 'var(--priority)' : 'var(--score-3)') +
-        '">' +
-        (dupe ? 'SKIP' : 'NEW') +
-        '</td>' +
-        '</tr>';
+      var name = _cmImportKey((p.firstName || '') + ' ' + (p.lastName || ''));
+      var hit = (_cmImportKey(p.studentNumber) && byNum[_cmImportKey(p.studentNumber)]) || byName[name];
+      if (!hit || matched[hit.id]) {
+        if (!hit) plan.added.push({ row: p, on: true });
+        return;
+      }
+      matched[hit.id] = true;
+      var sameName =
+        _cmImportKey(hit.firstName) === _cmImportKey(p.firstName) &&
+        _cmImportKey(hit.lastName) === _cmImportKey(p.lastName);
+      if (sameName || !p.firstName) plan.same++;
+      else plan.renamed.push({ sid: hit.id, row: p, on: true });
     });
-    html +=
-      '</tbody></table></div>' +
-      '<div style="display:flex;gap:8px">' +
-      '<button class="btn btn-primary" style="font-size:0.8125rem;padding:6px 14px" data-action="cmConfirmImport">Import</button>' +
-      '<button class="btn btn-ghost" style="font-size:0.8125rem;padding:6px 10px" data-action="cmCancelImport">Cancel</button>' +
-      '</div>' +
-      '</div>';
-    var el = document.getElementById('cm-import-preview');
-    if (el) el.innerHTML = html;
+    sortStudents(roster, 'lastName').forEach(function (s) {
+      if (!matched[s.id]) plan.missing.push({ sid: s.id, on: false });
+    });
+    cmPendingImport = plan;
+    renderClassManager();
+  }
+
+  function _cmRenderImportReview(cid) {
+    var plan = cmPendingImport;
+    if (!plan) return '';
+    var byId = {};
+    getStudents(cid).forEach(function (s) {
+      byId[s.id] = s;
+    });
+    function group(title, items, render, note) {
+      if (!items.length) return '';
+      return (
+        '<div class="cm-import-group"><div class="cm-import-group-head"><h3>' +
+        title +
+        '</h3><span>' +
+        items.length +
+        '</span></div>' +
+        items.map(render).join('') +
+        (note ? '<div class="cm-hint">' + note + '</div>' : '') +
+        '</div>'
+      );
+    }
+    function check(kind, i, on, body) {
+      return (
+        '<label class="cm-import-row"><input type="checkbox"' +
+        (on ? ' checked' : '') +
+        ' data-action-change="cmImportToggle" data-kind="' +
+        kind +
+        '" data-idx="' +
+        i +
+        '">' +
+        body +
+        '</label>'
+      );
+    }
+    var added = plan.added.filter(function (a) {
+      return a.on;
+    }).length;
+    var renamed = plan.renamed.filter(function (r) {
+      return r.on;
+    }).length;
+    var withdrawn = plan.missing.filter(function (m) {
+      return m.on;
+    }).length;
+    var summary = [];
+    if (added) summary.push('Add ' + added);
+    if (renamed) summary.push('rename ' + renamed);
+    if (withdrawn) summary.push('withdraw ' + withdrawn);
+    return (
+      '<div class="cm-section cm-import-review">' +
+      '<h2 class="cm-grade-title">Import Roster: Review Changes</h2>' +
+      '<div class="cm-hint">' +
+      (plan.fileName ? '<strong>' + esc(plan.fileName) + '</strong> · ' : '') +
+      plan.total +
+      (plan.total === 1 ? ' student' : ' students') +
+      '. Students are matched by student number, then by name. Nothing changes until you press Import.</div>' +
+      group('New to This Class', plan.added, function (a, i) {
+        var r = a.row;
+        return check(
+          'added',
+          i,
+          a.on,
+          '<span class="cm-import-name">' +
+            esc(((r.firstName || '') + ' ' + (r.lastName || '')).trim()) +
+            '</span><span class="cm-student-pronouns">' +
+            esc(r.pronouns || '') +
+            '</span><span class="cm-roster-num">' +
+            esc(r.studentNumber || '') +
+            '</span>',
+        );
+      }) +
+      group(
+        'Name Changed',
+        plan.renamed,
+        function (r, i) {
+          var st = byId[r.sid] || {};
+          return check(
+            'renamed',
+            i,
+            r.on,
+            '<span class="cm-import-name"><span class="cm-import-old">' +
+              esc(fullName(st)) +
+              '</span> → <strong>' +
+              esc(((r.row.firstName || '') + ' ' + (r.row.lastName || '')).trim()) +
+              '</strong></span><span class="cm-roster-num">' +
+              esc(st.studentNumber || '') +
+              '</span>',
+          );
+        },
+        'Same student number, so their scores and observations stay with them.',
+      ) +
+      group(
+        'In Your Class, Not in This File',
+        plan.missing,
+        function (m, i) {
+          var st = byId[m.sid] || {};
+          return check(
+            'missing',
+            i,
+            m.on,
+            '<span class="cm-import-name"><strong>' +
+              esc(fullName(st)) +
+              '</strong> · Withdraw from this class</span><span class="cm-roster-num">' +
+              esc(st.studentNumber || '') +
+              '</span>',
+          );
+        },
+        'Left unticked, they stay enrolled. Withdrawn students keep their scores.',
+      ) +
+      (plan.same
+        ? '<div class="cm-import-group cm-import-same"><h3>Already in Your Class</h3><span>' +
+          plan.same +
+          ' · no changes</span></div>'
+        : '') +
+      '<div class="cm-import-foot"><span>' +
+      (summary.length ? '<strong>' + esc(summary.join(', ')) + '.</strong>' : 'Nothing to change.') +
+      (withdrawn ? '' : ' No one is withdrawn.') +
+      '</span>' +
+      '<span class="cm-import-buttons"><button type="button" class="cm-action-btn" data-action="cmCancelImport">Cancel</button>' +
+      '<button type="button" class="btn btn-primary" data-action="cmConfirmImport"' +
+      (summary.length ? '' : ' disabled') +
+      '>Import</button></span></div>' +
+      '</div>'
+    );
+  }
+
+  function cmImportToggle(kind, idx, on) {
+    var list = cmPendingImport && cmPendingImport[kind];
+    if (!list || !list[idx]) return;
+    list[idx].on = !!on;
+    renderClassManager();
   }
 
   function cmConfirmImport() {
-    if (!cmPendingImport || !cmSelectedCourse) return;
-    var students = getStudents(cmSelectedCourse);
-    var existingNames = students.map(function (s) {
-      return fullName(s).toLowerCase();
+    var plan = cmPendingImport;
+    var cid = cmSelectedCourse;
+    if (!plan || !cid) return;
+    var students = getStudents(cid);
+    plan.renamed.forEach(function (r) {
+      if (!r.on) return;
+      var st = students.find(function (s) {
+        return s.id === r.sid;
+      });
+      if (!st) return;
+      st.firstName = r.row.firstName || st.firstName;
+      st.lastName = r.row.lastName || '';
+      st.sortName = (st.lastName + ' ' + st.firstName).trim();
     });
-    cmPendingImport.forEach(function (p) {
-      var fn = ((p.firstName || '') + ' ' + (p.lastName || '')).trim().toLowerCase();
-      if (existingNames.includes(fn)) return;
-      var sortName = ((p.lastName || '') + ' ' + (p.firstName || '')).trim();
+    plan.added.forEach(function (a) {
+      if (!a.on) return;
+      var p = a.row;
       students.push({
         id: uid(),
         firstName: p.firstName || '',
@@ -1315,19 +1596,21 @@ window.DashClassManager = (function () {
         dateOfBirth: p.dateOfBirth || '',
         email: p.email || '',
         attendance: [],
-        sortName: sortName,
+        sortName: ((p.lastName || '') + ' ' + (p.firstName || '')).trim(),
         enrolledDate: new Date().toISOString().slice(0, 10),
       });
     });
-    saveStudents(cmSelectedCourse, students);
+    saveStudents(cid, students);
+    plan.missing.forEach(function (m) {
+      if (m.on) withdrawStudent(cid, m.sid);
+    });
     cmPendingImport = null;
     renderClassManager();
   }
 
   function cmCancelImport() {
     cmPendingImport = null;
-    var el = document.getElementById('cm-import-preview');
-    if (el) el.innerHTML = '';
+    renderClassManager();
   }
 
   function openClassManager() {
@@ -1621,94 +1904,118 @@ window.DashClassManager = (function () {
     panels.details = html;
     html = '';
 
-    // Students tab: the roster
+    // Students tab: a toolbar, the roster as a table, then Withdrawn
     var students = getStudents(cid);
     html +=
-      '<div class="cm-section">' +
-      '<div class="cm-section-title" style="display:flex;align-items:center;justify-content:space-between">' +
-      '<span>Students <span style="font-weight:400;color:var(--text-3);text-transform:none;letter-spacing:0">(' +
-      students.length +
-      ')</span></span>' +
+      '<div class="cm-roster-bar">' +
+      '<div class="cm-hint">' +
+      (students.length
+        ? students.length +
+          (students.length === 1 ? ' student' : ' students') +
+          ', sorted by last name. Designations also show beside names in the gradebook.'
+        : 'No students yet. Add students one at a time or import a CSV roster.') +
+      '</div>' +
+      '<div class="cm-roster-buttons">' +
       (students.length > 1
-        ? '<button class="cm-add-link" data-action="cmToggleBulk" style="font-size:0.75rem;padding:2px 8px;border-radius:4px;' +
-          (cmBulkMode ? 'background:var(--active);color:white' : '') +
+        ? '<button type="button" class="cm-action-btn' +
+          (cmBulkMode ? ' active' : '') +
+          '" data-action="cmToggleBulk" aria-pressed="' +
+          cmBulkMode +
           '">' +
           (cmBulkMode ? 'Exit Bulk Edit' : 'Bulk Edit') +
           '</button>'
         : '') +
+      '<button type="button" class="cm-action-btn" data-action="cmImportRoster">Import Roster</button>' +
+      '<button type="button" class="btn btn-primary cm-roster-add" data-action="cmShowAddStudent">Add Student</button>' +
+      '<input type="file" id="cm-csv-input" accept=".csv,.txt" style="display:none" data-action-change="cmCSV">' +
+      '</div>' +
+      '</div>' +
+      '<div id="cm-import-preview">' +
+      (cmPendingImport ? _cmRenderImportReview(cid) : '') +
       '</div>';
+    var rosterHtml = '';
     if (students.length > 0) {
-      html += '<div class="cm-student-list">';
-      var sorted = sortStudents(students, 'lastName');
-      sorted.forEach(function (st) {
+      rosterHtml =
+        '<div class="cm-section cm-roster-section">' +
+        '<div class="cm-student-list cm-roster-table' +
+        (cmBulkMode ? ' cm-roster-bulk' : '') +
+        '">' +
+        '<div class="cm-roster-head">' +
+        (cmBulkMode ? '<span></span>' : '') +
+        '<span>Name</span><span>Pronouns</span><span>Student Number</span><span>Designations</span><span></span>' +
+        '</div>';
+      sortStudents(students, 'lastName').forEach(function (st) {
         var pref = st.preferred && st.preferred !== st.firstName ? st.preferred : '';
-        html +=
-          '<div class="cm-student-row">' +
+        var ds = st.designations || [];
+        var known = ds
+          .map(function (code) {
+            var d = designationInfo(code);
+            return d ? { code: code, d: d } : null;
+          })
+          .filter(Boolean);
+        var hasIep = ds.some(function (c) {
+          return BC_DESIGNATIONS[c]?.iep;
+        });
+        var hasMod = ds.some(function (c) {
+          return BC_DESIGNATIONS[c]?.modified;
+        });
+        rosterHtml +=
+          '<div class="cm-student-row cm-roster-row">' +
           (cmBulkMode
             ? '<input type="checkbox" class="cm-bulk-check" ' +
               (cmBulkSelected.has(st.id) ? 'checked' : '') +
               ' data-action="cmBulkToggleCheck" data-sid="' +
               st.id +
+              '" aria-label="Select ' +
+              esc(fullName(st)) +
               '">'
             : '') +
-          '<span class="cm-student-name">' +
+          '<span class="cm-roster-name"><span class="cm-student-name">' +
           esc(fullName(st)) +
           '</span>' +
-          (pref ? '<span class="cm-student-pref">"' + esc(pref) + '"</span>' : '') +
-          (st.designations || [])
-            .map(function (code) {
-              var d = designationInfo(code);
-              if (!d) return '';
+          (pref ? ' <span class="cm-student-pref">"' + esc(pref) + '"</span>' : '') +
+          '</span>' +
+          '<span class="cm-student-pronouns">' +
+          esc(st.pronouns || '') +
+          '</span>' +
+          '<span class="cm-roster-num">' +
+          esc(st.studentNumber || '') +
+          '</span>' +
+          '<span class="cm-roster-desig">' +
+          known
+            .map(function (k) {
               return (
                 '<span class="cm-desig-badge' +
-                (d.level > 0 ? ' low-inc' : '') +
+                (k.d.level > 0 ? ' low-inc' : '') +
                 '" title="' +
-                code +
-                ' \u2014 ' +
-                esc(d.name) +
+                esc(k.code) +
+                ' — ' +
+                esc(k.d.name) +
                 '">' +
-                esc(code) +
+                esc(k.code) +
                 '</span>'
               );
             })
             .join('') +
-          (function () {
-            var ds = st.designations || [];
-            var hasIep = ds.some(function (c) {
-              return BC_DESIGNATIONS[c]?.iep;
-            });
-            var hasMod = ds.some(function (c) {
-              return BC_DESIGNATIONS[c]?.modified;
-            });
-            return (
-              (hasIep ? '<span class="cm-iep-tag">IEP</span>' : '') +
-              (hasMod ? '<span class="cm-mod-tag">MOD</span>' : '')
-            );
-          })() +
-          (st.pronouns ? '<span class="cm-student-pronouns">' + esc(st.pronouns) + '</span>' : '') +
-          (st.studentNumber
-            ? '<span style="font-size:0.75rem;color:var(--text-3);font-family:\'SF Mono\',monospace">#' +
-              esc(st.studentNumber) +
-              '</span>'
-            : '') +
-          '<div class="cm-student-actions">' +
-          '<button class="cm-delete-mini" data-action="cmEditStudent" data-sid="' +
+          (known.length === 1 ? '<span class="cm-roster-desig-name">' + esc(known[0].d.name) + '</span>' : '') +
+          (hasIep ? '<span class="cm-iep-tag">IEP</span>' : '') +
+          (hasMod ? '<span class="cm-mod-tag">MOD</span>' : '') +
+          '</span>' +
+          '<span class="cm-student-actions">' +
+          '<button type="button" class="cm-add-link" data-action="cmEditStudent" data-sid="' +
           st.id +
-          '" title="Edit" style="font-size:0.75rem">\u270E</button>' +
-          '<button class="cm-delete-mini" data-action="cmRemoveStudent" data-sid="' +
-          st.id +
-          '" title="Withdraw" aria-label="Withdraw ' +
+          '" aria-label="Edit ' +
           esc(fullName(st)) +
-          '">\u2715</button>' +
-          '</div>' +
+          '">Edit</button>' +
+          '<button type="button" class="cm-add-link cm-roster-withdraw" data-action="cmRemoveStudent" data-sid="' +
+          st.id +
+          '" aria-label="Withdraw ' +
+          esc(fullName(st)) +
+          '">Withdraw</button>' +
+          '</span>' +
           '</div>';
       });
-      html += '</div>';
-    } else {
-      html +=
-        '<div style="text-align:center;padding:16px;color:var(--text-3);font-size:0.875rem;border:1.5px dashed var(--border);border-radius:var(--radius-sm)">' +
-        'No students yet. Add students individually or import a CSV roster.' +
-        '</div>';
+      rosterHtml += '</div></div>';
     }
     // Bulk edit panel
     if (cmBulkMode && students.length > 0) {
@@ -1809,15 +2116,8 @@ window.DashClassManager = (function () {
       '</div>' +
       '</div>' +
       '</div>' +
-      '<div class="cm-roster-actions">' +
-      '<button class="cm-add-link" data-action="cmShowAddStudent" style="padding:4px 0">+ Add Student</button>' +
-      '<span style="color:var(--border)">|</span>' +
-      '<button class="cm-add-link" data-action="cmImportRoster" style="padding:4px 0">Import Roster</button>' +
-      '<input type="file" id="cm-csv-input" accept=".csv,.txt" style="display:none" data-action-change="cmCSV">' +
-      '</div>' +
-      '<div id="cm-import-preview"></div>' +
-      renderWithdrawnList(cid) +
-      '</div>';
+      rosterHtml +
+      renderWithdrawnList(cid);
     panels.students = html;
     html = '';
 
@@ -3029,6 +3329,7 @@ window.DashClassManager = (function () {
 
   /* ── CM Actions ─────────────────────────────────────────── */
   function cmSelectClass(cid) {
+    if (cid !== cmSelectedCourse) cmPendingImport = null; // a review belongs to its class
     cmSelectedCourse = cid;
     cmMode = 'edit';
     renderClassManager();
@@ -5851,6 +6152,10 @@ window.DashClassManager = (function () {
       cmHandleCSV(el);
       return true;
     }
+    if (el.dataset.actionChange === 'cmImportToggle') {
+      cmImportToggle(el.dataset.kind, Number(el.dataset.idx), el.checked);
+      return true;
+    }
     if (el.dataset.actionChange === 'cmCheckStudent') {
       cmCheckStudent(el.value);
       return true;
@@ -6061,6 +6366,8 @@ window.DashClassManager = (function () {
     duplicateCourse: _cmDuplicateCourse,
     handleAction: handleAction,
     // The reporting terms draft as the editor holds it (tests).
+    // For tests: the import review a CSV file opens.
+    cmShowImportPreview: cmShowImportPreview,
     reportingTermsDraft: function (cid) {
       var st = _cmTermRows(cid || cmSelectedCourse);
       return { rows: st.rows.slice(), dirty: st.dirty, error: _cmTermError(cid || cmSelectedCourse) };
