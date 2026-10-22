@@ -1572,10 +1572,6 @@ window.DashClassManager = (function () {
   function renderCmDetail(cid) {
     var course = COURSES[cid];
     var cc = getCourseConfig(cid);
-    var method = cc.calcMethod || course.calcMethod || 'mostRecent';
-    var dw = cc.decayWeight != null ? cc.decayWeight : course.decayWeight || 0.65;
-    var cw = cc.categoryWeights || { summative: 1.0, formative: 0.0 };
-    var cwEnabled = cw.formative > 0;
     var lm = getLearningMap(cid);
     var studentCount = getStudents(cid).length;
     var assessCount = getAssessments(cid).length;
@@ -1825,90 +1821,8 @@ window.DashClassManager = (function () {
     panels.students = html;
     html = '';
 
-    // Grading tab: Grading & Calculation
-    // T-UI-02 — grading_system segmented control. Three segments:
-    //   proficiency / letter / both. Letter works without categories:
-    //   getCourseLetterData falls back to total points across all work.
-    var gs = course.gradingSystem || _cmDefaultGradingSystem(course);
-    html +=
-      '<div class="cm-section">' +
-      '<div class="cm-section-title">Grading &amp; Calculation</div>' +
-      '<div class="cm-field">' +
-      '<button class="cm-add-link" data-action="cmCopySetup">Copy grading setup\u2026</button>' +
-      '<div class="cm-hint">Copy this class\u2019s grading system, categories and other settings to your other classes, or import them from one.</div>' +
-      '</div>' +
-      '<div class="cm-field">' +
-      '<label class="cm-label">Grading System</label>' +
-      '<div class="seg cm-seg" role="radiogroup" aria-label="Grading system">' +
-      '<button class="seg-btn cm-seg-btn' +
-      (gs === 'proficiency' ? ' active' : '') +
-      '" role="radio" aria-checked="' +
-      (gs === 'proficiency') +
-      '" data-action="cmSetGradingSystem" data-value="proficiency">Proficiency</button>' +
-      '<button class="seg-btn cm-seg-btn' +
-      (gs === 'letter' ? ' active' : '') +
-      '" role="radio" aria-checked="' +
-      (gs === 'letter') +
-      '" data-action="cmSetGradingSystem" data-value="letter">Letter</button>' +
-      '<button class="seg-btn cm-seg-btn' +
-      (gs === 'both' ? ' active' : '') +
-      '" role="radio" aria-checked="' +
-      (gs === 'both') +
-      '" data-action="cmSetGradingSystem" data-value="both">Both</button>' +
-      '</div>' +
-      // Contextual grading-system description — mirrors the Phoneox React
-      // pattern at src/components/courses/grading-config.tsx:56-70.
-      '<div class="cm-hint" style="margin-top:6px">' +
-      _cmGradingSystemDescription(gs) +
-      '</div>' +
-      '</div>' +
-      _cmRenderCategoriesField(cmSelectedCourse) +
-      _cmRenderRoundPercentField(cmSelectedCourse) +
-      '<div class="cm-field">' +
-      '<label class="cm-label">Calculation Method</label>' +
-      '<div class="seg cm-seg" role="radiogroup" aria-label="Calculation method">' +
-      CALC_METHODS.map(function (m) {
-        return (
-          '<button class="seg-btn cm-seg-btn' +
-          (method === m.value ? ' active' : '') +
-          '"' +
-          segAttr(method === m.value, 'radio') +
-          ' data-action="cmSetCalcMethod" data-value="' +
-          m.value +
-          '">' +
-          m.label +
-          '</button>'
-        );
-      }).join('') +
-      '</div>' +
-      // Contextual description beneath the selected method — copied verbatim
-      // from Project Phoneox (src/components/courses/grading-config.tsx:100-115)
-      // so explanatory copy stays consistent across the React and JS builds.
-      '<div class="cm-hint" style="margin-top:6px">' +
-      _cmCalcMethodDescription(method) +
-      '</div>' +
-      '</div>' +
-      '<div class="cm-field" style="' +
-      (method === 'decayingAvg' ? '' : 'display:none') +
-      '">' +
-      '<label class="cm-label">Decay Weight</label>' +
-      '<div class="cm-slider-row">' +
-      '<input type="range" min="10" max="95" value="' +
-      Math.round(dw * 100) +
-      '" id="cm-decay-slider" data-action-input="cmDecaySlider" style="flex:1">' +
-      '<span class="cm-slider-label" id="cm-decay-val">' +
-      Math.round(dw * 100) +
-      '%</span>' +
-      '</div>' +
-      '<div class="cm-hint">Higher values weight recent scores more heavily.</div>' +
-      '</div>' +
-      // T-UI-02 retired controls: the legacy "Category weights (summative vs
-      // formative slider)" and "Report final grade as percentage" checkbox
-      // were deleted 2026-04-21. Real category weighting lands in T-UI-12's
-      // Category management row; percentage/letter display is driven entirely
-      // by grading_system above.
-      '</div>';
-    panels.grading = html;
+    // Grading tab
+    panels.grading = _cmRenderGradingTab(cid);
 
     // Reporting Terms tab
     panels.terms = '<div class="cm-section">' + _cmRenderReportingTermsField(cmSelectedCourse) + '</div>';
@@ -2216,6 +2130,345 @@ window.DashClassManager = (function () {
     classManagerOpen = false;
     if (typeof setActiveCourse === 'function') setActiveCourse(cid);
     if (typeof Router !== 'undefined' && Router.navigate) Router.navigate('/gradebook');
+  }
+
+  /* ── Grading tab ────────────────────────────────────────────
+     Grading System on top; under it two lanes, Competency Proficiency (the
+     calculation method) and Course Percentage (categories and rounding), and
+     beside them Check With a Student, one real student's grade under the
+     current settings. A lane the grading system doesn't use is greyed with a
+     line saying so. */
+  var CM_GRADING_SYSTEMS = [
+    { value: 'proficiency', label: 'Proficiency', desc: 'Emerging to Extending, out of 4', sample: '3.0 · Proficient' },
+    { value: 'letter', label: 'Letter', desc: 'Letter grade and %', sample: 'B 82%' },
+    { value: 'both', label: 'Both', desc: 'Proficiency day to day, letter and % on reports', sample: '3.0 · B 82%' },
+  ];
+  var CM_METHOD_TEXT = {
+    mostRecent: { label: 'Most Recent Score', desc: 'Only the latest score counts.' },
+    highest: { label: 'Highest Score', desc: 'The best score counts.' },
+    decayingAvg: { label: 'Decaying Average', desc: 'Every score counts; newer ones count more.' },
+    average: { label: 'Mean', desc: 'Every score counts the same.' },
+    median: { label: 'Median', desc: 'The middle score.' },
+    mode: { label: 'Mode', desc: 'The score that comes up most.' },
+  };
+  var CM_METHOD_ORDER = ['mostRecent', 'highest', 'decayingAvg', 'average', 'median', 'mode'];
+  var CM_EXAMPLE_SCORES = [1, 2, 2, 3, 4];
+  var _cmCheckSid = {}; // cid -> the student Check With a Student shows
+
+  function _cmMethodRule(method, dw) {
+    var w = Math.round(dw * 100);
+    switch (method) {
+      case 'highest':
+        return 'The highest score counts, whenever it was earned.';
+      case 'decayingAvg':
+        return (
+          'Start with the oldest score. Each newer score moves the average: new average = old average × ' +
+          (100 - w) +
+          '% + new score × ' +
+          w +
+          '%.'
+        );
+      case 'average':
+        return 'Add the scores and divide by how many there are. An assessment with a higher weight counts more.';
+      case 'median':
+        return 'Sort the scores and take the middle one. With an even number of scores, take the halfway point between the two middle scores.';
+      case 'mode':
+        return 'The proficiency that comes up most, counted by whole level, so 3+ and 3 both count as 3. A tie goes to the most recent of the tied scores, keeping its + or −.';
+      default:
+        return 'The score with the latest date counts. Earlier scores are ignored.';
+    }
+  }
+
+  function _cmRenderGradingTab(cid) {
+    var course = COURSES[cid];
+    var cc = getCourseConfig(cid);
+    var gs = course.gradingSystem || _cmDefaultGradingSystem(course);
+    var method = cc.calcMethod || course.calcMethod || 'mostRecent';
+    // calc.js counts any method it doesn't know as Most Recent; show that.
+    if (!CM_METHOD_TEXT[method]) method = 'mostRecent';
+    var dw = cc.decayWeight != null ? cc.decayWeight : course.decayWeight || 0.65;
+
+    var html =
+      '<div class="cm-section">' +
+      '<div class="cm-grade-head">' +
+      '<div><h2 class="cm-grade-title">Grading System</h2>' +
+      '<div class="cm-hint">What students and families see as the grade.</div></div>' +
+      '<button type="button" class="cm-action-btn" data-action="cmCopySetup">Copy Grading Setup…</button>' +
+      '</div>' +
+      '<div class="cm-gs-cards" role="radiogroup" aria-label="Grading system">' +
+      CM_GRADING_SYSTEMS.map(function (g) {
+        var on = g.value === gs;
+        return (
+          '<button type="button" class="cm-gs-card' +
+          (on ? ' active' : '') +
+          '" role="radio" aria-checked="' +
+          on +
+          '" data-action="cmSetGradingSystem" data-value="' +
+          g.value +
+          '">' +
+          '<span class="cm-gs-name">' +
+          g.label +
+          '</span>' +
+          '<span class="cm-gs-desc">' +
+          g.desc +
+          '</span>' +
+          '<span class="cm-gs-sample">Students see <strong>' +
+          g.sample +
+          '</strong></span>' +
+          '</button>'
+        );
+      }).join('') +
+      '</div>' +
+      '</div>';
+
+    var profNote =
+      gs === 'letter'
+        ? '<div class="cm-lane-note">In a Letter class this sets the competency views only. It does not change the %.</div>'
+        : '';
+    var prof =
+      '<div class="cm-section cm-lane">' +
+      '<h2 class="cm-grade-title">Competency Proficiency</h2>' +
+      '<div class="cm-hint">How each competency’s proficiency comes from a student’s scores.</div>' +
+      profNote +
+      '<div class="cm-method-head"><span class="cm-label" id="cm-method-label">Calculation Method</span>' +
+      '<span class="cm-hint">Example scores, oldest first: ' +
+      CM_EXAMPLE_SCORES.join(', ') +
+      '</span></div>' +
+      '<div class="cm-method-list" role="radiogroup" aria-labelledby="cm-method-label">' +
+      CM_METHOD_ORDER.map(function (m) {
+        var on = m === method;
+        var t = CM_METHOD_TEXT[m];
+        return (
+          '<button type="button" class="cm-method' +
+          (on ? ' active' : '') +
+          '" role="radio" aria-checked="' +
+          on +
+          '" data-action="cmSetCalcMethod" data-value="' +
+          m +
+          '">' +
+          '<span class="cm-method-dot" aria-hidden="true"></span>' +
+          '<span class="cm-method-text"><span class="cm-method-name">' +
+          t.label +
+          '</span><span class="cm-method-desc">' +
+          t.desc +
+          '</span></span>' +
+          '<span class="cm-method-example">' +
+          formatLevelAs(calcMethodExample(CM_EXAMPLE_SCORES, m, dw), 'proficiency') +
+          '</span>' +
+          '</button>'
+        );
+      }).join('') +
+      '</div>' +
+      (method === 'decayingAvg'
+        ? '<div class="cm-field"><label class="cm-label" for="cm-decay-slider">How Much Newer Work Counts</label>' +
+          '<div class="cm-slider-row">' +
+          '<input type="range" min="10" max="95" value="' +
+          Math.round(dw * 100) +
+          '" id="cm-decay-slider" data-action-input="cmDecaySlider" data-action-change="cmDecayCommit" style="flex:1">' +
+          '<span class="cm-slider-label" id="cm-decay-val">' +
+          Math.round(dw * 100) +
+          '%</span></div></div>'
+        : '') +
+      '<div class="cm-rule-box">' +
+      '<div class="cm-rule-title">Exactly How ' +
+      CM_METHOD_TEXT[method].label +
+      ' Works</div>' +
+      '<div class="cm-rule-text" id="cm-method-rule">' +
+      esc(_cmMethodRule(method, dw)) +
+      '</div>' +
+      '<div class="cm-hint">Every method skips work that hasn’t been scored.</div>' +
+      '</div>' +
+      '</div>';
+
+    var pctOff = gs === 'proficiency';
+    var whole = getRoundWholePercent(cid);
+    var pct =
+      '<div class="cm-section cm-lane' +
+      (pctOff ? ' cm-lane-off' : '') +
+      '">' +
+      '<h2 class="cm-grade-title">Course Percentage</h2>' +
+      '<div class="cm-hint">How the letter grade and % come from points and proficiency.</div>' +
+      (pctOff
+        ? '<div class="cm-lane-note">Not used in a Proficiency class. Choose Letter or Both to turn it on. Your categories stay saved.</div>'
+        : '') +
+      _cmRenderWeightBar(cid) +
+      _cmRenderCategoriesField(cid) +
+      '<div class="cm-field">' +
+      '<label class="cm-label" for="cm-round-percent">Show the % As</label>' +
+      '<select class="cm-input" id="cm-round-percent" data-action-change="cmRoundPercentSelect">' +
+      '<option value="whole"' +
+      (whole ? ' selected' : '') +
+      '>Whole Number (86%)</option>' +
+      '<option value="decimal"' +
+      (whole ? '' : ' selected') +
+      '>One Decimal (85.9%)</option>' +
+      '</select>' +
+      '<div class="cm-hint">BC report cards for grades 10–12 show a whole %.</div>' +
+      '</div>' +
+      '<div class="cm-rule-box">' +
+      '<div class="cm-rule-title">Exactly How the % Works</div>' +
+      '<div class="cm-rule-text">With no categories, the % is total points earned out of total points possible.</div>' +
+      '<div class="cm-rule-text">A category with no marked work for a student is left out, and the other categories share its weight.</div>' +
+      '<div class="cm-rule-text">The letter comes from the % as shown. Shown as a whole number, 85.5% becomes 86% and an A. Shown to one decimal, 85.94% stays 85.9% and a B.</div>' +
+      '</div>' +
+      '</div>';
+
+    html +=
+      '<div class="cm-grade-body">' +
+      '<div class="cm-grade-lanes">' +
+      prof +
+      pct +
+      '</div>' +
+      _cmRenderCheckStudent(cid, gs, method) +
+      '</div>';
+    return html;
+  }
+
+  /* The categories' weights as one bar, so a teacher sees the split. */
+  function _cmRenderWeightBar(cid) {
+    var rows = (_cmCatState(cid).rows || []).filter(function (r) {
+      return Number(r.weight) > 0;
+    });
+    if (!rows.length) return '';
+    var shades = ['var(--active)', '#5a9be6', '#a9c9f2', '#2f6fb8', '#7fb0ec', '#cfe0f7'];
+    return (
+      '<div class="cm-weight-bar" aria-hidden="true">' +
+      rows
+        .map(function (r, i) {
+          return '<span style="flex:' + Number(r.weight) + ';background:' + shades[i % shades.length] + '"></span>';
+        })
+        .join('') +
+      '</div>'
+    );
+  }
+
+  /* One student's grade with the settings on the left, from the class's own
+     scores. */
+  function _cmRenderCheckStudent(cid, gs, method) {
+    var students = sortStudents(getStudents(cid), 'lastName');
+    var head =
+      '<aside class="cm-section cm-check" aria-label="Check with a student">' +
+      '<h2 class="cm-grade-title">Check With a Student</h2>' +
+      '<div class="cm-hint">One student’s grade with the settings on the left. Change a setting and it updates.</div>';
+    if (!students.length) return head + '<div class="cm-hint">Add students to see a grade here.</div></aside>';
+    var sid = _cmCheckSid[cid];
+    if (
+      !students.some(function (s) {
+        return s.id === sid;
+      })
+    )
+      sid = students[0].id;
+    var summary = studentGradeSummary(cid, sid);
+    var html =
+      head +
+      '<div class="cm-field"><label class="cm-label" for="cm-check-student">Student</label>' +
+      '<select class="cm-input" id="cm-check-student" data-action-change="cmCheckStudent">' +
+      students
+        .map(function (s) {
+          return (
+            '<option value="' + s.id + '"' + (s.id === sid ? ' selected' : '') + '>' + esc(fullName(s)) + '</option>'
+          );
+        })
+        .join('') +
+      '</select></div>' +
+      '<div class="cm-check-overall"><span class="cm-check-label">Overall Grade</span>' +
+      '<span class="cm-check-value">' +
+      esc(summary.text || 'No scores yet') +
+      '</span></div>';
+
+    var lm = getLearningMap(cid);
+    var rows = (lm.sections || [])
+      .map(function (sec) {
+        var tag = sec.tags && sec.tags[0];
+        if (!tag) return '';
+        var scores = getTagScores(cid, sid, tag.id)
+          .filter(function (s) {
+            return s.score > 0;
+          })
+          .slice()
+          .sort(function (a, b) {
+            return (a.date || '').localeCompare(b.date || '');
+          })
+          .map(function (s) {
+            if (s.level != null) return formatScoreLevel(s.level, s.mod);
+            return Number.isInteger(s.score) ? String(s.score) : formatLevelAs(s.score, 'proficiency');
+          });
+        // The latest few, oldest first, so the method's rule can be followed.
+        var shownScores = scores.length > 6 ? ['\u2026'].concat(scores.slice(-6)) : scores;
+        return (
+          '<div class="cm-check-row"><span class="cm-check-code">' +
+          esc(_cmStdCode(tag)) +
+          '</span><span class="cm-check-scores">' +
+          (scores.length
+            ? (scores.length > 6 ? scores.length + ' scores: ' : 'Scores ') + esc(shownScores.join(', '))
+            : 'No scores yet') +
+          '</span><strong class="cm-check-num">' +
+          esc(formatLevel(cid, getSectionProficiency(cid, sid, sec.id))) +
+          '</strong></div>'
+        );
+      })
+      .join('');
+    html +=
+      '<div class="cm-check-group"><div class="cm-label">Competencies <span class="cm-check-sub">· ' +
+      CM_METHOD_TEXT[method].label +
+      '</span></div>' +
+      (gs === 'letter' ? '<div class="cm-hint">Shown on competency views, not in the %.</div>' : '') +
+      (rows || '<div class="cm-hint">No competencies yet.</div>') +
+      '</div>';
+
+    if (gs === 'proficiency') {
+      html += '<div class="cm-check-group cm-hint">No course % in a Proficiency class.</div>';
+    } else {
+      var cats = getCategories(cid) || [];
+      var scoped = _scopedAssessments(cid);
+      var letter = getCourseLetterData(cid, sid);
+      var catRows = cats
+        .map(function (c) {
+          var p = getAssessmentGroupPercentage(
+            cid,
+            sid,
+            scoped.filter(function (a) {
+              return (a.categoryId || a.category_id || null) === c.id;
+            }),
+          );
+          return (
+            '<span>' +
+            esc(c.name) +
+            '</span><span class="cm-check-num">' +
+            (p ? formatCoursePercent(cid, p.pct) : '—') +
+            '</span><span class="cm-check-num cm-check-weight">' +
+            Number(c.weight || 0) +
+            '%</span>'
+          );
+        })
+        .join('');
+      html +=
+        '<div class="cm-check-group"><div class="cm-label">Course % <span class="cm-check-sub">· ' +
+        (cats.length ? 'Weighted Categories' : 'Points Earned of Possible') +
+        '</span></div>' +
+        (cats.length
+          ? '<div class="cm-check-cats"><span class="cm-check-colhead">Category</span><span class="cm-check-colhead cm-check-num">Earned</span><span class="cm-check-colhead cm-check-num">Weight</span>' +
+            catRows +
+            '</div>'
+          : '') +
+        '<div class="cm-check-total"><strong>Course %</strong><strong>' +
+        (letter && letter.R != null
+          ? esc((letter.S ? letter.S + ' ' : '') + formatCoursePercent(cid, letter.R))
+          : '—') +
+        '</strong></div>' +
+        '</div>';
+    }
+    return html + '</aside>';
+  }
+
+  function cmCheckStudent(sid) {
+    if (!cmSelectedCourse) return;
+    _cmCheckSid[cmSelectedCourse] = sid;
+    renderClassManager();
+  }
+
+  function cmRoundPercentSelect(value) {
+    cmSetRoundPercent(value === 'decimal' ? 'decimal' : 'whole');
   }
 
   /* ── Curriculum Wizard ──────────────────────────────────── */
@@ -2893,7 +3146,7 @@ window.DashClassManager = (function () {
     // constraint — same concept, different internal string).
     var map = {
       mostRecent:
-        'Only the latest score counts. If a student scores 2, then 3, then 4, their grade is 4. Earlier scores are ignored entirely. This is the BC standard for competency-based grading \u2014 it answers "where is the student now?" not "how did they do on average."',
+        'Only the latest score counts. If a student scores 2, then 3, then 4, their grade is 4. Earlier scores are ignored entirely. It answers "where is the student now?" rather than "how did they do on average?"',
       highest:
         'Only the best score counts. If a student scores 2, then 4, then 3, their grade is 4. This rewards students who demonstrate mastery at any point and removes the penalty for early struggles while learning new material.',
       average:
@@ -2913,10 +3166,10 @@ window.DashClassManager = (function () {
   function _cmGradingSystemDescription(gs) {
     var map = {
       proficiency:
-        'Students are scored on a 1\u20134 scale: 1 (Beginning), 2 (Developing), 3 (Proficient), 4 (Extending). This is the standard scale used across BC K\u201312 classrooms and aligns directly with BC report card requirements.',
+        'Students are scored on the BC proficiency scale: 1 Emerging, 2 Developing, 3 Proficient, 4 Extending.',
       letter:
         'Students receive letter grades (A, B, C+, C, C\u2013, F) using BC Ministry of Education percentage cutoffs and conversion tables. All calculations follow the official BC grading scale, so report cards are generated correctly without manual conversion.',
-      both: 'Both pipelines run side by side: proficiency (1\u20134) drives the competency view and the dashboard overview; letter + percentage (from points earned, weighted by category if any, and the BC conversion tables) drive reports for grades 10\u201312. Useful when a teacher wants the competency lens day-to-day but the parent-facing report card still needs letter grades.',
+      both: 'Proficiency day to day, and a letter grade and % on reports. Useful in grades 10\u201312, where report cards need a letter and %.',
     };
     return esc(map[gs] || map.proficiency);
   }
@@ -3095,8 +3348,8 @@ window.DashClassManager = (function () {
       '</div>' +
       _cmRenderUncategorized(cid) +
       '<div class="cm-cat-footer">' +
-      '<button class="cm-add-link" data-action="cmCatAdd">+ Add category</button>' +
-      '<button class="cm-add-link" data-action="cmCatCopyFrom">Copy from another class</button>' +
+      '<button class="cm-add-link" data-action="cmCatAdd">+ Add Category</button>' +
+      '<button class="cm-add-link" data-action="cmCatCopyFrom">Copy From Another Class</button>' +
       '<div class="' +
       _cmCatSumClass(cid) +
       '" id="cm-cat-sum-' +
@@ -3108,7 +3361,7 @@ window.DashClassManager = (function () {
       cid +
       '" data-action="cmCatSave"' +
       (_cmCatCanSave(cid) ? '' : ' disabled') +
-      '>Save categories</button>' +
+      '>Save Categories</button>' +
       '</div>' +
       '</div>';
     return html;
@@ -4160,7 +4413,49 @@ window.DashClassManager = (function () {
     renderClassManager();
   }
 
+  // A new method moves grades that already exist, so the change says how
+  // many students it moves before it is made.
   function cmSetCalcMethod(val) {
+    if (!cmSelectedCourse || !CM_METHOD_TEXT[val]) return;
+    var cid = cmSelectedCourse;
+    var course = COURSES[cid];
+    var current = getCourseConfig(cid).calcMethod || course.calcMethod || 'mostRecent';
+    if (!CM_METHOD_TEXT[current]) current = 'mostRecent';
+    if (val === current) return;
+    var preview = previewCalcMethodChange(cid, val);
+    if (!preview.changed) return _cmApplyCalcMethod(val);
+    var letterOnly = courseGradeMode(cid) === 'letter';
+    var msg =
+      'This changes the ' +
+      (letterOnly ? 'competency proficiency' : 'overall proficiency') +
+      ' for ' +
+      preview.changed +
+      ' of your ' +
+      preview.total +
+      ' students.' +
+      (preview.example
+        ? ' For example, ' +
+          preview.example.name +
+          ' goes from ' +
+          preview.example.before +
+          ' to ' +
+          preview.example.after +
+          '.'
+        : '') +
+      (letterOnly ? ' It does not change the %.' : '') +
+      ' Marks you\u2019ve already copied into MyEd won\u2019t change there.';
+    showConfirm(
+      'Change Calculation Method to ' + CM_METHOD_TEXT[val].label + '?',
+      msg,
+      'Change Method',
+      'primary',
+      function () {
+        _cmApplyCalcMethod(val);
+      },
+    );
+  }
+
+  function _cmApplyCalcMethod(val) {
     if (!cmSelectedCourse) return;
     var cc = getCourseConfig(cmSelectedCourse);
     cc.calcMethod = val;
@@ -4172,6 +4467,8 @@ window.DashClassManager = (function () {
   function cmUpdateDecay(val) {
     if (!cmSelectedCourse) return;
     document.getElementById('cm-decay-val').textContent = val + '%';
+    var rule = document.getElementById('cm-method-rule');
+    if (rule) rule.textContent = _cmMethodRule('decayingAvg', parseInt(val, 10) / 100);
     var cc = getCourseConfig(cmSelectedCourse);
     cc.decayWeight = parseInt(val, 10) / 100;
     saveCourseConfig(cmSelectedCourse, cc);
@@ -5464,6 +5761,19 @@ window.DashClassManager = (function () {
   function handleChange(el) {
     if (el.dataset.actionChange === 'cmCSV') {
       cmHandleCSV(el);
+      return true;
+    }
+    if (el.dataset.actionChange === 'cmCheckStudent') {
+      cmCheckStudent(el.value);
+      return true;
+    }
+    if (el.dataset.actionChange === 'cmRoundPercentSelect') {
+      cmRoundPercentSelect(el.value);
+      return true;
+    }
+    // Letting go of the decay slider redraws the examples and the student check.
+    if (el.dataset.actionChange === 'cmDecayCommit') {
+      renderClassManager();
       return true;
     }
     if (el.dataset.actionChange === 'cmTermSchool') {
