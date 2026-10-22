@@ -81,6 +81,28 @@ describe('parseShorthand', () => {
   });
 });
 
+describe('a starter from the box leaves out the students', () => {
+  const lists = {
+    students: [
+      { id: 's1', name: 'Angel Araujo Guerrero', first: 'Angel', last: 'Araujo Guerrero' },
+      { id: 's2', name: 'Mei Wong', first: 'Mei', last: 'Wong' },
+    ],
+    tags: [{ key: 'collaboration', label: 'Collaboration' }],
+  };
+  it('takes out @names and the picked students, keeping #tags and !type', () => {
+    const r = H.starterText('@Mei explained her reasoning #collaboration !strength', lists, []);
+    expect(r).toEqual({ text: 'Explained her reasoning', dims: ['collaboration'], sentiment: 'strength' });
+  });
+  it('takes out a picked student\u2019s full or first name, and a possessive', () => {
+    expect(H.starterText('Angel Araujo Guerrero helped a partner', lists, ['s1']).text).toBe('Helped a partner');
+    expect(H.starterText("Angel's lab report was careful", lists, ['s1']).text).toBe('Lab report was careful');
+    expect(H.starterText('Helped Angel with the scale', lists, ['s1']).text).toBe('Helped with the scale');
+  });
+  it('leaves a name that belongs to no picked student, and words that only contain one', () => {
+    expect(H.starterText('Mei helped Angelica', lists, ['s1']).text).toBe('Mei helped Angelica');
+  });
+});
+
 describe('starter helpers', () => {
   const list = [
     { id: 'a', text: 'Asked a great question' },
@@ -375,6 +397,39 @@ describe('capture strip', () => {
     type(cap, 'Worked on their own today');
     cap.submit();
     expect(added[0].templateId).toBeNull();
+  });
+
+  it('picking a student from + Student closes the list and goes to the note; Shift-click picks several', () => {
+    const cap = mount();
+    click(cap.el.querySelector('#student-btn'));
+    expect(cap.el.querySelector('#student-dropdown')).toBeTruthy();
+    expect(cap.el.querySelector('#student-dropdown').textContent).toContain('Shift-click to pick more than one.');
+    click(cap.el.querySelector('[data-obsc="toggleStudent"][data-value="s1"]'));
+    expect(cap.getState().students).toEqual(['s1']);
+    expect(cap.el.querySelector('#student-dropdown')).toBeNull();
+    click(cap.el.querySelector('#student-btn'));
+    const shift = new win.Event('click', { bubbles: true });
+    shift.shiftKey = true;
+    cap.el.querySelector('[data-obsc="toggleStudent"][data-value="s2"]').dispatchEvent(shift);
+    expect(cap.getState().students).toEqual(['s1', 's2']);
+    expect(cap.el.querySelector('#student-dropdown')).toBeTruthy();
+  });
+
+  it('Save as Starter leaves the picked student out of the starter', () => {
+    withStarters([]);
+    const saved = [];
+    setGlobal('addObservationTemplate', (cid, row) => {
+      saved.push(row);
+      return Object.assign({ id: 'otNew' }, row);
+    });
+    const cap = mount({ students: ['s1'] });
+    type(cap, 'Mei explained her reasoning to the group');
+    cap.render();
+    click(cap.el.querySelector('#save-starter-btn'));
+    const dlg = document.querySelector('.obsc-save-overlay');
+    expect(dlg.querySelector('textarea').value).toBe('Explained her reasoning to the group');
+    click(dlg.querySelector('[data-save-starter="save"]'));
+    expect(saved[0].text).toBe('Explained her reasoning to the group');
   });
 
   it('Save as Starter saves what is in the box for all classes and the note waits for Add', () => {
