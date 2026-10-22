@@ -212,6 +212,13 @@
 .gp-grid .gp-cat-start {
   border-left: 1.25pt solid #000;
 }
+/* Attendance: a clear break between weeks, and dates a size up. */
+.gp-attendance .gp-grid .gp-cat-start {
+  border-left-width: 2pt;
+}
+.gp-attendance .gp-ch-turn {
+  font-size: 8pt;
+}
 .gp-grid .gp-final {
   border-left: 2pt solid #000;
   text-align: center;
@@ -366,7 +373,20 @@
 }
 .gpd-t-colhead .gpd-t-cell {
   height: 10px;
+  align-items: flex-end;
   background: var(--gpd-head);
+}
+/* A titled column's title, turned to read up the column. */
+.gpd-t-colhead .gpd-t-cell i {
+  width: 1px;
+  max-width: none;
+  height: 7px;
+  margin-bottom: 1px;
+  background: var(--gpd-mark);
+}
+/* The heavier rule where a category or an attendance week begins. */
+.gpd-t-brk {
+  box-shadow: -1px 0 0 var(--gpd-ink);
 }
 .gpd-t-rows {
   flex: 1 1 0;
@@ -609,48 +629,6 @@
 .gpd-switch input:focus-visible + .gpd-switch-ui {
   outline: 2px solid var(--active);
   outline-offset: 2px;
-}
-
-/* Blank Grid's Columns stepper. */
-.gpd-stepper {
-  display: flex;
-  align-items: center;
-}
-.gpd-stepper button,
-.gpd-stepper input {
-  box-sizing: border-box;
-  height: 28px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  font-family: var(--font-base);
-}
-.gpd-stepper button {
-  width: 28px;
-  padding: 0;
-  font-size: var(--text-md);
-  color: var(--text-2);
-  cursor: pointer;
-}
-.gpd-stepper button:first-child {
-  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
-}
-.gpd-stepper button:last-child {
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-}
-.gpd-stepper button:disabled {
-  color: var(--text-3);
-  opacity: 0.5;
-  cursor: default;
-}
-.gpd-stepper input {
-  width: 42px;
-  border-left: 0;
-  border-right: 0;
-  border-radius: 0;
-  text-align: center;
-  font-size: var(--text-sm);
-  font-weight: 500;
-  color: var(--text);
 }
 
 .gpd-date {

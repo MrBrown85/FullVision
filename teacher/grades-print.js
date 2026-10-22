@@ -10,6 +10,11 @@
    overall grades. Letter or Legal, portrait, 0.3in margins. Black and white
    only.
 
+   Blank Gradebook prints the same grid, assessment titles and all, with
+   every score box empty. Attendance prints it with school days across the
+   top instead, Monday to Friday from the Monday of this week, a heavier rule
+   between weeks, as many days as fit the page's width.
+
    The grid fills the page. Rows stretch to the foot of the page and columns
    to its right edge; when the class is small, blank rows and blank columns
    fill the rest, for writing in. Pagination is arithmetic in inches, not
@@ -60,6 +65,7 @@
       pageHeadH: 1.16,
       bandH: 0.18,
       colHeadH: 1.4,
+      dayHeadH: 0.85,
       keyH: 0.16,
     },
     compact: {
@@ -79,9 +85,16 @@
       pageHeadH: 1.1,
       bandH: 0.16,
       colHeadH: 1.26,
+      dayHeadH: 0.8,
       keyH: 0.15,
     },
   };
+  /* The column heads' height: a date needs less than a title. */
+  function _colHeadH(opts) {
+    var size = SIZES[opts.size] || SIZES.normal;
+    return opts.attendance ? size.dayHeadH : size.colHeadH;
+  }
+
   /* A cell printing two values (points over a level, or a level over its %
      in a class that shows both) needs a taller row. */
   var TWO_LINE = 1.6;
@@ -105,7 +118,7 @@
     picked: [],
     shownIds: null, // the ids the gradebook's filters leave visible
     undated: false,
-    scoresAs: 'entered', // entered | levels | both
+    scoresAs: '', // proficiency | percent | points; '' follows the class's grading style
     late: true,
     average: true,
     students: 'both', // both | name | number: what identifies a student
@@ -113,12 +126,15 @@
     finalGrade: true,
     paper: 'letter',
     size: 'normal',
-    blank: false,
-    gridCols: 0, // Blank Grid's column count; 0 fills the page as before
+    blank: false, // Blank Gradebook: the titles, every score box empty
+    attendance: false, // school days across the top in place of assessments
   };
   /* The choices remembered on this device. Term, assessments and paper are
      not: the first two follow the gradebook, paper is per class. */
-  var REMEMBERED = ['scoresAs', 'late', 'average', 'students', 'sortBy', 'finalGrade', 'size', 'gridCols'];
+  var REMEMBERED = ['late', 'average', 'students', 'sortBy', 'finalGrade', 'size'];
+
+  var WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
   var _state = null;
 
@@ -136,7 +152,10 @@
   }
 
   function _isoToday() {
-    var d = new Date();
+    return _iso(new Date());
+  }
+
+  function _iso(d) {
     var m = String(d.getMonth() + 1);
     var day = String(d.getDate());
     return d.getFullYear() + '-' + (m.length < 2 ? '0' + m : m) + '-' + (day.length < 2 ? '0' + day : day);
@@ -171,16 +190,31 @@
     var o = Object.assign({}, DEFAULT_OPTIONS, raw || {});
     if (!PAPER[o.paper]) o.paper = 'letter';
     if (!SIZES[o.size]) o.size = 'normal';
-    if (['entered', 'levels', 'both'].indexOf(o.scoresAs) < 0) o.scoresAs = 'entered';
-    if (['all', 'shown', 'pick', 'blank'].indexOf(o.assessments) < 0) o.assessments = 'all';
+    // Saved before the choices were Proficiency, Percentages and Points.
+    o.scoresAs = { entered: 'points', levels: 'proficiency', both: 'points' }[o.scoresAs] || o.scoresAs;
+    if (['proficiency', 'percent', 'points'].indexOf(o.scoresAs) < 0) o.scoresAs = '';
+    // Blank Grid, the old empty grid without titles, is now Blank Gradebook.
+    if (o.assessments === 'blank') {
+      o.assessments = 'all';
+      o.blank = true;
+    }
+    if (['all', 'shown', 'pick'].indexOf(o.assessments) < 0) o.assessments = 'all';
     // Saved before the Students choice: a Pupil Numbers box.
     if (raw && raw.students == null && raw.studentNumbers === false) o.students = 'name';
     if (['both', 'name', 'number'].indexOf(o.students) < 0) o.students = 'both';
     if (['last', 'first', 'number'].indexOf(o.sortBy) < 0) o.sortBy = 'last';
     o.term = o.term == null || o.term === '' ? 'all' : String(o.term);
     o.picked = Array.isArray(o.picked) ? o.picked.slice() : [];
-    o.gridCols = Math.max(0, Math.floor(Number(o.gridCols) || 0));
+    o.blank = !!o.blank;
+    o.attendance = !!o.attendance;
+    delete o.gridCols;
     return o;
+  }
+
+  /* Scores, until the teacher picks: a Letter class prints percentages,
+     any other proficiency. */
+  function defaultScoresAs(cid) {
+    return courseGradeMode(cid) === 'letter' ? 'percent' : 'proficiency';
   }
 
   /* The period the sheet covers: all time, a reporting term or two dates. */
@@ -282,7 +316,6 @@
 
   /* The assessments the period and the Assessments choice leave in. */
   function assessmentsFor(cid, opts, period) {
-    if (opts.assessments === 'blank') return [];
     period = period || periodFor(cid, opts);
     var list = getAssessments(cid).filter(function (a) {
       var d = _assessmentDate(a);
@@ -306,6 +339,7 @@
   /* One column per assessment, in category order (no category last), by
      date within a category. Numbered 1..n in that order. */
   function columnsFor(cid, opts, period) {
+    if (opts.attendance) return attendanceColumns(opts);
     var size = SIZES[opts.size] || SIZES.normal;
     var cats = _sortedCategories(cid);
     var rank = {};
@@ -352,6 +386,64 @@
     });
   }
 
+  /* The Monday an attendance sheet starts on: this week's, or the coming
+     week's when printed on a Saturday or Sunday. */
+  function weekStart(date) {
+    var now = date || new Date();
+    var d = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    var dow = d.getDay();
+    d.setDate(d.getDate() + (dow === 6 ? 2 : dow === 0 ? 1 : 1 - dow));
+    return d;
+  }
+
+  /* "Mon Oct 19". */
+  function dayLabel(d) {
+    return WEEKDAYS[d.getDay()] + ' ' + MONTHS[d.getMonth()] + ' ' + d.getDate();
+  }
+
+  /* Attendance's columns: school days, Monday to Friday, from the Monday of
+     the week it is printed, as many as fit across the page at their
+     narrowest. Each week is a band of its own. */
+  function attendanceColumns(opts, today) {
+    var count = pageCapacity(opts, 0).full;
+    var d = weekStart(today);
+    var monday = d;
+    var out = [];
+    while (out.length < count) {
+      var dow = d.getDay();
+      if (dow === 1) monday = new Date(d.getTime());
+      if (dow >= 1 && dow <= 5) {
+        var iso = _iso(d);
+        var label = dayLabel(d);
+        out.push({
+          n: out.length + 1,
+          id: 'day-' + iso,
+          assessment: null,
+          title: label,
+          lines: [label],
+          cut: false,
+          date: iso,
+          dateText: '',
+          outOf: null,
+          complete: false,
+          day: true,
+          catId: 'week-' + _iso(monday),
+          catName: 'Week of ' + MONTHS[monday.getMonth()] + ' ' + monday.getDate(),
+        });
+      }
+      d.setDate(d.getDate() + 1);
+    }
+    // A week cut short by the page's edge, too narrow for its label, keeps
+    // the rule but leaves its band empty; its dates are in the heads.
+    out.forEach(function (c) {
+      var days = out.filter(function (x) {
+        return x.catId === c.catId;
+      }).length;
+      if (days < 3) c.catName = '';
+    });
+    return out;
+  }
+
   /* ── Students and cells ────────────────────────────────── */
 
   function rowsFor(cid, opts) {
@@ -370,20 +462,24 @@
     });
   }
 
-  /* What one cell prints: { text, sub, late, mark }. `sub` is the level under
-     a points score when scores print as points and levels. */
+  /* What one cell prints: { text, late, mark }. The Scores choice prints
+     every score as a proficiency or a %, or as marked: points as points and
+     other work as the gradebook shows it. Complete/Incomplete and the
+     status marks print the same under every choice. */
   function cellText(cid, sid, col, opts) {
-    if (opts.blank) return { text: '', sub: '', mark: '' };
+    if (opts.blank) return { text: '', mark: '' };
     var cell = assessmentCellValue(cid, sid, col.assessment);
-    var out = { text: cell.text, sub: '', mark: '' };
+    var out = { text: cell.text, mark: '' };
     if (cell.kind === 'status') out.mark = cell.status;
     else if (cell.kind === 'complete') out.mark = cell.text;
     else if (cell.kind === 'none' || (cell.kind === 'missing' && !cell.zero)) out.mark = '—';
-    if (cell.kind === 'points' && opts.scoresAs !== 'entered') {
-      var level = getAssessmentOverallScore(cid, sid, col.id);
-      var levelText = level > 0 ? formatLevel(cid, level) : '—';
-      if (opts.scoresAs === 'levels') out.text = levelText;
-      else out.sub = levelText;
+    var as = opts.scoresAs || defaultScoresAs(cid);
+    if (cell.kind === 'points' && as === 'percent') {
+      out.text = formatPointsPercent(cell.value, col.outOf);
+    } else if (cell.kind === 'points' && as === 'proficiency') {
+      out.text = formatLevelAs(getAssessmentOverallScore(cid, sid, col.id), 'proficiency');
+    } else if (cell.kind === 'level' && as !== 'points') {
+      out.text = formatLevelAs(cell.value, as);
     }
     if (cell.late && opts.late && (cell.kind === 'points' || cell.kind === 'level' || cell.kind === 'complete')) {
       out.late = true;
@@ -391,13 +487,15 @@
     return out;
   }
 
-  /* The class average under a column, over every student on the sheet. */
+  /* The class average under a column, over every student on the sheet, in
+     the Scores choice's terms. */
   function columnAverageText(cid, students, col, opts) {
     var a = col.assessment;
-    if (col.complete || (col.outOf != null && opts.scoresAs !== 'levels')) {
+    var as = opts.scoresAs || defaultScoresAs(cid);
+    if (col.complete || (col.outOf != null && as !== 'proficiency')) {
       var stats = getClassPointsAverage(cid, students, a);
       if (!stats) return '—';
-      if (col.complete) return Math.round(stats.pct) + '%';
+      if (col.complete || as === 'percent') return Math.round(stats.pct) + '%';
       return formatPoints(Math.round(stats.avg * 10) / 10);
     }
     var values = [];
@@ -415,20 +513,16 @@
       values.reduce(function (x, y) {
         return x + y;
       }, 0) / values.length;
-    return formatLevel(cid, mean);
+    return as === 'points' ? formatLevel(cid, mean) : formatLevelAs(mean, as);
   }
 
   /* ── Geometry and pagination ───────────────────────────── */
 
-  function _isTwoLine(cid, opts, columns) {
+  /* A class that shows both grades prints its final grade, and under
+     Points its proficiency work, as a level over a %. */
+  function _isTwoLine(cid, opts) {
     if (opts.blank) return false;
-    if (cid && courseGradeMode(cid) === 'both') return true;
-    return (
-      opts.scoresAs === 'both' &&
-      columns.some(function (c) {
-        return c.outOf != null;
-      })
-    );
+    return !!cid && courseGradeMode(cid) === 'both';
   }
 
   function _rowLimits(opts, twoLine) {
@@ -483,7 +577,7 @@
   function gridHeight(opts) {
     var paper = PAPER[opts.paper] || PAPER.letter;
     var size = SIZES[opts.size] || SIZES.normal;
-    var fixed = size.pageHeadH + size.bandH + size.colHeadH + size.keyH;
+    var fixed = size.pageHeadH + size.bandH + _colHeadH(opts) + size.keyH;
     return _round2((paper.h - 2 * MARGIN) * (1 - SAFETY) - fixed);
   }
 
@@ -499,21 +593,6 @@
   function fill(space, count, max) {
     var total = Math.max(count, Math.ceil(_round2(space / max)), 1);
     return { size: _round2(space / total), blank: total - Math.max(count, 0) };
-  }
-
-  /* Blank Grid's Columns choice: the count that fills the page when none is
-     chosen, and the most that fit across it. */
-  function gridColumnRange(opts) {
-    var size = SIZES[opts.size] || SIZES.normal;
-    var cap = pageCapacity(opts, 0);
-    return { auto: fill(cap.width, 0, size.colMax).blank, min: 1, max: cap.full };
-  }
-
-  /* The blank columns a Blank Grid prints: the chosen count, kept to what
-     fits, or 0 to fill the page. */
-  function _gridCols(columns, opts) {
-    if (columns.length || opts.assessments !== 'blank' || !(opts.gridCols > 0)) return 0;
-    return Math.min(opts.gridCols, gridColumnRange(opts).max);
   }
 
   /* `n` items into the fewest blocks of at most `max`, as even as they go. */
@@ -557,7 +636,7 @@
     var size = SIZES[opts.size] || SIZES.normal;
     var cap = pageCapacity(opts, finalW);
     var hasFinal = finalW > 0;
-    if (twoLine === undefined) twoLine = _isTwoLine(null, opts, columns);
+    if (twoLine === undefined) twoLine = _isTwoLine(null, opts);
     var blocks = columnBlocks(columns.length, cap.full, cap.withFinal, hasFinal);
     var lim = _rowLimits(opts, twoLine);
     var height = gridHeight(opts);
@@ -569,10 +648,7 @@
       var rows = fill(height, sb.count + avg, lim.max);
       blocks.forEach(function (cb, i) {
         var last = hasFinal && i === blocks.length - 1;
-        var gridCols = _gridCols(columns, opts);
-        var cols = gridCols
-          ? { size: _round2(cap.width / gridCols), blank: gridCols }
-          : fill(last ? cap.widthWithFinal : cap.width, cb.count, size.colMax);
+        var cols = fill(last ? cap.widthWithFinal : cap.width, cb.count, size.colMax);
         pages.push({
           students: sb,
           cols: cb,
@@ -606,13 +682,11 @@
     var teacher = (typeof getConfig === 'function' && getConfig().displayName) || '';
     var scores = opts.grid
       ? 'Blank Grid'
-      : opts.blank
-        ? 'Blank'
-        : opts.scoresAs === 'levels'
-          ? 'Levels Only'
-          : opts.scoresAs === 'both'
-            ? 'Points and Levels'
-            : 'As Entered';
+      : opts.attendance
+        ? 'Attendance'
+        : opts.blank
+          ? 'Blank'
+          : { proficiency: 'Proficiency', percent: 'Percentages', points: 'Points' }[opts.scoresAs] || '';
     var periodText =
       period.kind === 'all'
         ? 'All Time'
@@ -638,11 +712,14 @@
      scoped to the period's term and the gradebook's term put back after. */
   function buildModel(cid, rawOpts) {
     var opts = normalizeOptions(rawOpts);
+    if (!opts.scoresAs) opts.scoresAs = defaultScoresAs(cid);
+    // An attendance sheet is blank: no scores, averages or final grade.
+    if (opts.attendance) opts.blank = true;
     var period = periodFor(cid, opts);
     return withPeriod(cid, period, function () {
       var columns = columnsFor(cid, opts, period);
-      // No columns (Blank Grid, or a class with no assessments): the roster
-      // prints on an empty grid that fills the page, for marking by hand.
+      // No columns (a class with no assessments, or none in the period): the
+      // roster prints on an empty grid that fills the page, for marking by hand.
       if (!columns.length) {
         opts.blank = true;
         opts.grid = true;
@@ -657,7 +734,7 @@
       var size = SIZES[opts.size] || SIZES.normal;
       var finalOn = _finalAllowed(period, opts) && rows.length > 0;
       var finalW = finalOn ? size.finalW[courseGradeMode(cid)] : 0;
-      var layout = paginate(columns, rows.length, opts, _isTwoLine(cid, opts, columns), finalW);
+      var layout = paginate(columns, rows.length, opts, _isTwoLine(cid, opts), finalW);
       var marks = {};
       rows.forEach(function (r) {
         r.cells = columns.map(function (c) {
@@ -677,11 +754,13 @@
               final: finalOn ? classGradeSummary(cid, ids).text || '\u2014' : '',
             }
           : null;
+      var header = headerFields(cid, opts, period, { students: rows.length, columns: columns.length });
+      if (opts.attendance) header.period = _dateRange(columns[0].date, columns[columns.length - 1].date);
       return {
         cid: cid,
         opts: opts,
         period: period,
-        header: headerFields(cid, opts, period, { students: rows.length, columns: columns.length }),
+        header: header,
         columns: columns,
         rows: rows,
         averages: averages,
@@ -776,6 +855,7 @@
       '<section class="gp-page gp-' +
       opts.size +
       (twoLine ? ' gp-two-line' : '') +
+      (opts.attendance ? ' gp-attendance' : '') +
       '" data-page="' +
       (index + 1) +
       '" style="width:' +
@@ -789,7 +869,7 @@
       'in;--gp-head-pt:' +
       size.headPt +
       'pt;--gp-colhead:' +
-      size.colHeadH +
+      _colHeadH(opts) +
       'in">';
 
     // Header, as MyEd lays out its class lists.
@@ -800,7 +880,9 @@
       '<div class="gp-head-school">' +
       _esc(h.school) +
       '</div>' +
-      '<div class="gp-head-title">Class Grade Sheet</div>' +
+      '<div class="gp-head-title">' +
+      (opts.attendance ? 'Attendance Sheet' : 'Class Grade Sheet') +
+      '</div>' +
       '<div class="gp-head-line"><span>Page ' +
       (index + 1) +
       ' of ' +
@@ -812,9 +894,9 @@
       _info('Class', h.className) +
       _info('Teacher', h.teacher) +
       _info('Block', h.block) +
-      _info('Term', h.period) +
+      (opts.attendance ? _info('Dates', h.period) : _info('Term', h.period)) +
       _info('Students', h.students) +
-      _info('Scores', h.scores) +
+      (opts.attendance ? _info('School Days', h.assessments) : _info('Scores', h.scores)) +
       '</div>' +
       '</header>';
 
@@ -867,7 +949,7 @@
     html += '</tr>';
 
     // Column heads: titles turned to read up the column.
-    html += '<tr class="gp-colhead" style="height:' + size.colHeadH + 'in">';
+    html += '<tr class="gp-colhead" style="height:' + _colHeadH(opts) + 'in">';
     if (showNo) html += '<th class="gp-rh gp-rh-no" scope="col">Pupil #</th>';
     if (showName) html += '<th class="gp-rh gp-rh-name" scope="col">Name</th>';
     var prevCat = null;
@@ -882,7 +964,7 @@
         '" title="' +
         _esc(c.title) +
         '">' +
-        _turnedHead(c.lines, [c.dateText, c.outOf != null ? '/' + formatPoints(c.outOf) : '']) +
+        _turnedHead(c.lines, c.day ? [] : [c.dateText, c.outOf != null ? '/' + formatPoints(c.outOf) : '']) +
         '</th>';
     });
     blanks.forEach(function (bc, i) {
@@ -919,9 +1001,8 @@
           start +
           (t.mark && t.mark !== '—' ? ' gp-mark' : '') +
           '">' +
-          (t.sub ? _esc(t.text) : two(t.text)) +
+          two(t.text) +
           (t.late ? '<span class="gp-late">L</span>' : '') +
-          (t.sub ? '<div class="gp-sub">' + _esc(String(t.sub).split(' · ')[0]) + '</div>' : '') +
           '</td>';
       });
       html += blankCells();
@@ -1100,6 +1181,7 @@
       });
     }
     opts.paper = _loadPaper(cid);
+    opts.scoresAs = defaultScoresAs(cid);
     if (given) {
       if (given.term != null) opts.term = String(given.term);
       if (Array.isArray(given.shownIds)) opts.shownIds = given.shownIds.slice();
@@ -1136,7 +1218,7 @@
   function _menus(cid, opts) {
     var assessments = [{ value: 'all', label: 'All Assessments' }];
     if (Array.isArray(opts.shownIds)) assessments.push({ value: 'shown', label: 'Shown in the Gradebook' });
-    assessments.push({ value: 'pick', label: 'Pick Assessments' }, { value: 'blank', label: 'Blank Grid' });
+    assessments.push({ value: 'pick', label: 'Pick Assessments' });
     return {
       term: [{ value: 'all', label: 'All Time' }]
         .concat(
@@ -1147,9 +1229,9 @@
         .concat([{ value: 'custom', label: 'Custom Dates' }]),
       assessments: assessments,
       scoresAs: [
-        { value: 'entered', label: 'As Entered' },
-        { value: 'levels', label: 'Levels Only' },
-        { value: 'both', label: 'Points and Levels' },
+        { value: 'proficiency', label: 'Proficiency' },
+        { value: 'percent', label: 'Percentages' },
+        { value: 'points', label: 'Points' },
       ],
       students: [
         { value: 'both', label: 'Pupil # and Name' },
@@ -1244,28 +1326,6 @@
     );
   }
 
-  /* The number of blank columns the Columns stepper shows: the chosen count
-     kept to what fits, or the count that fills the page. */
-  function _gridColsShown(opts) {
-    var range = gridColumnRange(opts);
-    return opts.gridCols > 0 ? Math.min(opts.gridCols, range.max) : range.auto;
-  }
-
-  function _stepperRow(opts) {
-    var range = gridColumnRange(opts);
-    var n = _gridColsShown(opts);
-    return (
-      '<div class="gpd-row gpd-sub"><label class="gpd-label" for="gpd-gridCols">Columns</label>' +
-      '<div class="gpd-stepper"><button type="button" data-step="-1" aria-label="Fewer Columns"' +
-      (n <= range.min ? ' disabled' : '') +
-      '>−</button><input type="text" inputmode="numeric" id="gpd-gridCols" data-opt="gridCols" value="' +
-      n +
-      '"><button type="button" data-step="1" aria-label="More Columns"' +
-      (n >= range.max ? ' disabled' : '') +
-      '>+</button></div></div>'
-    );
-  }
-
   function _pickList(cid, opts) {
     var period = periodFor(cid, opts);
     var list = assessmentsFor(cid, Object.assign({}, opts, { assessments: 'all' }), period).slice();
@@ -1311,29 +1371,32 @@
   function _settingsHtml(cid, opts) {
     var menus = _menus(cid, opts);
     var period = periodFor(cid, opts);
-    var gridOnly = opts.assessments === 'blank';
+    // Attendance puts days where the assessments go, so the assessment
+    // choices step aside; either blank sheet leaves the scores off.
+    var days = !!opts.attendance;
+    var blank = !!opts.blank || days;
 
-    var content = _menuRow(menus, opts, 'term', 'Term');
-    if (opts.term === 'custom') {
+    var content = _menuRow(menus, opts, 'term', 'Term', days);
+    if (opts.term === 'custom' && !days) {
       content += _dateRow('from', 'From', opts.from) + _dateRow('to', 'To', opts.to);
     }
-    if (period.kind !== 'all' && _undatedCount(cid) > 0) {
+    if (period.kind !== 'all' && !days && _undatedCount(cid) > 0) {
       content += _switchRow('undated', opts.undated, 'Undated Assessments', false, true);
     }
-    content += _menuRow(menus, opts, 'assessments', 'Assessments');
-    if (gridOnly) content += _stepperRow(opts);
-    if (opts.assessments === 'pick') {
+    content += _menuRow(menus, opts, 'assessments', 'Assessments', days);
+    if (opts.assessments === 'pick' && !days) {
       content += '<div class="gpd-pick" role="group" aria-label="Pick Assessments">' + _pickList(cid, opts) + '</div>';
     }
-    content += _menuRow(menus, opts, 'scoresAs', 'Scores', gridOnly);
-    content += _switchRow('blank', opts.blank, 'Blank Scores', gridOnly);
+    content += _menuRow(menus, opts, 'scoresAs', 'Scores', blank);
+    content += _switchRow('blank', blank, 'Blank Gradebook', days);
+    content += _switchRow('attendance', days, 'Blank Attendance');
 
     var students = _menuRow(menus, opts, 'students', 'Show As') + _menuRow(menus, opts, 'sortBy', 'Sort By');
 
     var page =
-      _switchRow('finalGrade', opts.finalGrade, 'Final Grade', period.kind === 'custom' || opts.blank || gridOnly) +
-      _switchRow('average', opts.average, 'Class Average Row', opts.blank || gridOnly) +
-      _switchRow('late', opts.late, 'Late Marks', opts.blank || gridOnly) +
+      _switchRow('finalGrade', opts.finalGrade, 'Final Grade', period.kind === 'custom' || blank) +
+      _switchRow('average', opts.average, 'Class Average Row', blank) +
+      _switchRow('late', opts.late, 'Late Marks', blank) +
       _menuRow(menus, opts, 'paper', 'Paper') +
       _menuRow(menus, opts, 'size', 'Text Size');
 
@@ -1357,6 +1420,11 @@
     var final = !!(page.final && model.final);
     var avg = !!(model.averages && page.students.count);
     var marked = !opts.blank;
+    var shown = model.columns.slice(page.cols.start, page.cols.start + page.cols.count);
+    // A heavier rule where a category, or an attendance week, begins.
+    var brk = shown.map(function (c, i) {
+      return i > 0 && c.catId !== shown[i - 1].catId ? ' gpd-t-brk' : '';
+    });
     var tracks =
       _round2(_rowHeadWidth(opts)) + 'fr' + (colCount ? ' repeat(' + colCount + ', ' + page.colW + 'fr)' : '');
     if (final) tracks += ' ' + model.final.w + 'fr';
@@ -1364,7 +1432,7 @@
       var out = '';
       for (var i = 0; i < colCount; i++) {
         var scored = marked && i < page.cols.count && kind !== 'blank';
-        out += '<span class="gpd-t-cell">' + (scored ? '<i></i>' : '') + '</span>';
+        out += '<span class="gpd-t-cell' + (brk[i] || '') + '">' + (scored ? '<i></i>' : '') + '</span>';
       }
       if (final) out += '<span class="gpd-t-cell gpd-t-final">' + (kind !== 'blank' ? '<i></i>' : '') + '</span>';
       return out;
@@ -1384,9 +1452,13 @@
     if (avg) {
       rows += '<div class="gpd-t-row gpd-t-avg"><span class="gpd-t-name"><i></i></span>' + cells('avg') + '</div>';
     }
+    // Each titled column head carries a stroke for its title; blank columns
+    // added to fill the page have none.
     var head = '<span class="gpd-t-cell"></span>';
-    for (var h = 0; h < colCount; h++) head += '<span class="gpd-t-cell"></span>';
-    if (final) head += '<span class="gpd-t-cell"></span>';
+    for (var h = 0; h < colCount; h++) {
+      head += '<span class="gpd-t-cell' + (brk[h] || '') + '">' + (h < page.cols.count ? '<i></i>' : '') + '</span>';
+    }
+    if (final) head += '<span class="gpd-t-cell"><i></i></span>';
     return (
       '<div class="gpd-thumb" aria-hidden="true" style="width:' +
       Math.round((THUMB_H * paper.w) / paper.h) +
@@ -1405,24 +1477,20 @@
     );
   }
 
-  /* "1 page · Letter" over "22 students · Blank Grid · 12 columns". */
+  /* "1 page · Letter" over "22 students · 37 columns", "22 students ·
+     Blank Gradebook · 37 columns" or "22 students · 16 school days". */
   function previewLines(model) {
     var p = model.pages.length;
-    var paper = PAPER[model.opts.paper] || PAPER.letter;
+    var opts = model.opts;
+    var paper = PAPER[opts.paper] || PAPER.letter;
     var first = p + (p === 1 ? ' page' : ' pages') + ' · ' + paper.label;
     var s = model.rows.length;
     if (!s) return { pages: first, detail: 'No students to print.' };
-    var c = model.opts.grid ? model.pages[0].blankCols : model.columns.length;
-    return {
-      pages: first,
-      detail:
-        s +
-        (s === 1 ? ' student' : ' students') +
-        ' · ' +
-        (model.opts.grid ? 'Blank Grid · ' : '') +
-        c +
-        (c === 1 ? ' column' : ' columns'),
-    };
+    var who = s + (s === 1 ? ' student' : ' students') + ' · ';
+    var c = opts.grid ? model.pages[0].blankCols : model.columns.length;
+    if (opts.attendance) return { pages: first, detail: who + c + (c === 1 ? ' school day' : ' school days') };
+    var what = opts.grid ? 'Blank Grid · ' : opts.blank ? 'Blank Gradebook · ' : '';
+    return { pages: first, detail: who + what + c + (c === 1 ? ' column' : ' columns') };
   }
 
   function _previewHtml(model) {
@@ -1588,13 +1656,6 @@
     return true;
   }
 
-  function _setGridCols(n) {
-    var range = gridColumnRange(_state.opts);
-    n = Math.floor(Number(n));
-    if (!isFinite(n) || n < 1) n = _gridColsShown(_state.opts);
-    _state.opts.gridCols = Math.max(range.min, Math.min(range.max, n));
-  }
-
   function open(cid, given) {
     close();
     _state = { cid: cid, opts: _loadOptions(cid, given), trigger: document.activeElement };
@@ -1628,20 +1689,6 @@
         close();
         return;
       }
-      var step = t.closest ? t.closest('[data-step]') : null;
-      if (step) {
-        _setGridCols(_gridColsShown(_state.opts) + Number(step.dataset.step));
-        _changed(null);
-        // The stepper is redrawn: focus goes back to the same button, or to
-        // the count when that button has reached its end.
-        var again = overlay.querySelector('[data-step="' + step.dataset.step + '"]');
-        if (again && !again.disabled) again.focus();
-        else {
-          var input = document.getElementById('gpd-gridCols');
-          if (input) input.focus();
-        }
-        return;
-      }
       var btn = t.closest ? t.closest('[data-gp]') : null;
       if (!btn) return;
       if (btn.dataset.gp === 'cancel') close();
@@ -1664,9 +1711,6 @@
         if (pick) pick.innerHTML = _pickList(cid, o);
         _saveOptions(cid, o);
         _refreshPreview();
-      } else if (t.dataset.opt === 'gridCols') {
-        _setGridCols(t.value);
-        _changed(t.id);
       } else if (t.dataset.opt) {
         o[t.dataset.opt] = !!t.checked;
         _changed(t.id);
@@ -1678,10 +1722,6 @@
       if (e.key === 'ArrowDown' && t.dataset && t.dataset.menu) {
         e.preventDefault();
         _openMenu(overlay, t);
-      } else if (e.key === 'Enter' && t.dataset && t.dataset.opt === 'gridCols') {
-        e.preventDefault();
-        _setGridCols(t.value);
-        _changed(t.id);
       }
     });
     overlay.addEventListener(
@@ -1753,7 +1793,8 @@
     gridHeight: gridHeight,
     fill: fill,
     paginate: paginate,
-    gridColumnRange: gridColumnRange,
+    weekStart: weekStart,
+    attendanceColumns: attendanceColumns,
     headerFields: headerFields,
     buildModel: buildModel,
     keyLines: keyLines,
@@ -1762,6 +1803,7 @@
     renderPage: renderPage,
     renderPages: renderPages,
     stage: stage,
+    defaultScoresAs: defaultScoresAs,
     activatePrintMode: activatePrintMode,
     deactivatePrintMode: deactivatePrintMode,
     print: print,

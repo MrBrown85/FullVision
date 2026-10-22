@@ -1152,6 +1152,22 @@ function formatLevel(cid, value, empty) {
   return num;
 }
 
+/* A level printed as the teacher chose rather than as the class shows it:
+   'percent' gives "75%" (level ÷ 4, the course's rule for a level as a %),
+   anything else the proficiency, "3.0". The printed grade sheet's Scores
+   choice. */
+function formatLevelAs(value, as, empty) {
+  if (!(value > 0)) return empty === undefined ? '\u2014' : empty;
+  if (as === 'percent') return Math.round((value / 4) * 100) + '%';
+  return Number(value).toFixed(1);
+}
+
+/* A points score as a % of the assessment's most, "90%". */
+function formatPointsPercent(points, maxPoints) {
+  var max = Number(maxPoints) || 100;
+  return Math.round((Number(points) / max) * 100) + '%';
+}
+
 /* What one gradebook cell shows: one student on one assessment, as the
    Scores view draws it and the printed grade sheet prints it. `today`
    (YYYY-MM-DD) decides whether a missing score is past due; it defaults to
