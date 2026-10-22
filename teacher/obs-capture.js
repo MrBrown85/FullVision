@@ -10,7 +10,8 @@
    until picked), the note box, then one row:
    + Starter, Tags (+ Add Tag: dispositions, Core Competencies, custom
    tags), the Context menu, + Link (an assessment, or one learning-map
-   competency with an optional Level), Keep Tags and Add.
+   competency with an optional Level), and Add. After Add the next note
+   starts fresh: the students stay, the type, context and tags clear.
    Shorthand in the box: @name, #tag, !strength|growth|concern|note, /starter.
    Enter sends, Shift+Enter adds a line.
 
@@ -27,7 +28,6 @@ window.ObsCapture = (function () {
   'use strict';
 
   var TYPE_KEYS = ['strength', 'growth', 'concern', 'note'];
-  var KEEP_TAGS_KEY = 'fv-obs-keep-tags';
 
   /* Unsent text per host and course, kept for the session so a route change
      inside the app does not lose it. */
@@ -52,21 +52,6 @@ window.ObsCapture = (function () {
       .normalize('NFD')
       .replace(/[̀-ͯ]/g, '')
       .replace(/[^a-z0-9]/g, '');
-  }
-
-  function _readKeepTags() {
-    try {
-      return localStorage.getItem(KEEP_TAGS_KEY) === '1';
-    } catch (e) {
-      return false;
-    }
-  }
-  function _writeKeepTags(on) {
-    try {
-      localStorage.setItem(KEEP_TAGS_KEY, on ? '1' : '0');
-    } catch (e) {
-      /* per-device convenience only */
-    }
   }
 
   /* ── Lists the strip offers ─────────────────────────────── */
@@ -466,7 +451,6 @@ window.ObsCapture = (function () {
       assessmentId: opts.assessmentId || null,
       competencyId: opts.competencyId || null,
       level: null,
-      keepTags: _readKeepTags(),
       menu: null,
       suggest: null,
       flagOffer: [],
@@ -601,7 +585,7 @@ window.ObsCapture = (function () {
       return h;
     }
 
-    /* One row: + Starter | Tags | Context, + Link, then Keep Tags and Add. */
+    /* One row: + Starter | Tags | Context, + Link, then Save as Starter and Add. */
     function renderLinks() {
       var h = chip('menu', '+ Starter', {
         value: 'starters',
@@ -670,11 +654,6 @@ window.ObsCapture = (function () {
       }
 
       h += '<span class="obsc-spacer"></span>';
-      h +=
-        '<label class="obsc-keep"><input type="checkbox" data-obsc="keepTags"' +
-        (state.keepTags ? ' checked' : '') +
-        '> Keep Tags</label>';
-      h += '<span class="obsc-hint">Enter adds</span>';
       h +=
         '<button type="button" class="obsc-save-starter" id="' +
         p +
@@ -1435,13 +1414,11 @@ window.ObsCapture = (function () {
       state.templateId = null;
       input.value = '';
       saveDraft();
-      if (!state.keepTags) {
-        state.dims = [];
-        state.sentiment = null;
-        state.context = null;
-        state.competencyId = opts.competencyId || null;
-        state.level = null;
-      }
+      state.dims = [];
+      state.sentiment = null;
+      state.context = null;
+      state.competencyId = opts.competencyId || null;
+      state.level = null;
       state.menu = null;
       render();
       _focus(input);
@@ -1457,7 +1434,6 @@ window.ObsCapture = (function () {
       if (!el || !root.contains(el) || el === root) return;
       var act = el.getAttribute('data-obsc');
       var val = el.getAttribute('data-value');
-      if (act === 'keepTags') return; // handled on change
       e.preventDefault();
       e.stopPropagation();
       if (act === 'menu') openMenu(val);
@@ -1545,13 +1521,6 @@ window.ObsCapture = (function () {
       var key = 'tag:' + label;
       if (state.dims.indexOf(key) < 0) state.dims.push(key);
       render();
-    }
-
-    function onChange(e) {
-      if (e.target.matches('[data-obsc="keepTags"]')) {
-        state.keepTags = !!e.target.checked;
-        _writeKeepTags(state.keepTags);
-      }
     }
 
     function onInput(e) {
@@ -1697,7 +1666,6 @@ window.ObsCapture = (function () {
     }
 
     root.addEventListener('click', onClick);
-    root.addEventListener('change', onChange);
     root.addEventListener('input', onInput);
     root.addEventListener('keydown', onKeydown);
     document.addEventListener('mousedown', onDocMousedown, true);
@@ -1749,7 +1717,6 @@ window.ObsCapture = (function () {
         _destroyed = true;
         document.removeEventListener('mousedown', onDocMousedown, true);
         root.removeEventListener('click', onClick);
-        root.removeEventListener('change', onChange);
         root.removeEventListener('input', onInput);
         root.removeEventListener('keydown', onKeydown);
         if (root.parentNode) root.parentNode.removeChild(root);

@@ -221,20 +221,7 @@ span.obsc-chip-label {
   border-color: var(--score-1);
 }
 
-/* ── Add, keep tags ──────────────────────────────────────── */
-.obsc-keep {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: var(--text-sm, 13px);
-  color: var(--text-2);
-  cursor: pointer;
-  white-space: nowrap;
-}
-.obsc-keep input {
-  margin: 0;
-  accent-color: var(--active);
-}
+/* ── Add ─────────────────────────────────────────────────── */
 .obsc-add {
   min-height: 30px;
   padding: 5px 16px;
