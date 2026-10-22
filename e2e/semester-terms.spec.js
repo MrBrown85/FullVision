@@ -38,13 +38,17 @@ test.describe('Semester classes', () => {
   test('Semester 2 keeps Terms 3 and 4 as Report 3 and 4, and Full year brings 1 and 2 back', async ({ page }) => {
     const span = await openTerms(page);
     await expect(span.getByRole('radio', { name: 'Full Year' })).toHaveAttribute('aria-checked', 'true');
-    await expect(termLabels(page)).toHaveCount(4);
+    // Saved terms show as tiles, with each term's report.
+    await expect(page.locator('.cm-term-tile')).toHaveCount(4);
+    await expect(page.locator('.cm-term-tile').first()).toContainText('Nov Report Card');
 
+    // A new span opens the editor with the semester's rows.
     await span.getByRole('radio', { name: 'Semester 2' }).click();
     await expect(termLabels(page)).toHaveCount(2);
     await expect(termLabels(page).first()).toHaveValue('Term 3');
-    await page.getByRole('button', { name: 'Save terms' }).click();
-    await expect(page.locator('[id^="cm-term-foot-"]')).toContainText('Report 3–4');
+    await page.getByRole('button', { name: 'Save Terms' }).click();
+    await expect(page.locator('.cm-term-tile')).toHaveCount(2);
+    await expect(page.locator('.cm-term-view-foot')).toContainText('Report 3–4');
     expect(await page.evaluate(cid => getReportingTerms(cid).map(t => t.ordinal), TEST_COURSE.id)).toEqual([3, 4]);
 
     await page.getByRole('radiogroup', { name: 'This Class Runs' }).getByRole('radio', { name: 'Full Year' }).click();
