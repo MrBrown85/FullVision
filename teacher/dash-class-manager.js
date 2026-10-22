@@ -77,7 +77,7 @@ window.DashClassManager = (function () {
   var classManagerOpen = false;
   var cmSelectedCourse = null;
   var cmMode = 'edit';
-  var cmTab = 'details'; // details | students | grading | terms | competencies | starters
+  var cmTab = 'details'; // details | students | grading | terms | competencies
 
   // Curriculum Wizard state
   var cwStep = 1;
@@ -1774,7 +1774,6 @@ window.DashClassManager = (function () {
       var newDetail = document.querySelector('.cm-detail');
       if (newDetail) newDetail.scrollTop = scrollTop;
     }
-    _cmStarterAfterRender();
   }
 
   function renderCmSidebar(courseIds) {
@@ -2326,14 +2325,11 @@ window.DashClassManager = (function () {
         subjectsHtml +
         '</div></div>';
 
-    // Sentence Starters tab (until starters become one list per teacher)
-    panels.starters = _cmRenderStarters(cid);
-
     var tab = panels[cmTab] != null ? cmTab : 'details';
     return (
       '<div class="cm-detail-inner cm-tabbed">' +
       _cmRenderHeader(cid, studentCount, assessCount, tagCount) +
-      _cmRenderTabs(tab, studentCount, tagCount, getObservationTemplates(cid).length) +
+      _cmRenderTabs(tab, studentCount, tagCount) +
       '<div class="cm-tab-panel cm-tab-panel-' +
       tab +
       '" role="tabpanel" id="cm-tabpanel" aria-labelledby="cm-tab-' +
@@ -2402,11 +2398,10 @@ window.DashClassManager = (function () {
     { id: 'grading', label: 'Grading' },
     { id: 'terms', label: 'Reporting Terms' },
     { id: 'competencies', label: 'Competencies' },
-    { id: 'starters', label: 'Sentence Starters' },
   ];
 
-  function _cmRenderTabs(active, studentCount, tagCount, starterCount) {
-    var counts = { students: studentCount, competencies: tagCount, starters: starterCount };
+  function _cmRenderTabs(active, studentCount, tagCount) {
+    var counts = { students: studentCount, competencies: tagCount };
     return (
       '<div class="cm-tabs" role="tablist" aria-label="Class settings">' +
       CM_TABS.map(function (t) {
@@ -4037,334 +4032,6 @@ window.DashClassManager = (function () {
     renderClassManager();
   }
 
-  /* ── Sentence starters ───────────────────────────────────────
-     The class's bank for the capture strip's "/" menu and the phone's quick
-     menu (docs/DECISIONS.md, "Observations (2026-10-18)"). A starter has
-     text, an optional type and context, and tags. One row is edited at a
-     time; the edit lives here until Save. */
-  var _cmStarterEdit = null; // { cid, id ('new' or the starter's id), text, sentiment, context, dims }
-  var _cmStarterError = '';
-  var _cmStarterFocus = null; // selector to focus after the next render
-
-  function _cmStarterSameId(a, b) {
-    if (!a || !b) return false;
-    if (a === b) return true;
-    if (typeof resolveObservationTemplateId !== 'function') return false;
-    return resolveObservationTemplateId(cmSelectedCourse, a) === resolveObservationTemplateId(cmSelectedCourse, b);
-  }
-
-  function _cmStarterPillsHtml(t) {
-    var h = '';
-    var s = t.sentiment && OBS_SENTIMENTS[t.sentiment];
-    if (s) h += '<span class="obs-pill obs-pill-type" data-sentiment="' + t.sentiment + '">' + esc(s.label) + '</span>';
-    var c = t.context && OBS_CONTEXTS[t.context];
-    if (c) h += '<span class="obs-pill obs-pill-context">' + esc(c.label) + '</span>';
-    (t.dims || []).forEach(function (k) {
-      var label = typeof resolveTag === 'function' ? resolveTag(k).label : k;
-      var color = typeof obsTagColor === 'function' ? obsTagColor(k) : 'var(--text-3)';
-      h +=
-        '<span class="obs-card-dim"><span class="dim-dot" style="background:' +
-        color +
-        '"></span>' +
-        esc(label) +
-        '</span>';
-    });
-    return h ? '<div class="cm-starter-pills">' + h + '</div>' : '';
-  }
-
-  function _cmStarterEditorHtml(cid) {
-    var ed = _cmStarterEdit;
-    var isNew = ed.id === 'new';
-    var h =
-      '<div class="cm-starter-editor" id="cm-starter-editor">' +
-      '<label class="cm-starter-editor-label" for="cm-starter-text">' +
-      (isNew ? 'New starter' : 'Edit starter') +
-      '</label>' +
-      '<input class="cm-input" id="cm-starter-text" data-action-input="cmStarterText" value="' +
-      esc(ed.text) +
-      '" placeholder="e.g. Explained their thinking to a partner" autocomplete="off">' +
-      '<div class="cm-starter-editor-row">' +
-      '<select class="cm-input cm-starter-select" data-action-change="cmStarterType" aria-label="Type">' +
-      '<option value="">No type</option>';
-    Object.keys(OBS_SENTIMENTS).forEach(function (k) {
-      h +=
-        '<option value="' +
-        k +
-        '"' +
-        (ed.sentiment === k ? ' selected' : '') +
-        '>' +
-        esc(OBS_SENTIMENTS[k].label) +
-        '</option>';
-    });
-    h +=
-      '</select>' +
-      '<select class="cm-input cm-starter-select" data-action-change="cmStarterContext" aria-label="Context">' +
-      '<option value="">No context</option>';
-    Object.keys(OBS_CONTEXTS).forEach(function (k) {
-      h +=
-        '<option value="' +
-        k +
-        '"' +
-        (ed.context === k ? ' selected' : '') +
-        '>' +
-        esc(OBS_CONTEXTS[k].label) +
-        '</option>';
-    });
-    h += '</select></div>';
-    var items = typeof ObsCapture !== 'undefined' ? ObsCapture.tagMenuItems(cid) : [];
-    if (items.length) {
-      h += '<div class="cm-starter-tags" role="group" aria-label="Tags">';
-      items.forEach(function (it) {
-        if (it.type === 'section') {
-          h += '<div class="cm-starter-tags-head">' + esc(it.label) + '</div>';
-          return;
-        }
-        var on = ed.dims.indexOf(it.key) >= 0;
-        h +=
-          '<button type="button" class="cm-starter-tag' +
-          (on ? ' is-on' : '') +
-          '" data-action="cmStarterTag" data-value="' +
-          esc(it.key) +
-          '" aria-pressed="' +
-          on +
-          '"><span class="dim-dot" style="background:' +
-          it.color +
-          '"></span>' +
-          esc(it.label) +
-          '</button>';
-      });
-      h += '</div>';
-    }
-    h +=
-      '<div class="cm-starter-editor-actions">' +
-      '<button class="btn btn-primary" data-action="cmStarterSave" id="cm-starter-save"' +
-      (ed.text.trim() ? '' : ' disabled') +
-      '>' +
-      (isNew ? 'Add starter' : 'Save') +
-      '</button>' +
-      '<button class="btn btn-ghost" data-action="cmStarterCancel">Cancel</button>' +
-      '</div></div>';
-    return h;
-  }
-
-  function _cmStarterRowHtml(t, idx, count) {
-    return (
-      '<div class="cm-starter-row" data-tplid="' +
-      esc(t.id) +
-      '">' +
-      '<div class="cm-starter-main"><div class="cm-starter-text">' +
-      esc(t.text) +
-      '</div>' +
-      _cmStarterPillsHtml(t) +
-      '</div>' +
-      '<div class="cm-starter-actions">' +
-      '<button class="cm-starter-btn" data-action="cmStarterMove" data-tplid="' +
-      esc(t.id) +
-      '" data-dir="-1" aria-label="Move up" title="Move up"' +
-      (idx === 0 ? ' disabled' : '') +
-      '>↑</button>' +
-      '<button class="cm-starter-btn" data-action="cmStarterMove" data-tplid="' +
-      esc(t.id) +
-      '" data-dir="1" aria-label="Move down" title="Move down"' +
-      (idx === count - 1 ? ' disabled' : '') +
-      '>↓</button>' +
-      '<button class="cm-starter-btn cm-starter-edit" data-action="cmStarterEdit" data-tplid="' +
-      esc(t.id) +
-      '">Edit</button>' +
-      '<button class="cm-delete-mini" data-action="cmStarterDelete" data-tplid="' +
-      esc(t.id) +
-      '" aria-label="Delete starter" title="Delete starter">✕</button>' +
-      '</div></div>'
-    );
-  }
-
-  function _cmRenderStarters(cid) {
-    var list = typeof getObservationTemplates === 'function' ? getObservationTemplates(cid) : [];
-    var editing = _cmStarterEdit && _cmStarterEdit.cid === cid ? _cmStarterEdit : null;
-    var html =
-      '<div class="cm-section" id="cm-starters">' +
-      '<div class="cm-section-title">Sentence Starters' +
-      (list.length ? ' <span class="cm-section-count">(' + list.length + ')</span>' : '') +
-      '</div>';
-    if (!list.length) {
-      html +=
-        '<div class="cm-hint cm-starter-intro">No sentence starters yet. A starter fills the observation box: type / in any observation box, or tap a student on the phone. Here are six to begin with.</div>' +
-        '<div class="cm-starter-list cm-starter-suggestions">';
-      (typeof OBS_STARTER_SUGGESTIONS !== 'undefined' ? OBS_STARTER_SUGGESTIONS : []).forEach(function (t) {
-        html +=
-          '<div class="cm-starter-row is-suggestion"><div class="cm-starter-main"><div class="cm-starter-text">' +
-          esc(t.text) +
-          '</div>' +
-          _cmStarterPillsHtml(t) +
-          '</div></div>';
-      });
-      html +=
-        '</div>' +
-        '<div class="cm-starter-empty-actions">' +
-        '<button class="btn btn-primary" data-action="cmStarterAddSuggested">Add these to this class</button>' +
-        (editing ? '' : '<button class="cm-add-link" data-action="cmStarterAdd">+ Write your own</button>') +
-        '</div>';
-    } else {
-      html +=
-        '<div class="cm-hint cm-starter-intro">Type / in any observation box to use one. On the phone, tap a student.</div>' +
-        '<div class="cm-starter-list">';
-      list.forEach(function (t, idx) {
-        if (editing && _cmStarterSameId(editing.id, t.id)) html += _cmStarterEditorHtml(cid);
-        else html += _cmStarterRowHtml(t, idx, list.length);
-      });
-      html += '</div>';
-      if (!editing || editing.id !== 'new') {
-        html += '<button class="cm-add-link" data-action="cmStarterAdd">+ Add starter</button>';
-      }
-    }
-    if (editing && editing.id === 'new') html += _cmStarterEditorHtml(cid);
-    if (_cmStarterError) html += '<div class="cm-starter-error" role="alert">' + esc(_cmStarterError) + '</div>';
-    html += '</div>';
-    return html;
-  }
-
-  function _cmStarterRender(focusSel) {
-    _cmStarterFocus = focusSel || null;
-    renderClassManager();
-  }
-
-  function _cmStarterSaved(ok) {
-    _cmStarterError = ok === false || ok === null ? 'Couldn’t save on this device. Its storage is full.' : '';
-  }
-
-  function cmStarterAdd() {
-    if (!cmSelectedCourse) return;
-    _cmStarterError = '';
-    _cmStarterEdit = { cid: cmSelectedCourse, id: 'new', text: '', sentiment: null, context: null, dims: [] };
-    _cmStarterRender('#cm-starter-text');
-  }
-
-  function cmStarterEdit(id) {
-    var cid = cmSelectedCourse;
-    var t = getObservationTemplates(cid).find(function (x) {
-      return _cmStarterSameId(x.id, id);
-    });
-    if (!t) return;
-    _cmStarterError = '';
-    _cmStarterEdit = {
-      cid: cid,
-      id: t.id,
-      text: t.text,
-      sentiment: t.sentiment || null,
-      context: t.context || null,
-      dims: (t.dims || []).slice(),
-    };
-    _cmStarterRender('#cm-starter-text');
-  }
-
-  function cmStarterCancel() {
-    var id = _cmStarterEdit && _cmStarterEdit.id;
-    _cmStarterEdit = null;
-    _cmStarterError = '';
-    _cmStarterRender(
-      id && id !== 'new' ? '[data-action="cmStarterEdit"][data-tplid="' + id + '"]' : '[data-action="cmStarterAdd"]',
-    );
-  }
-
-  function cmStarterSave() {
-    var ed = _cmStarterEdit;
-    if (!ed || !ed.text.trim()) return;
-    var row = { text: ed.text.trim(), sentiment: ed.sentiment, context: ed.context, dims: ed.dims.slice() };
-    var focusId;
-    if (ed.id === 'new') {
-      var added = addObservationTemplate(ed.cid, row);
-      _cmStarterSaved(added);
-      focusId = added && added.id;
-    } else {
-      _cmStarterSaved(updateObservationTemplate(ed.cid, ed.id, row));
-      focusId = ed.id;
-    }
-    _cmStarterEdit = null;
-    _cmStarterRender(focusId ? '[data-action="cmStarterEdit"][data-tplid="' + focusId + '"]' : null);
-  }
-
-  function cmStarterDelete(id) {
-    var cid = cmSelectedCourse;
-    var t = getObservationTemplates(cid).find(function (x) {
-      return _cmStarterSameId(x.id, id);
-    });
-    if (!t) return;
-    showConfirm(
-      'Delete starter',
-      'Delete “' + t.text + '”? Observations already written with it stay as they are.',
-      'Delete',
-      'danger',
-      function () {
-        _cmStarterSaved(removeObservationTemplate(cid, t.id));
-        if (_cmStarterEdit && _cmStarterSameId(_cmStarterEdit.id, t.id)) _cmStarterEdit = null;
-        _cmStarterRender('[data-action="cmStarterAdd"]');
-      },
-    );
-  }
-
-  function cmStarterMove(id, dir) {
-    var cid = cmSelectedCourse;
-    _cmStarterSaved(moveObservationTemplate(cid, id, dir));
-    var cur = typeof resolveObservationTemplateId === 'function' ? resolveObservationTemplateId(cid, id) : id;
-    var list = getObservationTemplates(cid);
-    var idx = list.findIndex(function (x) {
-      return _cmStarterSameId(x.id, cur);
-    });
-    // Keep focus on the arrow that moved it, or on the other one at an end.
-    var atEnd = dir < 0 ? idx === 0 : idx === list.length - 1;
-    var row = '[data-action="cmStarterMove"][data-tplid="' + (idx >= 0 ? list[idx].id : cur) + '"]';
-    _cmStarterRender(row + '[data-dir="' + (atEnd ? -dir : dir) + '"]');
-  }
-
-  function cmStarterAddSuggested() {
-    var cid = cmSelectedCourse;
-    if (!cid || typeof OBS_STARTER_SUGGESTIONS === 'undefined') return;
-    _cmStarterSaved(addObservationTemplates(cid, structuredClone(OBS_STARTER_SUGGESTIONS)));
-    _cmStarterRender('[data-action="cmStarterAdd"]');
-  }
-
-  function cmStarterTag(key) {
-    if (!_cmStarterEdit) return;
-    var i = _cmStarterEdit.dims.indexOf(key);
-    if (i >= 0) _cmStarterEdit.dims.splice(i, 1);
-    else _cmStarterEdit.dims.push(key);
-    var sel = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(key) : key;
-    _cmStarterRender('[data-action="cmStarterTag"][data-value="' + sel + '"]');
-  }
-
-  function cmStarterText(val) {
-    if (!_cmStarterEdit) return;
-    _cmStarterEdit.text = val;
-    var btn = document.getElementById('cm-starter-save');
-    if (btn) btn.disabled = !val.trim();
-  }
-
-  function _cmStarterAfterRender() {
-    if (!_cmStarterFocus) return;
-    var sel = _cmStarterFocus;
-    _cmStarterFocus = null;
-    var el = document.querySelector(sel);
-    if (!el || el.disabled) el = document.querySelector('[data-action="cmStarterAdd"]');
-    if (el && typeof el.focus === 'function') el.focus();
-  }
-
-  /* "Edit starters…" in the capture strip lands here. */
-  function openStarters(cid) {
-    classManagerOpen = true;
-    cmMode = 'edit';
-    cmSelectedCourse = cid && COURSES[cid] ? cid : _activeCourse;
-    cmTab = 'starters';
-    renderClassManager();
-    var sec = document.getElementById('cm-starters');
-    if (sec && typeof sec.scrollIntoView === 'function') sec.scrollIntoView({ block: 'start' });
-    var first =
-      sec &&
-      sec.querySelector(
-        '[data-action="cmStarterEdit"], [data-action="cmStarterAddSuggested"], [data-action="cmStarterAdd"]',
-      );
-    if (first && typeof first.focus === 'function') first.focus({ preventScroll: true });
-  }
-
   /* ── Reporting terms ─────────────────────────────────────────
      Up to six dated terms per class (docs/DECISIONS.md, "Reporting
      periods"). Edited like categories: rows change live, Save sends the
@@ -5108,7 +4775,7 @@ window.DashClassManager = (function () {
       '<div class="confirm-title" id="cm-dup-title">Duplicate ' +
       esc(courseDisplayName(src)) +
       '</div>' +
-      '<div class="confirm-message">Settings, curriculum, categories and sentence starters are copied. Students, assessments and rubrics are not.</div>' +
+      '<div class="confirm-message">Settings, curriculum and categories are copied. Students, assessments and rubrics are not.</div>' +
       '<div class="cm-field"><label class="cm-label" id="cm-dup-block-label">Block for the New Class</label>' +
       blockPickerHtml('cm-dup-block', '') +
       '</div>' +
@@ -5192,8 +4859,6 @@ window.DashClassManager = (function () {
       clone._version = 1;
       saveLearningMap(newCourse.id, clone);
     }
-    // Starters are class setup, so the copy gets them as new rows.
-    if (typeof copyObservationTemplates === 'function') copyObservationTemplates(sourceCid, newCourse.id);
     cmSelectedCourse = newCourse.id;
     cmMode = 'edit';
     renderClassManager();
@@ -6963,30 +6628,6 @@ window.DashClassManager = (function () {
       cmDuplicateCourse: function () {
         cmDuplicateCourse(el.dataset.cid);
       },
-      cmStarterAdd: function () {
-        cmStarterAdd();
-      },
-      cmStarterEdit: function () {
-        cmStarterEdit(el.dataset.tplid);
-      },
-      cmStarterCancel: function () {
-        cmStarterCancel();
-      },
-      cmStarterSave: function () {
-        cmStarterSave();
-      },
-      cmStarterDelete: function () {
-        cmStarterDelete(el.dataset.tplid);
-      },
-      cmStarterMove: function () {
-        cmStarterMove(el.dataset.tplid, parseInt(el.dataset.dir, 10));
-      },
-      cmStarterAddSuggested: function () {
-        cmStarterAddSuggested();
-      },
-      cmStarterTag: function () {
-        cmStarterTag(el.dataset.value);
-      },
       cmToggleArchive: function () {
         cmToggleArchive(el.dataset.cid);
       },
@@ -7143,10 +6784,6 @@ window.DashClassManager = (function () {
       cmTermLive(parseInt(el.dataset.idx, 10), el.dataset.field, el.value);
       return true;
     }
-    if (el.dataset.actionInput === 'cmStarterText') {
-      cmStarterText(el.value);
-      return true;
-    }
     // T-UI-02 retired: cmCwRange (legacy summative/formative slider).
     return false;
   }
@@ -7191,14 +6828,6 @@ window.DashClassManager = (function () {
     }
     if (el.dataset.actionChange === 'cmTermSchool') {
       cmTermSchool(el.value);
-      return true;
-    }
-    if (el.dataset.actionChange === 'cmStarterType' && _cmStarterEdit) {
-      _cmStarterEdit.sentiment = el.value || null;
-      return true;
-    }
-    if (el.dataset.actionChange === 'cmStarterContext' && _cmStarterEdit) {
-      _cmStarterEdit.context = el.value || null;
       return true;
     }
     // T-UI-02 retired: cmCwEnabled + cmReportPct (deleted 2026-04-21).
@@ -7268,18 +6897,6 @@ window.DashClassManager = (function () {
       if (el.classList.contains('cm-ican-text')) {
         e.preventDefault();
         el.blur();
-        return true;
-      }
-    }
-    if (el && el.id === 'cm-starter-text' && !e.isComposing) {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        cmStarterSave();
-        return true;
-      }
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        cmStarterCancel();
         return true;
       }
     }
@@ -7379,7 +6996,6 @@ window.DashClassManager = (function () {
       classManagerOpen = v;
     },
     openClassManager: openClassManager,
-    openStarters: openStarters,
     closeClassManager: closeClassManager,
     renderClassManager: renderClassManager,
     // The copy step behind the Duplicate Class dialog (block '' = none).
@@ -7433,8 +7049,6 @@ window.DashClassManager = (function () {
       _cmCollapsedStdFolders = {};
       _cmOpenStdCards = {};
       _cmCategoryState = {};
-      _cmStarterEdit = null;
-      _cmStarterError = '';
     },
   };
 })();

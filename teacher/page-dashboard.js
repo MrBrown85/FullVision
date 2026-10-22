@@ -882,9 +882,9 @@ window.PageDashboard = (function () {
     // A teacher with no classes yet starts in the class manager's
     // "Create a Class" screen.
     if (!activeCourse && Object.keys(COURSES).length === 0) CM.openClassManager();
-    // "Edit starters…" in an observation box opens the class's starters.
-    else if (params && params.manage === 'starters' && activeCourse) {
-      CM.openStarters(activeCourse);
+    // An old "Edit starters…" link: starters are on My Sentence Starters now.
+    else if (params && params.manage === 'starters') {
+      Router.navigate('/observations/starters');
       return;
     }
 

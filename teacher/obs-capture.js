@@ -14,9 +14,12 @@
    Shorthand in the box: @name, #tag, !strength|growth|concern|note, /starter.
    Enter sends, Shift+Enter adds a line.
 
-   Starters are the class's sentence starters (getObservationTemplates).
-   Picking one puts its text in the box and sets its type and context only
-   where none is chosen yet; its tags are added to the ones already picked.
+   Starters are the teacher's sentence starters, most used first
+   (getObservationTemplatesByUse), the same in every class. Picking one
+   puts its text in the box and sets its type and context only where none
+   is chosen yet; its tags are added to the ones already picked. The
+   observation remembers the starter so Times Used counts it. Save as
+   Starter keeps what is in the box as a new one.
 
    The level is evidence only. Nothing here or in calc.js turns it into a
    grade. */
@@ -217,14 +220,16 @@ window.ObsCapture = (function () {
 
   /* ── Sentence starters ──────────────────────────────────── */
 
-  function starterList(cid) {
-    return ((typeof getObservationTemplates === 'function' && getObservationTemplates(cid)) || []).filter(function (t) {
-      return t && t.text;
-    });
+  function starterList() {
+    return ((typeof getObservationTemplatesByUse === 'function' && getObservationTemplatesByUse()) || []).filter(
+      function (t) {
+        return t && t.text;
+      },
+    );
   }
 
   /* Starters whose text holds the query, the ones with a word starting
-     with it first. An empty query keeps them all, in the class's order. */
+     with it first. An empty query keeps them all, most used first. */
   function matchStarters(query, starters) {
     var q = _norm(query);
     if (!q) return starters.slice();
@@ -434,6 +439,7 @@ window.ObsCapture = (function () {
       suggest: null,
       flagOffer: [],
       error: '',
+      templateId: null, // the starter the text came from
     };
     if (!state.assessmentId && opts.defaultAssessment) state.assessmentId = defaultAssessmentId(cid);
     var draftKey = (opts.draftKey || 'obs') + '|' + cid;
@@ -638,6 +644,12 @@ window.ObsCapture = (function () {
         '> Keep Tags</label>';
       h += '<span class="obsc-hint">Enter adds</span>';
       h +=
+        '<button type="button" class="obsc-save-starter" id="' +
+        p +
+        'save-starter-btn" data-obsc="saveStarter"' +
+        (input.value.trim() ? '' : ' disabled') +
+        '>Save as Starter</button>';
+      h +=
         '<button type="button" class="obsc-add" id="' +
         p +
         'capture-add-btn" data-obsc="add" aria-label="Add observation">Add</button>';
@@ -743,8 +755,8 @@ window.ObsCapture = (function () {
       );
     }
 
-    /* Where starters are edited: Class Management on a computer. A host can
-       pass onEditStarters; the phone, which cannot edit them, says so. */
+    /* Where starters are edited: My Sentence Starters on a computer. A host
+       can pass onEditStarters; the phone, which cannot edit them, says so. */
     function canEditStarters() {
       return typeof opts.onEditStarters === 'function' || (typeof Router !== 'undefined' && !!Router.navigate);
     }
@@ -755,16 +767,16 @@ window.ObsCapture = (function () {
         return;
       }
       closeDialog();
-      if (typeof Router !== 'undefined' && Router.navigate) Router.navigate('/dashboard?manage=starters');
+      if (typeof Router !== 'undefined' && Router.navigate) Router.navigate('/observations/starters');
     }
     function starterFooterHtml() {
       if (canEditStarters()) {
         return (
           '<div class="obsc-item obsc-item-edit" role="option" tabindex="-1" aria-selected="false" data-obsc="editStarters">' +
-          '<span class="obsc-check" aria-hidden="true"></span><span class="obsc-item-label">Edit starters…</span></div>'
+          '<span class="obsc-check" aria-hidden="true"></span><span class="obsc-item-label">Edit My Starters…</span></div>'
         );
       }
-      return '<div class="obsc-menu-note">Add your own in Class Management on a computer.</div>';
+      return '<div class="obsc-menu-note">Add your own on My Sentence Starters on a computer.</div>';
     }
     function starterHint(t) {
       var info = t.sentiment && typeof OBS_SENTIMENTS !== 'undefined' && OBS_SENTIMENTS[t.sentiment];
@@ -813,7 +825,7 @@ window.ObsCapture = (function () {
         var starters = starterList(cid);
         if (starters.length) h += search('Search starters…');
         h += '<div class="obsc-menu-list">';
-        if (!starters.length) h += '<div class="obsc-menu-empty">This class has no sentence starters yet.</div>';
+        if (!starters.length) h += '<div class="obsc-menu-empty">You have no sentence starters yet.</div>';
         starters.forEach(function (t) {
           h += starterItem(t, 'data-obsc="pickStarter" data-value="' + _esc(t.id) + '"', false);
         });
@@ -900,10 +912,11 @@ window.ObsCapture = (function () {
       if (!sg) return '';
       var h = '';
       if (sg.kind === '/') {
+        if (sg.items.length && !sg.query) h += section('Most Used');
         if (!sg.items.length) {
           h += starterList(cid).length
             ? '<div class="obsc-menu-empty">No starter matches “' + _esc(sg.query) + '”.</div>'
-            : '<div class="obsc-menu-empty">This class has no sentence starters yet.</div>';
+            : '<div class="obsc-menu-empty">You have no sentence starters yet.</div>';
         }
         sg.items.forEach(function (it, i) {
           h += starterItem(it.starter, 'data-obsc="pickSuggest" data-value="' + i + '"', i === sg.index);
@@ -914,9 +927,9 @@ window.ObsCapture = (function () {
             (sg.index === sg.items.length ? ' is-active' : '') +
             '" role="option" aria-selected="' +
             (sg.index === sg.items.length) +
-            '" data-obsc="editStarters"><span class="obsc-item-label">Edit starters…</span></div>';
+            '" data-obsc="editStarters"><span class="obsc-item-label">Edit My Starters…</span></div>';
         } else {
-          h += '<div class="obsc-menu-note">Add your own in Class Management on a computer.</div>';
+          h += '<div class="obsc-menu-note">Add your own on My Sentence Starters on a computer.</div>';
         }
       } else if (!sg.items.length) {
         return '';
@@ -1018,6 +1031,146 @@ window.ObsCapture = (function () {
     function updateAdd() {
       var btn = root.querySelector('.obsc-add');
       if (btn) btn.disabled = !state.students.length || !input.value.trim();
+      var save = root.querySelector('.obsc-save-starter');
+      if (save) save.disabled = !input.value.trim();
+    }
+
+    /* The starter picked for this note, while its words are still there.
+       A note rewritten after picking one doesn't count as written from it. */
+    function starterStillUsed(text) {
+      if (!state.templateId) return null;
+      var t = starterList().find(function (x) {
+        return x.id === state.templateId || resolveObservationTemplateId(null, x.id) === state.templateId;
+      });
+      if (!t || _norm(text).indexOf(_norm(t.text)) < 0) return null;
+      return t.id;
+    }
+
+    /* Save as Starter: what is in the box, with its type, context and tags,
+       becomes one of the teacher's starters. The note itself waits for Add. */
+    function openSaveStarter() {
+      var text = input.value.trim();
+      if (!text) {
+        input.classList.add('obsc-input-empty');
+        _focus(input);
+        return;
+      }
+      clearMenus();
+      var names = studentList(cid)
+        .filter(function (s) {
+          return state.students.indexOf(s.id) >= 0;
+        })
+        .map(function (s) {
+          return s.first || s.name;
+        });
+      var who = names.length === 1 ? ' for ' + names[0] : names.length ? ' for these students' : '';
+      var sets = [];
+      var info = state.sentiment && typeof OBS_SENTIMENTS !== 'undefined' && OBS_SENTIMENTS[state.sentiment];
+      if (info)
+        sets.push(
+          '<span class="obs-pill obs-pill-type" data-sentiment="' +
+            state.sentiment +
+            '">' +
+            _esc(info.label) +
+            '</span>',
+        );
+      var ctx = state.context && typeof OBS_CONTEXTS !== 'undefined' && OBS_CONTEXTS[state.context];
+      if (ctx) sets.push('<span class="obs-pill obs-pill-context">' + _esc(ctx.label) + '</span>');
+      var dims = state.dims.filter(function (k) {
+        return !/^tag:/.test(k);
+      });
+      dims.forEach(function (k) {
+        sets.push(
+          '<span class="obs-card-dim"><span class="dim-dot" style="background:' +
+            (typeof obsTagColor === 'function' ? obsTagColor(k) : 'var(--text-3)') +
+            '"></span>' +
+            _esc(tagLabel(k)) +
+            '</span>',
+        );
+      });
+      var overlay = document.createElement('div');
+      overlay.className = 'confirm-overlay obsc-save-overlay';
+      overlay.setAttribute('role', 'dialog');
+      overlay.setAttribute('aria-modal', 'true');
+      overlay.setAttribute('aria-labelledby', p + 'save-starter-title');
+      overlay.innerHTML =
+        '<div class="confirm-card obsc-save-card">' +
+        '<div class="confirm-title" id="' +
+        p +
+        'save-starter-title">Save as Starter</div>' +
+        '<label class="obsc-save-label" for="' +
+        p +
+        'save-starter-text">Starter</label>' +
+        '<textarea class="obsc-save-text" id="' +
+        p +
+        'save-starter-text" rows="2">' +
+        _esc(text) +
+        '</textarea>' +
+        '<div class="obsc-save-hint">Leave out student names so it works for anyone.</div>' +
+        (sets.length
+          ? '<div class="obsc-save-sets"><span class="obsc-save-sets-label">It will set</span>' +
+            sets.join('') +
+            '</div>'
+          : '') +
+        '<div class="obsc-save-note">Saves to My Sentence Starters for all your classes. Your observation' +
+        _esc(who) +
+        ' isn\u2019t added until you press Add.</div>' +
+        '<div class="confirm-actions">' +
+        '<button type="button" class="confirm-cancel" data-save-starter="cancel">Cancel</button>' +
+        '<button type="button" class="confirm-ok primary" data-save-starter="save">Save Starter</button>' +
+        '</div></div>';
+      var returnFocus = document.activeElement;
+      var box = overlay.querySelector('textarea');
+      function close() {
+        document.removeEventListener('keydown', onKey, true);
+        if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+        if (returnFocus && typeof returnFocus.focus === 'function') returnFocus.focus();
+      }
+      function save() {
+        var body = box.value.trim();
+        if (!body) {
+          _focus(box);
+          return;
+        }
+        var added = addObservationTemplate(null, {
+          text: body,
+          sentiment: state.sentiment,
+          context: state.context,
+          dims: dims.slice(),
+        });
+        close();
+        if (!added) {
+          state.error = "Couldn't save on this device. Its storage is full.";
+          render();
+          return;
+        }
+        // The note in the box now counts as written from it.
+        if (_norm(input.value).indexOf(_norm(body)) >= 0) state.templateId = added.id;
+        _focus(input);
+      }
+      function onKey(e) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          e.stopPropagation();
+          close();
+        } else if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.target === box) {
+          e.preventDefault();
+          save();
+        }
+      }
+      overlay.addEventListener('click', function (e) {
+        var b = e.target.closest('[data-save-starter]');
+        if (b) {
+          if (b.getAttribute('data-save-starter') === 'save') save();
+          else close();
+        } else if (e.target === overlay) close();
+      });
+      overlay.addEventListener('keydown', function (e) {
+        e.stopPropagation();
+      });
+      document.addEventListener('keydown', onKey, true);
+      document.body.appendChild(overlay);
+      _focus(box);
     }
 
     function openMenu(name) {
@@ -1099,6 +1252,7 @@ window.ObsCapture = (function () {
       });
       if (!t) return;
       applyStarter(state, t);
+      state.templateId = t.id;
       var caret = typeof input.selectionStart === 'number' ? input.selectionStart : input.value.length;
       var start = range ? range.start : caret;
       var end = range ? range.end : typeof input.selectionEnd === 'number' ? input.selectionEnd : caret;
@@ -1222,6 +1376,7 @@ window.ObsCapture = (function () {
       var link = state.competencyId ? { competencyId: state.competencyId, level: state.level } : null;
       var sids = state.students.slice();
       var ok = true;
+      var fromStarter = starterStillUsed(text);
       sids.forEach(function (sid) {
         var r = addQuickOb(
           cid,
@@ -1232,6 +1387,7 @@ window.ObsCapture = (function () {
           state.context,
           ac ? Object.assign({}, ac) : null,
           link,
+          fromStarter,
         );
         if (r === false) ok = false;
       });
@@ -1243,6 +1399,7 @@ window.ObsCapture = (function () {
             })
           : [];
       if (!ok) state.error = "Couldn't save on this device. Its storage is full.";
+      state.templateId = null;
       input.value = '';
       saveDraft();
       if (!state.keepTags) {
@@ -1325,6 +1482,7 @@ window.ObsCapture = (function () {
         closeMenu(true);
       } else if (act === 'pickSuggest') pickSuggest(Number(val));
       else if (act === 'pickStarter') useStarter(val, null);
+      else if (act === 'saveStarter') openSaveStarter();
       else if (act === 'editStarters') editStarters();
       else if (act === 'add') submit();
       else if (act === 'flag') {
@@ -1392,7 +1550,7 @@ window.ObsCapture = (function () {
     function onKeydown(e) {
       if (e.target === input) {
         var sg = state.suggest;
-        // The '/' list ends with "Edit starters…", which the arrows reach too.
+        // The "/" list ends with "Edit My Starters…", which the arrows reach too.
         var rows = sg ? sg.items.length + (sg.kind === '/' && canEditStarters() ? 1 : 0) : 0;
         if (sg && rows) {
           if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {

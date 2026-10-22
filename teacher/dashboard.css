@@ -4497,3 +4497,123 @@ label.cm-cr-row {
     flex-basis: auto;
   }
 }
+/* My Sentence Starters (page-starters.js) */
+.ms-page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 28px 40px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  font-family: var(--font-base);
+}
+.ms-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.ms-title {
+  margin: 0;
+  font-size: var(--text-2xl, 28px);
+  font-weight: 700;
+  color: var(--text);
+}
+.ms-sub {
+  margin-top: 6px;
+  font-size: var(--text-md);
+  color: var(--text-2);
+}
+.ms-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: var(--active-light);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  font-size: var(--text-base);
+  line-height: 1.5;
+  color: var(--text);
+}
+.ms-info-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--link);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+}
+.ms-table {
+  background: var(--surface);
+  border: 1px solid var(--divider-subtle);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.ms-table.ms-empty {
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ms-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 110px 190px;
+  gap: 16px;
+  align-items: center;
+  padding: 14px 18px;
+  border-top: 1px solid var(--divider-subtle);
+}
+.ms-row-head {
+  border-top: none;
+  background: var(--bg);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-2);
+  padding: 10px 18px;
+}
+.ms-row-text {
+  font-size: var(--text-md);
+  font-weight: 500;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.ms-row-uses {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-md);
+  color: var(--text);
+}
+.ms-row-head .ms-row-uses {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.ms-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+}
+.ms-table .ms-editor {
+  margin: 10px 14px;
+}
+.ms-foot {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+@media (max-width: 760px) {
+  .ms-page {
+    padding: 20px 16px 32px;
+  }
+  .ms-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .ms-row-actions {
+    grid-column: 1 / -1;
+  }
+}

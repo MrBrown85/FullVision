@@ -581,13 +581,6 @@ function _migrateCourseDataLocalToCanonical(localId, canonicalId) {
       console.warn('Pending-cid replay saveCustomTags failed', e);
     }
   }
-  if (userEdits.observationTemplates) {
-    try {
-      saveObservationTemplates(canonicalId, userEdits.observationTemplates);
-    } catch (e) {
-      console.warn('Pending-cid replay saveObservationTemplates failed', e);
-    }
-  }
   // Goals/reflections/observations/flags currently have LS-only bulk saves
   // (per audit P6.6/P6.7). Their per-action UI paths fire RPCs directly, so
   // anything written via the bulk save during the pending window stays local
@@ -3591,7 +3584,6 @@ function _v2GradebookToCache(cid, payload) {
   _keepOrDefaultField(cid, 'reflections', {});
   _keepOrDefaultField(cid, 'overrides', {});
   _keepOrDefaultField(cid, 'studentProfileSummaries', {});
-  _keepOrDefaultField(cid, 'observationTemplates', []);
 
   _cache.notes[cid] = _safeParseLS('gb-notes-' + cid, {});
   _cache.modules[cid] = _safeParseLS('gb-modules-' + cid, _safeParseLS('gb-units-' + cid, [])) || [];
@@ -3788,7 +3780,11 @@ function _bundleToCache(cid, bundle) {
   if (Array.isArray(bundle.custom_tags)) _persistLoadedField(cid, 'customTags', bundle.custom_tags.slice());
   // A server without the starters bank sends no list; keep this device's.
   if (Array.isArray(bundle.observation_templates)) {
-    _persistLoadedField(cid, 'observationTemplates', _observationTemplatesFromServer(bundle.observation_templates));
+    _persistLoadedField(
+      _STARTER_SCOPE,
+      'observationTemplates',
+      _observationTemplatesFromServer(bundle.observation_templates),
+    );
   }
   _applyBundleCourseConfig(cid, bundle.course_config, bundle.gradebook && bundle.gradebook.course);
 
@@ -4140,7 +4136,6 @@ function _loadCourseFromLS(cid) {
   _cache.observations[cid] = _safeParseLS('gb-quick-obs-' + cid, {});
   _cache.termRatings[cid] = _safeParseLS('gb-term-ratings-' + cid, {});
   _cache.customTags[cid] = _safeParseLS('gb-custom-tags-' + cid, []);
-  _cache.observationTemplates[cid] = _safeParseLS('gb-obs-templates-' + cid, []);
   _cache.courseConfigs[cid] = _safeParseLS('gb-courseconfig-' + cid, {});
   _cache.reportConfig[cid] = _safeParseLS('gb-report-config-' + cid, null);
   _cache.studentProfileSummaries[cid] = _safeParseLS('gb-student-profile-summaries-' + cid, {});
@@ -8574,7 +8569,8 @@ function getAllQuickObs(cid) {
 
 /* link: optional { competencyId, level } — one learning-map tag id and a
    1-4 level on it. */
-function addQuickOb(cid, sid, text, dims, sentiment, context, assignmentContext, link) {
+/* templateId: the sentence starter it was written from, if any. */
+function addQuickOb(cid, sid, text, dims, sentiment, context, assignmentContext, link, templateId) {
   const all = getQuickObs(cid);
   if (!all[sid]) all[sid] = [];
   const entry = {
@@ -8592,6 +8588,7 @@ function addQuickOb(cid, sid, text, dims, sentiment, context, assignmentContext,
     var level = _observationLevel(link.level);
     if (level) entry.level = level;
   }
+  if (templateId) entry.templateId = templateId;
   all[sid].push(entry);
   _cache.observations[cid] = all;
   var lsOk = _safeLSSet('gb-quick-obs-' + cid, JSON.stringify(all));
@@ -8599,6 +8596,7 @@ function addQuickOb(cid, sid, text, dims, sentiment, context, assignmentContext,
   if (_writesEnabled()) {
     _persistObservationCreate(cid, sid, entry);
   }
+  if (templateId) noteObservationTemplateUse(templateId);
   _broadcastChange(cid, 'observations');
   return lsOk;
 }
@@ -8697,7 +8695,7 @@ function updateQuickOb(cid, sid, obId, updates) {
 /* v2 create_observation(p_course_id, p_body, p_sentiment, p_context_type,
    p_assessment_id, p_enrollment_ids uuid[], p_tag_ids uuid[],
    p_custom_tag_ids uuid[], p_idempotency_key, p_dims text[],
-   p_level smallint) → uuid */
+   p_level smallint, p_template_id uuid) → uuid */
 function _persistObservationCreate(cid, sid, entry) {
   if (!_isUuid(cid) || !_isSendableId(sid)) return;
   // The observation's own local id is re-keyed when the create lands, so an
@@ -8711,26 +8709,27 @@ function _persistObservationCreate(cid, sid, entry) {
   // p_dims (observation.dims). The linked competency is a learning-map tag
   // and goes in p_tag_ids (observation_tag).
   var tagIds = _observationTagIds(entry.competencyId);
+  var params = {
+    p_course_id: cid,
+    p_body: entry.text || '',
+    p_sentiment: entry.sentiment || null,
+    p_context_type: entry.context || null,
+    p_assessment_id: ctxAsmt,
+    p_enrollment_ids: [sid],
+    p_tag_ids: tagIds,
+    p_custom_tag_ids: [],
+    p_dims: _observationDims(entry.dims),
+    p_level: tagIds.length ? _observationLevel(entry.level) : null,
+  };
+  // The starter counts toward Times Used once it has a server id; one still
+  // waiting for its own create is left out.
+  var tplId = entry.templateId ? _resolveKnownId('observationTemplate', entry.templateId) : null;
+  if (_isUuid(tplId)) params.p_template_id = tplId;
   _trackPendingSync(
-    _writeRpc(
-      'create_observation',
-      {
-        p_course_id: cid,
-        p_body: entry.text || '',
-        p_sentiment: entry.sentiment || null,
-        p_context_type: entry.context || null,
-        p_assessment_id: ctxAsmt,
-        p_enrollment_ids: [sid],
-        p_tag_ids: tagIds,
-        p_custom_tag_ids: [],
-        p_dims: _observationDims(entry.dims),
-        p_level: tagIds.length ? _observationLevel(entry.level) : null,
-      },
-      {
-        retryKey: 'create_observation:' + entry.id,
-        entryId: rec ? rec.entryId : undefined,
-      },
-    ).then(function (res) {
+    _writeRpc('create_observation', params, {
+      retryKey: 'create_observation:' + entry.id,
+      entryId: rec ? rec.entryId : undefined,
+    }).then(function (res) {
       if (res.error) {
         if (res.error.handledSessionExpired || res.error.cancelled) return;
         console.warn('create_observation failed:', res.error);
@@ -8849,14 +8848,18 @@ window.updateObservationRich = function (obId, patch, joins) {
 };
 
 /* ── Sentence starters (observation_template) ─────────────────────────────
-   A class's bank of starters for the capture strip's "/" menu and
-   "+ Starter" chip, and the phone's quick menu (docs/DECISIONS.md,
-   "Observations (2026-10-18)", item 3). A row is
-   { id, text, sentiment, context, dims }; the list order is the display
-   order. The list loads with the class bundle and saves like modules: it is
-   diffed against the server baseline and each changed row goes out through
-   the outbox. A new row has a local id ('ot…') until its upsert lands. */
+   The teacher's one list of starters, used in every class: the capture
+   strip's "/" menu and "+ Starter" chip, the phone's quick menu, and My
+   Sentence Starters (migrations/20261022_teacher_sentence_starters.sql). A
+   row is { id, text, sentiment, context, dims, uses }; the list order is the
+   order on My Sentence Starters, and the menus sort by uses (Times Used,
+   every class). The list loads with any class bundle and saves like modules:
+   it is diffed against the server baseline and each changed row goes out
+   through the outbox. A new row has a local id ('ot…') until its upsert
+   lands. It is kept under one scope, not a class: the cid arguments below
+   are only for callers that still pass one. */
 var _TEMPLATE_SENTIMENTS = { strength: true, growth: true, concern: true, note: true };
+var _STARTER_SCOPE = 'teacher';
 
 function _cleanObservationTemplate(row) {
   row = row || {};
@@ -8870,7 +8873,16 @@ function _cleanObservationTemplate(row) {
     sentiment: _TEMPLATE_SENTIMENTS[row.sentiment] ? row.sentiment : null,
     context: row.context || null,
     dims: dims,
+    uses: Math.max(0, Number(row.uses) || 0),
   };
+}
+
+/* A class's custom tags ('tag:<label>') don't exist in the teacher's other
+   classes, so a starter doesn't keep them. */
+function _starterDims(dims) {
+  return (dims || []).filter(function (k) {
+    return !/^tag:/.test(k);
+  });
 }
 
 function _observationTemplatesFromServer(rows) {
@@ -8885,28 +8897,99 @@ function _observationTemplatesFromServer(rows) {
         sentiment: r.default_sentiment,
         context: r.default_context_type,
         dims: r.default_dims,
+        uses: r.use_count,
       });
     });
 }
 
-function getObservationTemplates(cid) {
-  if (_cache.observationTemplates[cid] !== undefined) return _cache.observationTemplates[cid] || [];
-  return _safeParseLS('gb-obs-templates-' + cid, []) || [];
+/* This device's list. Before starters belonged to the teacher, each class
+   kept its own (gb-obs-templates-<cid>); the first read folds those into
+   one, one row per wording, without custom tags. A signed-in teacher's list
+   then comes from the server with the next class bundle. */
+function _foldClassStarters() {
+  var out = [];
+  var seen = {};
+  try {
+    for (var i = 0; i < localStorage.length; i++) {
+      var key = localStorage.key(i);
+      if (!key || key.indexOf('gb-obs-templates-') !== 0 || key === 'gb-obs-templates-' + _STARTER_SCOPE) continue;
+      (_safeParseLS(key, []) || []).forEach(function (t) {
+        var norm = String((t && t.text) || '')
+          .trim()
+          .toLowerCase();
+        if (!norm || seen[norm]) return;
+        seen[norm] = true;
+        out.push(_cleanObservationTemplate(Object.assign({}, t, { dims: _starterDims(t.dims) })));
+      });
+    }
+  } catch (e) {
+    /* storage unavailable: start empty */
+  }
+  return out;
+}
+
+function getObservationTemplates() {
+  var scope = _STARTER_SCOPE;
+  if (_cache.observationTemplates[scope] !== undefined) return _cache.observationTemplates[scope] || [];
+  var list = _safeParseLS('gb-obs-templates-' + scope, null);
+  if (!Array.isArray(list)) {
+    list = _foldClassStarters();
+    if (list.length) _safeLSSet('gb-obs-templates-' + scope, JSON.stringify(list));
+  }
+  _cache.observationTemplates[scope] = list;
+  return list;
 }
 
 /* Returns false when this device's storage refused the list. */
 function saveObservationTemplates(cid, arr) {
-  arr = (arr || []).map(_cleanObservationTemplate);
+  var scope = _STARTER_SCOPE;
+  arr = (arr || []).map(function (t) {
+    return _cleanObservationTemplate(Object.assign({}, t, { dims: _starterDims(t && t.dims) }));
+  });
   var prev = _loadPersistedCourseFieldSnapshot(
     'observationTemplates',
-    cid,
-    (_cache.observationTemplates && _cache.observationTemplates[cid]) || [],
+    scope,
+    (_cache.observationTemplates && _cache.observationTemplates[scope]) || [],
   );
-  var lsOk = _saveCourseField('observationTemplates', cid, arr);
-  if (!_writesEnabled() || !_isUuid(cid)) return lsOk;
-  _registerLocalRows(cid, 'observationTemplate', arr, 'upsert_observation_template');
-  _persistObservationTemplatesToCanonical(cid, prev, arr);
+  var lsOk = _saveCourseField('observationTemplates', scope, arr);
+  if (!_writesEnabled()) return lsOk;
+  arr.forEach(function (t) {
+    if (!t.id || _isUuid(t.id) || _resolveKnownId('observationTemplate', t.id) !== t.id) return;
+    _registerPendingCreate(scope, 'observationTemplate', t.id, 'upsert_observation_template');
+  });
+  _persistObservationTemplatesToCanonical(scope, prev, arr);
   return lsOk;
+}
+
+/* An observation was written from this starter: count it here until the
+   next bundle brings the server's count (observation.template_id). */
+function noteObservationTemplateUse(id) {
+  var list = getObservationTemplates();
+  var i = _templateIndex(list, null, id);
+  if (i < 0) return;
+  list = list.slice();
+  list[i] = Object.assign({}, list[i], { uses: (list[i].uses || 0) + 1 });
+  _saveCourseField('observationTemplates', _STARTER_SCOPE, list);
+  if (_hasServerState('observationTemplates', _STARTER_SCOPE)) {
+    var base = _serverStateOr('observationTemplates', _STARTER_SCOPE, []).slice();
+    var bi = _templateIndex(base, null, id);
+    if (bi >= 0) base[bi] = Object.assign({}, base[bi], { uses: list[i].uses });
+    _rememberServerState('observationTemplates', _STARTER_SCOPE, base);
+  }
+}
+
+/* The menus' order: most used first, then the list order. */
+function getObservationTemplatesByUse() {
+  return getObservationTemplates()
+    .map(function (t, i) {
+      return { t: t, i: i };
+    })
+    .sort(function (a, b) {
+      return (b.t.uses || 0) - (a.t.uses || 0) || a.i - b.i;
+    })
+    .map(function (x) {
+      return x.t;
+    });
 }
 
 var _templateSaveQueue = {};
@@ -9060,25 +9143,17 @@ function resolveObservationTemplateId(cid, id) {
   return _resolveKnownId('observationTemplate', id);
 }
 
-/* Duplicate Class: the copy gets the source's starters as new rows. */
-function copyObservationTemplates(srcCid, dstCid) {
-  var rows = getObservationTemplates(srcCid).map(function (t) {
-    return { text: t.text, sentiment: t.sentiment, context: t.context, dims: (t.dims || []).slice() };
-  });
-  return rows.length ? addObservationTemplates(dstCid, rows) : [];
-}
-
 /* The RPCs. p_default_dims null leaves a starter's tags alone on update. */
+/* p_course_id is unused by the server since starters became the teacher's. */
 window.upsertObservationTemplate = function (cid, payload, options) {
   var sb = getSupabase();
   if (!sb) return Promise.resolve();
-  if (!_isUuid(cid)) return Promise.resolve();
   payload = payload || {};
   return _writeRpc(
     'upsert_observation_template',
     _stampIdempotencyKey('upsert_observation_template', {
       p_id: _isSendableId(payload.id) ? payload.id : null,
-      p_course_id: cid,
+      p_course_id: _isUuid(cid) ? cid : null,
       p_body: payload.body || '',
       p_default_sentiment: payload.defaultSentiment || null,
       p_default_context_type: payload.defaultContextType || null,

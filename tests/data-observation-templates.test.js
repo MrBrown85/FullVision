@@ -1,12 +1,13 @@
 /**
  * Sentence starters (observation_template) in shared/data.js.
  *
- * getObservationTemplates / saveObservationTemplates and the helpers the
- * Class Management section calls: a new starter is created through the
- * outbox with a local id and re-keyed to the server's; an edit, a reorder
- * and a delete each send only what changed; writes made offline wait in the
- * outbox; Demo Mode stays local; Duplicate Class copies starters as new
- * rows. docs/DECISIONS.md, "Observations (2026-10-18)".
+ * getObservationTemplates / saveObservationTemplates and the helpers My
+ * Sentence Starters calls: one list per teacher, whatever class is open
+ * (migrations/20261022_teacher_sentence_starters.sql). A new starter is
+ * created through the outbox with a local id and re-keyed to the server's;
+ * an edit, a reorder and a delete each send only what changed; writes made
+ * offline wait in the outbox; Demo Mode stays local; the lists classes kept
+ * before fold into one; the menus sort by Times Used.
  */
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -26,10 +27,11 @@ const CID2 = '11111111-1111-4111-8111-222222222222';
 const T1 = '88888888-8888-4888-8888-000000000001';
 const T2 = '88888888-8888-4888-8888-000000000002';
 
+// Starters are the teacher's: any class's cid reads and writes one list.
 function seed(cid, rows) {
-  _cache.observationTemplates[cid] = rows;
-  localStorage.setItem('gb-obs-templates-' + cid, JSON.stringify(rows));
-  _rememberServerState('observationTemplates', cid, rows);
+  _cache.observationTemplates.teacher = rows;
+  localStorage.setItem('gb-obs-templates-teacher', JSON.stringify(rows));
+  _rememberServerState('observationTemplates', 'teacher', rows);
 }
 
 const QUESTION = { text: 'Asked a great question', sentiment: 'strength', context: null, dims: ['curiosity'] };
@@ -75,14 +77,14 @@ describe('sentence starters data', () => {
     seed(CID, []);
     var row = addObservationTemplate(CID, QUESTION);
     expect(row.id).toMatch(/^ot/);
-    expect(getObservationTemplates(CID)).toEqual([Object.assign({ id: row.id }, QUESTION)]);
+    expect(getObservationTemplates(CID)).toEqual([Object.assign({ id: row.id, uses: 0 }, QUESTION)]);
     await settle();
 
     var calls = fake.committed.filter(c => c.name === 'upsert_observation_template');
     expect(calls).toHaveLength(1);
     expect(calls[0].params).toMatchObject({
       p_id: null,
-      p_course_id: CID,
+      p_course_id: null,
       p_body: 'Asked a great question',
       p_default_sentiment: 'strength',
       p_default_context_type: null,
@@ -92,7 +94,7 @@ describe('sentence starters data', () => {
     expect(_isUuid(calls[0].params.p_idempotency_key)).toBe(true);
     var id = getObservationTemplates(CID)[0].id;
     expect(_isUuid(id)).toBe(true);
-    expect(JSON.parse(localStorage.getItem('gb-obs-templates-' + CID))[0].id).toBe(id);
+    expect(JSON.parse(localStorage.getItem('gb-obs-templates-teacher'))[0].id).toBe(id);
     expect(resolveObservationTemplateId(CID, row.id)).toBe(id);
   });
 
@@ -207,19 +209,44 @@ describe('sentence starters data', () => {
     expect(getObservationTemplates('sci8')[0].text).toBe('Asked a great question');
   });
 
-  it('Duplicate Class copies the starters as new rows', async () => {
-    seed(CID, [{ id: T1, text: 'First', sentiment: 'growth', context: 'discussion', dims: ['respect'] }]);
-    seed(CID2, []);
-    copyObservationTemplates(CID, CID2);
-    var copy = getObservationTemplates(CID2);
-    expect(copy).toHaveLength(1);
-    expect(copy[0].id).not.toBe(T1);
-    expect(copy[0]).toMatchObject({ text: 'First', sentiment: 'growth', context: 'discussion', dims: ['respect'] });
-    await settle();
-    expect(
-      fake.committed.filter(c => c.name === 'upsert_observation_template' && c.params.p_course_id === CID2),
-    ).toHaveLength(1);
-    expect(getObservationTemplates(CID)[0].id).toBe(T1);
+  it('is one list in every class, without custom tags', async () => {
+    seed(CID, []);
+    addObservationTemplate(CID, { text: 'Kept the lab tidy', dims: ['respect', 'tag:Lab safety'] });
+    expect(getObservationTemplates(CID2).map(t => t.text)).toEqual(['Kept the lab tidy']);
+    expect(getObservationTemplates(CID2)[0].dims).toEqual(['respect']);
+  });
+
+  it('folds the lists classes kept before into one, one row per wording', () => {
+    localStorage.setItem(
+      'gb-obs-templates-' + CID,
+      JSON.stringify([
+        { id: T1, text: 'First', sentiment: 'growth', context: null, dims: ['respect', 'tag:Lab safety'] },
+        { id: T2, text: 'Second', sentiment: null, context: null, dims: [] },
+      ]),
+    );
+    localStorage.setItem(
+      'gb-obs-templates-' + CID2,
+      JSON.stringify([{ id: 'x', text: ' first ', sentiment: null, context: null, dims: [] }]),
+    );
+    var list = getObservationTemplates();
+    expect(list.map(t => t.id)).toEqual([T1, T2]);
+    expect(list[0].dims).toEqual(['respect']);
+    expect(JSON.parse(localStorage.getItem('gb-obs-templates-teacher'))).toHaveLength(2);
+  });
+
+  it('counts a use and lists the most used first, then in list order', () => {
+    var a = { id: T1, text: 'First', sentiment: null, context: null, dims: [], uses: 1 };
+    var b = { id: T2, text: 'Second', sentiment: null, context: null, dims: [], uses: 1 };
+    seed(CID, [a, b]);
+    expect(getObservationTemplatesByUse().map(t => t.id)).toEqual([T1, T2]);
+    noteObservationTemplateUse(T2);
+    expect(getObservationTemplates()[1].uses).toBe(2);
+    expect(getObservationTemplatesByUse().map(t => t.id)).toEqual([T2, T1]);
+    // A count is not an edit: nothing is sent.
+    saveObservationTemplates(CID, getObservationTemplates());
+    return settle().then(() => {
+      expect(fake.committed.filter(c => c.name === 'upsert_observation_template')).toHaveLength(0);
+    });
   });
 
   it('cleans what it stores: unknown types dropped, tags deduped, empty text skipped', () => {

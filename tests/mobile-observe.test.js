@@ -649,8 +649,8 @@ describe('Quick menu starters', () => {
     return html;
   }
 
-  it('lists the class starters in order instead of the fixed six', () => {
-    mockDataLayer({ getObservationTemplates: () => STARTERS });
+  it('lists the teacher\u2019s starters, most used first, instead of the fixed six', () => {
+    mockDataLayer({ getObservationTemplatesByUse: () => STARTERS });
     const html = menuHtml(CID);
     const texts = [...html.matchAll(/data-template="([^"]+)">.*?<span class="m-quick-row-text">([^<]+)<\/span>/g)].map(
       m => [m[1], m[2]],
@@ -662,15 +662,16 @@ describe('Quick menu starters', () => {
     expect(html).toContain('<span class="m-obs-type" data-sentiment="strength">Strength</span>');
     expect(html).toMatch(/data-action="m-obs-quick-compose"[^>]*><span class="m-quick-row-text">Write Your Own…</);
     expect(html).not.toContain('Strong collaboration with peers');
-    expect(html).not.toContain('Add your own in Class Management');
+    expect(html).toContain('Most used first.');
+    expect(html).not.toContain('Also Save as Starter when you write it');
   });
 
   it('a tap saves at once with the starter type, context and tags', () => {
     const added = [];
     mockDataLayer({
-      getObservationTemplates: () => STARTERS,
-      addQuickOb: (cid, sid, text, dims, sentiment, context) =>
-        added.push({ cid, sid, text, dims, sentiment, context }),
+      getObservationTemplatesByUse: () => STARTERS,
+      addQuickOb: (cid, sid, text, dims, sentiment, context, ac, link, templateId) =>
+        added.push({ cid, sid, text, dims, sentiment, context, templateId }),
     });
     tap(CID, 'ot1');
     expect(added).toEqual([
@@ -681,6 +682,7 @@ describe('Quick menu starters', () => {
         dims: ['cc:1'],
         sentiment: 'strength',
         context: 'small-group',
+        templateId: 'ot1',
       },
     ]);
   });
@@ -688,14 +690,18 @@ describe('Quick menu starters', () => {
   it('a class with no starters gets the six suggestions and a line saying where to add more', () => {
     const added = [];
     mockDataLayer({
-      getObservationTemplates: () => [],
-      addQuickOb: (cid, sid, text, dims, sentiment) => added.push({ text, dims, sentiment }),
+      getObservationTemplatesByUse: () => [],
+      addQuickOb: (cid, sid, text, dims, sentiment, context, ac, link, templateId) =>
+        added.push({ text, dims, sentiment, templateId }),
     });
     const html = menuHtml(CID);
     OBS_STARTER_SUGGESTIONS.forEach(t => expect(html).toContain(t.text));
-    expect(html).toContain('Add your own in Class Management on a computer.');
+    expect(html).toContain('To keep one of your own, turn on Also Save as Starter when you write it.');
     expect(MObserve.quickStarters(CID).suggested).toBe(true);
     tap(CID, 'suggested-1');
-    expect(added).toEqual([{ text: 'Asked a great question in class', dims: ['curiosity'], sentiment: 'strength' }]);
+    // A suggestion isn't one of the teacher's starters, so nothing is counted.
+    expect(added).toEqual([
+      { text: 'Asked a great question in class', dims: ['curiosity'], sentiment: 'strength', templateId: null },
+    ]);
   });
 });

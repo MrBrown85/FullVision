@@ -8,6 +8,7 @@ window.Router = (function () {
     '/student': window.PageStudent,
     '/gradebook': window.PageGradebook,
     '/observations': window.PageObservations,
+    '/observations/starters': window.PageStarters,
     '/reports': window.PageReports,
   };
 
@@ -17,6 +18,7 @@ window.Router = (function () {
     '/student': 'Student',
     '/gradebook': 'Gradebook',
     '/observations': 'Observations',
+    '/observations/starters': 'My Sentence Starters',
     '/reports': 'Reports',
   };
 
@@ -116,7 +118,7 @@ window.Router = (function () {
     if (path === '/assignments') dockPage = 'assignments';
     else if (path === '/student') dockPage = 'dashboard';
     else if (path === '/gradebook') dockPage = 'spreadsheet';
-    else if (path === '/observations') dockPage = 'observations';
+    else if (path === '/observations' || path === '/observations/starters') dockPage = 'observations';
     else if (path === '/reports') dockPage = 'reports';
 
     // If route has no SPA module yet, fall back to old HTML page
