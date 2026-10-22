@@ -118,7 +118,7 @@
     picked: [],
     shownIds: null, // the ids the gradebook's filters leave visible
     undated: false,
-    scoresAs: 'entered', // entered | levels | both
+    scoresAs: '', // proficiency | percent | points; '' follows the class's grading style
     late: true,
     average: true,
     students: 'both', // both | name | number: what identifies a student
@@ -131,7 +131,7 @@
   };
   /* The choices remembered on this device. Term, assessments and paper are
      not: the first two follow the gradebook, paper is per class. */
-  var REMEMBERED = ['scoresAs', 'late', 'average', 'students', 'sortBy', 'finalGrade', 'size'];
+  var REMEMBERED = ['late', 'average', 'students', 'sortBy', 'finalGrade', 'size'];
 
   var WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -190,7 +190,9 @@
     var o = Object.assign({}, DEFAULT_OPTIONS, raw || {});
     if (!PAPER[o.paper]) o.paper = 'letter';
     if (!SIZES[o.size]) o.size = 'normal';
-    if (['entered', 'levels', 'both'].indexOf(o.scoresAs) < 0) o.scoresAs = 'entered';
+    // Saved before the choices were Proficiency, Percentages and Points.
+    o.scoresAs = { entered: 'points', levels: 'proficiency', both: 'points' }[o.scoresAs] || o.scoresAs;
+    if (['proficiency', 'percent', 'points'].indexOf(o.scoresAs) < 0) o.scoresAs = '';
     // Blank Grid, the old empty grid without titles, is now Blank Gradebook.
     if (o.assessments === 'blank') {
       o.assessments = 'all';
@@ -207,6 +209,12 @@
     o.attendance = !!o.attendance;
     delete o.gridCols;
     return o;
+  }
+
+  /* Scores, until the teacher picks: a Letter class prints percentages,
+     any other proficiency. */
+  function defaultScoresAs(cid) {
+    return courseGradeMode(cid) === 'letter' ? 'percent' : 'proficiency';
   }
 
   /* The period the sheet covers: all time, a reporting term or two dates. */
@@ -454,20 +462,24 @@
     });
   }
 
-  /* What one cell prints: { text, sub, late, mark }. `sub` is the level under
-     a points score when scores print as points and levels. */
+  /* What one cell prints: { text, late, mark }. The Scores choice prints
+     every score as a proficiency or a %, or as marked: points as points and
+     other work as the gradebook shows it. Complete/Incomplete and the
+     status marks print the same under every choice. */
   function cellText(cid, sid, col, opts) {
-    if (opts.blank) return { text: '', sub: '', mark: '' };
+    if (opts.blank) return { text: '', mark: '' };
     var cell = assessmentCellValue(cid, sid, col.assessment);
-    var out = { text: cell.text, sub: '', mark: '' };
+    var out = { text: cell.text, mark: '' };
     if (cell.kind === 'status') out.mark = cell.status;
     else if (cell.kind === 'complete') out.mark = cell.text;
     else if (cell.kind === 'none' || (cell.kind === 'missing' && !cell.zero)) out.mark = '—';
-    if (cell.kind === 'points' && opts.scoresAs !== 'entered') {
-      var level = getAssessmentOverallScore(cid, sid, col.id);
-      var levelText = level > 0 ? formatLevel(cid, level) : '—';
-      if (opts.scoresAs === 'levels') out.text = levelText;
-      else out.sub = levelText;
+    var as = opts.scoresAs || defaultScoresAs(cid);
+    if (cell.kind === 'points' && as === 'percent') {
+      out.text = formatPointsPercent(cell.value, col.outOf);
+    } else if (cell.kind === 'points' && as === 'proficiency') {
+      out.text = formatLevelAs(getAssessmentOverallScore(cid, sid, col.id), 'proficiency');
+    } else if (cell.kind === 'level' && as !== 'points') {
+      out.text = formatLevelAs(cell.value, as);
     }
     if (cell.late && opts.late && (cell.kind === 'points' || cell.kind === 'level' || cell.kind === 'complete')) {
       out.late = true;
@@ -475,13 +487,15 @@
     return out;
   }
 
-  /* The class average under a column, over every student on the sheet. */
+  /* The class average under a column, over every student on the sheet, in
+     the Scores choice's terms. */
   function columnAverageText(cid, students, col, opts) {
     var a = col.assessment;
-    if (col.complete || (col.outOf != null && opts.scoresAs !== 'levels')) {
+    var as = opts.scoresAs || defaultScoresAs(cid);
+    if (col.complete || (col.outOf != null && as !== 'proficiency')) {
       var stats = getClassPointsAverage(cid, students, a);
       if (!stats) return '—';
-      if (col.complete) return Math.round(stats.pct) + '%';
+      if (col.complete || as === 'percent') return Math.round(stats.pct) + '%';
       return formatPoints(Math.round(stats.avg * 10) / 10);
     }
     var values = [];
@@ -499,20 +513,16 @@
       values.reduce(function (x, y) {
         return x + y;
       }, 0) / values.length;
-    return formatLevel(cid, mean);
+    return as === 'points' ? formatLevel(cid, mean) : formatLevelAs(mean, as);
   }
 
   /* ── Geometry and pagination ───────────────────────────── */
 
-  function _isTwoLine(cid, opts, columns) {
+  /* A class that shows both grades prints its final grade, and under
+     Points its proficiency work, as a level over a %. */
+  function _isTwoLine(cid, opts) {
     if (opts.blank) return false;
-    if (cid && courseGradeMode(cid) === 'both') return true;
-    return (
-      opts.scoresAs === 'both' &&
-      columns.some(function (c) {
-        return c.outOf != null;
-      })
-    );
+    return !!cid && courseGradeMode(cid) === 'both';
   }
 
   function _rowLimits(opts, twoLine) {
@@ -626,7 +636,7 @@
     var size = SIZES[opts.size] || SIZES.normal;
     var cap = pageCapacity(opts, finalW);
     var hasFinal = finalW > 0;
-    if (twoLine === undefined) twoLine = _isTwoLine(null, opts, columns);
+    if (twoLine === undefined) twoLine = _isTwoLine(null, opts);
     var blocks = columnBlocks(columns.length, cap.full, cap.withFinal, hasFinal);
     var lim = _rowLimits(opts, twoLine);
     var height = gridHeight(opts);
@@ -676,11 +686,7 @@
         ? 'Attendance'
         : opts.blank
           ? 'Blank'
-          : opts.scoresAs === 'levels'
-            ? 'All as Proficiency'
-            : opts.scoresAs === 'both'
-              ? 'Points with Proficiency'
-              : 'As Marked';
+          : { proficiency: 'Proficiency', percent: 'Percentages', points: 'Points' }[opts.scoresAs] || '';
     var periodText =
       period.kind === 'all'
         ? 'All Time'
@@ -706,6 +712,7 @@
      scoped to the period's term and the gradebook's term put back after. */
   function buildModel(cid, rawOpts) {
     var opts = normalizeOptions(rawOpts);
+    if (!opts.scoresAs) opts.scoresAs = defaultScoresAs(cid);
     // An attendance sheet is blank: no scores, averages or final grade.
     if (opts.attendance) opts.blank = true;
     var period = periodFor(cid, opts);
@@ -727,7 +734,7 @@
       var size = SIZES[opts.size] || SIZES.normal;
       var finalOn = _finalAllowed(period, opts) && rows.length > 0;
       var finalW = finalOn ? size.finalW[courseGradeMode(cid)] : 0;
-      var layout = paginate(columns, rows.length, opts, _isTwoLine(cid, opts, columns), finalW);
+      var layout = paginate(columns, rows.length, opts, _isTwoLine(cid, opts), finalW);
       var marks = {};
       rows.forEach(function (r) {
         r.cells = columns.map(function (c) {
@@ -994,9 +1001,8 @@
           start +
           (t.mark && t.mark !== '—' ? ' gp-mark' : '') +
           '">' +
-          (t.sub ? _esc(t.text) : two(t.text)) +
+          two(t.text) +
           (t.late ? '<span class="gp-late">L</span>' : '') +
-          (t.sub ? '<div class="gp-sub">' + _esc(String(t.sub).split(' · ')[0]) + '</div>' : '') +
           '</td>';
       });
       html += blankCells();
@@ -1175,6 +1181,7 @@
       });
     }
     opts.paper = _loadPaper(cid);
+    opts.scoresAs = defaultScoresAs(cid);
     if (given) {
       if (given.term != null) opts.term = String(given.term);
       if (Array.isArray(given.shownIds)) opts.shownIds = given.shownIds.slice();
@@ -1222,9 +1229,9 @@
         .concat([{ value: 'custom', label: 'Custom Dates' }]),
       assessments: assessments,
       scoresAs: [
-        { value: 'entered', label: 'As Marked' },
-        { value: 'levels', label: 'All as Proficiency' },
-        { value: 'both', label: 'Points with Proficiency' },
+        { value: 'proficiency', label: 'Proficiency' },
+        { value: 'percent', label: 'Percentages' },
+        { value: 'points', label: 'Points' },
       ],
       students: [
         { value: 'both', label: 'Pupil # and Name' },
@@ -1796,6 +1803,7 @@
     renderPage: renderPage,
     renderPages: renderPages,
     stage: stage,
+    defaultScoresAs: defaultScoresAs,
     activatePrintMode: activatePrintMode,
     deactivatePrintMode: deactivatePrintMode,
     print: print,

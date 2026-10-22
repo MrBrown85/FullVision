@@ -123,7 +123,7 @@ test.describe('Print Grades', () => {
     expect(values).toEqual([
       'All Time',
       'All Assessments',
-      'As Marked',
+      'Proficiency',
       'Pupil # and Name',
       'Last Name',
       'Letter · 8.5 × 11 in',

@@ -162,8 +162,8 @@ describe('columnsFor', () => {
 describe('cellText', () => {
   const col = id => GP.columnsFor(CID, GP.normalizeOptions({})).find(c => c.id === id);
 
-  it('prints what the Scores view shows', () => {
-    const opts = GP.normalizeOptions({});
+  it('prints what the Scores view shows under Points', () => {
+    const opts = GP.normalizeOptions({ scoresAs: 'points' });
     expect(GP.cellText(CID, 's1', col('q1'), opts)).toMatchObject({ text: '8', mark: '' });
     expect(GP.cellText(CID, 's1', col('l1'), opts)).toMatchObject({ text: '3.3' });
     expect(GP.cellText(CID, 's2', col('l1'), opts)).toMatchObject({ text: 'NS', mark: 'NS' });
@@ -177,12 +177,28 @@ describe('cellText', () => {
     expect(GP.cellText(CID, 's3', col('q1'), GP.normalizeOptions({ late: false })).late).toBeFalsy();
   });
 
-  it('prints points as levels, or both', () => {
-    expect(GP.cellText(CID, 's1', col('q1'), GP.normalizeOptions({ scoresAs: 'levels' })).text).toBe(
-      formatLevel(CID, 3.2),
-    );
-    const both = GP.cellText(CID, 's1', col('q1'), GP.normalizeOptions({ scoresAs: 'both' }));
-    expect(both).toMatchObject({ text: '8', sub: formatLevel(CID, 3.2) });
+  it('prints every score as a proficiency, a % or as marked', () => {
+    const text = (id, scoresAs) => GP.cellText(CID, 's1', col(id), GP.normalizeOptions({ scoresAs })).text;
+    // Quiz 1: 8 out of 10.
+    expect(text('q1', 'proficiency')).toBe(formatLevelAs(getAssessmentOverallScore(CID, 's1', 'q1'), 'proficiency'));
+    expect(text('q1', 'percent')).toBe('80%');
+    expect(text('q1', 'points')).toBe('8');
+    // Cell Structure Lab: 3+ on the proficiency scale.
+    expect(text('l1', 'proficiency')).toBe('3.3');
+    expect(text('l1', 'percent')).toBe('83%');
+    expect(text('l1', 'points')).toBe(formatLevel(CID, 3 + 1 / 3));
+    // Complete/Incomplete prints its mark under every choice.
+    ['proficiency', 'percent', 'points'].forEach(as => expect(text('hw', as)).toBe('✓'));
+  });
+
+  it("starts on the class's grading style and reads the old choices", () => {
+    expect(GP.defaultScoresAs(CID)).toBe('proficiency');
+    expect(GP.buildModel(CID, {}).opts.scoresAs).toBe('proficiency');
+    expect(GP.normalizeOptions({ scoresAs: 'entered' }).scoresAs).toBe('points');
+    expect(GP.normalizeOptions({ scoresAs: 'levels' }).scoresAs).toBe('proficiency');
+    expect(GP.normalizeOptions({ scoresAs: 'both' }).scoresAs).toBe('points');
+    seed({ course: { gradingSystem: 'letter' } });
+    expect(GP.defaultScoresAs(CID)).toBe('percent');
   });
 
   it('prints nothing on a blank sheet', () => {
@@ -276,7 +292,7 @@ describe('buildModel', () => {
       block: 'A',
       teacher: 'Colin Brown',
       students: '3',
-      scores: 'As Marked',
+      scores: 'Proficiency',
     });
     expect(model.header.printed).toMatch(/\d{4}, \d{1,2}:\d{2}/);
     expect(model.marks.map(m => m.key).sort()).toEqual(['L', 'NS', '—', '✓', '✗'].sort());
@@ -353,12 +369,17 @@ describe('buildModel', () => {
     expect(GP.normalizeOptions({ studentNumbers: true }).students).toBe('both');
   });
 
-  it('averages each assignment through calc.js', () => {
-    const model = GP.buildModel(CID, {});
-    const quiz = model.columns.findIndex(c => c.id === 'q1');
-    expect(model.averages.cells[quiz]).toBe('7.7');
-    const lab = model.columns.findIndex(c => c.id === 'l1');
-    expect(model.averages.cells[lab]).toBe(formatLevel(CID, (3 + 1 / 3 + 4) / 2));
+  it('averages each assignment through calc.js, as the Scores choice prints it', () => {
+    const avg = (scoresAs, id) => {
+      const model = GP.buildModel(CID, { scoresAs });
+      return model.averages.cells[model.columns.findIndex(c => c.id === id)];
+    };
+    const stats = getClassPointsAverage(CID, students, assessments[0]);
+    expect(avg('points', 'q1')).toBe('7.7');
+    expect(avg('percent', 'q1')).toBe(Math.round(stats.pct) + '%');
+    expect(avg('proficiency', 'l1')).toBe(formatLevelAs((3 + 1 / 3 + 4) / 2, 'proficiency'));
+    expect(avg('percent', 'l1')).toBe(formatLevelAs((3 + 1 / 3 + 4) / 2, 'percent'));
+    expect(avg('points', 'l1')).toBe(formatLevel(CID, (3 + 1 / 3 + 4) / 2));
   });
 
   it('sorts by last name as "Last, First", or by first name', () => {
@@ -513,7 +534,7 @@ describe('renderPages', () => {
 
   it('prints a class that shows both grades on two-line rows, the level over the %', () => {
     seed({ course: { gradingSystem: 'both' } });
-    const model = GP.buildModel(CID, {});
+    const model = GP.buildModel(CID, { scoresAs: 'points' });
     expect(model.layout.twoLine).toBe(true);
     const html = GP.renderPages(model);
     expect(html).toContain('gp-two-line');
