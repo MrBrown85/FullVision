@@ -135,4 +135,22 @@ test.describe('Sentence starters', () => {
     await expect(input).toHaveValue('Explained their reasoning clearly to the group');
     await expect(page.locator('.obs-card', { hasText: 'Explained their reasoning' })).toHaveCount(0);
   });
+
+  test('Escape in Save as Starter closes only that dialog, not the observation dialog behind it', async ({ page }) => {
+    await gotoApp(page, `/gradebook?course=${TEST_COURSE.id}`);
+    await page.evaluate(cid => {
+      ObsCapture.openDialog({ cid: cid, students: [getStudents(cid)[0].id], title: 'Add observation' });
+    }, TEST_COURSE.id);
+    const box = page.locator('.obsc-dialog textarea');
+    await box.fill('Shared the microscope without being asked');
+    await page.locator('.obsc-dialog .obsc-save-starter').click();
+    await expect(page.getByRole('dialog', { name: 'Save as Starter' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog', { name: 'Save as Starter' })).toHaveCount(0);
+    await expect(page.locator('.obsc-dialog')).toBeVisible();
+    await expect(box).toHaveValue('Shared the microscope without being asked');
+    // A second Escape closes the observation dialog, as before.
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.obsc-dialog')).toHaveCount(0);
+  });
 });

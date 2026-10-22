@@ -380,8 +380,14 @@ function getAssessmentOverallScore(cid, studentId, assessmentId) {
   // A leftover overall score (from before the assessment was linked to a
   // competency) must not count beside the new scores.
   var countsOverallKey = isPointsScored(assessment) || isUnlinkedTag(scoreTagIds(assessment, cid)[0]);
+  // A competency removed from the class keeps its scores so it can come
+  // back, but they stop counting here, as they do in proficiency: only the
+  // class's own competencies count (Colin, 2026-10-22). A points score is
+  // one number for the assessment, so it always counts.
+  var onlyClassTags = !isPointsScored(assessment) && getAllTags(cid).length > 0;
   var values = entries
     .filter(function (entry) {
+      if (onlyClassTags && !isUnlinkedTag(entry.tagId) && !getSectionForTag(cid, entry.tagId)) return false;
       return countsOverallKey || !isUnlinkedTag(entry.tagId);
     })
     .map(function (entry) {
@@ -1478,10 +1484,56 @@ function previewCalcMethodChange(cid, method, decayWeight, recentLimit) {
   return { changed: changed, total: students.length, example: example };
 }
 
+/* What removing these competencies (section ids) would do to the class:
+   how many students' overall grade changes, as the class shows it, out of
+   how many, and one example. Works out the grades on a copy of the learning
+   map held in memory for the moment, then puts the saved one back; nothing
+   is saved. */
+function previewCompetencyRemoval(cid, sectionIds) {
+  var drop = {};
+  (sectionIds || []).forEach(function (id) {
+    drop[id] = true;
+  });
+  var students = getStudents(cid);
+  var text = function (sid) {
+    return studentGradeSummary(cid, sid).text || '';
+  };
+  var before = students.map(function (s) {
+    return text(s.id);
+  });
+  var saved = _cache.learningMaps[cid];
+  var map = getLearningMap(cid);
+  var after;
+  try {
+    _cache.learningMaps[cid] = Object.assign({}, map, {
+      sections: (map.sections || []).filter(function (sec) {
+        return !drop[sec.id];
+      }),
+    });
+    clearProfCache();
+    after = students.map(function (s) {
+      return text(s.id);
+    });
+  } finally {
+    if (saved === undefined) delete _cache.learningMaps[cid];
+    else _cache.learningMaps[cid] = saved;
+    clearProfCache();
+  }
+  var changed = 0;
+  var example = null;
+  students.forEach(function (s, i) {
+    if (before[i] === after[i]) return;
+    changed++;
+    if (!example && before[i] && after[i]) example = { name: fullName(s), before: before[i], after: after[i] };
+  });
+  return { changed: changed, total: students.length, example: example };
+}
+
 /* ── Namespace ──────────────────────────────────────────────── */
 window.Calc = {
   calcMethodExample,
   getRecentScoreLimit,
+  previewCompetencyRemoval,
   formatCoursePercent,
   previewCalcMethodChange,
   clearProfCache,

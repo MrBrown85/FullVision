@@ -5468,7 +5468,13 @@ window.DashClassManager = (function () {
     var names = secs.map(_cmCompTitle);
     showConfirm(
       secs.length === 1 ? 'Remove 1 Competency' : 'Remove ' + secs.length + ' Competencies',
-      'Remove ' + _cmJoinNames(names, 'competencies') + ' from the class? Existing scores are kept.',
+      _cmRemoveMessage(
+        cmSelectedCourse,
+        secs.map(function (s) {
+          return s.id;
+        }),
+        'Remove ' + _cmJoinNames(names, 'competencies') + ' from the class?',
+      ),
       'Remove',
       'danger',
       function () {
@@ -6179,6 +6185,17 @@ window.DashClassManager = (function () {
         : r.onlyMine.length
           ? ' Your edits and your own competencies stay.'
           : ' Your edits stay.';
+    // Removing one moves grades, as the Remove confirm says.
+    if (p.remove.length) {
+      var moved = previewCompetencyRemoval(
+        r.cid,
+        p.remove.map(function (o) {
+          return _currentId('section', o.sec.id);
+        }),
+      );
+      if (moved.changed)
+        tail += ' The removals change the grade for ' + moved.changed + ' of your ' + moved.total + ' students.';
+    }
     return '<strong>' + n + (n === 1 ? ' change:' : ' changes:') + '</strong> ' + esc(phrases.join('; ')) + '.' + tail;
   }
 
@@ -6335,10 +6352,41 @@ window.DashClassManager = (function () {
     renderClassManager();
   }
 
+  /* The Remove confirm: what it does to grades, then that the scores are
+     kept for putting it back. */
+  function _cmRemoveMessage(cid, secIds, lead) {
+    var preview = previewCompetencyRemoval(cid, secIds);
+    var moves = preview.changed
+      ? ' This changes the grade for ' +
+        preview.changed +
+        ' of your ' +
+        preview.total +
+        ' students' +
+        (preview.example
+          ? '. For example, ' +
+            preview.example.name +
+            ' goes from ' +
+            preview.example.before +
+            ' to ' +
+            preview.example.after +
+            '.'
+          : '.') +
+        ' Marks you\u2019ve already copied into MyEd won\u2019t change there.'
+      : '';
+    return (
+      lead +
+      moves +
+      (secIds.length === 1
+        ? ' Its scores are kept, so Re-link can put it back.'
+        : ' Their scores are kept, so Re-link can put them back.')
+    );
+  }
+
   function cmDeleteStd(secId) {
+    var current = _currentId('section', secId);
     showConfirm(
       'Remove Competency',
-      'Remove this competency from the class? Existing scores are kept.',
+      _cmRemoveMessage(cmSelectedCourse, [current], 'Remove this competency from the class?'),
       'Remove',
       'danger',
       function () {

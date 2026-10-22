@@ -143,7 +143,9 @@ describe('Competencies tab', () => {
     expect(main.innerHTML).toContain('2 Selected');
     DashClassManager.handleAction('cmCompRemoveSelected', { dataset: {} });
     expect(confirms[0].title).toBe('Remove 2 Competencies');
-    expect(confirms[0].message).toBe('Remove Questioning and Lab Safety from the class? Existing scores are kept.');
+    expect(confirms[0].message).toBe(
+      'Remove Questioning and Lab Safety from the class? Their scores are kept, so Re-link can put them back.',
+    );
     expect(codes()).toEqual(['PI']);
     expect(getScores(CID).st1).toHaveLength(3);
     expect(
@@ -183,6 +185,7 @@ describe('Competencies tab', () => {
   });
 
   it('uses the curriculum version and removes one of the teacher’s own when picked', () => {
+    saveStudents(CID, [{ id: 'st1', firstName: 'Amara', lastName: 'Osei', enrolledDate: '2026-09-01' }]);
     DashClassManager.handleAction('cmStartRelink', { dataset: { cid: CID } });
     DashClassManager.handleAction('cmRelinkNext', { dataset: {} });
     DashClassManager.handleChange({
@@ -192,6 +195,8 @@ describe('Competencies tab', () => {
       dataset: { actionChange: 'cmCompReviewPick', group: 'onlyMine', idx: '0', pick: 'remove' },
     });
     expect(main.innerHTML).toContain('use the curriculum version of Questioning');
+    // Lab Safety has a score, so removing it moves that student's grade.
+    expect(main.innerHTML).toContain('The removals change the grade for 1 of your');
     DashClassManager.handleAction('cmCompReviewApply', { dataset: {} });
     var qap = getLearningMap(CID).sections.find(s => s.id === 'QAP').tags[0];
     expect(qap.label).toBe('Question and Predict');
