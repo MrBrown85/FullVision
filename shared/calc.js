@@ -1385,8 +1385,67 @@ function renderGrowthSparkline(points) {
     .join('')}</div>`;
 }
 
+/* A calculation method's result on plain example scores (oldest first), as
+   the Grading tab shows beside each method. The same _calcGroup the class
+   uses, so the example can't drift from the real rule. */
+function calcMethodExample(levels, method, decayWeight) {
+  var scores = (levels || []).map(function (v, i) {
+    return { score: v, date: '2000-01-' + String(i + 1).padStart(2, '0') };
+  });
+  return _calcGroup(scores, method, decayWeight, null);
+}
+
+/* A course % as this class shows it: a whole number or one decimal. */
+function formatCoursePercent(cid, R) {
+  if (R == null || isNaN(R)) return '—';
+  return _roundPercent(R, getRoundWholePercent(cid) ? 0 : 1) + '%';
+}
+
+/* What switching this class to another calculation method would do: how
+   many students' overall proficiency changes, out of how many, and one
+   example. Runs the class's own math under the new method and puts the
+   saved method back. */
+function previewCalcMethodChange(cid, method, decayWeight) {
+  var cc = getCourseConfig(cid);
+  var keep = { calcMethod: cc.calcMethod, decayWeight: cc.decayWeight };
+  var students = getStudents(cid);
+  var shown = function (v) {
+    return v > 0 ? Number(v).toFixed(1) : '';
+  };
+  var before = students.map(function (s) {
+    return shown(getOverallProficiency(cid, s.id));
+  });
+  cc.calcMethod = method;
+  if (decayWeight != null) cc.decayWeight = decayWeight;
+  clearProfCache();
+  var after = students.map(function (s) {
+    return shown(getOverallProficiency(cid, s.id));
+  });
+  if (keep.calcMethod === undefined) delete cc.calcMethod;
+  else cc.calcMethod = keep.calcMethod;
+  if (keep.decayWeight === undefined) delete cc.decayWeight;
+  else cc.decayWeight = keep.decayWeight;
+  clearProfCache();
+  var changed = 0;
+  var example = null;
+  students.forEach(function (s, i) {
+    if (before[i] === after[i]) return;
+    changed++;
+    if (!example && before[i] && after[i])
+      example = {
+        name: fullName(s),
+        before: before[i],
+        after: after[i],
+      };
+  });
+  return { changed: changed, total: students.length, example: example };
+}
+
 /* ── Namespace ──────────────────────────────────────────────── */
 window.Calc = {
+  calcMethodExample,
+  formatCoursePercent,
+  previewCalcMethodChange,
   clearProfCache,
   setActiveTerm,
   getActiveTerm,
