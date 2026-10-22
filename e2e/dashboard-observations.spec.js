@@ -23,7 +23,7 @@ const card = page => page.locator('#dash-obs-card');
 test.describe('Dashboard Observations card', () => {
   test('the top row cards match in height and the page never scrolls sideways', async ({ page }) => {
     await enterDemo(page);
-    for (const width of [1024, 1280, 1600]) {
+    for (const width of [800, 1024, 1280, 1600]) {
       await page.setViewportSize({ width, height: 900 });
       await openDashboard(page);
       for (const tab of ['By week', 'By competency']) {
@@ -43,13 +43,9 @@ test.describe('Dashboard Observations card', () => {
         });
         expect(m.scrollW, `sideways scroll at ${width} on ${tab}`).toBeLessThanOrEqual(m.clientW);
         expect(m.cardRight).toBeLessThanOrEqual(m.clientW);
-        // Side by side above 1100 px, the same height; stacked below.
-        if (width > 1100) {
-          expect(m.sameRow).toBe(true);
-          expect(Math.abs(m.dist - m.obs)).toBeLessThan(1);
-        } else {
-          expect(m.sameRow).toBe(false);
-        }
+        // Side by side at every desktop width, the same height.
+        expect(m.sameRow, `stacked at ${width} on ${tab}`).toBe(true);
+        expect(Math.abs(m.dist - m.obs)).toBeLessThan(1);
       }
       await card(page).getByRole('tab', { name: 'By week' }).click();
     }
