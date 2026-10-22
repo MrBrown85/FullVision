@@ -74,6 +74,7 @@
   var LAYOUT_ORDER = ['full', 'half', 'quarter'];
   var LEVELS = [4, 3, 2, 1];
   var LEVEL_NAMES = { 4: 'Extending', 3: 'Proficient', 2: 'Developing', 1: 'Emerging' };
+  var LINE_ROWS = 36; // write-on lines: a full page's height at the line pitch
   // The BC proficiency scale's general descriptors.
   var GENERAL_LEVELS = {
     1: 'The student demonstrates an initial understanding of the concepts and competencies relevant to the expected learning.',
@@ -379,12 +380,17 @@
     html += '</tbody></table>';
 
     if (include.feedback) {
-      html +=
-        '<div class="rubric-feedback' +
-        (data.feedback ? '' : ' is-empty') +
-        '"><div class="rubric-label">Feedback</div><div class="rubric-feedback-text">' +
-        _esc(data.feedback).replace(/\n/g, '<br>') +
-        '</div></div>';
+      // Written feedback prints in a box; with none, ruled lines fill the rest
+      // of the sheet for the teacher to write on by hand.
+      html += data.feedback
+        ? '<div class="rubric-feedback"><div class="rubric-label">Feedback</div><div class="rubric-feedback-text">' +
+          _esc(data.feedback).replace(/\n/g, '<br>') +
+          '</div></div>'
+        : '<div class="rubric-feedback is-lines"><div class="rubric-label">Feedback</div><div class="rubric-lines">' +
+          // More lines than any sheet holds; the box shows the whole ones
+          // that fit. Borders, not a background, so they always print.
+          new Array(LINE_ROWS + 1).join('<div class="rubric-line"></div>') +
+          '</div></div>';
     }
     html += '</div></div>';
     return html;

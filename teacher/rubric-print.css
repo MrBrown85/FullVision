@@ -70,10 +70,6 @@
 .layout-quarter .rubric-table td {
   padding: 0.28em 0.32em;
 }
-.layout-half .rubric-crit-head,
-.layout-quarter .rubric-crit-head {
-  width: 17%;
-}
 .layout-half .rubric-sheet-inner,
 .layout-quarter .rubric-sheet-inner {
   gap: 0.4em;
@@ -99,6 +95,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.6em;
+  height: 100%;
 }
 
 /* ── Header ───────────────────────────────────────────────── */
@@ -167,8 +164,9 @@
   text-align: left;
   overflow-wrap: break-word;
 }
+/* 22% holds a long word ("Consequence") whole on a half sheet. */
 .rubric-crit-head {
-  width: 19%;
+  width: 22%;
   font-size: 0.85em;
   font-weight: 700;
 }
@@ -184,6 +182,10 @@
 }
 .rubric-crit-name {
   font-weight: 700;
+  /* A name wraps between words, never inside one. */
+  hyphens: manual;
+  -webkit-hyphens: manual;
+  overflow-wrap: normal;
 }
 .rubric-crit-codes {
   margin-top: 0.3em;
@@ -191,9 +193,15 @@
   font-weight: 400;
   color: #555;
 }
+/* Descriptors at 0.8 of the sheet's text (Colin, 2026-10-22: "a bit
+   smaller so they fit"): tried 1 to 0.75 on 4, 6 and 8 rows; 0.8 fits 8 rows
+   on a full page and 6 on a half sheet without shrinking the names, and
+   stays readable once a half sheet's text is shrunk to fit. */
 .rubric-cell {
   position: relative;
   color: #222;
+  font-size: 0.8em;
+  line-height: 1.25;
 }
 /* Black and white only: the handouts go through the photocopier. The
    scored cell is a light grey fill, a heavy border and a ✓ mark. */
@@ -230,14 +238,44 @@
   font-size: 0.95em;
   line-height: 1.35;
 }
-.rubric-feedback.is-empty {
-  min-height: 6em;
+/* No feedback written: ruled lines for writing on by hand, filling the rest
+   of the sheet (at least three), so a short rubric doesn't end in an empty
+   box and a long one still has room. Line pitch suits handwriting. */
+.rubric-feedback.is-lines {
+  /* Basis 0: the spare lines must not count toward the sheet's height. */
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2em;
+  border: none;
+  padding: 0;
+  --rp-line: 0.32in;
 }
-.layout-half .rubric-feedback.is-empty {
-  min-height: 4em;
+.rubric-feedback.is-lines .rubric-label {
+  display: block;
 }
-.layout-quarter .rubric-feedback.is-empty {
-  min-height: 2.6em;
+.rubric-lines {
+  flex: 1 1 0;
+  min-height: calc(var(--rp-line) * 3);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+/* Each line is a border, which prints with or without background graphics;
+   the lines past the box's height are cut off whole. */
+.rubric-line {
+  flex: 0 0 var(--rp-line);
+  box-sizing: border-box;
+  border-bottom: 1px solid #8a8a8a;
+}
+.layout-half .rubric-feedback.is-lines {
+  --rp-line: 0.3in;
+}
+.layout-quarter .rubric-feedback.is-lines {
+  --rp-line: 0.26in;
+}
+.layout-quarter .rubric-lines {
+  min-height: calc(var(--rp-line) * 2);
 }
 
 /* ── Overflow marker (screen only, for the dialog's count) ────── */

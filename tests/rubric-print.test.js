@@ -134,7 +134,16 @@ describe('sheetData and renderSheet', () => {
     const html = RubricPrint.renderSheet(data, { include });
     expect(html).not.toContain('is-scored');
     expect(html).toContain('Alan Turing');
-    expect(html).toContain('rubric-feedback is-empty');
+    // No feedback written: ruled lines to write on, not an empty box.
+    expect(html).toContain('rubric-feedback is-lines');
+    expect(html).toContain('rubric-lines');
+  });
+
+  it('prints written feedback in its box, without lines', () => {
+    const data = Object.assign({}, RubricPrint.sheetData(CID, AID, SID), { feedback: 'Clear method.' });
+    const html = RubricPrint.renderSheet(data, { include });
+    expect(html).toContain('Clear method.');
+    expect(html).not.toContain('rubric-lines');
   });
 
   it('prints the criterion comment under its row and leaves it out when not included', () => {
