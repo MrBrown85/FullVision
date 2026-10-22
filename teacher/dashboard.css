@@ -3769,11 +3769,179 @@ body.fv-names-hidden .dash-search-input:not(:placeholder-shown) {
   gap: 2px;
   flex-shrink: 0;
 }
+/* Students tab: toolbar, the roster as a full-width table */
+.cm-roster-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.cm-roster-buttons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.cm-roster-buttons .cm-action-btn.active {
+  border-color: var(--active);
+  color: var(--link);
+}
+.cm-roster-section {
+  padding: 0;
+  overflow: hidden;
+}
+.cm-roster-table.cm-student-list {
+  max-height: none;
+  overflow: visible;
+  border: 0;
+  margin: 0;
+}
+.cm-roster-head,
+.cm-roster-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.6fr) 140px;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 18px;
+}
+.cm-roster-bulk .cm-roster-head,
+.cm-roster-bulk .cm-roster-row {
+  grid-template-columns: 20px minmax(0, 2.2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.6fr) 140px;
+}
+.cm-roster-head {
+  background: var(--bg);
+  border-bottom: 1px solid var(--divider-subtle);
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-2);
+}
+.cm-roster-row.cm-student-row {
+  display: grid;
+}
+.cm-roster-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cm-roster-num {
+  font-family: 'SF Mono', ui-monospace, monospace;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.cm-roster-desig {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.cm-roster-desig-name {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cm-roster-row .cm-student-actions {
+  gap: 16px;
+  justify-content: flex-end;
+}
+.cm-roster-withdraw {
+  color: var(--text-2);
+}
+/* Import review */
+.cm-import-review {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.cm-import-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cm-import-group-head,
+.cm-import-same {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-family: var(--font-base);
+}
+.cm-import-group h3 {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 700;
+  color: var(--text);
+}
+.cm-import-group-head span,
+.cm-import-same span {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.cm-import-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid var(--divider-subtle);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  font-family: var(--font-base);
+  font-size: var(--text-base);
+  cursor: pointer;
+}
+.cm-import-old {
+  color: var(--text-2);
+}
+.cm-import-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  border-top: 1px solid var(--divider-subtle);
+  padding-top: 12px;
+  font-family: var(--font-base);
+  font-size: var(--text-base);
+  color: var(--text-2);
+}
+.cm-import-foot strong {
+  color: var(--text);
+}
+.cm-import-buttons {
+  display: flex;
+  gap: 8px;
+}
+/* Keep a copy first, in the permanent-delete dialog */
+.cm-keep-copy {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin: 12px 0 4px;
+}
+.cm-keep-copy .cm-action-btn {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.cm-keep-copy-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.cm-keep-copy-text strong {
+  font-size: var(--text-base);
+  color: var(--text);
+}
 /* Withdrawn students, under the roster */
 .cm-withdrawn {
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border);
+  margin-top: 0;
 }
 .cm-withdrawn-title {
   font-size: var(--text-sm);

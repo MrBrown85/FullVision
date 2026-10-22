@@ -211,7 +211,7 @@ describe('class manager — remove student', () => {
     expect(section).toContain('data-withdrawn-sid="a1"');
     expect(section).toContain('Amara Osei');
     expect(section).toContain('data-action="cmReenrolStudent" data-sid="a1">Re-enrol</button>');
-    expect(section).toContain('data-action="cmDeleteWithdrawn" data-sid="a1">Delete permanently</button>');
+    expect(section).toContain('data-action="cmDeleteWithdrawn" data-sid="a1">Delete Permanently\u2026</button>');
     // The roster no longer shows them.
     expect(html).not.toContain('data-action="cmRemoveStudent" data-sid="a1"');
     expect(html).toContain('data-action="cmRemoveStudent" data-sid="a2"');
@@ -244,7 +244,8 @@ describe('class manager — remove student', () => {
     DashClassManager.handleAction('cmDeleteWithdrawn', stubEl({ sid: 'a1' }));
 
     var c = confirms[confirms.length - 1];
-    expect(c.title).toBe('Delete permanently');
+    expect(c.title).toBe('Delete Amara Osei Permanently?');
+    expect(c.okLabel).toBe('Delete Permanently');
     expect(c.okStyle).toBe('danger');
     expect(c.message).toMatch(/cannot be undone/);
     expect(toasts).toBe(0);

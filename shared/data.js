@@ -9557,6 +9557,12 @@ window.v2.saveReportTemplate = function (params, options) {
     options,
   );
 };
+/* A withdrawn student's scores and observations from the server, for the
+   copy offered before a permanent delete. Read-only; null in Demo Mode. */
+window.v2.getWithdrawnStudentRecords = function (enrollmentId) {
+  if (!_isUuid(enrollmentId)) return Promise.resolve({ data: null, error: null });
+  return _rpcOrNoop('get_withdrawn_student_records', { p_enrollment_id: enrollmentId });
+};
 window.v2.listReportTemplates = function () {
   return _rpcOrNoop('list_report_templates', {}).then(_listResult);
 };
