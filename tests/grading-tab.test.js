@@ -137,3 +137,78 @@ describe('switching the calculation method', () => {
     expect(main.innerHTML).toContain('Not used in a Proficiency class');
   });
 });
+
+describe('points to proficiency on the Grading tab', () => {
+  var originalGetElementById;
+  var main;
+  var inputs;
+
+  beforeEach(() => {
+    localStorage.clear();
+    seedClass();
+    main = { innerHTML: '' };
+    inputs = {};
+    originalGetElementById = document.getElementById;
+    document.getElementById = function (id) {
+      if (id === 'main') return main;
+      if (inputs[id]) return inputs[id];
+      return originalGetElementById(id);
+    };
+    DashClassManager.resetState();
+    DashClassManager.configure({ activeCourse: CID, onRender() {}, onCourseChange() {} });
+    DashClassManager.openClassManager();
+    DashClassManager.handleAction('cmSetTab', { dataset: { tab: 'grading' } });
+  });
+
+  afterEach(() => {
+    document.getElementById = originalGetElementById;
+  });
+
+  it('shows the default percents with the BC proficiency names', () => {
+    expect(main.innerHTML).toContain('Points to Proficiency');
+    expect(main.innerHTML).toMatch(/Extending<\/span><input[^>]*id="cm-pts-min-0"[^>]*value="86"/);
+    expect(main.innerHTML).toMatch(/id="cm-pts-min-1"[^>]*value="73"/);
+    expect(main.innerHTML).toMatch(/id="cm-pts-min-2"[^>]*value="50"/);
+    expect(main.innerHTML).toContain('Below 50%');
+  });
+
+  it('saves new percents and keeps any saved labels', () => {
+    _cache.courseConfigs[CID].gradingScale = {
+      boundaries: structuredClone(DEFAULT_GRADING_SCALE.boundaries),
+      labels: [null, null, 'Meeting', null],
+    };
+    inputs['cm-pts-min-0'] = { value: '90' };
+    inputs['cm-pts-min-1'] = { value: '75' };
+    inputs['cm-pts-min-2'] = { value: '55' };
+    DashClassManager.handleChange({ dataset: { actionChange: 'cmPointsScale' } });
+    expect(getGradingScale(CID)).toEqual({
+      boundaries: [
+        { min: 90, proficiency: 4 },
+        { min: 75, proficiency: 3 },
+        { min: 55, proficiency: 2 },
+        { min: 0, proficiency: 1 },
+      ],
+      labels: [null, null, 'Meeting', null],
+    });
+    expect(main.innerHTML).toContain('Below 55%');
+  });
+
+  it('resets to the defaults', () => {
+    _cache.courseConfigs[CID].gradingScale = {
+      boundaries: [
+        { min: 90, proficiency: 4 },
+        { min: 80, proficiency: 3 },
+        { min: 60, proficiency: 2 },
+        { min: 0, proficiency: 1 },
+      ],
+      labels: null,
+    };
+    DashClassManager.handleAction('cmPointsScaleReset', { dataset: {} });
+    expect(getGradingScale(CID)).toEqual(DEFAULT_GRADING_SCALE);
+  });
+
+  it('offers a class backup from Class Actions', () => {
+    expect(main.innerHTML).toContain('data-action="cmDownloadBackup"');
+    expect(main.innerHTML).toContain('Download Class Backup');
+  });
+});

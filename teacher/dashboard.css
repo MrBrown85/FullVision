@@ -4644,3 +4644,35 @@ label.cm-cr-row {
 .cm-recent-limit.off .cm-recent-select {
   opacity: 0.5;
 }
+.cm-pts-scale {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  border-top: 1px solid var(--divider-subtle);
+  padding-top: 12px;
+  margin-top: 12px;
+}
+.cm-pts-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cm-pts-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-sm);
+}
+.cm-pts-name {
+  width: 84px;
+  color: var(--text);
+}
+.cm-pts-min {
+  width: 64px;
+  text-align: center;
+}
+.cm-pts-unit,
+.cm-pts-below {
+  color: var(--text-2);
+}

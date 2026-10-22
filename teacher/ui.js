@@ -54,6 +54,12 @@ function renderDock(activePage, rightHTML) {
       `<a role="link" tabindex="0" data-href="${p.href}" class="seg-btn tb-seg-link${p.id === ap ? ' tb-seg-active" aria-current="page' : ''}">${p.label}</a>`,
   ).join('');
 
+  // Reset Demo deletes every class before reseeding, so it exists only in
+  // Demo Mode, never for a signed-in teacher.
+  const resetDemo =
+    typeof isDemoMode === 'function' && isDemoMode()
+      ? '<button class="tb-user-signout" data-action="resetDemoData">Reset Demo Data</button>'
+      : '';
   const userMenu = `<div class="tb-user-menu">
     <div class="tb-sync-anchor">
       <button class="tb-sync-badge obs-badge" id="tb-sync-badge" data-action="toggleSyncPopover" title="View sync status" aria-label="View sync status" aria-expanded="false" hidden>0</button>
@@ -64,7 +70,7 @@ function renderDock(activePage, rightHTML) {
       <span class="tb-user-name" id="tb-user-name"></span>
     </button>
     <div class="tb-user-dropdown">
-      <button class="tb-user-signout" data-action="signOut">Sign Out</button>
+      ${resetDemo}<button class="tb-user-signout" data-action="signOut">Sign Out</button>
     </div>
   </div>`;
 
@@ -1218,6 +1224,29 @@ document.addEventListener('click', function (e) {
         'danger',
         function () {
           signOut({ force: true });
+        },
+      );
+    },
+    resetDemoData: function () {
+      if (typeof isDemoMode !== 'function' || !isDemoMode()) return;
+      showConfirm(
+        'Reset Demo Data',
+        'Reset ALL data to demo defaults? This cannot be undone.',
+        'Reset',
+        'danger',
+        async function () {
+          await Promise.all(
+            Object.keys(COURSES).map(function (cid) {
+              return deleteCourseData(cid);
+            }),
+          );
+          Object.keys(COURSES).forEach(function (cid) {
+            delete COURSES[cid];
+          });
+          Object.assign(COURSES, structuredClone(DEFAULT_COURSES));
+          saveCourses(COURSES);
+          loadSeedIfNeeded();
+          Router.navigate('/dashboard');
         },
       );
     },
