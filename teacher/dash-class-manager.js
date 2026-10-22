@@ -129,7 +129,8 @@ window.DashClassManager = (function () {
     });
     var subName = sub ? sub.name : '';
     var subColor = sub ? sub.color : 'var(--text-3)';
-    var isOpen = _cmOpenStdCards[sec.id];
+    // A card opened under its local id stays open once the id is re-keyed.
+    var isOpen = _cmStdCardOpen(sec.id);
     var title = tag.label || sec.shortName || sec.name || '';
     var code = _cmStdCode(tag);
     var icans = tag.i_can_statements || [];
@@ -616,10 +617,24 @@ window.DashClassManager = (function () {
     tabs[0].focus();
   }
 
+  function _cmStdCardOpen(secId) {
+    return (
+      !!_cmOpenStdCards[secId] ||
+      Object.keys(_cmOpenStdCards).some(function (k) {
+        return _cmOpenStdCards[k] && k !== secId && _currentId('section', k) === secId;
+      })
+    );
+  }
+
   function cmToggleStdCard(secId) {
-    _cmOpenStdCards[secId] = !_cmOpenStdCards[secId];
+    var open = !_cmStdCardOpen(secId);
+    // Forget the key it was opened under before its id was re-keyed.
+    Object.keys(_cmOpenStdCards).forEach(function (k) {
+      if (_currentId('section', k) === secId) delete _cmOpenStdCards[k];
+    });
+    _cmOpenStdCards[secId] = open;
     var card = document.getElementById('cm-std-' + secId);
-    if (card) card.classList.toggle('open', _cmOpenStdCards[secId]);
+    if (card) card.classList.toggle('open', open);
   }
 
   function cmToggleStdFolder(uid) {
@@ -992,6 +1007,15 @@ window.DashClassManager = (function () {
 
   /* The withdrawn student's records as CSV rows. This device's copy when it
      has one (it withdrew them, or Demo Mode); else the server's. */
+  /* A score as the download shows it, the same whichever way the records
+     came: "8 / 10", "Complete" or "Incomplete", or a proficiency ("3+"). */
+  function _cmRecordScoreText(mode, value, maxPoints, mod) {
+    if (value == null || value === '') return '';
+    if (mode === 'complete') return Number(value) > 0 ? 'Complete' : 'Incomplete';
+    if (mode === 'points') return value + ' / ' + (maxPoints != null ? maxPoints : '');
+    return formatScoreLevel(Number(value), mod) || String(value);
+  }
+
   function _cmWithdrawnRecordRows(cid, entry) {
     var rec = entry.records || {};
     var hasLocal = (rec.scores && rec.scores.length) || (rec.observations && rec.observations.length);
@@ -1013,11 +1037,7 @@ window.DashClassManager = (function () {
           sc.date || a.dueDate || a.date || '',
           a.title || '',
           t.label || '',
-          sc.score == null
-            ? ''
-            : isPointsScored(a)
-              ? sc.score + ' / ' + (a.maxPoints || '')
-              : formatScoreLevel(sc.score, sc.mod) || String(sc.score),
+          _cmRecordScoreText(a.scoreMode || a.score_mode || 'proficiency', sc.score, a.maxPoints, sc.mod),
           status || '',
           sc.comment || '',
         ];
@@ -1048,7 +1068,7 @@ window.DashClassManager = (function () {
           day(r.date),
           r.assessment || '',
           '',
-          r.value == null ? '' : String(r.value),
+          _cmRecordScoreText(r.score_mode || 'proficiency', r.value, r.max_points, null),
           r.status || '',
           r.comment || '',
         ]);
@@ -1573,7 +1593,9 @@ window.DashClassManager = (function () {
     var list = cmPendingImport && cmPendingImport[kind];
     if (!list || !list[idx]) return;
     list[idx].on = !!on;
-    renderClassManager();
+    _cmRenderAndFocus(
+      '[data-action-change="cmImportToggle"][data-kind=' + _cmAttr(kind) + '][data-idx=' + _cmAttr(idx) + ']',
+    );
   }
 
   function cmConfirmImport() {
@@ -2742,6 +2764,9 @@ window.DashClassManager = (function () {
       '</span></div>';
 
     var lm = getLearningMap(cid);
+    // With "Count Only the Most Recent N", only those N count, so only
+    // those are listed (Most Recent Score already counts one).
+    var lastN = method !== 'mostRecent' ? getRecentScoreLimit(cid) : null;
     var rows = (lm.sections || [])
       .map(function (sec) {
         var tag = sec.tags && sec.tags[0];
@@ -2760,13 +2785,16 @@ window.DashClassManager = (function () {
           });
         // The latest few, oldest first, so the method's rule can be followed.
         var shownScores = scores.length > 6 ? ['\u2026'].concat(scores.slice(-6)) : scores;
+        var listed = !scores.length
+          ? 'No scores yet'
+          : lastN && scores.length > lastN
+            ? 'Last ' + lastN + ' of ' + scores.length + ' scores: ' + scores.slice(-lastN).join(', ')
+            : (scores.length > 6 ? scores.length + ' scores: ' : 'Scores ') + shownScores.join(', ');
         return (
           '<div class="cm-check-row"><span class="cm-check-code">' +
           esc(_cmStdCode(tag)) +
           '</span><span class="cm-check-scores">' +
-          (scores.length
-            ? (scores.length > 6 ? scores.length + ' scores: ' : 'Scores ') + esc(shownScores.join(', '))
-            : 'No scores yet') +
+          esc(listed) +
           '</span><strong class="cm-check-num">' +
           esc(formatLevel(cid, getSectionProficiency(cid, sid, sec.id))) +
           '</strong></div>'
@@ -5183,6 +5211,18 @@ window.DashClassManager = (function () {
     _cmRenderWithScroll();
   }
 
+  // Redraw, then put keyboard focus back on the control that caused it: a
+  // checkbox or radio is a new element after the redraw, and focus would
+  // otherwise fall back to the page.
+  function _cmAttr(v) {
+    return '"' + String(v).replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+  }
+  function _cmRenderAndFocus(sel) {
+    renderClassManager();
+    var el = sel && document.querySelector(sel);
+    if (el && typeof el.focus === 'function') el.focus({ preventScroll: true });
+  }
+
   // Re-render class manager preserving scroll position
   function _cmRenderWithScroll() {
     var container = document.querySelector('.cm-detail');
@@ -5229,12 +5269,17 @@ window.DashClassManager = (function () {
     });
     map._flatVersion = 2;
     saveLearningMap(cid, map);
+    // The new card opens with its Title ready to type over.
+    _cmOpenStdCards[stdId] = true;
     renderClassManager();
     requestAnimationFrame(function () {
-      var el = document.getElementById('cm-sec-' + stdId);
-      if (el) {
-        el.classList.add('open');
-        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      var id = _currentId('section', stdId);
+      var card = document.getElementById('cm-std-' + id);
+      if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      var title = document.getElementById('cm-std-title-' + id);
+      if (title) {
+        title.focus({ preventScroll: true });
+        if (typeof title.select === 'function') title.select();
       }
     });
   }
@@ -5429,13 +5474,13 @@ window.DashClassManager = (function () {
     (getLearningMap(cmSelectedCourse).sections || []).forEach(function (s) {
       cmCompSelected[s.id] = true;
     });
-    renderClassManager();
+    _cmRenderAndFocus('[data-action="cmCompSelectAll"]');
   }
 
   function cmCompToggle(secId, on) {
     if (on) cmCompSelected[secId] = true;
     else delete cmCompSelected[secId];
-    renderClassManager();
+    _cmRenderAndFocus('[data-action-change="cmCompToggle"][data-secid=' + _cmAttr(secId) + ']');
   }
 
   function _cmCompSelectedSections() {
@@ -6202,20 +6247,28 @@ window.DashClassManager = (function () {
   function cmCompReviewToggle(idx, on) {
     if (!cmCompReview || !cmCompReview.add[idx]) return;
     cmCompReview.add[idx].on = !!on;
-    renderClassManager();
+    _cmRenderAndFocus('[data-action-change="cmCompReviewToggle"][data-idx=' + _cmAttr(idx) + ']');
   }
 
   function cmCompReviewPick(group, idx, pick) {
     var list = cmCompReview && cmCompReview[group];
     if (!list || !list[idx]) return;
     list[idx].pick = pick;
-    renderClassManager();
+    _cmRenderAndFocus(
+      '[data-action-change="cmCompReviewPick"][data-group=' +
+        _cmAttr(group) +
+        '][data-idx=' +
+        _cmAttr(idx) +
+        '][data-pick=' +
+        _cmAttr(pick) +
+        ']',
+    );
   }
 
   function cmCompReviewShowSame() {
     if (!cmCompReview) return;
     cmCompReview.showSame = !cmCompReview.showSame;
-    renderClassManager();
+    _cmRenderAndFocus('[data-action="cmCompReviewShowSame"]');
   }
 
   function _cmCloseCompReview() {
@@ -7141,6 +7194,7 @@ window.DashClassManager = (function () {
     // For tests: the import review a CSV file opens.
     cmShowImportPreview: cmShowImportPreview,
     cmCompRowsFromCsv: cmCompRowsFromCsv,
+    withdrawnRecordRows: _cmWithdrawnRecordRows,
     reportingTermsDraft: function (cid) {
       var st = _cmTermRows(cid || cmSelectedCourse);
       return { rows: st.rows.slice(), dirty: st.dirty, error: _cmTermError(cid || cmSelectedCourse) };

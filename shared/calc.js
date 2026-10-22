@@ -345,6 +345,14 @@ function _rubricAssessmentPoints(cid, studentId, assessment) {
   return possible > 0 ? { earned: earned, possible: possible } : null;
 }
 
+/* A competency removed from the class (section.removed_at) keeps its scores
+   so it can come back, but they stop counting: only the class's own
+   competencies count toward an assessment and the course % (Colin,
+   2026-10-22). A class with no competencies yet removes nothing. */
+function _isRemovedCompetency(cid, tagId) {
+  return !isUnlinkedTag(tagId) && getAllTags(cid).length > 0 && !getSectionForTag(cid, tagId);
+}
+
 function getAssessmentOverallScore(cid, studentId, assessmentId) {
   var cacheKey = _ck(cid) + ':' + studentId + ':' + assessmentId;
   if (_assessmentOverallCache[cacheKey] !== undefined) return _assessmentOverallCache[cacheKey];
@@ -380,14 +388,12 @@ function getAssessmentOverallScore(cid, studentId, assessmentId) {
   // A leftover overall score (from before the assessment was linked to a
   // competency) must not count beside the new scores.
   var countsOverallKey = isPointsScored(assessment) || isUnlinkedTag(scoreTagIds(assessment, cid)[0]);
-  // A competency removed from the class keeps its scores so it can come
-  // back, but they stop counting here, as they do in proficiency: only the
-  // class's own competencies count (Colin, 2026-10-22). A points score is
-  // one number for the assessment, so it always counts.
-  var onlyClassTags = !isPointsScored(assessment) && getAllTags(cid).length > 0;
+  // A removed competency's scores don't count; a points score is one number
+  // for the assessment, so it always does.
+  var points = isPointsScored(assessment);
   var values = entries
     .filter(function (entry) {
-      if (onlyClassTags && !isUnlinkedTag(entry.tagId) && !getSectionForTag(cid, entry.tagId)) return false;
+      if (!points && _isRemovedCompetency(cid, entry.tagId)) return false;
       return countsOverallKey || !isUnlinkedTag(entry.tagId);
     })
     .map(function (entry) {

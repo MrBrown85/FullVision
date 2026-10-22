@@ -136,6 +136,8 @@ describe('the class setting', () => {
       expect(getRecentScoreLimit(CID)).toBe(3);
       expect(main.innerHTML).toContain('Only the most recent 3 scores count.');
       expect(main.innerHTML).toContain('<option value="3" selected>3 Scores</option>');
+      // Check With a Student lists only the scores that count.
+      expect(main.innerHTML).toContain('Last 3 of 5 scores: 2, 3, 4');
     });
 
     it('is off with Most Recent Score', () => {

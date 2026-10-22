@@ -382,6 +382,10 @@ window.PageStarters = (function () {
     _error = '';
     document.getElementById('page-layout').classList.add('sidebar-hidden');
     document.getElementById('sidebar-mount').style.display = 'none';
+    // No class list here, so no button to show it (as on the dashboard). The
+    // dock is drawn again on the next page, button and all.
+    var sidebarBtn = document.querySelector('.tb-btn');
+    if (sidebarBtn) sidebarBtn.style.display = 'none';
     _addDocListener('click', _handleClick);
     _addDocListener('input', _handleInput);
     _addDocListener('change', _handleChange);

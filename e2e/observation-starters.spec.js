@@ -81,6 +81,8 @@ test.describe('Sentence starters', () => {
 
   test('add the suggestions, reorder, edit and delete; Edit My Starters… comes back here', async ({ page }) => {
     const section = await openStarters(page);
+    // No class list on this page, so no sidebar button either.
+    await expect(page.locator('.tb-btn').first()).toBeHidden();
     await section.getByRole('button', { name: 'Add These Starters' }).click();
     await expect(section.locator('.ms-row:not(.ms-row-head)')).toHaveCount(6);
     const texts = () => section.locator('.ms-row-text').allTextContents();
@@ -113,6 +115,9 @@ test.describe('Sentence starters', () => {
     await expect(menu.locator('[data-obsc="pickStarter"]')).toHaveCount(5);
     await menu.getByText('Edit My Starters…').click();
     await expect(page.getByRole('heading', { name: 'My Sentence Starters' })).toBeVisible();
+    // Back on a page with a class list, the button is there again.
+    await page.locator('.tb-breadcrumb a').first().click();
+    await expect(page.locator('.tb-btn').first()).toBeVisible();
   });
 
   test('Save as Starter keeps what is in the box for every class', async ({ page }) => {

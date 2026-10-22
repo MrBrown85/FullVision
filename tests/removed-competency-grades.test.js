@@ -133,3 +133,25 @@ describe('the Remove confirm', () => {
     expect(getLearningMap(CID).sections.map(s => s.id)).toEqual(['A', 'B']);
   });
 });
+
+describe('the gradebook cell', () => {
+  it('shows the same score the overall counts once a competency is removed', () => {
+    expect(assessmentCellValue(CID, 's1', getAssessments(CID)[0], '2026-10-22').value).toBe(3);
+    removeB();
+    const cell = assessmentCellValue(CID, 's1', getAssessments(CID)[0], '2026-10-22');
+    expect(cell.value).toBe(4);
+    expect(cell.value).toBe(getAssessmentOverallScore(CID, 's1', 'lab'));
+  });
+});
+
+describe('where a removed competency stops showing', () => {
+  it('leaves the assessment competency list, but a points assessment keeps its score key', () => {
+    expect(scoreTagIds(getAssessments(CID)[0], CID)).toEqual(['A', 'B']);
+    removeB();
+    expect(scoreTagIds(getAssessments(CID)[0], CID)).toEqual(['A']);
+    // The link itself is kept, so Re-link can put it back.
+    expect(getAssessments(CID)[0].tagIds).toEqual(['A', 'B']);
+    expect(scoreTagIds(getAssessments(CID)[1], CID)).toEqual(['B']);
+    expect(getAssessmentOverallScore(CID, 's1', 'quiz')).toBeGreaterThan(0);
+  });
+});
