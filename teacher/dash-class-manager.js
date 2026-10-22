@@ -77,6 +77,7 @@ window.DashClassManager = (function () {
   var classManagerOpen = false;
   var cmSelectedCourse = null;
   var cmMode = 'edit';
+  var cmTab = 'details'; // details | students | grading | terms | competencies | starters
 
   // Curriculum Wizard state
   var cwStep = 1;
@@ -1440,9 +1441,10 @@ window.DashClassManager = (function () {
         '<div class="dash-toolbar cm-toolbar">' +
         renderBreadcrumb('Dashboard', '#/dashboard', 'Class Management', 'closeClassManager') +
         '<span class="dash-toolbar-spacer"></span>' +
-        '<span class="cm-toolbar-detail">' +
-        esc(detailTitle) +
-        '</span>' +
+        // The tabbed view names the class in its own header.
+        (cmMode === 'create' || cmRelinkStep > 0
+          ? '<span class="cm-toolbar-detail">' + esc(detailTitle) + '</span>'
+          : '') +
         '</div>';
     }
 
@@ -1491,7 +1493,7 @@ window.DashClassManager = (function () {
       ' Class' +
       (courseIds.length !== 1 ? 'es' : '') +
       '</span>' +
-      '<button class="cm-new-btn" data-action="cmStartCreate">+ New</button>' +
+      '<button class="cm-new-btn" data-action="cmStartCreate">+ New Class</button>' +
       '</div>' +
       '<div class="cm-class-list">';
     if (cmMode === 'create') {
@@ -1519,7 +1521,8 @@ window.DashClassManager = (function () {
       var c = COURSES[cid];
       var sc = getStudents(cid).length;
       var sel = cid === cmSelectedCourse && cmMode === 'edit' ? ' selected' : '';
-      var gs = c.gradingSystem === 'proficiency' ? 'Proficiency' : c.gradingSystem === 'letter' ? 'Letter' : 'Points';
+      var gsv = c.gradingSystem || _cmDefaultGradingSystem(c);
+      var gs = gsv === 'letter' ? 'Letter' : gsv === 'both' ? 'Both' : 'Proficiency';
       html +=
         '<div class="cm-class-item' +
         sel +
@@ -1533,7 +1536,7 @@ window.DashClassManager = (function () {
         gs +
         ' \u00B7 ' +
         sc +
-        ' student' +
+        ' Student' +
         (sc !== 1 ? 's' : '') +
         '</div>' +
         '</div>';
@@ -1556,9 +1559,9 @@ window.DashClassManager = (function () {
           '</div>' +
           '<div class="cm-class-meta">' +
           sc +
-          ' student' +
+          ' Student' +
           (sc !== 1 ? 's' : '') +
-          ' \u00B7 archived</div>' +
+          ' \u00B7 Archived</div>' +
           '</div>';
       });
     }
@@ -1577,53 +1580,31 @@ window.DashClassManager = (function () {
     var studentCount = getStudents(cid).length;
     var assessCount = getAssessments(cid).length;
     var tagCount = getAllTags(cid).length;
+    var panels = {};
 
-    var html = '<div class="cm-detail-inner">';
+    var html = '';
 
-    // LEFT COLUMN: Class Details + Students
-    html += '<div class="cm-col">';
-
-    // Section 1: Class Details
+    // Details tab: Class Details
     html +=
       '<div class="cm-section">' +
       '<div class="cm-section-title">Class Details</div>' +
+      '<div class="cm-details-row">' +
       '<div class="cm-field">' +
-      '<label class="cm-label">Class Name</label>' +
+      '<label class="cm-label" for="cm-name">Class Name</label>' +
       '<input class="cm-input" id="cm-name" value="' +
       esc(course.name) +
       '" data-action-blur="cmUpdateName">' +
       '</div>' +
       '<div class="cm-field">' +
-      '<label class="cm-label" id="cm-block-label">Block</label>' +
-      blockPickerHtml('cm-block', course.block) +
-      '</div>' +
-      '<div class="cm-row">' +
-      '<div class="cm-field">' +
-      '<label class="cm-label">Grade Level</label>' +
+      '<label class="cm-label" for="cm-grade">Grade Level</label>' +
       '<input class="cm-input" id="cm-grade" value="' +
       esc(course.gradeLevel || '') +
       '" placeholder="e.g. 10-12" data-action-blur="cmUpdateGrade">' +
       '</div>' +
+      '</div>' +
       '<div class="cm-field">' +
-      '<label class="cm-label">Stats</label>' +
-      '<div style="display:flex;gap:12px;padding:7px 0;font-size:0.8125rem;color:var(--text-2)">' +
-      '<span><strong>' +
-      studentCount +
-      '</strong> Student' +
-      (studentCount !== 1 ? 's' : '') +
-      '</span>' +
-      '<span><strong>' +
-      assessCount +
-      '</strong> Assessment' +
-      (assessCount !== 1 ? 's' : '') +
-      '</span>' +
-      '<span><strong>' +
-      tagCount +
-      '</strong> Standard' +
-      (tagCount !== 1 ? 's' : '') +
-      '</span>' +
-      '</div>' +
-      '</div>' +
+      '<label class="cm-label" id="cm-block-label">Block</label>' +
+      blockPickerHtml('cm-block', course.block) +
       '</div>' +
       '<div class="cm-field">' +
       '<label class="cm-label">Description</label>' +
@@ -1632,8 +1613,10 @@ window.DashClassManager = (function () {
       '</textarea>' +
       '</div>' +
       '</div>';
+    panels.details = html;
+    html = '';
 
-    // Section 2: Students (Roster)
+    // Students tab: the roster
     var students = getStudents(cid);
     html +=
       '<div class="cm-section">' +
@@ -1830,8 +1813,10 @@ window.DashClassManager = (function () {
       '<div id="cm-import-preview"></div>' +
       renderWithdrawnList(cid) +
       '</div>';
+    panels.students = html;
+    html = '';
 
-    // Section 3: Grading & Calculation (still in left column)
+    // Grading tab: Grading & Calculation
     // T-UI-02 — grading_system segmented control. Three segments:
     //   proficiency / letter / both. Letter works without categories:
     //   getCourseLetterData falls back to total points across all work.
@@ -1870,7 +1855,6 @@ window.DashClassManager = (function () {
       '</div>' +
       _cmRenderCategoriesField(cmSelectedCourse) +
       _cmRenderRoundPercentField(cmSelectedCourse) +
-      _cmRenderReportingTermsField(cmSelectedCourse) +
       '<div class="cm-field">' +
       '<label class="cm-label">Calculation Method</label>' +
       '<div class="seg cm-seg" role="radiogroup" aria-label="Calculation method">' +
@@ -1925,13 +1909,13 @@ window.DashClassManager = (function () {
       // Category management row; percentage/letter display is driven entirely
       // by grading_system above.
       '</div>';
+    panels.grading = html;
 
-    html += '</div>'; // close left column
+    // Reporting Terms tab
+    panels.terms = '<div class="cm-section">' + _cmRenderReportingTermsField(cmSelectedCourse) + '</div>';
+    html = '';
 
-    // RIGHT COLUMN: Curriculum
-    html += '<div class="cm-col-curriculum">';
-
-    // Curriculum -- Subjects
+    // Competencies tab: subjects, competencies and the BC Curriculum link
     html +=
       '<div class="cm-section">' +
       '<div class="cm-section-title">Curriculum</div>' +
@@ -2105,33 +2089,134 @@ window.DashClassManager = (function () {
         '">Link to BC Curriculum</button>';
     }
     html += '</div>';
+    panels.competencies = html;
 
-    // Section 5: Sentence starters
-    html += _cmRenderStarters(cid);
+    // Sentence Starters tab (until starters become one list per teacher)
+    panels.starters = _cmRenderStarters(cid);
 
-    html += '</div>'; // close right column (cm-col-curriculum)
+    var tab = panels[cmTab] != null ? cmTab : 'details';
+    return (
+      '<div class="cm-detail-inner cm-tabbed">' +
+      _cmRenderHeader(cid, studentCount, assessCount, tagCount) +
+      _cmRenderTabs(tab, studentCount, tagCount, getObservationTemplates(cid).length) +
+      '<div class="cm-tab-panel cm-tab-panel-' +
+      tab +
+      '" role="tabpanel" id="cm-tabpanel" aria-labelledby="cm-tab-' +
+      tab +
+      '">' +
+      panels[tab] +
+      '</div>' +
+      '</div>'
+    );
+  }
 
-    // Actions row
+  /* \u2500\u2500 Class header and tabs \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+     The class's name and counts, Open Gradebook, and Class Actions
+     (Duplicate, Archive, and Delete once archived) in a menu. */
+  function _cmRenderHeader(cid, studentCount, assessCount, tagCount) {
+    var course = COURSES[cid];
     var isArchived = isCourseArchived(cid);
-    html +=
-      '<div class="cm-actions-row">' +
-      '<button class="cm-action-btn" data-action="cmDuplicateCourse" data-cid="' +
+    var meta = [];
+    var block = typeof courseBlockLabel === 'function' ? courseBlockLabel(course) : '';
+    if (block) meta.push(block);
+    if (course.gradeLevel) meta.push('Grade ' + course.gradeLevel);
+    meta.push(studentCount + ' Student' + (studentCount !== 1 ? 's' : ''));
+    meta.push(assessCount + ' Assessment' + (assessCount !== 1 ? 's' : ''));
+    meta.push(tagCount + ' Competenc' + (tagCount !== 1 ? 'ies' : 'y'));
+    return (
+      '<div class="cm-head">' +
+      '<div class="cm-head-text">' +
+      '<h1 class="cm-head-title">' +
+      esc(course.name) +
+      '</h1>' +
+      '<div class="cm-head-meta">' +
+      esc(meta.join(' \u00B7 ')) +
+      (isArchived ? ' \u00B7 Archived' : '') +
+      '</div>' +
+      '</div>' +
+      '<div class="cm-head-actions">' +
+      '<button type="button" class="cm-action-btn" data-action="cmOpenGradebook" data-cid="' +
       cid +
-      '">\u29C9 Duplicate Class</button>' +
-      '<button class="cm-action-btn" data-action="cmToggleArchive" data-cid="' +
+      '">Open Gradebook</button>' +
+      '<div class="cm-std-menu-wrap">' +
+      '<button type="button" class="cm-action-btn" data-action="cmStdMenu" aria-haspopup="menu" aria-expanded="false">Class Actions \u25BE</button>' +
+      '<div class="cm-std-menu cm-class-actions-menu" role="menu" hidden>' +
+      '<button type="button" role="menuitem" class="cm-std-menu-item" data-action="cmDuplicateCourse" data-cid="' +
+      cid +
+      '">Duplicate Class</button>' +
+      '<button type="button" role="menuitem" class="cm-std-menu-item" data-action="cmToggleArchive" data-cid="' +
       cid +
       '">' +
       (isArchived ? 'Unarchive Class' : 'Archive Class') +
       '</button>' +
       (isArchived
-        ? '<button class="cm-action-btn cm-action-btn-danger" data-action="cmDeleteCourse" data-cid="' +
+        ? '<button type="button" role="menuitem" class="cm-std-menu-item danger" data-action="cmDeleteCourse" data-cid="' +
           cid +
           '">Delete Class</button>'
-        : '') +
-      '</div>';
+        : '<div class="cm-class-actions-note">Delete Class appears here once a class is archived.</div>') +
+      '</div>' +
+      '</div>' +
+      '</div>' +
+      '</div>'
+    );
+  }
 
-    html += '</div>'; // close cm-detail-inner
-    return html;
+  var CM_TABS = [
+    { id: 'details', label: 'Details' },
+    { id: 'students', label: 'Students' },
+    { id: 'grading', label: 'Grading' },
+    { id: 'terms', label: 'Reporting Terms' },
+    { id: 'competencies', label: 'Competencies' },
+    { id: 'starters', label: 'Sentence Starters' },
+  ];
+
+  function _cmRenderTabs(active, studentCount, tagCount, starterCount) {
+    var counts = { students: studentCount, competencies: tagCount, starters: starterCount };
+    return (
+      '<div class="cm-tabs" role="tablist" aria-label="Class settings">' +
+      CM_TABS.map(function (t) {
+        var on = t.id === active;
+        return (
+          '<button type="button" class="cm-tab' +
+          (on ? ' active' : '') +
+          '" role="tab" id="cm-tab-' +
+          t.id +
+          '" aria-selected="' +
+          on +
+          '" aria-controls="cm-tabpanel" tabindex="' +
+          (on ? '0' : '-1') +
+          '" data-action="cmSetTab" data-tab="' +
+          t.id +
+          '">' +
+          t.label +
+          (counts[t.id] != null ? ' <span class="cm-tab-count">' + counts[t.id] + '</span>' : '') +
+          '</button>'
+        );
+      }).join('') +
+      '</div>'
+    );
+  }
+
+  function cmSetTab(tab) {
+    if (
+      !CM_TABS.some(function (t) {
+        return t.id === tab;
+      })
+    )
+      return;
+    cmTab = tab;
+    renderClassManager();
+    var detail = document.querySelector('.cm-detail');
+    if (detail) detail.scrollTop = 0;
+    var btn = document.getElementById('cm-tab-' + tab);
+    if (btn && typeof btn.focus === 'function') btn.focus({ preventScroll: true });
+  }
+
+  function cmOpenGradebook(cid) {
+    if (!cid || !COURSES[cid]) return;
+    classManagerOpen = false;
+    if (typeof setActiveCourse === 'function') setActiveCourse(cid);
+    if (typeof Router !== 'undefined' && Router.navigate) Router.navigate('/gradebook');
   }
 
   /* ── Curriculum Wizard ──────────────────────────────────── */
@@ -3685,6 +3770,7 @@ window.DashClassManager = (function () {
     classManagerOpen = true;
     cmMode = 'edit';
     cmSelectedCourse = cid && COURSES[cid] ? cid : _activeCourse;
+    cmTab = 'starters';
     renderClassManager();
     var sec = document.getElementById('cm-starters');
     if (sec && typeof sec.scrollIntoView === 'function') sec.scrollIntoView({ block: 'start' });
@@ -5278,6 +5364,12 @@ window.DashClassManager = (function () {
       cmStdMenu: function () {
         cmStdToggleMenu(el);
       },
+      cmSetTab: function () {
+        cmSetTab(el.dataset.tab);
+      },
+      cmOpenGradebook: function () {
+        cmOpenGradebook(el.dataset.cid);
+      },
       cmStdEditWording: function () {
         cmStdEditWording(el.dataset.secid);
       },
@@ -5429,6 +5521,17 @@ window.DashClassManager = (function () {
       e.preventDefault();
       return true;
     }
+    // Arrow keys move between the class tabs, as in any tab list.
+    if (el && el.classList && el.classList.contains('cm-tab') && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      var ids = CM_TABS.map(function (t) {
+        return t.id;
+      });
+      var at = ids.indexOf(el.dataset.tab);
+      var next = ids[(at + (e.key === 'ArrowRight' ? 1 : ids.length - 1)) % ids.length];
+      e.preventDefault();
+      cmSetTab(next);
+      return true;
+    }
     if (el && el.classList && !e.isComposing && e.key === 'Enter' && !e.shiftKey) {
       // Enter adds the typed I Can statement, or ends an edit to one.
       if (el.classList.contains('cm-ican-new')) {
@@ -5575,6 +5678,7 @@ window.DashClassManager = (function () {
     resetState: function () {
       classManagerOpen = false;
       cmMode = 'edit';
+      cmTab = 'details';
       cmSelectedCourse = _activeCourse;
       _activeCourseChanged = false;
       cmEditingStudentId = null;

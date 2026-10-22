@@ -164,6 +164,7 @@ test('a starter can default to Note, and picking it sets the Note chip', async (
   await enterDemo(page);
   await page.goto('/teacher/app.html#/dashboard?course=sci8');
   await page.getByRole('button', { name: 'Class Management' }).first().click();
+  await page.getByRole('tab', { name: /^Sentence Starters/ }).click();
   const section = page.locator('#cm-starters');
   await expect(section).toBeVisible();
   // Demo Mode's class already has starters.

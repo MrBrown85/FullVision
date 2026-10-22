@@ -1549,6 +1549,102 @@ body.fv-names-hidden .dash-search-input:not(:placeholder-shown) {
   grid-column: 1 / -1;
 }
 
+/* Tabbed class view: a header, one row of tabs, then the open tab. */
+.cm-detail-inner.cm-tabbed {
+  display: block;
+  max-width: 1200px;
+}
+.cm-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.cm-head-title {
+  font-family: var(--font-base);
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+.cm-head-meta {
+  font-family: var(--font-base);
+  font-size: var(--text-base);
+  color: var(--text-2);
+  margin-top: 4px;
+}
+.cm-head-actions {
+  display: flex;
+  gap: 8px;
+}
+.cm-class-actions-menu {
+  min-width: 240px;
+}
+.cm-class-actions-note {
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  padding: 8px 10px 6px;
+  margin-top: 4px;
+  border-top: 0.5px solid var(--divider-subtle);
+}
+.cm-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+.cm-tab {
+  font-family: var(--font-base);
+  font-size: var(--text-md);
+  font-weight: 500;
+  color: var(--text-2);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+.cm-tab:hover {
+  color: var(--text);
+}
+.cm-tab.active {
+  color: var(--link);
+  font-weight: 600;
+  border-bottom-color: var(--link);
+}
+.cm-tab:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: -2px;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+.cm-tab-count {
+  color: var(--text-3);
+  font-weight: 500;
+}
+.cm-tab-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 900px;
+}
+.cm-tab-panel-competencies {
+  max-width: 1200px;
+}
+.cm-details-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.cm-details-row > .cm-field {
+  margin-bottom: 0;
+}
+
 .cm-section {
   background: var(--surface);
   border-radius: var(--radius);
