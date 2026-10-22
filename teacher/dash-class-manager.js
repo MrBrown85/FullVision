@@ -1612,6 +1612,15 @@ window.DashClassManager = (function () {
       esc(course.description || '') +
       '</textarea>' +
       '</div>' +
+      // Late Work Policy: free text, optional. Printed reports show it in
+      // the Score Distribution block.
+      '<div class="cm-field">' +
+      '<label class="cm-label" for="cm-late-policy">Late Work Policy</label>' +
+      '<textarea class="cm-textarea" id="cm-late-policy" rows="2" placeholder="e.g. Late assignments lose 10% per day, up to 3 days." data-action-blur="cmLateWorkPolicy">' +
+      esc(course.lateWorkPolicy || '') +
+      '</textarea>' +
+      '<div class="cm-hint">Optional. Printed reports with a Score Distribution block show it.</div>' +
+      '</div>' +
       '</div>';
     panels.details = html;
     html = '';
@@ -1892,16 +1901,6 @@ window.DashClassManager = (function () {
       '%</span>' +
       '</div>' +
       '<div class="cm-hint">Higher values weight recent scores more heavily.</div>' +
-      '</div>' +
-      // Late Work Policy — free-text, optional. Copy adapted from Phoneox
-      // src/components/courses/grading-config.tsx:204-222. Surfaced on the
-      // Score Distribution section of printed progress reports when set.
-      '<div class="cm-field">' +
-      '<label class="cm-label" for="cm-late-policy">Late Work Policy</label>' +
-      '<textarea class="cm-textarea" id="cm-late-policy" rows="2" placeholder="e.g. Late assignments lose 10% per day, up to 3 days." data-action-blur="cmLateWorkPolicy" aria-label="Late work policy">' +
-      esc(course.lateWorkPolicy || '') +
-      '</textarea>' +
-      '<div class="cm-hint">Optional. If set, this text appears on the Score Distribution section of printed progress reports.</div>' +
       '</div>' +
       // T-UI-02 retired controls: the legacy "Category weights (summative vs
       // formative slider)" and "Report final grade as percentage" checkbox
@@ -2863,7 +2862,9 @@ window.DashClassManager = (function () {
       }
       return;
     }
-    updateCourse(cmSelectedCourse, { [field]: field === 'block' ? normalizeCourseBlock(value) : value.trim() });
+    // A cleared optional field (Late Work Policy) arrives as null.
+    var clean = field === 'block' ? normalizeCourseBlock(value) : value == null ? null : String(value).trim();
+    updateCourse(cmSelectedCourse, { [field]: clean });
     var nameEl = document.querySelector('.cm-class-item.selected .cm-class-name');
     if ((field === 'name' || field === 'block') && nameEl)
       nameEl.textContent = courseDisplayName(COURSES[cmSelectedCourse]);

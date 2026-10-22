@@ -966,13 +966,13 @@ window.ReportBlocks = (function () {
       <text x="50" y="68" text-anchor="middle" style="font-size:6px;fill:var(--text-3);">proficient</text>
     </svg>
   </div>`;
-    // Late policy note (configurable per course)
-    const cc = getCourseConfig(cid);
-    const latePolicy = cc.lateWorkPolicy || '';
+    // Late policy note: the class's saved policy, the one value Copy grading
+    // setup and the server keep.
+    const latePolicy = (COURSES[cid] && COURSES[cid].lateWorkPolicy) || '';
     html += `<div style="flex:1;min-width:0;padding-top:6px">
     <div style="font-size:0.68rem;font-weight:700;color:var(--text-2);margin-bottom:4px">Late Work Policy</div>
     <div contenteditable="true" data-action="latePolicyEdit" style="font-size:0.68rem;color:${latePolicy ? 'var(--text-2)' : 'var(--text-3)'};line-height:1.45;font-style:${latePolicy ? 'normal' : 'italic'};outline:none;min-height:1.4em"
-    >${latePolicy || 'No late work policy set'}</div>
+    >${latePolicy ? esc(latePolicy) : 'No late work policy set'}</div>
   </div>`;
     html += `</div>`;
 
