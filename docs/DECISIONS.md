@@ -101,6 +101,7 @@ Context: every gradebook compared in the rubrics review returns the rubric to th
 3. **Three layouts:** full page, half sheet (two per landscape page) and quarter sheet (four per page), cut lines between. Text shrinks by layout, and shrinks further by steps to fit; a sheet that still does not fit is clipped and the dialog says so before printing.
 4. **One comment per criterion**, stored on `rubric_score.comment`, entered from an icon on the criterion row. It cannot exist without a level on the server, so a comment typed first waits on the device and goes up with the level.
 5. **Unscored students print a blank rubric.** Not submitted and Excused print as such in place of the overall level.
+6. **Every proficiency assessment prints one** (Colin, 2026-10-22). With no rubric of its own it prints a **Tag Rubric** (a row per competency it is scored on) or, with no competencies, a **General Rubric** (one Overall row). Their cells read the teacher's own wording for the competency where saved (the descriptor bank), else the BC proficiency scale's general descriptors ("The student demonstrates an initial / a partial / a complete / a sophisticated understanding of the concepts and competencies relevant to the expected learning."), never empty boxes. Points and Complete/Incomplete work print none.
 
 ## One rubric in several classes (2026-10-18)
 

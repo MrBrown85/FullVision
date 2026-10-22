@@ -13,6 +13,12 @@
    line between sheets. Descriptors shrink by layout; a sheet whose content
    doesn't fit its box is clipped, and the dialog says so before printing.
 
+   An assessment with no rubric of its own prints one too: a Tag Rubric, a
+   row per competency it is scored on, or a General Rubric, one Overall row
+   when it has none. Their level cells read the teacher's own wording for a
+   competency (the descriptor bank) or else the BC proficiency scale's
+   general descriptors (GENERAL_LEVELS), never empty boxes.
+
    Grade math stays in shared/calc.js (getAssessmentOverallScore,
    formatLevel, levelWord). Pure helpers are exposed for tests; the DOM is
    touched only from open() and print(). */
@@ -68,6 +74,13 @@
   var LAYOUT_ORDER = ['full', 'half', 'quarter'];
   var LEVELS = [4, 3, 2, 1];
   var LEVEL_NAMES = { 4: 'Extending', 3: 'Proficient', 2: 'Developing', 1: 'Emerging' };
+  // The BC proficiency scale's general descriptors.
+  var GENERAL_LEVELS = {
+    1: 'The student demonstrates an initial understanding of the concepts and competencies relevant to the expected learning.',
+    2: 'The student demonstrates a partial understanding of the concepts and competencies relevant to the expected learning.',
+    3: 'The student demonstrates a complete understanding of the concepts and competencies relevant to the expected learning.',
+    4: 'The student demonstrates a sophisticated understanding of the concepts and competencies relevant to the expected learning.',
+  };
 
   var DEFAULT_OPTIONS = {
     students: 'scored', // scored | all | pick
@@ -102,9 +115,49 @@
     );
   }
 
-  function _rubric(cid, assessment) {
+  function _customRubric(cid, assessment) {
     if (!assessment || !assessment.rubricId) return null;
     return getRubricById(cid, assessment.rubricId) || null;
+  }
+
+  // A competency's own level wording, where the teacher saved it.
+  function _ownLevels(tag) {
+    if (!tag || typeof getCompetencyDescriptor !== 'function' || typeof RubricDraft === 'undefined') return null;
+    return getCompetencyDescriptor(RubricDraft.competencyKey(tag));
+  }
+
+  /* The rubric a proficiency assessment without one prints: a Tag Rubric
+     (a row per competency it is scored on) or a General Rubric (one Overall
+     row). Null for points and Complete/Incomplete work. */
+  function defaultRubric(cid, assessment) {
+    if (!assessment || isPointsScored(assessment)) return null;
+    var ids = scoreTagIds(assessment, cid);
+    if (!ids.length || (ids.length === 1 && isUnlinkedTag(ids[0]))) {
+      return {
+        id: 'general',
+        name: 'General Rubric',
+        kind: 'general',
+        criteria: [{ id: UNLINKED_TAG_ID, name: 'Overall', tagIds: [], levels: GENERAL_LEVELS }],
+      };
+    }
+    var criteria = ids
+      .map(function (tid) {
+        var tag = getTagById(cid, tid);
+        if (!tag) return null;
+        var own = _ownLevels(tag) || {};
+        var levels = {};
+        LEVELS.forEach(function (lv) {
+          levels[lv] = (own[lv] && String(own[lv]).trim()) || GENERAL_LEVELS[lv];
+        });
+        return { id: tid, name: tag.label || tag.name || tag.code || '', tagIds: [tid], levels: levels };
+      })
+      .filter(Boolean);
+    return criteria.length ? { id: 'tags', name: 'Tag Rubric', kind: 'tags', criteria: criteria } : null;
+  }
+
+  // The assessment's own rubric, else its Tag or General Rubric.
+  function _rubric(cid, assessment) {
+    return _customRubric(cid, assessment) || defaultRubric(cid, assessment);
   }
 
   /* The level shown for one criterion: the grid's rule. All of the
@@ -135,11 +188,16 @@
     return { level: Math.min.apply(null, levels), mod: 0, mixed: true };
   }
 
-  function _criterionCodes(cid, criterion) {
+  /* The codes under a criterion. A Tag Rubric's row is named for its
+     competency, so only a real code shows there, never the name again. */
+  function _criterionCodes(cid, criterion, tagRubric) {
     return (criterion.tagIds || [])
       .map(function (tid) {
         var tag = getTagById(cid, tid);
-        return tag ? tag.code || tag.label || '' : '';
+        if (!tag) return '';
+        if (tag.code) return tag.code;
+        var idCode = tag.id && !/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(tag.id) ? tag.id : '';
+        return idCode || (tagRubric ? '' : tag.label || '');
       })
       .filter(Boolean);
   }
@@ -184,9 +242,12 @@
         level: lv.level,
         mod: lv.mod,
         mixed: lv.mixed,
+        // Criterion comments belong to a rubric of the teacher's own.
         comment:
-          typeof getRubricCriterionComment === 'function' ? getRubricCriterionComment(cid, sid, aid, criterion) : '',
-        codes: _criterionCodes(cid, criterion),
+          !rubric.kind && typeof getRubricCriterionComment === 'function'
+            ? getRubricCriterionComment(cid, sid, aid, criterion)
+            : '',
+        codes: _criterionCodes(cid, criterion, rubric.kind === 'tags'),
       };
     });
     var scored = rows.some(function (r) {
@@ -527,7 +588,7 @@
       return isStudentScored(cid, aid, s.id);
     }).length;
     var html = '<div class="confirm-card rubric-print-card">';
-    html += '<div class="confirm-title" id="rp-title">Print rubrics</div>';
+    html += '<div class="confirm-title" id="rp-title">Print Rubrics</div>';
     html +=
       '<div class="confirm-message">' +
       _esc(assessment ? assessment.title : '') +
@@ -559,8 +620,10 @@
     html += '</fieldset>';
     html += '<fieldset class="rp-group"><legend>Include</legend>';
     html += _check('feedback', opts.include.feedback, 'Feedback comment');
-    html += _check('criterionComments', opts.include.criterionComments, 'Criterion comments');
-    html += _check('codes', opts.include.codes, 'Competency codes');
+    // A Tag or General Rubric has no criterion comments; a General one no codes.
+    if (rubric && !rubric.kind)
+      html += _check('criterionComments', opts.include.criterionComments, 'Criterion comments');
+    if (!rubric || rubric.kind !== 'general') html += _check('codes', opts.include.codes, 'Competency codes');
     html += _check('overall', opts.include.overall, 'Overall level');
     html += '</fieldset>';
     html += '</div>';
@@ -691,6 +754,8 @@
     LAYOUT_ORDER: LAYOUT_ORDER,
     DEFAULT_OPTIONS: DEFAULT_OPTIONS,
     criterionLevel: criterionLevel,
+    defaultRubric: defaultRubric,
+    GENERAL_LEVELS: GENERAL_LEVELS,
     sheetData: sheetData,
     selectStudents: selectStudents,
     isStudentScored: isStudentScored,
