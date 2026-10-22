@@ -43,8 +43,12 @@ window.DashObservations = (function () {
     competency: 18 + 12 + 72 + 30 + 48,
   };
   // A week cell must hold 3 marks (5px each) and "+N" or "9+" without
-  // clipping; 34px leaves a margin for wider fonts.
-  var MIN_CELL = { week: 34, level: 44, both: 76 };
+  // clipping; 34px leaves a margin for wider fonts. On a narrower screen
+  // (a laptop, Windows display scaling) a compact week cell of 23px still
+  // holds 3 marks, and a week with more shows 1 mark and "+N", so the
+  // students can stay in two columns down to about 1280px.
+  var MIN_CELL = { week: 34, weekCompact: 23, level: 44, both: 76 };
+  var COMPACT_MARKS = 1;
 
   var DIAMOND =
     '<svg viewBox="0 0 12 12" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><path d="M6 1.2 10.8 6 6 10.8 1.2 6Z"/></svg>';
@@ -105,6 +109,21 @@ window.DashObservations = (function () {
     return Math.max(1, Math.min(rule, fit));
   }
 
+  /* Columns and cell size together. Full week cells while the rule's
+     columns fit; when they don't, compact week cells if those fit more
+     columns. By competency keeps its cells.
+       { tab, n, cells, minCell, width, fixed } → { cols, minCell, compact } */
+  function obsGridLayout(o) {
+    var full = obsGridColumns(o);
+    if (o.tab !== 'week' || !(o.width > 0) || full >= columnRule(o.n || 0)) {
+      return { cols: full, minCell: o.minCell, compact: false };
+    }
+    var compact = obsGridColumns(Object.assign({}, o, { minCell: MIN_CELL.weekCompact }));
+    return compact > full
+      ? { cols: compact, minCell: MIN_CELL.weekCompact, compact: true }
+      : { cols: full, minCell: o.minCell, compact: false };
+  }
+
   /* Students split into `cols` columns in roster order, rows per column =
      ceil(n / cols); the shorter columns are padded with nulls so every
      column ends on the same line. */
@@ -127,22 +146,25 @@ window.DashObservations = (function () {
      type) while there is room
      and the rest are the newest; "+N" counts the others ("9+" from 10).
      → { marks: ['concern', …] newest first, more, moreLabel, total } */
-  function weekMarks(obs) {
+  function weekMarks(obs, limit) {
     var list = newestFirst(obs);
     var total = list.length;
+    // A compact cell (limit) still shows up to 3 marks; only past 3 does it
+    // keep fewer, to leave room for "+N".
+    var max = limit || MAX_MARKS;
     var chosen;
     if (total <= MAX_MARKS) chosen = list;
     else {
       chosen = [];
       MARK_PRIORITY.forEach(function (t) {
-        if (chosen.length >= MAX_MARKS) return;
+        if (chosen.length >= max) return;
         var o = list.find(function (x) {
           return obType(x) === t;
         });
         if (o) chosen.push(o);
       });
       list.forEach(function (o) {
-        if (chosen.length < MAX_MARKS && chosen.indexOf(o) < 0) chosen.push(o);
+        if (chosen.length < max && chosen.indexOf(o) < 0) chosen.push(o);
       });
       chosen.sort(function (a, b) {
         return list.indexOf(a) - list.indexOf(b);
@@ -415,10 +437,20 @@ window.DashObservations = (function () {
     var cells = tab === 'competency' ? sections.length : win.weeks.length;
     var minCell = tab === 'competency' ? (mode === 'both' ? MIN_CELL.both : MIN_CELL.level) : MIN_CELL.week;
     var fixed = FIXED[tab];
-    var cols =
+    var layout =
       tab === 'competency' && sections.length > 7
-        ? 1
-        : obsGridColumns({ n: rows.length, cells: cells, minCell: minCell, width: state.width, fixed: fixed });
+        ? { cols: 1, minCell: minCell, compact: false }
+        : obsGridLayout({ tab: tab, n: rows.length, cells: cells, minCell: minCell, width: state.width, fixed: fixed });
+    var cols = layout.cols;
+    var baseMinCell = minCell;
+    minCell = layout.minCell;
+    if (layout.compact) {
+      rows.forEach(function (r) {
+        (r.cells || []).forEach(function (c) {
+          if (c.obs) c.marks = weekMarks(c.obs, COMPACT_MARKS);
+        });
+      });
+    }
     var blockMin = blockMinWidth(fixed, cells, minCell);
     var flags =
       tab === 'week' && !classObserved
@@ -449,6 +481,8 @@ window.DashObservations = (function () {
       scrollX: cols === 1 && state.width > 0 && blockMin > state.width,
       cells: cells,
       minCell: minCell,
+      baseMinCell: baseMinCell,
+      compact: layout.compact,
       fixed: fixed,
     };
     return _last;
@@ -882,6 +916,7 @@ window.DashObservations = (function () {
     obsGridColumns: obsGridColumns,
     columnRule: columnRule,
     blockMinWidth: blockMinWidth,
+    obsGridLayout: obsGridLayout,
     splitColumns: splitColumns,
     weekMarks: weekMarks,
     noStrength: noStrength,

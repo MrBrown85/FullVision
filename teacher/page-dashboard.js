@@ -493,18 +493,23 @@ window.PageDashboard = (function () {
     var w = _measureObsWidth(card);
     if (m && w > 0) {
       _obsWidth = w;
-      var cols =
+      var layout =
         m.tab === 'competency' && m.sections.length > 7
-          ? 1
-          : DashObservations.obsGridColumns({
+          ? { cols: 1, compact: false }
+          : DashObservations.obsGridLayout({
+              tab: m.tab,
               n: m.rows.length,
               cells: m.cells,
-              minCell: m.minCell,
+              minCell: m.baseMinCell || m.minCell,
               width: w,
               fixed: m.fixed,
             });
+      var cols = layout.cols;
       var scrollX = cols === 1 && m.blockMin > w;
-      if ((depth || 0) < OBS_MAX_PASSES && (cols !== m.cols || scrollX !== m.scrollX)) {
+      if (
+        (depth || 0) < OBS_MAX_PASSES &&
+        (cols !== m.cols || scrollX !== m.scrollX || !!layout.compact !== !!m.compact)
+      ) {
         renderObsCard(focusKey, depth);
         return;
       }
