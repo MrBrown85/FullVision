@@ -1283,8 +1283,73 @@ function _revalidateActiveClass() {
 }
 
 /** Load all data for a specific course into the cache. */
+/* ── Every class, loaded ──────────────────────────────────────
+   Boot loads the class the teacher opens with; preloadClasses then loads the
+   rest in the background, one at a time, so a class's roster, settings and
+   competencies are on the page before the teacher opens it (the class
+   picker, Class Management, copying between classes). loadClass shares one
+   load per class, so a class picked while it is preloading waits for that
+   same load. In Demo Mode and local-only use every class is already on this
+   device. */
+var _classLoads = {}; // cid → promise while loading, true once loaded
+
+function isClassLoaded(cid) {
+  if (!cid || !_useSupabase) return true;
+  return _classLoads[cid] === true;
+}
+
+function loadClass(cid) {
+  if (isClassLoaded(cid)) return Promise.resolve();
+  if (_classLoads[cid]) return _classLoads[cid];
+  var p = Promise.resolve()
+    .then(function () {
+      return initData(cid);
+    })
+    .catch(function (e) {
+      // initData keeps this device's saved copy when a load fails.
+      console.warn('Could not load class:', cid, e);
+    })
+    .then(function () {
+      _classLoads[cid] = true;
+    });
+  _classLoads[cid] = p;
+  return p;
+}
+
+/* The classes still to load, in the order they are loaded. The open class
+   is the page's own load. */
+function classesToPreload() {
+  var open = getActiveCourse();
+  return Object.keys(COURSES || {}).filter(function (cid) {
+    return cid !== open && !isCourseArchived(cid) && !isClassLoaded(cid);
+  });
+}
+
+var _preloadRun = null;
+function preloadClasses() {
+  if (_preloadRun) return _preloadRun;
+  _preloadRun = classesToPreload()
+    .reduce(function (chain, cid) {
+      return chain.then(function () {
+        return loadClass(cid);
+      });
+    }, Promise.resolve())
+    .then(function () {
+      _preloadRun = null;
+    });
+  return _preloadRun;
+}
+
 async function initData(cid) {
   if (!cid) return;
+  try {
+    return await _initClassData(cid);
+  } finally {
+    _classLoads[cid] = true;
+  }
+}
+
+async function _initClassData(cid) {
   // Avoid duplicate concurrent loads for same course
   if (_initPromise && _initPromise._cid === cid) return _initPromise;
 
@@ -1295,7 +1360,8 @@ async function initData(cid) {
     var inMemory = _cache.students[cid] !== undefined && _classVersion[cid] != null;
     if (inMemory || _savedCopyUsable(cid)) {
       if (!inMemory) _loadSavedCopy(cid);
-      _saveClassMeta(cid, { lastOpenedAt: Date.now() });
+      // A class loaded in the background hasn't been opened.
+      if (cid === getActiveCourse()) _saveClassMeta(cid, { lastOpenedAt: Date.now() });
       _startClassCheck(cid);
       if (cid === getActiveCourse()) _subscribeCourseSyncCursor(cid);
       return;
@@ -3869,7 +3935,9 @@ function _markSavedCopyDirty(cid) {
    saved copy stays on screen. */
 function _startClassCheck(cid) {
   _classFresh[cid] = false;
-  var offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+  // Only the class on screen holds the page while it is checked; another
+  // class checked in the background (preloadClasses) leaves the page alone.
+  var offline = (typeof navigator !== 'undefined' && navigator.onLine === false) || cid !== getActiveCourse();
   if (!offline) setPageLock('checking', true);
   var body = typeof document !== 'undefined' ? document.body : null;
   var noteTimer = setTimeout(function () {
@@ -4097,9 +4165,10 @@ function _courseLoadFailed(cid, error) {
   console.warn('get_gradebook failed for ' + cid + '; keeping the saved copy:', error);
   _loadError[cid] = { at: Date.now(), message: message };
   if (_cache.students[cid] === undefined) _loadCourseFromLS(cid);
-  // The message must never be what breaks a load.
+  // The message must never be what breaks a load. A class loaded in the
+  // background says nothing: it is said when the teacher opens it.
   try {
-    if (typeof showSyncToast === 'function') {
+    if (typeof showSyncToast === 'function' && cid === getActiveCourse()) {
       showSyncToast("Couldn't load the latest data for this class. " + _savedCopyDescription(cid), 'load-failed');
     }
   } catch (e) {
@@ -10717,6 +10786,9 @@ window.GB = {
   },
   initAllCourses,
   initData,
+  isClassLoaded,
+  loadClass,
+  preloadClasses,
   esc,
   escJs,
   initials,
