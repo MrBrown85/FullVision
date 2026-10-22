@@ -175,34 +175,6 @@ window.ObsCapture = (function () {
     return a ? a.title || '' : '';
   }
 
-  /* The assessment most recently scored in this class today, or null. */
-  function defaultAssessmentId(cid) {
-    var exists = function (aid) {
-      return (
-        !!aid &&
-        assessmentList(cid).some(function (a) {
-          return a.id === aid;
-        })
-      );
-    };
-    if (typeof getLastScoredAssessment === 'function') {
-      var last = getLastScoredAssessment(cid);
-      if (exists(last)) return last;
-    }
-    var today =
-      typeof courseToday === 'function' ? courseToday(cid) : typeof getTodayStr === 'function' ? getTodayStr() : '';
-    if (!today || typeof getScores !== 'function') return null;
-    var scores = getScores(cid) || {};
-    var best = null;
-    Object.keys(scores).forEach(function (sid) {
-      (scores[sid] || []).forEach(function (e) {
-        if (!e || e.date !== today || !e.assessmentId) return;
-        if (!best || (e.created || '') > (best.created || '')) best = e;
-      });
-    });
-    return best && exists(best.assessmentId) ? best.assessmentId : null;
-  }
-
   /* ── Sentence starters ──────────────────────────────────── */
 
   function starterList() {
@@ -432,7 +404,6 @@ window.ObsCapture = (function () {
        lockStudents        hide the student picker; the students are fixed
        assessmentId        pre-filled assessment
        lockAssessment      the assessment cannot be changed
-       defaultAssessment   pre-fill the assessment scored today
        competencyId        pre-filled competency
        draftKey            where unsent text is kept ('obs-page', 'student' …)
        layout              'inline' (menus float) or 'sheet' (menus in flow)
@@ -457,7 +428,6 @@ window.ObsCapture = (function () {
       error: '',
       templateId: null, // the starter the text came from
     };
-    if (!state.assessmentId && opts.defaultAssessment) state.assessmentId = defaultAssessmentId(cid);
     var draftKey = (opts.draftKey || 'obs') + '|' + cid;
     var root = document.createElement('div');
     root.className = 'obsc' + (opts.layout === 'sheet' ? ' obsc--sheet' : '');
@@ -1821,7 +1791,6 @@ window.ObsCapture = (function () {
       matchStudents: matchStudents,
       matchTags: matchTags,
       matchTypes: matchTypes,
-      defaultAssessmentId: defaultAssessmentId,
       studentList: studentList,
       drafts: _drafts,
     },

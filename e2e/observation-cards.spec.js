@@ -249,9 +249,8 @@ test.describe('Capture strip (D4), desktop', () => {
     await strip.locator('.obs-menu-item', { hasText: 'None' }).click();
     await expect(strip.locator('#context-btn')).toHaveText(/\+ Context/);
 
-    // The strip pre-fills an assessment scored today; clear it so + Link offers both.
-    const prefilled = strip.locator('[data-obsc="clearAssessment"]');
-    if (await prefilled.count()) await prefilled.click();
+    // Nothing is linked by default.
+    await expect(strip.locator('.obsc-chip-assessment')).toHaveCount(0);
     await strip.locator('#link-btn').click();
     await expect(strip.locator('#link-dropdown .obsc-item-label')).toHaveText(['+ Assessment', '+ Competency']);
     await strip.locator('#assessment-btn').click();

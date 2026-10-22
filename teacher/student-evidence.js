@@ -648,7 +648,6 @@ window.StudentEvidence = (function () {
         idPrefix: 'note-',
         students: [studentId],
         lockStudents: true,
-        defaultAssessment: true,
         draftKey: 'student|' + studentId,
         placeholder: 'Add an observation…',
         onAdd: function () {
