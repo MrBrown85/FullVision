@@ -248,7 +248,9 @@ describe('capture strip', () => {
       '+ Link▾',
     ]);
     expect(cap.el.querySelector('#context-btn').textContent).toBe('+ Context▾');
-    expect(cap.el.querySelector('.obsc-keep').textContent.trim()).toBe('Keep Tags');
+    // No Keep Tags box and no "Enter adds" hint (Colin, 2026-10-22).
+    expect(cap.el.querySelector('.obsc-keep')).toBeNull();
+    expect(text).not.toContain('Enter adds');
     expect(text).not.toMatch(/\p{Extended_Pictographic}/u);
     expect(cap.el.querySelector('#capture-input')).toBeTruthy();
     expect(cap.el.querySelector('#capture-add-btn').disabled).toBe(true);
@@ -276,20 +278,6 @@ describe('capture strip', () => {
     const e = press(cap, 'Enter', { shift: true });
     expect(e.defaultPrevented).toBe(false);
     expect(added).toHaveLength(0);
-  });
-
-  it('Keep tags keeps the type, context and tags after Add', () => {
-    const cap = mount({ students: ['s1'] });
-    const keep = cap.el.querySelector('[data-obsc="keepTags"]');
-    keep.checked = true;
-    keep.dispatchEvent(new win.Event('change', { bubbles: true }));
-    click(cap.el.querySelector('[data-obsc="type"][data-value="growth"]'));
-    type(cap, 'Needed a prompt to start #engagement ');
-    expect(cap.getState().dims).toEqual(['engagement']);
-    cap.submit();
-    expect(added[0].dims).toEqual(['engagement']);
-    expect(cap.getState().dims).toEqual(['engagement']);
-    expect(cap.getState().sentiment).toBe('growth');
   });
 
   it('a finished @name becomes a student chip as you type', () => {
