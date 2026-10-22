@@ -132,7 +132,9 @@ create table tag (
   section_id    uuid        not null references section(id) on delete cascade,
   code          text,
   label         text        not null,
-  i_can_text    text,
+  i_can_text    text,         -- the competency's wording, despite the name
+  i_can_statements text[]   not null default '{}',
+  source_text   text,         -- the curriculum wording it started with
   display_order integer     not null default 0,
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()
