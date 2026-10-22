@@ -34,6 +34,22 @@ describe('delete-account desktop flow', () => {
     expect(html).not.toContain('data-action="deleteAccount"');
   });
 
+  it('shows Reset Demo Data in the account menu only in Demo Mode', () => {
+    var original = window.isDemoMode;
+    try {
+      window.isDemoMode = function () {
+        return false;
+      };
+      expect(renderDock('dashboard')).not.toContain('data-action="resetDemoData"');
+      window.isDemoMode = function () {
+        return true;
+      };
+      expect(renderDock('dashboard')).toContain('data-action="resetDemoData"');
+    } finally {
+      window.isDemoMode = original;
+    }
+  });
+
   it('puts Delete Account last in the Assignments Advanced menu', () => {
     var src = readFileSync(resolve(root, 'teacher/page-assignments.js'), 'utf8');
     var adv = src.slice(src.indexOf('var advHtml ='), src.indexOf('return { toolbarHtml: toolbarHtml'));

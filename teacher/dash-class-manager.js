@@ -2448,6 +2448,9 @@ window.DashClassManager = (function () {
       '<button type="button" role="menuitem" class="cm-std-menu-item" data-action="cmDuplicateCourse" data-cid="' +
       cid +
       '">Duplicate Class</button>' +
+      '<button type="button" role="menuitem" class="cm-std-menu-item" data-action="cmDownloadBackup" data-cid="' +
+      cid +
+      '">Download Class Backup</button>' +
       '<button type="button" role="menuitem" class="cm-std-menu-item" data-action="cmToggleArchive" data-cid="' +
       cid +
       '">' +
@@ -2674,6 +2677,7 @@ window.DashClassManager = (function () {
       '<div class="cm-hint">Every method skips work that hasn’t been scored.</div>' +
       '</div>' +
       _cmRenderRecentLimit(method, lastN) +
+      _cmRenderPointsScale(cid) +
       '</div>';
 
     var pctOff = gs === 'proficiency';
@@ -2760,6 +2764,66 @@ window.DashClassManager = (function () {
       '</select>' +
       '</div>'
     );
+  }
+
+  /* The percent a points score needs for each proficiency. The lowest
+     proficiency takes everything below the one above it. */
+  function _cmRenderPointsScale(cid) {
+    var b = getGradingScale(cid).boundaries;
+    var rows = b
+      .map(function (row, i) {
+        var name = PROF_LABELS[row.proficiency];
+        var input =
+          i === b.length - 1
+            ? '<span class="cm-pts-below">Below ' + b[i - 1].min + '%</span>'
+            : '<input class="cm-input cm-pts-min" type="number" min="1" max="99" id="cm-pts-min-' +
+              i +
+              '" data-idx="' +
+              i +
+              '" value="' +
+              row.min +
+              '" data-action-change="cmPointsScale" aria-label="' +
+              name +
+              ' starts at this percent"><span class="cm-pts-unit">% and up</span>';
+        return '<div class="cm-pts-row"><span class="cm-pts-name">' + name + '</span>' + input + '</div>';
+      })
+      .join('');
+    return (
+      '<div class="cm-pts-scale">' +
+      '<div class="cm-recent-text"><span class="cm-label">Points to Proficiency</span>' +
+      '<span class="cm-hint">A points score becomes a proficiency by its percent.</span></div>' +
+      '<div class="cm-pts-rows">' +
+      rows +
+      '</div>' +
+      '<button type="button" class="cm-action-btn cm-pts-reset" data-action="cmPointsScaleReset">Reset to Defaults</button>' +
+      '</div>'
+    );
+  }
+
+  function cmSavePointsScale() {
+    if (!cmSelectedCourse) return;
+    var cc = getCourseConfig(cmSelectedCourse);
+    var scale = getGradingScale(cmSelectedCourse);
+    var boundaries = DEFAULT_GRADING_SCALE.boundaries.map(function (db, i) {
+      var inp = document.getElementById('cm-pts-min-' + i);
+      return {
+        min: inp ? Math.max(0, Math.min(99, parseInt(inp.value, 10) || 0)) : 0,
+        proficiency: db.proficiency,
+      };
+    });
+    // Labels saved before the scale moved here are kept as they were.
+    cc.gradingScale = { boundaries: boundaries, labels: scale.labels || null };
+    saveCourseConfig(cmSelectedCourse, cc);
+    renderClassManager();
+  }
+
+  function cmResetPointsScale() {
+    if (!cmSelectedCourse) return;
+    var cc = getCourseConfig(cmSelectedCourse);
+    // Saved, not deleted: other devices only take a scale the server has.
+    cc.gradingScale = structuredClone(DEFAULT_GRADING_SCALE);
+    saveCourseConfig(cmSelectedCourse, cc);
+    renderClassManager();
   }
 
   /* The categories' weights as one bar, so a teacher sees the split. */
@@ -4925,6 +4989,37 @@ window.DashClassManager = (function () {
   // Duplicate Class asks which block the copy is for. With a block, the copy
   // keeps the class name ("Philosophy 12", Block B); without one it is
   // "Philosophy 12 (Copy)" as before.
+  /* Everything the class holds, as one JSON file the teacher keeps. */
+  function cmDownloadBackup(cid) {
+    if (!COURSES[cid]) return;
+    var data = {
+      course: cid,
+      students: getStudents(cid),
+      categories: getCategories(cid),
+      assessments: getAssessments(cid),
+      scores: getScores(cid),
+      overrides: getOverrides(cid),
+      notes: getNotes(cid),
+      config: getCourseConfig(cid),
+      learningMap: getLearningMap(cid),
+      modules: getModules(cid),
+      rubrics: getRubrics(cid),
+      statuses: getAssignmentStatuses(cid),
+      flags: getFlags(cid),
+      goals: getGoals(cid),
+      reflections: getReflections(cid),
+      observations: getQuickObs(cid),
+      termRatings: getTermRatings(cid),
+      customTags: getCustomTags(cid),
+      reportConfig: getReportConfig(cid),
+    };
+    var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'gradebook-' + cid + '-' + new Date().toISOString().slice(0, 10) + '.json';
+    a.click();
+  }
+
   function cmDuplicateCourse(sourceCid) {
     var src = COURSES[sourceCid];
     if (!src) return;
@@ -6811,6 +6906,9 @@ window.DashClassManager = (function () {
       cmCopySetup: function () {
         cmOpenSetupCopy({});
       },
+      cmPointsScaleReset: function () {
+        cmResetPointsScale();
+      },
       cmCatSave: function () {
         cmCatSave();
       },
@@ -6864,6 +6962,9 @@ window.DashClassManager = (function () {
       },
       cmDuplicateCourse: function () {
         cmDuplicateCourse(el.dataset.cid);
+      },
+      cmDownloadBackup: function () {
+        cmDownloadBackup(el.dataset.cid);
       },
       cmToggleArchive: function () {
         cmToggleArchive(el.dataset.cid);
@@ -7086,6 +7187,10 @@ window.DashClassManager = (function () {
     }
     if (el.dataset.actionChange === 'cmRecentLimit') {
       cmSetRecentLimit(el.value);
+      return true;
+    }
+    if (el.dataset.actionChange === 'cmPointsScale') {
+      cmSavePointsScale();
       return true;
     }
     if (el.dataset.actionChange === 'cmStdGroup') {

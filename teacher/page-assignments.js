@@ -311,6 +311,9 @@ window.PageAssignments = (function () {
       '<div class="assess-toolbar-actions">' +
       '<div class="tb-dropdown-wrap">' +
       '<button class="tb-dropdown-btn' +
+      (_rubricsPanelOpen ? ' open' : '') +
+      '" data-action="toggleToolbarDropdown" data-panel="rubrics">Rubrics</button>' +
+      '<button class="tb-dropdown-btn' +
       (_advancedPanelOpen ? ' open' : '') +
       '" data-action="toggleToolbarDropdown" data-panel="advanced">Advanced</button>' +
       '<div class="tb-dropdown-panel' +
@@ -377,7 +380,6 @@ window.PageAssignments = (function () {
 
     // Advanced dropdown content
     var advHtml =
-      '<div class="settings-row"><label>Rubrics</label><button class="btn btn-primary" data-action="openRubricPanel">Rubric Bank</button></div>' +
       '<div class="settings-title">Calculation</div>' +
       '<div class="settings-row"><label>Method</label><select class="form-input" style="width:auto" data-action-change="updateCalcMethod"><option value="mostRecent"' +
       (method === 'mostRecent' ? ' selected' : '') +
@@ -395,19 +397,11 @@ window.PageAssignments = (function () {
       '%</span></label><input type="range" min="0" max="100" value="' +
       (dw * 100).toFixed(0) +
       '" data-action-input="updateDecaySlider"></div>' +
-      renderGradingScaleEditor(cid) +
       renderCategoryWeightsEditor(cid) +
       '<div class="settings-title" style="margin-top:16px;padding-top:12px;border-top:0.5px solid var(--divider-subtle)">Data</div>' +
-      '<div class="settings-row"><label>Export</label><button class="btn btn-primary" data-action="exportData">JSON</button></div>' +
       '<div class="settings-row"><label>Export Scores</label><button class="btn btn-primary" data-action="exportScoresCSV">Export Scores CSV</button></div>' +
       '<div class="settings-row"><label>Export Summary</label><button class="btn btn-primary" data-action="exportSummaryCSV">Export Summary CSV</button></div>' +
       '<div class="settings-row"><label>Delete class</label><button class="btn btn-danger" data-action="clearData">Delete</button></div>' +
-      // Reset Demo deletes every class before reseeding, so it exists only in
-      // Demo Mode, never for a signed-in teacher.
-      (_isDemo()
-        ? '<div class="settings-title" style="margin-top:16px;padding-top:12px;border-top:0.5px solid var(--divider-subtle)">Demo</div>' +
-          '<div class="settings-row"><label>Reset to Demo Data</label><button class="btn btn-danger" data-action="resetDemoData">Reset Demo</button></div>'
-        : '') +
       '<div class="settings-title" style="margin-top:16px;padding-top:12px;border-top:0.5px solid var(--divider-subtle)">Account</div>' +
       '<div class="settings-row"><label>Delete your account</label><button class="btn btn-danger" data-action="deleteAccount">Delete Account</button></div>';
 
@@ -1701,14 +1695,18 @@ window.PageAssignments = (function () {
   }
 
   function toggleToolbarDropdown(which) {
-    _advancedPanelOpen = !_advancedPanelOpen;
-    _rubricsPanelOpen = false;
+    var rubrics = which === 'rubrics';
+    _rubricsPanelOpen = rubrics ? !_rubricsPanelOpen : false;
+    _advancedPanelOpen = rubrics ? false : !_advancedPanelOpen;
+    _syncToolbarDropdowns();
+  }
+  function _syncToolbarDropdowns() {
     var ap = document.getElementById('tb-advanced-panel');
     var rp = document.getElementById('tb-rubrics-panel');
     if (ap) ap.classList.toggle('open', _advancedPanelOpen);
-    if (rp) rp.classList.remove('open');
+    if (rp) rp.classList.toggle('open', _rubricsPanelOpen);
     document.querySelectorAll('.tb-dropdown-btn').forEach(function (btn) {
-      btn.classList.toggle('open', _advancedPanelOpen);
+      btn.classList.toggle('open', btn.dataset.panel === 'rubrics' ? _rubricsPanelOpen : _advancedPanelOpen);
     });
   }
 
@@ -2996,8 +2994,7 @@ window.PageAssignments = (function () {
      the editor opens from it. */
   function _closeRubricsPanel() {
     _rubricsPanelOpen = false;
-    var rp = document.getElementById('tb-rubrics-panel');
-    if (rp) rp.classList.remove('open');
+    _syncToolbarDropdowns();
   }
   function newRubricUI() {
     _closeRubricsPanel();
@@ -4062,63 +4059,6 @@ window.PageAssignments = (function () {
     cc.decayWeight = parseInt(val, 10) / 100;
     saveCourseConfig(activeCourse, cc);
   }
-  function renderGradingScaleEditor(cid) {
-    var scale = getGradingScale(cid);
-    var b = scale.boundaries;
-    var labels = scale.labels || [null, null, null, null];
-    var defaultLabels = ['Emerging', 'Developing', 'Proficient', 'Extending'];
-    var html =
-      '<div class="settings-title" style="margin-top:16px;padding-top:12px;border-top:0.5px solid var(--divider-subtle)">Grading Scale</div><div style="font-size:0.75rem;color:var(--text-3);margin-bottom:8px">Set % boundaries for points \u2192 proficiency conversion</div><table style="width:100%;border-collapse:collapse;font-size:0.875rem"><thead><tr style="text-align:left;color:var(--text-3);font-size:0.75rem;"><th style="padding:4px 8px;width:40px">Level</th><th style="padding:4px 8px">Label</th><th style="padding:4px 8px;width:70px">Min %</th></tr></thead><tbody>';
-    for (var i = 0; i < b.length; i++) {
-      var prof = b[i].proficiency;
-      var label = (labels && labels[prof - 1]) || defaultLabels[prof - 1];
-      var isBottom = i === b.length - 1;
-      html +=
-        '<tr style="border-bottom:1px solid var(--divider-subtle)"><td style="padding:6px 8px;font-weight:600;color:var(--text-2)">' +
-        prof +
-        '</td><td style="padding:6px 8px"><input class="af-input gs-label" data-prof="' +
-        prof +
-        '" value="' +
-        esc(label) +
-        '" data-action-change="saveGradingScale" style="font-size:0.875rem;padding:4px 8px"></td><td style="padding:6px 8px">' +
-        (isBottom
-          ? '<span style="color:var(--text-3)">0</span>'
-          : '<input class="af-input gs-min" data-idx="' +
-            i +
-            '" type="number" min="1" max="99" value="' +
-            b[i].min +
-            '" data-action-change="saveGradingScale" style="font-size:0.875rem;padding:4px 8px;width:60px;text-align:center">') +
-        '</td></tr>';
-    }
-    html +=
-      '</tbody></table><button class="btn btn-ghost" data-action="resetGradingScale" style="font-size:0.75rem;margin-top:6px;padding:4px 10px">Reset to Defaults</button>';
-    return html;
-  }
-  function saveGradingScale() {
-    var cc = getCourseConfig(activeCourse);
-    var boundaries = [];
-    var labels = [null, null, null, null];
-    document.querySelectorAll('.gs-label').forEach(function (inp) {
-      var prof = parseInt(inp.dataset.prof, 10);
-      labels[prof - 1] = inp.value.trim() || null;
-    });
-    DEFAULT_GRADING_SCALE.boundaries.forEach(function (db, i) {
-      var inp = document.querySelector('.gs-min[data-idx="' + i + '"]');
-      boundaries.push({
-        min: inp ? Math.max(0, Math.min(99, parseInt(inp.value, 10) || 0)) : 0,
-        proficiency: db.proficiency,
-      });
-    });
-    cc.gradingScale = { boundaries: boundaries, labels: labels };
-    saveCourseConfig(activeCourse, cc);
-  }
-  function resetGradingScale() {
-    var cc = getCourseConfig(activeCourse);
-    // Saved, not deleted: other devices only take a scale the server has.
-    cc.gradingScale = structuredClone(DEFAULT_GRADING_SCALE);
-    saveCourseConfig(activeCourse, cc);
-    render();
-  }
   function renderCategoryWeightsEditor(cid) {
     var cw = getCategoryWeights(cid);
     var enabled = cw.formative > 0;
@@ -4417,35 +4357,6 @@ window.PageAssignments = (function () {
   }
 
   /* ── Export / Import ────────────────────────────────────── */
-  function exportData() {
-    var cid = activeCourse;
-    var data = {
-      course: cid,
-      students: getStudents(cid),
-      categories: getCategories(cid),
-      assessments: getAssessments(cid),
-      scores: getScores(cid),
-      overrides: getOverrides(cid),
-      notes: getNotes(cid),
-      config: getCourseConfig(cid),
-      learningMap: getLearningMap(cid),
-      modules: getModules(cid),
-      rubrics: getRubrics(cid),
-      statuses: getAssignmentStatuses(cid),
-      flags: getFlags(cid),
-      goals: getGoals(cid),
-      reflections: getReflections(cid),
-      observations: getQuickObs(cid),
-      termRatings: getTermRatings(cid),
-      customTags: getCustomTags(cid),
-      reportConfig: getReportConfig(cid),
-    };
-    var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'gradebook-' + cid + '-' + new Date().toISOString().slice(0, 10) + '.json';
-    a.click();
-  }
   function downloadCSV(csv, filename) {
     var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     var a = document.createElement('a');
@@ -4539,34 +4450,6 @@ window.PageAssignments = (function () {
       },
     );
   }
-  function _isDemo() {
-    return typeof isDemoMode === 'function' && isDemoMode();
-  }
-
-  function resetDemoData() {
-    if (!_isDemo()) return;
-    showConfirm(
-      'Reset Demo Data',
-      'Reset ALL data to demo defaults? This cannot be undone.',
-      'Reset',
-      'danger',
-      async function () {
-        await Promise.all(
-          Object.keys(COURSES).map(function (cid) {
-            return deleteCourseData(cid);
-          }),
-        );
-        Object.keys(COURSES).forEach(function (cid) {
-          delete COURSES[cid];
-        });
-        Object.assign(COURSES, structuredClone(DEFAULT_COURSES));
-        saveCourses(COURSES);
-        loadSeedIfNeeded();
-        Router.navigate('/dashboard');
-      },
-    );
-  }
-
   /* ── Keyboard Navigation ────────────────────────────────── */
   function kbFocusCell(el) {
     if (_kbFocusEl) _kbFocusEl.classList.remove('kb-focus');
@@ -4726,9 +4609,6 @@ window.PageAssignments = (function () {
       toggleToolbarDropdown: function () {
         toggleToolbarDropdown(el.dataset.panel);
       },
-      exportData: function () {
-        exportData();
-      },
       exportScoresCSV: function () {
         exportScoresCSV();
       },
@@ -4737,22 +4617,6 @@ window.PageAssignments = (function () {
       },
       clearData: function () {
         clearData();
-      },
-      resetDemoData: function () {
-        resetDemoData();
-      },
-      openRubricPanel: function () {
-        _advancedPanelOpen = false;
-        _rubricsPanelOpen = true;
-        var ap = document.getElementById('tb-advanced-panel');
-        var rp = document.getElementById('tb-rubrics-panel');
-        if (ap) ap.classList.remove('open');
-        if (rp) {
-          rp.classList.add('open');
-        }
-        document.querySelectorAll('.tb-dropdown-btn').forEach(function (btn) {
-          btn.classList.add('open');
-        });
       },
       clearAssessFilters: function () {
         e.preventDefault();
@@ -4892,9 +4756,6 @@ window.PageAssignments = (function () {
       toggleCritTag: function () {
         toggleCritTag(parseInt(el.dataset.index, 10), el.dataset.tagid);
       },
-      resetGradingScale: function () {
-        resetGradingScale();
-      },
       setMaxPoints: function () {
         var mp = document.getElementById('af-maxpoints');
         if (mp) mp.value = el.dataset.value;
@@ -4954,10 +4815,6 @@ window.PageAssignments = (function () {
     }
     if (el.dataset.actionChange === 'autoSetDueDate') {
       autoSetDueDate();
-      return;
-    }
-    if (el.dataset.actionChange === 'saveGradingScale') {
-      saveGradingScale();
       return;
     }
     if (el.dataset.actionChange === 'toggleCategoryWeights') {

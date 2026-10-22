@@ -568,6 +568,7 @@ body.offline-active #app-dock {
 }
 .tb-user-signout {
   display: block;
+  white-space: nowrap;
   width: 100%;
   padding: 7px 12px;
   text-align: left;
