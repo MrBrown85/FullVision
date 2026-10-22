@@ -140,12 +140,12 @@ test.describe('Gradebook — Spreadsheet View', () => {
     expect((await statuses())['stu-002:assess-001']).toBeUndefined();
   });
 
-  test('the Summary view is gone and a saved Summary choice opens Competencies', async ({ page }) => {
+  test('the Gradebook tab opens on Scores, even after Competencies was used', async ({ page }) => {
     await seedStudents(page);
-    await page.addInitScript(() => localStorage.setItem('gb_viewMode', 'summary'));
+    await page.addInitScript(() => localStorage.setItem('gb_viewMode', 'detailed'));
     await gotoApp(page, '/gradebook');
     await expect(page.locator('[data-action="setView"][data-mode="summary"]')).toHaveCount(0);
-    await expect(page.locator('[data-action="setView"][data-mode="detailed"]')).toHaveClass(/active/);
+    await expect(page.locator('[data-action="setView"][data-mode="scores"]')).toHaveClass(/active/);
   });
 
   test('switching between both tabs does not crash', async ({ page }) => {
@@ -157,7 +157,7 @@ test.describe('Gradebook — Spreadsheet View', () => {
       'stu-003': { 'assess-001': { QAP: 4 } },
     });
     await gotoApp(page, '/gradebook');
-    // Competencies → Scores
+    // Scores → Competencies → Scores
     await page.locator('[data-action="setView"][data-mode="scores"]').click();
     await page.waitForTimeout(300);
     await expect(page.locator('#main')).not.toBeEmpty();

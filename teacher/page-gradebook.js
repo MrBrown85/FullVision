@@ -11,7 +11,7 @@ window.PageGradebook = (function () {
 
   /* ── State variables ────────────────────────────────────── */
   var activeCourse;
-  var viewMode = savedViewMode();
+  var viewMode = 'scores';
   /* The Competencies view shows a rubric assessment as one column per
      competency ('competencies', the default) or one per criterion
      ('criteria'). Remembered per class on this device. */
@@ -99,14 +99,10 @@ window.PageGradebook = (function () {
   }
 
   /* ── View & filter controls ─────────────────────────────── */
-  // A saved 'summary' (the retired Summary view) falls back to Competencies.
-  function savedViewMode() {
-    return localStorage.getItem('gb_viewMode') === 'scores' ? 'scores' : 'detailed';
-  }
+  // The Gradebook tab always opens on Scores; the choice lasts until the page is left.
   function setView(mode) {
     _flushActiveScoreEditor();
     viewMode = mode;
-    localStorage.setItem('gb_viewMode', mode);
     render();
   }
   function toggleSectionFilter(secId) {
@@ -285,15 +281,15 @@ window.PageGradebook = (function () {
     html +=
       '<div class="seg gb-seg-control" role="tablist" aria-label="View mode">' +
       '<button class="seg-btn gb-seg-btn' +
-      (viewMode === 'detailed' ? ' active' : '') +
-      '" data-action="setView" data-mode="detailed" role="tab" aria-selected="' +
-      (viewMode === 'detailed') +
-      '">Competencies</button>' +
-      '<button class="seg-btn gb-seg-btn' +
       (viewMode === 'scores' ? ' active' : '') +
       '" data-action="setView" data-mode="scores" role="tab" aria-selected="' +
       (viewMode === 'scores') +
       '">Scores</button>' +
+      '<button class="seg-btn gb-seg-btn' +
+      (viewMode === 'detailed' ? ' active' : '') +
+      '" data-action="setView" data-mode="detailed" role="tab" aria-selected="' +
+      (viewMode === 'detailed') +
+      '">Competencies</button>' +
       '</div>';
 
     var hasRubricAssessment = allAssessments.some(function (a) {
@@ -302,20 +298,14 @@ window.PageGradebook = (function () {
     if (viewMode === 'detailed' && hasRubricAssessment) {
       var rubricCols = rubricColumnsMode(cid);
       html +=
-        '<div class="gb-rubric-cols">' +
-        '<span class="gb-rubric-cols-label" id="gb-rubric-cols-label">Rubric columns</span>' +
-        '<div class="seg gb-seg-control" role="tablist" aria-labelledby="gb-rubric-cols-label">' +
-        '<button class="seg-btn gb-seg-btn' +
-        (rubricCols === 'competencies' ? ' active' : '') +
-        '" data-action="setRubricColumns" data-mode="competencies" role="tab" aria-selected="' +
-        (rubricCols === 'competencies') +
-        '" title="One column per competency the rubric scores">Competencies</button>' +
-        '<button class="seg-btn gb-seg-btn' +
-        (rubricCols === 'criteria' ? ' active' : '') +
-        '" data-action="setRubricColumns" data-mode="criteria" role="tab" aria-selected="' +
-        (rubricCols === 'criteria') +
-        '" title="One column per rubric criterion">Criteria</button>' +
-        '</div></div>';
+        '<select class="class-picker gb-rubric-cols-select" data-action="setRubricColumns" aria-label="Rubric columns">' +
+        '<option value="competencies"' +
+        (rubricCols === 'competencies' ? ' selected' : '') +
+        '>Rubrics by Competency</option>' +
+        '<option value="criteria"' +
+        (rubricCols === 'criteria' ? ' selected' : '') +
+        '>Rubrics by Criterion</option>' +
+        '</select>';
     }
 
     html += typeof renderTermPicker === 'function' ? renderTermPicker(cid) : '';
@@ -2778,9 +2768,6 @@ window.PageGradebook = (function () {
         setView(el.dataset.mode);
       },
       toggleNewestFirst: toggleNewestFirst,
-      setRubricColumns: function () {
-        setRubricColumns(el.dataset.mode);
-      },
       toggleFilterStrip: function () {
         toggleFilterStrip();
       },
@@ -2842,6 +2829,8 @@ window.PageGradebook = (function () {
   function _handleChange(e) {
     if (e.target.matches('[data-action="switchCourse"]')) {
       switchCourse(e.target.value);
+    } else if (e.target.matches('[data-action="setRubricColumns"]')) {
+      setRubricColumns(e.target.value);
     }
   }
 
@@ -2849,7 +2838,7 @@ window.PageGradebook = (function () {
   function init(params) {
     activeCourse = params.course || getActiveCourse();
     setActiveCourse(activeCourse);
-    viewMode = savedViewMode();
+    viewMode = 'scores';
     filterSections = [];
     filterModules = [];
     filterCategories = [];

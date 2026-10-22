@@ -1055,18 +1055,6 @@ th.gb-group-alt {
 .gb-grid-colheads-row2 {
   display: flex;
 }
-/* Rubric columns: Competencies | Criteria (Competencies view only) */
-.gb-rubric-cols {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.gb-rubric-cols-label {
-  font-family: var(--font-base);
-  font-size: var(--text-xs);
-  color: var(--text-3);
-  white-space: nowrap;
-}
 .gb-grid-tag-header {
   flex: 0 0 54px;
   width: 54px;
