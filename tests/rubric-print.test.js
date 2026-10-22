@@ -277,3 +277,86 @@ describe('criterion comments in the data layer', () => {
     expect(scores[SID][0].critNote).toBeUndefined();
   });
 });
+
+/* An assessment with no rubric of its own prints a Tag Rubric (a row per
+   competency) or a General Rubric (one Overall row), with the teacher's own
+   wording for a competency where saved, else the BC proficiency scale's
+   general descriptors: never empty boxes. */
+describe('Tag and General Rubrics', () => {
+  const AID_TAGS = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
+  const AID_GEN = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2';
+  const AID_PTS = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa3';
+  beforeEach(() => {
+    _cache.learningMaps[CID] = {
+      subjects: [],
+      sections: [
+        { id: 'sec1', name: 'Inquiry', tags: [{ id: TAG_1, label: 'Questioning', code: 'QAP' }] },
+        { id: 'sec2', name: 'Planning', tags: [{ id: TAG_2, label: 'Planning' }] },
+      ],
+      _customized: true,
+      _flatVersion: 2,
+    };
+    saveAssessments(CID, [
+      { id: AID_TAGS, title: 'Lab write-up', date: '2026-10-03', type: 'summative', tagIds: [TAG_1, TAG_2] },
+      { id: AID_GEN, title: 'Reading check', date: '2026-10-03', type: 'summative', tagIds: [] },
+      {
+        id: AID_PTS,
+        title: 'Quiz',
+        date: '2026-10-03',
+        type: 'summative',
+        tagIds: [],
+        scoreMode: 'points',
+        maxPoints: 10,
+      },
+    ]);
+    saveScores(CID, {
+      [SID]: [
+        { id: 'g1', assessmentId: AID_TAGS, tagId: TAG_1, score: 3, mod: 1, date: '2026-10-03', note: '' },
+        { id: 'g2', assessmentId: AID_GEN, tagId: UNLINKED_TAG_ID, score: 4, date: '2026-10-03', note: '' },
+      ],
+    });
+  });
+
+  it('builds a Tag Rubric from the competencies, with the general wording', () => {
+    const r = RubricPrint.defaultRubric(CID, getAssessments(CID)[0]);
+    expect(r.name).toBe('Tag Rubric');
+    expect(r.criteria.map(c => c.name)).toEqual(['Questioning', 'Planning']);
+    expect(r.criteria[0].levels[3]).toBe(RubricPrint.GENERAL_LEVELS[3]);
+    expect(RubricPrint.GENERAL_LEVELS[1]).toBe(
+      'The student demonstrates an initial understanding of the concepts and competencies relevant to the expected learning.',
+    );
+  });
+
+  it('uses the teacher’s own wording for a competency where saved', () => {
+    const tag = getTagById(CID, TAG_1);
+    localStorage.setItem(
+      'gb-competency-descriptors',
+      JSON.stringify({ [RubricDraft.competencyKey(tag)]: { 3: 'Asks a testable question.' } }),
+    );
+    _competencyDescriptors = null;
+    const r = RubricPrint.defaultRubric(CID, getAssessments(CID)[0]);
+    expect(r.criteria[0].levels[3]).toBe('Asks a testable question.');
+    expect(r.criteria[0].levels[4]).toBe(RubricPrint.GENERAL_LEVELS[4]);
+    _competencyDescriptors = null;
+  });
+
+  it('builds a General Rubric with one Overall row when there are no competencies, and none for points work', () => {
+    const r = RubricPrint.defaultRubric(CID, getAssessments(CID)[1]);
+    expect(r.name).toBe('General Rubric');
+    expect(r.criteria.map(c => c.name)).toEqual(['Overall']);
+    expect(RubricPrint.defaultRubric(CID, getAssessments(CID)[2])).toBeNull();
+  });
+
+  it('prints the student’s levels on them, and the general wording in every cell', () => {
+    const tags = RubricPrint.sheetData(CID, AID_TAGS, SID);
+    expect(tags.rows[0]).toMatchObject({ level: 3, mod: 1, codes: ['QAP'] });
+    // Named for the competency, so no code means nothing under the name.
+    expect(tags.rows[1].codes).toEqual([]);
+    const html = RubricPrint.renderSheet(RubricPrint.sheetData(CID, AID_GEN, SID), RubricPrint.DEFAULT_OPTIONS);
+    expect(html).toContain('General Rubric');
+    expect(html).toContain('a sophisticated understanding');
+    expect(html).toMatch(/is-scored l4/);
+    expect(RubricPrint.isStudentScored(CID, AID_GEN, SID)).toBe(true);
+    expect(RubricPrint.isStudentScored(CID, AID_GEN, SID2)).toBe(false);
+  });
+});

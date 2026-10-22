@@ -567,10 +567,22 @@ window.PageAssignments = (function () {
                 '</div>' +
                 '<button class="rubric-print-btn" data-action="printRubrics" data-aid="' +
                 a.id +
-                '" title="Print a graded rubric for each student">Print rubrics</button>'
+                '" title="Print a graded rubric for each student">Print Rubrics</button>'
               );
             })()
-          : '') +
+          : !isPointsScored(a)
+            ? // No rubric of its own: a Tag Rubric, or a General Rubric when it
+              // has no competencies, with the proficiency scale's wording.
+              '<button class="rubric-print-btn" data-action="printRubrics" data-aid="' +
+              a.id +
+              '" title="Print a graded ' +
+              (scoreTagIds(a, cid).some(function (t) {
+                return !isUnlinkedTag(t);
+              })
+                ? 'tag'
+                : 'general') +
+              ' rubric for each student">Print Rubrics</button>'
+            : '') +
         '<button class="assess-header-action-btn" data-action="editAssess" data-aid="' +
         a.id +
         '" title="Edit" aria-label="Edit assessment">' +
