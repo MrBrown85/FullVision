@@ -1108,92 +1108,6 @@ function showConfirm(title, message, okLabel, okStyle, onConfirm) {
   document.addEventListener('keydown', trapHandler);
 }
 
-async function softDeleteAccountWithPassword(typedEmail, password) {
-  var currentUser = typeof getCurrentUser === 'function' ? await getCurrentUser() : null;
-  var expectedEmail = ((currentUser && currentUser.email) || '').trim();
-  if (!expectedEmail) throw new Error('Could not verify the current account email.');
-  if ((typedEmail || '').trim().toLowerCase() !== expectedEmail.toLowerCase()) {
-    throw new Error('Type your account email exactly to confirm deletion.');
-  }
-  if (!password) throw new Error('Enter your password to confirm deletion.');
-  if (typeof reauthenticateWithPassword === 'function') {
-    await reauthenticateWithPassword(password);
-  }
-  if (!window.v2 || typeof window.v2.softDeleteTeacher !== 'function') {
-    throw new Error('Delete account is unavailable right now.');
-  }
-  var result = await window.v2.softDeleteTeacher();
-  if (result && result.error) throw result.error;
-  await signOut({ force: true });
-}
-
-async function showDeleteAccountDialog() {
-  var currentUser = typeof getCurrentUser === 'function' ? await getCurrentUser() : null;
-  var email = ((currentUser && currentUser.email) || '').trim();
-  if (!email) {
-    if (typeof showSyncToast === 'function')
-      showSyncToast('Could not load account details. Sign in again and retry.', 'error');
-    return;
-  }
-
-  var overlay = document.createElement('div');
-  overlay.className = 'confirm-overlay';
-  overlay.setAttribute('role', 'dialog');
-  overlay.setAttribute('aria-modal', 'true');
-  overlay.setAttribute('aria-labelledby', 'delete-account-title');
-  overlay.innerHTML = `<div class="confirm-card">
-    <div class="confirm-title" id="delete-account-title">Delete Account</div>
-    <div class="confirm-message">Deleting your account hides all your data immediately and permanently removes it after 30 days. You can cancel the deletion by signing in again within 30 days.</div>
-    <div class="confirm-help">Type <strong>${esc(email)}</strong> and enter your password to confirm.</div>
-    <div class="confirm-form">
-      <label class="confirm-field">
-        <span class="confirm-label">Email confirmation</span>
-        <input class="confirm-input" id="delete-account-email" type="email" autocomplete="email" placeholder="${esc(email)}">
-      </label>
-      <label class="confirm-field">
-        <span class="confirm-label">Password</span>
-        <input class="confirm-input" id="delete-account-password" type="password" autocomplete="current-password" placeholder="Current password">
-      </label>
-    </div>
-    <div class="confirm-error" id="delete-account-error" aria-live="polite"></div>
-    <div class="confirm-actions">
-      <button class="confirm-cancel" id="delete-account-cancel">Cancel</button>
-      <button class="confirm-ok danger" id="delete-account-confirm">Delete Account</button>
-    </div>
-  </div>`;
-  document.body.appendChild(overlay);
-
-  var cancelBtn = overlay.querySelector('#delete-account-cancel');
-  var confirmBtn = overlay.querySelector('#delete-account-confirm');
-  var emailInput = overlay.querySelector('#delete-account-email');
-  var passwordInput = overlay.querySelector('#delete-account-password');
-  var errorEl = overlay.querySelector('#delete-account-error');
-
-  function closeOverlay() {
-    overlay.remove();
-  }
-
-  cancelBtn.onclick = function () {
-    closeOverlay();
-  };
-  overlay.addEventListener('click', function (evt) {
-    if (evt.target === overlay) closeOverlay();
-  });
-  confirmBtn.onclick = async function () {
-    errorEl.textContent = '';
-    confirmBtn.disabled = true;
-    cancelBtn.disabled = true;
-    try {
-      await softDeleteAccountWithPassword(emailInput.value, passwordInput.value);
-    } catch (err) {
-      errorEl.textContent = err && err.message ? err.message : 'Could not delete account.';
-      confirmBtn.disabled = false;
-      cancelBtn.disabled = false;
-    }
-  };
-  emailInput.focus();
-}
-
 /* ── Shared delegated click handler for gb-ui.js components ── */
 var _sidebarClickFnName = null;
 
@@ -1249,9 +1163,6 @@ document.addEventListener('click', function (e) {
           Router.navigate('/dashboard');
         },
       );
-    },
-    deleteAccount: async function () {
-      await showDeleteAccountDialog();
     },
     toggleSidebar: function () {
       toggleSidebar();

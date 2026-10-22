@@ -20,7 +20,6 @@ window.PageAssignments = (function () {
   var showUngraded = false;
   var rubricViewStates = {};
   var _rubricsPanelOpen = false;
-  var _advancedPanelOpen = false;
   var _showingNewForm = false;
   var _editingAssessId = null;
   var collapsedModules = {};
@@ -243,7 +242,7 @@ window.PageAssignments = (function () {
   }
 
   /* ── Toolbar ────────────────────────────────────────────── */
-  function renderAssessToolbar(cid, method, dw, assessments) {
+  function renderAssessToolbar(cid, assessments) {
     var courseOptions = getPickerCourses(cid)
       .map(function (c) {
         return '<option value="' + c.id + '"' + (c.id === cid ? ' selected' : '') + '>' + esc(c.name) + '</option>';
@@ -312,13 +311,7 @@ window.PageAssignments = (function () {
       '<div class="tb-dropdown-wrap">' +
       '<button class="tb-dropdown-btn' +
       (_rubricsPanelOpen ? ' open' : '') +
-      '" data-action="toggleToolbarDropdown" data-panel="rubrics">Rubrics</button>' +
-      '<button class="tb-dropdown-btn' +
-      (_advancedPanelOpen ? ' open' : '') +
-      '" data-action="toggleToolbarDropdown" data-panel="advanced">Advanced</button>' +
-      '<div class="tb-dropdown-panel' +
-      (_advancedPanelOpen ? ' open' : '') +
-      '" id="tb-advanced-panel"></div>' +
+      '" data-action="toggleToolbarDropdown">Rubrics</button>' +
       '<div class="tb-dropdown-panel' +
       (_rubricsPanelOpen ? ' open' : '') +
       '" id="tb-rubrics-panel"></div>' +
@@ -378,34 +371,7 @@ window.PageAssignments = (function () {
     rubHtml +=
       '</ul><button class="lo-add-btn" data-action="newRubricUI" style="display:block;width:100%">+ New Rubric</button>';
 
-    // Advanced dropdown content
-    var advHtml =
-      '<div class="settings-title">Calculation</div>' +
-      '<div class="settings-row"><label>Method</label><select class="form-input" style="width:auto" data-action-change="updateCalcMethod"><option value="mostRecent"' +
-      (method === 'mostRecent' ? ' selected' : '') +
-      '>Most Recent</option><option value="highest"' +
-      (method === 'highest' ? ' selected' : '') +
-      '>Highest</option><option value="mode"' +
-      (method === 'mode' ? ' selected' : '') +
-      '>Mode</option><option value="decayingAvg"' +
-      (method === 'decayingAvg' ? ' selected' : '') +
-      '>Decaying Average</option></select></div>' +
-      '<div id="decay-row" style="display:' +
-      (method === 'decayingAvg' ? 'flex' : 'none') +
-      '" class="settings-row"><label>Weight: <span id="decay-val">' +
-      (dw * 100).toFixed(0) +
-      '%</span></label><input type="range" min="0" max="100" value="' +
-      (dw * 100).toFixed(0) +
-      '" data-action-input="updateDecaySlider"></div>' +
-      renderCategoryWeightsEditor(cid) +
-      '<div class="settings-title" style="margin-top:16px;padding-top:12px;border-top:0.5px solid var(--divider-subtle)">Data</div>' +
-      '<div class="settings-row"><label>Export Scores</label><button class="btn btn-primary" data-action="exportScoresCSV">Export Scores CSV</button></div>' +
-      '<div class="settings-row"><label>Export Summary</label><button class="btn btn-primary" data-action="exportSummaryCSV">Export Summary CSV</button></div>' +
-      '<div class="settings-row"><label>Delete class</label><button class="btn btn-danger" data-action="clearData">Delete</button></div>' +
-      '<div class="settings-title" style="margin-top:16px;padding-top:12px;border-top:0.5px solid var(--divider-subtle)">Account</div>' +
-      '<div class="settings-row"><label>Delete your account</label><button class="btn btn-danger" data-action="deleteAccount">Delete Account</button></div>';
-
-    return { toolbarHtml: toolbarHtml, rubHtml: rubHtml, advHtml: advHtml };
+    return { toolbarHtml: toolbarHtml, rubHtml: rubHtml };
   }
 
   /* ── Assessment List ────────────────────────────────────── */
@@ -777,9 +743,6 @@ window.PageAssignments = (function () {
     var cid = activeCourse;
     var course = COURSES[cid];
     if (!course) return;
-    var cc = getCourseConfig(cid);
-    var method = cc.calcMethod || course.calcMethod || 'mostRecent';
-    var dw = cc.decayWeight != null ? cc.decayWeight : course.decayWeight || 0.65;
     var sections = getSections(cid);
     var allAssessments = sortAssessmentsForList(getAssessments(cid));
     var students = sortStudents(getStudents(cid), 'lastName');
@@ -826,12 +789,10 @@ window.PageAssignments = (function () {
     }
 
     // Render toolbar
-    var result = renderAssessToolbar(cid, method, dw, assessments);
+    var result = renderAssessToolbar(cid, assessments);
     document.getElementById('page-toolbar-mount').innerHTML = result.toolbarHtml;
     var rubPanel = document.getElementById('tb-rubrics-panel');
-    var advPanel = document.getElementById('tb-advanced-panel');
     if (rubPanel) rubPanel.innerHTML = result.rubHtml;
-    if (advPanel) advPanel.innerHTML = result.advHtml;
 
     // Render assessment list
     document.getElementById('main').innerHTML = renderAssessmentList(
@@ -1694,19 +1655,15 @@ window.PageAssignments = (function () {
     else hideDescriptorBar();
   }
 
-  function toggleToolbarDropdown(which) {
-    var rubrics = which === 'rubrics';
-    _rubricsPanelOpen = rubrics ? !_rubricsPanelOpen : false;
-    _advancedPanelOpen = rubrics ? false : !_advancedPanelOpen;
+  function toggleToolbarDropdown() {
+    _rubricsPanelOpen = !_rubricsPanelOpen;
     _syncToolbarDropdowns();
   }
   function _syncToolbarDropdowns() {
-    var ap = document.getElementById('tb-advanced-panel');
     var rp = document.getElementById('tb-rubrics-panel');
-    if (ap) ap.classList.toggle('open', _advancedPanelOpen);
     if (rp) rp.classList.toggle('open', _rubricsPanelOpen);
     document.querySelectorAll('.tb-dropdown-btn').forEach(function (btn) {
-      btn.classList.toggle('open', btn.dataset.panel === 'rubrics' ? _rubricsPanelOpen : _advancedPanelOpen);
+      btn.classList.toggle('open', _rubricsPanelOpen);
     });
   }
 
@@ -4044,67 +4001,6 @@ window.PageAssignments = (function () {
     }
   }
 
-  /* ── Advanced settings ──────────────────────────────────── */
-  function updateCalc(val) {
-    var cc = getCourseConfig(activeCourse);
-    cc.calcMethod = val;
-    saveCourseConfig(activeCourse, cc);
-    var dr = document.getElementById('decay-row');
-    if (dr) dr.style.display = val === 'decayingAvg' ? 'flex' : 'none';
-  }
-  function updateDecay(val) {
-    var dv = document.getElementById('decay-val');
-    if (dv) dv.textContent = val + '%';
-    var cc = getCourseConfig(activeCourse);
-    cc.decayWeight = parseInt(val, 10) / 100;
-    saveCourseConfig(activeCourse, cc);
-  }
-  function renderCategoryWeightsEditor(cid) {
-    var cw = getCategoryWeights(cid);
-    var enabled = cw.formative > 0;
-    var summPct = Math.round((cw.summative || 1) * 100);
-    var formPct = Math.round((cw.formative || 0) * 100);
-    return (
-      '<div class="settings-title" style="margin-top:16px;padding-top:12px;border-top:0.5px solid var(--divider-subtle)">Category Weights</div>' +
-      '<div class="settings-row" style="align-items:center;gap:8px"><label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:0.875rem"><input type="checkbox" id="cw-enabled" ' +
-      (enabled ? 'checked' : '') +
-      ' data-action-change="toggleCategoryWeights" style="width:16px;height:16px"> Weight formative assessments</label></div>' +
-      '<div id="cw-sliders" style="display:' +
-      (enabled ? '' : 'none') +
-      ';margin-top:8px"><div style="display:flex;gap:16px;align-items:center;font-size:0.875rem"><div style="flex:1"><label style="color:var(--text-2)">Summative</label><div style="display:flex;align-items:center;gap:6px"><input type="range" id="cw-range" min="0" max="100" value="' +
-      summPct +
-      '" data-action-input="updateCategoryWeightsSlider" style="flex:1"><span id="cw-summ-val" style="width:36px;text-align:right;font-weight:600">' +
-      summPct +
-      '%</span></div></div><div style="flex:1"><label style="color:var(--text-2)">Formative</label><div style="display:flex;align-items:center;gap:6px"><div style="flex:1;text-align:center;color:var(--text-3)">\u2190</div><span id="cw-form-val" style="width:36px;text-align:right;font-weight:600">' +
-      formPct +
-      '%</span></div></div></div></div>'
-    );
-  }
-  function toggleCategoryWeights(on) {
-    var sl = document.getElementById('cw-sliders');
-    if (sl) sl.style.display = on ? '' : 'none';
-    if (!on) {
-      var cc = getCourseConfig(activeCourse);
-      cc.categoryWeights = { summative: 1.0, formative: 0.0 };
-      saveCourseConfig(activeCourse, cc);
-    } else {
-      updateCategoryWeights(70);
-      var r = document.getElementById('cw-range');
-      if (r) r.value = 70;
-    }
-  }
-  function updateCategoryWeights(summPct) {
-    summPct = Math.max(0, Math.min(100, parseInt(summPct, 10) || 0));
-    var formPct = 100 - summPct;
-    var sv = document.getElementById('cw-summ-val');
-    if (sv) sv.textContent = summPct + '%';
-    var fv = document.getElementById('cw-form-val');
-    if (fv) fv.textContent = formPct + '%';
-    var cc = getCourseConfig(activeCourse);
-    cc.categoryWeights = { summative: summPct / 100, formative: formPct / 100 };
-    saveCourseConfig(activeCourse, cc);
-  }
-
   /* ── Module management ──────────────────────────────────── */
   function updateModuleName(moduleId, name) {
     var cid = activeCourse;
@@ -4357,99 +4253,6 @@ window.PageAssignments = (function () {
   }
 
   /* ── Export / Import ────────────────────────────────────── */
-  function downloadCSV(csv, filename) {
-    var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = filename;
-    a.click();
-  }
-  function exportScoresCSV() {
-    var cid = activeCourse;
-    var students = sortStudents(getStudents(cid), 'lastName');
-    var assessments = getAssessments(cid);
-    var scores = getScores(cid);
-    var statuses = getAssignmentStatuses(cid);
-    var csv = 'Student,Assessment,Date,Category,Tag,Tag Label,Score,Status\n';
-    students.forEach(function (st) {
-      assessments.forEach(function (a) {
-        var stStatus = statuses[st.id + ':' + a.id] || '';
-        var categoryName = _getCategoryName(cid, _getAssessmentCategoryId(a));
-        scoreTagIds(a, cid).forEach(function (tid) {
-          var key = scoreKeyInfo(cid, a, tid);
-          var entry = (scores[st.id] || []).find(function (s) {
-            return s.assessmentId === a.id && s.tagId === tid;
-          });
-          var score = entry ? entry.score : 0;
-          csv +=
-            '"' +
-            displayName(st).replace(/"/g, '""') +
-            '","' +
-            a.title.replace(/"/g, '""') +
-            '","' +
-            a.date +
-            '","' +
-            categoryName.replace(/"/g, '""') +
-            '","' +
-            (key && key.tag ? tid : '') +
-            '","' +
-            (key ? String(key.label || '').replace(/"/g, '""') : '') +
-            '","' +
-            score +
-            '","' +
-            stStatus +
-            '"\n';
-        });
-      });
-    });
-    downloadCSV(csv, 'scores-' + cid + '-' + new Date().toISOString().slice(0, 10) + '.csv');
-  }
-  function exportSummaryCSV() {
-    var cid = activeCourse;
-    var students = sortStudents(getStudents(cid), 'lastName');
-    var sections = getSections(cid);
-    var csv = 'Student,Overall';
-    sections.forEach(function (sec) {
-      csv += ',"' + sec.name.replace(/"/g, '""') + '"';
-    });
-    csv += '\n';
-    students.forEach(function (st) {
-      var overall = getOverallProficiency(cid, st.id);
-      csv += '"' + displayName(st).replace(/"/g, '""') + '","' + (overall > 0 ? overall.toFixed(1) : '') + '"';
-      sections.forEach(function (sec) {
-        var sp = getSectionProficiency(cid, st.id, sec.id);
-        csv += ',"' + (sp > 0 ? sp.toFixed(1) : '') + '"';
-      });
-      csv += '\n';
-    });
-    downloadCSV(csv, 'summary-' + cid + '-' + new Date().toISOString().slice(0, 10) + '.csv');
-  }
-  function clearData() {
-    if (!activeCourse || !COURSES[activeCourse]) return;
-    showConfirm(
-      'Delete Class',
-      'Delete ' + COURSES[activeCourse].name + '? It will be hidden immediately and permanently removed after 30 days.',
-      'Delete Class',
-      'danger',
-      async function () {
-        try {
-          await deleteCourseData(activeCourse);
-        } catch (err) {
-          console.error('deleteCourseData failed:', err);
-          showSyncToast('Delete class failed. Try again.', 'error');
-          return;
-        }
-
-        // Local/demo mode still expects a seed course after deleting the last class.
-        if (Object.keys(COURSES).length === 0 && (!_useSupabase || localStorage.getItem('gb-demo-mode') === '1')) {
-          Object.assign(COURSES, structuredClone(DEFAULT_COURSES));
-          saveCourses(COURSES);
-          loadSeedIfNeeded();
-        }
-        Router.navigate('/dashboard');
-      },
-    );
-  }
   /* ── Keyboard Navigation ────────────────────────────────── */
   function kbFocusCell(el) {
     if (_kbFocusEl) _kbFocusEl.classList.remove('kb-focus');
@@ -4494,16 +4297,9 @@ window.PageAssignments = (function () {
 
     // Close toolbar dropdowns on click outside
     if (!e.target.closest('.tb-dropdown-wrap')) {
-      if (_rubricsPanelOpen || _advancedPanelOpen) {
+      if (_rubricsPanelOpen) {
         _rubricsPanelOpen = false;
-        _advancedPanelOpen = false;
-        var rp = document.getElementById('tb-rubrics-panel');
-        var ap = document.getElementById('tb-advanced-panel');
-        if (rp) rp.classList.remove('open');
-        if (ap) ap.classList.remove('open');
-        document.querySelectorAll('.tb-dropdown-btn').forEach(function (btn) {
-          btn.classList.remove('open');
-        });
+        _syncToolbarDropdowns();
       }
     }
 
@@ -4607,16 +4403,7 @@ window.PageAssignments = (function () {
         clearFocusStudent();
       },
       toggleToolbarDropdown: function () {
-        toggleToolbarDropdown(el.dataset.panel);
-      },
-      exportScoresCSV: function () {
-        exportScoresCSV();
-      },
-      exportSummaryCSV: function () {
-        exportSummaryCSV();
-      },
-      clearData: function () {
-        clearData();
+        toggleToolbarDropdown();
       },
       clearAssessFilters: function () {
         e.preventDefault();
@@ -4778,14 +4565,6 @@ window.PageAssignments = (function () {
       setAssessSearch(el.value);
       return;
     }
-    if (el.dataset.actionInput === 'updateDecaySlider') {
-      updateDecay(el.value);
-      return;
-    }
-    if (el.dataset.actionInput === 'updateCategoryWeightsSlider') {
-      updateCategoryWeights(el.value);
-      return;
-    }
     // T-UI-09 · live weight mutation (mark dirty, no re-render — weight shows up
     // in the input itself, so the input's own value stays in sync).
     if (el.dataset.actionInput === 'critWeightLive') {
@@ -4805,20 +4584,12 @@ window.PageAssignments = (function () {
       switchCourse(el.value);
       return;
     }
-    if (el.dataset.actionChange === 'updateCalcMethod') {
-      updateCalc(el.value);
-      return;
-    }
     if (el.dataset.actionChange === 'onRubricSelect') {
       onRubricSelect(el.value);
       return;
     }
     if (el.dataset.actionChange === 'autoSetDueDate') {
       autoSetDueDate();
-      return;
-    }
-    if (el.dataset.actionChange === 'toggleCategoryWeights') {
-      toggleCategoryWeights(el.checked);
       return;
     }
     if (el.dataset.actionChange === 'moduleColor') {
@@ -5152,7 +4923,6 @@ window.PageAssignments = (function () {
     showUngraded = false;
     rubricViewStates = {};
     _rubricsPanelOpen = false;
-    _advancedPanelOpen = false;
     _showingNewForm = false;
     _editingAssessId = null;
     collapsedModules = {};
