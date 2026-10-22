@@ -69,6 +69,7 @@ async function openClassManager(page) {
   await page.goto('/teacher/app.html#/dashboard');
   await page.waitForSelector('#dock-mount nav', { timeout: 10_000 });
   await page.locator('[data-action="openClassManager"]').first().click();
+  await page.getByRole('tab', { name: /^Students/ }).click();
   await expect(page.locator('.cm-student-list').first()).toBeVisible();
 }
 
@@ -201,6 +202,7 @@ test.describe('Withdraw students', () => {
     await page.reload();
     await page.waitForSelector('#dock-mount nav');
     await page.locator('[data-action="openClassManager"]').first().click();
+    await page.getByRole('tab', { name: /^Students/ }).click();
     await expect(roster(page)).toContainText('Baker');
     await expect(roster(page)).not.toContainText('Anderson');
     await expect(withdrawn(page)).toHaveCount(0);
@@ -218,6 +220,7 @@ test.describe('Withdraw students in Demo Mode', () => {
     await page.waitForURL(/teacher\/app\.html/);
     await page.waitForSelector('#dock-mount nav');
     await page.locator('[data-action="openClassManager"]').first().click();
+    await page.getByRole('tab', { name: /^Students/ }).click();
     const firstRemove = page.locator('[data-action="cmRemoveStudent"]').first();
     await expect(firstRemove).toBeVisible();
     const sid = await firstRemove.getAttribute('data-sid');

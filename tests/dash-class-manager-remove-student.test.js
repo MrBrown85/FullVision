@@ -201,6 +201,8 @@ describe('class manager — remove student', () => {
 
   it('lists withdrawn students under the roster with Re-enrol and Delete permanently', () => {
     DashClassManager.handleAction('cmRemoveStudent', stubEl({ sid: 'a1' }));
+    // The roster and the Withdrawn list live on the Students tab.
+    DashClassManager.handleAction('cmSetTab', stubEl({ tab: 'students' }));
 
     var html = page();
     var section = html.slice(html.indexOf('id="cm-withdrawn"'));

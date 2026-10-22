@@ -12,6 +12,7 @@ async function storedStarters(page) {
 async function openStarters(page) {
   await gotoApp(page, '/dashboard');
   await page.getByRole('button', { name: 'Class Management' }).first().click();
+  await page.getByRole('tab', { name: /^Sentence Starters/ }).click();
   const section = page.locator('#cm-starters');
   await expect(section).toBeVisible();
   return section;

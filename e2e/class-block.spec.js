@@ -75,7 +75,8 @@ test.describe('Class blocks', () => {
     await seedClasses(page, [{ id: PHIL_A, name: 'Philosophy 12', block: 'A' }]);
     await gotoApp(page, '/dashboard');
     await page.getByRole('button', { name: 'Class Management' }).first().click();
-    await page.getByRole('button', { name: /Duplicate Class/ }).click();
+    await page.getByRole('button', { name: /Class Actions/ }).click();
+    await page.getByRole('menuitem', { name: 'Duplicate Class' }).click();
     const dialog = page.getByRole('dialog', { name: /Duplicate/ });
     await expect(dialog).toBeVisible();
     await dialog.getByRole('radio', { name: 'B', exact: true }).click();

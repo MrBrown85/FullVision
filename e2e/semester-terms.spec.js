@@ -16,6 +16,7 @@ const GRANDVIEW = [
 async function openTerms(page) {
   await gotoApp(page, '/dashboard');
   await page.getByRole('button', { name: 'Class Management' }).first().click();
+  await page.getByRole('tab', { name: 'Reporting Terms' }).click();
   const span = page.getByRole('radiogroup', { name: 'This Class Runs' });
   await expect(span).toBeVisible();
   return span;
