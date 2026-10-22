@@ -42,7 +42,8 @@
 /* ── Class Overview Panel ──────────────────────────────────── */
 /* Row 1: Class Distribution (one third) and Observations (two thirds), the
    same height. Row 2: Core Competencies with Next Steps, and Upcoming
-   Birthdays when there are any. Both rows stack below 1100 px. */
+   Birthdays when there are any. Both rows keep two columns on every desktop
+   width; they stack only at phone width, where the mobile app takes over. */
 .dash-overview-row {
   display: grid;
   gap: 12px;
@@ -58,7 +59,7 @@
 .dash-overview-second.is-single {
   grid-template-columns: minmax(0, 1fr);
 }
-@media (max-width: 1100px) {
+@media (max-width: 768px) {
   .dash-overview-top,
   .dash-overview-second {
     grid-template-columns: minmax(0, 1fr);
