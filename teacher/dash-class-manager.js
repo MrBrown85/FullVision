@@ -199,7 +199,7 @@ window.DashClassManager = (function () {
       sec.id +
       '" value="' +
       esc(code) +
-      '" maxlength="10" style="--chip:' +
+      '" maxlength="6" style="--chip:' +
       chipColor +
       '" data-stop-prop="true" data-action-blur="cmStdCode" data-secid="' +
       sec.id +
@@ -5011,7 +5011,7 @@ window.DashClassManager = (function () {
       .trim()
       .toUpperCase()
       .replace(/[^A-Z0-9._\-]/g, '')
-      .slice(0, 10);
+      .slice(0, 6);
     if (!newCode) return;
     var map = ensureCustomLearningMap(cmSelectedCourse);
     var sec = map.sections.find(function (s) {

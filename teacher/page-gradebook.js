@@ -823,6 +823,8 @@ window.PageGradebook = (function () {
         '<div class="gb-grid-tag-header' +
         altClass +
         (col.isCriterionCol ? ' gb-grid-tag-header-crit' : '') +
+        // A code longer than five characters drops a size so it still fits.
+        (!col.isCriterionCol && String(col.tagCode || '').length > 5 ? ' gb-code-long' : '') +
         '" style="flex:0 0 ' +
         tagW +
         'px;width:' +

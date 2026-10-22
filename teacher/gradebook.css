@@ -1069,6 +1069,14 @@ th.gb-group-alt {
   border-bottom: 2px solid; /* color set inline */
   background: var(--surface);
   box-sizing: border-box;
+  /* A code never spills into the next column; the full name is on hover. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gb-grid-tag-header.gb-code-long {
+  font-size: 0.625rem;
+  letter-spacing: 0;
 }
 /* A criterion column's header is its name, not a competency code */
 .gb-grid-tag-header-crit {
