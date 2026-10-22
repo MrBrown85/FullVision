@@ -223,11 +223,22 @@ window.Router = (function () {
     } else {
       _onRoute();
     }
+    _hideLoading();
     // Then the teacher's other classes, in the background once the first
     // page is up, so each is ready before it is opened.
     _whenIdle(function () {
       if (typeof preloadClasses === 'function') preloadClasses();
     });
+  }
+
+  // The loading screen fades out over the page that is now drawn.
+  function _hideLoading() {
+    var el = document.getElementById('app-loading');
+    if (!el) return;
+    el.classList.add('is-done');
+    setTimeout(function () {
+      el.remove();
+    }, 200);
   }
 
   function _whenIdle(fn) {

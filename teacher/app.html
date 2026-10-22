@@ -26,6 +26,12 @@
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to main content</a>
+    <!-- Shown from the first paint until the first page is drawn (router.js). -->
+    <div id="app-loading" class="app-loading" role="status" aria-live="polite">
+      <div class="app-loading-title">FullVision</div>
+      <div class="app-loading-spinner" aria-hidden="true"></div>
+      <div class="app-loading-text">Loading your classes…</div>
+    </div>
     <div id="gb-tooltip" class="u-hidden"></div>
     <div id="dock-mount"></div>
     <div class="page-layout" id="page-layout">
