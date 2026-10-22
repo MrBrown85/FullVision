@@ -336,6 +336,38 @@ window.ObsCapture = (function () {
     });
   }
 
+  function _reEscape(v) {
+    return String(v).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  /* A starter from what is in the box: no students. @name, #tag and !type
+     shorthand come out as they do on Add (the tags and type are kept), and
+     the picked students' names are taken out, with any "'s", so the starter
+     works for anyone. → { text, dims, sentiment } */
+  function starterText(value, lists, studentIds) {
+    var parsed = parseShorthand(value, lists);
+    var text = parsed.text;
+    var ids = (studentIds || []).concat(parsed.studentIds);
+    ((lists && lists.students) || []).forEach(function (s) {
+      if (ids.indexOf(s.id) < 0) return;
+      [s.name, s.first]
+        .filter(Boolean)
+        .sort(function (a, b) {
+          return b.length - a.length;
+        })
+        .forEach(function (n) {
+          text = text.replace(new RegExp('(^|[^\\w])' + _reEscape(n) + "(['\u2019]s)?(?![\\w])", 'gi'), '$1');
+        });
+    });
+    text = text
+      .replace(/\s{2,}/g, ' ')
+      .replace(/\s+([,.;:!?])/g, '$1')
+      .replace(/^[\s,.;:-]+/, '')
+      .trim();
+    if (text) text = text.charAt(0).toUpperCase() + text.slice(1);
+    return { text: text, dims: parsed.dims, sentiment: parsed.sentiment };
+  }
+
   /* Turn every shorthand token in `text` that names exactly one student,
      tag or type into a pick, and take it out of the text. Tokens that match
      nothing, or more than one thing, stay as typed. '/' tokens always stay:
@@ -838,7 +870,7 @@ window.ObsCapture = (function () {
         studentList(cid).forEach(function (s) {
           h += item('toggleStudent', s.id, s.name, { on: state.students.indexOf(s.id) >= 0, search: s.name });
         });
-        h += '</div>';
+        h += '</div><div class="obsc-menu-note">Shift-click to pick more than one.</div>';
       } else if (name === 'link') {
         id = p + 'link-dropdown';
         h += '<div class="obsc-menu-list">';
@@ -1049,8 +1081,10 @@ window.ObsCapture = (function () {
     /* Save as Starter: what is in the box, with its type, context and tags,
        becomes one of the teacher's starters. The note itself waits for Add. */
     function openSaveStarter() {
-      var text = input.value.trim();
-      if (!text) {
+      var from = starterText(input.value, lists(), state.students);
+      var text = from.text;
+      var sentiment = from.sentiment || state.sentiment;
+      if (!input.value.trim()) {
         input.classList.add('obsc-input-empty');
         _focus(input);
         return;
@@ -1065,19 +1099,15 @@ window.ObsCapture = (function () {
         });
       var who = names.length === 1 ? ' for ' + names[0] : names.length ? ' for these students' : '';
       var sets = [];
-      var info = state.sentiment && typeof OBS_SENTIMENTS !== 'undefined' && OBS_SENTIMENTS[state.sentiment];
+      var info = sentiment && typeof OBS_SENTIMENTS !== 'undefined' && OBS_SENTIMENTS[sentiment];
       if (info)
         sets.push(
-          '<span class="obs-pill obs-pill-type" data-sentiment="' +
-            state.sentiment +
-            '">' +
-            _esc(info.label) +
-            '</span>',
+          '<span class="obs-pill obs-pill-type" data-sentiment="' + sentiment + '">' + _esc(info.label) + '</span>',
         );
       var ctx = state.context && typeof OBS_CONTEXTS !== 'undefined' && OBS_CONTEXTS[state.context];
       if (ctx) sets.push('<span class="obs-pill obs-pill-context">' + _esc(ctx.label) + '</span>');
-      var dims = state.dims.filter(function (k) {
-        return !/^tag:/.test(k);
+      var dims = state.dims.concat(from.dims).filter(function (k, i, all) {
+        return !/^tag:/.test(k) && all.indexOf(k) === i;
       });
       dims.forEach(function (k) {
         sets.push(
@@ -1137,7 +1167,7 @@ window.ObsCapture = (function () {
         }
         var added = addObservationTemplate(null, {
           text: body,
-          sentiment: state.sentiment,
+          sentiment: sentiment,
           context: state.context,
           dims: dims.slice(),
         });
@@ -1448,7 +1478,10 @@ window.ObsCapture = (function () {
         if (i >= 0) state.students.splice(i, 1);
         else state.students.push(val);
         studentsChanged();
-        render();
+        // One pick closes the list and goes to the note; Shift-click (Space
+        // on the keyboard) keeps it open to pick several.
+        if (i < 0 && !(e.shiftKey || e.metaKey || e.ctrlKey)) closeMenu(true);
+        else render();
       } else if (act === 'setContext') {
         state.context = val || null;
         closeMenu(false);
@@ -1614,7 +1647,13 @@ window.ObsCapture = (function () {
       }
       if ((e.key === 'Enter' || e.key === ' ') && e.target.classList.contains('obsc-item')) {
         e.preventDefault();
-        e.target.click();
+        // Space toggles and keeps a list open, as Shift-click does; Enter
+        // picks like a click.
+        if (typeof MouseEvent === 'function') {
+          e.target.dispatchEvent(
+            new MouseEvent('click', { bubbles: true, cancelable: true, shiftKey: e.shiftKey || e.key === ' ' }),
+          );
+        } else e.target.click();
         return;
       }
       if (e.key === 'Enter' && e.target.matches('[data-obsc-search]')) {
@@ -1806,6 +1845,7 @@ window.ObsCapture = (function () {
     levelLabel: levelLabel,
     starterList: starterList,
     _helpers: {
+      starterText: starterText,
       matchStarters: matchStarters,
       applyStarter: applyStarter,
       insertText: insertText,
