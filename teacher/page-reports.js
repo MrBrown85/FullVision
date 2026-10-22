@@ -1591,7 +1591,7 @@ window.PageReports = (function () {
     var el = e.target;
     if (!el || el.dataset.action !== 'latePolicyEdit') return;
     var cid = activeCourse;
-    if (!getCourseConfig(cid).lateWorkPolicy) {
+    if (!(COURSES[cid] && COURSES[cid].lateWorkPolicy)) {
       el.textContent = '';
       el.style.color = 'var(--text-2)';
       el.style.fontStyle = 'normal';
@@ -1602,9 +1602,10 @@ window.PageReports = (function () {
     if (!el || el.dataset.action !== 'latePolicyEdit') return;
     var cid = activeCourse;
     var v = el.textContent.trim();
-    var c = getCourseConfig(cid);
-    c.lateWorkPolicy = v;
-    saveCourseConfig(cid, c);
+    var saved = (COURSES[cid] && COURSES[cid].lateWorkPolicy) || '';
+    // The placeholder shown when nothing is set is not a policy.
+    if (v === 'No late work policy set') v = '';
+    if (v !== saved) updateCourse(cid, { lateWorkPolicy: v || null });
     el.style.color = v ? 'var(--text-2)' : 'var(--text-3)';
     el.style.fontStyle = v ? 'normal' : 'italic';
     if (!v) el.textContent = 'No late work policy set';
