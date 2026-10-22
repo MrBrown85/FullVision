@@ -691,6 +691,27 @@ function _calcGroup(scores, method, decayWeight, assessmentWeights) {
   }
 }
 
+/* "Count Only the Most Recent N" (course.recent_score_limit): a class can
+   count only a competency's last N scored entries. Null counts them all. */
+function getRecentScoreLimit(cid) {
+  var cc = (typeof getCourseConfig === 'function' && getCourseConfig(cid)) || {};
+  var n = Number(cc.recentScoreLimit);
+  return n >= 1 ? Math.floor(n) : null;
+}
+
+/* A competency's last n scored entries by date, oldest first. Unscored
+   entries never count, so they are dropped first. */
+function _lastScoredEntries(scores, n) {
+  var valid = scores
+    .filter(function (s) {
+      return s.score > 0;
+    })
+    .sort(function (a, b) {
+      return (a.date || '').localeCompare(b.date || '');
+    });
+  return valid.length > n ? valid.slice(valid.length - n) : valid;
+}
+
 /** Calculate proficiency from an array of scores, splitting by category and applying weights.
  * @param {Score[]} scores - Array of score entries (mixed summative/formative)
  * @param {string} method - Calculation method: 'mostRecent'|'highest'|'mode'|'decayingAvg'
@@ -698,9 +719,13 @@ function _calcGroup(scores, method, decayWeight, assessmentWeights) {
  * @param {Object} [opts] - Additional options
  * @param {Object} [opts.categoryWeights] - { summative: number, formative: number }
  * @param {Object} [opts.assessmentWeights] - Map of assessmentId to weight multiplier
+ * @param {number} [opts.recentLimit] - Count only the last N scored entries (any method but Most Recent)
  * @returns {number} Proficiency level (0-4)
  */
 function calcProficiency(scores, method, decayWeight, opts) {
+  // Trimmed before the category split, so "the last 3" means the
+  // competency's last 3, whatever their categories.
+  if (opts && opts.recentLimit >= 1 && method !== 'mostRecent') scores = _lastScoredEntries(scores, opts.recentLimit);
   const aw = opts && opts.assessmentWeights;
   const cw = opts && opts.categoryWeights;
   const categorized = scores.filter(s => _scoreBucket(s, opts) === 'categorized');
@@ -790,6 +815,7 @@ function getTagProficiency(cid, studentId, tagId) {
   var result = calcProficiency(scores, method, dw, {
     categoryWeights: cw,
     assessmentWeights: aw,
+    recentLimit: getRecentScoreLimit(cid),
     getScoreBucket: function (score) {
       var assessment = assessMap.get(score.assessmentId);
       if (!assessment) return score && score.type === 'formative' ? 'uncategorized' : 'categorized';
@@ -1035,18 +1061,20 @@ function describeCalcMethod(cid) {
   var course = (typeof COURSES !== 'undefined' && COURSES && COURSES[cid]) || {};
   var method = cc.calcMethod || course.calcMethod || 'mostRecent';
   var dw = cc.decayWeight != null ? cc.decayWeight : course.decayWeight || 0.65;
+  var n = getRecentScoreLimit(cid);
+  var of = n ? ' of the last ' + n + ' scores' : '';
   switch (method) {
     case 'highest':
-      return 'Highest score';
+      return 'Highest score' + of;
     case 'average':
-      return 'Average of all scores';
+      return n ? 'Average' + of : 'Average of all scores';
     case 'median':
-      return 'Median score';
+      return 'Median score' + of;
     case 'mode':
-      return 'Most common score';
+      return 'Most common score' + of;
     case 'decayingAvg': {
       var pct = Math.round(Math.max(0.01, Math.min(1, Number(dw) || 0.65)) * 100);
-      return 'Decaying average: newer work counts more (' + pct + '%)';
+      return 'Decaying average' + of + ': newer work counts more (' + pct + '%)';
     }
     default:
       return 'Most recent score';
@@ -1083,7 +1111,7 @@ function getSectionGrowthData(cid, studentId, sectionId) {
   // Build opts for calcProficiency (matching getTagProficiency pattern)
   const cw = getCategoryWeights(cid);
   const aw = _getAW(cid);
-  const opts = { categoryWeights: cw, assessmentWeights: aw };
+  const opts = { categoryWeights: cw, assessmentWeights: aw, recentLimit: getRecentScoreLimit(cid) };
 
   // Sort allScores once by date, then use a running pointer — O(n) instead of O(n²).
   // For each date, advance the pointer to include all scores up to that date,
@@ -1387,11 +1415,13 @@ function renderGrowthSparkline(points) {
 
 /* A calculation method's result on plain example scores (oldest first), as
    the Grading tab shows beside each method. The same _calcGroup the class
-   uses, so the example can't drift from the real rule. */
-function calcMethodExample(levels, method, decayWeight) {
+   uses, so the example can't drift from the real rule. recentLimit counts
+   only the last N, as the class does. */
+function calcMethodExample(levels, method, decayWeight, recentLimit) {
   var scores = (levels || []).map(function (v, i) {
     return { score: v, date: '2000-01-' + String(i + 1).padStart(2, '0') };
   });
+  if (recentLimit >= 1 && method !== 'mostRecent') scores = _lastScoredEntries(scores, recentLimit);
   return _calcGroup(scores, method, decayWeight, null);
 }
 
@@ -1404,10 +1434,11 @@ function formatCoursePercent(cid, R) {
 /* What switching this class to another calculation method would do: how
    many students' overall proficiency changes, out of how many, and one
    example. Runs the class's own math under the new method and puts the
-   saved method back. */
-function previewCalcMethodChange(cid, method, decayWeight) {
+   saved method back. recentLimit, when given, previews "Count Only the Most
+   Recent N" too (null: all scores). */
+function previewCalcMethodChange(cid, method, decayWeight, recentLimit) {
   var cc = getCourseConfig(cid);
-  var keep = { calcMethod: cc.calcMethod, decayWeight: cc.decayWeight };
+  var keep = { calcMethod: cc.calcMethod, decayWeight: cc.decayWeight, recentScoreLimit: cc.recentScoreLimit };
   var students = getStudents(cid);
   var shown = function (v) {
     return v > 0 ? Number(v).toFixed(1) : '';
@@ -1417,6 +1448,10 @@ function previewCalcMethodChange(cid, method, decayWeight) {
   });
   cc.calcMethod = method;
   if (decayWeight != null) cc.decayWeight = decayWeight;
+  if (recentLimit !== undefined) {
+    if (recentLimit) cc.recentScoreLimit = recentLimit;
+    else delete cc.recentScoreLimit;
+  }
   clearProfCache();
   var after = students.map(function (s) {
     return shown(getOverallProficiency(cid, s.id));
@@ -1425,6 +1460,8 @@ function previewCalcMethodChange(cid, method, decayWeight) {
   else cc.calcMethod = keep.calcMethod;
   if (keep.decayWeight === undefined) delete cc.decayWeight;
   else cc.decayWeight = keep.decayWeight;
+  if (keep.recentScoreLimit === undefined) delete cc.recentScoreLimit;
+  else cc.recentScoreLimit = keep.recentScoreLimit;
   clearProfCache();
   var changed = 0;
   var example = null;
@@ -1444,6 +1481,7 @@ function previewCalcMethodChange(cid, method, decayWeight) {
 /* ── Namespace ──────────────────────────────────────────────── */
 window.Calc = {
   calcMethodExample,
+  getRecentScoreLimit,
   formatCoursePercent,
   previewCalcMethodChange,
   clearProfCache,

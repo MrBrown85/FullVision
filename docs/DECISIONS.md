@@ -181,6 +181,14 @@ Colin, 2026-10-22, from the Class Management redesign. Replaces Observations ite
 3. **Times Used** counts the observations written from a starter in every class (`observation.template_id`). The "/" menu (headed Most Used) and the phone's quick menu list the most used first; My Sentence Starters keeps the teacher's ↑ ↓ order. A note rewritten after picking a starter doesn't count.
 4. **Save as Starter** beside Add on the desktop strip, and **Also Save as Starter** on the phone's new-observation sheet, keep what is in the box (with its type, context and tags) as a new starter. The observation itself still waits for Add.
 
+## Count only the most recent scores (2026-10-22)
+
+From the Class Management redesign's Grading tab (Grading D, Colin, 2026-10-22).
+
+1. **A class can count only each competency's last N scored entries**: All Scores (the default), 3 Scores or 5 Scores, beside the calculation method. It applies to every method but Most Recent Score, which already counts one; there the menu is off. `course.recent_score_limit`, `migrations/20261022_course_recent_score_limit.sql`.
+2. **The last N by date, before the category split**, so "the last 3" means the competency's last 3, whatever their categories. Unscored work never counts.
+3. **It is grade math**: changing it shows how many students it moves, like a new method. The method examples, the rule box, the plain-words description on reports and the student page, and Copy Grading Setup's Calculation Method all include it. The course % (points and categories) doesn't use it.
+
 ## Buttons and breadcrumbs (2026-10-19)
 
 Context: a UI/UX sweep found solid blue spent on navigation ("Class Management", "← Dashboard", "Edit Student") beside the real action. Plan at `~/fullvision-design-fixes-plan.md`, PR B.
