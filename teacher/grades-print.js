@@ -677,9 +677,9 @@
         : opts.blank
           ? 'Blank'
           : opts.scoresAs === 'levels'
-            ? 'All as Levels'
+            ? 'All as Proficiency'
             : opts.scoresAs === 'both'
-              ? 'Points with Levels'
+              ? 'Points with Proficiency'
               : 'As Marked';
     var periodText =
       period.kind === 'all'
@@ -1223,8 +1223,8 @@
       assessments: assessments,
       scoresAs: [
         { value: 'entered', label: 'As Marked' },
-        { value: 'levels', label: 'All as Levels' },
-        { value: 'both', label: 'Points with Levels' },
+        { value: 'levels', label: 'All as Proficiency' },
+        { value: 'both', label: 'Points with Proficiency' },
       ],
       students: [
         { value: 'both', label: 'Pupil # and Name' },
