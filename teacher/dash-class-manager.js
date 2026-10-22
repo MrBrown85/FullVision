@@ -1643,11 +1643,57 @@ window.DashClassManager = (function () {
     renderClassManager();
   }
 
+  /* ── Other classes' data ─────────────────────────────────────
+     The data layer loads every class at sign-in (preloadClasses). A class
+     picked here before its turn is loaded first; until its data is in, it
+     shows "Loading", so nothing is edited against an empty copy. The
+     sidebar's counts fill in as each class arrives. */
+  function _cmClassReady(cid) {
+    return !cid || cid === _activeCourse || typeof isClassLoaded !== 'function' || isClassLoaded(cid);
+  }
+
+  // The sidebar alone, so a background load never redraws a field the
+  // teacher is typing in.
+  function _cmRefreshSidebar() {
+    var el = document.querySelector('.cm-sidebar');
+    if (el && classManagerOpen) el.outerHTML = renderCmSidebar(Object.keys(COURSES));
+  }
+
+  function _cmAfterLoad(cid) {
+    if (!classManagerOpen) return;
+    if (cid === cmSelectedCourse && cmMode === 'edit') renderClassManager();
+    else _cmRefreshSidebar();
+  }
+
+  // Load the picked class, then show it if it is still the one picked.
+  function _cmShowWhenLoaded(cid) {
+    if (_cmClassReady(cid)) return;
+    loadClass(cid).then(function () {
+      _cmAfterLoad(cid);
+    });
+  }
+
+  // Follow the classes still loading, in the order the data layer loads
+  // them, and fill each in as it lands.
+  function _cmFollowLoads() {
+    if (typeof classesToPreload !== 'function') return;
+    preloadClasses();
+    classesToPreload().reduce(function (chain, cid) {
+      return chain.then(function () {
+        if (!classManagerOpen) return;
+        return loadClass(cid).then(function () {
+          _cmAfterLoad(cid);
+        });
+      });
+    }, Promise.resolve());
+  }
+
   function openClassManager() {
     classManagerOpen = true;
     cmSelectedCourse = _activeCourse;
     cmMode = 'edit';
     renderClassManager();
+    _cmFollowLoads();
   }
   function closeClassManager() {
     classManagerOpen = false;
@@ -1783,6 +1829,12 @@ window.DashClassManager = (function () {
       html += renderCmRelinkPanel(cmRelinkCid);
     } else if (cmCompReview && cmCompReview.kind === 'file' && COURSES[cmCompReview.cid]) {
       html += _cmRenderCompReview(cmCompReview.cid);
+    } else if (cmSelectedCourse && COURSES[cmSelectedCourse] && !_cmClassReady(cmSelectedCourse)) {
+      html +=
+        '<div class="cm-detail-inner cm-tabbed"><div class="cm-head"><div class="cm-head-text">' +
+        '<h1 class="cm-head-title">' +
+        esc(COURSES[cmSelectedCourse].name) +
+        '</h1><div class="cm-head-meta" role="status">Loading this class\u2026</div></div></div></div>';
     } else if (cmSelectedCourse && COURSES[cmSelectedCourse]) {
       html += renderCmDetail(cmSelectedCourse);
     }
@@ -1833,7 +1885,8 @@ window.DashClassManager = (function () {
     });
     activeCids.forEach(function (cid) {
       var c = COURSES[cid];
-      var sc = getStudents(cid).length;
+      var ready = _cmClassReady(cid);
+      var sc = ready ? getStudents(cid).length : 0;
       var sel = cid === cmSelectedCourse && cmMode === 'edit' ? ' selected' : '';
       var gsv = c.gradingSystem || _cmDefaultGradingSystem(c);
       var gs = gsv === 'letter' ? 'Letter' : gsv === 'both' ? 'Both' : 'Proficiency';
@@ -1849,9 +1902,7 @@ window.DashClassManager = (function () {
         '<div class="cm-class-meta">' +
         gs +
         ' \u00B7 ' +
-        sc +
-        ' Student' +
-        (sc !== 1 ? 's' : '') +
+        (ready ? sc + ' Student' + (sc !== 1 ? 's' : '') : 'Loading\u2026') +
         '</div>' +
         '</div>';
     });
@@ -3432,6 +3483,7 @@ window.DashClassManager = (function () {
     cmSelectedCourse = cid;
     cmMode = 'edit';
     renderClassManager();
+    _cmShowWhenLoaded(cid);
   }
 
   function cmStartCreate() {

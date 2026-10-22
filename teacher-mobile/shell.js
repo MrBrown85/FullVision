@@ -66,6 +66,15 @@
 
     _hideLoader();
     _initPullToRefresh();
+    // The teacher's other classes load in the background, so switching to
+    // one doesn't start from nothing.
+    if (typeof preloadClasses === 'function') {
+      var preload = function () {
+        preloadClasses();
+      };
+      if (typeof requestIdleCallback === 'function') requestIdleCallback(preload, { timeout: 3000 });
+      else setTimeout(preload, 1500);
+    }
 
     // Register mobile re-render callback for cross-device sync
     if (window.GB && window.GB.registerMobileRerender) {

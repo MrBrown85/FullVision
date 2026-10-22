@@ -223,6 +223,16 @@ window.Router = (function () {
     } else {
       _onRoute();
     }
+    // Then the teacher's other classes, in the background once the first
+    // page is up, so each is ready before it is opened.
+    _whenIdle(function () {
+      if (typeof preloadClasses === 'function') preloadClasses();
+    });
+  }
+
+  function _whenIdle(fn) {
+    if (typeof requestIdleCallback === 'function') requestIdleCallback(fn, { timeout: 3000 });
+    else setTimeout(fn, 1500);
   }
 
   /* ── Navigate ────────────────────────────────────────────── */
