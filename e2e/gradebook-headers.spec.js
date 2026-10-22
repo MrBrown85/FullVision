@@ -11,8 +11,8 @@ async function enterDemo(page) {
 }
 
 async function openGradebook(page) {
-  await page.evaluate(() => localStorage.setItem('gb_viewMode', 'detailed'));
   await page.goto('/teacher/app.html#/gradebook?course=sci8');
+  await page.locator('[data-action="setView"][data-mode="detailed"]').click();
   await expect(page.locator('.gb-grid-assess-group').first()).toBeVisible();
 }
 
