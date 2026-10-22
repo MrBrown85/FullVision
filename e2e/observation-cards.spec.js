@@ -278,7 +278,7 @@ test.describe('Capture strip (D4), desktop', () => {
     const first = page.locator('#starter-dropdown .obsc-starter').first();
     await expect(first.locator('.obs-type')).toHaveText(/^(Strength|Growth|Concern|Note)$/);
     await expect(first.locator('.obsc-starter-sets')).not.toBeEmpty();
-    await expect(page.locator('#starter-dropdown')).toContainText('Edit starters…');
+    await expect(page.locator('#starter-dropdown')).toContainText('Edit My Starters…');
     await expect(page.locator('#starter-dropdown')).toContainText('A starter fills the type, context and tags');
   });
 });

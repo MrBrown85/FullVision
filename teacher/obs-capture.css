@@ -827,3 +827,66 @@ span.obsc-chip-label {
   border-radius: 0 0 5px 5px;
   color: var(--text-2);
 }
+
+/* Save as Starter: the button beside Add, and its dialog */
+.obsc-save-starter {
+  min-height: 30px;
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm, 13px);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.obsc-save-starter:hover:not(:disabled) {
+  background: var(--overlay-hover);
+}
+.obsc-save-starter:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.obsc-save-card {
+  width: min(420px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+.obsc-save-label {
+  font-size: var(--text-sm, 13px);
+  font-weight: 600;
+  color: var(--text-2);
+}
+.obsc-save-text {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-base, 14px);
+  resize: vertical;
+}
+.obsc-save-hint,
+.obsc-save-note {
+  font-size: var(--text-sm, 13px);
+  line-height: 1.45;
+  color: var(--text-2);
+}
+.obsc-save-sets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.obsc-save-sets-label {
+  font-size: var(--text-sm, 13px);
+  font-weight: 600;
+  color: var(--text);
+}

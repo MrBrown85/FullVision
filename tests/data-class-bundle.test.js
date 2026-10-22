@@ -306,6 +306,7 @@ function resetClass() {
   Object.keys(_DATA_KEYS).forEach(function (field) {
     delete _cache[field][CID];
   });
+  delete _cache.observationTemplates.teacher; // the teacher's starters
   _serverState = {};
   _localWrites = {};
   _refreshState = {};
@@ -516,7 +517,7 @@ describe('get_class_bundle', () => {
     expect(saves[0].p_payload.narrative_html).toBe('<p>Curious and kind.</p>');
   });
 
-  it('loads the class sentence starters, in order, with their tags', async () => {
+  it('loads the teacher\u2019s sentence starters, in order, with their tags and Times Used', async () => {
     resetClass();
     globalThis.__FV_CLASS_BUNDLE = true;
     globalThis.getSupabase = bundleServer;
@@ -528,6 +529,7 @@ describe('get_class_bundle', () => {
         default_context_type: null,
         default_dims: ['curiosity'],
         display_order: 0,
+        use_count: 4,
       },
       {
         id: TPL2,
@@ -544,10 +546,18 @@ describe('get_class_bundle', () => {
       bundleTemplates = null;
     }
     expect(getObservationTemplates(CID)).toEqual([
-      { id: TPL1, text: 'Asked a great question', sentiment: 'strength', context: null, dims: ['curiosity'] },
-      { id: TPL2, text: 'Needed a reminder to start', sentiment: 'growth', context: 'independent', dims: [] },
+      { id: TPL1, text: 'Asked a great question', sentiment: 'strength', context: null, dims: ['curiosity'], uses: 4 },
+      {
+        id: TPL2,
+        text: 'Needed a reminder to start',
+        sentiment: 'growth',
+        context: 'independent',
+        dims: [],
+        uses: 0,
+      },
     ]);
-    expect(JSON.parse(localStorage.getItem('gb-obs-templates-' + CID))).toHaveLength(2);
+    // The teacher's list, not the class's.
+    expect(JSON.parse(localStorage.getItem('gb-obs-templates-teacher'))).toHaveLength(2);
     // The loaded list is the baseline: saving it again sends nothing.
     var sent = [];
     globalThis.getSupabase = () => ({
@@ -563,8 +573,8 @@ describe('get_class_bundle', () => {
 
   it('keeps this device’s starters when the server sends no list', async () => {
     resetClass();
-    var local = [{ id: TPL1, text: 'Saved here', sentiment: null, context: null, dims: [] }];
-    localStorage.setItem('gb-obs-templates-' + CID, JSON.stringify(local));
+    var local = [{ id: TPL1, text: 'Saved here', sentiment: null, context: null, dims: [], uses: 0 }];
+    localStorage.setItem('gb-obs-templates-teacher', JSON.stringify(local));
     globalThis.__FV_CLASS_BUNDLE = true;
     globalThis.getSupabase = bundleServer;
     await initData(CID);

@@ -162,24 +162,22 @@ for (const scheme of ['light', 'dark']) {
 
 test('a starter can default to Note, and picking it sets the Note chip', async ({ page }) => {
   await enterDemo(page);
-  await page.goto('/teacher/app.html#/dashboard?course=sci8');
-  await page.getByRole('button', { name: 'Class Management' }).first().click();
-  await page.getByRole('tab', { name: /^Sentence Starters/ }).click();
-  const section = page.locator('#cm-starters');
+  await page.goto('/teacher/app.html#/observations/starters');
+  const section = page.locator('.ms-page');
   await expect(section).toBeVisible();
-  // Demo Mode's class already has starters.
-  await section.getByRole('button', { name: '+ Add starter' }).click();
-  await section.locator('#cm-starter-text').fill('Was away for the lab');
+  // Demo Mode's teacher already has starters.
+  await section.getByRole('button', { name: 'Add Starter' }).click();
+  await section.locator('#ms-text').fill('Was away for the lab');
   await expect(section.getByLabel('Type').locator('option')).toHaveText([
-    'No type',
+    'No Type',
     'Strength',
     'Growth',
     'Concern',
     'Note',
   ]);
   await section.getByLabel('Type').selectOption('note');
-  await section.getByRole('button', { name: 'Add starter' }).click();
-  const row = section.locator('.cm-starter-row', { hasText: 'Was away for the lab' });
+  await section.getByRole('button', { name: 'Add Starter' }).click();
+  const row = section.locator('.ms-row', { hasText: 'Was away for the lab' });
   await expect(row.locator('.obs-pill-type')).toHaveText('Note');
   await shot(section, 'desktop-cm-starter-light');
 

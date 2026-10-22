@@ -172,6 +172,15 @@ Context: a review of observation capture and display across desktop, phone, stud
     - On the dashboard a busy week shows Concern, Growth, Strength, then Note, then no type, while there is room.
     - The live database limits `observation.sentiment` and `observation_template.default_sentiment` to the three old values with check constraints `schema.sql` never recorded; `migrations/20261020_observation_note_type.sql` widens both to include `note`. No server function reads the values.
 
+## Sentence starters belong to the teacher (2026-10-22)
+
+Colin, 2026-10-22, from the Class Management redesign. Replaces Observations item 3's "per-class bank" and Duplicate Class copying them (item 8 under Copying a class's grading setup).
+
+1. **One list per teacher, used in every class**: My Sentence Starters, under Observations (`#/observations/starters`), reached from "Edit My Starters…" in any observation box. Class Management no longer has a Sentence Starters tab, and Duplicate Class no longer copies starters. `migrations/20261022_teacher_sentence_starters.sql`.
+2. **Existing banks merge**: one row per wording (trimmed, any case), the first by class order kept. **Custom tags are dropped from starters**, since each class has its own; dispositions and Core Competencies stay.
+3. **Times Used** counts the observations written from a starter in every class (`observation.template_id`). The "/" menu (headed Most Used) and the phone's quick menu list the most used first; My Sentence Starters keeps the teacher's ↑ ↓ order. A note rewritten after picking a starter doesn't count.
+4. **Save as Starter** beside Add on the desktop strip, and **Also Save as Starter** on the phone's new-observation sheet, keep what is in the box (with its type, context and tags) as a new starter. The observation itself still waits for Add.
+
 ## Buttons and breadcrumbs (2026-10-19)
 
 Context: a UI/UX sweep found solid blue spent on navigation ("Class Management", "← Dashboard", "Edit Student") beside the real action. Plan at `~/fullvision-design-fixes-plan.md`, PR B.

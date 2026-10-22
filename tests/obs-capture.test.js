@@ -160,8 +160,8 @@ describe('capture strip', () => {
     );
     setGlobal('getScores', () => ({}));
     setGlobal('getLastScoredAssessment', () => null);
-    setGlobal('addQuickOb', (cid, sid, text, dims, sentiment, context, ac, link) => {
-      added.push({ cid, sid, text, dims, sentiment, context, ac, link });
+    setGlobal('addQuickOb', (cid, sid, text, dims, sentiment, context, ac, link, templateId) => {
+      added.push({ cid, sid, text, dims, sentiment, context, ac, link, templateId });
       return true;
     });
     setGlobal('isStudentFlagged', (cid, sid) => !!flagged[sid]);
@@ -307,20 +307,21 @@ describe('capture strip', () => {
     },
     { id: 'ot3', text: 'Explained the question to a partner', sentiment: null, context: 'small-group', dims: [] },
   ];
+  // The teacher's starters, most used first: one list in every class.
   function withStarters(list) {
-    setGlobal('getObservationTemplates', cid => (cid === CID ? list || STARTERS : []));
+    setGlobal('getObservationTemplatesByUse', () => list || STARTERS);
   }
   function suggestLabels(cap) {
     return Array.from(cap.el.querySelectorAll('#capture-suggest .obsc-item .obsc-item-label')).map(e => e.textContent);
   }
 
-  it('a slash with no starters says so, offers Edit starters…, and Enter still adds', () => {
+  it('a slash with no starters says so, offers Edit My Starters…, and Enter still adds', () => {
     withStarters([]);
     const cap = mount({ students: ['s1'] });
     type(cap, 'Done early /');
     const box = cap.el.querySelector('#capture-suggest');
-    expect(box.textContent).toContain('This class has no sentence starters yet.');
-    expect(suggestLabels(cap)).toEqual(['Edit starters…']);
+    expect(box.textContent).toContain('You have no sentence starters yet.');
+    expect(suggestLabels(cap)).toEqual(['Edit My Starters…']);
     const navigated = [];
     setGlobal('Router', { navigate: h => navigated.push(h) });
     press(cap, 'Enter');
@@ -328,17 +329,18 @@ describe('capture strip', () => {
     expect(added).toHaveLength(1);
   });
 
-  it('a slash lists the class starters, filtered by what follows it', () => {
+  it('a slash lists the teacher\u2019s starters under Most Used, filtered by what follows it', () => {
     withStarters();
     const cap = mount({ students: ['s1'] });
     type(cap, '/');
-    expect(suggestLabels(cap)).toEqual([...STARTERS.map(t => t.text), 'Edit starters…']);
+    expect(cap.el.querySelector('#capture-suggest .obsc-menu-section').textContent).toBe('Most Used');
+    expect(suggestLabels(cap)).toEqual([...STARTERS.map(t => t.text), 'Edit My Starters…']);
     type(cap, '/quest');
     // A word starting with the query comes before one that only contains it.
     expect(suggestLabels(cap)).toEqual([
       'Asked a great question in class',
       'Explained the question to a partner',
-      'Edit starters…',
+      'Edit My Starters…',
     ]);
     type(cap, '/zzz');
     expect(cap.el.querySelector('#capture-suggest').textContent).toContain('No starter matches “zzz”.');
@@ -361,7 +363,43 @@ describe('capture strip', () => {
       sentiment: 'growth',
       context: 'independent',
       dims: ['selfRegulation', 'engagement'],
+      templateId: 'ot2',
     });
+  });
+
+  it('a note rewritten after picking a starter is not counted as written from it', () => {
+    withStarters();
+    const cap = mount({ students: ['s1'] });
+    type(cap, '/support');
+    press(cap, 'Enter');
+    type(cap, 'Worked on their own today');
+    cap.submit();
+    expect(added[0].templateId).toBeNull();
+  });
+
+  it('Save as Starter saves what is in the box for all classes and the note waits for Add', () => {
+    withStarters([]);
+    const saved = [];
+    setGlobal('addObservationTemplate', (cid, row) => {
+      saved.push(row);
+      return Object.assign({ id: 'otNew' }, row);
+    });
+    const cap = mount({ students: ['s1'] });
+    click(cap.el.querySelector('[data-obsc="type"][data-value="strength"]'));
+    type(cap, 'Explained their reasoning clearly to the group');
+    cap.render();
+    click(cap.el.querySelector('#save-starter-btn'));
+    const dlg = document.querySelector('.obsc-save-overlay');
+    expect(dlg.textContent).toContain('Leave out student names so it works for anyone.');
+    expect(dlg.textContent).toContain('Saves to My Sentence Starters for all your classes.');
+    expect(dlg.querySelector('textarea').value).toBe('Explained their reasoning clearly to the group');
+    click(dlg.querySelector('[data-save-starter="save"]'));
+    expect(saved).toEqual([
+      { text: 'Explained their reasoning clearly to the group', sentiment: 'strength', context: null, dims: [] },
+    ]);
+    expect(document.querySelector('.obsc-save-overlay')).toBeNull();
+    expect(added).toHaveLength(0);
+    expect(cap.getState().templateId).toBe('otNew');
   });
 
   it('a starter keeps the type and context already chosen and adds its tags to the picked ones', () => {
@@ -381,7 +419,7 @@ describe('capture strip', () => {
     expect(st.dims).toEqual(['engagement', 'selfRegulation']);
   });
 
-  it('the arrows reach Edit starters…, and it opens Class Management', () => {
+  it('the arrows reach Edit My Starters…, and it opens My Sentence Starters', () => {
     withStarters();
     const navigated = [];
     setGlobal('Router', { navigate: h => navigated.push(h) });
@@ -389,9 +427,9 @@ describe('capture strip', () => {
     type(cap, '/quest');
     press(cap, 'ArrowDown');
     press(cap, 'ArrowDown');
-    expect(cap.el.querySelector('#capture-suggest .is-active').textContent).toBe('Edit starters…');
+    expect(cap.el.querySelector('#capture-suggest .is-active').textContent).toBe('Edit My Starters…');
     press(cap, 'Enter');
-    expect(navigated).toEqual(['/dashboard?manage=starters']);
+    expect(navigated).toEqual(['/observations/starters']);
     expect(added).toHaveLength(0);
   });
 
@@ -404,7 +442,7 @@ describe('capture strip', () => {
     const menu = cap.el.querySelector('#starter-dropdown');
     expect(menu).toBeTruthy();
     const rows = Array.from(menu.querySelectorAll('.obsc-item')).map(e => e.textContent);
-    expect(rows[rows.length - 1]).toBe('Edit starters…');
+    expect(rows[rows.length - 1]).toBe('Edit My Starters…');
     expect(menu.querySelector('[data-obsc="pickStarter"][data-value="ot1"] .obsc-item-hint').textContent).toBe(
       'Strength',
     );
@@ -417,7 +455,7 @@ describe('capture strip', () => {
     expect(cap.el.querySelector('#starter-dropdown')).toBeNull();
   });
 
-  it('a host can handle Edit starters…; with no way to edit (the phone) it says where to', () => {
+  it('a host can handle Edit My Starters…; with no way to edit (the phone) it says where to', () => {
     withStarters();
     const asked = [];
     const cap = mount({ students: ['s1'], onEditStarters: cid => asked.push(cid) });
@@ -431,7 +469,7 @@ describe('capture strip', () => {
     click(phone.el.querySelector('#starter-btn'));
     const menu = phone.el.querySelector('#starter-dropdown');
     expect(menu.querySelector('[data-obsc="editStarters"]')).toBeNull();
-    expect(menu.textContent).toContain('Add your own in Class Management on a computer.');
+    expect(menu.textContent).toContain('Add your own on My Sentence Starters on a computer.');
   });
 
   it('with no student, Add opens the student menu instead of saving', () => {

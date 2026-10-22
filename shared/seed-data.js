@@ -3194,17 +3194,19 @@ function seedIfNeeded() {
     saveTermRatings('sci8', current(sci8TR));
   }
 
-  // Science 8 has the six suggested sentence starters as its own bank. A
-  // demo saved before the bank existed gets them once; a demo teacher who
-  // deletes them all keeps an empty list.
+  // The demo teacher's sentence starters are the six suggested ones. A demo
+  // saved before starters existed gets them once (one saved when they were
+  // Science 8's own folds that list in instead); a demo teacher who deletes
+  // them all keeps an empty list.
   if (
     COURSES.sci8 &&
     typeof saveObservationTemplates === 'function' &&
     typeof OBS_STARTER_SUGGESTIONS !== 'undefined' &&
+    localStorage.getItem('gb-obs-templates-teacher') === null &&
     localStorage.getItem('gb-obs-templates-sci8') === null
   ) {
     saveObservationTemplates(
-      'sci8',
+      null,
       OBS_STARTER_SUGGESTIONS.map(function (t, i) {
         return Object.assign({}, structuredClone(t), { id: 'ot-sci8-' + (i + 1) });
       }),

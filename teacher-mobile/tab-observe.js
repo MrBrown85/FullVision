@@ -408,7 +408,10 @@ window.MObserve = (function () {
       _tagChipsHtml() +
       '</div>' +
       (isNew
-        ? _linkRowsHtml(cid)
+        ? '<label class="m-edit-switch"><span class="m-edit-switch-text"><span class="m-edit-row-k">Also Save as Starter</span>' +
+          '<small>For all your classes. Leave out names.</small></span>' +
+          '<input type="checkbox" role="switch" id="m-obs-save-starter"></label>' +
+          _linkRowsHtml(cid)
         : '<button type="button" class="m-obs-sheet-delete" data-action="m-obs-delete" data-obid="' +
           ob.id +
           '" data-sid="' +
@@ -775,6 +778,19 @@ window.MObserve = (function () {
         ? { assessmentId: _selectedAssessment, assessmentTitle: _assessmentTitle(cid, _selectedAssessment) }
         : null;
       var link = _selectedCompetency ? { competencyId: _selectedCompetency, level: _selectedLevel } : null;
+      // "Also Save as Starter": the starter is saved first, so this
+      // observation counts as written from it.
+      var starterId = null;
+      var saveStarter = document.getElementById('m-obs-save-starter');
+      if (saveStarter && saveStarter.checked && typeof addObservationTemplate === 'function') {
+        var tpl = addObservationTemplate(null, {
+          text: text.trim(),
+          sentiment: _selectedSentiment,
+          context: _selectedContext,
+          dims: _selectedDims.slice(),
+        });
+        if (tpl) starterId = tpl.id;
+      }
       sids.forEach(function (sid) {
         var okA = addQuickOb(
           cid,
@@ -785,6 +801,7 @@ window.MObserve = (function () {
           _selectedContext,
           ac ? Object.assign({}, ac) : null,
           link,
+          starterId,
         );
         if (okA === false) allOk = false;
       });
@@ -885,14 +902,17 @@ window.MObserve = (function () {
   }
 
   /* ── Quick-post starters ───────────────────────────────────── */
-  /* The class's sentence starters (edited in Class Management on a
-     computer). A class with none gets the six suggestions, which work the
-     same way but are never saved as the class's own.
+  /* The teacher's sentence starters, most used first (edited on My
+     Sentence Starters on a computer, or added with "Also Save as Starter").
+     A teacher with none gets the six suggestions, which work the same way
+     but are never saved as their own.
      → { items: [{ key, text, sentiment, context, dims }], suggested } */
-  function quickStarters(cid) {
-    var own = (typeof getObservationTemplates === 'function' ? getObservationTemplates(cid) : []).filter(function (t) {
-      return t && t.text;
-    });
+  function quickStarters() {
+    var own = (typeof getObservationTemplatesByUse === 'function' ? getObservationTemplatesByUse() : []).filter(
+      function (t) {
+        return t && t.text;
+      },
+    );
     if (own.length) {
       return {
         suggested: false,
@@ -935,7 +955,7 @@ window.MObserve = (function () {
       '</div>' +
       '<button type="button" class="m-edit-cancel m-quick-cancel" data-action="m-sheet-cancel">Cancel</button>' +
       '</div>' +
-      '<div class="m-quick-sub">One tap posts it. Type, context and tags come from the starter.</div>' +
+      '<div class="m-quick-sub">One tap posts it. Type, context and tags come from the starter. Most used first.</div>' +
       '<div class="m-quick-rows" role="list" aria-labelledby="m-quick-title">';
 
     var starters = quickStarters(cid);
@@ -957,7 +977,8 @@ window.MObserve = (function () {
       '"><span class="m-quick-row-text">Write Your Own\u2026</span><span class="m-quick-row-car" aria-hidden="true">\u203a</span></button>' +
       '</div>';
     if (starters.suggested) {
-      html += '<div class="m-quick-note">Add your own in Class Management on a computer.</div>';
+      html +=
+        '<div class="m-quick-note">To keep one of your own, turn on Also Save as Starter when you write it.</div>';
     }
 
     MC.presentSheet(html, { half: true });
@@ -968,7 +989,18 @@ window.MObserve = (function () {
     if (!tmpl) return;
 
     try {
-      addQuickOb(cid, sid, tmpl.text, (tmpl.dims || []).slice(), tmpl.sentiment || null, tmpl.context || null);
+      var fromStarter = /^suggested-/.test(tmpl.key) ? null : tmpl.key;
+      addQuickOb(
+        cid,
+        sid,
+        tmpl.text,
+        (tmpl.dims || []).slice(),
+        tmpl.sentiment || null,
+        tmpl.context || null,
+        null,
+        null,
+        fromStarter,
+      );
     } catch (e) {
       MC.dismissSheet();
       MC.showToast('Failed to save \u2014 try again');
