@@ -4172,7 +4172,12 @@ window.DashClassManager = (function () {
     });
     var html = '<div class="cm-term-school">';
     html +=
-      '<select class="cm-input cm-term-school-select" data-action-change="cmTermSchool" aria-label="Surrey secondary school">' +
+      '<label class="cm-term-school-label" for="cm-term-school-' +
+      cid +
+      '">School</label>' +
+      '<select class="cm-input cm-term-school-select" id="cm-term-school-' +
+      cid +
+      '" data-action-change="cmTermSchool">' +
       schools
         .map(function (s) {
           return (
@@ -4184,7 +4189,7 @@ window.DashClassManager = (function () {
     if (available) {
       html +=
         '<button class="btn btn-primary cm-term-school-btn" data-action="cmTermSchoolPreset">' +
-        (hasRows ? 'Replace with this school’s dates' : 'Use this school’s dates') +
+        (hasRows ? 'Replace With This School’s Dates' : 'Use This School’s Dates') +
         '</button>';
     }
     html += '</div>';
@@ -4202,10 +4207,69 @@ window.DashClassManager = (function () {
     return html;
   }
 
+  var _cmTermEditing = {}; // cid -> true while Edit Dates is open
+
+  /* Saved terms as tiles: each term's name, dates and report. Edit Dates,
+     a change of span or a new school's dates open the editor below. */
+  function _cmTermDay(iso) {
+    if (!iso) return '';
+    var d = new Date(iso + 'T12:00:00');
+    return isNaN(d) ? iso : d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
+  }
+
+  function _cmRenderTermTiles(cid) {
+    var st = _cmTermRows(cid);
+    var rows = normalizeTermOrdinals(st.rows);
+    var match = typeof reportingTermsSchoolMatch === 'function' ? reportingTermsSchoolMatch(rows) : null;
+    var reports = typeof reportingTermReportNames === 'function' ? reportingTermReportNames(rows) : null;
+    var chosen = _cmTermSchoolId();
+    // The school menu offers another school's dates only once a different
+    // school is picked.
+    var preset = _cmRenderSchoolPreset(cid, true);
+    if (match && match.school.id === chosen)
+      preset = preset.replace(/<button[^>]*cm-term-school-btn[\s\S]*?<\/button>/, '');
+    return (
+      '<div class="cm-term-view">' +
+      '<div class="cm-hint">The gradebook, dashboard and student pages can show one term at a time. A term counts the assessments dated inside it.</div>' +
+      '<div class="cm-term-view-top">' +
+      preset +
+      _cmRenderTermSpan(cid) +
+      '</div>' +
+      '<div class="cm-term-tiles">' +
+      rows
+        .map(function (t, i) {
+          return (
+            '<div class="cm-term-tile">' +
+            '<div class="cm-term-tile-name">' +
+            esc(t.label || 'Term ' + t.ordinal) +
+            '</div>' +
+            '<div class="cm-term-tile-dates">' +
+            esc(_cmTermDay(t.starts_on)) +
+            ' \u2013 ' +
+            esc(_cmTermDay(t.ends_on)) +
+            '</div>' +
+            (reports && reports[i] ? '<div class="cm-term-tile-report">' + esc(reports[i]) + '</div>' : '') +
+            '</div>'
+          );
+        })
+        .join('') +
+      '</div>' +
+      '<div class="cm-term-view-foot">' +
+      '<div class="cm-hint">' +
+      (match ? 'Each term ends the day its report is published. ' : '') +
+      _cmTermFooterHtml(cid).replace(/<[^>]+>/g, '') +
+      '</div>' +
+      '<button type="button" class="cm-action-btn" data-action="cmTermEdit">Edit Dates</button>' +
+      '</div>' +
+      '</div>'
+    );
+  }
+
   function _cmRenderReportingTermsField(cid) {
     if (!cid) return '';
     var st = _cmTermRows(cid);
     var rows = st.rows;
+    if (rows.length && !st.dirty && !_cmTermEditing[cid]) return _cmRenderTermTiles(cid);
     var html =
       '<div class="cm-field cm-cat-field">' +
       '<label class="cm-label">Reporting Terms</label>' +
@@ -4250,7 +4314,7 @@ window.DashClassManager = (function () {
     html +=
       '<div class="cm-cat-footer">' +
       (rows.length > 0 && rows.length < REPORTING_TERMS_MAX
-        ? '<button class="cm-add-link" data-action="cmTermAdd">+ Add term</button>'
+        ? '<button class="cm-add-link" data-action="cmTermAdd">+ Add Term</button>'
         : '<span></span>') +
       '<div id="cm-term-foot-' +
       cid +
@@ -4261,10 +4325,27 @@ window.DashClassManager = (function () {
       cid +
       '" data-action="cmTermSave"' +
       (_cmTermCanSave(cid) ? '' : ' disabled') +
-      '>Save terms</button>' +
+      '>Save Terms</button>' +
       '</div>' +
+      (getReportingTerms(cid).length
+        ? '<button type="button" class="cm-add-link cm-term-cancel" data-action="cmTermCancel">Cancel</button>'
+        : '') +
       '</div>';
     return html;
+  }
+
+  function cmTermEdit() {
+    if (!cmSelectedCourse) return;
+    _cmTermEditing[cmSelectedCourse] = true;
+    renderClassManager();
+  }
+
+  // Cancel drops unsaved edits and goes back to the tiles.
+  function cmTermCancel() {
+    if (!cmSelectedCourse) return;
+    delete _cmTermState[cmSelectedCourse];
+    _cmTermEditing[cmSelectedCourse] = false;
+    renderClassManager();
   }
 
   /* "This class runs": Full year, Semester 1 or Semester 2. A semester class
@@ -4410,6 +4491,7 @@ window.DashClassManager = (function () {
       return;
     }
     delete _cmTermState[cid];
+    _cmTermEditing[cid] = false;
     renderClassManager();
   }
 
@@ -5526,6 +5608,12 @@ window.DashClassManager = (function () {
       },
       cmTermDelete: function () {
         cmTermDelete(parseInt(el.dataset.idx, 10));
+      },
+      cmTermEdit: function () {
+        cmTermEdit();
+      },
+      cmTermCancel: function () {
+        cmTermCancel();
       },
       cmTermSave: function () {
         cmTermSave();

@@ -1909,6 +1909,65 @@ body.fv-names-hidden .dash-search-input:not(:placeholder-shown) {
     flex: none;
   }
 }
+/* Reporting Terms tab: saved terms as tiles */
+.cm-term-view {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.cm-term-view-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.cm-term-view-top .cm-term-school,
+.cm-term-view-top .cm-term-span {
+  margin: 0;
+}
+.cm-term-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+.cm-term-tile {
+  border: 1px solid var(--divider-subtle);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  font-family: var(--font-base);
+}
+.cm-term-tile-name {
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--text);
+}
+.cm-term-tile-dates {
+  font-size: var(--text-base);
+  color: var(--text-2);
+  margin-top: 2px;
+}
+.cm-term-tile-report {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  margin-top: 6px;
+}
+.cm-term-view-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.cm-term-school-label {
+  font-family: var(--font-base);
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+.cm-term-cancel {
+  margin-top: 8px;
+}
 .cm-details-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
