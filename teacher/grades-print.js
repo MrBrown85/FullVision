@@ -677,10 +677,10 @@
         : opts.blank
           ? 'Blank'
           : opts.scoresAs === 'levels'
-            ? 'Levels Only'
+            ? 'All as Levels'
             : opts.scoresAs === 'both'
-              ? 'Points and Levels'
-              : 'As Entered';
+              ? 'Points with Levels'
+              : 'As Marked';
     var periodText =
       period.kind === 'all'
         ? 'All Time'
@@ -1222,9 +1222,9 @@
         .concat([{ value: 'custom', label: 'Custom Dates' }]),
       assessments: assessments,
       scoresAs: [
-        { value: 'entered', label: 'As Entered' },
-        { value: 'levels', label: 'Levels Only' },
-        { value: 'both', label: 'Points and Levels' },
+        { value: 'entered', label: 'As Marked' },
+        { value: 'levels', label: 'All as Levels' },
+        { value: 'both', label: 'Points with Levels' },
       ],
       students: [
         { value: 'both', label: 'Pupil # and Name' },

@@ -276,7 +276,7 @@ describe('buildModel', () => {
       block: 'A',
       teacher: 'Colin Brown',
       students: '3',
-      scores: 'As Entered',
+      scores: 'As Marked',
     });
     expect(model.header.printed).toMatch(/\d{4}, \d{1,2}:\d{2}/);
     expect(model.marks.map(m => m.key).sort()).toEqual(['L', 'NS', '—', '✓', '✗'].sort());

@@ -123,13 +123,13 @@ test.describe('Print Grades', () => {
     expect(values).toEqual([
       'All Time',
       'All Assessments',
-      'As Entered',
+      'As Marked',
       'Pupil # and Name',
       'Last Name',
       'Letter · 8.5 × 11 in',
       'Normal',
     ]);
-    const small = new Set(['a', 'an', 'and', 'as', 'for', 'in', 'of', 'the', 'to', 'by', '·', '×', '#']);
+    const small = new Set(['a', 'an', 'and', 'as', 'for', 'in', 'of', 'the', 'to', 'by', 'with', '·', '×', '#']);
     for (const label of labels.concat(values)) {
       for (const word of label.split(/\s+/)) {
         if (!word || small.has(word) || /^\d/.test(word)) continue;
