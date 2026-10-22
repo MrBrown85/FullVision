@@ -109,7 +109,8 @@ test.describe('Print Grades', () => {
       'Term',
       'Assessments',
       'Scores',
-      'Blank Scores',
+      'Blank Gradebook',
+      'Attendance',
       'Show As',
       'Sort By',
       'Final Grade',
@@ -135,7 +136,7 @@ test.describe('Print Grades', () => {
         expect(word[0], `"${label}"`).toBe(word[0].toUpperCase());
       }
     }
-    await expect(dialog.getByRole('switch')).toHaveCount(4);
+    await expect(dialog.getByRole('switch')).toHaveCount(5);
     await expectCount(dialog, '3 pages · Letter', `${STUDENTS} students · 37 columns`);
     // The page picture shows the first page's columns and the final grade only on the last.
     await expect(dialog.locator('.gpd-thumb .gpd-t-colhead .gpd-t-cell')).toHaveCount(14);
@@ -280,64 +281,77 @@ test.describe('Print Grades', () => {
     );
   });
 
-  test('Blank Grid prints the roster on an empty grid', async ({ page }) => {
+  test('Blank Gradebook prints the assessment titles over empty score boxes', async ({ page }) => {
     await openDemoGradebook(page);
     const dialog = await openDialog(page);
     await choose(dialog, 'Term', 'All Time');
-    await expect(dialog.getByRole('textbox', { name: 'Columns' })).toHaveCount(0);
-    await choose(dialog, 'Assessments', 'Blank Grid');
-    await expectCount(dialog, '1 page · Letter', `${STUDENTS} students · Blank Grid · 11 columns`);
-    await expect(dialog.getByRole('textbox', { name: 'Columns' })).toHaveValue('11');
-    for (const label of ['Final Grade', 'Class Average Row', 'Late Marks', 'Blank Scores']) {
+    await dialog.getByLabel('Blank Gradebook').check();
+    await expect(dialog.getByLabel('Blank Gradebook')).toHaveAccessibleDescription(
+      'Prints the assessment titles across the top with every score box empty.',
+    );
+    await expectCount(dialog, '3 pages · Letter', `${STUDENTS} students · Blank Gradebook · 37 columns`);
+    for (const label of ['Final Grade', 'Class Average Row', 'Late Marks']) {
       await expect(dialog.getByLabel(label)).toBeDisabled();
     }
     await expect(dialog.getByRole('button', { name: /^Scores / })).toBeDisabled();
-    await expect(dialog.locator('.gpd-thumb .gpd-t-colhead .gpd-t-cell')).toHaveCount(12);
+    // The picture shows a stroke for each title.
+    await expect(dialog.locator('.gpd-thumb .gpd-t-colhead .gpd-t-cell i')).toHaveCount(13);
+    await expect(dialog.locator('.gpd-thumb .gpd-t-avg')).toHaveCount(0);
     await stageFromDialog(page, dialog);
     const sheet = page.locator('#grades-print-root .gp-page');
-    await expect(sheet).toHaveCount(1);
-    await expect(sheet.locator('.gp-row:not(.gp-blank-row)')).toHaveCount(STUDENTS);
-    await expect(sheet.locator('th.gp-ch[data-col]')).toHaveCount(0);
-    expect(await sheet.locator('.gp-row').first().locator('td.gp-blank').count()).toBeGreaterThan(5);
-    await expect(sheet.locator('.gp-head')).toContainText('Scores: Blank Grid');
-    expect(countPages(await pdfOfStaged(page))).toBe(1);
+    await expect(sheet).toHaveCount(3);
+    await expect(sheet.first().locator('.gp-row:not(.gp-blank-row)')).toHaveCount(STUDENTS);
+    await expect(sheet.first().locator('th.gp-ch[data-col]')).toHaveCount(13);
+    await expect(sheet.first().locator('.gp-row td.gp-cell')).not.toHaveCount(0);
+    expect(
+      await sheet.locator('.gp-row td.gp-cell').evaluateAll(cells => cells.filter(c => c.textContent.trim()).length),
+    ).toBe(0);
+    await expect(sheet.locator('.gp-avg')).toHaveCount(0);
+    await expect(sheet.first().locator('.gp-head')).toContainText('Scores: Blank');
+    expect(countPages(await pdfOfStaged(page))).toBe(3);
     const reset = await openDialog(page);
-    await choose(reset, 'Assessments', 'All Assessments');
+    await reset.getByLabel('Blank Gradebook').uncheck();
     await reset.getByRole('button', { name: 'Cancel' }).click();
   });
 
-  test('Blank Grid prints the number of columns the stepper shows', async ({ page }) => {
+  test('Attendance prints school days from this Monday, a band per week', async ({ page }) => {
+    await page.clock.setFixedTime(new Date('2026-10-21T10:00:00'));
     await openDemoGradebook(page);
     const dialog = await openDialog(page);
-    await choose(dialog, 'Term', 'All Time');
-    await choose(dialog, 'Assessments', 'Blank Grid');
-    const count = dialog.getByRole('textbox', { name: 'Columns' });
-    await dialog.getByRole('button', { name: 'More Columns' }).click();
-    await expect(count).toHaveValue('12');
-    await expectCount(dialog, '1 page · Letter', `${STUDENTS} students · Blank Grid · 12 columns`);
-    await count.fill('6');
-    await count.press('Enter');
-    await expect(count).toHaveValue('6');
-    await expect(dialog.locator('.gpd-thumb .gpd-t-colhead .gpd-t-cell')).toHaveCount(7);
-    // More than fit across the page stops at the most that do.
-    await count.fill('99');
-    await count.press('Enter');
-    await expect(count).toHaveValue('16');
-    await expect(dialog.getByRole('button', { name: 'More Columns' })).toBeDisabled();
-    await dialog.getByRole('button', { name: 'Fewer Columns' }).click();
-    await expect(count).toHaveValue('15');
+    await dialog.getByLabel('Attendance').check();
+    await expect(dialog.getByLabel('Attendance')).toHaveAccessibleDescription(
+      'Prints school days across the top, Monday to Friday, from Mon Oct 19.',
+    );
+    await expectCount(dialog, '1 page · Letter', `${STUDENTS} students · 16 school days`);
+    for (const label of ['Blank Gradebook', 'Final Grade', 'Class Average Row', 'Late Marks']) {
+      await expect(dialog.getByLabel(label)).toBeDisabled();
+    }
+    for (const row of ['Term', 'Assessments', 'Scores']) {
+      await expect(dialog.getByRole('button', { name: new RegExp('^' + row + ' ') })).toBeDisabled();
+    }
+    // The picture draws a heavier rule where each new week begins.
+    await expect(dialog.locator('.gpd-thumb .gpd-t-colhead .gpd-t-brk')).toHaveCount(3);
     await stageFromDialog(page, dialog);
     const sheet = page.locator('#grades-print-root .gp-page');
     await expect(sheet).toHaveCount(1);
-    await expect(sheet.locator('.gp-row').first().locator('td.gp-blank')).toHaveCount(15);
+    await expect(sheet.locator('.gp-head-title')).toHaveText('Attendance Sheet');
+    await expect(sheet.locator('.gp-head')).toContainText('Dates: Oct 19 – Nov 9, 2026');
+    const heads = await sheet.locator('th.gp-ch[data-col]').allTextContents();
+    expect(heads.slice(0, 6)).toEqual([
+      'Mon Oct 19',
+      'Tue Oct 20',
+      'Wed Oct 21',
+      'Thu Oct 22',
+      'Fri Oct 23',
+      'Mon Oct 26',
+    ]);
+    expect(heads).toHaveLength(16);
+    await expect(sheet.locator('.gp-band-cell')).toHaveText(['Week of Oct 19', 'Week of Oct 26', 'Week of Nov 2', '']);
+    await expect(sheet.locator('.gp-row:not(.gp-blank-row)')).toHaveCount(STUDENTS);
     expect(countPages(await pdfOfStaged(page))).toBe(1);
     const reset = await openDialog(page);
-    await expect(reset.getByRole('textbox', { name: 'Columns' })).toHaveCount(0);
-    await choose(reset, 'Assessments', 'Blank Grid');
-    await expect(reset.getByRole('textbox', { name: 'Columns' })).toHaveValue('15');
-    await choose(reset, 'Assessments', 'All Assessments');
+    await reset.getByLabel('Attendance').uncheck();
     await reset.getByRole('button', { name: 'Cancel' }).click();
-    await page.evaluate(() => localStorage.removeItem('grades-print-options'));
   });
 
   test('Custom Dates shows From and To, and Pick Assessments its list', async ({ page }) => {

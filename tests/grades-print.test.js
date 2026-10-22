@@ -5,7 +5,7 @@
  * demo class to PDF and counts the pages.
  */
 import './setup.js';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const GP = window.GradesPrint;
 const CID = 'gp-class';
@@ -378,23 +378,30 @@ describe('buildModel', () => {
   });
 });
 
-describe('Blank Grid', () => {
-  it('prints the roster on an empty grid that fills the page', () => {
-    const model = GP.buildModel(CID, { assessments: 'blank' });
-    expect(model.columns).toEqual([]);
-    expect(model.rows.map(r => r.name)).toEqual(['Hopper, Grace', 'Lovelace, Ada', 'Turing, Alan']);
+describe('Blank Gradebook', () => {
+  it('prints the assessment titles across the top with every score box empty', () => {
+    const model = GP.buildModel(CID, { blank: true });
+    expect(model.columns.map(c => c.title)).toEqual(GP.buildModel(CID, {}).columns.map(c => c.title));
+    model.rows.forEach(r => r.cells.forEach(c => expect(c.text).toBe('')));
     expect(model.averages).toBeNull();
     expect(model.final).toBeNull();
-    expect(model.header.scores).toBe('Blank Grid');
-    const [page] = model.pages;
-    expect(page.cols.count).toBe(0);
-    expect(page.blankCols).toBeGreaterThan(0);
-    expect(page.blankCols * page.colW).toBeCloseTo(GP.pageCapacity(model.opts).width, 1);
-    expect((page.students.count + page.blankRows) * page.rowH).toBeCloseTo(model.layout.gridH, 1);
+    expect(model.marks).toEqual([]);
     const html = GP.renderPages(model);
+    expect(html).toContain('Cell Structure Lab');
     expect(html).toContain('Lovelace, Ada');
     expect(html).not.toContain('Class Average');
     expect(html).not.toContain('Final Grade');
+    expect(GP.previewLines(model)).toEqual({
+      pages: '1 page · Letter',
+      detail: '3 students · Blank Gradebook · 5 columns',
+    });
+  });
+
+  it('reads the old Blank Grid choice as Blank Gradebook', () => {
+    const o = GP.normalizeOptions({ assessments: 'blank', gridCols: 6 });
+    expect(o.assessments).toBe('all');
+    expect(o.blank).toBe(true);
+    expect(o.gridCols).toBeUndefined();
   });
 
   it('prints a blank grid for a class with no assessments', () => {
@@ -403,44 +410,82 @@ describe('Blank Grid', () => {
     const model = GP.buildModel(CID, {});
     expect(model.columns).toEqual([]);
     expect(model.pages).toHaveLength(1);
+    expect(model.pages[0].blankCols).toBe(11);
     expect(GP.statusText(model)).toBe('3 students · Blank Grid · 1 page.');
+    expect(GP.previewLines(model).detail).toBe('3 students · Blank Grid · 11 columns');
+  });
+});
+
+describe('Attendance', () => {
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
-  it('prints the Columns count for Blank Grid, kept to what fits, and fills the page without one', () => {
-    const range = GP.gridColumnRange(GP.normalizeOptions({}));
-    expect(range).toEqual({ auto: 11, min: 1, max: 16 });
-    const filled = GP.buildModel(CID, { assessments: 'blank' });
-    expect(filled.pages[0].blankCols).toBe(11);
-    const six = GP.buildModel(CID, { assessments: 'blank', gridCols: 6 });
-    expect(six.pages[0].blankCols).toBe(6);
-    expect(six.pages[0].colW).toBeCloseTo(filled.layout.capacity.width / 6, 2);
-    expect(GP.buildModel(CID, { assessments: 'blank', gridCols: 99 }).pages[0].blankCols).toBe(16);
-    // The count is Blank Grid's only: other choices print as before.
-    expect(GP.buildModel(CID, { gridCols: 6 }).pages[0].blankCols).toBe(GP.buildModel(CID, {}).pages[0].blankCols);
+  function at(iso) {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(iso + 'T10:00:00'));
+  }
+
+  it('starts on the Monday of the week it is printed, or the coming Monday at a weekend', () => {
+    const iso = d => GP.weekStart(new Date(d + 'T10:00:00')).toDateString();
+    expect(iso('2026-10-19')).toBe(new Date('2026-10-19T00:00:00').toDateString());
+    expect(iso('2026-10-21')).toBe(new Date('2026-10-19T00:00:00').toDateString());
+    expect(iso('2026-10-23')).toBe(new Date('2026-10-19T00:00:00').toDateString());
+    expect(iso('2026-10-24')).toBe(new Date('2026-10-26T00:00:00').toDateString());
+    expect(iso('2026-10-25')).toBe(new Date('2026-10-26T00:00:00').toDateString());
   });
 
-  it('gives the dialog its page count and what is on the sheet', () => {
-    expect(GP.previewLines(GP.buildModel(CID, {}))).toEqual({
-      pages: '1 page · Letter',
-      detail: '3 students · 5 columns',
-    });
-    expect(GP.previewLines(GP.buildModel(CID, { assessments: 'blank', gridCols: 12, paper: 'legal' }))).toEqual({
-      pages: '1 page · Legal',
-      detail: '3 students · Blank Grid · 12 columns',
-    });
+  it('fills the page width with school days, Monday to Friday, a band per week', () => {
+    at('2026-10-21');
+    const model = GP.buildModel(CID, { attendance: true });
+    const cap = GP.pageCapacity(model.opts);
+    expect(model.columns).toHaveLength(cap.full);
+    expect(model.columns.slice(0, 7).map(c => c.title)).toEqual([
+      'Mon Oct 19',
+      'Tue Oct 20',
+      'Wed Oct 21',
+      'Thu Oct 22',
+      'Fri Oct 23',
+      'Mon Oct 26',
+      'Tue Oct 27',
+    ]);
+    expect(model.columns.every(c => !/Sat|Sun/.test(c.title))).toBe(true);
+    expect(model.columns[0].catName).toBe('Week of Oct 19');
+    expect(model.columns[5].catName).toBe('Week of Oct 26');
+    const [page] = model.pages;
+    expect(model.pages).toHaveLength(1);
+    expect(page.blankCols).toBe(0);
+    expect(page.cols.count * page.colW).toBeCloseTo(cap.width, 1);
+    expect(page.colW).toBeGreaterThanOrEqual(GP.SIZES.normal.colMin);
+    expect(model.averages).toBeNull();
+    expect(model.final).toBeNull();
+    model.rows.forEach(r => r.cells.forEach(c => expect(c.text).toBe('')));
   });
 
-  it('follows the Students, Sort By, Paper and Text Size choices', () => {
-    const numbers = GP.renderPages(GP.buildModel(CID, { assessments: 'blank', students: 'number', sortBy: 'number' }));
-    expect(numbers).toContain('Pupil #');
-    expect(numbers).not.toContain('Lovelace');
-    const first = GP.buildModel(CID, { assessments: 'blank', sortBy: 'first' });
-    expect(first.rows.map(r => r.name)).toEqual(['Ada Lovelace', 'Alan Turing', 'Grace Hopper']);
-    const legal = GP.buildModel(CID, { assessments: 'blank', paper: 'legal' });
-    expect(legal.layout.gridH).toBeGreaterThan(GP.buildModel(CID, { assessments: 'blank' }).layout.gridH);
-    const compact = GP.buildModel(CID, { assessments: 'blank', size: 'compact' }).pages[0];
-    const normal = GP.buildModel(CID, { assessments: 'blank' }).pages[0];
-    expect(compact.blankCols).toBeGreaterThan(normal.blankCols);
+  it('prints an Attendance Sheet with the dates, a heavier rule between weeks and no scores', () => {
+    at('2026-10-21');
+    const model = GP.buildModel(CID, { attendance: true, scoresAs: 'both' });
+    const html = GP.renderPages(model);
+    expect(html).toContain('Attendance Sheet');
+    expect(html).toContain('gp-attendance');
+    expect(html).toContain('<b>Dates:</b> <span>Oct 19 – Nov 9, 2026</span>');
+    expect(html).toContain('<b>School Days:</b> <span>16</span>');
+    expect(html).toContain('Week of Oct 26');
+    expect(html).toContain('<div>Mon Oct 26</div>');
+    expect(html).not.toContain('Quiz 1');
+    expect(html).not.toContain('Class Average');
+    expect((html.match(/gp-cat-start/g) || []).length).toBeGreaterThan(0);
+    expect(GP.previewLines(model)).toEqual({ pages: '1 page · Letter', detail: '3 students · 16 school days' });
+  });
+
+  it('fits more days with Name Only or Compact text, and the same across on Legal', () => {
+    at('2026-10-21');
+    const normal = GP.buildModel(CID, { attendance: true }).columns.length;
+    expect(GP.buildModel(CID, { attendance: true, students: 'name' }).columns.length).toBeGreaterThan(normal);
+    expect(GP.buildModel(CID, { attendance: true, size: 'compact' }).columns.length).toBeGreaterThan(normal);
+    const legal = GP.buildModel(CID, { attendance: true, paper: 'legal' });
+    expect(legal.columns.length).toBe(normal);
+    expect(legal.layout.gridH).toBeGreaterThan(GP.buildModel(CID, { attendance: true }).layout.gridH);
   });
 });
 
