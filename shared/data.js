@@ -4068,6 +4068,12 @@ function _applyBundleCourseConfig(cid, row, courseRow) {
     if (typeof courseRow.round_percent === 'boolean') config.roundPercent = courseRow.round_percent;
     else if (typeof config.roundPercent === 'boolean') missing.round_percent = config.roundPercent;
   }
+  // "Count Only the Most Recent N" comes on the course row too. Null there is
+  // All Scores, a choice, so the server's value always wins.
+  if (courseRow && typeof courseRow === 'object' && 'recent_score_limit' in courseRow) {
+    if (Number(courseRow.recent_score_limit) >= 1) config.recentScoreLimit = Number(courseRow.recent_score_limit);
+    else delete config.recentScoreLimit;
+  }
   _persistLoadedField(cid, 'courseConfigs', config);
 
   if (!Object.keys(missing).length || !_writesEnabled() || !_isUuid(cid)) return;
@@ -7415,6 +7421,8 @@ function saveCourseConfig(cid, obj) {
       if (obj.gradingScale != null) patch.grading_scale = obj.gradingScale;
       if (obj.categoryWeights != null) patch.category_weights = obj.categoryWeights;
       if (typeof obj.roundPercent === 'boolean') patch.round_percent = obj.roundPercent;
+      // Null is a choice here (All Scores), so it is sent too.
+      if (obj.recentScoreLimit !== undefined) patch.recent_score_limit = obj.recentScoreLimit || null;
       if (Array.isArray(obj.reportingTerms)) patch.reporting_terms = obj.reportingTerms;
       if (Object.keys(patch).length > 0) {
         _trackPendingSync(

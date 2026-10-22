@@ -4617,3 +4617,29 @@ label.cm-cr-row {
     grid-column: 1 / -1;
   }
 }
+/* Grading tab: Count Only the Most Recent */
+.cm-recent-limit {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--divider-subtle);
+  padding-top: 12px;
+  margin-top: 12px;
+}
+.cm-recent-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.cm-recent-text .cm-label {
+  margin: 0;
+}
+.cm-recent-select {
+  width: auto;
+  min-width: 130px;
+  flex-shrink: 0;
+}
+.cm-recent-limit.off .cm-recent-select {
+  opacity: 0.5;
+}

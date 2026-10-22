@@ -2504,6 +2504,7 @@ window.DashClassManager = (function () {
     // calc.js counts any method it doesn't know as Most Recent; show that.
     if (!CM_METHOD_TEXT[method]) method = 'mostRecent';
     var dw = cc.decayWeight != null ? cc.decayWeight : course.decayWeight || 0.65;
+    var lastN = getRecentScoreLimit(cid);
 
     var html =
       '<div class="cm-section">' +
@@ -2550,6 +2551,7 @@ window.DashClassManager = (function () {
       '<div class="cm-method-head"><span class="cm-label" id="cm-method-label">Calculation Method</span>' +
       '<span class="cm-hint">Example scores, oldest first: ' +
       CM_EXAMPLE_SCORES.join(', ') +
+      (lastN && lastN < CM_EXAMPLE_SCORES.length ? ' (the last ' + lastN + ' count)' : '') +
       '</span></div>' +
       '<div class="cm-method-list" role="radiogroup" aria-labelledby="cm-method-label">' +
       CM_METHOD_ORDER.map(function (m) {
@@ -2570,7 +2572,7 @@ window.DashClassManager = (function () {
           t.desc +
           '</span></span>' +
           '<span class="cm-method-example">' +
-          formatLevelAs(calcMethodExample(CM_EXAMPLE_SCORES, m, dw), 'proficiency') +
+          formatLevelAs(calcMethodExample(CM_EXAMPLE_SCORES, m, dw, lastN), 'proficiency') +
           '</span>' +
           '</button>'
         );
@@ -2593,8 +2595,12 @@ window.DashClassManager = (function () {
       '<div class="cm-rule-text" id="cm-method-rule">' +
       esc(_cmMethodRule(method, dw)) +
       '</div>' +
+      (lastN && method !== 'mostRecent'
+        ? '<div class="cm-rule-text">Only the most recent ' + lastN + ' scores count.</div>'
+        : '') +
       '<div class="cm-hint">Every method skips work that hasn’t been scored.</div>' +
       '</div>' +
+      _cmRenderRecentLimit(method, lastN) +
       '</div>';
 
     var pctOff = gs === 'proficiency';
@@ -2639,6 +2645,48 @@ window.DashClassManager = (function () {
       _cmRenderCheckStudent(cid, gs, method) +
       '</div>';
     return html;
+  }
+
+  var CM_RECENT_LIMITS = [3, 5];
+
+  /* "Count Only the Most Recent": All Scores, or a competency's last 3 or 5.
+     Most Recent Score already counts one, so there it does nothing. */
+  function _cmRenderRecentLimit(method, lastN) {
+    var off = method === 'mostRecent';
+    var opts = [{ value: '', label: 'All Scores' }].concat(
+      CM_RECENT_LIMITS.map(function (n) {
+        return { value: String(n), label: n + ' Scores' };
+      }),
+    );
+    // A limit saved elsewhere that the menu doesn't list still shows.
+    if (lastN && CM_RECENT_LIMITS.indexOf(lastN) < 0) opts.push({ value: String(lastN), label: lastN + ' Scores' });
+    return (
+      '<div class="cm-recent-limit' +
+      (off ? ' off' : '') +
+      '">' +
+      '<span class="cm-recent-text"><label class="cm-label" for="cm-recent-limit">Count Only the Most Recent</label>' +
+      '<span class="cm-hint">' +
+      (off ? 'Not used with Most Recent Score.' : 'Older scores beyond this number are left out.') +
+      '</span></span>' +
+      '<select class="cm-input cm-recent-select" id="cm-recent-limit" data-action-change="cmRecentLimit"' +
+      (off ? ' disabled' : '') +
+      '>' +
+      opts
+        .map(function (o) {
+          return (
+            '<option value="' +
+            o.value +
+            '"' +
+            (String(lastN || '') === o.value ? ' selected' : '') +
+            '>' +
+            o.label +
+            '</option>'
+          );
+        })
+        .join('') +
+      '</select>' +
+      '</div>'
+    );
   }
 
   /* The categories' weights as one bar, so a teacher sees the split. */
@@ -4502,8 +4550,21 @@ window.DashClassManager = (function () {
     if (val === current) return;
     var preview = previewCalcMethodChange(cid, val);
     if (!preview.changed) return _cmApplyCalcMethod(val);
+    showConfirm(
+      'Change Calculation Method to ' + CM_METHOD_TEXT[val].label + '?',
+      _cmGradeChangeMessage(cid, preview),
+      'Change Method',
+      'primary',
+      function () {
+        _cmApplyCalcMethod(val);
+      },
+    );
+  }
+
+  /* What a grading change does to the class, for its confirm. */
+  function _cmGradeChangeMessage(cid, preview) {
     var letterOnly = courseGradeMode(cid) === 'letter';
-    var msg =
+    return (
       'This changes the ' +
       (letterOnly ? 'competency proficiency' : 'overall proficiency') +
       ' for ' +
@@ -4521,16 +4582,39 @@ window.DashClassManager = (function () {
           '.'
         : '') +
       (letterOnly ? ' It does not change the %.' : '') +
-      ' Marks you\u2019ve already copied into MyEd won\u2019t change there.';
+      ' Marks you\u2019ve already copied into MyEd won\u2019t change there.'
+    );
+  }
+
+  // Like a new method, a new limit moves existing grades, so it says how
+  // many students first. The menu shows the saved choice until confirmed.
+  function cmSetRecentLimit(val) {
+    if (!cmSelectedCourse) return;
+    var cid = cmSelectedCourse;
+    var next = parseInt(val, 10) >= 1 ? parseInt(val, 10) : null;
+    if (next === getRecentScoreLimit(cid)) return;
+    var course = COURSES[cid];
+    var method = getCourseConfig(cid).calcMethod || course.calcMethod || 'mostRecent';
+    var preview = previewCalcMethodChange(cid, method, undefined, next);
+    if (!preview.changed) return _cmApplyRecentLimit(next);
+    renderClassManager();
     showConfirm(
-      'Change Calculation Method to ' + CM_METHOD_TEXT[val].label + '?',
-      msg,
-      'Change Method',
+      next ? 'Count Only the Most Recent ' + next + ' Scores?' : 'Count All Scores?',
+      _cmGradeChangeMessage(cid, preview),
+      'Change',
       'primary',
       function () {
-        _cmApplyCalcMethod(val);
+        _cmApplyRecentLimit(next);
       },
     );
+  }
+
+  function _cmApplyRecentLimit(n) {
+    if (!cmSelectedCourse) return;
+    var cc = getCourseConfig(cmSelectedCourse);
+    cc.recentScoreLimit = n;
+    saveCourseConfig(cmSelectedCourse, cc);
+    renderClassManager();
   }
 
   function _cmApplyCalcMethod(val) {
@@ -6845,6 +6929,10 @@ window.DashClassManager = (function () {
     }
     if (el.dataset.actionChange === 'cmCompGroupColor') {
       cmUpdateCompGroupColor(el.dataset.grpid, el.value);
+      return true;
+    }
+    if (el.dataset.actionChange === 'cmRecentLimit') {
+      cmSetRecentLimit(el.value);
       return true;
     }
     if (el.dataset.actionChange === 'cmStdGroup') {

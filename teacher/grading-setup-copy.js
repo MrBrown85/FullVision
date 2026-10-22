@@ -79,12 +79,13 @@ window.GradingSetupCopy = (function () {
     var course = COURSES[cid] || {};
     var method = cc.calcMethod || course.calcMethod || 'mostRecent';
     var dw = cc.decayWeight != null ? cc.decayWeight : course.decayWeight || 0.65;
-    return { method: method, decayWeight: Number(dw) };
+    return { method: method, decayWeight: Number(dw), recentLimit: getRecentScoreLimit(cid) };
   }
 
   function _calcLabel(calc) {
     var label = METHOD_LABELS[calc.method] || calc.method;
     if (calc.method === 'decayingAvg') label += ' (' + Math.round(calc.decayWeight * 100) + '%)';
+    if (calc.recentLimit && calc.method !== 'mostRecent') label += ', last ' + calc.recentLimit + ' scores';
     return label;
   }
 
@@ -245,7 +246,10 @@ window.GradingSetupCopy = (function () {
     if (groups.calcMethod) {
       var ca = _calcOf(srcCid);
       var cb = _calcOf(dstCid);
-      var calcSame = ca.method === cb.method && (ca.method !== 'decayingAvg' || ca.decayWeight === cb.decayWeight);
+      var calcSame =
+        ca.method === cb.method &&
+        (ca.method !== 'decayingAvg' || ca.decayWeight === cb.decayWeight) &&
+        (ca.recentLimit || null) === (cb.recentLimit || null);
       add('calcMethod', calcSame ? [] : [_calcLabel(cb) + ' → ' + _calcLabel(ca) + '.']);
     }
     if (groups.roundPercent) {
@@ -402,6 +406,7 @@ window.GradingSetupCopy = (function () {
       courseUpdates.decayWeight = calc.decayWeight;
       cc.calcMethod = calc.method;
       cc.decayWeight = calc.decayWeight;
+      cc.recentScoreLimit = calc.recentLimit;
       ccChanged = true;
     }
     if (keys.roundPercent) {
