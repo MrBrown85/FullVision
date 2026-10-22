@@ -193,7 +193,28 @@ test.describe('Dashboard Observations card', () => {
     await expect(add()).toBeFocused();
   });
 
-  test('a busy week keeps three marks and its whole "+N" at every width', async ({ page }) => {
+  test('27 students sit in two columns from 1280px, with compact week cells below 1536px', async ({ page }) => {
+    await enterDemo(page);
+    for (const [width, compact] of [
+      [1280, true],
+      [1440, true],
+      [1600, false],
+    ]) {
+      await page.setViewportSize({ width, height: 900 });
+      await openDashboard(page);
+      await page.evaluate(() => PageDashboard.render());
+      await expect(card(page).locator('.dash-ob2-block')).toHaveCount(2);
+      const m = await page.evaluate(() => DashObservations.lastModel());
+      expect(m.cols, `columns at ${width}`).toBe(2);
+      expect(m.compact, `compact at ${width}`).toBe(compact);
+      const pane = await card(page)
+        .locator('.dash-ob2-pane')
+        .evaluate(p => p.scrollWidth <= p.clientWidth);
+      expect(pane, `grid scrolls sideways at ${width}`).toBe(true);
+    }
+  });
+
+  test('a busy week keeps its whole "+N" at every width: three marks, or one in a compact cell', async ({ page }) => {
     await enterDemo(page);
     await openDashboard(page);
     const [few, many] = await page.evaluate(() => {
@@ -219,10 +240,11 @@ test.describe('Dashboard Observations card', () => {
               marks: [...cell.querySelectorAll('i')].map(i => i.getBoundingClientRect().width),
             };
           });
+      const compact = await page.evaluate(() => DashObservations.lastModel().compact);
       for (const sid of [few, many]) {
         await expect.poll(async () => (await measure(sid)).fits, `"+N" cut at ${width}`).toBe(true);
         const m = await measure(sid);
-        expect(m.marks).toHaveLength(3);
+        expect(m.marks).toHaveLength(compact ? 1 : 3);
         for (const w of m.marks) expect(w, `mark width at ${width}`).toBeGreaterThanOrEqual(5);
       }
       expect((await measure(many)).label).toBe('9+');
