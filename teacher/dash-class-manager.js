@@ -121,6 +121,7 @@ window.DashClassManager = (function () {
   }
 
   function _cmRenderStdCard(sec, lm, compGroups) {
+    if (cmCompSelect) return _cmRenderStdSelectRow(sec);
     var tag = sec.tags[0] || {};
     var subs = lm.subjects || [];
     var sub = subs.find(function (s) {
@@ -277,6 +278,13 @@ window.DashClassManager = (function () {
       '">' +
       '</div>' +
       '</div>' +
+      // Where the statements print today: reports show the first one.
+      '<div class="cm-std-shown"><span class="cm-std-shown-label">Shown in:</span>' +
+      '<span class="cm-std-shown-chip">Printed Reports \u00B7 first statement</span>' +
+      '<span class="cm-std-shown-chip">Rubric Drafts</span>' +
+      '<button type="button" class="cm-add-link" data-action="cmStdHelp" data-secid="' +
+      sec.id +
+      '">Where These Appear</button></div>' +
       '</div>' +
       '<div class="cm-std-foot">' +
       (compGroups.length > 0
@@ -1751,6 +1759,8 @@ window.DashClassManager = (function () {
       html += renderCmCreateForm();
     } else if (cmRelinkStep > 0 && cmRelinkCid && COURSES[cmRelinkCid]) {
       html += renderCmRelinkPanel(cmRelinkCid);
+    } else if (cmCompReview && cmCompReview.kind === 'file' && COURSES[cmCompReview.cid]) {
+      html += _cmRenderCompReview(cmCompReview.cid);
     } else if (cmSelectedCourse && COURSES[cmSelectedCourse]) {
       html += renderCmDetail(cmSelectedCourse);
     }
@@ -2128,12 +2138,9 @@ window.DashClassManager = (function () {
     panels.terms = '<div class="cm-section">' + _cmRenderReportingTermsField(cmSelectedCourse) + '</div>';
     html = '';
 
-    // Competencies tab: subjects, competencies and the BC Curriculum link
-    html +=
-      '<div class="cm-section">' +
-      '<div class="cm-section-title">Curriculum</div>' +
-      '<div class="cm-field">' +
-      '<label class="cm-label">Subjects</label>';
+    // Competencies tab: a toolbar and the competencies, beside the BC
+    // Curriculum link and the subjects.
+    html += '<div class="cm-section cm-comp-side-card">' + '<h2 class="cm-grade-title">Subjects</h2>';
     (lm.subjects || []).forEach(function (sub) {
       html +=
         '<div class="cm-subject-row">' +
@@ -2160,6 +2167,8 @@ window.DashClassManager = (function () {
         '</div>';
     });
     html += '<button class="cm-add-link" data-action="cmAddSubject">+ Add Subject</button></div>';
+    var subjectsHtml = html;
+    html = '';
 
     // Learning Standards — folder-based UI (mirrors assignments page)
     var compGroups = lm.competencyGroups || [];
@@ -2176,7 +2185,7 @@ window.DashClassManager = (function () {
       return _cmGroupMap[g.id];
     });
 
-    html += '<div class="cm-field"><label class="cm-label">Competencies</label>';
+    html += _cmRenderCompToolbar(cid, lm, compGroups) + '<div class="cm-section cm-comp-list">';
 
     if ((lm.sections || []).length === 0 && compGroups.length === 0) {
       html +=
@@ -2270,18 +2279,20 @@ window.DashClassManager = (function () {
       });
     }
 
-    // Add buttons
-    html += '<button class="add-module-btn" data-action="cmAddCompGroup">+ Add Group</button>';
-    html += '<button class="cm-add-link" data-action="cmAddStd">+ Add Competency</button>';
-    html += '</div></div>';
+    html += '</div>';
+    var compHtml = html;
+    html = '';
 
-    // Section 4: BC Curriculum Link
+    // BC Curriculum Link
     var linkedTags = course.curriculumTags || [];
-    html += '<div class="cm-section">' + '<div class="cm-section-title">BC Curriculum Link</div>';
+    html += '<div class="cm-section cm-comp-side-card">' + '<h2 class="cm-grade-title">BC Curriculum Link</h2>';
     if (linkedTags.length > 0) {
       linkedTags.forEach(function (tag) {
         var courseData = CURRICULUM_INDEX ? CURRICULUM_INDEX[tag] : null;
-        var courseName = courseData ? courseData.course_name : tag;
+        var tagSubject = (lm.subjects || []).find(function (sub) {
+          return sub.id === tag;
+        });
+        var courseName = courseData ? courseData.course_name : tagSubject ? tagSubject.name : tag;
         html +=
           '<div class="cm-curric-link">' +
           '<span class="cm-curric-tag">' +
@@ -2293,7 +2304,10 @@ window.DashClassManager = (function () {
           '</div>';
       });
       html +=
-        '<button class="cm-relink-btn" data-action="cmStartRelink" data-cid="' + cid + '">Re-link Curriculum</button>';
+        '<button class="cm-relink-btn" data-action="cmStartRelink" data-cid="' +
+        cid +
+        '">Re-link Curriculum</button>' +
+        '<div class="cm-hint">You\u2019ll see what changes before anything is applied. Nothing you edited is overwritten.</div>';
     } else {
       html +=
         '<div class="cm-curric-unlinked">Not linked to BC Curriculum</div>' +
@@ -2302,7 +2316,15 @@ window.DashClassManager = (function () {
         '">Link to BC Curriculum</button>';
     }
     html += '</div>';
-    panels.competencies = html;
+    // Select mode is the list alone.
+    panels.competencies = cmCompSelect
+      ? '<div class="cm-comp-layout cm-comp-selecting"><div class="cm-comp-main">' + compHtml + '</div></div>'
+      : '<div class="cm-comp-layout"><div class="cm-comp-main">' +
+        compHtml +
+        '</div><div class="cm-comp-side">' +
+        html +
+        subjectsHtml +
+        '</div></div>';
 
     // Sentence Starters tab (until starters become one list per teacher)
     panels.starters = _cmRenderStarters(cid);
@@ -3329,7 +3351,13 @@ window.DashClassManager = (function () {
 
   /* ── CM Actions ─────────────────────────────────────────── */
   function cmSelectClass(cid) {
-    if (cid !== cmSelectedCourse) cmPendingImport = null; // a review belongs to its class
+    if (cid !== cmSelectedCourse) {
+      // A review or a selection belongs to its class.
+      cmPendingImport = null;
+      if (cmCompReview && cmCompReview.kind === 'file') cmCompReview = null;
+      cmCompSelect = false;
+      cmCompSelected = {};
+    }
     cmSelectedCourse = cid;
     cmMode = 'edit';
     renderClassManager();
@@ -4887,66 +4915,12 @@ window.DashClassManager = (function () {
   }
 
   function cmRelinkNext() {
-    if (cwSelectedTags.length === 0) return;
-    cmRelinkStep = 2;
-    renderClassManager();
-  }
-
-  function cmRelinkConfirm(mode) {
     if (!cmRelinkCid || cwSelectedTags.length === 0) return;
-    var cid = cmRelinkCid;
-
-    if (mode === 'replace') {
-      var map = buildLearningMapFromTags(cwSelectedTags);
-      if (map) {
-        saveLearningMap(cid, map);
-        updateCourse(cid, { curriculumTags: cwSelectedTags.slice() });
-      }
-    } else if (mode === 'merge') {
-      var existing = getLearningMap(cid);
-      var newMap = buildLearningMapFromTags(cwSelectedTags);
-      if (newMap) {
-        var existingSubIds = new Set(
-          (existing.subjects || []).map(function (s) {
-            return s.id;
-          }),
-        );
-        (newMap.subjects || []).forEach(function (s) {
-          if (!existingSubIds.has(s.id)) existing.subjects.push(s);
-        });
-        var existingSecIds = new Set(
-          (existing.sections || []).map(function (s) {
-            return s.id;
-          }),
-        );
-        (newMap.sections || []).forEach(function (s) {
-          if (!existingSecIds.has(s.id)) {
-            existing.sections.push(s);
-          } else {
-            var existingSec = existing.sections.find(function (es) {
-              return es.id === s.id;
-            });
-            var existingTagIds = new Set(
-              existingSec.tags.map(function (t) {
-                return t.id;
-              }),
-            );
-            s.tags.forEach(function (t) {
-              if (!existingTagIds.has(t.id)) existingSec.tags.push(t);
-            });
-          }
-        });
-        existing._customized = true;
-        saveLearningMap(cid, existing);
-        var allTags = new Set((COURSES[cid].curriculumTags || []).concat(cwSelectedTags));
-        updateCourse(cid, { curriculumTags: Array.from(allTags) });
-      }
-    }
-
-    cmRelinkCid = null;
-    cmRelinkStep = 0;
-    cwSelectedTags = [];
-    renderClassManager();
+    cmRelinkStep = 2;
+    _cmOpenCompReview(cmRelinkCid, _cmCurriculumCands(cwSelectedTags), {
+      kind: 'curriculum',
+      tags: cwSelectedTags.slice(),
+    });
   }
 
   function renderCmRelinkPanel(cid) {
@@ -5062,41 +5036,7 @@ window.DashClassManager = (function () {
         '>Next</button>' +
         '</div></div>';
     } else if (cmRelinkStep === 2) {
-      var course = COURSES[cid];
-      var existingTags = course.curriculumTags || [];
-      var tagCount = getAllTags(cid).length;
-
-      html += '<div class="cm-section"><div class="cm-section-title">Confirm Curriculum Change</div>';
-
-      html += '<div class="cm-field"><label class="cm-label">New Curriculum Link</label>';
-      cwSelectedTags.forEach(function (tag) {
-        var courseData = CURRICULUM_INDEX ? CURRICULUM_INDEX[tag] : null;
-        html +=
-          '<div class="cm-curric-link"><span class="cm-curric-tag">' +
-          esc(tag) +
-          '</span><span class="cm-curric-name">' +
-          esc(courseData ? courseData.course_name : tag) +
-          '</span></div>';
-      });
-      html += '</div>';
-
-      if (tagCount > 0) {
-        html +=
-          '<div class="cm-relink-warning">This class currently has <strong>' +
-          tagCount +
-          '</strong> learning standards with existing score data. Choose how to handle the change:</div>';
-      }
-
-      html += '<div class="cm-relink-actions" style="flex-direction:column;gap:8px">';
-      if (tagCount > 0) {
-        html +=
-          '<button class="btn btn-primary" data-action="cmRelinkConfirm" data-mode="merge" style="width:100%;text-align:left;padding:12px 16px"><strong>Merge</strong> \u2014 Add new standards, keep existing ones and all scores</button>' +
-          '<button class="cm-relink-btn" data-action="cmRelinkConfirm" data-mode="replace" style="width:100%;text-align:left;padding:12px 16px;border-color:var(--score-2);color:var(--score-2)"><strong>Replace</strong> \u2014 Remove current standards and replace with curriculum. Existing scores may be orphaned.</button>';
-      } else {
-        html +=
-          '<button class="btn btn-primary" data-action="cmRelinkConfirm" data-mode="replace">Apply Curriculum</button>';
-      }
-      html += '<button class="btn btn-ghost" data-action="cmRelinkBack">Back</button></div></div>';
+      html += _cmRenderCompReview(cid);
     }
 
     return html;
@@ -5599,6 +5539,1053 @@ window.DashClassManager = (function () {
     renderClassManager();
   }
 
+  /* ── Competencies toolbar, select mode, CSV ─────────────────
+     Select picks several competencies to move into a folder or remove
+     (scores kept). Import / Export writes the list as a CSV and reads one
+     back through the same review Re-link uses, so nothing is added twice. */
+  var cmCompSelect = false;
+  var cmCompSelected = {};
+  var cmCompReview = null;
+
+  var CM_COMP_CSV_HEADER = ['Code', 'Title', 'Curricular Competency', 'I Can Statements', 'Folder'];
+
+  function _cmRenderCompToolbar(cid, lm, compGroups) {
+    var secs = lm.sections || [];
+    if (cmCompSelect) {
+      var n = secs.filter(function (s) {
+        return cmCompSelected[s.id];
+      }).length;
+      var off = n === 0 ? ' disabled' : '';
+      return (
+        '<div class="cm-comp-toolbar cm-comp-selectbar">' +
+        '<span class="cm-comp-selected">' +
+        n +
+        ' Selected</span>' +
+        '<button type="button" class="cm-add-link" data-action="cmCompSelectAll">Select All</button>' +
+        '<div class="cm-comp-buttons">' +
+        (compGroups.length
+          ? '<div class="cm-std-menu-wrap">' +
+            '<button type="button" class="cm-action-btn" data-action="cmStdMenu" aria-haspopup="menu" aria-expanded="false"' +
+            off +
+            '>Move to Folder \u25BE</button>' +
+            '<div class="cm-std-menu" role="menu" hidden>' +
+            compGroups
+              .map(function (g) {
+                return (
+                  '<button type="button" role="menuitem" class="cm-std-menu-item" data-action="cmCompMove" data-grpid="' +
+                  g.id +
+                  '">' +
+                  esc(g.name) +
+                  '</button>'
+                );
+              })
+              .join('') +
+            '<button type="button" role="menuitem" class="cm-std-menu-item" data-action="cmCompMove" data-grpid="">Ungrouped</button>' +
+            '</div>' +
+            '</div>'
+          : '') +
+        '<button type="button" class="cm-action-btn cm-comp-remove" data-action="cmCompRemoveSelected"' +
+        off +
+        '>Remove\u2026</button>' +
+        '<button type="button" class="cm-action-btn" data-action="cmCompSelectDone">Done</button>' +
+        '</div>' +
+        '</div>'
+      );
+    }
+    return (
+      '<div class="cm-comp-toolbar">' +
+      '<div class="cm-hint">' +
+      (secs.length
+        ? 'Drag a competency to reorder it or move it into a folder.'
+        : 'Add competencies one at a time, import a CSV, or link the class to the BC Curriculum.') +
+      '</div>' +
+      '<div class="cm-comp-buttons">' +
+      (secs.length
+        ? '<button type="button" class="cm-action-btn" data-action="cmCompSelectStart">Select</button>'
+        : '') +
+      '<div class="cm-std-menu-wrap">' +
+      '<button type="button" class="cm-action-btn" data-action="cmStdMenu" aria-haspopup="menu" aria-expanded="false">Import / Export \u25BE</button>' +
+      '<div class="cm-std-menu cm-comp-io-menu" role="menu" hidden>' +
+      (secs.length
+        ? '<button type="button" role="menuitem" class="cm-std-menu-item cm-comp-io-item" data-action="cmCompExport">' +
+          '<span class="cm-comp-io-name">Export Competencies</span>' +
+          '<span class="cm-comp-io-desc">A CSV file with Code, Title, Curricular Competency, I Can Statements and Folder.</span>' +
+          '</button>'
+        : '') +
+      '<button type="button" role="menuitem" class="cm-std-menu-item cm-comp-io-item" data-action="cmCompImport">' +
+      '<span class="cm-comp-io-name">Import From CSV\u2026</span>' +
+      '<span class="cm-comp-io-desc">Same columns. You\u2019ll see what changes before anything is added, so nothing is duplicated.</span>' +
+      '</button>' +
+      '</div>' +
+      '</div>' +
+      '<button type="button" class="cm-action-btn" data-action="cmAddCompGroup">Add Folder</button>' +
+      '<button type="button" class="btn btn-primary" data-action="cmAddStd">Add Competency</button>' +
+      '<input type="file" id="cm-comp-csv-input" accept=".csv,.txt" style="display:none" data-action-change="cmCompCSV">' +
+      '</div>' +
+      '</div>'
+    );
+  }
+
+  function _cmRenderStdSelectRow(sec) {
+    var tag = sec.tags[0] || {};
+    var title = tag.label || sec.shortName || sec.name || '';
+    var code = _cmStdCode(tag);
+    var icans = (tag.i_can_statements || []).length;
+    var on = !!cmCompSelected[sec.id];
+    return (
+      '<label class="cm-comp-select-row' +
+      (on ? ' selected' : '') +
+      '">' +
+      '<input type="checkbox"' +
+      (on ? ' checked' : '') +
+      ' aria-label="Select ' +
+      esc(title) +
+      '" data-action-change="cmCompToggle" data-secid="' +
+      sec.id +
+      '">' +
+      (code ? '<span class="cm-std-code" style="--chip:' + sec.color + '">' + esc(code) + '</span>' : '') +
+      '<span class="cm-std-label">' +
+      esc(title) +
+      '</span>' +
+      (icans ? '<span class="cm-std-count">' + icans + ' I Can</span>' : '') +
+      '</label>'
+    );
+  }
+
+  function _cmCompTitle(sec) {
+    var tag = (sec && sec.tags && sec.tags[0]) || {};
+    return tag.label || sec.shortName || sec.name || '';
+  }
+
+  // "A", "A and B", "A, B and C"; past three, a count.
+  function _cmJoinNames(names, noun) {
+    if (names.length > 3) return names.length + ' ' + noun;
+    if (names.length <= 1) return names[0] || '';
+    return names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+  }
+
+  function cmCompSelectStart() {
+    cmCompSelect = true;
+    cmCompSelected = {};
+    renderClassManager();
+  }
+
+  function cmCompSelectDone() {
+    cmCompSelect = false;
+    cmCompSelected = {};
+    renderClassManager();
+  }
+
+  function cmCompSelectAll() {
+    (getLearningMap(cmSelectedCourse).sections || []).forEach(function (s) {
+      cmCompSelected[s.id] = true;
+    });
+    renderClassManager();
+  }
+
+  function cmCompToggle(secId, on) {
+    if (on) cmCompSelected[secId] = true;
+    else delete cmCompSelected[secId];
+    renderClassManager();
+  }
+
+  function _cmCompSelectedSections() {
+    return (getLearningMap(cmSelectedCourse).sections || []).filter(function (s) {
+      return cmCompSelected[s.id];
+    });
+  }
+
+  function cmCompMove(groupId) {
+    var cid = cmSelectedCourse;
+    if (!cid) return;
+    groupId = groupId ? _currentId('group', groupId) : '';
+    var ids = {};
+    _cmCompSelectedSections().forEach(function (s) {
+      ids[s.id] = true;
+    });
+    var map = ensureCustomLearningMap(cid);
+    (map.sections || []).forEach(function (sec) {
+      if (!ids[sec.id]) return;
+      if (groupId) sec.groupId = groupId;
+      else delete sec.groupId;
+    });
+    saveLearningMap(cid, map);
+    _cmRenderWithScroll();
+  }
+
+  function cmCompRemoveSelected() {
+    var secs = _cmCompSelectedSections();
+    if (!secs.length) return;
+    var names = secs.map(_cmCompTitle);
+    showConfirm(
+      secs.length === 1 ? 'Remove 1 Competency' : 'Remove ' + secs.length + ' Competencies',
+      'Remove ' + _cmJoinNames(names, 'competencies') + ' from the class? Existing scores are kept.',
+      'Remove',
+      'danger',
+      function () {
+        removeCompetencies(
+          cmSelectedCourse,
+          secs.map(function (s) {
+            return _currentId('section', s.id);
+          }),
+        );
+        cmCompSelected = {};
+        if (!(getLearningMap(cmSelectedCourse).sections || []).length) cmCompSelect = false;
+        renderClassManager();
+      },
+    );
+  }
+
+  function _cmCsvCell(v) {
+    return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  }
+
+  /* Rows of a CSV file. Quoted cells may hold commas, quotes ("") and line
+     breaks. */
+  function _cmParseCsv(text) {
+    var rows = [];
+    var row = [];
+    var cell = '';
+    var quoted = false;
+    text = String(text || '').replace(/^﻿/, '');
+    for (var i = 0; i < text.length; i++) {
+      var ch = text[i];
+      if (quoted) {
+        if (ch === '"' && text[i + 1] === '"') {
+          cell += '"';
+          i++;
+        } else if (ch === '"') quoted = false;
+        else cell += ch;
+      } else if (ch === '"') quoted = true;
+      else if (ch === ',') {
+        row.push(cell);
+        cell = '';
+      } else if (ch === '\n' || ch === '\r') {
+        if (ch === '\r' && text[i + 1] === '\n') i++;
+        row.push(cell);
+        rows.push(row);
+        row = [];
+        cell = '';
+      } else cell += ch;
+    }
+    if (cell !== '' || row.length) {
+      row.push(cell);
+      rows.push(row);
+    }
+    return rows.filter(function (r) {
+      return r.some(function (c) {
+        return String(c).trim();
+      });
+    });
+  }
+
+  function _cmSplitIcans(v) {
+    return String(v || '')
+      .split(/\r?\n/)
+      .map(function (s) {
+        return s.trim();
+      })
+      .filter(Boolean);
+  }
+
+  function cmCompExport() {
+    var cid = cmSelectedCourse;
+    if (!cid) return;
+    var lm = getLearningMap(cid);
+    var groups = {};
+    (lm.competencyGroups || []).forEach(function (g) {
+      groups[g.id] = g.name;
+    });
+    var rows = [CM_COMP_CSV_HEADER].concat(
+      (lm.sections || []).map(function (sec) {
+        var tag = sec.tags[0] || {};
+        return [
+          _cmStdCode(tag),
+          _cmCompTitle(sec),
+          tag.text || '',
+          (tag.i_can_statements || []).join('\n'),
+          (sec.groupId && groups[sec.groupId]) || '',
+        ];
+      }),
+    );
+    var csv = rows
+      .map(function (r) {
+        return r.map(_cmCsvCell).join(',');
+      })
+      .join('\n');
+    var blob = new Blob([csv], { type: 'text/csv' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = ((COURSES[cid] && COURSES[cid].name) || 'class').replace(/[^\w-]+/g, '_') + '_competencies.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function cmCompImport() {
+    var el = document.getElementById('cm-comp-csv-input');
+    if (el) el.click();
+  }
+
+  /* A CSV's rows as competencies to review. Columns are found by their
+     headers (the export's); a file without them is read in the export's
+     order. */
+  function cmCompRowsFromCsv(text) {
+    var rows = _cmParseCsv(text);
+    if (!rows.length) return [];
+    var head = rows[0].map(function (h) {
+      return String(h).trim().toLowerCase();
+    });
+    function col(test) {
+      return head.findIndex(test);
+    }
+    var at = {
+      code: col(function (h) {
+        return h === 'code';
+      }),
+      title: col(function (h) {
+        return h === 'title' || h === 'name';
+      }),
+      text: col(function (h) {
+        return h.indexOf('competency') >= 0 || h === 'wording';
+      }),
+      icans: col(function (h) {
+        return h.indexOf('i can') >= 0;
+      }),
+      folder: col(function (h) {
+        return h === 'folder' || h === 'group';
+      }),
+    };
+    var hasHeader = at.title >= 0 || at.text >= 0;
+    if (!hasHeader) at = { code: 0, title: 1, text: 2, icans: 3, folder: 4 };
+    return rows
+      .slice(hasHeader ? 1 : 0)
+      .map(function (r) {
+        function get(k) {
+          return at[k] >= 0 ? String(r[at[k]] == null ? '' : r[at[k]]).trim() : '';
+        }
+        return {
+          code: get('code'),
+          label: get('title'),
+          text: get('text'),
+          icans: _cmSplitIcans(at.icans >= 0 ? r[at.icans] : ''),
+          folder: get('folder'),
+        };
+      })
+      .filter(function (c) {
+        return c.label || c.text;
+      });
+  }
+
+  function cmCompCSV(input) {
+    var file = input.files && input.files[0];
+    if (!file || !cmSelectedCourse) return;
+    var cid = cmSelectedCourse;
+    var reader = new FileReader();
+    reader.onload = function (e) {
+      input.value = '';
+      var cands = cmCompRowsFromCsv(e.target.result);
+      if (!cands.length) {
+        showConfirm(
+          'Nothing to Import',
+          'No competencies were found in ' + file.name + '. The file needs a Title or Curricular Competency column.',
+          'OK',
+          'primary',
+          function () {},
+        );
+        return;
+      }
+      _cmOpenCompReview(cid, cands, { kind: 'file', fileName: file.name });
+    };
+    reader.readAsText(file);
+  }
+
+  /* ── Review: Re-link and CSV import ─────────────────────────
+     Each incoming competency is matched to the class by curriculum wording,
+     then code, then title. Matched and identical: stays. Matched and
+     different: the teacher picks Keep Mine (the default) or the incoming
+     version. Not in the class: added, or put back with its scores if the
+     teacher removed it earlier. In the class but not incoming: kept unless
+     the teacher picks Remove (scores kept either way). */
+  function _cmNorm(s) {
+    return String(s || '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+  }
+
+  function _cmSameList(a, b) {
+    a = (a || []).map(_cmNorm);
+    b = (b || []).map(_cmNorm);
+    return (
+      a.length === b.length &&
+      a.every(function (x, i) {
+        return x === b[i];
+      })
+    );
+  }
+
+  function _cmScoredAssessments(cid, tagId) {
+    var seen = {};
+    var scores = getScores(cid) || {};
+    Object.keys(scores).forEach(function (sid) {
+      (scores[sid] || []).forEach(function (s) {
+        if (s && s.tagId === tagId && s.score > 0) seen[s.assessmentId] = true;
+      });
+    });
+    return Object.keys(seen).length;
+  }
+
+  function _cmScoresNote(cid, tag) {
+    var n = tag ? _cmScoredAssessments(cid, tag.id) : 0;
+    return n ? 'Has scores in ' + n + (n === 1 ? ' assessment.' : ' assessments.') : 'No scores yet.';
+  }
+
+  function _cmIcanNote(n) {
+    return n + (n === 1 ? ' I Can statement' : ' I Can statements');
+  }
+
+  // Pair incoming competencies with sections, one pass per key so a
+  // wording match is never taken by an earlier code or title match.
+  function _cmMatch(cands, secs, keys) {
+    var pairs = {};
+    var used = {};
+    keys.forEach(function (key) {
+      cands.forEach(function (c, ci) {
+        if (pairs[ci] != null) return;
+        var want = key.cand(c);
+        if (!want) return;
+        var si = secs.findIndex(function (s, i) {
+          if (used[i]) return false;
+          return key.sec(s).indexOf(want) >= 0;
+        });
+        if (si >= 0) {
+          pairs[ci] = si;
+          used[si] = true;
+        }
+      });
+    });
+    return { pairs: pairs, used: used };
+  }
+
+  var CM_MATCH_KEYS = [
+    {
+      cand: function (c) {
+        return _cmNorm(c.source_text || c.text);
+      },
+      sec: function (s) {
+        var t = s.tags[0] || {};
+        return [_cmNorm(t.source_text), _cmNorm(t.text)].filter(Boolean);
+      },
+    },
+    {
+      cand: function (c) {
+        return _cmNorm(c.code);
+      },
+      sec: function (s) {
+        var code = _cmNorm(_cmStdCode(s.tags[0] || {}));
+        return code ? [code] : [];
+      },
+    },
+    {
+      cand: function (c) {
+        return _cmNorm(c.label);
+      },
+      sec: function (s) {
+        var t = _cmNorm(_cmCompTitle(s));
+        return t ? [t] : [];
+      },
+    },
+  ];
+
+  function _cmBuildCompReview(cid, cands, opts) {
+    var secs = (getLearningMap(cid).sections || []).filter(function (s) {
+      return s.tags && s.tags[0];
+    });
+    var removed = getRemovedSections(cid).filter(function (r) {
+      return r && r.section && r.section.tags && r.section.tags[0];
+    });
+    var live = _cmMatch(cands, secs, CM_MATCH_KEYS);
+    var rest = [];
+    cands.forEach(function (c, ci) {
+      if (live.pairs[ci] == null) rest.push(ci);
+    });
+    var back = _cmMatch(
+      rest.map(function (ci) {
+        return cands[ci];
+      }),
+      removed.map(function (r) {
+        return r.section;
+      }),
+      CM_MATCH_KEYS,
+    );
+    var review = {
+      cid: cid,
+      kind: opts.kind,
+      fileName: opts.fileName || '',
+      tags: opts.tags || [],
+      add: [],
+      changed: [],
+      onlyMine: [],
+      same: [],
+      showSame: false,
+    };
+    cands.forEach(function (c, ci) {
+      var si = live.pairs[ci];
+      if (si == null) {
+        var ri = back.pairs[rest.indexOf(ci)];
+        review.add.push({ cand: c, removed: ri != null ? removed[ri].section : null, on: true });
+        return;
+      }
+      var sec = secs[si];
+      var tag = sec.tags[0];
+      var same =
+        _cmNorm(_cmCompTitle(sec)) === _cmNorm(c.label) &&
+        // A competency with no wording yet differs only if the rest does.
+        (!_cmNorm(tag.text) || _cmNorm(tag.text) === _cmNorm(c.text)) &&
+        _cmSameList(tag.i_can_statements, c.icans);
+      if (same) review.same.push({ sec: sec });
+      else review.changed.push({ sec: sec, cand: c, pick: 'mine' });
+    });
+    secs.forEach(function (sec, i) {
+      if (!live.used[i]) review.onlyMine.push({ sec: sec, pick: 'keep' });
+    });
+    return review;
+  }
+
+  /* Open the review. A signed-in teacher's removed competencies come from
+     the server too, so one removed on another device is offered back. */
+  function _cmOpenCompReview(cid, cands, opts) {
+    cmCompReview = _cmBuildCompReview(cid, cands, opts);
+    cmCompReview.cands = cands;
+    cmCompReview.opts = opts;
+    renderClassManager();
+    var opened = cmCompReview;
+    if (window.v2 && typeof window.v2.listRemovedSections === 'function') {
+      Promise.resolve(window.v2.listRemovedSections(cid))
+        .then(function (res) {
+          if (!res || !Array.isArray(res.data) || !res.data.length) return;
+          var before = getRemovedSections(cid).length;
+          mergeRemovedSectionsFromServer(cid, res.data);
+          if (cmCompReview !== opened || getRemovedSections(cid).length === before) return;
+          cmCompReview = _cmBuildCompReview(cid, cands, opts);
+          cmCompReview.cands = cands;
+          cmCompReview.opts = opts;
+          renderClassManager();
+        })
+        .catch(function () {});
+    }
+  }
+
+  function _cmCurriculumCands(tags) {
+    var built = buildLearningMapFromTags(tags) || { subjects: [], sections: [] };
+    return (built.sections || []).map(function (sec) {
+      var tag = sec.tags[0] || {};
+      return {
+        code: tag.code || '',
+        label: tag.label || '',
+        text: tag.text || '',
+        source_text: tag.source_text || '',
+        icans: (tag.i_can_statements || []).slice(),
+        section: sec,
+        subject: (built.subjects || []).find(function (s) {
+          return s.id === sec.subject;
+        }),
+      };
+    });
+  }
+
+  function _cmIcanDiffNote(mine, theirs) {
+    var t = {};
+    (theirs || []).forEach(function (s) {
+      t[_cmNorm(s)] = true;
+    });
+    var m = {};
+    (mine || []).forEach(function (s) {
+      m[_cmNorm(s)] = true;
+    });
+    var added = (mine || []).filter(function (s) {
+      return !t[_cmNorm(s)];
+    }).length;
+    var dropped = (theirs || []).filter(function (s) {
+      return !m[_cmNorm(s)];
+    }).length;
+    var parts = [];
+    if (added) parts.push('you added ' + added);
+    if (dropped) parts.push('you removed ' + dropped);
+    return parts.length ? ' (' + parts.join(', ') + ')' : '';
+  }
+
+  function _cmRenderCompReview(cid) {
+    var r = cmCompReview;
+    if (!r) return '';
+    var file = r.kind === 'file';
+    var course = COURSES[cid];
+    var linked = (r.tags || [])
+      .map(function (t) {
+        var c = CURRICULUM_INDEX ? CURRICULUM_INDEX[t] : null;
+        return (c ? c.course_name : t) + ' (' + t + ')';
+      })
+      .join(', ');
+    function chip(sec, code) {
+      var color = (sec && sec.color) || (getLearningMap(cid).subjects || [{}])[0].color || 'var(--active)';
+      return code ? '<span class="cm-std-code" style="--chip:' + color + '">' + esc(code) + '</span>' : '';
+    }
+    function group(title, items, body) {
+      if (!items.length) return '';
+      return (
+        '<section class="cm-section cm-cr-group">' +
+        '<div class="cm-import-group-head"><h3>' +
+        title +
+        '</h3><span>' +
+        items.length +
+        '</span></div>' +
+        items.map(body).join('') +
+        '</section>'
+      );
+    }
+    var html =
+      '<div class="cm-comp-review">' +
+      '<button type="button" class="cm-back-link" data-action="cmCompReviewCancel">\u2039 Back to Competencies</button>' +
+      '<div class="cm-cr-head">' +
+      '<h1 class="cm-head-title">' +
+      (file
+        ? 'Import Competencies'
+        : (course.curriculumTags || []).length
+          ? 'Re-link Curriculum'
+          : 'Link to BC Curriculum') +
+      ': Review Changes</h1>' +
+      '<div class="cm-cr-sub">' +
+      esc(file ? r.fileName : linked) +
+      '. Competencies are matched by code and curriculum wording, so nothing is added twice. Nothing changes until you press Apply.</div>' +
+      '</div>';
+
+    html += group(
+      file ? 'In the File, Not in Your Class' : 'In the Curriculum, Not in Your Class',
+      r.add,
+      function (a, i) {
+        var src = a.removed || a.cand.section || {};
+        var code = a.removed ? _cmStdCode(a.removed.tags[0]) : a.cand.code;
+        var n = a.removed ? (a.removed.tags[0].i_can_statements || []).length : a.cand.icans.length;
+        return (
+          '<label class="cm-cr-row">' +
+          '<input type="checkbox"' +
+          (a.on ? ' checked' : '') +
+          ' data-action-change="cmCompReviewToggle" data-idx="' +
+          i +
+          '">' +
+          chip(src, code) +
+          '<span class="cm-cr-text"><span class="cm-cr-name">' +
+          esc(a.removed ? _cmCompTitle(a.removed) : a.cand.label || a.cand.text) +
+          '</span><span class="cm-cr-note">' +
+          (a.removed ? 'You removed this from the class earlier. ' : '') +
+          _cmIcanNote(n) +
+          '.</span></span>' +
+          '<span class="cm-cr-verb">' +
+          (a.removed ? 'Add Back' : 'Add') +
+          '</span>' +
+          '</label>'
+        );
+      },
+    );
+
+    html += group('You Changed These', r.changed, function (c, i) {
+      var tag = c.sec.tags[0];
+      var mineIcans = tag.i_can_statements || [];
+      var wording =
+        _cmNorm(tag.text) === _cmNorm(c.cand.text) ? '' : tag.text ? ' \u00B7 wording edited' : ' \u00B7 no wording';
+      function option(pick, label, name, note) {
+        return (
+          '<label class="cm-cr-option' +
+          (c.pick === pick ? ' on' : '') +
+          '">' +
+          '<input type="radio" name="cm-cr-changed-' +
+          i +
+          '"' +
+          (c.pick === pick ? ' checked' : '') +
+          ' data-action-change="cmCompReviewPick" data-group="changed" data-idx="' +
+          i +
+          '" data-pick="' +
+          pick +
+          '">' +
+          '<span class="cm-cr-text"><span class="cm-cr-pick">' +
+          label +
+          '</span><span class="cm-cr-name">' +
+          esc(name) +
+          '</span><span class="cm-cr-note">' +
+          note +
+          '</span></span>' +
+          '</label>'
+        );
+      }
+      return (
+        '<div class="cm-cr-changed">' +
+        '<div class="cm-cr-changed-head">' +
+        chip(c.sec, _cmStdCode(tag)) +
+        '<span class="cm-cr-note">' +
+        _cmScoresNote(cid, tag) +
+        (_cmScoredAssessments(cid, tag.id) ? ' Scores stay either way.' : '') +
+        '</span></div>' +
+        '<div class="cm-cr-options" role="radiogroup" aria-label="' +
+        esc(_cmCompTitle(c.sec)) +
+        '">' +
+        option(
+          'mine',
+          'Keep Mine',
+          _cmCompTitle(c.sec),
+          _cmIcanNote(mineIcans.length) + _cmIcanDiffNote(mineIcans, c.cand.icans) + wording,
+        ) +
+        option(
+          'theirs',
+          file ? 'Use the File\u2019s Version' : 'Use the Curriculum Version',
+          c.cand.label || c.cand.text,
+          _cmIcanNote(c.cand.icans.length),
+        ) +
+        '</div>' +
+        '</div>'
+      );
+    });
+
+    html += group('Only in Your Class', r.onlyMine, function (o, i) {
+      var tag = o.sec.tags[0];
+      var why = file ? 'Not in the file.' : tag.source_text ? 'Not in this curriculum.' : 'One of your own.';
+      function seg(pick, label) {
+        return (
+          '<label class="cm-cr-seg' +
+          (o.pick === pick ? ' on' : '') +
+          '"><input type="radio" name="cm-cr-only-' +
+          i +
+          '"' +
+          (o.pick === pick ? ' checked' : '') +
+          ' data-action-change="cmCompReviewPick" data-group="onlyMine" data-idx="' +
+          i +
+          '" data-pick="' +
+          pick +
+          '">' +
+          label +
+          '</label>'
+        );
+      }
+      return (
+        '<div class="cm-cr-row">' +
+        chip(o.sec, _cmStdCode(tag)) +
+        '<span class="cm-cr-text"><span class="cm-cr-name">' +
+        esc(_cmCompTitle(o.sec)) +
+        '</span><span class="cm-cr-note">' +
+        why +
+        ' ' +
+        _cmScoresNote(cid, tag) +
+        '</span></span>' +
+        '<div class="cm-cr-segs" role="radiogroup" aria-label="' +
+        esc(_cmCompTitle(o.sec)) +
+        '">' +
+        seg('keep', 'Keep') +
+        seg('remove', 'Remove') +
+        '</div>' +
+        '</div>'
+      );
+    });
+
+    if (r.same.length) {
+      var codes = r.same.map(function (s) {
+        return _cmStdCode(s.sec.tags[0]) || _cmCompTitle(s.sec);
+      });
+      html +=
+        '<section class="cm-section cm-cr-same">' +
+        '<div class="cm-cr-same-head"><div class="cm-cr-text"><h3>' +
+        (file ? 'Already Match the File' : 'Already Match the Curriculum') +
+        ' <span>' +
+        r.same.length +
+        '</span></h3><span class="cm-cr-note">' +
+        esc(
+          codes.length > 8 ? codes.slice(0, 8).join(', ') + ' and ' + (codes.length - 8) + ' more' : codes.join(', '),
+        ) +
+        (codes.length === 1 ? ' stays as it is.' : ' stay as they are.') +
+        '</span></div>' +
+        '<button type="button" class="cm-add-link" data-action="cmCompReviewShowSame" aria-expanded="' +
+        r.showSame +
+        '">' +
+        (r.showSame ? 'Hide' : 'Show') +
+        '</button></div>' +
+        (r.showSame
+          ? '<div class="cm-cr-same-list">' +
+            r.same
+              .map(function (s) {
+                return (
+                  '<div class="cm-cr-same-row">' +
+                  chip(s.sec, _cmStdCode(s.sec.tags[0])) +
+                  '<span>' +
+                  esc(_cmCompTitle(s.sec)) +
+                  '</span></div>'
+                );
+              })
+              .join('') +
+            '</div>'
+          : '') +
+        '</section>';
+    }
+
+    var s = _cmCompReviewSummary(r);
+    html +=
+      '<div class="cm-import-foot">' +
+      '<div>' +
+      s +
+      '</div>' +
+      '<div class="cm-import-buttons">' +
+      '<button type="button" class="cm-action-btn" data-action="cmCompReviewCancel">Cancel</button>' +
+      '<button type="button" class="btn btn-primary" data-action="cmCompReviewApply"' +
+      (_cmCompReviewCount(r) === 0 && !_cmCompReviewLinkChanges(r) ? ' disabled' : '') +
+      '>Apply Changes</button>' +
+      '</div>' +
+      '</div>' +
+      '</div>';
+    return html;
+  }
+
+  function _cmCompReviewLinkChanges(r) {
+    if (r.kind === 'file') return false;
+    var now = (COURSES[r.cid] && COURSES[r.cid].curriculumTags) || [];
+    return now.slice().sort().join('|') !== (r.tags || []).slice().sort().join('|');
+  }
+
+  function _cmCompReviewParts(r) {
+    var file = r.kind === 'file';
+    return {
+      back: r.add.filter(function (a) {
+        return a.on && a.removed;
+      }),
+      add: r.add.filter(function (a) {
+        return a.on && !a.removed;
+      }),
+      theirs: r.changed.filter(function (c) {
+        return c.pick === 'theirs';
+      }),
+      remove: r.onlyMine.filter(function (o) {
+        return o.pick === 'remove';
+      }),
+      versionOf: file ? 'use the file\u2019s version of ' : 'use the curriculum version of ',
+    };
+  }
+
+  function _cmCompReviewCount(r) {
+    var p = _cmCompReviewParts(r);
+    return p.back.length + p.add.length + p.theirs.length + p.remove.length;
+  }
+
+  function _cmCompReviewSummary(r) {
+    var p = _cmCompReviewParts(r);
+    var n = _cmCompReviewCount(r);
+    if (!n) {
+      return _cmCompReviewLinkChanges(r)
+        ? '<strong>No competency changes.</strong> Apply saves the new curriculum link.'
+        : '<strong>No changes.</strong>';
+    }
+    function names(list, fn) {
+      return list.map(fn);
+    }
+    var phrases = [];
+    if (p.back.length)
+      phrases.push(
+        'add back ' +
+          _cmJoinNames(
+            names(p.back, function (a) {
+              return _cmCompTitle(a.removed);
+            }),
+            'competencies',
+          ),
+      );
+    if (p.add.length)
+      phrases.push(
+        'add ' +
+          _cmJoinNames(
+            names(p.add, function (a) {
+              return a.cand.label || a.cand.text;
+            }),
+            'competencies',
+          ),
+      );
+    if (p.theirs.length)
+      phrases.push(
+        p.versionOf +
+          _cmJoinNames(
+            names(p.theirs, function (c) {
+              return _cmCompTitle(c.sec);
+            }),
+            'competencies',
+          ),
+      );
+    if (p.remove.length)
+      phrases.push(
+        'remove ' +
+          _cmJoinNames(
+            names(p.remove, function (o) {
+              return _cmCompTitle(o.sec);
+            }),
+            'competencies',
+          ),
+      );
+    var tail =
+      p.theirs.length || p.remove.length
+        ? ' Scores are kept.'
+        : r.onlyMine.length
+          ? ' Your edits and your own competencies stay.'
+          : ' Your edits stay.';
+    return '<strong>' + n + (n === 1 ? ' change:' : ' changes:') + '</strong> ' + esc(phrases.join('; ')) + '.' + tail;
+  }
+
+  function cmCompReviewToggle(idx, on) {
+    if (!cmCompReview || !cmCompReview.add[idx]) return;
+    cmCompReview.add[idx].on = !!on;
+    renderClassManager();
+  }
+
+  function cmCompReviewPick(group, idx, pick) {
+    var list = cmCompReview && cmCompReview[group];
+    if (!list || !list[idx]) return;
+    list[idx].pick = pick;
+    renderClassManager();
+  }
+
+  function cmCompReviewShowSame() {
+    if (!cmCompReview) return;
+    cmCompReview.showSame = !cmCompReview.showSame;
+    renderClassManager();
+  }
+
+  function _cmCloseCompReview() {
+    cmCompReview = null;
+    cmRelinkCid = null;
+    cmRelinkStep = 0;
+    cwSelectedTags = [];
+  }
+
+  function cmCompReviewCancel() {
+    _cmCloseCompReview();
+    cmTab = 'competencies';
+    renderClassManager();
+  }
+
+  function cmCompReviewApply() {
+    var r = cmCompReview;
+    if (!r) return;
+    var cid = r.cid;
+    var p = _cmCompReviewParts(r);
+
+    // Put removed competencies back first: each brings its scores with it.
+    p.back.forEach(function (a) {
+      restoreCompetency(cid, a.removed.id);
+    });
+
+    if (p.add.length || p.theirs.length) {
+      var map = ensureCustomLearningMap(cid);
+      if (!map.subjects) map.subjects = [];
+      if (!map.sections) map.sections = [];
+      if (!map.competencyGroups) map.competencyGroups = [];
+      var taken = {};
+      map.sections.forEach(function (s) {
+        taken[s.id] = true;
+      });
+      getRemovedSections(cid).forEach(function (x) {
+        if (x && x.section) taken[x.section.id] = true;
+      });
+      function freshId(base) {
+        var id = base && !taken[base] ? base : (base ? base + '_' : '') + uid();
+        taken[id] = true;
+        return id;
+      }
+      p.add.forEach(function (a) {
+        var c = a.cand;
+        var sec;
+        if (c.section) {
+          // From the curriculum: its subject comes along if the class lacks it.
+          if (
+            c.subject &&
+            !map.subjects.some(function (s) {
+              return s.id === c.subject.id;
+            })
+          ) {
+            map.subjects.push(structuredClone(c.subject));
+          }
+          sec = structuredClone(c.section);
+          sec.id = freshId(c.section.id);
+          sec.tags[0].id = sec.id;
+        } else {
+          if (!map.subjects.length) map.subjects.push({ id: 'subj1', name: 'General', color: '#6366f1' });
+          var sub = map.subjects[0];
+          var id = freshId('');
+          var label = c.label || c.text.slice(0, 40);
+          var short = label.split(' ')[0];
+          sec = {
+            id: id,
+            subject: sub.id,
+            name: label,
+            shortName: short,
+            color: sub.color,
+            tags: [
+              {
+                id: id,
+                code: c.code || undefined,
+                label: label,
+                text: c.text,
+                i_can_statements: c.icans.slice(),
+                color: sub.color,
+                subject: sub.id,
+                name: label,
+                shortName: short,
+              },
+            ],
+          };
+          if (!sec.tags[0].code) delete sec.tags[0].code;
+          if (c.folder) {
+            var grp = map.competencyGroups.find(function (g) {
+              return _cmNorm(g.name) === _cmNorm(c.folder);
+            });
+            if (!grp) {
+              var gi = map.competencyGroups.length;
+              grp = {
+                id: 'grp_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
+                name: c.folder,
+                color: '#6366f1',
+                sortOrder: gi,
+              };
+              map.competencyGroups.push(grp);
+            }
+            sec.groupId = grp.id;
+          }
+        }
+        map.sections.push(sec);
+      });
+      p.theirs.forEach(function (ch) {
+        var sec = map.sections.find(function (s) {
+          return s.id === _currentId('section', ch.sec.id);
+        });
+        if (!sec || !sec.tags[0]) return;
+        var tag = sec.tags[0];
+        if (ch.cand.label) tag.label = ch.cand.label;
+        tag.text = ch.cand.text;
+        tag.i_can_statements = ch.cand.icans.slice();
+        if (ch.cand.source_text) tag.source_text = ch.cand.source_text;
+      });
+      map._flatVersion = 2;
+      saveLearningMap(cid, map);
+    }
+
+    if (p.remove.length) {
+      removeCompetencies(
+        cid,
+        p.remove.map(function (o) {
+          return _currentId('section', o.sec.id);
+        }),
+      );
+    }
+
+    if (r.kind !== 'file' && _cmCompReviewLinkChanges(r)) updateCourse(cid, { curriculumTags: r.tags.slice() });
+
+    _cmCloseCompReview();
+    cmTab = 'competencies';
+    renderClassManager();
+  }
+
   function cmDeleteStd(secId) {
     showConfirm(
       'Remove Competency',
@@ -5606,14 +6593,8 @@ window.DashClassManager = (function () {
       'Remove',
       'danger',
       function () {
-        var cid = cmSelectedCourse;
-        var map = ensureCustomLearningMap(cid);
         // Resolved now: the id may have been re-keyed while the dialog was open.
-        var currentId = _currentId('section', secId);
-        map.sections = map.sections.filter(function (s) {
-          return s.id !== currentId;
-        });
-        saveLearningMap(cid, map);
+        removeCompetencies(cmSelectedCourse, [_currentId('section', secId)]);
         renderClassManager();
       },
     );
@@ -6093,12 +7074,35 @@ window.DashClassManager = (function () {
       cmRelinkNext: function () {
         cmRelinkNext();
       },
-      cmRelinkConfirm: function () {
-        cmRelinkConfirm(el.dataset.mode);
+      cmCompSelectStart: function () {
+        cmCompSelectStart();
       },
-      cmRelinkBack: function () {
-        cmRelinkStep = 1;
-        renderClassManager();
+      cmCompSelectDone: function () {
+        cmCompSelectDone();
+      },
+      cmCompSelectAll: function () {
+        cmCompSelectAll();
+      },
+      cmCompMove: function () {
+        cmCompMove(el.dataset.grpid);
+      },
+      cmCompRemoveSelected: function () {
+        cmCompRemoveSelected();
+      },
+      cmCompExport: function () {
+        cmCompExport();
+      },
+      cmCompImport: function () {
+        cmCompImport();
+      },
+      cmCompReviewShowSame: function () {
+        cmCompReviewShowSame();
+      },
+      cmCompReviewCancel: function () {
+        cmCompReviewCancel();
+      },
+      cmCompReviewApply: function () {
+        cmCompReviewApply();
       },
     };
     if (handlers[action]) {
@@ -6150,6 +7154,22 @@ window.DashClassManager = (function () {
   function handleChange(el) {
     if (el.dataset.actionChange === 'cmCSV') {
       cmHandleCSV(el);
+      return true;
+    }
+    if (el.dataset.actionChange === 'cmCompCSV') {
+      cmCompCSV(el);
+      return true;
+    }
+    if (el.dataset.actionChange === 'cmCompToggle') {
+      cmCompToggle(el.dataset.secid, el.checked);
+      return true;
+    }
+    if (el.dataset.actionChange === 'cmCompReviewToggle') {
+      cmCompReviewToggle(Number(el.dataset.idx), el.checked);
+      return true;
+    }
+    if (el.dataset.actionChange === 'cmCompReviewPick') {
+      cmCompReviewPick(el.dataset.group, Number(el.dataset.idx), el.dataset.pick);
       return true;
     }
     if (el.dataset.actionChange === 'cmImportToggle') {
@@ -6368,6 +7388,7 @@ window.DashClassManager = (function () {
     // The reporting terms draft as the editor holds it (tests).
     // For tests: the import review a CSV file opens.
     cmShowImportPreview: cmShowImportPreview,
+    cmCompRowsFromCsv: cmCompRowsFromCsv,
     reportingTermsDraft: function (cid) {
       var st = _cmTermRows(cid || cmSelectedCourse);
       return { rows: st.rows.slice(), dirty: st.dirty, error: _cmTermError(cid || cmSelectedCourse) };
@@ -6391,6 +7412,9 @@ window.DashClassManager = (function () {
       cmBulkMode = false;
       cmBulkSelected = new Set();
       cmPendingImport = null;
+      cmCompSelect = false;
+      cmCompSelected = {};
+      cmCompReview = null;
       cmRelinkCid = null;
       cmRelinkStep = 0;
       cwStep = 1;

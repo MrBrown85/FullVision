@@ -4106,3 +4106,394 @@ body.fv-names-hidden .dash-search-input:not(:placeholder-shown) {
   font-weight: 600;
   color: var(--text);
 }
+/* Competencies tab: the list and its toolbar beside the BC Curriculum link
+   and the subjects */
+.cm-comp-layout {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+.cm-comp-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.cm-comp-selecting .cm-comp-main {
+  max-width: 820px;
+}
+.cm-comp-side {
+  flex: 0 0 340px;
+  width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.cm-comp-side .cm-section {
+  margin: 0;
+}
+.cm-comp-side-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cm-comp-side-card > .cm-add-link {
+  align-self: flex-start;
+}
+.cm-comp-side-card .cm-relink-btn {
+  align-self: flex-start;
+  border-color: var(--border);
+  color: var(--text);
+  font-weight: 500;
+}
+.cm-comp-side-card .cm-relink-btn:hover {
+  background: var(--overlay-hover);
+  color: var(--text);
+}
+.cm-comp-list {
+  margin: 0;
+  padding: 14px 16px;
+}
+/* Folders sit in the list's card, not in boxes of their own */
+.cm-comp-list .mod-folder.mod-folder {
+  border: none;
+  background: none;
+  margin-bottom: 8px;
+}
+.cm-comp-list .mod-folder:last-child {
+  margin-bottom: 0;
+}
+.cm-comp-list .mod-folder-header {
+  padding: 4px 4px 8px;
+  border-radius: 0;
+}
+.cm-comp-list .mod-folder-body {
+  padding-top: 8px;
+}
+.cm-comp-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.cm-comp-toolbar > .cm-hint {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+.cm-comp-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.cm-comp-buttons .cm-action-btn,
+.cm-comp-buttons .btn {
+  min-height: 36px;
+}
+.cm-comp-io-menu {
+  width: 340px;
+}
+.cm-comp-io-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+}
+.cm-comp-io-name {
+  font-weight: 600;
+}
+.cm-comp-io-desc {
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--text-2);
+  white-space: normal;
+}
+/* Select mode */
+.cm-comp-selectbar {
+  justify-content: flex-start;
+  gap: 12px;
+  background: #1d1d1f;
+  color: #fff;
+  border: 1px solid #3a3a3c;
+  border-radius: var(--radius);
+  padding: 10px 14px;
+}
+.cm-comp-selected {
+  font-family: var(--font-base);
+  font-size: var(--text-md);
+  font-weight: 600;
+}
+.cm-comp-selectbar > .cm-add-link {
+  color: #9ecbff;
+  margin: 0;
+  padding: 4px 6px;
+}
+.cm-comp-selectbar .cm-comp-buttons {
+  margin-left: auto;
+}
+.cm-comp-selectbar .cm-action-btn {
+  background: none;
+  color: #fff;
+  border-color: #636366;
+}
+.cm-comp-selectbar .cm-action-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.cm-comp-selectbar .cm-comp-remove:not(:disabled) {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+  font-weight: 600;
+}
+.cm-comp-selectbar .cm-std-menu {
+  color: var(--text);
+}
+.cm-comp-select-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--divider-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  font-family: var(--font-base);
+  cursor: pointer;
+}
+.cm-comp-select-row.selected {
+  border: 1.5px solid var(--active);
+  background: var(--active-light);
+  padding: 11.5px 13.5px;
+}
+.cm-comp-select-row input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
+.cm-comp-select-row .cm-std-label {
+  flex: 1;
+}
+/* Where a competency's I Can statements print */
+.cm-std-shown {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.cm-std-shown-label {
+  font-weight: 600;
+  color: var(--text);
+}
+.cm-std-shown-chip {
+  background: var(--active-light);
+  color: var(--link);
+  border-radius: 10px;
+  padding: 2px 9px;
+}
+.cm-std-shown .cm-add-link {
+  margin: 0;
+  font-weight: 600;
+}
+/* Re-link and CSV import review */
+.cm-comp-review {
+  max-width: 900px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.cm-back-link {
+  align-self: flex-start;
+  border: none;
+  background: none;
+  padding: 0;
+  font-family: var(--font-base);
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--link);
+  cursor: pointer;
+}
+.cm-cr-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cm-cr-sub {
+  font-family: var(--font-base);
+  font-size: var(--text-md);
+  line-height: 1.5;
+  color: var(--text-2);
+}
+.cm-comp-review .cm-section {
+  margin: 0;
+}
+.cm-cr-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.cm-cr-row,
+.cm-cr-changed {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--divider-subtle);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  font-family: var(--font-base);
+}
+label.cm-cr-row {
+  cursor: pointer;
+}
+.cm-cr-row > input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
+.cm-cr-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.cm-cr-name {
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--text);
+}
+.cm-cr-note {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.cm-cr-verb {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text);
+}
+.cm-cr-changed {
+  flex-direction: column;
+  align-items: stretch;
+  padding: 14px;
+}
+.cm-cr-changed-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cm-cr-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.cm-cr-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 13px 15px;
+  cursor: pointer;
+}
+.cm-cr-option.on {
+  border: 2px solid var(--active);
+  background: var(--active-light);
+  padding: 12px 14px;
+}
+.cm-cr-option input {
+  margin-top: 3px;
+}
+.cm-cr-pick {
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: var(--text);
+}
+.cm-cr-segs {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--overlay-hover);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-base);
+}
+.cm-cr-seg {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.cm-cr-seg.on {
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+.cm-cr-seg input {
+  margin: 0;
+}
+.cm-cr-same-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  font-family: var(--font-base);
+}
+.cm-cr-same-head h3 {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 700;
+  color: var(--text);
+}
+.cm-cr-same-head h3 span {
+  font-weight: 500;
+  color: var(--text-3);
+}
+.cm-cr-same-head .cm-add-link {
+  margin: 0;
+  font-weight: 600;
+}
+.cm-cr-same-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+}
+.cm-cr-same-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-base);
+  font-size: var(--text-base);
+  color: var(--text);
+}
+.cm-comp-review .cm-import-foot {
+  border-top-color: var(--border);
+  padding-top: 16px;
+}
+.cm-comp-review .cm-import-foot > div:first-child {
+  flex: 1;
+  min-width: 0;
+}
+.cm-comp-review .cm-import-buttons {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+@media (max-width: 1100px) {
+  .cm-comp-layout {
+    flex-direction: column;
+  }
+  .cm-comp-side {
+    width: 100%;
+    flex-basis: auto;
+  }
+}

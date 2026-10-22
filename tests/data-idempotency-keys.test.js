@@ -58,10 +58,12 @@ describe('_stampIdempotencyKey', () => {
 
 describe('FV_IDEMPOTENT_RPCS', () => {
   it('names exactly the endpoints the server retrofitted', () => {
-    // Verified against pg_proc: these 28 are the public functions carrying a
+    // Verified against pg_proc: these 30 are the public functions carrying a
     // p_idempotency_key argument (the three student ones from
     // migrations/20261019_withdraw_students.sql, the six report-form ones
-    // from migrations/20261020_report_template / _report_issue / _guardian).
+    // from migrations/20261020_report_template / _report_issue / _guardian,
+    // remove_section / restore_section from
+    // migrations/20261022_soft_remove_competency.sql).
     // Keep in lockstep with the database.
     expect(Object.keys(FV_IDEMPOTENT_RPCS).sort()).toEqual([
       'create_assessment',
@@ -80,6 +82,8 @@ describe('FV_IDEMPOTENT_RPCS', () => {
       'import_roster_csv',
       'import_teams_class',
       'reenrol_student',
+      'remove_section',
+      'restore_section',
       'save_report_template',
       'upsert_category',
       'upsert_competency_group',
