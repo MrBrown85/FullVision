@@ -4626,17 +4626,8 @@ function _termRatingsRowsToBlob(rows) {
 /* Efficient single-score write — upserts one row to scores table + updates cache */
 /* `mod` is the level's + or − (1 or −1). Leaving it out means none, so
    picking a level clears a + or − it had before. */
-/* The assessment last scored in each class this session, with the day, so
-   the observation capture strip can pre-fill it (teacher/obs-capture.js). */
-var _lastScored = {};
-function getLastScoredAssessment(cid) {
-  var rec = _lastScored[cid];
-  return rec && rec.day === courseToday(cid) ? rec.aid : null;
-}
-
 function upsertScore(cid, sid, aid, tid, scoreVal, date, type, note, mod) {
   var nextMod = normalizeScoreMod(scoreVal, mod);
-  if (aid) _lastScored[cid] = { aid: aid, day: courseToday(cid) };
   // Update cache blob
   const scores = getScores(cid);
   if (!scores[sid]) scores[sid] = [];
@@ -10886,7 +10877,6 @@ window.GB = {
   getScores,
   saveScores,
   upsertScore,
-  getLastScoredAssessment,
   persistScoreDiffToCanonical,
   getPointsScore,
   setPointsScore,

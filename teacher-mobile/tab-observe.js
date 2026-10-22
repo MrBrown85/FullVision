@@ -583,7 +583,6 @@ window.MObserve = (function () {
   function presentNewObsSheet(cid, presetSid) {
     resetSheetState();
     _selectedStudents = presetSid ? [presetSid] : [];
-    _selectedAssessment = ObsCapture._helpers.defaultAssessmentId(cid);
     MC.presentSheet(_editSheetHtml(cid, null, null, null), {
       onClose: function () {
         var ta = document.getElementById('m-obs-text');

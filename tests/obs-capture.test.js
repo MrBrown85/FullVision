@@ -181,7 +181,6 @@ describe('capture strip', () => {
         ({ t1: { id: 't1', label: 'Make observations' }, t2: { id: 't2', label: 'Collect data safely' } })[id],
     );
     setGlobal('getScores', () => ({}));
-    setGlobal('getLastScoredAssessment', () => null);
     setGlobal('addQuickOb', (cid, sid, text, dims, sentiment, context, ac, link, templateId) => {
       added.push({ cid, sid, text, dims, sentiment, context, ac, link, templateId });
       return true;
@@ -636,17 +635,17 @@ describe('capture strip', () => {
     expect(text).toContain('Lab safety');
   });
 
-  it('the assessment pre-fills from what was scored today', () => {
-    globalThis.getLastScoredAssessment = () => 'a1';
-    const cap = mount({ defaultAssessment: true, students: ['s1'] });
-    expect(cap.el.textContent).toContain('Assessment: Mid-year lab skills check');
+  it('links no assessment by default, even after scoring one today', () => {
+    const cap = mount({ students: ['s1'] });
+    expect(cap.getState().assessmentId).toBeNull();
+    expect(cap.el.textContent).not.toContain('Assessment:');
     type(cap, 'Careful measurements');
     cap.submit();
-    expect(added[0].ac).toEqual({ assessmentId: 'a1', assessmentTitle: 'Mid-year lab skills check' });
+    expect(added[0].ac).toBeFalsy();
   });
 
-  it('without a score today, + Assessment opens a menu', () => {
-    const cap = mount({ defaultAssessment: true });
+  it('+ Assessment opens a menu', () => {
+    const cap = mount();
     click(cap.el.querySelector('#link-btn'));
     expect(cap.el.querySelector('#assessment-btn')).toBeTruthy();
     click(cap.el.querySelector('#assessment-btn'));

@@ -142,7 +142,6 @@ window.PageObservations = (function () {
     _capture = ObsCapture.create({
       cid: activeCourse,
       students: students,
-      defaultAssessment: true,
       draftKey: 'obs-page',
       onAdd: function () {
         refreshFeedAndCount();
