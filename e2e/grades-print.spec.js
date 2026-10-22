@@ -110,7 +110,7 @@ test.describe('Print Grades', () => {
       'Assessments',
       'Scores',
       'Blank Gradebook',
-      'Attendance',
+      'Blank Attendance',
       'Show As',
       'Sort By',
       'Final Grade',
@@ -286,9 +286,6 @@ test.describe('Print Grades', () => {
     const dialog = await openDialog(page);
     await choose(dialog, 'Term', 'All Time');
     await dialog.getByLabel('Blank Gradebook').check();
-    await expect(dialog.getByLabel('Blank Gradebook')).toHaveAccessibleDescription(
-      'Prints the assessment titles across the top with every score box empty.',
-    );
     await expectCount(dialog, '3 pages · Letter', `${STUDENTS} students · Blank Gradebook · 37 columns`);
     for (const label of ['Final Grade', 'Class Average Row', 'Late Marks']) {
       await expect(dialog.getByLabel(label)).toBeDisabled();
@@ -314,14 +311,11 @@ test.describe('Print Grades', () => {
     await reset.getByRole('button', { name: 'Cancel' }).click();
   });
 
-  test('Attendance prints school days from this Monday, a band per week', async ({ page }) => {
+  test('Blank Attendance prints school days from this Monday, a band per week', async ({ page }) => {
     await page.clock.setFixedTime(new Date('2026-10-21T10:00:00'));
     await openDemoGradebook(page);
     const dialog = await openDialog(page);
-    await dialog.getByLabel('Attendance').check();
-    await expect(dialog.getByLabel('Attendance')).toHaveAccessibleDescription(
-      'Prints school days across the top, Monday to Friday, from Mon Oct 19.',
-    );
+    await dialog.getByLabel('Blank Attendance').check();
     await expectCount(dialog, '1 page · Letter', `${STUDENTS} students · 16 school days`);
     for (const label of ['Blank Gradebook', 'Final Grade', 'Class Average Row', 'Late Marks']) {
       await expect(dialog.getByLabel(label)).toBeDisabled();
@@ -350,7 +344,7 @@ test.describe('Print Grades', () => {
     await expect(sheet.locator('.gp-row:not(.gp-blank-row)')).toHaveCount(STUDENTS);
     expect(countPages(await pdfOfStaged(page))).toBe(1);
     const reset = await openDialog(page);
-    await reset.getByLabel('Attendance').uncheck();
+    await reset.getByLabel('Blank Attendance').uncheck();
     await reset.getByRole('button', { name: 'Cancel' }).click();
   });
 

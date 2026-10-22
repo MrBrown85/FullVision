@@ -1282,32 +1282,21 @@
     );
   }
 
-  /* A row with a switch, and a sentence under its label when it needs one. */
-  function _switchRow(key, checked, label, off, sub, hint) {
-    var labelHtml = '<label class="gpd-label" for="gpd-' + key + '">' + _esc(label) + '</label>';
-    if (hint) {
-      labelHtml =
-        '<div class="gpd-label-wrap">' +
-        labelHtml +
-        '<div class="gpd-hint" id="gpd-h-' +
-        key +
-        '">' +
-        _esc(hint) +
-        '</div></div>';
-    }
+  /* A row with a switch. */
+  function _switchRow(key, checked, label, off, sub) {
     return (
       '<div class="gpd-row gpd-row-switch' +
       (sub ? ' gpd-sub' : '') +
-      (hint ? ' gpd-row-hint' : '') +
       (off ? ' is-off' : '') +
+      '"><label class="gpd-label" for="gpd-' +
+      key +
       '">' +
-      labelHtml +
-      '<span class="gpd-switch"><input type="checkbox" role="switch" id="gpd-' +
+      _esc(label) +
+      '</label><span class="gpd-switch"><input type="checkbox" role="switch" id="gpd-' +
       key +
       '" data-opt="' +
       key +
       '"' +
-      (hint ? ' aria-describedby="gpd-h-' + key + '"' : '') +
       (checked ? ' checked' : '') +
       (off ? ' disabled' : '') +
       '><span class="gpd-switch-ui" aria-hidden="true"></span></span></div>'
@@ -1392,22 +1381,8 @@
       content += '<div class="gpd-pick" role="group" aria-label="Pick Assessments">' + _pickList(cid, opts) + '</div>';
     }
     content += _menuRow(menus, opts, 'scoresAs', 'Scores', blank);
-    content += _switchRow(
-      'blank',
-      blank,
-      'Blank Gradebook',
-      days,
-      false,
-      'Prints the assessment titles across the top with every score box empty.',
-    );
-    content += _switchRow(
-      'attendance',
-      days,
-      'Attendance',
-      false,
-      false,
-      'Prints school days across the top, Monday to Friday, from ' + dayLabel(weekStart()) + '.',
-    );
+    content += _switchRow('blank', blank, 'Blank Gradebook', days);
+    content += _switchRow('attendance', days, 'Blank Attendance');
 
     var students = _menuRow(menus, opts, 'students', 'Show As') + _menuRow(menus, opts, 'sortBy', 'Sort By');
 
