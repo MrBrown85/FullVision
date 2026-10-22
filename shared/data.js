@@ -5997,6 +5997,117 @@ function ensureCustomLearningMap(cid) {
   return clone;
 }
 
+/* ── Removed competencies ───────────────────────────────────
+   Removing a competency takes its section out of the learning map but keeps
+   it, and every score tied to it, on the server (section.removed_at). This
+   device keeps the removed sections it knows of, so Re-link can say "you
+   removed this earlier" and put one back; listRemovedSections fills in the
+   ones removed on another device.
+   [{ section, removedAt }], newest first. */
+function getRemovedSections(cid) {
+  var list = _safeParseLS('gb-removed-sections-' + cid, []);
+  return Array.isArray(list) ? list : [];
+}
+
+function _saveRemovedSections(cid, list) {
+  try {
+    localStorage.setItem('gb-removed-sections-' + cid, JSON.stringify(list || []));
+  } catch (e) {
+    /* storage full: the server still has them */
+  }
+}
+
+/* Merge the server's removed sections into this device's list. */
+function mergeRemovedSectionsFromServer(cid, rows) {
+  if (!Array.isArray(rows)) return getRemovedSections(cid);
+  var list = getRemovedSections(cid);
+  var have = {};
+  list.forEach(function (r) {
+    if (r && r.section) have[r.section.id] = true;
+  });
+  rows.forEach(function (r) {
+    if (!r || have[r.id]) return;
+    list.push({
+      section: {
+        id: r.id,
+        name: r.name,
+        subject: r.subject_id,
+        groupId: r.competency_group_id || null,
+        tags: (r.tags || []).map(function (t) {
+          return {
+            id: t.id,
+            code: t.code,
+            label: t.label,
+            text: t.i_can_text || '',
+            i_can_statements: t.i_can_statements || [],
+            source_text: t.source_text || null,
+          };
+        }),
+      },
+      removedAt: r.removed_at,
+    });
+  });
+  _saveRemovedSections(cid, list);
+  return list;
+}
+
+/* Remove competencies (section ids) from the class. Their scores stay. */
+function removeCompetencies(cid, sectionIds) {
+  var ids = {};
+  (sectionIds || []).forEach(function (id) {
+    ids[resolveLearningMapId(cid, 'section', id)] = true;
+  });
+  var map = ensureCustomLearningMap(cid);
+  var taken = (map.sections || []).filter(function (s) {
+    return ids[s.id];
+  });
+  if (!taken.length) return 0;
+  map.sections = map.sections.filter(function (s) {
+    return !ids[s.id];
+  });
+  var now = new Date().toISOString();
+  var list = getRemovedSections(cid).filter(function (r) {
+    return !(r && r.section && ids[r.section.id]);
+  });
+  _saveRemovedSections(
+    cid,
+    taken
+      .map(function (s) {
+        return { section: structuredClone(s), removedAt: now };
+      })
+      .concat(list),
+  );
+  saveLearningMap(cid, map);
+  return taken.length;
+}
+
+/* Put a removed competency back, with its scores. */
+function restoreCompetency(cid, sectionId) {
+  var list = getRemovedSections(cid);
+  var entry = list.find(function (r) {
+    return r && r.section && r.section.id === sectionId;
+  });
+  if (!entry) return false;
+  var map = ensureCustomLearningMap(cid);
+  if (
+    !(map.sections || []).some(function (s) {
+      return s.id === sectionId;
+    })
+  ) {
+    map.sections = (map.sections || []).concat([structuredClone(entry.section)]);
+  }
+  _saveRemovedSections(
+    cid,
+    list.filter(function (r) {
+      return r !== entry;
+    }),
+  );
+  if (_writesEnabled() && _isUuid(sectionId) && window.v2 && window.v2.restoreSection)
+    window.v2.restoreSection(sectionId);
+  saveLearningMap(cid, map);
+  return true;
+}
+
 /* ── Modules (formerly Units) ───────────────────────────────── */
 function getModules(cid) {
   if (_cache.modules[cid] !== undefined) return _cache.modules[cid];
@@ -6401,6 +6512,19 @@ function _persistLearningMapToCanonical(cid, prevMap, nextMap) {
       }),
     );
 
+    // A removed competency (getRemovedSections) is kept on the server with
+    // its scores: its section is marked removed, and its tags stay.
+    var softRemoved = {};
+    getRemovedSections(cid).forEach(function (r) {
+      if (r && r.section) softRemoved[r.section.id] = true;
+    });
+    var keptTags = {};
+    ((baseline && baseline.sections) || []).forEach(function (sec) {
+      if (!softRemoved[sec.id]) return;
+      (sec.tags || []).forEach(function (t) {
+        if (t) keptTags[t.id] = true;
+      });
+    });
     // A row removed while its insert is still queued is simply not inserted;
     // one whose insert was sent is deleted by its server id.
     [
@@ -6411,8 +6535,14 @@ function _persistLearningMapToCanonical(cid, prevMap, nextMap) {
     ].forEach(function (pair) {
       Object.keys(pair[1]).forEach(function (id) {
         if (pair[2][id]) return;
+        if (pair[0] === 'tag' && keptTags[id]) return;
         var gone = _cancelPendingCreateOrResolve(cid, pair[0], id);
-        if (gone && pair[3]) opsToDelete.push(pair[3](gone));
+        if (!gone) return;
+        if (pair[0] === 'section' && softRemoved[id]) {
+          if (window.v2.removeSection) opsToDelete.push(window.v2.removeSection(gone));
+          return;
+        }
+        if (pair[3]) opsToDelete.push(pair[3](gone));
       });
     });
     opsToDelete.forEach(function (op) {
@@ -9266,6 +9396,18 @@ window.v2.upsertSection = function (params, options) {
 window.v2.deleteSection = function (id) {
   return _rpcOrNoop('delete_section', { p_id: id });
 };
+/* Remove a competency from a class but keep its scores (section.removed_at),
+   put one back, and list the removed ones (migrations/20261022_soft_remove_competency.sql). */
+window.v2.removeSection = function (id) {
+  return _rpcOrNoop('remove_section', { p_id: id });
+};
+window.v2.restoreSection = function (id) {
+  return _rpcOrNoop('restore_section', { p_id: id });
+};
+window.v2.listRemovedSections = function (courseId) {
+  if (!_isUuid(courseId)) return Promise.resolve({ data: null, error: null });
+  return _rpcOrNoop('list_removed_sections', { p_course_id: courseId });
+};
 window.v2.reorderSections = function (ids) {
   return _rpcOrNoop('reorder_sections', { p_ids: (ids || []).filter(_isUuid) });
 };
@@ -10532,6 +10674,10 @@ window.GB = {
   saveLearningMap,
   resetLearningMap,
   ensureCustomLearningMap,
+  getRemovedSections,
+  mergeRemovedSectionsFromServer,
+  removeCompetencies,
+  restoreCompetency,
   getModules,
   saveModules,
   getModuleById,

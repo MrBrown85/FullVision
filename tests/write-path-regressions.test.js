@@ -217,7 +217,8 @@ describe('write-path regressions (Phase 0)', () => {
 
     try {
       DashClassManager.handleAction('cmStartRelink', { dataset: { cid: CID } });
-      DashClassManager.handleAction('cmRelinkConfirm', { dataset: { mode: 'replace' } });
+      DashClassManager.handleAction('cmRelinkNext', { dataset: {} });
+      DashClassManager.handleAction('cmCompReviewApply', { dataset: {} });
       await settle(60);
     } finally {
       DashClassManager.resetState();

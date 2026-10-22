@@ -802,6 +802,8 @@ const FV_IDEMPOTENT_RPCS = {
   import_roster_csv: true,
   import_teams_class: true,
   reenrol_student: true,
+  remove_section: true,
+  restore_section: true,
   save_report_template: true,
   upsert_category: true,
   upsert_competency_group: true,
