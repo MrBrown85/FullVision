@@ -2387,7 +2387,9 @@ window.PageGradebook = (function () {
     }
 
     var _navDir = null; // 'down' | 'right' | null
+    var _cancelled = false; // Escape: removing the input blurs it, and blur saves
     inp.addEventListener('blur', function () {
+      if (_cancelled) return;
       commit(_navDir);
     });
     inp.addEventListener('keydown', function (ev) {
@@ -2400,6 +2402,7 @@ window.PageGradebook = (function () {
         _navDir = ev.shiftKey ? 'left' : 'right';
         inp.blur();
       } else if (ev.key === 'Escape') {
+        _cancelled = true;
         inp.remove();
         if (span) span.style.display = '';
         exitScoreMode();
