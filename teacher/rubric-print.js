@@ -31,44 +31,45 @@
   var OPTIONS_KEY = 'rubric-print-options';
 
   // Letter paper: 8.5in × 11in. Sheet boxes are the printable area split
-  // into equal parts; a hair under the exact size so a rounding error never
-  // pushes a page onto a blank one.
+  // into equal parts. Margins are a quarter inch, inside what most printers
+  // can reach, so the rubric prints as large as the paper allows (Colin,
+  // 2026-10-22).
   var LAYOUTS = {
     full: {
       key: 'full',
       label: 'Full page',
       help: '1 per page',
       orientation: 'portrait',
-      margin: 0.5,
+      margin: 0.25,
       cols: 1,
       rows: 1,
-      pageWidth: 7.5,
-      pageHeight: 10,
-      fontPt: 11,
+      pageWidth: 8,
+      pageHeight: 10.5,
+      fontPt: 12.5,
     },
     half: {
       key: 'half',
       label: 'Half sheet',
       help: '2 per landscape page',
       orientation: 'landscape',
-      margin: 0.4,
+      margin: 0.25,
       cols: 2,
       rows: 1,
-      pageWidth: 10.2,
-      pageHeight: 7.7,
-      fontPt: 9,
+      pageWidth: 10.5,
+      pageHeight: 8,
+      fontPt: 10,
     },
     quarter: {
       key: 'quarter',
       label: 'Quarter sheet',
       help: '4 per page',
       orientation: 'portrait',
-      margin: 0.4,
+      margin: 0.25,
       cols: 2,
       rows: 2,
-      pageWidth: 7.7,
-      pageHeight: 10.2,
-      fontPt: 7.5,
+      pageWidth: 8,
+      pageHeight: 10.5,
+      fontPt: 8,
     },
   };
   var LAYOUT_ORDER = ['full', 'half', 'quarter'];
