@@ -191,6 +191,16 @@ From the Class Management redesign's Grading tab (Grading D, Colin, 2026-10-22).
 2. **The last N by date, before the category split**, so "the last 3" means the competency's last 3, whatever their categories. Unscored work never counts.
 3. **It is grade math**: changing it shows how many students it moves, like a new method. The method examples, the rule box, the plain-words description on reports and the student page, and Copy Grading Setup's Calculation Method all include it. The course % (points and categories) doesn't use it.
 
+## Class Averages and statuses (2026-10-22)
+
+Context: the Competencies view, the printed grade sheet and the CSV export each worked out their own Class Average, so a column with a Not Submitted or Excused student could show different averages on screen and on paper, and the export had none. Students' own marks always agreed (all read `calc.js`); only the class-wide number differed. `shared/calc.js` `columnCountedValue`, `classColumnAverage`, `COLUMN_STATUS_RULES`.
+
+1. **One rule, in `calc.js`.** What each student counts for in a column is `columnCountedValue`; every Class Average is `classColumnAverage`, the mean of those values. The gradebook, the printed sheet and the CSV export all call it, and no page decides whether a status counts. `getClassPointsAverage` is the same rule for points work. A browser test (`e2e/class-average-agreement.spec.js`) holds the three to the same numbers.
+2. **A status counts as it does in the student's own grade for that work** (Colin, 2026-10-22). Points and Complete/Incomplete work, as in the course %: Excused is left out, Not Submitted counts as 0. Proficiency work, as in competency proficiency: Excused and Not Submitted are both left out, because missing work is no evidence, not a level of 0 (the BC proficiency scale has none, and BC reports Insufficient Evidence). Students with no score are left out.
+3. **A criterion column averages every competency it feeds** (Colin, 2026-10-22). In Rubrics by Criterion, each student's value is the mean of their scores on the criterion's competencies, so each student counts once.
+4. **The NS mark says how it counts.** Its tooltip reads "counts as 0" on points work; on proficiency work, "not counted, no evidence yet" in a Proficiency class and "0 in the course %, not counted in proficiency" in a class with a course %.
+5. **The CSV export prints what the Scores view shows** (`assessmentCellValue`: points as points, levels on the proficiency scale, NS and EXC as such) and ends with a Class Average row under each assessment.
+
 ## Buttons and breadcrumbs (2026-10-19)
 
 Context: a UI/UX sweep found solid blue spent on navigation ("Class Management", "← Dashboard", "Edit Student") beside the real action. Plan at `~/fullvision-design-fixes-plan.md`, PR B.

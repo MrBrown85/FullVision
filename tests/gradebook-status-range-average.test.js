@@ -109,59 +109,80 @@ describe('gradebook views use them', () => {
   });
 });
 
-// The Competencies view's Class Average for a competency column comes from
-// calc.js (getClassCompetencyAverage). Statuses count as in a points column:
-// Excused is left out, Not Submitted counts as 0.
-describe('getClassCompetencyAverage', () => {
+// Every Class Average (Competencies view, printed sheet, CSV export) comes
+// from calc.js's one column rule, classColumnAverage. A status counts as it
+// does in the student's own grade for that work: on points and
+// Complete/Incomplete work Excused is left out and Not Submitted is 0; on
+// proficiency work both are left out (no evidence).
+describe('classColumnAverage', () => {
   const level = { id: 'lv', title: 'lv', scoreMode: 'proficiency', tagIds: ['T1'], type: 'summative' };
-  const entry = (value, mod) => ({ assessmentId: 'lv', tagId: 'T1', score: value, mod, date: '2026-10-10' });
+  const entry = (value, mod, tagId = 'T1') => ({ assessmentId: 'lv', tagId, score: value, mod, date: '2026-10-10' });
+  const comp = tagIds => ({ assessment: level, tagIds });
 
-  it('averages the scored students, + and − included', () => {
+  it('averages the scored students on a competency, + and − included', () => {
     seed([level], { s1: [entry(3, 1)], s2: [entry(3, -1)], s3: [entry(2)], s4: [] });
-    const stats = getClassCompetencyAverage(CID, STUDENTS, 'lv', 'T1');
+    const stats = classColumnAverage(CID, STUDENTS, comp(['T1']));
     expect(stats.count).toBe(3);
     expect(stats.avg).toBeCloseTo((scoreModValue(entry(3, 1)) + scoreModValue(entry(3, -1)) + 2) / 3, 10);
   });
 
-  it('leaves out students with no score and returns null when nobody counts', () => {
+  it('returns null when nobody counts', () => {
     seed([level], { s1: [entry(0)], s2: [] });
-    expect(getClassCompetencyAverage(CID, STUDENTS, 'lv', 'T1')).toBeNull();
+    expect(classColumnAverage(CID, STUDENTS, comp(['T1']))).toBeNull();
   });
 
-  it('leaves out an Excused student, even with a score left', () => {
-    seed([level], { s1: [entry(4)], s2: [entry(2)] }, { 's2:lv': 'EXC' });
-    expect(getClassCompetencyAverage(CID, STUDENTS, 'lv', 'T1')).toEqual({ avg: 4, count: 1 });
-  });
-
-  it('counts Not Submitted as 0', () => {
-    seed([level], { s1: [entry(4)], s2: [entry(2)], s3: [] }, { 's3:lv': 'NS' });
-    expect(getClassCompetencyAverage(CID, STUDENTS, 'lv', 'T1')).toEqual({ avg: 2, count: 3 });
+  it('leaves Excused and Not Submitted out of proficiency work, even with a score left', () => {
+    seed([level], { s1: [entry(4)], s2: [entry(2)], s3: [entry(1)] }, { 's2:lv': 'EXC', 's3:lv': 'NS' });
+    expect(classColumnAverage(CID, STUDENTS, comp(['T1']))).toEqual({ avg: 4, count: 1 });
+    // The whole assessment, as the printed sheet reads it, follows the same rule.
+    expect(classColumnAverage(CID, STUDENTS, { assessment: level })).toEqual({ avg: 4, count: 1 });
   });
 
   it('averages every competency a rubric criterion feeds, each student once', () => {
     const twoKeys = { ...level, tagIds: ['T1', 'T2'] };
-    const e = (tagId, value) => ({ assessmentId: 'lv', tagId, score: value, date: '2026-10-10' });
-    // s1 averages 4 and 2 (3); s2 has only T1 (3); s3 is Not Submitted (0).
-    seed([twoKeys], { s1: [e('T1', 4), e('T2', 2)], s2: [e('T1', 3)], s3: [] }, { 's3:lv': 'NS' });
-    expect(getClassCompetencyAverage(CID, STUDENTS, 'lv', ['T1', 'T2'])).toEqual({ avg: 2, count: 3 });
-    // One competency, by itself, as before.
-    expect(getClassCompetencyAverage(CID, STUDENTS, 'lv', 'T2')).toEqual({ avg: 1, count: 2 });
+    seed([twoKeys], { s1: [entry(4, 0, 'T1'), entry(2, 0, 'T2')], s2: [entry(3, 0, 'T1')] });
+    expect(classColumnAverage(CID, STUDENTS, { assessment: twoKeys, tagIds: ['T1', 'T2'] })).toEqual({
+      avg: 3,
+      count: 2,
+    });
   });
 
-  it('matches the points rule for the same statuses', () => {
-    const pts = points('pt', 4);
+  it('counts Not Submitted as 0 and leaves Excused out on points work', () => {
+    const pts = points('pt', 10);
     seed(
-      [level, pts],
+      [pts],
+      { s1: [score('pt', 8)], s2: [score('pt', 6)], s3: [score('pt', 9)], s4: [] },
       {
-        s1: [entry(4), score('pt', 4)],
-        s2: [entry(2), score('pt', 2)],
-        s3: [],
+        's2:pt': 'NS',
+        's3:pt': 'EXC',
       },
-      { 's2:lv': 'EXC', 's2:pt': 'EXC', 's3:lv': 'NS', 's3:pt': 'NS' },
     );
-    const comp = getClassCompetencyAverage(CID, STUDENTS, 'lv', 'T1');
-    const ptsAvg = getClassPointsAverage(CID, STUDENTS, pts);
-    expect(comp.count).toBe(ptsAvg.count);
-    expect((comp.avg / 4) * 100).toBeCloseTo(ptsAvg.pct, 10);
+    expect(classColumnAverage(CID, STUDENTS, { assessment: pts })).toEqual({ avg: 4, pct: 40, count: 2 });
+    // Read as a proficiency (the printed sheet's Proficiency choice), the same students count.
+    expect(classColumnAverage(CID, STUDENTS, { assessment: pts, measure: 'level' }).count).toBe(2);
+    // getClassPointsAverage is the same rule.
+    expect(getClassPointsAverage(CID, STUDENTS, pts)).toEqual(classColumnAverage(CID, STUDENTS, { assessment: pts }));
+  });
+
+  it('writes each status rule once, matching how the course % counts points work', () => {
+    expect(COLUMN_STATUS_RULES.points).toEqual({ EXC: 'out', NS: 'zero' });
+    expect(COLUMN_STATUS_RULES.proficiency).toEqual({ EXC: 'out', NS: 'out' });
+    const pts = points('pt', 10);
+    seed([pts], { s1: [score('pt', 8)], s2: [score('pt', 8)] }, { 's1:pt': 'NS', 's2:pt': 'EXC' });
+    expect(getAssessmentOverallScore(CID, 's1', 'pt')).toBe(0);
+    expect(getAssessmentOverallScore(CID, 's2', 'pt')).toBeNull();
+  });
+});
+
+describe('scoreStatusMarker tooltip', () => {
+  const pts = points('pt', 10);
+  const prof = { id: 'lv', title: 'lv', scoreMode: 'proficiency', tagIds: ['T1'], type: 'summative' };
+  it('says how Not Submitted counts for the work', () => {
+    COURSES[CID] = { id: CID, gradingSystem: 'proficiency' };
+    expect(scoreStatusMarker('NS', CID, pts)).toContain('counts as 0');
+    expect(scoreStatusMarker('NS', CID, prof)).toContain('not counted, no evidence yet');
+    COURSES[CID].gradingSystem = 'letter';
+    expect(scoreStatusMarker('NS', CID, prof)).toContain('0 in the course %, not counted in proficiency');
+    delete COURSES[CID];
   });
 });

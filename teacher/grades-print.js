@@ -498,22 +498,11 @@
       if (col.complete || as === 'percent') return Math.round(stats.pct) + '%';
       return formatPoints(Math.round(stats.avg * 10) / 10);
     }
-    var values = [];
-    students.forEach(function (s) {
-      if (col.outOf != null) {
-        var v = getAssessmentOverallScore(cid, s.id, a.id);
-        if (v != null) values.push(v);
-        return;
-      }
-      var cell = assessmentCellValue(cid, s.id, a);
-      if (cell.kind === 'level') values.push(cell.value);
-    });
-    if (!values.length) return '—';
-    var mean =
-      values.reduce(function (x, y) {
-        return x + y;
-      }, 0) / values.length;
-    return as === 'points' ? formatLevel(cid, mean) : formatLevelAs(mean, as);
+    // Proficiency work, or points work printed as a proficiency: calc.js's
+    // one column rule, the same as the gradebook's Class Average.
+    var level = classColumnAverage(cid, students, { assessment: a, measure: 'level' });
+    if (!level) return '—';
+    return as === 'points' ? formatLevel(cid, level.avg) : formatLevelAs(level.avg, as);
   }
 
   /* ── Geometry and pagination ───────────────────────────── */

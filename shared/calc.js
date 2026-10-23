@@ -481,59 +481,94 @@ function _assessmentPoints(cid, studentId, assessment) {
   return { earned: Math.max(0, Math.min(cap, Number(entry.score) || 0)), possible: possible };
 }
 
-/* The class average on one points or Complete/Incomplete assessment,
-   counted as the course % counts it: not submitted is 0, excused and
-   ungraded work is left out, extra credit counts up to its cap. Returns
-   { avg (points), pct, count }, or null when nobody has a grade. */
-function getClassPointsAverage(cid, students, assessment) {
-  var earned = 0;
-  var possible = 0;
-  var count = 0;
-  (students || []).forEach(function (s) {
-    var pts = _assessmentPoints(cid, s.id, assessment);
-    if (!pts) return;
-    earned += pts.earned;
-    possible += pts.possible;
-    count++;
-  });
-  return count ? { avg: earned / count, pct: (earned / possible) * 100, count: count } : null;
-}
+/* ── Class Averages ───────────────────────────────────────────
+   One rule for what each student counts for in a gradebook column, used by
+   every Class Average: the Competencies view, the printed grade sheet and
+   the CSV export. A status counts as it does in the student's own grade for
+   that kind of work (Colin, 2026-10-22):
+   - Points and Complete/Incomplete work, as in the course %: Excused is
+     left out, Not Submitted counts as 0 (_assessmentPoints,
+     getAssessmentOverallScore follow the same rule).
+   - Proficiency work, as in competency proficiency: Excused and Not
+     Submitted are both left out. Missing work is no evidence, not a level
+     of 0; the BC proficiency scale has none.
+   Students without a score are left out. */
+var COLUMN_STATUS_RULES = {
+  points: { EXC: 'out', NS: 'zero' },
+  proficiency: { EXC: 'out', NS: 'out' },
+};
 
-/* The Class Average of one Competencies view column on one assessment: a
-   competency, or a rubric criterion with every competency it feeds
-   (`tagIds` an array). Each student counts once, at the mean of their
-   scores on those competencies, + and − included. Statuses count as they do
-   in a points column's average (getClassPointsAverage): Excused is left
-   out, Not Submitted counts as 0. Students with neither a score nor a
-   status are left out. Returns { avg, count }, or null when nobody counts. */
-function getClassCompetencyAverage(cid, students, assessmentId, tagIds) {
-  var keys = Array.isArray(tagIds) ? tagIds : [tagIds];
-  var scores = getScores(cid);
-  var total = 0;
-  var count = 0;
-  (students || []).forEach(function (s) {
-    var status = getAssignmentStatus(cid, s.id, assessmentId);
-    if (status === 'EXC') return;
-    if (status === 'NS') {
-      count++;
-      return;
+/* What one student counts for in one column, or null when they don't.
+   `col.assessment` is the assessment. `col.tagIds` narrows it to one
+   competency, or a rubric criterion's competencies (each student's value is
+   the mean of their scores on them). `col.measure: 'level'` reads points
+   work as a proficiency, as the printed sheet can. Returns { value } (a
+   level), or { earned, possible } for points work read as points. */
+function columnCountedValue(cid, sid, col) {
+  var a = col.assessment;
+  if (!a) return null;
+  var status = getAssignmentStatus(cid, sid, a.id);
+  if (isPointsScored(a)) {
+    var pointsRule = COLUMN_STATUS_RULES.points[status];
+    if (pointsRule === 'out') return null;
+    if (col.measure === 'level') {
+      var level = pointsRule === 'zero' ? 0 : getAssessmentOverallScore(cid, sid, a.id);
+      return level == null ? null : { value: level };
     }
-    var entries = scores[s.id] || [];
+    return _assessmentPoints(cid, sid, a);
+  }
+  if (COLUMN_STATUS_RULES.proficiency[status] === 'out') return null;
+  if (col.tagIds && col.tagIds.length) {
+    var entries = getScores(cid)[sid] || [];
     var vals = [];
-    keys.forEach(function (key) {
+    col.tagIds.forEach(function (key) {
       var entry = entries.find(function (e) {
-        return e.assessmentId === assessmentId && e.tagId === key;
+        return e.assessmentId === a.id && e.tagId === key;
       });
       if (entry && entry.score > 0) vals.push(scoreModValue(entry));
     });
-    if (!vals.length) return;
-    total +=
-      vals.reduce(function (x, y) {
-        return x + y;
-      }, 0) / vals.length;
+    if (!vals.length) return null;
+    return {
+      value:
+        vals.reduce(function (x, y) {
+          return x + y;
+        }, 0) / vals.length,
+    };
+  }
+  var cell = assessmentCellValue(cid, sid, a);
+  return cell.kind === 'level' ? { value: cell.value } : null;
+}
+
+/* The Class Average of one column: the mean of what each student counts
+   for (columnCountedValue). Points work read as points returns
+   { avg (points), pct, count }, extra credit up to its cap; everything else
+   returns { avg (a level), count }. Null when nobody counts. */
+function classColumnAverage(cid, students, col) {
+  var asPoints = col.assessment && isPointsScored(col.assessment) && col.measure !== 'level';
+  var total = 0;
+  var possible = 0;
+  var count = 0;
+  (students || []).forEach(function (s) {
+    var v = columnCountedValue(cid, s.id, col);
+    if (!v) return;
+    if (asPoints) {
+      total += v.earned;
+      possible += v.possible;
+    } else {
+      total += v.value;
+    }
     count++;
   });
-  return count ? { avg: total / count, count: count } : null;
+  if (!count) return null;
+  return asPoints
+    ? { avg: total / count, pct: (total / possible) * 100, count: count }
+    : { avg: total / count, count: count };
+}
+
+/* The class average on one points or Complete/Incomplete assessment, as
+   the course % counts it (classColumnAverage). */
+function getClassPointsAverage(cid, students, assessment) {
+  return classColumnAverage(cid, students, { assessment: assessment });
 }
 
 /* Whether a score is above what its assessment allows: 4 on proficiency
@@ -1586,6 +1621,8 @@ window.Calc = {
   assessmentInActiveTerm,
   undatedAssessmentCount,
   getClassPointsAverage,
+  classColumnAverage,
+  columnCountedValue,
   isScoreOutOfRange,
   courseShowsLetterGrades,
   pointsToProf,

@@ -913,7 +913,7 @@ window.PageGradebook = (function () {
           return a.id === col.assessmentId;
         });
         // Not submitted and Excused replace the score.
-        var statusMark = scoreStatusMarker(getAssignmentStatus(cid, s.id, col.assessmentId));
+        var statusMark = scoreStatusMarker(getAssignmentStatus(cid, s.id, col.assessmentId), cid, assess);
         if (col.isPointsCol && isCompletionScored(assess)) {
           var mark = getCompletionMark(cid, s.id, col.assessmentId);
           html +=
@@ -1017,9 +1017,14 @@ window.PageGradebook = (function () {
         html += _pointsAverageCell(cid, sortedStudents, col, startClass + altClass, wStyle);
         return;
       }
-      // A criterion column (Rubrics by Criterion) averages every competency
-      // the criterion feeds.
-      var stats = getClassCompetencyAverage(cid, sortedStudents, col.assessmentId, col.tagIds || col.tagId);
+      // calc.js's one column rule; a criterion column (Rubrics by Criterion)
+      // averages every competency the criterion feeds.
+      var stats = classColumnAverage(cid, sortedStudents, {
+        assessment: assessments.find(function (a) {
+          return a.id === col.assessmentId;
+        }),
+        tagIds: col.tagIds || [col.tagId],
+      });
       if (!stats)
         html +=
           '<td class="gb-score' +
@@ -1176,7 +1181,7 @@ window.PageGradebook = (function () {
           cellClass = '';
         var cmpMark = cell.mark;
         var cellStatus = cell.status;
-        var statusMark = cell.kind === 'status' ? scoreStatusMarker(cellStatus) : '';
+        var statusMark = cell.kind === 'status' ? scoreStatusMarker(cellStatus, cid, a) : '';
         if (statusMark) {
           // Not submitted and Excused replace the score.
           cellStyle = 'color:var(--text-3)';
@@ -1838,6 +1843,24 @@ window.PageGradebook = (function () {
   }
 
   /* ── Scores tab: CSV export ─────────────────────────────── */
+  /* A score as the CSV prints it: what the Scores view shows, as plain text. */
+  function _csvCellText(cell) {
+    if (cell.kind === 'status') return cell.status;
+    if (cell.kind === 'complete') return cell.mark === 'complete' ? 'Complete' : 'Incomplete';
+    if (cell.kind === 'points') return formatPoints(cell.value);
+    if (cell.kind === 'level') return formatLevelAs(cell.value, 'proficiency');
+    if (cell.kind === 'missing' && cell.zero) return '0';
+    return '';
+  }
+
+  /* A Class Average as the CSV prints it, the printed sheet's way. */
+  function _csvAverageText(a, stats) {
+    if (!stats) return '';
+    if (isCompletionScored(a)) return Math.round(stats.pct) + '%';
+    if (isPointsScored(a)) return formatPoints(Math.round(stats.avg * 10) / 10);
+    return formatLevelAs(stats.avg, 'proficiency');
+  }
+
   function exportScoresCSV() {
     var cid = activeCourse;
     var students = sortStudents(getStudents(cid), 'lastName');
@@ -1851,7 +1874,6 @@ window.PageGradebook = (function () {
         return (b.date || '').localeCompare(a.date || '');
       });
     var sections = getSections(cid);
-    var scores = getScores(cid);
     var grouped = getGroupedSections(cid);
     var hasGroups = grouped.groups.some(function (g) {
       return g.sections.length > 0;
@@ -1898,31 +1920,19 @@ window.PageGradebook = (function () {
         _getDisplayedFinalPercent(cid, s.id) != null ? _getDisplayedFinalPercent(cid, s.id).toFixed(1) + '%' : '',
       );
       if (isLetter) row.push(letterData.S ? letterData.S + ' (' + letterData.R + '%)' : '');
-      // Assessment scores
+      // Assessment scores, as the Scores view shows them (calc.js)
       assessments.forEach(function (a) {
-        var ss = scores[s.id] || [];
-        var tagScores = scoreTagIds(a, cid)
-          .map(function (tid) {
-            var e = ss.find(function (e) {
-              return e.assessmentId === a.id && e.tagId === tid;
-            });
-            return e ? scoreModValue(e) : 0;
-          })
-          .filter(function (v) {
-            return v > 0;
-          });
-        var avg =
-          tagScores.length > 0
-            ? tagScores.reduce(function (x, y) {
-                return x + y;
-              }, 0) / tagScores.length
-            : 0;
-        var rubricVal = getRubricAssessmentScore(cid, a, ss);
-        if (rubricVal !== undefined) avg = rubricVal || 0;
-        row.push(avg > 0 ? avg.toFixed(1) : '');
+        row.push(_csvCellText(assessmentCellValue(cid, s.id, a)));
       });
       rows.push(row);
     });
+    // Class Average under each assessment, by calc.js's one column rule
+    var avgRow = ['Class Average'];
+    for (var pad = 1; pad < headers.length - assessments.length; pad++) avgRow.push('');
+    assessments.forEach(function (a) {
+      avgRow.push(_csvAverageText(a, classColumnAverage(cid, students, { assessment: a })));
+    });
+    rows.push(avgRow);
 
     var csv = rows
       .map(function (r) {
