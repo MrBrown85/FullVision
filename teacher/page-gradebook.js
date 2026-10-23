@@ -54,8 +54,8 @@ window.PageGradebook = (function () {
   var _scrollShadowCleanup = null;
   var _scrollKey = null; // class and view of the last render, so a redraw keeps the table's scroll
   var _tipSource = null;
-  /* Name-cell tooltip HTML, keyed on student.id. Populated in renderNameCell,
-   * read by _handleMouseover. Replaces the previous round-trip through
+  /* Name-cell tooltip HTML, keyed on student.id. Populated by _setNameTip,
+   * read by _showNameTip. Replaces the previous round-trip through
    * data-tip="…" (which relied on every contributor to `tip` using esc()
    * correctly so the browser's attribute-decode-plus-innerHTML cycle
    * reconstructed the intended HTML without injection). Keeping the HTML
@@ -658,6 +658,19 @@ window.PageGradebook = (function () {
     requestAnimationFrame(update);
   }
 
+  /* A student's name in the grid's left column: a link to their page. */
+  function _rowheadNameOpen(cid, s) {
+    return (
+      '<a class="gb-grid-rowhead-name" role="link" tabindex="0" data-sid="' +
+      esc(s.id) +
+      '" data-href="#/student?id=' +
+      encodeURIComponent(s.id) +
+      '&course=' +
+      encodeURIComponent(cid) +
+      '">'
+    );
+  }
+
   /* The short code teachers know a competency by ("QAP1"). Tags loaded from
      the server have a long random id, so the id is used only when it is a
      readable code itself, as in Demo Mode. */
@@ -880,13 +893,14 @@ window.PageGradebook = (function () {
       var grade = studentGradeSummary(cid, s.id);
       var color = PROF_COLORS[grade.level] || PROF_COLORS[0];
       var label = levelWord(cid, overall);
+      _setNameTip(cid, s, sections);
       html +=
         '<div class="gb-grid-rowhead gb-grid-rowhead-comp' +
         altClass +
         '">' +
-        '<span class="gb-grid-rowhead-name">' +
+        _rowheadNameOpen(cid, s) +
         esc(fullName(s)) +
-        '</span>' +
+        '</a>' +
         '<span class="gb-grid-rowhead-overall" style="color:' +
         color +
         '">' +
@@ -1135,9 +1149,10 @@ window.PageGradebook = (function () {
     html += '<div class="gb-grid-rowheads" id="gb-rowheads">';
     sortedStudents.forEach(function (s, si) {
       var altClass = si % 2 === 1 ? ' gb-scores-alt' : '';
-      var overall = getOverallProficiency(cid, s.id);
-      var finalPct = _getDisplayedFinalPercent(cid, s.id);
-      var fr = Math.round(overall);
+      // The overall grade as the class is set to show it (calc.js): the
+      // proficiency, the letter and %, or both stacked, each in its colour.
+      var badges = studentGradeBadges(cid, s.id);
+      var gradeParts = [badges.prof, badges.letter].filter(Boolean);
       var desTags = (s.designations || [])
         .map(function (code) {
           var d = designationInfo(code);
@@ -1155,18 +1170,25 @@ window.PageGradebook = (function () {
           );
         })
         .join('');
+      _setNameTip(cid, s, sections);
       html +=
         '<div class="gb-grid-rowhead' +
         altClass +
         '">' +
-        '<span class="gb-grid-rowhead-name">' +
+        _rowheadNameOpen(cid, s) +
         esc(fullName(s)) +
         desTags +
-        '</span>' +
-        '<span class="gb-grid-rowhead-pct" style="color:' +
-        (finalPct != null && finalPct > 0 ? PROF_COLORS[fr] : 'var(--text-3)') +
-        '">' +
-        (finalPct != null && finalPct > 0 ? finalPct.toFixed(1) + '%' : '\u2014') +
+        '</a>' +
+        '<span class="gb-grid-rowhead-grade">' +
+        (gradeParts.length
+          ? gradeParts
+              .map(function (p) {
+                return (
+                  '<span style="color:' + (PROF_COLORS[p.level] || PROF_COLORS[0]) + '">' + esc(p.text) + '</span>'
+                );
+              })
+              .join('')
+          : '<span style="color:var(--text-3)">\u2014</span>') +
         '</span>' +
         '</div>';
     });
@@ -1321,58 +1343,35 @@ window.PageGradebook = (function () {
     );
   }
 
-  function renderNameCell(cid, student, sections, isLetter) {
-    var overall = getOverallProficiency(cid, student.id);
-    var letterData = _getStudentLetterData(cid, student.id);
-    var or2 = Math.round(overall);
-    var oLabel = overall > 0 ? PROF_LABELS[or2] : 'No Evidence';
-    var oColor = PROF_COLORS[or2] || PROF_COLORS[0];
-    var pctV = getCompletionPct(cid, student.id);
+  /* The tooltip on a student's name: the overall grade as the class shows
+     it, each section, and how much of the learning map has evidence. Every
+     value comes from calc.js. Kept in a map, not an attribute, so the HTML
+     never round-trips through the DOM. */
+  function _setNameTip(cid, student, sections) {
+    var grade = studentGradeSummary(cid, student.id);
+    var word = levelWord(cid, getOverallProficiency(cid, student.id));
     var tip =
       '<div class="gb-tip-row"><span class="gb-tip-label">Overall</span><span class="gb-tip-val" style="color:' +
-      oColor +
+      (grade.text ? PROF_COLORS[grade.level] || PROF_COLORS[0] : 'var(--text-3)') +
       '">' +
-      (courseGradeMode(cid) === 'letter'
-        ? studentGradeSummary(cid, student.id).text || oLabel
-        : oLabel + (overall > 0 ? ' (' + formatLevel(cid, overall) + ')' : '')) +
+      (grade.text ? (word ? word + ' (' + esc(grade.text) + ')' : esc(grade.text)) : 'No Evidence') +
       '</span></div>';
     sections.forEach(function (sec) {
       var sp = getSectionProficiency(cid, student.id, sec.id);
-      var sr = Math.round(sp);
-      var sc = PROF_COLORS[sr] || PROF_COLORS[0];
       tip +=
         '<div class="gb-tip-row"><span class="gb-tip-label">' +
         esc(sec.shortName || sec.name) +
         '</span><span class="gb-tip-val" style="color:' +
-        sc +
+        (PROF_COLORS[Math.round(sp)] || PROF_COLORS[0]) +
         '">' +
         formatLevel(cid, sp) +
         '</span></div>';
     });
-    if (isLetter && letterData.S) {
-      tip +=
-        '<div class="gb-tip-row"><span class="gb-tip-label">Grade</span><span class="gb-tip-val">' +
-        letterData.S +
-        ' (' +
-        letterData.R +
-        '%)</span></div>';
-    }
     tip +=
       '<div class="gb-tip-row"><span class="gb-tip-label">Coverage</span><span class="gb-tip-val">' +
-      pctV +
+      getCompletionPct(cid, student.id) +
       '%</span></div>';
     _nameTipHtml[student.id] = tip;
-    return (
-      '<div class="gb-name-wrap" data-sid="' +
-      esc(student.id) +
-      '"><a role="link" tabindex="0" data-href="#/student?id=' +
-      encodeURIComponent(student.id) +
-      '&course=' +
-      encodeURIComponent(cid) +
-      '">' +
-      esc(displayName(student)) +
-      '</a></div>'
-    );
   }
 
   function renderClassStatsRow(cid, students, cols, groups, sections, scores) {
@@ -2477,6 +2476,8 @@ window.PageGradebook = (function () {
   }
 
   function _handleKeydown(e) {
+    // Escape closes a tooltip first (WCAG 1.4.13: dismissible without moving).
+    if (e.key === 'Escape' && _tipSource) _hideTip();
     // Cmd+Z undoes the last score in either view; in a text field it stays
     // the field's own undo.
     var inTextField =
@@ -2506,6 +2507,9 @@ window.PageGradebook = (function () {
     }
     if (viewMode !== 'detailed') return;
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+    // Keys on a focused link or button (a student's name, the toolbar) are
+    // theirs: Tab moves on and Enter follows the link, not the grid.
+    if (e.target.closest && e.target.closest('a[data-href], button')) return;
     var table = document.querySelector('.gb-table');
     if (!table) return;
     var rows = table.querySelectorAll('tbody tr:not(.gb-stats-row)');
@@ -2675,53 +2679,35 @@ window.PageGradebook = (function () {
 
   /* ── Tooltip ─────────────────────────────────────────────── */
   function _handleMouseover(e) {
-    var gbTip = document.getElementById('gb-tooltip');
-    if (!gbTip) return;
-    var wrap = e.target.closest('.gb-name-wrap');
-    var tipHtml = wrap && wrap.dataset.sid ? _nameTipHtml[wrap.dataset.sid] : null;
-    if (wrap && tipHtml) {
-      gbTip.className = '';
-      gbTip.innerHTML = tipHtml;
-      gbTip.style.display = 'block';
-      _tipSource = wrap;
-      var rect = wrap.getBoundingClientRect();
-      var left = rect.right + 8;
-      var top = rect.top + rect.height / 2 - gbTip.offsetHeight / 2;
-      if (left + gbTip.offsetWidth > window.innerWidth - 12) {
-        left = rect.left;
-        top = rect.bottom + 6;
-      }
-      if (top < 8) top = 8;
-      if (top + gbTip.offsetHeight > window.innerHeight - 8) top = window.innerHeight - gbTip.offsetHeight - 8;
-      gbTip.style.left = left + 'px';
-      gbTip.style.top = top + 'px';
+    var name = e.target.closest('.gb-grid-rowhead-name');
+    if (name) {
+      _showNameTip(name);
       return;
     }
     var assessGroup = e.target.closest('.gb-grid-assess-group');
-    if (assessGroup) {
-      _showAssessTitleTip(assessGroup);
-      return;
+    if (assessGroup) _showAssessTitleTip(assessGroup);
+  }
+
+  /* Beside the name, or below it when there's no room to the right. */
+  function _showNameTip(name) {
+    var gbTip = document.getElementById('gb-tooltip');
+    var tipHtml = name.dataset.sid ? _nameTipHtml[name.dataset.sid] : null;
+    if (!gbTip || !tipHtml) return;
+    gbTip.className = '';
+    gbTip.innerHTML = tipHtml;
+    gbTip.style.display = 'block';
+    _tipSource = name;
+    var rect = name.getBoundingClientRect();
+    var left = rect.right + 8;
+    var top = rect.top + rect.height / 2 - gbTip.offsetHeight / 2;
+    if (left + gbTip.offsetWidth > window.innerWidth - 12) {
+      left = rect.left;
+      top = rect.bottom + 6;
     }
-    var tagTh = e.target.closest('.gb-tag-header');
-    if (tagTh) {
-      var tip = tagTh.querySelector('.gb-tag-tip');
-      if (tip && tip.textContent.trim()) {
-        gbTip.className = 'dark';
-        gbTip.textContent = tip.textContent.trim();
-        gbTip.style.display = 'block';
-        _tipSource = tagTh;
-        var rect = tagTh.getBoundingClientRect();
-        var left = rect.left + rect.width / 2 - gbTip.offsetWidth / 2;
-        var top = rect.top - gbTip.offsetHeight - 6;
-        if (left < 8) left = 8;
-        if (left + gbTip.offsetWidth > window.innerWidth - 8) left = window.innerWidth - gbTip.offsetWidth - 8;
-        if (top < 8) {
-          top = rect.bottom + 6;
-        }
-        gbTip.style.left = left + 'px';
-        gbTip.style.top = top + 'px';
-      }
-    }
+    if (top < 8) top = 8;
+    if (top + gbTip.offsetHeight > window.innerHeight - 8) top = window.innerHeight - gbTip.offsetHeight - 8;
+    gbTip.style.left = left + 'px';
+    gbTip.style.top = top + 'px';
   }
 
   /* A Competencies-view header clamps its title to two lines; hovering the
@@ -2752,7 +2738,13 @@ window.PageGradebook = (function () {
   }
 
   function _handleFocusin(e) {
-    var link = e.target.closest && e.target.closest('.gb-grid-assess-group .gb-assess-title');
+    if (!e.target.closest) return;
+    var name = e.target.closest('.gb-grid-rowhead-name');
+    if (name) {
+      _showNameTip(name);
+      return;
+    }
+    var link = e.target.closest('.gb-grid-assess-group .gb-assess-title');
     if (link) _showAssessTitleTip(link.closest('.gb-grid-assess-group'));
   }
 
