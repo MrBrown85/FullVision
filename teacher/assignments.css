@@ -1428,6 +1428,30 @@
 .rb-head-gap {
   flex: 1;
 }
+.rb-scope {
+  display: flex;
+  margin-left: 8px;
+  padding: 2px;
+  border-radius: 9px;
+  background: var(--seg-track);
+}
+.rb-scope-btn {
+  height: 30px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  cursor: pointer;
+}
+.rb-scope-btn.is-active {
+  background: var(--seg-thumb);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  font-weight: 600;
+  color: var(--text);
+}
 .rb-close {
   width: 36px;
   height: 36px;
@@ -1503,6 +1527,32 @@
   font-weight: 600;
   color: var(--text-3);
   padding: 12px 12px 4px;
+}
+/* All My Classes: one collapsible group per class */
+.rb-class {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 12px 12px 4px;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-3);
+  text-align: left;
+  cursor: pointer;
+}
+.rb-class:hover {
+  color: var(--text);
+}
+.rb-chev {
+  flex-shrink: 0;
+  transition: transform var(--duration-micro) var(--ease-out);
+}
+.rb-class[aria-expanded='true'] .rb-chev {
+  transform: rotate(90deg);
 }
 .rb-row {
   display: flex;
@@ -1789,6 +1839,37 @@
   background: var(--bg-secondary);
   color: var(--text-2);
   font-size: var(--text-xs);
+}
+/* A competency with no match in this class, shown before copying. */
+.rb-chip.is-missing {
+  background: transparent;
+  border: 1px dashed var(--score-2);
+  color: var(--score-2-text);
+}
+.rb-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--text-2);
+}
+.rb-note svg {
+  flex-shrink: 0;
+  color: var(--text-3);
+}
+.rb-foot.rb-legend {
+  justify-content: flex-start;
+  font-size: var(--text-sm);
+  color: var(--text-3);
+}
+.rb-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 .rb-weight {
   display: block;

@@ -703,6 +703,7 @@ window.RubricLibrary = (function () {
 
   return {
     uniqueName: uniqueName,
+    loadClass: loadClass,
     cloneRubric: cloneRubric,
     planCopy: planCopy,
     summaryLines: summaryLines,

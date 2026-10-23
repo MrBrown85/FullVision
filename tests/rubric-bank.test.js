@@ -128,4 +128,28 @@ describe('Rubric Bank', () => {
     expect(RubricBank.rename(A, 'r-graph', 'Data and Graphing Rubric')).toBe(true);
     expect(getRubricById(A, 'r-graph').name).toBe('Data and Graphing Rubric');
   });
+
+  it('lists the other live classes', () => {
+    expect(RubricBank.otherClasses(A).map(c => c.id)).toEqual([B]);
+  });
+
+  it('counts how many competencies match another class by name', () => {
+    var lab = getRubricById(A, 'r-lab');
+    expect(RubricBank.matchInfo(A, B, lab)).toEqual({ total: 1, matched: 1, byTag: { [A + '-t1']: true } });
+    _cache.learningMaps[B].sections[0].tags[0].label = 'Something Else';
+    _cache.learningMaps[B].sections[0].tags[0].text = 'Something else';
+    var after = RubricBank.matchInfo(A, B, lab);
+    expect(after.matched).toBe(0);
+    expect(after.byTag[A + '-t1']).toBe(false);
+  });
+
+  it('marks chips with no match when showing another class rubric', () => {
+    _cache.learningMaps[A].sections[0].tags[0].label = 'Something Else';
+    _cache.learningMaps[A].sections[0].tags[0].text = 'Something else';
+    var src = getRubricById(B, 'r-lab-b');
+    var match = RubricBank.matchInfo(B, A, src);
+    var html = RubricBank.gridHtml(A, src, { srcCid: B, match: match });
+    expect(html).toContain('rb-chip is-missing');
+    expect(html).toContain('Questioning and Predicting');
+  });
 });
