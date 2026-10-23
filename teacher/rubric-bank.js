@@ -166,6 +166,127 @@ window.RubricBank = (function () {
     return true;
   }
 
+  /* What deleting a rubric takes with it: each assessment that uses it and
+     how many students have rubric scores there. The database deletes those
+     scores with the rubric (rubric_score cascades from criterion). */
+  function deleteImpact(cid, rid) {
+    var students = (typeof getStudents === 'function' && getStudents(cid)) || [];
+    var scored = window.RubricPrint && RubricPrint.isStudentScored;
+    var rows = usesOf(cid, rid).map(function (a) {
+      var n = scored
+        ? students.filter(function (s) {
+            return RubricPrint.isStudentScored(cid, a.id, s.id);
+          }).length
+        : 0;
+      return { id: a.id, title: a.title || 'Untitled', date: a.date || '', scored: n };
+    });
+    var total = rows.reduce(function (sum, r) {
+      return sum + r.scored;
+    }, 0);
+    return { uses: rows, scored: total };
+  }
+
+  /* The delete confirmation (mockup C4): the assessments that use the rubric,
+     how many students have scores in each, what happens to them, and the
+     linked copy that stays. Cancel has focus; Escape cancels. */
+  function confirmDelete(cid, rid, onConfirm) {
+    var rubric = getRubricById(cid, rid);
+    if (!rubric) return;
+    var impact = deleteImpact(cid, rid);
+    var copies = window.RubricLibrary ? RubricLibrary.localCopies(cid, rubric) : [];
+    var html = '<div class="confirm-card rb-del-card">';
+    html += '<div class="confirm-title" id="rb-del-title">Delete ' + esc(rubric.name) + '?</div>';
+    if (impact.uses.length) {
+      html +=
+        '<div class="confirm-message">' +
+        esc(_plural(impact.uses.length, 'assessment uses', 'assessments use')) +
+        ' this rubric.</div>';
+      html += '<div class="rb-del-list">';
+      impact.uses.forEach(function (u) {
+        html +=
+          '<div class="rb-del-row"><span class="rb-del-name">' +
+          esc(u.title) +
+          '</span><span class="rb-del-meta">' +
+          esc(
+            [u.date ? formatDate(u.date) : '', u.scored ? _plural(u.scored, 'Student Scored', 'Students Scored') : '']
+              .filter(Boolean)
+              .join(' · '),
+          ) +
+          '</span></div>';
+      });
+      html += '</div>';
+      html +=
+        '<div class="rb-del-warn' +
+        (impact.scored ? ' is-danger' : '') +
+        '">' +
+        (impact.scored
+          ? 'The rubric scores in these assessments will be deleted with it. This cannot be undone.'
+          : 'They will lose their rubric link.') +
+        '</div>';
+    } else {
+      html += '<div class="confirm-message">No assessment uses this rubric. This cannot be undone.</div>';
+    }
+    if (copies.length) {
+      var names = copies.map(function (c) {
+        return c.className;
+      });
+      var list = names.length === 1 ? names[0] : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+      html +=
+        '<div class="rb-del-note">This rubric is linked with ' +
+        esc(list) +
+        '. ' +
+        (names.length === 1 ? 'That copy stays.' : 'Those copies stay.') +
+        '</div>';
+    }
+    html +=
+      '<div class="confirm-actions"><button type="button" class="confirm-cancel" data-del="cancel">Cancel</button>' +
+      '<button type="button" class="confirm-ok danger" data-del="ok">Delete Rubric</button></div></div>';
+
+    var trigger = document.activeElement;
+    var overlay = document.createElement('div');
+    overlay.className = 'confirm-overlay';
+    overlay.setAttribute('role', 'alertdialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-labelledby', 'rb-del-title');
+    overlay.innerHTML = html;
+    function done(ok) {
+      overlay.remove();
+      document.removeEventListener('keydown', onKey);
+      try {
+        if (trigger && document.body.contains(trigger) && trigger.focus) trigger.focus();
+      } catch (e) {
+        /* the trigger may have been redrawn */
+      }
+      if (ok) onConfirm();
+    }
+    function onKey(e) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        done(false);
+      } else if (e.key === 'Tab') {
+        // Keep focus on the two buttons.
+        var btns = overlay.querySelectorAll('button');
+        var first = btns[0];
+        var last = btns[btns.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    }
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay) return done(false);
+      var btn = e.target.closest ? e.target.closest('[data-del]') : null;
+      if (btn) done(btn.dataset.del === 'ok');
+    });
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(overlay);
+    overlay.querySelector('[data-del="cancel"]').focus();
+  }
+
   /* ── Remembered selection ───────────────────────────────── */
 
   function _loadSelected(cid) {
@@ -851,6 +972,8 @@ window.RubricBank = (function () {
     rowMeta: rowMeta,
     linkedLabel: linkedLabel,
     matchInfo: matchInfo,
+    deleteImpact: deleteImpact,
+    confirmDelete: confirmDelete,
     duplicate: duplicate,
     rename: rename,
     gridHtml: gridHtml,
