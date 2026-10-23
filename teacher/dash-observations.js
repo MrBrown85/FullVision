@@ -614,7 +614,7 @@ window.DashObservations = (function () {
       (letter ? 'a grade' : 'a level') +
       ' and how many pieces of evidence it rests on:</span>';
     if (!letter) {
-      [4, 3, 2, 1].forEach(function (n) {
+      levelOrderFor(m.cid).forEach(function (n) {
         h += '<span><i class="dash-ob2-swatch lv-' + n + '"></i>' + esc(PROF_LABELS[n]) + '</span>';
       });
     }

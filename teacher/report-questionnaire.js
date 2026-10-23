@@ -1341,7 +1341,7 @@ window.ReportQuestionnaire = (function () {
           <span class="tq-dim-label">${OBS_LABELS[dim]}</span>
         </div>
         <div class="tq-dim-pills">`;
-        [1, 2, 3, 4].forEach(lvl => {
+        levelOrderFor(cid).forEach(lvl => {
           html += `<button class="tq-pill pill-${lvl}${val === lvl ? ' active' : ''}"
           data-action="tqSetDim" data-sid="${sid}" data-dim="${dim}" data-lvl="${lvl}">${PILL_TEXT[lvl]}</button>`;
         });
@@ -1363,7 +1363,7 @@ window.ReportQuestionnaire = (function () {
       html += `<div class="tq-rate-row">
       <span class="tq-rate-label">${label}</span>
       <div class="tq-rate-pills">`;
-      [1, 2, 3, 4].forEach(lvl => {
+      levelOrderFor(cid).forEach(lvl => {
         html += `<button class="tq-rate-pill rp-${lvl}${val === lvl ? ' active' : ''}"
         data-action="tqSetField" data-sid="${sid}" data-field="${field}" data-lvl="${lvl}">${RATE_LABELS[lvl]}</button>`;
       });

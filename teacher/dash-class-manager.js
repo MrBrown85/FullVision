@@ -2613,6 +2613,7 @@ window.DashClassManager = (function () {
         );
       }).join('') +
       '</div>' +
+      _cmRenderLevelOrderField(cid) +
       '</div>';
 
     var profNote =
@@ -4188,6 +4189,45 @@ window.DashClassManager = (function () {
   function cmSetGradingSystem(val) {
     if (!cmSelectedCourse) return;
     updateCourse(cmSelectedCourse, { gradingSystem: val });
+    renderClassManager();
+  }
+
+  // Rubric Levels: the order the class draws the four levels, everywhere
+  // (levelOrderFor in shared/constants.js). Default Extending first.
+  var CM_LEVEL_ORDERS = [
+    { value: 'asc', label: 'Emerging First' },
+    { value: 'desc', label: 'Extending First' },
+  ];
+  function _cmRenderLevelOrderField(cid) {
+    var current = levelOrderFor(cid)[0] === 1 ? 'asc' : 'desc';
+    return (
+      '<div class="cm-field" style="margin-top:14px">' +
+      '<label class="cm-label" id="cm-level-order-label">Rubric Levels</label>' +
+      '<div class="seg cm-seg" id="cm-level-order" role="radiogroup" aria-labelledby="cm-level-order-label">' +
+      CM_LEVEL_ORDERS.map(function (o) {
+        var on = o.value === current;
+        return (
+          '<button type="button" class="seg-btn cm-seg-btn' +
+          (on ? ' active' : '') +
+          '" role="radio" aria-checked="' +
+          on +
+          '" data-action="cmSetLevelOrder" data-value="' +
+          o.value +
+          '">' +
+          o.label +
+          '</button>'
+        );
+      }).join('') +
+      '</div>' +
+      '<div class="cm-hint" style="margin-top:6px">Decides the order of the four levels on scoring cards, rubrics, printouts and reports in this class.</div>' +
+      '</div>'
+    );
+  }
+  function cmSetLevelOrder(val) {
+    if (!cmSelectedCourse) return;
+    var cc = getCourseConfig(cmSelectedCourse);
+    cc.levelOrder = val === 'asc' ? 'asc' : 'desc';
+    saveCourseConfig(cmSelectedCourse, cc);
     renderClassManager();
   }
 
@@ -6872,6 +6912,9 @@ window.DashClassManager = (function () {
       },
       cmSetRoundPercent: function () {
         cmSetRoundPercent(el.dataset.value);
+      },
+      cmSetLevelOrder: function () {
+        cmSetLevelOrder(el.dataset.value);
       },
       cmTermSpan: function () {
         cmTermSpan(el.dataset.value);

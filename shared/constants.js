@@ -309,6 +309,27 @@ function designationInfo(code) {
 
 const PROF_LABELS = { 0: 'No Evidence', 1: 'Emerging', 2: 'Developing', 3: 'Proficient', 4: 'Extending' };
 
+/* Rubric Levels: the order a class draws the four levels, wherever it draws
+   them (scoring cards, the rubric editor, printed rubrics, reports, the
+   phone). 'desc' puts Extending first (left or top), the default; 'asc'
+   puts Emerging first. Per class: course.level_order on the server,
+   `levelOrder` in the class's course config here. Math in calc.js and the
+   stored shape of a rubric never follow it; only what is drawn does.
+   Keyboard shortcuts stay tied to the level: 1 is always Emerging and 4
+   always Extending, wherever the button sits. */
+const LEVEL_ORDER_DEFAULT = 'desc';
+function levelOrder(course) {
+  var v = course && (course.levelOrder || course.level_order);
+  return v === 'asc' ? [1, 2, 3, 4] : [4, 3, 2, 1];
+}
+/* The order for a class by id: its course config, else the course row. */
+function levelOrderFor(cid) {
+  var cfg = cid && typeof getCourseConfig === 'function' ? getCourseConfig(cid) : null;
+  if (cfg && (cfg.levelOrder === 'asc' || cfg.levelOrder === 'desc')) return levelOrder(cfg);
+  var course = cid && typeof COURSES !== 'undefined' && COURSES ? COURSES[cid] : null;
+  return levelOrder(course);
+}
+
 /* ── + and − on proficiency levels ───────────────────────────────────────
    A score entry keeps its whole-number level in `score` and its + or − in
    `mod` (1 or −1). A + or − is worth a third of a level (3+ = 3.33); 1− and
