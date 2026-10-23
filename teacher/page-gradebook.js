@@ -1017,7 +1017,9 @@ window.PageGradebook = (function () {
         html += _pointsAverageCell(cid, sortedStudents, col, startClass + altClass, wStyle);
         return;
       }
-      var stats = getClassCompetencyAverage(cid, sortedStudents, col.assessmentId, col.tagId);
+      // A criterion column (Rubrics by Criterion) averages every competency
+      // the criterion feeds.
+      var stats = getClassCompetencyAverage(cid, sortedStudents, col.assessmentId, col.tagIds || col.tagId);
       if (!stats)
         html +=
           '<td class="gb-score' +

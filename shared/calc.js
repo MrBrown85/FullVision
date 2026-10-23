@@ -499,13 +499,15 @@ function getClassPointsAverage(cid, students, assessment) {
   return count ? { avg: earned / count, pct: (earned / possible) * 100, count: count } : null;
 }
 
-/* The Class Average of one competency on one assessment (a Competencies
-   view column): the mean of the students' scores there, + and − included.
-   Statuses count as they do in a points column's average
-   (getClassPointsAverage): Excused is left out, Not Submitted counts as 0.
-   Students with neither a score nor a status are left out.
-   Returns { avg, count }, or null when nobody counts. */
-function getClassCompetencyAverage(cid, students, assessmentId, tagId) {
+/* The Class Average of one Competencies view column on one assessment: a
+   competency, or a rubric criterion with every competency it feeds
+   (`tagIds` an array). Each student counts once, at the mean of their
+   scores on those competencies, + and − included. Statuses count as they do
+   in a points column's average (getClassPointsAverage): Excused is left
+   out, Not Submitted counts as 0. Students with neither a score nor a
+   status are left out. Returns { avg, count }, or null when nobody counts. */
+function getClassCompetencyAverage(cid, students, assessmentId, tagIds) {
+  var keys = Array.isArray(tagIds) ? tagIds : [tagIds];
   var scores = getScores(cid);
   var total = 0;
   var count = 0;
@@ -516,11 +518,19 @@ function getClassCompetencyAverage(cid, students, assessmentId, tagId) {
       count++;
       return;
     }
-    var entry = (scores[s.id] || []).find(function (e) {
-      return e.assessmentId === assessmentId && e.tagId === tagId;
+    var entries = scores[s.id] || [];
+    var vals = [];
+    keys.forEach(function (key) {
+      var entry = entries.find(function (e) {
+        return e.assessmentId === assessmentId && e.tagId === key;
+      });
+      if (entry && entry.score > 0) vals.push(scoreModValue(entry));
     });
-    if (!entry || !(entry.score > 0)) return;
-    total += scoreModValue(entry);
+    if (!vals.length) return;
+    total +=
+      vals.reduce(function (x, y) {
+        return x + y;
+      }, 0) / vals.length;
     count++;
   });
   return count ? { avg: total / count, count: count } : null;

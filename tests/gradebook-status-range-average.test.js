@@ -138,6 +138,16 @@ describe('getClassCompetencyAverage', () => {
     expect(getClassCompetencyAverage(CID, STUDENTS, 'lv', 'T1')).toEqual({ avg: 2, count: 3 });
   });
 
+  it('averages every competency a rubric criterion feeds, each student once', () => {
+    const twoKeys = { ...level, tagIds: ['T1', 'T2'] };
+    const e = (tagId, value) => ({ assessmentId: 'lv', tagId, score: value, date: '2026-10-10' });
+    // s1 averages 4 and 2 (3); s2 has only T1 (3); s3 is Not Submitted (0).
+    seed([twoKeys], { s1: [e('T1', 4), e('T2', 2)], s2: [e('T1', 3)], s3: [] }, { 's3:lv': 'NS' });
+    expect(getClassCompetencyAverage(CID, STUDENTS, 'lv', ['T1', 'T2'])).toEqual({ avg: 2, count: 3 });
+    // One competency, by itself, as before.
+    expect(getClassCompetencyAverage(CID, STUDENTS, 'lv', 'T2')).toEqual({ avg: 1, count: 2 });
+  });
+
   it('matches the points rule for the same statuses', () => {
     const pts = points('pt', 4);
     seed(
