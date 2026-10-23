@@ -567,8 +567,10 @@ window.PageGradebook = (function () {
 
   function applyHeaderHeight() {
     var container = document.getElementById('gb-colheads');
-    // The tilted label's length is derived from this in gradebook.css.
-    if (container) container.style.setProperty('--gb-head-h', _headerHeight + 'px');
+    // The tilted label's length, and the room the data area keeps for the
+    // last labels, are derived from this in gradebook.css.
+    var grid = container && container.closest('.gb-grid');
+    if (grid) grid.style.setProperty('--gb-head-h', _headerHeight + 'px');
     var colheads = document.querySelectorAll('#gb-colheads .gb-grid-colhead');
     colheads.forEach(function (el) {
       el.style.height = _headerHeight + 'px';
