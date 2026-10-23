@@ -927,7 +927,7 @@ window.PageGradebook = (function () {
           return a.id === col.assessmentId;
         });
         // Not submitted and Excused replace the score.
-        var statusMark = scoreStatusMarker(getAssignmentStatus(cid, s.id, col.assessmentId));
+        var statusMark = scoreStatusMarker(getAssignmentStatus(cid, s.id, col.assessmentId), cid, assess);
         if (col.isPointsCol && isCompletionScored(assess)) {
           var mark = getCompletionMark(cid, s.id, col.assessmentId);
           html +=
@@ -1031,18 +1031,15 @@ window.PageGradebook = (function () {
         html += _pointsAverageCell(cid, sortedStudents, col, startClass + altClass, wStyle);
         return;
       }
-      var vals = sortedStudents
-        .map(function (s) {
-          var ss = scores[s.id] || [];
-          var entry = ss.find(function (e) {
-            return e.assessmentId === col.assessmentId && e.tagId === col.tagId;
-          });
-          return entry && entry.score > 0 ? scoreModValue(entry) : null;
-        })
-        .filter(function (v) {
-          return v !== null;
-        });
-      if (!vals.length)
+      // calc.js's one column rule; a criterion column (Rubrics by Criterion)
+      // averages every competency the criterion feeds.
+      var stats = classColumnAverage(cid, sortedStudents, {
+        assessment: assessments.find(function (a) {
+          return a.id === col.assessmentId;
+        }),
+        tagIds: col.tagIds || [col.tagId],
+      });
+      if (!stats)
         html +=
           '<td class="gb-score' +
           startClass +
@@ -1051,11 +1048,6 @@ window.PageGradebook = (function () {
           wStyle +
           'cursor:default"><span class="gb-score-val s0" style="background:transparent">\u2014</span></td>';
       else {
-        var avg =
-          vals.reduce(function (a, b) {
-            return a + b;
-          }, 0) / vals.length;
-        var r = Math.round(avg);
         html +=
           '<td class="gb-score' +
           startClass +
@@ -1063,9 +1055,9 @@ window.PageGradebook = (function () {
           '" style="' +
           wStyle +
           'cursor:default"><span class="gb-avg-val" style="color:' +
-          PROF_COLORS[r] +
+          PROF_COLORS[Math.round(stats.avg)] +
           ';font-weight:700">' +
-          formatLevel(cid, avg) +
+          formatLevel(cid, stats.avg) +
           '</span></td>';
       }
     });
@@ -1211,7 +1203,7 @@ window.PageGradebook = (function () {
           cellClass = '';
         var cmpMark = cell.mark;
         var cellStatus = cell.status;
-        var statusMark = cell.kind === 'status' ? scoreStatusMarker(cellStatus) : '';
+        var statusMark = cell.kind === 'status' ? scoreStatusMarker(cellStatus, cid, a) : '';
         if (statusMark) {
           // Not submitted and Excused replace the score.
           cellStyle = 'color:var(--text-3)';
@@ -1313,36 +1305,6 @@ window.PageGradebook = (function () {
       '</td>'
     );
   }
-  function renderOverallStatsCell(cid, students) {
-    var mode = courseGradeMode(cid);
-    var avg = classGradeSummary(
-      cid,
-      students.map(function (s) {
-        return s.id;
-      }),
-    );
-    if (!avg.text)
-      return '<td class="gb-overall-col"><span class="gb-overall-num" style="color:var(--text-3)">—</span></td>';
-    // A Both class shows the class average level here; its Grade column has the letter.
-    var text = mode === 'both' ? avg.text.split(' \u00B7 ')[0] : avg.text;
-    var r = avg.level;
-    var tint = PROF_TINT[r] || '';
-    var bg = tint ? 'background:linear-gradient(' + tint + ',' + tint + '),var(--bg)' : '';
-    return (
-      '<td class="gb-overall-col"' +
-      (bg ? ' style="' + bg + '"' : '') +
-      '><span class="gb-overall-num" style="color:' +
-      PROF_COLORS[r] +
-      '">' +
-      text +
-      '</span><div class="gb-overall-label" style="color:' +
-      PROF_COLORS[r] +
-      '">' +
-      (mode === 'letter' ? '' : PROF_LABELS[r] || '') +
-      '</div></td>'
-    );
-  }
-
   /* The tooltip on a student's name: the overall grade as the class shows
      it, each section, and how much of the learning map has evidence. Every
      value comes from calc.js. Kept in a map, not an attribute, so the HTML
@@ -1372,56 +1334,6 @@ window.PageGradebook = (function () {
       getCompletionPct(cid, student.id) +
       '%</span></div>';
     _nameTipHtml[student.id] = tip;
-  }
-
-  function renderClassStatsRow(cid, students, cols, groups, sections, scores) {
-    var html = '<tr class="gb-stats-row"><th class="gb-name" scope="row">Class Average</th>';
-    html += renderOverallStatsCell(cid, students);
-    var colGroupMap = cols.map(function (_, i) {
-      return groups.find(function (g) {
-        return i >= g.startIdx && i < g.startIdx + g.count;
-      });
-    });
-    cols.forEach(function (col, i) {
-      var g = colGroupMap[i];
-      var startClass = g && g.groupIdx > 0 && g.startIdx === i ? ' gb-group-start' : '';
-      var altClass = g && g.groupIdx % 2 === 1 ? ' gb-group-alt' : '';
-      var vals = students
-        .map(function (s) {
-          var ss = scores[s.id] || [];
-          var entry = ss.find(function (e) {
-            return e.assessmentId === col.assessmentId && e.tagId === col.tagId;
-          });
-          return entry && entry.score > 0 ? scoreModValue(entry) : null;
-        })
-        .filter(function (v) {
-          return v !== null;
-        });
-      if (!vals.length)
-        html +=
-          '<td class="gb-score' +
-          startClass +
-          altClass +
-          '" style="cursor:default"><span class="gb-score-val s0" style="background:transparent">—</span></td>';
-      else {
-        var avg =
-          vals.reduce(function (a, b) {
-            return a + b;
-          }, 0) / vals.length;
-        var r = Math.round(avg);
-        html +=
-          '<td class="gb-score' +
-          startClass +
-          altClass +
-          '" style="cursor:default"><span class="gb-avg-val" style="color:' +
-          PROF_COLORS[r] +
-          ';font-weight:700">' +
-          formatLevel(cid, avg) +
-          '</span></td>';
-      }
-    });
-    html += '</tr>';
-    return html;
   }
 
   /* ── Sorting ─────────────────────────────────────────────── */
@@ -1940,6 +1852,24 @@ window.PageGradebook = (function () {
   }
 
   /* ── Scores tab: CSV export ─────────────────────────────── */
+  /* A score as the CSV prints it: what the Scores view shows, as plain text. */
+  function _csvCellText(cell) {
+    if (cell.kind === 'status') return cell.status;
+    if (cell.kind === 'complete') return cell.mark === 'complete' ? 'Complete' : 'Incomplete';
+    if (cell.kind === 'points') return formatPoints(cell.value);
+    if (cell.kind === 'level') return formatLevelAs(cell.value, 'proficiency');
+    if (cell.kind === 'missing' && cell.zero) return '0';
+    return '';
+  }
+
+  /* A Class Average as the CSV prints it, the printed sheet's way. */
+  function _csvAverageText(a, stats) {
+    if (!stats) return '';
+    if (isCompletionScored(a)) return Math.round(stats.pct) + '%';
+    if (isPointsScored(a)) return formatPoints(Math.round(stats.avg * 10) / 10);
+    return formatLevelAs(stats.avg, 'proficiency');
+  }
+
   function exportScoresCSV() {
     var cid = activeCourse;
     var students = sortStudents(getStudents(cid), 'lastName');
@@ -1953,7 +1883,6 @@ window.PageGradebook = (function () {
         return (b.date || '').localeCompare(a.date || '');
       });
     var sections = getSections(cid);
-    var scores = getScores(cid);
     var grouped = getGroupedSections(cid);
     var hasGroups = grouped.groups.some(function (g) {
       return g.sections.length > 0;
@@ -2000,31 +1929,19 @@ window.PageGradebook = (function () {
         _getDisplayedFinalPercent(cid, s.id) != null ? _getDisplayedFinalPercent(cid, s.id).toFixed(1) + '%' : '',
       );
       if (isLetter) row.push(letterData.S ? letterData.S + ' (' + letterData.R + '%)' : '');
-      // Assessment scores
+      // Assessment scores, as the Scores view shows them (calc.js)
       assessments.forEach(function (a) {
-        var ss = scores[s.id] || [];
-        var tagScores = scoreTagIds(a, cid)
-          .map(function (tid) {
-            var e = ss.find(function (e) {
-              return e.assessmentId === a.id && e.tagId === tid;
-            });
-            return e ? scoreModValue(e) : 0;
-          })
-          .filter(function (v) {
-            return v > 0;
-          });
-        var avg =
-          tagScores.length > 0
-            ? tagScores.reduce(function (x, y) {
-                return x + y;
-              }, 0) / tagScores.length
-            : 0;
-        var rubricVal = getRubricAssessmentScore(cid, a, ss);
-        if (rubricVal !== undefined) avg = rubricVal || 0;
-        row.push(avg > 0 ? avg.toFixed(1) : '');
+        row.push(_csvCellText(assessmentCellValue(cid, s.id, a)));
       });
       rows.push(row);
     });
+    // Class Average under each assessment, by calc.js's one column rule
+    var avgRow = ['Class Average'];
+    for (var pad = 1; pad < headers.length - assessments.length; pad++) avgRow.push('');
+    assessments.forEach(function (a) {
+      avgRow.push(_csvAverageText(a, classColumnAverage(cid, students, { assessment: a })));
+    });
+    rows.push(avgRow);
 
     var csv = rows
       .map(function (r) {

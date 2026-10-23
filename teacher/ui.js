@@ -1041,10 +1041,21 @@ function rerenderKeeping(id, renderFn) {
 }
 
 /* The mark a gradebook cell shows for a status that replaces its score:
-   NS (not submitted, counts as 0) or EXC (excused, not counted). Empty for
-   no status or Late, which keeps its score. */
-function scoreStatusMarker(status) {
-  if (status === 'NS') return '<span class="gb-status gb-status-ns" title="Not submitted: counts as 0">NS</span>';
+   NS (not submitted) or EXC (excused, not counted). Its tooltip says how NS
+   counts for this work (calc.js's COLUMN_STATUS_RULES): 0 on points work;
+   on proficiency work no evidence, though a class with a course % counts
+   it as 0 there. Empty for no status or Late, which keeps its score. */
+function scoreStatusMarker(status, cid, assessment) {
+  if (status === 'NS') {
+    var nsTitle = 'Not submitted: counts as 0';
+    if (assessment && !isPointsScored(assessment)) {
+      nsTitle =
+        courseGradeMode(cid) === 'proficiency'
+          ? 'Not submitted: not counted, no evidence yet'
+          : 'Not submitted: 0 in the course %, not counted in proficiency';
+    }
+    return '<span class="gb-status gb-status-ns" title="' + nsTitle + '">NS</span>';
+  }
   if (status === 'EXC') return '<span class="gb-status gb-status-exc" title="Excused: not counted">EXC</span>';
   return '';
 }
