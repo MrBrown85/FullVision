@@ -2378,6 +2378,7 @@ function _rekey(cid, kind, localId, serverId, extra) {
       _rekeyField('scores', cid, function (scores) {
         return _rekeyScoreEntries(scores, 'tagId', localId, serverId);
       });
+      var rubricLinksMoved = false;
       _rekeyField('rubrics', cid, function (rubrics) {
         var changed = false;
         (rubrics || []).forEach(function (r) {
@@ -2390,8 +2391,14 @@ function _rekey(cid, kind, localId, serverId, extra) {
             }
           });
         });
+        if (changed) rubricLinksMoved = true;
         return changed;
       });
+      // upsert_rubric drops a competency link whose id is still local, so a
+      // rubric saved before its competencies landed (a duplicated class, or
+      // a rubric built right after adding competencies) reached the server
+      // without them. Send the rubric again now the link has an id.
+      if (rubricLinksMoved && !(extra && extra.remote)) _resendRubricLinks(cid);
       _rekeyAssessmentReference(cid, 'tag', localId, serverId);
       _rekeyField('observations', cid, function (obs) {
         var changed = false;
@@ -7348,6 +7355,17 @@ function _persistRubricsToCanonical(cid, prev, arr) {
     });
   _rubricSaveQueue[cid] = _trackPendingSync(next);
   return _rubricSaveQueue[cid];
+}
+/* Re-send a class's rubrics once, after the competencies they link to get
+   their server ids (see the 'tag' re-key). Several competencies landing
+   together send one save. */
+var _rubricLinkResend = {};
+function _resendRubricLinks(cid) {
+  if (_rubricLinkResend[cid]) return;
+  _rubricLinkResend[cid] = setTimeout(function () {
+    delete _rubricLinkResend[cid];
+    if (_isUuid(cid)) saveRubrics(cid, getRubrics(cid));
+  }, 0);
 }
 function saveRubrics(cid, arr) {
   var nextArr = Array.isArray(arr) ? arr : [];
