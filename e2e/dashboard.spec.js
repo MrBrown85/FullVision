@@ -117,6 +117,7 @@ test.describe('Dashboard observation coverage', () => {
     const row = page.locator('#dash-obs-card .dash-ob2-row[data-sid="stu-001"]');
     await expect(row.locator('.dash-ob2-cell.has i[data-type="strength"]')).toHaveCount(1);
     await row.locator('.dash-ob2-cell.has').click();
-    await expect(page).toHaveURL(/#\/student\?id=stu-001&course=sci8&ob=o1/);
+    await expect(page).toHaveURL(/#\/student\?id=stu-001&course=sci8&tab=evidence&ob=o1/);
+    await expect(page.locator('#stu-tab-evidence')).toHaveAttribute('aria-selected', 'true');
   });
 });

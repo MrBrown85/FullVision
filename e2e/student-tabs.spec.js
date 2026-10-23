@@ -87,3 +87,43 @@ test('a Letter class shows percents, not proficiency words', async ({ page }) =>
   await expect(page.locator('#stu-tab-comps .stu-tab-stat')).toHaveText('6 of 6 Scored');
   await expect(page.locator('.stu-comp-level .stu-level').first()).toHaveText(/^\d+%$/);
 });
+
+test('the address names the tab, a reload keeps it, and a student opened with no tab gets the last one', async ({
+  page,
+}) => {
+  const sid = await openCece(page);
+  await page.locator('#stu-tab-goals').click();
+  await expect(page).toHaveURL(/[?&]tab=goals/);
+  await page.reload();
+  await expect(page.locator('#stu-tab-goals')).toHaveAttribute('aria-selected', 'true');
+  // No tab in the link: the one last opened on this device.
+  await page.goto(page.url().replace(/#.*/, '#/student?id=' + sid));
+  await expect(page.locator('#stu-tab-goals')).toHaveAttribute('aria-selected', 'true');
+});
+
+test('‹ › go to the next student in roster order and keep the tab', async ({ page }) => {
+  await openCece(page);
+  await page.locator('#stu-tab-evidence').click();
+  const order = await page.evaluate(() => sortStudents(getStudents(getActiveCourse()), 'lastName').map(s => s.id));
+  const here = await page.evaluate(() => new URLSearchParams(location.hash.split('?')[1]).get('id'));
+  const next = order[order.indexOf(here) + 1];
+  await page.getByRole('button', { name: /^Next student/ }).click();
+  await expect(page).toHaveURL(new RegExp('id=' + next + '&.*tab=evidence'));
+  await expect(page.locator('#stu-tab-evidence')).toHaveAttribute('aria-selected', 'true');
+  await page.getByRole('button', { name: /^Previous student/ }).click();
+  await expect(page).toHaveURL(new RegExp('id=' + here + '&'));
+});
+
+test('the dashboard opens the tab that matches where the teacher clicked', async ({ page }) => {
+  await page.goto('/login.html?demo=1');
+  await page.waitForURL(/app\.html/, { timeout: 15000 });
+  const card = page.locator('.dash-card').first();
+  await card.locator('.dash-card-sections').click();
+  await expect(page.locator('#stu-tab-comps')).toHaveAttribute('aria-selected', 'true');
+  await page.goBack();
+  await page.locator('.dash-card').first().locator('.dash-card-obs').click();
+  await expect(page.locator('#stu-tab-evidence')).toHaveAttribute('aria-selected', 'true');
+  await page.goBack();
+  await page.locator('.dash-ob2-name').first().click();
+  await expect(page.locator('#stu-tab-evidence')).toHaveAttribute('aria-selected', 'true');
+});

@@ -242,10 +242,11 @@ window.DashStudentCards = (function () {
             : '') +
           '</div>';
 
+        // data-student-tab: the student page tab a click here opens.
         html +=
           '<div class="dash-card-sections' +
           (courseGradeMode(cid) === 'proficiency' ? '' : ' dash-card-sections-pct') +
-          '">';
+          '" data-student-tab="comps">';
         var grouped = getGroupedSections(cid);
         if (grouped.groups.length > 0) {
           grouped.groups.forEach(function (gi) {
@@ -331,7 +332,7 @@ window.DashStudentCards = (function () {
           '%</span>' +
           trendIcon[trend] +
           '</div>' +
-          '<div class="dash-card-obs">' +
+          '<div class="dash-card-obs" data-student-tab="evidence">' +
           obsText +
           '</div>' +
           '</div>';

@@ -770,7 +770,15 @@ window.PageDashboard = (function () {
     // Dashboard-only actions
     var handlers = {
       goToStudent: function () {
-        Router.navigate('/student?id=' + el.dataset.sid + '&course=' + el.dataset.course);
+        // The competency tiles open Competencies, the observation line Evidence.
+        var part = e.target.closest('[data-student-tab]');
+        Router.navigate(
+          '/student?id=' +
+            el.dataset.sid +
+            '&course=' +
+            el.dataset.course +
+            (part ? '&tab=' + part.dataset.studentTab : ''),
+        );
       },
       toggleFlag: function () {
         toggleFlag(el.dataset.cid, el.dataset.sid);

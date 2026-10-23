@@ -496,6 +496,7 @@ window.DashObservations = (function () {
       encodeURIComponent(sid) +
       '&course=' +
       encodeURIComponent(cid) +
+      '&tab=evidence' +
       (obId ? '&ob=' + encodeURIComponent(obId) : '')
     );
   }
