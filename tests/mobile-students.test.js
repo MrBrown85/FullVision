@@ -192,20 +192,18 @@ describe('MStudents.renderDetail', () => {
     expect(html).toContain('Student not found');
   });
 
-  it('shows stats strip with completion, assessed, and notes', () => {
+  it('shows the five tabs with their counts', () => {
     mockDataLayer({
-      getCompletionPct: () => 75,
-      getAllTags: () => [{ id: 't1' }, { id: 't2' }],
       getStudentQuickObs: () => [{ id: 'ob1' }, { id: 'ob2' }, { id: 'ob3' }],
     });
     const html = MStudents.renderDetail(CID, 'stu1');
-    expect(html).toContain('75%');
-    expect(html).toContain('Complete');
-    expect(html).toContain('3'); // 3 observations
-    expect(html).toContain('Notes');
+    const labels = [...html.matchAll(/class="m-st-tab-label">([^<]+)</g)].map(m => m[1]);
+    expect(labels).toEqual(['Competencies', 'Assessments', 'Evidence', 'Goals', 'Learner Profile']);
+    expect(html).toContain('3 Observations');
+    expect(html).toContain('m-st-panel-evidence');
   });
 
-  it('shows missing count in stats strip', () => {
+  it('shows how many were not submitted on the Assessments tab', () => {
     mockDataLayer({
       getAssignmentStatuses: () => ({ 'stu1:a1': 'NS', 'stu1:a2': 'NS' }),
       getAssessments: () => [
@@ -214,8 +212,7 @@ describe('MStudents.renderDetail', () => {
       ],
     });
     const html = MStudents.renderDetail(CID, 'stu1');
-    expect(html).toContain('Missing');
-    expect(html).toContain('>2<');
+    expect(html).toContain('2 not submitted');
   });
 });
 
@@ -555,7 +552,7 @@ describe('Student detail with multiple sections', () => {
 
 /* ── Detail screen: recent assessments ──────────────────────── */
 describe('Student detail recent assessments', () => {
-  it('shows last 5 assessments sorted by date', () => {
+  it('lists every assessment on the Assessments tab, newest first', () => {
     mockDataLayer({
       getAssessments: () => [
         { id: 'a1', title: 'Assess 1', type: 'summative', date: '2025-01-01', tagIds: [] },
@@ -567,10 +564,10 @@ describe('Student detail recent assessments', () => {
       ],
     });
     const html = MStudents.renderDetail(CID, 'stu1');
-    // Should show 5 most recent, not all 6
-    expect(html).toContain('Assess 6');
-    expect(html).toContain('Assess 5');
-    expect(html).not.toContain('Assess 1'); // oldest should be cut
+    const panel = html.slice(html.indexOf('id="m-st-panel-assess"'), html.indexOf('id="m-st-panel-evidence"'));
+    expect(panel).toContain('Assess 6');
+    expect(panel).toContain('Assess 1');
+    expect(panel.indexOf('Assess 6')).toBeLessThan(panel.indexOf('Assess 1'));
   });
 
   it('shows NS status badge on assessments', () => {
@@ -606,7 +603,7 @@ describe('Student detail recent assessments', () => {
     const html = MStudents.renderDetail(CID, 'stu1');
     expect(html).toContain('No observations yet');
   });
-  it('shows the three newest observations, newest first, with text pills', () => {
+  it('lists the observations on the Evidence tab, newest first, with text pills', () => {
     // getStudentQuickObs is newest first.
     mockDataLayer({
       getStudentQuickObs: () => [
@@ -618,14 +615,10 @@ describe('Student detail recent assessments', () => {
       ],
     });
     const html = MStudents.renderDetail(CID, 'stu1');
-    const recent = html.slice(html.indexOf('Recent Observations'));
-    expect(recent).toContain('Fifth note');
-    expect(recent).toContain('Fourth note');
-    expect(recent).toContain('Third note');
-    expect(recent).not.toContain('Second note');
-    expect(recent).not.toContain('First note');
+    const recent = html.slice(html.indexOf('id="m-st-panel-evidence"'), html.indexOf('id="m-st-panel-goals"'));
+    ['Fifth note', 'Fourth note', 'Third note', 'Second note', 'First note'].forEach(t => expect(recent).toContain(t));
     expect(recent.indexOf('Fifth note')).toBeLessThan(recent.indexOf('Fourth note'));
-    expect(recent.indexOf('Fourth note')).toBeLessThan(recent.indexOf('Third note'));
+    expect(recent.indexOf('Second note')).toBeLessThan(recent.indexOf('First note'));
     expect(recent).toContain('<span class="m-obs-type" data-sentiment="strength">Strength</span>');
     expect(recent).toContain('<span class="m-obs-context">');
   });
@@ -633,7 +626,7 @@ describe('Student detail recent assessments', () => {
 
 /* ── Detail screen: score chips on assessments ──────────────── */
 describe('Assessment score chips', () => {
-  it('shows per-tag score chips on assessments', () => {
+  it('shows the assessment score as the gradebook does, and what it counts toward', () => {
     mockDataLayer({
       getAssessments: () => [{ id: 'a1', title: 'Test', type: 'summative', date: '2025-03-01', tagIds: ['t1'] }],
       getScores: () => ({
@@ -642,8 +635,9 @@ describe('Assessment score chips', () => {
       getTagById: (cid, tid) => ({ id: tid, label: 'Questioning', shortName: 'Quest' }),
     });
     const html = MStudents.renderDetail(CID, 'stu1');
-    expect(html).toContain('m-assess-score-chip');
+    expect(html).toContain('m-st-score');
     expect(html).toContain('3.5');
+    expect(html).toContain('m-st-toward">Questioning<');
   });
 
   it('shows dash for unscored tags', () => {
