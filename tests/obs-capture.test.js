@@ -579,7 +579,8 @@ describe('capture strip', () => {
     expect(cap.el.textContent).toContain('Competency: Collect data safely');
     click(cap.el.querySelector('#level-btn'));
     const levels = Array.from(cap.el.querySelectorAll('[data-menu="level"] .obsc-item-label')).map(e => e.textContent);
-    expect(levels).toEqual(['Emerging', 'Developing', 'Proficient', 'Extending', 'No level']);
+    // In the class's Rubric Levels order; Extending first is the default.
+    expect(levels).toEqual(['Extending', 'Proficient', 'Developing', 'Emerging', 'No level']);
     expect(cap.el.querySelector('[data-menu="level"]').textContent).toContain('never changes a grade');
     click(cap.el.querySelector('[data-menu="level"] [data-value="3"]'));
     expect(cap.el.querySelector('#level-btn').textContent).toBe('Level: looks Proficient');

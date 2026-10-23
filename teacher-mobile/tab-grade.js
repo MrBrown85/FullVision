@@ -658,7 +658,8 @@ window.MGrade = (function () {
         // graded-count / calc / report layers already treat identically
         // (all use `score > 0`).
         var btns = '';
-        for (var level = 1; level <= 4; level++) {
+        // In the class's Rubric Levels order, like the desktop card.
+        levelOrderFor(cid).forEach(function (level) {
           var active = current !== null && Math.round(current) === level ? ' m-score-active' : '';
           btns +=
             '<button class="m-score-btn' +
@@ -674,7 +675,7 @@ window.MGrade = (function () {
             '">' +
             level +
             '</button>';
-        }
+        });
         tagGroups +=
           '<div class="m-score-group">' +
           '<div class="m-score-tag-label"><span class="m-score-tag-dot" style="background:' +

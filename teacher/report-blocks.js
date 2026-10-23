@@ -858,7 +858,7 @@ window.ReportBlocks = (function () {
     const circ = 2 * Math.PI * r;
     let offset = 0;
     let arcs = '';
-    [1, 2, 3, 4].forEach(level => {
+    levelOrderFor(cid).forEach(level => {
       if (counts[level] === 0) return;
       const pct = counts[level] / total;
       const dash = circ * pct;
@@ -915,7 +915,7 @@ window.ReportBlocks = (function () {
         <text x="${cx}" y="${cy + 8}" text-anchor="middle" style="font-size:6.5px;fill:var(--text-3);">scores</text>
       </svg>
       <div style="display:flex;flex-direction:column;gap:4px;flex:1">`;
-    [4, 3, 2, 1].forEach(level => {
+    levelOrderFor(cid).forEach(level => {
       const pct = total > 0 ? Math.round((counts[level] / total) * 100) : 0;
       html += `<div style="display:flex;align-items:center;gap:6px">
       <span data-prof-bg="${level}" style="width:7px;height:7px;border-radius:50%;background:${rawColors[level]};flex-shrink:0"></span>

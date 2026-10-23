@@ -2577,22 +2577,78 @@ window.PageAssignments = (function () {
     );
   }
 
+  /* The four levels of a scoring card, in the class's Rubric Levels order
+     (levelOrderFor). The `lN` / `hlN` classes and data-level stay on the
+     level itself, so the 1–4 keys and the fill actions mean the same level
+     wherever the button sits. */
+  function _levelButtonsHtml(cid, activeClass, attrs) {
+    return levelOrderFor(cid)
+      .map(function (l) {
+        return (
+          '<div class="rsg-level l' +
+          l +
+          activeClass(l) +
+          '" ' +
+          attrs(l) +
+          ' role="button" tabindex="0">' +
+          PROF_LABELS[l] +
+          '</div>'
+        );
+      })
+      .join('');
+  }
+  function _fillAllHeaderHtml(cid, action, aid) {
+    return levelOrderFor(cid)
+      .map(function (l) {
+        return (
+          '<div class="rsg-header-level hl' +
+          l +
+          '" data-action="' +
+          action +
+          '" data-aid="' +
+          aid +
+          '" data-score="' +
+          l +
+          '" data-label="' +
+          PROF_LABELS[l] +
+          '" title="Fill all ' +
+          PROF_LABELS[l] +
+          '">' +
+          PROF_LABELS[l] +
+          '</div>'
+        );
+      })
+      .join('');
+  }
+  function _rowFillOptionsHtml(cid, action, aid, sid) {
+    return levelOrderFor(cid)
+      .map(function (l) {
+        return (
+          '<div class="col-fill-option" data-action="' +
+          action +
+          '" data-aid="' +
+          aid +
+          '" data-sid="' +
+          sid +
+          '" data-score="' +
+          l +
+          '" data-scope="row"><div class="col-fill-dot" style="background:var(--score-' +
+          l +
+          ')">' +
+          l +
+          '</div> ' +
+          PROF_LABELS[l] +
+          '</div>'
+        );
+      })
+      .join('');
+  }
+
   function renderTagGrid(cid, a, tagObjs, students, scores) {
     var html = '<div class="rsg-grid">';
     html +=
       '<div class="rsg-header"><div class="rsg-header-spacer">Student</div><div class="rsg-header-inner"><div class="rsg-header-crit-spacer"></div><div class="rsg-header-levels">' +
-      '<div class="rsg-header-level hl4" data-action="confirmFillAll" data-aid="' +
-      a.id +
-      '" data-score="4" data-label="Extending" title="Fill all Extending">Extending</div>' +
-      '<div class="rsg-header-level hl3" data-action="confirmFillAll" data-aid="' +
-      a.id +
-      '" data-score="3" data-label="Proficient" title="Fill all Proficient">Proficient</div>' +
-      '<div class="rsg-header-level hl2" data-action="confirmFillAll" data-aid="' +
-      a.id +
-      '" data-score="2" data-label="Developing" title="Fill all Developing">Developing</div>' +
-      '<div class="rsg-header-level hl1" data-action="confirmFillAll" data-aid="' +
-      a.id +
-      '" data-score="1" data-label="Emerging" title="Fill all Emerging">Emerging</div>' +
+      _fillAllHeaderHtml(cid, 'confirmFillAll', a.id) +
       '</div><div class="rsg-header-mod-spacer"></div></div><div class="rsg-header-action"></div></div>';
     var statuses = getAssignmentStatuses(cid);
     students.forEach(function (st) {
@@ -2632,68 +2688,32 @@ window.PageAssignments = (function () {
           esc(tag.label) +
           '</div>' +
           '<div class="rsg-levels">' +
-          '<div class="rsg-level l4' +
-          (score === 4 ? ' active' : '') +
-          '" data-action="selectTagLevel" data-level="4" data-aid="' +
-          a.id +
-          '" data-sid="' +
-          st.id +
-          '" data-tagid="' +
-          tag.id +
-          '" role="button" tabindex="0">Extending</div>' +
-          '<div class="rsg-level l3' +
-          (score === 3 ? ' active' : '') +
-          '" data-action="selectTagLevel" data-level="3" data-aid="' +
-          a.id +
-          '" data-sid="' +
-          st.id +
-          '" data-tagid="' +
-          tag.id +
-          '" role="button" tabindex="0">Proficient</div>' +
-          '<div class="rsg-level l2' +
-          (score === 2 ? ' active' : '') +
-          '" data-action="selectTagLevel" data-level="2" data-aid="' +
-          a.id +
-          '" data-sid="' +
-          st.id +
-          '" data-tagid="' +
-          tag.id +
-          '" role="button" tabindex="0">Developing</div>' +
-          '<div class="rsg-level l1' +
-          (score === 1 ? ' active' : '') +
-          '" data-action="selectTagLevel" data-level="1" data-aid="' +
-          a.id +
-          '" data-sid="' +
-          st.id +
-          '" data-tagid="' +
-          tag.id +
-          '" role="button" tabindex="0">Emerging</div>' +
+          _levelButtonsHtml(
+            cid,
+            function (l) {
+              return score === l ? ' active' : '';
+            },
+            function (l) {
+              return (
+                'data-action="selectTagLevel" data-level="' +
+                l +
+                '" data-aid="' +
+                a.id +
+                '" data-sid="' +
+                st.id +
+                '" data-tagid="' +
+                tag.id +
+                '"'
+              );
+            },
+          ) +
           '</div><div class="rsg-mods">' +
           scoreModButtonsHtml(score, mod) +
           '</div></div>';
       });
       html +=
         '</div><div class="score-row-action"><div class="row-fill-btn" data-action="toggleScoreMenu" title="Fill row">\u25BC<div class="col-fill-menu" data-stop-prop="true">' +
-        '<div class="col-fill-option" data-action="fillScoresAndClose" data-aid="' +
-        a.id +
-        '" data-sid="' +
-        st.id +
-        '" data-score="4" data-scope="row"><div class="col-fill-dot" style="background:var(--score-4)">4</div> Extending</div>' +
-        '<div class="col-fill-option" data-action="fillScoresAndClose" data-aid="' +
-        a.id +
-        '" data-sid="' +
-        st.id +
-        '" data-score="3" data-scope="row"><div class="col-fill-dot" style="background:var(--score-3)">3</div> Proficient</div>' +
-        '<div class="col-fill-option" data-action="fillScoresAndClose" data-aid="' +
-        a.id +
-        '" data-sid="' +
-        st.id +
-        '" data-score="2" data-scope="row"><div class="col-fill-dot" style="background:var(--score-2)">2</div> Developing</div>' +
-        '<div class="col-fill-option" data-action="fillScoresAndClose" data-aid="' +
-        a.id +
-        '" data-sid="' +
-        st.id +
-        '" data-score="1" data-scope="row"><div class="col-fill-dot" style="background:var(--score-1)">1</div> Emerging</div>' +
+        _rowFillOptionsHtml(cid, 'fillScoresAndClose', a.id, st.id) +
         '<div class="col-fill-option" data-action="fillScoresAndClose" data-aid="' +
         a.id +
         '" data-sid="' +
@@ -2727,18 +2747,7 @@ window.PageAssignments = (function () {
     var html = '<div class="rsg-grid">';
     html +=
       '<div class="rsg-header"><div class="rsg-header-spacer">Student</div><div class="rsg-header-inner"><div class="rsg-header-crit-spacer"></div><div class="rsg-header-levels">' +
-      '<div class="rsg-header-level hl4" data-action="confirmFillRubricAll" data-aid="' +
-      a.id +
-      '" data-score="4" data-label="Extending" title="Fill all Extending">Extending</div>' +
-      '<div class="rsg-header-level hl3" data-action="confirmFillRubricAll" data-aid="' +
-      a.id +
-      '" data-score="3" data-label="Proficient" title="Fill all Proficient">Proficient</div>' +
-      '<div class="rsg-header-level hl2" data-action="confirmFillRubricAll" data-aid="' +
-      a.id +
-      '" data-score="2" data-label="Developing" title="Fill all Developing">Developing</div>' +
-      '<div class="rsg-header-level hl1" data-action="confirmFillRubricAll" data-aid="' +
-      a.id +
-      '" data-score="1" data-label="Emerging" title="Fill all Emerging">Emerging</div>' +
+      _fillAllHeaderHtml(cid, 'confirmFillRubricAll', a.id) +
       '</div><div class="rsg-header-mod-spacer"></div><div class="rsg-header-comment-spacer"></div></div><div class="rsg-header-action"></div></div>';
 
     var statuses = getAssignmentStatuses(cid);
@@ -2805,42 +2814,25 @@ window.PageAssignments = (function () {
           '"><span class="rsg-criterion-name">' +
           esc(crit.name) +
           '</span></div><div class="rsg-levels">' +
-          '<div class="rsg-level l4' +
-          (displayScore === 4 ? (isMixed ? ' active mixed' : ' active') : '') +
-          '" data-action="selectRubricScore" data-level="4" data-aid="' +
-          a.id +
-          '" data-sid="' +
-          st.id +
-          '" data-critid="' +
-          crit.id +
-          '" role="button" tabindex="0">Extending</div>' +
-          '<div class="rsg-level l3' +
-          (displayScore === 3 ? (isMixed ? ' active mixed' : ' active') : '') +
-          '" data-action="selectRubricScore" data-level="3" data-aid="' +
-          a.id +
-          '" data-sid="' +
-          st.id +
-          '" data-critid="' +
-          crit.id +
-          '" role="button" tabindex="0">Proficient</div>' +
-          '<div class="rsg-level l2' +
-          (displayScore === 2 ? (isMixed ? ' active mixed' : ' active') : '') +
-          '" data-action="selectRubricScore" data-level="2" data-aid="' +
-          a.id +
-          '" data-sid="' +
-          st.id +
-          '" data-critid="' +
-          crit.id +
-          '" role="button" tabindex="0">Developing</div>' +
-          '<div class="rsg-level l1' +
-          (displayScore === 1 ? (isMixed ? ' active mixed' : ' active') : '') +
-          '" data-action="selectRubricScore" data-level="1" data-aid="' +
-          a.id +
-          '" data-sid="' +
-          st.id +
-          '" data-critid="' +
-          crit.id +
-          '" role="button" tabindex="0">Emerging</div>' +
+          _levelButtonsHtml(
+            cid,
+            function (l) {
+              return displayScore === l ? (isMixed ? ' active mixed' : ' active') : '';
+            },
+            function (l) {
+              return (
+                'data-action="selectRubricScore" data-level="' +
+                l +
+                '" data-aid="' +
+                a.id +
+                '" data-sid="' +
+                st.id +
+                '" data-critid="' +
+                crit.id +
+                '"'
+              );
+            },
+          ) +
           '</div><div class="rsg-mods">' +
           scoreModButtonsHtml(modLevel, critMod) +
           // Its own cell: .rsg-mods is redrawn on every score change.
@@ -2850,26 +2842,7 @@ window.PageAssignments = (function () {
       });
       html +=
         '</div><div class="score-row-action"><div class="row-fill-btn" data-action="toggleScoreMenu" title="Fill row">\u25BC<div class="col-fill-menu" data-stop-prop="true">' +
-        '<div class="col-fill-option" data-action="fillRubricScoresAndClose" data-aid="' +
-        a.id +
-        '" data-sid="' +
-        st.id +
-        '" data-score="4" data-scope="row"><div class="col-fill-dot" style="background:var(--score-4)">4</div> Extending</div>' +
-        '<div class="col-fill-option" data-action="fillRubricScoresAndClose" data-aid="' +
-        a.id +
-        '" data-sid="' +
-        st.id +
-        '" data-score="3" data-scope="row"><div class="col-fill-dot" style="background:var(--score-3)">3</div> Proficient</div>' +
-        '<div class="col-fill-option" data-action="fillRubricScoresAndClose" data-aid="' +
-        a.id +
-        '" data-sid="' +
-        st.id +
-        '" data-score="2" data-scope="row"><div class="col-fill-dot" style="background:var(--score-2)">2</div> Developing</div>' +
-        '<div class="col-fill-option" data-action="fillRubricScoresAndClose" data-aid="' +
-        a.id +
-        '" data-sid="' +
-        st.id +
-        '" data-score="1" data-scope="row"><div class="col-fill-dot" style="background:var(--score-1)">1</div> Emerging</div>' +
+        _rowFillOptionsHtml(cid, 'fillRubricScoresAndClose', a.id, st.id) +
         '<div class="col-fill-option" data-action="fillRubricScoresAndClose" data-aid="' +
         a.id +
         '" data-sid="' +
@@ -3070,12 +3043,12 @@ window.PageAssignments = (function () {
       if (inp) inp.focus();
     }, 50);
   }
-  var RUBRIC_LEVELS = [
-    { n: 4, name: 'Extending' },
-    { n: 3, name: 'Proficient' },
-    { n: 2, name: 'Developing' },
-    { n: 1, name: 'Emerging' },
-  ];
+  /* The editor's level columns, in the class's Rubric Levels order. */
+  function _rubricEditorLevels() {
+    return levelOrderFor(activeCourse).map(function (n) {
+      return { n: n, name: PROF_LABELS[n] };
+    });
+  }
   // A tag's teacher-facing name. Never the id: real tag ids are UUIDs.
   /* How a chip names the criterion that already uses its competency: by
      number when the criterion is named after the competency. */
@@ -3228,7 +3201,7 @@ window.PageAssignments = (function () {
       '</div><div class="rubric-part"><div class="rubric-part-label">Level descriptors' +
       draftBtn +
       '</div><div class="rubric-levels">';
-    RUBRIC_LEVELS.forEach(function (L) {
+    _rubricEditorLevels().forEach(function (L) {
       var pts = lv[L.n] != null ? lv[L.n] : L.n;
       html +=
         '<div class="rubric-level-card" style="--lvl:var(--score-' +
