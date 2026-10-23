@@ -110,7 +110,8 @@ describe('gradebook views use them', () => {
 });
 
 // The Competencies view's Class Average for a competency column comes from
-// calc.js (getClassCompetencyAverage), with today's rules unchanged.
+// calc.js (getClassCompetencyAverage). Statuses count as in a points column:
+// Excused is left out, Not Submitted counts as 0.
 describe('getClassCompetencyAverage', () => {
   const level = { id: 'lv', title: 'lv', scoreMode: 'proficiency', tagIds: ['T1'], type: 'summative' };
   const entry = (value, mod) => ({ assessmentId: 'lv', tagId: 'T1', score: value, mod, date: '2026-10-10' });
@@ -122,13 +123,35 @@ describe('getClassCompetencyAverage', () => {
     expect(stats.avg).toBeCloseTo((scoreModValue(entry(3, 1)) + scoreModValue(entry(3, -1)) + 2) / 3, 10);
   });
 
-  it('leaves out students with no score and returns null when nobody has one', () => {
+  it('leaves out students with no score and returns null when nobody counts', () => {
     seed([level], { s1: [entry(0)], s2: [] });
     expect(getClassCompetencyAverage(CID, STUDENTS, 'lv', 'T1')).toBeNull();
   });
 
-  it('still counts an Excused student score that is left, as before', () => {
+  it('leaves out an Excused student, even with a score left', () => {
     seed([level], { s1: [entry(4)], s2: [entry(2)] }, { 's2:lv': 'EXC' });
-    expect(getClassCompetencyAverage(CID, STUDENTS, 'lv', 'T1')).toEqual({ avg: 3, count: 2 });
+    expect(getClassCompetencyAverage(CID, STUDENTS, 'lv', 'T1')).toEqual({ avg: 4, count: 1 });
+  });
+
+  it('counts Not Submitted as 0', () => {
+    seed([level], { s1: [entry(4)], s2: [entry(2)], s3: [] }, { 's3:lv': 'NS' });
+    expect(getClassCompetencyAverage(CID, STUDENTS, 'lv', 'T1')).toEqual({ avg: 2, count: 3 });
+  });
+
+  it('matches the points rule for the same statuses', () => {
+    const pts = points('pt', 4);
+    seed(
+      [level, pts],
+      {
+        s1: [entry(4), score('pt', 4)],
+        s2: [entry(2), score('pt', 2)],
+        s3: [],
+      },
+      { 's2:lv': 'EXC', 's2:pt': 'EXC', 's3:lv': 'NS', 's3:pt': 'NS' },
+    );
+    const comp = getClassCompetencyAverage(CID, STUDENTS, 'lv', 'T1');
+    const ptsAvg = getClassPointsAverage(CID, STUDENTS, pts);
+    expect(comp.count).toBe(ptsAvg.count);
+    expect((comp.avg / 4) * 100).toBeCloseTo(ptsAvg.pct, 10);
   });
 });

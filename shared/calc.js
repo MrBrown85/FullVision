@@ -501,14 +501,21 @@ function getClassPointsAverage(cid, students, assessment) {
 
 /* The Class Average of one competency on one assessment (a Competencies
    view column): the mean of the students' scores there, + and − included.
-   Students without a score are left out, as are Not Submitted (its score is
-   cleared); an Excused student's score, if one is left, still counts.
-   Returns { avg, count }, or null when nobody has a score. */
+   Statuses count as they do in a points column's average
+   (getClassPointsAverage): Excused is left out, Not Submitted counts as 0.
+   Students with neither a score nor a status are left out.
+   Returns { avg, count }, or null when nobody counts. */
 function getClassCompetencyAverage(cid, students, assessmentId, tagId) {
   var scores = getScores(cid);
   var total = 0;
   var count = 0;
   (students || []).forEach(function (s) {
+    var status = getAssignmentStatus(cid, s.id, assessmentId);
+    if (status === 'EXC') return;
+    if (status === 'NS') {
+      count++;
+      return;
+    }
     var entry = (scores[s.id] || []).find(function (e) {
       return e.assessmentId === assessmentId && e.tagId === tagId;
     });
