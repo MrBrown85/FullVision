@@ -26,6 +26,23 @@ describe('_safeLSSet', () => {
     localStorage.setItem = origSetItem;
   });
 
+  it('reports a full device on the sync dot until that key saves again', () => {
+    const origSetItem = localStorage.setItem;
+    localStorage.setItem = () => {
+      const err = new Error('full');
+      err.name = 'QuotaExceededError';
+      throw err;
+    };
+    expect(_safeLSSet('gb-scores-full', 'value')).toBe(false);
+    localStorage.setItem = origSetItem;
+    expect(getSaveProblem()).toMatch(/storage is full/);
+    // Another key saving does not clear it; the failed key saving does.
+    _safeLSSet('gb-other', 'value');
+    expect(getSaveProblem()).toMatch(/storage is full/);
+    _safeLSSet('gb-scores-full', 'value');
+    expect(getSaveProblem()).toBeNull();
+  });
+
   it('handles very large values without crashing', () => {
     const bigValue = 'x'.repeat(100000);
     expect(() => _safeLSSet('gb-big', bigValue)).not.toThrow();

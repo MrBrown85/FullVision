@@ -139,6 +139,39 @@ describe('desktop sync status UI', () => {
     expect(elements['tb-sync-popover'].innerHTML).not.toContain('assessment not found');
   });
 
+  it('turns the dot red with the reason while this device cannot save', () => {
+    var elements = {
+      'offline-banner': createElementStub(),
+      'tb-sync-badge': createElementStub(),
+      'tb-sync-popover': createElementStub(),
+      'sync-indicator-dot': createElementStub(),
+    };
+    document.getElementById = function (id) {
+      return elements[id] || null;
+    };
+    document.body = { classList: createClassList() };
+    window.v2Queue = {
+      stats() {
+        return { queued: 0, deadLettered: 0, lastFlushAt: null, online: true, flushing: false };
+      },
+      deadLetter() {
+        return [];
+      },
+    };
+    var originalProblem = globalThis.getSaveProblem;
+    globalThis.getSaveProblem = () => "This device's storage is full, so recent changes may not be saved";
+    try {
+      refreshSyncStatusUI();
+    } finally {
+      globalThis.getSaveProblem = originalProblem;
+    }
+
+    expect(elements['sync-indicator-dot'].className).toBe('tb-sync-dot error');
+    expect(elements['sync-indicator-dot'].title).toBe(
+      "This device's storage is full, so recent changes may not be saved",
+    );
+  });
+
   it('returns to the idle state when no sync work remains', () => {
     var elements = {
       'offline-banner': createElementStub(),

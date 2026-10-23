@@ -205,7 +205,11 @@ function refreshSyncStatusUI() {
   if (dot) {
     var dotStatus = 'idle';
     var dotTitle = 'All changes saved';
-    if (stats.deadLettered > 0) {
+    var saveProblem = typeof getSaveProblem === 'function' ? getSaveProblem() : null;
+    if (saveProblem) {
+      dotStatus = 'error';
+      dotTitle = saveProblem;
+    } else if (stats.deadLettered > 0) {
       dotStatus = 'error';
       dotTitle = "Some changes couldn't be saved";
     } else if (stats.signedOut && stats.queued > 0) {
