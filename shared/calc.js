@@ -499,6 +499,26 @@ function getClassPointsAverage(cid, students, assessment) {
   return count ? { avg: earned / count, pct: (earned / possible) * 100, count: count } : null;
 }
 
+/* The Class Average of one competency on one assessment (a Competencies
+   view column): the mean of the students' scores there, + and − included.
+   Students without a score are left out, as are Not Submitted (its score is
+   cleared); an Excused student's score, if one is left, still counts.
+   Returns { avg, count }, or null when nobody has a score. */
+function getClassCompetencyAverage(cid, students, assessmentId, tagId) {
+  var scores = getScores(cid);
+  var total = 0;
+  var count = 0;
+  (students || []).forEach(function (s) {
+    var entry = (scores[s.id] || []).find(function (e) {
+      return e.assessmentId === assessmentId && e.tagId === tagId;
+    });
+    if (!entry || !(entry.score > 0)) return;
+    total += scoreModValue(entry);
+    count++;
+  });
+  return count ? { avg: total / count, count: count } : null;
+}
+
 /* Whether a score is above what its assessment allows: 4 on proficiency
    work, Complete (1) on Complete/Incomplete work, and twice the maximum on
    points work, which can earn extra credit. */

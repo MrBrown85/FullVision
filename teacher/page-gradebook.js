@@ -1017,18 +1017,8 @@ window.PageGradebook = (function () {
         html += _pointsAverageCell(cid, sortedStudents, col, startClass + altClass, wStyle);
         return;
       }
-      var vals = sortedStudents
-        .map(function (s) {
-          var ss = scores[s.id] || [];
-          var entry = ss.find(function (e) {
-            return e.assessmentId === col.assessmentId && e.tagId === col.tagId;
-          });
-          return entry && entry.score > 0 ? scoreModValue(entry) : null;
-        })
-        .filter(function (v) {
-          return v !== null;
-        });
-      if (!vals.length)
+      var stats = getClassCompetencyAverage(cid, sortedStudents, col.assessmentId, col.tagId);
+      if (!stats)
         html +=
           '<td class="gb-score' +
           startClass +
@@ -1037,11 +1027,6 @@ window.PageGradebook = (function () {
           wStyle +
           'cursor:default"><span class="gb-score-val s0" style="background:transparent">\u2014</span></td>';
       else {
-        var avg =
-          vals.reduce(function (a, b) {
-            return a + b;
-          }, 0) / vals.length;
-        var r = Math.round(avg);
         html +=
           '<td class="gb-score' +
           startClass +
@@ -1049,9 +1034,9 @@ window.PageGradebook = (function () {
           '" style="' +
           wStyle +
           'cursor:default"><span class="gb-avg-val" style="color:' +
-          PROF_COLORS[r] +
+          PROF_COLORS[Math.round(stats.avg)] +
           ';font-weight:700">' +
-          formatLevel(cid, avg) +
+          formatLevel(cid, stats.avg) +
           '</span></td>';
       }
     });
@@ -1291,36 +1276,6 @@ window.PageGradebook = (function () {
       '</td>'
     );
   }
-  function renderOverallStatsCell(cid, students) {
-    var mode = courseGradeMode(cid);
-    var avg = classGradeSummary(
-      cid,
-      students.map(function (s) {
-        return s.id;
-      }),
-    );
-    if (!avg.text)
-      return '<td class="gb-overall-col"><span class="gb-overall-num" style="color:var(--text-3)">—</span></td>';
-    // A Both class shows the class average level here; its Grade column has the letter.
-    var text = mode === 'both' ? avg.text.split(' \u00B7 ')[0] : avg.text;
-    var r = avg.level;
-    var tint = PROF_TINT[r] || '';
-    var bg = tint ? 'background:linear-gradient(' + tint + ',' + tint + '),var(--bg)' : '';
-    return (
-      '<td class="gb-overall-col"' +
-      (bg ? ' style="' + bg + '"' : '') +
-      '><span class="gb-overall-num" style="color:' +
-      PROF_COLORS[r] +
-      '">' +
-      text +
-      '</span><div class="gb-overall-label" style="color:' +
-      PROF_COLORS[r] +
-      '">' +
-      (mode === 'letter' ? '' : PROF_LABELS[r] || '') +
-      '</div></td>'
-    );
-  }
-
   function renderNameCell(cid, student, sections, isLetter) {
     var overall = getOverallProficiency(cid, student.id);
     var letterData = _getStudentLetterData(cid, student.id);
@@ -1373,56 +1328,6 @@ window.PageGradebook = (function () {
       esc(displayName(student)) +
       '</a></div>'
     );
-  }
-
-  function renderClassStatsRow(cid, students, cols, groups, sections, scores) {
-    var html = '<tr class="gb-stats-row"><th class="gb-name" scope="row">Class Average</th>';
-    html += renderOverallStatsCell(cid, students);
-    var colGroupMap = cols.map(function (_, i) {
-      return groups.find(function (g) {
-        return i >= g.startIdx && i < g.startIdx + g.count;
-      });
-    });
-    cols.forEach(function (col, i) {
-      var g = colGroupMap[i];
-      var startClass = g && g.groupIdx > 0 && g.startIdx === i ? ' gb-group-start' : '';
-      var altClass = g && g.groupIdx % 2 === 1 ? ' gb-group-alt' : '';
-      var vals = students
-        .map(function (s) {
-          var ss = scores[s.id] || [];
-          var entry = ss.find(function (e) {
-            return e.assessmentId === col.assessmentId && e.tagId === col.tagId;
-          });
-          return entry && entry.score > 0 ? scoreModValue(entry) : null;
-        })
-        .filter(function (v) {
-          return v !== null;
-        });
-      if (!vals.length)
-        html +=
-          '<td class="gb-score' +
-          startClass +
-          altClass +
-          '" style="cursor:default"><span class="gb-score-val s0" style="background:transparent">—</span></td>';
-      else {
-        var avg =
-          vals.reduce(function (a, b) {
-            return a + b;
-          }, 0) / vals.length;
-        var r = Math.round(avg);
-        html +=
-          '<td class="gb-score' +
-          startClass +
-          altClass +
-          '" style="cursor:default"><span class="gb-avg-val" style="color:' +
-          PROF_COLORS[r] +
-          ';font-weight:700">' +
-          formatLevel(cid, avg) +
-          '</span></td>';
-      }
-    });
-    html += '</tr>';
-    return html;
   }
 
   /* ── Sorting ─────────────────────────────────────────────── */

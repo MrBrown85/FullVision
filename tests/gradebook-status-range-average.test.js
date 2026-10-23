@@ -108,3 +108,27 @@ describe('gradebook views use them', () => {
     expect(src).toContain('getClassPointsAverage(cid, students, assess)');
   });
 });
+
+// The Competencies view's Class Average for a competency column comes from
+// calc.js (getClassCompetencyAverage), with today's rules unchanged.
+describe('getClassCompetencyAverage', () => {
+  const level = { id: 'lv', title: 'lv', scoreMode: 'proficiency', tagIds: ['T1'], type: 'summative' };
+  const entry = (value, mod) => ({ assessmentId: 'lv', tagId: 'T1', score: value, mod, date: '2026-10-10' });
+
+  it('averages the scored students, + and − included', () => {
+    seed([level], { s1: [entry(3, 1)], s2: [entry(3, -1)], s3: [entry(2)], s4: [] });
+    const stats = getClassCompetencyAverage(CID, STUDENTS, 'lv', 'T1');
+    expect(stats.count).toBe(3);
+    expect(stats.avg).toBeCloseTo((scoreModValue(entry(3, 1)) + scoreModValue(entry(3, -1)) + 2) / 3, 10);
+  });
+
+  it('leaves out students with no score and returns null when nobody has one', () => {
+    seed([level], { s1: [entry(0)], s2: [] });
+    expect(getClassCompetencyAverage(CID, STUDENTS, 'lv', 'T1')).toBeNull();
+  });
+
+  it('still counts an Excused student score that is left, as before', () => {
+    seed([level], { s1: [entry(4)], s2: [entry(2)] }, { 's2:lv': 'EXC' });
+    expect(getClassCompetencyAverage(CID, STUDENTS, 'lv', 'T1')).toEqual({ avg: 3, count: 2 });
+  });
+});
