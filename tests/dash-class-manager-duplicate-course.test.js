@@ -1,8 +1,9 @@
 /**
  * Class manager — Duplicate Class.
  *
- * The copy gets the class settings, the learning map, sentence starters and
- * the categories with their weights, all as new rows. Reporting terms stay
+ * The copy gets the class settings, the learning map, sentence starters,
+ * the categories with their weights and the rubrics (unlinked, competencies
+ * matched by name), all as new rows. Reporting terms stay
  * behind: their dates belong to one school year (docs/DECISIONS.md,
  * Reporting periods 6). Signed in, the categories wait for the new class's
  * server id and then go up through save_categories.
@@ -116,6 +117,71 @@ describe('class manager — duplicate class', () => {
     // The source class is untouched.
     expect(getCategories(SRC).map(c => c.id)).toEqual([TEST, LAB]);
     expect(getCourseConfig(SRC).reportingTerms).toEqual(TERMS);
+  });
+
+  it('copies rubrics as new, unlinked rows matched to the copy’s competencies', () => {
+    _cache.learningMaps[SRC] = {
+      subjects: [{ id: 'subj-sci', name: 'Science 8', color: '#123456' }],
+      sections: [
+        {
+          id: 'sec-q',
+          subject: 'subj-sci',
+          name: 'Questioning',
+          color: '#123456',
+          tags: [{ id: 'tag-q', label: 'Question and Predict', text: 'Ask questions' }],
+        },
+      ],
+      _customized: true,
+      _version: 1,
+    };
+    _cache.rubrics[SRC] = [
+      {
+        id: 'rub-lab',
+        name: 'Lab Rubric',
+        copyGroup: 'group-1',
+        criteria: [
+          { id: 'crit-q', name: 'Inquiry', tagIds: ['tag-q'], weight: 1, levels: { 4: 'a', 3: 'b', 2: 'c', 1: 'd' } },
+        ],
+      },
+      {
+        id: 'rub-adv',
+        name: 'Lab Skills',
+        style: 'advanced',
+        criteria: [
+          {
+            id: 'crit-safe',
+            name: 'Safety',
+            tagIds: [],
+            weight: 1,
+            levels: { 4: '', 3: '', 2: '', 1: '' },
+            checks: [{ id: 'chk-1', level: 3, label: 'Goggles on', displayOrder: 0 }],
+          },
+        ],
+      },
+    ];
+    duplicate();
+    const cid = newCid();
+    const copies = getRubrics(cid);
+    expect(copies.map(r => r.name)).toEqual(['Lab Rubric', 'Lab Skills']);
+    expect(copies.map(r => r.id)).not.toContain('rub-lab');
+    expect(copies[0].copyGroup).toBeUndefined();
+    // The competency is the copy's own, found by name.
+    const newTag = getLearningMap(cid).sections[0].tags[0];
+    expect(newTag.id).not.toBe('tag-q');
+    expect(copies[0].criteria[0].tagIds).toEqual([newTag.id]);
+    expect(copies[0].criteria[0].id).not.toBe('crit-q');
+    // An Advanced Rubric keeps its style and gets new checkbox ids.
+    expect(copies[1].style).toBe('advanced');
+    expect(copies[1].criteria[0].checks.map(k => k.label)).toEqual(['Goggles on']);
+    expect(copies[1].criteria[0].checks[0].id).not.toBe('chk-1');
+    // The source keeps its rubrics and its link.
+    expect(getRubrics(SRC).map(r => r.id)).toEqual(['rub-lab', 'rub-adv']);
+    expect(getRubrics(SRC)[0].copyGroup).toBe('group-1');
+  });
+
+  it('copies no rubrics when the source has none', () => {
+    duplicate();
+    expect(getRubrics(newCid())).toEqual([]);
   });
 
   it('with a block chosen, keeps the class name and sets the block', () => {

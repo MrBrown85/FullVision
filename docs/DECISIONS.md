@@ -81,7 +81,7 @@ Context: a teacher asked for Teams' "Import settings": set up grading once and u
 5. **A review step lists every change per class** before anything is saved, and what is already the same. Unsaved category or term edits in Class Management block the dialog until saved or undone.
 6. **Copies are not linked** and scores are never touched. Grades in the target classes follow the new setup.
 7. **Signed in, removed categories with work stay at 0% until the work has moved,** then a second save deletes them (the server refuses to delete a category in use). If the new categories haven't reached the server (offline, refused), the work stays where it is and Class Management offers the move later.
-8. **Duplicate Class copies categories and weights too** (2026-10-18), as new rows, with the class settings, learning map and sentence starters. It leaves reporting terms (Reporting periods 6), rubrics and assessments, which each have their own copy.
+8. **Duplicate Class copies categories and weights too** (2026-10-18), as new rows, with the class settings, learning map and sentence starters. It leaves reporting terms (Reporting periods 6) and assessments, which have their own copy. **Rubrics are copied too** (Colin, 2026-10-23, reversing the earlier "rubrics are not"): as new rows, competencies matched into the copy's learning map by name, not linked to the source class, as Schoology, Teams and Canvas copy rubrics with a course.
 
 ## Editing a rubric that already has scores (2026-10-18)
 
@@ -107,7 +107,7 @@ Context: every gradebook compared in the rubrics review returns the rubric to th
 
 Context: a rubric belongs to one class, so a teacher with two sections, or the same course next year, built it twice. Schoology copies rubrics from Resources into courses, Teams keeps one list per teacher, Classroom reuses from any class as a copy; none of them sync copies. Plan at `~/fullvision-rubric-library-plan.md`; `teacher/rubric-library.js`.
 
-1. **Rubrics stay per class.** `rubric.course_id` is kept; RLS, the class bundle, Demo Mode and the outbox all assume it. Duplicate Class does not copy rubrics; the copy below does.
+1. **Rubrics stay per class.** `rubric.course_id` is kept; RLS, the class bundle, Demo Mode and the outbox all assume it. Duplicate Class copies a class's rubrics, unlinked (2026-10-23, Copying a class's grading setup 8); the copy below is for one rubric into an existing class.
 2. **Copy on demand.** "Copy to another class" on the Rubric Bank and "From another class" on the assessment form copy a rubric, criteria and descriptors included, into another live class.
 3. **Competencies are matched by name** in the target (short label, then full text, same section preferred, as assessment copies do). A competency with no match is listed before the copy is made and the criterion keeps its descriptors. When more than half have no match the dialog says the class teaches a different course.
 4. **A same-named rubric in the target is never replaced**; the copy is named "Name (2)". Replacing criteria would delete scored ones.
