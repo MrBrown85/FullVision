@@ -164,7 +164,7 @@ window.ReportBlocks = (function () {
     return `<div class="report-header">
     <div class="report-header-main">
       <div class="report-course-title">${esc(titleParts.join(' \u00B7 '))}</div>
-      <div class="report-student-name">${esc(fullName(student))}</div>
+      <div class="report-student-name">${esc(printedStudentName(student, options.name))}</div>
     </div>
     <div class="report-header-meta">
       <div class="report-period">${esc(period)}</div>${dates ? `<div>${dates}</div>` : ''}${who ? `<div>${who}</div>` : ''}

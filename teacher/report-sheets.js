@@ -140,6 +140,15 @@ window.ReportSheets = (function () {
         { key: 'teacher', label: 'Teacher', def: true },
         { key: 'dates', label: 'Term Dates', def: true },
         { key: 'studentNumber', label: 'Student Number', def: true },
+        {
+          key: 'name',
+          label: 'Name',
+          def: 'preferred',
+          choices: [
+            { v: 'preferred', label: 'Preferred Name' },
+            { v: 'first', label: 'First Name' },
+          ],
+        },
       ],
     },
     'academic-summary': { label: 'Overall and Competencies', rows: 6, group: 'Grades' },

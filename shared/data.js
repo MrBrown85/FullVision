@@ -5170,6 +5170,19 @@ function displayNameFirst(st) {
 function displayNameWithLast(st) {
   return ((st.preferred || st.firstName || '') + ' ' + (st.lastName || '')).trim();
 }
+/* The name printed on a report card or rubric: the preferred name (the
+   first name when there is none), or the first name when `style` is
+   'first', then always the last name. A preferred name that already ends
+   in the last name keeps it once ("Bobby Smith"). */
+function printedStudentName(st, style) {
+  st = st || {};
+  var first = String((style === 'first' ? st.firstName || st.preferred : st.preferred || st.firstName) || '').trim();
+  var last = String(st.lastName || '').trim();
+  if (!last) return first || displayName(st);
+  var lower = first.toLowerCase();
+  if (lower === last.toLowerCase() || lower.slice(-(last.length + 1)) === ' ' + last.toLowerCase()) return first;
+  return (first + ' ' + last).trim();
+}
 
 function sortStudents(arr, mode, cid) {
   var c = arr.slice();

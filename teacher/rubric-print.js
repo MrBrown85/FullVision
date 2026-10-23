@@ -226,17 +226,9 @@
     return parts.filter(Boolean).join('\n');
   }
 
-  /* The name at the top of a sheet: the preferred name (the first name when
-     there is none) or the first name, then always the last name. A
-     preferred name that already ends in the last name keeps it once. */
+  /* The name at the top of a sheet (printedStudentName in shared/data.js). */
   function printName(student, nameStyle) {
-    var first = nameStyle === 'first' ? student.firstName || student.preferred : student.preferred || student.firstName;
-    first = String(first || '').trim();
-    var last = String(student.lastName || '').trim();
-    if (!last) return first || displayName(student);
-    var lower = first.toLowerCase();
-    if (lower === last.toLowerCase() || lower.slice(-(last.length + 1)) === ' ' + last.toLowerCase()) return first;
-    return (first + ' ' + last).trim();
+    return printedStudentName(student, nameStyle);
   }
 
   /* Everything one sheet shows. `scored` is false for a blank rubric.
