@@ -17,7 +17,6 @@ window.PageStudent = (function () {
   var _assessCat = ''; // Assessments tab: a category id, or '' for all
   var _openTags = new Set(); // competency cards whose evidence drawer is open
   var _overrideSelectedLevel = 0;
-  var _profileData = null;
   var Evidence = StudentEvidence;
   var Overrides = StudentOverrides;
 
@@ -58,7 +57,6 @@ window.PageStudent = (function () {
      on one tab. */
   function switchStudent(sid) {
     studentId = sid;
-    _profileData = null;
     Router.navigate('#/student?id=' + sid + '&course=' + activeCourse + '&tab=' + _tab);
   }
 
@@ -315,67 +313,6 @@ window.PageStudent = (function () {
       'PageStudent.switchStudent',
     );
     render();
-  }
-
-  /* ── Competency tree renderer ───────────────────────────── */
-  function _renderCompetencyTree(tree) {
-    if (!tree) return '';
-    var subjects = tree.subjects || [];
-    if (subjects.length === 0) return '';
-    var out = '<div class="ct-wrap"><div class="ct-title">Competency Profile</div>';
-    subjects.forEach(function (subj) {
-      var sections = subj.sections || [];
-      if (sections.length === 0) return;
-      out += '<div class="ct-subject"><div class="ct-subject-name">' + esc(subj.name) + '</div>';
-      sections.forEach(function (sec) {
-        // The level comes from shared/calc.js like everywhere else, not from
-        // the server's old calculation (archived in fv_legacy).
-        var prof = getSectionProficiency(activeCourse, studentId, sec.id) || null;
-        var profRounded = prof != null ? Math.round(prof) : 0;
-        var tags = sec.tags || [];
-        out +=
-          '<div class="ct-section">' +
-          '<div class="ct-section-header">' +
-          profLabelBadge(prof != null ? prof : 0) +
-          '<span class="ct-section-name">' +
-          esc(sec.name) +
-          '</span>' +
-          (sec.override ? '<span class="override-label">Overridden</span>' : '') +
-          '</div>';
-        if (tags.length > 0) {
-          out += '<div class="ct-tags">';
-          tags.forEach(function (tag) {
-            var lv = tag.latest_value;
-            var lvRounded = lv != null ? Math.round(lv) : 0;
-            var lvColor = lv != null ? PROF_COLORS[lvRounded] || PROF_COLORS[0] : 'var(--text-3)';
-            out +=
-              '<div class="ct-tag-row">' +
-              '<span class="ct-tag-code">' +
-              esc(tag.code || '') +
-              '</span>' +
-              '<span class="ct-tag-label">' +
-              esc(tag.label || '') +
-              '</span>' +
-              '<span class="ct-tag-val" style="color:' +
-              lvColor +
-              '">' +
-              formatLevel(activeCourse, lv) +
-              '</span>' +
-              '<span class="ct-tag-cov" title="' +
-              (tag.coverage_count || 0) +
-              ' assessment(s)">' +
-              (tag.coverage_count || 0) +
-              '</span>' +
-              '</div>';
-          });
-          out += '</div>';
-        }
-        out += '</div>';
-      });
-      out += '</div>';
-    });
-    out += '</div>';
-    return out;
   }
 
   /* ── Tabs ───────────────────────────────────────────────── */
@@ -683,7 +620,6 @@ window.PageStudent = (function () {
       });
     }
     if (!ctx.sections.length) html += '<div class="stu-empty">This class has no competencies yet.</div>';
-    if (_profileData && _profileData.competency_tree) html += _renderCompetencyTree(_profileData.competency_tree);
     return html;
   }
 
@@ -1373,27 +1309,15 @@ window.PageStudent = (function () {
     _addDocListener('change', _handleChange);
     _addDocListener('keydown', _handleKeydown);
 
-    _profileData = null;
     render();
 
     // "&ob=<id>" (a week on the dashboard's Observations card): show that
     // observation in the Evidence panel once the page has settled.
     var jumpOb = params.ob ? resolveObservationId(activeCourse, params.ob) : null;
-    var jumpSid = studentId;
-
-    if (window.v2 && window.v2.getStudentProfile) {
-      window.v2.getStudentProfile(studentId).then(function (res) {
-        if (res && res.data) {
-          _profileData = res.data;
-          render();
-          if (jumpOb && studentId === jumpSid) Evidence.jumpTo(jumpOb);
-        }
-      });
-    }
 
     requestAnimationFrame(function () {
       document.getElementById('main').scrollTop = 0;
-      if (jumpOb && studentId === jumpSid) Evidence.jumpTo(jumpOb);
+      if (jumpOb) Evidence.jumpTo(jumpOb);
     });
   }
 

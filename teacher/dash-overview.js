@@ -307,7 +307,13 @@ window.DashOverview = (function () {
         '<div class="dash-cc-dot" style="background:' +
         (assessed ? cc.color : 'var(--border)') +
         '"></div>' +
+        // A pill with no count has no hover card, so its name carries a title
+        // for when a narrow card cuts it short.
+        '<span class="dash-cc-name"' +
+        (count > 0 ? '' : ' title="' + esc(cc.label) + '"') +
+        '>' +
         esc(cc.label) +
+        '</span>' +
         (count > 0 ? '<span class="dash-cc-count">' + count + '</span>' : '') +
         (count > 0
           ? '<div class="dist-tip"><div class="dist-tip-title">' + esc(cc.label) + '</div>' + aNames + '</div>'
@@ -320,7 +326,7 @@ window.DashOverview = (function () {
 
     if (actionItems.length === 0) {
       html +=
-        '<div class="dash-action-item"><span class="dash-action-dot" style="background:var(--score-3)"></span><span class="dash-action-text" style="color:var(--score-3)">Looking good! All standards covered, all competencies tagged.</span></div>';
+        '<div class="dash-action-item"><span class="dash-action-dot" style="background:var(--score-3)"></span><span class="dash-action-text" style="color:var(--score-3)" title="Looking good! All standards covered, all competencies tagged.">Looking good! All standards covered, all competencies tagged.</span></div>';
     } else {
       html += '<div class="dash-action-list">';
       actionItems.forEach(function (item) {
