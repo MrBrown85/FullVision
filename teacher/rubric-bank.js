@@ -6,7 +6,7 @@
    deleting and the new-assessment form; it passes them in as hooks so this
    file never reaches into the page's state.
 
-   Hooks: edit(rid), newRubric(), remove(rid), print(rid, aid),
+   Hooks: edit(rid), newRubric(), remove(rid), print(rid, cid),
    useInNew(rid), goToAssessment(aid), changed().
    ─────────────────────────────────────────────────────────────── */
 window.RubricBank = (function () {
@@ -714,7 +714,7 @@ window.RubricBank = (function () {
     html +=
       '<div class="rb-actions"><button type="button" class="rb-btn rb-btn-primary" data-rb="copy-here">Copy to ' +
       esc(here) +
-      '</button></div></div>';
+      '</button><button type="button" class="rb-btn" data-rb="print">Print</button></div></div>';
     if (match.total) {
       var missing = match.total - match.matched;
       html +=
@@ -785,7 +785,7 @@ window.RubricBank = (function () {
       '</div></div>';
     html += '<div class="rb-actions">';
     html += '<button type="button" class="rb-btn rb-btn-primary" data-rb="edit">Edit Rubric</button>';
-    if (uses.length) html += '<button type="button" class="rb-btn" data-rb="print">Print</button>';
+    html += '<button type="button" class="rb-btn" data-rb="print">Print</button>';
     if (_canCopy(cid)) html += '<button type="button" class="rb-btn" data-rb="copy">Copy to Class</button>';
     html +=
       '<div class="rb-more-wrap"><button type="button" class="rb-btn rb-more' +
@@ -1009,10 +1009,11 @@ window.RubricBank = (function () {
         if (hooks.edit) hooks.edit(rid);
         break;
       case 'print': {
-        var uses = usesOf(cid, rid);
-        if (!uses.length) break;
+        // Another class's rubric prints blank only; this class's opens on its
+        // newest assessment, or blank when nothing uses it.
+        var printCid = _s.selCid;
         close();
-        if (hooks.print) hooks.print(rid, uses[0].id);
+        if (hooks.print) hooks.print(rid, printCid);
         break;
       }
       case 'copy':

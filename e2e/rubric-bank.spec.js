@@ -74,10 +74,10 @@ test.describe('Rubric Bank', () => {
     await expect(bank.locator('.rb-cell').first()).toHaveText('Explains why');
     await expect(bank.locator('.rb-use-chip')).toHaveText(['Rubric Lab Report']);
 
-    // Down moves to the unused rubric, which has nothing to print.
+    // Down moves to the unused rubric, which can still print blank.
     await bank.locator('#rb-search').press('ArrowDown');
     await expect(bank.locator('.rb-title')).toHaveText('Presentation Rubric');
-    await expect(bank.locator('[data-rb="print"]')).toHaveCount(0);
+    await expect(bank.locator('[data-rb="print"]')).toHaveCount(1);
 
     await bank.locator('#rb-search').fill('zzz');
     await expect(bank.locator('#rb-list')).toHaveText('No rubrics match.');
@@ -345,5 +345,72 @@ test.describe('Rubric Bank, class stats', () => {
       'Overall: Extending 0, Proficient 1, Developing 1, Emerging 0',
     );
     await expect(overall.locator('.rb-dist-seg')).toHaveText(['1', '1']);
+  });
+});
+
+test.describe('Rubric Bank, Print Rubrics window', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockAuth(page);
+    await seedCourse(page);
+    await seedStudents(page);
+    await page.addInitScript(
+      ({ rubrics, assessment, cid }) => {
+        localStorage.setItem('gb-rubrics-' + cid, JSON.stringify(rubrics));
+        localStorage.setItem('gb-assessments-' + cid, JSON.stringify([assessment]));
+      },
+      { rubrics: [LAB, TALK], assessment: ASSESSMENT, cid: TEST_COURSE.id },
+    );
+    await seedScores(page, { 'stu-001': { 'assess-rubric-001': { QAP: 3 } } });
+    await gotoApp(page, '/dashboard');
+  });
+
+  test('opens on completed rubrics, switches to blank copies, and counts pages', async ({ page }) => {
+    const bank = await openBank(page);
+    await bank.getByRole('button', { name: 'Print', exact: true }).click();
+    await expect(bank).toHaveCount(0);
+    const dialog = page.getByRole('dialog', { name: 'Print Rubrics' });
+    await expect(dialog).toContainText('Lab Report Rubric · 1 Criterion');
+    await expect(dialog.getByRole('radio', { name: /Completed Rubrics/ })).toBeChecked();
+    await expect(dialog.getByRole('radio', { name: /All Scored Students/ })).toBeVisible();
+    await dialog.getByRole('radio', { name: /All Students/ }).check();
+    await dialog.locator('.rp-tile', { hasText: '1 per Page' }).click();
+    await expect(dialog.getByRole('button', { name: 'Print 3 Pages' })).toBeEnabled();
+    await expect(dialog.locator('#rp-preview .rubric-page')).toHaveCount(1);
+    await expect(dialog.locator('#rp-preview-count')).toHaveText('Page 1 of 3');
+
+    await dialog.locator('.rp-tile', { hasText: 'Blank Rubric' }).click();
+    await expect(dialog.getByRole('radio', { name: /All Students/ })).toHaveCount(0);
+    await expect(dialog.getByRole('spinbutton', { name: 'Copies' })).toHaveValue('3');
+    await expect(dialog.getByRole('checkbox', { name: 'Overall Level' })).toHaveCount(0);
+    await expect(dialog.getByRole('checkbox', { name: 'Competency Codes' })).toBeVisible();
+    await dialog.locator('.rp-tile', { hasText: '4 per Page' }).click();
+    await expect(dialog.getByRole('button', { name: 'Print 1 Page' })).toBeEnabled();
+    await expect(dialog.locator('#rp-preview .rubric-name-line')).toHaveCount(3);
+  });
+
+  test('a rubric no assessment uses prints blank only', async ({ page }) => {
+    const bank = await openBank(page);
+    await bank.locator('.rb-row', { hasText: 'Presentation Rubric' }).click();
+    await bank.getByRole('button', { name: 'Print', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Print Rubrics' });
+    await expect(dialog.getByRole('radio', { name: /Completed Rubrics/ })).toBeDisabled();
+    await expect(dialog.getByRole('radio', { name: /Blank Rubric/ })).toBeChecked();
+    await dialog.getByRole('spinbutton', { name: 'Copies' }).fill('5');
+    await dialog.locator('.rp-tile', { hasText: '2 per Page' }).click();
+    await expect(dialog.getByRole('button', { name: 'Print 3 Pages' })).toBeEnabled();
+    await expect(dialog.locator('#rp-status')).toContainText('5 blank rubrics on 3 pages');
+  });
+
+  test('the assessment card opens the same window on that assessment', async ({ page }) => {
+    await page.evaluate(() => {
+      window.location.hash = '#/assignments';
+    });
+    const title = page.locator('text=Rubric Lab Report').first();
+    await expect(title).toBeVisible();
+    if (!(await page.locator('[data-action="printRubrics"]').first().isVisible())) await title.click();
+    await page.locator('[data-action="printRubrics"]').first().click();
+    const dialog = page.getByRole('dialog', { name: 'Print Rubrics' });
+    await expect(dialog.getByRole('radio', { name: /Completed Rubrics/ })).toBeChecked();
+    await expect(dialog.getByRole('radio', { name: /Blank Rubric/ })).toBeEnabled();
   });
 });

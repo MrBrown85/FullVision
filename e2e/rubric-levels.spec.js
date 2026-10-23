@@ -75,7 +75,7 @@ async function printedHeads(page) {
   await page.locator('[data-action="printRubrics"]').first().click();
   const dialog = page.getByRole('dialog', { name: 'Print Rubrics' });
   await expect(dialog).toBeVisible();
-  await dialog.getByRole('button', { name: 'Print', exact: true }).click();
+  await dialog.getByRole('button', { name: /^Print \d+ Pages?$/ }).click();
   const sheet = page.locator('#rubric-print-root .rubric-sheet').first();
   await expect(sheet.locator('.rubric-level-head')).toHaveCount(4);
   const heads = await sheet.locator('.rubric-level-head').allTextContents();

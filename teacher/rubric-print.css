@@ -115,6 +115,23 @@
   font-weight: 700;
   line-height: 1.15;
 }
+/* A blank rubric: a line to write the student's name on. */
+.rubric-name-line {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.4em;
+  width: 100%;
+  max-width: 22em;
+}
+.rubric-name-line .rubric-label {
+  font-size: 0.6em;
+  color: #000;
+}
+.rubric-name-rule {
+  flex: 1;
+  height: 1em;
+  border-bottom: 1px solid #000;
+}
 .rubric-meta {
   font-size: 0.9em;
   color: #333;
@@ -285,13 +302,153 @@
 
 /* ── Options dialog ───────────────────────────────────────── */
 .rubric-print-card {
-  max-width: 460px;
-}
-.rp-groups {
+  max-width: 820px;
+  max-height: calc(100vh - 32px);
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  margin-bottom: 14px;
+}
+/* Options on the left, the page preview on the right. */
+.rp-body {
+  display: flex;
+  gap: 24px;
+  min-height: 0;
+  overflow-y: auto;
+  margin-bottom: 16px;
+}
+.rp-groups {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.rp-side {
+  width: 260px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rp-legend {
+  font-family: var(--font-base);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-3);
+}
+.rp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rp-select,
+.rp-copies {
+  height: 36px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-family: var(--font-base);
+  font-size: var(--text-base);
+  color: var(--text);
+}
+.rp-copies {
+  width: 96px;
+}
+/* Choices drawn as tiles; each holds a real radio. */
+.rp-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.rp-tiles.is-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.rp-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  font-family: var(--font-base);
+  cursor: pointer;
+}
+.rp-tiles.is-three .rp-tile {
+  align-items: center;
+  text-align: center;
+}
+.rp-tile input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.rp-tile.is-on {
+  border-color: var(--active);
+  box-shadow: inset 0 0 0 1px var(--active);
+  background: var(--active-light);
+}
+.rp-tile:focus-within {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+.rp-tile.is-disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.rp-tile-title {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text);
+}
+.rp-tile-help {
+  font-size: var(--text-xs);
+  color: var(--text-3);
+}
+.rp-page-icon {
+  display: grid;
+  width: 34px;
+  height: 44px;
+  margin-bottom: 4px;
+  border: 1px solid var(--text-3);
+  background: var(--surface);
+}
+.rp-page-icon.is-landscape {
+  width: 56px;
+  height: 44px;
+}
+.rp-page-icon span {
+  border: 1px dashed var(--border-2);
+  margin: 2px;
+  background: repeating-linear-gradient(var(--surface) 0 4px, var(--bg-secondary) 4px 6px);
+}
+/* Page 1, scaled down from the staged sheets. */
+.rp-preview {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 264px;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--bg-secondary);
+}
+.rp-preview-frame {
+  overflow: hidden;
+  background: #fff;
+  color: #000;
+  font-family: var(--font-base, system-ui, sans-serif);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+.rp-preview-count {
+  font-family: var(--font-base);
+  font-size: var(--text-xs);
+  color: var(--text-3);
+  text-align: center;
 }
 .rp-group {
   border: none;
@@ -330,7 +487,7 @@
   padding-top: 2px;
 }
 .rp-pick {
-  max-height: 180px;
+  max-height: 132px;
   overflow-y: auto;
   margin: 4px 0 0 24px;
   padding: 4px 8px;
@@ -349,8 +506,21 @@
   font-size: var(--text-sm);
   color: var(--text-2);
   line-height: 1.45;
-  margin-bottom: 16px;
   min-height: 1.4em;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+@media (max-width: 760px) {
+  .rp-body {
+    flex-direction: column;
+  }
+  .rp-side {
+    width: auto;
+  }
+  .rp-tiles.is-three {
+    grid-template-columns: 1fr;
+  }
 }
 .rp-status.is-warning {
   color: var(--score-1-text, #991b1b);
