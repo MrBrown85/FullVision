@@ -2283,8 +2283,12 @@ window.PageGradebook = (function () {
     td.appendChild(inp);
     inp.focus();
     inp.select();
+    // What the cell opened with. A Scores cell shows one value for the whole
+    // assessment (the average of its competencies), so writing it back
+    // unchanged would flatten each competency's own score and +/−.
+    var openedValue = inp.value;
 
-    function commit(navDir) {
+    function save() {
       var val = isPts ? parsePointsInput(inp.value, maxPts) : parseFloat(inp.value);
       // Blank clears: null for points (where 0 is a score), 0 for levels.
       if (!isPts && (inp.value === '' || isNaN(val))) val = 0;
@@ -2334,6 +2338,10 @@ window.PageGradebook = (function () {
           showSyncToast("Couldn't save score — your other changes are safe. Try again in a moment.", 'error');
         }
       }
+    }
+
+    function commit(navDir) {
+      if (inp.value !== openedValue) save();
       clearProfCache();
       inp.remove();
       if (span) span.style.display = '';
