@@ -35,18 +35,18 @@
   page-break-after: auto;
 }
 .rubric-page.layout-full {
-  width: 7.5in;
-  height: 10in;
+  width: 8in;
+  height: 10.5in;
   grid-template-columns: 1fr;
 }
 .rubric-page.layout-half {
-  width: 10.2in;
-  height: 7.7in;
+  width: 10.5in;
+  height: 8in;
   grid-template-columns: 1fr 1fr;
 }
 .rubric-page.layout-quarter {
-  width: 7.7in;
-  height: 10.2in;
+  width: 8in;
+  height: 10.5in;
   grid-template-columns: 1fr 1fr;
   grid-template-rows: 1fr 1fr;
 }
