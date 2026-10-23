@@ -324,6 +324,11 @@
 .rp-help {
   color: var(--text-3);
 }
+.rp-group > .rp-help {
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  padding-top: 2px;
+}
 .rp-pick {
   max-height: 180px;
   overflow-y: auto;
