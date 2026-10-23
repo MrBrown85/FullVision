@@ -55,9 +55,44 @@
 .dash-overview-second {
   grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
   margin-top: 12px;
+  /* As tall as Upcoming Birthdays with its title and three birthdays
+     (Colin, 2026-10-22), whatever Core Competencies and Next Steps hold;
+     Next Steps scrolls inside it. The card's border and padding, the title
+     line and its margin, and three rows of a 34px avatar with 5px above and
+     below. */
+  height: calc(2px + 2 * 16px + var(--text-base) * 1.5 + 10px + 3 * (34px + 2 * 5px));
+  grid-template-rows: minmax(0, 1fr);
+}
+.dash-overview-second > .dash-overview-section {
+  min-height: 0;
+}
+/* Tighter spacing in Core Competencies, so Next Steps shows its first item
+   in full at that height; further items scroll. */
+.dash-overview-second .dash-cc-grid {
+  margin-top: 0;
+}
+.dash-overview-second .dash-next-steps {
+  margin-top: 6px;
+}
+.dash-overview-second .dash-next-steps .dash-section-title {
+  margin-bottom: 4px;
+}
+.dash-overview-second .dash-action-list {
+  margin-top: 0;
+}
+.dash-overview-second .dash-action-item {
+  padding: 5px 12px;
 }
 .dash-overview-second.is-single {
   grid-template-columns: minmax(0, 1fr);
+}
+/* Narrower, the seven Core Competencies take three rows and leave Next
+   Steps no room, so the row grows to fit instead. */
+@media (max-width: 1239px) {
+  .dash-overview-second {
+    height: auto;
+    grid-template-rows: none;
+  }
 }
 @media (max-width: 768px) {
   .dash-overview-top,
@@ -1050,6 +1085,8 @@ body.fv-names-hidden .dash-search-input:not(:placeholder-shown) {
   grid-template-columns: repeat(4, 1fr);
   gap: 12px;
   padding: 0;
+  /* The section above already sets the 12px between boxes. */
+  margin-top: 0;
 }
 @media (max-width: 960px) {
   .dash-grid {
