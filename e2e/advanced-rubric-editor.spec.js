@@ -229,3 +229,61 @@ test.describe('Advanced Rubric editor', () => {
     ]);
   });
 });
+
+test.describe('Advanced Rubric editor, Draft from a competency', () => {
+  const seed = checks => ({
+    id: 'rub-draft',
+    name: 'Planning Rubric',
+    style: 'advanced',
+    criteria: [
+      {
+        id: 'crit-plan',
+        name: 'Criterion 1',
+        tagIds: ['PI'],
+        weight: 1,
+        levels: { 4: '', 3: '', 2: '', 1: '' },
+        checks: checks,
+      },
+    ],
+  });
+
+  async function openDraft(page, checks) {
+    await mockAuth(page);
+    await seedCourse(page);
+    await seedStudents(page);
+    await page.addInitScript(
+      ({ cid, map, statements, rubric }) => {
+        const withStatements = JSON.parse(JSON.stringify(map), (key, value) =>
+          key === 'i_can_statements' ? statements : value,
+        );
+        localStorage.setItem('gb-learningMaps-' + cid, JSON.stringify(withStatements));
+        localStorage.setItem('gb-rubrics-' + cid, JSON.stringify([rubric]));
+      },
+      { cid: TEST_COURSE.id, map: TEST_LEARNING_MAP, statements: STATEMENTS, rubric: seed(checks) },
+    );
+    await gotoApp(page, '/assignments');
+    await page.locator('[data-action="openRubricBank"]').click();
+    await page.getByRole('dialog', { name: 'Rubric Bank' }).getByRole('button', { name: 'Edit Rubric' }).click();
+    const editor = page.locator('#rubric-modal');
+    await expect(editor).toBeVisible();
+    const draft = editor.locator('[data-action="draftCriterion"]').first();
+    if (!(await draft.isVisible())) await editor.locator('.rubric-criterion').first().click();
+    await draft.click();
+    return editor;
+  }
+
+  test('fills an empty Proficient level with the I-can statements', async ({ page }) => {
+    const editor = await openDraft(page, []);
+    const proficient = editor.locator('.rubric-check-input[data-level="3"]');
+    await expect(proficient).toHaveCount(2);
+    await expect(proficient.first()).toHaveValue(STATEMENTS[0]);
+    await expect(proficient.nth(1)).toHaveValue(STATEMENTS[1]);
+  });
+
+  test('leaves Proficient alone when it already has boxes', async ({ page }) => {
+    const editor = await openDraft(page, [{ id: 'k-own', level: 3, label: 'My own box', displayOrder: 0 }]);
+    const proficient = editor.locator('.rubric-check-input[data-level="3"]');
+    await expect(proficient).toHaveCount(1);
+    await expect(proficient.first()).toHaveValue('My own box');
+  });
+});
