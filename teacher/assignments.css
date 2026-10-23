@@ -867,7 +867,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 20px;
+  /* Controls start 12px in, in line with the boxes below. */
+  padding: 10px 12px;
   background: var(--surface);
   border-bottom: 0.5px solid var(--divider-medium);
 }

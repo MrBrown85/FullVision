@@ -921,7 +921,8 @@ body.fv-names-hidden .dash-search-input:not(:placeholder-shown) {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 20px;
+  /* Controls start 12px in, in line with the boxes below. */
+  padding: 10px 12px;
   background: var(--surface);
   border-bottom: 1px solid var(--divider-strong);
   flex-wrap: wrap;
