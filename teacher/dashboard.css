@@ -56,15 +56,39 @@
   grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
   margin-top: 12px;
   /* As tall as Upcoming Birthdays with its title and three birthdays
-     (Colin, 2026-10-22), whatever Core Competencies and Next Steps hold;
-     Next Steps scrolls inside it. The card's border and padding, the title
-     line and its margin, and three rows of a 34px avatar with 5px above and
-     below. */
-  height: calc(2px + 2 * 16px + var(--text-base) * 1.5 + 10px + 3 * (34px + 2 * 5px));
+     (Colin, 2026-10-22), at every width and whatever Core Competencies and
+     Next Steps hold; Next Steps scrolls inside it. The card's border and
+     padding, the title line and its margin, and three rows of a 34px avatar
+     with 5px above and below. */
+  --dash-row2-h: calc(2px + 2 * 16px + var(--text-base) * 1.5 + 10px + 3 * (34px + 2 * 5px));
+  height: var(--dash-row2-h);
   grid-template-rows: minmax(0, 1fr);
 }
 .dash-overview-second > .dash-overview-section {
   min-height: 0;
+}
+/* The seven Core Competencies take two lines at most. Where the card is too
+   narrow for that, they take a four-column grid and a long name ends in an
+   ellipsis (the full name is in its hover card or title). */
+.dash-cc-card {
+  container-type: inline-size;
+}
+.dash-cc-name {
+  min-width: 0;
+}
+@container (max-width: 745px) {
+  .dash-cc-card .dash-cc-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .dash-cc-card .dash-cc-pill {
+    min-width: 0;
+  }
+  .dash-cc-card .dash-cc-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 /* Tighter spacing in Core Competencies, so Next Steps shows its first item
    in full at that height; further items scroll. */
@@ -83,21 +107,27 @@
 .dash-overview-second .dash-action-item {
   padding: 5px 12px;
 }
+/* One line each, the full text in its title, so a narrow card still shows
+   the first in full. */
+.dash-overview-second .dash-action-text {
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+}
 .dash-overview-second.is-single {
   grid-template-columns: minmax(0, 1fr);
-}
-/* Narrower, the seven Core Competencies take three rows and leave Next
-   Steps no room, so the row grows to fit instead. */
-@media (max-width: 1239px) {
-  .dash-overview-second {
-    height: auto;
-    grid-template-rows: none;
-  }
 }
 @media (max-width: 768px) {
   .dash-overview-top,
   .dash-overview-second {
     grid-template-columns: minmax(0, 1fr);
+  }
+  /* Stacked, each card keeps the row's height. */
+  .dash-overview-second {
+    height: auto;
+    grid-template-rows: none;
+  }
+  .dash-overview-second > .dash-overview-section {
+    height: var(--dash-row2-h);
   }
 }
 .dash-overview-section {
@@ -259,6 +289,7 @@
   font-size: var(--text-xs);
   color: var(--text-3);
   margin-left: 2px;
+  flex-shrink: 0;
 }
 
 /* Action items */

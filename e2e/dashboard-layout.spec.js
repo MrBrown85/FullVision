@@ -14,6 +14,33 @@ async function openDashboard(page) {
   await page.locator('.dash-overview-second').waitFor();
 }
 
+/* At every width the row keeps its height: on a narrow card the seven Core
+   Competencies take a four-column grid (two lines, long names cut short), and
+   the first Next Step still shows in full. */
+for (const width of [1440, 1200, 1024, 800]) {
+  test(`at ${width}px the birthdays row keeps its height and shows a Next Step`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await openDashboard(page);
+    const m = await page.evaluate(() => {
+      var pills = Array.prototype.slice.call(document.querySelectorAll('.dash-cc-pill'));
+      var list = document.querySelector('.dash-action-list').getBoundingClientRect();
+      var item = document.querySelector('.dash-action-item').getBoundingClientRect();
+      var card = document.querySelector('.dash-bday-card');
+      return {
+        row: Math.round(document.querySelector('.dash-overview-second').getBoundingClientRect().height),
+        bday: Math.round(card.getBoundingClientRect().height),
+        cc: Math.round(document.querySelector('.dash-cc-card').getBoundingClientRect().height),
+        lines: new Set(pills.map(p => Math.round(p.getBoundingClientRect().top))).size,
+        nextStepShown: item.top >= list.top - 0.5 && item.bottom <= list.bottom + 0.5,
+      };
+    });
+    expect(m.cc).toBe(m.bday);
+    expect(m.row).toBe(m.bday);
+    expect(m.lines).toBeLessThanOrEqual(2);
+    expect(m.nextStepShown).toBe(true);
+  });
+}
+
 test('the birthdays row is as tall as three birthdays and stays that size', async ({ page }) => {
   await openDashboard(page);
   const fit = () =>
