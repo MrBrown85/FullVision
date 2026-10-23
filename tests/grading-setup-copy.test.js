@@ -133,6 +133,18 @@ describe('grading setup copies across classes', () => {
     expect(exit.categoryId).toBeNull();
   });
 
+  it('copies Rubric Levels, and names it when already the same', async () => {
+    _cache.courseConfigs[A].levelOrder = 'asc';
+    const plan = GradingSetupCopy.planSetup(A, B, { levelOrder: true });
+    expect(plan.changes).toEqual([
+      { key: 'levelOrder', label: 'Rubric Levels', lines: ['Extending First → Emerging First.'] },
+    ]);
+    await GradingSetupCopy.applySetup(plan, {});
+    expect(levelOrderFor(B)).toEqual([1, 2, 3, 4]);
+    expect(GradingSetupCopy.planSetup(A, B, { levelOrder: true }).same).toEqual(['Rubric Levels']);
+    expect(GradingSetupCopy.describeSource(A).levelOrder).toBe('Emerging First');
+  });
+
   it('copies reporting terms only when ticked', async () => {
     const plan = GradingSetupCopy.planSetup(A, C, { reportingTerms: true });
     expect(plan.changes[0].key).toBe('reportingTerms');
