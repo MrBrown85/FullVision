@@ -143,10 +143,10 @@ window.DashInsights = (function () {
     return html + '</div>';
   }
 
-  function mixLegendHtml() {
+  function mixLegendHtml(cid) {
     return (
       '<div class="dash-mix-legend">' +
-      [1, 2, 3, 4]
+      levelOrderFor(cid)
         .map(function (l) {
           return '<span><i style="background:var(--score-' + l + ')"></i>' + esc(PROF_LABELS[l]) + '</span>';
         })
@@ -591,7 +591,7 @@ window.DashInsights = (function () {
     if (prof) {
       html +=
         '<div class="dash-sg-legend">' +
-        [1, 2, 3, 4]
+        levelOrderFor(cid)
           .map(function (l) {
             return '<span><span aria-hidden="true">' + GLYPHS[l] + '</span> ' + esc(PROF_LABELS[l]) + '</span>';
           })

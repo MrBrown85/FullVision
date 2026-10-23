@@ -274,6 +274,7 @@
       }
     }
     return {
+      cid: cid,
       courseName: _courseName(cid),
       assessment: assessment,
       rubric: rubric,
@@ -336,6 +337,8 @@
 
   function renderSheet(data, opts) {
     var include = opts.include || DEFAULT_OPTIONS.include;
+    // The level columns run in the class's Rubric Levels order.
+    var levels = levelOrderFor(data.cid);
     var html = '<div class="rubric-sheet"><div class="rubric-sheet-inner">';
     html += '<div class="rubric-head"><div class="rubric-head-main">';
     html += '<div class="rubric-student">' + _esc(data.studentName) + '</div>';
@@ -358,7 +361,7 @@
       '<table class="rubric-table"><thead><tr><th class="rubric-crit-head">' +
       _esc(data.rubric.name || 'Criteria') +
       '</th>';
-    LEVELS.forEach(function (lv) {
+    levels.forEach(function (lv) {
       html += '<th class="rubric-level-head l' + lv + '">' + LEVEL_NAMES[lv] + '</th>';
     });
     html += '</tr></thead><tbody>';
@@ -371,7 +374,7 @@
       if (include.codes && row.codes.length)
         html += '<div class="rubric-crit-codes">' + _esc(row.codes.join(' · ')) + '</div>';
       html += '</th>';
-      LEVELS.forEach(function (lv) {
+      levels.forEach(function (lv) {
         var scored = row.level === lv;
         html +=
           '<td class="rubric-cell' +
@@ -385,7 +388,7 @@
       if (include.criterionComments && row.comment) {
         html +=
           '<tr class="rubric-comment-row"><td colspan="' +
-          (LEVELS.length + 1) +
+          (levels.length + 1) +
           '"><span class="rubric-label">Comment</span>' +
           _esc(row.comment) +
           '</td></tr>';

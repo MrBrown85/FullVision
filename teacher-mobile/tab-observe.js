@@ -492,7 +492,7 @@ window.MObserve = (function () {
       rows += _pickRow(kind, '', 'None', !_selectedCompetency, { none: true });
     } else if (kind === 'level') {
       rows += '<div class="m-pick-note">What level does this look like? Evidence only; it never changes a grade.</div>';
-      [1, 2, 3, 4].forEach(function (n) {
+      levelOrderFor(cid).forEach(function (n) {
         rows += _pickRow(kind, String(n), ObsCapture.levelLabel(n), _selectedLevel === n);
       });
       rows += _pickRow(kind, '', 'No Level', !_selectedLevel, { none: true });

@@ -874,7 +874,7 @@ window.ObsCapture = (function () {
       } else if (name === 'level') {
         h +=
           '<div class="obsc-menu-note">What level does this look like? Evidence only; it never changes a grade.</div><div class="obsc-menu-list">';
-        [1, 2, 3, 4].forEach(function (n) {
+        levelOrderFor(cid).forEach(function (n) {
           h += item('setLevel', n, levelLabel(n), { on: state.level === n });
         });
         h += item('setLevel', '', 'No level', { on: !state.level });

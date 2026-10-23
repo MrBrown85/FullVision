@@ -222,7 +222,7 @@ window.DashOverview = (function () {
     // proficiency; a Letter class sees each competency's average.
     var showMix = DashInsights.showsProficiency(cid);
     if (showMix) {
-      html += DashInsights.mixLegendHtml() + DashInsights.mixListHtml(cid, allStudents, opts.mixPop);
+      html += DashInsights.mixLegendHtml(cid) + DashInsights.mixListHtml(cid, allStudents, opts.mixPop);
     } else {
       html += '<div class="dash-outcome-list" tabindex="0" aria-label="Curricular competencies">';
       sectionClassAvgs.forEach(function (item) {

@@ -35,18 +35,24 @@ window.StudentOverrides = (function () {
       (rawProf > 0 ? PROF_LABELS[rawRounded] : '') +
       '</strong></div>' +
       '<div class="override-levels">' +
-      '<button class="override-level-btn' +
-      (getSelectedLevel() === 4 ? ' selected' : '') +
-      '" data-level="4" data-action="selectOverrideLevel" data-value="4">4 Extending</button>' +
-      '<button class="override-level-btn' +
-      (getSelectedLevel() === 3 ? ' selected' : '') +
-      '" data-level="3" data-action="selectOverrideLevel" data-value="3">3 Proficient</button>' +
-      '<button class="override-level-btn' +
-      (getSelectedLevel() === 2 ? ' selected' : '') +
-      '" data-level="2" data-action="selectOverrideLevel" data-value="2">2 Developing</button>' +
-      '<button class="override-level-btn' +
-      (getSelectedLevel() === 1 ? ' selected' : '') +
-      '" data-level="1" data-action="selectOverrideLevel" data-value="1">1 Emerging</button>' +
+      // In the class's Rubric Levels order.
+      levelOrderFor(activeCourse)
+        .map(function (l) {
+          return (
+            '<button class="override-level-btn' +
+            (getSelectedLevel() === l ? ' selected' : '') +
+            '" data-level="' +
+            l +
+            '" data-action="selectOverrideLevel" data-value="' +
+            l +
+            '">' +
+            l +
+            ' ' +
+            PROF_LABELS[l] +
+            '</button>'
+          );
+        })
+        .join('') +
       '</div>' +
       '<label class="override-reason-label">Reason (required)</label>' +
       '<textarea class="override-reason" id="override-reason-' +

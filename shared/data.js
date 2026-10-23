@@ -4174,6 +4174,12 @@ function _applyBundleCourseConfig(cid, row, courseRow) {
     if (Number(courseRow.recent_score_limit) >= 1) config.recentScoreLimit = Number(courseRow.recent_score_limit);
     else delete config.recentScoreLimit;
   }
+  // Rubric Levels (level_order) comes on the course row. The server never
+  // holds null there, so its value always wins; a bundle from before the
+  // column reads as Extending first.
+  if (courseRow && typeof courseRow === 'object' && 'level_order' in courseRow) {
+    config.levelOrder = courseRow.level_order === 'asc' ? 'asc' : 'desc';
+  }
   _persistLoadedField(cid, 'courseConfigs', config);
 
   if (!Object.keys(missing).length || !_writesEnabled() || !_isUuid(cid)) return;
@@ -7536,6 +7542,7 @@ function saveCourseConfig(cid, obj) {
       if (typeof obj.roundPercent === 'boolean') patch.round_percent = obj.roundPercent;
       // Null is a choice here (All Scores), so it is sent too.
       if (obj.recentScoreLimit !== undefined) patch.recent_score_limit = obj.recentScoreLimit || null;
+      if (obj.levelOrder === 'asc' || obj.levelOrder === 'desc') patch.level_order = obj.levelOrder;
       if (Array.isArray(obj.reportingTerms)) patch.reporting_terms = obj.reportingTerms;
       if (Object.keys(patch).length > 0) {
         _trackPendingSync(
