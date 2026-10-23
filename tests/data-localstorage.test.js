@@ -21,7 +21,9 @@ describe('_safeLSSet', () => {
 
   it('catches errors without crashing when setItem throws', () => {
     const origSetItem = localStorage.setItem;
-    localStorage.setItem = () => { throw new Error('QuotaExceededError'); };
+    localStorage.setItem = () => {
+      throw new Error('QuotaExceededError');
+    };
     expect(() => _safeLSSet('gb-boom', 'value')).not.toThrow();
     localStorage.setItem = origSetItem;
   });
