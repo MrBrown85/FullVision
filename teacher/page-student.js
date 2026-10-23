@@ -54,10 +54,12 @@ window.PageStudent = (function () {
     Router.navigate('#/dashboard');
   }
 
+  /* Another student keeps the open tab, so a teacher can go down the class
+     on one tab. */
   function switchStudent(sid) {
     studentId = sid;
     _profileData = null;
-    Router.navigate('#/student?id=' + sid + '&course=' + activeCourse);
+    Router.navigate('#/student?id=' + sid + '&course=' + activeCourse + '&tab=' + _tab);
   }
 
   /* ── Override UI ─────────────────────────────────────────── */
@@ -1076,14 +1078,64 @@ window.PageStudent = (function () {
     return html;
   }
 
+  function _isTab(id) {
+    return TABS.some(function (t) {
+      return t.id === id;
+    });
+  }
+
+  /* The last tab a teacher opened, on this device. */
+  var TAB_KEY = 'gb-student-tab';
+  function _savedTab() {
+    try {
+      var t = localStorage.getItem(TAB_KEY);
+      return _isTab(t) ? t : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /* The address names the open tab, so a link or a reload opens it. Set in
+     place: changing the hash would reload the page. */
+  function _syncTabToUrl() {
+    var hash =
+      '#/student?id=' + encodeURIComponent(studentId) + '&course=' + encodeURIComponent(activeCourse) + '&tab=' + _tab;
+    if (location.hash !== hash) history.replaceState(null, '', hash);
+  }
+
+  /* The students in the sidebar's order, and this one's neighbours. */
+  function _neighbours() {
+    var list = sortStudents(getStudents(activeCourse), 'lastName');
+    var i = list.findIndex(function (s) {
+      return s.id === studentId;
+    });
+    return { prev: i > 0 ? list[i - 1] : null, next: i >= 0 && i < list.length - 1 ? list[i + 1] : null };
+  }
+
+  function _stepButtonHtml(dir, st) {
+    var label = dir === 'prev' ? 'Previous student' : 'Next student';
+    return (
+      '<button type="button" class="stu-step-btn" data-action="stuStep" data-sid="' +
+      (st ? esc(st.id) : '') +
+      '"' +
+      (st ? ' title="' + esc(label + ': ' + fullName(st)) + '"' : ' disabled') +
+      ' aria-label="' +
+      esc(st ? label + ': ' + fullName(st) : label) +
+      '">' +
+      (dir === 'prev' ? '‹' : '›') +
+      '</button>'
+    );
+  }
+
   function setTab(id) {
-    if (
-      !TABS.some(function (t) {
-        return t.id === id;
-      })
-    )
-      return;
+    if (!_isTab(id)) return;
     _tab = id;
+    try {
+      localStorage.setItem(TAB_KEY, id);
+    } catch (e) {
+      /* private mode: the tab just isn't remembered */
+    }
+    _syncTabToUrl();
     render();
     var btn = document.getElementById('stu-tab-' + id);
     if (btn) btn.focus();
@@ -1122,6 +1174,10 @@ window.PageStudent = (function () {
     var html =
       '<div class="student-toolbar">' +
       renderBreadcrumb('Dashboard', '#/dashboard', fullName(student) || displayName(student)) +
+      '<span class="stu-step">' +
+      _stepButtonHtml('prev', _neighbours().prev) +
+      _stepButtonHtml('next', _neighbours().next) +
+      '</span>' +
       '<button class="tb-edit-btn" data-action="openEditStudent">Edit Student</button>' +
       (typeof renderTermPicker === 'function' ? renderTermPicker(cid) : '') +
       '</div>';
@@ -1187,6 +1243,9 @@ window.PageStudent = (function () {
       },
       stuTab: function () {
         setTab(el.dataset.tab);
+      },
+      stuStep: function () {
+        if (el.dataset.sid) switchStudent(el.dataset.sid);
       },
       stuAssessFilter: function () {
         _assessFilter = el.dataset.filter || 'all';
@@ -1290,8 +1349,9 @@ window.PageStudent = (function () {
     _openTags = new Set();
     _assessFilter = 'all';
     _assessCat = '';
-    // A link to one observation opens the Evidence tab.
-    if (params.ob) _tab = 'evidence';
+    // The tab the link names; a link to one observation opens Evidence;
+    // otherwise the tab last opened on this device.
+    _tab = _isTab(params.tab) ? params.tab : params.ob ? 'evidence' : _savedTab() || 'comps';
     _overrideSelectedLevel = 0;
 
     // Show sidebar with student roster

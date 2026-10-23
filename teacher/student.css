@@ -1532,6 +1532,30 @@ button.ced-obs-row {
 /* ── Student page tabs (teacher/page-student.js) ─────────────────────────
    One segmented track of five tabs, each with its count for the term,
    above one panel. */
+.stu-step {
+  display: inline-flex;
+  gap: 4px;
+}
+.stu-step-btn {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font: inherit;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--text);
+  cursor: pointer;
+}
+.stu-step-btn:hover:not(:disabled) {
+  background: var(--overlay-hover);
+}
+.stu-step-btn:disabled {
+  color: var(--text-3);
+  cursor: default;
+  opacity: 0.6;
+}
 .stu-tabs {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
