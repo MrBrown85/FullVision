@@ -44,6 +44,8 @@ test.describe('Regression smoke (P1.2)', () => {
       window.location.hash = '#/gradebook?course=' + courseId;
     }, SMOKE_WELCOME_COURSE.id);
     await expect(page.getByRole('combobox', { name: 'Select course' })).toHaveValue(SMOKE_WELCOME_COURSE.id);
+    // The gradebook opens on Scores; a competency's cell is in Competencies.
+    await page.locator('[data-action="setView"][data-mode="detailed"]').click();
     await expect(scoreCell).toBeVisible();
 
     await scoreCell.click();
@@ -66,6 +68,7 @@ test.describe('Regression smoke (P1.2)', () => {
       window.location.hash = '#/gradebook?course=' + courseId;
     }, SMOKE_WELCOME_COURSE.id);
     await expect(page.locator('body')).toContainText(SMOKE_WELCOME_STUDENTS[0].firstName);
+    await page.locator('[data-action="setView"][data-mode="detailed"]').click();
     await expect(scoreCell.locator('.gb-score-val')).toHaveText(writtenValue);
   });
 });

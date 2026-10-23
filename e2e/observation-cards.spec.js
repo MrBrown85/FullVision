@@ -95,7 +95,14 @@ test.describe('Observation editor (D3), desktop', () => {
     await card.click();
     const ed = page.locator('#obs-focus-card');
     await expect(ed).toBeVisible();
+    await settled(page);
     return { ed, obId };
+  }
+
+  /* The editor focuses its box and puts the caret at the end one frame
+     after it opens; typing before that lands after the old text. */
+  async function settled(page) {
+    await expect(page.locator('#focus-textarea')).toBeFocused();
   }
 
   test('type tabs: the chosen one is filled; clicking it again clears it', async ({ page }) => {
@@ -139,12 +146,14 @@ test.describe('Observation editor (D3), desktop', () => {
     await expect(card.locator('.obs-card-text')).toHaveText(before);
 
     await card.click();
+    await settled(page);
     await page.locator('#focus-textarea').fill('Another change');
     await page.keyboard.press('Escape');
     await expect(page.locator('#obs-focus-card')).toHaveCount(0);
     await expect(card.locator('.obs-card-text')).toHaveText(before);
 
     await card.click();
+    await settled(page);
     await page.locator('#focus-textarea').fill('Saved with Enter');
     await page.keyboard.press('Enter');
     await expect(page.locator('#obs-focus-card')).toHaveCount(0);

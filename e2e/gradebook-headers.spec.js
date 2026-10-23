@@ -92,6 +92,8 @@ test.describe('Gradebook column headers', () => {
     expect(await firstDate()).toBe(dates[dates.length - 1]);
 
     await page.reload();
+    // The view itself isn't remembered (it opens on Scores); Newest first is.
+    await page.locator('[data-action="setView"][data-mode="detailed"]').click();
     await expect(page.locator('.gb-grid-assess-group').first()).toBeVisible();
     await expect(page.getByRole('button', { name: 'Newest first' })).toHaveAttribute('aria-pressed', 'true');
     expect(await firstDate()).toBe(dates[dates.length - 1]);
