@@ -166,6 +166,7 @@ create table rubric (
   course_id  uuid        not null references course(id) on delete cascade,
   name       text        not null,
   copy_group uuid,                                                    -- shared by a rubric and its copies in the teacher's other classes; null = never copied (20261018_rubric_copy_group)
+  style      text        not null default 'standard',                 -- standard | advanced: checkboxes inside each level cell (20261022_advanced_rubric_checks)
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -192,6 +193,18 @@ create table criterion_tag (
   criterion_id uuid not null references criterion(id) on delete cascade,
   tag_id       uuid not null references tag(id)       on delete cascade,
   primary key (criterion_id, tag_id)
+);
+
+-- One checkbox in a level cell of an Advanced Rubric criterion
+-- (20261022_advanced_rubric_checks). display_order is within its level.
+create table criterion_check (
+  id            uuid        not null primary key,
+  criterion_id  uuid        not null references criterion(id) on delete cascade,
+  level         smallint    not null,                               -- 1..4
+  label         text        not null,
+  display_order integer     not null default 0,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
 );
 
 -- Students + enrollment
@@ -285,6 +298,16 @@ create table rubric_score (
   comment       text,                                                -- the teacher's note on this criterion, printed on the rubric handout (20261018_rubric_score_comment)
   updated_at    timestamptz not null default now(),
   unique (enrollment_id, assessment_id, criterion_id)
+);
+
+-- A ticked Advanced Rubric checkbox on one student's rubric score. A row means
+-- ticked; unticking deletes it (20261022_advanced_rubric_checks).
+create table rubric_check_score (
+  enrollment_id uuid        not null references enrollment(id)      on delete cascade,
+  assessment_id uuid        not null references assessment(id)      on delete cascade,
+  check_id      uuid        not null references criterion_check(id) on delete cascade,
+  created_at    timestamptz not null default now(),
+  primary key (enrollment_id, assessment_id, check_id)
 );
 
 -- A teacher's own wording for a competency's rubric levels: where "From
@@ -591,7 +614,8 @@ create table guardian (
 --   upsert_tag / delete_tag / reorder_tags(p_ids uuid[])
 --   upsert_module / delete_module / reorder_modules(p_ids uuid[])
 --   save_categories / upsert_category / delete_category
---   upsert_rubric(p_id, p_course_id, p_name, p_criteria jsonb, p_copy_group uuid) / delete_rubric
+--   upsert_rubric(p_id, p_course_id, p_name, p_criteria jsonb, p_copy_group uuid, p_idempotency_key uuid,
+--                 p_style text) / delete_rubric                      -- (2026-10-22) p_style 'standard' | 'advanced'; each criterion may carry checks: [{ id?, level, label, display_order }]
 --   list_rubric_copies(p_copy_group uuid)                             -- (2026-10-18) live copies across the teacher's classes
 --   save_competency_descriptors(p_entries jsonb) / list_competency_descriptors()  -- (2026-10-18) the teacher's own level wording per competency
 --
@@ -630,6 +654,8 @@ create table guardian (
 --                       p_value integer, p_modifier smallint default 0, p_comment text default null)
 --                       -- null p_comment keeps the saved comment, '' clears it; 0/null value deletes the row
 --   fill_rubric(p_enrollment_id uuid, p_assessment_id uuid, p_value integer)
+--   set_rubric_check(p_enrollment_id uuid, p_assessment_id uuid, p_check_id uuid, p_on boolean)
+--                       -- (2026-10-22) tick / clear one Advanced Rubric checkbox; idempotent by nature, no key
 --   clear_score(p_enrollment_id uuid, p_assessment_id uuid)
 --   clear_row_scores(p_enrollment_id uuid, p_course_id uuid)
 --   clear_column_scores(p_assessment_id uuid)

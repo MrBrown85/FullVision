@@ -71,6 +71,7 @@ const _cache = {
   courseConfigs: {}, // keyed by cid
   modules: {}, // keyed by cid
   rubrics: {}, // keyed by cid
+  rubricChecks: {}, // keyed by cid — ticked Advanced Rubric checkboxes { 'sid:aid': [checkId, …] }
   flags: {}, // keyed by cid
   goals: {}, // keyed by cid
   reflections: {}, // keyed by cid
@@ -97,6 +98,7 @@ const _DATA_KEYS = {
   courseConfigs: 'courseconfig',
   modules: 'modules',
   rubrics: 'rubrics',
+  rubricChecks: 'rubric-checks',
   flags: 'flags',
   goals: 'goals',
   reflections: 'reflections',
@@ -754,6 +756,7 @@ var _ECHO_SAFE_RPCS = {
   upsert_score: true,
   upsert_tag_score: true,
   upsert_rubric_score: true,
+  set_rubric_check: true,
   set_score_status: true,
   save_score_comment: true,
   clear_score: true,
@@ -2008,6 +2011,7 @@ var _ID_PARAM_KINDS = {
   p_competency_group_id: 'group',
   p_rubric_id: 'rubric',
   p_criterion_id: 'criterion',
+  p_check_id: 'check',
   p_module_id: 'module',
   p_category_id: 'category',
 };
@@ -2259,6 +2263,10 @@ function _rekeyStudentRefs(cid, localId, serverId) {
   _rekeyField('statuses', cid, function (statuses) {
     return _rekeyStatusKeys(statuses, localId, serverId);
   });
+  // Ticked checkboxes are keyed 'sid:aid' like statuses.
+  _rekeyField('rubricChecks', cid, function (checks) {
+    return _rekeyStatusKeys(checks, localId, serverId);
+  });
 }
 
 function _rekeyAssessmentRefs(cid, localId, serverId) {
@@ -2267,6 +2275,9 @@ function _rekeyAssessmentRefs(cid, localId, serverId) {
   });
   _rekeyField('statuses', cid, function (statuses) {
     return _rekeyStatusKeys(statuses, localId, serverId);
+  });
+  _rekeyField('rubricChecks', cid, function (checks) {
+    return _rekeyStatusKeys(checks, localId, serverId);
   });
   _rekeyField('observations', cid, function (obs) {
     var changed = false;
@@ -2411,6 +2422,30 @@ function _rekey(cid, kind, localId, serverId, extra) {
     _rekeyField('scores', cid, function (scores) {
       return _rekeyScoreEntries(scores, 'tagId', localId, serverId);
     });
+  } else if (kind === 'check') {
+    // An Advanced Rubric checkbox: in its criterion's list and in the ticks.
+    _rekeyField('rubrics', cid, function (rubrics) {
+      var changed = false;
+      (rubrics || []).forEach(function (r) {
+        (r && r.criteria ? r.criteria : []).forEach(function (c) {
+          if (_rekeyRowId(c && c.checks, localId, serverId)) changed = true;
+        });
+      });
+      return changed;
+    });
+    _rekeyField('rubricChecks', cid, function (checks) {
+      var changed = false;
+      Object.keys(checks || {}).forEach(function (key) {
+        var list = checks[key];
+        if (!Array.isArray(list)) return;
+        var i = list.indexOf(localId);
+        if (i < 0) return;
+        if (list.indexOf(serverId) >= 0) list.splice(i, 1);
+        else list[i] = serverId;
+        changed = true;
+      });
+      return changed;
+    });
   } else if (kind === 'module') {
     _rekeyField('modules', cid, function (rows) {
       return _rekeyRowId(rows, localId, serverId);
@@ -2469,7 +2504,7 @@ function _onCreateLanded(entryId, data) {
   if (!recs.length) return;
   var rubricIds = {};
   recs.forEach(function (rec) {
-    if (rec.kind === 'criterion') return; // resolved once its rubric is known
+    if (rec.kind === 'criterion' || rec.kind === 'check') return; // resolved once its rubric is known
     var serverId = _serverIdFrom(rec, data);
     if (!serverId || serverId === rec.localId) {
       _unregisterPendingCreate(rec);
@@ -2486,7 +2521,7 @@ function _onCreateLanded(entryId, data) {
     if (rec.kind === 'rubric') rubricIds[rec.localId] = serverId;
   });
   recs.forEach(function (rec) {
-    if (rec.kind !== 'criterion') return;
+    if (rec.kind !== 'criterion' && rec.kind !== 'check') return;
     var serverRubricId = rubricIds[rec.parent] || _resolveKnownId('rubric', rec.parent);
     if (!_isUuid(serverRubricId)) {
       _unregisterPendingCreate(rec);
@@ -2495,14 +2530,24 @@ function _onCreateLanded(entryId, data) {
     rec._serverRubricId = serverRubricId;
   });
   var criteria = recs.filter(function (rec) {
-    return rec.kind === 'criterion' && rec._serverRubricId;
+    return (rec.kind === 'criterion' || rec.kind === 'check') && rec._serverRubricId;
   });
   return criteria.length ? _resolveRubricCriteria(criteria) : undefined;
 }
 
+/* The checkbox at `index` among a criterion's checks for `level`, in the
+   order the server returns them (display order, then id). */
+function _rubricCheckAt(crit, level, index) {
+  var list = ((crit && crit.checks) || []).filter(function (check) {
+    return check && Number(check.level) === Number(level);
+  });
+  return list[index] || null;
+}
+
 /* upsert_rubric answers with the rubric id only; the criteria ids come from
    the rubric tables. Pair the local criteria with the server's by position
-   (display order), the order the upsert sent them in. */
+   (display order), the order the upsert sent them in. An Advanced Rubric's
+   checkboxes pair the same way, by position within their criterion's level. */
 function _resolveRubricCriteria(recs) {
   var cid = recs[0].cid;
   var serverRubricId = recs[0]._serverRubricId;
@@ -2523,13 +2568,18 @@ function _resolveRubricCriteria(recs) {
       });
       if (!rubric) return giveUp('rubric criteria could not be read back');
       recs.forEach(function (rec) {
-        var crit = (rubric.criteria || [])[rec.index];
+        var isCheck = rec.kind === 'check';
+        var crit = (rubric.criteria || [])[isCheck ? rec.critIndex : rec.index];
+        var row = isCheck ? _rubricCheckAt(crit, rec.level, rec.index) : crit;
         _unregisterPendingCreate(rec);
-        if (crit && _isUuid(crit.id)) _rekey(cid, 'criterion', rec.localId, crit.id);
+        if (row && _isUuid(row.id)) _rekey(cid, rec.kind, rec.localId, row.id);
         else {
           var q = window.v2Queue;
           if (q && typeof q.dropBlockedOn === 'function') {
-            q.dropBlockedOn(rec.localId, { deadLetter: true, error: 'rubric criterion was not created' });
+            q.dropBlockedOn(rec.localId, {
+              deadLetter: true,
+              error: isCheck ? 'rubric checkbox was not created' : 'rubric criterion was not created',
+            });
           }
         }
       });
@@ -2661,14 +2711,33 @@ function _registerRubricRows(cid, rubrics) {
     // a new rubric's criteria share its entry, an existing rubric's get one.
     var entryId = rec ? rec.entryId : null;
     (rubric.criteria || []).forEach(function (crit, idx) {
-      if (!crit || !crit.id || _isUuid(crit.id)) return;
-      if (_resolveKnownId('criterion', crit.id) !== crit.id) return;
-      var critRec = _registerPendingCreate(cid, 'criterion', crit.id, 'upsert_rubric', {
-        entryId: entryId,
-        parent: rubric.id,
-        index: idx,
+      if (!crit || !crit.id) return;
+      if (!_isUuid(crit.id) && _resolveKnownId('criterion', crit.id) === crit.id) {
+        var critRec = _registerPendingCreate(cid, 'criterion', crit.id, 'upsert_rubric', {
+          entryId: entryId,
+          parent: rubric.id,
+          index: idx,
+        });
+        if (!entryId && critRec) entryId = critRec.entryId;
+      }
+      // An Advanced Rubric's checkboxes are created with their criterion and
+      // read back by position within their level (critIndex, level, index).
+      var perLevel = {};
+      (crit.checks || []).forEach(function (check) {
+        if (!check || !check.id) return;
+        var level = Number(check.level);
+        var at = perLevel[level] || 0;
+        perLevel[level] = at + 1;
+        if (_isUuid(check.id) || _resolveKnownId('check', check.id) !== check.id) return;
+        var checkRec = _registerPendingCreate(cid, 'check', check.id, 'upsert_rubric', {
+          entryId: entryId,
+          parent: rubric.id,
+          critIndex: idx,
+          level: level,
+          index: at,
+        });
+        if (!entryId && checkRec) entryId = checkRec.entryId;
       });
-      if (!entryId && critRec) entryId = critRec.entryId;
     });
   });
 }
@@ -3822,12 +3891,44 @@ function _bundleCells(gb) {
   return cells;
 }
 
+/* check_rows → { 'sid:aid': [checkId, …] }, each list in index order so the
+   same data always produces the same cache. */
+function _bundleRubricChecks(gb) {
+  var students = gb.students || [];
+  var assessments = gb.assessments || [];
+  var checks = gb.check_index || [];
+  var out = {};
+  (gb.check_rows || [])
+    .slice()
+    .sort(function (a, b) {
+      return a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+    })
+    .forEach(function (r) {
+      var sid = students[r[0]] && students[r[0]].enrollment_id;
+      var aid = assessments[r[1]] && assessments[r[1]].id;
+      var checkId = checks[r[2]];
+      if (!sid || !aid || !checkId) return;
+      var key = sid + ':' + aid;
+      if (!out[key]) out[key] = [];
+      if (out[key].indexOf(checkId) < 0) out[key].push(checkId);
+    });
+  return out;
+}
+
 function _bundleToCache(cid, bundle) {
   var gb = bundle.gradebook || {};
 
   // Rubrics first: rubric scores are mapped to competencies through them.
   var rb = bundle.rubrics || {};
-  _persistLoadedField(cid, 'rubrics', _canonicalRubricRowsToCache(rb.rubrics, rb.criteria, rb.criterion_tags));
+  _persistLoadedField(
+    cid,
+    'rubrics',
+    _canonicalRubricRowsToCache(rb.rubrics, rb.criteria, rb.criterion_tags, rb.criterion_checks),
+  );
+  // Ticked Advanced Rubric checkboxes: [student, assessment, check] rows
+  // pointing into the roster, assessment and check lists. A bundle from
+  // before the checks has none; the class then has no ticks.
+  _persistLoadedField(cid, 'rubricChecks', _bundleRubricChecks(gb));
 
   var map = _canonicalLearningMapToCache(cid, bundle.learning_map || {});
   var emptyMap = !(map.subjects && map.subjects.length) && !(map.sections && map.sections.length);
@@ -4254,6 +4355,7 @@ function _loadCourseFromLS(cid) {
   _cache.studentProfileSummaries[cid] = _safeParseLS('gb-student-profile-summaries-' + cid, {});
   _cache.withdrawn[cid] = _safeParseLS('gb-withdrawn-' + cid, []);
   _cache.rubrics[cid] = _safeParseLS('gb-rubrics-' + cid, []);
+  _cache.rubricChecks[cid] = _safeParseLS('gb-rubric-checks-' + cid, {});
 
   // Learning map: check localStorage first, then fall back to LEARNING_MAP constant
   const lmRaw = _safeParseLS('gb-learningmap-' + cid, null);
@@ -5620,6 +5722,7 @@ function _clearCourseLocalState(id) {
     'learningmap',
     'modules',
     'rubrics',
+    'rubric-checks',
     'statuses',
     'quick-obs',
     'term-ratings',
@@ -6881,14 +6984,35 @@ function _rubricCriteriaPayload(rubric) {
     if (levelValues[1] != null || levelValues['1'] != null)
       payload.level1Value = Number(levelValues[1] != null ? levelValues[1] : levelValues['1']);
     if (crit && _isUuid(crit.id)) payload.id = crit.id;
+    // Advanced Rubrics: the checkboxes in each level cell, ordered within
+    // their level. A Standard rubric sends an empty list, which clears any
+    // checkboxes it had.
+    var perLevel = {};
+    payload.checks = (crit && crit.checks ? crit.checks : [])
+      .filter(function (check) {
+        return check && Number(check.level) >= 1 && Number(check.level) <= 4;
+      })
+      .map(function (check) {
+        var level = Number(check.level);
+        var at = perLevel[level] || 0;
+        perLevel[level] = at + 1;
+        var row = { level: level, label: String(check.label == null ? '' : check.label), displayOrder: at };
+        if (_isUuid(check.id)) row.id = check.id;
+        return row;
+      });
     return payload;
   });
+}
+/* 'advanced' when the rubric says so; anything else, a missing field
+   included, is a Standard rubric. */
+function rubricStyle(rubric) {
+  return rubric && rubric.style === 'advanced' ? 'advanced' : 'standard';
 }
 async function _loadCanonicalRubrics(cid) {
   var sb = getSupabase();
   if (!sb || !_isUuid(cid) || typeof sb.from !== 'function') return [];
 
-  var rubricsQuery = sb.from('rubric').select('id,name,created_at');
+  var rubricsQuery = sb.from('rubric').select('id,name,created_at,copy_group,style');
   if (typeof rubricsQuery.eq === 'function') rubricsQuery = rubricsQuery.eq('course_id', cid);
   var rubricsRes = await rubricsQuery;
   if (rubricsRes.error) throw rubricsRes.error;
@@ -6924,20 +7048,29 @@ async function _loadCanonicalRubrics(cid) {
   });
 
   var criterionTagRows = [];
+  var criterionCheckRows = [];
   if (criterionIds.length > 0) {
     var tagsQuery = sb.from('criterion_tag').select('criterion_id,tag_id');
     if (typeof tagsQuery.in === 'function') tagsQuery = tagsQuery.in('criterion_id', criterionIds);
     var tagsRes = await tagsQuery;
     if (tagsRes.error) throw tagsRes.error;
     criterionTagRows = tagsRes.data || [];
+
+    var checksQuery = sb.from('criterion_check').select('id,criterion_id,level,label,display_order');
+    if (typeof checksQuery.in === 'function') checksQuery = checksQuery.in('criterion_id', criterionIds);
+    var checksRes = await checksQuery;
+    if (checksRes.error) throw checksRes.error;
+    criterionCheckRows = checksRes.data || [];
   }
 
-  return _canonicalRubricRowsToCache(rubricRows, criterionRows, criterionTagRows);
+  return _canonicalRubricRowsToCache(rubricRows, criterionRows, criterionTagRows, criterionCheckRows);
 }
 
-/* rubric, criterion and criterion_tag rows → the client's rubric list. Used
-   by the table reads above and by get_class_bundle. */
-function _canonicalRubricRowsToCache(rubricRows, criterionRows, criterionTagRows) {
+/* rubric, criterion, criterion_tag and criterion_check rows → the client's
+   rubric list. Used by the table reads above and by get_class_bundle. A
+   rubric row without `style` (a bundle from before Advanced Rubrics) is
+   Standard. */
+function _canonicalRubricRowsToCache(rubricRows, criterionRows, criterionTagRows, criterionCheckRows) {
   rubricRows = (rubricRows || []).slice().sort(function (a, b) {
     var aKey = a.created_at || a.id || '';
     var bKey = b.created_at || b.id || '';
@@ -6956,6 +7089,27 @@ function _canonicalRubricRowsToCache(rubricRows, criterionRows, criterionTagRows
     if (!tagsByCriterion[row.criterion_id]) tagsByCriterion[row.criterion_id] = [];
     tagsByCriterion[row.criterion_id].push(row.tag_id);
   });
+  // Checkboxes in display order within their level, then by id, the order
+  // _resolveRubricCriteria pairs new ones by.
+  var checksByCriterion = {};
+  (criterionCheckRows || [])
+    .slice()
+    .sort(function (a, b) {
+      var ao = Number(a.display_order || 0);
+      var bo = Number(b.display_order || 0);
+      if (ao !== bo) return ao - bo;
+      return (a.id || '') < (b.id || '') ? -1 : 1;
+    })
+    .forEach(function (row) {
+      if (!row || !row.criterion_id || !row.id) return;
+      if (!checksByCriterion[row.criterion_id]) checksByCriterion[row.criterion_id] = [];
+      checksByCriterion[row.criterion_id].push({
+        id: row.id,
+        level: Number(row.level),
+        label: row.label || '',
+        displayOrder: Number(row.display_order || 0),
+      });
+    });
 
   var criteriaByRubric = {};
   criterionRows.forEach(function (row) {
@@ -6984,6 +7138,7 @@ function _canonicalRubricRowsToCache(rubricRows, criterionRows, criterionTagRows
       weight: row.weight != null && !isNaN(Number(row.weight)) ? Number(row.weight) : 1,
       displayOrder: Number(row.display_order || 0),
       levelValues: Object.keys(levelValues).length ? levelValues : null,
+      checks: checksByCriterion[row.id] || [],
     });
   });
 
@@ -6992,6 +7147,7 @@ function _canonicalRubricRowsToCache(rubricRows, criterionRows, criterionTagRows
       id: row.id,
       name: row.name || '',
       title: row.name || '',
+      style: rubricStyle(row),
       criteria: criteriaByRubric[row.id] || [],
     };
     if (row.copy_group) rubric.copyGroup = row.copy_group;
@@ -7040,7 +7196,12 @@ function _reconcileCanonicalRubrics(localArr, canonicalArr, idMap) {
 }
 /* The fields a rubric is saved with; equal signatures need no write. */
 function _rubricSignature(rubric) {
-  return JSON.stringify([_rubricName(rubric), _rubricCriteriaPayload(rubric), (rubric && rubric.copyGroup) || null]);
+  return JSON.stringify([
+    _rubricName(rubric),
+    _rubricCriteriaPayload(rubric),
+    (rubric && rubric.copyGroup) || null,
+    rubricStyle(rubric),
+  ]);
 }
 /* What the teacher typed, ids left out: a save in progress re-keys ids. */
 function _rubricsContentSignature(rubrics) {
@@ -7087,17 +7248,29 @@ function _persistRubricsToCanonical(cid, prev, arr) {
         if (
           !_isUuid(rubric.id) ||
           (rubric.criteria || []).some(function (c) {
-            return !(c && _isUuid(c.id));
+            return (
+              !(c && _isUuid(c.id)) ||
+              (c.checks || []).some(function (check) {
+                return !(check && _isUuid(check.id));
+              })
+            );
           })
         ) {
           insertedRows = true;
         }
-        // The rubric's own record, or a new criterion's inside an existing
-        // rubric: either names the entry this upsert is.
+        // The rubric's own record, or a new criterion's or checkbox's inside
+        // an existing rubric: any of them names the entry this upsert is.
         var rec = _isUuid(rubric.id) ? null : _pendingCreateFor('rubric', rubric.id);
         if (!rec) {
           (rubric.criteria || []).some(function (c) {
-            rec = c && !_isUuid(c.id) ? _pendingCreateFor('criterion', c.id) : null;
+            if (!c) return false;
+            rec = !_isUuid(c.id) ? _pendingCreateFor('criterion', c.id) : null;
+            if (!rec) {
+              (c.checks || []).some(function (check) {
+                rec = check && !_isUuid(check.id) ? _pendingCreateFor('check', check.id) : null;
+                return !!rec;
+              });
+            }
             return !!rec;
           });
         }
@@ -7108,6 +7281,7 @@ function _persistRubricsToCanonical(cid, prev, arr) {
                 id: rubric.id,
                 courseId: cid,
                 name: _rubricName(rubric),
+                style: rubricStyle(rubric),
                 criteria: _rubricCriteriaPayload(rubric),
                 copyGroup: rubric.copyGroup || null,
               },
@@ -7187,6 +7361,61 @@ function saveRubrics(cid, arr) {
 }
 function getRubricById(cid, rubricId) {
   return getRubrics(cid).find(r => r.id === rubricId);
+}
+
+/* ── Advanced Rubric checkboxes (migrations/20261022_advanced_rubric_checks.sql)
+   A tick is a rubric_check_score row: (enrollment, assessment, check). In
+   the cache they are { 'sid:aid': [checkId, …] }, in localStorage under
+   gb-rubric-checks-<cid>, written through the outbox with set_rubric_check
+   so a tick made offline lands later. The level a tick suggests is the
+   client's business (shared/rubric-checks.js); nothing here changes a score. */
+function getRubricChecks(cid) {
+  if (_cache.rubricChecks[cid] !== undefined) return _cache.rubricChecks[cid];
+  var stored = _safeParseLS('gb-rubric-checks-' + cid, {});
+  _cache.rubricChecks[cid] = stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {};
+  return _cache.rubricChecks[cid];
+}
+/* The ids of the checkboxes ticked for one student on one assessment. */
+function getRubricCheckIds(cid, sid, aid) {
+  var list = getRubricChecks(cid)[sid + ':' + aid];
+  return Array.isArray(list) ? list.slice() : [];
+}
+function isRubricCheckOn(cid, sid, aid, checkId) {
+  return getRubricCheckIds(cid, sid, aid).indexOf(checkId) >= 0;
+}
+/* Tick (on) or clear (off) one checkbox. The cache changes at once; the
+   server row follows when both ids can be sent. Returns the ticked ids. */
+function setRubricCheck(cid, sid, aid, checkId, on) {
+  if (!cid || !sid || !aid || !checkId) return getRubricCheckIds(cid, sid, aid);
+  var checks = getRubricChecks(cid);
+  var key = sid + ':' + aid;
+  var list = Array.isArray(checks[key]) ? checks[key].slice() : [];
+  var i = list.indexOf(checkId);
+  var changed = false;
+  if (on && i < 0) {
+    list.push(checkId);
+    changed = true;
+  } else if (!on && i >= 0) {
+    list.splice(i, 1);
+    changed = true;
+  }
+  if (!changed) return list;
+  if (list.length) checks[key] = list;
+  else delete checks[key];
+  _saveCourseField('rubricChecks', cid, checks);
+  if (_writesEnabled() && _isSendableId(sid) && _isSendableId(aid) && _isSendableId(checkId)) {
+    _trackPendingSync(
+      _writeRpc('set_rubric_check', {
+        p_enrollment_id: sid,
+        p_assessment_id: aid,
+        p_check_id: checkId,
+        p_on: !!on,
+      }).then(function (res) {
+        if (res && res.error) _reportScoreWriteFailure('set_rubric_check', res.error);
+      }),
+    );
+  }
+  return list;
 }
 
 /* ── Competency descriptors (one teacher's own wording) ──────────────
@@ -8241,6 +8470,9 @@ function _cleanOrphanedScores(cid, validArr) {
   if (dropScores(scores)) _saveCourseField('scores', cid, scores);
   var statuses = getAssignmentStatuses(cid);
   if (dropStatuses(statuses)) _saveCourseField('statuses', cid, statuses);
+  // Ticked checkboxes are keyed 'sid:aid' like statuses.
+  var checks = getRubricChecks(cid);
+  if (dropStatuses(checks)) _saveCourseField('rubricChecks', cid, checks);
   if (_hasServerState('scores', cid)) dropScores(_serverState.scores[cid]);
   if (_hasServerState('statuses', cid)) dropStatuses(_serverState.statuses[cid]);
 }
@@ -9712,12 +9944,14 @@ window.v2.saveCategories = function (courseId, rows, options) {
   );
 };
 
-/* Rubric — composite save: rubric row + criteria diff + criterion_tag replace,
-   all in one transaction.  criteria payload:
+/* Rubric — composite save: rubric row + criteria diff + criterion_tag replace
+   + criterion_check replace, all in one transaction.  criteria payload:
      [{ id?: uuid, name, level_{1..4}_descriptor, level_{1..4}_value?,
-        weight?, display_order?, linked_tag_ids?: uuid[] }, …]
+        weight?, display_order?, linked_tag_ids?: uuid[],
+        checks?: [{ id?: uuid, level 1..4, label, display_order }] }, …]
    Criteria present in the array are upserted; criteria absent are deleted
-   (cascades criterion_tag + rubric_score). */
+   (cascades criterion_tag, criterion_check + rubric_score). A criterion's
+   checks are replaced the same way (migrations/20261022_advanced_rubric_checks.sql). */
 window.v2.upsertRubric = function (params, options) {
   params = params || {};
   var criteria = (params.criteria || []).map(function (c) {
@@ -9730,6 +9964,15 @@ window.v2.upsertRubric = function (params, options) {
       weight: c.weight != null ? Number(c.weight) : 1.0,
       display_order: c.displayOrder != null ? Number(c.displayOrder) : 0,
       linked_tag_ids: (c.linkedTagIds || []).filter(_isUuid),
+      checks: (c.checks || []).map(function (check) {
+        var row = {
+          level: Number(check.level),
+          label: check.label == null ? '' : String(check.label),
+          display_order: check.displayOrder != null ? Number(check.displayOrder) : 0,
+        };
+        if (_isUuid(check.id)) row.id = check.id;
+        return row;
+      }),
     };
     if (c.level4Value != null) payload.level_4_value = Number(c.level4Value);
     if (c.level3Value != null) payload.level_3_value = Number(c.level3Value);
@@ -9746,6 +9989,7 @@ window.v2.upsertRubric = function (params, options) {
       p_name: params.name || '',
       p_criteria: criteria,
       p_copy_group: _isUuid(params.copyGroup) ? params.copyGroup : null,
+      p_style: params.style === 'advanced' ? 'advanced' : 'standard',
     },
     options,
   );

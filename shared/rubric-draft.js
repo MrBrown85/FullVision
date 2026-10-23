@@ -131,10 +131,13 @@ window.RubricDraft = (function () {
   }
 
   /* True for a criterion nobody has touched: the default name, no
-     competencies and no descriptors. A new rubric starts with one. */
+     competencies, no descriptors and no checkboxes. A new rubric starts
+     with one. */
   function isBlankCriterion(crit) {
     if (!crit) return false;
-    return !hasDescriptors(crit) && !(crit.tagIds || []).length && isDefaultName(crit.name);
+    return (
+      !hasDescriptors(crit) && !(crit.tagIds || []).length && !(crit.checks || []).length && isDefaultName(crit.name)
+    );
   }
 
   function hasDescriptors(crit) {

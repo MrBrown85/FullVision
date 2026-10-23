@@ -90,6 +90,8 @@ window.PageAssignments = (function () {
 
   // Rubric editor state
   var _editingRubric = null;
+  // An Advanced Rubric checkbox being dragged to a new place in its level.
+  var _dragCheck = null;
   var _rubricDirty = false;
   // The rubric as saved and its scored-student counts, for the edit guard.
   var _rubricBefore = null;
@@ -2946,7 +2948,9 @@ window.PageAssignments = (function () {
   function _closeRubricsPanel() {
     if (window.RubricBank) RubricBank.close();
   }
-  function newRubricUI() {
+  /* A new rubric, Standard unless `style` is 'advanced' (the Rubric Bank's
+     "+ New Rubric" menu picks). */
+  function newRubricUI(style) {
     _closeRubricsPanel();
     _whenWordingLoaded();
     _rubricBefore = null;
@@ -2954,7 +2958,8 @@ window.PageAssignments = (function () {
       id: uid(),
       name: 'New Rubric',
       created: new Date().toISOString(),
-      criteria: [{ id: uid(), name: 'Criterion 1', tagIds: [], levels: { 4: '', 3: '', 2: '', 1: '' } }],
+      style: style === 'advanced' ? 'advanced' : 'standard',
+      criteria: [{ id: uid(), name: 'Criterion 1', tagIds: [], levels: { 4: '', 3: '', 2: '', 1: '' }, checks: [] }],
       _isNew: true,
     };
     _rubricDirty = false;
@@ -3007,13 +3012,38 @@ window.PageAssignments = (function () {
     if (existing) existing.remove();
     var r = _editingRubric;
     var sections = getSections(activeCourse);
+    var advanced = _editorIsAdvanced();
     var html =
       '<div class="rubric-modal-overlay" id="rubric-modal" data-action="rubricModalBackdrop" role="dialog" aria-modal="true">' +
-      '<div class="rubric-editor"><div class="rubric-editor-header"><h2 class="rubric-editor-title">' +
+      '<div class="rubric-editor' +
+      (advanced ? ' advanced' : '') +
+      '"><div class="rubric-editor-header"><h2 class="rubric-editor-title">' +
       (r._isNew ? 'New Rubric' : 'Edit Rubric') +
       '</h2>' +
+      // Standard: one descriptor per level. Advanced: checkboxes inside each
+      // level cell as well (Rubric Bank plan \u00a75).
+      '<div class="seg seg-sm rubric-style-seg" role="radiogroup" aria-label="Rubric Style">' +
+      ['standard', 'advanced']
+        .map(function (s) {
+          var on = advanced === (s === 'advanced');
+          return (
+            '<button type="button" class="seg-btn" role="radio" aria-checked="' +
+            on +
+            '" data-action="setRubricStyle" data-style="' +
+            s +
+            '">' +
+            (s === 'advanced' ? 'Advanced' : 'Standard') +
+            '</button>'
+          );
+        })
+        .join('') +
+      '</div>' +
       '<button class="rubric-editor-close" data-action="cancelRubricEdit" title="Close" aria-label="Close">\u2715</button></div>' +
-      '<div class="rubric-editor-body"><p class="rubric-guard-note" id="re-guard-note" hidden></p><input class="rubric-name-input" id="re-name" value="' +
+      '<div class="rubric-editor-body"><p class="rubric-guard-note" id="re-guard-note" hidden></p>' +
+      '<p class="rubric-style-hint" id="re-style-hint"' +
+      (advanced ? '' : ' hidden') +
+      '>Each level has a descriptor and checkboxes. When scoring, ticking boxes suggests the level: the highest level whose boxes are all ticked. You can always pick a different level.</p>' +
+      '<input class="rubric-name-input" id="re-name" value="' +
       esc(r.name) +
       '" placeholder="Rubric name\u2026" aria-label="Rubric name"><div id="re-criteria">';
     r.criteria.forEach(function (crit, ci) {
@@ -3021,13 +3051,185 @@ window.PageAssignments = (function () {
     });
     html +=
       '</div></div><div class="rubric-editor-footer"><button class="rubric-add-criterion-btn" data-action="addCriterion">+ Add Criterion</button>' +
-      '<button class="rubric-add-criterion-btn" data-action="criterionFromCompetency" title="Add criteria for competencies, with their descriptors drafted">+ From competency</button>' +
+      '<button class="rubric-add-criterion-btn" data-action="criterionFromCompetency" title="Add criteria for competencies, with their descriptors drafted">+ From Competency</button>' +
       '<button class="btn btn-ghost" data-action="cancelRubricEdit">Cancel</button><button class="btn btn-primary" data-action="saveRubricEdit">Save Rubric</button></div></div></div>';
     document.body.insertAdjacentHTML('beforeend', html);
     setTimeout(function () {
       var inp = document.getElementById('re-name');
       if (inp) inp.focus();
     }, 50);
+  }
+  function _editorIsAdvanced() {
+    return !!_editingRubric && rubricStyle(_editingRubric) === 'advanced';
+  }
+  /* ── Advanced Rubrics: the checkboxes in each level cell ──────────── */
+  /* One level cell's checkbox list: a row per checkbox (drag handle, box,
+     label, remove) and "+ Add Checkbox". Enter in a label adds the next. */
+  function _renderCheckList(ci, crit, L) {
+    var html = '<div class="rubric-check-list" data-check-list="' + ci + ':' + L.n + '">';
+    RubricChecks.checksAt(crit, L.n).forEach(function (check) {
+      var ids = ' data-check-id="' + esc(check.id) + '" data-crit="' + ci + '" data-level="' + L.n + '"';
+      html +=
+        '<div class="rubric-check-row" draggable="true"' +
+        ids +
+        '>' +
+        '<span class="rubric-check-handle" title="Drag to reorder" aria-hidden="true">⠇</span>' +
+        '<span class="rubric-check-box" aria-hidden="true"></span>' +
+        '<input class="rubric-check-input" value="' +
+        esc(check.label || '') +
+        '" placeholder="What you look for…" aria-label="' +
+        L.name +
+        ' checkbox" data-action-blur="critCheckLabel"' +
+        ids +
+        '>' +
+        '<button type="button" class="rubric-check-remove" data-action="removeCritCheck"' +
+        ids +
+        ' title="Remove Checkbox" aria-label="Remove Checkbox">✕</button></div>';
+    });
+    html +=
+      '<button type="button" class="rubric-add-check-btn" data-action="addCritCheck" data-crit="' +
+      ci +
+      '" data-level="' +
+      L.n +
+      '">+ Add Checkbox</button></div>';
+    return html;
+  }
+  /* Replace one level's checkboxes, renumbering them; other levels stay. */
+  function _setLevelChecks(crit, level, list) {
+    var others = (crit.checks || []).filter(function (k) {
+      return k && Number(k.level) !== level;
+    });
+    list.forEach(function (k, i) {
+      k.level = level;
+      k.displayOrder = i;
+    });
+    crit.checks = others.concat(list);
+  }
+  function _focusCheckInput(checkId) {
+    var input = document.querySelector('.rubric-check-input[data-check-id="' + checkId + '"]');
+    if (input) input.focus();
+  }
+  /* A new checkbox after `afterId`, or at the end of the level. */
+  function addCritCheck(ci, level, afterId) {
+    if (!_editingRubric) return;
+    var crit = _editingRubric.criteria[ci];
+    if (!crit) return;
+    var list = RubricChecks.checksAt(crit, level);
+    var at = list.length;
+    if (afterId) {
+      var i = list.findIndex(function (k) {
+        return k.id === afterId;
+      });
+      if (i >= 0) at = i + 1;
+    }
+    var check = { id: uid(), level: level, label: '', displayOrder: at };
+    list.splice(at, 0, check);
+    _setLevelChecks(crit, level, list);
+    _rubricDirty = true;
+    _refreshCriterionDOM(ci);
+    _focusCheckInput(check.id);
+  }
+  function updateCritCheckLabel(ci, checkId, value) {
+    if (!_editingRubric) return;
+    var crit = _editingRubric.criteria[ci];
+    var check = (crit && crit.checks ? crit.checks : []).find(function (k) {
+      return k && k.id === checkId;
+    });
+    if (!check) return;
+    var label = String(value || '').trim();
+    if (check.label === label) return;
+    check.label = label;
+    _rubricDirty = true;
+  }
+  function removeCritCheck(ci, checkId) {
+    if (!_editingRubric) return;
+    var crit = _editingRubric.criteria[ci];
+    var check = (crit && crit.checks ? crit.checks : []).find(function (k) {
+      return k && k.id === checkId;
+    });
+    if (!check) return;
+    var level = Number(check.level);
+    _setLevelChecks(
+      crit,
+      level,
+      RubricChecks.checksAt(crit, level).filter(function (k) {
+        return k.id !== checkId;
+      }),
+    );
+    _rubricDirty = true;
+    _refreshCriterionDOM(ci);
+  }
+  /* Move a checkbox to `toIndex` within its level. */
+  function moveCritCheck(ci, checkId, toIndex) {
+    if (!_editingRubric) return;
+    var crit = _editingRubric.criteria[ci];
+    var check = (crit && crit.checks ? crit.checks : []).find(function (k) {
+      return k && k.id === checkId;
+    });
+    if (!check) return;
+    var level = Number(check.level);
+    var list = RubricChecks.checksAt(crit, level).filter(function (k) {
+      return k.id !== checkId;
+    });
+    var at = Math.max(0, Math.min(list.length, toIndex));
+    list.splice(at, 0, check);
+    _setLevelChecks(crit, level, list);
+    _rubricDirty = true;
+    _refreshCriterionDOM(ci);
+  }
+  /* Standard | Advanced. Advanced → Standard drops every checkbox, so it
+     asks first when there are any; scores keep their levels. Standard →
+     Advanced keeps the descriptors. */
+  function setRubricStyle(style) {
+    if (!_editingRubric) return;
+    var next = style === 'advanced' ? 'advanced' : 'standard';
+    if (rubricStyle(_editingRubric) === next) return;
+    if (next === 'standard' && RubricChecks.countChecks(_editingRubric) > 0) {
+      showConfirm(
+        'Switch to a Standard Rubric?',
+        'The checkboxes in every level will be removed. Students’ scores keep their levels.',
+        'Remove Checkboxes',
+        'danger',
+        function () {
+          _applyRubricStyle('standard');
+        },
+      );
+      return;
+    }
+    _applyRubricStyle(next);
+  }
+  function _applyRubricStyle(next) {
+    if (!_editingRubric) return;
+    _editingRubric.style = next;
+    if (next === 'standard') {
+      _editingRubric.criteria.forEach(function (c) {
+        if (c) c.checks = [];
+      });
+    }
+    _rubricDirty = true;
+    document.querySelectorAll('.rubric-style-seg .seg-btn').forEach(function (b) {
+      b.setAttribute('aria-checked', String(b.dataset.style === next));
+    });
+    var editor = document.querySelector('#rubric-modal .rubric-editor');
+    if (editor) editor.classList.toggle('advanced', next === 'advanced');
+    var hint = document.getElementById('re-style-hint');
+    if (hint) hint.hidden = next !== 'advanced';
+    _refreshCriterionDOM(_expandedCriterion);
+  }
+  /* A checkbox without a label is nothing to save. */
+  function _dropBlankChecks(rubric) {
+    (rubric.criteria || []).forEach(function (c) {
+      if (!c || !c.checks) return;
+      [4, 3, 2, 1].forEach(function (level) {
+        _setLevelChecks(
+          c,
+          level,
+          RubricChecks.checksAt(c, level).filter(function (k) {
+            return String(k.label || '').trim();
+          }),
+        );
+      });
+    });
   }
   /* The editor's level columns, in the class's Rubric Levels order. */
   function _rubricEditorLevels() {
@@ -3214,7 +3416,9 @@ window.PageAssignments = (function () {
         L.name +
         ' descriptor">' +
         esc((crit.levels && crit.levels[L.n]) || '') +
-        '</textarea></div>';
+        '</textarea>' +
+        (_editorIsAdvanced() ? _renderCheckList(ci, crit, L) : '') +
+        '</div>';
     });
     html += '</div></div></div></div>';
     return html;
@@ -3301,6 +3505,7 @@ window.PageAssignments = (function () {
       levels: { 4: '', 3: '', 2: '', 1: '' },
       weight: 1,
       levelValues: null,
+      checks: [],
     });
     _expandedCriterion = _editingRubric.criteria.length - 1;
     _refreshCriterionDOM(_expandedCriterion);
@@ -3409,7 +3614,14 @@ window.PageAssignments = (function () {
       var tag = getTagById(activeCourse, id);
       if (!tag) return;
       used[id] = true;
-      added.push(RubricDraft.draftCriterion(tag, uid, _savedWording(tag)));
+      var drafted = RubricDraft.draftCriterion(tag, uid, _savedWording(tag));
+      // In an Advanced Rubric each I-can statement is a Proficient checkbox.
+      drafted.checks = _editorIsAdvanced()
+        ? RubricDraft.statementsOf(tag).map(function (statement, i) {
+            return { id: uid(), level: 3, label: statement, displayOrder: i };
+          })
+        : [];
+      added.push(drafted);
     });
     if (!added.length) return;
     // A new rubric's untouched first criterion is replaced, not left beside.
@@ -3542,6 +3754,8 @@ window.PageAssignments = (function () {
       alert('Add at least one criterion.');
       return;
     }
+    _editingRubric.style = rubricStyle(_editingRubric);
+    _dropBlankChecks(_editingRubric);
     // A criterion with no competency is allowed: it counts toward the
     // overall grade only.
     var cid = activeCourse;
@@ -4363,7 +4577,16 @@ window.PageAssignments = (function () {
         deleteRubricUI(el.dataset.rid);
       },
       newRubricUI: function () {
-        newRubricUI();
+        newRubricUI(el.dataset.style);
+      },
+      setRubricStyle: function () {
+        setRubricStyle(el.dataset.style);
+      },
+      addCritCheck: function () {
+        addCritCheck(parseInt(el.dataset.crit, 10), parseInt(el.dataset.level, 10));
+      },
+      removeCritCheck: function () {
+        removeCritCheck(parseInt(el.dataset.crit, 10), el.dataset.checkId);
       },
       newRubricFromForm: function () {
         newRubricFromForm();
@@ -4619,6 +4842,10 @@ window.PageAssignments = (function () {
       updateCritLevel(parseInt(el.dataset.crit, 10), parseInt(el.dataset.level, 10), el.value);
       return;
     }
+    if (el.dataset.actionBlur === 'critCheckLabel') {
+      updateCritCheckLabel(parseInt(el.dataset.crit, 10), el.dataset.checkId, el.value);
+      return;
+    }
     // T-UI-09 / T-UI-10 · rubric weight + per-level value overrides.
     if (el.dataset.actionBlur === 'critWeight') {
       updateCritWeight(parseInt(el.dataset.critIdx, 10), el.value);
@@ -4638,6 +4865,30 @@ window.PageAssignments = (function () {
   }
 
   function _handleKeydown(e) {
+    // A checkbox label in the rubric editor: Enter adds the next checkbox
+    // (a blank one stays alone); Alt+↑/↓ moves it within its level.
+    var checkInput = e.target && e.target.closest ? e.target.closest('.rubric-check-input') : null;
+    if (checkInput) {
+      var ci = parseInt(checkInput.dataset.crit, 10);
+      var checkId = checkInput.dataset.checkId;
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        updateCritCheckLabel(ci, checkId, checkInput.value);
+        if (checkInput.value.trim()) addCritCheck(ci, parseInt(checkInput.dataset.level, 10), checkId);
+        return;
+      }
+      if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+        e.preventDefault();
+        updateCritCheckLabel(ci, checkId, checkInput.value);
+        var row = checkInput.closest('.rubric-check-row');
+        var rows = Array.from(row.parentNode.querySelectorAll('.rubric-check-row'));
+        var from = rows.indexOf(row);
+        moveCritCheck(ci, checkId, e.key === 'ArrowUp' ? from - 1 : from + 1);
+        _focusCheckInput(checkId);
+        return;
+      }
+      return;
+    }
     // The Rubric Bank window handles its own keys.
     if (window.RubricBank && RubricBank.isOpen()) return;
     // While the criterion comment box is open, keys stay inside it: Escape
@@ -4747,7 +4998,31 @@ window.PageAssignments = (function () {
   }
 
   /* ── Drag event handlers (delegated) ────────────────────── */
+  /* The checkbox list a drag is over, when it is the dragged checkbox's own. */
+  function _checkDropList(e) {
+    if (!_dragCheck) return null;
+    var list = e.target.closest ? e.target.closest('.rubric-check-list') : null;
+    return list && list.dataset.checkList === _dragCheck.ci + ':' + _dragCheck.level ? list : null;
+  }
+  function _clearCheckDropMarks() {
+    document.querySelectorAll('.rubric-check-row.drop-before, .rubric-check-row.drop-after').forEach(function (r) {
+      r.classList.remove('drop-before', 'drop-after');
+    });
+  }
   function _handleDragStart(e) {
+    // A checkbox in the rubric editor, moving within its level.
+    var checkRow = e.target.closest('.rubric-check-row');
+    if (checkRow) {
+      _dragCheck = { ci: checkRow.dataset.crit, level: checkRow.dataset.level, id: checkRow.dataset.checkId };
+      e.dataTransfer.effectAllowed = 'move';
+      try {
+        e.dataTransfer.setData('text/plain', checkRow.dataset.checkId);
+      } catch (err) {
+        /* some browsers refuse setData on a synthetic drag */
+      }
+      checkRow.classList.add('dragging');
+      return;
+    }
     // Collab drag must be checked FIRST — members are nested inside assess cards
     var collabDrag = e.target.closest('[data-collab-drag-sid]');
     if (collabDrag) {
@@ -4766,6 +5041,14 @@ window.PageAssignments = (function () {
     }
   }
   function _handleDragEnd(e) {
+    if (_dragCheck) {
+      _dragCheck = null;
+      _clearCheckDropMarks();
+      document.querySelectorAll('.rubric-check-row.dragging').forEach(function (r) {
+        r.classList.remove('dragging');
+      });
+      return;
+    }
     if (_dragAssessId) {
       onAssessDragEnd();
       return;
@@ -4778,6 +5061,19 @@ window.PageAssignments = (function () {
     _dragFromGroup = null;
   }
   function _handleDragOver(e) {
+    if (_dragCheck) {
+      var checkList = _checkDropList(e);
+      if (!checkList) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      _clearCheckDropMarks();
+      var overRow = e.target.closest('.rubric-check-row');
+      if (overRow && overRow.dataset.checkId !== _dragCheck.id) {
+        var box = overRow.getBoundingClientRect();
+        overRow.classList.add(e.clientY < box.top + box.height / 2 ? 'drop-before' : 'drop-after');
+      }
+      return;
+    }
     // Module drop zone
     var dropZone = e.target.closest('[data-mod-drop-zone]');
     if (dropZone && _dragModuleId) {
@@ -4838,6 +5134,11 @@ window.PageAssignments = (function () {
     }
   }
   function _handleDragLeave(e) {
+    if (_dragCheck) {
+      var leftList = e.target.closest ? e.target.closest('.rubric-check-list') : null;
+      if (leftList && !leftList.contains(e.relatedTarget)) _clearCheckDropMarks();
+      return;
+    }
     var dropZone = e.target.closest('[data-mod-drop-zone]');
     if (dropZone) {
       dropZone.classList.remove('drag-over');
@@ -4863,6 +5164,26 @@ window.PageAssignments = (function () {
     }
   }
   function _handleDrop(e) {
+    if (_dragCheck) {
+      var checkList = _checkDropList(e);
+      var drag = _dragCheck;
+      _dragCheck = null;
+      _clearCheckDropMarks();
+      if (!checkList) return;
+      e.preventDefault();
+      var rows = Array.from(checkList.querySelectorAll('.rubric-check-row'));
+      var overRow = e.target.closest('.rubric-check-row');
+      var to = rows.length - 1;
+      if (overRow && overRow.dataset.checkId !== drag.id) {
+        var box = overRow.getBoundingClientRect();
+        var others = rows.filter(function (r) {
+          return r.dataset.checkId !== drag.id;
+        });
+        to = others.indexOf(overRow) + (e.clientY < box.top + box.height / 2 ? 0 : 1);
+      }
+      moveCritCheck(parseInt(drag.ci, 10), drag.id, to);
+      return;
+    }
     // Module drop zone
     var dropZone = e.target.closest('[data-mod-drop-zone]');
     if (dropZone && _dragModuleId) {

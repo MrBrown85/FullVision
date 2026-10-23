@@ -312,6 +312,7 @@ export async function mockAuth(page) {
           categories: get('categories', []) || [],
           modules: get('modules', []) || [],
           rubrics: get('rubrics', []) || [],
+          rubricChecks: get('rubric-checks', {}) || {},
           observations: get('observations', {}) || {},
           flags: get('flags', {}) || {},
           goals: get('goals', {}) || {},
@@ -385,9 +386,14 @@ export async function mockAuth(page) {
     }
 
     function rubricsPayload(rubrics) {
-      const out = { rubrics: [], criteria: [], criterion_tags: [] };
+      const out = { rubrics: [], criteria: [], criterion_tags: [], criterion_checks: [] };
       (rubrics || []).forEach((r, ri) => {
-        out.rubrics.push({ id: r.id, name: r.name || '', created_at: '2026-09-01T00:00:' + String(10 + ri) + 'Z' });
+        out.rubrics.push({
+          id: r.id,
+          name: r.name || '',
+          created_at: '2026-09-01T00:00:' + String(10 + ri) + 'Z',
+          style: r.style === 'advanced' ? 'advanced' : 'standard',
+        });
         (r.criteria || []).forEach((c, ci) => {
           const levels = c.levels || {};
           const values = c.levelValues || {};
@@ -407,6 +413,16 @@ export async function mockAuth(page) {
             display_order: c.displayOrder != null ? c.displayOrder : ci,
           });
           (c.tagIds || []).forEach(tagId => out.criterion_tags.push({ criterion_id: c.id, tag_id: tagId }));
+          // Advanced Rubric checkboxes (migrations/20261022_advanced_rubric_checks.sql).
+          (c.checks || []).forEach(k =>
+            out.criterion_checks.push({
+              id: k.id,
+              criterion_id: c.id,
+              level: k.level,
+              label: k.label || '',
+              display_order: k.displayOrder || 0,
+            }),
+          );
         });
       });
       return out;
@@ -537,7 +553,25 @@ export async function mockAuth(page) {
         score_rows: Object.values(scoreCells),
         tag_rows: tagRows,
         criterion_rows: [],
+        ...checkRowsPayload(data, students, assessments),
       };
+    }
+
+    // Ticked Advanced Rubric checkboxes as [student, assessment, check] rows.
+    function checkRowsPayload(data, students, assessments) {
+      const checkIndex = [];
+      const rows = [];
+      Object.keys(data.rubricChecks || {}).forEach(key => {
+        const i = key.indexOf(':');
+        const si = students.findIndex(s => s.enrollment_id === key.slice(0, i));
+        const ai = assessments.findIndex(a => a.id === key.slice(i + 1));
+        if (si < 0 || ai < 0) return;
+        (data.rubricChecks[key] || []).forEach(checkId => {
+          if (checkIndex.indexOf(checkId) < 0) checkIndex.push(checkId);
+          rows.push([si, ai, checkIndex.indexOf(checkId)]);
+        });
+      });
+      return { check_index: checkIndex, check_rows: rows };
     }
 
     function profilesPayload(data) {
