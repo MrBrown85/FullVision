@@ -29,9 +29,8 @@ window.PageDashboard = (function () {
   var _popFor = null;
 
   /* Class insights (dash-insights.js): Cards or Grid and the Who Needs Help
-     rule are remembered on this device; an open segment list is not. */
-  var STUDENT_VIEW_KEY = 'fv-dash-student-view';
-  var HELP_RULE_KEY = 'fv-dash-help-rule';
+     rule follow the teacher to any device (getDashboardPrefs); an open
+     segment list does not. */
   var studentView = 'cards';
   var helpRule = null;
   var helpRuleOpen = false;
@@ -908,7 +907,7 @@ window.PageDashboard = (function () {
       },
       studentView: function () {
         studentView = el.dataset.view === 'grid' ? 'grid' : 'cards';
-        _writePref(STUDENT_VIEW_KEY, studentView === 'grid' ? 'grid' : null);
+        saveDashboardPrefs({ studentView: studentView });
         render();
       },
       studentNames: function () {
@@ -950,7 +949,7 @@ window.PageDashboard = (function () {
     if (el.dataset.action === 'helpRuleBelow' || el.dataset.action === 'helpRuleMin') {
       if (el.dataset.action === 'helpRuleBelow') helpRule.below = Number(el.value);
       else helpRule.min = Number(el.value);
-      _writePref(HELP_RULE_KEY, JSON.stringify(helpRule));
+      saveDashboardPrefs({ helpRule: { below: helpRule.below, min: helpRule.min } });
       render();
       var again = document.querySelector('[data-action="' + el.dataset.action + '"]');
       if (again) again.focus();
@@ -988,8 +987,9 @@ window.PageDashboard = (function () {
     _obsNavKey = null;
     namesHidden = _readPref(HIDE_NAMES_KEY) === '1';
     document.body.classList.toggle('fv-names-hidden', namesHidden);
-    studentView = _readPref(STUDENT_VIEW_KEY) === 'grid' ? 'grid' : 'cards';
-    helpRule = DashInsights.readRule(_readPref(HELP_RULE_KEY));
+    var dashPrefs = getDashboardPrefs();
+    studentView = dashPrefs.studentView === 'grid' ? 'grid' : 'cards';
+    helpRule = DashInsights.readRule(dashPrefs.helpRule);
     helpRuleOpen = false;
     mixPop = null;
     CM.configure({ activeCourse: activeCourse, onRender: render, onCourseChange: switchCourse });

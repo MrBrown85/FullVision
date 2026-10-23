@@ -459,6 +459,7 @@ function _exitDegradedMode(bootstrapData) {
       mobileViewMode: prefs.mobile_view_mode || null,
       mobileSortMode: prefs.mobile_sort_mode || null,
       cardWidgetConfig: prefs.card_widget_config || null,
+      dashboardPrefs: prefs.dashboard_prefs || null,
       displayName: teacher.display_name || null,
       email: teacher.email || null,
       accountDeletedAt: teacher.deleted_at || null,
@@ -1129,7 +1130,7 @@ async function initAllCourses() {
   // Load global state from v2 RPCs:
   //   bootstrap_teacher(email, display_name) → { id, email, display_name,
   //     created_at, deleted_at, preferences: { active_course_id, view_mode,
-  //     mobile_view_mode, mobile_sort_mode, card_widget_config } }
+  //     mobile_view_mode, mobile_sort_mode, card_widget_config, dashboard_prefs } }
   //     Creates teacher + teacher_preference on first sign-in;
   //     returns existing rows on subsequent sign-ins.
   //   list_teacher_courses() → [{ id, name, grade_level, description, color,
@@ -1151,6 +1152,7 @@ async function initAllCourses() {
         mobileViewMode: prefs.mobile_view_mode || null,
         mobileSortMode: prefs.mobile_sort_mode || null,
         cardWidgetConfig: prefs.card_widget_config || null,
+        dashboardPrefs: prefs.dashboard_prefs || null,
         displayName: teacher.display_name || null,
         email: teacher.email || null,
         // deleted_at non-null ⇒ pending soft-delete; Pass C §5 prompts restore.
@@ -7474,6 +7476,9 @@ function _teacherPrefsPatchFromConfig(obj) {
   if (Object.prototype.hasOwnProperty.call(obj, 'cardWidgetConfig')) {
     patch.card_widget_config = obj.cardWidgetConfig || null;
   }
+  if (Object.prototype.hasOwnProperty.call(obj, 'dashboardPrefs')) {
+    patch.dashboard_prefs = obj.dashboardPrefs || null;
+  }
   return patch;
 }
 function saveConfig(obj) {
@@ -10782,6 +10787,26 @@ function saveCardWidgetConfig(config) {
   }
 }
 
+/* The dashboard's settings that follow the teacher to any device:
+   { studentView: 'cards' | 'grid', helpRule: { below, min } }. Empty until
+   one is changed. */
+function getDashboardPrefs() {
+  var cfg = _cache.config || getConfig();
+  return (cfg && cfg.dashboardPrefs) || {};
+}
+
+/* Change some of them; the rest stay. Saved with the teacher's preferences. */
+function saveDashboardPrefs(change) {
+  var prefs = Object.assign({}, getDashboardPrefs(), change || {});
+  var cfg = Object.assign({}, getConfig() || {}, { dashboardPrefs: prefs });
+  _cache.config = cfg;
+  _safeLSSet('gb-config', JSON.stringify(cfg));
+  if (_writesEnabled() && window.v2 && window.v2.saveTeacherPreferences) {
+    window.v2.saveTeacherPreferences({ dashboard_prefs: prefs });
+  }
+  return prefs;
+}
+
 function clearCardWidgetConfig() {
   try {
     localStorage.removeItem('m-card-widgets');
@@ -10951,6 +10976,8 @@ window.GB = {
   getCardWidgetConfig,
   saveCardWidgetConfig,
   clearCardWidgetConfig,
+  getDashboardPrefs,
+  saveDashboardPrefs,
 };
 
 /**

@@ -200,13 +200,10 @@ window.DashInsights = (function () {
   }
 
   /* ── Who Needs Help ─────────────────────────────────────── */
-  function readRule(raw) {
-    var r = {};
-    try {
-      r = JSON.parse(raw || '{}') || {};
-    } catch (e) {
-      r = {};
-    }
+  // The saved rule ({ below, min }) with anything missing or out of range
+  // set to the default: below Proficient, at least 3 scores.
+  function readRule(saved) {
+    var r = saved && typeof saved === 'object' ? saved : {};
     return {
       below: r.below === 2 ? 2 : DEFAULT_RULE.below,
       min: r.min >= 1 && r.min <= 5 ? Math.round(r.min) : DEFAULT_RULE.min,

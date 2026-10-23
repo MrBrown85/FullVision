@@ -99,9 +99,9 @@ describe('Who Needs Help', () => {
   });
 
   it('reads a saved rule and falls back to Below Proficient, at least 3 scores', () => {
-    expect(DashInsights.readRule(null)).toEqual({ below: 3, min: 3 });
-    expect(DashInsights.readRule('{"below":2,"min":1}')).toEqual({ below: 2, min: 1 });
-    expect(DashInsights.readRule('not json')).toEqual({ below: 3, min: 3 });
+    expect(DashInsights.readRule(undefined)).toEqual({ below: 3, min: 3 });
+    expect(DashInsights.readRule({ below: 2, min: 1 })).toEqual({ below: 2, min: 1 });
+    expect(DashInsights.readRule({ below: 7, min: 9 })).toEqual({ below: 3, min: 3 });
   });
 
   it('says so when nobody is below the rule', () => {
@@ -151,5 +151,20 @@ describe('a class average on one assessment', () => {
       classColumnAverageText(CID, { scoreMode: 'points', maxPoints: 10 }, { avg: 7.37, pct: 73.7, count: 3 }),
     ).toBe('7.4/10 · 74%');
     expect(classColumnAverageText(CID, { scoreMode: 'points' }, null)).toBe('—');
+  });
+});
+
+describe('dashboard settings follow the teacher', () => {
+  it('saves Cards | Grid and the rule with the teacher config, each keeping the other', () => {
+    saveDashboardPrefs({ studentView: 'grid' });
+    saveDashboardPrefs({ helpRule: { below: 2, min: 1 } });
+    expect(getDashboardPrefs()).toEqual({ studentView: 'grid', helpRule: { below: 2, min: 1 } });
+    expect(JSON.parse(localStorage.getItem('gb-config')).dashboardPrefs.studentView).toBe('grid');
+  });
+
+  it('sends them to save_teacher_preferences as dashboard_prefs', () => {
+    expect(_teacherPrefsPatchFromConfig({ dashboardPrefs: { studentView: 'grid' } })).toEqual({
+      dashboard_prefs: { studentView: 'grid' },
+    });
   });
 });
