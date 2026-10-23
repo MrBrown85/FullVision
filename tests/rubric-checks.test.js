@@ -94,6 +94,15 @@ describe('RubricChecks.levelAfterTick', () => {
   });
 });
 
+describe('a criterion with checkboxes is not blank', () => {
+  it('keeps "+ From Competency" from replacing it', () => {
+    var blank = { id: 'c', name: 'Criterion 1', tagIds: [], levels: {}, checks: [] };
+    expect(RubricDraft.isBlankCriterion(blank)).toBe(true);
+    blank.checks = [{ id: 'k', level: 3, label: 'Goggles on' }];
+    expect(RubricDraft.isBlankCriterion(blank)).toBe(false);
+  });
+});
+
 describe('RubricChecks counts', () => {
   it('counts ticked boxes against the total', () => {
     expect(RubricChecks.tickedCount(criterion(), ['k3a', 'k4a', 'nope'])).toEqual({ ticked: 2, total: 7 });
