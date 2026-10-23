@@ -658,6 +658,17 @@ window.PageGradebook = (function () {
     requestAnimationFrame(update);
   }
 
+  /* A student's name in the grid's left column: a link to their page. */
+  function _rowheadNameOpen(cid, s) {
+    return (
+      '<a class="gb-grid-rowhead-name" role="link" tabindex="0" data-href="#/student?id=' +
+      encodeURIComponent(s.id) +
+      '&course=' +
+      encodeURIComponent(cid) +
+      '">'
+    );
+  }
+
   /* The short code teachers know a competency by ("QAP1"). Tags loaded from
      the server have a long random id, so the id is used only when it is a
      readable code itself, as in Demo Mode. */
@@ -884,9 +895,9 @@ window.PageGradebook = (function () {
         '<div class="gb-grid-rowhead gb-grid-rowhead-comp' +
         altClass +
         '">' +
-        '<span class="gb-grid-rowhead-name">' +
+        _rowheadNameOpen(cid, s) +
         esc(fullName(s)) +
-        '</span>' +
+        '</a>' +
         '<span class="gb-grid-rowhead-overall" style="color:' +
         color +
         '">' +
@@ -1160,10 +1171,10 @@ window.PageGradebook = (function () {
         '<div class="gb-grid-rowhead' +
         altClass +
         '">' +
-        '<span class="gb-grid-rowhead-name">' +
+        _rowheadNameOpen(cid, s) +
         esc(fullName(s)) +
         desTags +
-        '</span>' +
+        '</a>' +
         '<span class="gb-grid-rowhead-grade">' +
         (gradeParts.length
           ? gradeParts
@@ -2523,6 +2534,9 @@ window.PageGradebook = (function () {
     }
     if (viewMode !== 'detailed') return;
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+    // Keys on a focused link or button (a student's name, the toolbar) are
+    // theirs: Tab moves on and Enter follows the link, not the grid.
+    if (e.target.closest && e.target.closest('a[data-href], button')) return;
     var table = document.querySelector('.gb-table');
     if (!table) return;
     var rows = table.querySelectorAll('tbody tr:not(.gb-stats-row)');

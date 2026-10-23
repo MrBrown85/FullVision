@@ -958,6 +958,10 @@ th.gb-group-alt {
   text-overflow: ellipsis;
   flex: 1;
   min-width: 0;
+  text-decoration: none;
+}
+.gb-grid-rowhead-name:hover {
+  color: var(--link);
 }
 .gb-grid-rowhead-grade {
   display: flex;
