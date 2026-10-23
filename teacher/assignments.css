@@ -1989,6 +1989,55 @@
     display: none;
   }
 }
+/* Delete confirmation: the assessments a rubric is in, and what goes. */
+.confirm-card.rb-del-card {
+  max-width: 480px;
+}
+.rb-del-card .confirm-message {
+  margin-bottom: 12px;
+}
+.rb-del-list {
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 12px;
+}
+.rb-del-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+  padding: 0 14px;
+  font-family: var(--font-base);
+  font-size: var(--text-base);
+  color: var(--text);
+}
+.rb-del-row + .rb-del-row {
+  border-top: 1px solid var(--divider-subtle);
+}
+.rb-del-meta {
+  flex-shrink: 0;
+  font-size: var(--text-sm);
+  color: var(--text-3);
+}
+.rb-del-warn,
+.rb-del-note {
+  margin-bottom: 12px;
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text-2);
+}
+.rb-del-warn.is-danger {
+  color: var(--danger);
+  font-weight: 600;
+}
+.rb-del-note {
+  margin-bottom: 20px;
+  color: var(--text-3);
+}
 @media print {
   .rb-overlay {
     display: none;

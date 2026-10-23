@@ -4,7 +4,7 @@
  * only, with its actions (teacher/rubric-bank.js).
  */
 import { test, expect } from '@playwright/test';
-import { mockAuth, seedCourse, seedStudents, gotoApp, TEST_COURSE } from './helpers.js';
+import { mockAuth, seedCourse, seedStudents, seedScores, gotoApp, TEST_COURSE } from './helpers.js';
 
 const LAB = {
   id: 'rubric-001',
@@ -225,5 +225,63 @@ test.describe('Rubric Bank, All My Classes', () => {
     await bank.locator('#rb-search').fill('ecosystems');
     await expect(bank.locator('.rb-row')).toHaveText([/Ecosystems Field Study Rubric/]);
     await expect(bank.locator('.rb-class')).toHaveCount(1);
+  });
+});
+
+test.describe('Rubric Bank, delete', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockAuth(page);
+    await seedCourse(page);
+    await seedStudents(page);
+    await page.addInitScript(
+      ({ rubrics, assessment, cid }) => {
+        localStorage.setItem('gb-rubrics-' + cid, JSON.stringify(rubrics));
+        localStorage.setItem('gb-assessments-' + cid, JSON.stringify([assessment]));
+      },
+      { rubrics: [LAB, TALK], assessment: ASSESSMENT, cid: TEST_COURSE.id },
+    );
+  });
+
+  async function openDelete(page) {
+    await gotoApp(page, '/dashboard');
+    const bank = await openBank(page);
+    await bank.getByRole('button', { name: 'More actions' }).click();
+    await bank.getByRole('menuitem', { name: 'Delete Rubric' }).click();
+    const dialog = page.getByRole('alertdialog', { name: 'Delete Lab Report Rubric?' });
+    await expect(dialog).toBeVisible();
+    return dialog;
+  }
+
+  test('names the assessments; Cancel keeps the rubric', async ({ page }) => {
+    const dialog = await openDelete(page);
+    await expect(dialog).toContainText('1 assessment uses this rubric.');
+    await expect(dialog.locator('.rb-del-row')).toHaveText([/Rubric Lab Report.*Mar 21, 2026/]);
+    await expect(dialog.locator('.rb-del-warn')).toHaveText('They will lose their rubric link.');
+    await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    await expect(page.getByRole('dialog', { name: 'Rubric Bank' })).toBeVisible();
+    expect(await page.evaluate(cid => getRubrics(cid).length, TEST_COURSE.id)).toBe(2);
+  });
+
+  test('warns that scores go with it, then deletes', async ({ page }) => {
+    await seedScores(page, { 'stu-001': { 'assess-rubric-001': { QAP: 3 } } });
+    const dialog = await openDelete(page);
+    await expect(dialog.locator('.rb-del-row')).toContainText('1 Student Scored');
+    await expect(dialog.locator('.rb-del-warn')).toHaveText(
+      'The rubric scores in these assessments will be deleted with it. This cannot be undone.',
+    );
+    await dialog.getByRole('button', { name: 'Delete Rubric' }).click();
+    await expect(dialog).toHaveCount(0);
+    const bank = page.getByRole('dialog', { name: 'Rubric Bank' });
+    await expect(bank.locator('.rb-title')).toHaveText('Presentation Rubric');
+    const left = await page.evaluate(
+      cid => ({
+        rubrics: getRubrics(cid).map(r => r.id),
+        link: getAssessments(cid)[0].rubricId || null,
+      }),
+      TEST_COURSE.id,
+    );
+    expect(left).toEqual({ rubrics: ['rubric-002'], link: null });
   });
 });

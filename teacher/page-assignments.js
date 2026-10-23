@@ -2967,6 +2967,14 @@ window.PageAssignments = (function () {
   function deleteRubricUI(rubricId) {
     var rubric = getRubricById(activeCourse, rubricId);
     if (!rubric) return;
+    if (window.RubricBank) {
+      RubricBank.confirmDelete(activeCourse, rubricId, function () {
+        deleteRubric(activeCourse, rubricId);
+        render();
+        RubricBank.refresh();
+      });
+      return;
+    }
     var linked = getAssessments(activeCourse).filter(function (a) {
       return a.rubricId === rubricId;
     }).length;
