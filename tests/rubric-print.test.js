@@ -369,3 +369,12 @@ describe('Tag and General Rubrics', () => {
     expect(RubricPrint.isStudentScored(CID, AID_GEN, SID2)).toBe(false);
   });
 });
+
+describe('Print Rubrics layout for picked students', () => {
+  it('is a full page for one, two to a page for two, four to a page for three or more', () => {
+    expect(RubricPrint.layoutForCount(1)).toBe('full');
+    expect(RubricPrint.layoutForCount(2)).toBe('half');
+    expect(RubricPrint.layoutForCount(3)).toBe('quarter');
+    expect(RubricPrint.layoutForCount(27)).toBe('quarter');
+  });
+});

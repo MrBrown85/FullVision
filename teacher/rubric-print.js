@@ -305,6 +305,12 @@
     });
   }
 
+  /* The layout for a number of picked students: one on a full page, two
+     two to a page, three or more four to a page. */
+  function layoutForCount(n) {
+    return n >= 3 ? 'quarter' : n === 2 ? 'half' : 'full';
+  }
+
   function pageCount(sheets, layoutKey) {
     var layout = LAYOUTS[layoutKey] || LAYOUTS.full;
     var perPage = layout.cols * layout.rows;
@@ -551,9 +557,11 @@
     return opts;
   }
 
-  function _saveOptions(opts) {
+  // The layout saved is the one the teacher last chose, not one picked for
+  // them by how many students are ticked.
+  function _saveOptions(opts, layout) {
     try {
-      localStorage.setItem(OPTIONS_KEY, JSON.stringify({ layout: opts.layout, include: opts.include }));
+      localStorage.setItem(OPTIONS_KEY, JSON.stringify({ layout: layout || opts.layout, include: opts.include }));
     } catch (e) {
       /* storage full or blocked: the defaults are fine */
     }
@@ -605,7 +613,8 @@
     html += _radio('rp-students', 'scored', opts.students === 'scored', 'All scored students', '(' + scoredCount + ')');
     html += _radio('rp-students', 'all', opts.students === 'all', 'All students', '(' + students.length + ')');
     html += _radio('rp-students', 'pick', opts.students === 'pick', 'Pick students');
-    html += '<div class="rp-pick"' + (opts.students === 'pick' ? '' : ' hidden') + '>';
+    // Always shown: ticking a name switches to Pick students.
+    html += '<div class="rp-pick">';
     students.forEach(function (s) {
       html +=
         '<label class="rp-option rp-pick-option"><input type="checkbox" data-pick="' +
@@ -681,15 +690,48 @@
     overlay.querySelectorAll('input[data-pick]:checked').forEach(function (box) {
       opts.picked.push(box.dataset.pick);
     });
-    var pick = overlay.querySelector('.rp-pick');
-    if (pick) pick.hidden = opts.students !== 'pick';
   }
 
-  function open(cid, aid) {
+  /* A name ticked or unticked. From All or All scored it starts a new pick
+     of just that student; under Pick students it adds or removes one. The
+     layout follows how many are picked (layoutForCount). */
+  function _onPick(overlay, box) {
+    var pickRadio = overlay.querySelector('input[name="rp-students"][value="pick"]');
+    if (pickRadio && !pickRadio.checked) {
+      overlay.querySelectorAll('input[data-pick]').forEach(function (b) {
+        b.checked = b === box;
+      });
+      pickRadio.checked = true;
+    }
+    var n = overlay.querySelectorAll('input[data-pick]:checked').length;
+    if (!n) return;
+    var layoutRadio = overlay.querySelector('input[name="rp-layout"][value="' + layoutForCount(n) + '"]');
+    if (layoutRadio) layoutRadio.checked = true;
+  }
+
+  /* Open the dialog. With `openOpts.studentId` (the Assignments page is
+     grading one student) it starts on that student's rubric, full page;
+     otherwise on every student, in the layout last chosen. */
+  function open(cid, aid, openOpts) {
     close();
     var assessment = _assessment(cid, aid);
     if (!_rubric(cid, assessment)) return;
-    _state = { cid: cid, aid: aid, opts: _loadOptions(), trigger: document.activeElement };
+    var opts = _loadOptions();
+    var userLayout = opts.layout;
+    var sid = openOpts && openOpts.studentId;
+    var hasStudent =
+      sid &&
+      getStudents(cid).some(function (s) {
+        return s.id === sid;
+      });
+    if (hasStudent) {
+      opts.students = 'pick';
+      opts.picked = [sid];
+      opts.layout = layoutForCount(1);
+    } else {
+      opts.students = 'all';
+    }
+    _state = { cid: cid, aid: aid, opts: opts, userLayout: userLayout, trigger: document.activeElement };
     var overlay = document.createElement('div');
     overlay.id = OVERLAY_ID;
     overlay.className = 'confirm-overlay rubric-print-overlay';
@@ -707,9 +749,20 @@
       if (btn.dataset.rp === 'cancel') close();
       else if (btn.dataset.rp === 'print') _printFromDialog();
     });
-    overlay.addEventListener('change', function () {
+    overlay.addEventListener('change', function (e) {
+      var t = e.target;
+      if (t && t.dataset && t.dataset.pick !== undefined) _onPick(overlay, t);
+      else if (t && t.name === 'rp-students' && t.value !== 'pick') {
+        // Back to every student: no picks, and the layout last chosen.
+        overlay.querySelectorAll('input[data-pick]').forEach(function (b) {
+          b.checked = false;
+        });
+        var saved = overlay.querySelector('input[name="rp-layout"][value="' + _state.userLayout + '"]');
+        if (saved) saved.checked = true;
+      }
       _readOptionsFromDialog(overlay);
-      _saveOptions(_state.opts);
+      if (t && t.name === 'rp-layout') _state.userLayout = _state.opts.layout;
+      _saveOptions(_state.opts, _state.userLayout);
       _refreshStatus();
     });
     _state.keyHandler = function (e) {
@@ -717,6 +770,9 @@
     };
     document.addEventListener('keydown', _state.keyHandler);
     document.body.appendChild(overlay);
+    // The graded student may be far down the list: show their tick.
+    var picked = overlay.querySelector('input[data-pick]:checked');
+    if (picked && picked.scrollIntoView) picked.scrollIntoView({ block: 'nearest' });
     _refreshStatus();
     var first = overlay.querySelector('input[name="rp-layout"]:checked') || overlay.querySelector('input');
     if (first && first.focus) first.focus();
@@ -766,6 +822,7 @@
     selectStudents: selectStudents,
     isStudentScored: isStudentScored,
     pageCount: pageCount,
+    layoutForCount: layoutForCount,
     renderSheet: renderSheet,
     renderPages: renderPages,
     stage: stage,

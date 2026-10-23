@@ -4478,7 +4478,8 @@ window.PageAssignments = (function () {
         closeCriterionComment();
       },
       printRubrics: function () {
-        if (window.RubricPrint) RubricPrint.open(activeCourse, el.dataset.aid);
+        // Grading one student: their rubric. Every student showing: everyone's.
+        if (window.RubricPrint) RubricPrint.open(activeCourse, el.dataset.aid, { studentId: focusStudentId });
       },
       toggleSectionTags: function () {
         toggleSectionTags(el.dataset.secid);
