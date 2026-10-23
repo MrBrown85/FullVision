@@ -393,6 +393,8 @@ export async function mockAuth(page) {
           name: r.name || '',
           created_at: '2026-09-01T00:00:' + String(10 + ri) + 'Z',
           style: r.style === 'advanced' ? 'advanced' : 'standard',
+          // The live bundle sends the link between copies (20261018_rubric_copy_group).
+          copy_group: r.copyGroup || null,
         });
         (r.criteria || []).forEach((c, ci) => {
           const levels = c.levels || {};
@@ -710,6 +712,19 @@ export async function mockAuth(page) {
         res = { data: courseRows() };
       } else if (name === 'get_class_bundle') {
         res = classBundle(params && params.p_course_id, params && params.p_if_version);
+      } else if (name === 'list_rubric_copies') {
+        // Every rubric in the teacher's classes sharing the copy group, as
+        // the live RPC lists them (20261018_rubric_copy_group.sql).
+        const group = params && params.p_copy_group;
+        const courses = readLS('gb-courses', {}) || {};
+        const rows = [];
+        Object.keys(courses).forEach(cid => {
+          (readLS('gb-rubrics-' + cid, []) || []).forEach(r => {
+            if (r && group && r.copyGroup === group)
+              rows.push({ course_id: cid, rubric_id: r.id, course_name: courses[cid].name || '' });
+          });
+        });
+        res = { data: rows };
       } else if (/^(get|list)_/.test(name)) {
         // Reads the bundle replaced: nothing.
         res = { data: null };
