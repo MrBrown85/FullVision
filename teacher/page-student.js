@@ -655,7 +655,7 @@ window.PageStudent = (function () {
           esc(tag.code || tag.shortName || '') +
           '</th>';
     });
-    html += '<th class="gt-col-avg">Avg</th></tr></thead><tbody>';
+    html += '<th class="gt-col-avg">Score</th></tr></thead><tbody>';
 
     sortedAssessments.forEach(function (assess) {
       var assessScores = allScores.filter(function (s) {
@@ -685,16 +685,11 @@ window.PageStudent = (function () {
             ? 'Complete'
             : scoredCount + '/' + totalTags + ' scored';
 
-      var scoredEntries = assessScores.filter(function (s) {
-        return s.score > 0;
-      });
-      var rowAvg =
-        scoredEntries.length > 0
-          ? scoredEntries.reduce(function (sum, s) {
-              return sum + scoreModValue(s);
-            }, 0) / scoredEntries.length
-          : 0;
-      var rowAvgR = Math.round(rowAvg);
+      // The row's score as the gradebook shows it: points as points, a
+      // level with its + or −, rubric work at its weights.
+      var cell = assessmentCellValue(cid, studentId, assess);
+      var isPoints = isPointsScored(assess) && !isCompletionScored(assess);
+      var maxPoints = assess.maxPoints || 100;
 
       var mod = assess.moduleId ? getModuleById(cid, assess.moduleId) : null;
       var assessStatus = statuses[studentId + ':' + assess.id];
@@ -753,13 +748,37 @@ window.PageStudent = (function () {
           var entry = assessScores.find(function (s) {
             return s.tagId === tag.id;
           });
-          var score = entry ? entry.score : 0;
-          if (score > 0) {
+          if (entry && isScoreEntered(assess, entry)) {
+            // Points count toward the competency as the level they convert
+            // to; Complete/Incomplete shows its mark.
+            var level, pipText, pipTitle;
+            if (isCompletionScored(assess)) {
+              level = 0;
+              pipText = entry.score > 0 ? '✓' : '✗';
+              pipTitle = entry.score > 0 ? 'Complete' : 'Incomplete';
+            } else if (isPoints) {
+              level = pointsToProf(entry.score, maxPoints, getGradingScale(cid));
+              pipText = String(level);
+              pipTitle =
+                formatPoints(entry.score) +
+                ' of ' +
+                formatPoints(maxPoints) +
+                ' points (' +
+                formatPointsPercent(entry.score, maxPoints) +
+                '), counted as ' +
+                level;
+            } else {
+              level = entry.score;
+              pipText = formatScoreLevel(entry.score, entry.mod);
+              pipTitle = '';
+            }
             html +=
               '<td class="gt-cell-score"><span class="gt-score-pip' +
-              (PROF_COLORS[score] ? '" style="background:' + PROF_COLORS[score] : ' gt-score-pip-plain') +
-              '">' +
-              score +
+              (PROF_COLORS[level] ? '" style="background:' + PROF_COLORS[level] : ' gt-score-pip-plain') +
+              '"' +
+              (pipTitle ? ' title="' + esc(pipTitle) + '"' : '') +
+              '>' +
+              esc(pipText) +
               '</span></td>';
           } else {
             html += '<td class="gt-cell-score"><span class="gt-score-empty">—</span></td>';
@@ -767,11 +786,19 @@ window.PageStudent = (function () {
         }
       });
 
+      var cellText =
+        cell.kind === 'points'
+          ? formatPoints(cell.value) +
+            '/' +
+            formatPoints(maxPoints) +
+            ' · ' +
+            formatPointsPercent(cell.value, maxPoints)
+          : cell.text;
       html +=
         '<td class="gt-cell-avg">' +
-        (rowAvg > 0
-          ? '<span style="color:' + PROF_COLORS[rowAvgR] + ';font-weight:700">' + formatLevel(cid, rowAvg) + '</span>'
-          : '<span style="color:var(--text-3)">—</span>') +
+        (cell.level > 0
+          ? '<span style="color:' + PROF_COLORS[cell.level] + ';font-weight:700">' + esc(cellText) + '</span>'
+          : '<span style="color:var(--text-3)">' + esc(cellText) + '</span>') +
         '</td>';
       html += '</tr>';
     });
