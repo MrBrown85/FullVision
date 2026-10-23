@@ -7,6 +7,10 @@ window.MGrade = (function () {
   var _currentIdx = 0;
   var _undoStack = [];
   var _scrollRAF = null;
+  // Rubric view per assessment (true unless Tags is chosen) and the
+  // Advanced Rubric checklists open, keyed sid:aid:critId.
+  var _rubricView = {};
+  var _openChecks = {};
 
   /* ── Filter state ─────────────────────────────────────────────
    * Per-course, persisted to localStorage under gb-grade-filters-<cid>.
@@ -540,7 +544,14 @@ window.MGrade = (function () {
     });
     swiper += '</div>';
 
-    return '<div class="m-screen m-screen-hidden" id="m-screen-grade-swiper">' + nav + thumbs + swiper + '</div>';
+    return (
+      '<div class="m-screen m-screen-hidden" id="m-screen-grade-swiper">' +
+      nav +
+      thumbs +
+      _viewSwitchHtml(cid, assessment) +
+      swiper +
+      '</div>'
+    );
   }
 
   function _renderStudentCard(cid, st, assessment, allScores, allStatuses) {
@@ -589,7 +600,16 @@ window.MGrade = (function () {
         _completionBtnsHtml(getCompletionMark(cid, st.id, assessment.id)) +
         '</div>';
     }
-    (isCompletionScored(assessment) ? [] : scoreTagIds(assessment, cid)).forEach(function (tid, tagIdx) {
+    // A rubric of the assessment's own is scored by criterion (Tags | Rubric).
+    var rubric = _rubricViewOn(cid, assessment) ? _ownRubric(cid, assessment) : null;
+    if (rubric) {
+      tagGroups = (rubric.criteria || [])
+        .map(function (crit) {
+          return _criterionGroupHtml(cid, st, assessment, rubric, crit);
+        })
+        .join('');
+    }
+    (isCompletionScored(assessment) || rubric ? [] : scoreTagIds(assessment, cid)).forEach(function (tid, tagIdx) {
       var tag = getTagById(cid, tid);
       var sec = getSectionForTag(cid, tid);
       var key = tag ? null : scoreKeyInfo(cid, assessment, tid);
@@ -739,6 +759,331 @@ window.MGrade = (function () {
       statusRow +
       '</div></div>'
     );
+  }
+
+  /* ── Rubric view (Rubric Bank plan §5, PR 10) ──────────────────
+     An assessment with a rubric of its own is scored by criterion, as the
+     desktop's Rubric view does: one row per criterion whose level is saved
+     under each of its competencies (rubricCriterionScoreKeys). Tags | Rubric
+     switches back to one row per competency. An Advanced Rubric's criterion
+     also has a Checks button that opens its checkboxes under the row;
+     ticking writes the level they suggest unless the teacher picked one by
+     hand (RubricChecks.levelAfterTick). */
+  function _ownRubric(cid, assessment) {
+    if (!assessment || !assessment.rubricId) return null;
+    if (isPointsScored(assessment) || isCompletionScored(assessment)) return null;
+    return getRubricById(cid, assessment.rubricId) || null;
+  }
+
+  function _rubricViewOn(cid, assessment) {
+    return !!_ownRubric(cid, assessment) && _rubricView[assessment.id] !== false;
+  }
+
+  function _isAdvanced(rubric) {
+    return !!rubric && typeof rubricStyle === 'function' && rubricStyle(rubric) === 'advanced';
+  }
+
+  function _findCriterion(cid, aid, critId) {
+    var a = getAssessments(cid).find(function (x) {
+      return x.id === aid;
+    });
+    var rubric = _ownRubric(cid, a);
+    var crit = rubric
+      ? (rubric.criteria || []).find(function (c) {
+          return c.id === critId;
+        })
+      : null;
+    return crit ? { assessment: a, rubric: rubric, crit: crit } : null;
+  }
+
+  /* A criterion's level, the desktop grid's rule: one level when its
+     competencies agree (with their ±), else the lowest, marked mixed. */
+  function _critState(cid, sid, aid, crit) {
+    var entries = getScores(cid)[sid] || [];
+    var levels = [];
+    var mods = [];
+    rubricCriterionScoreKeys(crit).forEach(function (tid) {
+      var e = entries.find(function (s) {
+        return s.assessmentId === aid && s.tagId === tid;
+      });
+      if (e && e.score > 0) {
+        levels.push(e.score);
+        mods.push(normalizeScoreMod(e.score, e.mod));
+      }
+    });
+    if (!levels.length) return { level: 0, mod: 0, mixed: false };
+    var same = levels.every(function (l) {
+      return l === levels[0];
+    });
+    var modsAgree = mods.every(function (m) {
+      return m === mods[0];
+    });
+    if (same) return { level: levels[0], mod: modsAgree ? mods[0] : 0, mixed: false };
+    return { level: Math.min.apply(null, levels), mod: 0, mixed: true };
+  }
+
+  function _viewSwitchHtml(cid, assessment) {
+    if (!_ownRubric(cid, assessment)) return '';
+    var rubricOn = _rubricViewOn(cid, assessment);
+    return (
+      '<div class="m-grade-view-row"><div class="m-segmented" role="group" aria-label="Score by">' +
+      '<button class="m-seg-btn' +
+      (rubricOn ? '' : ' m-seg-active') +
+      '" data-action="m-grade-view" data-view="tags" data-aid="' +
+      assessment.id +
+      '" aria-pressed="' +
+      !rubricOn +
+      '">Tags</button>' +
+      '<button class="m-seg-btn' +
+      (rubricOn ? ' m-seg-active' : '') +
+      '" data-action="m-grade-view" data-view="rubric" data-aid="' +
+      assessment.id +
+      '" aria-pressed="' +
+      rubricOn +
+      '">Rubric</button></div></div>'
+    );
+  }
+
+  function _checklistHtml(cid, sid, aid, crit, state) {
+    var ticked = getRubricCheckIds(cid, sid, aid);
+    var suggested = RubricChecks.suggestedLevel(crit, ticked);
+    var head = suggested ? 'Suggested: ' + PROF_LABELS[suggested] : 'No Level Suggested Yet';
+    var hint = !suggested
+      ? 'Tick what you saw. A level is suggested when all of its boxes are ticked.'
+      : state.level && state.level !== suggested
+        ? 'You picked ' + PROF_LABELS[state.level] + '. Ticks keep your choice until you clear the level.'
+        : 'Every ' + PROF_LABELS[suggested] + ' box is ticked. Pick another level to override.';
+    var html =
+      '<div class="m-checklist"><div class="m-checklist-head">' +
+      MC.esc(head) +
+      '</div><div class="m-checklist-hint">' +
+      MC.esc(hint) +
+      '</div>';
+    levelOrderFor(cid).forEach(function (lv) {
+      var boxes = RubricChecks.checksAt(crit, lv);
+      if (!boxes.length) return;
+      html +=
+        '<div class="m-checklist-level"><div class="m-checklist-level-name l' + lv + '">' + PROF_LABELS[lv] + '</div>';
+      boxes.forEach(function (check) {
+        html +=
+          '<label class="m-check"><input type="checkbox" data-action="m-grade-tick" data-sid="' +
+          sid +
+          '" data-aid="' +
+          aid +
+          '" data-critid="' +
+          crit.id +
+          '" data-checkid="' +
+          check.id +
+          '"' +
+          (ticked.indexOf(check.id) >= 0 ? ' checked' : '') +
+          '><span>' +
+          MC.esc(check.label) +
+          '</span></label>';
+      });
+      html += '</div>';
+    });
+    return html + '</div>';
+  }
+
+  /* One criterion: its name, the four levels, ± and, on an Advanced
+     Rubric, the Checks button and its open checklist. */
+  function _criterionGroupHtml(cid, st, assessment, rubric, crit) {
+    var state = _critState(cid, st.id, assessment.id, crit);
+    var btns = '';
+    levelOrderFor(cid).forEach(function (level) {
+      btns +=
+        '<button class="m-score-btn' +
+        (state.level === level ? ' m-score-active' : '') +
+        (state.level === level && state.mixed ? ' m-score-mixed' : '') +
+        '" data-action="m-grade-crit" data-score="' +
+        level +
+        '" data-sid="' +
+        st.id +
+        '" data-aid="' +
+        assessment.id +
+        '" data-critid="' +
+        crit.id +
+        '">' +
+        level +
+        '</button>';
+    });
+    var advanced = _isAdvanced(rubric) && RubricChecks.hasChecks(crit);
+    var open = advanced && !!_openChecks[st.id + ':' + assessment.id + ':' + crit.id];
+    var checksBtn = '';
+    if (advanced) {
+      var count = RubricChecks.tickedCount(crit, getRubricCheckIds(cid, st.id, assessment.id));
+      checksBtn =
+        '<button class="m-checks-btn' +
+        (open ? ' m-checks-open' : '') +
+        '" data-action="m-grade-checks" data-sid="' +
+        st.id +
+        '" data-aid="' +
+        assessment.id +
+        '" data-critid="' +
+        crit.id +
+        '" aria-expanded="' +
+        open +
+        '" aria-label="Checklist, ' +
+        count.ticked +
+        ' of ' +
+        count.total +
+        ' ticked"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 12l3 3 5-6"/></svg>' +
+        count.ticked +
+        '/' +
+        count.total +
+        '</button>';
+    }
+    return (
+      '<div class="m-score-group m-crit-group" data-critid="' +
+      crit.id +
+      '">' +
+      '<div class="m-score-tag-label m-crit-label"><span class="m-crit-name">' +
+      MC.esc(crit.name || 'Criterion') +
+      '</span>' +
+      checksBtn +
+      '</div>' +
+      '<div class="m-score-btns" role="radiogroup" aria-label="Score for ' +
+      MC.esc(crit.name || 'criterion') +
+      '">' +
+      btns +
+      '</div>' +
+      '<div class="m-score-mods" data-sid="' +
+      st.id +
+      '" data-aid="' +
+      assessment.id +
+      '" data-critid="' +
+      crit.id +
+      '">' +
+      _modBtnsHtml(state.mixed ? 0 : state.level, state.mod) +
+      '</div>' +
+      (open ? _checklistHtml(cid, st.id, assessment.id, crit, state) : '') +
+      '</div>'
+    );
+  }
+
+  /* Redraw one student's card in place after a criterion change. */
+  function _refreshCard(cid, sid, aid) {
+    var card = document.querySelector('.m-swiper-card[data-sid="' + sid + '"]');
+    var assessment = getAssessments(cid).find(function (a) {
+      return a.id === aid;
+    });
+    var st = getStudents(cid).find(function (s) {
+      return s.id === sid;
+    });
+    if (!card || !assessment || !st) return;
+    card.outerHTML = _renderStudentCard(cid, st, assessment, getScores(cid), getAssignmentStatuses(cid));
+  }
+
+  function _scoreType(assessment) {
+    return assessment
+      ? getAssessmentCategoryId(assessment)
+        ? 'summative'
+        : assessment.type || 'formative'
+      : 'summative';
+  }
+
+  /* Write one level (and ±) under every key of a criterion, undoable as one. */
+  function _writeCriterion(cid, sid, found, level, mod) {
+    var aid = found.assessment.id;
+    var keys = rubricCriterionScoreKeys(found.crit);
+    var prev = keys.map(function (tid) {
+      var e = _currentEntry(cid, sid, aid, tid);
+      return { tid: tid, prev: e ? [JSON.parse(JSON.stringify(e))] : [] };
+    });
+    _undoStack.push({ cid: cid, sid: sid, aid: aid, multi: prev });
+    if (_undoStack.length > 20) _undoStack.shift();
+    keys.forEach(function (tid) {
+      upsertScore(
+        cid,
+        sid,
+        aid,
+        tid,
+        level,
+        found.assessment.date || getTodayStr(),
+        _scoreType(found.assessment),
+        '',
+        mod || 0,
+      );
+    });
+    clearProfCache();
+  }
+
+  /* A level tapped on a criterion; tapping the active one clears it. */
+  function setCriterionScore(cid, sid, aid, critId, level) {
+    var found = _findCriterion(cid, aid, critId);
+    if (!found) return;
+    var state = _critState(cid, sid, aid, found.crit);
+    var cleared = state.level === level && !state.mixed;
+    _writeCriterion(cid, sid, found, cleared ? 0 : level, 0);
+    MC.haptic();
+    _refreshCard(cid, sid, aid);
+    _updateThumbGraded(cid, aid);
+    if (cleared) {
+      MC.showToast('Score cleared', {
+        onUndo: function () {
+          undoLastScore();
+        },
+        duration: 5000,
+      });
+    }
+  }
+
+  // Tapping the active + or − again clears it.
+  function setCriterionMod(cid, sid, aid, critId, mod) {
+    var found = _findCriterion(cid, aid, critId);
+    if (!found) return;
+    var state = _critState(cid, sid, aid, found.crit);
+    if (!(state.level > 0) || state.mixed) return;
+    var next = state.mod === mod ? 0 : mod;
+    if (normalizeScoreMod(state.level, next) !== next) return;
+    _writeCriterion(cid, sid, found, state.level, next);
+    MC.haptic();
+    _refreshCard(cid, sid, aid);
+  }
+
+  function setGradeView(cid, aid, view) {
+    _rubricView[aid] = view !== 'tags';
+    document.querySelectorAll('.m-grade-view-row .m-seg-btn').forEach(function (btn) {
+      var on = btn.getAttribute('data-view') === view;
+      btn.classList.toggle('m-seg-active', on);
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    var assessment = getAssessments(cid).find(function (a) {
+      return a.id === aid;
+    });
+    var swiper = document.getElementById('m-swiper');
+    if (!swiper || !assessment) return;
+    var left = swiper.scrollLeft;
+    var scores = getScores(cid);
+    var statuses = getAssignmentStatuses(cid);
+    swiper.innerHTML = sortStudents(getStudents(cid).slice(), 'alpha')
+      .map(function (st) {
+        return _renderStudentCard(cid, st, assessment, scores, statuses);
+      })
+      .join('');
+    swiper.scrollLeft = left;
+  }
+
+  function toggleChecklist(cid, sid, aid, critId) {
+    var key = sid + ':' + aid + ':' + critId;
+    if (_openChecks[key]) delete _openChecks[key];
+    else _openChecks[key] = true;
+    _refreshCard(cid, sid, aid);
+  }
+
+  /* A box ticked or cleared: save it, then write the level the boxes suggest
+     unless the teacher picked a different one by hand. */
+  function tickCheck(cid, sid, aid, critId, checkId, on) {
+    var found = _findCriterion(cid, aid, critId);
+    if (!found) return;
+    var before = getRubricCheckIds(cid, sid, aid);
+    var after = setRubricCheck(cid, sid, aid, checkId, on);
+    var state = _critState(cid, sid, aid, found.crit);
+    var next = RubricChecks.levelAfterTick(found.crit, state.level, before, after);
+    if (next !== state.level) _writeCriterion(cid, sid, found, next, 0);
+    MC.haptic();
+    _refreshCard(cid, sid, aid);
+    _updateThumbGraded(cid, aid);
   }
 
   /* ── + / − on a level ──────────────────────────────────────── */
@@ -932,6 +1277,7 @@ window.MGrade = (function () {
   function undoLastScore() {
     var entry = _undoStack.pop();
     if (!entry) return;
+    if (entry.multi) return _undoCriterion(entry);
     var allScores = getScores(entry.cid);
     var beforeScores = structuredClone(allScores);
     var stScores = (allScores[entry.sid] || []).filter(function (s) {
@@ -957,6 +1303,30 @@ window.MGrade = (function () {
       });
     }
     _syncModBtns(entry.cid, entry.sid, entry.aid, entry.tid);
+    _updateThumbGraded(entry.cid, entry.aid);
+    MC.showToast('Score reverted');
+  }
+
+  /* A criterion's change, put back on every key it wrote. */
+  function _undoCriterion(entry) {
+    var allScores = getScores(entry.cid);
+    var beforeScores = structuredClone(allScores);
+    var tids = entry.multi.map(function (m) {
+      return m.tid;
+    });
+    var stScores = (allScores[entry.sid] || []).filter(function (s) {
+      return !(s.assessmentId === entry.aid && tids.indexOf(s.tagId) >= 0);
+    });
+    entry.multi.forEach(function (m) {
+      m.prev.forEach(function (p) {
+        stScores.push(p);
+      });
+    });
+    allScores[entry.sid] = stScores;
+    saveScores(entry.cid, allScores);
+    persistScoreDiffToCanonical(entry.cid, beforeScores, allScores);
+    clearProfCache();
+    _refreshCard(entry.cid, entry.sid, entry.aid);
     _updateThumbGraded(entry.cid, entry.aid);
     MC.showToast('Score reverted');
   }
@@ -1089,6 +1459,11 @@ window.MGrade = (function () {
     renderSwiper: renderSwiper,
     setScore: setScore,
     setScoreMod: setScoreMod,
+    setCriterionScore: setCriterionScore,
+    setCriterionMod: setCriterionMod,
+    setGradeView: setGradeView,
+    toggleChecklist: toggleChecklist,
+    tickCheck: tickCheck,
     setStatus: setStatus,
     adjustPointsScore: adjustPointsScore,
     setCompletion: setCompletion,
