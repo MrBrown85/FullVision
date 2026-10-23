@@ -115,7 +115,7 @@ describe('sheetData and renderSheet', () => {
   it('shades the scored cell with its ± mark and prints the descriptors', () => {
     const data = RubricPrint.sheetData(CID, AID, SID);
     expect(data.scored).toBe(true);
-    expect(data.studentName).toBe('Ada');
+    expect(data.studentName).toBe('Ada Lovelace');
     expect(data.rows[0].level).toBe(3);
     const html = RubricPrint.renderSheet(data, { include });
     expect(html).toContain('class="rubric-cell is-scored l3"');
@@ -376,5 +376,21 @@ describe('Print Rubrics layout for picked students', () => {
     expect(RubricPrint.layoutForCount(2)).toBe('half');
     expect(RubricPrint.layoutForCount(3)).toBe('quarter');
     expect(RubricPrint.layoutForCount(27)).toBe('quarter');
+  });
+});
+
+describe('Print Rubrics student name', () => {
+  const nora = { firstName: 'Eleanor', preferred: 'Nora', lastName: 'Kim' };
+  it('prints the preferred name, or the first name, and always the last name', () => {
+    expect(RubricPrint.printName(nora, 'preferred')).toBe('Nora Kim');
+    expect(RubricPrint.printName(nora, 'first')).toBe('Eleanor Kim');
+  });
+  it('uses the first name when there is no preferred name', () => {
+    expect(RubricPrint.printName({ firstName: 'Alan', lastName: 'Turing' }, 'preferred')).toBe('Alan Turing');
+  });
+  it('does not repeat a last name the preferred name already has', () => {
+    expect(
+      RubricPrint.printName({ firstName: 'Robert', preferred: 'Bobby Smith', lastName: 'Smith' }, 'preferred'),
+    ).toBe('Bobby Smith');
   });
 });

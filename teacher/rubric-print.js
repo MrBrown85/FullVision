@@ -88,6 +88,7 @@
     students: 'scored', // scored | all | pick
     picked: [],
     layout: 'full',
+    nameStyle: 'preferred', // preferred | first; the last name always follows
     include: { feedback: true, criterionComments: true, codes: true, overall: true },
   };
 
@@ -225,8 +226,22 @@
     return parts.filter(Boolean).join('\n');
   }
 
-  /* Everything one sheet shows. `scored` is false for a blank rubric. */
-  function sheetData(cid, aid, sid) {
+  /* The name at the top of a sheet: the preferred name (the first name when
+     there is none) or the first name, then always the last name. A
+     preferred name that already ends in the last name keeps it once. */
+  function printName(student, nameStyle) {
+    var first = nameStyle === 'first' ? student.firstName || student.preferred : student.preferred || student.firstName;
+    first = String(first || '').trim();
+    var last = String(student.lastName || '').trim();
+    if (!last) return first || displayName(student);
+    var lower = first.toLowerCase();
+    if (lower === last.toLowerCase() || lower.slice(-(last.length + 1)) === ' ' + last.toLowerCase()) return first;
+    return (first + ' ' + last).trim();
+  }
+
+  /* Everything one sheet shows. `scored` is false for a blank rubric.
+     `nameStyle` picks the name at the top (printName). */
+  function sheetData(cid, aid, sid, nameStyle) {
     var assessment = _assessment(cid, aid);
     var rubric = _rubric(cid, assessment);
     var student = getStudents(cid).find(function (s) {
@@ -271,7 +286,7 @@
       assessment: assessment,
       rubric: rubric,
       student: student,
-      studentName: displayName(student),
+      studentName: printName(student, nameStyle || DEFAULT_OPTIONS.nameStyle),
       date: assessment.date ? formatDate(assessment.date) : '',
       status: status === 'NS' ? 'Not submitted' : status === 'EXC' ? 'Excused' : status === 'LATE' ? 'Late' : '',
       scored: scored,
@@ -412,7 +427,7 @@
       html += '<div class="rubric-page layout-' + layout.key + '" style="font-size:' + layout.fontPt + 'pt">';
       for (var j = i; j < i + perPage; j++) {
         if (j < students.length) {
-          var data = sheetData(cid, aid, students[j].id);
+          var data = sheetData(cid, aid, students[j].id, opts.nameStyle);
           html += data ? renderSheet(data, opts) : '<div class="rubric-sheet"></div>';
         } else {
           html += '<div class="rubric-sheet is-blank"></div>';
@@ -545,10 +560,12 @@
       students: DEFAULT_OPTIONS.students,
       picked: [],
       layout: DEFAULT_OPTIONS.layout,
+      nameStyle: DEFAULT_OPTIONS.nameStyle,
       include: Object.assign({}, DEFAULT_OPTIONS.include),
     };
     if (saved && typeof saved === 'object') {
       if (LAYOUTS[saved.layout]) opts.layout = saved.layout;
+      if (saved.nameStyle === 'first' || saved.nameStyle === 'preferred') opts.nameStyle = saved.nameStyle;
       if (saved.include && typeof saved.include === 'object') {
         Object.keys(opts.include).forEach(function (k) {
           if (typeof saved.include[k] === 'boolean') opts.include[k] = saved.include[k];
@@ -562,7 +579,10 @@
   // them by how many students are ticked.
   function _saveOptions(opts, layout) {
     try {
-      localStorage.setItem(OPTIONS_KEY, JSON.stringify({ layout: layout || opts.layout, include: opts.include }));
+      localStorage.setItem(
+        OPTIONS_KEY,
+        JSON.stringify({ layout: layout || opts.layout, nameStyle: opts.nameStyle, include: opts.include }),
+      );
     } catch (e) {
       /* storage full or blocked: the defaults are fine */
     }
@@ -634,6 +654,11 @@
       html += _radio('rp-layout', key, opts.layout === key, layout.label, layout.help);
     });
     html += '</fieldset>';
+    html += '<fieldset class="rp-group"><legend>Name</legend>';
+    html += _radio('rp-name', 'preferred', opts.nameStyle !== 'first', 'Preferred Name', '(first name if none)');
+    html += _radio('rp-name', 'first', opts.nameStyle === 'first', 'First Name');
+    html += '<div class="rp-help">The last name always follows.</div>';
+    html += '</fieldset>';
     html += '<fieldset class="rp-group"><legend>Include</legend>';
     html += _check('feedback', opts.include.feedback, 'Feedback comment');
     // A Tag or General Rubric has no criterion comments; a General one no codes.
@@ -682,6 +707,8 @@
     var opts = _state.opts;
     var studentsRadio = overlay.querySelector('input[name="rp-students"]:checked');
     if (studentsRadio) opts.students = studentsRadio.value;
+    var nameRadio = overlay.querySelector('input[name="rp-name"]:checked');
+    if (nameRadio) opts.nameStyle = nameRadio.value;
     var layoutRadio = overlay.querySelector('input[name="rp-layout"]:checked');
     if (layoutRadio && LAYOUTS[layoutRadio.value]) opts.layout = layoutRadio.value;
     overlay.querySelectorAll('input[data-include]').forEach(function (box) {
@@ -824,6 +851,7 @@
     isStudentScored: isStudentScored,
     pageCount: pageCount,
     layoutForCount: layoutForCount,
+    printName: printName,
     renderSheet: renderSheet,
     renderPages: renderPages,
     stage: stage,
