@@ -15,9 +15,10 @@ window.RubricBank = (function () {
   var OVERLAY_ID = 'rubric-bank-overlay';
   var SELECTED_KEY = 'rubric-bank-selected';
   var USES_SHOWN = 4;
+  var STATS_KEY = 'rubric-bank-stats';
 
   // { cid, hooks, scope, selected, selCid, query, openClasses, loaded,
-  //   menuOpen, renaming, allUses, trigger, keyHandler }
+  //   menuOpen, renaming, allUses, statsAid, trigger, keyHandler }
   var _s = null;
 
   /* ── Data ───────────────────────────────────────────────── */
@@ -164,6 +165,106 @@ window.RubricBank = (function () {
       }),
     );
     return true;
+  }
+
+  /* ── Class stats (teacher only, never printed) ──────────── */
+
+  /* A custom-criteria rubric has no criterion linked to a competency, so
+     its result only reaches the overall grade. */
+  function isCustomCriteria(rubric) {
+    var crit = rubric.criteria || [];
+    return (
+      crit.length > 0 &&
+      crit.every(function (c) {
+        return !(c.tagIds || []).length;
+      })
+    );
+  }
+
+  /* How the class has scored on a rubric so far, over the assessments that
+     use it (or the one `aid`): per criterion, one level per student per
+     assessment, read the way the printed sheet reads it, so a criterion
+     linked to two competencies counts once. A + or − does not move the
+     level; excused and unscored students are left out. A custom-criteria
+     rubric also counts each student's overall level, rounded as the sheet's
+     Overall rounds it. */
+  function classStats(cid, rubric, aid) {
+    var uses = usesOf(cid, rubric.id).filter(function (a) {
+      return !aid || a.id === aid;
+    });
+    var students = (typeof getStudents === 'function' && getStudents(cid)) || [];
+    var scores = (typeof getScores === 'function' && getScores(cid)) || {};
+    var custom = isCustomCriteria(rubric);
+    var empty = function () {
+      return { 4: 0, 3: 0, 2: 0, 1: 0 };
+    };
+    var out = { assessments: uses.length, scores: 0, byCrit: {}, custom: custom, overall: empty(), overallCount: 0 };
+    (rubric.criteria || []).forEach(function (c) {
+      out.byCrit[c.id] = empty();
+    });
+    if (!window.RubricPrint) return out;
+    uses.forEach(function (a) {
+      students.forEach(function (s) {
+        if (typeof getAssignmentStatus === 'function' && getAssignmentStatus(cid, s.id, a.id) === 'EXC') return;
+        var entries = scores[s.id] || [];
+        (rubric.criteria || []).forEach(function (c) {
+          var lv = RubricPrint.criterionLevel(entries, a.id, c).level;
+          if (lv >= 1 && lv <= 4) {
+            out.byCrit[c.id][lv]++;
+            out.scores++;
+          }
+        });
+        if (custom && typeof getAssessmentOverallScore === 'function') {
+          var v = getAssessmentOverallScore(cid, s.id, a.id);
+          if (v > 0) {
+            out.overall[Math.min(4, Math.max(1, Math.round(v)))]++;
+            out.overallCount++;
+          }
+        }
+      });
+    });
+    return out;
+  }
+
+  /* "Extending 14, Proficient 38, Developing 16, Emerging 4", in the class's order. */
+  function countsText(cid, counts) {
+    return _levels(cid)
+      .map(function (lv) {
+        return PROF_LABELS[lv] + ' ' + counts[lv];
+      })
+      .join(', ');
+  }
+
+  /* A pie as a conic-gradient, clockwise from the top in the class's order.
+     Levels with no scores get no slice. */
+  function pieBackground(cid, counts) {
+    var total = counts[1] + counts[2] + counts[3] + counts[4];
+    if (!total) return '';
+    var at = 0;
+    var stops = [];
+    _levels(cid).forEach(function (lv) {
+      if (!counts[lv]) return;
+      var from = at;
+      at += (counts[lv] / total) * 100;
+      stops.push('var(--score-' + lv + ') ' + from.toFixed(2) + '% ' + at.toFixed(2) + '%');
+    });
+    return 'conic-gradient(' + stops.join(', ') + ')';
+  }
+
+  function _statsOn() {
+    try {
+      return localStorage.getItem(STATS_KEY) !== 'off';
+    } catch (e) {
+      return true;
+    }
+  }
+
+  function _setStatsOn(on) {
+    try {
+      localStorage.setItem(STATS_KEY, on ? 'on' : 'off');
+    } catch (e) {
+      /* storage blocked: the switch resets next time */
+    }
   }
 
   /* What deleting a rubric takes with it: each assessment that uses it and
@@ -451,8 +552,9 @@ window.RubricBank = (function () {
           return (
             '<span class="rb-chip' +
             (missing ? ' is-missing' : '') +
+            '" title="' +
+            esc(missing ? label + ': no match in ' + _className(cid) : label) +
             '"' +
-            (missing ? ' title="No match in ' + esc(_className(cid)) + '"' : '') +
             '>' +
             esc(label) +
             '</span>'
@@ -460,13 +562,15 @@ window.RubricBank = (function () {
         })
         .join('');
       html +=
-        '<tr><th scope="row" class="rb-crit"><span class="rb-crit-name">' +
+        '<tr><th scope="row" class="rb-crit"><div class="rb-crit-wrap"><div class="rb-crit-main"><span class="rb-crit-name">' +
         esc(c.name) +
         '</span>' +
         (chips ? '<span class="rb-chips">' + chips + '</span>' : '') +
         '<span class="rb-weight">Weight ' +
         esc(String(c.weight != null ? c.weight : 1)) +
-        '</span></th>';
+        '</span></div>' +
+        _pieHtml(cid, opts.stats && opts.stats.byCrit[c.id]) +
+        '</div></th>';
       levels.forEach(function (lv) {
         var value = c.levelValues && c.levelValues[lv] != null ? c.levelValues[lv] : lv;
         html +=
@@ -479,6 +583,100 @@ window.RubricBank = (function () {
     });
     html += '</tbody></table>';
     return html;
+  }
+
+  /* A criterion's pie: no numbers, the counts on hover and for screen readers. */
+  function _pieHtml(cid, counts) {
+    var bg = counts ? pieBackground(cid, counts) : '';
+    if (!bg) return '';
+    var label = countsText(cid, counts);
+    return (
+      '<span class="rb-pie" role="img" aria-label="' +
+      esc(label) +
+      '" title="' +
+      esc(label) +
+      '" style="background:' +
+      bg +
+      '"></span>'
+    );
+  }
+
+  /* "Class So Far" above the grid: the count, the assessment to look at,
+     the note that only the teacher sees it, and the switch. */
+  function _statsLineHtml(cid, rubric, stats, uses) {
+    var on = _statsOn();
+    var html = '<div class="rb-stats"><span class="rb-stats-label">Class So Far</span>';
+    if (on) {
+      html +=
+        '<span>' +
+        esc(
+          _plural(stats.scores, 'score', 'scores') +
+            ' across ' +
+            _plural(stats.assessments, 'assessment', 'assessments'),
+        ) +
+        '</span>';
+      if (uses.length > 1) {
+        html +=
+          '<select class="rb-stats-scope" data-rb-change="stats-scope" aria-label="Assessments counted"><option value="">All Assessments</option>' +
+          uses
+            .map(function (a) {
+              return (
+                '<option value="' +
+                esc(a.id) +
+                '"' +
+                (_s.statsAid === a.id ? ' selected' : '') +
+                '>' +
+                esc(a.title || 'Untitled') +
+                '</option>'
+              );
+            })
+            .join('') +
+          '</select>';
+      }
+      html += '<span class="rb-stats-private">Only you see these. They are never printed.</span>';
+    }
+    html +=
+      '<label class="rb-stats-toggle" for="rb-stats-on">Show Class Stats</label>' +
+      '<span class="gpd-switch"><input type="checkbox" role="switch" id="rb-stats-on" data-rb-change="stats-on"' +
+      (on ? ' checked' : '') +
+      '><span class="gpd-switch-ui" aria-hidden="true"></span></span></div>';
+    return html;
+  }
+
+  /* A custom-criteria rubric's overall levels, in the dashboard's Class
+     Distribution style, pinned under the grid. */
+  function _overallHtml(cid, stats) {
+    if (!stats.custom || !stats.overallCount) return '';
+    var label = countsText(cid, stats.overall);
+    var segs = _levels(cid)
+      .filter(function (lv) {
+        return stats.overall[lv] > 0;
+      })
+      .map(function (lv) {
+        return (
+          '<div class="dist-seg rb-dist-seg" style="flex:' +
+          stats.overall[lv] +
+          ';background:var(--score-' +
+          lv +
+          '-bg);color:var(--score-' +
+          lv +
+          ')">' +
+          stats.overall[lv] +
+          '</div>'
+        );
+      })
+      .join('');
+    return (
+      '<div class="rb-overall"><div class="rb-overall-label">Overall Level' +
+      (stats.assessments > 1 ? '<span>One per student per assessment</span>' : '') +
+      '</div><div class="rb-overall-bar" role="img" aria-label="Overall: ' +
+      esc(label) +
+      '" title="' +
+      esc(label) +
+      '">' +
+      segs +
+      '</div></div>'
+    );
   }
 
   function _menuHtml() {
@@ -565,6 +763,10 @@ window.RubricBank = (function () {
     if (_isForeign()) return _foreignPaneHtml(r);
     var uses = usesOf(cid, r.id);
     var linked = linkedLabel(cid, r);
+    var stats = uses.length ? classStats(cid, r, _s.statsAid) : null;
+    // No stats line until someone has a score with this rubric.
+    if (stats && !stats.scores && !stats.overallCount && !_s.statsAid) stats = null;
+    var showStats = !!stats && _statsOn();
     var html = '<div class="rb-pane-head"><div class="rb-title-wrap">';
     if (_s.renaming) {
       html +=
@@ -574,7 +776,10 @@ window.RubricBank = (function () {
     }
     html +=
       '<div class="rb-sub"><span>' +
-      esc(_plural((r.criteria || []).length, 'Criterion', 'Criteria')) +
+      esc(
+        _plural((r.criteria || []).length, 'Criterion', 'Criteria') +
+          (isCustomCriteria(r) ? ' · Custom Criteria (Not Linked to Competencies)' : ''),
+      ) +
       '</span>' +
       (linked ? '<span class="rb-linked">' + esc(linked) + '</span>' : '') +
       '</div></div>';
@@ -590,7 +795,9 @@ window.RubricBank = (function () {
       '"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>' +
       (_s.menuOpen ? _menuHtml() : '') +
       '</div></div></div>';
-    html += '<div class="rb-grid-wrap">' + gridHtml(cid, r) + '</div>';
+    if (stats) html += _statsLineHtml(cid, r, stats, uses);
+    html += '<div class="rb-grid-wrap">' + gridHtml(cid, r, { stats: showStats ? stats : null }) + '</div>';
+    if (showStats) html += _overallHtml(cid, stats);
     html += '<div class="rb-foot"><div class="rb-used">';
     if (uses.length) {
       html += '<span class="rb-used-label">Used In</span>';
@@ -695,6 +902,7 @@ window.RubricBank = (function () {
     _s.menuOpen = false;
     _s.renaming = false;
     _s.allUses = false;
+    _s.statsAid = '';
     if (_s.selCid === _s.cid) _saveSelected(_s.cid, rid);
     refresh();
     var row = _root() && _root().querySelector('.rb-row.is-selected');
@@ -906,6 +1114,7 @@ window.RubricBank = (function () {
       menuOpen: false,
       renaming: false,
       allUses: false,
+      statsAid: '',
       trigger: document.activeElement,
     };
     _s.openClasses[cid] = true;
@@ -930,6 +1139,21 @@ window.RubricBank = (function () {
       if (e.target && e.target.id === 'rb-search') {
         _s.query = e.target.value;
         _renderList();
+      }
+    });
+    overlay.addEventListener('change', function (e) {
+      var t = e.target;
+      if (!t || !t.dataset) return;
+      if (t.dataset.rbChange === 'stats-on') {
+        _setStatsOn(t.checked);
+        _renderPane();
+        var sw = document.getElementById('rb-stats-on');
+        if (sw) sw.focus();
+      } else if (t.dataset.rbChange === 'stats-scope') {
+        _s.statsAid = t.value;
+        _renderPane();
+        var sel = _root().querySelector('.rb-stats-scope');
+        if (sel) sel.focus();
       }
     });
     overlay.addEventListener('focusout', function (e) {
@@ -972,6 +1196,10 @@ window.RubricBank = (function () {
     rowMeta: rowMeta,
     linkedLabel: linkedLabel,
     matchInfo: matchInfo,
+    classStats: classStats,
+    isCustomCriteria: isCustomCriteria,
+    pieBackground: pieBackground,
+    countsText: countsText,
     deleteImpact: deleteImpact,
     confirmDelete: confirmDelete,
     duplicate: duplicate,
