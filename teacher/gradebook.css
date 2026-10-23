@@ -772,7 +772,9 @@ th.gb-group-alt {
 }
 .gb-grid {
   display: grid;
-  grid-template-columns: 200px 1fr;
+  /* minmax(0, …): the score area is as wide as the box and scrolls inside
+     it, instead of growing to fit every column and pushing the page sideways. */
+  grid-template-columns: 200px minmax(0, 1fr);
   grid-template-rows: auto 1fr;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -801,12 +803,12 @@ th.gb-group-alt {
   color: var(--text-2);
 }
 /* Q2: Column headers — scrolls horizontally via JS transform on inner div.
-   overflow:visible is intentional — allows rotated header text to extend
-   past the right edge without clipping. scrollLeft is not used here. */
+   Clipped to the box; the Scores data area keeps room at its right end for
+   the last tilted titles (below). scrollLeft is not used here. */
 .gb-grid-colheads {
   grid-row: 1;
   grid-column: 2;
-  overflow: visible;
+  overflow: hidden;
   border-bottom: 2px solid var(--border);
   background: var(--bg);
   position: relative;
@@ -889,10 +891,10 @@ th.gb-group-alt {
   transform-origin: bottom right;
   transform: skewX(-45deg);
 }
-/* Header row resize handle (bottom edge of colheads) */
+/* Header row resize handle (bottom edge of colheads, inside its clip) */
 .gb-header-resize-handle {
   position: absolute;
-  bottom: -3px;
+  bottom: 0;
   left: 0;
   right: 0;
   height: 6px;
@@ -1154,6 +1156,17 @@ th.gb-group-alt {
   grid-column: 2;
   overflow: auto;
   border-bottom-right-radius: var(--qr);
+}
+/* Each Scores title slants right by the header's height, so the data area
+   scrolls that much further for the last titles to show in full. An empty
+   column, not padding: Safari leaves end padding out of the scroll width. */
+.gb-grid:not(.gb-grid-comp) > .gb-grid-data {
+  display: grid;
+  grid-template-columns: max-content var(--gb-head-h, 200px);
+  align-content: start;
+}
+.gb-grid:not(.gb-grid-comp) > .gb-grid-data::after {
+  content: '';
 }
 
 .gb-scores-table {
