@@ -1149,9 +1149,10 @@ window.PageGradebook = (function () {
     html += '<div class="gb-grid-rowheads" id="gb-rowheads">';
     sortedStudents.forEach(function (s, si) {
       var altClass = si % 2 === 1 ? ' gb-scores-alt' : '';
-      var overall = getOverallProficiency(cid, s.id);
-      var finalPct = _getDisplayedFinalPercent(cid, s.id);
-      var fr = Math.round(overall);
+      // The overall grade as the class is set to show it (calc.js): the
+      // proficiency, the letter and %, or both stacked, each in its colour.
+      var badges = studentGradeBadges(cid, s.id);
+      var gradeParts = [badges.prof, badges.letter].filter(Boolean);
       var desTags = (s.designations || [])
         .map(function (code) {
           var d = designationInfo(code);
@@ -1178,10 +1179,16 @@ window.PageGradebook = (function () {
         esc(fullName(s)) +
         desTags +
         '</a>' +
-        '<span class="gb-grid-rowhead-pct" style="color:' +
-        (finalPct != null && finalPct > 0 ? PROF_COLORS[fr] : 'var(--text-3)') +
-        '">' +
-        (finalPct != null && finalPct > 0 ? finalPct.toFixed(1) + '%' : '\u2014') +
+        '<span class="gb-grid-rowhead-grade">' +
+        (gradeParts.length
+          ? gradeParts
+              .map(function (p) {
+                return (
+                  '<span style="color:' + (PROF_COLORS[p.level] || PROF_COLORS[0]) + '">' + esc(p.text) + '</span>'
+                );
+              })
+              .join('')
+          : '<span style="color:var(--text-3)">\u2014</span>') +
         '</span>' +
         '</div>';
     });

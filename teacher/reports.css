@@ -2048,7 +2048,8 @@
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: 12px;
-  padding: 12px 2px 4px;
+  /* 12px from the page's edges and between boxes, as on every page. */
+  padding: 12px 12px 20px;
   grid-auto-flow: dense;
   align-items: start;
 }
@@ -2056,7 +2057,8 @@
 /* Full-bleed header + footer above/below the grid */
 .student-header-top {
   grid-column: 1 / -1;
-  margin-bottom: 4px;
+  /* The grid's 12px gap is the space below it. */
+  margin-bottom: 0;
 }
 .tq-nav-footer {
   grid-column: 1 / -1;
