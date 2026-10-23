@@ -2258,41 +2258,15 @@ window.PageGradebook = (function () {
       });
       _undoStack.push({ cid: cid, sid: sid, aid: aid, tagIds: tagIds, prevEntries: prevEntries });
       while (_undoStack.length > 50) _undoStack.shift();
-      // Apply score to all tags in this assessment.
-      // P7.1: if any per-tag write fails (LS quota / blocked guard), revert
-      // the cached state from the undo snapshot so the rendered cell matches
-      // truth, then surface a retry toast.
-      var allOk = true;
+      // Apply score to all tags in this assessment. A save this device
+      // couldn't keep shows on the sync dot (data.js), not here.
       if (isPts) {
         // One value for the whole assessment, mirrored onto each competency.
         setPointsScore(cid, sid, aid, val);
       } else {
         tagIds.forEach(function (tid) {
-          var ok = upsertScore(
-            cid,
-            sid,
-            aid,
-            tid,
-            val,
-            assess.date || courseToday(cid),
-            assess.type || 'summative',
-            '',
-          );
-          if (ok === false) allOk = false;
+          upsertScore(cid, sid, aid, tid, val, assess.date || courseToday(cid), assess.type || 'summative', '');
         });
-      }
-      if (!allOk) {
-        var revertScores = getScores(cid);
-        revertScores[sid] = (revertScores[sid] || []).filter(function (e) {
-          return e.assessmentId !== aid || tagIds.indexOf(e.tagId) === -1;
-        });
-        prevEntries.forEach(function (e) {
-          if (e) revertScores[sid].push(structuredClone(e));
-        });
-        saveScores(cid, revertScores);
-        if (typeof showSyncToast === 'function') {
-          showSyncToast("Couldn't save score — your other changes are safe. Try again in a moment.", 'error');
-        }
       }
     }
 

@@ -456,6 +456,8 @@ describe('write-path audit: data layer', () => {
 
     expect(ok).toBe(false);
     expect(_serverState.scores[CID][ENR_Y]).toBeUndefined();
+    // Said on the sync dot, not in a message.
+    expect(getSaveProblem()).toMatch(/storage is full/);
   });
 
   // Finding 6, report sketch. Passes today: the second save reads the live cache, so the create is never sent.

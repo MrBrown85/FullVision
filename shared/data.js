@@ -115,7 +115,24 @@ const _DATA_KEYS = {
 let _useSupabase = false;
 let _teacherId = null;
 let _initPromise = null; // dedup concurrent initData calls
-let _lsQuotaWarned = false; // show the "storage full" toast at most once per session
+/* A save this device couldn't keep: localStorage keys that failed for lack
+   of room, and whether the outbox has refused a write since its last
+   accepted one. Shown only on the sync dot (getSaveProblem), never as a
+   message. */
+const _storageFullKeys = new Set();
+let _outboxRefused = false;
+
+/* The sync dot's explanation while a save problem lasts, or null. */
+function getSaveProblem() {
+  if (!_storageFullKeys.size && !_outboxRefused) return null;
+  return "This device's storage is full, so recent changes may not be saved";
+}
+window.getSaveProblem = getSaveProblem;
+
+function _saveProblemChanged() {
+  if (typeof refreshSyncStatusUI === 'function') refreshSyncStatusUI();
+  else _updateSyncIndicator();
+}
 
 /* Degraded-mode state (P6.1).
    _supabaseDegraded is set when initial bootstrap fails after retry. While
@@ -301,6 +318,12 @@ function _withTimeout(promise, ms, label) {
 function _updateSyncIndicator() {
   const dot = document.getElementById('sync-indicator-dot');
   if (!dot) return;
+  const problem = getSaveProblem();
+  if (problem) {
+    dot.className = 'tb-sync-dot error';
+    dot.title = problem;
+    return;
+  }
   const s = getSyncStatus();
   // Degraded mode reuses the 'error' visual but conveys a different message.
   var visual = s.status === 'degraded' ? 'error' : s.status;
@@ -1724,7 +1747,6 @@ function _revertBaselineRow(undo, name, params) {
 /* Pushes the outbox refused, counted so a save can tell its own write was
    refused (it happens synchronously, inside the save). */
 var _writeRefusals = 0;
-var _refusalToastAt = 0;
 
 function _onWriteRefused(name, params, undo, reason, entryId) {
   _writeRefusals++;
@@ -1742,9 +1764,9 @@ function _onWriteRefused(name, params, undo, reason, entryId) {
       _serverState[field][rec.cid] = _serverState[field][rec.cid].filter(r => !r || r.id !== rec.localId);
     });
   });
-  if (Date.now() - _refusalToastAt > 5000 && typeof showSyncToast === 'function') {
-    _refusalToastAt = Date.now();
-    showSyncToast('Local storage full \u2014 your changes may not save offline', 'error');
+  if (!_outboxRefused) {
+    _outboxRefused = true;
+    _saveProblemChanged();
   }
 }
 
@@ -4259,28 +4281,32 @@ function _safeParseLS(key, fallback) {
 function _safeLSSet(key, value) {
   try {
     localStorage.setItem(key, value);
+    _storageSaved(key);
     return true;
   } catch (e) {
     var keyClass = /^gb-/.test(key) && key.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i);
     if (e.name === 'QuotaExceededError' && /^gb-/.test(key) && _evictOldestSavedCopy(keyClass ? keyClass[1] : null)) {
       try {
         localStorage.setItem(key, value);
+        _storageSaved(key);
         return true;
       } catch (retryError) {
         e = retryError;
       }
     }
     console.warn('localStorage write failed (' + key + '):', e);
-    if (e.name === 'QuotaExceededError') {
-      // P7.1: surface every quota event, not just the first \u2014 teacher needs to
-      // know each subsequent write also failed to persist locally.
-      _lsQuotaWarned = true;
-      if (typeof showSyncToast === 'function') {
-        showSyncToast('Local storage full \u2014 your changes may not save offline', 'error');
-      }
+    // Every quota failure counts until that key saves again; the sync dot
+    // says so (getSaveProblem).
+    if (e.name === 'QuotaExceededError' && !_storageFullKeys.has(key)) {
+      _storageFullKeys.add(key);
+      _saveProblemChanged();
     }
     return false;
   }
+}
+
+function _storageSaved(key) {
+  if (_storageFullKeys.delete(key)) _saveProblemChanged();
 }
 
 function _loadCoursesFromLS() {
@@ -9453,6 +9479,10 @@ function _writeRpc(name, params, options) {
     if (pushed && pushed.refused) {
       _onWriteRefused(name, params, undo, pushed.refused, options.entryId);
       return pushed;
+    }
+    if (_outboxRefused) {
+      _outboxRefused = false;
+      _saveProblemChanged();
     }
     // A cell write that replaced a queued one already holds the older row.
     if (undo && !_baselineUndo[entryId]) _baselineUndo[entryId] = undo;
