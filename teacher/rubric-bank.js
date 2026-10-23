@@ -140,8 +140,18 @@ window.RubricBank = (function () {
     var copy = structuredClone(src);
     copy.id = uid();
     delete copy.copyGroup;
+    // An Advanced Rubric's checkboxes get new ids too, so ticks never
+    // cross from one rubric to the other.
     copy.criteria = (copy.criteria || []).map(function (c) {
-      return Object.assign({}, c, { id: uid() });
+      var next = Object.assign({}, c, { id: uid() });
+      if (c.checks) {
+        next.checks = window.RubricLibrary
+          ? RubricLibrary.freshChecks(c.checks)
+          : c.checks.map(function (k) {
+              return Object.assign({}, k, { id: uid() });
+            });
+      }
+      return next;
     });
     copy.name = window.RubricLibrary ? RubricLibrary.uniqueName(src.name, list) : src.name + ' (2)';
     copy.title = copy.name;

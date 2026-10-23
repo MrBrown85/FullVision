@@ -25,6 +25,7 @@ const PRECACHE_URLS = [
   '/shared/auto-update.js',
   '/shared/calc.js',
   '/shared/rubric-draft.js',
+  '/shared/rubric-checks.js',
   // Teacher desktop
   '/teacher/app.html',
   '/teacher/styles.css?v=3',
