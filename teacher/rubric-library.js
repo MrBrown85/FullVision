@@ -46,13 +46,23 @@ window.RubricLibrary = (function () {
     return base + ' (' + n + ')';
   }
 
-  /* A copy of `rubric` for `dstCid`: new ids, competencies matched by name. */
+  /* An Advanced Rubric's checkboxes with new ids: a copy has its own rows,
+     so ticks (keyed by check id) never cross classes. */
+  function freshChecks(checks) {
+    return (checks || []).map(function (check) {
+      return Object.assign({}, check, { id: uid() });
+    });
+  }
+
+  /* A copy of `rubric` for `dstCid`: new ids, competencies matched by name,
+     the style and checkboxes carried. */
   function cloneRubric(srcCid, dstCid, rubric) {
     var clone = structuredClone(rubric);
     clone.id = uid();
     clone.criteria = (clone.criteria || []).map(function (c) {
       var next = Object.assign({}, c, { id: uid() });
       next.tagIds = AssessmentCopy.mapTags(srcCid, dstCid, c.tagIds || []).ids;
+      next.checks = freshChecks(c.checks);
       return next;
     });
     return clone;
@@ -227,7 +237,21 @@ window.RubricLibrary = (function () {
         return vals[l] != null && vals[l] !== '' ? Number(vals[l]) : l;
       }),
       weight: c && c.weight != null && c.weight !== '' ? Number(c.weight) : 1,
+      // The checkbox labels of each level, in order.
+      checks: [4, 3, 2, 1].map(function (l) {
+        return ((c && c.checks) || [])
+          .filter(function (check) {
+            return check && Number(check.level) === l;
+          })
+          .map(function (check) {
+            return _norm(check.label);
+          });
+      }),
     };
+  }
+
+  function _styleOf(rubric) {
+    return rubric && rubric.style === 'advanced' ? 'advanced' : 'standard';
   }
 
   function _same(a, b) {
@@ -271,6 +295,13 @@ window.RubricLibrary = (function () {
         next.name = after.name;
         lines.push('Name → ' + after.name);
       } else skipped.push('name');
+    }
+    // Standard ↔ Advanced follows too, so the copy's cells match.
+    if (_styleOf(before) !== _styleOf(after)) {
+      if (_styleOf(copy) === _styleOf(before)) {
+        next.style = _styleOf(after);
+        lines.push('Style → ' + (next.style === 'advanced' ? 'Advanced' : 'Standard'));
+      } else skipped.push('the style');
     }
 
     (before.criteria || []).forEach(function (bc, idx) {
@@ -321,6 +352,12 @@ window.RubricLibrary = (function () {
           lines.push('Weight of “' + ac.name + '” → ' + av.weight);
         } else skipped.push('the weight of “' + target.name + '”');
       }
+      if (!_same(bv.checks, av.checks)) {
+        if (_same(cv.checks, bv.checks)) {
+          nextCrit.checks = freshChecks(ac.checks);
+          lines.push('Checkboxes of “' + ac.name + '” updated');
+        } else skipped.push('the checkboxes of “' + target.name + '”');
+      }
     });
 
     (after.criteria || []).forEach(function (ac) {
@@ -330,6 +367,7 @@ window.RubricLibrary = (function () {
       });
       if (existed) return;
       var added = Object.assign(structuredClone(ac), { id: uid() });
+      added.checks = freshChecks(ac.checks);
       var tags = AssessmentCopy.mapTags(srcCid, dstCid, ac.tagIds || []);
       added.tagIds = tags.ids;
       next.criteria.push(added);
