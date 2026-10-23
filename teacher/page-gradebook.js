@@ -46,6 +46,7 @@ window.PageGradebook = (function () {
   var filterModules = [];
   var filterCategories = [];
   var searchQuery = '';
+  var searchText = ''; // what the box holds, spaces and capitals as typed
   var sortCol = null;
   var _filterStripOpen = false;
   var _printTerm = 'all';
@@ -120,9 +121,16 @@ window.PageGradebook = (function () {
     else filterCategories.push(catId);
     render();
   }
-  function onSearch(val) {
-    searchQuery = (val || '').toLowerCase().trim();
+  // The search box is redrawn with the page, so the new box gets the focus
+  // and the caret back.
+  function onSearch(val, caret) {
+    searchText = val || '';
+    searchQuery = searchText.toLowerCase().trim();
     render();
+    var inp = document.querySelector('.gb-search-input');
+    if (!inp) return;
+    inp.focus();
+    if (caret != null) inp.setSelectionRange(caret, caret);
   }
   /* Student name sort cycles on every click and loops:
      first name A–Z, first Z–A, last name A–Z, last Z–A. */
@@ -327,7 +335,7 @@ window.PageGradebook = (function () {
       '<div class="gb-search-wrap"><span class="gb-search-icon">' +
       LINE_ICONS.search +
       '</span><input class="gb-search-input" type="text" placeholder="Search…" value="' +
-      esc(searchQuery) +
+      esc(searchText) +
       '" data-action-input="gbSearch" aria-label="Search students"></div>';
 
     html +=
@@ -2855,7 +2863,7 @@ window.PageGradebook = (function () {
 
   function _handleInput(e) {
     if (e.target.matches('[data-action-input="gbSearch"]')) {
-      onSearch(e.target.value);
+      onSearch(e.target.value, e.target.selectionStart);
     }
   }
 
@@ -2876,6 +2884,7 @@ window.PageGradebook = (function () {
     filterModules = [];
     filterCategories = [];
     searchQuery = '';
+    searchText = '';
     sortCol = null;
     _filterStripOpen = false;
     _scrollKey = null;
