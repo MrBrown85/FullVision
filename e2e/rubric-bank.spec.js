@@ -414,3 +414,76 @@ test.describe('Rubric Bank, Print Rubrics window', () => {
     await expect(dialog.getByRole('radio', { name: /Blank Rubric/ })).toBeEnabled();
   });
 });
+
+test.describe('Rubric Bank, Advanced Rubrics', () => {
+  const ADV = {
+    id: 'rubric-adv',
+    name: 'Lab Skills Rubric',
+    style: 'advanced',
+    criteria: [
+      {
+        id: 'crit-safe',
+        name: 'Safety',
+        tagIds: ['QAP'],
+        weight: 1,
+        levels: { 4: 'Leads safe practice', 3: 'Follows every step', 2: 'Needs reminders', 1: 'Many reminders' },
+        checks: [
+          { id: 'k4a', level: 4, label: 'Reminds others', displayOrder: 0 },
+          { id: 'k3a', level: 3, label: 'Goggles on', displayOrder: 0 },
+          { id: 'k3b', level: 3, label: 'Cleans the station', displayOrder: 1 },
+        ],
+      },
+    ],
+  };
+
+  test.beforeEach(async ({ page }) => {
+    await mockAuth(page);
+    await seedCourse(page);
+    await seedStudents(page);
+    await page.addInitScript(
+      ({ rubrics, cid }) => {
+        localStorage.setItem('gb-rubrics-' + cid, JSON.stringify(rubrics));
+        localStorage.setItem('gb-assessments-' + cid, '[]');
+        localStorage.setItem('rubric-bank-selected', JSON.stringify({ [cid]: 'rubric-adv' }));
+      },
+      { rubrics: [LAB, ADV], cid: TEST_COURSE.id },
+    );
+    await gotoApp(page, '/dashboard');
+  });
+
+  test('tags the rubric, counts its checkboxes and draws them under each level', async ({ page }) => {
+    const bank = await openBank(page);
+    await expect(bank.locator('.rb-row', { hasText: 'Lab Skills Rubric' }).locator('.rb-adv-tag')).toHaveText(
+      'Advanced',
+    );
+    await expect(bank.locator('.rb-row', { hasText: 'Lab Report Rubric' }).locator('.rb-adv-tag')).toHaveCount(0);
+    await expect(bank.locator('.rb-sub')).toContainText('1 Criterion · 3 Checkboxes');
+    await expect(bank.locator('.rb-rule')).toContainText('the highest level whose boxes are all ticked');
+    await expect(bank.locator('.rb-cell').nth(1).locator('.rb-cell-check')).toHaveText([
+      'Goggles on',
+      'Cleans the station',
+    ]);
+  });
+
+  test('+ New Rubric offers Standard and Advanced', async ({ page }) => {
+    const bank = await openBank(page);
+    await bank.getByRole('button', { name: /New Rubric/ }).click();
+    await expect(bank.getByRole('menuitem')).toHaveCount(2);
+    await bank.getByRole('menuitem', { name: /Advanced Rubric/ }).click();
+    await expect(bank).toHaveCount(0);
+    const editor = page.locator('#rubric-modal');
+    await expect(editor).toBeVisible();
+    await expect(editor.locator('.rubric-style-seg').getByRole('radio', { name: 'Advanced' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+  });
+
+  test('Print offers Checkboxes for an Advanced rubric', async ({ page }) => {
+    const bank = await openBank(page);
+    await bank.getByRole('button', { name: 'Print', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Print Rubrics' });
+    await expect(dialog.getByRole('checkbox', { name: 'Checkboxes' })).toBeChecked();
+    await expect(dialog.locator('#rp-preview .rubric-check')).toHaveCount(3);
+  });
+});

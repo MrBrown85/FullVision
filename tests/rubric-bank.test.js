@@ -153,3 +153,30 @@ describe('Rubric Bank', () => {
     expect(html).toContain('Questioning and Predicting');
   });
 });
+
+describe('Rubric Bank, Advanced Rubrics', () => {
+  it('draws each level’s checkboxes under its descriptor', () => {
+    var r = {
+      id: 'r-adv',
+      name: 'Lab Skills',
+      style: 'advanced',
+      criteria: [
+        {
+          id: 'c1',
+          name: 'Safety',
+          tagIds: [],
+          levels: { 4: 'Leads', 3: 'Follows', 2: 'Reminded', 1: 'Often reminded' },
+          checks: [
+            { id: 'k1', level: 3, label: 'Goggles on', displayOrder: 0 },
+            { id: 'k2', level: 4, label: 'Reminds others', displayOrder: 0 },
+          ],
+        },
+      ],
+    };
+    expect(RubricBank.isAdvanced(r)).toBe(true);
+    var html = RubricBank.gridHtml('cls-adv-only', r);
+    expect(html).toContain('rb-cell-checks');
+    expect(html.indexOf('Reminds others')).toBeLessThan(html.indexOf('Goggles on'));
+    expect(RubricBank.isAdvanced(Object.assign({}, r, { style: 'standard' }))).toBe(false);
+  });
+});

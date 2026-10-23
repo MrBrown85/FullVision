@@ -429,3 +429,50 @@ describe('Blank rubrics', () => {
     expect(RubricPrint.usesOf(CID, RUBRIC).map(a => a.id)).toEqual(['later', AID]);
   });
 });
+
+describe('Advanced Rubric checkboxes on the sheet', () => {
+  function makeAdvanced() {
+    saveRubrics(
+      CID,
+      getRubrics(CID).map(r =>
+        Object.assign({}, r, {
+          style: 'advanced',
+          criteria: r.criteria.map((c, i) =>
+            i === 0
+              ? Object.assign({}, c, {
+                  checks: [
+                    { id: 'kA', level: 3, label: 'Plans a fair test', displayOrder: 0 },
+                    { id: 'kB', level: 3, label: 'Names the variables', displayOrder: 1 },
+                  ],
+                })
+              : c,
+          ),
+        }),
+      ),
+    );
+  }
+
+  it('prints each box, filled when ticked, when Checkboxes is included', () => {
+    makeAdvanced();
+    setRubricCheck(CID, SID, AID, 'kA', true);
+    const data = RubricPrint.sheetData(CID, AID, SID);
+    const html = RubricPrint.renderSheet(data, { include: { checks: true } });
+    expect(html).toContain('rubric-check is-on');
+    expect(html).toContain('Plans a fair test');
+    expect((html.match(/class="rubric-check"/g) || []).length).toBe(1);
+    expect(RubricPrint.renderSheet(data, { include: { checks: false } })).not.toContain('rubric-checks');
+  });
+
+  it('prints empty boxes on a blank rubric', () => {
+    makeAdvanced();
+    const out = RubricPrint.renderPages(CID, null, {
+      mode: 'blank',
+      rubricId: RUBRIC,
+      copies: 1,
+      layout: 'full',
+      include: { checks: true },
+    });
+    expect(out.html).toContain('Names the variables');
+    expect(out.html).not.toContain('is-on');
+  });
+});
