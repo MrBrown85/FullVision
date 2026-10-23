@@ -653,18 +653,22 @@ function renderStudentHeader(cid, sid, opts) {
   }
   html += `<div class="sh-spacer"></div>`;
   html += `<div class="sh-stats">`;
-  html += `<div class="sh-stat">
+  // opts.hideCounts: the page shows these counts elsewhere (the student
+  // page's tabs).
+  if (!opts.hideCounts) {
+    html += `<div class="sh-stat">
     <div class="sh-stat-val">${scoredAssessments.size}<span style="font-size:0.7em;font-weight:500;color:var(--text-3)">/${assessments.length}</span></div>
     <div class="sh-stat-label">Assessed</div>
   </div>`;
-  html += `<div class="sh-stat">
+    html += `<div class="sh-stat">
     <div class="sh-stat-val">${coveredTags}<span style="font-size:0.7em;font-weight:500;color:var(--text-3)">/${allTags.length}</span></div>
     <div class="sh-stat-label">Tags</div>
   </div>`;
-  html += `<div class="sh-stat">
+    html += `<div class="sh-stat">
     <div class="sh-stat-val">${obs.length}</div>
     <div class="sh-stat-label">Observations</div>
   </div>`;
+  }
   if (attRate !== null) {
     const attColor = attRate >= 90 ? 'var(--score-3)' : attRate >= 75 ? 'var(--score-2)' : 'var(--score-1)';
     html += `<div class="sh-stat">
