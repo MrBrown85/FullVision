@@ -19,6 +19,11 @@ window.PageAssignments = (function () {
   var assessSearch = '';
   var showUngraded = false;
   var rubricViewStates = {};
+  // Advanced Rubric checklists open under their criterion rows, keyed
+  // aid:sid:critId. In All mode every one is open except those closed.
+  var _openChecklists = new Set();
+  var _closedChecklists = new Set();
+  var CHECKLIST_MODE_KEY = 'rsg-checklists-mode';
   var _showingNewForm = false;
   var _editingAssessId = null;
   var collapsedModules = {};
@@ -532,6 +537,7 @@ window.PageAssignments = (function () {
                 a.id +
                 '" data-rubric="true">Rubric</button>' +
                 '</div>' +
+                (showRubric && _isAdvancedRubric(getRubricById(cid, a.rubricId)) ? _checklistModeHtml() : '') +
                 '<button class="rubric-print-btn" data-action="printRubrics" data-aid="' +
                 a.id +
                 '" title="Print a graded rubric for each student">Print Rubrics</button>'
@@ -2439,6 +2445,9 @@ window.PageAssignments = (function () {
     if (!wasActive) el.classList.add('active');
     syncModRow(el.closest('.rsg-criterion-row'));
     refreshSidebarGrades(sid);
+    // An open checklist's hint says whether the level is the boxes' or picked.
+    if (RubricChecks.hasChecks(crit) && _isChecklistOpen(aid, sid, critId))
+      _refreshChecklistRow(aid, sid, critId, false);
   }
   function updateRubricRowUI(row, value) {
     row.querySelectorAll('.rsg-level').forEach(function (l) {
@@ -2675,6 +2684,228 @@ window.PageAssignments = (function () {
     return html;
   }
 
+  /* ── Advanced Rubric checklists (plan §5, PR 8; mockup C10) ──
+     A criterion row gets a Checks button ("3/8"); it opens the criterion's
+     checkboxes under the row, one column under each level button. Ticking
+     a box saves the tick and writes the level the boxes suggest, unless the
+     teacher picked a different level by hand (RubricChecks.levelAfterTick). */
+  function _isAdvancedRubric(rubric) {
+    return (
+      !!rubric &&
+      typeof rubricStyle === 'function' &&
+      rubricStyle(rubric) === 'advanced' &&
+      (rubric.criteria || []).some(function (c) {
+        return RubricChecks.hasChecks(c);
+      })
+    );
+  }
+  function _checklistMode() {
+    try {
+      return localStorage.getItem(CHECKLIST_MODE_KEY) === 'all' ? 'all' : 'one';
+    } catch (e) {
+      return 'one';
+    }
+  }
+  function _checklistKey(aid, sid, critId) {
+    return aid + ':' + sid + ':' + critId;
+  }
+  function _isChecklistOpen(aid, sid, critId) {
+    var key = _checklistKey(aid, sid, critId);
+    return _checklistMode() === 'all' ? !_closedChecklists.has(key) : _openChecklists.has(key);
+  }
+  function _checklistModeHtml() {
+    var all = _checklistMode() === 'all';
+    return (
+      '<span class="rsg-checklist-mode-label">Open Checklists</span>' +
+      '<div class="seg seg-sm rsg-checklist-mode" role="group" aria-label="Open checklists">' +
+      '<button class="seg-btn"' +
+      segAttr(!all) +
+      ' data-action="setChecklistMode" data-mode="one">One at a Time</button>' +
+      '<button class="seg-btn"' +
+      segAttr(all) +
+      ' data-action="setChecklistMode" data-mode="all">All</button>' +
+      '</div>'
+    );
+  }
+  function _checksButtonHtml(cid, aid, sid, crit) {
+    if (!RubricChecks.hasChecks(crit)) return '';
+    var count = RubricChecks.tickedCount(crit, getRubricCheckIds(cid, sid, aid));
+    var open = _isChecklistOpen(aid, sid, crit.id);
+    return (
+      '<button type="button" class="rsg-checks-btn' +
+      (open ? ' is-open' : '') +
+      (count.ticked ? ' has-ticks' : '') +
+      '" data-action="toggleChecklist" data-aid="' +
+      aid +
+      '" data-sid="' +
+      sid +
+      '" data-critid="' +
+      crit.id +
+      '" aria-expanded="' +
+      open +
+      '" aria-label="Checklist for ' +
+      esc(crit.name) +
+      ', ' +
+      count.ticked +
+      ' of ' +
+      count.total +
+      ' ticked" title="Checklist (K)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 12l3 3 5-6"/></svg>' +
+      count.ticked +
+      '/' +
+      count.total +
+      '</button>'
+    );
+  }
+  /* The checkboxes under a criterion row, in the class's level order, with
+     the level they suggest at the left. */
+  function _checklistPanelHtml(cid, aid, sid, crit, currentLevel) {
+    var ticked = getRubricCheckIds(cid, sid, aid);
+    var suggested = RubricChecks.suggestedLevel(crit, ticked);
+    var current = Number(currentLevel) || 0;
+    var head = suggested ? 'Suggested: ' + PROF_LABELS[suggested] : 'No Level Suggested Yet';
+    var hint = !suggested
+      ? 'Tick what you saw. A level is suggested when all of its boxes are ticked.'
+      : current && current !== suggested
+        ? 'You picked ' + PROF_LABELS[current] + '. Ticks keep your choice until you clear the level.'
+        : 'Every ' + PROF_LABELS[suggested] + ' box is ticked. Pick another level to override.';
+    var html =
+      '<div class="rsg-checklist" data-aid="' +
+      aid +
+      '" data-sid="' +
+      sid +
+      '" data-critid="' +
+      crit.id +
+      '"><div class="rsg-checklist-side"><span class="rsg-checklist-head">' +
+      esc(head) +
+      '</span><span class="rsg-checklist-hint">' +
+      esc(hint) +
+      '</span></div><div class="rsg-checklist-cols">';
+    levelOrderFor(cid).forEach(function (lv) {
+      html += '<div class="rsg-checklist-col" data-level="' + lv + '">';
+      RubricChecks.checksAt(crit, lv).forEach(function (check) {
+        html +=
+          '<label class="rsg-check"><input type="checkbox" data-action="tickRubricCheck" data-aid="' +
+          aid +
+          '" data-sid="' +
+          sid +
+          '" data-critid="' +
+          crit.id +
+          '" data-checkid="' +
+          check.id +
+          '"' +
+          (ticked.indexOf(check.id) >= 0 ? ' checked' : '') +
+          '><span>' +
+          esc(check.label) +
+          '</span></label>';
+      });
+      html += '</div>';
+    });
+    html += '</div><div class="rsg-checklist-pad"></div></div>';
+    return html;
+  }
+  /* The level a criterion row shows now: the grid's rule (lowest when its
+     competencies disagree). */
+  function _criterionLevelNow(cid, aid, sid, crit) {
+    return RubricPrint.criterionLevel(getScores(cid)[sid] || [], aid, crit).level;
+  }
+  function _criterionRow(aid, sid, critId) {
+    return document.querySelector(
+      '.rsg-criterion-row[data-assess="' + aid + '"][data-student="' + sid + '"][data-criterion="' + critId + '"]',
+    );
+  }
+  function toggleChecklist(el) {
+    var aid = el.dataset.aid,
+      sid = el.dataset.sid,
+      critId = el.dataset.critid;
+    var key = _checklistKey(aid, sid, critId);
+    var open = _isChecklistOpen(aid, sid, critId);
+    if (_checklistMode() === 'all') {
+      if (open) _closedChecklists.add(key);
+      else _closedChecklists.delete(key);
+    } else {
+      // One at a Time: opening one closes the last.
+      _openChecklists.clear();
+      if (!open) _openChecklists.add(key);
+    }
+    _refreshChecklistRow(aid, sid, critId, true);
+  }
+  function setChecklistMode(mode) {
+    try {
+      localStorage.setItem(CHECKLIST_MODE_KEY, mode === 'all' ? 'all' : 'one');
+    } catch (e) {
+      /* storage blocked: One at a Time */
+    }
+    _openChecklists.clear();
+    _closedChecklists.clear();
+    render();
+  }
+  /* Redraw one criterion's Checks button and checklist in place, and close
+     any checklist One at a Time has shut. */
+  function _refreshChecklistRow(aid, sid, critId, focusButton) {
+    var cid = activeCourse;
+    var crit = getRubricCriterion(aid, critId);
+    if (!crit) return;
+    if (_checklistMode() === 'one') {
+      document.querySelectorAll('.rsg-checklist').forEach(function (panel) {
+        var d = panel.dataset;
+        if (_openChecklists.has(_checklistKey(d.aid, d.sid, d.critid))) return;
+        var other = _criterionRow(d.aid, d.sid, d.critid);
+        var btn = other && other.querySelector('.rsg-checks-btn');
+        if (btn) {
+          btn.classList.remove('is-open');
+          btn.setAttribute('aria-expanded', 'false');
+        }
+        panel.remove();
+      });
+    }
+    var row = _criterionRow(aid, sid, critId);
+    if (!row) return;
+    var cell = row.querySelector('.rsg-checks-cell');
+    if (cell) cell.innerHTML = _checksButtonHtml(cid, aid, sid, crit);
+    var next = row.nextElementSibling;
+    var panel = next && next.classList.contains('rsg-checklist') ? next : null;
+    if (_isChecklistOpen(aid, sid, critId)) {
+      var html = _checklistPanelHtml(cid, aid, sid, crit, _criterionLevelNow(cid, aid, sid, crit));
+      if (panel) panel.outerHTML = html;
+      else row.insertAdjacentHTML('afterend', html);
+    } else if (panel) panel.remove();
+    if (focusButton) {
+      var btn = cell && cell.querySelector('.rsg-checks-btn');
+      if (btn) btn.focus();
+    }
+  }
+  /* A box ticked or cleared: save the tick, then write the level the boxes
+     suggest unless the teacher picked another by hand. */
+  function tickRubricCheck(el) {
+    var cid = activeCourse;
+    var aid = el.dataset.aid,
+      sid = el.dataset.sid,
+      critId = el.dataset.critid,
+      checkId = el.dataset.checkid;
+    var crit = getRubricCriterion(aid, critId);
+    if (!crit) return;
+    var before = getRubricCheckIds(cid, sid, aid);
+    var after = setRubricCheck(cid, sid, aid, checkId, el.checked);
+    var current = _criterionLevelNow(cid, aid, sid, crit);
+    var next = RubricChecks.levelAfterTick(crit, current, before, after);
+    if (next !== current) {
+      rubricCriterionScoreKeys(crit).forEach(function (tagId) {
+        setScore(cid, sid, aid, tagId, next);
+      });
+      var row = _criterionRow(aid, sid, critId);
+      if (row) {
+        updateRubricRowUI(row, next);
+        syncModRow(row);
+      }
+      refreshSidebarGrades(sid);
+    }
+    _refreshChecklistRow(aid, sid, critId, false);
+    var again = document.querySelector(
+      '.rsg-checklist input[data-sid="' + sid + '"][data-aid="' + aid + '"][data-checkid="' + checkId + '"]',
+    );
+    if (again) again.focus();
+  }
+
   function renderRubricGradingView(cid, a, students, scores) {
     var rubric = getRubricById(cid, a.rubricId);
     if (!rubric) return '';
@@ -2694,11 +2925,14 @@ window.PageAssignments = (function () {
       })
       .filter(Boolean);
 
-    var html = '<div class="rsg-grid">';
+    var advanced = _isAdvancedRubric(rubric);
+    var html = '<div class="rsg-grid' + (advanced ? ' is-advanced' : '') + '">';
     html +=
       '<div class="rsg-header"><div class="rsg-header-spacer">Student</div><div class="rsg-header-inner"><div class="rsg-header-crit-spacer"></div><div class="rsg-header-levels">' +
       _fillAllHeaderHtml(cid, 'confirmFillRubricAll', a.id) +
-      '</div><div class="rsg-header-mod-spacer"></div><div class="rsg-header-comment-spacer"></div></div><div class="rsg-header-action"></div></div>';
+      '</div>' +
+      (advanced ? '<div class="rsg-header-checks-spacer">Checks</div>' : '') +
+      '<div class="rsg-header-mod-spacer"></div><div class="rsg-header-comment-spacer"></div></div><div class="rsg-header-action"></div></div>';
 
     var statuses = getAssignmentStatuses(cid);
     students.forEach(function (st) {
@@ -2783,12 +3017,16 @@ window.PageAssignments = (function () {
               );
             },
           ) +
-          '</div><div class="rsg-mods">' +
+          '</div>' +
+          (advanced ? '<div class="rsg-checks-cell">' + _checksButtonHtml(cid, a.id, st.id, crit) + '</div>' : '') +
+          '<div class="rsg-mods">' +
           scoreModButtonsHtml(modLevel, critMod) +
           // Its own cell: .rsg-mods is redrawn on every score change.
           '</div><div class="rsg-comment-cell">' +
           criterionCommentButtonHtml(a.id, st.id, crit) +
           '</div></div>';
+        if (advanced && RubricChecks.hasChecks(crit) && _isChecklistOpen(a.id, st.id, crit.id))
+          html += _checklistPanelHtml(cid, a.id, st.id, crit, displayScore);
       });
       html +=
         '</div><div class="score-row-action"><div class="row-fill-btn" data-action="toggleScoreMenu" title="Fill row">\u25BC<div class="col-fill-menu" data-stop-prop="true">' +
@@ -4632,6 +4870,15 @@ window.PageAssignments = (function () {
       selectTagLevel: function () {
         selectTagLevel(el, parseInt(el.dataset.level, 10), el.dataset.aid, el.dataset.sid, el.dataset.tagid);
       },
+      toggleChecklist: function () {
+        toggleChecklist(el);
+      },
+      tickRubricCheck: function () {
+        tickRubricCheck(el);
+      },
+      setChecklistMode: function () {
+        setChecklistMode(el.dataset.mode);
+      },
       selectRubricScore: function () {
         selectRubricScore(el, parseInt(el.dataset.level, 10), el.dataset.aid, el.dataset.sid, el.dataset.critid);
       },
@@ -4955,6 +5202,22 @@ window.PageAssignments = (function () {
         if (lvl) lvl.click();
       }
       navigateKb('down');
+      return;
+    }
+    if (
+      (key === 'k' || key === 'K') &&
+      !e.metaKey &&
+      !e.ctrlKey &&
+      !e.altKey &&
+      _kbFocusEl.classList.contains('rsg-criterion-row') &&
+      !document.getElementById('rubric-modal') &&
+      !document.querySelector('.confirm-overlay')
+    ) {
+      var checksBtn = _kbFocusEl.querySelector('.rsg-checks-btn');
+      if (checksBtn) {
+        e.preventDefault();
+        checksBtn.click();
+      }
       return;
     }
     if (
