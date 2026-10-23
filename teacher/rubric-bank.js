@@ -6,7 +6,7 @@
    deleting and the new-assessment form; it passes them in as hooks so this
    file never reaches into the page's state.
 
-   Hooks: edit(rid), newRubric(), remove(rid), print(rid, cid),
+   Hooks: edit(rid), newRubric(style), remove(rid), print(rid, cid),
    useInNew(rid), goToAssessment(aid), changed().
    ─────────────────────────────────────────────────────────────── */
 window.RubricBank = (function () {
@@ -176,6 +176,45 @@ window.RubricBank = (function () {
     );
     return true;
   }
+
+  /* ── Advanced Rubrics (plan §5, PR 9; mockup C9) ────────── */
+
+  function isAdvanced(rubric) {
+    return typeof rubricStyle === 'function' && rubricStyle(rubric) === 'advanced';
+  }
+
+  /* "3 Criteria", plus "· 24 Checkboxes" on an Advanced Rubric. */
+  function _sizeText(rubric) {
+    var text = _plural((rubric.criteria || []).length, 'Criterion', 'Criteria');
+    if (isAdvanced(rubric) && window.RubricChecks)
+      text += ' · ' + _plural(RubricChecks.countChecks(rubric), 'Checkbox', 'Checkboxes');
+    return text;
+  }
+
+  function _advTagHtml(rubric) {
+    return isAdvanced(rubric) ? '<span class="rb-adv-tag">Advanced</span>' : '';
+  }
+
+  /* An Advanced Rubric's checkboxes for one level, under its descriptor. */
+  function _cellChecksHtml(criterion, level) {
+    if (!window.RubricChecks) return '';
+    var boxes = RubricChecks.checksAt(criterion, level);
+    if (!boxes.length) return '';
+    return (
+      '<span class="rb-cell-checks">' +
+      boxes
+        .map(function (check) {
+          return (
+            '<span class="rb-cell-check"><span class="rb-box" aria-hidden="true"></span>' + esc(check.label) + '</span>'
+          );
+        })
+        .join('') +
+      '</span>'
+    );
+  }
+
+  var LEVEL_RULE =
+    'When scoring, ticking boxes suggests a level: the highest level whose boxes are all ticked. You can always pick a different level.';
 
   /* ── Class stats (teacher only, never printed) ──────────── */
 
@@ -449,8 +488,10 @@ window.RubricBank = (function () {
       esc(r.id) +
       '" aria-current="' +
       (selected ? 'true' : 'false') +
-      '"><span class="rb-row-name">' +
+      '"><span class="rb-row-top"><span class="rb-row-name">' +
       esc(r.name) +
+      '</span>' +
+      _advTagHtml(r) +
       '</span><span class="rb-row-meta">' +
       esc(rowMeta(cid, r)) +
       '</span></button>'
@@ -586,6 +627,7 @@ window.RubricBank = (function () {
         html +=
           '<td class="rb-cell">' +
           esc((c.levels && c.levels[lv]) || '') +
+          (isAdvanced(rubric) ? _cellChecksHtml(c, lv) : '') +
           (plainValues ? '' : '<span class="rb-cell-value">Value ' + esc(String(value)) + '</span>') +
           '</td>';
       });
@@ -689,6 +731,32 @@ window.RubricBank = (function () {
     );
   }
 
+  /* "+ New Rubric": a menu of Standard Rubric and Advanced Rubric (C9). */
+  function _newHtml() {
+    var open = !!_s.newMenuOpen;
+    return (
+      '<button type="button" class="rb-btn rb-btn-new' +
+      (open ? ' is-open' : '') +
+      '" data-rb="new-menu" aria-haspopup="menu" aria-expanded="' +
+      open +
+      '">+ New Rubric <span aria-hidden="true">▾</span></button>' +
+      (open
+        ? '<div class="rb-menu rb-new-menu" role="menu">' +
+          '<button type="button" role="menuitem" data-rb="new" data-style="standard"><span class="rb-menu-title">Standard Rubric</span><span class="rb-menu-help">One descriptor per level. Pick a level to score.</span></button>' +
+          '<button type="button" role="menuitem" data-rb="new" data-style="advanced"><span class="rb-menu-title">Advanced Rubric</span><span class="rb-menu-help">Checkboxes inside each level. Ticks suggest the level.</span></button>' +
+          '</div>'
+        : '')
+    );
+  }
+
+  function _renderNew(focusFirst) {
+    var el = document.getElementById('rb-new');
+    if (!el) return;
+    el.innerHTML = _newHtml();
+    var target = focusFirst ? el.querySelector('.rb-new-menu button') : el.querySelector('[data-rb="new-menu"]');
+    if (target && focusFirst) target.focus();
+  }
+
   function _menuHtml() {
     return (
       '<div class="rb-menu" role="menu">' +
@@ -709,14 +777,19 @@ window.RubricBank = (function () {
     var n = usesOf(src, r.id).length;
     var match = matchInfo(src, cid, r);
     var html = '<div class="rb-pane-head"><div class="rb-title-wrap">';
-    html += '<h3 class="rb-title" id="rb-title">' + esc(r.name) + '</h3>';
+    html +=
+      '<div class="rb-title-row"><h3 class="rb-title" id="rb-title">' +
+      esc(r.name) +
+      '</h3>' +
+      _advTagHtml(r) +
+      '</div>';
     html +=
       '<div class="rb-sub"><span>' +
       esc(
         'From ' +
           _className(src) +
           ' · ' +
-          _plural((r.criteria || []).length, 'Criterion', 'Criteria') +
+          _sizeText(r) +
           ' · ' +
           (n ? 'Used in ' + _plural(n, _className(src) + ' Assessment', _className(src) + ' Assessments') : 'Not Used'),
       ) +
@@ -745,6 +818,7 @@ window.RubricBank = (function () {
         ) +
         '</span></div>';
     }
+    if (isAdvanced(r)) html += '<div class="rb-rule">' + esc(LEVEL_RULE) + '</div>';
     html += '<div class="rb-grid-wrap">' + gridHtml(cid, r, { srcCid: src, match: match }) + '</div>';
     if (match.total > match.matched) {
       html +=
@@ -763,7 +837,7 @@ window.RubricBank = (function () {
     if (!r) {
       return (
         '<div class="rb-empty-pane"><div class="rb-empty-title">This class has no rubrics yet.</div>' +
-        '<div class="rb-empty-actions"><button type="button" class="rb-btn rb-btn-primary" data-rb="new">+ New Rubric</button>' +
+        '<div class="rb-empty-actions"><button type="button" class="rb-btn rb-btn-primary" data-rb="new" data-style="standard">+ New Rubric</button>' +
         (_canCopy(cid)
           ? '<button type="button" class="rb-btn" data-rb="scope" data-scope="all">Copy One From Another Class</button>'
           : '') +
@@ -782,14 +856,16 @@ window.RubricBank = (function () {
       html +=
         '<input class="rb-rename" id="rb-rename" aria-label="Rubric name" value="' + esc(r.name) + '" maxlength="120">';
     } else {
-      html += '<h3 class="rb-title" id="rb-title">' + esc(r.name) + '</h3>';
+      html +=
+        '<div class="rb-title-row"><h3 class="rb-title" id="rb-title">' +
+        esc(r.name) +
+        '</h3>' +
+        _advTagHtml(r) +
+        '</div>';
     }
     html +=
       '<div class="rb-sub"><span>' +
-      esc(
-        _plural((r.criteria || []).length, 'Criterion', 'Criteria') +
-          (isCustomCriteria(r) ? ' · Custom Criteria (Not Linked to Competencies)' : ''),
-      ) +
+      esc(_sizeText(r) + (isCustomCriteria(r) ? ' · Custom Criteria (Not Linked to Competencies)' : '')) +
       '</span>' +
       (linked ? '<span class="rb-linked">' + esc(linked) + '</span>' : '') +
       '</div></div>';
@@ -805,6 +881,7 @@ window.RubricBank = (function () {
       '"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>' +
       (_s.menuOpen ? _menuHtml() : '') +
       '</div></div></div>';
+    if (isAdvanced(r)) html += '<div class="rb-rule">' + esc(LEVEL_RULE) + '</div>';
     if (stats) html += _statsLineHtml(cid, r, stats, uses);
     html += '<div class="rb-grid-wrap">' + gridHtml(cid, r, { stats: showStats ? stats : null }) + '</div>';
     if (showStats) html += _overallHtml(cid, stats);
@@ -858,7 +935,9 @@ window.RubricBank = (function () {
       _scopeHtml() +
       '</div>' +
       '<div class="rb-head-gap"></div>' +
-      '<button type="button" class="rb-btn rb-btn-new" data-rb="new">+ New Rubric</button>' +
+      '<div class="rb-new-wrap" id="rb-new">' +
+      _newHtml() +
+      '</div>' +
       '<button type="button" class="rb-close" data-rb="close" aria-label="Close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>' +
       '</div>' +
       '<div class="rb-body"><div class="rb-side">' +
@@ -1006,10 +1085,16 @@ window.RubricBank = (function () {
       case 'select':
         _select(el.dataset.rid, el.dataset.cid);
         break;
-      case 'new':
-        close();
-        if (hooks.newRubric) hooks.newRubric();
+      case 'new-menu':
+        _s.newMenuOpen = !_s.newMenuOpen;
+        _renderNew(_s.newMenuOpen);
         break;
+      case 'new': {
+        var style = el && el.dataset.style === 'advanced' ? 'advanced' : 'standard';
+        close();
+        if (hooks.newRubric) hooks.newRubric(style);
+        break;
+      }
       case 'copy-here':
         _copyHere();
         break;
@@ -1087,7 +1172,12 @@ window.RubricBank = (function () {
     }
     if (e.key === 'Escape') {
       e.preventDefault();
-      if (_s.menuOpen) {
+      if (_s.newMenuOpen) {
+        _s.newMenuOpen = false;
+        _renderNew(false);
+        var newBtn = _root().querySelector('[data-rb="new-menu"]');
+        if (newBtn) newBtn.focus();
+      } else if (_s.menuOpen) {
         _s.menuOpen = false;
         _renderPane();
         var more = _root().querySelector('[data-rb="more"]');
@@ -1142,6 +1232,10 @@ window.RubricBank = (function () {
       if (_s.menuOpen && !(e.target.closest && e.target.closest('.rb-more-wrap'))) {
         _s.menuOpen = false;
         _renderPane();
+      }
+      if (_s.newMenuOpen && !(e.target.closest && e.target.closest('.rb-new-wrap'))) {
+        _s.newMenuOpen = false;
+        _renderNew(false);
       }
       var btn = e.target.closest ? e.target.closest('[data-rb]') : null;
       if (btn) _act(btn.dataset.rb, btn);
@@ -1211,6 +1305,7 @@ window.RubricBank = (function () {
     isCustomCriteria: isCustomCriteria,
     pieBackground: pieBackground,
     countsText: countsText,
+    isAdvanced: isAdvanced,
     deleteImpact: deleteImpact,
     confirmDelete: confirmDelete,
     duplicate: duplicate,

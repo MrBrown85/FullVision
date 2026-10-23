@@ -99,7 +99,7 @@
     picked: [],
     layout: 'full',
     nameStyle: 'preferred', // preferred | first; the last name always follows
-    include: { feedback: true, criterionComments: true, codes: true, overall: true },
+    include: { feedback: true, criterionComments: true, codes: true, overall: true, checks: true },
   };
 
   // { cid, aid, rubricId, uses, opts, userLayout, trigger } while the dialog is open
@@ -297,6 +297,8 @@
       rows: rows,
       overall: overall,
       feedback: _feedbackText(cid, sid, aid, entries),
+      // An Advanced Rubric's ticked checkboxes for this student.
+      ticked: typeof getRubricCheckIds === 'function' ? getRubricCheckIds(cid, sid, aid) : [],
     };
   }
 
@@ -327,6 +329,7 @@
       }),
       overall: null,
       feedback: '',
+      ticked: [],
     };
   }
 
@@ -399,6 +402,39 @@
     return '<span class="rubric-mark" aria-label="' + _esc(LEVEL_NAMES[row.level] || '') + '">' + mark + '</span>';
   }
 
+  /* An Advanced Rubric's checkboxes for one level: an empty square, or a
+     black one with a white tick when ticked. Black and white only. */
+  function _checksHtml(criterion, level, ticked) {
+    if (typeof RubricChecks === 'undefined') return '';
+    var boxes = RubricChecks.checksAt(criterion, level);
+    if (!boxes.length) return '';
+    var on = ticked || [];
+    return (
+      '<div class="rubric-checks">' +
+      boxes
+        .map(function (check) {
+          var isOn = on.indexOf(check.id) >= 0;
+          return (
+            '<div class="rubric-check' +
+            (isOn ? ' is-on' : '') +
+            '"><span class="rubric-box" aria-label="' +
+            (isOn ? 'Ticked' : 'Not ticked') +
+            '">' +
+            (isOn ? '✓' : '') +
+            '</span><span>' +
+            _esc(check.label) +
+            '</span></div>'
+          );
+        })
+        .join('') +
+      '</div>'
+    );
+  }
+
+  function _isAdvancedRubric(rubric) {
+    return !!rubric && !rubric.kind && typeof rubricStyle === 'function' && rubricStyle(rubric) === 'advanced';
+  }
+
   function renderSheet(data, opts) {
     var include = opts.include || DEFAULT_OPTIONS.include;
     // The level columns run in the class's Rubric Levels order.
@@ -448,6 +484,7 @@
           '">' +
           (scored ? _markHtml(row) : '') +
           _esc((c.levels && c.levels[lv]) || '') +
+          (include.checks ? _checksHtml(c, lv, data.ticked) : '') +
           '</td>';
       });
       html += '</tr>';
@@ -505,7 +542,9 @@
   function _renderBlankPages(cid, aid, opts, layout, perPage) {
     var data = blankSheetData(cid, _jobRubric(cid, aid, opts), aid ? _assessment(cid, aid) : null);
     var count = data ? _copies(opts.copies) : 0;
-    var sheetOpts = { include: { codes: !!(opts.include && opts.include.codes) } };
+    var sheetOpts = {
+      include: { codes: !!(opts.include && opts.include.codes), checks: !!(opts.include && opts.include.checks) },
+    };
     var sheet = data ? renderSheet(data, sheetOpts) : '';
     var html = '';
     for (var i = 0; i < count; i += perPage) {
@@ -856,6 +895,7 @@
         includes += _check('criterionComments', opts.include.criterionComments, 'Criterion Comments');
     }
     if (_hasCodes(cid, rubric)) includes += _check('codes', opts.include.codes, 'Competency Codes');
+    if (_isAdvancedRubric(rubric)) includes += _check('checks', opts.include.checks, 'Checkboxes');
     if (includes) html += '<fieldset class="rp-group"><legend>Include</legend>' + includes + '</fieldset>';
     html += '</div>';
 

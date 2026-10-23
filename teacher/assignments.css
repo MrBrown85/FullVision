@@ -4192,3 +4192,85 @@
 .crit-from-comp-dialog .rubric-comp-group {
   margin-top: 4px;
 }
+
+/* ── Rubric Bank: Advanced Rubrics ─────────────────────────── */
+.rb-row-top,
+.rb-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.rb-title-row {
+  gap: 8px;
+}
+.rb-adv-tag {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 5px;
+  background: var(--accent-purple-light);
+  color: var(--accent-purple);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.rb-title-row .rb-adv-tag {
+  height: 22px;
+  font-size: var(--text-sm);
+}
+.rb-rule {
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--text-3);
+}
+.rb-cell-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+.rb-cell-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: var(--text-xs);
+  line-height: 1.35;
+  color: var(--text-2);
+}
+.rb-box {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  margin-top: 1px;
+  border: 1.5px solid var(--text-3);
+  border-radius: 3px;
+  box-sizing: border-box;
+}
+.rb-new-wrap {
+  position: relative;
+}
+.rb-btn-new.is-open {
+  background: var(--active-light);
+}
+.rb-menu.rb-new-menu {
+  width: 290px;
+  top: 42px;
+}
+.rb-new-menu button {
+  height: auto;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 12px;
+}
+.rb-menu-title {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text);
+}
+.rb-menu-help {
+  font-size: var(--text-xs);
+  color: var(--text-3);
+}
