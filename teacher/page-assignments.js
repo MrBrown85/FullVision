@@ -377,7 +377,7 @@ window.PageAssignments = (function () {
   /* ── Assessment List ────────────────────────────────────── */
   function renderAssessmentList(cid, assessments, allAssessments, students, scores, modules) {
     var html =
-      '<div class="settings-grid" style="display:grid;grid-template-columns:1fr;gap:20px;align-items:start;padding:16px 20px">';
+      '<div class="settings-grid" style="display:grid;grid-template-columns:1fr;gap:20px;align-items:start;padding:12px 12px 20px">';
     html += '<div>';
 
     // New assessment form

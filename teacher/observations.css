@@ -4,7 +4,7 @@
 .obs-capture-host {
   background: var(--surface);
   border-bottom: 1px solid var(--border);
-  padding: 10px 16px;
+  padding: 10px 12px;
   flex-shrink: 0;
 }
 .obs-capture-host .obsc {
@@ -145,7 +145,7 @@
   display: flex;
   align-items: baseline;
   gap: 8px;
-  padding: 8px 16px;
+  padding: 8px 12px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
@@ -312,7 +312,8 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 0 20px 20px;
+  /* 12px from the page's edges and between boxes, as on every page. */
+  padding: 0 12px 20px;
 }
 .obs-feed-date-group {
   margin-top: 18px;
@@ -332,6 +333,9 @@
 }
 .obs-feed .obs-feed-date-group {
   max-width: 860px;
+}
+.obs-feed .obs-card {
+  margin-bottom: 12px;
 }
 
 /* One observation: a fixed type column so names line up, the note, a
