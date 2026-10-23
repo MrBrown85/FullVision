@@ -771,6 +771,19 @@ window.PageReports = (function () {
         ')</span></span></label>';
     }
     html += '</fieldset>';
+    // The Letterhead's Name option, here too so it can be set at print time.
+    var nameStyle = ReportSheets.optionsFor(ReportSheets.cellOf(form, 'header') || { block: 'header' }).name;
+    html += '<fieldset class="issue-group"><legend>Name</legend>';
+    html +=
+      '<label class="issue-option"><input type="radio" name="issue-name" value="preferred"' +
+      (nameStyle !== 'first' ? ' checked' : '') +
+      '><span>Preferred Name <span class="issue-help">(first name if none)</span></span></label>';
+    html +=
+      '<label class="issue-option"><input type="radio" name="issue-name" value="first"' +
+      (nameStyle === 'first' ? ' checked' : '') +
+      '><span>First Name</span></label>';
+    html += '<div class="issue-help">The last name always follows.</div>';
+    html += '</fieldset>';
     var warn = [];
     if (c.summary.noComment.length) {
       warn.push(
@@ -840,6 +853,14 @@ window.PageReports = (function () {
           switchTab('questionnaire');
         }
       }
+    });
+    // Name: change the Letterhead option, redraw the reports, and print
+    // what is now on screen.
+    overlay.addEventListener('change', function (e) {
+      var t = e.target;
+      if (!t || t.name !== 'issue-name') return;
+      _setForm(ReportSheets.setOption(_formOf(), 'header', 'name', t.value));
+      if (_issueState) _issueState.counts = _issueCounts();
     });
     _issueState.keyHandler = function (e) {
       if (e.key === 'Escape') closeIssueDialog();

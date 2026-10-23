@@ -346,6 +346,24 @@ test.describe('Page Studio', () => {
     await expect(page.getByRole('button', { name: 'Print Reports' })).toBeVisible();
   });
 
+  test('Print Reports sets the name on the reports: preferred or first, always the last name', async ({ page }) => {
+    await openStudio(page);
+    await showEveryone(page);
+    const jas = page.locator('.report-student-name', { hasText: 'Gill' });
+    await expect(jas.first()).toHaveText('Jas Gill');
+    await page.getByRole('button', { name: 'Print Reports' }).click();
+    const dialog = page.locator('#issue-overlay');
+    await expect(dialog.getByRole('group', { name: 'Name' })).toBeVisible();
+    await expect(dialog.getByRole('radio', { name: /Preferred Name/ })).toBeChecked();
+    await dialog.getByRole('radio', { name: 'First Name', exact: true }).check();
+    await expect(jas.first()).toHaveText('Jasper Gill');
+    await dialog.locator('[data-issue="cancel"]').click();
+    await expect(dialog).toHaveCount(0);
+    // It is the Letterhead's option, so it stays chosen.
+    await page.getByRole('button', { name: 'Print Reports' }).click();
+    await expect(dialog.getByRole('radio', { name: 'First Name', exact: true })).toBeChecked();
+  });
+
   test('the comment box says how the draft sits in its box, as it is typed', async ({ page }) => {
     await page.goto('/login.html?demo=1');
     await page.waitForURL(/app\.html/, { timeout: 15000 });
