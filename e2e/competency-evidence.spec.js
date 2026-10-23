@@ -22,9 +22,9 @@ test.describe('Competency card evidence drawer', () => {
     await enterDemo(page);
     await page.goto('/teacher/app.html#/student?id=st23&course=sci8');
 
-    // The first card whose competency has scores.
+    // The first competency row with scores (the Competencies tab opens first).
     const card = page
-      .locator('.dash-section')
+      .locator('.stu-comp')
       .filter({ has: page.locator('.dash-tag-evidence', { hasText: /score/ }) })
       .first();
     const row = card.locator('.dash-tag-row');
@@ -36,8 +36,7 @@ test.describe('Competency card evidence drawer', () => {
     const linked = Number(m[2]);
     expect(scores).toBeGreaterThan(0);
     const tagId = await row.getAttribute('data-tagid');
-    const sectionBadge = await card.locator('.dash-section-header .prof-label').textContent();
-    const tagBadge = await row.locator('.prof-label').textContent();
+    const levelBadge = await row.locator('.stu-level').textContent();
     const collapsed = (await card.boundingBox()).height;
 
     // Expand: the explanation line, then the scores.
@@ -78,21 +77,23 @@ test.describe('Competency card evidence drawer', () => {
     const saved = (await meiObs(page)).find(o => o.text === text);
     expect(saved).toMatchObject({ competencyId: tagId, level: 4 });
 
-    // In the Evidence panel, and the drawer row jumps to it.
+    // The drawer row opens it in the Evidence tab.
+    await obsRow.click();
+    await expect(page.locator('#stu-tab-evidence')).toHaveAttribute('aria-selected', 'true');
     const panelCard = page.locator('#ev-list .obs-card[data-obid="' + saved.id + '"]');
+    await expect(panelCard).toHaveClass(/ev-card-hit/);
     await expect(panelCard).toContainText(text);
     await expect(panelCard.locator('.obsc-pill-level')).toHaveText('Looks Extending');
     await expect(page.locator('.ev-tl-mark[data-obid="' + saved.id + '"]')).toHaveCount(1);
-    await obsRow.click();
-    await expect(panelCard).toHaveClass(/ev-card-hit/);
 
-    // Evidence only: neither level badge moved.
-    await expect(card.locator('.dash-section-header .prof-label')).toHaveText(sectionBadge);
-    await expect(row.locator('.prof-label')).toHaveText(tagBadge);
+    // Evidence only: the level badge did not move. The drawer is still open.
+    await page.locator('#stu-tab-comps').click();
+    await expect(row).toHaveAttribute('aria-expanded', 'true');
+    await expect(row.locator('.stu-level')).toHaveText(levelBadge);
 
-    // Done closes the strip; collapsing returns the card to its height.
-    await drawer.getByRole('button', { name: 'Done' }).click();
+    // Leaving the tab closed the strip; collapsing returns the card to its height.
     await expect(strip).toHaveCount(0);
+    await expect(drawer.getByRole('button', { name: 'Add observation' })).toBeVisible();
     await row.click();
     await expect(row).toHaveAttribute('aria-expanded', 'false');
     expect((await card.boundingBox()).height).toBeCloseTo(collapsed, 0);

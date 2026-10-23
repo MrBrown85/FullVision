@@ -64,7 +64,16 @@ const DESKTOP = [
     },
   },
   { name: 'gradebook', hash: '#/gradebook', ready: '.gb-grid' },
-  { name: 'student', hash: '#/student?id=st23&course=sci8', ready: '#ev-panel' },
+  // The student page, one tab at a time.
+  ...['comps', 'assess', 'evidence', 'goals', 'profile'].map(tab => ({
+    name: 'student ' + tab,
+    hash: '#/student?id=st23&course=sci8',
+    ready: '.stu-tabs',
+    async open(page) {
+      await page.locator('#stu-tab-' + tab).click();
+      await expect(page.locator('#stu-tab-' + tab)).toHaveAttribute('aria-selected', 'true');
+    },
+  })),
   { name: 'reports', hash: '#/reports', ready: '.student-row' },
 ];
 

@@ -19,9 +19,10 @@ test.describe('Student page Evidence panel', () => {
   test('shows tabs with counts, adds through the strip, and deletes with Undo', async ({ page }) => {
     await enterDemo(page);
     await page.goto('/teacher/app.html#/student?id=st23&course=sci8');
+    await page.locator('#stu-tab-evidence').click();
 
     const panel = page.locator('#ev-panel');
-    await expect(panel.getByRole('heading', { name: 'Evidence' })).toBeVisible();
+    await expect(panel).toBeVisible();
     await expect(page.getByText('Assignment Feedback')).toHaveCount(0);
     await expect(page.getByText('Notes & Observations')).toHaveCount(0);
 

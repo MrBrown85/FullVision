@@ -12,8 +12,9 @@ window.PageStudent = (function () {
   /* ── State variables ────────────────────────────────────── */
   var studentId;
   var activeCourse;
-  var activeSectionFilters = new Set();
-  var _expandedGroups = new Set();
+  var _tab = 'comps'; // the open tab: comps, assess, evidence, goals, profile
+  var _assessFilter = 'all'; // Assessments tab: all, prof, points, unscored
+  var _assessCat = ''; // Assessments tab: a category id, or '' for all
   var _openTags = new Set(); // competency cards whose evidence drawer is open
   var _overrideSelectedLevel = 0;
   var _profileData = null;
@@ -56,37 +57,7 @@ window.PageStudent = (function () {
   function switchStudent(sid) {
     studentId = sid;
     _profileData = null;
-    activeSectionFilters.clear();
     Router.navigate('#/student?id=' + sid + '&course=' + activeCourse);
-  }
-
-  /* ── Grade toggle ───────────────────────────────────────── */
-  function toggleGradesView() {
-    var wrap = document.getElementById('grades-table-wrap');
-    var text = document.getElementById('grades-toggle-text');
-    var arrow = document.getElementById('grades-toggle-arrow');
-    if (!wrap) return;
-    var isCollapsed = wrap.classList.toggle('collapsed');
-    if (text) text.textContent = isCollapsed ? 'Show All Assignments' : 'Show Less';
-    if (arrow) arrow.textContent = isCollapsed ? '▼' : '▲';
-  }
-
-  function toggleSectionFilter(secId) {
-    if (activeSectionFilters.has(secId)) {
-      activeSectionFilters.delete(secId);
-    } else {
-      activeSectionFilters.add(secId);
-    }
-    render();
-  }
-
-  function toggleGroupExpand(groupId) {
-    if (_expandedGroups.has(groupId)) {
-      _expandedGroups.delete(groupId);
-    } else {
-      _expandedGroups.add(groupId);
-    }
-    render();
   }
 
   /* ── Override UI ─────────────────────────────────────────── */
@@ -405,6 +376,719 @@ window.PageStudent = (function () {
     return out;
   }
 
+  /* ── Tabs ───────────────────────────────────────────────── */
+  var TABS = [
+    { id: 'comps', label: 'Competencies' },
+    { id: 'assess', label: 'Assessments' },
+    { id: 'evidence', label: 'Evidence' },
+    { id: 'goals', label: 'Goals and Reflections' },
+    { id: 'profile', label: 'Learner Profile' },
+  ];
+
+  function _plural(n, one, many) {
+    return n + ' ' + (n === 1 ? one : many);
+  }
+
+  function _shortDay(dateStr) {
+    if (!dateStr) return '';
+    var d = new Date(String(dateStr).slice(0, 10) + 'T00:00:00');
+    return isNaN(d) ? '' : d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
+  }
+
+  function _daysAgo(dateStr) {
+    var today = typeof getTodayStr === 'function' ? getTodayStr() : new Date().toISOString().slice(0, 10);
+    var n = Math.round((new Date(today + 'T00:00:00') - new Date(String(dateStr).slice(0, 10) + 'T00:00:00')) / 864e5);
+    if (!(n >= 0)) return _shortDay(dateStr);
+    return n === 0 ? 'today' : n === 1 ? 'yesterday' : n + ' days ago';
+  }
+
+  function _obDay(ob) {
+    return (ob && (ob.date || (ob.created || '').slice(0, 10))) || '';
+  }
+
+  /* A level as the class shows it, with its proficiency word unless the
+     class is Letter, tinted by its level. */
+  function _levelPill(cid, v) {
+    var lvl = v > 0 ? Math.round(v) : 0;
+    var word = typeof levelWord === 'function' ? levelWord(cid, v) : '';
+    return (
+      '<span class="stu-level stu-level-' +
+      lvl +
+      '">' +
+      esc(formatLevel(cid, v)) +
+      (word ? ' ' + esc(word) : '') +
+      '</span>'
+    );
+  }
+
+  /* A score entry from getTagScores as teachers write it: 3+, or 8/10. */
+  function _entryText(entry, assess) {
+    if (assess && isPointsScored(assess) && !isCompletionScored(assess) && entry.rawPoints != null) {
+      return formatPoints(entry.rawPoints) + '/' + formatPoints(assess.maxPoints || 100);
+    }
+    var level = entry.level != null ? entry.level : entry.score;
+    return formatScoreLevel(level, entry.mod) || String(level);
+  }
+
+  /* One assessment's score as the gradebook shows it. */
+  function _cellText(cell, assess) {
+    if (cell.kind === 'points') {
+      var max = assess.maxPoints || 100;
+      return formatPoints(cell.value) + '/' + formatPoints(max) + ' · ' + formatPointsPercent(cell.value, max);
+    }
+    return cell.text;
+  }
+
+  /* A competency's scored entries in the current term, oldest first. */
+  function _compEntries(cid, sec) {
+    var tag = sec.tags[0];
+    if (!tag) return [];
+    return getTagScores(cid, studentId, tag.id)
+      .filter(function (s) {
+        return s.score > 0;
+      })
+      .slice()
+      .sort(function (a, b) {
+        return (a.date || '').localeCompare(b.date || '');
+      });
+  }
+
+  function _latestLine(cid, sec, assessMap) {
+    var entries = _compEntries(cid, sec);
+    var last = entries[entries.length - 1];
+    if (!last) return 'No scores yet';
+    var a = assessMap[last.assessmentId];
+    return _entryText(last, a) + (a ? ' on ' + a.title : '') + ', ' + _shortDay(last.date);
+  }
+
+  function _tabSummaries(ctx) {
+    var cid = ctx.cid;
+    var out = {};
+    var profs = ctx.sections
+      .map(function (sec) {
+        return getSectionProficiency(cid, studentId, sec.id);
+      })
+      .filter(function (v) {
+        return v > 0;
+      });
+    if (!profs.length)
+      out.comps = { stat: 'Not Scored', sub: _plural(ctx.sections.length, 'competency', 'competencies') };
+    else {
+      var lo = Math.min.apply(null, profs);
+      var hi = Math.max.apply(null, profs);
+      var atProf = profs.filter(function (v) {
+        return Math.round(v) >= 3;
+      }).length;
+      out.comps = {
+        stat:
+          courseGradeMode(cid) === 'letter'
+            ? profs.length + ' of ' + ctx.sections.length + ' Scored'
+            : atProf + ' of ' + ctx.sections.length + ' Proficient',
+        sub:
+          lo === hi
+            ? 'All at ' + formatLevel(cid, lo)
+            : 'Range: ' + formatLevel(cid, lo) + ' to ' + formatLevel(cid, hi),
+      };
+    }
+    var scope = ctx.term ? ctx.term.label || 'This term' : 'All time';
+    var scored = ctx.cells.filter(function (c) {
+      return c.cell.kind === 'points' || c.cell.kind === 'level' || c.cell.kind === 'complete';
+    });
+    var unscored = ctx.cells.filter(function (c) {
+      return c.cell.kind === 'none' || c.cell.kind === 'missing';
+    }).length;
+    var latestA = scored.reduce(function (m, c) {
+      return (c.a.date || '') > m ? c.a.date : m;
+    }, '');
+    out.assess = {
+      stat: scored.length + ' Scored',
+      sub:
+        scope + (latestA ? ' · Latest ' + _shortDay(latestA) : '') + (unscored ? ' · ' + unscored + ' not scored' : ''),
+    };
+    var lastOb = ctx.obs[0];
+    out.evidence = {
+      stat: _plural(ctx.obs.length, 'Observation', 'Observations'),
+      sub: scope + (lastOb ? ' · Latest ' + _daysAgo(_obDay(lastOb)) : ' · None yet'),
+    };
+    var goals = getGoals(cid)[studentId] || {};
+    var refl = getReflections(cid)[studentId] || {};
+    var goalCount = ctx.sections.filter(function (sec) {
+      return !!(goals[sec.id] || '').trim();
+    }).length;
+    var reflCount = ctx.sections.filter(function (sec) {
+      return !!(refl[sec.id] && (refl[sec.id].text || refl[sec.id].confidence));
+    }).length;
+    out.goals = {
+      stat: goalCount + ' of ' + ctx.sections.length + ' Set',
+      sub: reflCount ? _plural(reflCount, 'self-reflection', 'self-reflections') : 'No self-reflections yet',
+    };
+    var seen = OBS_DIMS.filter(function (d) {
+      return ctx.obs.some(function (o) {
+        return (o.dims || []).indexOf(d) >= 0;
+      });
+    }).length;
+    out.profile = {
+      stat: seen + ' of ' + OBS_DIMS.length + ' Seen',
+      sub: seen < OBS_DIMS.length ? OBS_DIMS.length - seen + ' not seen yet' : 'All seen',
+    };
+    return out;
+  }
+
+  function _tabBarHtml(sums) {
+    return (
+      '<div class="stu-tabs" role="tablist" aria-label="Student details">' +
+      TABS.map(function (t) {
+        var on = t.id === _tab;
+        var sm = sums[t.id];
+        return (
+          '<button type="button" role="tab" class="stu-tab' +
+          (on ? ' active' : '') +
+          '" id="stu-tab-' +
+          t.id +
+          '" data-action="stuTab" data-tab="' +
+          t.id +
+          '" aria-selected="' +
+          on +
+          '" aria-controls="stu-panel" tabindex="' +
+          (on ? '0' : '-1') +
+          '"><span class="stu-tab-label">' +
+          esc(t.label) +
+          '</span><span class="stu-tab-stat">' +
+          esc(sm.stat) +
+          '</span><span class="stu-tab-sub">' +
+          esc(sm.sub) +
+          '</span></button>'
+        );
+      }).join('') +
+      '</div>'
+    );
+  }
+
+  /* ── Competencies tab ───────────────────────────────────── */
+  function _compRowHtml(ctx, sec) {
+    var cid = ctx.cid;
+    var tag = sec.tags[0];
+    var sp = getSectionProficiency(cid, studentId, sec.id);
+    var override = getSectionOverride(cid, studentId, sec.id);
+    var entries = _compEntries(cid, sec);
+    var bars = entries
+      .map(function (e) {
+        var lvl = e.level != null ? e.level : Math.round(e.score);
+        var a = ctx.assessMap[e.assessmentId];
+        return (
+          '<span class="stu-bar" style="height:' +
+          Math.max(4, Math.round((Math.min(e.score, 4) / 4) * 28)) +
+          'px;background:' +
+          (PROF_COLORS[lvl] || PROF_COLORS[0]) +
+          '" title="' +
+          esc(_shortDay(e.date) + ': ' + _entryText(e, a) + (a ? ' on ' + a.title : '')) +
+          '"></span>'
+        );
+      })
+      .join('');
+    if (!tag) {
+      return (
+        '<div class="stu-comp"><div class="stu-comp-row stu-comp-row-static"><span class="stu-comp-name"><strong>' +
+        esc(sec.name) +
+        '</strong></span>' +
+        _levelPill(cid, sp) +
+        '</div></div>'
+      );
+    }
+    var drawerId = 'ced-' + sec.id;
+    var open = _openTags.has(tag.id);
+    return (
+      '<div class="stu-comp">' +
+      '<button type="button" class="dash-tag-row stu-comp-row' +
+      (open ? ' open' : '') +
+      '" data-action="toggleTag" data-tagid="' +
+      esc(tag.id) +
+      '" aria-expanded="' +
+      open +
+      '" aria-controls="' +
+      esc(drawerId) +
+      '">' +
+      '<span class="stu-comp-name"><strong>' +
+      esc(sec.name) +
+      '</strong>' +
+      (tag.label && tag.label !== sec.name ? '<span class="stu-sub">' + esc(tag.label) + '</span>' : '') +
+      (override ? '<span class="override-label">Overridden</span>' : '') +
+      '</span>' +
+      '<span class="stu-comp-level">' +
+      _levelPill(cid, sp) +
+      '</span>' +
+      '<span class="stu-comp-bars" aria-hidden="true">' +
+      (bars || '<span class="stu-sub">No scores yet</span>') +
+      '</span>' +
+      '<span class="stu-comp-latest"><span>' +
+      esc(_latestLine(cid, sec, ctx.assessMap)) +
+      '</span><span class="stu-sub dash-tag-evidence">' +
+      esc(CompetencyEvidence.rowCount(cid, studentId, tag.id)) +
+      '</span></span>' +
+      '<span class="dash-tag-chevron" aria-hidden="true">&#9654;</span>' +
+      '</button>' +
+      CompetencyEvidence.drawerHtml(cid, studentId, sec, tag, drawerId) +
+      '<div class="stu-comp-override">' +
+      '<button type="button" class="override-btn' +
+      (override ? ' active' : '') +
+      '" data-action="toggleOverridePanel" data-secid="' +
+      sec.id +
+      '">' +
+      (override ? 'Edit Override' : 'Override Proficiency') +
+      '</button>' +
+      '<div class="override-panel" id="override-panel-' +
+      sec.id +
+      '" style="display:none"></div>' +
+      '</div>' +
+      '</div>'
+    );
+  }
+
+  function _compsTabHtml(ctx) {
+    var cid = ctx.cid;
+    var html =
+      '<div class="stu-panel-note">Competency levels: ' +
+      esc(describeCalcMethod(cid)) +
+      '. Bars show ' +
+      (ctx.term ? 'this term’s' : 'all') +
+      ' scores, oldest to newest. Select a competency to see the evidence behind it.</div>';
+    var grouped = getGroupedSections(cid);
+    var hasGroups = grouped.groups.some(function (g) {
+      return g.sections.length > 0;
+    });
+    if (hasGroups) {
+      grouped.groups.forEach(function (gi) {
+        if (!gi.sections.length) return;
+        html +=
+          '<h3 class="stu-group-head"><span>' +
+          esc(gi.group.name) +
+          '</span>' +
+          _levelPill(cid, getGroupProficiency(cid, studentId, gi.group.id)) +
+          '</h3>';
+        gi.sections.forEach(function (sec) {
+          html += _compRowHtml(ctx, sec);
+        });
+      });
+      if (grouped.ungrouped.length) {
+        html += '<h3 class="stu-group-head"><span>Other Competencies</span></h3>';
+        grouped.ungrouped.forEach(function (sec) {
+          html += _compRowHtml(ctx, sec);
+        });
+      }
+    } else {
+      ctx.sections.forEach(function (sec) {
+        html += _compRowHtml(ctx, sec);
+      });
+    }
+    if (!ctx.sections.length) html += '<div class="stu-empty">This class has no competencies yet.</div>';
+    if (_profileData && _profileData.competency_tree) html += _renderCompetencyTree(_profileData.competency_tree);
+    return html;
+  }
+
+  /* ── Assessments tab ────────────────────────────────────── */
+  function _assessTabHtml(ctx) {
+    var cid = ctx.cid;
+    var secByTag = {};
+    ctx.sections.forEach(function (sec) {
+      sec.tags.forEach(function (t) {
+        secByTag[t.id] = sec;
+      });
+    });
+    var isPts = function (a) {
+      return isPointsScored(a);
+    };
+    var unscored = function (c) {
+      return c.cell.kind === 'none' || c.cell.kind === 'missing';
+    };
+    var cells = ctx.cells.slice().sort(function (x, y) {
+      return (y.a.date || '').localeCompare(x.a.date || '');
+    });
+    var counts = {
+      all: cells.length,
+      prof: cells.filter(function (c) {
+        return !isPts(c.a);
+      }).length,
+      points: cells.filter(function (c) {
+        return isPts(c.a);
+      }).length,
+      unscored: cells.filter(unscored).length,
+    };
+    var shown = cells.filter(function (c) {
+      if (_assessCat && getAssessmentCategoryId(c.a) !== _assessCat) return false;
+      if (_assessFilter === 'prof') return !isPts(c.a);
+      if (_assessFilter === 'points') return isPts(c.a);
+      if (_assessFilter === 'unscored') return unscored(c);
+      return true;
+    });
+    var chip = function (key, label) {
+      var on = _assessFilter === key;
+      return (
+        '<button type="button" class="stu-chip' +
+        (on ? ' active' : '') +
+        '" data-action="stuAssessFilter" data-filter="' +
+        key +
+        '" aria-pressed="' +
+        on +
+        '">' +
+        esc(label) +
+        ' ' +
+        counts[key] +
+        '</button>'
+      );
+    };
+    var cats = (getCategories(cid) || []).filter(function (cat) {
+      return cells.some(function (c) {
+        return getAssessmentCategoryId(c.a) === cat.id;
+      });
+    });
+    var html =
+      '<div class="stu-toolbar">' +
+      chip('all', 'All') +
+      chip('prof', 'Proficiency') +
+      chip('points', 'Points') +
+      (counts.unscored ? chip('unscored', 'Not Scored') : '') +
+      (cats.length
+        ? '<select class="stu-select" data-action-change="stuAssessCat" aria-label="Category"><option value="">All Categories</option>' +
+          cats
+            .map(function (cat) {
+              return (
+                '<option value="' +
+                esc(cat.id) +
+                '"' +
+                (_assessCat === cat.id ? ' selected' : '') +
+                '>' +
+                esc(cat.name) +
+                '</option>'
+              );
+            })
+            .join('') +
+          '</select>'
+        : '') +
+      '<a class="stu-link" role="link" tabindex="0" data-href="#/gradebook?course=' +
+      cid +
+      '">Open in Gradebook</a>' +
+      '</div>';
+    if (!shown.length) {
+      return (
+        html + '<div class="stu-empty">' + (cells.length ? 'No assessments match.' : 'No assessments yet.') + '</div>'
+      );
+    }
+    var month = '';
+    shown.forEach(function (c) {
+      var a = c.a;
+      var m = (a.date || '').slice(0, 7);
+      if (m !== month) {
+        month = m;
+        var md = m ? new Date(m + '-01T00:00:00') : null;
+        html +=
+          '<h3 class="stu-month">' +
+          (md && !isNaN(md) ? md.toLocaleDateString('en-CA', { month: 'long', year: 'numeric' }) : 'No Date') +
+          '</h3>';
+      }
+      // Each competency by its short title (the tag's label), as the cards show it.
+      var toward = [];
+      (a.tagIds || []).forEach(function (tid) {
+        var sec = secByTag[tid];
+        if (!sec) return;
+        var tag = getTagById(cid, tid);
+        var name = (tag && tag.label) || sec.name;
+        if (toward.indexOf(name) < 0) toward.push(name);
+      });
+      var towardText =
+        toward.length && toward.length === ctx.sections.length && toward.length > 2
+          ? 'All competencies'
+          : toward.join(', ');
+      var status = ctx.statuses[studentId + ':' + a.id];
+      var cell = c.cell;
+      html +=
+        '<div class="stu-assess-row">' +
+        '<span class="stu-assess-date">' +
+        esc(_shortDay(a.date)) +
+        '</span>' +
+        '<span class="stu-assess-title"><a role="link" tabindex="0" data-href="#/assignments?course=' +
+        cid +
+        '&open=' +
+        a.id +
+        '&student=' +
+        studentId +
+        '" title="Open in Assignments">' +
+        esc(a.title) +
+        '</a>' +
+        (status === 'NS'
+          ? '<span class="gt-status-tag gt-tag-ns">NS</span>'
+          : status === 'EXC'
+            ? '<span class="gt-status-tag gt-tag-exc">EXC</span>'
+            : status === 'LATE'
+              ? '<span class="gt-status-tag gt-tag-late">LATE</span>'
+              : '') +
+        '</span>' +
+        '<span class="stu-assess-cat">' +
+        _assessmentCategoryBadge(cid, a) +
+        '</span>' +
+        '<span class="stu-assess-score"><span class="stu-level stu-level-' +
+        (cell.level > 0 ? cell.level : 0) +
+        '">' +
+        esc(_cellText(cell, a)) +
+        '</span></span>' +
+        '<span class="stu-assess-toward">' +
+        esc(towardText) +
+        '</span>' +
+        '</div>';
+    });
+    return html;
+  }
+
+  /* ── Goals and Reflections tab ──────────────────────────── */
+  function _goalsTabHtml(ctx) {
+    var cid = ctx.cid;
+    var first = displayNameFirst(ctx.student);
+    var goals = getGoals(cid)[studentId] || {};
+    var reflections = getReflections(cid)[studentId] || {};
+    var html = '<div class="stu-goal-grid">';
+    ctx.sections.forEach(function (sec) {
+      var tag = sec.tags[0];
+      var goalText = goals[sec.id] || '';
+      var refl = reflections[sec.id] || {};
+      var confLabel = refl.confidence ? CONFIDENCE_LABELS[refl.confidence] || '' : '';
+      var confColor = refl.confidence ? CONFIDENCE_COLORS[refl.confidence] || '#bbb' : '';
+      var hasRefl = !!(refl.text || refl.confidence);
+      html +=
+        '<div class="stu-goal-card">' +
+        '<div class="stu-goal-head"><span class="stu-comp-name"><strong>' +
+        esc(sec.name) +
+        '</strong>' +
+        (tag && tag.label && tag.label !== sec.name ? '<span class="stu-sub">' + esc(tag.label) + '</span>' : '') +
+        '</span>' +
+        _levelPill(cid, getSectionProficiency(cid, studentId, sec.id)) +
+        '</div>' +
+        '<div class="stu-sub">Latest: ' +
+        esc(_latestLine(cid, sec, ctx.assessMap)) +
+        '</div>' +
+        // Goal (ids are what editGoal / saveGoalField use)
+        '<div class="section-goal stu-goal-part" id="goal-' +
+        sec.id +
+        '">' +
+        '<div class="stu-goal-label"><span>Goal</span><button type="button" class="stu-chip" data-action="editGoal" data-secid="' +
+        sec.id +
+        '">' +
+        (goalText ? 'Edit' : '+ Goal') +
+        '</button></div>' +
+        '<div class="section-goal-text" id="goal-text-' +
+        sec.id +
+        '">' +
+        (goalText ? esc(goalText) : '<span class="stu-muted">No goal set.</span>') +
+        '</div>' +
+        '<div class="inline-edit-area" id="goal-edit-' +
+        sec.id +
+        '" style="display:none">' +
+        '<textarea id="goal-input-' +
+        sec.id +
+        '" aria-label="Goal for ' +
+        esc(sec.name) +
+        '" placeholder="What will ' +
+        esc(first) +
+        ' work on next?">' +
+        esc(goalText) +
+        '</textarea>' +
+        '<div class="inline-edit-actions">' +
+        '<button class="btn btn-primary" data-action="saveGoalField" data-secid="' +
+        sec.id +
+        '">Save</button>' +
+        '<button class="btn" data-action="cancelGoalEdit" data-secid="' +
+        sec.id +
+        '">Cancel</button>' +
+        '</div>' +
+        '</div>' +
+        '</div>' +
+        // Self-reflection
+        '<div class="section-reflection stu-goal-part" id="refl-' +
+        sec.id +
+        '">' +
+        '<div class="stu-goal-label"><span>In ' +
+        esc(first) +
+        '’s Words' +
+        (confLabel
+          ? ' <span class="confidence-badge" style="background:' + confColor + '">' + confLabel + '</span>'
+          : '') +
+        '</span><button type="button" class="stu-chip" data-action="editReflection" data-secid="' +
+        sec.id +
+        '">' +
+        (hasRefl ? 'Edit' : '+ Self-Reflection') +
+        '</button></div>' +
+        '<div class="section-reflection-text" id="refl-text-' +
+        sec.id +
+        '">' +
+        (refl.text ? esc(refl.text) : '<span class="stu-muted">No self-reflection yet.</span>') +
+        (refl.date ? '<div class="stu-sub">' + formatDate(refl.date) + '</div>' : '') +
+        '</div>' +
+        '<div class="inline-edit-area" id="refl-edit-' +
+        sec.id +
+        '" style="display:none">' +
+        '<select id="refl-conf-' +
+        sec.id +
+        '" aria-label="Confidence level">' +
+        '<option value="">Confidence level…</option>' +
+        [1, 2, 3, 4]
+          .map(function (n) {
+            return (
+              '<option value="' +
+              n +
+              '"' +
+              (refl.confidence === n ? ' selected' : '') +
+              '>' +
+              CONFIDENCE_LABELS[n] +
+              '</option>'
+            );
+          })
+          .join('') +
+        '</select>' +
+        '<textarea id="refl-input-' +
+        sec.id +
+        '" aria-label="Self-reflection for ' +
+        esc(sec.name) +
+        '" placeholder="' +
+        esc(first) +
+        '’s own words about their learning…">' +
+        esc(refl.text || '') +
+        '</textarea>' +
+        '<div class="inline-edit-actions">' +
+        '<button class="btn btn-primary" data-action="saveReflField" data-secid="' +
+        sec.id +
+        '">Save</button>' +
+        '<button class="btn" data-action="cancelReflEdit" data-secid="' +
+        sec.id +
+        '">Cancel</button>' +
+        '</div>' +
+        '</div>' +
+        '</div>' +
+        '</div>';
+    });
+    html += '</div>';
+    if (!ctx.sections.length) html += '<div class="stu-empty">This class has no competencies yet.</div>';
+    return html;
+  }
+
+  /* ── Learner Profile tab ────────────────────────────────── */
+  function _profileTabHtml(ctx) {
+    var cid = ctx.cid;
+    var first = displayNameFirst(ctx.student);
+    var desc = (typeof ReportBlocks !== 'undefined' && ReportBlocks.OBS_DESCRIPTORS) || {};
+    var groups = [
+      { name: 'Learning Dispositions', sub: 'How ' + first + ' learns', dims: LEARNING_DIMS },
+      { name: 'Relational and Identity', sub: 'Who ' + first + ' is with others', dims: RELATIONAL_DIMS },
+    ];
+    var html =
+      '<div class="stu-panel-note">From the tags on ' +
+      esc(first) +
+      '’s ' +
+      _plural(ctx.obs.length, 'observation', 'observations') +
+      (ctx.term ? ' this term' : '') +
+      '. Each dot is one observation.</div><div class="stu-profile-grid">';
+    groups.forEach(function (g) {
+      html +=
+        '<div class="stu-profile-group"><h3>' + esc(g.name) + '</h3><div class="stu-sub">' + esc(g.sub) + '</div>';
+      g.dims.forEach(function (d) {
+        var tagged = ctx.obs.filter(function (o) {
+          return (o.dims || []).indexOf(d) >= 0;
+        });
+        var latest = tagged[0];
+        var dots = '';
+        for (var i = 0; i < Math.min(tagged.length, 5); i++) dots += '<span class="stu-dot on"></span>';
+        if (!tagged.length) dots = '<span class="stu-dot"></span>';
+        html +=
+          '<div class="stu-dim' +
+          (tagged.length ? '' : ' unseen') +
+          '">' +
+          '<div class="stu-dim-text"><strong>' +
+          esc(OBS_LABELS[d]) +
+          '</strong>' +
+          (desc[d] ? '<span class="stu-sub">' + esc(desc[d].desc) + '</span>' : '') +
+          '<span class="stu-dim-latest">' +
+          (latest
+            ? 'Latest: ' + esc(_shortDay(_obDay(latest))) + ', ' + esc(String(latest.text || '').split('\n')[0])
+            : 'Not seen yet') +
+          '</span></div>' +
+          '<span class="stu-dots" aria-label="' +
+          _plural(tagged.length, 'observation', 'observations') +
+          '">' +
+          dots +
+          (tagged.length > 5 ? '<span class="stu-sub">' + tagged.length + '</span>' : '') +
+          '</span></div>';
+      });
+      html += '</div>';
+    });
+    html += '</div>';
+
+    // Core competencies tagged on the student's scored assessments.
+    var tally = {};
+    CORE_COMPETENCIES.forEach(function (cc) {
+      tally[cc.id] = 0;
+    });
+    ctx.assessments.forEach(function (a) {
+      if (!(a.coreCompetencyIds && a.coreCompetencyIds.length)) return;
+      var hasScore = ctx.allScores.some(function (s) {
+        return s.assessmentId === a.id && s.score > 0;
+      });
+      if (!hasScore) return;
+      a.coreCompetencyIds.forEach(function (id) {
+        if (tally[id] !== undefined) tally[id]++;
+      });
+    });
+    var max = Math.max(1, Math.max.apply(null, Object.values(tally)));
+    var byGroup = {};
+    CORE_COMPETENCIES.forEach(function (cc) {
+      (byGroup[cc.group] = byGroup[cc.group] || []).push(cc);
+    });
+    html +=
+      '<div class="stu-core-head"><h3>Core Competencies</h3><span class="stu-sub">How often each was tagged on ' +
+      esc(first) +
+      '’s scored assessments' +
+      (ctx.term ? ' this term' : '') +
+      '.</span></div><div class="stu-core-grid">';
+    Object.keys(byGroup).forEach(function (group) {
+      var ccs = byGroup[group];
+      html +=
+        '<div class="stu-core-group" style="--cc:' +
+        ccs[0].color +
+        '"><div class="stu-core-name" style="color:' +
+        tintText(ccs[0].color) +
+        '">' +
+        esc(group) +
+        '</div>';
+      ccs.forEach(function (cc) {
+        var n = tally[cc.id];
+        html +=
+          '<div class="stu-core-row' +
+          (n ? '' : ' unseen') +
+          '"><span>' +
+          esc(cc.label) +
+          '</span><strong>' +
+          n +
+          '</strong><span class="stu-core-track"><span class="stu-core-fill" style="width:' +
+          (n ? Math.max(6, Math.round((n / max) * 100)) : 0) +
+          '%;background:' +
+          cc.color +
+          '"></span></span></div>';
+      });
+      html += '</div>';
+    });
+    html += '</div>';
+    return html;
+  }
+
+  function setTab(id) {
+    if (
+      !TABS.some(function (t) {
+        return t.id === id;
+      })
+    )
+      return;
+    _tab = id;
+    render();
+    var btn = document.getElementById('stu-tab-' + id);
+    if (btn) btn.focus();
+  }
+
   /* ── Main render ────────────────────────────────────────── */
   function render() {
     var cid = activeCourse;
@@ -426,30 +1110,12 @@ window.PageStudent = (function () {
     // Every grade on this page follows the class's chosen reporting term.
     if (typeof activateSavedTerm === 'function') activateSavedTerm(cid);
     var sections = getSections(cid);
-    var allTags = getAllTags(cid);
     var assessments = getAssessments(cid);
     var assessMap = {};
     assessments.forEach(function (a) {
       assessMap[a.id] = a;
     });
-    var overall = getOverallProficiency(cid, studentId);
-    var overallRounded = Math.round(overall);
-    var profColor = PROF_COLORS[overallRounded] || PROF_COLORS[0];
-
-    // Completion stats
-    var coveredTags = allTags.filter(function (t) {
-      var sc = getTagScores(cid, studentId, t.id);
-      return sc.some(function (s) {
-        return s.score > 0;
-      });
-    }).length;
-    var scoredAssessments = new Set();
     var allScores = getScores(cid)[studentId] || [];
-    allScores.forEach(function (s) {
-      if (s.score > 0) scoredAssessments.add(s.assessmentId);
-    });
-    var completionPct = getCompletionPct(cid, studentId);
-
     var statuses = getAssignmentStatuses(cid);
 
     // ── Toolbar ──
@@ -466,782 +1132,39 @@ window.PageStudent = (function () {
     html += renderStudentHeader(cid, studentId, {
       buttonLabel: 'Term Questionnaire',
       buttonHref: '#/reports?course=' + cid + '&tab=questionnaire&student=' + studentId,
+      hideCounts: true,
     });
 
-    var obs = getStudentQuickObs(cid, studentId);
-    var att = student.attendance || [];
-
-    // ── Stats bar ──
-    html += '<div class="student-stats-bar">';
-    html +=
-      '<div class="completion-card">' +
-      completionRing(completionPct, profColor) +
-      '<div class="completion-stats">' +
-      '<div class="completion-stat"><strong>' +
-      scoredAssessments.size +
-      '/' +
-      assessments.length +
-      '</strong> Assessed</div>' +
-      '<div class="completion-stat"><strong>' +
-      coveredTags +
-      '/' +
-      allTags.length +
-      '</strong> Tags Covered</div>' +
-      '</div>' +
-      '</div>';
-    var _stGrouped = getGroupedSections(cid);
-    var _renderSecMini = function (sec) {
-      var sp = getSectionProficiency(cid, studentId, sec.id);
-      var isActive = activeSectionFilters.has(sec.id);
-      var isDimmed = activeSectionFilters.size > 0 && !isActive;
-      return (
-        '<div class="section-mini-card' +
-        (isActive ? ' active-filter' : '') +
-        (isDimmed ? ' dimmed' : '') +
-        '" data-action="toggleSectionFilter" data-secid="' +
-        sec.id +
-        '">' +
-        '<div class="section-mini-stripe" style="background:' +
-        sec.color +
-        '"></div>' +
-        '<div class="section-mini-val" style="color:' +
-        (sp > 0 ? sec.color : 'var(--text-3)') +
-        '">' +
-        formatLevel(cid, sp) +
-        '</div>' +
-        '<div class="section-mini-label">' +
-        esc(sec.name) +
-        '</div>' +
-        '</div>'
-      );
+    // ── Tabs ──
+    // Every count and list below follows the class's chosen reporting term.
+    var term = typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
+    var termAssessments = assessments.filter(function (a) {
+      return assessmentInActiveTerm(cid, a);
+    });
+    var ctx = {
+      cid: cid,
+      student: student,
+      sections: sections,
+      assessments: termAssessments,
+      assessMap: assessMap,
+      allScores: allScores,
+      statuses: statuses,
+      term: term,
+      obs: getStudentQuickObs(cid, studentId).filter(function (o) {
+        return CompetencyEvidence._helpers.obsInTerm(o, term);
+      }),
+      cells: termAssessments.map(function (a) {
+        return { a: a, cell: assessmentCellValue(cid, studentId, a) };
+      }),
     };
-    if (
-      _stGrouped.groups.some(function (g) {
-        return g.sections.length > 0;
-      })
-    ) {
-      // Group-aware: one card per group (averaged) + accordion + ungrouped
-      _stGrouped.groups.forEach(function (gi) {
-        if (gi.sections.length === 0) return;
-        var gp = getGroupProficiency(cid, studentId, gi.group.id);
-        var isExpanded = _expandedGroups.has(gi.group.id);
-        var anyActive = gi.sections.some(function (s) {
-          return activeSectionFilters.has(s.id);
-        });
-        var isDimmed = activeSectionFilters.size > 0 && !anyActive;
-        html +=
-          '<div class="section-mini-card' +
-          (anyActive ? ' active-filter' : '') +
-          (isDimmed ? ' dimmed' : '') +
-          '" data-action="toggleGroupExpand" data-groupid="' +
-          gi.group.id +
-          '">' +
-          '<div class="section-mini-stripe" style="background:' +
-          gi.group.color +
-          '"></div>' +
-          '<div class="section-mini-val" style="color:' +
-          (gp > 0 ? gi.group.color : 'var(--text-3)') +
-          '">' +
-          formatLevel(cid, gp) +
-          '</div>' +
-          '<div class="section-mini-label">' +
-          esc(gi.group.name) +
-          '</div>' +
-          '</div>';
-        // Accordion: show individual sections when expanded
-        if (isExpanded) {
-          html += '<div class="stu-group-accordion">';
-          gi.sections.forEach(function (sec) {
-            html += _renderSecMini(sec);
-          });
-          html += '</div>';
-        }
-      });
-      // Ungrouped sections as individual cards
-      _stGrouped.ungrouped.forEach(function (sec) {
-        html += _renderSecMini(sec);
-      });
-    } else {
-      // No groups — flat section cards
-      sections.forEach(function (sec) {
-        html += _renderSecMini(sec);
-      });
-    }
-    // How the levels above are worked out (the class's setting).
-    html +=
-      '<div class="student-calc-method" title="How each competency level is worked out from the scores. Change it in Class Management.">Competency levels: ' +
-      esc(describeCalcMethod(cid)) +
-      '</div>';
+    html += _tabBarHtml(_tabSummaries(ctx));
+    html += '<div class="stu-panel" id="stu-panel" role="tabpanel" aria-labelledby="stu-tab-' + _tab + '">';
+    if (_tab === 'assess') html += _assessTabHtml(ctx);
+    else if (_tab === 'evidence') html += Evidence.panelHtml();
+    else if (_tab === 'goals') html += _goalsTabHtml(ctx);
+    else if (_tab === 'profile') html += _profileTabHtml(ctx);
+    else html += _compsTabHtml(ctx);
     html += '</div>';
-
-    // ── Assessment Grades Table ──
-    var sortedAssessments = assessments.slice().sort(function (a, b) {
-      return (b.date || '').localeCompare(a.date || '');
-    });
-
-    if (activeSectionFilters.size > 0) {
-      var filterTagIds = new Set();
-      sections.forEach(function (sec) {
-        if (activeSectionFilters.has(sec.id)) {
-          sec.tags.forEach(function (t) {
-            filterTagIds.add(t.id);
-          });
-        }
-      });
-      sortedAssessments = sortedAssessments.filter(function (a) {
-        return (a.tagIds || []).some(function (tid) {
-          return filterTagIds.has(tid);
-        });
-      });
-    }
-
-    html +=
-      '<div class="grades-section">' +
-      '<div class="grades-header">' +
-      '<div class="insight-title" style="margin-bottom:0">Assessment Grades' +
-      (activeSectionFilters.size > 0
-        ? ' <span style="font-family:var(--font-base);font-size:0.75rem;font-weight:500;color:var(--text-3);text-transform:none;letter-spacing:0">(filtered — <button type="button" data-action="clearSectionFilters" style="font:inherit;color:var(--link);text-decoration:none;background:none;border:0;padding:0;cursor:pointer">show all</button>)</span>'
-        : '') +
-      '</div>' +
-      '<div class="grades-legend">' +
-      '<span class="grades-legend-item"><span class="grades-legend-dot" style="background:' +
-      PROF_COLORS[4] +
-      '"></span>Ext</span>' +
-      '<span class="grades-legend-item"><span class="grades-legend-dot" style="background:' +
-      PROF_COLORS[3] +
-      '"></span>Pro</span>' +
-      '<span class="grades-legend-item"><span class="grades-legend-dot" style="background:' +
-      PROF_COLORS[2] +
-      '"></span>Dev</span>' +
-      '<span class="grades-legend-item"><span class="grades-legend-dot" style="background:' +
-      PROF_COLORS[1] +
-      '"></span>Emg</span>' +
-      '<span class="grades-legend-item"><span class="grades-legend-dot" style="background:var(--surface-2);border:1px solid var(--border)"></span>—</span>' +
-      '</div>' +
-      '</div>' +
-      '<div class="grades-table-wrap' +
-      (sortedAssessments.length > 8 ? ' collapsed' : '') +
-      '" id="grades-table-wrap">' +
-      '<table class="grades-table">' +
-      '<thead><tr>' +
-      '<th class="gt-col-status"></th>' +
-      '<th class="gt-col-title">Assignment</th>' +
-      '<th class="gt-col-date">Date</th>' +
-      '<th class="gt-col-type">Category</th>';
-
-    var allAssessTagIds = [];
-    sortedAssessments.forEach(function (a) {
-      (a.tagIds || []).forEach(function (tid) {
-        if (!allAssessTagIds.includes(tid)) allAssessTagIds.push(tid);
-      });
-    });
-    var tagColGroups = [];
-    sections.forEach(function (sec) {
-      var secTags = sec.tags.filter(function (t) {
-        return allAssessTagIds.includes(t.id);
-      });
-      if (secTags.length > 0) tagColGroups.push({ sec: sec, tags: secTags });
-    });
-
-    tagColGroups.forEach(function (g) {
-      var tag = g.tags[0];
-      if (tag)
-        html +=
-          '<th class="gt-col-score" style="color:' +
-          tintText(g.sec.color) +
-          '" title="' +
-          esc(tag.text || tag.label) +
-          '">' +
-          esc(tag.code || tag.shortName || '') +
-          '</th>';
-    });
-    html += '<th class="gt-col-avg">Score</th></tr></thead><tbody>';
-
-    sortedAssessments.forEach(function (assess) {
-      var assessScores = allScores.filter(function (s) {
-        return s.assessmentId === assess.id;
-      });
-      var scoredCount = assessScores.filter(function (s) {
-        return s.score > 0;
-      }).length;
-      var totalTags = scoreTagIds(assess, cid).length;
-      var allScored = totalTags > 0 && scoredCount >= totalTags;
-      var noneScored = scoredCount === 0;
-      var isLate = assess.dueDate && new Date(assess.dueDate) < new Date() && noneScored;
-
-      var statusColor = isLate
-        ? 'var(--priority)'
-        : noneScored
-          ? 'var(--text-3)'
-          : allScored
-            ? 'var(--score-3)'
-            : '#e65100';
-      var statusIcon = isLate ? '\u26A0\uFE0E' : noneScored ? '○' : allScored ? '●' : '◐';
-      var statusTitle = isLate
-        ? 'Past due — not scored'
-        : noneScored
-          ? 'Not scored'
-          : allScored
-            ? 'Complete'
-            : scoredCount + '/' + totalTags + ' scored';
-
-      // The row's score as the gradebook shows it: points as points, a
-      // level with its + or −, rubric work at its weights.
-      var cell = assessmentCellValue(cid, studentId, assess);
-      var isPoints = isPointsScored(assess) && !isCompletionScored(assess);
-      var maxPoints = assess.maxPoints || 100;
-
-      var mod = assess.moduleId ? getModuleById(cid, assess.moduleId) : null;
-      var assessStatus = statuses[studentId + ':' + assess.id];
-
-      html +=
-        '<tr class="gt-row' +
-        (noneScored ? ' gt-row-empty' : '') +
-        (assessStatus ? ' gt-row-status' : '') +
-        '">' +
-        '<td class="gt-cell-status" title="' +
-        statusTitle +
-        '"><span style="color:' +
-        statusColor +
-        '">' +
-        statusIcon +
-        '</span></td>' +
-        '<td class="gt-cell-title">' +
-        '<a class="gt-title-text" role="link" tabindex="0" data-href="#/assignments?course=' +
-        cid +
-        '&open=' +
-        assess.id +
-        '&student=' +
-        studentId +
-        '" title="Open in Assignments">' +
-        esc(assess.title) +
-        '</a>' +
-        (mod
-          ? '<span class="gt-module-dot" style="background:' +
-            cssColor(mod.color) +
-            '" title="' +
-            esc(mod.name) +
-            '"></span>'
-          : '') +
-        (assessStatus === 'NS'
-          ? '<span class="gt-status-tag gt-tag-ns">NS</span>'
-          : assessStatus === 'EXC'
-            ? '<span class="gt-status-tag gt-tag-exc">EXC</span>'
-            : assessStatus === 'LATE'
-              ? '<span class="gt-status-tag gt-tag-late">LATE</span>'
-              : '') +
-        '</td>' +
-        '<td class="gt-cell-date">' +
-        formatDate(assess.date) +
-        '</td>' +
-        '<td class="gt-cell-type">' +
-        _assessmentCategoryBadge(cid, assess) +
-        '</td>';
-
-      tagColGroups.forEach(function (g) {
-        var tag = g.tags[0];
-        if (!tag) return;
-        var included = (assess.tagIds || []).includes(tag.id);
-        if (!included) {
-          html += '<td class="gt-cell-score gt-cell-na"></td>';
-        } else {
-          var entry = assessScores.find(function (s) {
-            return s.tagId === tag.id;
-          });
-          if (entry && isScoreEntered(assess, entry)) {
-            // Points count toward the competency as the level they convert
-            // to; Complete/Incomplete shows its mark.
-            var level, pipText, pipTitle;
-            if (isCompletionScored(assess)) {
-              level = 0;
-              pipText = entry.score > 0 ? '✓' : '✗';
-              pipTitle = entry.score > 0 ? 'Complete' : 'Incomplete';
-            } else if (isPoints) {
-              level = pointsToProf(entry.score, maxPoints, getGradingScale(cid));
-              pipText = String(level);
-              pipTitle =
-                formatPoints(entry.score) +
-                ' of ' +
-                formatPoints(maxPoints) +
-                ' points (' +
-                formatPointsPercent(entry.score, maxPoints) +
-                '), counted as ' +
-                level;
-            } else {
-              level = entry.score;
-              pipText = formatScoreLevel(entry.score, entry.mod);
-              pipTitle = '';
-            }
-            html +=
-              '<td class="gt-cell-score"><span class="gt-score-pip' +
-              (PROF_COLORS[level] ? '" style="background:' + PROF_COLORS[level] : ' gt-score-pip-plain') +
-              '"' +
-              (pipTitle ? ' title="' + esc(pipTitle) + '"' : '') +
-              '>' +
-              esc(pipText) +
-              '</span></td>';
-          } else {
-            html += '<td class="gt-cell-score"><span class="gt-score-empty">—</span></td>';
-          }
-        }
-      });
-
-      var cellText =
-        cell.kind === 'points'
-          ? formatPoints(cell.value) +
-            '/' +
-            formatPoints(maxPoints) +
-            ' · ' +
-            formatPointsPercent(cell.value, maxPoints)
-          : cell.text;
-      html +=
-        '<td class="gt-cell-avg">' +
-        (cell.level > 0
-          ? '<span style="color:' + PROF_COLORS[cell.level] + ';font-weight:700">' + esc(cellText) + '</span>'
-          : '<span style="color:var(--text-3)">' + esc(cellText) + '</span>') +
-        '</td>';
-      html += '</tr>';
-    });
-
-    html += '</tbody></table></div>';
-    if (sortedAssessments.length > 8) {
-      html +=
-        '<div style="text-align:center"><button class="grades-toggle-btn" data-action="toggleGradesView">' +
-        '<span id="grades-toggle-text">Show All ' +
-        sortedAssessments.length +
-        ' Assignments</span>' +
-        '<span id="grades-toggle-arrow">▼</span>' +
-        '</button></div>';
-    }
-
-    if (scoredAssessments.size === 0) {
-      html +=
-        '<div class="empty-state"><div class="empty-state-title">No scores yet</div><div class="empty-state-text">Grade assignments in the Assignments tab to see results here.</div></div>';
-    }
-
-    html += '</div>';
-
-    // ── Section cards grid ──
-    var goals = getGoals(cid);
-    var reflections = getReflections(cid);
-    var studentGoals = goals[studentId] || {};
-    var studentReflections = reflections[studentId] || {};
-
-    html += '<div class="dash-grid">';
-    sections.forEach(function (sec) {
-      var sp = getSectionProficiency(cid, studentId, sec.id);
-      var spRounded = Math.round(sp);
-      var subj = getSubjects(cid).find(function (su) {
-        return su.id === sec.subject;
-      });
-      var growthData = getSectionGrowthData(cid, studentId, sec.id);
-      var override = getSectionOverride(cid, studentId, sec.id);
-      var rawProf = getSectionProficiencyRaw(cid, studentId, sec.id);
-
-      html +=
-        '<div class="dash-section">' +
-        '<div class="dash-section-stripe" style="background:' +
-        sec.color +
-        '"></div>' +
-        '<div class="dash-section-header">' +
-        '<div>' +
-        '<div class="dash-section-title">' +
-        esc(sec.name) +
-        '</div>' +
-        (subj ? '<div class="dash-section-subject">' + esc(subj.name) + '</div>' : '') +
-        (override ? '<div class="override-label">Overridden</div>' : '') +
-        '</div>' +
-        profLabelBadge(sp) +
-        '<button class="override-btn' +
-        (override ? ' active' : '') +
-        '" data-action="toggleOverridePanel" data-secid="' +
-        sec.id +
-        '" data-stop-prop="true" title="' +
-        (override ? 'Edit override' : 'Override proficiency') +
-        '">' +
-        '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 1.5l3 3L5 14H2v-3L11.5 1.5z"/></svg>' +
-        '</button>' +
-        '</div>' +
-        '<div class="override-panel" id="override-panel-' +
-        sec.id +
-        '" style="display:none"></div>';
-
-      if (growthData.length > 0) {
-        html +=
-          '<div style="margin-bottom:8px;">' +
-          '<span style="font-size:0.75rem;color:var(--text-3);margin-right:6px;">Growth</span>' +
-          renderGrowthSparkline(growthData) +
-          '</div>';
-      }
-
-      var tag = sec.tags[0];
-      if (tag) {
-        var tp = getTagProficiency(cid, studentId, tag.id);
-        var drawerId = 'ced-' + sec.id;
-        var tagOpen = _openTags.has(tag.id);
-        html +=
-          '<button type="button" class="dash-tag-row' +
-          (tagOpen ? ' open' : '') +
-          '" data-action="toggleTag" data-tagid="' +
-          esc(tag.id) +
-          '" aria-expanded="' +
-          tagOpen +
-          '" aria-controls="' +
-          esc(drawerId) +
-          '"><span class="dash-tag-inner">' +
-          profLabelBadge(tp) +
-          '<span class="dash-tag-label">' +
-          esc(tag.label) +
-          '</span>' +
-          '<span class="dash-tag-bar">' +
-          profBar(tp, 4, sec.color) +
-          '</span>' +
-          '<span class="dash-tag-evidence">' +
-          esc(CompetencyEvidence.rowCount(cid, studentId, tag.id)) +
-          '</span>' +
-          '<span class="dash-tag-chevron" aria-hidden="true">&#9654;</span>' +
-          '</span></button>' +
-          CompetencyEvidence.drawerHtml(cid, studentId, sec, tag, drawerId);
-      }
-
-      // Goal section
-      var goalText = studentGoals[sec.id] || '';
-      html +=
-        '<div class="section-goal" id="goal-' +
-        sec.id +
-        '">' +
-        '<div class="section-goal-label">Goal <button class="edit-btn-inline" data-action="editGoal" data-secid="' +
-        sec.id +
-        '">✎ Edit</button></div>' +
-        '<div class="section-goal-text" id="goal-text-' +
-        sec.id +
-        '">' +
-        (goalText ? esc(goalText) : '') +
-        '</div>' +
-        '<div class="inline-edit-area" id="goal-edit-' +
-        sec.id +
-        '" style="display:none">' +
-        '<textarea id="goal-input-' +
-        sec.id +
-        '" placeholder="Set a learning goal for this section…">' +
-        esc(goalText) +
-        '</textarea>' +
-        '<div class="inline-edit-actions">' +
-        '<button class="btn btn-primary" data-action="saveGoalField" data-secid="' +
-        sec.id +
-        '">Save</button>' +
-        '<button class="btn" data-action="cancelGoalEdit" data-secid="' +
-        sec.id +
-        '">Cancel</button>' +
-        '</div>' +
-        '</div>' +
-        '</div>';
-
-      // Reflection section
-      var refl = studentReflections[sec.id] || {};
-      var confLabel = refl.confidence ? CONFIDENCE_LABELS[refl.confidence] || '' : '';
-      var confColor = refl.confidence ? CONFIDENCE_COLORS[refl.confidence] || '#bbb' : '';
-      html +=
-        '<div class="section-reflection" id="refl-' +
-        sec.id +
-        '">' +
-        '<div class="section-reflection-label">Self-Reflection' +
-        (confLabel
-          ? ' <span class="confidence-badge" style="background:' + confColor + '">' + confLabel + '</span>'
-          : '') +
-        ' <button class="edit-btn-inline" data-action="editReflection" data-secid="' +
-        sec.id +
-        '">✎ Edit</button>' +
-        '</div>' +
-        '<div class="section-reflection-text" id="refl-text-' +
-        sec.id +
-        '">' +
-        (refl.text ? esc(refl.text) : '') +
-        '</div>' +
-        (refl.date
-          ? '<div style="font-size:0.75rem;color:var(--text-3);margin-top:2px;">' + formatDate(refl.date) + '</div>'
-          : '') +
-        '<div class="inline-edit-area" id="refl-edit-' +
-        sec.id +
-        '" style="display:none">' +
-        '<select id="refl-conf-' +
-        sec.id +
-        '">' +
-        '<option value="">Confidence level…</option>' +
-        '<option value="1"' +
-        (refl.confidence === 1 ? ' selected' : '') +
-        '>Beginning</option>' +
-        '<option value="2"' +
-        (refl.confidence === 2 ? ' selected' : '') +
-        '>Growing</option>' +
-        '<option value="3"' +
-        (refl.confidence === 3 ? ' selected' : '') +
-        '>Confident</option>' +
-        '<option value="4"' +
-        (refl.confidence === 4 ? ' selected' : '') +
-        '>Leading</option>' +
-        '</select>' +
-        '<textarea id="refl-input-' +
-        sec.id +
-        '" placeholder="Student\'s own words about their learning…">' +
-        esc(refl.text || '') +
-        '</textarea>' +
-        '<div class="inline-edit-actions">' +
-        '<button class="btn btn-primary" data-action="saveReflField" data-secid="' +
-        sec.id +
-        '">Save</button>' +
-        '<button class="btn" data-action="cancelReflEdit" data-secid="' +
-        sec.id +
-        '">Cancel</button>' +
-        '</div>' +
-        '</div>' +
-        '</div>';
-
-      html += '</div>';
-    });
-    html += '</div>';
-
-    // ── Insights grid ──
-    // (Growth Profile, Needs Attention), then the Evidence panel
-    // This is large but identical to student.html render logic — included inline
-    html += '<div class="insights-grid">';
-
-    // 1. Growth Profile
-    html += '<div class="insight-card"><div class="insight-title">Growth Profile</div>';
-    var gpSections = getSections(cid);
-    gpSections.forEach(function (sec) {
-      var prof = getSectionProficiency(cid, studentId, sec.id);
-      var trend = getSectionTrend(cid, studentId, sec.id);
-      var pct = prof > 0 ? (prof / 4) * 100 : 0;
-      var color = prof > 0 ? PROF_COLORS[Math.round(prof)] : 'var(--text-3)';
-      var tIcon = trend === 'up' ? '↑' : trend === 'down' ? '↓' : '';
-      var tColor = trend === 'up' ? 'var(--score-3)' : trend === 'down' ? 'var(--danger)' : '';
-      var shortLabel = sec.name.length > 14 ? sec.name.slice(0, 13) + '…' : sec.name;
-      html +=
-        '<div class="gp-section-row">' +
-        '<span class="gp-section-label" title="' +
-        esc(sec.name) +
-        '">' +
-        esc(shortLabel) +
-        '</span>' +
-        '<div class="gp-section-bar-track"><div class="gp-section-bar-fill" style="width:' +
-        pct +
-        '%;background:' +
-        color +
-        '"></div></div>' +
-        '<span class="gp-section-val" style="color:' +
-        color +
-        '">' +
-        formatLevel(cid, prof) +
-        '</span>' +
-        '<span class="gp-section-trend" style="color:' +
-        tColor +
-        '">' +
-        tIcon +
-        '</span>' +
-        '</div>';
-    });
-    html += '<div class="gp-divider"></div>';
-    var gpObs = getStudentQuickObs(cid, studentId);
-    var obsDims = {};
-    gpObs.forEach(function (o) {
-      (o.dims || []).forEach(function (d) {
-        obsDims[d] = (obsDims[d] || 0) + 1;
-      });
-    });
-    var gpAllDims = OBS_DIMS.map(function (d) {
-      return { key: d, label: OBS_SHORT[d] };
-    });
-    html += '<div class="gp-dims">';
-    gpAllDims.forEach(function (d) {
-      var count = obsDims[d.key] || 0;
-      html +=
-        '<span class="gp-dim-pip ' +
-        (count > 0 ? 'active' : 'inactive') +
-        '">' +
-        d.label +
-        (count > 0 ? ' ' + count : '') +
-        '</span>';
-    });
-    html += '</div>';
-    // Observations by type, as text pills.
-    if (gpObs.length > 0) {
-      html +=
-        '<div class="gp-obs-stat">' +
-        Object.keys(OBS_SENTIMENTS)
-          .map(function (key) {
-            var n = gpObs.filter(function (o) {
-              return o.sentiment === key;
-            }).length;
-            return (
-              '<span class="obs-pill obs-pill-type' +
-              (n ? '' : ' gp-obs-zero') +
-              '" data-sentiment="' +
-              key +
-              '">' +
-              esc(OBS_SENTIMENTS[key].label) +
-              ' ' +
-              n +
-              '</span>'
-            );
-          })
-          .join('') +
-        '</div>';
-    } else {
-      html += '<div class="gp-obs-stat">No observations yet</div>';
-    }
-    html += '<div class="gp-divider"></div>';
-    var gpCompPct = getCompletionPct(cid, studentId);
-    var gpAllTags = getAllTags(cid);
-    var gpCoveredTags = gpAllTags.filter(function (t) {
-      var sc = getTagScores(cid, studentId, t.id);
-      return sc.some(function (s) {
-        return s.score > 0;
-      });
-    }).length;
-    html +=
-      '<div class="gp-coverage-row"><div class="gp-coverage-bar"><div class="gp-coverage-fill" style="width:' +
-      gpCompPct +
-      '%"></div></div><span class="gp-coverage-label">' +
-      gpCoveredTags +
-      '/' +
-      gpAllTags.length +
-      ' tags · ' +
-      gpCompPct +
-      '%</span></div>';
-    html += '</div>';
-
-    // 2. Needs Attention
-    html += '<div class="insight-card"><div class="insight-title">Needs Attention</div>';
-    var attentionItems = [];
-    sortedAssessments.forEach(function (assess) {
-      var aScores = allScores.filter(function (s) {
-        return s.assessmentId === assess.id && isScoreEntered(assess, s);
-      });
-      var totalT = scoreTagIds(assess, cid).length;
-      if (aScores.length === 0) attentionItems.push({ type: 'missing', assess: assess, detail: 'No scores entered' });
-      else if (aScores.length < totalT)
-        attentionItems.push({
-          type: 'partial',
-          assess: assess,
-          detail: aScores.length + '/' + totalT + ' tags scored',
-        });
-    });
-    sortedAssessments.forEach(function (assess) {
-      var aScores = allScores.filter(function (s) {
-        return s.assessmentId === assess.id && s.score > 0;
-      });
-      if (aScores.length === 0) return;
-      var avg =
-        aScores.reduce(function (sum, s) {
-          return sum + scoreModValue(s);
-        }, 0) / aScores.length;
-      var rubricAvg = getRubricAssessmentScore(cid, assess, aScores);
-      if (rubricAvg != null) avg = rubricAvg;
-      if (avg < 2)
-        attentionItems.push({
-          type: 'low',
-          assess: assess,
-          detail: 'Avg ' + formatLevel(cid, avg) + ' — needs support',
-        });
-    });
-    if (attentionItems.length === 0) {
-      html += '<div class="attention-empty">✓ All caught up — no issues flagged.</div>';
-    } else {
-      attentionItems.slice(0, 6).forEach(function (item) {
-        var icon = item.type === 'missing' ? '○' : item.type === 'partial' ? '◐' : '▼';
-        var iconBg = item.type === 'missing' ? 'var(--surface-2)' : item.type === 'partial' ? '#fff3e0' : '#fce4ec';
-        var iconColor = item.type === 'missing' ? 'var(--text-3)' : item.type === 'partial' ? '#e65100' : '#c62828';
-        html +=
-          '<div class="attention-item">' +
-          '<div class="attention-icon" style="background:' +
-          iconBg +
-          ';color:' +
-          iconColor +
-          '">' +
-          icon +
-          '</div>' +
-          '<div class="attention-info">' +
-          '<div class="attention-title">' +
-          esc(item.assess.title) +
-          '</div>' +
-          '<div class="attention-detail">' +
-          item.detail +
-          ' · ' +
-          formatDate(item.assess.date) +
-          '</div>' +
-          '</div>' +
-          '</div>';
-      });
-    }
-    html += '</div>';
-
-    html += '</div>'; // end insights-grid
-
-    // 3. Evidence: timeline, capture strip, tabs and cards
-    html += Evidence.panelHtml();
-
-    if (_profileData && _profileData.competency_tree) {
-      html += _renderCompetencyTree(_profileData.competency_tree);
-    }
-
-    // ── Core Competencies ──
-    var ccTally = {};
-    CORE_COMPETENCIES.forEach(function (cc) {
-      ccTally[cc.id] = 0;
-    });
-    assessments.forEach(function (assess) {
-      if (!(assess.coreCompetencyIds && assess.coreCompetencyIds.length > 0)) return;
-      var hasScore = allScores.some(function (s) {
-        return s.assessmentId === assess.id && s.score > 0;
-      });
-      if (!hasScore) return;
-      assess.coreCompetencyIds.forEach(function (ccId) {
-        if (ccTally[ccId] !== undefined) ccTally[ccId]++;
-      });
-    });
-    var maxCC = Math.max(1, Math.max.apply(null, Object.values(ccTally)));
-    var anyCC = Object.values(ccTally).some(function (v) {
-      return v > 0;
-    });
-
-    if (anyCC) {
-      html +=
-        '<div class="cc-profile"><div class="cc-profile-title">Core Competencies</div><div class="cc-profile-grid">';
-      var groups = {};
-      CORE_COMPETENCIES.forEach(function (cc) {
-        if (!groups[cc.group]) groups[cc.group] = [];
-        groups[cc.group].push(cc);
-      });
-      Object.entries(groups).forEach(function (entry) {
-        var group = entry[0],
-          ccs = entry[1];
-        html +=
-          '<div class="cc-group"><div class="cc-group-label" style="color:' +
-          tintText(ccs[0].color) +
-          '">' +
-          esc(group) +
-          '</div>';
-        ccs.forEach(function (cc) {
-          var count = ccTally[cc.id];
-          var pctV = Math.round((count / maxCC) * 100);
-          html +=
-            '<div class="cc-bar-row"><span class="cc-bar-label">' +
-            esc(cc.label) +
-            '</span><div class="cc-bar-track"><div class="cc-bar-fill" style="width:' +
-            (count > 0 ? Math.max(pctV, 6) : 0) +
-            '%;background:' +
-            cc.color +
-            '"></div></div><span class="cc-bar-count" style="color:' +
-            (count > 0 ? tintText(cc.color) : 'var(--text-3)') +
-            '">' +
-            count +
-            '</span></div>';
-        });
-        html += '</div>';
-      });
-      html += '</div></div>';
-    }
 
     html += '</div></div>'; // close padding wrapper + scroll wrapper
     var main = document.getElementById('main');
@@ -1262,20 +1185,12 @@ window.PageStudent = (function () {
       openEditStudent: function () {
         openEditStudent();
       },
-      toggleSectionFilter: function () {
-        toggleSectionFilter(el.dataset.secid);
+      stuTab: function () {
+        setTab(el.dataset.tab);
       },
-      toggleGroupExpand: function () {
-        toggleGroupExpand(el.dataset.groupid);
-      },
-      clearSectionFilters: function () {
-        e.preventDefault();
-        activeSectionFilters.clear();
-        _expandedGroups.clear();
+      stuAssessFilter: function () {
+        _assessFilter = el.dataset.filter || 'all';
         render();
-      },
-      toggleGradesView: function () {
-        toggleGradesView();
       },
       toggleOverridePanel: function () {
         toggleOverridePanel(el.dataset.secid);
@@ -1326,13 +1241,57 @@ window.PageStudent = (function () {
     }
   }
 
+  function _handleChange(e) {
+    var el = e.target;
+    if (el && el.dataset && el.dataset.actionChange === 'stuAssessCat') {
+      _assessCat = el.value || '';
+      render();
+    }
+  }
+
+  /* Arrow keys, Home and End move between the tabs. */
+  function _handleKeydown(e) {
+    var tab = e.target && e.target.closest && e.target.closest('.stu-tab');
+    if (!tab) return;
+    var ids = TABS.map(function (t) {
+      return t.id;
+    });
+    var i = ids.indexOf(tab.dataset.tab);
+    var next =
+      e.key === 'ArrowRight'
+        ? i + 1
+        : e.key === 'ArrowLeft'
+          ? i - 1
+          : e.key === 'Home'
+            ? 0
+            : e.key === 'End'
+              ? ids.length - 1
+              : null;
+    if (next == null) return;
+    e.preventDefault();
+    setTab(ids[(next + ids.length) % ids.length]);
+  }
+
+  /* A drawer's observation link opens it in the Evidence tab. */
+  function _handleJump(e) {
+    var el = e.target && e.target.closest && e.target.closest('[data-ced="jump"]');
+    if (!el) return;
+    var obId = el.getAttribute('data-obid');
+    _tab = 'evidence';
+    render();
+    Evidence.jumpTo(obId);
+  }
+
   /* ── init / destroy ─────────────────────────────────────── */
   function init(params) {
     activeCourse = params.course || getActiveCourse();
     setActiveCourse(activeCourse);
     studentId = params.id;
-    activeSectionFilters = new Set();
     _openTags = new Set();
+    _assessFilter = 'all';
+    _assessCat = '';
+    // A link to one observation opens the Evidence tab.
+    if (params.ob) _tab = 'evidence';
     _overrideSelectedLevel = 0;
 
     // Show sidebar with student roster
@@ -1350,6 +1309,9 @@ window.PageStudent = (function () {
 
     // Add delegated listeners
     _addDocListener('click', _handleClick);
+    _addDocListener('click', _handleJump);
+    _addDocListener('change', _handleChange);
+    _addDocListener('keydown', _handleKeydown);
 
     _profileData = null;
     render();

@@ -142,6 +142,7 @@ for (const scheme of ['light', 'dark']) {
     test("the student page's Evidence panel shows the Note block and the timeline key", async ({ page }) => {
       await enterDemo(page);
       await page.goto('/teacher/app.html#/student?id=st1&course=sci8');
+      await page.locator('#stu-tab-evidence').click();
       const panel = page.locator('#ev-panel');
       await expect(panel.locator('.ev-tl-key')).toHaveText([
         'Strength',
