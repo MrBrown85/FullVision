@@ -2921,8 +2921,15 @@ window.PageAssignments = (function () {
       edit: editRubricUI,
       newRubric: newRubricUI,
       remove: deleteRubricUI,
-      print: function (rid, aid) {
-        if (window.RubricPrint) RubricPrint.open(activeCourse, aid);
+      // Another class's rubric prints blank; this class's opens on its uses.
+      print: function (rid, cid) {
+        if (!window.RubricPrint) return;
+        var other = cid && cid !== activeCourse;
+        RubricPrint.open(other ? cid : activeCourse, null, {
+          rubricId: rid,
+          mode: other ? 'blank' : '',
+          blankOnly: other,
+        });
       },
       useInNew: function (rid) {
         showNewForm();

@@ -394,3 +394,38 @@ describe('Print Rubrics student name', () => {
     ).toBe('Bobby Smith');
   });
 });
+
+describe('Blank rubrics', () => {
+  it('draws a Name line and no levels, scores or feedback', () => {
+    const rubric = getRubricById(CID, RUBRIC);
+    const data = RubricPrint.blankSheetData(CID, rubric, null);
+    expect(data.blank).toBe(true);
+    expect(data.rows.every(r => r.level === 0)).toBe(true);
+    const html = RubricPrint.renderSheet(data, { include: { codes: true } });
+    expect(html).toContain('rubric-name-line');
+    expect(html).not.toContain('is-scored');
+    expect(html).not.toContain('rubric-feedback');
+  });
+
+  it('prints the number of copies asked for, at most 40', () => {
+    const base = { mode: 'blank', rubricId: RUBRIC, layout: 'half', include: { codes: true } };
+    const out = RubricPrint.renderPages(CID, null, Object.assign({ copies: 5 }, base));
+    expect(out).toMatchObject({ sheets: 5, pages: 3 });
+    expect(RubricPrint.renderPages(CID, null, Object.assign({ copies: 99 }, base)).sheets).toBe(RubricPrint.MAX_COPIES);
+    expect(RubricPrint.renderPages(CID, null, Object.assign({ copies: 0 }, base)).sheets).toBe(1);
+  });
+
+  it('uses the assessment for the title and date when there is one', () => {
+    const out = RubricPrint.renderPages(CID, AID, { mode: 'blank', copies: 1, layout: 'full', include: {} });
+    expect(out.html).toContain('Cell lab');
+    expect(out.html).not.toContain('Ada');
+  });
+
+  it('lists the assessments that use a rubric, newest first', () => {
+    saveAssessments(
+      CID,
+      getAssessments(CID).concat([{ id: 'later', title: 'Later lab', date: '2026-11-01', rubricId: RUBRIC }]),
+    );
+    expect(RubricPrint.usesOf(CID, RUBRIC).map(a => a.id)).toEqual(['later', AID]);
+  });
+});

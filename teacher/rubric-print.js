@@ -37,8 +37,10 @@
   var LAYOUTS = {
     full: {
       key: 'full',
-      label: 'Full page',
+      label: 'Full Page',
       help: '1 per page',
+      tile: '1 per Page',
+      tileHelp: 'Full page',
       orientation: 'portrait',
       margin: 0.25,
       cols: 1,
@@ -49,8 +51,10 @@
     },
     half: {
       key: 'half',
-      label: 'Half sheet',
+      label: 'Half Sheet',
       help: '2 per landscape page',
+      tile: '2 per Page',
+      tileHelp: 'Half sheets, landscape',
       orientation: 'landscape',
       margin: 0.25,
       cols: 2,
@@ -61,8 +65,10 @@
     },
     quarter: {
       key: 'quarter',
-      label: 'Quarter sheet',
+      label: 'Quarter Sheet',
       help: '4 per page',
+      tile: '4 per Page',
+      tileHelp: 'Quarter sheets',
       orientation: 'portrait',
       margin: 0.25,
       cols: 2,
@@ -84,7 +90,11 @@
     4: 'The student demonstrates a sophisticated understanding of the concepts and competencies relevant to the expected learning.',
   };
 
+  var MAX_COPIES = 40;
+
   var DEFAULT_OPTIONS = {
+    mode: 'completed', // completed | blank
+    copies: 1, // blank copies
     students: 'scored', // scored | all | pick
     picked: [],
     layout: 'full',
@@ -92,7 +102,8 @@
     include: { feedback: true, criterionComments: true, codes: true, overall: true },
   };
 
-  var _state = null; // { cid, aid, opts } while the dialog is open
+  // { cid, aid, rubricId, uses, opts, userLayout, trigger } while the dialog is open
+  var _state = null;
 
   /* ── Data ───────────────────────────────────────────────── */
 
@@ -289,6 +300,59 @@
     };
   }
 
+  /* A blank sheet: the rubric with no student, no levels marked and a Name
+     line to write on. `assessment` is optional; it adds the title and date. */
+  function blankSheetData(cid, rubric, assessment) {
+    if (!rubric) return null;
+    return {
+      cid: cid,
+      blank: true,
+      courseName: _courseName(cid),
+      assessment: assessment || null,
+      rubric: rubric,
+      student: null,
+      studentName: '',
+      date: assessment && assessment.date ? formatDate(assessment.date) : '',
+      status: '',
+      scored: false,
+      rows: (rubric.criteria || []).map(function (criterion) {
+        return {
+          criterion: criterion,
+          level: 0,
+          mod: 0,
+          mixed: false,
+          comment: '',
+          codes: _criterionCodes(cid, criterion, rubric.kind === 'tags'),
+        };
+      }),
+      overall: null,
+      feedback: '',
+    };
+  }
+
+  /* The assessments that use a rubric of the teacher's own, newest first. */
+  function usesOf(cid, rubricId) {
+    return (getAssessments(cid) || [])
+      .filter(function (a) {
+        return a && a.rubricId === rubricId;
+      })
+      .sort(function (a, b) {
+        return String(b.date || '').localeCompare(String(a.date || ''));
+      });
+  }
+
+  /* The rubric a print job draws: the assessment's, else the one named. */
+  function _jobRubric(cid, aid, opts) {
+    if (aid) return _rubric(cid, _assessment(cid, aid));
+    return opts && opts.rubricId ? getRubricById(cid, opts.rubricId) || null : null;
+  }
+
+  function _copies(n) {
+    n = Math.round(Number(n));
+    if (!(n >= 1)) return 1;
+    return Math.min(MAX_COPIES, n);
+  }
+
   /* The students to print, in roster order. */
   function selectStudents(cid, aid, opts) {
     var students = getStudents(cid);
@@ -341,8 +405,10 @@
     var levels = levelOrderFor(data.cid);
     var html = '<div class="rubric-sheet"><div class="rubric-sheet-inner">';
     html += '<div class="rubric-head"><div class="rubric-head-main">';
-    html += '<div class="rubric-student">' + _esc(data.studentName) + '</div>';
-    var meta = [data.courseName, data.assessment.title, data.date].filter(Boolean);
+    html += data.blank
+      ? '<div class="rubric-student rubric-name-line"><span class="rubric-label">Name</span><span class="rubric-name-rule"></span></div>'
+      : '<div class="rubric-student">' + _esc(data.studentName) + '</div>';
+    var meta = [data.courseName, data.assessment && data.assessment.title, data.date].filter(Boolean);
     html += '<div class="rubric-meta">' + meta.map(_esc).join(' · ') + '</div>';
     html += '</div>';
     if (include.overall && data.overall) {
@@ -416,6 +482,7 @@
   function renderPages(cid, aid, opts) {
     var layout = LAYOUTS[opts.layout] || LAYOUTS.full;
     var perPage = layout.cols * layout.rows;
+    if (opts.mode === 'blank') return _renderBlankPages(cid, aid, opts, layout, perPage);
     var students = selectStudents(cid, aid, opts);
     var html = '';
     for (var i = 0; i < students.length; i += perPage) {
@@ -431,6 +498,22 @@
       html += '</div>';
     }
     return { html: html, sheets: students.length, pages: Math.ceil(students.length / perPage) };
+  }
+
+  /* Blank copies of the rubric. Only competency codes can be added: there is
+     no student, level, comment or feedback to print. */
+  function _renderBlankPages(cid, aid, opts, layout, perPage) {
+    var data = blankSheetData(cid, _jobRubric(cid, aid, opts), aid ? _assessment(cid, aid) : null);
+    var count = data ? _copies(opts.copies) : 0;
+    var sheetOpts = { include: { codes: !!(opts.include && opts.include.codes) } };
+    var sheet = data ? renderSheet(data, sheetOpts) : '';
+    var html = '';
+    for (var i = 0; i < count; i += perPage) {
+      html += '<div class="rubric-page layout-' + layout.key + '" style="font-size:' + layout.fontPt + 'pt">';
+      for (var j = i; j < i + perPage; j++) html += j < count ? sheet : '<div class="rubric-sheet is-blank"></div>';
+      html += '</div>';
+    }
+    return { html: html, sheets: count, pages: Math.ceil(count / perPage) };
   }
 
   /* ── DOM: print root, measuring, printing ───────────────── */
@@ -552,6 +635,8 @@
       saved = null;
     }
     var opts = {
+      mode: DEFAULT_OPTIONS.mode,
+      copies: DEFAULT_OPTIONS.copies,
       students: DEFAULT_OPTIONS.students,
       picked: [],
       layout: DEFAULT_OPTIONS.layout,
@@ -610,60 +695,176 @@
     );
   }
 
-  function _dialogHtml(cid, aid, opts) {
-    var assessment = _assessment(cid, aid);
-    var rubric = _rubric(cid, assessment);
+  /* A choice drawn as a tile: a real radio, so arrows and Space work. */
+  function _tile(name, value, checked, title, help, drawing, disabled) {
+    return (
+      '<label class="rp-tile' +
+      (checked ? ' is-on' : '') +
+      (disabled ? ' is-disabled' : '') +
+      '"><input type="radio" name="' +
+      name +
+      '" value="' +
+      value +
+      '"' +
+      (checked ? ' checked' : '') +
+      (disabled ? ' disabled' : '') +
+      '>' +
+      (drawing || '') +
+      '<span class="rp-tile-title">' +
+      _esc(title) +
+      '</span><span class="rp-tile-help">' +
+      _esc(help) +
+      '</span></label>'
+    );
+  }
+
+  /* A small page with its sheets, for the Rubrics per Page tiles. */
+  function _pageDrawing(layout) {
+    var cells = '';
+    for (var i = 0; i < layout.cols * layout.rows; i++) cells += '<span></span>';
+    return (
+      '<span class="rp-page-icon is-' +
+      layout.orientation +
+      '" style="grid-template-columns:repeat(' +
+      layout.cols +
+      ',1fr);grid-template-rows:repeat(' +
+      layout.rows +
+      ',1fr)" aria-hidden="true">' +
+      cells +
+      '</span>'
+    );
+  }
+
+  /* A criterion with a competency code, so Competency Codes has something
+     to print. */
+  function _hasCodes(cid, rubric) {
+    if (!rubric || rubric.kind === 'general') return false;
+    return (rubric.criteria || []).some(function (c) {
+      return _criterionCodes(cid, c, rubric.kind === 'tags').length > 0;
+    });
+  }
+
+  function _dialogHtml() {
+    var cid = _state.cid;
+    var aid = _state.aid;
+    var opts = _state.opts;
+    var blank = opts.mode === 'blank';
+    var rubric = _jobRubric(cid, aid, opts);
     var students = getStudents(cid);
-    var scoredCount = students.filter(function (s) {
-      return isStudentScored(cid, aid, s.id);
-    }).length;
     var html = '<div class="confirm-card rubric-print-card">';
     html += '<div class="confirm-title" id="rp-title">Print Rubrics</div>';
     html +=
       '<div class="confirm-message">' +
-      _esc(assessment ? assessment.title : '') +
-      (rubric ? ' · ' + _esc(rubric.name) : '') +
+      _esc(rubric ? rubric.name : '') +
+      (rubric
+        ? ' · ' + _esc((rubric.criteria || []).length === 1 ? '1 Criterion' : rubric.criteria.length + ' Criteria')
+        : '') +
       '</div>';
-    html += '<div class="rp-groups">';
-    html += '<fieldset class="rp-group"><legend>Students</legend>';
-    html += _radio('rp-students', 'scored', opts.students === 'scored', 'All scored students', '(' + scoredCount + ')');
-    html += _radio('rp-students', 'all', opts.students === 'all', 'All students', '(' + students.length + ')');
-    html += _radio('rp-students', 'pick', opts.students === 'pick', 'Pick students');
-    // Always shown: ticking a name switches to Pick students.
-    html += '<div class="rp-pick">';
-    students.forEach(function (s) {
-      html +=
-        '<label class="rp-option rp-pick-option"><input type="checkbox" data-pick="' +
-        _esc(s.id) +
-        '"' +
-        (opts.picked.indexOf(s.id) >= 0 ? ' checked' : '') +
-        '><span>' +
-        _esc(displayName(s)) +
-        (isStudentScored(cid, aid, s.id) ? '' : ' <span class="rp-help">not scored</span>') +
-        '</span></label>';
-    });
+    html += '<div class="rp-body"><div class="rp-groups">';
+
+    html += '<fieldset class="rp-group"><legend>What to Print</legend><div class="rp-tiles">';
+    html += _tile(
+      'rp-mode',
+      'completed',
+      !blank,
+      'Completed Rubrics',
+      _state.uses.length ? 'One per student, with their scores' : 'No assessment uses this rubric yet',
+      '',
+      !_state.uses.length,
+    );
+    html += _tile('rp-mode', 'blank', blank, 'Blank Rubric', 'No names or scores, for handing out');
     html += '</div></fieldset>';
-    html += '<fieldset class="rp-group"><legend>Layout</legend>';
+
+    if (!blank && _state.uses.length > 1) {
+      html +=
+        '<label class="rp-group rp-field"><span class="rp-legend">Assessment</span><select class="rp-select" id="rp-assessment">' +
+        _state.uses
+          .map(function (a) {
+            return (
+              '<option value="' +
+              _esc(a.id) +
+              '"' +
+              (a.id === aid ? ' selected' : '') +
+              '>' +
+              _esc(a.title || 'Untitled') +
+              (a.date ? ' · ' + _esc(formatDate(a.date)) : '') +
+              '</option>'
+            );
+          })
+          .join('') +
+        '</select></label>';
+    }
+
+    if (blank) {
+      html +=
+        '<label class="rp-group rp-field"><span class="rp-legend">Copies</span><input type="number" class="rp-copies" id="rp-copies" min="1" max="' +
+        MAX_COPIES +
+        '" step="1" value="' +
+        _copies(opts.copies) +
+        '"></label>';
+    } else {
+      var scoredCount = students.filter(function (s) {
+        return isStudentScored(cid, aid, s.id);
+      }).length;
+      html += '<fieldset class="rp-group"><legend>Students</legend>';
+      html += _radio(
+        'rp-students',
+        'scored',
+        opts.students === 'scored',
+        'All Scored Students',
+        '(' + scoredCount + ')',
+      );
+      html += _radio('rp-students', 'all', opts.students === 'all', 'All Students', '(' + students.length + ')');
+      html += _radio('rp-students', 'pick', opts.students === 'pick', 'Pick Students');
+      // Always shown: ticking a name switches to Pick Students.
+      html += '<div class="rp-pick">';
+      students.forEach(function (s) {
+        html +=
+          '<label class="rp-option rp-pick-option"><input type="checkbox" data-pick="' +
+          _esc(s.id) +
+          '"' +
+          (opts.picked.indexOf(s.id) >= 0 ? ' checked' : '') +
+          '><span>' +
+          _esc(displayName(s)) +
+          (isStudentScored(cid, aid, s.id) ? '' : ' <span class="rp-help">not scored</span>') +
+          '</span></label>';
+      });
+      html += '</div></fieldset>';
+    }
+
+    html += '<fieldset class="rp-group"><legend>Rubrics per Page</legend><div class="rp-tiles is-three">';
     LAYOUT_ORDER.forEach(function (key) {
       var layout = LAYOUTS[key];
-      html += _radio('rp-layout', key, opts.layout === key, layout.label, layout.help);
+      html += _tile('rp-layout', key, opts.layout === key, layout.tile, layout.tileHelp, _pageDrawing(layout));
     });
-    html += '</fieldset>';
-    html += '<fieldset class="rp-group"><legend>Name</legend>';
-    html += _radio('rp-name', 'preferred', opts.nameStyle !== 'first', 'Preferred Name', '(first name if none)');
-    html += _radio('rp-name', 'first', opts.nameStyle === 'first', 'First Name');
-    html += '<div class="rp-help">The last name always follows.</div>';
-    html += '</fieldset>';
-    html += '<fieldset class="rp-group"><legend>Include</legend>';
-    html += _check('feedback', opts.include.feedback, 'Feedback comment');
-    // A Tag or General Rubric has no criterion comments; a General one no codes.
-    if (rubric && !rubric.kind)
-      html += _check('criterionComments', opts.include.criterionComments, 'Criterion comments');
-    if (!rubric || rubric.kind !== 'general') html += _check('codes', opts.include.codes, 'Competency codes');
-    html += _check('overall', opts.include.overall, 'Overall level');
-    html += '</fieldset>';
+    html += '</div></fieldset>';
+
+    if (!blank) {
+      html += '<fieldset class="rp-group"><legend>Name</legend>';
+      html += _radio('rp-name', 'preferred', opts.nameStyle !== 'first', 'Preferred Name', '(first name if none)');
+      html += _radio('rp-name', 'first', opts.nameStyle === 'first', 'First Name');
+      html += '<div class="rp-help">The last name always follows.</div>';
+      html += '</fieldset>';
+    }
+
+    var includes = '';
+    if (!blank) {
+      includes += _check('overall', opts.include.overall, 'Overall Level');
+      includes += _check('feedback', opts.include.feedback, 'Feedback Comment');
+      // A Tag or General Rubric has no criterion comments.
+      if (rubric && !rubric.kind)
+        includes += _check('criterionComments', opts.include.criterionComments, 'Criterion Comments');
+    }
+    if (_hasCodes(cid, rubric)) includes += _check('codes', opts.include.codes, 'Competency Codes');
+    if (includes) html += '<fieldset class="rp-group"><legend>Include</legend>' + includes + '</fieldset>';
     html += '</div>';
-    html += '<div class="rp-status" id="rp-status" aria-live="polite"></div>';
+
+    html +=
+      '<div class="rp-side"><div class="rp-legend">Preview</div>' +
+      '<div class="rp-preview" id="rp-preview" aria-hidden="true"></div>' +
+      '<div class="rp-preview-count" id="rp-preview-count"></div>' +
+      '<div class="rp-status" id="rp-status" aria-live="polite"></div></div>';
+    html += '</div>';
     html +=
       '<div class="confirm-actions"><button type="button" class="confirm-cancel" data-rp="cancel">Cancel</button>';
     html += '<button type="button" class="confirm-ok primary" data-rp="print">Print</button></div>';
@@ -671,11 +872,17 @@
     return html;
   }
 
-  function _statusText(out) {
-    if (!out.sheets) return 'No students selected.';
-    var sheets = out.sheets === 1 ? '1 sheet' : out.sheets + ' sheets';
+  function _statusText(out, blank) {
+    if (!out.sheets) return blank ? 'Nothing to print.' : 'No students selected.';
+    var sheets = blank
+      ? out.sheets === 1
+        ? '1 blank rubric'
+        : out.sheets + ' blank rubrics'
+      : out.sheets === 1
+        ? '1 rubric'
+        : out.sheets + ' rubrics';
     var pages = out.pages === 1 ? '1 page' : out.pages + ' pages';
-    var text = sheets + ' on ' + pages + '.';
+    var text = sheets + ' on ' + pages + '. Black and white, ready for the photocopier.';
     if (out.scale < 1) text += ' Text is reduced to ' + Math.round(out.scale * 100) + '% to fit.';
     if (out.overflowing) {
       text +=
@@ -686,16 +893,49 @@
     return text;
   }
 
+  /* Page 1 of the staged job, scaled into the preview box. */
+  function _drawPreview(out) {
+    var box = document.getElementById('rp-preview');
+    var count = document.getElementById('rp-preview-count');
+    if (!box) return;
+    box.innerHTML = '';
+    var page = document.querySelector('#' + ROOT_ID + ' .rubric-page');
+    if (count) count.textContent = out.pages ? 'Page 1 of ' + out.pages : '';
+    if (!page) return;
+    var w = page.offsetWidth;
+    var h = page.offsetHeight;
+    if (!w || !h) return;
+    var room = box.clientWidth - 24;
+    var roomH = 240;
+    var scale = Math.min(room / w, roomH / h);
+    var frame = document.createElement('div');
+    frame.className = 'rp-preview-frame';
+    frame.style.width = Math.round(w * scale) + 'px';
+    frame.style.height = Math.round(h * scale) + 'px';
+    var clone = page.cloneNode(true);
+    clone.style.width = w + 'px';
+    clone.style.height = h + 'px';
+    clone.style.transform = 'scale(' + scale + ')';
+    clone.style.transformOrigin = '0 0';
+    frame.appendChild(clone);
+    box.appendChild(frame);
+  }
+
   function _refreshStatus() {
     if (!_state) return;
+    var blank = _state.opts.mode === 'blank';
     var out = stage(_state.cid, _state.aid, _state.opts);
     var status = document.getElementById('rp-status');
     if (status) {
-      status.textContent = _statusText(out);
+      status.textContent = _statusText(out, blank);
       status.classList.toggle('is-warning', out.overflowing > 0);
     }
+    _drawPreview(out);
     var printBtn = document.querySelector('#' + OVERLAY_ID + ' [data-rp="print"]');
-    if (printBtn) printBtn.disabled = !out.sheets;
+    if (printBtn) {
+      printBtn.disabled = !out.sheets;
+      printBtn.textContent = !out.pages ? 'Print' : out.pages === 1 ? 'Print 1 Page' : 'Print ' + out.pages + ' Pages';
+    }
   }
 
   function _readOptionsFromDialog(overlay) {
@@ -706,17 +946,21 @@
     if (nameRadio) opts.nameStyle = nameRadio.value;
     var layoutRadio = overlay.querySelector('input[name="rp-layout"]:checked');
     if (layoutRadio && LAYOUTS[layoutRadio.value]) opts.layout = layoutRadio.value;
+    var copies = overlay.querySelector('#rp-copies');
+    if (copies) opts.copies = _copies(copies.value);
     overlay.querySelectorAll('input[data-include]').forEach(function (box) {
       opts.include[box.dataset.include] = !!box.checked;
     });
-    opts.picked = [];
-    overlay.querySelectorAll('input[data-pick]:checked').forEach(function (box) {
-      opts.picked.push(box.dataset.pick);
-    });
+    if (opts.mode !== 'blank') {
+      opts.picked = [];
+      overlay.querySelectorAll('input[data-pick]:checked').forEach(function (box) {
+        opts.picked.push(box.dataset.pick);
+      });
+    }
   }
 
-  /* A name ticked or unticked. From All or All scored it starts a new pick
-     of just that student; under Pick students it adds or removes one. The
+  /* A name ticked or unticked. From All or All Scored it starts a new pick
+     of just that student; under Pick Students it adds or removes one. The
      layout follows how many are picked (layoutForCount). */
   function _onPick(overlay, box) {
     var pickRadio = overlay.querySelector('input[name="rp-students"][value="pick"]');
@@ -732,36 +976,80 @@
     if (layoutRadio) layoutRadio.checked = true;
   }
 
-  /* Open the dialog. With `openOpts.studentId` (the Assignments page is
-     grading one student) it starts on that student's rubric, full page;
-     otherwise on every student, in the layout last chosen. */
+  /* Redraw the dialog after a choice that changes which groups it shows
+     (what to print, the assessment), keeping focus on that control. */
+  function _redraw(overlay, focusSelector) {
+    // Swap the card's contents, not the card, so its opening animation
+    // doesn't play again.
+    var card = overlay.querySelector('.rubric-print-card');
+    var next = document.createElement('div');
+    next.innerHTML = _dialogHtml();
+    if (card && next.firstChild) card.innerHTML = next.firstChild.innerHTML;
+    else overlay.innerHTML = next.innerHTML;
+    _refreshStatus();
+    var el = focusSelector && overlay.querySelector(focusSelector);
+    if (el && el.focus) el.focus();
+  }
+
+  function _syncTiles(overlay) {
+    overlay.querySelectorAll('.rp-tile').forEach(function (tile) {
+      var input = tile.querySelector('input');
+      tile.classList.toggle('is-on', !!(input && input.checked));
+    });
+  }
+
+  /* Open the window.
+     From an assessment card: open(cid, aid, { studentId }) starts on its
+     completed rubrics (that one student, full page, when grading one).
+     From the Rubric Bank: open(cid, null, { rubricId, mode }) starts on the
+     newest assessment that uses the rubric, or on a blank rubric when none
+     does or `mode` is 'blank'. `blankOnly` offers nothing else (another
+     class's rubric). */
   function open(cid, aid, openOpts) {
+    openOpts = openOpts || {};
     close();
-    var assessment = _assessment(cid, aid);
-    if (!_rubric(cid, assessment)) return;
+    var assessment = aid ? _assessment(cid, aid) : null;
+    var rubricId = openOpts.rubricId || (assessment && assessment.rubricId) || null;
+    var rubric = assessment ? _rubric(cid, assessment) : rubricId ? getRubricById(cid, rubricId) : null;
+    if (!rubric) return;
+    // A rubric of the teacher's own can be printed for any assessment that
+    // uses it; a Tag or General Rubric belongs to its one assessment.
+    var uses = openOpts.blankOnly ? [] : rubricId ? usesOf(cid, rubricId) : assessment ? [assessment] : [];
+    if (!aid && uses.length && openOpts.mode !== 'blank') aid = uses[0].id;
     var opts = _loadOptions();
     var userLayout = opts.layout;
-    var sid = openOpts && openOpts.studentId;
+    opts.rubricId = rubricId;
+    opts.mode = openOpts.mode === 'blank' || !aid ? 'blank' : 'completed';
+    opts.copies = _copies(getStudents(cid).length || 1);
+    var sid = openOpts.studentId;
     var hasStudent =
       sid &&
       getStudents(cid).some(function (s) {
         return s.id === sid;
       });
-    if (hasStudent) {
+    if (hasStudent && opts.mode === 'completed') {
       opts.students = 'pick';
       opts.picked = [sid];
       opts.layout = layoutForCount(1);
     } else {
       opts.students = 'all';
     }
-    _state = { cid: cid, aid: aid, opts: opts, userLayout: userLayout, trigger: document.activeElement };
+    _state = {
+      cid: cid,
+      aid: aid,
+      rubricId: rubricId,
+      uses: uses,
+      opts: opts,
+      userLayout: userLayout,
+      trigger: document.activeElement,
+    };
     var overlay = document.createElement('div');
     overlay.id = OVERLAY_ID;
     overlay.className = 'confirm-overlay rubric-print-overlay';
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-labelledby', 'rp-title');
-    overlay.innerHTML = _dialogHtml(cid, aid, _state.opts);
+    overlay.innerHTML = _dialogHtml();
     overlay.addEventListener('click', function (e) {
       if (e.target === overlay) {
         close();
@@ -774,6 +1062,17 @@
     });
     overlay.addEventListener('change', function (e) {
       var t = e.target;
+      if (t && t.name === 'rp-mode') {
+        _readOptionsFromDialog(overlay);
+        _state.opts.mode = t.value;
+        return _redraw(overlay, 'input[name="rp-mode"]:checked');
+      }
+      if (t && t.id === 'rp-assessment') {
+        _state.aid = t.value;
+        _state.opts.picked = [];
+        if (_state.opts.students === 'pick') _state.opts.students = 'all';
+        return _redraw(overlay, '#rp-assessment');
+      }
       if (t && t.dataset && t.dataset.pick !== undefined) _onPick(overlay, t);
       else if (t && t.name === 'rp-students' && t.value !== 'pick') {
         // Back to every student: no picks, and the layout last chosen.
@@ -785,8 +1084,15 @@
       }
       _readOptionsFromDialog(overlay);
       if (t && t.name === 'rp-layout') _state.userLayout = _state.opts.layout;
+      _syncTiles(overlay);
       _saveOptions(_state.opts, _state.userLayout);
       _refreshStatus();
+    });
+    overlay.addEventListener('input', function (e) {
+      if (e.target && e.target.id === 'rp-copies') {
+        _readOptionsFromDialog(overlay);
+        _refreshStatus();
+      }
     });
     _state.keyHandler = function (e) {
       if (e.key === 'Escape') close();
@@ -842,6 +1148,9 @@
     defaultRubric: defaultRubric,
     GENERAL_LEVELS: GENERAL_LEVELS,
     sheetData: sheetData,
+    blankSheetData: blankSheetData,
+    usesOf: usesOf,
+    MAX_COPIES: MAX_COPIES,
     selectStudents: selectStudents,
     isStudentScored: isStudentScored,
     pageCount: pageCount,
