@@ -17,11 +17,11 @@ window.DashOverview = (function () {
       })
       .join('');
     return (
-      '<div class="dash-toolbar">' +
+      '<div class="page-toolbar dash-toolbar">' +
       '<select class="class-picker dash-course-select" data-action="dashSwitchCourse" aria-label="Select course">' +
       courseOptions +
       '</select>' +
-      '<button class="dash-add-btn" data-action="openClassManager">Class Management</button>' +
+      '<button class="tb-action-btn tb-action-secondary" data-action="openClassManager">Class Management</button>' +
       (typeof renderTermPicker === 'function' ? renderTermPicker(activeCourse) : '') +
       '<div class="dash-search-wrap">' +
       '<span class="search-icon" aria-hidden="true">' +
@@ -31,7 +31,7 @@ window.DashOverview = (function () {
       esc(searchQuery) +
       '" data-action-input="dashSearch" aria-label="Search students">' +
       '</div>' +
-      '<select class="dash-sort-select" data-action="dashSort" aria-label="Sort students">' +
+      '<select class="term-select dash-sort-select" data-action="dashSort" aria-label="Sort students">' +
       '<option value="last-asc"' +
       (sortMode === 'last-asc' ? ' selected' : '') +
       '>Last Name A\u2192Z</option>' +

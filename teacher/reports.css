@@ -8,15 +8,6 @@
 .page-main:has(.report-toolbar) {
   overflow-y: auto !important;
 }
-.report-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
-  background: var(--surface);
-  border-bottom: 0.5px solid var(--divider-medium);
-  flex-shrink: 0;
-}
 .report-toolbar-label {
   font-family: var(--font-base);
   font-size: var(--text-xs);
@@ -40,21 +31,6 @@
   background: var(--surface);
   border-color: var(--active);
   box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.12);
-}
-.report-term-select {
-  font-family: var(--font-base);
-  font-size: var(--text-base);
-  padding: 5px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg);
-  color: var(--text);
-  outline: none;
-  cursor: pointer;
-}
-.report-term-select:focus {
-  border-color: var(--active);
-  outline: none;
 }
 .report-print-btn {
   padding: 5px 14px;
@@ -80,12 +56,15 @@
   display: inline-block;
 }
 .student-picker-btn {
+  height: var(--control-h);
   font-family: var(--font-base);
   font-size: var(--text-base);
-  background: var(--surface);
+  font-weight: 500;
+  /* A picker like the term and class pickers: the same chevron. */
+  background: var(--surface) var(--select-chevron) no-repeat right 10px center;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 4px 10px;
+  padding: 4px 28px 4px 10px;
   cursor: pointer;
   color: var(--text);
   min-width: 150px;
@@ -98,10 +77,6 @@
 }
 .student-picker-btn:hover {
   border-color: var(--active);
-}
-.student-picker-btn .arrow {
-  font-size: var(--text-xs);
-  color: var(--text-3);
 }
 .student-picker-dropdown {
   display: none;
@@ -1977,8 +1952,8 @@
   gap: 4px;
 }
 .tq-toolbar-arrow {
-  width: 28px;
-  height: 28px;
+  width: var(--control-h);
+  height: var(--control-h);
   border-radius: 8px;
   border: none;
   background: transparent;
@@ -3095,10 +3070,10 @@
   justify-content: space-between;
   gap: 12px;
   min-height: 34px;
-  padding: 4px 14px;
+  padding: 4px 12px;
   font-size: 12px;
   color: var(--text-2);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 0.5px solid var(--divider-medium);
   background: var(--surface);
 }
 .studio-fit {

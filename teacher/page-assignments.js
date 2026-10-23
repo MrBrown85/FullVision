@@ -250,7 +250,7 @@ window.PageAssignments = (function () {
       .join('');
 
     var toolbarHtml =
-      '<div class="assess-toolbar">' +
+      '<div class="page-toolbar assess-toolbar">' +
       '<select class="class-picker assess-course-select" data-action="assessSwitchCourse" aria-label="Select course">' +
       courseOptions +
       '</select>' +
