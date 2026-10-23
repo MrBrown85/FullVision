@@ -618,9 +618,6 @@ th.gb-group-alt {
 }
 
 /* Student popover — fixed-position tooltip appended to body */
-.gb-name-wrap {
-  position: relative;
-}
 #gb-tooltip {
   display: none;
   position: fixed;
