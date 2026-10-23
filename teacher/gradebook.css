@@ -959,9 +959,13 @@ th.gb-group-alt {
   flex: 1;
   min-width: 0;
 }
-.gb-grid-rowhead-pct {
+.gb-grid-rowhead-grade {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
   font-weight: 700;
   font-size: 12px;
+  line-height: 1.2;
   flex-shrink: 0;
   margin-left: 8px;
 }
