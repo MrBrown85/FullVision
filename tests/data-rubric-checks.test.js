@@ -319,6 +319,32 @@ describe('a deleted assessment drops its ticks', () => {
   });
 });
 
+describe('Duplicate in the Rubric Bank carries the checks', () => {
+  afterEach(() => {
+    delete _cache.rubrics[CID];
+  });
+
+  it('copies style and checkboxes with new ids', () => {
+    localStorage.clear();
+    _cache.rubrics[CID] = [
+      {
+        id: R1,
+        name: 'Lab Skills',
+        style: 'advanced',
+        criteria: [
+          { id: C1, name: 'Safety', tagIds: [], levels: {}, checks: [{ id: K1, level: 3, label: 'Goggles on' }] },
+        ],
+      },
+    ];
+    var copy = RubricBank.duplicate(CID, R1);
+    expect(copy.style).toBe('advanced');
+    expect(copy.criteria[0].checks.map(k => k.label)).toEqual(['Goggles on']);
+    expect(copy.criteria[0].checks[0].id).not.toBe(K1);
+    // The source keeps its own ids.
+    expect(getRubricById(CID, R1).criteria[0].checks[0].id).toBe(K1);
+  });
+});
+
 describe('copies carry the checks', () => {
   it('gives a copied rubric new check ids and keeps the labels, levels and style', () => {
     var src = {

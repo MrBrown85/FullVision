@@ -34,7 +34,7 @@ describe('account menu', () => {
 describe('Assignments toolbar', () => {
   it('has a Rubrics button and no Advanced menu', () => {
     var src = readFileSync(resolve(root, 'teacher/page-assignments.js'), 'utf8');
-    expect(src).toContain('data-action="toggleToolbarDropdown">Rubrics</button>');
+    expect(src).toContain('data-action="openRubricBank">Rubrics</button>');
     expect(src).not.toContain('>Advanced</button>');
     expect(src).not.toContain('tb-advanced-panel');
     expect(src).not.toContain('data-action="deleteAccount"');

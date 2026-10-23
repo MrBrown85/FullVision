@@ -24,8 +24,9 @@ function checkRows(criterion) {
 
 async function openNewRubric(page) {
   await gotoApp(page, '/assignments');
-  await page.locator('[data-action="toggleToolbarDropdown"]').click();
-  await page.locator('[data-action="newRubricUI"]').click();
+  await page.locator('[data-action="openRubricBank"]').click();
+  const bank = page.getByRole('dialog', { name: 'Rubric Bank' });
+  await bank.locator('[data-rb="new"]').first().click();
   const editor = page.locator('#rubric-modal');
   await expect(editor).toBeVisible();
   return editor;
@@ -99,8 +100,9 @@ test.describe('Advanced Rubric editor', () => {
     ]);
 
     // Reopen: the boxes come back; Standard asks first, then drops them.
-    await page.locator('[data-action="toggleToolbarDropdown"]').click();
-    await page.locator('[data-action="editRubricUI"][data-rid="' + rubrics[0].id + '"]').click();
+    // Through the Rubric Bank: the only rubric is selected when it opens.
+    await page.locator('[data-action="openRubricBank"]').click();
+    await page.getByRole('dialog', { name: 'Rubric Bank' }).getByRole('button', { name: 'Edit Rubric' }).click();
     await expect(editor).toBeVisible();
     await expect(editor.locator('.rubric-check-input')).toHaveCount(3);
     await expect(editor.locator('.rubric-check-input[data-level="3"]').first()).toHaveValue('Cleans the station');

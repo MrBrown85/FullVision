@@ -61,6 +61,7 @@ const PRECACHE_URLS = [
   '/teacher/rubric-print.js',
   '/teacher/grades-print.js',
   '/teacher/rubric-library.js',
+  '/teacher/rubric-bank.js',
   '/teacher/grading-setup-copy.js',
   '/teacher/page-dashboard.js',
   '/teacher/page-assignments.js',

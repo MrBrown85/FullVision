@@ -741,7 +741,9 @@ window.RubricLibrary = (function () {
 
   return {
     uniqueName: uniqueName,
+    loadClass: loadClass,
     cloneRubric: cloneRubric,
+    freshChecks: freshChecks,
     planCopy: planCopy,
     summaryLines: summaryLines,
     copyTo: copyTo,
