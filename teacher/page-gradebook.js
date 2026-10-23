@@ -51,6 +51,7 @@ window.PageGradebook = (function () {
   var _printTerm = 'all';
   var _printShownIds = null;
   var _scrollShadowCleanup = null;
+  var _scrollKey = null; // class and view of the last render, so a redraw keeps the table's scroll
   var _tipSource = null;
   /* Name-cell tooltip HTML, keyed on student.id. Populated in renderNameCell,
    * read by _handleMouseover. Replaces the previous round-trip through
@@ -428,10 +429,19 @@ window.PageGradebook = (function () {
       html += renderDetailedTable(cid, students, assessments, sections, isLetter, scores);
     }
 
+    // A redraw (a saved score, a sort, a filter) leaves the table where it
+    // was; another class or view starts at the top.
+    var scrollKey = cid + '|' + viewMode;
+    var prevData = document.getElementById('gb-data');
+    var keepScroll =
+      prevData && _scrollKey === scrollKey ? { top: prevData.scrollTop, left: prevData.scrollLeft } : null;
+    _scrollKey = scrollKey;
+
     document.getElementById('main').innerHTML = html;
     applyStickyLeft();
     initScrollShadows();
     initGridScrollSync();
+    if (keepScroll) restoreGridScroll(keepScroll);
     initGridHoverSync();
     initHeaderResize();
     initColHoverTooltip();
@@ -484,6 +494,16 @@ window.PageGradebook = (function () {
     };
     data.addEventListener('scroll', fn, { passive: true });
     _gridScrollHandler = { el: data, fn: fn };
+  }
+
+  /* Put the data area back at a saved position and line the headers up with
+     it now, not on the next scroll event. */
+  function restoreGridScroll(pos) {
+    var data = document.getElementById('gb-data');
+    if (!data) return;
+    data.scrollTop = pos.top;
+    data.scrollLeft = pos.left;
+    if (_gridScrollHandler) _gridScrollHandler.fn();
   }
 
   /* ── Sticky left positions ─────────────────────────────── */
@@ -2847,6 +2867,7 @@ window.PageGradebook = (function () {
     searchQuery = '';
     sortCol = null;
     _filterStripOpen = false;
+    _scrollKey = null;
     _tipSource = null;
 
     // No sidebar for gradebook
