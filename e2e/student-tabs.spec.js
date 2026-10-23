@@ -127,3 +127,30 @@ test('the dashboard opens the tab that matches where the teacher clicked', async
   await page.locator('.dash-ob2-name').first().click();
   await expect(page.locator('#stu-tab-evidence')).toHaveAttribute('aria-selected', 'true');
 });
+
+// The Competencies tab's rows already show each competency; the separate
+// Competency Profile list under them was a repeat (Colin, 2026-10-22), and
+// the page no longer asks the server for it.
+test('the Competencies tab has no Competency Profile list', async ({ page }) => {
+  await page.goto('/login.html?demo=1');
+  await page.waitForURL(/app\.html/, { timeout: 15000 });
+  const sid = await page.evaluate(() => {
+    window.__profileCalls = 0;
+    window.v2.getStudentProfile = function () {
+      window.__profileCalls++;
+      return Promise.resolve({
+        data: {
+          competency_tree: {
+            subjects: [{ name: 'Science 8', sections: [{ name: 'Questioning', tags: [{ code: 'QAP', label: 'Q' }] }] }],
+          },
+        },
+      });
+    };
+    return getStudents(getActiveCourse()).find(s => s.firstName === 'Cece').id;
+  });
+  await page.goto(page.url().replace(/#.*/, '#/student?id=' + sid + '&tab=comps'));
+  await expect(page.locator('#stu-tab-comps')).toHaveAttribute('aria-selected', 'true');
+  await page.waitForTimeout(300);
+  await expect(page.getByText('Competency Profile')).toHaveCount(0);
+  expect(await page.evaluate(() => window.__profileCalls)).toBe(0);
+});
