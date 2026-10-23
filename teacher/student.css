@@ -1615,7 +1615,7 @@ button.ced-obs-row {
 .stu-comp button.dash-tag-row.stu-comp-row,
 .stu-comp-row-static {
   display: grid;
-  grid-template-columns: minmax(220px, 1.4fr) 150px minmax(150px, 1fr) minmax(200px, 1fr) 12px;
+  grid-template-columns: minmax(220px, 1.4fr) 150px minmax(150px, 1fr) 190px minmax(200px, 1fr) 12px;
   align-items: center;
   gap: 16px;
   width: 100%;
@@ -1651,6 +1651,42 @@ button.ced-obs-row {
   flex-direction: column;
   gap: 2px;
   font-size: var(--text-sm);
+}
+/* The class on this competency: a count at each proficiency, and a ▼ over
+   this student's. */
+.stu-comp-class {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  text-align: left;
+  white-space: nowrap;
+}
+.stu-class-track {
+  position: relative;
+  height: 10px;
+}
+.stu-class-mark {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-size: 10px;
+  line-height: 10px;
+  color: var(--text);
+}
+.stu-class-bar {
+  display: flex;
+  gap: 2px;
+  height: 16px;
+}
+.stu-class-bar span {
+  min-width: 18px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-2xs);
+  font-weight: 700;
 }
 .stu-comp-latest .dash-tag-evidence {
   width: auto;
@@ -1728,7 +1764,7 @@ button.ced-obs-row {
 }
 .stu-assess-row {
   display: grid;
-  grid-template-columns: 64px minmax(200px, 1.3fr) 200px 150px minmax(160px, 1fr);
+  grid-template-columns: 64px minmax(200px, 1.3fr) 200px 150px 150px minmax(160px, 1fr);
   align-items: center;
   gap: 12px;
   min-height: 44px;
@@ -1757,6 +1793,16 @@ button.ced-obs-row {
 .stu-assess-toward {
   font-size: var(--text-xs);
   color: var(--text-3);
+}
+.stu-class-avg {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid var(--divider-strong);
+  border-radius: 6px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-2);
+  white-space: nowrap;
 }
 
 /* Goals and Reflections */
@@ -1927,6 +1973,7 @@ button.ced-obs-row {
     grid-template-areas:
       'name level chev'
       'bars bars chev'
+      'class class chev'
       'latest latest chev';
     row-gap: 8px;
   }
@@ -1942,6 +1989,9 @@ button.ced-obs-row {
   .stu-comp-latest {
     grid-area: latest;
   }
+  .stu-comp-class {
+    grid-area: class;
+  }
   .stu-comp-row .dash-tag-chevron {
     grid-area: chev;
   }
@@ -1949,7 +1999,7 @@ button.ced-obs-row {
     grid-template-columns: 56px minmax(0, 1fr) auto;
     grid-template-areas:
       'date title score'
-      '. cat cat'
+      '. cat class'
       '. toward toward';
     row-gap: 4px;
     padding: 10px 0;
@@ -1968,6 +2018,10 @@ button.ced-obs-row {
   }
   .stu-assess-toward {
     grid-area: toward;
+  }
+  .stu-assess-class {
+    grid-area: class;
+    justify-self: end;
   }
 }
 @media (prefers-color-scheme: dark) {

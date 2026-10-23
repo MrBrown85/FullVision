@@ -232,6 +232,7 @@ load('teacher/dash-class-manager.js');
 load('teacher/dash-overview.js');
 load('teacher/dash-observations.js');
 load('teacher/dash-student-cards.js');
+load('teacher/dash-insights.js');
 load('teacher/assign-collab.js');
 load('teacher/assessment-copy.js');
 load('teacher/rubric-guard.js');

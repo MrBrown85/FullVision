@@ -1413,6 +1413,25 @@ function studentGradeSummary(cid, sid) {
    them. */
 function classGradeSummary(cid, studentIds) {
   var mode = courseGradeMode(cid);
+  var means = _classGradeMeans(cid, studentIds);
+  var parts = [];
+  var level = 0;
+  if (means.prof != null) {
+    parts.push(means.prof.toFixed(1));
+    level = Math.round(means.prof);
+  }
+  if (means.pct != null) {
+    var pct = _roundPercent(means.pct, getRoundWholePercent(cid) ? 0 : 1);
+    parts.push(percentageToLetter(pct) + ' ' + pct + '%');
+    if (mode === 'letter') level = _percentLevel(pct);
+  }
+  return { text: parts.join(' \u00B7 '), level: level };
+}
+
+/* The class's mean overall proficiency (`prof`) and mean course % (`pct`),
+   each null when the class doesn't show it or nobody has one yet. */
+function _classGradeMeans(cid, studentIds) {
+  var mode = courseGradeMode(cid);
   var profs = [];
   var pcts = [];
   (studentIds || []).forEach(function (sid) {
@@ -1426,25 +1445,94 @@ function classGradeSummary(cid, studentIds) {
     }
   });
   function mean(list) {
+    return list.length
+      ? list.reduce(function (a, b) {
+          return a + b;
+        }, 0) / list.length
+      : null;
+  }
+  return { prof: mean(profs), pct: mean(pcts) };
+}
+
+/* How the class average moved since the reporting term before the active
+   one, in the grade the class shows first (the % in a Letter class, else
+   the proficiency): { text: '\u25B2 0.1', dir: 1, since: 'Term 1' }, dir -1 for
+   down and 0 (text 'No Change') when it rounds to nothing. Null when no term
+   is active, the active term is the first, or either term has no grades. */
+function classGradeChange(cid, studentIds) {
+  var active = getActiveTerm(cid);
+  if (!active) return null;
+  var terms = typeof getReportingTerms === 'function' ? getReportingTerms(cid) : [];
+  var prev = null;
+  terms.forEach(function (t) {
+    if (t.ordinal < active.ordinal && (!prev || t.ordinal > prev.ordinal)) prev = t;
+  });
+  if (!prev) return null;
+  var key = courseGradeMode(cid) === 'letter' ? 'pct' : 'prof';
+  var now = _classGradeMeans(cid, studentIds)[key];
+  setActiveTerm(cid, prev.ordinal);
+  var before = _classGradeMeans(cid, studentIds)[key];
+  setActiveTerm(cid, active.ordinal);
+  if (now == null || before == null) return null;
+  var diff =
+    key === 'pct'
+      ? _roundPercent(now, getRoundWholePercent(cid) ? 0 : 1) - _roundPercent(before, getRoundWholePercent(cid) ? 0 : 1)
+      : Math.round(now * 10) / 10 - Math.round(before * 10) / 10;
+  diff = Math.round(diff * 10) / 10;
+  var dir = diff > 0 ? 1 : diff < 0 ? -1 : 0;
+  var amount = key === 'pct' ? Math.abs(diff) + '%' : Math.abs(diff).toFixed(1);
+  return {
+    text: dir === 0 ? 'No Change' : (dir > 0 ? '\u25B2 ' : '\u25BC ') + amount,
+    dir: dir,
+    since: prev.label || 'Term ' + prev.ordinal,
+  };
+}
+
+/* How a class sits on one competency: each student's proficiency on a
+   section (`which.sectionId`) or a group of sections (`which.groupId`),
+   banded by its rounded level the way the cards colour it. Returns
+   { bands: [{ level, label, ids }] Emerging first, values: { sid: level },
+   avg: the mean level (0 when nobody is scored) }. Students not yet scored
+   on it are left out. */
+function competencyDistribution(cid, studentIds, which) {
+  var bands = [1, 2, 3, 4].map(function (level) {
+    return { level: level, label: PROF_LABELS[level], ids: [] };
+  });
+  var values = {};
+  var total = 0;
+  var count = 0;
+  (studentIds || []).forEach(function (sid) {
+    var v =
+      which && which.groupId
+        ? getGroupProficiency(cid, sid, which.groupId)
+        : getSectionProficiency(cid, sid, which && which.sectionId);
+    if (!(v > 0)) return;
+    var level = Math.max(1, Math.min(4, Math.round(v)));
+    bands[level - 1].ids.push(sid);
+    values[sid] = v;
+    total += v;
+    count++;
+  });
+  return { bands: bands, values: values, avg: count ? total / count : 0 };
+}
+
+/* A classColumnAverage result as the class reads it: a level through
+   formatLevel, points work as "7.4/10 \u00B7 74%", Complete/Incomplete work as
+   its %. "\u2014" when nobody counts. */
+function classColumnAverageText(cid, assessment, res) {
+  if (!res) return '\u2014';
+  if (res.pct != null) {
+    if (isCompletionScored(assessment)) return Math.round(res.pct) + '%';
     return (
-      list.reduce(function (a, b) {
-        return a + b;
-      }, 0) / list.length
+      formatPoints(Math.round(res.avg * 10) / 10) +
+      '/' +
+      formatPoints(Number(assessment.maxPoints) || 100) +
+      ' \u00B7 ' +
+      Math.round(res.pct) +
+      '%'
     );
   }
-  var parts = [];
-  var level = 0;
-  if (profs.length) {
-    var prof = mean(profs);
-    parts.push(prof.toFixed(1));
-    level = Math.round(prof);
-  }
-  if (pcts.length) {
-    var pct = _roundPercent(mean(pcts), getRoundWholePercent(cid) ? 0 : 1);
-    parts.push(percentageToLetter(pct) + ' ' + pct + '%');
-    if (mode === 'letter') level = _percentLevel(pct);
-  }
-  return { text: parts.join(' \u00B7 '), level: level };
+  return formatLevel(cid, res.avg);
 }
 
 /* How many students sit at each grade, best first: by letter grade (A to F)
@@ -1641,7 +1729,10 @@ window.Calc = {
   studentGradeBadges,
   studentGradeSummary,
   classGradeSummary,
+  classGradeChange,
   classGradeDistribution,
+  competencyDistribution,
+  classColumnAverageText,
   getAssessmentGroupPercentage,
   calcProficiency,
   getTagScores,
