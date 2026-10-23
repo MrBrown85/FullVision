@@ -812,13 +812,36 @@ function _sidebarGradeBadge(part) {
   return `<span class="student-row-prof" style="color:${color};background:${tint}">${esc(part.text)}</span>`;
 }
 
+/* After a score changes: redraw only the grade beside one student (`sid`),
+   or beside every student, and leave the names and the roster's scroll as
+   they are. Without a roster for this class it rebuilds (refreshSidebar). */
+function refreshSidebarGrades(sid) {
+  const cid = typeof activeCourse !== 'undefined' ? activeCourse : getActiveCourse();
+  const picker = document.getElementById('gb-course-select');
+  if (!document.getElementById('gb-roster-list') || !picker || picker.value !== cid) {
+    refreshSidebar();
+    return;
+  }
+  if (!sid) {
+    fillSidebarBadges(cid);
+    return;
+  }
+  const el = document.querySelector('[data-prof-sid="' + sid + '"]');
+  if (el) el.innerHTML = _sidebarBadgesHtml(cid, sid);
+}
+
+function _sidebarBadgesHtml(cid, sid) {
+  var badges = studentGradeBadges(cid, sid);
+  return (
+    (badges.prof ? _sidebarGradeBadge(badges.prof) : '') + (badges.letter ? _sidebarGradeBadge(badges.letter) : '')
+  );
+}
+
 /** Fill sidebar grade badges asynchronously after sidebar is mounted. */
 function fillSidebarBadges(cid) {
   requestAnimationFrame(function () {
     document.querySelectorAll('[data-prof-sid]').forEach(function (el) {
-      var badges = studentGradeBadges(cid, el.getAttribute('data-prof-sid'));
-      el.innerHTML =
-        (badges.prof ? _sidebarGradeBadge(badges.prof) : '') + (badges.letter ? _sidebarGradeBadge(badges.letter) : '');
+      el.innerHTML = _sidebarBadgesHtml(cid, el.getAttribute('data-prof-sid'));
     });
   });
 }
@@ -1347,6 +1370,7 @@ window.UI = {
   renderStudentHeader,
   renderSidebar,
   fillSidebarBadges,
+  refreshSidebarGrades,
   filterRoster,
   profBadge,
   profBar,

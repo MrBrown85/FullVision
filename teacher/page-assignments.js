@@ -155,39 +155,82 @@ window.PageAssignments = (function () {
   }
 
   /* ── Focus Student ─────────────────────────────────────── */
+  /* Picking a student while some assessments are open (grading the whole
+     class) keeps just those open, for that student; with none open, every
+     assessment opens. Leaving keeps the class on those same assessments. */
   function toggleFocusStudent(sid) {
     if (focusStudentId === sid) {
-      focusStudentId = null;
-      openAssessIds.clear();
-      _allExpanded = true;
-      _collapsedIds.clear();
+      _leaveFocus();
     } else if (!focusStudentId) {
       focusStudentId = sid;
-      openAssessIds.clear();
-      _allExpanded = true;
       _collapsedIds.clear();
+      _allExpanded = openAssessIds.size === 0;
     } else {
       focusStudentId = sid;
     }
-    document.getElementById('sidebar-mount').innerHTML = renderSidebar(
-      activeCourse,
-      focusStudentId,
-      'toggleFocusStudent',
-    );
+    _syncSidebarSelection();
     render();
   }
 
   function clearFocusStudent() {
+    _leaveFocus();
+    _syncSidebarSelection();
+    render();
+  }
+
+  function _leaveFocus() {
     focusStudentId = null;
-    openAssessIds.clear();
+    if (_allExpanded) openAssessIds.clear();
     _allExpanded = true;
     _collapsedIds.clear();
-    document.getElementById('sidebar-mount').innerHTML = renderSidebar(
-      activeCourse,
-      focusStudentId,
-      'toggleFocusStudent',
-    );
+  }
+
+  /* Mark the focused student in the roster without redrawing it, so the
+     names and the roster's scroll stay put. */
+  function _syncSidebarSelection() {
+    var rows = document.querySelectorAll('#gb-roster-list .student-row');
+    if (!rows.length) {
+      document.getElementById('sidebar-mount').innerHTML = renderSidebar(
+        activeCourse,
+        focusStudentId,
+        'toggleFocusStudent',
+      );
+      return;
+    }
+    rows.forEach(function (r) {
+      var on = r.dataset.sid === focusStudentId;
+      r.classList.toggle('selected', on);
+      if (on && r.scrollIntoView) r.scrollIntoView({ block: 'nearest' });
+    });
+  }
+
+  /* Left and Right arrows while grading one student: the previous or next
+     student in the roster (as filtered by its search), on the same open
+     assessments. A focused rubric row moves to the new student's first row. */
+  function stepFocusStudent(dir) {
+    if (!focusStudentId) return;
+    var ids = Array.prototype.filter
+      .call(document.querySelectorAll('#gb-roster-list .student-row'), function (r) {
+        return r.style.display !== 'none';
+      })
+      .map(function (r) {
+        return r.dataset.sid;
+      });
+    if (!ids.length) {
+      ids = sortStudents(getStudents(activeCourse), 'lastName').map(function (s) {
+        return s.id;
+      });
+    }
+    var i = ids.indexOf(focusStudentId);
+    var next = ids[i + dir];
+    if (i < 0 || !next) return;
+    var hadKbFocus = !!_kbFocusEl;
+    focusStudentId = next;
+    _syncSidebarSelection();
     render();
+    var card = document.querySelector('.assess-card.open');
+    if (card && card.scrollIntoView) card.scrollIntoView({ block: 'nearest' });
+    if (hadKbFocus && card) kbFocusCell(card.querySelector('.rsg-criterion-row'));
   }
 
   /* ── Assessment Filters ────────────────────────────────── */
@@ -1609,7 +1652,7 @@ window.PageAssignments = (function () {
         openAssessIds.delete(aid);
         _collapsedIds.delete(aid);
         render();
-        refreshSidebar();
+        refreshSidebarGrades();
       },
     );
   }
@@ -1906,7 +1949,7 @@ window.PageAssignments = (function () {
     var grid = el.closest('.ldg-grid');
     if (cell) cell.innerHTML = completionButtonsHtml(aid, sid, next);
     refreshLedgerSummary(grid);
-    refreshSidebar();
+    refreshSidebarGrades(sid);
   }
 
   function confirmFillCompletion(aid) {
@@ -1924,13 +1967,13 @@ window.PageAssignments = (function () {
           setCompletionMark(cid, st.id, aid, 'complete');
         });
         render();
-        refreshSidebar();
+        refreshSidebarGrades();
         showUndoToast('Unmarked students set to Complete', function () {
           var beforeScores = getScores(cid);
           saveScores(cid, prevScores);
           if (getScores(cid) === prevScores) persistScoreDiffToCanonical(cid, beforeScores, prevScores);
           render();
-          refreshSidebar();
+          refreshSidebarGrades();
         });
       },
     );
@@ -2011,14 +2054,14 @@ window.PageAssignments = (function () {
           marked.push(st.id);
         });
         render();
-        refreshSidebar();
+        refreshSidebarGrades();
         if (!marked.length) return;
         showUndoToast('Unmarked students set to Not Submitted', function () {
           marked.forEach(function (sid) {
             setAssignmentStatus(cid, sid, aid, null);
           });
           render();
-          refreshSidebar();
+          refreshSidebarGrades();
         });
       },
     );
@@ -2047,13 +2090,13 @@ window.PageAssignments = (function () {
           setPointsScore(cid, st.id, aid, max);
         });
         render();
-        refreshSidebar();
+        refreshSidebarGrades();
         showUndoToast('Unmarked students set to ' + label, function () {
           var beforeScores = getScores(cid);
           saveScores(cid, prevScores);
           if (getScores(cid) === prevScores) persistScoreDiffToCanonical(cid, beforeScores, prevScores);
           render();
-          refreshSidebar();
+          refreshSidebarGrades();
         });
       },
     );
@@ -2219,7 +2262,7 @@ window.PageAssignments = (function () {
       }
       refreshLedgerSummary(row.closest('.ldg-grid'));
     }
-    refreshSidebar();
+    refreshSidebarGrades(sid);
   }
 
   function setScore(cid, sid, aid, tagId, value, mod) {
@@ -2301,7 +2344,7 @@ window.PageAssignments = (function () {
       setScore(activeCourse, row.dataset.student, row.dataset.assess, tid, st.level, next);
     });
     syncModRow(row);
-    refreshSidebar();
+    refreshSidebarGrades(row.dataset.student);
   }
 
   function selectTagLevel(el, value, aid, sid, tagId) {
@@ -2313,7 +2356,7 @@ window.PageAssignments = (function () {
     });
     if (!wasActive) el.classList.add('active');
     syncModRow(el.closest('.rsg-criterion-row'));
-    refreshSidebar();
+    refreshSidebarGrades(sid);
   }
 
   function selectScore(el, value) {
@@ -2332,7 +2375,7 @@ window.PageAssignments = (function () {
       o.classList.remove('active');
     });
     if (!wasActive) el.classList.add('active');
-    refreshSidebar();
+    refreshSidebarGrades(sid);
   }
 
   /* ── Bulk scoring ───────────────────────────────────────── */
@@ -2410,13 +2453,13 @@ window.PageAssignments = (function () {
       updateRubricRowUI(row, st.mixed ? 0 : st.level);
     });
     syncModRows('.rsg-criterion-row[data-assess="' + aid + '"]');
-    refreshSidebar();
+    refreshSidebarGrades();
     showUndoToast(toastMsg, function () {
       var beforeScores = getScores(cid);
       saveScores(cid, prevScores);
       if (getScores(cid) === prevScores) persistScoreDiffToCanonical(cid, beforeScores, prevScores);
       render();
-      refreshSidebar();
+      refreshSidebarGrades();
     });
   }
 
@@ -2445,7 +2488,7 @@ window.PageAssignments = (function () {
     });
     if (!wasActive) el.classList.add('active');
     syncModRow(el.closest('.rsg-criterion-row'));
-    refreshSidebar();
+    refreshSidebarGrades(sid);
   }
   function updateRubricRowUI(row, value) {
     row.querySelectorAll('.rsg-level').forEach(function (l) {
@@ -2508,13 +2551,13 @@ window.PageAssignments = (function () {
       updateRubricRowUI(row, value);
     });
     syncModRows('.rsg-criterion-row[data-assess="' + aid + '"]');
-    refreshSidebar();
+    refreshSidebarGrades();
     showUndoToast(toastMsg, function () {
       var beforeScores = getScores(cid);
       saveScores(cid, prevScores);
       if (getScores(cid) === prevScores) persistScoreDiffToCanonical(cid, beforeScores, prevScores);
       render();
-      refreshSidebar();
+      refreshSidebarGrades();
     });
   }
   function confirmFillAll(aid, value, label) {
@@ -4682,6 +4725,20 @@ window.PageAssignments = (function () {
       if (document.activeElement.classList.contains('gb-pts-input')) {
         handlePointsKey(e, document.activeElement);
       }
+      return;
+    }
+    if (
+      focusStudentId &&
+      (e.key === 'ArrowLeft' || e.key === 'ArrowRight') &&
+      !e.metaKey &&
+      !e.ctrlKey &&
+      !e.altKey &&
+      !e.shiftKey &&
+      !document.getElementById('rubric-modal') &&
+      !document.querySelector('.confirm-overlay')
+    ) {
+      e.preventDefault();
+      stepFocusStudent(e.key === 'ArrowRight' ? 1 : -1);
       return;
     }
     if (!_kbFocusEl) return;
