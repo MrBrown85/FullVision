@@ -193,6 +193,13 @@ window.DashOverview = (function () {
       (classGrade.text || '\u2014') +
       '</div>' +
       '<div class="dash-mini-stat-label">Class Avg</div>' +
+      (opts.classChange
+        ? '<div class="dash-mini-stat-change' +
+          (opts.classChange.dir > 0 ? ' is-up' : opts.classChange.dir < 0 ? ' is-down' : '') +
+          '">' +
+          esc(opts.classChange.text + ' Since ' + opts.classChange.since) +
+          '</div>'
+        : '') +
       '</div>' +
       '<div class="dash-mini-stat">' +
       '<div class="dash-mini-stat-val" style="color:' +
@@ -211,47 +218,54 @@ window.DashOverview = (function () {
       '</div>';
 
     // The list scrolls past six competencies so the card keeps its size.
-    html += '<div class="dash-outcome-list" tabindex="0" aria-label="Curricular competencies">';
-    sectionClassAvgs.forEach(function (item) {
-      var sec = item.section;
-      var avg = item.avg;
-      var r = Math.round(avg);
-      var pct = avg > 0 ? (avg / 4) * 100 : 0;
-      var color = avg > 0 ? PROF_COLORS[r] : 'var(--text-3)';
-      var rawColor =
-        avg > 0
-          ? r === 1
-            ? 'var(--score-1)'
-            : r === 2
-              ? 'var(--score-2)'
-              : r === 3
-                ? 'var(--score-3)'
-                : r === 4
-                  ? 'var(--score-4)'
-                  : 'var(--text-3)'
-          : 'var(--divider-subtle)';
-      html +=
-        '<div class="dash-outcome-row">' +
-        '<span class="dash-outcome-label" style="color:' +
-        tintText(sec.color) +
-        '">' +
-        esc(sec.shortName || sec.name) +
-        '</span>' +
-        '<div class="dash-outcome-bar-track">' +
-        '<div class="dash-outcome-bar-fill" style="width:' +
-        pct +
-        '%;background:' +
-        rawColor +
-        '"></div>' +
-        '</div>' +
-        '<span class="dash-outcome-val" style="color:' +
-        color +
-        '">' +
-        formatLevel(cid, avg) +
-        '</span>' +
-        '</div>';
-    });
-    html += '</div>';
+    // Proficiency and Both classes see how many students sit at each
+    // proficiency; a Letter class sees each competency's average.
+    var showMix = DashInsights.showsProficiency(cid);
+    if (showMix) {
+      html += DashInsights.mixLegendHtml() + DashInsights.mixListHtml(cid, allStudents, opts.mixPop);
+    } else {
+      html += '<div class="dash-outcome-list" tabindex="0" aria-label="Curricular competencies">';
+      sectionClassAvgs.forEach(function (item) {
+        var sec = item.section;
+        var avg = item.avg;
+        var r = Math.round(avg);
+        var pct = avg > 0 ? (avg / 4) * 100 : 0;
+        var color = avg > 0 ? PROF_COLORS[r] : 'var(--text-3)';
+        var rawColor =
+          avg > 0
+            ? r === 1
+              ? 'var(--score-1)'
+              : r === 2
+                ? 'var(--score-2)'
+                : r === 3
+                  ? 'var(--score-3)'
+                  : r === 4
+                    ? 'var(--score-4)'
+                    : 'var(--text-3)'
+            : 'var(--divider-subtle)';
+        html +=
+          '<div class="dash-outcome-row">' +
+          '<span class="dash-outcome-label" style="color:' +
+          tintText(sec.color) +
+          '">' +
+          esc(sec.shortName || sec.name) +
+          '</span>' +
+          '<div class="dash-outcome-bar-track">' +
+          '<div class="dash-outcome-bar-fill" style="width:' +
+          pct +
+          '%;background:' +
+          rawColor +
+          '"></div>' +
+          '</div>' +
+          '<span class="dash-outcome-val" style="color:' +
+          color +
+          '">' +
+          formatLevel(cid, avg) +
+          '</span>' +
+          '</div>';
+      });
+      html += '</div>';
+    }
 
     html +=
       '<div style="margin-top:10px">' +
@@ -283,6 +297,12 @@ window.DashOverview = (function () {
       '<section class="dash-overview-section dash-ob2" id="dash-obs-card" aria-labelledby="dash-ob2-title">' +
       DashObservations.renderCard(cid, allStudents, opts.obs || {}) +
       '</section>';
+    html += '</div>';
+
+    // Who Needs Help (not in a Letter class) and Missing and Late.
+    html += '<div class="dash-overview-row dash-overview-insights' + (showMix ? '' : ' is-single') + '">';
+    if (showMix) html += DashInsights.helpCardHtml(cid, allStudents, opts.helpRule, opts.helpRuleOpen);
+    html += DashInsights.missingCardHtml(cid, allStudents, getTodayStr());
     html += '</div>';
 
     var upcomingBdays = getUpcomingBirthdays(cid);

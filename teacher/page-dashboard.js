@@ -28,6 +28,15 @@ window.PageDashboard = (function () {
   var _resizeTimer = null;
   var _popFor = null;
 
+  /* Class insights (dash-insights.js): Cards or Grid and the Who Needs Help
+     rule are remembered on this device; an open segment list is not. */
+  var STUDENT_VIEW_KEY = 'fv-dash-student-view';
+  var HELP_RULE_KEY = 'fv-dash-help-rule';
+  var studentView = 'cards';
+  var helpRule = null;
+  var helpRuleOpen = false;
+  var mixPop = null; // { key, level } of the open proficiency segment
+
   function _readPref(key) {
     try {
       return localStorage.getItem(key);
@@ -82,6 +91,7 @@ window.PageDashboard = (function () {
   async function switchCourse(cid) {
     activeCourse = cid;
     obsHighlight = null;
+    mixPop = null;
     _obsNavKey = null;
     // Reset class manager state for new course
     CM.configure({ activeCourse: cid, onRender: render, onCourseChange: switchCourse });
@@ -420,15 +430,37 @@ window.PageDashboard = (function () {
       ccAssessments: ccAssessments,
       actionItems: actionItems,
       obs: _obsState(),
+      classChange: classGradeChange(
+        cid,
+        allStudents.map(function (s) {
+          return s.id;
+        }),
+      ),
+      mixPop: mixPop,
+      helpRule: helpRule,
+      helpRuleOpen: helpRuleOpen,
     });
     obsHighlight = _lastObsState.highlight;
 
-    /* -- Student Card Grid -- */
-    html += StudentCards.renderStudentCards(cid, students, allStudents, sections, assessments, allScores, flags);
+    /* -- Students: cards or the grid -- */
+    if (allStudents.length) html += DashInsights.studentsHeaderHtml(studentView, namesHidden);
+    if (studentView === 'grid' && students.length) html += DashInsights.studentGridHtml(cid, students, allStudents);
+    else html += StudentCards.renderStudentCards(cid, students, allStudents, sections, assessments, allScores, flags);
+
+    // The open segment's students, placed under it once it is drawn.
+    var popHtml = DashInsights.popHtml(cid, allStudents, mixPop);
+    if (!popHtml) mixPop = null;
+    html +=
+      '<div class="dash-mix-pop" id="dash-mix-pop" role="dialog" aria-label="Students"' +
+      (popHtml ? '' : ' hidden') +
+      '>' +
+      popHtml +
+      '</div>';
 
     _hidePop();
     document.getElementById('main').innerHTML = html;
     _afterObsRender(null, 0);
+    _placeMixPop();
 
     // Restore sort dropdown
     var sortSelect = document.querySelector('.dash-sort-select');
@@ -622,6 +654,46 @@ window.PageDashboard = (function () {
     _writePref(HIDE_NAMES_KEY, namesHidden ? '1' : null);
     document.body.classList.toggle('fv-names-hidden', namesHidden);
     _hidePop();
+    // The Students heading has its own Hide Names button.
+    Array.prototype.forEach.call(document.querySelectorAll('[data-action="studentNames"]'), function (b) {
+      b.setAttribute('aria-pressed', String(namesHidden));
+      b.textContent = namesHidden ? 'Show Names' : 'Hide Names';
+    });
+  }
+
+  /* The open proficiency segment's list sits under the segment, inside the
+     window. */
+  function _placeMixPop() {
+    var pop = document.getElementById('dash-mix-pop');
+    if (!pop || pop.hidden) return;
+    var seg = document.querySelector('.dash-mix-seg.active');
+    if (!seg) {
+      pop.hidden = true;
+      return;
+    }
+    var r = seg.getBoundingClientRect();
+    var pw = pop.offsetWidth;
+    var ph = pop.offsetHeight;
+    var left = Math.max(8, Math.min(r.left, window.innerWidth - pw - 8));
+    var top = r.bottom + 6;
+    if (top + ph > window.innerHeight - 8) top = Math.max(8, r.top - ph - 6);
+    pop.style.left = Math.round(left) + 'px';
+    pop.style.top = Math.round(top) + 'px';
+  }
+
+  function _closeMixPop() {
+    if (!mixPop) return;
+    var key = mixPop.key;
+    var level = mixPop.level;
+    mixPop = null;
+    var pop = document.getElementById('dash-mix-pop');
+    if (pop) pop.hidden = true;
+    var seg = document.querySelector('.dash-mix-seg.active');
+    if (seg) {
+      seg.classList.remove('active');
+      seg.setAttribute('aria-expanded', 'false');
+    }
+    return { key: key, level: level };
   }
 
   function _obsKeydown(e) {
@@ -706,7 +778,15 @@ window.PageDashboard = (function () {
     if (_popFor && e.target === _popFor) _hidePop();
   }
 
+  function _onScrollClose(e) {
+    if (!mixPop) return;
+    var pop = document.getElementById('dash-mix-pop');
+    if (pop && e.target && pop.contains && pop.contains(e.target)) return;
+    _closeMixPop();
+  }
+
   function _onResize() {
+    _placeMixPop();
     clearTimeout(_resizeTimer);
     _resizeTimer = setTimeout(function () {
       var card = _obsCard();
@@ -759,6 +839,8 @@ window.PageDashboard = (function () {
 
   /* ── Delegated click handler ────────────────────────────── */
   function _handleClick(e) {
+    // A click outside the open segment list closes it.
+    if (mixPop && !e.target.closest('#dash-mix-pop, .dash-mix-seg')) _closeMixPop();
     var el = e.target.closest('[data-action]');
     if (!el) return;
     var action = el.dataset.action;
@@ -803,6 +885,36 @@ window.PageDashboard = (function () {
       obsAdd: function () {
         openObsDialog(el.dataset.sid);
       },
+      mixSeg: function () {
+        var key = el.dataset.key;
+        var level = Number(el.dataset.level);
+        var was = _closeMixPop();
+        if (was && was.key === key && was.level === level) return;
+        mixPop = { key: key, level: level };
+        render();
+        var pop = document.getElementById('dash-mix-pop');
+        var first = pop && pop.querySelector('a, button');
+        if (first) first.focus();
+      },
+      mixClose: function () {
+        var was = _closeMixPop();
+        var seg =
+          was && document.querySelector('.dash-mix-seg[data-key="' + was.key + '"][data-level="' + was.level + '"]');
+        if (seg) seg.focus();
+      },
+      helpRule: function () {
+        helpRuleOpen = !helpRuleOpen;
+        render();
+      },
+      studentView: function () {
+        studentView = el.dataset.view === 'grid' ? 'grid' : 'cards';
+        _writePref(STUDENT_VIEW_KEY, studentView === 'grid' ? 'grid' : null);
+        render();
+      },
+      studentNames: function () {
+        _setNamesHidden(!namesHidden);
+        renderObsCard(null);
+      },
       // The sort menu is handled on change (_handleChange). Handling it on
       // click too re-rendered the toolbar as the menu opened, which closed it
       // before an option could be picked.
@@ -835,6 +947,15 @@ window.PageDashboard = (function () {
       render();
       return;
     }
+    if (el.dataset.action === 'helpRuleBelow' || el.dataset.action === 'helpRuleMin') {
+      if (el.dataset.action === 'helpRuleBelow') helpRule.below = Number(el.value);
+      else helpRule.min = Number(el.value);
+      _writePref(HELP_RULE_KEY, JSON.stringify(helpRule));
+      render();
+      var again = document.querySelector('[data-action="' + el.dataset.action + '"]');
+      if (again) again.focus();
+      return;
+    }
     // Delegate cm/cw change handlers
     CM.handleChange(el);
   }
@@ -844,6 +965,12 @@ window.PageDashboard = (function () {
   }
 
   function _handleKeydown(e) {
+    if (e.key === 'Escape' && mixPop) {
+      var was = _closeMixPop();
+      var seg = document.querySelector('.dash-mix-seg[data-key="' + was.key + '"][data-level="' + was.level + '"]');
+      if (seg) seg.focus();
+      return;
+    }
     if (_obsKeydown(e)) return;
     CM.handleKeydown(e);
   }
@@ -861,6 +988,10 @@ window.PageDashboard = (function () {
     _obsNavKey = null;
     namesHidden = _readPref(HIDE_NAMES_KEY) === '1';
     document.body.classList.toggle('fv-names-hidden', namesHidden);
+    studentView = _readPref(STUDENT_VIEW_KEY) === 'grid' ? 'grid' : 'cards';
+    helpRule = DashInsights.readRule(_readPref(HELP_RULE_KEY));
+    helpRuleOpen = false;
+    mixPop = null;
     CM.configure({ activeCourse: activeCourse, onRender: render, onCourseChange: switchCourse });
     CM.resetState();
 
@@ -888,6 +1019,8 @@ window.PageDashboard = (function () {
     _addDocListener('mouseout', _onMouseout);
     _addDocListener('focusin', _onFocusin);
     _addDocListener('focusout', _onFocusout);
+    // Scrolling moves the segment the open list belongs to: close it.
+    _addDocListener('scroll', _onScrollClose, true);
     window.addEventListener('resize', _onResize);
     CM.initDrag();
 

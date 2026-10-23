@@ -83,6 +83,18 @@
   display: flex;
   align-items: center;
 }
+/* The students a dashboard link opened the gradebook on; a click shows all. */
+.gb-student-filter {
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--link);
+  background: var(--focus-banner-bg);
+  border: 1px solid var(--focus-banner-border);
+  border-radius: 14px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
 .gb-search-icon {
   position: absolute;
   left: 9px;

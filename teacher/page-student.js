@@ -559,6 +559,7 @@ window.PageStudent = (function () {
       '<span class="stu-comp-bars" aria-hidden="true">' +
       (bars || '<span class="stu-sub">No scores yet</span>') +
       '</span>' +
+      _classCompHtml(ctx, sec) +
       '<span class="stu-comp-latest"><span>' +
       esc(_latestLine(cid, sec, ctx.assessMap)) +
       '</span><span class="stu-sub dash-tag-evidence">' +
@@ -580,6 +581,78 @@ window.PageStudent = (function () {
       '" style="display:none"></div>' +
       '</div>' +
       '</div>'
+    );
+  }
+
+  /* Where the class sits on a competency: how many students are at each
+     proficiency, a ▼ over this student's, and how many are below Proficient.
+     A Letter class sees the class average. */
+  function _classCompHtml(ctx, sec) {
+    var cid = ctx.cid;
+    var dist = competencyDistribution(cid, ctx.classIds, { sectionId: sec.id });
+    var scored = dist.bands.reduce(function (n, b) {
+      return n + b.ids.length;
+    }, 0);
+    if (!scored) return '<span class="stu-comp-class"><span class="stu-sub">Class Not Scored</span></span>';
+    if (courseGradeMode(cid) === 'letter') {
+      return (
+        '<span class="stu-comp-class"><span class="stu-sub">Class Avg ' +
+        esc(formatLevel(cid, dist.avg)) +
+        '</span></span>'
+      );
+    }
+    var mine = dist.values[studentId];
+    var myLevel = mine > 0 ? Math.max(1, Math.min(4, Math.round(mine))) : 0;
+    var before = 0;
+    dist.bands.forEach(function (b) {
+      if (b.level < myLevel) before += b.ids.length;
+    });
+    var at = myLevel ? ((before + dist.bands[myLevel - 1].ids.length / 2) / scored) * 100 : 0;
+    var below = dist.bands[0].ids.length + dist.bands[1].ids.length;
+    var label =
+      'Class: ' +
+      dist.bands
+        .map(function (b) {
+          return b.ids.length + ' ' + b.label;
+        })
+        .join(', ') +
+      (myLevel ? '. ' + displayNameFirst(ctx.student) + ' is ' + PROF_LABELS[myLevel] + '.' : '.');
+    return (
+      '<span class="stu-comp-class" role="img" aria-label="' +
+      esc(label) +
+      '">' +
+      '<span class="stu-class-track">' +
+      (myLevel ? '<span class="stu-class-mark" style="left:' + Math.round(at) + '%">\u25BC</span>' : '') +
+      '</span>' +
+      '<span class="stu-class-bar">' +
+      dist.bands
+        .filter(function (b) {
+          return b.ids.length > 0;
+        })
+        .map(function (b) {
+          return (
+            '<span style="flex:' +
+            b.ids.length +
+            ' 1 0;background:var(--score-' +
+            b.level +
+            '-bg);color:var(--score-' +
+            b.level +
+            '-text)">' +
+            b.ids.length +
+            '</span>'
+          );
+        })
+        .join('') +
+      '</span>' +
+      '<span class="stu-sub">' +
+      below +
+      ' of ' +
+      scored +
+      ' Below Proficient</span>' +
+      '<span class="stu-sub">Class Avg ' +
+      esc(formatLevel(cid, dist.avg)) +
+      '</span>' +
+      '</span>'
     );
   }
 
@@ -767,6 +840,9 @@ window.PageStudent = (function () {
         (cell.level > 0 ? cell.level : 0) +
         '">' +
         esc(_cellText(cell, a)) +
+        '</span></span>' +
+        '<span class="stu-assess-class"><span class="stu-class-avg" title="Class average">Class ' +
+        esc(classColumnAverageText(cid, a, classColumnAverage(cid, ctx.classStudents, { assessment: a }))) +
         '</span></span>' +
         '<span class="stu-assess-toward">' +
         esc(towardText) +
@@ -1133,9 +1209,14 @@ window.PageStudent = (function () {
     var termAssessments = assessments.filter(function (a) {
       return assessmentInActiveTerm(cid, a);
     });
+    var classStudents = getStudents(cid);
     var ctx = {
       cid: cid,
       student: student,
+      classStudents: classStudents,
+      classIds: classStudents.map(function (s) {
+        return s.id;
+      }),
       sections: sections,
       assessments: termAssessments,
       assessMap: assessMap,

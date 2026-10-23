@@ -45,6 +45,8 @@ window.PageGradebook = (function () {
   var filterSections = [];
   var filterModules = [];
   var filterCategories = [];
+  // Students a dashboard link opened the gradebook on (?students=), until cleared.
+  var filterStudentIds = [];
   var searchQuery = '';
   var searchText = ''; // what the box holds, spaces and capitals as typed
   var sortCol = null;
@@ -94,6 +96,7 @@ window.PageGradebook = (function () {
     _flushActiveScoreEditor();
     activeCourse = cid;
     if (!(await switchActiveCourse(cid))) return;
+    filterStudentIds = [];
     filterSections = [];
     filterModules = [];
     filterCategories = [];
@@ -226,6 +229,12 @@ window.PageGradebook = (function () {
     var isLetter = courseShowsLetterGrades(course);
     var scores = getScores(cid);
 
+    if (filterStudentIds.length) {
+      students = students.filter(function (s) {
+        return filterStudentIds.indexOf(s.id) >= 0;
+      });
+    }
+
     if (searchQuery) {
       students = students.filter(function (s) {
         return (
@@ -337,6 +346,15 @@ window.PageGradebook = (function () {
       '</span><input class="gb-search-input" type="text" placeholder="Search…" value="' +
       esc(searchText) +
       '" data-action-input="gbSearch" aria-label="Search students"></div>';
+
+    if (filterStudentIds.length) {
+      html +=
+        '<button class="gb-student-filter" data-action="clearStudentFilter" aria-label="Show all students">Showing ' +
+        filterStudentIds.length +
+        ' Student' +
+        (filterStudentIds.length === 1 ? '' : 's') +
+        ' <span aria-hidden="true">\u00D7</span></button>';
+    }
 
     html +=
       '<div style="margin-left:auto;display:flex;align-items:center;gap:12px">' +
@@ -2678,6 +2696,12 @@ window.PageGradebook = (function () {
       toggleFilterStrip: function () {
         toggleFilterStrip();
       },
+      clearStudentFilter: function () {
+        filterStudentIds = [];
+        // Drop ?students= from the address so a reload shows everyone too.
+        history.replaceState(null, '', '#/gradebook?course=' + activeCourse);
+        render();
+      },
       toggleCategoryFilter: function () {
         toggleCategoryFilter(el.dataset.catid);
       },
@@ -2749,6 +2773,16 @@ window.PageGradebook = (function () {
     filterSections = [];
     filterModules = [];
     filterCategories = [];
+    // From a dashboard link: these students, and one competency's columns.
+    filterStudentIds = params.students ? String(params.students).split(',').filter(Boolean) : [];
+    var linkedSection = params.section;
+    if (
+      linkedSection &&
+      getSections(activeCourse).some(function (sec) {
+        return sec.id === linkedSection;
+      })
+    )
+      filterSections = [linkedSection];
     searchQuery = '';
     searchText = '';
     sortCol = null;

@@ -83,7 +83,7 @@ test('every box on the dashboard is 12px from the next', async ({ page }) => {
   await openDashboard(page);
   const gaps = await page.evaluate(() => {
     var boxes = Array.prototype.slice
-      .call(document.querySelectorAll('.dash-overview-section, .dash-card'))
+      .call(document.querySelectorAll('.dash-overview-section, .dash-students-head, .dash-card'))
       .slice(0, 12)
       .map(function (el) {
         var r = el.getBoundingClientRect();
