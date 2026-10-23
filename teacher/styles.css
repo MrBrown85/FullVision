@@ -166,6 +166,9 @@
   /* ── Layout ──────────────────────────────────────────────── */
   --dock-h: 52px;
   --toolbar-h: 52px;
+  /* Page toolbars: every control is --control-h tall, a filter chip --chip-h. */
+  --control-h: 32px;
+  --chip-h: 24px;
   --sidebar-w: 240px;
 }
 
@@ -637,6 +640,7 @@ body.offline-active #app-dock {
   -webkit-appearance: none;
   appearance: none;
   max-width: 260px;
+  height: var(--control-h);
 }
 .term-select:hover {
   border-color: var(--text-3);
@@ -651,6 +655,7 @@ body.offline-active #app-dock {
    (width, margin). Focus uses the shared input ring above. */
 .class-picker {
   max-width: 100%;
+  height: var(--control-h);
   /* Same padding and border as the term, sort and search controls beside
      it, so every toolbar control is the same height. */
   padding: 6px 30px 6px 10px;
@@ -672,9 +677,23 @@ body.offline-active #app-dock {
   border-color: var(--text-3);
 }
 
+/* ── Page toolbars ─────────────────────────────────────────── */
+/* The bar under the dock on every page (Dashboard, Assignments, Gradebook,
+   Reports): its controls start 12px in, in line with the boxes below, sit
+   10px apart and are one height, with one hairline under the bar. A page's
+   own class adds only what its bar needs beyond this. */
+.page-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px 10px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border-bottom: 0.5px solid var(--divider-medium);
+  flex-shrink: 0;
+}
 .tb-action-btn {
   padding: 8px 16px;
-  min-height: 32px;
+  height: var(--control-h);
   line-height: 1;
   font-family: var(--font-base);
   font-size: var(--text-base);
@@ -697,10 +716,22 @@ body.offline-active #app-dock {
 .tb-action-btn:active {
   transform: scale(0.97);
 }
+/* An outline action beside the blue one (Class Management, Print Grades,
+   Add from Another Class). */
+.tb-action-btn.tb-action-secondary {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.tb-action-btn.tb-action-secondary:hover {
+  filter: none;
+  box-shadow: none;
+  background: var(--overlay-hover);
+}
 /* Toolbar toggle button — macOS-style pill toggle */
 .tb-toggle-btn {
   padding: 4px 12px;
-  min-height: 28px;
+  height: var(--control-h);
   line-height: 1;
   font-family: var(--font-base);
   font-size: var(--text-base);
@@ -752,7 +783,9 @@ body.offline-active #app-dock {
   font-family: var(--font-base);
   font-size: var(--text-base);
   font-weight: 500;
-  line-height: 1.2;
+  /* With the track's 2px and 5px padding, a control height (--control-h)
+     like the toolbar controls beside it. */
+  line-height: calc(var(--control-h) - 14px);
   white-space: nowrap;
   text-align: center;
   text-decoration: none;
@@ -794,6 +827,7 @@ body.offline-active #app-dock {
 .seg-sm .seg-btn {
   padding: 3px 9px;
   font-size: var(--text-sm);
+  line-height: 1.2;
   border-radius: 4px;
 }
 
@@ -842,6 +876,7 @@ body.offline-active #app-dock {
 }
 #gb-roster-search {
   width: 100%;
+  height: var(--control-h);
   font-family: var(--font-base);
   font-size: var(--text-base);
   background: var(--surface);

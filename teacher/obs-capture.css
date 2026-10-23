@@ -223,7 +223,7 @@ span.obsc-chip-label {
 
 /* ── Add ─────────────────────────────────────────────────── */
 .obsc-add {
-  min-height: 30px;
+  height: var(--control-h);
   padding: 5px 16px;
   border: 0;
   border-radius: var(--radius-sm, 8px);
@@ -817,7 +817,7 @@ span.obsc-chip-label {
 
 /* Save as Starter: the button beside Add, and its dialog */
 .obsc-save-starter {
-  min-height: 30px;
+  height: var(--control-h);
   padding: 5px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm, 8px);

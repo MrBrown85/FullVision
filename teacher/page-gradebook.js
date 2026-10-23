@@ -274,7 +274,7 @@ window.PageGradebook = (function () {
     var modules = getModules(cid);
     var activeFilterCount = filterCategories.length + filterSections.length + filterModules.length;
 
-    html += '<div class="gb-toolbar">';
+    html += '<div class="page-toolbar gb-toolbar">';
     var courseOpts = getPickerCourses(activeCourse)
       .map(function (c) {
         return (

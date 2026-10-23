@@ -19,14 +19,7 @@
 
 /* ── Layer 1: Primary bar ──────────────────────────────────── */
 .gb-toolbar {
-  display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 12px;
-  padding: 10px 20px;
-  background: var(--surface);
-  border-bottom: 0.5px solid var(--divider-medium);
-  flex-shrink: 0;
   position: relative;
   z-index: 1;
 }
@@ -43,9 +36,10 @@
   display: flex;
   align-items: center;
   gap: 5px;
+  height: var(--control-h);
   padding: 5px 12px;
   font-family: var(--font-base);
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
   font-weight: 500;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -97,6 +91,7 @@
   pointer-events: none;
 }
 .gb-search-input {
+  height: var(--control-h);
   font-family: var(--font-base);
   font-size: var(--text-base);
   padding: 5px 12px 5px 28px;
@@ -145,7 +140,8 @@
   display: none;
   align-items: center;
   gap: 10px;
-  padding: 8px 16px;
+  /* In line with the toolbar above it. */
+  padding: 8px 12px;
   background: rgba(0, 0, 0, 0.015);
   border-bottom: 0.5px solid var(--divider-medium);
   animation: filterSlideIn 0.2s ease-out;
@@ -190,7 +186,8 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 3px 10px;
+  height: var(--chip-h);
+  padding: 0 10px;
   font-family: var(--font-base);
   font-size: var(--text-sm);
   font-weight: 500;

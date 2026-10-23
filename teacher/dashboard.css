@@ -984,13 +984,6 @@ body.fv-names-hidden .dash-search-input:not(:placeholder-shown) {
 
 /* ── Toolbar ────────────────────────────────────────────────── */
 .dash-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  /* Controls start 12px in, in line with the boxes below. */
-  padding: 10px 12px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--divider-strong);
   flex-wrap: wrap;
 }
 .dash-search-wrap {
@@ -1008,43 +1001,33 @@ body.fv-names-hidden .dash-search-input:not(:placeholder-shown) {
 }
 .dash-search-input {
   width: 100%;
+  height: var(--control-h);
   padding: 6px 10px 6px 28px;
   font-family: var(--font-base);
   font-size: var(--text-base);
-  border: 1px solid var(--border);
+  /* A toolbar search: filled, outlined only while typing. */
+  border: 1px solid transparent;
   border-radius: 8px;
-  background: var(--surface);
-  transition: border 0.12s;
+  background: var(--overlay-hover);
+  color: var(--text);
+  /* Not the text colour: Hide Names turns it transparent at once. */
+  transition:
+    background-color 0.2s,
+    border-color 0.2s,
+    box-shadow 0.2s;
   outline: none;
 }
 .dash-search-input:focus {
-  border-color: var(--active);
-}
-.dash-sort-select {
-  font-family: var(--font-base);
-  font-size: var(--text-base);
-  font-weight: 500;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 6px 28px 6px 10px;
-  cursor: pointer;
   background: var(--surface);
-  color: var(--text-2);
-  transition: border 0.12s;
-  -webkit-appearance: none;
-  appearance: none;
-  background-image: var(--select-chevron);
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-}
-.dash-sort-select:hover {
-  border-color: var(--text-3);
+  border-color: var(--active);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.12);
 }
 .dash-filter-chip {
   display: flex;
   align-items: center;
   gap: 5px;
-  padding: 5px 12px;
+  height: var(--chip-h);
+  padding: 0 10px;
   font-family: var(--font-base);
   font-size: var(--text-sm);
   font-weight: 500;
@@ -1083,23 +1066,6 @@ body.fv-names-hidden .dash-search-input:not(:placeholder-shown) {
 }
 /* Class Management is settings, so it is a secondary (outline) button:
    solid blue is kept for a screen's main action (docs/DECISIONS.md). */
-.dash-add-btn {
-  padding: 6px 14px;
-  font-family: var(--font-base);
-  font-size: var(--text-base);
-  font-weight: 600;
-  border-radius: 8px;
-  white-space: nowrap;
-  background: var(--surface);
-  color: var(--text);
-  border: 1px solid var(--border);
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.dash-add-btn:hover {
-  background: var(--overlay-hover);
-  border-color: var(--text-3);
-}
 .dash-toolbar-spacer {
   flex: 1;
 }
