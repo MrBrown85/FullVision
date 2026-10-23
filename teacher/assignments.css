@@ -2329,18 +2329,30 @@
     background var(--duration-micro),
     color var(--duration-micro);
 }
+/* In colour, so they are easy to find while grading: Complete in the
+   Proficient green, Incomplete in the Emerging red, tinted until chosen and
+   filled once chosen, as a rubric level is. Size and spacing unchanged. */
+.cmp-btn.cmp-complete {
+  background: var(--score-3-bg);
+  color: var(--score-3-text);
+}
+.cmp-btn.cmp-incomplete {
+  background: var(--score-1-bg);
+  color: var(--score-1-text);
+}
 .cmp-btn:hover {
-  color: var(--text);
+  filter: brightness(0.96);
 }
 .cmp-btn.active {
-  background: var(--seg-thumb);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 .cmp-btn.cmp-complete.active {
-  color: var(--score-3-dark);
+  background: var(--score-3);
+  color: #fff;
 }
 .cmp-btn.cmp-incomplete.active {
-  color: var(--score-1-dark);
+  background: var(--score-1);
+  color: #fff;
 }
 .score-row.has-status .cmp-cell,
 .score-row.has-status .pts-input-cell {
