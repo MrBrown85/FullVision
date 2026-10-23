@@ -5074,7 +5074,7 @@ window.DashClassManager = (function () {
       '<div class="confirm-title" id="cm-dup-title">Duplicate ' +
       esc(courseDisplayName(src)) +
       '</div>' +
-      '<div class="confirm-message">Settings, curriculum and categories are copied. Students, assessments and rubrics are not.</div>' +
+      '<div class="confirm-message">Settings, curriculum, categories and rubrics are copied. Students and assessments are not.</div>' +
       '<div class="cm-field"><label class="cm-label" id="cm-dup-block-label">Block for the New Class</label>' +
       blockPickerHtml('cm-dup-block', '') +
       '</div>' +
@@ -5157,6 +5157,20 @@ window.DashClassManager = (function () {
       clone._customized = true;
       clone._version = 1;
       saveLearningMap(newCourse.id, clone);
+    }
+    // Rubrics, as new rows with their competencies matched into the copy's
+    // learning map by name. Not linked to the source: next year's class
+    // shouldn't offer to update last year's (Copy to Class links sections).
+    var srcRubrics = getRubrics(sourceCid) || [];
+    if (srcRubrics.length && window.RubricLibrary) {
+      saveRubrics(
+        newCourse.id,
+        srcRubrics.filter(Boolean).map(function (r) {
+          var copy = RubricLibrary.cloneRubric(sourceCid, newCourse.id, r);
+          delete copy.copyGroup;
+          return copy;
+        }),
+      );
     }
     cmSelectedCourse = newCourse.id;
     cmMode = 'edit';
