@@ -285,3 +285,65 @@ test.describe('Rubric Bank, delete', () => {
     expect(left).toEqual({ rubrics: ['rubric-002'], link: null });
   });
 });
+
+test.describe('Rubric Bank, class stats', () => {
+  const TALKS = {
+    ...ASSESSMENT,
+    id: 'assess-talk',
+    title: 'Talks',
+    date: '2026-03-25',
+    tagIds: [],
+    rubricId: 'rubric-002',
+  };
+
+  test.beforeEach(async ({ page }) => {
+    await mockAuth(page);
+    await seedCourse(page);
+    await seedStudents(page);
+    await page.addInitScript(
+      ({ rubrics, assessments, cid }) => {
+        localStorage.setItem('gb-rubrics-' + cid, JSON.stringify(rubrics));
+        localStorage.setItem('gb-assessments-' + cid, JSON.stringify(assessments));
+      },
+      { rubrics: [LAB, TALK], assessments: [ASSESSMENT, TALKS], cid: TEST_COURSE.id },
+    );
+    await seedScores(page, {
+      'stu-001': { 'assess-rubric-001': { QAP: 4 }, 'assess-talk': { 'crit-voice': 3 } },
+      'stu-002': { 'assess-rubric-001': { QAP: 3 }, 'assess-talk': { 'crit-voice': 2 } },
+    });
+    await gotoApp(page, '/dashboard');
+  });
+
+  test('a pie per criterion, hidden by the switch until it is turned back on', async ({ page }) => {
+    let bank = await openBank(page);
+    await expect(bank.locator('.rb-stats')).toContainText('2 scores across 1 assessment');
+    await expect(bank.locator('.rb-stats')).toContainText('Only you see these. They are never printed.');
+    await expect(bank.locator('.rb-pie')).toHaveAttribute(
+      'aria-label',
+      'Extending 1, Proficient 1, Developing 0, Emerging 0',
+    );
+    await expect(bank.locator('.rb-overall')).toHaveCount(0);
+
+    await bank.getByRole('switch', { name: 'Show Class Stats' }).click();
+    await expect(bank.locator('.rb-pie')).toHaveCount(0);
+    await bank.locator('[data-rb="close"]').click();
+    bank = await openBank(page);
+    await expect(bank.locator('.rb-pie')).toHaveCount(0);
+    await expect(bank.getByRole('switch', { name: 'Show Class Stats' })).not.toBeChecked();
+    await bank.getByRole('switch', { name: 'Show Class Stats' }).click();
+    await expect(bank.locator('.rb-pie')).toHaveCount(1);
+  });
+
+  test('a custom-criteria rubric shows its overall levels', async ({ page }) => {
+    const bank = await openBank(page);
+    await bank.locator('.rb-row', { hasText: 'Presentation Rubric' }).click();
+    await expect(bank.locator('.rb-sub')).toContainText('Custom Criteria (Not Linked to Competencies)');
+    const overall = bank.locator('.rb-overall');
+    await expect(overall).toContainText('Overall Level');
+    await expect(overall.locator('.rb-overall-bar')).toHaveAttribute(
+      'aria-label',
+      'Overall: Extending 0, Proficient 1, Developing 1, Emerging 0',
+    );
+    await expect(overall.locator('.rb-dist-seg')).toHaveText(['1', '1']);
+  });
+});
