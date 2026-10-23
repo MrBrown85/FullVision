@@ -839,8 +839,56 @@
         return;
       }
 
+      if (action === 'm-grade-crit') {
+        MGrade.setCriterionScore(
+          _cid,
+          target.getAttribute('data-sid'),
+          target.getAttribute('data-aid'),
+          target.getAttribute('data-critid'),
+          parseInt(target.getAttribute('data-score'), 10),
+        );
+        return;
+      }
+
+      if (action === 'm-grade-view') {
+        MGrade.setGradeView(_cid, target.getAttribute('data-aid'), target.getAttribute('data-view'));
+        return;
+      }
+
+      if (action === 'm-grade-checks') {
+        MGrade.toggleChecklist(
+          _cid,
+          target.getAttribute('data-sid'),
+          target.getAttribute('data-aid'),
+          target.getAttribute('data-critid'),
+        );
+        return;
+      }
+
+      if (action === 'm-grade-tick') {
+        MGrade.tickCheck(
+          _cid,
+          target.getAttribute('data-sid'),
+          target.getAttribute('data-aid'),
+          target.getAttribute('data-critid'),
+          target.getAttribute('data-checkid'),
+          target.checked,
+        );
+        return;
+      }
+
       if (action === 'm-grade-mod') {
         var modBox = target.closest('.m-score-mods');
+        if (modBox.getAttribute('data-critid')) {
+          MGrade.setCriterionMod(
+            _cid,
+            modBox.getAttribute('data-sid'),
+            modBox.getAttribute('data-aid'),
+            modBox.getAttribute('data-critid'),
+            parseInt(target.closest('[data-mod]').getAttribute('data-mod'), 10),
+          );
+          return;
+        }
         MGrade.setScoreMod(
           _cid,
           modBox.getAttribute('data-sid'),
