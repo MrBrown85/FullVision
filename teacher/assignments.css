@@ -1385,54 +1385,533 @@
     0 0 0 3.5px var(--cc-color);
 }
 
-/* ── Rubric Builder ─────────────────────────────────────────── */
-.rubric-list {
-  list-style: none;
-  padding: 0;
-  margin: 0 0 8px;
-}
-.rubric-list-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--divider-subtle);
-  font-size: var(--text-md);
-}
-.rubric-list-item:last-child {
-  border-bottom: none;
-}
-.rubric-list-name {
-  flex: 1;
-  font-weight: 500;
-  color: var(--text);
-}
-.rubric-list-count {
-  font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
-  font-size: var(--text-sm);
-  color: var(--text-3);
-}
-.rubric-list-btn {
-  width: 24px;
-  height: 24px;
-  border-radius: 4px;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  cursor: pointer;
-  font-size: var(--text-sm);
-  color: var(--text-3);
+/* ── Rubric Bank ────────────────────────────────────────────── */
+/* The Rubrics button's window (teacher/rubric-bank.js). It sits under the
+   rubric editor (5000) and the confirm dialogs (10002) it opens. */
+.rb-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  background: rgba(0, 0, 0, 0.32);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.1s;
+  padding: 24px;
+  animation: fade-in var(--duration-normal) ease-out;
 }
-.rubric-list-btn:hover {
+.rb-card {
+  width: min(1184px, 100%);
+  height: min(760px, 100%);
+  background: var(--surface);
+  border-radius: 14px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-family: var(--font-base);
+  color: var(--text);
+}
+.rb-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 60px;
+  flex-shrink: 0;
+  padding: 0 12px 0 24px;
+  border-bottom: 1px solid var(--divider-medium);
+}
+.rb-heading {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+.rb-head-gap {
+  flex: 1;
+}
+.rb-close {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-3);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.rb-close:hover {
+  background: var(--overlay-hover);
+}
+.rb-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Left: search and the list */
+.rb-side {
+  width: 300px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--divider-medium);
+  background: var(--bg);
+}
+.rb-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  margin: 12px 12px 4px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-3);
+}
+.rb-search:focus-within {
   border-color: var(--active);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.12);
+}
+.rb-search input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--text);
+}
+/* The box shows focus; the input inside it does not draw a second ring. */
+.rb-search input:focus,
+.rb-search input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+.rb-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 8px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rb-group {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-3);
+  padding: 12px 12px 4px;
+}
+.rb-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 9px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  color: var(--text);
+  cursor: pointer;
+}
+.rb-row:hover {
+  background: var(--overlay-hover);
+}
+.rb-row.is-selected {
+  background: var(--active-light);
+}
+.rb-row:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: -2px;
+}
+.rb-row-name {
+  font-size: var(--text-base);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rb-row.is-selected .rb-row-name {
   color: var(--link);
 }
-.rubric-list-btn.delete:hover {
-  border-color: var(--score-1);
-  color: var(--score-1);
+.rb-row-meta {
+  font-size: var(--text-xs);
+  color: var(--text-3);
+}
+.rb-empty-list {
+  padding: 16px 12px;
+  font-size: var(--text-sm);
+  color: var(--text-3);
+}
+.rb-hint {
+  padding: 10px 16px;
+  border-top: 1px solid var(--divider-subtle);
+  font-size: var(--text-xs);
+  color: var(--text-3);
+}
+
+/* Right: the selected rubric */
+.rb-pane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 24px;
+}
+.rb-pane-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.rb-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.rb-title {
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.rb-rename {
+  font: inherit;
+  font-size: 1.25rem;
+  font-weight: 700;
+  padding: 4px 8px;
+  border: 1px solid var(--active);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  min-width: 320px;
+}
+.rb-rename.is-invalid {
+  border-color: var(--danger);
+}
+.rb-sub {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: var(--text-sm);
+  color: var(--text-3);
+}
+.rb-linked {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 12px;
+  background: var(--active-light);
+  color: var(--link);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.rb-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.rb-btn {
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  font: inherit;
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.rb-btn:hover {
+  background: var(--overlay-hover);
+}
+.rb-btn-primary {
+  background: var(--active);
+  border-color: var(--active);
+  color: #fff;
+  font-weight: 600;
+}
+.rb-btn-primary:hover {
+  background: var(--active);
+  filter: brightness(0.92);
+}
+.rb-btn-new,
+.rb-btn-link {
+  color: var(--link);
+  font-weight: 600;
+}
+.rb-more {
+  width: 36px;
+  padding: 0;
+  justify-content: center;
+}
+.rb-more.is-open {
+  background: var(--surface-2);
+}
+.rb-more-wrap {
+  position: relative;
+}
+.rb-menu {
+  position: absolute;
+  right: 0;
+  top: 44px;
+  z-index: 2;
+  width: 200px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
+}
+.rb-menu button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  font: inherit;
+  font-size: var(--text-base);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.rb-menu button:hover,
+.rb-menu button:focus-visible {
+  background: var(--overlay-hover);
+  outline: none;
+}
+.rb-menu button.is-danger {
+  color: var(--danger);
+}
+.rb-menu-sep {
+  height: 1px;
+  margin: 6px 0;
+  background: var(--divider-medium);
+}
+
+/* The rubric, read only, in the class's level order */
+.rb-grid-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.rb-grid {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 6px 0;
+  margin: 0 -6px;
+  table-layout: fixed;
+}
+.rb-grid th,
+.rb-grid td {
+  text-align: left;
+  vertical-align: top;
+}
+.rb-crit-head {
+  width: 210px;
+  padding: 8px 10px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-3);
+}
+.rb-level-head {
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.rb-level-head span {
+  display: inline-block;
+}
+.rb-level-value {
+  float: right;
+}
+.rb-level-head.l4 {
+  background: var(--score-4-bg);
+  color: var(--score-4-text);
+}
+.rb-level-head.l3 {
+  background: var(--score-3-bg);
+  color: var(--score-3-text);
+}
+.rb-level-head.l2 {
+  background: var(--score-2-bg);
+  color: var(--score-2-text);
+}
+.rb-level-head.l1 {
+  background: var(--score-1-bg);
+  color: var(--score-1-text);
+}
+.rb-crit,
+.rb-cell {
+  padding: 12px 10px;
+  border-top: 1px solid var(--divider-medium);
+}
+.rb-crit {
+  font-weight: 400;
+}
+.rb-crit-name {
+  display: block;
+  font-size: var(--text-base);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.rb-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+.rb-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 11px;
+  background: var(--bg-secondary);
+  color: var(--text-2);
+  font-size: var(--text-xs);
+}
+.rb-weight {
+  display: block;
+  margin-top: 6px;
+  font-size: var(--text-xs);
+  color: var(--text-3);
+}
+.rb-cell {
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--text);
+  overflow-wrap: break-word;
+}
+.rb-cell-value {
+  display: block;
+  margin-top: 6px;
+  font-size: var(--text-xs);
+  color: var(--text-3);
+}
+.rb-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--divider-medium);
+}
+.rb-used {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+.rb-used-label {
+  margin-right: 4px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-2);
+}
+.rb-use-chip {
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--surface);
+  font: inherit;
+  font-size: var(--text-xs);
+  color: var(--link);
+  cursor: pointer;
+}
+.rb-use-chip:hover {
+  border-color: var(--active);
+}
+.rb-use-more {
+  height: 26px;
+  padding: 0 8px;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.rb-use-more:hover {
+  color: var(--link);
+}
+.rb-empty-pane {
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+}
+.rb-empty-title {
+  font-size: var(--text-md);
+  color: var(--text-2);
+}
+.rb-empty-actions {
+  display: flex;
+  gap: 8px;
+}
+/* Smaller laptops: a narrower list and criterion column leave the four
+   level columns room for whole words. */
+@media (max-width: 1240px) {
+  .rb-side {
+    width: 240px;
+  }
+  .rb-crit-head {
+    width: 160px;
+  }
+  .rb-pane {
+    padding: 18px 18px;
+  }
+}
+@media (max-width: 760px) {
+  .rb-overlay {
+    padding: 0;
+  }
+  .rb-card {
+    height: 100%;
+    border-radius: 0;
+  }
+  .rb-body {
+    flex-direction: column;
+  }
+  .rb-side {
+    width: auto;
+    max-height: 40%;
+    border-right: none;
+    border-bottom: 1px solid var(--divider-medium);
+  }
+  .rb-hint {
+    display: none;
+  }
+}
+@media print {
+  .rb-overlay {
+    display: none;
+  }
 }
 
 /* Rubric editor modal overlay */
@@ -2867,57 +3346,6 @@
   font-style: italic;
 }
 
-/* ── Settings Panel Toggle ─────────────────────────────── */
-/* ── Toolbar Dropdown Panels ──────────────────────────────── */
-.tb-dropdown-wrap {
-  position: relative;
-}
-.tb-dropdown-btn {
-  height: var(--control-h);
-  padding: 5px 12px;
-  font-family: var(--font-base);
-  font-size: var(--text-base);
-  /* Weighted like the outline actions beside it. */
-  font-weight: 600;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--text);
-  cursor: pointer;
-  transition: all 0.12s;
-  white-space: nowrap;
-}
-.tb-dropdown-btn:hover {
-  border-color: var(--text-3);
-  color: var(--text);
-}
-.tb-dropdown-btn.open {
-  border-color: var(--active);
-  color: var(--active);
-  background: rgba(0, 122, 255, 0.04);
-}
-.tb-dropdown-panel {
-  display: none;
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  z-index: 9000;
-  background: var(--surface);
-  border: 1px solid var(--divider-strong);
-  border-radius: 12px;
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.14),
-    0 2px 8px rgba(0, 0, 0, 0.06);
-  min-width: 300px;
-  max-width: 420px;
-  max-height: 70vh;
-  overflow-y: auto;
-  padding: 14px 16px;
-}
-.tb-dropdown-panel.open {
-  display: block;
-}
-
 /* ── Keyboard Navigation Focus ──────────────────────────── */
 .score-group.kb-focus {
   outline: 2px solid var(--active);
@@ -3393,10 +3821,6 @@
   margin-top: 8px;
   font-size: var(--text-xs);
   color: var(--text-3);
-}
-.rubric-list-item .rubric-copy-badge {
-  margin-left: 6px;
-  white-space: nowrap;
 }
 .rubric-linked-removal {
   margin-top: 4px;

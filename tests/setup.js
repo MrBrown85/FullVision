@@ -244,6 +244,7 @@ load('teacher/student-overrides.js');
 load('teacher/rubric-print.js');
 load('teacher/grades-print.js');
 load('teacher/rubric-library.js');
+load('teacher/rubric-bank.js');
 load('teacher/grading-setup-copy.js');
 load('teacher/router.js');
 

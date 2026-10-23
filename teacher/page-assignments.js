@@ -19,7 +19,6 @@ window.PageAssignments = (function () {
   var assessSearch = '';
   var showUngraded = false;
   var rubricViewStates = {};
-  var _rubricsPanelOpen = false;
   var _showingNewForm = false;
   var _editingAssessId = null;
   var collapsedModules = {};
@@ -351,14 +350,7 @@ window.PageAssignments = (function () {
         ? '<button class="tb-action-btn tb-show-all-btn" data-action="clearFocusStudent">Show All Students</button>'
         : '') +
       '<div class="assess-toolbar-actions">' +
-      '<div class="tb-dropdown-wrap">' +
-      '<button class="tb-dropdown-btn' +
-      (_rubricsPanelOpen ? ' open' : '') +
-      '" data-action="toggleToolbarDropdown">Rubrics</button>' +
-      '<div class="tb-dropdown-panel' +
-      (_rubricsPanelOpen ? ' open' : '') +
-      '" id="tb-rubrics-panel"></div>' +
-      '</div>' +
+      '<button class="tb-action-btn tb-action-secondary" data-action="openRubricBank">Rubrics</button>' +
       (window.AssessmentCopy &&
       (AssessmentCopy.copyTargets(cid).sameCourse.length || AssessmentCopy.copyTargets(cid).other.length)
         ? '<button class="tb-action-btn tb-action-secondary" data-action="addFromClass">Add from another class</button>'
@@ -384,37 +376,7 @@ window.PageAssignments = (function () {
       }
     }
 
-    // Rubrics dropdown content
-    var rubrics = getRubrics(cid);
-    var rubHtml = '<div class="settings-title">Rubrics</div><ul class="rubric-list">';
-    if (rubrics.length === 0) {
-      rubHtml += '<li style="font-size:0.875rem;color:var(--text-3);padding:8px 10px">No rubrics yet.</li>';
-    }
-    rubrics.forEach(function (r) {
-      rubHtml +=
-        '<li class="rubric-list-item">' +
-        '<span class="rubric-list-name">' +
-        esc(r.name) +
-        '</span>' +
-        '<span class="rubric-list-count">' +
-        r.criteria.length +
-        ' criteria</span>' +
-        (window.RubricLibrary ? RubricLibrary.renderCopies(cid, r) : '') +
-        '<button class="rubric-list-btn" data-action="editRubricUI" data-rid="' +
-        r.id +
-        '" title="Edit">\u270E</button>' +
-        '<button class="rubric-list-btn" data-action="copyRubricUI" data-rid="' +
-        r.id +
-        '" title="Copy to another class" aria-label="Copy rubric to another class">\u29C9</button>' +
-        '<button class="rubric-list-btn delete" data-action="deleteRubricUI" data-rid="' +
-        r.id +
-        '" title="Delete" aria-label="Delete rubric">\u2715</button>' +
-        '</li>';
-    });
-    rubHtml +=
-      '</ul><button class="lo-add-btn" data-action="newRubricUI" style="display:block;width:100%">+ New Rubric</button>';
-
-    return { toolbarHtml: toolbarHtml, rubHtml: rubHtml };
+    return { toolbarHtml: toolbarHtml };
   }
 
   /* ── Assessment List ────────────────────────────────────── */
@@ -834,8 +796,6 @@ window.PageAssignments = (function () {
     // Render toolbar
     var result = renderAssessToolbar(cid, assessments);
     document.getElementById('page-toolbar-mount').innerHTML = result.toolbarHtml;
-    var rubPanel = document.getElementById('tb-rubrics-panel');
-    if (rubPanel) rubPanel.innerHTML = result.rubHtml;
 
     // Render assessment list
     document.getElementById('main').innerHTML = renderAssessmentList(
@@ -1696,18 +1656,6 @@ window.PageAssignments = (function () {
     render();
     if (isRubric) showDescriptorBar();
     else hideDescriptorBar();
-  }
-
-  function toggleToolbarDropdown() {
-    _rubricsPanelOpen = !_rubricsPanelOpen;
-    _syncToolbarDropdowns();
-  }
-  function _syncToolbarDropdowns() {
-    var rp = document.getElementById('tb-rubrics-panel');
-    if (rp) rp.classList.toggle('open', _rubricsPanelOpen);
-    document.querySelectorAll('.tb-dropdown-btn').forEach(function (btn) {
-      btn.classList.toggle('open', _rubricsPanelOpen);
-    });
   }
 
   /* ── Scoring Functions ──────────────────────────────────── */
@@ -2963,11 +2911,33 @@ window.PageAssignments = (function () {
   }
 
   /* ── Rubric Builder UI ──────────────────────────────────── */
-  /* The toolbar's rubric list sits above the editor modal, so it closes when
-     the editor opens from it. */
+  /* The Rubrics button's window. It sits under the editor modal, so it
+     closes before the editor opens. */
+  function openRubricBank() {
+    if (!window.RubricBank) return;
+    RubricBank.open(activeCourse, {
+      edit: editRubricUI,
+      newRubric: newRubricUI,
+      remove: deleteRubricUI,
+      print: function (rid, aid) {
+        if (window.RubricPrint) RubricPrint.open(activeCourse, aid);
+      },
+      useInNew: function (rid) {
+        showNewForm();
+        var dd = document.getElementById('af-rubric');
+        if (dd) {
+          dd.value = rid;
+          onRubricSelect(rid);
+        }
+      },
+      goToAssessment: function (aid) {
+        openCopyIn(activeCourse, aid);
+      },
+      changed: render,
+    });
+  }
   function _closeRubricsPanel() {
-    _rubricsPanelOpen = false;
-    _syncToolbarDropdowns();
+    if (window.RubricBank) RubricBank.close();
   }
   function newRubricUI() {
     _closeRubricsPanel();
@@ -3012,6 +2982,7 @@ window.PageAssignments = (function () {
     showConfirm('Delete Rubric', msg, 'Delete', 'danger', function () {
       deleteRubric(activeCourse, rubricId);
       render();
+      if (window.RubricBank) RubricBank.refresh();
     });
   }
 
@@ -4311,14 +4282,6 @@ window.PageAssignments = (function () {
     )
       closeMenus();
 
-    // Close toolbar dropdowns on click outside
-    if (!e.target.closest('.tb-dropdown-wrap')) {
-      if (_rubricsPanelOpen) {
-        _rubricsPanelOpen = false;
-        _syncToolbarDropdowns();
-      }
-    }
-
     var el = e.target.closest('[data-action]');
     if (!el) return;
     var action = el.dataset.action;
@@ -4418,8 +4381,8 @@ window.PageAssignments = (function () {
       clearFocusStudent: function () {
         clearFocusStudent();
       },
-      toggleToolbarDropdown: function () {
-        toggleToolbarDropdown();
+      openRubricBank: function () {
+        openRubricBank();
       },
       clearAssessFilters: function () {
         e.preventDefault();
@@ -4660,6 +4623,8 @@ window.PageAssignments = (function () {
   }
 
   function _handleKeydown(e) {
+    // The Rubric Bank window handles its own keys.
+    if (window.RubricBank && RubricBank.isOpen()) return;
     // While the criterion comment box is open, keys stay inside it: Escape
     // closes, Tab cycles its controls, and scoring keys never reach the grid.
     if (_critCommentState && document.activeElement.id !== 'crit-comment-input') {
@@ -4953,7 +4918,6 @@ window.PageAssignments = (function () {
     assessSearch = '';
     showUngraded = false;
     rubricViewStates = {};
-    _rubricsPanelOpen = false;
     _showingNewForm = false;
     _editingAssessId = null;
     collapsedModules = {};
