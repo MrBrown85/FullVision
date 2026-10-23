@@ -630,6 +630,11 @@
         return;
       }
 
+      if (action === 'm-student-tab') {
+        MStudentDetail.selectTab(target, target.getAttribute('data-tab'));
+        return;
+      }
+
       if (action === 'm-toggle-section') {
         var card = target.closest('.m-section-card');
         if (card) {

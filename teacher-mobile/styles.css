@@ -3459,3 +3459,176 @@ body.fv-switching-course::after {
   outline: 2px solid var(--active);
   outline-offset: 2px;
 }
+
+/* ── Student detail tabs (student-detail.js) ─────────────────────────────
+   The desktop student page's five tabs: one segmented track that scrolls
+   sideways, each tab with its count. */
+.m-st-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 0 16px 4px;
+  padding: 4px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  background: var(--seg-track);
+  border-radius: 12px;
+}
+.m-st-tabs::-webkit-scrollbar {
+  display: none;
+}
+.m-st-tab {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  min-height: 48px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  color: var(--text);
+}
+.m-st-tab.active {
+  background: var(--seg-thumb);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.14),
+    0 0 0 0.5px rgba(0, 0, 0, 0.06);
+}
+.m-st-tab-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.m-st-tab-stat {
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.m-st-tab.active .m-st-tab-stat {
+  color: var(--link);
+}
+@media (prefers-color-scheme: dark) {
+  .m-st-tab.active .m-st-tab-stat {
+    color: var(--text);
+  }
+}
+.m-st-panel[hidden] {
+  display: none;
+}
+.m-st-list {
+  padding-top: 8px;
+}
+.m-st-note {
+  margin: 4px 16px 8px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.m-st-note-warn {
+  color: var(--priority);
+  font-weight: 600;
+}
+.m-st-muted {
+  color: var(--text-3);
+}
+.m-st-score {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  background: var(--surface-2);
+  color: var(--text-3);
+}
+.m-st-level-1 {
+  background: var(--score-1-bg);
+  color: var(--score-1-text);
+}
+.m-st-level-2 {
+  background: var(--score-2-bg);
+  color: var(--score-2-text);
+}
+.m-st-level-3 {
+  background: var(--score-3-bg);
+  color: var(--score-3-text);
+}
+.m-st-level-4 {
+  background: var(--score-4-bg);
+  color: var(--score-4-text);
+}
+.m-st-assess-sub {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-top: 6px;
+}
+.m-st-toward {
+  font-size: 12px;
+  color: var(--text-3);
+}
+.m-st-goal {
+  margin: 0 16px 8px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: var(--surface);
+}
+.m-st-goal-name {
+  font-size: 15px;
+  font-weight: 600;
+}
+.m-st-goal-label {
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-2);
+}
+.m-st-goal-text {
+  margin-top: 2px;
+  font-size: 14px;
+}
+.m-st-dim {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 16px;
+  padding: 10px 16px;
+  background: var(--surface);
+  border-bottom: 0.5px solid var(--divider-subtle);
+}
+.m-st-list .m-st-dim:first-child {
+  border-radius: 12px 12px 0 0;
+}
+.m-st-list .m-st-dim:last-child {
+  border-radius: 0 0 12px 12px;
+  border-bottom: none;
+}
+.m-st-dim-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.m-st-dim-name {
+  font-size: 15px;
+  font-weight: 600;
+}
+.m-st-dim.unseen .m-st-dim-name {
+  color: var(--text-2);
+}
+.m-st-dim-latest {
+  font-size: 12px;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.m-st-dim-count {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-2);
+}
