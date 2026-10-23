@@ -133,3 +133,97 @@ test.describe('Rubric Bank', () => {
     await expect(page.locator('#ac-assess-rubric-001')).toBeVisible();
   });
 });
+
+const SCI9 = { id: 'sci9', name: 'Science 9 — Test', gradingSystem: 'proficiency', calcMethod: 'mostRecent' };
+
+const SCI9_MAP = {
+  _flatVersion: 2,
+  subjects: [{ id: 'SCI9', name: 'Science 9', color: '#0891b2' }],
+  sections: [
+    {
+      id: 'S9Q',
+      subject: 'SCI9',
+      name: 'Questioning and Predicting',
+      shortName: 'Questioning',
+      color: '#0891b2',
+      tags: [{ id: 'S9Q', label: 'Question and Predict', text: '', subject: 'SCI9', i_can_statements: [] }],
+    },
+    {
+      id: 'S9H',
+      subject: 'SCI9',
+      name: 'Applying and Innovating',
+      shortName: 'Applying',
+      color: '#0891b2',
+      tags: [{ id: 'S9H', label: 'Assess Human Impact', text: '', subject: 'SCI9', i_can_statements: [] }],
+    },
+  ],
+};
+
+const FIELD = {
+  id: 'rubric-901',
+  name: 'Ecosystems Field Study Rubric',
+  criteria: [
+    {
+      id: 'crit-obs',
+      name: 'Field Observations',
+      tagIds: ['S9Q'],
+      weight: 1,
+      levels: { 4: 'a', 3: 'b', 2: 'c', 1: 'd' },
+    },
+    { id: 'crit-hum', name: 'Human Impact', tagIds: ['S9H'], weight: 1, levels: { 4: 'e', 3: 'f', 2: 'g', 1: 'h' } },
+  ],
+};
+
+test.describe('Rubric Bank, All My Classes', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockAuth(page);
+    await seedCourse(page);
+    await seedStudents(page);
+    await page.addInitScript(
+      ({ course, map, rubric, sci8Rubrics }) => {
+        const courses = JSON.parse(localStorage.getItem('gb-courses') || '{}');
+        courses[course.id] = course;
+        localStorage.setItem('gb-courses', JSON.stringify(courses));
+        localStorage.setItem('gb-learningMaps-' + course.id, JSON.stringify(map));
+        ['students', 'assessments', 'observations', 'modules', 'customTags'].forEach(k =>
+          localStorage.setItem('gb-' + k + '-' + course.id, '[]'),
+        );
+        localStorage.setItem('gb-rubrics-' + course.id, JSON.stringify([rubric]));
+        localStorage.setItem('gb-rubrics-sci8', JSON.stringify(sci8Rubrics));
+      },
+      { course: SCI9, map: SCI9_MAP, rubric: FIELD, sci8Rubrics: [LAB] },
+    );
+    await gotoApp(page, '/dashboard');
+  });
+
+  test('browses another class and copies a rubric in', async ({ page }) => {
+    const bank = await openBank(page);
+    await bank.getByRole('button', { name: 'All My Classes' }).click();
+    const group = bank.locator('.rb-class', { hasText: 'Science 9 — Test' });
+    await expect(group).toContainText('· 1');
+    await expect(group).toHaveAttribute('aria-expanded', 'false');
+    await group.click();
+    await bank.locator('.rb-row', { hasText: 'Ecosystems Field Study Rubric' }).click();
+
+    await expect(bank.locator('.rb-sub')).toHaveText('From Science 9 — Test · 2 Criteria · Not Used');
+    await expect(bank.locator('.rb-note')).toContainText('1 of 2 match');
+    await expect(bank.locator('.rb-grid .rb-chip.is-missing')).toHaveText('Assess Human Impact');
+    await expect(bank.getByRole('button', { name: 'Edit Rubric' })).toHaveCount(0);
+
+    await bank.getByRole('button', { name: /^Copy to Science 8/ }).click();
+    await expect(bank.getByRole('button', { name: 'This Class' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(bank.locator('.rb-title')).toHaveText('Ecosystems Field Study Rubric');
+    await expect(bank.getByRole('button', { name: 'Edit Rubric' })).toBeVisible();
+    const copied = await page.evaluate(() => getRubrics('sci8').find(r => r.name === 'Ecosystems Field Study Rubric'));
+    expect(copied.criteria.map(c => c.tagIds)).toEqual([['QAP'], []]);
+  });
+
+  test('search opens every class with a match', async ({ page }) => {
+    const bank = await openBank(page);
+    await bank.getByRole('button', { name: 'All My Classes' }).click();
+    await expect(bank.locator('.rb-class', { hasText: 'Science 9 — Test' })).toContainText('· 1');
+    await bank.locator('#rb-search').fill('ecosystems');
+    await expect(bank.locator('.rb-row')).toHaveText([/Ecosystems Field Study Rubric/]);
+    await expect(bank.locator('.rb-class')).toHaveCount(1);
+  });
+});

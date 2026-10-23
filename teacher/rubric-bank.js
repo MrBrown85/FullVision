@@ -1,9 +1,10 @@
 /* ── Rubric Bank ────────────────────────────────────────────────
    The window the Rubrics button opens: the class's rubrics on the left,
    grouped by whether an assessment uses them, and the selected rubric read
-   only on the right with its actions. The page owns editing, deleting and
-   the new-assessment form; it passes them in as hooks so this file never
-   reaches into the page's state.
+   only on the right with its actions. All My Classes lists every class's
+   rubrics; one from another class can be copied in. The page owns editing,
+   deleting and the new-assessment form; it passes them in as hooks so this
+   file never reaches into the page's state.
 
    Hooks: edit(rid), newRubric(), remove(rid), print(rid, aid),
    useInNew(rid), goToAssessment(aid), changed().
@@ -15,7 +16,8 @@ window.RubricBank = (function () {
   var SELECTED_KEY = 'rubric-bank-selected';
   var USES_SHOWN = 4;
 
-  // { cid, hooks, selected, query, menuOpen, renaming, allUses, trigger, keyHandler }
+  // { cid, hooks, scope, selected, selCid, query, openClasses, loaded,
+  //   menuOpen, renaming, allUses, trigger, keyHandler }
   var _s = null;
 
   /* ── Data ───────────────────────────────────────────────── */
@@ -29,6 +31,10 @@ window.RubricBank = (function () {
 
   function _rubrics(cid) {
     return (typeof getRubrics === 'function' && getRubrics(cid)) || [];
+  }
+
+  function _className(cid) {
+    return (COURSES[cid] && courseDisplayName(COURSES[cid])) || 'This Class';
   }
 
   /* The assessments that use a rubric, newest first. */
@@ -74,6 +80,13 @@ window.RubricBank = (function () {
     return { used: used, unused: unused };
   }
 
+  /* The teacher's other live classes, same course first, as Copy lists them. */
+  function otherClasses(cid) {
+    if (!window.AssessmentCopy) return [];
+    var t = AssessmentCopy.copyTargets(cid);
+    return t.sameCourse.concat(t.other);
+  }
+
   function _plural(n, one, many) {
     return n + ' ' + (n === 1 ? one : many);
   }
@@ -96,10 +109,24 @@ window.RubricBank = (function () {
     return 'Linked With ' + copies.length + ' Classes';
   }
 
+  /* How a rubric's competencies land in another class, matched by name the
+     way Copy matches them: { total, matched, byTag: { tagId: true|false } }. */
+  function matchInfo(srcCid, dstCid, rubric) {
+    var out = { total: 0, matched: 0, byTag: {} };
+    if (!window.AssessmentCopy) return out;
+    (rubric.criteria || []).forEach(function (c) {
+      (c.tagIds || []).forEach(function (tid) {
+        var hit = AssessmentCopy.mapTags(srcCid, dstCid, [tid]).ids.length > 0;
+        out.byTag[tid] = hit;
+        out.total++;
+        if (hit) out.matched++;
+      });
+    });
+    return out;
+  }
+
   function _canCopy(cid) {
-    if (!window.RubricLibrary || !window.AssessmentCopy) return false;
-    var t = AssessmentCopy.copyTargets(cid);
-    return !!(t.sameCourse.length || t.other.length);
+    return !!window.RubricLibrary && otherClasses(cid).length > 0;
   }
 
   /* A copy in the same class: new ids, numbered name, not linked. */
@@ -160,26 +187,33 @@ window.RubricBank = (function () {
     }
   }
 
-  /* The selected rubric, falling back to the first in the list. */
+  /* The selected rubric, falling back to the first in this class. */
   function _current() {
-    var all = _rubrics(_s.cid);
-    var hit = all.find(function (r) {
+    var hit = _rubrics(_s.selCid).find(function (r) {
       return r.id === _s.selected;
     });
     if (hit) return hit;
     var g = groups(_s.cid, '');
     var first = g.used[0] || g.unused[0] || null;
+    _s.selCid = _s.cid;
     _s.selected = first ? first.id : null;
     return first;
   }
 
+  function _isForeign() {
+    return _s.selCid !== _s.cid;
+  }
+
   /* ── Rendering ──────────────────────────────────────────── */
 
-  function _rowHtml(cid, r, selected) {
+  function _rowHtml(cid, r) {
+    var selected = r.id === _s.selected && cid === _s.selCid;
     return (
       '<button type="button" class="rb-row' +
       (selected ? ' is-selected' : '') +
-      '" data-rb="select" data-rid="' +
+      '" data-rb="select" data-cid="' +
+      esc(cid) +
+      '" data-rid="' +
       esc(r.id) +
       '" aria-current="' +
       (selected ? 'true' : 'false') +
@@ -191,26 +225,72 @@ window.RubricBank = (function () {
     );
   }
 
-  function listHtml() {
+  function _classListHtml() {
     var cid = _s.cid;
     var g = groups(cid, _s.query);
-    var className = (COURSES[cid] && courseDisplayName(COURSES[cid])) || 'This Class';
     if (!_rubrics(cid).length) return '<div class="rb-empty-list">No rubrics yet.</div>';
     if (!g.used.length && !g.unused.length) return '<div class="rb-empty-list">No rubrics match.</div>';
     var html = '';
     if (g.used.length) {
-      html += '<div class="rb-group">Used in ' + esc(className) + ' · ' + g.used.length + '</div>';
+      html += '<div class="rb-group">Used in ' + esc(_className(cid)) + ' · ' + g.used.length + '</div>';
       g.used.forEach(function (r) {
-        html += _rowHtml(cid, r, r.id === _s.selected);
+        html += _rowHtml(cid, r);
       });
     }
     if (g.unused.length) {
       html += '<div class="rb-group">Not Used Yet · ' + g.unused.length + '</div>';
       g.unused.forEach(function (r) {
-        html += _rowHtml(cid, r, r.id === _s.selected);
+        html += _rowHtml(cid, r);
       });
     }
     return html;
+  }
+
+  /* One collapsible group per class, this class first and open. A search
+     opens every group that has a match. */
+  function _allListHtml() {
+    var cid = _s.cid;
+    var classes = [{ id: cid, name: _className(cid) + ' (This Class)' }].concat(
+      otherClasses(cid).map(function (c) {
+        return { id: c.id, name: c.name };
+      }),
+    );
+    var searching = !!_norm(_s.query);
+    var html = '';
+    var any = false;
+    classes.forEach(function (c) {
+      var own = c.id === cid;
+      var ready = own || _s.loaded;
+      var rows = ready
+        ? _rubrics(c.id).filter(function (r) {
+            return matches(c.id, r, _s.query);
+          })
+        : [];
+      if (searching && !rows.length) return;
+      any = true;
+      var open = searching || !!_s.openClasses[c.id];
+      html +=
+        '<button type="button" class="rb-class" data-rb="group" data-cid="' +
+        esc(c.id) +
+        '" aria-expanded="' +
+        (open ? 'true' : 'false') +
+        '"><svg class="rb-chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg><span>' +
+        esc(c.name) +
+        (ready ? ' · ' + rows.length : '') +
+        '</span></button>';
+      if (!open) return;
+      if (!ready) html += '<div class="rb-empty-list">Loading…</div>';
+      else if (!rows.length) html += '<div class="rb-empty-list">No rubrics yet.</div>';
+      rows.forEach(function (r) {
+        html += _rowHtml(c.id, r);
+      });
+    });
+    if (!any) return '<div class="rb-empty-list">No rubrics match.</div>';
+    return html;
+  }
+
+  function listHtml() {
+    return _s.scope === 'all' ? _allListHtml() : _classListHtml();
   }
 
   /* The header shows each level's value when every criterion uses the
@@ -221,7 +301,12 @@ window.RubricBank = (function () {
     });
   }
 
-  function gridHtml(cid, rubric) {
+  /* The rubric as a read-only table in `cid`'s level order. `opts.srcCid`
+     is where the rubric's competencies live (another class when browsing);
+     `opts.match` marks the chips with no match in this class. */
+  function gridHtml(cid, rubric, opts) {
+    opts = opts || {};
+    var srcCid = opts.srcCid || cid;
     var levels = _levels(cid);
     var plainValues = _defaultValues(rubric);
     var html = '<table class="rb-grid"><thead><tr><th class="rb-crit-head" scope="col">Criterion</th>';
@@ -239,8 +324,18 @@ window.RubricBank = (function () {
     (rubric.criteria || []).forEach(function (c) {
       var chips = (c.tagIds || [])
         .map(function (tid) {
-          var label = _tagLabel(cid, tid);
-          return label ? '<span class="rb-chip">' + esc(label) + '</span>' : '';
+          var label = _tagLabel(srcCid, tid);
+          if (!label) return '';
+          var missing = opts.match && opts.match.byTag[tid] === false;
+          return (
+            '<span class="rb-chip' +
+            (missing ? ' is-missing' : '') +
+            '"' +
+            (missing ? ' title="No match in ' + esc(_className(cid)) + '"' : '') +
+            '>' +
+            esc(label) +
+            '</span>'
+          );
         })
         .join('');
       html +=
@@ -276,6 +371,63 @@ window.RubricBank = (function () {
     );
   }
 
+  /* A rubric from another class: where it is from, how its competencies
+     match this class, and Copy. */
+  function _foreignPaneHtml(r) {
+    var cid = _s.cid;
+    var src = _s.selCid;
+    var here = _className(cid);
+    var n = usesOf(src, r.id).length;
+    var match = matchInfo(src, cid, r);
+    var html = '<div class="rb-pane-head"><div class="rb-title-wrap">';
+    html += '<h3 class="rb-title" id="rb-title">' + esc(r.name) + '</h3>';
+    html +=
+      '<div class="rb-sub"><span>' +
+      esc(
+        'From ' +
+          _className(src) +
+          ' · ' +
+          _plural((r.criteria || []).length, 'Criterion', 'Criteria') +
+          ' · ' +
+          (n ? 'Used in ' + _plural(n, _className(src) + ' Assessment', _className(src) + ' Assessments') : 'Not Used'),
+      ) +
+      '</span></div></div>';
+    html +=
+      '<div class="rb-actions"><button type="button" class="rb-btn rb-btn-primary" data-rb="copy-here">Copy to ' +
+      esc(here) +
+      '</button></div></div>';
+    if (match.total) {
+      var missing = match.total - match.matched;
+      html +=
+        '<div class="rb-note"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg><span>' +
+        esc(
+          'Competencies are matched to ' +
+            here +
+            ' by name. ' +
+            match.matched +
+            ' of ' +
+            match.total +
+            ' match.' +
+            (missing
+              ? ' The ' +
+                (missing === 1 ? 'other is' : missing + ' others are') +
+                ' left off the copy; you can add competencies in the editor afterwards.'
+              : ''),
+        ) +
+        '</span></div>';
+    }
+    html += '<div class="rb-grid-wrap">' + gridHtml(cid, r, { srcCid: src, match: match }) + '</div>';
+    if (match.total > match.matched) {
+      html +=
+        '<div class="rb-foot rb-legend"><span><span class="rb-chip">Matches</span> Found in ' +
+        esc(here) +
+        '</span><span><span class="rb-chip is-missing">No Match</span> Not in ' +
+        esc(here) +
+        '</span></div>';
+    }
+    return html;
+  }
+
   function paneHtml() {
     var cid = _s.cid;
     var r = _current();
@@ -284,11 +436,12 @@ window.RubricBank = (function () {
         '<div class="rb-empty-pane"><div class="rb-empty-title">This class has no rubrics yet.</div>' +
         '<div class="rb-empty-actions"><button type="button" class="rb-btn rb-btn-primary" data-rb="new">+ New Rubric</button>' +
         (_canCopy(cid)
-          ? '<button type="button" class="rb-btn" data-rb="pick">Copy One From Another Class</button>'
+          ? '<button type="button" class="rb-btn" data-rb="scope" data-scope="all">Copy One From Another Class</button>'
           : '') +
         '</div></div>'
       );
     }
+    if (_isForeign()) return _foreignPaneHtml(r);
     var uses = usesOf(cid, r.id);
     var linked = linkedLabel(cid, r);
     var html = '<div class="rb-pane-head"><div class="rb-title-wrap">';
@@ -341,10 +494,31 @@ window.RubricBank = (function () {
     return html;
   }
 
+  function _scopeHtml() {
+    if (!otherClasses(_s.cid).length) return '';
+    var all = _s.scope === 'all';
+    return (
+      '<div class="rb-scope" role="group" aria-label="Which rubrics">' +
+      '<button type="button" class="rb-scope-btn' +
+      (all ? '' : ' is-active') +
+      '" data-rb="scope" data-scope="class" aria-pressed="' +
+      (all ? 'false' : 'true') +
+      '">This Class</button>' +
+      '<button type="button" class="rb-scope-btn' +
+      (all ? ' is-active' : '') +
+      '" data-rb="scope" data-scope="all" aria-pressed="' +
+      (all ? 'true' : 'false') +
+      '">All My Classes</button></div>'
+    );
+  }
+
   function _overlayHtml() {
     return (
       '<div class="rb-card" role="dialog" aria-modal="true" aria-labelledby="rb-heading">' +
       '<div class="rb-head"><h2 class="rb-heading" id="rb-heading">Rubric Bank</h2>' +
+      '<div id="rb-scope">' +
+      _scopeHtml() +
+      '</div>' +
       '<div class="rb-head-gap"></div>' +
       '<button type="button" class="rb-btn rb-btn-new" data-rb="new">+ New Rubric</button>' +
       '<button type="button" class="rb-close" data-rb="close" aria-label="Close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>' +
@@ -385,36 +559,79 @@ window.RubricBank = (function () {
 
   function refresh() {
     if (!_s || !_root()) return;
+    var scope = document.getElementById('rb-scope');
+    if (scope) scope.innerHTML = _scopeHtml();
     _renderList();
     _renderPane();
   }
 
   /* ── Actions ───────────────────────────────────────────── */
 
-  function _select(rid) {
+  function _select(rid, cid) {
     if (!rid) return;
     _s.selected = rid;
+    _s.selCid = cid || _s.cid;
     _s.menuOpen = false;
     _s.renaming = false;
     _s.allUses = false;
-    _saveSelected(_s.cid, rid);
+    if (_s.selCid === _s.cid) _saveSelected(_s.cid, rid);
     refresh();
     var row = _root() && _root().querySelector('.rb-row.is-selected');
     if (row && row.scrollIntoView) row.scrollIntoView({ block: 'nearest' });
   }
 
-  /* Up and Down walk the visible list in its drawn order. */
+  /* Up and Down walk the rows as drawn, across open class groups too. */
   function _step(dir) {
-    var g = groups(_s.cid, _s.query);
-    var ids = g.used.concat(g.unused).map(function (r) {
-      return r.id;
+    var rows = Array.prototype.slice.call(_root().querySelectorAll('#rb-list .rb-row'));
+    if (!rows.length) return;
+    var i = rows.findIndex(function (row) {
+      return row.dataset.rid === _s.selected && row.dataset.cid === _s.selCid;
     });
-    if (!ids.length) return;
-    var i = ids.indexOf(_s.selected);
-    var next = i < 0 ? 0 : Math.max(0, Math.min(ids.length - 1, i + dir));
-    _select(ids[next]);
+    var next = rows[i < 0 ? 0 : Math.max(0, Math.min(rows.length - 1, i + dir))];
+    _select(next.dataset.rid, next.dataset.cid);
     var row = _root() && _root().querySelector('.rb-row.is-selected');
     if (row && row.focus) row.focus();
+  }
+
+  /* All My Classes needs the other classes' rubrics on this device. */
+  function _loadOthers() {
+    if (_s.loaded) return;
+    var cid = _s.cid;
+    var load = window.RubricLibrary && RubricLibrary.loadClass;
+    var ids = otherClasses(cid).map(function (c) {
+      return c.id;
+    });
+    Promise.all(ids.map(load || Promise.resolve.bind(Promise))).then(function () {
+      if (!_s || _s.cid !== cid) return;
+      _s.loaded = true;
+      _renderList();
+    });
+  }
+
+  function _setScope(scope) {
+    _s.scope = scope === 'all' ? 'all' : 'class';
+    _s.openClasses = {};
+    _s.openClasses[_s.cid] = true;
+    if (_s.scope === 'all') _loadOthers();
+    else if (_isForeign()) {
+      _s.selCid = _s.cid;
+      _s.selected = _loadSelected(_s.cid);
+    }
+    refresh();
+  }
+
+  /* Copy another class's rubric here, then show it in This Class. */
+  function _copyHere() {
+    var cid = _s.cid;
+    var src = _s.selCid;
+    var rubric = getRubricById(src, _s.selected);
+    if (!rubric || !window.RubricLibrary) return;
+    RubricLibrary.copyTo(src, rubric, [cid]).then(function (done) {
+      if (_s && _s.hooks.changed) _s.hooks.changed();
+      if (!_s || _s.cid !== cid || !done[0]) return;
+      _s.scope = 'class';
+      _select(done[0].rubric.id, cid);
+    });
   }
 
   function _finishRename(save) {
@@ -440,20 +657,25 @@ window.RubricBank = (function () {
       case 'close':
         close();
         break;
+      case 'scope':
+        _setScope(el.dataset.scope);
+        break;
+      case 'group':
+        _s.openClasses[el.dataset.cid] = !_s.openClasses[el.dataset.cid];
+        _renderList();
+        break;
       case 'select':
-        _select(el.dataset.rid);
+        _select(el.dataset.rid, el.dataset.cid);
         break;
       case 'new':
         close();
         if (hooks.newRubric) hooks.newRubric();
         break;
-      case 'pick':
-        RubricLibrary.openPickDialog(cid, function (rubric) {
-          if (hooks.changed) hooks.changed();
-          if (_s) _select(rubric.id);
-        });
+      case 'copy-here':
+        _copyHere();
         break;
       case 'edit':
+        if (_isForeign()) break;
         close();
         if (hooks.edit) hooks.edit(rid);
         break;
@@ -481,7 +703,7 @@ window.RubricBank = (function () {
       case 'duplicate': {
         var copy = duplicate(cid, rid);
         if (hooks.changed) hooks.changed();
-        if (copy) _select(copy.id);
+        if (copy) _select(copy.id, cid);
         break;
       }
       case 'rename':
@@ -540,7 +762,7 @@ window.RubricBank = (function () {
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
       _step(e.key === 'ArrowDown' ? 1 : -1);
-    } else if (e.key === 'Enter' && _s.selected) {
+    } else if (e.key === 'Enter' && _s.selected && !(target.dataset && target.dataset.rb === 'group')) {
       e.preventDefault();
       _act('edit');
     }
@@ -554,13 +776,18 @@ window.RubricBank = (function () {
     _s = {
       cid: cid,
       hooks: hooks || {},
+      scope: 'class',
       selected: _loadSelected(cid),
+      selCid: cid,
       query: '',
+      openClasses: {},
+      loaded: false,
       menuOpen: false,
       renaming: false,
       allUses: false,
       trigger: document.activeElement,
     };
+    _s.openClasses[cid] = true;
     _current();
     var overlay = document.createElement('div');
     overlay.id = OVERLAY_ID;
@@ -620,8 +847,10 @@ window.RubricBank = (function () {
     usesOf: usesOf,
     matches: matches,
     groups: groups,
+    otherClasses: otherClasses,
     rowMeta: rowMeta,
     linkedLabel: linkedLabel,
+    matchInfo: matchInfo,
     duplicate: duplicate,
     rename: rename,
     gridHtml: gridHtml,
