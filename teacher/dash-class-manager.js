@@ -1808,7 +1808,7 @@ window.DashClassManager = (function () {
     var toolbarMount = document.getElementById('page-toolbar-mount');
     if (toolbarMount) {
       toolbarMount.innerHTML =
-        '<div class="dash-toolbar cm-toolbar">' +
+        '<div class="page-toolbar dash-toolbar cm-toolbar">' +
         renderBreadcrumb('Dashboard', '#/dashboard', 'Class Management', 'closeClassManager') +
         '<span class="dash-toolbar-spacer"></span>' +
         // The tabbed view names the class in its own header.
@@ -1816,6 +1816,14 @@ window.DashClassManager = (function () {
           ? '<span class="cm-toolbar-detail">' + esc(detailTitle) + '</span>'
           : '') +
         '</div>';
+    }
+
+    // The class list takes the student list's place beside the page; the
+    // dashboard puts the roster back when Class Management closes.
+    var sideMount = document.getElementById('sidebar-mount');
+    if (sideMount) {
+      sideMount.removeAttribute('data-cid');
+      sideMount.style.display = courseIds.length === 0 && cmMode !== 'create' ? 'none' : '';
     }
 
     // Empty state
@@ -1831,7 +1839,8 @@ window.DashClassManager = (function () {
     }
 
     html += '<div class="cm-layout">';
-    html += renderCmSidebar(courseIds);
+    if (sideMount) sideMount.innerHTML = renderCmSidebar(courseIds);
+    else html += renderCmSidebar(courseIds);
     html += '<div class="cm-detail">';
 
     if (cmMode === 'create') {
@@ -1861,23 +1870,68 @@ window.DashClassManager = (function () {
     }
   }
 
+  /* The badge on a class row: its block ("A"), or the name's initials
+     when the block is a longer label or there is none. */
+  function _cmClassBadge(c) {
+    var b = normalizeCourseBlock(c && c.block);
+    if (/^[A-Z0-9]{1,2}$/.test(b)) return b;
+    var words = String((c && c.name) || '')
+      .split(/\s+/)
+      .filter(Boolean);
+    return ((words[0] || '?').charAt(0) + (words[1] ? words[1].charAt(0) : '')).toUpperCase();
+  }
+
+  function _cmClassItemHtml(cid, meta, extraClass) {
+    var c = COURSES[cid];
+    var sel = cid === cmSelectedCourse && cmMode === 'edit' ? ' selected' : '';
+    return (
+      '<div class="cm-class-item' +
+      sel +
+      (extraClass || '') +
+      '" data-action="cmSelectClass" data-cid="' +
+      cid +
+      '">' +
+      '<span class="cm-class-avatar" aria-hidden="true" style="background:' +
+      (typeof _avatarColor === 'function' ? _avatarColor(cid) : 'var(--text-3)') +
+      '">' +
+      esc(_cmClassBadge(c)) +
+      '</span>' +
+      '<span class="cm-class-text">' +
+      '<span class="cm-class-name">' +
+      esc(c.name || '') +
+      '</span>' +
+      '<span class="cm-class-meta">' +
+      meta +
+      '</span>' +
+      '</span>' +
+      '</div>'
+    );
+  }
+
+  function _cmStudentCount(n) {
+    return n + ' Student' + (n !== 1 ? 's' : '');
+  }
+
   function renderCmSidebar(courseIds) {
     var html =
-      '<div class="cm-sidebar">' +
+      '<aside class="cm-sidebar" aria-label="Classes">' +
       '<div class="cm-sidebar-header">' +
-      '<span class="cm-sidebar-label">' +
+      '<span class="cm-sidebar-title">Classes</span>' +
+      '<span class="cm-sidebar-count">' +
       courseIds.length +
-      ' Class' +
+      ' class' +
       (courseIds.length !== 1 ? 'es' : '') +
       '</span>' +
-      '<button class="cm-new-btn" data-action="cmStartCreate">+ New Class</button>' +
       '</div>' +
       '<div class="cm-class-list">';
     if (cmMode === 'create') {
       html +=
         '<div class="cm-class-item cm-create-active">' +
-        '<div class="cm-class-name" style="color:var(--link)">New Class</div>' +
-        '<div class="cm-class-meta">Setting up\u2026</div>' +
+        '<span class="cm-class-avatar cm-class-avatar-new" aria-hidden="true">+</span>' +
+        '<span class="cm-class-text">' +
+        '<span class="cm-class-name">New Class</span>' +
+        '<span class="cm-class-meta">Setting up…</span>' +
+        '</span>' +
         '</div>';
     }
     var activeCids = sortCoursesByBlock(
@@ -1895,53 +1949,25 @@ window.DashClassManager = (function () {
       return isCourseArchived(cid);
     });
     activeCids.forEach(function (cid) {
-      var c = COURSES[cid];
       var ready = _cmClassReady(cid);
-      var sc = ready ? getStudents(cid).length : 0;
-      var sel = cid === cmSelectedCourse && cmMode === 'edit' ? ' selected' : '';
-      var gsv = c.gradingSystem || _cmDefaultGradingSystem(c);
-      var gs = gsv === 'letter' ? 'Letter' : gsv === 'both' ? 'Both' : 'Proficiency';
-      html +=
-        '<div class="cm-class-item' +
-        sel +
-        '" data-action="cmSelectClass" data-cid="' +
-        cid +
-        '">' +
-        '<div class="cm-class-name">' +
-        esc(courseDisplayName(c)) +
-        '</div>' +
-        '<div class="cm-class-meta">' +
-        gs +
-        ' \u00B7 ' +
-        (ready ? sc + ' Student' + (sc !== 1 ? 's' : '') : 'Loading\u2026') +
-        '</div>' +
-        '</div>';
+      var label = courseBlockLabel(COURSES[cid]);
+      var meta = (label ? esc(label) + ' · ' : '') + (ready ? _cmStudentCount(getStudents(cid).length) : 'Loading…');
+      html += _cmClassItemHtml(cid, meta);
     });
     if (archivedCids.length > 0) {
-      html +=
-        '<div style="padding:8px 12px 4px;font-size:0.75rem;font-weight:600;color:var(--text-3);margin-top:8px;border-top:1px solid var(--border)">Archived</div>';
+      html += '<div class="cm-class-group">Archived</div>';
       archivedCids.forEach(function (cid) {
-        var c = COURSES[cid];
-        var sc = getStudents(cid).length;
-        var sel = cid === cmSelectedCourse && cmMode === 'edit' ? ' selected' : '';
-        html +=
-          '<div class="cm-class-item' +
-          sel +
-          '" data-action="cmSelectClass" data-cid="' +
-          cid +
-          '" style="opacity:0.5">' +
-          '<div class="cm-class-name">' +
-          esc(courseDisplayName(c)) +
-          '</div>' +
-          '<div class="cm-class-meta">' +
-          sc +
-          ' Student' +
-          (sc !== 1 ? 's' : '') +
-          ' \u00B7 Archived</div>' +
-          '</div>';
+        html += _cmClassItemHtml(cid, _cmStudentCount(getStudents(cid).length) + ' · Archived', ' archived');
       });
     }
-    html += '</div></div>';
+    html +=
+      '</div>' +
+      '<div class="cm-sidebar-foot">' +
+      '<button type="button" class="cm-new-btn" data-action="cmStartCreate">' +
+      '<svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="2" x2="6" y2="10"/><line x1="2" y1="6" x2="10" y2="6"/></svg>' +
+      'New Class</button>' +
+      '</div>' +
+      '</aside>';
     return html;
   }
 
@@ -3646,9 +3672,7 @@ window.DashClassManager = (function () {
     // A cleared optional field (Late Work Policy) arrives as null.
     var clean = field === 'block' ? normalizeCourseBlock(value) : value == null ? null : String(value).trim();
     updateCourse(cmSelectedCourse, { [field]: clean });
-    var nameEl = document.querySelector('.cm-class-item.selected .cm-class-name');
-    if ((field === 'name' || field === 'block') && nameEl)
-      nameEl.textContent = courseDisplayName(COURSES[cmSelectedCourse]);
+    if (field === 'name' || field === 'block') _cmRefreshSidebar();
   }
 
   // T-UI-02 helpers ──────────────────────────────────────────────────

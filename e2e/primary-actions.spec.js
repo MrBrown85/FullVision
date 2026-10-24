@@ -89,7 +89,7 @@ test.describe('Breadcrumb on the dashboard child screens', () => {
     await expect(link).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(page).toHaveURL(/#\/dashboard$/);
-    await expect(page.locator('.dash-course-select')).toBeVisible();
+    await expect(page.locator('.dash-toolbar [data-action="openClassManager"]')).toBeVisible();
   });
 
   test('Class Management: Dashboard › Class Management, linking back', async ({ page }) => {
@@ -107,7 +107,7 @@ test.describe('Breadcrumb on the dashboard child screens', () => {
     await expect(link).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(page.locator('.cm-layout')).toHaveCount(0);
-    await expect(page.locator('.dash-course-select')).toBeVisible();
+    await expect(page.locator('.dash-toolbar [data-action="openClassManager"]')).toBeVisible();
     await expect(page.getByRole('navigation', { name: 'Breadcrumb' })).toHaveCount(0);
   });
 });
