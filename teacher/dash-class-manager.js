@@ -152,7 +152,9 @@ window.DashClassManager = (function () {
       sec.color +
       '"></div>' +
       (code ? '<span class="cm-std-code" style="--chip:' + chipColor + '">' + esc(code) + '</span>' : '') +
-      '<span class="cm-std-label">' +
+      '<span class="cm-std-label" data-fallback="' +
+      esc(sec.shortName || sec.name || '') +
+      '">' +
       esc(title) +
       '</span>' +
       '<span class="cm-std-meta">' +
@@ -192,7 +194,7 @@ window.DashClassManager = (function () {
       sec.id +
       '" value="' +
       esc(title) +
-      '" data-stop-prop="true" data-action-blur="cmStdLabel" data-secid="' +
+      '" data-stop-prop="true" data-action-input="cmStdLabelLive" data-action-blur="cmStdLabel" data-secid="' +
       sec.id +
       '"></div>' +
       '<div class="cm-std-field cm-std-field-code"><label class="cm-label" for="cm-std-code-' +
@@ -6651,6 +6653,18 @@ window.DashClassManager = (function () {
     }
   }
 
+  /* Typing a title renames the card header as you go; blur saves it. */
+  function cmStdLabelLive(secId, val) {
+    var card = document.getElementById('cm-std-' + secId);
+    if (!card) return;
+    var label = card.querySelector('.cm-std-label');
+    if (!label) return;
+    var title = val.trim() || label.dataset.fallback || '';
+    label.textContent = title;
+    var menuBtn = card.querySelector('.cm-std-icon-btn');
+    if (menuBtn) menuBtn.setAttribute('aria-label', 'More actions for ' + title);
+  }
+
   function cmUpdateStdText(secId, val) {
     secId = _currentId('section', secId);
     if (!cmSelectedCourse) return;
@@ -7159,6 +7173,10 @@ window.DashClassManager = (function () {
     }
     if (el.dataset.actionInput === 'cmCatNameLive') {
       cmCatNameLive(parseInt(el.dataset.idx, 10), el.value);
+      return true;
+    }
+    if (el.dataset.actionInput === 'cmStdLabelLive') {
+      cmStdLabelLive(el.dataset.secid, el.value);
       return true;
     }
     if (el.dataset.actionInput === 'cmTermLive') {
