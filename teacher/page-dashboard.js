@@ -110,10 +110,12 @@ window.PageDashboard = (function () {
       return;
     }
     mount.style.display = '';
-    var picker = document.getElementById('gb-course-select');
+    // The list's own picker already shows the new class when it made the
+    // switch, so the class the list was built for is kept on the mount.
     var rows = document.querySelectorAll('#gb-roster-list .student-row').length;
-    if (picker && picker.value === activeCourse && rows === getStudents(activeCourse).length) return;
+    if (mount.dataset.cid === activeCourse && rows === getStudents(activeCourse).length) return;
     mount.innerHTML = renderSidebar(activeCourse, null);
+    mount.dataset.cid = activeCourse;
   }
 
   /* ── Main render ────────────────────────────────────────── */
@@ -1015,6 +1017,7 @@ window.PageDashboard = (function () {
 
     // The student list, as on the other pages (_syncSidebar in render)
     document.getElementById('sidebar-mount').innerHTML = '';
+    delete document.getElementById('sidebar-mount').dataset.cid;
     initSidebarToggle();
 
     // Add page-specific class for scoped CSS
