@@ -122,6 +122,7 @@ window.ReportStudio = (function () {
           id +
           '" draggable="false" aria-pressed="' +
           placed +
+          (placed ? '" title="On the report. Click to remove it.' : '') +
           '">' +
           '<span class="studio-grip" aria-hidden="true">⠿</span>' +
           '<span class="studio-blk-name">' +
@@ -523,6 +524,23 @@ window.ReportStudio = (function () {
       });
     }
 
+    /* A drop whose top lands inside a block in its columns goes in above
+       that block (top half) or below it (bottom half), never part way
+       down it; the shove then moves what is below. */
+    function snapRow(body, x, y, at) {
+      var snapped = y;
+      body.querySelectorAll(':scope > .sheet-cell[data-block]').forEach(function (c) {
+        if (c.dataset.block === drag.id) return;
+        var cx = Number(c.dataset.x);
+        var cw = Number(c.dataset.w);
+        var cy = Number(c.dataset.y);
+        var ch = Number(c.dataset.h);
+        if (!(x < cx + cw && cx < x + drag.w) || y <= cy || y >= cy + ch) return;
+        snapped = c.classList.contains('sheet-pinned') || at < cy + ch / 2 ? cy : cy + ch;
+      });
+      return snapped;
+    }
+
     function moveDrag(e) {
       if (!drag.ghost) return;
       drag.ghost.style.left = e.clientX - drag.gx * (drag.k || 0.6) + 'px';
@@ -540,7 +558,7 @@ window.ReportStudio = (function () {
       var px = (e.clientX - pg.left) / pg.k - drag.gx;
       var py = (e.clientY - pg.top) / pg.k - drag.gy;
       var x = Math.max(0, Math.min(COLS - drag.w, Math.round(px / u)));
-      var y = Math.max(0, Math.min(api.rows() - 2, Math.round(py / ROW)));
+      var y = snapRow(pg.body, x, Math.max(0, Math.min(api.rows() - 2, Math.round(py / ROW))), py / ROW);
       if (drag.over && drag.over.page === pg.page && drag.over.x === x && drag.over.y === y) return;
       drag.over = { page: pg.page, x: x, y: y };
       drag.hold.style.left = x * u + 'px';

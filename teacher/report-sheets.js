@@ -603,15 +603,38 @@ window.ReportSheets = (function () {
   /* The stored layout made what the canvas shows: each block's row (and
      page) from where the resolver placed it for the previewed student.
      positions: layoutStudent's { blockId: { page, y } }. A block that
-     landed on a continued page, past the form's own, keeps its place. */
+     landed on a continued page, past the form's own, keeps its place. So
+     does a block pushed onto a later page while a block after it stays
+     behind on an earlier one: moved, it would flow after that block. */
   function settle(f, positions) {
     if (!positions) return f;
     f = _clone(f);
+    var n = f.pages.length;
+    // Where each block ends up stored: its landing page, or where it is.
+    var target = {};
+    var flow = [];
+    f.pages.forEach(function (pg, p) {
+      pg.blocks.forEach(function (b) {
+        var at = positions[b.block];
+        if (!at || b.block === 'header') return;
+        target[b.block] = at.page < n ? at.page : p;
+        flow.push({ id: b.block, from: p, page: at.page, y: at.y, x: b.x });
+      });
+    });
+    flow.sort(function (a, b) {
+      return a.page - b.page || a.y - b.y || a.x - b.x;
+    });
+    var behind = Infinity; // the earliest stored page of any block later in the flow
+    for (var i = flow.length - 1; i >= 0; i--) {
+      var it = flow[i];
+      if (target[it.id] > it.from && behind < target[it.id]) target[it.id] = it.from;
+      behind = Math.min(behind, target[it.id]);
+    }
     var moves = [];
     f.pages.forEach(function (pg, p) {
       pg.blocks = pg.blocks.filter(function (b) {
         var at = positions[b.block];
-        if (!at || b.block === 'header' || at.page >= f.pages.length) return true;
+        if (!at || b.block === 'header' || target[b.block] !== at.page) return true;
         b.y = at.y;
         if (at.page === p) return true;
         moves.push({ page: at.page, block: b });
