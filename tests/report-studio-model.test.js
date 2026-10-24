@@ -245,6 +245,26 @@ describe('settle, pages and free room', () => {
     expect(S.settle(S.form(), null)).toEqual(S.form());
   });
 
+  it('settle leaves a block pushed to a later page where it is when a block after it stays behind', () => {
+    // Core Competencies dropped above Teacher Comment: it lands on page 2,
+    // and the Comment it pushed lands on a continued page past the form's.
+    const placed = S.place(S.form(), 'core-competencies', { page: 0, x: 0, y: 32, w: 12, h: 16 });
+    const f = S.settle(placed, {
+      'academic-summary': { page: 0, y: 5 },
+      'core-competencies': { page: 1, y: 0 },
+      'teacher-narrative': { page: 2, y: 0 },
+      'competency-table': { page: 2, y: 8 },
+      'next-steps': { page: 2, y: 21 },
+      'learner-dimensions': { page: 3, y: 0 },
+      legend: { page: 3, y: 15 },
+      'parent-response': { page: 1, y: 21 },
+    });
+    // Moved to page 2 it would flow after the Comment still stored on page 1.
+    expect(S.locate(f, 'core-competencies').page).toBe(0);
+    expect(S.cellOf(f, 'core-competencies').y).toBe(32);
+    expect(S.locate(f, 'teacher-narrative').page).toBe(0);
+  });
+
   it('addPage adds an empty page; removePage removes only an empty page past the second', () => {
     let f = S.addPage(S.form());
     expect(f.pages).toHaveLength(3);

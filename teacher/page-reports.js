@@ -1334,10 +1334,15 @@ window.PageReports = (function () {
       studioBlock: function () {
         // A block not on the form goes full width at the first free row of
         // the last page; when that page is full, at the top of a new one.
+        // A block already on the form comes off it, for every student.
         var id = el.dataset.block;
         var f = _formOf();
-        if (ReportSheets.locate(f, id)) _selectBlock(id);
-        else {
+        if (ReportSheets.locate(f, id)) {
+          if (studioSelected === id) studioSelected = null;
+          if (popoverOpen === id) popoverOpen = null;
+          _setForm(ReportSheets.removeCell(f, id));
+          _announce(ReportSheets.BLOCKS[id].label + ' removed from the report.');
+        } else {
           var h = ReportSheets.BLOCKS[id].rows;
           var at = ReportSheets.firstFree(f, f.pages.length - 1, ReportSheets.COLS, h);
           var rows = (_lastSummary && _lastSummary.rows) || 46;
