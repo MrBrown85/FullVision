@@ -99,6 +99,23 @@ window.PageDashboard = (function () {
     render();
   }
 
+  /* The student list beside the dashboard. It is rebuilt only when the
+     class or its roster changed, so its search and scroll survive the
+     dashboard's own re-renders. Class Management hides it (dashboard.css). */
+  function _syncSidebar() {
+    var mount = document.getElementById('sidebar-mount');
+    if (!mount) return;
+    if (!activeCourse || !COURSES[activeCourse]) {
+      mount.style.display = 'none';
+      return;
+    }
+    mount.style.display = '';
+    var picker = document.getElementById('gb-course-select');
+    var rows = document.querySelectorAll('#gb-roster-list .student-row').length;
+    if (picker && picker.value === activeCourse && rows === getStudents(activeCourse).length) return;
+    mount.innerHTML = renderSidebar(activeCourse, null);
+  }
+
   /* ── Main render ────────────────────────────────────────── */
   function render() {
     if (CM.classManagerOpen) {
@@ -115,6 +132,7 @@ window.PageDashboard = (function () {
         setActiveCourse(nonArchived);
       }
     }
+    _syncSidebar();
     var cid = activeCourse;
     // Every grade on this page follows the class's chosen reporting term.
     if (typeof activateSavedTerm === 'function') activateSavedTerm(cid);
@@ -995,16 +1013,16 @@ window.PageDashboard = (function () {
     CM.configure({ activeCourse: activeCourse, onRender: render, onCourseChange: switchCourse });
     CM.resetState();
 
-    // Dashboard has no sidebar
-    document.getElementById('page-layout').classList.add('sidebar-hidden');
-    document.getElementById('sidebar-mount').style.display = 'none';
+    // The student list, as on the other pages (_syncSidebar in render)
+    document.getElementById('sidebar-mount').innerHTML = '';
+    initSidebarToggle();
 
     // Add page-specific class for scoped CSS
     document.getElementById('main').classList.add('page-dashboard');
 
-    // Hide sidebar toggle in dock
+    // Show the sidebar toggle in the dock
     var sidebarBtn = document.querySelector('.tb-btn');
-    if (sidebarBtn) sidebarBtn.style.display = 'none';
+    if (sidebarBtn) sidebarBtn.style.display = '';
 
     // Expose switchCourse globally for dock course selector
     window._pageSwitchCourse = switchCourse;
