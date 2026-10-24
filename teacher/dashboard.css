@@ -1,6 +1,11 @@
 /* dashboard.css — Dashboard page styles */
 
 /* ── Dashboard-scoped overrides ────────────────────────────── */
+/* The student list has its own class picker: the toolbar's shows only
+   when the list is collapsed (as on Assignments). */
+.page-layout:not(.sidebar-hidden) .dash-course-select {
+  display: none;
+}
 /* Class Management lists the classes itself: no student list beside it. */
 .page-layout:has(.cm-toolbar) #sidebar-mount {
   display: none;
