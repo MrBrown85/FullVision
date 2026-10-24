@@ -151,7 +151,16 @@ window.DashClassManager = (function () {
       '<div class="cm-std-color-bar" style="background:' +
       sec.color +
       '"></div>' +
-      (code ? '<span class="cm-std-code" style="--chip:' + chipColor + '">' + esc(code) + '</span>' : '') +
+      // Always present (hidden when empty) so typing a code can fill it in.
+      '<span class="cm-std-code" style="--chip:' +
+      chipColor +
+      '" data-fallback="' +
+      esc(code) +
+      '"' +
+      (code ? '' : ' hidden') +
+      '>' +
+      esc(code) +
+      '</span>' +
       '<span class="cm-std-label" data-fallback="' +
       esc(sec.shortName || sec.name || '') +
       '">' +
@@ -206,7 +215,7 @@ window.DashClassManager = (function () {
       esc(code) +
       '" maxlength="6" style="--chip:' +
       chipColor +
-      '" data-stop-prop="true" data-action-blur="cmStdCode" data-secid="' +
+      '" data-stop-prop="true" data-action-input="cmStdCodeLive" data-action-blur="cmStdCode" data-secid="' +
       sec.id +
       '"></div>' +
       '</div>' +
@@ -6803,14 +6812,29 @@ window.DashClassManager = (function () {
   // server-owned UUIDs that the database authoritatively holds, and the
   // user-visible code is its own column. This implementation just updates
   // tag.code locally; saveLearningMap sends the changed tag.
-  function cmUpdateStdCode(secId, val) {
-    secId = _currentId('section', secId);
-    if (!cmSelectedCourse) return;
-    var newCode = val
+  function _cmCleanCode(val) {
+    return val
       .trim()
       .toUpperCase()
       .replace(/[^A-Z0-9._\-]/g, '')
       .slice(0, 6);
+  }
+
+  /* Typing a code updates the header chip as you go; blur saves it. A blank
+     box shows the saved code, since saving ignores a blank code. */
+  function cmStdCodeLive(secId, val) {
+    var card = document.getElementById('cm-std-' + secId);
+    var chip = card && card.querySelector('.cm-std-code');
+    if (!chip) return;
+    var code = _cmCleanCode(val) || chip.dataset.fallback || '';
+    chip.textContent = code;
+    chip.hidden = !code;
+  }
+
+  function cmUpdateStdCode(secId, val) {
+    secId = _currentId('section', secId);
+    if (!cmSelectedCourse) return;
+    var newCode = _cmCleanCode(val);
     if (!newCode) return;
     var map = ensureCustomLearningMap(cmSelectedCourse);
     var sec = map.sections.find(function (s) {
@@ -7173,6 +7197,10 @@ window.DashClassManager = (function () {
     }
     if (el.dataset.actionInput === 'cmCatNameLive') {
       cmCatNameLive(parseInt(el.dataset.idx, 10), el.value);
+      return true;
+    }
+    if (el.dataset.actionInput === 'cmStdCodeLive') {
+      cmStdCodeLive(el.dataset.secid, el.value);
       return true;
     }
     if (el.dataset.actionInput === 'cmStdLabelLive') {
