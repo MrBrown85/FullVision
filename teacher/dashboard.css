@@ -1,6 +1,10 @@
 /* dashboard.css — Dashboard page styles */
 
 /* ── Dashboard-scoped overrides ────────────────────────────── */
+/* Class Management lists the classes itself: no student list beside it. */
+.page-layout:has(.cm-toolbar) #sidebar-mount {
+  display: none;
+}
 #main.page-main.page-dashboard {
   background: var(--bg-secondary, #ececf0);
   padding: 0 12px 20px;
