@@ -145,7 +145,7 @@ window.PageReports = (function () {
     if (stepper) stepper.style.display = tab === 'progress' ? '' : 'none';
     if (tab !== 'progress') _restoreSidebarBadges();
     var layout = document.getElementById('page-layout');
-    if (layout) layout.classList.toggle('sidebar-hidden', tab === 'progress' || !_sidebarVisible);
+    if (layout) layout.classList.toggle('sidebar-hidden', !_sidebarVisible);
     renderReports();
   }
 

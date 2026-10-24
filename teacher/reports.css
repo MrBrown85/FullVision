@@ -3222,6 +3222,12 @@
   color: var(--border);
   font-size: 12px;
 }
+/* The student list stays open beside Progress Reports, so on narrower
+   screens the toolbar wraps rather than pushing Print Reports off the edge. */
+.report-toolbar {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
 @media (max-width: 1520px) {
   .report-toolbar .tb-label,
   .report-toolbar .tb-divider {
