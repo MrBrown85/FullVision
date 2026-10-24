@@ -75,10 +75,10 @@ async function seedTwoClasses(page) {
   );
 }
 
-// [tab, route, picker, where the roster shows]. Dashboard and Gradebook have
-// their own picker and no sidebar; Student goes back to Dashboard on a switch.
+// [tab, route, picker, where the roster shows]. Gradebook has its own picker
+// and no sidebar; Student goes back to Dashboard on a switch.
 const TABS = [
-  ['Dashboard', '/dashboard', '.dash-course-select', '#main'],
+  ['Dashboard', '/dashboard', '#gb-course-select', '#gb-roster-list'],
   ['Assignments', '/assignments', '#gb-course-select', '#gb-roster-list'],
   ['Student', '/student?id=' + CLASS_A.students[0][0], '#gb-course-select', '#main'],
   ['Gradebook', '/gradebook', '.gb-course-select', '#main'],

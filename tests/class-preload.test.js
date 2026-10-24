@@ -82,8 +82,10 @@ describe('Class Management while classes load', () => {
   var originalQuery;
   beforeEach(() => {
     main = { innerHTML: '' };
+    sidebar = { innerHTML: '', style: {}, removeAttribute() {} };
     originalGetElementById = document.getElementById;
     document.getElementById = function (id) {
+      if (id === 'sidebar-mount') return sidebar;
       return id === 'main' ? main : originalGetElementById(id);
     };
     DashClassManager.resetState();
@@ -95,7 +97,8 @@ describe('Class Management while classes load', () => {
 
   it('shows Loading for a class not yet in, then its count; a picked class waits for its data', async () => {
     DashClassManager.openClassManager();
-    expect(main.innerHTML).toContain('Letter · Loading…');
+    // The class list sits where the student list goes.
+    expect(sidebar.innerHTML).toContain('Loading…');
     DashClassManager.handleAction('cmSelectClass', { dataset: { cid: B } });
     expect(main.innerHTML).toContain('Loading this class…');
     expect(main.innerHTML).not.toContain('data-tab="students"');

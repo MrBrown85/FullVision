@@ -63,11 +63,12 @@ test.describe('Class blocks', () => {
     await expect(picker).toBeVisible();
     await picker.getByRole('radio', { name: 'A', exact: true }).click();
     await expect(picker.getByRole('radio', { name: 'A', exact: true })).toHaveAttribute('aria-checked', 'true');
-    await expect(page.locator('.cm-class-item.selected .cm-class-name')).toHaveText('Block A · Philosophy 12');
+    await expect(page.locator('.cm-class-item.selected .cm-class-name')).toHaveText('Philosophy 12');
+    await expect(page.locator('.cm-class-item.selected .cm-class-meta')).toContainText('Block A');
 
     await page.locator('#cm-block-other').fill('Lunch club');
     await page.locator('#cm-block-other').blur();
-    await expect(page.locator('.cm-class-item.selected .cm-class-name')).toHaveText('Lunch club · Philosophy 12');
+    await expect(page.locator('.cm-class-item.selected .cm-class-meta')).toContainText('Lunch club');
     expect(await page.evaluate(cid => COURSES[cid].block, PHIL_A)).toBe('Lunch club');
   });
 
