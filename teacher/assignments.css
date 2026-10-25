@@ -554,6 +554,103 @@
 .af-mode-card[aria-checked='true'] svg {
   color: var(--active);
 }
+/* Each card's tooltip: a picture and a sentence, below the card on hover
+   (after a short pause) or keyboard focus. */
+.af-mode-item {
+  position: relative;
+  display: flex;
+}
+.af-mode-item .af-mode-card {
+  flex: 1;
+}
+.af-mode-tip {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: var(--z-popover);
+  width: 260px;
+  box-sizing: border-box;
+  padding: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity var(--duration-micro) ease,
+    visibility 0s linear var(--duration-micro);
+}
+.af-mode-item:last-child .af-mode-tip {
+  left: auto;
+  right: 0;
+}
+@media (hover: hover) {
+  .af-mode-item:hover .af-mode-tip {
+    opacity: 1;
+    visibility: visible;
+    transition-delay: 400ms;
+  }
+}
+.af-mode-card:focus-visible + .af-mode-tip {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+.af-mode-tip-pic {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 72px;
+  margin-bottom: 8px;
+  background: var(--bg);
+  border-radius: 6px;
+}
+.af-mode-tip-text {
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--text);
+}
+.af-tip-level {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.af-tip-level-code {
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  color: var(--text-2);
+}
+.af-tip-pts-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  width: 56px;
+  height: 30px;
+  box-sizing: border-box;
+  padding: 0 10px;
+  font-weight: 600;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.af-tip-pts-max {
+  margin-left: -2px;
+  font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
+  font-size: var(--text-base);
+  color: var(--text-2);
+}
+.af-tip-pts-pct {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text);
+}
+.af-mode-tip-pic .cmp-btn {
+  cursor: default;
+}
 @media (max-width: 560px) {
   .af-mode-cards {
     grid-template-columns: 1fr;

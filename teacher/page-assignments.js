@@ -1074,15 +1074,29 @@ window.PageAssignments = (function () {
       '<div class="af-mode-cards" role="radiogroup" aria-labelledby="af-scoremode-label">' +
       SCORE_MODE_CARDS.map(function (m) {
         return (
+          '<div class="af-mode-item">' +
           '<button type="button" class="af-mode-card af-scoremode-btn" role="radio" aria-checked="' +
           (scoreMode === m.mode) +
+          '" aria-describedby="af-mode-tip-' +
+          m.mode +
           '" data-mode="' +
           m.mode +
           '" data-action="setScoreMode">' +
           m.icon +
           '<span>' +
           m.label +
-          '</span></button>'
+          '</span></button>' +
+          '<div class="af-mode-tip" role="tooltip" id="af-mode-tip-' +
+          m.mode +
+          '">' +
+          '<div class="af-mode-tip-pic" aria-hidden="true">' +
+          m.picture() +
+          '</div>' +
+          '<div class="af-mode-tip-text">' +
+          m.tip +
+          '</div>' +
+          '</div>' +
+          '</div>'
         );
       }).join('') +
       '</div>' +
@@ -1307,21 +1321,53 @@ window.PageAssignments = (function () {
     if (wrap) wrap.style.display = mode === 'points' ? '' : 'none';
   }
 
-  // The three ways to score an assessment, as cards with an icon each.
+  // The three ways to score an assessment, as cards with an icon each. On
+  // hover or keyboard focus each shows a tooltip: a picture of how its scores
+  // are entered, built from the grading screens' own pieces, and a sentence.
   var SCORE_MODE_CARDS = [
     {
       mode: 'proficiency',
       label: 'Proficiency',
+      tip: 'Score each competency from Emerging to Extending.',
+      picture: function () {
+        return [1, 2, 3, 4]
+          .map(function (level) {
+            return (
+              '<span class="af-tip-level"><span class="gb-score-val s' +
+              level +
+              '">' +
+              level +
+              '</span><span class="af-tip-level-code">' +
+              PROF_CODES[level] +
+              '</span></span>'
+            );
+          })
+          .join('');
+      },
       icon: '<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 16v-3"/><path d="M8 16v-6"/><path d="M12 16v-9"/><path d="M16 16V4"/></svg>',
     },
     {
       mode: 'points',
       label: 'Points',
+      tip: 'Enter a score out of Max Points.',
+      picture: function () {
+        return (
+          '<span class="af-tip-pts-box">17</span><span class="af-tip-pts-max">/ 20</span>' +
+          '<span class="af-tip-pts-pct">85%</span>'
+        );
+      },
       icon: '<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M8 3 6 17"/><path d="M14 3l-2 14"/><path d="M3.5 7.5h13"/><path d="M3 12.5h13"/></svg>',
     },
     {
       mode: 'complete',
       label: 'Complete/Incomplete',
+      tip: 'Mark the work done or not done. Complete counts as full marks.',
+      picture: function () {
+        return (
+          '<span class="ldg-seg"><span class="cmp-btn cmp-complete active">\u2713 Complete</span>' +
+          '<span class="cmp-btn cmp-incomplete">\u2717 Incomplete</span></span>'
+        );
+      },
       icon: '<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="m6.8 10.2 2.2 2.2 4.2-4.6"/></svg>',
     },
   ];
