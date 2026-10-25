@@ -126,6 +126,25 @@ describe('assessment group grades', () => {
     expect(rubricCriterionLevel(CID, A, labs[1], rubric.criteria[0])).toBeNull();
   });
 
+  it('compares a group with all of the student’s work and places it on the 0–4 scale', () => {
+    seed({
+      categories: cats,
+      assessments: work,
+      scores: { [A]: [score('t1', 15), score('t2', 18), score('l1', 9)] },
+    });
+    const all = assessmentGroupGrade(CID, A, work);
+    const labs = assessmentGroupGrade(CID, A, [work[2]]);
+    // 42 of 60 = 70%; labs 90%
+    expect(groupGradeDiff(CID, labs, all)).toEqual({ value: 20, text: '+20.0%', dir: 1 });
+    expect(groupGradeDiff(CID, all, labs).text).toBe('−20.0%');
+    expect(groupGradeValue(CID, labs)).toBeCloseTo(3.6, 5);
+    const lv = [level('x', 'tests'), level('y', 'tests')];
+    seed({ gradingSystem: 'proficiency', assessments: lv, scores: { [A]: [score('x', 3), score('y', 2)] } });
+    const g = assessmentGroupGrade(CID, A, lv);
+    expect(groupGradeValue(CID, g)).toBe(2.5);
+    expect(groupGradeDiff(CID, assessmentGroupGrade(CID, A, [lv[0]]), g).text).toBe('+0.5');
+  });
+
   it('names a value by the nearest level a teacher can enter', () => {
     expect(nearestScoreLevel(3 + 1 / 3)).toEqual({ level: 3, text: '3+' });
     expect(nearestScoreLevel(2 + 2 / 3)).toEqual({ level: 3, text: '3−' });

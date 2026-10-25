@@ -19,6 +19,8 @@ window.PageStudent = (function () {
   var _assessClosed = {}; // Assessments tab: '<group by>:<key>' of groups folded shut
   var _bdOpen = {}; // Grade Breakdown tab: categories whose assessments show
   var _bdRubric = ''; // Grade Breakdown tab: the shared rubric shown ('' = the first)
+  var _typeView = 'strengths'; // Grade Breakdown tab: strengths, growth, month, timeline
+  var _typeFocus = ''; // Grade Breakdown tab, Timeline: the type brought forward ('' = all)
   var _openTags = new Set(); // competency cards whose evidence drawer is open
   var _overrideSelectedLevel = 0;
   var Evidence = StudentEvidence;
@@ -1175,6 +1177,367 @@ window.PageStudent = (function () {
     );
   }
 
+  /* ── Grade Breakdown: assignment type views ─────────────── */
+  var TYPE_VIEWS = [
+    { id: 'strengths', label: 'Strengths' },
+    { id: 'growth', label: 'Growth' },
+    { id: 'month', label: 'By Month' },
+    { id: 'timeline', label: 'Timeline' },
+  ];
+  var TYPE_VIEW_KEY = 'gb-student-type-view';
+  var TYPE_COLORS = ['#1565c0', '#c2410c', '#6d28d9', '#0f766e', '#64748b', '#a21caf', '#4d7c0f'];
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  function _savedTypeView() {
+    try {
+      var v = localStorage.getItem(TYPE_VIEW_KEY);
+      return TYPE_VIEWS.some(function (t) {
+        return t.id === v;
+      })
+        ? v
+        : 'strengths';
+    } catch (e) {
+      return 'strengths';
+    }
+  }
+
+  function _dayNum(date) {
+    var d = new Date(String(date || '').slice(0, 10) + 'T00:00:00');
+    return isNaN(d) ? null : Math.round(d.getTime() / 864e5);
+  }
+
+  /* A group's scored assessments, oldest first, each with its grade and its
+     place on the 0–4 scale. */
+  function _scoredPoints(cid, assessments) {
+    return assessments
+      .slice()
+      .sort(function (x, y) {
+        return (x.date || '').localeCompare(y.date || '');
+      })
+      .map(function (a) {
+        var g = assessmentGroupGrade(cid, studentId, [a]);
+        var v = groupGradeValue(cid, g);
+        var t = _dayNum(a.date);
+        return v == null || t == null ? null : { a: a, g: g, v: v, t: t };
+      })
+      .filter(Boolean);
+  }
+
+  /* One scale for every chart in the section: dates across, 0–4 up, with
+     the axis labelled as the class shows grades. */
+  function _chartScale(cid, pointLists) {
+    var all = [].concat.apply([], pointLists);
+    var t0 = Math.min.apply(
+      null,
+      all.map(function (p) {
+        return p.t;
+      }),
+    );
+    var t1 = Math.max.apply(
+      null,
+      all.map(function (p) {
+        return p.t;
+      }),
+    );
+    if (t1 - t0 < 14) {
+      t0 -= 7;
+      t1 += 7;
+    }
+    var vmin = Math.min.apply(
+      null,
+      all.map(function (p) {
+        return p.v;
+      }),
+    );
+    var lo = Math.max(0, Math.min(2, Math.floor((vmin - 0.25) * 2) / 2));
+    var x = function (t) {
+      return 3 + ((t - t0) / (t1 - t0)) * 94;
+    };
+    var y = function (v) {
+      return (1 - (Math.min(4, v) - lo) / (4 - lo)) * 100;
+    };
+    var ticks = [];
+    for (var k = Math.ceil(lo); k <= 4; k++) ticks.push({ y: y(k), text: formatLevel(cid, k) });
+    var months = [];
+    var d = new Date(t0 * 864e5);
+    var m = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1));
+    // The first month's name, unless the next month starts right after it.
+    if (x(m.getTime() / 864e5) - x(t0) > 8) months.push({ x: x(t0), text: MONTHS[d.getUTCMonth()] });
+    while (m.getTime() / 864e5 <= t1) {
+      months.push({ x: x(m.getTime() / 864e5), text: MONTHS[m.getUTCMonth()] });
+      m = new Date(Date.UTC(m.getUTCFullYear(), m.getUTCMonth() + 1, 1));
+    }
+    return { x: x, y: y, ticks: ticks, months: months };
+  }
+
+  /* A line chart: each series a line through its points, the latest point
+     larger. series: [{ points, color, dim, wide }]. */
+  function _lineChartHtml(scale, series, height, label) {
+    var html = '<div class="stu-chart" style="height:' + height + 'px" role="img" aria-label="' + esc(label) + '">';
+    scale.ticks.forEach(function (t) {
+      html +=
+        '<span class="stu-chart-grid" style="top:' +
+        t.y.toFixed(2) +
+        '%"></span><span class="stu-chart-tick" style="top:' +
+        t.y.toFixed(2) +
+        '%" aria-hidden="true">' +
+        esc(t.text) +
+        '</span>';
+    });
+    series.forEach(function (s) {
+      if (s.points.length > 1)
+        html +=
+          '<svg class="stu-chart-line' +
+          (s.dim ? ' dim' : '') +
+          '" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polyline points="' +
+          s.points
+            .map(function (p) {
+              return scale.x(p.t).toFixed(2) + ',' + scale.y(p.v).toFixed(2);
+            })
+            .join(' ') +
+          '" fill="none" stroke="' +
+          s.color +
+          '" stroke-width="' +
+          (s.wide ? 2.6 : 1.6) +
+          '" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>';
+    });
+    series.forEach(function (s) {
+      s.points.forEach(function (p, i) {
+        html +=
+          '<span class="stu-chart-dot' +
+          (i === s.points.length - 1 ? ' last' : '') +
+          (s.dim ? ' dim' : '') +
+          '" style="left:' +
+          scale.x(p.t).toFixed(2) +
+          '%;top:' +
+          scale.y(p.v).toFixed(2) +
+          '%;background:' +
+          (s.dotColor ? PROF_COLORS[p.g.level] || PROF_COLORS[0] : s.color) +
+          '" title="' +
+          esc(_shortDay(p.a.date) + ': ' + p.a.title + ', ' + p.g.text) +
+          '"></span>';
+      });
+    });
+    html += '</div><div class="stu-chart-x" aria-hidden="true">';
+    scale.months.forEach(function (m) {
+      html += '<span style="left:' + m.x.toFixed(2) + '%">' + esc(m.text) + '</span>';
+    });
+    return html + '</div>';
+  }
+
+  function _firstLatestHtml(points) {
+    if (points.length < 2) return '<span class="stu-rt-change"><span class="stu-rt-none">\u2014</span></span>';
+    var first = points[0];
+    var last = points[points.length - 1];
+    var dir = last.v > first.v ? 'up' : last.v < first.v ? 'down' : 'flat';
+    return (
+      '<span class="stu-rt-change stu-rt-' +
+      dir +
+      '">' +
+      _gradePill(first.g) +
+      '<svg width="18" height="10" viewBox="0 0 18 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-label="' +
+      (dir === 'up' ? 'up to' : dir === 'down' ? 'down to' : 'still') +
+      '"><path d="M1 5h15M12 1l4 4-4 4"/></svg>' +
+      _gradePill(last.g) +
+      '</span>'
+    );
+  }
+
+  /* Strengths: each type against all of the student's work. */
+  function _typeStrengthsHtml(ctx, types) {
+    var cid = ctx.cid;
+    var own = assessmentGroupGrade(cid, studentId, ctx.assessments);
+    var rows = types
+      .map(function (g) {
+        var mine = assessmentGroupGrade(cid, studentId, g.assessments);
+        return { g: g, mine: mine, diff: groupGradeDiff(cid, mine, own) };
+      })
+      .sort(function (a, b) {
+        return (b.diff ? b.diff.value : -Infinity) - (a.diff ? a.diff.value : -Infinity);
+      });
+    var span = rows.reduce(
+      function (m, r) {
+        return r.diff ? Math.max(m, Math.abs(r.diff.value)) : m;
+      },
+      courseGradeMode(cid) === 'letter' ? 10 : 0.5,
+    );
+    var html =
+      '<div class="stu-ts"><div class="stu-ts-row stu-ts-head"><span></span><span class="stu-ts-axis" aria-hidden="true"><span class="stu-ts-weaker">Weaker</span><span class="stu-ts-own">All Work ' +
+      _gradePill(own) +
+      '</span><span class="stu-ts-stronger">Stronger</span></span><span></span></div>';
+    rows.forEach(function (r) {
+      var w = r.diff ? (Math.abs(r.diff.value) / span) * 50 : 0;
+      var below = r.diff && r.diff.dir < 0;
+      html +=
+        '<div class="stu-ts-row"><span class="stu-bd-name"><strong>' +
+        esc(r.g.name) +
+        '</strong><span class="stu-sub">' +
+        esc(_plural(r.g.assessments.length, 'assessment', 'assessments')) +
+        '</span></span><span class="stu-ts-track" role="img" aria-label="' +
+        esc(
+          r.g.name +
+            ': ' +
+            (r.mine ? r.mine.text : 'not scored') +
+            (r.diff ? ', ' + r.diff.text + ' against all work' : ''),
+        ) +
+        '"><span class="stu-ts-bar ' +
+        (below ? 'weaker' : 'stronger') +
+        '" style="left:' +
+        (below ? 50 - w : 50).toFixed(2) +
+        '%;width:' +
+        Math.max(w, 0.6).toFixed(2) +
+        '%"></span>' +
+        (r.diff
+          ? '<span class="stu-ts-num ' +
+            (below ? 'weaker' : 'stronger') +
+            '" style="left:' +
+            (below ? 50 - w : 50 + w).toFixed(2) +
+            '%">' +
+            esc(r.diff.text) +
+            '</span>'
+          : '') +
+        '</span><span class="stu-ts-grade">' +
+        _gradePill(r.mine) +
+        '</span></div>';
+    });
+    return html + '</div>';
+  }
+
+  /* Growth: a small chart per type, all on one timeline. */
+  function _typeGrowthHtml(ctx, types) {
+    var cid = ctx.cid;
+    var lists = types.map(function (g) {
+      return _scoredPoints(cid, g.assessments);
+    });
+    var any = lists.some(function (l) {
+      return l.length;
+    });
+    if (!any) return '<div class="stu-empty">No scores yet.</div>';
+    var scale = _chartScale(
+      cid,
+      lists.filter(function (l) {
+        return l.length;
+      }),
+    );
+    var html = '<div class="stu-tg">';
+    types.forEach(function (g, i) {
+      var pts = lists[i];
+      html +=
+        '<div class="stu-tg-card"><div class="stu-tg-head"><span class="stu-bd-name"><strong>' +
+        esc(g.name) +
+        '</strong><span class="stu-sub">' +
+        esc(_plural(g.assessments.length, 'assessment', 'assessments')) +
+        '</span></span>' +
+        _firstLatestHtml(pts) +
+        '</div>' +
+        (pts.length
+          ? _lineChartHtml(scale, [{ points: pts, color: '#3a3a3c', dotColor: true }], 110, g.name + ' over time')
+          : '<div class="stu-empty">No scores yet.</div>') +
+        '</div>';
+    });
+    return html + '</div>';
+  }
+
+  /* By Month: a row per type, a column per month, as the rubric table. */
+  function _typeMonthHtml(ctx, types) {
+    var cid = ctx.cid;
+    var keys = [];
+    ctx.assessments.forEach(function (a) {
+      var m = (a.date || '').slice(0, 7);
+      if (m && keys.indexOf(m) < 0) keys.push(m);
+    });
+    keys.sort();
+    if (!keys.length) return '<div class="stu-empty">No dated assessments yet.</div>';
+    var cols = 'grid-template-columns:minmax(140px,1.2fr) repeat(' + keys.length + ',minmax(60px,1fr)) 190px 110px';
+    var html =
+      '<div class="stu-rt-scroll"><div class="stu-rt" role="table" aria-label="Assignment types by month"><div class="stu-rt-row stu-rt-head" role="row" style="' +
+      cols +
+      '"><span role="columnheader">Type</span>';
+    keys.forEach(function (k) {
+      html += '<span role="columnheader" class="stu-rt-center">' + esc(MONTHS[Number(k.slice(5)) - 1]) + '</span>';
+    });
+    html +=
+      '<span role="columnheader" class="stu-rt-center">First to Latest</span><span role="columnheader" class="stu-rt-right">All</span></div>';
+    types.forEach(function (g) {
+      html +=
+        '<div class="stu-rt-row" role="row" style="' +
+        cols +
+        '"><span role="rowheader" class="stu-bd-name"><strong>' +
+        esc(g.name) +
+        '</strong><span class="stu-sub">' +
+        esc(_plural(g.assessments.length, 'assessment', 'assessments')) +
+        '</span></span>';
+      keys.forEach(function (k) {
+        var inMonth = g.assessments.filter(function (a) {
+          return (a.date || '').slice(0, 7) === k;
+        });
+        var mg = inMonth.length ? assessmentGroupGrade(cid, studentId, inMonth) : null;
+        html +=
+          '<span role="cell" class="stu-rt-center">' +
+          (mg ? _gradePill(mg) : '<span class="stu-rt-none">\u2014</span>') +
+          '</span>';
+      });
+      html +=
+        '<span role="cell">' +
+        _firstLatestHtml(_scoredPoints(cid, g.assessments)) +
+        '</span><span role="cell" class="stu-rt-right">' +
+        _gradePill(assessmentGroupGrade(cid, studentId, g.assessments)) +
+        '</span></div>';
+    });
+    return html + '</div></div>';
+  }
+
+  /* Timeline: every assessment on one chart, a line per type; a type's
+     chip brings it forward. */
+  function _typeTimelineHtml(ctx, types) {
+    var cid = ctx.cid;
+    var lists = types.map(function (g) {
+      return _scoredPoints(cid, g.assessments);
+    });
+    var withPts = lists.filter(function (l) {
+      return l.length;
+    });
+    if (!withPts.length) return '<div class="stu-empty">No scores yet.</div>';
+    var focus = types.some(function (g) {
+      return g.key === _typeFocus;
+    })
+      ? _typeFocus
+      : '';
+    var chip = function (key, label, color) {
+      var on = focus === key;
+      return (
+        '<button type="button" class="stu-chip' +
+        (on ? ' active' : '') +
+        '" data-action="stuTypeFocus" data-key="' +
+        esc(key) +
+        '" aria-pressed="' +
+        on +
+        '">' +
+        (color ? '<span class="stu-chip-dot" style="background:' + color + '" aria-hidden="true"></span>' : '') +
+        esc(label) +
+        '</button>'
+      );
+    };
+    var html = '<div class="stu-rt-picker" role="group" aria-label="Show">' + chip('', 'All Types', '');
+    types.forEach(function (g, i) {
+      html += chip(g.key, g.name, TYPE_COLORS[i % TYPE_COLORS.length]);
+    });
+    html += '</div>';
+    var series = types.map(function (g, i) {
+      return {
+        points: lists[i],
+        color: TYPE_COLORS[i % TYPE_COLORS.length],
+        dim: !!focus && g.key !== focus,
+        wide: focus === g.key,
+      };
+    });
+    // The type brought forward draws last, on top.
+    series.sort(function (a, b) {
+      return (a.wide ? 1 : 0) - (b.wide ? 1 : 0);
+    });
+    return html + _lineChartHtml(_chartScale(cid, withPts), series, 320, 'Every assessment over time, a line per type');
+  }
+
   function _breakdownTabHtml(ctx) {
     var cid = ctx.cid;
     var mode = courseGradeMode(cid);
@@ -1284,28 +1647,33 @@ window.PageStudent = (function () {
     }
     html += '</section>';
 
-    // Assignment types
+    // Assignment types: four ways to look at this student's work by type.
     var types = _assessGroups(cid, ctx.assessments, 'type');
     html +=
-      '<section class="stu-bd-section" aria-labelledby="stu-bd-types"><div class="stu-bd-title"><h3 id="stu-bd-types">Assignment Types</h3><span class="stu-sub">From each assessment’s Evidence Type</span></div>';
-    if (!types.length) html += '<div class="stu-empty">No assessments yet.</div>';
-    else {
-      html += '<div class="stu-bd-tiles">';
-      types.forEach(function (g) {
-        var mine = assessmentGroupGrade(cid, studentId, g.assessments);
-        var cls = classAssessmentGroupGrade(cid, ctx.classIds, g.assessments);
+      '<section class="stu-bd-section" aria-labelledby="stu-bd-types"><div class="stu-bd-title"><h3 id="stu-bd-types">Assignment Types</h3>';
+    if (types.length) {
+      html += '<div class="seg seg-sm" role="radiogroup" aria-label="Assignment types view">';
+      TYPE_VIEWS.forEach(function (v) {
+        var on = _typeView === v.id;
         html +=
-          '<div class="stu-bd-tile"><div class="stu-bd-tile-head"><strong>' +
-          esc(g.name) +
-          '</strong><span class="stu-sub">' +
-          esc(_plural(g.assessments.length, 'assessment', 'assessments')) +
-          '</span></div>' +
-          _gradePill(mine) +
-          _classLine(cid, mine, cls) +
-          '</div>';
+          '<button type="button" class="seg-btn' +
+          (on ? ' active' : '') +
+          '" role="radio" aria-checked="' +
+          on +
+          '" data-action="stuTypeView" data-view="' +
+          v.id +
+          '">' +
+          esc(v.label) +
+          '</button>';
       });
       html += '</div>';
     }
+    html += '</div>';
+    if (!types.length) html += '<div class="stu-empty">No assessments yet.</div>';
+    else if (_typeView === 'growth') html += _typeGrowthHtml(ctx, types);
+    else if (_typeView === 'month') html += _typeMonthHtml(ctx, types);
+    else if (_typeView === 'timeline') html += _typeTimelineHtml(ctx, types);
+    else html += _typeStrengthsHtml(ctx, types);
     html += '</section>';
 
     // Rubrics used on more than one assessment: one picked at a time, its
@@ -1877,6 +2245,19 @@ window.PageStudent = (function () {
         _bdRubric = el.dataset.key || '';
         render();
       },
+      stuTypeView: function () {
+        _typeView = el.dataset.view || 'strengths';
+        try {
+          localStorage.setItem(TYPE_VIEW_KEY, _typeView);
+        } catch (err) {
+          /* private mode: the choice lasts this visit */
+        }
+        render();
+      },
+      stuTypeFocus: function () {
+        _typeFocus = el.dataset.key || '';
+        render();
+      },
       toggleOverridePanel: function () {
         toggleOverridePanel(el.dataset.secid);
       },
@@ -1979,6 +2360,8 @@ window.PageStudent = (function () {
     _assessClosed = {};
     _bdOpen = {};
     _bdRubric = '';
+    _typeView = _savedTypeView();
+    _typeFocus = '';
     // The tab the link names; a link to one observation opens Observations;
     // otherwise the tab last opened on this device.
     _tab = _isTab(params.tab) ? params.tab : params.ob ? 'evidence' : _savedTab() || 'comps';
