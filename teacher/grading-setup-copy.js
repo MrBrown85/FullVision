@@ -6,8 +6,8 @@
  * beside the categories imports the categories alone.
  *
  * What copies: grading system, categories and weights, calculation method,
- * course % rounding, late work policy, and (only when ticked) reporting
- * terms. Categories are matched by name: a same-named category keeps its id,
+ * course % rounding, Rubric Levels (the order of the four levels), late
+ * work policy, and (only when ticked) reporting terms. Categories are matched by name: a same-named category keeps its id,
  * so its assessments stay in it. A category the source doesn't have is
  * removed, and its assessments move to one the teacher picks first.
  * Copies are not linked, and scores are never touched.
@@ -20,12 +20,21 @@ window.GradingSetupCopy = (function () {
     { key: 'categories', label: 'Categories and weights', on: true },
     { key: 'calcMethod', label: 'Calculation method', on: true },
     { key: 'roundPercent', label: 'Course %', on: true },
+    { key: 'levelOrder', label: 'Rubric Levels', on: true },
     { key: 'lateWorkPolicy', label: 'Late work policy', on: true },
     // Dates belong to one school year (docs/DECISIONS.md, Reporting periods 6).
     { key: 'reportingTerms', label: 'Reporting terms', on: false },
   ];
 
   var SYSTEM_LABELS = { proficiency: 'Proficiency', letter: 'Letter', both: 'Both' };
+
+  /* Rubric Levels as Class Details names it: 'asc' or 'desc'. */
+  function _levelOrderOf(cid) {
+    return levelOrderFor(cid)[0] === 1 ? 'asc' : 'desc';
+  }
+  function _levelOrderLabel(order) {
+    return order === 'asc' ? 'Emerging First' : 'Extending First';
+  }
   var METHOD_LABELS = {
     mostRecent: 'Most Recent',
     highest: 'Highest',
@@ -113,6 +122,7 @@ window.GradingSetupCopy = (function () {
         : '',
       calcMethod: _calcLabel(_calcOf(cid)),
       roundPercent: getRoundWholePercent(cid) ? 'Whole number' : 'One decimal',
+      levelOrder: _levelOrderLabel(_levelOrderOf(cid)),
       lateWorkPolicy: late || 'None',
       reportingTerms: terms.length
         ? terms
@@ -259,6 +269,11 @@ window.GradingSetupCopy = (function () {
         return w ? 'Whole number' : 'One decimal';
       };
       add('roundPercent', ra === rb ? [] : [rl(rb) + ' → ' + rl(ra) + '.']);
+    }
+    if (groups.levelOrder) {
+      var oa = _levelOrderOf(srcCid);
+      var ob = _levelOrderOf(dstCid);
+      add('levelOrder', oa === ob ? [] : [_levelOrderLabel(ob) + ' → ' + _levelOrderLabel(oa) + '.']);
     }
     if (groups.lateWorkPolicy) {
       var la = (srcCourse.lateWorkPolicy || '').trim();
@@ -411,6 +426,10 @@ window.GradingSetupCopy = (function () {
     }
     if (keys.roundPercent) {
       cc.roundPercent = !!getRoundWholePercent(srcCid);
+      ccChanged = true;
+    }
+    if (keys.levelOrder) {
+      cc.levelOrder = _levelOrderOf(srcCid);
       ccChanged = true;
     }
     if (keys.lateWorkPolicy) {
