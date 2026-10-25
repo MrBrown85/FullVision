@@ -105,3 +105,107 @@ describe('Import Roster review', () => {
     expect(names()).toEqual(['Fatima Hassan', 'Liam Chen', 'Tyler Rowe']);
   });
 });
+
+describe('Import Roster file reading', () => {
+  it('reads columns by header in any order, with quoted commas', () => {
+    var table = DashClassManager.rosterImportTable(
+      'Student Number,Name,Usual First Name,Birth Date,Parent Email\n' +
+        'STU-301,"Okafor, Cecilia",Cece,2012-05-15,n.okafor@example.com\n',
+    );
+    expect(table.map).toEqual(['studentNumber', 'fullName', 'preferred', 'dateOfBirth', 'parentEmail']);
+    var read = DashClassManager.rosterRowsFromTable(table);
+    expect(read.rows).toEqual([
+      {
+        studentNumber: 'STU-301',
+        firstName: 'Cecilia',
+        lastName: 'Okafor',
+        preferred: 'Cece',
+        dateOfBirth: '2012-05-15',
+        parentEmails: ['n.okafor@example.com'],
+      },
+    ]);
+  });
+
+  it('handles CRLF, a BOM, "" inside quotes and tab-separated files', () => {
+    expect(DashClassManager.parseRosterCsv('\uFEFFa,"b ""c"", d"\r\n1,2\r\n')).toEqual([
+      ['a', 'b "c", d'],
+      ['1', '2'],
+    ]);
+    expect(DashClassManager.parseRosterCsv('First Name\tLast Name\nAva\tLee\n')).toEqual([
+      ['First Name', 'Last Name'],
+      ['Ava', 'Lee'],
+    ]);
+  });
+
+  it('falls back to the old fixed column order when no header is known', () => {
+    var table = DashClassManager.rosterImportTable('Ava,Lee,,she/her,STU-9,2012-01-02,ava@school.ca\n');
+    var read = DashClassManager.rosterRowsFromTable(table);
+    expect(read.rows[0]).toMatchObject({
+      firstName: 'Ava',
+      lastName: 'Lee',
+      pronouns: 'she/her',
+      studentNumber: 'STU-9',
+      dateOfBirth: '2012-01-02',
+      email: 'ava@school.ca',
+    });
+  });
+
+  it('keeps known designations and ELL, and counts what it could not read', () => {
+    var table = DashClassManager.rosterImportTable(
+      'First Name,Last Name,Designations,ELL,DOB,Email\nAva,Lee,Q; ZZ,yes,03/04/2012,not-an-email\n',
+    );
+    var read = DashClassManager.rosterRowsFromTable(table);
+    expect(read.rows[0].designations).toEqual(['Q', 'ELL']);
+    expect(read.rows[0].dateOfBirth).toBeUndefined();
+    expect(read.skipped).toEqual({ dates: 1, emails: 1, codes: 1 });
+  });
+});
+
+describe('Import Roster review: details and columns', () => {
+  var main;
+  var originalGetElementById;
+
+  beforeEach(() => {
+    localStorage.clear();
+    saveCourses({ [CID]: { id: CID, name: 'Science 8' } });
+    saveStudents(CID, [student('s1', 'Fatima', 'Hassan', 'STU-208')]);
+    main = { innerHTML: '' };
+    originalGetElementById = document.getElementById;
+    document.getElementById = function (id) {
+      return id === 'main' ? main : originalGetElementById(id);
+    };
+    DashClassManager.resetState();
+    DashClassManager.configure({ activeCourse: CID, onRender() {}, onCourseChange() {} });
+    DashClassManager.openClassManager();
+    DashClassManager.handleAction('cmSetTab', { dataset: { tab: 'students' } });
+  });
+
+  afterEach(() => {
+    document.getElementById = originalGetElementById;
+  });
+
+  it('offers filled-in details for a matched student and applies them on Import', () => {
+    var table = DashClassManager.rosterImportTable(
+      'Student Number,First Name,Last Name,Pronouns,Date of Birth,Designations\nSTU-208,Fatima,Hassan,she/her,2013-07-09,G\n',
+    );
+    var read = DashClassManager.rosterRowsFromTable(table);
+    DashClassManager.cmShowImportPreview(read.rows, 'myed.csv', table, read.skipped);
+    expect(main.innerHTML).toContain('Details Updated');
+    expect(main.innerHTML).toContain('Pronouns, Date of Birth, G');
+    expect(main.innerHTML).toContain('Columns in This File');
+    DashClassManager.handleAction('cmConfirmImport', { dataset: {} });
+    var st = getStudents(CID)[0];
+    expect(st.pronouns).toBe('she/her');
+    expect(st.dateOfBirth).toBe('2013-07-09');
+    expect(st.designations).toEqual(['G']);
+  });
+
+  it('re-reads the file when a column is matched to a different field', () => {
+    var table = DashClassManager.rosterImportTable('First Name,Last Name,Code\nNoor,Al-Rashid,STU-202\n');
+    var read = DashClassManager.rosterRowsFromTable(table);
+    DashClassManager.cmShowImportPreview(read.rows, 'f.csv', table, read.skipped);
+    DashClassManager.handleChange({ dataset: { actionChange: 'cmImportMap', col: '2' }, value: 'studentNumber' });
+    DashClassManager.handleAction('cmConfirmImport', { dataset: {} });
+    expect(getStudents(CID).find(s => s.firstName === 'Noor').studentNumber).toBe('STU-202');
+  });
+});
