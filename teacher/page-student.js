@@ -19,7 +19,7 @@ window.PageStudent = (function () {
   var _assessClosed = {}; // Assessments tab: '<group by>:<key>' of groups folded shut
   var _bdOpen = {}; // Grade Breakdown tab: categories whose assessments show
   var _bdRubric = ''; // Grade Breakdown tab: the shared rubric shown ('' = the first)
-  var _typeView = 'strengths'; // Grade Breakdown tab: strengths, growth, month, timeline
+  var _typeView = 'timeline'; // Grade Breakdown tab: timeline, strengths, growth, month
   var _typeFocus = ''; // Grade Breakdown tab, Timeline: the type brought forward ('' = all)
   var _coreTerm = null; // Learner Profile: the term ordinal whose self-assessments show
   var _coreEditing = ''; // Learner Profile: the Core Competency being self-assessed
@@ -1207,9 +1207,9 @@ window.PageStudent = (function () {
         return t.id === v;
       })
         ? v
-        : 'strengths';
+        : 'timeline';
     } catch (e) {
-      return 'strengths';
+      return 'timeline';
     }
   }
 
@@ -1554,7 +1554,37 @@ window.PageStudent = (function () {
     var cid = ctx.cid;
     var mode = courseGradeMode(cid);
     var showShares = mode !== 'proficiency';
+
+    // Assignment types: four ways to look at this student's work by type.
+    var types = _assessGroups(cid, ctx.assessments, 'type');
     var html =
+      '<section class="stu-bd-section" aria-labelledby="stu-bd-types"><div class="stu-bd-title"><h3 id="stu-bd-types">Assignment Types</h3>';
+    if (types.length) {
+      html += '<div class="seg seg-sm" role="radiogroup" aria-label="Assignment types view">';
+      TYPE_VIEWS.forEach(function (v) {
+        var on = _typeView === v.id;
+        html +=
+          '<button type="button" class="seg-btn' +
+          (on ? ' active' : '') +
+          '" role="radio" aria-checked="' +
+          on +
+          '" data-action="stuTypeView" data-view="' +
+          v.id +
+          '">' +
+          esc(v.label) +
+          '</button>';
+      });
+      html += '</div>';
+    }
+    html += '</div>';
+    if (!types.length) html += '<div class="stu-empty">No assessments yet.</div>';
+    else if (_typeView === 'growth') html += _typeGrowthHtml(ctx, types);
+    else if (_typeView === 'month') html += _typeMonthHtml(ctx, types);
+    else if (_typeView === 'timeline') html += _typeTimelineHtml(ctx, types);
+    else html += _typeStrengthsHtml(ctx, types);
+    html += '</section>';
+
+    html +=
       '<div class="stu-panel-note">Each group’s grade is worked out the way the course grade is: ' +
       (mode === 'proficiency' ? 'the average of its scored assessments.' : 'points earned out of points possible.') +
       ' Bars show each assessment, oldest to newest.</div>';
@@ -1653,35 +1683,6 @@ window.PageStudent = (function () {
       });
       html += '</div>';
     }
-    html += '</section>';
-
-    // Assignment types: four ways to look at this student's work by type.
-    var types = _assessGroups(cid, ctx.assessments, 'type');
-    html +=
-      '<section class="stu-bd-section" aria-labelledby="stu-bd-types"><div class="stu-bd-title"><h3 id="stu-bd-types">Assignment Types</h3>';
-    if (types.length) {
-      html += '<div class="seg seg-sm" role="radiogroup" aria-label="Assignment types view">';
-      TYPE_VIEWS.forEach(function (v) {
-        var on = _typeView === v.id;
-        html +=
-          '<button type="button" class="seg-btn' +
-          (on ? ' active' : '') +
-          '" role="radio" aria-checked="' +
-          on +
-          '" data-action="stuTypeView" data-view="' +
-          v.id +
-          '">' +
-          esc(v.label) +
-          '</button>';
-      });
-      html += '</div>';
-    }
-    html += '</div>';
-    if (!types.length) html += '<div class="stu-empty">No assessments yet.</div>';
-    else if (_typeView === 'growth') html += _typeGrowthHtml(ctx, types);
-    else if (_typeView === 'month') html += _typeMonthHtml(ctx, types);
-    else if (_typeView === 'timeline') html += _typeTimelineHtml(ctx, types);
-    else html += _typeStrengthsHtml(ctx, types);
     html += '</section>';
 
     // Rubrics used on more than one assessment: one picked at a time, its
@@ -2455,11 +2456,45 @@ window.PageStudent = (function () {
 
     html += '</div></div>'; // close padding wrapper + scroll wrapper
     var main = document.getElementById('main');
+    // A redraw on the same student and tab (a view switch, a chip, a fold)
+    // keeps the page where it was and the focus on the control clicked.
+    var place = _placeBefore(main);
     main.innerHTML = html;
+    _placeAfter(main, place);
     // The Evidence panel and the competency drawers show the same
     // observations; a change in one redraws the other.
     Evidence.mount(activeCourse, studentId, { onChange: CompetencyEvidence.refresh });
     CompetencyEvidence.mount(activeCourse, studentId, main, { onAdd: Evidence.refresh });
+  }
+
+  var _drawnFor = ''; // student and tab the page was last drawn for
+
+  function _placeBefore(main) {
+    var key = studentId + '|' + _tab;
+    var same = key === _drawnFor;
+    _drawnFor = key;
+    if (!same) return null;
+    var scroller = main.querySelector('.student-scroll');
+    var active = document.activeElement;
+    var ctl = active && main.contains(active) && active.dataset ? active.dataset : null;
+    return {
+      top: scroller ? scroller.scrollTop : 0,
+      action: ctl && ctl.action ? ctl.action : '',
+      data: ctl ? Object.assign({}, ctl) : null,
+    };
+  }
+
+  function _placeAfter(main, place) {
+    if (!place) return;
+    var scroller = main.querySelector('.student-scroll');
+    if (scroller) scroller.scrollTop = place.top;
+    if (!place.action) return;
+    var match = Array.prototype.find.call(main.querySelectorAll('[data-action="' + place.action + '"]'), function (n) {
+      return Object.keys(place.data).every(function (k) {
+        return n.dataset[k] === place.data[k];
+      });
+    });
+    if (match) match.focus({ preventScroll: true });
   }
 
   /* ── Delegated click handler ──────────────────────────────── */
@@ -2508,7 +2543,7 @@ window.PageStudent = (function () {
         render();
       },
       stuTypeView: function () {
-        _typeView = el.dataset.view || 'strengths';
+        _typeView = el.dataset.view || 'timeline';
         try {
           localStorage.setItem(TYPE_VIEW_KEY, _typeView);
         } catch (err) {
@@ -2647,6 +2682,7 @@ window.PageStudent = (function () {
     _typeFocus = '';
     _coreTerm = null;
     _coreEditing = '';
+    _drawnFor = '';
     // The tab the link names; a link to one observation opens Observations;
     // otherwise the tab last opened on this device.
     _tab = _isTab(params.tab) ? params.tab : params.ob ? 'evidence' : _savedTab() || 'comps';
