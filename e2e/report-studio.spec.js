@@ -180,7 +180,8 @@ test.describe('Page Studio', () => {
     await openStudio(page);
     await expect(page.locator('#studio > *')).toHaveCount(2);
     await expect(page.locator('#studio-inspector')).toHaveCount(0);
-    await expect(page.locator('.studio-palette .studio-blk')).toHaveCount(17);
+    // 18 with Attendance (Term Questionnaire totals, 2026-10-24).
+    await expect(page.locator('.studio-palette .studio-blk')).toHaveCount(18);
     await expect(page.locator('.studio-blk.placed')).toHaveCount(7);
     await expect(page.locator('.studio-palette')).not.toContainText('Letterhead');
     await expect(page.locator('.sheet-label').first()).toHaveText('Page 1 of 2');

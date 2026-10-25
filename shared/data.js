@@ -10137,6 +10137,19 @@ window.v2.listCourseGoalDates = function (courseId) {
   return _rpcOrNoop('list_course_goal_dates', { p_course_id: courseId });
 };
 
+/* Attendance totals to date on each report (term_rating.absences / lates). */
+window.v2.listCourseTermAttendance = function (courseId) {
+  return _rpcOrNoop('list_course_term_attendance', { p_course_id: courseId });
+};
+window.v2.saveTermAttendance = function (enrollmentId, term, absences, lates) {
+  return _rpcOrNoop('save_term_attendance', {
+    p_enrollment_id: enrollmentId,
+    p_term: term,
+    p_absences: absences,
+    p_lates: lates,
+  });
+};
+
 /* Core Competency self-assessments: one per (enrollment, competency, term). */
 window.v2.listCourseCoreSelfAssessments = function (courseId) {
   return _rpcOrNoop('list_course_core_self_assessments', { p_course_id: courseId });
@@ -11037,6 +11050,92 @@ function upsertTermRating(cid, sid, termId, data) {
   }
 }
 
+/* ── Attendance on the Term Questionnaire ──────────────────
+   Teachers take attendance in MyEd BC (or on paper), so FullVision keeps
+   only what the report card prints: at each report, the classes absent and
+   times late so far this year, copied from MyEd. Every report's numbers are
+   totals to date; "this term" is worked out against the last report that
+   has them, so no teacher subtracts (Colin, 2026-10-24). */
+function _attendanceCount(v) {
+  if (v === '' || v == null) return null;
+  var n = Math.floor(Number(v));
+  return isFinite(n) && n >= 0 ? n : null;
+}
+
+/* Saves one report's totals to date; null (or '') clears a number. */
+function saveTermAttendance(cid, sid, termId, absences, lates) {
+  var a = _attendanceCount(absences);
+  var l = _attendanceCount(lates);
+  upsertTermRating(cid, sid, termId, { absences: a, lates: l });
+  if (_writesEnabled() && _isSendableId(sid) && window.v2 && window.v2.saveTermAttendance) {
+    var t = _termNumber(termId);
+    if (t >= 1 && t <= 6) window.v2.saveTermAttendance(sid, t, a, l);
+  }
+}
+
+/* A report's attendance: its totals to date, the last earlier report's
+   totals (each number from the latest earlier report that has it), and
+   the change since then. With no earlier report, this term's change is
+   the total itself. Nulls where nothing is entered. */
+function getTermAttendance(cid, sid, termId) {
+  var mine = (getTermRatings(cid) || {})[sid] || {};
+  var n = _termNumber(termId);
+  var cur = mine[termId] || {};
+  var earlier = Object.keys(mine)
+    .filter(function (k) {
+      return _termNumber(k) < n;
+    })
+    .sort(function (x, y) {
+      return _termNumber(y) - _termNumber(x);
+    });
+  var out = { absences: _attendanceCount(cur.absences), lates: _attendanceCount(cur.lates) };
+  ['absences', 'lates'].forEach(function (f) {
+    var prevKey = earlier.find(function (k) {
+      return _attendanceCount(mine[k][f]) != null;
+    });
+    var prev = prevKey ? _attendanceCount(mine[prevKey][f]) : null;
+    out['prev' + f[0].toUpperCase() + f.slice(1)] = prev;
+    out[f + 'PrevTerm'] = prevKey || null;
+    out[f + 'ThisTerm'] = out[f] == null ? null : prev == null ? out[f] : out[f] - prev;
+  });
+  return out;
+}
+
+/* The saved totals from the server, laid over this device's copy. Read
+   when the Reports page opens, so a class still loads in one request.
+   Resolves true when it changed anything on this device. */
+async function loadTermAttendance(cid) {
+  if (!_useSupabase || !window.v2 || !window.v2.listCourseTermAttendance) return false;
+  try {
+    var res = await window.v2.listCourseTermAttendance(cid);
+    if (!res || res.error) return;
+    var data = _rpcObject(res.data !== undefined ? res.data : res) || {};
+    var all = _cloneValue(getTermRatings(cid) || {}) || {};
+    var changed = false;
+    Object.keys(data).forEach(function (sid) {
+      Object.keys(data[sid] || {}).forEach(function (t) {
+        var termId = 'term-' + t;
+        var row = data[sid][t] || {};
+        if (!all[sid]) all[sid] = {};
+        var prev = all[sid][termId] || {};
+        var a = _attendanceCount(row.absences);
+        var l = _attendanceCount(row.lates);
+        if (_attendanceCount(prev.absences) === a && _attendanceCount(prev.lates) === l) return;
+        changed = true;
+        all[sid][termId] = Object.assign({ dims: Object.fromEntries(OBS_DIMS.map(d => [d, 0])) }, prev, {
+          absences: a,
+          lates: l,
+        });
+      });
+    });
+    if (changed) _persistLoadedField(cid, 'termRatings', all);
+    return changed;
+  } catch (e) {
+    console.warn('list_course_term_attendance failed for ' + cid + ':', e);
+    return false;
+  }
+}
+
 /* save_term_rating treats every key it receives as "set this field", so only
    the fields the caller changed are sent. Sending the whole local blob erased
    the saved narrative and social traits whenever the blob was incomplete,
@@ -11350,6 +11449,9 @@ window.GB = {
   getTermRatings,
   saveTermRatings,
   getStudentTermRating,
+  saveTermAttendance,
+  getTermAttendance,
+  loadTermAttendance,
   upsertTermRating,
   getReportConfig,
   saveReportConfig,

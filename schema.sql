@@ -459,6 +459,8 @@ create table term_rating (
   work_habits_rating    integer,
   participation_rating  integer,
   social_traits         text[]      not null default array[]::text[],
+  absences              integer     check (absences >= 0),            -- classes absent, total to date at this report (from MyEd)
+  lates                 integer     check (lates >= 0),               -- times late, total to date at this report
   created_at            timestamptz not null default now(),
   updated_at            timestamptz not null default now(),
   unique (enrollment_id, term)
@@ -706,6 +708,8 @@ create table guardian (
 --
 -- Term rating:
 --   save_term_rating(p_enrollment_id uuid, p_term integer, p_payload jsonb)
+--   save_term_attendance(p_enrollment_id uuid, p_term integer, p_absences int, p_lates int)
+--   list_course_term_attendance(p_course_id uuid)  -- {enrollment_id: {term: {absences, lates}}}
 --   get_term_rating(p_enrollment_id uuid, p_term integer)
 --
 -- Report config + preferences + report:

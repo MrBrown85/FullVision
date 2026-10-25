@@ -28,6 +28,27 @@ window.ReportBlocks = (function () {
     return reportContext().termId;
   }
 
+  /* The year's attendance as one sentence for the comment, from the totals
+     to date (getTermAttendance). Empty when neither number is entered. */
+  function attendanceSentence(student, att) {
+    const first = displayNameFirst(student);
+    const a = att ? att.absences : null;
+    const l = att ? att.lates : null;
+    const missed =
+      a == null ? '' : a === 0 ? 'has not missed any classes' : 'has missed ' + a + (a === 1 ? ' class' : ' classes');
+    const late =
+      l == null
+        ? ''
+        : l === 0
+          ? a === 0
+            ? 'has always been on time'
+            : 'has not been late'
+          : 'has been late ' + l + (l === 1 ? ' time' : ' times');
+    if (!missed && !late) return '';
+    if (missed && late) return first + ' ' + missed + ' this year and ' + late + '.';
+    return first + ' ' + (missed || late) + ' this year.';
+  }
+
   /* ── Pronoun helpers ─────────────────────────────────────── */
   function getPronouns(student) {
     const p = (student.pronouns || 'they/them').toLowerCase().split('/');
@@ -1310,6 +1331,27 @@ window.ReportBlocks = (function () {
   </div>`;
   }
 
+  /* Attendance: the totals to date the teacher copied from MyEd into the
+     Term Questionnaire, and with them the change since the last report.
+     Nothing to print when neither number is entered. */
+  function renderBlockAttendance(cid, student, ctx, options) {
+    const att = getTermAttendance(cid, student.id, ctx.termId);
+    if (att.absences == null && att.lates == null) return '';
+    const term = options.thisTerm !== false;
+    const n = v => (v == null ? '\u2014' : String(v));
+    const row = (label, year, now) =>
+      `<tr><td>${label}</td><td class="col-num">${n(year)}</td>${term ? `<td class="col-num">${n(now)}</td>` : ''}</tr>`;
+    return `<div class="report-block-box report-attendance">
+    <table class="report-tag-table"><thead><tr><th style="text-align:left">Attendance</th><th class="col-num">This Year</th>${
+      term ? '<th class="col-num">This Term</th>' : ''
+    }</tr></thead><tbody>${row('Classes Absent', att.absences, att.absencesThisTerm)}${row(
+      'Times Late',
+      att.lates,
+      att.latesThisTerm,
+    )}</tbody></table>
+  </div>`;
+  }
+
   /* ── Block dispatcher ── */
   /* ctx is { termId, termLabel }. Callers on the Reports page build it once
      with reportContext() and pass it for every student. */
@@ -1371,6 +1413,8 @@ window.ReportBlocks = (function () {
         return renderBlockGrowth(cid, student);
       case 'missing-work':
         return renderBlockMissingWork(cid, student);
+      case 'term-attendance':
+        return renderBlockAttendance(cid, student, ctx, options);
       default:
         return '';
     }
@@ -1405,6 +1449,8 @@ window.ReportBlocks = (function () {
     renderBlockTermGlance: renderBlockTermGlance,
     renderBlockGrowth: renderBlockGrowth,
     renderBlockMissingWork: renderBlockMissingWork,
+    renderBlockAttendance: renderBlockAttendance,
+    attendanceSentence: attendanceSentence,
     renderReportBlock: renderReportBlock,
   };
 })();
