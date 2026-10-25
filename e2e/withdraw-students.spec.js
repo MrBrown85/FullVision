@@ -78,13 +78,21 @@ function rpcCalls(page, name) {
 }
 
 async function withdrawAlice(page) {
-  await page.locator(`[data-action="cmRemoveStudent"][data-sid="${ALICE}"]`).click();
+  await clickWithdraw(page, ALICE);
   const dialog = page.locator('.confirm-card');
   await expect(dialog.locator('.confirm-title')).toHaveText('Withdraw student');
   await dialog.locator('#confirm-ok-btn').click();
 }
 
 const roster = page => page.locator('.cm-section .cm-student-list').first();
+// The roster's names are in edit boxes, so read them from the rows' data-name.
+const rosterRow = (page, last) => roster(page).locator(`.cm-rs-row[data-name*="${last.toLowerCase()}"]`);
+
+// Withdraw is in each row's More menu.
+async function clickWithdraw(page, sid) {
+  await page.locator(`.cm-rs-row[data-sid="${sid}"] .cm-rs-menu`).click();
+  await page.locator(`[data-action="cmRemoveStudent"][data-sid="${sid}"]`).click();
+}
 const withdrawn = page => page.locator('#cm-withdrawn');
 
 test.describe('Withdraw students', () => {
@@ -97,7 +105,7 @@ test.describe('Withdraw students', () => {
     page,
   }) => {
     await openClassManager(page);
-    await page.locator(`[data-action="cmRemoveStudent"][data-sid="${ALICE}"]`).click();
+    await clickWithdraw(page, ALICE);
 
     const dialog = page.locator('.confirm-card');
     await expect(dialog.locator('.confirm-message')).toContainText('kept');
@@ -105,8 +113,8 @@ test.describe('Withdraw students', () => {
     await expect(dialog.locator('#confirm-ok-btn')).toHaveText('Withdraw');
     await dialog.locator('#confirm-ok-btn').click();
 
-    await expect(roster(page)).not.toContainText('Anderson');
-    await expect(roster(page)).toContainText('Baker');
+    await expect(rosterRow(page, 'Anderson')).toHaveCount(0);
+    await expect(rosterRow(page, 'Baker')).toHaveCount(1);
     await expect(withdrawn(page)).toContainText('Withdrawn (1)');
     const row = withdrawn(page).locator(`[data-withdrawn-sid="${ALICE}"]`);
     await expect(row).toContainText('Alice Anderson');
@@ -156,7 +164,7 @@ test.describe('Withdraw students', () => {
 
     await withdrawn(page).getByRole('button', { name: 'Re-enrol' }).click();
 
-    await expect(roster(page)).toContainText('Anderson');
+    await expect(rosterRow(page, 'Anderson')).toHaveCount(1);
     await expect(withdrawn(page)).toHaveCount(0);
     await expect.poll(() => rpcCalls(page, 'reenrol_student')).toHaveLength(1);
     expect((await rpcCalls(page, 'reenrol_student'))[0].p_enrollment_id).toBe(ALICE);
@@ -175,7 +183,7 @@ test.describe('Withdraw students', () => {
 
     await page.locator('#undo-toast').getByRole('button', { name: 'Undo' }).click();
 
-    await expect(roster(page)).toContainText('Anderson');
+    await expect(rosterRow(page, 'Anderson')).toHaveCount(1);
     await expect(withdrawn(page)).toHaveCount(0);
     await expect.poll(() => rpcCalls(page, 'reenrol_student')).toHaveLength(1);
   });
@@ -195,7 +203,7 @@ test.describe('Withdraw students', () => {
     await dialog.locator('#confirm-ok-btn').click();
 
     await expect(withdrawn(page)).toHaveCount(0);
-    await expect(roster(page)).not.toContainText('Anderson');
+    await expect(rosterRow(page, 'Anderson')).toHaveCount(0);
     await expect(page.locator('#undo-toast')).toHaveCount(0);
     await expect.poll(() => rpcCalls(page, 'delete_withdrawn_student')).toHaveLength(1);
     expect((await rpcCalls(page, 'delete_withdrawn_student'))[0].p_enrollment_id).toBe(ALICE);
@@ -205,8 +213,8 @@ test.describe('Withdraw students', () => {
     await page.waitForSelector('#dock-mount nav');
     await page.locator('[data-action="openClassManager"]').first().click();
     await page.getByRole('tab', { name: /^Students/ }).click();
-    await expect(roster(page)).toContainText('Baker');
-    await expect(roster(page)).not.toContainText('Anderson');
+    await expect(rosterRow(page, 'Baker')).toHaveCount(1);
+    await expect(rosterRow(page, 'Anderson')).toHaveCount(0);
     await expect(withdrawn(page)).toHaveCount(0);
   });
 });
@@ -223,27 +231,27 @@ test.describe('Withdraw students in Demo Mode', () => {
     await page.waitForSelector('#dock-mount nav');
     await page.locator('[data-action="openClassManager"]').first().click();
     await page.getByRole('tab', { name: /^Students/ }).click();
-    const firstRemove = page.locator('[data-action="cmRemoveStudent"]').first();
-    await expect(firstRemove).toBeVisible();
-    const sid = await firstRemove.getAttribute('data-sid');
-    const before = await page.locator('[data-action="cmRemoveStudent"]').count();
+    const rows = page.locator('.cm-rs-row');
+    await expect(rows.first()).toBeVisible();
+    const sid = await rows.first().getAttribute('data-sid');
+    const before = await rows.count();
 
-    await firstRemove.click();
+    await clickWithdraw(page, sid);
     await page.locator('.confirm-card #confirm-ok-btn').click();
-    await expect(page.locator('[data-action="cmRemoveStudent"]')).toHaveCount(before - 1);
+    await expect(rows).toHaveCount(before - 1);
     await expect(page.locator(`#cm-withdrawn [data-withdrawn-sid="${sid}"]`)).toBeVisible();
 
     await page.locator('#cm-withdrawn').getByRole('button', { name: 'Re-enrol' }).click();
-    await expect(page.locator('[data-action="cmRemoveStudent"]')).toHaveCount(before);
+    await expect(rows).toHaveCount(before);
     await expect(page.locator('#cm-withdrawn')).toHaveCount(0);
 
-    await page.locator(`[data-action="cmRemoveStudent"][data-sid="${sid}"]`).click();
+    await clickWithdraw(page, sid);
     await page.locator('.confirm-card #confirm-ok-btn').click();
     await page.evaluate(() => dismissUndoToast());
     await page.locator('#cm-withdrawn').getByRole('button', { name: 'Delete permanently' }).click();
     await page.locator('.confirm-card #confirm-ok-btn').click();
     await expect(page.locator('#cm-withdrawn')).toHaveCount(0);
-    await expect(page.locator('[data-action="cmRemoveStudent"]')).toHaveCount(before - 1);
+    await expect(rows).toHaveCount(before - 1);
 
     expect(requests).toEqual([]);
   });

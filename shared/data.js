@@ -10356,7 +10356,8 @@ window.v2.deleteReportIssue = function (issueId) {
 /* A guardian: { id?, studentId, name, relationship, email, phone, language,
    consentAt, consentSource }. Consent is sent only when both consentAt and
    consentSource are given; the server refuses one without the other.
-   Nothing in the app calls this until the district policy check is done. */
+   The Students tab stores parent emails here; nothing sends to them until
+   the district's position on teacher-to-family email is known. */
 window.v2.upsertGuardian = function (params, options) {
   params = params || {};
   var consent = params.consentAt && params.consentSource;

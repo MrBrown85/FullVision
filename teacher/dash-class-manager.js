@@ -90,9 +90,12 @@ window.DashClassManager = (function () {
   // Class Manager student editing
   var cmEditingStudentId = null;
 
-  // Bulk edit
-  var cmBulkMode = false;
-  var cmBulkSelected = new Set();
+  // Students tab roster: sort, search, and each class's guardians by enrollment
+  var cmRosterSortMode = 'lastName';
+  var cmRosterQuery = '';
+  var _cmGuardians = {};
+  var _cmGuardiansLoaded = {};
+  var _cmGuardiansReady = {};
 
   // Import preview
   var cmPendingImport = null;
@@ -1297,79 +1300,540 @@ window.DashClassManager = (function () {
     });
   }
 
-  function cmEditStudent(sid) {
-    if (!cmSelectedCourse) return;
-    var students = getStudents(cmSelectedCourse);
-    var st = students.find(function (s) {
-      return s.id === sid;
-    });
-    if (!st) return;
-    cmEditingStudentId = sid;
-    var form = document.getElementById('cm-add-student-form');
-    if (form) form.style.display = 'block';
-    var el = function (id) {
-      return document.getElementById(id);
-    };
-    if (el('cm-add-first')) el('cm-add-first').value = st.firstName || '';
-    if (el('cm-add-last')) el('cm-add-last').value = st.lastName || '';
-    if (el('cm-add-pref')) el('cm-add-pref').value = st.preferred || '';
-    if (el('cm-add-pro')) el('cm-add-pro').value = st.pronouns || '';
-    if (el('cm-add-num')) el('cm-add-num').value = st.studentNumber || '';
-    if (el('cm-add-dob')) el('cm-add-dob').value = st.dateOfBirth || '';
-    if (el('cm-add-email')) el('cm-add-email').value = st.email || '';
-    var desigs = st.designations || [];
-    document.querySelectorAll('.cm-desig-check').forEach(function (cb) {
-      cb.checked = desigs.indexOf(cb.value) >= 0;
-    });
-    var btn = el('cm-save-btn');
-    if (btn) btn.textContent = 'Update';
-    if (el('cm-add-first')) el('cm-add-first').focus();
-  }
-
   function cmRemoveStudent(sid) {
     if (!cmSelectedCourse) return;
     withdrawStudentUI(sid);
   }
 
-  /* ── Bulk Edit Mode ─────────────────────────────────────── */
-  function cmToggleBulk() {
-    cmBulkMode = !cmBulkMode;
-    cmBulkSelected.clear();
-    renderClassManager();
+  /* ── Students tab: the roster, edited in place ──────────────
+     Every field is a box in its row. Enter or ↓ moves down a column, ↑ up,
+     Tab across, Escape leaves. A field saves when it loses focus, through
+     saveStudents (only the changed fields go to the server), so moving down
+     a column saves as it goes. Parent Email and Parent Email 2 are the
+     student's first two guardian rows. */
+  var ROSTER_COLS = ['last', 'first', 'pref', 'pron', 'num', 'dob', 'email', 'g0', 'g1', 'desig', 'ell'];
+
+  function _cmRosterStudents(cid) {
+    return sortStudents(getStudents(cid), cmRosterSortMode === 'firstName' ? 'firstName' : 'lastName');
   }
 
-  function cmBulkToggle(sid) {
-    if (cmBulkSelected.has(sid)) cmBulkSelected.delete(sid);
-    else cmBulkSelected.add(sid);
-    renderClassManager();
+  function _cmGuardiansFor(cid, sid) {
+    var byStudent = _cmGuardians[cid] || {};
+    return byStudent[sid] || [];
   }
 
-  function cmBulkSelectAll() {
-    var students = getStudents(cmSelectedCourse);
-    students.forEach(function (s) {
-      cmBulkSelected.add(s.id);
+  /* Loads the class's guardians once per visit to the tab, then fills in
+     the Parent Email boxes in place, so a box being typed in keeps focus. */
+  function _cmLoadGuardians(cid) {
+    if (_cmGuardiansLoaded[cid] || !(window.v2 && window.v2.listCourseGuardians)) return;
+    _cmGuardiansLoaded[cid] = true;
+    window.v2.listCourseGuardians(cid).then(function (res) {
+      if (!res || !res.data) return;
+      _cmGuardiansReady[cid] = true;
+      var byStudent = {};
+      res.data.forEach(function (g) {
+        var sid = g.enrollment_id;
+        if (!byStudent[sid]) byStudent[sid] = [];
+        byStudent[sid].push(g);
+      });
+      Object.keys(byStudent).forEach(function (sid) {
+        byStudent[sid].sort(function (a, b) {
+          return String(a.created_at || '').localeCompare(String(b.created_at || ''));
+        });
+      });
+      _cmGuardians[cid] = byStudent;
+      if (cmSelectedCourse !== cid) return;
+      document
+        .querySelectorAll('.cm-rs-row input[data-col="g0"], .cm-rs-row input[data-col="g1"]')
+        .forEach(function (inp) {
+          if (inp === document.activeElement) return;
+          var g = _cmGuardiansFor(cid, inp.dataset.sid)[inp.dataset.col === 'g0' ? 0 : 1];
+          inp.value = (g && g.email) || '';
+        });
+      var sum = document.getElementById('cm-rs-summary');
+      if (sum) sum.textContent = _cmRosterSummary(cid);
     });
-    renderClassManager();
   }
 
-  function cmBulkDeselectAll() {
-    cmBulkSelected.clear();
-    renderClassManager();
-  }
-
-  function cmApplyBulk() {
-    if (!cmSelectedCourse || cmBulkSelected.size === 0) return;
-    var pronouns = (document.getElementById('cm-bulk-pro')?.value || '').trim();
-    var students = getStudents(cmSelectedCourse);
-    // Attendance is taken in MyEd; its totals go in the Term Questionnaire.
+  function _cmRosterSummary(cid) {
+    var students = getStudents(cid);
+    var desig = 0,
+      ell = 0,
+      noParent = 0;
     students.forEach(function (st) {
-      if (!cmBulkSelected.has(st.id)) return;
-      if (pronouns) st.pronouns = pronouns;
+      var ds = st.designations || [];
+      if (
+        ds.some(function (c) {
+          return !!BC_DESIGNATIONS[c];
+        })
+      )
+        desig++;
+      if (ds.indexOf('ELL') >= 0) ell++;
+      if (
+        _cmGuardiansReady[cid] &&
+        !_cmGuardiansFor(cid, st.id).some(function (g) {
+          return g.email;
+        })
+      )
+        noParent++;
     });
-    saveStudents(cmSelectedCourse, students);
-    cmBulkMode = false;
-    cmBulkSelected.clear();
+    var parts = [students.length + (students.length === 1 ? ' student' : ' students')];
+    if (desig) parts.push(desig + ' with designations');
+    if (ell) parts.push(ell + ' ELL');
+    if (noParent) parts.push(noParent + ' missing a parent email');
+    return parts.join(' · ');
+  }
+
+  function _cmRosterInput(st, col, value, label, extra) {
+    return (
+      '<input class="cm-rs-in' +
+      (col === 'last' || col === 'first' ? ' cm-rs-strong' : '') +
+      '" data-col="' +
+      col +
+      '" data-sid="' +
+      esc(st.id) +
+      '" data-action-blur="cmRosterField" value="' +
+      esc(value || '') +
+      '" aria-label="' +
+      esc(label + ', ' + fullName(st)) +
+      '"' +
+      (extra || '') +
+      '>'
+    );
+  }
+
+  function _cmRosterDesigCell(st) {
+    var ds = st.designations || [];
+    var chips = ds
+      .filter(function (code) {
+        return !!BC_DESIGNATIONS[code];
+      })
+      .map(function (code) {
+        var d = BC_DESIGNATIONS[code];
+        return (
+          '<button type="button" class="cm-rs-chip" data-action="cmRosterDesigRemove" data-sid="' +
+          esc(st.id) +
+          '" data-code="' +
+          esc(code) +
+          '" title="' +
+          esc(code + ' — ' + d.name) +
+          '" aria-label="Remove ' +
+          esc(code + ' ' + d.name) +
+          '"><strong>' +
+          esc(code) +
+          '</strong> ' +
+          esc(d.name) +
+          ' <span aria-hidden="true">×</span></button>'
+        );
+      })
+      .join('');
+    var hasIep = ds.some(function (c) {
+      return BC_DESIGNATIONS[c] && BC_DESIGNATIONS[c].iep;
+    });
+    var hasMod = ds.some(function (c) {
+      return BC_DESIGNATIONS[c] && BC_DESIGNATIONS[c].modified;
+    });
+    return (
+      '<span class="cm-rs-desig">' +
+      chips +
+      (hasIep ? '<span class="cm-iep-tag">IEP</span>' : '') +
+      (hasMod ? '<span class="cm-mod-tag">MOD</span>' : '') +
+      '<span class="cm-rs-desig-wrap">' +
+      '<button type="button" class="cm-rs-add" data-col="desig" data-sid="' +
+      esc(st.id) +
+      '" data-action="cmRosterDesigOpen" aria-haspopup="true" aria-expanded="false" aria-label="Add a designation, ' +
+      esc(fullName(st)) +
+      '">+</button>' +
+      '</span>' +
+      '</span>'
+    );
+  }
+
+  function _cmRosterRowHtml(cid, st, i) {
+    var g = _cmGuardiansFor(cid, st.id);
+    var ell = (st.designations || []).indexOf('ELL') >= 0;
+    var name = ((st.firstName || '') + ' ' + (st.lastName || '') + ' ' + (st.preferred || '')).toLowerCase();
+    return (
+      '<div class="cm-rs-grid cm-rs-row' +
+      (i % 2 ? ' cm-rs-alt' : '') +
+      '" data-sid="' +
+      esc(st.id) +
+      '" data-name="' +
+      esc(name) +
+      '"' +
+      (cmRosterQuery && name.indexOf(cmRosterQuery) < 0 ? ' hidden' : '') +
+      '>' +
+      '<span class="cm-rs-stick1">' +
+      _cmRosterInput(st, 'last', st.lastName, 'Last name') +
+      '</span>' +
+      '<span class="cm-rs-stick2">' +
+      _cmRosterInput(st, 'first', st.firstName, 'First name', ' required') +
+      '</span>' +
+      _cmRosterInput(st, 'pref', st.preferred, 'Preferred name', ' placeholder="—"') +
+      _cmRosterInput(st, 'pron', st.pronouns, 'Pronouns', ' list="cm-rs-pronouns"') +
+      _cmRosterInput(st, 'num', st.studentNumber, 'Student number') +
+      _cmRosterInput(st, 'dob', st.dateOfBirth, 'Date of birth', ' type="date"') +
+      _cmRosterInput(st, 'email', st.email, 'Student email', ' type="email" placeholder="+ Add"') +
+      _cmRosterInput(st, 'g0', g[0] && g[0].email, 'Parent email', ' type="email" placeholder="+ Add"') +
+      _cmRosterInput(st, 'g1', g[1] && g[1].email, 'Second parent email', ' type="email" placeholder="+ Add"') +
+      _cmRosterDesigCell(st) +
+      '<span class="cm-rs-check"><input type="checkbox" data-col="ell" data-sid="' +
+      esc(st.id) +
+      '" data-action-change="cmRosterEll"' +
+      (ell ? ' checked' : '') +
+      ' aria-label="English language learner, ' +
+      esc(fullName(st)) +
+      '"></span>' +
+      '<span class="cm-std-menu-wrap cm-rs-menu-wrap">' +
+      '<button type="button" class="cm-rs-menu" data-action="cmStdMenu" aria-haspopup="menu" aria-expanded="false" aria-label="More for ' +
+      esc(fullName(st)) +
+      '">⋯</button>' +
+      '<div class="cm-std-menu" role="menu" hidden>' +
+      '<button type="button" role="menuitem" class="cm-std-menu-item" data-action="cmOpenStudentPage" data-sid="' +
+      esc(st.id) +
+      '">Open Student Page</button>' +
+      '<button type="button" role="menuitem" class="cm-std-menu-item danger" data-action="cmRemoveStudent" data-sid="' +
+      esc(st.id) +
+      '">Withdraw</button>' +
+      '</div>' +
+      '</span>' +
+      '</div>'
+    );
+  }
+
+  function _cmRosterHtml(cid) {
+    var students = _cmRosterStudents(cid);
+    var sortBtn = function (mode, label) {
+      var on = cmRosterSortMode === mode;
+      return (
+        '<button type="button" class="cm-rs-sort" data-action="cmRosterSort" data-sort="' +
+        mode +
+        '" aria-pressed="' +
+        on +
+        '">' +
+        label +
+        (on ? ' <span aria-hidden="true">↑</span>' : '') +
+        '</button>'
+      );
+    };
+    var html =
+      '<datalist id="cm-rs-pronouns">' +
+      PRONOUNS_OPTIONS.map(function (p) {
+        return '<option value="' + esc(p) + '">';
+      }).join('') +
+      '</datalist>' +
+      '<div class="cm-section cm-roster-section cm-rs-section">' +
+      '<div class="cm-rs-scroll cm-student-list">' +
+      '<div class="cm-rs-grid cm-rs-head">' +
+      '<span class="cm-rs-stick1">' +
+      sortBtn('lastName', 'Last Name') +
+      '</span>' +
+      '<span class="cm-rs-stick2">' +
+      sortBtn('firstName', 'First Name') +
+      '</span>' +
+      '<span>Preferred</span><span>Pronouns</span><span>Student Number</span><span>Date of Birth</span>' +
+      '<span>Student Email</span><span>Parent Email</span><span>Parent Email 2</span><span>Designations</span>' +
+      '<span>ELL</span><span></span>' +
+      '</div>';
+    students.forEach(function (st, i) {
+      html += _cmRosterRowHtml(cid, st, i);
+    });
+    html += '</div></div>';
+    return html;
+  }
+
+  function cmRosterSort(mode) {
+    cmRosterSortMode = mode === 'firstName' ? 'firstName' : 'lastName';
     renderClassManager();
+  }
+
+  function cmRosterSearch(q) {
+    cmRosterQuery = String(q || '')
+      .trim()
+      .toLowerCase();
+    var n = 0;
+    document.querySelectorAll('.cm-rs-row').forEach(function (row) {
+      var hit = !cmRosterQuery || (row.dataset.name || '').indexOf(cmRosterQuery) >= 0;
+      row.hidden = !hit;
+      if (hit) row.classList.toggle('cm-rs-alt', n++ % 2 === 1);
+    });
+  }
+
+  var ROSTER_FIELD = {
+    last: 'lastName',
+    first: 'firstName',
+    pref: 'preferred',
+    pron: 'pronouns',
+    num: 'studentNumber',
+    dob: 'dateOfBirth',
+    email: 'email',
+  };
+
+  /* A roster box lost focus: save it if it changed. First name can't be
+     blank and an email must look like one; either puts the old value back. */
+  function cmRosterField(el) {
+    var cid = cmSelectedCourse;
+    if (!cid) return;
+    var col = el.dataset.col;
+    var value = (el.value || '').trim();
+    if (col === 'g0' || col === 'g1') return _cmSaveGuardianEmail(cid, el, value);
+    var key = ROSTER_FIELD[col];
+    if (!key) return;
+    var students = getStudents(cid);
+    var st = students.find(function (s) {
+      return s.id === el.dataset.sid;
+    });
+    if (!st) return;
+    var old = st[key] || '';
+    if (value === old) return;
+    if ((col === 'first' && !value) || (col === 'email' && value && !el.checkValidity())) {
+      el.value = old;
+      el.classList.add('cm-rs-bad');
+      setTimeout(function () {
+        el.classList.remove('cm-rs-bad');
+      }, 1600);
+      return;
+    }
+    st[key] = value;
+    if (col === 'first' || col === 'last') st.sortName = ((st.lastName || '') + ' ' + (st.firstName || '')).trim();
+    saveStudents(cid, students);
+    var row = el.closest('.cm-rs-row');
+    if (row)
+      row.dataset.name = ((st.firstName || '') + ' ' + (st.lastName || '') + ' ' + (st.preferred || '')).toLowerCase();
+    var sum = document.getElementById('cm-rs-summary');
+    if (sum) sum.textContent = _cmRosterSummary(cid);
+  }
+
+  function _cmSaveGuardianEmail(cid, el, email) {
+    var sid = el.dataset.sid;
+    var idx = el.dataset.col === 'g0' ? 0 : 1;
+    var list = (_cmGuardians[cid] = _cmGuardians[cid] || {});
+    var mine = (list[sid] = list[sid] || []);
+    var g = mine[idx];
+    if ((g ? g.email || '' : '') === email) return;
+    if (email && !el.checkValidity()) {
+      el.value = g ? g.email || '' : '';
+      el.classList.add('cm-rs-bad');
+      setTimeout(function () {
+        el.classList.remove('cm-rs-bad');
+      }, 1600);
+      return;
+    }
+    var st = getStudents(cid).find(function (s) {
+      return s.id === sid;
+    });
+    if (!email) {
+      if (g && g.id && window.v2 && window.v2.deleteGuardian) window.v2.deleteGuardian(g.id);
+      mine.splice(idx, 1);
+    } else if (g) {
+      g.email = email;
+      if (st && st.personId && window.v2 && window.v2.upsertGuardian)
+        window.v2.upsertGuardian({
+          id: g.id,
+          studentId: st.personId,
+          name: g.name,
+          relationship: g.relationship,
+          email: email,
+          phone: g.phone,
+          language: g.language,
+        });
+    } else {
+      // A guardian needs a name; the roster only asks for an address.
+      var fresh = { name: 'Parent / Guardian', email: email };
+      mine.push(fresh);
+      if (st && st.personId && window.v2 && window.v2.upsertGuardian)
+        window.v2.upsertGuardian({ studentId: st.personId, name: fresh.name, email: email }).then(function (res) {
+          var row = res && res.data;
+          if (row && row.id) fresh.id = row.id;
+        });
+    }
+    var sum = document.getElementById('cm-rs-summary');
+    if (sum) sum.textContent = _cmRosterSummary(cid);
+  }
+
+  function cmRosterEll(el) {
+    var cid = cmSelectedCourse;
+    var students = getStudents(cid);
+    var st = students.find(function (s) {
+      return s.id === el.dataset.sid;
+    });
+    if (!st) return;
+    var ds = (st.designations || []).filter(function (c) {
+      return c !== 'ELL';
+    });
+    if (el.checked) ds.push('ELL');
+    st.designations = ds;
+    saveStudents(cid, students);
+    var sum = document.getElementById('cm-rs-summary');
+    if (sum) sum.textContent = _cmRosterSummary(cid);
+  }
+
+  function _cmSetDesignations(sid, ds) {
+    var cid = cmSelectedCourse;
+    var students = getStudents(cid);
+    var st = students.find(function (s) {
+      return s.id === sid;
+    });
+    if (!st) return;
+    st.designations = ds;
+    delete st.designation;
+    saveStudents(cid, students);
+    renderClassManager();
+    var add = document.querySelector('.cm-rs-add[data-sid="' + sid + '"]');
+    if (add) add.focus();
+  }
+
+  function cmRosterDesigRemove(sid, code) {
+    var st = getStudents(cmSelectedCourse).find(function (s) {
+      return s.id === sid;
+    });
+    if (!st) return;
+    _cmSetDesignations(
+      sid,
+      (st.designations || []).filter(function (c) {
+        return c !== code;
+      }),
+    );
+  }
+
+  /* The + in Designations opens the BC codes under it; picking one adds it. */
+  function cmRosterDesigOpen(btn) {
+    var wrap = btn.parentElement;
+    var open = wrap.querySelector('.cm-rs-picker');
+    _cmCloseRosterPicker();
+    if (open) return;
+    var st = getStudents(cmSelectedCourse).find(function (s) {
+      return s.id === btn.dataset.sid;
+    });
+    if (!st) return;
+    var have = st.designations || [];
+    var picker = document.createElement('div');
+    picker.className = 'cm-rs-picker';
+    picker.setAttribute('role', 'menu');
+    picker.innerHTML = Object.keys(BC_DESIGNATIONS)
+      .filter(function (code) {
+        return have.indexOf(code) < 0;
+      })
+      .map(function (code) {
+        return (
+          '<button type="button" role="menuitem" class="cm-rs-pick" data-action="cmRosterDesigAdd" data-sid="' +
+          esc(st.id) +
+          '" data-code="' +
+          esc(code) +
+          '"><strong>' +
+          esc(code) +
+          '</strong> ' +
+          esc(BC_DESIGNATIONS[code].name) +
+          '</button>'
+        );
+      })
+      .join('');
+    wrap.appendChild(picker);
+    btn.setAttribute('aria-expanded', 'true');
+    _cmFloatOverScroll(picker, btn);
+    var first = picker.querySelector('button');
+    if (first) first.focus();
+  }
+
+  function _cmCloseRosterPicker() {
+    var any = false;
+    document.querySelectorAll('.cm-rs-picker').forEach(function (p) {
+      var btn = p.parentElement.querySelector('.cm-rs-add');
+      if (btn) btn.setAttribute('aria-expanded', 'false');
+      p.remove();
+      any = true;
+    });
+    return any;
+  }
+
+  function cmRosterDesigAdd(sid, code) {
+    var st = getStudents(cmSelectedCourse).find(function (s) {
+      return s.id === sid;
+    });
+    if (!st) return;
+    _cmCloseRosterPicker();
+    _cmSetDesignations(sid, (st.designations || []).concat([code]));
+  }
+
+  /* Enter or ↓ to the same box one row down, ↑ one row up; Escape leaves.
+     Rows hidden by the search are skipped. */
+  function _cmRosterKeydown(e) {
+    var el = e.target;
+    if (!el || !el.dataset || !el.dataset.col || !el.closest('.cm-rs-row')) return false;
+    if (e.isComposing) return false;
+    var k = e.key;
+    if (k === 'Escape') {
+      if (_cmCloseRosterPicker()) {
+        e.preventDefault();
+        return true;
+      }
+      el.blur();
+      return true;
+    }
+    if (el.type === 'checkbox' && k === 'Enter') {
+      e.preventDefault();
+      el.checked = !el.checked;
+      cmRosterEll(el);
+      return true;
+    }
+    var dir = k === 'Enter' || k === 'ArrowDown' ? 1 : k === 'ArrowUp' ? -1 : 0;
+    if (!dir || e.shiftKey || e.altKey || e.metaKey || e.ctrlKey) return false;
+    if (el.type === 'date' && k !== 'Enter') return false;
+    var rows = Array.prototype.filter.call(document.querySelectorAll('.cm-rs-row'), function (r) {
+      return !r.hidden;
+    });
+    var at = rows.indexOf(el.closest('.cm-rs-row'));
+    var next = rows[at + dir];
+    if (!next) return false;
+    var target = next.querySelector('[data-col="' + el.dataset.col + '"]');
+    if (!target) return false;
+    e.preventDefault();
+    target.focus();
+    if (target.select) target.select();
+    return true;
+  }
+
+  /* A menu opened inside the roster's sideways-scrolling table would be cut
+     off by it, so it floats over the page under its button instead, and
+     closes if the table or page scrolls. */
+  function _cmFloatOverScroll(menu, btn) {
+    var box = btn.closest('.cm-rs-scroll');
+    if (!box) return;
+    var r = btn.getBoundingClientRect();
+    menu.style.position = 'fixed';
+    menu.style.top = Math.round(r.bottom + 4) + 'px';
+    var w = menu.offsetWidth;
+    var left = menu.classList.contains('cm-std-menu') ? r.right - w : r.left;
+    menu.style.left = Math.max(8, Math.min(Math.round(left), window.innerWidth - w - 8)) + 'px';
+    menu.style.right = 'auto';
+    // Close when the table or page really scrolls away, not on the scroll
+    // that brought the button into view as it was clicked.
+    var detail = btn.closest('.cm-detail');
+    var at = function () {
+      return box.scrollLeft + ',' + box.scrollTop + ',' + (detail ? detail.scrollTop : 0);
+    };
+    var start = null;
+    var onScroll = function () {
+      if (start === null || at() === start) return;
+      box.removeEventListener('scroll', onScroll);
+      if (detail) detail.removeEventListener('scroll', onScroll);
+      if (!menu.isConnected || menu.hidden) return;
+      _cmCloseStdMenus();
+      _cmCloseRosterPicker();
+    };
+    box.addEventListener('scroll', onScroll);
+    if (detail) detail.addEventListener('scroll', onScroll);
+    setTimeout(function () {
+      start = at();
+    }, 150);
+  }
+
+  function cmOpenStudentPage(sid) {
+    var cid = cmSelectedCourse;
+    if (!cid || !sid) return;
+    classManagerOpen = false;
+    if (typeof setActiveCourse === 'function') setActiveCourse(cid);
+    location.hash = '#/student?course=' + encodeURIComponent(cid) + '&id=' + encodeURIComponent(sid);
   }
 
   function cmImportRoster() {
@@ -2015,27 +2479,24 @@ window.DashClassManager = (function () {
     panels.details = html;
     html = '';
 
-    // Students tab: a toolbar, the roster as a table, then Withdrawn
+    // Students tab: a toolbar, the roster edited in place, then Withdrawn
     var students = getStudents(cid);
+    _cmLoadGuardians(cid);
     html +=
       '<div class="cm-roster-bar">' +
-      '<div class="cm-hint">' +
+      '<div class="cm-rs-tools">' +
       (students.length
-        ? students.length +
-          (students.length === 1 ? ' student' : ' students') +
-          ', sorted by last name. Designations also show beside names in the gradebook.'
-        : 'No students yet. Add students one at a time or import a CSV roster.') +
+        ? '<label class="cm-rs-search"><span class="cm-rs-sr">Find a student</span>' +
+          '<input class="cm-input" type="search" placeholder="Find a student" data-action-input="cmRosterSearch" value="' +
+          esc(cmRosterQuery) +
+          '"></label>' +
+          '<span class="cm-hint cm-rs-summary">Click any field to edit. Enter or ↓ moves down a column, Tab moves across.</span>' +
+          '<span class="cm-hint cm-rs-summary" id="cm-rs-summary">' +
+          esc(_cmRosterSummary(cid)) +
+          '</span>'
+        : '<span class="cm-hint">No students yet. Add students one at a time or import a CSV roster.</span>') +
       '</div>' +
       '<div class="cm-roster-buttons">' +
-      (students.length > 1
-        ? '<button type="button" class="cm-action-btn' +
-          (cmBulkMode ? ' active' : '') +
-          '" data-action="cmToggleBulk" aria-pressed="' +
-          cmBulkMode +
-          '">' +
-          (cmBulkMode ? 'Exit Bulk Edit' : 'Bulk Edit') +
-          '</button>'
-        : '') +
       '<button type="button" class="cm-action-btn" data-action="cmImportRoster">Import Roster</button>' +
       '<button type="button" class="btn btn-primary cm-roster-add" data-action="cmShowAddStudent">Add Student</button>' +
       '<input type="file" id="cm-csv-input" accept=".csv,.txt" style="display:none" data-action-change="cmCSV">' +
@@ -2044,114 +2505,7 @@ window.DashClassManager = (function () {
       '<div id="cm-import-preview">' +
       (cmPendingImport ? _cmRenderImportReview(cid) : '') +
       '</div>';
-    var rosterHtml = '';
-    if (students.length > 0) {
-      rosterHtml =
-        '<div class="cm-section cm-roster-section">' +
-        '<div class="cm-student-list cm-roster-table' +
-        (cmBulkMode ? ' cm-roster-bulk' : '') +
-        '">' +
-        '<div class="cm-roster-head">' +
-        (cmBulkMode ? '<span></span>' : '') +
-        '<span>Name</span><span>Pronouns</span><span>Student Number</span><span>Designations</span><span></span>' +
-        '</div>';
-      sortStudents(students, 'lastName').forEach(function (st) {
-        var pref = st.preferred && st.preferred !== st.firstName ? st.preferred : '';
-        var ds = st.designations || [];
-        var known = ds
-          .map(function (code) {
-            var d = designationInfo(code);
-            return d ? { code: code, d: d } : null;
-          })
-          .filter(Boolean);
-        var hasIep = ds.some(function (c) {
-          return BC_DESIGNATIONS[c]?.iep;
-        });
-        var hasMod = ds.some(function (c) {
-          return BC_DESIGNATIONS[c]?.modified;
-        });
-        rosterHtml +=
-          '<div class="cm-student-row cm-roster-row">' +
-          (cmBulkMode
-            ? '<input type="checkbox" class="cm-bulk-check" ' +
-              (cmBulkSelected.has(st.id) ? 'checked' : '') +
-              ' data-action="cmBulkToggleCheck" data-sid="' +
-              st.id +
-              '" aria-label="Select ' +
-              esc(fullName(st)) +
-              '">'
-            : '') +
-          '<span class="cm-roster-name"><span class="cm-student-name">' +
-          esc(fullName(st)) +
-          '</span>' +
-          (pref ? ' <span class="cm-student-pref">"' + esc(pref) + '"</span>' : '') +
-          '</span>' +
-          '<span class="cm-student-pronouns">' +
-          esc(st.pronouns || '') +
-          '</span>' +
-          '<span class="cm-roster-num">' +
-          esc(st.studentNumber || '') +
-          '</span>' +
-          '<span class="cm-roster-desig">' +
-          known
-            .map(function (k) {
-              return (
-                '<span class="cm-desig-badge' +
-                (k.d.level > 0 ? ' low-inc' : '') +
-                '" title="' +
-                esc(k.code) +
-                ' — ' +
-                esc(k.d.name) +
-                '">' +
-                esc(k.code) +
-                '</span>'
-              );
-            })
-            .join('') +
-          (known.length === 1 ? '<span class="cm-roster-desig-name">' + esc(known[0].d.name) + '</span>' : '') +
-          (hasIep ? '<span class="cm-iep-tag">IEP</span>' : '') +
-          (hasMod ? '<span class="cm-mod-tag">MOD</span>' : '') +
-          '</span>' +
-          '<span class="cm-student-actions">' +
-          '<button type="button" class="cm-add-link" data-action="cmEditStudent" data-sid="' +
-          st.id +
-          '" aria-label="Edit ' +
-          esc(fullName(st)) +
-          '">Edit</button>' +
-          '<button type="button" class="cm-add-link cm-roster-withdraw" data-action="cmRemoveStudent" data-sid="' +
-          st.id +
-          '" aria-label="Withdraw ' +
-          esc(fullName(st)) +
-          '">Withdraw</button>' +
-          '</span>' +
-          '</div>';
-      });
-      rosterHtml += '</div></div>';
-    }
-    // Bulk edit panel
-    if (cmBulkMode && students.length > 0) {
-      html +=
-        '<div class="cm-bulk-panel">' +
-        '<div style="display:flex;gap:8px;margin-bottom:8px">' +
-        '<button class="cm-add-link" data-action="cmBulkSelectAll" style="font-size:0.75rem">Select All</button>' +
-        '<button class="cm-add-link" data-action="cmBulkDeselectAll" style="font-size:0.75rem">Deselect All</button>' +
-        '<span style="font-size:0.75rem;color:var(--text-3);margin-left:auto">' +
-        cmBulkSelected.size +
-        ' selected</span>' +
-        '</div>' +
-        '<div class="cm-student-form" style="gap:8px 12px">' +
-        '<div class="cm-field">' +
-        '<label class="cm-label">Set Pronouns</label>' +
-        pronounsSelect('cm-bulk-pro', '') +
-        '</div>' +
-        '</div>' +
-        '<div style="display:flex;gap:8px;margin-top:8px">' +
-        '<button class="btn btn-primary" data-action="cmApplyBulk" style="font-size:0.8125rem;padding:6px 14px" ' +
-        (cmBulkSelected.size === 0 ? 'disabled' : '') +
-        '>Apply to Selected</button>' +
-        '</div>' +
-        '</div>';
-    }
+    var rosterHtml = students.length ? _cmRosterHtml(cid) : '';
     // Add/Edit student form
     html +=
       '<div id="cm-add-student-form" style="display:none" class="cm-add-student-form">' +
@@ -2415,7 +2769,9 @@ window.DashClassManager = (function () {
 
     var tab = panels[cmTab] != null ? cmTab : 'details';
     return (
-      '<div class="cm-detail-inner cm-tabbed">' +
+      '<div class="cm-detail-inner cm-tabbed' +
+      (tab === 'students' ? ' cm-tabbed-wide' : '') +
+      '">' +
       _cmRenderHeader(cid, studentCount, assessCount, tagCount) +
       _cmRenderTabs(tab, studentCount, tagCount) +
       '<div class="cm-tab-panel cm-tab-panel-' +
@@ -6749,6 +7105,7 @@ window.DashClassManager = (function () {
     if (open) {
       menu.hidden = false;
       btn.setAttribute('aria-expanded', 'true');
+      _cmFloatOverScroll(menu, btn);
       var first = menu.querySelector('.cm-std-menu-item');
       if (first) first.focus();
     }
@@ -6886,6 +7243,7 @@ window.DashClassManager = (function () {
   function handleAction(action, el, e) {
     // Any click other than on a card's More button closes its open menu.
     if (action !== 'cmStdMenu') _cmCloseStdMenus();
+    if (action !== 'cmRosterDesigOpen') _cmCloseRosterPicker();
     var handlers = {
       openClassManager: function () {
         openClassManager();
@@ -6902,11 +7260,23 @@ window.DashClassManager = (function () {
       cmSelectClass: function () {
         cmSelectClass(el.dataset.cid);
       },
-      cmEditStudent: function () {
-        cmEditStudent(el.dataset.sid);
-      },
       cmRemoveStudent: function () {
         cmRemoveStudent(el.dataset.sid);
+      },
+      cmOpenStudentPage: function () {
+        cmOpenStudentPage(el.dataset.sid);
+      },
+      cmRosterSort: function () {
+        cmRosterSort(el.dataset.sort);
+      },
+      cmRosterDesigOpen: function () {
+        cmRosterDesigOpen(el);
+      },
+      cmRosterDesigAdd: function () {
+        cmRosterDesigAdd(el.dataset.sid, el.dataset.code);
+      },
+      cmRosterDesigRemove: function () {
+        cmRosterDesigRemove(el.dataset.sid, el.dataset.code);
       },
       cmReenrolStudent: function () {
         cmReenrolStudent(el.dataset.sid);
@@ -6931,18 +7301,6 @@ window.DashClassManager = (function () {
       },
       cmCancelImport: function () {
         cmCancelImport();
-      },
-      cmToggleBulk: function () {
-        cmToggleBulk();
-      },
-      cmBulkSelectAll: function () {
-        cmBulkSelectAll();
-      },
-      cmBulkDeselectAll: function () {
-        cmBulkDeselectAll();
-      },
-      cmApplyBulk: function () {
-        cmApplyBulk();
       },
       cmSetGradingSystem: function () {
         cmSetGradingSystem(el.dataset.value);
@@ -7176,6 +7534,10 @@ window.DashClassManager = (function () {
   }
 
   function handleInput(el) {
+    if (el.dataset.actionInput === 'cmRosterSearch') {
+      cmRosterSearch(el.value);
+      return true;
+    }
     if (el.dataset.actionInput === 'cmBlockOtherInput') {
       blockOtherInput(el);
       return true;
@@ -7296,8 +7658,8 @@ window.DashClassManager = (function () {
       cmUpdateSecColor(el.dataset.secid, el.value);
       return true;
     }
-    if (el.dataset.action === 'cmBulkToggleCheck') {
-      cmBulkToggle(el.dataset.sid);
+    if (el.dataset.actionChange === 'cmRosterEll') {
+      cmRosterEll(el);
       return true;
     }
     return false;
@@ -7311,6 +7673,11 @@ window.DashClassManager = (function () {
       e.preventDefault();
       return true;
     }
+    if (e.key === 'Escape' && _cmCloseRosterPicker()) {
+      e.preventDefault();
+      return true;
+    }
+    if (_cmRosterKeydown(e)) return true;
     // Arrow keys move between the class tabs, as in any tab list.
     if (el && el.classList && el.classList.contains('cm-tab') && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
       var ids = CM_TABS.map(function (t) {
@@ -7346,6 +7713,10 @@ window.DashClassManager = (function () {
   }
 
   function handleBlur(el) {
+    if (el.dataset.actionBlur === 'cmRosterField') {
+      cmRosterField(el);
+      return true;
+    }
     if (el.dataset.actionBlur === 'cmBlockOtherBlur') {
       var typed = normalizeCourseBlock(el.value);
       var cur = normalizeCourseBlock(COURSES[cmSelectedCourse] && COURSES[cmSelectedCourse].block);
@@ -7463,8 +7834,9 @@ window.DashClassManager = (function () {
       cmSelectedCourse = _activeCourse;
       _activeCourseChanged = false;
       cmEditingStudentId = null;
-      cmBulkMode = false;
-      cmBulkSelected = new Set();
+      cmRosterQuery = '';
+      _cmGuardiansLoaded = {};
+      _cmGuardiansReady = {};
       cmPendingImport = null;
       cmCompSelect = false;
       cmCompSelected = {};
