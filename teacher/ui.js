@@ -865,6 +865,60 @@ document.addEventListener('input', function (e) {
   if (e.target.id === 'gb-roster-search') filterRoster();
 });
 
+/* Up and down arrows step through the student list once the teacher has
+   picked a name in it (clicked it, or put the focus on it): the next shown
+   name is opened as a click would open it, and takes the focus so the keys
+   keep working. With no name selected they only move the focus. A click
+   anywhere else gives the arrows back to scrolling. */
+let _rosterActive = false;
+document.addEventListener(
+  'pointerdown',
+  function (e) {
+    _rosterActive = !!(e.target.closest && e.target.closest('#gb-roster-list .student-row'));
+  },
+  true,
+);
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+  if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+  const list = document.getElementById('gb-roster-list');
+  if (!list || !list.offsetParent) return;
+  const inList = list.contains(e.target);
+  const onPage = e.target === document.body || e.target === document.documentElement;
+  if (!inList && !(onPage && _rosterActive)) return;
+  const rows = Array.prototype.filter.call(list.querySelectorAll('.student-row'), function (r) {
+    return r.style.display !== 'none';
+  });
+  const selected = list.querySelector('.student-row.selected');
+  const from = (inList && e.target.closest('.student-row')) || selected;
+  const i = rows.indexOf(from);
+  if (i < 0) return;
+  e.preventDefault();
+  const next = rows[i + (e.key === 'ArrowDown' ? 1 : -1)];
+  if (!next) return;
+  _rosterActive = true;
+  if (!selected) {
+    next.focus();
+    return;
+  }
+  const sid = next.dataset.sid;
+  next.click();
+  _focusRosterRow(sid, 0);
+});
+
+/* The page may redraw the list after the click: focus the student's row
+   once it is there. */
+function _focusRosterRow(sid, tries) {
+  const row = document.querySelector('#gb-roster-list .student-row[data-sid="' + sid + '"]');
+  if (row && row.classList.contains('selected')) {
+    row.focus({ preventScroll: true });
+    row.scrollIntoView({ block: 'nearest' });
+    return;
+  }
+  if (tries < 20) setTimeout(_focusRosterRow, 25, sid, tries + 1);
+  else if (row) row.focus();
+}
+
 /* ── Proficiency badge HTML ─────────────────────────────────── */
 function profBadge(score, size) {
   const s = Math.round(score);
