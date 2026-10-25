@@ -172,6 +172,12 @@ test('Grade Breakdown shows each category with its share, and Group By groups th
     'true',
   );
   await expect(page.locator('.stu-chart-line')).toHaveCount(5);
+  // Each section is its own card; the chart's points say what they are.
+  await expect(page.locator('#stu-panel.stu-panel-cards > .stu-bd-section')).toHaveCount(4);
+  await expect(page.locator('.stu-bar-key')).toContainText('Proficient');
+  await page.locator('.stu-chart-dot').first().click();
+  await expect(page.locator('.stu-chart-dot.show .stu-chart-tip')).toBeVisible();
+  await expect(page.locator('.stu-rt-head').last()).toContainText('Start to Now');
   for (const view of ['growth', 'month', 'strengths']) {
     await page.locator('[data-action="stuTypeView"][data-view="' + view + '"]').click();
     await expect(page.locator('[data-action="stuTypeView"][data-view="' + view + '"]')).toHaveAttribute(

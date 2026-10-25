@@ -1198,6 +1198,8 @@ window.PageStudent = (function () {
   ];
   var TYPE_VIEW_KEY = 'gb-student-type-view';
   var TYPE_COLORS = ['#1565c0', '#c2410c', '#6d28d9', '#0f766e', '#64748b', '#a21caf', '#4d7c0f'];
+  // A shape per type too, so the lines are told apart without colour.
+  var TYPE_SHAPES = ['circle', 'square', 'triangle', 'diamond', 'down'];
   var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
   function _savedTypeView() {
@@ -1268,8 +1270,12 @@ window.PageStudent = (function () {
     var y = function (v) {
       return (1 - (Math.min(4, v) - lo) / (4 - lo)) * 100;
     };
+    // Proficiency classes label the axis with the scale's words; Letter
+    // classes with the percent.
+    var words = courseGradeMode(cid) !== 'letter';
     var ticks = [];
-    for (var k = Math.ceil(lo); k <= 4; k++) ticks.push({ y: y(k), text: formatLevel(cid, k) });
+    for (var k = Math.max(1, Math.ceil(lo)); k <= 4; k++)
+      ticks.push({ y: y(k), text: words ? PROF_LABELS[k] : formatLevel(cid, k) });
     var months = [];
     var d = new Date(t0 * 864e5);
     var m = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1));
@@ -1279,13 +1285,21 @@ window.PageStudent = (function () {
       months.push({ x: x(m.getTime() / 864e5), text: MONTHS[m.getUTCMonth()] });
       m = new Date(Date.UTC(m.getUTCFullYear(), m.getUTCMonth() + 1, 1));
     }
-    return { x: x, y: y, ticks: ticks, months: months };
+    return { x: x, y: y, ticks: ticks, months: months, words: words };
   }
 
   /* A line chart: each series a line through its points, the latest point
-     larger. series: [{ points, color, dim, wide }]. */
+     larger. Each point is a button whose label shows on hover, focus or a
+     tap. series: [{ name, points, color, shape, dim, wide, dotColor }]. */
   function _lineChartHtml(scale, series, height, label) {
-    var html = '<div class="stu-chart" style="height:' + height + 'px" role="img" aria-label="' + esc(label) + '">';
+    var html =
+      '<div class="stu-chart' +
+      (scale.words ? ' stu-chart-words' : '') +
+      '" style="height:' +
+      height +
+      'px" role="group" aria-label="' +
+      esc(label) +
+      '">';
     scale.ticks.forEach(function (t) {
       html +=
         '<span class="stu-chart-grid" style="top:' +
@@ -1315,44 +1329,36 @@ window.PageStudent = (function () {
     });
     series.forEach(function (s) {
       s.points.forEach(function (p, i) {
+        var x = scale.x(p.t);
+        var meta = (s.name ? s.name + ' \u00B7 ' : '') + _shortDay(p.a.date) + ' \u00B7 ' + p.g.text;
         html +=
-          '<span class="stu-chart-dot' +
+          '<button type="button" class="stu-chart-dot' +
           (i === s.points.length - 1 ? ' last' : '') +
           (s.dim ? ' dim' : '') +
-          '" style="left:' +
-          scale.x(p.t).toFixed(2) +
+          (x > 70 ? ' tip-end' : x < 30 ? ' tip-start' : '') +
+          (scale.y(p.v) < 25 ? ' tip-below' : '') +
+          '" data-action="stuChartTip" style="left:' +
+          x.toFixed(2) +
           '%;top:' +
           scale.y(p.v).toFixed(2) +
-          '%;background:' +
+          '%" aria-label="' +
+          esc(p.a.title + ', ' + meta) +
+          '"><span class="stu-chart-mark stu-shape-' +
+          (s.shape || 'circle') +
+          '" style="background:' +
           (s.dotColor ? PROF_COLORS[p.g.level] || PROF_COLORS[0] : s.color) +
-          '" title="' +
-          esc(_shortDay(p.a.date) + ': ' + p.a.title + ', ' + p.g.text) +
-          '"></span>';
+          '"></span><span class="stu-chart-tip" aria-hidden="true"><strong>' +
+          esc(p.a.title) +
+          '</strong>' +
+          esc(meta) +
+          '</span></button>';
       });
     });
-    html += '</div><div class="stu-chart-x" aria-hidden="true">';
+    html += '</div><div class="stu-chart-x' + (scale.words ? ' stu-chart-words' : '') + '" aria-hidden="true">';
     scale.months.forEach(function (m) {
       html += '<span style="left:' + m.x.toFixed(2) + '%">' + esc(m.text) + '</span>';
     });
     return html + '</div>';
-  }
-
-  function _firstLatestHtml(points) {
-    if (points.length < 2) return '<span class="stu-rt-change"><span class="stu-rt-none">\u2014</span></span>';
-    var first = points[0];
-    var last = points[points.length - 1];
-    var dir = last.v > first.v ? 'up' : last.v < first.v ? 'down' : 'flat';
-    return (
-      '<span class="stu-rt-change stu-rt-' +
-      dir +
-      '">' +
-      _gradePill(first.g) +
-      '<svg width="18" height="10" viewBox="0 0 18 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-label="' +
-      (dir === 'up' ? 'up to' : dir === 'down' ? 'down to' : 'still') +
-      '"><path d="M1 5h15M12 1l4 4-4 4"/></svg>' +
-      _gradePill(last.g) +
-      '</span>'
-    );
   }
 
   /* Strengths: each type against all of the student's work. */
@@ -1440,10 +1446,10 @@ window.PageStudent = (function () {
         '</strong><span class="stu-sub">' +
         esc(_plural(g.assessments.length, 'assessment', 'assessments')) +
         '</span></span>' +
-        _firstLatestHtml(pts) +
+        _startNowHtml(cid, pts) +
         '</div>' +
         (pts.length
-          ? _lineChartHtml(scale, [{ points: pts, color: '#3a3a3c', dotColor: true }], 110, g.name + ' over time')
+          ? _lineChartHtml(scale, [{ points: pts, color: '#3a3a3c', dotColor: true }], 110, g.name + ' Over Time')
           : '<div class="stu-empty">No scores yet.</div>') +
         '</div>';
     });
@@ -1469,7 +1475,7 @@ window.PageStudent = (function () {
       html += '<span role="columnheader" class="stu-rt-center">' + esc(MONTHS[Number(k.slice(5)) - 1]) + '</span>';
     });
     html +=
-      '<span role="columnheader" class="stu-rt-center">First to Latest</span><span role="columnheader" class="stu-rt-right">All</span></div>';
+      '<span role="columnheader" class="stu-rt-center">Start to Now</span><span role="columnheader" class="stu-rt-right">All</span></div>';
     types.forEach(function (g) {
       html +=
         '<div class="stu-rt-row" role="row" style="' +
@@ -1491,7 +1497,7 @@ window.PageStudent = (function () {
       });
       html +=
         '<span role="cell">' +
-        _firstLatestHtml(_scoredPoints(cid, g.assessments)) +
+        _startNowHtml(cid, _scoredPoints(cid, g.assessments)) +
         '</span><span role="cell" class="stu-rt-right">' +
         _gradePill(assessmentGroupGrade(cid, studentId, g.assessments)) +
         '</span></div>';
@@ -1515,30 +1521,41 @@ window.PageStudent = (function () {
     })
       ? _typeFocus
       : '';
-    var chip = function (key, label, color) {
+    var chip = function (key, label, color, shape) {
       var on = focus === key;
       return (
         '<button type="button" class="stu-chip' +
         (on ? ' active' : '') +
+        (color ? ' stu-chip-typed" style="--chip-c:' + color : '') +
         '" data-action="stuTypeFocus" data-key="' +
         esc(key) +
         '" aria-pressed="' +
         on +
         '">' +
-        (color ? '<span class="stu-chip-dot" style="background:' + color + '" aria-hidden="true"></span>' : '') +
+        (color
+          ? '<span class="stu-chip-dot stu-shape-' +
+            shape +
+            '" style="background:' +
+            color +
+            '" aria-hidden="true"></span>'
+          : '') +
         esc(label) +
         '</button>'
       );
     };
-    var html = '<div class="stu-rt-picker" role="group" aria-label="Show">' + chip('', 'All Types', '');
+    var html =
+      '<div class="stu-rt-picker" role="group" aria-labelledby="stu-hl-label"><span class="stu-picker-label" id="stu-hl-label">Highlight</span>' +
+      chip('', 'All Types', '');
     types.forEach(function (g, i) {
-      html += chip(g.key, g.name, TYPE_COLORS[i % TYPE_COLORS.length]);
+      html += chip(g.key, g.name, TYPE_COLORS[i % TYPE_COLORS.length], TYPE_SHAPES[i % TYPE_SHAPES.length]);
     });
     html += '</div>';
     var series = types.map(function (g, i) {
       return {
+        name: g.name,
         points: lists[i],
         color: TYPE_COLORS[i % TYPE_COLORS.length],
+        shape: TYPE_SHAPES[i % TYPE_SHAPES.length],
         dim: !!focus && g.key !== focus,
         wide: focus === g.key,
       };
@@ -1547,8 +1564,61 @@ window.PageStudent = (function () {
     series.sort(function (a, b) {
       return (a.wide ? 1 : 0) - (b.wide ? 1 : 0);
     });
-    return html + _lineChartHtml(_chartScale(cid, withPts), series, 320, 'Every assessment over time, a line per type');
+    return html + _lineChartHtml(_chartScale(cid, withPts), series, 320, 'Scored Assessments by Type');
   }
+
+  /* A Grade Breakdown card's head: its title with a caption under it, and
+     any controls at the right. */
+  function _bdTitleHtml(id, title, caption, controls) {
+    return (
+      '<div class="stu-bd-title"><div class="stu-bd-heading"><h3 id="' +
+      id +
+      '">' +
+      esc(title) +
+      '</h3>' +
+      (caption ? '<span class="stu-sub">' + esc(caption) + '</span>' : '') +
+      '</div>' +
+      (controls || '') +
+      '</div>'
+    );
+  }
+
+  /* What the bar colours mean: the levels the bars use, lowest first.
+     Letter classes show percents, so they get no proficiency key. */
+  function _barKeyHtml(cid, assessments) {
+    if (courseGradeMode(cid) === 'letter') return '';
+    var seen = {};
+    assessments.forEach(function (a) {
+      var g = assessmentGroupGrade(cid, studentId, [a]);
+      if (g && g.level) seen[g.level] = true;
+    });
+    var levels = [1, 2, 3, 4].filter(function (k) {
+      return seen[k];
+    });
+    if (!levels.length) return '';
+    return (
+      '<div class="stu-bar-key" aria-hidden="true">' +
+      levels
+        .map(function (k) {
+          return (
+            '<span><span class="stu-bar-swatch" style="background:' +
+            PROF_COLORS[k] +
+            '"></span>' +
+            esc(PROF_LABELS[k]) +
+            '</span>'
+          );
+        })
+        .join('') +
+      '</div>'
+    );
+  }
+
+  var TYPE_CAPTIONS = {
+    timeline: 'Scored assessments in date order, one line per type.',
+    strengths: 'The grade for each type, compared with all work.',
+    growth: 'Scores over time for each type.',
+    month: 'The grade for each type, by month.',
+  };
 
   function _breakdownTabHtml(ctx) {
     var cid = ctx.cid;
@@ -1557,13 +1627,12 @@ window.PageStudent = (function () {
 
     // Assignment types: four ways to look at this student's work by type.
     var types = _assessGroups(cid, ctx.assessments, 'type');
-    var html =
-      '<section class="stu-bd-section" aria-labelledby="stu-bd-types"><div class="stu-bd-title"><h3 id="stu-bd-types">Assignment Types</h3>';
+    var views = '';
     if (types.length) {
-      html += '<div class="seg seg-sm" role="radiogroup" aria-label="Assignment types view">';
+      views += '<div class="seg seg-sm" role="radiogroup" aria-label="Assignment types view">';
       TYPE_VIEWS.forEach(function (v) {
         var on = _typeView === v.id;
-        html +=
+        views +=
           '<button type="button" class="seg-btn' +
           (on ? ' active' : '') +
           '" role="radio" aria-checked="' +
@@ -1574,9 +1643,11 @@ window.PageStudent = (function () {
           esc(v.label) +
           '</button>';
       });
-      html += '</div>';
+      views += '</div>';
     }
-    html += '</div>';
+    var html =
+      '<section class="stu-bd-section" aria-labelledby="stu-bd-types">' +
+      _bdTitleHtml('stu-bd-types', 'Assignment Types', types.length ? TYPE_CAPTIONS[_typeView] : '', views);
     if (!types.length) html += '<div class="stu-empty">No assessments yet.</div>';
     else if (_typeView === 'growth') html += _typeGrowthHtml(ctx, types);
     else if (_typeView === 'month') html += _typeMonthHtml(ctx, types);
@@ -1584,21 +1655,20 @@ window.PageStudent = (function () {
     else html += _typeStrengthsHtml(ctx, types);
     html += '</section>';
 
-    html +=
-      '<div class="stu-panel-note">Each group’s grade is worked out the way the course grade is: ' +
-      (mode === 'proficiency' ? 'the average of its scored assessments.' : 'points earned out of points possible.') +
-      ' Bars show each assessment, oldest to newest.</div>';
-
     // Categories
     var cats = _assessGroups(cid, ctx.assessments, 'category');
-    html += '<section class="stu-bd-section" aria-labelledby="stu-bd-cats"><div class="stu-bd-title">';
-    html += '<h3 id="stu-bd-cats">Categories</h3>';
-    if (cats.length)
-      html +=
-        '<span class="stu-sub">' +
-        (showShares ? 'The course grade is these, weighted' : 'Weighted in the course grade') +
-        '</span>';
-    html += '</div>';
+    html +=
+      '<section class="stu-bd-section" aria-labelledby="stu-bd-cats">' +
+      _bdTitleHtml(
+        'stu-bd-cats',
+        'Categories',
+        cats.length
+          ? 'Weighted to produce the course grade. Each category grade is ' +
+              (mode === 'proficiency'
+                ? 'the average of its scored assessments.'
+                : 'points earned out of points possible.')
+          : '',
+      );
     if (!cats.length) {
       html += '<div class="stu-empty">No assessments in a category yet.</div>';
     } else {
@@ -1608,7 +1678,9 @@ window.PageStudent = (function () {
         (showShares ? ' stu-bd-cats-shares' : ' stu-bd-cats') +
         '">' +
         _bdHeadRow(
-          ['Category', 'Weight', 'Grade', 'Assessments', 'Start to Now'].concat(showShares ? ['Adds to Course %'] : []),
+          ['Category', 'Weight', 'Grade', 'Assessments \u00B7 Oldest to Newest', 'Start to Now'].concat(
+            showShares ? ['Adds to Course %'] : [],
+          ),
         );
       cats.forEach(function (g) {
         var mine = assessmentGroupGrade(cid, studentId, g.assessments);
@@ -1646,7 +1718,7 @@ window.PageStudent = (function () {
             esc(formatCoursePercent(cid, course.R).replace('%', '')) +
             '</span></div>';
       }
-      html += '</div>';
+      html += '</div>' + _barKeyHtml(cid, ctx.assessments);
     }
     html += '</section>';
 
@@ -1655,14 +1727,22 @@ window.PageStudent = (function () {
     var hasModules = mods.some(function (g) {
       return g.key;
     });
+    // With none, the card is one line saying where modules are made.
     html +=
-      '<section class="stu-bd-section" aria-labelledby="stu-bd-mods"><div class="stu-bd-title"><h3 id="stu-bd-mods">Modules</h3><span class="stu-sub">The folders on the Assignments page. They don’t change the course grade.</span></div>';
-    if (!hasModules) {
-      html += '<div class="stu-empty">No modules yet. Group assessments into modules on the Assignments page.</div>';
-    } else {
+      '<section class="stu-bd-section' +
+      (hasModules ? '' : ' stu-bd-section-empty') +
+      '" aria-labelledby="stu-bd-mods">' +
+      _bdTitleHtml(
+        'stu-bd-mods',
+        'Modules',
+        hasModules
+          ? 'Assessment groups from the Assignments page. Not part of the course grade.'
+          : 'None yet. Modules are created on the Assignments page.',
+      );
+    if (hasModules) {
       html +=
         '<div class="stu-bd-table stu-bd-mods">' +
-        _bdHeadRow(['Module', 'Grade', 'Assessments', 'Start to Now', 'Latest']);
+        _bdHeadRow(['Module', 'Grade', 'Assessments \u00B7 Oldest to Newest', 'Start to Now', 'Latest']);
       mods.forEach(function (g) {
         var mine = assessmentGroupGrade(cid, studentId, g.assessments);
         var c = _bdGroupCells(ctx, g, mine);
@@ -1691,7 +1771,12 @@ window.PageStudent = (function () {
       return g.key && g.rubric && g.assessments.length > 1;
     });
     html +=
-      '<section class="stu-bd-section" aria-labelledby="stu-bd-rubrics"><div class="stu-bd-title"><h3 id="stu-bd-rubrics">Shared Rubrics</h3></div>';
+      '<section class="stu-bd-section" aria-labelledby="stu-bd-rubrics">' +
+      _bdTitleHtml(
+        'stu-bd-rubrics',
+        'Shared Rubrics',
+        rubrics.length ? 'Criterion scores for rubrics used on more than one assessment.' : '',
+      );
     if (!rubrics.length) html += '<div class="stu-empty">No rubric is used on more than one assessment yet.</div>';
     else {
       var pick =
@@ -1722,14 +1807,14 @@ window.PageStudent = (function () {
   }
 
   /* A shared rubric as a table: a criterion per row, an assessment per
-     column (oldest first), each cell the level as scored, then the first
-     and latest scores and the average beside the class's. */
+     column (oldest first), each cell the level as scored, then Start to
+     Now and the average. */
   function _rubricTableHtml(ctx, g) {
     var cid = ctx.cid;
     var list = g.assessments.slice().sort(function (x, y) {
       return (x.date || '').localeCompare(y.date || '');
     });
-    var cols = 'grid-template-columns:minmax(150px,1.2fr) repeat(' + list.length + ',minmax(64px,1fr)) 110px 110px';
+    var cols = 'grid-template-columns:minmax(150px,1.2fr) repeat(' + list.length + ',minmax(72px,1fr)) 110px 90px';
     var mean = function (vs) {
       return vs.length
         ? vs.reduce(function (s, v) {
@@ -1758,7 +1843,7 @@ window.PageStudent = (function () {
         esc(_shortDay(a.date)) +
         '</span></span>';
     });
-    html += '<span role="columnheader" class="stu-rt-center">First to Latest</span>';
+    html += '<span role="columnheader" class="stu-rt-center">Start to Now</span>';
     html += '<span role="columnheader" class="stu-rt-right">Average</span></div>';
     (g.rubric.criteria || []).filter(Boolean).forEach(function (crit) {
       var vals = list.map(function (a) {
@@ -1767,9 +1852,11 @@ window.PageStudent = (function () {
       var scored = vals.filter(function (v) {
         return v != null;
       });
-      var first = scored[0];
-      var latest = scored[scored.length - 1];
-      var dir = scored.length > 1 ? (latest > first ? 'up' : latest < first ? 'down' : 'flat') : '';
+      var points = [];
+      vals.forEach(function (v, i) {
+        var t = _dayNum(list[i].date);
+        if (v != null && t != null) points.push({ t: t, v: v });
+      });
       html += '<div class="stu-rt-row" role="row" style="' + cols + '">';
       html += '<span role="rowheader" class="stu-rt-crit">' + esc(crit.name || 'Criterion') + '</span>';
       vals.forEach(function (v, i) {
@@ -1782,18 +1869,7 @@ window.PageStudent = (function () {
           chip(v) +
           '</span>';
       });
-      html +=
-        '<span role="cell" class="stu-rt-change stu-rt-' +
-        (dir || 'flat') +
-        '">' +
-        (dir
-          ? chip(first) +
-            '<svg width="18" height="10" viewBox="0 0 18 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-label="' +
-            (dir === 'up' ? 'up to' : dir === 'down' ? 'down to' : 'still') +
-            '"><path d="M1 5h15M12 1l4 4-4 4"/></svg>' +
-            chip(latest)
-          : '<span class="stu-rt-none">\u2014</span>') +
-        '</span>';
+      html += '<span role="cell" class="stu-rt-center">' + _startNowHtml(cid, points) + '</span>';
       html +=
         '<span role="cell" class="stu-rt-avg"><strong>' +
         esc(formatLevel(cid, mean(scored))) +
@@ -2445,7 +2521,13 @@ window.PageStudent = (function () {
       }),
     };
     html += _tabBarHtml(_tabSummaries(ctx));
-    html += '<div class="stu-panel" id="stu-panel" role="tabpanel" aria-labelledby="stu-tab-' + _tab + '">';
+    // Grade Breakdown's sections are cards of their own on the page.
+    html +=
+      '<div class="stu-panel' +
+      (_tab === 'breakdown' ? ' stu-panel-cards' : '') +
+      '" id="stu-panel" role="tabpanel" aria-labelledby="stu-tab-' +
+      _tab +
+      '">';
     if (_tab === 'assess') html += _assessTabHtml(ctx);
     else if (_tab === 'evidence') html += Evidence.panelHtml();
     else if (_tab === 'breakdown') html += _breakdownTabHtml(ctx);
@@ -2550,6 +2632,14 @@ window.PageStudent = (function () {
           /* private mode: the choice lasts this visit */
         }
         render();
+      },
+      // A tap on a chart point shows its label; another tap hides it.
+      stuChartTip: function () {
+        var open = el.classList.contains('show');
+        document.querySelectorAll('.stu-chart-dot.show').forEach(function (d) {
+          d.classList.remove('show');
+        });
+        if (!open) el.classList.add('show');
       },
       stuTypeFocus: function () {
         _typeFocus = el.dataset.key || '';
