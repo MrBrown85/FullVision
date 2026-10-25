@@ -1475,6 +1475,9 @@ window.PageReports = (function () {
       tqToggleTrait: function () {
         tqToggleTrait(el.dataset.sid, el.dataset.tid);
       },
+      tqToggleAttendanceMention: function () {
+        RQ.tqToggleAttendanceMention(el.dataset.sid);
+      },
       tqToggleAssignment: function () {
         tqToggleAssignment(el.dataset.sid, el.dataset.aid);
       },
@@ -1514,6 +1517,11 @@ window.PageReports = (function () {
   function _handleStudioChange(e) {
     var el = e.target;
     if (!el || !el.dataset) return;
+    // The questionnaire's attendance boxes save when they change.
+    if (el.dataset.tqAtt) {
+      RQ.tqSetAttendance(el.dataset.sid);
+      return;
+    }
     var a = el.dataset.action;
     if (a === 'studioOption') _setForm(ReportSheets.setOption(_formOf(), el.dataset.block, el.dataset.key, el.checked));
     else if (a === 'studioText')
@@ -1581,6 +1589,14 @@ window.PageReports = (function () {
      changes. Demo Mode and offline keep the device copies. */
   function _syncFromServer(cid) {
     _syncTemplates();
+    // Attendance totals are read here, not with the class, and redraw the
+    // page only when they changed and the teacher isn't typing in a box.
+    if (typeof loadTermAttendance === 'function') {
+      loadTermAttendance(cid).then(function (changed) {
+        var typing = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.tqAtt;
+        if (changed && cid === activeCourse && !typing) renderReports();
+      });
+    }
     if (typeof ReportIssues !== 'undefined' && typeof ReportIssues.sync === 'function') {
       ReportIssues.sync(cid).then(function (changed) {
         if (changed && cid === activeCourse) _populateCopies();
