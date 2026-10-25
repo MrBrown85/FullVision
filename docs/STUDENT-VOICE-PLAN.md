@@ -120,11 +120,11 @@ reflection              add recorded_at and a response_id; keep the latest-per-s
 
 Nothing in the database becomes callable without signing in; the 2026-10-13 anon revoke stays total.
 
-- **One Supabase Edge Function, `student-submit`, in ca-central-1,** holding the service-role key server-side. Routes: `open` (code → that student's form or issued report and first name), `check` (birthday, for reports only), `submit` (answers). The phone never holds a database key.
-- It calls SECURITY DEFINER functions in a `student_submit` schema granted only to `service_role`, so the logic stays in SQL and testable in `begin … rollback`.
+- **One Supabase Edge Function, `student-submit`, in ca-central-1.** Routes: `open` (code → that student's form and first name) and `submit` (answers); `check` (birthday) arrives with report codes in PR 9. The phone calls it with `?forceFunctionRegion=ca-central-1`, and the function refuses to run in any other region (421). It is deployed with `verify_jwt` off: the phone holds no key at all, and the slip's code is the credential.
+- It calls SECURITY DEFINER functions in a `student_submit` schema over a direct database connection (`SUPABASE_DB_URL`). The schema is not exposed through the API, and only `service_role` has execute, so the logic stays in SQL and testable locally.
 - Codes are hashed with a per-row salt; the plain code exists only on the printed slip. Questionnaire codes are single-use and live only while the questionnaire is open. Report codes are reusable until expiry and need the birthday check. Reissue revokes the old code.
-- `open` returns a signed 30-minute token that `submit` requires; the token is also the idempotency key, so a double tap saves once.
-- Rate limits per code, per class and per IP hash, with a lockout after repeated failures. Turnstile only if abuse appears.
+- `open` returns a random 30-minute token, stored only as a hash in `student_submit.session`, that `submit` requires. A second submit with the same token returns the first result, so a double tap saves once. (A stored token rather than a signed one, so it can be checked and expired in SQL with no signing secret.)
+- Rate limits: ten failed opens per IP hash in 15 minutes locks that hash out; 500 failed opens across everyone in 10 minutes pauses opening; 20 opens per code; 120 submits a minute per class. The IP hash is an HMAC made in the edge function; the address is never stored. Turnstile only if abuse appears.
 - Responses are append-only from the student path. Logs record code id, class id, outcome and timing, never answers or names.
 - The private note is teacher-only: never printed, never in a report, never sent to a model.
 - Demo Mode never calls the function.
