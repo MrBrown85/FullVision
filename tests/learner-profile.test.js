@@ -246,3 +246,77 @@ describe('LearnerProfile', () => {
     expect(cards[1].querySelector('.qw-b').textContent).toBe('Family is everything');
   });
 });
+
+describe('LearnerProfile: replies to phone reports', () => {
+  let originals;
+  let doc;
+  beforeEach(() => {
+    localStorage.clear();
+    originals = { isDemoMode: globalThis.isDemoMode };
+    globalThis.isDemoMode = () => true;
+    Questionnaires._reset();
+    StudentVoice._reset();
+    seed();
+    // Add a Reply to Report 1, answered after the Goal Check-In.
+    const list = JSON.parse(localStorage.getItem('gb-questionnaires-' + CID));
+    const reply = questionnaire('qy', 'report-reply', { title: 'Reply to Report 1' });
+    list.push(reply);
+    localStorage.setItem('gb-questionnaires-' + CID, JSON.stringify(list));
+    const resp = JSON.parse(localStorage.getItem('gb-responses-' + CID));
+    resp.qy = {
+      e1: [
+        {
+          id: 'r9',
+          submitted_at: '2025-11-22T18:00:00Z',
+          answers: answersFor(reply, { 1: 'my journal', 3: ['Keep It'], 4: 'start the data table at lunch' }),
+        },
+      ],
+    };
+    localStorage.setItem('gb-responses-' + CID, JSON.stringify(resp));
+    doc = parseHTML('<!doctype html><html><body></body></html>').document;
+  });
+  afterEach(() => {
+    globalThis.isDemoMode = originals.isDemoMode;
+  });
+  const mount = html => {
+    const box = doc.createElement('div');
+    box.innerHTML = html;
+    return box;
+  };
+  const opts = extra => {
+    const model = StudentVoice.profile(StudentVoice.entries(CID, 'e1'));
+    return Object.assign(
+      {
+        model,
+        first: 'Harjot',
+        initials: 'HG',
+        classLabel: 'Science 8',
+        courseName: 'Science 8',
+        aboutOn: true,
+        goalCount: 2,
+      },
+      extra,
+    );
+  };
+
+  it('the reply is the newest reflection, marked new until seen', () => {
+    const o = opts();
+    o.newReply = o.model.reply.rid;
+    const box = mount(LearnerProfile.reflectionsHtml(o));
+    const first = box.querySelector('.qw-group');
+    expect(first.classList.contains('lp-reply')).toBe(true);
+    expect(first.classList.contains('lp-new')).toBe(true);
+    expect(first.querySelector('h3').textContent).toContain('Reply to Report 1');
+    expect(first.querySelector('h3').textContent).toContain('Nov 22 · after reading the report on their phone');
+    expect(box.querySelector('.qw-head span').textContent).toBe('Newest first');
+    expect(mount(LearnerProfile.reflectionsHtml(opts())).querySelector('.lp-new')).toBeNull();
+  });
+
+  it('the goal says it was kept, the newest next step leads, the earlier one stays underneath', () => {
+    const box = mount(LearnerProfile.courseGoalHtml(opts()));
+    expect(box.querySelector('.gl-meta').textContent).toContain('kept Nov 22');
+    expect(box.querySelector('.gl-check .qw-b').textContent).toBe('start the data table at lunch');
+    expect(box.querySelector('.gl-check .gl-meta').textContent).toBe('From the Report 1 reply · Nov 22');
+    expect(box.querySelector('.lp-hist').textContent).toBe('Earlier next step · Nov 7: “study earlier”');
+  });
+});

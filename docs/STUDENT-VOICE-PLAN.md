@@ -82,6 +82,8 @@ Letter, 2 × 4 slips, dashed grey cut lines, black and white: name, class, quest
 - Teacher, Reports › Progress Reports › Sent to Phones: issue date and expiry, Print QR Slips, Update Issued Copy, Close All Links; counts for opened, replied, changed goal, not opened; a filterable list with reply previews and New Slip for students who haven't opened.
 - A reply lands at the top of Reflections on the Learner Profile, highlighted while new; a kept or changed goal and the new next step update the Goals card, with the earlier step kept underneath.
 
+- As built (PR 9, 2026-10-25): the phone copy is its own record (`phone_report`, `phone_report_student`), not a column on `report_issue`, which holds the printed sheets' HTML and needs a paper issue first. The teacher's browser builds each copy with the app's grade helpers, so it follows the class's grading style. Report codes are reusable until the last day the teacher sets; five wrong birthdays lock a session. A shared school address no longer locks a class out: the per-address limit on open is 60 code misses in 15 minutes, and wrong birthdays don't count toward it.
+
 ### Missing-work reminders: canvas screens M1–M2
 
 - Opened from the gradebook. Students with missing work, all ticked, with their missing assignments and who the email goes to (student, parents, both; "no parent email" flagged).

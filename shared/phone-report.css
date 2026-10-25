@@ -1,0 +1,239 @@
+/* A report on a student's phone (shared/phone-report-view.js; canvas R2).
+   Loaded by the student page (s/) and by the teacher's Sent to Phones
+   preview, so both show the same thing. Light only: it's the student's
+   page, styled like their phone. */
+
+.pr-view {
+  background: #f5f5f7;
+  color: #1d1d1f;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', system-ui, sans-serif;
+}
+.pr-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #fff;
+  border-bottom: 1px solid #d1d1d6;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.pr-av {
+  width: 40px;
+  height: 40px;
+  border-radius: 20px;
+  background: #1565c0;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.pr-who {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.pr-name {
+  font-size: 17px;
+  font-weight: 700;
+}
+.pr-meta {
+  font-size: 13px;
+  color: #636366;
+}
+.pr-main {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.pr-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.pr-rows {
+  gap: 0;
+}
+.pr-rows .pr-h {
+  padding-bottom: 6px;
+}
+.pr-h {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #636366;
+}
+.pr-big {
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+.pr-big-1 {
+  color: #b42318;
+}
+.pr-big-2 {
+  color: #b45309;
+}
+.pr-big-3 {
+  color: #2e7d32;
+}
+.pr-big-4 {
+  color: #1d4ed8;
+}
+.pr-scale,
+.pr-scale-words {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 3px;
+}
+.pr-scale span {
+  height: 8px;
+  border-radius: 4px;
+  background: #e5e5ea;
+}
+.pr-scale .pr-on-1 {
+  background: #b42318;
+}
+.pr-scale .pr-on-2 {
+  background: #d97706;
+}
+.pr-scale .pr-on-3 {
+  background: #2e7d32;
+}
+.pr-scale .pr-on-4 {
+  background: #1d4ed8;
+}
+.pr-scale-words {
+  font-size: 11px;
+  color: #636366;
+  text-align: center;
+}
+.pr-scale-words .on {
+  color: #1d1d1f;
+  font-weight: 700;
+}
+.pr-also {
+  font-size: 15px;
+  color: #636366;
+}
+.pr-note {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.pr-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+.pr-h + .pr-row {
+  border-top: 0;
+}
+.pr-rname {
+  font-size: 16px;
+  font-weight: 600;
+}
+.pr-rsub {
+  font-size: 13px;
+  color: #636366;
+  margin-top: 2px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.pr-lvl {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.pr-lvl-0 {
+  background: #f2f2f7;
+  color: #636366;
+  font-weight: 600;
+}
+.pr-lvl-1 {
+  background: #fee2e2;
+  color: #991b1b;
+}
+.pr-lvl-2 {
+  background: #fef3c7;
+  color: #92400e;
+}
+.pr-lvl-3 {
+  background: #bbf7d0;
+  color: #166534;
+}
+.pr-lvl-4 {
+  background: #dbeafe;
+  color: #1e40af;
+}
+.pr-p {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.pr-goal {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.pr-said {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+}
+.pr-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 5px;
+  background: #007aff;
+  flex-shrink: 0;
+}
+.pr-att {
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+.pr-att-n {
+  display: flex;
+  gap: 18px;
+  text-align: center;
+}
+.pr-att-n strong {
+  display: block;
+  font-size: 22px;
+  font-weight: 700;
+}
+.pr-att-n span {
+  font-size: 12px;
+  color: #636366;
+}
+.pr-fine {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #636366;
+  text-align: center;
+}

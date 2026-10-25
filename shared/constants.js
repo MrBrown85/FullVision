@@ -830,10 +830,12 @@ const TB_PAGES = [
    Read by shared/data.js (direct online writes) and shared/offline-queue.js
    (queued writes replayed on reconnect). */
 const FV_IDEMPOTENT_RPCS = {
+  close_phone_report: true,
   create_assessment: true,
   create_course: true,
   create_custom_tag: true,
   create_observation: true,
+  create_phone_report: true,
   create_report_issue: true,
   create_student_and_enroll: true,
   delete_guardian: true,
@@ -847,11 +849,13 @@ const FV_IDEMPOTENT_RPCS = {
   import_roster_csv: true,
   import_teams_class: true,
   issue_access_codes: true,
+  issue_report_codes: true,
   reenrol_student: true,
   remove_section: true,
   restore_section: true,
   save_report_template: true,
   set_questionnaire_on: true,
+  update_phone_report: true,
   upsert_category: true,
   upsert_competency_group: true,
   upsert_guardian: true,

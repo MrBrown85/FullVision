@@ -73,8 +73,9 @@ var CmQuestionnaires = (function () {
   /* How many questionnaires are on, for the tab's count (null until read). */
   function countOn(cid) {
     if (!Questionnaires.loaded(cid)) return null;
+    // A report's Reply to Report is counted with the report, not here.
     return Questionnaires.list(cid).filter(function (q) {
-      return q.is_on && !q.parent_id;
+      return q.is_on && !q.parent_id && q.kind !== 'report_reply';
     }).length;
   }
 

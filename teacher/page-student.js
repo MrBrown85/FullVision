@@ -468,10 +468,15 @@ window.PageStudent = (function () {
       ctx.sections.filter(function (sec) {
         return !!(goals[sec.id] || '').trim();
       }).length;
-    out.profile = {
-      stat: _plural(goalCount, 'Goal', 'Goals'),
-      sub: voice.last ? 'Last answer ' + LearnerProfile.day(voice.last) : 'No answers yet',
-    };
+    out.profile = _newReply(voice)
+      ? {
+          stat: 'New Reply',
+          sub: voice.reply.title.replace(/^Reply to /, '') + ' reply · ' + LearnerProfile.day(voice.reply.at),
+        }
+      : {
+          stat: _plural(goalCount, 'Goal', 'Goals'),
+          sub: voice.last ? 'Last answer ' + LearnerProfile.day(voice.last) : 'No answers yet',
+        };
     return out;
   }
 
@@ -2007,6 +2012,29 @@ window.PageStudent = (function () {
     return StudentVoice.profile(StudentVoice.entries(cid, studentId));
   }
 
+  /* A reply to a report is new until you've seen it on the Learner Profile,
+     on this device. */
+  var SEEN_REPLIES = 'gb-lp-replies-seen';
+  function _newReply(voice) {
+    var rid = voice && voice.reply && voice.reply.rid;
+    if (!rid) return null;
+    try {
+      return (JSON.parse(localStorage.getItem(SEEN_REPLIES) || '{}') || {})[rid] ? null : rid;
+    } catch (e) {
+      return null;
+    }
+  }
+  function _markReplySeen(rid) {
+    if (!rid) return;
+    try {
+      var seen = JSON.parse(localStorage.getItem(SEEN_REPLIES) || '{}') || {};
+      seen[rid] = true;
+      localStorage.setItem(SEEN_REPLIES, JSON.stringify(seen));
+    } catch (e) {
+      /* private mode: it shows as new again next time */
+    }
+  }
+
   /* A competency goal's editor (ids are what editGoal / saveGoalField use). */
   function _goalEditorHtml(ctx, sec, goalText) {
     return (
@@ -2269,6 +2297,7 @@ window.PageStudent = (function () {
       grade: course.gradeLevel || '',
       pronouns: ctx.student.pronouns || '',
       courseName: course.name || 'Course',
+      newReply: _newReply(model),
       aboutOn:
         typeof Questionnaires !== 'undefined' &&
         Questionnaires.list(cid).some(function (q) {
@@ -2280,6 +2309,8 @@ window.PageStudent = (function () {
           return !!(goals[sec.id] || '').trim();
         }).length,
     };
+    // Seen now: the next visit shows it as read.
+    _markReplySeen(o.newReply);
     return (
       '<div class="lp-layout"><aside class="lp-aside">' +
       LearnerProfile.idCardHtml(o) +
