@@ -5608,7 +5608,7 @@ function createCourse(data) {
     __pendingLocalId: localId,
     name: data.name || 'Untitled Class',
     gradingSystem: data.gradingSystem || 'proficiency',
-    calcMethod: data.calcMethod || 'mostRecent',
+    calcMethod: data.calcMethod || 'average',
     decayWeight: data.decayWeight || 0.65,
     description: data.description || '',
     gradeLevel: data.gradeLevel || '',

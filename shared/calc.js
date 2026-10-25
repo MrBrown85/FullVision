@@ -1120,7 +1120,7 @@ function getTagProficiency(cid, studentId, tagId) {
 
   const cc = getCourseConfig(cid);
   const course = COURSES[cid];
-  const method = cc.calcMethod || course.calcMethod || 'mostRecent';
+  const method = cc.calcMethod || course.calcMethod || 'average';
   const dw = cc.decayWeight != null ? cc.decayWeight : course.decayWeight || 0.65;
   const scores = getCountedTagScores(cid, studentId, tagId);
   const cw = getCategoryWeights(cid);
@@ -1373,7 +1373,7 @@ function completionRing(pct, color) {
 function describeCalcMethod(cid) {
   var cc = getCourseConfig(cid) || {};
   var course = (typeof COURSES !== 'undefined' && COURSES && COURSES[cid]) || {};
-  var method = cc.calcMethod || course.calcMethod || 'mostRecent';
+  var method = cc.calcMethod || course.calcMethod || 'average';
   var dw = cc.decayWeight != null ? cc.decayWeight : course.decayWeight || 0.65;
   var n = getRecentScoreLimit(cid);
   var of = n ? ' of the last ' + n + ' scores' : '';
@@ -1407,7 +1407,7 @@ function getSectionGrowthData(cid, studentId, sectionId) {
   if (!section) return [];
   const cc = getCourseConfig(cid);
   const course = COURSES[cid];
-  const method = cc.calcMethod || course.calcMethod || 'mostRecent';
+  const method = cc.calcMethod || course.calcMethod || 'average';
   const dw = cc.decayWeight != null ? cc.decayWeight : course.decayWeight || 0.65;
 
   // Collect all scored evidence across all tags in this section.

@@ -19,8 +19,8 @@ afterEach(() => {
 });
 
 describe('describeCalcMethod', () => {
-  it('defaults to most recent', () => {
-    expect(describeCalcMethod(CID)).toBe('Most recent score');
+  it('defaults to mean', () => {
+    expect(describeCalcMethod(CID)).toBe('Average of all scores');
   });
 
   it('names each method', () => {

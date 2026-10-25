@@ -86,7 +86,7 @@ window.GradingSetupCopy = (function () {
   function _calcOf(cid) {
     var cc = getCourseConfig(cid) || {};
     var course = COURSES[cid] || {};
-    var method = cc.calcMethod || course.calcMethod || 'mostRecent';
+    var method = cc.calcMethod || course.calcMethod || 'average';
     var dw = cc.decayWeight != null ? cc.decayWeight : course.decayWeight || 0.65;
     return { method: method, decayWeight: Number(dw), recentLimit: getRecentScoreLimit(cid) };
   }

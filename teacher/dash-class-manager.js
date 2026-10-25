@@ -3352,7 +3352,7 @@ window.DashClassManager = (function () {
     var course = COURSES[cid];
     var cc = getCourseConfig(cid);
     var gs = course.gradingSystem || _cmDefaultGradingSystem(course);
-    var method = cc.calcMethod || course.calcMethod || 'mostRecent';
+    var method = cc.calcMethod || course.calcMethod || 'average';
     // calc.js counts any method it doesn't know as Most Recent; show that.
     if (!CM_METHOD_TEXT[method]) method = 'mostRecent';
     var dw = cc.decayWeight != null ? cc.decayWeight : course.decayWeight || 0.65;
@@ -3947,7 +3947,7 @@ window.DashClassManager = (function () {
     }
     if (cwStep2Grade) preGrade = cwStep2Grade;
     var grading = cwStep2Grading || _cmDefaultGradingSystem({ gradeLevel: preGrade });
-    var calc = cwStep2Calc || _cmDefaultCalcMethod(preGrade);
+    var calc = cwStep2Calc || _cmDefaultCalcMethod();
 
     var html = '<div class="cm-detail-inner" style="display:block">';
     html += renderCwStepBar();
@@ -4198,8 +4198,7 @@ window.DashClassManager = (function () {
       (document.querySelector('#cm-cg-grading .cm-seg-btn.active') || {}).dataset?.val ||
       _cmDefaultGradingSystem({ gradeLevel: cwStep2Grade });
     cwStep2Calc =
-      (document.querySelector('#cm-cg-calc .cm-seg-btn.active') || {}).dataset?.val ||
-      _cmDefaultCalcMethod(cwStep2Grade);
+      (document.querySelector('#cm-cg-calc .cm-seg-btn.active') || {}).dataset?.val || _cmDefaultCalcMethod();
     cwStep2Decay = document.getElementById('cm-cg-decay-slider')?.value || '65';
     cwStep2LatePolicy = document.getElementById('cm-new-late-policy')?.value || '';
     cwStep = 3;
@@ -4278,6 +4277,7 @@ window.DashClassManager = (function () {
     var cc = getCourseConfig(course.id);
     cc.calcMethod = cwStep2Calc;
     cc.decayWeight = parseInt(cwStep2Decay, 10) / 100;
+    cc.levelOrder = _cmDefaultLevelOrder(course.gradeLevel);
     var defaultTerms = _cmDefaultReportingTerms(course.id, cwStep2Span);
     if (defaultTerms && !(Array.isArray(cc.reportingTerms) && cc.reportingTerms.length))
       cc.reportingTerms = defaultTerms;
@@ -4384,7 +4384,7 @@ window.DashClassManager = (function () {
       }
     }
     if (!cwStep2Calc) {
-      var cbtn = document.querySelector('#cm-cg-calc .cm-seg-btn[data-val="' + _cmDefaultCalcMethod(value) + '"]');
+      var cbtn = document.querySelector('#cm-cg-calc .cm-seg-btn[data-val="' + _cmDefaultCalcMethod() + '"]');
       if (cbtn) {
         cmCreateToggle(cbtn, 'cm-cg-calc');
         cwStep2Calc = '';
@@ -4416,6 +4416,7 @@ window.DashClassManager = (function () {
 
   // T-UI-02 helpers ──────────────────────────────────────────────────
   // Default grading_system by grade level: 8–9 → proficiency, 10–12 → letter.
+  // Every new class defaults to Mean (_cmDefaultCalcMethod).
   // Falls back to proficiency when the grade isn't a number we recognize.
   function _cmDefaultGradingSystem(course) {
     var gl = parseInt((course && course.gradeLevel) || '', 10);
@@ -4423,9 +4424,15 @@ window.DashClassManager = (function () {
     return 'proficiency';
   }
 
-  // Default calc_method by grade level: 10–12 → mean, otherwise most recent.
-  function _cmDefaultCalcMethod(gradeLevel) {
-    return _cmDefaultGradingSystem({ gradeLevel: gradeLevel }) === 'letter' ? 'average' : 'mostRecent';
+  // A new class always calculates competencies by Mean.
+  function _cmDefaultCalcMethod() {
+    return 'average';
+  }
+
+  // Default Rubric Levels: Emerging First where the class grades by
+  // proficiency (grades 8–9), Extending First otherwise.
+  function _cmDefaultLevelOrder(gradeLevel) {
+    return _cmDefaultGradingSystem({ gradeLevel: gradeLevel }) === 'proficiency' ? 'asc' : 'desc';
   }
 
   // Calculation-method descriptions (verbatim from Project Phoneox React build
@@ -4967,7 +4974,8 @@ window.DashClassManager = (function () {
   }
 
   // Rubric Levels: the order the class draws the four levels, everywhere
-  // (levelOrderFor in shared/constants.js). Default Extending first.
+  // (levelOrderFor in shared/constants.js). A new class starts Emerging First
+  // in grades 8–9, Extending First in 10–12 (_cmDefaultLevelOrder).
   var CM_LEVEL_ORDERS = [
     { value: 'asc', label: 'Emerging First' },
     { value: 'desc', label: 'Extending First' },
@@ -5503,7 +5511,7 @@ window.DashClassManager = (function () {
     if (!cmSelectedCourse || !CM_METHOD_TEXT[val]) return;
     var cid = cmSelectedCourse;
     var course = COURSES[cid];
-    var current = getCourseConfig(cid).calcMethod || course.calcMethod || 'mostRecent';
+    var current = getCourseConfig(cid).calcMethod || course.calcMethod || 'average';
     if (!CM_METHOD_TEXT[current]) current = 'mostRecent';
     if (val === current) return;
     var preview = previewCalcMethodChange(cid, val);
@@ -5552,7 +5560,7 @@ window.DashClassManager = (function () {
     var next = parseInt(val, 10) >= 1 ? parseInt(val, 10) : null;
     if (next === getRecentScoreLimit(cid)) return;
     var course = COURSES[cid];
-    var method = getCourseConfig(cid).calcMethod || course.calcMethod || 'mostRecent';
+    var method = getCourseConfig(cid).calcMethod || course.calcMethod || 'average';
     var preview = previewCalcMethodChange(cid, method, undefined, next);
     if (!preview.changed) return _cmApplyRecentLimit(next);
     renderClassManager();
@@ -5903,7 +5911,7 @@ window.DashClassManager = (function () {
       gradeLevel: src.gradeLevel || '',
       description: src.description || '',
       gradingSystem: src.gradingSystem || 'proficiency',
-      calcMethod: src.calcMethod || 'mostRecent',
+      calcMethod: src.calcMethod || 'average',
       decayWeight: src.decayWeight || 0.65,
     });
     // Reporting terms stay behind: their dates belong to one school year
