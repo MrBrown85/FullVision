@@ -51,6 +51,8 @@ const PRECACHE_URLS = [
   '/teacher/questionnaires.js',
   '/teacher/qr-slips.js',
   '/teacher/cm-questionnaires.js',
+  '/teacher/student-voice.js',
+  '/teacher/learner-profile.js',
   '/teacher/dash-class-manager.js',
   '/teacher/dash-overview.js',
   '/teacher/dash-observations.js',

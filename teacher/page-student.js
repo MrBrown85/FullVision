@@ -12,7 +12,7 @@ window.PageStudent = (function () {
   /* ── State variables ────────────────────────────────────── */
   var studentId;
   var activeCourse;
-  var _tab = 'comps'; // the open tab: comps, assess, evidence, breakdown, goals, profile
+  var _tab = 'comps'; // the open tab: comps, assess, evidence, breakdown, profile
   var _assessFilter = 'all'; // Assessments tab: all, prof, points, unscored
   var _assessCat = ''; // Assessments tab: a category id, or '' for all
   var _assessGroup = 'date'; // Assessments tab: date, category, module, type, rubric
@@ -330,7 +330,6 @@ window.PageStudent = (function () {
     { id: 'assess', label: 'Assessments' },
     { id: 'evidence', label: 'Observations' },
     { id: 'breakdown', label: 'Grade Breakdown' },
-    { id: 'goals', label: 'Goals and Reflections' },
     { id: 'profile', label: 'Learner Profile' },
   ];
 
@@ -460,26 +459,18 @@ window.PageStudent = (function () {
       sub: scope + (lastOb ? ' · Latest ' + _daysAgo(_obDay(lastOb)) : ' · None yet'),
     };
     out.breakdown = _breakdownSummary(ctx);
+    // The Learner Profile: goals set (the student's own and the competency
+    // goals) and when the student last answered.
+    var voice = _voiceModel(cid);
     var goals = getGoals(cid)[studentId] || {};
-    var refl = getReflections(cid)[studentId] || {};
-    var goalCount = ctx.sections.filter(function (sec) {
-      return !!(goals[sec.id] || '').trim();
-    }).length;
-    var reflCount = ctx.sections.filter(function (sec) {
-      return !!(refl[sec.id] && (refl[sec.id].text || refl[sec.id].confidence));
-    }).length;
-    out.goals = {
-      stat: goalCount + ' of ' + ctx.sections.length + ' Set',
-      sub: reflCount ? _plural(reflCount, 'self-reflection', 'self-reflections') : 'No self-reflections yet',
-    };
-    var seen = OBS_DIMS.filter(function (d) {
-      return ctx.obs.some(function (o) {
-        return (o.dims || []).indexOf(d) >= 0;
-      });
-    }).length;
+    var goalCount =
+      LearnerProfile.goalCount(voice) +
+      ctx.sections.filter(function (sec) {
+        return !!(goals[sec.id] || '').trim();
+      }).length;
     out.profile = {
-      stat: seen + ' of ' + OBS_DIMS.length + ' Seen',
-      sub: seen < OBS_DIMS.length ? OBS_DIMS.length - seen + ' not seen yet' : 'All seen',
+      stat: _plural(goalCount, 'Goal', 'Goals'),
+      sub: voice.last ? 'Last answer ' + LearnerProfile.day(voice.last) : 'No answers yet',
     };
     return out;
   }
@@ -1957,7 +1948,7 @@ window.PageStudent = (function () {
       (compact
         ? '<button type="button" class="stu-chip" data-action="editReflection" data-secid="' +
           sec.id +
-          '">+ Self-Reflection</button>'
+          '">+ Reflection</button>'
         : (refl.text ? esc(refl.text) : '<span class="stu-muted">No self-reflection yet.</span>') +
           (refl.date ? '<div class="stu-sub">' + formatDate(refl.date) + '</div>' : '')) +
       '</div>' +
@@ -2002,47 +1993,83 @@ window.PageStudent = (function () {
     );
   }
 
-  /* The competency's scores since its goal was set, newest first; without a
-     date, its latest few. */
-  function _sinceGoalHtml(ctx, sec, setOn) {
-    var entries = _compEntries(ctx.cid, sec);
-    var day = setOn ? String(setOn).slice(0, 10) : '';
-    var list = day
-      ? entries.filter(function (e) {
-          return (e.date || '') >= day;
-        })
-      : entries.slice(-4);
-    var html =
-      '<div class="stu-goal-since"><div class="stu-goal-label"><span>' +
-      (day ? 'Since the Goal' : 'Latest Scores') +
-      '</span></div>';
-    if (!list.length) return html + '<div class="stu-muted">No scores since then yet.</div></div>';
-    list
-      .slice()
-      .reverse()
-      .slice(0, 6)
-      .forEach(function (e) {
-        var a = ctx.assessMap[e.assessmentId];
-        var lvl = e.level != null ? e.level : Math.round(e.score);
-        html +=
-          '<div class="stu-goal-since-row"><span class="stu-assess-date">' +
-          esc(_shortDay(e.date)) +
-          '</span><span class="stu-goal-since-title">' +
-          esc(a ? a.title : '') +
-          '</span><span class="stu-level stu-level-' +
-          (lvl > 0 ? Math.min(4, lvl) : 0) +
-          '">' +
-          esc(_entryText(e, a)) +
-          '</span></div>';
+  /* The student's answers as the Learner Profile reads them, once the class's
+     questionnaires and responses are in (a redraw follows when they arrive). */
+  var _EMPTY_VOICE = { about: null, checkin: null, reflections: [], last: null };
+  function _voiceModel(cid) {
+    if (typeof StudentVoice === 'undefined') return _EMPTY_VOICE;
+    if (!StudentVoice.loaded(cid)) {
+      StudentVoice.load(cid, function (loadedCid) {
+        if (loadedCid === activeCourse) render();
       });
-    return html + '</div>';
+      if (!StudentVoice.loaded(cid)) return _EMPTY_VOICE;
+    }
+    return StudentVoice.profile(StudentVoice.entries(cid, studentId));
   }
 
-  /* ── Goals and Reflections tab ──────────────────────────── */
-  /* Competencies with a goal or the student's own words get a card with the
-     scores since the goal; the rest are one line each, ready for a goal. */
-  function _goalsTabHtml(ctx) {
+  /* A competency goal's editor (ids are what editGoal / saveGoalField use). */
+  function _goalEditorHtml(ctx, sec, goalText) {
+    return (
+      '<div class="inline-edit-area" id="goal-edit-' +
+      sec.id +
+      '" style="display:none"><textarea id="goal-input-' +
+      sec.id +
+      '" aria-label="Goal for ' +
+      esc(sec.name) +
+      '" placeholder="What will ' +
+      esc(displayNameFirst(ctx.student)) +
+      ' work on next?">' +
+      esc(goalText) +
+      '</textarea><div class="inline-edit-actions"><button class="btn btn-primary" data-action="saveGoalField" data-secid="' +
+      sec.id +
+      '">Save</button><button class="btn" data-action="cancelGoalEdit" data-secid="' +
+      sec.id +
+      '">Cancel</button></div></div>'
+    );
+  }
+
+  function _reflEditorHtml(ctx, sec, refl) {
+    var first = displayNameFirst(ctx.student);
+    return (
+      '<div class="inline-edit-area" id="refl-edit-' +
+      sec.id +
+      '" style="display:none"><select id="refl-conf-' +
+      sec.id +
+      '" aria-label="Confidence level"><option value="">Confidence level…</option>' +
+      [1, 2, 3, 4]
+        .map(function (n) {
+          return (
+            '<option value="' +
+            n +
+            '"' +
+            (refl.confidence === n ? ' selected' : '') +
+            '>' +
+            CONFIDENCE_LABELS[n] +
+            '</option>'
+          );
+        })
+        .join('') +
+      '</select><textarea id="refl-input-' +
+      sec.id +
+      '" aria-label="Self-reflection for ' +
+      esc(sec.name) +
+      '" placeholder="' +
+      esc(first) +
+      '’s own words about their learning…">' +
+      esc(refl.text || '') +
+      '</textarea><div class="inline-edit-actions"><button class="btn btn-primary" data-action="saveReflField" data-secid="' +
+      sec.id +
+      '">Save</button><button class="btn" data-action="cancelReflEdit" data-secid="' +
+      sec.id +
+      '">Cancel</button></div></div>'
+    );
+  }
+
+  /* Competency goals (canvas 9d): a card for each competency with your goal
+     or the student's words side by side; the rest in one No Goal Yet list. */
+  function _compGoalsHtml(ctx) {
     var cid = ctx.cid;
+    var first = displayNameFirst(ctx.student);
     var goals = getGoals(cid)[studentId] || {};
     var reflections = getReflections(cid)[studentId] || {};
     var dates = (typeof getGoalDates === 'function' ? getGoalDates(cid)[studentId] : null) || {};
@@ -2052,54 +2079,86 @@ window.PageStudent = (function () {
       var refl = reflections[sec.id] || {};
       (goals[sec.id] || refl.text || refl.confidence ? full : rest).push(sec);
     });
-    var head = function (sec) {
-      var tag = sec.tags[0];
-      return (
-        '<div class="stu-goal-head"><span class="stu-comp-name"><strong>' +
-        esc(sec.name) +
-        '</strong>' +
-        (tag && tag.label && tag.label !== sec.name ? '<span class="stu-sub">' + esc(tag.label) + '</span>' : '') +
-        '</span>' +
-        _levelPill(cid, getSectionProficiency(cid, studentId, sec.id)) +
-        '</div>'
-      );
-    };
     var html = '';
-    if (full.length) {
-      html += '<div class="stu-goal-list">';
-      full.forEach(function (sec) {
-        var goalText = goals[sec.id] || '';
-        var setOn = goalText ? dates[sec.id] : null;
-        html +=
-          '<div class="stu-goal-card stu-goal-full"><div class="stu-goal-main">' +
-          head(sec) +
-          (goalText ? _goalBlockHtml(ctx, sec, goalText, setOn, false) : _goalBlockHtml(ctx, sec, '', null, true)) +
-          _reflBlockHtml(ctx, sec, reflections[sec.id] || {}, false) +
-          '</div>' +
-          _sinceGoalHtml(ctx, sec, setOn) +
-          '</div>';
-      });
-      html += '</div>';
-    }
+    full.forEach(function (sec) {
+      var goalText = goals[sec.id] || '';
+      var refl = reflections[sec.id] || {};
+      var setOn = goalText ? dates[sec.id] : null;
+      var conf = refl.confidence ? CONFIDENCE_LABELS[refl.confidence] || '' : '';
+      html +=
+        '<div class="gl-card"><div class="gl-top"><div class="gl-title">' +
+        esc(sec.name) +
+        '</div>' +
+        _levelPill(cid, getSectionProficiency(cid, studentId, sec.id)) +
+        '</div><div class="gl-pair"><div id="goal-' +
+        sec.id +
+        '">' +
+        (goalText
+          ? '<div class="qw-q qw-q-flush">' +
+            LearnerProfile.src('you', first) +
+            ' Goal' +
+            (setOn ? ' · ' + esc(_shortDay(setOn)) : '') +
+            ' <button type="button" class="stu-chip" data-action="editGoal" data-secid="' +
+            sec.id +
+            '">Edit</button></div><div class="gl-answer" id="goal-text-' +
+            sec.id +
+            '">' +
+            esc(goalText) +
+            '</div>'
+          : '<div id="goal-text-' +
+            sec.id +
+            '"><button type="button" class="stu-chip" data-action="editGoal" data-secid="' +
+            sec.id +
+            '">+ Goal</button></div>') +
+        _goalEditorHtml(ctx, sec, goalText) +
+        '</div><div id="refl-' +
+        sec.id +
+        '">' +
+        (refl.text || refl.confidence
+          ? '<figure class="qw"><figcaption class="qw-q qw-q-flush">' +
+            LearnerProfile.src('them', first) +
+            ' How confident?' +
+            (conf ? ' · ' + esc(conf) : '') +
+            ' <button type="button" class="stu-chip" data-action="editReflection" data-secid="' +
+            sec.id +
+            '">Edit</button></figcaption><div id="refl-text-' +
+            sec.id +
+            '">' +
+            (refl.text ? LearnerProfile.bubble(refl.text) : '<div class="gl-none">No answer</div>') +
+            '</div></figure>'
+          : '<div id="refl-text-' +
+            sec.id +
+            '"><button type="button" class="stu-chip" data-action="editReflection" data-secid="' +
+            sec.id +
+            '">+ Reflection</button></div>') +
+        _reflEditorHtml(ctx, sec, refl) +
+        '</div></div></div>';
+    });
     if (rest.length) {
-      html += '<div class="stu-goal-rest">' + (full.length ? '<div class="stu-goal-rest-title">No Goal Yet</div>' : '');
+      html +=
+        '<div class="gl-card gl-rest"><div class="gl-top"><div class="gl-title">No Goal Yet</div><span class="gl-meta">' +
+        esc(_plural(rest.length, 'competency', 'competencies')) +
+        '</span></div><div class="gl-rows">';
       rest.forEach(function (sec) {
         html +=
-          '<div class="stu-goal-card stu-goal-compact"><div class="stu-goal-row">' +
-          head(sec) +
-          '<span class="stu-goal-adds">' +
+          '<div class="gl-row"><strong>' +
+          esc(sec.name) +
+          '</strong>' +
+          _levelPill(cid, getSectionProficiency(cid, studentId, sec.id)) +
+          '<span class="gl-adds">' +
           _goalBlockHtml(ctx, sec, '', null, true) +
           _reflBlockHtml(ctx, sec, {}, true) +
-          '</span></div></div>';
+          '</span></div>';
       });
-      html += '</div>';
+      html += '</div></div>';
     }
-    if (!ctx.sections.length) html += '<div class="stu-empty">This class has no competencies yet.</div>';
+    if (!ctx.sections.length) html += '<div class="lp-none">This class has no competencies yet.</div>';
     return html;
   }
 
-  /* ── Learner Profile tab ────────────────────────────────── */
-  function _profileTabHtml(ctx) {
+  /* Each learning disposition on one timeline, a dot per observation tagged
+     with it (it opens the observation); the ones not seen yet in one row. */
+  function _dispositionsHtml(ctx) {
     var cid = ctx.cid;
     var first = displayNameFirst(ctx.student);
     var groups = [
@@ -2188,8 +2247,59 @@ window.PageStudent = (function () {
     });
     html += '</div>';
 
-    html += _coreSelfHtml(ctx);
     return html;
+  }
+
+  /* ── Learner Profile tab (canvas 9d) ────────────────────── */
+  /* The ID card beside the student's own words: About Me, Goals (theirs and
+     the competency goals), Reflections; then what observations show and the
+     Core Competency self-assessments by term. */
+  function _profileTabHtml(ctx) {
+    var cid = ctx.cid;
+    var course = COURSES[cid] || {};
+    var first = displayNameFirst(ctx.student);
+    var model = _voiceModel(cid);
+    var goals = getGoals(cid)[studentId] || {};
+    var block = typeof courseBlockLabel === 'function' ? courseBlockLabel(course) : '';
+    var o = {
+      model: model,
+      first: first,
+      initials: initials(ctx.student),
+      classLabel: (course.name || '') + (block ? ' · ' + block : ''),
+      grade: course.gradeLevel || '',
+      pronouns: ctx.student.pronouns || '',
+      courseName: course.name || 'Course',
+      aboutOn:
+        typeof Questionnaires !== 'undefined' &&
+        Questionnaires.list(cid).some(function (q) {
+          return q.kind === 'about_me' && q.is_on;
+        }),
+      goalCount:
+        LearnerProfile.goalCount(model) +
+        ctx.sections.filter(function (sec) {
+          return !!(goals[sec.id] || '').trim();
+        }).length,
+    };
+    return (
+      '<div class="lp-layout"><aside class="lp-aside">' +
+      LearnerProfile.idCardHtml(o) +
+      '</aside><div class="lp-main">' +
+      LearnerProfile.aboutHtml(o) +
+      '<section class="qw-sec" id="lp-goals" aria-labelledby="lp-goals-h"><div class="qw-head"><h2 id="lp-goals-h">Goals</h2></div>' +
+      LearnerProfile.courseGoalHtml(o) +
+      LearnerProfile.coreGoalHtml(o) +
+      '<div class="qw-group"><h3>Competency Goals</h3>' +
+      _compGoalsHtml(ctx) +
+      '</div></section>' +
+      LearnerProfile.reflectionsHtml(o) +
+      '<section class="qw-sec" id="lp-dispositions" aria-labelledby="lp-disp-h"><div class="qw-head"><h2 id="lp-disp-h">Seen in Observations</h2></div>' +
+      _dispositionsHtml(ctx) +
+      '</section><section class="qw-sec" id="lp-core" aria-labelledby="lp-core-h"><div class="qw-head"><h2 id="lp-core-h">Core Competencies in ' +
+      esc(first) +
+      '’s Words</h2></div>' +
+      _coreSelfHtml(ctx, true) +
+      '</section></div></div>'
+    );
   }
 
   function _saveCoreSelf(coreId, clear) {
@@ -2239,7 +2349,7 @@ window.PageStudent = (function () {
     return { terms: terms, pick: pick, key: 'T' + pick.ordinal };
   }
 
-  function _coreSelfHtml(ctx) {
+  function _coreSelfHtml(ctx, inSection) {
     var cid = ctx.cid;
     var first = displayNameFirst(ctx.student);
     var tk = _coreTermKeys(ctx);
@@ -2256,7 +2366,10 @@ window.PageStudent = (function () {
         tally[id] = (tally[id] || 0) + 1;
       });
     });
-    var html = '<div class="stu-core-head"><h3>Core Competencies · In ' + esc(first) + '’s Words</h3>';
+    // In the Learner Profile the section heading names it; only the term picker stays.
+    var html =
+      '<div class="stu-core-head">' +
+      (inSection ? '<span></span>' : '<h3>Core Competencies · In ' + esc(first) + '’s Words</h3>');
     if (tk.terms.length) {
       html += '<div class="seg seg-sm" role="radiogroup" aria-label="Term">';
       tk.terms.forEach(function (t) {
@@ -2391,6 +2504,7 @@ window.PageStudent = (function () {
   function _savedTab() {
     try {
       var t = localStorage.getItem(TAB_KEY);
+      if (t === 'goals') t = 'profile';
       return _isTab(t) ? t : null;
     } catch (e) {
       return null;
@@ -2531,7 +2645,6 @@ window.PageStudent = (function () {
     if (_tab === 'assess') html += _assessTabHtml(ctx);
     else if (_tab === 'evidence') html += Evidence.panelHtml();
     else if (_tab === 'breakdown') html += _breakdownTabHtml(ctx);
-    else if (_tab === 'goals') html += _goalsTabHtml(ctx);
     else if (_tab === 'profile') html += _profileTabHtml(ctx);
     else html += _compsTabHtml(ctx);
     html += '</div>';
@@ -2675,6 +2788,10 @@ window.PageStudent = (function () {
       editGoal: function () {
         editGoal(el.dataset.secid);
       },
+      lpJump: function () {
+        var to = document.getElementById(el.dataset.target);
+        if (to) to.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      },
       saveGoalField: function () {
         saveGoalField(el.dataset.secid);
       },
@@ -2775,7 +2892,9 @@ window.PageStudent = (function () {
     _drawnFor = '';
     // The tab the link names; a link to one observation opens Observations;
     // otherwise the tab last opened on this device.
-    _tab = _isTab(params.tab) ? params.tab : params.ob ? 'evidence' : _savedTab() || 'comps';
+    // Goals and Reflections is part of the Learner Profile now; old links open it.
+    var asked = params.tab === 'goals' ? 'profile' : params.tab;
+    _tab = _isTab(asked) ? asked : params.ob ? 'evidence' : _savedTab() || 'comps';
     _overrideSelectedLevel = 0;
 
     // Show sidebar with student roster

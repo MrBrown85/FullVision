@@ -73,6 +73,7 @@ Letter, 2 × 4 slips, dashed grey cut lines, black and white: name, class, quest
 - About Me: As a Learner (good at, hard right now) and Outside School, each answer in a speech bubble under its question. Repeated questions carry a ↻ Jan · Jun tag.
 - Goals: the course goal (full text once, status as a dot plus text, latest next step with its source), the Core Competency goal, then competency goals (cards for those with a goal; a "No Goal Yet" list with + Goal / + Reflection).
 - Reflections, newest first: replies to reports, the reporting-period reflection (Personal Shield as bubbles, how it helps), self-assessments with the four-step control.
+- Below Reflections, the page keeps what the Learner Profile tab already had: the disposition timelines from observation tags ("Seen in Observations") and the Core Competency self-assessment table by term (Colin, 2026-10-25). The Translate link waits: sending a student's words to a translation service needs its own privacy decision.
 - Hierarchy rules from the audit: section 18px bold, group 14px bold, question 13px grey, answer 16px for every answer; bubbles only for student words; "From Cece" or "Set by you" wherever student and teacher entries sit together; headings in the teacher's voice; answers capped near 68 characters a line with line breaks kept; no filler text.
 
 ### Report to phones: canvas screens R1–R4, T1, T2

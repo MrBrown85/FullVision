@@ -11559,7 +11559,7 @@ window.loadSeedIfNeeded = function () {
   // Lazy-load the script, then seed
   return new Promise(function (resolve) {
     var s = document.createElement('script');
-    s.src = '/shared/seed-data.js?v=43';
+    s.src = '/shared/seed-data.js?v=44';
     s.onload = function () {
       if (typeof seedIfNeeded === 'function') seedIfNeeded();
       resolve();

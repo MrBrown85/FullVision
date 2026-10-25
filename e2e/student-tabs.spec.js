@@ -1,5 +1,5 @@
 /**
- * The student page's six tabs: each shows its count for the term, the
+ * The student page's five tabs: each shows its count for the term, the
  * keyboard moves between them, and each panel keeps the page's tools
  * (evidence drawer, override, goals). Demo Mode, Cece in Science 8.
  */
@@ -14,22 +14,21 @@ async function openCece(page) {
   return sid;
 }
 
-test('six tabs, Competencies first, and the arrow keys move between them', async ({ page }) => {
+test('five tabs, Competencies first, and the arrow keys move between them', async ({ page }) => {
   await openCece(page);
   const tabs = page.getByRole('tab', {
-    name: /Competencies|Assessments|Observations|Grade Breakdown|Goals and Reflections|Learner Profile/,
+    name: /Competencies|Assessments|Observations|Grade Breakdown|Learner Profile/,
   });
   await expect(page.locator('.stu-tab .stu-tab-label')).toHaveText([
     'Competencies',
     'Assessments',
     'Observations',
     'Grade Breakdown',
-    'Goals and Reflections',
     'Learner Profile',
   ]);
   await expect(page.locator('#stu-tab-comps')).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('#stu-tab-comps .stu-tab-stat')).toHaveText('6 of 6 Proficient');
-  await expect(tabs).toHaveCount(6);
+  await expect(tabs).toHaveCount(5);
   await page.locator('#stu-tab-comps').focus();
   await page.keyboard.press('ArrowRight');
   await expect(page.locator('#stu-tab-assess')).toHaveAttribute('aria-selected', 'true');
@@ -49,15 +48,18 @@ test('a competency row opens its evidence and the override', async ({ page }) =>
   await expect(comp.locator('.override-panel')).toBeVisible();
 });
 
-test('a goal saves from the Goals and Reflections tab', async ({ page }) => {
+test('a competency goal saves from the Learner Profile', async ({ page }) => {
   const sid = await openCece(page);
-  await page.locator('#stu-tab-goals').click();
-  const card = page.locator('.stu-goal-card').first();
-  await card.getByRole('button', { name: '+ Goal' }).click();
-  await card.locator('textarea').first().fill('Write a testable question before each lab');
-  await card.getByRole('button', { name: 'Save' }).first().click();
-  await expect(page.locator('.stu-goal-card').first()).toContainText('Write a testable question before each lab');
-  await expect(page.locator('#stu-tab-goals .stu-tab-stat')).toHaveText('1 of 6 Set');
+  await page.locator('#stu-tab-profile').click();
+  // Cece's own two goals (About Me and the Goal Check-In) are in the count.
+  await expect(page.locator('#stu-tab-profile .stu-tab-stat')).toHaveText('2 Goals');
+  const row = page.locator('.gl-row').first();
+  await row.getByRole('button', { name: '+ Goal' }).click();
+  await row.locator('textarea').first().fill('Write a testable question before each lab');
+  await row.getByRole('button', { name: 'Save' }).first().click();
+  const card = page.locator('#lp-goals .gl-card', { hasText: 'Write a testable question before each lab' });
+  await expect(card).toContainText('Set by you');
+  await expect(page.locator('#stu-tab-profile .stu-tab-stat')).toHaveText('3 Goals');
   const saved = await page.evaluate(id => Object.values(getGoals(getActiveCourse())[id] || {}), sid);
   expect(saved).toContain('Write a testable question before each lab');
 });
@@ -93,13 +95,16 @@ test('the address names the tab, a reload keeps it, and a student opened with no
   page,
 }) => {
   const sid = await openCece(page);
-  await page.locator('#stu-tab-goals').click();
-  await expect(page).toHaveURL(/[?&]tab=goals/);
+  await page.locator('#stu-tab-breakdown').click();
+  await expect(page).toHaveURL(/[?&]tab=breakdown/);
   await page.reload();
-  await expect(page.locator('#stu-tab-goals')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('#stu-tab-breakdown')).toHaveAttribute('aria-selected', 'true');
   // No tab in the link: the one last opened on this device.
   await page.goto(page.url().replace(/#.*/, '#/student?id=' + sid));
-  await expect(page.locator('#stu-tab-goals')).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('#stu-tab-breakdown')).toHaveAttribute('aria-selected', 'true');
+  // An old link to Goals and Reflections opens the Learner Profile.
+  await page.goto(page.url().replace(/#.*/, '#/student?id=' + sid + '&tab=goals'));
+  await expect(page.locator('#stu-tab-profile')).toHaveAttribute('aria-selected', 'true');
 });
 
 test('‹ › go to the next student in roster order and keep the tab', async ({ page }) => {
