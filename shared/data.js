@@ -74,6 +74,7 @@ const _cache = {
   rubricChecks: {}, // keyed by cid — ticked Advanced Rubric checkboxes { 'sid:aid': [checkId, …] }
   flags: {}, // keyed by cid
   goals: {}, // keyed by cid
+  goalDates: {}, // keyed by cid — when each goal was set { sid: { secId: ISO } }
   reflections: {}, // keyed by cid
   overrides: {}, // keyed by cid
   statuses: {}, // keyed by cid
@@ -3020,6 +3021,8 @@ async function loadStudentProfileSummaries(cid) {
     _cache.studentProfileSummaries[cid] = localSummaries || {};
     return _cache.studentProfileSummaries[cid];
   }
+  // Goal dates load beside the profiles; the Goals tab redraws without them.
+  _loadGoalDates(cid);
   try {
     var res = await window.v2.listCourseStudentProfiles(cid);
     if (res && res.error) throw res.error;
@@ -8886,6 +8889,36 @@ function saveGoals(cid, obj) {
   _saveCourseField('goals', cid, obj);
 }
 
+/* When each goal was set (last saved): { sid: { sectionId: ISO date } }.
+   Signed in, the server's dates fill it as the class loads; a goal saved here
+   dates itself at once, and in Demo Mode that is the only source. */
+function getGoalDates(cid) {
+  if (_cache.goalDates[cid] !== undefined) return _cache.goalDates[cid];
+  return _safeParseLS('gb-goal-dates-' + cid, {}) || {};
+}
+function setGoalDate(cid, sid, sectionId, date) {
+  var all = Object.assign({}, getGoalDates(cid));
+  var mine = Object.assign({}, all[sid] || {});
+  if (date) mine[sectionId] = date;
+  else delete mine[sectionId];
+  all[sid] = mine;
+  _cache.goalDates[cid] = all;
+  _safeLSSet('gb-goal-dates-' + cid, JSON.stringify(all));
+}
+async function _loadGoalDates(cid) {
+  if (!_useSupabase || !window.v2 || !window.v2.listCourseGoalDates) return;
+  try {
+    var res = await window.v2.listCourseGoalDates(cid);
+    // A server without the read: the dates stay as this device saved them.
+    if (!res || res.error) return;
+    var data = _rpcObject(res.data !== undefined ? res.data : res) || {};
+    _cache.goalDates[cid] = data;
+    _safeLSSet('gb-goal-dates-' + cid, JSON.stringify(data));
+  } catch (e) {
+    console.warn('list_course_goal_dates failed for ' + cid + ':', e);
+  }
+}
+
 function getReflections(cid) {
   if (_cache.reflections[cid] !== undefined) return _cache.reflections[cid];
   try {
@@ -10036,6 +10069,11 @@ window.v2.saveGoal = function (enrollmentId, sectionId, body) {
     p_section_id: sectionId,
     p_body: body || '',
   });
+};
+
+/* When each goal in a class was last saved: {enrollment_id: {section_id: ISO}}. */
+window.v2.listCourseGoalDates = function (courseId) {
+  return _rpcOrNoop('list_course_goal_dates', { p_course_id: courseId });
 };
 
 /* Reflection: one per (enrollment, section). confidence ∈ 1..5 or null. */
@@ -11210,6 +11248,8 @@ window.GB = {
   toggleFlag,
   getGoals,
   saveGoals,
+  getGoalDates,
+  setGoalDate,
   getReflections,
   saveReflections,
   getQuickObs,

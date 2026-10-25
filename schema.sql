@@ -684,6 +684,7 @@ create table guardian (
 --   clear_section_override(p_enrollment_id uuid, p_section_id uuid)
 --   bulk_attendance(p_enrollment_ids uuid[], p_date date, p_status text)
 --   list_course_student_profiles(p_course_id uuid)
+--   list_course_goal_dates(p_course_id uuid)   -- {enrollment_id: {section_id: updated_at}}
 --
 -- Term rating:
 --   save_term_rating(p_enrollment_id uuid, p_term integer, p_payload jsonb)
