@@ -165,7 +165,8 @@ test('Grade Breakdown shows each category with its share, and Group By groups th
   await expect(page.locator('.stu-bd-cats .stu-bd-row:not(.stu-bd-head)')).toHaveCount(3);
   await page.locator('.stu-bd-cats [data-action="stuBdToggle"]').first().click();
   await expect(page.locator('.stu-bd-items .stu-bd-item')).toHaveCount(8);
-  await expect(page.locator('.stu-bd-rubric').first()).toContainText('Rubric');
+  await expect(page.locator('.stu-rt-picker .stu-chip.active')).toContainText('Rubric');
+  await expect(page.locator('.stu-rt-row:not(.stu-rt-head)')).toHaveCount(3);
 
   await page.locator('#stu-tab-assess').click();
   await page.locator('[data-action="stuAssessGroup"][data-group="category"]').click();
