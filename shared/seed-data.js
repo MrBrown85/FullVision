@@ -3213,6 +3213,179 @@ function seedIfNeeded() {
     );
   }
 
+  // ── Student questionnaires (Demo Mode) ──
+  // About Me from September and the November Reflection with its Goal
+  // Check-In, turned on in Science 8, with answers from Cece (all three),
+  // Noor (About Me) and Sam (About Me and part of the reflection). Stored as
+  // teacher/questionnaires.js and teacher/student-voice.js keep them in Demo
+  // Mode, so the Questionnaires tab and the Learner Profile agree. Seeded
+  // once per device, separately from the class, so a demo seeded before
+  // these existed gets them too.
+  (function seedStudentVoice() {
+    if (!COURSES.sci8 || typeof QUESTIONNAIRE_TEMPLATES === 'undefined') return;
+    if (localStorage.getItem('gb-questionnaires-sci8') != null) return;
+    var tpl = function (id) {
+      return QUESTIONNAIRE_TEMPLATES.find(function (t) {
+        return t.id === id;
+      });
+    };
+    var made = function (id, tid, extra) {
+      var t = tpl(tid);
+      return Object.assign(
+        {
+          id: id,
+          course_id: 'sci8',
+          kind: t.kind,
+          title: t.title,
+          template_id: t.id,
+          theme: t.theme || null,
+          report_period: null,
+          parent_id: null,
+          is_on: true,
+          myed_comment: t.myed_comment || null,
+          created_at: current('2025-09-08T16:00:00Z'),
+          updated_at: current('2025-09-08T16:00:00Z'),
+          questions: t.questions.map(function (q, i) {
+            return Object.assign(
+              {
+                id: id + '-' + (i + 1),
+                display_order: i + 1,
+                options: {},
+                core_ids: [],
+                repeated_key: null,
+                teacher_only: false,
+                prompt_translations: {},
+              },
+              JSON.parse(JSON.stringify(q)),
+            );
+          }),
+        },
+        extra,
+      );
+    };
+    var about = made('q-demo-about', 'about-me', { opens_on: current('2025-09-10'), closes_on: current('2025-09-19') });
+    var refl = made('q-demo-nov', 'core-8-1', {
+      report_period: 1,
+      opens_on: current('2025-11-03'),
+      closes_on: current('2025-11-14'),
+    });
+    var goal = made('q-demo-goal', 'goal-checkin', {
+      report_period: 1,
+      parent_id: refl.id,
+      opens_on: refl.opens_on,
+      closes_on: refl.closes_on,
+    });
+    // Answers by question number: text, a list (json) or {num, text, json}.
+    var SAMPLES = [
+      [
+        about,
+        'st1',
+        '2025-09-16T18:20:00Z',
+        {
+          1: 'SEE-see',
+          2: ['English', 'Igbo'],
+          3: ['With a partner'],
+          4: "Soccer, drawing, and helping at my aunt's bakery on weekends.",
+          5: 'I ask a lot of questions and I like figuring out why things happen in labs.',
+          6: 'Finishing my lab write-ups on time. I start them and then forget about them.',
+          7: 'Hand in labs on time by finishing my data table in class.\n\nHow:\n- start the table before I leave class\n- check the due dates every Friday',
+          8: "My grandma is staying with us so it's loud at home some nights.",
+        },
+      ],
+      [
+        about,
+        'st2',
+        '2025-09-15T17:05:00Z',
+        {
+          1: 'NOOR',
+          2: ['English', 'Arabic'],
+          3: ['Alone'],
+          4: 'Reading and drawing comics with my sister.',
+          5: "I'm careful and I check my work twice.",
+          6: 'Talking in front of the whole class.',
+          7: "Ask a question when I'm stuck instead of waiting.",
+        },
+      ],
+      [
+        about,
+        'st3',
+        '2025-09-17T19:40:00Z',
+        {
+          1: 'SAM',
+          2: ['English'],
+          3: ['In a group'],
+          4: 'Basketball and video games.',
+          5: 'Building things with my hands.',
+          6: 'everything lol',
+          7: 'Get better at the tests by studying before the night before.',
+        },
+      ],
+      [
+        refl,
+        'st1',
+        '2025-11-07T17:30:00Z',
+        {
+          1: {
+            json: ['Curious', 'Soccer', 'Finish on time', 'Baking'],
+            text: 'Curious · Soccer · Finish on time · Baking',
+          },
+          2: "Being curious helps me in labs because I want to know why things happen. Soccer taught me to keep going when I'm tired.",
+          3: {
+            json: {
+              levels: { PAR: 2, PPI: 3 },
+              why: {
+                PAR: 'I set goals but I forget to check on them.',
+                PPI: 'My family and my culture matter a lot to me.',
+              },
+            },
+            text: 'I set goals but I forget to check on them. · My family and my culture matter a lot to me.',
+          },
+        },
+      ],
+      [
+        goal,
+        'st1',
+        '2025-11-07T17:30:00Z',
+        {
+          1: { num: 2, text: 'Working On It' },
+          2: 'Ask for the lab sheet a day early so I can set up the table at home.',
+          3: 'PAR',
+          4: 'Check my goals every Friday instead of forgetting them.',
+        },
+      ],
+      [
+        refl,
+        'st3',
+        '2025-11-10T18:10:00Z',
+        {
+          1: { json: ['Funny', 'Basketball', '', 'Family'], text: 'Funny · Basketball · Family' },
+          3: { json: { levels: { PAR: 1 } } },
+        },
+      ],
+    ];
+    var responses = {};
+    SAMPLES.forEach(function (row, n) {
+      var q = row[0];
+      var answers = {};
+      Object.keys(row[3]).forEach(function (k) {
+        var v = row[3][k];
+        var qid = q.id + '-' + k;
+        if (typeof v === 'string') answers[qid] = { num: null, text: v, json: null };
+        else if (Array.isArray(v)) answers[qid] = { num: null, text: v.join(', '), json: v };
+        else answers[qid] = { num: v.num == null ? null : v.num, text: v.text || null, json: v.json || null };
+      });
+      responses[q.id] = responses[q.id] || {};
+      responses[q.id][row[1]] = [
+        { id: 'r-demo-' + (n + 1), submitted_at: current(row[2]), via: 'link', answers: answers },
+      ];
+    });
+    [about, refl, goal].forEach(function (q) {
+      q.answered = Object.keys(responses[q.id] || {});
+    });
+    localStorage.setItem('gb-questionnaires-sci8', JSON.stringify([about, refl, goal]));
+    localStorage.setItem('gb-responses-sci8', JSON.stringify(responses));
+  })();
+
   // ── Migrate old gb-notes into gb-quick-obs (one-time) ──
   Object.keys(COURSES).forEach(cid => {
     const oldNotes = getNotes(cid);

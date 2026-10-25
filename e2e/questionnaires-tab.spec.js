@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
 
 /* The Questionnaires tab in Class Management (docs/STUDENT-VOICE-PLAN.md,
-   PR 5). Demo Mode, Science 8: turning on About Me shows who has answered,
-   an edited question survives a reload, and Print QR Slips builds one slip
-   per student, each with its own QR code. */
+   PR 5). Demo Mode, Science 8: About Me shows who has answered, an edited
+   question survives a reload, and Print QR Slips builds one slip per
+   student, each with its own QR code. */
 
 async function enterDemo(page) {
   await page.goto('/login.html');
@@ -16,14 +16,20 @@ async function openQuestionnaires(page) {
   await page.getByRole('tab', { name: /Questionnaires/ }).click();
 }
 
-test('About Me turns on, saves an edited question, and prints a slip per student', async ({ page }) => {
+test('About Me shows who answered, turns off and on, saves an edited question, and prints slips', async ({ page }) => {
   await enterDemo(page);
   await openQuestionnaires(page);
+  // Demo Mode's Science 8 has About Me and the November Reflection on, with
+  // three students' answers (shared/seed-data.js).
   const card = page.locator('[data-card="about-me"]');
   await expect(card.locator('.sq-name')).toHaveText('About Me');
-  await card.getByRole('radio', { name: 'On' }).click();
-  await expect(card.locator('.sq-facts')).toContainText('Answered0 of 27');
+  await expect(card.locator('.sq-facts')).toContainText('Answered3 of 27');
+  await expect(page.getByRole('tab', { name: /Questionnaires/ })).toContainText('2');
+  await card.getByRole('radio', { name: 'Off' }).click();
+  await expect(card).toHaveClass(/sq-off/);
   await expect(page.getByRole('tab', { name: /Questionnaires/ })).toContainText('1');
+  await card.getByRole('radio', { name: 'On' }).click();
+  await expect(card.locator('.sq-facts')).toContainText('Answered3 of 27');
 
   await card.getByRole('button', { name: 'Show Questions' }).click();
   const first = card.getByLabel('Question 1');
@@ -43,4 +49,7 @@ test('About Me turns on, saves an edited question, and prints a slip per student
   await page.locator('[data-card="about-me"]').getByRole('button', { name: 'Print QR Slips' }).click();
   await expect.poll(() => page.evaluate(() => window.__printedSlips)).toBe(27);
   expect(await page.evaluate(() => window.__printedQrs)).toBe(27);
+  await page.evaluate(() => (window.__printedSlips = 0));
+  await page.locator('[data-card="about-me"]').getByRole('button', { name: 'Print Slips for 24 Not Answered' }).click();
+  await expect.poll(() => page.evaluate(() => window.__printedSlips)).toBe(24);
 });
