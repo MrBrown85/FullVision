@@ -1,31 +1,167 @@
 # FullVision student voice: plan
 
-Written 2026-10-17. Design only; nothing built. Fits the existing UI rather than adding new surfaces. Citations are to the repo as of 2026-10-17.
+Written 2026-10-17. Revised 2026-10-24 to match the approved mockups on the design canvas (https://claude.ai/artifact/B7CKPGG7LXFBHwQRxzbCjT). The canvas is the visual spec: every PR below is checked against it screen by screen before merge. Nothing here is built yet.
 
 ## What this adds
 
-Four instruments, all optional per class, all feeding one learner profile and the report:
+Students answer short questionnaires on their own phones by scanning a QR slip, with no accounts. Their answers, goals and reflections live on the Learner Profile next to the teacher's evidence, and feed the report comment. Two related features use the same plumbing: the November report sent to students' phones (with a reply), and missing-work reminders for families.
 
-1. **About Me** (September): the student introduces themselves. Includes a teacher-only private box.
-2. **Core competency reflection** (each reporting period): a different form for each grade and each reporting period, seeded from your own grade-by-period matrix (see "The question bank" below). Three short written prompts on that period's theme, plus a quick self-rating on the nine dimensions. This is the Ministry's required student self-reflection, and it produces the MyEd comment that goes with it.
-   2b. **Curricular self-assessment** (optional, per period): the student rates the course's curricular competencies using the learning map's own "I can…" statements, with one sentence of evidence each. Separate from the core reflection so neither form gets long.
-3. **Goal check-in** (mid-term): how the goal is going, what's next. Reflections become a dated history.
-4. **Interview** (reporting week, teacher-led): two to four minutes per student, three generated questions, answers typed or tapped on the spot.
+Instruments, all optional per class:
 
-Everything a student or an interview produces is a dated _conversation_ record tied to the student and a competency, next to the teacher's observations and scores. The report can then quote it, show the Ministry self-assessment section, use it when drafting comments, and show September-to-June growth in the student's words.
+1. **About Me** (start of course): how to say my name, languages at home, how I learn best, what I do outside school, and three repeated questions (good at, hard right now, what I want to get better at and how). A private note only the teacher sees.
+2. **Core Competency Reflection** (each reporting period): the grade-by-period theme from the Brainstorm file, its activity as prompts, and a self-assessment on that period's Core Competencies on the scale already live in `core_self_assessment`: Beginning, Growing, Confident, Leading, each with a one-sentence why.
+3. **Goal Check-In** (same slip as the reflection): how the Science 8 goal is going (Not Started, Working On It, Mostly There, Done), what's next, and one Core Competency goal with one thing to do this week.
+4. **Curricular Self-Assessment** (optional, off by default): the class's I-can statements on the same four-step scale.
+5. **Reply to Report** (after a report is sent to phones): proud of, surprised by, keep or change the goal plus one thing before the next report, anything for the teacher.
 
-Nothing here requires student accounts, photos, or a parent portal.
+Interview mode (teacher-led, on Observations and mobile) stays in the plan but is not in this build.
 
-## What already exists
+## What already exists (main, 2026-10-24)
 
-- The teacher's term questionnaire: nine dimensions in two groups (`shared/constants.js:560-570`), narrative, work habits, participation, traits, strengths and growth tags (`schema.sql:377-408`, `data.js:2786-2791`). It is the model for the student version.
-- Printed blank self-reflection blocks that students fill on paper: `renderBlockStudentReflectionLearning` and `…Habits` (`teacher/report-blocks.js:412-470`). Paper mode is already half built; this plan makes those blocks fillable and prefilled.
-- "I can…" statements per tag (`schema.sql:119`, `data.js:1862-1863`, `4667-4669`), already rendered on reports (`report-blocks.js:321-355`). They become the self-assessment items.
-- `goal` and `reflection` per student per competency, one row each (`schema.sql:335-354`); this plan turns reflection into a history.
-- Report config with togglable blocks per class (`schema.sql:433-438`, `report-blocks.js:1004-1027`).
-- The Reports page: Term Questionnaire · Progress Reports · Class Summary tabs, a student picker, and a Report 1–6 period select (`teacher/page-reports.js:612`).
-- Observations: quick-add bar, tags, timeline (`teacher/page-observations.js`).
-- Security: anon can't run any function (`migrations/20261013_revoke_anon_function_execute.sql`). Student submissions need a deliberate, narrow exception.
+- `core_self_assessment` (enrollment, core_id, term_key, level, body, goal) with `upsert_core_self_assessment` and `list_course_core_self_assessments` (#386, applied). Student self-assessments write here; nothing new is needed for the scale.
+- `goal` (enrollment, section, body) with goal dates (#385, applied), and `reflection` (enrollment, section, body, confidence), one row per competency.
+- `guardian` (student, name, relationship, email, phone, language, consent_at, consent_source) with `upsert_guardian`, `delete_guardian`, `list_course_guardians` (`migrations/20261020_guardian.sql`, applied). Parent emails on the roster are these rows; no new field is needed. Its header records that nothing should email families until the district's position on teacher-to-family email is known.
+- `report_issue` and `report_issue_student` (`migrations/20261020_report_issue.sql`, applied): a fixed copy of each student's report at the moment it was issued. Phone reports link to this copy, not to live scores.
+- Netlify Edge Functions are set up (`netlify/edge-functions/inject-env.js`) but run at the nearest Netlify location, not necessarily in Canada. Student submissions use a Supabase Edge Function in ca-central-1 instead (see Security).
+- The roster import (`cmHandleCSV`) reads seven columns by position and splits on bare commas; see PR 3.
+
+## Decisions (approved 2026-10-24, replacing the 2026-10-17 list)
+
+1. **One QR per student per questionnaire.** The slip carries the student's own code; scanning signs them in and shows "Hi Cece, is this you?". The code sits after `#` in the URL so it never reaches a server log. A typed fallback code is printed under the QR. Eight slips per letter page, black and white, styled like the rubric handouts.
+2. **Students rate Core Competencies, not the nine dispositions.** The teacher keeps rating dispositions on the Term Questionnaire; the two scales are not shown side by side.
+3. **One scrolling page per form,** with a progress bar, not one question per card. Answer boxes grow as the student types. Sentence starters under the repeated questions.
+4. **Goal Check-In rides on the reflection's slip** and is edited inside the November card on the Questionnaires tab, with its own On/Off.
+5. **Class Management gets a Questionnaires tab** (one card per questionnaire: status, dates, answered count, who hasn't answered, Print QR Slips, inline question editor, MyEd comment). The Students tab holds the full roster only.
+6. **The Goals and Reflections tab is removed.** Its content moves onto the Learner Profile tab, which becomes one page: ID card, About Me, Goals, Reflections.
+7. **Student words are shown exactly as written,** never summarized, filtered or autocorrected. Blank answers show the question with "No answer". Answers in another language get a Translate link that never replaces the original.
+8. **Phone reports use the issued copy** and a birthday check, expire at a set date, and can be closed or reissued per student.
+9. **Missing-work reminders start as Outlook drafts,** one personalised draft per student opened from FullVision. Sending from FullVision comes later.
+10. **The Term Questionnaire is redesigned separately.** It stays as it is through this build; its redesign starts from a data inventory and a written spec, and pulls in student voice once the data exists. The 2026-10-17 decision to migrate it into the shared tables in phase 5 is dropped.
+11. **Prompts stay English first,** with `prompt_translations` on the question table from day one.
+
+## Screens (the canvas)
+
+### Student phone (no login): canvas screens 1–5
+
+- `/s/` at the site root, built from `teacher-mobile` components and tokens: slim header with class and progress, cards, segmented scale buttons, footer buttons. No navigation, no other students, no grades.
+- Scan screen: avatar, "Hi Cece!", what they're about to answer and how long it takes, Yes / No That's Not Me, and the typed-code fallback.
+- About Me, November Reflection (theme card, Personal Shield, how it helps, self-assessment with why), My Goals (September goal read-only, status, next step, Core Competency goal picker with one thing this week), Sent.
+- Demo Mode: the demo class code runs the form locally and writes nothing.
+
+### Class Management › Students: canvas screen 6
+
+- Full roster, every field editable in place: Last, First, Preferred, Pronouns, Student Number, Date of Birth, Student Email, Parent Email, Parent Email 2 (the first two `guardian` rows), Designations (chips with ×, + opens the BC code picker), ELL (checkbox). About Me status is read-only.
+- Enter or ↓ moves down a column, ↑ up, Tab across, Esc leaves. Saves through the existing write path with no banners or toasts (sync dot only).
+- Sticky header and sticky Last/First columns; the table scrolls sideways. Alternating row shading; the hovered or focused row turns light blue. The tab's 900px and 1200px width caps are lifted for this tab only.
+- Toolbar: search, a one-line summary (students, designations, ELL, About Me answered, missing parent emails), Import Roster, Add Student. Bulk Edit is removed. A ⋯ menu per row: Open Student Page, Withdraw.
+
+### Class Management › Questionnaires: canvas screen 6b
+
+- One card per questionnaire with On/Off, description, status dot, dates, answered count and progress bar, and who hasn't answered.
+- Actions on the card: View Answers, Reopen for N Students, Print QR Slips, Hide/Show Questions, Change Dates.
+- The questions open inside their card: numbered, type shown ("4 short answers", "Self-assessment · Beginning to Leading, plus why"), growing text boxes, Remove, competencies as removable chips, + Add Question, and the MyEd comment for families. Off questionnaires show as a grey header-only card.
+- The tab label shows a count of open questionnaires.
+
+### QR slips: canvas screen 7
+
+Letter, 2 × 4 slips, dashed grey cut lines, black and white: name, class, questionnaire and dates, QR, typed fallback code, "works once and only for you". The private note never prints.
+
+### Student page › Learner Profile: canvas screen 9d
+
+- Five tabs on the student page (Goals and Reflections removed). The Learner Profile tab stat shows goal count or a new reply.
+- Sticky ID card: band with class and grade, avatar, how to say the name with the stressed syllable in bold, pronouns, languages, learns best, jump links (About Me, Goals, Reflections with dates or counts). Private note card under it: "Only you see this."
+- About Me: As a Learner (good at, hard right now) and Outside School, each answer in a speech bubble under its question. Repeated questions carry a ↻ Jan · Jun tag.
+- Goals: the course goal (full text once, status as a dot plus text, latest next step with its source), the Core Competency goal, then competency goals (cards for those with a goal; a "No Goal Yet" list with + Goal / + Reflection).
+- Reflections, newest first: replies to reports, the reporting-period reflection (Personal Shield as bubbles, how it helps), self-assessments with the four-step control.
+- Hierarchy rules from the audit: section 18px bold, group 14px bold, question 13px grey, answer 16px for every answer; bubbles only for student words; "From Cece" or "Set by you" wherever student and teacher entries sit together; headings in the teacher's voice; answers capped near 68 characters a line with line breaks kept; no filler text.
+
+### Report to phones: canvas screens R1–R4, T1, T2
+
+- Student: birthday check → the issued report (sticky name, class, report and issue date; overall on the four-level scale with one plain sentence; each competency with a student-friendly line; the teacher's comment; their goal and self-assessment; attendance) → Reply to Your Report → Sent. A line says the official report is in MyEd.
+- Teacher, Reports › Progress Reports › Sent to Phones: issue date and expiry, Print QR Slips, Update Issued Copy, Close All Links; counts for opened, replied, changed goal, not opened; a filterable list with reply previews and New Slip for students who haven't opened.
+- A reply lands at the top of Reflections on the Learner Profile, highlighted while new; a kept or changed goal and the new next step update the Goals card, with the earlier step kept underneath.
+
+### Missing-work reminders: canvas screens M1–M2
+
+- Opened from the gradebook. Students with missing work, all ticked, with their missing assignments and who the email goes to (student, parents, both; "no parent email" flagged).
+- A per-student preview: shared editable intro, due date and closing; the missing list with due dates filled from the gradebook; signed with the teacher's name.
+- Open [Name]'s Draft opens a `mailto:` draft in the teacher's mail app, then steps to the next student and marks the row "Draft opened". Copy Email is the fallback when a draft is too long. No repeat sending in this version.
+
+## Data model
+
+Additive. Existing tables keep working.
+
+```
+questionnaire_template  id, kind, grade (8–12 or null), period (1 Nov | 2 Mar | 3 Jun | null),
+                        year, theme, myed_comment, questions jsonb     -- seeded from the Brainstorm file
+questionnaire           id, course_id, template_id (nullable), kind
+                        (about_me | core_reflection | goal_checkin | curricular_self_assessment | report_reply),
+                        title, theme, report_period (1–6, null for about_me), parent_id (goal_checkin → its
+                        core_reflection, same slip), opens_at, closes_at, is_on, created_at
+question                id, questionnaire_id, display_order, prompt, prompt_translations jsonb,
+                        kind (text | short_set | scale4 | choice | goal_status | core_pick),
+                        core_ids text[] (for scale4 on Core Competencies), repeated_key, teacher_only boolean
+response                id, questionnaire_id, enrollment_id, via (link | paper | forms_csv),
+                        submitted_at, created_by (teacher or null)
+answer                  id, response_id, question_id, value_num, value_text, value_json
+student_access_code     id, enrollment_id, questionnaire_id (or report_issue_id), code_hash, salt,
+                        expires_at, used_at, revoked_at, opened_at
+submit_attempt          id, code_id (nullable), course_id, ip_hash, outcome, at
+reflection              add recorded_at and a response_id; keep the latest-per-section view for current readers
+```
+
+- Self-assessment answers also upsert `core_self_assessment` for that term, so the existing readers keep working.
+- Goal Check-In answers update `goal` (status, next step) and keep the earlier next step as history.
+- Report replies are a `response` on a `report_reply` questionnaire tied to the `report_issue`.
+- Parent emails are `guardian` rows. The roster's Parent Email and Parent Email 2 columns are the first two by created_at.
+- `get_class_bundle` gains `questionnaires`, `responses` and `guardians`; the bundle schema version bumps.
+
+## Security
+
+Nothing in the database becomes callable without signing in; the 2026-10-13 anon revoke stays total.
+
+- **One Supabase Edge Function, `student-submit`, in ca-central-1,** holding the service-role key server-side. Routes: `open` (code → that student's form or issued report and first name), `check` (birthday, for reports only), `submit` (answers). The phone never holds a database key.
+- It calls SECURITY DEFINER functions in a `student_submit` schema granted only to `service_role`, so the logic stays in SQL and testable in `begin … rollback`.
+- Codes are hashed with a per-row salt; the plain code exists only on the printed slip. Questionnaire codes are single-use and live only while the questionnaire is open. Report codes are reusable until expiry and need the birthday check. Reissue revokes the old code.
+- `open` returns a signed 30-minute token that `submit` requires; the token is also the idempotency key, so a double tap saves once.
+- Rate limits per code, per class and per IP hash, with a lockout after repeated failures. Turnstile only if abuse appears.
+- Responses are append-only from the student path. Logs record code id, class id, outcome and timing, never answers or names.
+- The private note is teacher-only: never printed, never in a report, never sent to a model.
+- Demo Mode never calls the function.
+
+## Privacy
+
+- Answers, guardian emails and reports stay in gradebook-prod (ca-central-1); the edge function runs in the same region.
+- Phone reports show nothing that shouldn't be on a fridge: no designations, no private note, no observations. The name and issue date stay pinned at the top, so a screenshot is clearly that student's.
+- Emailing families waits on the district's position (as the guardian migration says). The Outlook-draft reminders send from the teacher's own school account, so FullVision itself sends nothing.
+- The privacy page gains a plain-language section on student forms, phone reports and guardian emails, shipped with PR 6.
+
+## Build order: one branch and PR each
+
+Each PR is checked element by element against its canvas screen before merge. Migrations go to a Supabase branch first. Screenshots come from the deploy preview in Demo Mode.
+
+| PR  | What                                                                                                                                                                                                                                            | Depends on                     | Size         |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ | ------------ |
+| 1   | This plan                                                                                                                                                                                                                                       | —                              | Small        |
+| 2   | **Students tab:** full roster, every field editable in place, keyboard moves, guardians as Parent Email columns through the existing guardian RPCs, designations picker, ELL, search, ⋯ menu, Bulk Edit removed, width caps lifted on this tab  | —                              | Medium       |
+| 3   | **Roster import v2:** read columns by header with a match-your-columns step, proper quoted CSV, new columns (Parent Email ×2, Designations, ELL), MyEd class-list export, updated `roster-template.csv`                                         | 2                              | Small–medium |
+| 4   | **Questionnaire data:** migration for the tables above, templates seeded from the Brainstorm file, teacher RPCs (`upsert_questionnaire`, `set_questionnaire_on`, `issue_access_codes`, `list_responses`), bundle section. No student access yet | —                              | Medium       |
+| 5   | **Questionnaires tab and QR slips:** cards, inline question editor, Print QR Slips (letter, 2 × 4), the tab count                                                                                                                               | 4                              | Medium       |
+| 6   | **Security:** `student-submit` edge function, `student_submit` schema, hashed codes, tokens, rate limits, SQL and function tests, privacy page section. Reviewed on its own, no UI in the same PR                                               | 4                              | Medium–large |
+| 7   | **Student phone page `/s/`:** scan screen, About Me, November Reflection with Goal Check-In, Sent, Demo Mode, Playwright at the mobile preset                                                                                                   | 6                              | Medium       |
+| 8   | **Learner Profile:** ID card, About Me, Goals, Reflections in one page; Goals and Reflections tab removed; hierarchy rules; Translate link                                                                                                      | 4 (shows answers once 7 lands) | Medium       |
+| 9   | **Report to phones:** report codes on `report_issue`, birthday check route, phone report page, Reply to Report, Sent to Phones on Progress Reports, replies on the Learner Profile                                                              | 6, 7, 8                        | Medium–large |
+| 10  | **Missing-work reminders:** gradebook entry point, per-student preview, `mailto:` drafts, Copy Email, Draft opened tracking                                                                                                                     | 2                              | Small–medium |
+
+PRs 2, 3 and 10 touch no new backend and can start right away. PR 6 is the critical path for everything students touch.
+
+## Later
+
+- Term Questionnaire redesign: data inventory, written spec, then mockups; pulls in student voice from PRs 7–9.
+- Sending reminders and reports from FullVision (email service, sending domain, district approval).
+- Interview mode on Observations and mobile.
+- Curricular self-assessment content, and the course question bank below.
+- Paper entry and Forms CSV import for classes without phones.
 
 ## The question bank: your file
 
@@ -69,147 +205,3 @@ One bank file, `shared/curriculum-questions.json`, keyed by course short tag →
 The bank is read-only reference data like `curriculum_data.js`: loaded lazily, never stored per class. When a class is created from a BC course, its curricular self-assessment is assembled from the bank for the competencies assessed that period. A custom class (no curriculum) gets the rating question only, from whatever I-can text the teacher typed. Teachers can edit a question for their class; the edit lives on the class's `question` row, the bank stays untouched.
 
 Size: generating and checking 223 courses is roughly ten sessions of batch work, not design work. Start with the courses you teach (Humanities 8, Socials 10, History 12, Philosophy 12) so the pilot has them, then fill the rest by subject.
-
-## UI integration, screen by screen
-
-The rule: no new top-level tab. Student voice appears where the teacher already looks for that student or that report.
-
-### Reports page
-
-- **Term Questionnaire tab** becomes two columns when a student has submitted: the teacher's rating on the left (unchanged), the student's self-rating on the right, same nine dimensions, same chips. Gaps of two or more levels get a thin amber underline. Hover shows the student's one-sentence evidence. The teacher's workflow doesn't change; they just see more.
-- A **"Student voice"** strip under the questionnaire: the student's latest goal check-in, their proudest-work pick, and interview notes if any, each with a date. One "Use in comment" toggle per item.
-- A **Questionnaires** button in the toolbar (next to the Report period select) opens a side panel: which instruments are open for this class and period, response counts, Print code sheet, Close, Import Forms CSV, Paper entry.
-- **Progress Reports tab:** three new report blocks in the existing block registry, toggled per class like the others:
-  - _Core competency reflection_ (the Ministry section): the period's theme, the student's answers, and the template's MyEd comment line; prints blank with the prompts if there is no response, exactly as today's blank blocks do.
-  - _In the student's words_: one or two chosen quotes with dates.
-  - _Then and now_: September answer beside the current answer for the three repeated questions.
-- **Class Summary tab:** one card, "How the class sees itself": self-rating distribution per dimension, common goals, what students said they're nervous about, anonymous and aggregate.
-
-### Student page
-
-- Each competency chip's panel (where the override lives, `teacher/student-overrides.js`) gains a "Student says" line: self-rating and sentence for that competency this period, with a link to the full response.
-- A **Learner profile** card at the top: About Me answers (name pronunciation, languages, how I learn, interests), the teacher-only private box marked as such, and a flag if the box has content the teacher hasn't read.
-- **Reflection history** replaces the single reflection field: a dated list, newest first, add-entry at the top.
-
-### Observations page
-
-- The quick-add bar gets a third chip beside Tags: **Interview**. Picking it switches the bar into interview mode for the selected student: three generated questions appear as prompts above the text box, the teacher answers each in a line, Save writes one observation per answer with `context_type = 'interview'` and the competency tag. The timeline shows interview entries with a distinct icon. The class rail shows a small dot on students interviewed this period, so the teacher can work down the list during a work block.
-- Generated questions come from: the biggest teacher–student gap, the competency with the least evidence this period, and the goal status. Teachers can replace any with their own; the last three used are remembered.
-
-### Class Management
-
-- A **Student questionnaires** section under Students: enable About Me / Core reflection / Curricular self-assessment / Goal check-in for this class. The core reflection is pre-picked from the class's grade level and the reporting period (Grade 10 + November → "Resilience and adapting to change"); a class whose grade level is a range gets a picker. The teacher can preview and edit the prompts, sets open and close dates, and chooses which Report N on the Reports page the form belongs to. Print or regenerate code sheets here. Lives beside the roster because it's roster-shaped work.
-
-### The student page (new, public, no login)
-
-- One static page at `/s/` (site root, not under `teacher/`), built the way the teacher mobile app is built: it loads `teacher/styles.css` (the tokens) and `teacher-mobile/styles.css`, and reuses the mobile components (`teacher-mobile/components.js`: cards, chips, segmented scale buttons, the sheet pattern) rather than new ones. Same type scale, same proficiency colours, same card radius and shadows, same dark mode. A student who has seen the teacher's phone screen in class recognizes it.
-- Layout follows the mobile shell: a slim header with the class name and a progress dots row, one question per card, the four-point scale as the same segmented buttons the teacher taps, text answers in the same textarea style, Next/Back in the mobile footer bar. No tab bar, no student rail, no settings.
-- Reuse is one-way: the student page imports from the mobile app; the mobile app never imports from `/s/`. Anything the student page needs that the mobile app lacks (sentence starters, read-aloud, the language switch) is added to `components.js` so both can use it.
-- The student enters the class code from the QR or link and their personal code from the code sheet. They see only their own form. Submit shows a confirmation and nothing else. No navigation, no other students, no grades.
-- Playwright runs it at the mobile preset, like `e2e/mobile.spec.js`.
-
-### Mobile teacher app
-
-- Interview mode only, in `tab-observe.js`: the same three prompts and a text box. The rest is desktop.
-
-## Data model
-
-Additive. Existing tables keep working; the teacher's term questionnaire migrates into the same shape later.
-
-```
-questionnaire_template
-                     id, kind, grade (8–12 or null), period (1 Nov | 2 Mar | 3 Jun | null),
-                     year, theme, myed_comment, questions jsonb   -- seeded from the Brainstorm file
-questionnaire        id, course_id, template_id (nullable), kind
-                     (about_me | core_reflection | curricular_self_assessment | goal_checkin | interview),
-                     title, theme, report_period (1–6, null for about_me), opens_at, closes_at,
-                     is_open, created_at
-question             id, questionnaire_id, display_order, prompt, prompt_translations jsonb,
-                     kind (scale4 | emoji | text | choice | pick_assessment),
-                     dimension (one of the nine, nullable), tag_id (nullable),
-                     repeated_key (for same-question-three-times), teacher_only boolean
-response             id, questionnaire_id, enrollment_id, via (link | forms_csv | paper | interview),
-                     submitted_at, created_by (teacher or null)
-answer               id, response_id, question_id, value_num, value_text, chosen_assessment_id
-student_access_code  enrollment_id, questionnaire_id, code (6 chars), expires_at, used_at
-reflection           add a `recorded_at` and drop the unique (enrollment, section); keep the
-                     latest-per-section view for current readers
-```
-
-Interview answers are stored as `observation` rows with `context_type = 'interview'` and an `observation_tag`, plus a `response` with `via = 'interview'` that groups them. That keeps interviews visible on the Observations timeline without a second feed.
-
-`term_rating` is unchanged. The two-column view joins it with the student's `response` for the same period.
-
-## RPCs and security
-
-Teacher side (authenticated, SECURITY INVOKER as now):
-
-- `upsert_questionnaire`, `set_questionnaire_open`, `issue_access_codes(questionnaire_id)` → code sheet rows, `list_responses(course_id, period)`, `enter_paper_response`, `import_forms_responses(questionnaire_id, rows jsonb)`, `save_interview(enrollment_id, period, answers jsonb)`.
-- `get_class_bundle` gains `questionnaires` and `responses` sections; bundle schema version bumps.
-
-Student side: the anon revoke stays total. Nothing in the database is callable by the anon key.
-
-- The student page talks to one **Supabase Edge Function**, `student-submit`, invoked in `ca-central-1` (regional invocation, so answers never leave Canada in transit), holding the service-role key server-side. Two routes: `open` (class code + personal code → the questions, the student's first name for confirmation, nothing else) and `submit` (answers). The page never sees a database key.
-- The function calls two SECURITY DEFINER functions in a new schema `student_submit`, granted to `service_role` only: `open_form` and `submit_form`. Keeping the logic in SQL keeps it testable in `begin … rollback` and keeps the function thin.
-- **Codes are hashed at rest.** `student_access_code` stores a SHA-256 of the code with a per-row salt; the plain code exists only on the printed sheet. A database leak doesn't leak the codes.
-- **Open returns a short-lived token** (signed, 30 minutes, bound to the code row) and `submit` requires it. A guessed code can't post answers without first opening the form, and the open is the rate-limited step.
-- **Rate limiting** in a `submit_attempt` table: per code, per class, per IP, with a lockout after a handful of failures. Optional Cloudflare Turnstile on the code screen if abuse ever shows up; not at launch.
-- **Single use and windowed.** A code is valid between `opens_at` and `closes_at` and is burned on submit. Reissue from the Questionnaires panel invalidates the old one.
-- **Append-only responses.** `response` and `answer` are inserted, never updated or deleted by the student path. A resubmission is a new response; the teacher sees the latest and can open the earlier one.
-- **Idempotent submit.** The token doubles as the idempotency key, so a double tap or a flaky connection can't create two responses.
-- **No personal data in logs.** The function logs code-row id, class id, outcome and timing; never answers or names.
-- **Least privilege all the way down.** anon has no grants; the edge function's service role is used only through the two functions; RLS on every new table through `fv_owns_course` and `fv_owns_enrollment` for the teacher side, exactly as today.
-- **Demo Mode** never calls the function; the student page detects the demo class code and runs locally.
-
-Why not an anon-callable RPC: it would reopen the hole closed on 2026-10-13, put a key in the student page, and leave rate limiting and token handling to SQL. The edge function costs one more deployable and buys a clean security story for the PIA.
-
-Demo Mode: questionnaires and responses live in the local cache like everything else; the student page shows a "Demo class" sample form that writes to nothing.
-
-## Report and AI pipeline
-
-Per class, in the Report config: `student_self_assessment`, `student_quotes`, `then_and_now` blocks, plus a `use_student_voice_in_draft` switch.
-
-When drafting a comment, the de-identified payload for a student adds:
-
-```
-self: Collaboration 4 ("I organized our group roles"), Questioning 2 ("I don't ask much")
-teacher: Collaboration 2, Questioning 3
-interview (Nov 12): "I usually let others talk first"
-goal (set Sept 20, checked Nov 1): finish work on time — partly met
-proudest: the ecosystem essay — "rewrote the ending three times"
-then/now: Sept "I'm shy in groups" → Nov "I volunteer to present"
-```
-
-No names, no student numbers, no free text that identifies anyone (the private About Me box never enters the payload). The draft is asked to mention at most one student quote and to stay inside MyEd's character limit.
-
-## Privacy
-
-- Responses are the student's personal information held by the teacher; same retention as the class (30-day purge after delete).
-- The private box is teacher-only, never printed, never sent to a model, flagged until read. A reminder line under it: if a student discloses harm, follow your school's process.
-- Students can't see other students, grades, or the teacher's ratings.
-- The student page sets no cookies and stores nothing locally.
-- The privacy page gains a section describing the student form in plain words.
-
-## Build order and size
-
-1. **Core reflection + code sheet + two-column questionnaire.** Convert the Brainstorm file into `shared/questionnaire-templates.json` (15 templates, plus the MyEd comment per template), new tables and RPCs, the student page, the Reports two-column view, the readable Ministry block. Large: four or five sessions. Ship before the next written Learning Update.
-   1b. **Curricular self-assessment** from the I-can statements, reusing everything from 1. Small.
-2. **Report blocks and draft switch.** Quotes, then-and-now, the de-identified payload. Medium.
-3. **About Me + learner profile card + private box.** Medium.
-4. **Interview mode** on Observations and mobile, with generated questions. Medium.
-5. **Goal check-in and reflection history.** Small.
-6. **Forms CSV import and paper entry.** Small each, when a pilot teacher asks.
-7. **Class Summary card and student-led-conference sheet.** Small.
-8. **Course question bank, later.** A longer-term goal, not part of the first release: `scripts/build_question_bank.py` and `shared/curriculum-questions.json`, generated subject by subject with a teacher-reading check. Until it exists, the curricular self-assessment uses the I-can ratings only, which already cover every course. Start with your four courses when you want it; the rest can follow over time.
-
-Do nothing until the checkout is synced with main. Each phase is its own branch and PR, migrations tried on a Supabase branch first, screenshots from the deploy preview in Demo Mode.
-
-## Decisions (approved 2026-10-17)
-
-1. **Two forms, not one.** The core reflection is the grade-by-period template from your Brainstorm file: three written prompts on the theme plus the nine-dimension rating. The curricular self-assessment is a separate optional form built from the course's I-can statements for competencies assessed that period. Neither form should take a student more than ten minutes.
-2. **Codes: one per student per questionnaire.** Single use, expires with the close date. Reissue from the Questionnaires panel.
-3. **Previous answers:** shown for the three repeated questions only, read-only, above the new answer box. Everything else starts blank.
-4. **The three repeated questions:** "What am I good at as a learner?" · "What is hard for me right now?" · "What do I want to get better at, and how?" Asked in About Me (September), the January self-assessment and the June self-assessment.
-5. **Language: English first.** The question table carries `prompt_translations` from day one so adding Punjabi, Mandarin and Arabic is data, not code. Add them after a pilot teacher asks.
-6. **Interview answers are observations** with `context_type = 'interview'`, grouped by a `response` row. One timeline.
-7. **The teacher's term questionnaire stays as is** through phases 1–4. Migrate it into the shared tables in phase 5, when the two shapes have settled.
