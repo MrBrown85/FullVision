@@ -586,6 +586,64 @@ create table guardian (
   updated_at      timestamptz not null default now()
 );
 
+-- Student questionnaires (20261025_questionnaires_tables_and_functions / _templates).
+create table questionnaire_template (                                 -- read-only; 18 seeded forms
+  id text primary key,                                                -- core-<grade>-<period> | about-me | goal-checkin | report-reply
+  kind text not null, grade integer, period integer, year integer not null default 2026,
+  title text not null, theme text, core_heading text, myed_comment text,
+  questions jsonb not null default '[]',                              -- [{prompt, kind, options, core_ids, repeated_key, teacher_only}]
+  updated_at timestamptz not null default now()
+);
+
+create table questionnaire (                                          -- RLS fv_owns_course
+  id uuid primary key default gen_random_uuid(),
+  course_id uuid not null references course(id) on delete cascade,
+  template_id text references questionnaire_template(id) on delete set null,
+  kind text not null,                                                 -- about_me | core_reflection | goal_checkin | curricular_self_assessment | report_reply
+  title text not null, theme text, report_period integer,
+  parent_id uuid references questionnaire(id) on delete set null,     -- a Goal Check-In rides on its reflection's slip
+  opens_on date, closes_on date, is_on boolean not null default true, myed_comment text,
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+);
+
+create table question (                                               -- RLS through questionnaire
+  id uuid primary key default gen_random_uuid(),
+  questionnaire_id uuid not null references questionnaire(id) on delete cascade,
+  display_order integer not null default 0, prompt text not null,
+  prompt_translations jsonb not null default '{}',
+  kind text not null,                                                 -- text | short_set | scale4 | choice | goal_status | core_pick
+  options jsonb not null default '{}', core_ids text[] not null default '{}',
+  repeated_key text, teacher_only boolean not null default false,
+  archived boolean not null default false,                            -- removed after students answered it
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+);
+
+create table response (                                               -- RLS fv_owns_enrollment
+  id uuid primary key default gen_random_uuid(),
+  questionnaire_id uuid not null references questionnaire(id) on delete cascade,
+  enrollment_id uuid not null references enrollment(id) on delete cascade,
+  via text not null default 'link',                                   -- link | paper | forms_csv
+  submitted_at timestamptz not null default now(), created_by uuid
+);
+
+create table answer (                                                 -- RLS through response
+  id uuid primary key default gen_random_uuid(),
+  response_id uuid not null references response(id) on delete cascade,
+  question_id uuid not null references question(id) on delete cascade,
+  value_num numeric, value_text text, value_json jsonb,
+  unique (response_id, question_id)
+);
+
+create table student_access_code (                                    -- RLS fv_owns_enrollment; no plain codes
+  id uuid primary key default gen_random_uuid(),
+  enrollment_id uuid not null references enrollment(id) on delete cascade,
+  questionnaire_id uuid references questionnaire(id) on delete cascade,
+  report_issue_id uuid,
+  code_hash text not null unique, salt text not null,                 -- sha256(salt || ':' || CODE)
+  expires_at timestamptz not null, opened_at timestamptz, used_at timestamptz, revoked_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
 -- ─── Extensions + cron ──────────────────────────────────────────────────────
 -- pg_cron enabled (migration fullvision_v2_enable_pg_cron).
 -- Job `fv_retention_cleanup_daily` runs at 03:17 UTC calling fv_retention_cleanup().
@@ -732,6 +790,18 @@ create table guardian (
 --                   p_language text, p_consent_at timestamptz, p_consent_source text, p_id uuid, p_idempotency_key uuid)
 --   delete_guardian(p_id uuid, p_idempotency_key uuid)
 --   list_course_guardians(p_course_id uuid)
+--
+-- Student questionnaires:
+--   list_questionnaire_templates()
+--   upsert_questionnaire(p_course_id uuid, p_kind text, p_title text, p_template_id text, p_theme text,
+--                        p_report_period integer, p_parent_id uuid, p_opens_on date, p_closes_on date,
+--                        p_is_on boolean, p_myed_comment text, p_questions jsonb, p_id uuid, p_idempotency_key uuid)
+--   set_questionnaire_on(p_id uuid, p_is_on boolean, p_idempotency_key uuid)
+--   delete_questionnaire(p_id uuid, p_idempotency_key uuid)    -- refused once anyone has answered
+--   issue_access_codes(p_questionnaire_id uuid, p_enrollment_ids uuid[], p_idempotency_key uuid)
+--                                                             -- [{enrollment_id, code}]; replay returns no codes
+--   list_course_questionnaires(p_course_id uuid)
+--   list_course_responses(p_course_id uuid)     -- {questionnaire_id: {enrollment_id: [{id, submitted_at, via, answers}]}}
 --
 -- Imports:
 --   import_teams_class(p_payload jsonb)

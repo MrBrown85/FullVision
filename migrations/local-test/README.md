@@ -25,3 +25,17 @@ Result on 2026-10-20 (Postgres 17.10, local): 46 of 46 checks pass. The run
 found one defect, fixed before the apply: `jsonb_typeof(form->'front') =
 'array'` is NULL when `front` is missing, and a NULL check passes, so a form
 with no `front` array was accepted. The check now wraps it in `coalesce`.
+
+## Student questionnaires (2026-10-25)
+
+`questionnaires.py` exercises `20261025_questionnaires_tables_and_functions.sql`
+and `_templates.sql` the same way:
+
+```bash
+PGPORT=54331 python3 run.py harness.sql ../20261025_questionnaires_tables_and_functions.sql ../20261025_questionnaires_templates.sql
+PGPORT=54331 python3 questionnaires.py
+```
+
+Roles are shared by every database in a Postgres instance, so in a second
+fresh database load `harness.sql` without its three `create role` lines.
+Result on 2026-10-25 (Postgres 17.10, local): 42 of 42 checks pass.

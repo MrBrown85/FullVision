@@ -10385,6 +10385,80 @@ window.v2.listCourseGuardians = function (courseId) {
   return _rpcOrNoop('list_course_guardians', { p_course_id: courseId }).then(_listResult);
 };
 
+/* ── Student questionnaires ─────────────────────────────────────────────
+   migrations/20261025_questionnaires_tables_and_functions.sql;
+   docs/STUDENT-VOICE-PLAN.md. Reads return { data, error } with data null
+   when nothing was read (Demo Mode, signed out, an error). */
+window.v2.listQuestionnaireTemplates = function () {
+  return _rpcOrNoop('list_questionnaire_templates', {}).then(_listResult);
+};
+window.v2.listCourseQuestionnaires = function (courseId) {
+  if (!_isUuid(courseId)) return Promise.resolve({ data: null, error: null });
+  return _rpcOrNoop('list_course_questionnaires', { p_course_id: courseId }).then(_listResult);
+};
+/* { questionnaire_id: { enrollment_id: [{ id, submitted_at, via, answers }] } } */
+window.v2.listCourseResponses = function (courseId) {
+  if (!_isUuid(courseId)) return Promise.resolve({ data: null, error: null });
+  return _rpcOrNoop('list_course_responses', { p_course_id: courseId }).then(function (res) {
+    var error = (res && res.error) || null;
+    return { data: res && res.data && !error ? res.data : null, error: error };
+  });
+};
+/* A questionnaire: { id?, courseId, kind, title, templateId, theme,
+   reportPeriod, parentId, opensOn, closesOn, isOn, myedComment, questions }.
+   questions is the whole list in order, or null to keep them (or, for a new
+   one from a template, to copy the template's). */
+window.v2.upsertQuestionnaire = function (params, options) {
+  params = params || {};
+  return _rpcOrNoop(
+    'upsert_questionnaire',
+    {
+      p_course_id: params.courseId,
+      p_kind: params.kind,
+      p_title: String(params.title == null ? '' : params.title).trim(),
+      p_template_id: params.templateId || null,
+      p_theme: params.theme || null,
+      p_report_period: params.reportPeriod == null ? null : Number(params.reportPeriod),
+      p_parent_id: _isUuid(params.parentId) ? params.parentId : null,
+      p_opens_on: params.opensOn || null,
+      p_closes_on: params.closesOn || null,
+      p_is_on: params.isOn !== false,
+      p_myed_comment: params.myedComment || null,
+      p_questions: Array.isArray(params.questions) ? params.questions : null,
+      p_id: _isUuid(params.id) ? params.id : null,
+    },
+    options,
+  );
+};
+window.v2.setQuestionnaireOn = function (id, isOn) {
+  if (!_isUuid(id)) return Promise.resolve({ data: null, error: null });
+  return _rpcOrNoop('set_questionnaire_on', { p_id: id, p_is_on: !!isOn });
+};
+window.v2.deleteQuestionnaire = function (id) {
+  if (!_isUuid(id)) return Promise.resolve({ data: null, error: null });
+  return _rpcOrNoop('delete_questionnaire', { p_id: id });
+};
+/* New slip codes: [{ enrollment_id, code }], every enrolled student when
+   enrollmentIds is empty. Online only and never through the outbox: the
+   plain codes come back once and a replay returns none, so a failed call is
+   simply issued again. */
+window.v2.issueAccessCodes = function (questionnaireId, enrollmentIds) {
+  if (!_isUuid(questionnaireId)) return Promise.resolve({ data: null, error: null });
+  var sb = getSupabase();
+  if (!sb || _isDemoSession()) return Promise.resolve({ data: null, error: null });
+  var ids = (enrollmentIds || []).filter(_isUuid);
+  var rpcParams = { p_questionnaire_id: questionnaireId, p_enrollment_ids: ids.length ? ids : null };
+  _stampIdempotencyKey('issue_access_codes', rpcParams);
+  return _trackWriteSync(
+    'issue_access_codes',
+    _callRpcWithAuthGuard('issue_access_codes', rpcParams).then(function (res) {
+      if (res.error && !res.error.handledSessionExpired) console.warn('issue_access_codes failed:', res.error);
+      var rows = res && Array.isArray(res.data) ? res.data : null;
+      return { data: rows, error: res.error || null };
+    }),
+  );
+};
+
 /* Teacher preferences — jsonb patch; omitted keys unchanged. */
 window.v2.saveTeacherPreferences = function (patch) {
   return _rpcOrNoop('save_teacher_preferences', { p_patch: patch || {} });
