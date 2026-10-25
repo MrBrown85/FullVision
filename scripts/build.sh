@@ -14,6 +14,9 @@ cp roster-template.csv _headers dist/
 # App directories
 cp -r teacher teacher-mobile shared vendor dist/
 
+# The student phone page (fullvision.ca/s/#CODE)
+cp -r s dist/
+
 # Future portals (copy if they exist)
 [ -d student ] && cp -r student dist/ || true
 [ -d parent ] && cp -r parent dist/ || true
