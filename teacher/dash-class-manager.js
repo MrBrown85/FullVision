@@ -1360,19 +1360,11 @@ window.DashClassManager = (function () {
   function cmApplyBulk() {
     if (!cmSelectedCourse || cmBulkSelected.size === 0) return;
     var pronouns = (document.getElementById('cm-bulk-pro')?.value || '').trim();
-    var attDate = (document.getElementById('cm-bulk-att-date')?.value || '').trim();
-    var attStatus = (document.getElementById('cm-bulk-att-status')?.value || '').trim();
     var students = getStudents(cmSelectedCourse);
+    // Attendance is taken in MyEd; its totals go in the Term Questionnaire.
     students.forEach(function (st) {
       if (!cmBulkSelected.has(st.id)) return;
       if (pronouns) st.pronouns = pronouns;
-      if (attDate && attStatus) {
-        if (!st.attendance) st.attendance = [];
-        st.attendance.push({ date: attDate, status: attStatus, note: '' });
-        st.attendance.sort(function (a, b) {
-          return b.date.localeCompare(a.date);
-        });
-      }
     });
     saveStudents(cmSelectedCourse, students);
     cmBulkMode = false;
@@ -2151,20 +2143,6 @@ window.DashClassManager = (function () {
         '<div class="cm-field">' +
         '<label class="cm-label">Set Pronouns</label>' +
         pronounsSelect('cm-bulk-pro', '') +
-        '</div>' +
-        '<div class="cm-field">' +
-        '<label class="cm-label">Add Attendance</label>' +
-        '<div style="display:flex;gap:6px">' +
-        '<input type="date" class="cm-input" id="cm-bulk-att-date" value="' +
-        getTodayStr() +
-        '" style="font-size:0.8125rem;flex:1">' +
-        '<select class="cm-input" id="cm-bulk-att-status" style="font-size:0.8125rem;flex:1">' +
-        '<option value="present">Present</option>' +
-        '<option value="absent">Absent</option>' +
-        '<option value="late">Late</option>' +
-        '<option value="excused">Excused</option>' +
-        '</select>' +
-        '</div>' +
         '</div>' +
         '</div>' +
         '<div style="display:flex;gap:8px;margin-top:8px">' +

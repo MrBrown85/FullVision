@@ -190,6 +190,16 @@ window.ReportSheets = (function () {
     'term-glance': { label: 'This Term at a Glance', rows: 5, group: 'Grades' },
     growth: { label: 'Growth Since Last Report', rows: 10, table: true, group: 'Grades' },
     'missing-work': { label: 'Missing Work', rows: 6, table: true, group: 'Grades' },
+    // Totals to date from the Term Questionnaire (classes absent, times late).
+    // Not 'attendance': an older block by that name was retired, and forms
+    // saved with it drop it.
+    'term-attendance': {
+      label: 'Attendance',
+      rows: 5,
+      table: true,
+      group: 'Grades',
+      options: [{ key: 'thisTerm', label: 'This Term Column', def: true }],
+    },
     'section-outcomes': { label: 'Learning Outcomes', rows: 20, group: 'Grades', retired: true },
     'score-distribution': { label: 'Score Distribution', rows: 14, group: 'Grades', retired: true },
     'section-chart': { label: 'Section Chart', rows: 20, group: 'Grades', retired: true },

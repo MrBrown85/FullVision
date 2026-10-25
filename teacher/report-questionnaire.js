@@ -135,6 +135,139 @@ window.ReportQuestionnaire = (function () {
     rerender();
   }
 
+  function _plainText(html) {
+    const d = document.createElement('div');
+    d.innerHTML = html || '';
+    return d.textContent;
+  }
+
+  /* The report a term id names, as the report picker shows it. */
+  function _reportLabel(termId) {
+    const sel = document.getElementById('report-period');
+    const n = String(termId || '').match(/(\d+)$/);
+    const opt = sel && n ? Array.prototype.find.call(sel.options, o => o.value === 'Report ' + n[1]) : null;
+    return opt ? opt.text : n ? 'Report ' + n[1] : '';
+  }
+
+  function _plural(n, one, many) {
+    return n + ' ' + (n === 1 ? one : many);
+  }
+
+  /* Under the attendance boxes: the change since the last report with
+     totals, or a warning when a total is lower than that report's. */
+  function _attendanceNoteHtml(att) {
+    const lower = ['absences', 'lates'].find(f => {
+      const prev = att['prev' + f[0].toUpperCase() + f.slice(1)];
+      return att[f] != null && prev != null && att[f] < prev;
+    });
+    if (lower) {
+      const prev = att[lower === 'absences' ? 'prevAbsences' : 'prevLates'];
+      const what = lower === 'absences' ? _plural(prev, 'absence', 'absences') : _plural(prev, 'late', 'lates');
+      return `<span class="tq-att-warn">Lower than the ${what} entered for the ${esc(
+        _reportLabel(att[lower + 'PrevTerm']),
+      )} report. Enter the total to date from MyEd.</span>`;
+    }
+    const prevTerm = att.absencesPrevTerm || att.latesPrevTerm;
+    const entered = att.absences != null || att.lates != null;
+    if (!prevTerm) {
+      return entered ? 'No earlier report has attendance, so these are this term’s totals too.' : '';
+    }
+    const was = [
+      att.prevAbsences != null ? att.prevAbsences + ' absent' : '',
+      att.prevLates != null ? att.prevLates + ' late' : '',
+    ]
+      .filter(Boolean)
+      .join(', ');
+    if (!entered) return `The ${esc(_reportLabel(prevTerm))} report had ${was}.`;
+    const since = [
+      att.absencesThisTerm != null ? att.absencesThisTerm + ' absent' : '',
+      att.latesThisTerm != null ? att.latesThisTerm + ' late' : '',
+    ]
+      .filter(Boolean)
+      .join(', ');
+    return `Since the ${esc(_reportLabel(prevTerm))} report (${was}): <strong>${since}</strong>`;
+  }
+
+  /* The comment's attendance sentence for a student's current totals. */
+  function _attendanceSentenceFor(sid) {
+    const student = getStudents(_activeCourse).find(s => s.id === sid);
+    return student ? ReportBlocks.attendanceSentence(student, getTermAttendance(_activeCourse, sid, getTermId())) : '';
+  }
+
+  /* Takes a sentence out of the comment's text, with the space before it. */
+  function _removeSentence(editor, sentence) {
+    if (!sentence) return false;
+    const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode())) {
+      const at = node.data.indexOf(sentence);
+      if (at < 0) continue;
+      const start = at > 0 && node.data[at - 1] === ' ' ? at - 1 : at;
+      node.data = node.data.slice(0, start) + node.data.slice(at + sentence.length);
+      return true;
+    }
+    return false;
+  }
+
+  function _appendSentence(editor, sentence) {
+    const last = editor.lastElementChild;
+    const into = last && /^(P|DIV)$/.test(last.tagName) ? last : editor;
+    const text = into.textContent.replace(/\s+$/, '');
+    into.appendChild(document.createTextNode((text ? ' ' : '') + sentence));
+  }
+
+  /* The Mention in Comment row shows whether the comment has the sentence. */
+  function _syncAttendanceMention(sid) {
+    const row = document.getElementById('tq-att-mention');
+    const editor = document.getElementById('tq-narrative');
+    if (!row || !editor) return;
+    const sentence = _attendanceSentenceFor(sid);
+    const on = !!sentence && editor.textContent.indexOf(sentence) >= 0;
+    row.classList.toggle('selected', on);
+    row.setAttribute('aria-pressed', String(on));
+    row.disabled = !sentence;
+    const check = row.querySelector('.tq-tag-check');
+    if (check) check.textContent = on ? '\u2713' : '';
+  }
+
+  /* Mention in Comment: the year's attendance as one sentence at the end
+     of the comment, edited like any other text; a second click takes it out.
+     Nothing goes in unless the teacher picks it. */
+  function tqToggleAttendanceMention(sid) {
+    const editor = document.getElementById('tq-narrative');
+    const sentence = _attendanceSentenceFor(sid);
+    if (!editor || !sentence) return;
+    if (!_removeSentence(editor, sentence)) _appendSentence(editor, sentence);
+    tqNarrativeDirty = true;
+    tqSaveNarrative();
+    _syncAttendanceMention(sid);
+  }
+
+  /* A box changed: save both totals and redraw only the note, so the
+     cursor stays where the teacher put it. */
+  function tqSetAttendance(sid) {
+    const abs = document.getElementById('tq-att-absences');
+    const late = document.getElementById('tq-att-lates');
+    if (!abs || !late) return;
+    const termId = getTermId();
+    const before = _attendanceSentenceFor(sid);
+    saveTermAttendance(_activeCourse, sid, termId, abs.value, late.value);
+    const att = getTermAttendance(_activeCourse, sid, termId);
+    // A comment that mentions the old totals gets the new ones.
+    const editor = document.getElementById('tq-narrative');
+    const after = _attendanceSentenceFor(sid);
+    if (editor && before && before !== after && _removeSentence(editor, before)) {
+      if (after) _appendSentence(editor, after);
+      tqNarrativeDirty = true;
+      tqSaveNarrative();
+    }
+    _syncAttendanceMention(sid);
+    const note = document.getElementById('tq-att-note');
+    if (note) note.innerHTML = _attendanceNoteHtml(att);
+    abs.classList.toggle('warn', att.absences != null && att.prevAbsences != null && att.absences < att.prevAbsences);
+    late.classList.toggle('warn', att.lates != null && att.prevLates != null && att.lates < att.prevLates);
+  }
+
   function tqToggleTrait(sid, traitId) {
     tqSaveNarrative();
     const termId = getTermId();
@@ -1181,6 +1314,11 @@ window.ReportQuestionnaire = (function () {
 
     // ═══ ASSEMBLE ═══
     // Use <p> tags for contenteditable editor; fallback plain-text also works
+    // A comment that mentioned attendance keeps it, at the end.
+    const attSentence = ReportBlocks.attendanceSentence(student, getTermAttendance(cid, sid, termId));
+    const editorNow = document.getElementById('tq-narrative');
+    const said = editorNow ? editorNow.textContent : _plainText(rating.narrative || '');
+    if (attSentence && said.indexOf(attSentence) >= 0 && paras.length) paras[paras.length - 1] += ' ' + attSentence;
     const html = paras.map(p => `<p>${_tidyNarrative(p)}</p>`).join('');
     upsertTermRating(cid, sid, termId, { narrative: html });
     rerender();
@@ -1369,6 +1507,30 @@ window.ReportQuestionnaire = (function () {
       });
       html += `</div></div>`;
     });
+
+    // Attendance: the totals so far this year, as MyEd shows them.
+    const att = getTermAttendance(cid, sid, termId);
+    const attSentence = ReportBlocks.attendanceSentence(student, att);
+    const attMentioned = !!attSentence && _plainText(narrative).indexOf(attSentence) >= 0;
+    html += `<div class="tq-rate-row tq-att-row">
+      <div class="tq-att-head"><span class="tq-rate-label">Attendance</span><span class="tq-att-source">Totals to date, from MyEd</span></div>
+      <div class="tq-att-fields">
+        <label class="tq-att-field"><span>Classes Absent</span>
+          <input type="number" min="0" step="1" inputmode="numeric" class="tq-att-input${
+            att.absences != null && att.prevAbsences != null && att.absences < att.prevAbsences ? ' warn' : ''
+          }" id="tq-att-absences" data-tq-att="absences" data-sid="${sid}" value="${att.absences == null ? '' : att.absences}" placeholder="—"></label>
+        <label class="tq-att-field"><span>Times Late</span>
+          <input type="number" min="0" step="1" inputmode="numeric" class="tq-att-input${
+            att.lates != null && att.prevLates != null && att.lates < att.prevLates ? ' warn' : ''
+          }" id="tq-att-lates" data-tq-att="lates" data-sid="${sid}" value="${att.lates == null ? '' : att.lates}" placeholder="—"></label>
+      </div>
+      <div class="tq-att-note" id="tq-att-note" aria-live="polite">${_attendanceNoteHtml(att)}</div>
+      <button type="button" class="tq-assignment-row tq-att-mention${attMentioned ? ' selected' : ''}" id="tq-att-mention"
+        data-action="tqToggleAttendanceMention" data-sid="${sid}" aria-pressed="${attMentioned}"${attSentence ? '' : ' disabled'}>
+        <span class="tq-tag-check">${attMentioned ? '\u2713' : ''}</span>
+        <span class="tq-assignment-title">Mention in Comment</span>
+      </button>
+    </div>`;
 
     // Trait chips
     const SOCIAL_TRAITS = [
@@ -1615,6 +1777,8 @@ window.ReportQuestionnaire = (function () {
     tqCopyNarrative: tqCopyNarrative,
     tqSetDim: tqSetDim,
     tqSetField: tqSetField,
+    tqSetAttendance: tqSetAttendance,
+    tqToggleAttendanceMention: tqToggleAttendanceMention,
     tqToggleTrait: tqToggleTrait,
     tqToggleAssignment: tqToggleAssignment,
     tqToggleOb: tqToggleOb,
