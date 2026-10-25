@@ -24,6 +24,12 @@ Supersedes D2. Teachers asked for the multiplier back on points work (an assignm
 - **Toward competencies and level averages, it counts that many times:** competency proficiency, category averages and group grades.
 - A gradebook column and its Class Average still show the assessment's own points (5/6), not the multiplied ones.
 
+## New class defaults (2026-10-25)
+
+- **Grades 8–9:** Proficiency, Rubric Levels Emerging First, Mean.
+- **Grades 10–12:** Letter, Mean. Rubric Levels stay Extending First.
+- **Mean is the default calculation method** for every new class and new teacher. A class with no method set reads as Mean.
+
 ## Product shape (2026-10-17)
 
 - **Teacher-only.** No student or parent logins. Printed reports are the family surface. A no-login student form for self-reflection is planned (see `STUDENT-VOICE-PLAN.md`), not a portal.
