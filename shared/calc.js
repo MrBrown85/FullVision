@@ -618,6 +618,145 @@ function getAssessmentGroupPercentage(cid, studentId, assessments) {
   return count > 0 && possible > 0 ? { pct: (earned / possible) * 100, count: count } : null;
 }
 
+/* A student's grade on any group of assessments (a category, a module, an
+   assignment type, a rubric's assessments), as the class shows grades.
+   prof: the mean of the scored assessments' overall levels, as a category's
+   average is worked out (getCategoryAverage). pct: points earned out of
+   points possible (getAssessmentGroupPercentage). A Proficiency class shows
+   the level, a Letter class the letter and %, a Both class both.
+   Returns { text, level, prof, pct, count } or null when nothing is scored. */
+function assessmentGroupGrade(cid, studentId, assessments) {
+  var levels = (assessments || [])
+    .map(function (a) {
+      return getAssessmentOverallScore(cid, studentId, a.id);
+    })
+    .filter(function (v) {
+      return v != null;
+    });
+  var prof = levels.length
+    ? levels.reduce(function (s, v) {
+        return s + v;
+      }, 0) / levels.length
+    : null;
+  var group = getAssessmentGroupPercentage(cid, studentId, assessments);
+  return _groupGrade(cid, prof, group ? group.pct : null, Math.max(levels.length, group ? group.count : 0));
+}
+
+/* The class average on a group of assessments: each student's group grade,
+   averaged, as assessmentGroupGrade shows it. */
+function classAssessmentGroupGrade(cid, studentIds, assessments) {
+  var profs = [];
+  var pcts = [];
+  (studentIds || []).forEach(function (sid) {
+    var g = assessmentGroupGrade(cid, sid, assessments);
+    if (!g) return;
+    if (g.prof != null) profs.push(g.prof);
+    if (g.pct != null) pcts.push(g.pct);
+  });
+  var mean = function (list) {
+    return list.length
+      ? list.reduce(function (s, v) {
+          return s + v;
+        }, 0) / list.length
+      : null;
+  };
+  return _groupGrade(cid, mean(profs), mean(pcts), Math.max(profs.length, pcts.length));
+}
+
+function _groupGrade(cid, prof, pct, count) {
+  if (prof == null && pct == null) return null;
+  var mode = courseGradeMode(cid);
+  var shownPct = pct == null ? null : _roundPercent(pct, getRoundWholePercent(cid) ? 0 : 1);
+  var profText = prof == null ? null : Number(prof).toFixed(1);
+  var pctText = shownPct == null ? null : percentageToLetter(shownPct) + ' ' + shownPct + '%';
+  var text = mode === 'letter' ? pctText : mode === 'both' ? [profText, pctText].filter(Boolean).join(' · ') : profText;
+  var level = mode === 'letter' ? (shownPct == null ? 0 : _percentLevel(shownPct)) : prof > 0 ? Math.round(prof) : 0;
+  if (!text) return null;
+  return { text: text, level: level, prof: prof, pct: pct, count: count };
+}
+
+/* How a student's group grade sits against the class's, in the grade the
+   class shows first: "4.2% below class", "0.3 above class". */
+function groupGradeGap(cid, mine, cls) {
+  if (!mine || !cls) return null;
+  var asPct = courseGradeMode(cid) === 'letter';
+  var a = asPct ? mine.pct : mine.prof;
+  var b = asPct ? cls.pct : cls.prof;
+  if (a == null || b == null) return null;
+  var d = Math.round((a - b) * 10) / 10;
+  if (d === 0) return { text: 'Same as class', dir: 0 };
+  var amount = Math.abs(d).toFixed(1) + (asPct ? '%' : '');
+  return { text: amount + (d > 0 ? ' above class' : ' below class'), dir: d > 0 ? 1 : -1 };
+}
+
+/* Each category's share of the course %: its weight times its % over the
+   weights of the categories with a %, as getCourseLetterData adds them up.
+   { [categoryId]: { points, text } } ("30.0"), {} when no category has a %. */
+function categoryCourseShares(cid, studentId) {
+  var assessments = _scopedAssessments(cid);
+  var rows = [];
+  var weightSum = 0;
+  (getCategories(cid) || []).forEach(function (category) {
+    var pct = getAssessmentGroupPercentage(
+      cid,
+      studentId,
+      assessments.filter(function (a) {
+        return (a.categoryId || a.category_id || null) === category.id;
+      }),
+    );
+    if (pct == null) return;
+    var weight = Number(category.weight || 0);
+    weightSum += weight;
+    rows.push({ id: category.id, value: weight * pct.pct });
+  });
+  var out = {};
+  if (!(weightSum > 0)) return out;
+  rows.forEach(function (r) {
+    var points = _roundPercent(r.value / weightSum, 1);
+    out[r.id] = { points: points, text: points.toFixed(1) };
+  });
+  return out;
+}
+
+/* One rubric criterion's level for a student on one assessment, on the
+   0–4 scale (its points as a share of its top value), or null when the
+   criterion has no score or the work is excused or not submitted. */
+function rubricCriterionLevel(cid, studentId, assessment, criterion) {
+  if (!assessment || !criterion) return null;
+  var status = getAssignmentStatus(cid, studentId, assessment.id);
+  if (status === 'EXC' || status === 'NS') return null;
+  var keys = rubricCriterionScoreKeys(criterion);
+  var values = (getScores(cid)[studentId] || [])
+    .filter(function (e) {
+      return e.assessmentId === assessment.id && keys.indexOf(e.tagId) >= 0;
+    })
+    .map(function (e) {
+      return _rubricLevelValue(criterion, e.score, e.mod);
+    })
+    .filter(function (v) {
+      return v != null;
+    });
+  if (!values.length) return null;
+  var max = _rubricCriterionMax(criterion);
+  if (!(max > 0)) return null;
+  var avg =
+    values.reduce(function (s, v) {
+      return s + v;
+    }, 0) / values.length;
+  return Math.max(0, Math.min(4, (avg / max) * 4));
+}
+
+/* A 0–4 value as the nearest level a teacher can enter: 3.33 is "3+",
+   2.67 is "3−". { level, text }; level is the whole level its colour
+   comes from. */
+function nearestScoreLevel(value) {
+  if (!(value > 0)) return { level: 0, text: '' };
+  var steps = Math.round(value / SCORE_MOD_STEP);
+  var level = Math.max(1, Math.min(4, Math.round(steps * SCORE_MOD_STEP)));
+  var mod = Math.round((steps * SCORE_MOD_STEP - level) / SCORE_MOD_STEP);
+  return { level: level, text: formatScoreLevel(level, mod) };
+}
+
 /* Whether a class shows its course % as a whole number (86%) rather than
    to one decimal (85.9%). A class setting, like Schoology's; unset, it is on
    for grades 10–12, whose BC report cards show a whole %. */
@@ -1734,6 +1873,12 @@ window.Calc = {
   competencyDistribution,
   classColumnAverageText,
   getAssessmentGroupPercentage,
+  assessmentGroupGrade,
+  classAssessmentGroupGrade,
+  groupGradeGap,
+  categoryCourseShares,
+  rubricCriterionLevel,
+  nearestScoreLevel,
   calcProficiency,
   getTagScores,
   getTagProficiency,
