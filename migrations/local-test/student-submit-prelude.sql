@@ -4,6 +4,7 @@
 alter table public.student add column if not exists preferred_name text;
 alter table public.course add column if not exists timezone text not null default 'America/Vancouver';
 alter table public.course add column if not exists reporting_terms jsonb;
+alter table public.course add column if not exists block text;
 create table if not exists public.core_self_assessment (
   id            uuid        not null primary key default gen_random_uuid(),
   enrollment_id uuid        not null references enrollment(id) on delete cascade,

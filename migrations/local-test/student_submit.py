@@ -7,7 +7,7 @@ transaction, rolled back at the end.
 
 PGPORT=54331 PGDATABASE=fv_ss python3 run.py harness.sql student-submit-prelude.sql \\
   ../20261025_questionnaires_tables_and_functions.sql ../20261025_questionnaires_templates.sql \\
-  ../20261025_student_submit.sql
+  ../20261025_student_submit.sql ../20261025_student_submit_phone.sql
 PGPORT=54331 PGDATABASE=fv_ss python3 student_submit.py
 """
 import os, sys, json, uuid
@@ -96,7 +96,7 @@ ok('a good code opens, in any case and with any separator', r.get('ok') is True,
 tok1 = r['token']
 ok('the token is 64 hex characters', len(tok1) == 64 and all(ch in '0123456789abcdef' for ch in tok1), tok1)
 ok('the preferred name is the first name shown', r['student'] == {'first_name': 'CeCe'}, r['student'])
-ok('the class name', r['course'] == {'name': 'Science 8'}, r['course'])
+ok('the class name and block', r['course'] == {'name': 'Science 8', 'block': None}, r['course'])
 ok('two parts: the reflection and its Goal Check-In',
    [p['id'] for p in r['parts']] == [qid, gc['id']], [p['id'] for p in r['parts']])
 ok('no teacher fields reach the phone',
@@ -195,10 +195,17 @@ c.run('update questionnaire set is_on = false where id = :q', q=qid)
 r = open_(new1)
 ok('turned off: closed', r.get('error') == 'closed', r)
 back(); sp(); as_owner()
-c.run("update course set timezone = 'Pacific/Kiritimati' where id = :c", c=COURSE_A)
-c.run("update questionnaire set closes_on = (now() at time zone 'America/Vancouver')::date where id = :q", q=qid)
+# A zone whose date differs from Vancouver's right now: Kiritimati (UTC+14)
+# is a day ahead from 3 a.m. Vancouver time, Etc/GMT+12 a day behind before 5 a.m.
+ahead = one("select (now() at time zone 'Pacific/Kiritimati')::date > (now() at time zone 'America/Vancouver')::date")
+if ahead:
+    c.run("update course set timezone = 'Pacific/Kiritimati' where id = :c", c=COURSE_A)
+    c.run("update questionnaire set closes_on = (now() at time zone 'America/Vancouver')::date where id = :q", q=qid)
+else:
+    c.run("update course set timezone = 'Etc/GMT+12' where id = :c", c=COURSE_A)
+    c.run("update questionnaire set opens_on = (now() at time zone 'America/Vancouver')::date where id = :q", q=qid)
 r = open_(new1)
-ok("the class's time zone decides the day", r.get('error') == 'closed', r)
+ok("the class's time zone decides the day", r.get('error') == ('closed' if ahead else 'not_open_yet'), r)
 back(); sp(); as_owner()
 c.run('update enrollment set withdrawn_at = now() where id = :e', e=ENR1)
 r = open_(new1)
@@ -240,6 +247,43 @@ as_owner()
 c.run("insert into student_submit.attempt (route, outcome, course_id) select 'submit', 'ok', :c from generate_series(1, 120)", c=COURSE_A)
 r = submit(r['token'], {helps: 'busy?'})
 ok('120 submits a minute in one class is the ceiling', r == {'ok': False, 'error': 'busy'}, r)
+back()
+
+# ── For the phone page (20261025_student_submit_phone.sql) ─────────────
+sp()
+as_teacher(A)
+am = c.run("select upsert_questionnaire(:c, 'about_me', 'About Me', 'about-me', p_opens_on => (:d::date - 1), p_closes_on => (:d::date + 7), p_idempotency_key => :k)",
+           c=COURSE_A, d=today, k=key())[0][0]
+amq = {x['prompt']: x for x in am['questions']}
+langs = amq['What languages do you speak at home?']['id']
+learn = amq['I learn best when I work…']['id']
+better = [x for x in am['questions'] if x['repeated_key'] == 'better_at'][0]['id']
+amcode = c.run('select issue_access_codes(:q, :ids::uuid[], :k)', q=am['id'], ids='{%s}' % ENR2, k=key())[0][0][0]['code']
+r = open_(amcode)
+ok('About Me opens with no course goal context', r.get('context') == {}, r.get('context'))
+tok = r['token']
+r = submit(tok, {langs: ['English', 'x' * 61]})
+ok('a typed-in language over 60 characters is refused', r.get('error') == 'invalid', r)
+r = submit(tok, {learn: ['On a boat']})
+ok('a typed-in answer is refused where the question allows no other', r.get('error') == 'invalid', r)
+r = submit(tok, {langs: ['English', ' Igbo ', 'Igbo', ''], better: 'Hand in labs on time by finishing my data table in class.'})
+ok('a typed-in language is kept, trimmed and not doubled', r.get('ok') is True
+   and one('select value_json from answer where question_id = :x', x=langs) == ['English', 'Igbo'], r)
+
+as_teacher(A)
+codes3 = c.run('select issue_access_codes(:q, :ids::uuid[], :k)', q=qid, ids='{%s}' % ENR2, k=key())[0][0]
+r = open_(codes3[0]['code'])
+ok('the reflection carries its grade', r['parts'][0].get('grade') == 8, r['parts'][0].get('grade'))
+ok("the Goal Check-In shows the student's own course goal",
+   (r.get('context') or {}).get('course_goal', {}).get('text') == 'Hand in labs on time by finishing my data table in class.', r.get('context'))
+r = submit(r['token'], {scale: {'levels': {'PAR': 2, 'PPI': 3}, 'why': {'PAR': 'I forget to check my goals.', 'PPI': 'I know what I value.'}}})
+bodies = dict((x[0], x[1]) for x in c.run("select core_id, body from core_self_assessment where enrollment_id = :e and term_key = 'T1'", e=ENR2))
+ok('each competency keeps its own why', bodies == {'PAR': 'I forget to check my goals.', 'PPI': 'I know what I value.'}, bodies)
+back()
+sp()
+r = open_(new1)
+r = submit(r['token'], {scale: {'levels': {'PAR': 2}, 'why': {'COM': 'not asked'}}})
+ok('a why for a competency the question does not ask about is refused', r.get('error') == 'invalid', r)
 back()
 
 # ── What the log keeps ─────────────────────────────────────────────────
