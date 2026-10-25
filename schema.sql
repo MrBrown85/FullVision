@@ -653,7 +653,7 @@ create table student_submit.session (                                 -- one per
   id uuid primary key default gen_random_uuid(),
   token_hash text not null unique,
   code_id uuid not null references public.student_access_code(id) on delete cascade,
-  expires_at timestamptz not null,                                    -- 30 minutes after open
+  expires_at timestamptz not null,                                    -- 80 minutes (a block) after open
   submitted_at timestamptz, result jsonb,                             -- a second submit returns result
   created_at timestamptz not null default now()
 );

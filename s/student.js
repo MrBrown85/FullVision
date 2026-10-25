@@ -967,7 +967,7 @@ var StudentPage = (function () {
     function attempt(retried) {
       return call({ route: 'submit', token: S.data.token, answers: answers }).then(function (res) {
         if (res && res.ok) return res;
-        // The 30-minute token ran out while they wrote: open again for a
+        // The 80-minute token (a class block) ran out while they wrote: open again for a
         // fresh one (the code is still unused) and send once more.
         if (res && res.error === 'expired' && !retried) {
           return call({ route: 'open', code: S.code }).then(function (again) {
