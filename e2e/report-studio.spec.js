@@ -11,6 +11,22 @@ import { test, expect } from '@playwright/test';
 
 test.describe.configure({ mode: 'parallel' });
 
+/* Fit, page counts and the grid depend on text width. The app's font stack
+   is the system font: SF Pro on a Mac, DejaVu Sans (much wider) on the Linux
+   CI runner, where the longest report spills to a second sheet. Arial is on
+   macOS and Windows, and Linux renders it with the metric-identical
+   Liberation Sans, so these tests lay out the same everywhere. */
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    // Init scripts run before <html> exists: set the font as soon as it does.
+    new MutationObserver((_, observer) => {
+      if (!document.documentElement) return;
+      document.documentElement.style.setProperty('--font-base', "Arial, 'Liberation Sans', sans-serif");
+      observer.disconnect();
+    }).observe(document, { childList: true });
+  });
+});
+
 const STUDENTS = 27;
 const COL = 61; // one column and its gutter, px, on a Letter page
 const ROW = 20;
@@ -684,6 +700,8 @@ test.describe('Page Studio hands on the page', () => {
   test('a block dropped on the grey field comes off the report', async ({ page }) => {
     await openStudio(page);
     const legend = cellOf(page, 'legend');
+    // The legend is on the back page, below the fold beside the student list (#372).
+    await legend.scrollIntoViewIfNeeded();
     const b = await legend.boundingBox();
     const field = await page.locator('#rb-preview').boundingBox();
     await dragStart(page, { x: b.x + 10, y: b.y + 10 }, { x: field.x + 8, y: field.y + field.height / 2 });

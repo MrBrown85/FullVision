@@ -193,12 +193,16 @@ test.describe('Dashboard Observations card', () => {
     await expect(add()).toBeFocused();
   });
 
-  test('27 students sit in two columns from 1280px, with compact week cells below 1536px', async ({ page }) => {
+  // The dashboard shows the student list (#374), so the card is about 240px
+  // narrower than the window less the nav: two columns start at 1520px.
+  test('with the student list open, 27 students sit in two columns from 1520px, with compact week cells below 1776px', async ({
+    page,
+  }) => {
     await enterDemo(page);
     for (const [width, compact] of [
-      [1280, true],
-      [1440, true],
-      [1600, false],
+      [1520, true],
+      [1680, true],
+      [1840, false],
     ]) {
       await page.setViewportSize({ width, height: 900 });
       await openDashboard(page);

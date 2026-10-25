@@ -91,7 +91,9 @@ test.describe('Gradebook column headers', () => {
     await expect(page.getByRole('button', { name: 'Newest first' })).toHaveAttribute('aria-pressed', 'true');
     expect(await firstDate()).toBe(dates[dates.length - 1]);
 
+    // The gradebook always opens on Scores (#305); Newest first is what is remembered.
     await page.reload();
+    await page.locator('[data-action="setView"][data-mode="detailed"]').click();
     await expect(page.locator('.gb-grid-assess-group').first()).toBeVisible();
     await expect(page.getByRole('button', { name: 'Newest first' })).toHaveAttribute('aria-pressed', 'true');
     expect(await firstDate()).toBe(dates[dates.length - 1]);

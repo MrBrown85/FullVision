@@ -178,11 +178,8 @@ test.describe('Mobile: Sidebar Toggle', () => {
     await expect(sidebar).toBeHidden();
   });
 
-  // BUG: the sidebar toggle button (.tb-btn) is always rendered in the dock
-  // but is never display:flex — the CSS targets .sidebar-toggle (legacy class)
-  // not the actual .tb-btn[data-action="toggleSidebar"]
+  // The dashboard shows the student list and its toggle in the dock (#374).
   test('sidebar toggle button should be visible at tablet widths', async ({ page }) => {
-    test.fail(); // known bug: toggle button hidden due to CSS class mismatch
     await page.setViewportSize(SMALL_TABLET);
     await gotoApp(page, '/dashboard');
     const toggle = page.locator('[data-action="toggleSidebar"]');
@@ -190,21 +187,20 @@ test.describe('Mobile: Sidebar Toggle', () => {
   });
 
   test('sidebar toggle button should be visible at 375px', async ({ page }) => {
-    test.fail(); // known bug: same CSS class mismatch
     await page.setViewportSize(MOBILE);
     await gotoApp(page, '/dashboard');
     const toggle = page.locator('[data-action="toggleSidebar"]');
     await expect(toggle).toBeVisible();
   });
 
-  // These tests depend on the toggle button being visible, so they'll also fail
+  // BUG: at 1024px and below styles.css sets #gb-sidebar to display:none
+  // whatever the toggle says, so the toggle shows but opens nothing.
   test('clicking toggle should show and hide sidebar', async ({ page }) => {
-    test.fail(); // depends on toggle button visibility bug above
+    test.fail(); // known bug: the student list never shows below 1025px
     await page.setViewportSize(SMALL_TABLET);
     await gotoApp(page, '/dashboard');
     const toggle = page.locator('[data-action="toggleSidebar"]');
-    // Fail fast on the known bug rather than wait out the test timeout.
-    await expect(toggle).toBeVisible({ timeout: 5_000 });
+    await expect(toggle).toBeVisible();
     await toggle.click();
     await page.waitForTimeout(300);
     await expect(page.locator('#gb-sidebar')).toBeVisible();
