@@ -294,12 +294,12 @@ window.StudentEvidence = (function () {
   function panelHtml() {
     return (
       '<section class="ev-panel" id="ev-panel" aria-labelledby="ev-title">' +
-      '<div class="ev-head"><h2 class="ev-title" id="ev-title">Evidence</h2></div>' +
+      '<div class="ev-head"><h2 class="ev-title" id="ev-title">Observations</h2></div>' +
       '<div class="ev-timeline" id="ev-timeline"></div>' +
       '<div class="note-capture" id="note-capture"></div>' +
       '<div class="ev-toolbar">' +
-      '<div class="seg seg-sm ev-tabs" role="tablist" aria-label="Show evidence" id="ev-tabs"></div>' +
-      '<input type="search" class="note-search-input ev-search" id="ev-search" placeholder="Search evidence" aria-label="Search evidence">' +
+      '<div class="seg seg-sm ev-tabs" role="tablist" aria-label="Show observations" id="ev-tabs"></div>' +
+      '<input type="search" class="note-search-input ev-search" id="ev-search" placeholder="Search observations" aria-label="Search observations">' +
       '</div>' +
       '<div class="ev-list" id="ev-list" role="tabpanel" aria-labelledby="ev-tab-' +
       _tab +
@@ -426,7 +426,7 @@ window.StudentEvidence = (function () {
     if (layout.today != null)
       out += '<span class="ev-tl-today" style="left:' + pct(layout.today) + '" aria-hidden="true"></span>';
     layout.gaps.forEach(function (g) {
-      var text = 'No evidence for ' + g.days + ' days';
+      var text = 'No observations for ' + g.days + ' days';
       var title =
         text +
         (g.toToday

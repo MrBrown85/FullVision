@@ -567,7 +567,14 @@ window.PageStudent = (function () {
       '<span class="stu-comp-bars" aria-hidden="true">' +
       (bars || '<span class="stu-sub">No scores yet</span>') +
       '</span>' +
-      _classCompHtml(ctx, sec) +
+      '<span class="stu-comp-class">' +
+      _startNowHtml(
+        cid,
+        entries.map(function (e) {
+          return { t: _dayNum(e.date), v: e.score };
+        }),
+      ) +
+      '</span>' +
       '<span class="stu-comp-latest"><span>' +
       esc(_latestLine(cid, sec, ctx.assessMap)) +
       '</span><span class="stu-sub dash-tag-evidence">' +
@@ -575,6 +582,7 @@ window.PageStudent = (function () {
       '</span></span>' +
       '<span class="dash-tag-chevron" aria-hidden="true">&#9654;</span>' +
       '</button>' +
+      _compWhereHtml(ctx, entries) +
       CompetencyEvidence.drawerHtml(cid, studentId, sec, tag, drawerId) +
       '<div class="stu-comp-override">' +
       '<button type="button" class="override-btn' +
@@ -592,74 +600,94 @@ window.PageStudent = (function () {
     );
   }
 
-  /* Where the class sits on a competency: how many students are at each
-     proficiency, a ▼ over this student's, and how many are below Proficient.
-     A Letter class sees the class average. */
-  function _classCompHtml(ctx, sec) {
-    var cid = ctx.cid;
-    var dist = competencyDistribution(cid, ctx.classIds, { sectionId: sec.id });
-    var scored = dist.bands.reduce(function (n, b) {
-      return n + b.ids.length;
-    }, 0);
-    if (!scored) return '<span class="stu-comp-class"><span class="stu-sub">Class Not Scored</span></span>';
-    if (courseGradeMode(cid) === 'letter') {
-      return (
-        '<span class="stu-comp-class"><span class="stu-sub">Class Avg ' +
-        esc(formatLevel(cid, dist.avg)) +
-        '</span></span>'
-      );
-    }
-    var mine = dist.values[studentId];
-    var myLevel = mine > 0 ? Math.max(1, Math.min(4, Math.round(mine))) : 0;
-    var before = 0;
-    dist.bands.forEach(function (b) {
-      if (b.level < myLevel) before += b.ids.length;
-    });
-    var at = myLevel ? ((before + dist.bands[myLevel - 1].ids.length / 2) / scored) * 100 : 0;
-    var below = dist.bands[0].ids.length + dist.bands[1].ids.length;
-    var label =
-      'Class: ' +
-      dist.bands
-        .map(function (b) {
-          return b.ids.length + ' ' + b.label;
-        })
-        .join(', ') +
-      (myLevel ? '. ' + displayNameFirst(ctx.student) + ' is ' + PROF_LABELS[myLevel] + '.' : '.');
+  /* Where a run of scores started and where it is now (startAndNow), as
+     the class shows levels; a dash when the run is too short to say. */
+  function _startNowHtml(cid, points) {
+    var sn = startAndNow(points);
+    if (!sn) return '<span class="stu-rt-change"><span class="stu-rt-none">—</span></span>';
+    var a = formatLevel(cid, sn.start);
+    var b = formatLevel(cid, sn.now);
+    var dir = a === b ? 'flat' : sn.now > sn.start ? 'up' : 'down';
     return (
-      '<span class="stu-comp-class" role="img" aria-label="' +
-      esc(label) +
-      '">' +
-      '<span class="stu-class-track">' +
-      (myLevel ? '<span class="stu-class-mark" style="left:' + Math.round(at) + '%">\u25BC</span>' : '') +
-      '</span>' +
-      '<span class="stu-class-bar">' +
-      dist.bands
-        .filter(function (b) {
-          return b.ids.length > 0;
-        })
-        .map(function (b) {
-          return (
-            '<span style="flex:' +
-            b.ids.length +
-            ' 1 0;background:var(--score-' +
-            b.level +
-            '-bg);color:var(--score-' +
-            b.level +
-            '-text)">' +
-            b.ids.length +
-            '</span>'
-          );
-        })
-        .join('') +
-      '</span>' +
-      '<span class="stu-sub">' +
-      below +
-      ' of ' +
-      scored +
-      ' Below Proficient</span>' +
-      '<span class="stu-sub">Class Avg ' +
-      esc(formatLevel(cid, dist.avg)) +
-      '</span>' +
+      '<span class="stu-rt-change stu-rt-' +
+      dir +
+      '" title="' +
+      esc('First four weeks ' + a + ', last four weeks ' + b) +
+      '"><span class="stu-sn">' +
+      esc(a) +
+      '</span><svg width="18" height="10" viewBox="0 0 18 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-label="' +
+      (dir === 'up' ? 'up to' : dir === 'down' ? 'down to' : 'still') +
+      '"><path d="M1 5h15M12 1l4 4-4 4"/></svg><span class="stu-sn">' +
+      esc(b) +
+      '</span></span>'
+    );
+  }
+
+  /* A competency's scores split by the kind of work they came from, so a
+     teacher sees where the skill shows best. Shown in the open row. */
+  function _compWhereHtml(ctx, entries) {
+    var cid = ctx.cid;
+    var byType = {};
+    entries.forEach(function (e) {
+      var a = ctx.assessMap[e.assessmentId];
+      var t = (a && a.evidenceType) || '';
+      (byType[t] = byType[t] || []).push(e);
+    });
+    var rows = Object.keys(byType)
+      .map(function (t) {
+        return { name: _typeLabel(t), n: byType[t].length, v: averageLevels(byType[t]) };
+      })
+      .filter(function (r) {
+        return r.v != null;
+      })
+      .sort(function (x, y) {
+        return y.v - x.v;
+      });
+    if (rows.length < 2) return '';
+    var html = '<div class="stu-comp-where"><div class="stu-comp-where-title">Where It Shows</div>';
+    rows.forEach(function (r) {
+      var lvl = Math.max(1, Math.min(4, Math.round(r.v)));
+      html +=
+        '<div class="stu-comp-where-row"><span><strong>' +
+        esc(r.name) +
+        '</strong> <span class="stu-comp-where-n">· ' +
+        r.n +
+        '</span></span><span class="stu-comp-where-track" role="img" aria-label="' +
+        esc(r.name + ': ' + formatLevel(cid, r.v) + ' across ' + _plural(r.n, 'score', 'scores')) +
+        '"><span style="width:' +
+        Math.round((Math.min(4, r.v) / 4) * 100) +
+        '%;background:' +
+        (PROF_COLORS[lvl] || PROF_COLORS[0]) +
+        '"></span></span><strong class="stu-comp-where-v">' +
+        esc(formatLevel(cid, r.v)) +
+        '</strong></div>';
+    });
+    return html + '</div>';
+  }
+
+  /* The teacher's own words on a piece of work: the comments left on it in
+     Assignments (observations linked to it), else the note on its score;
+     otherwise a way to add one. */
+  function _assessNoteHtml(ctx, a) {
+    var linked = typeof getAssignmentObs === 'function' ? getAssignmentObs(ctx.cid, studentId, a.id) : [];
+    var text = linked.length ? String(linked[0].text || '').split('\n')[0] : '';
+    if (!text) {
+      var withNote = ctx.allScores.find(function (s) {
+        return s.assessmentId === a.id && s.note;
+      });
+      text = withNote ? withNote.note : '';
+    }
+    var href = '#/assignments?course=' + ctx.cid + '&open=' + a.id + '&student=' + studentId;
+    if (!text)
+      return (
+        '<a class="stu-note-add" role="link" tabindex="0" data-href="' +
+        href +
+        '" title="Open in Assignments">+ Note</a>'
+      );
+    return (
+      '<span class="stu-note">' +
+      esc(text) +
+      (linked.length > 1 ? ' <span class="stu-sub-inline">+' + (linked.length - 1) + ' more</span>' : '') +
       '</span>'
     );
   }
@@ -810,24 +838,6 @@ window.PageStudent = (function () {
   /* A group grade as a tinted pill, as the class shows grades. */
   function _gradePill(g) {
     return '<span class="stu-level stu-level-' + (g ? g.level : 0) + '">' + esc(g ? g.text : '\u2014') + '</span>';
-  }
-
-  /* The class's grade on the group and how this student sits against it. */
-  function _classLine(cid, mine, cls) {
-    var gap = groupGradeGap(cid, mine, cls);
-    return (
-      '<span class="stu-group-class"><span class="stu-class-avg" title="Class average">Class ' +
-      esc(cls ? cls.text : '\u2014') +
-      '</span>' +
-      (gap
-        ? '<span class="stu-gap' +
-          (gap.dir > 0 ? ' stu-gap-up' : gap.dir < 0 ? ' stu-gap-down' : '') +
-          '">' +
-          esc(gap.text) +
-          '</span>'
-        : '') +
-      '</span>'
-    );
   }
 
   /* One bar per scored assessment, oldest to newest, as the competency rows
@@ -1015,9 +1025,9 @@ window.PageStudent = (function () {
         '">' +
         esc(_cellText(cell, a)) +
         '</span></span>' +
-        '<span class="stu-assess-class"><span class="stu-class-avg" title="Class average">Class ' +
-        esc(classColumnAverageText(cid, a, classColumnAverage(cid, ctx.classStudents, { assessment: a }))) +
-        '</span></span>' +
+        '<span class="stu-assess-class stu-assess-note">' +
+        _assessNoteHtml(ctx, a) +
+        '</span>' +
         '<span class="stu-assess-toward">' +
         esc(towardText) +
         '</span>' +
@@ -1055,7 +1065,6 @@ window.PageStudent = (function () {
       var fold = _assessGroup + ':' + g.key;
       var open = !_assessClosed[fold];
       var mine = assessmentGroupGrade(cid, studentId, g.assessments);
-      var cls = classAssessmentGroupGrade(cid, ctx.classIds, g.assessments);
       html +=
         '<div class="stu-agroup">' +
         '<button type="button" class="stu-agroup-head" data-action="stuAssessFold" data-fold="' +
@@ -1073,7 +1082,7 @@ window.PageStudent = (function () {
         esc(_groupMeta(cid, g)) +
         '</span>' +
         '<span class="stu-agroup-grades">' +
-        _classLine(cid, mine, cls) +
+        _startNowHtml(cid, _scoredPoints(cid, g.assessments)) +
         _gradePill(mine) +
         '</span>' +
         '</button>';
@@ -1124,7 +1133,7 @@ window.PageStudent = (function () {
   }
 
   /* One group as a table row: name and count, grade, bars, class. */
-  function _bdGroupCells(ctx, g, mine, cls) {
+  function _bdGroupCells(ctx, g, mine) {
     var scored = g.assessments.filter(function (a) {
       return assessmentGroupGrade(ctx.cid, studentId, [a]);
     }).length;
@@ -1143,7 +1152,7 @@ window.PageStudent = (function () {
         '<span class="stu-comp-bars" aria-hidden="true">' +
         (_groupBars(ctx.cid, g.assessments) || '<span class="stu-sub">No scores yet</span>') +
         '</span>',
-      cls: _classLine(ctx.cid, mine, cls),
+      change: _startNowHtml(ctx.cid, _scoredPoints(ctx.cid, g.assessments)),
     };
   }
 
@@ -1566,14 +1575,11 @@ window.PageStudent = (function () {
         (showShares ? ' stu-bd-cats-shares' : ' stu-bd-cats') +
         '">' +
         _bdHeadRow(
-          ['Category', 'Weight', 'Grade', 'Assessments', 'Class Average'].concat(
-            showShares ? ['Adds to Course %'] : [],
-          ),
+          ['Category', 'Weight', 'Grade', 'Assessments', 'Start to Now'].concat(showShares ? ['Adds to Course %'] : []),
         );
       cats.forEach(function (g) {
         var mine = assessmentGroupGrade(cid, studentId, g.assessments);
-        var cls = classAssessmentGroupGrade(cid, ctx.classIds, g.assessments);
-        var c = _bdGroupCells(ctx, g, mine, cls);
+        var c = _bdGroupCells(ctx, g, mine);
         var open = !!_bdOpen[g.key || '-'];
         html +=
           '<div class="stu-bd-group"><button type="button" class="stu-bd-row" data-action="stuBdToggle" data-key="' +
@@ -1587,7 +1593,7 @@ window.PageStudent = (function () {
           '</span>' +
           c.grade +
           c.bars +
-          c.cls +
+          c.change +
           (showShares
             ? '<span class="stu-bd-share">' +
               (g.category && shares[g.key] ? esc(shares[g.key].text) : '\u2014') +
@@ -1623,11 +1629,10 @@ window.PageStudent = (function () {
     } else {
       html +=
         '<div class="stu-bd-table stu-bd-mods">' +
-        _bdHeadRow(['Module', 'Grade', 'Assessments', 'Class Average', 'Latest']);
+        _bdHeadRow(['Module', 'Grade', 'Assessments', 'Start to Now', 'Latest']);
       mods.forEach(function (g) {
         var mine = assessmentGroupGrade(cid, studentId, g.assessments);
-        var cls = classAssessmentGroupGrade(cid, ctx.classIds, g.assessments);
-        var c = _bdGroupCells(ctx, g, mine, cls);
+        var c = _bdGroupCells(ctx, g, mine);
         var latest = g.assessments.reduce(function (m, a) {
           return (a.date || '') > m ? a.date : m;
         }, '');
@@ -1638,7 +1643,7 @@ window.PageStudent = (function () {
           c.name +
           c.grade +
           c.bars +
-          c.cls +
+          c.change +
           '<span class="stu-bd-latest">' +
           esc(_shortDay(latest)) +
           '</span></div>';
@@ -1758,13 +1763,6 @@ window.PageStudent = (function () {
       var scored = vals.filter(function (v) {
         return v != null;
       });
-      var classVals = [];
-      ctx.classIds.forEach(function (sid) {
-        list.forEach(function (a) {
-          var v = rubricCriterionLevel(cid, sid, a, crit);
-          if (v != null) classVals.push(v);
-        });
-      });
       var first = scored[0];
       var latest = scored[scored.length - 1];
       var dir = scored.length > 1 ? (latest > first ? 'up' : latest < first ? 'down' : 'flat') : '';
@@ -1795,9 +1793,7 @@ window.PageStudent = (function () {
       html +=
         '<span role="cell" class="stu-rt-avg"><strong>' +
         esc(formatLevel(cid, mean(scored))) +
-        '</strong><span class="stu-sub">Class ' +
-        esc(formatLevel(cid, mean(classVals))) +
-        '</span></span></div>';
+        '</strong></span></div>';
     });
     html += '</div></div>';
     return html;
@@ -1937,7 +1933,6 @@ window.PageStudent = (function () {
   function _profileTabHtml(ctx) {
     var cid = ctx.cid;
     var first = displayNameFirst(ctx.student);
-    var desc = (typeof ReportBlocks !== 'undefined' && ReportBlocks.OBS_DESCRIPTORS) || {};
     var groups = [
       { name: 'Learning Dispositions', sub: 'How ' + first + ' learns', dims: LEARNING_DIMS },
       { name: 'Relational and Identity', sub: 'Who ' + first + ' is with others', dims: RELATIONAL_DIMS },
@@ -1949,37 +1944,77 @@ window.PageStudent = (function () {
       _plural(ctx.obs.length, 'observation', 'observations') +
       (ctx.term ? ' this term' : '') +
       '. Each dot is one observation.</div><div class="stu-profile-grid">';
+    // Each disposition on one timeline, a dot per observation (it opens the
+    // observation); the ones not seen yet gather in one row.
+    var times = ctx.obs
+      .map(function (o) {
+        return _dayNum(_obDay(o));
+      })
+      .filter(function (t) {
+        return t != null;
+      });
+    var t0 = times.length ? Math.min.apply(null, times) : 0;
+    var t1 = times.length ? Math.max.apply(null, times) : 0;
+    if (t1 - t0 < 28) {
+      t0 -= 14;
+      t1 += 14;
+    }
+    var xAt = function (t) {
+      return 3 + ((t - t0) / (t1 - t0)) * 94;
+    };
+    var axis = '<div class="stu-lane-axis" aria-hidden="true"><span></span><span class="stu-lane-months">';
+    var md = new Date(t0 * 864e5);
+    var m = new Date(Date.UTC(md.getUTCFullYear(), md.getUTCMonth() + 1, 1));
+    while (m.getTime() / 864e5 <= t1) {
+      axis +=
+        '<span style="left:' + xAt(m.getTime() / 864e5).toFixed(2) + '%">' + esc(MONTHS[m.getUTCMonth()]) + '</span>';
+      m = new Date(Date.UTC(m.getUTCFullYear(), m.getUTCMonth() + 1, 1));
+    }
+    axis += '</span></div>';
     groups.forEach(function (g) {
-      html +=
-        '<div class="stu-profile-group"><h3>' + esc(g.name) + '</h3><div class="stu-sub">' + esc(g.sub) + '</div>';
+      var seen = [];
+      var unseen = [];
       g.dims.forEach(function (d) {
         var tagged = ctx.obs.filter(function (o) {
           return (o.dims || []).indexOf(d) >= 0;
         });
-        var latest = tagged[0];
-        var dots = '';
-        for (var i = 0; i < Math.min(tagged.length, 5); i++) dots += '<span class="stu-dot on"></span>';
-        if (!tagged.length) dots = '<span class="stu-dot"></span>';
-        html +=
-          '<div class="stu-dim' +
-          (tagged.length ? '' : ' unseen') +
-          '">' +
-          '<div class="stu-dim-text"><strong>' +
-          esc(OBS_LABELS[d]) +
-          '</strong>' +
-          (desc[d] ? '<span class="stu-sub">' + esc(desc[d].desc) + '</span>' : '') +
-          '<span class="stu-dim-latest">' +
-          (latest
-            ? 'Latest: ' + esc(_shortDay(_obDay(latest))) + ', ' + esc(String(latest.text || '').split('\n')[0])
-            : 'Not seen yet') +
-          '</span></div>' +
-          '<span class="stu-dots" aria-label="' +
-          _plural(tagged.length, 'observation', 'observations') +
-          '">' +
-          dots +
-          (tagged.length > 5 ? '<span class="stu-sub">' + tagged.length + '</span>' : '') +
-          '</span></div>';
+        (tagged.length ? seen : unseen).push({ d: d, obs: tagged });
       });
+      html +=
+        '<div class="stu-profile-group"><h3>' + esc(g.name) + '</h3><div class="stu-sub">' + esc(g.sub) + '</div>';
+      if (seen.length) html += axis;
+      seen.forEach(function (r) {
+        html +=
+          '<div class="stu-lane"><span class="stu-lane-name"><strong>' +
+          esc(OBS_LABELS[r.d]) +
+          '</strong><span class="stu-sub">' +
+          esc(_plural(r.obs.length, 'time', 'times')) +
+          '</span></span><span class="stu-lane-track" role="group" aria-label="' +
+          esc(OBS_LABELS[r.d] + ', ' + _plural(r.obs.length, 'observation', 'observations')) +
+          '">';
+        r.obs.forEach(function (o) {
+          var t = _dayNum(_obDay(o));
+          if (t == null) return;
+          html +=
+            '<button type="button" class="stu-lane-dot" data-ced="jump" data-obid="' +
+            esc(o.id) +
+            '" style="left:' +
+            xAt(t).toFixed(2) +
+            '%" title="' +
+            esc(_shortDay(_obDay(o)) + ': ' + String(o.text || '').split('\n')[0]) +
+            '" aria-label="' +
+            esc(_shortDay(_obDay(o)) + ': ' + String(o.text || '').split('\n')[0]) +
+            '"></button>';
+        });
+        html += '</span></div>';
+      });
+      if (unseen.length) {
+        html += '<div class="stu-unseen"><span class="stu-unseen-label">Not Seen Yet</span>';
+        unseen.forEach(function (r) {
+          html += '<span class="stu-unseen-chip">' + esc(OBS_LABELS[r.d]) + '</span>';
+        });
+        html += '</div>';
+      }
       html += '</div>';
     });
     html += '</div>';

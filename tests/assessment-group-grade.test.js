@@ -145,6 +145,49 @@ describe('assessment group grades', () => {
     expect(groupGradeDiff(CID, assessmentGroupGrade(CID, A, [lv[0]]), g).text).toBe('+0.5');
   });
 
+  it('says where a run of scores started and where it is now', () => {
+    const run = pairs => pairs.map(([t, v]) => ({ t, v }));
+    // Over eight weeks: the first four weeks against the last four.
+    const long = startAndNow(
+      run([
+        [0, 2],
+        [10, 2],
+        [27, 3],
+        [40, 3],
+        [70, 3],
+        [84, 4],
+      ]),
+    );
+    expect(long.start).toBeCloseTo(7 / 3, 5);
+    expect(long.now).toBeCloseTo(3.5, 5);
+    expect(long.startCount).toBe(3);
+    // Under eight weeks: the two halves.
+    const short = startAndNow(
+      run([
+        [0, 2],
+        [10, 2],
+        [20, 3],
+        [30, 4],
+      ]),
+    );
+    expect(short).toEqual({ start: 2, now: 3.5, startCount: 2, nowCount: 2 });
+    // Too short to say.
+    expect(
+      startAndNow(
+        run([
+          [0, 2],
+          [5, 3],
+        ]),
+      ),
+    ).toBeNull();
+    expect(startAndNow(run([[0, 2]]))).toBeNull();
+  });
+
+  it('averages score entries at the values the calculations use', () => {
+    expect(averageLevels([{ score: 3 + 1 / 3, level: 3 }, { score: 2 }])).toBeCloseTo(8 / 3, 5);
+    expect(averageLevels([{ score: 0 }])).toBeNull();
+  });
+
   it('names a value by the nearest level a teacher can enter', () => {
     expect(nearestScoreLevel(3 + 1 / 3)).toEqual({ level: 3, text: '3+' });
     expect(nearestScoreLevel(2 + 2 / 3)).toEqual({ level: 3, text: '3−' });
