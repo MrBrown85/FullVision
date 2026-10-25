@@ -3891,6 +3891,21 @@ window.PageAssignments = (function () {
       if (!c || c !== crit) return;
       c.levels = RubricDraft.draftLevels(tag, _savedWording(tag)).levels;
       if (RubricDraft.isDefaultName(c.name)) c.name = tagName || c.name;
+      // An Advanced Rubric also gets each I-can statement as a Proficient
+      // checkbox, as "+ From Competency" gives it, but only when Proficient
+      // has no boxes yet: boxes the teacher wrote are never replaced.
+      if (_editorIsAdvanced()) {
+        var hasProficient = (c.checks || []).some(function (k) {
+          return Number(k.level) === 3;
+        });
+        if (!hasProficient) {
+          c.checks = (c.checks || []).concat(
+            RubricDraft.statementsOf(tag).map(function (statement, i) {
+              return { id: uid(), level: 3, label: statement, displayOrder: i };
+            }),
+          );
+        }
+      }
       _rubricDirty = true;
       _expandedCriterion = idx;
       _refreshCriterionDOM(idx);
