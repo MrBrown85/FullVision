@@ -58,12 +58,13 @@ describe('_stampIdempotencyKey', () => {
 
 describe('FV_IDEMPOTENT_RPCS', () => {
   it('names exactly the endpoints the server retrofitted', () => {
-    // Verified against pg_proc: these 30 are the public functions carrying a
+    // Verified against pg_proc: these 34 are the public functions carrying a
     // p_idempotency_key argument (the three student ones from
     // migrations/20261019_withdraw_students.sql, the six report-form ones
     // from migrations/20261020_report_template / _report_issue / _guardian,
     // remove_section / restore_section from
-    // migrations/20261022_soft_remove_competency.sql).
+    // migrations/20261022_soft_remove_competency.sql, the four questionnaire
+    // ones from migrations/20261025_questionnaires_tables_and_functions.sql).
     // Keep in lockstep with the database.
     expect(Object.keys(FV_IDEMPOTENT_RPCS).sort()).toEqual([
       'create_assessment',
@@ -73,6 +74,7 @@ describe('FV_IDEMPOTENT_RPCS', () => {
       'create_report_issue',
       'create_student_and_enroll',
       'delete_guardian',
+      'delete_questionnaire',
       'delete_report_issue',
       'delete_report_template',
       'delete_withdrawn_student',
@@ -81,16 +83,19 @@ describe('FV_IDEMPOTENT_RPCS', () => {
       'import_json_restore',
       'import_roster_csv',
       'import_teams_class',
+      'issue_access_codes',
       'reenrol_student',
       'remove_section',
       'restore_section',
       'save_report_template',
+      'set_questionnaire_on',
       'upsert_category',
       'upsert_competency_group',
       'upsert_guardian',
       'upsert_module',
       'upsert_note',
       'upsert_observation_template',
+      'upsert_questionnaire',
       'upsert_rubric',
       'upsert_section',
       'upsert_subject',
