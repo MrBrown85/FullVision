@@ -27,6 +27,9 @@ window.PageAssignments = (function () {
   var _showingNewForm = false;
   var _editingAssessId = null;
   var collapsedModules = {};
+  // Closed modules stay closed when the teacher leaves the page and comes
+  // back, per class, on this device.
+  var MODULES_CLOSED_KEY = 'gb-assign-modules-closed-';
   var _dragAssessId = null;
   var _dragModuleId = null;
   var _dragSid = null;
@@ -129,6 +132,27 @@ window.PageAssignments = (function () {
   ];
   var SECTION_COLORS = ['#3b82f6', '#0891b2', '#059669', '#9333ea', '#dc2626', '#ea580c', '#0284c7', '#4f46e5'];
 
+  function _loadClosedModules(cid) {
+    try {
+      var saved = JSON.parse(localStorage.getItem(MODULES_CLOSED_KEY + cid) || '{}');
+      return saved && typeof saved === 'object' ? saved : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function _saveClosedModules() {
+    var closed = {};
+    Object.keys(collapsedModules).forEach(function (id) {
+      if (collapsedModules[id]) closed[id] = true;
+    });
+    try {
+      localStorage.setItem(MODULES_CLOSED_KEY + activeCourse, JSON.stringify(closed));
+    } catch (e) {
+      /* private mode: closed modules last this visit */
+    }
+  }
+
   /* ── switchCourse ───────────────────────────────────────── */
   async function switchCourse(cid) {
     activeCourse = cid;
@@ -137,7 +161,7 @@ window.PageAssignments = (function () {
     assessSearch = '';
     showUngraded = false;
     focusStudentId = null;
-    collapsedModules = {};
+    collapsedModules = _loadClosedModules(cid);
     rubricViewStates = {};
     document.getElementById('sidebar-mount').innerHTML = renderSidebar(
       activeCourse,
@@ -4517,6 +4541,7 @@ window.PageAssignments = (function () {
   }
   function toggleModuleFolder(moduleId) {
     collapsedModules[moduleId] = !collapsedModules[moduleId];
+    _saveClosedModules();
     var folder = document.querySelector('.mod-folder[data-module-id="' + moduleId + '"]');
     if (folder) folder.classList.toggle('open', !collapsedModules[moduleId]);
   }
@@ -5534,7 +5559,7 @@ window.PageAssignments = (function () {
     rubricViewStates = {};
     _showingNewForm = false;
     _editingAssessId = null;
-    collapsedModules = {};
+    collapsedModules = _loadClosedModules(activeCourse);
     _dragAssessId = null;
     _dragModuleId = null;
     _mergeTargetId = null;
