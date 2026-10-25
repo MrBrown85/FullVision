@@ -414,6 +414,22 @@ create table reflection (
   unique (enrollment_id, section_id)
 );
 
+-- A student's self-assessment of one BC Core Competency in one reporting
+-- term (term_key 'T1', 'T2', … or ''): their step (1 Beginning … 4 Leading),
+-- their words and their goal. Never a teacher's grade.
+create table core_self_assessment (
+  id            uuid        not null primary key default gen_random_uuid(),
+  enrollment_id uuid        not null references enrollment(id) on delete cascade,
+  core_id       text        not null,                                -- COM COL CT CRT PPI PAR SAR
+  term_key      text        not null default '',
+  level         integer,                                             -- 1..4 guard
+  body          text,
+  goal          text,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now(),
+  unique (enrollment_id, core_id, term_key)
+);
+
 create table section_override (
   id            uuid        not null primary key,
   enrollment_id uuid        not null references enrollment(id) on delete cascade,
@@ -685,6 +701,8 @@ create table guardian (
 --   bulk_attendance(p_enrollment_ids uuid[], p_date date, p_status text)
 --   list_course_student_profiles(p_course_id uuid)
 --   list_course_goal_dates(p_course_id uuid)   -- {enrollment_id: {section_id: updated_at}}
+--   upsert_core_self_assessment(p_enrollment_id uuid, p_core_id text, p_term_key text, p_level int, p_body text, p_goal text)
+--   list_course_core_self_assessments(p_course_id uuid)   -- {enrollment_id: {term_key: {core_id: {level, text, goal, date}}}}
 --
 -- Term rating:
 --   save_term_rating(p_enrollment_id uuid, p_term integer, p_payload jsonb)

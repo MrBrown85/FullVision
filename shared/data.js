@@ -75,6 +75,7 @@ const _cache = {
   flags: {}, // keyed by cid
   goals: {}, // keyed by cid
   goalDates: {}, // keyed by cid — when each goal was set { sid: { secId: ISO } }
+  coreSelf: {}, // keyed by cid — Core Competency self-assessments { sid: { termKey: { coreId: entry } } }
   reflections: {}, // keyed by cid
   overrides: {}, // keyed by cid
   statuses: {}, // keyed by cid
@@ -3021,8 +3022,10 @@ async function loadStudentProfileSummaries(cid) {
     _cache.studentProfileSummaries[cid] = localSummaries || {};
     return _cache.studentProfileSummaries[cid];
   }
-  // Goal dates load beside the profiles; the Goals tab redraws without them.
+  // Goal dates and Core Competency self-assessments load beside the
+  // profiles; the student page draws without them until they arrive.
   _loadGoalDates(cid);
+  _loadCoreSelf(cid);
   try {
     var res = await window.v2.listCourseStudentProfiles(cid);
     if (res && res.error) throw res.error;
@@ -8919,6 +8922,46 @@ async function _loadGoalDates(cid) {
   }
 }
 
+/* Students' self-assessments of the Core Competencies, by reporting term:
+   { sid: { termKey: { coreId: { level 1–4, text, goal, date } } } }.
+   termKey is 'T' + the term's ordinal, or '' for a class without terms. The
+   student's own words, entered by the teacher; never a teacher's grade. */
+function getCoreSelf(cid) {
+  if (_cache.coreSelf[cid] !== undefined) return _cache.coreSelf[cid];
+  return _safeParseLS('gb-core-self-' + cid, {}) || {};
+}
+/* Saves one self-assessment (entry null, or with nothing in it, removes it). */
+function saveCoreSelfAssessment(cid, sid, termKey, coreId, entry) {
+  var level = entry && entry.level >= 1 && entry.level <= 4 ? Number(entry.level) : null;
+  var text = entry && entry.text ? String(entry.text).trim() : '';
+  var goal = entry && entry.goal ? String(entry.goal).trim() : '';
+  var all = Object.assign({}, getCoreSelf(cid));
+  var mine = Object.assign({}, all[sid] || {});
+  var term = Object.assign({}, mine[termKey || ''] || {});
+  if (level || text || goal) term[coreId] = { level: level, text: text, goal: goal, date: new Date().toISOString() };
+  else delete term[coreId];
+  mine[termKey || ''] = term;
+  all[sid] = mine;
+  _cache.coreSelf[cid] = all;
+  _safeLSSet('gb-core-self-' + cid, JSON.stringify(all));
+  if (_writesEnabled() && _isUuid(sid) && window.v2 && window.v2.saveCoreSelfAssessment) {
+    window.v2.saveCoreSelfAssessment(sid, coreId, termKey || '', level, text, goal);
+  }
+}
+async function _loadCoreSelf(cid) {
+  if (!_useSupabase || !window.v2 || !window.v2.listCourseCoreSelfAssessments) return;
+  try {
+    var res = await window.v2.listCourseCoreSelfAssessments(cid);
+    // A server without the read: what this device saved stays.
+    if (!res || res.error) return;
+    var data = _rpcObject(res.data !== undefined ? res.data : res) || {};
+    _cache.coreSelf[cid] = data;
+    _safeLSSet('gb-core-self-' + cid, JSON.stringify(data));
+  } catch (e) {
+    console.warn('list_course_core_self_assessments failed for ' + cid + ':', e);
+  }
+}
+
 function getReflections(cid) {
   if (_cache.reflections[cid] !== undefined) return _cache.reflections[cid];
   try {
@@ -10074,6 +10117,21 @@ window.v2.saveGoal = function (enrollmentId, sectionId, body) {
 /* When each goal in a class was last saved: {enrollment_id: {section_id: ISO}}. */
 window.v2.listCourseGoalDates = function (courseId) {
   return _rpcOrNoop('list_course_goal_dates', { p_course_id: courseId });
+};
+
+/* Core Competency self-assessments: one per (enrollment, competency, term). */
+window.v2.listCourseCoreSelfAssessments = function (courseId) {
+  return _rpcOrNoop('list_course_core_self_assessments', { p_course_id: courseId });
+};
+window.v2.saveCoreSelfAssessment = function (enrollmentId, coreId, termKey, level, text, goal) {
+  return _rpcOrNoop('upsert_core_self_assessment', {
+    p_enrollment_id: enrollmentId,
+    p_core_id: coreId,
+    p_term_key: termKey || '',
+    p_level: level != null ? Number(level) : null,
+    p_body: text || null,
+    p_goal: goal || null,
+  });
 };
 
 /* Reflection: one per (enrollment, section). confidence ∈ 1..5 or null. */
@@ -11250,6 +11308,8 @@ window.GB = {
   saveGoals,
   getGoalDates,
   setGoalDate,
+  getCoreSelf,
+  saveCoreSelfAssessment,
   getReflections,
   saveReflections,
   getQuickObs,
