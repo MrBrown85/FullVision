@@ -7,7 +7,8 @@ transaction, rolled back at the end.
 
 PGPORT=54331 PGDATABASE=fv_ss python3 run.py harness.sql student-submit-prelude.sql \\
   ../20261025_questionnaires_tables_and_functions.sql ../20261025_questionnaires_templates.sql \\
-  ../20261025_student_submit.sql ../20261025_student_submit_phone.sql
+  ../20261025_student_submit.sql ../20261025_student_submit_phone.sql \\
+  ../20261025_student_submit_token_80.sql
 PGPORT=54331 PGDATABASE=fv_ss python3 student_submit.py
 """
 import os, sys, json, uuid
@@ -94,6 +95,8 @@ ok('an unknown code is not found', r == {'ok': False, 'error': 'not_found'}, r)
 r = open_(code[ENR1].lower().replace('-', ' '))
 ok('a good code opens, in any case and with any separator', r.get('ok') is True, r)
 tok1 = r['token']
+mins = one("select extract(epoch from (expires_at - now())) / 60 from student_submit.session order by created_at desc limit 1")
+ok('the token lasts a class block, 80 minutes', 79 < float(mins) <= 80, mins)
 ok('the token is 64 hex characters', len(tok1) == 64 and all(ch in '0123456789abcdef' for ch in tok1), tok1)
 ok('the preferred name is the first name shown', r['student'] == {'first_name': 'CeCe'}, r['student'])
 ok('the class name and block', r['course'] == {'name': 'Science 8', 'block': None}, r['course'])

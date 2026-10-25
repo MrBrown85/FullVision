@@ -2,7 +2,7 @@
  * The student phone page (s/student.js; docs/STUDENT-VOICE-PLAN.md, PR 7),
  * in linkedom with a stand-in fetch. Opens a code, renders each question
  * type, collects answers in the shape student_submit.submit takes, retries
- * once with a fresh token when the 30-minute one has run out, and keeps
+ * once with a fresh token when the 80-minute one has run out, and keeps
  * Demo Mode off the network.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';

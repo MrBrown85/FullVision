@@ -52,13 +52,14 @@ leaves out.
 ```bash
 PGPORT=54331 PGDATABASE=fv_ss python3 run.py harness.sql student-submit-prelude.sql \
   ../20261025_questionnaires_tables_and_functions.sql ../20261025_questionnaires_templates.sql \
-  ../20261025_student_submit.sql ../20261025_student_submit_phone.sql
+  ../20261025_student_submit.sql ../20261025_student_submit_phone.sql ../20261025_student_submit_token_80.sql
 PGPORT=54331 PGDATABASE=fv_ss python3 student_submit.py
 ```
 
 With `20261025_student_submit_phone.sql` (PR 7: typed-in choices, a why per
 competency, the grade, the block and the course goal), 77 of 77 pass on
-2026-10-25.
+2026-10-25. With `20261025_student_submit_token_80.sql` (tokens last a
+class block, 80 minutes), 78 of 78.
 
 Result on 2026-10-24 (Postgres 17, local): 69 of 69 pass, and
 `questionnaires.py` still passes 42 of 42 against the rewritten
