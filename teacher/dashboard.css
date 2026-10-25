@@ -4285,11 +4285,6 @@ body.fv-names-hidden .dash-search-input:not(:placeholder-shown) {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.cm-student-pref {
-  color: var(--text-3);
-  font-size: var(--text-sm);
-  flex-shrink: 0;
-}
 .cm-student-pronouns {
   color: var(--text-3);
   font-size: var(--text-sm);
@@ -4355,67 +4350,273 @@ body.fv-names-hidden .dash-search-input:not(:placeholder-shown) {
   padding: 0;
   overflow: hidden;
 }
-.cm-roster-table.cm-student-list {
+/* Students tab roster: every field edited in place. The table scrolls
+   sideways under a sticky header with Last and First Name pinned, rows
+   alternate, and the row being pointed at or edited turns light blue. */
+.cm-detail-inner.cm-tabbed.cm-tabbed-wide,
+.cm-tabbed-wide .cm-tab-panel {
+  max-width: none;
+}
+.cm-rs-tools {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+}
+.cm-rs-tools ~ .cm-roster-buttons {
+  flex-shrink: 0;
+}
+.cm-rs-search input {
+  width: 240px;
+}
+.cm-rs-summary {
+  margin: 0;
+}
+.cm-rs-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.cm-rs-section {
+  padding: 0;
+  overflow: hidden;
+}
+.cm-rs-scroll {
+  overflow-x: auto;
   max-height: none;
-  overflow: visible;
   border: 0;
   margin: 0;
 }
-.cm-roster-head,
-.cm-roster-row {
+.cm-rs-grid {
   display: grid;
-  grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.6fr) 140px;
-  gap: 12px;
+  grid-template-columns: 150px 140px 110px 110px 120px 140px 230px 220px 220px 240px 48px 40px;
+  column-gap: 12px;
   align-items: center;
-  padding: 10px 18px;
+  padding: 0 12px;
+  min-width: max-content;
 }
-.cm-roster-bulk .cm-roster-head,
-.cm-roster-bulk .cm-roster-row {
-  grid-template-columns: 20px minmax(0, 2.2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.6fr) 140px;
-}
-.cm-roster-head {
+.cm-rs-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  height: 40px;
   background: var(--bg);
   border-bottom: 1px solid var(--divider-subtle);
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   font-weight: 600;
   color: var(--text-2);
 }
-.cm-roster-row.cm-student-row {
-  display: grid;
+.cm-rs-row {
+  height: 44px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--divider-subtle);
 }
-.cm-roster-name {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.cm-rs-row[hidden] {
+  display: none;
 }
-.cm-roster-num {
-  font-family: 'SF Mono', ui-monospace, monospace;
-  font-size: var(--text-sm);
+.cm-rs-stick1,
+.cm-rs-stick2 {
+  position: sticky;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  height: 100%;
+  background: inherit;
+}
+.cm-rs-stick1 {
+  left: 0;
+  margin-left: -12px;
+  padding-left: 12px;
+}
+.cm-rs-stick2 {
+  left: 150px;
+  box-shadow: 8px 0 8px -8px rgba(0, 0, 0, 0.12);
+}
+.cm-rs-alt {
+  background: var(--bg);
+}
+.cm-rs-row:hover,
+.cm-rs-row:focus-within {
+  background: var(--focus-banner-bg);
+}
+.cm-rs-sort {
+  font: inherit;
+  font-weight: 600;
   color: var(--text-2);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
 }
-.cm-roster-desig {
+.cm-rs-sort[aria-pressed='true'] {
+  color: var(--text);
+}
+.cm-rs-in {
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--text);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 5px 7px;
+  margin: 0 -8px;
+  width: calc(100% + 16px);
+  min-width: 0;
+  box-sizing: border-box;
+  text-overflow: ellipsis;
+}
+.cm-rs-in::placeholder {
+  color: var(--link);
+  font-weight: 600;
+}
+.cm-rs-row:hover .cm-rs-in {
+  border-color: var(--divider-medium);
+}
+.cm-rs-in:hover {
+  border-color: var(--border);
+  background: var(--surface);
+}
+.cm-rs-in:focus {
+  outline: none;
+  border-color: var(--active);
+  background: var(--surface);
+  box-shadow: 0 0 0 3px var(--active-light);
+}
+.cm-rs-in.cm-rs-bad {
+  border-color: var(--score-1);
+  box-shadow: 0 0 0 3px var(--priority-light);
+}
+.cm-rs-strong {
+  font-weight: 600;
+}
+.cm-rs-desig {
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
 }
-.cm-roster-desig-name {
+.cm-rs-chip {
+  font: inherit;
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  border: 0;
+  border-radius: 4px;
+  padding: 2px 6px;
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+}
+.cm-rs-desig-wrap {
+  position: relative;
+}
+.cm-rs-add {
+  width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  border: 1px dashed var(--border-2);
+  background: transparent;
+  color: var(--link);
+  font-weight: 700;
+  cursor: pointer;
+}
+.cm-rs-picker {
+  position: absolute;
+  top: 28px;
+  left: 0;
+  z-index: var(--z-fab);
+  display: flex;
+  flex-direction: column;
+  min-width: 240px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 4px;
+  background: var(--surface);
+  border: 0.5px solid var(--divider-medium);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+}
+.cm-rs-pick {
+  font: inherit;
   font-size: var(--text-sm);
+  text-align: left;
+  border: 0;
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.cm-rs-pick:hover,
+.cm-rs-pick:focus {
+  background: var(--active-light);
+  outline: none;
+}
+.cm-rs-check {
+  display: flex;
+  justify-content: center;
+}
+.cm-rs-check input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+.cm-rs-menu {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 0;
+  background: transparent;
   color: var(--text-2);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.cm-rs-menu:hover {
+  background: var(--surface-2);
+}
+.cm-rs-add:focus-visible,
+.cm-rs-menu:focus-visible,
+.cm-rs-chip:focus-visible,
+.cm-rs-check input:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 1px;
+}
+.cm-rs-menu-wrap {
+  position: relative;
+}
+.cm-rs-menu-wrap .cm-std-menu {
+  right: 0;
+  left: auto;
+}
+/* Import review */
+.cm-import-columns .cm-import-col-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 6px 16px;
+  margin: 6px 0;
+}
+.cm-import-col {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 170px;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--text-sm);
+}
+.cm-import-col-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.cm-roster-row .cm-student-actions {
-  gap: 16px;
-  justify-content: flex-end;
+.cm-import-col select {
+  padding: 4px 8px;
+  font-size: var(--text-sm);
 }
-.cm-roster-withdraw {
-  color: var(--text-2);
-}
-/* Import review */
+
 .cm-import-review {
   display: flex;
   flex-direction: column;
@@ -4543,13 +4744,6 @@ body.fv-names-hidden .dash-search-input:not(:placeholder-shown) {
 .cm-withdrawn-delete {
   color: var(--danger);
 }
-.cm-bulk-check {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--active);
-  flex-shrink: 0;
-  cursor: pointer;
-}
 .cm-add-student-form {
   border: 1px solid var(--active);
   border-radius: var(--radius-sm);
@@ -4614,13 +4808,6 @@ body.fv-names-hidden .dash-search-input:not(:placeholder-shown) {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.cm-bulk-panel {
-  border: 1px solid var(--active);
-  border-radius: var(--radius-sm);
-  padding: 10px 12px;
-  margin-top: 8px;
-  background: rgba(0, 122, 255, 0.03);
 }
 .cm-roster-actions {
   display: flex;
