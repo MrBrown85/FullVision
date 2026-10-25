@@ -689,6 +689,28 @@ function groupGradeGap(cid, mine, cls) {
   return { text: amount + (d > 0 ? ' above class' : ' below class'), dir: d > 0 ? 1 : -1 };
 }
 
+/* How one group grade sits against another (a type against all the
+   student's work), in the grade the class shows first: { value, text, dir },
+   value in % points in a Letter class, else in levels; text "+8.0%", "−0.3". */
+function groupGradeDiff(cid, mine, ref) {
+  if (!mine || !ref) return null;
+  var asPct = courseGradeMode(cid) === 'letter';
+  var a = asPct ? mine.pct : mine.prof;
+  var b = asPct ? ref.pct : ref.prof;
+  if (a == null || b == null) return null;
+  var d = Math.round((a - b) * 10) / 10;
+  var sign = d > 0 ? '+' : d < 0 ? '\u2212' : '';
+  return { value: d, text: sign + Math.abs(d).toFixed(1) + (asPct ? '%' : ''), dir: d > 0 ? 1 : d < 0 ? -1 : 0 };
+}
+
+/* A group grade on the 0–4 scale, for charts: the level, or in a Letter
+   class the % as a level (75% is 3), so formatLevel labels the axis. */
+function groupGradeValue(cid, g) {
+  if (!g) return null;
+  if (courseGradeMode(cid) === 'letter') return g.pct == null ? null : g.pct / 25;
+  return g.prof != null ? g.prof : g.pct == null ? null : g.pct / 25;
+}
+
 /* Each category's share of the course %: its weight times its % over the
    weights of the categories with a %, as getCourseLetterData adds them up.
    { [categoryId]: { points, text } } ("30.0"), {} when no category has a %. */
@@ -1876,6 +1898,8 @@ window.Calc = {
   assessmentGroupGrade,
   classAssessmentGroupGrade,
   groupGradeGap,
+  groupGradeDiff,
+  groupGradeValue,
   categoryCourseShares,
   rubricCriterionLevel,
   nearestScoreLevel,

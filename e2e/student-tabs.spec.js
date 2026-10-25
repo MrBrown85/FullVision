@@ -165,6 +165,16 @@ test('Grade Breakdown shows each category with its share, and Group By groups th
   await expect(page.locator('.stu-bd-cats .stu-bd-row:not(.stu-bd-head)')).toHaveCount(3);
   await page.locator('.stu-bd-cats [data-action="stuBdToggle"]').first().click();
   await expect(page.locator('.stu-bd-items .stu-bd-item')).toHaveCount(8);
+  await expect(page.locator('.stu-ts-row:not(.stu-ts-head)')).toHaveCount(5);
+  for (const view of ['growth', 'month', 'timeline']) {
+    await page.locator('[data-action="stuTypeView"][data-view="' + view + '"]').click();
+    await expect(page.locator('[data-action="stuTypeView"][data-view="' + view + '"]')).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+  }
+  await expect(page.locator('.stu-chart-line')).toHaveCount(5);
+  await page.locator('[data-action="stuTypeView"][data-view="strengths"]').click();
   await expect(page.locator('.stu-rt-picker .stu-chip.active')).toContainText('Rubric');
   await expect(page.locator('.stu-rt-row:not(.stu-rt-head)')).toHaveCount(3);
 
