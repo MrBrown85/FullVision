@@ -134,6 +134,7 @@ window.PageStudent = (function () {
     if (!goals[studentId]) goals[studentId] = {};
     goals[studentId][secId] = text;
     saveGoals(cid, goals);
+    if (typeof setGoalDate === 'function') setGoalDate(cid, studentId, secId, text ? new Date().toISOString() : null);
     if (window.v2 && _isUuid && _isUuid(studentId)) {
       await window.v2.saveGoal(studentId, secId, text);
     }
@@ -1799,132 +1800,221 @@ window.PageStudent = (function () {
     return html;
   }
 
+  /* A competency's goal: what it is, when it was set, and its editor (ids are
+     what editGoal / saveGoalField use). `compact` leaves only the button. */
+  function _goalBlockHtml(ctx, sec, goalText, setOn, compact) {
+    var first = displayNameFirst(ctx.student);
+    return (
+      '<div class="section-goal stu-goal-part' +
+      (compact ? ' compact' : '') +
+      '" id="goal-' +
+      sec.id +
+      '">' +
+      (compact
+        ? ''
+        : '<div class="stu-goal-label"><span>Goal' +
+          (setOn ? ' · Set ' + esc(_shortDay(setOn)) : '') +
+          '</span><button type="button" class="stu-chip" data-action="editGoal" data-secid="' +
+          sec.id +
+          '">Edit</button></div>') +
+      '<div class="section-goal-text" id="goal-text-' +
+      sec.id +
+      '">' +
+      (compact
+        ? '<button type="button" class="stu-chip" data-action="editGoal" data-secid="' + sec.id + '">+ Goal</button>'
+        : esc(goalText)) +
+      '</div>' +
+      '<div class="inline-edit-area" id="goal-edit-' +
+      sec.id +
+      '" style="display:none">' +
+      '<textarea id="goal-input-' +
+      sec.id +
+      '" aria-label="Goal for ' +
+      esc(sec.name) +
+      '" placeholder="What will ' +
+      esc(first) +
+      ' work on next?">' +
+      esc(goalText) +
+      '</textarea>' +
+      '<div class="inline-edit-actions">' +
+      '<button class="btn btn-primary" data-action="saveGoalField" data-secid="' +
+      sec.id +
+      '">Save</button>' +
+      '<button class="btn" data-action="cancelGoalEdit" data-secid="' +
+      sec.id +
+      '">Cancel</button>' +
+      '</div></div></div>'
+    );
+  }
+
+  /* The student's own words on a competency, and their editor. */
+  function _reflBlockHtml(ctx, sec, refl, compact) {
+    var first = displayNameFirst(ctx.student);
+    var confLabel = refl.confidence ? CONFIDENCE_LABELS[refl.confidence] || '' : '';
+    var confColor = refl.confidence ? CONFIDENCE_COLORS[refl.confidence] || '#bbb' : '';
+    var hasRefl = !!(refl.text || refl.confidence);
+    return (
+      '<div class="section-reflection stu-goal-part' +
+      (compact ? ' compact' : '') +
+      '" id="refl-' +
+      sec.id +
+      '">' +
+      (compact
+        ? ''
+        : '<div class="stu-goal-label"><span>In ' +
+          esc(first) +
+          '’s Words' +
+          (confLabel
+            ? ' <span class="confidence-badge" style="background:' + confColor + '">' + confLabel + '</span>'
+            : '') +
+          '</span><button type="button" class="stu-chip" data-action="editReflection" data-secid="' +
+          sec.id +
+          '">' +
+          (hasRefl ? 'Edit' : '+ Self-Reflection') +
+          '</button></div>') +
+      '<div class="section-reflection-text" id="refl-text-' +
+      sec.id +
+      '">' +
+      (compact
+        ? '<button type="button" class="stu-chip" data-action="editReflection" data-secid="' +
+          sec.id +
+          '">+ Self-Reflection</button>'
+        : (refl.text ? esc(refl.text) : '<span class="stu-muted">No self-reflection yet.</span>') +
+          (refl.date ? '<div class="stu-sub">' + formatDate(refl.date) + '</div>' : '')) +
+      '</div>' +
+      '<div class="inline-edit-area" id="refl-edit-' +
+      sec.id +
+      '" style="display:none">' +
+      '<select id="refl-conf-' +
+      sec.id +
+      '" aria-label="Confidence level">' +
+      '<option value="">Confidence level…</option>' +
+      [1, 2, 3, 4]
+        .map(function (n) {
+          return (
+            '<option value="' +
+            n +
+            '"' +
+            (refl.confidence === n ? ' selected' : '') +
+            '>' +
+            CONFIDENCE_LABELS[n] +
+            '</option>'
+          );
+        })
+        .join('') +
+      '</select>' +
+      '<textarea id="refl-input-' +
+      sec.id +
+      '" aria-label="Self-reflection for ' +
+      esc(sec.name) +
+      '" placeholder="' +
+      esc(first) +
+      '’s own words about their learning…">' +
+      esc(refl.text || '') +
+      '</textarea>' +
+      '<div class="inline-edit-actions">' +
+      '<button class="btn btn-primary" data-action="saveReflField" data-secid="' +
+      sec.id +
+      '">Save</button>' +
+      '<button class="btn" data-action="cancelReflEdit" data-secid="' +
+      sec.id +
+      '">Cancel</button>' +
+      '</div></div></div>'
+    );
+  }
+
+  /* The competency's scores since its goal was set, newest first; without a
+     date, its latest few. */
+  function _sinceGoalHtml(ctx, sec, setOn) {
+    var entries = _compEntries(ctx.cid, sec);
+    var day = setOn ? String(setOn).slice(0, 10) : '';
+    var list = day
+      ? entries.filter(function (e) {
+          return (e.date || '') >= day;
+        })
+      : entries.slice(-4);
+    var html =
+      '<div class="stu-goal-since"><div class="stu-goal-label"><span>' +
+      (day ? 'Since the Goal' : 'Latest Scores') +
+      '</span></div>';
+    if (!list.length) return html + '<div class="stu-muted">No scores since then yet.</div></div>';
+    list
+      .slice()
+      .reverse()
+      .slice(0, 6)
+      .forEach(function (e) {
+        var a = ctx.assessMap[e.assessmentId];
+        var lvl = e.level != null ? e.level : Math.round(e.score);
+        html +=
+          '<div class="stu-goal-since-row"><span class="stu-assess-date">' +
+          esc(_shortDay(e.date)) +
+          '</span><span class="stu-goal-since-title">' +
+          esc(a ? a.title : '') +
+          '</span><span class="stu-level stu-level-' +
+          (lvl > 0 ? Math.min(4, lvl) : 0) +
+          '">' +
+          esc(_entryText(e, a)) +
+          '</span></div>';
+      });
+    return html + '</div>';
+  }
+
   /* ── Goals and Reflections tab ──────────────────────────── */
+  /* Competencies with a goal or the student's own words get a card with the
+     scores since the goal; the rest are one line each, ready for a goal. */
   function _goalsTabHtml(ctx) {
     var cid = ctx.cid;
-    var first = displayNameFirst(ctx.student);
     var goals = getGoals(cid)[studentId] || {};
     var reflections = getReflections(cid)[studentId] || {};
-    var html = '<div class="stu-goal-grid">';
+    var dates = (typeof getGoalDates === 'function' ? getGoalDates(cid)[studentId] : null) || {};
+    var full = [];
+    var rest = [];
     ctx.sections.forEach(function (sec) {
-      var tag = sec.tags[0];
-      var goalText = goals[sec.id] || '';
       var refl = reflections[sec.id] || {};
-      var confLabel = refl.confidence ? CONFIDENCE_LABELS[refl.confidence] || '' : '';
-      var confColor = refl.confidence ? CONFIDENCE_COLORS[refl.confidence] || '#bbb' : '';
-      var hasRefl = !!(refl.text || refl.confidence);
-      html +=
-        '<div class="stu-goal-card">' +
+      (goals[sec.id] || refl.text || refl.confidence ? full : rest).push(sec);
+    });
+    var head = function (sec) {
+      var tag = sec.tags[0];
+      return (
         '<div class="stu-goal-head"><span class="stu-comp-name"><strong>' +
         esc(sec.name) +
         '</strong>' +
         (tag && tag.label && tag.label !== sec.name ? '<span class="stu-sub">' + esc(tag.label) + '</span>' : '') +
         '</span>' +
         _levelPill(cid, getSectionProficiency(cid, studentId, sec.id)) +
-        '</div>' +
-        '<div class="stu-sub">Latest: ' +
-        esc(_latestLine(cid, sec, ctx.assessMap)) +
-        '</div>' +
-        // Goal (ids are what editGoal / saveGoalField use)
-        '<div class="section-goal stu-goal-part" id="goal-' +
-        sec.id +
-        '">' +
-        '<div class="stu-goal-label"><span>Goal</span><button type="button" class="stu-chip" data-action="editGoal" data-secid="' +
-        sec.id +
-        '">' +
-        (goalText ? 'Edit' : '+ Goal') +
-        '</button></div>' +
-        '<div class="section-goal-text" id="goal-text-' +
-        sec.id +
-        '">' +
-        (goalText ? esc(goalText) : '<span class="stu-muted">No goal set.</span>') +
-        '</div>' +
-        '<div class="inline-edit-area" id="goal-edit-' +
-        sec.id +
-        '" style="display:none">' +
-        '<textarea id="goal-input-' +
-        sec.id +
-        '" aria-label="Goal for ' +
-        esc(sec.name) +
-        '" placeholder="What will ' +
-        esc(first) +
-        ' work on next?">' +
-        esc(goalText) +
-        '</textarea>' +
-        '<div class="inline-edit-actions">' +
-        '<button class="btn btn-primary" data-action="saveGoalField" data-secid="' +
-        sec.id +
-        '">Save</button>' +
-        '<button class="btn" data-action="cancelGoalEdit" data-secid="' +
-        sec.id +
-        '">Cancel</button>' +
-        '</div>' +
-        '</div>' +
-        '</div>' +
-        // Self-reflection
-        '<div class="section-reflection stu-goal-part" id="refl-' +
-        sec.id +
-        '">' +
-        '<div class="stu-goal-label"><span>In ' +
-        esc(first) +
-        '’s Words' +
-        (confLabel
-          ? ' <span class="confidence-badge" style="background:' + confColor + '">' + confLabel + '</span>'
-          : '') +
-        '</span><button type="button" class="stu-chip" data-action="editReflection" data-secid="' +
-        sec.id +
-        '">' +
-        (hasRefl ? 'Edit' : '+ Self-Reflection') +
-        '</button></div>' +
-        '<div class="section-reflection-text" id="refl-text-' +
-        sec.id +
-        '">' +
-        (refl.text ? esc(refl.text) : '<span class="stu-muted">No self-reflection yet.</span>') +
-        (refl.date ? '<div class="stu-sub">' + formatDate(refl.date) + '</div>' : '') +
-        '</div>' +
-        '<div class="inline-edit-area" id="refl-edit-' +
-        sec.id +
-        '" style="display:none">' +
-        '<select id="refl-conf-' +
-        sec.id +
-        '" aria-label="Confidence level">' +
-        '<option value="">Confidence level…</option>' +
-        [1, 2, 3, 4]
-          .map(function (n) {
-            return (
-              '<option value="' +
-              n +
-              '"' +
-              (refl.confidence === n ? ' selected' : '') +
-              '>' +
-              CONFIDENCE_LABELS[n] +
-              '</option>'
-            );
-          })
-          .join('') +
-        '</select>' +
-        '<textarea id="refl-input-' +
-        sec.id +
-        '" aria-label="Self-reflection for ' +
-        esc(sec.name) +
-        '" placeholder="' +
-        esc(first) +
-        '’s own words about their learning…">' +
-        esc(refl.text || '') +
-        '</textarea>' +
-        '<div class="inline-edit-actions">' +
-        '<button class="btn btn-primary" data-action="saveReflField" data-secid="' +
-        sec.id +
-        '">Save</button>' +
-        '<button class="btn" data-action="cancelReflEdit" data-secid="' +
-        sec.id +
-        '">Cancel</button>' +
-        '</div>' +
-        '</div>' +
-        '</div>' +
-        '</div>';
-    });
-    html += '</div>';
+        '</div>'
+      );
+    };
+    var html = '';
+    if (full.length) {
+      html += '<div class="stu-goal-list">';
+      full.forEach(function (sec) {
+        var goalText = goals[sec.id] || '';
+        var setOn = goalText ? dates[sec.id] : null;
+        html +=
+          '<div class="stu-goal-card stu-goal-full"><div class="stu-goal-main">' +
+          head(sec) +
+          (goalText ? _goalBlockHtml(ctx, sec, goalText, setOn, false) : _goalBlockHtml(ctx, sec, '', null, true)) +
+          _reflBlockHtml(ctx, sec, reflections[sec.id] || {}, false) +
+          '</div>' +
+          _sinceGoalHtml(ctx, sec, setOn) +
+          '</div>';
+      });
+      html += '</div>';
+    }
+    if (rest.length) {
+      html += '<div class="stu-goal-rest">' + (full.length ? '<div class="stu-goal-rest-title">No Goal Yet</div>' : '');
+      rest.forEach(function (sec) {
+        html +=
+          '<div class="stu-goal-card stu-goal-compact"><div class="stu-goal-row">' +
+          head(sec) +
+          '<span class="stu-goal-adds">' +
+          _goalBlockHtml(ctx, sec, '', null, true) +
+          _reflBlockHtml(ctx, sec, {}, true) +
+          '</span></div></div>';
+      });
+      html += '</div>';
+    }
     if (!ctx.sections.length) html += '<div class="stu-empty">This class has no competencies yet.</div>';
     return html;
   }
