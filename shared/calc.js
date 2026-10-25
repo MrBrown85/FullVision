@@ -711,6 +711,58 @@ function groupGradeValue(cid, g) {
   return g.prof != null ? g.prof : g.pct == null ? null : g.pct / 25;
 }
 
+/* A run of dated values on the 0–4 scale, as where it started and where it
+   is now: the mean of the first four weeks of values and of the last four.
+   A run under eight weeks long splits into its first and second halves.
+   points: [{ t (a day number), v }]. Null with fewer than two values or a
+   run under two weeks. */
+function startAndNow(points) {
+  var pts = (points || [])
+    .filter(function (p) {
+      return p && p.v != null && p.t != null && isFinite(p.v);
+    })
+    .slice()
+    .sort(function (a, b) {
+      return a.t - b.t;
+    });
+  if (pts.length < 2) return null;
+  var t0 = pts[0].t;
+  var t1 = pts[pts.length - 1].t;
+  if (t1 - t0 < 14) return null;
+  var win = t1 - t0 >= 56 ? 28 : (t1 - t0) / 2;
+  var mean = function (list) {
+    return (
+      list.reduce(function (s, p) {
+        return s + p.v;
+      }, 0) / list.length
+    );
+  };
+  var first = pts.filter(function (p) {
+    return p.t <= t0 + win;
+  });
+  var last = pts.filter(function (p) {
+    return p.t >= t1 - win;
+  });
+  return { start: mean(first), now: mean(last), startCount: first.length, nowCount: last.length };
+}
+
+/* The mean of a student's score entries (getTagScores), each at the value
+   the calculations use (3+ is 3.33). Null when there are none. */
+function averageLevels(entries) {
+  var vals = (entries || [])
+    .map(function (e) {
+      return Number(e.score);
+    })
+    .filter(function (v) {
+      return v > 0;
+    });
+  return vals.length
+    ? vals.reduce(function (s, v) {
+        return s + v;
+      }, 0) / vals.length
+    : null;
+}
+
 /* Each category's share of the course %: its weight times its % over the
    weights of the categories with a %, as getCourseLetterData adds them up.
    { [categoryId]: { points, text } } ("30.0"), {} when no category has a %. */
@@ -1924,6 +1976,8 @@ window.Calc = {
   groupGradeGap,
   groupGradeDiff,
   groupGradeValue,
+  startAndNow,
+  averageLevels,
   categoryCourseShares,
   rubricCriterionLevel,
   nearestScoreLevel,

@@ -215,7 +215,7 @@ describe('Evidence panel in the page', () => {
   const cardIds = () => $$('#ev-list .obs-card').map(c => c.getAttribute('data-obid'));
 
   it('shows one Evidence panel with tabs, counts and cards newest first, without the name', () => {
-    expect($('#ev-title').textContent).toBe('Evidence');
+    expect($('#ev-title').textContent).toBe('Observations');
     expect(tabText()).toEqual(['All 3', 'By competency 0', 'Assessments 1', 'Concerns 1']);
     expect(cardIds()).toEqual(['o3', 'o2', 'o1']);
     expect($('#ev-list .obs-card-student')).toBeNull();
@@ -228,7 +228,7 @@ describe('Evidence panel in the page', () => {
     expect($('.ev-tl-mark[data-obid="o2"]').getAttribute('data-shape')).toBe('square');
     expect($('.ev-tl-mark[data-obid="o3"]').getAttribute('aria-label')).toBe('Oct 16 · Concern: Left the lab early');
     // Sep 20 → Oct 1 is 11 days, Oct 1 → Oct 16 is 15, Oct 16 → today is 2.
-    expect($$('.ev-tl-gap-label').map(g => g.textContent)).toEqual(['No evidence for 15 days']);
+    expect($$('.ev-tl-gap-label').map(g => g.textContent)).toEqual(['No observations for 15 days']);
     expect($('.ev-tl-range').textContent).toBe('All time · Sep 20 to today');
   });
 
