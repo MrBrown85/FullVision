@@ -1801,7 +1801,14 @@ window.DashClassManager = (function () {
     if (!box) return;
     var r = btn.getBoundingClientRect();
     menu.style.position = 'fixed';
-    menu.style.top = Math.round(r.bottom + 4) + 'px';
+    // Below the button, or above it when there's more room there; never
+    // taller than the room it has, so every item can be reached.
+    var below = window.innerHeight - r.bottom - 12;
+    var above = r.top - 12;
+    var up = menu.offsetHeight > below && above > below;
+    menu.style.maxHeight = Math.max(120, up ? above : below) + 'px';
+    menu.style.overflowY = 'auto';
+    menu.style.top = Math.round(up ? Math.max(8, r.top - 4 - menu.offsetHeight) : r.bottom + 4) + 'px';
     var w = menu.offsetWidth;
     var left = menu.classList.contains('cm-std-menu') ? r.right - w : r.left;
     menu.style.left = Math.max(8, Math.min(Math.round(left), window.innerWidth - w - 8)) + 'px';
