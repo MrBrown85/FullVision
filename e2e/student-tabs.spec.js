@@ -197,19 +197,24 @@ test('Grade Breakdown shows each category with its share, and Group By groups th
   await expect(page.locator('.stu-agroup').first().locator('.stu-assess-row')).toHaveCount(0);
 });
 
-// A view switch or a chip redraws the tab; the page stays where it was and
-// the clicked control keeps the focus (Colin, 2026-10-24).
+// A view switch, a chip or a fold redraws the tab; the page stays where it
+// was and the clicked control keeps the focus (Colin, 2026-10-24). Opening
+// a category only adds rows under it, so nothing makes the browser clamp
+// the scroll position.
 test('Grade Breakdown buttons keep the scroll position and focus', async ({ page }) => {
   await openCece(page);
   await page.locator('#stu-tab-breakdown').click();
-  const chip = page.locator('[data-action="stuBdRubric"]').nth(1);
-  await chip.scrollIntoViewIfNeeded();
+  const row = page.locator('.stu-bd-cats [data-action="stuBdToggle"]').last();
+  await row.evaluate(el => el.scrollIntoView({ block: 'center' }));
   const before = await page.evaluate(() => document.querySelector('.student-scroll').scrollTop);
   expect(before).toBeGreaterThan(100);
-  await chip.click();
-  await expect(page.locator('[data-action="stuBdRubric"]').nth(1)).toHaveAttribute('aria-pressed', 'true');
+  await row.click();
+  await expect(page.locator('.stu-bd-cats [data-action="stuBdToggle"]').last()).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  );
   expect(await page.evaluate(() => document.querySelector('.student-scroll').scrollTop)).toBe(before);
-  expect(await page.evaluate(() => document.activeElement.dataset.action)).toBe('stuBdRubric');
+  expect(await page.evaluate(() => document.activeElement.dataset.action)).toBe('stuBdToggle');
   await page.locator('#stu-tab-assess').click();
   expect(await page.evaluate(() => document.querySelector('.student-scroll').scrollTop)).toBe(0);
 });
