@@ -1,0 +1,139 @@
+/* Printable QR slips (teacher/qr-slips.js). Eight to a letter page, two
+   across and four down, black and white with dashed grey cut lines like the
+   rubric handouts. The slips render into #qr-slips-root, kept off screen,
+   and become the only thing printed while body.qr-slips-active is set. */
+
+#qr-slips-root {
+  position: absolute;
+  top: 0;
+  left: -30000px;
+  width: 8in;
+  pointer-events: none;
+  background: #fff;
+  color: #000;
+  font-family: var(--font-base, system-ui, sans-serif);
+}
+.qs-page {
+  width: 8in;
+  height: 10.5in;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(4, minmax(0, 1fr));
+  break-after: page;
+  page-break-after: always;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+.qs-page:last-child {
+  break-after: auto;
+  page-break-after: auto;
+}
+.qs-slip {
+  box-sizing: border-box;
+  padding: 0.12in;
+  display: flex;
+  flex-direction: column;
+  gap: 0.08in;
+  overflow: hidden;
+  line-height: 1.22;
+  border-right: 1px dashed #9a9a9a;
+  border-bottom: 1px dashed #9a9a9a;
+}
+.qs-slip:nth-child(2n) {
+  border-right: 0;
+}
+.qs-slip:nth-child(n + 7) {
+  border-bottom: 0;
+}
+.qs-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.12in;
+  padding-bottom: 0.05in;
+  border-bottom: 2px solid #000;
+}
+.qs-who {
+  min-width: 0;
+}
+.qs-name {
+  font-size: 16pt;
+  font-weight: 700;
+  line-height: 1.15;
+}
+.qs-class,
+.qs-dates {
+  font-size: 9.5pt;
+  color: #333;
+}
+.qs-what {
+  flex-shrink: 0;
+  text-align: right;
+}
+.qs-title {
+  font-size: 10.5pt;
+  font-weight: 700;
+}
+.qs-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.14in;
+}
+.qs-qr {
+  width: 1.35in;
+  height: 1.35in;
+  flex-shrink: 0;
+}
+.qs-qr svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.qs-how {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.06in;
+}
+.qs-scan {
+  font-size: 10pt;
+}
+.qs-type span {
+  display: block;
+  font-size: 7.5pt;
+  font-weight: 700;
+  color: #555;
+}
+.qs-type strong {
+  display: block;
+  font-size: 17pt;
+  letter-spacing: 2px;
+  font-family: ui-monospace, Menlo, monospace;
+}
+.qs-once {
+  font-size: 8pt;
+  color: #333;
+}
+
+@media print {
+  body.qr-slips-active {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+  body.qr-slips-active > :not(#qr-slips-root) {
+    display: none !important;
+  }
+  body.qr-slips-active #qr-slips-root {
+    position: static;
+    left: auto;
+    width: auto;
+    pointer-events: auto;
+  }
+}

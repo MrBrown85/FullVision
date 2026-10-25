@@ -77,7 +77,7 @@ window.DashClassManager = (function () {
   var classManagerOpen = false;
   var cmSelectedCourse = null;
   var cmMode = 'edit';
-  var cmTab = 'details'; // details | students | grading | terms | competencies
+  var cmTab = 'details'; // details | students | questionnaires | grading | terms | competencies
 
   // Curriculum Wizard state
   var cwStep = 1;
@@ -2972,6 +2972,9 @@ window.DashClassManager = (function () {
     panels.students = html;
     html = '';
 
+    // Questionnaires tab (teacher/cm-questionnaires.js)
+    if (typeof CmQuestionnaires !== 'undefined') panels.questionnaires = CmQuestionnaires.render(cid);
+
     // Grading tab
     panels.grading = _cmRenderGradingTab(cid);
 
@@ -3242,6 +3245,7 @@ window.DashClassManager = (function () {
   var CM_TABS = [
     { id: 'details', label: 'Details' },
     { id: 'students', label: 'Students' },
+    { id: 'questionnaires', label: 'Questionnaires' },
     { id: 'grading', label: 'Grading' },
     { id: 'terms', label: 'Reporting Terms' },
     { id: 'competencies', label: 'Competencies' },
@@ -3249,6 +3253,7 @@ window.DashClassManager = (function () {
 
   function _cmRenderTabs(active, studentCount, tagCount) {
     var counts = { students: studentCount, competencies: tagCount };
+    if (typeof CmQuestionnaires !== 'undefined') counts.questionnaires = CmQuestionnaires.countOn(cmSelectedCourse);
     return (
       '<div class="cm-tabs" role="tablist" aria-label="Class settings">' +
       CM_TABS.map(function (t) {
@@ -7644,6 +7649,8 @@ window.DashClassManager = (function () {
     // Any click other than on a card's More button closes its open menu.
     if (action !== 'cmStdMenu') _cmCloseStdMenus();
     if (action !== 'cmRosterDesigOpen') _cmCloseRosterPicker();
+    if (/^sq[A-Z]/.test(action) && typeof CmQuestionnaires !== 'undefined')
+      return CmQuestionnaires.handleAction(action, el);
     var handlers = {
       openClassManager: function () {
         openClassManager();
@@ -7980,6 +7987,7 @@ window.DashClassManager = (function () {
   }
 
   function handleChange(el) {
+    if (typeof CmQuestionnaires !== 'undefined' && CmQuestionnaires.handleChange(el)) return true;
     if (el.dataset.actionChange === 'cmCSV') {
       cmHandleCSV(el);
       return true;
@@ -8117,6 +8125,7 @@ window.DashClassManager = (function () {
   }
 
   function handleBlur(el) {
+    if (typeof CmQuestionnaires !== 'undefined' && CmQuestionnaires.handleBlur(el)) return true;
     if (el.dataset.actionBlur === 'cmRosterField') {
       cmRosterField(el);
       return true;
