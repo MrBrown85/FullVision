@@ -2512,7 +2512,9 @@
   align-items: flex-start;
   gap: 6px;
   cursor: pointer;
-  transition: all 0.15s;
+  transition:
+    background-color 0.12s,
+    border-color 0.12s;
 }
 .tq-evidence-item:hover {
   background: var(--divider-subtle);
@@ -2906,19 +2908,23 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 10px;
+  /* The border is always there, clear until picked, so picking a row only
+     changes its colours: nothing grows or moves. */
+  padding: 4px 9px;
+  border: 1px solid transparent;
   background: var(--bg);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: all 0.1s;
+  transition:
+    background-color 0.12s,
+    border-color 0.12s;
 }
 .tq-assignment-row:hover {
   background: var(--divider-subtle);
 }
 .tq-assignment-row.selected {
   background: rgba(0, 122, 255, 0.06);
-  border: 1px solid rgba(0, 122, 255, 0.15);
-  padding: 4px 9px;
+  border-color: rgba(0, 122, 255, 0.15);
 }
 .tq-assignment-row .tq-tag-check {
   width: 13px;

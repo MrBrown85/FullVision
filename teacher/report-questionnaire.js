@@ -177,7 +177,10 @@ window.ReportQuestionnaire = (function () {
     if (idx >= 0) list.splice(idx, 1);
     else list.push(obId);
     upsertTermRating(_activeCourse, sid, termId, { mentionObs: list });
-    rerender();
+    // In place, as assignments: a redraw moved the page under the cursor.
+    const row = document.querySelector(`.tq-evidence-item[data-obid="${obId}"][data-sid="${sid}"]`);
+    if (row) row.classList.toggle('selected', idx < 0);
+    else rerender();
   }
 
   /* Generated text is stitched from fragments, some of which start
