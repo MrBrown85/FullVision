@@ -77,7 +77,7 @@ test.describe('Competency card evidence drawer', () => {
     const saved = (await meiObs(page)).find(o => o.text === text);
     expect(saved).toMatchObject({ competencyId: tagId, level: 4 });
 
-    // The drawer row opens it in the Evidence tab.
+    // The drawer row opens it in the Observations tab.
     await obsRow.click();
     await expect(page.locator('#stu-tab-evidence')).toHaveAttribute('aria-selected', 'true');
     const panelCard = page.locator('#ev-list .obs-card[data-obid="' + saved.id + '"]');

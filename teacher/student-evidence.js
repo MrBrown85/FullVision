@@ -411,7 +411,7 @@ window.StudentEvidence = (function () {
       '<span class="ev-tl-key" data-type="none">No type</span>' +
       '<span class="ev-tl-key" data-shape="square">Assessment</span>' +
       '</span></div>' +
-      '<div class="ev-tl-scroll"><div class="ev-tl-track" role="group" aria-label="Evidence timeline, ' +
+      '<div class="ev-tl-scroll"><div class="ev-tl-track" role="group" aria-label="Observations timeline, ' +
       esc(range.replace(' · ', ', ')) +
       '">' +
       '<div class="ev-tl-axis"></div>';

@@ -12,9 +12,12 @@ window.PageStudent = (function () {
   /* ── State variables ────────────────────────────────────── */
   var studentId;
   var activeCourse;
-  var _tab = 'comps'; // the open tab: comps, assess, evidence, goals, profile
+  var _tab = 'comps'; // the open tab: comps, assess, evidence, breakdown, goals, profile
   var _assessFilter = 'all'; // Assessments tab: all, prof, points, unscored
   var _assessCat = ''; // Assessments tab: a category id, or '' for all
+  var _assessGroup = 'date'; // Assessments tab: date, category, module, type, rubric
+  var _assessClosed = {}; // Assessments tab: '<group by>:<key>' of groups folded shut
+  var _bdOpen = {}; // Grade Breakdown tab: categories whose assessments show
   var _openTags = new Set(); // competency cards whose evidence drawer is open
   var _overrideSelectedLevel = 0;
   var Evidence = StudentEvidence;
@@ -319,7 +322,8 @@ window.PageStudent = (function () {
   var TABS = [
     { id: 'comps', label: 'Competencies' },
     { id: 'assess', label: 'Assessments' },
-    { id: 'evidence', label: 'Evidence' },
+    { id: 'evidence', label: 'Observations' },
+    { id: 'breakdown', label: 'Grade Breakdown' },
     { id: 'goals', label: 'Goals and Reflections' },
     { id: 'profile', label: 'Learner Profile' },
   ];
@@ -446,9 +450,10 @@ window.PageStudent = (function () {
     };
     var lastOb = ctx.obs[0];
     out.evidence = {
-      stat: _plural(ctx.obs.length, 'Observation', 'Observations'),
+      stat: _plural(ctx.obs.length, 'Note', 'Notes'),
       sub: scope + (lastOb ? ' · Latest ' + _daysAgo(_obDay(lastOb)) : ' · None yet'),
     };
+    out.breakdown = _breakdownSummary(ctx);
     var goals = getGoals(cid)[studentId] || {};
     var refl = getReflections(cid)[studentId] || {};
     var goalCount = ctx.sections.filter(function (sec) {
@@ -696,6 +701,163 @@ window.PageStudent = (function () {
     return html;
   }
 
+  /* ── Groups of assessments (Assessments tab, Grade Breakdown) ── */
+  var GROUP_BYS = [
+    { id: 'date', label: 'Date' },
+    { id: 'category', label: 'Category' },
+    { id: 'module', label: 'Module' },
+    { id: 'type', label: 'Type' },
+    { id: 'rubric', label: 'Rubric' },
+  ];
+  var TYPE_ORDER = ['written', 'observation', 'audio', 'video', 'photo', 'conversation'];
+  var GROUP_KEY = 'gb-student-assess-group';
+
+  function _savedGroupBy() {
+    try {
+      var g = localStorage.getItem(GROUP_KEY);
+      return GROUP_BYS.some(function (b) {
+        return b.id === g;
+      })
+        ? g
+        : 'date';
+    } catch (e) {
+      return 'date';
+    }
+  }
+
+  function _typeLabel(t) {
+    return t ? String(t).charAt(0).toUpperCase() + String(t).slice(1) : 'No Type';
+  }
+
+  function _rubricIdOf(a) {
+    return isPointsScored(a) ? '' : a.rubricId || a.rubric_id || '';
+  }
+
+  /* Assessments sorted into groups by category, module, assignment type or
+     rubric, in the class's own order, with the ones in no group last. Each
+     group is { key, name, assessments, category?, rubric? }; empty groups
+     are left out. */
+  function _assessGroups(cid, assessments, by) {
+    var groups = [];
+    var add = function (key, name, extra) {
+      var list = assessments.filter(function (a) {
+        return _groupKeyOf(cid, a, by) === key;
+      });
+      if (list.length) groups.push(Object.assign({ key: key, name: name, assessments: list }, extra || {}));
+    };
+    if (by === 'category') {
+      (getCategories(cid) || []).forEach(function (cat) {
+        add(cat.id, cat.name, { category: cat });
+      });
+      add('', 'No Category');
+    } else if (by === 'module') {
+      (getModules(cid) || []).forEach(function (m) {
+        add(m.id, m.name || 'Untitled Module');
+      });
+      add('', 'No Module');
+    } else if (by === 'type') {
+      var seen = [];
+      assessments.forEach(function (a) {
+        var t = a.evidenceType || '';
+        if (t && seen.indexOf(t) < 0) seen.push(t);
+      });
+      seen.sort(function (x, y) {
+        var ix = TYPE_ORDER.indexOf(x);
+        var iy = TYPE_ORDER.indexOf(y);
+        if (ix < 0 && iy < 0) return x.localeCompare(y);
+        if (ix < 0) return 1;
+        if (iy < 0) return -1;
+        return ix - iy;
+      });
+      seen.forEach(function (t) {
+        add(t, _typeLabel(t));
+      });
+      add('', 'No Type');
+    } else if (by === 'rubric') {
+      var ids = [];
+      assessments.forEach(function (a) {
+        var r = _rubricIdOf(a);
+        if (r && ids.indexOf(r) < 0) ids.push(r);
+      });
+      ids.forEach(function (rid) {
+        var rubric = getRubricById(cid, rid);
+        add(rid, (rubric && rubric.name) || 'Rubric', { rubric: rubric });
+      });
+      add('', 'No Rubric');
+    }
+    return groups;
+  }
+
+  function _groupKeyOf(cid, a, by) {
+    if (by === 'category') return getAssessmentCategoryId(a) || '';
+    if (by === 'module') {
+      var mid = a.moduleId || '';
+      return mid &&
+        (getModules(cid) || []).some(function (m) {
+          return m.id === mid;
+        })
+        ? mid
+        : '';
+    }
+    if (by === 'type') return a.evidenceType || '';
+    if (by === 'rubric') return _rubricIdOf(a);
+    return '';
+  }
+
+  /* A group grade as a tinted pill, as the class shows grades. */
+  function _gradePill(g) {
+    return '<span class="stu-level stu-level-' + (g ? g.level : 0) + '">' + esc(g ? g.text : '\u2014') + '</span>';
+  }
+
+  /* The class's grade on the group and how this student sits against it. */
+  function _classLine(cid, mine, cls) {
+    var gap = groupGradeGap(cid, mine, cls);
+    return (
+      '<span class="stu-group-class"><span class="stu-class-avg" title="Class average">Class ' +
+      esc(cls ? cls.text : '\u2014') +
+      '</span>' +
+      (gap
+        ? '<span class="stu-gap' +
+          (gap.dir > 0 ? ' stu-gap-up' : gap.dir < 0 ? ' stu-gap-down' : '') +
+          '">' +
+          esc(gap.text) +
+          '</span>'
+        : '') +
+      '</span>'
+    );
+  }
+
+  /* One bar per scored assessment, oldest to newest, as the competency rows
+     draw them. */
+  function _groupBars(cid, assessments) {
+    return assessments
+      .slice()
+      .sort(function (x, y) {
+        return (x.date || '').localeCompare(y.date || '');
+      })
+      .map(function (a) {
+        var g = assessmentGroupGrade(cid, studentId, [a]);
+        if (!g) return '';
+        var share = g.pct != null ? g.pct / 100 : g.prof / 4;
+        return (
+          '<span class="stu-bar" style="height:' +
+          Math.max(4, Math.round(Math.min(1, share) * 28)) +
+          'px;background:' +
+          (PROF_COLORS[g.level] || PROF_COLORS[0]) +
+          '" title="' +
+          esc(_shortDay(a.date) + ': ' + a.title + ', ' + g.text) +
+          '"></span>'
+        );
+      })
+      .join('');
+  }
+
+  function _groupMeta(cid, g) {
+    var n = _plural(g.assessments.length, 'assessment', 'assessments');
+    var w = g.category ? Number(g.category.weight || 0) : 0;
+    return w > 0 ? w + '% of the grade \u00B7 ' + n : n;
+  }
+
   /* ── Assessments tab ────────────────────────────────────── */
   function _assessTabHtml(ctx) {
     var cid = ctx.cid;
@@ -752,8 +914,27 @@ window.PageStudent = (function () {
         return getAssessmentCategoryId(c.a) === cat.id;
       });
     });
+    var groupSeg =
+      '<span class="stu-group-label" id="stu-group-label">Group By</span>' +
+      '<div class="seg seg-sm stu-group-seg" role="radiogroup" aria-labelledby="stu-group-label">' +
+      GROUP_BYS.map(function (b) {
+        var on = _assessGroup === b.id;
+        return (
+          '<button type="button" class="seg-btn' +
+          (on ? ' active' : '') +
+          '" role="radio" aria-checked="' +
+          on +
+          '" data-action="stuAssessGroup" data-group="' +
+          b.id +
+          '">' +
+          esc(b.label) +
+          '</button>'
+        );
+      }).join('') +
+      '</div>';
     var html =
       '<div class="stu-toolbar">' +
+      groupSeg +
       chip('all', 'All') +
       chip('prof', 'Proficiency') +
       chip('points', 'Points') +
@@ -784,18 +965,8 @@ window.PageStudent = (function () {
         html + '<div class="stu-empty">' + (cells.length ? 'No assessments match.' : 'No assessments yet.') + '</div>'
       );
     }
-    var month = '';
-    shown.forEach(function (c) {
+    var rowHtml = function (c) {
       var a = c.a;
-      var m = (a.date || '').slice(0, 7);
-      if (m !== month) {
-        month = m;
-        var md = m ? new Date(m + '-01T00:00:00') : null;
-        html +=
-          '<h3 class="stu-month">' +
-          (md && !isNaN(md) ? md.toLocaleDateString('en-CA', { month: 'long', year: 'numeric' }) : 'No Date') +
-          '</h3>';
-      }
       // Each competency by its short title (the tag's label), as the cards show it.
       var toward = [];
       (a.tagIds || []).forEach(function (tid) {
@@ -811,7 +982,7 @@ window.PageStudent = (function () {
           : toward.join(', ');
       var status = ctx.statuses[studentId + ':' + a.id];
       var cell = c.cell;
-      html +=
+      return (
         '<div class="stu-assess-row">' +
         '<span class="stu-assess-date">' +
         esc(_shortDay(a.date)) +
@@ -847,8 +1018,369 @@ window.PageStudent = (function () {
         '<span class="stu-assess-toward">' +
         esc(towardText) +
         '</span>' +
-        '</div>';
+        '</div>'
+      );
+    };
+    if (_assessGroup === 'date') {
+      var month = '';
+      shown.forEach(function (c) {
+        var m = (c.a.date || '').slice(0, 7);
+        if (m !== month) {
+          month = m;
+          var md = m ? new Date(m + '-01T00:00:00') : null;
+          html +=
+            '<h3 class="stu-month">' +
+            (md && !isNaN(md) ? md.toLocaleDateString('en-CA', { month: 'long', year: 'numeric' }) : 'No Date') +
+            '</h3>';
+        }
+        html += rowHtml(c);
+      });
+      return html;
+    }
+    // Grouped: each group's grade and the class's on what is listed.
+    var byId = {};
+    shown.forEach(function (c) {
+      byId[c.a.id] = c;
     });
+    _assessGroups(
+      cid,
+      shown.map(function (c) {
+        return c.a;
+      }),
+      _assessGroup,
+    ).forEach(function (g) {
+      var fold = _assessGroup + ':' + g.key;
+      var open = !_assessClosed[fold];
+      var mine = assessmentGroupGrade(cid, studentId, g.assessments);
+      var cls = classAssessmentGroupGrade(cid, ctx.classIds, g.assessments);
+      html +=
+        '<div class="stu-agroup">' +
+        '<button type="button" class="stu-agroup-head" data-action="stuAssessFold" data-fold="' +
+        esc(fold) +
+        '" aria-expanded="' +
+        open +
+        '">' +
+        '<span class="stu-agroup-chev" aria-hidden="true">' +
+        (open ? '\u25BE' : '\u25B8') +
+        '</span>' +
+        '<span class="stu-agroup-name">' +
+        esc(g.name) +
+        '</span>' +
+        '<span class="stu-agroup-meta">' +
+        esc(_groupMeta(cid, g)) +
+        '</span>' +
+        '<span class="stu-agroup-grades">' +
+        _classLine(cid, mine, cls) +
+        _gradePill(mine) +
+        '</span>' +
+        '</button>';
+      if (open)
+        g.assessments.forEach(function (a) {
+          html += rowHtml(byId[a.id]);
+        });
+      html += '</div>';
+    });
+    return html;
+  }
+
+  /* ── Grade Breakdown tab ────────────────────────────────── */
+  function _breakdownSummary(ctx) {
+    var cid = ctx.cid;
+    var cats = _assessGroups(cid, ctx.assessments, 'category').filter(function (g) {
+      return g.category;
+    });
+    var mods = _assessGroups(cid, ctx.assessments, 'module').filter(function (g) {
+      return g.key;
+    });
+    var parts = [];
+    if (cats.length) parts.push(_plural(cats.length, 'Category', 'Categories'));
+    if (mods.length) parts.push(_plural(mods.length, 'Module', 'Modules'));
+    var lowest = null;
+    cats.forEach(function (g) {
+      var gr = assessmentGroupGrade(cid, studentId, g.assessments);
+      if (!gr) return;
+      var v = courseGradeMode(cid) === 'letter' ? gr.pct : gr.prof;
+      if (v != null && (!lowest || v < lowest.v)) lowest = { v: v, name: g.name };
+    });
+    return {
+      stat: parts.length ? parts.join(' \u00B7 ') : 'By Type and Rubric',
+      sub: lowest && cats.length > 1 ? 'Lowest: ' + lowest.name : cats.length ? 'One category' : 'No categories yet',
+    };
+  }
+
+  function _bdHeadRow(cells) {
+    return (
+      '<div class="stu-bd-row stu-bd-head" aria-hidden="true">' +
+      cells
+        .map(function (c) {
+          return '<span>' + esc(c) + '</span>';
+        })
+        .join('') +
+      '</div>'
+    );
+  }
+
+  /* One group as a table row: name and count, grade, bars, class. */
+  function _bdGroupCells(ctx, g, mine, cls) {
+    var scored = g.assessments.filter(function (a) {
+      return assessmentGroupGrade(ctx.cid, studentId, [a]);
+    }).length;
+    var count =
+      _plural(g.assessments.length, 'assessment', 'assessments') +
+      (scored === g.assessments.length ? '' : ', ' + scored + ' scored');
+    return {
+      name:
+        '<span class="stu-bd-name"><strong>' +
+        esc(g.name) +
+        '</strong><span class="stu-sub">' +
+        esc(count) +
+        '</span></span>',
+      grade: '<span>' + _gradePill(mine) + '</span>',
+      bars:
+        '<span class="stu-comp-bars" aria-hidden="true">' +
+        (_groupBars(ctx.cid, g.assessments) || '<span class="stu-sub">No scores yet</span>') +
+        '</span>',
+      cls: _classLine(ctx.cid, mine, cls),
+    };
+  }
+
+  function _bdAssessList(ctx, assessments) {
+    return (
+      '<div class="stu-bd-items">' +
+      assessments
+        .slice()
+        .sort(function (x, y) {
+          return (y.date || '').localeCompare(x.date || '');
+        })
+        .map(function (a) {
+          return (
+            '<div class="stu-bd-item"><span class="stu-assess-date">' +
+            esc(_shortDay(a.date)) +
+            '</span><span class="stu-assess-title"><a role="link" tabindex="0" data-href="#/assignments?course=' +
+            ctx.cid +
+            '&open=' +
+            a.id +
+            '&student=' +
+            studentId +
+            '" title="Open in Assignments">' +
+            esc(a.title) +
+            '</a></span>' +
+            _gradePill(assessmentGroupGrade(ctx.cid, studentId, [a])) +
+            '</div>'
+          );
+        })
+        .join('') +
+      '</div>'
+    );
+  }
+
+  function _breakdownTabHtml(ctx) {
+    var cid = ctx.cid;
+    var mode = courseGradeMode(cid);
+    var showShares = mode !== 'proficiency';
+    var html =
+      '<div class="stu-panel-note">Each group’s grade is worked out the way the course grade is: ' +
+      (mode === 'proficiency' ? 'the average of its scored assessments.' : 'points earned out of points possible.') +
+      ' Bars show each assessment, oldest to newest.</div>';
+
+    // Categories
+    var cats = _assessGroups(cid, ctx.assessments, 'category');
+    html += '<section class="stu-bd-section" aria-labelledby="stu-bd-cats"><div class="stu-bd-title">';
+    html += '<h3 id="stu-bd-cats">Categories</h3>';
+    if (cats.length)
+      html +=
+        '<span class="stu-sub">' +
+        (showShares ? 'The course grade is these, weighted' : 'Weighted in the course grade') +
+        '</span>';
+    html += '</div>';
+    if (!cats.length) {
+      html += '<div class="stu-empty">No assessments in a category yet.</div>';
+    } else {
+      var shares = showShares ? categoryCourseShares(cid, studentId) : {};
+      html +=
+        '<div class="stu-bd-table' +
+        (showShares ? ' stu-bd-cats-shares' : ' stu-bd-cats') +
+        '">' +
+        _bdHeadRow(
+          ['Category', 'Weight', 'Grade', 'Assessments', 'Class Average'].concat(
+            showShares ? ['Adds to Course %'] : [],
+          ),
+        );
+      cats.forEach(function (g) {
+        var mine = assessmentGroupGrade(cid, studentId, g.assessments);
+        var cls = classAssessmentGroupGrade(cid, ctx.classIds, g.assessments);
+        var c = _bdGroupCells(ctx, g, mine, cls);
+        var open = !!_bdOpen[g.key || '-'];
+        html +=
+          '<div class="stu-bd-group"><button type="button" class="stu-bd-row" data-action="stuBdToggle" data-key="' +
+          esc(g.key || '-') +
+          '" aria-expanded="' +
+          open +
+          '">' +
+          c.name +
+          '<span class="stu-bd-weight">' +
+          (g.category ? esc(Number(g.category.weight || 0) + '%') : '\u2014') +
+          '</span>' +
+          c.grade +
+          c.bars +
+          c.cls +
+          (showShares
+            ? '<span class="stu-bd-share">' +
+              (g.category && shares[g.key] ? esc(shares[g.key].text) : '\u2014') +
+              '</span>'
+            : '') +
+          '</button>' +
+          (open ? _bdAssessList(ctx, g.assessments) : '') +
+          '</div>';
+      });
+      if (showShares) {
+        var course = getCourseLetterData(cid, studentId);
+        if (course && course.R != null)
+          html +=
+            '<div class="stu-bd-row stu-bd-total"><span class="stu-bd-name"><strong>Course</strong></span><span class="stu-bd-weight">100%</span><span>' +
+            _gradePill(studentGradeSummary(cid, studentId)) +
+            '</span><span></span><span></span><span class="stu-bd-share">' +
+            esc(formatCoursePercent(cid, course.R).replace('%', '')) +
+            '</span></div>';
+      }
+      html += '</div>';
+    }
+    html += '</section>';
+
+    // Modules
+    var mods = _assessGroups(cid, ctx.assessments, 'module');
+    var hasModules = mods.some(function (g) {
+      return g.key;
+    });
+    html +=
+      '<section class="stu-bd-section" aria-labelledby="stu-bd-mods"><div class="stu-bd-title"><h3 id="stu-bd-mods">Modules</h3><span class="stu-sub">The folders on the Assignments page. They don’t change the course grade.</span></div>';
+    if (!hasModules) {
+      html += '<div class="stu-empty">No modules yet. Group assessments into modules on the Assignments page.</div>';
+    } else {
+      html +=
+        '<div class="stu-bd-table stu-bd-mods">' +
+        _bdHeadRow(['Module', 'Grade', 'Assessments', 'Class Average', 'Latest']);
+      mods.forEach(function (g) {
+        var mine = assessmentGroupGrade(cid, studentId, g.assessments);
+        var cls = classAssessmentGroupGrade(cid, ctx.classIds, g.assessments);
+        var c = _bdGroupCells(ctx, g, mine, cls);
+        var latest = g.assessments.reduce(function (m, a) {
+          return (a.date || '') > m ? a.date : m;
+        }, '');
+        html +=
+          '<div class="stu-bd-row' +
+          (g.key ? '' : ' stu-bd-none') +
+          '">' +
+          c.name +
+          c.grade +
+          c.bars +
+          c.cls +
+          '<span class="stu-bd-latest">' +
+          esc(_shortDay(latest)) +
+          '</span></div>';
+      });
+      html += '</div>';
+    }
+    html += '</section>';
+
+    // Assignment types
+    var types = _assessGroups(cid, ctx.assessments, 'type');
+    html +=
+      '<section class="stu-bd-section" aria-labelledby="stu-bd-types"><div class="stu-bd-title"><h3 id="stu-bd-types">Assignment Types</h3><span class="stu-sub">From each assessment’s Evidence Type</span></div>';
+    if (!types.length) html += '<div class="stu-empty">No assessments yet.</div>';
+    else {
+      html += '<div class="stu-bd-tiles">';
+      types.forEach(function (g) {
+        var mine = assessmentGroupGrade(cid, studentId, g.assessments);
+        var cls = classAssessmentGroupGrade(cid, ctx.classIds, g.assessments);
+        html +=
+          '<div class="stu-bd-tile"><div class="stu-bd-tile-head"><strong>' +
+          esc(g.name) +
+          '</strong><span class="stu-sub">' +
+          esc(_plural(g.assessments.length, 'assessment', 'assessments')) +
+          '</span></div>' +
+          _gradePill(mine) +
+          _classLine(cid, mine, cls) +
+          '</div>';
+      });
+      html += '</div>';
+    }
+    html += '</section>';
+
+    // Rubrics used on more than one assessment
+    var rubrics = _assessGroups(cid, ctx.assessments, 'rubric').filter(function (g) {
+      return g.key && g.rubric && g.assessments.length > 1;
+    });
+    html +=
+      '<section class="stu-bd-section" aria-labelledby="stu-bd-rubrics"><div class="stu-bd-title"><h3 id="stu-bd-rubrics">Shared Rubrics</h3><span class="stu-sub">Rubrics used on more than one assessment. Each square is one assessment, oldest to newest.</span></div>';
+    if (!rubrics.length) html += '<div class="stu-empty">No rubric is used on more than one assessment yet.</div>';
+    else {
+      html += '<div class="stu-bd-rubrics">';
+      rubrics.forEach(function (g) {
+        var list = g.assessments.slice().sort(function (x, y) {
+          return (x.date || '').localeCompare(y.date || '');
+        });
+        var first = list[0] && list[0].date;
+        var last = list[list.length - 1] && list[list.length - 1].date;
+        html +=
+          '<div class="stu-bd-rubric"><div class="stu-bd-tile-head"><strong>' +
+          esc(g.name) +
+          '</strong><span class="stu-sub">' +
+          esc(
+            _plural(list.length, 'assessment', 'assessments') +
+              (first && last ? ' \u00B7 ' + _shortDay(first) + ' to ' + _shortDay(last) : ''),
+          ) +
+          '</span></div>';
+        (g.rubric.criteria || []).filter(Boolean).forEach(function (crit) {
+          var mine = [];
+          var squares = list
+            .map(function (a) {
+              var v = rubricCriterionLevel(cid, studentId, a, crit);
+              if (v == null)
+                return '<span class="stu-crit-sq stu-crit-none" title="' + esc(a.title + ': not scored') + '"></span>';
+              mine.push(v);
+              var near = nearestScoreLevel(v);
+              return (
+                '<span class="stu-crit-sq stu-level-' +
+                near.level +
+                '" title="' +
+                esc(_shortDay(a.date) + ': ' + a.title + ', ' + formatLevel(cid, v)) +
+                '">' +
+                esc(near.text) +
+                '</span>'
+              );
+            })
+            .join('');
+          var classVals = [];
+          ctx.classIds.forEach(function (sid) {
+            list.forEach(function (a) {
+              var v = rubricCriterionLevel(cid, sid, a, crit);
+              if (v != null) classVals.push(v);
+            });
+          });
+          var mean = function (vs) {
+            return vs.length
+              ? vs.reduce(function (s, v) {
+                  return s + v;
+                }, 0) / vs.length
+              : null;
+          };
+          html +=
+            '<div class="stu-crit-row"><span class="stu-crit-name">' +
+            esc(crit.name || 'Criterion') +
+            '</span><span class="stu-crit-squares">' +
+            squares +
+            '</span><span class="stu-crit-avg"><strong>Average ' +
+            esc(formatLevel(cid, mean(mine))) +
+            '</strong><span class="stu-sub">Class ' +
+            esc(formatLevel(cid, mean(classVals))) +
+            '</span></span></div>';
+        });
+        html += '</div>';
+      });
+      html += '</div>';
+    }
+    html += '</section>';
     return html;
   }
 
@@ -1234,6 +1766,7 @@ window.PageStudent = (function () {
     html += '<div class="stu-panel" id="stu-panel" role="tabpanel" aria-labelledby="stu-tab-' + _tab + '">';
     if (_tab === 'assess') html += _assessTabHtml(ctx);
     else if (_tab === 'evidence') html += Evidence.panelHtml();
+    else if (_tab === 'breakdown') html += _breakdownTabHtml(ctx);
     else if (_tab === 'goals') html += _goalsTabHtml(ctx);
     else if (_tab === 'profile') html += _profileTabHtml(ctx);
     else html += _compsTabHtml(ctx);
@@ -1266,6 +1799,27 @@ window.PageStudent = (function () {
       },
       stuAssessFilter: function () {
         _assessFilter = el.dataset.filter || 'all';
+        render();
+      },
+      stuAssessGroup: function () {
+        _assessGroup = el.dataset.group || 'date';
+        try {
+          localStorage.setItem(GROUP_KEY, _assessGroup);
+        } catch (err) {
+          /* private mode: the choice lasts this visit */
+        }
+        render();
+      },
+      stuAssessFold: function () {
+        var k = el.dataset.fold;
+        if (_assessClosed[k]) delete _assessClosed[k];
+        else _assessClosed[k] = true;
+        render();
+      },
+      stuBdToggle: function () {
+        var k = el.dataset.key;
+        if (_bdOpen[k]) delete _bdOpen[k];
+        else _bdOpen[k] = true;
         render();
       },
       toggleOverridePanel: function () {
@@ -1348,7 +1902,7 @@ window.PageStudent = (function () {
     setTab(ids[(next + ids.length) % ids.length]);
   }
 
-  /* A drawer's observation link opens it in the Evidence tab. */
+  /* A drawer's observation link opens it in the Observations tab. */
   function _handleJump(e) {
     var el = e.target && e.target.closest && e.target.closest('[data-ced="jump"]');
     if (!el) return;
@@ -1366,7 +1920,10 @@ window.PageStudent = (function () {
     _openTags = new Set();
     _assessFilter = 'all';
     _assessCat = '';
-    // The tab the link names; a link to one observation opens Evidence;
+    _assessGroup = _savedGroupBy();
+    _assessClosed = {};
+    _bdOpen = {};
+    // The tab the link names; a link to one observation opens Observations;
     // otherwise the tab last opened on this device.
     _tab = _isTab(params.tab) ? params.tab : params.ob ? 'evidence' : _savedTab() || 'comps';
     _overrideSelectedLevel = 0;

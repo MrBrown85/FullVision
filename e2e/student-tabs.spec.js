@@ -1,5 +1,5 @@
 /**
- * The student page's five tabs: each shows its count for the term, the
+ * The student page's six tabs: each shows its count for the term, the
  * keyboard moves between them, and each panel keeps the page's tools
  * (evidence drawer, override, goals). Demo Mode, Cece in Science 8.
  */
@@ -14,21 +14,22 @@ async function openCece(page) {
   return sid;
 }
 
-test('five tabs, Competencies first, and the arrow keys move between them', async ({ page }) => {
+test('six tabs, Competencies first, and the arrow keys move between them', async ({ page }) => {
   await openCece(page);
   const tabs = page.getByRole('tab', {
-    name: /Competencies|Assessments|Evidence|Goals and Reflections|Learner Profile/,
+    name: /Competencies|Assessments|Observations|Grade Breakdown|Goals and Reflections|Learner Profile/,
   });
   await expect(page.locator('.stu-tab .stu-tab-label')).toHaveText([
     'Competencies',
     'Assessments',
-    'Evidence',
+    'Observations',
+    'Grade Breakdown',
     'Goals and Reflections',
     'Learner Profile',
   ]);
   await expect(page.locator('#stu-tab-comps')).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('#stu-tab-comps .stu-tab-stat')).toHaveText('6 of 6 Proficient');
-  await expect(tabs).toHaveCount(5);
+  await expect(tabs).toHaveCount(6);
   await page.locator('#stu-tab-comps').focus();
   await page.keyboard.press('ArrowRight');
   await expect(page.locator('#stu-tab-assess')).toHaveAttribute('aria-selected', 'true');
@@ -153,4 +154,23 @@ test('the Competencies tab has no Competency Profile list', async ({ page }) => 
   await page.waitForTimeout(300);
   await expect(page.getByText('Competency Profile')).toHaveCount(0);
   expect(await page.evaluate(() => window.__profileCalls)).toBe(0);
+});
+
+test('Grade Breakdown shows each category with its share, and Group By groups the Assessments tab', async ({
+  page,
+}) => {
+  await openCece(page);
+  await page.locator('#stu-tab-breakdown').click();
+  await expect(page.locator('#stu-tab-breakdown .stu-tab-stat')).toHaveText('3 Categories');
+  await expect(page.locator('.stu-bd-cats .stu-bd-row:not(.stu-bd-head)')).toHaveCount(3);
+  await page.locator('.stu-bd-cats [data-action="stuBdToggle"]').first().click();
+  await expect(page.locator('.stu-bd-items .stu-bd-item')).toHaveCount(8);
+  await expect(page.locator('.stu-bd-rubric').first()).toContainText('Rubric');
+
+  await page.locator('#stu-tab-assess').click();
+  await page.locator('[data-action="stuAssessGroup"][data-group="category"]').click();
+  await expect(page.locator('.stu-agroup-head')).toHaveCount(3);
+  await expect(page.locator('.stu-agroup-head').first()).toContainText('40% of the grade');
+  await page.locator('.stu-agroup-head').first().click();
+  await expect(page.locator('.stu-agroup').first().locator('.stu-assess-row')).toHaveCount(0);
 });
