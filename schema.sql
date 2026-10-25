@@ -644,6 +644,27 @@ create table student_access_code (                                    -- RLS fv_
   created_at timestamptz not null default now()
 );
 
+-- Students answering on their phones (20261025_student_submit). The schema is
+-- not exposed through the API; only the student-submit edge function reaches
+-- it, over a direct connection. RLS on, no policies, nothing granted to anon or
+-- authenticated.
+create schema student_submit;
+create table student_submit.session (                                 -- one per open; the token only as a hash
+  id uuid primary key default gen_random_uuid(),
+  token_hash text not null unique,
+  code_id uuid not null references public.student_access_code(id) on delete cascade,
+  expires_at timestamptz not null,                                    -- 30 minutes after open
+  submitted_at timestamptz, result jsonb,                             -- a second submit returns result
+  created_at timestamptz not null default now()
+);
+create table student_submit.attempt (                                 -- rate limits and the log; kept 30 days
+  id bigint generated always as identity primary key,
+  at timestamptz not null default now(),
+  route text not null check (route in ('open', 'submit')),
+  outcome text not null,
+  ip_hash text, code_id uuid, course_id uuid                          -- an HMAC of the IP; never answers or names
+);
+
 -- ─── Extensions + cron ──────────────────────────────────────────────────────
 -- pg_cron enabled (migration fullvision_v2_enable_pg_cron).
 -- Job `fv_retention_cleanup_daily` runs at 03:17 UTC calling fv_retention_cleanup().
@@ -802,6 +823,13 @@ create table student_access_code (                                    -- RLS fv_
 --                                                             -- [{enrollment_id, code}]; replay returns no codes
 --   list_course_questionnaires(p_course_id uuid)
 --   list_course_responses(p_course_id uuid)     -- {questionnaire_id: {enrollment_id: [{id, submitted_at, via, answers}]}}
+--   _issue_access_code(p_enrollment_id uuid, p_questionnaire_id uuid, p_expires_at timestamptz)
+--                                                             -- definer; draws a code no live code reads as
+--
+-- Student path (service_role only, called by the student-submit edge function):
+--   student_submit.open(p_code text, p_ip_hash text)       -- {ok, token, student, course, parts} | {ok:false, error}
+--   student_submit.submit(p_token text, p_answers jsonb, p_ip_hash text)
+--                                                             -- {ok, submitted_at} | {ok:false, error[, question_id]}
 --
 -- Imports:
 --   import_teams_class(p_payload jsonb)

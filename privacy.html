@@ -101,7 +101,7 @@
     <main class="policy">
       <a class="back" role="link" tabindex="0" data-href="login.html">← Back to FullVision</a>
       <h1>Privacy Policy</h1>
-      <p class="updated">Last updated: October 13, 2026</p>
+      <p class="updated">Last updated: October 24, 2026</p>
 
       <p>
         FullVision is a gradebook and learning-profile tool for teachers in British Columbia. This page explains what
@@ -117,10 +117,34 @@
 
       <h2>Who uses it</h2>
       <p>
-        Only teachers sign in. Students and parents do not have accounts, and FullVision never contacts them. Teachers
-        enter student information themselves, so each teacher decides what goes in. Before entering student information,
-        a teacher should confirm that their school district allows it.
+        Only teachers sign in. Students and parents do not have accounts, and FullVision never emails or messages them.
+        Teachers enter student information themselves, so each teacher decides what goes in. Before entering student
+        information, a teacher should confirm that their school district allows it.
       </p>
+
+      <h2>Student questionnaires</h2>
+      <p>
+        A teacher can turn on short questionnaires, such as About Me or a Core Competency reflection, and print a slip
+        for each student. The student scans the slip's code with a phone and answers there, without an account.
+      </p>
+      <ul>
+        <li>
+          The phone shows only the student's first name, the class name and the questions. It never shows marks,
+          designations, notes or another student's information.
+        </li>
+        <li>
+          Each code works once, only for that student, and only while the questionnaire is open. FullVision stores codes
+          only as one-way hashes, so a code cannot be read back from the database.
+        </li>
+        <li>
+          The answers go to the teacher's gradebook and nowhere else. A question the teacher marks as private, such as
+          "Is there anything else you want me to know?", is seen only by the teacher and never printed on a report.
+        </li>
+        <li>
+          To stop people guessing codes, FullVision blocks a network after repeated wrong codes. For this it keeps a
+          scrambled form of the phone's network address with each attempt for 30 days. The address itself is not stored.
+        </li>
+      </ul>
 
       <h2>What FullVision stores</h2>
       <table>
@@ -141,8 +165,9 @@
           <tr>
             <td>Students</td>
             <td>
-              Name, preferred name, pronouns, student number, email address, date of birth, and learning designations
-              (such as an IEP). Only a first name is required; the teacher chooses whether to add the rest.
+              Name, preferred name, pronouns, student number, email address, date of birth, learning designations (such
+              as an IEP), and parents' or guardians' email addresses. Only a first name is required; the teacher chooses
+              whether to add the rest.
             </td>
           </tr>
           <tr>
@@ -150,6 +175,13 @@
             <td>
               Scores, proficiency levels and comments on assignments; observations; notes; goals and reflections;
               attendance; term ratings and report-card comments; and flags the teacher sets.
+            </td>
+          </tr>
+          <tr>
+            <td>Student answers</td>
+            <td>
+              What students write in their teacher's questionnaires, and their Core Competency self-assessments. Each
+              answer is saved with the time it was sent.
             </td>
           </tr>
           <tr>
@@ -174,6 +206,10 @@
           Montreal data centre (AWS ca-central-1).
         </li>
         <li>
+          <strong>Student answers</strong> go from the student's phone to a Supabase service that runs in the same
+          Montreal data centre, and from there into the database. They do not pass through Netlify.
+        </li>
+        <li>
           <strong>Web pages</strong> are delivered by Netlify, which serves them from data centres around the world.
           Netlify handles page requests, including your IP address, but does not receive the information in your
           gradebook.
@@ -195,7 +231,7 @@
         <li>
           <strong>You.</strong> Each teacher sees only their own classes and students. The database enforces this on
           every request; signed-in teachers cannot read another teacher's data, and people who are not signed in cannot
-          read or run anything.
+          read anything. The only thing they can do is answer a questionnaire with a code from its slip.
         </li>
         <li>
           <strong>The operator.</strong> Colin Brown has administrator access to the database. He uses it only to keep
@@ -222,6 +258,7 @@
         </li>
         <li>A student who no longer belongs to any class is deleted along with that class.</li>
         <li>Change history for scores and term ratings is kept for 2 years, or until its class is deleted.</li>
+        <li>The record of questionnaire code attempts is kept for 30 days.</li>
         <li>
           <strong>Backups.</strong> Supabase makes a daily backup of the database and keeps each one for 7 days. A
           deleted item can remain in backups for up to 7 days after it is deleted.
@@ -234,6 +271,7 @@
         <li>Supabase encrypts the stored data and backups.</li>
         <li>Passwords are stored only as one-way hashes and are never visible to the operator.</li>
         <li>Database rules restrict every request to the signed-in teacher's own data.</li>
+        <li>Student codes work once, are stored only as one-way hashes, and are blocked after repeated wrong tries.</li>
         <li>The pages only run scripts from FullVision itself and from Sentry's error-reporting service.</li>
       </ul>
 
