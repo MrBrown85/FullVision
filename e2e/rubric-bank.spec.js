@@ -487,3 +487,67 @@ test.describe('Rubric Bank, Advanced Rubrics', () => {
     await expect(dialog.locator('#rp-preview .rubric-check')).toHaveCount(3);
   });
 });
+
+test.describe('Rubric Bank, renaming a linked rubric', () => {
+  const GROUP = '7a7a7a7a-0000-4000-8000-000000000001';
+
+  test.beforeEach(async ({ page }) => {
+    await mockAuth(page);
+    await seedCourse(page);
+    await seedStudents(page);
+    await page.addInitScript(
+      ({ course, map, mine, theirs }) => {
+        const courses = JSON.parse(localStorage.getItem('gb-courses') || '{}');
+        courses[course.id] = course;
+        localStorage.setItem('gb-courses', JSON.stringify(courses));
+        localStorage.setItem('gb-learningMaps-' + course.id, JSON.stringify(map));
+        ['students', 'assessments', 'observations', 'modules', 'customTags'].forEach(k =>
+          localStorage.setItem('gb-' + k + '-' + course.id, '[]'),
+        );
+        localStorage.setItem('gb-rubrics-' + course.id, JSON.stringify([theirs]));
+        localStorage.setItem('gb-rubrics-sci8', JSON.stringify([mine]));
+        localStorage.setItem('gb-assessments-sci8', '[]');
+      },
+      {
+        course: SCI9,
+        map: SCI9_MAP,
+        mine: { ...LAB, copyGroup: GROUP },
+        theirs: {
+          ...LAB,
+          id: 'rubric-lab-9',
+          copyGroup: GROUP,
+          criteria: [{ ...LAB.criteria[0], id: 'crit-9', tagIds: ['S9Q'] }],
+        },
+      },
+    );
+    await gotoApp(page, '/dashboard');
+  });
+
+  test('offers the new name to the linked copy', async ({ page }) => {
+    const bank = await openBank(page);
+    await expect(bank.locator('.rb-linked')).toHaveText('Linked With Science 9 — Test');
+    await bank.getByRole('button', { name: 'More actions' }).click();
+    await bank.getByRole('menuitem', { name: 'Rename' }).click();
+    await bank.locator('#rb-rename').fill('Lab Report Rubric, Grade 8');
+    await bank.locator('#rb-rename').press('Enter');
+
+    const offer = page.getByRole('dialog', { name: 'Update the other classes too?' });
+    await expect(offer).toBeVisible();
+    await expect(offer).toContainText('Name → Lab Report Rubric, Grade 8');
+    await offer.getByRole('button', { name: 'Update' }).click();
+    await expect(offer).toHaveCount(0);
+    expect(await page.evaluate(() => getRubricById('sci9', 'rubric-lab-9').name)).toBe('Lab Report Rubric, Grade 8');
+  });
+
+  test('Only this class keeps the copy’s name', async ({ page }) => {
+    const bank = await openBank(page);
+    await bank.getByRole('button', { name: 'More actions' }).click();
+    await bank.getByRole('menuitem', { name: 'Rename' }).click();
+    await bank.locator('#rb-rename').fill('Renamed Here');
+    await bank.locator('#rb-rename').press('Enter');
+    const offer = page.getByRole('dialog', { name: 'Update the other classes too?' });
+    await offer.getByRole('button', { name: 'Only this class' }).click();
+    expect(await page.evaluate(() => getRubricById('sci9', 'rubric-lab-9').name)).toBe('Lab Report Rubric');
+    await expect(bank.locator('.rb-title')).toHaveText('Renamed Here');
+  });
+});

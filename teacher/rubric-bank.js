@@ -1054,16 +1054,30 @@ window.RubricBank = (function () {
 
   function _finishRename(save) {
     var input = document.getElementById('rb-rename');
-    if (save && input && !rename(_s.cid, _s.selected, input.value)) {
+    var cid = _s.cid;
+    var hooks = _s.hooks;
+    var current = save ? getRubricById(cid, _s.selected) : null;
+    var before = current ? structuredClone(current) : null;
+    if (save && input && !rename(cid, _s.selected, input.value)) {
       input.classList.add('is-invalid');
       input.setAttribute('aria-invalid', 'true');
       return;
     }
     _s.renaming = false;
     refresh();
-    if (save && _s.hooks.changed) _s.hooks.changed();
+    if (save && hooks.changed) hooks.changed();
     var title = document.getElementById('rb-title');
     if (title) title.setAttribute('tabindex', '-1');
+    // A linked rubric: offer the new name in its other classes, as saving
+    // an edit does ("Update the other classes too?").
+    var after = before ? getRubricById(cid, before.id) : null;
+    if (after && after.copyGroup && before.name !== after.name && window.RubricLibrary) {
+      RubricLibrary.offerLinkedEdit(cid, before, after).then(function (names) {
+        if (!names || !names.length) return;
+        if (hooks.changed) hooks.changed();
+        if (_s && _s.cid === cid) refresh();
+      });
+    }
   }
 
   function _act(action, el) {
