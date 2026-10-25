@@ -107,3 +107,25 @@ test('Dashboard: the toolbar is in line with the boxes', async ({ page }) => {
   await page.locator('.dash-toolbar').waitFor();
   expect(await toolbarInset(page, '.dash-toolbar')).toBe(12);
 });
+
+// The student page and its Term Questionnaire share a header card: same
+// place, same size, no counts on either (Colin, 2026-10-24).
+test('Student page: 12px edges and gaps; its header matches the Term Questionnaire', async ({ page }) => {
+  await open(page, '#/student?id=st27&tab=comps');
+  await page.locator('.stu-panel').waitFor();
+  const m = await measure(page, '.student-header-top, .stu-tabs, .stu-panel');
+  expect([m.left, m.right]).toEqual([12, 12]);
+  expect(m.gaps).toEqual([12]);
+  expect(await toolbarInset(page, '.student-toolbar')).toBe(12);
+  const box = () =>
+    page.evaluate(() => {
+      const r = document.querySelector('.student-header-top').getBoundingClientRect();
+      const b = document.querySelector('.student-header-top .page-toggle-btn').getBoundingClientRect();
+      return [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height), Math.round(b.height)];
+    });
+  const onStudent = await box();
+  await page.goto(page.url().replace(/#.*/, '#/reports?tab=questionnaire&student=st27'));
+  await page.locator('.tq-panel').first().waitFor();
+  expect(await box()).toEqual(onStudent);
+  await expect(page.locator('.student-header-top .sh-stat')).toHaveCount(0);
+});

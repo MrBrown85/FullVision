@@ -1220,6 +1220,8 @@ body.offline-active #app-dock {
 }
 /* A link to another screen that is not this screen's main action. */
 .page-toggle-btn.page-toggle-btn--secondary {
+  /* 1px less padding for the border: as tall as the primary button. */
+  padding: 7px 17px;
   background: var(--surface);
   color: var(--text);
   border: 1px solid var(--border);

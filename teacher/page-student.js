@@ -2484,7 +2484,8 @@ window.PageStudent = (function () {
       (typeof renderTermPicker === 'function' ? renderTermPicker(cid) : '') +
       '</div>';
 
-    html += '<div class="student-scroll"><div style="padding:16px 20px">';
+    // 12px from the page's edges and between boxes, 20px at the foot.
+    html += '<div class="student-scroll"><div style="padding:12px 12px 20px">';
 
     // ── Header ──
     html += renderStudentHeader(cid, studentId, {
