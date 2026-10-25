@@ -21,7 +21,7 @@ const scroll = page => page.evaluate(() => document.getElementById('report-outpu
 
 test('an assignment row keeps its size and place when picked', async ({ page }) => {
   await open(page);
-  const sel = '.tq-assignment-row:not(.selected)';
+  const sel = '.tq-assignment-row[data-aid]:not(.selected)';
   const aid = await page.locator(sel).first().getAttribute('data-aid');
   const row = '.tq-assignment-row[data-aid="' + aid + '"]';
   await page.locator(row).scrollIntoViewIfNeeded();
@@ -35,7 +35,7 @@ test('an assignment row keeps its size and place when picked', async ({ page }) 
   expect(await scroll(page)).toBe(top);
   // Picked and unpicked rows share their box; only colours animate.
   const box = await page.evaluate(() =>
-    [...document.querySelectorAll('.tq-assignment-row')].slice(0, 4).map(r => {
+    [...document.querySelectorAll('.tq-assignment-row[data-aid]')].slice(0, 4).map(r => {
       const cs = getComputedStyle(r);
       return [r.classList.contains('selected'), cs.padding, cs.borderTopWidth, cs.transitionProperty];
     }),
