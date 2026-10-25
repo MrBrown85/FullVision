@@ -805,11 +805,14 @@ function renderSidebar(activeCourse, selectedStudentId, onStudentClick) {
 }
 
 /* The grade beside each name, as the class is set to grade
-   (studentGradeBadges): level out of 4, letter and %, or both. */
+   (studentRosterBadges): proficiency code (EXT, PRF, DEV, EMG, IC), letter
+   and %, or both. */
 function _sidebarGradeBadge(part) {
-  var color = PROF_COLORS[part.level] || PROF_COLORS[0];
+  // IC has no level colour; the level-0 grey (#bbb) is too faint to read as text.
+  var color = part.level ? PROF_COLORS[part.level] || PROF_COLORS[0] : 'var(--text-2)';
   var tint = PROF_TINT[part.level] || 'transparent';
-  return `<span class="student-row-prof" style="color:${color};background:${tint}">${esc(part.text)}</span>`;
+  var title = part.title ? ` title="${esc(part.title)}"` : '';
+  return `<span class="student-row-prof" style="color:${color};background:${tint}"${title}>${esc(part.text)}</span>`;
 }
 
 /* After a score changes: redraw only the grade beside one student (`sid`),
@@ -831,7 +834,7 @@ function refreshSidebarGrades(sid) {
 }
 
 function _sidebarBadgesHtml(cid, sid) {
-  var badges = studentGradeBadges(cid, sid);
+  var badges = studentRosterBadges(cid, sid);
   return (
     (badges.prof ? _sidebarGradeBadge(badges.prof) : '') + (badges.letter ? _sidebarGradeBadge(badges.letter) : '')
   );
