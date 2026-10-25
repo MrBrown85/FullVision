@@ -1064,53 +1064,61 @@ window.PageAssignments = (function () {
       '</div>' +
       '<div id="collab-panel-mount"></div>';
 
-    // Scoring mode & weight
+    // Scoring mode, then its settings
     html +=
-      '<div class="af-row" style="align-items:end">' +
-      '<div class="af-field" style="flex:0 0 auto">' +
-      '<label class="af-label">Scoring Mode</label>' +
+      '<div class="af-field">' +
+      '<span class="af-label" id="af-scoremode-label">Scoring Mode</span>' +
       '<input type="hidden" id="af-scoremode" value="' +
       scoreMode +
       '">' +
-      '<div class="seg af-type-toggle" role="group" aria-label="Scoring mode">' +
-      '<button type="button" class="seg-btn af-type-btn af-scoremode-btn' +
-      (scoreMode === 'proficiency' ? ' active' : '') +
-      '"' +
-      segAttr(scoreMode === 'proficiency') +
-      ' data-mode="proficiency" data-action="setScoreMode">Proficiency</button>' +
-      '<button type="button" class="seg-btn af-type-btn af-scoremode-btn' +
-      (scoreMode === 'points' ? ' active' : '') +
-      '"' +
-      segAttr(scoreMode === 'points') +
-      ' data-mode="points" data-action="setScoreMode">Points</button>' +
-      '<button type="button" class="seg-btn af-type-btn af-scoremode-btn' +
-      (scoreMode === 'complete' ? ' active' : '') +
-      '"' +
-      segAttr(scoreMode === 'complete') +
-      ' data-mode="complete" data-action="setScoreMode">Complete/<wbr>Incomplete</button>' +
+      '<div class="af-mode-cards" role="radiogroup" aria-labelledby="af-scoremode-label">' +
+      SCORE_MODE_CARDS.map(function (m) {
+        return (
+          '<div class="af-mode-item">' +
+          '<button type="button" class="af-mode-card af-scoremode-btn" role="radio" aria-checked="' +
+          (scoreMode === m.mode) +
+          '" aria-describedby="af-mode-tip-' +
+          m.mode +
+          '" data-mode="' +
+          m.mode +
+          '" data-action="setScoreMode">' +
+          m.icon +
+          '<span>' +
+          m.label +
+          '</span></button>' +
+          '<div class="af-mode-tip" role="tooltip" id="af-mode-tip-' +
+          m.mode +
+          '">' +
+          '<div class="af-mode-tip-pic" aria-hidden="true">' +
+          m.picture() +
+          '</div>' +
+          '<div class="af-mode-tip-text">' +
+          m.tip +
+          '</div>' +
+          '</div>' +
+          '</div>'
+        );
+      }).join('') +
       '</div>' +
       '</div>' +
+      '<div class="af-row af-score-settings">' +
       '<div class="af-field" id="af-maxpoints-wrap" style="flex:0 0 auto;' +
       (scoreMode === 'points' ? '' : 'display:none') +
       '">' +
-      '<label class="af-label">Max Points</label>' +
-      '<div style="display:flex;gap:6px;align-items:center">' +
+      '<label class="af-label" for="af-maxpoints">Max Points</label>' +
+      '<div style="display:flex;gap:8px;align-items:center">' +
       '<input class="af-input" id="af-maxpoints" type="number" min="1" max="9999" value="' +
       maxPoints +
-      '" style="width:80px;text-align:center">' +
-      '<div id="af-maxpoints-picks" style="display:flex;gap:4px">' +
+      '" style="width:72px;text-align:center">' +
+      '<div class="seg" id="af-maxpoints-picks" role="group" aria-label="Common maximums">' +
       [10, 25, 50, 100]
         .map(function (v) {
           return (
-            '<button type="button" class="af-chip' +
-            (maxPoints === v ? ' active' : '') +
-            '" data-action="setMaxPoints" data-value="' +
+            '<button type="button" class="seg-btn"' +
+            segAttr(maxPoints === v) +
+            ' data-action="setMaxPoints" data-value="' +
             v +
-            '" style="padding:4px 8px;font-size:0.75rem;border-radius:6px;border:1px solid var(--border);background:' +
-            (maxPoints === v ? 'var(--primary)' : 'var(--bg-2)') +
-            ';color:' +
-            (maxPoints === v ? '#fff' : 'var(--text-2)') +
-            ';cursor:pointer">' +
+            '">' +
             v +
             '</button>'
           );
@@ -1121,7 +1129,7 @@ window.PageAssignments = (function () {
       '</div>' +
       '<div class="af-field" id="af-weight-wrap" style="flex:0 0 auto">' +
       '<label class="af-label" for="af-weight">Factor</label>' +
-      '<select class="af-input" id="af-weight" style="width:80px">' +
+      '<select class="af-input" id="af-weight" style="width:76px">' +
       _factorChoices(weight)
         .map(function (w) {
           return '<option value="' + w + '"' + (w === weight ? ' selected' : '') + '>' + w + 'x</option>';
@@ -1304,12 +1312,65 @@ window.PageAssignments = (function () {
   }
 
   function setScoreMode(mode) {
-    segSelect(document.querySelector('.af-scoremode-btn[data-mode="' + mode + '"]'));
+    document.querySelectorAll('.af-scoremode-btn').forEach(function (b) {
+      b.setAttribute('aria-checked', b.dataset.mode === mode ? 'true' : 'false');
+    });
     var el = document.getElementById('af-scoremode');
     if (el) el.value = mode;
     var wrap = document.getElementById('af-maxpoints-wrap');
     if (wrap) wrap.style.display = mode === 'points' ? '' : 'none';
   }
+
+  // The three ways to score an assessment, as cards with an icon each. On
+  // hover or keyboard focus each shows a tooltip: a picture of how its scores
+  // are entered, built from the grading screens' own pieces, and a sentence.
+  var SCORE_MODE_CARDS = [
+    {
+      mode: 'proficiency',
+      label: 'Proficiency',
+      tip: 'Score each competency from Emerging to Extending.',
+      picture: function () {
+        return [1, 2, 3, 4]
+          .map(function (level) {
+            return (
+              '<span class="af-tip-level"><span class="gb-score-val s' +
+              level +
+              '">' +
+              level +
+              '</span><span class="af-tip-level-code">' +
+              PROF_CODES[level] +
+              '</span></span>'
+            );
+          })
+          .join('');
+      },
+      icon: '<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 16v-3"/><path d="M8 16v-6"/><path d="M12 16v-9"/><path d="M16 16V4"/></svg>',
+    },
+    {
+      mode: 'points',
+      label: 'Points',
+      tip: 'Enter a score out of Max Points.',
+      picture: function () {
+        return (
+          '<span class="af-tip-pts-box">17</span><span class="af-tip-pts-max">/ 20</span>' +
+          '<span class="af-tip-pts-pct">85%</span>'
+        );
+      },
+      icon: '<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M8 3 6 17"/><path d="M14 3l-2 14"/><path d="M3.5 7.5h13"/><path d="M3 12.5h13"/></svg>',
+    },
+    {
+      mode: 'complete',
+      label: 'Complete/Incomplete',
+      tip: 'Mark the work done or not done. Complete counts as full marks.',
+      picture: function () {
+        return (
+          '<span class="ldg-seg"><span class="cmp-btn cmp-complete active">\u2713 Complete</span>' +
+          '<span class="cmp-btn cmp-incomplete">\u2717 Incomplete</span></span>'
+        );
+      },
+      icon: '<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="m6.8 10.2 2.2 2.2 4.2-4.6"/></svg>',
+    },
+  ];
 
   // The Factor list, with an assessment's own Factor kept if it isn't on it.
   function _factorChoices(current) {
@@ -5056,10 +5117,7 @@ window.PageAssignments = (function () {
       setMaxPoints: function () {
         var mp = document.getElementById('af-maxpoints');
         if (mp) mp.value = el.dataset.value;
-        document.querySelectorAll('#af-maxpoints-picks .af-chip').forEach(function (c) {
-          c.classList.remove('active');
-        });
-        el.classList.add('active');
+        segSelect(el);
       },
     };
     if (handlers[action]) {
