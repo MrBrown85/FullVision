@@ -7,6 +7,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Run by hand (Actions › CI › Run workflow) to run the browser tests on a branch.
+  workflow_dispatch:
 
 jobs:
   test-and-format:
@@ -86,10 +88,12 @@ jobs:
   # (scripts/e2e-server.mjs) and a fake Supabase (e2e/helpers.js). They take
   # about five minutes, so they run once, after a merge to main, not on every
   # push to a pull request. Run them locally with `npm run test:e2e` before
-  # merging a change to a page. Not a required check.
+  # merging a change to a page. Not a required check. Pinned to Ubuntu 24.04:
+  # ubuntu-latest moved to 26.04 in October 2026, where Playwright 1.58 can't
+  # install Chromium.
   e2e:
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
 
     steps:
