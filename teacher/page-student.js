@@ -18,6 +18,7 @@ window.PageStudent = (function () {
   var _assessGroup = 'date'; // Assessments tab: date, category, module, type, rubric
   var _assessClosed = {}; // Assessments tab: '<group by>:<key>' of groups folded shut
   var _bdOpen = {}; // Grade Breakdown tab: categories whose assessments show
+  var _bdRubric = ''; // Grade Breakdown tab: the shared rubric shown ('' = the first)
   var _openTags = new Set(); // competency cards whose evidence drawer is open
   var _overrideSelectedLevel = 0;
   var Evidence = StudentEvidence;
@@ -1307,80 +1308,130 @@ window.PageStudent = (function () {
     }
     html += '</section>';
 
-    // Rubrics used on more than one assessment
+    // Rubrics used on more than one assessment: one picked at a time, its
+    // criteria down the side and its assessments across, oldest first.
     var rubrics = _assessGroups(cid, ctx.assessments, 'rubric').filter(function (g) {
       return g.key && g.rubric && g.assessments.length > 1;
     });
     html +=
-      '<section class="stu-bd-section" aria-labelledby="stu-bd-rubrics"><div class="stu-bd-title"><h3 id="stu-bd-rubrics">Shared Rubrics</h3><span class="stu-sub">Rubrics used on more than one assessment. Each square is one assessment, oldest to newest.</span></div>';
+      '<section class="stu-bd-section" aria-labelledby="stu-bd-rubrics"><div class="stu-bd-title"><h3 id="stu-bd-rubrics">Shared Rubrics</h3></div>';
     if (!rubrics.length) html += '<div class="stu-empty">No rubric is used on more than one assessment yet.</div>';
     else {
-      html += '<div class="stu-bd-rubrics">';
+      var pick =
+        rubrics.find(function (g) {
+          return g.key === _bdRubric;
+        }) || rubrics[0];
+      html += '<div class="stu-rt-picker" role="group" aria-label="Rubric">';
       rubrics.forEach(function (g) {
-        var list = g.assessments.slice().sort(function (x, y) {
-          return (x.date || '').localeCompare(y.date || '');
-        });
-        var first = list[0] && list[0].date;
-        var last = list[list.length - 1] && list[list.length - 1].date;
+        var on = g === pick;
         html +=
-          '<div class="stu-bd-rubric"><div class="stu-bd-tile-head"><strong>' +
+          '<button type="button" class="stu-chip' +
+          (on ? ' active' : '') +
+          '" data-action="stuBdRubric" data-key="' +
+          esc(g.key) +
+          '" aria-pressed="' +
+          on +
+          '">' +
           esc(g.name) +
-          '</strong><span class="stu-sub">' +
-          esc(
-            _plural(list.length, 'assessment', 'assessments') +
-              (first && last ? ' \u00B7 ' + _shortDay(first) + ' to ' + _shortDay(last) : ''),
-          ) +
-          '</span></div>';
-        (g.rubric.criteria || []).filter(Boolean).forEach(function (crit) {
-          var mine = [];
-          var squares = list
-            .map(function (a) {
-              var v = rubricCriterionLevel(cid, studentId, a, crit);
-              if (v == null)
-                return '<span class="stu-crit-sq stu-crit-none" title="' + esc(a.title + ': not scored') + '"></span>';
-              mine.push(v);
-              var near = nearestScoreLevel(v);
-              return (
-                '<span class="stu-crit-sq stu-level-' +
-                near.level +
-                '" title="' +
-                esc(_shortDay(a.date) + ': ' + a.title + ', ' + formatLevel(cid, v)) +
-                '">' +
-                esc(near.text) +
-                '</span>'
-              );
-            })
-            .join('');
-          var classVals = [];
-          ctx.classIds.forEach(function (sid) {
-            list.forEach(function (a) {
-              var v = rubricCriterionLevel(cid, sid, a, crit);
-              if (v != null) classVals.push(v);
-            });
-          });
-          var mean = function (vs) {
-            return vs.length
-              ? vs.reduce(function (s, v) {
-                  return s + v;
-                }, 0) / vs.length
-              : null;
-          };
-          html +=
-            '<div class="stu-crit-row"><span class="stu-crit-name">' +
-            esc(crit.name || 'Criterion') +
-            '</span><span class="stu-crit-squares">' +
-            squares +
-            '</span><span class="stu-crit-avg"><strong>Average ' +
-            esc(formatLevel(cid, mean(mine))) +
-            '</strong><span class="stu-sub">Class ' +
-            esc(formatLevel(cid, mean(classVals))) +
-            '</span></span></div>';
-        });
-        html += '</div>';
+          ' \u00B7 ' +
+          g.assessments.length +
+          '</button>';
       });
       html += '</div>';
+      html += _rubricTableHtml(ctx, pick);
     }
     html += '</section>';
+    return html;
+  }
+
+  /* A shared rubric as a table: a criterion per row, an assessment per
+     column (oldest first), each cell the level as scored, then the first
+     and latest scores and the average beside the class's. */
+  function _rubricTableHtml(ctx, g) {
+    var cid = ctx.cid;
+    var list = g.assessments.slice().sort(function (x, y) {
+      return (x.date || '').localeCompare(y.date || '');
+    });
+    var cols = 'grid-template-columns:minmax(150px,1.2fr) repeat(' + list.length + ',minmax(64px,1fr)) 110px 110px';
+    var mean = function (vs) {
+      return vs.length
+        ? vs.reduce(function (s, v) {
+            return s + v;
+          }, 0) / vs.length
+        : null;
+    };
+    var chip = function (v) {
+      if (v == null) return '<span class="stu-rt-none">\u2014</span>';
+      var near = nearestScoreLevel(v);
+      return '<span class="stu-rt-score stu-level-' + near.level + '">' + esc(near.text) + '</span>';
+    };
+    var html =
+      '<div class="stu-rt-scroll"><div class="stu-rt" role="table" aria-label="' +
+      esc(g.name) +
+      '"><div class="stu-rt-row stu-rt-head" role="row" style="' +
+      cols +
+      '"><span role="columnheader">Criterion</span>';
+    list.forEach(function (a) {
+      html +=
+        '<span role="columnheader" class="stu-rt-assess" title="' +
+        esc(a.title) +
+        '"><span class="stu-rt-assess-title">' +
+        esc(a.title) +
+        '</span><span class="stu-rt-assess-date">' +
+        esc(_shortDay(a.date)) +
+        '</span></span>';
+    });
+    html += '<span role="columnheader" class="stu-rt-center">First to Latest</span>';
+    html += '<span role="columnheader" class="stu-rt-right">Average</span></div>';
+    (g.rubric.criteria || []).filter(Boolean).forEach(function (crit) {
+      var vals = list.map(function (a) {
+        return rubricCriterionLevel(cid, studentId, a, crit);
+      });
+      var scored = vals.filter(function (v) {
+        return v != null;
+      });
+      var classVals = [];
+      ctx.classIds.forEach(function (sid) {
+        list.forEach(function (a) {
+          var v = rubricCriterionLevel(cid, sid, a, crit);
+          if (v != null) classVals.push(v);
+        });
+      });
+      var first = scored[0];
+      var latest = scored[scored.length - 1];
+      var dir = scored.length > 1 ? (latest > first ? 'up' : latest < first ? 'down' : 'flat') : '';
+      html += '<div class="stu-rt-row" role="row" style="' + cols + '">';
+      html += '<span role="rowheader" class="stu-rt-crit">' + esc(crit.name || 'Criterion') + '</span>';
+      vals.forEach(function (v, i) {
+        html +=
+          '<span role="cell" class="stu-rt-center" title="' +
+          esc(
+            list[i].title + ', ' + _shortDay(list[i].date) + (v == null ? ': not scored' : ': ' + formatLevel(cid, v)),
+          ) +
+          '">' +
+          chip(v) +
+          '</span>';
+      });
+      html +=
+        '<span role="cell" class="stu-rt-change stu-rt-' +
+        (dir || 'flat') +
+        '">' +
+        (dir
+          ? chip(first) +
+            '<svg width="18" height="10" viewBox="0 0 18 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-label="' +
+            (dir === 'up' ? 'up to' : dir === 'down' ? 'down to' : 'still') +
+            '"><path d="M1 5h15M12 1l4 4-4 4"/></svg>' +
+            chip(latest)
+          : '<span class="stu-rt-none">\u2014</span>') +
+        '</span>';
+      html +=
+        '<span role="cell" class="stu-rt-avg"><strong>' +
+        esc(formatLevel(cid, mean(scored))) +
+        '</strong><span class="stu-sub">Class ' +
+        esc(formatLevel(cid, mean(classVals))) +
+        '</span></span></div>';
+    });
+    html += '</div></div>';
     return html;
   }
 
@@ -1822,6 +1873,10 @@ window.PageStudent = (function () {
         else _bdOpen[k] = true;
         render();
       },
+      stuBdRubric: function () {
+        _bdRubric = el.dataset.key || '';
+        render();
+      },
       toggleOverridePanel: function () {
         toggleOverridePanel(el.dataset.secid);
       },
@@ -1923,6 +1978,7 @@ window.PageStudent = (function () {
     _assessGroup = _savedGroupBy();
     _assessClosed = {};
     _bdOpen = {};
+    _bdRubric = '';
     // The tab the link names; a link to one observation opens Observations;
     // otherwise the tab last opened on this device.
     _tab = _isTab(params.tab) ? params.tab : params.ob ? 'evidence' : _savedTab() || 'comps';
