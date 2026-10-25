@@ -21,6 +21,8 @@ window.PageStudent = (function () {
   var _bdRubric = ''; // Grade Breakdown tab: the shared rubric shown ('' = the first)
   var _typeView = 'strengths'; // Grade Breakdown tab: strengths, growth, month, timeline
   var _typeFocus = ''; // Grade Breakdown tab, Timeline: the type brought forward ('' = all)
+  var _coreTerm = null; // Learner Profile: the term ordinal whose self-assessments show
+  var _coreEditing = ''; // Learner Profile: the Core Competency being self-assessed
   var _openTags = new Set(); // competency cards whose evidence drawer is open
   var _overrideSelectedLevel = 0;
   var Evidence = StudentEvidence;
@@ -2109,11 +2111,64 @@ window.PageStudent = (function () {
     });
     html += '</div>';
 
-    // Core competencies tagged on the student's scored assessments.
-    var tally = {};
-    CORE_COMPETENCIES.forEach(function (cc) {
-      tally[cc.id] = 0;
+    html += _coreSelfHtml(ctx);
+    return html;
+  }
+
+  function _saveCoreSelf(coreId, clear) {
+    var picked = document.querySelector('input[name="core-level-' + coreId + '"]:checked');
+    var text = document.getElementById('core-text-' + coreId);
+    var goal = document.getElementById('core-goal-' + coreId);
+    var tk = _coreTermKeys({
+      cid: activeCourse,
+      term: typeof getActiveTerm === 'function' ? getActiveTerm(activeCourse) : null,
     });
+    saveCoreSelfAssessment(
+      activeCourse,
+      studentId,
+      tk.key,
+      coreId,
+      clear
+        ? null
+        : { level: picked ? Number(picked.value) : null, text: text ? text.value : '', goal: goal ? goal.value : '' },
+    );
+    _coreEditing = '';
+    render();
+  }
+
+  /* The Core Competencies in the student's own words: their step on
+     Beginning / Growing / Confident / Leading, what they say, and their goal,
+     by reporting term. Never a teacher's grade (BC: students self-assess the
+     Core Competencies). The work tagged with each is evidence to point to. */
+  var CORE_STEPS = [1, 2, 3, 4];
+
+  function _coreTermKeys(ctx) {
+    var terms = typeof getReportingTerms === 'function' ? getReportingTerms(ctx.cid) : [];
+    if (!terms.length) return { terms: [], key: '' };
+    var pick = terms.find(function (t) {
+      return t.ordinal === _coreTerm;
+    });
+    if (!pick && ctx.term)
+      pick = terms.find(function (t) {
+        return t.ordinal === ctx.term.ordinal;
+      });
+    if (!pick) {
+      var today = typeof getTodayStr === 'function' ? getTodayStr() : new Date().toISOString().slice(0, 10);
+      pick =
+        terms.find(function (t) {
+          return t.starts_on <= today && today <= t.ends_on;
+        }) || terms[terms.length - 1];
+    }
+    return { terms: terms, pick: pick, key: 'T' + pick.ordinal };
+  }
+
+  function _coreSelfHtml(ctx) {
+    var cid = ctx.cid;
+    var first = displayNameFirst(ctx.student);
+    var tk = _coreTermKeys(ctx);
+    var mine = ((typeof getCoreSelf === 'function' ? getCoreSelf(cid)[studentId] : null) || {})[tk.key] || {};
+    // Scored work tagged with each Core Competency: evidence to point to.
+    var tally = {};
     ctx.assessments.forEach(function (a) {
       if (!(a.coreCompetencyIds && a.coreCompetencyIds.length)) return;
       var hasScore = ctx.allScores.some(function (s) {
@@ -2121,49 +2176,131 @@ window.PageStudent = (function () {
       });
       if (!hasScore) return;
       a.coreCompetencyIds.forEach(function (id) {
-        if (tally[id] !== undefined) tally[id]++;
+        tally[id] = (tally[id] || 0) + 1;
       });
     });
-    var max = Math.max(1, Math.max.apply(null, Object.values(tally)));
-    var byGroup = {};
-    CORE_COMPETENCIES.forEach(function (cc) {
-      (byGroup[cc.group] = byGroup[cc.group] || []).push(cc);
-    });
-    html +=
-      '<div class="stu-core-head"><h3>Core Competencies</h3><span class="stu-sub">How often each was tagged on ' +
-      esc(first) +
-      '’s scored assessments' +
-      (ctx.term ? ' this term' : '') +
-      '.</span></div><div class="stu-core-grid">';
-    Object.keys(byGroup).forEach(function (group) {
-      var ccs = byGroup[group];
-      html +=
-        '<div class="stu-core-group" style="--cc:' +
-        ccs[0].color +
-        '"><div class="stu-core-name" style="color:' +
-        tintText(ccs[0].color) +
-        '">' +
-        esc(group) +
-        '</div>';
-      ccs.forEach(function (cc) {
-        var n = tally[cc.id];
+    var html = '<div class="stu-core-head"><h3>Core Competencies · In ' + esc(first) + '’s Words</h3>';
+    if (tk.terms.length) {
+      html += '<div class="seg seg-sm" role="radiogroup" aria-label="Term">';
+      tk.terms.forEach(function (t) {
+        var on = t === tk.pick;
         html +=
-          '<div class="stu-core-row' +
-          (n ? '' : ' unseen') +
-          '"><span>' +
-          esc(cc.label) +
-          '</span><strong>' +
-          n +
-          '</strong><span class="stu-core-track"><span class="stu-core-fill" style="width:' +
-          (n ? Math.max(6, Math.round((n / max) * 100)) : 0) +
-          '%;background:' +
-          cc.color +
-          '"></span></span></div>';
+          '<button type="button" class="seg-btn' +
+          (on ? ' active' : '') +
+          '" role="radio" aria-checked="' +
+          on +
+          '" data-action="stuCoreTerm" data-ordinal="' +
+          t.ordinal +
+          '">' +
+          esc(t.label || 'Term ' + t.ordinal) +
+          '</button>';
       });
       html += '</div>';
+    }
+    html +=
+      '</div><div class="stu-core-table"><div class="stu-core-trow stu-core-thead" aria-hidden="true"><span>Core Competency</span><span>' +
+      esc(first) +
+      '’s Self-Assessment</span><span>' +
+      esc(first) +
+      '’s Goal</span><span>Work to Point To</span></div>';
+    CORE_COMPETENCIES.forEach(function (cc) {
+      var e = mine[cc.id];
+      var editing = _coreEditing === cc.id;
+      var n = tally[cc.id] || 0;
+      html +=
+        '<div class="stu-core-trow"><span class="stu-core-cname"><strong>' +
+        esc(cc.label) +
+        '</strong><span class="stu-sub">' +
+        esc(cc.group) +
+        '</span></span>';
+      if (e && !editing) {
+        html +=
+          '<span class="stu-core-self"><span class="stu-core-steps" role="img" aria-label="' +
+          esc(first + ' chose ' + (CONFIDENCE_LABELS[e.level] || 'no step')) +
+          '">';
+        CORE_STEPS.forEach(function (lv) {
+          html +=
+            '<span class="stu-core-step' +
+            (e.level === lv ? ' on' : '') +
+            '">' +
+            esc(CONFIDENCE_LABELS[lv]) +
+            '</span>';
+        });
+        html +=
+          '</span>' +
+          (e.text ? '<span class="stu-core-words">' + esc(e.text) + '</span>' : '') +
+          '</span><span class="stu-core-goal">' +
+          (e.goal ? esc(e.goal) : '<span class="stu-muted">—</span>') +
+          '</span>';
+      } else if (!editing) {
+        html +=
+          '<span><button type="button" class="stu-chip" data-action="stuCoreEdit" data-core="' +
+          cc.id +
+          '">+ Self-Assessment</button></span><span class="stu-muted">—</span>';
+      } else {
+        html += '<span></span><span></span>';
+      }
+      html +=
+        '<span class="stu-core-work' +
+        (n ? '' : ' none') +
+        '">' +
+        (n ? esc(_plural(n, 'assessment', 'assessments')) : 'None tagged yet') +
+        (e && !editing
+          ? ' <button type="button" class="stu-chip" data-action="stuCoreEdit" data-core="' + cc.id + '">Edit</button>'
+          : '') +
+        '</span></div>';
+      if (editing) html += _coreEditHtml(first, cc, e || {});
     });
-    html += '</div>';
-    return html;
+    return html + '</div>';
+  }
+
+  function _coreEditHtml(first, cc, e) {
+    var html =
+      '<div class="stu-core-edit" data-core="' +
+      cc.id +
+      '"><fieldset class="stu-core-scale"><legend>' +
+      esc(first) +
+      '’s step on ' +
+      esc(cc.label) +
+      '</legend>';
+    CORE_STEPS.forEach(function (lv) {
+      html +=
+        '<label class="stu-core-pick"><input type="radio" name="core-level-' +
+        cc.id +
+        '" value="' +
+        lv +
+        '"' +
+        (e.level === lv ? ' checked' : '') +
+        '><span>' +
+        esc(CONFIDENCE_LABELS[lv]) +
+        '</span></label>';
+    });
+    return (
+      html +
+      '</fieldset><label class="stu-core-field"><span>In ' +
+      esc(first) +
+      '’s words</span><textarea id="core-text-' +
+      cc.id +
+      '" placeholder="What ' +
+      esc(first) +
+      ' says about this">' +
+      esc(e.text || '') +
+      '</textarea></label><label class="stu-core-field"><span>' +
+      esc(first) +
+      '’s goal</span><input type="text" id="core-goal-' +
+      cc.id +
+      '" value="' +
+      esc(e.goal || '') +
+      '" placeholder="What ' +
+      esc(first) +
+      ' will work on"></label><div class="inline-edit-actions"><button type="button" class="btn btn-primary" data-action="stuCoreSave" data-core="' +
+      cc.id +
+      '">Save</button><button type="button" class="btn" data-action="stuCoreCancel">Cancel</button>' +
+      (e.level || e.text || e.goal
+        ? '<button type="button" class="btn" data-action="stuCoreClear" data-core="' + cc.id + '">Clear</button>'
+        : '') +
+      '</div></div>'
+    );
   }
 
   function _isTab(id) {
@@ -2383,6 +2520,27 @@ window.PageStudent = (function () {
         _typeFocus = el.dataset.key || '';
         render();
       },
+      stuCoreTerm: function () {
+        _coreTerm = Number(el.dataset.ordinal);
+        _coreEditing = '';
+        render();
+      },
+      stuCoreEdit: function () {
+        _coreEditing = el.dataset.core || '';
+        render();
+        var box = document.getElementById('core-text-' + _coreEditing);
+        if (box) box.focus();
+      },
+      stuCoreCancel: function () {
+        _coreEditing = '';
+        render();
+      },
+      stuCoreSave: function () {
+        _saveCoreSelf(el.dataset.core, false);
+      },
+      stuCoreClear: function () {
+        _saveCoreSelf(el.dataset.core, true);
+      },
       toggleOverridePanel: function () {
         toggleOverridePanel(el.dataset.secid);
       },
@@ -2487,6 +2645,8 @@ window.PageStudent = (function () {
     _bdRubric = '';
     _typeView = _savedTypeView();
     _typeFocus = '';
+    _coreTerm = null;
+    _coreEditing = '';
     // The tab the link names; a link to one observation opens Observations;
     // otherwise the tab last opened on this device.
     _tab = _isTab(params.tab) ? params.tab : params.ob ? 'evidence' : _savedTab() || 'comps';
