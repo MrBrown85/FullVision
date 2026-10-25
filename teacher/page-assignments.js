@@ -1119,17 +1119,12 @@ window.PageAssignments = (function () {
       '</div>' +
       '</div>' +
       '</div>' +
-      '<div class="af-field" id="af-weight-wrap" style="flex:0 0 auto;' +
-      (scoreMode === 'proficiency' ? '' : 'display:none') +
-      '" title="How much this counts toward competency proficiency, compared with other assessments. It doesn\u2019t change the course %.">' +
-      '<label class="af-label" for="af-weight">Proficiency Weight</label>' +
-      '<select class="af-input" id="af-weight" style="width:80px">' +
-      [0.5, 1, 1.5, 2, 3]
-        .map(function (w) {
-          return '<option value="' + w + '"' + (w === weight ? ' selected' : '') + '>' + w + 'x</option>';
-        })
-        .join('') +
-      '</select>' +
+      '<div class="af-field" id="af-weight-wrap" style="flex:0 0 auto"' +
+      ' title="Counts this assessment this many times, in the course % and toward competencies. At 4, a score of 5 out of 6 counts as 20 out of 24.">' +
+      '<label class="af-label" for="af-weight">Factor</label>' +
+      '<input class="af-input" id="af-weight" type="number" min="0.1" step="any" value="' +
+      weight +
+      '" style="width:80px;text-align:center">' +
       '</div>' +
       '</div>';
 
@@ -1311,14 +1306,12 @@ window.PageAssignments = (function () {
     if (el) el.value = mode;
     var wrap = document.getElementById('af-maxpoints-wrap');
     if (wrap) wrap.style.display = mode === 'points' ? '' : 'none';
-    var weightWrap = document.getElementById('af-weight-wrap');
-    if (weightWrap) weightWrap.style.display = mode === 'proficiency' ? '' : 'none';
   }
 
-  // The proficiency weight only applies to proficiency work (D2).
-  function _formAssessWeight(scoreModeVal) {
-    if (scoreModeVal !== 'proficiency') return 1;
-    return parseFloat((document.getElementById('af-weight') || {}).value) || 1;
+  // The Factor applies to every kind of scoring; blank, 0 or less is 1.
+  function _formAssessWeight() {
+    var factor = parseFloat((document.getElementById('af-weight') || {}).value);
+    return factor > 0 ? factor : 1;
   }
 
   /* ── Assessment CRUD ────────────────────────────────────── */
@@ -1458,7 +1451,7 @@ window.PageAssignments = (function () {
       newAssess.scoreMode = 'complete';
       newAssess.maxPoints = COMPLETE_MAX_POINTS;
     }
-    var assessWeight = _formAssessWeight(scoreModeVal);
+    var assessWeight = _formAssessWeight();
     if (assessWeight !== 1) newAssess.weight = assessWeight;
     // Read before render() replaces the form.
     var copyTargets = window.AssessmentCopy ? AssessmentCopy.readTargets(activeCourse) : [];
@@ -1562,7 +1555,7 @@ window.PageAssignments = (function () {
       assessments[idx].scoreMode = undefined;
       assessments[idx].maxPoints = undefined;
     }
-    var assessWeight = _formAssessWeight(scoreModeVal);
+    var assessWeight = _formAssessWeight();
     assessments[idx].weight = assessWeight !== 1 ? assessWeight : undefined;
     // Read before hideNewForm()/render() replace the form.
     var copyTargets = window.AssessmentCopy ? AssessmentCopy.readTargets(activeCourse) : [];

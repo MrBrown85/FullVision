@@ -177,16 +177,17 @@ function getCategoryWeights(cid) {
   const cc = getCourseConfig(cid);
   return cc.categoryWeights || { summative: 1.0, formative: 0.0 };
 }
-/** Get the proficiency weight multiplier for an assessment. Points and
- * Complete/Incomplete work always counts 1: the control is hidden there, as
- * in Schoology and Teams, where a teacher changes max points instead.
+/** Get an assessment's Factor, as in Schoology: it counts that many times.
+ * Its points earned and possible are multiplied in the course % (6 points at
+ * 4x count as 24), and its scores count that many times toward competency
+ * proficiency and level averages. Any kind of scoring can have one.
  * @param {Object} assessment - Assessment object
- * @param {number} [assessment.weight] - Weight value, defaults to 1
- * @returns {number} Assessment weight
+ * @param {number} [assessment.weight] - The Factor, defaults to 1
+ * @returns {number} Assessment Factor
  */
 function getAssessmentWeight(assessment) {
-  if (!assessment || isPointsScored(assessment)) return 1;
-  return assessment.weight || 1;
+  var factor = assessment ? Number(assessment.weight) : NaN;
+  return factor > 0 ? factor : 1;
 }
 
 function _scoreBucket(score, opts) {
@@ -418,30 +419,35 @@ function getAssessmentOverallScore(cid, studentId, assessmentId) {
   return result;
 }
 
+/* The mean of a student's overall levels on a group of assessments, each
+   counted its Factor times. { mean, count }, or null when none is scored. */
+function _factoredMeanLevel(cid, studentId, assessments) {
+  var sum = 0;
+  var factors = 0;
+  var count = 0;
+  (assessments || []).forEach(function (assessment) {
+    var value = getAssessmentOverallScore(cid, studentId, assessment.id);
+    if (value == null) return;
+    var factor = getAssessmentWeight(assessment);
+    sum += factor * value;
+    factors += factor;
+    count++;
+  });
+  return count ? { mean: sum / factors, count: count } : null;
+}
+
 function getCategoryAverage(cid, studentId, categoryId) {
   var cacheKey = _ck(cid) + ':' + studentId + ':' + categoryId;
   if (_categoryAvgCache[cacheKey] !== undefined) return _categoryAvgCache[cacheKey];
 
-  var values = _scopedAssessments(cid)
-    .filter(function (assessment) {
+  var levels = _factoredMeanLevel(
+    cid,
+    studentId,
+    _scopedAssessments(cid).filter(function (assessment) {
       return (assessment.categoryId || assessment.category_id || null) === categoryId;
-    })
-    .map(function (assessment) {
-      return getAssessmentOverallScore(cid, studentId, assessment.id);
-    })
-    .filter(function (value) {
-      return value != null;
-    });
-
-  if (values.length === 0) {
-    _categoryAvgCache[cacheKey] = null;
-    return null;
-  }
-
-  var result =
-    values.reduce(function (sum, value) {
-      return sum + value;
-    }, 0) / values.length;
+    }),
+  );
+  var result = levels ? levels.mean : null;
   _categoryAvgCache[cacheKey] = result;
   return result;
 }
@@ -586,32 +592,34 @@ function isScoreOutOfRange(assessment, value) {
    points, so 2.75/6 + 14.25/24 is 17/30 = 56.7%. Rubric work counts its
    criteria's points, like Schoology and Teams (four 4-point criteria = 16).
    A proficiency level counts as that many points out of 4 (3 = 75%,
-   3+ = 83.3%). Returns { pct, count }
+   3+ = 83.3%). Each assessment's points earned and possible are multiplied
+   by its Factor (4/6 at 4x counts as 16/24). Returns { pct, count }
    (count = graded assessments), or null when nothing in the group is graded. */
 function getAssessmentGroupPercentage(cid, studentId, assessments) {
   var earned = 0;
   var possible = 0;
   var count = 0;
   (assessments || []).forEach(function (assessment) {
+    var factor = getAssessmentWeight(assessment);
     if (isPointsScored(assessment)) {
       var pts = _assessmentPoints(cid, studentId, assessment);
       if (!pts) return;
-      earned += pts.earned;
-      possible += pts.possible;
+      earned += factor * pts.earned;
+      possible += factor * pts.possible;
     } else {
       // Rubric work counts its own points (6 of 10 = 60%), not a level.
       var rubricPts = _rubricAssessmentPoints(cid, studentId, assessment);
       if (rubricPts !== undefined) {
         if (!rubricPts) return;
-        earned += rubricPts.earned;
-        possible += rubricPts.possible;
+        earned += factor * rubricPts.earned;
+        possible += factor * rubricPts.possible;
         count++;
         return;
       }
       var level = getAssessmentOverallScore(cid, studentId, assessment.id);
       if (level == null) return;
-      earned += Math.max(0, Math.min(4, level));
-      possible += 4;
+      earned += factor * Math.max(0, Math.min(4, level));
+      possible += factor * 4;
     }
     count++;
   });
@@ -620,26 +628,21 @@ function getAssessmentGroupPercentage(cid, studentId, assessments) {
 
 /* A student's grade on any group of assessments (a category, a module, an
    assignment type, a rubric's assessments), as the class shows grades.
-   prof: the mean of the scored assessments' overall levels, as a category's
+   prof: the mean of the scored assessments' overall levels, each counted
+   its Factor times, as a category's
    average is worked out (getCategoryAverage). pct: points earned out of
    points possible (getAssessmentGroupPercentage). A Proficiency class shows
    the level, a Letter class the letter and %, a Both class both.
    Returns { text, level, prof, pct, count } or null when nothing is scored. */
 function assessmentGroupGrade(cid, studentId, assessments) {
-  var levels = (assessments || [])
-    .map(function (a) {
-      return getAssessmentOverallScore(cid, studentId, a.id);
-    })
-    .filter(function (v) {
-      return v != null;
-    });
-  var prof = levels.length
-    ? levels.reduce(function (s, v) {
-        return s + v;
-      }, 0) / levels.length
-    : null;
+  var levels = _factoredMeanLevel(cid, studentId, assessments);
   var group = getAssessmentGroupPercentage(cid, studentId, assessments);
-  return _groupGrade(cid, prof, group ? group.pct : null, Math.max(levels.length, group ? group.count : 0));
+  return _groupGrade(
+    cid,
+    levels ? levels.mean : null,
+    group ? group.pct : null,
+    Math.max(levels ? levels.count : 0, group ? group.count : 0),
+  );
 }
 
 /* The class average on a group of assessments: each student's group grade,
@@ -885,19 +888,8 @@ function getCourseLetterData(cid, studentId) {
     if (weightTotal > 0) Q = weightedSum / weightTotal;
     if (pctWeight > 0) R = pctSum / pctWeight;
   } else {
-    var values = assessments
-      .map(function (assessment) {
-        return getAssessmentOverallScore(cid, studentId, assessment.id);
-      })
-      .filter(function (value) {
-        return value != null;
-      });
-    if (values.length > 0) {
-      Q =
-        values.reduce(function (sum, value) {
-          return sum + value;
-        }, 0) / values.length;
-    }
+    var levels = _factoredMeanLevel(cid, studentId, assessments);
+    if (levels) Q = levels.mean;
     var all = getAssessmentGroupPercentage(cid, studentId, assessments);
     if (all) R = all.pct;
   }

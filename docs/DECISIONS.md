@@ -7,13 +7,22 @@ Settled product decisions. Add a dated entry when one is made; don't reopen one 
 Context: `grading-compliance-plan.md`. All implemented; see its status table.
 
 - **D1 Category weights must total exactly 100** to save. Not relative weights.
-- **D2 Per-assessment weight** (0.5×–3×) applies to proficiency work only; hidden on points and Complete/Incomplete work, labelled "Proficiency weight".
+- **D2 Per-assessment weight** (0.5×–3×) applies to proficiency work only; hidden on points and Complete/Incomplete work, labelled "Proficiency weight". _Superseded 2026-10-25 by the Factor below._
 - **D3 A proficiency level counts as level ÷ 4** toward a percentage (3 = 75%). Not the middle of a letter band.
 - **D4 Extra credit:** points work can score up to 2× its maximum; the course % can exceed 100.
 - **D5 No drop-lowest.** Skipped; low demand.
 - **D6 Rounding:** a class setting, whole number or one decimal; default whole for grades 10–12. The letter always comes from the % as shown.
 - **D7 Missing counts as 0.** No switch to turn it off.
 - **D8 + and − on every proficiency score** (Colin, 2026-10-22: "the plus minus should be consistent"): a competency, a rubric criterion, and an assessment scored as a whole on its Overall row (`score.modifier`, `migrations/20261022_score_modifier.sql`), in Assignments, the gradebook and the phone. A 3+ counts as 3.33 wherever it is.
+
+## Assessment Factor (2026-10-25)
+
+Supersedes D2. Teachers asked for the multiplier back on points work (an assignment out of 6 counted 4 times), and Schoology has one ("Factor"). Colin: taking it out was an oversight.
+
+- **Every assessment has a Factor**, any number above 0, default 1, labelled "Factor" on the assessment form for every kind of scoring.
+- **In the course %, its points earned and possible are multiplied by it:** 5/6 at 4 counts as 20/24. Proficiency work (level out of 4) and rubric points are multiplied the same way.
+- **Toward competencies and level averages, it counts that many times:** competency proficiency, category averages and group grades.
+- A gradebook column and its Class Average still show the assessment's own points (5/6), not the multiplied ones.
 
 ## Product shape (2026-10-17)
 
