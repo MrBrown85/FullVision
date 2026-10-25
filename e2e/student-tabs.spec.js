@@ -165,16 +165,21 @@ test('Grade Breakdown shows each category with its share, and Group By groups th
   await expect(page.locator('.stu-bd-cats .stu-bd-row:not(.stu-bd-head)')).toHaveCount(3);
   await page.locator('.stu-bd-cats [data-action="stuBdToggle"]').first().click();
   await expect(page.locator('.stu-bd-items .stu-bd-item')).toHaveCount(8);
-  await expect(page.locator('.stu-ts-row:not(.stu-ts-head)')).toHaveCount(5);
-  for (const view of ['growth', 'month', 'timeline']) {
+  // Assignment Types comes first and opens on Timeline.
+  await expect(page.locator('.stu-bd-section').first()).toHaveAttribute('aria-labelledby', 'stu-bd-types');
+  await expect(page.locator('[data-action="stuTypeView"][data-view="timeline"]')).toHaveAttribute(
+    'aria-checked',
+    'true',
+  );
+  await expect(page.locator('.stu-chart-line')).toHaveCount(5);
+  for (const view of ['growth', 'month', 'strengths']) {
     await page.locator('[data-action="stuTypeView"][data-view="' + view + '"]').click();
     await expect(page.locator('[data-action="stuTypeView"][data-view="' + view + '"]')).toHaveAttribute(
       'aria-checked',
       'true',
     );
   }
-  await expect(page.locator('.stu-chart-line')).toHaveCount(5);
-  await page.locator('[data-action="stuTypeView"][data-view="strengths"]').click();
+  await expect(page.locator('.stu-ts-row:not(.stu-ts-head)')).toHaveCount(5);
   await expect(page.locator('.stu-rt-picker .stu-chip.active')).toContainText('Rubric');
   await expect(page.locator('.stu-rt-row:not(.stu-rt-head)')).toHaveCount(3);
 
@@ -184,4 +189,21 @@ test('Grade Breakdown shows each category with its share, and Group By groups th
   await expect(page.locator('.stu-agroup-head').first()).toContainText('40% of the grade');
   await page.locator('.stu-agroup-head').first().click();
   await expect(page.locator('.stu-agroup').first().locator('.stu-assess-row')).toHaveCount(0);
+});
+
+// A view switch or a chip redraws the tab; the page stays where it was and
+// the clicked control keeps the focus (Colin, 2026-10-24).
+test('Grade Breakdown buttons keep the scroll position and focus', async ({ page }) => {
+  await openCece(page);
+  await page.locator('#stu-tab-breakdown').click();
+  const chip = page.locator('[data-action="stuBdRubric"]').nth(1);
+  await chip.scrollIntoViewIfNeeded();
+  const before = await page.evaluate(() => document.querySelector('.student-scroll').scrollTop);
+  expect(before).toBeGreaterThan(100);
+  await chip.click();
+  await expect(page.locator('[data-action="stuBdRubric"]').nth(1)).toHaveAttribute('aria-pressed', 'true');
+  expect(await page.evaluate(() => document.querySelector('.student-scroll').scrollTop)).toBe(before);
+  expect(await page.evaluate(() => document.activeElement.dataset.action)).toBe('stuBdRubric');
+  await page.locator('#stu-tab-assess').click();
+  expect(await page.evaluate(() => document.querySelector('.student-scroll').scrollTop)).toBe(0);
 });
