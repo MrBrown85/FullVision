@@ -2393,7 +2393,10 @@
 }
 button.tq-att-mention {
   width: 100%;
-  border: none;
+  /* As the assignment rows: a clear border until picked, so picking only
+     changes colours. */
+  padding: 4px 9px;
+  border: 1px solid transparent;
   font: inherit;
   text-align: left;
 }
