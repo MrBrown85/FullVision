@@ -148,3 +148,76 @@ test('Demo Mode answers About Me with no request', async ({ page }) => {
   await expect(page.getByText('This was Demo Mode. Nothing was sent.')).toBeVisible();
   expect(posts).toHaveLength(0);
 });
+
+test('a report slip: birthday, the report as sent, a reply', async ({ page }) => {
+  const posts = [];
+  await page.route('**/functions/v1/student-submit**', async route => {
+    const req = route.request();
+    const cors = {
+      'access-control-allow-origin': '*',
+      'access-control-allow-headers': 'content-type',
+      'access-control-allow-methods': 'POST, OPTIONS',
+    };
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    const body = JSON.parse(req.postData() || '{}');
+    posts.push(body);
+    const replies = {
+      open: {
+        ok: true,
+        kind: 'report',
+        token: 'c'.repeat(64),
+        student: { first_name: 'Cece' },
+        course: { name: 'Science 8', block: 'B' },
+        report: { title: 'Report 1', expires_on: '2027-01-31' },
+        has_birthday: true,
+      },
+      check: {
+        ok: true,
+        report: {
+          name: 'Cece Okafor',
+          first: 'Cece',
+          course: 'Science 8',
+          report: 'Report 1',
+          overall: { mode: 'proficiency', text: '3.0', level: 3, word: 'Proficient' },
+          comment: ['Cece is curious.'],
+        },
+        reply: {
+          id: 'rq',
+          kind: 'report_reply',
+          title: 'Reply to Report 1',
+          questions: [
+            {
+              id: '44444444-0000-4000-8000-000000000001',
+              kind: 'text',
+              prompt: 'What are you most proud of?',
+              options: {},
+              core_ids: [],
+            },
+          ],
+        },
+        replied_at: null,
+      },
+      submit: { ok: true, submitted_at: '2026-11-22T18:00:00Z' },
+    };
+    return route.fulfill({
+      status: 200,
+      headers: { ...cors, 'content-type': 'application/json' },
+      body: JSON.stringify(replies[body.route]),
+    });
+  });
+  await page.goto('/s/#K7M-4QX');
+  await expect(page.getByRole('heading', { name: 'Your report is ready, Cece' })).toBeVisible();
+  await page.getByLabel('Month').selectOption('5');
+  await page.getByLabel('Day').selectOption('15');
+  await page.getByLabel('Year').selectOption('2012');
+  await page.getByRole('button', { name: 'Open My Report' }).tap();
+  await expect(page.locator('.pr-big')).toHaveText('Proficient');
+  expect(posts[1]).toEqual({ route: 'check', token: 'c'.repeat(64), birthday: '2012-05-15' });
+  await page.getByRole('button', { name: 'Reply to Your Report' }).tap();
+  await page.getByLabel('What are you most proud of?').fill('my biodiversity journal');
+  await page.getByRole('button', { name: 'Send to My Teacher' }).tap();
+  await expect(page.getByText('Your next step is saved with your goal.')).toBeVisible();
+  expect(posts[2].answers).toEqual({ '44444444-0000-4000-8000-000000000001': 'my biodiversity journal' });
+  await page.getByRole('button', { name: 'Back to My Report' }).tap();
+  await expect(page.getByText('You replied on Nov 22. Thanks.')).toBeVisible();
+});

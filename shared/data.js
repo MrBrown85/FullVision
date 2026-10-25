@@ -10460,6 +10460,77 @@ window.v2.issueAccessCodes = function (questionnaireId, enrollmentIds) {
   );
 };
 
+/* Reports on students' phones (migrations/20261025_phone_reports.sql).
+   Every write is online only and never queued: the teacher is waiting on
+   the result (the new report, the slip codes), and a failed call is simply
+   made again. Each carries an idempotency key. */
+function _phoneReportCall(name, params, shape) {
+  var sb = getSupabase();
+  if (!sb || _isDemoSession()) return Promise.resolve({ data: null, error: null });
+  _stampIdempotencyKey(name, params);
+  return _trackWriteSync(
+    name,
+    _callRpcWithAuthGuard(name, params).then(function (res) {
+      if (res.error && !res.error.handledSessionExpired) console.warn(name + ' failed:', res.error);
+      return { data: res && !res.error ? shape(res.data) : null, error: res.error || null };
+    }),
+  );
+}
+function _phoneReportObject(d) {
+  return d && typeof d === 'object' && !Array.isArray(d) ? d : null;
+}
+/* students: [{ enrollment_id, data }] */
+window.v2.createPhoneReport = function (courseId, term, termLabel, expiresOn, students) {
+  if (!_isUuid(courseId)) return Promise.resolve({ data: null, error: null });
+  return _phoneReportCall(
+    'create_phone_report',
+    {
+      p_course_id: courseId,
+      p_term: term,
+      p_term_label: termLabel || null,
+      p_expires_on: expiresOn,
+      p_students: (students || []).filter(function (s) {
+        return _isUuid(s.enrollment_id);
+      }),
+    },
+    _phoneReportObject,
+  );
+};
+window.v2.updatePhoneReport = function (reportId, students, expiresOn) {
+  if (!_isUuid(reportId)) return Promise.resolve({ data: null, error: null });
+  return _phoneReportCall(
+    'update_phone_report',
+    {
+      p_id: reportId,
+      p_students: (students || []).filter(function (s) {
+        return _isUuid(s.enrollment_id);
+      }),
+      p_expires_on: expiresOn || null,
+    },
+    _phoneReportObject,
+  );
+};
+window.v2.closePhoneReport = function (reportId) {
+  if (!_isUuid(reportId)) return Promise.resolve({ data: null, error: null });
+  return _phoneReportCall('close_phone_report', { p_id: reportId }, _phoneReportObject);
+};
+/* [{ enrollment_id, code }]: the plain codes come back once. */
+window.v2.issueReportCodes = function (reportId, enrollmentIds) {
+  if (!_isUuid(reportId)) return Promise.resolve({ data: null, error: null });
+  var ids = (enrollmentIds || []).filter(_isUuid);
+  return _phoneReportCall(
+    'issue_report_codes',
+    { p_report_id: reportId, p_enrollment_ids: ids.length ? ids : null },
+    function (d) {
+      return Array.isArray(d) ? d : null;
+    },
+  );
+};
+window.v2.listPhoneReports = function (courseId) {
+  if (!_isUuid(courseId)) return Promise.resolve({ data: null, error: null });
+  return _rpcOrNoop('list_phone_reports', { p_course_id: courseId }).then(_listResult);
+};
+
 /* Teacher preferences — jsonb patch; omitted keys unchanged. */
 window.v2.saveTeacherPreferences = function (patch) {
   return _rpcOrNoop('save_teacher_preferences', { p_patch: patch || {} });

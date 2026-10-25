@@ -8,7 +8,7 @@ transaction, rolled back at the end.
 PGPORT=54331 PGDATABASE=fv_ss python3 run.py harness.sql student-submit-prelude.sql \\
   ../20261025_questionnaires_tables_and_functions.sql ../20261025_questionnaires_templates.sql \\
   ../20261025_student_submit.sql ../20261025_student_submit_phone.sql \\
-  ../20261025_student_submit_token_80.sql
+  ../20261025_student_submit_token_80.sql ../20261025_phone_reports.sql
 PGPORT=54331 PGDATABASE=fv_ss python3 student_submit.py
 """
 import os, sys, json, uuid
@@ -93,7 +93,7 @@ ok('a malformed code is not found', r == {'ok': False, 'error': 'not_found'}, r)
 r = open_('ZZZ-ZZZ')
 ok('an unknown code is not found', r == {'ok': False, 'error': 'not_found'}, r)
 r = open_(code[ENR1].lower().replace('-', ' '))
-ok('a good code opens, in any case and with any separator', r.get('ok') is True, r)
+ok('a good code opens, in any case and with any separator', r.get('ok') is True and r.get('kind') == 'questionnaire', r)
 tok1 = r['token']
 mins = one("select extract(epoch from (expires_at - now())) / 60 from student_submit.session order by created_at desc limit 1")
 ok('the token lasts a class block, 80 minutes', 79 < float(mins) <= 80, mins)
@@ -235,9 +235,14 @@ back()
 
 # ── Rate limits ────────────────────────────────────────────────────────
 sp()
-for i in range(10): open_('ZZZ-ZZZ', ip='ip-guess')
+# A school shares one address: 59 misses still let a good code through,
+# the 60th locks the address out (20261025_phone_reports.sql).
+for i in range(59): open_('ZZZ-ZZZ', ip='ip-guess')
 r = open_(new1, ip='ip-guess')
-ok('ten misses from one IP lock it out, even with a good code', r == {'ok': False, 'error': 'locked'}, r)
+ok('59 misses from one address still let a good code open', r.get('ok') is True, r)
+open_('ZZZ-ZZZ', ip='ip-guess')
+r = open_(new1, ip='ip-guess')
+ok('the 60th miss from one address locks it out, even with a good code', r == {'ok': False, 'error': 'locked'}, r)
 r = open_(new1, ip='ip-other')
 ok('another IP is unaffected', r.get('ok') is True, r)
 back(); sp(); as_owner()

@@ -22,6 +22,10 @@ const handle = makeHandler({
       const [row] = await sql`select student_submit.open(${code}, ${ipHash}) as r`;
       return row.r;
     },
+    async check(token, birthday, ipHash) {
+      const [row] = await sql`select student_submit.check(${token}, ${birthday}, ${ipHash}) as r`;
+      return row.r;
+    },
     async submit(token, answers, ipHash) {
       const [row] = await sql`select student_submit.submit(${token}, ${sql.json(answers)}, ${ipHash}) as r`;
       return row.r;

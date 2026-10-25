@@ -14,6 +14,7 @@ import { parseHTML } from 'linkedom';
 const ROOT = resolve(__dirname, '..');
 // tests/setup.js (the global setup file) has loaded shared/questionnaire-templates.js.
 runInThisContext(readFileSync(resolve(ROOT, 's/student.js'), 'utf8'));
+// shared/phone-report-view.js is loaded by tests/setup.js too.
 const T = globalThis.StudentPage._test;
 
 const PARTS = [
@@ -266,5 +267,159 @@ describe('student page', () => {
     click('[data-act="send"]');
     for (let i = 0; i < 3; i++) await tick();
     expect(sessionStorage.getItem('fv-s-draft-K7M4QX')).toBeNull();
+  });
+});
+
+describe('student page: a report on the phone', () => {
+  const REPORT_OPEN = {
+    ok: true,
+    kind: 'report',
+    token: 'a'.repeat(64),
+    student: { first_name: 'Cece' },
+    course: { name: 'Science 8', block: 'B' },
+    report: { title: 'Report 1', expires_on: '2027-01-31' },
+    has_birthday: true,
+  };
+  const REPLY = {
+    id: 'rq',
+    kind: 'report_reply',
+    title: 'Reply to Report 1',
+    questions: [
+      { id: 'r1', kind: 'text', prompt: 'What are you most proud of?', options: {}, core_ids: [] },
+      {
+        id: 'r3',
+        kind: 'choice',
+        prompt: 'Your goal: keep it or change it?',
+        options: { choices: ['Keep It', 'Change It'], multiple: false },
+        core_ids: [],
+      },
+      { id: 'r4', kind: 'text', prompt: 'One thing you will do before the next report', options: {}, core_ids: [] },
+    ],
+  };
+  const COPY = {
+    name: 'Cece Okafor',
+    first: 'Cece',
+    course: 'Science 8',
+    report: 'Report 1',
+    overall: { mode: 'proficiency', text: '3.0', level: 3, word: 'Proficient' },
+    goal: { text: 'Hand in labs on time.', status: 'Working On It' },
+  };
+  beforeEach(setup);
+  afterEach(() => Object.assign(globalThis, originals));
+  const pickBirthday = () => {
+    root.querySelector('#sp-bm option[value="5"]').setAttribute('selected', '');
+    root.querySelector('#sp-bd option[value="15"]').setAttribute('selected', '');
+    root.querySelector('#sp-by option[value="2012"]').setAttribute('selected', '');
+  };
+
+  it('a report code asks for the birthday first, and says how long the link works', async () => {
+    replies.push(REPORT_OPEN);
+    T.start(root, '#K7M4QX');
+    await tick();
+    expect(root.querySelector('.sp-big').textContent).toBe('Your report is ready, Cece');
+    expect(root.querySelector('.sp-head-title').textContent).toBe('Science 8 · Block B');
+    expect(root.querySelector('.sp-fine').textContent).toBe(
+      'This link works until Jan 31. Keep your slip private, like a password.',
+    );
+    expect(root.querySelectorAll('.sp-bday select')).toHaveLength(3);
+  });
+
+  it('no birthday on file: no pickers, just what to do', async () => {
+    replies.push(Object.assign({}, REPORT_OPEN, { has_birthday: false }));
+    T.start(root, '#K7M4QX');
+    await tick();
+    expect(root.querySelector('.sp-bday')).toBeNull();
+    expect(root.textContent).toContain('Ask your teacher.');
+    expect(root.querySelector('[data-act="rcheck"]')).toBeNull();
+  });
+
+  it('a wrong birthday says so with the tries left; the right one opens the report as sent', async () => {
+    replies.push(REPORT_OPEN);
+    T.start(root, '#K7M4QX');
+    await tick();
+    click('[data-act="rcheck"]');
+    await tick();
+    expect(calls).toHaveLength(1);
+    expect(root.querySelector('.sp-msg').textContent).toBe('Choose the month, day and year you were born.');
+    pickBirthday();
+    replies.push({ ok: false, error: 'wrong_birthday', tries_left: 3 });
+    click('[data-act="rcheck"]');
+    for (let i = 0; i < 3; i++) await tick();
+    expect(calls[1].body).toEqual({ route: 'check', token: 'a'.repeat(64), birthday: '2012-05-15' });
+    expect(root.querySelector('.sp-msg').textContent).toBe(
+      "That birthday doesn't match. Check the month, day and year. 3 tries left.",
+    );
+    expect(root.querySelector('#sp-bm').value).toBe('5');
+    replies.push({ ok: true, report: COPY, reply: REPLY, replied_at: null });
+    click('[data-act="rcheck"]');
+    for (let i = 0; i < 3; i++) await tick();
+    expect(root.querySelector('.pr-big').textContent).toBe('Proficient');
+    expect(root.querySelector('[data-act="reply"]').textContent).toBe('Reply to Your Report');
+  });
+
+  it('the reply names their goal, sends once, and leads back to the report', async () => {
+    replies.push(REPORT_OPEN);
+    T.start(root, '#K7M4QX');
+    await tick();
+    pickBirthday();
+    replies.push({ ok: true, report: COPY, reply: REPLY, replied_at: null });
+    click('[data-act="rcheck"]');
+    for (let i = 0; i < 3; i++) await tick();
+    click('[data-act="reply"]');
+    expect(root.querySelector('.sp-head-sub').textContent).toBe('Science 8 · Report 1 · Only your teacher sees this');
+    expect(root.textContent).toContain('Your goal: Hand in labs on time.');
+    type('[data-q="r1"][data-kind="text"]', 'my biodiversity journal');
+    click('[data-act="choice"][data-q="r3"][data-value="Keep It"]');
+    type('[data-q="r4"][data-kind="text"]', 'start the data table at lunch');
+    replies.push({ ok: true, submitted_at: '2026-11-22T18:00:00Z' });
+    click('[data-act="send"]');
+    for (let i = 0; i < 3; i++) await tick();
+    expect(calls[2].body).toEqual({
+      route: 'submit',
+      token: 'a'.repeat(64),
+      answers: { r1: 'my biodiversity journal', r3: ['Keep It'], r4: 'start the data table at lunch' },
+    });
+    expect(root.textContent).toContain('Your next step is saved with your goal.');
+    click('[data-act="to-report"]');
+    expect(root.querySelector('[data-act="reply"]')).toBeNull();
+    expect(root.textContent).toContain('You replied on Nov 22. Thanks.');
+  });
+
+  it('a session that ran out while they wrote opens again, checks the birthday again, then sends', async () => {
+    replies.push(REPORT_OPEN);
+    T.start(root, '#K7M4QX');
+    await tick();
+    pickBirthday();
+    replies.push({ ok: true, report: COPY, reply: REPLY, replied_at: null });
+    click('[data-act="rcheck"]');
+    for (let i = 0; i < 3; i++) await tick();
+    click('[data-act="reply"]');
+    type('[data-q="r1"][data-kind="text"]', 'proud');
+    replies.push(
+      { ok: false, error: 'expired' },
+      Object.assign({}, REPORT_OPEN, { token: 'b'.repeat(64) }),
+      { ok: true, report: COPY, reply: REPLY },
+      { ok: true },
+    );
+    click('[data-act="send"]');
+    for (let i = 0; i < 8; i++) await tick();
+    expect(calls.slice(2).map(c => c.body.route)).toEqual(['submit', 'open', 'check', 'submit']);
+    expect(calls[4].body).toEqual({ route: 'check', token: 'b'.repeat(64), birthday: '2012-05-15' });
+    expect(root.textContent).toContain('Sent to Your Teacher');
+  });
+
+  it('Demo Mode shows a sample report and reply with no request', async () => {
+    T.start(root, '#demo-report');
+    await tick();
+    pickBirthday();
+    click('[data-act="rcheck"]');
+    await tick();
+    expect(root.querySelector('.pr-name').textContent).toBe('Cece Adeyemi');
+    click('[data-act="reply"]');
+    type('textarea[data-kind="text"]', 'my journal');
+    click('[data-act="send"]');
+    await tick();
+    expect(calls).toHaveLength(0);
+    expect(root.textContent).toContain('This was Demo Mode. Nothing was sent.');
   });
 });

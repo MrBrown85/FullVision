@@ -101,7 +101,7 @@
     <main class="policy">
       <a class="back" role="link" tabindex="0" data-href="login.html">← Back to FullVision</a>
       <h1>Privacy Policy</h1>
-      <p class="updated">Last updated: October 24, 2026</p>
+      <p class="updated">Last updated: October 25, 2026</p>
 
       <p>
         FullVision is a gradebook and learning-profile tool for teachers in British Columbia. This page explains what
@@ -146,6 +146,24 @@
         </li>
       </ul>
 
+      <h2>Reports on students' phones</h2>
+      <p>
+        A teacher can send a student's progress report to the student's phone. The student opens it with the code on
+        their slip and their birthday, and can reply to the teacher once.
+      </p>
+      <ul>
+        <li>
+          The phone shows a copy the teacher made when they sent it: the student's levels, the teacher's comment, the
+          student's own goal and self-assessment, and attendance. It never shows designations, notes, observations or
+          private answers. The teacher can update the copy or close the link at any time.
+        </li>
+        <li>
+          The link works until the date the teacher sets. FullVision checks the birthday against the date of birth the
+          teacher entered; after five wrong birthdays the page stops accepting more.
+        </li>
+        <li>The student's reply goes to the teacher and nowhere else.</li>
+      </ul>
+
       <h2>What FullVision stores</h2>
       <table>
         <thead>
@@ -180,9 +198,13 @@
           <tr>
             <td>Student answers</td>
             <td>
-              What students write in their teacher's questionnaires, and their Core Competency self-assessments. Each
-              answer is saved with the time it was sent.
+              What students write in their teacher's questionnaires and in replies to their reports, and their Core
+              Competency self-assessments. Each answer is saved with the time it was sent.
             </td>
+          </tr>
+          <tr>
+            <td>Reports sent to phones</td>
+            <td>The copy of each student's report the teacher sent to phones, and when the student opened it.</td>
           </tr>
           <tr>
             <td>Classes</td>
@@ -231,7 +253,8 @@
         <li>
           <strong>You.</strong> Each teacher sees only their own classes and students. The database enforces this on
           every request; signed-in teachers cannot read another teacher's data, and people who are not signed in cannot
-          read anything. The only thing they can do is answer a questionnaire with a code from its slip.
+          read anything. The only thing they can do is answer a questionnaire, or open their own report, with the code
+          on their slip.
         </li>
         <li>
           <strong>The operator.</strong> Colin Brown has administrator access to the database. He uses it only to keep
@@ -258,7 +281,7 @@
         </li>
         <li>A student who no longer belongs to any class is deleted along with that class.</li>
         <li>Change history for scores and term ratings is kept for 2 years, or until its class is deleted.</li>
-        <li>The record of questionnaire code attempts is kept for 30 days.</li>
+        <li>The record of student code attempts is kept for 30 days.</li>
         <li>
           <strong>Backups.</strong> Supabase makes a daily backup of the database and keeps each one for 7 days. A
           deleted item can remain in backups for up to 7 days after it is deleted.

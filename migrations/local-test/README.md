@@ -65,3 +65,19 @@ Result on 2026-10-24 (Postgres 17, local): 69 of 69 pass, and
 `questionnaires.py` still passes 42 of 42 against the rewritten
 `issue_access_codes`.
 Result on 2026-10-25 (Postgres 17.10, local): 42 of 42 checks pass.
+
+## Phone reports (2026-10-25)
+
+`phone_reports.py` exercises `20261025_phone_reports.sql`: sending, report
+codes, the birthday check (no birthday, wrong birthdays and the lockout),
+the reply (once, after the check, the code still working for reading),
+update, close and the last day, as Teacher A, Teacher B and anon. Load every
+file in `student_submit.py`'s list, then:
+
+```bash
+PGPORT=54331 PGDATABASE=fv_ss python3 phone_reports.py
+```
+
+Result on 2026-10-25: 37 of 37, with `student_submit.py` at 79 of 79 (its
+lockout test now expects 60 misses per address) and `questionnaires.py` at
+42 of 42.

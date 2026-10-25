@@ -25,6 +25,12 @@ function setup(overrides) {
               ? { ok: true, token: 'a'.repeat(64), student: { first_name: 'Cece' } }
               : { ok: false, error: 'not_found' };
           },
+          async check(token, birthday, hash) {
+            calls.push({ route: 'check', token, birthday, hash });
+            return birthday === '2012-05-15'
+              ? { ok: true, report: { first: 'Cece' } }
+              : { ok: false, error: 'wrong_birthday' };
+          },
           async submit(token, answers, hash) {
             calls.push({ route: 'submit', token, answers, hash });
             return { ok: true, submitted_at: '2026-11-04T10:00:00Z' };
@@ -69,6 +75,19 @@ describe('student-submit handler', () => {
     const res = await handle(post({ route: 'submit', token: 'a'.repeat(64), answers }));
     expect(await res.json()).toEqual({ ok: true, submitted_at: '2026-11-04T10:00:00Z' });
     expect(calls[0]).toMatchObject({ route: 'submit', token: 'a'.repeat(64), answers });
+  });
+
+  it('checks a birthday for a phone report, and never logs it', async () => {
+    const { handle, calls, logs } = setup();
+    const res = await handle(post({ route: 'check', token: 'a'.repeat(64), birthday: '2012-05-15' }));
+    expect(await res.json()).toEqual({ ok: true, report: { first: 'Cece' } });
+    expect(calls[0]).toMatchObject({ route: 'check', birthday: '2012-05-15' });
+    for (const birthday of ['May 15', '2012-5-15', 20120515, undefined]) {
+      const bad = await handle(post({ route: 'check', token: 'a'.repeat(64), birthday }));
+      expect(bad.status, String(birthday)).toBe(400);
+    }
+    expect(calls).toHaveLength(1);
+    expect(JSON.stringify(logs)).not.toContain('2012');
   });
 
   it('refuses to run outside ca-central-1, before touching the database', async () => {

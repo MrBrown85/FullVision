@@ -96,7 +96,9 @@ var QrSlips = (function () {
       ) +
       ' and type</span><strong>' +
       esc(slip.code) +
-      '</strong></div><div class="qs-once">This code works once and only for you.</div></div></div>' +
+      '</strong></div><div class="qs-once">' +
+      esc(q.slipNote || 'This code works once and only for you.') +
+      '</div></div></div>' +
       '</div>'
     );
   }

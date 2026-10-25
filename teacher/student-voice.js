@@ -195,9 +195,22 @@ var StudentVoice = (function () {
     var checkins = list.filter(function (e) {
       return e.kind === 'goal_checkin';
     });
+    // The latest reply to a report: kept or changed their goal, and the next step.
+    var replyEntry = list.find(function (e) {
+      return e.kind === 'report_reply';
+    });
+    var reply = null;
+    if (replyEntry) {
+      reply = { at: replyEntry.at, title: replyEntry.title, rid: replyEntry.rid, choice: null, next: null };
+      replyEntry.items.forEach(function (it) {
+        if (it.q.kind === 'choice' && /goal/i.test(it.q.prompt || '')) reply.choice = it;
+        else if (it.q.kind === 'text' && /before the next report/i.test(it.q.prompt || '')) reply.next = it;
+      });
+    }
     return {
       about: a,
       checkin: _checkin(checkins[0]),
+      reply: reply,
       reflections: list.filter(function (e) {
         return e.kind === 'core_reflection' || e.kind === 'report_reply';
       }),

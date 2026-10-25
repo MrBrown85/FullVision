@@ -1,7 +1,8 @@
 // The student-submit request handler (docs/STUDENT-VOICE-PLAN.md, PR 6).
 //
-// A student's phone posts here; nothing else does. Two routes:
+// A student's phone posts here; nothing else does. Three routes:
 //   {route: 'open', code}             -> student_submit.open
+//   {route: 'check', token, birthday} -> student_submit.check (phone reports)
 //   {route: 'submit', token, answers} -> student_submit.submit
 // The SQL functions (migrations/20261025_student_submit.sql) hold every
 // rule; this file only checks the request's shape, refuses to run outside
@@ -13,6 +14,7 @@
 
 export type Db = {
   open: (code: string, ipHash: string) => Promise<Record<string, unknown>>;
+  check: (token: string, birthday: string, ipHash: string) => Promise<Record<string, unknown>>;
   submit: (token: string, answers: unknown, ipHash: string) => Promise<Record<string, unknown>>;
 };
 
@@ -118,6 +120,16 @@ export function makeHandler(opts: Options) {
           return reply(400, { ok: false, error: 'bad_request' }, origin);
         }
         result = await opts.db.open(body.code, hash);
+      } else if (route === 'check') {
+        if (
+          typeof body.token !== 'string' ||
+          body.token.length > 128 ||
+          typeof body.birthday !== 'string' ||
+          !/^\d{4}-\d{2}-\d{2}$/.test(body.birthday)
+        ) {
+          return reply(400, { ok: false, error: 'bad_request' }, origin);
+        }
+        result = await opts.db.check(body.token, body.birthday, hash);
       } else if (route === 'submit') {
         if (typeof body.token !== 'string' || body.token.length > 128 || body.answers == null) {
           return reply(400, { ok: false, error: 'bad_request' }, origin);
@@ -132,7 +144,7 @@ export function makeHandler(opts: Options) {
       return reply(500, { ok: false, error: 'server' }, origin);
     }
 
-    // Route, outcome and time. Never the code, token, answers or name.
+    // Route, outcome and time. Never the code, token, birthday, answers or name.
     log({
       route,
       outcome: result && result.ok ? 'ok' : (result && result.error) || 'unknown',

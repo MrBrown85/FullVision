@@ -665,6 +665,31 @@ create table student_submit.attempt (                                 -- rate li
   ip_hash text, code_id uuid, course_id uuid                          -- an HMAC of the IP; never answers or names
 );
 
+-- Reports on students' phones (20261025_phone_reports). The teacher's copy of
+-- each student's report, fixed until updated; codes in student_access_code
+-- (phone_report_id) open it after a birthday check. RLS through the course.
+create table phone_report (
+  id uuid primary key default gen_random_uuid(),
+  course_id uuid not null references course(id) on delete cascade,
+  term integer not null,                                              -- 1..6
+  term_label text,
+  reply_questionnaire_id uuid references questionnaire(id) on delete set null, -- its Reply to Report
+  issued_at timestamptz not null default now(), updated_at timestamptz not null default now(),
+  expires_on date not null,                                           -- links work through this day
+  closed_at timestamptz,                                              -- Close All Links
+  created_by uuid references teacher(id) on delete set null
+);
+create table phone_report_student (
+  report_id uuid not null references phone_report(id) on delete cascade,
+  enrollment_id uuid not null references enrollment(id) on delete cascade,
+  data jsonb not null,                                                -- the phone copy (shared/phone-report-view.js)
+  updated_at timestamptz not null default now(),
+  primary key (report_id, enrollment_id)
+);
+-- student_access_code.phone_report_id uuid references phone_report(id) on delete cascade;
+-- check (num_nonnulls(questionnaire_id, report_issue_id, phone_report_id) >= 1).
+-- student_submit.session gains checked_at timestamptz, check_fails integer.
+
 -- ─── Extensions + cron ──────────────────────────────────────────────────────
 -- pg_cron enabled (migration fullvision_v2_enable_pg_cron).
 -- Job `fv_retention_cleanup_daily` runs at 03:17 UTC calling fv_retention_cleanup().
@@ -826,8 +851,17 @@ create table student_submit.attempt (                                 -- rate li
 --   _issue_access_code(p_enrollment_id uuid, p_questionnaire_id uuid, p_expires_at timestamptz)
 --                                                             -- definer; draws a code no live code reads as
 --
+-- Phone reports:
+--   create_phone_report(p_course_id uuid, p_term integer, p_term_label text, p_expires_on date,
+--                       p_students jsonb, p_idempotency_key uuid)       -- with its Reply to Report
+--   update_phone_report(p_id uuid, p_students jsonb, p_expires_on date, p_idempotency_key uuid)
+--   close_phone_report(p_id uuid, p_idempotency_key uuid)
+--   issue_report_codes(p_report_id uuid, p_enrollment_ids uuid[], p_idempotency_key uuid)
+--   list_phone_reports(p_course_id uuid)       -- each with students' data, opened_at, replied_at
+--
 -- Student path (service_role only, called by the student-submit edge function):
 --   student_submit.open(p_code text, p_ip_hash text)       -- {ok, token, student, course, parts} | {ok:false, error}
+--   student_submit.check(p_token text, p_birthday text, p_ip_hash text) -- a phone report, after the birthday
 --   student_submit.submit(p_token text, p_answers jsonb, p_ip_hash text)
 --                                                             -- {ok, submitted_at} | {ok:false, error[, question_id]}
 --
