@@ -1341,7 +1341,19 @@ window.DashClassManager = (function () {
           return String(a.created_at || '').localeCompare(String(b.created_at || ''));
         });
       });
+      getStudents(cid).forEach(function (st) {
+        (st.pendingGuardianEmails || []).forEach(function (email) {
+          var mine = (byStudent[st.id] = byStudent[st.id] || []);
+          if (
+            !mine.some(function (g) {
+              return g.email === email;
+            })
+          )
+            mine.push({ name: 'Parent / Guardian', email: email });
+        });
+      });
       _cmGuardians[cid] = byStudent;
+      _cmFlushPendingGuardians(cid);
       if (cmSelectedCourse !== cid) return;
       document
         .querySelectorAll('.cm-rs-row input[data-col="g0"], .cm-rs-row input[data-col="g1"]')
@@ -1627,7 +1639,7 @@ window.DashClassManager = (function () {
       mine.splice(idx, 1);
     } else if (g) {
       g.email = email;
-      if (st && st.personId && window.v2 && window.v2.upsertGuardian)
+      if (g.id && _isServerPerson(st))
         window.v2.upsertGuardian({
           id: g.id,
           studentId: st.personId,
@@ -1637,15 +1649,10 @@ window.DashClassManager = (function () {
           phone: g.phone,
           language: g.language,
         });
-    } else {
+    } else if (st) {
       // A guardian needs a name; the roster only asks for an address.
-      var fresh = { name: 'Parent / Guardian', email: email };
-      mine.push(fresh);
-      if (st && st.personId && window.v2 && window.v2.upsertGuardian)
-        window.v2.upsertGuardian({ studentId: st.personId, name: fresh.name, email: email }).then(function (res) {
-          var row = res && res.data;
-          if (row && row.id) fresh.id = row.id;
-        });
+      _cmAddGuardianEmail(cid, st, email);
+      if (st.pendingGuardianEmails) saveStudents(cid, getStudents(cid));
     }
     var sum = document.getElementById('cm-rs-summary');
     if (sum) sum.textContent = _cmRosterSummary(cid);
@@ -1848,52 +1855,298 @@ window.DashClassManager = (function () {
     if (el) el.click();
   }
 
+  /* ── Import Roster: reading the file ────────────────────────
+     Columns are read by their header, so a MyEd export or a spreadsheet in
+     any column order lands in the right fields. Quoted cells may hold commas
+     ("Okafor, Cecilia"). A file with no header the importer knows is read in
+     the old fixed order: First, Last, Preferred, Pronouns, Student Number,
+     Date of Birth, Email; or Name, Preferred, Pronouns with fewer than four
+     columns. The review lets the teacher change what each column means. */
+  var ROSTER_IMPORT_FIELDS = [
+    ['', 'Ignore'],
+    ['lastName', 'Last Name'],
+    ['firstName', 'First Name'],
+    ['fullName', 'Full Name'],
+    ['preferred', 'Preferred Name'],
+    ['pronouns', 'Pronouns'],
+    ['studentNumber', 'Student Number'],
+    ['dateOfBirth', 'Date of Birth'],
+    ['email', 'Student Email'],
+    ['parentEmail', 'Parent Email'],
+    ['parentEmail2', 'Parent Email 2'],
+    ['designations', 'Designations'],
+    ['ell', 'ELL'],
+  ];
+  var ROSTER_HEADER_ALIASES = {
+    lastName: ['last', 'last name', 'lastname', 'surname', 'legal surname', 'legal last name', 'family name'],
+    firstName: ['first', 'first name', 'firstname', 'given name', 'legal first name', 'legal given name'],
+    fullName: ['name', 'student name', 'full name', 'student'],
+    preferred: ['preferred', 'preferred name', 'usual first name', 'usual name', 'nickname', 'goes by'],
+    pronouns: ['pronouns', 'pronoun'],
+    studentNumber: [
+      'student number',
+      'studentnumber',
+      'student #',
+      'student no',
+      'student id',
+      'pupil #',
+      'pupil number',
+      'pupil no',
+      'local id',
+    ],
+    dateOfBirth: ['dob', 'date of birth', 'birth date', 'birthdate', 'birthday'],
+    email: ['email', 'student email', 'school email', 'e-mail', 'email address'],
+    parentEmail: [
+      'parent email',
+      'guardian email',
+      'parent 1 email',
+      'guardian 1 email',
+      'parent/guardian email',
+      'contact email',
+      'family email',
+    ],
+    parentEmail2: ['parent email 2', 'guardian email 2', 'parent 2 email', 'guardian 2 email', 'second parent email'],
+    designations: ['designation', 'designations', 'special ed', 'special education', 'special ed category'],
+    ell: ['ell', 'esl', 'ell status', 'esl status', 'english language learner'],
+  };
+
+  function rosterFieldFor(header) {
+    var k = String(header || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[_.]+/g, ' ')
+      .replace(/\s+/g, ' ');
+    var found = '';
+    Object.keys(ROSTER_HEADER_ALIASES).some(function (field) {
+      if (ROSTER_HEADER_ALIASES[field].indexOf(k) >= 0) found = field;
+      return !!found;
+    });
+    return found;
+  }
+
+  /* Rows of cells. Commas or tabs (whichever the first line has more of),
+     "quoted, cells", "" for a quote inside one, CRLF or LF, a leading BOM. */
+  function parseRosterCsv(text) {
+    text = String(text || '').replace(/^﻿/, '');
+    var first = text.split(/\r?\n/)[0] || '';
+    var delim = first.split('\t').length > first.split(',').length ? '\t' : ',';
+    var rows = [];
+    var row = [];
+    var cell = '';
+    var quoted = false;
+    for (var i = 0; i < text.length; i++) {
+      var c = text[i];
+      if (quoted) {
+        if (c === '"' && text[i + 1] === '"') {
+          cell += '"';
+          i++;
+        } else if (c === '"') quoted = false;
+        else cell += c;
+      } else if (c === '"' && !cell.trim()) {
+        quoted = true;
+        cell = '';
+      } else if (c === delim) {
+        row.push(cell);
+        cell = '';
+      } else if (c === '\n' || c === '\r') {
+        if (c === '\r' && text[i + 1] === '\n') i++;
+        row.push(cell);
+        rows.push(row);
+        row = [];
+        cell = '';
+      } else cell += c;
+    }
+    if (cell || row.length) {
+      row.push(cell);
+      rows.push(row);
+    }
+    return rows
+      .map(function (r) {
+        return r.map(function (s) {
+          return s.trim();
+        });
+      })
+      .filter(function (r) {
+        return r.some(Boolean);
+      });
+  }
+
+  /* The file as { headers, body, map }: map[i] is the field column i fills. */
+  function rosterImportTable(text) {
+    var rows = parseRosterCsv(text);
+    if (!rows.length) return { headers: [], body: [], map: [] };
+    var map = rows[0].map(rosterFieldFor);
+    if (map.some(Boolean)) return { headers: rows[0], body: rows.slice(1), map: map };
+    var width = Math.max.apply(
+      null,
+      rows.map(function (r) {
+        return r.length;
+      }),
+    );
+    var order =
+      width >= 4
+        ? ['firstName', 'lastName', 'preferred', 'pronouns', 'studentNumber', 'dateOfBirth', 'email']
+        : ['fullName', 'preferred', 'pronouns'];
+    return {
+      headers: order.slice(0, width).map(function () {
+        return '';
+      }),
+      body: rows,
+      map: order.slice(0, width),
+    };
+  }
+
+  function _rosterEmailOk(v) {
+    return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v);
+  }
+
+  /* 2012-05-15, 2012/5/15, or a written date like May 15, 2012. A
+     day-first or month-first number date can't be told apart, so it's
+     left out rather than guessed. */
+  function _rosterDate(v) {
+    var m = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/.exec(v);
+    var pad = function (n) {
+      return (n < 10 ? '0' : '') + n;
+    };
+    if (m) {
+      var y = +m[1],
+        mo = +m[2],
+        d = +m[3];
+      return mo >= 1 && mo <= 12 && d >= 1 && d <= 31 ? y + '-' + pad(mo) + '-' + pad(d) : '';
+    }
+    if (!/[a-z]/i.test(v)) return '';
+    var t = new Date(v + ' 12:00');
+    return isNaN(t) ? '' : t.getFullYear() + '-' + pad(t.getMonth() + 1) + '-' + pad(t.getDate());
+  }
+
+  function _rosterSplitName(v) {
+    if (v.indexOf(',') >= 0) {
+      var parts = v.split(',');
+      return { first: parts.slice(1).join(',').trim(), last: parts[0].trim() };
+    }
+    var words = v.split(/\s+/);
+    return { first: words[0] || '', last: words.slice(1).join(' ') };
+  }
+
+  /* The table's rows as students, and what couldn't be read. A blank cell
+     never clears anything; codes that aren't BC designations are left out. */
+  function rosterRowsFromTable(table) {
+    var out = [];
+    var skipped = { dates: 0, emails: 0, codes: 0 };
+    var addCode = function (p, code) {
+      p.designations = p.designations || [];
+      if (p.designations.indexOf(code) < 0) p.designations.push(code);
+    };
+    table.body.forEach(function (r) {
+      var p = { parentEmails: [] };
+      table.map.forEach(function (field, i) {
+        var v = (r[i] || '').trim();
+        if (!field || !v) return;
+        if (field === 'fullName') {
+          var nm = _rosterSplitName(v);
+          if (!p.firstName) p.firstName = nm.first;
+          if (!p.lastName) p.lastName = nm.last;
+        } else if (field === 'dateOfBirth') {
+          var d = _rosterDate(v);
+          if (d) p.dateOfBirth = d;
+          else skipped.dates++;
+        } else if (field === 'email') {
+          if (_rosterEmailOk(v)) p.email = v;
+          else skipped.emails++;
+        } else if (field === 'parentEmail' || field === 'parentEmail2') {
+          v.split(/[;,\s]+/)
+            .filter(Boolean)
+            .forEach(function (e) {
+              if (!_rosterEmailOk(e)) skipped.emails++;
+              else if (p.parentEmails.indexOf(e) < 0) p.parentEmails.push(e);
+            });
+        } else if (field === 'designations') {
+          v.toUpperCase()
+            .split(/[\s,;/]+/)
+            .filter(Boolean)
+            .forEach(function (code) {
+              if (BC_DESIGNATIONS[code] || SUPPORT_FLAGS[code]) addCode(p, code);
+              else skipped.codes++;
+            });
+        } else if (field === 'ell') {
+          if (/^(y|yes|true|1|x|ell|esl)$/i.test(v)) addCode(p, 'ELL');
+        } else p[field] = v;
+      });
+      if (p.firstName || p.lastName) out.push(p);
+    });
+    return { rows: out, skipped: skipped };
+  }
+
+  /* ── Guardian addresses from the roster and the import ──────
+     Stored on the server's guardian table; nothing is emailed from
+     FullVision (families are emailed from the teacher's Outlook). A student
+     the server hasn't created yet has no person id to attach a guardian to,
+     so the address is kept on the student record and saved to the guardian
+     table once the id arrives. */
+  function _cmAddGuardianEmail(cid, st, email) {
+    var list = (_cmGuardians[cid] = _cmGuardians[cid] || {});
+    var mine = (list[st.id] = list[st.id] || []);
+    if (
+      mine.some(function (g) {
+        return (g.email || '').toLowerCase() === email.toLowerCase();
+      })
+    )
+      return;
+    var fresh = { name: 'Parent / Guardian', email: email };
+    mine.push(fresh);
+    if (_isServerPerson(st)) _cmSendGuardian(st, fresh);
+    else st.pendingGuardianEmails = (st.pendingGuardianEmails || []).concat([email]);
+  }
+
+  function _isServerPerson(st) {
+    return !!(st && /^[0-9a-f-]{36}$/i.test(st.personId || '') && window.v2 && window.v2.upsertGuardian);
+  }
+
+  function _cmSendGuardian(st, g) {
+    return window.v2.upsertGuardian({ studentId: st.personId, name: g.name, email: g.email }).then(function (res) {
+      var row = res && res.data;
+      if (row && row.id) g.id = row.id;
+    });
+  }
+
+  function _cmFlushPendingGuardians(cid) {
+    var students = getStudents(cid);
+    var changed = false;
+    students.forEach(function (st) {
+      if (!st.pendingGuardianEmails || !st.pendingGuardianEmails.length || !_isServerPerson(st)) return;
+      var mine = _cmGuardiansFor(cid, st.id);
+      st.pendingGuardianEmails.forEach(function (email) {
+        var g = mine.find(function (x) {
+          return x.email === email && !x.id;
+        }) || { name: 'Parent / Guardian', email: email };
+        _cmSendGuardian(st, g);
+      });
+      delete st.pendingGuardianEmails;
+      changed = true;
+    });
+    if (changed) saveStudents(cid, students);
+  }
+
   function cmHandleCSV(input) {
     var file = input.files[0];
     if (!file) return;
     var reader = new FileReader();
     reader.onload = function (e) {
-      var lines = e.target.result
-        .split('\n')
-        .map(function (l) {
-          return l.trim();
-        })
-        .filter(function (l) {
-          return l;
-        });
-      var hdr = (lines[0] || '').toLowerCase();
-      var hasHeader = hdr.includes('first') || hdr.includes('name') || hdr.includes('last');
-      var start = hasHeader ? 1 : 0;
-      var parsed = [];
-      for (var i = start; i < lines.length; i++) {
-        var parts = lines[i].split(',').map(function (p) {
-          return p.trim();
-        });
-        if (!parts[0]) continue;
-        if (hdr.includes('first') || parts.length >= 4) {
-          parsed.push({
-            firstName: parts[0],
-            lastName: parts[1] || '',
-            preferred: parts[2] || '',
-            pronouns: parts[3] || '',
-            studentNumber: parts[4] || '',
-            dateOfBirth: parts[5] || '',
-            email: parts[6] || '',
-          });
-        } else {
-          var np = parts[0].split(/\s+/);
-          parsed.push({
-            firstName: np[0] || '',
-            lastName: np.slice(1).join(' ') || '',
-            preferred: parts[1] || '',
-            pronouns: parts[2] || '',
-          });
-        }
-      }
-      cmShowImportPreview(parsed, file.name);
+      var table = rosterImportTable(e.target.result);
+      var read = rosterRowsFromTable(table);
+      cmShowImportPreview(read.rows, file.name, table, read.skipped);
     };
     reader.readAsText(file);
     input.value = '';
+  }
+
+  /* A column's meaning changed in the review: read the file again. */
+  function cmImportMap(col, field) {
+    var plan = cmPendingImport;
+    if (!plan || !plan.table) return;
+    plan.table.map[Number(col)] = field;
+    var read = rosterRowsFromTable(plan.table);
+    cmShowImportPreview(read.rows, plan.fileName, plan.table, read.skipped);
   }
 
   /* Import review. Rows are matched to the roster by student number, then
@@ -1906,7 +2159,7 @@ window.DashClassManager = (function () {
       .toLowerCase();
   }
 
-  function cmShowImportPreview(parsed, fileName) {
+  function cmShowImportPreview(parsed, fileName, table, skipped) {
     var cid = cmSelectedCourse;
     if (!cid) return;
     var roster = getStudents(cid);
@@ -1917,7 +2170,17 @@ window.DashClassManager = (function () {
       byName[_cmImportKey(fullName(s))] = s;
     });
     var matched = {};
-    var plan = { fileName: fileName || '', total: parsed.length, added: [], renamed: [], missing: [], same: 0 };
+    var plan = {
+      fileName: fileName || '',
+      total: parsed.length,
+      added: [],
+      renamed: [],
+      updated: [],
+      missing: [],
+      same: 0,
+      table: table || null,
+      skipped: skipped || null,
+    };
     parsed.forEach(function (p) {
       var name = _cmImportKey((p.firstName || '') + ' ' + (p.lastName || ''));
       var hit = (_cmImportKey(p.studentNumber) && byNum[_cmImportKey(p.studentNumber)]) || byName[name];
@@ -1929,14 +2192,46 @@ window.DashClassManager = (function () {
       var sameName =
         _cmImportKey(hit.firstName) === _cmImportKey(p.firstName) &&
         _cmImportKey(hit.lastName) === _cmImportKey(p.lastName);
-      if (sameName || !p.firstName) plan.same++;
-      else plan.renamed.push({ sid: hit.id, row: p, on: true });
+      if (!sameName && p.firstName) plan.renamed.push({ sid: hit.id, row: p, on: true });
+      var fields = _cmImportChanges(cid, hit, p);
+      if (fields.length) plan.updated.push({ sid: hit.id, row: p, fields: fields, on: true });
+      else if (sameName || !p.firstName) plan.same++;
     });
     sortStudents(roster, 'lastName').forEach(function (s) {
       if (!matched[s.id]) plan.missing.push({ sid: s.id, on: false });
     });
     cmPendingImport = plan;
     renderClassManager();
+  }
+
+  /* What a matched row would change: a field the file fills and the roster
+     has differently, a designation the student doesn't have yet, a parent
+     email not on file. Blank cells change nothing. */
+  var IMPORT_FIELD_LABELS = {
+    preferred: 'Preferred Name',
+    pronouns: 'Pronouns',
+    studentNumber: 'Student Number',
+    dateOfBirth: 'Date of Birth',
+    email: 'Student Email',
+  };
+  function _cmImportChanges(cid, st, p) {
+    var out = [];
+    Object.keys(IMPORT_FIELD_LABELS).forEach(function (k) {
+      if (p[k] && String(p[k]) !== String(st[k] || '')) out.push(IMPORT_FIELD_LABELS[k]);
+    });
+    var have = st.designations || [];
+    var newCodes = (p.designations || []).filter(function (c) {
+      return have.indexOf(c) < 0;
+    });
+    if (newCodes.length) out.push(newCodes.join(', '));
+    var known = _cmGuardiansFor(cid, st.id).map(function (g) {
+      return (g.email || '').toLowerCase();
+    });
+    var newParents = (p.parentEmails || []).filter(function (e) {
+      return known.indexOf(e.toLowerCase()) < 0;
+    });
+    if (newParents.length) out.push(newParents.length === 1 ? 'Parent Email' : newParents.length + ' Parent Emails');
+    return out;
   }
 
   function _cmRenderImportReview(cid) {
@@ -1981,10 +2276,52 @@ window.DashClassManager = (function () {
     var withdrawn = plan.missing.filter(function (m) {
       return m.on;
     }).length;
+    var updated = (plan.updated || []).filter(function (u) {
+      return u.on;
+    }).length;
     var summary = [];
     if (added) summary.push('Add ' + added);
     if (renamed) summary.push('rename ' + renamed);
+    if (updated) summary.push('update ' + updated);
     if (withdrawn) summary.push('withdraw ' + withdrawn);
+    if (summary.length) summary[0] = summary[0].charAt(0).toUpperCase() + summary[0].slice(1);
+    var columns = '';
+    if (plan.table && plan.table.headers.some(Boolean)) {
+      columns =
+        '<div class="cm-import-group cm-import-columns"><div class="cm-import-group-head"><h3>Columns in This File</h3></div>' +
+        '<div class="cm-import-col-grid">' +
+        plan.table.headers
+          .map(function (h, i) {
+            var field = plan.table.map[i] || '';
+            return (
+              '<label class="cm-import-col"><span class="cm-import-col-name">' +
+              esc(h || 'Column ' + (i + 1)) +
+              '</span><select class="cm-input" data-action-change="cmImportMap" data-col="' +
+              i +
+              '" aria-label="What ' +
+              esc(h || 'column ' + (i + 1)) +
+              ' holds">' +
+              ROSTER_IMPORT_FIELDS.map(function (f) {
+                return '<option value="' + f[0] + '"' + (f[0] === field ? ' selected' : '') + '>' + f[1] + '</option>';
+              }).join('') +
+              '</select></label>'
+            );
+          })
+          .join('') +
+        '</div>' +
+        '<div class="cm-hint">Change a column if it was matched to the wrong field. Ignored columns aren\'t imported.</div>' +
+        '</div>';
+    }
+    var sk = plan.skipped || {};
+    var skippedParts = [];
+    if (sk.dates) skippedParts.push(sk.dates + (sk.dates === 1 ? ' date' : ' dates'));
+    if (sk.emails) skippedParts.push(sk.emails + (sk.emails === 1 ? ' email' : ' emails'));
+    if (sk.codes) skippedParts.push(sk.codes + (sk.codes === 1 ? ' designation code' : ' designation codes'));
+    var skippedNote = skippedParts.length
+      ? '<div class="cm-hint cm-import-skipped">' +
+        esc(skippedParts.join(', ')) +
+        " couldn't be read and will be left out. Dates need to look like 2012-05-15.</div>"
+      : '';
     return (
       '<div class="cm-section cm-import-review">' +
       '<h2 class="cm-grade-title">Import Roster: Review Changes</h2>' +
@@ -1993,6 +2330,8 @@ window.DashClassManager = (function () {
       plan.total +
       (plan.total === 1 ? ' student' : ' students') +
       '. Students are matched by student number, then by name. Nothing changes until you press Import.</div>' +
+      skippedNote +
+      columns +
       group('New to This Class', plan.added, function (a, i) {
         var r = a.row;
         return check(
@@ -2027,6 +2366,26 @@ window.DashClassManager = (function () {
           );
         },
         'Same student number, so their scores and observations stay with them.',
+      ) +
+      group(
+        'Details Updated',
+        plan.updated || [],
+        function (u, i) {
+          var st = byId[u.sid] || {};
+          return check(
+            'updated',
+            i,
+            u.on,
+            '<span class="cm-import-name"><strong>' +
+              esc(fullName(st)) +
+              '</strong> · ' +
+              esc(u.fields.join(', ')) +
+              '</span><span class="cm-roster-num">' +
+              esc(st.studentNumber || '') +
+              '</span>',
+          );
+        },
+        'Only filled-in cells change anything. Designations and parent emails are added, never removed.',
       ) +
       group(
         'In Your Class, Not in This File',
@@ -2087,10 +2446,28 @@ window.DashClassManager = (function () {
       st.lastName = r.row.lastName || '';
       st.sortName = (st.lastName + ' ' + st.firstName).trim();
     });
+    (plan.updated || []).forEach(function (u) {
+      if (!u.on) return;
+      var st = students.find(function (s) {
+        return s.id === u.sid;
+      });
+      if (!st) return;
+      Object.keys(IMPORT_FIELD_LABELS).forEach(function (k) {
+        if (u.row[k]) st[k] = u.row[k];
+      });
+      (u.row.designations || []).forEach(function (c) {
+        st.designations = st.designations || [];
+        if (st.designations.indexOf(c) < 0) st.designations.push(c);
+      });
+      (u.row.parentEmails || []).forEach(function (e) {
+        _cmAddGuardianEmail(cid, st, e);
+      });
+    });
+    var newGuardians = [];
     plan.added.forEach(function (a) {
       if (!a.on) return;
       var p = a.row;
-      students.push({
+      var fresh = {
         id: uid(),
         firstName: p.firstName || '',
         lastName: p.lastName || '',
@@ -2099,12 +2476,28 @@ window.DashClassManager = (function () {
         studentNumber: p.studentNumber || '',
         dateOfBirth: p.dateOfBirth || '',
         email: p.email || '',
+        designations: (p.designations || []).slice(),
         attendance: [],
         sortName: ((p.lastName || '') + ' ' + (p.firstName || '')).trim(),
         enrolledDate: new Date().toISOString().slice(0, 10),
+      };
+      students.push(fresh);
+      (p.parentEmails || []).forEach(function (e) {
+        newGuardians.push([fresh, e]);
       });
     });
+    newGuardians.forEach(function (pair) {
+      _cmAddGuardianEmail(cid, pair[0], pair[1]);
+    });
     saveStudents(cid, students);
+    // New students get their person id when their create lands; their
+    // parent addresses are saved to the guardian table then.
+    if (newGuardians.length)
+      [4000, 15000].forEach(function (ms) {
+        setTimeout(function () {
+          _cmFlushPendingGuardians(cid);
+        }, ms);
+      });
     plan.missing.forEach(function (m) {
       if (m.on) withdrawStudent(cid, m.sid);
     });
@@ -7665,6 +8058,10 @@ window.DashClassManager = (function () {
       cmUpdateSecColor(el.dataset.secid, el.value);
       return true;
     }
+    if (el.dataset.actionChange === 'cmImportMap') {
+      cmImportMap(el.dataset.col, el.value);
+      return true;
+    }
     if (el.dataset.actionChange === 'cmRosterEll') {
       cmRosterEll(el);
       return true;
@@ -7819,6 +8216,9 @@ window.DashClassManager = (function () {
     // The reporting terms draft as the editor holds it (tests).
     // For tests: the import review a CSV file opens.
     cmShowImportPreview: cmShowImportPreview,
+    parseRosterCsv: parseRosterCsv,
+    rosterImportTable: rosterImportTable,
+    rosterRowsFromTable: rosterRowsFromTable,
     cmCompRowsFromCsv: cmCompRowsFromCsv,
     withdrawnRecordRows: _cmWithdrawnRecordRows,
     reportingTermsDraft: function (cid) {

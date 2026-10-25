@@ -1,6 +1,6 @@
-First,Last,Preferred,Pronouns,StudentNumber,DOB,Email
-Cece,Adeyemi,,she/her,STU-201,2012-05-15,cece@school.ca
-Jordan,Kim,JK,they/them,STU-215,2012-08-22,
-Hannah,Berg,,she/her,STU-203,2012-11-03,hannah.b@school.ca
-Sam,Blackwood,,he/him,STU-204,,
-Liam,Chen,,,STU-206,,
+Last Name,First Name,Preferred Name,Pronouns,Student Number,Date of Birth,Student Email,Parent Email,Parent Email 2,Designations,ELL
+Adeyemi,Cece,,she/her,STU-201,2012-05-15,cece@school.ca,parent.adeyemi@example.com,,,
+Kim,Jordan,JK,they/them,STU-215,2012-08-22,,j.kim@example.com,s.kim@example.com,,yes
+Berg,Hannah,,she/her,STU-203,2012-11-03,hannah.b@school.ca,,,Q,
+"Blackwood, Jr.",Sam,,he/him,STU-204,,,,,,
+Chen,Liam,,,STU-206,,,,,,
