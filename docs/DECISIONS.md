@@ -19,7 +19,7 @@ Context: `grading-compliance-plan.md`. All implemented; see its status table.
 
 Supersedes D2. Teachers asked for the multiplier back on points work (an assignment out of 6 counted 4 times), and Schoology has one ("Factor"). Colin: taking it out was an oversight.
 
-- **Every assessment has a Factor**, any number above 0, default 1, labelled "Factor" on the assessment form for every kind of scoring.
+- **Every assessment has a Factor**, default 1x, chosen from 0.5x–5x under "Factor" on the assessment form for every kind of scoring.
 - **In the course %, its points earned and possible are multiplied by it:** 5/6 at 4 counts as 20/24. Proficiency work (level out of 4) and rubric points are multiplied the same way.
 - **Toward competencies and level averages, it counts that many times:** competency proficiency, category averages and group grades.
 - A gradebook column and its Class Average still show the assessment's own points (5/6), not the multiplied ones.

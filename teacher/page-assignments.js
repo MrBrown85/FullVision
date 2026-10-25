@@ -886,7 +886,7 @@ window.PageAssignments = (function () {
     var categories = _getSortedCategories(cid);
     var scoreMode = assess ? assess.scoreMode || 'proficiency' : 'proficiency';
     var maxPoints = assess ? assess.maxPoints || 100 : 100;
-    var weight = assess ? assess.weight || 1 : 1;
+    var weight = getAssessmentWeight(assess);
 
     var html = '';
 
@@ -1119,12 +1119,15 @@ window.PageAssignments = (function () {
       '</div>' +
       '</div>' +
       '</div>' +
-      '<div class="af-field" id="af-weight-wrap" style="flex:0 0 auto"' +
-      ' title="Counts this assessment this many times, in the course % and toward competencies. At 4, a score of 5 out of 6 counts as 20 out of 24.">' +
+      '<div class="af-field" id="af-weight-wrap" style="flex:0 0 auto">' +
       '<label class="af-label" for="af-weight">Factor</label>' +
-      '<input class="af-input" id="af-weight" type="number" min="0.1" step="any" value="' +
-      weight +
-      '" style="width:80px;text-align:center">' +
+      '<select class="af-input" id="af-weight" style="width:80px">' +
+      _factorChoices(weight)
+        .map(function (w) {
+          return '<option value="' + w + '"' + (w === weight ? ' selected' : '') + '>' + w + 'x</option>';
+        })
+        .join('') +
+      '</select>' +
       '</div>' +
       '</div>';
 
@@ -1306,6 +1309,15 @@ window.PageAssignments = (function () {
     if (el) el.value = mode;
     var wrap = document.getElementById('af-maxpoints-wrap');
     if (wrap) wrap.style.display = mode === 'points' ? '' : 'none';
+  }
+
+  // The Factor list, with an assessment's own Factor kept if it isn't on it.
+  function _factorChoices(current) {
+    var list = [0.5, 1, 1.5, 2, 3, 4, 5];
+    if (current > 0 && list.indexOf(current) < 0) list.push(current);
+    return list.sort(function (a, b) {
+      return a - b;
+    });
   }
 
   // The Factor applies to every kind of scoring; blank, 0 or less is 1.
