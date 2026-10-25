@@ -1030,61 +1030,83 @@ body.offline-active #app-dock {
   flex-direction: column;
 }
 
-/* ── Shared Student Header (student dashboard + term questionnaire) ── */
+/* ── Shared Student Header (student dashboard + term questionnaire) ──
+   One line: avatar, the name with any designations, a line of facts under
+   it; at the right any missing or late work, the grade and the button. */
 .student-header-top {
   display: flex;
-  flex-direction: column;
-  gap: 0;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 20px 24px 16px;
+  padding: 14px 20px;
   margin-bottom: 16px;
 }
-.sh-row1 {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  flex-wrap: wrap;
-}
-.student-identity {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  flex-shrink: 0;
-}
 .student-avatar-xl {
-  width: 48px;
-  height: 48px;
-  border-radius: var(--radius-lg);
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius);
   background: var(--text);
   color: #fff;
   font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
-  font-size: var(--text-xl);
+  font-size: var(--text-lg);
   font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(26, 26, 46, 0.15);
 }
 .student-identity-text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
+  min-width: 0;
+}
+.sh-name-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
 }
 .student-name-xl {
   font-family: var(--font-base);
-  font-size: var(--text-2xl);
+  font-size: var(--text-xl);
   font-weight: 700;
   color: var(--text);
   line-height: 1.2;
   letter-spacing: var(--tracking-tight);
 }
-.student-pronouns {
-  font-family: var(--font-base);
-  font-size: var(--text-xs);
+.sh-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.sh-dot {
   color: var(--text-3);
+}
+/* The student number and email copy on a click. */
+.sh-copy {
+  padding: 1px 4px;
+  margin: 0 -4px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: copy;
+}
+.sh-copy:hover {
+  background: var(--overlay-hover);
+  color: var(--link);
+}
+.sh-copy:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 1px;
 }
 .sh-spacer {
   flex: 1;
@@ -1092,104 +1114,73 @@ body.offline-active #app-dock {
 .sh-stats {
   display: flex;
   align-items: center;
-  gap: 2px;
-  flex-wrap: wrap;
+  gap: 20px;
 }
 .sh-stat {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 8px 12px;
-  min-width: 60px;
-}
-.sh-stat + .sh-stat {
-  border-left: 1px solid var(--divider-subtle);
+  align-items: flex-end;
+  gap: 1px;
 }
 .sh-stat-val {
   font-family: var(--font-base);
-  font-size: var(--text-2xl);
+  font-size: var(--text-md);
   font-weight: 700;
-  line-height: 1.1;
+  line-height: 1.2;
 }
 .sh-stat-label {
   font-family: var(--font-base);
-  font-size: var(--text-2xs);
-  font-weight: 500;
-  color: var(--text-3);
-  margin-top: 2px;
+  font-size: var(--text-xs);
+  color: var(--text-2);
 }
-.sh-row2 {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px solid var(--divider-subtle);
-}
-.sh-chip {
+.sh-tag {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 3px 10px;
-  border-radius: var(--radius-xl);
+  padding: 2px 8px;
+  border-radius: 6px;
   font-family: var(--font-base);
   font-size: var(--text-xs);
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text-2);
   background: var(--overlay-hover);
 }
-.sh-chip-icon {
-  font-style: normal;
-}
-.sh-chip-email {
-  cursor: pointer;
-  border: none;
-  transition:
-    background 0.15s,
-    color 0.15s;
-}
-.sh-chip-email:hover {
-  background: var(--overlay-active);
-  color: var(--link);
-}
-.sh-chip-desig {
+.sh-tag-desig {
   background: rgba(0, 122, 255, 0.08);
   color: var(--link);
-  font-weight: 600;
 }
-.sh-chip-desig.low-inc {
+.sh-tag-desig.low-inc {
   background: rgba(255, 59, 48, 0.08);
   color: var(--priority);
 }
-.sh-chip-iep {
+.sh-tag-iep {
   background: rgba(255, 149, 0, 0.1);
   color: var(--iep-badge);
-  font-weight: 600;
 }
-.sh-chip-mod {
+.sh-tag-mod {
   background: rgba(88, 86, 214, 0.1);
   color: var(--mod-badge);
-  font-weight: 600;
 }
+/* The grade, tinted in its proficiency's colour. */
 .overall-card {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border-radius: var(--radius);
-  padding: 8px 18px;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--grade-c) 12%, var(--surface));
+  color: var(--grade-c);
   flex-shrink: 0;
 }
 .overall-val {
   font-family: var(--font-base);
-  font-size: var(--text-3xl);
+  font-size: var(--text-xl);
   font-weight: 700;
-  line-height: 1;
+  line-height: 1.1;
 }
 .overall-word {
   font-family: var(--font-base);
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   font-weight: 600;
 }
 .page-toggle-btn {
@@ -1283,21 +1274,20 @@ body.offline-active #app-dock {
 
 /* ── Letter grade card (shared, used by renderStudentHeader) ── */
 .letter-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius);
-  padding: 8px 16px;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  border-radius: 10px;
+  padding: 6px 12px;
   background: var(--surface);
   flex-shrink: 0;
   border: 1px solid var(--border);
 }
 .letter-val {
   font-family: var(--font-base);
-  font-size: var(--text-3xl);
+  font-size: var(--text-xl);
   font-weight: 700;
-  line-height: 1;
+  line-height: 1.1;
 }
 .letter-pct {
   font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
@@ -3287,10 +3277,7 @@ body.offline-active #app-dock {
   }
 
   .student-name-xl {
-    font-size: var(--text-xl);
-  }
-  .overall-val {
-    font-size: var(--text-2xl);
+    font-size: var(--text-lg);
   }
 }
 

@@ -218,3 +218,19 @@ test('Grade Breakdown buttons keep the scroll position and focus', async ({ page
   await page.locator('#stu-tab-assess').click();
   expect(await page.evaluate(() => document.querySelector('.student-scroll').scrollTop)).toBe(0);
 });
+
+// The header is one line: the full name, then pronouns, student number and
+// birthday; a click on the student number copies it (Colin, 2026-10-24).
+test('the header shows one line of facts and copies the student number', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await openCece(page);
+  const header = page.locator('.student-header-top');
+  await expect(header.locator('.student-name-xl')).toHaveText('Cece Adeyemi');
+  await expect(header.locator('.sh-meta')).toContainText('STU-201');
+  await expect(header).not.toContainText('Born');
+  await expect(header).not.toContainText('complete');
+  await expect(header).not.toContainText('Attendance');
+  await header.locator('[data-action="copy-student-field"]').click();
+  await expect(header.locator('[data-action="copy-student-field"]')).toHaveText('Copied!');
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('STU-201');
+});
