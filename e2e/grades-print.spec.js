@@ -349,6 +349,8 @@ test.describe('Print Grades', () => {
   });
 
   test('Custom Dates shows From and To, and Pick Assessments its list', async ({ page }) => {
+    // Demo dates follow today; pin the day so the window below holds four assessments.
+    await page.clock.setFixedTime(new Date('2026-10-21T10:00:00'));
     await openDemoGradebook(page);
     const dialog = await openDialog(page);
     await choose(dialog, 'Term', 'Custom Dates');

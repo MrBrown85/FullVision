@@ -83,7 +83,9 @@ test.describe('Class blocks', () => {
     await dialog.getByRole('radio', { name: 'B', exact: true }).click();
     await dialog.getByRole('button', { name: 'Duplicate', exact: true }).click();
     await expect(dialog).toBeHidden();
-    await expect(page.locator('.cm-class-name', { hasText: 'Block B · Philosophy 12' })).toBeVisible();
-    await expect(page.locator('.cm-class-name', { hasText: 'Block A · Philosophy 12' })).toBeVisible();
+    for (const block of ['Block B', 'Block A']) {
+      const row = page.locator('.cm-class-item').filter({ has: page.locator('.cm-class-meta', { hasText: block }) });
+      await expect(row.locator('.cm-class-name')).toHaveText('Philosophy 12');
+    }
   });
 });
