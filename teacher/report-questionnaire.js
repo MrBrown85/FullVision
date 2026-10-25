@@ -1324,6 +1324,7 @@ window.ReportQuestionnaire = (function () {
       buttonLabel: 'Student Dashboard',
       buttonHref: `#/student?course=${cid}&id=${sid}`,
       buttonSecondary: true,
+      hideCounts: true,
     });
 
     // ══ ROW 1: Dispositions + Quick Profile (4/4/4) ══

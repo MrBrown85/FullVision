@@ -2171,24 +2171,21 @@
    Inspired by System Preferences, SF Symbols, and HIG
    ═══════════════════════════════════════════════════════════════ */
 .tq-panel {
-  background: var(--surface-glass);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 0.5px solid var(--overlay-pressed);
-  border-radius: 14px;
-  padding: 12px 14px;
+  /* The same card as the student page's: white, hairline, 12px corners. */
+  background: var(--surface);
+  border: 0.5px solid var(--divider-medium);
+  border-radius: var(--radius);
+  padding: 16px 20px 18px;
   display: flex;
   flex-direction: column;
-  box-shadow:
-    0 0.5px 1px var(--overlay-hover),
-    0 2px 8px var(--overlay-hover);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 .tq-panel-title {
   font-family: var(--font-base);
-  font-size: var(--text-base);
-  font-weight: 650;
-  color: var(--text-2);
-  margin-bottom: 10px;
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 12px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2858,7 +2855,6 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin-top: 4px;
   padding-top: 14px;
   border-top: 1px solid var(--border);
   position: relative;
