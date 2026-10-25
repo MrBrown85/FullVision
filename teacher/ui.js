@@ -581,39 +581,14 @@ function renderStudentHeader(cid, sid, opts) {
   const student = students.find(s => s.id === sid);
   if (!student) return '';
 
-  const sections = getSections(cid);
-  const allTags = getAllTags(cid);
-  // In a reporting term the header's counts cover that term, like its grades.
+  // In a reporting term the header's work counts cover that term, like its grades.
   const inTerm = typeof assessmentInActiveTerm === 'function';
   const assessments = getAssessments(cid).filter(a => !inTerm || assessmentInActiveTerm(cid, a));
-  const assessmentIds = new Set(assessments.map(a => a.id));
   const overall = getOverallProficiency(cid, sid);
   const overallRounded = Math.round(overall);
   const profColor = PROF_COLORS[overallRounded] || PROF_COLORS[0];
 
-  // Completion stats
-  const coveredTags = allTags.filter(t => {
-    const sc = getTagScores(cid, sid, t.id);
-    return sc.some(s => s.score > 0);
-  }).length;
-  const scoredAssessments = new Set();
-  const allScores = getScores(cid)[sid] || [];
-  allScores.forEach(s => {
-    if (s.score > 0 && assessmentIds.has(s.assessmentId)) scoredAssessments.add(s.assessmentId);
-  });
-  const completionPct = getCompletionPct(cid, sid);
-
-  // Observations
-  const obs = getStudentQuickObs(cid, sid);
-
-  // Attendance
-  const att = student.attendance || [];
-  const attPresent = att.filter(a => a.status === 'present').length;
-  const attAbsent = att.filter(a => a.status === 'absent').length;
-  const attLate = att.filter(a => a.status === 'late').length;
-  const attRate = att.length > 0 ? Math.round((attPresent / att.length) * 100) : null;
-
-  // NS / EXC counts
+  // Not Submitted / Excused / Late work
   const statuses = getAssignmentStatuses(cid);
   const nsAssignments = [],
     excAssignments = [],
@@ -625,23 +600,65 @@ function renderStudentHeader(cid, sid, opts) {
     else if (st === 'LATE') lateAssignments.push(a.title);
   });
 
+  // Designations sit beside the name, where they are seen first.
+  let tags = '';
+  let hasIep = false,
+    hasMod = false;
+  (student.designations || []).forEach(code => {
+    const d = designationInfo(code);
+    if (!d) return;
+    tags += `<span class="sh-tag sh-tag-desig${d.level > 0 ? ' low-inc' : ''}" title="${code} \u2014 ${d.name}${d.iep ? ' \u00b7 IEP Required' : ''}${d.modified ? ' \u00b7 Modified Program' : ''}"><strong>${code}</strong> ${d.name}</span>`;
+    if (d.iep) hasIep = true;
+    if (d.modified) hasMod = true;
+  });
+  if (hasIep) tags += `<span class="sh-tag sh-tag-iep">IEP</span>`;
+  if (hasMod) tags += `<span class="sh-tag sh-tag-mod">Modified</span>`;
+
+  // One line under the name: pronouns, student number and email (each
+  // copies on a click), birthday.
+  const meta = [];
+  if (student.pronouns) meta.push(`<span>${esc(student.pronouns)}</span>`);
+  if (student.studentNumber)
+    meta.push(
+      `<button type="button" class="sh-copy" data-action="copy-student-field" data-copy="${esc(student.studentNumber)}" title="Copy student number" aria-label="Student number ${esc(student.studentNumber)}, copy">${esc(student.studentNumber)}</button>`,
+    );
+  if (student.dateOfBirth) meta.push(`<span title="Birthday">${formatDate(student.dateOfBirth)}</span>`);
+  if (student.email)
+    meta.push(
+      `<button type="button" class="sh-copy" data-action="copy-student-field" data-copy="${esc(student.email)}" title="Copy email" aria-label="Email ${esc(student.email)}, copy">${esc(student.email)}</button>`,
+    );
+
   let html = `<div class="student-header-top">`;
-  // Row 1: avatar + name | proficiency | stats | button
-  html += `<div class="sh-row1">`;
-  html += `<div class="student-identity">
-    <div class="student-avatar-xl">${initials(student)}</div>
-    <div class="student-identity-text">
-      <div class="student-name-xl">${esc(displayName(student))}</div>
-      ${student.pronouns ? `<div class="student-pronouns">${esc(student.pronouns)}</div>` : ''}
-    </div>
+  html += `<div class="student-avatar-xl" aria-hidden="true">${initials(student)}</div>`;
+  html += `<div class="student-identity-text">
+    <div class="sh-name-row"><span class="student-name-xl">${esc(displayNameWithLast(student))}</span>${tags}</div>
+    ${meta.length ? `<div class="sh-meta">${meta.join('<span class="sh-dot" aria-hidden="true">\u00b7</span>')}</div>` : ''}
   </div>`;
+  html += `<div class="sh-spacer"></div>`;
+
+  const work = [
+    [nsAssignments, 'Not Submitted', 'var(--score-1)'],
+    [excAssignments, 'Excused', ''],
+    [lateAssignments, 'Late', 'var(--score-2)'],
+  ].filter(w => w[0].length);
+  if (work.length) {
+    html += `<div class="sh-stats">`;
+    work.forEach(([list, label, color]) => {
+      html += `<div class="sh-stat" title="${list.map(t => esc(t)).join('\n')}">
+      <div class="sh-stat-val"${color ? ` style="color:${color}"` : ''}>${list.length}</div>
+      <div class="sh-stat-label">${label}</div>
+    </div>`;
+    });
+    html += `</div>`;
+  }
+
   // A Letter class shows only the letter grade; Proficiency only the level;
   // Both shows both (courseGradeMode).
   const letterOnly = courseGradeMode(cid) === 'letter';
   if (!letterOnly) {
-    html += `<div class="overall-card">
-    <div class="overall-val" style="color:${profColor}">${overall > 0 ? overall.toFixed(1) : '\u2014'}</div>
-    <div class="overall-word" style="color:${profColor}">${PROF_LABELS[overallRounded] || 'No Evidence'}</div>
+    html += `<div class="overall-card" style="--grade-c:${profColor}">
+    <span class="overall-val">${overall > 0 ? overall.toFixed(1) : '\u2014'}</span>
+    <span class="overall-word">${PROF_LABELS[overallRounded] || 'No Evidence'}</span>
   </div>`;
   }
   // A points class with no linked competencies has a % but no proficiency.
@@ -651,94 +668,15 @@ function renderStudentHeader(cid, sid, opts) {
       : null;
   if (lg && (lg.R != null || overall > 0 || letterOnly)) {
     html += `<div class="letter-card">
-      <div class="letter-val">${lg && lg.S ? lg.S : '—'}</div>
-      <div class="letter-pct">${lg && lg.R != null ? lg.R + '%' : '—'}</div>
+      <span class="letter-val">${lg && lg.S ? lg.S : '—'}</span>
+      <span class="letter-pct">${lg && lg.R != null ? lg.R + '%' : '—'}</span>
     </div>`;
   }
-  html += `<div class="sh-spacer"></div>`;
-  html += `<div class="sh-stats">`;
-  // opts.hideCounts: the page shows these counts elsewhere (the student
-  // page's tabs).
-  if (!opts.hideCounts) {
-    html += `<div class="sh-stat">
-    <div class="sh-stat-val">${scoredAssessments.size}<span style="font-size:0.7em;font-weight:500;color:var(--text-3)">/${assessments.length}</span></div>
-    <div class="sh-stat-label">Assessed</div>
-  </div>`;
-    html += `<div class="sh-stat">
-    <div class="sh-stat-val">${coveredTags}<span style="font-size:0.7em;font-weight:500;color:var(--text-3)">/${allTags.length}</span></div>
-    <div class="sh-stat-label">Tags</div>
-  </div>`;
-    html += `<div class="sh-stat">
-    <div class="sh-stat-val">${obs.length}</div>
-    <div class="sh-stat-label">Observations</div>
-  </div>`;
-  }
-  if (attRate !== null) {
-    const attColor = attRate >= 90 ? 'var(--score-3)' : attRate >= 75 ? 'var(--score-2)' : 'var(--score-1)';
-    html += `<div class="sh-stat">
-      <div class="sh-stat-val" style="color:${attColor}">${attRate}%</div>
-      <div class="sh-stat-label">Attendance</div>
-    </div>`;
-  }
-  if (nsAssignments.length > 0) {
-    html += `<div class="sh-stat" title="${nsAssignments.map(t => esc(t)).join('\n')}">
-      <div class="sh-stat-val" style="color:var(--score-1)">${nsAssignments.length}</div>
-      <div class="sh-stat-label">Not Submitted</div>
-    </div>`;
-  }
-  if (excAssignments.length > 0) {
-    html += `<div class="sh-stat" title="${excAssignments.map(t => esc(t)).join('\n')}">
-      <div class="sh-stat-val">${excAssignments.length}</div>
-      <div class="sh-stat-label">Excused</div>
-    </div>`;
-  }
-  if (lateAssignments.length > 0) {
-    html += `<div class="sh-stat" title="${lateAssignments.map(t => esc(t)).join('\n')}">
-      <div class="sh-stat-val" style="color:var(--score-2)">${lateAssignments.length}</div>
-      <div class="sh-stat-label">Late</div>
-    </div>`;
-  }
-  html += `</div>`; // end sh-stats
   if (opts.buttonLabel && opts.buttonHref) {
     // A link to another screen is navigation, so it is secondary unless it is
     // the screen's main action (docs/DECISIONS.md, "Buttons").
     const btnCls = 'page-toggle-btn' + (opts.buttonSecondary ? ' page-toggle-btn--secondary' : '');
     html += `<a class="${btnCls}" role="link" tabindex="0" data-href="${opts.buttonHref}">${esc(opts.buttonLabel)}</a>`;
-  }
-  html += `</div>`; // end sh-row1
-
-  // Row 2: metadata chips
-  const chips = [];
-  if (student.studentNumber)
-    chips.push(`<span class="sh-chip"><em class="sh-chip-icon">#</em> ${esc(student.studentNumber)}</span>`);
-  if (student.dateOfBirth) chips.push(`<span class="sh-chip">${formatDate(student.dateOfBirth)}</span>`);
-  if (student.email)
-    chips.push(
-      `<button type="button" class="sh-chip sh-chip-email" data-action="copy-student-email" data-email="${esc(student.email)}" title="Copy email">${esc(student.email)}</button>`,
-    );
-  if (att.length > 0) {
-    let attParts = [`${attPresent} present`];
-    if (attAbsent > 0) attParts.push(`${attAbsent} absent`);
-    if (attLate > 0) attParts.push(`${attLate} late`);
-    chips.push(`<span class="sh-chip">${attParts.join(' \u00b7 ')}</span>`);
-  }
-  const desigs = student.designations || [];
-  let hasIep = false,
-    hasMod = false;
-  desigs.forEach(code => {
-    const d = designationInfo(code);
-    if (!d) return;
-    chips.push(
-      `<span class="sh-chip sh-chip-desig${d.level > 0 ? ' low-inc' : ''}" title="${code} \u2014 ${d.name}${d.iep ? ' \u00b7 IEP Required' : ''}${d.modified ? ' \u00b7 Modified Program' : ''}"><strong>${code}</strong> ${d.name}</span>`,
-    );
-    if (d.iep) hasIep = true;
-    if (d.modified) hasMod = true;
-  });
-  if (hasIep) chips.push(`<span class="sh-chip sh-chip-iep">IEP</span>`);
-  if (hasMod) chips.push(`<span class="sh-chip sh-chip-mod">Modified</span>`);
-  chips.push(`<span class="sh-chip">${completionPct}% complete</span>`);
-  if (chips.length > 0) {
-    html += `<div class="sh-row2">${chips.join('')}</div>`;
   }
   html += `</div>`; // end student-header-top
   return html;
@@ -1327,16 +1265,18 @@ document.addEventListener('click', function (e) {
       });
       dismissSyncToast();
       break;
-    case 'copy-student-email':
-      _handleCopyStudentEmail(btn);
+    case 'copy-student-field':
+      _handleCopyStudentField(btn);
       break;
   }
 });
 
-function _handleCopyStudentEmail(btn) {
-  var email = btn.dataset.email;
-  if (!email) return;
-  _copyTextToClipboard(email).then(function (ok) {
+/* The header's student number or email: a click copies it, and the button
+   says Copied for a moment. */
+function _handleCopyStudentField(btn) {
+  var text = btn.dataset.copy;
+  if (!text) return;
+  _copyTextToClipboard(text).then(function (ok) {
     if (!ok) return;
     var original = btn.textContent;
     btn.textContent = 'Copied!';
