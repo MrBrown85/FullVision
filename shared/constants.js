@@ -308,6 +308,9 @@ function designationInfo(code) {
 }
 
 const PROF_LABELS = { 0: 'No Evidence', 1: 'Emerging', 2: 'Developing', 3: 'Proficient', 4: 'Extending' };
+// A level's short code, as the roster beside the names shows it. 0 is
+// Incomplete: nothing scored yet.
+const PROF_CODES = { 0: 'IC', 1: 'EMG', 2: 'DEV', 3: 'PRF', 4: 'EXT' };
 
 /* Rubric Levels: the order a class draws the four levels, wherever it draws
    them (scoring cards, the rubric editor, printed rubrics, reports, the

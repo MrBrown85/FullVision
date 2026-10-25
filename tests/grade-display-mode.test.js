@@ -67,6 +67,33 @@ describe('grades shown by grading setting', () => {
     expect(studentGradeSummary(CID, 's3').text).toBe('');
   });
 
+  it('shows the roster grade as a proficiency code', () => {
+    expect([0, 1, 1.4, 1.5, 2.49, 2.67, 3, 3.33, 3.5, 4].map(levelCode)).toEqual([
+      'IC',
+      'EMG',
+      'EMG',
+      'DEV',
+      'DEV',
+      'PRF',
+      'PRF',
+      'PRF',
+      'EXT',
+      'EXT',
+    ]);
+    setting('proficiency');
+    expect(studentRosterBadges(CID, 's1')).toEqual({
+      prof: { text: 'PRF', level: 3, title: 'Proficient' },
+      letter: null,
+    });
+    expect(studentRosterBadges(CID, 's3').prof).toEqual({ text: 'IC', level: 0, title: 'No Evidence' });
+    setting('both');
+    expect(studentRosterBadges(CID, 's1').prof.text).toBe('PRF');
+    expect(studentRosterBadges(CID, 's1').letter.text).toBe('B 78.9%');
+    setting('letter');
+    expect(studentRosterBadges(CID, 's1')).toEqual({ prof: null, letter: { text: 'B 78.9%', level: 3 } });
+    expect(studentRosterBadges(CID, 's3')).toEqual({ prof: null, letter: null });
+  });
+
   it('colours a letter grade by its band', () => {
     setting('letter');
     expect(studentGradeSummary(CID, 's2').level).toBe(4);

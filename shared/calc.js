@@ -1554,6 +1554,28 @@ function studentGradeBadges(cid, sid) {
   return out;
 }
 
+/* A level as its short code: EXT, PRF, DEV or EMG for the whole level it
+   rounds to (the level its colour and word come from), IC with none. A +
+   or − is already in the value, so 2.67 (3−) is PRF and 3.33 (3+) is PRF. */
+function levelCode(value) {
+  if (!(value > 0)) return PROF_CODES[0];
+  return PROF_CODES[Math.max(1, Math.min(4, Math.round(value)))];
+}
+
+/* The grades beside a name in the roster: studentGradeBadges with the
+   proficiency as its code ("PRF", titled "Proficient") instead of the level
+   out of 4, and IC until the student has a score. Letter classes show only
+   the letter and %, as before. */
+function studentRosterBadges(cid, sid) {
+  var badges = studentGradeBadges(cid, sid);
+  var prof = null;
+  if (courseGradeMode(cid) !== 'letter') {
+    var level = badges.prof ? Math.max(1, Math.min(4, badges.prof.level)) : 0;
+    prof = { text: levelCode(level), level: level, title: PROF_LABELS[level] };
+  }
+  return { prof: prof, letter: badges.letter };
+}
+
 /* A student's overall grade as one line, and the level its colour comes
    from (the letter's in a Letter class, else the proficiency's). */
 function studentGradeSummary(cid, sid) {
@@ -1888,6 +1910,8 @@ window.Calc = {
   assessmentCellValue,
   levelWord,
   studentGradeBadges,
+  levelCode,
+  studentRosterBadges,
   studentGradeSummary,
   classGradeSummary,
   classGradeChange,
