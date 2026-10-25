@@ -3663,7 +3663,7 @@ window.DashClassManager = (function () {
       .map(function (sec) {
         var tag = sec.tags && sec.tags[0];
         if (!tag) return '';
-        var scores = getTagScores(cid, sid, tag.id)
+        var scores = getCountedTagScores(cid, sid, tag.id)
           .filter(function (s) {
             return s.score > 0;
           })

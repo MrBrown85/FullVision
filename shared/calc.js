@@ -1091,6 +1091,31 @@ function getTagScores(cid, studentId, tagId) {
   return result;
 }
 
+/* Whether an assessment counts toward a student's grades. Work in a 0%
+   category counts toward nothing: not the course % and not competency
+   proficiency. It still shows as evidence. */
+function countsTowardGrades(cid, assessment) {
+  var categoryId = assessment && (assessment.categoryId || assessment.category_id);
+  if (!categoryId) return true;
+  var category = getCategoryById(cid, categoryId);
+  return !category || Number(category.weight || 0) > 0;
+}
+
+/** getTagScores without the scores that count toward nothing (0% category work).
+ * The proficiency calculations use these; evidence lists use getTagScores.
+ * @param {string} cid - Course ID
+ * @param {string} studentId - Student ID
+ * @param {string} tagId - Learning tag ID
+ * @returns {Score[]} Score entries that count toward the competency level
+ */
+function getCountedTagScores(cid, studentId, tagId) {
+  var assessMap = _getAssessMap(cid);
+  return getTagScores(cid, studentId, tagId).filter(function (s) {
+    var assessment = assessMap.get(s.assessmentId);
+    return !assessment || countsTowardGrades(cid, assessment);
+  });
+}
+
 /** Calculate proficiency for a single tag using the course's configured method and weights.
  * @param {string} cid - Course ID
  * @param {string} studentId - Student ID
@@ -1105,7 +1130,7 @@ function getTagProficiency(cid, studentId, tagId) {
   const course = COURSES[cid];
   const method = cc.calcMethod || course.calcMethod || 'mostRecent';
   const dw = cc.decayWeight != null ? cc.decayWeight : course.decayWeight || 0.65;
-  const scores = getTagScores(cid, studentId, tagId);
+  const scores = getCountedTagScores(cid, studentId, tagId);
   const cw = getCategoryWeights(cid);
   const aw = _getAW(cid);
   var assessMap = _getAssessMap(cid);
@@ -1265,7 +1290,7 @@ function getSectionTrend(cid, studentId, sectionId) {
   // Compare the two most recent scored evidence entries for the section.
   const allScores = [];
   section.tags.forEach(tag => {
-    getTagScores(cid, studentId, tag.id)
+    getCountedTagScores(cid, studentId, tag.id)
       .filter(_isScoredEvidence)
       .forEach(s => allScores.push(s));
   });
@@ -1396,7 +1421,7 @@ function getSectionGrowthData(cid, studentId, sectionId) {
   // Collect all scored evidence across all tags in this section.
   const allScores = [];
   section.tags.forEach(tag => {
-    getTagScores(cid, studentId, tag.id)
+    getCountedTagScores(cid, studentId, tag.id)
       .filter(_isScoredEvidence)
       .forEach(s => allScores.push({ ...s, _tagId: tag.id }));
   });
