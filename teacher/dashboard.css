@@ -774,7 +774,8 @@ a.dash-ins-name:hover {
   font-family: var(--font-base);
   font-size: var(--text-sm);
 }
-.dash-na-row:hover {
+.dash-na-row:hover,
+.dash-na-row:focus-within {
   background: var(--overlay-hover);
 }
 .dash-na-rank {
@@ -840,7 +841,11 @@ a.dash-ins-name:hover {
   display: flex;
   gap: 6px;
   padding-left: 28px;
-  background: linear-gradient(90deg, transparent, var(--surface) 24px);
+  /* The hovered row's own colour (the hover tint over the card), so the
+     fade blends into the row instead of showing a white block. */
+  background:
+    linear-gradient(90deg, transparent, var(--overlay-hover) 24px),
+    linear-gradient(90deg, transparent, var(--surface) 24px);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.12s;
