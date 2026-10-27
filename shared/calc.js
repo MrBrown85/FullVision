@@ -460,14 +460,32 @@ function qToPercentage(Q) {
   return Math.min(100, 82 + (Q - 3) * 14);
 }
 
-function percentageToLetter(R) {
+/* BC reporting: under 50% is IE (Insufficient Evidence) until the course
+   ends, and F only after (Colin, 2026-10-27). Whatever way the % was earned
+   (points, proficiency, Complete/Incomplete); proficiency words such as
+   Emerging are never replaced. The course has ended once today reaches the
+   class's last reporting term's end (the final report's date), or while
+   that last term is the one in view, as the final report is. A class with
+   no reporting terms never ends, so it shows IE. With no class given, F. */
+function percentageToLetter(R, cid) {
   if (R == null) return null;
   if (R >= 86) return 'A';
   if (R >= 73) return 'B';
   if (R >= 67) return 'C+';
   if (R >= 60) return 'C';
   if (R >= 50) return 'C-';
-  return 'F';
+  return cid == null || courseHasEnded(cid) ? 'F' : 'IE';
+}
+
+/** Whether a class's course is over, so a failing grade shows F, not IE. */
+function courseHasEnded(cid) {
+  var terms = typeof getReportingTerms === 'function' ? getReportingTerms(cid) : [];
+  if (!terms.length) return false;
+  var last = terms[terms.length - 1];
+  var active = _activeTerm[cid];
+  if (active && Number(active.ordinal) === Number(last.ordinal)) return true;
+  var today = typeof courseToday === 'function' ? courseToday(cid) : '';
+  return !!(today && last.ends_on && today >= last.ends_on);
 }
 
 /* A points-scored assessment's points for one student, or null when it
@@ -671,7 +689,7 @@ function _groupGrade(cid, prof, pct, count) {
   var mode = courseGradeMode(cid);
   var shownPct = pct == null ? null : _roundPercent(pct, getRoundWholePercent(cid) ? 0 : 1);
   var profText = prof == null ? null : Number(prof).toFixed(1);
-  var pctText = shownPct == null ? null : percentageToLetter(shownPct) + ' ' + shownPct + '%';
+  var pctText = shownPct == null ? null : percentageToLetter(shownPct, cid) + ' ' + shownPct + '%';
   var text = mode === 'letter' ? pctText : mode === 'both' ? [profText, pctText].filter(Boolean).join(' · ') : profText;
   var level = mode === 'letter' ? (shownPct == null ? 0 : _percentLevel(shownPct)) : prof > 0 ? Math.round(prof) : 0;
   if (!text) return null;
@@ -900,7 +918,7 @@ function getCourseLetterData(cid, studentId) {
   var result = {
     Q: Q,
     R: shown,
-    S: percentageToLetter(shown),
+    S: percentageToLetter(shown, cid),
   };
   _courseLetterCache[cacheKey] = result;
   return result;
@@ -1263,11 +1281,12 @@ function getOverallProficiency(cid, studentId) {
 
 /** Convert an average proficiency to a letter grade and percentage for PHIL12.
  * @param {number} avgProf - Average proficiency (0-4)
+ * @param {string} [cid] - Class, for IE before the course ends
  * @returns {{letter: string, pct: number}} Letter grade and corresponding percentage
  */
-function calcLetterGrade(avgProf) {
+function calcLetterGrade(avgProf, cid) {
   var pct = qToPercentage(avgProf);
-  return { letter: percentageToLetter(pct), pct: pct == null ? null : Math.round(pct * 10) / 10 };
+  return { letter: percentageToLetter(pct, cid), pct: pct == null ? null : Math.round(pct * 10) / 10 };
 }
 
 /** Determine the trend direction for a section by comparing the two most recent summative scores.
@@ -1674,7 +1693,7 @@ function classGradeSummary(cid, studentIds) {
   }
   if (means.pct != null) {
     var pct = _roundPercent(means.pct, getRoundWholePercent(cid) ? 0 : 1);
-    parts.push(percentageToLetter(pct) + ' ' + pct + '%');
+    parts.push(percentageToLetter(pct, cid) + ' ' + pct + '%');
     if (mode === 'letter') level = _percentLevel(pct);
   }
   return { text: parts.join(' \u00B7 '), level: level };
@@ -1798,19 +1817,20 @@ var _LETTER_BANDS = [
   { label: 'C+', min: 67 },
   { label: 'C', min: 60 },
   { label: 'C-', min: 50 },
-  { label: 'F', min: 0 },
+  { label: 'F', min: 0 }, // IE until the course ends (percentageToLetter)
 ];
 
 function classGradeDistribution(cid, studentIds) {
   var bands;
   if (courseGradeMode(cid) === 'letter') {
+    var under50 = percentageToLetter(0, cid);
     bands = _LETTER_BANDS.map(function (b) {
-      return { label: b.label, level: _percentLevel(b.min), ids: [] };
+      return { label: b.min === 0 ? under50 : b.label, level: _percentLevel(b.min), ids: [] };
     });
     (studentIds || []).forEach(function (sid) {
       var lg = getCourseLetterData(cid, sid);
       if (!lg || lg.R == null) return;
-      var letter = percentageToLetter(lg.R);
+      var letter = percentageToLetter(lg.R, cid);
       bands.forEach(function (b) {
         if (b.label === letter) b.ids.push(sid);
       });
@@ -1973,6 +1993,7 @@ window.Calc = {
   getCategoryAverage,
   qToPercentage,
   percentageToLetter,
+  courseHasEnded,
   getCourseLetterData,
   courseGradeMode,
   formatLevel,
