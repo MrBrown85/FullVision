@@ -1983,6 +1983,18 @@ window.PageGradebook = (function () {
   }
 
   /* ── Scores tab: context menus ──────────────────────────── */
+  /* Opens a right-click menu at the pointer, flipped up or left when it
+     would run past the bottom or right edge of the window. */
+  function _placeContextMenu(menu, x, y) {
+    document.body.appendChild(menu);
+    var w = menu.offsetWidth;
+    var h = menu.offsetHeight;
+    if (x + w > window.innerWidth - 8) x = Math.max(8, x - w);
+    if (y + h > window.innerHeight - 8) y = Math.max(8, y - h);
+    menu.style.left = x + 'px';
+    menu.style.top = y + 'px';
+  }
+
   function _dismissContextMenu() {
     var existing = document.querySelector('.gb-ctx-menu');
     if (existing) existing.remove();
@@ -1995,8 +2007,6 @@ window.PageGradebook = (function () {
     var status = getAssignmentStatus(activeCourse, sid, aid);
     var menu = document.createElement('div');
     menu.className = 'gb-ctx-menu';
-    menu.style.left = e.clientX + 'px';
-    menu.style.top = e.clientY + 'px';
     menu.innerHTML =
       '<div class="gb-ctx-item" data-ctx="editCell">Edit score</div>' +
       '<div class="gb-ctx-item" data-ctx="clearCell">Clear score</div>' +
@@ -2009,7 +2019,7 @@ window.PageGradebook = (function () {
       '</div>' +
       '<div class="gb-ctx-divider"></div>' +
       '<div class="gb-ctx-item" data-ctx="addObservation">Add observation</div>';
-    document.body.appendChild(menu);
+    _placeContextMenu(menu, e.clientX, e.clientY);
     menu.addEventListener('click', function (ev) {
       var item = ev.target.closest('[data-ctx]');
       if (!item) return;
@@ -2093,8 +2103,6 @@ window.PageGradebook = (function () {
     var aid = header.dataset.aid;
     var menu = document.createElement('div');
     menu.className = 'gb-ctx-menu';
-    menu.style.left = e.clientX + 'px';
-    menu.style.top = e.clientY + 'px';
     var assess = getAssessments(activeCourse).find(function (a) {
       return a.id === aid;
     });
@@ -2109,7 +2117,7 @@ window.PageGradebook = (function () {
         : '') +
       '<div class="gb-ctx-divider"></div>' +
       '<div class="gb-ctx-item gb-ctx-danger" data-ctx="deleteAssess">Delete Assignment</div>';
-    document.body.appendChild(menu);
+    _placeContextMenu(menu, e.clientX, e.clientY);
     menu.addEventListener('click', function (ev) {
       var item = ev.target.closest('[data-ctx]');
       if (!item) return;
