@@ -8,11 +8,7 @@
     "time_period": "Modern to Contemporary",
     "description": "Asian Studies 12 examines Asia's diverse physical resources, political systems, cultural traditions, economic development, and contemporary challenges. Students investigate the legacy of colonialism and imperialism, the formation of national and ethnic identities, the rapid industrialization of Asian economies, and ongoing social and political movements. The course develops cross-cultural literacy and an understanding of Asia's increasing global significance.",
     "general_description": "A multidisciplinary study of Asia examining its geographic diversity, colonial history, national and ethnic identities, rapid economic development, contemporary social movements, and its growing role in global affairs.",
-    "cross_curricular_connections": [
-      "Human Geography 12",
-      "20th Century World History 12",
-      "Comparative Cultures 12"
-    ],
+    "cross_curricular_connections": ["Human Geography 12", "20th Century World History 12", "Comparative Cultures 12"],
     "first_peoples_principles": true
   },
   "big_ideas": [
@@ -69,7 +65,7 @@
               "I can compare how the same event is seen as significant by different Asian nations.",
               "I can argue for the global significance of Asia's economic rise."
             ],
-            "short_label": "Historical Development",
+            "short_label": "Significance",
             "tag": "HD"
           }
         ]
@@ -103,7 +99,7 @@
               "I can compare how different Asian nations approached industrialization and economic development.",
               "I can evaluate what has changed and what has persisted in a specific Asian society over the past century."
             ],
-            "short_label": "Social Analysis",
+            "short_label": "Continuity and Change",
             "tag": "SA"
           }
         ]
@@ -120,7 +116,7 @@
               "I can evaluate the role of individuals (Mao, Gandhi, Mandela) vs. structural forces in historical change.",
               "I can trace the consequences of colonial rule for a specific Asian nation's development."
             ],
-            "short_label": "Learning Foundation",
+            "short_label": "Cause and Consequence",
             "tag": "LF"
           }
         ]
@@ -154,7 +150,7 @@
               "I can evaluate the ethics of authoritarian development models (economic growth vs. political rights).",
               "I can argue for or against international intervention in a contemporary Asian human rights situation."
             ],
-            "short_label": "Civic Engagement",
+            "short_label": "Ethical Judgment",
             "tag": "CE"
           }
         ]

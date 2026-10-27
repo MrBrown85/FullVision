@@ -7,11 +7,7 @@
     "ministry_url": "https://curriculum.gov.bc.ca/curriculum/adst/12/tourism",
     "description": "Students explore advanced tourism management principles, event planning strategies, and hospitality industry operations. This course emphasizes understanding tourism's economic and cultural impacts, managing visitor experiences, and pursuing hospitality-related careers.",
     "general_description": "Advanced tourism management, event planning, hospitality industry operations, and tourism career pathways.",
-    "cross_curricular_connections": [
-      "Business Computer Applications 12",
-      "Accounting 12",
-      "Communications 12"
-    ],
+    "cross_curricular_connections": ["Business Computer Applications 12", "Accounting 12", "Communications 12"],
     "first_peoples_principles": true
   },
   "big_ideas": [
@@ -105,7 +101,7 @@
               "I can evaluate attractions and experience quality",
               "I can recommend experience improvements"
             ],
-            "short_label": "Skill Application",
+            "short_label": "Destination Analysis",
             "tag": "AS"
           },
           {
@@ -183,7 +179,7 @@
               "I can coordinate vendor communications",
               "I can track event metrics and ROI"
             ],
-            "short_label": "Learning Foundation B",
+            "short_label": "Event Management Software",
             "tag": "LFB"
           },
           {
@@ -195,7 +191,7 @@
               "I can track customer preferences and loyalty",
               "I can generate customer analytics and insights"
             ],
-            "short_label": "Learning Foundation C",
+            "short_label": "Point-of-Sale and CRM Systems",
             "tag": "LFC"
           }
         ]

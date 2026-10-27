@@ -8,11 +8,7 @@
     "time_period": "Ancient to Contemporary",
     "description": "Philosophy 12 examines the fundamental questions of human existence: What can we know? What is real? What is right? How should we live? Students explore the major branches of philosophy — epistemology, metaphysics, ethics, and political philosophy — and develop skills in logical reasoning, argument analysis, and Socratic dialogue. The course challenges students to question their assumptions and engage with radically different ways of seeing the world.",
     "general_description": "An exploration of philosophy's major branches — epistemology, metaphysics, ethics, and political philosophy — developing students' capacity for logical reasoning, argument analysis, and reflective self-examination.",
-    "cross_curricular_connections": [
-      "ELA",
-      "Social Justice 12",
-      "Law Studies 12"
-    ],
+    "cross_curricular_connections": ["ELA", "Social Justice 12", "Law Studies 12"],
     "first_peoples_principles": true
   },
   "big_ideas": [
@@ -69,7 +65,7 @@
               "I can connect a philosophical concept (e.g., justice, freedom) to a contemporary political issue.",
               "I can explain how philosophical thinking applies to decisions in my own life."
             ],
-            "short_label": "Evaluate Evidence",
+            "short_label": "Application",
             "tag": "EE"
           }
         ]
@@ -103,7 +99,7 @@
               "I can explain how historical context shaped a philosopher's ideas.",
               "I can compare philosophical traditions across cultures (e.g., Western, Indigenous, Eastern)."
             ],
-            "short_label": "Social Analysis",
+            "short_label": "Historical Understanding",
             "tag": "SA"
           }
         ]

@@ -7,10 +7,7 @@
     "ministry_url": "https://curriculum.gov.bc.ca/curriculum/adst/12/woodwork",
     "description": "Students develop advanced woodworking skills in furniture design, millwork, and specialty projects. This course emphasizes project design and costing, industry-standard finishing, and professional woodworking practices for carpentry and furniture-making careers.",
     "general_description": "Advanced furniture and millwork, project design and costing, industry-standard finishing.",
-    "cross_curricular_connections": [
-      "Furniture and Cabinetry 12",
-      "Design"
-    ],
+    "cross_curricular_connections": ["Furniture and Cabinetry 12", "Design"],
     "first_peoples_principles": true
   },
   "big_ideas": [
@@ -104,7 +101,7 @@
               "I can assemble projects precisely",
               "I can troubleshoot problems"
             ],
-            "short_label": "Precision Measurement",
+            "short_label": "Woodworking Techniques",
             "tag": "PM"
           },
           {
@@ -158,7 +155,7 @@
               "I can use scrapers and rasps",
               "I can maintain hand tools"
             ],
-            "short_label": "Safety Practices",
+            "short_label": "Hand Tools",
             "tag": "SAF"
           },
           {
@@ -170,7 +167,7 @@
               "I can use routers and sanders",
               "I can maintain power tools"
             ],
-            "short_label": "Tool Proficiency",
+            "short_label": "Power Tools",
             "tag": "AT"
           },
           {

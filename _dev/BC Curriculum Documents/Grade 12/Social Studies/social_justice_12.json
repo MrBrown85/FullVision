@@ -104,7 +104,7 @@
               "I can compare the experiences of a marginalized group in different countries or historical periods.",
               "I can evaluate whether progress on social justice issues has been real and lasting."
             ],
-            "short_label": "Social Analysis",
+            "short_label": "Continuity and Change",
             "tag": "SA"
           }
         ]
@@ -138,7 +138,7 @@
               "I can use the concept of intersectionality to analyze how multiple identities affect a person's experience.",
               "I can present multiple perspectives on a controversial social justice topic fairly."
             ],
-            "short_label": "Communicate Findings",
+            "short_label": "Perspective",
             "tag": "CF"
           }
         ]
@@ -155,7 +155,7 @@
               "I can consider competing values (e.g., free speech vs. protection from hate speech) in my ethical reasoning.",
               "I can propose an ethical course of action in response to a social injustice."
             ],
-            "short_label": "Civic Engagement",
+            "short_label": "Ethical Judgment",
             "tag": "CE"
           }
         ]

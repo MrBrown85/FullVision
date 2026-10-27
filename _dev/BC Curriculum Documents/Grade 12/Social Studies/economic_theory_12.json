@@ -8,11 +8,7 @@
     "time_period": "Historical to Contemporary",
     "description": "Economic Theory 12 traces the history of economic thought from ancient barter systems and mercantilism through classical theory, Marxist economics, neoclassical economics, Keynesianism, and contemporary approaches. Students develop the ability to evaluate competing economic theories and their real-world social and political impacts, including an exploration of First Peoples economic systems.",
     "general_description": "A historical and analytical study of economic theories from mercantilism to contemporary thought, examining how competing economic frameworks shape political decisions, social movements, and material conditions.",
-    "cross_curricular_connections": [
-      "Political Studies 12",
-      "Social Justice 12",
-      "History 12"
-    ],
+    "cross_curricular_connections": ["Political Studies 12", "Social Justice 12", "History 12"],
     "first_peoples_principles": true
   },
   "big_ideas": [
@@ -154,7 +150,7 @@
               "I can argue for or against an economic system on ethical grounds.",
               "I can analyze who benefits and who is harmed by a given economic arrangement."
             ],
-            "short_label": "Economic Analysis B",
+            "short_label": "Ethical Judgment",
             "tag": "EAB"
           }
         ]

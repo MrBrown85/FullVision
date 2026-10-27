@@ -8,11 +8,7 @@
     "time_period": "Ancient to Contemporary",
     "description": "Comparative World Religions 12 examines religious belief systems across time and cultures, exploring how religion shapes social, political, legal, and environmental values. Students study the core beliefs, sacred texts, practices, and institutional structures of world religions and develop tools for respectful cross-cultural religious literacy.",
     "general_description": "A comparative study of world religions examining core beliefs, sacred texts, institutional structures, and how religious traditions shape social, political, and environmental values across cultures.",
-    "cross_curricular_connections": [
-      "Comparative Cultures 12",
-      "Philosophy 12",
-      "Social Justice 12"
-    ],
+    "cross_curricular_connections": ["Comparative Cultures 12", "Philosophy 12", "Social Justice 12"],
     "first_peoples_principles": true
   },
   "big_ideas": [
@@ -69,7 +65,7 @@
               "I can describe how a founding figure or key event shaped the development of a religion.",
               "I can compare the significance of a similar event (e.g., a prophet's revelation) across different traditions."
             ],
-            "short_label": "Understand Systems",
+            "short_label": "Significance of Texts",
             "tag": "US"
           }
         ]
@@ -103,7 +99,7 @@
               "I can compare an ancient religious practice with its contemporary form and explain what changed.",
               "I can analyze why some religions declined while others grew."
             ],
-            "short_label": "Social Analysis",
+            "short_label": "Continuity and Change",
             "tag": "SA"
           }
         ]
@@ -120,7 +116,7 @@
               "I can trace how contact between cultures influenced the development of religious traditions.",
               "I can assess the political and economic factors that influenced the spread of a religion."
             ],
-            "short_label": "Learning Foundation",
+            "short_label": "Causes and Influences",
             "tag": "LF"
           }
         ]
@@ -137,7 +133,7 @@
               "I can describe a religious viewpoint on a social issue without personally endorsing or rejecting it.",
               "I can identify how religious perspective differs from secular perspective on the same issue."
             ],
-            "short_label": "Communicate Findings",
+            "short_label": "Perspective",
             "tag": "CF"
           }
         ]
@@ -154,7 +150,7 @@
               "I can compare a media representation of a faith tradition with insider accounts.",
               "I can explain the consequences of religious misrepresentation for real communities."
             ],
-            "short_label": "Presentation Skills",
+            "short_label": "Media Accuracy",
             "tag": "PS"
           }
         ]

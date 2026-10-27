@@ -7,12 +7,7 @@
     "ministry_url": "https://curriculum.gov.bc.ca/curriculum/arts-education/11/studio-arts-3d",
     "description": "Students develop three-dimensional art skills including sculpture, modeling, and construction techniques. This course emphasizes form, space, material exploration, and the translation of ideas into three-dimensional work.",
     "general_description": "A course focused on three-dimensional art including sculpture, modeling, and form exploration.",
-    "cross_curricular_connections": [
-      "Sculpture",
-      "Material Exploration",
-      "Spatial Thinking",
-      "Form and Space"
-    ],
+    "cross_curricular_connections": ["Sculpture", "Material Exploration", "Spatial Thinking", "Form and Space"],
     "first_peoples_principles": true
   },
   "big_ideas": [
@@ -142,7 +137,7 @@
               "I can place personal work within broader artistic conversations",
               "I can appreciate diverse approaches to three-dimensional art"
             ],
-            "short_label": "Reading Comprehension",
+            "short_label": "Artistic Contexts",
             "tag": "RC"
           }
         ]
@@ -214,7 +209,7 @@
               "I can explore connections between sculpture and performance or installation",
               "I can work across disciplines in my artistic practice"
             ],
-            "short_label": "Three-dimensional Design",
+            "short_label": "Interdisciplinary Connections",
             "tag": "TD"
           },
           {

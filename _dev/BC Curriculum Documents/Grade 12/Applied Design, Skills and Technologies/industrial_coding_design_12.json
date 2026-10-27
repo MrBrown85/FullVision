@@ -7,11 +7,7 @@
     "ministry_url": "https://curriculum.gov.bc.ca/curriculum/adst/12/industrial-coding-design",
     "description": "Students develop advanced skills in CNC programming, CAD/CAM design-to-production workflows, and digital fabrication technologies. This course emphasizes computer numerical control programming, 3D design, laser cutting, and 3D printing applications.",
     "general_description": "CNC programming, CAD/CAM workflows, laser cutting, and 3D printing technologies.",
-    "cross_curricular_connections": [
-      "Computer Programming 12",
-      "Drafting 12",
-      "Engineering 12"
-    ],
+    "cross_curricular_connections": ["Computer Programming 12", "Drafting 12", "Engineering 12"],
     "first_peoples_principles": true
   },
   "big_ideas": [
@@ -105,7 +101,7 @@
               "I can modify and iterate designs",
               "I can validate designs for production"
             ],
-            "short_label": "Scale Modeling",
+            "short_label": "CAD Modeling",
             "tag": "AS"
           },
           {
@@ -171,7 +167,7 @@
               "I can set up work and tools",
               "I can maintain equipment"
             ],
-            "short_label": "Cnc Machining B",
+            "short_label": "CNC Machining",
             "tag": "CMB"
           },
           {
@@ -195,7 +191,7 @@
               "I can combine multiple fabrication methods",
               "I can automate and optimize production"
             ],
-            "short_label": "Laser Cutting B",
+            "short_label": "Laser Cutting",
             "tag": "LCB"
           }
         ]

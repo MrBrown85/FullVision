@@ -118,7 +118,7 @@
               "I can evaluate production quality and artistry",
               "I can understand music industry standards"
             ],
-            "short_label": "Learning Foundation",
+            "short_label": "Music Production",
             "tag": "LF"
           },
           {
@@ -226,7 +226,7 @@
               "I can develop work at edge of contemporary practice",
               "I can contribute to musical innovation"
             ],
-            "short_label": "Musical Composition B",
+            "short_label": "Contemporary Composition",
             "tag": "MCB"
           },
           {
@@ -250,7 +250,7 @@
               "I can build networks in music and audio industries",
               "I can envision lifelong compositional and musical practice"
             ],
-            "short_label": "Musical Composition C",
+            "short_label": "Professional Development",
             "tag": "MCC"
           }
         ]

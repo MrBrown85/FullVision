@@ -7,11 +7,7 @@
     "ministry_url": "https://curriculum.gov.bc.ca/curriculum/physical-health-education/8/core",
     "description": "Physical and Health Education 8 develops students' physical literacy, health knowledge, and social-emotional skills. Students refine fundamental movement skills and apply them across a wide range of physical activities, learn to monitor and improve their own fitness, and develop knowledge and skills for healthy decision-making across physical, emotional, mental, and social dimensions of health. First Peoples perspectives on holistic well-being and community health are integrated throughout.",
     "general_description": "A comprehensive course developing physical literacy, fitness knowledge, healthy active living habits, social-emotional skills, and health decision-making — building the foundation for lifelong physical activity participation and personal well-being.",
-    "cross_curricular_connections": [
-      "Science",
-      "Social Studies",
-      "Career Education"
-    ],
+    "cross_curricular_connections": ["Science", "Social Studies", "Career Education"],
     "first_peoples_principles": true
   },
   "big_ideas": [
@@ -95,7 +91,7 @@
               "I can propose and apply strategies for developing and maintaining healthy, respectful relationships.",
               "I can create and implement strategies to promote the health and well-being of my school and community."
             ],
-            "short_label": "Personal Health",
+            "short_label": "Personal Safety",
             "tag": "PH"
           }
         ]

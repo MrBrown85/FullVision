@@ -7,11 +7,7 @@
     "ministry_url": "https://curriculum.gov.bc.ca/curriculum/mathematics/8/core",
     "description": "Mathematics 8 extends students' number sense through perfect squares and cubes, proportional reasoning, and fractions, while building algebraic thinking through linear relations and two-step equations. Students deepen their understanding of geometry and measurement with the Pythagorean theorem and 3D objects, explore probability and data, and apply mathematical thinking to financial literacy. First Peoples mathematical knowledge, including cultural number systems and spatial reasoning, is integrated throughout.",
     "general_description": "An intermediate mathematics course developing number sense, proportional reasoning, algebra, geometry, data analysis, and financial literacy — building strong foundations for senior mathematics pathways.",
-    "cross_curricular_connections": [
-      "Science",
-      "Social Studies",
-      "Financial Literacy"
-    ],
+    "cross_curricular_connections": ["Science", "Social Studies", "Financial Literacy"],
     "first_peoples_principles": true
   },
   "big_ideas": [
@@ -57,7 +53,7 @@
               "I can use tools and technology to explore patterns and test my conjectures.",
               "I can model real-world situations with mathematical representations."
             ],
-            "short_label": "Reading Comprehension",
+            "short_label": "Logic and Patterns",
             "tag": "RC"
           }
         ]

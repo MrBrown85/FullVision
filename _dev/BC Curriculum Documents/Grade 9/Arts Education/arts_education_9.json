@@ -7,11 +7,7 @@
     "ministry_url": "https://curriculum.gov.bc.ca/curriculum/arts-education/9/core",
     "description": "Arts Education 9 deepens the integrated arts learning of earlier grades, focusing on identity, community, and cross-cultural insight. Students engage more deeply with the unique sensory languages of dance, drama, music, and visual arts — developing artistic technique, critical response skills, and ethical awareness. Aboriginal worldviews and diverse cultural perspectives are central to the curriculum. This course prepares students for senior specialized arts pathways.",
     "general_description": "An integrated arts course exploring identity, community, and cross-cultural understanding through dance, drama, music, and visual arts — developing artistic technique, reflective practice, and ethical responsibility in artistic creation.",
-    "cross_curricular_connections": [
-      "Social Studies",
-      "English Language Arts",
-      "Physical Education"
-    ],
+    "cross_curricular_connections": ["Social Studies", "English Language Arts", "Physical Education"],
     "first_peoples_principles": true
   },
   "big_ideas": [
@@ -51,7 +47,7 @@
               "I can recognize and reflect on the personal, social, cultural, historical, and environmental contexts that shape artistic work.",
               "I can explore my own identity, sense of place, and cultural belonging through artistic creation."
             ],
-            "short_label": "Literary Elements",
+            "short_label": "Generate Artworks",
             "tag": "LE"
           }
         ]

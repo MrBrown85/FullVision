@@ -9,12 +9,7 @@
     "description": "B.C. First Peoples 12 examines the histories, cultures, governance, and contemporary experiences of British Columbia's First Peoples. With a strong emphasis on land-based identity, oral tradition, and self-determination, the course traces the impacts of contact and colonialism while centring Indigenous voices, legal precedents, and resistance movements. Students engage with Indigenous ways of knowing and build tools for understanding reconciliation.",
     "general_description": "An in-depth study of BC First Peoples from pre-contact to present, examining land relationships, oral tradition, colonial history, cultural expression, governance, and the ongoing path toward self-determination and reconciliation.",
     "course_notes": "This course centres Indigenous perspectives, oral traditions, and community voices. Engagement with local Elders and knowledge keepers is strongly encouraged.",
-    "cross_curricular_connections": [
-      "ELA",
-      "Law Studies",
-      "Social Justice 12",
-      "Contemporary Indigenous Studies 12"
-    ],
+    "cross_curricular_connections": ["ELA", "Law Studies", "Social Justice 12", "Contemporary Indigenous Studies 12"],
     "first_peoples_principles": true
   },
   "big_ideas": [
@@ -54,7 +49,7 @@
               "I can present my findings in a way that accurately and respectfully represents Indigenous perspectives.",
               "I can lead or contribute meaningfully to collaborative inquiry."
             ],
-            "short_label": "Represent Relationships",
+            "short_label": "Critical Inquiry",
             "tag": "RR"
           }
         ]
@@ -89,7 +84,7 @@
               "I can analyze how the Delgamuukw v. BC (1997) ruling recognized oral history as legal evidence.",
               "I can compare Indigenous relational and holistic ways of knowing with Western analytical approaches."
             ],
-            "short_label": "Indigenous Literature",
+            "short_label": "Oral Traditions as Evidence",
             "tag": "IL"
           }
         ]
@@ -106,7 +101,7 @@
               "I can trace how the Indian Act has changed over time and evaluate what impact those changes had.",
               "I can explain what 'spiralling' time means in an Indigenous worldview versus the Western linear view of time."
             ],
-            "short_label": "Historical Analysis",
+            "short_label": "Continuity and Change",
             "tag": "HA"
           }
         ]
@@ -157,7 +152,7 @@
               "I can take on the perspective of a First Nation community in analyzing a land claim or treaty negotiation.",
               "I can analyze media representations of First Peoples and identify stereotypes or biases."
             ],
-            "short_label": "Learning Foundation B",
+            "short_label": "Perspective",
             "tag": "LFB"
           }
         ]
@@ -174,7 +169,7 @@
               "I can discuss what reconciliation requires — from individuals, from governments, and from society.",
               "I can make an ethical argument about the responsibility of non-Indigenous Canadians in the process of reconciliation."
             ],
-            "short_label": "Mathematical Reasoning",
+            "short_label": "Ethical Judgment",
             "tag": "MR"
           }
         ]

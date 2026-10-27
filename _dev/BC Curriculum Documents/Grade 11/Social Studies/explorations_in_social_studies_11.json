@@ -9,13 +9,7 @@
     "description": "Explorations in Social Studies 11 is a flexible course that allows students to explore a range of social studies topics aligned with provincial learning standards. Students choose from at least three content areas covering topics such as Asia's economic rise, BC First Peoples cultures, urbanization, law, philosophy, economic theory, genocide studies, religious traditions, social justice, and political systems. The course builds critical inquiry skills applicable across all social studies disciplines.",
     "general_description": "A flexible Grade 11 course allowing students to explore diverse social studies topics including Indigenous cultures, political systems, economics, philosophy, law, urban studies, genocide studies, and world religions.",
     "course_structure_note": "Students must demonstrate learning standards in at least THREE of the listed content areas. Schools and teachers may choose which areas to offer.",
-    "cross_curricular_connections": [
-      "ELA",
-      "Philosophy",
-      "Law",
-      "Economics",
-      "Geography"
-    ],
+    "cross_curricular_connections": ["ELA", "Philosophy", "Law", "Economics", "Geography"],
     "first_peoples_principles": true
   },
   "big_ideas": [
@@ -190,7 +184,7 @@
               "I can explain how worldview, values, and lived experience shape a person's perspective.",
               "I can present multiple perspectives on a controversial topic fairly and accurately."
             ],
-            "short_label": "Infer Competency",
+            "short_label": "Perspective",
             "tag": "P"
           }
         ]

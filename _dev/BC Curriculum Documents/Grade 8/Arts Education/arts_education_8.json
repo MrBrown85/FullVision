@@ -7,11 +7,7 @@
     "ministry_url": "https://curriculum.gov.bc.ca/curriculum/arts-education/8/core",
     "description": "Arts Education 8 is an integrated arts course encompassing dance, drama, music, and visual arts. Students explore creative expression as a means of communicating identity, culture, and perspective, developing artistic skills across multiple disciplines. First Peoples artistic traditions and diverse cultural works are central to the curriculum, and students engage thoughtfully with the ethics of artistic practice including cultural appropriation. This course builds the foundation for senior Arts pathways.",
     "general_description": "An integrated arts course exploring dance, drama, music, and visual arts as unique languages for creative expression, cultural connection, and personal identity — developing artistic skills, reflective practice, and appreciation for diverse artistic traditions.",
-    "cross_curricular_connections": [
-      "Social Studies",
-      "English Language Arts",
-      "Physical Education"
-    ],
+    "cross_curricular_connections": ["Social Studies", "English Language Arts", "Physical Education"],
     "first_peoples_principles": true
   },
   "big_ideas": [
@@ -51,7 +47,7 @@
               "I can explore how my identity, place, and cultural background influence and appear in my artistic work.",
               "I can demonstrate understanding of the personal, social, cultural, and environmental contexts that shape artistic work."
             ],
-            "short_label": "Literary Elements",
+            "short_label": "Materials and Techniques",
             "tag": "LE"
           }
         ]
@@ -69,7 +65,7 @@
               "I can reflect on artworks to interpret the artist's intentions and the context in which they were created.",
               "I can respond to artworks by connecting them to knowledge from other subject areas and personal experiences."
             ],
-            "short_label": "Autonomous Systems",
+            "short_label": "Analyze Artistic Processes",
             "tag": "AS"
           }
         ]
@@ -88,7 +84,7 @@
               "I can document, perform, and share my artistic work in thoughtful and purposeful ways.",
               "I can use artistic expression to engage with environmental and global issues."
             ],
-            "short_label": "Analyze Artworks",
+            "short_label": "Adapt for New Contexts",
             "tag": "AA"
           }
         ]

@@ -5292,7 +5292,7 @@
           },
           {
             "id": "cc_EFPLS10_comp_3",
-            "short_label": "Literary Elements",
+            "short_label": "Personal Connections",
             "tag": "LE",
             "raw": "Make meaningful connections between Indigenous literary texts and personal experiences, community contexts, and historical events",
             "i_can_statements": [
@@ -5912,7 +5912,7 @@
         "competencies": [
           {
             "id": "cc_sl10_comp_1",
-            "short_label": "Learning Foundation",
+            "short_label": "Story and Oral Tradition",
             "tag": "LF",
             "raw": "Recognize and appreciate the role of story, narrative, and oral tradition in expressing First Peoples perspectives, values, beliefs, and points of view.",
             "i_can_statements": [
@@ -11190,7 +11190,7 @@
           },
           {
             "id": "cc_dsd11_rr_2",
-            "short_label": "Design Practice",
+            "short_label": "Script and Design",
             "tag": "DP",
             "raw": "Examine relationships between script, design, and production elements",
             "i_can_statements": [
@@ -12568,7 +12568,7 @@
           },
           {
             "id": "cc_sa3d11_rr_4",
-            "short_label": "Reading Comprehension",
+            "short_label": "Artistic Contexts",
             "tag": "RC",
             "raw": "Connect three-dimensional work to broader artistic contexts",
             "i_can_statements": [
@@ -12638,7 +12638,7 @@
         "competencies": [
           {
             "id": "cc_sa3d11_ce_1",
-            "short_label": "Three-dimensional Design",
+            "short_label": "Interdisciplinary Connections",
             "tag": "TD",
             "raw": "Connect three-dimensional work to other art forms and disciplines",
             "i_can_statements": [
@@ -13400,7 +13400,7 @@
           },
           {
             "id": "cc_EFPLSNM11_comp_3",
-            "short_label": "Presentation Skills",
+            "short_label": "Make Connections",
             "tag": "PS",
             "raw": "Make connections between Indigenous literature, digital media, and broader issues of representation, cultural preservation, and decolonization",
             "i_can_statements": [
@@ -13895,7 +13895,7 @@
         "competencies": [
           {
             "id": "cc_CS11_CR_1",
-            "short_label": "Code Documentation",
+            "short_label": "Impact of Computing",
             "tag": "CD",
             "raw": "Reflect on the applications of computational thinking across disciplines and the broader impact of technology.",
             "i_can_statements": [
@@ -14042,7 +14042,7 @@
         "competencies": [
           {
             "id": "cc_HOM11_CR_1",
-            "short_label": "Historical Math Communication",
+            "short_label": "Cultural Connections",
             "tag": "HMC",
             "raw": "Reflect on how mathematical history reveals the interconnectedness of cultures and the ongoing evolution of mathematical thinking.",
             "i_can_statements": [
@@ -15065,7 +15065,7 @@
         "competencies": [
           {
             "id": "cc_sfc11_pc_1",
-            "short_label": "Plan Competency",
+            "short_label": "Plan Investigations",
             "tag": "PAC",
             "raw": "Collaboratively plan and select appropriate investigation methods; assess risks and ethical issues; use SI units and equipment to collect reliable data; apply accuracy and precision concepts.",
             "i_can_statements": [
@@ -15293,7 +15293,7 @@
         "competencies": [
           {
             "id": "cc_ess11_persp_1",
-            "short_label": "Infer Competency",
+            "short_label": "Perspective",
             "tag": "P",
             "raw": "Infer and explain different perspectives on people, places, events, or developments.",
             "i_can_statements": [
@@ -16293,7 +16293,7 @@
         "competencies": [
           {
             "id": "cc_cis12_sig_1",
-            "short_label": "Indigenous Literature",
+            "short_label": "Significance",
             "tag": "IL",
             "raw": "Assess and compare the significance of interconnections between people, places, and events in Indigenous contexts.",
             "i_can_statements": [
@@ -16326,7 +16326,7 @@
         "competencies": [
           {
             "id": "cc_cis12_cc_1",
-            "short_label": "Social Analysis",
+            "short_label": "Continuity and Change",
             "tag": "SA",
             "raw": "Compare and contrast continuities and changes for Indigenous groups across time and place.",
             "i_can_statements": [
@@ -16342,7 +16342,7 @@
         "competencies": [
           {
             "id": "cc_cis12_caus_1",
-            "short_label": "Learning Foundation",
+            "short_label": "Cause and Consequence",
             "tag": "LF",
             "raw": "Assess how underlying conditions and actions affect contemporary Indigenous issues.",
             "i_can_statements": [
@@ -16374,7 +16374,7 @@
         "competencies": [
           {
             "id": "cc_cis12_eth_1",
-            "short_label": "Communicate Findings",
+            "short_label": "Ethical Judgment",
             "tag": "CF",
             "raw": "Make reasoned ethical claims about actions in the past and present related to Indigenous peoples.",
             "i_can_statements": [
@@ -17324,7 +17324,7 @@
         "competencies": [
           {
             "id": "cc_econ12_eth_1",
-            "short_label": "Economic Analysis B",
+            "short_label": "Ethical Judgment",
             "tag": "EAB",
             "raw": "Make reasoned ethical judgments about the application of economic theories.",
             "i_can_statements": [
@@ -18894,7 +18894,7 @@
         "competencies": [
           {
             "id": "cc_hle12_as_1",
-            "short_label": "Design Practice B",
+            "short_label": "Interior Design",
             "tag": "DPB",
             "raw": "Apply interior design principles to plan and execute designs",
             "i_can_statements": [
@@ -19060,7 +19060,7 @@
         "competencies": [
           {
             "id": "cc_icd12_as_1",
-            "short_label": "Scale Modeling",
+            "short_label": "CAD Modeling",
             "tag": "AS",
             "raw": "Apply CAD modeling and design skills",
             "i_can_statements": [
@@ -19125,7 +19125,7 @@
           },
           {
             "id": "cc_icd12_at_2",
-            "short_label": "Cnc Machining B",
+            "short_label": "CNC Machining",
             "tag": "CMB",
             "raw": "Use CNC machines and equipment",
             "i_can_statements": [
@@ -19149,7 +19149,7 @@
           },
           {
             "id": "cc_icd12_at_4",
-            "short_label": "Laser Cutting B",
+            "short_label": "Laser Cutting",
             "tag": "LCB",
             "raw": "Use laser cutting and digital fabrication technologies",
             "i_can_statements": [
@@ -19315,7 +19315,7 @@
           },
           {
             "id": "cc_machw12_at_4",
-            "short_label": "Print Design",
+            "short_label": "Blueprint Reading",
             "tag": "PRN",
             "raw": "Use blueprint reading and planning tools",
             "i_can_statements": [
@@ -19392,7 +19392,7 @@
         "competencies": [
           {
             "id": "cc_mech12_as_1",
-            "short_label": "Textile Arts",
+            "short_label": "Mechanical Fabrication",
             "tag": "TA",
             "raw": "Apply mechanical design and fabrication skills",
             "i_can_statements": [
@@ -19416,7 +19416,7 @@
           },
           {
             "id": "cc_mech12_as_3",
-            "short_label": "Computational Thinking",
+            "short_label": "Programming and Control",
             "tag": "CT",
             "raw": "Apply programming and control skills",
             "i_can_statements": [
@@ -19457,7 +19457,7 @@
           },
           {
             "id": "cc_mech12_at_2",
-            "short_label": "Tool Proficiency",
+            "short_label": "Electrical Design Tools",
             "tag": "ELC2",
             "raw": "Use electrical design and simulation tools",
             "i_can_statements": [
@@ -19623,7 +19623,7 @@
           },
           {
             "id": "cc_mdes12_at_2",
-            "short_label": "Design Practice",
+            "short_label": "Prototyping Tools",
             "tag": "DP",
             "raw": "Use prototyping and interactive design tools",
             "i_can_statements": [
@@ -19724,7 +19724,7 @@
         "competencies": [
           {
             "id": "cc_metal12_as_1",
-            "short_label": "Material Exploration",
+            "short_label": "Cutting and Preparation",
             "tag": "ME",
             "raw": "Apply cutting and material preparation skills",
             "i_can_statements": [
@@ -19801,7 +19801,7 @@
           },
           {
             "id": "cc_metal12_at_3",
-            "short_label": "Equipment Operation B",
+            "short_label": "Finishing Equipment",
             "tag": "EOB",
             "raw": "Use finishing and coating equipment",
             "i_can_statements": [
@@ -19849,7 +19849,7 @@
           },
           {
             "id": "cc_rov12_ad_2",
-            "short_label": "Autonomous Systems",
+            "short_label": "Mechanical Systems Design",
             "tag": "AS",
             "raw": "Design mechanical systems for ROVs and drones",
             "i_can_statements": [
@@ -19914,7 +19914,7 @@
           },
           {
             "id": "cc_rov12_as_3",
-            "short_label": "Skill Application",
+            "short_label": "Programming and Control",
             "tag": "AS",
             "raw": "Apply programming and autonomous control",
             "i_can_statements": [
@@ -19979,7 +19979,7 @@
           },
           {
             "id": "cc_rov12_at_4",
-            "short_label": "Tool Proficiency",
+            "short_label": "Data Collection Tools",
             "tag": "AT",
             "raw": "Use data collection and analysis tools",
             "i_can_statements": [
@@ -20027,7 +20027,7 @@
           },
           {
             "id": "cc_rob12_ad_3",
-            "short_label": "Design Practice",
+            "short_label": "Autonomous Behavior",
             "tag": "DP",
             "raw": "Design autonomous behavior and decision-making",
             "i_can_statements": [
@@ -20039,7 +20039,7 @@
           },
           {
             "id": "cc_rob12_ad_4",
-            "short_label": "Style and Tone",
+            "short_label": "Competition Strategy",
             "tag": "ST",
             "raw": "Design competition strategies and capstone projects",
             "i_can_statements": [
@@ -20056,7 +20056,7 @@
         "competencies": [
           {
             "id": "cc_rob12_as_1",
-            "short_label": "Textile Arts",
+            "short_label": "Robot Fabrication",
             "tag": "TA",
             "raw": "Apply robot assembly and fabrication skills",
             "i_can_statements": [
@@ -20080,7 +20080,7 @@
           },
           {
             "id": "cc_rob12_as_3",
-            "short_label": "Skill Application",
+            "short_label": "Programming and Algorithms",
             "tag": "AS",
             "raw": "Apply programming and algorithm development",
             "i_can_statements": [
@@ -20133,7 +20133,7 @@
           },
           {
             "id": "cc_rob12_at_3",
-            "short_label": "Robot Design B",
+            "short_label": "Robot CAD Design",
             "tag": "RDB",
             "raw": "Use CAD and design software for robots",
             "i_can_statements": [
@@ -20145,7 +20145,7 @@
           },
           {
             "id": "cc_rob12_at_4",
-            "short_label": "Tool Proficiency",
+            "short_label": "Machine Learning Tools",
             "tag": "AT",
             "raw": "Use machine learning and AI tools",
             "i_can_statements": [
@@ -20299,7 +20299,7 @@
           },
           {
             "id": "cc_ssf12_at_3",
-            "short_label": "Specialized Skills B",
+            "short_label": "Specialized Research",
             "tag": "SSB",
             "raw": "Use technology for specialized research and analysis",
             "i_can_statements": [
@@ -20554,7 +20554,7 @@
         "competencies": [
           {
             "id": "cc_tour12_as_1",
-            "short_label": "Skill Application",
+            "short_label": "Destination Analysis",
             "tag": "AS",
             "raw": "Apply destination analysis to plan tourist attractions and experiences",
             "i_can_statements": [
@@ -20631,7 +20631,7 @@
           },
           {
             "id": "cc_tour12_at_3",
-            "short_label": "Learning Foundation B",
+            "short_label": "Event Management Software",
             "tag": "LFB",
             "raw": "Use event management and planning software",
             "i_can_statements": [
@@ -20643,7 +20643,7 @@
           },
           {
             "id": "cc_tour12_at_4",
-            "short_label": "Learning Foundation C",
+            "short_label": "Point-of-Sale and CRM Systems",
             "tag": "LFC",
             "raw": "Use point-of-sale and customer relationship management systems",
             "i_can_statements": [
@@ -20720,7 +20720,7 @@
         "competencies": [
           {
             "id": "cc_wood12_as_1",
-            "short_label": "Precision Measurement",
+            "short_label": "Woodworking Techniques",
             "tag": "PM",
             "raw": "Apply woodworking techniques with precision and quality",
             "i_can_statements": [
@@ -20773,7 +20773,7 @@
         "competencies": [
           {
             "id": "cc_wood12_at_1",
-            "short_label": "Safety Practices",
+            "short_label": "Hand Tools",
             "tag": "SAF",
             "raw": "Use hand tools with skill and safety",
             "i_can_statements": [
@@ -20785,7 +20785,7 @@
           },
           {
             "id": "cc_wood12_at_2",
-            "short_label": "Tool Proficiency",
+            "short_label": "Power Tools",
             "tag": "AT",
             "raw": "Use power tools safely and effectively",
             "i_can_statements": [
@@ -21004,7 +21004,7 @@
           },
           {
             "id": "cc_artstudio12_ce_2",
-            "short_label": "Learning Foundation B",
+            "short_label": "Contemporary Practice",
             "tag": "LFB",
             "raw": "Explore contemporary and innovative artistic practice",
             "i_can_statements": [
@@ -21016,7 +21016,7 @@
           },
           {
             "id": "cc_artstudio12_ce_3",
-            "short_label": "Learning Foundation C",
+            "short_label": "Professional Networks",
             "tag": "LFC",
             "raw": "Develop professional networks and art world engagement",
             "i_can_statements": [
@@ -21070,7 +21070,7 @@
         "competencies": [
           {
             "id": "cc_chor12_rr_1",
-            "short_label": "Genre Study",
+            "short_label": "Performance Evaluation",
             "tag": "GS",
             "raw": "Critically evaluate complex choral performances using sophisticated musical vocabulary; analyze the relationship between choral repertoire, cultural context, and artistic intent; reflect on personal artistic legacy and future musical participation.",
             "i_can_statements": [
@@ -21159,7 +21159,7 @@
           },
           {
             "id": "cc_cp12_rr_2",
-            "short_label": "Learning Foundation",
+            "short_label": "Music Production",
             "tag": "LF",
             "raw": "Understand music production and recording at professional level",
             "i_can_statements": [
@@ -21265,7 +21265,7 @@
           },
           {
             "id": "cc_cp12_ce_2",
-            "short_label": "Musical Composition B",
+            "short_label": "Contemporary Composition",
             "tag": "MCB",
             "raw": "Explore contemporary and innovative compositional approaches",
             "i_can_statements": [
@@ -21289,7 +21289,7 @@
           },
           {
             "id": "cc_cp12_ce_4",
-            "short_label": "Musical Composition C",
+            "short_label": "Professional Development",
             "tag": "MCC",
             "raw": "Plan for continued compositional and professional development",
             "i_can_statements": [
@@ -21496,7 +21496,7 @@
           },
           {
             "id": "cc_cmusic12_ce_3",
-            "short_label": "Learning Foundation B",
+            "short_label": "Career Pathways",
             "tag": "LFB",
             "raw": "Develop professional presence and career pathways",
             "i_can_statements": [
@@ -21621,7 +21621,7 @@
           },
           {
             "id": "cc_dchore12_rr_4",
-            "short_label": "Learning Foundation B",
+            "short_label": "Dance Traditions",
             "tag": "LFB",
             "raw": "Develop sophisticated understanding of diverse dance traditions",
             "i_can_statements": [
@@ -21662,7 +21662,7 @@
           },
           {
             "id": "cc_dchore12_cd_3",
-            "short_label": "Learning Foundation C",
+            "short_label": "Professional Presentation",
             "tag": "LFC",
             "raw": "Present choreographic work to professional audiences",
             "i_can_statements": [
@@ -21775,7 +21775,7 @@
           },
           {
             "id": "cc_dcomp12_ec_3",
-            "short_label": "Style and Tone",
+            "short_label": "Stylistic Versatility",
             "tag": "ST",
             "raw": "Develop versatility across diverse choreographic styles",
             "i_can_statements": [
@@ -21994,7 +21994,7 @@
           },
           {
             "id": "cc_dcond12_ec_3",
-            "short_label": "Project Management",
+            "short_label": "Holistic Wellness",
             "tag": "EAC",
             "raw": "Manage conditioning, health, and wellness holistically",
             "i_can_statements": [
@@ -22023,7 +22023,7 @@
         "competencies": [
           {
             "id": "cc_dcond12_rr_1",
-            "short_label": "Learning Foundation",
+            "short_label": "Anatomy and Physiology",
             "tag": "LF",
             "raw": "Understand advanced anatomy and exercise physiology",
             "i_can_statements": [
@@ -22129,7 +22129,7 @@
         "competencies": [
           {
             "id": "cc_dcond12_ce_1",
-            "short_label": "Reading Comprehension",
+            "short_label": "Professional Contexts",
             "tag": "RC",
             "raw": "Connect conditioning to diverse professional dance contexts",
             "i_can_statements": [
@@ -22834,7 +22834,7 @@
           },
           {
             "id": "cc_ftvt12_rr_2",
-            "short_label": "Learning Foundation",
+            "short_label": "Film and TV Production",
             "tag": "LF",
             "raw": "Understand film and television production at professional level",
             "i_can_statements": [
@@ -23207,7 +23207,7 @@
         "competencies": [
           {
             "id": "cc_instmus12_ec_1",
-            "short_label": "Autonomous Systems",
+            "short_label": "Technical Proficiency",
             "tag": "AS",
             "raw": "Demonstrate the highest level of technical proficiency and expressive musicianship; perform demanding and diverse repertoire with artistic independence; create through improvisation and composition.",
             "i_can_statements": [
@@ -25310,7 +25310,7 @@
         "competencies": [
           {
             "id": "cc_CS12_CR_1",
-            "short_label": "Software Documentation",
+            "short_label": "Ethics and Impact",
             "tag": "SD",
             "raw": "Reflect on the broader impacts of technology and the ethical responsibilities of software developers.",
             "i_can_statements": [
@@ -25633,7 +25633,7 @@
         "competencies": [
           {
             "id": "cc_STAT12_CR_1",
-            "short_label": "Statistical Communication",
+            "short_label": "Ethics and Applications",
             "tag": "SC",
             "raw": "Reflect on how statistical thinking applies across disciplines and consider ethical dimensions of data collection and analysis.",
             "i_can_statements": [
@@ -26582,7 +26582,7 @@
         "competencies": [
           {
             "id": "cc_hist12_sig_1",
-            "short_label": "Historical Development",
+            "short_label": "Significance",
             "tag": "HD",
             "raw": "Assess the significance of people, locations, events, and developments in 20th century world history.",
             "i_can_statements": [
@@ -26615,7 +26615,7 @@
         "competencies": [
           {
             "id": "cc_hist12_cc_1",
-            "short_label": "Social Analysis",
+            "short_label": "Continuity and Change",
             "tag": "SA",
             "raw": "Compare and contrast continuities and changes for different groups at particular times and places.",
             "i_can_statements": [
@@ -26663,7 +26663,7 @@
         "competencies": [
           {
             "id": "cc_hist12_eth_1",
-            "short_label": "Autonomous Systems",
+            "short_label": "Ethical Judgment",
             "tag": "AS",
             "raw": "Make reasoned ethical judgments about controversial actions in the past or present.",
             "i_can_statements": [
@@ -26703,7 +26703,7 @@
         "competencies": [
           {
             "id": "cc_asia12_sig_1",
-            "short_label": "Historical Development",
+            "short_label": "Significance",
             "tag": "HD",
             "raw": "Assess the significance of people, locations, events, or developments in Asian history and contemporary affairs.",
             "i_can_statements": [
@@ -26735,7 +26735,7 @@
         "competencies": [
           {
             "id": "cc_asia12_cc_1",
-            "short_label": "Social Analysis",
+            "short_label": "Continuity and Change",
             "tag": "SA",
             "raw": "Compare and contrast continuities and changes across Asian nations and peoples.",
             "i_can_statements": [
@@ -26751,7 +26751,7 @@
         "competencies": [
           {
             "id": "cc_asia12_caus_1",
-            "short_label": "Learning Foundation",
+            "short_label": "Cause and Consequence",
             "tag": "LF",
             "raw": "Assess how conditions and the actions of groups affect events in Asia.",
             "i_can_statements": [
@@ -26783,7 +26783,7 @@
         "competencies": [
           {
             "id": "cc_asia12_eth_1",
-            "short_label": "Civic Engagement",
+            "short_label": "Ethical Judgment",
             "tag": "CE",
             "raw": "Make reasoned ethical judgments about actions in Asian history and contemporary affairs.",
             "i_can_statements": [
@@ -26806,7 +26806,7 @@
         "competencies": [
           {
             "id": "cc_bcfp12_inquiry_1",
-            "short_label": "Represent Relationships",
+            "short_label": "Critical Inquiry",
             "tag": "RR",
             "raw": "Draw conclusions, assess positions, demonstrate leadership, identify problems, evaluate data, interpret maps/graphs/tables, cite sources, construct visual representations.",
             "i_can_statements": [
@@ -26839,7 +26839,7 @@
         "competencies": [
           {
             "id": "cc_bcfp12_ev_1",
-            "short_label": "Indigenous Literature",
+            "short_label": "Oral Traditions as Evidence",
             "tag": "IL",
             "raw": "Interpret oral traditions and Indigenous ways of knowing with appropriate protocols to contextualize events.",
             "i_can_statements": [
@@ -26856,7 +26856,7 @@
         "competencies": [
           {
             "id": "cc_bcfp12_cc_1",
-            "short_label": "Historical Analysis",
+            "short_label": "Continuity and Change",
             "tag": "HA",
             "raw": "Characterize different time periods in BC First Peoples history and identify key turning points.",
             "i_can_statements": [
@@ -26904,7 +26904,7 @@
         "competencies": [
           {
             "id": "cc_bcfp12_persp_1",
-            "short_label": "Learning Foundation B",
+            "short_label": "Perspective",
             "tag": "LFB",
             "raw": "Explain different perspectives on past and present issues and compare varying perspectives on land and place.",
             "i_can_statements": [
@@ -26920,7 +26920,7 @@
         "competencies": [
           {
             "id": "cc_bcfp12_eth_1",
-            "short_label": "Mathematical Reasoning",
+            "short_label": "Ethical Judgment",
             "tag": "MR",
             "raw": "Make reasoned ethical judgments and assess appropriate ways to remember, reconcile, or respond.",
             "i_can_statements": [
@@ -26992,7 +26992,7 @@
         "competencies": [
           {
             "id": "cc_comp12_cc_1",
-            "short_label": "Critical Analysis",
+            "short_label": "Continuity and Change",
             "tag": "CA",
             "raw": "Analyze continuities and changes in diverse cultures.",
             "i_can_statements": [
@@ -27024,7 +27024,7 @@
         "competencies": [
           {
             "id": "cc_comp12_persp_1",
-            "short_label": "Communicate Findings",
+            "short_label": "Perspective",
             "tag": "CF",
             "raw": "Explain different perspectives on past and present cultures.",
             "i_can_statements": [
@@ -27040,7 +27040,7 @@
         "competencies": [
           {
             "id": "cc_comp12_eth_1",
-            "short_label": "Civic Engagement",
+            "short_label": "Ethical Judgment",
             "tag": "CE",
             "raw": "Make reasoned ethical judgments about cultural actions and appropriate ways to remember and respond.",
             "i_can_statements": [
@@ -27080,7 +27080,7 @@
         "competencies": [
           {
             "id": "cc_rel12_sig_1",
-            "short_label": "Understand Systems",
+            "short_label": "Significance of Texts",
             "tag": "US",
             "raw": "Explain the significance of texts, philosophies, events, or developments within belief systems.",
             "i_can_statements": [
@@ -27112,7 +27112,7 @@
         "competencies": [
           {
             "id": "cc_rel12_cc_1",
-            "short_label": "Social Analysis",
+            "short_label": "Continuity and Change",
             "tag": "SA",
             "raw": "Compare the growth, decline, and transformation of religions over time.",
             "i_can_statements": [
@@ -27128,7 +27128,7 @@
         "competencies": [
           {
             "id": "cc_rel12_caus_1",
-            "short_label": "Learning Foundation",
+            "short_label": "Causes and Influences",
             "tag": "LF",
             "raw": "Assess the origins and influences of religious movements and groups.",
             "i_can_statements": [
@@ -27144,7 +27144,7 @@
         "competencies": [
           {
             "id": "cc_rel12_persp_1",
-            "short_label": "Communicate Findings",
+            "short_label": "Perspective",
             "tag": "CF",
             "raw": "Explain different religious perspectives on past or present people, places, issues, or events.",
             "i_can_statements": [
@@ -27160,7 +27160,7 @@
         "competencies": [
           {
             "id": "cc_rel12_media_1",
-            "short_label": "Presentation Skills",
+            "short_label": "Media Accuracy",
             "tag": "PS",
             "raw": "Assess the accuracy of religious representations in media and popular culture.",
             "i_can_statements": [
@@ -27200,7 +27200,7 @@
         "competencies": [
           {
             "id": "cc_gen12_sig_1",
-            "short_label": "Historical Analysis",
+            "short_label": "Significance",
             "tag": "HA",
             "raw": "Assess the significance of genocides and compare how different groups view their historical importance.",
             "i_can_statements": [
@@ -27233,7 +27233,7 @@
         "competencies": [
           {
             "id": "cc_gen12_cc_1",
-            "short_label": "Critical Analysis",
+            "short_label": "Continuity and Change",
             "tag": "CA",
             "raw": "Analyze how different groups were affected by genocide across different time periods.",
             "i_can_statements": [
@@ -27249,7 +27249,7 @@
         "competencies": [
           {
             "id": "cc_gen12_caus_1",
-            "short_label": "Learning Foundation",
+            "short_label": "Cause and Consequence",
             "tag": "LF",
             "raw": "Assess the causes and consequences of genocide, distinguishing intended from unintended outcomes.",
             "i_can_statements": [
@@ -27281,7 +27281,7 @@
         "competencies": [
           {
             "id": "cc_gen12_eth_1",
-            "short_label": "Social Analysis",
+            "short_label": "Ethical Judgment",
             "tag": "SA",
             "raw": "Make reasoned ethical judgments about genocide, considering historical context.",
             "i_can_statements": [
@@ -27321,7 +27321,7 @@
         "competencies": [
           {
             "id": "cc_hgeo12_place_1",
-            "short_label": "Learning Foundation",
+            "short_label": "Sense of Place",
             "tag": "LF",
             "raw": "Assess the significance of places by identifying their physical and human characteristics.",
             "i_can_statements": [
@@ -27353,7 +27353,7 @@
         "competencies": [
           {
             "id": "cc_hgeo12_patterns_1",
-            "short_label": "Social Analysis",
+            "short_label": "Patterns and Trends",
             "tag": "SA",
             "raw": "Draw conclusions about variation and distribution of geographic phenomena over time and space.",
             "i_can_statements": [
@@ -27401,7 +27401,7 @@
         "competencies": [
           {
             "id": "cc_hgeo12_inter_1",
-            "short_label": "Sustainable Practices",
+            "short_label": "Interactions and Associations",
             "tag": "SP",
             "raw": "Identify and assess how human and environmental factors influence each other.",
             "i_can_statements": [
@@ -27417,7 +27417,7 @@
         "competencies": [
           {
             "id": "cc_hgeo12_eth_1",
-            "short_label": "Civic Engagement",
+            "short_label": "Ethical Judgment",
             "tag": "CE",
             "raw": "Make reasoned ethical judgments about geographic actions and their consequences.",
             "i_can_statements": [
@@ -27457,7 +27457,7 @@
         "competencies": [
           {
             "id": "cc_law12_sig_1",
-            "short_label": "Evaluate Evidence",
+            "short_label": "Significance and Impact",
             "tag": "EE",
             "raw": "Assess and compare the significance and impact of legal systems or codes.",
             "i_can_statements": [
@@ -27489,7 +27489,7 @@
         "competencies": [
           {
             "id": "cc_law12_cc_1",
-            "short_label": "Critical Analysis",
+            "short_label": "Continuity and Change",
             "tag": "CA",
             "raw": "Analyze continuities and changes in legal systems across jurisdictions.",
             "i_can_statements": [
@@ -27521,7 +27521,7 @@
         "competencies": [
           {
             "id": "cc_law12_eth_1",
-            "short_label": "Social Analysis",
+            "short_label": "Ethical Judgment",
             "tag": "SA",
             "raw": "Make reasoned ethical judgments about controversial legal decisions, legislation, and policy.",
             "i_can_statements": [
@@ -27561,7 +27561,7 @@
         "competencies": [
           {
             "id": "cc_phil12_app_1",
-            "short_label": "Evaluate Evidence",
+            "short_label": "Application",
             "tag": "EE",
             "raw": "Assess the relevance of philosophical ideas for everyday life and current social/political issues.",
             "i_can_statements": [
@@ -27593,7 +27593,7 @@
         "competencies": [
           {
             "id": "cc_phil12_hist_1",
-            "short_label": "Social Analysis",
+            "short_label": "Historical Understanding",
             "tag": "SA",
             "raw": "Compare continuity, change, and divergence across philosophical ideas, disciplines, and schools of thought.",
             "i_can_statements": [
@@ -27665,7 +27665,7 @@
         "competencies": [
           {
             "id": "cc_pgeo12_place_1",
-            "short_label": "Learning Foundation",
+            "short_label": "Sense of Place",
             "tag": "LF",
             "raw": "Assess the significance of places by identifying their physical features.",
             "i_can_statements": [
@@ -27681,7 +27681,7 @@
         "competencies": [
           {
             "id": "cc_pgeo12_patterns_1",
-            "short_label": "Social Analysis",
+            "short_label": "Patterns and Trends",
             "tag": "SA",
             "raw": "Draw conclusions about variation and distribution of physical geographic phenomena.",
             "i_can_statements": [
@@ -27729,7 +27729,7 @@
         "competencies": [
           {
             "id": "cc_pgeo12_inter_1",
-            "short_label": "Sustainable Practices",
+            "short_label": "Interactions and Associations",
             "tag": "SP",
             "raw": "Identify and assess how human and environmental factors influence each other.",
             "i_can_statements": [
@@ -27745,7 +27745,7 @@
         "competencies": [
           {
             "id": "cc_pgeo12_eth_1",
-            "short_label": "Civic Engagement",
+            "short_label": "Ethical Judgment",
             "tag": "CE",
             "raw": "Make reasoned ethical judgments about actions affecting physical geographic systems.",
             "i_can_statements": [
@@ -27834,7 +27834,7 @@
         "competencies": [
           {
             "id": "cc_pol12_caus_1",
-            "short_label": "Learning Foundation B",
+            "short_label": "Cause and Consequence",
             "tag": "LFB",
             "raw": "Assess how underlying conditions and the actions of individuals or groups affect political events and outcomes.",
             "i_can_statements": [
@@ -27850,7 +27850,7 @@
         "competencies": [
           {
             "id": "cc_pol12_persp_1",
-            "short_label": "Learning Foundation C",
+            "short_label": "Perspective",
             "tag": "LFC",
             "raw": "Explain and infer different perspectives on political systems and events.",
             "i_can_statements": [
@@ -27866,7 +27866,7 @@
         "competencies": [
           {
             "id": "cc_pol12_eth_1",
-            "short_label": "Understand Systems",
+            "short_label": "Ethical Judgment",
             "tag": "US",
             "raw": "Make reasoned ethical judgments about political decisions and systems.",
             "i_can_statements": [
@@ -27938,7 +27938,7 @@
         "competencies": [
           {
             "id": "cc_sj12_cc_1",
-            "short_label": "Social Analysis",
+            "short_label": "Continuity and Change",
             "tag": "SA",
             "raw": "Compare and contrast continuities and changes for different groups across times and places.",
             "i_can_statements": [
@@ -27970,7 +27970,7 @@
         "competencies": [
           {
             "id": "cc_sj12_persp_1",
-            "short_label": "Communicate Findings",
+            "short_label": "Perspective",
             "tag": "CF",
             "raw": "Explain different perspectives on past and present social justice issues.",
             "i_can_statements": [
@@ -27986,7 +27986,7 @@
         "competencies": [
           {
             "id": "cc_sj12_eth_1",
-            "short_label": "Civic Engagement",
+            "short_label": "Ethical Judgment",
             "tag": "CE",
             "raw": "Make reasoned ethical judgments about controversial social justice actions and issues.",
             "i_can_statements": [
@@ -28074,7 +28074,7 @@
         "competencies": [
           {
             "id": "cc_urb12_caus_1",
-            "short_label": "Learning Foundation B",
+            "short_label": "Cause and Consequence",
             "tag": "LFB",
             "raw": "Assess the causes and consequences of urban policy decisions.",
             "i_can_statements": [
@@ -28090,7 +28090,7 @@
         "competencies": [
           {
             "id": "cc_urb12_persp_1",
-            "short_label": "Geometric Thinking",
+            "short_label": "Perspective",
             "tag": "GT",
             "raw": "Explain the forces that shape opinions and decisions on urban issues.",
             "i_can_statements": [
@@ -28106,7 +28106,7 @@
         "competencies": [
           {
             "id": "cc_urb12_eth_1",
-            "short_label": "Communicate Findings",
+            "short_label": "Ethical Judgment",
             "tag": "CF",
             "raw": "Make reasoned ethical judgments about urban planning issues past and present.",
             "i_can_statements": [
@@ -28153,7 +28153,7 @@
           },
           {
             "id": "cc_adst8_ad_3",
-            "short_label": "Evaluate Designs",
+            "short_label": "User Needs",
             "tag": "ED",
             "raw": "Consider user needs in design decisions",
             "i_can_statements": [
@@ -28165,7 +28165,7 @@
           },
           {
             "id": "cc_adst8_ad_4",
-            "short_label": "Refine Solutions",
+            "short_label": "Communicate Designs",
             "tag": "RS",
             "raw": "Communicate design thinking and solutions",
             "i_can_statements": [
@@ -28182,7 +28182,7 @@
         "competencies": [
           {
             "id": "cc_adst8_as_1",
-            "short_label": "Foundational Techniques",
+            "short_label": "Safe Tool Use",
             "tag": "FT",
             "raw": "Select and use appropriate tools and equipment safely",
             "i_can_statements": [
@@ -28194,7 +28194,7 @@
           },
           {
             "id": "cc_adst8_as_2",
-            "short_label": "Develop Skills",
+            "short_label": "Materials and Technique",
             "tag": "DS",
             "raw": "Work with materials and demonstrate technique",
             "i_can_statements": [
@@ -28206,7 +28206,7 @@
           },
           {
             "id": "cc_adst8_as_3",
-            "short_label": "Advanced Techniques",
+            "short_label": "Practical Problem Solving",
             "tag": "AT",
             "raw": "Develop practical problem-solving skills",
             "i_can_statements": [
@@ -28218,7 +28218,7 @@
           },
           {
             "id": "cc_adst8_as_4",
-            "short_label": "Master Skills",
+            "short_label": "Group Projects",
             "tag": "MS",
             "raw": "Collaborate and manage group projects",
             "i_can_statements": [
@@ -28295,7 +28295,7 @@
         "competencies": [
           {
             "id": "cc_arts8_ec_1",
-            "short_label": "Literary Elements",
+            "short_label": "Materials and Techniques",
             "tag": "LE",
             "raw": "Intentionally select and apply materials, movements, technologies, and techniques by combining artistic elements and principles to express moods, ideas, and messages; create artistic works collaboratively and individually using imagination, inquiry, and experimentation; explore relationships between identity, place, culture, and belonging; demonstrate understanding of personal, social, cultural, and environmental contexts in the arts.",
             "i_can_statements": [
@@ -28312,7 +28312,7 @@
         "competencies": [
           {
             "id": "cc_arts8_rr_1",
-            "short_label": "Autonomous Systems",
+            "short_label": "Analyze Artistic Processes",
             "tag": "AS",
             "raw": "Describe and analyze how artists use processes, materials, and technologies to create and communicate; develop and critically appraise own and others' ideas to improve artistic quality; reflect on artworks to understand artists' motivations; interpret works using knowledge from various learning areas; respond to artworks using worldly knowledge and personal experience.",
             "i_can_statements": [
@@ -28329,7 +28329,7 @@
         "competencies": [
           {
             "id": "cc_arts8_cd_1",
-            "short_label": "Analyze Artworks",
+            "short_label": "Adapt for New Contexts",
             "tag": "AA",
             "raw": "Adapt skills, processes, materials, movements, and techniques for new contexts and audiences; interpret and communicate ideas using symbols, elements, and principles; take creative risks in expressing feelings, ideas, and experiences; describe and respond to artworks; document, choreograph, perform, and share creative works; use arts to address environmental and global issues.",
             "i_can_statements": [
@@ -28479,7 +28479,7 @@
           },
           {
             "id": "cc_ela8_comp_7",
-            "short_label": "Cultural Studies",
+            "short_label": "Language and Identity",
             "tag": "CS",
             "raw": "Recognize how language constructs personal, social, and cultural identity.",
             "i_can_statements": [
@@ -28523,7 +28523,7 @@
           },
           {
             "id": "cc_ela8_comp_11",
-            "short_label": "Thematic Analysis",
+            "short_label": "Text Structures",
             "tag": "TA",
             "raw": "Recognize an increasing range of text structures and how they contribute to meaning.",
             "i_can_statements": [
@@ -28545,7 +28545,7 @@
           },
           {
             "id": "cc_ela8_comp_13",
-            "short_label": "Indigenous Literature",
+            "short_label": "First Peoples Text Protocols",
             "tag": "IL",
             "raw": "Develop an awareness of the protocols and ownership associated with First Peoples texts.",
             "i_can_statements": [
@@ -28572,7 +28572,7 @@
           },
           {
             "id": "cc_ela8_creat_2",
-            "short_label": "Literary Elements",
+            "short_label": "Writing Process",
             "tag": "LE",
             "raw": "Use writing and design processes to plan, develop, and create engaging and meaningful literary and informational texts for a variety of purposes and audiences.",
             "i_can_statements": [
@@ -28583,7 +28583,7 @@
           },
           {
             "id": "cc_ela8_creat_3",
-            "short_label": "Autonomous Systems",
+            "short_label": "Revise and Refine",
             "tag": "AS",
             "raw": "Assess and refine texts to improve their clarity, effectiveness, and impact according to purpose, audience, and message.",
             "i_can_statements": [
@@ -28594,7 +28594,7 @@
           },
           {
             "id": "cc_ela8_creat_4",
-            "short_label": "Learning Foundation B",
+            "short_label": "Conventions",
             "tag": "LFB",
             "raw": "Use an increasing repertoire of conventions of Canadian spelling, grammar, and punctuation.",
             "i_can_statements": [
@@ -28605,7 +28605,7 @@
           },
           {
             "id": "cc_ela8_creat_5",
-            "short_label": "Narrative Writing",
+            "short_label": "Oral Storytelling",
             "tag": "NW",
             "raw": "Use and experiment with oral storytelling processes.",
             "i_can_statements": [
@@ -28616,7 +28616,7 @@
           },
           {
             "id": "cc_ela8_creat_6",
-            "short_label": "Learning Foundation C",
+            "short_label": "Forms and Genres",
             "tag": "LFC",
             "raw": "Select and use appropriate features, forms, and genres according to audience, purpose, and message.",
             "i_can_statements": [
@@ -28650,7 +28650,7 @@
         "competencies": [
           {
             "id": "cc_math8_ra_1",
-            "short_label": "Reading Comprehension",
+            "short_label": "Logic and Patterns",
             "tag": "RC",
             "raw": "Use logic and patterns to solve puzzles and play games; apply reasoning and logic to explore, analyze, and apply mathematical ideas; estimate reasonably; demonstrate and apply mental math strategies; use tools or technology to explore patterns and test conjectures; model mathematics in contextualized experiences.",
             "i_can_statements": [
@@ -28760,7 +28760,7 @@
         "competencies": [
           {
             "id": "cc_phe8_sch_1",
-            "short_label": "Personal Health",
+            "short_label": "Personal Safety",
             "tag": "PH",
             "raw": "Propose strategies for avoiding and/or responding to unsafe or exploitative situations; propose strategies for responding to discrimination, stereotyping, and bullying; propose strategies for developing and maintaining healthy relationships; create strategies for promoting school and community well-being.",
             "i_can_statements": [
@@ -28918,7 +28918,7 @@
           },
           {
             "id": "cc_ss8_inquiry_2",
-            "short_label": "Presentation Skills",
+            "short_label": "Interpret Graphics",
             "tag": "PS",
             "raw": "Interpret and analyze graphic representations of historical data including maps, charts, and images.",
             "i_can_statements": [
@@ -28929,7 +28929,7 @@
           },
           {
             "id": "cc_ss8_inquiry_3",
-            "short_label": "Critical Inquiry",
+            "short_label": "Cite Sources",
             "tag": "CI",
             "raw": "Accurately cite sources for information gathered through research.",
             "i_can_statements": [
@@ -28973,7 +28973,7 @@
           },
           {
             "id": "cc_ss8_ev_2",
-            "short_label": "Learning Foundation",
+            "short_label": "Evidence",
             "tag": "LF",
             "raw": "Identify what creators of accounts or narratives have chosen to emphasize as significant.",
             "i_can_statements": [
@@ -28988,7 +28988,7 @@
         "competencies": [
           {
             "id": "cc_ss8_cc_1",
-            "short_label": "Social Analysis",
+            "short_label": "Continuity and Change",
             "tag": "SA",
             "raw": "Characterize different time periods in history, identifying examples of progress and decline, and key turning points.",
             "i_can_statements": [
@@ -29004,7 +29004,7 @@
         "competencies": [
           {
             "id": "cc_ss8_caus_1",
-            "short_label": "Civic Engagement",
+            "short_label": "Cause and Consequence",
             "tag": "CE",
             "raw": "Determine causation in historical events, distinguishing between systemic factors and unpredictable actions, and examining short- and long-term consequences.",
             "i_can_statements": [
@@ -29020,7 +29020,7 @@
         "competencies": [
           {
             "id": "cc_ss8_persp_1",
-            "short_label": "Critical Evaluation",
+            "short_label": "Perspective",
             "tag": "CE",
             "raw": "Compare worldviews of peoples from different cultures and time periods and evaluate how institutions responded to change.",
             "i_can_statements": [
@@ -29083,7 +29083,7 @@
           },
           {
             "id": "cc_adst9_ad_3",
-            "short_label": "Evaluate Designs",
+            "short_label": "Broader Impact",
             "tag": "ED",
             "raw": "Consider broader impact in design thinking",
             "i_can_statements": [
@@ -29095,7 +29095,7 @@
           },
           {
             "id": "cc_adst9_ad_4",
-            "short_label": "Refine Solutions",
+            "short_label": "Present Designs",
             "tag": "RS",
             "raw": "Present and advocate for design solutions",
             "i_can_statements": [
@@ -29112,7 +29112,7 @@
         "competencies": [
           {
             "id": "cc_adst9_as_1",
-            "short_label": "Foundational Techniques",
+            "short_label": "Precise Techniques",
             "tag": "FT",
             "raw": "Apply advanced techniques with increasing precision",
             "i_can_statements": [
@@ -29124,7 +29124,7 @@
           },
           {
             "id": "cc_adst9_as_2",
-            "short_label": "Develop Skills",
+            "short_label": "Independent Projects",
             "tag": "DS",
             "raw": "Work independently on substantial projects",
             "i_can_statements": [
@@ -29136,7 +29136,7 @@
           },
           {
             "id": "cc_adst9_as_3",
-            "short_label": "Advanced Techniques",
+            "short_label": "Specialization",
             "tag": "AT",
             "raw": "Develop specialization in chosen discipline",
             "i_can_statements": [
@@ -29148,7 +29148,7 @@
           },
           {
             "id": "cc_adst9_as_4",
-            "short_label": "Master Skills",
+            "short_label": "Group Projects",
             "tag": "MS",
             "raw": "Collaborate effectively on group projects",
             "i_can_statements": [
@@ -29165,7 +29165,7 @@
         "competencies": [
           {
             "id": "cc_adst9_at_1",
-            "short_label": "Explore Technologies",
+            "short_label": "Build Technological Systems",
             "tag": "ET",
             "raw": "Design and build complex technological systems",
             "i_can_statements": [
@@ -29225,7 +29225,7 @@
         "competencies": [
           {
             "id": "cc_arts9_ec_1",
-            "short_label": "Literary Elements",
+            "short_label": "Generate Artworks",
             "tag": "LE",
             "raw": "Generate artistic works individually and collaboratively using imagination, inquiry, and purposeful play; investigate materials, environments, and techniques by combining elements and processes; recognize personal, social, cultural, historical, and environmental contexts; examine identity, place, culture, and belonging; intentionally combine elements to establish specific moods or meanings.",
             "i_can_statements": [
@@ -29423,7 +29423,7 @@
           },
           {
             "id": "cc_ela9_comp_7",
-            "short_label": "Cultural Studies",
+            "short_label": "Language and Identity",
             "tag": "CS",
             "raw": "Recognize how language constructs personal, social, and cultural identity.",
             "i_can_statements": [
@@ -29467,7 +29467,7 @@
           },
           {
             "id": "cc_ela9_comp_11",
-            "short_label": "Thematic Analysis",
+            "short_label": "Text Structures",
             "tag": "TA",
             "raw": "Recognize an increasing range of text structures and how they contribute to meaning.",
             "i_can_statements": [
@@ -29527,7 +29527,7 @@
           },
           {
             "id": "cc_ela9_creat_2",
-            "short_label": "Literary Elements",
+            "short_label": "Writing Process",
             "tag": "LE",
             "raw": "Use writing and design processes to plan, develop, and create engaging and meaningful literary and informational texts for a variety of purposes and audiences.",
             "i_can_statements": [
@@ -29538,7 +29538,7 @@
           },
           {
             "id": "cc_ela9_creat_3",
-            "short_label": "Autonomous Systems",
+            "short_label": "Revise and Refine",
             "tag": "AS",
             "raw": "Assess and refine texts to improve their clarity, effectiveness, and impact according to purpose, audience, and message.",
             "i_can_statements": [
@@ -29549,7 +29549,7 @@
           },
           {
             "id": "cc_ela9_creat_4",
-            "short_label": "Learning Foundation B",
+            "short_label": "Conventions",
             "tag": "LFB",
             "raw": "Use an increasing repertoire of conventions of Canadian spelling, grammar, and punctuation.",
             "i_can_statements": [
@@ -29560,7 +29560,7 @@
           },
           {
             "id": "cc_ela9_creat_5",
-            "short_label": "Narrative Writing",
+            "short_label": "Oral Storytelling",
             "tag": "NW",
             "raw": "Use and experiment with oral storytelling processes.",
             "i_can_statements": [
@@ -29571,7 +29571,7 @@
           },
           {
             "id": "cc_ela9_creat_6",
-            "short_label": "Learning Foundation C",
+            "short_label": "Forms and Genres",
             "tag": "LFC",
             "raw": "Select and use appropriate features, forms, and genres according to audience, purpose, and message.",
             "i_can_statements": [
@@ -29616,7 +29616,7 @@
         "competencies": [
           {
             "id": "cc_math9_ra_1",
-            "short_label": "Reading Comprehension",
+            "short_label": "Logic and Patterns",
             "tag": "RC",
             "raw": "Apply logic and patterns to solve puzzles and games; employ reasoning to explore and apply mathematical ideas; estimate reasonably; apply mental math strategies; use technology to explore patterns and test ideas; model mathematics in contextualized experiences.",
             "i_can_statements": [
@@ -29725,7 +29725,7 @@
         "competencies": [
           {
             "id": "cc_phe9_sch_1",
-            "short_label": "Personal Health",
+            "short_label": "Personal Safety",
             "tag": "PH",
             "raw": "Propose strategies for avoiding and/or responding to unsafe or exploitative situations; propose strategies for responding to discrimination, stereotyping, and bullying; propose strategies for developing and maintaining healthy relationships; create strategies for promoting school and community well-being.",
             "i_can_statements": [
@@ -29890,7 +29890,7 @@
         "competencies": [
           {
             "id": "cc_ss9_sig_1",
-            "short_label": "Historical Analysis",
+            "short_label": "Significance",
             "tag": "HA",
             "raw": "Assess historical importance and compare varying perspectives on historical significance.",
             "i_can_statements": [
@@ -29923,7 +29923,7 @@
         "competencies": [
           {
             "id": "cc_ss9_cc_1",
-            "short_label": "Social Analysis",
+            "short_label": "Continuity and Change",
             "tag": "SA",
             "raw": "Compare and contrast continuities and changes for different groups at the same time period.",
             "i_can_statements": [
@@ -29939,7 +29939,7 @@
         "competencies": [
           {
             "id": "cc_ss9_caus_1",
-            "short_label": "Critical Evaluation",
+            "short_label": "Cause and Consequence",
             "tag": "CE",
             "raw": "Evaluate how prevailing conditions and the actions of individuals or groups affect events.",
             "i_can_statements": [
@@ -29955,7 +29955,7 @@
         "competencies": [
           {
             "id": "cc_ss9_persp_1",
-            "short_label": "Learning Foundation",
+            "short_label": "Perspective",
             "tag": "LF",
             "raw": "Explain different perspectives on past or present people, places, issues, or events by considering prevailing norms, values, worldviews, and beliefs.",
             "i_can_statements": [
@@ -29971,7 +29971,7 @@
         "competencies": [
           {
             "id": "cc_ss9_eth_1",
-            "short_label": "Autonomous Systems",
+            "short_label": "Ethical Judgment",
             "tag": "AS",
             "raw": "Make reasoned ethical judgments about controversial actions in the past or present.",
             "i_can_statements": [

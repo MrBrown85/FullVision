@@ -7,11 +7,7 @@
     "ministry_url": "https://curriculum.gov.bc.ca/curriculum/adst/12/remotely-operated-vehicles-drones",
     "description": "Students explore the design, programming, and operation of remotely operated vehicles (ROVs) and unmanned aerial vehicles (drones). This course emphasizes engineering design, autonomous systems, and real-world applications in exploration and monitoring.",
     "general_description": "ROV and drone design, programming, operation, and industry applications.",
-    "cross_curricular_connections": [
-      "Robotics 12",
-      "Computer Programming 12",
-      "Mechatronics 12"
-    ],
+    "cross_curricular_connections": ["Robotics 12", "Computer Programming 12", "Mechatronics 12"],
     "first_peoples_principles": true
   },
   "big_ideas": [
@@ -63,7 +59,7 @@
               "I can design for stability and control",
               "I can optimize for hydrodynamics or aerodynamics"
             ],
-            "short_label": "Autonomous Systems",
+            "short_label": "Mechanical Systems Design",
             "tag": "AS"
           },
           {
@@ -129,7 +125,7 @@
               "I can integrate sensors",
               "I can debug and optimize"
             ],
-            "short_label": "Skill Application",
+            "short_label": "Programming and Control",
             "tag": "AS"
           },
           {
@@ -195,7 +191,7 @@
               "I can create visualizations",
               "I can generate reports"
             ],
-            "short_label": "Tool Proficiency",
+            "short_label": "Data Collection Tools",
             "tag": "AT"
           }
         ]

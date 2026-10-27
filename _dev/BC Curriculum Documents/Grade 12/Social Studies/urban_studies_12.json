@@ -8,11 +8,7 @@
     "time_period": "Historical to Contemporary",
     "description": "Urban Studies 12 examines urbanization as a global phenomenon and the forces that shape how cities develop, function, and change. Students investigate the history of urban settlement, the functions of local government, urban planning principles, and contemporary challenges facing cities — from housing affordability to climate resilience. The course develops civic literacy and an understanding of how planning decisions affect quality of life.",
     "general_description": "An examination of urbanization as a global force, exploring how cities form, how they are governed, how planning decisions are made, and how contemporary cities can become more livable, equitable, and sustainable.",
-    "cross_curricular_connections": [
-      "Human Geography 12",
-      "Political Studies 12",
-      "Social Justice 12"
-    ],
+    "cross_curricular_connections": ["Human Geography 12", "Political Studies 12", "Social Justice 12"],
     "first_peoples_principles": true
   },
   "big_ideas": [
@@ -120,7 +116,7 @@
               "I can evaluate the intended and unintended consequences of a housing policy.",
               "I can analyze the long-term effects of urban sprawl on environment, health, and community."
             ],
-            "short_label": "Learning Foundation B",
+            "short_label": "Cause and Consequence",
             "tag": "LFB"
           }
         ]
@@ -137,7 +133,7 @@
               "I can analyze how political ideology shapes different approaches to housing or transit policy.",
               "I can identify who benefits and who is harmed by a particular planning decision."
             ],
-            "short_label": "Geometric Thinking",
+            "short_label": "Perspective",
             "tag": "GT"
           }
         ]
@@ -154,7 +150,7 @@
               "I can make an ethical argument about housing affordability as a right.",
               "I can evaluate historical urban decisions (e.g., freeway construction through minority neighbourhoods) using ethical reasoning."
             ],
-            "short_label": "Communicate Findings",
+            "short_label": "Ethical Judgment",
             "tag": "CF"
           }
         ]

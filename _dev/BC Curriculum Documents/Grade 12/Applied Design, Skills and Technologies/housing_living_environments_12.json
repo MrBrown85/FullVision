@@ -7,12 +7,7 @@
     "ministry_url": "https://curriculum.gov.bc.ca/curriculum/adst/12/housing-living-environments",
     "description": "Students explore housing design, interior design principles, housing systems, sustainable living practices, and architectural planning. This course develops skills for creating functional, aesthetically pleasing, and sustainable living environments.",
     "general_description": "Interior design, housing systems, sustainable living, and architectural planning for residential environments.",
-    "cross_curricular_connections": [
-      "Design",
-      "Sustainability",
-      "Architecture",
-      "Environmental Science"
-    ],
+    "cross_curricular_connections": ["Design", "Sustainability", "Architecture", "Environmental Science"],
     "first_peoples_principles": true
   },
   "big_ideas": [
@@ -106,7 +101,7 @@
               "I can create mood boards and design concepts",
               "I can evaluate and refine designs"
             ],
-            "short_label": "Design Practice B",
+            "short_label": "Interior Design",
             "tag": "DPB"
           },
           {

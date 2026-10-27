@@ -8,11 +8,7 @@
     "time_period": "Contemporary / Scientific",
     "description": "Physical Geography 12 focuses on understanding Earth's natural systems and their interactions with human society. Students examine the structure and function of Earth's major systems (atmosphere, hydrosphere, cryosphere, lithosphere, and biosphere), explore how natural processes shape landscapes and climate, and analyze how human activities alter these systems. The course develops scientific literacy and geographic reasoning.",
     "general_description": "A scientific study of Earth's natural systems — atmosphere, hydrosphere, cryosphere, lithosphere, and biosphere — examining natural processes, climate patterns, ecosystems, and the growing impact of human activity.",
-    "cross_curricular_connections": [
-      "Human Geography 12",
-      "Earth Sciences 11",
-      "Environmental Science"
-    ],
+    "cross_curricular_connections": ["Human Geography 12", "Earth Sciences 11", "Environmental Science"],
     "first_peoples_principles": true
   },
   "big_ideas": [
@@ -81,7 +77,7 @@
               "I can explain how Indigenous peoples understand and describe their physical environment.",
               "I can evaluate why a physical geographic feature is significant to settlement, culture, or economy."
             ],
-            "short_label": "Learning Foundation",
+            "short_label": "Sense of Place",
             "tag": "LF"
           }
         ]
@@ -98,7 +94,7 @@
               "I can track how a physical process (glacial retreat, deforestation, sea level rise) changes over time.",
               "I can use data to identify climate or ecological patterns at different scales."
             ],
-            "short_label": "Social Analysis",
+            "short_label": "Patterns and Trends",
             "tag": "SA"
           }
         ]
@@ -149,7 +145,7 @@
               "I can analyze how urban development alters local hydrology and temperature.",
               "I can evaluate how climate change is altering a specific physical system (Arctic ice, coral reefs, monsoons)."
             ],
-            "short_label": "Sustainable Practices",
+            "short_label": "Interactions and Associations",
             "tag": "SP"
           }
         ]
@@ -166,7 +162,7 @@
               "I can evaluate whether a development project that damages an ecosystem is justified.",
               "I can argue for specific policies to protect a physical geographic system at risk."
             ],
-            "short_label": "Civic Engagement",
+            "short_label": "Ethical Judgment",
             "tag": "CE"
           }
         ]

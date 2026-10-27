@@ -9,11 +9,7 @@
     "description": "Contemporary Indigenous Studies 12 focuses on Indigenous identities, worldviews, resilience, and self-determination in Canada and globally. Students engage with Indigenous ways of knowing, examine the ongoing effects of colonialism, and explore paths toward reconciliation. The course centres Indigenous voices, scholarship, and community perspectives as its primary sources.",
     "general_description": "A contemporary study of Indigenous peoples in Canada and globally, examining identity, worldview, colonialism's ongoing impacts, rights advocacy, and the journey toward reconciliation and self-determination.",
     "course_notes": "This course is designed with Indigenous perspectives at its centre. Engagement with local Elders, knowledge keepers, and Indigenous-led scholarship is strongly encouraged.",
-    "cross_curricular_connections": [
-      "BC First Peoples 12",
-      "Social Justice 12",
-      "Law Studies 12"
-    ],
+    "cross_curricular_connections": ["BC First Peoples 12", "Social Justice 12", "Law Studies 12"],
     "first_peoples_principles": true
   },
   "big_ideas": [
@@ -70,7 +66,7 @@
               "I can compare how the same event is viewed from Indigenous and settler perspectives.",
               "I can evaluate the significance of land in Indigenous worldviews compared to Western legal frameworks."
             ],
-            "short_label": "Indigenous Literature",
+            "short_label": "Significance",
             "tag": "IL"
           }
         ]
@@ -105,7 +101,7 @@
               "I can compare the contemporary situation of Indigenous peoples in Canada with those in other colonial nations.",
               "I can identify what aspects of colonial policy persist today in different forms."
             ],
-            "short_label": "Social Analysis",
+            "short_label": "Continuity and Change",
             "tag": "SA"
           }
         ]
@@ -122,7 +118,7 @@
               "I can identify the factors that drive Indigenous land rights movements.",
               "I can evaluate the intended and unintended consequences of reconciliation policies."
             ],
-            "short_label": "Learning Foundation",
+            "short_label": "Cause and Consequence",
             "tag": "LF"
           }
         ]
@@ -156,7 +152,7 @@
               "I can evaluate whether Canada has met its legal and moral obligations to Indigenous peoples.",
               "I can discuss what meaningful Indigenous consent looks like in resource development."
             ],
-            "short_label": "Communicate Findings",
+            "short_label": "Ethical Judgment",
             "tag": "CF"
           }
         ]
