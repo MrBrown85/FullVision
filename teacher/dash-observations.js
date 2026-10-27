@@ -506,7 +506,7 @@ window.DashObservations = (function () {
   }
 
   /* The card's head: the title and window, the flags (`flags`), then the
-     tabs, Hide Names and Record at the right. */
+     tabs and Record at the right. */
   function _headHtml(m, state, students, flags) {
     var cid = m ? m.cid : state.cid;
     var record =
@@ -545,12 +545,6 @@ window.DashObservations = (function () {
           '</button>';
       });
       h += '</div>';
-      h +=
-        '<button type="button" class="dash-ob2-tool" data-action="obsNames" data-focus-key="names" aria-pressed="' +
-        !!state.namesHidden +
-        '">' +
-        (state.namesHidden ? 'Show Names' : 'Hide Names') +
-        '</button>';
     }
     return h + record + '</div></div>';
   }
@@ -843,7 +837,7 @@ window.DashObservations = (function () {
   }
 
   /* The card's inner HTML (the page owns the #dash-obs-card element).
-     state: { tab, highlight, namesHidden, width }. A highlight whose flag
+     state: { tab, highlight, width }. A highlight whose flag
      is gone is dropped: state.highlight is set to null. */
   function renderCard(cid, students, state) {
     state = state || {};

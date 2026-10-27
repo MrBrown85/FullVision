@@ -278,7 +278,7 @@ window.DashOverview = (function () {
   /* The dashboard under the toolbar: the top bar; Needs Attention beside
      Curricular and Core Competencies; then Observations across the page.
      page-dashboard.js re-renders only the Observations card's inside for its
-     tab, flag and Hide Names clicks. */
+     tab and flag clicks. */
   function renderOverviewPanel(opts) {
     var cid = opts.cid;
     var allStudents = opts.allStudents;

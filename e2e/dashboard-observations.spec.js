@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 /* The dashboard's Observations card (docs/DECISIONS.md, "Observations
    (2026-10-18)", item 4) in Demo Mode on Science 8: its place, both tabs,
-   flags, Hide names, the "+" dialog, the week popover and the jump to the
+   flags, the "+" dialog, the week popover and the jump to the
    student page. The demo class has no competency gaps and no linked
    observations, so the tests make them through the data layer and read the
    expected counts from the page. */
@@ -87,39 +87,6 @@ test.describe('Dashboard Observations card', () => {
     await card(page).locator('.dash-ob2-flag').first().click();
     await card(page).getByRole('tab', { name: 'By Competency' }).click();
     await expect(card(page).locator('.dash-ob2-row.is-dim')).toHaveCount(0);
-  });
-
-  test('Hide names blurs names on the card and the student cards', async ({ page }) => {
-    await enterDemo(page);
-    await openDashboard(page);
-    const blur = loc => loc.evaluate(el => getComputedStyle(el).filter);
-    const btn = card(page).getByRole('button', { name: 'Hide Names' });
-    await btn.click();
-    const shown = card(page).getByRole('button', { name: 'Show Names' });
-    await expect(shown).toHaveAttribute('aria-pressed', 'true');
-    await expect(shown).toBeFocused();
-    expect(await blur(card(page).locator('.dash-ob2-name').first())).toMatch(/blur/);
-    expect(await blur(page.locator('.dash-card-name').first())).toMatch(/blur/);
-    // Grades stay readable.
-    expect(await blur(page.locator('.dash-card-badge').first())).toBe('none');
-    // The search box stays a control: only a typed name is blurred.
-    const search = page.locator('.dash-search-input');
-    expect(await blur(search)).toBe('none');
-    await search.fill('a');
-    expect(await search.evaluate(el => getComputedStyle(el).color)).toBe('rgba(0, 0, 0, 0)');
-    expect(await search.evaluate(el => getComputedStyle(el).textShadow)).toMatch(/px/);
-    expect(await blur(search)).toBe('none');
-    await search.fill('');
-    // The week popover stays closed while names are hidden.
-    await card(page).locator('.dash-ob2-cell.has').first().hover();
-    await expect(page.locator('#dash-ob2-pop')).toBeHidden();
-    // Remembered on this device.
-    await page.reload();
-    await expect(card(page).getByRole('button', { name: 'Show Names' })).toBeVisible();
-    expect(await blur(page.locator('.dash-card-name').first())).toMatch(/blur/);
-    await card(page).getByRole('button', { name: 'Show Names' }).click();
-    expect(await blur(card(page).locator('.dash-ob2-name').first())).toBe('none');
-    expect(await blur(page.locator('.dash-card-name').first())).toBe('none');
   });
 
   test('a week shows its notes on hover and on focus', async ({ page }) => {
