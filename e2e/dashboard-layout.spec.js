@@ -1,8 +1,9 @@
 /**
- * The class dashboard's boxes (Colin, 2026-10-22): the Core Competencies
- * and Upcoming Birthdays row is as tall as Upcoming Birthdays with its title
- * and three birthdays, whatever Next Steps holds, and every box is 12px from
- * the next, across and down. Demo Mode, Science 8.
+ * The class dashboard's boxes (docs/DECISIONS.md, "Class dashboard
+ * (2026-10-26)"): the top bar, then Needs Attention beside Curricular and
+ * Core Competencies and as tall as the two of them, its list scrolling
+ * inside, then Observations; every box 12px from the next, across and down.
+ * Demo Mode, Science 8.
  */
 import { test, expect } from '@playwright/test';
 
@@ -11,79 +12,81 @@ test.use({ viewport: { width: 1440, height: 900 } });
 async function openDashboard(page) {
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/app\.html/, { timeout: 15000 });
-  await page.locator('.dash-overview-second').waitFor();
+  await page.locator('#dash-na-card').waitFor();
 }
 
-/* At every width the row keeps its height: on a narrow card the seven Core
-   Competencies take a four-column grid (two lines, long names cut short), and
-   the first Next Step still shows in full. */
-for (const width of [1440, 1200, 1024, 800]) {
-  test(`at ${width}px the birthdays row keeps its height and shows a Next Step`, async ({ page }) => {
+for (const width of [1440, 1200]) {
+  test(`at ${width}px Needs Attention is as tall as the competency cards and scrolls inside`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await openDashboard(page);
     const m = await page.evaluate(() => {
-      var pills = Array.prototype.slice.call(document.querySelectorAll('.dash-cc-pill'));
-      var list = document.querySelector('.dash-action-list').getBoundingClientRect();
-      var item = document.querySelector('.dash-action-item').getBoundingClientRect();
-      var card = document.querySelector('.dash-bday-card');
+      var na = document.querySelector('#dash-na-card').getBoundingClientRect();
+      var side = document.querySelector('.dash-overview-side').getBoundingClientRect();
+      var list = document.querySelector('.dash-na-list');
       return {
-        row: Math.round(document.querySelector('.dash-overview-second').getBoundingClientRect().height),
-        bday: Math.round(card.getBoundingClientRect().height),
-        cc: Math.round(document.querySelector('.dash-cc-card').getBoundingClientRect().height),
-        lines: new Set(pills.map(p => Math.round(p.getBoundingClientRect().top))).size,
-        nextStepShown: item.top >= list.top - 0.5 && item.bottom <= list.bottom + 0.5,
+        top: Math.round(na.top - side.top),
+        bottom: Math.round(na.bottom - side.bottom),
+        scrolls: list.scrollHeight > list.clientHeight,
+        rows: document.querySelectorAll('.dash-na-row:not(.is-class)').length,
       };
     });
-    expect(m.cc).toBe(m.bday);
-    expect(m.row).toBe(m.bday);
-    expect(m.lines).toBeLessThanOrEqual(2);
-    expect(m.nextStepShown).toBe(true);
+    expect(m.top).toBe(0);
+    expect(m.bottom).toBe(0);
+    expect(m.rows).toBeGreaterThan(5);
+    expect(m.scrolls).toBe(true);
   });
 }
 
-test('the birthdays row is as tall as three birthdays and stays that size', async ({ page }) => {
+test('below 1100px the competency cards go under Needs Attention, which keeps a height', async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 900 });
   await openDashboard(page);
-  const fit = () =>
-    page.evaluate(() => {
-      var card = document.querySelector('.dash-bday-card');
-      var rows = card.children;
-      var last = rows[rows.length - 1].getBoundingClientRect();
-      var box = card.getBoundingClientRect();
-      var pad = parseFloat(getComputedStyle(card).paddingBottom) + parseFloat(getComputedStyle(card).borderBottomWidth);
-      return {
-        birthdays: rows.length - 1,
-        spare: Math.round(box.bottom - pad - last.bottom),
-        row: Math.round(document.querySelector('.dash-overview-second').getBoundingClientRect().height),
-        cc: Math.round(document.querySelector('.dash-cc-card').getBoundingClientRect().height),
-      };
-    });
-  const before = await fit();
-  expect(before.birthdays).toBe(3);
-  expect(before.spare).toBe(0);
-  expect(before.cc).toBe(before.row);
+  const m = await page.evaluate(() => {
+    var na = document.querySelector('#dash-na-card').getBoundingClientRect();
+    var side = document.querySelector('.dash-overview-side').getBoundingClientRect();
+    return { stacked: side.top >= na.bottom, height: na.height };
+  });
+  expect(m.stacked).toBe(true);
+  expect(m.height).toBeGreaterThan(200);
+});
 
-  // Many Next Steps scroll inside the card; the row keeps its height.
-  await page.evaluate(() => {
-    var list = document.querySelector('.dash-action-list');
-    var item = list.querySelector('.dash-action-item');
-    for (var i = 0; i < 6; i++) list.appendChild(item.cloneNode(true));
-  });
-  const after = await fit();
-  expect(after.row).toBe(before.row);
-  // The first Next Step shows in full.
-  const first = await page.evaluate(() => {
-    var list = document.querySelector('.dash-action-list').getBoundingClientRect();
-    var item = document.querySelector('.dash-action-item').getBoundingClientRect();
-    return Math.round(item.bottom - list.bottom);
-  });
-  expect(first).toBeLessThanOrEqual(0);
+test('the filters, "N Below" and the Missing and Late cell pick who Needs Attention shows', async ({ page }) => {
+  await openDashboard(page);
+  const card = page.locator('#dash-na-card');
+  const rows = card.locator('.dash-na-row:not(.is-class)');
+  const all = await rows.count();
+  await card.locator('[data-action="naFilter"][data-filter="nostr"]').click();
+  await expect(card.locator('[data-filter="nostr"]')).toHaveAttribute('aria-pressed', 'true');
+  const nostr = await rows.count();
+  expect(nostr).toBeLessThan(all);
+  expect(await card.locator('.dash-na-diamond').count()).toBe(nostr);
+  // A competency's "N Below" shows its students and a chip to clear it.
+  const below = page.locator('.dash-mix-below[data-key]').first();
+  const n = Number(await below.locator('b').textContent());
+  await below.click();
+  await expect(rows).toHaveCount(n);
+  await expect(card.locator('.dash-na-compchip')).toBeVisible();
+  await card.locator('.dash-na-compchip').click();
+  await expect(card.locator('[data-filter="nostr"]')).toHaveAttribute('aria-pressed', 'true');
+  await card.locator('[data-filter="all"]').click();
+  await expect(rows).toHaveCount(all);
+});
+
+test("a row's buttons show on hover without moving anything", async ({ page }) => {
+  await openDashboard(page);
+  const row = page.locator('.dash-na-row:not(.is-class)').first();
+  const before = await row.boundingBox();
+  const act = row.locator('.dash-na-act');
+  expect(await act.evaluate(el => getComputedStyle(el).opacity)).toBe('0');
+  await row.hover();
+  await expect.poll(() => act.evaluate(el => getComputedStyle(el).opacity)).toBe('1');
+  expect(await row.boundingBox()).toEqual(before);
 });
 
 test('every box on the dashboard is 12px from the next', async ({ page }) => {
   await openDashboard(page);
   const gaps = await page.evaluate(() => {
     var boxes = Array.prototype.slice
-      .call(document.querySelectorAll('.dash-overview-section, .dash-students-head, .dash-card'))
+      .call(document.querySelectorAll('.dash-glance, .dash-overview-section, .dash-students-head, .dash-card'))
       .slice(0, 12)
       .map(function (el) {
         var r = el.getBoundingClientRect();
