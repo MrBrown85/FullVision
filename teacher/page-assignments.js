@@ -4658,7 +4658,10 @@ window.PageAssignments = (function () {
   }
   function onModuleDropZoneDrop(event, targetIndex) {
     event.preventDefault();
-    event.currentTarget.classList.remove('drag-over');
+    // The drop listener is on the document, so the event's own target element is not the zone.
+    document.querySelectorAll('.mod-drop-zone.drag-over').forEach(function (el) {
+      el.classList.remove('drag-over');
+    });
     var moduleId = _dragModuleId || event.dataTransfer.getData('application/module-id');
     if (!moduleId) return;
     var cid = activeCourse;
