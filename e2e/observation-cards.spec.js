@@ -7,13 +7,13 @@ async function enterDemo(page, { phone = false } = {}) {
   await page.setViewportSize(phone ? { width: 390, height: 844 } : { width: 1440, height: 900 });
   await page.goto('/login.html');
   await page.locator('#demo-mode-btn').click();
-  await page.waitForURL(phone ? /teacher-mobile\// : /teacher\/app\.html/);
+  await page.waitForURL(phone ? /teacher-mobile\// : /\/dashboard/);
 }
 
 test.describe('Observation cards, desktop', () => {
   test('a type block leads each card and names line up', async ({ page }) => {
     await enterDemo(page);
-    await page.goto('/teacher/app.html#/observations');
+    await page.goto('/observations');
     const cards = page.locator('.obs-card');
     await expect(cards.first()).toBeVisible();
     await expect(cards.first().locator('.obs-type')).toHaveText(/^(Strength|Growth|Concern|Note)$/);
@@ -88,7 +88,7 @@ test.describe('Observation cards, phone swipe', () => {
 test.describe('Observation editor (D3), desktop', () => {
   async function openFirst(page) {
     await enterDemo(page);
-    await page.goto('/teacher/app.html#/observations');
+    await page.goto('/observations');
     const card = page.locator('.obs-card').first();
     await expect(card).toBeVisible();
     const obId = await card.getAttribute('data-obid');
@@ -153,7 +153,7 @@ test.describe('Observation editor (D3), desktop', () => {
 
   test('a quoted note warns that changes show in the report', async ({ page }) => {
     await enterDemo(page);
-    await page.goto('/teacher/app.html#/observations');
+    await page.goto('/observations');
     const quoted = page.locator('.obs-card', { has: page.locator('.obs-card-quoted') }).first();
     await quoted.click();
     await expect(page.locator('#obs-focus-card .obs-notice')).toHaveText(
@@ -216,7 +216,7 @@ test.describe('Observation editor (D3), phone', () => {
 test.describe('Capture strip (D4), desktop', () => {
   test('type chips start unpicked beside the student; Context menu with None, + Link, Add waits', async ({ page }) => {
     await enterDemo(page);
-    await page.goto('/teacher/app.html#/observations');
+    await page.goto('/observations');
     const strip = page.locator('#obs-capture');
     await expect(strip.locator('.obs-band')).toHaveCount(0);
     await expect(strip.locator('[data-part="who"] .obsc-chip-type')).toHaveText([
@@ -272,7 +272,7 @@ test.describe('Capture strip (D4), desktop', () => {
 
   test('the starter menu shows each starter with its type block and what it sets', async ({ page }) => {
     await enterDemo(page);
-    await page.goto('/teacher/app.html#/observations');
+    await page.goto('/observations');
     await page.locator('#starter-btn').click();
     const first = page.locator('#starter-dropdown .obsc-starter').first();
     await expect(first.locator('.obs-type')).toHaveText(/^(Strength|Growth|Concern|Note)$/);

@@ -92,7 +92,7 @@ test.describe('Observations — keyboard, undo and views', () => {
   });
 
   test('a student link from the dashboard picks and filters to that student', async ({ page }) => {
-    await page.goto(`/teacher/app.html#/observations?course=${TEST_COURSE.id}&student=stu-002`);
+    await page.goto(`/observations?course=${TEST_COURSE.id}&student=stu-002`);
     await page.waitForSelector('#capture-input');
     await expect(page.locator('#obs-capture .obsc-chip-student')).toContainText('Bob');
     await expect(page.locator('#filter-student-btn')).toHaveClass(/active/);

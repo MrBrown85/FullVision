@@ -192,7 +192,7 @@ window.DashOverview = (function () {
     var html =
       '<section class="dash-overview-section dash-comp-card" aria-labelledby="dash-comp-title">' +
       '<div class="dash-section-title"><span id="dash-comp-title">Curricular Competencies</span>' +
-      '<a role="link" tabindex="0" data-href="#/gradebook?course=' +
+      '<a role="link" tabindex="0" data-href="/gradebook?course=' +
       cid +
       '">View Gradebook \u2192</a></div>';
     if (DashInsights.showsProficiency(cid)) {

@@ -39,9 +39,9 @@ test.describe('Regression smoke (P1.2)', () => {
     await page.locator('#si-password').fill(password);
     await page.locator('#form-signin button[type="submit"]').click();
 
-    await page.waitForURL(/\/teacher\/app/);
+    await page.waitForURL(/\/dashboard/);
     await page.evaluate(courseId => {
-      window.location.hash = '#/gradebook?course=' + courseId;
+      window.Router.navigate('/gradebook?course=' + courseId);
     }, SMOKE_WELCOME_COURSE.id);
     await expect(page.getByRole('combobox', { name: 'Select course' })).toHaveValue(SMOKE_WELCOME_COURSE.id);
     // The gradebook opens on Scores (#305); the per-competency cells are in Competencies.
@@ -63,9 +63,9 @@ test.describe('Regression smoke (P1.2)', () => {
     await page.locator('#si-password').fill(password);
     await page.locator('#form-signin button[type="submit"]').click();
 
-    await page.waitForURL(/\/teacher\/app/);
+    await page.waitForURL(/\/dashboard/);
     await page.evaluate(courseId => {
-      window.location.hash = '#/gradebook?course=' + courseId;
+      window.Router.navigate('/gradebook?course=' + courseId);
     }, SMOKE_WELCOME_COURSE.id);
     await expect(page.locator('body')).toContainText(SMOKE_WELCOME_STUDENTS[0].firstName);
     await page.locator('[data-action="setView"][data-mode="detailed"]').click();

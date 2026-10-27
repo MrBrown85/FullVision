@@ -93,7 +93,7 @@ export async function finishWizard(page) {
  * PageAssignments.switchCourse API.
  */
 export async function openAssignmentForCourse(page, courseId) {
-  await page.goto(`/teacher/app.html#/assignments`);
+  await page.goto(`/assignments`);
   await page.waitForLoadState('networkidle');
   await page.waitForFunction(() => window.PageAssignments !== undefined, null, { timeout: 15_000 });
   await page.evaluate(cid => window.PageAssignments.switchCourse(cid), courseId);

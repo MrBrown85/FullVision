@@ -626,7 +626,7 @@ function renderSidebar(activeCourse, selectedStudentId, onStudentClick) {
 
   const flags = getFlags(cid);
   students.forEach(s => {
-    const href = `#/student?id=${s.id}&course=${cid}`;
+    const href = `/student?id=${s.id}&course=${cid}`;
     const flagged = flags[s.id];
     const avatarBg = _avatarColor(s.id);
     // A row that runs a page function is a button, so the browser shows no
@@ -851,7 +851,7 @@ function refreshSidebar() {
   if (!selId) {
     const sel = document.querySelector('.student-row.selected');
     if (sel) {
-      // Support both hash routes (#/student?id=x) and data-sid attributes
+      // Support both route links (/student?id=x) and data-sid attributes
       const sid = sel.dataset.sid;
       if (sid) {
         selId = sid;

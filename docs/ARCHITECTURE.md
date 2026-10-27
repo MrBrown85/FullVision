@@ -42,7 +42,7 @@ The app persists teacher data through Supabase Auth plus a public RPC surface. I
   - `page-reports.js`
 - Shared desktop UI shell: `teacher/ui.js`
 
-The desktop app is a hash-routed single-page app. Page modules render into shared mount points for the dock, sidebar, page toolbar, and main content area.
+The desktop app is a single-page app on real paths: `/dashboard`, `/assignments`, `/gradebook`, `/observations`, `/observations/starters`, `/reports` and `/student?id=…`. Netlify serves `teacher/app.html` at each of them and `teacher/router.js` draws the page with `history.pushState`; the list is repeated in `netlify.toml`, `sw.js`, `serve.json` and the local servers, and `tests/app-routes.test.js` keeps them in step. Old `/teacher/app.html#/…` links are rewritten to the clean address at boot. Page modules render into shared mount points for the dock, sidebar, page toolbar, and main content area.
 
 ### Mobile PWA
 

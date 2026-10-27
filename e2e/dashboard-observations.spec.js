@@ -10,11 +10,11 @@ import { test, expect } from '@playwright/test';
 async function enterDemo(page) {
   await page.goto('/login.html');
   await page.locator('#demo-mode-btn').click();
-  await page.waitForURL(/teacher\/app\.html/);
+  await page.waitForURL(/\/dashboard/);
 }
 
 async function openDashboard(page) {
-  await page.goto('/teacher/app.html#/dashboard?course=sci8');
+  await page.goto('/dashboard?course=sci8');
   await expect(page.locator('#dash-obs-card .dash-ob2-row[data-sid]').first()).toBeVisible();
 }
 
@@ -230,10 +230,10 @@ test.describe('Dashboard Observations card', () => {
     await openDashboard(page);
     const cell = card(page).locator('.dash-ob2-cell.has').first();
     const href = await cell.getAttribute('data-href');
-    const obId = new URL('http://x/' + href.replace('#/', '')).searchParams.get('ob');
+    const obId = new URL('http://x/' + href.replace('/', '')).searchParams.get('ob');
     expect(obId).toBeTruthy();
     await cell.click();
-    await expect(page).toHaveURL(/#\/student\?id=.+&ob=/);
+    await expect(page).toHaveURL(/\/student\?id=.+&ob=/);
     const target = page.locator('#ev-list .obs-card[data-obid="' + obId + '"]');
     await expect(target).toBeFocused();
     await expect(target).toHaveClass(/ev-card-hit/);

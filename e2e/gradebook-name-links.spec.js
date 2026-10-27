@@ -14,7 +14,7 @@ test.beforeEach(async ({ page }) => {
 
 test('clicking a name in Scores opens the student page', async ({ page }) => {
   await page.locator('.gb-grid-rowheads a.gb-grid-rowhead-name', { hasText: 'Alice' }).click();
-  await expect(page).toHaveURL(/#\/student\?id=stu-001&course=/);
+  await expect(page).toHaveURL(/\/student\?id=stu-001&course=/);
 });
 
 test('in Competencies, Tab and Enter on a name belong to the link, not the grid', async ({ page }) => {
@@ -37,7 +37,7 @@ test('in Competencies, Tab and Enter on a name belong to the link, not the grid'
   await expect(names.nth(1)).toBeFocused();
 
   await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(/#\/student\?id=stu-002&course=/);
+  await expect(page).toHaveURL(/\/student\?id=stu-002&course=/);
   // Enter followed the link; it did not step the focused cell again.
   expect(await storedScores()).toEqual(before);
 });

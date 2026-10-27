@@ -121,7 +121,7 @@ window.CompetencyEvidence = (function () {
   function scoreRowHtml(cid, sid, sc, assessMap) {
     var assess = assessMap[sc.assessmentId];
     var sColor = PROF_COLORS[sc.level || sc.score] || PROF_COLORS[0];
-    var href = assess ? '#/assignments?course=' + cid + '&open=' + assess.id + '&student=' + sid : '';
+    var href = assess ? '/assignments?course=' + cid + '&open=' + assess.id + '&student=' + sid : '';
     var title = assess ? esc(assess.title) : 'Unknown';
     return (
       '<li class="ced-item"><a class="tag-assess-row"' +

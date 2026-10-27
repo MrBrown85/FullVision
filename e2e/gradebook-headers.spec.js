@@ -7,11 +7,11 @@ import { test, expect } from '@playwright/test';
 async function enterDemo(page) {
   await page.goto('/login.html');
   await page.locator('#demo-mode-btn').click();
-  await page.waitForURL(/teacher\/app\.html/);
+  await page.waitForURL(/\/dashboard/);
 }
 
 async function openGradebook(page) {
-  await page.goto('/teacher/app.html#/gradebook?course=sci8');
+  await page.goto('/gradebook?course=sci8');
   await page.locator('[data-action="setView"][data-mode="detailed"]').click();
   await expect(page.locator('.gb-grid-assess-group').first()).toBeVisible();
 }
@@ -75,7 +75,7 @@ test.describe('Gradebook column headers', () => {
     const firstDate = () =>
       page.evaluate(() => {
         const a = document.querySelector('.gb-grid-assess-group .gb-assess-title');
-        const id = new URL(a.dataset.href, location.href).hash.match(/open=([^&]+)/)[1];
+        const id = new URL(a.dataset.href, location.href).search.match(/open=([^&]+)/)[1];
         return getAssessments('sci8').find(x => x.id === id).date;
       });
     const dates = await page.evaluate(() =>

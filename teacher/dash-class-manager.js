@@ -1847,7 +1847,7 @@ window.DashClassManager = (function () {
     if (!cid || !sid) return;
     classManagerOpen = false;
     if (typeof setActiveCourse === 'function') setActiveCourse(cid);
-    location.hash = '#/student?course=' + encodeURIComponent(cid) + '&id=' + encodeURIComponent(sid);
+    Router.navigate('/student?course=' + encodeURIComponent(cid) + '&id=' + encodeURIComponent(sid));
   }
 
   function cmImportRoster() {
@@ -2665,7 +2665,7 @@ window.DashClassManager = (function () {
     if (toolbarMount) {
       toolbarMount.innerHTML =
         '<div class="page-toolbar dash-toolbar cm-toolbar">' +
-        renderBreadcrumb('Dashboard', '#/dashboard', 'Class Management', 'closeClassManager') +
+        renderBreadcrumb('Dashboard', '/dashboard', 'Class Management', 'closeClassManager') +
         '<span class="dash-toolbar-spacer"></span>' +
         // The tabbed view names the class in its own header.
         (cmMode === 'create' || cmRelinkStep > 0

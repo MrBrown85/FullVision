@@ -34,8 +34,8 @@ const ROW = 20;
 /* The Studio on the Report Card starter, settled on the longest report. */
 async function openStudio(page) {
   await page.goto('/login.html?demo=1');
-  await page.waitForURL(/app\.html/, { timeout: 15000 });
-  await page.goto(page.url().replace(/#.*/, '#/reports'));
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  await page.evaluate(r => window.Router.navigate(r), '/reports');
   await page.getByRole('tab', { name: 'Progress Reports' }).click();
   await expect(page.locator('#studio')).toBeVisible();
   await expect(page.locator('#studio-fit')).not.toBeEmpty();
@@ -383,8 +383,8 @@ test.describe('Page Studio', () => {
 
   test('the comment box says how the draft sits in its box, as it is typed', async ({ page }) => {
     await page.goto('/login.html?demo=1');
-    await page.waitForURL(/app\.html/, { timeout: 15000 });
-    await page.goto(page.url().replace(/#.*/, '#/reports'));
+    await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+    await page.evaluate(r => window.Router.navigate(r), '/reports');
     const fit = page.locator('#tq-fit-text');
     await expect(fit).toContainText(/^Fits\. \d+ lines?; room for \d+ more\.$/);
     const editor = page.locator('#tq-narrative');

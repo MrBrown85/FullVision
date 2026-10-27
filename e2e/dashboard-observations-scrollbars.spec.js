@@ -10,7 +10,7 @@ test.use({ launchOptions: { ignoreDefaultArgs: ['--hide-scrollbars'] } });
 async function enterDemo(page) {
   await page.goto('/login.html');
   await page.locator('#demo-mode-btn').click();
-  await page.waitForURL(/teacher\/app\.html/);
+  await page.waitForURL(/\/dashboard/);
 }
 
 const card = page => page.locator('#dash-obs-card');
@@ -18,7 +18,7 @@ const card = page => page.locator('#dash-obs-card');
 test('a scrollbar in the grid is counted, and names stay in view when it scrolls sideways', async ({ page }) => {
   await enterDemo(page);
   await page.setViewportSize({ width: 1024, height: 900 });
-  await page.goto('/teacher/app.html#/dashboard?course=sci8');
+  await page.goto('/dashboard?course=sci8');
   await expect(card(page).locator('.dash-ob2-row[data-sid]').first()).toBeVisible();
   // A 40px scrollbar and a short pane, so the grid always has one.
   await page.addStyleTag({

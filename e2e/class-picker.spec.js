@@ -99,7 +99,7 @@ test.describe('Class picker', () => {
   });
 
   test('the test server sends the production nonce CSP', async ({ page }) => {
-    const response = await page.goto('/teacher/app.html#/dashboard');
+    const response = await page.goto('/dashboard');
     const csp = response.headers()['content-security-policy'] || '';
     expect(csp).toMatch(/script-src 'self' 'nonce-[0-9a-f-]+'/);
     expect(csp.split(';').find(d => d.trim().startsWith('script-src'))).not.toContain('unsafe-inline');

@@ -68,7 +68,7 @@ window.DashInsights = (function () {
   }
 
   function _studentHref(cid, sid, tab) {
-    return '#/student?id=' + sid + '&course=' + cid + (tab ? '&tab=' + tab : '');
+    return '/student?id=' + sid + '&course=' + cid + (tab ? '&tab=' + tab : '');
   }
 
   // A student's name with their proficiency on one competency, tinted by it.
@@ -202,7 +202,7 @@ window.DashInsights = (function () {
 
   function _gradebookHref(cid, ids, col) {
     return (
-      '#/gradebook?course=' +
+      '/gradebook?course=' +
       cid +
       '&students=' +
       ids.join(',') +

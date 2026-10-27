@@ -39,6 +39,43 @@
   [headers.values]
     Cache-Control = "no-cache"
 
+# The desktop app's pages are app.html under other names; like every HTML
+# page they must never be served stale (shared/auto-update.js relies on it).
+[[headers]]
+  for = "/dashboard"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/assignments"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/student"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/gradebook"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/observations"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/observations/starters"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/reports"
+  [headers.values]
+    Cache-Control = "no-cache"
+
 [[edge_functions]]
   path = "/*"
   function = "inject-env"
@@ -49,15 +86,54 @@
   to = "/login.html"
   status = 200
 
+# Desktop app pages. Each address serves the app shell; teacher/router.js
+# draws the page. Keep this list in step with _routes in teacher/router.js
+# (tests/app-routes.test.js checks). Netlify matches these with or without
+# a trailing slash, and keeps the query string.
+[[redirects]]
+  from = "/dashboard"
+  to = "/teacher/app.html"
+  status = 200
+
+[[redirects]]
+  from = "/assignments"
+  to = "/teacher/app.html"
+  status = 200
+
+[[redirects]]
+  from = "/student"
+  to = "/teacher/app.html"
+  status = 200
+
+[[redirects]]
+  from = "/gradebook"
+  to = "/teacher/app.html"
+  status = 200
+
+[[redirects]]
+  from = "/observations"
+  to = "/teacher/app.html"
+  status = 200
+
+[[redirects]]
+  from = "/observations/starters"
+  to = "/teacher/app.html"
+  status = 200
+
+[[redirects]]
+  from = "/reports"
+  to = "/teacher/app.html"
+  status = 200
+
 # Legacy URL redirects
 [[redirects]]
   from = "/app.html"
-  to = "/teacher/app.html"
+  to = "/dashboard"
   status = 301
 
 [[redirects]]
   from = "/app"
-  to = "/teacher/app.html"
+  to = "/dashboard"
   status = 301
 
 [[redirects]]
@@ -69,17 +145,3 @@
   from = "/mobile"
   to = "/teacher-mobile/"
   status = 301
-
-# ── Future portals ───────────────────────────────────────────────────────────
-# These redirects are wired up now so the URLs work the moment index.html exists.
-# Do NOT build UI here yet — just reserving the routes.
-
-[[redirects]]
-  from = "/student"
-  to = "/student/index.html"
-  status = 200
-
-[[redirects]]
-  from = "/parent"
-  to = "/parent/index.html"
-  status = 200

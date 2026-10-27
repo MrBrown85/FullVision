@@ -24,7 +24,7 @@ test('a signed-in teacher has no Reset Demo Data in the account menu', async ({ 
 
 test('Demo Mode has Reset Demo Data in the account menu', async ({ page }) => {
   await page.goto('/login.html?demo=1');
-  await page.waitForURL(/app\.html/, { timeout: 15000 });
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   const menu = await openAccountMenu(page);
   await expect(menu.getByRole('button', { name: 'Reset Demo Data' })).toBeVisible();
 });

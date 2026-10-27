@@ -492,7 +492,7 @@ window.DashObservations = (function () {
 
   function _studentHref(cid, sid, obId) {
     return (
-      '#/student?id=' +
+      '/student?id=' +
       encodeURIComponent(sid) +
       '&course=' +
       encodeURIComponent(cid) +
@@ -510,7 +510,7 @@ window.DashObservations = (function () {
   function _headHtml(m, state, students, flags) {
     var cid = m ? m.cid : state.cid;
     var record =
-      '<a class="dash-ob2-record" role="link" tabindex="0" data-href="#/observations?course=' +
+      '<a class="dash-ob2-record" role="link" tabindex="0" data-href="/observations?course=' +
       encodeURIComponent(cid) +
       '">Record →</a>';
     var h =
@@ -557,7 +557,7 @@ window.DashObservations = (function () {
     if (m.tab === 'week' && !m.classObserved) {
       return (
         '<div class="dash-ob2-flags"><span class="dash-ob2-clear">No observations recorded yet. ' +
-        '<a role="link" tabindex="0" data-href="#/observations?course=' +
+        '<a role="link" tabindex="0" data-href="/observations?course=' +
         encodeURIComponent(m.cid) +
         '">Record →</a></span></div>'
       );

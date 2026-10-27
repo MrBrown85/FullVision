@@ -31,7 +31,7 @@ async function enterDemo(page, { phone = false } = {}) {
   if (phone) await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/login.html');
   await page.locator('#demo-mode-btn').click();
-  await page.waitForURL(phone ? /teacher-mobile\// : /teacher\/app\.html/);
+  await page.waitForURL(phone ? /teacher-mobile\// : /\/dashboard/);
 }
 
 async function expectReadable(page) {
@@ -49,10 +49,10 @@ async function expectReadable(page) {
 }
 
 const DESKTOP = [
-  { name: 'dashboard', hash: '#/dashboard', ready: '.dash-card' },
+  { name: 'dashboard', hash: '/dashboard', ready: '.dash-card' },
   {
     name: 'assignments with a rubric open',
-    hash: '#/assignments',
+    hash: '/assignments',
     ready: '#ac-sci8a1',
     open: async page => {
       await page.locator('#ac-sci8a1 .assess-header').click();
@@ -63,18 +63,18 @@ const DESKTOP = [
       await expect(row.locator('.rsg-mod.active')).toHaveCount(1);
     },
   },
-  { name: 'gradebook', hash: '#/gradebook', ready: '.gb-grid' },
+  { name: 'gradebook', hash: '/gradebook', ready: '.gb-grid' },
   // The student page, one tab at a time.
   ...['comps', 'assess', 'evidence', 'profile'].map(tab => ({
     name: 'student ' + tab,
-    hash: '#/student?id=st23&course=sci8',
+    hash: '/student?id=st23&course=sci8',
     ready: '.stu-tabs',
     async open(page) {
       await page.locator('#stu-tab-' + tab).click();
       await expect(page.locator('#stu-tab-' + tab)).toHaveAttribute('aria-selected', 'true');
     },
   })),
-  { name: 'reports', hash: '#/reports', ready: '.student-row' },
+  { name: 'reports', hash: '/reports', ready: '.student-row' },
 ];
 
 for (const colorScheme of ['light', 'dark']) {
@@ -85,7 +85,7 @@ for (const colorScheme of ['light', 'dark']) {
       test(`${p.name}`, async ({ page }) => {
         await page.setViewportSize({ width: 1440, height: 900 });
         await enterDemo(page);
-        await page.goto('/teacher/app.html' + p.hash);
+        await page.goto(p.hash);
         await expect(page.locator(p.ready).first()).toBeVisible();
         if (p.open) await p.open(page);
         await expectReadable(page);

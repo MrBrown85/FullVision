@@ -1465,7 +1465,7 @@ window.ReportQuestionnaire = (function () {
     // ══ HEADER BAR (shared component) ══
     html += renderStudentHeader(cid, sid, {
       buttonLabel: 'Student Dashboard',
-      buttonHref: `#/student?course=${cid}&id=${sid}`,
+      buttonHref: `/student?course=${cid}&id=${sid}`,
       buttonSecondary: true,
     });
 

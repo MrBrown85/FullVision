@@ -6,7 +6,7 @@
  *   test.beforeEach(async ({ page }) => {
  *     await mockAuth(page);
  *     await seedCourse(page);
- *     await page.goto('/teacher/app.html#/dashboard');
+ *     await page.goto('/dashboard');
  *     await page.waitForSelector('#dock-mount');
  *   });
  */
@@ -1118,7 +1118,10 @@ export async function mockPersistentAuthFlow(
       auth: {
         getSession: () => {
           const session = loadSession();
-          if (window.location.pathname.indexOf('/teacher/app') !== -1) {
+          // The desktop app's pages (/dashboard, /gradebook, …), not sign-in.
+          if (
+            /^\/(dashboard|assignments|student|gradebook|observations|reports)(\/|$)/.test(window.location.pathname)
+          ) {
             return noopPromise({ data: { session: null }, error: null });
           }
           return noopPromise({ data: { session: session ? clone(session) : null }, error: null });
@@ -1398,14 +1401,14 @@ export async function seedScores(page, scores) {
 
 /** Navigate to app and wait for the dock to render (app booted). */
 export async function gotoApp(page, hash = '/dashboard') {
-  await page.goto(`/teacher/app.html#${hash}`);
+  await page.goto(hash);
   await page.waitForSelector('#dock-mount nav', { timeout: 10_000 });
 }
 
 /** Navigate to a specific page within the SPA. */
 export async function navigateTo(page, route) {
   await page.evaluate(r => {
-    window.location.hash = r;
+    window.Router.navigate(r);
   }, route);
   // Wait for page render
   await page.waitForTimeout(500);

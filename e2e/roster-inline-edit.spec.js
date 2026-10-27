@@ -53,7 +53,7 @@ async function seedClass(page) {
 }
 
 async function openRoster(page) {
-  await page.goto('/teacher/app.html#/dashboard');
+  await page.goto('/dashboard');
   await page.waitForSelector('#dock-mount nav', { timeout: 10_000 });
   await page.locator('[data-action="openClassManager"]').first().click();
   await page.getByRole('tab', { name: /^Students/ }).click();

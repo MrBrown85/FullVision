@@ -9,7 +9,7 @@ import { test, expect } from '@playwright/test';
 async function enterDemo(page) {
   await page.goto('/login.html');
   await page.locator('#demo-mode-btn').click();
-  await page.waitForURL(/teacher\/app\.html/);
+  await page.waitForURL(/\/dashboard/);
 }
 
 const AID = 'e2e-overall';
@@ -23,7 +23,7 @@ async function openGrading(page) {
       ]),
     );
   }, AID);
-  await page.goto('/teacher/app.html#/assignments?course=sci8');
+  await page.goto('/assignments?course=sci8');
   await page.locator(`[data-action="toggleAssess"][data-aid="${AID}"]`).click();
   await expect(page.locator(`.rsg-criterion-row[data-assess="${AID}"]`).first()).toBeVisible();
 }

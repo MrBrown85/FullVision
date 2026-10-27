@@ -98,6 +98,25 @@ const PRECACHE_URLS = [
   '/teacher-mobile/shell.js',
 ];
 
+// The desktop app's pages (teacher/router.js _routes). Each is app.html under
+// another address, so one cached copy serves them all: the copy is stored as
+// /teacher/app.html, and an offline reload of /gradebook?course=… gets it.
+const APP_SHELL = '/teacher/app.html';
+const APP_ROUTES = [
+  '/dashboard',
+  '/assignments',
+  '/student',
+  '/gradebook',
+  '/observations',
+  '/observations/starters',
+  '/reports',
+];
+
+function isAppRoute(url) {
+  const path = url.pathname.length > 1 ? url.pathname.replace(/\/$/, '') : url.pathname;
+  return url.origin === self.location.origin && APP_ROUTES.includes(path);
+}
+
 // Install: pre-cache all app files
 self.addEventListener('install', event => {
   event.waitUntil(
@@ -150,15 +169,16 @@ self.addEventListener('fetch', event => {
     event.request.mode === 'navigate' ||
     (event.request.headers.get('accept') && event.request.headers.get('accept').includes('text/html'))
   ) {
+    const cacheKey = isAppRoute(url) ? APP_SHELL : event.request;
     event.respondWith(
       fetch(event.request)
         .then(response => {
-          cacheIfGood(event.request, response);
+          cacheIfGood(cacheKey, response);
           return response;
         })
         .catch(() => {
           // Network failed — serve from cache
-          return caches.match(event.request).then(
+          return caches.match(cacheKey).then(
             cached =>
               cached ||
               new Response('Offline — please check your connection.', {

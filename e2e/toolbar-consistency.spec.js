@@ -11,8 +11,8 @@ test.use({ viewport: { width: 1440, height: 900 } });
 
 async function open(page, hash) {
   await page.goto('/login.html?demo=1');
-  await page.waitForURL(/app\.html/, { timeout: 15000 });
-  await page.goto(page.url().replace(/#.*/, hash));
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  await page.evaluate(r => window.Router.navigate(r), hash);
 }
 
 /* The bar's inset and hairline, and the heights of what is in it: controls
@@ -46,10 +46,10 @@ function measureBar(page, selector) {
 const HAIRLINE = 'solid rgba(0, 0, 0, 0.09)';
 
 const PAGES = [
-  ['#/dashboard', '.dash-toolbar'],
-  ['#/assignments', '.assess-toolbar'],
-  ['#/gradebook', '.gb-toolbar'],
-  ['#/reports', '.report-toolbar'],
+  ['/dashboard', '.dash-toolbar'],
+  ['/assignments', '.assess-toolbar'],
+  ['/gradebook', '.gb-toolbar'],
+  ['/reports', '.report-toolbar'],
 ];
 
 for (const [hash, bar] of PAGES) {
@@ -65,7 +65,7 @@ for (const [hash, bar] of PAGES) {
 }
 
 test('the secondary bars are in line with the toolbars, chips 24px', async ({ page }) => {
-  await open(page, '#/observations');
+  await open(page, '/observations');
   await page.locator('.obs-toolbar').waitFor();
   const obs = await measureBar(page, '.obs-toolbar');
   expect(obs.inset).toBe('12px');
@@ -81,7 +81,7 @@ test('the secondary bars are in line with the toolbars, chips 24px', async ({ pa
   );
   expect(capture).toEqual([32, 32]);
 
-  await page.goto(page.url().replace(/#.*/, '#/gradebook'));
+  await page.evaluate(r => window.Router.navigate(r), '/gradebook');
   await page.locator('[data-action="toggleFilterStrip"]').click();
   const strip = await measureBar(page, '.gb-filter-strip');
   expect(strip.inset).toBe('12px');

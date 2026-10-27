@@ -48,7 +48,7 @@ const ASSESSMENT = { ...TEST_ASSESSMENT, id: ASSESSMENT_ID };
 /* Load the app and wait until the outbox has done its start-up flush, which
    ignores backoff and would otherwise add an attempt to a test's write. */
 async function bootApp(page) {
-  await page.goto('/teacher/app.html#/dashboard');
+  await page.goto('/dashboard');
   await page.waitForSelector('#dock-mount nav', { timeout: 10_000 });
   await page.waitForFunction(
     () => {
