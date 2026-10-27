@@ -687,7 +687,11 @@ window.PageAssignments = (function () {
         '</span>' +
         '<input class="mod-folder-name-input" value="' +
         esc(u.name) +
-        '" draggable="false"' +
+        '" size="' +
+        Math.max(4, (u.name || '').length) +
+        '" title="' +
+        esc(u.name) +
+        '" aria-label="Module name" spellcheck="false" autocomplete="off" draggable="false"' +
         ' data-stop-prop="true" data-action-blur="moduleName" data-moduleid="' +
         u.id +
         '">' +
@@ -4573,10 +4577,24 @@ window.PageAssignments = (function () {
     var u = modules.find(function (x) {
       return x.id === moduleId;
     });
-    if (u && name.trim()) {
+    if (u && name.trim() && name.trim() !== u.name) {
       u.name = name.trim();
       saveModules(cid, modules);
     }
+    return u ? u.name : name;
+  }
+  function _moduleNameSaved(input) {
+    var u = getModules(activeCourse).find(function (x) {
+      return x.id === input.dataset.moduleid;
+    });
+    return u ? u.name : input.value;
+  }
+  /* A module's folder can be dragged, so while its name is being edited the
+     folder stops being draggable: otherwise selecting the text drags the
+     module. */
+  function _setModuleDraggable(input, on) {
+    var folder = input.closest('.mod-folder');
+    if (folder) folder.draggable = on;
   }
   function updateModuleColor(moduleId, color) {
     var cid = activeCourse;
@@ -5143,6 +5161,11 @@ window.PageAssignments = (function () {
   /* ── Input/change/blur handler ──────────────────────────── */
   function _handleInput(e) {
     var el = e.target;
+    // The box grows with the name where field-sizing isn't supported.
+    if (el.dataset.actionBlur === 'moduleName') {
+      el.size = Math.max(4, el.value.length);
+      return;
+    }
     if (el.dataset.actionInput === 'assessSearch') {
       setAssessSearch(el.value);
       return;
@@ -5192,10 +5215,21 @@ window.PageAssignments = (function () {
     }
   }
 
+  function _handleFocus(e) {
+    var el = e.target;
+    if (el && el.dataset && el.dataset.actionBlur === 'moduleName') _setModuleDraggable(el, false);
+  }
+
   function _handleBlur(e) {
     var el = e.target;
     if (el.dataset.actionBlur === 'moduleName') {
-      updateModuleName(el.dataset.moduleid, el.value);
+      // An empty name is not saved, so the box shows the saved one again.
+      var saved = updateModuleName(el.dataset.moduleid, el.value);
+      el.value = saved;
+      el.title = saved;
+      el.size = Math.max(4, saved.length);
+      el.scrollLeft = 0;
+      _setModuleDraggable(el, true);
       return;
     }
     if (el.dataset.actionBlur === 'critName') {
@@ -5229,6 +5263,18 @@ window.PageAssignments = (function () {
   }
 
   function _handleKeydown(e) {
+    // A module name: Enter saves, Escape puts back the saved name.
+    if (e.target && e.target.dataset && e.target.dataset.actionBlur === 'moduleName') {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        e.target.blur();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        e.target.value = _moduleNameSaved(e.target);
+        e.target.blur();
+      }
+      return;
+    }
     // A checkbox label in the rubric editor: Enter adds the next checkbox
     // (a blank one stays alone); Alt+↑/↓ moves it within its level.
     var checkInput = e.target && e.target.closest ? e.target.closest('.rubric-check-input') : null;
@@ -5677,6 +5723,8 @@ window.PageAssignments = (function () {
     _addDocListener('click', _handleClick);
     _addDocListener('input', _handleInput);
     _addDocListener('change', _handleChange);
+    _addDocListener('focus', _handleFocus, true);
+    _addDocListener('mousedown', _handleFocus);
     _addDocListener('blur', _handleBlur, true);
     _addDocListener('keydown', _handleKeydown);
     _addDocListener('dragstart', _handleDragStart);
