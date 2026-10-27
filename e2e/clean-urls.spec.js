@@ -66,3 +66,17 @@ test('a trailing slash is tidied', async ({ page }) => {
   await page.goto('/gradebook/');
   await expect(page).toHaveURL(/\/gradebook$/);
 });
+
+test('an old Edit starters link opens My Sentence Starters with its own title', async ({ page }) => {
+  await signInDemo(page);
+  await page.goto('/dashboard?manage=starters');
+  await expect(page).toHaveURL(/\/observations\/starters$/);
+  await expect(page).toHaveTitle('FullVision \u2014 My Sentence Starters');
+});
+
+test('a link with a broken %-code still opens the app', async ({ page }) => {
+  await signInDemo(page);
+  await page.goto('/gradebook?course=sci8&x=%E0%A4%A');
+  await expect(page.locator('#app-loading')).toHaveCount(0);
+  await expect(page.locator('#dock-mount [aria-current="page"]')).toHaveText('Gradebook');
+});

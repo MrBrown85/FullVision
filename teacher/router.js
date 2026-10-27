@@ -24,6 +24,7 @@ window.Router = (function () {
 
   var _currentPage = null;
   var _currentUrl = null;
+  var _routeSeq = 0;
   var _booted = false;
 
   function _isRoute(path) {
@@ -54,11 +55,21 @@ window.Router = (function () {
       qs.split('&').forEach(function (pair) {
         var parts = pair.split('=');
         if (parts[0]) {
-          params[decodeURIComponent(parts[0])] = decodeURIComponent(parts[1] || '');
+          params[_decode(parts[0])] = _decode(parts[1] || '');
         }
       });
     }
     return { path: path, params: params };
+  }
+
+  // A broken %-code in a pasted link (%E0%A4%A) is kept as typed rather
+  // than throwing, which left the app on its loading screen.
+  function _decode(s) {
+    try {
+      return decodeURIComponent(s);
+    } catch (e) {
+      return s;
+    }
   }
 
   // "#/gradebook?course=x", "/gradebook?course=x" → "/gradebook?course=x"
@@ -99,6 +110,7 @@ window.Router = (function () {
 
   /* ── Route handler ───────────────────────────────────────── */
   function _onRoute() {
+    var seq = ++_routeSeq;
     var parsed = _parseUrl(location.pathname, location.search);
     var path = parsed.path;
     var params = parsed.params;
@@ -153,6 +165,9 @@ window.Router = (function () {
     if (module && module.init) {
       module.init(params);
     }
+    // The page sent the teacher on from its init (an old link's redirect);
+    // that route has drawn and titled the page already.
+    if (seq !== _routeSeq) return;
 
     // Update page title for browser tab, history, and screen readers
     var pageTitle = _titles[path] || 'Dashboard';
@@ -195,7 +210,7 @@ window.Router = (function () {
     window.addEventListener('popstate', function () {
       if (location.pathname + location.search !== _currentUrl) _onRoute();
     });
-    // An old "/…" link clicked inside the app
+    // An old "#/…" link clicked inside the app
     window.addEventListener('hashchange', function () {
       if (location.hash.indexOf('#/') === 0) navigate(location.hash, true);
     });
@@ -239,7 +254,7 @@ window.Router = (function () {
   }
 
   /* ── Navigate ────────────────────────────────────────────── */
-  // Accepts "/gradebook?course=x" or the older "/gradebook?course=x".
+  // Accepts "/gradebook?course=x" or the older "#/gradebook?course=x".
   // Going to the address already showing does nothing, unless replacing.
   function navigate(target, replace) {
     var url = _toUrl(target);
