@@ -2082,15 +2082,11 @@ window.PageGradebook = (function () {
     var assess = getAssessments(activeCourse).find(function (a) {
       return a.id === aid;
     });
-    var _cc = getCourseConfig(activeCourse);
-    var currentPolicy = (assess && assess.missingPolicy) || _cc.missingPolicy || 'exclude';
     menu.innerHTML =
       '<div class="gb-ctx-item" data-ctx="scoreMode">Score This Assignment</div>' +
       '<div class="gb-ctx-item" data-ctx="editAssess">Edit Assignment Details</div>' +
       '<div class="gb-ctx-divider"></div>' +
-      '<div class="gb-ctx-item" data-ctx="toggleZeroPolicy">' +
-      (currentPolicy === 'zero' ? '\u2713 ' : '') +
-      'Count missing as zero</div>' +
+      '<div class="gb-ctx-item" data-ctx="markUngradedNS">Count missing as zero</div>' +
       '<div class="gb-ctx-divider"></div>' +
       '<div class="gb-ctx-item gb-ctx-danger" data-ctx="deleteAssess">Delete Assignment</div>';
     document.body.appendChild(menu);
@@ -2100,15 +2096,25 @@ window.PageGradebook = (function () {
       var action = item.dataset.ctx;
       if (action === 'scoreMode') enterScoreMode(aid);
       else if (action === 'editAssess') Router.navigate('/assignments?course=' + activeCourse + '&open=' + aid);
-      else if (action === 'toggleZeroPolicy') {
-        var assessList = getAssessments(activeCourse);
-        var a = assessList.find(function (x) {
-          return x.id === aid;
-        });
-        if (a) {
-          a.missingPolicy = a.missingPolicy === 'zero' ? 'exclude' : 'zero';
-          saveAssessments(activeCourse, assessList);
-          render();
+      else if (action === 'markUngradedNS') {
+        // Every student row on screen with nothing in this column (no score,
+        // no mark, no status) becomes NS, which calc.js counts as 0.
+        if (assess) {
+          var statuses = getAssignmentStatuses(activeCourse);
+          var changed = false;
+          document.querySelectorAll('.gb-scores-row[data-sid]').forEach(function (row) {
+            var sid = row.dataset.sid;
+            var cell = assessmentCellValue(activeCourse, sid, assess);
+            if ((cell.kind === 'none' || cell.kind === 'missing') && !cell.status) {
+              statuses[sid + ':' + aid] = 'NS';
+              changed = true;
+            }
+          });
+          if (changed) {
+            saveAssignmentStatuses(activeCourse, statuses);
+            clearProfCache();
+            render();
+          }
         }
       } else if (action === 'deleteAssess') {
         // P7.8: replace native confirm with the in-app dialog so the dialog
