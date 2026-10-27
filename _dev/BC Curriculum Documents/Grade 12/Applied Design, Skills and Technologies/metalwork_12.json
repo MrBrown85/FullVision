@@ -7,10 +7,7 @@
     "ministry_url": "https://curriculum.gov.bc.ca/curriculum/adst/12/metalwork",
     "description": "Students develop advanced metal fabrication skills including structural steel work, welding, forming, and finishing. This course emphasizes professional metalworking techniques, safety practices, and industry applications.",
     "general_description": "Advanced metal fabrication, structural steel, welding, and industry applications.",
-    "cross_curricular_connections": [
-      "Machining and Welding 12",
-      "Art Metal and Jewellery 12"
-    ],
+    "cross_curricular_connections": ["Machining and Welding 12", "Art Metal and Jewellery 12"],
     "first_peoples_principles": true
   },
   "big_ideas": [

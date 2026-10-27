@@ -8,11 +8,7 @@
     "time_period": "7th Century to 1750",
     "description": "Social Studies 8 examines significant cultural, social, and political changes resulting from contacts and conflicts between peoples. Students explore how human and environmental factors shaped populations and living standards during the era of exploration, expansion, and colonization. The course spans from roughly the 7th century through 1750, investigating how changing ideas about the world created tension between adopting new ideas and preserving established traditions.",
     "general_description": "A study of global history from the 7th century to 1750, examining how exploration, colonization, and the exchange of ideas reshaped civilizations and created lasting cultural, social, and political change.",
-    "cross_curricular_connections": [
-      "ELA",
-      "Arts Education",
-      "ADST"
-    ],
+    "cross_curricular_connections": ["ELA", "Arts Education", "ADST"],
     "first_peoples_principles": true
   },
   "big_ideas": [

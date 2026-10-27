@@ -7,11 +7,7 @@
     "ministry_url": "https://curriculum.gov.bc.ca/curriculum/adst/12/robotics",
     "description": "Students develop advanced robotics skills including autonomous systems, AI integration, competition robotics, and capstone projects. This course emphasizes design thinking, programming, mechanical innovation, and real-world problem-solving in robotics.",
     "general_description": "Advanced robotics, autonomous systems, AI integration, competition and capstone projects.",
-    "cross_curricular_connections": [
-      "Computer Programming 12",
-      "Mechatronics 12",
-      "Electronics 12"
-    ],
+    "cross_curricular_connections": ["Computer Programming 12", "Mechatronics 12", "Electronics 12"],
     "first_peoples_principles": true
   },
   "big_ideas": [

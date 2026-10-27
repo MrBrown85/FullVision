@@ -7,12 +7,7 @@
     "ministry_url": "https://curriculum.gov.bc.ca/curriculum/arts-education/12/choral-music",
     "description": "Choral Music 12 is the capstone choral course, developing students as accomplished singers, musical leaders, and reflective artists. Students perform challenging repertoire across diverse traditions, take on leadership roles within the ensemble, and deepen their understanding of choral artistry and the cultural significance of choral music. The course cultivates lifelong musical participation and prepares students for post-secondary choral music, music education, or continued community singing. Senior students serve as musical models and mentors within the ensemble.",
     "general_description": "The capstone choral course developing vocal mastery, ensemble leadership, advanced repertoire study, and critical musicianship — building lifelong choral artistry and musical leadership.",
-    "cross_curricular_connections": [
-      "Drama",
-      "Social Studies",
-      "ELA",
-      "Music Theory"
-    ],
+    "cross_curricular_connections": ["Drama", "Social Studies", "ELA", "Music Theory"],
     "first_peoples_principles": true
   },
   "big_ideas": [

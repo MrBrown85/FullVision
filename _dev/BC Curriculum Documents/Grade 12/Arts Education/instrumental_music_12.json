@@ -7,11 +7,7 @@
     "ministry_url": "https://curriculum.gov.bc.ca/curriculum/arts-education/12/music",
     "description": "Instrumental Music 12 is the capstone senior instrumental music course, developing students' highest level of musical artistry, technical proficiency, and musical leadership. Students engage in independent musical decision-making, perform demanding repertoire from diverse traditions, and contribute meaningfully to ensemble culture. First Peoples musical traditions and contemporary Indigenous artists are studied with depth and respect. This course prepares students for post-secondary music programs, conservatory study, and lifelong musical engagement.",
     "general_description": "The capstone senior instrumental music course developing the highest level of musical artistry, technical proficiency, independent musicianship, and ensemble leadership — preparing students for post-secondary music programs and lifelong musical engagement.",
-    "cross_curricular_connections": [
-      "Instrumental Music 11",
-      "Composition and Production 11",
-      "Music History"
-    ],
+    "cross_curricular_connections": ["Instrumental Music 11", "Composition and Production 11", "Music History"],
     "first_peoples_principles": true
   },
   "big_ideas": [

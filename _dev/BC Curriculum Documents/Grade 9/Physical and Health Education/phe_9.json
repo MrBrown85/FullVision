@@ -7,11 +7,7 @@
     "ministry_url": "https://curriculum.gov.bc.ca/curriculum/physical-health-education/9/core",
     "description": "Physical and Health Education 9 builds on the physical literacy and health foundations of earlier grades, challenging students to apply and refine movement skills across a wider range of activities, take greater ownership of personal fitness planning, and develop deeper health knowledge. Students engage with more complex health topics — including sexual health and relationships, psychoactive substances, and mental health challenges — and develop stronger critical thinking and advocacy skills. First Peoples perspectives on holistic well-being and community health continue to be integrated.",
     "general_description": "A comprehensive course refining physical literacy, deepening health knowledge, advancing fitness self-management, and developing critical thinking about health decisions — building personal and community health advocacy skills.",
-    "cross_curricular_connections": [
-      "Science",
-      "Social Studies",
-      "Career Education"
-    ],
+    "cross_curricular_connections": ["Science", "Social Studies", "Career Education"],
     "first_peoples_principles": true
   },
   "big_ideas": [

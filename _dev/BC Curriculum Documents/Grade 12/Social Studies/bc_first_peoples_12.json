@@ -9,12 +9,7 @@
     "description": "B.C. First Peoples 12 examines the histories, cultures, governance, and contemporary experiences of British Columbia's First Peoples. With a strong emphasis on land-based identity, oral tradition, and self-determination, the course traces the impacts of contact and colonialism while centring Indigenous voices, legal precedents, and resistance movements. Students engage with Indigenous ways of knowing and build tools for understanding reconciliation.",
     "general_description": "An in-depth study of BC First Peoples from pre-contact to present, examining land relationships, oral tradition, colonial history, cultural expression, governance, and the ongoing path toward self-determination and reconciliation.",
     "course_notes": "This course centres Indigenous perspectives, oral traditions, and community voices. Engagement with local Elders and knowledge keepers is strongly encouraged.",
-    "cross_curricular_connections": [
-      "ELA",
-      "Law Studies",
-      "Social Justice 12",
-      "Contemporary Indigenous Studies 12"
-    ],
+    "cross_curricular_connections": ["ELA", "Law Studies", "Social Justice 12", "Contemporary Indigenous Studies 12"],
     "first_peoples_principles": true
   },
   "big_ideas": [

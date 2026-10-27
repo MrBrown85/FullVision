@@ -7,11 +7,7 @@
     "ministry_url": "https://curriculum.gov.bc.ca/curriculum/english-language-arts/10/spoken-language",
     "description": "Spoken Language 10 develops students' oral communication skills through a range of spoken forms including oral storytelling, debate, spoken word and slam poetry, recitation, presentations, and podcast/radio production. Students explore how voice is a powerful creative and persuasive tool, and how First Peoples oral traditions model the depth and richness of spoken language. The course builds confidence, clarity, and intentionality in public speaking and oral performance.",
     "general_description": "A focused study of spoken language and oral communication, developing confidence and skill in oral storytelling, debate, spoken word, presentation, and performance through understanding of voice as a powerful creative tool.",
-    "cross_curricular_connections": [
-      "Drama",
-      "Social Studies",
-      "Arts Education"
-    ],
+    "cross_curricular_connections": ["Drama", "Social Studies", "Arts Education"],
     "first_peoples_principles": true
   },
   "big_ideas": [

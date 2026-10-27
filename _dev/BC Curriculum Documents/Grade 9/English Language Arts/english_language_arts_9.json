@@ -8,11 +8,7 @@
     "description": "English Language Arts 9 deepens students' skills in reading, writing, speaking, listening, and representing through engagement with increasingly complex texts. Students examine how texts are socially and culturally constructed, how language shapes identity, and how perspectives shape interpretation. There is a growing emphasis on rhetorical awareness, opinion writing with evidence, and understanding the diversity within First Peoples societies represented in texts.",
     "general_description": "An integrated study of reading, writing, speaking, listening, and representing through complex texts, with growing emphasis on rhetorical analysis, evidence-based writing, and critical literacy.",
     "course_structure_note": "ELA 9 is a single integrated course. Content builds directly from ELA 8, adding rhetorical devices, language change, irony, and opinion writing.",
-    "cross_curricular_connections": [
-      "Social Studies",
-      "Arts Education",
-      "Career Education"
-    ],
+    "cross_curricular_connections": ["Social Studies", "Arts Education", "Career Education"],
     "first_peoples_principles": true
   },
   "big_ideas": [

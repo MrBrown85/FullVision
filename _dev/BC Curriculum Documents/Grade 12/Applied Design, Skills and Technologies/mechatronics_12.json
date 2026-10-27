@@ -7,11 +7,7 @@
     "ministry_url": "https://curriculum.gov.bc.ca/curriculum/adst/12/mechatronics",
     "description": "Students explore the integration of mechanical, electrical, and computing systems to create automated and robotic solutions. This course emphasizes the synergy of mechanical design, electronic control, and programming for intelligent machine systems.",
     "general_description": "Integration of mechanical, electrical, and computing systems; automation and robotics.",
-    "cross_curricular_connections": [
-      "Robotics 12",
-      "Electronics 12",
-      "Computer Programming 12"
-    ],
+    "cross_curricular_connections": ["Robotics 12", "Electronics 12", "Computer Programming 12"],
     "first_peoples_principles": true
   },
   "big_ideas": [

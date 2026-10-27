@@ -7,11 +7,7 @@
     "ministry_url": "https://curriculum.gov.bc.ca/curriculum/adst/12/specialized-studies-food",
     "description": "Students pursue specialized study in food systems through focused exploration of topics such as baking and pastry, world cuisines, or food entrepreneurship. This course allows for deep engagement with chosen area of food specialization through projects, research, and practical application.",
     "general_description": "Specialized culinary focus areas including baking/pastry, world cuisines, or food entrepreneurship.",
-    "cross_curricular_connections": [
-      "Culinary Arts 12",
-      "Food Studies 12",
-      "Entrepreneurship 12"
-    ],
+    "cross_curricular_connections": ["Culinary Arts 12", "Food Studies 12", "Entrepreneurship 12"],
     "first_peoples_principles": true
   },
   "big_ideas": [

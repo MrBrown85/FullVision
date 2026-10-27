@@ -7,12 +7,7 @@
     "ministry_url": "https://curriculum.gov.bc.ca/curriculum/english-language-arts/10/efp-literary-studies",
     "description": "EFP Literary Studies 10 explores First Peoples oral and written literary traditions, examining how Indigenous authors use storytelling to convey worldviews, histories, and contemporary perspectives. Students engage with a diverse range of Indigenous writers and literary forms, including traditional narratives, contemporary fiction, poetry, and land-based narratives that reflect the cultural richness of First Peoples. Through close reading and literary analysis, students develop critical thinking skills while deepening their appreciation for Indigenous voices and narratives.",
     "general_description": "An exploration of First Peoples literary traditions and contemporary Indigenous authors through diverse literary forms and cultural perspectives.",
-    "cross_curricular_connections": [
-      "Social Studies",
-      "Arts Education",
-      "Indigenous Knowledge",
-      "History"
-    ],
+    "cross_curricular_connections": ["Social Studies", "Arts Education", "Indigenous Knowledge", "History"],
     "first_peoples_principles": true
   },
   "big_ideas": [

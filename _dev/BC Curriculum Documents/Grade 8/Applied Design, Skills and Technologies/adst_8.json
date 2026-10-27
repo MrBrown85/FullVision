@@ -7,12 +7,7 @@
     "ministry_url": "https://curriculum.gov.bc.ca/curriculum/adst/8/applied-design-skills-technologies",
     "description": "Grade 8 Applied Design, Skills and Technologies introduces students to a range of hands-on disciplines including drafting, electronics, entrepreneurship, food studies, information and communications technology, media arts, metalwork, power technology, textiles, and woodwork. Students develop foundational competencies in applied design thinking, practical skills, and technological literacy while exploring their interests and aptitudes across multiple areas.",
     "general_description": "Integrated core curriculum covering design, practical skills, and applied technologies across multiple disciplines.",
-    "cross_curricular_connections": [
-      "Mathematics",
-      "Science",
-      "Social Studies",
-      "Career Life Education"
-    ],
+    "cross_curricular_connections": ["Mathematics", "Science", "Social Studies", "Career Life Education"],
     "first_peoples_principles": true
   },
   "big_ideas": [

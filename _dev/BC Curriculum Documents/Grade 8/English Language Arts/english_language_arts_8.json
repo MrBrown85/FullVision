@@ -8,11 +8,7 @@
     "description": "English Language Arts 8 builds students' skills in reading, writing, speaking, listening, and representing through engagement with a wide range of literary and informational texts. Students explore how stories and texts are socially and culturally constructed, how language shapes identity, and how critical thinking helps them become engaged citizens. First Peoples texts, perspectives, and oral traditions are integrated throughout.",
     "general_description": "An integrated study of reading, writing, speaking, listening, and representing through diverse literary and informational texts, developing critical literacy and creative communication skills.",
     "course_structure_note": "ELA 8 is a single integrated course (not modular). Competencies address both Comprehend & Connect and Create & Communicate.",
-    "cross_curricular_connections": [
-      "Social Studies",
-      "Arts Education",
-      "ADST"
-    ],
+    "cross_curricular_connections": ["Social Studies", "Arts Education", "ADST"],
     "first_peoples_principles": true
   },
   "big_ideas": [

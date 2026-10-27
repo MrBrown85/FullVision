@@ -7,10 +7,7 @@
     "ministry_url": "https://curriculum.gov.bc.ca/curriculum/adst/12/machining-welding",
     "description": "Students develop advanced machining and welding skills including lathe and mill operation, welding certifications, precision measurement, and metalwork techniques. This course prepares students for trades certifications and careers in fabrication and machining.",
     "general_description": "Lathe and mill operation, welding certifications, precision measurement, and metalwork.",
-    "cross_curricular_connections": [
-      "Art Metal and Jewellery 12",
-      "Engineering 12"
-    ],
+    "cross_curricular_connections": ["Art Metal and Jewellery 12", "Engineering 12"],
     "first_peoples_principles": true
   },
   "big_ideas": [

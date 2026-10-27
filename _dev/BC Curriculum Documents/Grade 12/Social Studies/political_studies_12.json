@@ -8,11 +8,7 @@
     "time_period": "Contemporary / Historical",
     "description": "Political Studies 12 examines how political systems work, how power is exercised, and how citizens can engage in democratic life. Students explore political institutions, ideologies, electoral systems, public opinion, and international relations. The course builds civic literacy, critical media skills, and a commitment to engaged citizenship.",
     "general_description": "A study of political institutions, ideologies, electoral systems, and international relations, developing students' capacity for informed civic participation and critical analysis of political power.",
-    "cross_curricular_connections": [
-      "Law Studies 12",
-      "Economics",
-      "Social Justice 12"
-    ],
+    "cross_curricular_connections": ["Law Studies 12", "Economics", "Social Justice 12"],
     "first_peoples_principles": true
   },
   "big_ideas": [

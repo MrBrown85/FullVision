@@ -8,11 +8,7 @@
     "time_period": "Contemporary / Scientific",
     "description": "Physical Geography 12 focuses on understanding Earth's natural systems and their interactions with human society. Students examine the structure and function of Earth's major systems (atmosphere, hydrosphere, cryosphere, lithosphere, and biosphere), explore how natural processes shape landscapes and climate, and analyze how human activities alter these systems. The course develops scientific literacy and geographic reasoning.",
     "general_description": "A scientific study of Earth's natural systems — atmosphere, hydrosphere, cryosphere, lithosphere, and biosphere — examining natural processes, climate patterns, ecosystems, and the growing impact of human activity.",
-    "cross_curricular_connections": [
-      "Human Geography 12",
-      "Earth Sciences 11",
-      "Environmental Science"
-    ],
+    "cross_curricular_connections": ["Human Geography 12", "Earth Sciences 11", "Environmental Science"],
     "first_peoples_principles": true
   },
   "big_ideas": [

@@ -7,11 +7,7 @@
     "ministry_url": "https://curriculum.gov.bc.ca/curriculum/science/11/science-for-citizens",
     "description": "Science for Citizens 11 is a practical, applied science course designed to develop scientific literacy and decision-making skills for everyday life, work, and community engagement. Students explore how scientific knowledge informs personal and public health decisions, workplace safety, technology use, and responses to natural hazards. First Peoples traditional knowledge and practices are integrated throughout as legitimate and valuable scientific and practical frameworks.",
     "general_description": "An applied science course developing scientific literacy for daily life, personal and public health, workplace safety, technology literacy, and environmental awareness — connecting science to real-world decisions, local communities, and global challenges.",
-    "cross_curricular_connections": [
-      "Career Education",
-      "Health",
-      "Environmental Studies"
-    ],
+    "cross_curricular_connections": ["Career Education", "Health", "Environmental Studies"],
     "first_peoples_principles": true
   },
   "big_ideas": [

@@ -8,11 +8,7 @@
     "time_period": "Ancient to Contemporary",
     "description": "Comparative World Religions 12 examines religious belief systems across time and cultures, exploring how religion shapes social, political, legal, and environmental values. Students study the core beliefs, sacred texts, practices, and institutional structures of world religions and develop tools for respectful cross-cultural religious literacy.",
     "general_description": "A comparative study of world religions examining core beliefs, sacred texts, institutional structures, and how religious traditions shape social, political, and environmental values across cultures.",
-    "cross_curricular_connections": [
-      "Comparative Cultures 12",
-      "Philosophy 12",
-      "Social Justice 12"
-    ],
+    "cross_curricular_connections": ["Comparative Cultures 12", "Philosophy 12", "Social Justice 12"],
     "first_peoples_principles": true
   },
   "big_ideas": [

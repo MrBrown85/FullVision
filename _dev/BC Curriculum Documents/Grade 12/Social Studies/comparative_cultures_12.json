@@ -8,11 +8,7 @@
     "time_period": "Ancient to Contemporary",
     "description": "Comparative Cultures 12 examines how cultural diversity and complexity enhance understanding across societies. Students explore how belief systems, social organization, languages, and artistic expressions are shaped by and shape each other, and how geography and environment influenced the development of agriculture, trade, and increasingly complex civilizations. The course builds cross-cultural empathy and analytical skills.",
     "general_description": "A comparative study of world cultures examining how belief systems, social structures, language, environment, and artistic expression interact to create distinct and diverse human societies.",
-    "cross_curricular_connections": [
-      "ELA",
-      "Arts Education",
-      "Comparative World Religions 12"
-    ],
+    "cross_curricular_connections": ["ELA", "Arts Education", "Comparative World Religions 12"],
     "first_peoples_principles": true
   },
   "big_ideas": [

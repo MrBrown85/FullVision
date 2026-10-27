@@ -9,11 +9,7 @@
     "description": "Contemporary Indigenous Studies 12 focuses on Indigenous identities, worldviews, resilience, and self-determination in Canada and globally. Students engage with Indigenous ways of knowing, examine the ongoing effects of colonialism, and explore paths toward reconciliation. The course centres Indigenous voices, scholarship, and community perspectives as its primary sources.",
     "general_description": "A contemporary study of Indigenous peoples in Canada and globally, examining identity, worldview, colonialism's ongoing impacts, rights advocacy, and the journey toward reconciliation and self-determination.",
     "course_notes": "This course is designed with Indigenous perspectives at its centre. Engagement with local Elders, knowledge keepers, and Indigenous-led scholarship is strongly encouraged.",
-    "cross_curricular_connections": [
-      "BC First Peoples 12",
-      "Social Justice 12",
-      "Law Studies 12"
-    ],
+    "cross_curricular_connections": ["BC First Peoples 12", "Social Justice 12", "Law Studies 12"],
     "first_peoples_principles": true
   },
   "big_ideas": [

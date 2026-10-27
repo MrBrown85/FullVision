@@ -8,11 +8,7 @@
     "time_period": "Contemporary / Global",
     "description": "Human Geography 12 examines how people interact with the physical world, analyzing demographic patterns, agriculture, urbanization, industrialization, cultural geography, and political organization. Students develop geographic literacy — the ability to use spatial thinking, maps, and data analysis to understand how human activities shape and are shaped by the physical environment.",
     "general_description": "A study of how human societies interact with the physical world, examining population patterns, agricultural systems, urbanization, resource use, cultural landscapes, and geopolitical organization.",
-    "cross_curricular_connections": [
-      "Physical Geography 12",
-      "Economics",
-      "Environmental Science"
-    ],
+    "cross_curricular_connections": ["Physical Geography 12", "Economics", "Environmental Science"],
     "first_peoples_principles": true
   },
   "big_ideas": [

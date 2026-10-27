@@ -7,11 +7,7 @@
     "ministry_url": "https://curriculum.gov.bc.ca/curriculum/mathematics/9/core",
     "description": "Mathematics 9 extends number sense to rational numbers and exponent laws, introduces polynomial operations, and develops algebraic reasoning through linear equations and two-variable relations. Students apply proportional and spatial reasoning through scale diagrams and similarity, and critically engage with data and statistics in social contexts. Financial literacy — including budgeting — connects mathematics to real-world decision making. First Peoples mathematical knowledge and perspectives are woven throughout.",
     "general_description": "An intermediate mathematics course extending rational number operations, exponent laws, polynomial algebra, linear relations, spatial reasoning with similarity, and statistical literacy — bridging toward senior mathematics pathways.",
-    "cross_curricular_connections": [
-      "Science",
-      "Social Studies",
-      "Financial Literacy"
-    ],
+    "cross_curricular_connections": ["Science", "Social Studies", "Financial Literacy"],
     "first_peoples_principles": true
   },
   "big_ideas": [

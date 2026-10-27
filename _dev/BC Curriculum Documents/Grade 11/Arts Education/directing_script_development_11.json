@@ -7,12 +7,7 @@
     "ministry_url": "https://curriculum.gov.bc.ca/curriculum/arts-education/11/directing-script-development",
     "description": "Students develop directorial vision, script analysis skills, and basic script writing and development practices. This course emphasizes understanding dramatic literature, blocking and staging, and bringing creative vision to the stage.",
     "general_description": "A course focused on directorial vision, script analysis, script writing, and staging for theatre.",
-    "cross_curricular_connections": [
-      "Literature",
-      "Writing",
-      "Visual Composition",
-      "Leadership"
-    ],
+    "cross_curricular_connections": ["Literature", "Writing", "Visual Composition", "Leadership"],
     "first_peoples_principles": true
   },
   "big_ideas": [

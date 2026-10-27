@@ -8,11 +8,7 @@
     "time_period": "Modern to Contemporary",
     "description": "Asian Studies 12 examines Asia's diverse physical resources, political systems, cultural traditions, economic development, and contemporary challenges. Students investigate the legacy of colonialism and imperialism, the formation of national and ethnic identities, the rapid industrialization of Asian economies, and ongoing social and political movements. The course develops cross-cultural literacy and an understanding of Asia's increasing global significance.",
     "general_description": "A multidisciplinary study of Asia examining its geographic diversity, colonial history, national and ethnic identities, rapid economic development, contemporary social movements, and its growing role in global affairs.",
-    "cross_curricular_connections": [
-      "Human Geography 12",
-      "20th Century World History 12",
-      "Comparative Cultures 12"
-    ],
+    "cross_curricular_connections": ["Human Geography 12", "20th Century World History 12", "Comparative Cultures 12"],
     "first_peoples_principles": true
   },
   "big_ideas": [

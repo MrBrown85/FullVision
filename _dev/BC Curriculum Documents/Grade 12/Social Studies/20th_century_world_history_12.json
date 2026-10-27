@@ -8,11 +8,7 @@
     "time_period": "1900–2000",
     "description": "20th Century World History 12 examines the most transformative century in modern history, exploring how nationalism, imperialism, technology, and ideology reshaped the world. Students investigate the causes and consequences of the World Wars, the Cold War, decolonization, human rights movements, and cultural change. The course uses historical inquiry to help students assess competing accounts, evaluate source reliability, and make reasoned ethical judgments about controversial events.",
     "general_description": "A rigorous study of world history from 1900 to 2000, examining nationalism, global wars, ideological conflicts, decolonization, human rights movements, and technological change through historical inquiry.",
-    "cross_curricular_connections": [
-      "ELA",
-      "Political Studies",
-      "Genocide Studies"
-    ],
+    "cross_curricular_connections": ["ELA", "Political Studies", "Genocide Studies"],
     "first_peoples_principles": true
   },
   "big_ideas": [

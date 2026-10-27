@@ -7,10 +7,7 @@
     "ministry_url": "https://curriculum.gov.bc.ca/curriculum/adst/12/media-design",
     "description": "Students develop advanced media design skills encompassing brand identity systems, campaign design, and industry-standard practices. This course emphasizes strategic design thinking, visual communication, and professional portfolio development for media design careers.",
     "general_description": "Advanced media design, brand identity systems, campaign design, and industry standards.",
-    "cross_curricular_connections": [
-      "Graphic Production 12",
-      "Digital Media Development 12"
-    ],
+    "cross_curricular_connections": ["Graphic Production 12", "Digital Media Development 12"],
     "first_peoples_principles": true
   },
   "big_ideas": [

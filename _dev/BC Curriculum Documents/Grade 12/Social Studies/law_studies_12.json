@@ -8,11 +8,7 @@
     "time_period": "Contemporary / Historical",
     "description": "Law Studies 12 introduces students to Canada's legal framework, examining the Constitution, court systems, criminal and civil law, Indigenous legal orders, and international law. Students explore how laws are created, interpreted, and changed over time, and how legal systems reflect the values of the societies that create them. The course builds skills in legal reasoning, ethical analysis, and civic engagement.",
     "general_description": "An introduction to Canadian and international law, examining constitutional frameworks, court systems, criminal and civil law, Indigenous legal traditions, and how laws evolve to reflect changing social values.",
-    "cross_curricular_connections": [
-      "Political Studies 12",
-      "Social Justice 12",
-      "BC First Peoples 12"
-    ],
+    "cross_curricular_connections": ["Political Studies 12", "Social Justice 12", "BC First Peoples 12"],
     "first_peoples_principles": true
   },
   "big_ideas": [

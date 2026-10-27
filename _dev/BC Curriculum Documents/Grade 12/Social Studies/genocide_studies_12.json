@@ -8,11 +8,7 @@
     "time_period": "Modern History to Contemporary",
     "description": "Genocide Studies 12 examines the origins, characteristics, and global manifestations of genocide, alongside responses and prevention strategies. Students explore how genocides occur, what conditions make them possible, and how international law and civil society have tried — and often failed — to prevent them. The course builds critical thinking skills, emotional literacy, and a commitment to human dignity.",
     "general_description": "A study of genocide as a historical and contemporary phenomenon, examining its stages, global examples, international legal responses, and prevention strategies — grounded in a commitment to human dignity and never again.",
-    "cross_curricular_connections": [
-      "20th Century World History 12",
-      "Law Studies 12",
-      "Social Justice 12"
-    ],
+    "cross_curricular_connections": ["20th Century World History 12", "Law Studies 12", "Social Justice 12"],
     "first_peoples_principles": true
   },
   "big_ideas": [

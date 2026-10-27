@@ -8,11 +8,7 @@
     "time_period": "1750–1919",
     "description": "Social Studies 9 explores the political, social, economic, and technological revolutions that reshaped the world between 1750 and 1919. Students examine imperialism, migration, nationalism, global conflicts, and discriminatory policies. The course investigates how collective identities are constructed, how power disparities reshape relationships between groups, and how environmental and ideological factors influence change.",
     "general_description": "A study of world history from 1750 to 1919, tracing revolutions in politics, industry, and thought, and examining how imperialism, migration, and emerging nationalism transformed global society.",
-    "cross_curricular_connections": [
-      "ELA",
-      "Geography",
-      "Science"
-    ],
+    "cross_curricular_connections": ["ELA", "Geography", "Science"],
     "first_peoples_principles": true
   },
   "big_ideas": [

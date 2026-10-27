@@ -8,11 +8,7 @@
     "time_period": "Historical to Contemporary",
     "description": "Urban Studies 12 examines urbanization as a global phenomenon and the forces that shape how cities develop, function, and change. Students investigate the history of urban settlement, the functions of local government, urban planning principles, and contemporary challenges facing cities — from housing affordability to climate resilience. The course develops civic literacy and an understanding of how planning decisions affect quality of life.",
     "general_description": "An examination of urbanization as a global force, exploring how cities form, how they are governed, how planning decisions are made, and how contemporary cities can become more livable, equitable, and sustainable.",
-    "cross_curricular_connections": [
-      "Human Geography 12",
-      "Political Studies 12",
-      "Social Justice 12"
-    ],
+    "cross_curricular_connections": ["Human Geography 12", "Political Studies 12", "Social Justice 12"],
     "first_peoples_principles": true
   },
   "big_ideas": [
