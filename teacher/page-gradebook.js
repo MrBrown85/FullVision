@@ -2072,6 +2072,22 @@ window.PageGradebook = (function () {
     });
   }
 
+  /* The cells Count Missing as Zero / as Excused set in one column, kept on
+     this device so Undo Count Missing can take them off again. */
+  function _bulkStatusUndo(cid, aid) {
+    try {
+      return JSON.parse(localStorage.getItem('gb_bulkStatus_' + cid + '_' + aid)) || [];
+    } catch (e) {
+      return [];
+    }
+  }
+  function _saveBulkStatusUndo(cid, aid, list) {
+    try {
+      if (list.length) localStorage.setItem('gb_bulkStatus_' + cid + '_' + aid, JSON.stringify(list));
+      else localStorage.removeItem('gb_bulkStatus_' + cid + '_' + aid);
+    } catch (e) {}
+  }
+
   function showHeaderContextMenu(e, header) {
     _dismissContextMenu();
     var aid = header.dataset.aid;
@@ -2086,7 +2102,11 @@ window.PageGradebook = (function () {
       '<div class="gb-ctx-item" data-ctx="scoreMode">Score This Assignment</div>' +
       '<div class="gb-ctx-item" data-ctx="editAssess">Edit Assignment Details</div>' +
       '<div class="gb-ctx-divider"></div>' +
-      '<div class="gb-ctx-item" data-ctx="markUngradedNS">Count missing as zero</div>' +
+      '<div class="gb-ctx-item" data-ctx="markUngradedNS">Count Missing as Zero</div>' +
+      '<div class="gb-ctx-item" data-ctx="markUngradedEXC">Count Missing as Excused</div>' +
+      (_bulkStatusUndo(activeCourse, aid).length
+        ? '<div class="gb-ctx-item" data-ctx="undoBulkStatus">Undo Count Missing</div>'
+        : '') +
       '<div class="gb-ctx-divider"></div>' +
       '<div class="gb-ctx-item gb-ctx-danger" data-ctx="deleteAssess">Delete Assignment</div>';
     document.body.appendChild(menu);
@@ -2096,26 +2116,42 @@ window.PageGradebook = (function () {
       var action = item.dataset.ctx;
       if (action === 'scoreMode') enterScoreMode(aid);
       else if (action === 'editAssess') Router.navigate('/assignments?course=' + activeCourse + '&open=' + aid);
-      else if (action === 'markUngradedNS') {
+      else if (action === 'markUngradedNS' || action === 'markUngradedEXC') {
         // Every student row on screen with nothing in this column (no score,
-        // no mark, no status) becomes NS, which calc.js counts as 0.
+        // no mark, no status) becomes NS (counted as 0) or EXC.
         if (assess) {
+          var next = action === 'markUngradedNS' ? 'NS' : 'EXC';
           var statuses = getAssignmentStatuses(activeCourse);
+          var undo = _bulkStatusUndo(activeCourse, aid);
           var changed = false;
           document.querySelectorAll('.gb-scores-row[data-sid]').forEach(function (row) {
             var sid = row.dataset.sid;
             var cell = assessmentCellValue(activeCourse, sid, assess);
             if ((cell.kind === 'none' || cell.kind === 'missing') && !cell.status) {
-              statuses[sid + ':' + aid] = 'NS';
+              statuses[sid + ':' + aid] = next;
+              undo.push({ sid: sid, status: next });
               changed = true;
             }
           });
           if (changed) {
             saveAssignmentStatuses(activeCourse, statuses);
+            _saveBulkStatusUndo(activeCourse, aid, undo);
             clearProfCache();
             render();
           }
         }
+      } else if (action === 'undoBulkStatus') {
+        // Takes off only the NS / EXC the bulk items set, and only where the
+        // cell still holds that status.
+        var st = getAssignmentStatuses(activeCourse);
+        _bulkStatusUndo(activeCourse, aid).forEach(function (u) {
+          var key = u.sid + ':' + aid;
+          if (st[key] === u.status) delete st[key];
+        });
+        saveAssignmentStatuses(activeCourse, st);
+        _saveBulkStatusUndo(activeCourse, aid, []);
+        clearProfCache();
+        render();
       } else if (action === 'deleteAssess') {
         // P7.8: replace native confirm with the in-app dialog so the dialog
         // can spell out irreversibility and stay consistent with other
