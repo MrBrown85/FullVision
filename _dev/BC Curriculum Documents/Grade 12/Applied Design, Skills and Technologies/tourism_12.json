@@ -105,7 +105,7 @@
               "I can evaluate attractions and experience quality",
               "I can recommend experience improvements"
             ],
-            "short_label": "Skill Application",
+            "short_label": "Destination Analysis",
             "tag": "AS"
           },
           {
@@ -183,7 +183,7 @@
               "I can coordinate vendor communications",
               "I can track event metrics and ROI"
             ],
-            "short_label": "Learning Foundation B",
+            "short_label": "Event Management Software",
             "tag": "LFB"
           },
           {
@@ -195,7 +195,7 @@
               "I can track customer preferences and loyalty",
               "I can generate customer analytics and insights"
             ],
-            "short_label": "Learning Foundation C",
+            "short_label": "Point-of-Sale and CRM Systems",
             "tag": "LFC"
           }
         ]

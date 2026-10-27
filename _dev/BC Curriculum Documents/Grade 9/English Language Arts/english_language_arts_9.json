@@ -122,7 +122,7 @@
               "I can analyze how language is used to include or exclude different groups.",
               "I can identify how dominant cultural narratives are reinforced or challenged through language."
             ],
-            "short_label": "Cultural Studies",
+            "short_label": "Language and Identity",
             "tag": "CS"
           },
           {
@@ -166,7 +166,7 @@
               "I can analyze how a non-linear or cyclical structure affects the reader's experience.",
               "I can compare the structure of a written text with an oral or visual text on the same topic."
             ],
-            "short_label": "Thematic Analysis",
+            "short_label": "Text Structures",
             "tag": "TA"
           },
           {
@@ -227,7 +227,7 @@
               "I can draft, revise, and edit writing through multiple stages.",
               "I can make intentional design choices (layout, headings, visuals) to suit my audience and purpose."
             ],
-            "short_label": "Literary Elements",
+            "short_label": "Writing Process",
             "tag": "LE"
           },
           {
@@ -238,7 +238,7 @@
               "I can use peer feedback to make targeted revisions that strengthen my writing.",
               "I can explain the choices I made in revising and how they improved the final text."
             ],
-            "short_label": "Autonomous Systems",
+            "short_label": "Revise and Refine",
             "tag": "AS"
           },
           {
@@ -249,7 +249,7 @@
               "I can recognize and correct common errors (double negatives, mixed metaphors, word misuse).",
               "I can explain the purpose of specific conventions and use them purposefully."
             ],
-            "short_label": "Learning Foundation B",
+            "short_label": "Conventions",
             "tag": "LFB"
           },
           {
@@ -260,7 +260,7 @@
               "I can experiment with oral techniques such as call-and-response, repetition, and dramatic pause.",
               "I can adapt a written text for an oral storytelling context."
             ],
-            "short_label": "Narrative Writing",
+            "short_label": "Oral Storytelling",
             "tag": "NW"
           },
           {
@@ -271,7 +271,7 @@
               "I can experiment with different forms (spoken word, essay, narrative, report) for the same content.",
               "I can analyze how professional writers make genre choices and apply that learning to my own writing."
             ],
-            "short_label": "Learning Foundation C",
+            "short_label": "Forms and Genres",
             "tag": "LFC"
           },
           {

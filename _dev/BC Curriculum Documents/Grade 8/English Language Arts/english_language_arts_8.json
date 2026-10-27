@@ -122,7 +122,7 @@
               "I can identify examples of how language creates or reinforces social norms.",
               "I can discuss how the language used in a text positions readers to think in a certain way."
             ],
-            "short_label": "Cultural Studies",
+            "short_label": "Language and Identity",
             "tag": "CS"
           },
           {
@@ -166,7 +166,7 @@
               "I can describe how a text's structure helps the reader follow the argument or narrative.",
               "I can compare two texts with different structures and explain how each serves its purpose."
             ],
-            "short_label": "Thematic Analysis",
+            "short_label": "Text Structures",
             "tag": "TA"
           },
           {
@@ -188,7 +188,7 @@
               "I can recognize that some stories belong to specific communities and require permission to retell.",
               "I can discuss why it matters to respect the intellectual and cultural ownership of Indigenous texts."
             ],
-            "short_label": "Indigenous Literature",
+            "short_label": "First Peoples Text Protocols",
             "tag": "IL"
           }
         ]
@@ -216,7 +216,7 @@
               "I can draft, revise, and edit my writing to improve clarity and impact.",
               "I can create texts that are appropriate for their intended audience and purpose."
             ],
-            "short_label": "Literary Elements",
+            "short_label": "Writing Process",
             "tag": "LE"
           },
           {
@@ -227,7 +227,7 @@
               "I can give and receive specific, constructive feedback on writing.",
               "I can revise my work based on feedback to improve its impact."
             ],
-            "short_label": "Autonomous Systems",
+            "short_label": "Revise and Refine",
             "tag": "AS"
           },
           {
@@ -238,7 +238,7 @@
               "I can proofread my work to catch and correct errors.",
               "I can explain the purpose of specific grammar or punctuation rules."
             ],
-            "short_label": "Learning Foundation B",
+            "short_label": "Conventions",
             "tag": "LFB"
           },
           {
@@ -249,7 +249,7 @@
               "I can experiment with oral storytelling conventions such as repetition, dialogue, and imagery.",
               "I can adapt a written story for oral delivery."
             ],
-            "short_label": "Narrative Writing",
+            "short_label": "Oral Storytelling",
             "tag": "NW"
           },
           {
@@ -260,7 +260,7 @@
               "I can explain why I chose a particular form and how it suits my message.",
               "I can experiment with different genres to find which works best for my topic."
             ],
-            "short_label": "Learning Foundation C",
+            "short_label": "Forms and Genres",
             "tag": "LFC"
           },
           {

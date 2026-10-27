@@ -69,7 +69,7 @@
               "I can connect a philosophical concept (e.g., justice, freedom) to a contemporary political issue.",
               "I can explain how philosophical thinking applies to decisions in my own life."
             ],
-            "short_label": "Evaluate Evidence",
+            "short_label": "Application",
             "tag": "EE"
           }
         ]
@@ -103,7 +103,7 @@
               "I can explain how historical context shaped a philosopher's ideas.",
               "I can compare philosophical traditions across cultures (e.g., Western, Indigenous, Eastern)."
             ],
-            "short_label": "Social Analysis",
+            "short_label": "Historical Understanding",
             "tag": "SA"
           }
         ]

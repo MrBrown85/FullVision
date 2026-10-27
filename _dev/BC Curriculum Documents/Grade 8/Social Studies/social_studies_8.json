@@ -62,7 +62,7 @@
               "I can compare two historical maps to identify how a place or situation changed over time.",
               "I can explain what information a visual source gives us and what it leaves out."
             ],
-            "short_label": "Presentation Skills",
+            "short_label": "Interpret Graphics",
             "tag": "PS"
           },
           {
@@ -73,7 +73,7 @@
               "I can distinguish between a primary and a secondary source.",
               "I can explain why it matters to credit the creators of information."
             ],
-            "short_label": "Critical Inquiry",
+            "short_label": "Cite Sources",
             "tag": "CI"
           }
         ]
@@ -118,7 +118,7 @@
               "I can notice what a source highlights and what it ignores or downplays.",
               "I can explain how an author's background or purpose shapes what they choose to record."
             ],
-            "short_label": "Learning Foundation",
+            "short_label": "Evidence",
             "tag": "LF"
           }
         ]
@@ -135,7 +135,7 @@
               "I can identify a turning point in history and explain why it changed things.",
               "I can discuss whether a change represented progress for everyone or just for some groups."
             ],
-            "short_label": "Social Analysis",
+            "short_label": "Continuity and Change",
             "tag": "SA"
           }
         ]
@@ -152,7 +152,7 @@
               "I can distinguish between things that were planned and things that happened by accident.",
               "I can trace both the short-term and long-term consequences of a historical event or decision."
             ],
-            "short_label": "Civic Engagement",
+            "short_label": "Cause and Consequence",
             "tag": "CE"
           }
         ]
@@ -169,7 +169,7 @@
               "I can explain how a person's background, religion, or culture shapes their worldview.",
               "I can analyze how institutions (e.g., the Church, governments) responded to new ideas or challenges."
             ],
-            "short_label": "Critical Evaluation",
+            "short_label": "Perspective",
             "tag": "CE"
           }
         ]

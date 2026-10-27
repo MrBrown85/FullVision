@@ -54,7 +54,7 @@
               "I can present my findings in a way that accurately and respectfully represents Indigenous perspectives.",
               "I can lead or contribute meaningfully to collaborative inquiry."
             ],
-            "short_label": "Represent Relationships",
+            "short_label": "Critical Inquiry",
             "tag": "RR"
           }
         ]
@@ -89,7 +89,7 @@
               "I can analyze how the Delgamuukw v. BC (1997) ruling recognized oral history as legal evidence.",
               "I can compare Indigenous relational and holistic ways of knowing with Western analytical approaches."
             ],
-            "short_label": "Indigenous Literature",
+            "short_label": "Oral Traditions as Evidence",
             "tag": "IL"
           }
         ]
@@ -106,7 +106,7 @@
               "I can trace how the Indian Act has changed over time and evaluate what impact those changes had.",
               "I can explain what 'spiralling' time means in an Indigenous worldview versus the Western linear view of time."
             ],
-            "short_label": "Historical Analysis",
+            "short_label": "Continuity and Change",
             "tag": "HA"
           }
         ]
@@ -157,7 +157,7 @@
               "I can take on the perspective of a First Nation community in analyzing a land claim or treaty negotiation.",
               "I can analyze media representations of First Peoples and identify stereotypes or biases."
             ],
-            "short_label": "Learning Foundation B",
+            "short_label": "Perspective",
             "tag": "LFB"
           }
         ]
@@ -174,7 +174,7 @@
               "I can discuss what reconciliation requires — from individuals, from governments, and from society.",
               "I can make an ethical argument about the responsibility of non-Indigenous Canadians in the process of reconciliation."
             ],
-            "short_label": "Mathematical Reasoning",
+            "short_label": "Ethical Judgment",
             "tag": "MR"
           }
         ]

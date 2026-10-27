@@ -120,7 +120,7 @@
               "I can evaluate the intended and unintended consequences of a housing policy.",
               "I can analyze the long-term effects of urban sprawl on environment, health, and community."
             ],
-            "short_label": "Learning Foundation B",
+            "short_label": "Cause and Consequence",
             "tag": "LFB"
           }
         ]
@@ -137,7 +137,7 @@
               "I can analyze how political ideology shapes different approaches to housing or transit policy.",
               "I can identify who benefits and who is harmed by a particular planning decision."
             ],
-            "short_label": "Geometric Thinking",
+            "short_label": "Perspective",
             "tag": "GT"
           }
         ]
@@ -154,7 +154,7 @@
               "I can make an ethical argument about housing affordability as a right.",
               "I can evaluate historical urban decisions (e.g., freeway construction through minority neighbourhoods) using ethical reasoning."
             ],
-            "short_label": "Communicate Findings",
+            "short_label": "Ethical Judgment",
             "tag": "CF"
           }
         ]

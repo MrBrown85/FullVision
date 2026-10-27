@@ -81,7 +81,7 @@
               "I can explain how Indigenous peoples understand and describe their physical environment.",
               "I can evaluate why a physical geographic feature is significant to settlement, culture, or economy."
             ],
-            "short_label": "Learning Foundation",
+            "short_label": "Sense of Place",
             "tag": "LF"
           }
         ]
@@ -98,7 +98,7 @@
               "I can track how a physical process (glacial retreat, deforestation, sea level rise) changes over time.",
               "I can use data to identify climate or ecological patterns at different scales."
             ],
-            "short_label": "Social Analysis",
+            "short_label": "Patterns and Trends",
             "tag": "SA"
           }
         ]
@@ -149,7 +149,7 @@
               "I can analyze how urban development alters local hydrology and temperature.",
               "I can evaluate how climate change is altering a specific physical system (Arctic ice, coral reefs, monsoons)."
             ],
-            "short_label": "Sustainable Practices",
+            "short_label": "Interactions and Associations",
             "tag": "SP"
           }
         ]
@@ -166,7 +166,7 @@
               "I can evaluate whether a development project that damages an ecosystem is justified.",
               "I can argue for specific policies to protect a physical geographic system at risk."
             ],
-            "short_label": "Civic Engagement",
+            "short_label": "Ethical Judgment",
             "tag": "CE"
           }
         ]

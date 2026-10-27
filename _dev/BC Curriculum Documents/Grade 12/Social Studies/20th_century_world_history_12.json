@@ -64,7 +64,7 @@
               "I can compare how the same event is viewed as significant by different nations or groups.",
               "I can argue for a ranking of the most significant events of the 20th century with evidence."
             ],
-            "short_label": "Historical Development",
+            "short_label": "Significance",
             "tag": "HD"
           }
         ]
@@ -99,7 +99,7 @@
               "I can identify what stayed constant in international relations even as specific events changed.",
               "I can compare how different nations experienced the same global event (e.g., WWII, the Cold War)."
             ],
-            "short_label": "Social Analysis",
+            "short_label": "Continuity and Change",
             "tag": "SA"
           }
         ]
@@ -150,7 +150,7 @@
               "I can evaluate the responsibility of bystanders and non-combatants during genocide.",
               "I can argue whether modern nations have a responsibility to respond to historical injustices committed by their predecessors."
             ],
-            "short_label": "Autonomous Systems",
+            "short_label": "Ethical Judgment",
             "tag": "AS"
           }
         ]

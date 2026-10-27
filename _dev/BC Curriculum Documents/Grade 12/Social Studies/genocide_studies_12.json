@@ -69,7 +69,7 @@
               "I can explain why some genocides receive more international attention and recognition than others.",
               "I can compare how survivors, perpetrators, and bystanders view the significance of the same event."
             ],
-            "short_label": "Historical Analysis",
+            "short_label": "Significance",
             "tag": "HA"
           }
         ]
@@ -104,7 +104,7 @@
               "I can compare how different groups (perpetrators, victims, bystanders, international community) experienced the same genocide.",
               "I can analyze whether international responses to genocide have changed over the 20th and 21st centuries."
             ],
-            "short_label": "Critical Analysis",
+            "short_label": "Continuity and Change",
             "tag": "CA"
           }
         ]
@@ -121,7 +121,7 @@
               "I can evaluate the role of leadership, propaganda, and ordinary citizens in carrying out genocide.",
               "I can trace the long-term consequences of genocide on surviving communities and the world."
             ],
-            "short_label": "Learning Foundation",
+            "short_label": "Cause and Consequence",
             "tag": "LF"
           }
         ]
@@ -155,7 +155,7 @@
               "I can evaluate whether international responses to a specific genocide were ethically adequate.",
               "I can argue for the moral imperative of genocide recognition and prevention."
             ],
-            "short_label": "Social Analysis",
+            "short_label": "Ethical Judgment",
             "tag": "SA"
           }
         ]

@@ -76,7 +76,7 @@
               "I can explain how my design choices affect the user experience",
               "I can consider cultural and environmental factors in my design"
             ],
-            "short_label": "Evaluate Designs",
+            "short_label": "User Needs",
             "tag": "ED"
           },
           {
@@ -88,7 +88,7 @@
               "I can present my design and listen to feedback constructively",
               "I can document my design process and decisions"
             ],
-            "short_label": "Refine Solutions",
+            "short_label": "Communicate Designs",
             "tag": "RS"
           }
         ]
@@ -106,7 +106,7 @@
               "I can maintain and care for tools and equipment properly",
               "I can recognize hazards and prevent injuries in the workshop"
             ],
-            "short_label": "Foundational Techniques",
+            "short_label": "Safe Tool Use",
             "tag": "FT"
           },
           {
@@ -118,7 +118,7 @@
               "I can measure and mark materials accurately",
               "I can finish and refine my work to meet quality standards"
             ],
-            "short_label": "Develop Skills",
+            "short_label": "Materials and Technique",
             "tag": "DS"
           },
           {
@@ -130,7 +130,7 @@
               "I can learn from mistakes and apply those lessons to future projects",
               "I can work independently and ask for help when needed"
             ],
-            "short_label": "Advanced Techniques",
+            "short_label": "Practical Problem Solving",
             "tag": "AT"
           },
           {
@@ -142,7 +142,7 @@
               "I can divide tasks fairly and manage timelines",
               "I can reflect on how my group worked together and identify improvements"
             ],
-            "short_label": "Master Skills",
+            "short_label": "Group Projects",
             "tag": "MS"
           }
         ]

@@ -69,7 +69,7 @@
               "I can explain how a place's identity is constructed through history, culture, and geography.",
               "I can compare how different groups attach meaning to the same place."
             ],
-            "short_label": "Learning Foundation",
+            "short_label": "Sense of Place",
             "tag": "LF"
           }
         ]
@@ -103,7 +103,7 @@
               "I can explain why a particular resource, crop, or human activity is distributed the way it is.",
               "I can track how geographic patterns change over time (e.g., urbanization trends, migration flows)."
             ],
-            "short_label": "Social Analysis",
+            "short_label": "Patterns and Trends",
             "tag": "SA"
           }
         ]
@@ -154,7 +154,7 @@
               "I can analyze how a natural disaster becomes a humanitarian crisis through social and political factors.",
               "I can evaluate the relationship between poverty, geography, and environmental vulnerability."
             ],
-            "short_label": "Sustainable Practices",
+            "short_label": "Interactions and Associations",
             "tag": "SP"
           }
         ]
@@ -171,7 +171,7 @@
               "I can evaluate whether wealthy nations have a geographic responsibility toward climate-vulnerable nations.",
               "I can discuss the ethics of border controls and migration policy from a geographic perspective."
             ],
-            "short_label": "Civic Engagement",
+            "short_label": "Ethical Judgment",
             "tag": "CE"
           }
         ]

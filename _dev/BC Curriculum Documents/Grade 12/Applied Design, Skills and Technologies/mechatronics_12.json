@@ -105,7 +105,7 @@
               "I can fabricate and assemble parts",
               "I can verify mechanical function"
             ],
-            "short_label": "Textile Arts",
+            "short_label": "Mechanical Fabrication",
             "tag": "TA"
           },
           {
@@ -129,7 +129,7 @@
               "I can debug and optimize code",
               "I can test system behavior"
             ],
-            "short_label": "Computational Thinking",
+            "short_label": "Programming and Control",
             "tag": "CT"
           },
           {
@@ -171,7 +171,7 @@
               "I can use breadboards and prototyping",
               "I can troubleshoot circuits"
             ],
-            "short_label": "Tool Proficiency",
+            "short_label": "Electrical Design Tools",
             "tag": "ELC2"
           },
           {

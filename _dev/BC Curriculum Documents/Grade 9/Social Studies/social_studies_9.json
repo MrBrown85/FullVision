@@ -69,7 +69,7 @@
               "I can explain how significance looks different depending on whose perspective you take.",
               "I can compare how the same event is remembered differently by different groups."
             ],
-            "short_label": "Historical Analysis",
+            "short_label": "Significance",
             "tag": "HA"
           }
         ]
@@ -104,7 +104,7 @@
               "I can identify what changed and what stayed the same for a group across a historical period.",
               "I can evaluate whether a change represented progress, decline, or both — depending on who you ask."
             ],
-            "short_label": "Social Analysis",
+            "short_label": "Continuity and Change",
             "tag": "SA"
           }
         ]
@@ -121,7 +121,7 @@
               "I can evaluate the role individuals played versus broader social forces in causing change.",
               "I can trace both intended and unintended consequences of a decision or event."
             ],
-            "short_label": "Critical Evaluation",
+            "short_label": "Cause and Consequence",
             "tag": "CE"
           }
         ]
@@ -138,7 +138,7 @@
               "I can explain how someone's worldview shapes how they interpret an event.",
               "I can avoid projecting modern values unfairly onto people from the past."
             ],
-            "short_label": "Learning Foundation",
+            "short_label": "Perspective",
             "tag": "LF"
           }
         ]
@@ -155,7 +155,7 @@
               "I can discuss whether people today have a responsibility to respond to historical injustices.",
               "I can distinguish between condemning a past action and condemning the people who committed it."
             ],
-            "short_label": "Autonomous Systems",
+            "short_label": "Ethical Judgment",
             "tag": "AS"
           }
         ]

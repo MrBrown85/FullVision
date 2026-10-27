@@ -75,7 +75,7 @@
               "I can plan navigation systems",
               "I can design adaptive behaviors"
             ],
-            "short_label": "Design Practice",
+            "short_label": "Autonomous Behavior",
             "tag": "DP"
           },
           {
@@ -87,7 +87,7 @@
               "I can plan capstone projects",
               "I can design for competition success"
             ],
-            "short_label": "Style and Tone",
+            "short_label": "Competition Strategy",
             "tag": "ST"
           }
         ]
@@ -105,7 +105,7 @@
               "I can troubleshoot mechanical issues",
               "I can maintain robots"
             ],
-            "short_label": "Textile Arts",
+            "short_label": "Robot Fabrication",
             "tag": "TA"
           },
           {
@@ -129,7 +129,7 @@
               "I can debug and optimize code",
               "I can implement AI techniques"
             ],
-            "short_label": "Skill Application",
+            "short_label": "Programming and Algorithms",
             "tag": "AS"
           },
           {
@@ -183,7 +183,7 @@
               "I can optimize designs",
               "I can generate fabrication drawings"
             ],
-            "short_label": "Robot Design B",
+            "short_label": "Robot CAD Design",
             "tag": "RDB"
           },
           {
@@ -195,7 +195,7 @@
               "I can use AI libraries and frameworks",
               "I can integrate AI with robotics"
             ],
-            "short_label": "Tool Proficiency",
+            "short_label": "Machine Learning Tools",
             "tag": "AT"
           }
         ]

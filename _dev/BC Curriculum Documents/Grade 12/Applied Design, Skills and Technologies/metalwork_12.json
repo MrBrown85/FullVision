@@ -104,7 +104,7 @@
               "I can measure and mark accurately",
               "I can achieve quality cuts"
             ],
-            "short_label": "Material Exploration",
+            "short_label": "Cutting and Preparation",
             "tag": "ME"
           },
           {
@@ -182,7 +182,7 @@
               "I can use spray equipment",
               "I can maintain finishing equipment"
             ],
-            "short_label": "Equipment Operation B",
+            "short_label": "Finishing Equipment",
             "tag": "EOB"
           },
           {

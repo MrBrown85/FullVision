@@ -116,7 +116,7 @@
               "I can evaluate how a specific leader's actions changed the direction of a political system.",
               "I can trace the intended and unintended consequences of a policy decision."
             ],
-            "short_label": "Learning Foundation B",
+            "short_label": "Cause and Consequence",
             "tag": "LFB"
           }
         ]
@@ -133,7 +133,7 @@
               "I can take on the perspective of a political ideology I disagree with and represent it accurately.",
               "I can explain how geographic, economic, and cultural background shapes political views."
             ],
-            "short_label": "Learning Foundation C",
+            "short_label": "Perspective",
             "tag": "LFC"
           }
         ]
@@ -150,7 +150,7 @@
               "I can evaluate whether a political decision was ethical, considering both consequences and principles.",
               "I can argue for a position on electoral reform, Indigenous governance, or foreign policy using evidence."
             ],
-            "short_label": "Understand Systems",
+            "short_label": "Ethical Judgment",
             "tag": "US"
           }
         ]

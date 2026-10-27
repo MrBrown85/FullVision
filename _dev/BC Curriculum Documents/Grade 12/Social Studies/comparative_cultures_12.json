@@ -103,7 +103,7 @@
               "I can identify what causes cultures to change: contact, conquest, trade, technology.",
               "I can evaluate whether cultural change represents loss, adaptation, or growth — depending on perspective."
             ],
-            "short_label": "Critical Analysis",
+            "short_label": "Continuity and Change",
             "tag": "CA"
           }
         ]
@@ -137,7 +137,7 @@
               "I can analyze how colonialism distorted Western understanding of non-Western cultures.",
               "I can compare insider and outsider perspectives on the same cultural tradition."
             ],
-            "short_label": "Communicate Findings",
+            "short_label": "Perspective",
             "tag": "CF"
           }
         ]
@@ -154,7 +154,7 @@
               "I can evaluate how cultural heritage should be preserved, shared, and protected.",
               "I can discuss what 'cultural respect' means in practice and what it requires of us."
             ],
-            "short_label": "Civic Engagement",
+            "short_label": "Ethical Judgment",
             "tag": "CE"
           }
         ]

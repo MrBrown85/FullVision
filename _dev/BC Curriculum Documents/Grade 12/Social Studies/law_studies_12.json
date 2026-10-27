@@ -69,7 +69,7 @@
               "I can compare the impact of different legal systems on different groups within society.",
               "I can evaluate a landmark court case and explain its lasting significance."
             ],
-            "short_label": "Evaluate Evidence",
+            "short_label": "Significance and Impact",
             "tag": "EE"
           }
         ]
@@ -103,7 +103,7 @@
               "I can compare legal systems across different countries or jurisdictions.",
               "I can explain why laws change and what forces drive legal reform."
             ],
-            "short_label": "Critical Analysis",
+            "short_label": "Continuity and Change",
             "tag": "CA"
           }
         ]
@@ -137,7 +137,7 @@
               "I can debate whether a law is just using ethical reasoning frameworks.",
               "I can evaluate the principles of restorative, retributive, and rehabilitative justice and argue for one approach."
             ],
-            "short_label": "Social Analysis",
+            "short_label": "Ethical Judgment",
             "tag": "SA"
           }
         ]

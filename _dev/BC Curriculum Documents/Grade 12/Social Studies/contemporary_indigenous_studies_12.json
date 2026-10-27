@@ -70,7 +70,7 @@
               "I can compare how the same event is viewed from Indigenous and settler perspectives.",
               "I can evaluate the significance of land in Indigenous worldviews compared to Western legal frameworks."
             ],
-            "short_label": "Indigenous Literature",
+            "short_label": "Significance",
             "tag": "IL"
           }
         ]
@@ -105,7 +105,7 @@
               "I can compare the contemporary situation of Indigenous peoples in Canada with those in other colonial nations.",
               "I can identify what aspects of colonial policy persist today in different forms."
             ],
-            "short_label": "Social Analysis",
+            "short_label": "Continuity and Change",
             "tag": "SA"
           }
         ]
@@ -122,7 +122,7 @@
               "I can identify the factors that drive Indigenous land rights movements.",
               "I can evaluate the intended and unintended consequences of reconciliation policies."
             ],
-            "short_label": "Learning Foundation",
+            "short_label": "Cause and Consequence",
             "tag": "LF"
           }
         ]
@@ -156,7 +156,7 @@
               "I can evaluate whether Canada has met its legal and moral obligations to Indigenous peoples.",
               "I can discuss what meaningful Indigenous consent looks like in resource development."
             ],
-            "short_label": "Communicate Findings",
+            "short_label": "Ethical Judgment",
             "tag": "CF"
           }
         ]
