@@ -50,6 +50,82 @@ describe('Router.parseUrl', () => {
     const result = Router.parseUrl('/student', '?id=s1&course=c1&tab=goals');
     expect(result.params).toEqual({ id: 's1', course: 'c1', tab: 'goals' });
   });
+
+  it('keeps a broken %-code as typed instead of throwing', () => {
+    const result = Router.parseUrl('/student', '?id=%E0%A4%A&course=c1');
+    expect(result.params).toEqual({ id: '%E0%A4%A', course: 'c1' });
+  });
+});
+
+describe('Router navigation flushes pending edits', () => {
+  it('blurs the active input before destroying the current page', () => {
+    var events = [];
+    PageDashboard.destroy = () => {
+      events.push('destroy');
+    };
+
+    var activeEl = {
+      tagName: 'INPUT',
+      isContentEditable: false,
+      blur: () => {
+        events.push('blur');
+      },
+    };
+    Object.defineProperty(document, 'activeElement', {
+      configurable: true,
+      get: () => activeEl,
+    });
+
+    Router.navigate('/assignments', true);
+
+    expect(events).toEqual(['blur', 'destroy']);
+  });
+
+  it('blurs contenteditable elements before route teardown', () => {
+    var blurred = false;
+    var activeEl = {
+      tagName: 'DIV',
+      isContentEditable: true,
+      blur: () => {
+        blurred = true;
+      },
+    };
+    Object.defineProperty(document, 'activeElement', {
+      configurable: true,
+      get: () => activeEl,
+    });
+
+    Router.navigate('/reports', true);
+
+    expect(blurred).toBe(true);
+  });
+});
+
+describe('Router: a page that sends the teacher on from its init', () => {
+  it('leaves the title of the page it went to', () => {
+    var origReplace = history.replaceState;
+    var origInit = PageDashboard.init;
+    // Let the address follow replaceState, as the browser's does.
+    history.replaceState = (state, title, url) => {
+      var q = url.indexOf('?');
+      location.pathname = q < 0 ? url : url.slice(0, q);
+      location.search = q < 0 ? '' : url.slice(q);
+    };
+    PageDashboard.init = () => {
+      PageDashboard.init = origInit;
+      Router.navigate('/reports', true);
+    };
+    try {
+      Router.navigate('/dashboard', true);
+      expect(location.pathname).toBe('/reports');
+      expect(document.title).toBe('FullVision \u2014 Reports');
+    } finally {
+      history.replaceState = origReplace;
+      PageDashboard.init = origInit;
+      location.pathname = '';
+      location.search = '';
+    }
+  });
 });
 
 describe('Router.legacyUrl', () => {
@@ -96,49 +172,5 @@ describe('Router.isRoute', () => {
     ['/login.html', '/teacher-mobile/', '/s/', '/privacy.html', '/'].forEach(p =>
       expect(Router.isRoute(p)).toBe(false),
     );
-  });
-});
-
-describe('Router navigation flushes pending edits', () => {
-  it('blurs the active input before destroying the current page', () => {
-    var events = [];
-    PageDashboard.destroy = () => {
-      events.push('destroy');
-    };
-
-    var activeEl = {
-      tagName: 'INPUT',
-      isContentEditable: false,
-      blur: () => {
-        events.push('blur');
-      },
-    };
-    Object.defineProperty(document, 'activeElement', {
-      configurable: true,
-      get: () => activeEl,
-    });
-
-    Router.navigate('/assignments', true);
-
-    expect(events).toEqual(['blur', 'destroy']);
-  });
-
-  it('blurs contenteditable elements before route teardown', () => {
-    var blurred = false;
-    var activeEl = {
-      tagName: 'DIV',
-      isContentEditable: true,
-      blur: () => {
-        blurred = true;
-      },
-    };
-    Object.defineProperty(document, 'activeElement', {
-      configurable: true,
-      get: () => activeEl,
-    });
-
-    Router.navigate('/reports', true);
-
-    expect(blurred).toBe(true);
   });
 });
