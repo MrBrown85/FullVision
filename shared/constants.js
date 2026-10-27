@@ -42,9 +42,11 @@ const DEFAULT_COURSES = {
     id: 'sci8',
     name: 'Science 8',
     block: 'A',
+    // Demo Mode's class: Proficiency, Mean, Emerging First (Colin, 2026-10-26).
     gradingSystem: 'proficiency',
-    calcMethod: 'mostRecent',
+    calcMethod: 'average',
     decayWeight: 0.65,
+    levelOrder: 'asc',
     curriculumTags: ['SCI8'],
   },
 };
