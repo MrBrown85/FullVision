@@ -746,7 +746,7 @@ window.PageAssignments = (function () {
         '" data-module-id="__none__" data-folder-drop="__none__">' +
         '<div class="mod-folder-header" data-action="toggleModuleFolder" data-uid="__none__">' +
         '<span class="mod-folder-chevron">\u25B6</span>' +
-        '<span class="mod-folder-name" style="font-size:0.95rem;font-weight:500;color:var(--text-3)">Unassigned</span>' +
+        '<span class="mod-folder-name" style="font-size:0.95rem;font-weight:500;color:var(--text-3)">Ungrouped Assignments</span>' +
         '<span class="mod-folder-meta">' +
         ungrouped.length +
         ' assignment' +
@@ -4611,7 +4611,7 @@ window.PageAssignments = (function () {
   function deleteModule(moduleId, assessCount) {
     var msg =
       assessCount > 0
-        ? assessCount + ' assessment(s) use this module. They will become unassigned. Delete anyway?'
+        ? assessCount + ' assessment(s) use this module. They will move to Ungrouped Assignments. Delete anyway?'
         : 'Delete this module?';
     showConfirm('Delete Module', msg, 'Delete', 'danger', function () {
       var cid = activeCourse;
