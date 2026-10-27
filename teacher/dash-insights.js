@@ -685,7 +685,7 @@ window.DashInsights = (function () {
   }
 
   /* ── Students: Cards | Grid ─────────────────────────────── */
-  function studentsHeaderHtml(view, namesHidden) {
+  function studentsHeaderHtml(view) {
     var seg = function (id, label) {
       var on = view === id;
       return (
@@ -705,11 +705,6 @@ window.DashInsights = (function () {
       seg('cards', 'Cards') +
       seg('grid', 'Grid') +
       '</div>' +
-      '<button type="button" class="dash-ob2-tool" data-action="studentNames" aria-pressed="' +
-      !!namesHidden +
-      '">' +
-      (namesHidden ? 'Show Names' : 'Hide Names') +
-      '</button>' +
       '</div>'
     );
   }

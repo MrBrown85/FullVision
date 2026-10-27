@@ -16,13 +16,11 @@ window.PageDashboard = (function () {
   var searchQuery = '';
   var _dashSearchTimer = null;
 
-  /* The Observations card (dash-observations.js): its tab and Hide names
-     are remembered on this device; a highlight is not. */
+  /* The Observations card (dash-observations.js): its tab is remembered on
+     this device; a highlight is not. */
   var OBS_TAB_KEY = 'fv-dash-obs-tab';
-  var HIDE_NAMES_KEY = 'fv-dash-hide-names';
   var obsTab = 'week';
   var obsHighlight = null;
-  var namesHidden = false;
   var _obsWidth = 0;
   var _obsNavKey = null;
   var _resizeTimer = null;
@@ -470,7 +468,7 @@ window.PageDashboard = (function () {
     obsHighlight = _lastObsState.highlight;
 
     /* -- Students: cards or the grid -- */
-    if (allStudents.length) html += DashInsights.studentsHeaderHtml(studentView, namesHidden);
+    if (allStudents.length) html += DashInsights.studentsHeaderHtml(studentView);
     if (studentView === 'grid' && students.length) html += DashInsights.studentGridHtml(cid, students, allStudents);
     else html += StudentCards.renderStudentCards(cid, students, allStudents, sections, assessments, allScores, flags);
 
@@ -500,7 +498,6 @@ window.PageDashboard = (function () {
     _lastObsState = {
       tab: obsTab,
       highlight: obsHighlight,
-      namesHidden: namesHidden,
       width: _obsWidth || _estimateObsWidth(),
     };
     return _lastObsState;
@@ -528,7 +525,7 @@ window.PageDashboard = (function () {
     return document.getElementById('dash-obs-card');
   }
 
-  /* Re-render only the Observations card (tabs, flags, Hide names). */
+  /* Re-render only the Observations card (tabs, flags). */
   function renderObsCard(focusKey, depth) {
     var card = _obsCard();
     if (!card) return;
@@ -675,18 +672,6 @@ window.PageDashboard = (function () {
     renderObsCard('tab-' + tab);
   }
 
-  function _setNamesHidden(hidden) {
-    namesHidden = !!hidden;
-    _writePref(HIDE_NAMES_KEY, namesHidden ? '1' : null);
-    document.body.classList.toggle('fv-names-hidden', namesHidden);
-    _hidePop();
-    // The Students heading has its own Hide Names button.
-    Array.prototype.forEach.call(document.querySelectorAll('[data-action="studentNames"]'), function (b) {
-      b.setAttribute('aria-pressed', String(namesHidden));
-      b.textContent = namesHidden ? 'Show Names' : 'Hide Names';
-    });
-  }
-
   /* The open proficiency segment's list sits under the segment, inside the
      window. */
   function _placeMixPop() {
@@ -752,8 +737,6 @@ window.PageDashboard = (function () {
     var pop = document.getElementById('dash-ob2-pop');
     if (!pop) return;
     var isCell = t.classList.contains('dash-ob2-cell');
-    // While names are hidden the notes stay closed; they can name students.
-    if (isCell && namesHidden) return;
     var html = isCell
       ? DashObservations.popoverHtml(t.getAttribute('data-sid'), Number(t.getAttribute('data-wi')))
       : '<div>' + esc(t.getAttribute('aria-label') || '') + '</div>';
@@ -919,10 +902,6 @@ window.PageDashboard = (function () {
         obsHighlight = obsHighlight === key ? null : key;
         renderObsCard('flag-' + key);
       },
-      obsNames: function () {
-        _setNamesHidden(!namesHidden);
-        renderObsCard('names');
-      },
       obsAdd: function () {
         openObsDialog(el.dataset.sid);
       },
@@ -970,10 +949,6 @@ window.PageDashboard = (function () {
         studentView = el.dataset.view === 'grid' ? 'grid' : 'cards';
         saveDashboardPrefs({ studentView: studentView });
         render();
-      },
-      studentNames: function () {
-        _setNamesHidden(!namesHidden);
-        renderObsCard(null);
       },
       // The sort menu is handled on change (_handleChange). Handling it on
       // click too re-rendered the toolbar as the menu opened, which closed it
@@ -1046,8 +1021,6 @@ window.PageDashboard = (function () {
     obsHighlight = null;
     _obsWidth = 0;
     _obsNavKey = null;
-    namesHidden = _readPref(HIDE_NAMES_KEY) === '1';
-    document.body.classList.toggle('fv-names-hidden', namesHidden);
     var dashPrefs = getDashboardPrefs();
     studentView = dashPrefs.studentView === 'grid' ? 'grid' : 'cards';
     helpRule = DashInsights.readRule(dashPrefs.helpRule);
@@ -1109,7 +1082,6 @@ window.PageDashboard = (function () {
     _hidePop();
     window.removeEventListener('resize', _onResize);
     clearTimeout(_resizeTimer);
-    document.body.classList.remove('fv-names-hidden');
     CM.destroy();
     _listeners.forEach(function (l) {
       document.removeEventListener(l.type, l.handler, l.options);

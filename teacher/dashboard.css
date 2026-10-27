@@ -911,7 +911,7 @@ a.dash-ins-name:hover {
   color: var(--text-2);
 }
 
-/* Students heading: Cards | Grid and Hide Names. */
+/* Students heading: Cards | Grid. */
 .dash-students-head {
   display: flex;
   align-items: center;
@@ -1078,23 +1078,6 @@ a.dash-ins-name:hover {
   align-items: center;
   flex-wrap: wrap;
   gap: 8px 12px;
-}
-.dash-ob2-tool {
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  color: var(--text-2);
-  background: var(--surface);
-  cursor: pointer;
-  padding: 4px 10px;
-}
-.dash-ob2-tool {
-  border: 1px solid var(--divider-strong);
-  border-radius: 7px;
-}
-.dash-ob2-tool[aria-pressed='true'] {
-  background: var(--text);
-  border-color: var(--text);
-  color: var(--surface);
 }
 .dash-ob2-record,
 .dash-ob2-clear a,
@@ -1561,32 +1544,6 @@ a.dash-ins-name:hover {
   color: var(--link);
 }
 
-/* Hide names: every student name on the dashboard is blurred, for when the
-   screen is on the classroom TV. Grades stay visible. */
-body.fv-names-hidden .page-dashboard .dash-ob2-name,
-body.fv-names-hidden .page-dashboard .dash-card-name,
-body.fv-names-hidden .page-dashboard .dash-card-pronouns,
-body.fv-names-hidden .page-dashboard .dash-card-stunum,
-body.fv-names-hidden .page-dashboard .dash-desig-wrap,
-body.fv-names-hidden .page-dashboard .dist-seg .dist-tip-name,
-body.fv-names-hidden .page-dashboard .bday-avatar,
-body.fv-names-hidden .page-dashboard .dash-bday-name,
-body.fv-names-hidden .page-dashboard .dash-ins-name,
-body.fv-names-hidden .dash-mix-pop .dash-ins-name,
-body.fv-names-hidden .obsc-dialog .obsc-dialog-sub,
-body.fv-names-hidden .obsc-dialog .obsc-chip-student,
-body.fv-names-hidden .obsc-dialog .obsc-flag-btn {
-  filter: blur(0.4em);
-  user-select: none;
-}
-/* The search box stays a control: only a typed name is blurred, not the
-   border or the placeholder. */
-body.fv-names-hidden .dash-search-input:not(:placeholder-shown) {
-  color: transparent;
-  caret-color: var(--text);
-  text-shadow: 0 0 0.4em var(--text);
-}
-
 /* ── Birthday Widget ─────────────────────────────────────── */
 .dash-birthday-box {
   margin-top: 12px;
@@ -1687,7 +1644,6 @@ body.fv-names-hidden .dash-search-input:not(:placeholder-shown) {
   border-radius: 8px;
   background: var(--overlay-hover);
   color: var(--text);
-  /* Not the text colour: Hide Names turns it transparent at once. */
   transition:
     background-color 0.2s,
     border-color 0.2s,
