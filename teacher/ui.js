@@ -61,10 +61,6 @@ function renderDock(activePage, rightHTML) {
       ? '<button class="tb-user-signout" data-action="resetDemoData">Reset Demo Data</button>'
       : '';
   const userMenu = `<div class="tb-user-menu">
-    <div class="tb-sync-anchor">
-      <button class="tb-sync-badge obs-badge" id="tb-sync-badge" data-action="toggleSyncPopover" title="View sync status" aria-label="View sync status" aria-expanded="false" hidden>0</button>
-      <div class="tb-sync-popover" id="tb-sync-popover" hidden></div>
-    </div>
     <button class="tb-user-btn" data-action="toggleUserMenu" title="Account" aria-label="Account menu" aria-expanded="false" aria-haspopup="true">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="5" r="3"/><path d="M2 14c0-3 2.5-5 6-5s6 2 6 5"/></svg>
       <span class="tb-user-name" id="tb-user-name"></span>
@@ -108,77 +104,12 @@ function _getQueueStats() {
   };
 }
 
-// Failed (dead-lettered) writes are not listed for teachers: the list confused
-// more than it helped (Oct 2026). The sync dot turns red while any exist.
-function _getUnsyncedCount(stats) {
-  return Number(stats.queued || 0);
-}
-
-function _formatRelativeTime(iso) {
-  if (!iso) return 'Not yet';
-  var ts = Date.parse(iso);
-  if (!ts) return 'Unknown';
-  var diffMs = Date.now() - ts;
-  if (diffMs < 60000) return 'Just now';
-  var diffMin = Math.round(diffMs / 60000);
-  if (diffMin < 60) return diffMin === 1 ? '1 minute ago' : diffMin + ' minutes ago';
-  var diffHr = Math.round(diffMin / 60);
-  if (diffHr < 24) return diffHr === 1 ? '1 hour ago' : diffHr + ' hours ago';
-  var diffDay = Math.round(diffHr / 24);
-  return diffDay === 1 ? '1 day ago' : diffDay + ' days ago';
-}
-
-function _humanizeEndpoint(endpoint) {
-  return (endpoint || 'queued write')
-    .replace(/^v2\./, '')
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, function (c) {
-      return c.toUpperCase();
-    });
-}
-
-function _renderSyncPopoverContent(stats) {
-  var total = _getUnsyncedCount(stats);
-  var summary = total > 0 ? total + ' unsynced' : 'All changes saved';
-  var pendingCopy = stats.queued === 1 ? '1 pending write' : stats.queued + ' pending writes';
-  var meta = [pendingCopy];
-  return `<div class="tb-sync-popover-card">
-    <div class="tb-sync-popover-header">
-      <div>
-        <div class="tb-sync-popover-title">${esc(summary)}</div>
-        <div class="tb-sync-popover-meta">${esc(meta.join(' · '))}</div>
-      </div>
-      <button class="tb-sync-action" data-action="retrySyncQueue">Retry</button>
-    </div>
-    <div class="tb-sync-popover-row">
-      <span>Connection</span>
-      <strong>${stats.online ? 'Online' : 'Offline'}</strong>
-    </div>
-    <div class="tb-sync-popover-row">
-      <span>Last sync</span>
-      <strong>${esc(_formatRelativeTime(stats.lastFlushAt))}</strong>
-    </div>
-  </div>`;
-}
-
-function _setSyncPopoverOpen(isOpen) {
-  var popover = document.getElementById('tb-sync-popover');
-  var badge = document.getElementById('tb-sync-badge');
-  if (!popover) return;
-  popover.hidden = !isOpen;
-  popover.classList.toggle('open', !!isOpen);
-  if (badge) badge.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-}
-
-function _closeSyncPopover() {
-  _setSyncPopoverOpen(false);
-}
-
+// Sync shows only as the dot: no count, popover or list of failed writes
+// (Oct 2026). Teachers found the number confusing; the dot's colour and
+// tooltip say all they need.
 function refreshSyncStatusUI() {
   var stats = _getQueueStats();
-  var total = _getUnsyncedCount(stats);
-  var badge = document.getElementById('tb-sync-badge');
-  var popover = document.getElementById('tb-sync-popover');
+  var total = stats.queued;
   var banner = document.getElementById('offline-banner');
   var dot = document.getElementById('sync-indicator-dot');
   var body = document.body;
@@ -188,18 +119,6 @@ function refreshSyncStatusUI() {
   }
   if (body && body.classList && typeof body.classList.toggle === 'function') {
     body.classList.toggle('offline-active', !stats.online);
-  }
-
-  if (badge) {
-    var label = total === 1 ? '1 unsynced change' : total + ' unsynced changes';
-    badge.hidden = total <= 0;
-    badge.textContent = total > 99 ? '99+' : String(total);
-    badge.title = label;
-    badge.setAttribute('aria-label', label);
-  }
-
-  if (popover) {
-    popover.innerHTML = _renderSyncPopoverContent(stats);
   }
 
   if (dot) {
@@ -442,7 +361,6 @@ document.addEventListener('click', function (e) {
     menu.classList.remove('open');
     const button = menu.querySelector('.tb-user-btn');
     if (button) button.setAttribute('aria-expanded', 'false');
-    _closeSyncPopover();
   }
 });
 
@@ -1157,12 +1075,6 @@ document.addEventListener('click', function (e) {
       var isOpen = el.parentElement.classList.toggle('open');
       el.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
     },
-    toggleSyncPopover: function () {
-      if (el.hidden) return;
-      var popover = document.getElementById('tb-sync-popover');
-      if (!popover) return;
-      _setSyncPopoverOpen(popover.hidden);
-    },
     signOut: async function () {
       var res = await signOut();
       if (!res || !res.unsent) return;
@@ -1223,11 +1135,6 @@ document.addEventListener('click', function (e) {
     },
     retrySyncQueue: async function () {
       await retrySyncQueue();
-    },
-    dismissSyncDeadLetter: function () {
-      if (!window.v2Queue || typeof window.v2Queue.dismissDeadLetter !== 'function') return;
-      window.v2Queue.dismissDeadLetter(el.dataset.id);
-      refreshSyncStatusUI();
     },
   };
   if (handlers[action]) {
