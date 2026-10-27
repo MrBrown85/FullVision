@@ -760,7 +760,7 @@ window.PageAssignments = (function () {
                 return renderAssessCard(a, true);
               })
               .join('')
-          : '<div class="mod-folder-empty">Drop assignments here to unassign from a module</div>') +
+          : '<div class="mod-folder-empty">Drop an assignment here to take it out of its module</div>') +
         '</div>' +
         '</div>';
     }
