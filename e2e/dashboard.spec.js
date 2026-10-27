@@ -33,29 +33,29 @@ test.describe('Dashboard & Navigation', () => {
   test('navigate to Assignments via dock', async ({ page }) => {
     await page.locator('#dock-mount a:has-text("Assignments")').click();
     await page.waitForTimeout(500);
-    expect(page.url()).toContain('#/assignments');
+    expect(page.url()).toContain('/assignments');
   });
 
   test('navigate to Gradebook via dock', async ({ page }) => {
     await page.locator('#dock-mount a:has-text("Gradebook")').click();
     await page.waitForTimeout(500);
-    expect(page.url()).toContain('#/gradebook');
+    expect(page.url()).toContain('/gradebook');
   });
 
   test('navigate to Observations via dock', async ({ page }) => {
     await page.locator('#dock-mount a:has-text("Observations")').click();
     await page.waitForTimeout(500);
-    expect(page.url()).toContain('#/observations');
+    expect(page.url()).toContain('/observations');
   });
 
   test('navigate to Reports via dock', async ({ page }) => {
     await page.locator('#dock-mount a:has-text("Reports")').click();
     await page.waitForTimeout(500);
-    expect(page.url()).toContain('#/reports');
+    expect(page.url()).toContain('/reports');
   });
 
   test('hash navigation updates page content', async ({ page }) => {
-    await navigateTo(page, '#/assignments');
+    await navigateTo(page, '/assignments');
     // Should no longer show dashboard content
     const main = page.locator('#main');
     await expect(main).not.toBeEmpty();
@@ -117,7 +117,7 @@ test.describe('Dashboard observation coverage', () => {
     const row = page.locator('#dash-obs-card .dash-ob2-row[data-sid="stu-001"]');
     await expect(row.locator('.dash-ob2-cell.has i[data-type="strength"]')).toHaveCount(1);
     await row.locator('.dash-ob2-cell.has').click();
-    await expect(page).toHaveURL(/#\/student\?id=stu-001&course=sci8&tab=evidence&ob=o1/);
+    await expect(page).toHaveURL(/\/student\?id=stu-001&course=sci8&tab=evidence&ob=o1/);
     await expect(page.locator('#stu-tab-evidence')).toHaveAttribute('aria-selected', 'true');
   });
 });

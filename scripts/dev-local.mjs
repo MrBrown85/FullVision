@@ -61,9 +61,21 @@ const MIME = {
   '.webmanifest': 'application/manifest+json',
 };
 
+// The desktop app's pages, served as app.html like netlify.toml does.
+const APP_ROUTES = [
+  '/dashboard',
+  '/assignments',
+  '/student',
+  '/gradebook',
+  '/observations',
+  '/observations/starters',
+  '/reports',
+];
+
 function resolvePath(urlPath) {
   if (urlPath === '/' || urlPath === '') return '/login.html';
   if (urlPath === '/app.html') return '/teacher/app.html';
+  if (APP_ROUTES.includes(urlPath.replace(/\/$/, ''))) return '/teacher/app.html';
   return urlPath;
 }
 

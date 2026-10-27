@@ -75,8 +75,9 @@ test.describe('Mobile: Overflow Prevention', () => {
 
   test('no horizontal overflow on any page at 320px', async ({ page }) => {
     await page.setViewportSize(SMALL_MOBILE);
+    await gotoApp(page, '/dashboard');
     for (const p of pages) {
-      await navigateTo(page, `#${p.route}`);
+      await navigateTo(page, p.route);
       await page.waitForTimeout(500);
       await assertNoOverflow(page);
     }
@@ -113,7 +114,7 @@ test.describe('Mobile: Dock Navigation', () => {
     await gotoApp(page, '/dashboard');
     await page.locator('.tb-seg a.tb-seg-link:has-text("Assignments")').click();
     await page.waitForTimeout(500);
-    expect(page.url()).toContain('#/assignments');
+    expect(page.url()).toContain('/assignments');
   });
 
   test('dock labels hidden at 320px but icons remain visible', async ({ page }) => {
@@ -373,7 +374,7 @@ test.describe('Mobile: Dashboard Content', () => {
     if (await nameLink.isVisible()) {
       await nameLink.click();
       await page.waitForTimeout(500);
-      expect(page.url()).toContain('#/student');
+      expect(page.url()).toContain('/student');
     }
   });
 });

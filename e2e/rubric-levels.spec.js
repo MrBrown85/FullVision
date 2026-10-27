@@ -47,7 +47,7 @@ async function seedRubric(page) {
    row's level buttons, as texts left to right. */
 async function openCard(page) {
   await page.evaluate(() => {
-    window.location.hash = '#/assignments';
+    window.Router.navigate('/assignments');
   });
   const title = page.locator('text=Rubric Lab Report').first();
   await expect(title).toBeVisible();
@@ -104,7 +104,7 @@ test.describe('Rubric Levels', () => {
 
     // Class Management → Grading → Rubric Levels.
     await page.evaluate(() => {
-      window.location.hash = '#/dashboard';
+      window.Router.navigate('/dashboard');
     });
     await page.getByRole('button', { name: 'Class Management' }).first().click();
     await page.locator('[data-action="cmSetTab"][data-tab="grading"]').click();

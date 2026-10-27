@@ -10,7 +10,7 @@ import { test, expect } from '@playwright/test';
 async function enterDemo(page) {
   await page.goto('/login.html');
   await page.locator('#demo-mode-btn').click();
-  await page.waitForURL(/teacher\/app\.html/);
+  await page.waitForURL(/\/dashboard/);
 }
 
 async function meiObs(page) {
@@ -20,7 +20,7 @@ async function meiObs(page) {
 test.describe('Competency card evidence drawer', () => {
   test('lists scores, adds a linked observation with a level, and leaves the levels alone', async ({ page }) => {
     await enterDemo(page);
-    await page.goto('/teacher/app.html#/student?id=st23&course=sci8');
+    await page.goto('/student?id=st23&course=sci8');
 
     // The first competency row with scores (the Competencies tab opens first).
     const card = page

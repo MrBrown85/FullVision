@@ -8,7 +8,7 @@ import { test, expect } from '@playwright/test';
 async function enterDemo(page) {
   await page.goto('/login.html');
   await page.locator('#demo-mode-btn').click();
-  await page.waitForURL(/teacher\/app\.html/);
+  await page.waitForURL(/\/dashboard/);
 }
 
 async function openQuestionnaires(page) {

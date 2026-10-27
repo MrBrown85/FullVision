@@ -11,8 +11,8 @@ test.use({ viewport: { width: 1440, height: 900 } });
 
 async function open(page, hash) {
   await page.goto('/login.html?demo=1');
-  await page.waitForURL(/app\.html/, { timeout: 15000 });
-  await page.goto(page.url().replace(/#.*/, hash));
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  await page.evaluate(r => window.Router.navigate(r), hash);
 }
 
 /* The page's boxes (rounded, filled, edged, not inside another box): their
@@ -72,7 +72,7 @@ const toolbarInset = (page, selector) =>
   page.evaluate(sel => parseFloat(getComputedStyle(document.querySelector(sel)).paddingLeft), selector);
 
 test('Assignments: 12px edges, 12px between cards, toolbar in line', async ({ page }) => {
-  await open(page, '#/assignments');
+  await open(page, '/assignments');
   await page.locator('.assess-card').first().waitFor();
   const m = await measure(page, '.assess-card');
   expect([m.left, m.right]).toEqual([12, 12]);
@@ -81,7 +81,7 @@ test('Assignments: 12px edges, 12px between cards, toolbar in line', async ({ pa
 });
 
 test('Observations: 12px edges, 12px between cards in a day, capture box in line', async ({ page }) => {
-  await open(page, '#/observations');
+  await open(page, '/observations');
   await page.locator('.obs-card').first().waitFor();
   const m = await measure(page, '.obs-feed-date-group:nth-of-type(2) .obs-card');
   expect(m.left).toBe(12);
@@ -95,7 +95,7 @@ test('Observations: 12px edges, 12px between cards in a day, capture box in line
 });
 
 test('Reports: 12px edges and 12px between the header and every panel', async ({ page }) => {
-  await open(page, '#/reports');
+  await open(page, '/reports');
   await page.locator('.tq-panel').first().waitFor();
   const m = await measure(page, '.tq-wrap > .student-header-top, .tq-wrap > .tq-panel');
   expect([m.left, m.right]).toEqual([12, 12]);
@@ -103,7 +103,7 @@ test('Reports: 12px edges and 12px between the header and every panel', async ({
 });
 
 test('Dashboard: the toolbar is in line with the boxes', async ({ page }) => {
-  await open(page, '#/dashboard');
+  await open(page, '/dashboard');
   await page.locator('.dash-toolbar').waitFor();
   expect(await toolbarInset(page, '.dash-toolbar')).toBe(12);
 });
@@ -111,7 +111,7 @@ test('Dashboard: the toolbar is in line with the boxes', async ({ page }) => {
 // The student page and its Term Questionnaire share a header card: same
 // place, same size, no counts on either (Colin, 2026-10-24).
 test('Student page: 12px edges and gaps; its header matches the Term Questionnaire', async ({ page }) => {
-  await open(page, '#/student?id=st27&tab=comps');
+  await open(page, '/student?id=st27&tab=comps');
   await page.locator('.stu-panel').waitFor();
   const m = await measure(page, '.student-header-top, .stu-tabs, .stu-panel');
   expect([m.left, m.right]).toEqual([12, 12]);
@@ -124,7 +124,7 @@ test('Student page: 12px edges and gaps; its header matches the Term Questionnai
       return [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height), Math.round(b.height)];
     });
   const onStudent = await box();
-  await page.goto(page.url().replace(/#.*/, '#/reports?tab=questionnaire&student=st27'));
+  await page.evaluate(r => window.Router.navigate(r), '/reports?tab=questionnaire&student=st27');
   await page.locator('.tq-panel').first().waitFor();
   expect(await box()).toEqual(onStudent);
   await expect(page.locator('.student-header-top .sh-stat')).toHaveCount(0);

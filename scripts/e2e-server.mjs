@@ -22,8 +22,7 @@ const PORT = Number(process.env.PORT) || 8347;
 // The edge function reads its credentials from Netlify.env.
 globalThis.Netlify = {
   env: {
-    get: name =>
-      ({ SUPABASE_URL: 'https://e2e-test.supabase.co', SUPABASE_KEY: 'e2e-test-anon-key' })[name] || '',
+    get: name => ({ SUPABASE_URL: 'https://e2e-test.supabase.co', SUPABASE_KEY: 'e2e-test-anon-key' })[name] || '',
   },
 };
 
@@ -43,11 +42,22 @@ const MIME = {
   '.woff2': 'font/woff2',
 };
 
-// netlify.toml's rewrites the tests use.
+// netlify.toml's rewrites the tests use, including the desktop app's pages.
+const APP_ROUTES = [
+  '/dashboard',
+  '/assignments',
+  '/student',
+  '/gradebook',
+  '/observations',
+  '/observations/starters',
+  '/reports',
+];
 const REWRITES = { '/': '/login.html', '/app.html': '/teacher/app.html' };
+for (const route of APP_ROUTES) REWRITES[route] = '/teacher/app.html';
 
 async function staticResponse(urlPath) {
-  let path = REWRITES[urlPath] || urlPath;
+  const bare = urlPath.length > 1 ? urlPath.replace(/\/$/, '') : urlPath;
+  let path = REWRITES[bare] || urlPath;
   if (path.endsWith('/')) path += 'index.html';
   const file = join(DIST, path);
   if (!file.startsWith(DIST)) return new Response('Forbidden', { status: 403 });

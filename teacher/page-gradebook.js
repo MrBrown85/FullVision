@@ -367,7 +367,7 @@ window.PageGradebook = (function () {
         ? '<button class="tb-toggle-btn" data-action="exportScoresCSV" title="Export CSV">\u2913 Export</button>'
         : '') +
       '<button class="tb-action-btn tb-action-secondary" data-action="printGrades">Print Grades</button>' +
-      '<a class="tb-action-btn" role="link" tabindex="0" data-href="#/assignments?course=' +
+      '<a class="tb-action-btn" role="link" tabindex="0" data-href="/assignments?course=' +
       activeCourse +
       '&new=1">+ New Assessment</a>' +
       '</div>';
@@ -445,7 +445,7 @@ window.PageGradebook = (function () {
         '<div style="font-family:var(--font-base);font-size:0.95rem;margin-bottom:4px">No assignments found' +
         secLabel +
         '.</div>' +
-        '<div style="font-family:var(--font-base);font-size:0.875rem">Try adjusting your filters or <a role="link" tabindex="0" data-href="#/assignments?course=' +
+        '<div style="font-family:var(--font-base);font-size:0.875rem">Try adjusting your filters or <a role="link" tabindex="0" data-href="/assignments?course=' +
         cid +
         '" style="color:var(--link)">create a new assessment</a>.</div>' +
         '</div>';
@@ -681,7 +681,7 @@ window.PageGradebook = (function () {
     return (
       '<a class="gb-grid-rowhead-name" role="link" tabindex="0" data-sid="' +
       esc(s.id) +
-      '" data-href="#/student?id=' +
+      '" data-href="/student?id=' +
       encodeURIComponent(s.id) +
       '&course=' +
       encodeURIComponent(cid) +
@@ -846,7 +846,7 @@ window.PageGradebook = (function () {
         '" style="width:' +
         g.groupW +
         'px">' +
-        '<a class="gb-assess-title" role="link" tabindex="0" data-href="#/assignments?course=' +
+        '<a class="gb-assess-title" role="link" tabindex="0" data-href="/assignments?course=' +
         cid +
         '&open=' +
         a.id +
@@ -2099,7 +2099,7 @@ window.PageGradebook = (function () {
       if (!item) return;
       var action = item.dataset.ctx;
       if (action === 'scoreMode') enterScoreMode(aid);
-      else if (action === 'editAssess') Router.navigate('#/assignments?course=' + activeCourse + '&open=' + aid);
+      else if (action === 'editAssess') Router.navigate('/assignments?course=' + activeCourse + '&open=' + aid);
       else if (action === 'toggleZeroPolicy') {
         var assessList = getAssessments(activeCourse);
         var a = assessList.find(function (x) {
@@ -2699,7 +2699,7 @@ window.PageGradebook = (function () {
       clearStudentFilter: function () {
         filterStudentIds = [];
         // Drop ?students= from the address so a reload shows everyone too.
-        history.replaceState(null, '', '#/gradebook?course=' + activeCourse);
+        Router.setUrl('/gradebook?course=' + activeCourse);
         render();
       },
       toggleCategoryFilter: function () {

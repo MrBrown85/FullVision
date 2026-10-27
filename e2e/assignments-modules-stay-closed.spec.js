@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test';
 // and back (Colin, 2026-10-24).
 test('a closed module stays closed after leaving Assignments', async ({ page }) => {
   await page.goto('/login.html?demo=1');
-  await page.waitForURL(/app\.html/, { timeout: 15000 });
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   // Two modules, each holding one assessment.
   await page.evaluate(() => {
     const cid = getActiveCourse();
@@ -18,16 +18,16 @@ test('a closed module stays closed after leaving Assignments', async ({ page }) 
     list[1].moduleId = 'mod-b';
     saveAssessments(cid, list);
   });
-  await page.goto(page.url().replace(/#.*/, '#/assignments'));
+  await page.evaluate(r => window.Router.navigate(r), '/assignments');
   const id = 'mod-a';
   const folder = page.locator('.mod-folder[data-module-id="' + id + '"]');
   await expect(folder).toHaveClass(/\bopen\b/);
   await folder.locator('[data-action="toggleModuleFolder"]').first().click();
   await expect(folder).not.toHaveClass(/\bopen\b/);
 
-  await page.goto(page.url().replace(/#.*/, '#/gradebook'));
+  await page.evaluate(r => window.Router.navigate(r), '/gradebook');
   await expect(page.locator('.mod-folder')).toHaveCount(0);
-  await page.goto(page.url().replace(/#.*/, '#/assignments'));
+  await page.evaluate(r => window.Router.navigate(r), '/assignments');
   await expect(folder).not.toHaveClass(/\bopen\b/);
   await expect(page.locator('.mod-folder[data-module-id="mod-b"]')).toHaveClass(/\bopen\b/);
 

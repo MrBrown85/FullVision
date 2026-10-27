@@ -27,7 +27,7 @@ function portalRedirect(user) {
       return (window.location.href = '/parent/');
     case 'teacher':
     default:
-      return (window.location.href = preferMobile ? '/teacher-mobile/' : '/teacher/app.html');
+      return (window.location.href = preferMobile ? '/teacher-mobile/' : '/dashboard');
   }
 }
 
@@ -146,14 +146,14 @@ async function maybePromptRestoreAccount(user) {
     localStorage.setItem('gb-demo-mode', '1');
     localStorage.setItem('gb-demo-mode-token', _demoToken());
     var preferMobile = window.innerWidth <= 768 && localStorage.getItem('td-mobile-pref') !== 'desktop';
-    window.location.href = preferMobile ? '/teacher-mobile/' : '/teacher/app.html';
+    window.location.href = preferMobile ? '/teacher-mobile/' : '/dashboard';
     return;
   }
   // Dev mode: only skip login on localhost when explicitly opted in with ?dev=1
   var hasConfig = !!(window.__ENV && window.__ENV.SUPABASE_URL && !window.__ENV.SUPABASE_URL.startsWith('__'));
   var isDevOptIn = new URLSearchParams(location.search).get('dev') === '1';
   if (location.hostname === 'localhost' && !hasConfig && isDevOptIn) {
-    window.location.href = '/teacher/app.html';
+    window.location.href = '/dashboard';
     return;
   }
   try {
@@ -311,7 +311,7 @@ function enterDemoMode() {
   // Mobile pref: respect any existing td-mobile-pref override; otherwise let
   // viewport choose desktop vs mobile entry.
   var preferMobile = window.innerWidth <= 768 && localStorage.getItem('td-mobile-pref') !== 'desktop';
-  window.location.href = preferMobile ? '/teacher-mobile/' : '/teacher/app.html';
+  window.location.href = preferMobile ? '/teacher-mobile/' : '/dashboard';
 }
 
 /* ── Forgot password ───────────────────────────────────────── */

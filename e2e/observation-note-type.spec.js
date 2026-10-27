@@ -13,7 +13,7 @@ async function enterDemo(page, { phone = false } = {}) {
   await page.setViewportSize(phone ? { width: 390, height: 844 } : { width: 1440, height: 900 });
   await page.goto('/login.html');
   await page.locator('#demo-mode-btn').click();
-  await page.waitForURL(phone ? /teacher-mobile\// : /teacher\/app\.html/);
+  await page.waitForURL(phone ? /teacher-mobile\// : /\/dashboard/);
 }
 
 async function shot(target, name) {
@@ -39,7 +39,7 @@ for (const scheme of ['light', 'dark']) {
 
     test('the strip adds a Note with its chip or !note; the card shows a yellow block', async ({ page }) => {
       await enterDemo(page);
-      await page.goto('/teacher/app.html#/observations?course=sci8');
+      await page.goto('/observations?course=sci8');
       const strip = page.locator('#obs-capture');
       await expect(strip.locator('[data-part="who"] .obsc-chip-type')).toHaveText([
         'Strength',
@@ -79,7 +79,7 @@ for (const scheme of ['light', 'dark']) {
 
     test('the editor has a Note tab, and the Type filter shows only Notes', async ({ page }) => {
       await enterDemo(page);
-      await page.goto('/teacher/app.html#/observations?course=sci8');
+      await page.goto('/observations?course=sci8');
       const card = page.locator('.obs-card', { hasText: 'Ines consistently follows safety procedures' });
       await card.locator('.obs-card-text').click();
       const ed = page.locator('#obs-focus-card');
@@ -104,7 +104,7 @@ for (const scheme of ['light', 'dark']) {
       page,
     }) => {
       await enterDemo(page);
-      await page.goto('/teacher/app.html#/dashboard?course=sci8');
+      await page.goto('/dashboard?course=sci8');
       const obsCard = page.locator('#dash-obs-card');
       await expect(obsCard.locator('.dash-ob2-row[data-sid]').first()).toBeVisible();
       await obsCard.getByRole('tab', { name: 'By Week' }).click();
@@ -141,7 +141,7 @@ for (const scheme of ['light', 'dark']) {
 
     test("the student page's Evidence panel shows the Note block and the timeline key", async ({ page }) => {
       await enterDemo(page);
-      await page.goto('/teacher/app.html#/student?id=st1&course=sci8');
+      await page.goto('/student?id=st1&course=sci8');
       await page.locator('#stu-tab-evidence').click();
       const panel = page.locator('#ev-panel');
       await expect(panel.locator('.ev-tl-key')).toHaveText([
@@ -163,7 +163,7 @@ for (const scheme of ['light', 'dark']) {
 
 test('a starter can default to Note, and picking it sets the Note chip', async ({ page }) => {
   await enterDemo(page);
-  await page.goto('/teacher/app.html#/observations/starters');
+  await page.goto('/observations/starters');
   const section = page.locator('.ms-page');
   await expect(section).toBeVisible();
   // Demo Mode's teacher already has starters.
@@ -182,7 +182,7 @@ test('a starter can default to Note, and picking it sets the Note chip', async (
   await expect(row.locator('.obs-pill-type')).toHaveText('Note');
   await shot(section, 'desktop-cm-starter-light');
 
-  await page.goto('/teacher/app.html#/observations?course=sci8');
+  await page.goto('/observations?course=sci8');
   const input = page.locator('#capture-input');
   await input.click();
   await input.pressSequentially('@Liam ');

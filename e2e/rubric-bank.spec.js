@@ -42,7 +42,7 @@ const ASSESSMENT = {
 
 async function openBank(page) {
   await page.evaluate(() => {
-    window.location.hash = '#/assignments';
+    window.Router.navigate('/assignments');
   });
   await page.locator('[data-action="openRubricBank"]').click();
   const bank = page.getByRole('dialog', { name: 'Rubric Bank' });
@@ -403,7 +403,7 @@ test.describe('Rubric Bank, Print Rubrics window', () => {
 
   test('the assessment card opens the same window on that assessment', async ({ page }) => {
     await page.evaluate(() => {
-      window.location.hash = '#/assignments';
+      window.Router.navigate('/assignments');
     });
     const title = page.locator('text=Rubric Lab Report').first();
     await expect(title).toBeVisible();

@@ -19,7 +19,7 @@ export async function signIn(page) {
   await page.fill('#si-email', TEST_USER_EMAIL);
   await page.fill('#si-password', TEST_USER_PASSWORD);
   await page.click('#si-submit');
-  await page.waitForURL('**/teacher/app.html**', { timeout: 15_000 });
+  await page.waitForURL('**/dashboard**', { timeout: 15_000 });
   await page.waitForFunction(() => window.DashClassManager !== undefined, null, { timeout: 15_000 });
   await page.waitForFunction(
     async () => {

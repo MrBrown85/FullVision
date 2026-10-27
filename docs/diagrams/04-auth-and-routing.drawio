@@ -55,14 +55,14 @@
         <mxCell id="m-bootapp" value="_bootApp()&#10;initAllCourses → get_teacher_preferences,&#10;list_teacher_courses&#10;→ getActiveCourse → initData(cid)&#10;→ _renderTab('students')" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#82b366;align=left" vertex="1" parent="1">
           <mxGeometry x="300" y="850" width="280" height="120" as="geometry" />
         </mxCell>
-        <mxCell id="d-bootapp" value="router.js boot sequence&#10;initAllCourses → getActiveCourse&#10;→ initData(cid) → loadSeedIfNeeded&#10;→ migrateAllStudents → hashchange listener&#10;→ navigate('/dashboard') or onRoute()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;align=left" vertex="1" parent="1">
+        <mxCell id="d-bootapp" value="router.js boot sequence&#10;initAllCourses → getActiveCourse&#10;→ initData(cid) → loadSeedIfNeeded&#10;→ migrateAllStudents → popstate listener&#10;→ old #/ link → clean URL, then onRoute()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#6c8ebf;align=left" vertex="1" parent="1">
           <mxGeometry x="1020" y="850" width="320" height="120" as="geometry" />
         </mxCell>
 
         <mxCell id="m-tabs" value="Tab bar render&#10;Students · Observe · Grade&#10;Event delegation via _bindEvents" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left" vertex="1" parent="1">
           <mxGeometry x="300" y="1000" width="280" height="80" as="geometry" />
         </mxCell>
-        <mxCell id="d-hash" value="Hash router&#10;#/dashboard → page-dashboard.init&#10;#/gradebook → page-gradebook.init&#10;#/assignments → page-assignments.init&#10;#/observations → page-observations.init&#10;#/student?id= → page-student.init&#10;#/reports → page-reports.init" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;align=left" vertex="1" parent="1">
+        <mxCell id="d-hash" value="Path router&#10;/dashboard → page-dashboard.init&#10;/gradebook → page-gradebook.init&#10;/assignments → page-assignments.init&#10;/observations → page-observations.init&#10;/student?id= → page-student.init&#10;/reports → page-reports.init" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;align=left" vertex="1" parent="1">
           <mxGeometry x="1020" y="1000" width="320" height="140" as="geometry" />
         </mxCell>
 

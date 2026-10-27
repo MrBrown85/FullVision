@@ -166,7 +166,7 @@ window.DashStudentCards = (function () {
           '</span>' +
           '<div class="dash-card-info">' +
           '<div class="dash-card-name-row">' +
-          '<a class="dash-card-name" role="link" tabindex="0" data-href="#/student?id=' +
+          '<a class="dash-card-name" role="link" tabindex="0" data-href="/student?id=' +
           st.id +
           '&course=' +
           cid +

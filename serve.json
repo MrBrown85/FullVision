@@ -1,0 +1,11 @@
+{
+  "rewrites": [
+    { "source": "/dashboard", "destination": "/teacher/app.html" },
+    { "source": "/assignments", "destination": "/teacher/app.html" },
+    { "source": "/student", "destination": "/teacher/app.html" },
+    { "source": "/gradebook", "destination": "/teacher/app.html" },
+    { "source": "/observations", "destination": "/teacher/app.html" },
+    { "source": "/observations/starters", "destination": "/teacher/app.html" },
+    { "source": "/reports", "destination": "/teacher/app.html" }
+  ]
+}

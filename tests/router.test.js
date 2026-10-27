@@ -1,6 +1,5 @@
 /**
- * Router tests — gb-router.js :: Router.parseHash()
- * Pure string parsing, no DOM needed.
+ * Router tests — teacher/router.js :: parseUrl, legacyUrl, isRoute, navigate
  */
 
 var _activeElementDescriptor = Object.getOwnPropertyDescriptor(document, 'activeElement');
@@ -13,71 +12,106 @@ afterEach(() => {
   }
 });
 
-describe('Router.parseHash', () => {
-  it('parses hash with path and params', () => {
-    const result = Router.parseHash('#/student?id=st1&course=sci8');
+describe('Router.parseUrl', () => {
+  it('parses a path with params', () => {
+    const result = Router.parseUrl('/student', '?id=st1&course=sci8');
     expect(result.path).toBe('/student');
     expect(result.params).toEqual({ id: 'st1', course: 'sci8' });
   });
 
-  it('parses hash with no params', () => {
-    const result = Router.parseHash('#/dashboard');
+  it('parses a path with no params', () => {
+    const result = Router.parseUrl('/dashboard', '');
     expect(result.path).toBe('/dashboard');
     expect(result.params).toEqual({});
   });
 
-  it('defaults to /dashboard for empty hash', () => {
-    expect(Router.parseHash('').path).toBe('/dashboard');
-    expect(Router.parseHash('').params).toEqual({});
+  it('parses a two-part path', () => {
+    expect(Router.parseUrl('/observations/starters', '').path).toBe('/observations/starters');
   });
 
-  it('defaults to /dashboard for # only', () => {
-    expect(Router.parseHash('#').path).toBe('/dashboard');
+  it('drops a trailing slash', () => {
+    expect(Router.parseUrl('/gradebook/', '?course=math7').path).toBe('/gradebook');
   });
 
-  it('defaults to /dashboard for #/', () => {
-    expect(Router.parseHash('#/').path).toBe('/dashboard');
+  it('defaults to /dashboard for an empty path', () => {
+    expect(Router.parseUrl('', '').path).toBe('/dashboard');
+    expect(Router.parseUrl(undefined, undefined).path).toBe('/dashboard');
   });
 
   it('decodes URL-encoded param values', () => {
-    const result = Router.parseHash('#/student?name=John%20Doe');
-    expect(result.params.name).toBe('John Doe');
+    expect(Router.parseUrl('/student', '?name=John%20Doe').params.name).toBe('John Doe');
   });
 
-  it('handles single param', () => {
-    const result = Router.parseHash('#/gradebook?course=math7');
-    expect(result.path).toBe('/gradebook');
-    expect(result.params).toEqual({ course: 'math7' });
-  });
-
-  it('handles param with empty value', () => {
-    const result = Router.parseHash('#/reports?filter=');
-    expect(result.params.filter).toBe('');
+  it('handles a param with an empty value', () => {
+    expect(Router.parseUrl('/reports', '?filter=').params.filter).toBe('');
   });
 
   it('handles multiple params', () => {
-    const result = Router.parseHash('#/student?id=s1&course=c1&tab=goals');
-    expect(Object.keys(result.params)).toHaveLength(3);
-    expect(result.params.id).toBe('s1');
-    expect(result.params.course).toBe('c1');
-    expect(result.params.tab).toBe('goals');
+    const result = Router.parseUrl('/student', '?id=s1&course=c1&tab=goals');
+    expect(result.params).toEqual({ id: 's1', course: 'c1', tab: 'goals' });
+  });
+});
+
+describe('Router.legacyUrl', () => {
+  it('turns an old hash link into a clean address', () => {
+    expect(Router.legacyUrl('/teacher/app.html', '', '#/gradebook?course=sci8')).toBe('/gradebook?course=sci8');
+    expect(Router.legacyUrl('/teacher/app.html', '', '#/student?id=s1&course=c1&tab=goals')).toBe(
+      '/student?id=s1&course=c1&tab=goals',
+    );
   });
 
-  it('handles null/undefined input', () => {
-    expect(Router.parseHash(null).path).toBe('/dashboard');
-    expect(Router.parseHash(undefined).path).toBe('/dashboard');
+  it('sends app.html with no route, or an empty route, to the dashboard', () => {
+    expect(Router.legacyUrl('/teacher/app.html', '', '')).toBe('/dashboard');
+    expect(Router.legacyUrl('/teacher/app.html', '', '#/')).toBe('/dashboard');
+  });
+
+  it('leaves a hash that is not a route alone', () => {
+    expect(Router.legacyUrl('/gradebook', '?course=sci8', '#main')).toBe(null);
+  });
+
+  it('drops a trailing slash and keeps the query', () => {
+    expect(Router.legacyUrl('/gradebook/', '?course=sci8', '')).toBe('/gradebook?course=sci8');
+  });
+
+  it('leaves a clean address alone', () => {
+    expect(Router.legacyUrl('/reports', '?tab=questionnaire', '')).toBe(null);
+  });
+});
+
+describe('Router.isRoute', () => {
+  it('knows the app pages', () => {
+    [
+      '/dashboard',
+      '/assignments',
+      '/student',
+      '/gradebook',
+      '/observations',
+      '/observations/starters',
+      '/reports',
+    ].forEach(p => expect(Router.isRoute(p)).toBe(true));
+    expect(Router.isRoute('/gradebook/')).toBe(true);
+  });
+
+  it('does not claim other pages', () => {
+    ['/login.html', '/teacher-mobile/', '/s/', '/privacy.html', '/'].forEach(p =>
+      expect(Router.isRoute(p)).toBe(false),
+    );
   });
 });
 
 describe('Router navigation flushes pending edits', () => {
   it('blurs the active input before destroying the current page', () => {
     var events = [];
-    PageDashboard.destroy = () => { events.push('destroy'); };
+    PageDashboard.destroy = () => {
+      events.push('destroy');
+    };
 
     var activeEl = {
       tagName: 'INPUT',
       isContentEditable: false,
-      blur: () => { events.push('blur'); },
+      blur: () => {
+        events.push('blur');
+      },
     };
     Object.defineProperty(document, 'activeElement', {
       configurable: true,
@@ -94,7 +128,9 @@ describe('Router navigation flushes pending edits', () => {
     var activeEl = {
       tagName: 'DIV',
       isContentEditable: true,
-      blur: () => { blurred = true; },
+      blur: () => {
+        blurred = true;
+      },
     };
     Object.defineProperty(document, 'activeElement', {
       configurable: true,

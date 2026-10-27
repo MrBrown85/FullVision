@@ -806,11 +806,11 @@ const LINE_ICONS = {
   lock: _LINE_SVG + '<rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>',
 };
 const TB_PAGES = [
-  { id: 'dashboard', label: 'Dashboard', href: 'index.html' },
-  { id: 'assignments', label: 'Assignments', href: 'settings.html' },
-  { id: 'observations', label: 'Observations', href: 'observations.html' },
-  { id: 'spreadsheet', label: 'Gradebook', href: 'spreadsheet.html' },
-  { id: 'reports', label: 'Reports', href: 'reports.html' },
+  { id: 'dashboard', label: 'Dashboard', href: '/dashboard' },
+  { id: 'assignments', label: 'Assignments', href: '/assignments' },
+  { id: 'observations', label: 'Observations', href: '/observations' },
+  { id: 'spreadsheet', label: 'Gradebook', href: '/gradebook' },
+  { id: 'reports', label: 'Reports', href: '/reports' },
 ];
 
 /* ── Idempotent write RPCs ──────────────────────────────────── */

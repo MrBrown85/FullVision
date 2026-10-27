@@ -568,7 +568,7 @@
 
       if (action === 'm-switch-desktop') {
         localStorage.setItem('td-mobile-pref', 'desktop');
-        window.location.href = '/teacher/app.html';
+        window.location.href = '/dashboard';
         return;
       }
 

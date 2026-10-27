@@ -12,7 +12,9 @@ test.describe('Accessibility Basics', () => {
   test('app has a skip-to-content link', async ({ page }) => {
     await gotoApp(page, '/dashboard');
     // Skip-to-content link should exist (may be visually hidden)
-    const skipLink = page.locator('a[href="#main"], a[href="#content"], a.skip-to-content, a.skip-link, [class*="skip"]');
+    const skipLink = page.locator(
+      'a[href="#main"], a[href="#content"], a.skip-to-content, a.skip-link, [class*="skip"]',
+    );
     const count = await skipLink.count();
     expect(count).toBeGreaterThanOrEqual(1);
     // The #main landmark should exist

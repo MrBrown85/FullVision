@@ -1,5 +1,17 @@
 import { test, expect } from '@playwright/test';
-import { mockAuth, seedCourse, seedStudents, seedAssessments, seedScores, gotoApp, getText, clickAction, TEST_ASSESSMENT, TEST_STUDENTS, TEST_COURSE } from './helpers.js';
+import {
+  mockAuth,
+  seedCourse,
+  seedStudents,
+  seedAssessments,
+  seedScores,
+  gotoApp,
+  getText,
+  clickAction,
+  TEST_ASSESSMENT,
+  TEST_STUDENTS,
+  TEST_COURSE,
+} from './helpers.js';
 
 test.describe('Score Entry Workflow', () => {
   test.beforeEach(async ({ page }) => {
@@ -60,9 +72,13 @@ test.describe('Score Entry Workflow', () => {
       await page.waitForTimeout(300);
     }
     // Navigate away via hash (no full reload — preserves auth mock)
-    await page.evaluate(() => { window.location.hash = '#/dashboard'; });
+    await page.evaluate(() => {
+      window.Router.navigate('/dashboard');
+    });
     await page.waitForTimeout(500);
-    await page.evaluate(() => { window.location.hash = '#/assignments'; });
+    await page.evaluate(() => {
+      window.Router.navigate('/assignments');
+    });
     await page.waitForTimeout(500);
     // Expand the assessment again
     const assessEl2 = page.locator('text=Lab Report 1').first();

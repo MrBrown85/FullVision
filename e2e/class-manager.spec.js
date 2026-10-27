@@ -17,13 +17,20 @@ test.describe('Class Manager — Student CRUD', () => {
     await gotoApp(page, '/dashboard');
     const body = page.locator('body');
     const text = await body.textContent();
-    const hasAddOrEmpty = text.includes('Add') || text.includes('add') || text.includes('Import') || text.includes('No students') || text.includes('0 students');
+    const hasAddOrEmpty =
+      text.includes('Add') ||
+      text.includes('add') ||
+      text.includes('Import') ||
+      text.includes('No students') ||
+      text.includes('0 students');
     expect(hasAddOrEmpty).toBeTruthy();
   });
 
   test('can open class management panel', async ({ page }) => {
     await gotoApp(page, '/dashboard');
-    const cmBtn = page.locator('button:has-text("Class Management"), [data-action="cmOpen"], [data-action="cmToggle"]').first();
+    const cmBtn = page
+      .locator('button:has-text("Class Management"), [data-action="cmOpen"], [data-action="cmToggle"]')
+      .first();
     if (await cmBtn.isVisible()) {
       await cmBtn.click();
       await page.waitForTimeout(300);

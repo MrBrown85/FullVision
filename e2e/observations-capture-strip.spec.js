@@ -56,7 +56,7 @@ test.describe('Observation capture strip', () => {
     });
 
     await page.locator('.comment-popover-close').click();
-    await page.goto(`/teacher/app.html#/observations?course=${TEST_COURSE.id}`);
+    await page.evaluate(r => window.Router.navigate(r), `/observations?course=${TEST_COURSE.id}`);
     const card = page.locator('.obs-card', { hasText: 'Explained the method to her group' });
     await expect(card).toBeVisible();
     await expect(card.locator('.obs-type')).toHaveText('Strength');
@@ -100,9 +100,9 @@ test.describe('Observation capture strip', () => {
   test('unsent text survives a trip to another page', async ({ page }) => {
     await gotoApp(page, '/observations');
     await page.locator('#capture-input').fill('Half a thought about Alice');
-    await page.evaluate(() => (location.hash = '#/dashboard'));
+    await page.evaluate(() => window.Router.navigate('/dashboard'));
     await expect(page.locator('#capture-input')).toHaveCount(0);
-    await page.evaluate(() => (location.hash = '#/observations'));
+    await page.evaluate(() => window.Router.navigate('/observations'));
     await expect(page.locator('#capture-input')).toHaveValue('Half a thought about Alice');
   });
 

@@ -7,8 +7,8 @@ import { test, expect } from '@playwright/test';
 
 test('send to phones, print slips, preview a copy, close the links', async ({ page }) => {
   await page.goto('/login.html?demo=1');
-  await page.waitForURL(/app\.html/, { timeout: 15000 });
-  await page.goto(page.url().replace(/#.*/, '#/reports'));
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  await page.evaluate(r => window.Router.navigate(r), '/reports');
   await page.getByRole('tab', { name: 'Progress Reports' }).click();
   await page.getByRole('button', { name: 'Sent to Phones' }).click();
   await expect(page.locator('.pp-title')).toContainText('to Students’ Phones');

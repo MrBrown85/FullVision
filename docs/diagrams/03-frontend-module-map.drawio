@@ -46,7 +46,7 @@
         <mxCell id="ui" value="ui.js — top-bar, nav, toasts, user menu, signOut binding" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top" vertex="1" parent="1">
           <mxGeometry x="560" y="120" width="520" height="40" as="geometry" />
         </mxCell>
-        <mxCell id="router" value="router.js — hash router, boot sequence, global auth boundary" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top" vertex="1" parent="1">
+        <mxCell id="router" value="router.js — path router, boot sequence, global auth boundary" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top" vertex="1" parent="1">
           <mxGeometry x="560" y="170" width="520" height="40" as="geometry" />
         </mxCell>
         <mxCell id="pg-dash" value="page-dashboard.js&#10;• Dashboard roster + class distribution&#10;• Class mgr entry" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffffff;align=left;verticalAlign=top" vertex="1" parent="1">

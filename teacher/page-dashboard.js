@@ -361,7 +361,7 @@ window.PageDashboard = (function () {
           ' not yet assessed (' +
           secNames.join(', ') +
           ')',
-        link: '#/assignments?course=' + cid,
+        link: '/assignments?course=' + cid,
         linkText: 'Plan',
       });
     }
@@ -381,7 +381,7 @@ window.PageDashboard = (function () {
               return cc.label;
             })
             .join(', '),
-        link: '#/assignments?course=' + cid,
+        link: '/assignments?course=' + cid,
         linkText: 'Tag',
       });
     }
@@ -404,7 +404,7 @@ window.PageDashboard = (function () {
     if (recentObsCount === 0) {
       actionItems.push({
         text: 'No observations recorded this week',
-        link: '#/observations',
+        link: '/observations',
         linkText: 'Observe',
       });
     }
@@ -419,7 +419,7 @@ window.PageDashboard = (function () {
           ' student' +
           (unobservedStudents.length !== 1 ? 's have' : ' has') +
           ' no observations yet',
-        link: '#/observations',
+        link: '/observations',
         linkText: 'Observe',
       });
     }

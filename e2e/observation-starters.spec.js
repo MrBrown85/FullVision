@@ -53,7 +53,7 @@ test.describe('Sentence starters', () => {
     ]);
 
     // After a reload, on the Observations page.
-    await page.goto(`/teacher/app.html#/observations?course=${TEST_COURSE.id}`);
+    await page.goto(`/observations?course=${TEST_COURSE.id}`);
     const input = page.locator('#capture-input');
     await input.click();
     await input.pressSequentially('@Bob ');
@@ -109,7 +109,7 @@ test.describe('Sentence starters', () => {
     await expect(section.locator('.ms-row:not(.ms-row-head)')).toHaveCount(5);
     expect((await storedStarters(page)).map(t => t.text)[0]).toBe('Strong collaboration with peers');
 
-    await page.goto(`/teacher/app.html#/observations?course=${TEST_COURSE.id}`);
+    await page.goto(`/observations?course=${TEST_COURSE.id}`);
     await page.locator('#starter-btn').click();
     const menu = page.locator('#starter-dropdown');
     await expect(menu.locator('[data-obsc="pickStarter"]')).toHaveCount(5);

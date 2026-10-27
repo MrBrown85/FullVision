@@ -7,9 +7,9 @@ import { test, expect } from '@playwright/test';
 
 async function openCece(page) {
   await page.goto('/login.html?demo=1');
-  await page.waitForURL(/app\.html/, { timeout: 15000 });
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   const sid = await page.evaluate(() => getStudents(getActiveCourse()).find(s => s.firstName === 'Cece').id);
-  await page.goto(page.url().replace(/#.*/, '#/student?id=' + sid));
+  await page.evaluate(r => window.Router.navigate(r), '/student?id=' + sid);
   await page.locator('.stu-tabs').waitFor();
   return sid;
 }
@@ -78,14 +78,14 @@ test('the tab counts follow the reporting term', async ({ page }) => {
 
 test('a Letter class shows percents, not proficiency words', async ({ page }) => {
   await page.goto('/login.html?demo=1');
-  await page.waitForURL(/app\.html/, { timeout: 15000 });
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   const sid = await page.evaluate(() => {
     const cid = getActiveCourse();
     COURSES[cid].gradingSystem = 'letter';
     clearProfCache();
     return getStudents(cid).find(s => s.firstName === 'Cece').id;
   });
-  await page.goto(page.url().replace(/#.*/, '#/student?id=' + sid));
+  await page.evaluate(r => window.Router.navigate(r), '/student?id=' + sid);
   await page.locator('.stu-tabs').waitFor();
   await expect(page.locator('#stu-tab-comps .stu-tab-stat')).toHaveText('6 of 6 Scored');
   await expect(page.locator('.stu-comp-level .stu-level').first()).toHaveText(/^\d+%$/);
@@ -100,10 +100,10 @@ test('the address names the tab, a reload keeps it, and a student opened with no
   await page.reload();
   await expect(page.locator('#stu-tab-breakdown')).toHaveAttribute('aria-selected', 'true');
   // No tab in the link: the one last opened on this device.
-  await page.goto(page.url().replace(/#.*/, '#/student?id=' + sid));
+  await page.evaluate(r => window.Router.navigate(r), '/student?id=' + sid);
   await expect(page.locator('#stu-tab-breakdown')).toHaveAttribute('aria-selected', 'true');
   // An old link to Goals and Reflections opens the Learner Profile.
-  await page.goto(page.url().replace(/#.*/, '#/student?id=' + sid + '&tab=goals'));
+  await page.evaluate(r => window.Router.navigate(r), '/student?id=' + sid + '&tab=goals');
   await expect(page.locator('#stu-tab-profile')).toHaveAttribute('aria-selected', 'true');
 });
 
@@ -111,7 +111,7 @@ test('‹ › go to the next student in roster order and keep the tab', async ({
   await openCece(page);
   await page.locator('#stu-tab-evidence').click();
   const order = await page.evaluate(() => sortStudents(getStudents(getActiveCourse()), 'lastName').map(s => s.id));
-  const here = await page.evaluate(() => new URLSearchParams(location.hash.split('?')[1]).get('id'));
+  const here = await page.evaluate(() => new URLSearchParams(location.search).get('id'));
   const next = order[order.indexOf(here) + 1];
   await page.getByRole('button', { name: /^Next student/ }).click();
   await expect(page).toHaveURL(new RegExp('id=' + next + '&.*tab=evidence'));
@@ -122,7 +122,7 @@ test('‹ › go to the next student in roster order and keep the tab', async ({
 
 test('the dashboard opens the tab that matches where the teacher clicked', async ({ page }) => {
   await page.goto('/login.html?demo=1');
-  await page.waitForURL(/app\.html/, { timeout: 15000 });
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   const card = page.locator('.dash-card').first();
   await card.locator('.dash-card-strip').click();
   await expect(page.locator('#stu-tab-comps')).toHaveAttribute('aria-selected', 'true');
@@ -139,7 +139,7 @@ test('the dashboard opens the tab that matches where the teacher clicked', async
 // the page no longer asks the server for it.
 test('the Competencies tab has no Competency Profile list', async ({ page }) => {
   await page.goto('/login.html?demo=1');
-  await page.waitForURL(/app\.html/, { timeout: 15000 });
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   const sid = await page.evaluate(() => {
     window.__profileCalls = 0;
     window.v2.getStudentProfile = function () {
@@ -154,7 +154,7 @@ test('the Competencies tab has no Competency Profile list', async ({ page }) => 
     };
     return getStudents(getActiveCourse()).find(s => s.firstName === 'Cece').id;
   });
-  await page.goto(page.url().replace(/#.*/, '#/student?id=' + sid + '&tab=comps'));
+  await page.evaluate(r => window.Router.navigate(r), '/student?id=' + sid + '&tab=comps');
   await expect(page.locator('#stu-tab-comps')).toHaveAttribute('aria-selected', 'true');
   await page.waitForTimeout(300);
   await expect(page.getByText('Competency Profile')).toHaveCount(0);

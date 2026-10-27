@@ -472,7 +472,7 @@ var PhoneReports = (function () {
     return (
       '<div class="pp-grid pp-row' +
       (i % 2 ? ' pp-alt' : '') +
-      '"><a class="pp-name" href="#/student?id=' +
+      '"><a class="pp-name" href="/student?id=' +
       encodeURIComponent(st.id) +
       '&course=' +
       encodeURIComponent(cid) +

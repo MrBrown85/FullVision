@@ -66,7 +66,7 @@ async function seedClass(page) {
 }
 
 async function openClassManager(page) {
-  await page.goto('/teacher/app.html#/dashboard');
+  await page.goto('/dashboard');
   await page.waitForSelector('#dock-mount nav', { timeout: 10_000 });
   await page.locator('[data-action="openClassManager"]').first().click();
   await page.getByRole('tab', { name: /^Students/ }).click();
@@ -135,7 +135,7 @@ test.describe('Withdraw students', () => {
     await withdrawAlice(page);
     await expect(withdrawn(page)).toContainText('Alice Anderson');
 
-    await page.goto('/teacher/app.html#/gradebook');
+    await page.goto('/gradebook');
     await page.waitForSelector('#dock-mount nav');
     await expect(page.locator('#main')).toContainText('Baker');
     await expect(page.locator('#main')).not.toContainText('Anderson');
@@ -172,7 +172,7 @@ test.describe('Withdraw students', () => {
     const score = await page.evaluate(({ cid, sid }) => getScores(cid)[sid][0].score, { cid: CID, sid: ALICE });
     expect(score).toBe(4);
 
-    await page.goto('/teacher/app.html#/gradebook');
+    await page.goto('/gradebook');
     await page.waitForSelector('#dock-mount nav');
     await expect(page.locator('#main')).toContainText('Anderson');
   });
@@ -227,7 +227,7 @@ test.describe('Withdraw students in Demo Mode', () => {
     });
     await page.goto('/login.html');
     await page.locator('#demo-mode-btn').click();
-    await page.waitForURL(/teacher\/app\.html/);
+    await page.waitForURL(/\/dashboard/);
     await page.waitForSelector('#dock-mount nav');
     await page.locator('[data-action="openClassManager"]').first().click();
     await page.getByRole('tab', { name: /^Students/ }).click();

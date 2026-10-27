@@ -58,7 +58,7 @@ function row(page, sid, critId) {
 
 async function openCard(page) {
   await page.evaluate(() => {
-    window.location.hash = '#/assignments';
+    window.Router.navigate('/assignments');
   });
   const title = page.locator('text=Density Lab').first();
   await expect(title).toBeVisible();
@@ -152,7 +152,7 @@ test.describe('Scoring an Advanced Rubric', () => {
       );
     }, TEST_COURSE.id);
     await page.evaluate(() => {
-      window.location.hash = '#/dashboard';
+      window.Router.navigate('/dashboard');
     });
     await openCard(page);
     await expect(page.locator('.rsg-checks-btn')).toHaveCount(0);

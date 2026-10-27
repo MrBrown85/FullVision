@@ -58,14 +58,14 @@ window.PageStudent = (function () {
   /* ── switchCourse ───────────────────────────────────────── */
   async function switchCourse(cid) {
     if (!(await switchActiveCourse(cid))) return;
-    Router.navigate('#/dashboard');
+    Router.navigate('/dashboard');
   }
 
   /* Another student keeps the open tab, so a teacher can go down the class
      on one tab. */
   function switchStudent(sid) {
     studentId = sid;
-    Router.navigate('#/student?id=' + sid + '&course=' + activeCourse + '&tab=' + _tab);
+    Router.navigate('/student?id=' + sid + '&course=' + activeCourse + '&tab=' + _tab);
   }
 
   /* ── Override UI ─────────────────────────────────────────── */
@@ -676,7 +676,7 @@ window.PageStudent = (function () {
       });
       text = withNote ? withNote.note : '';
     }
-    var href = '#/assignments?course=' + ctx.cid + '&open=' + a.id + '&student=' + studentId;
+    var href = '/assignments?course=' + ctx.cid + '&open=' + a.id + '&student=' + studentId;
     if (!text)
       return (
         '<a class="stu-note-add" role="link" tabindex="0" data-href="' +
@@ -968,7 +968,7 @@ window.PageStudent = (function () {
             .join('') +
           '</select>'
         : '') +
-      '<a class="stu-link" role="link" tabindex="0" data-href="#/gradebook?course=' +
+      '<a class="stu-link" role="link" tabindex="0" data-href="/gradebook?course=' +
       cid +
       '">Open in Gradebook</a>' +
       '</div>';
@@ -999,7 +999,7 @@ window.PageStudent = (function () {
         '<span class="stu-assess-date">' +
         esc(_shortDay(a.date)) +
         '</span>' +
-        '<span class="stu-assess-title"><a role="link" tabindex="0" data-href="#/assignments?course=' +
+        '<span class="stu-assess-title"><a role="link" tabindex="0" data-href="/assignments?course=' +
         cid +
         '&open=' +
         a.id +
@@ -1167,7 +1167,7 @@ window.PageStudent = (function () {
           return (
             '<div class="stu-bd-item"><span class="stu-assess-date">' +
             esc(_shortDay(a.date)) +
-            '</span><span class="stu-assess-title"><a role="link" tabindex="0" data-href="#/assignments?course=' +
+            '</span><span class="stu-assess-title"><a role="link" tabindex="0" data-href="/assignments?course=' +
             ctx.cid +
             '&open=' +
             a.id +
@@ -2543,11 +2543,11 @@ window.PageStudent = (function () {
   }
 
   /* The address names the open tab, so a link or a reload opens it. Set in
-     place: changing the hash would reload the page. */
+     place: navigating would re-render the page. */
   function _syncTabToUrl() {
-    var hash =
-      '#/student?id=' + encodeURIComponent(studentId) + '&course=' + encodeURIComponent(activeCourse) + '&tab=' + _tab;
-    if (location.hash !== hash) history.replaceState(null, '', hash);
+    Router.setUrl(
+      '/student?id=' + encodeURIComponent(studentId) + '&course=' + encodeURIComponent(activeCourse) + '&tab=' + _tab,
+    );
   }
 
   /* The students in the sidebar's order, and this one's neighbours. */
@@ -2602,7 +2602,7 @@ window.PageStudent = (function () {
         '<div style="font-size:2rem;margin-bottom:12px;opacity:0.5">?</div>' +
         '<div style="font-weight:600;font-size:1.1rem;margin-bottom:6px">Student not found</div>' +
         '<div style="color:var(--text-3);margin-bottom:16px">This student may have been removed or the link is outdated.</div>' +
-        '<a role="link" tabindex="0" data-href="#/dashboard" class="btn btn-primary">Back to Dashboard</a></div>';
+        '<a role="link" tabindex="0" data-href="/dashboard" class="btn btn-primary">Back to Dashboard</a></div>';
       return;
     }
 
@@ -2620,7 +2620,7 @@ window.PageStudent = (function () {
     // ── Toolbar ──
     var html =
       '<div class="student-toolbar">' +
-      renderBreadcrumb('Dashboard', '#/dashboard', fullName(student) || displayName(student)) +
+      renderBreadcrumb('Dashboard', '/dashboard', fullName(student) || displayName(student)) +
       '<span class="stu-step">' +
       _stepButtonHtml('prev', _neighbours().prev) +
       _stepButtonHtml('next', _neighbours().next) +
@@ -2635,7 +2635,7 @@ window.PageStudent = (function () {
     // ── Header ──
     html += renderStudentHeader(cid, studentId, {
       buttonLabel: 'Term Questionnaire',
-      buttonHref: '#/reports?course=' + cid + '&tab=questionnaire&student=' + studentId,
+      buttonHref: '/reports?course=' + cid + '&tab=questionnaire&student=' + studentId,
     });
 
     // ── Tabs ──

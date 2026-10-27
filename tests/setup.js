@@ -194,7 +194,7 @@ Object.defineProperty(globalThis.navigator, 'locks', {
 });
 globalThis.requestAnimationFrame = fn => fn();
 globalThis.addEventListener = () => {};
-globalThis.history = { replaceState() {} };
+globalThis.history = { replaceState() {}, pushState() {} };
 globalThis.location = { hash: '', href: '', pathname: '', search: '' };
 
 // Page module stubs (required by gb-router.js)

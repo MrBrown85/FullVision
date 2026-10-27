@@ -29,9 +29,9 @@ test.describe('Observations — Quick Capture', () => {
 
   test('student selector is visible with seeded students', async ({ page }) => {
     await seedStudents(page);
-    await navigateTo(page, '#/dashboard');
+    await navigateTo(page, '/dashboard');
     await page.waitForTimeout(300);
-    await navigateTo(page, '#/observations');
+    await navigateTo(page, '/observations');
     await page.waitForTimeout(500);
 
     // Should show student names or a student selector

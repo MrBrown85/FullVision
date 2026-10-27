@@ -6,9 +6,9 @@ import { test, expect } from '@playwright/test';
 
 async function openCece(page) {
   await page.goto('/login.html?demo=1');
-  await page.waitForURL(/app\.html/, { timeout: 15000 });
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   const sid = await page.evaluate(() => getStudents(getActiveCourse()).find(s => s.firstName === 'Cece').id);
-  await page.goto(page.url().replace(/#.*/, '#/student?id=' + sid));
+  await page.evaluate(r => window.Router.navigate(r), '/student?id=' + sid);
   await page.locator('.stu-tabs').waitFor();
 }
 

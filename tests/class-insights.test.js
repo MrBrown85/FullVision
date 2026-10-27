@@ -138,7 +138,7 @@ describe('Needs Attention', () => {
     const html = DashInsights.attentionCardHtml(CID, model({ below: 3, min: 3 }), {});
     expect(html).toContain('Below Proficient on <b>3</b> of 3');
     expect(html).toContain('Lowest');
-    expect(html).toContain('#/gradebook?course=' + CID + '&students=s1');
+    expect(html).toContain('/gradebook?course=' + CID + '&students=s1');
     expect(html).toContain('Below Proficient · At Least 3 Scores');
   });
 
@@ -158,7 +158,7 @@ describe('Needs Attention', () => {
 
   it('puts the class Next Steps above the students', () => {
     const html = DashInsights.attentionCardHtml(CID, model({ below: 3, min: 3 }), {
-      classItems: [{ text: '2 core competencies not yet tagged', link: '#/assignments', linkText: 'Tag' }],
+      classItems: [{ text: '2 core competencies not yet tagged', link: '/assignments', linkText: 'Tag' }],
     });
     expect(html.indexOf('2 core competencies not yet tagged')).toBeLessThan(html.indexOf('Raj Venkatesh'));
   });

@@ -177,7 +177,7 @@ window.PageStarters = (function () {
     if (toolbar) {
       toolbar.innerHTML =
         '<div class="dash-toolbar">' +
-        renderBreadcrumb('Observations', '#/observations', 'My Sentence Starters', 'msBack') +
+        renderBreadcrumb('Observations', '/observations', 'My Sentence Starters', 'msBack') +
         '</div>';
     }
     var h =

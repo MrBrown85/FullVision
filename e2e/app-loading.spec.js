@@ -13,7 +13,7 @@ test('the page starts on the loading screen', async ({ page }) => {
 
 test('the loading screen goes once the dashboard is drawn', async ({ page }) => {
   await page.goto('/login.html?demo=1');
-  await page.waitForURL(/app\.html/, { timeout: 15000 });
+  await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await expect(page.locator('#app-loading')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Class Management' }).first()).toBeVisible();
 });

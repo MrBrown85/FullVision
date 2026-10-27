@@ -1,4 +1,4 @@
-/* ── gb-router.js — Hash-based SPA router ─────────────────── */
+/* ── gb-router.js — SPA router on real paths (/dashboard, /gradebook?course=…) ── */
 window.Router = (function () {
   'use strict';
 
@@ -22,27 +22,13 @@ window.Router = (function () {
     '/reports': 'Reports',
   };
 
-  /* Map old HTML filenames to hash routes for link interception */
-  var _fileToHash = {
-    'index.html': '/dashboard',
-    'settings.html': '/assignments',
-    'student.html': '/student',
-    'spreadsheet.html': '/gradebook',
-    'observations.html': '/observations',
-    'reports.html': '/reports',
-  };
-
-  /* Map hash routes back to old HTML files (for Phase 1 fallback) */
-  var _hashToFile = {
-    '/assignments': 'settings.html',
-    '/student': 'student.html',
-    '/gradebook': 'spreadsheet.html',
-    '/observations': 'observations.html',
-    '/reports': 'reports.html',
-  };
-
   var _currentPage = null;
+  var _currentUrl = null;
   var _booted = false;
+
+  function _isRoute(path) {
+    return Object.prototype.hasOwnProperty.call(_routes, path);
+  }
 
   function _flushPendingEdits() {
     var active = document.activeElement;
@@ -57,18 +43,14 @@ window.Router = (function () {
     }
   }
 
-  /* ── Parse hash ──────────────────────────────────────────── */
-  function _parseHash(hash) {
-    // e.g. "#/student?id=st1&course=sci8" → { path: '/student', params: { id:'st1', course:'sci8' } }
-    if (!hash || hash === '#' || hash === '#/') {
-      return { path: '/dashboard', params: {} };
-    }
-    var raw = hash.replace(/^#/, '');
-    var qIdx = raw.indexOf('?');
-    var path = qIdx >= 0 ? raw.substring(0, qIdx) : raw;
+  /* ── Parse URL ───────────────────────────────────────────── */
+  function _parseUrl(pathname, search) {
+    // e.g. ("/student", "?id=st1&course=sci8") → { path: '/student', params: { id:'st1', course:'sci8' } }
+    var path = pathname || '/dashboard';
+    if (path.length > 1 && path.charAt(path.length - 1) === '/') path = path.slice(0, -1);
     var params = {};
-    if (qIdx >= 0) {
-      var qs = raw.substring(qIdx + 1);
+    var qs = (search || '').replace(/^\?/, '');
+    if (qs) {
       qs.split('&').forEach(function (pair) {
         var parts = pair.split('=');
         if (parts[0]) {
@@ -77,6 +59,25 @@ window.Router = (function () {
       });
     }
     return { path: path, params: params };
+  }
+
+  // "#/gradebook?course=x", "/gradebook?course=x" → "/gradebook?course=x"
+  function _toUrl(target) {
+    var url = String(target || '').replace(/^#/, '');
+    return url.charAt(0) === '/' ? url : '/' + url;
+  }
+
+  // The clean address to show instead of the one the app opened at, or null.
+  // Links from before clean URLs (/teacher/app.html#/gradebook?course=x) and
+  // a trailing slash (/gradebook/) both get tidied. Only "#/" hashes are
+  // routes; #main (the skip link) and anything else are left alone.
+  function _legacyUrl(pathname, search, hash) {
+    if (hash && hash.indexOf('#/') === 0) return hash.length > 2 ? _toUrl(hash) : '/dashboard';
+    if (!pathname || pathname === '/' || /\/app\.html$/.test(pathname)) return '/dashboard';
+    if (pathname.length > 1 && pathname.charAt(pathname.length - 1) === '/') {
+      return pathname.slice(0, -1) + (search || '');
+    }
+    return null;
   }
 
   /* ── Render dock ─────────────────────────────────────────── */
@@ -98,7 +99,7 @@ window.Router = (function () {
 
   /* ── Route handler ───────────────────────────────────────── */
   function _onRoute() {
-    var parsed = _parseHash(location.hash);
+    var parsed = _parseUrl(location.pathname, location.search);
     var path = parsed.path;
     var params = parsed.params;
 
@@ -121,25 +122,16 @@ window.Router = (function () {
     else if (path === '/observations' || path === '/observations/starters') dockPage = 'observations';
     else if (path === '/reports') dockPage = 'reports';
 
-    // If route has no SPA module yet, fall back to old HTML page
-    if (!_routes[path]) {
-      var fallbackFile = _hashToFile[path];
-      if (fallbackFile) {
-        // Build query string from params
-        var qs = Object.keys(params)
-          .map(function (k) {
-            return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
-          })
-          .join('&');
-        window.location.href = fallbackFile + (qs ? '?' + qs : '');
-        return;
-      }
-      // Unknown route — default to dashboard
+    // Unknown route — show the dashboard at its own address
+    if (!_isRoute(path)) {
       path = '/dashboard';
       dockPage = 'dashboard';
+      params = {};
+      history.replaceState(null, '', '/dashboard');
     }
 
     var module = _routes[path];
+    _currentUrl = location.pathname + location.search;
 
     // Destroy previous page
     if (_currentPage && _currentPage.destroy) {
@@ -182,10 +174,13 @@ window.Router = (function () {
     if (_booted) return;
     _booted = true;
 
+    var legacy = _legacyUrl(location.pathname, location.search, location.hash);
+    if (legacy) history.replaceState(null, '', legacy);
+
     await requireAuth();
     await initAllCourses();
     // Open the class a deep link names, not the last one used.
-    var linked = _parseHash(location.hash).params.course;
+    var linked = _parseUrl(location.pathname, location.search).params.course;
     if (_needsCourseLoad(linked)) setActiveCourse(linked);
     var cid = getActiveCourse();
     var loadStarted = performance.now();
@@ -195,34 +190,31 @@ window.Router = (function () {
     await loadSeedIfNeeded();
     migrateAllStudents();
 
-    // Listen for hash changes
-    window.addEventListener('hashchange', _onRoute);
-
-    // Intercept clicks on dock links to use hash navigation
-    document.addEventListener('click', function (e) {
-      var link = e.target.closest('#app-dock a[data-href]');
-      if (!link) return;
-      var href = link.getAttribute('data-href');
-      if (!href || href.charAt(0) === '#') return; // already a hash link
-
-      // Check if this href maps to a hash route
-      var filename = href.split('?')[0];
-      var hashRoute = _fileToHash[filename];
-      if (hashRoute) {
-        e.preventDefault();
-        // Preserve query params
-        var qIdx = href.indexOf('?');
-        var qs = qIdx >= 0 ? href.substring(qIdx + 1) : '';
-        navigate(hashRoute + (qs ? '?' + qs : ''));
-      }
+    // Back and forward. A fragment-only change (the skip link's #main) also
+    // fires popstate; the page itself hasn't changed, so leave it be.
+    window.addEventListener('popstate', function () {
+      if (location.pathname + location.search !== _currentUrl) _onRoute();
+    });
+    // An old "/…" link clicked inside the app
+    window.addEventListener('hashchange', function () {
+      if (location.hash.indexOf('#/') === 0) navigate(location.hash, true);
     });
 
-    // Set default hash if none, then trigger initial route
-    if (!location.hash || location.hash === '#' || location.hash === '#/') {
-      navigate('/dashboard', true);
-    } else {
-      _onRoute();
-    }
+    // Plain <a href="/student?…"> links to app pages switch pages in place
+    // instead of reloading the app. data-href links go through link-nav.js.
+    // In-page links (#main, the skip link) are the browser's to follow.
+    document.addEventListener('click', function (e) {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      var link = e.target.closest && e.target.closest('a[href]');
+      if (!link || (link.target && link.target !== '_self') || link.hasAttribute('download')) return;
+      if (link.getAttribute('href').charAt(0) === '#') return;
+      var url = new URL(link.getAttribute('href'), location.href);
+      if (url.origin !== location.origin || !_isRoute(_parseUrl(url.pathname).path)) return;
+      e.preventDefault();
+      navigate(url.pathname + url.search);
+    });
+
+    _onRoute();
     _hideLoading();
     // Then the teacher's other classes, in the background once the first
     // page is up, so each is ready before it is opened.
@@ -247,23 +239,34 @@ window.Router = (function () {
   }
 
   /* ── Navigate ────────────────────────────────────────────── */
-  function navigate(hash, replace) {
-    // Ensure hash starts with #
-    var fullHash = hash.charAt(0) === '#' ? hash : '#' + hash;
-    if (replace) {
-      history.replaceState(null, '', fullHash);
-      _onRoute();
-    } else {
-      // Setting location.hash fires hashchange which calls _onRoute
-      location.hash = fullHash;
-    }
+  // Accepts "/gradebook?course=x" or the older "/gradebook?course=x".
+  // Going to the address already showing does nothing, unless replacing.
+  function navigate(target, replace) {
+    var url = _toUrl(target);
+    if (!replace && url === location.pathname + location.search) return;
+    if (replace) history.replaceState(null, '', url);
+    else history.pushState(null, '', url);
+    _onRoute();
+  }
+
+  // Change the address without re-rendering: a page recording its own state
+  // (the open tab, a cleared filter) so a reload or a link reopens it.
+  function setUrl(target) {
+    var url = _toUrl(target);
+    if (url !== location.pathname + location.search) history.replaceState(null, '', url);
+    _currentUrl = url;
   }
 
   /* ── Public API ──────────────────────────────────────────── */
   return {
     boot: boot,
     navigate: navigate,
-    parseHash: _parseHash,
+    setUrl: setUrl,
+    isRoute: function (pathname) {
+      return _isRoute(_parseUrl(pathname).path);
+    },
+    parseUrl: _parseUrl,
+    legacyUrl: _legacyUrl,
     getCurrentPage: function () {
       return _currentPage;
     },

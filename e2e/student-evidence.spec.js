@@ -8,7 +8,7 @@ import { test, expect } from '@playwright/test';
 async function enterDemo(page) {
   await page.goto('/login.html');
   await page.locator('#demo-mode-btn').click();
-  await page.waitForURL(/teacher\/app\.html/);
+  await page.waitForURL(/\/dashboard/);
 }
 
 async function meiObs(page) {
@@ -18,7 +18,7 @@ async function meiObs(page) {
 test.describe('Student page Evidence panel', () => {
   test('shows tabs with counts, adds through the strip, and deletes with Undo', async ({ page }) => {
     await enterDemo(page);
-    await page.goto('/teacher/app.html#/student?id=st23&course=sci8');
+    await page.goto('/student?id=st23&course=sci8');
     await page.locator('#stu-tab-evidence').click();
 
     const panel = page.locator('#ev-panel');
@@ -78,7 +78,7 @@ test.describe('Student page Evidence panel', () => {
 
   test('the dashboard card shows type dots and days since the last observation', async ({ page }) => {
     await enterDemo(page);
-    await page.goto('/teacher/app.html#/dashboard?course=sci8');
+    await page.goto('/dashboard?course=sci8');
     const line = page.locator('.dash-card[data-sid="st23"] .dash-card-obs');
     await expect(line.locator('.dash-obs-dot')).toHaveCount(3);
     const when = line.locator('.dash-obs-when');
