@@ -127,4 +127,21 @@ describe('the bundle brings reporting terms back', () => {
     _applyBundleCourseConfig(CID, { grading_scale: null, category_weights: null, reporting_terms: QUARTERS }, {});
     expect(getReportingTerms(CID)).toEqual(QUARTERS);
   });
+
+  // The live get_class_bundle's course_config has only the scale and the
+  // weights; the terms come on gradebook.course. After a sign-out wiped this
+  // device, a class came back with no terms.
+  it('hydrates reportingTerms from the course row when course_config leaves them out', () => {
+    _applyBundleCourseConfig(
+      CID,
+      { grading_scale: null, category_weights: null },
+      { id: CID, name: 'Humanities 8', reporting_terms: QUARTERS },
+    );
+    expect(getReportingTerms(CID)).toEqual(QUARTERS);
+  });
+
+  it('keeps no terms when the course row has none', () => {
+    _applyBundleCourseConfig(CID, { grading_scale: null, category_weights: null }, { id: CID, reporting_terms: null });
+    expect(getReportingTerms(CID)).toEqual([]);
+  });
 });

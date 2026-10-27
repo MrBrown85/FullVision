@@ -4260,7 +4260,10 @@ function _applyBundleTermRatings(cid, rows) {
    device's. One only this device has was saved before the server stored
    them, so it is sent up rather than dropped: a reset elsewhere saves the
    default scale, never null, so a null on the server always means "never
-   saved". */
+   saved". get_class_bundle's course_config carries only the scale and the
+   weights; the reporting terms come on the course row (gradebook.course),
+   so each field is read from course_config, else the course row. Reading
+   course_config alone lost a class's terms on every fresh sign-in. */
 var _COURSE_CONFIG_COLUMNS = {
   gradingScale: 'grading_scale',
   categoryWeights: 'category_weights',
@@ -4270,9 +4273,11 @@ function _applyBundleCourseConfig(cid, row, courseRow) {
   if (!row || typeof row !== 'object') return;
   var config = Object.assign({}, getCourseConfig(cid) || {});
   var missing = {};
+  var hasCourseRow = !!courseRow && typeof courseRow === 'object';
   Object.keys(_COURSE_CONFIG_COLUMNS).forEach(function (field) {
     var column = _COURSE_CONFIG_COLUMNS[field];
     var onServer = row[column];
+    if (onServer == null && hasCourseRow) onServer = courseRow[column];
     if (onServer && typeof onServer === 'object') config[field] = _cloneValue(onServer);
     else if (config[field] != null) missing[column] = config[field];
   });
