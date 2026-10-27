@@ -1,6 +1,6 @@
 /**
  * A Letter class doesn't describe students with proficiency words. The
- * dashboard's Class Distribution counts students by letter grade, and the
+ * dashboard's Class Average bar counts students by letter grade, and the
  * Reports questionnaire's Academic Snapshot and auto-written narrative give
  * the letter and %. Proficiency classes are unchanged; Both shows both in
  * the snapshot and counts by level on the dashboard.
@@ -99,7 +99,7 @@ describe('class grade distribution', () => {
       flagCount: 0,
       actionItems: [],
     });
-    return html.slice(html.indexOf('Class Distribution'), html.indexOf('Curricular Competencies'));
+    return html.slice(html.indexOf('Class Average'), html.indexOf('Missing and Late'));
   }
 
   it('shows letter grades on the dashboard bar in a Letter class', () => {

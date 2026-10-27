@@ -124,7 +124,7 @@ test('the dashboard opens the tab that matches where the teacher clicked', async
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/app\.html/, { timeout: 15000 });
   const card = page.locator('.dash-card').first();
-  await card.locator('.dash-card-sections').click();
+  await card.locator('.dash-card-strip').click();
   await expect(page.locator('#stu-tab-comps')).toHaveAttribute('aria-selected', 'true');
   await page.goBack();
   await page.locator('.dash-card').first().locator('.dash-card-obs').click();

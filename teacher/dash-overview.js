@@ -73,57 +73,53 @@ window.DashOverview = (function () {
     );
   }
 
-  function renderOverviewPanel(opts) {
+  /* The top bar: Class Average with its proficiency (or letter) mix, Missing
+     and Late, and Upcoming Birthdays. */
+  function glanceHtml(opts) {
     var cid = opts.cid;
-    var sections = opts.sections;
     var allStudents = opts.allStudents;
-    var assessments = opts.assessments;
+    var studentIds = allStudents.map(function (s) {
+      return s.id;
+    });
     // The class average as this class shows grades (level, letter, or both).
-    var classGrade = classGradeSummary(
-      cid,
-      (allStudents || []).map(function (s) {
-        return s.id;
-      }),
-    );
-    var tagCoveragePct = opts.tagCoveragePct;
-    var sectionClassAvgs = opts.sectionClassAvgs;
-    var tagsWithEvidence = opts.tagsWithEvidence;
-    var allTags = opts.allTags;
-    var tagCoverageMap = opts.tagCoverageMap;
-    var assessedCCs = opts.assessedCCs;
-    var ccCounts = opts.ccCounts;
-    var ccAssessments = opts.ccAssessments;
-    var actionItems = opts.actionItems;
-    var html = '';
+    var classGrade = classGradeSummary(cid, studentIds);
+    var word = levelWord(cid, opts.classAvg);
+    var html = '<section class="dash-glance" aria-label="Class at a Glance">';
 
-    // Row 1: Class Distribution (one third) and Observations (two thirds),
-    // the same height. Row 2: Core Competencies and Upcoming Birthdays.
-    html += '<div class="dash-section dash-overview">';
-    html += '<div class="dash-overview-row dash-overview-top">';
+    html +=
+      '<div class="dash-glance-cell dash-glance-avg">' +
+      '<span class="dash-glance-label">Class Average</span>' +
+      '<span class="dash-glance-value">' +
+      esc(classGrade.text || '\u2014') +
+      (word
+        ? '<span class="dash-glance-word" style="color:var(--score-' +
+          classGrade.level +
+          '-text)">' +
+          esc(word) +
+          '</span>'
+        : '') +
+      '</span>';
+    if (opts.classChange) {
+      html +=
+        '<span class="dash-glance-change' +
+        (opts.classChange.dir > 0 ? ' is-up' : opts.classChange.dir < 0 ? ' is-down' : '') +
+        '">' +
+        esc(opts.classChange.text + ' Since ' + opts.classChange.since) +
+        '</span>';
+    }
 
-    html += '<div class="dash-overview-section dash-dist-card">';
-
-    // By letter grade in a Letter class, by proficiency level otherwise.
+    // By letter grade in a Letter class, by proficiency otherwise. Each part
+    // lists its students on hover.
     var nameById = {};
     allStudents.forEach(function (s) {
       nameById[s.id] = displayName(s);
     });
-    var studentIds = allStudents.map(function (s) {
-      return s.id;
-    });
     var distribData = classGradeDistribution(cid, studentIds).filter(function (d) {
       return d.ids.length > 0;
     });
-    var totalWithProf = distribData.reduce(function (sum, d) {
-      return sum + d.ids.length;
-    }, 0);
-
-    html += '<div class="dash-section-title">Class Distribution</div>';
-    if (totalWithProf > 0) {
-      html += '<div style="display:flex;height:28px;gap:2px">';
+    if (distribData.length) {
+      html += '<div class="dash-glance-dist">';
       distribData.forEach(function (d) {
-        var count = d.ids.length;
-        var pct = (count / totalWithProf) * 100;
         var names = d.ids
           .map(function (id) {
             return nameById[id];
@@ -135,279 +131,179 @@ window.DashOverview = (function () {
           .join('');
         html +=
           '<div class="dist-seg" style="flex:' +
-          count +
+          d.ids.length +
           ';background:var(--score-' +
           d.level +
-          '-bg);display:flex;align-items:center;justify-content:center;min-width:' +
-          (pct > 8 ? '0' : '28px') +
-          ';transition:flex 0.3s var(--ease-out)">' +
-          '<span style="font-family:var(--font-base);font-size:' +
-          (pct > 15 ? '0.875rem' : '0.75rem') +
-          ';font-weight:700;color:var(--score-' +
-          d.level +
           ')">' +
-          count +
-          '</span>' +
-          '<div class="dist-tip">' +
-          '<div class="dist-tip-title">' +
+          '<div class="dist-tip"><div class="dist-tip-title">' +
           esc(d.label) +
           '</div>' +
           names +
-          '</div>' +
-          '</div>';
+          '</div></div>';
+      });
+      html += '</div><div class="dash-glance-key">';
+      distribData.forEach(function (d) {
+        html += '<span><b>' + d.ids.length + '</b> ' + esc(d.label) + '</span>';
       });
       html += '</div>';
-      html += '<div style="display:flex;gap:12px;margin-top:6px;justify-content:center">';
-      distribData.forEach(function (d) {
+    } else {
+      html += '<span class="dash-glance-sub">No scores yet.</span>';
+    }
+    html += '</div>';
+
+    html += DashInsights.missingGlanceHtml(opts.missing || []);
+
+    var bdays = getUpcomingBirthdays(cid);
+    html += '<div class="dash-glance-cell dash-glance-bdays"><span class="dash-glance-label">Upcoming Birthdays</span>';
+    if (!bdays.length) {
+      html += '<span class="dash-glance-sub">No birthdays on file.</span>';
+    } else {
+      html += '<div class="dash-bdays">';
+      bdays.forEach(function (b) {
+        var day = b.nextBday.toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' });
+        var countdown = b.daysUntil === 0 ? 'Today' : b.daysUntil === 1 ? 'Tomorrow' : 'in ' + b.daysUntil + ' days';
         html +=
-          '<div style="display:flex;align-items:center;gap:4px">' +
-          '<div style="width:8px;height:8px;border-radius:2px;background:var(--score-' +
-          d.level +
-          ')"></div>' +
-          '<span style="font-family:var(--font-base);font-size:0.75rem;color:var(--text-2)">' +
-          esc(d.label) +
+          '<div class="dash-bday">' +
+          '<span class="dash-bday-name">' +
+          esc(displayNameWithLast(b.student)) +
+          '</span>' +
+          '<span class="dash-bday-when' +
+          (b.daysUntil <= 1 ? ' is-soon' : '') +
+          '">' +
+          '<span>' +
+          esc(day) +
+          '</span> · <span>' +
+          esc(countdown) +
+          '</span>' +
           '</span>' +
           '</div>';
       });
       html += '</div>';
-    } else {
-      html +=
-        '<div style="height:28px;border-radius:8px;background:var(--overlay-hover);display:flex;align-items:center;justify-content:center">' +
-        '<span style="font-family:var(--font-base);font-size:0.75rem;color:var(--text-3)">No data yet</span>' +
-        '</div>';
     }
+    html += '</div>';
+    return html + '</section>';
+  }
 
-    html +=
-      '<div style="margin-top:14px"><div class="dash-section-title">Curricular Competencies' +
+  /* Curricular Competencies: the proficiency mix with "N Below" in a
+     Proficiency or Both class, each competency's average in a Letter class;
+     a line with the assessments and standards assessed under it. */
+  function competenciesCardHtml(opts) {
+    var cid = opts.cid;
+    var html =
+      '<section class="dash-overview-section dash-comp-card" aria-labelledby="dash-comp-title">' +
+      '<div class="dash-section-title"><span id="dash-comp-title">Curricular Competencies</span>' +
       '<a role="link" tabindex="0" data-href="#/gradebook?course=' +
       cid +
-      '">View Gradebook \u2192</a>' +
-      '</div></div>';
-
-    html +=
-      '<div class="dash-quick-stats">' +
-      '<div class="dash-mini-stat">' +
-      '<div class="dash-mini-stat-val" style="color:' +
-      (classGrade.level > 0 ? PROF_COLORS[classGrade.level] : 'var(--text-3)') +
-      '">' +
-      (classGrade.text || '\u2014') +
-      '</div>' +
-      '<div class="dash-mini-stat-label">Class Avg</div>' +
-      (opts.classChange
-        ? '<div class="dash-mini-stat-change' +
-          (opts.classChange.dir > 0 ? ' is-up' : opts.classChange.dir < 0 ? ' is-down' : '') +
-          '">' +
-          esc(opts.classChange.text + ' Since ' + opts.classChange.since) +
-          '</div>'
-        : '') +
-      '</div>' +
-      '<div class="dash-mini-stat">' +
-      '<div class="dash-mini-stat-val" style="color:' +
-      (tagCoveragePct >= 75 ? 'var(--score-3)' : tagCoveragePct >= 50 ? 'var(--score-2)' : 'var(--score-1)') +
-      '">' +
-      tagCoveragePct +
-      '%</div>' +
-      '<div class="dash-mini-stat-label">Standards Covered</div>' +
-      '</div>' +
-      '<div class="dash-mini-stat">' +
-      '<div class="dash-mini-stat-val">' +
-      assessments.length +
-      '</div>' +
-      '<div class="dash-mini-stat-label">Assessments</div>' +
-      '</div>' +
-      '</div>';
-
-    // The list scrolls past six competencies so the card keeps its size.
-    // Proficiency and Both classes see how many students sit at each
-    // proficiency; a Letter class sees each competency's average.
-    var showMix = DashInsights.showsProficiency(cid);
-    if (showMix) {
-      html += DashInsights.mixLegendHtml(cid) + DashInsights.mixListHtml(cid, allStudents, opts.mixPop);
+      '">View Gradebook \u2192</a></div>';
+    if (DashInsights.showsProficiency(cid)) {
+      html +=
+        DashInsights.mixLegendHtml(cid) +
+        DashInsights.mixListHtml(cid, opts.allStudents, opts.mixPop, opts.belowCounts, opts.naComp);
     } else {
-      html += '<div class="dash-outcome-list" tabindex="0" aria-label="Curricular competencies">';
-      sectionClassAvgs.forEach(function (item) {
+      html += '<div class="dash-outcome-list" aria-label="Curricular competencies">';
+      opts.sectionClassAvgs.forEach(function (item) {
         var sec = item.section;
         var avg = item.avg;
         var r = Math.round(avg);
-        var pct = avg > 0 ? (avg / 4) * 100 : 0;
-        var color = avg > 0 ? PROF_COLORS[r] : 'var(--text-3)';
-        var rawColor =
-          avg > 0
-            ? r === 1
-              ? 'var(--score-1)'
-              : r === 2
-                ? 'var(--score-2)'
-                : r === 3
-                  ? 'var(--score-3)'
-                  : r === 4
-                    ? 'var(--score-4)'
-                    : 'var(--text-3)'
-            : 'var(--divider-subtle)';
         html +=
           '<div class="dash-outcome-row">' +
-          '<span class="dash-outcome-label" style="color:' +
-          tintText(sec.color) +
+          '<span class="dash-outcome-label" title="' +
+          esc(sec.name || sec.shortName || '') +
           '">' +
           esc(sec.shortName || sec.name) +
           '</span>' +
           '<div class="dash-outcome-bar-track">' +
           '<div class="dash-outcome-bar-fill" style="width:' +
-          pct +
+          (avg > 0 ? (avg / 4) * 100 : 0) +
           '%;background:' +
-          rawColor +
+          (avg > 0 ? 'var(--score-' + r + ')' : 'var(--divider-subtle)') +
           '"></div>' +
           '</div>' +
-          '<span class="dash-outcome-val" style="color:' +
-          color +
-          '">' +
-          formatLevel(cid, avg) +
+          '<span class="dash-outcome-val">' +
+          esc(formatLevel(cid, avg)) +
           '</span>' +
           '</div>';
       });
       html += '</div>';
     }
-
+    var n = opts.assessments.length;
     html +=
-      '<div style="margin-top:10px">' +
-      '<div style="font-size:0.75rem;color:var(--text-3);margin-bottom:4px">' +
-      tagsWithEvidence +
+      '<div class="dash-comp-foot">' +
+      n +
+      ' assessment' +
+      (n === 1 ? '' : 's') +
+      ' · ' +
+      opts.tagsWithEvidence +
       ' of ' +
-      allTags.length +
-      ' Standards Assessed</div>' +
-      '<div class="dash-tag-grid">';
-    sections.forEach(function (sec) {
-      sec.tags.forEach(function (tag) {
-        var hasEv = tagCoverageMap[tag.id];
-        var bg = hasEv ? sec.color : 'var(--divider-subtle)';
-        html +=
-          '<div class="dash-tag-pip" title="' +
-          esc(tag.text || tag.label) +
-          (hasEv ? '' : ' \u2014 not yet assessed') +
-          '" style="background:' +
-          bg +
-          '"></div>';
-      });
-    });
-    html += '</div></div>';
-    html += '</div>';
+      opts.allTags.length +
+      ' standards assessed</div>';
+    return html + '</section>';
+  }
 
-    // The Observations card. page-dashboard.js re-renders only its inside
-    // for tab, flag and Hide names clicks.
-    html +=
-      '<section class="dash-overview-section dash-ob2" id="dash-obs-card" aria-labelledby="dash-ob2-title">' +
-      DashObservations.renderCard(cid, allStudents, opts.obs || {}) +
-      '</section>';
-    html += '</div>';
-
-    // Who Needs Help (not in a Letter class) and Missing and Late.
-    html += '<div class="dash-overview-row dash-overview-insights' + (showMix ? '' : ' is-single') + '">';
-    if (showMix) html += DashInsights.helpCardHtml(cid, allStudents, opts.helpRule, opts.helpRuleOpen);
-    html += DashInsights.missingCardHtml(cid, allStudents, getTodayStr());
-    html += '</div>';
-
-    var upcomingBdays = getUpcomingBirthdays(cid);
-    html += '<div class="dash-overview-row dash-overview-second' + (upcomingBdays.length ? '' : ' is-single') + '">';
-
-    html +=
-      '<div class="dash-overview-section dash-cc-card">' + '<div class="dash-section-title">Core Competencies</div>';
-
-    html += '<div class="dash-cc-grid">';
+  /* Core Competencies: each with how many assessments are tagged with it,
+     and their titles on hover. */
+  function coreCardHtml(opts) {
+    var html =
+      '<section class="dash-overview-section dash-core-card" aria-labelledby="dash-core-title">' +
+      '<div class="dash-section-title"><span id="dash-core-title">Core Competencies</span>' +
+      '<span class="dash-core-sub">Assessments Tagged</span></div><div class="dash-core-list">';
     CORE_COMPETENCIES.forEach(function (cc) {
-      var assessed = assessedCCs.has(cc.id);
-      var count = ccCounts[cc.id] || 0;
-      var aNames = (ccAssessments[cc.id] || [])
+      var count = opts.ccCounts[cc.id] || 0;
+      var names = (opts.ccAssessments[cc.id] || [])
         .map(function (n) {
           return '<div class="dist-tip-name">' + esc(n) + '</div>';
         })
         .join('');
       html +=
-        '<div class="dash-cc-pill' +
-        (!assessed ? ' is-unassessed' : '') +
+        '<div class="dash-core-row' +
+        (count ? '' : ' is-unassessed') +
         '">' +
-        '<div class="dash-cc-dot" style="background:' +
-        (assessed ? cc.color : 'var(--border)') +
-        '"></div>' +
-        // A pill with no count has no hover card, so its name carries a title
-        // for when a narrow card cuts it short.
-        '<span class="dash-cc-name"' +
-        (count > 0 ? '' : ' title="' + esc(cc.label) + '"') +
-        '>' +
+        '<span class="dash-core-dot" style="' +
+        (count ? 'background:' + cc.color : '') +
+        '"></span>' +
+        '<span class="dash-core-name">' +
         esc(cc.label) +
         '</span>' +
-        (count > 0 ? '<span class="dash-cc-count">' + count + '</span>' : '') +
-        (count > 0
-          ? '<div class="dist-tip"><div class="dist-tip-title">' + esc(cc.label) + '</div>' + aNames + '</div>'
+        '<span class="dash-core-count">' +
+        (count || '\u2014') +
+        '</span>' +
+        (count
+          ? '<div class="dist-tip"><div class="dist-tip-title">' + esc(cc.label) + '</div>' + names + '</div>'
           : '') +
         '</div>';
     });
+    return html + '</div></section>';
+  }
+
+  /* The dashboard under the toolbar: the top bar; Needs Attention beside
+     Curricular and Core Competencies; then Observations across the page.
+     page-dashboard.js re-renders only the Observations card's inside for its
+     tab, flag and Hide Names clicks. */
+  function renderOverviewPanel(opts) {
+    var cid = opts.cid;
+    var allStudents = opts.allStudents;
+    var missing = DashInsights.missingItems(cid, allStudents, getTodayStr());
+    var model = DashInsights.attentionModel(cid, allStudents, { rule: opts.helpRule });
+    var html = '<div class="dash-section dash-overview">';
+    html += glanceHtml(Object.assign({}, opts, { missing: missing }));
+    html += '<div class="dash-overview-row dash-overview-main">';
+    html += DashInsights.attentionCardHtml(cid, model, {
+      filter: opts.naFilter,
+      comp: opts.naComp,
+      ruleOpen: opts.helpRuleOpen,
+      classItems: opts.actionItems,
+    });
+    html +=
+      '<div class="dash-overview-side">' +
+      competenciesCardHtml(Object.assign({}, opts, { belowCounts: DashInsights.belowCounts(model) })) +
+      coreCardHtml(opts) +
+      '</div>';
     html += '</div>';
-
-    html += '<div class="dash-next-steps"><div class="dash-section-title">Next Steps</div>';
-
-    if (actionItems.length === 0) {
-      html +=
-        '<div class="dash-action-item"><span class="dash-action-dot" style="background:var(--score-3)"></span><span class="dash-action-text" style="color:var(--score-3)" title="Looking good! All standards covered, all competencies tagged.">Looking good! All standards covered, all competencies tagged.</span></div>';
-    } else {
-      html += '<div class="dash-action-list">';
-      actionItems.forEach(function (item) {
-        html +=
-          '<div class="dash-action-item">' +
-          '<span class="dash-action-dot"></span>' +
-          '<span class="dash-action-text" title="' +
-          esc(item.text) +
-          '">' +
-          esc(item.text) +
-          '</span>' +
-          (item.link
-            ? '<a class="dash-action-link" role="link" tabindex="0" data-href="' +
-              item.link +
-              '">' +
-              esc(item.linkText) +
-              ' &rarr;</a>'
-            : '') +
-          '</div>';
-      });
-      html += '</div>';
-    }
-
+    html +=
+      '<section class="dash-overview-section dash-ob2" id="dash-obs-card" aria-labelledby="dash-ob2-title">' +
+      DashObservations.renderCard(cid, allStudents, opts.obs || {}) +
+      '</section>';
     html += '</div>';
-    html += '</div>';
-
-    if (upcomingBdays.length > 0) {
-      html +=
-        '<div class="dash-overview-section dash-bday-card">' +
-        '<div class="dash-section-title">Upcoming Birthdays</div>';
-      upcomingBdays.forEach(function (b) {
-        var dob = parseLocalDate(b.student.dateOfBirth);
-        var monthDay = dob.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
-        var countdown =
-          b.daysUntil === 0
-            ? '<span style="color:var(--score-3);font-weight:600">Today!</span>'
-            : b.daysUntil === 1
-              ? '<span style="color:var(--score-2);font-weight:600">Tomorrow</span>'
-              : '<span style="color:var(--text-3)">in ' + b.daysUntil + ' days</span>';
-        html +=
-          '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:0.875rem">' +
-          '<div class="bday-avatar">' +
-          initials(b.student) +
-          '</div>' +
-          '<span class="dash-bday-name" style="font-weight:500;color:var(--text)">' +
-          esc(displayName(b.student)) +
-          '</span>' +
-          '<span style="font-size:0.8125rem;color:var(--text-3)">' +
-          monthDay +
-          '</span>' +
-          '<span style="margin-left:auto;font-size:0.8125rem">' +
-          countdown +
-          '</span>' +
-          '</div>';
-      });
-      html += '</div>';
-    }
-
-    html += '</div>'; // row 2
-    html += '</div>'; // dash-section
-
     return html;
   }
 
@@ -508,6 +404,7 @@ window.DashOverview = (function () {
   return {
     renderDashToolbar: renderDashToolbar,
     renderOverviewPanel: renderOverviewPanel,
+    glanceHtml: glanceHtml,
     renderBirthdayWidget: renderBirthdayWidget,
     obsWeekStart: obsWeekStart,
     obsCoverageWeeks: obsCoverageWeeks,

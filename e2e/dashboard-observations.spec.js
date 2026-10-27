@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 /* The dashboard's Observations card (docs/DECISIONS.md, "Observations
-   (2026-10-18)", item 4) in Demo Mode on Science 8: the top row, both tabs,
+   (2026-10-18)", item 4) in Demo Mode on Science 8: its place, both tabs,
    flags, Hide names, the "+" dialog, the week popover and the jump to the
    student page. The demo class has no competency gaps and no linked
    observations, so the tests make them through the data layer and read the
@@ -21,21 +21,22 @@ async function openDashboard(page) {
 const card = page => page.locator('#dash-obs-card');
 
 test.describe('Dashboard Observations card', () => {
-  test('the top row cards match in height and the page never scrolls sideways', async ({ page }) => {
+  test('the card spans the page under the competencies and never scrolls sideways', async ({ page }) => {
     await enterDemo(page);
     for (const width of [800, 1024, 1280, 1600]) {
       await page.setViewportSize({ width, height: 900 });
       await openDashboard(page);
-      for (const tab of ['By week', 'By competency']) {
+      for (const tab of ['By Week', 'By Competency']) {
         await card(page).getByRole('tab', { name: tab }).click();
         await expect(card(page).getByRole('tab', { name: tab })).toHaveAttribute('aria-selected', 'true');
         const m = await page.evaluate(() => {
-          const d = document.querySelector('.dash-dist-card').getBoundingClientRect();
+          const g = document.querySelector('.dash-glance').getBoundingClientRect();
+          const n = document.querySelector('#dash-na-card').getBoundingClientRect();
           const o = document.querySelector('#dash-obs-card').getBoundingClientRect();
           return {
-            dist: d.height,
-            obs: o.height,
-            sameRow: Math.abs(d.top - o.top) < 1,
+            left: Math.abs(o.left - g.left),
+            right: Math.abs(o.right - g.right),
+            below: o.top >= n.bottom,
             scrollW: document.documentElement.scrollWidth,
             clientW: document.documentElement.clientWidth,
             cardRight: o.right,
@@ -43,26 +44,27 @@ test.describe('Dashboard Observations card', () => {
         });
         expect(m.scrollW, `sideways scroll at ${width} on ${tab}`).toBeLessThanOrEqual(m.clientW);
         expect(m.cardRight).toBeLessThanOrEqual(m.clientW);
-        // Side by side at every desktop width, the same height.
-        expect(m.sameRow, `stacked at ${width} on ${tab}`).toBe(true);
-        expect(Math.abs(m.dist - m.obs)).toBeLessThan(1);
+        // As wide as the top bar, below Needs Attention.
+        expect(m.left).toBeLessThan(1);
+        expect(m.right).toBeLessThan(1);
+        expect(m.below, `overlaps at ${width} on ${tab}`).toBe(true);
       }
-      await card(page).getByRole('tab', { name: 'By week' }).click();
+      await card(page).getByRole('tab', { name: 'By Week' }).click();
     }
   });
 
   test('remembers the tab after a reload, and arrow keys switch it', async ({ page }) => {
     await enterDemo(page);
     await openDashboard(page);
-    await expect(card(page).getByRole('tab', { name: 'By week' })).toHaveAttribute('aria-selected', 'true');
-    await card(page).getByRole('tab', { name: 'By competency' }).click();
+    await expect(card(page).getByRole('tab', { name: 'By Week' })).toHaveAttribute('aria-selected', 'true');
+    await card(page).getByRole('tab', { name: 'By Competency' }).click();
     await expect(card(page).locator('.dash-ob2-lv').first()).toBeVisible();
     await page.reload();
-    await expect(card(page).getByRole('tab', { name: 'By competency' })).toHaveAttribute('aria-selected', 'true');
-    await card(page).getByRole('tab', { name: 'By competency' }).focus();
+    await expect(card(page).getByRole('tab', { name: 'By Competency' })).toHaveAttribute('aria-selected', 'true');
+    await card(page).getByRole('tab', { name: 'By Competency' }).focus();
     await page.keyboard.press('ArrowLeft');
-    await expect(card(page).getByRole('tab', { name: 'By week' })).toHaveAttribute('aria-selected', 'true');
-    await expect(card(page).getByRole('tab', { name: 'By week' })).toBeFocused();
+    await expect(card(page).getByRole('tab', { name: 'By Week' })).toHaveAttribute('aria-selected', 'true');
+    await expect(card(page).getByRole('tab', { name: 'By Week' })).toBeFocused();
   });
 
   test('a flag dims the other students and clears on a second click', async ({ page }) => {
@@ -83,7 +85,7 @@ test.describe('Dashboard Observations card', () => {
     await expect(card(page).locator('.dash-ob2-row.is-dim')).toHaveCount(0);
     // Switching tabs clears a highlight.
     await card(page).locator('.dash-ob2-flag').first().click();
-    await card(page).getByRole('tab', { name: 'By competency' }).click();
+    await card(page).getByRole('tab', { name: 'By Competency' }).click();
     await expect(card(page).locator('.dash-ob2-row.is-dim')).toHaveCount(0);
   });
 
@@ -91,15 +93,15 @@ test.describe('Dashboard Observations card', () => {
     await enterDemo(page);
     await openDashboard(page);
     const blur = loc => loc.evaluate(el => getComputedStyle(el).filter);
-    const btn = card(page).getByRole('button', { name: 'Hide names' });
+    const btn = card(page).getByRole('button', { name: 'Hide Names' });
     await btn.click();
-    const shown = card(page).getByRole('button', { name: 'Show names' });
+    const shown = card(page).getByRole('button', { name: 'Show Names' });
     await expect(shown).toHaveAttribute('aria-pressed', 'true');
     await expect(shown).toBeFocused();
     expect(await blur(card(page).locator('.dash-ob2-name').first())).toMatch(/blur/);
     expect(await blur(page.locator('.dash-card-name').first())).toMatch(/blur/);
     // Grades stay readable.
-    expect(await blur(page.locator('.dash-card-badge-num').first())).toBe('none');
+    expect(await blur(page.locator('.dash-card-badge').first())).toBe('none');
     // The search box stays a control: only a typed name is blurred.
     const search = page.locator('.dash-search-input');
     expect(await blur(search)).toBe('none');
@@ -113,9 +115,9 @@ test.describe('Dashboard Observations card', () => {
     await expect(page.locator('#dash-ob2-pop')).toBeHidden();
     // Remembered on this device.
     await page.reload();
-    await expect(card(page).getByRole('button', { name: 'Show names' })).toBeVisible();
+    await expect(card(page).getByRole('button', { name: 'Show Names' })).toBeVisible();
     expect(await blur(page.locator('.dash-card-name').first())).toMatch(/blur/);
-    await card(page).getByRole('button', { name: 'Show names' }).click();
+    await card(page).getByRole('button', { name: 'Show Names' }).click();
     expect(await blur(card(page).locator('.dash-ob2-name').first())).toBe('none');
     expect(await blur(page.locator('.dash-card-name').first())).toBe('none');
   });
@@ -193,16 +195,17 @@ test.describe('Dashboard Observations card', () => {
     await expect(add()).toBeFocused();
   });
 
-  // The dashboard shows the student list (#374), so the card is about 240px
-  // narrower than the window less the nav: two columns start at 1520px.
-  test('with the student list open, 27 students sit in two columns from 1520px, with compact week cells below 1776px', async ({
+  // The card spans the page beside the student list (#374): 27 students sit
+  // in two columns at every desktop width, with compact week cells on a
+  // narrow window.
+  test('with the student list open, 27 students sit in two columns, with compact week cells below 1200px', async ({
     page,
   }) => {
     await enterDemo(page);
     for (const [width, compact] of [
-      [1520, true],
-      [1680, true],
-      [1840, false],
+      [1150, true],
+      [1280, false],
+      [1600, false],
     ]) {
       await page.setViewportSize({ width, height: 900 });
       await openDashboard(page);
@@ -284,7 +287,7 @@ test.describe('Dashboard Observations card', () => {
       PageDashboard.render();
       return secs.length;
     });
-    await card(page).getByRole('tab', { name: 'By competency' }).click();
+    await card(page).getByRole('tab', { name: 'By Competency' }).click();
     const row = card(page).locator('.dash-ob2-row[data-sid="st-new"]');
     await expect(row.locator('.dash-ob2-lv.is-gap')).toHaveCount(sections - 1);
     await expect(row.locator('.dash-ob2-lv.is-gap').first()).toHaveText('none');

@@ -35,6 +35,10 @@ window.PageDashboard = (function () {
   var helpRule = null;
   var helpRuleOpen = false;
   var mixPop = null; // { key, level } of the open proficiency segment
+  // Needs Attention: the filter and the competency picked from "N Below".
+  // Neither is remembered.
+  var naFilter = 'all';
+  var naComp = null;
 
   function _readPref(key) {
     try {
@@ -91,6 +95,8 @@ window.PageDashboard = (function () {
     activeCourse = cid;
     obsHighlight = null;
     mixPop = null;
+    naFilter = 'all';
+    naComp = null;
     _obsNavKey = null;
     // Reset class manager state for new course
     CM.configure({ activeCourse: cid, onRender: render, onCourseChange: switchCourse });
@@ -458,6 +464,8 @@ window.PageDashboard = (function () {
       mixPop: mixPop,
       helpRule: helpRule,
       helpRuleOpen: helpRuleOpen,
+      naFilter: naFilter,
+      naComp: naComp,
     });
     obsHighlight = _lastObsState.highlight;
 
@@ -498,12 +506,11 @@ window.PageDashboard = (function () {
     return _lastObsState;
   }
 
-  // Before the card exists: two thirds of #main above 1100 px, all of it below.
+  // Before the card exists: the width of #main, less the page and card padding.
   function _estimateObsWidth() {
     var main = document.getElementById('main');
     var w = main ? main.clientWidth - 24 : 0;
     if (!(w > 0)) return 0;
-    if (window.innerWidth > 1100) w = ((w - 12) * 2) / 3;
     return Math.max(0, Math.floor(w - 42));
   }
 
@@ -856,6 +863,21 @@ window.PageDashboard = (function () {
 
   /* ── Student Management ─────────────────────────────────── */
 
+  /* After a Needs Attention change: focus back on the control used, or, from
+     the top bar, bring the card into view and focus its list. */
+  function _focusNa(selector) {
+    var el = selector ? document.querySelector(selector) : null;
+    if (el) {
+      el.focus();
+      return;
+    }
+    var card = document.getElementById('dash-na-card');
+    if (!card) return;
+    card.scrollIntoView({ block: 'nearest' });
+    var list = card.querySelector('.dash-na-list');
+    if (list) list.focus({ preventScroll: true });
+  }
+
   /* ── Delegated click handler ────────────────────────────── */
   function _handleClick(e) {
     // A click outside the open segment list closes it.
@@ -924,6 +946,25 @@ window.PageDashboard = (function () {
       helpRule: function () {
         helpRuleOpen = !helpRuleOpen;
         render();
+      },
+      naFilter: function () {
+        naFilter = el.dataset.filter || 'all';
+        naComp = null;
+        var fromTop = !!el.closest('.dash-glance');
+        render();
+        _focusNa(fromTop ? null : '[data-action="naFilter"][data-filter="' + naFilter + '"]');
+      },
+      naComp: function () {
+        var key = el.dataset.key || null;
+        naComp = key && key !== naComp ? key : null;
+        render();
+        _focusNa(
+          naComp
+            ? '.dash-mix-below[data-key="' + naComp + '"]'
+            : key
+              ? '.dash-mix-below[data-key="' + key + '"]'
+              : '[data-action="naFilter"][data-filter="' + naFilter + '"]',
+        );
       },
       studentView: function () {
         studentView = el.dataset.view === 'grid' ? 'grid' : 'cards';
@@ -1012,6 +1053,8 @@ window.PageDashboard = (function () {
     helpRule = DashInsights.readRule(dashPrefs.helpRule);
     helpRuleOpen = false;
     mixPop = null;
+    naFilter = 'all';
+    naComp = null;
     CM.configure({ activeCourse: activeCourse, onRender: render, onCourseChange: switchCourse });
     CM.resetState();
 

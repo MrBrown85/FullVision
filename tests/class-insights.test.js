@@ -103,19 +103,72 @@ describe('Who Needs Help', () => {
     expect(DashInsights.readRule({ below: 2, min: 1 })).toEqual({ below: 2, min: 1 });
     expect(DashInsights.readRule({ below: 7, min: 9 })).toEqual({ below: 3, min: 3 });
   });
+});
+
+describe('Needs Attention', () => {
+  const OVERALL = { s1: 1.7, s2: 2.1, s3: 3.8, s4: 2.5 };
+  beforeEach(() => {
+    saved.getStudentQuickObs = globalThis.getStudentQuickObs;
+    saved.getOverallProficiency = globalThis.getOverallProficiency;
+    saved.studentGradeSummary = globalThis.studentGradeSummary;
+    globalThis.getStudentQuickObs = () => [];
+    globalThis.getAssessments = () => [];
+    globalThis.getOverallProficiency = (cid, sid) => OVERALL[sid];
+    globalThis.studentGradeSummary = (cid, sid) => ({ text: String(OVERALL[sid]), level: Math.round(OVERALL[sid]) });
+  });
+  afterEach(() => {
+    ['getStudentQuickObs', 'getOverallProficiency', 'studentGradeSummary'].forEach(name => {
+      globalThis[name] = saved[name];
+    });
+  });
+  const model = rule => DashInsights.attentionModel(CID, STUDENTS, { rule, todayStr: '2026-10-22' });
+
+  it('lists each student once, worst first, with the competencies under the rule', () => {
+    const m = model({ below: 3, min: 3 });
+    expect(m.people.map(p => [p.student.id, p.below.length])).toEqual([
+      ['s1', 3],
+      ['s2', 3],
+      ['s4', 1],
+    ]);
+    expect(m.counts).toEqual({ all: 3, below: 3, notobs: 0, nostr: 0, missing: 0 });
+    expect(DashInsights.belowCounts(m)).toEqual({ 's:q': 2, 's:p': 3, 's:c': 2 });
+  });
+
+  it('says how many competencies are below and the lowest, and links the gradebook', () => {
+    const html = DashInsights.attentionCardHtml(CID, model({ below: 3, min: 3 }), {});
+    expect(html).toContain('Below Proficient on <b>3</b> of 3');
+    expect(html).toContain('Lowest');
+    expect(html).toContain('#/gradebook?course=' + CID + '&students=s1');
+    expect(html).toContain('Below Proficient · At Least 3 Scores');
+  });
+
+  it("shows one competency's students when its count is picked", () => {
+    const html = DashInsights.attentionCardHtml(CID, model({ below: 3, min: 3 }), { comp: 's:p' });
+    expect(html).toContain('3 students');
+    expect(html).toContain('&students=s4&section=p');
+    expect(html).toContain('dash-na-compchip');
+  });
 
   it('says so when nobody is below the rule', () => {
     PROF.s1.p = 3;
-    const html = DashInsights.helpCardHtml(CID, STUDENTS, { below: 2, min: 3 }, false);
+    const html = DashInsights.attentionCardHtml(CID, model({ below: 2, min: 3 }), { filter: 'below' });
     PROF.s1.p = 1;
     expect(html).toContain('Every scored student is at Developing or above.');
   });
 
-  it('links each group to the gradebook with its students', () => {
-    const html = DashInsights.helpCardHtml(CID, STUDENTS, { below: 3, min: 3 }, false);
-    expect(html).toContain('#/gradebook?course=' + CID + '&students=s1,s2,s4&section=p');
-    expect(html).toContain('3 Below Proficient');
-    expect(html).toContain('2 Below Proficient on Each');
+  it('puts the class Next Steps above the students', () => {
+    const html = DashInsights.attentionCardHtml(CID, model({ below: 3, min: 3 }), {
+      classItems: [{ text: '2 core competencies not yet tagged', link: '#/assignments', linkText: 'Tag' }],
+    });
+    expect(html.indexOf('2 core competencies not yet tagged')).toBeLessThan(html.indexOf('Raj Venkatesh'));
+  });
+});
+
+describe('the Missing and Late cell', () => {
+  it('says so at zero and counts each kind otherwise', () => {
+    expect(DashInsights.missingGlanceHtml([])).toContain('Nothing is missing or late.');
+    const html = DashInsights.missingGlanceHtml([{ kind: 'ns' }, { kind: 'late' }, { kind: 'late' }]);
+    expect(html).toContain('<b>1</b> Not Submitted · <b>2</b> Late · <b>0</b> Past Due');
   });
 });
 

@@ -8,18 +8,9 @@ window.DashStudentCards = (function () {
     flat: '<span style="color:var(--text-3);font-size:0.9375rem">&#x2192;</span>',
   };
 
-  // A competency or group value in a small tile, as the class shows grades
-  // (formatLevel). The % sign is set smaller so "100%" fits where "4.0" did.
-  function _tileValue(cid, value) {
-    return esc(formatLevel(cid, value)).replace(/%/g, '<span class="dash-pct">%</span>');
-  }
+  var GLYPHS = { 1: '○', 2: '◐', 3: '●', 4: '◆' };
 
-  // A tile names its competency by the section's short name ("Questioning"),
-  // which fits on the tile; the full name is the tile's tooltip.
-  function standardLabel(sec) {
-    var tag = sec && sec.tags && sec.tags[0];
-    return (sec && sec.shortName) || (tag && (tag.label || tag.code || tag.name)) || (sec && sec.name) || '';
-  }
+  // A competency's full name for its segment's tooltip.
   function standardTitle(sec) {
     var tag = sec && sec.tags && sec.tags[0];
     var name = (sec && sec.name) || '';
@@ -164,17 +155,15 @@ window.DashStudentCards = (function () {
           cid +
           '">';
 
+        var prof = courseGradeMode(cid) !== 'letter';
+        var word = levelWord(cid, overall);
         html +=
           '<div class="dash-card-header">' +
-          '<button class="dash-flag-btn" data-action="toggleFlag" data-cid="' +
-          cid +
-          '" data-sid="' +
-          st.id +
-          '" data-stop-prop="true" title="Flag student" aria-label="Flag student" style="color:' +
-          (flagged ? 'var(--priority)' : 'var(--text-2)') +
+          '<span class="dash-card-avatar" aria-hidden="true" style="background:' +
+          _avatarColor(st.id) +
           '">' +
-          (flagged ? '\u2691' : '\u2690') +
-          '</button>' +
+          esc(initials(st)) +
+          '</span>' +
           '<div class="dash-card-info">' +
           '<div class="dash-card-name-row">' +
           '<a class="dash-card-name" role="link" tabindex="0" data-href="#/student?id=' +
@@ -182,7 +171,7 @@ window.DashStudentCards = (function () {
           '&course=' +
           cid +
           '" data-stop-prop="true">' +
-          esc(displayName(st)) +
+          esc(displayNameWithLast(st)) +
           '</a>' +
           ((st.designations || []).length > 0
             ? (function () {
@@ -212,27 +201,25 @@ window.DashStudentCards = (function () {
               })()
             : '') +
           '</div>' +
-          (st.pronouns ? '<div class="dash-card-pronouns">' + esc(st.pronouns) + '</div>' : '') +
-          (st.studentNumber
-            ? '<div class="dash-card-stunum" style="font-size:0.75rem;color:var(--text-3);font-family:\'SF Mono\',ui-monospace,monospace">#' +
-              esc(st.studentNumber) +
+          (st.pronouns || st.studentNumber
+            ? '<div class="dash-card-sub">' +
+              (st.pronouns ? '<span class="dash-card-pronouns">' + esc(st.pronouns) + '</span>' : '') +
+              (st.studentNumber ? '<span class="dash-card-stunum">#' + esc(st.studentNumber) + '</span>' : '') +
               '</div>'
             : '') +
           '</div>' +
-          '<div class="dash-card-badge" style="background:' +
-          PROF_TINT[op] +
-          '">' +
-          '<div class="dash-card-badge-num" style="color:' +
-          PROF_COLORS[op] +
-          '">' +
-          (grade.text || '\u2014') +
-          '</div>' +
-          '<div class="dash-card-badge-label" style="color:' +
-          PROF_COLORS[op] +
-          '">' +
-          levelWord(cid, overall) +
-          '</div>' +
-          '</div>' +
+          '<span class="dash-card-badge' +
+          (op ? '' : ' is-none') +
+          '"' +
+          (op ? ' style="background:var(--score-' + op + '-bg);color:var(--score-' + op + '-text)"' : '') +
+          ' role="img" aria-label="' +
+          esc('Overall ' + (grade.text || 'not yet graded') + (word ? ' ' + word : '')) +
+          '"' +
+          (word ? ' title="' + esc(word) + '"' : '') +
+          '>' +
+          (prof && GLYPHS[op] ? GLYPHS[op] + ' ' : '') +
+          esc(grade.text || '\u2014') +
+          '</span>' +
           (missingCount > 0
             ? '<span class="dash-card-missing" title="' +
               missingCount +
@@ -240,98 +227,64 @@ window.DashStudentCards = (function () {
               missingCount +
               '</span>'
             : '') +
+          '<button class="dash-flag-btn' +
+          (flagged ? ' is-on' : '') +
+          '" data-action="toggleFlag" data-cid="' +
+          cid +
+          '" data-sid="' +
+          st.id +
+          '" data-stop-prop="true" title="Flag student" aria-label="Flag student" aria-pressed="' +
+          flagged +
+          '">' +
+          (flagged ? '\u2691' : '\u2690') +
+          '</button>' +
           '</div>';
 
-        // data-student-tab: the student page tab a click here opens.
-        html +=
-          '<div class="dash-card-sections' +
-          (courseGradeMode(cid) === 'proficiency' ? '' : ' dash-card-sections-pct') +
-          '" data-student-tab="comps">';
+        // One segment per competency (or group), tinted by its proficiency;
+        // its name and value are the tooltip. Evidence coverage and the trend
+        // close the line. data-student-tab: the student page tab a click here
+        // opens.
+        var parts = [];
         var grouped = getGroupedSections(cid);
         if (grouped.groups.length > 0) {
           grouped.groups.forEach(function (gi) {
             if (gi.sections.length === 0) return;
-            var groupVal = getGroupProficiency(cid, st.id, gi.group.id);
-            var gr = Math.round(groupVal);
-            html +=
-              '<div class="dash-section-mini" title="' +
-              esc(gi.group.name) +
-              '" style="background:' +
-              PROF_TINT[gr] +
-              '">' +
-              '<div style="position:absolute;top:0;left:4px;right:4px;height:3px;border-radius:2px;background:' +
-              gi.group.color +
-              '"></div>' +
-              '<div class="dash-section-name">' +
-              esc(gi.group.name) +
-              '</div>' +
-              '<div class="dash-section-val" style="color:' +
-              PROF_COLORS[gr] +
-              '">' +
-              _tileValue(cid, groupVal) +
-              '</div>' +
-              '</div>';
+            parts.push({ title: gi.group.name, value: getGroupProficiency(cid, st.id, gi.group.id) });
           });
           grouped.ungrouped.forEach(function (sec) {
-            var secVal = getSectionProficiency(cid, st.id, sec.id);
-            var sr = Math.round(secVal);
-            var secLabel = standardLabel(sec);
-            html +=
-              '<div class="dash-section-mini" title="' +
-              esc(standardTitle(sec)) +
-              '" style="background:' +
-              PROF_TINT[sr] +
-              '">' +
-              '<div style="position:absolute;top:0;left:4px;right:4px;height:3px;border-radius:2px;background:' +
-              sec.color +
-              '"></div>' +
-              '<div class="dash-section-name">' +
-              esc(secLabel) +
-              '</div>' +
-              '<div class="dash-section-val" style="color:' +
-              PROF_COLORS[sr] +
-              '">' +
-              _tileValue(cid, secVal) +
-              '</div>' +
-              '</div>';
+            parts.push({ title: standardTitle(sec), value: getSectionProficiency(cid, st.id, sec.id) });
           });
         } else {
           sections.forEach(function (sec) {
-            var secVal = getSectionProficiency(cid, st.id, sec.id);
-            var secRounded = Math.round(secVal);
-            var secLabel = standardLabel(sec);
-            html +=
-              '<div class="dash-section-mini" title="' +
-              esc(standardTitle(sec)) +
-              '" style="background:' +
-              PROF_TINT[secRounded] +
-              '">' +
-              '<div style="position:absolute;top:0;left:4px;right:4px;height:3px;border-radius:2px;background:' +
-              sec.color +
-              '"></div>' +
-              '<div class="dash-section-name">' +
-              esc(secLabel) +
-              '</div>' +
-              '<div class="dash-section-val" style="color:' +
-              PROF_COLORS[secRounded] +
-              '">' +
-              _tileValue(cid, secVal) +
-              '</div>' +
-              '</div>';
+            parts.push({ title: standardTitle(sec), value: getSectionProficiency(cid, st.id, sec.id) });
           });
         }
-        html += '</div>';
+        html += '<div class="dash-card-strip" data-student-tab="comps">';
+        parts.forEach(function (part) {
+          var r = part.value > 0 ? Math.max(1, Math.min(4, Math.round(part.value))) : 0;
+          var tip =
+            part.title +
+            ': ' +
+            (r ? formatLevel(cid, part.value) + (prof ? ' ' + PROF_LABELS[r] : '') : 'not yet assessed');
+          html +=
+            '<span class="dash-card-seg" role="img" aria-label="' +
+            esc(tip) +
+            '" title="' +
+            esc(tip) +
+            '" style="background:' +
+            (r ? 'var(--score-' + r + ')' : 'var(--divider-medium)') +
+            '"></span>';
+        });
+        html +=
+          '<span class="dash-card-meta" title="Evidence coverage">' +
+          pct +
+          '%' +
+          trendIcon[trend] +
+          '</span>' +
+          '</div>';
 
         html +=
           '<div class="dash-card-footer">' +
-          '<div class="dash-card-meta">' +
-          '<span style="color:' +
-          (pct >= 75 ? 'var(--score-3)' : pct >= 50 ? 'var(--score-2)' : 'var(--score-1)') +
-          '">' +
-          pct +
-          '%</span>' +
-          trendIcon[trend] +
-          '</div>' +
           '<div class="dash-card-obs" data-student-tab="evidence">' +
           obsText +
           '</div>' +

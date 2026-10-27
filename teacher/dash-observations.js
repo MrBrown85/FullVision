@@ -505,7 +505,9 @@ window.DashObservations = (function () {
     return ' data-ob2-nav data-ob2-col="' + col + '" tabindex="-1" data-focus-key="nav:' + esc(sid) + ':' + col + '"';
   }
 
-  function _headHtml(m, state, students) {
+  /* The card's head: the title and window, the flags (`flags`), then the
+     tabs, Hide Names and Record at the right. */
+  function _headHtml(m, state, students, flags) {
     var cid = m ? m.cid : state.cid;
     var record =
       '<a class="dash-ob2-record" role="link" tabindex="0" data-href="#/observations?course=' +
@@ -517,12 +519,14 @@ window.DashObservations = (function () {
       (m
         ? '<span class="dash-ob2-window">' + esc(m.tab === 'competency' ? _compLabel(m) : m.win.label) + '</span>'
         : '') +
-      '</div><div class="dash-ob2-tools">';
+      '</div>' +
+      (flags || '') +
+      '<div class="dash-ob2-tools">';
     if (m && students > 0) {
       h += '<div class="seg seg-sm dash-ob2-tabs" role="tablist" aria-label="Observations view">';
       [
-        ['week', 'By week'],
-        ['competency', 'By competency'],
+        ['week', 'By Week'],
+        ['competency', 'By Competency'],
       ].forEach(function (t) {
         var on = m.tab === t[0];
         h +=
@@ -545,7 +549,7 @@ window.DashObservations = (function () {
         '<button type="button" class="dash-ob2-tool" data-action="obsNames" data-focus-key="names" aria-pressed="' +
         !!state.namesHidden +
         '">' +
-        (state.namesHidden ? 'Show names' : 'Hide names') +
+        (state.namesHidden ? 'Show Names' : 'Hide Names') +
         '</button>';
     }
     return h + record + '</div></div>';
@@ -846,23 +850,27 @@ window.DashObservations = (function () {
     students = students || [];
     if (students.length === 0) {
       _last = null;
-      return (
-        _headHtml(null, { cid: cid }, 0) +
-        '<div class="dash-ob2-flags"><span class="dash-ob2-clear">No students yet.</span></div>'
+      return _headHtml(
+        null,
+        { cid: cid },
+        0,
+        '<div class="dash-ob2-flags"><span class="dash-ob2-clear">No students yet.</span></div>',
       );
     }
     var m = buildModel(cid, students, state);
     state.highlight = m.highlight;
-    var h = _headHtml(m, state, students.length);
     if (m.tab === 'competency' && m.sections.length === 0) {
-      return (
-        h +
+      return _headHtml(
+        m,
+        state,
+        students.length,
         '<div class="dash-ob2-flags"><span class="dash-ob2-clear">This class has no curricular competencies yet. ' +
-        '<button type="button" class="dash-ob2-linkbtn" data-action="openClassManager">Class Management →</button>' +
-        '</span></div>'
+          '<button type="button" class="dash-ob2-linkbtn" data-action="openClassManager">Class Management →</button>' +
+          '</span></div>',
       );
     }
-    h += _flagsHtml(m) + _keyHtml(m) + _gridHtml(m);
+    var h = _headHtml(m, state, students.length, _flagsHtml(m));
+    h += _keyHtml(m) + _gridHtml(m);
     h += '<div class="dash-ob2-pop" id="dash-ob2-pop" role="tooltip" hidden></div>';
     return h;
   }

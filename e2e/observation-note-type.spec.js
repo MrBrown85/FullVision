@@ -107,7 +107,7 @@ for (const scheme of ['light', 'dark']) {
       await page.goto('/teacher/app.html#/dashboard?course=sci8');
       const obsCard = page.locator('#dash-obs-card');
       await expect(obsCard.locator('.dash-ob2-row[data-sid]').first()).toBeVisible();
-      await obsCard.getByRole('tab', { name: 'By week' }).click();
+      await obsCard.getByRole('tab', { name: 'By Week' }).click();
       const key = obsCard.locator('.dash-ob2-key');
       await expect(key).toContainText('Strength');
       await expect(key.locator('.dash-ob2-swatch[data-type]')).toHaveCount(5);
