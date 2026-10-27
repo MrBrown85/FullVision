@@ -11415,9 +11415,10 @@ function saveCardWidgetConfig(config) {
   }
 }
 
-/* The dashboard's settings that follow the teacher to any device:
-   { studentView: 'cards' | 'grid', helpRule: { below, min } }. Empty until
-   one is changed. */
+/* The settings that follow the teacher to any device:
+   { studentView: 'cards' | 'grid', helpRule: { below, min },
+     closedModules: { [courseId]: [moduleId] } } (closed module folders on
+   the Assignments page). Empty until one is changed. */
 function getDashboardPrefs() {
   var cfg = _cache.config || getConfig();
   return (cfg && cfg.dashboardPrefs) || {};
