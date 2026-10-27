@@ -36,7 +36,7 @@ Supersedes D2. Teachers asked for the multiplier back on points work (an assignm
 - **Flat learning map:** one section per competency, grouped by subject and competency group. Not a duplication to be cleaned up.
 - **Demo Mode is the only sample data.** No Welcome Class.
 - **Manual archive; delete only after archive; soft delete with a 30-day purge.**
-- **Letter cutoffs are the BC scale,** fixed, not editable schemes.
+- **Letter cutoffs are the BC scale,** fixed, not editable schemes. **Under 50% is IE (Insufficient Evidence) until the course ends, then F** (Colin, 2026-10-27, BC reporting policy). It applies to every letter, however the % was earned; proficiency words such as Emerging are never replaced. The course has ended once today reaches the last reporting term's end, or while that last term is in view (the final report). A class with no terms shows IE.
 - **Overrides are per competency with a required reason.** No course-level final-grade override.
 - **No LMS features:** no assignment submission, content pages, discussions or quizzes. FullVision sits beside the district LMS.
 - **Students are removed by withdrawal, not deletion** (2026-10-19). The roster's remove button withdraws: the student leaves the roster, gradebook, dashboard, observations, phone app and reports, and their scores, observations and reports stay on the server. Class Management lists them under Withdrawn with Re-enrol. Permanent delete is the second step, only from that list, and only for a withdrawn student (`delete_withdrawn_student`); it has no Undo.
