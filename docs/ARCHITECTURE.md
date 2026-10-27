@@ -175,8 +175,7 @@ Remote persistence then happens through explicit v2 helpers and dispatchers, inc
 Desktop UI currently exposes queue and offline state through:
 
 - offline banner
-- unsynced badge
-- sync status popover
+- the sync dot (green saved, yellow syncing, red a problem; the tooltip says which). No count or popover (removed Oct 2026: the number next to the teacher's name confused people).
 
 The queue is the active retry mechanism for flows that opt into queued dispatch.
 

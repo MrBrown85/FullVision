@@ -40,7 +40,7 @@ Supersedes D2. Teachers asked for the multiplier back on points work (an assignm
 - **Overrides are per competency with a required reason.** No course-level final-grade override.
 - **No LMS features:** no assignment submission, content pages, discussions or quizzes. FullVision sits beside the district LMS.
 - **Students are removed by withdrawal, not deletion** (2026-10-19). The roster's remove button withdraws: the student leaves the roster, gradebook, dashboard, observations, phone app and reports, and their scores, observations and reports stay on the server. Class Management lists them under Withdrawn with Re-enrol. Permanent delete is the second step, only from that list, and only for a withdrawn student (`delete_withdrawn_student`); it has no Undo.
-- **Sync failures show only on the sync dot.** No banners or toasts.
+- **Sync failures show only on the sync dot.** No banners or toasts. No count of unsynced changes either (2026-10-27): the dot's colour and tooltip are the whole sync display.
 - **Plain language in the UI:** no jargon without a legend. Casing: see "Text size and casing" (2026-10-19).
 
 ## Student voice (2026-10-17)

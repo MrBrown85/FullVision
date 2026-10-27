@@ -65,18 +65,18 @@ describe('desktop sync status UI', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders the offline banner and sync status shell in the dock', () => {
+  // Sync shows only as the dot: a count next to the teacher's name confused people.
+  it('renders the offline banner and the sync dot, with no count or popover', () => {
     var html = renderDock('dashboard');
     expect(html).toContain('offline-banner');
-    expect(html).toContain('tb-sync-badge');
-    expect(html).toContain('tb-sync-popover');
+    expect(html).toContain('sync-indicator-dot');
+    expect(html).not.toContain('tb-sync-badge');
+    expect(html).not.toContain('tb-sync-popover');
   });
 
   it('shows queued and failed sync state from the offline queue', () => {
     var elements = {
       'offline-banner': createElementStub(),
-      'tb-sync-badge': createElementStub(),
-      'tb-sync-popover': createElementStub(),
       'sync-indicator-dot': createElementStub(),
     };
     document.getElementById = function (id) {
@@ -103,19 +103,12 @@ describe('desktop sync status UI', () => {
 
     expect(elements['offline-banner'].hidden).toBe(false);
     expect(document.body.classList.contains('offline-active')).toBe(true);
-    expect(elements['tb-sync-badge'].hidden).toBe(false);
-    expect(elements['tb-sync-badge'].textContent).toBe('2');
-    expect(elements['tb-sync-popover'].innerHTML).toContain('2 unsynced');
-    // Failed writes are hidden from teachers.
-    expect(elements['tb-sync-popover'].innerHTML).not.toContain('assessment not found');
     expect(elements['sync-indicator-dot'].className).toBe('tb-sync-dot error');
   });
 
   it('turns the dot red while a write the server rejected remains', () => {
     var elements = {
       'offline-banner': createElementStub(),
-      'tb-sync-badge': createElementStub(),
-      'tb-sync-popover': createElementStub(),
       'sync-indicator-dot': createElementStub(),
     };
     document.getElementById = function (id) {
@@ -136,14 +129,11 @@ describe('desktop sync status UI', () => {
     expect(elements['offline-banner'].hidden).toBe(true);
     expect(elements['sync-indicator-dot'].className).toBe('tb-sync-dot error');
     expect(elements['sync-indicator-dot'].title).toBe("Some changes couldn't be saved");
-    expect(elements['tb-sync-popover'].innerHTML).not.toContain('assessment not found');
   });
 
   it('turns the dot red with the reason while this device cannot save', () => {
     var elements = {
       'offline-banner': createElementStub(),
-      'tb-sync-badge': createElementStub(),
-      'tb-sync-popover': createElementStub(),
       'sync-indicator-dot': createElementStub(),
     };
     document.getElementById = function (id) {
@@ -175,8 +165,6 @@ describe('desktop sync status UI', () => {
   it('returns to the idle state when no sync work remains', () => {
     var elements = {
       'offline-banner': createElementStub(),
-      'tb-sync-badge': createElementStub(),
-      'tb-sync-popover': createElementStub(),
       'sync-indicator-dot': createElementStub(),
     };
     document.getElementById = function (id) {
@@ -203,8 +191,7 @@ describe('desktop sync status UI', () => {
 
     expect(elements['offline-banner'].hidden).toBe(true);
     expect(document.body.classList.contains('offline-active')).toBe(false);
-    expect(elements['tb-sync-badge'].hidden).toBe(true);
-    expect(elements['tb-sync-popover'].innerHTML).toContain('All changes saved');
     expect(elements['sync-indicator-dot'].className).toBe('tb-sync-dot idle');
+    expect(elements['sync-indicator-dot'].title).toBe('All changes saved');
   });
 });
