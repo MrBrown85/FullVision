@@ -27,8 +27,9 @@ window.PageAssignments = (function () {
   var _showingNewForm = false;
   var _editingAssessId = null;
   var collapsedModules = {};
-  // Closed modules stay closed when the teacher leaves the page and comes
-  // back, per class, on this device.
+  // Closed modules stay closed per class, saved with the teacher's
+  // preferences so they survive signing out. This key is the old
+  // browser-only copy, read once when a class has nothing saved yet.
   var MODULES_CLOSED_KEY = 'gb-assign-modules-closed-';
   var _dragAssessId = null;
   var _dragModuleId = null;
@@ -133,6 +134,14 @@ window.PageAssignments = (function () {
   var SECTION_COLORS = ['#3b82f6', '#0891b2', '#059669', '#9333ea', '#dc2626', '#ea580c', '#0284c7', '#4f46e5'];
 
   function _loadClosedModules(cid) {
+    var byClass = getDashboardPrefs().closedModules || {};
+    if (Array.isArray(byClass[cid])) {
+      var closed = {};
+      byClass[cid].forEach(function (id) {
+        closed[id] = true;
+      });
+      return closed;
+    }
     try {
       var saved = JSON.parse(localStorage.getItem(MODULES_CLOSED_KEY + cid) || '{}');
       return saved && typeof saved === 'object' ? saved : {};
@@ -142,15 +151,12 @@ window.PageAssignments = (function () {
   }
 
   function _saveClosedModules() {
-    var closed = {};
-    Object.keys(collapsedModules).forEach(function (id) {
-      if (collapsedModules[id]) closed[id] = true;
+    var ids = Object.keys(collapsedModules).filter(function (id) {
+      return collapsedModules[id];
     });
-    try {
-      localStorage.setItem(MODULES_CLOSED_KEY + activeCourse, JSON.stringify(closed));
-    } catch (e) {
-      /* private mode: closed modules last this visit */
-    }
+    var byClass = Object.assign({}, getDashboardPrefs().closedModules || {});
+    byClass[activeCourse] = ids;
+    saveDashboardPrefs({ closedModules: byClass });
   }
 
   /* ── switchCourse ───────────────────────────────────────── */
@@ -4673,6 +4679,11 @@ window.PageAssignments = (function () {
     var moved = modules.splice(fromIndex, 1)[0];
     var insertAt = fromIndex < targetIndex ? targetIndex - 1 : targetIndex;
     modules.splice(insertAt, 0, moved);
+    // The saved order is sortOrder, not the array position: renumber so the
+    // move is written and the class reloads in this order.
+    modules.forEach(function (u, i) {
+      u.sortOrder = i;
+    });
     saveModules(cid, modules);
     _dragModuleId = null;
     render();
