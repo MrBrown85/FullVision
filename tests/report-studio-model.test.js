@@ -1,377 +1,400 @@
 /**
- * The layout model behind Page Studio (teacher/report-sheets.js): pages of
- * blocks, each a rectangle on a 12-column grid of 20px rows, migration from
- * every earlier shape, and the pure helpers the Studio calls.
- * docs/DECISIONS.md "Report forms".
+ * The layout model behind Page Studio (teacher/report-sheets.js): sides
+ * of rows, each row one block at Row width or one or two at Side by Side
+ * width, migration from every earlier shape, and the pure helpers the
+ * Studio calls. docs/DECISIONS.md "Report forms" 13.
  */
 import './setup.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 const S = ReportSheets;
-const rects = pg => pg.blocks.map(b => [b.block, b.x, b.y, b.w, b.h]);
 const ids = f => S.onForm(f);
+const rowsOf = (f, side) =>
+  f.sides[side].rows.map(r => r.cells.map(c => c.block + (c.size === 'half' ? '/half' : '')).join('+'));
 
 describe('normalizeForm', () => {
   it('is the Report Card when nothing is saved', () => {
     const f = S.normalizeForm(undefined);
-    expect(f.v).toBe(5);
-    expect(Object.keys(f)).toEqual(['v', 'id', 'name', 'type', 'pagesPerStudent', 'pages', 'pinned', 'perStudent']);
-    expect(f.pages[0].blocks[0]).toEqual({ block: 'header', x: 0, y: 0, w: 12 });
-    expect(ids(f)).toEqual([
+    expect(f.v).toBe(6);
+    expect(Object.keys(f)).toEqual(['v', 'id', 'name', 'type', 'sides', 'pinned', 'perStudent']);
+    expect(f.sides).toHaveLength(2);
+    expect(rowsOf(f, 0)).toEqual([
       'header',
-      'academic-summary',
-      'teacher-narrative',
       'competency-table',
-      'next-steps',
-      'learner-dimensions',
       'legend',
-      'parent-response',
+      'teacher-narrative',
+      'term-attendance/half+missing-work/half',
     ]);
-    expect(S.cellOf(f, 'teacher-narrative')).toMatchObject({ x: 0, w: 12, h: 8 });
+    expect(rowsOf(f, 1)).toEqual(['learner-dimensions', 'parent-response']);
+    expect(S.cellOf(f, 'teacher-narrative')).toEqual({ block: 'teacher-narrative', size: 'row', lines: 10 });
+    expect(S.cellOf(f, 'parent-response')).toEqual({ block: 'parent-response', size: 'row', lines: 3 });
     expect(f.pinned).toBe('parent-response');
-    expect(f.pagesPerStudent).toBe('auto');
     expect(f.type).toBe('standard');
+    expect(f).not.toHaveProperty('pagesPerStudent');
+    expect(f).not.toHaveProperty('pages');
   });
 
-  it('migrates a v4 form: spans become columns, rows stack at their tallest cell, lines become rows', () => {
+  it('migrates a v5 grid form: blocks in (row, column) order become rows, two half-wide blocks on one grid row a pair, a fill block’s rows its lines', () => {
     const f = S.normalizeForm({
-      v: 4,
+      v: 5,
       id: 'mine',
       name: 'Mine',
+      pages: [
+        {
+          blocks: [
+            { block: 'header', x: 0, y: 0, w: 12 },
+            { block: 'teacher-narrative', x: 0, y: 5, w: 12, h: 13, options: { x: 1 } },
+            { block: 'legend', x: 6, y: 18, w: 6, h: 6 },
+            { block: 'support-home', x: 0, y: 18, w: 6, h: 6 },
+            { block: 'competency-table', x: 0, y: 24, w: 8, h: 13 },
+            { block: 'observations', x: 8, y: 24, w: 4, h: 13 },
+            { block: 'growth', x: 0, y: 37, w: 5, h: 8 },
+          ],
+        },
+        { blocks: [{ block: 'parent-response', x: 0, y: 30, w: 12, h: 10 }] },
+      ],
       pinned: 'parent-response',
-      pagesPerStudent: 2,
+      perStudent: { st1: { hide: ['legend'] } },
+    });
+    expect(f.v).toBe(6);
+    expect(f.id).toBe('mine');
+    expect(rowsOf(f, 0)).toEqual([
+      'header',
+      'teacher-narrative',
+      'support-home/half+legend/half',
+      'competency-table',
+      'observations/half',
+      'growth/half',
+    ]);
+    // 13 rows × 20px less the box's 40px, in 22px lines: 10.
+    expect(S.cellOf(f, 'teacher-narrative')).toEqual({
+      block: 'teacher-narrative',
+      size: 'row',
+      lines: 10,
+      options: { x: 1 },
+    });
+    expect(S.cellOf(f, 'parent-response').lines).toBe(7);
+    expect(f.pinned).toBe('parent-response');
+    expect(f.perStudent).toEqual({ st1: { hide: ['legend'] } });
+  });
+
+  it('migrates a v4 form through v5: spans become widths, lines stay lines', () => {
+    const f = S.normalizeForm({
+      v: 4,
       pages: [
         {
           rows: [
-            { cells: [{ block: 'header', span: 12, options: { school: false } }] },
-            { cells: [{ block: 'teacher-narrative', span: 12, height: 'fixed', lines: 5 }] },
+            { cells: [{ block: 'header', span: 12 }] },
+            { cells: [{ block: 'teacher-narrative', span: 12, height: 'fixed', lines: 6 }] },
             {
               cells: [
-                { block: 'competency-table', span: 8, options: { evidence: false } },
-                { block: 'legend', span: 4 },
-              ],
-            },
-            {
-              cells: [
-                { block: 'next-steps', span: 6 },
-                { block: 'observations', span: 6 },
-              ],
-            },
-            {
-              cells: [
-                { block: 'core-competencies', span: 4 },
-                { block: 'grade-table', span: 4 },
-                { block: 'section-chart', span: 4 },
+                { block: 'competency-table', span: 6 },
+                { block: 'legend', span: 6 },
               ],
             },
           ],
         },
-        { rows: [{ cells: [{ block: 'learner-dimensions' }] }, { cells: [{ block: 'parent-response' }] }] },
+        { rows: [{ cells: [{ block: 'parent-response', span: 12 }] }] },
       ],
+      pinned: 'parent-response',
     });
-    expect(f.v).toBe(5);
-    expect(f.pagesPerStudent).toBe(2);
-    expect(f.pinned).toBe('parent-response');
-    expect(f.pages[0].blocks[0]).toEqual({ block: 'header', x: 0, y: 0, w: 12, options: { school: false } });
-    // header 5 rows; comment 5 lines → ceil((5·22 + 40) / 20) = 8 rows; the 8+4 row is the table's 13.
-    expect(rects(f.pages[0]).slice(1)).toEqual([
-      ['teacher-narrative', 0, 5, 12, 8],
-      ['competency-table', 0, 13, 8, 13],
-      ['legend', 8, 13, 4, 6],
-      ['next-steps', 0, 26, 6, 8],
-      ['observations', 6, 26, 6, 16],
-      ['core-competencies', 0, 42, 4, 16],
-      ['grade-table', 4, 42, 4, 20],
-      ['section-chart', 8, 42, 4, 20],
-    ]);
-    expect(S.cellOf(f, 'competency-table').options).toEqual({ evidence: false });
-    expect(rects(f.pages[1])).toEqual([
-      ['learner-dimensions', 0, 0, 12, 15],
-      ['parent-response', 0, 15, 12, 15],
-    ]);
+    expect(rowsOf(f, 0)).toEqual(['header', 'teacher-narrative', 'competency-table/half+legend/half']);
+    expect(S.cellOf(f, 'teacher-narrative').lines).toBe(6);
+    expect(rowsOf(f, 1)).toEqual(['parent-response']);
   });
 
-  it('a v4 comment with no height kept 8 lines; Fit Content takes the block’s default', () => {
-    const row = cell => ({ v: 4, pages: [{ rows: [{ cells: [cell] }] }] });
-    expect(S.cellOf(S.normalizeForm(row({ block: 'teacher-narrative' })), 'teacher-narrative').h).toBe(11);
-    expect(S.cellOf(S.normalizeForm(row({ block: 'teacher-narrative', height: 'fit' })), 'teacher-narrative').h).toBe(
-      8,
-    );
-  });
-
-  it('migrates a v3 form through v4: a pair is two halves, room is rows, the pin is the form’s', () => {
+  it('migrates a v3 form through v4: a pair is two halves, the pin is the form’s', () => {
     const f = S.normalizeForm({
       v: 3,
-      type: 'compact',
-      front: [
-        { block: 'header' },
-        { block: 'teacher-narrative', room: { lines: 5 }, whenEmpty: 'box' },
-        { pair: [{ block: 'competency-table' }, { block: 'legend' }] },
-        { pair: [{ block: 'observations' }, { block: 'attendance' }] },
-      ],
-      back: [{ block: 'learner-dimensions' }, { block: 'parent-response', pinned: 'bottom' }],
+      front: [{ block: 'header' }, { pair: [{ block: 'competency-table' }, { block: 'legend' }] }],
+      back: [{ block: 'learner-dimensions' }, { block: 'parent-response', pinned: true }],
     });
-    expect(f.v).toBe(5);
-    expect(f.type).toBe('compact');
-    expect(rects(f.pages[0]).slice(1)).toEqual([
-      ['teacher-narrative', 0, 5, 12, 8],
-      ['competency-table', 0, 13, 6, 13],
-      ['legend', 6, 13, 6, 6],
-      // Attendance is no longer a block: the pair falls back to observations alone, full width.
-      ['observations', 0, 26, 12, 16],
-    ]);
-    expect(ids(f)).toContain('parent-response');
+    expect(rowsOf(f, 0)).toEqual(['header', 'competency-table/half+legend/half']);
+    expect(rowsOf(f, 1)).toEqual(['learner-dimensions', 'parent-response']);
     expect(f.pinned).toBe('parent-response');
   });
 
-  it('drops unknown blocks, duplicates and extra fields, clamps rectangles to the grid, keeps empty pages', () => {
+  it('drops unknown blocks, duplicates and extra fields, keeps empty sides, and makes the pinned block last at Row width', () => {
     const f = S.normalizeForm({
-      v: 5,
-      pages: [
+      v: 6,
+      sides: [
         {
-          blocks: [
-            { block: 'bogus', x: 0, y: 0, w: 12, h: 4 },
-            { block: 'legend', x: 11, y: -3, w: 1, h: 0, span: 6, lines: 3, whenEmpty: 'box' },
-            { block: 'header', x: 4, y: 9, w: 3, h: 7 },
+          rows: [
+            {
+              cells: [
+                { block: 'parent-response', size: 'half', extra: 1 },
+                { block: 'legend', size: 'half' },
+              ],
+            },
+            { cells: [{ block: 'nope' }] },
+            { cells: [{ block: 'legend' }] },
+            {
+              cells: [
+                { block: 'student-reflection-learning', size: 'half' },
+                { block: 'observations', size: 'half' },
+              ],
+            },
+            { cells: [{ block: 'header', options: { school: false } }] },
           ],
         },
-        {
-          blocks: [
-            { block: 'legend', x: 0, y: 0, w: 12, h: 4 },
-            { block: 'next-steps', x: 2, y: 5, w: 40 },
-          ],
-        },
-        { blocks: [] },
+        { rows: [] },
+        { rows: [{ cells: [{ block: 'teacher-narrative', lines: 99 }] }] },
       ],
-      pinned: 'legend',
-      perStudent: { s1: { hide: ['legend', 'header', 'nope'] }, s2: { hide: [] } },
+      pinned: 'parent-response',
     });
-    expect(f.pages[0].blocks).toEqual([
-      { block: 'header', x: 0, y: 0, w: 12 },
-      { block: 'legend', x: 9, y: 0, w: 3, h: 2 },
+    expect(rowsOf(f, 0)).toEqual([
+      'header',
+      'legend/half',
+      'student-reflection-learning',
+      'observations/half',
+      'parent-response',
     ]);
-    expect(f.pages[1].blocks).toEqual([{ block: 'next-steps', x: 0, y: 5, w: 12, h: 8 }]);
-    expect(f.pages).toHaveLength(3);
-    expect(f.pinned).toBeNull();
-    expect(f.perStudent).toEqual({ s1: { hide: ['legend'] } });
+    expect(S.cellOf(f, 'parent-response')).toEqual({ block: 'parent-response', size: 'row', lines: 3 });
+    expect(S.cellOf(f, 'header')).toEqual({ block: 'header', size: 'row', options: { school: false } });
+    expect(f.sides[1].rows).toEqual([]);
+    expect(S.cellOf(f, 'teacher-narrative').lines).toBe(16);
+    expect(S.canHalf('student-reflection-learning')).toBe(false);
+    expect(S.canHalf('parent-response')).toBe(false);
+    expect(S.canHalf('legend')).toBe(true);
   });
 
   it('formFor opens an old Brief class on the Interim Update and anything else on the Report Card', () => {
-    expect(S.formFor({ preset: 'brief', blocks: [] }).id).toBe('interim-update');
-    expect(S.formFor({ preset: 'detailed', blocks: [] }).id).toBe('report-card');
+    expect(S.formFor({ preset: 'brief' }).id).toBe('interim-update');
+    expect(S.formFor({ preset: 'brief' }).sides).toHaveLength(1);
+    expect(S.formFor({ preset: 'standard' }).id).toBe('report-card');
     expect(S.formFor(null).id).toBe('report-card');
-    expect(S.formFor({ form: { v: 3, front: [{ block: 'header' }, { block: 'legend' }], back: [] } }).v).toBe(5);
+    expect(S.formFor({ form: { v: 6, id: 'x', sides: [] } }).id).toBe('x');
   });
 });
 
-describe('place, move and resize', () => {
-  const base = () => S.form();
-
-  it('place puts a new block at a rectangle, clamped to the grid, and pushes what it covers down', () => {
-    // The legend over the comment (rows 11–18): the comment and everything under it move down 5.
-    const f = S.place(base(), 'legend', { page: 0, x: 0, y: 11, w: 12, h: 5 });
-    expect(S.cellOf(f, 'legend')).toEqual({ block: 'legend', x: 0, y: 11, w: 12, h: 5 });
-    expect(S.cellOf(f, 'teacher-narrative').y).toBe(16);
-    expect(S.cellOf(f, 'competency-table').y).toBe(24);
-    expect(S.cellOf(f, 'next-steps').y).toBe(37);
-    // Above it, nothing moves.
-    expect(S.cellOf(f, 'academic-summary').y).toBe(5);
-    const g = S.place(base(), 'legend', { page: 1, x: 11, y: 16, w: 1 });
-    expect(S.cellOf(g, 'legend')).toEqual({ block: 'legend', x: 9, y: 16, w: 3, h: 6 });
-    // Over the bottom of a block that started above it, it still takes the place.
-    const d = S.place(base(), 'legend', { page: 1, x: 0, y: 10, w: 12 });
-    expect(S.cellOf(d, 'legend').y).toBe(10);
-    expect(S.cellOf(d, 'learner-dimensions').y).toBe(16);
+describe('editing', () => {
+  it('insert puts a new block in its own row at the end of a side, before the pinned row; at a row index on request', () => {
+    let f = S.insert(S.form(), 'observations', { side: 1 });
+    expect(rowsOf(f, 1)).toEqual(['learner-dimensions', 'observations', 'parent-response']);
+    f = S.insert(f, 'next-steps', { side: 0, row: 2 });
+    expect(rowsOf(f, 0)).toEqual([
+      'header',
+      'competency-table',
+      'next-steps',
+      'legend',
+      'teacher-narrative',
+      'term-attendance/half+missing-work/half',
+    ]);
+    // Row 0 on the Front is the letterhead's: a block asked there goes under it.
+    f = S.insert(f, 'growth', { side: 0, row: 0 });
+    expect(rowsOf(f, 0)[1]).toBe('growth');
+    // A moved block keeps its options and leaves its pair.
+    f = S.insert(S.setOption(f, 'missing-work', 'x', 1), 'missing-work', { side: 1, row: 0 });
+    expect(rowsOf(f, 0)).toContain('term-attendance/half');
+    expect(rowsOf(f, 1)[0]).toBe('missing-work/half');
+    expect(S.cellOf(f, 'missing-work').options).toEqual({ x: 1 });
+    expect(S.insert(f, 'header', { side: 1 })).toBe(f);
+    expect(S.insert(f, 'nope', { side: 1 })).toBe(f);
   });
 
-  it('place without a page uses the last; w and h default to full width and the block’s rows', () => {
-    const f = S.place(base(), 'observations', { x: 0, y: 15 });
-    expect(S.locate(f, 'observations').page).toBe(1);
-    expect(S.cellOf(f, 'observations')).toMatchObject({ x: 0, y: 15, w: 12, h: 16 });
+  it('beside pairs two blocks that may go Side by Side when the target is alone; otherwise nothing changes', () => {
+    const f0 = S.form();
+    const f = S.beside(f0, 'legend', 'competency-table');
+    expect(rowsOf(f, 0)).toEqual([
+      'header',
+      'competency-table/half+legend/half',
+      'teacher-narrative',
+      'term-attendance/half+missing-work/half',
+    ]);
+    expect(S.partnerOf(f, 'legend')).toBe('competency-table');
+    expect(S.partnerOf(f, 'teacher-narrative')).toBeNull();
+    // A full pair takes no third; the reflections never pair; the response never pairs.
+    expect(S.beside(f, 'teacher-narrative', 'legend')).toEqual(f);
+    expect(S.beside(f0, 'student-reflection-habits', 'legend')).toBe(f0);
+    expect(S.beside(f0, 'legend', 'parent-response')).toBe(f0);
+    // A new block from the palette pairs too.
+    const g = S.beside(f0, 'support-home', 'legend');
+    expect(rowsOf(g, 0)[2]).toBe('legend/half+support-home/half');
   });
 
-  it('a block placed beside another sits beside it; one placed into the letterhead goes under it', () => {
-    let f = S.resize(base(), 'competency-table', { w: 6 });
-    f = S.place(f, 'legend', { page: 0, x: 6, y: 19, w: 6, h: 5 });
-    expect(S.cellOf(f, 'competency-table')).toMatchObject({ x: 0, y: 19, w: 6 });
-    expect(S.cellOf(f, 'legend')).toMatchObject({ x: 6, y: 19, w: 6 });
-    const g = S.place(base(), 'legend', { page: 0, x: 0, y: 1, w: 12, h: 5 });
-    expect(S.cellOf(g, 'legend').y).toBe(5);
+  it('moveRow moves a row up or down on its side; the letterhead and the pinned row stay put', () => {
+    let f = S.moveRow(S.form(), 'teacher-narrative', -1);
+    expect(rowsOf(f, 0)).toEqual([
+      'header',
+      'competency-table',
+      'teacher-narrative',
+      'legend',
+      'term-attendance/half+missing-work/half',
+    ]);
+    f = S.moveRow(f, 'missing-work', -1);
+    expect(rowsOf(f, 0)[3]).toBe('term-attendance/half+missing-work/half');
+    expect(S.moveRow(f, 'competency-table', -1)).toBe(f); // under the letterhead already
+    expect(S.moveRow(f, 'learner-dimensions', 1)).toBe(f); // above the pinned row already
+    expect(S.moveRow(f, 'parent-response', -1)).toBe(f);
+    expect(S.moveRow(f, 'header', 1)).toBe(f);
   });
 
-  it('move keeps the block’s size, options and pin; the letterhead cannot be placed, moved or removed', () => {
-    let f = S.setOption(base(), 'next-steps', 'ican', 1);
-    f = S.move(f, 'next-steps', { page: 1, y: 15 });
-    expect(S.locate(f, 'next-steps').page).toBe(1);
-    expect(S.cellOf(f, 'next-steps')).toEqual({ block: 'next-steps', x: 0, y: 15, w: 12, h: 8, options: { ican: 1 } });
-    expect(ids(f).filter(id => id === 'next-steps')).toHaveLength(1);
-    const g = S.move(base(), 'parent-response', { page: 0, y: 40 });
-    expect(g.pinned).toBe('parent-response');
-    expect(S.place(base(), 'header', { page: 1, y: 3 })).toEqual(base());
-    expect(S.move(base(), 'header', { y: 3 })).toEqual(base());
-    expect(S.removeCell(base(), 'header')).toEqual(base());
+  it('moveToSide appends a row to another side before its pinned row', () => {
+    const f = S.moveToSide(S.form(), 'legend', 1);
+    expect(rowsOf(f, 0)).toEqual([
+      'header',
+      'competency-table',
+      'teacher-narrative',
+      'term-attendance/half+missing-work/half',
+    ]);
+    expect(rowsOf(f, 1)).toEqual(['learner-dimensions', 'legend', 'parent-response']);
+    expect(S.moveToSide(f, 'legend', 1)).toBe(f);
+    expect(S.moveToSide(f, 'legend', 5)).toBe(f);
+    expect(S.moveToSide(f, 'parent-response', 0)).toBe(f);
   });
 
-  it('resize clamps to 3–12 columns and at least 2 rows, keeps the block on the grid, and pushes what it covers', () => {
-    let f = S.move(S.resize(base(), 'competency-table', { w: 6 }), 'competency-table', { x: 6 });
-    expect(S.cellOf(f, 'competency-table')).toMatchObject({ x: 6, w: 6 });
-    f = S.resize(f, 'competency-table', { w: 12 });
-    expect(S.cellOf(f, 'competency-table')).toMatchObject({ x: 0, w: 12 });
-    f = S.resize(f, 'competency-table', { w: 1, h: 0 });
-    expect(S.cellOf(f, 'competency-table')).toMatchObject({ w: 3, h: 2 });
-    // Taller: the block under it moves down.
-    f = S.resize(base(), 'teacher-narrative', { h: 12 });
-    expect(S.cellOf(f, 'teacher-narrative').h).toBe(12);
-    expect(S.cellOf(f, 'competency-table').y).toBe(23);
-    expect(S.resize(base(), 'header', { h: 9 })).toEqual(base());
-  });
-});
-
-describe('settle, pages and free room', () => {
-  it('settle stores each block’s row and page where it landed; continued pages and the letterhead stay put', () => {
-    const f = S.settle(S.form(), {
-      header: { page: 0, y: 3 },
-      'competency-table': { page: 0, y: 19 },
-      'next-steps': { page: 1, y: 0 },
-      'learner-dimensions': { page: 1, y: 8 },
-      'parent-response': { page: 2, y: 0 },
-    });
-    expect(f.pages[0].blocks[0]).toEqual({ block: 'header', x: 0, y: 0, w: 12 });
-    expect(S.cellOf(f, 'competency-table').y).toBe(19);
-    expect(S.locate(f, 'next-steps').page).toBe(1);
-    expect(S.cellOf(f, 'next-steps').y).toBe(0);
-    expect(S.cellOf(f, 'learner-dimensions').y).toBe(8);
-    expect(S.locate(f, 'parent-response').page).toBe(1);
-    expect(S.settle(S.form(), null)).toEqual(S.form());
+  it('setSize: Side by Side pairs with a lone Side by Side neighbour; Row splits a pair, the partner staying at half width', () => {
+    let f = S.setSize(S.form(), 'legend', 'half');
+    expect(rowsOf(f, 0)[2]).toBe('legend/half');
+    f = S.setSize(f, 'competency-table', 'half');
+    expect(rowsOf(f, 0)).toEqual([
+      'header',
+      'competency-table/half+legend/half',
+      'teacher-narrative',
+      'term-attendance/half+missing-work/half',
+    ]);
+    f = S.setSize(f, 'competency-table', 'row');
+    expect(rowsOf(f, 0)).toEqual([
+      'header',
+      'competency-table',
+      'legend/half',
+      'teacher-narrative',
+      'term-attendance/half+missing-work/half',
+    ]);
+    expect(S.setSize(f, 'student-reflection-habits', 'half')).toEqual(f);
+    expect(rowsOf(S.setSize(S.form(), 'parent-response', 'half'), 1)).toEqual([
+      'learner-dimensions',
+      'parent-response',
+    ]);
   });
 
-  it('settle leaves a block pushed to a later page where it is when a block after it stays behind', () => {
-    // Core Competencies dropped above Teacher Comment: it lands on page 2,
-    // and the Comment it pushed lands on a continued page past the form's.
-    const placed = S.place(S.form(), 'core-competencies', { page: 0, x: 0, y: 32, w: 12, h: 16 });
-    const f = S.settle(placed, {
-      'academic-summary': { page: 0, y: 5 },
-      'core-competencies': { page: 1, y: 0 },
-      'teacher-narrative': { page: 2, y: 0 },
-      'competency-table': { page: 2, y: 8 },
-      'next-steps': { page: 2, y: 21 },
-      'learner-dimensions': { page: 3, y: 0 },
-      legend: { page: 3, y: 15 },
-      'parent-response': { page: 1, y: 21 },
-    });
-    // Moved to page 2 it would flow after the Comment still stored on page 1.
-    expect(S.locate(f, 'core-competencies').page).toBe(0);
-    expect(S.cellOf(f, 'core-competencies').y).toBe(32);
-    expect(S.locate(f, 'teacher-narrative').page).toBe(0);
-  });
-
-  it('addPage adds an empty page; removePage removes only an empty page past the second', () => {
-    let f = S.addPage(S.form());
-    expect(f.pages).toHaveLength(3);
-    expect(f.pages[2].blocks).toEqual([]);
-    expect(S.removePage(f, 1)).toEqual(f);
-    f = S.removePage(f, 2);
-    expect(f.pages).toHaveLength(2);
-    const g = S.place(S.addPage(S.form()), 'legend', { page: 2, y: 0 });
-    expect(S.removePage(g, 2)).toEqual(g);
-  });
-
-  it('firstFree finds the first row where a block fits with nothing in the way', () => {
+  it('setLines clamps to the block’s range and only applies to writing boxes', () => {
     const f = S.form();
-    expect(S.firstFree(S.removeCell(f, 'legend'), 1, 12, 5)).toEqual({ page: 1, x: 0, y: 15 });
-    expect(S.firstFree(S.removeCell(f, 'legend'), 1, 12, 7)).toEqual({ page: 1, x: 0, y: 46 });
-    expect(S.firstFree(f, 0, 12, 4)).toEqual({ page: 0, x: 0, y: 40 });
-    const half = S.resize(f, 'competency-table', { w: 6 });
-    expect(S.firstFree(half, 0, 6, 4)).toEqual({ page: 0, x: 6, y: 19 });
-    expect(S.firstFree(f, 5, 12, 4)).toBeNull();
+    expect(S.cellOf(S.setLines(f, 'teacher-narrative', 14), 'teacher-narrative').lines).toBe(14);
+    expect(S.cellOf(S.setLines(f, 'teacher-narrative', 1), 'teacher-narrative').lines).toBe(3);
+    expect(S.cellOf(S.setLines(f, 'teacher-narrative', 40), 'teacher-narrative').lines).toBe(16);
+    expect(S.cellOf(S.setLines(f, 'parent-response', 5), 'parent-response').lines).toBe(5);
+    expect(S.setLines(f, 'legend', 5)).toEqual(f);
+    expect(S.optionsFor(S.cellOf(f, 'teacher-narrative')).lines).toBe(10);
+    expect(S.optionsFor({ block: 'teacher-narrative' }).lines).toBe(10);
   });
-});
 
-describe('cell settings', () => {
-  it('removeCell drops the block and the pin if it was pinned, and keeps its page', () => {
-    let f = S.removeCell(S.form(), 'parent-response');
-    expect(ids(f)).not.toContain('parent-response');
+  it('removeCell drops the block (and the pin if it was pinned); its partner stays alone at half width', () => {
+    let f = S.removeCell(S.form(), 'term-attendance');
+    expect(rowsOf(f, 0)[4]).toBe('missing-work/half');
+    expect(S.available(f)).toContain('term-attendance');
+    f = S.removeCell(f, 'parent-response');
     expect(f.pinned).toBeNull();
-    f = S.removeCell(S.removeCell(f, 'learner-dimensions'), 'legend');
-    expect(f.pages).toHaveLength(2);
-    expect(f.pages[1].blocks).toEqual([]);
+    expect(rowsOf(f, 1)).toEqual(['learner-dimensions']);
+    expect(S.removeCell(f, 'header')).toBe(f);
+    expect(S.removeCell(f, 'nope')).toBe(f);
   });
 
-  it('setOption, setNoEvidence, setPinned, setType, setPagesPerStudent', () => {
+  it('addSide, removeSide (only an empty side past the second) and setSides (Front Only folds the Back onto the Front)', () => {
+    let f = S.addSide(S.form());
+    expect(f.sides).toHaveLength(3);
+    expect(S.removeSide(f, 1)).toBe(f);
+    expect(S.removeSide(f, 2).sides).toHaveLength(2);
+    f = S.insert(f, 'observations', { side: 2 });
+    expect(S.removeSide(f, 2)).toBe(f);
+    const one = S.setSides(S.form(), 1);
+    expect(one.sides).toHaveLength(1);
+    expect(rowsOf(one, 0)).toEqual([
+      'header',
+      'competency-table',
+      'legend',
+      'teacher-narrative',
+      'term-attendance/half+missing-work/half',
+      'learner-dimensions',
+      'parent-response',
+    ]);
+    expect(one.pinned).toBe('parent-response');
+    const two = S.setSides(one, 2);
+    expect(two.sides).toHaveLength(2);
+    expect(two.sides[1].rows).toEqual([]);
+    expect(S.setSides(S.form(), 2).sides).toHaveLength(2);
+  });
+
+  it('setOption, setNoEvidence, setPinned, setType', () => {
     let f = S.setOption(S.form(), 'competency-table', 'evidence', false);
     expect(S.cellOf(f, 'competency-table').options).toEqual({ evidence: false });
     f = S.setNoEvidence(f, 'competency-table', 'hide');
     expect(S.cellOf(f, 'competency-table').noEvidence).toBe('hide');
     f = S.setPinned(f, null);
     expect(f.pinned).toBeNull();
-    f = S.setPinned(f, 'parent-response');
-    expect(f.pinned).toBe('parent-response');
+    expect(S.setPinned(f, 'parent-response').pinned).toBe('parent-response');
     expect(S.setPinned(f, 'legend').pinned).toBeNull();
     expect(S.setType(f, 'compact').type).toBe('compact');
-    expect(S.setPagesPerStudent(f, 2).pagesPerStudent).toBe(2);
-    expect(S.setPagesPerStudent(f, 7).pagesPerStudent).toBe('auto');
+    expect(S.setType(f, 'x').type).toBe('standard');
   });
 
   it('hideFor hides a block for one student and leaves the class layout alone', () => {
-    let f = S.hideFor(S.form(), 'stu-1', 'next-steps', true);
-    expect(S.hiddenFor(f, 'stu-1')).toEqual(['next-steps']);
-    expect(S.hiddenFor(f, 'stu-2')).toEqual([]);
-    expect(ids(f)).toEqual(ids(S.form()));
-    f = S.hideFor(f, 'stu-1', 'next-steps', false);
+    let f = S.hideFor(S.form(), 'st1', 'legend', true);
+    expect(S.hiddenFor(f, 'st1')).toEqual(['legend']);
+    expect(S.hiddenFor(f, 'st2')).toEqual([]);
+    expect(rowsOf(f, 0)).toEqual(rowsOf(S.form(), 0));
+    f = S.hideFor(f, 'st1', 'legend', false);
     expect(f.perStudent).toEqual({});
+  });
+
+  it('the letterhead keeps its options through normalizeForm and any later edit', () => {
+    let f = S.setOption(S.form(), 'header', 'studentNumber', false);
+    expect(S.cellOf(f, 'header').options).toEqual({ studentNumber: false });
+    f = S.insert(f, 'legend', { side: 1 });
+    expect(S.cellOf(f, 'header').options).toEqual({ studentNumber: false });
+    expect(S.normalizeForm(f).sides[0].rows[0].cells[0].options).toEqual({ studentNumber: false });
   });
 });
 
 describe('starters', () => {
-  it('are whole v5 forms with real rectangles, nothing overlapping', () => {
-    expect(S.starters().map(s => s.id)).toEqual(['report-card', 'interim-update', 'conference-pack']);
-    S.starters().forEach(({ id }) => {
-      const f = S.starter(id);
-      expect(f.v, id).toBe(5);
-      expect(f).toEqual(S.normalizeForm(f));
-      f.pages.forEach(pg => {
-        const bs = pg.blocks.map(b => ({ ...b, h: b.h ?? S.BLOCKS[b.block].rows }));
-        bs.forEach((a, i) =>
-          bs.slice(i + 1).forEach(b => {
-            const cols = a.x < b.x + b.w && b.x < a.x + a.w;
-            const rows = a.y < b.y + b.h && b.y < a.y + a.h;
-            expect(cols && rows, `${id}: ${a.block} and ${b.block}`).toBe(false);
-          }),
-        );
-      });
+  it('are whole v6 forms: the letterhead first, the Response last on the Back, every block once', () => {
+    S.starters().forEach(st => {
+      const f = S.starter(st.id);
+      expect(f.v).toBe(6);
+      expect(f.sides[0].rows[0].cells[0].block).toBe('header');
+      const all = ids(f);
+      expect(new Set(all).size).toBe(all.length);
+      if (f.pinned) {
+        const last = f.sides[f.sides.length - 1].rows.slice(-1)[0];
+        expect(last.cells.map(c => c.block)).toEqual([f.pinned]);
+      }
     });
-    const interim = S.starter('interim-update');
-    expect(ids(interim)).toEqual(['header', 'academic-summary', 'teacher-narrative', 'next-steps', 'legend']);
-    expect(interim.pages).toHaveLength(1);
-    expect(interim.pinned).toBeNull();
-    expect(ids(S.starter('conference-pack'))).toContain('grade-table');
+    expect(S.starter('interim-update').sides).toHaveLength(1);
+    expect(S.starter('conference-pack').sides).toHaveLength(2);
+    expect(S.optionsFor(S.cellOf(S.starter('conference-pack'), 'grade-table')).range).toBe('all');
     expect(S.starter('nope')).toBeNull();
   });
-});
 
-describe('block options', () => {
-  it('optionsFor fills the registry defaults and adds the no-evidence rule', () => {
-    const f = S.form();
-    expect(S.optionsFor(S.cellOf(f, 'competency-table'))).toEqual({
+  it('optionsFor fills the registry defaults and adds the no-evidence rule and the lines', () => {
+    expect(S.optionsFor({ block: 'competency-table' })).toEqual({
       evidence: true,
       ican: false,
       assignments: false,
       noEvidence: 'show',
     });
-    const g = S.setNoEvidence(S.setOption(f, 'competency-table', 'evidence', false), 'competency-table', 'hide');
-    expect(S.optionsFor(S.cellOf(g, 'competency-table'))).toMatchObject({ evidence: false, noEvidence: 'hide' });
-    expect(S.optionsFor(S.cellOf(f, 'next-steps'))).toEqual({ ican: 2 });
-    expect(S.optionsFor(S.cellOf(f, 'learner-dimensions'))).toEqual({ descriptions: false, examples: false });
-    expect(S.optionsFor(S.cellOf(f, 'teacher-narrative'))).toEqual({});
+    expect(S.optionsFor({ block: 'competency-table', options: { ican: true }, noEvidence: 'hide' })).toMatchObject({
+      ican: true,
+      noEvidence: 'hide',
+    });
+    expect(S.optionsFor({ block: 'parent-response', lines: 5 })).toEqual({ lines: 5 });
+    expect(S.optionsFor({ block: 'legend' })).toEqual({});
   });
 
-  it('every option in the registry has a key, a Title Case label and a default', () => {
-    Object.entries(S.BLOCKS).forEach(([id, def]) => {
+  it('every option in the registry has a key, a Title Case label and a default; every block a label and a group', () => {
+    Object.keys(S.BLOCKS).forEach(id => {
+      const def = S.BLOCKS[id];
+      expect(def.label).toMatch(/^[A-Z]/);
+      if (id !== 'header') expect(S.PALETTE_GROUPS).toContain(def.group);
+      expect(def).not.toHaveProperty('rows');
       (def.options || []).forEach(o => {
-        expect(typeof o.key, id).toBe('string');
-        expect(o.label.charAt(0), id + ' ' + o.key).toMatch(/[A-Z]/);
-        expect(o.def, id + ' ' + o.key).not.toBeUndefined();
+        expect(o.key).toMatch(/^[a-z][A-Za-z]*$/);
+        expect(o.label).toMatch(/^[A-Z]/);
+        expect(o).toHaveProperty('def');
       });
+      if (def.fill && def.lines) {
+        expect(def.minLines).toBeLessThanOrEqual(def.lines);
+        expect(def.maxLines).toBeGreaterThanOrEqual(def.lines);
+      }
     });
   });
 });
@@ -392,14 +415,25 @@ describe('rendering with options', () => {
     expect(html).toContain('Upcoming');
     expect(html).toContain('Science fair<br>on Nov 30 &lt;b&gt;');
   });
-});
 
-describe('the letterhead keeps its options', () => {
-  it('through normalizeForm and any later edit', () => {
-    let f = ReportSheets.setOption(ReportSheets.form(), 'header', 'studentNumber', false);
-    expect(ReportSheets.cellOf(f, 'header').options).toEqual({ studentNumber: false });
-    f = ReportSheets.place(f, 'legend', { page: 1, y: 12 });
-    expect(ReportSheets.cellOf(f, 'header').options).toEqual({ studentNumber: false });
+  it('the Parent / Guardian Response sizes its comments box by its lines and keeps its wording', () => {
+    const three = ReportBlocks.renderReportBlock(
+      'parent-response',
+      'c1',
+      { firstName: 'A', lastName: 'B' },
+      {},
+      { lines: 3 },
+    );
+    expect(three).toContain('min-height:82px');
+    expect(three).toContain('Please review this report with your child and return this section to the school.');
+    const six = ReportBlocks.renderReportBlock(
+      'parent-response',
+      'c1',
+      { firstName: 'A', lastName: 'B' },
+      {},
+      { lines: 6 },
+    );
+    expect(six).toContain('min-height:148px');
   });
 });
 
@@ -542,29 +576,29 @@ describe('stage 3 blocks', () => {
   });
 
   it('retired blocks leave the palette but a saved layout keeps them', () => {
-    const html = ReportStudio.paletteHtml(S.form(), {}, 'blocks', []);
+    const html = ReportStudio.paletteHtml(S.form(), 'blocks', []);
     ['section-outcomes', 'score-distribution', 'section-chart'].forEach(id =>
       expect(html).not.toContain(`data-block="${id}"`),
     );
     ['support-home', 'term-glance', 'growth', 'missing-work'].forEach(id =>
       expect(html).toContain(`data-block="${id}"`),
     );
-    const kept = S.place(S.form(), 'section-chart', { page: 1, y: 40 });
+    const kept = S.insert(S.form(), 'section-chart', { side: 1 });
     expect(S.onForm(kept)).toContain('section-chart');
-    expect(ReportStudio.paletteHtml(kept, {}, 'blocks', [])).toMatch(
+    expect(ReportStudio.paletteHtml(kept, 'blocks', [])).toMatch(
       /class="studio-blk placed"[^>]*data-block="section-chart"/,
     );
   });
 
   it('Assignment Grades offers Last 10, This Term and All; This Term is the default', () => {
-    const f = S.place(S.form(), 'grade-table', { page: 1, y: 40 });
+    const f = S.insert(S.form(), 'grade-table', { side: 1 });
     expect(S.optionsFor(S.cellOf(f, 'grade-table')).range).toBe('term');
     const pop = ReportStudio.popoverHtml(f, 'grade-table');
     expect(pop).toContain('aria-label="Assessments"');
     expect(pop).toMatch(/data-value="last10"[^>]*>Last 10</);
     expect(pop).toMatch(/data-value="term" role="radio" aria-checked="true">This Term</);
     expect(pop).toMatch(/data-value="all"[^>]*>All</);
-    const sup = ReportStudio.popoverHtml(S.place(S.form(), 'support-home', { page: 1, y: 40 }), 'support-home');
+    const sup = ReportStudio.popoverHtml(S.insert(S.form(), 'support-home', { side: 1 }), 'support-home');
     expect(sup).toContain('Your Own Line');
     expect(sup).toContain('data-action="studioText" data-block="support-home" data-key="note"');
   });

@@ -94,10 +94,10 @@ window.PageReports = (function () {
       b.setAttribute('aria-checked', on ? 'true' : 'false');
     });
   }
-  function _syncPagesButtons() {
-    var pps = String(_formOf().pagesPerStudent);
-    document.querySelectorAll('#report-pages .seg-btn').forEach(function (b) {
-      var on = b.dataset.pages === pps;
+  function _syncSidesButtons() {
+    var n = _formOf().sides.length > 1 ? '2' : '1';
+    document.querySelectorAll('#report-sides .seg-btn').forEach(function (b) {
+      var on = b.dataset.sides === n;
       b.classList.toggle('active', on);
       b.setAttribute('aria-checked', on ? 'true' : 'false');
     });
@@ -127,7 +127,7 @@ window.PageReports = (function () {
     if (tbPrint) tbPrint.style.display = tab === 'questionnaire' ? 'none' : '';
     const tbPaper = document.getElementById('report-paper');
     if (tbPaper) tbPaper.style.display = tab === 'questionnaire' ? 'none' : '';
-    ['report-pages', 'report-ink', 'tb-divider', 'tb-paper-label', 'tb-save-template'].forEach(function (id) {
+    ['report-sides', 'report-ink', 'tb-divider', 'tb-paper-label', 'tb-save-template'].forEach(function (id) {
       const el = document.getElementById(id);
       if (el) el.style.display = tab === 'progress' ? '' : 'none';
     });
@@ -138,7 +138,7 @@ window.PageReports = (function () {
     if (copySel && tab !== 'progress') copySel.style.display = 'none';
     if (tab === 'progress') {
       _syncInkButtons();
-      _syncPagesButtons();
+      _syncSidesButtons();
     }
     const tbRail = document.getElementById('tb-rail-btn');
     if (tbRail) tbRail.style.display = tab === 'progress' ? '' : 'none';
@@ -376,15 +376,9 @@ window.PageReports = (function () {
 
     // Progress Reports: Page Studio (report-studio.js)
     output.innerHTML = ReportStudio.layoutHtml({ view: studioView });
-    if (_settlePending) {
-      // A form saved before the page grid: store where its blocks land.
-      _settlePending = false;
-      reportConfig.form = _settled(reportConfig.form);
-      saveReportConfig(activeCourse, reportConfig);
-    }
     renderStudioPanels();
     renderReportPreview();
-    _mountStudioDrag();
+    _mountStudioKeys();
 
     // Highlight selected students in sidebar for progress tab
     if (selectedStudentIds && selectedStudentIds.length > 0) {
@@ -471,93 +465,95 @@ window.PageReports = (function () {
     preview.classList.toggle('studio-stacked', !!z.stacked);
   }
 
-  /* + Page after the last page; Empty · Remove on an empty page past the
+  /* + Page after the last side; Empty · Remove on an empty side past the
      second. One Student view only. */
   function _decoratePages(preview) {
     if (studioView !== 'one' || viewingIssue) return;
     var student = preview.querySelector('.sheet-student');
     if (!student) return;
     var f = _formOf();
-    f.pages.forEach(function (pg, i) {
-      if (i < 2 || pg.blocks.length) return;
-      var sheet = preview.querySelector('.sheet-zoom[data-page="' + i + '"] .report-sheet');
+    f.sides.forEach(function (sd, i) {
+      if (i < 2 || sd.rows.length) return;
+      var sheet = preview.querySelector('.sheet-zoom[data-side="' + i + '"] .report-sheet');
       if (!sheet) return;
       var b = document.createElement('button');
       b.type = 'button';
       b.className = 'studio-page-empty no-print';
-      b.dataset.action = 'studioRemovePage';
-      b.dataset.page = String(i);
+      b.dataset.action = 'studioRemoveSide';
+      b.dataset.side = String(i);
       b.textContent = 'Empty · Remove';
       sheet.appendChild(b);
     });
     var add = document.createElement('button');
     add.type = 'button';
     add.className = 'studio-page-add no-print';
-    add.dataset.action = 'studioAddPage';
+    add.dataset.action = 'studioAddSide';
     add.textContent = '+ Page';
     student.appendChild(add);
   }
 
-  /* The selected block: a blue outline, its handles, and its toolbar
-     above it (in the canvas, not the scaled page, so it reads at screen
-     size); the Options popover under the toolbar when it is open. */
+  /* The selected block: a blue outline on the page and its card in the
+     gutter beside the pages (in the canvas, not the scaled page, so it
+     reads at screen size), level with the block; the Options popover
+     under the card when it is open. */
   function _applySelection(preview) {
     preview.querySelectorAll('.sheet-cell.studio-sel').forEach(function (el) {
       el.classList.remove('studio-sel');
     });
-    preview.querySelectorAll('.studio-handle, .studio-bar, .studio-pop').forEach(function (el) {
+    preview.querySelectorAll('.studio-bar, .studio-pop').forEach(function (el) {
       el.remove();
     });
-    preview.querySelectorAll('.sheet-body > .sheet-cell[data-block]').forEach(function (el) {
+    preview.querySelectorAll('.sheet-body .sheet-cell[data-block]').forEach(function (el) {
       if (el.dataset.block !== 'header') el.setAttribute('tabindex', '0');
     });
     if (_focusBlock) {
-      var target = preview.querySelector('.sheet-body > .sheet-cell[data-block="' + _focusBlock + '"]');
+      var target = preview.querySelector('.sheet-body .sheet-cell[data-block="' + _focusBlock + '"]');
       _focusBlock = null;
       if (target) target.focus({ preventScroll: true });
     }
     if (!studioSelected || studioView !== 'one' || viewingIssue) return;
-    var cells = preview.querySelectorAll('.sheet-body > .sheet-cell[data-block="' + studioSelected + '"]');
+    var cells = preview.querySelectorAll('.sheet-body .sheet-cell[data-block="' + studioSelected + '"]');
     if (!cells.length) return;
     var first = cells[0];
-    var def = ReportSheets.BLOCKS[studioSelected];
     cells.forEach(function (el) {
       el.classList.add('studio-sel');
     });
-    if (!def.locked) {
-      ['e', 's', 'se'].forEach(function (kind) {
-        var h = document.createElement('span');
-        h.className = 'studio-handle studio-h-' + kind;
-        h.dataset.handle = kind;
-        h.setAttribute('aria-hidden', 'true');
-        first.appendChild(h);
-      });
-    }
     var st = _previewStudent();
     var who = st ? { id: st.id, name: fullName(st) } : null;
     var bar = document.createElement('div');
     bar.innerHTML = ReportStudio.blockToolbarHtml(_formOf(), studioSelected, who);
     var barEl = bar.firstElementChild;
-    if (barEl) {
-      preview.appendChild(barEl);
-      var pr = preview.getBoundingClientRect();
-      var cr = first.getBoundingClientRect();
-      barEl.style.left = Math.max(0, cr.left - pr.left + preview.scrollLeft) + 'px';
-      barEl.style.top = Math.max(0, cr.top - pr.top + preview.scrollTop - barEl.offsetHeight - 6) + 'px';
-      if (popoverOpen === studioSelected && ReportStudio.hasOptions(studioSelected)) {
-        var pop = document.createElement('div');
-        pop.innerHTML = ReportStudio.popoverHtml(_formOf(), studioSelected);
-        var popEl = pop.firstElementChild;
-        if (popEl) {
-          preview.appendChild(popEl);
-          popEl.style.left = barEl.style.left;
-          popEl.style.top = parseFloat(barEl.style.top) + barEl.offsetHeight + 4 + 'px';
-          var btn = barEl.querySelector('[data-action="studioOptions"]');
-          if (btn) btn.setAttribute('aria-expanded', 'true');
-        }
-      } else {
-        popoverOpen = null;
+    if (!barEl) return;
+    preview.appendChild(barEl);
+    var pr = preview.getBoundingClientRect();
+    var cr = first.getBoundingClientRect();
+    // The gutter: right of the rightmost page, level with the block.
+    var right = 0;
+    preview.querySelectorAll('.sheet-zoom').forEach(function (z) {
+      right = Math.max(right, z.getBoundingClientRect().right);
+    });
+    var left = right - pr.left + preview.scrollLeft + 16;
+    if (left + barEl.offsetWidth > preview.clientWidth + preview.scrollLeft) {
+      // No gutter (stacked pages): under the block instead.
+      left = Math.max(0, cr.left - pr.left + preview.scrollLeft);
+      barEl.style.top = cr.bottom - pr.top + preview.scrollTop + 8 + 'px';
+    } else {
+      barEl.style.top = Math.max(0, cr.top - pr.top + preview.scrollTop) + 'px';
+    }
+    barEl.style.left = left + 'px';
+    if (popoverOpen === studioSelected && ReportStudio.hasOptions(studioSelected)) {
+      var pop = document.createElement('div');
+      pop.innerHTML = ReportStudio.popoverHtml(_formOf(), studioSelected);
+      var popEl = pop.firstElementChild;
+      if (popEl) {
+        preview.appendChild(popEl);
+        popEl.style.left = barEl.style.left;
+        popEl.style.top = parseFloat(barEl.style.top) + barEl.offsetHeight + 6 + 'px';
+        var btn = barEl.querySelector('[data-action="studioOptions"]');
+        if (btn) btn.setAttribute('aria-expanded', 'true');
       }
+    } else {
+      popoverOpen = null;
     }
   }
   var _focusBlock = null;
@@ -949,42 +945,36 @@ window.PageReports = (function () {
   var previewAuto = true; // previewSid was chosen for the teacher (the longest report), not by them
   var studioSelected = null; // the selected block id
   var studioTab = 'blocks'; // the palette's tab
-  var _blockSizes = null; // palette badges, measured once per class/paper/type
+  var _blockSizes = null; // every block's Row and Side by Side height for the class, measured once per class/paper/type
 
-  /* Every edit is stored as the canvas shows it for the previewed student
-     (ReportSheets.settle): each block's row and page where it landed. */
-  function _setForm(form) {
-    reportConfig.form = _settled(ReportSheets.normalizeForm(form));
+  /* Every edit saves the form and can be undone: `label` names the change
+     on the Undo toast ("Moved Teacher Comment up"); without one there is
+     no toast (an Undo itself, or a change the caller announces). */
+  function _setForm(form, label) {
+    var before = reportConfig.form ? JSON.parse(JSON.stringify(reportConfig.form)) : null;
+    reportConfig.form = ReportSheets.normalizeForm(form);
     saveReportConfig(activeCourse, reportConfig);
     if (studioSelected && !ReportSheets.locate(reportConfig.form, studioSelected)) studioSelected = null;
     _classFitKey = '';
     renderStudioPanels();
     renderReportPreview();
     updateCommentFit();
+    _syncSidesButtons();
+    if (label && typeof showUndoToast === 'function') {
+      var wasSelected = studioSelected;
+      showUndoToast(label, function () {
+        studioSelected = wasSelected;
+        _setForm(before || ReportSheets.form());
+      });
+    }
   }
 
   function _formOf() {
     return ReportSheets.formFor(reportConfig);
   }
 
-  function _settled(form) {
-    var st = _previewStudent();
-    if (!st) return form;
-    try {
-      var r = ReportSheets.describeStudent(activeCourse, st, ReportBlocks.reportContext(), {
-        paper: reportPaper,
-        form: form,
-      });
-      return ReportSheets.settle(form, r.positions);
-    } catch (e) {
-      return form;
-    }
-  }
-
-  var _settlePending = false; // a saved form from before the page grid, settled on first show
   function _loadReportConfig(cid) {
     var rc = Object.assign({}, (typeof getReportConfig === 'function' && getReportConfig(cid)) || {});
-    _settlePending = !!(rc.form && rc.form.v !== 5);
     rc.form = ReportSheets.formFor(rc);
     rc.preset = 'standard';
     return rc;
@@ -994,7 +984,13 @@ window.PageReports = (function () {
     var palette = document.getElementById('studio-palette');
     if (palette) {
       if (_blockSizes === null) _blockSizes = _measureBlockSizes();
-      palette.innerHTML = ReportStudio.paletteHtml(_formOf(), _blockSizes, studioTab, ReportSheets.templates());
+      palette.innerHTML = ReportStudio.paletteHtml(
+        _formOf(),
+        studioTab,
+        ReportSheets.templates(),
+        _blockSizes,
+        _classFitKey === _classFitKeyNow() ? _classFit : null,
+      );
     }
     _renderFitLine();
   }
@@ -1002,22 +998,35 @@ window.PageReports = (function () {
   function _renderFitLine() {
     var line = document.getElementById('studio-fit');
     if (!line) return;
-    line.innerHTML = ReportStudio.fitLineHtml(_classFitKey === _classFitKeyNow() ? _classFit : null);
+    line.innerHTML = ReportStudio.fitLineHtml(_classFitKey === _classFitKeyNow() ? _classFit : null, _formOf());
     line.classList.toggle('ok', !!line.textContent && !line.firstElementChild);
   }
 
+  /* Every block at both widths for every student: the tallest wins, so
+     the palette knows where a block has room for the whole class. */
   function _measureBlockSizes() {
     try {
       var students = sortStudents(getStudents(activeCourse), 'lastName');
-      var st = students[Math.floor(students.length / 2)];
-      if (!st) return {};
-      return ReportSheets.blockSizes(activeCourse, st, ReportBlocks.reportContext(), {
+      if (!students.length) return {};
+      return ReportSheets.blockSizes(activeCourse, students, ReportBlocks.reportContext(), {
         paper: reportPaper,
         type: _formOf().type,
       });
     } catch (e) {
       return {};
     }
+  }
+
+  /* Where a block from the palette lands: the Front when it has room for
+     every student, else the Back (the toast says so), else after the
+     report when it is taller than a side. Null when nothing fits. */
+  function _landing(id) {
+    var f = _formOf();
+    var land = ReportStudio.landing(f, id, _blockSizes, _classFitKey === _classFitKeyNow() ? _classFit : null);
+    if (!land) return { side: f.sides.length - 1 };
+    if (land.reason) return null;
+    if (land.after) return { side: f.sides.length - 1, after: true };
+    return land;
   }
 
   /* The whole class laid out on the form, for the fit line, once per
@@ -1048,7 +1057,8 @@ window.PageReports = (function () {
       } catch (e) {
         _classFit = null;
       }
-      _renderFitLine();
+      // The palette greys the blocks with no room once the fit is in.
+      renderStudioPanels();
       // The summary names the longest report; the canvas moves to it.
       if (previewAuto && studioView === 'one') {
         var longest = ReportStudio.longestStudent(_classFit);
@@ -1137,12 +1147,11 @@ window.PageReports = (function () {
     return _previewStudents()[0] || null;
   }
 
-  /* The pointer and keyboard work on the page (report-studio.js). Every
-     edit goes through _setForm, which settles the stored layout to what
-     the canvas shows. */
-  var _studioDrag = null;
-  function _mountStudioDrag() {
-    if (_studioDrag) _studioDrag.destroy();
+  /* The keyboard work on the page (report-studio.js). Every edit goes
+     through _setForm, which saves and offers Undo. */
+  var _studioKeys = null;
+  function _mountStudioKeys() {
+    if (_studioKeys) _studioKeys.destroy();
     var root = document.getElementById('studio');
     if (!root) return;
     var keepFocus = function (id) {
@@ -1150,48 +1159,31 @@ window.PageReports = (function () {
         _focusBlock = id;
       }
     };
-    _studioDrag = ReportStudio.initDrag(root, {
+    _studioKeys = ReportStudio.initKeys(root, {
       form: _formOf,
-      place: function (id, rect) {
-        studioSelected = id;
-        _setForm(ReportSheets.place(_formOf(), id, rect));
-      },
-      move: function (id, to) {
+      move: function (id, dir) {
         keepFocus(id);
-        _setForm(ReportSheets.move(_formOf(), id, to));
+        _moveBlock(id, dir);
       },
-      resize: function (id, size) {
-        keepFocus(id);
-        _setForm(ReportSheets.resize(_formOf(), id, size));
-      },
-      remove: function (id) {
-        studioSelected = null;
-        popoverOpen = null;
-        _setForm(ReportSheets.removeCell(_formOf(), id));
-      },
-      select: _selectBlock,
+      remove: _removeBlock,
       announce: _announce,
-      html: function (id, w) {
-        var st = _previewStudent();
-        if (!st) return '';
-        var cell = ReportSheets.cellOf(_formOf(), id) || { block: id };
-        try {
-          return ReportBlocks.renderReportBlock(
-            id,
-            activeCourse,
-            st,
-            ReportBlocks.reportContext(),
-            ReportSheets.optionsFor(cell),
-          );
-        } catch (e) {
-          return '';
-        }
-      },
-      rows: function () {
-        var r = _lastSummary && _lastSummary.rows;
-        return r || (reportPaper === 'legal' ? 61 : 46);
-      },
     });
+  }
+
+  function _label(id) {
+    return ReportSheets.BLOCKS[id] ? ReportSheets.BLOCKS[id].label : id;
+  }
+  function _moveBlock(id, dir) {
+    var f = _formOf();
+    var next = ReportSheets.moveRow(f, id, dir);
+    if (JSON.stringify(next) === JSON.stringify(f)) return;
+    _setForm(next, 'Moved ' + _label(id) + (dir < 0 ? ' up' : ' down'));
+  }
+  function _removeBlock(id) {
+    if (studioSelected === id) studioSelected = null;
+    if (popoverOpen === id) popoverOpen = null;
+    _setForm(ReportSheets.removeCell(_formOf(), id), 'Removed ' + _label(id));
+    _announce(_label(id) + ' removed from the report.');
   }
 
   /* ── Course switching ────────────────────────────────────────── */
@@ -1295,11 +1287,9 @@ window.PageReports = (function () {
       var pv = document.getElementById('rb-preview');
       if (pv) _applySelection(pv);
     }
-    var cell = e.target.closest('.studio-pages .sheet-body > .sheet-cell[data-block]');
+    var cell = e.target.closest('.studio-pages .sheet-body .sheet-cell[data-block]');
     if (cell && studioView === 'one' && !viewingIssue) {
-      if (!e.target.closest('.studio-handle') && !(_studioDrag && _studioDrag.dragging())) {
-        _selectBlock(cell.dataset.block);
-      }
+      _selectBlock(cell.dataset.block);
       return;
     }
 
@@ -1334,11 +1324,12 @@ window.PageReports = (function () {
         setView(el.dataset.ink === 'black' ? 'photocopy' : 'screen');
         _syncInkButtons();
       },
-      setPages: function () {
-        _setForm(
-          ReportSheets.setPagesPerStudent(_formOf(), el.dataset.pages === 'auto' ? 'auto' : Number(el.dataset.pages)),
-        );
-        _syncPagesButtons();
+      setSides: function () {
+        var n = el.dataset.sides === '1' ? 1 : 2;
+        var f = _formOf();
+        if ((f.sides.length === 1) === (n === 1)) return;
+        _setForm(ReportSheets.setSides(f, n), n === 1 ? 'Front only' : 'Front and Back');
+        _syncSidesButtons();
       },
       studioView: function () {
         studioView = el.dataset.view === 'all' ? 'all' : 'one';
@@ -1350,36 +1341,69 @@ window.PageReports = (function () {
         if (studioTab === 'templates') _syncTemplates();
       },
       studioBlock: function () {
-        // A block not on the form goes full width at the first free row of
-        // the last page; when that page is full, at the top of a new one.
-        // A block already on the form comes off it, for every student.
+        // A block already on the form is found on the page. One that isn't
+        // lands in a row of its own: on the Front when it has room for
+        // every student, else on the Back, with a toast that says so. A
+        // block taller than a side prints after the report.
         var id = el.dataset.block;
         var f = _formOf();
         if (ReportSheets.locate(f, id)) {
-          if (studioSelected === id) studioSelected = null;
-          if (popoverOpen === id) popoverOpen = null;
-          _setForm(ReportSheets.removeCell(f, id));
-          _announce(ReportSheets.BLOCKS[id].label + ' removed from the report.');
-        } else {
-          var h = ReportSheets.BLOCKS[id].rows;
-          var at = ReportSheets.firstFree(f, f.pages.length - 1, ReportSheets.COLS, h);
-          var rows = (_lastSummary && _lastSummary.rows) || 46;
-          if (at.y + h > rows) {
-            f = ReportSheets.addPage(f);
-            at = { page: f.pages.length - 1, x: 0, y: 0 };
-          }
-          studioSelected = id;
-          _setForm(ReportSheets.place(f, id, { page: at.page, x: at.x, y: at.y, w: ReportSheets.COLS, h: h }));
+          _focusBlock = id;
+          _selectBlock(id);
+          var cell = document.querySelector('.studio-pages .sheet-cell[data-block="' + id + '"]');
+          if (cell && cell.scrollIntoView) cell.scrollIntoView({ block: 'nearest' });
+          return;
         }
+        if (el.getAttribute('aria-disabled') === 'true') return;
+        var land = _landing(id);
+        if (!land) return;
+        studioSelected = id;
+        var label = 'Added ' + _label(id);
+        if (land.after) label += '. It prints after the report';
+        else if (land.side > 0 && f.sides.length > 1)
+          label += ' to the ' + (land.side === 1 ? 'Back' : 'Page ' + (land.side + 1)) + '. The Front is full';
+        _setForm(ReportSheets.insert(f, id, { side: land.side }), label);
+        _announce(ReportStudio.placeText(_formOf(), id) + '.');
       },
       studioChoice: function () {
         popoverOpen = null;
         var v = el.dataset.value;
-        _setForm(ReportSheets.setOption(_formOf(), el.dataset.block, el.dataset.key, /^\d+$/.test(v) ? Number(v) : v));
+        _setForm(
+          ReportSheets.setOption(_formOf(), el.dataset.block, el.dataset.key, /^\d+$/.test(v) ? Number(v) : v),
+          'Changed ' + _label(el.dataset.block) + ' options',
+        );
       },
       studioNoEvidence: function () {
         popoverOpen = null;
-        _setForm(ReportSheets.setNoEvidence(_formOf(), el.dataset.block, el.dataset.rule));
+        _setForm(
+          ReportSheets.setNoEvidence(_formOf(), el.dataset.block, el.dataset.rule),
+          'Changed ' + _label(el.dataset.block) + ' options',
+        );
+      },
+      studioLines: function () {
+        var id = el.dataset.block;
+        var cur = ReportSheets.optionsFor(ReportSheets.cellOf(_formOf(), id) || { block: id }).lines;
+        var n = cur + (Number(el.dataset.dir) || 1);
+        _setForm(ReportSheets.setLines(_formOf(), id, n), _label(id) + ': ' + n + ' lines');
+      },
+      studioSize: function () {
+        var id = el.dataset.block;
+        var size = el.dataset.size === 'half' ? 'half' : 'row';
+        var f = _formOf();
+        if ((ReportSheets.cellOf(f, id) || {}).size === size) return;
+        _setForm(ReportSheets.setSize(f, id, size), _label(id) + ': ' + (size === 'half' ? 'Side by Side' : 'Row'));
+      },
+      studioMove: function () {
+        _moveBlock(el.dataset.block, Number(el.dataset.dir) || 1);
+      },
+      studioMoveSide: function () {
+        var id = el.dataset.block;
+        var to = Number(el.dataset.side) || 0;
+        _setForm(
+          ReportSheets.moveToSide(_formOf(), id, to),
+          'Moved ' + _label(id) + ' to the ' + (to === 0 ? 'Front' : to === 1 ? 'Back' : 'Page ' + (to + 1)),
+        );
+        _announce(ReportStudio.placeText(_formOf(), id) + '.');
       },
       studioOptions: function () {
         popoverOpen = popoverOpen === el.dataset.block ? null : el.dataset.block;
@@ -1391,33 +1415,31 @@ window.PageReports = (function () {
       },
       studioLeaveOff: function () {
         var on = el.getAttribute('aria-pressed') !== 'true';
-        _setForm(ReportSheets.hideFor(_formOf(), el.dataset.sid, el.dataset.block, on));
+        var st = _previewStudent();
+        var first = st ? fullName(st).split(/\s+/)[0] : 'this student';
+        _setForm(
+          ReportSheets.hideFor(_formOf(), el.dataset.sid, el.dataset.block, on),
+          (on ? 'Left off ' : 'Put back ') + _label(el.dataset.block) + ' for ' + first,
+        );
       },
       studioRemove: function () {
-        var id = el.dataset.block;
-        studioSelected = null;
-        popoverOpen = null;
-        _setForm(ReportSheets.removeCell(_formOf(), id));
-        _announce(ReportSheets.BLOCKS[id].label + ' removed from the report.');
+        _removeBlock(el.dataset.block);
       },
-      studioAddPage: function () {
-        _setForm(ReportSheets.addPage(_formOf()));
+      studioAddSide: function () {
+        _setForm(ReportSheets.addSide(_formOf()), 'Added a page');
+        _syncSidesButtons();
       },
-      studioRemovePage: function () {
-        _setForm(ReportSheets.removePage(_formOf(), Number(el.dataset.page)));
+      studioRemoveSide: function () {
+        _setForm(ReportSheets.removeSide(_formOf(), Number(el.dataset.side)), 'Removed the empty page');
+        _syncSidesButtons();
       },
       studioTemplate: function () {
         var f = el.dataset.starter ? ReportSheets.starter(el.dataset.starter) : ReportSheets.template(el.dataset.id);
         if (!f) return;
-        var before = _formOf();
         var name = el.textContent.trim();
         studioSelected = null;
-        _setForm(f);
-        if (typeof showUndoToast === 'function') {
-          showUndoToast('Applied ' + name, function () {
-            _setForm(before);
-          });
-        }
+        _setForm(f, 'Applied ' + name);
+        _syncSidesButtons();
       },
       studioTemplateDelete: function () {
         var t = ReportSheets.templates().find(function (x) {
@@ -1549,9 +1571,14 @@ window.PageReports = (function () {
       return;
     }
     var a = el.dataset.action;
-    if (a === 'studioOption') _setForm(ReportSheets.setOption(_formOf(), el.dataset.block, el.dataset.key, el.checked));
-    else if (a === 'studioText')
+    if (a === 'studioOption') {
+      _setForm(
+        ReportSheets.setOption(_formOf(), el.dataset.block, el.dataset.key, el.checked),
+        'Changed ' + _label(el.dataset.block) + ' options',
+      );
+    } else if (a === 'studioText') {
       _setForm(ReportSheets.setOption(_formOf(), el.dataset.block, el.dataset.key, el.value));
+    }
   }
 
   function _handleSelectionChange() {
@@ -1756,9 +1783,9 @@ window.PageReports = (function () {
 
   function destroy() {
     _closeSaveTemplate();
-    if (_studioDrag) {
-      _studioDrag.destroy();
-      _studioDrag = null;
+    if (_studioKeys) {
+      _studioKeys.destroy();
+      _studioKeys = null;
     }
     // Save any unsaved narrative
     if (RQ.tqNarrativeDirty) tqSaveCurrentIfNeeded();
@@ -1795,7 +1822,7 @@ window.PageReports = (function () {
 
   /* -- Toolbar HTML (rendered into main on init) ---------- */
   var TOOLBAR_HTML =
-    '<div class="page-toolbar report-toolbar no-print">\n      <div class="seg report-seg-control" role="tablist" aria-label="Report type">\n        <button class="seg-btn report-seg-btn active" data-action="switchTab" data-tab="questionnaire" role="tab" aria-selected="true">Term Questionnaire</button>\n        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="progress" role="tab" aria-selected="false">Progress Reports</button>\n      </div>\n      <div class="report-stepper" id="report-stepper" style="display:none">\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="-1" title="Previous student" aria-label="Previous student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="1" title="Next student" aria-label="Next student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n      </div>\n      <div class="student-picker" id="student-picker">\n        <button class="student-picker-btn" data-action="toggleStudentPicker" aria-label="Select students" aria-expanded="false" aria-haspopup="listbox">\n          <span id="picker-label">All Students</span>\n        </button>\n        <div class="student-picker-dropdown" id="picker-dropdown"></div>\n      </div>\n      <div class="tq-student-nav" id="tq-student-nav" style="display:none">\n        <button class="tq-toolbar-arrow" data-action="tqPrevStudent" title="Previous student" aria-label="Previous student">\n          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>\n        </button>\n        <span class="tq-student-name" id="tq-student-name"></span>\n        <button class="tq-toolbar-arrow" data-action="tqNextStudent" title="Next student" aria-label="Next student">\n          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>\n        </button>\n        <div class="tq-progress-ring" id="tq-progress-ring">\n          <svg width="30" height="30" viewBox="0 0 30 30">\n            <circle class="ring-bg" cx="15" cy="15" r="12"/>\n            <circle class="ring-fill" id="tq-ring-fill" cx="15" cy="15" r="12" stroke-dasharray="75.4" stroke-dashoffset="75.4"/>\n          </svg>\n          <span class="tq-progress-label" id="tq-progress-label"></span>\n        </div>\n      </div>\n      <select id="report-period" class="term-select" aria-label="Report"></select>\n      <select id="report-copy" class="term-select" aria-label="Copy" style="display:none"></select>\n      <span class="tb-divider" id="tb-divider" aria-hidden="true">\u2502</span>\n      <span class="tb-label" id="tb-paper-label">Paper</span>\n      <div class="seg seg-sm" id="report-paper" role="radiogroup" aria-label="Paper" style="display:none">\n        <button class="seg-btn active" data-action="setPaper" data-paper="letter" role="radio" aria-checked="true">Letter</button>\n        <button class="seg-btn" data-action="setPaper" data-paper="legal" role="radio" aria-checked="false">Legal</button>\n      </div>\n      <span class="tb-label tb-label-progress">Pages</span>\n      <div class="seg seg-sm" id="report-pages" role="radiogroup" aria-label="Pages per student" style="display:none">\n        <button class="seg-btn" data-action="setPages" data-pages="1" role="radio" aria-checked="false">1</button>\n        <button class="seg-btn" data-action="setPages" data-pages="2" role="radio" aria-checked="false">2</button>\n        <button class="seg-btn active" data-action="setPages" data-pages="auto" role="radio" aria-checked="true">Auto</button>\n      </div>\n      <span class="tb-label tb-label-progress">Ink</span>\n      <div class="seg seg-sm" id="report-ink" role="radiogroup" aria-label="Ink" style="display:none">\n        <button class="seg-btn" data-action="setInk" data-ink="black" role="radio" aria-checked="false">Black</button>\n        <button class="seg-btn active" data-action="setInk" data-ink="colour" role="radio" aria-checked="true">Colour</button>\n      </div>\n      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">\n        <button class="tb-toggle-btn" id="tb-phones-btn" style="display:none" data-action="togglePhones" aria-pressed="false">Sent to Phones</button>\n        <button class="tb-toggle-btn" id="tb-rail-btn" style="display:none" data-action="toggleRail" aria-pressed="false" aria-controls="studio-palette">Blocks</button>\n        <button class="tb-toggle-btn" id="tb-save-template" style="display:none" data-action="openSaveTemplate">Save as Template</button>\n        <button class="tb-action-btn" id="tb-print-btn" data-action="printReports">Print Reports</button>\n      </div>\n    </div>\n    <div id="report-output" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto"></div>';
+    '<div class="page-toolbar report-toolbar no-print">\n      <div class="seg report-seg-control" role="tablist" aria-label="Report type">\n        <button class="seg-btn report-seg-btn active" data-action="switchTab" data-tab="questionnaire" role="tab" aria-selected="true">Term Questionnaire</button>\n        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="progress" role="tab" aria-selected="false">Progress Reports</button>\n      </div>\n      <div class="report-stepper" id="report-stepper" style="display:none">\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="-1" title="Previous student" aria-label="Previous student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="1" title="Next student" aria-label="Next student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n      </div>\n      <div class="student-picker" id="student-picker">\n        <button class="student-picker-btn" data-action="toggleStudentPicker" aria-label="Select students" aria-expanded="false" aria-haspopup="listbox">\n          <span id="picker-label">All Students</span>\n        </button>\n        <div class="student-picker-dropdown" id="picker-dropdown"></div>\n      </div>\n      <div class="tq-student-nav" id="tq-student-nav" style="display:none">\n        <button class="tq-toolbar-arrow" data-action="tqPrevStudent" title="Previous student" aria-label="Previous student">\n          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>\n        </button>\n        <span class="tq-student-name" id="tq-student-name"></span>\n        <button class="tq-toolbar-arrow" data-action="tqNextStudent" title="Next student" aria-label="Next student">\n          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>\n        </button>\n        <div class="tq-progress-ring" id="tq-progress-ring">\n          <svg width="30" height="30" viewBox="0 0 30 30">\n            <circle class="ring-bg" cx="15" cy="15" r="12"/>\n            <circle class="ring-fill" id="tq-ring-fill" cx="15" cy="15" r="12" stroke-dasharray="75.4" stroke-dashoffset="75.4"/>\n          </svg>\n          <span class="tq-progress-label" id="tq-progress-label"></span>\n        </div>\n      </div>\n      <select id="report-period" class="term-select" aria-label="Report"></select>\n      <select id="report-copy" class="term-select" aria-label="Copy" style="display:none"></select>\n      <span class="tb-divider" id="tb-divider" aria-hidden="true">\u2502</span>\n      <span class="tb-label" id="tb-paper-label">Paper</span>\n      <div class="seg seg-sm" id="report-paper" role="radiogroup" aria-label="Paper" style="display:none">\n        <button class="seg-btn active" data-action="setPaper" data-paper="letter" role="radio" aria-checked="true">Letter</button>\n        <button class="seg-btn" data-action="setPaper" data-paper="legal" role="radio" aria-checked="false">Legal</button>\n      </div>\n      <span class="tb-label tb-label-progress">Sides</span>\n      <div class="seg seg-sm" id="report-sides" role="radiogroup" aria-label="Sides" style="display:none">\n        <button class="seg-btn" data-action="setSides" data-sides="1" role="radio" aria-checked="false">Front Only</button>\n        <button class="seg-btn active" data-action="setSides" data-sides="2" role="radio" aria-checked="true">Front and Back</button>\n      </div>\n      <span class="tb-label tb-label-progress">Ink</span>\n      <div class="seg seg-sm" id="report-ink" role="radiogroup" aria-label="Ink" style="display:none">\n        <button class="seg-btn" data-action="setInk" data-ink="black" role="radio" aria-checked="false">Black</button>\n        <button class="seg-btn active" data-action="setInk" data-ink="colour" role="radio" aria-checked="true">Colour</button>\n      </div>\n      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">\n        <button class="tb-toggle-btn" id="tb-phones-btn" style="display:none" data-action="togglePhones" aria-pressed="false">Sent to Phones</button>\n        <button class="tb-toggle-btn" id="tb-rail-btn" style="display:none" data-action="toggleRail" aria-pressed="false" aria-controls="studio-palette">Blocks</button>\n        <button class="tb-toggle-btn" id="tb-save-template" style="display:none" data-action="openSaveTemplate">Save as Template</button>\n        <button class="tb-action-btn" id="tb-print-btn" data-action="printReports">Print Reports</button>\n      </div>\n    </div>\n    <div id="report-output" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto"></div>';
 
   /* -- Public API ----------------------------------------- */
   return {

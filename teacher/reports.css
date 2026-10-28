@@ -1228,7 +1228,8 @@
   flex-direction: column;
   width: 8.5in;
   height: 11in;
-  padding: 0.5in;
+  /* The letterhead sits near the top; the content column is 720px wide. */
+  padding: 24px 48px 36px;
   background: #fff;
   color: #000;
   font-size: 9.5pt;
@@ -1242,9 +1243,21 @@
 .report-sheet-measure {
   box-shadow: none;
 }
+/* The side: a stack of rows 12px apart; the pinned row docks to the
+   bottom; the room left stays at the bottom. */
 .sheet-body {
   flex: 1 1 auto;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+}
+.sheet-row {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  flex: 0 0 auto;
 }
 .sheet-item {
   display: flow-root;
@@ -3188,12 +3201,15 @@ button.tq-att-mention:disabled {
    transform, not zoom: a transform leaves layout alone, so a page measures
    on screen exactly as the engine measured it (zoom re-wraps text in
    WebKit). The wrapper takes the scaled size so the pages sit together. */
+/* The pages are centred in the room left of the gutter, where the selected
+   block's card sits (report-studio.js GUTTER_W). */
 .rb-preview.studio-pages:not(.studio-all) .sheet-student {
   display: flex;
   flex-wrap: wrap;
   gap: 22px;
   justify-content: center;
   align-items: flex-start;
+  padding-right: 212px;
 }
 .rb-preview.studio-pages:not(.studio-all) .sheet-zoom {
   zoom: 1;
@@ -3225,10 +3241,10 @@ button.tq-att-mention:disabled {
 .rb-preview.studio-pages .report-sheet .sheet-body {
   overflow: hidden;
 }
-/* The page grid: every block absolutely at its rectangle, sized by the
-   engine (report-sheets.js). A cell is a size container, so a block lays
-   itself out for the width it is given; the measuring stage uses the same
-   cells, so what is measured is what prints. */
+/* A cell: one block at Row or Side by Side width, as tall as its row
+   (report-sheets.js sets both). A cell is a size container, so a block
+   lays itself out for the width it is given; the measuring stage uses the
+   same cells, so what is measured is what prints. */
 .report-sheet .sheet-body {
   position: relative;
 }
@@ -3239,9 +3255,11 @@ button.tq-att-mention:disabled {
   box-sizing: border-box;
   container-type: inline-size;
   border-radius: 6px;
+  flex: 0 0 auto;
 }
-.sheet-body > .sheet-cell {
-  position: absolute;
+.sheet-cell > .report-block-box {
+  flex: 1 1 auto;
+  box-sizing: border-box;
 }
 .sheet-fill > .report-block-box {
   flex: 1 1 auto;
@@ -3339,11 +3357,10 @@ button.tq-att-mention:disabled {
   }
 }
 
-/* ── Page Studio: hands on the page ───────────────────────────────
-   The pages are scaled with a transform, so anything drawn inside a page
-   (handles, the placeholder, the grid) is sized against --sheet-zoom to
-   read at screen size; the block toolbar, the popover and the chip sit
-   in the canvas itself, unscaled. */
+/* ── Page Studio: the selected block ───────────────────────────────
+   The pages are scaled with a transform, so an outline on a page is sized
+   against --sheet-zoom to read at screen size; the block's card and the
+   popover sit in the canvas itself, unscaled. */
 .studio-pages .sheet-cell:focus-visible {
   outline: 2px solid var(--active);
   outline-offset: 1px;
@@ -3359,150 +3376,153 @@ button.tq-att-mention:disabled {
   overflow: hidden;
   clip: rect(0 0 0 0);
 }
-/* A block left off this student's report keeps its place as a dashed box. */
-.studio-pages:not(.studio-all) .sheet-cell.sheet-off {
+/* A block that prints nothing for this student (left off, or with nothing
+   to say) takes no room on paper; on the canvas it keeps its place as a
+   dashed box with its name, so it can still be selected. */
+.sheet-row-empty {
+  display: none;
+}
+.studio-pages:not(.studio-all) .sheet-row-empty {
+  display: flex;
+}
+.studio-pages:not(.studio-all) .sheet-row-empty .sheet-cell {
+  min-height: 30px;
+}
+.studio-pages:not(.studio-all) .sheet-cell.sheet-empty {
   outline: calc(1px / var(--sheet-zoom, 1)) dashed #b4bcc7;
   outline-offset: -1px;
-}
-/* The grid, while a block is held or sized. */
-.studio-grid-on .studio-pages:not(.studio-all) .sheet-body::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 1;
-  background-image:
-    repeating-linear-gradient(to right, rgba(10, 108, 255, 0.07) 0 49px, transparent 49px 61px),
-    repeating-linear-gradient(to bottom, transparent 0 19px, rgba(10, 108, 255, 0.16) 19px 20px);
-}
-.studio-grid-on .studio-pages .sheet-cell {
-  transition: transform 120ms ease-out;
-}
-.studio-place {
-  position: absolute;
-  z-index: 2;
-  box-sizing: border-box;
-  border: calc(2px / var(--sheet-zoom, 1)) dashed var(--active);
   border-radius: 6px;
-  background: rgba(10, 108, 255, 0.08);
-  pointer-events: none;
 }
-.studio-dragging .studio-pages .sheet-cell {
-  pointer-events: none;
-}
-.studio-dragging .studio-blk,
-.studio-dragging {
-  cursor: grabbing;
-}
-.studio-blk,
-.studio-pages:not(.studio-all) .sheet-body > .sheet-cell {
-  touch-action: none;
-}
-.studio-ghost {
-  position: fixed;
-  z-index: 60;
-  pointer-events: none;
-  opacity: 0.85;
-  filter: drop-shadow(0 8px 20px rgba(10, 108, 255, 0.3));
-}
-.studio-ghost-sheet {
-  height: auto !important;
-  min-height: 0;
-  padding: 0 !important;
-  box-shadow: none !important;
-  transform-origin: top left;
-  overflow: visible !important;
-}
-.studio-ghost.out {
-  opacity: 0.6;
-  filter: drop-shadow(0 8px 20px rgba(220, 38, 38, 0.45)) grayscale(1);
-}
-.studio-ghost.out .studio-ghost-sheet {
-  outline: 3px solid var(--danger);
-}
-/* The selected block's handles: right edge, bottom edge, corner. */
-.studio-handle {
-  position: absolute;
-  z-index: 3;
-  box-sizing: border-box;
-  background: #fff;
-  border: calc(2px / var(--sheet-zoom, 1)) solid var(--active);
-  border-radius: calc(2px / var(--sheet-zoom, 1));
-}
-.studio-h-e {
-  right: calc(-6px / var(--sheet-zoom, 1));
-  top: 50%;
-  width: calc(10px / var(--sheet-zoom, 1));
-  height: calc(22px / var(--sheet-zoom, 1));
-  margin-top: calc(-11px / var(--sheet-zoom, 1));
-  cursor: ew-resize;
-}
-.studio-h-s {
-  bottom: calc(-6px / var(--sheet-zoom, 1));
-  left: 50%;
-  width: calc(22px / var(--sheet-zoom, 1));
-  height: calc(10px / var(--sheet-zoom, 1));
-  margin-left: calc(-11px / var(--sheet-zoom, 1));
-  cursor: ns-resize;
-}
-.studio-h-se {
-  right: calc(-7px / var(--sheet-zoom, 1));
-  bottom: calc(-7px / var(--sheet-zoom, 1));
-  width: calc(13px / var(--sheet-zoom, 1));
-  height: calc(13px / var(--sheet-zoom, 1));
-  cursor: nwse-resize;
-}
-.studio-chip {
-  position: absolute;
-  z-index: 8;
-  background: var(--active);
-  color: #fff;
+.studio-pages:not(.studio-all) .sheet-cell.sheet-empty::after {
+  content: attr(data-label);
+  padding: 7px 10px;
   font-family: var(--font-base);
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 9px;
-  pointer-events: none;
-  white-space: nowrap;
+  font-size: 8pt;
+  color: #8e8e93;
 }
-/* The block toolbar and the Options popover, in the canvas. */
+/* The palette: a block on the report is ticked; one with no room is
+   greyed with the reason. */
+.studio-tick {
+  width: 14px;
+  flex: 0 0 14px;
+  color: #2e7d32;
+  font-weight: 700;
+  font-size: 12px;
+}
+.studio-blk.nofit {
+  color: var(--text-3);
+  cursor: default;
+  flex-wrap: wrap;
+}
+.studio-blk.nofit:hover {
+  border-color: var(--border);
+}
+.studio-why {
+  flex: 0 0 100%;
+  padding-left: 22px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-3);
+}
+/* The selected block's card, in the gutter beside the page. */
 .studio-bar {
   position: absolute;
   z-index: 7;
+  width: 196px;
+  box-sizing: border-box;
   display: flex;
-  gap: 2px;
-  padding: 2px;
+  flex-direction: column;
+  gap: 9px;
+  padding: 12px;
   background: var(--surface);
   border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
+  font-size: 12.5px;
+  color: var(--text);
+}
+.studio-bar-where {
+  font-size: 11px;
+  color: var(--text-3);
+}
+.studio-bar-name {
+  font-size: 14px;
+  font-weight: 700;
+}
+.studio-bar-hint {
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--text-3);
+}
+.studio-bar-lines {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--border);
   border-radius: 8px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  padding: 5px 8px;
+}
+.studio-bar-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.studio-bar-step b {
+  min-width: 16px;
+  text-align: center;
+}
+.studio-bar-stepbtn {
+  font: inherit;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+.studio-bar-stepbtn:disabled {
+  color: var(--text-3);
+  cursor: default;
+}
+.studio-bar-size {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.studio-bar-acts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
 }
 .studio-bar-btn {
   font: inherit;
   font-size: 12px;
-  font-weight: 600;
   color: var(--text);
-  background: none;
-  border: none;
-  border-radius: 6px;
-  padding: 4px 9px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 6px 4px;
   cursor: pointer;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .studio-bar-btn:hover {
-  background: var(--overlay-hover, #f0f2f5);
+  border-color: var(--active);
+}
+.studio-bar-btn:disabled {
+  color: var(--text-3);
+  border-color: var(--divider-subtle, var(--border));
+  cursor: default;
 }
 .studio-bar-btn.active {
   background: var(--active-tint, #e8f0ff);
   color: var(--active);
+  border-color: var(--active);
 }
 .studio-bar-x {
-  font-size: 15px;
-  line-height: 1;
-  padding: 2px 8px;
-  color: var(--text-3);
-}
-.studio-bar-x:hover {
   color: var(--danger);
 }
 .studio-pop {
@@ -3555,25 +3575,14 @@ button.tq-att-mention:disabled {
   color: var(--danger);
   border-color: var(--danger);
 }
-/* Everyone: a block pushed off its page is outlined on the thumbnail;
-   a cut is the Doesn't fit strip, already on the last page. */
-.report-fitmap .sheet-cell.sheet-pushed {
-  outline: 3px solid #b45309;
-  outline-offset: -1px;
-}
 @media print {
   .studio-live,
   .studio-bar,
   .studio-pop,
-  .studio-handle,
-  .studio-place,
-  .studio-ghost,
-  .studio-chip,
   .studio-page-add,
   .studio-page-empty {
     display: none !important;
   }
-  .report-fitmap .sheet-cell.sheet-pushed,
   .sheet-cell.sheet-off {
     outline: none !important;
   }
