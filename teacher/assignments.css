@@ -3195,23 +3195,28 @@
 }
 
 /* ── Ledger: Complete/Incomplete and points rows ───────────────
-   One line per student: Name · Mark · Status · Comment. The rubric and
-   proficiency grids (.rsg-*) keep their own layout. */
+   One line per student: Name · Mark · Status · Comment, rows running to
+   the card's edges with hairlines between, the tally and fill actions on
+   top and, for points, the class line at the foot. */
 .ldg-grid {
-  --ldg-cols: minmax(160px, 240px) minmax(220px, 280px) minmax(0, 1fr) 48px;
-  margin: 8px 0 4px;
+  --ldg-cols: 220px minmax(0, 1fr) auto 110px;
+  margin: 0 -16px;
+}
+.ldg-grid.pts-grid {
+  --ldg-cols: 220px 230px minmax(0, 1fr) 110px;
 }
 .ldg-bar {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 2px 0 10px;
+  gap: 14px;
+  padding: 10px 16px;
+  box-shadow: inset 0 -0.5px 0 var(--divider-heavy);
 }
 .ldg-tally {
   display: flex;
   gap: 14px;
   font-size: var(--text-sm);
-  color: var(--text-3);
+  color: var(--text);
 }
 .ldg-tally b {
   color: var(--text);
@@ -3223,30 +3228,37 @@
   margin-left: auto;
 }
 .ldg-action {
-  padding: 6px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
+  height: 28px;
+  padding: 0 11px;
+  border: none;
+  border-radius: 14px;
+  background: rgba(118, 118, 128, 0.12);
   font-family: inherit;
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   font-weight: 600;
   color: var(--text);
   cursor: pointer;
-  transition: border-color var(--duration-micro);
 }
 .ldg-action:hover {
-  border-color: var(--text-3);
+  background: rgba(118, 118, 128, 0.2);
+}
+.ldg-action + .ldg-action {
+  background: rgba(0, 122, 255, 0.1);
+  color: var(--link);
+}
+.ldg-action + .ldg-action:hover {
+  background: rgba(0, 122, 255, 0.16);
 }
 .ldg-head {
   display: grid;
   grid-template-columns: var(--ldg-cols);
-  gap: 16px;
+  gap: 12px;
   align-items: center;
-  padding: 0 8px 6px;
-  border-bottom: 2px solid var(--border);
+  padding: 6px 16px;
+  box-shadow: inset 0 -0.5px 0 var(--divider-heavy);
   font-size: var(--text-xs);
-  font-weight: 600;
-  color: var(--text-3);
+  font-weight: 700;
+  color: var(--text);
 }
 .ldg-head-end {
   text-align: right;
@@ -3254,13 +3266,14 @@
 .score-row.ldg-row {
   display: grid;
   grid-template-columns: var(--ldg-cols);
-  gap: 16px;
+  gap: 12px;
   align-items: center;
   min-height: 44px;
-  padding: 4px 8px;
-  border-bottom: 1px solid var(--divider-subtle);
-  border-left: none;
+  margin: 0;
+  padding: 7px 16px;
+  border: none;
   border-radius: 0;
+  box-shadow: inset 0 -0.5px 0 var(--divider-heavy);
 }
 .score-row.ldg-row.has-late {
   border-left: none;
@@ -3269,8 +3282,8 @@
   /* Undo the generic .score-row:hover widening (margin 0 -8px): these rows
      already carry their padding, so the widening slid every control left. */
   margin: 0;
-  padding: 4px 8px;
-  background: var(--overlay-hover);
+  padding: 7px 16px;
+  background: transparent;
 }
 .score-row.ldg-row:focus-visible {
   outline: 2px solid var(--active);
@@ -3278,212 +3291,184 @@
   border-radius: var(--radius-sm);
 }
 .ldg-name {
-  font-size: var(--text-base);
-  font-weight: 500;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   color: var(--text);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* Mark: a two-way segmented control */
+/* Mark: two capsules; the chosen one solid in its colour */
 .cmp-cell {
   display: flex;
   align-items: center;
 }
 .ldg-seg {
   display: inline-flex;
-  gap: 2px;
-  padding: 2px;
-  border-radius: var(--radius-sm);
-  background: var(--seg-track);
+  gap: 6px;
 }
 .cmp-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 28px;
+  height: 30px;
   padding: 0 12px;
   border: none;
-  border-radius: 6px;
-  background: transparent;
+  border-radius: 15px;
+  background: rgba(118, 118, 128, 0.12);
   font-family: inherit;
   font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--text-2);
+  font-weight: 500;
+  color: var(--text);
   cursor: pointer;
-  transition:
-    background var(--duration-micro),
-    color var(--duration-micro);
-}
-/* In colour, so they are easy to find while grading: Complete in the
-   Proficient green, Incomplete in the Emerging red, tinted until chosen and
-   filled once chosen, as a rubric level is. Size and spacing unchanged. */
-.cmp-btn.cmp-complete {
-  background: var(--score-3-bg);
-  color: var(--score-3-text);
-}
-.cmp-btn.cmp-incomplete {
-  background: var(--score-1-bg);
-  color: var(--score-1-text);
 }
 .cmp-btn:hover {
-  filter: brightness(0.96);
+  background: rgba(118, 118, 128, 0.2);
+}
+.cmp-complete .cmp-icon-bg {
+  fill: var(--score-3);
+}
+.cmp-incomplete .cmp-icon-bg {
+  fill: var(--score-1);
+}
+.cmp-icon-mark {
+  stroke: #fff;
 }
 .cmp-btn.active {
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  color: #fff;
+  font-weight: 700;
 }
 .cmp-btn.cmp-complete.active {
   background: var(--score-3);
-  color: #fff;
+  box-shadow: 0 2px 6px rgba(46, 125, 50, 0.3);
 }
 .cmp-btn.cmp-incomplete.active {
   background: var(--score-1);
-  color: #fff;
+  box-shadow: 0 2px 6px rgba(211, 47, 47, 0.3);
+}
+.cmp-btn.active .cmp-icon-bg {
+  fill: #fff;
+}
+.cmp-btn.cmp-complete.active .cmp-icon-mark {
+  stroke: var(--score-3);
+}
+.cmp-btn.cmp-incomplete.active .cmp-icon-mark {
+  stroke: var(--score-1);
 }
 .score-row.has-status .cmp-cell,
 .score-row.has-status .pts-input-cell {
   opacity: 0.3;
   pointer-events: none;
 }
-/* Status: one at a time, in words */
-.ldg-status {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+/* Status: Late | Excused | Missing, the grader's segmented control */
+.ldg-status.grader-status {
+  justify-self: start;
 }
-.ldg-chip {
-  height: 26px;
-  padding: 0 10px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface);
-  font-family: inherit;
+.ldg-status .grader-status-btn {
+  height: 24px;
+  padding: 0 9px;
   font-size: var(--text-xs);
-  font-weight: 500;
-  color: var(--text-3);
-  cursor: pointer;
-  transition:
-    border-color var(--duration-micro),
-    color var(--duration-micro);
 }
-.ldg-chip:hover {
-  border-color: var(--text-3);
-  color: var(--text);
+.ldg-status .grader-status-sep {
+  margin: 6px 0;
 }
-.ldg-chip.active-late {
-  background: #fff3e0;
-  border-color: var(--score-2);
-  color: var(--obs-note-text);
-  font-weight: 700;
-}
-.ldg-chip.active-excused {
-  background: var(--bg-secondary);
-  border-color: var(--text-2);
-  color: var(--text);
-  font-weight: 700;
-}
-.ldg-chip.active-ns {
-  background: var(--score-1-bg);
-  border-color: var(--score-1);
-  color: var(--score-1-dark);
-  font-weight: 700;
-}
-/* Comment: an icon, blue only when comments exist */
+/* Comment: a blue-tinted pill with its count */
 .ldg-comment {
   display: flex;
   justify-content: flex-end;
 }
 .ldg-note {
-  position: relative;
-  width: 32px;
-  height: 32px;
+  height: 26px;
+  padding: 0 9px;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-3);
+  gap: 4px;
+  border: none;
+  border-radius: 13px;
+  background: rgba(0, 122, 255, 0.1);
+  color: var(--link);
+  font-family: inherit;
+  font-size: var(--text-xs);
+  font-weight: 600;
   cursor: pointer;
 }
 .ldg-note:hover {
-  border-color: var(--border);
-  color: var(--text);
-}
-.ldg-note.has {
-  color: var(--link);
+  background: rgba(0, 122, 255, 0.16);
 }
 .ldg-note-count {
-  position: absolute;
-  top: -5px;
-  right: -5px;
   min-width: 16px;
   height: 16px;
   padding: 0 4px;
   box-sizing: border-box;
   border-radius: 8px;
   background: var(--link);
-  color: #fff;
+  color: var(--surface);
   font-size: var(--text-2xs);
   font-weight: 700;
   line-height: 16px;
   text-align: center;
 }
-/* Points: a boxed score, the maximum and the percent */
+/* Points: a grey score box, the maximum and the percent */
 .ldg-pts .pts-input-cell {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 10px;
+  gap: 8px;
 }
 .ldg-row .gb-pts-input.ldg-pts-input {
-  width: 64px;
+  width: 60px;
   height: 30px;
   box-sizing: border-box;
   padding: 0 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: rgba(118, 118, 128, 0.12);
   text-align: right;
-  font-weight: 600;
+  font-family: inherit;
+  font-size: var(--text-md);
+  font-weight: 700;
+  color: var(--text);
 }
 .ldg-row .gb-pts-input.ldg-pts-input:focus {
+  background: var(--surface);
   border: 1px solid var(--active) !important;
   box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15) !important;
 }
-.ldg-row .gb-pts-input.ldg-pts-input:disabled {
-  border-color: var(--border);
-}
 .ldg-pts .gb-pts-max {
-  font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
+  font-family: inherit;
+  font-size: var(--text-base);
+  color: var(--text);
 }
 .ldg-pts .gb-pts-live-pct {
   min-width: 44px;
+  margin-left: 14px;
+  font-family: inherit;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text);
 }
 .ldg-stats {
-  display: grid;
-  grid-template-columns: minmax(160px, 240px) auto auto auto 1fr;
-  gap: 16px;
-  padding: 10px 8px 8px;
-  border-top: 2px solid var(--border);
-  font-size: var(--text-xs);
-  color: var(--text-3);
-}
-/* The 2px rule above the class line replaces the last student's divider. */
-.score-row.ldg-row:has(+ .ldg-stats:not(:empty)) {
-  border-bottom: none;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 10px 16px;
+  background: rgba(118, 118, 128, 0.06);
+  box-shadow: inset 0 0.5px 0 var(--divider-heavy);
+  font-size: var(--text-sm);
+  color: var(--text);
 }
 .ldg-stats:empty {
   display: none;
 }
 .ldg-stats b {
   color: var(--text);
-  font-family: 'SF Mono', ui-monospace, 'Menlo', monospace;
 }
 .ldg-stats .ldg-name {
-  font-size: var(--text-xs);
-  color: var(--text-3);
+  width: 220px;
+  font-size: var(--text-sm);
+  font-weight: 700;
 }
 /* + / − beside the levels */
 /* − | + under the criterion name, a stepper like the grader's. */
