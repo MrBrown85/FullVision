@@ -1009,7 +1009,7 @@ window.PageStudent = (function () {
         esc(a.title) +
         '</a>' +
         (status === 'NS'
-          ? '<span class="gt-status-tag gt-tag-ns">NS</span>'
+          ? '<span class="gt-status-tag gt-tag-ns">M</span>'
           : status === 'EXC'
             ? '<span class="gt-status-tag gt-tag-exc">EXC</span>'
             : status === 'LATE'

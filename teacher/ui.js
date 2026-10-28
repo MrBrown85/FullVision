@@ -506,7 +506,7 @@ function renderStudentHeader(cid, sid, opts) {
   const overallRounded = Math.round(overall);
   const profColor = PROF_COLORS[overallRounded] || PROF_COLORS[0];
 
-  // Not Submitted / Excused / Late work
+  // Missing / Excused / Late work
   const statuses = getAssignmentStatuses(cid);
   const nsAssignments = [],
     excAssignments = [],
@@ -555,7 +555,7 @@ function renderStudentHeader(cid, sid, opts) {
   html += `<div class="sh-spacer"></div>`;
 
   const work = [
-    [nsAssignments, 'Not Submitted', 'var(--score-1)'],
+    [nsAssignments, 'Missing', 'var(--score-1)'],
     [excAssignments, 'Excused', ''],
     [lateAssignments, 'Late', 'var(--score-2)'],
   ].filter(w => w[0].length);
@@ -981,20 +981,20 @@ function rerenderKeeping(id, renderFn) {
 }
 
 /* The mark a gradebook cell shows for a status that replaces its score:
-   NS (not submitted) or EXC (excused, not counted). Its tooltip says how NS
+   M (missing, stored as NS) or EXC (excused, not counted). Its tooltip says how M
    counts for this work (calc.js's COLUMN_STATUS_RULES): 0 on points work;
    on proficiency work no evidence, though a class with a course % counts
    it as 0 there. Empty for no status or Late, which keeps its score. */
 function scoreStatusMarker(status, cid, assessment) {
   if (status === 'NS') {
-    var nsTitle = 'Not submitted: counts as 0';
+    var nsTitle = 'Missing: counts as 0';
     if (assessment && !isPointsScored(assessment)) {
       nsTitle =
         courseGradeMode(cid) === 'proficiency'
-          ? 'Not submitted: not counted, no evidence yet'
-          : 'Not submitted: 0 in the course %, not counted in proficiency';
+          ? 'Missing: not counted, no evidence yet'
+          : 'Missing: 0 in the course %, not counted in proficiency';
     }
-    return '<span class="gb-status gb-status-ns" title="' + nsTitle + '">NS</span>';
+    return '<span class="gb-status gb-status-ns" title="' + nsTitle + '">M</span>';
   }
   if (status === 'EXC') return '<span class="gb-status gb-status-exc" title="Excused: not counted">EXC</span>';
   return '';

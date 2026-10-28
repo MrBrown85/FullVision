@@ -292,7 +292,7 @@
       student: student,
       studentName: printName(student, nameStyle || DEFAULT_OPTIONS.nameStyle),
       date: assessment.date ? formatDate(assessment.date) : '',
-      status: status === 'NS' ? 'Not submitted' : status === 'EXC' ? 'Excused' : status === 'LATE' ? 'Late' : '',
+      status: status === 'NS' ? 'Missing' : status === 'EXC' ? 'Excused' : status === 'LATE' ? 'Late' : '',
       scored: scored,
       rows: rows,
       overall: overall,

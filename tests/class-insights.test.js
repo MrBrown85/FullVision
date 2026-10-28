@@ -168,7 +168,7 @@ describe('the Missing and Late cell', () => {
   it('says so at zero and counts each kind otherwise', () => {
     expect(DashInsights.missingGlanceHtml([])).toContain('Nothing is missing or late.');
     const html = DashInsights.missingGlanceHtml([{ kind: 'ns' }, { kind: 'late' }, { kind: 'late' }]);
-    expect(html).toContain('<b>1</b> Not Submitted · <b>2</b> Late · <b>0</b> Past Due');
+    expect(html).toContain('<b>1</b> Missing · <b>2</b> Late · <b>0</b> Past Due');
   });
 });
 

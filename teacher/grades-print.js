@@ -102,7 +102,7 @@
   var TITLE_LINES = 2;
 
   var MARKS = [
-    { key: 'NS', label: 'Not Submitted' },
+    { key: 'M', label: 'Missing' },
     { key: 'EXC', label: 'Excused' },
     { key: 'L', label: 'Late' },
     { key: '✓', label: 'Complete' },
@@ -470,7 +470,7 @@
     if (opts.blank) return { text: '', mark: '' };
     var cell = assessmentCellValue(cid, sid, col.assessment);
     var out = { text: cell.text, mark: '' };
-    if (cell.kind === 'status') out.mark = cell.status;
+    if (cell.kind === 'status') out.mark = cell.text;
     else if (cell.kind === 'complete') out.mark = cell.text;
     else if (cell.kind === 'none' || (cell.kind === 'missing' && !cell.zero)) out.mark = '—';
     var as = opts.scoresAs || defaultScoresAs(cid);

@@ -1262,7 +1262,7 @@ window.PageGradebook = (function () {
           ': ' +
           (statusMark
             ? cellStatus === 'NS'
-              ? 'Not submitted'
+              ? 'Missing'
               : 'Excused'
             : cmpMark
               ? cmpMark === 'complete'
@@ -1349,7 +1349,7 @@ window.PageGradebook = (function () {
         tip +=
           '<div class="gb-tip-note">' +
           ns +
-          (ns === 1 ? ' assignment NS (counts as 0)' : ' assignments NS (count as 0)') +
+          (ns === 1 ? ' assignment missing (counts as 0)' : ' assignments missing (count as 0)') +
           '</div>';
     }
     // Categories make up the course grade, so they sit under it, each graded

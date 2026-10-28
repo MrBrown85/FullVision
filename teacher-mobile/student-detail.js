@@ -396,7 +396,7 @@ window.MStudentDetail = (function () {
       return statuses[sid + ':' + a.id] === 'NS';
     }).length;
     var assessHtml = '';
-    if (nsN) assessHtml += '<div class="m-st-note m-st-note-warn">' + nsN + ' not submitted</div>';
+    if (nsN) assessHtml += '<div class="m-st-note m-st-note-warn">' + nsN + ' missing</div>';
     if (!cells.length) {
       assessHtml +=
         '<div class="m-empty" style="padding:20px"><div class="m-empty-subtitle">No assessments yet</div></div>';
@@ -420,7 +420,7 @@ window.MStudentDetail = (function () {
         '<span class="m-assess-title">' +
         MC.esc(a.title) +
         (status === 'NS'
-          ? ' <span class="m-badge" style="background:var(--priority-light);color:var(--priority)">NS</span>'
+          ? ' <span class="m-badge" style="background:var(--priority-light);color:var(--priority)">M</span>'
           : status === 'EXC'
             ? ' <span class="m-badge" style="background:var(--active-light);color:var(--link)">EXC</span>'
             : '') +

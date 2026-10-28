@@ -1813,7 +1813,7 @@ window.PageAssignments = (function () {
   var LEDGER_STATUSES = [
     ['LATE', 'Late', 'active-late'],
     ['EXC', 'Excused', 'active-excused'],
-    ['NS', 'Not Submitted', 'active-ns'],
+    ['NS', 'Missing', 'active-ns'],
   ];
   var LEDGER_COMMENT_ICON =
     '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" stroke-linejoin="round"/></svg>';
@@ -1960,7 +1960,7 @@ window.PageAssignments = (function () {
       '<div class="ldg-bar"><span class="ldg-tally"></span>' +
       '<div class="ldg-actions"><button type="button" class="ldg-action" data-action="confirmFillNotSubmitted" data-aid="' +
       a.id +
-      '">Set Unmarked to Not Submitted</button>' +
+      '">Set Unmarked to Missing</button>' +
       '<button type="button" class="ldg-action cmp-fill-all" data-action="confirmFillCompletion" data-aid="' +
       a.id +
       '">Set Unmarked to Complete</button></div></div>' +
@@ -2060,7 +2060,7 @@ window.PageAssignments = (function () {
       '<div class="ldg-bar"><span class="ldg-tally"></span>' +
       '<div class="ldg-actions"><button type="button" class="ldg-action" data-action="confirmFillNotSubmitted" data-aid="' +
       a.id +
-      '">Set Unmarked to Not Submitted</button>' +
+      '">Set Unmarked to Missing</button>' +
       '<button type="button" class="ldg-action" data-action="confirmFillPoints" data-aid="' +
       a.id +
       '">Set Unmarked to ' +
@@ -2106,12 +2106,12 @@ window.PageAssignments = (function () {
     return html;
   }
 
-  // Every student with no score and no status becomes Not Submitted, with undo.
+  // Every student with no score and no status becomes Missing, with undo.
   function confirmFillNotSubmitted(aid) {
     showConfirm(
-      'Set Unmarked to Not Submitted',
-      'Set every unmarked student to Not Submitted?',
-      'Set to Not Submitted',
+      'Set Unmarked to Missing',
+      'Set every unmarked student to Missing?',
+      'Set to Missing',
       'primary',
       function () {
         var cid = activeCourse;
@@ -2125,7 +2125,7 @@ window.PageAssignments = (function () {
         render();
         refreshSidebarGrades();
         if (!marked.length) return;
-        showUndoToast('Unmarked students set to Not Submitted', function () {
+        showUndoToast('Unmarked students set to Missing', function () {
           marked.forEach(function (sid) {
             setAssignmentStatus(cid, sid, aid, null);
           });
@@ -2269,7 +2269,7 @@ window.PageAssignments = (function () {
       aid +
       '" data-sid="' +
       sid +
-      '" data-status="NS" data-stop-prop="true" title="Not Submitted">NS</button>' +
+      '" data-status="NS" data-stop-prop="true" title="Missing">M</button>' +
       '<button class="comment-btn" data-action="openCommentPopover" data-cid="' +
       cid +
       '" data-sid="' +
@@ -5804,7 +5804,7 @@ window.PageAssignments = (function () {
   // The assessment's grade for the student, in words.
   function _graderGradeText(cid, a, sid) {
     var cell = assessmentCellValue(cid, sid, a);
-    if (cell.kind === 'status') return cell.status === 'NS' ? 'Not Submitted' : 'Excused';
+    if (cell.kind === 'status') return cell.status === 'NS' ? 'Missing' : 'Excused';
     if (cell.kind === 'complete') return cell.mark === 'complete' ? 'Complete' : 'Incomplete';
     if (cell.kind === 'level')
       return PROF_LABELS[Math.max(1, Math.min(4, Math.round(cell.value)))] + ' (' + cell.text + ')';
