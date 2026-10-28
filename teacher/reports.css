@@ -4025,6 +4025,112 @@ textarea.studio-text {
   color: #636366;
 }
 
+/* ── Next Steps, Progress in One Area, Ways to Support at Home (plan PR 5) ── */
+.report-steps,
+.report-support {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  column-gap: 14px;
+  row-gap: 3px;
+  font-size: var(--text-base);
+  line-height: 1.35;
+}
+.report-support {
+  grid-template-columns: 96px minmax(0, 1fr);
+  row-gap: 4px;
+}
+.report-steps-half .report-steps {
+  grid-template-columns: 86px minmax(0, 1fr);
+}
+.report-support-half .report-support {
+  grid-template-columns: 74px minmax(0, 1fr);
+}
+.report-steps-k,
+.report-support-k,
+.report-progress-k {
+  color: #636366;
+}
+.report-steps-v {
+  font-weight: 600;
+}
+.report-steps-latest {
+  color: #48484a;
+  font-size: var(--text-xs);
+}
+.report-sheet .report-next-steps {
+  margin-bottom: 0 !important;
+  padding: 10px 14px !important;
+}
+.report-progress-sub {
+  font-weight: 400;
+  color: #636366;
+}
+.report-progress-body {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+.report-progress-half .report-progress-body {
+  flex-direction: column;
+  align-items: stretch;
+}
+.report-progress-facts {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  column-gap: 10px;
+  row-gap: 5px;
+  font-size: var(--text-sm);
+  line-height: 1.35;
+  align-content: start;
+  font-variant-numeric: tabular-nums;
+}
+.report-progress-chg {
+  color: #48484a;
+}
+.report-progress-list {
+  flex: none;
+  width: 290px;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+.report-progress-half .report-progress-list {
+  width: auto;
+}
+.report-progress-lh,
+.report-progress-li {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 46px;
+  column-gap: 6px;
+  align-items: center;
+}
+.report-progress-lh {
+  font-size: var(--text-2xs);
+  color: #636366;
+  border-bottom: 1px solid #1d1d1f;
+  padding-bottom: 2px;
+}
+.report-progress-li {
+  min-height: 17px;
+  border-bottom: 1px solid #e5e5ea;
+}
+.report-progress-date {
+  color: #636366;
+}
+.report-progress-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.report-progress-n {
+  text-align: right;
+}
+.report-sheet .report-progress,
+.report-sheet .report-support-home {
+  margin-bottom: 0 !important;
+}
+
 /* ── Assignment Grades as rows (plan PR 4) ─────────────────────── */
 .report-grades-cols {
   display: grid;

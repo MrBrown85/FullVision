@@ -161,7 +161,7 @@ test.describe('Page Studio', () => {
     await openStudio(page);
     await expect(page.locator('#studio > *')).toHaveCount(2);
     await expect(page.locator('#studio-inspector')).toHaveCount(0);
-    await expect(page.locator('.studio-palette .studio-blk')).toHaveCount(16);
+    await expect(page.locator('.studio-palette .studio-blk')).toHaveCount(17);
     await expect(page.locator('.studio-blk.placed')).toHaveCount(7);
     await expect(page.locator('.studio-palette')).not.toContainText('Letterhead');
     // No size badges, no grid, no handles.
@@ -919,15 +919,13 @@ test.describe('Hands on the page', () => {
     await bar(page).getByRole('button', { name: 'Remove' }).click();
     await page.locator('[data-action="studioBlock"][data-block="core-competencies"]').click();
     expect(await rowsOf(page, 0)).toContain('core-competencies');
-    // Growth and Next Steps no longer has room there: dropped on the Front, it goes to the Back.
+    // Next Steps no longer has room there: dropped on the Front, it goes to the Back.
     const from = await center(page.locator('[data-action="studioBlock"][data-block="next-steps"]'));
     await dragStart(page, from, await gapAbove(page, 'legend'));
     await page.mouse.up();
     expect(await rowsOf(page, 0)).not.toContain('next-steps');
     expect(await rowsOf(page, 1)).toEqual(['next-steps', 'parent-response']);
-    await expect(page.locator('#undo-toast')).toContainText(
-      'Added Growth and Next Steps to the Back. The Front is full',
-    );
+    await expect(page.locator('#undo-toast')).toContainText('Added Next Steps to the Back. The Front is full');
     await expect(page.locator('#studio-fit')).toHaveText('1 sheet for all 27 students');
     await undo(page).click();
     expect(await rowsOf(page, 1)).toEqual(['parent-response']);
