@@ -760,6 +760,8 @@ window.PageAssignments = (function () {
   }
   function _levelCardsHtml(cid, a, tagObjs, st) {
     var order = levelOrderFor(cid);
+    // Feedback per competency lives on tag_score, which rubric work doesn't use.
+    var withNotes = !a.rubricId;
     return (
       '<div class="grdl-cards">' +
       tagObjs
@@ -804,11 +806,33 @@ window.PageAssignments = (function () {
             seg +
             '</div>' +
             _graderStepperHtml(state.level, state.mod, 'data-action="graderTagMod" data-tag="' + esc(t.id) + '"') +
-            '</div></section>'
+            '</div>' +
+            (withNotes ? _tagNoteHtml(cid, a.id, st.id, t.id) : '') +
+            '</section>'
           );
         })
         .join('') +
       '</div>'
+    );
+  }
+  // The competency's Feedback (Optional) box, one line until it has focus
+  // or text, as under a rubric criterion.
+  function _tagNoteHtml(cid, aid, sid, tagId) {
+    var note = getTagComment(cid, sid, aid, tagId);
+    var id = 'grdl-note-' + esc(tagId);
+    return (
+      '<label class="grdt-note-label grdl-note-label" for="' +
+      id +
+      '">Feedback (Optional)</label>' +
+      '<textarea id="' +
+      id +
+      '" class="grdt-note' +
+      (note ? ' has-text' : '') +
+      '" rows="1" data-action-blur="graderTagNote" data-tag="' +
+      esc(tagId) +
+      '">' +
+      esc(note) +
+      '</textarea>'
     );
   }
   function _pointsCardHtml(cid, a, st) {
@@ -5787,6 +5811,15 @@ window.PageAssignments = (function () {
       )
         saveRubricCriterionComment(activeCourse, focusStudentId, noteAid, el.dataset.critid, text);
       el.classList.toggle('has-text', !!text);
+      return;
+    }
+    if (el.dataset.actionBlur === 'graderTagNote') {
+      var tagAid = _graderAid(el);
+      var tagText = el.value.trim();
+      if (!tagAid || !focusStudentId) return;
+      if (tagText !== getTagComment(activeCourse, focusStudentId, tagAid, el.dataset.tag))
+        saveTagComment(activeCourse, focusStudentId, tagAid, el.dataset.tag, tagText);
+      el.classList.toggle('has-text', !!tagText);
       return;
     }
     if (el.dataset.actionBlur === 'critName') {

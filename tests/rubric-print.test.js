@@ -339,6 +339,15 @@ describe('Tag and General Rubrics', () => {
     );
   });
 
+  it('prints a competency’s feedback under its Tag Rubric row', () => {
+    saveTagComment(CID, SID, AID_TAGS, TAG_1, 'Asks sharp questions.');
+    const data = RubricPrint.sheetData(CID, AID_TAGS, SID);
+    expect(data.rows[0].comment).toBe('Asks sharp questions.');
+    expect(data.rows[1].comment).toBe('');
+    const include = { feedback: true, criterionComments: true, codes: true, overall: true };
+    expect(RubricPrint.renderSheet(data, { include })).toContain('Asks sharp questions.');
+  });
+
   it('uses the teacher’s own wording for a competency where saved', () => {
     const tag = getTagById(CID, TAG_1);
     localStorage.setItem(

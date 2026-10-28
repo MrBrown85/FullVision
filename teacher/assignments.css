@@ -5077,6 +5077,13 @@
   font-weight: 600;
   color: var(--text);
 }
+/* A competency card's feedback row sits under its name and level control. */
+.grdl-note-label {
+  align-self: start;
+}
+.grdl-card .grdt-note {
+  align-self: start;
+}
 /* One line until clicked; three while typing or once it holds text. */
 .grdt-note {
   box-sizing: border-box;
