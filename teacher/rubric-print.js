@@ -270,6 +270,11 @@
             : rubric.kind === 'tags' && typeof getTagComment === 'function'
               ? getTagComment(cid, sid, aid, criterion.id)
               : '',
+        // A single-point rubric's Went Beyond; its Work On is the comment.
+        beyond:
+          !rubric.kind && typeof getRubricCriterionBeyond === 'function'
+            ? getRubricCriterionBeyond(cid, sid, aid, criterion)
+            : '',
         codes: _criterionCodes(cid, criterion, rubric.kind === 'tags'),
       };
     });
@@ -327,6 +332,7 @@
           mod: 0,
           mixed: false,
           comment: '',
+          beyond: '',
           codes: _criterionCodes(cid, criterion, rubric.kind === 'tags'),
         };
       }),
@@ -438,6 +444,65 @@
     return !!rubric && !rubric.kind && typeof rubricStyle === 'function' && rubricStyle(rubric) === 'advanced';
   }
 
+  function _isSinglePoint(rubric) {
+    return !!rubric && !rubric.kind && typeof rubricStyle === 'function' && rubricStyle(rubric) === 'single_point';
+  }
+
+  /* A single-point rubric: Criterion | Work On | Proficient Standard | Went
+     Beyond. The standard's cell names the student's level. On a graded
+     sheet the two note columns print only when some criterion has one; a
+     blank copy keeps them empty to write in. */
+  function _singlePointTableHtml(data, include) {
+    var notes = include.criterionComments !== false;
+    var showWork =
+      data.blank ||
+      (notes &&
+        data.rows.some(function (r) {
+          return r.comment;
+        }));
+    var showBeyond =
+      data.blank ||
+      (notes &&
+        data.rows.some(function (r) {
+          return r.beyond;
+        }));
+    var html =
+      '<table class="rubric-table is-single-point"><thead><tr><th class="rubric-crit-head">' +
+      _esc(data.rubric.name || 'Criteria') +
+      '</th>' +
+      (showWork ? '<th class="rubric-level-head rubric-sp-note-head">Work On</th>' : '') +
+      '<th class="rubric-level-head rubric-sp-standard-head">Proficient Standard</th>' +
+      (showBeyond ? '<th class="rubric-level-head rubric-sp-note-head">Went Beyond</th>' : '') +
+      '</tr></thead><tbody>';
+    data.rows.forEach(function (row) {
+      var c = row.criterion;
+      var scored = row.level > 0;
+      html +=
+        '<tr class="rubric-row"><th class="rubric-crit" scope="row"><div class="rubric-crit-name">' +
+        _esc(c.name) +
+        '</div>';
+      if (include.codes && row.codes.length)
+        html += '<div class="rubric-crit-codes">' + _esc(row.codes.join(' · ')) + '</div>';
+      html += '</th>';
+      if (showWork) html += '<td class="rubric-cell rubric-sp-note">' + _esc(row.comment || '') + '</td>';
+      html +=
+        '<td class="rubric-cell rubric-sp-standard' +
+        (scored ? ' is-scored l' + row.level + (row.mixed ? ' is-mixed' : '') : '') +
+        '">' +
+        (scored
+          ? '<span class="rubric-sp-level">' +
+            _esc(LEVEL_NAMES[row.level] || '') +
+            (row.mod > 0 ? ' +' : row.mod < 0 ? ' −' : '') +
+            '</span>'
+          : '') +
+        _esc((c.levels && (c.levels[3] || c.levels['3'])) || '') +
+        '</td>';
+      if (showBeyond) html += '<td class="rubric-cell rubric-sp-note">' + _esc(row.beyond || '') + '</td>';
+      html += '</tr>';
+    });
+    return html + '</tbody></table>';
+  }
+
   function renderSheet(data, opts) {
     var include = opts.include || DEFAULT_OPTIONS.include;
     // The level columns run in the class's Rubric Levels order.
@@ -462,6 +527,10 @@
     }
     html += '</div>';
 
+    if (_isSinglePoint(data.rubric)) {
+      html += _singlePointTableHtml(data, include);
+      return html + _feedbackHtml(data, include) + '</div></div>';
+    }
     html +=
       '<table class="rubric-table"><thead><tr><th class="rubric-crit-head">' +
       _esc(data.rubric.name || 'Criteria') +
@@ -501,22 +570,24 @@
       }
     });
     html += '</tbody></table>';
+    html += _feedbackHtml(data, include);
+    html += '</div></div>';
+    return html;
+  }
 
-    if (include.feedback) {
-      // Written feedback prints in a box; with none, ruled lines fill the rest
-      // of the sheet for the teacher to write on by hand.
-      html += data.feedback
-        ? '<div class="rubric-feedback"><div class="rubric-label">Feedback</div><div class="rubric-feedback-text">' +
+  function _feedbackHtml(data, include) {
+    if (!include.feedback) return '';
+    // Written feedback prints in a box; with none, ruled lines fill the rest
+    // of the sheet for the teacher to write on by hand.
+    return data.feedback
+      ? '<div class="rubric-feedback"><div class="rubric-label">Feedback</div><div class="rubric-feedback-text">' +
           _esc(data.feedback).replace(/\n/g, '<br>') +
           '</div></div>'
-        : '<div class="rubric-feedback is-lines"><div class="rubric-label">Feedback</div><div class="rubric-lines">' +
+      : '<div class="rubric-feedback is-lines"><div class="rubric-label">Feedback</div><div class="rubric-lines">' +
           // More lines than any sheet holds; the box shows the whole ones
           // that fit. Borders, not a background, so they always print.
           new Array(LINE_ROWS + 1).join('<div class="rubric-line"></div>') +
           '</div></div>';
-    }
-    html += '</div></div>';
-    return html;
   }
 
   function renderPages(cid, aid, opts) {
@@ -895,7 +966,11 @@
       includes += _check('feedback', opts.include.feedback, 'Feedback Comment');
       // A General Rubric has no row comments; a Tag Rubric's are on its competencies.
       if (rubric && !rubric.kind)
-        includes += _check('criterionComments', opts.include.criterionComments, 'Criterion Comments');
+        includes += _check(
+          'criterionComments',
+          opts.include.criterionComments,
+          _isSinglePoint(rubric) ? 'Work On and Went Beyond' : 'Criterion Comments',
+        );
       else if (rubric && rubric.kind === 'tags')
         includes += _check('criterionComments', opts.include.criterionComments, 'Competency Comments');
     }

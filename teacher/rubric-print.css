@@ -588,3 +588,19 @@
     outline: none;
   }
 }
+
+/* Single-point rubric: Criterion | Work On | Proficient Standard | Went
+   Beyond. Black and white like every sheet; the standard's cell names the
+   student's level and is shaded and boxed as a scored cell. */
+.rubric-sp-standard-head {
+  width: 38%;
+}
+.rubric-sp-note {
+  font-weight: 400;
+}
+.rubric-sp-level {
+  display: block;
+  margin-bottom: 0.3em;
+  font-weight: 700;
+  font-size: 1.05em;
+}

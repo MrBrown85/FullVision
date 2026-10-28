@@ -324,6 +324,57 @@ describe('criterion comments in the data layer', () => {
   });
 });
 
+describe('Single-point rubrics', () => {
+  const include = { feedback: true, criterionComments: true, codes: true, overall: true };
+  beforeEach(() => {
+    const rubrics = getRubrics(CID).map(r =>
+      Object.assign({}, r, {
+        style: 'single_point',
+        criteria: r.criteria.map(c =>
+          Object.assign({}, c, { levels: Object.assign({}, c.levels, { 3: 'Meets: ' + c.name }) }),
+        ),
+      }),
+    );
+    saveRubrics(CID, rubrics);
+  });
+
+  it('prints Work On | Proficient Standard | Went Beyond with the level named', () => {
+    saveRubricCriterionComment(CID, SID, AID, CRIT_A, 'Label the variables.');
+    saveRubricCriterionBeyond(CID, SID, AID, CRIT_A, 'Ran a second trial.');
+    const data = RubricPrint.sheetData(CID, AID, SID);
+    expect(data.rows[0].beyond).toBe('Ran a second trial.');
+    const html = RubricPrint.renderSheet(data, { include });
+    expect(html).toContain('rubric-table is-single-point');
+    expect(html).toContain('>Work On</th>');
+    expect(html).toContain('>Went Beyond</th>');
+    expect(html).toContain('Label the variables.');
+    expect(html).toContain('Ran a second trial.');
+    expect(html).toContain('Meets: Inquiry');
+    expect(html).toContain('<span class="rubric-sp-level">Proficient +</span>');
+    // No four-level columns.
+    expect(html).not.toContain('>Extending</th>');
+  });
+
+  it('leaves out a note column nobody wrote in, and both when notes are off', () => {
+    saveRubricCriterionComment(CID, SID, AID, CRIT_A, 'Label the variables.');
+    const data = RubricPrint.sheetData(CID, AID, SID);
+    const html = RubricPrint.renderSheet(data, { include });
+    expect(html).toContain('>Work On</th>');
+    expect(html).not.toContain('>Went Beyond</th>');
+    const off = RubricPrint.renderSheet(data, { include: Object.assign({}, include, { criterionComments: false }) });
+    expect(off).not.toContain('>Work On</th>');
+    expect(off).not.toContain('Label the variables.');
+  });
+
+  it('a blank copy keeps both note columns empty to write in', () => {
+    const data = RubricPrint.blankSheetData(CID, getRubricById(CID, RUBRIC), getAssessments(CID)[0]);
+    const html = RubricPrint.renderSheet(data, { include: { codes: true } });
+    expect(html).toContain('>Work On</th>');
+    expect(html).toContain('>Went Beyond</th>');
+    expect(html).not.toContain('rubric-sp-level');
+  });
+});
+
 /* An assessment with no rubric of its own prints a Tag Rubric (a row per
    competency) or a General Rubric (one Overall row), with the teacher's own
    wording for a competency where saved, else the BC proficiency scale's
