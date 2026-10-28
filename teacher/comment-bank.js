@@ -645,13 +645,14 @@ window.CommentBank = (function () {
      sentences that fit, grouped by source, two per group until Show All (an
      added sentence always shows), sentences used for three or more
      classmates last in their group. opts: { more: {part: true}, comments:
-     classmates' comments this term, bank }. */
+     classmates' comments this term, first: the first name for the titles
+     (sentences use the name the student goes by), bank }. */
   function parts(ctx, text, opts) {
     opts = opts || {};
     var bank = opts.bank || COMMENT_BANK;
     var more = opts.more || {};
     var lastStart = _lastStart(text);
-    var first = ctx.name;
+    var first = opts.first || ctx.name;
     var titles = {
       habits: 'Work Habits',
       now: 'Where ' + first + ' Is Now',

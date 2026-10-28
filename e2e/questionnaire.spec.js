@@ -13,6 +13,14 @@ async function open(page, student = 'st1') {
   await page.locator('#tq-narrative').waitFor();
 }
 
+/* The cursor at the end of the comment (End only reaches the end of a
+   wrapped line). */
+async function toEnd(page) {
+  const box = page.locator('#tq-narrative');
+  await box.click();
+  await box.evaluate(el => el.setSelectionRange(el.value.length, el.value.length));
+}
+
 /* Elements whose content is wider than their box and not scrolled, and
    buttons whose label is cut off. */
 async function overflow(page) {
@@ -52,8 +60,7 @@ test('Approve sets Ready and the roster tick; an edit clears it', async ({ page 
   await cece.click();
 
   // An edit after approval clears it.
-  await page.locator('#tq-narrative').click();
-  await page.keyboard.press('End');
+  await toEnd(page);
   await page.keyboard.type(' One more sentence.');
   await expect(page.locator('#tq-approve')).toHaveText('Approve Comment');
   await expect(page.locator('#tq-ready')).toHaveText('0 of 27 Ready');
@@ -149,8 +156,7 @@ test('a note quoted in the comment says In the comment; the private note is mark
   const first = page.locator('.qn-obs').first();
   await expect(first.locator('.qn-quoted')).toHaveCount(0);
   const text = await first.locator('.qn-obs-text').textContent();
-  await page.locator('#tq-narrative').click();
-  await page.keyboard.press('End');
+  await toEnd(page);
   await page.keyboard.type(' I noted: “' + text.trim() + '”');
   await expect(first.locator('.qn-quoted')).toHaveText('In the comment');
   await expect(page.locator('.qn-private')).toContainText('Private · Never Printed');
@@ -255,5 +261,101 @@ test.describe('on a 1366 × 768 laptop', () => {
       await expect(page.locator('.qn-ev-card:visible')).toHaveCount(1);
       expect(await overflow(page)).toEqual([]);
     }
+  });
+});
+
+test.describe('the BC Written Learning Update and the Questions sheet', () => {
+  test('the six requirements tick as sentences are added', async ({ page }) => {
+    await open(page);
+    const count = page.locator('.qn-bc-count');
+    await expect(count).toHaveText('2 of 6 requirements');
+    const req = name => page.locator('.qn-req', { hasText: name });
+    await expect(req('Work Habits')).toContainText('Nothing from part 1 yet');
+    for (const part of ['habits', 'now', 'go', 'how']) {
+      await page.locator(`.qn-part[data-part="${part}"] .qn-row:not(.added)`).first().click();
+    }
+    await expect(count).toHaveText('✓ 6 of 6 requirements');
+    await expect(page.locator('#tq-bc-short')).toHaveText('✓ 6 of 6 requirements');
+    await page.locator('[data-action="tqToggleBcAll"]').click();
+    await expect(req('Work Habits')).toContainText('Teacher Comment · part 1');
+    await expect(req('Self-Reflection and Goals')).toContainText('Self-Assessment and Goal · answered');
+    await expect(page.locator('.qn-also-row')).toHaveText([
+      /Proficiency Legend\s*Same for all/,
+      /Attendance\s*Optional/,
+      /Missing Work\s*From assignments/,
+      /Assignment Grades\s*From scores/,
+      /Parent \/ Guardian Response\s*Family writes/,
+    ]);
+    await expect(page.locator('.qn-left')).toContainText('Approve the Comment');
+    await page.locator('#tq-approve').click();
+    await expect(page.locator('.qn-left')).toContainText('Nothing. Cece is ready.');
+  });
+
+  test('Jasper is waiting on his Self-Assessment and Goal', async ({ page }) => {
+    await open(page, 'st7');
+    await expect(page.locator('.qn-req', { hasText: 'Self-Reflection and Goals' })).toContainText(
+      'Self-Assessment and Goal · waiting on Jasper',
+    );
+    await expect(page.locator('.qn-left')).toContainText('Waiting on Jasper');
+  });
+
+  test('a form without Proficiency shows it as not met, with the reason', async ({ page }) => {
+    await open(page);
+    await page.evaluate(() => {
+      const cfg = getReportConfig('sci8') || {};
+      const form = ReportSheets.removeCell(ReportSheets.formFor(cfg), 'proficiency');
+      saveReportConfig('sci8', Object.assign({}, cfg, { form }));
+    });
+    await page.reload();
+    await page.locator('#report-period').selectOption('Report 2');
+    await expect(page.locator('.qn-req', { hasText: 'Proficiency in Each Area' })).toContainText(
+      'The Proficiency block is not on this report',
+    );
+    await expect(page.locator('.qn-req', { hasText: 'Proficiency in Each Area' }).locator('.qn-req-mark')).toHaveText(
+      '●',
+    );
+  });
+
+  test('Questions lists exactly the form’s blocks; its boxes turn cards off', async ({ page }) => {
+    await open(page);
+    await page.locator('#tq-questions-btn').click();
+    const sheet = page.getByRole('dialog', { name: 'Questions' });
+    await expect(sheet).toBeVisible();
+    const blocks = await page.evaluate(() =>
+      ReportSheets.onForm(ReportSheets.formFor(getReportConfig('sci8') || {})).map(id => ReportSheets.BLOCKS[id].label),
+    );
+    await expect(sheet.locator('.qn-q-row:not(.qn-q-head) .qn-q-block')).toHaveText(blocks);
+    await expect(sheet.locator('.qn-q-row', { hasText: 'Teacher Comment' })).toContainText('You');
+    await sheet.locator('[data-tq-card="obs"]').uncheck();
+    await expect(page.locator('[data-card="obs"]')).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(sheet).toHaveCount(0);
+    await page.reload();
+    await page.locator('#report-period').selectOption('Report 2');
+    await expect(page.locator('[data-card="obs"]')).toHaveCount(0);
+    expect(await overflow(page)).toEqual([]);
+  });
+
+  test('Open in Progress Reports lands on the student’s report', async ({ page }) => {
+    await open(page, 'st7');
+    await page.locator('[data-action="tqOpenReport"]').click();
+    await expect(page.getByRole('tab', { name: 'Progress Reports' })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('#picker-label')).toHaveText('Jasper Gill');
+    await expect(page.locator('.report-sheet').first().locator('.report-student-name')).toContainText('Jas');
+  });
+});
+
+test.describe('the BC card on a 1366 × 768 laptop', () => {
+  test.use({ viewport: { width: 1366, height: 768 } });
+
+  test('opens from the strip’s button and closes with Escape', async ({ page }) => {
+    await open(page);
+    await expect(page.locator('#tq-bc-card')).toBeHidden();
+    await expect(page.locator('#tq-bc-short')).toHaveText('2 of 6 requirements');
+    await page.locator('.qn-bc-btn').click();
+    await expect(page.locator('#tq-bc-card')).toBeVisible();
+    expect(await overflow(page)).toEqual([]);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#tq-bc-card')).toBeHidden();
   });
 });
