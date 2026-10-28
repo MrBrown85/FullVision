@@ -997,6 +997,9 @@ window.PageReports = (function () {
   function _setForm(form, label) {
     var before = reportConfig.form ? JSON.parse(JSON.stringify(reportConfig.form)) : null;
     reportConfig.form = ReportSheets.normalizeForm(form);
+    // Heights follow each placed block's options and lines; a move or a
+    // size change keeps them.
+    if (before && _optionsOf(before) !== _optionsOf(reportConfig.form)) _blockSizes = null;
     saveReportConfig(activeCourse, reportConfig);
     if (studioSelected && !ReportSheets.locate(reportConfig.form, studioSelected)) studioSelected = null;
     _classFitKey = '';
@@ -1006,11 +1009,27 @@ window.PageReports = (function () {
     _syncSidesButtons();
     if (label && typeof showUndoToast === 'function') {
       var wasSelected = studioSelected;
+      var cid = activeCourse;
       showUndoToast(label, function () {
+        // Undo belongs to the class it was made in.
+        if (activeCourse !== cid) return;
         studioSelected = wasSelected;
         _setForm(before || ReportSheets.form());
       });
     }
+  }
+
+  /* Every placed block's options, no-evidence rule and lines, by id. */
+  function _optionsOf(f) {
+    var out = {};
+    (f.sides || []).forEach(function (sd) {
+      sd.rows.forEach(function (row) {
+        row.cells.forEach(function (c) {
+          out[c.block] = [c.options || null, c.noEvidence || null, c.lines || null];
+        });
+      });
+    });
+    return JSON.stringify(out);
   }
 
   function _formOf() {
@@ -1085,6 +1104,7 @@ window.PageReports = (function () {
       return ReportSheets.blockSizes(activeCourse, students, ReportBlocks.reportContext(), {
         paper: reportPaper,
         type: _formOf().type,
+        form: _formOf(),
       });
     } catch (e) {
       return {};
@@ -1374,6 +1394,8 @@ window.PageReports = (function () {
 
   /* ── Course switching ────────────────────────────────────────── */
   async function switchCourse(cid) {
+    // A pending Undo belongs to the class being left.
+    if (typeof dismissUndoToast === 'function') dismissUndoToast();
     activeCourse = cid;
     if (!(await switchActiveCourse(cid))) return;
     selectedStudentIds = null; // reset to all
@@ -1577,7 +1599,10 @@ window.PageReports = (function () {
         var size = el.dataset.size === 'half' ? 'half' : 'row';
         var f = _formOf();
         if ((ReportSheets.cellOf(f, id) || {}).size === size) return;
-        _setForm(ReportSheets.setSize(f, id, size), _label(id) + ': ' + (size === 'half' ? 'Side by Side' : 'Row'));
+        _setForm(
+          ReportSheets.setSize(f, id, size, ReportStudio.halfHeights(_blockSizes)),
+          _label(id) + ': ' + (size === 'half' ? 'Side by Side' : 'Row'),
+        );
       },
       studioMove: function () {
         _moveBlock(el.dataset.block, Number(el.dataset.dir) || 1);
@@ -1816,6 +1841,8 @@ window.PageReports = (function () {
 
   function _handleReportPeriodChange() {
     viewingIssue = null;
+    // A different report term means different work and heights.
+    _blockSizes = null;
     renderReports();
   }
 

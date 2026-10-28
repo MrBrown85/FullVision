@@ -849,10 +849,22 @@ window.ReportSheets = (function () {
     f.sides[side].rows.splice(_lastRow(f, side), 0, row);
     return normalizeForm(f);
   }
+  /* Layout Rule 6: two Side by Side blocks pair only when the shorter is at
+     least half the taller one's height. heights: { id: px at Side by Side }
+     (blockSizes' half); a block not measured yet pairs. */
+  function pairsWell(a, b, heights) {
+    if (!canHalf(a) || !canHalf(b)) return false;
+    var ha = heights && heights[a];
+    var hb = heights && heights[b];
+    if (!(ha > 0) || !(hb > 0)) return true;
+    return Math.min(ha, hb) >= Math.max(ha, hb) / 2;
+  }
+
   /* Row or Side by Side. Going Side by Side, a lone Side by Side block in
-     the row just above or below becomes its partner. Back to Row, a paired
-     block's partner stays alone at half width in the row below it. */
-  function setSize(f, id, size) {
+     the row just above or below becomes its partner when the two pair well
+     (heights, as pairsWell). Back to Row, a paired block's partner stays
+     alone at half width in the row below it. */
+  function setSize(f, id, size, heights) {
     var at = locate(f, id);
     if (!at || id === 'header') return f;
     f = _clone(f);
@@ -870,7 +882,8 @@ window.ReportSheets = (function () {
             r.cells[0].size === 'half' &&
             canHalf(r.cells[0].block) &&
             r.cells[0].block !== 'header' &&
-            r.cells[0].block !== f.pinned
+            r.cells[0].block !== f.pinned &&
+            pairsWell(id, r.cells[0].block, heights)
           );
         };
         var near = lone(rows[at.row - 1]) ? at.row - 1 : lone(rows[at.row + 1]) ? at.row + 1 : -1;
@@ -1229,11 +1242,15 @@ window.ReportSheets = (function () {
           return;
         }
         if (r.h > H) {
-          // Taller than a whole side: after the report.
+          // Taller than a whole side: after the report. A short partner
+          // stays on its side, alone in the row.
+          var short = [];
           r.live.forEach(function (c) {
-            after.push(c);
+            if (c.px > H) after.push(c);
+            else short.push(c);
           });
-          return;
+          if (!short.length) return;
+          r = rowOf(short);
         }
         var lim = cur === side ? limit : H;
         if (y + r.h > lim && (y > 0 || cur === side)) {
@@ -1792,6 +1809,7 @@ window.ReportSheets = (function () {
      checks and its previews. */
   function blockSizes(cid, students, ctx, opts) {
     opts = opts || {};
+    var formUsed = opts.form ? normalizeForm(opts.form) : null;
     var stage = _stage(document.body, ROW_W, opts.type === 'compact' ? 'compact' : 'standard');
     var out = {};
     var ids = BLOCK_ORDER.filter(function (id) {
@@ -1804,10 +1822,16 @@ window.ReportSheets = (function () {
       (Array.isArray(students) ? students : [students]).forEach(function (st) {
         var cells = [];
         ids.forEach(function (id) {
-          var cell = _cleanCell({ block: id });
-          var html = _cellHtml(cell, cid, st, ctx);
-          cells.push({ cell: cell, size: 'row', html: html });
-          if (canHalf(id)) cells.push({ cell: cell, size: 'half', html: html });
+          // A placed block measures with its own options; each width with
+          // the layout it prints at that width.
+          var placed = formUsed && cellOf(formUsed, id);
+          var base = _cleanCell(placed || { block: id });
+          var row = Object.assign({}, base, { size: 'row' });
+          cells.push({ cell: row, size: 'row', html: _cellHtml(row, cid, st, ctx) });
+          if (canHalf(id)) {
+            var half = Object.assign({}, base, { size: 'half' });
+            cells.push({ cell: half, size: 'half', html: _cellHtml(half, cid, st, ctx) });
+          }
         });
         _measureCells(stage, cells);
         cells.forEach(function (c) {
@@ -1867,6 +1891,7 @@ window.ReportSheets = (function () {
     BLOCKS: BLOCKS,
     PALETTE_GROUPS: PALETTE_GROUPS,
     canHalf: canHalf,
+    pairsWell: pairsWell,
     normalizeForm: normalizeForm,
     optionsFor: optionsFor,
     formFor: formFor,

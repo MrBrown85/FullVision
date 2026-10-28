@@ -571,6 +571,20 @@ describe('stage 3 blocks', () => {
       expect(text(ReportBlocks.renderReportBlock('next-steps', CID, CECE, {}, {}))).toContain(
         'Latest: Poster, Oct 20 · 2.7 / 4 · 67% Proficient',
       );
+      // Both: Proficiency shows the level and the %, and the change in levels.
+      const both = text(
+        ReportBlocks.renderReportBlock(
+          'proficiency',
+          CID,
+          CECE,
+          {},
+          S.optionsFor({ block: 'proficiency' }, ReportBlocks.showDefaults(CID)),
+        ),
+      );
+      expect(both).toMatch(/Plan [\d.]+ · \d+% Proficient 3\.3 · 83% Proficient [+−]?\d\.\d 3/);
+      expect(text(ReportBlocks.renderReportBlock('progress', CID, CECE, {}, {}))).toContain(
+        'Now 2.7 · 67% Proficient (−0.3 this term)',
+      );
     } finally {
       COURSES[CID].gradingSystem = 'proficiency';
     }

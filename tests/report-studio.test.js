@@ -262,3 +262,14 @@ describe('ReportStudio Everyone order and the Templates tab', () => {
     expect(bare).not.toContain('studio-tpl-thumbs');
   });
 });
+
+describe('review fixes: the Templates tab', () => {
+  it('marks a starter current only while the layout is as it came', () => {
+    const f = ReportSheets.form();
+    expect(ReportStudio.sameLayout(f, ReportSheets.starter('report-card'))).toBe(true);
+    const edited = ReportSheets.removeCell(f, 'legend');
+    expect(ReportStudio.sameLayout(edited, ReportSheets.starter('report-card'))).toBe(false);
+    expect(ReportStudio.paletteHtml(edited, 'templates', [])).not.toContain('studio-tpl current');
+    expect(ReportStudio.paletteHtml(f, 'templates', [])).toMatch(/studio-tpl current[^>]*data-starter="report-card"/);
+  });
+});

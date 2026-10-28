@@ -667,16 +667,12 @@ window.ReportBlocks = (function () {
     if (options.startNow !== false && (startV > 0 || nowV > 0)) {
       // Figures as the class reads them: a level and its word, or a % for a letter class.
       const letter = courseGradeMode(cid) === 'letter';
-      const plain = v => (letter ? formatLevelAs(v, 'percent') : levelFigure(v) + ' ' + _profWord(v));
-      const pctChange = () => {
-        if (!(startV > 0 && nowV > 0)) return '\u2014';
-        const d = Math.round((nowV / 4) * 100) - Math.round((startV / 4) * 100);
-        return (d > 0 ? '+' : d < 0 ? '\u2212' : '') + Math.abs(d) + '%';
-      };
+      const plain = v => formatLevel(cid, v) + (letter ? '' : ' ' + _profWord(v));
+
       facts.push(['Start of term', esc(plain(startV))]);
       facts.push([
         'Now',
-        `<b>${esc(plain(nowV))}</b> <span class="report-progress-chg">(${esc(letter ? pctChange() : levelChange(startV, nowV))} this term)</span>`,
+        `<b>${esc(plain(nowV))}</b> <span class="report-progress-chg">(${esc(levelChangeAs(cid, startV, nowV))} this term)</span>`,
       ]);
     }
     if (options.best !== false && bests.length) {
@@ -745,6 +741,12 @@ window.ReportBlocks = (function () {
   /* A section's level at the start of this term, from its scores in date
      order (calc.js startAndNow); null without enough dated scores. */
   function _sectionStart(cid, sid, sec) {
+    const now = typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
+    return _pass('start|' + cid + '|' + sid + '|' + (now ? now.ordinal : '') + '|' + sec.id, () =>
+      _sectionStartNow(cid, sid, sec),
+    );
+  }
+  function _sectionStartNow(cid, sid, sec) {
     const dates = {};
     getAssessments(cid).forEach(a => {
       const d = typeof _assessmentDate === 'function' ? _assessmentDate(a) : a.date || a.dueDate || null;
@@ -763,7 +765,25 @@ window.ReportBlocks = (function () {
   }
   /* Every section's level in the previous reporting term, read through
      calc.js with the term switched and put back; null without one. */
+  /* The previous term's levels and the start-of-term levels are read by
+     Proficiency and by every Focus Area block for the same student in one
+     render; they are kept until the current task ends (scores can't change
+     inside it). */
+  let _passCache = null;
+  function _pass(key, make) {
+    if (!_passCache) {
+      _passCache = {};
+      Promise.resolve().then(() => (_passCache = null));
+    }
+    if (!(key in _passCache)) _passCache[key] = make();
+    return _passCache[key];
+  }
   function _lastReportLevels(cid, sid, sections) {
+    const now = typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
+    const key = 'last|' + cid + '|' + sid + '|' + (now ? now.ordinal : '') + '|' + sections.map(s => s.id).join(',');
+    return _pass(key, () => _lastReportLevelsNow(cid, sid, sections));
+  }
+  function _lastReportLevelsNow(cid, sid, sections) {
     const now = typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
     if (!now) return null;
     const prev = (typeof getReportingTerms === 'function' ? getReportingTerms(cid) : [])
@@ -825,21 +845,15 @@ window.ReportBlocks = (function () {
     // letter class, with the proficiency word where it is on.
     const fig = v => {
       if (!(v > 0)) return '<span class="report-ct-none">—</span>';
-      const num = mode === 'letter' ? formatLevel(cid, v) : levelFigure(v);
+      // The class's figure: 3.2, 80%, or 3.2 · 80% for Both (calc.js).
+      const num = formatLevel(cid, v);
       const parts = [];
       if (showScore) parts.push(esc(num));
       if (showWord) parts.push(esc(_profWord(v)));
       if (!parts.length) parts.push(esc(num));
       return parts.join(' ');
     };
-    // The change in the figure the class reads: levels (+0.2), or points of
-    // a percent for a letter class (+5%).
-    const change = (a, b) => {
-      if (mode !== 'letter') return levelChange(a, b);
-      if (!(a > 0 && b > 0)) return '\u2014';
-      const d = Math.round((b / 4) * 100) - Math.round((a / 4) * 100);
-      return (d > 0 ? '+' : d < 0 ? '\u2212' : '') + Math.abs(d) + '%';
-    };
+    const change = (a, b) => levelChangeAs(cid, a, b);
     const colCount = 2 + (showChange ? 1 : 0) + (showAssessed ? 1 : 0) + 1;
     const head = (nameLabel, short) =>
       `<tr><th>${nameLabel}</th><th class="report-prof-n">${esc(short ? thenLabel.replace(/^(Term|Start of Term)$/, m => (m === 'Start of Term' ? 'Start' : m)) : thenLabel)}</th><th class="report-prof-n">${nowLabel}</th>${showChange ? '<th class="report-prof-n">Change</th>' : ''}${showAssessed ? `<th class="report-prof-n">${short ? 'Ev.' : 'Assessed'}</th>` : ''}</tr>`;
@@ -955,9 +969,9 @@ window.ReportBlocks = (function () {
         };
         const hi = ties(ranked, ranked[0]);
         const lo = ties(ranked.slice().reverse(), ranked[ranked.length - 1]);
-        facts += `<div class="report-prof-fact"><b>Highest now:</b> ${esc(names(hi))} ${esc(mode === 'letter' ? formatLevel(cid, hi[0].now) : levelFigure(hi[0].now))}.${work(hi, true)}</div>`;
+        facts += `<div class="report-prof-fact"><b>Highest now:</b> ${esc(names(hi))} ${esc(formatLevel(cid, hi[0].now))}.${work(hi, true)}</div>`;
         if (ranked.length > 1 && Math.round(lo[0].now * 10) !== Math.round(hi[0].now * 10)) {
-          facts += `<div class="report-prof-fact"><b>Lowest now:</b> ${esc(names(lo))} ${esc(mode === 'letter' ? formatLevel(cid, lo[0].now) : levelFigure(lo[0].now))}.${work(lo, false)}</div>`;
+          facts += `<div class="report-prof-fact"><b>Lowest now:</b> ${esc(names(lo))} ${esc(formatLevel(cid, lo[0].now))}.${work(lo, false)}</div>`;
         }
       }
     }
