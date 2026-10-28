@@ -851,6 +851,22 @@ test.describe('Page Studio', () => {
     await expect(card.locator('.studio-tpl-side .report-sheet')).toHaveCount(2);
     await expect(card.locator('.studio-tpl-side .report-student-name').first()).toHaveText(await previewName(page));
     await expect(card.locator('.studio-tpl-count')).toHaveText('1 sheet');
+    // Every side of every template sits inside its card: more sides draw smaller, none is cut off.
+    const cut = await palette(page)
+      .locator('.studio-tpl-thumbs')
+      .evaluateAll(boxes =>
+        boxes.flatMap(box => {
+          const edge = box.getBoundingClientRect().right;
+          return [...box.children]
+            .filter(s => s.getBoundingClientRect().right > edge + 0.5)
+            .map(() => box.closest('.studio-tpl').getAttribute('aria-label'));
+        }),
+      );
+    expect(cut).toEqual([]);
+    const sides = await palette(page)
+      .locator('.studio-tpl-thumbs')
+      .evaluateAll(boxes => boxes.map(b => b.children.length));
+    expect(Math.max(...sides)).toBeGreaterThan(2);
     await expect(
       palette(page).locator('.studio-tpl[data-starter="interim-update"] .studio-tpl-side .report-sheet'),
     ).toHaveCount(2);
