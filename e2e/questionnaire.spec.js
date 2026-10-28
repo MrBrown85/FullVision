@@ -359,3 +359,26 @@ test.describe('the BC card on a 1366 × 768 laptop', () => {
     await expect(page.locator('#tq-bc-card')).toBeHidden();
   });
 });
+
+test('end to end: rate, write from the bank, approve, move on, and the report prints it', async ({ page }) => {
+  await open(page);
+  await page.locator('[data-action="tqRate"][data-habit="part"][data-value="4"]').click();
+  const added = [];
+  for (const part of ['habits', 'now', 'go', 'how']) {
+    const row = page.locator(`.qn-part[data-part="${part}"] .qn-row:not(.added)`).first();
+    added.push(await row.getAttribute('data-text'));
+    await row.click();
+  }
+  await expect(page.locator('.qn-bc-count')).toHaveText('✓ 6 of 6 requirements');
+  await page.locator('#tq-approve').click();
+  await page.locator('#tq-save-next').click();
+  await expect(page.locator('.qn-name')).toHaveText('Noor Al-Rashid');
+  await expect(page.locator('#tq-ready')).toHaveText('1 of 27 Ready');
+  await expect(page.locator('#gb-sidebar .student-row[data-sid="st1"] .qn-tick')).toHaveText('✓');
+
+  await page.locator('#gb-sidebar .student-row[data-sid="st1"]').click();
+  await page.locator('[data-action="tqOpenReport"]').click();
+  const comment = page.locator('.report-sheet').first().locator('.report-comment-text');
+  for (const t of added) await expect(comment).toContainText(t);
+  expect(await overflow(page)).toEqual([]);
+});

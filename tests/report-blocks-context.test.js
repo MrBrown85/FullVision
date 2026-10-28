@@ -23,7 +23,7 @@ beforeEach(() => {
   savedRating = globalThis.getStudentTermRating;
   savedTerms = globalThis.getReportingTerms;
   globalThis.getStudentTermRating = (cid, sid, termId) =>
-    termId === 'term-2' ? { narrative: 'Cece has grown this term.', dims: { engagement: 4, collaboration: 3 } } : null;
+    termId === 'term-2' ? { narrative: 'Cece has grown this term.', habits: { completes: 4, others: 3 } } : null;
   globalThis.getReportingTerms = () => [
     { ordinal: 1, label: 'Term 1', starts_on: '2026-09-01', ends_on: '2026-11-14' },
     { ordinal: 2, label: 'Term 2', starts_on: '2026-11-15', ends_on: '2027-01-29' },
@@ -60,6 +60,19 @@ describe('report block renderers take the term as context', () => {
     const other = { termId: 'term-1', termLabel: 'Nov Report Card' };
     expect(ReportBlocks.renderReportBlock('teacher-narrative', CID, STUDENT, other)).toBe('');
     expect(ReportBlocks.renderReportBlock('learner-dimensions', CID, STUDENT, other)).toBe('');
+  });
+
+  it('the Teacher Comment prints plain text as paragraphs, one per line, and escapes it', () => {
+    const ctx2 = {
+      termId: 'term-2',
+      narrativeOverride: 'Cece asks <good> questions.\n\nNext: labs on time.\nKeep going.',
+    };
+    const html = ReportBlocks.renderReportBlock('teacher-narrative', CID, STUDENT, ctx2);
+    expect(html).toContain('<p>Cece asks &lt;good&gt; questions.</p><p>Next: labs on time.</p><p>Keep going.</p>');
+    const old = { termId: 'term-2', narrativeOverride: '<p>Saved by the old editor.</p>' };
+    expect(ReportBlocks.renderReportBlock('teacher-narrative', CID, STUDENT, old)).toContain(
+      '<p>Saved by the old editor.</p>',
+    );
   });
 
   it('every block renders with a context and no page', () => {

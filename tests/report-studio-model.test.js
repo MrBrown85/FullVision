@@ -679,13 +679,13 @@ describe('stage 3 blocks', () => {
     expect(ReportBlocks.renderReportBlock('term-attendance', CID, CECE, { termId: 'term-2' }, {})).toBe('');
   });
 
-  it('Learning Dispositions prints each rated disposition as how often, Rarely to Consistently', () => {
-    stub('getStudentTermRating', () => ({ dims: { engagement: 4, curiosity: 2, resilience: 0, respect: 1 } }));
+  it('Learning Dispositions prints each rated habit as how often, Rarely to Consistently', () => {
+    stub('getStudentTermRating', () => ({ habits: { completes: 4, part: 2, ready: 5, devices: 1 } }));
     const html = ReportBlocks.renderReportBlock('learner-dimensions', CID, CECE, { termId: 'term-2' }, {});
     expect(text(html)).toBe(
-      'Learning Dispositions Teacher observation · Rarely · Sometimes · Usually · Consistently Engagement Consistently Curiosity &amp; Exploration Sometimes Respect Rarely',
+      'Learning Dispositions Teacher observation · Rarely · Sometimes · Usually · Consistently Completes Work Consistently Takes Part Sometimes Uses Devices Well Rarely',
     );
-    expect(html).not.toMatch(/[●○]|Thriving|Developing/);
+    expect(html).not.toMatch(/[●○]|Thriving|Developing|Not Seen/);
     const all = text(
       ReportBlocks.renderReportBlock(
         'learner-dimensions',
@@ -695,8 +695,13 @@ describe('stage 3 blocks', () => {
         { rated: false, scale: false },
       ),
     );
-    expect(all).toContain('Resilience —');
+    expect(all).toContain('Works With Others —');
+    expect(all).not.toContain('Comes Ready');
     expect(all).not.toContain('Teacher observation');
+    stub('getStudentTermRating', () => ({ habits: { ready: 5 } }));
+    expect(ReportBlocks.renderReportBlock('learner-dimensions', CID, CECE, { termId: 'term-2' }, {})).toBe('');
+    stub('getStudentTermRating', () => ({ dims: { engagement: 4 } }));
+    expect(ReportBlocks.renderReportBlock('learner-dimensions', CID, CECE, { termId: 'term-2' }, {})).toBe('');
     stub('getStudentTermRating', () => ({ dims: {} }));
     expect(ReportBlocks.renderReportBlock('learner-dimensions', CID, CECE, { termId: 'term-2' }, {})).toBe('');
   });
