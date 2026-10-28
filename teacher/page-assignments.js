@@ -325,6 +325,15 @@ window.PageAssignments = (function () {
     }, 200);
   }
 
+  /* ── Assessment card icons ─────────────────────────────── */
+  var _RUBRIC_ICON =
+    '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5a2 2 0 012-2h13v16H6a2 2 0 00-2 2z"/><path d="M4 19V5"/></svg>';
+  var _WARNING_ICON =
+    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17v.5"/></svg>';
+  // Points right when closed; the open card turns it down.
+  var _CHEVRON_ICON =
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>';
+
   /* ── Filter menu ────────────────────────────────────────── */
   /* One Filter button holds the category filters and Ungraded Only; it
      reads "Filter · n" while any are on. Ticking keeps the menu open;
@@ -911,6 +920,7 @@ window.PageAssignments = (function () {
         '<div class="assess-header" data-action="toggleAssess" data-aid="' +
         a.id +
         '">' +
+        '<span class="assess-grip" aria-hidden="true" title="Drag to reorder">⠿</span>' +
         '<div class="assess-header-info">' +
         '<span class="assess-title">' +
         esc(a.title) +
@@ -939,7 +949,7 @@ window.PageAssignments = (function () {
         (a.rubricId
           ? (function () {
               var r = getRubricById(cid, a.rubricId);
-              return r ? '<span class="rubric-badge">' + esc(r.name) + '</span>' : '';
+              return r ? '<span class="rubric-badge">' + _RUBRIC_ICON + esc(r.name) + '</span>' : '';
             })()
           : '') +
         (a.coreCompetencyIds || [])
@@ -978,9 +988,10 @@ window.PageAssignments = (function () {
               }).length;
               if (unscoredCount > 0)
                 return (
-                  '<span style="font-size:0.75rem;color:var(--priority);margin-left:6px" title="' +
+                  '<span class="assess-missing" title="' +
                   unscoredCount +
-                  ' students unscored past due date">\u26A0\uFE0E ' +
+                  ' students unscored past due date">' +
+                  _WARNING_ICON +
                   unscoredCount +
                   ' missing</span>'
                 );
@@ -1000,7 +1011,7 @@ window.PageAssignments = (function () {
                 segAttr(!showRubric) +
                 ' data-action="setRubricView" data-aid="' +
                 a.id +
-                '" data-rubric="false">Tags</button>' +
+                '" data-rubric="false">Competencies</button>' +
                 '<button class="seg-btn rubric-view-btn"' +
                 segAttr(showRubric) +
                 ' data-action="setRubricView" data-aid="' +
@@ -1010,7 +1021,9 @@ window.PageAssignments = (function () {
                 (showRubric && _isAdvancedRubric(getRubricById(cid, a.rubricId)) ? _checklistModeHtml() : '') +
                 '<button class="rubric-print-btn" data-action="printRubrics" data-aid="' +
                 a.id +
-                '" title="Print a graded rubric for each student">Print Rubrics</button>'
+                '" title="Print a graded rubric for each student">' +
+                _GRADER_PRINTER +
+                'Print Rubrics</button>'
               );
             })()
           : !isPointsScored(a)
@@ -1024,7 +1037,9 @@ window.PageAssignments = (function () {
               })
                 ? 'tag'
                 : 'general') +
-              ' rubric for each student">Print Rubrics</button>'
+              ' rubric for each student">' +
+              _GRADER_PRINTER +
+              'Print Rubrics</button>'
             : '') +
         '<button class="assess-header-action-btn" data-action="editAssess" data-aid="' +
         a.id +
@@ -1042,8 +1057,8 @@ window.PageAssignments = (function () {
         LINE_ICONS.trash +
         '</button>' +
         '</div>' +
-        '<span class="assess-chevron">' +
-        (isOpen ? '\u25BE' : '\u25B8') +
+        '<span class="assess-chevron" aria-hidden="true">' +
+        _CHEVRON_ICON +
         '</span>' +
         '</div>' +
         '<div class="assess-body">' +
