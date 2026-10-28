@@ -1017,7 +1017,7 @@ test.describe('Printed progress reports', () => {
     await expect(meta.locator('.report-period')).toHaveText(
       await page.locator('#report-period option:checked').innerText(),
     );
-    await expect(meta).toContainText(/\w{3} \d{1,2} – \w{3} \d{1,2}, \d{4}/);
+    await expect(meta).toContainText(/\w{3} \d{1,2}(, \d{4})? – \w{3} \d{1,2}, \d{4}/);
     await expect(meta).toContainText(/Student No\. STU-\d+/);
     await expect(page.locator('.report-sheet').first().locator('.sheet-footer')).toContainText(
       'Ethan Dubois · Page 1 of 2',
