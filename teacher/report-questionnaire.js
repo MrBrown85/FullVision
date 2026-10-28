@@ -196,6 +196,7 @@ window.ReportQuestionnaire = (function () {
   }
   function _syncNote() {
     _syncQuotedSoon();
+    _syncRows();
     var el = _box();
     var note = document.getElementById('tq-text-note');
     if (el && note)
@@ -374,6 +375,7 @@ window.ReportQuestionnaire = (function () {
     if (chip) chip.outerHTML = _attChip(att);
     abs.classList.toggle('warn', att.absences != null && att.prevAbsences != null && att.absences < att.prevAbsences);
     late.classList.toggle('warn', att.lates != null && att.prevLates != null && att.lates < att.prevLates);
+    _redrawBank();
   }
 
   /* ── The student strip ───────────────────────────────────── */
@@ -688,8 +690,275 @@ window.ReportQuestionnaire = (function () {
     if (ev) ev.innerHTML = _obsHtml(_activeCourse, f, comment);
   }
 
-  function _bankHtml() {
+  /* ── The Comment Bank ────────────────────────────────────── */
+
+  /* The teacher's picks that are not saved: the note to quote and the I Can
+     per Focus Area, for each student, this session. The Focus Area is saved
+     on the rating (focusSectionId) so the report's Next Steps follow it. */
+  var _picks = {};
+  var _more = {};
+  function _picksFor(sid) {
+    if (!_picks[sid]) _picks[sid] = { note: null, ican: {} };
+    return _picks[sid];
+  }
+
+  /* Classmates' comments this report, for "used for 3 or more classmates". */
+  function _classmateComments(cid, sid, termId) {
+    var all = getTermRatings(cid) || {};
+    return Object.keys(all)
+      .filter(function (k) {
+        return k !== sid && all[k] && all[k][termId] && all[k][termId].narrative;
+      })
+      .map(function (k) {
+        return plainComment(all[k][termId].narrative);
+      });
+  }
+
+  function _bankContext(cid, student, f) {
+    var rating = getStudentTermRating(cid, student.id, getTermId()) || {};
+    var picks = _picksFor(student.id);
+    return CommentBank.context(f, {
+      habits: rating.habits || {},
+      focus: rating.focusSectionId || f.focusId,
+      ican: (picks.ican || {})[rating.focusSectionId || f.focusId] || 0,
+      note: picks.note,
+    });
+  }
+
+  function _ratingsHtml(cid, f, ctx) {
+    var stored = (getStudentTermRating(cid, f.sid, getTermId()) || {}).habits || {};
+    var rated = CommentBank.HABITS.filter(function (h) {
+      return ctx._habits[h.key] != null;
+    }).length;
+    var rows = CommentBank.HABITS.map(function (h) {
+      var v = ctx._habits[h.key];
+      var auto = h.key === 'completes' && v != null && stored.completes == null;
+      var note =
+        v == null
+          ? '<span class="qn-rate-note waiting">Not rated</span>'
+          : auto
+            ? `<span class="qn-rate-note">From assignments · ${f.record.handed} of ${f.record.total}, ${f.record.late} late, ${f.record.missing} missing</span>`
+            : '';
+      var opts = CommentBank.SCALE.map(function (label, i) {
+        var val = i + 1;
+        var on = v === val;
+        return `<button type="button" class="qn-rate-opt${on ? ' on' : ''}${val === CommentBank.NOT_SEEN ? ' not-seen' : ''}" data-action="tqRate" data-habit="${h.key}" data-value="${val}" aria-pressed="${on}">${label}</button>`;
+      }).join('');
+      var title = h.hint.replace('{his}', f.pronouns.poss);
+      return `<div class="qn-rate">
+        <div class="qn-rate-head"><span class="qn-rate-name">${esc(h.name)}</span><span class="qn-rate-hint">${esc(title)}</span><span class="qn-fill"></span>${note}</div>
+        <div class="qn-rate-opts" role="group" aria-label="${esc(h.name)}">${opts}</div>
+      </div>`;
+    }).join('');
+    return `<div class="qn-rates">
+      <div class="qn-rates-head"><span>How Often You’ve Seen It This Term</span><span class="qn-card-sub">${rated} of 6 rated</span></div>
+      ${rows}
+    </div>`;
+  }
+
+  function _choosersHtml(cid, f, ctx, part) {
+    var chooser = function (label, opts) {
+      return `<div class="qn-chooser"><span class="qn-chooser-label">${esc(label)}</span>${opts
+        .map(function (o) {
+          return `<button type="button" class="qn-choice${o.on ? ' on' : ''}" data-action="${o.action}" data-value="${esc(o.value)}" aria-pressed="${o.on}">${esc(o.label)}</button>`;
+        })
+        .join('')}</div>`;
+    };
+    if (part === 'now' && f.obs.length) {
+      return chooser(
+        'Note to Quote',
+        f.obs.map(function (o) {
+          return {
+            action: 'tqPickNote',
+            value: o.id,
+            on: !!ctx._note && ctx._note.id === o.id,
+            label: o.day + (o.dims && o.dims[0] ? ' · ' + _tagLabel(o.dims[0]) : ''),
+          };
+        }),
+      );
+    }
+    if (part === 'go' && ctx._options.length) {
+      var focus = ctx._focus;
+      var html = chooser(
+        'Focus Area',
+        ctx._options.map(function (c) {
+          return {
+            action: 'tqPickFocus',
+            value: c.id,
+            on: !!focus && focus.id === c.id,
+            label: c.name + ' ' + formatLevel(cid, c.start) + ' → ' + formatLevel(cid, c.now),
+          };
+        }),
+      );
+      if (focus && focus.iCans.length) {
+        html += chooser(
+          'I Can',
+          focus.iCans.map(function (s) {
+            return {
+              action: 'tqPickICan',
+              value: String(focus.iCans.indexOf(s)),
+              on: ctx.nextStep === s,
+              label: s.replace(/^I can /i, '').replace(/\.$/, ''),
+            };
+          }),
+        );
+      }
+      return html;
+    }
     return '';
+  }
+
+  function _rowHtml(r) {
+    var meta = [];
+    if (r.repeats) meta.push('Starts like your last sentence');
+    if (r.crowded) meta.push('Used for ' + r.used + ' classmates this term');
+    return `${r.first ? `<div class="qn-group">${esc(r.group)}</div>` : ''}<button type="button" class="qn-row${r.added ? ' added' : ''}" data-action="tqAdd" data-id="${r.id}" data-text="${esc(r.text)}" aria-label="${esc((r.added ? 'Added: ' : 'Add: ') + r.text)}">
+        <span class="qn-row-body"><span class="qn-row-text">${esc(r.text)}</span><span class="qn-row-meta"${meta.length ? '' : ' hidden'}>${esc(meta.join(' · '))}</span></span>
+        <span class="qn-pill">${r.added ? '✓ Added' : 'Add'}</span>
+      </button>`;
+  }
+
+  function _bankHtml(cid, student, f) {
+    if (_commentTab !== 'this') {
+      return `<div class="qn-card"><div class="qn-card-title">Comment Bank</div><div class="qn-empty">The bank builds this report’s comment. Choose This Report on the Teacher Comment to use it.</div></div>`;
+    }
+    var termId = getTermId();
+    var ctx = _bankContext(cid, student, f);
+    var text = plainComment((getStudentTermRating(cid, student.id, termId) || {}).narrative || '');
+    var el = _box();
+    if (el && el.dataset.sid === student.id) text = el.value;
+    var parts = CommentBank.parts(ctx, text, {
+      more: _more,
+      comments: _classmateComments(cid, student.id, termId),
+    });
+    var first = displayNameFirst(student);
+    var fit = parts.reduce(function (n, p) {
+      return n + p.fit;
+    }, 0);
+    var html = parts
+      .map(function (p) {
+        return `<div class="qn-part" data-part="${p.id}">
+          <div class="qn-part-head"><span class="qn-part-title"><span class="qn-part-n">${p.n}</span>${esc(p.title)}</span><span class="qn-card-sub">${p.fit} fit ${esc(first)}</span></div>
+          ${p.id === 'habits' ? _ratingsHtml(cid, f, ctx) : ''}
+          ${_choosersHtml(cid, f, ctx, p.id)}
+          ${p.rows.map(_rowHtml).join('')}
+          <div class="qn-part-foot"><span class="qn-card-sub">${p.waiting ? p.waiting + ' more appear once ' + esc(first) + ' has the ratings or data they use' : ''}</span>${
+            p.canMore
+              ? `<button type="button" class="qn-link" data-action="tqMore" data-part="${p.id}">${p.more ? 'Show Fewer' : 'Show All ' + p.fit}</button>`
+              : ''
+          }</div>
+        </div>`;
+      })
+      .join('');
+    return `<div class="qn-card qn-bank-card">
+      <div class="qn-card-row"><div class="qn-card-title">Comment Bank</div><div class="qn-card-sub">${COMMENT_BANK.sentences.length} sentences · ${fit} fit ${esc(first)}</div></div>
+      <div class="qn-bank-hint">Add puts a sentence, filled in for ${esc(first)}, at the end of your comment. Sentences you have used for ${CommentBank.USED_BY} or more classmates this term sit at the bottom of each list.</div>
+      ${html}
+    </div>`;
+  }
+
+  /* Redraws only the bank column, where it was scrolled to. */
+  function _redrawBank() {
+    var st = _current();
+    var col = document.getElementById('tq-bank');
+    if (!st || !col) return;
+    var top = col.scrollTop;
+    col.innerHTML = _bankHtml(_activeCourse, st, CommentBank.facts(_activeCourse, st, getTermId()));
+    col.scrollTop = top;
+  }
+
+  /* After the comment changes: each row's Added and "starts like" note, in
+     place. */
+  function _syncRows() {
+    var el = _box();
+    if (!el) return;
+    var text = el.value;
+    var last =
+      (
+        text
+          .trim()
+          .split(/(?<=[.!?”])\s+/)
+          .pop() || ''
+      ).split(/\s+/)[0] || '';
+    document.querySelectorAll('#tq-bank .qn-row').forEach(function (row) {
+      var t = row.dataset.text || '';
+      var added = text.indexOf(t) >= 0;
+      row.classList.toggle('added', added);
+      row.setAttribute('aria-label', (added ? 'Added: ' : 'Add: ') + t);
+      var pill = row.querySelector('.qn-pill');
+      if (pill) pill.textContent = added ? '✓ Added' : 'Add';
+      var meta = row.querySelector('.qn-row-meta');
+      if (meta) {
+        var bits = meta.textContent.split(' · ').filter(function (b) {
+          return b && b !== 'Starts like your last sentence';
+        });
+        if (!added && last && t.split(/\s+/)[0] === last) bits.unshift('Starts like your last sentence');
+        meta.textContent = bits.join(' · ');
+        meta.hidden = !bits.length;
+      }
+    });
+  }
+
+  /* Add: the filled sentence at the end of the comment, typed in so ⌘Z
+     undoes it; the row shows ✓ Added where it is. */
+  function tqAdd(btn) {
+    var el = _box();
+    var t = btn && btn.dataset.text;
+    if (!el || !t || el.value.indexOf(t) >= 0) return;
+    var end = el.value.replace(/\s+$/, '');
+    var add = (end ? (/\n$/.test(el.value) ? '' : ' ') : '') + t;
+    el.focus();
+    el.setSelectionRange(end.length, el.value.length);
+    var ok = false;
+    try {
+      ok = document.execCommand('insertText', false, add);
+    } catch (e) {
+      ok = false;
+    }
+    if (!ok) el.value = end + add;
+    el.scrollTop = el.scrollHeight;
+    tqNarrativeDirty = true;
+    tqSaveNarrative();
+    _syncNote();
+    _syncRows();
+  }
+
+  /* A habit picked on the scale: saved with the others (the whole map). */
+  function tqRate(key, value) {
+    var st = _current();
+    if (!st) return;
+    tqSaveCurrentIfNeeded();
+    var termId = getTermId();
+    var habits = Object.assign({}, (getStudentTermRating(_activeCourse, st.id, termId) || {}).habits || {});
+    habits[key] = Number(value);
+    upsertTermRating(_activeCourse, st.id, termId, { habits: habits });
+    _redrawBank();
+  }
+  function tqPickNote(id) {
+    var st = _current();
+    if (!st) return;
+    _picksFor(st.id).note = id;
+    _redrawBank();
+  }
+  function tqPickFocus(id) {
+    var st = _current();
+    if (!st) return;
+    tqSaveCurrentIfNeeded();
+    upsertTermRating(_activeCourse, st.id, getTermId(), { focusSectionId: id });
+    _redrawBank();
+  }
+  function tqPickICan(i) {
+    var st = _current();
+    if (!st) return;
+    var rating = getStudentTermRating(_activeCourse, st.id, getTermId()) || {};
+    var f = CommentBank.facts(_activeCourse, st, getTermId());
+    var focus = rating.focusSectionId || f.focusId;
+    _picksFor(st.id).ican[focus] = Number(i) || 0;
+    _redrawBank();
+  }
+  function tqMore(part) {
+    _more[part] = !_more[part];
+    _redrawBank();
   }
 
   /* ── The Teacher Comment ─────────────────────────────────── */
@@ -857,6 +1126,12 @@ window.ReportQuestionnaire = (function () {
     tqCommentTab: tqCommentTab,
     tqRosterFilter: tqRosterFilter,
     tqEvidenceTab: tqEvidenceTab,
+    tqAdd: tqAdd,
+    tqRate: tqRate,
+    tqPickNote: tqPickNote,
+    tqPickFocus: tqPickFocus,
+    tqPickICan: tqPickICan,
+    tqMore: tqMore,
     cardsOn: cardsOn,
     tqSetAttendance: tqSetAttendance,
     tqSelectStudent: tqSelectStudent,

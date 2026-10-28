@@ -277,7 +277,9 @@ window.CommentBank = (function () {
     var mode = courseGradeMode(cid);
     var letter =
       mode !== 'proficiency' && typeof getCourseLetterData === 'function' ? getCourseLetterData(cid, sid) : null;
-    var focus = ReportBlocks.focusArea(cid, student, { termId: termId }, 'focus');
+    // The report's own Focus Area before any pick (the biggest change), so
+    // the choices keep their order when the teacher picks one.
+    var focus = ReportBlocks.focusArea(cid, student, { termId: termId }, 'change');
     var att = getTermAttendance(cid, sid, termId) || {};
     var rating = getStudentTermRating(cid, sid, termId) || {};
 
@@ -300,6 +302,7 @@ window.CommentBank = (function () {
       levelText: function (v) {
         return mode === 'letter' ? formatLevel(cid, v) : levelWord(cid, v);
       },
+      defaultFocusId: (focus && focus.sec && focus.sec.id) || null,
       focusId: rating.focusSectionId || (focus && focus.sec && focus.sec.id) || null,
       absent: att.absencesThisTerm,
       late: att.latesThisTerm,
@@ -319,7 +322,7 @@ window.CommentBank = (function () {
       return cb - ca || a.now - b.now;
     });
     var first = withLevels.find(function (c) {
-      return c.id === f.focusId;
+      return c.id === (f.defaultFocusId || f.focusId);
     });
     var out = first ? [first] : [];
     sorted.forEach(function (c) {
@@ -374,9 +377,19 @@ window.CommentBank = (function () {
         return c.id === picks.focus;
       }) || options[0];
     var iCan = focus && focus.iCans.length ? focus.iCans[Math.min(picks.ican || 0, focus.iCans.length - 1)] : '';
+    // Strengths are the highest levels now; the areas to grow, the two
+    // lowest (only below the highest, so an even term names none).
     var byNow = f.comps.slice().sort(function (a, b) {
       return b.level - a.level;
     });
+    var highest = byNow.length ? tenths(byNow[0].level) : 0;
+    var lowest = byNow
+      .slice()
+      .reverse()
+      .filter(function (c) {
+        return tenths(c.level) < highest;
+      })
+      .slice(0, 2);
 
     // Work: best and lowest this term.
     var best = f.work.slice().sort(function (a, b) {
@@ -469,7 +482,7 @@ window.CommentBank = (function () {
       strengths: list(
         byNow
           .filter(function (c) {
-            return !focus || c.id !== focus.id;
+            return lowest.indexOf(c) < 0;
           })
           .slice(0, 2)
           .map(function (c) {
@@ -477,7 +490,7 @@ window.CommentBank = (function () {
           }),
       ),
       growthAreas: list(
-        options.slice(0, 2).map(function (c) {
+        lowest.map(function (c) {
           return c.name;
         }),
       ),

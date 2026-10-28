@@ -1715,6 +1715,24 @@ window.PageReports = (function () {
       tqEvidenceTab: function () {
         RQ.tqEvidenceTab(el.dataset.tab);
       },
+      tqAdd: function () {
+        RQ.tqAdd(el);
+      },
+      tqRate: function () {
+        RQ.tqRate(el.dataset.habit, el.dataset.value);
+      },
+      tqPickNote: function () {
+        RQ.tqPickNote(el.dataset.value);
+      },
+      tqPickFocus: function () {
+        RQ.tqPickFocus(el.dataset.value);
+      },
+      tqPickICan: function () {
+        RQ.tqPickICan(el.dataset.value);
+      },
+      tqMore: function () {
+        RQ.tqMore(el.dataset.part);
+      },
     };
     if (handlers[action]) {
       handlers[action]();
