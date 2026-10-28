@@ -166,7 +166,7 @@ create table rubric (
   course_id  uuid        not null references course(id) on delete cascade,
   name       text        not null,
   copy_group uuid,                                                    -- shared by a rubric and its copies in the teacher's other classes; null = never copied (20261018_rubric_copy_group)
-  style      text        not null default 'standard',                 -- standard | advanced: checkboxes inside each level cell (20261022_advanced_rubric_checks)
+  style      text        not null default 'standard',                 -- standard | advanced: checkboxes inside each level cell (20261022_advanced_rubric_checks) | single_point: the Proficient standard only, with Work On and Went Beyond notes (20261027_single_point_rubric)
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -297,7 +297,8 @@ create table rubric_score (
   criterion_id  uuid        not null references criterion(id)  on delete cascade,
   value         integer,                                             -- 1..4; null = no level yet, the row holds only its comment (20261027_score_comments)
   modifier      smallint    not null default 0,                      -- −1 | 0 | +1, as tag_score (20261013_proficiency_plus_minus)
-  comment       text,                                                -- the teacher's note on this criterion, printed on the rubric handout (20261018_rubric_score_comment)
+  comment       text,                                                -- the teacher's note on this criterion, printed on the rubric handout (20261018_rubric_score_comment); Work On on a single-point rubric
+  beyond        text,                                                -- Went Beyond, single-point rubrics (20261027_single_point_rubric)
   updated_at    timestamptz not null default now(),
   unique (enrollment_id, assessment_id, criterion_id)
 );
@@ -739,7 +740,7 @@ create table phone_report_student (
 --   upsert_module / delete_module / reorder_modules(p_ids uuid[])
 --   save_categories / upsert_category / delete_category
 --   upsert_rubric(p_id, p_course_id, p_name, p_criteria jsonb, p_copy_group uuid, p_idempotency_key uuid,
---                 p_style text) / delete_rubric                      -- (2026-10-22) p_style 'standard' | 'advanced'; each criterion may carry checks: [{ id?, level, label, display_order }]
+--                 p_style text) / delete_rubric                      -- (2026-10-22) p_style 'standard' | 'advanced' | 'single_point' (2026-10-27); each criterion may carry checks: [{ id?, level, label, display_order }]
 --   list_rubric_copies(p_copy_group uuid)                             -- (2026-10-18) live copies across the teacher's classes
 --   save_competency_descriptors(p_entries jsonb) / list_competency_descriptors()  -- (2026-10-18) the teacher's own level wording per competency
 --
@@ -776,7 +777,8 @@ create table phone_report_student (
 --   upsert_tag_score(p_enrollment_id uuid, p_assessment_id uuid, p_tag_id uuid,
 --                    p_value integer, p_modifier smallint default 0, p_comment text default null)
 --   upsert_rubric_score(p_enrollment_id uuid, p_assessment_id uuid, p_criterion_id uuid,
---                       p_value integer, p_modifier smallint default 0, p_comment text default null)
+--                       p_value integer, p_modifier smallint default 0, p_comment text default null,
+--                       p_beyond text default null)   -- p_beyond (20261027_single_point_rubric) follows p_comment's rules
 --                       -- both: null p_comment keeps the saved comment, '' clears it; a 0/null value keeps
 --                       -- the row as comment-only while a comment remains, else deletes it (20261027_score_comments)
 --   fill_rubric(p_enrollment_id uuid, p_assessment_id uuid, p_value integer)

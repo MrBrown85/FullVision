@@ -3235,13 +3235,14 @@ function _pushHydratedScore(scores, sid, entry) {
     return candidate.assessmentId === entry.assessmentId && (candidate.tagId || '') === keyTag;
   });
   if (existing) {
-    // A criterion comment the server no longer has is gone here too.
+    // A criterion note the server no longer has is gone here too.
     if (!entry.critNote) delete existing.critNote;
+    if (!entry.critBeyond) delete existing.critBeyond;
     Object.assign(existing, entry);
   } else scores[sid].push(entry);
 }
 
-function _scoreEntryFromCanonical(cid, assessment, tagId, value, comment, modifier, criterionComment) {
+function _scoreEntryFromCanonical(cid, assessment, tagId, value, comment, modifier, criterionComment, criterionBeyond) {
   var entry = {
     // Deterministic, so loading the same server data twice writes the same
     // localStorage string: a changing value here made every load look like an
@@ -3260,6 +3261,8 @@ function _scoreEntryFromCanonical(cid, assessment, tagId, value, comment, modifi
   // The teacher's note on a rubric criterion (set on every score key the
   // criterion fans out to) or on a competency, printed on the rubric handout.
   if (criterionComment) entry.critNote = String(criterionComment);
+  // A single-point rubric's Went Beyond note (rubric_score.beyond).
+  if (criterionBeyond) entry.critBeyond = String(criterionBeyond);
   return entry;
 }
 
@@ -3395,6 +3398,7 @@ async function _hydrateAssessmentDetails(cid) {
                 comment,
                 rubricScore.modifier,
                 rubricScore.comment,
+                rubricScore.beyond,
               ),
             );
           });
@@ -3634,6 +3638,7 @@ function _gradebookCellsToScoreCache(cid, assessments, cells) {
               comment,
               rubricScore.modifier,
               rubricScore.comment,
+              rubricScore.beyond,
             ),
           );
         });
@@ -3903,7 +3908,14 @@ function _bundleCells(gb) {
   sorted(gb.criterion_rows).forEach(function (r) {
     var cell = cellFor(r[0], r[1]);
     if (cell && criteria[r[2]])
-      cell.rubric_scores.push({ criterion_id: criteria[r[2]], value: r[3], modifier: r[4], comment: r[5] || null });
+      // A seventh value, Went Beyond, from migrations/20261027_single_point_rubric.sql.
+      cell.rubric_scores.push({
+        criterion_id: criteria[r[2]],
+        value: r[3],
+        modifier: r[4],
+        comment: r[5] || null,
+        beyond: r[6] || null,
+      });
   });
   // A points-scored assessment is scored as a whole; get_assessment_detail
   // ignored any competency scores left on it, and so does this.
@@ -4894,6 +4906,7 @@ function _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note, mod) {
     // A criterion comment typed before the level was chosen waits in the
     // cache; it goes up with the level. Null leaves the server's comment.
     var criterionComment = _rubricCriterionCommentFor(cid, sid, aid, tid) || null;
+    var criterionBeyond = _rubricCriterionNoteFor(cid, sid, aid, tid, 'critBeyond') || null;
     if (criterion) {
       ops.push({
         rpc: 'upsert_rubric_score',
@@ -4904,6 +4917,7 @@ function _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note, mod) {
           p_value: intVal,
           p_modifier: modifier,
           p_comment: criterionComment,
+          p_beyond: criterionBeyond,
         },
       });
     } else if (isPoints || isUnlinkedTag(tid) || (assessment && !isAssessmentTag && !criterionForTag)) {
@@ -4942,6 +4956,7 @@ function _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note, mod) {
             p_value: intVal,
             p_modifier: modifier,
             p_comment: criterionComment,
+            p_beyond: criterionBeyond,
           },
         });
       }
@@ -4971,35 +4986,49 @@ function _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note, mod) {
   }
 }
 
-/* ── Rubric criterion comments ─────────────────────────────────────────
-   A short note on one criterion of a rubric assessment, printed under that
-   row on the rubric handout (teacher/rubric-print.js). It lives on
-   rubric_score.comment and, in the cache, as `critNote` on each score key
-   the criterion fans out to. */
+/* ── Rubric criterion notes ────────────────────────────────────────────
+   Two notes on one criterion of a rubric assessment, printed under that
+   row on the rubric handout (teacher/rubric-print.js):
+   - the comment ("Work On" on a single-point rubric): rubric_score.comment,
+     cached as `critNote`;
+   - Went Beyond, single-point rubrics only: rubric_score.beyond, cached as
+     `critBeyond`.
+   Each is set on every score key the criterion fans out to. */
+var _CRITERION_NOTE_PARAMS = { critNote: 'p_comment', critBeyond: 'p_beyond' };
 
-/* The cached comment for the criterion holding score key `tid`. */
-function _rubricCriterionCommentFor(cid, sid, aid, tid) {
+/* The cached note (`field`) for the criterion holding score key `tid`. */
+function _rubricCriterionNoteFor(cid, sid, aid, tid, field) {
   var entries = getScores(cid)[sid] || [];
   var entry = entries.find(function (e) {
     return e && e.assessmentId === aid && e.tagId === tid;
   });
-  return entry && entry.critNote ? entry.critNote : '';
+  return entry && entry[field] ? entry[field] : '';
+}
+function _rubricCriterionCommentFor(cid, sid, aid, tid) {
+  return _rubricCriterionNoteFor(cid, sid, aid, tid, 'critNote');
 }
 
-/* The criterion's comment, from whichever of its keys holds one. */
-function getRubricCriterionComment(cid, sid, aid, criterion) {
+/* The criterion's note, from whichever of its keys holds one. */
+function _getRubricCriterionNote(cid, sid, aid, criterion, field) {
   var keys = rubricCriterionScoreKeys(criterion);
   for (var i = 0; i < keys.length; i++) {
-    var note = _rubricCriterionCommentFor(cid, sid, aid, keys[i]);
+    var note = _rubricCriterionNoteFor(cid, sid, aid, keys[i], field);
     if (note) return note;
   }
   return '';
 }
+function getRubricCriterionComment(cid, sid, aid, criterion) {
+  return _getRubricCriterionNote(cid, sid, aid, criterion, 'critNote');
+}
+function getRubricCriterionBeyond(cid, sid, aid, criterion) {
+  return _getRubricCriterionNote(cid, sid, aid, criterion, 'critBeyond');
+}
 
-/* Save (or clear, with '') the comment on one criterion. The cache changes
-   at once and the server row follows; with no level yet the row holds only
-   the comment (rubric_score.value null, migrations/20261027_score_comments.sql). */
-function saveRubricCriterionComment(cid, sid, aid, criterionId, text) {
+/* Save (or clear, with '') one note on one criterion. The cache changes at
+   once and the server row follows; with no level yet the row holds only
+   its notes (rubric_score.value null, migrations/20261027_score_comments.sql).
+   The other note is sent as null, which keeps it. */
+function _saveRubricCriterionNote(cid, sid, aid, criterionId, text, field) {
   var assessment = _assessmentById(cid, aid);
   var criterion = _rubricCriterionById(cid, assessment, criterionId);
   if (!criterion) return false;
@@ -5027,9 +5056,9 @@ function saveRubricCriterionComment(cid, sid, aid, criterionId, text) {
       };
       scores[sid].push(entry);
     }
-    if ((entry.critNote || '') !== note) changed = true;
-    if (note) entry.critNote = note;
-    else delete entry.critNote;
+    if ((entry[field] || '') !== note) changed = true;
+    if (note) entry[field] = note;
+    else delete entry[field];
     if (Number(entry.score) > 0 && !level) {
       level = Number(entry.score);
       mod = normalizeScoreMod(level, entry.mod);
@@ -5040,15 +5069,16 @@ function saveRubricCriterionComment(cid, sid, aid, criterionId, text) {
   var lsOk = _safeLSSet('gb-scores-' + cid, JSON.stringify(scores));
   _markLocalWrite('scores', cid);
   if (_writesEnabled() && _isSendableId(sid) && _isSendableId(aid) && _isSendableId(criterionId)) {
+    var params = {
+      p_enrollment_id: sid,
+      p_assessment_id: aid,
+      p_criterion_id: criterionId,
+      p_value: level || null,
+      p_modifier: mod,
+    };
+    params[_CRITERION_NOTE_PARAMS[field]] = note;
     _trackPendingSync(
-      _writeRpc('upsert_rubric_score', {
-        p_enrollment_id: sid,
-        p_assessment_id: aid,
-        p_criterion_id: criterionId,
-        p_value: level || null,
-        p_modifier: mod,
-        p_comment: note,
-      }).then(function (res) {
+      _writeRpc('upsert_rubric_score', params).then(function (res) {
         if (res.error) _reportScoreWriteFailure('upsert_rubric_score', res.error);
       }),
     );
@@ -5058,6 +5088,12 @@ function saveRubricCriterionComment(cid, sid, aid, criterionId, text) {
   }
   _broadcastChange(cid, 'scores');
   return lsOk;
+}
+function saveRubricCriterionComment(cid, sid, aid, criterionId, text) {
+  return _saveRubricCriterionNote(cid, sid, aid, criterionId, text, 'critNote');
+}
+function saveRubricCriterionBeyond(cid, sid, aid, criterionId, text) {
+  return _saveRubricCriterionNote(cid, sid, aid, criterionId, text, 'critBeyond');
 }
 
 /* ── Competency comments ───────────────────────────────────────────────
@@ -5128,7 +5164,8 @@ function _scoreEntryRemoteChanged(a, b) {
     (a.score || 0) !== (b.score || 0) ||
     (a.mod || 0) !== (b.mod || 0) ||
     (a.note || '') !== (b.note || '') ||
-    (a.critNote || '') !== (b.critNote || '')
+    (a.critNote || '') !== (b.critNote || '') ||
+    (a.critBeyond || '') !== (b.critBeyond || '')
   );
 }
 
@@ -7096,10 +7133,11 @@ function _rubricCriteriaPayload(rubric) {
     return payload;
   });
 }
-/* 'advanced' when the rubric says so; anything else, a missing field
-   included, is a Standard rubric. */
+/* 'advanced' or 'single_point' when the rubric says so; anything else, a
+   missing field included, is a Standard rubric. */
+var RUBRIC_STYLES = ['standard', 'advanced', 'single_point'];
 function rubricStyle(rubric) {
-  return rubric && rubric.style === 'advanced' ? 'advanced' : 'standard';
+  return rubric && RUBRIC_STYLES.indexOf(rubric.style) > 0 ? rubric.style : 'standard';
 }
 async function _loadCanonicalRubrics(cid) {
   var sb = getSupabase();
@@ -10179,7 +10217,7 @@ window.v2.upsertRubric = function (params, options) {
       p_name: params.name || '',
       p_criteria: criteria,
       p_copy_group: _isUuid(params.copyGroup) ? params.copyGroup : null,
-      p_style: params.style === 'advanced' ? 'advanced' : 'standard',
+      p_style: rubricStyle({ style: params.style }),
     },
     options,
   );
