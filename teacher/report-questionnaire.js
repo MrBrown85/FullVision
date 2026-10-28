@@ -73,7 +73,7 @@ window.ReportQuestionnaire = (function () {
      and line breaks become new lines, tags go, entities are read. */
   function plainComment(stored) {
     var s = String(stored || '');
-    if (!/<[a-z][\s\S]*>/i.test(s)) return s;
+    if (!/<\/?(p|div|br|ul|ol|li|b|i|u|strong|em|span)\b[^>]*>/i.test(s)) return s;
     s = s
       .replace(/<br\s*\/?>/gi, '\n')
       .replace(/<\/(p|div|li|h[1-6])\s*>/gi, '\n')

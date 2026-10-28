@@ -39,7 +39,7 @@ The app persists teacher data through Supabase Auth plus a public RPC surface. I
   - `page-student.js`
   - `page-gradebook.js`
   - `page-observations.js`
-  - `page-reports.js`
+  - `page-reports.js`: Reports, with two tabs. The Term Questionnaire is `report-questionnaire.js` (one student at a time: the student strip, What FullVision Has, the Comment Bank, the Teacher Comment and the BC Written Learning Update card); its Comment Bank is data in `shared/comment-bank.js` and a pure engine in `teacher/comment-bank.js` (`facts` reads one student's term from the data layer; `context`, `fits`, `fill`, `parts` decide what is offered; nothing writes a sentence). Progress Reports are `report-studio.js`, `report-sheets.js` (forms, layout and fit) and `report-blocks.js` (one renderer per printed block).
 - Shared desktop UI shell: `teacher/ui.js`
 
 The desktop app is a single-page app on real paths: `/dashboard`, `/assignments`, `/gradebook`, `/observations`, `/observations/starters`, `/reports` and `/student?id=…`. Netlify serves `teacher/app.html` at each of them and `teacher/router.js` draws the page with `history.pushState`; the list is repeated in `netlify.toml`, `sw.js`, `serve.json` and the local servers, and `tests/app-routes.test.js` keeps them in step. Old `/teacher/app.html#/…` links are rewritten to the clean address at boot. Page modules render into shared mount points for the dock, sidebar, page toolbar, and main content area.
@@ -194,7 +194,7 @@ FullVision is organized around a teacher-owned data model:
 - students and enrollments
 - assessments and scores
 - observations
-- term/report artifacts
+- term/report artifacts (`term_rating`: the comment as plain text, the six work habits, approval, attendance totals)
 - preferences and report configuration
 
 The app is designed around teacher-owned classroom workflows rather than student or parent self-service access.

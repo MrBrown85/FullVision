@@ -260,22 +260,26 @@ window.ReportBlocks = (function () {
   // renderBlockNarrative removed — teacher-narrative block now handles all narrative output
 
   /* ── Learning Dispositions ────────────────────────────────────────
-     Each disposition the teacher rated in the Term Questionnaire, as how
-     often: Rarely · Sometimes · Usually · Consistently (the four levels
-     the questionnaire stores). Three columns at Row width, one at Side by
-     Side. Developing now only means proficiency. No dots, no bars. */
+     The six work habits the teacher rated in the Term Questionnaire
+     (term_rating.habits, DECISIONS 14), as how often: Rarely · Sometimes ·
+     Usually · Consistently. Not Seen and unrated habits are left off (Only
+     Rated off lists the unrated with a dash); a student with none rated
+     prints no block. Three columns at Row width, one at Side by Side. No
+     dots, no bars; Developing only means proficiency. */
   function renderBlockLearnerDimensions(cid, student, ctx, options) {
     options = options || {};
     const half = options.size === 'half';
     const termId = ctx && ctx.termId;
     const rating = getStudentTermRating(cid, student.id, termId);
-    const dims = (rating && rating.dims) || {};
-    const list = LEARNING_DIMS.concat(RELATIONAL_DIMS).filter(d => options.rated === false || (dims[d] || 0) > 0);
-    if (!list.length || !list.some(d => (dims[d] || 0) > 0)) return '';
-    const rows = list
+    const habits = (rating && rating.habits) || {};
+    const bank = window.CommentBank;
+    const scale = bank.SCALE;
+    const rated = h => habits[h.key] >= 1 && habits[h.key] <= 4;
+    if (!bank.HABITS.some(rated)) return '';
+    const rows = bank.HABITS.filter(h => rated(h) || (options.rated === false && habits[h.key] !== bank.NOT_SEEN))
       .map(
-        d =>
-          `<div class="report-disp-row"><span>${esc(OBS_LABELS[d] || d)}</span><span class="report-disp-word" data-level="${dims[d] || 0}">${esc((dims[d] > 0 && OBS_LEVEL_LABELS[dims[d]]) || '—')}</span></div>`,
+        h =>
+          `<div class="report-disp-row"><span>${esc(h.name)}</span><span class="report-disp-word" data-level="${rated(h) ? habits[h.key] : 0}">${esc(rated(h) ? scale[habits[h.key] - 1] : '\u2014')}</span></div>`,
       )
       .join('');
     return `<div class="report-block-box report-learner-profile${half ? ' report-disp-half' : ''}">
@@ -306,8 +310,18 @@ window.ReportBlocks = (function () {
     }
     if (!narrative || !String(narrative).trim()) return '';
     narrative = String(narrative);
-    const isHtml = /<[a-z][\s\S]*>/i.test(narrative);
-    const content = isHtml ? sanitizeNarrativeHtml(narrative.trim()) : esc(narrative.trim());
+    // A comment saved by the old editor is HTML until it is next edited; the
+    // questionnaire saves plain text, a paragraph per line.
+    const isHtml = /<\/?(p|div|br|ul|ol|li|b|i|u|strong|em|span)\b[^>]*>/i.test(narrative);
+    const content = isHtml
+      ? sanitizeNarrativeHtml(narrative.trim())
+      : narrative
+          .trim()
+          .split(/\n+/)
+          .map(p => p.trim())
+          .filter(Boolean)
+          .map(p => `<p>${esc(p)}</p>`)
+          .join('');
     return renderCommentBox(content);
   }
 

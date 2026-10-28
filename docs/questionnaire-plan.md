@@ -53,6 +53,8 @@ As `report-forms-plan.md`: decide first (the DECISIONS entry lands with this pla
 
 PR 2 waits on Colin for the migration; PRs 3 to 7 stack above it and can be reviewed before it is applied. Each PR is merged once CI is green (Colin, 2026-10-28: "merge on green").
 
+Built 2026-10-28: PR 2 #468 (the migration applied on Colin's OK), PR 3 #469, PR 4 #470, PR 5 #471, PR 6 #472, PR 7 #473, PR 8 this one. Each PR's description lists what it decided differently from this plan or the canvas.
+
 ## Open
 
 - The Growth dots on screen (three rows by level) are the canvas's; the printed report keeps figures (DECISIONS, Progress Reports).

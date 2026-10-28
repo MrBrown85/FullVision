@@ -20,6 +20,12 @@ describe('plainComment', () => {
     );
   });
 
+  it('keeps a plain comment that only looks like a tag', () => {
+    expect(ReportQuestionnaire.plainComment('Cece asks <good> questions; 3 < 4.')).toBe(
+      'Cece asks <good> questions; 3 < 4.',
+    );
+  });
+
   it('gives an empty string for nothing', () => {
     expect(ReportQuestionnaire.plainComment(null)).toBe('');
   });

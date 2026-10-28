@@ -119,6 +119,20 @@ async function openWithForm(page, makeForm) {
   await expect(page.locator('.report-sheet').first()).toBeVisible();
 }
 
+/* Every Demo student's six habits rated, so Learning Dispositions prints
+   for everyone (Demo Mode has none rated, as the questionnaire canvas
+   shows, and an unrated student prints no block). */
+async function rateEveryone(page) {
+  await page.evaluate(() => {
+    const cid = getActiveCourse();
+    const habits = { completes: 4, ready: 3, others: 4, part: 3, feedback: 3, devices: 4 };
+    getStudents(cid).forEach(s => upsertTermRating(cid, s.id, ReportBlocks.getTermId(), { habits }));
+  });
+  await page.reload();
+  await page.getByRole('tab', { name: 'Progress Reports' }).click();
+  await expect(page.locator('.report-sheet').first()).toBeVisible();
+}
+
 const palette = page => page.locator('#studio-palette');
 const bar = page => page.locator('.studio-bar');
 const popover = page => page.locator('#studio-pop');
@@ -491,6 +505,7 @@ test.describe('Page Studio', () => {
 
   test('the Conference Pack’s grade table does not fit its side: it continues for every student', async ({ page }) => {
     await openStudio(page);
+    await rateEveryone(page);
     await applyTemplate(page, 'conference-pack');
     // Every assessment as rows: more than the back holds above the Response,
     // so it continues (a block taller than a side would print after the report).
@@ -841,6 +856,7 @@ test.describe('Page Studio', () => {
     page,
   }) => {
     await openStudio(page);
+    await rateEveryone(page);
     await palette(page).getByRole('tab', { name: 'Templates' }).click();
     await expect(palette(page)).toContainText('Your Templates');
     await expect(palette(page)).toContainText('None yet');
@@ -1194,6 +1210,31 @@ test.describe('Printed progress reports', () => {
     await expect(page.getByRole('radio', { name: 'Legal' })).toHaveAttribute('aria-checked', 'true');
     await page.getByRole('radio', { name: 'Letter' }).click();
     for (const box of pageBoxes(await printToPdf(page))) expect(box).toEqual([612, 792]);
+  });
+
+  test('Learning Dispositions prints the six habits from the questionnaire; an unrated class prints none', async ({
+    page,
+  }) => {
+    await openStudio(page);
+    await applyTemplate(page, 'conference-pack');
+    await showEveryone(page);
+    // The Demo class has the old nine dispositions on this device and no habits: nothing prints.
+    await expect(page.locator('.report-sheet .report-learner-profile')).toHaveCount(0);
+    await page.evaluate(() =>
+      upsertTermRating(getActiveCourse(), 'st1', ReportBlocks.getTermId(), {
+        habits: { completes: 4, part: 2, ready: 5 },
+      }),
+    );
+    await page.reload();
+    await page.getByRole('tab', { name: 'Progress Reports' }).click();
+    await showEveryone(page);
+    const block = page.locator('.report-sheet .report-learner-profile');
+    await expect(block).toHaveCount(1);
+    await expect(block.locator('.report-disp-row')).toHaveText([
+      /Completes Work\s*Consistently/,
+      /Takes Part\s*Sometimes/,
+    ]);
+    await expect(block).not.toContainText('Not Seen');
   });
 
   test('a dimension the teacher did not rate is left off the printed report', async ({ page }) => {

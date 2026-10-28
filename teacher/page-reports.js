@@ -27,7 +27,6 @@ window.PageReports = (function () {
 
   /* ── Block renderers + helpers now in report-blocks.js ────── */
   var getPronouns = ReportBlocks.getPronouns;
-  var OBS_DESCRIPTORS = ReportBlocks.OBS_DESCRIPTORS;
   var getTermId = ReportBlocks.getTermId;
   var renderReportBlock = ReportBlocks.renderReportBlock;
 
