@@ -3303,6 +3303,10 @@ button.tq-att-mention:disabled {
   font-weight: 600;
   margin-bottom: 5px;
 }
+.studio-field-note {
+  font-weight: 400;
+  color: var(--text-3);
+}
 .report-text-body {
   font-size: var(--text-base);
   line-height: 1.5;
@@ -4019,6 +4023,68 @@ textarea.studio-text {
 }
 .report-sheet .report-header-k {
   color: #636366;
+}
+
+/* ── Assignment Grades as rows (plan PR 4) ─────────────────────── */
+.report-grades-cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 18px;
+  align-items: start;
+}
+.report-grades-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.report-grades-head {
+  font-family: var(--font-base);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  color: #48484a;
+  border-bottom: 1px solid #1d1d1f;
+  padding: 6px 0 2px;
+}
+.report-grades-row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 90px 62px;
+  column-gap: 6px;
+  align-items: center;
+  min-height: 20px;
+  padding: 2px 0;
+  box-sizing: border-box;
+  border-bottom: 1px solid #e5e5ea;
+  font-size: var(--text-xs);
+  line-height: 1.25;
+}
+.report-grades-noword .report-grades-row {
+  grid-template-columns: 40px minmax(0, 1fr) 90px;
+}
+.report-grades-col:only-child .report-grades-row {
+  grid-template-columns: 44px minmax(0, 1fr) 104px 70px;
+}
+.report-grades-noword .report-grades-col:only-child .report-grades-row {
+  grid-template-columns: 44px minmax(0, 1fr) 104px;
+}
+.report-grades-date {
+  color: #636366;
+}
+.report-grades-figs {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.report-grades-word {
+  color: #48484a;
+  white-space: nowrap;
+}
+.report-grades-legend {
+  margin-top: 6px;
+  font-size: var(--text-2xs);
+  color: #636366;
+}
+.report-sheet .report-grades {
+  margin-bottom: 0 !important;
 }
 
 /* ── Page Studio stage 3: the new blocks and their shapes ──────── */

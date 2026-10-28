@@ -137,7 +137,7 @@ describe('ReportStudio', () => {
     expect(resp).not.toContain('studioSize');
     // Move Up is off for the first row under the letterhead; Move Down for the last.
     expect(ReportStudio.blockToolbarHtml(f, 'proficiency', who)).toMatch(/data-dir="-1" disabled/);
-    expect(ReportStudio.blockToolbarHtml(f, 'learner-dimensions', who)).toMatch(/data-dir="1" disabled/);
+    expect(ReportStudio.blockToolbarHtml(f, 'grade-table', who)).toMatch(/data-dir="1" disabled/);
     expect(ReportStudio.blockToolbarHtml(f, 'nope', who)).toBe('');
     // Everyone view: no Leave Off.
     expect(ReportStudio.blockToolbarHtml(f, 'legend', null)).not.toContain('Leave Off');

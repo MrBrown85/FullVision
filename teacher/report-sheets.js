@@ -73,11 +73,7 @@ window.ReportSheets = (function () {
         ],
       },
       {
-        // Learning Dispositions holds the back until Assignment Grades is one
-        // row per assessment (plan PR 4) and Self-Assessment and Goal lands
-        // (PR 6); today's grade table is taller than the room above the
-        // Response.
-        rows: [_row(_c('learner-dimensions')), _row(_c('parent-response', 'row', { lines: 3 }))],
+        rows: [_row(_c('grade-table')), _row(_c('parent-response', 'row', { lines: 3 }))],
       },
     ],
     pinned: 'parent-response',
@@ -220,19 +216,47 @@ window.ReportSheets = (function () {
         { key: 'assignments', label: 'Assignment Names', def: false },
       ],
     },
+    // One row per assessment: date, full title and the marks the teacher
+    // picks under Show. Percent and Proficiency Word start from the class
+    // grading setting ('auto': ReportBlocks.showDefaults).
     'grade-table': {
       label: 'Assignment Grades',
-      table: true,
       group: 'Grades',
       options: [
-        { key: 'date', label: 'Date', def: true },
-        { key: 'category', label: 'Category', def: true },
-        { key: 'area', label: 'Learning Area', def: true },
         { key: 'score', label: 'Score', def: true },
-        { key: 'level', label: 'Proficiency', def: true },
+        { key: 'percent', label: 'Percent', def: 'auto' },
+        { key: 'word', label: 'Proficiency Word', def: 'auto' },
+        {
+          key: 'organize',
+          label: 'Organize By',
+          def: 'category',
+          choices: [
+            { v: 'category', label: 'Category' },
+            { v: 'date', label: 'Date' },
+            { v: 'competency', label: 'Competency' },
+          ],
+        },
+        {
+          key: 'order',
+          label: 'Order',
+          def: 'newest',
+          choices: [
+            { v: 'newest', label: 'Newest First' },
+            { v: 'oldest', label: 'Oldest First' },
+          ],
+        },
+        {
+          key: 'columns',
+          label: 'Columns',
+          def: 'two',
+          choices: [
+            { v: 'two', label: 'Two' },
+            { v: 'one', label: 'One' },
+          ],
+        },
         {
           key: 'range',
-          label: 'Assessments',
+          label: 'Range',
           def: 'term',
           choices: [
             { v: 'last10', label: 'Last 10' },
@@ -240,6 +264,7 @@ window.ReportSheets = (function () {
             { v: 'all', label: 'All' },
           ],
         },
+        { key: 'per', label: 'Per Competency', def: 5, choices: [3, 5, 8] },
       ],
     },
     'term-glance': { label: 'This Term at a Glance', group: 'Grades' },
@@ -1217,8 +1242,10 @@ window.ReportSheets = (function () {
   }
 
   /* A cell's options with the registry's defaults filled in, plus its
-     no-evidence rule and its lines, as the renderer reads them. */
-  function optionsFor(cell) {
+     no-evidence rule, its lines and its size, as the renderer reads them.
+     An option whose default is 'auto' takes the class's value from `autos`
+     ({ key: value }) when given, else stays 'auto' for the renderer. */
+  function optionsFor(cell, autos) {
     var def = BLOCKS[cell.block] || {};
     var out = {};
     (def.options || []).forEach(function (o) {
@@ -1227,6 +1254,11 @@ window.ReportSheets = (function () {
     Object.keys(cell.options || {}).forEach(function (k) {
       out[k] = cell.options[k];
     });
+    if (autos) {
+      Object.keys(out).forEach(function (k) {
+        if (out[k] === 'auto' && k in autos) out[k] = autos[k];
+      });
+    }
     if (def.noEvidence) out.noEvidence = cell.noEvidence === 'hide' ? 'hide' : 'show';
     if (def.fill && def.lines) out.lines = cell.lines != null ? cell.lines : def.lines;
     out.size = cell.size === 'half' ? 'half' : 'row';
