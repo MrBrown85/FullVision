@@ -112,6 +112,8 @@ window.PageReports = (function () {
 
   /* ── Tab switching ───────────────────────────────────────────── */
   function switchTab(tab) {
+    // A comment typed in the last moment is saved before the page changes.
+    RQ.tqSaveCurrentIfNeeded();
     activeTab = tab;
     viewingIssue = null;
     segSelect(document.querySelector('.report-seg-btn[data-tab="' + tab + '"]'));
@@ -1389,6 +1391,7 @@ window.PageReports = (function () {
 
   /* ── Course switching ────────────────────────────────────────── */
   async function switchCourse(cid) {
+    RQ.tqSaveCurrentIfNeeded();
     // A pending Undo belongs to the class being left.
     if (typeof dismissUndoToast === 'function') dismissUndoToast();
     activeCourse = cid;
@@ -1824,6 +1827,8 @@ window.PageReports = (function () {
   }
 
   function _handleReportPeriodChange() {
+    // The box knows the report it was drawn for, so this saves there.
+    RQ.tqSaveCurrentIfNeeded();
     viewingIssue = null;
     // A different report term means different work and heights.
     _blockSizes = null;

@@ -43,13 +43,14 @@ test('Approve sets Ready and the roster tick; an edit clears it', async ({ page 
   await open(page);
   const cece = page.locator('#gb-sidebar .student-row[data-sid="st1"]');
   await expect(page.locator('#tq-ready')).toHaveText('0 of 27 Ready');
-  await expect(cece.locator('.qn-needs')).toHaveText('Needs Approval');
+  await expect(cece.locator('.student-row-note')).toHaveText('Needs Approval');
+  await expect(cece.locator('.student-row-note')).toBeVisible();
 
   await page.locator('#tq-approve').click();
   await expect(page.locator('#tq-approve')).toHaveText('✓ Approved');
   await expect(page.locator('#tq-ready')).toHaveText('1 of 27 Ready');
-  await expect(cece.locator('.qn-tick')).toHaveText('✓');
-  await expect(cece.locator('.qn-needs')).toHaveText('');
+  await expect(cece.locator('.student-row-mark')).toHaveText('✓');
+  await expect(cece.locator('.student-row-note')).toHaveCount(0);
 
   // Not Ready leaves Cece out once another student is on screen.
   await page.locator('[data-action="tqRosterFilter"][data-filter="not-ready"]').click();
@@ -64,12 +65,63 @@ test('Approve sets Ready and the roster tick; an edit clears it', async ({ page 
   await page.keyboard.type(' One more sentence.');
   await expect(page.locator('#tq-approve')).toHaveText('Approve Comment');
   await expect(page.locator('#tq-ready')).toHaveText('0 of 27 Ready');
-  await expect(cece.locator('.qn-needs')).toHaveText('Needs Approval');
+  await expect(cece.locator('.student-row-note')).toHaveText('Needs Approval');
 
   // The text is kept, and is plain text.
   await page.reload();
   await page.locator('#report-period').selectOption('Report 2');
   await expect(page.locator('#tq-narrative')).toHaveValue(/One more sentence\.$/);
+});
+
+test('typing just before leaving is saved: Progress Reports, another report, another class', async ({ page }) => {
+  await open(page);
+  // Within the 0.6 s pause the box waits before saving.
+  await toEnd(page);
+  await page.keyboard.type(' Saved on the way out.');
+  await page.locator('.report-seg-btn[data-tab="progress"]').click();
+  expect(await page.evaluate(() => getStudentTermRating('sci8', 'st1', 'term-2').narrative)).toMatch(
+    /Saved on the way out\.$/,
+  );
+  await page.locator('.report-seg-btn[data-tab="questionnaire"]').click();
+  await toEnd(page);
+  await page.keyboard.type(' Kept with Report 2.');
+  await page.locator('#report-period').selectOption('Report 1');
+  const saved = await page.evaluate(() => [
+    getStudentTermRating('sci8', 'st1', 'term-2').narrative,
+    (getStudentTermRating('sci8', 'st1', 'term-1') || {}).narrative || '',
+  ]);
+  expect(saved[0]).toMatch(/Kept with Report 2\.$/);
+  expect(saved[1]).not.toContain('Kept with Report 2');
+});
+
+test('the roster marks survive a sidebar redraw; arrows skip students Not Ready hides', async ({ page }) => {
+  await open(page);
+  await page.locator('#tq-approve').click();
+  await page.evaluate(() => refreshSidebar());
+  const cece = page.locator('#gb-sidebar .student-row[data-sid="st1"]');
+  await expect(cece.locator('.student-row-mark')).toHaveText('✓');
+  await expect(page.locator('#gb-sidebar .student-row[data-sid="st7"] .student-row-note')).toHaveText('Needs Approval');
+  await expect(page.locator('#gb-sidebar .student-row[data-sid="st7"] .student-row-note')).toBeVisible();
+  await expect(page.locator('#gb-sidebar-extra [data-filter="not-ready"]')).toHaveText('Not Ready 26');
+  // Approve Hannah; with Not Ready on, ↓ from Noor (just above her) skips her.
+  const row = sid => page.locator(`#gb-sidebar .student-row[data-sid="${sid}"]`);
+  const ids = await page.evaluate(() => ReportQuestionnaire.getTqStudents().map(s => s.id));
+  const [noor, hannah, sam] = [ids[1], ids[2], ids[3]];
+  await row(hannah).click();
+  await page.locator('#tq-approve').click();
+  await row(noor).click();
+  await page.locator('[data-action="tqRosterFilter"][data-filter="not-ready"]').click();
+  await expect(row(hannah)).toBeHidden();
+  await row(noor).focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('#gb-sidebar .student-row.selected')).toHaveAttribute('data-sid', sam);
+  await expect(page.locator('.qn-name')).toHaveText('Sam Blackwood');
+  // Leaving the questionnaire gives the grades back.
+  await page.locator('[data-action="tqRosterFilter"][data-filter="all"]').click();
+  await page.locator('.report-seg-btn[data-tab="progress"]').click();
+  await expect(page.locator('#gb-sidebar .student-row-note')).toHaveCount(0);
+  await expect(page.locator('#gb-sidebar-extra')).toHaveCount(0);
+  await expect(cece.locator('.student-row-prof').first()).toBeVisible();
 });
 
 test('a comment saved as HTML reads as text', async ({ page }) => {
@@ -151,14 +203,14 @@ test('Growth: every score as a dot, Start → Now as the Progress in One Area bl
   await expect(page.locator('.qn-record')).toContainText('22 of 22');
 });
 
-test('a note quoted in the comment says In the comment; the private note is marked', async ({ page }) => {
+test('a note quoted in the comment says In the Comment; the private note is marked', async ({ page }) => {
   await open(page);
   const first = page.locator('.qn-obs').first();
   await expect(first.locator('.qn-quoted')).toHaveCount(0);
   const text = await first.locator('.qn-obs-text').textContent();
   await toEnd(page);
   await page.keyboard.type(' I noted: “' + text.trim() + '”');
-  await expect(first.locator('.qn-quoted')).toHaveText('In the comment');
+  await expect(first.locator('.qn-quoted')).toHaveText('In the Comment');
   await expect(page.locator('.qn-private')).toContainText('Private · Never Printed');
   await expect(page.locator('.qn-private')).toContainText('grandma');
 });
@@ -374,7 +426,7 @@ test('end to end: rate, write from the bank, approve, move on, and the report pr
   await page.locator('#tq-save-next').click();
   await expect(page.locator('.qn-name')).toHaveText('Noor Al-Rashid');
   await expect(page.locator('#tq-ready')).toHaveText('1 of 27 Ready');
-  await expect(page.locator('#gb-sidebar .student-row[data-sid="st1"] .qn-tick')).toHaveText('✓');
+  await expect(page.locator('#gb-sidebar .student-row[data-sid="st1"] .student-row-mark')).toHaveText('✓');
 
   await page.locator('#gb-sidebar .student-row[data-sid="st1"]').click();
   await page.locator('[data-action="tqOpenReport"]').click();

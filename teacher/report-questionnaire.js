@@ -33,6 +33,18 @@ window.ReportQuestionnaire = (function () {
   var _commentTab = 'this'; // 'this' or an earlier report's term id
   var _saveTimer = null;
 
+  /* What FullVision has for the student on screen, read once per drawing and
+     again only after something it depends on changes (a habit, the Focus
+     Area, attendance); typing never re-reads it. */
+  var _factsCache = null;
+  function _facts(student, fresh) {
+    var key = _activeCourse + '|' + student.id + '|' + getTermId();
+    if (fresh || !_factsCache || _factsCache.key !== key) {
+      _factsCache = { key: key, f: CommentBank.facts(_activeCourse, student, getTermId()) };
+    }
+    return _factsCache.f;
+  }
+
   function getTqStudents() {
     return sortStudents(getStudents(_activeCourse), 'lastName');
   }
@@ -101,24 +113,27 @@ window.ReportQuestionnaire = (function () {
     return document.getElementById('tq-narrative');
   }
 
-  /* Saves the box's text for the student on screen. An edit after approval
-     clears it (upsertTermRating does, as the server does). */
+  /* Saves the box's text for the class, student and report the box was
+     drawn for (its data attributes), so a save that runs after the report,
+     the class or the tab has changed still lands where it was typed. An
+     edit after approval clears it (upsertTermRating does, as the server
+     does). */
   function tqSaveNarrative() {
     var el = _box();
-    var st = _current();
-    if (!el || !st) return;
     clearTimeout(_saveTimer);
-    var termId = getTermId();
-    var before = getStudentTermRating(_activeCourse, st.id, termId) || {};
+    if (!el || !el.dataset.sid) return;
+    var cid = el.dataset.cid || _activeCourse;
+    var sid = el.dataset.sid;
+    var termId = el.dataset.term || getTermId();
+    var before = getStudentTermRating(cid, sid, termId) || {};
     var text = el.value.replace(/\s+$/, '');
-    if (text === plainComment(before.narrative || '').replace(/\s+$/, '')) {
-      tqNarrativeDirty = false;
-      return;
-    }
-    upsertTermRating(_activeCourse, st.id, termId, { narrative: text });
     tqNarrativeDirty = false;
+    if (text === plainComment(before.narrative || '').replace(/\s+$/, '')) return;
+    upsertTermRating(cid, sid, termId, { narrative: text });
     _syncStatus();
   }
+  /* Before anything replaces the page: the class, the report, the tab, the
+     student. */
   function tqSaveCurrentIfNeeded() {
     if (tqNarrativeDirty) tqSaveNarrative();
   }
@@ -224,78 +239,40 @@ window.ReportQuestionnaire = (function () {
 
   /* ── The roster (the app's sidebar) ───────────────────────── */
 
-  /* Under each name, Needs Approval until the comment is approved, then a
-     tick in place of the grade; All · Not Ready above the list. The grades
-     come back on any other tab (restoreRoster). */
+  /* The sidebar's annotator (ui.js setSidebarAnnotator): under each name
+     Needs Approval until the comment is approved, then a tick in place of
+     the grade; All · Not Ready above the list. The grades come back on any
+     other tab (restoreRoster). */
   function syncRoster() {
-    var cid = _activeCourse;
     var students = getTqStudents();
     var ready = students.filter(function (s) {
       return _approved(s.id);
     }).length;
     var line = document.getElementById('tq-ready');
     if (line) line.textContent = ready + ' of ' + students.length + ' Ready';
-    var top = document.getElementById('gb-sidebar-top');
-    if (top) {
-      var seg = document.getElementById('qn-roster-filter');
-      if (!seg) {
-        seg = document.createElement('div');
-        seg.id = 'qn-roster-filter';
-        seg.className = 'seg qn-roster-filter';
-        seg.setAttribute('role', 'group');
-        seg.setAttribute('aria-label', 'Show students');
-        top.appendChild(seg);
-      }
-      seg.innerHTML =
-        '<button type="button" class="seg-btn' +
-        (_notReadyOnly ? '' : ' active') +
-        '" data-action="tqRosterFilter" data-filter="all" aria-pressed="' +
-        !_notReadyOnly +
-        '">All ' +
-        students.length +
-        '</button><button type="button" class="seg-btn' +
-        (_notReadyOnly ? ' active' : '') +
-        '" data-action="tqRosterFilter" data-filter="not-ready" aria-pressed="' +
-        _notReadyOnly +
-        '">Not Ready ' +
-        (students.length - ready) +
-        '</button>';
-    }
     var cur = _current();
-    document.querySelectorAll('#gb-sidebar .student-row[data-sid]').forEach(function (row) {
-      var sid = row.getAttribute('data-sid');
+    var annotate = function (sid) {
       var ok = _approved(sid);
-      var tick = row.querySelector('.qn-tick');
-      if (!tick) {
-        tick = document.createElement('span');
-        tick.className = 'qn-tick';
-        row.appendChild(tick);
-      }
-      tick.textContent = ok ? '\u2713' : '';
-      tick.setAttribute('aria-label', ok ? 'Ready' : '');
-      var info = row.querySelector('.student-info');
-      var needs = info && info.querySelector('.qn-needs');
-      if (info && !needs) {
-        needs = document.createElement('span');
-        needs.className = 'qn-needs';
-        info.appendChild(needs);
-      }
-      if (needs) needs.textContent = ok ? '' : 'Needs Approval';
-      row.classList.toggle('qn-ready', ok);
-      row.classList.toggle('qn-hidden', _notReadyOnly && ok && !(cur && cur.id === sid));
-      row.classList.toggle('selected', !!cur && cur.id === sid);
+      return {
+        sub: ok ? '' : 'Needs Approval',
+        mark: ok ? '<span class="student-row-mark ok" aria-label="Ready">\u2713</span>' : '',
+        hidden: _notReadyOnly && ok && !(cur && cur.id === sid),
+      };
+    };
+    annotate.top = function () {
+      var btn = function (filter, label, on) {
+        return `<button type="button" class="seg-btn${on ? ' active' : ''}" data-action="tqRosterFilter" data-filter="${filter}" aria-pressed="${on}">${label}</button>`;
+      };
+      return `<div class="seg qn-roster-filter" role="group" aria-label="Show Students">${btn('all', 'All ' + students.length, !_notReadyOnly)}${btn('not-ready', 'Not Ready ' + (students.length - ready), _notReadyOnly)}</div>`;
+    };
+    if (typeof setSidebarAnnotator === 'function') setSidebarAnnotator(annotate);
+    document.querySelectorAll('#gb-sidebar .student-row[data-sid]').forEach(function (row) {
+      row.classList.toggle('selected', !!cur && cur.id === row.getAttribute('data-sid'));
     });
-    if (cid && typeof document !== 'undefined') document.body.classList.add('qn-roster');
+    document.body.classList.add('qn-roster');
   }
   function restoreRoster() {
-    var seg = document.getElementById('qn-roster-filter');
-    if (seg) seg.remove();
-    document.querySelectorAll('#gb-sidebar .qn-needs, #gb-sidebar .qn-tick').forEach(function (n) {
-      n.remove();
-    });
-    document.querySelectorAll('#gb-sidebar .student-row').forEach(function (row) {
-      row.classList.remove('qn-ready', 'qn-hidden');
-    });
+    if (typeof setSidebarAnnotator === 'function') setSidebarAnnotator(null);
     document.body.classList.remove('qn-roster');
   }
   function tqRosterFilter(which) {
@@ -400,7 +377,7 @@ window.ReportQuestionnaire = (function () {
     return parts.join(' · ');
   }
 
-  function _stripHtml(cid, student, f) {
+  function _stripHtml(cid, student, f, bc) {
     var sid = student.id;
     var first = student.firstName || displayNameFirst(student);
     var termId = getTermId();
@@ -430,7 +407,7 @@ window.ReportQuestionnaire = (function () {
       </div>
       <button type="button" class="qn-bc-btn" data-action="tqToggleBc" aria-expanded="false">
         <span class="qn-bc-btn-label">BC Requirements</span>
-        <span class="qn-bc-btn-short${_bcState(cid, student, f).all ? ' ok' : ''}" id="tq-bc-short">${esc(_bcShort(cid, student, f))}</span>
+        <span class="qn-bc-btn-short${bc.all ? ' ok' : ''}" id="tq-bc-short">${esc(_bcShort(bc))}</span>
       </button>
     </div>`;
   }
@@ -540,13 +517,11 @@ window.ReportQuestionnaire = (function () {
     };
   }
 
-  function _bcShort(cid, student, f) {
-    var b = _bcState(cid, student, f);
+  function _bcShort(b) {
     return (b.all ? '✓ ' : '') + b.done + ' of ' + b.reqs.length + ' requirements';
   }
 
-  function _bcInnerHtml(cid, student, f) {
-    var b = _bcState(cid, student, f);
+  function _bcInnerHtml(b) {
     var shown = _bcOpen
       ? b.reqs
       : b.reqs.filter(function (r) {
@@ -554,7 +529,7 @@ window.ReportQuestionnaire = (function () {
         });
     return `<div class="qn-card-title">BC Written Learning Update</div>
       <button type="button" class="qn-bc-toggle" data-action="tqToggleBcAll" aria-expanded="${_bcOpen}">
-        <span class="qn-bc-count${b.all ? ' ok' : ''}">${b.all ? '✓ ' : ''}${b.done} of ${b.reqs.length} requirements</span>
+        <span class="qn-bc-count${b.all ? ' ok' : ''}">${_bcShort(b)}</span>
         <span class="qn-link-text">${_bcOpen ? 'Hide' : 'Show All'}</span>
       </button>
       ${shown
@@ -581,8 +556,8 @@ window.ReportQuestionnaire = (function () {
       </div>`;
   }
 
-  function _bcCardHtml(cid, student, f) {
-    return `<div class="qn-card qn-bc-card" id="tq-bc-card">${_bcInnerHtml(cid, student, f)}</div>`;
+  function _bcCardHtml(b) {
+    return `<div class="qn-card qn-bc-card" id="tq-bc-card">${_bcInnerHtml(b)}</div>`;
   }
 
   /* The card and the strip's count, after the comment or a rating changes. */
@@ -590,12 +565,12 @@ window.ReportQuestionnaire = (function () {
     var st = _current();
     var card = document.getElementById('tq-bc-card');
     if (!st || !card) return;
-    var f = CommentBank.facts(_activeCourse, st, getTermId());
-    card.innerHTML = _bcInnerHtml(_activeCourse, st, f);
+    var b = _bcState(_activeCourse, st, _facts(st));
+    card.innerHTML = _bcInnerHtml(b);
     var short = document.getElementById('tq-bc-short');
     if (short) {
-      short.textContent = _bcShort(_activeCourse, st, f);
-      short.classList.toggle('ok', _bcState(_activeCourse, st, f).all);
+      short.textContent = _bcShort(b);
+      short.classList.toggle('ok', b.all);
     }
   }
   var _bcTimer = null;
@@ -765,7 +740,7 @@ window.ReportQuestionnaire = (function () {
     }
     var st = _current();
     var col = document.getElementById('tq-evidence');
-    if (st && col) col.innerHTML = _evidenceHtml(cid, st, CommentBank.facts(cid, st, getTermId()));
+    if (st && col) col.innerHTML = _evidenceHtml(cid, st, _facts(st));
   }
 
   /* ── What FullVision Has ──────────────────────────────────── */
@@ -870,12 +845,12 @@ window.ReportQuestionnaire = (function () {
             })
             .join(
               '',
-            )}<span class="qn-fill"></span>${quoted ? '<span class="qn-quoted">In the comment</span>' : ''}</div>
+            )}<span class="qn-fill"></span>${quoted ? '<span class="qn-quoted">In the Comment</span>' : ''}</div>
         </div>`;
       })
       .join('');
     return `<div class="qn-card">
-      <div class="qn-card-row"><div class="qn-card-title">Observations</div><div class="qn-card-sub">This term · ${f.obs.length}</div></div>
+      <div class="qn-card-row"><div class="qn-card-title">Observations</div><div class="qn-card-sub">This Term · ${f.obs.length}</div></div>
       ${items || '<div class="qn-empty">None this term. The comment works without them: Work Habits is built from your habit ratings.</div>'}
     </div>`;
   }
@@ -1012,7 +987,7 @@ window.ReportQuestionnaire = (function () {
     var comment = el.value;
     var st = _current();
     if (!st) return;
-    var f = CommentBank.facts(_activeCourse, st, getTermId());
+    var f = _facts(st);
     var ev = document.querySelector('.qn-ev-card[data-card="obs"]');
     if (ev) ev.innerHTML = _obsHtml(_activeCourse, f, comment);
   }
@@ -1062,7 +1037,7 @@ window.ReportQuestionnaire = (function () {
       var auto = h.key === 'completes' && v != null && stored.completes == null;
       var note =
         v == null
-          ? '<span class="qn-rate-note waiting">Not rated</span>'
+          ? '<span class="qn-rate-note waiting">Not Rated</span>'
           : auto
             ? `<span class="qn-rate-note">From assignments · ${f.record.handed} of ${f.record.total}, ${f.record.late} late, ${f.record.missing} missing</span>`
             : '';
@@ -1071,9 +1046,8 @@ window.ReportQuestionnaire = (function () {
         var on = v === val;
         return `<button type="button" class="qn-rate-opt${on ? ' on' : ''}${val === CommentBank.NOT_SEEN ? ' not-seen' : ''}" data-action="tqRate" data-habit="${h.key}" data-value="${val}" aria-pressed="${on}">${label}</button>`;
       }).join('');
-      var title = h.hint.replace('{his}', f.pronouns.poss);
       return `<div class="qn-rate">
-        <div class="qn-rate-head"><span class="qn-rate-name">${esc(h.name)}</span><span class="qn-rate-hint">${esc(title)}</span><span class="qn-fill"></span>${note}</div>
+        <div class="qn-rate-head"><span class="qn-rate-name">${esc(h.name)}</span><span class="qn-rate-hint">${esc(h.hint)}</span><span class="qn-fill"></span>${note}</div>
         <div class="qn-rate-opts" role="group" aria-label="${esc(h.name)}">${opts}</div>
       </div>`;
     }).join('');
@@ -1113,7 +1087,7 @@ window.ReportQuestionnaire = (function () {
             action: 'tqPickFocus',
             value: c.id,
             on: !!focus && focus.id === c.id,
-            label: c.name + ' ' + formatLevel(cid, c.start) + ' → ' + formatLevel(cid, c.now),
+            label: c.start > 0 ? c.name + ' ' + formatLevel(cid, c.start) + ' → ' + formatLevel(cid, c.now) : c.name,
           };
         }),
       );
@@ -1136,12 +1110,9 @@ window.ReportQuestionnaire = (function () {
   }
 
   function _rowHtml(r) {
-    var meta = [];
-    if (r.repeats) meta.push('Starts like your last sentence');
-    if (r.crowded) meta.push('Used for ' + r.used + ' classmates this term');
-    return `${r.first ? `<div class="qn-group">${esc(r.group)}</div>` : ''}<button type="button" class="qn-row${r.added ? ' added' : ''}" data-action="tqAdd" data-id="${r.id}" data-text="${esc(r.text)}" aria-label="${esc((r.added ? 'Added: ' : 'Add: ') + r.text)}">
-        <span class="qn-row-body"><span class="qn-row-text">${esc(r.text)}</span><span class="qn-row-meta"${meta.length ? '' : ' hidden'}>${esc(meta.join(' · '))}</span></span>
-        <span class="qn-pill">${r.added ? '✓ Added' : 'Add'}</span>
+    return `${r.first ? `<div class="qn-group">${esc(r.group)}</div>` : ''}<button type="button" class="qn-row${r.added ? ' added' : ''}" data-action="tqAdd" data-id="${r.id}" data-used="${r.used}" data-text="${esc(r.text)}" aria-label="${esc((r.added ? 'Added: ' : 'Add: ') + r.text)}">
+        <span class="qn-row-body"><span class="qn-row-text">${esc(r.text)}</span><span class="qn-row-meta"${r.meta ? '' : ' hidden'}>${esc(r.meta)}</span></span>
+        <span class="qn-pill">${r.added ? '\u2713 Added' : 'Add'}</span>
       </button>`;
   }
 
@@ -1191,7 +1162,8 @@ window.ReportQuestionnaire = (function () {
     var col = document.getElementById('tq-bank');
     if (!st || !col) return;
     var top = col.scrollTop;
-    col.innerHTML = _bankHtml(_activeCourse, st, CommentBank.facts(_activeCourse, st, getTermId()));
+    // A habit, the Focus Area or attendance changed: read the facts again.
+    col.innerHTML = _bankHtml(_activeCourse, st, _facts(st, true));
     col.scrollTop = top;
     _syncBc();
   }
@@ -1202,28 +1174,21 @@ window.ReportQuestionnaire = (function () {
     var el = _box();
     if (!el) return;
     var text = el.value;
-    var last =
-      (
-        text
-          .trim()
-          .split(/(?<=[.!?”])\s+/)
-          .pop() || ''
-      ).split(/\s+/)[0] || '';
+    var last = CommentBank.lastStart(text);
     document.querySelectorAll('#tq-bank .qn-row').forEach(function (row) {
       var t = row.dataset.text || '';
       var added = text.indexOf(t) >= 0;
       row.classList.toggle('added', added);
       row.setAttribute('aria-label', (added ? 'Added: ' : 'Add: ') + t);
       var pill = row.querySelector('.qn-pill');
-      if (pill) pill.textContent = added ? '✓ Added' : 'Add';
+      if (pill) pill.textContent = added ? '\u2713 Added' : 'Add';
       var meta = row.querySelector('.qn-row-meta');
       if (meta) {
-        var bits = meta.textContent.split(' · ').filter(function (b) {
-          return b && b !== 'Starts like your last sentence';
-        });
-        if (!added && last && t.split(/\s+/)[0] === last) bits.unshift('Starts like your last sentence');
-        meta.textContent = bits.join(' · ');
-        meta.hidden = !bits.length;
+        meta.textContent = CommentBank.rowMeta(
+          !added && CommentBank.repeatsLast(t, last),
+          Number(row.dataset.used) || 0,
+        );
+        meta.hidden = !meta.textContent;
       }
     });
   }
@@ -1280,8 +1245,7 @@ window.ReportQuestionnaire = (function () {
     var st = _current();
     if (!st) return;
     var rating = getStudentTermRating(_activeCourse, st.id, getTermId()) || {};
-    var f = CommentBank.facts(_activeCourse, st, getTermId());
-    var focus = rating.focusSectionId || f.focusId;
+    var focus = rating.focusSectionId || _facts(st).focusId;
     _picksFor(st.id).ican[focus] = Number(i) || 0;
     _redrawBank();
   }
@@ -1330,7 +1294,7 @@ window.ReportQuestionnaire = (function () {
     if (thisTab) {
       body = `<label class="qn-text-wrap">
           <span class="qn-hint">Your comment. Type it, or add sentences from the Comment Bank and edit them. Prints as one paragraph.</span>
-          <textarea id="tq-narrative" class="qn-text" rows="4" spellcheck="true" data-sid="${sid}">${esc(text)}</textarea>
+          <textarea id="tq-narrative" class="qn-text" rows="4" spellcheck="true" data-cid="${esc(cid)}" data-sid="${esc(sid)}" data-term="${esc(termId)}">${esc(text)}</textarea>
         </label>
         <div class="qn-text-actions">
           <span class="qn-text-note" id="tq-text-note">${text.trim() ? 'Edit any word.' : 'Empty. Type, or add from the Comment Bank.'}</span>
@@ -1386,7 +1350,8 @@ window.ReportQuestionnaire = (function () {
     if (tqStudentIndex >= students.length) tqStudentIndex = 0;
     var student = students[tqStudentIndex];
     var termId = getTermId();
-    var f = CommentBank.facts(cid, student, termId);
+    var f = _facts(student, true);
+    var bc = _bcState(cid, student, f);
 
     var name = document.getElementById('tq-student-name');
     if (name) name.textContent = displayName(student);
@@ -1395,7 +1360,7 @@ window.ReportQuestionnaire = (function () {
 
     var last = tqStudentIndex >= students.length - 1;
     return `<div class="qn" data-sid="${student.id}">
-      ${_stripHtml(cid, student, f)}
+      ${_stripHtml(cid, student, f, bc)}
       <div class="qn-body">
         <div class="qn-mid">
           <div class="qn-cols">
@@ -1411,7 +1376,7 @@ window.ReportQuestionnaire = (function () {
         <div class="qn-side">
           <div class="qn-side-title">Teacher Comment · Built From FullVision</div>
           ${_commentHtml(cid, student)}
-          ${_bcCardHtml(cid, student, f)}
+          ${_bcCardHtml(bc)}
         </div>
       </div>
     </div>`;
