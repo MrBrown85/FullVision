@@ -1323,34 +1323,56 @@ window.PageGradebook = (function () {
       '</td>'
     );
   }
-  /* The tooltip on a student's name: the overall grade as the class shows
-     it, each section, and how much of the learning map has evidence. Every
-     value comes from calc.js. Kept in a map, not an attribute, so the HTML
-     never round-trips through the DOM. */
+  /* The tooltip on a student's name, in two groups so the two kinds of
+     number never sit side by side: the course grade as the class shows it
+     (with how many assignments are NS, which count as 0 toward a %), then
+     each competency as a proficiency word, then how many competencies have
+     evidence. Every value comes from calc.js. Kept in a map, not an
+     attribute, so the HTML never round-trips through the DOM. */
   function _setNameTip(cid, student, sections) {
     var grade = studentGradeSummary(cid, student.id);
     var word = levelWord(cid, getOverallProficiency(cid, student.id));
     var tip =
-      '<div class="gb-tip-row"><span class="gb-tip-label">Overall</span><span class="gb-tip-val" style="color:' +
+      '<div class="gb-tip-head">Course Grade</div>' +
+      '<div class="gb-tip-grade" style="color:' +
       (grade.text ? PROF_COLORS[grade.level] || PROF_COLORS[0] : 'var(--text-3)') +
       '">' +
       (grade.text ? (word ? word + ' (' + esc(grade.text) + ')' : esc(grade.text)) : 'No Evidence') +
-      '</span></div>';
+      '</div>';
+    // NS lowers only a percentage; a Proficiency class shows none.
+    if (courseGradeMode(cid) !== 'proficiency') {
+      var ns = getAssessments(cid).filter(function (a) {
+        return getAssignmentStatus(cid, student.id, a.id) === 'NS';
+      }).length;
+      if (ns > 0)
+        tip +=
+          '<div class="gb-tip-note">' +
+          ns +
+          (ns === 1 ? ' assignment NS (counts as 0)' : ' assignments NS (count as 0)') +
+          '</div>';
+    }
+    tip += '<div class="gb-tip-head">Competencies</div>';
+    var withEvidence = 0;
     sections.forEach(function (sec) {
       var sp = getSectionProficiency(cid, student.id, sec.id);
+      if (getSectionProficiencyRaw(cid, student.id, sec.id) > 0) withEvidence++;
+      var r = Math.max(0, Math.min(4, Math.round(sp)));
       tip +=
         '<div class="gb-tip-row"><span class="gb-tip-label">' +
         esc(sec.shortName || sec.name) +
         '</span><span class="gb-tip-val" style="color:' +
-        (PROF_COLORS[Math.round(sp)] || PROF_COLORS[0]) +
+        (r ? PROF_COLORS[r] : 'var(--text-3)') +
         '">' +
-        formatLevel(cid, sp) +
+        PROF_LABELS[r] +
         '</span></div>';
     });
     tip +=
-      '<div class="gb-tip-row"><span class="gb-tip-label">Coverage</span><span class="gb-tip-val">' +
-      getCompletionPct(cid, student.id) +
-      '%</span></div>';
+      '<div class="gb-tip-note gb-tip-foot">Evidence in ' +
+      withEvidence +
+      ' of ' +
+      sections.length +
+      (sections.length === 1 ? ' competency' : ' competencies') +
+      '</div>';
     _nameTipHtml[student.id] = tip;
   }
 

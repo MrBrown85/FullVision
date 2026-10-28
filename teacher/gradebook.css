@@ -665,6 +665,26 @@ th.gb-group-alt {
 .gb-tip-val {
   font-weight: 600;
 }
+.gb-tip-head {
+  margin: 10px 0 2px;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--text-2);
+}
+.gb-tip-head:first-child {
+  margin-top: 0;
+}
+.gb-tip-grade {
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+.gb-tip-note {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+.gb-tip-foot {
+  margin-top: 8px;
+}
 
 /* Class stats row */
 .gb-stats-row td {
