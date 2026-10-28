@@ -1527,7 +1527,7 @@ window.ReportSheets = (function () {
 
   /* Lays one student onto the form's sides. Returns { html, sheets, sides,
      continued: [blockId], after: [label], over, used, free: [px per
-     stored side], commentLines, room, noComment, badge }. */
+     stored side], commentLines, room, noComment, noAttendance, badge }. */
   function layoutStudent(cid, student, ctx, opts) {
     var f = opts.form || normalizeForm(FORM_REPORT_CARD);
     var probe = opts.probe;
@@ -1592,6 +1592,12 @@ window.ReportSheets = (function () {
         return row.y + row.h > H;
       });
     });
+    // An Attendance block on the form with nothing to print (no totals
+    // entered, and not left off on purpose), for the print dialog.
+    var attendance = measured.find(function (m) {
+      return m.cell.block === 'term-attendance';
+    });
+    var noAttendance = !!attendance && !attendance.off && !attendance.html;
     // The comment's lines and its box's room, for the questionnaire.
     var noComment = !!comment && /report-ruled-empty/.test(comment.html);
     var room = comment ? optionsFor(comment.cell).lines : 0;
@@ -1645,6 +1651,7 @@ window.ReportSheets = (function () {
       commentLines: commentLines,
       room: room,
       noComment: noComment,
+      noAttendance: noAttendance,
       badge: badge,
     };
   }
@@ -1675,7 +1682,16 @@ window.ReportSheets = (function () {
   }
 
   function _summary(students) {
-    return { students: students.length, sheets: 0, pages: 0, continued: [], over: [], noComment: [], perStudent: {} };
+    return {
+      students: students.length,
+      sheets: 0,
+      pages: 0,
+      continued: [],
+      over: [],
+      noComment: [],
+      noAttendance: [],
+      perStudent: {},
+    };
   }
   function _count(summary, st, r) {
     summary.sheets += r.sheets;
@@ -1683,6 +1699,7 @@ window.ReportSheets = (function () {
     if (r.sheets > 1) summary.continued.push(fullName(st));
     if (r.over) summary.over.push(fullName(st));
     if (r.noComment) summary.noComment.push(fullName(st));
+    if (r.noAttendance) summary.noAttendance.push(fullName(st));
     summary.perStudent[st.id] = {
       sheets: r.sheets,
       sides: r.sides,
@@ -1691,6 +1708,7 @@ window.ReportSheets = (function () {
       after: r.after,
       badge: r.badge,
       noComment: r.noComment,
+      noAttendance: r.noAttendance,
       name: fullName(st),
       used: r.used,
       free: r.free,

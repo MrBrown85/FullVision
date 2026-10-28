@@ -743,7 +743,7 @@ window.PageReports = (function () {
   var _issueState = null;
 
   function _issueCounts() {
-    var s = _lastSummary || { perStudent: {}, continued: [], noComment: [] };
+    var s = _lastSummary || { perStudent: {}, continued: [], noComment: [], noAttendance: [] };
     var ids = Object.keys(s.perStudent || {});
     var sheets = 0;
     var hashes = {};
@@ -835,6 +835,17 @@ window.PageReports = (function () {
           ' no Teacher Comment. The box prints with lines. <button type="button" data-issue="write">Write them now</button>',
       );
     }
+    // Attendance is optional: a student without totals prints without the
+    // block, and the dialog says so once, like a missing comment.
+    var noAtt = c.summary.noAttendance || [];
+    if (noAtt.length) {
+      warn.push(
+        (noAtt.length === c.ids.length
+          ? 'No attendance is entered for this report.'
+          : esc(noAtt.join(', ')) + (noAtt.length === 1 ? ' has' : ' have') + ' no attendance entered.') +
+          ' Their reports print without it. <button type="button" data-issue="attendance">Enter it now</button>',
+      );
+    }
     if (c.summary.over && c.summary.over.length) {
       warn.push(esc(c.summary.over.join(', ')) + ': a block is taller than a page.');
     }
@@ -885,10 +896,10 @@ window.PageReports = (function () {
       e.preventDefault();
       if (a.dataset.issue === 'cancel') closeIssueDialog();
       else if (a.dataset.issue === 'go') _issueFromDialog(overlay);
-      else if (a.dataset.issue === 'write') {
-        var names = c.summary.noComment;
+      else if (a.dataset.issue === 'write' || a.dataset.issue === 'attendance') {
+        var key = a.dataset.issue === 'write' ? 'noComment' : 'noAttendance';
         var first = Object.keys(c.summary.perStudent).find(function (sid) {
-          return c.summary.perStudent[sid].noComment;
+          return c.summary.perStudent[sid][key];
         });
         closeIssueDialog();
         if (first) {

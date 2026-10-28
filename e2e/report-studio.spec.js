@@ -500,6 +500,11 @@ test.describe('Page Studio', () => {
     await expect(dialog).toContainText('Print 27 Reports');
     await expect(dialog).toContainText('27 students · 1 sheet each');
     await expect(dialog).toContainText('Letter, 2-sided, flip on long edge');
+    // Demo Mode has no attendance entered: said once, never blocking.
+    await expect(dialog.locator('.issue-warn')).toContainText(
+      'No attendance is entered for this report. Their reports print without it.',
+    );
+    await expect(dialog.locator('[data-issue="attendance"]')).toHaveText('Enter it now');
     await expect(dialog).not.toContainText(/Issue/);
     await expect(dialog.locator('[data-issue="go"]')).toHaveText('Print');
     await dialog.locator('[data-issue="go"]').click();
@@ -512,6 +517,29 @@ test.describe('Page Studio', () => {
     await expect(page.getByRole('button', { name: 'Print This Copy' })).toBeVisible();
     await copies.selectOption({ index: 0 });
     await expect(page.getByRole('button', { name: 'Print Reports' })).toBeVisible();
+  });
+
+  test('Enter it now opens the Term Questionnaire on a student with no attendance; with totals entered the note names the rest', async ({
+    page,
+  }) => {
+    await openStudio(page);
+    await page.evaluate(() => {
+      const cid = getActiveCourse();
+      const ctx = ReportBlocks.reportContext();
+      getStudents(cid)
+        .slice(1)
+        .forEach(st => saveTermAttendance(cid, st.id, ctx.termId, 2, 1));
+    });
+    await page.locator('.studio-view [data-view="all"]').click();
+    await page.locator('.studio-view [data-view="one"]').click();
+    await page.getByRole('button', { name: 'Print Reports' }).click();
+    const dialog = page.locator('#issue-overlay');
+    await expect(dialog.locator('.issue-warn')).toContainText(
+      /^Before you print.*\w+ \w+ has no attendance entered\. Their reports print without it\./,
+    );
+    await dialog.locator('[data-issue="attendance"]').click();
+    await expect(dialog).toHaveCount(0);
+    await expect(page.getByRole('tab', { name: 'Term Questionnaire' })).toHaveAttribute('aria-selected', 'true');
   });
 
   test('Print Reports sets the name on the reports: preferred or first, always the last name', async ({ page }) => {
