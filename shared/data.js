@@ -6257,7 +6257,10 @@ function buildLearningMapFromTags(shortTags) {
       }
     }
     if (addedSections) {
-      subjects.push({ id: courseTag, name: course.course_name, color: colour });
+      // `family` is the BC subject area ("Physical and Health Education"),
+      // which the Term Questionnaire's Comment Bank reads to offer wording
+      // for that kind of class.
+      subjects.push({ id: courseTag, name: course.course_name, color: colour, family: course.subject });
     }
   }
 

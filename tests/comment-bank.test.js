@@ -63,10 +63,30 @@ function fullContext(p, habits) {
 }
 
 describe('the bank', () => {
-  it('has 250 sentences in four parts, each with a unique id', () => {
-    expect(COMMENT_BANK.sentences).toHaveLength(250);
+  it('has 434 sentences in four parts, each with a unique id', () => {
+    expect(COMMENT_BANK.sentences).toHaveLength(434);
     expect(COMMENT_BANK.parts.map(p => p.id)).toEqual(['habits', 'now', 'go', 'how']);
-    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(250);
+    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(434);
+  });
+
+  it('has wording for every kind of class, and keeps handed-in work out of PE and Arts', () => {
+    const fams = ['pe', 'arts', 'math', 'adst', 'ela', 'socials', 'science', 'career'];
+    fams.forEach(f => {
+      const mine = COMMENT_BANK.sentences.filter(s => s.subjects && s.subjects.indexOf(f) >= 0);
+      expect(mine.length, f).toBeGreaterThanOrEqual(6);
+      ['Emerging', 'Developing', 'Proficient'].forEach(w =>
+        expect(
+          mine.some(s => s.when && s.when.standing === w),
+          f + ' ' + w,
+        ).toBe(true),
+      );
+    });
+    COMMENT_BANK.sentences
+      .filter(s => s.part === 'habits' && /Completes Work/.test(s.group) && !s.subjects)
+      .forEach(s => expect(s.except, s.id).toEqual(['pe', 'arts']));
+    ['g104', 'g105', 'w112'].forEach(id =>
+      expect(COMMENT_BANK.sentences.find(s => s.id === id).except).toEqual(['pe', 'career']),
+    );
   });
 
   it('covers every habit at every level, and every picture with an opening and a closer', () => {
@@ -353,16 +373,18 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     return CommentBank.context(CommentBank.facts(cid, st, 'term-2'), {});
   };
 
-  it('offers Cece 96 sentences (9, 45, 18, 24); the canvas’s 100-sentence bank gave 43', () => {
+  it('knows the Demo class is Science from its name, and offers Cece 100 sentences (9, 46, 19, 26)', () => {
+    expect(CommentBank.familyOf(cid)).toBe('science');
     const ctx = ctxFor('Cece');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 45, 18, 24]);
-    expect(CommentBank.fitCount(ctx)).toBe(96);
+    expect(ctx._family).toBe('science');
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 46, 19, 26]);
+    expect(CommentBank.fitCount(ctx)).toBe(100);
   });
 
-  it('offers Jasper 83 (9, 38, 14, 22), by the name he goes by', () => {
+  it('offers Jasper 87 (9, 39, 15, 24), by the name he goes by', () => {
     const ctx = ctxFor('Jasper');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 38, 14, 22]);
-    expect(CommentBank.fitCount(ctx)).toBe(83);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 39, 15, 24]);
+    expect(CommentBank.fitCount(ctx)).toBe(87);
     expect(ctx.name).toBe('Jas');
     expect(ctx.fellCount).toBe('four');
   });
@@ -453,6 +475,12 @@ describe('Demo Mode (Science 8, Report 2)', () => {
       expect(d.text, st.firstName).not.toMatch(/[{}[\]]|  /);
       const quotes = d.text.match(/“[^”]+”/g) || [];
       expect(new Set(quotes).size, st.firstName).toBe(quotes.length);
+      // The growing habits are said once.
+      const growing = d.ids.filter(id => {
+        const s = COMMENT_BANK.sentences.find(x => x.id === id);
+        return (s.needs || []).some(k => k === 'growthHabits' || k === 'growthHabitNames');
+      });
+      expect(growing.length, st.firstName).toBeLessThanOrEqual(1);
     });
   });
 
@@ -500,5 +528,101 @@ describe('competency names in an imported class', () => {
     expect(names).toEqual(ReportBlocks.reportSections(cid).slice(0, 3).map(ReportBlocks.competencyLabel));
     expect(names).not.toContain('Use Social Studies inquiry processes and skills');
     delete COURSES[cid];
+  });
+});
+
+describe('wording by kind of class', () => {
+  it('offers a sentence to its subjects only, and an except sentence to every other kind', () => {
+    const pe = { id: 'x', text: 'x', subjects: ['pe'] };
+    const notPe = { id: 'y', text: 'y', except: ['pe', 'career'] };
+    const any = { id: 'z', text: 'z' };
+    expect(CommentBank.forFamily(pe, 'pe')).toBe(true);
+    expect(CommentBank.forFamily(pe, 'math')).toBe(false);
+    expect(CommentBank.forFamily(pe, '')).toBe(false);
+    expect(CommentBank.forFamily(notPe, 'pe')).toBe(false);
+    expect(CommentBank.forFamily(notPe, 'career')).toBe(false);
+    expect(CommentBank.forFamily(notPe, 'math')).toBe(true);
+    expect(CommentBank.forFamily(notPe, '')).toBe(true);
+    expect(CommentBank.forFamily(any, 'pe')).toBe(true);
+  });
+
+  it('reads the kind of class from the imported subject, its tag, or the class name', () => {
+    const cid = 'course-kind';
+    const withMap = (map, name) => {
+      COURSES[cid] = { id: cid, name };
+      _cache.learningMaps[cid] = map;
+      return CommentBank.familyOf(cid);
+    };
+    expect(
+      withMap(
+        { subjects: [{ id: 'PHE8', name: 'PE 8', family: 'Physical and Health Education' }], sections: [] },
+        'Block C',
+      ),
+    ).toBe('pe');
+    expect(withMap({ subjects: [{ id: 'DRAMA10', name: 'Drama 10' }], sections: [] }, 'Block C')).toBe('arts');
+    expect(withMap({ subjects: [{ id: 'FOM11', name: 'Foundations 11' }], sections: [] }, 'Block C')).toBe('math');
+    expect(withMap({ subjects: [], sections: [] }, 'Foods 9')).toBe('adst');
+    expect(withMap({ subjects: [], sections: [] }, 'Socials 10')).toBe('socials');
+    expect(withMap({ subjects: [], sections: [] }, 'Block D')).toBe('');
+    delete COURSES[cid];
+    delete _cache.learningMaps[cid];
+  });
+
+  it('drafts for every kind of class without handed-in or area-to-build wording where it does not belong', async () => {
+    window._CURRICULUM_DATA = JSON.parse(readFileSync('curriculum_by_course.json', 'utf-8'));
+    await loadCurriculumIndex();
+    const cases = [
+      ['PHE8', 'pe'],
+      ['DRAMA10', 'arts'],
+      ['MATH8', 'math'],
+      ['FS10', 'adst'],
+      ['ELA10', 'ela'],
+      ['SS8', 'socials'],
+      ['SCI10', 'science'],
+      ['CLE10', 'career'],
+    ];
+    cases.forEach(([tag, fam]) => {
+      const cid = 'course-' + tag;
+      const map = buildLearningMapFromTags([tag]);
+      COURSES[cid] = { id: cid, name: tag, gradingSystem: 'proficiency' };
+      const st = { id: 'stu-k', firstName: 'Priya', lastName: 'Kaur', pronouns: 'she/her' };
+      _cache.students[cid] = [st];
+      _cache.learningMaps[cid] = map;
+      _cache.categories[cid] = [];
+      const secs = map.sections.slice(0, 4);
+      _cache.assessments[cid] = secs.map((sec, i) => ({
+        id: 'a' + i,
+        title: 'Unit ' + (i + 1),
+        scoreMode: 'proficiency',
+        tagIds: [sec.tags[0].id],
+        type: 'summative',
+        date: '2026-09-1' + i,
+      }));
+      _cache.scores[cid] = {
+        'stu-k': _cache.assessments[cid].map((a, i) => ({
+          assessmentId: a.id,
+          tagId: a.tagIds[0],
+          score: [3, 2, 4, 3][i],
+          date: a.date,
+        })),
+      };
+      _cache.statuses[cid] = {};
+      _cache.overrides[cid] = {};
+      _cache.courseConfigs[cid] = {};
+      _cache.observations[cid] = {};
+      _cache.reflections[cid] = {};
+      _cache.termRatings[cid] = { 'stu-k': { 'term-1': { habits: { completes: 2, ready: 3, part: 2, devices: 2 } } } };
+      clearProfCache();
+      const f = CommentBank.facts(cid, st, 'term-1');
+      expect(f.family, tag).toBe(fam);
+      const ctx = CommentBank.context(f, {});
+      const d = CommentBank.draft(ctx, { seed: 5 });
+      expect(d.ids.length, tag).toBeGreaterThanOrEqual(6);
+      expect(d.text, tag).not.toMatch(/[{}[\]]/);
+      if (fam === 'pe' || fam === 'arts') expect(d.text, tag).not.toMatch(/hands? in|handing in/i);
+      if (fam === 'pe' || fam === 'career')
+        expect(d.text, tag).not.toMatch(/area to build|room to grow in|targeted practice in/i);
+      delete COURSES[cid];
+    });
   });
 });
