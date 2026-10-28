@@ -310,7 +310,7 @@ test.describe('Page Studio', () => {
     const habits = page.locator('[data-action="studioBlock"][data-block="student-reflection-habits"]');
     await habits.scrollIntoViewIfNeeded();
     await expect(habits).toHaveClass(/nofit/);
-    await expect(habits).toContainText('No room on either side');
+    await expect(habits).toContainText('No room on either side. Add a page or remove a block.');
     await expect(habits).toHaveAttribute('aria-disabled', 'true');
     await habits.click({ force: true });
     await expect(page.locator('.sheet-cell[data-block="student-reflection-habits"]')).toHaveCount(0);
@@ -480,6 +480,49 @@ test.describe('Page Studio', () => {
     await expect(page.locator('.report-sheet.sheet-overflow')).toHaveCount(0);
     await applyTemplate(page, 'report-card');
     await expect(page.locator('.report-sheet')).toHaveCount(STUDENTS * 2, { timeout: 30_000 });
+  });
+
+  test('the paper stays white with dark ink in dark mode; the screen around it goes dark', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await openStudio(page);
+    const sheet = page.locator('#rb-preview .report-sheet').first();
+    expect(await sheet.evaluate(el => getComputedStyle(el).backgroundColor)).toBe('rgb(255, 255, 255)');
+    for (const sel of ['.report-student-name', '.report-proficiency', '.report-comment-box']) {
+      const colors = await sheet
+        .locator(sel)
+        .first()
+        .evaluate(el => {
+          const box = el.closest('.report-block-box') || el;
+          return [getComputedStyle(el).color, getComputedStyle(box).backgroundColor];
+        });
+      expect(colors[0]).toMatch(/^rgb\((0|29), (0|29), (0|31)\)$/);
+      expect(colors[1]).toMatch(/^rgb(a?)\((255, 255, 255|0, 0, 0, 0)/);
+    }
+    expect(await page.locator('.studio-palette').evaluate(el => getComputedStyle(el).backgroundColor)).not.toBe(
+      'rgb(255, 255, 255)',
+    );
+    await page.emulateMedia({ colorScheme: 'light' });
+  });
+
+  test('every block, the letterhead too, is reached by Tab and selected with Enter', async ({ page }) => {
+    await openStudio(page);
+    const head = cellOf(page, 'header');
+    await expect(head).toHaveAttribute('tabindex', '0');
+    await expect(head).toHaveAttribute('aria-label', 'Letterhead');
+    await head.focus();
+    await page.keyboard.press('Enter');
+    await expect(head).toHaveClass(/studio-sel/);
+    await expect(bar(page)).toContainText('Always first on the Front');
+    const legend = cellOf(page, 'legend');
+    await legend.focus();
+    await page.keyboard.press(' ');
+    await expect(legend).toHaveClass(/studio-sel/);
+    await expect(bar(page).locator('.studio-bar-name')).toHaveText('Proficiency Legend');
+    // The card's buttons show their whole labels.
+    const cut = await bar(page)
+      .locator('.studio-bar-btn')
+      .evaluateAll(btns => btns.filter(b => b.scrollWidth > b.clientWidth + 1).map(b => b.textContent));
+    expect(cut).toEqual([]);
   });
 
   test('Black ink turns the levels black', async ({ page }) => {
