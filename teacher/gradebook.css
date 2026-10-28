@@ -682,6 +682,10 @@ th.gb-group-alt {
   font-size: var(--text-sm);
   color: var(--text-2);
 }
+.gb-tip-count {
+  font-weight: 400;
+  color: var(--text-3);
+}
 .gb-tip-foot {
   margin-top: 8px;
 }
