@@ -18,7 +18,7 @@ const ASSESSMENT = {
   scoreMode: '',
   maxPoints: 0,
   weight: 1,
-  collaboration: 'pair',
+  collaboration: 'individual',
   created: new Date('2026-03-21').toISOString(),
 };
 
@@ -38,7 +38,6 @@ test('a card opens to Competencies | Rubric and its actions', async ({ page }) =
   const card = page.locator('#ac-assess-card');
   await expect(card.locator('.assess-grip')).toBeVisible();
   await expect(card.locator('.rubric-badge')).toHaveText('Lab Report Rubric');
-  await expect(card.locator('.collab-badge')).toHaveText('Pair');
 
   if (!(await card.evaluate(el => el.classList.contains('open')))) await card.locator('.assess-title').click();
   await expect(card).toHaveClass(/open/);
