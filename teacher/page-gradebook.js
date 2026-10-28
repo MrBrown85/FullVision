@@ -1325,10 +1325,11 @@ window.PageGradebook = (function () {
   }
   /* The tooltip on a student's name, in two groups so the two kinds of
      number never sit side by side: the course grade as the class shows it
-     (with how many assignments are NS, which count as 0 toward a %), then
-     each competency as a proficiency word, then how many competencies have
-     evidence. Every value comes from calc.js. Kept in a map, not an
-     attribute, so the HTML never round-trips through the DOM. */
+     (with how many assignments are NS, which count as 0 toward a %) and
+     each category's grade, then each competency as a proficiency word,
+     then how many competencies have evidence. Every value comes from
+     calc.js. Kept in a map, not an attribute, so the HTML never
+     round-trips through the DOM. */
   function _setNameTip(cid, student, sections) {
     var grade = studentGradeSummary(cid, student.id);
     var word = levelWord(cid, getOverallProficiency(cid, student.id));
@@ -1350,6 +1351,30 @@ window.PageGradebook = (function () {
           ns +
           (ns === 1 ? ' assignment NS (counts as 0)' : ' assignments NS (count as 0)') +
           '</div>';
+    }
+    // Categories make up the course grade, so they sit under it, each graded
+    // as the class shows grades.
+    var cats = getCategories(cid) || [];
+    if (cats.length) {
+      var scoped = _scopedAssessments(cid);
+      tip += '<div class="gb-tip-head">Categories</div>';
+      cats.forEach(function (cat) {
+        var g = assessmentGroupGrade(
+          cid,
+          student.id,
+          scoped.filter(function (a) {
+            return (a.categoryId || a.category_id || null) === cat.id;
+          }),
+        );
+        tip +=
+          '<div class="gb-tip-row"><span class="gb-tip-label">' +
+          esc(cat.name) +
+          '</span><span class="gb-tip-val" style="color:' +
+          (g ? PROF_COLORS[g.level] || PROF_COLORS[0] : 'var(--text-3)') +
+          '">' +
+          (g ? esc(g.text) : '\u2014') +
+          '</span></div>';
+      });
     }
     tip += '<div class="gb-tip-head">Competencies</div>';
     var withEvidence = 0;
