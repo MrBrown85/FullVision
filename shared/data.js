@@ -3257,8 +3257,8 @@ function _scoreEntryFromCanonical(cid, assessment, tagId, value, comment, modifi
   };
   var mod = normalizeScoreMod(entry.score, modifier);
   if (mod) entry.mod = mod;
-  // The teacher's note on a rubric criterion, printed on the rubric handout.
-  // It is set on every score key the criterion fans out to.
+  // The teacher's note on a rubric criterion (set on every score key the
+  // criterion fans out to) or on a competency, printed on the rubric handout.
   if (criterionComment) entry.critNote = String(criterionComment);
   return entry;
 }
@@ -3376,7 +3376,7 @@ async function _hydrateAssessmentDetails(cid) {
           _pushHydratedScore(
             scores,
             sid,
-            _scoreEntryFromCanonical(cid, merged, tagId, tagScore.value, comment, tagScore.modifier),
+            _scoreEntryFromCanonical(cid, merged, tagId, tagScore.value, comment, tagScore.modifier, tagScore.comment),
           );
         });
         var rubricScores = cell.rubric_scores || cell.rubricScores || [];
@@ -3608,7 +3608,15 @@ function _gradebookCellsToScoreCache(cid, assessments, cells) {
         _pushHydratedScore(
           scores,
           sid,
-          _scoreEntryFromCanonical(cid, assessment, tagId, tagScore.value, comment, tagScore.modifier),
+          _scoreEntryFromCanonical(
+            cid,
+            assessment,
+            tagId,
+            tagScore.value,
+            comment,
+            tagScore.modifier,
+            tagScore.comment,
+          ),
         );
       });
       (cell.rubric_scores || cell.rubricScores || []).forEach(function (rubricScore) {
@@ -3888,7 +3896,9 @@ function _bundleCells(gb) {
   });
   sorted(gb.tag_rows).forEach(function (r) {
     var cell = cellFor(r[0], r[1]);
-    if (cell && tags[r[2]]) cell.tag_scores.push({ tag_id: tags[r[2]], value: r[3], modifier: r[4] });
+    // A sixth value, the competency's comment, from migrations/20261027_score_comments.sql.
+    if (cell && tags[r[2]])
+      cell.tag_scores.push({ tag_id: tags[r[2]], value: r[3], modifier: r[4], comment: r[5] || null });
   });
   sorted(gb.criterion_rows).forEach(function (r) {
     var cell = cellFor(r[0], r[1]);
@@ -4912,7 +4922,14 @@ function _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note, mod) {
       if (!isRubric) {
         ops.push({
           rpc: 'upsert_tag_score',
-          params: { p_enrollment_id: sid, p_assessment_id: aid, p_tag_id: tid, p_value: intVal, p_modifier: modifier },
+          params: {
+            p_enrollment_id: sid,
+            p_assessment_id: aid,
+            p_tag_id: tid,
+            p_value: intVal,
+            p_modifier: modifier,
+            p_comment: criterionComment,
+          },
         });
       }
       if (criterionForTag && _isSendableId(criterionForTag.id)) {
@@ -4980,9 +4997,8 @@ function getRubricCriterionComment(cid, sid, aid, criterion) {
 }
 
 /* Save (or clear, with '') the comment on one criterion. The cache changes
-   at once; the server row is updated when the criterion has a level, and
-   otherwise the comment goes up with the level when one is chosen (a
-   rubric_score row cannot exist without a value). */
+   at once and the server row follows; with no level yet the row holds only
+   the comment (rubric_score.value null, migrations/20261027_score_comments.sql). */
 function saveRubricCriterionComment(cid, sid, aid, criterionId, text) {
   var assessment = _assessmentById(cid, aid);
   var criterion = _rubricCriterionById(cid, assessment, criterionId);
@@ -5023,13 +5039,13 @@ function saveRubricCriterionComment(cid, sid, aid, criterionId, text) {
   _cache.scores[cid] = scores;
   var lsOk = _safeLSSet('gb-scores-' + cid, JSON.stringify(scores));
   _markLocalWrite('scores', cid);
-  if (_writesEnabled() && level > 0 && _isSendableId(sid) && _isSendableId(aid) && _isSendableId(criterionId)) {
+  if (_writesEnabled() && _isSendableId(sid) && _isSendableId(aid) && _isSendableId(criterionId)) {
     _trackPendingSync(
       _writeRpc('upsert_rubric_score', {
         p_enrollment_id: sid,
         p_assessment_id: aid,
         p_criterion_id: criterionId,
-        p_value: level,
+        p_value: level || null,
         p_modifier: mod,
         p_comment: note,
       }).then(function (res) {
@@ -5039,6 +5055,63 @@ function saveRubricCriterionComment(cid, sid, aid, criterionId, text) {
     rubricCriterionScoreKeys(criterion).forEach(function (tid) {
       _rememberScoreCell(cid, sid, aid, tid, scores);
     });
+  }
+  _broadcastChange(cid, 'scores');
+  return lsOk;
+}
+
+/* ── Competency comments ───────────────────────────────────────────────
+   Feedback on one competency of work scored by competency levels (no
+   rubric). It lives on tag_score.comment and, in the cache, as `critNote`
+   on that competency's score entry, like a criterion's comment. */
+function getTagComment(cid, sid, aid, tagId) {
+  return _rubricCriterionCommentFor(cid, sid, aid, tagId);
+}
+
+/* Save (or clear, with '') a competency's comment. With no level yet the
+   server row holds only the comment (tag_score.value null). */
+function saveTagComment(cid, sid, aid, tagId, text) {
+  var assessment = _assessmentById(cid, aid);
+  var note = (text == null ? '' : String(text)).trim();
+  var scores = getScores(cid);
+  if (!scores[sid]) scores[sid] = [];
+  var entry = scores[sid].find(function (e) {
+    return e && e.assessmentId === aid && e.tagId === tagId;
+  });
+  if ((entry && entry.critNote ? entry.critNote : '') === note) return true;
+  if (!entry) {
+    entry = {
+      id: sid + ':' + aid + ':' + tagId,
+      assessmentId: aid,
+      tagId: tagId,
+      score: 0,
+      date: (assessment && assessment.date) || courseToday(cid),
+      type: (assessment && assessment.type) || 'summative',
+      note: '',
+      created: new Date().toISOString(),
+    };
+    scores[sid].push(entry);
+  }
+  if (note) entry.critNote = note;
+  else delete entry.critNote;
+  var level = Number(entry.score) > 0 ? Number(entry.score) : 0;
+  _cache.scores[cid] = scores;
+  var lsOk = _safeLSSet('gb-scores-' + cid, JSON.stringify(scores));
+  _markLocalWrite('scores', cid);
+  if (_writesEnabled() && _isSendableId(sid) && _isSendableId(aid) && _isSendableId(tagId)) {
+    _trackPendingSync(
+      _writeRpc('upsert_tag_score', {
+        p_enrollment_id: sid,
+        p_assessment_id: aid,
+        p_tag_id: tagId,
+        p_value: level || null,
+        p_modifier: level ? normalizeScoreMod(level, entry.mod) : 0,
+        p_comment: note,
+      }).then(function (res) {
+        if (res.error) _reportScoreWriteFailure('upsert_tag_score', res.error);
+      }),
+    );
+    _rememberScoreCell(cid, sid, aid, tagId, scores);
   }
   _broadcastChange(cid, 'scores');
   return lsOk;

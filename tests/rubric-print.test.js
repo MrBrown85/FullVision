@@ -237,17 +237,20 @@ describe('criterion comments in the data layer', () => {
     expect(calls[1].payload.p_comment).toBe('');
   });
 
-  it('a comment on an unscored criterion waits locally and goes up with the level', () => {
+  it('a comment on an unscored criterion is saved with no level, then goes up with the level', () => {
     saveRubricCriterionComment(CID, SID2, AID, CRIT_B, 'Speak up.');
-    expect(rubricCalls()).toHaveLength(0);
+    let calls = rubricCalls();
+    expect(calls).toHaveLength(1);
+    expect(calls[0].payload.p_value).toBeNull();
+    expect(calls[0].payload.p_comment).toBe('Speak up.');
     expect(getScores(CID)[SID2].find(e => e.tagId === CRIT_B).critNote).toBe('Speak up.');
     expect(RubricPrint.isStudentScored(CID, AID, SID2)).toBe(false);
 
     upsertScore(CID, SID2, AID, CRIT_B, 3, '2026-10-03', 'summative', '');
-    const calls = rubricCalls();
-    expect(calls).toHaveLength(1);
-    expect(calls[0].payload.p_value).toBe(3);
-    expect(calls[0].payload.p_comment).toBe('Speak up.');
+    calls = rubricCalls();
+    expect(calls).toHaveLength(2);
+    expect(calls[1].payload.p_value).toBe(3);
+    expect(calls[1].payload.p_comment).toBe('Speak up.');
   });
 
   it('a level change on a criterion with no comment sends null, which keeps the saved one', () => {
