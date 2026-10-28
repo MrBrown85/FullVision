@@ -1055,6 +1055,7 @@ window.PageReports = (function () {
         _classFitKey === _classFitKeyNow() ? _classFit : null,
         studioTab === 'templates' ? _templateThumbs() : null,
       );
+      ReportStudio.fitThumbs(palette);
     }
     _renderFitLine();
   }
@@ -1681,6 +1682,7 @@ window.PageReports = (function () {
         var open = layout.classList.toggle('rail-open');
         el.classList.toggle('active', open);
         el.setAttribute('aria-pressed', open ? 'true' : 'false');
+        if (open) ReportStudio.fitThumbs(document.getElementById('studio-palette'));
       },
       stepStudent: function () {
         // One student at a time, in roster order; All becomes the first or last.

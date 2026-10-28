@@ -119,6 +119,24 @@ window.ReportStudio = (function () {
   /* tab: 'blocks' | 'templates'. A block on the form is ticked; clicking
      it finds it on the page. A block with no room is greyed with the
      reason. */
+  /* Template pictures shrink to fit their cards: every side in one row,
+     no larger than 7.5% of the paper and never cut off at a card's edge.
+     All cards share the smallest scale so the pictures match in size.
+     Skips a palette that is hidden (narrow screens, rail closed). */
+  function fitThumbs(root) {
+    if (!root) return;
+    var scale = 0.075;
+    Array.prototype.forEach.call(root.querySelectorAll('.studio-tpl-thumbs'), function (box) {
+      var n = box.children.length;
+      var cs = getComputedStyle(box);
+      var w = box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      if (!n || !(w > 0)) return;
+      var gap = parseFloat(cs.columnGap) || 0;
+      scale = Math.min(scale, (w - gap * (n - 1)) / n / 816);
+    });
+    root.style.setProperty('--tpl-scale', scale.toFixed(4));
+  }
+
   function paletteHtml(form, tab, templates, sizes, fit, thumbs) {
     var sheets = S();
     var on = sheets.onForm(form);
@@ -998,6 +1016,7 @@ window.ReportStudio = (function () {
   return {
     layoutHtml: layoutHtml,
     paletteHtml: paletteHtml,
+    fitThumbs: fitThumbs,
     landing: landing,
     fitsOn: fitsOn,
     halfHeights: halfHeights,
