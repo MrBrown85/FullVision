@@ -197,6 +197,7 @@ window.ReportQuestionnaire = (function () {
   function _syncNote() {
     _syncQuotedSoon();
     _syncRows();
+    _syncBcSoon();
     var el = _box();
     var note = document.getElementById('tq-text-note');
     if (el && note)
@@ -218,6 +219,7 @@ window.ReportQuestionnaire = (function () {
     var card = document.getElementById('tq-comment-card');
     if (card) card.classList.toggle('waiting', !on);
     syncRoster();
+    _syncBc();
   }
 
   /* ── The roster (the app's sidebar) ───────────────────────── */
@@ -400,7 +402,7 @@ window.ReportQuestionnaire = (function () {
 
   function _stripHtml(cid, student, f) {
     var sid = student.id;
-    var first = displayNameFirst(student);
+    var first = student.firstName || displayNameFirst(student);
     var termId = getTermId();
     var att = getTermAttendance(cid, sid, termId);
     var goal = f.voice.goal;
@@ -428,17 +430,342 @@ window.ReportQuestionnaire = (function () {
       </div>
       <button type="button" class="qn-bc-btn" data-action="tqToggleBc" aria-expanded="false">
         <span class="qn-bc-btn-label">BC Requirements</span>
-        <span class="qn-bc-btn-short" id="tq-bc-short">${esc(_bcShort(cid, student, f))}</span>
+        <span class="qn-bc-btn-short${_bcState(cid, student, f).all ? ' ok' : ''}" id="tq-bc-short">${esc(_bcShort(cid, student, f))}</span>
       </button>
     </div>`;
   }
 
-  /* ── The BC Written Learning Update (PR 7) ───────────────── */
-  function _bcShort() {
-    return '';
+  /* ── The BC Written Learning Update ──────────────────────── */
+
+  function _form(cid) {
+    return ReportSheets.formFor((typeof getReportConfig === 'function' && getReportConfig(cid)) || {});
   }
-  function _bcCardHtml() {
-    return '';
+  function _blockLabel(id) {
+    var b = ReportSheets.BLOCKS[id];
+    return b ? b.label : id;
+  }
+
+  /* BC's six requirements for a written learning update, each met by a
+     block on the class's form or by a part of the comment, and where. */
+  var _bcOpen = false;
+  function _bcState(cid, student, f) {
+    var first = student.firstName || displayNameFirst(student);
+    var on = ReportSheets.onForm(_form(cid));
+    var has = function (id) {
+      return on.indexOf(id) >= 0;
+    };
+    var termId = getTermId();
+    var rating = getStudentTermRating(cid, student.id, termId) || {};
+    var el = _box();
+    var text = el && el.dataset.sid === student.id ? el.value : plainComment(rating.narrative || '');
+    var parts = CommentBank.parts(_bankContext(cid, student, f), text, {});
+    var inPart = function (i) {
+      return parts[i] && parts[i].inComment;
+    };
+    var rated = Object.keys(rating.habits || {}).some(function (k) {
+      return rating.habits[k] >= 1 && rating.habits[k] <= 4;
+    });
+    var answered = (f.voice.entries || []).some(function (e) {
+      return e.kind === 'core_reflection' || e.kind === 'goal_checkin';
+    });
+    var req = function (name, done, where) {
+      return { name: name, done: !!done, where: where };
+    };
+    var part = function (i, name, block, blockWhere) {
+      if (inPart(i)) return req(name, true, 'Teacher Comment · part ' + (i + 1));
+      if (block) return req(name, true, blockWhere);
+      return req(name, false, 'Nothing from part ' + (i + 1) + ' yet');
+    };
+    var reqs = [
+      has('proficiency')
+        ? req('Proficiency in Each Area', true, 'Proficiency · from scores')
+        : req('Proficiency in Each Area', false, 'The Proficiency block is not on this report'),
+      part(0, 'Work Habits', has('learner-dimensions') && rated, 'Learning Dispositions · from your ratings'),
+      part(1, 'Strengths and Growth', has('progress'), 'Progress in One Area · from scores'),
+      part(2, 'Next Steps', has('next-steps'), 'Next Steps · from your Focus Area'),
+      part(3, 'Ways to Support', has('support-home'), 'Ways to Support at Home · from your Focus Area'),
+      has('self-assessment')
+        ? req(
+            'Self-Reflection and Goals',
+            answered,
+            'Self-Assessment and Goal · ' + (answered ? 'answered' : 'waiting on ' + first),
+          )
+        : req('Self-Reflection and Goals', false, 'The Self-Assessment and Goal block is not on this report'),
+    ];
+    var used = [
+      'header',
+      'proficiency',
+      'teacher-narrative',
+      'learner-dimensions',
+      'progress',
+      'next-steps',
+      'support-home',
+      'self-assessment',
+    ];
+    var att = getTermAttendance(cid, student.id, termId);
+    var also = on
+      .filter(function (id) {
+        return used.indexOf(id) < 0;
+      })
+      .map(function (id) {
+        var status = {
+          'missing-work': 'From assignments',
+          'grade-table': 'From scores',
+          'competency-table': 'From scores',
+          legend: 'Same for all',
+          'parent-response': 'Family writes',
+          'text-block': 'Your text',
+          'student-reflection-learning': 'Student writes',
+          'student-reflection-habits': 'Student writes',
+          'term-attendance':
+            att.absences != null || att.lates != null
+              ? [att.absences != null ? att.absences + ' absent' : '', att.lates != null ? att.lates + ' late' : '']
+                  .filter(Boolean)
+                  .join(' · ')
+              : 'Optional',
+        }[id];
+        return { name: _blockLabel(id), status: status || 'From FullVision' };
+      });
+    var done = reqs.filter(function (r) {
+      return r.done;
+    }).length;
+    return {
+      reqs: reqs,
+      done: done,
+      all: done === reqs.length,
+      also: also,
+      approved: !!rating.approvedAt,
+      waiting: has('self-assessment') && !answered,
+      first: first,
+    };
+  }
+
+  function _bcShort(cid, student, f) {
+    var b = _bcState(cid, student, f);
+    return (b.all ? '✓ ' : '') + b.done + ' of ' + b.reqs.length + ' requirements';
+  }
+
+  function _bcInnerHtml(cid, student, f) {
+    var b = _bcState(cid, student, f);
+    var shown = _bcOpen
+      ? b.reqs
+      : b.reqs.filter(function (r) {
+          return !r.done;
+        });
+    return `<div class="qn-card-title">BC Written Learning Update</div>
+      <button type="button" class="qn-bc-toggle" data-action="tqToggleBcAll" aria-expanded="${_bcOpen}">
+        <span class="qn-bc-count${b.all ? ' ok' : ''}">${b.all ? '✓ ' : ''}${b.done} of ${b.reqs.length} requirements</span>
+        <span class="qn-link-text">${_bcOpen ? 'Hide' : 'Show All'}</span>
+      </button>
+      ${shown
+        .map(function (r) {
+          return `<div class="qn-req"><span class="qn-req-mark${r.done ? ' ok' : ''}" aria-label="${r.done ? 'Met' : 'Not met'}">${r.done ? '✓' : '●'}</span><span class="qn-req-name">${esc(r.name)}</span><span></span><span class="qn-req-where">${esc(r.where)}</span></div>`;
+        })
+        .join('')}
+      ${
+        _bcOpen && b.also.length
+          ? `<div class="qn-also"><span class="qn-also-title">Also on This Report</span>${b.also
+              .map(function (a) {
+                return `<div class="qn-also-row"><span>${esc(a.name)}</span><span>${esc(a.status)}</span></div>`;
+              })
+              .join('')}</div>`
+          : ''
+      }
+      <div class="qn-left">
+        <div class="qn-left-list">
+          <span class="qn-card-sub">Left for You</span>
+          ${b.approved ? `<span class="qn-left-item ok">Nothing. ${esc(b.first)} is ready.</span>` : '<span class="qn-left-item">Approve the Comment</span>'}
+          ${b.waiting ? `<span class="qn-card-sub qn-left-wait">Waiting on ${esc(b.first)}</span><span class="qn-left-item">Self-Assessment and Goal</span>` : ''}
+        </div>
+        <button type="button" class="qn-link" data-action="tqOpenReport">Open in Progress Reports ›</button>
+      </div>`;
+  }
+
+  function _bcCardHtml(cid, student, f) {
+    return `<div class="qn-card qn-bc-card" id="tq-bc-card">${_bcInnerHtml(cid, student, f)}</div>`;
+  }
+
+  /* The card and the strip's count, after the comment or a rating changes. */
+  function _syncBc() {
+    var st = _current();
+    var card = document.getElementById('tq-bc-card');
+    if (!st || !card) return;
+    var f = CommentBank.facts(_activeCourse, st, getTermId());
+    card.innerHTML = _bcInnerHtml(_activeCourse, st, f);
+    var short = document.getElementById('tq-bc-short');
+    if (short) {
+      short.textContent = _bcShort(_activeCourse, st, f);
+      short.classList.toggle('ok', _bcState(_activeCourse, st, f).all);
+    }
+  }
+  var _bcTimer = null;
+  function _syncBcSoon() {
+    clearTimeout(_bcTimer);
+    _bcTimer = setTimeout(_syncBc, 300);
+  }
+
+  function tqToggleBcAll() {
+    _bcOpen = !_bcOpen;
+    _syncBc();
+  }
+
+  /* Below 1400 px the card opens under the strip's button. */
+  function tqToggleBc(force) {
+    var qn = document.querySelector('.qn');
+    var btn = document.querySelector('.qn-bc-btn');
+    var card = document.getElementById('tq-bc-card');
+    if (!qn || !card) return;
+    var open = typeof force === 'boolean' ? force : !qn.classList.contains('bc-open');
+    qn.classList.toggle('bc-open', open);
+    if (btn) btn.setAttribute('aria-expanded', String(open));
+    if (open) {
+      var strip = qn.querySelector('.qn-strip');
+      card.style.top = strip ? strip.offsetTop + strip.offsetHeight + 6 + 'px' : '';
+      card.scrollTop = 0;
+    } else {
+      card.style.top = '';
+    }
+  }
+
+  /* ── The Questions sheet ─────────────────────────────────── */
+
+  /* What the questionnaire asks for each block on the class's form. */
+  function _asks(cid, id) {
+    var mine = function (t) {
+      return { ask: t, who: 'You', asks: true };
+    };
+    var none = function (t, who) {
+      return { ask: t, who: who || 'FullVision', asks: false };
+    };
+    var phones = '';
+    if (typeof Questionnaires !== 'undefined' && Questionnaires.list) {
+      phones = Questionnaires.list(cid)
+        .filter(function (q) {
+          return (q.kind === 'core_reflection' || q.kind === 'goal_checkin') && !q.archived_at;
+        })
+        .map(function (q) {
+          return q.title;
+        })
+        .filter(function (t, i, a) {
+          return t && a.indexOf(t) === i;
+        });
+    }
+    var map = {
+      header: none('Nothing. Comes from Class Settings.'),
+      proficiency: none('Nothing. Comes from scores.'),
+      legend: none('Nothing. Same for everyone.'),
+      'competency-table': none('Nothing. Comes from scores.'),
+      'grade-table': none('Nothing. Comes from scores.'),
+      'missing-work': none('Nothing. Comes from assignments.'),
+      'teacher-narrative': mine(
+        'Written by you. Six habit scales and the Comment Bank (' +
+          COMMENT_BANK.sentences.length +
+          ' sentences in four parts) supply wording to add and edit.',
+      ),
+      'term-attendance': mine('Optional. Classes Absent and Times Late, typed from MyEd.'),
+      'learner-dimensions': mine('The six habit scales, Rarely to Consistently.'),
+      'next-steps': mine('The Focus Area and I Can, picked in the Comment Bank.'),
+      progress: mine('The Focus Area, picked in the Comment Bank.'),
+      'support-home': mine('The Focus Area, picked in the Comment Bank. The work comes from scores.'),
+      'self-assessment': {
+        ask: (phones.length ? CommentBank.list(phones) : 'The reflection and Goal Check-In') + ', on phones.',
+        who: 'Student',
+        asks: true,
+      },
+      'student-reflection-learning': none('Nothing. The student writes on the printed page.', 'Student'),
+      'student-reflection-habits': none('Nothing. The student writes on the printed page.', 'Student'),
+      'parent-response': none('Nothing. The family writes it.', 'Family'),
+      'text-block': none('Nothing. Your text on the form, in Progress Reports.', 'You'),
+    };
+    return map[id] || none('Nothing. Comes from FullVision.');
+  }
+
+  var QUESTIONS_ID = 'tq-questions-overlay';
+  function _questionsHtml(cid) {
+    var form = _form(cid);
+    var on = ReportSheets.onForm(form);
+    var course = (typeof COURSES !== 'undefined' && COURSES[cid] && COURSES[cid].name) || '';
+    var rows = on
+      .map(function (id) {
+        var a = _asks(cid, id);
+        return `<div class="qn-q-row"><span class="qn-q-block">${esc(_blockLabel(id))}</span><span class="qn-q-ask${a.asks ? '' : ' none'}">${esc(a.ask)}</span><span class="qn-q-who who-${a.who.toLowerCase()}">${esc(a.who)}</span></div>`;
+      })
+      .join('');
+    var off = Object.keys(ReportSheets.BLOCKS)
+      .filter(function (id) {
+        var b = ReportSheets.BLOCKS[id];
+        return !b.retired && on.indexOf(id) < 0 && id !== 'header';
+      })
+      .map(_blockLabel);
+    var cards = cardsOn(cid);
+    var CARDS = [
+      ['growth', 'Growth', 'Every score this term and Start → Now per competency'],
+      ['obs', 'Observations', 'Quick observations from this term'],
+      ['voice', 'Student Voice', 'About Me, reflections and goal check-ins'],
+      ['assignments', 'Assignments', 'Handed in, late and missing this term'],
+    ];
+    return `<div class="qn-q-sheet" role="document">
+      <div class="qn-q-top"><div class="confirm-title" id="tq-questions-title">Questions</div><button type="button" class="qn-btn" data-action="tqCloseQuestions">Done</button></div>
+      <div class="qn-q-grid">
+        <div class="qn-card">
+          <div class="qn-card-row"><div class="qn-q-title">Where Each Block Gets Its Content</div><div class="qn-card-sub">Set by the blocks on ${esc(course)}’s report</div></div>
+          <div class="qn-q-row qn-q-head"><span>Report Block</span><span>The Questionnaire Asks</span><span>Who</span></div>
+          ${rows}
+          ${
+            off.length
+              ? `<div class="qn-q-off"><div><b>Not on This Report</b><span>${esc(off.join(' · '))}</span></div><button type="button" class="qn-btn" data-action="tqOpenProgress">Open Progress Reports</button></div>`
+              : ''
+          }
+        </div>
+        <div class="qn-card">
+          <div class="qn-card-row"><div class="qn-q-title">What FullVision Has</div><div class="qn-card-sub">Shown beside your questions</div></div>
+          ${CARDS.map(function (c) {
+            return `<label class="qn-q-card"><span><b>${c[1]}</b><span>${c[2]}</span></span><input type="checkbox" data-tq-card="${c[0]}"${cards[c[0]] ? ' checked' : ''}></label>`;
+          }).join('')}
+          <div class="qn-q-never"><span class="qn-card-sub">Never Printed</span><span>Student Voice answers marked Private.</span></div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  function tqOpenQuestions() {
+    tqCloseQuestions();
+    var overlay = document.createElement('div');
+    overlay.id = QUESTIONS_ID;
+    overlay.className = 'confirm-overlay qn-q-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-labelledby', 'tq-questions-title');
+    overlay.innerHTML = _questionsHtml(_activeCourse);
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay) tqCloseQuestions();
+    });
+    document.body.appendChild(overlay);
+    var done = overlay.querySelector('[data-action="tqCloseQuestions"]');
+    if (done) done.focus();
+  }
+  function tqCloseQuestions() {
+    var o = document.getElementById(QUESTIONS_ID);
+    if (!o) return;
+    o.remove();
+    var b = document.getElementById('tq-questions-btn');
+    if (b) b.focus();
+  }
+
+  /* A What FullVision Has box on the sheet: saved on this device, and the
+     column redrawn at once. */
+  function tqSetCard(key, on) {
+    var cid = _activeCourse;
+    var cards = cardsOn(cid);
+    cards[key] = !!on;
+    try {
+      localStorage.setItem('gb-tq-cards-' + cid, JSON.stringify(cards));
+    } catch (e) {
+      /* the choice holds for this visit */
+    }
+    var st = _current();
+    var col = document.getElementById('tq-evidence');
+    if (st && col) col.innerHTML = _evidenceHtml(cid, st, CommentBank.facts(cid, st, getTermId()));
   }
 
   /* ── What FullVision Has ──────────────────────────────────── */
@@ -557,7 +884,7 @@ window.ReportQuestionnaire = (function () {
      shield, the Core Competency goal with its Goal Check-In, the next step,
      the private note (marked, never printed), and forms not answered. */
   function _voiceHtml(cid, student, f) {
-    var first = displayNameFirst(student);
+    var first = student.firstName || displayNameFirst(student);
     var p = f.pronouns;
     var v = f.voice;
     var prof = v.profile;
@@ -828,10 +1155,11 @@ window.ReportQuestionnaire = (function () {
     var el = _box();
     if (el && el.dataset.sid === student.id) text = el.value;
     var parts = CommentBank.parts(ctx, text, {
+      first: student.firstName,
       more: _more,
       comments: _classmateComments(cid, student.id, termId),
     });
-    var first = displayNameFirst(student);
+    var first = student.firstName || displayNameFirst(student);
     var fit = parts.reduce(function (n, p) {
       return n + p.fit;
     }, 0);
@@ -865,6 +1193,7 @@ window.ReportQuestionnaire = (function () {
     var top = col.scrollTop;
     col.innerHTML = _bankHtml(_activeCourse, st, CommentBank.facts(_activeCourse, st, getTermId()));
     col.scrollTop = top;
+    _syncBc();
   }
 
   /* After the comment changes: each row's Added and "starts like" note, in
@@ -1097,6 +1426,12 @@ window.ReportQuestionnaire = (function () {
   /* ⌘ Return (or Ctrl Return) saves and moves on; ↑ ↓ change the student
      outside a text field (the sidebar handles them while it has the focus). */
   function handleKey(e) {
+    if (e.key === 'Escape') {
+      if (document.getElementById(QUESTIONS_ID)) tqCloseQuestions();
+      else tqToggleBc(false);
+      return;
+    }
+    if (document.getElementById(QUESTIONS_ID)) return;
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
       tqNextStudent();
@@ -1132,6 +1467,11 @@ window.ReportQuestionnaire = (function () {
     tqPickFocus: tqPickFocus,
     tqPickICan: tqPickICan,
     tqMore: tqMore,
+    tqToggleBc: tqToggleBc,
+    tqToggleBcAll: tqToggleBcAll,
+    tqOpenQuestions: tqOpenQuestions,
+    tqCloseQuestions: tqCloseQuestions,
+    tqSetCard: tqSetCard,
     cardsOn: cardsOn,
     tqSetAttendance: tqSetAttendance,
     tqSelectStudent: tqSelectStudent,
