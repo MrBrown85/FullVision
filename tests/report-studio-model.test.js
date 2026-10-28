@@ -25,7 +25,7 @@ describe('normalizeForm', () => {
       'teacher-narrative',
       'term-attendance/half+missing-work/half',
     ]);
-    expect(rowsOf(f, 1)).toEqual(['grade-table', 'parent-response']);
+    expect(rowsOf(f, 1)).toEqual(['self-assessment', 'grade-table', 'parent-response']);
     expect(S.cellOf(f, 'teacher-narrative')).toEqual({ block: 'teacher-narrative', size: 'row', lines: 10 });
     expect(S.cellOf(f, 'parent-response')).toEqual({ block: 'parent-response', size: 'row', lines: 3 });
     expect(f.pinned).toBe('parent-response');
@@ -170,7 +170,7 @@ describe('normalizeForm', () => {
 describe('editing', () => {
   it('insert puts a new block in its own row at the end of a side, before the pinned row; at a row index on request', () => {
     let f = S.insert(S.form(), 'observations', { side: 1 });
-    expect(rowsOf(f, 1)).toEqual(['grade-table', 'observations', 'parent-response']);
+    expect(rowsOf(f, 1)).toEqual(['self-assessment', 'grade-table', 'observations', 'parent-response']);
     f = S.insert(f, 'next-steps', { side: 0, row: 2 });
     expect(rowsOf(f, 0)).toEqual([
       'header',
@@ -237,7 +237,7 @@ describe('editing', () => {
       'teacher-narrative',
       'term-attendance/half+missing-work/half',
     ]);
-    expect(rowsOf(f, 1)).toEqual(['grade-table', 'legend', 'parent-response']);
+    expect(rowsOf(f, 1)).toEqual(['self-assessment', 'grade-table', 'legend', 'parent-response']);
     expect(S.moveToSide(f, 'legend', 1)).toBe(f);
     expect(S.moveToSide(f, 'legend', 5)).toBe(f);
     expect(S.moveToSide(f, 'parent-response', 0)).toBe(f);
@@ -262,7 +262,11 @@ describe('editing', () => {
       'term-attendance/half+missing-work/half',
     ]);
     expect(S.setSize(f, 'student-reflection-habits', 'half')).toEqual(f);
-    expect(rowsOf(S.setSize(S.form(), 'parent-response', 'half'), 1)).toEqual(['grade-table', 'parent-response']);
+    expect(rowsOf(S.setSize(S.form(), 'parent-response', 'half'), 1)).toEqual([
+      'self-assessment',
+      'grade-table',
+      'parent-response',
+    ]);
   });
 
   it('setLines clamps to the block’s range and only applies to writing boxes', () => {
@@ -282,7 +286,7 @@ describe('editing', () => {
     expect(S.available(f)).toContain('term-attendance');
     f = S.removeCell(f, 'parent-response');
     expect(f.pinned).toBeNull();
-    expect(rowsOf(f, 1)).toEqual(['grade-table']);
+    expect(rowsOf(f, 1)).toEqual(['self-assessment', 'grade-table']);
     expect(S.removeCell(f, 'header')).toBe(f);
     expect(S.removeCell(f, 'nope')).toBe(f);
   });
@@ -302,6 +306,7 @@ describe('editing', () => {
       'legend',
       'teacher-narrative',
       'term-attendance/half+missing-work/half',
+      'self-assessment',
       'grade-table',
       'parent-response',
     ]);
@@ -575,7 +580,7 @@ describe('stage 3 blocks', () => {
     expect(ReportBlocks.renderReportBlock('progress', CID, CECE, {}, {})).toBe('');
   });
 
-  it('Missing Work lists this term’s past-due and not-submitted work, and nothing when there is none', () => {
+  it('Missing Work names this term’s missing work on one line, says None this term, or stays off', () => {
     const work = [
       { id: 'a1', title: 'Lab Report', dueDate: '2026-10-02' },
       { id: 'a2', title: 'Quiz', date: '2026-10-05' },
@@ -583,13 +588,132 @@ describe('stage 3 blocks', () => {
     ];
     stub('getAssessments', () => work);
     stub('assessmentInActiveTerm', () => true);
+    stub('courseToday', () => '2026-10-10');
     stub('assessmentCellValue', (cid, sid, a) =>
       a.id === 'a1' ? { kind: 'missing' } : a.id === 'a2' ? { kind: 'status', status: 'NS' } : { kind: 'level' },
     );
-    const html = text(ReportBlocks.renderReportBlock('missing-work', CID, CECE, {}, {}));
-    expect(html).toBe('Missing Work Assignment Due Status Lab Report Oct 2 Past Due Quiz Oct 5 Missing');
+    expect(text(ReportBlocks.renderReportBlock('missing-work', CID, CECE, {}, {}))).toBe(
+      'Missing Work Lab Report, Quiz As of Oct 10, 2026',
+    );
+    expect(text(ReportBlocks.renderReportBlock('missing-work', CID, CECE, {}, { titles: false }))).toBe(
+      'Missing Work 2 assignments As of Oct 10, 2026',
+    );
+    expect(text(ReportBlocks.renderReportBlock('missing-work', CID, CECE, {}, { size: 'half' }))).toBe(
+      'Missing Work As of Oct 10, 2026 2 Lab Report, Quiz',
+    );
     stub('assessmentCellValue', () => ({ kind: 'level' }));
-    expect(ReportBlocks.renderReportBlock('missing-work', CID, CECE, {}, {})).toBe('');
+    expect(text(ReportBlocks.renderReportBlock('missing-work', CID, CECE, {}, {}))).toBe(
+      'Missing Work None this term As of Oct 10, 2026',
+    );
+    expect(ReportBlocks.renderReportBlock('missing-work', CID, CECE, {}, { none: 'off' })).toBe('');
+  });
+
+  it('Attendance prints the questionnaire’s totals for this term or the year, and nothing when none are entered', () => {
+    stub('getTermAttendance', () => ({ absences: 5, lates: 2, absencesThisTerm: 3, latesThisTerm: 1 }));
+    expect(text(ReportBlocks.renderReportBlock('term-attendance', CID, CECE, { termId: 'term-2' }, {}))).toBe(
+      'Attendance Classes Absent 3 Times Late 1 This term',
+    );
+    expect(
+      text(
+        ReportBlocks.renderReportBlock(
+          'term-attendance',
+          CID,
+          CECE,
+          { termId: 'term-2' },
+          { period: 'year', late: false },
+        ),
+      ),
+    ).toBe('Attendance Classes Absent 5 Year to date');
+    expect(
+      text(ReportBlocks.renderReportBlock('term-attendance', CID, CECE, { termId: 'term-2' }, { size: 'half' })),
+    ).toBe('Attendance This term 3 Classes Absent 1 Times Late');
+    stub('getTermAttendance', () => ({ absences: null, lates: null }));
+    expect(ReportBlocks.renderReportBlock('term-attendance', CID, CECE, { termId: 'term-2' }, {})).toBe('');
+  });
+
+  it('Learning Dispositions prints each rated disposition as how often, Rarely to Consistently', () => {
+    stub('getStudentTermRating', () => ({ dims: { engagement: 4, curiosity: 2, resilience: 0, respect: 1 } }));
+    const html = ReportBlocks.renderReportBlock('learner-dimensions', CID, CECE, { termId: 'term-2' }, {});
+    expect(text(html)).toBe(
+      'Learning Dispositions Teacher observation · Rarely · Sometimes · Usually · Consistently Engagement Consistently Curiosity &amp; Exploration Sometimes Respect Rarely',
+    );
+    expect(html).not.toMatch(/[●○]|Thriving|Developing/);
+    const all = text(
+      ReportBlocks.renderReportBlock(
+        'learner-dimensions',
+        CID,
+        CECE,
+        { termId: 'term-2' },
+        { rated: false, scale: false },
+      ),
+    );
+    expect(all).toContain('Resilience —');
+    expect(all).not.toContain('Teacher observation');
+    stub('getStudentTermRating', () => ({ dims: {} }));
+    expect(ReportBlocks.renderReportBlock('learner-dimensions', CID, CECE, { termId: 'term-2' }, {})).toBe('');
+  });
+
+  it('Self-Assessment and Goal prints the student’s own words: strength, Core Competency answers, goal, check-in and next step', () => {
+    const entries = [
+      {
+        kind: 'goal_checkin',
+        title: 'Goal Check-In',
+        at: '2025-11-07',
+        items: [
+          { q: { kind: 'goal_status' }, v: { num: 2, text: 'Working On It' } },
+          { q: { kind: 'text' }, v: { text: 'Ask for the lab sheet a day early.' } },
+          { q: { kind: 'core_pick' }, v: { text: 'PAR' } },
+          { q: { kind: 'text' }, v: { text: 'Check my goals every Friday.' } },
+        ],
+      },
+      {
+        kind: 'core_reflection',
+        title: 'November Reflection',
+        at: '2025-11-07',
+        items: [
+          {
+            q: { kind: 'scale4', core_ids: ['PAR', 'PPI'] },
+            v: {
+              json: {
+                levels: { PAR: 2, PPI: 3 },
+                why: { PAR: 'I set goals but I forget to check on them.', PPI: 'My family matters to me.' },
+              },
+            },
+          },
+        ],
+      },
+      {
+        kind: 'about_me',
+        title: 'About Me',
+        at: '2025-09-16',
+        items: [{ q: { kind: 'text', repeated_key: 'good_at' }, v: { text: 'I ask a lot of questions.' } }],
+      },
+    ];
+    stub('StudentVoice', {
+      entries: () => entries,
+      profile: () => ({
+        about: { goodAt: entries[2].items[0] },
+        checkin: { status: entries[0].items[0], next: entries[0].items[1], coreGoal: entries[0].items[3] },
+        reflections: [entries[1]],
+      }),
+    });
+    {
+      const html = ReportBlocks.renderReportBlock('self-assessment', CID, CECE, {}, {});
+      expect(text(html)).toBe(
+        "Self-Assessment and Goal In Cece's own words, About Me and November Reflection and Goal Check-In What I'm good at as a learner “I ask a lot of questions.” Personal Awareness and Responsibility “I set goals but I forget to check on them.” Personal and Cultural Identity “My family matters to me.” My goal “Check my goals every Friday.” How it's going Working On It What I'll do next “Ask for the lab sheet a day early.”",
+      );
+      const goalOnly = text(
+        ReportBlocks.renderReportBlock('self-assessment', CID, CECE, {}, { strength: false, core: false }),
+      );
+      expect(goalOnly).toBe(
+        "Self-Assessment and Goal In Cece's own words, Goal Check-In My goal “Check my goals every Friday.” How it's going Working On It What I'll do next “Ask for the lab sheet a day early.”",
+      );
+      expect(ReportBlocks.renderReportBlock('self-assessment', CID, CECE, {}, { size: 'half' })).toContain(
+        'report-self-half',
+      );
+      globalThis.StudentVoice.entries = () => [];
+      expect(ReportBlocks.renderReportBlock('self-assessment', CID, CECE, {}, {})).toBe('');
+    }
   });
 
   it('This Term at a Glance counts the term’s work and names the strongest and growing competency', () => {
@@ -853,7 +977,7 @@ describe('stage 3 blocks', () => {
       'competency-table',
       'growth',
     ].forEach(id => expect(html).not.toContain(`data-block="${id}"`));
-    ['support-home', 'term-glance', 'missing-work', 'proficiency'].forEach(id =>
+    ['support-home', 'progress', 'missing-work', 'proficiency', 'self-assessment'].forEach(id =>
       expect(html).toContain(`data-block="${id}"`),
     );
     const kept = S.insert(S.form(), 'section-chart', { side: 1 });

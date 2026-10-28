@@ -1750,6 +1750,13 @@ window.PageReports = (function () {
      changes. Demo Mode and offline keep the device copies. */
   function _syncFromServer(cid) {
     _syncTemplates();
+    // Student Voice answers (Self-Assessment and Goal) arrive after the
+    // class; the reports redraw once when they do.
+    if (typeof StudentVoice !== 'undefined' && !StudentVoice.loaded(cid)) {
+      StudentVoice.load(cid, function () {
+        if (cid === activeCourse && activeTab === 'progress') renderReports();
+      });
+    }
     // Attendance totals are read here, not with the class, and redraw the
     // page only when they changed and the teacher isn't typing in a box.
     if (typeof loadTermAttendance === 'function') {

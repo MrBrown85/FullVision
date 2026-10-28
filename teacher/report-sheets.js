@@ -55,8 +55,7 @@ window.ReportSheets = (function () {
   function _row() {
     return { cells: Array.prototype.slice.call(arguments) };
   }
-  /* The Report Card. Self-Assessment and Goal (plan PR 6) opens the back
-     when it lands. */
+  /* The Report Card: the default layout from the audit canvas. */
   var FORM_REPORT_CARD = {
     v: 6,
     id: 'report-card',
@@ -73,7 +72,7 @@ window.ReportSheets = (function () {
         ],
       },
       {
-        rows: [_row(_c('grade-table')), _row(_c('parent-response', 'row', { lines: 3 }))],
+        rows: [_row(_c('self-assessment')), _row(_c('grade-table')), _row(_c('parent-response', 'row', { lines: 3 }))],
       },
     ],
     pinned: 'parent-response',
@@ -267,17 +266,42 @@ window.ReportSheets = (function () {
         { key: 'per', label: 'Per Competency', def: 5, choices: [3, 5, 8] },
       ],
     },
-    'term-glance': { label: 'This Term at a Glance', group: 'Grades' },
+    'term-glance': { label: 'This Term at a Glance', group: 'Grades', retired: true },
     growth: { label: 'Growth Since Last Report', table: true, group: 'Grades', retired: true },
-    'missing-work': { label: 'Missing Work', table: true, group: 'Grades' },
+    'missing-work': {
+      label: 'Missing Work',
+      group: 'Grades',
+      options: [
+        {
+          key: 'none',
+          label: 'When None',
+          def: 'say',
+          choices: [
+            { v: 'say', label: 'Say None' },
+            { v: 'off', label: 'Leave Off' },
+          ],
+        },
+        { key: 'titles', label: 'Assignment Titles', def: true },
+      ],
+    },
     // Totals to date from the Term Questionnaire (classes absent, times late).
     // Not 'attendance': an older block by that name was retired, and forms
     // saved with it drop it.
     'term-attendance': {
       label: 'Attendance',
-      table: true,
       group: 'Grades',
-      options: [{ key: 'thisTerm', label: 'This Term Column', def: true }],
+      options: [
+        {
+          key: 'period',
+          label: 'Period',
+          def: 'term',
+          choices: [
+            { v: 'term', label: 'This Term' },
+            { v: 'year', label: 'Year to Date' },
+          ],
+        },
+        { key: 'late', label: 'Times Late', def: true },
+      ],
     },
     'section-outcomes': { label: 'Learning Outcomes', group: 'Grades', retired: true },
     'score-distribution': { label: 'Score Distribution', group: 'Grades', retired: true },
@@ -290,7 +314,7 @@ window.ReportSheets = (function () {
       maxLines: 16,
       group: 'Comments and Evidence',
     },
-    observations: { label: 'Observations', group: 'Comments and Evidence' },
+    observations: { label: 'Observations', group: 'Comments and Evidence', retired: true },
     // Next Steps, Ways to Support at Home and Progress in One Area share
     // the student's Focus Area: the competency picked in the Term
     // Questionnaire, else the one with the biggest change (plan PR 5).
@@ -331,22 +355,36 @@ window.ReportSheets = (function () {
         { key: 'toward', label: 'Working Toward', def: true },
       ],
     },
+    // Learning Dispositions print how often, Rarely to Consistently (plan
+    // PR 6); Developing now only means proficiency.
     'learner-dimensions': {
       label: 'Learning Dispositions',
       group: 'Learner Profile',
       options: [
-        { key: 'descriptions', label: 'Descriptions', def: false },
-        { key: 'examples', label: 'Examples', def: false },
+        { key: 'rated', label: 'Only Rated Dispositions', def: true },
+        { key: 'scale', label: 'Scale Line', def: true },
       ],
     },
     'core-competencies': {
       label: 'Core Competencies',
       group: 'Learner Profile',
+      retired: true,
       noEvidence: true,
       options: [{ key: 'intro', label: 'Introduction', def: true }],
     },
-    'student-reflection-learning': { label: 'Reflection: My Learning', half: false, group: 'Learner Profile' },
-    'student-reflection-habits': { label: 'Reflection: My Habits', half: false, group: 'Learner Profile' },
+    // The student's own words from Student Voice: About Me, the Core
+    // Competency reflection and the Goal Check-In.
+    'self-assessment': {
+      label: 'Self-Assessment and Goal',
+      group: 'Student Voice',
+      options: [
+        { key: 'strength', label: 'Strength', def: true },
+        { key: 'core', label: 'Core Competency Answers', def: true },
+        { key: 'goal', label: 'Goal and Check-In', def: true },
+      ],
+    },
+    'student-reflection-learning': { label: 'Reflection: My Learning', half: false, group: 'Student Voice' },
+    'student-reflection-habits': { label: 'Reflection: My Habits', half: false, group: 'Student Voice' },
     'parent-response': {
       label: 'Parent / Guardian Response',
       fill: true,
@@ -370,7 +408,7 @@ window.ReportSheets = (function () {
     'text-block': { label: 'Text Block', fill: true, group: 'Family' },
   };
   var BLOCK_ORDER = Object.keys(BLOCKS);
-  var PALETTE_GROUPS = ['Grades', 'Comments and Evidence', 'Learner Profile', 'Family'];
+  var PALETTE_GROUPS = ['Grades', 'Comments and Evidence', 'Student Voice', 'Learner Profile', 'Family'];
 
   function _clone(f) {
     return JSON.parse(JSON.stringify(f));

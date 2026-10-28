@@ -83,12 +83,14 @@ describe('ReportStudio', () => {
 
   it('renders the palette with every block grouped, the placed ones ticked and the ones with no room greyed', () => {
     const f = ReportSheets.form();
-    const sizes = { observations: { row: 400, half: 600 } };
+    const sizes = { 'student-reflection-habits': { row: 600, half: null } };
     const html = ReportStudio.paletteHtml(f, 'blocks', [], sizes, fit([{ free: [100, 100] }]));
     expect(html).toContain('Grades');
     expect(html).toMatch(/class="studio-blk placed"[^>]*data-block="proficiency"[^>]*aria-pressed="true"/);
     expect(html).toContain('Click to find it');
-    expect(html).toMatch(/class="studio-blk nofit"[^>]*data-block="observations"[^>]*aria-disabled="true"/);
+    expect(html).toMatch(
+      /class="studio-blk nofit"[^>]*data-block="student-reflection-habits"[^>]*aria-disabled="true"/,
+    );
     expect(html).toContain('No room on either side');
     expect(html).not.toContain('Letterhead');
     expect(html).not.toMatch(/studio-sz|>S<|>XL</);
@@ -166,7 +168,7 @@ describe('ReportStudio', () => {
     const f = ReportSheets.form();
     expect(ReportStudio.placeText(f, 'teacher-narrative')).toBe('Teacher Comment, Front, row 4 of 5');
     expect(ReportStudio.placeText(f, 'term-attendance')).toBe('Attendance, Front, row 5 of 5, beside Missing Work');
-    expect(ReportStudio.placeText(f, 'parent-response')).toBe('Parent / Guardian Response, Back, row 2 of 2');
+    expect(ReportStudio.placeText(f, 'parent-response')).toBe('Parent / Guardian Response, Back, row 3 of 3');
     expect(ReportStudio.placeText(f, 'nope')).toBe('');
   });
 });

@@ -56,7 +56,7 @@ describe('report block renderers take the term as context', () => {
     expect(ReportBlocks.renderReportBlock('teacher-narrative', CID, STUDENT, ctx)).toContain(
       'Cece has grown this term.',
     );
-    expect(ReportBlocks.renderReportBlock('learner-dimensions', CID, STUDENT, ctx)).toContain('Thriving');
+    expect(ReportBlocks.renderReportBlock('learner-dimensions', CID, STUDENT, ctx)).toContain('Consistently');
     const other = { termId: 'term-1', termLabel: 'Nov Report Card' };
     expect(ReportBlocks.renderReportBlock('teacher-narrative', CID, STUDENT, other)).toBe('');
     expect(ReportBlocks.renderReportBlock('learner-dimensions', CID, STUDENT, other)).toBe('');
