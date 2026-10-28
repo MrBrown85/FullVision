@@ -685,6 +685,10 @@ function refreshSidebarGrades(sid) {
     fillSidebarBadges(cid);
     return;
   }
+  if (_sidebarAnnotator) {
+    applySidebarAnnotations();
+    return;
+  }
   const el = document.querySelector('[data-prof-sid="' + sid + '"]');
   if (el) el.innerHTML = _sidebarBadgesHtml(cid, sid);
 }
@@ -699,9 +703,62 @@ function _sidebarBadgesHtml(cid, sid) {
 /** Fill sidebar grade badges asynchronously after sidebar is mounted. */
 function fillSidebarBadges(cid) {
   requestAnimationFrame(function () {
+    if (_sidebarAnnotator) {
+      applySidebarAnnotations();
+      return;
+    }
     document.querySelectorAll('[data-prof-sid]').forEach(function (el) {
       el.innerHTML = _sidebarBadgesHtml(cid, el.getAttribute('data-prof-sid'));
     });
+  });
+}
+
+/* ── Roster annotations ──────────────────────────────────────
+   A page may mark the roster for its own job: a line under each name, a
+   mark in place of the grade, rows left out, and controls above the list
+   (the Term Questionnaire: Needs Approval, a tick, All · Not Ready). The
+   annotator is a function (sid) -> { sub, mark (HTML), hidden }, with an
+   optional .top() giving the HTML above the list. Every drawing of the
+   sidebar applies it, so a redraw (a score changed, the class switched)
+   keeps the marks; null gives the grades back. */
+let _sidebarAnnotator = null;
+function setSidebarAnnotator(fn) {
+  const had = !!_sidebarAnnotator;
+  _sidebarAnnotator = fn || null;
+  applySidebarAnnotations();
+  if (had && !_sidebarAnnotator)
+    fillSidebarBadges(typeof activeCourse !== 'undefined' ? activeCourse : getActiveCourse());
+}
+function applySidebarAnnotations() {
+  const a = _sidebarAnnotator;
+  const top = document.getElementById('gb-sidebar-top');
+  let extra = document.getElementById('gb-sidebar-extra');
+  if (a && a.top && top) {
+    if (!extra) {
+      extra = document.createElement('div');
+      extra.id = 'gb-sidebar-extra';
+      top.appendChild(extra);
+    }
+    extra.innerHTML = a.top();
+  } else if (extra) {
+    extra.remove();
+  }
+  document.querySelectorAll('#gb-roster-list .student-row[data-sid]').forEach(function (row) {
+    const n = (a && a(row.dataset.sid)) || {};
+    let sub = row.querySelector('.student-row-note');
+    if (n.sub) {
+      if (!sub) {
+        sub = document.createElement('span');
+        sub.className = 'student-row-note';
+        row.querySelector('.student-info').appendChild(sub);
+      }
+      sub.textContent = n.sub;
+    } else if (sub) {
+      sub.remove();
+    }
+    const cell = row.querySelector('.student-row-grades');
+    if (cell && a) cell.innerHTML = n.mark || '';
+    row.classList.toggle('roster-hidden', !!n.hidden);
   });
 }
 
@@ -746,7 +803,7 @@ document.addEventListener('keydown', function (e) {
   const onPage = e.target === document.body || e.target === document.documentElement;
   if (!inList && !(onPage && _rosterActive)) return;
   const rows = Array.prototype.filter.call(list.querySelectorAll('.student-row'), function (r) {
-    return r.style.display !== 'none';
+    return r.style.display !== 'none' && !r.classList.contains('roster-hidden');
   });
   const selected = list.querySelector('.student-row.selected');
   const from = (inList && e.target.closest('.student-row')) || selected;

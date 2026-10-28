@@ -119,11 +119,15 @@ window.CommentBank = (function () {
     return out;
   }
 
-  function _quote(text) {
+  /* Text that ends a sentence: its own . ! ? or … kept, else a period. */
+  function _ended(text) {
     var t = String(text || '').trim();
     if (!t) return '';
-    if (!/[.!?…]$/.test(t)) t += '.';
-    return '“' + t + '”';
+    return /[.!?…]$/.test(t) ? t : t + '.';
+  }
+  function _quote(text) {
+    var t = _ended(text);
+    return t ? '“' + t + '”' : '';
   }
   function _day(d) {
     var date = typeof parseLocalDate === 'function' ? parseLocalDate(String(d).slice(0, 10)) : new Date(d);
@@ -311,8 +315,11 @@ window.CommentBank = (function () {
   }
 
   /* The Focus Area choices: the report's Focus Area first, then the
-     competencies whose level changed most this term, ties to the lowest now. */
-  function focusOptions(f) {
+     competencies whose level changed most this term, ties to the lowest now.
+     A Focus Area the teacher saved is always one of them (in the last place
+     when it is no longer in the top three), so the comment and the printed
+     report never disagree. */
+  function focusOptions(f, picked) {
     var withLevels = f.comps.filter(function (c) {
       return c.start > 0 && c.now > 0;
     });
@@ -328,6 +335,15 @@ window.CommentBank = (function () {
     sorted.forEach(function (c) {
       if (out.length < 3 && out.indexOf(c) < 0) out.push(c);
     });
+    var saved =
+      picked &&
+      f.comps.find(function (c) {
+        return c.id === picked;
+      });
+    if (saved && out.indexOf(saved) < 0) {
+      if (out.length >= 3) out.pop();
+      out.push(saved);
+    }
     return out;
   }
 
@@ -371,7 +387,7 @@ window.CommentBank = (function () {
       return word(c.start) === 'Extending' && word(c.now) === 'Proficient';
     });
 
-    var options = focusOptions(f);
+    var options = focusOptions(f, picks.focus);
     var focus =
       options.find(function (c) {
         return c.id === picks.focus;
@@ -446,13 +462,18 @@ window.CommentBank = (function () {
         return habits[h.key] === lvl;
       });
     };
+    // A habit phrase names the student's own work ("{his} work"): filled
+    // here, so fill() never reads a slot inside a value.
+    var phrase = function (t) {
+      return t.replace(/\{his\}/g, p.poss);
+    };
     var strengthBits = [];
     if (withHabit(4).length)
       strengthBits.push(
         'consistently ' +
           list(
             withHabit(4).map(function (h) {
-              return h.does;
+              return phrase(h.does);
             }),
           ),
       );
@@ -461,7 +482,7 @@ window.CommentBank = (function () {
         'usually ' +
           list(
             withHabit(3).map(function (h) {
-              return h.does;
+              return phrase(h.does);
             }),
           ),
       );
@@ -514,9 +535,9 @@ window.CommentBank = (function () {
           ? 'a solid grasp of the material'
           : 'progress toward understanding the key concepts'
         : '',
-      note: note ? note.text.replace(/[.\s]+$/, '') + '.' : '',
+      note: note ? _ended(note.text) : '',
       when: note && note.day ? 'on ' + note.day : '',
-      concernNote: concern ? concern.text.replace(/[.\s]+$/, '') + '.' : '',
+      concernNote: concern ? _ended(concern.text) : '',
       concernWhen: concern && concern.day ? concern.day : '',
       selfGood: _quote(f.voice.good),
       selfHard: _quote(f.voice.hard),
@@ -531,7 +552,7 @@ window.CommentBank = (function () {
       strengthHabits: strengthBits.join(', and '),
       growthHabits: list(
         growing.map(function (h) {
-          return h.doing;
+          return phrase(h.doing);
         }),
       ),
       strengthHabitNames: list(
@@ -562,8 +583,10 @@ window.CommentBank = (function () {
     });
   }
 
-  /* Pronoun slots, then the data slots, then [singular|plural] verbs after a
-     pronoun ("she is", "they are"); a capital to start. */
+  /* One pass over the sentence's own text: a pronoun slot, a data slot, or a
+     [singular|plural] verb after a pronoun ("she is", "they are"); a capital
+     to start. Values go in as written: a note or a student's answer that
+     happens to hold "{name}" or "[a|b]" is never read as a slot. */
   function fill(s, ctx) {
     var p = ctx._p || { subj: 'they', obj: 'them', poss: 'their', refl: 'themselves' };
     var cap = function (w) {
@@ -577,17 +600,12 @@ window.CommentBank = (function () {
       his: p.poss,
       himself: p.refl,
     };
-    var slot = function (m, k) {
-      if (k in pron) return pron[k];
-      return ctx[k] == null ? '' : String(ctx[k]);
-    };
-    // Slots inside slot values ({his} in a habit phrase) fill on a second pass.
-    var t = String(s.text)
-      .replace(/\{(\w+)\}/g, slot)
-      .replace(/\{(\w+)\}/g, slot)
-      .replace(/\[([^|\]]*)\|([^\]]*)\]/g, function (m, one, many) {
-        return p.subj === 'they' ? many : one;
-      });
+    var own = Object.prototype.hasOwnProperty;
+    var t = String(s.text).replace(/\{(\w+)\}|\[([^|\]]*)\|([^\]]*)\]/g, function (m, k, one, many) {
+      if (k === undefined) return p.subj === 'they' ? many : one;
+      if (own.call(pron, k)) return pron[k];
+      return own.call(ctx, k) && ctx[k] != null ? String(ctx[k]) : '';
+    });
     return t.charAt(0).toUpperCase() + t.slice(1);
   }
 
@@ -631,14 +649,28 @@ window.CommentBank = (function () {
     }).length;
   }
 
-  /* The first word of the comment's last sentence. */
-  function _lastStart(text) {
-    var last =
-      String(text || '')
-        .trim()
-        .split(/(?<=[.!?”])\s+/)
-        .pop() || '';
-    return last.split(/\s+/)[0] || '';
+  /* The first word of the comment's last sentence: what follows the last
+     . ! ? or closing quote that has a space after it. (No lookbehind, which
+     Safari before 16.4 cannot parse.) */
+  function lastStart(text) {
+    var t = String(text || '').trim();
+    var re = /[.!?”]\s+(?=\S)/g;
+    var from = 0;
+    var m;
+    while ((m = re.exec(t))) from = m.index + m[0].length;
+    return t.slice(from).split(/\s+/)[0] || '';
+  }
+
+  /* A row's note under its sentence. */
+  function rowMeta(repeats, used) {
+    var bits = [];
+    if (repeats) bits.push('Starts like your last sentence');
+    if (used >= USED_BY) bits.push('Used for ' + used + ' classmates this term');
+    return bits.join(' · ');
+  }
+  /* Whether a sentence not yet added starts like the comment's last one. */
+  function repeatsLast(sentence, last) {
+    return !!last && String(sentence).split(/\s+/)[0] === last;
   }
 
   /* The Comment Bank column: the four parts in BC's order, each with the
@@ -651,7 +683,7 @@ window.CommentBank = (function () {
     opts = opts || {};
     var bank = opts.bank || COMMENT_BANK;
     var more = opts.more || {};
-    var lastStart = _lastStart(text);
+    var last = lastStart(text);
     var first = opts.first || ctx.name;
     var titles = {
       habits: 'Work Habits',
@@ -699,7 +731,8 @@ window.CommentBank = (function () {
       shown.forEach(function (r) {
         r.first = r.group !== prev;
         prev = r.group;
-        r.repeats = !r.added && !!lastStart && r.text.split(/\s+/)[0] === lastStart;
+        r.repeats = !r.added && repeatsLast(r.text, last);
+        r.meta = rowMeta(r.repeats, r.used);
       });
       return {
         id: part.id,
@@ -737,6 +770,9 @@ window.CommentBank = (function () {
     context: context,
     fits: fits,
     fill: fill,
+    lastStart: lastStart,
+    rowMeta: rowMeta,
+    repeatsLast: repeatsLast,
     pattern: pattern,
     usedBy: usedBy,
     parts: parts,

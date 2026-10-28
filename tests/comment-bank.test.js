@@ -51,7 +51,7 @@ function fullContext(p, habits) {
     nextStep: 'I can identify sources of error.',
     seeWork: 'Energy Lab',
     aboutWork: 'Map Quiz',
-    strengthHabits: 'consistently uses feedback to improve {his} work',
+    strengthHabits: 'consistently uses feedback to improve ' + p.poss + ' work',
     growthHabits: 'taking part in class',
     strengthHabitNames: 'using feedback',
     growthHabitNames: 'taking part in class',
@@ -116,9 +116,93 @@ describe('fill', () => {
     expect(CommentBank.fill(h02, fullContext(P.he))).toBe('He is working on taking part in class.');
   });
 
-  it('fills a pronoun inside a habit phrase', () => {
+  it('puts a habit phrase in as the context gives it', () => {
     const h01 = COMMENT_BANK.sentences.find(s => s.id === 'h01');
     expect(CommentBank.fill(h01, fullContext(P.he))).toBe('Noor consistently uses feedback to improve his work.');
+  });
+});
+
+describe('fill takes values as written', () => {
+  it('never reads a slot or a verb choice inside a value', () => {
+    const n50 = COMMENT_BANK.sentences.find(s => s.id === 'n50');
+    const ctx = { ...fullContext(P.she), selfGood: '“I like [math|science] and {name} games.”' };
+    expect(CommentBank.fill(n50, ctx)).toBe(
+      'In her own words, she is good at this: “I like [math|science] and {name} games.”',
+    );
+  });
+
+  it('gives nothing for a slot the context does not own', () => {
+    const s = { id: 'x', text: '{name} and {constructor}.' };
+    expect(CommentBank.fill(s, fullContext(P.he))).toBe('Noor and .');
+  });
+
+  it('fills the pronoun in a habit phrase when the context is built', () => {
+    const st = { id: 's', firstName: 'Ava', pronouns: 'she/her' };
+    const f = {
+      name: 'Ava',
+      pronouns: ReportBlocks.getPronouns(st),
+      comps: [],
+      work: [],
+      record: { total: 0, handed: 0, late: 0, missing: 0 },
+      obs: [],
+      voice: {},
+      confidence: [],
+      habits: { feedback: 4, devices: 2 },
+      levelText: () => '',
+    };
+    const ctx = CommentBank.context(f, {});
+    expect(ctx.strengthHabits).toBe('consistently uses feedback to improve her work');
+    expect(ctx.growthHabits).toBe('using devices for learning and putting her phone away when asked');
+  });
+});
+
+describe('the note keeps its own ending', () => {
+  const f = note => ({
+    name: 'Ava',
+    pronouns: { subj: 'she', obj: 'her', poss: 'her', refl: 'herself' },
+    comps: [],
+    work: [],
+    record: { total: 0, handed: 0, late: 0, missing: 0 },
+    obs: [{ id: 'o1', text: note, day: 'Oct 24', sentiment: 'growth' }],
+    voice: {},
+    confidence: [],
+    habits: {},
+    levelText: () => '',
+  });
+
+  it('adds a period only when the note has no . ! or ?', () => {
+    expect(CommentBank.context(f('Asked why the ice melted faster?'), {}).note).toBe(
+      'Asked why the ice melted faster?',
+    );
+    expect(CommentBank.context(f('Helped a classmate!'), {}).note).toBe('Helped a classmate!');
+    expect(CommentBank.context(f('Finished the lab  '), {}).note).toBe('Finished the lab.');
+    expect(CommentBank.context(f('Left early?'), {}).concernNote).toBe('Left early?');
+  });
+});
+
+describe('lastStart', () => {
+  it('finds the first word of the last sentence, quotes and all', () => {
+    expect(CommentBank.lastStart('Cece works hard. She asks “why?” Then she writes it down')).toBe('Then');
+    expect(CommentBank.lastStart('One sentence only')).toBe('One');
+    expect(CommentBank.lastStart('Ends here. ')).toBe('Ends');
+    expect(CommentBank.lastStart('')).toBe('');
+  });
+});
+
+describe('focusOptions', () => {
+  const comp = (id, start, now) => ({ id, name: id, start, now, level: now, scores: [{ v: now }], iCans: [] });
+  const f = {
+    comps: [comp('A', 3, 3), comp('B', 4, 2), comp('C', 3.5, 2.5), comp('D', 3, 2.2), comp('E', 2, 2.9)],
+    defaultFocusId: 'A',
+  };
+
+  it('leads with the report’s Focus Area, then the biggest changes', () => {
+    expect(CommentBank.focusOptions(f).map(c => c.id)).toEqual(['A', 'B', 'C']);
+  });
+
+  it('keeps a saved Focus Area that is no longer in the top three', () => {
+    expect(CommentBank.focusOptions(f, 'E').map(c => c.id)).toEqual(['A', 'B', 'E']);
+    expect(CommentBank.focusOptions(f, 'B').map(c => c.id)).toEqual(['A', 'B', 'C']);
   });
 });
 
