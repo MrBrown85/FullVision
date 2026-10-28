@@ -77,6 +77,24 @@ window.ReportStudio = (function () {
     return { reason: form.sides.length > 1 ? 'No room on either side' : 'No room on the Front' };
   }
 
+  /* Whether a block has room on one side for every student: true, false,
+     or null while the class is still being measured. A block already on
+     that side always has room there (it moves within the side). */
+  function fitsOn(form, id, side, sizes, fit) {
+    var sheets = S();
+    if (!sizes || !sizes[id] || !fit || !fit.perStudent) return null;
+    var at = sheets.locate(form, id);
+    if (at && at.side === side) return true;
+    var need = sizes[id].row;
+    var H = fit.sideHeight || sheets.sideHeight('letter');
+    var free = Infinity;
+    Object.keys(fit.perStudent).forEach(function (sid) {
+      var f = fit.perStudent[sid].free;
+      free = Math.min(free, f && f[side] != null ? f[side] : 0);
+    });
+    return need + sheets.GAP <= free || (need <= free && free === H);
+  }
+
   /* tab: 'blocks' | 'templates'. A block on the form is ticked; clicking
      it finds it on the page. A block with no room is greyed with the
      reason. */
@@ -531,6 +549,352 @@ window.ReportStudio = (function () {
     );
   }
 
+  /* ── Where a held block would land (pure) ───────────────────────
+     rows: the side's rows top to bottom in sheet px, each { top, bottom,
+     cells: [{ id, size, right }], pinned?, held? } (held: the row the
+     dragged block is alone in, which is not a target and not counted);
+     x, y: the pointer in sheet px; opts: { lo (the first row index a drop
+     may take: 1 on the Front, after the letterhead), canBeside(id) (the
+     held block may pair with that lone Side by Side block) }.
+     A drop lands between rows: the target is the gap under every row whose
+     midpoint is above the pointer, so each gap owns the half of the block
+     above it and the half of the block below it. Over the empty half of a
+     row that holds one Side by Side block, the drop lands beside that
+     block instead. Nothing lands after the pinned row. Returns
+     { kind: 'row', index } or { kind: 'beside', target } or null. */
+  function targetFor(rows, x, y, opts) {
+    opts = opts || {};
+    var lo = opts.lo || 0;
+    var index = 0;
+    var last = 0;
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      if (r.held) continue;
+      if (r.pinned) break;
+      if (r.cells.length === 1 && r.cells[0].size === 'half' && y >= r.top && y <= r.bottom && x > r.cells[0].right) {
+        if (opts.canBeside && opts.canBeside(r.cells[0].id)) return { kind: 'beside', target: r.cells[0].id };
+      }
+      if (y > (r.top + r.bottom) / 2) index = last + 1;
+      last++;
+    }
+    return { kind: 'row', index: Math.max(lo, Math.min(index, last)) };
+  }
+
+  /* A block from the palette, at its real size for the previewed student,
+     shown while the pointer rests on it. */
+  function peekHtml(label, who, html) {
+    return (
+      '<div class="studio-peek no-print" role="presentation">' +
+      '<div class="studio-peek-box"><div class="studio-peek-sheet report-sheet"><div class="sheet-cell" style="width:' +
+      S().ROW_W +
+      'px">' +
+      html +
+      '</div></div></div>' +
+      '<div class="studio-peek-cap">' +
+      esc(label) +
+      (who ? ' for ' + esc(who) : '') +
+      ', at print size</div></div>'
+    );
+  }
+
+  /* ── Hands on the page ───────────────────────────────────────────
+     A block from the palette or the page is picked up after a 6px move
+     and follows the pointer as its own rendered HTML at the canvas scale.
+     While it is held, the rows under the gap it would take slide down to
+     make room and a line marks the gap; over the empty half beside a lone
+     Side by Side block, a slot marks the pair. Dropped on a page it lands
+     there; dropped anywhere else it is let go, nothing changes. Escape
+     lets go.
+     api: { form(), sizes() ({ id: { row, half } } or null), insert(id,
+     { side, row }), beside(id, targetId), select(id), announce(text),
+     html(id, size), canHalf(id) } */
+  var THRESHOLD = 6;
+
+  function initDrag(root, api) {
+    if (!root) return null;
+    var ac = new AbortController();
+    var signal = ac.signal;
+    var sheets = S();
+    var drag = null; // { id, fromPage, x, y, started, ghost, k, over, size }
+
+    function preview() {
+      return root.querySelector('.rb-preview');
+    }
+    function onePage() {
+      var p = preview();
+      return !!p && !p.classList.contains('studio-all');
+    }
+    function sheetScale(sheet) {
+      return sheet.getBoundingClientRect().width / sheet.offsetWidth || 1;
+    }
+    /* The side under a point: { side, base (rows on earlier sheets of the
+       same side), body, k, left, top, zoom } or null. A continued sheet
+       counts as its stored side. */
+    function pageAt(x, y) {
+      var zooms = root.querySelectorAll(
+        '.studio-pages:not(.studio-all) .sheet-zoom[data-side], .studio-pages:not(.studio-all) .sheet-zoom[data-from]',
+      );
+      for (var i = 0; i < zooms.length; i++) {
+        var sheet = zooms[i].querySelector('.report-sheet');
+        if (!sheet) continue;
+        var r = sheet.getBoundingClientRect();
+        if (x < r.left || x > r.right || y < r.top || y > r.bottom) continue;
+        var side = Number(zooms[i].dataset.side != null ? zooms[i].dataset.side : zooms[i].dataset.from);
+        var base = 0;
+        for (var j = 0; j < i; j++) {
+          var zj = zooms[j];
+          var from = zj.dataset.side != null ? zj.dataset.side : zj.dataset.from;
+          if (Number(from) === side) base += zj.querySelectorAll('.sheet-row:not(.sheet-pinned)').length;
+        }
+        var body = sheet.querySelector('.sheet-body');
+        var br = body.getBoundingClientRect();
+        return { side: side, base: base, body: body, k: sheetScale(sheet), left: br.left, top: br.top, zoom: zooms[i] };
+      }
+      return null;
+    }
+    function rowsOf(pg) {
+      var k = pg.k;
+      return Array.prototype.map.call(pg.body.querySelectorAll(':scope > .sheet-row'), function (row) {
+        var rr = row.getBoundingClientRect();
+        var cells = Array.prototype.map.call(row.querySelectorAll(':scope > .sheet-cell'), function (c) {
+          return { id: c.dataset.block, size: c.dataset.size, right: (c.getBoundingClientRect().right - pg.left) / k };
+        });
+        return {
+          el: row,
+          top: (rr.top - pg.top) / k,
+          bottom: (rr.bottom - pg.top) / k,
+          cells: cells,
+          pinned: row.classList.contains('sheet-pinned'),
+          held: !!drag && cells.length === 1 && cells[0].id === drag.id,
+        };
+      });
+    }
+    function blockOf(el) {
+      if (el.closest('.studio-bar, .studio-pop, .studio-page-add, .studio-page-empty, .studio-tpl, .studio-tpl-del'))
+        return null;
+      var src = el.closest(
+        '.studio-blk[data-block], .studio-pages:not(.studio-all) .sheet-body .sheet-cell[data-block]',
+      );
+      if (!src) return null;
+      var id = src.dataset.block;
+      if (id === 'header' || !sheets.BLOCKS[id]) return null;
+      if (src.classList.contains('nofit') || src.classList.contains('placed')) return null;
+      var f = api.form();
+      if (f.pinned === id) return null;
+      return { id: id, el: src, fromPage: src.classList.contains('sheet-cell') };
+    }
+    /* The pair rule: the shorter block is at least half the taller one. */
+    function pairs(a, b) {
+      var sizes = api.sizes();
+      if (!api.canHalf(a) || !api.canHalf(b)) return false;
+      if (!sizes || !sizes[a] || !sizes[b]) return true;
+      var ha = sizes[a].half || 0;
+      var hb = sizes[b].half || 0;
+      if (!ha || !hb) return true;
+      return Math.min(ha, hb) >= Math.max(ha, hb) / 2;
+    }
+    function heldHeight(size) {
+      var sizes = api.sizes();
+      var s = sizes && sizes[drag.id];
+      if (!s) return 120;
+      return (size === 'half' ? s.half || s.row : s.row) || 120;
+    }
+
+    function startDrag(e) {
+      drag.started = true;
+      root.classList.add('studio-dragging');
+      var f = api.form();
+      var cell = sheets.cellOf(f, drag.id);
+      drag.size = cell ? cell.size : 'row';
+      var pg = pageAt(e.clientX, e.clientY) || firstPage();
+      var k = pg ? pg.k : 0.6;
+      var wPx = sheets.cellWidth(drag.size);
+      var ghost = document.createElement('div');
+      ghost.className = 'studio-ghost';
+      var own = drag.fromPage
+        ? root.querySelector('.studio-pages:not(.studio-all) .sheet-cell[data-block="' + drag.id + '"]')
+        : null;
+      ghost.innerHTML =
+        '<div class="report-sheet studio-ghost-sheet" style="width:' +
+        wPx +
+        'px;transform:scale(' +
+        k +
+        ')"><div class="sheet-cell" style="width:' +
+        wPx +
+        'px">' +
+        (own && own.innerHTML ? own.innerHTML : api.html(drag.id, drag.size)) +
+        '</div></div>';
+      ghost.style.width = wPx * k + 'px';
+      document.body.appendChild(ghost);
+      drag.ghost = ghost;
+      drag.k = k;
+      if (own) {
+        var cr = own.getBoundingClientRect();
+        drag.gx = (drag.x - cr.left) / k;
+        drag.gy = (drag.y - cr.top) / k;
+        own.classList.add('studio-held');
+      } else {
+        drag.gx = 24;
+        drag.gy = 16;
+      }
+      moveDrag(e);
+    }
+    function firstPage() {
+      var z = root.querySelector('.studio-pages:not(.studio-all) .sheet-zoom[data-side] .report-sheet');
+      if (!z) return null;
+      var r = z.getBoundingClientRect();
+      return pageAt(r.left + 10, r.top + 10);
+    }
+    function clearMarks() {
+      root.querySelectorAll('.sheet-row[data-slide]').forEach(function (r) {
+        r.style.transform = '';
+        delete r.dataset.slide;
+      });
+      root.querySelectorAll('.studio-drop-line, .studio-drop-slot').forEach(function (el) {
+        el.remove();
+      });
+    }
+    function moveDrag(e) {
+      if (!drag.ghost) return;
+      drag.ghost.style.left = e.clientX - drag.gx * (drag.k || 0.6) + 'px';
+      drag.ghost.style.top = e.clientY - drag.gy * (drag.k || 0.6) + 'px';
+      var pg = pageAt(e.clientX, e.clientY);
+      drag.k = pg ? pg.k : drag.k;
+      if (!pg) {
+        drag.over = null;
+        clearMarks();
+        return;
+      }
+      var rows = rowsOf(pg);
+      var x = (e.clientX - pg.left) / pg.k;
+      var y = (e.clientY - pg.top) / pg.k;
+      var t = targetFor(rows, x, y, {
+        lo: pg.side === 0 && pg.base === 0 ? 1 : 0,
+        canBeside: function (id) {
+          return pairs(drag.id, id);
+        },
+      });
+      var key = pg.side + ':' + pg.base + ':' + t.kind + ':' + (t.kind === 'row' ? t.index : t.target);
+      if (drag.over && drag.over.key === key) return;
+      drag.over = {
+        key: key,
+        side: pg.side,
+        row: t.kind === 'row' ? pg.base + t.index : null,
+        target: t.target || null,
+      };
+      clearMarks();
+      if (t.kind === 'beside') {
+        var row = rows.find(function (r) {
+          return r.cells.length === 1 && r.cells[0].id === t.target;
+        });
+        if (row) {
+          var slot = document.createElement('div');
+          slot.className = 'studio-drop-slot';
+          slot.style.left = sheets.HALF_W + sheets.GAP + 'px';
+          slot.style.width = sheets.HALF_W + 'px';
+          slot.style.height = row.bottom - row.top + 'px';
+          row.el.appendChild(slot);
+        }
+        return;
+      }
+      // The rows from the target gap down slide by the held block's height.
+      var h = heldHeight('row') + sheets.GAP;
+      var live = rows.filter(function (r) {
+        return !r.held;
+      });
+      var at = live[t.index];
+      var line = document.createElement('div');
+      line.className = 'studio-drop-line';
+      var top = at ? at.top - sheets.GAP / 2 : live.length ? live[live.length - 1].bottom + sheets.GAP / 2 : 0;
+      if (at && at.pinned) top = at.top - sheets.GAP / 2;
+      line.style.top = top + 'px';
+      pg.body.appendChild(line);
+      live.forEach(function (r, i) {
+        if (i < t.index || r.pinned) return;
+        r.el.style.transform = 'translateY(' + h + 'px)';
+        r.el.dataset.slide = '1';
+      });
+    }
+    function endDrag(drop) {
+      if (!drag) return;
+      var d = drag;
+      drag = null;
+      if (d.ghost) d.ghost.remove();
+      clearMarks();
+      root.querySelectorAll('.studio-held').forEach(function (el) {
+        el.classList.remove('studio-held');
+      });
+      root.classList.remove('studio-dragging');
+      if (!drop || !d.over) {
+        api.announce('Let go.');
+        return;
+      }
+      if (d.over.target) api.beside(d.id, d.over.target);
+      else api.insert(d.id, { side: d.over.side, row: d.over.row });
+      api.select(d.id);
+      api.announce(placeText(api.form(), d.id) + '.');
+    }
+
+    root.addEventListener(
+      'pointerdown',
+      function (e) {
+        if (e.button !== 0 || !onePage()) return;
+        var b = blockOf(e.target);
+        if (!b) return;
+        drag = { id: b.id, fromPage: b.fromPage, x: e.clientX, y: e.clientY, started: false, over: null };
+      },
+      { signal: signal },
+    );
+    document.addEventListener(
+      'pointermove',
+      function (e) {
+        if (!drag) return;
+        if (!drag.started) {
+          if (Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y) < THRESHOLD) return;
+          startDrag(e);
+          return;
+        }
+        moveDrag(e);
+      },
+      { signal: signal },
+    );
+    document.addEventListener(
+      'pointerup',
+      function () {
+        if (!drag) return;
+        if (!drag.started) {
+          drag = null;
+          return;
+        }
+        endDrag(true);
+      },
+      { signal: signal },
+    );
+    document.addEventListener(
+      'keydown',
+      function (e) {
+        if (e.key === 'Escape' && drag && drag.started) {
+          endDrag(false);
+          e.preventDefault();
+        }
+      },
+      { signal: signal },
+    );
+
+    return {
+      destroy: function () {
+        ac.abort();
+        if (drag && drag.ghost) drag.ghost.remove();
+        clearMarks();
+        root.classList.remove('studio-dragging');
+        drag = null;
+      },
+      dragging: function () {
+        return !!(drag && drag.started);
+      },
+    };
+  }
+
   /* Keyboard on a focused block: ArrowUp / ArrowDown move its row, Delete
      removes it; the live region says where it is.
      api: { form(), move(id, dir), remove(id), announce(text) } */
@@ -569,6 +933,7 @@ window.ReportStudio = (function () {
     layoutHtml: layoutHtml,
     paletteHtml: paletteHtml,
     landing: landing,
+    fitsOn: fitsOn,
     fitLineHtml: fitLineHtml,
     longestStudent: longestStudent,
     hasOptions: hasOptions,
@@ -577,5 +942,8 @@ window.ReportStudio = (function () {
     placeText: placeText,
     fitZoom: fitZoom,
     initKeys: initKeys,
+    initDrag: initDrag,
+    targetFor: targetFor,
+    peekHtml: peekHtml,
   };
 })();

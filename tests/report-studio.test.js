@@ -169,3 +169,59 @@ describe('ReportStudio', () => {
     expect(ReportStudio.placeText(f, 'nope')).toBe('');
   });
 });
+
+describe('ReportStudio drag targets', () => {
+  const row = (top, bottom, cells, more) => ({ top, bottom, cells, ...more });
+  const c = (id, size, right) => ({ id, size, right: right ?? 720 });
+  const rows = [
+    row(0, 81, [c('header', 'row')]),
+    row(93, 339, [c('competency-table', 'row')]),
+    row(351, 468, [c('legend', 'half', 354)]),
+    row(480, 606, [c('teacher-narrative', 'row')]),
+    row(700, 996, [c('parent-response', 'row')], { pinned: true }),
+  ];
+  const T = (x, y, opts) => ReportStudio.targetFor(rows, x, y, { lo: 1, ...opts });
+
+  it('a drop lands in the gap under every row whose midpoint is above the pointer, never above the letterhead or after the pinned row', () => {
+    expect(T(100, 10)).toEqual({ kind: 'row', index: 1 });
+    expect(T(100, 100)).toEqual({ kind: 'row', index: 1 });
+    expect(T(100, 300)).toEqual({ kind: 'row', index: 2 });
+    expect(T(100, 400)).toEqual({ kind: 'row', index: 2 });
+    expect(T(100, 460)).toEqual({ kind: 'row', index: 3 });
+    expect(T(100, 600)).toEqual({ kind: 'row', index: 4 });
+    expect(T(100, 900)).toEqual({ kind: 'row', index: 4 });
+  });
+
+  it('over the empty half beside a lone Side by Side block the drop lands beside it, when the pair is allowed', () => {
+    const ok = { canBeside: () => true };
+    expect(T(500, 400, ok)).toEqual({ kind: 'beside', target: 'legend' });
+    expect(T(200, 400, ok)).toEqual({ kind: 'row', index: 2 });
+    expect(T(500, 400, { canBeside: () => false })).toEqual({ kind: 'row', index: 2 });
+    expect(T(500, 400)).toEqual({ kind: 'row', index: 2 });
+  });
+
+  it('the held block’s own row is neither a target nor counted', () => {
+    const held = rows.map(r => (r.cells[0].id === 'competency-table' ? { ...r, held: true } : r));
+    expect(ReportStudio.targetFor(held, 100, 300, { lo: 1 })).toEqual({ kind: 'row', index: 1 });
+    expect(ReportStudio.targetFor(held, 100, 460, { lo: 1 })).toEqual({ kind: 'row', index: 2 });
+  });
+
+  it('fitsOn says whether a side has room for the block for every student', () => {
+    const f = ReportSheets.form();
+    const sizes = { observations: { row: 400, half: 600 } };
+    const fit = list => ({ perStudent: per(list), sideHeight: 996 });
+    expect(ReportStudio.fitsOn(f, 'observations', 0, sizes, fit([{ free: [500, 0] }, { free: [420, 0] }]))).toBe(true);
+    expect(ReportStudio.fitsOn(f, 'observations', 0, sizes, fit([{ free: [500, 0] }, { free: [300, 0] }]))).toBe(false);
+    expect(ReportStudio.fitsOn(f, 'observations', 1, sizes, fit([{ free: [0, 996] }]))).toBe(true);
+    // A block already on the side moves within it.
+    expect(ReportStudio.fitsOn(f, 'legend', 0, { legend: { row: 2000 } }, fit([{ free: [0, 0] }]))).toBe(true);
+    expect(ReportStudio.fitsOn(f, 'observations', 0, null, fit([{}]))).toBeNull();
+  });
+
+  it('peekHtml wraps the block at Row width with its caption', () => {
+    const html = ReportStudio.peekHtml('Teacher Comment', 'Ethan Dubois', '<div>x</div>');
+    expect(html).toContain('studio-peek-box');
+    expect(html).toContain('width:720px');
+    expect(html).toContain('Teacher Comment for Ethan Dubois, at print size');
+  });
+});

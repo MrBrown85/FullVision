@@ -1147,13 +1147,57 @@ window.PageReports = (function () {
     return _previewStudents()[0] || null;
   }
 
-  /* The keyboard work on the page (report-studio.js). Every edit goes
-     through _setForm, which saves and offers Undo. */
+  /* The pointer and keyboard work on the page (report-studio.js). Every
+     edit goes through _setForm, which saves and offers Undo. A drop on a
+     side with no room for every student lands on the next side that has
+     it, and the toast says so. */
   var _studioKeys = null;
+  var _studioDrag = null;
   function _mountStudioKeys() {
     if (_studioKeys) _studioKeys.destroy();
+    if (_studioDrag) _studioDrag.destroy();
     var root = document.getElementById('studio');
     if (!root) return;
+    var fit = function () {
+      return _classFitKey === _classFitKeyNow() ? _classFit : null;
+    };
+    _studioDrag = ReportStudio.initDrag(root, {
+      form: _formOf,
+      sizes: function () {
+        return _blockSizes;
+      },
+      canHalf: ReportSheets.canHalf,
+      insert: function (id, to) {
+        var f = _formOf();
+        var was = ReportSheets.locate(f, id);
+        var label = (was ? 'Moved ' : 'Added ') + _label(id);
+        // A side with no room for every student passes the block on to the
+        // next side that has it (the sides after it first).
+        if (ReportStudio.fitsOn(f, id, to.side, _blockSizes, fit()) === false) {
+          var order = [];
+          for (var s = to.side + 1; s < f.sides.length; s++) order.push(s);
+          for (var t = 0; t < to.side; t++) order.push(t);
+          var next = order.find(function (s) {
+            return ReportStudio.fitsOn(f, id, s, _blockSizes, fit());
+          });
+          if (next != null) {
+            var full = to.side === 0 ? 'The Front is full' : to.side === 1 ? 'The Back is full' : 'That page is full';
+            label += ' to the ' + (next === 1 ? 'Back' : next === 0 ? 'Front' : 'Page ' + (next + 1)) + '. ' + full;
+            to = { side: next };
+          }
+        }
+        _setForm(ReportSheets.insert(f, id, to), label);
+      },
+      beside: function (id, target) {
+        var f = _formOf();
+        _setForm(ReportSheets.beside(f, id, target), 'Put ' + _label(id) + ' beside ' + _label(target));
+      },
+      select: _selectBlock,
+      announce: _announce,
+      html: function (id, size) {
+        return _blockHtml(id, size);
+      },
+    });
     var keepFocus = function (id) {
       if (document.activeElement && document.activeElement.closest && document.activeElement.closest('.sheet-cell')) {
         _focusBlock = id;
@@ -1172,6 +1216,70 @@ window.PageReports = (function () {
 
   function _label(id) {
     return ReportSheets.BLOCKS[id] ? ReportSheets.BLOCKS[id].label : id;
+  }
+  /* A block rendered for the previewed student, for the ghost and the
+     palette's previews. */
+  function _blockHtml(id, size) {
+    var st = _previewStudent();
+    if (!st) return '';
+    var cell = ReportSheets.cellOf(_formOf(), id) || { block: id, size: size || 'row' };
+    try {
+      return ReportBlocks.renderReportBlock(
+        id,
+        activeCourse,
+        st,
+        ReportBlocks.reportContext(),
+        ReportSheets.optionsFor(cell),
+      );
+    } catch (e) {
+      return '';
+    }
+  }
+
+  /* Holding the pointer on a block in the palette shows it at its real
+     size for the previewed student, beside the palette. */
+  var PEEK_SCALE = 0.47; // reports.css .studio-peek-sheet
+  var _peekTimer = null;
+  var _peekFor = null; // the palette button the pointer rests on
+  function _hidePeek() {
+    clearTimeout(_peekTimer);
+    _peekTimer = null;
+    _peekFor = null;
+    var p = document.getElementById('studio-peek');
+    if (p) p.remove();
+  }
+  function _handlePeekOver(e) {
+    var btn = e.target.closest ? e.target.closest('#studio-palette .studio-blk[data-block]') : null;
+    if (!btn || (_studioDrag && _studioDrag.dragging())) return;
+    _hidePeek();
+    _peekFor = btn;
+    _peekTimer = setTimeout(function () {
+      if (_peekFor !== btn) return;
+      var id = btn.dataset.block;
+      var html = _blockHtml(id, 'row');
+      if (!html) return;
+      var st = _previewStudent();
+      var wrap = document.createElement('div');
+      wrap.innerHTML = ReportStudio.peekHtml(_label(id), st ? fullName(st) : '', html);
+      var peek = wrap.firstElementChild;
+      peek.id = 'studio-peek';
+      document.body.appendChild(peek);
+      // The sheet is scaled with a transform, which leaves layout alone:
+      // the box takes the scaled height by hand.
+      var inner = peek.querySelector('.sheet-cell');
+      peek.querySelector('.studio-peek-box').style.height = Math.ceil(inner.offsetHeight * PEEK_SCALE) + 'px';
+      var br = btn.getBoundingClientRect();
+      var top = Math.max(8, Math.min(br.top, window.innerHeight - peek.offsetHeight - 8));
+      peek.style.left = br.right + 10 + 'px';
+      peek.style.top = top + 'px';
+    }, 350);
+  }
+  function _handlePeekOut(e) {
+    var btn = e.target.closest ? e.target.closest('#studio-palette .studio-blk[data-block]') : null;
+    if (!btn) return;
+    var to = e.relatedTarget;
+    if (to && btn.contains(to)) return;
+    _hidePeek();
   }
   function _moveBlock(id, dir) {
     var f = _formOf();
@@ -1771,6 +1879,9 @@ window.PageReports = (function () {
     window._pageSwitchCourse = switchCourse;
 
     _addDocListener('click', _handleClick);
+    _addDocListener('pointerover', _handlePeekOver);
+    _addDocListener('pointerout', _handlePeekOut);
+    _addDocListener('pointerdown', _hidePeek);
     _addDocListener('change', _handleStudioChange);
     _addDocListener('keydown', _handleStudioKey);
     window.addEventListener('resize', _handleResize);
@@ -1783,9 +1894,14 @@ window.PageReports = (function () {
 
   function destroy() {
     _closeSaveTemplate();
+    _hidePeek();
     if (_studioKeys) {
       _studioKeys.destroy();
       _studioKeys = null;
+    }
+    if (_studioDrag) {
+      _studioDrag.destroy();
+      _studioDrag = null;
     }
     // Save any unsaved narrative
     if (RQ.tqNarrativeDirty) tqSaveCurrentIfNeeded();

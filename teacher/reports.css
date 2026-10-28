@@ -3424,6 +3424,107 @@ button.tq-att-mention:disabled {
   font-weight: 400;
   color: var(--text-3);
 }
+/* ── Hands on the page: the held block, the gap it would take, the slot
+   beside a lone Side by Side block, and the palette's previews. */
+.studio-blk:not(.placed):not(.nofit),
+.studio-pages:not(.studio-all) .sheet-body .sheet-cell:not([data-block='header']) {
+  touch-action: none;
+}
+.studio-blk:not(.placed):not(.nofit) {
+  cursor: grab;
+}
+.studio-dragging,
+.studio-dragging .studio-blk {
+  cursor: grabbing;
+}
+.studio-dragging .studio-pages .sheet-cell {
+  pointer-events: none;
+}
+.studio-ghost {
+  position: fixed;
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0.85;
+  filter: drop-shadow(0 8px 20px rgba(10, 108, 255, 0.3));
+}
+.studio-ghost-sheet {
+  height: auto !important;
+  min-height: 0;
+  padding: 0 !important;
+  box-shadow: none !important;
+  transform-origin: top left;
+  overflow: visible !important;
+}
+.studio-pages .sheet-cell.studio-held {
+  opacity: 0.3;
+}
+.studio-pages .sheet-row {
+  transition: transform 160ms ease-out;
+}
+.studio-drop-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: calc(3px / var(--sheet-zoom, 1)) solid var(--active);
+  border-radius: 2px;
+  z-index: 2;
+  pointer-events: none;
+}
+.studio-drop-slot {
+  position: absolute;
+  top: 0;
+  box-sizing: border-box;
+  border: calc(2px / var(--sheet-zoom, 1)) dashed var(--active);
+  border-radius: 6px;
+  background: rgba(10, 108, 255, 0.08);
+  z-index: 2;
+  pointer-events: none;
+}
+.studio-pages .sheet-row {
+  position: relative;
+}
+.studio-peek {
+  position: fixed;
+  z-index: 70;
+  width: 356px;
+  padding: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+}
+.studio-peek-box {
+  position: relative;
+  overflow: hidden;
+  width: 338px;
+}
+.studio-peek-sheet {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 720px;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  box-shadow: none;
+  transform: scale(0.47);
+  transform-origin: top left;
+}
+.studio-peek-sheet .sheet-cell {
+  display: block;
+}
+.studio-peek-cap {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-3);
+}
+@media (prefers-reduced-motion: reduce) {
+  .studio-pages .sheet-row {
+    transition: none;
+  }
+}
 /* The selected block's card, in the gutter beside the page. */
 .studio-bar {
   position: absolute;

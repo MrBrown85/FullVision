@@ -770,6 +770,196 @@ test.describe('Page Studio', () => {
   });
 });
 
+test.describe('Hands on the page', () => {
+  test.setTimeout(90_000);
+
+  /* The palette and the canvas scroll; a point is only reachable on screen. */
+  async function center(locator) {
+    await locator.scrollIntoViewIfNeeded();
+    const b = await locator.boundingBox();
+    return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+  }
+  /* Presses at `from`, moves past the pick-up threshold, then to `to`. */
+  async function dragStart(page, from, to) {
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move(from.x + 10, from.y + 10, { steps: 3 });
+    await page.mouse.move(to.x, to.y, { steps: 12 });
+    await page.waitForTimeout(220);
+  }
+  /* A point just under a block's top edge: the gap above it. */
+  async function gapAbove(page, id) {
+    const b = await cellOf(page, id).boundingBox();
+    return { x: b.x + 60, y: b.y + 6 };
+  }
+
+  test('a block dragged from the palette lands in the gap under the pointer; the ghost and the line show while it is held, rows slide', async ({
+    page,
+  }) => {
+    await openStudio(page);
+    const from = await center(page.locator('[data-action="studioBlock"][data-block="term-glance"]'));
+    const to = await gapAbove(page, 'teacher-narrative');
+    await dragStart(page, from, to);
+    await expect(page.locator('.studio-ghost')).toBeVisible();
+    await expect(page.locator('.studio-ghost .report-glance')).toHaveCount(1);
+    await expect(page.locator('.sheet-zoom[data-side="0"] .studio-drop-line')).toHaveCount(1);
+    // The comment and the rows under it slide down; the legend stays.
+    const slid = await page
+      .locator('.sheet-zoom[data-side="0"] .sheet-row[data-slide]')
+      .evaluateAll(rows => rows.map(r => r.querySelector('.sheet-cell').dataset.block));
+    expect(slid).toEqual(['teacher-narrative', 'term-attendance']);
+    expect(await cellOf(page, 'teacher-narrative').evaluate(el => el.closest('.sheet-row').style.transform)).toMatch(
+      /translateY\(\d+px\)/,
+    );
+    await page.mouse.up();
+    expect(await rowsOf(page, 0)).toEqual([
+      'header',
+      'competency-table',
+      'legend',
+      'term-glance',
+      'teacher-narrative',
+      'term-attendance/half+missing-work/half',
+    ]);
+    await expect(page.locator('.studio-ghost, .studio-drop-line, .sheet-row[data-slide]')).toHaveCount(0);
+    await expect(cellOf(page, 'term-glance')).toHaveClass(/studio-sel/);
+    await expect(page.locator('#studio-live')).toHaveText('This Term at a Glance, Front, row 4 of 6.');
+    await expect(page.locator('#undo-toast')).toContainText('Added This Term at a Glance');
+    expect(await overlapping(page)).toEqual([]);
+    expect(await overflowing(page)).toEqual([]);
+  });
+
+  test('a block on the page moves to another gap; Escape lets go; a drop off the page changes nothing', async ({
+    page,
+  }) => {
+    await openStudio(page);
+    const from = await center(cellOf(page, 'teacher-narrative'));
+    const to = await gapAbove(page, 'competency-table');
+    await dragStart(page, from, to);
+    await expect(cellOf(page, 'teacher-narrative')).toHaveClass(/studio-held/);
+    await page.mouse.up();
+    expect(await rowsOf(page, 0)).toEqual([
+      'header',
+      'teacher-narrative',
+      'competency-table',
+      'legend',
+      'term-attendance/half+missing-work/half',
+    ]);
+    await expect(page.locator('#undo-toast')).toContainText('Moved Teacher Comment');
+    // Escape.
+    await dragStart(page, await center(cellOf(page, 'legend')), await gapAbove(page, 'competency-table'));
+    await page.keyboard.press('Escape');
+    await page.mouse.up();
+    expect(await rowsOf(page, 0)).toEqual([
+      'header',
+      'teacher-narrative',
+      'competency-table',
+      'legend',
+      'term-attendance/half+missing-work/half',
+    ]);
+    await expect(page.locator('#studio-live')).toHaveText('Let go.');
+    // Off the page: let go, nothing removed.
+    const head = page.locator('.studio-head');
+    const hb = await head.boundingBox();
+    await dragStart(page, await center(cellOf(page, 'legend')), { x: hb.x + hb.width / 2, y: hb.y + hb.height / 2 });
+    await page.mouse.up();
+    expect(await rowsOf(page, 0)).toContain('legend');
+    expect(await overlapping(page)).toEqual([]);
+  });
+
+  test('dropped on the empty half beside a lone Side by Side block, a block pairs with it; the slot shows while held', async ({
+    page,
+  }) => {
+    await openStudio(page);
+    await cellOf(page, 'legend').click();
+    await bar(page).getByRole('radio', { name: 'Side by Side' }).click();
+    const legend = await cellOf(page, 'legend').boundingBox();
+    const from = await center(page.locator('[data-action="studioBlock"][data-block="term-glance"]'));
+    await dragStart(page, from, { x: legend.x + legend.width + 40, y: legend.y + legend.height / 2 });
+    await expect(page.locator('.studio-drop-slot')).toHaveCount(1);
+    await expect(page.locator('.studio-drop-line')).toHaveCount(0);
+    await page.mouse.up();
+    expect(await rowsOf(page, 0)).toEqual([
+      'header',
+      'competency-table',
+      'legend/half+term-glance/half',
+      'teacher-narrative',
+      'term-attendance/half+missing-work/half',
+    ]);
+    await expect(page.locator('#undo-toast')).toContainText('Put This Term at a Glance beside Proficiency Legend');
+    await expect(page.locator('#studio-live')).toHaveText(
+      'This Term at a Glance, Front, row 3 of 5, beside Proficiency Legend.',
+    );
+    // A pair offers no beside target: a drop over it lands in a gap.
+    const pair = await cellOf(page, 'term-glance').boundingBox();
+    await dragStart(page, await center(page.locator('[data-action="studioBlock"][data-block="growth"]')), {
+      x: pair.x + 40,
+      y: pair.y + pair.height / 2,
+    });
+    await expect(page.locator('.studio-drop-slot')).toHaveCount(0);
+    await expect(page.locator('.studio-drop-line')).toHaveCount(1);
+    await page.mouse.up();
+    expect(await overlapping(page)).toEqual([]);
+    expect(await overflowing(page)).toEqual([]);
+  });
+
+  test('a drop on a Front with no room for every student lands on the Back, and the toast says so', async ({
+    page,
+  }) => {
+    await openStudio(page);
+    // Fill the Front: Core Competencies takes most of what is left.
+    await page.locator('[data-action="studioBlock"][data-block="core-competencies"]').click();
+    expect(await rowsOf(page, 0)).toContain('core-competencies');
+    // Growth Since Last Report no longer has room there: dropped on the Front, it goes to the Back.
+    const from = await center(page.locator('[data-action="studioBlock"][data-block="growth"]'));
+    await dragStart(page, from, await gapAbove(page, 'legend'));
+    await page.mouse.up();
+    expect(await rowsOf(page, 0)).not.toContain('growth');
+    expect(await rowsOf(page, 1)).toEqual(['learner-dimensions', 'growth', 'parent-response']);
+    await expect(page.locator('#undo-toast')).toContainText(
+      'Added Growth Since Last Report to the Back. The Front is full',
+    );
+    await expect(page.locator('#studio-fit')).toHaveText('1 sheet for all 27 students');
+    await undo(page).click();
+    expect(await rowsOf(page, 1)).toEqual(['learner-dimensions', 'parent-response']);
+  });
+
+  test('holding the pointer on a block in the palette shows it at print size for the previewed student', async ({
+    page,
+  }) => {
+    await openStudio(page);
+    const btn = page.locator('[data-action="studioBlock"][data-block="observations"]');
+    await btn.hover();
+    const peek = page.locator('#studio-peek');
+    await expect(peek).toBeVisible();
+    await expect(peek).toContainText('Observations for Ethan Dubois, at print size');
+    await expect(peek.locator('.report-learner-profile, .report-block-box').first()).toBeVisible();
+    const box = await peek.locator('.studio-peek-box').boundingBox();
+    expect(box.height).toBeGreaterThan(60);
+    const pal = await page.locator('#studio-palette').boundingBox();
+    expect(box.x).toBeGreaterThan(pal.x + pal.width);
+    await page.locator('.studio-head').hover();
+    await expect(peek).toHaveCount(0);
+  });
+
+  test('the letterhead and the Response cannot be picked up', async ({ page }) => {
+    await openStudio(page);
+    await dragStart(page, await center(cellOf(page, 'parent-response')), await gapAbove(page, 'competency-table'));
+    await expect(page.locator('.studio-ghost')).toHaveCount(0);
+    await page.mouse.up();
+    expect(await rowsOf(page, 1)).toEqual(['learner-dimensions', 'parent-response']);
+    await dragStart(page, await center(cellOf(page, 'header')), await gapAbove(page, 'legend'));
+    await expect(page.locator('.studio-ghost')).toHaveCount(0);
+    await page.mouse.up();
+    expect(await rowsOf(page, 0)).toEqual([
+      'header',
+      'competency-table',
+      'legend',
+      'teacher-narrative',
+      'term-attendance/half+missing-work/half',
+    ]);
+  });
+});
+
 test('below 1240 px wide, Save as Template is in the Templates tab and the toolbar fits', async ({ page }) => {
   await openStudio(page);
   await page.setViewportSize({ width: 1100, height: 800 });
