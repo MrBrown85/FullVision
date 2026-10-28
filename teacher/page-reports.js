@@ -1456,9 +1456,6 @@ window.PageReports = (function () {
   function tqToggleOb(sid, obId) {
     RQ.tqToggleOb(sid, obId);
   }
-  function tqAutoNarrative(sid) {
-    RQ.tqAutoNarrative(sid);
-  }
   function tqSelectStudent(sid) {
     RQ.tqSelectStudent(sid);
   }
@@ -1741,9 +1738,6 @@ window.PageReports = (function () {
       },
       tqExec: function () {
         tqExec(el.dataset.cmd);
-      },
-      tqAutoNarrative: function () {
-        tqAutoNarrative(el.dataset.sid);
       },
       tqCopyNarrative: function () {
         tqCopyNarrative();
