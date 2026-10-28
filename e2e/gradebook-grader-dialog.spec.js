@@ -18,10 +18,10 @@ test('a Scores cell opens the grader dialog', async ({ page }) => {
   await expect(dialog).toBeVisible();
   await expect(dialog.locator('.grader-foot')).toContainText('Proficient');
 
-  await dialog.locator('[data-action="toggleStudentStatus"][data-status="NS"]').click();
+  await dialog.locator('.grader-status [data-status="NS"]').click();
   await expect(dialog.locator('.grader-foot')).toContainText('Missing');
 
-  await page.keyboard.press('Escape');
+  await dialog.locator('.grader-done').click();
   await expect(page.locator('#grader-overlay')).toHaveCount(0);
   await expect(cell).toHaveText('M');
   const status = await page.evaluate(cid => {
