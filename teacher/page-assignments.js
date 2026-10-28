@@ -334,6 +334,11 @@ window.PageAssignments = (function () {
   var _CHEVRON_ICON =
     '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>';
 
+  var _MODULE_CHEVRON =
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>';
+  var _MODULE_TRASH =
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg>';
+
   /* ── Filter menu ────────────────────────────────────────── */
   /* One Filter button holds the category filters and Ungraded Only; it
      reads "Filter · n" while any are on. Ticking keeps the menu open;
@@ -1103,6 +1108,8 @@ window.PageAssignments = (function () {
       html +=
         '<div class="mod-folder' +
         (folderOpen ? ' open' : '') +
+        '" style="--mod-color:' +
+        esc(u.color || '#6366f1') +
         '" data-module-id="' +
         u.id +
         '" draggable="true" data-module-drag="' +
@@ -1113,8 +1120,10 @@ window.PageAssignments = (function () {
         '<div class="mod-folder-header" data-action="toggleModuleFolder" data-uid="' +
         u.id +
         '">' +
-        '<span class="mod-folder-grip">\u2807</span>' +
-        '<span class="mod-folder-chevron">\u25B6</span>' +
+        '<span class="mod-folder-grip" aria-hidden="true" title="Drag to reorder">\u2807</span>' +
+        '<span class="mod-folder-chevron" aria-hidden="true">' +
+        _MODULE_CHEVRON +
+        '</span>' +
         '<span class="mod-folder-color" style="background:' +
         (u.color || '#6366f1') +
         '" title="Change colour" data-action="openColorPicker" data-stop-prop="true">' +
@@ -1144,7 +1153,9 @@ window.PageAssignments = (function () {
         u.id +
         '" data-count="' +
         items.length +
-        '" title="Delete module">\u2715</button>' +
+        '" title="Delete module" aria-label="Delete module">' +
+        _MODULE_TRASH +
+        '</button>' +
         '</div>' +
         '</div>' +
         '<div class="mod-folder-body">' +
@@ -1184,11 +1195,13 @@ window.PageAssignments = (function () {
         (ungrouped.length === 0 ? ' empty-target' : '') +
         '" data-module-id="__none__" data-folder-drop="__none__">' +
         '<div class="mod-folder-header" data-action="toggleModuleFolder" data-uid="__none__">' +
-        '<span class="mod-folder-chevron">\u25B6</span>' +
-        '<span class="mod-folder-name" style="font-size:0.95rem;font-weight:500;color:var(--text-3)">Ungrouped Assignments</span>' +
+        '<span class="mod-folder-chevron" aria-hidden="true">' +
+        _MODULE_CHEVRON +
+        '</span>' +
+        '<span class="mod-folder-name">Ungrouped Assignments</span>' +
         '<span class="mod-folder-meta">' +
         ungrouped.length +
-        ' assignment' +
+        ' Assignment' +
         (ungrouped.length !== 1 ? 's' : '') +
         '</span>' +
         '</div>' +
