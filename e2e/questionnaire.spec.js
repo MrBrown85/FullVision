@@ -135,6 +135,44 @@ test('the roster marks survive a sidebar redraw; arrows skip students Not Ready 
   await expect(cece.locator('.student-row-prof').first()).toBeVisible();
 });
 
+test('Generate drafts the comment from the bank; ⌘Z brings the old text back; every student drafts', async ({
+  page,
+}) => {
+  await open(page);
+  const box = page.locator('#tq-narrative');
+  const before = await box.inputValue();
+  await page.locator('#tq-generate').click();
+  const first = await box.inputValue();
+  expect(first).not.toBe(before);
+  expect(first).toContain('Cece');
+  expect(first.split(/(?<=[.!?”])\s+(?=[A-Z“])/).length).toBeGreaterThanOrEqual(8);
+  expect(first).not.toMatch(/[{}[\]]/);
+  expect(await page.evaluate(() => getStudentTermRating('sci8', 'st1', 'term-2').narrative)).toBe(first);
+  // The rows that made the draft say Added; the meter counts it.
+  await expect(page.locator('#tq-bank .qn-row.added').first()).toBeVisible();
+  await expect(page.locator('#tq-meter-label')).toHaveText(/^\d+ of 10 lines$/);
+  // Again: a different mix. Undo: the previous draft, then the original.
+  await page.locator('#tq-generate').click();
+  const second = await box.inputValue();
+  expect(second).not.toBe(first);
+  await box.focus();
+  await page.keyboard.press('Meta+z');
+  await expect(box).toHaveValue(first);
+  await page.keyboard.press('Meta+z');
+  await expect(box).toHaveValue(before);
+  // Every student in the class gets a draft with no slot left unfilled.
+  const bad = await page.evaluate(() =>
+    ReportQuestionnaire.getTqStudents()
+      .map(st => {
+        const ctx = CommentBank.context(CommentBank.facts('sci8', st, 'term-2'), {});
+        const d = CommentBank.draft(ctx, { seed: CommentBank.seedFor(st.id) });
+        return d.ids.length < 6 || /[{}[\]]/.test(d.text) ? st.firstName : null;
+      })
+      .filter(Boolean),
+  );
+  expect(bad).toEqual([]);
+});
+
 test('a comment saved as HTML reads as text', async ({ page }) => {
   await open(page);
   await page.evaluate(() =>
@@ -246,7 +284,7 @@ test('Jasper: nothing from his phone yet, his forms Not Answered, his goal Not s
 
 test('Add appends the filled sentence; the row shows ✓ Added in place, nothing redrawn', async ({ page }) => {
   await open(page);
-  await expect(page.locator('.qn-bank-card .qn-card-sub').first()).toHaveText('100 sentences · 43 fit Cece');
+  await expect(page.locator('.qn-bank-card .qn-card-sub').first()).toHaveText('250 sentences · 96 fit Cece');
   const row = page.locator('.qn-part[data-part="now"] .qn-row').first();
   const text = await row.getAttribute('data-text');
   await row.evaluate(el => (el.__mark = 'same'));
@@ -283,9 +321,9 @@ test('Focus Area changes the next-step sentences; a habit picked changes what fi
   // Completes Work starts from the record; Takes Part picked at Consistently adds its sentences.
   const habits = page.locator('.qn-part[data-part="habits"]');
   await expect(habits.locator('.qn-rate').first()).toContainText('From assignments · 22 of 22, 0 late, 0 missing');
-  await expect(habits.locator('.qn-part-head .qn-card-sub')).toHaveText('5 fit Cece');
-  await page.locator('[data-action="tqRate"][data-habit="part"][data-value="4"]').click();
   await expect(habits.locator('.qn-part-head .qn-card-sub')).toHaveText('9 fit Cece');
+  await page.locator('[data-action="tqRate"][data-habit="part"][data-value="4"]').click();
+  await expect(habits.locator('.qn-part-head .qn-card-sub')).toHaveText('15 fit Cece');
   await expect(page.locator('.qn-rates-head .qn-card-sub')).toHaveText('2 of 6 rated');
   expect(await page.evaluate(() => getStudentTermRating('sci8', 'st1', 'term-2').habits)).toEqual({ part: 4 });
 });

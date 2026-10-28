@@ -453,9 +453,15 @@ window.CommentBank = (function () {
       f.obs.find(function (o) {
         return o.id === picks.note;
       }) || f.obs[0];
-    var concern = f.obs.find(function (o) {
+    // Something to work on: a growth or concern note other than the one
+    // being quoted, so a draft never quotes the same note twice.
+    var isConcern = function (o) {
       return o.sentiment === 'concern' || o.sentiment === 'growth';
-    });
+    };
+    var concern =
+      f.obs.find(function (o) {
+        return isConcern(o) && (!note || o.id !== note.id);
+      }) || f.obs.find(isConcern);
 
     var withHabit = function (lvl) {
       return HABITS.filter(function (h) {
@@ -492,6 +498,7 @@ window.CommentBank = (function () {
     return {
       _p: p,
       _habits: habits,
+      _standing: f.standing || '',
       _options: options,
       _focus: focus || null,
       _note: note || null,
@@ -523,6 +530,11 @@ window.CommentBank = (function () {
           ? 'yes'
           : '',
       rise: rises.length ? rises[0].name : '',
+      fall: drops.length
+        ? drops.slice().sort(function (a, b) {
+            return tenths(a.start) - tenths(a.now) - (tenths(b.start) - tenths(b.now));
+          })[0].name
+        : '',
       fellCount: fell.length > 1 ? NUM[fell.length] || String(fell.length) : '',
       assignment: top ? top.title : '',
       level: top ? f.levelText(top.v) : '',
@@ -546,6 +558,16 @@ window.CommentBank = (function () {
       goal: _quote(f.voice.goal),
       plan: _quote(f.voice.plan),
       focus: focus ? focus.name : '',
+      // The Focus Area only when it is one of the two lowest now, for
+      // sentences that call it the area to build (the report's Focus Area
+      // can be the biggest change, rising or falling).
+      focusLow:
+        focus &&
+        lowest.some(function (c) {
+          return c.id === focus.id;
+        })
+          ? focus.name
+          : '',
       nextStep: iCan,
       seeWork: seeWork,
       aboutWork: aboutWork,
@@ -579,7 +601,9 @@ window.CommentBank = (function () {
     for (var i = 0; i < needs.length; i++) if (!ctx[needs[i]]) return false;
     var when = s.when || {};
     return Object.keys(when).every(function (k) {
-      return k === 'picture' ? ctx.picture === when[k] : (ctx._habits || {})[k] === when[k];
+      if (k === 'picture') return ctx.picture === when[k];
+      if (k === 'standing') return ctx._standing === when[k];
+      return (ctx._habits || {})[k] === when[k];
     });
   }
 
@@ -751,6 +775,108 @@ window.CommentBank = (function () {
     });
   }
 
+  /* ── Generate ──────────────────────────────────────────────────────── */
+
+  /* A small repeatable random: the same seed gives the same draft. */
+  function _rng(seed) {
+    var x = (Number(seed) || 1) >>> 0;
+    return function () {
+      x = (x + 0x6d2b79f5) >>> 0;
+      var t = x;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function seedFor(text) {
+    var h = 2166136261;
+    String(text || '')
+      .split('')
+      .forEach(function (ch) {
+        h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0;
+      });
+    return h || 1;
+  }
+
+  /* The draft's shape: an opening, the habits (what is strong, what is
+     growing, attendance when entered), where the student is now (overall,
+     growth, one example), the next step (and the student's own goal), and
+     how they will get there (home or class, then a closer). Each step takes
+     at most one sentence. */
+  var DRAFT_STEPS = [
+    { part: 'now', groups: ['Openings'] },
+    { part: 'habits', needsAny: ['strengthHabits', 'strengthHabitNames'] },
+    { part: 'habits', needsAny: ['growthHabits', 'growthHabitNames'] },
+    { part: 'habits', groups: ['Completes Work and Takes Part'], unless: 1 },
+    { part: 'habits', groups: ['Attendance'] },
+    { part: 'now', groups: ['Overall'] },
+    { part: 'now', groups: ['Growth This Term'] },
+    { part: 'now', groups: ['Examples From Work', 'From Your Notes', "In the Student's Words"] },
+    { part: 'go', groups: ['Next Step'] },
+    { part: 'go', groups: ["In the Student's Words", 'Work to Revisit', 'From Your Notes'] },
+    { part: 'how', groups: ['At Home', 'In Class', "In the Student's Words"] },
+    { part: 'how', groups: ['Looking Ahead'] },
+  ];
+
+  /* A draft from the bank for one student: the sentences that fit, one per
+     step, the least used for classmates first, a repeatable pick among the
+     ties by `seed` (a new seed gives a new mix), never two in a row that
+     start with the same word. Returns { text, ids }. */
+  function draft(ctx, opts) {
+    opts = opts || {};
+    var bank = opts.bank || COMMENT_BANK;
+    var rand = _rng(opts.seed);
+    var comments = opts.comments || [];
+    var taken = {};
+    var out = [];
+    var got = [];
+    DRAFT_STEPS.forEach(function (step, i) {
+      if (step.unless != null && got[step.unless]) return;
+      var cands = bank.sentences.filter(function (s) {
+        if (s.part !== step.part || taken[s.id] || !fits(s, ctx)) return false;
+        if (step.groups && step.groups.indexOf(s.group) < 0) return false;
+        if (step.needsAny)
+          return (s.needs || []).some(function (k) {
+            return step.needsAny.indexOf(k) >= 0;
+          });
+        return true;
+      });
+      if (!cands.length) {
+        got[i] = false;
+        return;
+      }
+      var last = out.length ? out[out.length - 1].split(/\s+/)[0] : '';
+      var sofar = out.join(' ');
+      var scored = cands.map(function (s) {
+        var t = fill(s, ctx);
+        var used = usedBy(s, comments);
+        // A quotation already in the draft (the same note twice) is out.
+        var quotes = t.match(/\u201C[^\u201D]+\u201D/g) || [];
+        if (
+          quotes.some(function (q) {
+            return sofar.indexOf(q) >= 0;
+          })
+        )
+          used += 100;
+        // An opening a classmate already has reads as a form letter.
+        if (step.groups && step.groups[0] === 'Openings' && used) used += 10;
+        if (repeatsLast(t, last)) used += 5;
+        return { s: s, t: t, used: used, r: rand() };
+      });
+      scored.sort(function (a, b) {
+        return a.used - b.used || a.r - b.r;
+      });
+      var pick = scored[0];
+      taken[pick.s.id] = true;
+      out.push(pick.t);
+      got[i] = true;
+    });
+    return {
+      text: out.join(' '),
+      ids: Object.keys(taken),
+    };
+  }
+
   /* How many sentences fit, in all. */
   function fitCount(ctx, bank) {
     return (bank || COMMENT_BANK).sentences.filter(function (s) {
@@ -777,6 +903,9 @@ window.CommentBank = (function () {
     usedBy: usedBy,
     parts: parts,
     fitCount: fitCount,
+    draft: draft,
+    seedFor: seedFor,
+    DRAFT_STEPS: DRAFT_STEPS,
     list: list,
   };
 })();

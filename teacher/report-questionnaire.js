@@ -212,10 +212,6 @@ window.ReportQuestionnaire = (function () {
   function _syncNote() {
     _syncQuotedSoon();
     _syncRows();
-    var el = _box();
-    var note = document.getElementById('tq-text-note');
-    if (el && note)
-      note.textContent = el.value.trim() ? 'Edit any word.' : 'Empty. Type, or add from the Comment Bank.';
     if (_commentFit) _commentFit();
   }
 
@@ -1030,6 +1026,39 @@ window.ReportQuestionnaire = (function () {
     _syncRows();
   }
 
+  /* Generate: a draft from the bank, filled in for the student, in the
+     box in place of what was there (typed in, so ⌘Z brings the old text
+     back). Each press gives a new mix; the student's own seed keeps the
+     first draft the same between visits. */
+  var _generated = {};
+  function tqGenerate() {
+    var st = _current();
+    var el = _box();
+    if (!st || !el) return;
+    var termId = getTermId();
+    var f = _facts(st);
+    var n = (_generated[st.id] || 0) + 1;
+    _generated[st.id] = n;
+    var d = CommentBank.draft(_bankContext(_activeCourse, st, f), {
+      seed: CommentBank.seedFor(st.id + '|' + termId) + n,
+      comments: _classmateComments(_activeCourse, st.id, termId),
+    });
+    if (!d.text) return;
+    el.focus();
+    el.select();
+    var ok = false;
+    try {
+      ok = document.execCommand('insertText', false, d.text);
+    } catch (e) {
+      ok = false;
+    }
+    if (!ok || el.value !== d.text) el.value = d.text;
+    el.scrollTop = 0;
+    tqNarrativeDirty = true;
+    tqSaveNarrative();
+    _syncNote();
+  }
+
   /* A habit picked on the scale: saved with the others (the whole map). */
   function tqRate(key, value) {
     var st = _current();
@@ -1110,9 +1139,9 @@ window.ReportQuestionnaire = (function () {
           <textarea id="tq-narrative" class="qn-text" rows="4" spellcheck="true" data-cid="${esc(cid)}" data-sid="${esc(sid)}" data-term="${esc(termId)}">${esc(text)}</textarea>
         </label>
         <div class="qn-text-actions">
-          <span class="qn-text-note" id="tq-text-note">${text.trim() ? 'Edit any word.' : 'Empty. Type, or add from the Comment Bank.'}</span>
           <button type="button" class="qn-link" data-action="tqClear">Clear</button>
           <button type="button" class="qn-link" data-action="tqCopyNarrative" id="tq-copy-btn">Copy</button>
+          <button type="button" class="qn-generate" data-action="tqGenerate" id="tq-generate" title="A draft from the Comment Bank; \u2318 Z brings back what was there">Generate</button>
           <button type="button" class="qn-approve${on ? ' on' : ''}" id="tq-approve" data-action="tqApprove" aria-pressed="${on}">${on ? '✓ Approved' : 'Approve Comment'}</button>
         </div>`;
     } else {
@@ -1241,6 +1270,7 @@ window.ReportQuestionnaire = (function () {
     tqRosterFilter: tqRosterFilter,
     tqEvidenceTab: tqEvidenceTab,
     tqAdd: tqAdd,
+    tqGenerate: tqGenerate,
     tqRate: tqRate,
     tqPickNote: tqPickNote,
     tqPickFocus: tqPickFocus,

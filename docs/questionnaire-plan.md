@@ -36,7 +36,7 @@ The nine disposition pills, Quick Profile (Work Habits, Participation, Traits), 
 
 ## Process
 
-As `report-forms-plan.md`: decide first (the DECISIONS entry lands with this plan), one PR per change on a `claude/<slug>` branch, stacked in order, CI green (vitest, prettier, the Playwright build) before a squash merge, Netlify deploys `main`. Every PR works in Demo Mode. Grade display changes none; the migration needs Colin's review and OK (rules 1 and 2). Title Case for labels and buttons; plain sentences for hints. No sentence is ever written by a model: the bank is the bank.
+As `report-forms-plan.md`: decide first (the DECISIONS entry lands with this plan), one PR per change on a `claude/<slug>` branch, stacked in order, CI green (vitest, prettier, the Playwright build) before a squash merge, Netlify deploys `main`. Every PR works in Demo Mode. Grade display changes none; the migration needs Colin's review and OK (rules 1 and 2). Title Case for labels and buttons; plain sentences for hints. No sentence is ever written by a model: the bank is the bank. Generate (added after the build at Colin's direction) assembles a draft from it.
 
 ## PRs
 
@@ -53,7 +53,7 @@ As `report-forms-plan.md`: decide first (the DECISIONS entry lands with this pla
 
 PR 2 waits on Colin for the migration; PRs 3 to 7 stack above it and can be reviewed before it is applied. Each PR is merged once CI is green (Colin, 2026-10-28: "merge on green").
 
-After the build (2026-10-28, Colin): the BC Written Learning Update card and the strip's BC Requirements button are gone; the Teacher Comment fills the right column. Built 2026-10-28: PR 2 #468 (the migration applied on Colin's OK), PR 3 #469, PR 4 #470, PR 5 #471, PR 6 #472, PR 7 #473, PR 8 this one. Each PR's description lists what it decided differently from this plan or the canvas.
+After the build (2026-10-28, Colin): Generate returns, built on the bank (`CommentBank.draft`), and the bank grows from 100 to 250 sentences; the BC Written Learning Update card and the strip's BC Requirements button are gone; the Teacher Comment fills the right column. Built 2026-10-28: PR 2 #468 (the migration applied on Colin's OK), PR 3 #469, PR 4 #470, PR 5 #471, PR 6 #472, PR 7 #473, PR 8 this one. Each PR's description lists what it decided differently from this plan or the canvas.
 
 ## Open
 
