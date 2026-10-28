@@ -50,7 +50,9 @@ test.describe('Gradebook Scores cell editing', () => {
 
   test('leaving a cell unchanged keeps each competency score and its +/−', async ({ page }) => {
     const cell = page.locator('.gb-scores-cell[data-sid="stu-001"][data-aid="assess-001"]');
-    await cell.click();
+    // A click opens the grader dialog; the typed editor is Edit score.
+    await cell.click({ button: 'right' });
+    await page.locator('.gb-ctx-item[data-ctx="editCell"]').click();
     await expect(cell.locator('.gb-scores-input')).toBeFocused();
     await page.locator('.gb-toolbar').click({ position: { x: 5, y: 5 } });
     await expect(cell.locator('.gb-scores-input')).toHaveCount(0);
@@ -62,7 +64,9 @@ test.describe('Gradebook Scores cell editing', () => {
 
   test('typing a new value still scores every competency', async ({ page }) => {
     const cell = page.locator('.gb-scores-cell[data-sid="stu-001"][data-aid="assess-001"]');
-    await cell.click();
+    // A click opens the grader dialog; the typed editor is Edit score.
+    await cell.click({ button: 'right' });
+    await page.locator('.gb-ctx-item[data-ctx="editCell"]').click();
     await cell.locator('.gb-scores-input').fill('2');
     await cell.locator('.gb-scores-input').press('Enter');
     await expect

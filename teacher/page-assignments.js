@@ -224,6 +224,7 @@ window.PageAssignments = (function () {
   /* Mark the focused student in the roster without redrawing it, so the
      names and the roster's scroll stay put. */
   function _syncSidebarSelection() {
+    if (_grader) return;
     var rows = document.querySelectorAll('#gb-roster-list .student-row');
     if (!rows.length) {
       document.getElementById('sidebar-mount').innerHTML = renderSidebar(
@@ -245,13 +246,15 @@ window.PageAssignments = (function () {
      assessments. A focused rubric row moves to the new student's first row. */
   function stepFocusStudent(dir) {
     if (!focusStudentId) return;
-    var ids = Array.prototype.filter
-      .call(document.querySelectorAll('#gb-roster-list .student-row'), function (r) {
-        return r.style.display !== 'none';
-      })
-      .map(function (r) {
-        return r.dataset.sid;
-      });
+    var ids = _grader
+      ? _grader.studentIds
+      : Array.prototype.filter
+          .call(document.querySelectorAll('#gb-roster-list .student-row'), function (r) {
+            return r.style.display !== 'none';
+          })
+          .map(function (r) {
+            return r.dataset.sid;
+          });
     if (!ids.length) {
       ids = sortStudents(getStudents(activeCourse), 'lastName').map(function (s) {
         return s.id;
@@ -417,6 +420,29 @@ window.PageAssignments = (function () {
   }
 
   /* ── Assessment List ────────────────────────────────────── */
+  // Competencies, rubric criteria with none, or one overall score.
+  function _scoreTagObjs(cid, a) {
+    var tagObjs = scoreTagIds(a, cid)
+      .map(function (key) {
+        return scoreKeyInfo(cid, a, key);
+      })
+      .filter(Boolean);
+    return tagObjs.length ? tagObjs : [{ id: UNLINKED_TAG_ID, label: 'Overall', text: 'Not linked to a competency' }];
+  }
+
+  /* The grading controls for one assessment, for the students given: the
+     Complete/Incomplete grid, the points grid, the rubric or the
+     competency grid, as the assessment is scored. */
+  function _graderHtml(cid, a, tagObjs, students, scores) {
+    if (isCompletionScored(a)) return renderCompletionGrid(cid, a, students);
+    if (a.scoreMode === 'points') return renderPointsGrid(cid, a, students, scores);
+    if (a.rubricId && getRubricById(cid, a.rubricId)) {
+      var showRubric = rubricViewStates[a.id] !== undefined ? rubricViewStates[a.id] : true;
+      if (showRubric) return renderRubricGradingView(cid, a, students, scores);
+    }
+    return renderTagGrid(cid, a, tagObjs, students, scores);
+  }
+
   function renderAssessmentList(cid, assessments, allAssessments, students, scores, modules) {
     var html =
       '<div class="settings-grid" style="display:grid;grid-template-columns:1fr;gap:20px;align-items:start;padding:12px 12px 20px">';
@@ -446,13 +472,7 @@ window.PageAssignments = (function () {
           ? !_collapsedIds.has(a.id)
           : openAssessIds.has(a.id)
         : openAssessIds.has(a.id);
-      // Competencies, rubric criteria with none, or one overall score.
-      var tagObjs = scoreTagIds(a, cid)
-        .map(function (key) {
-          return scoreKeyInfo(cid, a, key);
-        })
-        .filter(Boolean);
-      if (!tagObjs.length) tagObjs = [{ id: UNLINKED_TAG_ID, label: 'Overall', text: 'Not linked to a competency' }];
+      var tagObjs = _scoreTagObjs(cid, a);
       var categoryId = _getAssessmentCategoryId(a);
       var categoryName = _getCategoryName(cid, categoryId);
       var c =
@@ -612,25 +632,17 @@ window.PageAssignments = (function () {
             esc(a.description) +
             '</div>'
           : '') +
-        (function () {
-          var gridStudents = focusStudentId
+        _graderHtml(
+          cid,
+          a,
+          tagObjs,
+          focusStudentId
             ? students.filter(function (st) {
                 return st.id === focusStudentId;
               })
-            : students;
-          return isCompletionScored(a)
-            ? renderCompletionGrid(cid, a, gridStudents)
-            : a.scoreMode === 'points'
-              ? renderPointsGrid(cid, a, gridStudents, scores)
-              : a.rubricId && getRubricById(cid, a.rubricId)
-                ? (function () {
-                    var showRubric = rubricViewStates[a.id] !== undefined ? rubricViewStates[a.id] : true;
-                    return showRubric
-                      ? renderRubricGradingView(cid, a, gridStudents, scores)
-                      : renderTagGrid(cid, a, tagObjs, gridStudents, scores);
-                  })()
-                : renderTagGrid(cid, a, tagObjs, gridStudents, scores);
-        })() +
+            : students,
+          scores,
+        ) +
         '</div>' +
         '</div>';
       return c;
@@ -787,6 +799,7 @@ window.PageAssignments = (function () {
 
   /* ── Main render ────────────────────────────────────────── */
   function render() {
+    if (_grader) return _renderGrader();
     var cid = activeCourse;
     var course = COURSES[cid];
     if (!course) return;
@@ -5666,6 +5679,179 @@ window.PageAssignments = (function () {
     if (lvl) resetDescriptorBar();
   }
 
+  /* ── Grader dialog ───────────────────────────────────────
+     The gradebook's cell editor: this page's grading controls for one
+     assessment and one student, in a dialog over the gradebook. While it is
+     open, render() draws the dialog instead of the page, and this page's
+     listeners run alongside the gradebook's (which stand aside, see
+     PageAssignments.graderOpen). */
+  var _grader = null;
+
+  function openGrader(cid, aid, sid, opts) {
+    if (_grader) closeGrader();
+    opts = opts || {};
+    activeCourse = cid;
+    openAssessIds = new Set([aid]);
+    focusStudentId = sid;
+    _allExpanded = false;
+    _collapsedIds = new Set();
+    rubricViewStates = {};
+    _commentPopoverState = null;
+    _critCommentState = null;
+    _kbFocusEl = null;
+    _statusDebounce = {};
+    AC.configure(cid);
+    var overlay = document.createElement('div');
+    overlay.id = 'grader-overlay';
+    overlay.className = 'grader-overlay';
+    overlay.innerHTML =
+      '<div class="grader-dialog" role="dialog" aria-modal="true" aria-labelledby="grader-title" tabindex="-1"></div>';
+    document.body.appendChild(overlay);
+    _grader = {
+      overlay: overlay,
+      aid: aid,
+      studentIds:
+        opts.studentIds && opts.studentIds.length
+          ? opts.studentIds.slice()
+          : sortStudents(getStudents(cid), 'lastName').map(function (s) {
+              return s.id;
+            }),
+      onClose: opts.onClose || null,
+    };
+    overlay.addEventListener('mousedown', function (e) {
+      if (e.target === overlay) closeGrader();
+    });
+    overlay.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-grader]');
+      if (!btn) return;
+      var what = btn.dataset.grader;
+      if (what === 'close') closeGrader();
+      else stepFocusStudent(what === 'next' ? 1 : -1);
+    });
+    _addDocListener('click', _handleClick);
+    _addDocListener('input', _handleInput);
+    _addDocListener('change', _handleChange);
+    _addDocListener('focus', _handleFocus, true);
+    _addDocListener('mousedown', _handleFocus);
+    _addDocListener('blur', _handleBlur, true);
+    _addDocListener('keydown', _handleKeydown);
+    _addDocListener('keydown', _graderKeydown);
+    ['click', 'change', 'keyup', 'focusout'].forEach(function (type) {
+      _addDocListener(type, _graderAfterEvent);
+    });
+    _addDocListener('mouseover', _handleMouseOver);
+    _addDocListener('mouseout', _handleMouseOut);
+    render();
+    overlay.querySelector('.grader-dialog').focus();
+  }
+
+  /* Escape closes the dialog once nothing inside it (a comment box, the
+     rubric window, a confirm) is using the key. In a points box it first
+     puts back the saved points, as on this page; a second Escape closes. */
+  function _graderKeydown(e) {
+    if (e.key !== 'Escape' || e.defaultPrevented || !_grader) return;
+    if (e.target && ['INPUT', 'TEXTAREA', 'SELECT'].indexOf(e.target.tagName) >= 0) return;
+    if (_critCommentState || _commentPopoverState) return;
+    if (document.getElementById('rubric-modal') || document.querySelector('.confirm-overlay')) return;
+    if (window.RubricBank && RubricBank.isOpen()) return;
+    e.preventDefault();
+    closeGrader();
+  }
+
+  function _renderGrader() {
+    var cid = activeCourse;
+    var dialog = _grader.overlay.querySelector('.grader-dialog');
+    var a = getAssessments(cid).find(function (x) {
+      return x.id === _grader.aid;
+    });
+    var st = getStudents(cid).find(function (x) {
+      return x.id === focusStudentId;
+    });
+    if (!a || !st) {
+      closeGrader();
+      return;
+    }
+    // The header is drawn once and only updated, so a save that redraws
+    // the controls (a points box on blur) doesn't swap out the button
+    // being clicked.
+    if (!dialog.firstChild)
+      dialog.innerHTML =
+        '<div class="grader-head">' +
+        '<h2 class="grader-title" id="grader-title"></h2>' +
+        '<button type="button" class="grader-close" data-grader="close" aria-label="Close">\u2715</button>' +
+        '</div>' +
+        '<div class="grader-steps">' +
+        '<button type="button" class="btn btn-ghost" data-grader="prev">\u25C0 Previous Student</button>' +
+        '<span class="grader-student"></span>' +
+        '<button type="button" class="btn btn-ghost" data-grader="next">Next Student \u25B6</button>' +
+        '</div>' +
+        '<div class="grader-body"></div>' +
+        '<div class="grader-foot">Grade: <strong></strong></div>';
+    var i = _grader.studentIds.indexOf(st.id);
+    dialog.querySelector('.grader-title').textContent = a.title || 'Assessment';
+    dialog.querySelector('.grader-student').textContent = displayNameWithLast(st);
+    dialog.querySelector('[data-grader="prev"]').disabled = !(i > 0);
+    dialog.querySelector('[data-grader="next"]').disabled = !(i >= 0 && i < _grader.studentIds.length - 1);
+    dialog.querySelector('.grader-body').innerHTML =
+      '<div class="assess-card open active" id="ac-' +
+      a.id +
+      '"><div class="assess-body">' +
+      _graderHtml(cid, a, _scoreTagObjs(cid, a), [st], getScores(cid)) +
+      '</div></div>';
+    dialog.querySelector('.grader-foot strong').textContent = _graderGradeText(cid, a, st.id);
+  }
+
+  // The assessment's grade for the student, in words.
+  function _graderGradeText(cid, a, sid) {
+    var cell = assessmentCellValue(cid, sid, a);
+    if (cell.kind === 'status') return cell.status === 'NS' ? 'Not Submitted' : 'Excused';
+    if (cell.kind === 'complete') return cell.mark === 'complete' ? 'Complete' : 'Incomplete';
+    if (cell.kind === 'level')
+      return PROF_LABELS[Math.max(1, Math.min(4, Math.round(cell.value)))] + ' (' + cell.text + ')';
+    if (cell.kind === 'points') return cell.text + ' of ' + (a.maxPoints || 100);
+    return 'Not Graded';
+  }
+
+  // Most grading controls save without redrawing, so the grade line is
+  // brought up to date after each one.
+  function _graderAfterEvent() {
+    setTimeout(function () {
+      if (!_grader) return;
+      var a = getAssessments(activeCourse).find(function (x) {
+        return x.id === _grader.aid;
+      });
+      var out = _grader.overlay.querySelector('.grader-foot strong');
+      if (a && out && focusStudentId) out.textContent = _graderGradeText(activeCourse, a, focusStudentId);
+    }, 0);
+  }
+
+  function closeGrader() {
+    if (!_grader) return;
+    // A field being typed in saves on blur, so finish it before closing.
+    var active = document.activeElement;
+    if (active && _grader.overlay.contains(active) && active.blur) active.blur();
+    var g = _grader;
+    _grader = null;
+    _listeners.forEach(function (l) {
+      document.removeEventListener(l.type, l.handler, l.options);
+    });
+    _listeners = [];
+    Object.keys(_statusDebounce).forEach(function (k) {
+      delete _statusDebounce[k];
+    });
+    ['rsg-descriptor-bar', 'rubric-modal', 'comment-popover-overlay', 'crit-comment-overlay'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.remove();
+    });
+    if (_commentCapture) _commentCapture.destroy();
+    _commentCapture = null;
+    _critCommentState = null;
+    _kbFocusEl = null;
+    focusStudentId = null;
+    g.overlay.remove();
+    if (g.onClose) g.onClose();
+  }
+
   /* ── init / destroy ─────────────────────────────────────── */
   function init(params) {
     // Reset all state
@@ -5817,6 +6003,11 @@ window.PageAssignments = (function () {
     init: init,
     destroy: destroy,
     render: render,
+    openGrader: openGrader,
+    closeGrader: closeGrader,
+    graderOpen: function () {
+      return !!_grader;
+    },
     switchCourse: switchCourse,
     toggleFocusStudent: toggleFocusStudent,
   };
