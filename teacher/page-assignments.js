@@ -506,6 +506,7 @@ window.PageAssignments = (function () {
      competency grid, as the assessment is scored. */
   function _graderHtml(cid, a, tagObjs, students, scores, oneStudent) {
     var one = oneStudent && students.length === 1 ? students[0] : null;
+    if (isDibelsScored(a)) return one ? _dibelsCardHtml(cid, a, one) : _dibelsGridHtml(cid, a, students);
     if (isCompletionScored(a)) return one ? _completeCardHtml(cid, a, one) : renderCompletionGrid(cid, a, students);
     if (a.scoreMode === 'points')
       return one ? _pointsCardHtml(cid, a, one) : renderPointsGrid(cid, a, students, scores);
@@ -810,6 +811,404 @@ window.PageAssignments = (function () {
         '</section>';
     });
     return '<div class="grdt-tiles grsp-tiles">' + html + '</div>';
+  }
+
+  /* ── DIBELS 8 benchmark ─────────────────────────────────────
+     Raw scores per window: Oral Reading Fluency words correct and errors,
+     Maze correct and incorrect. Accuracy, the adjusted Maze score and the
+     Grade 8 levels are worked out (shared/constants.js); none of it counts
+     toward a grade. One student gets two cards; the class gets one row each
+     with the level counts above. Fields save when they lose focus. */
+  var _dibelsPeriods = {};
+  var _dibelsLoaded = {};
+  function _dibelsPeriodOf(a) {
+    return _dibelsPeriods[a.id] || dibelsPeriodFor(courseToday(activeCourse));
+  }
+  function _dibelsChip(level, text) {
+    if (!level) return '<span class="dbl-chip is-empty">—</span>';
+    return (
+      '<span class="dbl-chip ' +
+      DIBELS_LEVELS[level].tone +
+      '"><span class="dbl-dot" aria-hidden="true"></span>' +
+      esc(text || DIBELS_LEVELS[level].label) +
+      '</span>'
+    );
+  }
+  // One student's numbers and what they work out to in one window.
+  function _dibelsFigures(cid, sid, aid, period) {
+    var row = getDibelsScore(cid, sid, aid, period) || {};
+    var adjusted = dibelsMazeAdjusted(row.mazeCorrect, row.mazeIncorrect);
+    return {
+      row: row,
+      accuracy: dibelsAccuracy(row.orfWrc, row.orfErrors),
+      adjusted: adjusted,
+      orfLevel: dibelsLevel('orf', period, row.orfWrc),
+      mazeLevel: dibelsLevel('maze', period, adjusted),
+    };
+  }
+  function _fmtDibels(n) {
+    return n == null ? '' : String(Math.round(n * 10) / 10);
+  }
+  function _dibelsPeriodSegHtml(a) {
+    var on = _dibelsPeriodOf(a);
+    return (
+      '<div class="grader-status dbl-period" role="group" aria-label="Benchmark window">' +
+      DIBELS_PERIODS.map(function (p) {
+        return (
+          '<button type="button" class="grader-status-btn' +
+          (p === on ? ' is-on is-period' : '') +
+          '" aria-pressed="' +
+          (p === on) +
+          '" data-action="setDibelsPeriod" data-aid="' +
+          a.id +
+          '" data-period="' +
+          p +
+          '">' +
+          DIBELS_PERIOD_NAMES[p] +
+          '</button>'
+        );
+      }).join('<span class="grader-status-sep" aria-hidden="true"></span>') +
+      '</div>'
+    );
+  }
+  function _dibelsCutsText(period) {
+    var o = DIBELS_CUTS.orf[period];
+    var m = DIBELS_CUTS.maze[period];
+    return (
+      'Grade 8 ' +
+      DIBELS_PERIOD_NAMES[period].toLowerCase() +
+      ' cut points. ORF words correct: Above ' +
+      o.above +
+      ', Core ' +
+      o.core +
+      ', Strategic ' +
+      o.strategic +
+      '. Maze adjusted (correct − incorrect ÷ 2): Above ' +
+      m.above +
+      ', Core ' +
+      m.core +
+      ', Strategic ' +
+      m.strategic +
+      '.'
+    );
+  }
+  function _dibelsLevelPillsHtml(cid, a, sid) {
+    var f = _dibelsFigures(cid, sid, a.id, _dibelsPeriodOf(a));
+    return (
+      '<span class="dbl-foot-label">ORF</span>' +
+      _dibelsChip(f.orfLevel) +
+      '<span class="dbl-foot-label">Maze</span>' +
+      _dibelsChip(f.mazeLevel)
+    );
+  }
+  function _dibelsInput(sid, aid, field, value, label, big) {
+    return (
+      '<input type="text" inputmode="numeric" class="dbl-input' +
+      (big ? ' is-big' : '') +
+      '" value="' +
+      (value == null ? '' : value) +
+      '" aria-label="' +
+      esc(label) +
+      '" data-action-blur="dibelsField" data-sid="' +
+      sid +
+      '" data-aid="' +
+      aid +
+      '" data-field="' +
+      field +
+      '">'
+    );
+  }
+  function _dibelsCardHtml(cid, a, st) {
+    var period = _dibelsPeriodOf(a);
+    var f = _dibelsFigures(cid, st.id, a.id, period);
+    var o = DIBELS_CUTS.orf[period];
+    var m = DIBELS_CUTS.maze[period];
+    function stat(label, value, out) {
+      return (
+        '<div class="dbl-stat"><span class="dbl-stat-label">' +
+        label +
+        '</span><span class="dbl-stat-value" data-out="' +
+        out +
+        '">' +
+        value +
+        '</span></div>'
+      );
+    }
+    function field(label, inner) {
+      return '<label class="dbl-field"><span class="dbl-stat-label">' + label + '</span>' + inner + '</label>';
+    }
+    return (
+      '<div class="dbl-card-wrap" data-dibels-card="' +
+      a.id +
+      '">' +
+      '<div class="dbl-bar">' +
+      _dibelsPeriodSegHtml(a) +
+      '<span class="grader-spacer"></span><span class="dbl-no-grade">Doesn’t count toward grades</span></div>' +
+      '<section class="grdl-card dbl-card"><div class="grdl-side"><h3 class="grdl-name">Oral Reading Fluency</h3>' +
+      '<span class="grdl-text">Words read correctly and errors in the one-minute passage. Grade 8 cut points: Above ' +
+      o.above +
+      ', Core ' +
+      o.core +
+      ', Strategic ' +
+      o.strategic +
+      '.</span></div><div class="dbl-fields">' +
+      field('Words Correct', _dibelsInput(st.id, a.id, 'orfWrc', f.row.orfWrc, 'Words correct', true)) +
+      field('Errors', _dibelsInput(st.id, a.id, 'orfErrors', f.row.orfErrors, 'Errors', true)) +
+      stat('Accuracy', f.accuracy == null ? '—' : f.accuracy + '%', 'accuracy') +
+      stat('Level', _dibelsChip(f.orfLevel), 'orfLevel') +
+      '</div></section>' +
+      '<section class="grdl-card dbl-card"><div class="grdl-side"><h3 class="grdl-name">Maze</h3>' +
+      '<span class="grdl-text">Correct and incorrect answers. Adjusted = correct − incorrect ÷ 2. Cut points: Above ' +
+      m.above +
+      ', Core ' +
+      m.core +
+      ', Strategic ' +
+      m.strategic +
+      '.</span></div><div class="dbl-fields">' +
+      field('Correct', _dibelsInput(st.id, a.id, 'mazeCorrect', f.row.mazeCorrect, 'Maze correct', true)) +
+      field('Incorrect', _dibelsInput(st.id, a.id, 'mazeIncorrect', f.row.mazeIncorrect, 'Maze incorrect', true)) +
+      stat('Adjusted', f.adjusted == null ? '—' : _fmtDibels(f.adjusted), 'adjusted') +
+      stat('Level', _dibelsChip(f.mazeLevel), 'mazeLevel') +
+      '</div></section></div>'
+    );
+  }
+  function _dibelsCountsHtml(cid, a, students, period) {
+    var counts = { orf: {}, maze: {} };
+    var tested = 0;
+    students.forEach(function (st) {
+      var status = getAssignmentStatus(cid, st.id, a.id);
+      if (status === 'NS' || status === 'EXC') return;
+      var f = _dibelsFigures(cid, st.id, a.id, period);
+      if (f.orfLevel || f.mazeLevel) tested++;
+      if (f.orfLevel) counts.orf[f.orfLevel] = (counts.orf[f.orfLevel] || 0) + 1;
+      if (f.mazeLevel) counts.maze[f.mazeLevel] = (counts.maze[f.mazeLevel] || 0) + 1;
+    });
+    function line(name, key) {
+      return (
+        '<div class="dbl-count-row"><span class="dbl-count-name">' +
+        name +
+        '</span>' +
+        ['above', 'core', 'strategic', 'intensive']
+          .map(function (lv) {
+            return '<span class="dbl-count">' + _dibelsChip(lv) + '<b>' + (counts[key][lv] || 0) + '</b></span>';
+          })
+          .join('') +
+        '</div>'
+      );
+    }
+    return (
+      '<div class="dbl-summary">' +
+      '<div class="dbl-bar">' +
+      _dibelsPeriodSegHtml(a) +
+      '<span class="dbl-tested"><b>' +
+      tested +
+      '</b> of ' +
+      students.length +
+      ' tested</span><span class="grader-spacer"></span><span class="dbl-no-grade">Doesn’t count toward grades</span></div>' +
+      line('ORF', 'orf') +
+      line('Maze', 'maze') +
+      '<span class="dbl-cuts">' +
+      _dibelsCutsText(period) +
+      '</span></div>'
+    );
+  }
+  function _dibelsRowHtml(cid, a, st, period) {
+    var f = _dibelsFigures(cid, st.id, a.id, period);
+    var status = getAssignmentStatus(cid, st.id, a.id);
+    var name = displayNameWithLast(st);
+    return (
+      '<div class="score-row dbl-row' +
+      (status === 'NS' || status === 'EXC' ? ' has-status' : '') +
+      '" data-status-student="' +
+      st.id +
+      '" data-status-assess="' +
+      a.id +
+      '">' +
+      '<span class="ldg-name">' +
+      esc(name) +
+      '</span>' +
+      _dibelsInput(st.id, a.id, 'orfWrc', f.row.orfWrc, 'Words correct, ' + name) +
+      _dibelsInput(st.id, a.id, 'orfErrors', f.row.orfErrors, 'Errors, ' + name) +
+      '<span class="dbl-num" data-out="accuracy">' +
+      (f.accuracy == null ? '' : f.accuracy + '%') +
+      '</span>' +
+      '<span data-out="orfLevel">' +
+      (f.orfLevel ? _dibelsChip(f.orfLevel) : '') +
+      '</span>' +
+      '<span class="dbl-divider" aria-hidden="true"></span>' +
+      _dibelsInput(st.id, a.id, 'mazeCorrect', f.row.mazeCorrect, 'Maze correct, ' + name) +
+      _dibelsInput(st.id, a.id, 'mazeIncorrect', f.row.mazeIncorrect, 'Maze incorrect, ' + name) +
+      '<span class="dbl-num" data-out="adjusted">' +
+      _fmtDibels(f.adjusted) +
+      '</span>' +
+      '<span data-out="mazeLevel">' +
+      (f.mazeLevel ? _dibelsChip(f.mazeLevel) : '') +
+      '</span>' +
+      '<div class="ldg-status grader-status" role="group" aria-label="Status">' +
+      _graderStatusButtons(a.id, st.id, status, ['EXC', 'NS'])
+        .replace(/class="grader-status-btn/g, 'class="grader-status-btn ldg-chip')
+        .replace(/data-status=/g, 'data-stop-prop="true" tabindex="-1" data-status=') +
+      '</div>' +
+      '</div>'
+    );
+  }
+  function _dibelsGridHtml(cid, a, students) {
+    var period = _dibelsPeriodOf(a);
+    return (
+      '<div class="dbl-grid" data-aid="' +
+      a.id +
+      '">' +
+      _dibelsCountsHtml(cid, a, students, period) +
+      '<div class="dbl-head dbl-head-groups"><span></span><span class="dbl-group">Oral Reading Fluency</span><span></span><span class="dbl-group">Maze</span><span></span></div>' +
+      '<div class="dbl-head"><span>Student</span><span class="is-num">Words Correct</span><span class="is-num">Errors</span><span class="is-num">Accuracy</span><span>ORF Level</span><span></span><span class="is-num">Correct</span><span class="is-num">Incorrect</span><span class="is-num">Adjusted</span><span>Maze Level</span><span class="is-end">Status</span></div>' +
+      students
+        .map(function (st) {
+          return _dibelsRowHtml(cid, a, st, period);
+        })
+        .join('') +
+      '</div>'
+    );
+  }
+  // A field left: save the window's four numbers, then redraw what they
+  // work out to without redrawing the inputs, so Tab keeps moving on.
+  function _commitDibelsField(el) {
+    var cid = activeCourse;
+    var sid = el.dataset.sid;
+    var aid = el.dataset.aid;
+    var a = getAssessments(cid).find(function (x) {
+      return x.id === aid;
+    });
+    if (!a) return;
+    var period = _dibelsPeriodOf(a);
+    var values = Object.assign({}, getDibelsScore(cid, sid, aid, period) || {});
+    var raw = el.value.trim();
+    var n = raw === '' ? null : Math.floor(Number(raw));
+    values[el.dataset.field] = raw === '' || !isFinite(n) || n < 0 ? null : n;
+    el.value = values[el.dataset.field] == null ? '' : values[el.dataset.field];
+    saveDibelsScore(cid, sid, aid, period, values);
+    var f = _dibelsFigures(cid, sid, aid, period);
+    var scope = el.closest('.dbl-row') || el.closest('.dbl-card-wrap');
+    if (!scope) return;
+    // A grid row leaves an empty figure blank; the card shows a dash.
+    var none = scope.classList.contains('dbl-row') ? '' : '—';
+    scope.querySelector('[data-out="accuracy"]').textContent = f.accuracy == null ? none : f.accuracy + '%';
+    scope.querySelector('[data-out="adjusted"]').textContent = f.adjusted == null ? none : _fmtDibels(f.adjusted);
+    scope.querySelector('[data-out="orfLevel"]').innerHTML = f.orfLevel || none ? _dibelsChip(f.orfLevel) : '';
+    scope.querySelector('[data-out="mazeLevel"]').innerHTML = f.mazeLevel || none ? _dibelsChip(f.mazeLevel) : '';
+    if (scope.classList.contains('dbl-row')) {
+      var grid = scope.closest('.dbl-grid');
+      var summary = grid && grid.querySelector('.dbl-summary');
+      if (summary) {
+        // Only the counts: the window buttons stay, so a click that ended
+        // this field's edit still lands on them.
+        var fresh = document.createElement('div');
+        fresh.innerHTML = _dibelsCountsHtml(cid, a, sortStudents(getStudents(cid), 'lastName'), period);
+        summary.querySelector('.dbl-tested').replaceWith(fresh.querySelector('.dbl-tested'));
+        var rows = summary.querySelectorAll('.dbl-count-row');
+        fresh.querySelectorAll('.dbl-count-row').forEach(function (row, i) {
+          rows[i].replaceWith(row);
+        });
+      }
+    } else {
+      // One student: the footer's levels, in the dialog or the inline head.
+      var holder = scope.closest('#grader-overlay, .assess-card');
+      var levels = holder && holder.querySelector('.grader-dibels-levels');
+      if (levels) levels.innerHTML = _dibelsLevelPillsHtml(cid, a, sid);
+    }
+    refreshSidebarGrades(sid);
+  }
+  function setDibelsPeriod(aid, period) {
+    if (DIBELS_PERIODS.indexOf(period) < 0) return;
+    _dibelsPeriods[aid] = period;
+    render();
+  }
+  // The class's DIBELS scores come from the server once per class.
+  function _loadDibelsOnce(cid) {
+    if (_dibelsLoaded[cid] || typeof loadDibelsScores !== 'function') return;
+    var any = getAssessments(cid).some(isDibelsScored);
+    if (!any) return;
+    _dibelsLoaded[cid] = true;
+    loadDibelsScores(cid).then(function (changed) {
+      if (changed && activeCourse === cid) render();
+    });
+  }
+  /* A plain black-and-white sheet of the class's scores in the shown
+     window, printed from a hidden frame. */
+  function printDibels(aid) {
+    var cid = activeCourse;
+    var a = getAssessments(cid).find(function (x) {
+      return x.id === aid;
+    });
+    if (!a) return;
+    var period = _dibelsPeriodOf(a);
+    var students = sortStudents(getStudents(cid), 'lastName');
+    var rows = students
+      .map(function (st) {
+        var f = _dibelsFigures(cid, st.id, aid, period);
+        var status = getAssignmentStatus(cid, st.id, aid);
+        var r = f.row;
+        function v(x) {
+          return x == null ? '' : esc(String(x));
+        }
+        return (
+          '<tr><th>' +
+          esc(displayNameWithLast(st)) +
+          '</th><td>' +
+          v(r.orfWrc) +
+          '</td><td>' +
+          v(r.orfErrors) +
+          '</td><td>' +
+          (f.accuracy == null ? '' : f.accuracy + '%') +
+          '</td><td>' +
+          (f.orfLevel ? DIBELS_LEVELS[f.orfLevel].label : '') +
+          '</td><td>' +
+          v(r.mazeCorrect) +
+          '</td><td>' +
+          v(r.mazeIncorrect) +
+          '</td><td>' +
+          _fmtDibels(f.adjusted) +
+          '</td><td>' +
+          (f.mazeLevel ? DIBELS_LEVELS[f.mazeLevel].label : '') +
+          '</td><td>' +
+          (status === 'NS' ? 'Missing' : status === 'EXC' ? 'Excused' : '') +
+          '</td></tr>'
+        );
+      })
+      .join('');
+    var course = COURSES[cid] || {};
+    var html =
+      '<!doctype html><html><head><meta charset="utf-8"><title>' +
+      esc(a.title || 'DIBELS 8 Benchmark') +
+      '</title><style>' +
+      'body{font-family:-apple-system,system-ui,sans-serif;color:#000;margin:0.4in;font-size:10pt}' +
+      'h1{font-size:15pt;margin:0 0 2pt}p{margin:0 0 8pt}' +
+      'table{width:100%;border-collapse:collapse}th,td{border:1px solid #000;padding:3pt 5pt;text-align:right}' +
+      'th{text-align:left;font-weight:700}thead th{text-align:center;background:#eee}' +
+      '.cuts{font-size:8.5pt;margin-top:8pt}' +
+      '</style></head><body><h1>' +
+      esc(a.title || 'DIBELS 8 Benchmark') +
+      '</h1><p>' +
+      esc([course.name, DIBELS_PERIOD_NAMES[period], a.date ? formatDate(a.date) : ''].filter(Boolean).join(' · ')) +
+      '</p><table><thead><tr><th rowspan="2">Student</th><th colspan="4">Oral Reading Fluency</th><th colspan="4">Maze</th><th rowspan="2">Status</th></tr>' +
+      '<tr><th>Words Correct</th><th>Errors</th><th>Accuracy</th><th>Level</th><th>Correct</th><th>Incorrect</th><th>Adjusted</th><th>Level</th></tr></thead><tbody>' +
+      rows +
+      '</tbody></table><p class="cuts">' +
+      esc(_dibelsCutsText(period)) +
+      ' DIBELS scores count toward no grade.</p></body></html>';
+    var frame = document.createElement('iframe');
+    frame.setAttribute('aria-hidden', 'true');
+    frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+    document.body.appendChild(frame);
+    frame.contentDocument.open();
+    frame.contentDocument.write(html);
+    frame.contentDocument.close();
+    setTimeout(function () {
+      frame.contentWindow.focus();
+      frame.contentWindow.print();
+      setTimeout(function () {
+        frame.remove();
+      }, 1000);
+    }, 50);
   }
 
   /* ── Levels, points and Complete/Incomplete for one student ── */
@@ -1148,21 +1547,27 @@ window.PageAssignments = (function () {
                 'Print Rubrics</button>'
               );
             })()
-          : !isPointsScored(a)
-            ? // No rubric of its own: a Tag Rubric, or a General Rubric when it
-              // has no competencies, with the proficiency scale's wording.
-              '<button class="rubric-print-btn" data-action="printRubrics" data-aid="' +
+          : isDibelsScored(a)
+            ? '<button class="rubric-print-btn" data-action="printDibels" data-aid="' +
               a.id +
-              '" title="Print a graded ' +
-              (scoreTagIds(a, cid).some(function (t) {
-                return !isUnlinkedTag(t);
-              })
-                ? 'tag'
-                : 'general') +
-              ' rubric for each student">' +
+              '" title="Print this window\'s scores for the class">' +
               _GRADER_PRINTER +
-              'Print Rubrics</button>'
-            : '') +
+              'Print Class Sheet</button>'
+            : !isPointsScored(a)
+              ? // No rubric of its own: a Tag Rubric, or a General Rubric when it
+                // has no competencies, with the proficiency scale's wording.
+                '<button class="rubric-print-btn" data-action="printRubrics" data-aid="' +
+                a.id +
+                '" title="Print a graded ' +
+                (scoreTagIds(a, cid).some(function (t) {
+                  return !isUnlinkedTag(t);
+                })
+                  ? 'tag'
+                  : 'general') +
+                ' rubric for each student">' +
+                _GRADER_PRINTER +
+                'Print Rubrics</button>'
+              : '') +
         '<button class="assess-header-action-btn" data-action="editAssess" data-aid="' +
         a.id +
         '" title="Edit" aria-label="Edit assessment">' +
@@ -1360,6 +1765,7 @@ window.PageAssignments = (function () {
     var cid = activeCourse;
     var course = COURSES[cid];
     if (!course) return;
+    _loadDibelsOnce(cid);
     var sections = getSections(cid);
     var allAssessments = sortAssessmentsForList(getAssessments(cid));
     var students = sortStudents(getStudents(cid), 'lastName');
@@ -1954,6 +2360,18 @@ window.PageAssignments = (function () {
       },
       icon: '<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10" cy="10" r="7"/><path d="m6.8 10.2 2.2 2.2 4.2-4.6"/></svg>',
     },
+    {
+      mode: 'dibels',
+      label: 'DIBELS 8 Benchmark',
+      tip: 'Enter raw Oral Reading Fluency and Maze scores at the beginning, middle and end of the year. Accuracy and levels are worked out. It counts toward no grade.',
+      picture: function () {
+        return (
+          '<span class="af-tip-pts-box">147</span><span class="af-tip-pts-max">words</span>' +
+          '<span class="dbl-chip l4">Above</span>'
+        );
+      },
+      icon: '<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4.5h5a2 2 0 0 1 2 2V16a1.5 1.5 0 0 0-1.5-1.5H3z"/><path d="M17 4.5h-5a2 2 0 0 0-2 2V16a1.5 1.5 0 0 1 1.5-1.5H17z"/></svg>',
+    },
   ];
 
   // The Factor list, with an assessment's own Factor kept if it isn't on it.
@@ -2107,6 +2525,8 @@ window.PageAssignments = (function () {
     } else if (scoreModeVal === 'complete') {
       newAssess.scoreMode = 'complete';
       newAssess.maxPoints = COMPLETE_MAX_POINTS;
+    } else if (scoreModeVal === 'dibels') {
+      newAssess.scoreMode = 'dibels';
     }
     var assessWeight = _formAssessWeight();
     if (assessWeight !== 1) newAssess.weight = assessWeight;
@@ -2208,6 +2628,9 @@ window.PageAssignments = (function () {
     } else if (scoreModeVal === 'complete') {
       assessments[idx].scoreMode = 'complete';
       assessments[idx].maxPoints = COMPLETE_MAX_POINTS;
+    } else if (scoreModeVal === 'dibels') {
+      assessments[idx].scoreMode = 'dibels';
+      assessments[idx].maxPoints = undefined;
     } else {
       assessments[idx].scoreMode = undefined;
       assessments[idx].maxPoints = undefined;
@@ -2904,6 +3327,8 @@ window.PageAssignments = (function () {
         row.querySelectorAll('.rsg-criterion-row').forEach(syncModRow);
       }
       refreshLedgerSummary(row.closest('.ldg-grid'));
+      // DIBELS counts leave out Missing and Excused students.
+      if (row.closest('.dbl-grid')) render();
     } else if (!_grader && document.querySelector('.grader-inline')) {
       // One student's grader on the page: redraw its status, lock and grade.
       render();
@@ -5767,6 +6192,12 @@ window.PageAssignments = (function () {
       confirmFillRubricAll: function () {
         confirmFillRubricAll(el.dataset.aid, parseInt(el.dataset.score, 10), el.dataset.label);
       },
+      setDibelsPeriod: function () {
+        setDibelsPeriod(el.dataset.aid, el.dataset.period);
+      },
+      printDibels: function () {
+        printDibels(el.dataset.aid);
+      },
       graderLevel: function () {
         // A tick inside an Advanced tile is its own action, not a pick.
         if (e.target.closest('.grdt-check')) return;
@@ -5986,6 +6417,10 @@ window.PageAssignments = (function () {
       )
         saveRubricCriterionComment(activeCourse, focusStudentId, noteAid, el.dataset.critid, text);
       el.classList.toggle('has-text', !!text);
+      return;
+    }
+    if (el.dataset.actionBlur === 'dibelsField') {
+      if (el.isConnected) _commitDibelsField(el);
       return;
     }
     if (el.dataset.actionBlur === 'rsgWorkOn' || el.dataset.actionBlur === 'rsgBeyond') {
@@ -6482,6 +6917,7 @@ window.PageAssignments = (function () {
     if (_grader) closeGrader();
     opts = opts || {};
     activeCourse = cid;
+    _loadDibelsOnce(cid);
     openAssessIds = new Set([aid]);
     focusStudentId = sid;
     _allExpanded = false;
@@ -6666,7 +7102,7 @@ window.PageAssignments = (function () {
      (it prints the levels and feedback), nothing on points or
      Complete/Incomplete work, which has nothing of its own to print. */
   function _graderPrintButton(cid, a) {
-    if (isPointsScored(a)) return '';
+    if (isPointsScored(a) || isDibelsScored(a)) return '';
     var label = a.rubricId && getRubricById(cid, a.rubricId) ? 'Print Rubric' : 'Print';
     return (
       '<button type="button" class="grader-print" data-action="printRubrics" data-aid="' +
@@ -6723,7 +7159,7 @@ window.PageAssignments = (function () {
       esc(displayNameWithLast(st)) +
       '</h4>' +
       '<div class="grader-status" role="group" aria-label="Status">' +
-      _graderStatusButtons(a.id, st.id, status, ['LATE', 'EXC', 'NS']) +
+      _graderStatusButtons(a.id, st.id, status, isDibelsScored(a) ? ['EXC', 'NS'] : ['LATE', 'EXC', 'NS']) +
       '</div>' +
       '<button type="button" class="grader-add-comment" data-action="openCommentPopover" data-cid="' +
       cid +
@@ -6736,12 +7172,14 @@ window.PageAssignments = (function () {
       '</button>' +
       '<span class="grader-spacer"></span>' +
       '<span class="grader-hint">← → change student</span>' +
-      '<span class="grader-grade-label">Grade</span>' +
-      '<span class="grader-grade' +
-      (grade.tone ? ' tone-' + grade.tone : '') +
-      '">' +
-      esc(grade.text) +
-      '</span>' +
+      (isDibelsScored(a)
+        ? '<span class="grader-dibels-levels">' + _dibelsLevelPillsHtml(cid, a, st.id) + '</span>'
+        : '<span class="grader-grade-label">Grade</span>' +
+          '<span class="grader-grade' +
+          (grade.tone ? ' tone-' + grade.tone : '') +
+          '">' +
+          esc(grade.text) +
+          '</span>') +
       '</div>' +
       _graderHtml(cid, a, tagObjs, [st], scores, true) +
       '</div>'
@@ -6760,7 +7198,13 @@ window.PageAssignments = (function () {
     var dialog = _grader.overlay.querySelector('.grader-dialog');
     if (!a || !sid || !dialog) return;
     var status = getAssignmentStatus(cid, sid, a.id);
-    dialog.querySelector('.grader-status').innerHTML = _graderStatusButtons(a.id, sid, status, ['NS', 'EXC', 'LATE']);
+    // A DIBELS benchmark is given on the day or not at all: no Late.
+    dialog.querySelector('.grader-status').innerHTML = _graderStatusButtons(
+      a.id,
+      sid,
+      status,
+      isDibelsScored(a) ? ['NS', 'EXC'] : ['NS', 'EXC', 'LATE'],
+    );
     var notes = getAssignmentObs(cid, sid, a.id)
       .slice()
       .sort(function (x, y) {
@@ -6784,6 +7228,19 @@ window.PageAssignments = (function () {
     var pill = dialog.querySelector('.grader-grade');
     pill.textContent = grade.text;
     pill.className = 'grader-grade' + (grade.tone ? ' tone-' + grade.tone : '');
+    // A DIBELS benchmark has no grade: its footer shows the ORF and Maze levels.
+    var dibels = isDibelsScored(a);
+    dialog.querySelector('.grader-grade-label').hidden = dibels;
+    pill.hidden = dibels;
+    var levels = dialog.querySelector('.grader-dibels-levels');
+    if (dibels) {
+      if (!levels) {
+        levels = document.createElement('span');
+        levels.className = 'grader-dibels-levels';
+        dialog.querySelector('.grader-foot').appendChild(levels);
+      }
+      levels.innerHTML = _dibelsLevelPillsHtml(cid, a, sid);
+    } else if (levels) levels.remove();
   }
 
   // The assessment's grade for the student, in words, and the colour its

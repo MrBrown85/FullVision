@@ -1236,6 +1236,11 @@ window.PageGradebook = (function () {
           // Warning for out-of-range: above 4 on proficiency work, above the
           // extra-credit cap (twice the maximum) on points work.
           if (cell.outOfRange) cellClass = ' gb-scores-warning';
+        } else if (cell.kind === 'dibels' && cell.dibels) {
+          // A DIBELS benchmark's latest reading level, as a word; not a grade.
+          var dl = { above: 4, core: 3, strategic: 2, intensive: 1 }[cell.dibels.level] || 0;
+          cellStyle = dl ? 'background:' + PROF_TINT[dl] + ';color:' + PROF_COLORS[dl] : 'color:var(--text-3)';
+          display = '<span class="gb-scores-dibels">' + esc(cell.text) + '</span>';
         } else if (cell.kind === 'missing' && cell.zero) {
           cellStyle = 'color:var(--score-1)';
           display = '<span class="gb-scores-zero">0</span>';
@@ -1945,6 +1950,7 @@ window.PageGradebook = (function () {
     if (cell.kind === 'points') return formatPoints(cell.value);
     if (cell.kind === 'level') return formatLevelAs(cell.value, 'proficiency');
     if (cell.kind === 'missing' && cell.zero) return '0';
+    if (cell.kind === 'dibels') return cell.dibels ? cell.text : '';
     return '';
   }
 
