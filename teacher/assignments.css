@@ -4829,22 +4829,22 @@
 }
 
 /* ── Rubric tiles (grader, one student) ─────────────────────── */
-.gt-tiles {
+.grdt-tiles {
   display: flex;
   flex-direction: column;
   gap: 12px;
   padding: 6px 0;
 }
-.gt-legend,
-.gt-row {
+.grdt-legend,
+.grdt-row {
   display: grid;
   grid-template-columns: 200px repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
-.gt-legend {
+.grdt-legend {
   padding: 0 14px;
 }
-.gt-legend-level {
+.grdt-legend-level {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -4852,24 +4852,24 @@
   font-weight: 600;
   color: var(--text);
 }
-.gt-dot {
+.grdt-dot {
   width: 8px;
   height: 8px;
   border-radius: 4px;
 }
-.gt-dot.l4 {
+.grdt-dot.l4 {
   background: var(--score-4);
 }
-.gt-dot.l3 {
+.grdt-dot.l3 {
   background: var(--score-3);
 }
-.gt-dot.l2 {
+.grdt-dot.l2 {
   background: var(--score-2);
 }
-.gt-dot.l1 {
+.grdt-dot.l1 {
   background: var(--score-1);
 }
-.gt-crit {
+.grdt-crit {
   background: var(--surface);
   border-radius: 16px;
   padding: 14px;
@@ -4881,16 +4881,16 @@
     0 0 0 0.5px var(--divider-medium);
   outline: none;
 }
-.gt-crit:focus-visible {
+.grdt-crit:focus-visible {
   box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.35);
 }
-.gt-crit-side {
+.grdt-crit-side {
   display: flex;
   flex-direction: column;
   gap: 8px;
   padding: 4px 8px 4px 2px;
 }
-.gt-crit-name {
+.grdt-crit-name {
   margin: 0;
   font-size: var(--text-lg);
   font-weight: 600;
@@ -4898,12 +4898,12 @@
   letter-spacing: -0.01em;
   color: var(--text);
 }
-.gt-codes {
+.grdt-codes {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
 }
-.gt-code {
+.grdt-code {
   padding: 3px 8px;
   border-radius: 10px;
   background: rgba(118, 118, 128, 0.14);
@@ -4911,7 +4911,7 @@
   font-weight: 600;
   color: var(--text);
 }
-.gt-not-scored {
+.grdt-not-scored {
   align-self: flex-start;
   padding: 3px 9px;
   border-radius: 10px;
@@ -4920,7 +4920,7 @@
   font-weight: 600;
   color: var(--text);
 }
-.gt-tile {
+.grdt-tile {
   text-align: left;
   padding: 12px;
   border: none;
@@ -4932,10 +4932,10 @@
   color: var(--text);
   cursor: pointer;
 }
-.gt-tile:hover {
+.grdt-tile:hover {
   background: rgba(118, 118, 128, 0.14);
 }
-.gt-tile.is-chosen {
+.grdt-tile.is-chosen {
   padding: 10px 12px 12px;
   display: flex;
   flex-direction: column;
@@ -4944,27 +4944,27 @@
   cursor: default;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
 }
-.gt-tile.is-chosen.l4 {
+.grdt-tile.is-chosen.l4 {
   background: var(--score-4);
 }
-.gt-tile.is-chosen.l3 {
+.grdt-tile.is-chosen.l3 {
   background: var(--score-3);
 }
-.gt-tile.is-chosen.l2 {
+.grdt-tile.is-chosen.l2 {
   background: var(--score-2);
 }
-.gt-tile.is-chosen.l1 {
+.grdt-tile.is-chosen.l1 {
   background: var(--score-1);
 }
-.gt-tile.is-chosen .gt-words {
+.grdt-tile.is-chosen .grdt-words {
   font-weight: 500;
 }
-.gt-tile-head {
+.grdt-tile-head {
   display: flex;
   align-items: center;
   gap: 6px;
 }
-.gt-chosen-label {
+.grdt-chosen-label {
   flex: 1;
   display: flex;
   align-items: center;
@@ -4979,26 +4979,26 @@
   text-align: left;
   cursor: pointer;
 }
-.gt-tile.is-chosen.l4 .gt-chosen-label svg {
+.grdt-tile.is-chosen.l4 .grdt-chosen-label svg {
   color: var(--score-4);
 }
-.gt-tile.is-chosen.l3 .gt-chosen-label svg {
+.grdt-tile.is-chosen.l3 .grdt-chosen-label svg {
   color: var(--score-3);
 }
-.gt-tile.is-chosen.l2 .gt-chosen-label svg {
+.grdt-tile.is-chosen.l2 .grdt-chosen-label svg {
   color: var(--score-2);
 }
-.gt-tile.is-chosen.l1 .gt-chosen-label svg {
+.grdt-tile.is-chosen.l1 .grdt-chosen-label svg {
   color: var(--score-1);
 }
-.gt-stepper {
+.grdt-stepper {
   display: flex;
   align-items: center;
   padding: 2px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.2);
 }
-.gt-stepper button {
+.grdt-stepper button {
   width: 28px;
   height: 24px;
   border: none;
@@ -5010,45 +5010,45 @@
   line-height: 1;
   cursor: pointer;
 }
-.gt-stepper button.is-on {
+.grdt-stepper button.is-on {
   background: #fff;
   font-weight: 700;
 }
-.gt-tile.is-chosen.l4 .gt-stepper button.is-on {
+.grdt-tile.is-chosen.l4 .grdt-stepper button.is-on {
   color: var(--score-4);
 }
-.gt-tile.is-chosen.l3 .gt-stepper button.is-on {
+.grdt-tile.is-chosen.l3 .grdt-stepper button.is-on {
   color: var(--score-3);
 }
-.gt-tile.is-chosen.l2 .gt-stepper button.is-on {
+.grdt-tile.is-chosen.l2 .grdt-stepper button.is-on {
   color: var(--score-2);
 }
-.gt-tile.is-chosen.l1 .gt-stepper button.is-on {
+.grdt-tile.is-chosen.l1 .grdt-stepper button.is-on {
   color: var(--score-1);
 }
-.gt-stepper button:disabled {
+.grdt-stepper button:disabled {
   opacity: 0.35;
   cursor: default;
 }
-.gt-stepper-sep {
+.grdt-stepper-sep {
   width: 1px;
   height: 14px;
   background: rgba(255, 255, 255, 0.45);
 }
-.gt-note-row {
+.grdt-note-row {
   display: grid;
   grid-template-columns: 200px minmax(0, 1fr);
   gap: 8px;
   align-items: start;
 }
-.gt-note-label {
+.grdt-note-label {
   padding: 9px 2px 0;
   font-size: var(--text-sm);
   font-weight: 600;
   color: var(--text);
 }
 /* One line until clicked; three while typing or once it holds text. */
-.gt-note {
+.grdt-note {
   box-sizing: border-box;
   width: 100%;
   height: 36px;
@@ -5066,11 +5066,11 @@
     height 150ms ease,
     box-shadow 150ms ease;
 }
-.gt-note:focus,
-.gt-note.has-text {
+.grdt-note:focus,
+.grdt-note.has-text {
   height: 84px;
 }
-.gt-note:focus {
+.grdt-note:focus {
   background: var(--surface);
   box-shadow:
     0 0 0 1px var(--active),
@@ -5078,26 +5078,26 @@
 }
 /* The tiles sit straight on the dialog's grey, without the card behind
    the older grids. */
-.grader-body .assess-card:has(.gt-tiles) {
+.grader-body .assess-card:has(.grdt-tiles) {
   background: none;
   padding: 0;
 }
 
 /* Advanced Rubric tiles: checkboxes, a pick button, the suggestion */
-.gt-tile.is-checklist {
+.grdt-tile.is-checklist {
   display: flex;
   flex-direction: column;
   gap: 8px;
   cursor: default;
 }
-.gt-tile.is-checklist:hover {
+.grdt-tile.is-checklist:hover {
   background: rgba(118, 118, 128, 0.08);
 }
-.gt-tile.is-suggested,
-.gt-tile.is-suggested:hover {
+.grdt-tile.is-suggested,
+.grdt-tile.is-suggested:hover {
   background: rgba(255, 159, 10, 0.16);
 }
-.gt-pick {
+.grdt-pick {
   align-self: flex-start;
   display: inline-flex;
   align-items: center;
@@ -5112,26 +5112,26 @@
   font-weight: 600;
   cursor: pointer;
 }
-.gt-pick:hover {
+.grdt-pick:hover {
   background: rgba(118, 118, 128, 0.22);
 }
-.gt-tile-top {
+.grdt-tile-top {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
 }
-.gt-suggested-tag {
+.grdt-suggested-tag {
   font-size: var(--text-xs);
   font-weight: 700;
   color: var(--score-2-dark);
 }
-.gt-checks {
+.grdt-checks {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
-.gt-check {
+.grdt-check {
   display: flex;
   align-items: flex-start;
   gap: 8px;
@@ -5139,20 +5139,20 @@
   line-height: 1.45;
   cursor: pointer;
 }
-.gt-check input {
+.grdt-check input {
   margin: 2px 0 0;
   width: 16px;
   height: 16px;
   flex-shrink: 0;
   accent-color: var(--active);
 }
-.gt-tile.is-chosen .gt-check input {
+.grdt-tile.is-chosen .grdt-check input {
   accent-color: #fff;
 }
-.gt-words-small {
+.grdt-words-small {
   font-size: var(--text-sm);
 }
-.gt-advice {
+.grdt-advice {
   display: flex;
   flex-direction: column;
   gap: 3px;
@@ -5163,15 +5163,253 @@
   line-height: 1.4;
   color: var(--text);
 }
-.gt-advice.l4 strong {
+.grdt-advice.l4 strong {
   color: var(--score-4);
 }
-.gt-advice.l3 strong {
+.grdt-advice.l3 strong {
   color: var(--score-3);
 }
-.gt-advice.l2 strong {
+.grdt-advice.l2 strong {
   color: var(--score-2);
 }
-.gt-advice.l1 strong {
+.grdt-advice.l1 strong {
   color: var(--score-1);
+}
+
+/* ── Levels, points and Complete/Incomplete (grader, one student) ── */
+.grdl-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 6px 0;
+}
+.grdl-card,
+.grdp-card {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 14px 16px;
+  background: var(--surface);
+  border-radius: 16px;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.06),
+    0 0 0 0.5px var(--divider-medium);
+  outline: none;
+}
+.grdp-card {
+  padding: 22px 24px;
+}
+.grdl-card:focus-visible {
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.35);
+}
+.grdl-side {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+.grdl-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.grdl-name {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.grdl-text {
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--text);
+}
+.grdl-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.grdl-seg {
+  flex: 1;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 10px;
+  background: rgba(118, 118, 128, 0.14);
+}
+.grdl-level {
+  flex: 1;
+  height: 34px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-base);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.grdl-level:hover {
+  background: rgba(118, 118, 128, 0.12);
+}
+.grdl-level.is-on {
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+}
+.grdl-level.is-on.l4 {
+  background: var(--score-4);
+}
+.grdl-level.is-on.l3 {
+  background: var(--score-3);
+}
+.grdl-level.is-on.l2 {
+  background: var(--score-2);
+}
+.grdl-level.is-on.l1 {
+  background: var(--score-1);
+}
+.grdl-stepper {
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  border-radius: 10px;
+  background: rgba(118, 118, 128, 0.14);
+}
+.grdl-stepper button {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+.grdl-stepper button.is-on {
+  background: var(--surface);
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14);
+}
+.grdl-stepper button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.grdl-stepper-sep {
+  width: 1px;
+  height: 16px;
+  background: rgba(60, 60, 67, 0.25);
+}
+.grdp-entry {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.grdp-input {
+  box-sizing: border-box;
+  width: 120px;
+  height: 56px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 12px;
+  background: rgba(118, 118, 128, 0.12);
+  color: var(--text);
+  font: inherit;
+  font-size: 30px;
+  font-weight: 700;
+  text-align: right;
+  outline: none;
+}
+.grdp-input:focus {
+  background: var(--surface);
+  box-shadow:
+    0 0 0 1px var(--active),
+    0 0 0 4px rgba(0, 122, 255, 0.25);
+}
+.grdp-max {
+  font-size: 30px;
+  font-weight: 300;
+  color: var(--text);
+}
+.grdp-pct {
+  margin-left: 6px;
+  padding: 6px 12px;
+  border-radius: 14px;
+  background: rgba(118, 118, 128, 0.14);
+  font-size: var(--text-md);
+  font-weight: 700;
+  color: var(--text);
+}
+.grdc-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.grdc-btn {
+  height: 64px;
+  border: none;
+  border-radius: 14px;
+  background: rgba(118, 118, 128, 0.1);
+  color: var(--text);
+  font: inherit;
+  font-size: 17px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+}
+.grdc-complete .grdc-icon-bg {
+  fill: var(--score-3);
+}
+.grdc-incomplete .grdc-icon-bg {
+  fill: var(--score-1);
+}
+.grdc-icon-mark {
+  stroke: #fff;
+}
+.grdc-btn.is-on {
+  color: #fff;
+  font-weight: 700;
+}
+.grdc-complete.is-on {
+  background: var(--score-3);
+  box-shadow: 0 4px 12px rgba(46, 125, 50, 0.28);
+}
+.grdc-incomplete.is-on {
+  background: var(--score-1);
+  box-shadow: 0 4px 12px rgba(211, 47, 47, 0.28);
+}
+.grdc-btn.is-on .grdc-icon-bg {
+  fill: #fff;
+}
+.grdc-complete.is-on .grdc-icon-mark {
+  stroke: var(--score-3);
+}
+.grdc-incomplete.is-on .grdc-icon-mark {
+  stroke: var(--score-1);
+}
+.grdc-btn:disabled,
+.grdp-input:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+/* Missing or Excused: the work isn't graded, so the controls step back. */
+.grader-body.is-locked .grdt-tiles,
+.grader-body.is-locked .grdl-cards,
+.grader-body.is-locked .grdp-card {
+  opacity: 0.45;
+  pointer-events: none;
+}
+.grader-body .assess-card:has(.grdl-cards),
+.grader-body .assess-card:has(.grdp-card) {
+  background: none;
+  padding: 0;
 }

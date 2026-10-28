@@ -434,8 +434,10 @@ window.PageAssignments = (function () {
      Complete/Incomplete grid, the points grid, the rubric or the
      competency grid, as the assessment is scored. */
   function _graderHtml(cid, a, tagObjs, students, scores, oneStudent) {
-    if (isCompletionScored(a)) return renderCompletionGrid(cid, a, students);
-    if (a.scoreMode === 'points') return renderPointsGrid(cid, a, students, scores);
+    var one = oneStudent && students.length === 1 ? students[0] : null;
+    if (isCompletionScored(a)) return one ? _completeCardHtml(cid, a, one) : renderCompletionGrid(cid, a, students);
+    if (a.scoreMode === 'points')
+      return one ? _pointsCardHtml(cid, a, one) : renderPointsGrid(cid, a, students, scores);
     if (a.rubricId && getRubricById(cid, a.rubricId)) {
       var showRubric = rubricViewStates[a.id] !== undefined ? rubricViewStates[a.id] : true;
       var rubric = getRubricById(cid, a.rubricId);
@@ -443,6 +445,7 @@ window.PageAssignments = (function () {
         return _rubricTilesHtml(cid, a, rubric, students[0], _isAdvancedRubric(rubric));
       if (showRubric) return renderRubricGradingView(cid, a, students, scores);
     }
+    if (one) return _levelCardsHtml(cid, a, tagObjs, one);
     return renderTagGrid(cid, a, tagObjs, students, scores);
   }
 
@@ -477,10 +480,12 @@ window.PageAssignments = (function () {
     var order = levelOrderFor(cid);
     var ticked = advanced ? getRubricCheckIds(cid, st.id, a.id) : [];
     var html =
-      '<div class="gt-legend"><span></span>' +
+      '<div class="grdt-legend"><span></span>' +
       order
         .map(function (lv) {
-          return '<span class="gt-legend-level"><span class="gt-dot l' + lv + '"></span>' + PROF_LABELS[lv] + '</span>';
+          return (
+            '<span class="grdt-legend-level"><span class="grdt-dot l' + lv + '"></span>' + PROF_LABELS[lv] + '</span>'
+          );
         })
         .join('') +
       '</div>';
@@ -494,7 +499,7 @@ window.PageAssignments = (function () {
           if (!t) return '';
           // The printed rubric's rule: the tag's code, else an id that isn't a database id.
           var code = t.code || (t.id && !/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(t.id) ? t.id : '') || t.label || '';
-          return '<span class="gt-code" title="' + esc(t.label || '') + '">' + esc(code) + '</span>';
+          return '<span class="grdt-code" title="' + esc(t.label || '') + '">' + esc(code) + '</span>';
         })
         .join('');
       var tiles = order
@@ -502,12 +507,12 @@ window.PageAssignments = (function () {
           var words = (crit.levels && (crit.levels[lv] || crit.levels[String(lv)])) || '';
           var boxes = advanced ? RubricChecks.checksAt(crit, lv) : [];
           var body = boxes.length
-            ? (words ? '<span class="gt-words gt-words-small">' + esc(words) + '</span>' : '') +
-              '<span class="gt-checks">' +
+            ? (words ? '<span class="grdt-words grdt-words-small">' + esc(words) + '</span>' : '') +
+              '<span class="grdt-checks">' +
               boxes
                 .map(function (check) {
                   return (
-                    '<label class="gt-check"><input type="checkbox" data-action="graderTick" data-critid="' +
+                    '<label class="grdt-check"><input type="checkbox" data-action="graderTick" data-critid="' +
                     crit.id +
                     '" data-checkid="' +
                     check.id +
@@ -520,17 +525,17 @@ window.PageAssignments = (function () {
                 })
                 .join('') +
               '</span>'
-            : '<span class="gt-words">' + esc(words) + '</span>';
+            : '<span class="grdt-words">' + esc(words) + '</span>';
           if (state.level === lv) {
             var modLabel = state.mod > 0 ? ' +' : state.mod < 0 ? ' −' : '';
             var canUp = normalizeScoreMod(lv, 1) === 1;
             var canDown = normalizeScoreMod(lv, -1) === -1;
             return (
-              '<div class="gt-tile is-chosen l' +
+              '<div class="grdt-tile is-chosen l' +
               lv +
               '">' +
-              '<div class="gt-tile-head">' +
-              '<button type="button" class="gt-chosen-label" data-action="graderLevel" data-critid="' +
+              '<div class="grdt-tile-head">' +
+              '<button type="button" class="grdt-chosen-label" data-action="graderLevel" data-critid="' +
               crit.id +
               '" data-level="' +
               lv +
@@ -539,7 +544,7 @@ window.PageAssignments = (function () {
               PROF_LABELS[lv] +
               modLabel +
               '</button>' +
-              '<span class="gt-stepper" role="group" aria-label="Fine-tune ' +
+              '<span class="grdt-stepper" role="group" aria-label="Fine-tune ' +
               PROF_LABELS[lv] +
               '">' +
               '<button type="button" data-action="graderMod" data-critid="' +
@@ -552,7 +557,7 @@ window.PageAssignments = (function () {
               (canDown ? '' : ' disabled') +
               (state.mod < 0 ? ' class="is-on"' : '') +
               '>−</button>' +
-              '<span class="gt-stepper-sep" aria-hidden="true"></span>' +
+              '<span class="grdt-stepper-sep" aria-hidden="true"></span>' +
               '<button type="button" data-action="graderMod" data-critid="' +
               crit.id +
               '" data-mod="1" aria-label="High ' +
@@ -573,12 +578,12 @@ window.PageAssignments = (function () {
             // its level from the button at its top.
             var isSuggested = advice && advice.suggested === lv;
             return (
-              '<div class="gt-tile is-checklist' +
+              '<div class="grdt-tile is-checklist' +
               (isSuggested ? ' is-suggested' : '') +
               '">' +
-              '<div class="gt-tile-top">' +
-              (isSuggested ? '<span class="gt-suggested-tag">Suggested</span>' : '') +
-              '<button type="button" class="gt-pick" data-action="graderLevel" data-critid="' +
+              '<div class="grdt-tile-top">' +
+              (isSuggested ? '<span class="grdt-suggested-tag">Suggested</span>' : '') +
+              '<button type="button" class="grdt-pick" data-action="graderLevel" data-critid="' +
               crit.id +
               '" data-level="' +
               lv +
@@ -591,7 +596,7 @@ window.PageAssignments = (function () {
             );
           }
           return (
-            '<button type="button" class="gt-tile" data-action="graderLevel" data-critid="' +
+            '<button type="button" class="grdt-tile" data-action="graderLevel" data-critid="' +
             crit.id +
             '" data-level="' +
             lv +
@@ -599,7 +604,7 @@ window.PageAssignments = (function () {
             PROF_LABELS[lv] +
             ': ' +
             esc(words) +
-            '"><span class="gt-words">' +
+            '"><span class="grdt-words">' +
             esc(words) +
             '</span></button>'
           );
@@ -607,19 +612,19 @@ window.PageAssignments = (function () {
         .join('');
       var note = getRubricCriterionComment(cid, st.id, a.id, crit);
       html +=
-        '<section class="gt-crit" tabindex="0" data-critid="' +
+        '<section class="grdt-crit" tabindex="0" data-critid="' +
         crit.id +
         '" aria-label="' +
         esc(crit.name || 'Criterion') +
         '">' +
-        '<div class="gt-row">' +
-        '<div class="gt-crit-side"><h3 class="gt-crit-name">' +
+        '<div class="grdt-row">' +
+        '<div class="grdt-crit-side"><h3 class="grdt-crit-name">' +
         esc(crit.name || 'Criterion') +
         '</h3>' +
-        (codes ? '<div class="gt-codes">' + codes + '</div>' : '') +
-        (state.level ? '' : '<span class="gt-not-scored">Not Scored</span>') +
+        (codes ? '<div class="grdt-codes">' + codes + '</div>' : '') +
+        (state.level ? '' : '<span class="grdt-not-scored">Not Scored</span>') +
         (advice
-          ? '<div class="gt-advice' +
+          ? '<div class="grdt-advice' +
             (advice.suggested ? ' l' + advice.suggested : '') +
             '"><strong>' +
             esc(advice.head) +
@@ -630,12 +635,12 @@ window.PageAssignments = (function () {
         '</div>' +
         tiles +
         '</div>' +
-        '<div class="gt-note-row"><label class="gt-note-label" for="gt-note-' +
+        '<div class="grdt-note-row"><label class="grdt-note-label" for="grdt-note-' +
         crit.id +
         '">Feedback (Optional)</label>' +
-        '<textarea id="gt-note-' +
+        '<textarea id="grdt-note-' +
         crit.id +
-        '" class="gt-note' +
+        '" class="grdt-note' +
         (note ? ' has-text' : '') +
         '" rows="1" data-action-blur="graderCritNote" data-critid="' +
         crit.id +
@@ -644,7 +649,160 @@ window.PageAssignments = (function () {
         '</textarea></div>' +
         '</section>';
     });
-    return '<div class="gt-tiles">' + html + '</div>';
+    return '<div class="grdt-tiles">' + html + '</div>';
+  }
+
+  /* ── Levels, points and Complete/Incomplete for one student ── */
+  function _tagState(cid, sid, aid, tagId) {
+    var e = (getScores(cid)[sid] || []).find(function (x) {
+      return x.assessmentId === aid && x.tagId === tagId;
+    });
+    var v = e ? Number(e.score) || 0 : 0;
+    return { level: v, mod: v && e.mod ? e.mod : 0 };
+  }
+  function _graderStepperHtml(level, mod, attrs) {
+    var name = PROF_LABELS[level] || '';
+    var off = !level;
+    return (
+      '<span class="grdl-stepper" role="group" aria-label="Fine-tune' +
+      (name ? ' ' + name : '') +
+      '">' +
+      '<button type="button" ' +
+      attrs +
+      ' data-mod="-1" aria-label="Low ' +
+      name +
+      '" aria-pressed="' +
+      (mod < 0) +
+      '"' +
+      (off || normalizeScoreMod(level, -1) !== -1 ? ' disabled' : '') +
+      (mod < 0 ? ' class="is-on"' : '') +
+      '>−</button><span class="grdl-stepper-sep" aria-hidden="true"></span>' +
+      '<button type="button" ' +
+      attrs +
+      ' data-mod="1" aria-label="High ' +
+      name +
+      '" aria-pressed="' +
+      (mod > 0) +
+      '"' +
+      (off || normalizeScoreMod(level, 1) !== 1 ? ' disabled' : '') +
+      (mod > 0 ? ' class="is-on"' : '') +
+      '>+</button></span>'
+    );
+  }
+  function _levelCardsHtml(cid, a, tagObjs, st) {
+    var order = levelOrderFor(cid);
+    return (
+      '<div class="grdl-cards">' +
+      tagObjs
+        .map(function (t) {
+          var state = _tagState(cid, st.id, a.id, t.id);
+          var tag = t.tag || null;
+          var code = tag ? tag.code || (tag.id && !/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(tag.id) ? tag.id : '') : '';
+          var seg = order
+            .map(function (lv) {
+              var on = state.level === lv;
+              return (
+                '<button type="button" class="grdl-level' +
+                (on ? ' is-on l' + lv : '') +
+                '" data-action="graderTagLevel" data-tag="' +
+                esc(t.id) +
+                '" data-level="' +
+                lv +
+                '" aria-pressed="' +
+                on +
+                '">' +
+                PROF_LABELS[lv] +
+                (on && state.mod > 0 ? ' +' : on && state.mod < 0 ? ' −' : '') +
+                '</button>'
+              );
+            })
+            .join('');
+          return (
+            '<section class="grdl-card" tabindex="0" data-tag="' +
+            esc(t.id) +
+            '" aria-label="' +
+            esc(t.label || '') +
+            '">' +
+            '<div class="grdl-side"><div class="grdl-name-row"><h3 class="grdl-name">' +
+            esc(t.label || '') +
+            '</h3>' +
+            (code ? '<span class="grdt-code">' + esc(code) + '</span>' : '') +
+            '</div>' +
+            (t.text && t.text !== t.label ? '<span class="grdl-text">' + esc(t.text) + '</span>' : '') +
+            (state.level ? '' : '<span class="grdt-not-scored">Not Scored</span>') +
+            '</div>' +
+            '<div class="grdl-controls"><div class="grdl-seg" role="group" aria-label="Level">' +
+            seg +
+            '</div>' +
+            _graderStepperHtml(state.level, state.mod, 'data-action="graderTagMod" data-tag="' + esc(t.id) + '"') +
+            '</div></section>'
+          );
+        })
+        .join('') +
+      '</div>'
+    );
+  }
+  function _pointsCardHtml(cid, a, st) {
+    var max = Number(a.maxPoints) || 100;
+    var raw = getPointsScore(cid, st.id, a.id);
+    var status = getAssignmentStatus(cid, st.id, a.id);
+    var locked = status === 'NS' || status === 'EXC';
+    return (
+      '<section class="grdp-card">' +
+      '<div class="grdl-side"><label class="grdl-name" for="grdp-input">Score</label>' +
+      '<span class="grdl-text">Type the points earned. Up to twice the total counts as extra credit.</span></div>' +
+      '<div class="grdp-entry"><input id="grdp-input" class="grdp-input" type="text" inputmode="decimal" autocomplete="off"' +
+      ' data-action-blur="graderPoints" data-max="' +
+      max +
+      '" value="' +
+      (raw != null ? esc(formatPoints(raw)) : '') +
+      '"' +
+      (locked ? ' disabled' : '') +
+      '><span class="grdp-max">/ ' +
+      esc(formatPoints(max)) +
+      '</span>' +
+      (raw != null ? '<span class="grdp-pct">' + Math.round((raw / max) * 100) + '%</span>' : '') +
+      '</div></section>'
+    );
+  }
+  function _completeCardHtml(cid, a, st) {
+    var mark = getCompletionMark(cid, st.id, a.id);
+    var status = getAssignmentStatus(cid, st.id, a.id);
+    var locked = status === 'NS' || status === 'EXC';
+    function btn(value, label, icon) {
+      var on = mark === value;
+      return (
+        '<button type="button" class="grdc-btn grdc-' +
+        value +
+        (on ? ' is-on' : '') +
+        '" data-action="graderMark" data-mark="' +
+        value +
+        '" aria-pressed="' +
+        on +
+        '"' +
+        (locked ? ' disabled' : '') +
+        '>' +
+        icon +
+        label +
+        '</button>'
+      );
+    }
+    return (
+      '<section class="grdp-card">' +
+      '<div class="grdl-side"><h3 class="grdl-name">Mark</h3><span class="grdl-text">Click again to clear the mark.</span></div>' +
+      '<div class="grdc-pair" role="group" aria-label="Mark">' +
+      btn(
+        'complete',
+        'Complete',
+        '<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" class="grdc-icon-bg"/><path d="M7.5 12.5l3 3 6-6.5" fill="none" class="grdc-icon-mark" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      ) +
+      btn(
+        'incomplete',
+        'Incomplete',
+        '<svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" class="grdc-icon-bg"/><path d="M8.5 8.5l7 7M15.5 8.5l-7 7" fill="none" class="grdc-icon-mark" stroke-width="2.4" stroke-linecap="round"/></svg>',
+      ) +
+      '</div></section>'
+    );
   }
 
   function renderAssessmentList(cid, assessments, allAssessments, students, scores, modules) {
@@ -5282,6 +5440,19 @@ window.PageAssignments = (function () {
       graderLevel: function () {
         _graderSetLevel(el.dataset.critid, parseInt(el.dataset.level, 10));
       },
+      graderTagLevel: function () {
+        _graderSetTagLevel(el.dataset.tag, parseInt(el.dataset.level, 10));
+      },
+      graderTagMod: function () {
+        _graderSetTagMod(el.dataset.tag, parseInt(el.dataset.mod, 10));
+      },
+      graderMark: function () {
+        if (!_grader || !focusStudentId) return;
+        var now = getCompletionMark(activeCourse, focusStudentId, _grader.aid);
+        setCompletionMark(activeCourse, focusStudentId, _grader.aid, now === el.dataset.mark ? null : el.dataset.mark);
+        refreshSidebarGrades(focusStudentId);
+        render();
+      },
       graderTick: function () {
         _graderTick(el.dataset.critid, el.dataset.checkid, el.checked);
       },
@@ -5466,6 +5637,10 @@ window.PageAssignments = (function () {
       el.size = Math.max(4, saved.length);
       el.scrollLeft = 0;
       _setModuleDraggable(el, true);
+      return;
+    }
+    if (el.dataset.actionBlur === 'graderPoints' && _grader) {
+      _graderCommitPoints(el);
       return;
     }
     if (el.dataset.actionBlur === 'graderCritNote' && _grader) {
@@ -5983,16 +6158,26 @@ window.PageAssignments = (function () {
      puts back the saved points, as on this page; a second Escape closes. */
   function _graderKeydown(e) {
     if (!_grader || e.defaultPrevented) return;
-    var card = e.target && e.target.classList && e.target.classList.contains('gt-crit') ? e.target : null;
-    if (card && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    if (e.key === 'Enter' && e.target && e.target.classList && e.target.classList.contains('grdp-input')) {
+      e.preventDefault();
+      e.target.blur();
+      return;
+    }
+    var cls = e.target && e.target.classList;
+    var card = cls && cls.contains('grdt-crit') ? e.target : null;
+    var tagCard = cls && cls.contains('grdl-card') ? e.target : null;
+    if ((card || tagCard) && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      var up = e.key === '+' || e.key === '=';
       if (['1', '2', '3', '4'].indexOf(e.key) >= 0) {
         e.preventDefault();
-        _graderSetLevel(card.dataset.critid, parseInt(e.key, 10));
+        if (card) _graderSetLevel(card.dataset.critid, parseInt(e.key, 10));
+        else _graderSetTagLevel(tagCard.dataset.tag, parseInt(e.key, 10));
         return;
       }
-      if (e.key === '+' || e.key === '=' || e.key === '-' || e.key === '_') {
+      if (up || e.key === '-' || e.key === '_') {
         e.preventDefault();
-        _graderSetMod(card.dataset.critid, e.key === '+' || e.key === '=' ? 1 : -1);
+        if (card) _graderSetMod(card.dataset.critid, up ? 1 : -1);
+        else _graderSetTagMod(tagCard.dataset.tag, up ? 1 : -1);
         return;
       }
     }
@@ -6153,6 +6338,8 @@ window.PageAssignments = (function () {
           })
           .join('')
       : '<p class="grader-note grader-note-empty">No comments on this assignment yet.</p>';
+    // Missing and Excused set the grading controls aside, as the grids do.
+    dialog.querySelector('.grader-body').classList.toggle('is-locked', status === 'NS' || status === 'EXC');
     var grade = _graderGrade(cid, a, sid);
     var pill = dialog.querySelector('.grader-grade');
     pill.textContent = grade.text;
@@ -6230,12 +6417,54 @@ window.PageAssignments = (function () {
       });
     refreshSidebarGrades(focusStudentId);
     render();
-    var box = _grader.overlay.querySelector('.gt-check input[data-checkid="' + checkId + '"]');
+    var box = _grader.overlay.querySelector('.grdt-check input[data-checkid="' + checkId + '"]');
     if (box) box.focus({ preventScroll: true });
+  }
+  function _graderSetTagLevel(tagId, level) {
+    if (!_grader || !focusStudentId) return;
+    var state = _tagState(activeCourse, focusStudentId, _grader.aid, tagId);
+    setScore(activeCourse, focusStudentId, _grader.aid, tagId, state.level === level ? 0 : level, 0);
+    refreshSidebarGrades(focusStudentId);
+    render();
+    _focusGraderCard('.grdl-card[data-tag="' + tagId + '"]');
+  }
+  function _graderSetTagMod(tagId, mod) {
+    if (!_grader || !focusStudentId) return;
+    var state = _tagState(activeCourse, focusStudentId, _grader.aid, tagId);
+    if (!state.level) return;
+    var next = state.mod === mod ? 0 : mod;
+    if (normalizeScoreMod(state.level, next) !== next) return;
+    setScore(activeCourse, focusStudentId, _grader.aid, tagId, state.level, next);
+    refreshSidebarGrades(focusStudentId);
+    render();
+    _focusGraderCard('.grdl-card[data-tag="' + tagId + '"]');
+  }
+  // Saves typed points the way the Assignments ledger does: blank clears, a
+  // typed 0 is a score, leaving an unchanged box saves nothing.
+  function _graderCommitPoints(inp) {
+    if (!_grader || !focusStudentId) return;
+    var cid = activeCourse;
+    var aid = _grader.aid;
+    var max = parseFloat(inp.dataset.max) || 100;
+    var raw = parsePointsInput(inp.value, max);
+    if (raw === getPointsScore(cid, focusStudentId, aid)) {
+      inp.value = raw != null ? formatPoints(raw) : '';
+      return;
+    }
+    if (raw != null) setScore(cid, focusStudentId, aid, aid, raw);
+    setPointsScore(cid, focusStudentId, aid, raw);
+    refreshSidebarGrades(focusStudentId);
+    render();
+  }
+  function _focusGraderCard(selector) {
+    var card = _grader && _grader.overlay.querySelector(selector);
+    var active = document.activeElement;
+    var lost = !active || active === document.body || active.classList.contains('grader-dialog');
+    if (card && lost) card.focus({ preventScroll: true });
   }
   // A redraw keeps keyboard scoring on the same criterion.
   function _focusGraderCriterion(critId) {
-    var card = _grader && _grader.overlay.querySelector('.gt-crit[data-critid="' + critId + '"]');
+    var card = _grader && _grader.overlay.querySelector('.grdt-crit[data-critid="' + critId + '"]');
     var active = document.activeElement;
     var lost = !active || active === document.body || active.classList.contains('grader-dialog');
     if (card && lost) card.focus({ preventScroll: true });

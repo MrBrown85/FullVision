@@ -56,20 +56,20 @@ test('rubric tiles score, fine-tune and take feedback', async ({ page }) => {
   await page.locator('.gb-scores-cell[data-sid="stu-001"][data-aid="assess-gt"]').click();
 
   const dialog = page.locator('#grader-overlay .grader-dialog');
-  const hyp = dialog.locator('.gt-crit[data-critid="crit-hyp"]');
+  const hyp = dialog.locator('.grdt-crit[data-critid="crit-hyp"]');
   await expect(hyp).toContainText('Clear and testable');
-  await expect(hyp.locator('.gt-not-scored')).toBeVisible();
+  await expect(hyp.locator('.grdt-not-scored')).toBeVisible();
 
-  await hyp.locator('.gt-tile[data-level="3"]').click();
-  await expect(hyp.locator('.gt-tile.is-chosen')).toContainText('Proficient');
-  await hyp.locator('.gt-stepper [data-mod="1"]').click();
-  await expect(hyp.locator('.gt-chosen-label')).toHaveText(/Proficient \+/);
+  await hyp.locator('.grdt-tile[data-level="3"]').click();
+  await expect(hyp.locator('.grdt-tile.is-chosen')).toContainText('Proficient');
+  await hyp.locator('.grdt-stepper [data-mod="1"]').click();
+  await expect(hyp.locator('.grdt-chosen-label')).toHaveText(/Proficient \+/);
 
   await hyp.focus();
   await page.keyboard.press('4');
-  await expect(hyp.locator('.gt-chosen-label')).toHaveText(/Extending/);
+  await expect(hyp.locator('.grdt-chosen-label')).toHaveText(/Extending/);
 
-  await hyp.locator('.gt-note').fill('Clear question.');
+  await hyp.locator('.grdt-note').fill('Clear question.');
   await dialog.locator('.grader-student').click();
   const note = await page.evaluate(
     ({ cid }) => {
