@@ -1714,6 +1714,9 @@ window.PageReports = (function () {
       tqAdd: function () {
         RQ.tqAdd(el);
       },
+      tqGenerate: function () {
+        RQ.tqGenerate();
+      },
       tqRate: function () {
         RQ.tqRate(el.dataset.habit, el.dataset.value);
       },

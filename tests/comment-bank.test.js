@@ -29,6 +29,8 @@ function fullContext(p, habits) {
     growthAreas: 'Communicating',
     even: 'yes',
     rise: 'Evaluating',
+    fall: 'Planning',
+    focusLow: 'Evaluating',
     fellCount: 'two',
     assignment: 'Energy Lab',
     level: 'Extending',
@@ -61,10 +63,30 @@ function fullContext(p, habits) {
 }
 
 describe('the bank', () => {
-  it('has 100 sentences in four parts, each with a unique id', () => {
-    expect(COMMENT_BANK.sentences).toHaveLength(100);
+  it('has 250 sentences in four parts, each with a unique id', () => {
+    expect(COMMENT_BANK.sentences).toHaveLength(250);
     expect(COMMENT_BANK.parts.map(p => p.id)).toEqual(['habits', 'now', 'go', 'how']);
-    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(100);
+    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(250);
+  });
+
+  it('covers every habit at every level, and every picture with an opening and a closer', () => {
+    const at = (key, lvl) => COMMENT_BANK.sentences.filter(s => s.when && s.when[key] === lvl);
+    CommentBank.HABITS.forEach(h =>
+      [1, 2, 3, 4].forEach(l => expect(at(h.key, l).length, h.key + ' ' + l).toBeGreaterThan(0)),
+    );
+    ['strong', 'steady', 'challenge', 'early'].forEach(pic => {
+      expect(at('picture', pic).filter(s => s.group === 'Openings').length, pic).toBeGreaterThanOrEqual(3);
+      expect(at('picture', pic).filter(s => s.group === 'Looking Ahead').length, pic).toBeGreaterThanOrEqual(2);
+    });
+    ['Emerging', 'Developing', 'Proficient', 'Extending'].forEach(w =>
+      expect(at('standing', w).length, w).toBeGreaterThanOrEqual(3),
+    );
+  });
+
+  it('keeps the old generator’s cut patterns out: no superlatives, no teacher’s feelings', () => {
+    const banned =
+      /outstanding|joy to have|pleased|proud|excellent|impressive|standout|shines|stay tuned|can't say enough/i;
+    COMMENT_BANK.sentences.forEach(s => expect(s.text, s.id).not.toMatch(banned));
   });
 
   it('puts a [singular|plural] verb only right after a pronoun', () => {
@@ -80,6 +102,7 @@ describe('the bank', () => {
     COMMENT_BANK.sentences.forEach(s => {
       Object.entries(s.when || {}).forEach(([k, v]) => {
         if (k === 'picture') expect(['strong', 'steady', 'challenge', 'early']).toContain(v);
+        else if (k === 'standing') expect(['Emerging', 'Developing', 'Proficient', 'Extending']).toContain(v);
         else {
           expect(keys, s.id).toContain(k);
           expect(v).toBeGreaterThanOrEqual(1);
@@ -330,16 +353,16 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     return CommentBank.context(CommentBank.facts(cid, st, 'term-2'), {});
   };
 
-  it('offers Cece the 43 sentences the canvas shows (5, 22, 7, 9)', () => {
+  it('offers Cece 96 sentences (9, 45, 18, 24); the canvas’s 100-sentence bank gave 43', () => {
     const ctx = ctxFor('Cece');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([5, 22, 7, 9]);
-    expect(CommentBank.fitCount(ctx)).toBe(43);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 45, 18, 24]);
+    expect(CommentBank.fitCount(ctx)).toBe(96);
   });
 
-  it('offers Jasper the 38 the canvas shows (5, 19, 6, 8), by the name he goes by', () => {
+  it('offers Jasper 83 (9, 38, 14, 22), by the name he goes by', () => {
     const ctx = ctxFor('Jasper');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([5, 19, 6, 8]);
-    expect(CommentBank.fitCount(ctx)).toBe(38);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 38, 14, 22]);
+    expect(CommentBank.fitCount(ctx)).toBe(83);
     expect(ctx.name).toBe('Jas');
     expect(ctx.fellCount).toBe('four');
   });
@@ -381,8 +404,64 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     const st = getStudents(cid).find(s => s.firstName === 'Cece');
     saveTermAttendance(cid, st.id, 'term-2', 4, 2);
     const ctx = CommentBank.context(CommentBank.facts(cid, st, 'term-2'), {});
-    const habits = CommentBank.parts(ctx, '')[0];
-    expect(habits.fit).toBe(7);
+    const habits = CommentBank.parts(ctx, '', { more: { habits: true } })[0];
+    expect(habits.fit).toBe(9 + 7);
+    expect(habits.rows.filter(r => r.group === 'Attendance')).toHaveLength(7);
     saveTermAttendance(cid, st.id, 'term-2', null, null);
+  });
+
+  it('Generate drafts a comment from the bank: one sentence per step, every slot filled', () => {
+    const ctx = ctxFor('Cece');
+    const d = CommentBank.draft(ctx, { seed: 1 });
+    const sentences = d.text.split(/(?<=[.!?”])\s+(?=[A-Z“])/);
+    expect(sentences.length).toBeGreaterThanOrEqual(8);
+    expect(d.text).not.toMatch(/[{}[\]]/);
+    expect(d.text).toMatch(/^Cece /);
+    expect(d.text).toMatch(/Science 8/);
+    // Each chosen sentence fits and is in the bank once.
+    expect(new Set(d.ids).size).toBe(d.ids.length);
+    d.ids.forEach(id =>
+      expect(
+        CommentBank.fits(
+          COMMENT_BANK.sentences.find(s => s.id === id),
+          ctx,
+        ),
+      ).toBe(true),
+    );
+    // In the draft's order: opening, habits, now, go, how.
+    const order = d.ids.map(id => COMMENT_BANK.sentences.find(s => s.id === id).part);
+    const first = part => order.indexOf(part);
+    expect(order[0]).toBe('now');
+    expect(first('habits')).toBeLessThan(first('go'));
+    expect(first('go')).toBeLessThan(first('how'));
+  });
+
+  it('the same seed gives the same draft; a new seed a different one; classmates get different openings', () => {
+    const ctx = ctxFor('Cece');
+    expect(CommentBank.draft(ctx, { seed: 7 }).text).toBe(CommentBank.draft(ctx, { seed: 7 }).text);
+    expect(CommentBank.draft(ctx, { seed: 7 }).text).not.toBe(CommentBank.draft(ctx, { seed: 8 }).text);
+    const mine = CommentBank.draft(ctx, { seed: 7 }).text;
+    const other = CommentBank.draft(ctx, { seed: 7, comments: [mine] }).text;
+    expect(other.split('. ')[0]).not.toBe(mine.split('. ')[0]);
+  });
+
+  it('drafts for every Demo student: six or more sentences, nothing unfilled, no note quoted twice', () => {
+    getStudents(cid).forEach(st => {
+      const ctx = CommentBank.context(CommentBank.facts(cid, st, 'term-2'), {});
+      const d = CommentBank.draft(ctx, { seed: CommentBank.seedFor(st.id) });
+      expect(d.ids.length, st.firstName).toBeGreaterThanOrEqual(6);
+      expect(d.text, st.firstName).not.toMatch(/[{}[\]]|  /);
+      const quotes = d.text.match(/“[^”]+”/g) || [];
+      expect(new Set(quotes).size, st.firstName).toBe(quotes.length);
+    });
+  });
+
+  it('never calls a rising Focus Area the area to build', () => {
+    // Cece's Focus Area is Communicating (the biggest change, upward).
+    const ctx = ctxFor('Cece');
+    expect(ctx.focus).toBe('Communicating');
+    expect(ctx.focusLow).toBe('');
+    const texts = CommentBank.parts(ctx, '', { more: { go: true } })[2].rows.map(r => r.text);
+    expect(texts.some(t => /Communicating is the area to build next/.test(t))).toBe(false);
   });
 });
