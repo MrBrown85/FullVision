@@ -506,7 +506,11 @@ window.PageReports = (function () {
       el.remove();
     });
     preview.querySelectorAll('.sheet-body .sheet-cell[data-block]').forEach(function (el) {
-      if (el.dataset.block !== 'header') el.setAttribute('tabindex', '0');
+      // Every block, the letterhead too, can be reached and selected from
+      // the keyboard; a screen reader hears the block's name.
+      el.setAttribute('tabindex', '0');
+      el.setAttribute('role', 'group');
+      el.setAttribute('aria-label', _label(el.dataset.block));
     });
     if (_focusBlock) {
       var target = preview.querySelector('.sheet-body .sheet-cell[data-block="' + _focusBlock + '"]');
@@ -1280,6 +1284,10 @@ window.PageReports = (function () {
         _moveBlock(id, dir);
       },
       remove: _removeBlock,
+      select: function (id) {
+        _focusBlock = id;
+        _selectBlock(id);
+      },
       announce: _announce,
     });
   }

@@ -177,7 +177,7 @@ window.ReportSheets = (function () {
           groups: true,
         },
         { key: 'score', label: 'Score out of 4', def: true },
-        { key: 'word', label: 'Proficiency Word', def: true },
+        { key: 'word', label: 'Proficiency Word', def: 'auto' },
         { key: 'change', label: 'Change', def: true },
         { key: 'assessed', label: 'Assessed Count', def: true },
         { key: 'overall', label: 'Overall', def: true },

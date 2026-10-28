@@ -1215,6 +1215,30 @@
   margin: 0 0 6px 2px;
 }
 .report-sheet {
+  /* Paper stays paper in both themes: the theme tokens the blocks read are
+     set to their light values on the sheet itself, so a dark-mode screen
+     shows (and prints) the same black on white. */
+  --bg: #f5f5f7;
+  --bg-secondary: #ececf0;
+  --surface: #ffffff;
+  --surface-2: #e5e5ea;
+  --border: #d1d1d6;
+  --border-2: #c7c7cc;
+  --text: #1d1d1f;
+  --text-2: #636366;
+  --text-3: #58585d;
+  --divider-subtle: rgba(0, 0, 0, 0.06);
+  --divider-medium: rgba(0, 0, 0, 0.09);
+  --divider-strong: rgba(0, 0, 0, 0.12);
+  --score-0: #bbb;
+  --score-1: #d32f2f;
+  --score-2: #c07a00;
+  --score-3: #2e7d32;
+  --score-4: #1565c0;
+  --report-block-bg: #f5f3ef;
+  --report-callout-bg: #fef9f0;
+  --report-callout-border: #e8d5a8;
+  color-scheme: light;
   /* The print sizes, on the sheet itself, so a sheet measures the same
      wherever it is rendered (the preview, or a stage on <body>). */
   --text-2xs: 0.625rem;
@@ -3226,7 +3250,7 @@ button.tq-att-mention:disabled {
   gap: 22px;
   justify-content: center;
   align-items: flex-start;
-  padding-right: 212px;
+  padding-right: 232px;
 }
 .rb-preview.studio-pages:not(.studio-all) .sheet-zoom {
   zoom: 1;
@@ -3550,7 +3574,7 @@ button.tq-att-mention:disabled {
 .studio-bar {
   position: absolute;
   z-index: 7;
-  width: 196px;
+  width: 216px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -3627,9 +3651,8 @@ button.tq-att-mention:disabled {
   border-radius: 7px;
   padding: 6px 4px;
   cursor: pointer;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 .studio-bar-btn:hover {
   border-color: var(--active);

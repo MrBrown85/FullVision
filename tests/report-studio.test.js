@@ -62,9 +62,11 @@ describe('ReportStudio', () => {
     });
     expect(ReportStudio.landing(f, 'observations', sizes, fit([{ free: [300, 400] }]))).toEqual({
       reason: 'No room on either side',
+      fix: 'Add a page or remove a block',
     });
     expect(ReportStudio.landing(ReportSheets.setSides(f, 1), 'observations', sizes, fit([{ free: [300] }]))).toEqual({
       reason: 'No room on the Front',
+      fix: 'Choose Front and Back',
     });
     expect(ReportStudio.landing(f, 'big', sizes, fit([{}]))).toEqual({ after: true });
     // An empty side has room for anything up to a side.
@@ -91,7 +93,7 @@ describe('ReportStudio', () => {
     expect(html).toMatch(
       /class="studio-blk nofit"[^>]*data-block="student-reflection-habits"[^>]*aria-disabled="true"/,
     );
-    expect(html).toContain('No room on either side');
+    expect(html).toContain('No room on either side. Add a page or remove a block.');
     expect(html).not.toContain('Letterhead');
     expect(html).not.toMatch(/studio-sz|>S<|>XL</);
     // Retired blocks stay out unless placed.

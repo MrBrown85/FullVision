@@ -575,16 +575,21 @@ window.ReportBlocks = (function () {
       .sort((x, y) => (x.d || '').localeCompare(y.d || ''));
   }
   /* "Chemical Reactions Lab, Oct 12 · 3.3 / 4 Proficient" */
-  function _workLine(w) {
+  /* A mark as the class reads it: "3.3 / 4 Proficient", "83%" for a
+     letter class, "3.3 / 4 · 83% Proficient" for Both. `word` false drops
+     the proficiency word. */
+  function _mark(cid, v, word) {
+    if (!(v > 0)) return '\u2014';
+    const mode = courseGradeMode(cid);
+    const pct = formatLevelAs(v, 'percent');
+    if (mode === 'letter') return pct;
+    const fig = levelFigure(v) + ' / 4' + (mode === 'both' ? ' \u00B7 ' + pct : '');
+    return word === false ? fig : fig + ' ' + _profWord(v);
+  }
+  /* "Chemical Reactions Lab, Oct 12 · 3.3 / 4 Proficient" */
+  function _workLine(cid, w) {
     const when = _assessmentWhen(w.a);
-    return (
-      esc(w.a.title || '') +
-      (when ? ', ' + when : '') +
-      ' · ' +
-      esc(levelFigure(w.score)) +
-      ' / 4 ' +
-      esc(_profWord(w.score))
-    );
+    return esc(w.a.title || '') + (when ? ', ' + when : '') + ' \u00B7 ' + esc(_mark(cid, w.score));
   }
   function _firstICan(sec) {
     const tag = (sec.tags || []).find(t => (t.i_can_statements || []).length);
@@ -615,7 +620,7 @@ window.ReportBlocks = (function () {
         return (
           `<div class="report-steps-k">${esc(r.name)}</div><div class="report-steps-v">${ican ? '“' + esc(ican) + '”' : 'Keep building on this competency.'}</div>` +
           (options.latest !== false && latest
-            ? `<div></div><div class="report-steps-latest">Latest: ${_workLine(latest)}</div>`
+            ? `<div></div><div class="report-steps-latest">Latest: ${_workLine(cid, latest)}</div>`
             : '')
         );
       })
@@ -660,23 +665,28 @@ window.ReportBlocks = (function () {
     const when = a => (_assessmentWhen(a) ? ', ' + _assessmentWhen(a) : '');
     const facts = [];
     if (options.startNow !== false && (startV > 0 || nowV > 0)) {
-      facts.push(['Start of term', esc(levelFigure(startV)) + ' ' + esc(_profWord(startV))]);
+      // Figures as the class reads them: a level and its word, or a % for a letter class.
+      const letter = courseGradeMode(cid) === 'letter';
+      const plain = v => (letter ? formatLevelAs(v, 'percent') : levelFigure(v) + ' ' + _profWord(v));
+      const pctChange = () => {
+        if (!(startV > 0 && nowV > 0)) return '\u2014';
+        const d = Math.round((nowV / 4) * 100) - Math.round((startV / 4) * 100);
+        return (d > 0 ? '+' : d < 0 ? '\u2212' : '') + Math.abs(d) + '%';
+      };
+      facts.push(['Start of term', esc(plain(startV))]);
       facts.push([
         'Now',
-        `<b>${esc(levelFigure(nowV))} ${esc(_profWord(nowV))}</b> <span class="report-progress-chg">(${esc(levelChange(startV, nowV))} this term)</span>`,
+        `<b>${esc(plain(nowV))}</b> <span class="report-progress-chg">(${esc(letter ? pctChange() : levelChange(startV, nowV))} this term)</span>`,
       ]);
     }
     if (options.best !== false && bests.length) {
       facts.push([
         'Best',
-        bests.map(w => esc(w.a.title || '') + when(w.a)).join(' · ') + ' · ' + esc(levelFigure(top)) + ' / 4',
+        bests.map(w => esc(w.a.title || '') + when(w.a)).join(' · ') + ' · ' + esc(_mark(cid, top, false)),
       ]);
     }
     if (options.latest !== false && latest) {
-      facts.push([
-        'Latest',
-        esc(latest.a.title || '') + when(latest.a) + ' · ' + esc(levelFigure(latest.score)) + ' / 4',
-      ]);
+      facts.push(['Latest', esc(latest.a.title || '') + when(latest.a) + ' · ' + esc(_mark(cid, latest.score, false))]);
     }
     const ican = _firstICan(area.sec);
     if (options.toward !== false && ican) facts.push(['Working toward', '“' + esc(ican) + '”']);
@@ -688,7 +698,7 @@ window.ReportBlocks = (function () {
         work
           .map(
             w =>
-              `<div class="report-progress-li"><span class="report-progress-date">${esc(_assessmentWhen(w.a))}</span><span class="report-progress-title">${esc(w.a.title || '')}</span><span class="report-progress-n">${esc(levelFigure(w.score))}</span></div>`,
+              `<div class="report-progress-li"><span class="report-progress-date">${esc(_assessmentWhen(w.a))}</span><span class="report-progress-title">${esc(w.a.title || '')}</span><span class="report-progress-n">${esc(courseGradeMode(cid) === 'letter' ? formatLevelAs(w.score, 'percent') : levelFigure(w.score))}</span></div>`,
           )
           .join('') +
         '</div>';
@@ -785,7 +795,8 @@ window.ReportBlocks = (function () {
     const sid = student.id;
     const half = options.size === 'half';
     const showScore = options.score !== false;
-    const showWord = options.word !== false && !half;
+    const autoWord = showDefaults(cid).word;
+    const showWord = (options.word === 'auto' || options.word == null ? autoWord : options.word !== false) && !half;
     const showChange = options.change !== false;
     const showAssessed = options.assessed !== false;
     const hideEmpty = options.noEvidence === 'hide';
@@ -821,11 +832,19 @@ window.ReportBlocks = (function () {
       if (!parts.length) parts.push(esc(num));
       return parts.join(' ');
     };
+    // The change in the figure the class reads: levels (+0.2), or points of
+    // a percent for a letter class (+5%).
+    const change = (a, b) => {
+      if (mode !== 'letter') return levelChange(a, b);
+      if (!(a > 0 && b > 0)) return '\u2014';
+      const d = Math.round((b / 4) * 100) - Math.round((a / 4) * 100);
+      return (d > 0 ? '+' : d < 0 ? '\u2212' : '') + Math.abs(d) + '%';
+    };
     const colCount = 2 + (showChange ? 1 : 0) + (showAssessed ? 1 : 0) + 1;
     const head = (nameLabel, short) =>
       `<tr><th>${nameLabel}</th><th class="report-prof-n">${esc(short ? thenLabel.replace(/^(Term|Start of Term)$/, m => (m === 'Start of Term' ? 'Start' : m)) : thenLabel)}</th><th class="report-prof-n">${nowLabel}</th>${showChange ? '<th class="report-prof-n">Change</th>' : ''}${showAssessed ? `<th class="report-prof-n">${short ? 'Ev.' : 'Assessed'}</th>` : ''}</tr>`;
     const tr = (name, then, now, n, cls, count) =>
-      `<tr${cls ? ` class="${cls}"` : ''}><td class="report-ct-name">${esc(name)}${count ? `<span class="report-prof-count"> · ${count}</span>` : ''}</td><td class="report-prof-n">${fig(then)}</td><td class="report-prof-n">${fig(now)}</td>${showChange ? `<td class="report-prof-n">${esc(levelChange(then, now))}</td>` : ''}${showAssessed ? `<td class="report-prof-n report-prof-ev">${n}</td>` : ''}</tr>`;
+      `<tr${cls ? ` class="${cls}"` : ''}><td class="report-ct-name">${esc(name)}${count ? `<span class="report-prof-count"> · ${count}</span>` : ''}</td><td class="report-prof-n">${fig(then)}</td><td class="report-prof-n">${fig(now)}</td>${showChange ? `<td class="report-prof-n">${esc(change(then, now))}</td>` : ''}${showAssessed ? `<td class="report-prof-n report-prof-ev">${n}</td>` : ''}</tr>`;
     const headRow = name => `<tr class="report-ct-group"><td colspan="${colCount}">${esc(name)}</td></tr>`;
     const sortRows = list => (lowestFirst ? list.slice().sort((a, b) => (a.now || 9) - (b.now || 9)) : list);
     const avg = (list, k) => {
@@ -932,13 +951,13 @@ window.ReportBlocks = (function () {
           const named = top
             .map(w => esc(w.a.title) + (_assessmentWhen(w.a) ? ' (' + _assessmentWhen(w.a) + ')' : ''))
             .join(' and ');
-          return ` ${best ? 'Best' : 'Lowest'} work: ${named}, ${esc(levelFigure(top[0].score))} / 4.`;
+          return ` ${best ? 'Best' : 'Lowest'} work: ${named}, ${esc(_mark(cid, top[0].score, false))}.`;
         };
         const hi = ties(ranked, ranked[0]);
         const lo = ties(ranked.slice().reverse(), ranked[ranked.length - 1]);
-        facts += `<div class="report-prof-fact"><b>Highest now:</b> ${esc(names(hi))} ${esc(levelFigure(hi[0].now))}.${work(hi, true)}</div>`;
+        facts += `<div class="report-prof-fact"><b>Highest now:</b> ${esc(names(hi))} ${esc(mode === 'letter' ? formatLevel(cid, hi[0].now) : levelFigure(hi[0].now))}.${work(hi, true)}</div>`;
         if (ranked.length > 1 && Math.round(lo[0].now * 10) !== Math.round(hi[0].now * 10)) {
-          facts += `<div class="report-prof-fact"><b>Lowest now:</b> ${esc(names(lo))} ${esc(levelFigure(lo[0].now))}.${work(lo, false)}</div>`;
+          facts += `<div class="report-prof-fact"><b>Lowest now:</b> ${esc(names(lo))} ${esc(mode === 'letter' ? formatLevel(cid, lo[0].now) : levelFigure(lo[0].now))}.${work(lo, false)}</div>`;
         }
       }
     }
@@ -1679,9 +1698,12 @@ window.ReportBlocks = (function () {
       if (work.length) {
         const best = work.slice().sort((a, b) => b.score - a.score || (b.d || '').localeCompare(a.d || ''))[0];
         const low = work.slice().sort((a, b) => a.score - b.score || (b.d || '').localeCompare(a.d || ''))[0];
-        if (options.see !== false && best) lines.push(['Ask to see', _workLine(best)]);
+        if (options.see !== false && best) lines.push(['Ask to see', _workLine(cid, best)]);
         if (options.about !== false && low && (work.length > 1 || options.see === false)) {
-          lines.push(['Ask about', _workLine(low) + (low !== best ? ', ' + esc(p.poss) + ' lowest this term' : '')]);
+          lines.push([
+            'Ask about',
+            _workLine(cid, low) + (low !== best ? ', ' + esc(p.poss) + ' lowest this term' : ''),
+          ]);
         }
       }
     }

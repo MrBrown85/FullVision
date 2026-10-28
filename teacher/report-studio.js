@@ -74,7 +74,13 @@ window.ReportStudio = (function () {
       });
       if (need + sheets.GAP <= free || (need <= free && free === H)) return { side: s };
     }
-    return { reason: form.sides.length > 1 ? 'No room on either side' : 'No room on the Front' };
+    // Say what would make room: + Page, or Front and Back for a front-only report.
+    return form.sides.length > 1
+      ? {
+          reason: form.sides.length > 2 ? 'No room on any page' : 'No room on either side',
+          fix: 'Add a page or remove a block',
+        }
+      : { reason: 'No room on the Front', fix: 'Choose Front and Back' };
   }
 
   /* Whether a block has room on one side for every student: true, false,
@@ -183,7 +189,7 @@ window.ReportStudio = (function () {
           '<span class="studio-blk-name">' +
           esc(def.label) +
           '</span>' +
-          (nofit ? '<span class="studio-why">' + esc(land.reason) + '</span>' : '') +
+          (nofit ? '<span class="studio-why">' + esc(land.reason) + '. ' + esc(land.fix) + '.</span>' : '') +
           '</button>';
       });
     });
@@ -560,7 +566,7 @@ window.ReportStudio = (function () {
   /* The pages scale to the canvas, leaving the gutter for the selected
      block's card: two side by side at up to 62%, never below 45%;
      narrower than that, one above the other. */
-  var GUTTER_W = 220;
+  var GUTTER_W = 240;
   function fitZoom(canvasWidth, paper) {
     var sheetW = 8.5 * 96;
     var two = Math.min(0.62, (canvasWidth - 72 - GUTTER_W) / (2 * sheetW));
@@ -934,9 +940,10 @@ window.ReportStudio = (function () {
     };
   }
 
-  /* Keyboard on a focused block: ArrowUp / ArrowDown move its row, Delete
-     removes it; the live region says where it is.
-     api: { form(), move(id, dir), remove(id), announce(text) } */
+  /* Keyboard on a focused block: Enter or Space selects it, ArrowUp /
+     ArrowDown move its row, Delete removes it; the live region says where
+     it is. The letterhead only selects.
+     api: { form(), move(id, dir), remove(id), select(id), announce(text) } */
   function initKeys(root, api) {
     if (!root) return null;
     var ac = new AbortController();
@@ -946,6 +953,12 @@ window.ReportStudio = (function () {
         var cell = e.target.closest ? e.target.closest('.studio-pages .sheet-body .sheet-cell[data-block]') : null;
         if (!cell) return;
         var id = cell.dataset.block;
+        if ((e.key === 'Enter' || e.key === ' ') && e.target === cell) {
+          // Enter or Space selects the block and shows its card.
+          e.preventDefault();
+          if (api.select) api.select(id);
+          return;
+        }
         if (id === 'header') return;
         if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
           e.preventDefault();

@@ -542,6 +542,40 @@ describe('stage 3 blocks', () => {
     expect(ReportBlocks.renderReportBlock('next-steps', CID, CECE, {}, {})).toBe('');
   });
 
+  it('a letter class reads every mark as a percent: Next Steps, Support at Home, Progress and Proficiency', () => {
+    focusClass();
+    COURSES[CID].gradingSystem = 'letter';
+    try {
+      expect(text(ReportBlocks.renderReportBlock('next-steps', CID, CECE, {}, {}))).toContain(
+        'Latest: Poster, Oct 20 · 67%',
+      );
+      expect(text(ReportBlocks.renderReportBlock('support-home', CID, CECE, {}, {}))).toContain(
+        'Ask to see Lab Report, Sep 10 · 75% Ask about Poster, Oct 20 · 67%, her lowest this term',
+      );
+      const prog = text(ReportBlocks.renderReportBlock('progress', CID, CECE, {}, {}));
+      expect(prog).toContain('Start of term 75% Now 67% (−8% this term)');
+      expect(prog).toContain('Best Lab Report, Sep 10 · 75%');
+      expect(prog).not.toMatch(/Proficient|\/ 4/);
+      const prof = text(
+        ReportBlocks.renderReportBlock(
+          'proficiency',
+          CID,
+          CECE,
+          {},
+          S.optionsFor({ block: 'proficiency' }, ReportBlocks.showDefaults(CID)),
+        ),
+      );
+      expect(prof).not.toContain('Proficient');
+      expect(prof).toMatch(/Plan \d+% 83% [+−]?\d+% 3/);
+      COURSES[CID].gradingSystem = 'both';
+      expect(text(ReportBlocks.renderReportBlock('next-steps', CID, CECE, {}, {}))).toContain(
+        'Latest: Poster, Oct 20 · 2.7 / 4 · 67% Proficient',
+      );
+    } finally {
+      COURSES[CID].gradingSystem = 'proficiency';
+    }
+  });
+
   it('Ways to Support at Home names the best and lowest work in the Focus Area, with the teacher’s own line', () => {
     focusClass();
     const html = ReportBlocks.renderReportBlock('support-home', CID, CECE, {}, { note: 'Read together each night.' });
