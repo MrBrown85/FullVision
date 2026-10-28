@@ -72,6 +72,7 @@ const _cache = {
   modules: {}, // keyed by cid
   rubrics: {}, // keyed by cid
   rubricChecks: {}, // keyed by cid — ticked Advanced Rubric checkboxes { 'sid:aid': [checkId, …] }
+  dibels: {}, // keyed by cid — DIBELS raw scores { 'sid:aid': { boy|moy|eoy: { orfWrc, orfErrors, mazeCorrect, mazeIncorrect } } }
   flags: {}, // keyed by cid
   goals: {}, // keyed by cid
   goalDates: {}, // keyed by cid — when each goal was set { sid: { secId: ISO } }
@@ -101,6 +102,7 @@ const _DATA_KEYS = {
   modules: 'modules',
   rubrics: 'rubrics',
   rubricChecks: 'rubric-checks',
+  dibels: 'dibels',
   flags: 'flags',
   goals: 'goals',
   reflections: 'reflections',
@@ -759,6 +761,7 @@ var _ECHO_SAFE_RPCS = {
   upsert_tag_score: true,
   upsert_rubric_score: true,
   set_rubric_check: true,
+  upsert_dibels_score: true,
   set_score_status: true,
   save_score_comment: true,
   clear_score: true,
@@ -2265,9 +2268,12 @@ function _rekeyStudentRefs(cid, localId, serverId) {
   _rekeyField('statuses', cid, function (statuses) {
     return _rekeyStatusKeys(statuses, localId, serverId);
   });
-  // Ticked checkboxes are keyed 'sid:aid' like statuses.
+  // Ticked checkboxes and DIBELS scores are keyed 'sid:aid' like statuses.
   _rekeyField('rubricChecks', cid, function (checks) {
     return _rekeyStatusKeys(checks, localId, serverId);
+  });
+  _rekeyField('dibels', cid, function (dibels) {
+    return _rekeyStatusKeys(dibels, localId, serverId);
   });
 }
 
@@ -2280,6 +2286,9 @@ function _rekeyAssessmentRefs(cid, localId, serverId) {
   });
   _rekeyField('rubricChecks', cid, function (checks) {
     return _rekeyStatusKeys(checks, localId, serverId);
+  });
+  _rekeyField('dibels', cid, function (dibels) {
+    return _rekeyStatusKeys(dibels, localId, serverId);
   });
   _rekeyField('observations', cid, function (obs) {
     var changed = false;
@@ -8631,6 +8640,8 @@ function _cleanOrphanedScores(cid, validArr) {
   // Ticked checkboxes are keyed 'sid:aid' like statuses.
   var checks = getRubricChecks(cid);
   if (dropStatuses(checks)) _saveCourseField('rubricChecks', cid, checks);
+  var dibels = getDibelsScores(cid);
+  if (dropStatuses(dibels)) _saveCourseField('dibels', cid, dibels);
   if (_hasServerState('scores', cid)) dropScores(_serverState.scores[cid]);
   if (_hasServerState('statuses', cid)) dropStatuses(_serverState.statuses[cid]);
 }
@@ -11416,6 +11427,103 @@ async function loadTermAttendance(cid) {
   }
 }
 
+/* ── DIBELS 8 benchmark scores ─────────────────────────────
+   Raw scores for one student on one DIBELS assessment, in up to three
+   windows (Beginning, Middle and End of Year): oral reading fluency words
+   read correctly and errors, and Maze correct and incorrect. Kept on
+   dibels_score (migrations/20261027_dibels_scores.sql) and here keyed
+   'sid:aid' like statuses. Accuracy, the adjusted Maze score and the
+   benchmark levels are worked out from these, never stored. */
+var DIBELS_PERIODS = ['boy', 'moy', 'eoy'];
+var _DIBELS_FIELDS = [
+  ['orfWrc', 'orf_wrc'],
+  ['orfErrors', 'orf_errors'],
+  ['mazeCorrect', 'maze_correct'],
+  ['mazeIncorrect', 'maze_incorrect'],
+];
+function _dibelsCount(v) {
+  if (v === '' || v == null) return null;
+  var n = Math.floor(Number(v));
+  return isFinite(n) && n >= 0 ? n : null;
+}
+function getDibelsScores(cid) {
+  if (_cache.dibels[cid] !== undefined) return _cache.dibels[cid];
+  var stored = _safeParseLS('gb-dibels-' + cid, {});
+  _cache.dibels[cid] = stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {};
+  return _cache.dibels[cid];
+}
+/* One window's four numbers (nulls where not entered), or null when none. */
+function getDibelsScore(cid, sid, aid, period) {
+  var row = (getDibelsScores(cid)[sid + ':' + aid] || {})[period];
+  return row ? Object.assign({}, row) : null;
+}
+/* Saves one window's numbers; blanks are null, all blank clears the window. */
+function saveDibelsScore(cid, sid, aid, period, values) {
+  if (!cid || !sid || !aid || DIBELS_PERIODS.indexOf(period) < 0) return false;
+  var row = {};
+  var any = false;
+  _DIBELS_FIELDS.forEach(function (f) {
+    row[f[0]] = _dibelsCount(values && values[f[0]]);
+    if (row[f[0]] != null) any = true;
+  });
+  var all = getDibelsScores(cid);
+  var key = sid + ':' + aid;
+  var prev = (all[key] || {})[period] || null;
+  var same =
+    prev &&
+    _DIBELS_FIELDS.every(function (f) {
+      return prev[f[0]] === row[f[0]];
+    });
+  if ((!any && !prev) || (any && same)) return true;
+  if (!all[key]) all[key] = {};
+  if (any) all[key][period] = row;
+  else delete all[key][period];
+  if (!Object.keys(all[key]).length) delete all[key];
+  var lsOk = _saveCourseField('dibels', cid, all);
+  if (_writesEnabled() && _isSendableId(sid) && _isSendableId(aid)) {
+    var params = { p_enrollment_id: sid, p_assessment_id: aid, p_period: period };
+    _DIBELS_FIELDS.forEach(function (f) {
+      params['p_' + f[1]] = row[f[0]];
+    });
+    _trackPendingSync(
+      _writeRpc('upsert_dibels_score', params).then(function (res) {
+        if (res && res.error) _reportScoreWriteFailure('upsert_dibels_score', res.error);
+      }),
+    );
+  }
+  return lsOk;
+}
+/* The class's saved DIBELS scores from the server, laid over this device's
+   copy. Read when a page that shows them opens, so a class still loads in
+   one request. Resolves true when it changed anything here. */
+async function loadDibelsScores(cid) {
+  if (!_useSupabase || !_isUuid(cid)) return false;
+  var sb = getSupabase();
+  if (!sb) return false;
+  try {
+    var res = await sb.rpc('list_course_dibels', { p_course_id: cid });
+    if (!res || res.error) return false;
+    var rows = Array.isArray(res.data) ? res.data : [];
+    var next = {};
+    rows.forEach(function (r) {
+      if (!r || DIBELS_PERIODS.indexOf(r.period) < 0) return;
+      var key = r.enrollment_id + ':' + r.assessment_id;
+      if (!next[key]) next[key] = {};
+      var row = {};
+      _DIBELS_FIELDS.forEach(function (f) {
+        row[f[0]] = _dibelsCount(r[f[1]]);
+      });
+      next[key][r.period] = row;
+    });
+    if (JSON.stringify(next) === JSON.stringify(getDibelsScores(cid))) return false;
+    _persistLoadedField(cid, 'dibels', next);
+    return true;
+  } catch (e) {
+    console.warn('list_course_dibels failed for ' + cid + ':', e);
+    return false;
+  }
+}
+
 /* save_term_rating treats every key it receives as "set this field", so only
    the fields the caller changed are sent. Sending the whole local blob erased
    the saved narrative and social traits whenever the blob was incomplete,
@@ -11733,6 +11841,10 @@ window.GB = {
   saveTermAttendance,
   getTermAttendance,
   loadTermAttendance,
+  getDibelsScores,
+  getDibelsScore,
+  saveDibelsScore,
+  loadDibelsScores,
   upsertTermRating,
   getReportConfig,
   saveReportConfig,

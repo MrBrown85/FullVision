@@ -378,6 +378,12 @@ function isCompletionScored(assessment) {
   return !!assessment && (assessment.scoreMode || assessment.score_mode) === 'complete';
 }
 
+/* A DIBELS 8 benchmark: raw reading scores in three windows (dibels_score),
+   kept for the reading record and counted toward no grade. */
+function isDibelsScored(assessment) {
+  return !!assessment && (assessment.scoreMode || assessment.score_mode) === 'dibels';
+}
+
 function isPointsScored(assessment) {
   var mode = assessment && (assessment.scoreMode || assessment.score_mode);
   return mode === 'points' || mode === 'complete';
