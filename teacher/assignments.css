@@ -5413,3 +5413,79 @@
   background: none;
   padding: 0;
 }
+
+/* One student on the Assignments page: the dialog's grader inside the
+   open card. The card is already white, so criteria and competencies are
+   rows in it rather than cards of their own. */
+.grader-inline {
+  display: flex;
+  flex-direction: column;
+  padding-top: 4px;
+}
+.grader-inline-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0 10px;
+  box-shadow: inset 0 -0.5px 0 var(--divider-medium);
+}
+.grader-inline-name {
+  margin: 0;
+  font-size: 1.3125rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--text);
+}
+.grader-inline .grader-status-btn {
+  height: 24px;
+  padding: 0 10px;
+  font-size: var(--text-xs);
+}
+.grader-inline .grader-add-comment {
+  height: 26px;
+  border-radius: 13px;
+  font-size: var(--text-xs);
+}
+.grader-inline .grader-add-comment .comment-count {
+  font-weight: 700;
+}
+.grader-inline .grader-hint {
+  flex: none;
+}
+.grader-inline .grader-grade {
+  padding: 4px 11px;
+  border-radius: 12px;
+  font-size: var(--text-sm);
+}
+.grader-inline .grdt-tiles,
+.grader-inline .grdl-cards {
+  gap: 0;
+  padding: 0;
+}
+.grader-inline .grdt-legend {
+  padding: 10px 0 0;
+}
+.grader-inline .grdt-crit,
+.grader-inline .grdl-card,
+.grader-inline .grdp-card {
+  background: none;
+  border-radius: 0;
+  padding: 12px 0 14px;
+  box-shadow: inset 0 -0.5px 0 var(--divider-medium);
+}
+.grader-inline .grdt-crit:last-child,
+.grader-inline .grdl-card:last-child,
+.grader-inline .grdp-card:last-child {
+  box-shadow: none;
+}
+.grader-inline .grdt-crit:focus-visible,
+.grader-inline .grdl-card:focus-visible {
+  border-radius: 12px;
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.35);
+}
+.grader-inline.is-locked .grdt-tiles,
+.grader-inline.is-locked .grdl-cards,
+.grader-inline.is-locked .grdp-card {
+  opacity: 0.45;
+  pointer-events: none;
+}
