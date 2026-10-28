@@ -86,7 +86,7 @@ describe('ReportStudio', () => {
     const sizes = { observations: { row: 400, half: 600 } };
     const html = ReportStudio.paletteHtml(f, 'blocks', [], sizes, fit([{ free: [100, 100] }]));
     expect(html).toContain('Grades');
-    expect(html).toMatch(/class="studio-blk placed"[^>]*data-block="competency-table"[^>]*aria-pressed="true"/);
+    expect(html).toMatch(/class="studio-blk placed"[^>]*data-block="proficiency"[^>]*aria-pressed="true"/);
     expect(html).toContain('Click to find it');
     expect(html).toMatch(/class="studio-blk nofit"[^>]*data-block="observations"[^>]*aria-disabled="true"/);
     expect(html).toContain('No room on either side');
@@ -121,7 +121,7 @@ describe('ReportStudio', () => {
     expect(comment).not.toContain('studioOptions');
     // The legend: no lines; Options for the table.
     expect(ReportStudio.blockToolbarHtml(f, 'legend', who)).not.toContain('studioLines');
-    expect(ReportStudio.blockToolbarHtml(f, 'competency-table', who)).toContain('Options ▾');
+    expect(ReportStudio.blockToolbarHtml(f, 'proficiency', who)).toContain('Options ▾');
     // The letterhead: Options and a line, nothing to move.
     const head = ReportStudio.blockToolbarHtml(f, 'header', who);
     expect(head).toContain('Always first on the Front');
@@ -136,7 +136,7 @@ describe('ReportStudio', () => {
     expect(resp).not.toContain('Move');
     expect(resp).not.toContain('studioSize');
     // Move Up is off for the first row under the letterhead; Move Down for the last.
-    expect(ReportStudio.blockToolbarHtml(f, 'competency-table', who)).toMatch(/data-dir="-1" disabled/);
+    expect(ReportStudio.blockToolbarHtml(f, 'proficiency', who)).toMatch(/data-dir="-1" disabled/);
     expect(ReportStudio.blockToolbarHtml(f, 'learner-dimensions', who)).toMatch(/data-dir="1" disabled/);
     expect(ReportStudio.blockToolbarHtml(f, 'nope', who)).toBe('');
     // Everyone view: no Leave Off.
@@ -145,12 +145,13 @@ describe('ReportStudio', () => {
 
   it('the Options popover is a dialog with the block’s Show checkboxes, choices, no-evidence rule or text fields', () => {
     const f = ReportSheets.form();
-    const table = ReportStudio.popoverHtml(f, 'competency-table');
+    const table = ReportStudio.popoverHtml(f, 'proficiency');
     expect(table).toContain('role="dialog"');
-    expect(table).toContain('aria-label="Competency Table Options"');
-    expect(table).toContain('data-key="evidence"');
+    expect(table).toContain('aria-label="Proficiency Options"');
+    expect(table).toContain('data-key="score"');
+    expect(table).toContain('aria-label="Compare With"');
     expect(table).toContain('Hide Row');
-    expect(table).not.toMatch(/Width|Height|Lines|row \d/);
+    expect(table).not.toMatch(/Width|Height|row \d/);
     const withSteps = ReportSheets.insert(f, 'next-steps', { side: 0 });
     expect(ReportStudio.popoverHtml(withSteps, 'next-steps')).toContain('aria-label="I-can Statements"');
     const text = ReportStudio.popoverHtml(ReportSheets.insert(f, 'text-block', { side: 1 }), 'text-block');
@@ -175,7 +176,7 @@ describe('ReportStudio drag targets', () => {
   const c = (id, size, right) => ({ id, size, right: right ?? 720 });
   const rows = [
     row(0, 81, [c('header', 'row')]),
-    row(93, 339, [c('competency-table', 'row')]),
+    row(93, 339, [c('proficiency', 'row')]),
     row(351, 468, [c('legend', 'half', 354)]),
     row(480, 606, [c('teacher-narrative', 'row')]),
     row(700, 996, [c('parent-response', 'row')], { pinned: true }),
@@ -201,7 +202,7 @@ describe('ReportStudio drag targets', () => {
   });
 
   it('the held block’s own row is neither a target nor counted', () => {
-    const held = rows.map(r => (r.cells[0].id === 'competency-table' ? { ...r, held: true } : r));
+    const held = rows.map(r => (r.cells[0].id === 'proficiency' ? { ...r, held: true } : r));
     expect(ReportStudio.targetFor(held, 100, 300, { lo: 1 })).toEqual({ kind: 'row', index: 1 });
     expect(ReportStudio.targetFor(held, 100, 460, { lo: 1 })).toEqual({ kind: 'row', index: 2 });
   });

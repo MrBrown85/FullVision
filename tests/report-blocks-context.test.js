@@ -48,7 +48,7 @@ describe('report block renderers take the term as context', () => {
     expect(html).toContain('Jan Report Card');
     expect(html).toContain('Term 2');
     expect(html).toContain('Nov 15');
-    expect(html).toContain('Student No. STU-201');
+    expect(html).toContain('Student No.</span><span>STU-201');
     expect(html).toContain('Science 8 · Block A');
   });
 

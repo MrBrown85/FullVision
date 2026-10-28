@@ -20,7 +20,7 @@ describe('normalizeForm', () => {
     expect(f.sides).toHaveLength(2);
     expect(rowsOf(f, 0)).toEqual([
       'header',
-      'competency-table',
+      'proficiency',
       'legend',
       'teacher-narrative',
       'term-attendance/half+missing-work/half',
@@ -46,7 +46,7 @@ describe('normalizeForm', () => {
             { block: 'teacher-narrative', x: 0, y: 5, w: 12, h: 13, options: { x: 1 } },
             { block: 'legend', x: 6, y: 18, w: 6, h: 6 },
             { block: 'support-home', x: 0, y: 18, w: 6, h: 6 },
-            { block: 'competency-table', x: 0, y: 24, w: 8, h: 13 },
+            { block: 'proficiency', x: 0, y: 24, w: 8, h: 13 },
             { block: 'observations', x: 8, y: 24, w: 4, h: 13 },
             { block: 'growth', x: 0, y: 37, w: 5, h: 8 },
           ],
@@ -62,7 +62,7 @@ describe('normalizeForm', () => {
       'header',
       'teacher-narrative',
       'support-home/half+legend/half',
-      'competency-table',
+      'proficiency',
       'observations/half',
       'growth/half',
     ]);
@@ -88,7 +88,7 @@ describe('normalizeForm', () => {
             { cells: [{ block: 'teacher-narrative', span: 12, height: 'fixed', lines: 6 }] },
             {
               cells: [
-                { block: 'competency-table', span: 6 },
+                { block: 'proficiency', span: 6 },
                 { block: 'legend', span: 6 },
               ],
             },
@@ -98,7 +98,7 @@ describe('normalizeForm', () => {
       ],
       pinned: 'parent-response',
     });
-    expect(rowsOf(f, 0)).toEqual(['header', 'teacher-narrative', 'competency-table/half+legend/half']);
+    expect(rowsOf(f, 0)).toEqual(['header', 'teacher-narrative', 'proficiency/half+legend/half']);
     expect(S.cellOf(f, 'teacher-narrative').lines).toBe(6);
     expect(rowsOf(f, 1)).toEqual(['parent-response']);
   });
@@ -106,10 +106,10 @@ describe('normalizeForm', () => {
   it('migrates a v3 form through v4: a pair is two halves, the pin is the form’s', () => {
     const f = S.normalizeForm({
       v: 3,
-      front: [{ block: 'header' }, { pair: [{ block: 'competency-table' }, { block: 'legend' }] }],
+      front: [{ block: 'header' }, { pair: [{ block: 'proficiency' }, { block: 'legend' }] }],
       back: [{ block: 'learner-dimensions' }, { block: 'parent-response', pinned: true }],
     });
-    expect(rowsOf(f, 0)).toEqual(['header', 'competency-table/half+legend/half']);
+    expect(rowsOf(f, 0)).toEqual(['header', 'proficiency/half+legend/half']);
     expect(rowsOf(f, 1)).toEqual(['learner-dimensions', 'parent-response']);
     expect(f.pinned).toBe('parent-response');
   });
@@ -174,7 +174,7 @@ describe('editing', () => {
     f = S.insert(f, 'next-steps', { side: 0, row: 2 });
     expect(rowsOf(f, 0)).toEqual([
       'header',
-      'competency-table',
+      'proficiency',
       'next-steps',
       'legend',
       'teacher-narrative',
@@ -194,14 +194,14 @@ describe('editing', () => {
 
   it('beside pairs two blocks that may go Side by Side when the target is alone; otherwise nothing changes', () => {
     const f0 = S.form();
-    const f = S.beside(f0, 'legend', 'competency-table');
+    const f = S.beside(f0, 'legend', 'proficiency');
     expect(rowsOf(f, 0)).toEqual([
       'header',
-      'competency-table/half+legend/half',
+      'proficiency/half+legend/half',
       'teacher-narrative',
       'term-attendance/half+missing-work/half',
     ]);
-    expect(S.partnerOf(f, 'legend')).toBe('competency-table');
+    expect(S.partnerOf(f, 'legend')).toBe('proficiency');
     expect(S.partnerOf(f, 'teacher-narrative')).toBeNull();
     // A full pair takes no third; the reflections never pair; the response never pairs.
     expect(S.beside(f, 'teacher-narrative', 'legend')).toEqual(f);
@@ -216,14 +216,14 @@ describe('editing', () => {
     let f = S.moveRow(S.form(), 'teacher-narrative', -1);
     expect(rowsOf(f, 0)).toEqual([
       'header',
-      'competency-table',
+      'proficiency',
       'teacher-narrative',
       'legend',
       'term-attendance/half+missing-work/half',
     ]);
     f = S.moveRow(f, 'missing-work', -1);
     expect(rowsOf(f, 0)[3]).toBe('term-attendance/half+missing-work/half');
-    expect(S.moveRow(f, 'competency-table', -1)).toBe(f); // under the letterhead already
+    expect(S.moveRow(f, 'proficiency', -1)).toBe(f); // under the letterhead already
     expect(S.moveRow(f, 'learner-dimensions', 1)).toBe(f); // above the pinned row already
     expect(S.moveRow(f, 'parent-response', -1)).toBe(f);
     expect(S.moveRow(f, 'header', 1)).toBe(f);
@@ -233,7 +233,7 @@ describe('editing', () => {
     const f = S.moveToSide(S.form(), 'legend', 1);
     expect(rowsOf(f, 0)).toEqual([
       'header',
-      'competency-table',
+      'proficiency',
       'teacher-narrative',
       'term-attendance/half+missing-work/half',
     ]);
@@ -246,17 +246,17 @@ describe('editing', () => {
   it('setSize: Side by Side pairs with a lone Side by Side neighbour; Row splits a pair, the partner staying at half width', () => {
     let f = S.setSize(S.form(), 'legend', 'half');
     expect(rowsOf(f, 0)[2]).toBe('legend/half');
-    f = S.setSize(f, 'competency-table', 'half');
+    f = S.setSize(f, 'proficiency', 'half');
     expect(rowsOf(f, 0)).toEqual([
       'header',
-      'competency-table/half+legend/half',
+      'proficiency/half+legend/half',
       'teacher-narrative',
       'term-attendance/half+missing-work/half',
     ]);
-    f = S.setSize(f, 'competency-table', 'row');
+    f = S.setSize(f, 'proficiency', 'row');
     expect(rowsOf(f, 0)).toEqual([
       'header',
-      'competency-table',
+      'proficiency',
       'legend/half',
       'teacher-narrative',
       'term-attendance/half+missing-work/half',
@@ -301,7 +301,7 @@ describe('editing', () => {
     expect(one.sides).toHaveLength(1);
     expect(rowsOf(one, 0)).toEqual([
       'header',
-      'competency-table',
+      'proficiency',
       'legend',
       'teacher-narrative',
       'term-attendance/half+missing-work/half',
@@ -316,10 +316,10 @@ describe('editing', () => {
   });
 
   it('setOption, setNoEvidence, setPinned, setType', () => {
-    let f = S.setOption(S.form(), 'competency-table', 'evidence', false);
-    expect(S.cellOf(f, 'competency-table').options).toEqual({ evidence: false });
-    f = S.setNoEvidence(f, 'competency-table', 'hide');
-    expect(S.cellOf(f, 'competency-table').noEvidence).toBe('hide');
+    let f = S.setOption(S.form(), 'proficiency', 'evidence', false);
+    expect(S.cellOf(f, 'proficiency').options).toEqual({ evidence: false });
+    f = S.setNoEvidence(f, 'proficiency', 'hide');
+    expect(S.cellOf(f, 'proficiency').noEvidence).toBe('hide');
     f = S.setPinned(f, null);
     expect(f.pinned).toBeNull();
     expect(S.setPinned(f, 'parent-response').pinned).toBe('parent-response');
@@ -371,13 +371,15 @@ describe('starters', () => {
       ican: false,
       assignments: false,
       noEvidence: 'show',
+      size: 'row',
     });
     expect(S.optionsFor({ block: 'competency-table', options: { ican: true }, noEvidence: 'hide' })).toMatchObject({
       ican: true,
       noEvidence: 'hide',
     });
-    expect(S.optionsFor({ block: 'parent-response', lines: 5 })).toEqual({ lines: 5 });
-    expect(S.optionsFor({ block: 'legend' })).toEqual({});
+    expect(S.optionsFor({ block: 'parent-response', lines: 5 })).toEqual({ lines: 5, size: 'row' });
+    expect(S.optionsFor({ block: 'legend' })).toEqual({ size: 'row' });
+    expect(S.optionsFor({ block: 'legend', size: 'half' })).toEqual({ size: 'half' });
   });
 
   it('every option in the registry has a key, a Title Case label and a default; every block a label and a group', () => {
@@ -575,12 +577,106 @@ describe('stage 3 blocks', () => {
     expect(ReportBlocks.renderReportBlock('growth', CID, CECE, {}, {})).toBe('');
   });
 
+  it('Proficiency prints figures then and now, the word, the change and the assessed count per competency, Overall on top, and the highest and lowest lines', () => {
+    const work = [
+      { id: 'a1', title: 'Lab Report', date: '2026-09-10' },
+      { id: 'a2', title: 'Quiz', date: '2026-10-05' },
+    ];
+    stub('getAssessments', () => work);
+    stub('getActiveTerm', () => null);
+    stub('getGroupedSections', () => ({ groups: [], ungrouped: [] }));
+    const secs = [
+      {
+        id: 'q',
+        name: 'Questioning and Predicting',
+        shortName: 'Questioning',
+        tags: [{ id: 't1', label: 'Question and Predict' }],
+      },
+      { id: 'p', name: 'Planning', tags: [{ id: 't2', label: 'Plan Investigations' }] },
+      { id: 'e', name: 'Evaluating', tags: [{ id: 't3', label: 'Evaluate Methods' }] },
+    ];
+    stub('getSections', () => secs);
+    stub('getSectionProficiency', (cid, sid, id) => ({ q: 3.2, p: 3.4, e: 0 })[id]);
+    stub('getOverallProficiency', () => 3.3);
+    stub('getTagScores', (cid, sid, tid) =>
+      tid === 't1'
+        ? [
+            { assessmentId: 'a1', score: 3 },
+            { assessmentId: 'a2', score: 3.33 },
+          ]
+        : tid === 't2'
+          ? [{ assessmentId: 'a2', score: 4 }]
+          : [],
+    );
+    const html = ReportBlocks.renderReportBlock('proficiency', CID, CECE, {}, S.optionsFor({ block: 'proficiency' }));
+    const t = text(html);
+    expect(t).toContain('Proficiency Curricular Competencies · Science 8');
+    expect(t).toContain('Competency Start of Term Now Change Assessed');
+    expect(t).toContain('Overall 3.0 Proficient 3.3 Proficient +0.3 3');
+    expect(t).toContain('Question and Predict 3.0 Proficient 3.2 Proficient +0.2 2');
+    expect(t).toContain('Plan Investigations — 3.4 Proficient — 1');
+    expect(t).toContain('Evaluate Methods — — — 0');
+    expect(t).toContain('Highest now: Plan Investigations 3.4. Best work: Quiz (Oct 5), 4.0 / 4.');
+    expect(t).toContain('Lowest now: Question and Predict 3.2. Lowest work: Lab Report (Sep 10), 3.0 / 4.');
+    expect(html).not.toMatch(/[●○]/);
+    // Options: no word, no facts, hide empty rows, lowest first, no overall.
+    const bare = text(
+      ReportBlocks.renderReportBlock(
+        'proficiency',
+        CID,
+        CECE,
+        {},
+        { word: false, facts: false, overall: false, order: 'lowest', noEvidence: 'hide', size: 'row' },
+      ),
+    );
+    expect(bare).not.toContain('Evaluate Methods');
+    expect(bare).not.toContain('Overall');
+    expect(bare).not.toContain('Highest now');
+    expect(bare.indexOf('Question and Predict')).toBeLessThan(bare.indexOf('Plan Investigations'));
+    expect(bare).toContain('Question and Predict 3.0 3.2 +0.2 2');
+    // Side by Side: short headings, no word.
+    const half = text(ReportBlocks.renderReportBlock('proficiency', CID, CECE, {}, { size: 'half' }));
+    expect(half).toContain('Competency Start Now Change Ev.');
+    expect(half).not.toContain('Proficient');
+    // Groups: a heading per group, the rest under Other Competencies; Each Group averages.
+    stub('getGroupedSections', () => ({
+      groups: [{ group: { id: 'g1', name: 'Inquiry' }, sections: [secs[0], secs[1]] }],
+      ungrouped: [secs[2]],
+    }));
+    stub('getGroupProficiency', () => 3.3);
+    const grouped = text(ReportBlocks.renderReportBlock('proficiency', CID, CECE, {}, {}));
+    expect(grouped).toContain('Inquiry Question and Predict');
+    expect(grouped).toContain('Other Competencies Evaluate Methods');
+    const byGroup = text(ReportBlocks.renderReportBlock('proficiency', CID, CECE, {}, { rows: 'group' }));
+    expect(byGroup).toContain('Group Start of Term Now Change Assessed');
+    expect(byGroup).toContain('Inquiry · 2 3.0 Proficient 3.3 Proficient +0.3 3');
+    expect(byGroup).toContain('Other Competencies Evaluate Methods');
+    // Nothing to print without competencies.
+    stub('getSections', () => []);
+    stub('getGroupedSections', () => ({ groups: [], ungrouped: [] }));
+    expect(ReportBlocks.renderReportBlock('proficiency', CID, CECE, {}, {})).toBe('');
+  });
+
+  it('the legend is one strip of four figures and words, two by two at Side by Side', () => {
+    const row = ReportBlocks.renderReportBlock('legend', CID, CECE, {}, { size: 'row' });
+    expect(text(row)).toBe(
+      'BC Proficiency Scale, out of 4 1 · Emerging Initial understanding 2 · Developing Partial understanding 3 · Proficient Complete understanding 4 · Extending Sophisticated understanding',
+    );
+    expect(row).not.toMatch(/[●○]/);
+    expect(ReportBlocks.renderReportBlock('legend', CID, CECE, {}, { size: 'half' })).toContain('report-legend-half');
+  });
+
   it('retired blocks leave the palette but a saved layout keeps them', () => {
     const html = ReportStudio.paletteHtml(S.form(), 'blocks', []);
-    ['section-outcomes', 'score-distribution', 'section-chart'].forEach(id =>
-      expect(html).not.toContain(`data-block="${id}"`),
-    );
-    ['support-home', 'term-glance', 'growth', 'missing-work'].forEach(id =>
+    [
+      'section-outcomes',
+      'score-distribution',
+      'section-chart',
+      'academic-summary',
+      'competency-table',
+      'growth',
+    ].forEach(id => expect(html).not.toContain(`data-block="${id}"`));
+    ['support-home', 'term-glance', 'missing-work', 'proficiency'].forEach(id =>
       expect(html).toContain(`data-block="${id}"`),
     );
     const kept = S.insert(S.form(), 'section-chart', { side: 1 });

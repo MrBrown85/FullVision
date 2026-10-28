@@ -172,24 +172,24 @@ window.ReportBlocks = (function () {
     const block = typeof courseBlockLabel === 'function' ? courseBlockLabel(course) : '';
     const teacher = (typeof getConfig === 'function' && getConfig().displayName) || '';
 
-    const titleParts = [school, course.name, block].filter(Boolean);
+    const titleParts = [school, course.name, block, period].filter(Boolean);
     let dates = term && options.dates !== false ? _formatDateRange(term.starts_on, term.ends_on) : '';
     if (dates && term.label && term.label !== period) dates = esc(term.label) + ' \u00B7 ' + dates;
-    const who = [
-      teacher && options.teacher !== false ? 'Teacher: ' + esc(teacher) : '',
-      student.studentNumber && options.studentNumber !== false ? 'Student No. ' + esc(student.studentNumber) : '',
+    const meta = [
+      dates ? ['Term', dates] : null,
+      teacher && options.teacher !== false ? ['Teacher', esc(teacher)] : null,
+      student.studentNumber && options.studentNumber !== false ? ['Student No.', esc(student.studentNumber)] : null,
     ]
       .filter(Boolean)
-      .join(' \u00B7 ');
+      .map(([k, v]) => `<span class="report-header-k">${k}</span><span>${v}</span>`)
+      .join('');
 
     return `<div class="report-header">
     <div class="report-header-main">
       <div class="report-course-title">${esc(titleParts.join(' \u00B7 '))}</div>
       <div class="report-student-name">${esc(printedStudentName(student, options.name))}</div>
     </div>
-    <div class="report-header-meta">
-      <div class="report-period">${esc(period)}</div>${dates ? `<div>${dates}</div>` : ''}${who ? `<div>${who}</div>` : ''}
-    </div>
+    <div class="report-header-meta">${meta}</div>
   </div>`;
   }
 
@@ -581,12 +581,274 @@ window.ReportBlocks = (function () {
     </div></div>`;
   }
 
-  function renderBlockLegend() {
-    return `<div class="report-legend">
-    <div class="report-legend-item">${levelDots(1)}<div class="report-legend-text"><span class="report-legend-word">Emerging</span><span class="report-legend-desc">Beginning to develop understanding; requires consistent support</span></div></div>
-    <div class="report-legend-item">${levelDots(2)}<div class="report-legend-text"><span class="report-legend-word">Developing</span><span class="report-legend-desc">Growing understanding; demonstrates learning with some support</span></div></div>
-    <div class="report-legend-item">${levelDots(3)}<div class="report-legend-text"><span class="report-legend-word">Proficient</span><span class="report-legend-desc">Solid, independent understanding of grade-level expectations</span></div></div>
-    <div class="report-legend-item">${levelDots(4)}<div class="report-legend-text"><span class="report-legend-word">Extending</span><span class="report-legend-desc">Deep, sophisticated understanding; applies learning in new contexts</span></div></div>
+  /* ── Proficiency ────────────────────────────────────────────────
+     Each competency's level as figures: the score out of 4 at the last
+     report (or the start of this term) and now, the proficiency word, the
+     change, and how many assessments the level rests on; Overall on top;
+     two lines of facts under the table naming the highest and lowest
+     competencies now and the best and lowest work. Rows are the class's
+     competencies in curriculum order (or lowest first), named by the
+     competency's own label; a class with groups prints a heading per
+     group and Other Competencies for the rest, or one averaged row per
+     group. More than 12 rows go in two columns, a group never split. No
+     dots, no colour. Replaces Overall and Competencies, the Competency
+     Table and Growth Since Last Report (DECISIONS "Report forms" 13). */
+  function _competencyLabel(sec) {
+    const tag = (sec.tags || [])[0];
+    return (tag && tag.label) || sec.name || '';
+  }
+  /* The assessments a section's level rests on: distinct, scored, and
+     the best and lowest of them with their dates. */
+  function _sectionEvidence(cid, sid, sec) {
+    const titles = {};
+    getAssessments(cid).forEach(a => (titles[a.id] = a));
+    const byId = {};
+    (sec.tags || []).forEach(tag => {
+      getTagScores(cid, sid, tag.id).forEach(sc => {
+        if (!(sc.score > 0)) return;
+        const prev = byId[sc.assessmentId];
+        if (!prev || sc.score > prev.score) byId[sc.assessmentId] = { score: sc.score, a: titles[sc.assessmentId] };
+      });
+    });
+    const list = Object.keys(byId).map(id => byId[id]);
+    return { count: list.length, list };
+  }
+  /* A section's level at the start of this term, from its scores in date
+     order (calc.js startAndNow); null without enough dated scores. */
+  function _sectionStart(cid, sid, sec) {
+    const dates = {};
+    getAssessments(cid).forEach(a => {
+      const d = typeof _assessmentDate === 'function' ? _assessmentDate(a) : a.date || a.dueDate || null;
+      if (d) dates[a.id] = d;
+    });
+    const points = [];
+    (sec.tags || []).forEach(tag => {
+      getTagScores(cid, sid, tag.id).forEach(sc => {
+        const d = dates[sc.assessmentId];
+        if (!(sc.score > 0) || !d) return;
+        points.push({ t: Math.round(parseLocalDate(d).getTime() / 86400000), v: sc.score });
+      });
+    });
+    const r = startAndNow(points);
+    return r ? r.start : null;
+  }
+  /* Every section's level in the previous reporting term, read through
+     calc.js with the term switched and put back; null without one. */
+  function _lastReportLevels(cid, sid, sections) {
+    const now = typeof getActiveTerm === 'function' ? getActiveTerm(cid) : null;
+    if (!now) return null;
+    const prev = (typeof getReportingTerms === 'function' ? getReportingTerms(cid) : [])
+      .filter(t => t.ordinal < now.ordinal)
+      .pop();
+    if (!prev) return null;
+    let before;
+    try {
+      setActiveTerm(cid, prev.ordinal);
+      before = sections.map(sec => getSectionProficiency(cid, sid, sec.id));
+    } finally {
+      setActiveTerm(cid, now.ordinal);
+    }
+    if (!before.some(v => v > 0)) return null;
+    return { label: prev.label || 'Last Report', levels: before };
+  }
+  function _profWord(v) {
+    return v > 0 ? PROF_LABELS[Math.min(4, Math.max(1, Math.round(v)))] : '';
+  }
+  function _assessmentWhen(a) {
+    const d = a && (typeof _assessmentDate === 'function' ? _assessmentDate(a) : a.date || a.dueDate);
+    if (!d) return '';
+    const dt = parseLocalDate(d);
+    return dt.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
+  }
+
+  function renderBlockProficiency(cid, student, ctx, options) {
+    options = options || {};
+    const sid = student.id;
+    const half = options.size === 'half';
+    const showScore = options.score !== false;
+    const showWord = options.word !== false && !half;
+    const showChange = options.change !== false;
+    const showAssessed = options.assessed !== false;
+    const hideEmpty = options.noEvidence === 'hide';
+    const lowestFirst = options.order === 'lowest';
+    const mode = courseGradeMode(cid);
+    const grouped = getGroupedSections(cid);
+    const hasGroups = grouped.groups.some(g => g.sections.length);
+    const sections = _reportSections(cid);
+    if (!sections.length) return '';
+
+    // Then and now, per section.
+    const last = options.compare !== 'start' ? _lastReportLevels(cid, sid, sections) : null;
+    const thenLabel = last ? last.label : 'Start of Term';
+    const nowLabel = 'Now';
+    const rowsBySection = {};
+    sections.forEach((sec, i) => {
+      const now = getSectionProficiency(cid, sid, sec.id);
+      const then = last ? last.levels[i] : _sectionStart(cid, sid, sec);
+      const ev = _sectionEvidence(cid, sid, sec);
+      rowsBySection[sec.id] = { sec, name: _competencyLabel(sec), then: then > 0 ? then : 0, now, ev };
+    });
+    const live = sections.map(sec => rowsBySection[sec.id]).filter(r => r.now > 0 || !hideEmpty);
+    if (!live.length) return '';
+
+    // A figure as the class shows it: the score out of 4, or the % for a
+    // letter class, with the proficiency word where it is on.
+    const fig = v => {
+      if (!(v > 0)) return '<span class="report-ct-none">—</span>';
+      const num = mode === 'letter' ? formatLevel(cid, v) : levelFigure(v);
+      const parts = [];
+      if (showScore) parts.push(esc(num));
+      if (showWord) parts.push(esc(_profWord(v)));
+      if (!parts.length) parts.push(esc(num));
+      return parts.join(' ');
+    };
+    const colCount = 2 + (showChange ? 1 : 0) + (showAssessed ? 1 : 0) + 1;
+    const head = (nameLabel, short) =>
+      `<tr><th>${nameLabel}</th><th class="report-prof-n">${esc(short ? thenLabel.replace(/^(Term|Start of Term)$/, m => (m === 'Start of Term' ? 'Start' : m)) : thenLabel)}</th><th class="report-prof-n">${nowLabel}</th>${showChange ? '<th class="report-prof-n">Change</th>' : ''}${showAssessed ? `<th class="report-prof-n">${short ? 'Ev.' : 'Assessed'}</th>` : ''}</tr>`;
+    const tr = (name, then, now, n, cls, count) =>
+      `<tr${cls ? ` class="${cls}"` : ''}><td class="report-ct-name">${esc(name)}${count ? `<span class="report-prof-count"> · ${count}</span>` : ''}</td><td class="report-prof-n">${fig(then)}</td><td class="report-prof-n">${fig(now)}</td>${showChange ? `<td class="report-prof-n">${esc(levelChange(then, now))}</td>` : ''}${showAssessed ? `<td class="report-prof-n report-prof-ev">${n}</td>` : ''}</tr>`;
+    const headRow = name => `<tr class="report-ct-group"><td colspan="${colCount}">${esc(name)}</td></tr>`;
+    const sortRows = list => (lowestFirst ? list.slice().sort((a, b) => (a.now || 9) - (b.now || 9)) : list);
+    const avg = (list, k) => {
+      const v = list.map(r => r[k]).filter(x => x > 0);
+      return v.length ? v.reduce((t, x) => t + x, 0) / v.length : 0;
+    };
+    const sum = list => list.reduce((t, r) => t + r.ev.count, 0);
+
+    // Overall: the class's roll-up now, and then from the same rows.
+    const overallNow = getOverallProficiency(cid, sid);
+    const overallThen = avg(live, 'then');
+    const overallRow =
+      options.overall !== false ? tr('Overall', overallThen, overallNow, sum(live), 'report-prof-overall') : '';
+
+    // The rows: blocks that never split across columns.
+    const blocks = [];
+    const byGroup = options.rows === 'group' && hasGroups;
+    if (hasGroups) {
+      const loose = grouped.ungrouped.map(sec => rowsBySection[sec.id]).filter(r => live.indexOf(r) >= 0);
+      if (byGroup) {
+        const groupRows = grouped.groups
+          .filter(g => g.sections.length)
+          .map(g => {
+            const rs = g.sections.map(sec => rowsBySection[sec.id]).filter(r => live.indexOf(r) >= 0);
+            return {
+              name: g.group.name,
+              then: avg(rs, 'then'),
+              now: getGroupProficiency(cid, sid, g.group.id),
+              ev: { count: sum(rs) },
+              count: rs.length,
+            };
+          })
+          .filter(r => r.count);
+        blocks.push(sortRows(groupRows).map(r => tr(r.name, r.then, r.now, r.ev.count, 'report-prof-group', r.count)));
+        if (loose.length)
+          blocks.push(
+            [headRow('Other Competencies')].concat(sortRows(loose).map(r => tr(r.name, r.then, r.now, r.ev.count))),
+          );
+      } else {
+        grouped.groups.forEach(g => {
+          const rs = g.sections.map(sec => rowsBySection[sec.id]).filter(r => live.indexOf(r) >= 0);
+          if (!rs.length) return;
+          blocks.push([headRow(g.group.name)].concat(sortRows(rs).map(r => tr(r.name, r.then, r.now, r.ev.count))));
+        });
+        if (loose.length)
+          blocks.push(
+            [headRow('Other Competencies')].concat(sortRows(loose).map(r => tr(r.name, r.then, r.now, r.ev.count))),
+          );
+      }
+    } else {
+      blocks.push(sortRows(live).map(r => tr(r.name, r.then, r.now, r.ev.count)));
+    }
+    const total = blocks.reduce((t, b) => t + b.length, 0);
+    const twoCols = !half && !byGroup && total > 12;
+    const nameLabel = byGroup ? 'Group' : 'Competency';
+    let body;
+    if (twoCols) {
+      let left = [];
+      let right = [];
+      if (blocks.length === 1) {
+        const cut = Math.ceil(blocks[0].length / 2);
+        left = blocks[0].slice(0, cut);
+        right = blocks[0].slice(cut);
+      } else {
+        let acc = 0;
+        blocks.forEach(b => {
+          if (!right.length && acc + b.length / 2 <= total / 2) {
+            left = left.concat(b);
+            acc += b.length;
+          } else right = right.concat(b);
+        });
+      }
+      const table = rows =>
+        `<table class="report-ct report-prof"><thead>${head(nameLabel, true)}</thead><tbody>${rows.join('')}</tbody></table>`;
+      body =
+        (overallRow
+          ? `<table class="report-ct report-prof report-prof-top"><tbody>${overallRow}</tbody></table>`
+          : '') + `<div class="report-prof-cols">${table(left)}${table(right)}</div>`;
+    } else {
+      body = `<table class="report-ct report-prof"><thead>${head(nameLabel, half)}</thead><tbody>${overallRow}${blocks.map(b => b.join('')).join('')}</tbody></table>`;
+    }
+
+    // The facts: the highest and lowest competencies now, and the best and
+    // lowest work in them.
+    let facts = '';
+    if (options.facts !== false) {
+      const ranked = live
+        .filter(r => r.now > 0)
+        .slice()
+        .sort((a, b) => b.now - a.now);
+      if (ranked.length) {
+        const ties = (list, pick) => list.filter(r => Math.round(r.now * 10) === Math.round(pick.now * 10)).slice(0, 3);
+        const names = list =>
+          list
+            .map(r => r.name)
+            .join(', ')
+            .replace(/, ([^,]*)$/, list.length > 2 ? ', and $1' : ' and $1');
+        const work = (list, best) => {
+          const items = [];
+          list.forEach(r => r.ev.list.forEach(w => w.a && items.push(w)));
+          if (!items.length) return '';
+          items.sort((a, b) => (best ? b.score - a.score : a.score - b.score));
+          const top = items.filter(w => Math.round(w.score * 10) === Math.round(items[0].score * 10)).slice(0, 2);
+          const named = top
+            .map(w => esc(w.a.title) + (_assessmentWhen(w.a) ? ' (' + _assessmentWhen(w.a) + ')' : ''))
+            .join(' and ');
+          return ` ${best ? 'Best' : 'Lowest'} work: ${named}, ${esc(levelFigure(top[0].score))} / 4.`;
+        };
+        const hi = ties(ranked, ranked[0]);
+        const lo = ties(ranked.slice().reverse(), ranked[ranked.length - 1]);
+        facts += `<div class="report-prof-fact"><b>Highest now:</b> ${esc(names(hi))} ${esc(levelFigure(hi[0].now))}.${work(hi, true)}</div>`;
+        if (ranked.length > 1 && Math.round(lo[0].now * 10) !== Math.round(hi[0].now * 10)) {
+          facts += `<div class="report-prof-fact"><b>Lowest now:</b> ${esc(names(lo))} ${esc(levelFigure(lo[0].now))}.${work(lo, false)}</div>`;
+        }
+      }
+    }
+    const course = COURSES[cid] || {};
+    const meta = (half ? '' : 'Curricular Competencies · ') + esc(course.name || '');
+    return `<div class="report-block-box report-proficiency${half ? ' report-prof-half' : ''}">
+    <div class="report-prof-head"><div class="report-block-title">Proficiency</div><div class="report-prof-meta">${meta}</div></div>
+    ${body}${facts ? `<div class="report-prof-facts">${facts}</div>` : ''}
+  </div>`;
+  }
+
+  /* The BC Proficiency Scale as one strip: the figure and the word for
+     each level, with a few words of what it means. Two by two at Side by
+     Side width. No dots. */
+  const LEGEND_LEVELS = [
+    [1, 'Emerging', 'Initial understanding'],
+    [2, 'Developing', 'Partial understanding'],
+    [3, 'Proficient', 'Complete understanding'],
+    [4, 'Extending', 'Sophisticated understanding'],
+  ];
+  function renderBlockLegend(options) {
+    const half = options && options.size === 'half';
+    const items = LEGEND_LEVELS.map(
+      ([n, word, what]) =>
+        `<div class="report-legend-item"><div class="report-legend-word">${n} \u00B7 ${word}</div><div class="report-legend-desc">${what}</div></div>`,
+    ).join('');
+    return `<div class="report-block-box report-legend${half ? ' report-legend-half' : ''}">
+    <div class="report-legend-title">BC Proficiency Scale, out of 4</div>
+    <div class="report-legend-items">${items}</div>
   </div>`;
   }
 
@@ -1399,8 +1661,10 @@ window.ReportBlocks = (function () {
         return renderBlockObservations(cid, student);
       case 'next-steps':
         return renderBlockNextSteps(cid, student, options);
+      case 'proficiency':
+        return renderBlockProficiency(cid, student, ctx, options);
       case 'legend':
-        return renderBlockLegend();
+        return renderBlockLegend(options);
       case 'parent-response':
         return renderBlockParentResponse(cid, student, options);
       case 'student-reflection-learning':
@@ -1440,6 +1704,7 @@ window.ReportBlocks = (function () {
     renderBlockSectionOutcomes: renderBlockSectionOutcomes,
     renderBlockNextSteps: renderBlockNextSteps,
     renderBlockLegend: renderBlockLegend,
+    renderBlockProficiency: renderBlockProficiency,
     renderBlockParentResponse: renderBlockParentResponse,
     renderBlockStudentReflectionLearning: renderBlockStudentReflectionLearning,
     renderBlockStudentReflectionHabits: renderBlockStudentReflectionHabits,

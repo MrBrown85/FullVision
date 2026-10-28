@@ -55,9 +55,8 @@ window.ReportSheets = (function () {
   function _row() {
     return { cells: Array.prototype.slice.call(arguments) };
   }
-  /* The Report Card. The Proficiency block (plan PR 3) replaces the
-     Competency Table here when it lands; Self-Assessment and Goal (PR 6)
-     opens the back. */
+  /* The Report Card. Self-Assessment and Goal (plan PR 6) opens the back
+     when it lands. */
   var FORM_REPORT_CARD = {
     v: 6,
     id: 'report-card',
@@ -67,7 +66,7 @@ window.ReportSheets = (function () {
       {
         rows: [
           _row(_c('header')),
-          _row(_c('competency-table')),
+          _row(_c('proficiency')),
           _row(_c('legend')),
           _row(_c('teacher-narrative', 'row', { lines: 10 })),
           _row(_c('term-attendance', 'half'), _c('missing-work', 'half')),
@@ -93,7 +92,7 @@ window.ReportSheets = (function () {
       {
         rows: [
           _row(_c('header')),
-          _row(_c('competency-table')),
+          _row(_c('proficiency')),
           _row(_c('teacher-narrative', 'row', { lines: 10 })),
           _row(_c('legend')),
         ],
@@ -111,7 +110,7 @@ window.ReportSheets = (function () {
       {
         rows: [
           _row(_c('header')),
-          _row(_c('competency-table')),
+          _row(_c('proficiency')),
           _row(_c('legend')),
           _row(_c('teacher-narrative', 'row', { lines: 10 })),
           _row(_c('next-steps')),
@@ -165,11 +164,55 @@ window.ReportSheets = (function () {
         },
       ],
     },
-    'academic-summary': { label: 'Overall and Competencies', group: 'Grades' },
+    // Proficiency replaces Overall and Competencies, the Competency Table
+    // and Growth Since Last Report (plan PR 3): figures, never dots.
+    proficiency: {
+      label: 'Proficiency',
+      group: 'Grades',
+      noEvidence: true,
+      options: [
+        {
+          key: 'rows',
+          label: 'Rows',
+          def: 'each',
+          choices: [
+            { v: 'each', label: 'Each Competency' },
+            { v: 'group', label: 'Each Group' },
+          ],
+          groups: true,
+        },
+        { key: 'score', label: 'Score out of 4', def: true },
+        { key: 'word', label: 'Proficiency Word', def: true },
+        { key: 'change', label: 'Change', def: true },
+        { key: 'assessed', label: 'Assessed Count', def: true },
+        { key: 'overall', label: 'Overall', def: true },
+        { key: 'facts', label: 'Highest and Lowest Lines', def: true },
+        {
+          key: 'compare',
+          label: 'Compare With',
+          def: 'last',
+          choices: [
+            { v: 'last', label: 'Last Report' },
+            { v: 'start', label: 'Start of Term' },
+          ],
+        },
+        {
+          key: 'order',
+          label: 'Order',
+          def: 'curriculum',
+          choices: [
+            { v: 'curriculum', label: 'Curriculum' },
+            { v: 'lowest', label: 'Lowest First' },
+          ],
+        },
+      ],
+    },
+    'academic-summary': { label: 'Overall and Competencies', group: 'Grades', retired: true },
     'competency-table': {
       label: 'Competency Table',
       table: true,
       group: 'Grades',
+      retired: true,
       noEvidence: true,
       options: [
         { key: 'evidence', label: 'Evidence Count', def: true },
@@ -200,7 +243,7 @@ window.ReportSheets = (function () {
       ],
     },
     'term-glance': { label: 'This Term at a Glance', group: 'Grades' },
-    growth: { label: 'Growth Since Last Report', table: true, group: 'Grades' },
+    growth: { label: 'Growth Since Last Report', table: true, group: 'Grades', retired: true },
     'missing-work': { label: 'Missing Work', table: true, group: 'Grades' },
     // Totals to date from the Term Questionnaire (classes absent, times late).
     // Not 'attendance': an older block by that name was retired, and forms
@@ -1186,6 +1229,7 @@ window.ReportSheets = (function () {
     });
     if (def.noEvidence) out.noEvidence = cell.noEvidence === 'hide' ? 'hide' : 'show';
     if (def.fill && def.lines) out.lines = cell.lines != null ? cell.lines : def.lines;
+    out.size = cell.size === 'half' ? 'half' : 'row';
     return out;
   }
 
