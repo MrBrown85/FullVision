@@ -184,7 +184,9 @@ window.CommentBank = (function () {
         });
         return {
           id: sec.id,
-          name: sec.name || sec.shortName || '',
+          // The competency's own label, as the printed report names it; the
+          // section name is the curriculum category, shared by several.
+          name: ReportBlocks.competencyLabel(sec),
           scores: scores,
           start: sn ? sn.start : 0,
           now: sn ? sn.now : 0,

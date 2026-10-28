@@ -457,11 +457,48 @@ describe('Demo Mode (Science 8, Report 2)', () => {
   });
 
   it('never calls a rising Focus Area the area to build', () => {
-    // Cece's Focus Area is Communicating (the biggest change, upward).
+    // Cece's Focus Area is Scientific Communication (the biggest change, upward).
     const ctx = ctxFor('Cece');
-    expect(ctx.focus).toBe('Communicating');
+    expect(ctx.focus).toBe('Scientific Communication');
     expect(ctx.focusLow).toBe('');
     const texts = CommentBank.parts(ctx, '', { more: { go: true } })[2].rows.map(r => r.text);
-    expect(texts.some(t => /Communicating is the area to build next/.test(t))).toBe(false);
+    expect(texts.some(t => /Scientific Communication is the area to build next/.test(t))).toBe(false);
+  });
+});
+
+describe('competency names in an imported class', () => {
+  it('names each competency by its own label, as the report does, not by its category', async () => {
+    window._CURRICULUM_DATA = JSON.parse(readFileSync('curriculum_by_course.json', 'utf-8'));
+    await loadCurriculumIndex();
+    const cid = 'course-ss8';
+    const map = buildLearningMapFromTags(['SS8']);
+    COURSES[cid] = { id: cid, name: 'Socials 8', gradingSystem: 'proficiency' };
+    const st = { id: 'stu-p', firstName: 'Priya', lastName: 'Kaur', pronouns: 'she/her' };
+    _cache.students[cid] = [st];
+    _cache.learningMaps[cid] = map;
+    _cache.categories[cid] = [];
+    _cache.assessments[cid] = map.sections.slice(0, 3).map((sec, i) => ({
+      id: 'a' + i,
+      title: 'Task ' + i,
+      scoreMode: 'proficiency',
+      tagIds: [sec.tags[0].id],
+      type: 'summative',
+      date: '2026-09-1' + i,
+    }));
+    _cache.scores[cid] = {
+      'stu-p': _cache.assessments[cid].map(a => ({ assessmentId: a.id, tagId: a.tagIds[0], score: 3, date: a.date })),
+    };
+    _cache.statuses[cid] = {};
+    _cache.overrides[cid] = {};
+    _cache.courseConfigs[cid] = {};
+    _cache.observations[cid] = {};
+    _cache.reflections[cid] = {};
+    _cache.termRatings[cid] = {};
+    clearProfCache();
+    const names = CommentBank.facts(cid, st, 'term-1').comps.map(c => c.name);
+    expect(names).toEqual(['Critical Thinking', 'Interpret Graphics', 'Cite Sources']);
+    expect(names).toEqual(ReportBlocks.reportSections(cid).slice(0, 3).map(ReportBlocks.competencyLabel));
+    expect(names).not.toContain('Use Social Studies inquiry processes and skills');
+    delete COURSES[cid];
   });
 });
