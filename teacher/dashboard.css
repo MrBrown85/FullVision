@@ -449,11 +449,20 @@ button.dash-glance-cell:disabled {
   color: var(--text-2);
   font-variant-numeric: tabular-nums;
 }
+/* Assessment titles run long: the card grows to fit them and wraps past
+   its cap instead of running out of the box. */
 .dash-core-row .dist-tip {
   left: 24px;
   transform: none;
   top: 100%;
   margin-top: 2px;
+  width: max-content;
+  max-width: min(360px, calc(100vw - 48px));
+  white-space: normal;
+}
+.dash-core-row .dist-tip-name {
+  line-height: 1.4;
+  padding: 2px 0;
 }
 
 /* ── Class insights (dash-insights.js) ─────────────────────── */
