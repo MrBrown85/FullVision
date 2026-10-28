@@ -61,7 +61,8 @@ test('Advanced Rubric tiles tick, suggest and keep a hand-picked level', async (
   await expect(crit.locator('.grdt-advice')).toContainText('Suggested: Proficient');
   await expect(crit.locator('.grdt-tile.is-chosen')).toContainText('Proficient');
 
-  await crit.locator('.grdt-pick', { hasText: 'Pick Extending' }).click();
+  // The tile around the checkboxes picks its level.
+  await crit.locator('.grdt-tile.is-checklist[data-level="4"]').click({ position: { x: 6, y: 6 } });
   await expect(crit.locator('.grdt-tile.is-chosen')).toContainText('Extending');
   await expect(crit.locator('.grdt-advice')).toContainText('You picked Extending');
   await expect(crit.locator('.grdt-tile.is-suggested')).toContainText('Goggles on');
