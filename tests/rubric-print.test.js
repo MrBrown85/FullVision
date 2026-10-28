@@ -275,7 +275,41 @@ describe('criterion comments in the data layer', () => {
       value: 3,
       modifier: 1,
       comment: 'Nice work',
+      beyond: null,
     });
+  });
+
+  it('reads Went Beyond from the seventh element and saves it on its own', () => {
+    const cells = _bundleCells({
+      students: [{ enrollment_id: SID }],
+      assessments: [{ id: AID }],
+      tag_index: [],
+      criterion_index: [CRIT_A],
+      score_rows: [],
+      tag_rows: [],
+      criterion_rows: [[0, 0, 0, 3, 0, 'Label axes', 'Added a trend line']],
+    });
+    expect(cells[SID][AID].rubric_scores[0].beyond).toBe('Added a trend line');
+    const entry = _scoreEntryFromCanonical(CID, getAssessments(CID)[0], TAG_1, 3, '', 0, 'Label axes', 'Extra');
+    expect(entry.critBeyond).toBe('Extra');
+
+    saveRubricCriterionBeyond(CID, SID, AID, CRIT_A, 'Added a trend line');
+    expect(getRubricCriterionBeyond(CID, SID, AID, getRubricById(CID, RUBRIC).criteria[0])).toBe('Added a trend line');
+    const calls = rubricCalls();
+    expect(calls).toHaveLength(1);
+    expect(calls[0].payload.p_beyond).toBe('Added a trend line');
+    // The comment isn't sent, so the server keeps it.
+    expect('p_comment' in calls[0].payload).toBe(false);
+    // A level change sends the saved Went Beyond along.
+    upsertScore(CID, SID, AID, TAG_1, 4, '2026-10-03', 'summative', '');
+    expect(rubricCalls()[1].payload.p_beyond).toBe('Added a trend line');
+  });
+
+  it('knows the single-point style', () => {
+    expect(rubricStyle({ style: 'single_point' })).toBe('single_point');
+    expect(rubricStyle({ style: 'advanced' })).toBe('advanced');
+    expect(rubricStyle({ style: 'odd' })).toBe('standard');
+    expect(rubricStyle(null)).toBe('standard');
   });
 
   it('fans the server comment out to each score key and drops it when the server clears it', () => {

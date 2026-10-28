@@ -251,7 +251,7 @@ window.RubricLibrary = (function () {
   }
 
   function _styleOf(rubric) {
-    return rubric && rubric.style === 'advanced' ? 'advanced' : 'standard';
+    return rubricStyle(rubric);
   }
 
   function _same(a, b) {
@@ -300,7 +300,7 @@ window.RubricLibrary = (function () {
     if (_styleOf(before) !== _styleOf(after)) {
       if (_styleOf(copy) === _styleOf(before)) {
         next.style = _styleOf(after);
-        lines.push('Style → ' + (next.style === 'advanced' ? 'Advanced' : 'Standard'));
+        lines.push('Style → ' + ({ advanced: 'Advanced', single_point: 'Single-Point' }[next.style] || 'Standard'));
       } else skipped.push('the style');
     }
 
