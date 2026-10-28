@@ -13,6 +13,13 @@ function _seedShiftDays() {
   return Math.round((today - last) / 86400000) - 1;
 }
 
+// The June 30 on or after today: the end of the demo's school year.
+function _seedSchoolYearEnd() {
+  var today = getTodayStr();
+  var year = Number(today.slice(0, 4));
+  return today.slice(5) > '06-30' ? year + 1 + '-06-30' : year + '-06-30';
+}
+
 // A deep copy of value with every date string moved by days.
 function shiftSeedDates(value, days) {
   if (typeof value === 'string') {
@@ -521,7 +528,11 @@ function seedIfNeeded() {
         reportingTerms: current([
           { ordinal: 1, label: 'Term 1', starts_on: '2025-09-01', ends_on: '2025-11-30' },
           { ordinal: 2, label: 'Term 2', starts_on: '2025-12-01', ends_on: SEED_LAST_DAY },
-        ]),
+        ]).map(function (term) {
+          // Term 2 runs to the end of the school year, so the class isn't
+          // over and a failing grade shows IE, not F.
+          return term.ordinal === 2 ? Object.assign(term, { ends_on: _seedSchoolYearEnd() }) : term;
+        }),
       }),
     );
 
