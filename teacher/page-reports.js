@@ -408,7 +408,9 @@ window.PageReports = (function () {
         : all.filter(function (st) {
             return selectedStudentIds.includes(st.id);
           });
-    if (studioView === 'all') return chosen;
+    // Everyone leads with the students on more than one sheet.
+    if (studioView === 'all')
+      return ReportStudio.orderBySheets(chosen, _classFitKey === _classFitKeyNow() ? _classFit : null);
     if (previewAuto) {
       var longest = ReportStudio.longestStudent(_classFitKey === _classFitKeyNow() ? _classFit : null);
       if (
@@ -613,9 +615,36 @@ window.PageReports = (function () {
       _classFit = summary;
       _classFitKey = _classFitKeyNow();
       _renderFitLine();
+      _leadWithLongest(summary);
     } else {
       _scheduleClassFit();
     }
+  }
+
+  /* Everyone, once its own render has measured the class: the students
+     on more than one sheet move to the front, in place, without a redraw. */
+  function _leadWithLongest(summary) {
+    var preview = document.getElementById('rb-preview');
+    if (!preview || !summary || !summary.perStudent) return;
+    var nodes = Array.prototype.slice.call(preview.querySelectorAll(':scope > .sheet-student'));
+    var wanted = ReportStudio.orderBySheets(
+      nodes.map(function (el) {
+        return { id: el.dataset.sid };
+      }),
+      summary,
+    ).map(function (x) {
+      return x.id;
+    });
+    var current = nodes.map(function (el) {
+      return el.dataset.sid;
+    });
+    if (wanted.join() === current.join()) return;
+    wanted.forEach(function (sid) {
+      var el = nodes.find(function (n) {
+        return n.dataset.sid === sid;
+      });
+      if (el) preview.appendChild(el);
+    });
   }
 
   function _populateCopies() {
@@ -990,6 +1019,7 @@ window.PageReports = (function () {
         ReportSheets.templates(),
         _blockSizes,
         _classFitKey === _classFitKeyNow() ? _classFit : null,
+        studioTab === 'templates' ? _templateThumbs() : null,
       );
     }
     _renderFitLine();
@@ -1000,6 +1030,35 @@ window.PageReports = (function () {
     if (!line) return;
     line.innerHTML = ReportStudio.fitLineHtml(_classFitKey === _classFitKeyNow() ? _classFit : null, _formOf());
     line.classList.toggle('ok', !!line.textContent && !line.firstElementChild);
+  }
+
+  /* Each starter and saved template drawn with the previewed student's
+     real report, for the Templates tab: { id: { html, sheets } }. Measured
+     once per class, student, paper and library. */
+  var _thumbCache = { key: '', thumbs: null };
+  function _templateThumbs() {
+    var st = _previewStudent();
+    if (!st) return null;
+    var list = ReportSheets.templates();
+    var key = [activeCourse, st.id, reportPaper, ReportBlocks.reportContext().termId, JSON.stringify(list)].join('|');
+    if (_thumbCache.key === key) return _thumbCache.thumbs;
+    var out = {};
+    var ctx = ReportBlocks.reportContext();
+    var draw = function (id, form) {
+      try {
+        out[id] = ReportSheets.thumbs(activeCourse, st, ctx, { form: form, paper: reportPaper });
+      } catch (e) {
+        out[id] = null;
+      }
+    };
+    ReportSheets.starters().forEach(function (s) {
+      draw(s.id, ReportSheets.starter(s.id));
+    });
+    list.forEach(function (t) {
+      draw(t.id, t.form);
+    });
+    _thumbCache = { key: key, thumbs: out };
+    return out;
   }
 
   /* Every block at both widths for every student: the tallest wins, so
@@ -1544,7 +1603,7 @@ window.PageReports = (function () {
       studioTemplate: function () {
         var f = el.dataset.starter ? ReportSheets.starter(el.dataset.starter) : ReportSheets.template(el.dataset.id);
         if (!f) return;
-        var name = el.textContent.trim();
+        var name = ((el.querySelector && el.querySelector('.studio-blk-name')) || el).textContent.trim();
         studioSelected = null;
         _setForm(f, 'Applied ' + name);
         _syncSidesButtons();

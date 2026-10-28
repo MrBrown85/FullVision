@@ -228,3 +228,35 @@ describe('ReportStudio drag targets', () => {
     expect(html).toContain('Teacher Comment for Ethan Dubois, at print size');
   });
 });
+
+describe('ReportStudio Everyone order and the Templates tab', () => {
+  it('Everyone leads with the students on more than one sheet, most first, then roster order', () => {
+    const students = [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }];
+    const summary = { perStudent: { a: { sheets: 1 }, b: { sheets: 2 }, c: { sheets: 3 }, d: { sheets: 1 } } };
+    expect(ReportStudio.orderBySheets(students, summary).map(s => s.id)).toEqual(['c', 'b', 'a', 'd']);
+    expect(ReportStudio.orderBySheets(students, null).map(s => s.id)).toEqual(['a', 'b', 'c', 'd']);
+    expect(ReportStudio.orderBySheets(students, { perStudent: {} }).map(s => s.id)).toEqual(['a', 'b', 'c', 'd']);
+  });
+
+  it('the Templates tab draws each template with the real report and its sheet count, and marks the current one', () => {
+    const f = ReportSheets.form();
+    const thumbs = {
+      'report-card': {
+        html: '<span class="studio-tpl-side">x</span><span class="studio-tpl-side">y</span>',
+        sheets: 1,
+      },
+      'interim-update': { html: '<span class="studio-tpl-side">x</span>', sheets: 1 },
+      t1: { html: '<span class="studio-tpl-side">x</span>', sheets: 2 },
+    };
+    const html = ReportStudio.paletteHtml(f, 'templates', [{ id: 't1', name: 'Mine' }], null, null, thumbs);
+    expect(html).toMatch(/class="studio-blk studio-tpl current"[^>]*data-starter="report-card"/);
+    expect(html).toMatch(/data-starter="interim-update"[^>]*>(?!.*current)/);
+    expect((html.match(/studio-tpl-side/g) || []).length).toBe(4);
+    expect(html).toContain('Report Card</span><span class="studio-tpl-count">1 sheet</span>');
+    expect(html).toContain('Mine</span><span class="studio-tpl-count">2 sheets</span>');
+    // Without thumbs the cards still list the templates.
+    const bare = ReportStudio.paletteHtml(f, 'templates', []);
+    expect(bare).toContain('Conference Pack');
+    expect(bare).not.toContain('studio-tpl-thumbs');
+  });
+});

@@ -132,3 +132,17 @@ describe('ReportSheets sizes', () => {
     expect(ReportSheets.sideLabel(null)).toBe('Blank');
   });
 });
+
+describe('ReportSheets.fitText', () => {
+  it('says how a comment sits in its lines, and names the second sheet when the report runs to one', () => {
+    expect(ReportSheets.fitText(null)).toBe('');
+    expect(ReportSheets.fitText({ room: 10, noComment: true })).toBe('No comment yet. The box holds 10 lines.');
+    expect(ReportSheets.fitText({ room: 10, commentLines: 4, sheets: 1 })).toBe('Fits. 4 lines; room for 6 more.');
+    expect(ReportSheets.fitText({ room: 10, commentLines: 13, sheets: 1 })).toBe(
+      '13 lines, 3 past the box; what is under it moves down. Nothing is cut.',
+    );
+    expect(ReportSheets.fitText({ room: 10, commentLines: 18, sheets: 2 })).toBe(
+      '18 lines, 8 past the box; this report runs to 2 sheets. Nothing is cut.',
+    );
+  });
+});

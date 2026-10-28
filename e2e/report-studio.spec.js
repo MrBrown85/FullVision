@@ -122,7 +122,7 @@ async function openWithForm(page, makeForm) {
 const palette = page => page.locator('#studio-palette');
 const bar = page => page.locator('.studio-bar');
 const popover = page => page.locator('#studio-pop');
-const cellOf = (page, id) => page.locator(`.sheet-cell[data-block="${id}"]`).first();
+const cellOf = (page, id) => page.locator(`#rb-preview .sheet-cell[data-block="${id}"]`).first();
 const undo = page => page.locator('#undo-toast').getByRole('button', { name: 'Undo' });
 /* The previewed student (the longest report), as the letterhead names them. */
 const previewName = page => page.locator('.report-sheet').first().locator('.report-student-name').innerText();
@@ -546,7 +546,9 @@ test.describe('Page Studio', () => {
       await page.keyboard.type(
         ' She keeps asking questions that move the whole class forward and writes it all down with care.',
       );
-    await expect(fit).toContainText(/\d+ lines, \d+ past the box; what is under it moves down\. Nothing is cut\./);
+    await expect(fit).toContainText(
+      /\d+ lines, \d+ past the box; (what is under it moves down|this report runs to \d sheets)\. Nothing is cut\./,
+    );
     await page.getByRole('button', { name: 'See the Page' }).click();
     await expect(page.getByRole('tab', { name: 'Progress Reports' })).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator('#picker-label')).toHaveText('Cece Adeyemi');
@@ -726,17 +728,28 @@ test.describe('Page Studio', () => {
     expect(await overflowing(page)).toEqual([]);
   });
 
-  test('a starter applies, and Undo puts the layout back', async ({ page }) => {
+  test('a starter applies, and Undo puts the layout back; the Templates tab draws each template with the real report', async ({
+    page,
+  }) => {
     await openStudio(page);
     await palette(page).getByRole('tab', { name: 'Templates' }).click();
     await expect(palette(page)).toContainText('Your Templates');
     await expect(palette(page)).toContainText('None yet');
+    // Each starter is drawn with the previewed student's sheets and says how many it takes.
+    const card = palette(page).locator('.studio-tpl[data-starter="report-card"]');
+    await expect(card).toHaveClass(/current/);
+    await expect(card.locator('.studio-tpl-side .report-sheet')).toHaveCount(2);
+    await expect(card.locator('.studio-tpl-side .report-student-name').first()).toHaveText(await previewName(page));
+    await expect(card.locator('.studio-tpl-count')).toHaveText('1 sheet');
+    await expect(
+      palette(page).locator('.studio-tpl[data-starter="interim-update"] .studio-tpl-side .report-sheet'),
+    ).toHaveCount(2);
     await palette(page).getByRole('button', { name: 'Interim Update', exact: true }).click();
-    await expect(page.locator('.report-sheet .report-grades')).toHaveCount(0);
+    await expect(page.locator('#rb-preview .report-sheet .report-grades')).toHaveCount(0);
     await expect(page.getByRole('radio', { name: 'Front Only' })).toHaveAttribute('aria-checked', 'true');
     await expect(page.locator('#undo-toast')).toContainText('Applied Interim Update');
     await undo(page).click();
-    await expect(page.locator('.report-sheet .report-grades')).toHaveCount(1);
+    await expect(page.locator('#rb-preview .report-sheet .report-grades')).toHaveCount(1);
     await expect(page.getByRole('radio', { name: 'Front and Back' })).toHaveAttribute('aria-checked', 'true');
   });
 
@@ -744,7 +757,7 @@ test.describe('Page Studio', () => {
     await openStudio(page);
     await page.locator('[data-action="studioBlock"][data-block="support-home"]').scrollIntoViewIfNeeded();
     await page.locator('[data-action="studioBlock"][data-block="support-home"]').click();
-    await expect(page.locator('.sheet-cell[data-block="support-home"]')).toHaveCount(1);
+    await expect(page.locator('#rb-preview .sheet-cell[data-block="support-home"]')).toHaveCount(1);
     await page.getByRole('button', { name: 'Save as Template' }).click();
     const dialog = page.getByRole('dialog', { name: 'Save as Template' });
     await expect(dialog).toBeVisible();
@@ -755,9 +768,9 @@ test.describe('Page Studio', () => {
       palette(page).getByRole('button', { name: 'Science 8 with Support at Home', exact: true }),
     ).toBeVisible();
     await palette(page).getByRole('button', { name: 'Report Card', exact: true }).click();
-    await expect(page.locator('.sheet-cell[data-block="support-home"]')).toHaveCount(0);
+    await expect(page.locator('#rb-preview .sheet-cell[data-block="support-home"]')).toHaveCount(0);
     await palette(page).getByRole('button', { name: 'Science 8 with Support at Home', exact: true }).click();
-    await expect(page.locator('.sheet-cell[data-block="support-home"]')).toHaveCount(1);
+    await expect(page.locator('#rb-preview .sheet-cell[data-block="support-home"]')).toHaveCount(1);
     await page.reload();
     await page.getByRole('tab', { name: 'Progress Reports' }).click();
     await palette(page).getByRole('tab', { name: 'Templates' }).click();

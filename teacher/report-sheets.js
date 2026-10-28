@@ -1804,14 +1804,39 @@ window.ReportSheets = (function () {
   }
 
   /* What the comment box tells the teacher while they write. Never a cap:
-     the form never shrinks a student's words. */
+     the form never shrinks a student's words; a comment past its box moves
+     the rows under it down, and onto a second sheet when the side is full. */
   function fitText(r) {
     if (!r || !r.room) return '';
     if (r.noComment) return 'No comment yet. The box holds ' + r.room + ' lines.';
     var n = r.commentLines;
     var word = n === 1 ? ' line' : ' lines';
     if (n <= r.room) return 'Fits. ' + n + word + '; room for ' + (r.room - n) + ' more.';
-    return n + word + ', ' + (n - r.room) + ' past the box; what is under it moves down. Nothing is cut.';
+    var past = n + word + ', ' + (n - r.room) + ' past the box; ';
+    if (r.sheets > 1) return past + 'this report runs to ' + r.sheets + ' sheets. Nothing is cut.';
+    return past + 'what is under it moves down. Nothing is cut.';
+  }
+
+  /* One student's sides on a form, as small pictures for the Templates
+     tab: { html, sheets }. The sides are the real sheets, scaled by CSS. */
+  function thumbs(cid, student, ctx, opts) {
+    opts = opts || {};
+    var paper = PAPER[opts.paper] ? opts.paper : 'letter';
+    var formUsed = normalizeForm(opts.form);
+    var stage = _stage(document.body, ROW_W, formUsed.type);
+    try {
+      var probe = _probe(stage);
+      var r = layoutStudent(cid, student, ctx, { form: formUsed, paper: paper, stage: stage, probe: probe });
+      var tpl = document.createElement('div');
+      tpl.innerHTML = r.html;
+      var sides = Array.prototype.map.call(tpl.querySelectorAll('.sheet-zoom'), function (z) {
+        var sheet = z.querySelector('.report-sheet');
+        return sheet ? '<div class="studio-tpl-side">' + sheet.outerHTML + '</div>' : '';
+      });
+      return { html: sides.join(''), sheets: r.sheets };
+    } finally {
+      stage.remove();
+    }
   }
 
   return {
@@ -1863,6 +1888,7 @@ window.ReportSheets = (function () {
     classSummary: classSummary,
     blockSizes: blockSizes,
     fitText: fitText,
+    thumbs: thumbs,
     paperSize: paperSize,
     layoutStudent: layoutStudent,
     renderPreview: renderPreview,
