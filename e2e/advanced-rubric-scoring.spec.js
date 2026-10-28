@@ -75,7 +75,7 @@ test.describe('Scoring an Advanced Rubric', () => {
       ({ rubric, assessment, cid }) => {
         localStorage.setItem('gb-rubrics-' + cid, JSON.stringify([rubric]));
         localStorage.setItem('gb-assessments-' + cid, JSON.stringify([assessment]));
-        localStorage.removeItem('rsg-checklists-mode');
+        localStorage.removeItem('rsg-checklists');
       },
       { rubric: RUBRIC, assessment: ASSESSMENT, cid: TEST_COURSE.id },
     );
@@ -87,10 +87,11 @@ test.describe('Scoring an Advanced Rubric', () => {
     const safety = row(page, 'stu-001', 'crit-safe');
     const btn = safety.locator('.rsg-checks-btn');
     await expect(btn).toHaveText('0/4');
-    await btn.click();
+    // Checklists show by default.
+    await expect(btn).toHaveAttribute('aria-expanded', 'true');
     const panel = page.locator('.rsg-checklist[data-sid="stu-001"][data-critid="crit-safe"]');
     await expect(panel).toBeVisible();
-    await expect(panel.locator('.rsg-checklist-head')).toHaveText('No Level Suggested Yet');
+    await expect(safety.locator('.rsg-checklist-head')).toHaveText('No Level Suggested Yet');
     // Columns run in the class's level order: Extending first by default.
     await expect(panel.locator('.rsg-checklist-col').first()).toHaveAttribute('data-level', '4');
 
@@ -98,7 +99,8 @@ test.describe('Scoring an Advanced Rubric', () => {
     await expect(safety.locator('.rsg-level.active')).toHaveCount(0);
     await panel.getByLabel('Cleans the station').check();
     await expect(safety.locator('.rsg-level.active')).toHaveText('Proficient');
-    await expect(panel.locator('.rsg-checklist-head')).toHaveText('Suggested: Proficient');
+    await expect(row(page, 'stu-001', 'crit-safe').locator('.rsg-checklist-head')).toHaveText('Suggested: Proficient');
+    await expect(panel.locator('.rsg-checklist-col.is-chosen')).toHaveAttribute('data-level', '3');
     await expect(safety.locator('.rsg-checks-btn')).toHaveText('2/4');
     const stored = await page.evaluate(cid => getRubricCheckIds(cid, 'stu-001', 'assess-adv').sort(), TEST_COURSE.id);
     expect(stored).toEqual(['k3a', 'k3b']);
@@ -110,33 +112,37 @@ test.describe('Scoring an Advanced Rubric', () => {
   test('a level picked by hand stays when boxes are ticked', async ({ page }) => {
     const safety = row(page, 'stu-001', 'crit-safe');
     await safety.locator('.rsg-level', { hasText: 'Developing' }).click();
-    await safety.locator('.rsg-checks-btn').click();
     const panel = page.locator('.rsg-checklist[data-sid="stu-001"][data-critid="crit-safe"]');
     await panel.getByLabel('Goggles on').check();
     await panel.getByLabel('Cleans the station').check();
     await expect(safety.locator('.rsg-level.active')).toHaveText('Developing');
-    await expect(panel.locator('.rsg-checklist-hint')).toContainText('You picked Developing');
+    await expect(row(page, 'stu-001', 'crit-safe').locator('.rsg-checklist-hint')).toContainText(
+      'You picked Developing',
+    );
   });
 
-  test('One at a Time closes the last checklist; All opens every one', async ({ page }) => {
-    await row(page, 'stu-001', 'crit-safe').locator('.rsg-checks-btn').click();
-    await expect(page.locator('.rsg-checklist')).toHaveCount(1);
-    await row(page, 'stu-002', 'crit-data').locator('.rsg-checks-btn').click();
-    await expect(page.locator('.rsg-checklist')).toHaveCount(1);
-    await expect(page.locator('.rsg-checklist[data-sid="stu-002"][data-critid="crit-data"]')).toBeVisible();
-    await expect(row(page, 'stu-001', 'crit-safe').locator('.rsg-checks-btn')).toHaveAttribute(
-      'aria-expanded',
-      'false',
-    );
-
-    await page.getByRole('button', { name: 'All', exact: true }).click();
-    await openCard(page);
+  test('Show opens every checklist; Hide closes them and a row opens its own', async ({ page }) => {
     // Three students, two criteria with boxes each.
     await expect(page.locator('.rsg-checklist')).toHaveCount(6);
-    expect(await page.evaluate(() => localStorage.getItem('rsg-checklists-mode'))).toBe('all');
+    await row(page, 'stu-001', 'crit-safe').locator('.rsg-checks-btn').click();
+    await expect(page.locator('.rsg-checklist')).toHaveCount(5);
+
+    await page.getByRole('button', { name: 'Hide', exact: true }).click();
+    await openCard(page);
+    await expect(page.locator('.rsg-checklist')).toHaveCount(0);
+    expect(await page.evaluate(() => localStorage.getItem('rsg-checklists'))).toBe('hide');
+    await row(page, 'stu-001', 'crit-safe').locator('.rsg-checks-btn').click();
+    await row(page, 'stu-002', 'crit-data').locator('.rsg-checks-btn').click();
+    await expect(page.locator('.rsg-checklist')).toHaveCount(2);
+
+    await page.getByRole('button', { name: 'Show', exact: true }).click();
+    await openCard(page);
+    await expect(page.locator('.rsg-checklist')).toHaveCount(6);
   });
 
   test('K opens the focused row’s checklist', async ({ page }) => {
+    await page.getByRole('button', { name: 'Hide', exact: true }).click();
+    await openCard(page);
     const safety = row(page, 'stu-001', 'crit-safe');
     await safety.locator('.rsg-level', { hasText: 'Proficient' }).click();
     await safety.locator('.rsg-level', { hasText: 'Proficient' }).click();
