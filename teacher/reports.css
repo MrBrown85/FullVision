@@ -3619,9 +3619,9 @@ textarea.studio-text {
 /* ══ Term Questionnaire (DECISIONS 14) ══════════════════════════════
    The canvas "Term Questionnaire Mockup", version 19, on the app's tokens.
    Text is 12 px at least (DECISIONS, Text size). Below 1400 px the
-   evidence column becomes tabs, the comment box is shorter, the bottom bar
-   goes (Save and Next is in the toolbar) and the BC card opens from the
-   strip's button. */
+   evidence column becomes tabs, the comment box is shorter and the bottom
+   bar goes (Save and Next is in the toolbar). The Teacher Comment fills the
+   right column so the whole comment can be read (Colin, 2026-10-28). */
 #report-output.qn-output {
   overflow: hidden !important;
 }
@@ -3812,30 +3812,6 @@ body.qn-roster #gb-sidebar .student-row-note {
 .qn-att-warn {
   color: var(--score-2-text);
 }
-.qn-bc-btn {
-  display: none;
-  font: inherit;
-  flex: none;
-  min-height: 44px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  border-radius: 10px;
-  padding: 4px 12px;
-  cursor: pointer;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 1px;
-  color: var(--text);
-}
-.qn-bc-btn-label {
-  font-size: var(--text-xs);
-  color: var(--text-2);
-}
-.qn-bc-btn-short {
-  font-weight: 600;
-  white-space: nowrap;
-}
-
 /* The three columns under the strip */
 .qn-body {
   flex: 1;
@@ -3950,7 +3926,8 @@ body.qn-roster #gb-sidebar .student-row-note {
   margin: 0 2px -4px;
 }
 .qn-comment-card {
-  flex: 1 0 auto;
+  flex: 1 1 auto;
+  min-height: 0;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -4011,7 +3988,8 @@ body.qn-roster #gb-sidebar .student-row-note {
   color: var(--score-2-text);
 }
 .qn-text-wrap {
-  flex: 1 0 auto;
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -4022,7 +4000,7 @@ body.qn-roster #gb-sidebar .student-row-note {
   line-height: 1.35;
 }
 .qn-text {
-  flex: 1 0 auto;
+  flex: 1 1 auto;
   font: inherit;
   font-size: var(--text-base);
   line-height: 1.55;
@@ -4519,110 +4497,6 @@ body.qn-roster #gb-sidebar .student-row-note {
   white-space: nowrap;
 }
 
-/* The BC Written Learning Update */
-.qn {
-  position: relative;
-}
-.qn-bc-card {
-  flex: 0 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-}
-.qn-bc-toggle {
-  font: inherit;
-  color: var(--text);
-  cursor: pointer;
-  min-height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  border-radius: 9px;
-  padding: 0 10px;
-}
-.qn-bc-count {
-  font-weight: 600;
-}
-.qn-bc-count.ok,
-.qn-bc-btn-short.ok {
-  color: var(--score-3-text);
-}
-.qn-link-text {
-  font-size: var(--text-xs);
-  color: var(--link);
-}
-.qn-req {
-  display: grid;
-  grid-template-columns: 16px minmax(0, 1fr);
-  gap: 0 6px;
-  font-size: var(--text-xs);
-  padding: 2px 4px;
-}
-.qn-req-mark {
-  font-weight: 700;
-  color: var(--score-2-text);
-}
-.qn-req-mark.ok {
-  color: var(--score-3-text);
-}
-.qn-req-name {
-  font-weight: 600;
-}
-.qn-req-where {
-  color: var(--text-2);
-}
-.qn-also {
-  border-top: 1px solid var(--surface-2);
-  padding-top: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-.qn-also-title {
-  font-size: var(--text-xs);
-  font-weight: 700;
-  color: var(--text-2);
-}
-.qn-also-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: var(--text-xs);
-  padding: 2px 4px;
-}
-.qn-also-row span:last-child {
-  color: var(--text-2);
-  white-space: nowrap;
-}
-.qn-left {
-  border-top: 1px solid var(--surface-2);
-  padding-top: 10px;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 8px 12px;
-}
-.qn-left-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.qn-left-item {
-  font-weight: 600;
-}
-.qn-left-item.ok {
-  color: var(--score-3-text);
-}
-.qn-left-wait {
-  margin-top: 4px;
-}
-.qn-left .qn-link {
-  min-height: 28px;
-}
-
 /* The Questions sheet */
 .qn-q-overlay {
   align-items: flex-start;
@@ -4754,9 +4628,6 @@ body.qn-roster #gb-sidebar .student-row-note {
   .qn-side-title {
     display: none;
   }
-  .qn-bc-btn {
-    display: flex;
-  }
   .qn-text {
     min-height: 140px;
   }
@@ -4768,18 +4639,6 @@ body.qn-roster #gb-sidebar .student-row-note {
   }
   .qn-evidence .qn-card {
     padding: 14px 12px;
-  }
-  .qn-bc-card {
-    display: none;
-  }
-  .qn.bc-open .qn-bc-card {
-    display: flex;
-    position: absolute;
-    right: 12px;
-    width: 380px;
-    max-height: 70vh;
-    z-index: 5;
-    box-shadow: var(--shadow-lg);
   }
   .qn-evidence .qn-col-title,
   .qn-ev-card:not(.on) {
