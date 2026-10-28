@@ -244,7 +244,7 @@ create table assessment (
   description    text,
   date_assigned  date,
   due_date       date,
-  score_mode     text        not null,                              -- scale | rubric | points | complete (20261013_complete_incomplete_scoring)
+  score_mode     text        not null,                              -- proficiency | points | complete (20261013_complete_incomplete_scoring) | dibels (20261027_dibels_scores)
   max_points     numeric,
   weight         numeric     not null,
   evidence_type  text,
@@ -301,6 +301,22 @@ create table rubric_score (
   beyond        text,                                                -- Went Beyond, single-point rubrics (20261027_single_point_rubric)
   updated_at    timestamptz not null default now(),
   unique (enrollment_id, assessment_id, criterion_id)
+);
+
+-- DIBELS 8 benchmark raw scores, one row per student, DIBELS assessment and
+-- window. Accuracy, the adjusted Maze score and levels are worked out in the
+-- app; a DIBELS assessment counts toward no grade (20261027_dibels_scores).
+create table dibels_score (
+  id             uuid        not null primary key,
+  enrollment_id  uuid        not null references enrollment(id) on delete cascade,
+  assessment_id  uuid        not null references assessment(id) on delete cascade,
+  period         text        not null,                             -- boy | moy | eoy
+  orf_wrc        integer,                                          -- oral reading fluency: words read correctly; null = not entered, never negative
+  orf_errors     integer,                                          -- oral reading fluency: errors
+  maze_correct   integer,
+  maze_incorrect integer,
+  updated_at     timestamptz not null default now(),
+  unique (enrollment_id, assessment_id, period)
 );
 
 -- A ticked Advanced Rubric checkbox on one student's rubric score. A row means
@@ -820,6 +836,12 @@ create table phone_report_student (
 --   save_term_rating(p_enrollment_id uuid, p_term integer, p_payload jsonb)
 --   save_term_attendance(p_enrollment_id uuid, p_term integer, p_absences int, p_lates int)
 --   list_course_term_attendance(p_course_id uuid)  -- {enrollment_id: {term: {absences, lates}}}
+--
+-- DIBELS (20261027_dibels_scores):
+--   upsert_dibels_score(p_enrollment_id uuid, p_assessment_id uuid, p_period text,
+--                       p_orf_wrc int, p_orf_errors int, p_maze_correct int, p_maze_incorrect int)
+--                       -- DIBELS assessments only; all four null deletes the window; idempotent by nature
+--   list_course_dibels(p_course_id uuid)  -- [{enrollment_id, assessment_id, period, orf_wrc, orf_errors, maze_correct, maze_incorrect}]
 --   get_term_rating(p_enrollment_id uuid, p_term integer)
 --
 -- Report config + preferences + report:
