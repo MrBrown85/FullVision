@@ -264,7 +264,6 @@ window.ReportBlocks = (function () {
      often: Rarely · Sometimes · Usually · Consistently (the four levels
      the questionnaire stores). Three columns at Row width, one at Side by
      Side. Developing now only means proficiency. No dots, no bars. */
-  const FREQUENCY_WORDS = { 1: 'Rarely', 2: 'Sometimes', 3: 'Usually', 4: 'Consistently' };
   function renderBlockLearnerDimensions(cid, student, ctx, options) {
     options = options || {};
     const half = options.size === 'half';
@@ -276,7 +275,7 @@ window.ReportBlocks = (function () {
     const rows = list
       .map(
         d =>
-          `<div class="report-disp-row"><span>${esc(OBS_LABELS[d] || d)}</span><span class="report-disp-word" data-level="${dims[d] || 0}">${esc(FREQUENCY_WORDS[dims[d]] || '—')}</span></div>`,
+          `<div class="report-disp-row"><span>${esc(OBS_LABELS[d] || d)}</span><span class="report-disp-word" data-level="${dims[d] || 0}">${esc((dims[d] > 0 && OBS_LEVEL_LABELS[dims[d]]) || '—')}</span></div>`,
       )
       .join('');
     return `<div class="report-block-box report-learner-profile${half ? ' report-disp-half' : ''}">
