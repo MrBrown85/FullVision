@@ -2322,6 +2322,29 @@ window.PageGradebook = (function () {
   }
 
   /* ── Scores tab: inline cell editing ────────────────────── */
+  /* Clicking a score opens the Assignments page's grader for that student
+     and assessment in a dialog: the rubric, Complete/Incomplete, points or
+     levels, whichever the work uses. Previous/Next steps through the rows
+     in the order shown; closing redraws the gradebook. While it is open the
+     gradebook's own listeners stand aside (_graderOpen). */
+  function openGrader(sid, aid) {
+    if (!window.PageAssignments || !sid || !aid) return;
+    var ids = Array.prototype.map.call(document.querySelectorAll('.gb-scores-row[data-sid]'), function (row) {
+      return row.dataset.sid;
+    });
+    _hideTip();
+    PageAssignments.openGrader(activeCourse, aid, sid, {
+      studentIds: ids,
+      onClose: function () {
+        clearProfCache();
+        render();
+      },
+    });
+  }
+  function _graderOpen() {
+    return !!(window.PageAssignments && PageAssignments.graderOpen());
+  }
+
   function startCellEdit(td) {
     if (td.querySelector('.gb-scores-input')) return;
     var cid = activeCourse;
@@ -2503,6 +2526,7 @@ window.PageGradebook = (function () {
   }
 
   function _handleKeydown(e) {
+    if (_graderOpen()) return;
     // Escape closes a tooltip first (WCAG 1.4.13: dismissible without moving).
     if (e.key === 'Escape' && _tipSource) _hideTip();
     // Cmd+Z undoes the last score in either view; in a text field it stays
@@ -2706,6 +2730,7 @@ window.PageGradebook = (function () {
 
   /* ── Tooltip ─────────────────────────────────────────────── */
   function _handleMouseover(e) {
+    if (_graderOpen()) return;
     var name = e.target.closest('.gb-grid-rowhead-name');
     if (name) {
       _showNameTip(name);
@@ -2765,6 +2790,7 @@ window.PageGradebook = (function () {
   }
 
   function _handleFocusin(e) {
+    if (_graderOpen()) return;
     if (!e.target.closest) return;
     var name = e.target.closest('.gb-grid-rowhead-name');
     if (name) {
@@ -2788,6 +2814,7 @@ window.PageGradebook = (function () {
 
   /* ── Delegated click handler ──────────────────────────────── */
   function _handleClick(e) {
+    if (_graderOpen()) return;
     // Click-to-focus for score cells
     var td = e.target.closest('td.gb-score');
     var table = document.querySelector('.gb-table');
@@ -2839,7 +2866,7 @@ window.PageGradebook = (function () {
         cycleScore(el);
       },
       editScoreCell: function () {
-        startCellEdit(el);
+        openGrader(el.dataset.sid, el.dataset.aid);
       },
       startScoreMode: function () {
         enterScoreMode(el.dataset.aid);
@@ -2870,12 +2897,14 @@ window.PageGradebook = (function () {
   }
 
   function _handleInput(e) {
+    if (_graderOpen()) return;
     if (e.target.matches('[data-action-input="gbSearch"]')) {
       onSearch(e.target.value, e.target.selectionStart);
     }
   }
 
   function _handleChange(e) {
+    if (_graderOpen()) return;
     if (e.target.matches('[data-action="switchCourse"]')) {
       switchCourse(e.target.value);
     } else if (e.target.matches('[data-action="setRubricColumns"]')) {
@@ -2918,6 +2947,7 @@ window.PageGradebook = (function () {
 
     _addDocListener('click', _handleClick);
     _addDocListener('contextmenu', function (e) {
+      if (_graderOpen()) return;
       // Scores tab context menus
       var cell = e.target.closest('.gb-scores-cell');
       if (cell) {
@@ -2933,6 +2963,7 @@ window.PageGradebook = (function () {
       }
     });
     _addDocListener('dblclick', function (e) {
+      if (_graderOpen()) return;
       var el = e.target.closest('[data-action-dblclick]');
       if (!el) return;
       e.preventDefault();
@@ -2955,6 +2986,7 @@ window.PageGradebook = (function () {
   }
 
   function destroy() {
+    if (_graderOpen()) PageAssignments.closeGrader();
     ObsCapture.closeDialog();
     if (window.GradesPrint) GradesPrint.close();
     _flushActiveScoreEditor();

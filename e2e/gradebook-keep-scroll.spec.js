@@ -25,7 +25,9 @@ test('saving a score keeps the table scrolled where it was', async ({ page }) =>
   await data.evaluate(el => (el.scrollTop = 600));
 
   const cell = page.locator('.gb-scores-cell[data-sid="stu-025"][data-aid="assess-001"]');
-  await cell.click();
+  // A click opens the grader dialog; the typed editor is Edit score.
+  await cell.click({ button: 'right' });
+  await page.locator('.gb-ctx-item[data-ctx="editCell"]').click();
   await cell.locator('.gb-scores-input').fill('3');
   // Measured once the editor is open: focusing it may nudge the cell into view.
   const before = await data.evaluate(el => el.scrollTop);

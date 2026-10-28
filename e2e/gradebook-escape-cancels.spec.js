@@ -11,7 +11,9 @@ test('Escape in a Scores cell cancels the edit', async ({ page }) => {
   await gotoApp(page, '/gradebook');
 
   const cell = page.locator('.gb-scores-cell[data-sid="stu-001"][data-aid="assess-001"]');
-  await cell.click();
+  // A click opens the grader dialog; the typed editor is Edit score.
+  await cell.click({ button: 'right' });
+  await page.locator('.gb-ctx-item[data-ctx="editCell"]').click();
   const input = cell.locator('.gb-scores-input');
   await input.fill('1');
   await input.press('Escape');

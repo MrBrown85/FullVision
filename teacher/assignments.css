@@ -4560,3 +4560,88 @@
   color: var(--text-3);
   white-space: nowrap;
 }
+
+/* ── Grader dialog: the gradebook's cell editor ─────────────
+   Below the rubric bank (4000), rubric editor (5000), comment boxes (9999)
+   and confirms (10002) the grading controls can open. */
+.grader-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3900;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12vh 24px 24px;
+}
+.grader-dialog {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  width: min(960px, 100%);
+  max-height: calc(88vh - 24px);
+  display: flex;
+  flex-direction: column;
+  outline: none;
+}
+.grader-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px 8px;
+}
+.grader-title {
+  flex: 1;
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+.grader-close {
+  border: none;
+  background: none;
+  font-size: 1.125rem;
+  color: var(--text-2);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+}
+.grader-close:hover {
+  background: var(--bg);
+}
+.grader-steps {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 20px 12px;
+  border-bottom: 1px solid var(--divider-medium);
+}
+.grader-student {
+  font-weight: 600;
+}
+.grader-body {
+  overflow: auto;
+  padding: 12px 20px;
+}
+.grader-body .assess-card {
+  border: none;
+  box-shadow: none;
+  margin: 0;
+  background: none;
+}
+.grader-foot {
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--divider-medium);
+  text-align: right;
+  color: var(--text-2);
+}
+.grader-foot strong {
+  color: var(--text);
+}
+/* The column header's levels and the Set Unmarked buttons fill every
+   student, and the stats row is the class's; the dialog grades one. */
+.grader-body .rsg-header,
+.grader-body .ldg-bar,
+.grader-body .ldg-stats {
+  display: none;
+}
