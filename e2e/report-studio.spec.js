@@ -194,7 +194,7 @@ test.describe('Page Studio', () => {
       'teacher-narrative',
       'term-attendance/half+missing-work/half',
     ]);
-    expect(await rowsOf(page, 1)).toEqual(['learner-dimensions', 'parent-response']);
+    expect(await rowsOf(page, 1)).toEqual(['grade-table', 'parent-response']);
     // Row cells are 720 wide, pair cells 354; no cell is absolutely placed.
     const widths = await page
       .locator('.sheet-zoom[data-side="0"] .sheet-cell')
@@ -311,8 +311,8 @@ test.describe('Page Studio', () => {
     await expect(habits).toHaveAttribute('aria-disabled', 'true');
     await habits.click({ force: true });
     await expect(page.locator('.sheet-cell[data-block="student-reflection-habits"]')).toHaveCount(0);
-    // Take the dispositions off the Back: the reflection now has room there, not on the Front.
-    await cellOf(page, 'learner-dimensions').click();
+    // Take the grades off the Back: the reflection now has room there, not on the Front.
+    await cellOf(page, 'grade-table').click();
     await bar(page).getByRole('button', { name: 'Remove' }).click();
     await expect(habits).not.toHaveClass(/nofit/);
     await habits.click({ force: true });
@@ -383,7 +383,7 @@ test.describe('Page Studio', () => {
     ]);
     await cellOf(page, 'legend').click();
     await bar(page).getByRole('button', { name: 'Move to Back' }).click();
-    expect(await rowsOf(page, 1)).toEqual(['learner-dimensions', 'legend', 'parent-response']);
+    expect(await rowsOf(page, 1)).toEqual(['grade-table', 'legend', 'parent-response']);
     await expect(page.locator('#studio-live')).toHaveText('Proficiency Legend, Back, row 2 of 3.');
     await cellOf(page, 'legend').click();
     await expect(bar(page)).toContainText('On the Back');
@@ -448,9 +448,7 @@ test.describe('Page Studio', () => {
       'term-attendance/half+missing-work/half',
       'parent-response',
     ]);
-    await expect(
-      page.locator('.sheet-zoom').nth(1).locator('.sheet-cell[data-block="learner-dimensions"]'),
-    ).toHaveCount(1);
+    await expect(page.locator('.sheet-zoom').nth(1).locator('.sheet-cell[data-block="grade-table"]')).toHaveCount(1);
     await expect(page.locator('.sheet-label').nth(0)).toHaveText('Front');
     await expect(page.locator('.sheet-label').nth(1)).toHaveText('Continued');
     await expect(page.locator('#studio-fit .studio-fit-link')).toHaveText('Continues on the back for 27 students');
@@ -464,15 +462,13 @@ test.describe('Page Studio', () => {
     await expect(page.locator('.sheet-label').nth(1)).toHaveText('Blank');
   });
 
-  test('the Conference Pack’s grade table is taller than a side: it prints after the report, cut at its rows', async ({
-    page,
-  }) => {
+  test('the Conference Pack’s grade table does not fit its side: it continues for every student', async ({ page }) => {
     await openStudio(page);
     await applyTemplate(page, 'conference-pack');
-    await expect(page.locator('.sheet-label').nth(2)).toHaveText('After the Report');
-    await expect(
-      page.locator('.report-block-title', { hasText: 'Assignment Grades (continued)' }).first(),
-    ).toBeVisible();
+    // Every assessment as rows: more than the back holds above the Response,
+    // so it continues (a block taller than a side would print after the report).
+    await expect(page.locator('.sheet-label').nth(2)).toHaveText(/^(Continued|After the Report)$/);
+    await expect(page.locator('.report-grades .report-prof-meta').first()).toContainText('All ·');
     await expect(page.locator('.sheet-zoom[data-side="1"] .sheet-pinned .report-parent-response')).toHaveCount(1);
     expect(await overflowing(page)).toEqual([]);
     expect(await overlapping(page)).toEqual([]);
@@ -726,11 +722,11 @@ test.describe('Page Studio', () => {
     await expect(palette(page)).toContainText('Your Templates');
     await expect(palette(page)).toContainText('None yet');
     await palette(page).getByRole('button', { name: 'Interim Update', exact: true }).click();
-    await expect(page.locator('.report-sheet .report-learner-profile')).toHaveCount(0);
+    await expect(page.locator('.report-sheet .report-grades')).toHaveCount(0);
     await expect(page.getByRole('radio', { name: 'Front Only' })).toHaveAttribute('aria-checked', 'true');
     await expect(page.locator('#undo-toast')).toContainText('Applied Interim Update');
     await undo(page).click();
-    await expect(page.locator('.report-sheet .report-learner-profile')).toHaveCount(1);
+    await expect(page.locator('.report-sheet .report-grades')).toHaveCount(1);
     await expect(page.getByRole('radio', { name: 'Front and Back' })).toHaveAttribute('aria-checked', 'true');
   });
 
@@ -917,7 +913,10 @@ test.describe('Hands on the page', () => {
     page,
   }) => {
     await openStudio(page);
-    // Fill the Front: Core Competencies takes most of what is left.
+    // Make room on the Back (the grades fill it) and fill the Front: Core
+    // Competencies takes most of what is left there.
+    await cellOf(page, 'grade-table').click();
+    await bar(page).getByRole('button', { name: 'Remove' }).click();
     await page.locator('[data-action="studioBlock"][data-block="core-competencies"]').click();
     expect(await rowsOf(page, 0)).toContain('core-competencies');
     // Growth and Next Steps no longer has room there: dropped on the Front, it goes to the Back.
@@ -925,13 +924,13 @@ test.describe('Hands on the page', () => {
     await dragStart(page, from, await gapAbove(page, 'legend'));
     await page.mouse.up();
     expect(await rowsOf(page, 0)).not.toContain('next-steps');
-    expect(await rowsOf(page, 1)).toEqual(['learner-dimensions', 'next-steps', 'parent-response']);
+    expect(await rowsOf(page, 1)).toEqual(['next-steps', 'parent-response']);
     await expect(page.locator('#undo-toast')).toContainText(
       'Added Growth and Next Steps to the Back. The Front is full',
     );
     await expect(page.locator('#studio-fit')).toHaveText('1 sheet for all 27 students');
     await undo(page).click();
-    expect(await rowsOf(page, 1)).toEqual(['learner-dimensions', 'parent-response']);
+    expect(await rowsOf(page, 1)).toEqual(['parent-response']);
   });
 
   test('holding the pointer on a block in the palette shows it at print size for the previewed student', async ({
@@ -957,7 +956,7 @@ test.describe('Hands on the page', () => {
     await dragStart(page, await center(cellOf(page, 'parent-response')), await gapAbove(page, 'proficiency'));
     await expect(page.locator('.studio-ghost')).toHaveCount(0);
     await page.mouse.up();
-    expect(await rowsOf(page, 1)).toEqual(['learner-dimensions', 'parent-response']);
+    expect(await rowsOf(page, 1)).toEqual(['grade-table', 'parent-response']);
     await dragStart(page, await center(cellOf(page, 'header')), await gapAbove(page, 'legend'));
     await expect(page.locator('.studio-ghost')).toHaveCount(0);
     await page.mouse.up();
@@ -1027,7 +1026,6 @@ test.describe('Printed progress reports', () => {
   test('levels print as figures and a word, in black, with no dots', async ({ page }) => {
     await openStudio(page);
     const level = page.locator('#rb-preview .report-prof td.report-prof-n').first();
-    const dim = page.locator('#rb-preview .report-learner-dim-value').first();
     await expect(level).toContainText(/^\d\.\d (Emerging|Developing|Proficient|Extending)$/);
     await expect(page.locator('#rb-preview .report-proficiency').first()).not.toContainText(/[●○]/);
     await expect(page.locator('#rb-preview .report-legend').first()).not.toContainText(/[●○]/);
@@ -1035,7 +1033,6 @@ test.describe('Printed progress reports', () => {
     await expect(page.locator('#rb-preview .report-legend')).toContainText('BC Proficiency Scale, out of 4');
     await page.emulateMedia({ media: 'print' });
     expect(await level.evaluate(el => getComputedStyle(el).color)).toBe('rgb(0, 0, 0)');
-    expect(await dim.evaluate(el => getComputedStyle(el).color)).toBe('rgb(0, 0, 0)');
     await page.emulateMedia({ media: 'screen' });
   });
 

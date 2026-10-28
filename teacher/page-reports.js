@@ -543,7 +543,7 @@ window.PageReports = (function () {
     barEl.style.left = left + 'px';
     if (popoverOpen === studioSelected && ReportStudio.hasOptions(studioSelected)) {
       var pop = document.createElement('div');
-      pop.innerHTML = ReportStudio.popoverHtml(_formOf(), studioSelected);
+      pop.innerHTML = ReportStudio.popoverHtml(_formOf(), studioSelected, ReportBlocks.showDefaults(activeCourse));
       var popEl = pop.firstElementChild;
       if (popEl) {
         preview.appendChild(popEl);

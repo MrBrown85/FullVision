@@ -392,7 +392,7 @@ window.ReportStudio = (function () {
 
   /* The Options popover: the block's Show checkboxes, its choices, the
      no-evidence rule and the Text Block's title and text. */
-  function popoverHtml(form, id) {
+  function popoverHtml(form, id, autos) {
     var sheets = S();
     var def = sheets.BLOCKS[id];
     var cell = sheets.cellOf(form, id);
@@ -403,15 +403,15 @@ window.ReportStudio = (function () {
       ' Options" data-block="' +
       id +
       '">' +
-      _optionsHtml(id, cell, def) +
+      _optionsHtml(id, cell, def, autos) +
       '</div>'
     );
   }
 
   /* Show, choices, No Evidence and the text block's words. */
-  function _optionsHtml(id, cell, def) {
+  function _optionsHtml(id, cell, def, autos) {
     var sheets = S();
-    var opts = sheets.optionsFor(cell);
+    var opts = sheets.optionsFor(cell, autos || {});
     var html = '';
     if (id === 'text-block') {
       html +=
@@ -449,7 +449,13 @@ window.ReportStudio = (function () {
       return !o.choices && !o.text;
     });
     if (bools.length) {
-      html += '<div class="studio-field"><label>Show</label><div class="studio-checks">';
+      var auto = bools.some(function (o) {
+        return o.def === 'auto';
+      });
+      html +=
+        '<div class="studio-field"><label>Show' +
+        (auto ? ' <span class="studio-field-note">(starts from the class grading setting)</span>' : '') +
+        '</label><div class="studio-checks">';
       bools.forEach(function (o) {
         html +=
           '<label class="studio-check"><input type="checkbox" data-action="studioOption" data-block="' +
@@ -457,7 +463,7 @@ window.ReportStudio = (function () {
           '" data-key="' +
           o.key +
           '"' +
-          (opts[o.key] ? ' checked' : '') +
+          (opts[o.key] && opts[o.key] !== 'auto' ? ' checked' : '') +
           '> ' +
           esc(o.label) +
           '</label>';

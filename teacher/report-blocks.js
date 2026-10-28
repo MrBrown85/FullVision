@@ -1284,111 +1284,172 @@ window.ReportBlocks = (function () {
     return html;
   }
 
-  /* ── Assignment Grades Table ── */
+  /* ── Assignment Grades ──────────────────────────────────────────
+     One row per assessment: the date, the full title, and the marks the
+     teacher picks under Show: the Score (12/15, or 3.3 / 4 for work scored
+     on proficiency), the Percent and the Proficiency Word. Percent and the
+     word start from the class grading setting (showDefaults). Organized by
+     Category, by Date (a heading per month) or by Competency (a heading per
+     competency over its latest few pieces of work, each row the mark on
+     that competency). Newest or oldest first; two columns or one, a
+     heading never split across columns. Range: the last 10, this term or
+     all. Side by Side is one column of the last 10 (never by competency).
+     No dots (DECISIONS "Report forms" 13). */
+  function showDefaults(cid) {
+    const mode = courseGradeMode(cid);
+    return { percent: mode !== 'proficiency', word: mode !== 'letter' };
+  }
+  function _monthName(d) {
+    return parseLocalDate(d).toLocaleDateString('en-CA', { month: 'long' });
+  }
+  /* The marks for one row: { score, percent, word } as strings ('' when
+     there is none). cv: calc.js assessmentCellValue. level: the mark on
+     one competency instead of the whole assessment. */
+  function _rowMarks(cid, a, cv, level) {
+    if (level != null) {
+      if (!(level > 0)) return { score: '—', percent: '', word: '' };
+      return { score: levelFigure(level) + ' / 4', percent: formatLevelAs(level, 'percent'), word: _profWord(level) };
+    }
+    if (cv.kind === 'status') return { score: cv.status === 'EXC' ? 'Excused' : 'Missing', percent: '', word: '' };
+    if (cv.kind === 'missing') return { score: 'Missing', percent: '', word: '' };
+    if (cv.kind === 'complete') {
+      return { score: cv.mark === 'complete' ? '✓ Complete' : '✗ Incomplete', percent: '', word: '' };
+    }
+    if (cv.kind === 'dibels') return { score: cv.text, percent: '', word: '' };
+    if (cv.kind === 'points') {
+      const max = Number(a.maxPoints) || 100;
+      return {
+        score: formatPoints(cv.value) + '/' + formatPoints(max),
+        percent: formatPointsPercent(cv.value, max),
+        word: _profWord(cv.level),
+      };
+    }
+    if (cv.kind === 'level' && cv.value > 0) {
+      return {
+        score: levelFigure(cv.value) + ' / 4',
+        percent: formatLevelAs(cv.value, 'percent'),
+        word: _profWord(cv.value),
+      };
+    }
+    return { score: 'Not assessed', percent: '', word: '' };
+  }
+
   function renderBlockGradeTable(cid, student, options) {
     options = options || {};
-    const on = key => options[key] !== false;
-    // This term by default; the last ten or everything when the teacher says so.
-    const range = options.range === 'all' || options.range === 'last10' ? options.range : 'term';
-    let assessments = getAssessments(cid).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-    if (range === 'term') assessments = assessments.filter(a => assessmentInActiveTerm(cid, a));
-    else if (range === 'last10') assessments = assessments.slice(0, 10);
-    const scores = getScores(cid)[student.id] || [];
-    if (assessments.length === 0) return '';
-    const scale = getGradingScale(cid);
-    const scaleLabels = scale.labels || null;
-    function profLabel(level) {
-      if (scaleLabels && scaleLabels[level - 1]) return scaleLabels[level - 1];
-      return PROF_LABELS[level] || '';
-    }
-    // Get tag objects for inline display
-    const sections = getSections(cid);
-    const allTags = sections.flatMap(sec => (sec.tags || []).map(t => ({ ...t, color: sec.color })));
+    const sid = student.id;
+    const half = options.size === 'half';
+    const autos = showDefaults(cid);
+    const pick = (k, dflt) => (options[k] === 'auto' || options[k] == null ? dflt : options[k] !== false);
+    const showScore = pick('score', true);
+    const showPct = pick('percent', autos.percent);
+    const showWord = pick('word', autos.word);
+    const organize = half && options.organize === 'competency' ? 'category' : options.organize || 'category';
+    const oldest = options.order === 'oldest';
+    const one = half || options.columns === 'one';
+    const range = half ? 'last10' : options.range === 'all' || options.range === 'last10' ? options.range : 'term';
+    const per = Math.max(1, Number(options.per) || 5);
 
-    function renderRows(list) {
-      let rows = '';
-      list.forEach(a => {
-        const cmpEntry = isCompletionScored(a) ? scores.find(s => s.assessmentId === a.id && s.score != null) : null;
-        const aScores = cmpEntry ? [cmpEntry] : scores.filter(s => s.assessmentId === a.id && isScoreEntered(a, s));
-        const isPoints = a.scoreMode === 'points';
-        const max = a.maxPoints || 100;
-        const weightLabel =
-          getAssessmentWeight(a) !== 1
-            ? ` <span style="font-size:0.62rem;color:var(--text-3);font-weight:400">${a.weight}×</span>`
-            : '';
-        const dateStr = a.date
-          ? new Date(a.date + 'T00:00:00').toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })
-          : '—';
-        const categoryLabel = getAssessmentCategoryName(cid, a);
-        // Learning areas column — use readable labels, deduplicate by section
-        const tagSections = new Set();
-        (a.tagIds || []).forEach(tid => {
-          const sec = sections.find(s => (s.tags || []).some(t => t.id === tid));
-          if (sec) tagSections.add(sec.shortName || sec.name);
+    const dated = getAssessments(cid)
+      .filter(a => !isDibelsScored || !isDibelsScored(a))
+      .map(a => ({ a, d: typeof _assessmentDate === 'function' ? _assessmentDate(a) : a.date || '' }))
+      .sort((x, y) => (y.d || '').localeCompare(x.d || ''));
+    let pool = dated;
+    if (range === 'term') pool = dated.filter(x => assessmentInActiveTerm(cid, x.a));
+    else if (range === 'last10') pool = dated.slice(0, 10);
+    if (oldest) pool = pool.slice().reverse();
+    if (!pool.length) return '';
+
+    const figs = m => [showScore && m.score, showPct && m.percent].filter(Boolean).join(' · ') || m.score;
+    const when = d => (d ? parseLocalDate(d).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }) : '—');
+    const rowHtml = (x, marks) =>
+      `<div class="report-grades-row"><span class="report-grades-date">${esc(when(x.d))}</span><span class="report-grades-title">${esc(x.a.title || '')}</span><span class="report-grades-figs">${esc(figs(marks))}</span>${showWord ? `<span class="report-grades-word">${esc(marks.word)}</span>` : ''}</div>`;
+
+    // The groups: a heading and its rows, in the order they print.
+    const groups = [];
+    if (organize === 'competency') {
+      const sections = _reportSections(cid);
+      sections.forEach(sec => {
+        const byAssessment = {};
+        (sec.tags || []).forEach(tag => {
+          getTagScores(cid, sid, tag.id).forEach(sc => {
+            if (sc.score > 0 && (byAssessment[sc.assessmentId] == null || sc.score > byAssessment[sc.assessmentId])) {
+              byAssessment[sc.assessmentId] = sc.score;
+            }
+          });
         });
-        const tagPills = Array.from(tagSections)
-          .map(
-            name =>
-              `<span style="display:inline-block;font-size:0.62rem;font-weight:500;color:var(--text-2);line-height:1.3">${esc(name)}</span>`,
-          )
-          .join('<span style="color:var(--text-3);margin:0 2px">·</span>');
-        if (aScores.length === 0) {
-          const span = (on('score') ? 1 : 0) + (on('level') ? 1 : 0);
-          rows += `<tr>
-          <td style="font-weight:500">${esc(a.title)}${weightLabel}</td>
-          ${on('date') ? `<td class="col-date" style="color:var(--text-3);font-size:0.76rem">${dateStr}</td>` : ''}
-          ${on('category') ? `<td class="col-category" style="font-size:0.68rem;color:var(--text-2)">${esc(categoryLabel)}</td>` : ''}
-          ${on('area') ? `<td class="col-area" style="font-size:0.68rem">${tagPills}</td>` : ''}
-          ${span ? `<td style="color:var(--text-3);font-style:italic" colspan="${span}">Not assessed</td>` : ''}</tr>`;
-          return;
+        const rows = pool.filter(x => byAssessment[x.a.id] != null).slice(0, per);
+        if (rows.length) {
+          groups.push({
+            name: _competencyLabel(sec),
+            rows: rows.map(x => rowHtml(x, _rowMarks(cid, x.a, null, byAssessment[x.a.id]))),
+          });
         }
-        let scoreDisplay, profDisplay;
-        if (cmpEntry) {
-          const done = Number(cmpEntry.score) > 0;
-          const color = done ? 'var(--score-3)' : 'var(--score-1)';
-          scoreDisplay = `<td style="text-align:center;font-weight:600;font-size:1rem;color:${color}">${done ? '\u2713' : '\u2717'}</td>`;
-          profDisplay = `<td style="text-align:center;font-size:0.74rem;font-weight:600;color:${color}">${done ? 'Complete' : 'Incomplete'}</td>`;
-        } else if (isPoints) {
-          const rawAvg = aScores.reduce((s, x) => s + x.score, 0) / aScores.length;
-          const pct = Math.round((rawAvg / max) * 100);
-          const profLevel = pointsToProf(rawAvg, max, scale);
-          const color = PROF_COLORS[profLevel] || 'var(--text-3)';
-          scoreDisplay = `<td style="text-align:center;font-weight:600;font-size:1rem">${formatPoints(rawAvg)}<span style="color:var(--text-3);font-weight:400">/${max}</span></td>`;
-          profDisplay = `<td style="text-align:center"><span class="report-level-pill" data-prof="${profLevel}" data-prof-bg="${profLevel}" style="display:inline-block;padding:2px 10px;border-radius:6px;font-size:0.74rem;font-weight:600;background:${PROF_TINT[profLevel] || 'transparent'};color:${color}">${levelDots(profLevel)}${profLabel(profLevel)} <span style="font-weight:400;opacity:0.7">${pct}%</span></span></td>`;
-        } else {
-          let avg = aScores.reduce((s, x) => s + scoreModValue(x), 0) / aScores.length;
-          const rubricAvg = getRubricAssessmentScore(cid, a, aScores);
-          if (rubricAvg != null) avg = rubricAvg;
-          const r = Math.round(avg);
-          const color = PROF_COLORS[r] || 'var(--text-3)';
-          scoreDisplay = `<td data-prof="${r}" style="text-align:center;font-weight:600;font-size:1rem;color:${color}">${r}<span style="color:var(--text-3);font-weight:400">/4</span></td>`;
-          profDisplay = `<td style="text-align:center"><span class="report-level-pill" data-prof="${r}" data-prof-bg="${r}" style="display:inline-block;padding:2px 10px;border-radius:6px;font-size:0.74rem;font-weight:600;background:${PROF_TINT[r] || 'transparent'};color:${color}">${levelDots(r)}${profLabel(r)}</span></td>`;
-        }
-        scoreDisplay = scoreDisplay.replace('<td ', '<td class="col-score" ');
-        rows += `<tr>
-        <td style="font-weight:500">${esc(a.title)}${weightLabel}</td>
-        ${on('date') ? `<td class="col-date" style="color:var(--text-3);font-size:0.76rem">${dateStr}</td>` : ''}
-        ${on('category') ? `<td class="col-category" style="font-size:0.68rem;color:var(--text-2)">${esc(categoryLabel)}</td>` : ''}
-        ${on('area') ? `<td class="col-area" style="font-size:0.68rem">${tagPills}</td>` : ''}
-        ${on('score') ? scoreDisplay : ''}${on('level') ? profDisplay : ''}</tr>`;
       });
-      return rows;
+    } else {
+      const cells = {};
+      pool.forEach(x => (cells[x.a.id] = assessmentCellValue(cid, sid, x.a)));
+      if (organize === 'date') {
+        const months = [];
+        pool.forEach(x => {
+          const key = x.d ? x.d.slice(0, 7) : '';
+          let g = months.find(m => m.key === key);
+          if (!g) months.push((g = { key, name: x.d ? _monthName(x.d) : 'Undated', rows: [] }));
+          g.rows.push(rowHtml(x, _rowMarks(cid, x.a, cells[x.a.id])));
+        });
+        months.forEach(m => groups.push({ name: m.name, rows: m.rows }));
+      } else {
+        const cats = (getCategories(cid) || []).map(c => ({ id: c.id, name: c.name, rows: [] }));
+        const none = { id: null, name: 'No Category', rows: [] };
+        pool.forEach(x => {
+          const id = x.a.categoryId || x.a.category_id || null;
+          const g = cats.find(c => c.id === id) || none;
+          g.rows.push(rowHtml(x, _rowMarks(cid, x.a, cells[x.a.id])));
+        });
+        cats.concat([none]).forEach(g => {
+          if (g.rows.length) groups.push({ name: g.name, rows: g.rows });
+        });
+      }
     }
+    if (!groups.length) return '';
 
-    let html = `<div class="report-block-box" style="page-break-inside:avoid">
-    <div class="report-block-title">Assignment Grades</div>
-    <table class="report-tag-table report-grade-table" style="margin-top:4px">
-      <thead><tr>
-        <th style="text-align:left">Assignment</th>
-        ${on('date') ? '<th class="col-date" style="width:10%;text-align:left">Date</th>' : ''}
-        ${on('category') ? '<th class="col-category" style="width:14%;text-align:left">Category</th>' : ''}
-        ${on('area') ? '<th class="col-area" style="width:18%;text-align:left">Learning Area</th>' : ''}
-        ${on('score') ? '<th class="col-score" style="width:12%;text-align:center">Score</th>' : ''}
-        ${on('level') ? '<th style="width:12%;text-align:center">Proficiency</th>' : ''}
-      </tr></thead><tbody>`;
-    html += renderRows(assessments);
-    html += `</tbody></table></div>`;
-    return html;
+    const groupHtml = g => `<div class="report-grades-head">${esc(g.name)}</div>${g.rows.join('')}`;
+    let body;
+    if (one) body = `<div class="report-grades-col">${groups.map(groupHtml).join('')}</div>`;
+    else {
+      // Groups fill the left column in order until it holds about half the
+      // lines, then the rest go right. A group never splits.
+      const lines = g => g.rows.length + 1;
+      const total = groups.reduce((t, g) => t + lines(g), 0);
+      const left = [];
+      const right = [];
+      let acc = 0;
+      groups.forEach(g => {
+        if (!right.length && acc + lines(g) / 2 <= total / 2) {
+          left.push(g);
+          acc += lines(g);
+        } else right.push(g);
+      });
+      body = `<div class="report-grades-cols"><div class="report-grades-col">${left.map(groupHtml).join('')}</div><div class="report-grades-col">${right.map(groupHtml).join('')}</div></div>`;
+    }
+    const n = pool.length;
+    const meta = half
+      ? 'Last 10'
+      : (range === 'last10' ? 'Last 10' : range === 'all' ? 'All' : 'This term') +
+        (organize === 'competency'
+          ? ` · latest ${per} for each competency`
+          : ` · ${n} assessment${n === 1 ? '' : 's'}`);
+    const legend = [
+      showScore ? 'Points shown as scored; other work scored out of 4.' : '',
+      showWord ? 'Proficiency: 1 Emerging · 2 Developing · 3 Proficient · 4 Extending.' : '',
+      organize === 'competency' ? 'Each mark is for that competency.' : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+    return `<div class="report-block-box report-grades${half ? ' report-grades-half' : ''}${showWord ? '' : ' report-grades-noword'}">
+    <div class="report-prof-head"><div class="report-block-title">Assignment Grades</div><div class="report-prof-meta">${esc(meta)}</div></div>
+    ${body}
+    <div class="report-grades-legend">${legend}</div>
+  </div>`;
   }
 
   /* ── Core Competencies ── */
@@ -1705,6 +1766,7 @@ window.ReportBlocks = (function () {
     renderBlockNextSteps: renderBlockNextSteps,
     renderBlockLegend: renderBlockLegend,
     renderBlockProficiency: renderBlockProficiency,
+    showDefaults: showDefaults,
     renderBlockParentResponse: renderBlockParentResponse,
     renderBlockStudentReflectionLearning: renderBlockStudentReflectionLearning,
     renderBlockStudentReflectionHabits: renderBlockStudentReflectionHabits,
