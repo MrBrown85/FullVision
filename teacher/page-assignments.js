@@ -513,7 +513,9 @@ window.PageAssignments = (function () {
       var showRubric = rubricViewStates[a.id] !== undefined ? rubricViewStates[a.id] : true;
       var rubric = getRubricById(cid, a.rubricId);
       if (showRubric && oneStudent && students.length === 1)
-        return _rubricTilesHtml(cid, a, rubric, students[0], _isAdvancedRubric(rubric));
+        return rubricStyle(rubric) === 'single_point'
+          ? _singlePointHtml(cid, a, rubric, students[0])
+          : _rubricTilesHtml(cid, a, rubric, students[0], _isAdvancedRubric(rubric));
       if (showRubric) return renderRubricGradingView(cid, a, students, scores);
     }
     if (one) return _levelCardsHtml(cid, a, tagObjs, one);
@@ -564,15 +566,7 @@ window.PageAssignments = (function () {
       if (!crit) return;
       var state = _criterionState(cid, st.id, a.id, crit);
       var advice = advanced && RubricChecks.hasChecks(crit) ? _checklistAdvice(crit, ticked, state.level) : null;
-      var codes = (crit.tagIds || [])
-        .map(function (tid) {
-          var t = getTagById(cid, tid);
-          if (!t) return '';
-          // The printed rubric's rule: the tag's code, else an id that isn't a database id.
-          var code = t.code || (t.id && !/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(t.id) ? t.id : '') || t.label || '';
-          return '<span class="grdt-code" title="' + esc(t.label || '') + '">' + esc(code) + '</span>';
-        })
-        .join('');
+      var codes = _rubricCodesHtml(cid, crit);
       var tiles = order
         .map(function (lv) {
           var words = (crit.levels && (crit.levels[lv] || crit.levels[String(lv)])) || '';
@@ -719,6 +713,103 @@ window.PageAssignments = (function () {
         '</section>';
     });
     return '<div class="grdt-tiles">' + html + '</div>';
+  }
+
+  /* ── Single-point rubric: one student ──────────────────────
+     Each criterion is a card in three columns: Work On (the criterion's
+     comment), the Proficient standard with the level control and − | +
+     under it, and Went Beyond. Both notes are optional and save when they
+     lose focus; 1–4 and + / − work on a focused card. */
+  function _rubricCodesHtml(cid, crit) {
+    return (crit.tagIds || [])
+      .map(function (tid) {
+        var t = getTagById(cid, tid);
+        if (!t) return '';
+        // The printed rubric's rule: the tag's code, else an id that isn't a database id.
+        var code = t.code || (t.id && !/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(t.id) ? t.id : '') || t.label || '';
+        return '<span class="grdt-code" title="' + esc(t.label || '') + '">' + esc(code) + '</span>';
+      })
+      .join('');
+  }
+  function _singlePointNoteHtml(kind, crit, text) {
+    var work = kind === 'work';
+    var id = (work ? 'grsp-work-' : 'grsp-beyond-') + crit.id;
+    return (
+      '<div class="grsp-note ' +
+      (work ? 'is-work' : 'is-beyond') +
+      '"><label class="grsp-note-label" for="' +
+      id +
+      '"><span class="grsp-dot" aria-hidden="true"></span>' +
+      (work ? 'Work On' : 'Went Beyond') +
+      '</label><textarea id="' +
+      id +
+      '" class="grdt-note' +
+      (text ? ' has-text' : '') +
+      '" rows="1" data-action-blur="' +
+      (work ? 'graderCritNote' : 'graderCritBeyond') +
+      '" data-critid="' +
+      crit.id +
+      '">' +
+      esc(text) +
+      '</textarea></div>'
+    );
+  }
+  function _singlePointHtml(cid, a, rubric, st) {
+    var order = levelOrderFor(cid);
+    var html =
+      '<div class="grsp-legend">' +
+      '<span class="is-work"><span class="grsp-dot" aria-hidden="true"></span>Areas for Growth</span>' +
+      '<span class="is-standard"><span class="grsp-dot" aria-hidden="true"></span>Proficient Standard</span>' +
+      '<span class="is-beyond"><span class="grsp-dot" aria-hidden="true"></span>Going Beyond</span>' +
+      '</div>';
+    (rubric.criteria || []).forEach(function (crit) {
+      if (!crit) return;
+      var state = _criterionState(cid, st.id, a.id, crit);
+      var seg = order
+        .map(function (lv) {
+          var on = state.level === lv;
+          return (
+            '<button type="button" class="grdl-level' +
+            (on ? ' is-on l' + lv : '') +
+            '" data-action="graderLevel" data-critid="' +
+            crit.id +
+            '" data-level="' +
+            lv +
+            '" aria-pressed="' +
+            on +
+            '">' +
+            PROF_LABELS[lv] +
+            '</button>'
+          );
+        })
+        .join('');
+      var codes = _rubricCodesHtml(cid, crit);
+      html +=
+        '<section class="grdt-crit grsp-crit" tabindex="0" data-critid="' +
+        crit.id +
+        '" aria-label="' +
+        esc(crit.name || '') +
+        '">' +
+        _singlePointNoteHtml('work', crit, getRubricCriterionComment(cid, st.id, a.id, crit)) +
+        '<div class="grsp-standard">' +
+        '<h3 class="grdt-crit-name">' +
+        esc(crit.name || '') +
+        '</h3>' +
+        (codes ? '<div class="grdt-codes">' + codes + '</div>' : '') +
+        '<p class="grsp-words">' +
+        esc((crit.levels && (crit.levels[3] || crit.levels['3'])) || '') +
+        '</p>' +
+        '<div class="grsp-controls"><div class="grdl-seg" role="group" aria-label="Level">' +
+        seg +
+        '</div>' +
+        _graderStepperHtml(state.level, state.mod, 'data-action="graderMod" data-critid="' + crit.id + '"') +
+        '</div>' +
+        (state.level ? '' : '<span class="grdt-not-scored">' + _NOT_SCORED_ICON + 'Not Scored</span>') +
+        '</div>' +
+        _singlePointNoteHtml('beyond', crit, getRubricCriterionBeyond(cid, st.id, a.id, crit)) +
+        '</section>';
+    });
+    return '<div class="grdt-tiles grsp-tiles">' + html + '</div>';
   }
 
   /* ── Levels, points and Complete/Incomplete for one student ── */
@@ -1343,10 +1434,12 @@ window.PageAssignments = (function () {
         var a = assessments.find(function (x) {
           return x.id === aid;
         });
+        // A single-point rubric has only the Proficient wording to show.
         return (
           a &&
           a.rubricId &&
           getRubricById(cid, a.rubricId) &&
+          rubricStyle(getRubricById(cid, a.rubricId)) !== 'single_point' &&
           (rubricViewStates[a.id] !== undefined ? rubricViewStates[a.id] : true)
         );
       });
@@ -3155,14 +3248,71 @@ window.PageAssignments = (function () {
   }
   /* The whole-class grid's top row: "Set Everyone To" and a capsule per
      level (today's fill-all), and the hover hint for the rubric wording. */
-  function _setEveryoneHtml(cid, action, aid) {
+  function _setEveryoneHtml(cid, action, aid, withHint) {
     return (
       '<div class="rsg-header">' +
       '<span class="rsg-header-label">Set Everyone To</span>' +
       '<div class="rsg-header-levels">' +
       _fillAllHeaderHtml(cid, action, aid) +
       '</div>' +
-      '<span class="rsg-header-hint">Hover a level to see its wording</span>' +
+      (withHint === false ? '' : '<span class="rsg-header-hint">Hover a level to see its wording</span>') +
+      '</div>'
+    );
+  }
+  /* A single-point rubric's Proficient standard, once above the class:
+     a tinted card per criterion. */
+  function _singlePointStripHtml(rubric) {
+    return (
+      '<div class="rsg-sp-strip"><span class="rsg-sp-strip-label"><span class="grsp-dot" aria-hidden="true"></span>Proficient Standard</span>' +
+      '<div class="rsg-sp-cards">' +
+      (rubric.criteria || [])
+        .map(function (crit) {
+          return (
+            '<div class="rsg-sp-card"><span class="rsg-sp-card-name">' +
+            esc(crit.name || '') +
+            '</span><span class="rsg-sp-card-words">' +
+            esc((crit.levels && (crit.levels[3] || crit.levels['3'])) || '') +
+            '</span></div>'
+          );
+        })
+        .join('') +
+      '</div></div>'
+    );
+  }
+  /* Work On and Went Beyond under a single-point criterion's level control:
+     white fields, label above, saved when they lose focus. */
+  function _rsgSinglePointNotesHtml(cid, aid, sid, crit) {
+    var st = getStudents(cid).find(function (x) {
+      return x.id === sid;
+    });
+    var name = esc((crit.name || '') + (st ? ', ' + displayNameWithLast(st) : ''));
+    function field(kind, label, text) {
+      return (
+        '<label class="rsg-sp-field is-' +
+        kind +
+        '"><span class="rsg-sp-label"><span class="grsp-dot" aria-hidden="true"></span>' +
+        label +
+        '</span><input type="text" class="rsg-sp-input" value="' +
+        esc(text) +
+        '" aria-label="' +
+        label +
+        ', ' +
+        name +
+        '" data-action-blur="' +
+        (kind === 'work' ? 'rsgWorkOn' : 'rsgBeyond') +
+        '" data-aid="' +
+        aid +
+        '" data-sid="' +
+        sid +
+        '" data-critid="' +
+        crit.id +
+        '"></label>'
+      );
+    }
+    return (
+      '<div class="rsg-sp-notes">' +
+      field('work', 'Work On', getRubricCriterionComment(cid, sid, aid, crit)) +
+      field('beyond', 'Went Beyond', getRubricCriterionBeyond(cid, sid, aid, crit)) +
       '</div>'
     );
   }
@@ -3540,8 +3690,10 @@ window.PageAssignments = (function () {
       .filter(Boolean);
 
     var advanced = _isAdvancedRubric(rubric);
-    var html = '<div class="rsg-grid' + (advanced ? ' is-advanced' : '') + '">';
-    html += _setEveryoneHtml(cid, 'confirmFillRubricAll', a.id);
+    var single = rubricStyle(rubric) === 'single_point';
+    var html = '<div class="rsg-grid' + (advanced ? ' is-advanced' : '') + (single ? ' is-single-point' : '') + '">';
+    if (single) html += _singlePointStripHtml(rubric);
+    html += _setEveryoneHtml(cid, 'confirmFillRubricAll', a.id, !single);
 
     var statuses = getAssignmentStatuses(cid);
     students.forEach(function (st) {
@@ -3560,7 +3712,7 @@ window.PageAssignments = (function () {
         _rsgStudentHeadHtml(cid, a.id, st, stStatus, 'fillRubricScoresAndClose') +
         '<div class="rsg-criteria">';
       criteria.forEach(function (crit) {
-        html += _rubricCriterionRowHtml(cid, a.id, st.id, crit, studentScores, advanced);
+        html += _rubricCriterionRowHtml(cid, a.id, st.id, crit, studentScores, advanced, single);
       });
       html += '</div></div>';
     });
@@ -3579,7 +3731,7 @@ window.PageAssignments = (function () {
   /* One criterion for one student in the whole-class grid. On an Advanced
      rubric with its checklist open, the suggestion sits under the tools and
      a column of boxes under each level button, inside the row. */
-  function _rubricCriterionRowHtml(cid, aid, sid, crit, studentScores, advanced) {
+  function _rubricCriterionRowHtml(cid, aid, sid, crit, studentScores, advanced, single) {
     var tagMods = [];
     var tagScores = rubricCriterionScoreKeys(crit).map(function (tid) {
       var entry = studentScores.find(function (s) {
@@ -3636,9 +3788,8 @@ window.PageAssignments = (function () {
       // Its own cell: .rsg-mods is redrawn on every score change.
       '</div>' +
       (advanced ? '<div class="rsg-checks-cell">' + _checksButtonHtml(cid, aid, sid, crit) + '</div>' : '') +
-      '<div class="rsg-comment-cell">' +
-      criterionCommentButtonHtml(aid, sid, crit) +
-      '</div>' +
+      // A single-point criterion's comment is its Work On field.
+      (single ? '' : '<div class="rsg-comment-cell">' + criterionCommentButtonHtml(aid, sid, crit) + '</div>') +
       '</div>' +
       (advice
         ? '<div class="rsg-checklist-advice' +
@@ -3673,6 +3824,7 @@ window.PageAssignments = (function () {
       ) +
       '</div>' +
       (open ? _checklistPanelHtml(cid, aid, sid, crit, displayScore) : '') +
+      (single ? _rsgSinglePointNotesHtml(cid, aid, sid, crit) : '') +
       '</div></div>'
     );
   }
@@ -5834,6 +5986,36 @@ window.PageAssignments = (function () {
       )
         saveRubricCriterionComment(activeCourse, focusStudentId, noteAid, el.dataset.critid, text);
       el.classList.toggle('has-text', !!text);
+      return;
+    }
+    if (el.dataset.actionBlur === 'rsgWorkOn' || el.dataset.actionBlur === 'rsgBeyond') {
+      var spCrit = getRubricCriterion(el.dataset.aid, el.dataset.critid);
+      if (!spCrit || !el.isConnected) return;
+      var spText = el.value.trim();
+      var beyond = el.dataset.actionBlur === 'rsgBeyond';
+      var spSaved = beyond
+        ? getRubricCriterionBeyond(activeCourse, el.dataset.sid, el.dataset.aid, spCrit)
+        : getRubricCriterionComment(activeCourse, el.dataset.sid, el.dataset.aid, spCrit);
+      if (spText === spSaved) return;
+      if (beyond) saveRubricCriterionBeyond(activeCourse, el.dataset.sid, el.dataset.aid, el.dataset.critid, spText);
+      else saveRubricCriterionComment(activeCourse, el.dataset.sid, el.dataset.aid, el.dataset.critid, spText);
+      return;
+    }
+    if (el.dataset.actionBlur === 'graderCritBeyond') {
+      var beyondAid = _graderAid(el);
+      var beyondText = el.value.trim();
+      if (!beyondAid || !focusStudentId) return;
+      if (
+        beyondText !==
+        getRubricCriterionBeyond(
+          activeCourse,
+          focusStudentId,
+          beyondAid,
+          _graderCriterion(beyondAid, el.dataset.critid),
+        )
+      )
+        saveRubricCriterionBeyond(activeCourse, focusStudentId, beyondAid, el.dataset.critid, beyondText);
+      el.classList.toggle('has-text', !!beyondText);
       return;
     }
     if (el.dataset.actionBlur === 'graderTagNote') {

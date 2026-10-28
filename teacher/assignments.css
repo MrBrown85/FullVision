@@ -5740,3 +5740,188 @@
 .assess-header-actions .rubric-view-toggle {
   margin-right: 0;
 }
+
+/* ── Single-point rubrics (plan PR 16) ───────────────────────
+   One student: a card per criterion in three columns, Work On | the
+   Proficient standard with its level control | Went Beyond. */
+.grsp-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  background: var(--score-3);
+}
+.is-work .grsp-dot {
+  background: var(--score-2);
+}
+.is-beyond .grsp-dot {
+  background: var(--score-4);
+}
+.grsp-legend {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr) 250px;
+  column-gap: 10px;
+  padding: 2px 14px 0;
+}
+.grsp-legend > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+.grsp-legend > .is-standard {
+  justify-content: center;
+}
+.grdt-crit.grsp-crit {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr) 250px;
+  gap: 10px;
+  align-items: start;
+}
+.grsp-note {
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(118, 118, 128, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.grsp-note-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+.grsp-note .grdt-note {
+  background: var(--surface);
+}
+.grsp-standard {
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  text-align: center;
+}
+.grsp-standard .grdt-codes {
+  justify-content: center;
+}
+.grsp-words {
+  margin: 0;
+  font-size: var(--text-base);
+  line-height: 1.5;
+  color: var(--text);
+}
+.grsp-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.grsp-controls .grdl-seg {
+  flex: none;
+}
+.grsp-controls .grdl-level {
+  flex: none;
+  height: 28px;
+  padding: 0 11px;
+  font-size: var(--text-sm);
+}
+.grsp-standard .grdt-not-scored {
+  align-self: center;
+}
+.grader-inline .grdt-crit.grsp-crit {
+  padding: 12px 0 14px;
+}
+
+/* Whole class: the Proficient standard once above the students, and Work On
+   and Went Beyond under each criterion's level control. */
+.rsg-sp-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 16px 12px;
+  box-shadow: inset 0 -0.5px 0 var(--divider-heavy);
+}
+.rsg-sp-strip-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--text);
+}
+.rsg-sp-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+.rsg-sp-card {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--score-3) 10%, var(--surface));
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rsg-sp-card-name {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--text);
+}
+.rsg-sp-card-words {
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--text);
+}
+.rsg-sp-notes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.rsg-sp-field {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rsg-sp-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text);
+}
+.rsg-sp-label .grsp-dot {
+  width: 7px;
+  height: 7px;
+}
+.rsg-sp-input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid #aeaeb2;
+  border-radius: 8px;
+  background: var(--surface);
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--text);
+  outline: none;
+}
+.rsg-sp-input:focus {
+  border-color: var(--active);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
+}
+@media (prefers-color-scheme: dark) {
+  .rsg-sp-input {
+    border-color: var(--border);
+  }
+}
+.rsg-grid.is-single-point .rsg-criteria {
+  gap: 14px;
+}
