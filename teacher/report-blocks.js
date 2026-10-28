@@ -591,7 +591,9 @@ window.ReportBlocks = (function () {
   }
 
   /* ── Parent / Guardian Response ── */
-  function renderBlockParentResponse(cid, student) {
+  /* options.lines: the comments box's writing room, from the form. */
+  function renderBlockParentResponse(cid, student, options) {
+    const lines = Math.max(1, Number((options && options.lines) || 3));
     const name = esc(displayNameFirst(student));
     let html = `<div class="report-block-box report-parent-response">`;
     html += `<div class="report-block-title">Parent / Guardian Response</div>`;
@@ -615,7 +617,7 @@ window.ReportBlocks = (function () {
     // Comments
     html += `<div class="report-parent-comments" style="margin-top:14px">
     <div class="report-parent-label" style="margin-bottom:6px">Comments or Questions</div>
-    <div class="report-parent-comments-box" style="border:1.5px solid var(--border);border-radius:8px;min-height:60px;padding:8px"></div>
+    <div class="report-parent-comments-box" style="border:1.5px solid var(--border);border-radius:8px;min-height:${lines * 22 + 16}px;padding:8px"></div>
   </div>`;
     html += `</div>`;
     return html;
@@ -1400,7 +1402,7 @@ window.ReportBlocks = (function () {
       case 'legend':
         return renderBlockLegend();
       case 'parent-response':
-        return renderBlockParentResponse(cid, student);
+        return renderBlockParentResponse(cid, student, options);
       case 'student-reflection-learning':
         return renderBlockStudentReflectionLearning(cid, student);
       case 'student-reflection-habits':

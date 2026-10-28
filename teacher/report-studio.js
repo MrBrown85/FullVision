@@ -1,11 +1,12 @@
 /* report-studio.js — Page Studio: the Progress Reports screen.
-   A palette of blocks on the left and the previewed student's pages at
-   paper size on the right, under the class's fit line. A block is picked
-   up and dropped on the page grid, sized by its handles, and carries a
-   small toolbar: Options, Leave Off, Remove. This module renders the
-   panes and runs the pointer and keyboard work; page-reports.js owns the
-   state and the clicks (teacher/report-sheets.js is the model).
-   docs/DECISIONS.md "Report forms" 8; docs/report-forms-plan.md Phase 7. */
+   A palette of blocks on the left and the previewed student's sides at
+   paper size on the right, under the class's fit line. A block is added
+   from the palette and lands in a row of its own; the selected block's
+   card sits in the gutter beside the page with its Size, Lines, Move,
+   Options, Leave Off and Remove. This module renders the panes;
+   page-reports.js owns the state and the clicks (teacher/report-sheets.js
+   is the model and the engine).
+   docs/DECISIONS.md "Report forms" 8; docs/report-forms-plan.md Phase 8. */
 window.ReportStudio = (function () {
   'use strict';
 
@@ -51,18 +52,35 @@ window.ReportStudio = (function () {
     );
   }
 
-  /* S ≤ 120 px, M ≤ 300, L ≤ 600, else XL. Unknown: an em dash. */
-  function sizeBadge(px) {
-    if (!(px > 0)) return '—';
-    if (px <= 120) return 'S';
-    if (px <= 300) return 'M';
-    if (px <= 600) return 'L';
-    return 'XL';
+  /* Where a block not on the form would land, from the class's measured
+     sizes and the room left on each side for the tightest student:
+     { side } for the first side with room, { after: true } for a block
+     taller than a side (it prints after the report), or { reason } when
+     nothing fits. sizes: ReportSheets.blockSizes; fit: the class summary
+     (its perStudent[].free). Null while either is still being measured. */
+  function landing(form, id, sizes, fit) {
+    var sheets = S();
+    if (!sizes || !sizes[id] || !fit || !fit.perStudent) return null;
+    var need = sizes[id].row;
+    var H = fit.sideHeight || sheets.sideHeight('letter');
+    if (need > H) return { after: true };
+    var ids = Object.keys(fit.perStudent);
+    if (!ids.length) return null;
+    for (var s = 0; s < form.sides.length; s++) {
+      var free = Infinity;
+      ids.forEach(function (sid) {
+        var f = fit.perStudent[sid].free;
+        free = Math.min(free, f && f[s] != null ? f[s] : 0);
+      });
+      if (need + sheets.GAP <= free || (need <= free && free === H)) return { side: s };
+    }
+    return { reason: form.sides.length > 1 ? 'No room on either side' : 'No room on the Front' };
   }
 
-  /* tab: 'blocks' | 'templates'. sizes: { blockId: px } once measured.
-     A block on the form is dimmed; clicking it selects it on the page. */
-  function paletteHtml(form, sizes, tab, templates) {
+  /* tab: 'blocks' | 'templates'. A block on the form is ticked; clicking
+     it finds it on the page. A block with no room is greyed with the
+     reason. */
+  function paletteHtml(form, tab, templates, sizes, fit) {
     var sheets = S();
     var on = sheets.onForm(form);
     var html =
@@ -115,53 +133,88 @@ window.ReportStudio = (function () {
         if (def.group !== group) return;
         var placed = on.indexOf(id) >= 0;
         if (def.retired && !placed) return;
+        var land = placed ? null : landing(form, id, sizes, fit);
+        var nofit = !!(land && land.reason);
         html +=
           '<button type="button" class="studio-blk' +
           (placed ? ' placed' : '') +
+          (nofit ? ' nofit' : '') +
           '" data-action="studioBlock" data-block="' +
           id +
-          '" draggable="false" aria-pressed="' +
+          '" aria-pressed="' +
           placed +
-          (placed ? '" title="On the report. Click to remove it.' : '') +
-          '">' +
-          '<span class="studio-grip" aria-hidden="true">⠿</span>' +
+          '"' +
+          (nofit ? ' aria-disabled="true"' : '') +
+          (placed ? ' title="On the report. Click to find it."' : '') +
+          '>' +
+          '<span class="studio-tick" aria-hidden="true">' +
+          (placed ? '✓' : '') +
+          '</span>' +
           '<span class="studio-blk-name">' +
           esc(def.label) +
-          '</span><span class="studio-sz">' +
-          sizeBadge(sizes && sizes[id]) +
-          '</span></button>';
+          '</span>' +
+          (nofit ? '<span class="studio-why">' + esc(land.reason) + '</span>' : '') +
+          '</button>';
       });
     });
     return html;
   }
 
-  /* The class fit in one line, from ReportSheets.classSummary: every
-     student fits, some push a block past its page (a link to Everyone),
-     or, with a Pages cap, some are cut. */
-  function fitLineHtml(summary) {
+  /* The class fit in one line, from ReportSheets.classSummary: the sheets
+     every student needs, or how many need a second sheet (a link to
+     Everyone, which leads with them). */
+  function fitLineHtml(summary, form) {
     if (!summary || !summary.perStudent) return '';
     var ids = Object.keys(summary.perStudent);
     var n = ids.length;
-    var some = function (key) {
-      return ids.filter(function (id) {
-        var list = summary.perStudent[id][key];
-        return list && list.length;
-      }).length;
-    };
     var students = function (k) {
       return k + (k === 1 ? ' student' : ' students');
     };
-    var cut = some('cut');
-    if (cut) return '<span class="studio-fit-cut">Cut for ' + students(cut) + '</span>';
-    var pushed = some('pushed');
-    if (pushed) {
+    var more = ids.filter(function (id) {
+      return summary.perStudent[id].sheets > 1;
+    }).length;
+    var over = ids.filter(function (id) {
+      return summary.perStudent[id].over;
+    }).length;
+    if (over) {
       return (
-        '<button type="button" class="studio-fit-link" data-action="studioView" data-view="all">Pushes past the page for ' +
-        students(pushed) +
+        '<button type="button" class="studio-fit-link" data-action="studioView" data-view="all">A block is taller than a page for ' +
+        students(over) +
         '</button>'
       );
     }
-    return 'Fits for ' + n + ' of ' + students(n);
+    if (more) {
+      var most = Math.max.apply(
+        null,
+        ids.map(function (id) {
+          return summary.perStudent[id].sheets;
+        }),
+      );
+      return (
+        '<button type="button" class="studio-fit-link" data-action="studioView" data-view="all">' +
+        most +
+        ' sheets for ' +
+        students(more) +
+        '</button>'
+      );
+    }
+    var frontOnly = form && form.sides.length === 1;
+    if (frontOnly) {
+      // One side still fits a sheet when it continues onto the back; say so.
+      var cont = ids.filter(function (id) {
+        return summary.perStudent[id].sides > 1;
+      }).length;
+      if (cont) {
+        return (
+          '<button type="button" class="studio-fit-link" data-action="studioView" data-view="all">Continues on the back for ' +
+          students(cont) +
+          '</button>'
+        );
+      }
+    }
+    return (
+      (frontOnly ? 'Front only · 1 page for ' : '1 sheet for ') + (n === 1 ? '1 student' : 'all ' + n + ' students')
+    );
   }
 
   /* The student whose report is longest (most measured px), for the
@@ -182,16 +235,110 @@ window.ReportStudio = (function () {
     return !!def && (!!(def.options && def.options.length) || !!def.noEvidence || id === 'text-block');
   }
 
-  /* The small toolbar above the selected block: Options ▾ (blocks with
-     options), Leave Off <first name> (a toggle; not the letterhead) and ×
-     Remove (not the letterhead). who: { id, name } of the previewed
-     student, or null in Everyone view. */
+  function _sideName(form, s) {
+    if (s === 0) return 'Front';
+    if (s === 1) return 'Back';
+    return 'Page ' + (s + 1);
+  }
+
+  /* The selected block's card, in the gutter beside the page: where it
+     is, its Lines (fill blocks), Size (Row | Side by Side), Move Up, Move
+     Down, Move to Back / Front, Options ▾, Leave Off <first name> and
+     Remove. The letterhead and the pinned Response say why they don't
+     move. who: { id, name } of the previewed student, or null. */
   function blockToolbarHtml(form, id, who) {
     var sheets = S();
     var def = sheets.BLOCKS[id];
-    if (!def || !sheets.locate(form, id)) return '';
+    var at = sheets.locate(form, id);
+    var cell = sheets.cellOf(form, id);
+    if (!def || !at || !cell) return '';
+    var pinned = form.pinned === id;
+    var opts = sheets.optionsFor(cell);
     var html =
-      '<div class="studio-bar no-print" data-block="' + id + '" role="toolbar" aria-label="' + esc(def.label) + '">';
+      '<div class="studio-bar no-print" data-block="' +
+      id +
+      '" role="toolbar" aria-label="' +
+      esc(def.label) +
+      '">' +
+      '<div class="studio-bar-where">On the ' +
+      esc(_sideName(form, at.side)) +
+      '</div>' +
+      '<div class="studio-bar-name">' +
+      esc(def.label) +
+      '</div>';
+    if (def.fill && def.lines) {
+      var n = opts.lines;
+      html +=
+        '<div class="studio-bar-lines"><span>' +
+        esc(def.linesLabel || 'Lines') +
+        '</span><span class="studio-bar-step">' +
+        '<button type="button" class="studio-bar-stepbtn" data-action="studioLines" data-block="' +
+        id +
+        '" data-dir="-1" aria-label="Fewer lines"' +
+        (n <= (def.minLines || 1) ? ' disabled' : '') +
+        '>−</button>' +
+        '<b>' +
+        n +
+        '</b>' +
+        '<button type="button" class="studio-bar-stepbtn" data-action="studioLines" data-block="' +
+        id +
+        '" data-dir="1" aria-label="More lines"' +
+        (n >= (def.maxLines || 30) ? ' disabled' : '') +
+        '>+</button></span></div>';
+      if (id === 'teacher-narrative') {
+        html +=
+          '<div class="studio-bar-hint">Room for the longest comment in the class. A student with no comment yet gets these as ruled lines.</div>';
+      }
+    }
+    if (sheets.canHalf(id)) {
+      var half = cell.size === 'half';
+      html +=
+        '<div class="studio-bar-size"><span>Size</span><span class="seg seg-sm" role="radiogroup" aria-label="Size">' +
+        '<button type="button" class="seg-btn' +
+        (half ? '' : ' active') +
+        '" data-action="studioSize" data-block="' +
+        id +
+        '" data-size="row" role="radio" aria-checked="' +
+        !half +
+        '">Row</button>' +
+        '<button type="button" class="seg-btn' +
+        (half ? ' active' : '') +
+        '" data-action="studioSize" data-block="' +
+        id +
+        '" data-size="half" role="radio" aria-checked="' +
+        half +
+        '">Side by Side</button></span></div>';
+    }
+    if (def.locked) html += '<div class="studio-bar-hint">Always first on the Front. Options sets what it shows.</div>';
+    if (pinned) html += '<div class="studio-bar-hint">Always last on the Back.</div>';
+    html += '<div class="studio-bar-acts">';
+    if (!def.locked && !pinned) {
+      var rows = form.sides[at.side].rows;
+      var lo = at.side === 0 ? 1 : 0;
+      var hi = rows.length - (form.pinned && sheets.locate(form, form.pinned).side === at.side ? 2 : 1);
+      html +=
+        '<button type="button" class="studio-bar-btn" data-action="studioMove" data-block="' +
+        id +
+        '" data-dir="-1"' +
+        (at.row <= lo ? ' disabled' : '') +
+        '>Move Up</button>' +
+        '<button type="button" class="studio-bar-btn" data-action="studioMove" data-block="' +
+        id +
+        '" data-dir="1"' +
+        (at.row >= hi ? ' disabled' : '') +
+        '>Move Down</button>';
+      if (form.sides.length > 1) {
+        var to = at.side === 0 ? 1 : 0;
+        html +=
+          '<button type="button" class="studio-bar-btn" data-action="studioMoveSide" data-block="' +
+          id +
+          '" data-side="' +
+          to +
+          '">Move to ' +
+          esc(_sideName(form, to)) +
+          '</button>';
+      }
+    }
     if (hasOptions(id)) {
       html +=
         '<button type="button" class="studio-bar-btn" data-action="studioOptions" data-block="' +
@@ -220,11 +367,9 @@ window.ReportStudio = (function () {
       html +=
         '<button type="button" class="studio-bar-btn studio-bar-x" data-action="studioRemove" data-block="' +
         id +
-        '" aria-label="Remove ' +
-        esc(def.label) +
-        '" title="Remove">×</button>';
+        '">Remove</button>';
     }
-    return html + '</div>';
+    return html + '</div></div>';
   }
 
   /* The Options popover: the block's Show checkboxes, its choices, the
@@ -355,424 +500,67 @@ window.ReportStudio = (function () {
     return html;
   }
 
-  /* The pages scale to the canvas: two side by side at up to 62%, never
-     below 45%; narrower than that, one above the other. */
+  /* The pages scale to the canvas, leaving the gutter for the selected
+     block's card: two side by side at up to 62%, never below 45%;
+     narrower than that, one above the other. */
+  var GUTTER_W = 220;
   function fitZoom(canvasWidth, paper) {
     var sheetW = 8.5 * 96;
-    var two = Math.min(0.62, (canvasWidth - 72) / (2 * sheetW));
+    var two = Math.min(0.62, (canvasWidth - 72 - GUTTER_W) / (2 * sheetW));
     if (two >= 0.45) return { zoom: Math.round(two * 1000) / 1000, stacked: false };
-    var one = Math.min(0.62, Math.max(0.3, (canvasWidth - 40) / sheetW));
+    var one = Math.min(0.62, Math.max(0.3, (canvasWidth - 40 - GUTTER_W) / sheetW));
     return { zoom: Math.round(one * 1000) / 1000, stacked: true, paper: paper };
   }
 
-  /* "Teacher Comment, page 1, columns 7 to 12, rows 10 to 17" for the
-     live region. */
+  /* "Teacher Comment, Front, row 3 of 5" for the live region. */
   function placeText(form, id) {
     var sheets = S();
     var at = sheets.locate(form, id);
-    var b = sheets.cellOf(form, id);
-    if (!at || !b) return '';
-    var h = b.h != null ? b.h : sheets.BLOCKS[id].rows;
+    if (!at) return '';
+    var rows = form.sides[at.side].rows.length;
+    var partner = sheets.partnerOf(form, id);
     return (
       sheets.BLOCKS[id].label +
-      ', page ' +
-      (at.page + 1) +
-      ', columns ' +
-      (b.x + 1) +
-      ' to ' +
-      (b.x + b.w) +
-      ', rows ' +
-      (b.y + 1) +
-      ' to ' +
-      (b.y + h)
+      ', ' +
+      _sideName(form, at.side) +
+      ', row ' +
+      (at.row + 1) +
+      ' of ' +
+      rows +
+      (partner ? ', beside ' + sheets.BLOCKS[partner].label : '')
     );
   }
 
-  /* ── Hands on the page ───────────────────────────────────────────
-     Pointer: a block from the palette or the page is picked up after a
-     6px move and follows the pointer as its own rendered HTML at the
-     canvas scale; while it is held the pages show the grid, a placeholder
-     snaps to the cell under the pointer and the blocks it would shove
-     slide down to show the result. Dropped on a page it is placed or
-     moved there; dropped on the grey field, a block from the page is
-     removed; Escape lets go. The selected block's handles (right edge,
-     bottom edge, corner) drag its width and height with a chip saying
-     "6 × 12". Keyboard: a focused block moves one cell with the arrow
-     keys, resizes with Shift and an arrow, is removed with Delete; the
-     live region says where it is.
-     api: { form(), place(id, rect), move(id, to), resize(id, size),
-     remove(id), select(id), announce(text), html(id, w), rows() } */
-  var THRESHOLD = 6;
-
-  function initDrag(root, api) {
+  /* Keyboard on a focused block: ArrowUp / ArrowDown move its row, Delete
+     removes it; the live region says where it is.
+     api: { form(), move(id, dir), remove(id), announce(text) } */
+  function initKeys(root, api) {
     if (!root) return null;
     var ac = new AbortController();
-    var signal = ac.signal;
-    var sheets = S();
-    var drag = null; // { id, fromPage, w, h, x, y, gx, gy, started, ghost, hold, over }
-    var resize = null; // { id, cell, body, kind, x0, y0, w0, h0, bx, by, k, w, h, box, chip }
-
-    var COLS = sheets.COLS;
-    var ROW = sheets.ROW_PX;
-
-    function unit(contentW) {
-      return (contentW + sheets.GUTTER) / COLS;
-    }
-    function sheetScale(sheet) {
-      return sheet.getBoundingClientRect().width / sheet.offsetWidth || 1;
-    }
-    function preview() {
-      return root.querySelector('.rb-preview');
-    }
-    function onePage() {
-      var p = preview();
-      return !!p && !p.classList.contains('studio-all');
-    }
-    /* The form page under a point: { page, body, sheet, k, left, top,
-       contentW } or null (the grey field, a continued page). */
-    function pageAt(x, y) {
-      var zooms = root.querySelectorAll('.studio-pages:not(.studio-all) .sheet-zoom[data-page]');
-      for (var i = 0; i < zooms.length; i++) {
-        var sheet = zooms[i].querySelector('.report-sheet');
-        if (!sheet) continue;
-        var r = sheet.getBoundingClientRect();
-        if (x < r.left || x > r.right || y < r.top || y > r.bottom) continue;
-        var k = sheetScale(sheet);
-        var body = sheet.querySelector('.sheet-body');
-        var br = body.getBoundingClientRect();
-        return {
-          page: Number(zooms[i].dataset.page),
-          sheet: sheet,
-          body: body,
-          k: k,
-          left: br.left,
-          top: br.top,
-          contentW: body.offsetWidth,
-        };
-      }
-      return null;
-    }
-    function cellOnPage(id) {
-      return root.querySelector('.studio-pages:not(.studio-all) .sheet-body > .sheet-cell[data-block="' + id + '"]');
-    }
-
-    function blockOf(el) {
-      if (el.closest('.studio-bar, .studio-pop, .studio-handle, .studio-page-add, .studio-page-empty')) return null;
-      var src = el.closest(
-        '.studio-blk[data-block], .studio-pages:not(.studio-all) .sheet-body > .sheet-cell[data-block]',
-      );
-      if (!src) return null;
-      var id = src.dataset.block;
-      if (id === 'header' || !sheets.BLOCKS[id]) return null;
-      return { id: id, el: src, fromPage: src.classList.contains('sheet-cell') };
-    }
-
-    function startDrag(e) {
-      drag.started = true;
-      root.classList.add('studio-dragging', 'studio-grid-on');
-      var f = api.form();
-      var b = sheets.cellOf(f, drag.id);
-      drag.w = b ? b.w : COLS;
-      drag.h = b ? b.h : sheets.BLOCKS[drag.id].rows;
-      // The ghost is the block as rendered, at the canvas scale.
-      var pg = pageAt(e.clientX, e.clientY) || firstPage();
-      var k = pg ? pg.k : 0.6;
-      var contentW = pg ? pg.contentW : sheets.contentWidth('letter');
-      var wPx = drag.w * unit(contentW) - sheets.GUTTER;
-      var ghost = document.createElement('div');
-      ghost.className = 'studio-ghost';
-      ghost.innerHTML =
-        '<div class="report-sheet studio-ghost-sheet" style="width:' +
-        wPx +
-        'px;transform:scale(' +
-        k +
-        ')"><div class="sheet-cell" style="width:' +
-        wPx +
-        'px">' +
-        (drag.fromPage && cellOnPage(drag.id) ? cellOnPage(drag.id).innerHTML : api.html(drag.id, drag.w)) +
-        '</div></div>';
-      ghost.style.width = wPx * k + 'px';
-      document.body.appendChild(ghost);
-      drag.ghost = ghost;
-      drag.k = k;
-      // Where the pointer holds the block, in grid units.
-      if (drag.fromPage && cellOnPage(drag.id)) {
-        var cr = cellOnPage(drag.id).getBoundingClientRect();
-        drag.gx = (drag.x - cr.left) / k;
-        drag.gy = (drag.y - cr.top) / k;
-      } else {
-        drag.gx = 24;
-        drag.gy = 16;
-      }
-      var hold = document.createElement('div');
-      hold.className = 'studio-place';
-      drag.hold = hold;
-      moveDrag(e);
-    }
-
-    function firstPage() {
-      var z = root.querySelector('.studio-pages:not(.studio-all) .sheet-zoom[data-page] .report-sheet');
-      if (!z) return null;
-      var r = z.getBoundingClientRect();
-      return pageAt(r.left + 10, r.top + 10);
-    }
-
-    function clearShove() {
-      root.querySelectorAll('.sheet-cell[data-shove]').forEach(function (c) {
-        c.style.transform = '';
-        delete c.dataset.shove;
-      });
-    }
-
-    /* A drop whose top lands inside a block in its columns goes in above
-       that block (top half) or below it (bottom half), never part way
-       down it; the shove then moves what is below. */
-    function snapRow(body, x, y, at) {
-      var snapped = y;
-      body.querySelectorAll(':scope > .sheet-cell[data-block]').forEach(function (c) {
-        if (c.dataset.block === drag.id) return;
-        var cx = Number(c.dataset.x);
-        var cw = Number(c.dataset.w);
-        var cy = Number(c.dataset.y);
-        var ch = Number(c.dataset.h);
-        if (!(x < cx + cw && cx < x + drag.w) || y <= cy || y >= cy + ch) return;
-        snapped = c.classList.contains('sheet-pinned') || at < cy + ch / 2 ? cy : cy + ch;
-      });
-      return snapped;
-    }
-
-    function moveDrag(e) {
-      if (!drag.ghost) return;
-      drag.ghost.style.left = e.clientX - drag.gx * (drag.k || 0.6) + 'px';
-      drag.ghost.style.top = e.clientY - drag.gy * (drag.k || 0.6) + 'px';
-      var pg = pageAt(e.clientX, e.clientY);
-      drag.k = pg ? pg.k : drag.k;
-      drag.ghost.classList.toggle('out', !pg && drag.fromPage);
-      if (!pg) {
-        drag.over = null;
-        if (drag.hold.parentNode) drag.hold.remove();
-        clearShove();
-        return;
-      }
-      var u = unit(pg.contentW);
-      var px = (e.clientX - pg.left) / pg.k - drag.gx;
-      var py = (e.clientY - pg.top) / pg.k - drag.gy;
-      var x = Math.max(0, Math.min(COLS - drag.w, Math.round(px / u)));
-      var y = snapRow(pg.body, x, Math.max(0, Math.min(api.rows() - 2, Math.round(py / ROW))), py / ROW);
-      if (drag.over && drag.over.page === pg.page && drag.over.x === x && drag.over.y === y) return;
-      drag.over = { page: pg.page, x: x, y: y };
-      drag.hold.style.left = x * u + 'px';
-      drag.hold.style.top = y * ROW + 'px';
-      drag.hold.style.width = drag.w * u - sheets.GUTTER + 'px';
-      drag.hold.style.height = drag.h * ROW + 'px';
-      if (drag.hold.parentNode !== pg.body) pg.body.appendChild(drag.hold);
-      // What the drop would shove: each block's new row against where it sits.
-      clearShove();
-      var f = api.form();
-      var next = sheets.place(f, drag.id, { page: pg.page, x: x, y: y, w: drag.w, h: drag.h });
-      (next.pages[pg.page] || { blocks: [] }).blocks.forEach(function (b) {
-        if (b.block === drag.id) return;
-        var cell = pg.body.querySelector('.sheet-cell[data-block="' + b.block + '"]');
-        if (!cell) return;
-        var dy = b.y - Number(cell.dataset.y);
-        if (dy > 0) {
-          cell.style.transform = 'translateY(' + dy * ROW + 'px)';
-          cell.dataset.shove = '1';
-        }
-      });
-    }
-
-    function endDrag(drop) {
-      if (!drag) return;
-      var d = drag;
-      drag = null;
-      if (d.ghost) d.ghost.remove();
-      if (d.hold && d.hold.parentNode) d.hold.remove();
-      clearShove();
-      root.classList.remove('studio-dragging', 'studio-grid-on');
-      if (!drop) {
-        api.announce('Let go.');
-        return;
-      }
-      if (d.over) {
-        if (d.fromPage) api.move(d.id, { page: d.over.page, x: d.over.x, y: d.over.y });
-        else api.place(d.id, { page: d.over.page, x: d.over.x, y: d.over.y, w: d.w, h: d.h });
-        api.select(d.id);
-        api.announce(placeText(api.form(), d.id) + '.');
-      } else if (d.fromPage) {
-        api.remove(d.id);
-      }
-    }
-
-    /* Resize by a handle: the outline snaps to columns and rows and a
-       chip says the size; the form takes it on release. */
-    function startResize(handle, e) {
-      var cell = handle.closest('.sheet-cell');
-      var body = cell && cell.closest('.sheet-body');
-      var sheet = cell && cell.closest('.report-sheet');
-      if (!cell || !body || !sheet) return;
-      var k = sheetScale(sheet);
-      var box = document.createElement('div');
-      box.className = 'studio-place studio-resizing';
-      box.style.left = cell.style.left;
-      box.style.top = cell.style.top;
-      var chip = document.createElement('div');
-      chip.className = 'studio-chip';
-      resize = {
-        id: cell.dataset.block,
-        cell: cell,
-        body: body,
-        kind: handle.dataset.handle,
-        x0: e.clientX,
-        y0: e.clientY,
-        w0: Number(cell.dataset.w),
-        h0: Number(cell.dataset.h),
-        bx: Number(cell.dataset.x),
-        k: k,
-        contentW: body.offsetWidth,
-        box: box,
-        chip: chip,
-      };
-      resize.w = resize.w0;
-      resize.h = resize.h0;
-      root.classList.add('studio-grid-on');
-      body.appendChild(box);
-      preview().appendChild(chip);
-      moveResize(e);
-    }
-    function moveResize(e) {
-      var r = resize;
-      var u = unit(r.contentW);
-      var w = r.w0;
-      var h = r.h0;
-      if (r.kind !== 's') w = Math.round(r.w0 + (e.clientX - r.x0) / r.k / u);
-      if (r.kind !== 'e') h = Math.round(r.h0 + (e.clientY - r.y0) / r.k / ROW);
-      r.w = Math.max(3, Math.min(COLS - r.bx, w));
-      r.h = Math.max(2, h);
-      r.box.style.width = r.w * u - sheets.GUTTER + 'px';
-      r.box.style.height = r.h * ROW + 'px';
-      r.chip.textContent = r.w + ' × ' + r.h;
-      var pr = preview().getBoundingClientRect();
-      r.chip.style.left = e.clientX - pr.left + preview().scrollLeft + 14 + 'px';
-      r.chip.style.top = e.clientY - pr.top + preview().scrollTop + 14 + 'px';
-    }
-    function endResize(apply) {
-      var r = resize;
-      resize = null;
-      r.box.remove();
-      r.chip.remove();
-      root.classList.remove('studio-grid-on');
-      if (apply && (r.w !== r.w0 || r.h !== r.h0)) {
-        api.resize(r.id, { w: r.w, h: r.h });
-        api.announce(placeText(api.form(), r.id) + '.');
-      }
-    }
-
-    root.addEventListener(
-      'pointerdown',
-      function (e) {
-        if (e.button !== 0 || !onePage()) return;
-        var handle = e.target.closest('.studio-handle');
-        if (handle) {
-          startResize(handle, e);
-          e.preventDefault();
-          return;
-        }
-        var b = blockOf(e.target);
-        if (!b) return;
-        drag = { id: b.id, fromPage: b.fromPage, x: e.clientX, y: e.clientY, started: false, over: null };
-      },
-      { signal: signal },
-    );
-
-    document.addEventListener(
-      'pointermove',
-      function (e) {
-        if (resize) {
-          moveResize(e);
-          return;
-        }
-        if (!drag) return;
-        if (!drag.started) {
-          if (Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y) < THRESHOLD) return;
-          startDrag(e);
-          return;
-        }
-        moveDrag(e);
-      },
-      { signal: signal },
-    );
-
-    document.addEventListener(
-      'pointerup',
-      function () {
-        if (resize) {
-          endResize(true);
-          return;
-        }
-        if (!drag) return;
-        if (!drag.started) {
-          drag = null;
-          return;
-        }
-        endDrag(true);
-      },
-      { signal: signal },
-    );
-
     document.addEventListener(
       'keydown',
       function (e) {
-        if (e.key === 'Escape') {
-          if (drag && drag.started) {
-            endDrag(false);
-            e.preventDefault();
-            return;
-          }
-          if (resize) {
-            endResize(false);
-            e.preventDefault();
-            return;
-          }
-        }
-        var cell = e.target.closest ? e.target.closest('.studio-pages .sheet-body > .sheet-cell[data-block]') : null;
-        if (!cell || !onePage()) return;
+        var cell = e.target.closest ? e.target.closest('.studio-pages .sheet-body .sheet-cell[data-block]') : null;
+        if (!cell) return;
         var id = cell.dataset.block;
         if (id === 'header') return;
-        var f = api.form();
-        var b = sheets.cellOf(f, id);
-        var at = sheets.locate(f, id);
-        if (!b || !at) return;
-        var arrows = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
-        if (arrows[e.key]) {
+        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
           e.preventDefault();
-          var d = arrows[e.key];
-          if (e.shiftKey) api.resize(id, { w: b.w + d[0], h: (b.h != null ? b.h : sheets.BLOCKS[id].rows) + d[1] });
-          else api.move(id, { page: at.page, x: b.x + d[0], y: Math.max(0, b.y + d[1]) });
+          api.move(id, e.key === 'ArrowUp' ? -1 : 1);
           api.announce(placeText(api.form(), id) + '.');
           return;
         }
         if (e.key === 'Delete' || e.key === 'Backspace') {
           e.preventDefault();
           api.remove(id);
-          api.announce(sheets.BLOCKS[id].label + ' removed from the report.');
+          api.announce(S().BLOCKS[id].label + ' removed from the report.');
         }
       },
-      { signal: signal },
+      { signal: ac.signal },
     );
-
     return {
       destroy: function () {
         ac.abort();
-        if (drag && drag.ghost) drag.ghost.remove();
-        if (drag && drag.hold && drag.hold.parentNode) drag.hold.remove();
-        if (resize) endResize(false);
-        clearShove();
-        root.classList.remove('studio-dragging', 'studio-grid-on');
-        drag = null;
-      },
-      dragging: function () {
-        return !!(drag && drag.started) || !!resize;
       },
     };
   }
@@ -780,14 +568,14 @@ window.ReportStudio = (function () {
   return {
     layoutHtml: layoutHtml,
     paletteHtml: paletteHtml,
+    landing: landing,
     fitLineHtml: fitLineHtml,
     longestStudent: longestStudent,
     hasOptions: hasOptions,
     blockToolbarHtml: blockToolbarHtml,
     popoverHtml: popoverHtml,
     placeText: placeText,
-    sizeBadge: sizeBadge,
     fitZoom: fitZoom,
-    initDrag: initDrag,
+    initKeys: initKeys,
   };
 })();
