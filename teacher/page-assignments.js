@@ -2754,6 +2754,13 @@ window.PageAssignments = (function () {
         if (btn.classList.contains('ldg-chip'))
           btn.setAttribute('aria-pressed', String(btn.dataset.status === newStatus));
       });
+      // The grid's Late | Excused | Missing control.
+      row.querySelectorAll('.grader-status-btn').forEach(function (btn) {
+        var on = btn.dataset.status === newStatus;
+        btn.classList.remove('is-on', 'is-ns', 'is-exc', 'is-late');
+        if (on) btn.classList.add('is-on', 'is-' + newStatus.toLowerCase());
+        btn.setAttribute('aria-pressed', String(on));
+      });
       if (newStatus === 'EXC') row.querySelector('[data-status="EXC"]').classList.add('active-excused');
       else if (newStatus === 'NS') row.querySelector('[data-status="NS"]').classList.add('active-ns');
       else if (newStatus === 'LATE') row.querySelector('[data-status="LATE"]').classList.add('active-late');
@@ -3112,8 +3119,59 @@ window.PageAssignments = (function () {
           '</div>'
         );
       })
-      .join('');
+      .join('<span class="rsg-level-sep" aria-hidden="true"></span>');
   }
+  /* The whole-class grid's top row: "Set Everyone To" and a capsule per
+     level (today's fill-all), and the hover hint for the rubric wording. */
+  function _setEveryoneHtml(cid, action, aid) {
+    return (
+      '<div class="rsg-header">' +
+      '<span class="rsg-header-label">Set Everyone To</span>' +
+      '<div class="rsg-header-levels">' +
+      _fillAllHeaderHtml(cid, action, aid) +
+      '</div>' +
+      '<span class="rsg-header-hint">Hover a level to see its wording</span>' +
+      '</div>'
+    );
+  }
+  /* A student's row in the whole-class grid: the name, Late | Excused |
+     Missing, Comment, and the row's fill menu. */
+  function _rsgStudentHeadHtml(cid, aid, st, status, fillAction) {
+    var count = getAssignmentObs(cid, st.id, aid).length;
+    return (
+      '<div class="rsg-student-head">' +
+      '<span class="rsg-student-name">' +
+      esc(displayNameWithLast(st)) +
+      '</span>' +
+      '<div class="grader-status rsg-status" role="group" aria-label="Status" data-stop-prop="true">' +
+      _graderStatusButtons(aid, st.id, status, ['LATE', 'EXC', 'NS']) +
+      '</div>' +
+      '<button type="button" class="comment-btn rsg-comment-btn" data-action="openCommentPopover" data-cid="' +
+      cid +
+      '" data-sid="' +
+      st.id +
+      '" data-aid="' +
+      aid +
+      '" data-stop-prop="true" title="Comments">Comment' +
+      (count > 0 ? ' <span class="comment-count">' + count + '</span>' : '') +
+      '</button>' +
+      '<div class="score-row-action"><div class="row-fill-btn" data-action="toggleScoreMenu" title="Set this student\'s levels" aria-label="Set this student\'s levels">' +
+      _ROW_FILL_ICON +
+      '<div class="col-fill-menu" data-stop-prop="true">' +
+      _rowFillOptionsHtml(cid, fillAction, aid, st.id) +
+      '<div class="col-fill-option" data-action="' +
+      fillAction +
+      '" data-aid="' +
+      aid +
+      '" data-sid="' +
+      st.id +
+      '" data-score="0" data-scope="row"><div class="col-fill-dot" style="background:var(--surface-2);color:var(--text-3)">0</div> Clear</div>' +
+      '</div></div></div>' +
+      '</div>'
+    );
+  }
+  var _ROW_FILL_ICON =
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
   function _fillAllHeaderHtml(cid, action, aid) {
     return levelOrderFor(cid)
       .map(function (l) {
@@ -3163,10 +3221,7 @@ window.PageAssignments = (function () {
 
   function renderTagGrid(cid, a, tagObjs, students, scores) {
     var html = '<div class="rsg-grid">';
-    html +=
-      '<div class="rsg-header"><div class="rsg-header-spacer">Student</div><div class="rsg-header-inner"><div class="rsg-header-crit-spacer"></div><div class="rsg-header-levels">' +
-      _fillAllHeaderHtml(cid, 'confirmFillAll', a.id) +
-      '</div><div class="rsg-header-mod-spacer"></div></div><div class="rsg-header-action"></div></div>';
+    html += _setEveryoneHtml(cid, 'confirmFillAll', a.id);
     var statuses = getAssignmentStatuses(cid);
     students.forEach(function (st) {
       var studentScores = scores[st.id] || [];
@@ -3181,10 +3236,8 @@ window.PageAssignments = (function () {
         '" data-status-assess="' +
         a.id +
         '">' +
-        '<div class="rsg-student-name">' +
-        esc(displayNameWithLast(st)) +
-        renderStatusToggles(a.id, st.id, stStatus) +
-        '</div><div class="rsg-criteria">';
+        _rsgStudentHeadHtml(cid, a.id, st, stStatus, 'fillScoresAndClose') +
+        '<div class="rsg-criteria">';
       tagObjs.forEach(function (tag) {
         var entry = studentScores.find(function (s) {
           return s.assessmentId === a.id && s.tagId === tag.id;
@@ -3199,11 +3252,16 @@ window.PageAssignments = (function () {
           '" data-tag="' +
           tag.id +
           '">' +
+          '<div class="rsg-criterion-side">' +
           '<div class="rsg-criterion-label" title="' +
           esc(tag.text || tag.label) +
           '"><svg class="rsg-tag-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 9.5V2.5a1 1 0 0 1 1-1h7l5 5v3"/><path d="M14.5 9.5l-5 5-4-4 5-5"/><circle cx="5" cy="5" r="1" fill="currentColor" stroke="none"/></svg>' +
+          '<span class="rsg-criterion-name">' +
           esc(tag.label) +
-          '</div>' +
+          '</span></div>' +
+          '<div class="rsg-crit-tools"><div class="rsg-mods">' +
+          scoreModButtonsHtml(score, mod) +
+          '</div></div></div>' +
           '<div class="rsg-levels">' +
           _levelButtonsHtml(
             cid,
@@ -3224,19 +3282,9 @@ window.PageAssignments = (function () {
               );
             },
           ) +
-          '</div><div class="rsg-mods">' +
-          scoreModButtonsHtml(score, mod) +
           '</div></div>';
       });
-      html +=
-        '</div><div class="score-row-action"><div class="row-fill-btn" data-action="toggleScoreMenu" title="Fill row">\u25BC<div class="col-fill-menu" data-stop-prop="true">' +
-        _rowFillOptionsHtml(cid, 'fillScoresAndClose', a.id, st.id) +
-        '<div class="col-fill-option" data-action="fillScoresAndClose" data-aid="' +
-        a.id +
-        '" data-sid="' +
-        st.id +
-        '" data-score="0" data-scope="row"><div class="col-fill-dot" style="background:var(--surface-2);color:var(--text-3)">0</div> Clear</div>' +
-        '</div></div></div></div>';
+      html += '</div></div>';
     });
     html += '</div>';
     return html;
@@ -3495,12 +3543,7 @@ window.PageAssignments = (function () {
 
     var advanced = _isAdvancedRubric(rubric);
     var html = '<div class="rsg-grid' + (advanced ? ' is-advanced' : '') + '">';
-    html +=
-      '<div class="rsg-header"><div class="rsg-header-spacer">Student</div><div class="rsg-header-inner"><div class="rsg-header-crit-spacer"></div><div class="rsg-header-levels">' +
-      _fillAllHeaderHtml(cid, 'confirmFillRubricAll', a.id) +
-      '</div>' +
-      (advanced ? '<div class="rsg-header-checks-spacer">Checks</div>' : '') +
-      '<div class="rsg-header-mod-spacer"></div><div class="rsg-header-comment-spacer"></div></div><div class="rsg-header-action"></div></div>';
+    html += _setEveryoneHtml(cid, 'confirmFillRubricAll', a.id);
 
     var statuses = getAssignmentStatuses(cid);
     students.forEach(function (st) {
@@ -3516,10 +3559,8 @@ window.PageAssignments = (function () {
         '" data-status-assess="' +
         a.id +
         '">' +
-        '<div class="rsg-student-name">' +
-        esc(displayNameWithLast(st)) +
-        renderStatusToggles(a.id, st.id, stStatus) +
-        '</div><div class="rsg-criteria">';
+        _rsgStudentHeadHtml(cid, a.id, st, stStatus, 'fillRubricScoresAndClose') +
+        '<div class="rsg-criteria">';
       criteria.forEach(function (crit) {
         var tagMods = [];
         var tagScores = rubricCriterionScoreKeys(crit).map(function (tid) {
@@ -3561,11 +3602,22 @@ window.PageAssignments = (function () {
           '" data-criterion="' +
           crit.id +
           '">' +
+          '<div class="rsg-criterion-side">' +
           '<div class="rsg-criterion-label" title="' +
           esc(crit.name) +
           '"><span class="rsg-criterion-name">' +
           esc(crit.name) +
-          '</span></div><div class="rsg-levels">' +
+          '</span></div>' +
+          '<div class="rsg-crit-tools">' +
+          '<div class="rsg-mods">' +
+          scoreModButtonsHtml(modLevel, critMod) +
+          // Its own cell: .rsg-mods is redrawn on every score change.
+          '</div><div class="rsg-comment-cell">' +
+          criterionCommentButtonHtml(a.id, st.id, crit) +
+          '</div>' +
+          (advanced ? '<div class="rsg-checks-cell">' + _checksButtonHtml(cid, a.id, st.id, crit) + '</div>' : '') +
+          '</div></div>' +
+          '<div class="rsg-levels">' +
           _levelButtonsHtml(
             cid,
             function (l) {
@@ -3585,26 +3637,11 @@ window.PageAssignments = (function () {
               );
             },
           ) +
-          '</div>' +
-          (advanced ? '<div class="rsg-checks-cell">' + _checksButtonHtml(cid, a.id, st.id, crit) + '</div>' : '') +
-          '<div class="rsg-mods">' +
-          scoreModButtonsHtml(modLevel, critMod) +
-          // Its own cell: .rsg-mods is redrawn on every score change.
-          '</div><div class="rsg-comment-cell">' +
-          criterionCommentButtonHtml(a.id, st.id, crit) +
           '</div></div>';
         if (advanced && RubricChecks.hasChecks(crit) && _isChecklistOpen(a.id, st.id, crit.id))
           html += _checklistPanelHtml(cid, a.id, st.id, crit, displayScore);
       });
-      html +=
-        '</div><div class="score-row-action"><div class="row-fill-btn" data-action="toggleScoreMenu" title="Fill row">\u25BC<div class="col-fill-menu" data-stop-prop="true">' +
-        _rowFillOptionsHtml(cid, 'fillRubricScoresAndClose', a.id, st.id) +
-        '<div class="col-fill-option" data-action="fillRubricScoresAndClose" data-aid="' +
-        a.id +
-        '" data-sid="' +
-        st.id +
-        '" data-score="0" data-scope="row"><div class="col-fill-dot" style="background:var(--surface-2);color:var(--text-3)">0</div> Clear</div>' +
-        '</div></div></div></div>';
+      html += '</div></div>';
     });
     html += '</div>';
 
