@@ -1588,7 +1588,8 @@ function assessmentCellValue(cid, sid, assessment, today) {
   if (status === 'NS' || status === 'EXC') {
     out.kind = 'status';
     out.value = val;
-    out.text = status;
+    // Missing work shows as M; the stored status stays 'NS'.
+    out.text = status === 'NS' ? 'M' : status;
     return out;
   }
   var mark = isComplete ? getCompletionMark(cid, sid, a.id) : null;

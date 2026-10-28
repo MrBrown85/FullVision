@@ -203,7 +203,7 @@ describe('MStudents.renderDetail', () => {
     expect(html).toContain('m-st-panel-evidence');
   });
 
-  it('shows how many were not submitted on the Assessments tab', () => {
+  it('shows how many are missing on the Assessments tab', () => {
     mockDataLayer({
       getAssignmentStatuses: () => ({ 'stu1:a1': 'NS', 'stu1:a2': 'NS' }),
       getAssessments: () => [
@@ -212,7 +212,7 @@ describe('MStudents.renderDetail', () => {
       ],
     });
     const html = MStudents.renderDetail(CID, 'stu1');
-    expect(html).toContain('2 not submitted');
+    expect(html).toContain('2 missing');
   });
 });
 
@@ -576,7 +576,7 @@ describe('Student detail recent assessments', () => {
       getAssignmentStatuses: () => ({ 'stu1:a1': 'NS' }),
     });
     const html = MStudents.renderDetail(CID, 'stu1');
-    expect(html).toContain('>NS<');
+    expect(html).toContain('>M<');
   });
 
   it('shows EXC status badge on excused assessments', () => {

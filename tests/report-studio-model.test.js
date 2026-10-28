@@ -473,7 +473,7 @@ describe('stage 3 blocks', () => {
       a.id === 'a1' ? { kind: 'missing' } : a.id === 'a2' ? { kind: 'status', status: 'NS' } : { kind: 'level' },
     );
     const html = text(ReportBlocks.renderReportBlock('missing-work', CID, CECE, {}, {}));
-    expect(html).toBe('Missing Work Assignment Due Status Lab Report Oct 2 Past Due Quiz Oct 5 Not Submitted');
+    expect(html).toBe('Missing Work Assignment Due Status Lab Report Oct 2 Past Due Quiz Oct 5 Missing');
     stub('assessmentCellValue', () => ({ kind: 'level' }));
     expect(ReportBlocks.renderReportBlock('missing-work', CID, CECE, {}, {})).toBe('');
   });

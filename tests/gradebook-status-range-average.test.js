@@ -30,7 +30,7 @@ function seed(assessments, scoresBySid, statuses = {}) {
 
 describe('scoreStatusMarker', () => {
   it('marks Not submitted and Excused', () => {
-    expect(scoreStatusMarker('NS')).toContain('>NS<');
+    expect(scoreStatusMarker('NS')).toContain('>M<');
     expect(scoreStatusMarker('NS')).toContain('counts as 0');
     expect(scoreStatusMarker('EXC')).toContain('>EXC<');
   });

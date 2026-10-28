@@ -118,7 +118,7 @@ describe('assessmentCellValue', () => {
       entries: [{ assessmentId: 'quiz', tagId: 'overall', score: 12 }],
       statuses: { [SID + ':quiz']: 'NS' },
     });
-    expect(assessmentCellValue(CID, SID, a, TODAY)).toMatchObject({ kind: 'status', status: 'NS', text: 'NS' });
+    expect(assessmentCellValue(CID, SID, a, TODAY)).toMatchObject({ kind: 'status', status: 'NS', text: 'M' });
     seed({ assessments: [a], statuses: { [SID + ':quiz']: 'EXC' } });
     expect(assessmentCellValue(CID, SID, a, TODAY)).toMatchObject({ kind: 'status', status: 'EXC', text: 'EXC' });
   });

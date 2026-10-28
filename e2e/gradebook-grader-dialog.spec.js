@@ -19,11 +19,11 @@ test('a Scores cell opens the grader dialog', async ({ page }) => {
   await expect(dialog.locator('.grader-foot')).toContainText('Proficient');
 
   await dialog.locator('[data-action="toggleStudentStatus"][data-status="NS"]').click();
-  await expect(dialog.locator('.grader-foot')).toContainText('Not Submitted');
+  await expect(dialog.locator('.grader-foot')).toContainText('Missing');
 
   await page.keyboard.press('Escape');
   await expect(page.locator('#grader-overlay')).toHaveCount(0);
-  await expect(cell).toContainText('NS');
+  await expect(cell).toHaveText('M');
   const status = await page.evaluate(cid => {
     var all = JSON.parse(localStorage.getItem('gb-statuses-' + cid) || '{}');
     return all['stu-001:assess-001'] || null;

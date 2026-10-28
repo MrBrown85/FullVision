@@ -1322,7 +1322,7 @@ window.ReportBlocks = (function () {
     const rows = missing
       .map(
         c =>
-          `<tr><td>${esc(c.a.title)}</td><td class="col-date">${day(c.a.dueDate || c.a.date)}</td><td>${c.cell.status === 'NS' ? 'Not Submitted' : 'Past Due'}</td></tr>`,
+          `<tr><td>${esc(c.a.title)}</td><td class="col-date">${day(c.a.dueDate || c.a.date)}</td><td>${c.cell.status === 'NS' ? 'Missing' : 'Past Due'}</td></tr>`,
       )
       .join('');
     return `<div class="report-block-box report-missing-work">

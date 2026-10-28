@@ -730,7 +730,7 @@ window.MGrade = (function () {
       st.id +
       '" data-aid="' +
       assessment.id +
-      '">NS</button>' +
+      '">M</button>' +
       '<button class="m-status-pill' +
       (status === 'EXC' ? ' m-status-active' : '') +
       '" data-action="m-grade-status" data-val="EXC" data-sid="' +

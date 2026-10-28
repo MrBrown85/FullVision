@@ -279,7 +279,7 @@ window.DashInsights = (function () {
 
   /* ── Missing and Late ───────────────────────────────────── */
   var MISSING_KINDS = {
-    ns: { label: 'Not Submitted', cls: 'is-ns' },
+    ns: { label: 'Missing', cls: 'is-ns' },
     late: { label: 'Late', cls: 'is-late' },
     due: { label: 'Past Due', cls: 'is-due' },
   };

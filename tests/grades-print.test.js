@@ -166,7 +166,7 @@ describe('cellText', () => {
     const opts = GP.normalizeOptions({ scoresAs: 'points' });
     expect(GP.cellText(CID, 's1', col('q1'), opts)).toMatchObject({ text: '8', mark: '' });
     expect(GP.cellText(CID, 's1', col('l1'), opts)).toMatchObject({ text: '3.3' });
-    expect(GP.cellText(CID, 's2', col('l1'), opts)).toMatchObject({ text: 'NS', mark: 'NS' });
+    expect(GP.cellText(CID, 's2', col('l1'), opts)).toMatchObject({ text: 'M', mark: 'M' });
     expect(GP.cellText(CID, 's1', col('hw'), opts)).toMatchObject({ text: '✓', mark: '✓' });
     expect(GP.cellText(CID, 's3', col('hw'), opts)).toMatchObject({ text: '✗', mark: '✗' });
     expect(GP.cellText(CID, 's2', col('hw'), opts)).toMatchObject({ text: '—', mark: '—' });
@@ -295,7 +295,7 @@ describe('buildModel', () => {
       scores: 'Proficiency',
     });
     expect(model.header.printed).toMatch(/\d{4}, \d{1,2}:\d{2}/);
-    expect(model.marks.map(m => m.key).sort()).toEqual(['L', 'NS', '—', '✓', '✗'].sort());
+    expect(model.marks.map(m => m.key).sort()).toEqual(['L', 'M', '—', '✓', '✗'].sort());
   });
 
   it('prints no category averages, only the final grade at the right', () => {

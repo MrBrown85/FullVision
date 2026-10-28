@@ -121,7 +121,7 @@ test.describe('Gradebook — Spreadsheet View', () => {
 
     await pick('Mark missing');
     expect((await statuses())['stu-001:assess-001']).toBe('NS');
-    await expect(cell).toContainText('NS');
+    await expect(cell).toHaveText('M');
     // NS clears the proficiency score, as on the Assignments page.
     const scores = await page.evaluate(
       cid => JSON.parse(localStorage.getItem('gb-scores-' + cid) || '{}'),
