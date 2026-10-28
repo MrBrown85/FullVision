@@ -120,6 +120,9 @@ const bar = page => page.locator('.studio-bar');
 const popover = page => page.locator('#studio-pop');
 const cellOf = (page, id) => page.locator(`.sheet-cell[data-block="${id}"]`).first();
 const undo = page => page.locator('#undo-toast').getByRole('button', { name: 'Undo' });
+/* The previewed student (the longest report), as the letterhead names them. */
+const previewName = page => page.locator('.report-sheet').first().locator('.report-student-name').innerText();
+const firstName = async page => (await previewName(page)).split(' ')[0];
 
 /* Selects a block on the page and opens its Options popover. */
 async function openOptions(page, id) {
@@ -158,15 +161,15 @@ test.describe('Page Studio', () => {
     await openStudio(page);
     await expect(page.locator('#studio > *')).toHaveCount(2);
     await expect(page.locator('#studio-inspector')).toHaveCount(0);
-    await expect(page.locator('.studio-palette .studio-blk')).toHaveCount(18);
+    await expect(page.locator('.studio-palette .studio-blk')).toHaveCount(16);
     await expect(page.locator('.studio-blk.placed')).toHaveCount(7);
     await expect(page.locator('.studio-palette')).not.toContainText('Letterhead');
     // No size badges, no grid, no handles.
     await expect(page.locator('.studio-sz, .studio-handle, .studio-grip')).toHaveCount(0);
     await expect(page.locator('.sheet-label').nth(0)).toHaveText('Front');
     await expect(page.locator('.sheet-label').nth(1)).toHaveText('Back');
-    // The longest report in the class.
-    await expect(page.locator('.report-sheet').first().locator('.report-student-name')).toHaveText('Ethan Dubois');
+    // The longest report in the class, not the first on the roster.
+    await expect(page.locator('.report-sheet').first().locator('.report-student-name')).not.toHaveText('Cece Adeyemi');
     await expect(page.locator('#studio-fit')).toHaveText('1 sheet for all 27 students');
     await expect(page.locator('.studio-head')).toHaveText(/^1 sheet for all 27 studentsOne StudentEveryone$/);
     await expect(page.locator('.studio-page-add')).toHaveText('+ Page');
@@ -186,7 +189,7 @@ test.describe('Page Studio', () => {
     await openStudio(page);
     expect(await rowsOf(page, 0)).toEqual([
       'header',
-      'competency-table',
+      'proficiency',
       'legend',
       'teacher-narrative',
       'term-attendance/half+missing-work/half',
@@ -198,7 +201,7 @@ test.describe('Page Studio', () => {
       .evaluateAll(cells => cells.map(c => [c.dataset.block, c.offsetWidth, getComputedStyle(c).position]));
     expect(widths).toEqual([
       ['header', 720, 'relative'],
-      ['competency-table', 720, 'relative'],
+      ['proficiency', 720, 'relative'],
       ['legend', 720, 'relative'],
       ['teacher-narrative', 720, 'relative'],
       ['term-attendance', 354, 'relative'],
@@ -248,7 +251,7 @@ test.describe('Page Studio', () => {
     await expect(bar(page).getByRole('button', { name: 'Move Up' })).toBeEnabled();
     await expect(bar(page).getByRole('button', { name: 'Move Down' })).toBeEnabled();
     await expect(bar(page).getByRole('button', { name: 'Move to Back' })).toBeVisible();
-    await expect(bar(page).getByRole('button', { name: 'Leave Off Ethan' })).toBeVisible();
+    await expect(bar(page).getByRole('button', { name: 'Leave Off ' + (await firstName(page)) })).toBeVisible();
     await expect(bar(page).getByRole('button', { name: 'Remove' })).toBeVisible();
     await expect(bar(page).locator('[data-action="studioOptions"]')).toHaveCount(0);
     // The card sits to the right of the pages, level with the block.
@@ -329,11 +332,11 @@ test.describe('Page Studio', () => {
     expect(await rowsOf(page, 0)).toContain('legend/half');
     await expect(cellOf(page, 'legend')).toHaveCSS('width', '354px');
     await expect(page.locator('#undo-toast')).toContainText('Proficiency Legend: Side by Side');
-    await cellOf(page, 'competency-table').click();
+    await cellOf(page, 'proficiency').click();
     await bar(page).getByRole('radio', { name: 'Side by Side' }).click();
     expect(await rowsOf(page, 0)).toEqual([
       'header',
-      'competency-table/half+legend/half',
+      'proficiency/half+legend/half',
       'teacher-narrative',
       'term-attendance/half+missing-work/half',
     ]);
@@ -345,11 +348,11 @@ test.describe('Page Studio', () => {
     expect(heights[0]).toBe(heights[1]);
     expect(await overlapping(page)).toEqual([]);
     expect(await overflowing(page)).toEqual([]);
-    await cellOf(page, 'competency-table').click();
+    await cellOf(page, 'proficiency').click();
     await bar(page).getByRole('radio', { name: 'Row' }).click();
     expect(await rowsOf(page, 0)).toEqual([
       'header',
-      'competency-table',
+      'proficiency',
       'legend/half',
       'teacher-narrative',
       'term-attendance/half+missing-work/half',
@@ -364,7 +367,7 @@ test.describe('Page Studio', () => {
     await bar(page).getByRole('button', { name: 'Move Up' }).click();
     expect(await rowsOf(page, 0)).toEqual([
       'header',
-      'competency-table',
+      'proficiency',
       'teacher-narrative',
       'legend',
       'term-attendance/half+missing-work/half',
@@ -373,7 +376,7 @@ test.describe('Page Studio', () => {
     await undo(page).click();
     expect(await rowsOf(page, 0)).toEqual([
       'header',
-      'competency-table',
+      'proficiency',
       'legend',
       'teacher-narrative',
       'term-attendance/half+missing-work/half',
@@ -439,7 +442,7 @@ test.describe('Page Studio', () => {
     // continue on a side of their own for this student.
     expect(await rowsOf(page, 0)).toEqual([
       'header',
-      'competency-table',
+      'proficiency',
       'legend',
       'teacher-narrative',
       'term-attendance/half+missing-work/half',
@@ -483,7 +486,7 @@ test.describe('Page Studio', () => {
 
   test('Black ink turns the levels black', async ({ page }) => {
     await openStudio(page);
-    const level = page.locator('#rb-preview .report-ct-level').first();
+    const level = page.locator('#rb-preview .report-prof td.report-prof-n').first();
     const before = await level.evaluate(el => getComputedStyle(el).color);
     await page.getByRole('radio', { name: 'Black' }).click();
     await expect(page.locator('#rb-preview')).toHaveClass(/report-photocopy/);
@@ -581,7 +584,7 @@ test.describe('Page Studio', () => {
             blocks: [
               { block: 'header', x: 0, y: 0, w: 12 },
               { block: 'teacher-narrative', x: 0, y: 5, w: 12, h: 13 },
-              { block: 'competency-table', x: 0, y: 18, w: 6, h: 13 },
+              { block: 'proficiency', x: 0, y: 18, w: 6, h: 13 },
               { block: 'legend', x: 6, y: 18, w: 6, h: 6 },
             ],
           },
@@ -592,7 +595,7 @@ test.describe('Page Studio', () => {
       };
       saveReportConfig(cid, rc);
     });
-    expect(await rowsOf(page, 0)).toEqual(['header', 'teacher-narrative', 'competency-table/half+legend/half']);
+    expect(await rowsOf(page, 0)).toEqual(['header', 'teacher-narrative', 'proficiency/half+legend/half']);
     expect(await rowsOf(page, 1)).toEqual(['parent-response']);
     await cellOf(page, 'teacher-narrative').click();
     await expect(bar(page).locator('.studio-bar-step b')).toHaveText('10');
@@ -617,7 +620,7 @@ test.describe('Page Studio', () => {
     expect(legal - letter).toBeGreaterThan(170);
     expect(await rowsOf(page, 0)).toEqual([
       'header',
-      'competency-table',
+      'proficiency',
       'legend',
       'teacher-narrative',
       'term-attendance/half+missing-work/half',
@@ -625,14 +628,14 @@ test.describe('Page Studio', () => {
     await page.getByRole('radio', { name: 'Letter' }).click();
   });
 
-  test('the Options popover unchecks Evidence Count and closes with Escape', async ({ page }) => {
+  test('the Options popover unchecks Assessed Count and closes with Escape', async ({ page }) => {
     await openStudio(page);
-    await expect(page.locator('.report-sheet .report-ct th.report-ct-evidence')).toHaveCount(1);
-    const pop = await openOptions(page, 'competency-table');
+    await expect(page.locator('.report-sheet .report-prof thead th')).toHaveCount(5);
+    const pop = await openOptions(page, 'proficiency');
     await expect(pop).toHaveAttribute('role', 'dialog');
-    await pop.getByLabel('Evidence Count').uncheck();
-    await expect(page.locator('.report-sheet .report-ct th.report-ct-evidence')).toHaveCount(0);
-    await expect(page.locator('#undo-toast')).toContainText('Changed Competency Table options');
+    await pop.getByLabel('Assessed Count').uncheck();
+    await expect(page.locator('.report-sheet .report-prof thead th')).toHaveCount(4);
+    await expect(page.locator('#undo-toast')).toContainText('Changed Proficiency options');
     await expect(popover(page)).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(popover(page)).toHaveCount(0);
@@ -650,9 +653,10 @@ test.describe('Page Studio', () => {
     const sid = await page.locator('.sheet-student').first().getAttribute('data-sid');
     await cellOf(page, 'teacher-narrative').click();
     const off = bar(page).locator('[data-action="studioLeaveOff"]');
-    await expect(off).toHaveText('Leave Off Ethan');
+    const first = await firstName(page);
+    await expect(off).toHaveText('Leave Off ' + first);
     await off.click();
-    await expect(page.locator('#undo-toast')).toContainText('Left off Teacher Comment for Ethan');
+    await expect(page.locator('#undo-toast')).toContainText('Left off Teacher Comment for ' + first);
     await expect(bar(page).locator('[data-action="studioLeaveOff"]')).toHaveAttribute('aria-pressed', 'true');
     const cell = cellOf(page, 'teacher-narrative');
     await expect(cell).toHaveClass(/sheet-off/);
@@ -687,10 +691,17 @@ test.describe('Page Studio', () => {
 
   test('the palette offers the new blocks and no longer the old charts', async ({ page }) => {
     await openStudio(page);
-    for (const id of ['support-home', 'term-glance', 'growth', 'missing-work', 'term-attendance', 'text-block']) {
+    for (const id of ['support-home', 'term-glance', 'proficiency', 'missing-work', 'term-attendance', 'text-block']) {
       await expect(page.locator(`[data-action="studioBlock"][data-block="${id}"]`)).toHaveCount(1);
     }
-    for (const id of ['section-outcomes', 'score-distribution', 'section-chart']) {
+    for (const id of [
+      'section-outcomes',
+      'score-distribution',
+      'section-chart',
+      'academic-summary',
+      'competency-table',
+      'growth',
+    ]) {
       await expect(page.locator(`[data-action="studioBlock"][data-block="${id}"]`)).toHaveCount(0);
     }
   });
@@ -814,7 +825,7 @@ test.describe('Hands on the page', () => {
     await page.mouse.up();
     expect(await rowsOf(page, 0)).toEqual([
       'header',
-      'competency-table',
+      'proficiency',
       'legend',
       'term-glance',
       'teacher-narrative',
@@ -833,26 +844,26 @@ test.describe('Hands on the page', () => {
   }) => {
     await openStudio(page);
     const from = await center(cellOf(page, 'teacher-narrative'));
-    const to = await gapAbove(page, 'competency-table');
+    const to = await gapAbove(page, 'proficiency');
     await dragStart(page, from, to);
     await expect(cellOf(page, 'teacher-narrative')).toHaveClass(/studio-held/);
     await page.mouse.up();
     expect(await rowsOf(page, 0)).toEqual([
       'header',
       'teacher-narrative',
-      'competency-table',
+      'proficiency',
       'legend',
       'term-attendance/half+missing-work/half',
     ]);
     await expect(page.locator('#undo-toast')).toContainText('Moved Teacher Comment');
     // Escape.
-    await dragStart(page, await center(cellOf(page, 'legend')), await gapAbove(page, 'competency-table'));
+    await dragStart(page, await center(cellOf(page, 'legend')), await gapAbove(page, 'proficiency'));
     await page.keyboard.press('Escape');
     await page.mouse.up();
     expect(await rowsOf(page, 0)).toEqual([
       'header',
       'teacher-narrative',
-      'competency-table',
+      'proficiency',
       'legend',
       'term-attendance/half+missing-work/half',
     ]);
@@ -880,7 +891,7 @@ test.describe('Hands on the page', () => {
     await page.mouse.up();
     expect(await rowsOf(page, 0)).toEqual([
       'header',
-      'competency-table',
+      'proficiency',
       'legend/half+term-glance/half',
       'teacher-narrative',
       'term-attendance/half+missing-work/half',
@@ -891,7 +902,7 @@ test.describe('Hands on the page', () => {
     );
     // A pair offers no beside target: a drop over it lands in a gap.
     const pair = await cellOf(page, 'term-glance').boundingBox();
-    await dragStart(page, await center(page.locator('[data-action="studioBlock"][data-block="growth"]')), {
+    await dragStart(page, await center(page.locator('[data-action="studioBlock"][data-block="next-steps"]')), {
       x: pair.x + 40,
       y: pair.y + pair.height / 2,
     });
@@ -909,14 +920,14 @@ test.describe('Hands on the page', () => {
     // Fill the Front: Core Competencies takes most of what is left.
     await page.locator('[data-action="studioBlock"][data-block="core-competencies"]').click();
     expect(await rowsOf(page, 0)).toContain('core-competencies');
-    // Growth Since Last Report no longer has room there: dropped on the Front, it goes to the Back.
-    const from = await center(page.locator('[data-action="studioBlock"][data-block="growth"]'));
+    // Growth and Next Steps no longer has room there: dropped on the Front, it goes to the Back.
+    const from = await center(page.locator('[data-action="studioBlock"][data-block="next-steps"]'));
     await dragStart(page, from, await gapAbove(page, 'legend'));
     await page.mouse.up();
-    expect(await rowsOf(page, 0)).not.toContain('growth');
-    expect(await rowsOf(page, 1)).toEqual(['learner-dimensions', 'growth', 'parent-response']);
+    expect(await rowsOf(page, 0)).not.toContain('next-steps');
+    expect(await rowsOf(page, 1)).toEqual(['learner-dimensions', 'next-steps', 'parent-response']);
     await expect(page.locator('#undo-toast')).toContainText(
-      'Added Growth Since Last Report to the Back. The Front is full',
+      'Added Growth and Next Steps to the Back. The Front is full',
     );
     await expect(page.locator('#studio-fit')).toHaveText('1 sheet for all 27 students');
     await undo(page).click();
@@ -931,7 +942,7 @@ test.describe('Hands on the page', () => {
     await btn.hover();
     const peek = page.locator('#studio-peek');
     await expect(peek).toBeVisible();
-    await expect(peek).toContainText('Observations for Ethan Dubois, at print size');
+    await expect(peek).toContainText('Observations for ' + (await previewName(page)) + ', at print size');
     await expect(peek.locator('.report-learner-profile, .report-block-box').first()).toBeVisible();
     const box = await peek.locator('.studio-peek-box').boundingBox();
     expect(box.height).toBeGreaterThan(60);
@@ -943,7 +954,7 @@ test.describe('Hands on the page', () => {
 
   test('the letterhead and the Response cannot be picked up', async ({ page }) => {
     await openStudio(page);
-    await dragStart(page, await center(cellOf(page, 'parent-response')), await gapAbove(page, 'competency-table'));
+    await dragStart(page, await center(cellOf(page, 'parent-response')), await gapAbove(page, 'proficiency'));
     await expect(page.locator('.studio-ghost')).toHaveCount(0);
     await page.mouse.up();
     expect(await rowsOf(page, 1)).toEqual(['learner-dimensions', 'parent-response']);
@@ -952,7 +963,7 @@ test.describe('Hands on the page', () => {
     await page.mouse.up();
     expect(await rowsOf(page, 0)).toEqual([
       'header',
-      'competency-table',
+      'proficiency',
       'legend',
       'teacher-narrative',
       'term-attendance/half+missing-work/half',
@@ -995,14 +1006,14 @@ test.describe('Printed progress reports', () => {
   test('the letterhead names the class, block, report, term dates and student number; no footer', async ({ page }) => {
     await openStudio(page);
     const header = page.locator('.report-sheet').first().locator('.report-header');
-    await expect(header.locator('.report-course-title')).toHaveText('Science 8 · Block A');
-    await expect(header.locator('.report-student-name')).toHaveText('Ethan Dubois');
-    const meta = header.locator('.report-header-meta');
-    await expect(meta.locator('.report-period')).toHaveText(
+    await expect(header.locator('.report-course-title')).toHaveText(/^Science 8 · Block A · .+/);
+    await expect(header.locator('.report-student-name')).toHaveText(/\w+ \w+/);
+    await expect(header.locator('.report-course-title')).toContainText(
       await page.locator('#report-period option:checked').innerText(),
     );
-    await expect(meta).toContainText(/\w{3} \d{1,2}(, \d{4})? – \w{3} \d{1,2}, \d{4}/);
-    await expect(meta).toContainText(/Student No\. STU-\d+/);
+    const meta = header.locator('.report-header-meta');
+    await expect(meta).toContainText(/Term\w{3} \d{1,2}(, \d{4})? – \w{3} \d{1,2}, \d{4}/);
+    await expect(meta).toContainText(/Student No\.STU-\d+/);
     await expect(page.locator('.sheet-footer')).toHaveCount(0);
     // The letterhead sits near the top: 24px of padding.
     const top = await page
@@ -1013,12 +1024,15 @@ test.describe('Printed progress reports', () => {
     expect(Math.round(top)).toBe(24);
   });
 
-  test('levels print as dots and a word in black', async ({ page }) => {
+  test('levels print as figures and a word, in black, with no dots', async ({ page }) => {
     await openStudio(page);
-    const level = page.locator('#rb-preview .report-ct-level').first();
+    const level = page.locator('#rb-preview .report-prof td.report-prof-n').first();
     const dim = page.locator('#rb-preview .report-learner-dim-value').first();
-    await expect(level).toContainText(/[●○]{4}/);
-    await expect(dim).toContainText(/[●○]{4}/);
+    await expect(level).toContainText(/^\d\.\d (Emerging|Developing|Proficient|Extending)$/);
+    await expect(page.locator('#rb-preview .report-proficiency').first()).not.toContainText(/[●○]/);
+    await expect(page.locator('#rb-preview .report-legend').first()).not.toContainText(/[●○]/);
+    await expect(page.locator('#rb-preview .report-legend')).toContainText('1 · Emerging');
+    await expect(page.locator('#rb-preview .report-legend')).toContainText('BC Proficiency Scale, out of 4');
     await page.emulateMedia({ media: 'print' });
     expect(await level.evaluate(el => getComputedStyle(el).color)).toBe('rgb(0, 0, 0)');
     expect(await dim.evaluate(el => getComputedStyle(el).color)).toBe('rgb(0, 0, 0)');

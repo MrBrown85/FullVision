@@ -1518,6 +1518,22 @@ function formatLevel(cid, value, empty) {
   return num;
 }
 
+/* A level from 0 to 4 as a figure, "3.3", for a block that prints the
+   score out of 4 whatever the class's grading style; `empty` when there is
+   none. The one place a level is rounded to a decimal. */
+function levelFigure(value, empty) {
+  if (!(value > 0)) return empty === undefined ? '\u2014' : empty;
+  return Number(value).toFixed(1);
+}
+
+/* The change between two printed figures, so 3.1 to 3.0 reads "−0.1";
+   "—" when either side has no level. */
+function levelChange(before, after) {
+  if (!(before > 0 && after > 0)) return '\u2014';
+  var d = Math.round(after * 10) - Math.round(before * 10);
+  return (d > 0 ? '+' : d < 0 ? '\u2212' : '') + (Math.abs(d) / 10).toFixed(1);
+}
+
 /* A level printed as the teacher chose rather than as the class shows it:
    'percent' gives "75%" (level ÷ 4, the course's rule for a level as a %),
    anything else the proficiency, "3.0". The printed grade sheet's Scores

@@ -3893,6 +3893,134 @@ textarea.studio-text {
   }
 }
 
+/* ── Proficiency, the legend strip and the letterhead (plan PR 3) ── */
+.report-prof-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+.report-prof-meta {
+  font-size: var(--text-2xs);
+  color: #555;
+}
+.report-prof .report-prof-n,
+.report-prof th.report-prof-n {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.report-prof td.report-prof-n {
+  font-weight: 600;
+}
+.report-prof td.report-prof-ev {
+  font-weight: 400;
+  color: #444;
+}
+.report-prof-count {
+  font-weight: 400;
+  color: #555;
+}
+.report-prof-overall td {
+  font-weight: 700;
+}
+.report-prof-group td.report-ct-name {
+  font-weight: 600;
+}
+.report-prof-top {
+  margin-bottom: 4px;
+}
+.report-prof-cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 18px;
+  align-items: start;
+}
+.report-prof-cols .report-prof {
+  font-size: var(--text-xs);
+}
+.report-prof-facts {
+  margin-top: 6px;
+  font-size: var(--text-xs);
+  line-height: 1.4;
+}
+.report-prof-half .report-prof {
+  font-size: var(--text-xs);
+}
+.report-sheet .report-proficiency {
+  margin-bottom: 0 !important;
+}
+/* The legend: one strip of the four levels, two by two at Side by Side. */
+.report-sheet .report-legend {
+  display: block;
+  margin-bottom: 0 !important;
+  padding: 8px 14px;
+  background: var(--surface);
+  overflow: visible;
+}
+.report-legend-title {
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.report-legend-items {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  column-gap: 10px;
+}
+.report-legend-half .report-legend-items {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  row-gap: 8px;
+}
+.report-sheet .report-legend-item {
+  display: block;
+  padding: 0;
+  border: 0;
+  font-size: var(--text-sm);
+}
+.report-sheet .report-legend-word {
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+.report-sheet .report-legend-desc {
+  font-size: var(--text-2xs);
+  color: #444;
+  white-space: nowrap;
+}
+/* The letterhead sits near the top: the class, block and report on one
+   line over the name; term, teacher and student number as pairs at the
+   right. */
+.report-sheet .report-header {
+  align-items: flex-end;
+  margin-bottom: 0 !important;
+  padding-bottom: 8px !important;
+  border-bottom: 2px solid #1d1d1f;
+}
+.report-sheet .report-course-title {
+  font-size: var(--text-sm) !important;
+  color: #48484a;
+}
+.report-sheet .report-student-name {
+  font-size: 30px !important;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.05;
+  margin-top: 4px;
+}
+.report-sheet .report-header-meta {
+  display: grid;
+  grid-template-columns: auto auto;
+  column-gap: 12px;
+  row-gap: 2px;
+  text-align: right;
+  font-size: var(--text-xs) !important;
+  line-height: 1.35 !important;
+}
+.report-sheet .report-header-k {
+  color: #636366;
+}
+
 /* ── Page Studio stage 3: the new blocks and their shapes ──────── */
 .report-support-list {
   margin: 2px 0 0;
