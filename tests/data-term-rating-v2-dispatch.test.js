@@ -59,7 +59,9 @@ describe('v2 saveTermRating', () => {
       mentionAssessmentIds: [AID],
       mentionObservationIds: [OB],
     });
-    var call = client.calls.find(function (c) { return c.name === 'save_term_rating'; });
+    var call = client.calls.find(function (c) {
+      return c.name === 'save_term_rating';
+    });
     expect(call.payload.p_enrollment_id).toBe(ENR);
     expect(call.payload.p_term).toBe(2);
     expect(call.payload.p_payload).toEqual({
@@ -80,7 +82,9 @@ describe('v2 saveTermRating', () => {
 
   it('omits keys that are not in the input payload (partial update)', async () => {
     await window.v2.saveTermRating(ENR, 1, { narrativeHtml: 'x' });
-    var call = client.calls.find(function (c) { return c.name === 'save_term_rating'; });
+    var call = client.calls.find(function (c) {
+      return c.name === 'save_term_rating';
+    });
     expect(Object.keys(call.payload.p_payload)).toEqual(['narrative_html']);
   });
 
@@ -91,22 +95,36 @@ describe('v2 saveTermRating', () => {
       mentionAssessmentIds: [],
       mentionObservationIds: [],
     });
-    var call = client.calls.find(function (c) { return c.name === 'save_term_rating'; });
+    var call = client.calls.find(function (c) {
+      return c.name === 'save_term_rating';
+    });
     expect(call.payload.p_payload.strength_tags).toEqual([]);
     expect(call.payload.p_payload.growth_tags).toEqual([]);
     expect(call.payload.p_payload.mention_assessments).toEqual([]);
     expect(call.payload.p_payload.mention_observations).toEqual([]);
   });
 
+  it('sends habits as a clean map and approved as a boolean', async () => {
+    await window.v2.saveTermRating(ENR, 2, { habits: { completes: 4, ready: '2', part: 6, others: 0 }, approved: 1 });
+    var call = client.calls.find(function (c) {
+      return c.name === 'save_term_rating';
+    });
+    expect(call.payload.p_payload).toEqual({ habits: { completes: 4, ready: 2 }, approved: true });
+  });
+
   it('coerces term to Number', async () => {
     await window.v2.saveTermRating(ENR, '3', {});
-    var call = client.calls.find(function (c) { return c.name === 'save_term_rating'; });
+    var call = client.calls.find(function (c) {
+      return c.name === 'save_term_rating';
+    });
     expect(call.payload.p_term).toBe(3);
   });
 
   it('defaults socialTraits to [] when the key is present but value is falsy', async () => {
     await window.v2.saveTermRating(ENR, 1, { socialTraits: null });
-    var call = client.calls.find(function (c) { return c.name === 'save_term_rating'; });
+    var call = client.calls.find(function (c) {
+      return c.name === 'save_term_rating';
+    });
     expect(call.payload.p_payload.social_traits).toEqual([]);
   });
 });

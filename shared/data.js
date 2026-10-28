@@ -4241,10 +4241,12 @@ function _fillOverrideCalculated(cid) {
 }
 
 /* Term ratings from the server, merged into this device's copy. The server's
-   fields win; "dims" isn't stored on the server, so this device keeps its
-   own. A rating this device has and the server doesn't was written while
-   saves never reached the server (term ids read as NaN until Oct 2026): it
-   is sent now, once. */
+   fields win; the nine "dims" the old questionnaire rated were never stored
+   on the server, so this device keeps its own (read by old reports only).
+   The six habits and the approval are on the server since Oct 28 2026. A
+   rating this device has and the server doesn't was written while saves
+   never reached the server (term ids read as NaN until Oct 2026): it is sent
+   now, once. */
 function _applyBundleTermRatings(cid, rows) {
   var local = _cloneValue(getTermRatings(cid) || {}) || {};
   var onServer = {};
@@ -4257,9 +4259,11 @@ function _applyBundleTermRatings(cid, rows) {
     var termId = 'term-' + r.term;
     onServer[r.enrollment_id + '|' + termId] = true;
     if (!local[r.enrollment_id]) local[r.enrollment_id] = {};
-    var prev = local[r.enrollment_id][termId] || { dims: Object.fromEntries(OBS_DIMS.map(d => [d, 0])) };
+    var prev = local[r.enrollment_id][termId] || {};
     local[r.enrollment_id][termId] = Object.assign({}, prev, {
       narrative: r.narrative_html || '',
+      habits: r.habits && typeof r.habits === 'object' ? r.habits : {},
+      approvedAt: r.approved_at || null,
       workHabits: r.work_habits_rating || 0,
       participation: r.participation_rating || 0,
       socialTraits: r.social_traits || [],
@@ -4282,7 +4286,9 @@ function _applyBundleTermRatings(cid, rows) {
       var payload = _termRatingPatch(local[sid][termId]);
       var hasContent = Object.keys(payload).some(function (k) {
         var v = payload[k];
-        return Array.isArray(v) ? v.length > 0 : !!v;
+        if (Array.isArray(v)) return v.length > 0;
+        if (v && typeof v === 'object') return Object.keys(v).length > 0;
+        return !!v;
       });
       if (t >= 1 && t <= 6 && hasContent) window.v2.saveTermRating(sid, t, payload);
     });
@@ -11086,6 +11092,8 @@ window.v2.saveTermRating = function (enrollmentId, term, payload) {
   if ('workHabitsRating' in payload) wire.work_habits_rating = payload.workHabitsRating;
   if ('participationRating' in payload) wire.participation_rating = payload.participationRating;
   if ('socialTraits' in payload) wire.social_traits = payload.socialTraits || [];
+  if (payload.habits && typeof payload.habits === 'object') wire.habits = _habitsWire(payload.habits);
+  if ('approved' in payload) wire.approved = !!payload.approved;
   if (Array.isArray(payload.dimensions)) {
     wire.dimensions = payload.dimensions.map(function (d) {
       return { section_id: d.sectionId, rating: Number(d.rating) };
@@ -11313,16 +11321,22 @@ function getStudentTermRating(cid, sid, termId) {
   return (all[sid] && all[sid][termId]) || null;
 }
 
+/* A changed comment needs a new approval: the server clears approved_at when
+   narrative_html changes without an `approved` key, and this copy does the
+   same. */
 function upsertTermRating(cid, sid, termId, data) {
   const all = getTermRatings(cid);
   if (!all[sid]) all[sid] = {};
   const now = new Date().toISOString();
-  if (all[sid][termId]) {
-    Object.assign(all[sid][termId], data);
-    all[sid][termId].modified = now;
+  const prev = all[sid][termId];
+  if (prev && 'narrative' in data && !('approvedAt' in data) && (data.narrative || '') !== (prev.narrative || '')) {
+    data = Object.assign({}, data, { approvedAt: null });
+  }
+  if (prev) {
+    Object.assign(prev, data);
+    prev.modified = now;
   } else {
     all[sid][termId] = {
-      dims: Object.fromEntries(OBS_DIMS.map(d => [d, 0])),
       narrative: '',
       created: now,
       modified: now,
@@ -11413,7 +11427,7 @@ async function loadTermAttendance(cid) {
         var l = _attendanceCount(row.lates);
         if (_attendanceCount(prev.absences) === a && _attendanceCount(prev.lates) === l) return;
         changed = true;
-        all[sid][termId] = Object.assign({ dims: Object.fromEntries(OBS_DIMS.map(d => [d, 0])) }, prev, {
+        all[sid][termId] = Object.assign({}, prev, {
           absences: a,
           lates: l,
         });
@@ -11548,6 +11562,8 @@ var _TERM_RATING_WIRE = {
   growthAreas: 'growthTagIds',
   mentionAssessments: 'mentionAssessmentIds',
   mentionObs: 'mentionObservationIds',
+  habits: 'habits',
+  approvedAt: 'approved',
 };
 function _termRatingPatch(data) {
   var payload = {};
@@ -11556,9 +11572,23 @@ function _termRatingPatch(data) {
     if (!wireKey) return;
     var value = data[key];
     if ((key === 'workHabits' || key === 'participation') && !value) value = null;
+    if (key === 'approvedAt') value = !!value;
     payload[wireKey] = value;
   });
   return payload;
+}
+
+/* The six work habits, 1 Rarely … 4 Consistently, 5 Not Seen; anything else
+   (0, null, an unknown key) means not rated and is left out, as the server
+   accepts only those keys and values. */
+var HABIT_KEYS = ['completes', 'ready', 'others', 'part', 'feedback', 'devices'];
+function _habitsWire(habits) {
+  var out = {};
+  HABIT_KEYS.forEach(function (k) {
+    var v = Number(habits[k]);
+    if (v >= 1 && v <= 5 && Math.floor(v) === v) out[k] = v;
+  });
+  return out;
 }
 
 /* ── Report Config ─────────────────────────────────────────── */
