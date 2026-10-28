@@ -629,23 +629,21 @@ window.PageAssignments = (function () {
             );
           }
           if (boxes.length) {
-            // Checkboxes can't sit inside a button, so an Advanced tile picks
-            // its level from the button at its top.
+            // Checkboxes can't sit inside a button: clicking the tile around
+            // them picks its level (1–4 on the focused criterion does too).
             var isSuggested = advice && advice.suggested === lv;
             return (
-              '<div class="grdt-tile is-checklist' +
+              '<div class="grdt-tile is-checklist l' +
+              lv +
               (isSuggested ? ' is-suggested' : '') +
-              '">' +
-              '<div class="grdt-tile-top">' +
-              (isSuggested ? '<span class="grdt-suggested-tag">Suggested</span>' : '') +
-              '<button type="button" class="grdt-pick" data-action="graderLevel" data-critid="' +
+              '" data-action="graderLevel" data-critid="' +
               crit.id +
               '" data-level="' +
               lv +
-              '">' +
-              'Pick ' +
+              '" title="Pick ' +
               PROF_LABELS[lv] +
-              '</button></div>' +
+              '">' +
+              (isSuggested ? '<span class="grdt-suggested-tag">' + _SUGGESTED_ICON + 'Suggested</span>' : '') +
               body +
               '</div>'
             );
@@ -677,7 +675,7 @@ window.PageAssignments = (function () {
         esc(crit.name || 'Criterion') +
         '</h3>' +
         (codes ? '<div class="grdt-codes">' + codes + '</div>' : '') +
-        (state.level ? '' : '<span class="grdt-not-scored">Not Scored</span>') +
+        (state.level ? '' : '<span class="grdt-not-scored">' + _NOT_SCORED_ICON + 'Not Scored</span>') +
         (advice
           ? '<div class="grdt-advice' +
             (advice.suggested ? ' l' + advice.suggested : '') +
@@ -784,7 +782,7 @@ window.PageAssignments = (function () {
             (code ? '<span class="grdt-code">' + esc(code) + '</span>' : '') +
             '</div>' +
             (t.text && t.text !== t.label ? '<span class="grdl-text">' + esc(t.text) + '</span>' : '') +
-            (state.level ? '' : '<span class="grdt-not-scored">Not Scored</span>') +
+            (state.level ? '' : '<span class="grdt-not-scored">' + _NOT_SCORED_ICON + 'Not Scored</span>') +
             '</div>' +
             '<div class="grdl-controls"><div class="grdl-seg" role="group" aria-label="Level">' +
             seg +
@@ -5508,6 +5506,8 @@ window.PageAssignments = (function () {
         confirmFillRubricAll(el.dataset.aid, parseInt(el.dataset.score, 10), el.dataset.label);
       },
       graderLevel: function () {
+        // A tick inside an Advanced tile is its own action, not a pick.
+        if (e.target.closest('.grdt-check')) return;
         _graderSetLevel(_graderAid(el), el.dataset.critid, parseInt(el.dataset.level, 10));
       },
       graderTagLevel: function () {
@@ -6377,6 +6377,10 @@ window.PageAssignments = (function () {
     );
   }
 
+  var _SUGGESTED_ICON =
+    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z"/></svg>';
+  var _NOT_SCORED_ICON =
+    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>';
   var _GRADER_STATUS_LABELS = { NS: 'Missing', EXC: 'Excused', LATE: 'Late' };
   // The Missing | Excused | Late control's buttons, in the order given.
   function _graderStatusButtons(aid, sid, status, order) {
@@ -6399,7 +6403,7 @@ window.PageAssignments = (function () {
           '</button>'
         );
       })
-      .join('');
+      .join('<span class="grader-status-sep" aria-hidden="true"></span>');
   }
 
   /* One student open on the Assignments page: the dialog's grader inside
