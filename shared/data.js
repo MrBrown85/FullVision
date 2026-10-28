@@ -5168,6 +5168,51 @@ function saveTagComment(cid, sid, aid, tagId, text) {
   return lsOk;
 }
 
+/* ── Overall comment ───────────────────────────────────────────────────
+   The teacher's comment on a whole piece of work: score.comment on the
+   server and, in the cache, the `note` every score entry of that student
+   and assessment carries. The rubric handout prints it. */
+function getScoreComment(cid, sid, aid) {
+  var entry = (getScores(cid)[sid] || []).find(function (e) {
+    return e && e.assessmentId === aid && e.note;
+  });
+  return entry ? String(entry.note) : '';
+}
+
+/* Change (or clear, with '') an overall comment the work already has a
+   score entry for. With no entry there is nothing to write it on. */
+function saveScoreComment(cid, sid, aid, text) {
+  var note = (text == null ? '' : String(text)).trim();
+  var scores = getScores(cid);
+  var entries = (scores[sid] || []).filter(function (e) {
+    return e && e.assessmentId === aid;
+  });
+  if (!entries.length) return false;
+  if (getScoreComment(cid, sid, aid) === note) return true;
+  entries.forEach(function (e) {
+    e.note = note;
+  });
+  _cache.scores[cid] = scores;
+  var lsOk = _safeLSSet('gb-scores-' + cid, JSON.stringify(scores));
+  _markLocalWrite('scores', cid);
+  if (_writesEnabled() && _isSendableId(sid) && _isSendableId(aid)) {
+    _trackPendingSync(
+      _writeRpc('save_score_comment', {
+        p_enrollment_id: sid,
+        p_assessment_id: aid,
+        p_comment: note,
+      }).then(function (res) {
+        if (res.error) _reportScoreWriteFailure('save_score_comment', res.error);
+      }),
+    );
+    entries.forEach(function (e) {
+      _rememberScoreCell(cid, sid, aid, e.tagId, scores);
+    });
+  }
+  _broadcastChange(cid, 'scores');
+  return lsOk;
+}
+
 function _scoreEntryKey(sid, entry) {
   if (!sid || !entry || !entry.assessmentId) return null;
   return [sid, entry.assessmentId, entry.tagId || ''].join(':');
@@ -11861,6 +11906,8 @@ window.GB = {
   updateQuickOb,
   getQuickObsByDim,
   getAssignmentObs,
+  getScoreComment,
+  saveScoreComment,
   getStudentAssignmentFeedback,
   hasAssignmentFeedback,
   getCustomTags,

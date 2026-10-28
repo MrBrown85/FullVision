@@ -2839,7 +2839,7 @@ window.PageAssignments = (function () {
   }
 
   function ledgerCommentHtml(cid, aid, sid) {
-    var count = getAssignmentObs(cid, sid, aid).length;
+    var count = _assignmentCommentCount(cid, sid, aid);
     return (
       '<div class="ldg-comment"><button type="button" class="ldg-note' +
       (count > 0 ? ' has' : '') +
@@ -3243,7 +3243,7 @@ window.PageAssignments = (function () {
 
   function renderStatusToggles(aid, sid, currentStatus) {
     var cid = activeCourse;
-    var commentCount = getAssignmentObs(cid, sid, aid).length;
+    var commentCount = _assignmentCommentCount(cid, sid, aid);
     return (
       '<div class="student-status-toggles">' +
       '<button class="student-status-btn' +
@@ -3744,7 +3744,7 @@ window.PageAssignments = (function () {
   /* A student's row in the whole-class grid: the name, Late | Excused |
      Missing, Comment, and the row's fill menu. */
   function _rsgStudentHeadHtml(cid, aid, st, status, fillAction) {
-    var count = getAssignmentObs(cid, st.id, aid).length;
+    var count = _assignmentCommentCount(cid, st.id, aid);
     return (
       '<div class="rsg-student-head">' +
       '<span class="rsg-student-name">' +
@@ -5354,11 +5354,42 @@ window.PageAssignments = (function () {
     _commentPopoverState = { cid: cid, sid: sid, aid: aid };
     renderCommentPopover();
   }
+  /* The Comment button counts the comments left on the work and its
+     overall comment (the note on its score). */
+  function _assignmentCommentCount(cid, sid, aid) {
+    return getAssignmentObs(cid, sid, aid).length + (getScoreComment(cid, sid, aid) ? 1 : 0);
+  }
+  var OVERALL_COMMENT_ID = 'overall';
+  function _overallCommentHtml(cid, sid, aid) {
+    var text = getScoreComment(cid, sid, aid);
+    if (!text) return '';
+    var pill = '<span class="comment-entry-pills"><span class="obs-pill">Overall Comment</span></span>';
+    if (_commentEditId === OVERALL_COMMENT_ID) {
+      return (
+        '<div class="comment-entry is-editing"><span class="comment-entry-date"></span><span class="comment-entry-main"><textarea class="comment-entry-input" rows="3" aria-label="Edit overall comment">' +
+        esc(text) +
+        '</textarea><span class="comment-entry-edit-actions"><button type="button" class="btn btn-ghost" data-action="cancelCommentEdit" data-stop-prop="true">Cancel</button><button type="button" class="btn btn-primary" data-action="saveCommentEdit" data-stop-prop="true">Save</button></span></span></div>'
+      );
+    }
+    return (
+      '<div class="comment-entry"><span class="comment-entry-date"></span><span class="comment-entry-main"><span class="comment-entry-text">' +
+      esc(text) +
+      '</span>' +
+      pill +
+      '</span><button class="comment-entry-edit" data-action="editComment" data-obid="' +
+      OVERALL_COMMENT_ID +
+      '" data-stop-prop="true" title="Edit" aria-label="Edit overall comment"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.5 2.5l3 3-8 8h-3v-3z"/></svg></button><button class="comment-entry-del" data-action="deleteComment" data-obid="' +
+      OVERALL_COMMENT_ID +
+      '" data-stop-prop="true" title="Delete" aria-label="Delete overall comment">✕</button></div>'
+    );
+  }
   function _commentEntriesHtml(cid, sid, aid) {
     var obs = getAssignmentObs(cid, sid, aid);
-    if (obs.length === 0) return '<div class="comment-popover-empty">No comments yet</div>';
+    var overall = _overallCommentHtml(cid, sid, aid);
+    if (obs.length === 0 && !overall) return '<div class="comment-popover-empty">No comments yet</div>';
     return (
       '<div class="comment-popover-entries">' +
+      overall +
       obs
         .map(function (o) {
           var d = new Date(o.created);
@@ -5505,8 +5536,12 @@ window.PageAssignments = (function () {
       if (input) input.focus();
       return;
     }
-    // The comment may have been re-keyed to its server id since the list drew.
-    updateQuickOb(cid, sid, resolveObservationId(cid, _commentEditId), { text: text });
+    if (_commentEditId === OVERALL_COMMENT_ID) {
+      saveScoreComment(cid, sid, _commentPopoverState.aid, text);
+    } else {
+      // The comment may have been re-keyed to its server id since the list drew.
+      updateQuickOb(cid, sid, resolveObservationId(cid, _commentEditId), { text: text });
+    }
     cancelCommentEdit();
   }
   function deleteComment(obId) {
@@ -5515,7 +5550,8 @@ window.PageAssignments = (function () {
       sid = _commentPopoverState.sid,
       aid = _commentPopoverState.aid;
     if (obId === _commentEditId) _commentEditId = null;
-    deleteQuickOb(cid, sid, obId);
+    if (obId === OVERALL_COMMENT_ID) saveScoreComment(cid, sid, aid, '');
+    else deleteQuickOb(cid, sid, obId);
     renderCommentPopover();
     updateCommentBadge(sid, aid);
   }
@@ -5533,8 +5569,8 @@ window.PageAssignments = (function () {
   }
   function updateCommentBadge(sid, aid) {
     var cid = activeCourse;
-    var count = getAssignmentObs(cid, sid, aid).length;
-    document.querySelectorAll('.comment-btn').forEach(function (btn) {
+    var count = _assignmentCommentCount(cid, sid, aid);
+    document.querySelectorAll('.comment-btn, .grader-inline .grader-add-comment').forEach(function (btn) {
       if (btn.dataset.sid === sid && btn.dataset.aid === aid)
         btn.innerHTML = count > 0 ? 'Comment <span class="comment-count">' + count + '</span>' : 'Comment';
     });
@@ -7211,7 +7247,7 @@ window.PageAssignments = (function () {
      Missing control, Comment, the arrow-key hint and the grade. */
   function _inlineGraderHtml(cid, a, tagObjs, st, scores) {
     var status = getAssignmentStatus(cid, st.id, a.id);
-    var count = getAssignmentObs(cid, st.id, a.id).length;
+    var count = _assignmentCommentCount(cid, st.id, a.id);
     var grade = _graderGrade(cid, a, st.id);
     return (
       '<div class="grader-inline' +
