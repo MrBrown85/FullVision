@@ -439,8 +439,8 @@ window.PageAssignments = (function () {
     if (a.rubricId && getRubricById(cid, a.rubricId)) {
       var showRubric = rubricViewStates[a.id] !== undefined ? rubricViewStates[a.id] : true;
       var rubric = getRubricById(cid, a.rubricId);
-      if (showRubric && oneStudent && students.length === 1 && !_isAdvancedRubric(rubric))
-        return _rubricTilesHtml(cid, a, rubric, students[0]);
+      if (showRubric && oneStudent && students.length === 1)
+        return _rubricTilesHtml(cid, a, rubric, students[0], _isAdvancedRubric(rubric));
       if (showRubric) return renderRubricGradingView(cid, a, students, scores);
     }
     return renderTagGrid(cid, a, tagObjs, students, scores);
@@ -473,8 +473,9 @@ window.PageAssignments = (function () {
     });
     return { level: level, mod: mixed ? 0 : mod, mixed: mixed };
   }
-  function _rubricTilesHtml(cid, a, rubric, st) {
+  function _rubricTilesHtml(cid, a, rubric, st, advanced) {
     var order = levelOrderFor(cid);
+    var ticked = advanced ? getRubricCheckIds(cid, st.id, a.id) : [];
     var html =
       '<div class="gt-legend"><span></span>' +
       order
@@ -486,6 +487,7 @@ window.PageAssignments = (function () {
     (rubric.criteria || []).forEach(function (crit) {
       if (!crit) return;
       var state = _criterionState(cid, st.id, a.id, crit);
+      var advice = advanced && RubricChecks.hasChecks(crit) ? _checklistAdvice(crit, ticked, state.level) : null;
       var codes = (crit.tagIds || [])
         .map(function (tid) {
           var t = getTagById(cid, tid);
@@ -498,6 +500,27 @@ window.PageAssignments = (function () {
       var tiles = order
         .map(function (lv) {
           var words = (crit.levels && (crit.levels[lv] || crit.levels[String(lv)])) || '';
+          var boxes = advanced ? RubricChecks.checksAt(crit, lv) : [];
+          var body = boxes.length
+            ? (words ? '<span class="gt-words gt-words-small">' + esc(words) + '</span>' : '') +
+              '<span class="gt-checks">' +
+              boxes
+                .map(function (check) {
+                  return (
+                    '<label class="gt-check"><input type="checkbox" data-action="graderTick" data-critid="' +
+                    crit.id +
+                    '" data-checkid="' +
+                    check.id +
+                    '"' +
+                    (ticked.indexOf(check.id) >= 0 ? ' checked' : '') +
+                    '><span>' +
+                    esc(check.label) +
+                    '</span></label>'
+                  );
+                })
+                .join('') +
+              '</span>'
+            : '<span class="gt-words">' + esc(words) + '</span>';
           if (state.level === lv) {
             var modLabel = state.mod > 0 ? ' +' : state.mod < 0 ? ' −' : '';
             var canUp = normalizeScoreMod(lv, 1) === 1;
@@ -541,9 +564,29 @@ window.PageAssignments = (function () {
               (state.mod > 0 ? ' class="is-on"' : '') +
               '>+</button>' +
               '</span></div>' +
-              '<span class="gt-words">' +
-              esc(words) +
-              '</span>' +
+              body +
+              '</div>'
+            );
+          }
+          if (boxes.length) {
+            // Checkboxes can't sit inside a button, so an Advanced tile picks
+            // its level from the button at its top.
+            var isSuggested = advice && advice.suggested === lv;
+            return (
+              '<div class="gt-tile is-checklist' +
+              (isSuggested ? ' is-suggested' : '') +
+              '">' +
+              '<div class="gt-tile-top">' +
+              (isSuggested ? '<span class="gt-suggested-tag">Suggested</span>' : '') +
+              '<button type="button" class="gt-pick" data-action="graderLevel" data-critid="' +
+              crit.id +
+              '" data-level="' +
+              lv +
+              '">' +
+              'Pick ' +
+              PROF_LABELS[lv] +
+              '</button></div>' +
+              body +
               '</div>'
             );
           }
@@ -575,6 +618,15 @@ window.PageAssignments = (function () {
         '</h3>' +
         (codes ? '<div class="gt-codes">' + codes + '</div>' : '') +
         (state.level ? '' : '<span class="gt-not-scored">Not Scored</span>') +
+        (advice
+          ? '<div class="gt-advice' +
+            (advice.suggested ? ' l' + advice.suggested : '') +
+            '"><strong>' +
+            esc(advice.head) +
+            '</strong><span>' +
+            esc(advice.hint) +
+            '</span></div>'
+          : '') +
         '</div>' +
         tiles +
         '</div>' +
@@ -3023,16 +3075,26 @@ window.PageAssignments = (function () {
   }
   /* The checkboxes under a criterion row, in the class's level order, with
      the level they suggest at the left. */
-  function _checklistPanelHtml(cid, aid, sid, crit, currentLevel) {
-    var ticked = getRubricCheckIds(cid, sid, aid);
+  /* What the ticked boxes say about a criterion's level, in the words the
+     checklist and the grader both show. */
+  function _checklistAdvice(crit, ticked, currentLevel) {
     var suggested = RubricChecks.suggestedLevel(crit, ticked);
     var current = Number(currentLevel) || 0;
-    var head = suggested ? 'Suggested: ' + PROF_LABELS[suggested] : 'No Level Suggested Yet';
-    var hint = !suggested
-      ? 'Tick what you saw. A level is suggested when all of its boxes are ticked.'
-      : current && current !== suggested
-        ? 'You picked ' + PROF_LABELS[current] + '. Ticks keep your choice until you clear the level.'
-        : 'Every ' + PROF_LABELS[suggested] + ' box is ticked. Pick another level to override.';
+    return {
+      suggested: suggested,
+      head: suggested ? 'Suggested: ' + PROF_LABELS[suggested] : 'No Level Suggested Yet',
+      hint: !suggested
+        ? 'Tick what you saw. A level is suggested when all of its boxes are ticked.'
+        : current && current !== suggested
+          ? 'You picked ' + PROF_LABELS[current] + '. Ticks keep your choice until you clear the level.'
+          : 'Every ' + PROF_LABELS[suggested] + ' box is ticked. Pick another level to override.',
+    };
+  }
+  function _checklistPanelHtml(cid, aid, sid, crit, currentLevel) {
+    var ticked = getRubricCheckIds(cid, sid, aid);
+    var advice = _checklistAdvice(crit, ticked, currentLevel);
+    var head = advice.head;
+    var hint = advice.hint;
     var html =
       '<div class="rsg-checklist" data-aid="' +
       aid +
@@ -5220,6 +5282,9 @@ window.PageAssignments = (function () {
       graderLevel: function () {
         _graderSetLevel(el.dataset.critid, parseInt(el.dataset.level, 10));
       },
+      graderTick: function () {
+        _graderTick(el.dataset.critid, el.dataset.checkid, el.checked);
+      },
       graderMod: function () {
         _graderSetMod(el.dataset.critid, parseInt(el.dataset.mod, 10));
       },
@@ -5932,7 +5997,10 @@ window.PageAssignments = (function () {
       }
     }
     if (e.key !== 'Escape') return;
-    if (e.target && ['INPUT', 'TEXTAREA', 'SELECT'].indexOf(e.target.tagName) >= 0) return;
+    var t = e.target;
+    var typing =
+      t && (t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || (t.tagName === 'INPUT' && t.type !== 'checkbox'));
+    if (typing) return;
     if (_critCommentState || _commentPopoverState) return;
     if (document.getElementById('rubric-modal') || document.querySelector('.confirm-overlay')) return;
     if (window.RubricBank && RubricBank.isOpen()) return;
@@ -6143,6 +6211,27 @@ window.PageAssignments = (function () {
     refreshSidebarGrades(focusStudentId);
     render();
     _focusGraderCriterion(critId);
+  }
+  /* A tick saves the box and, like the Assignments checklist, moves the
+     level to the one the boxes suggest unless the teacher picked another. */
+  function _graderTick(critId, checkId, on) {
+    if (!_grader || !focusStudentId) return;
+    var cid = activeCourse;
+    var aid = _grader.aid;
+    var crit = _graderCriterion(critId);
+    if (!crit) return;
+    var before = getRubricCheckIds(cid, focusStudentId, aid);
+    var after = setRubricCheck(cid, focusStudentId, aid, checkId, on);
+    var current = _criterionLevelNow(cid, aid, focusStudentId, crit);
+    var next = RubricChecks.levelAfterTick(crit, current, before, after);
+    if (next !== current)
+      rubricCriterionScoreKeys(crit).forEach(function (tid) {
+        setScore(cid, focusStudentId, aid, tid, next);
+      });
+    refreshSidebarGrades(focusStudentId);
+    render();
+    var box = _grader.overlay.querySelector('.gt-check input[data-checkid="' + checkId + '"]');
+    if (box) box.focus({ preventScroll: true });
   }
   // A redraw keeps keyboard scoring on the same criterion.
   function _focusGraderCriterion(critId) {
