@@ -283,8 +283,9 @@ create table tag_score (
   enrollment_id uuid        not null references enrollment(id) on delete cascade,
   assessment_id uuid        not null references assessment(id) on delete cascade,
   tag_id        uuid        not null references tag(id)        on delete cascade,
-  value         integer     not null,                                -- proficiency 1..4
+  value         integer,                                             -- proficiency 1..4; null = no level yet, the row holds only its comment (20261027_score_comments)
   modifier      smallint    not null default 0,                      -- −1 | 0 | +1, a third of a level; no 1− or 4+ (20261013_proficiency_plus_minus)
+  comment       text,                                                -- the teacher's feedback on this competency (20261027_score_comments)
   updated_at    timestamptz not null default now(),
   unique (enrollment_id, assessment_id, tag_id)
 );
@@ -294,7 +295,7 @@ create table rubric_score (
   enrollment_id uuid        not null references enrollment(id) on delete cascade,
   assessment_id uuid        not null references assessment(id) on delete cascade,
   criterion_id  uuid        not null references criterion(id)  on delete cascade,
-  value         integer     not null,                                -- 1..4
+  value         integer,                                             -- 1..4; null = no level yet, the row holds only its comment (20261027_score_comments)
   modifier      smallint    not null default 0,                      -- −1 | 0 | +1, as tag_score (20261013_proficiency_plus_minus)
   comment       text,                                                -- the teacher's note on this criterion, printed on the rubric handout (20261018_rubric_score_comment)
   updated_at    timestamptz not null default now(),
@@ -772,10 +773,12 @@ create table phone_report_student (
 --   upsert_score(p_enrollment_id uuid, p_assessment_id uuid, p_value numeric)
 --   set_score_status(p_enrollment_id uuid, p_assessment_id uuid, p_status text)
 --   save_score_comment(p_enrollment_id uuid, p_assessment_id uuid, p_comment text)
---   upsert_tag_score(p_enrollment_id uuid, p_assessment_id uuid, p_tag_id uuid, p_value integer)
+--   upsert_tag_score(p_enrollment_id uuid, p_assessment_id uuid, p_tag_id uuid,
+--                    p_value integer, p_modifier smallint default 0, p_comment text default null)
 --   upsert_rubric_score(p_enrollment_id uuid, p_assessment_id uuid, p_criterion_id uuid,
 --                       p_value integer, p_modifier smallint default 0, p_comment text default null)
---                       -- null p_comment keeps the saved comment, '' clears it; 0/null value deletes the row
+--                       -- both: null p_comment keeps the saved comment, '' clears it; a 0/null value keeps
+--                       -- the row as comment-only while a comment remains, else deletes it (20261027_score_comments)
 --   fill_rubric(p_enrollment_id uuid, p_assessment_id uuid, p_value integer)
 --   set_rubric_check(p_enrollment_id uuid, p_assessment_id uuid, p_check_id uuid, p_on boolean)
 --                       -- (2026-10-22) tick / clear one Advanced Rubric checkbox; idempotent by nature, no key

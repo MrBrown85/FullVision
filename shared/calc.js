@@ -395,6 +395,9 @@ function getAssessmentOverallScore(cid, studentId, assessmentId) {
   var values = entries
     .filter(function (entry) {
       if (!points && _isRemovedCompetency(cid, entry.tagId)) return false;
+      // A proficiency entry with no level (a cleared level, or one that only
+      // holds a comment) is unscored, not a 0.
+      if (!points && !(Number(entry.score) > 0)) return false;
       return countsOverallKey || !isUnlinkedTag(entry.tagId);
     })
     .map(function (entry) {
