@@ -1475,6 +1475,7 @@ window.ReportSheets = (function () {
       html +=
         '<div class="sheet-zoom"' +
         (side && side.kind === 'side' ? ' data-side="' + side.from + '"' : '') +
+        (side && side.kind === 'continued' ? ' data-from="' + side.from + '"' : '') +
         '><div class="sheet-label no-print">' +
         esc(sideLabel(side, s)) +
         '</div>' +
