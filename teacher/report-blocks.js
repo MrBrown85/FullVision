@@ -528,57 +528,192 @@ window.ReportBlocks = (function () {
     return html;
   }
 
-  function renderBlockNextSteps(cid, student, options) {
-    const icanCount = options && options.ican != null ? Math.max(0, Math.min(3, Number(options.ican))) : 2;
-    const focusAreas = getFocusAreas(cid, student.id, 3);
-    const realFocus = focusAreas.filter(f => f.prof <= 2);
-    if (realFocus.length === 0) return _keepGoing(cid, student, icanCount);
-    let html = `<div class="report-next-steps"><div class="report-next-steps-title">Suggested Next Steps</div>`;
-    realFocus.forEach((f, i) => {
-      const secName = f.section ? f.section.name : '';
-      const profLabel = f.prof > 0 ? PROF_LABELS[Math.round(f.prof)] : 'No Evidence';
-      const profColor = PROF_COLORS[Math.round(f.prof)] || PROF_COLORS[0];
-      let nextStepDesc = `<strong>${esc(secName)}</strong> &mdash; ${esc(f.tag.label)}: ${esc(profLabel)}.`;
-      // The first two I-can statements as goals. Three focus areas with four
-      // statements each was a third of a page on its own.
-      if (icanCount > 0 && f.tag.i_can_statements && f.tag.i_can_statements.length > 0) {
-        nextStepDesc += ` <span style="color:var(--text-2)">Focus areas:</span>`;
-        nextStepDesc += `<ul class="report-ican-list" style="margin-top:4px">`;
-        f.tag.i_can_statements.slice(0, icanCount).forEach(stmt => {
-          nextStepDesc += `<li class="report-ican-item">${esc(stmt)}</li>`;
-        });
-        nextStepDesc += `</ul>`;
-      } else if (icanCount > 0) {
-        nextStepDesc += ` Continue building skills in this area.`;
-      }
-      html += `<div class="report-next-step-item">
-      <div class="report-next-step-bullet" data-prof-bg="${Math.round(f.prof)}" style="background:${profColor}">${i + 1}</div>
-      <div>${nextStepDesc}</div>
-    </div>`;
+  /* ── The Focus Area ─────────────────────────────────────────────
+     One competency per student, used by Next Steps, Ways to Support at
+     Home and Progress in One Area: the one picked in the Term
+     Questionnaire (rating.focusSectionId) when there is one, else the one
+     whose level changed most since the last report (or the start of this
+     term), ties to the lowest now. Returns { sec, name, then, now } or
+     null without evidence. */
+  function _areaRows(cid, student, ctx) {
+    const sid = student.id;
+    const sections = _reportSections(cid);
+    const last = _lastReportLevels(cid, sid, sections);
+    return sections
+      .map((sec, i) => {
+        const now = getSectionProficiency(cid, sid, sec.id);
+        const then = last ? last.levels[i] : _sectionStart(cid, sid, sec);
+        return {
+          sec,
+          name: _competencyLabel(sec),
+          then: then > 0 ? then : 0,
+          now,
+          thenLabel: last ? last.label : 'Start of Term',
+        };
+      })
+      .filter(r => r.now > 0);
+  }
+  function focusArea(cid, student, ctx, which) {
+    const rows = _areaRows(cid, student, ctx);
+    if (!rows.length) return null;
+    const termId = ctx && ctx.termId;
+    const rating = typeof getStudentTermRating === 'function' ? getStudentTermRating(cid, student.id, termId) : null;
+    const picked = rating && rating.focusSectionId ? rows.find(r => r.sec.id === rating.focusSectionId) : null;
+    if ((!which || which === 'focus') && picked) return Object.assign({ picked: true }, picked);
+    const sorted = rows.slice();
+    if (which === 'highest') sorted.sort((a, b) => b.now - a.now);
+    else if (which === 'lowest') sorted.sort((a, b) => a.now - b.now);
+    else {
+      // The biggest change, then the lowest now.
+      const change = r => (r.then > 0 ? Math.abs(Math.round(r.now * 10) - Math.round(r.then * 10)) : -1);
+      sorted.sort((a, b) => change(b) - change(a) || a.now - b.now);
+    }
+    return sorted[0];
+  }
+  /* A section's scored work, in date order: [{ a, d, score }], the highest
+     mark per assessment. */
+  function _sectionWork(cid, sid, sec) {
+    const byId = {};
+    getAssessments(cid).forEach(a => (byId[a.id] = a));
+    const best = {};
+    (sec.tags || []).forEach(tag => {
+      getTagScores(cid, sid, tag.id).forEach(sc => {
+        if (!(sc.score > 0) || !byId[sc.assessmentId]) return;
+        if (!best[sc.assessmentId] || sc.score > best[sc.assessmentId]) best[sc.assessmentId] = sc.score;
+      });
     });
-    html += `</div>`;
-    return html;
+    return Object.keys(best)
+      .map(id => ({
+        a: byId[id],
+        d: typeof _assessmentDate === 'function' ? _assessmentDate(byId[id]) : byId[id].date || '',
+        score: best[id],
+      }))
+      .sort((x, y) => (x.d || '').localeCompare(y.d || ''));
+  }
+  /* "Chemical Reactions Lab, Oct 12 · 3.3 / 4 Proficient" */
+  function _workLine(w) {
+    const when = _assessmentWhen(w.a);
+    return (
+      esc(w.a.title || '') +
+      (when ? ', ' + when : '') +
+      ' · ' +
+      esc(levelFigure(w.score)) +
+      ' / 4 ' +
+      esc(_profWord(w.score))
+    );
+  }
+  function _firstICan(sec) {
+    const tag = (sec.tags || []).find(t => (t.i_can_statements || []).length);
+    return tag ? String(tag.i_can_statements[0]).trim() : '';
   }
 
-  /* No area under Proficient: the strongest competency and its next I-can
-     statements, so the block always says something true. Nothing when the
-     student has no evidence at all. */
-  function _keepGoing(cid, student, icanCount) {
-    const best = getAllTags(cid)
-      .map(t => ({ tag: t, prof: getTagProficiency(cid, student.id, t.id), section: getSectionForTag(cid, t.id) }))
-      .filter(x => x.prof > 0)
-      .sort((a, b) => b.prof - a.prof)[0];
-    if (!best) return '';
-    const r = Math.round(best.prof);
-    let desc = `<strong>Keep going</strong> &mdash; ${esc(best.section ? best.section.name : '')}: ${esc(best.tag.label)}, ${esc(PROF_LABELS[r] || '')}.`;
-    const stmts = (best.tag.i_can_statements || []).slice(0, icanCount);
-    if (stmts.length) {
-      desc += `<ul class="report-ican-list" style="margin-top:4px">${stmts.map(st => `<li class="report-ican-item">${esc(st)}</li>`).join('')}</ul>`;
+  /* ── Next Steps ───────────────────────────────────────────────────
+     The Focus Area (and the next lowest competency on request): its I Can
+     statement and the student's latest score on it. The student's goal
+     prints in Self-Assessment and Goal, not here. */
+  function renderBlockNextSteps(cid, student, ctx, options) {
+    options = options || {};
+    const half = options.size === 'half';
+    const focus = focusArea(cid, student, ctx, 'focus');
+    if (!focus) return '';
+    const areas = [focus];
+    if (options.areas === 'two') {
+      const next = _areaRows(cid, student, ctx)
+        .filter(r => r.sec.id !== focus.sec.id)
+        .sort((a, b) => a.now - b.now)[0];
+      if (next) areas.push(next);
     }
-    return `<div class="report-next-steps"><div class="report-next-steps-title">Suggested Next Steps</div><div class="report-next-step-item">
-      <div class="report-next-step-bullet" data-prof-bg="${r}" style="background:${PROF_COLORS[r] || PROF_COLORS[0]}">1</div>
-      <div>${desc}</div>
-    </div></div>`;
+    const rows = areas
+      .map(r => {
+        const ican = _firstICan(r.sec);
+        const work = _sectionWork(cid, student.id, r.sec);
+        const latest = work[work.length - 1];
+        return (
+          `<div class="report-steps-k">${esc(r.name)}</div><div class="report-steps-v">${ican ? '“' + esc(ican) + '”' : 'Keep building on this competency.'}</div>` +
+          (options.latest !== false && latest
+            ? `<div></div><div class="report-steps-latest">Latest: ${_workLine(latest)}</div>`
+            : '')
+        );
+      })
+      .join('');
+    return `<div class="report-block-box report-next-steps${half ? ' report-steps-half' : ''}">
+    <div class="report-block-title">Next Steps</div>
+    <div class="report-steps">${rows}</div>
+  </div>`;
+  }
+
+  /* ── Progress in One Area ──────────────────────────────────────────
+     One competency (the Focus Area, or the lowest or highest now) as
+     figures: every score this term with its date and work, the level at
+     the start of the term and now with the change, the best and latest
+     work, and the first I Can statement to work toward. Side by Side
+     stacks the facts over the list. */
+  function renderBlockProgress(cid, student, ctx, options) {
+    options = options || {};
+    const half = options.size === 'half';
+    const which = options.area === 'lowest' || options.area === 'highest' ? options.area : 'focus';
+    const area = focusArea(cid, student, ctx, which);
+    if (!area) return '';
+    const work = _sectionWork(cid, student.id, area.sec).filter(w => assessmentInActiveTerm(cid, w.a));
+    const points = work
+      .filter(w => w.d)
+      .map(w => ({ t: Math.round(parseLocalDate(w.d).getTime() / 86400000), v: w.score }));
+    const sn = startAndNow(points);
+    const startV = sn ? sn.start : work.length ? work[0].score : 0;
+    const nowV = sn ? sn.now : work.length ? work[work.length - 1].score : area.now;
+    const top = work.length ? Math.max(...work.map(w => w.score)) : 0;
+    const bests = work.filter(w => Math.round(w.score * 10) === Math.round(top * 10)).slice(0, 2);
+    const latest = work[work.length - 1];
+    const sub = (area.sec.tags || [])[0] && area.sec.tags[0].label !== area.sec.name ? area.sec.name : '';
+    const why =
+      which === 'lowest'
+        ? 'Lowest now'
+        : which === 'highest'
+          ? 'Highest now'
+          : area.picked
+            ? 'Focus area'
+            : 'Focus area (biggest change)';
+    const when = a => (_assessmentWhen(a) ? ', ' + _assessmentWhen(a) : '');
+    const facts = [];
+    if (options.startNow !== false && (startV > 0 || nowV > 0)) {
+      facts.push(['Start of term', esc(levelFigure(startV)) + ' ' + esc(_profWord(startV))]);
+      facts.push([
+        'Now',
+        `<b>${esc(levelFigure(nowV))} ${esc(_profWord(nowV))}</b> <span class="report-progress-chg">(${esc(levelChange(startV, nowV))} this term)</span>`,
+      ]);
+    }
+    if (options.best !== false && bests.length) {
+      facts.push([
+        'Best',
+        bests.map(w => esc(w.a.title || '') + when(w.a)).join(' · ') + ' · ' + esc(levelFigure(top)) + ' / 4',
+      ]);
+    }
+    if (options.latest !== false && latest) {
+      facts.push([
+        'Latest',
+        esc(latest.a.title || '') + when(latest.a) + ' · ' + esc(levelFigure(latest.score)) + ' / 4',
+      ]);
+    }
+    const ican = _firstICan(area.sec);
+    if (options.toward !== false && ican) facts.push(['Working toward', '“' + esc(ican) + '”']);
+    const factsHtml = facts.map(([k, v]) => `<span class="report-progress-k">${k}</span><span>${v}</span>`).join('');
+    let list = '';
+    if (options.list !== false && work.length) {
+      list =
+        `<div class="report-progress-list"><div class="report-progress-lh"><span>Date</span><span>Every score this term</span><span class="report-progress-n">Score</span></div>` +
+        work
+          .map(
+            w =>
+              `<div class="report-progress-li"><span class="report-progress-date">${esc(_assessmentWhen(w.a))}</span><span class="report-progress-title">${esc(w.a.title || '')}</span><span class="report-progress-n">${esc(levelFigure(w.score))}</span></div>`,
+          )
+          .join('') +
+        '</div>';
+    }
+    if (!factsHtml && !list) return '';
+    return `<div class="report-block-box report-progress${half ? ' report-progress-half' : ''}">
+    <div class="report-prof-head"><div class="report-block-title">Progress: ${esc(area.name)}${sub ? ` <span class="report-progress-sub">· ${esc(sub)}</span>` : ''}</div><div class="report-prof-meta">${esc(why)}</div></div>
+    <div class="report-progress-body">${factsHtml ? `<div class="report-progress-facts">${factsHtml}</div>` : ''}${list}</div>
+  </div>`;
   }
 
   /* ── Proficiency ────────────────────────────────────────────────
@@ -1525,6 +1660,11 @@ window.ReportBlocks = (function () {
      weakest assessed competencies ("I can plan a fair test" becomes "Ask
      Cece to show you how she can plan a fair test."), and the teacher's
      own line for the class. Nothing generated beyond that wording. */
+  /* ── Ways to Support at Home ──
+     Lines for the family from the I-can statements of the student's
+     weakest assessed competencies ("I can plan a fair test" becomes "Ask
+     Cece to show you how she can plan a fair test."), and the teacher's
+     own line for the class. Nothing generated beyond that wording. */
   function _forFamily(student, stmt) {
     const p = getPronouns(student);
     const name = displayNameFirst(student);
@@ -1540,21 +1680,33 @@ window.ReportBlocks = (function () {
       .replace(/\bI'm\b/g, p.subj + (p.subj === 'they' ? "'re" : "'s"));
     return `Ask ${name} to show you how ${p.subj} can ${rest}.`;
   }
-  function renderBlockSupportHome(cid, student, options) {
+  /* ── Ways to Support at Home ────────────────────────────────────
+     The student's best and lowest work in the Focus Area this term, for
+     the family to ask to see and ask about, and the teacher's own line.
+     The student's goal prints in Self-Assessment and Goal, not here. */
+  function renderBlockSupportHome(cid, student, ctx, options) {
     options = options || {};
-    const count = Math.max(1, Math.min(3, Number(options.lines) || 2));
-    const weakest = getAllTags(cid)
-      .map(t => ({ tag: t, prof: getTagProficiency(cid, student.id, t.id) }))
-      .filter(x => x.prof > 0 && (x.tag.i_can_statements || []).length)
-      .sort((a, b) => a.prof - b.prof)
-      .slice(0, count);
-    const lines = weakest.map(x => _forFamily(student, x.tag.i_can_statements[0]));
+    const half = options.size === 'half';
+    const p = getPronouns(student);
+    const lines = [];
+    const focus = focusArea(cid, student, ctx, 'focus');
+    if (focus) {
+      const work = _sectionWork(cid, student.id, focus.sec).filter(w => assessmentInActiveTerm(cid, w.a));
+      if (work.length) {
+        const best = work.slice().sort((a, b) => b.score - a.score || (b.d || '').localeCompare(a.d || ''))[0];
+        const low = work.slice().sort((a, b) => a.score - b.score || (b.d || '').localeCompare(a.d || ''))[0];
+        if (options.see !== false && best) lines.push(['Ask to see', _workLine(best)]);
+        if (options.about !== false && low && (work.length > 1 || options.see === false)) {
+          lines.push(['Ask about', _workLine(low) + (low !== best ? ', ' + esc(p.poss) + ' lowest this term' : '')]);
+        }
+      }
+    }
     const note = String(options.note || '').trim();
-    if (note) lines.push(note);
+    if (note) lines.push(['', esc(note)]);
     if (!lines.length) return '';
-    return `<div class="report-block-box report-support-home">
+    return `<div class="report-block-box report-support-home${half ? ' report-support-half' : ''}">
     <div class="report-block-title">Ways to Support at Home</div>
-    <ul class="report-support-list">${lines.map(l => `<li>${esc(l)}</li>`).join('')}</ul>
+    <div class="report-support">${lines.map(([k, v]) => `<span class="report-support-k">${k}</span><span>${v}</span>`).join('')}</div>
   </div>`;
   }
 
@@ -1721,7 +1873,9 @@ window.ReportBlocks = (function () {
       case 'observations':
         return renderBlockObservations(cid, student);
       case 'next-steps':
-        return renderBlockNextSteps(cid, student, options);
+        return renderBlockNextSteps(cid, student, ctx, options);
+      case 'progress':
+        return renderBlockProgress(cid, student, ctx, options);
       case 'proficiency':
         return renderBlockProficiency(cid, student, ctx, options);
       case 'legend':
@@ -1733,7 +1887,7 @@ window.ReportBlocks = (function () {
       case 'student-reflection-habits':
         return renderBlockStudentReflectionHabits(cid, student);
       case 'support-home':
-        return renderBlockSupportHome(cid, student, options);
+        return renderBlockSupportHome(cid, student, ctx, options);
       case 'term-glance':
         return renderBlockTermGlance(cid, student);
       case 'growth':
@@ -1766,6 +1920,8 @@ window.ReportBlocks = (function () {
     renderBlockNextSteps: renderBlockNextSteps,
     renderBlockLegend: renderBlockLegend,
     renderBlockProficiency: renderBlockProficiency,
+    renderBlockProgress: renderBlockProgress,
+    focusArea: focusArea,
     showDefaults: showDefaults,
     renderBlockParentResponse: renderBlockParentResponse,
     renderBlockStudentReflectionLearning: renderBlockStudentReflectionLearning,

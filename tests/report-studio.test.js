@@ -153,7 +153,7 @@ describe('ReportStudio', () => {
     expect(table).toContain('Hide Row');
     expect(table).not.toMatch(/Width|Height|row \d/);
     const withSteps = ReportSheets.insert(f, 'next-steps', { side: 0 });
-    expect(ReportStudio.popoverHtml(withSteps, 'next-steps')).toContain('aria-label="I-can Statements"');
+    expect(ReportStudio.popoverHtml(withSteps, 'next-steps')).toContain('aria-label="Competencies"');
     const text = ReportStudio.popoverHtml(ReportSheets.insert(f, 'text-block', { side: 1 }), 'text-block');
     expect(text).toContain('id="studio-text-title"');
     expect(text).toContain('id="studio-text-body"');

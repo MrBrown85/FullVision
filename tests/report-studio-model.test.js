@@ -467,31 +467,112 @@ describe('stage 3 blocks', () => {
     Object.keys(keep).forEach(k => delete keep[k]);
   });
 
-  it('Ways to Support at Home turns the weakest I-can statements into lines for the family, with the teacher’s own line', () => {
-    const html = ReportBlocks.renderReportBlock(
-      'support-home',
-      CID,
-      CECE,
-      {},
-      { lines: 2, note: 'Read together each night.' },
+  /* A class of two competencies with dated, scored work for the Focus Area
+     helpers: Plan (3.0 → 3.3) and Share (3.0 → 2.7). */
+  function focusClass() {
+    const work = [
+      { id: 'a1', title: 'Lab Report', date: '2026-09-10' },
+      { id: 'a2', title: 'Quiz', date: '2026-10-05' },
+      { id: 'a3', title: 'Poster', date: '2026-10-20' },
+    ];
+    const secs = [
+      {
+        id: 'p',
+        name: 'Planning',
+        tags: [{ id: 't1', label: 'Plan', i_can_statements: ['I can plan a fair test with my partner.'] }],
+      },
+      {
+        id: 's',
+        name: 'Communicating',
+        tags: [{ id: 't2', label: 'Share', i_can_statements: ['I can explain my thinking to myself and others'] }],
+      },
+    ];
+    stub('getAssessments', () => work);
+    stub('assessmentInActiveTerm', () => true);
+    stub('getActiveTerm', () => null);
+    stub('getGroupedSections', () => ({ groups: [], ungrouped: [] }));
+    stub('getSections', () => secs);
+    stub('getSectionProficiency', (cid, sid, id) => ({ p: 3.3, s: 2.7 })[id]);
+    stub('getTagScores', (cid, sid, tid) =>
+      tid === 't1'
+        ? [
+            { assessmentId: 'a1', score: 3 },
+            { assessmentId: 'a2', score: 3.33 },
+            { assessmentId: 'a3', score: 3.33 },
+          ]
+        : [
+            { assessmentId: 'a1', score: 3 },
+            { assessmentId: 'a2', score: 2.67 },
+            { assessmentId: 'a3', score: 2.67 },
+          ],
     );
+    stub('getStudentTermRating', () => null);
+  }
+
+  it('the Focus Area is the questionnaire’s pick, else the competency whose level changed most', () => {
+    focusClass();
+    // Both moved 0.3; the lowest now wins the tie.
+    expect(ReportBlocks.focusArea(CID, CECE, {}).name).toBe('Share');
+    expect(ReportBlocks.focusArea(CID, CECE, {}, 'highest').name).toBe('Plan');
+    expect(ReportBlocks.focusArea(CID, CECE, {}, 'lowest').name).toBe('Share');
+    stub('getStudentTermRating', () => ({ focusSectionId: 'p' }));
+    expect(ReportBlocks.focusArea(CID, CECE, {}).name).toBe('Plan');
+    expect(ReportBlocks.focusArea(CID, CECE, {}).picked).toBe(true);
+    stub('getSectionProficiency', () => 0);
+    expect(ReportBlocks.focusArea(CID, CECE, {})).toBeNull();
+  });
+
+  it('Next Steps prints the Focus Area, its I Can statement and the latest score; the next lowest on request', () => {
+    focusClass();
+    const html = ReportBlocks.renderReportBlock('next-steps', CID, CECE, {}, {});
     expect(text(html)).toBe(
-      'Ways to Support at Home Ask Cece to show you how she can plan a fair test with her partner. Ask Cece to show you how she can explain her thinking to herself and others. Read together each night.',
+      'Next Steps Share “I can explain my thinking to myself and others” Latest: Poster, Oct 20 · 2.7 / 4 Proficient',
     );
-    expect(text(ReportBlocks.renderReportBlock('support-home', CID, CECE, {}, { lines: 3 }))).toContain(
-      'Talk with Cece about this: Asks good questions',
+    expect(html).not.toMatch(/[●○]/);
+    const two = text(ReportBlocks.renderReportBlock('next-steps', CID, CECE, {}, { areas: 'two', latest: false }));
+    expect(two).toBe(
+      'Next Steps Share “I can explain my thinking to myself and others” Plan “I can plan a fair test with my partner.”',
     );
-    stub('getTagProficiency', () => 0);
+    stub('getSectionProficiency', () => 0);
+    expect(ReportBlocks.renderReportBlock('next-steps', CID, CECE, {}, {})).toBe('');
+  });
+
+  it('Ways to Support at Home names the best and lowest work in the Focus Area, with the teacher’s own line', () => {
+    focusClass();
+    const html = ReportBlocks.renderReportBlock('support-home', CID, CECE, {}, { note: 'Read together each night.' });
+    expect(text(html)).toBe(
+      'Ways to Support at Home Ask to see Lab Report, Sep 10 · 3.0 / 4 Proficient Ask about Poster, Oct 20 · 2.7 / 4 Proficient, her lowest this term Read together each night.',
+    );
+    expect(text(ReportBlocks.renderReportBlock('support-home', CID, CECE, {}, { about: false }))).toBe(
+      'Ways to Support at Home Ask to see Lab Report, Sep 10 · 3.0 / 4 Proficient',
+    );
+    stub('getTagScores', () => []);
     expect(ReportBlocks.renderReportBlock('support-home', CID, CECE, {}, {})).toBe('');
   });
 
-  it('Growth and Next Steps says Keep going with the strongest competency when nothing is under Proficient', () => {
-    stub('getFocusAreas', () => [{ tag: tags[1], prof: 3, section: { name: 'Questioning and Predicting' } }]);
-    const html = text(ReportBlocks.renderReportBlock('next-steps', CID, CECE, {}, { ican: 1 }));
-    expect(html).toContain('Keep going — Questioning and Predicting: Ask, Extending.');
-    expect(html).toContain('Asks good questions');
-    stub('getTagProficiency', () => 0);
-    expect(ReportBlocks.renderReportBlock('next-steps', CID, CECE, {}, {})).toBe('');
+  it('Progress in One Area lists every score this term with the start, now, best, latest and the I Can statement', () => {
+    focusClass();
+    const html = ReportBlocks.renderReportBlock('progress', CID, CECE, {}, {});
+    const t = text(html);
+    expect(t).toContain('Progress: Share · Communicating Focus area (biggest change)');
+    expect(t).toContain('Start of term 3.0 Proficient Now 2.7 Proficient (−0.3 this term)');
+    expect(t).toContain('Best Lab Report, Sep 10 · 3.0 / 4');
+    expect(t).toContain('Latest Poster, Oct 20 · 2.7 / 4');
+    expect(t).toContain('Working toward “I can explain my thinking to myself and others”');
+    expect(t).toContain('Date Every score this term Score Sep 10 Lab Report 3.0 Oct 5 Quiz 2.7 Oct 20 Poster 2.7');
+    expect(html).not.toMatch(/[●○]/);
+    const high = text(
+      ReportBlocks.renderReportBlock('progress', CID, CECE, {}, { area: 'highest', list: false, toward: false }),
+    );
+    expect(high).toContain('Progress: Plan · Planning Highest now');
+    expect(high).toContain('Now 3.3 Proficient (+0.3 this term)');
+    expect(high).not.toContain('Every score');
+    expect(high).not.toContain('Working toward');
+    expect(ReportBlocks.renderReportBlock('progress', CID, CECE, {}, { size: 'half' })).toContain(
+      'report-progress-half',
+    );
+    stub('getSectionProficiency', () => 0);
+    expect(ReportBlocks.renderReportBlock('progress', CID, CECE, {}, {})).toBe('');
   });
 
   it('Missing Work lists this term’s past-due and not-submitted work, and nothing when there is none', () => {

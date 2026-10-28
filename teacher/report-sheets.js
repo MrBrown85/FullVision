@@ -291,10 +291,45 @@ window.ReportSheets = (function () {
       group: 'Comments and Evidence',
     },
     observations: { label: 'Observations', group: 'Comments and Evidence' },
+    // Next Steps, Ways to Support at Home and Progress in One Area share
+    // the student's Focus Area: the competency picked in the Term
+    // Questionnaire, else the one with the biggest change (plan PR 5).
     'next-steps': {
-      label: 'Growth and Next Steps',
+      label: 'Next Steps',
       group: 'Comments and Evidence',
-      options: [{ key: 'ican', label: 'I-can Statements', def: 2, choices: [0, 1, 2, 3] }],
+      options: [
+        {
+          key: 'areas',
+          label: 'Competencies',
+          def: 'focus',
+          choices: [
+            { v: 'focus', label: 'Focus Area' },
+            { v: 'two', label: 'Focus Area and Next Lowest' },
+          ],
+        },
+        { key: 'latest', label: 'Latest Score', def: true },
+      ],
+    },
+    progress: {
+      label: 'Progress in One Area',
+      group: 'Grades',
+      options: [
+        {
+          key: 'area',
+          label: 'Area',
+          def: 'focus',
+          choices: [
+            { v: 'focus', label: 'Focus Area' },
+            { v: 'lowest', label: 'Lowest Now' },
+            { v: 'highest', label: 'Highest Now' },
+          ],
+        },
+        { key: 'list', label: 'Every Score This Term', def: true },
+        { key: 'startNow', label: 'Start and Now', def: true },
+        { key: 'best', label: 'Best', def: true },
+        { key: 'latest', label: 'Latest', def: true },
+        { key: 'toward', label: 'Working Toward', def: true },
+      ],
     },
     'learner-dimensions': {
       label: 'Learning Dispositions',
@@ -327,7 +362,8 @@ window.ReportSheets = (function () {
       label: 'Ways to Support at Home',
       group: 'Family',
       options: [
-        { key: 'lines', label: 'Lines', def: 2, choices: [1, 2, 3] },
+        { key: 'see', label: 'Ask to See (best work)', def: true },
+        { key: 'about', label: 'Ask About (lowest work)', def: true },
         { key: 'note', label: 'Your Own Line', def: '', text: true },
       ],
     },
