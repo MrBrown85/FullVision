@@ -433,14 +433,166 @@ window.PageAssignments = (function () {
   /* The grading controls for one assessment, for the students given: the
      Complete/Incomplete grid, the points grid, the rubric or the
      competency grid, as the assessment is scored. */
-  function _graderHtml(cid, a, tagObjs, students, scores) {
+  function _graderHtml(cid, a, tagObjs, students, scores, oneStudent) {
     if (isCompletionScored(a)) return renderCompletionGrid(cid, a, students);
     if (a.scoreMode === 'points') return renderPointsGrid(cid, a, students, scores);
     if (a.rubricId && getRubricById(cid, a.rubricId)) {
       var showRubric = rubricViewStates[a.id] !== undefined ? rubricViewStates[a.id] : true;
+      var rubric = getRubricById(cid, a.rubricId);
+      if (showRubric && oneStudent && students.length === 1 && !_isAdvancedRubric(rubric))
+        return _rubricTilesHtml(cid, a, rubric, students[0]);
       if (showRubric) return renderRubricGradingView(cid, a, students, scores);
     }
     return renderTagGrid(cid, a, tagObjs, students, scores);
+  }
+
+  /* ── Rubric tiles: one student, the rubric's full wording ──
+     Each criterion is a card: its name, competency codes and a Not Scored
+     mark on the left; the four levels as tiles in the course's level order,
+     each with its full descriptor. The chosen tile is the level's solid
+     colour with the − | + stepper inside it. Under the tiles, the
+     criterion's feedback (rubric_score.comment, printed on the graded
+     rubric). Clicking a tile, a stepper half or pressing 1–4 / + / − on a
+     focused card goes through _handleClick / _graderKeydown. */
+  function _criterionState(cid, sid, aid, crit) {
+    var entries = getScores(cid)[sid] || [];
+    var level = 0;
+    var mod = 0;
+    var mixed = false;
+    rubricCriterionScoreKeys(crit).forEach(function (tid) {
+      var e = entries.find(function (x) {
+        return x.assessmentId === aid && x.tagId === tid;
+      });
+      var v = e ? Number(e.score) || 0 : 0;
+      if (!v) return;
+      if (level && (v !== level || (e.mod || 0) !== mod)) mixed = true;
+      if (!level) {
+        level = v;
+        mod = e.mod || 0;
+      }
+    });
+    return { level: level, mod: mixed ? 0 : mod, mixed: mixed };
+  }
+  function _rubricTilesHtml(cid, a, rubric, st) {
+    var order = levelOrderFor(cid);
+    var html =
+      '<div class="gt-legend"><span></span>' +
+      order
+        .map(function (lv) {
+          return '<span class="gt-legend-level"><span class="gt-dot l' + lv + '"></span>' + PROF_LABELS[lv] + '</span>';
+        })
+        .join('') +
+      '</div>';
+    (rubric.criteria || []).forEach(function (crit) {
+      if (!crit) return;
+      var state = _criterionState(cid, st.id, a.id, crit);
+      var codes = (crit.tagIds || [])
+        .map(function (tid) {
+          var t = getTagById(cid, tid);
+          if (!t) return '';
+          // The printed rubric's rule: the tag's code, else an id that isn't a database id.
+          var code = t.code || (t.id && !/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(t.id) ? t.id : '') || t.label || '';
+          return '<span class="gt-code" title="' + esc(t.label || '') + '">' + esc(code) + '</span>';
+        })
+        .join('');
+      var tiles = order
+        .map(function (lv) {
+          var words = (crit.levels && (crit.levels[lv] || crit.levels[String(lv)])) || '';
+          if (state.level === lv) {
+            var modLabel = state.mod > 0 ? ' +' : state.mod < 0 ? ' −' : '';
+            var canUp = normalizeScoreMod(lv, 1) === 1;
+            var canDown = normalizeScoreMod(lv, -1) === -1;
+            return (
+              '<div class="gt-tile is-chosen l' +
+              lv +
+              '">' +
+              '<div class="gt-tile-head">' +
+              '<button type="button" class="gt-chosen-label" data-action="graderLevel" data-critid="' +
+              crit.id +
+              '" data-level="' +
+              lv +
+              '" aria-pressed="true" title="Click to clear">' +
+              '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="#fff"/><path d="M7.5 12.5l3 3 6-6.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+              PROF_LABELS[lv] +
+              modLabel +
+              '</button>' +
+              '<span class="gt-stepper" role="group" aria-label="Fine-tune ' +
+              PROF_LABELS[lv] +
+              '">' +
+              '<button type="button" data-action="graderMod" data-critid="' +
+              crit.id +
+              '" data-mod="-1" aria-label="Low ' +
+              PROF_LABELS[lv] +
+              '" aria-pressed="' +
+              (state.mod < 0) +
+              '"' +
+              (canDown ? '' : ' disabled') +
+              (state.mod < 0 ? ' class="is-on"' : '') +
+              '>−</button>' +
+              '<span class="gt-stepper-sep" aria-hidden="true"></span>' +
+              '<button type="button" data-action="graderMod" data-critid="' +
+              crit.id +
+              '" data-mod="1" aria-label="High ' +
+              PROF_LABELS[lv] +
+              '" aria-pressed="' +
+              (state.mod > 0) +
+              '"' +
+              (canUp ? '' : ' disabled') +
+              (state.mod > 0 ? ' class="is-on"' : '') +
+              '>+</button>' +
+              '</span></div>' +
+              '<span class="gt-words">' +
+              esc(words) +
+              '</span>' +
+              '</div>'
+            );
+          }
+          return (
+            '<button type="button" class="gt-tile" data-action="graderLevel" data-critid="' +
+            crit.id +
+            '" data-level="' +
+            lv +
+            '" aria-label="' +
+            PROF_LABELS[lv] +
+            ': ' +
+            esc(words) +
+            '"><span class="gt-words">' +
+            esc(words) +
+            '</span></button>'
+          );
+        })
+        .join('');
+      var note = getRubricCriterionComment(cid, st.id, a.id, crit);
+      html +=
+        '<section class="gt-crit" tabindex="0" data-critid="' +
+        crit.id +
+        '" aria-label="' +
+        esc(crit.name || 'Criterion') +
+        '">' +
+        '<div class="gt-row">' +
+        '<div class="gt-crit-side"><h3 class="gt-crit-name">' +
+        esc(crit.name || 'Criterion') +
+        '</h3>' +
+        (codes ? '<div class="gt-codes">' + codes + '</div>' : '') +
+        (state.level ? '' : '<span class="gt-not-scored">Not Scored</span>') +
+        '</div>' +
+        tiles +
+        '</div>' +
+        '<div class="gt-note-row"><label class="gt-note-label" for="gt-note-' +
+        crit.id +
+        '">Feedback (Optional)</label>' +
+        '<textarea id="gt-note-' +
+        crit.id +
+        '" class="gt-note' +
+        (note ? ' has-text' : '') +
+        '" rows="1" data-action-blur="graderCritNote" data-critid="' +
+        crit.id +
+        '">' +
+        esc(note) +
+        '</textarea></div>' +
+        '</section>';
+    });
+    return '<div class="gt-tiles">' + html + '</div>';
   }
 
   function renderAssessmentList(cid, assessments, allAssessments, students, scores, modules) {
@@ -5065,6 +5217,12 @@ window.PageAssignments = (function () {
       confirmFillRubricAll: function () {
         confirmFillRubricAll(el.dataset.aid, parseInt(el.dataset.score, 10), el.dataset.label);
       },
+      graderLevel: function () {
+        _graderSetLevel(el.dataset.critid, parseInt(el.dataset.level, 10));
+      },
+      graderMod: function () {
+        _graderSetMod(el.dataset.critid, parseInt(el.dataset.mod, 10));
+      },
       toggleStudentStatus: function () {
         toggleStudentStatus(el.dataset.aid, el.dataset.sid, el.dataset.status);
       },
@@ -5243,6 +5401,16 @@ window.PageAssignments = (function () {
       el.size = Math.max(4, saved.length);
       el.scrollLeft = 0;
       _setModuleDraggable(el, true);
+      return;
+    }
+    if (el.dataset.actionBlur === 'graderCritNote' && _grader) {
+      var text = el.value.trim();
+      if (
+        text !==
+        getRubricCriterionComment(activeCourse, focusStudentId, _grader.aid, _graderCriterion(el.dataset.critid))
+      )
+        saveRubricCriterionComment(activeCourse, focusStudentId, _grader.aid, el.dataset.critid, text);
+      el.classList.toggle('has-text', !!text);
       return;
     }
     if (el.dataset.actionBlur === 'critName') {
@@ -5749,7 +5917,21 @@ window.PageAssignments = (function () {
      rubric window, a confirm) is using the key. In a points box it first
      puts back the saved points, as on this page; a second Escape closes. */
   function _graderKeydown(e) {
-    if (e.key !== 'Escape' || e.defaultPrevented || !_grader) return;
+    if (!_grader || e.defaultPrevented) return;
+    var card = e.target && e.target.classList && e.target.classList.contains('gt-crit') ? e.target : null;
+    if (card && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      if (['1', '2', '3', '4'].indexOf(e.key) >= 0) {
+        e.preventDefault();
+        _graderSetLevel(card.dataset.critid, parseInt(e.key, 10));
+        return;
+      }
+      if (e.key === '+' || e.key === '=' || e.key === '-' || e.key === '_') {
+        e.preventDefault();
+        _graderSetMod(card.dataset.critid, e.key === '+' || e.key === '=' ? 1 : -1);
+        return;
+      }
+    }
+    if (e.key !== 'Escape') return;
     if (e.target && ['INPUT', 'TEXTAREA', 'SELECT'].indexOf(e.target.tagName) >= 0) return;
     if (_critCommentState || _commentPopoverState) return;
     if (document.getElementById('rubric-modal') || document.querySelector('.confirm-overlay')) return;
@@ -5820,7 +6002,7 @@ window.PageAssignments = (function () {
       '<div class="assess-card open active" id="ac-' +
       a.id +
       '"><div class="assess-body">' +
-      _graderHtml(cid, a, _scoreTagObjs(cid, a), [st], getScores(cid)) +
+      _graderHtml(cid, a, _scoreTagObjs(cid, a), [st], getScores(cid), true) +
       '</div></div>';
     _refreshGraderChrome();
   }
@@ -5924,6 +6106,50 @@ window.PageAssignments = (function () {
     }
     if (cell.kind === 'points') return { text: cell.text + ' of ' + (a.maxPoints || 100), tone: 'ink' };
     return { text: 'Not Graded', tone: 'muted' };
+  }
+
+  function _graderCriterion(critId) {
+    var a = getAssessments(activeCourse).find(function (x) {
+      return x.id === _grader.aid;
+    });
+    return a ? getRubricCriterion(a.id, critId) : null;
+  }
+  /* Picking the chosen level again clears it; another level replaces it
+     and drops any + or −. */
+  function _graderSetLevel(critId, level) {
+    if (!_grader || !focusStudentId) return;
+    var crit = _graderCriterion(critId);
+    if (!crit) return;
+    var state = _criterionState(activeCourse, focusStudentId, _grader.aid, crit);
+    var next = state.level === level && !state.mixed ? 0 : level;
+    rubricCriterionScoreKeys(crit).forEach(function (tid) {
+      setScore(activeCourse, focusStudentId, _grader.aid, tid, next, 0);
+    });
+    refreshSidebarGrades(focusStudentId);
+    render();
+    _focusGraderCriterion(critId);
+  }
+  function _graderSetMod(critId, mod) {
+    if (!_grader || !focusStudentId) return;
+    var crit = _graderCriterion(critId);
+    if (!crit) return;
+    var state = _criterionState(activeCourse, focusStudentId, _grader.aid, crit);
+    if (!state.level) return;
+    var next = state.mod === mod ? 0 : mod;
+    if (normalizeScoreMod(state.level, next) !== next) return;
+    rubricCriterionScoreKeys(crit).forEach(function (tid) {
+      setScore(activeCourse, focusStudentId, _grader.aid, tid, state.level, next);
+    });
+    refreshSidebarGrades(focusStudentId);
+    render();
+    _focusGraderCriterion(critId);
+  }
+  // A redraw keeps keyboard scoring on the same criterion.
+  function _focusGraderCriterion(critId) {
+    var card = _grader && _grader.overlay.querySelector('.gt-crit[data-critid="' + critId + '"]');
+    var active = document.activeElement;
+    var lost = !active || active === document.body || active.classList.contains('grader-dialog');
+    if (card && lost) card.focus({ preventScroll: true });
   }
 
   // Most grading controls save without redrawing, so the status, comments
