@@ -64,6 +64,16 @@ test('level cards score, fine-tune and take keys', async ({ page }) => {
   await page.keyboard.press('2');
   await expect(card.locator('.grdl-level.is-on')).toHaveText('Developing');
   await expect(dialog.locator('.grader-grade')).toContainText('Developing');
+
+  // Feedback on the competency saves when the box loses focus.
+  const note = card.locator('.grdt-note');
+  await note.fill('Spots the trend in each graph.');
+  await dialog.locator('.grader-student').click();
+  await expect(note).toHaveClass(/has-text/);
+  const saved = await page.evaluate(({ cid }) => getTagComment(cid, 'stu-001', 'assess-gl', 'QAP'), {
+    cid: TEST_COURSE.id,
+  });
+  expect(saved).toBe('Spots the trend in each graph.');
 });
 
 test('points field saves on Enter and shows the percentage', async ({ page }) => {

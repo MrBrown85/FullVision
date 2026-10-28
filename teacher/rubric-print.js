@@ -262,11 +262,14 @@
         level: lv.level,
         mod: lv.mod,
         mixed: lv.mixed,
-        // Criterion comments belong to a rubric of the teacher's own.
+        // Comments belong to a rubric of the teacher's own (on a criterion)
+        // or a Tag Rubric (on a competency); a General Rubric has none.
         comment:
           !rubric.kind && typeof getRubricCriterionComment === 'function'
             ? getRubricCriterionComment(cid, sid, aid, criterion)
-            : '',
+            : rubric.kind === 'tags' && typeof getTagComment === 'function'
+              ? getTagComment(cid, sid, aid, criterion.id)
+              : '',
         codes: _criterionCodes(cid, criterion, rubric.kind === 'tags'),
       };
     });
@@ -890,9 +893,11 @@
     if (!blank) {
       includes += _check('overall', opts.include.overall, 'Overall Level');
       includes += _check('feedback', opts.include.feedback, 'Feedback Comment');
-      // A Tag or General Rubric has no criterion comments.
+      // A General Rubric has no row comments; a Tag Rubric's are on its competencies.
       if (rubric && !rubric.kind)
         includes += _check('criterionComments', opts.include.criterionComments, 'Criterion Comments');
+      else if (rubric && rubric.kind === 'tags')
+        includes += _check('criterionComments', opts.include.criterionComments, 'Competency Comments');
     }
     if (_hasCodes(cid, rubric)) includes += _check('codes', opts.include.codes, 'Competency Codes');
     if (_isAdvancedRubric(rubric)) includes += _check('checks', opts.include.checks, 'Checkboxes');
