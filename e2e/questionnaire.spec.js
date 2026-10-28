@@ -175,8 +175,59 @@ test('Jasper: nothing from his phone yet, his forms Not Answered, his goal Not s
   await expect(page.locator('.qn-about')).toHaveText('Goes by Jas · he/him · STU-207');
 });
 
-test('no overflow at 1440 × 900', async ({ page }) => {
+test('Add appends the filled sentence; the row shows ✓ Added in place, nothing redrawn', async ({ page }) => {
   await open(page);
+  await expect(page.locator('.qn-bank-card .qn-card-sub').first()).toHaveText('100 sentences · 43 fit Cece');
+  const row = page.locator('.qn-part[data-part="now"] .qn-row').first();
+  const text = await row.getAttribute('data-text');
+  await row.evaluate(el => (el.__mark = 'same'));
+  await row.click();
+  await expect(page.locator('#tq-narrative')).toHaveValue(
+    new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$'),
+  );
+  await expect(row.locator('.qn-pill')).toHaveText('✓ Added');
+  expect(await row.evaluate(el => el.__mark)).toBe('same');
+  // Saved, and a second Add of the same sentence adds nothing.
+  await row.click();
+  const value = await page.locator('#tq-narrative').inputValue();
+  expect(value.split(text).length - 1).toBe(1);
+  expect(await page.evaluate(() => getStudentTermRating('sci8', 'st1', 'term-2').narrative)).toBe(value);
+  // Deleting it from the box gives the row back its Add.
+  await page.locator('#tq-narrative').fill(value.replace(text, '').trim());
+  await expect(row.locator('.qn-pill')).toHaveText('Add');
+});
+
+test('Focus Area changes the next-step sentences; a habit picked changes what fits', async ({ page }) => {
+  await open(page);
+  const go = page.locator('.qn-part[data-part="go"]');
+  const first = await go.locator('.qn-row').first().textContent();
+  const focus = go.locator('[data-action="tqPickFocus"]');
+  await focus.nth(1).click();
+  await expect(focus.nth(1)).toHaveAttribute('aria-pressed', 'true');
+  const name = (await focus.nth(1).textContent()).replace(/ \d.*$/, '');
+  await expect(go.locator('.qn-row').first()).toContainText('next step is in ' + name);
+  expect(await go.locator('.qn-row').first().textContent()).not.toBe(first);
+  // I Can picks the statement quoted.
+  const ican = go.locator('[data-action="tqPickICan"]');
+  await ican.nth(1).click();
+  await expect(go.locator('.qn-row').first()).toContainText((await ican.nth(1).textContent()).trim());
+  // Completes Work starts from the record; Takes Part picked at Consistently adds its sentences.
+  const habits = page.locator('.qn-part[data-part="habits"]');
+  await expect(habits.locator('.qn-rate').first()).toContainText('From assignments · 22 of 22, 0 late, 0 missing');
+  await expect(habits.locator('.qn-part-head .qn-card-sub')).toHaveText('5 fit Cece');
+  await page.locator('[data-action="tqRate"][data-habit="part"][data-value="4"]').click();
+  await expect(habits.locator('.qn-part-head .qn-card-sub')).toHaveText('9 fit Cece');
+  await expect(page.locator('.qn-rates-head .qn-card-sub')).toHaveText('2 of 6 rated');
+  expect(await page.evaluate(() => getStudentTermRating('sci8', 'st1', 'term-2').habits)).toEqual({ part: 4 });
+});
+
+test('no overflow at 1440 × 900, with every part of the bank shown in full', async ({ page }) => {
+  await open(page);
+  expect(await overflow(page)).toEqual([]);
+  for (const part of ['habits', 'now', 'go', 'how']) {
+    const more = page.locator(`[data-action="tqMore"][data-part="${part}"]`);
+    if (await more.count()) await more.click();
+  }
   expect(await overflow(page)).toEqual([]);
 });
 

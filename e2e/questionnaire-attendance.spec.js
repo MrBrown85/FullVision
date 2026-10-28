@@ -48,3 +48,18 @@ test('totals to date give this term without any math', async ({ page }) => {
   await expect(page.locator('#tq-att-note')).toContainText('Lower than the 4 absences');
   await expect(page.locator('#tq-att-absences')).toHaveClass(/warn/);
 });
+
+test('the attendance sentences are in the Comment Bank once totals are entered', async ({ page }) => {
+  await openQuestionnaire(page);
+  await pickReport(page, 1);
+  const habits = page.locator('.qn-part[data-part="habits"]');
+  await expect(habits.locator('.qn-group', { hasText: 'Attendance' })).toHaveCount(0);
+  await enter(page, 4, 2);
+  const absent = habits.locator('.qn-row', { hasText: 'has been absent from 4 classes this term' });
+  const late = habits.locator('.qn-row', { hasText: 'has arrived late 2 times this term' });
+  await expect(absent).toHaveCount(1);
+  await expect(late).toHaveCount(1);
+  await absent.click();
+  await expect(page.locator('#tq-narrative')).toHaveValue(/has been absent from 4 classes this term/);
+  await expect(absent.locator('.qn-pill')).toHaveText('✓ Added');
+});
