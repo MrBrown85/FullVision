@@ -4720,7 +4720,8 @@ textarea.studio-text {
 }
 .qn-roster-filter .seg-btn {
   min-height: 28px;
-  padding: 0 6px;
+  padding: 0 4px;
+  font-size: var(--text-xs);
   white-space: nowrap;
 }
 #gb-sidebar .qn-needs {
@@ -5155,6 +5156,237 @@ body.qn-roster #gb-sidebar .student-row-grades {
   margin-bottom: 0;
 }
 
+/* What FullVision Has */
+.qn-ev-tabs {
+  display: none;
+  grid-template-columns: repeat(3, minmax(max-content, 1fr));
+}
+.qn-ev-tabs .seg-btn {
+  min-height: 30px;
+  padding: 0 4px;
+  white-space: nowrap;
+}
+.qn-card-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.qn-card-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+.qn-empty {
+  color: var(--text-3);
+  line-height: 1.45;
+}
+.qn-growth-cols {
+  white-space: nowrap;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: var(--text-xs);
+  color: var(--text-2);
+  border-bottom: 1px solid var(--surface-2);
+  padding-bottom: 4px;
+  margin-top: -2px;
+}
+.qn-growth-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 2px 0 6px;
+  border-bottom: 1px solid var(--bg);
+}
+.qn-growth-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+.qn-growth-name {
+  font-weight: 600;
+  line-height: 1.3;
+  min-width: 0;
+}
+.qn-growth-sn {
+  flex: none;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--text-2);
+}
+.qn-growth-sn.up {
+  color: var(--score-3-dark);
+}
+.qn-growth-sn.down {
+  color: var(--score-2-text);
+}
+.qn-dots {
+  display: flex;
+  gap: 2px;
+  height: 20px;
+  align-items: flex-start;
+  border-top: 1px dotted var(--border);
+  border-bottom: 1px dotted var(--border);
+  min-width: 0;
+}
+.qn-dot {
+  flex: 0 1 6px;
+  min-width: 3px;
+  height: 6px;
+  border-radius: 50%;
+}
+.qn-dot.top {
+  margin-top: 1px;
+}
+.qn-dot.mid {
+  margin-top: 7px;
+}
+.qn-dot.low {
+  margin-top: 13px;
+}
+.qn-dot[data-level='4'],
+.qn-key[data-level='4'] {
+  background: var(--score-4);
+}
+.qn-dot[data-level='3'],
+.qn-key[data-level='3'] {
+  background: var(--score-3);
+}
+.qn-dot[data-level='2'],
+.qn-key[data-level='2'] {
+  background: var(--score-2);
+}
+.qn-dot[data-level='1'],
+.qn-key[data-level='1'] {
+  background: var(--score-1);
+}
+.qn-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: var(--text-xs);
+  color: var(--text-3);
+}
+.qn-key {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: 1px;
+}
+.qn-record {
+  border-top: 1px solid var(--surface-2);
+  padding-top: 8px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.qn-record div {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.qn-record span {
+  font-size: var(--text-xs);
+  color: var(--text-2);
+}
+.qn-obs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-bottom: 1px solid var(--surface-2);
+  padding-bottom: 8px;
+}
+.qn-obs:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.qn-obs-text {
+  line-height: 1.4;
+}
+.qn-obs-meta {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.qn-obs-date {
+  font-size: var(--text-xs);
+  color: var(--text-2);
+}
+.qn-tag {
+  font-size: var(--text-xs);
+  background: var(--bg-secondary);
+  border-radius: 99px;
+  padding: 1px 8px;
+}
+.qn-fill {
+  flex: 1;
+}
+.qn-quoted {
+  font-size: var(--text-xs);
+  color: var(--link);
+  font-weight: 600;
+}
+.qn-voice {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.qn-voice-q {
+  font-size: var(--text-xs);
+  color: var(--text-2);
+}
+.qn-voice-a {
+  line-height: 1.4;
+}
+.qn-private {
+  background: var(--bg);
+  border: 1px dashed var(--border-2);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.qn-private-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 2px 8px;
+  font-size: var(--text-xs);
+  color: var(--text-2);
+}
+.qn-private-head > span:first-child {
+  flex: 1 1 180px;
+}
+.qn-private-chip {
+  font-weight: 600;
+  color: var(--text-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  padding: 0 7px;
+  white-space: nowrap;
+}
+.qn-form {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--surface-2);
+  padding: 4px 0 7px;
+}
+.qn-chip.warn {
+  color: var(--score-2-text);
+  background: #fdf3dc;
+}
+
 @media (max-width: 1399px) {
   .qn-bottom,
   .qn-side-title {
@@ -5165,5 +5397,18 @@ body.qn-roster #gb-sidebar .student-row-grades {
   }
   .qn-text {
     min-height: 140px;
+  }
+  .qn-ev-tabs {
+    display: grid;
+  }
+  body.qn-roster {
+    --sidebar-w: 220px;
+  }
+  .qn-evidence .qn-card {
+    padding: 14px 12px;
+  }
+  .qn-evidence .qn-col-title,
+  .qn-ev-card:not(.on) {
+    display: none;
   }
 }

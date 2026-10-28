@@ -102,7 +102,7 @@ test('Term Questionnaire: 12px edges and 12px between the strip and the cards', 
   // The evidence column's first card is 12px in from the page and under the strip's divider.
   const card = await page.evaluate(() => {
     const main = document.getElementById('main').getBoundingClientRect();
-    const c = document.querySelector('.qn-evidence > *:not(.qn-col-title)')?.getBoundingClientRect();
+    const c = document.querySelector('.qn-evidence .qn-card')?.getBoundingClientRect();
     const side = document.querySelector('.qn-comment-card').getBoundingClientRect();
     const sideCol = document.querySelector('.qn-side').getBoundingClientRect();
     return {

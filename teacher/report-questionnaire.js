@@ -187,7 +187,15 @@ window.ReportQuestionnaire = (function () {
   }
 
   /* ── In-place updates (no redraw while the teacher types) ─── */
+  var _quotedTimer = null;
+  function _syncQuotedSoon() {
+    clearTimeout(_quotedTimer);
+    _quotedTimer = setTimeout(function () {
+      _syncQuoted();
+    }, 300);
+  }
   function _syncNote() {
+    _syncQuotedSoon();
     var el = _box();
     var note = document.getElementById('tq-text-note');
     if (el && note)
@@ -431,10 +439,255 @@ window.ReportQuestionnaire = (function () {
     return '';
   }
 
-  /* ── The middle columns (PRs 5 and 6) ────────────────────── */
-  function _evidenceHtml() {
-    return '<div class="qn-col-title">What FullVision Has</div>';
+  /* ── What FullVision Has ──────────────────────────────────── */
+
+  /* The cards the teacher shows beside the questions, on this device
+     (the Questions sheet; gb-tq-cards-<cid>). All on until changed. */
+  var CARD_KEYS = ['growth', 'obs', 'voice', 'assignments'];
+  function cardsOn(cid) {
+    var out = { growth: true, obs: true, voice: true, assignments: true };
+    try {
+      var saved = JSON.parse(localStorage.getItem('gb-tq-cards-' + cid) || '{}') || {};
+      CARD_KEYS.forEach(function (k) {
+        if (saved[k] === false) out[k] = false;
+      });
+    } catch (e) {
+      /* keep the defaults */
+    }
+    return out;
   }
+
+  var _evTab = 'growth'; // the laptop's one card at a time
+
+  /* A dot per score on three rows by level: Extending on top, Proficient
+     in the middle, Developing and Emerging at the bottom. */
+  function _dot(v) {
+    var lvl = Math.max(1, Math.min(4, Math.round(v)));
+    var row = lvl >= 4 ? 'top' : lvl === 3 ? 'mid' : 'low';
+    return `<span class="qn-dot ${row}" data-level="${lvl}"></span>`;
+  }
+
+  function _growthHtml(cid, f, cards) {
+    var rows = f.comps
+      .filter(function (c) {
+        return c.scores.length;
+      })
+      .map(function (c) {
+        var up = Math.round(c.now * 10) - Math.round(c.start * 10);
+        var sn = c.start > 0 ? formatLevel(cid, c.start) + ' → ' + formatLevel(cid, c.now) : '';
+        var aria =
+          c.name +
+          ': ' +
+          c.scores.length +
+          (c.scores.length === 1 ? ' score' : ' scores') +
+          (c.start > 0
+            ? ', ' +
+              (PROF_LABELS[Math.round(c.start)] || '') +
+              ' at the start, ' +
+              (PROF_LABELS[Math.round(c.now)] || '') +
+              ' now'
+            : '');
+        return `<div class="qn-growth-row">
+          <div class="qn-growth-head"><span class="qn-growth-name">${esc(c.name)}</span><span class="qn-growth-sn ${up > 0 ? 'up' : up < 0 ? 'down' : ''}">${esc(sn)}</span></div>
+          <span class="qn-dots" role="img" aria-label="${esc(aria)}">${c.scores
+            .map(function (sc) {
+              return _dot(sc.v);
+            })
+            .join('')}</span>
+        </div>`;
+      })
+      .join('');
+    var emerging = f.comps.some(function (c) {
+      return c.scores.some(function (sc) {
+        return Math.round(sc.v) <= 1;
+      });
+    });
+    var rec = f.record;
+    return `<div class="qn-card">
+      <div class="qn-card-head"><div class="qn-card-title">Growth</div><div class="qn-card-sub">Every score this term, oldest to newest. A higher dot is a higher level.</div></div>
+      ${
+        rows
+          ? `<div class="qn-growth-cols"><span>Competency and Scores</span><span>Start → Now</span></div>${rows}
+      <div class="qn-legend"><span><i class="qn-key" data-level="4"></i>Extending</span><span><i class="qn-key" data-level="3"></i>Proficient</span><span><i class="qn-key" data-level="2"></i>Developing</span>${emerging ? '<span><i class="qn-key" data-level="1"></i>Emerging</span>' : ''}</div>`
+          : '<div class="qn-empty">No scores this term yet.</div>'
+      }
+      ${
+        cards.assignments
+          ? `<div class="qn-record">
+        <div><span>Handed In</span><b>${rec.handed} of ${rec.total}</b></div>
+        <div><span>Late</span><b>${rec.late}</b></div>
+        <div><span>Missing</span><b>${rec.missing}</b></div>
+      </div>`
+          : ''
+      }
+    </div>`;
+  }
+
+  function _tagLabel(key) {
+    var t = typeof resolveTag === 'function' ? resolveTag(key) : { label: key };
+    var label = String(t.label || key);
+    return t.type === 'dim' ? label.split(' & ')[0] : label.replace(/ & /g, ' and ');
+  }
+
+  function _obsHtml(cid, f, comment) {
+    var items = f.obs
+      .map(function (o) {
+        var quoted = !!o.text && comment.indexOf(o.text.replace(/[.\s]+$/, '')) >= 0;
+        return `<div class="qn-obs">
+          <div class="qn-obs-text">${esc(o.text)}</div>
+          <div class="qn-obs-meta"><span class="qn-obs-date">${esc(o.day)}</span>${(o.dims || [])
+            .map(function (d) {
+              return `<span class="qn-tag">${esc(_tagLabel(d))}</span>`;
+            })
+            .join(
+              '',
+            )}<span class="qn-fill"></span>${quoted ? '<span class="qn-quoted">In the comment</span>' : ''}</div>
+        </div>`;
+      })
+      .join('');
+    return `<div class="qn-card">
+      <div class="qn-card-row"><div class="qn-card-title">Observations</div><div class="qn-card-sub">This term · ${f.obs.length}</div></div>
+      ${items || '<div class="qn-empty">None this term. The comment works without them: Work Habits is built from your habit ratings.</div>'}
+    </div>`;
+  }
+
+  /* The student's own words: what they are good at and find hard, their
+     shield, the Core Competency goal with its Goal Check-In, the next step,
+     the private note (marked, never printed), and forms not answered. */
+  function _voiceHtml(cid, student, f) {
+    var first = displayNameFirst(student);
+    var p = f.pronouns;
+    var v = f.voice;
+    var prof = v.profile;
+    var answer = function (it) {
+      return it && it.v && it.v.text ? String(it.v.text).trim() : '';
+    };
+    var q = function (it, fallback) {
+      return (it && it.q && it.q.prompt) || fallback;
+    };
+    var rows = [];
+    var about = prof && prof.about;
+    if (answer(about && about.goodAt)) rows.push([q(about.goodAt), '“' + answer(about.goodAt) + '”']);
+    if (answer(about && about.hard)) rows.push([q(about.hard), '“' + answer(about.hard) + '”']);
+    var refl =
+      prof &&
+      prof.reflections &&
+      prof.reflections.find(function (e) {
+        return e.kind === 'core_reflection';
+      });
+    var shield =
+      refl &&
+      refl.items.find(function (it) {
+        return it.q.kind === 'short_set' && it.v;
+      });
+    if (shield) {
+      var words = Array.isArray(shield.v.json) ? shield.v.json.filter(Boolean).join(' · ') : answer(shield);
+      rows.push([String(shield.q.prompt || '').split(':')[0], words]);
+    }
+    var ck = prof && prof.checkin;
+    if (ck && (answer(ck.coreGoal) || answer(ck.status))) {
+      var code = answer(ck.core);
+      var cc = code && typeof getCoreCompetency === 'function' ? getCoreCompetency(code) : null;
+      var ccName = cc ? cc.label.replace(/ & /g, ' and ') : code;
+      var a =
+        (ccName ? ccName + ': ' : '') +
+        (answer(ck.coreGoal) ? '“' + answer(ck.coreGoal) + '” ' : '') +
+        (answer(ck.status) ? answer(ck.status) + '.' : '');
+      rows.push(['Core Competency to grow · Goal Check-In', a.trim()]);
+    }
+    if (ck && answer(ck.next)) rows.push([q(ck.next, 'What will you do next?'), '“' + answer(ck.next) + '”']);
+    var answered = {};
+    (v.entries || []).forEach(function (e) {
+      answered[e.qid] = true;
+    });
+    var forms =
+      typeof Questionnaires !== 'undefined' && Questionnaires.list
+        ? Questionnaires.list(cid).filter(function (qn) {
+            return !answered[qn.id] && qn.kind !== 'report_reply' && !qn.archived_at;
+          })
+        : [];
+    var sub = (v.entries || []).length ? 'From ' + p.poss + ' phone' : 'Nothing from ' + p.poss + ' phone yet';
+    return `<div class="qn-card">
+      <div class="qn-card-row"><div class="qn-card-title">${esc(first)}’s Voice</div><div class="qn-card-sub">${esc(sub)}</div></div>
+      ${rows
+        .map(function (r) {
+          return `<div class="qn-voice"><div class="qn-voice-q">${esc(r[0])}</div><div class="qn-voice-a">${esc(r[1])}</div></div>`;
+        })
+        .join('')}
+      ${
+        v.private
+          ? `<div class="qn-private"><div class="qn-private-head"><span>${esc(q(about && about.note, 'Anything else you want me to know?'))}</span><span class="qn-private-chip">Private · Never Printed</span></div><div class="qn-voice-a">“${esc(v.private)}”</div></div>`
+          : ''
+      }
+      ${forms
+        .map(function (qn) {
+          return `<div class="qn-form"><span>${esc(qn.title || '')}</span><span class="qn-chip warn">Not Answered</span></div>`;
+        })
+        .join('')}
+    </div>`;
+  }
+
+  function _evidenceHtml(cid, student, f) {
+    var cards = cardsOn(cid);
+    var comment = plainComment((getStudentTermRating(cid, student.id, getTermId()) || {}).narrative || '');
+    var shown = [
+      ['growth', 'Growth', cards.growth || cards.assignments],
+      ['obs', 'Observations', cards.obs],
+      ['voice', 'Voice', cards.voice],
+    ].filter(function (t) {
+      return t[2];
+    });
+    if (
+      !shown.some(function (t) {
+        return t[0] === _evTab;
+      })
+    )
+      _evTab = shown.length ? shown[0][0] : 'growth';
+    var tabs = shown.length
+      ? `<div class="seg qn-ev-tabs" role="group" aria-label="What FullVision Has">${shown
+          .map(function (t) {
+            var on = _evTab === t[0];
+            return `<button type="button" class="seg-btn${on ? ' active' : ''}" data-action="tqEvidenceTab" data-tab="${t[0]}" aria-pressed="${on}">${t[1]}</button>`;
+          })
+          .join('')}</div>`
+      : '';
+    var card = function (key, html) {
+      return `<div class="qn-ev-card${_evTab === key ? ' on' : ''}" data-card="${key}">${html}</div>`;
+    };
+    return (
+      tabs +
+      '<div class="qn-col-title">What FullVision Has</div>' +
+      (cards.growth || cards.assignments ? card('growth', _growthHtml(cid, f, cards)) : '') +
+      (cards.obs ? card('obs', _obsHtml(cid, f, comment)) : '') +
+      (cards.voice ? card('voice', _voiceHtml(cid, student, f)) : '') +
+      (shown.length ? '' : '<div class="qn-empty">Every card is off. Turn them on in Questions.</div>')
+    );
+  }
+
+  function tqEvidenceTab(tab) {
+    _evTab = tab;
+    document.querySelectorAll('.qn-ev-tabs .seg-btn').forEach(function (b) {
+      var on = b.dataset.tab === tab;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', String(on));
+    });
+    document.querySelectorAll('.qn-ev-card').forEach(function (c) {
+      c.classList.toggle('on', c.dataset.card === tab);
+    });
+  }
+
+  /* After the comment changes: which notes it quotes. */
+  function _syncQuoted() {
+    var el = _box();
+    if (!el) return;
+    var comment = el.value;
+    var st = _current();
+    if (!st) return;
+    var f = CommentBank.facts(_activeCourse, st, getTermId());
+    var ev = document.querySelector('.qn-ev-card[data-card="obs"]');
+    if (ev) ev.innerHTML = _obsHtml(_activeCourse, f, comment);
+  }
+
   function _bankHtml() {
     return '';
   }
@@ -603,6 +856,8 @@ window.ReportQuestionnaire = (function () {
     tqApprove: tqApprove,
     tqCommentTab: tqCommentTab,
     tqRosterFilter: tqRosterFilter,
+    tqEvidenceTab: tqEvidenceTab,
+    cardsOn: cardsOn,
     tqSetAttendance: tqSetAttendance,
     tqSelectStudent: tqSelectStudent,
     renderTermQuestionnaire: renderTermQuestionnaire,

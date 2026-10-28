@@ -1712,6 +1712,9 @@ window.PageReports = (function () {
       tqRosterFilter: function () {
         RQ.tqRosterFilter(el.dataset.filter);
       },
+      tqEvidenceTab: function () {
+        RQ.tqEvidenceTab(el.dataset.tab);
+      },
     };
     if (handlers[action]) {
       handlers[action]();
