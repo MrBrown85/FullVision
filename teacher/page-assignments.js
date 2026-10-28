@@ -2242,7 +2242,7 @@ window.PageAssignments = (function () {
             '" data-sid="' +
             sid +
             '">' +
-            (m === 'complete' ? '\u2713 Complete' : '\u2717 Incomplete') +
+            (m === 'complete' ? _CMP_ICON_COMPLETE + 'Complete' : _CMP_ICON_INCOMPLETE + 'Incomplete') +
             '</button>'
           );
         })
@@ -2250,6 +2250,12 @@ window.PageAssignments = (function () {
       '</span>'
     );
   }
+
+  // A filled circle in the mark's colour; white on the chosen capsule.
+  var _CMP_ICON_COMPLETE =
+    '<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" class="cmp-icon-bg"/><path d="M7.5 12.5l3 3 6-6.5" fill="none" class="cmp-icon-mark" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  var _CMP_ICON_INCOMPLETE =
+    '<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" class="cmp-icon-bg"/><path d="M8.5 8.5l7 7M15.5 8.5l-7 7" fill="none" class="cmp-icon-mark" stroke-width="2.4" stroke-linecap="round"/></svg>';
 
   /* ── Ledger rows (Complete/Incomplete and points) ───────────
      One line per student: Name · Mark · Status · Comment. The rubric and
@@ -2260,16 +2266,17 @@ window.PageAssignments = (function () {
     ['NS', 'Missing', 'active-ns'],
   ];
   var LEDGER_COMMENT_ICON =
-    '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" stroke-linejoin="round"/></svg>';
+    '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" stroke-linejoin="round"/></svg>';
 
+  // Late | Excused | Missing as one segmented control, like the grader's.
   function ledgerStatusHtml(aid, sid, current) {
     return (
-      '<div class="ldg-status">' +
+      '<div class="ldg-status grader-status" role="group" aria-label="Status">' +
       LEDGER_STATUSES.map(function (s) {
         var on = current === s[0];
         return (
-          '<button type="button" class="ldg-chip' +
-          (on ? ' ' + s[2] : '') +
+          '<button type="button" class="grader-status-btn ldg-chip' +
+          (on ? ' ' + s[2] + ' is-on is-' + s[0].toLowerCase() : '') +
           '" aria-pressed="' +
           on +
           '" tabindex="-1" data-action="toggleStudentStatus" data-aid="' +
@@ -2282,13 +2289,13 @@ window.PageAssignments = (function () {
           s[1] +
           '</button>'
         );
-      }).join('') +
+      }).join('<span class="grader-status-sep" aria-hidden="true"></span>') +
       '</div>'
     );
   }
 
   function ledgerCommentInner(count) {
-    return LEDGER_COMMENT_ICON + (count > 0 ? '<span class="ldg-note-count">' + count + '</span>' : '');
+    return LEDGER_COMMENT_ICON + 'Comment' + (count > 0 ? '<span class="ldg-note-count">' + count + '</span>' : '');
   }
 
   function ledgerCommentHtml(cid, aid, sid) {
@@ -2302,7 +2309,7 @@ window.PageAssignments = (function () {
       sid +
       '" data-aid="' +
       aid +
-      '" data-stop-prop="true" aria-label="Comments" title="Comments">' +
+      '" data-stop-prop="true" title="Comments">' +
       ledgerCommentInner(count) +
       '</button></div>'
     );
@@ -2511,8 +2518,7 @@ window.PageAssignments = (function () {
       max +
       ' / ' +
       max +
-      '</button></div></div>' +
-      '<div class="ldg-head"><span>Student</span><span>Score</span><span>Status</span><span class="ldg-head-end">Comment</span></div>';
+      '</button></div></div>';
     students.forEach(function (st) {
       var raw = getPointsScore(cid, st.id, a.id);
       var stStatus = statuses[st.id + ':' + a.id] || null;
