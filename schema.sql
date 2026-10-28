@@ -480,6 +480,8 @@ create table term_rating (
   social_traits         text[]      not null default array[]::text[],
   absences              integer     check (absences >= 0),            -- classes absent, total to date at this report (from MyEd)
   lates                 integer     check (lates >= 0),               -- times late, total to date at this report
+  habits                jsonb       not null default '{}',             -- six work habits {completes, ready, others, part, feedback, devices}: 1 Rarely … 4 Consistently, 5 Not Seen
+  approved_at           timestamptz,                                  -- the teacher approved the comment; cleared when it changes
   created_at            timestamptz not null default now(),
   updated_at            timestamptz not null default now(),
   unique (enrollment_id, term)
@@ -833,7 +835,7 @@ create table phone_report_student (
 --   list_course_core_self_assessments(p_course_id uuid)   -- {enrollment_id: {term_key: {core_id: {level, text, goal, date}}}}
 --
 -- Term rating:
---   save_term_rating(p_enrollment_id uuid, p_term integer, p_payload jsonb)
+--   save_term_rating(p_enrollment_id uuid, p_term integer, p_payload jsonb)  -- payload may carry habits {…} and approved true/false
 --   save_term_attendance(p_enrollment_id uuid, p_term integer, p_absences int, p_lates int)
 --   list_course_term_attendance(p_course_id uuid)  -- {enrollment_id: {term: {absences, lates}}}
 --

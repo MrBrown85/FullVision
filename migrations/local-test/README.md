@@ -81,3 +81,21 @@ PGPORT=54331 PGDATABASE=fv_ss python3 phone_reports.py
 Result on 2026-10-25: 37 of 37, with `student_submit.py` at 79 of 79 (its
 lockout test now expects 60 misses per address) and `questionnaires.py` at
 42 of 42.
+
+## Term rating habits and approval (2026-10-28)
+
+`term_rating_habits.py` exercises `20261028_term_rating_habits_approval.sql`.
+`term-rating-prelude.sql` adds `term_rating`, its audit and link tables, and
+`save_term_rating` and a `get_class_bundle` stand-in whose term_ratings block
+is the live one, so the migration's in-place patch runs against the real
+anchor. Habits (stored, replaced whole, Not Seen, every bad value refused,
+audited), approval (set, kept on a second approve, cleared by an edited
+comment or `approved: false`, audited), the old fields, the bundle's
+read-back, and what Teacher B and no JWT can do.
+
+```bash
+PGPORT=54331 PGDATABASE=fv_tq python3 run.py harness.sql term-rating-prelude.sql ../20261028_term_rating_habits_approval.sql
+PGPORT=54331 PGDATABASE=fv_tq python3 term_rating_habits.py
+```
+
+Result on 2026-10-28 (Postgres 17.10, local): 37 of 37.
