@@ -1383,7 +1383,12 @@
   .report-fitmap .sheet-zoom {
     zoom: 1 !important;
     display: block !important;
+    width: auto !important;
+    height: auto !important;
     margin: 0 !important;
+  }
+  .report-fitmap .sheet-zoom > .report-sheet {
+    transform: none !important;
   }
   .report-fitmap .sheet-student {
     width: auto !important;
@@ -1488,11 +1493,23 @@
 .report-fitmap .sheet-label {
   display: none;
 }
+/* A transform, not zoom: zoom re-lays the page out at 13% and rounds every
+   line box, so a thumbnail could grow past what the engine measured. */
 .report-fitmap .sheet-zoom {
-  zoom: 0.13;
   display: inline-block;
+  position: relative;
+  width: calc(8.5in * 0.13);
+  height: calc(11in * 0.13);
   margin: 0 20px 0 0;
   vertical-align: top;
+  overflow: visible;
+}
+.report-fitmap .sheet-zoom:has(.report-sheet[data-paper='legal']) {
+  height: calc(14in * 0.13);
+}
+.report-fitmap .sheet-zoom > .report-sheet {
+  transform: scale(0.13);
+  transform-origin: top left;
 }
 .report-fitmap .sheet-student:not([data-sheets='1']) .sheet-zoom:nth-child(n + 4) .report-sheet {
   outline: 16px solid var(--score-2);
@@ -4128,6 +4145,132 @@ textarea.studio-text {
 }
 .report-sheet .report-progress,
 .report-sheet .report-support-home {
+  margin-bottom: 0 !important;
+}
+
+/* ── Attendance, Missing Work, Learning Dispositions, Self-Assessment (plan PR 6) ── */
+.report-sheet .report-strip {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  padding: 0 14px !important;
+  min-height: 44px;
+  margin-bottom: 0 !important;
+  font-size: var(--text-base);
+}
+.report-strip-title {
+  font-size: var(--text-md);
+  width: 96px;
+  flex: none;
+}
+.report-strip-k {
+  color: #636366;
+}
+.report-strip-meta {
+  margin-left: auto;
+  font-size: var(--text-2xs);
+  color: #636366;
+}
+.report-sheet .report-strip-half {
+  margin-bottom: 0 !important;
+  padding: 10px 14px !important;
+}
+.report-strip-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 6px;
+}
+.report-strip-head b {
+  font-size: var(--text-md);
+}
+.report-strip-figs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.report-strip-fig {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.report-strip-fig b {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.1;
+}
+.report-strip-fig span {
+  font-size: var(--text-2xs);
+  color: #636366;
+}
+.report-disp {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: 18px;
+  row-gap: 8px;
+  font-size: var(--text-base);
+}
+.report-disp-half .report-disp {
+  grid-template-columns: minmax(0, 1fr);
+}
+.report-disp-half .report-disp-head {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+.report-disp-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid #e5e5ea;
+  padding-bottom: 5px;
+}
+.report-disp-word {
+  white-space: nowrap;
+  font-weight: 600;
+}
+.report-sheet .report-learner-profile {
+  margin-bottom: 0 !important;
+}
+.report-self-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 16px;
+  font-size: var(--text-base);
+  line-height: 1.4;
+}
+.report-self-half .report-self-body {
+  grid-template-columns: minmax(0, 1fr);
+}
+.report-self-half .report-self-head {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+.report-self-col {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.report-self-right {
+  border-left: 1px solid #e5e5ea;
+  padding-left: 14px;
+}
+.report-self-half .report-self-right {
+  border-left: 0;
+  padding-left: 0;
+  border-top: 1px solid #e5e5ea;
+  padding-top: 7px;
+}
+.report-self-k {
+  font-size: var(--text-2xs);
+  color: #636366;
+}
+.report-self-goal {
+  font-weight: 600;
+}
+.report-sheet .report-self {
   margin-bottom: 0 !important;
 }
 

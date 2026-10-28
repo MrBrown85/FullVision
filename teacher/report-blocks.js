@@ -259,45 +259,30 @@ window.ReportBlocks = (function () {
 
   // renderBlockNarrative removed — teacher-narrative block now handles all narrative output
 
-  function _renderDimGroup(dimList, rating, groupTitle, options) {
-    options = options || {};
-    const dims = rating.dims || {};
-    // Only the dimensions the teacher rated this term. "Not Assessed" on a
-    // family's copy read as a gap in the teacher's work, not the student's.
-    const rated = dimList.filter(dim => (dims[dim] || 0) > 0);
-    if (rated.length === 0) return '';
-    let html = `<div class="report-learner-title">${groupTitle}</div>`;
-    html += `<div class="report-learner-dims">`;
-    rated.forEach(dim => {
-      const val = dims[dim];
-      const pct = (val / 4) * 100;
-      const label = OBS_LEVEL_LABELS[val];
-      const color = OBS_LEVEL_COLORS[val];
-      const info = OBS_DESCRIPTORS[dim] || {};
-      html += `<div class="report-learner-dim">
-      <div class="report-learner-dim-info">
-        <div class="report-learner-dim-label">${OBS_LABELS[dim]}</div>
-        ${options.descriptions && info.desc ? `<div class="report-dim-note">${esc(info.desc)}</div>` : ''}${options.examples && info.example ? `<div class="report-dim-note report-dim-example">${esc(info.example)}</div>` : ''}
-        <div class="report-learner-dim-value" data-prof="${val}" style="color:${color};margin-top:4px">${levelDots(val)}${label}</div>
-        <div class="report-learner-dim-bar">
-          <div class="report-learner-dim-fill" data-prof-bg="${val}" style="width:${pct}%;background:${color}"></div>
-        </div>
-      </div>
-    </div>`;
-    });
-    html += `</div>`;
-    return html;
-  }
-
+  /* ── Learning Dispositions ────────────────────────────────────────
+     Each disposition the teacher rated in the Term Questionnaire, as how
+     often: Rarely · Sometimes · Usually · Consistently (the four levels
+     the questionnaire stores). Three columns at Row width, one at Side by
+     Side. Developing now only means proficiency. No dots, no bars. */
+  const FREQUENCY_WORDS = { 1: 'Rarely', 2: 'Sometimes', 3: 'Usually', 4: 'Consistently' };
   function renderBlockLearnerDimensions(cid, student, ctx, options) {
+    options = options || {};
+    const half = options.size === 'half';
     const termId = ctx && ctx.termId;
     const rating = getStudentTermRating(cid, student.id, termId);
-    if (!rating) return '';
-    const groups =
-      _renderDimGroup(LEARNING_DIMS, rating, 'Learning Dispositions', options) +
-      _renderDimGroup(RELATIONAL_DIMS, rating, 'Relational & Identity', options);
-    if (!groups) return '';
-    return `<div class="report-learner-profile">${groups}</div>`;
+    const dims = (rating && rating.dims) || {};
+    const list = LEARNING_DIMS.concat(RELATIONAL_DIMS).filter(d => options.rated === false || (dims[d] || 0) > 0);
+    if (!list.length || !list.some(d => (dims[d] || 0) > 0)) return '';
+    const rows = list
+      .map(
+        d =>
+          `<div class="report-disp-row"><span>${esc(OBS_LABELS[d] || d)}</span><span class="report-disp-word" data-level="${dims[d] || 0}">${esc(FREQUENCY_WORDS[dims[d]] || '—')}</span></div>`,
+      )
+      .join('');
+    return `<div class="report-block-box report-learner-profile${half ? ' report-disp-half' : ''}">
+    <div class="report-prof-head report-disp-head"><div class="report-block-title">Learning Dispositions</div>${options.scale !== false ? '<div class="report-prof-meta">Teacher observation · Rarely · Sometimes · Usually · Consistently</div>' : ''}</div>
+    <div class="report-disp">${rows}</div>
+  </div>`;
   }
 
   /* The Teacher Comment box around already-safe HTML. The sheet engine
@@ -1791,41 +1776,132 @@ window.ReportBlocks = (function () {
 
   /* ── Missing Work ── this term's assessments past due with no score, or
      marked not submitted. Nothing for a student with none. */
-  function renderBlockMissingWork(cid, student) {
+  /* ── Missing Work ────────────────────────────────────────────────
+     This term's missing and not-submitted work as of today: one line at
+     Row width ("None this term", or the titles), a count over its words at
+     Side by Side. When there is none it says so, or stays off. */
+  function _asOf(cid) {
+    const d = typeof courseToday === 'function' ? courseToday(cid) : new Date().toISOString().slice(0, 10);
+    return (
+      'As of ' + parseLocalDate(d).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', year: 'numeric' })
+    );
+  }
+  function renderBlockMissingWork(cid, student, ctx, options) {
+    options = options || {};
+    const half = options.size === 'half';
     const missing = _termCells(cid, student).filter(c => c.cell.kind === 'missing' || c.cell.status === 'NS');
-    if (!missing.length) return '';
-    const day = d =>
-      d ? new Date(d + 'T00:00:00').toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }) : '\u2014';
-    const rows = missing
-      .map(
-        c =>
-          `<tr><td>${esc(c.a.title)}</td><td class="col-date">${day(c.a.dueDate || c.a.date)}</td><td>${c.cell.status === 'NS' ? 'Missing' : 'Past Due'}</td></tr>`,
-      )
-      .join('');
-    return `<div class="report-block-box report-missing-work">
-    <div class="report-block-title">Missing Work</div>
-    <table class="report-tag-table"><thead><tr><th style="text-align:left">Assignment</th><th class="col-date" style="text-align:left">Due</th><th style="text-align:left">Status</th></tr></thead><tbody>${rows}</tbody></table>
+    if (!missing.length && options.none === 'off') return '';
+    const n = missing.length;
+    const titles = missing.map(c => esc(c.a.title || '')).join(', ');
+    const words = n
+      ? options.titles !== false
+        ? titles
+        : n + (n === 1 ? ' assignment' : ' assignments')
+      : 'None this term';
+    if (half) {
+      return `<div class="report-block-box report-missing-work report-strip-half">
+    <div class="report-strip-head"><b>Missing Work</b><span class="report-prof-meta">${esc(_asOf(cid))}</span></div>
+    <div class="report-strip-fig"><b>${n}</b><span>${words}</span></div>
+  </div>`;
+    }
+    return `<div class="report-block-box report-missing-work report-strip">
+    <b class="report-strip-title">Missing Work</b><span>${words}</span><span class="report-strip-meta">${esc(_asOf(cid))}</span>
   </div>`;
   }
 
-  /* Attendance: the totals to date the teacher copied from MyEd into the
-     Term Questionnaire, and with them the change since the last report.
-     Nothing to print when neither number is entered. */
+  /* ── Attendance ─────────────────────────────────────────────────
+     The totals the teacher copied from MyEd into the Term Questionnaire:
+     classes absent and times late, this term or the year to date. One
+     line at Row width, two figures at Side by Side. Nothing to print when
+     neither number is entered. */
   function renderBlockAttendance(cid, student, ctx, options) {
+    options = options || {};
+    const half = options.size === 'half';
     const att = getTermAttendance(cid, student.id, ctx.termId);
     if (att.absences == null && att.lates == null) return '';
-    const term = options.thisTerm !== false;
-    const n = v => (v == null ? '\u2014' : String(v));
-    const row = (label, year, now) =>
-      `<tr><td>${label}</td><td class="col-num">${n(year)}</td>${term ? `<td class="col-num">${n(now)}</td>` : ''}</tr>`;
-    return `<div class="report-block-box report-attendance">
-    <table class="report-tag-table"><thead><tr><th style="text-align:left">Attendance</th><th class="col-num">This Year</th>${
-      term ? '<th class="col-num">This Term</th>' : ''
-    }</tr></thead><tbody>${row('Classes Absent', att.absences, att.absencesThisTerm)}${row(
-      'Times Late',
-      att.lates,
-      att.latesThisTerm,
-    )}</tbody></table>
+    const year = options.period === 'year';
+    const absent = year ? att.absences : att.absencesThisTerm;
+    const late = year ? att.lates : att.latesThisTerm;
+    const n = v => (v == null ? '—' : String(v));
+    const when = year ? 'Year to date' : 'This term';
+    const cells = [['Classes Absent', absent]].concat(options.late !== false ? [['Times Late', late]] : []);
+    if (half) {
+      return `<div class="report-block-box report-attendance report-strip-half">
+    <div class="report-strip-head"><b>Attendance</b><span class="report-prof-meta">${when}</span></div>
+    <div class="report-strip-figs">${cells.map(([k, v]) => `<div class="report-strip-fig"><b>${n(v)}</b><span>${k}</span></div>`).join('')}</div>
+  </div>`;
+    }
+    return `<div class="report-block-box report-attendance report-strip">
+    <b class="report-strip-title">Attendance</b>${cells.map(([k, v]) => `<span><span class="report-strip-k">${k}</span> <b>${n(v)}</b></span>`).join('')}<span class="report-strip-meta">${when}</span>
+  </div>`;
+  }
+
+  /* ── Self-Assessment and Goal ──────────────────────────────────────
+     The student's own words from Student Voice: what they are good at as
+     a learner (About Me), their Core Competency reflections (the latest
+     reflection's "why" for each competency), and their goal from the
+     latest Goal Check-In with how it is going and what they will do next.
+     Nothing when the student has answered none of it. */
+  function _voiceText(v) {
+    if (!v) return '';
+    if (v.text != null && String(v.text).trim()) return String(v.text).trim();
+    if (Array.isArray(v.json)) return v.json.filter(Boolean).join(', ');
+    return '';
+  }
+  function renderBlockSelfAssessment(cid, student, ctx, options) {
+    options = options || {};
+    if (typeof StudentVoice === 'undefined') return '';
+    const half = options.size === 'half';
+    const list = StudentVoice.entries(cid, student.id);
+    if (!list.length) return '';
+    const profile = StudentVoice.profile(list);
+    const first = displayNameFirst(student);
+    const sources = [];
+    const left = [];
+    const right = [];
+    const item = (k, v, strong) =>
+      `<div class="report-self-item"><div class="report-self-k">${k}</div><div${strong ? ' class="report-self-goal"' : ''}>${esc(v)}</div></div>`;
+    const quote = t => '“' + t.replace(/^[“"]|[”"]$/g, '') + '”';
+    if (options.strength !== false && profile.about && profile.about.goodAt && profile.about.goodAt.v) {
+      left.push(item("What I'm good at as a learner", quote(_voiceText(profile.about.goodAt.v))));
+      sources.push('About Me');
+    }
+    if (options.core !== false) {
+      const refl = profile.reflections.find(e => e.kind === 'core_reflection');
+      if (refl) {
+        let any = false;
+        refl.items.forEach(it => {
+          if (it.q.kind !== 'scale4' || !it.v || !it.v.json || !it.v.json.why) return;
+          (it.q.core_ids || []).forEach(id => {
+            const why = String(it.v.json.why[id] || '').trim();
+            if (!why) return;
+            const core = typeof getCoreCompetency === 'function' ? getCoreCompetency(id) : null;
+            left.push(item(esc(core ? core.label.replace(/ & /g, ' and ') : id), quote(why)));
+            any = true;
+          });
+        });
+        if (any) sources.push(refl.title || 'Reflection');
+      }
+    }
+    const c = profile.checkin;
+    if (options.goal !== false && c) {
+      const goal = c.coreGoal && _voiceText(c.coreGoal.v);
+      const status = c.status && _voiceText(c.status.v);
+      const next = (c.next && _voiceText(c.next.v)) || (c.coreStep && _voiceText(c.coreStep.v));
+      if (goal) right.push(item('My goal', quote(goal), true));
+      if (status) right.push(item("How it's going", status));
+      if (next) right.push(item("What I'll do next", quote(next)));
+      if (goal || status || next) {
+        const entry = list.find(e => e.kind === 'goal_checkin');
+        sources.push((entry && entry.title) || 'Goal Check-In');
+      }
+    }
+    if (!left.length && !right.length) return '';
+    const uniq = sources.filter((x, i) => sources.indexOf(x) === i);
+    const sub = `In ${esc(first)}'s own words` + (uniq.length ? ', ' + esc(uniq.join(' and ')) : '');
+    return `<div class="report-block-box report-self${half ? ' report-self-half' : ''}">
+    <div class="report-prof-head report-self-head"><div class="report-block-title">Self-Assessment and Goal</div><div class="report-prof-meta">${sub}</div></div>
+    <div class="report-self-body"><div class="report-self-col">${left.join('')}</div>${right.length ? `<div class="report-self-col report-self-right">${right.join('')}</div>` : ''}</div>
   </div>`;
   }
 
@@ -1893,7 +1969,9 @@ window.ReportBlocks = (function () {
       case 'growth':
         return renderBlockGrowth(cid, student);
       case 'missing-work':
-        return renderBlockMissingWork(cid, student);
+        return renderBlockMissingWork(cid, student, ctx, options);
+      case 'self-assessment':
+        return renderBlockSelfAssessment(cid, student, ctx, options);
       case 'term-attendance':
         return renderBlockAttendance(cid, student, ctx, options);
       default:
@@ -1921,6 +1999,7 @@ window.ReportBlocks = (function () {
     renderBlockLegend: renderBlockLegend,
     renderBlockProficiency: renderBlockProficiency,
     renderBlockProgress: renderBlockProgress,
+    renderBlockSelfAssessment: renderBlockSelfAssessment,
     focusArea: focusArea,
     showDefaults: showDefaults,
     renderBlockParentResponse: renderBlockParentResponse,

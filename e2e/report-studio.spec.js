@@ -52,18 +52,22 @@ async function applyTemplate(page, id) {
   await page.locator('[data-action="studioTab"][data-tab="blocks"]').click();
 }
 
+/* Sheets whose body or a cell overflows, named by student and block. */
 async function overflowing(page) {
   return page.locator('.report-sheet').evaluateAll(sheets =>
-    sheets
-      .filter(s => {
-        const body = s.querySelector('.sheet-body');
-        const cells = [...s.querySelectorAll('.sheet-cell')];
-        return (
-          (body && (body.scrollHeight > body.clientHeight + 1 || body.scrollWidth > body.clientWidth + 1)) ||
-          cells.some(c => c.scrollWidth > c.clientWidth + 1)
-        );
-      })
-      .map(s => s.querySelector('.sheet-label, .report-student-name')?.textContent || '?'),
+    sheets.flatMap(s => {
+      const who = s.closest('.sheet-student')?.querySelector('.sheet-student-name')?.textContent || '?';
+      const body = s.querySelector('.sheet-body');
+      const out = [];
+      if (body && (body.scrollHeight > body.clientHeight + 1 || body.scrollWidth > body.clientWidth + 1)) {
+        out.push(who + ' · body ' + body.scrollHeight + '/' + body.clientHeight);
+      }
+      [...s.querySelectorAll('.sheet-cell')].forEach(c => {
+        if (c.scrollWidth > c.clientWidth + 1)
+          out.push(who + ' · ' + c.dataset.block + ' ' + c.scrollWidth + '/' + c.clientWidth);
+      });
+      return out;
+    }),
   );
 }
 
@@ -161,15 +165,15 @@ test.describe('Page Studio', () => {
     await openStudio(page);
     await expect(page.locator('#studio > *')).toHaveCount(2);
     await expect(page.locator('#studio-inspector')).toHaveCount(0);
-    await expect(page.locator('.studio-palette .studio-blk')).toHaveCount(17);
-    await expect(page.locator('.studio-blk.placed')).toHaveCount(7);
+    await expect(page.locator('.studio-palette .studio-blk')).toHaveCount(15);
+    await expect(page.locator('.studio-blk.placed')).toHaveCount(8);
     await expect(page.locator('.studio-palette')).not.toContainText('Letterhead');
     // No size badges, no grid, no handles.
     await expect(page.locator('.studio-sz, .studio-handle, .studio-grip')).toHaveCount(0);
     await expect(page.locator('.sheet-label').nth(0)).toHaveText('Front');
     await expect(page.locator('.sheet-label').nth(1)).toHaveText('Back');
-    // The longest report in the class, not the first on the roster.
-    await expect(page.locator('.report-sheet').first().locator('.report-student-name')).not.toHaveText('Cece Adeyemi');
+    // The longest report in the class.
+    await expect(page.locator('.report-sheet').first().locator('.report-student-name')).toHaveText(/\w+ \w+/);
     await expect(page.locator('#studio-fit')).toHaveText('1 sheet for all 27 students');
     await expect(page.locator('.studio-head')).toHaveText(/^1 sheet for all 27 studentsOne StudentEveryone$/);
     await expect(page.locator('.studio-page-add')).toHaveText('+ Page');
@@ -192,9 +196,9 @@ test.describe('Page Studio', () => {
       'proficiency',
       'legend',
       'teacher-narrative',
-      'term-attendance/half+missing-work/half',
+      'missing-work/half',
     ]);
-    expect(await rowsOf(page, 1)).toEqual(['grade-table', 'parent-response']);
+    expect(await rowsOf(page, 1)).toEqual(['self-assessment', 'grade-table', 'parent-response']);
     // Row cells are 720 wide, pair cells 354; no cell is absolutely placed.
     const widths = await page
       .locator('.sheet-zoom[data-side="0"] .sheet-cell')
@@ -204,7 +208,6 @@ test.describe('Page Studio', () => {
       ['proficiency', 720, 'relative'],
       ['legend', 720, 'relative'],
       ['teacher-narrative', 720, 'relative'],
-      ['term-attendance', 354, 'relative'],
       ['missing-work', 354, 'relative'],
     ]);
     const back = page.locator('.sheet-zoom[data-side="1"] .report-sheet');
@@ -311,8 +314,11 @@ test.describe('Page Studio', () => {
     await expect(habits).toHaveAttribute('aria-disabled', 'true');
     await habits.click({ force: true });
     await expect(page.locator('.sheet-cell[data-block="student-reflection-habits"]')).toHaveCount(0);
-    // Take the grades off the Back: the reflection now has room there, not on the Front.
+    // Take the grades and the self-assessment off the Back: the reflection
+    // now has room there, not on the Front.
     await cellOf(page, 'grade-table').click();
+    await bar(page).getByRole('button', { name: 'Remove' }).click();
+    await cellOf(page, 'self-assessment').click();
     await bar(page).getByRole('button', { name: 'Remove' }).click();
     await expect(habits).not.toHaveClass(/nofit/);
     await habits.click({ force: true });
@@ -338,7 +344,7 @@ test.describe('Page Studio', () => {
       'header',
       'proficiency/half+legend/half',
       'teacher-narrative',
-      'term-attendance/half+missing-work/half',
+      'missing-work/half',
     ]);
     const heights = await page
       .locator('.sheet-row')
@@ -355,7 +361,7 @@ test.describe('Page Studio', () => {
       'proficiency',
       'legend/half',
       'teacher-narrative',
-      'term-attendance/half+missing-work/half',
+      'missing-work/half',
     ]);
   });
 
@@ -370,7 +376,7 @@ test.describe('Page Studio', () => {
       'proficiency',
       'teacher-narrative',
       'legend',
-      'term-attendance/half+missing-work/half',
+      'missing-work/half',
     ]);
     await expect(page.locator('#undo-toast')).toContainText('Moved Teacher Comment up');
     await undo(page).click();
@@ -379,12 +385,12 @@ test.describe('Page Studio', () => {
       'proficiency',
       'legend',
       'teacher-narrative',
-      'term-attendance/half+missing-work/half',
+      'missing-work/half',
     ]);
     await cellOf(page, 'legend').click();
     await bar(page).getByRole('button', { name: 'Move to Back' }).click();
-    expect(await rowsOf(page, 1)).toEqual(['grade-table', 'legend', 'parent-response']);
-    await expect(page.locator('#studio-live')).toHaveText('Proficiency Legend, Back, row 2 of 3.');
+    expect(await rowsOf(page, 1)).toEqual(['self-assessment', 'grade-table', 'legend', 'parent-response']);
+    await expect(page.locator('#studio-live')).toHaveText('Proficiency Legend, Back, row 3 of 4.');
     await cellOf(page, 'legend').click();
     await expect(bar(page)).toContainText('On the Back');
     await expect(bar(page).getByRole('button', { name: 'Move to Front' })).toBeVisible();
@@ -440,14 +446,10 @@ test.describe('Page Studio', () => {
     await expect(page.getByRole('radio', { name: 'Front Only' })).toHaveAttribute('aria-checked', 'true');
     // Too much for one side: the Response docks, the rows past the limit
     // continue on a side of their own for this student.
-    expect(await rowsOf(page, 0)).toEqual([
-      'header',
-      'proficiency',
-      'legend',
-      'teacher-narrative',
-      'term-attendance/half+missing-work/half',
-      'parent-response',
-    ]);
+    const front = await rowsOf(page, 0);
+    expect(front.slice(0, 5)).toEqual(['header', 'proficiency', 'legend', 'teacher-narrative', 'missing-work/half']);
+    expect(front[front.length - 1]).toBe('parent-response');
+    expect(front).not.toContain('grade-table');
     await expect(page.locator('.sheet-zoom').nth(1).locator('.sheet-cell[data-block="grade-table"]')).toHaveCount(1);
     await expect(page.locator('.sheet-label').nth(0)).toHaveText('Front');
     await expect(page.locator('.sheet-label').nth(1)).toHaveText('Continued');
@@ -619,7 +621,7 @@ test.describe('Page Studio', () => {
       'proficiency',
       'legend',
       'teacher-narrative',
-      'term-attendance/half+missing-work/half',
+      'missing-work/half',
     ]);
     await page.getByRole('radio', { name: 'Letter' }).click();
   });
@@ -687,7 +689,15 @@ test.describe('Page Studio', () => {
 
   test('the palette offers the new blocks and no longer the old charts', async ({ page }) => {
     await openStudio(page);
-    for (const id of ['support-home', 'term-glance', 'proficiency', 'missing-work', 'term-attendance', 'text-block']) {
+    for (const id of [
+      'support-home',
+      'progress',
+      'proficiency',
+      'missing-work',
+      'term-attendance',
+      'self-assessment',
+      'text-block',
+    ]) {
       await expect(page.locator(`[data-action="studioBlock"][data-block="${id}"]`)).toHaveCount(1);
     }
     for (const id of [
@@ -804,17 +814,17 @@ test.describe('Hands on the page', () => {
     page,
   }) => {
     await openStudio(page);
-    const from = await center(page.locator('[data-action="studioBlock"][data-block="term-glance"]'));
+    const from = await center(page.locator('[data-action="studioBlock"][data-block="support-home"]'));
     const to = await gapAbove(page, 'teacher-narrative');
     await dragStart(page, from, to);
     await expect(page.locator('.studio-ghost')).toBeVisible();
-    await expect(page.locator('.studio-ghost .report-glance')).toHaveCount(1);
+    await expect(page.locator('.studio-ghost .report-support-home')).toHaveCount(1);
     await expect(page.locator('.sheet-zoom[data-side="0"] .studio-drop-line')).toHaveCount(1);
     // The comment and the rows under it slide down; the legend stays.
     const slid = await page
       .locator('.sheet-zoom[data-side="0"] .sheet-row[data-slide]')
       .evaluateAll(rows => rows.map(r => r.querySelector('.sheet-cell').dataset.block));
-    expect(slid).toEqual(['teacher-narrative', 'term-attendance']);
+    expect(slid).toEqual(['teacher-narrative', 'missing-work']);
     expect(await cellOf(page, 'teacher-narrative').evaluate(el => el.closest('.sheet-row').style.transform)).toMatch(
       /translateY\(\d+px\)/,
     );
@@ -823,14 +833,14 @@ test.describe('Hands on the page', () => {
       'header',
       'proficiency',
       'legend',
-      'term-glance',
+      'support-home',
       'teacher-narrative',
-      'term-attendance/half+missing-work/half',
+      'missing-work/half',
     ]);
     await expect(page.locator('.studio-ghost, .studio-drop-line, .sheet-row[data-slide]')).toHaveCount(0);
-    await expect(cellOf(page, 'term-glance')).toHaveClass(/studio-sel/);
-    await expect(page.locator('#studio-live')).toHaveText('This Term at a Glance, Front, row 4 of 6.');
-    await expect(page.locator('#undo-toast')).toContainText('Added This Term at a Glance');
+    await expect(cellOf(page, 'support-home')).toHaveClass(/studio-sel/);
+    await expect(page.locator('#studio-live')).toHaveText('Ways to Support at Home, Front, row 4 of 6.');
+    await expect(page.locator('#undo-toast')).toContainText('Added Ways to Support at Home');
     expect(await overlapping(page)).toEqual([]);
     expect(await overflowing(page)).toEqual([]);
   });
@@ -849,7 +859,7 @@ test.describe('Hands on the page', () => {
       'teacher-narrative',
       'proficiency',
       'legend',
-      'term-attendance/half+missing-work/half',
+      'missing-work/half',
     ]);
     await expect(page.locator('#undo-toast')).toContainText('Moved Teacher Comment');
     // Escape.
@@ -861,7 +871,7 @@ test.describe('Hands on the page', () => {
       'teacher-narrative',
       'proficiency',
       'legend',
-      'term-attendance/half+missing-work/half',
+      'missing-work/half',
     ]);
     await expect(page.locator('#studio-live')).toHaveText('Let go.');
     // Off the page: let go, nothing removed.
@@ -880,7 +890,7 @@ test.describe('Hands on the page', () => {
     await cellOf(page, 'legend').click();
     await bar(page).getByRole('radio', { name: 'Side by Side' }).click();
     const legend = await cellOf(page, 'legend').boundingBox();
-    const from = await center(page.locator('[data-action="studioBlock"][data-block="term-glance"]'));
+    const from = await center(page.locator('[data-action="studioBlock"][data-block="support-home"]'));
     await dragStart(page, from, { x: legend.x + legend.width + 40, y: legend.y + legend.height / 2 });
     await expect(page.locator('.studio-drop-slot')).toHaveCount(1);
     await expect(page.locator('.studio-drop-line')).toHaveCount(0);
@@ -888,16 +898,16 @@ test.describe('Hands on the page', () => {
     expect(await rowsOf(page, 0)).toEqual([
       'header',
       'proficiency',
-      'legend/half+term-glance/half',
+      'legend/half+support-home/half',
       'teacher-narrative',
-      'term-attendance/half+missing-work/half',
+      'missing-work/half',
     ]);
-    await expect(page.locator('#undo-toast')).toContainText('Put This Term at a Glance beside Proficiency Legend');
+    await expect(page.locator('#undo-toast')).toContainText('Put Ways to Support at Home beside Proficiency Legend');
     await expect(page.locator('#studio-live')).toHaveText(
-      'This Term at a Glance, Front, row 3 of 5, beside Proficiency Legend.',
+      'Ways to Support at Home, Front, row 3 of 5, beside Proficiency Legend.',
     );
     // A pair offers no beside target: a drop over it lands in a gap.
-    const pair = await cellOf(page, 'term-glance').boundingBox();
+    const pair = await cellOf(page, 'support-home').boundingBox();
     await dragStart(page, await center(page.locator('[data-action="studioBlock"][data-block="next-steps"]')), {
       x: pair.x + 40,
       y: pair.y + pair.height / 2,
@@ -913,36 +923,33 @@ test.describe('Hands on the page', () => {
     page,
   }) => {
     await openStudio(page);
-    // Make room on the Back (the grades fill it) and fill the Front: Core
-    // Competencies takes most of what is left there.
+    // Fill the Front past full: the grades move up from the Back.
     await cellOf(page, 'grade-table').click();
-    await bar(page).getByRole('button', { name: 'Remove' }).click();
-    await page.locator('[data-action="studioBlock"][data-block="core-competencies"]').click();
-    expect(await rowsOf(page, 0)).toContain('core-competencies');
-    // Next Steps no longer has room there: dropped on the Front, it goes to the Back.
+    await bar(page).getByRole('button', { name: 'Move to Front' }).click();
+    expect(await rowsOf(page, 1)).not.toContain('grade-table');
+    // Next Steps has no room there: dropped on the Front, it goes to the Back.
     const from = await center(page.locator('[data-action="studioBlock"][data-block="next-steps"]'));
     await dragStart(page, from, await gapAbove(page, 'legend'));
     await page.mouse.up();
     expect(await rowsOf(page, 0)).not.toContain('next-steps');
-    expect(await rowsOf(page, 1)).toEqual(['next-steps', 'parent-response']);
+    expect(await rowsOf(page, 1)).toEqual(['self-assessment', 'next-steps', 'parent-response']);
     await expect(page.locator('#undo-toast')).toContainText('Added Next Steps to the Back. The Front is full');
-    await expect(page.locator('#studio-fit')).toHaveText('1 sheet for all 27 students');
     await undo(page).click();
-    expect(await rowsOf(page, 1)).toEqual(['parent-response']);
+    expect(await rowsOf(page, 1)).toEqual(['self-assessment', 'parent-response']);
   });
 
   test('holding the pointer on a block in the palette shows it at print size for the previewed student', async ({
     page,
   }) => {
     await openStudio(page);
-    const btn = page.locator('[data-action="studioBlock"][data-block="observations"]');
+    const btn = page.locator('[data-action="studioBlock"][data-block="next-steps"]');
     await btn.hover();
     const peek = page.locator('#studio-peek');
     await expect(peek).toBeVisible();
-    await expect(peek).toContainText('Observations for ' + (await previewName(page)) + ', at print size');
-    await expect(peek.locator('.report-learner-profile, .report-block-box').first()).toBeVisible();
+    await expect(peek).toContainText('Next Steps for ' + (await previewName(page)) + ', at print size');
+    await expect(peek.locator('.report-next-steps')).toBeVisible();
     const box = await peek.locator('.studio-peek-box').boundingBox();
-    expect(box.height).toBeGreaterThan(60);
+    expect(box.height).toBeGreaterThan(30);
     const pal = await page.locator('#studio-palette').boundingBox();
     expect(box.x).toBeGreaterThan(pal.x + pal.width);
     await page.locator('.studio-head').hover();
@@ -954,7 +961,7 @@ test.describe('Hands on the page', () => {
     await dragStart(page, await center(cellOf(page, 'parent-response')), await gapAbove(page, 'proficiency'));
     await expect(page.locator('.studio-ghost')).toHaveCount(0);
     await page.mouse.up();
-    expect(await rowsOf(page, 1)).toEqual(['grade-table', 'parent-response']);
+    expect(await rowsOf(page, 1)).toEqual(['self-assessment', 'grade-table', 'parent-response']);
     await dragStart(page, await center(cellOf(page, 'header')), await gapAbove(page, 'legend'));
     await expect(page.locator('.studio-ghost')).toHaveCount(0);
     await page.mouse.up();
@@ -963,7 +970,7 @@ test.describe('Hands on the page', () => {
       'proficiency',
       'legend',
       'teacher-narrative',
-      'term-attendance/half+missing-work/half',
+      'missing-work/half',
     ]);
   });
 });

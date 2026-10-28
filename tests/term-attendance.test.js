@@ -66,8 +66,14 @@ describe('term attendance', () => {
     saveTermAttendance(CID, MAX.id, 'term-1', 4, 3);
     saveTermAttendance(CID, MAX.id, 'term-3', 10, 5);
     const html = ReportBlocks.renderBlockAttendance(CID, MAX, ctx, {});
-    expect(html).toContain('Classes Absent</td><td class="col-num">10</td><td class="col-num">6</td>');
-    expect(html).toContain('Times Late</td><td class="col-num">5</td><td class="col-num">2</td>');
-    expect(ReportBlocks.renderBlockAttendance(CID, MAX, ctx, { thisTerm: false })).not.toContain('This Term');
+    // This term by default (the totals less the last report's), the year on request.
+    expect(html).toContain('Classes Absent</span> <b>6</b>');
+    expect(html).toContain('Times Late</span> <b>2</b>');
+    expect(html).toContain('This term');
+    const year = ReportBlocks.renderBlockAttendance(CID, MAX, ctx, { period: 'year' });
+    expect(year).toContain('Classes Absent</span> <b>10</b>');
+    expect(year).toContain('Times Late</span> <b>5</b>');
+    expect(year).toContain('Year to date');
+    expect(ReportBlocks.renderBlockAttendance(CID, MAX, ctx, { late: false })).not.toContain('Times Late');
   });
 });
