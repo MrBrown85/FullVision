@@ -5771,58 +5771,165 @@ window.PageAssignments = (function () {
       closeGrader();
       return;
     }
-    // The header is drawn once and only updated, so a save that redraws
-    // the controls (a points box on blur) doesn't swap out the button
-    // being clicked.
+    // The toolbar and student header are drawn once and only updated, so a
+    // save that redraws the controls (a points box on blur) doesn't swap out
+    // the button being clicked.
     if (!dialog.firstChild)
       dialog.innerHTML =
-        '<div class="grader-head">' +
+        '<div class="grader-toolbar">' +
+        '<div class="grader-toolbar-start"></div>' +
         '<h2 class="grader-title" id="grader-title"></h2>' +
-        '<button type="button" class="grader-close" data-grader="close" aria-label="Close">\u2715</button>' +
+        '<div class="grader-toolbar-end"><button type="button" class="grader-done" data-grader="close">Done</button></div>' +
         '</div>' +
-        '<div class="grader-steps">' +
-        '<button type="button" class="btn btn-ghost" data-grader="prev">\u25C0 Previous Student</button>' +
-        '<span class="grader-student"></span>' +
-        '<button type="button" class="btn btn-ghost" data-grader="next">Next Student \u25B6</button>' +
+        '<div class="grader-scroll">' +
+        '<div class="grader-student-row">' +
+        '<button type="button" class="grader-step" data-grader="prev" aria-label="Previous student">' +
+        _GRADER_CHEVRON_LEFT +
+        '</button>' +
+        '<h1 class="grader-student"></h1>' +
+        '<button type="button" class="grader-step" data-grader="next" aria-label="Next student">' +
+        _GRADER_CHEVRON_RIGHT +
+        '</button>' +
+        '<span class="grader-spacer"></span>' +
+        '<div class="grader-status" role="group" aria-label="Status"></div>' +
         '</div>' +
         '<div class="grader-body"></div>' +
-        '<div class="grader-foot">Grade: <strong></strong></div>';
+        '<section class="grader-feedback" aria-labelledby="grader-feedback-title">' +
+        '<div class="grader-feedback-head"><h2 id="grader-feedback-title">Overall Feedback</h2>' +
+        '<button type="button" class="grader-add-comment" data-action="openCommentPopover">' +
+        _GRADER_PLUS +
+        'Add Comment</button></div>' +
+        '<div class="grader-feedback-list"></div>' +
+        '</section>' +
+        '</div>' +
+        '<div class="grader-foot">' +
+        '<span class="grader-hint">← → change student · Esc closes</span>' +
+        '<span class="grader-grade-label">Grade</span><span class="grader-grade"></span>' +
+        '</div>';
     var i = _grader.studentIds.indexOf(st.id);
     dialog.querySelector('.grader-title').textContent = a.title || 'Assessment';
     dialog.querySelector('.grader-student').textContent = displayNameWithLast(st);
     dialog.querySelector('[data-grader="prev"]').disabled = !(i > 0);
     dialog.querySelector('[data-grader="next"]').disabled = !(i >= 0 && i < _grader.studentIds.length - 1);
+    dialog.querySelector('.grader-toolbar-start').innerHTML = _graderPrintButton(cid, a);
+    var add = dialog.querySelector('.grader-add-comment');
+    add.dataset.cid = cid;
+    add.dataset.sid = st.id;
+    add.dataset.aid = a.id;
     dialog.querySelector('.grader-body').innerHTML =
       '<div class="assess-card open active" id="ac-' +
       a.id +
       '"><div class="assess-body">' +
       _graderHtml(cid, a, _scoreTagObjs(cid, a), [st], getScores(cid)) +
       '</div></div>';
-    dialog.querySelector('.grader-foot strong').textContent = _graderGradeText(cid, a, st.id);
+    _refreshGraderChrome();
   }
 
-  // The assessment's grade for the student, in words.
-  function _graderGradeText(cid, a, sid) {
-    var cell = assessmentCellValue(cid, sid, a);
-    if (cell.kind === 'status') return cell.status === 'NS' ? 'Missing' : 'Excused';
-    if (cell.kind === 'complete') return cell.mark === 'complete' ? 'Complete' : 'Incomplete';
-    if (cell.kind === 'level')
-      return PROF_LABELS[Math.max(1, Math.min(4, Math.round(cell.value)))] + ' (' + cell.text + ')';
-    if (cell.kind === 'points') return cell.text + ' of ' + (a.maxPoints || 100);
-    return 'Not Graded';
+  var _GRADER_CHEVRON_LEFT =
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>';
+  var _GRADER_CHEVRON_RIGHT =
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>';
+  var _GRADER_PLUS =
+    '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
+  var _GRADER_PRINTER =
+    '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/></svg>';
+
+  /* Print Rubric on rubric work, Print on work scored by competency levels
+     (it prints the levels and feedback), nothing on points or
+     Complete/Incomplete work, which has nothing of its own to print. */
+  function _graderPrintButton(cid, a) {
+    if (isPointsScored(a)) return '';
+    var label = a.rubricId && getRubricById(cid, a.rubricId) ? 'Print Rubric' : 'Print';
+    return (
+      '<button type="button" class="grader-print" data-action="printRubrics" data-aid="' +
+      a.id +
+      '">' +
+      _GRADER_PRINTER +
+      label +
+      '</button>'
+    );
   }
 
-  // Most grading controls save without redrawing, so the grade line is
-  // brought up to date after each one.
-  function _graderAfterEvent() {
-    setTimeout(function () {
-      if (!_grader) return;
-      var a = getAssessments(activeCourse).find(function (x) {
-        return x.id === _grader.aid;
+  /* The parts of the dialog that change with every click: the status
+     control, the comment list and the grade. */
+  function _refreshGraderChrome() {
+    if (!_grader) return;
+    var cid = activeCourse;
+    var sid = focusStudentId;
+    var a = getAssessments(cid).find(function (x) {
+      return x.id === _grader.aid;
+    });
+    var dialog = _grader.overlay.querySelector('.grader-dialog');
+    if (!a || !sid || !dialog) return;
+    var status = getAssignmentStatus(cid, sid, a.id);
+    dialog.querySelector('.grader-status').innerHTML = [
+      ['NS', 'Missing'],
+      ['EXC', 'Excused'],
+      ['LATE', 'Late'],
+    ]
+      .map(function (s) {
+        var on = status === s[0];
+        return (
+          '<button type="button" class="grader-status-btn' +
+          (on ? ' is-on is-' + s[0].toLowerCase() : '') +
+          '" aria-pressed="' +
+          on +
+          '" data-action="toggleStudentStatus" data-aid="' +
+          a.id +
+          '" data-sid="' +
+          sid +
+          '" data-status="' +
+          s[0] +
+          '">' +
+          s[1] +
+          '</button>'
+        );
+      })
+      .join('');
+    var notes = getAssignmentObs(cid, sid, a.id)
+      .slice()
+      .sort(function (x, y) {
+        return (x.created || '') < (y.created || '') ? -1 : 1;
       });
-      var out = _grader.overlay.querySelector('.grader-foot strong');
-      if (a && out && focusStudentId) out.textContent = _graderGradeText(activeCourse, a, focusStudentId);
-    }, 0);
+    dialog.querySelector('.grader-feedback-list').innerHTML = notes.length
+      ? notes
+          .map(function (o) {
+            return (
+              '<p class="grader-note">' +
+              (o.date ? '<span class="grader-note-date">' + esc(formatDate(o.date)) + '</span>' : '') +
+              esc(o.text || '') +
+              '</p>'
+            );
+          })
+          .join('')
+      : '<p class="grader-note grader-note-empty">No comments on this assignment yet.</p>';
+    var grade = _graderGrade(cid, a, sid);
+    var pill = dialog.querySelector('.grader-grade');
+    pill.textContent = grade.text;
+    pill.className = 'grader-grade' + (grade.tone ? ' tone-' + grade.tone : '');
+  }
+
+  // The assessment's grade for the student, in words, and the colour its
+  // capsule takes: a level's own colour, Complete green, Incomplete and
+  // Missing red, points dark, Excused and ungraded grey.
+  function _graderGrade(cid, a, sid) {
+    var cell = assessmentCellValue(cid, sid, a);
+    if (cell.kind === 'status')
+      return cell.status === 'NS' ? { text: 'Missing', tone: 'l1' } : { text: 'Excused', tone: 'muted' };
+    if (cell.kind === 'complete')
+      return cell.mark === 'complete' ? { text: 'Complete', tone: 'l3' } : { text: 'Incomplete', tone: 'l1' };
+    if (cell.kind === 'level') {
+      var lv = Math.max(1, Math.min(4, Math.round(cell.value)));
+      return { text: PROF_LABELS[lv] + ' (' + cell.text + ')', tone: 'l' + lv };
+    }
+    if (cell.kind === 'points') return { text: cell.text + ' of ' + (a.maxPoints || 100), tone: 'ink' };
+    return { text: 'Not Graded', tone: 'muted' };
+  }
+
+  // Most grading controls save without redrawing, so the status, comments
+  // and grade are brought up to date after each one.
+  function _graderAfterEvent() {
+    setTimeout(_refreshGraderChrome, 0);
   }
 
   function closeGrader() {

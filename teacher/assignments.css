@@ -4575,67 +4575,249 @@
   padding: 12vh 24px 24px;
 }
 .grader-dialog {
-  background: var(--surface);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
-  width: min(960px, 100%);
+  background: var(--bg);
+  border-radius: 20px;
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.18),
+    0 2px 6px rgba(0, 0, 0, 0.08);
+  width: min(1040px, 100%);
   max-height: calc(88vh - 24px);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   outline: none;
 }
-.grader-head {
-  display: flex;
+.grader-toolbar {
+  flex-shrink: 0;
+  height: 52px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  gap: 12px;
-  padding: 16px 20px 8px;
+  padding: 0 16px;
+  background: var(--surface);
+  box-shadow: 0 0.5px 0 var(--divider-heavy);
+}
+.grader-toolbar-end {
+  display: flex;
+  justify-content: flex-end;
 }
 .grader-title {
-  flex: 1;
   margin: 0;
-  font-size: var(--text-lg);
-  font-weight: 700;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
 }
-.grader-close {
+.grader-print,
+.grader-add-comment {
+  height: 30px;
+  padding: 0 12px;
   border: none;
-  background: none;
-  font-size: 1.125rem;
-  color: var(--text-2);
+  border-radius: 8px;
+  background: var(--active-light);
+  color: var(--active);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   cursor: pointer;
-  padding: 4px 8px;
-  border-radius: var(--radius-sm);
 }
-.grader-close:hover {
-  background: var(--bg);
+.grader-add-comment {
+  border-radius: 15px;
 }
-.grader-steps {
+.grader-done {
+  height: 30px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 15px;
+  background: var(--active);
+  color: #fff;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.grader-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 20px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.grader-student-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 0 20px 12px;
-  border-bottom: 1px solid var(--divider-medium);
+  gap: 14px;
 }
 .grader-student {
-  font-weight: 600;
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
 }
-.grader-body {
-  overflow: auto;
-  padding: 12px 20px;
+.grader-step {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 17px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.12),
+    0 0 0 0.5px var(--divider-medium);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.grader-step:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.grader-spacer {
+  flex: 1;
+}
+.grader-status {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 9px;
+  background: rgba(118, 118, 128, 0.14);
+}
+.grader-status-btn {
+  height: 28px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.grader-status-btn.is-on {
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.18);
+}
+.grader-status-btn.is-ns {
+  background: var(--score-1);
+}
+.grader-status-btn.is-exc {
+  background: var(--text-2);
+}
+.grader-status-btn.is-late {
+  background: var(--score-2);
 }
 .grader-body .assess-card {
   border: none;
   box-shadow: none;
   margin: 0;
-  background: none;
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 4px 14px;
+}
+/* The dialog grades one student: their name, status and Comment live in
+   its header and Overall Feedback, so the grids' own copies stand aside. */
+.grader-body .rsg-student {
+  grid-template-columns: minmax(0, 1fr) 36px;
+}
+.grader-body .rsg-student-name,
+.grader-body .ldg-head,
+.grader-body .ldg-name,
+.grader-body .ldg-status,
+.grader-body .ldg-comment {
+  display: none;
+}
+.grader-body .ldg-grid {
+  --ldg-cols: minmax(0, 1fr);
+}
+.grader-feedback {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.grader-feedback-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 4px;
+}
+.grader-feedback-head h2 {
+  flex: 1;
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--text);
+}
+.grader-feedback-list {
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 6px 16px;
+  box-shadow: 0 0 0 0.5px var(--divider-medium);
+}
+.grader-note {
+  margin: 0;
+  padding: 10px 0;
+  font-size: var(--text-base);
+  line-height: 1.5;
+  color: var(--text);
+}
+.grader-note + .grader-note {
+  border-top: 1px solid var(--divider-subtle);
+}
+.grader-note-date {
+  display: block;
+  font-size: var(--text-xs);
+  font-weight: 600;
 }
 .grader-foot {
-  padding: 12px 20px 16px;
-  border-top: 1px solid var(--divider-medium);
-  text-align: right;
-  color: var(--text-2);
+  flex-shrink: 0;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 20px;
+  background: var(--surface);
+  box-shadow: 0 -0.5px 0 var(--divider-heavy);
+  color: var(--text);
 }
-.grader-foot strong {
+.grader-hint {
+  flex: 1;
+  font-size: var(--text-sm);
+}
+.grader-grade-label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.grader-grade {
+  padding: 5px 12px;
+  border-radius: 14px;
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: #fff;
+  background: var(--text);
+}
+.grader-grade.tone-l4 {
+  background: var(--score-4);
+}
+.grader-grade.tone-l3 {
+  background: var(--score-3);
+}
+.grader-grade.tone-l2 {
+  background: var(--score-2);
+}
+.grader-grade.tone-l1 {
+  background: var(--score-1);
+}
+.grader-grade.tone-muted {
+  background: var(--surface-2);
   color: var(--text);
 }
 /* The column header's levels and the Set Unmarked buttons fill every
