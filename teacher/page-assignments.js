@@ -828,6 +828,11 @@ window.PageAssignments = (function () {
       '</div>';
 
     // Assessment cards grouped by module folders
+    var focusSt = focusStudentId
+      ? students.find(function (st) {
+          return st.id === focusStudentId;
+        })
+      : null;
     function renderAssessCard(a, isUncategorized) {
       var isOpen = focusStudentId
         ? _allExpanded
@@ -994,17 +999,9 @@ window.PageAssignments = (function () {
             esc(a.description) +
             '</div>'
           : '') +
-        _graderHtml(
-          cid,
-          a,
-          tagObjs,
-          focusStudentId
-            ? students.filter(function (st) {
-                return st.id === focusStudentId;
-              })
-            : students,
-          scores,
-        ) +
+        (focusSt
+          ? _inlineGraderHtml(cid, a, tagObjs, focusSt, scores)
+          : _graderHtml(cid, a, tagObjs, focusStudentId ? [] : students, scores)) +
         '</div>' +
         '</div>';
       return c;
@@ -1247,7 +1244,9 @@ window.PageAssignments = (function () {
         );
       });
     }
-    if (hasActiveRubricView) showDescriptorBar();
+    // One student's tiles show every level's wording, so the hover bar is
+    // only for the whole class.
+    if (hasActiveRubricView && !focusStudentId) showDescriptorBar();
     else hideDescriptorBar();
   }
 
@@ -2137,7 +2136,7 @@ window.PageAssignments = (function () {
   function setRubricView(aid, isRubric) {
     rubricViewStates[aid] = isRubric;
     render();
-    if (isRubric) showDescriptorBar();
+    if (isRubric && !focusStudentId) showDescriptorBar();
     else hideDescriptorBar();
   }
 
@@ -2692,6 +2691,9 @@ window.PageAssignments = (function () {
         row.querySelectorAll('.rsg-criterion-row').forEach(syncModRow);
       }
       refreshLedgerSummary(row.closest('.ldg-grid'));
+    } else if (!_grader && document.querySelector('.grader-inline')) {
+      // One student's grader on the page: redraw its status, lock and grade.
+      render();
     }
     refreshSidebarGrades(sid);
   }
@@ -5438,26 +5440,27 @@ window.PageAssignments = (function () {
         confirmFillRubricAll(el.dataset.aid, parseInt(el.dataset.score, 10), el.dataset.label);
       },
       graderLevel: function () {
-        _graderSetLevel(el.dataset.critid, parseInt(el.dataset.level, 10));
+        _graderSetLevel(_graderAid(el), el.dataset.critid, parseInt(el.dataset.level, 10));
       },
       graderTagLevel: function () {
-        _graderSetTagLevel(el.dataset.tag, parseInt(el.dataset.level, 10));
+        _graderSetTagLevel(_graderAid(el), el.dataset.tag, parseInt(el.dataset.level, 10));
       },
       graderTagMod: function () {
-        _graderSetTagMod(el.dataset.tag, parseInt(el.dataset.mod, 10));
+        _graderSetTagMod(_graderAid(el), el.dataset.tag, parseInt(el.dataset.mod, 10));
       },
       graderMark: function () {
-        if (!_grader || !focusStudentId) return;
-        var now = getCompletionMark(activeCourse, focusStudentId, _grader.aid);
-        setCompletionMark(activeCourse, focusStudentId, _grader.aid, now === el.dataset.mark ? null : el.dataset.mark);
+        var aid = _graderAid(el);
+        if (!aid || !focusStudentId) return;
+        var now = getCompletionMark(activeCourse, focusStudentId, aid);
+        setCompletionMark(activeCourse, focusStudentId, aid, now === el.dataset.mark ? null : el.dataset.mark);
         refreshSidebarGrades(focusStudentId);
         render();
       },
       graderTick: function () {
-        _graderTick(el.dataset.critid, el.dataset.checkid, el.checked);
+        _graderTick(_graderAid(el), el.dataset.critid, el.dataset.checkid, el.checked);
       },
       graderMod: function () {
-        _graderSetMod(el.dataset.critid, parseInt(el.dataset.mod, 10));
+        _graderSetMod(_graderAid(el), el.dataset.critid, parseInt(el.dataset.mod, 10));
       },
       toggleStudentStatus: function () {
         toggleStudentStatus(el.dataset.aid, el.dataset.sid, el.dataset.status);
@@ -5639,17 +5642,19 @@ window.PageAssignments = (function () {
       _setModuleDraggable(el, true);
       return;
     }
-    if (el.dataset.actionBlur === 'graderPoints' && _grader) {
+    if (el.dataset.actionBlur === 'graderPoints') {
       _graderCommitPoints(el);
       return;
     }
-    if (el.dataset.actionBlur === 'graderCritNote' && _grader) {
+    if (el.dataset.actionBlur === 'graderCritNote') {
+      var noteAid = _graderAid(el);
       var text = el.value.trim();
+      if (!noteAid || !focusStudentId) return;
       if (
         text !==
-        getRubricCriterionComment(activeCourse, focusStudentId, _grader.aid, _graderCriterion(el.dataset.critid))
+        getRubricCriterionComment(activeCourse, focusStudentId, noteAid, _graderCriterion(noteAid, el.dataset.critid))
       )
-        saveRubricCriterionComment(activeCourse, focusStudentId, _grader.aid, el.dataset.critid, text);
+        saveRubricCriterionComment(activeCourse, focusStudentId, noteAid, el.dataset.critid, text);
       el.classList.toggle('has-text', !!text);
       return;
     }
@@ -5684,6 +5689,8 @@ window.PageAssignments = (function () {
   }
 
   function _handleKeydown(e) {
+    // One student's grader open on the page (the dialog runs its own).
+    if (!_grader && _graderCardKey(e)) return;
     // A module name: Enter saves, Escape puts back the saved name.
     if (e.target && e.target.dataset && e.target.dataset.actionBlur === 'moduleName') {
       if (e.key === 'Enter') {
@@ -6158,29 +6165,7 @@ window.PageAssignments = (function () {
      puts back the saved points, as on this page; a second Escape closes. */
   function _graderKeydown(e) {
     if (!_grader || e.defaultPrevented) return;
-    if (e.key === 'Enter' && e.target && e.target.classList && e.target.classList.contains('grdp-input')) {
-      e.preventDefault();
-      e.target.blur();
-      return;
-    }
-    var cls = e.target && e.target.classList;
-    var card = cls && cls.contains('grdt-crit') ? e.target : null;
-    var tagCard = cls && cls.contains('grdl-card') ? e.target : null;
-    if ((card || tagCard) && !e.metaKey && !e.ctrlKey && !e.altKey) {
-      var up = e.key === '+' || e.key === '=';
-      if (['1', '2', '3', '4'].indexOf(e.key) >= 0) {
-        e.preventDefault();
-        if (card) _graderSetLevel(card.dataset.critid, parseInt(e.key, 10));
-        else _graderSetTagLevel(tagCard.dataset.tag, parseInt(e.key, 10));
-        return;
-      }
-      if (up || e.key === '-' || e.key === '_') {
-        e.preventDefault();
-        if (card) _graderSetMod(card.dataset.critid, up ? 1 : -1);
-        else _graderSetTagMod(tagCard.dataset.tag, up ? 1 : -1);
-        return;
-      }
-    }
+    if (_graderCardKey(e)) return;
     if (e.key !== 'Escape') return;
     var t = e.target;
     var typing =
@@ -6191,6 +6176,38 @@ window.PageAssignments = (function () {
     if (window.RubricBank && RubricBank.isOpen()) return;
     e.preventDefault();
     closeGrader();
+  }
+
+  /* Keys on a grader card, in the dialog or on the page: Enter in a points
+     box saves it; 1–4 picks a level and + / − fine-tunes it on a focused
+     criterion or competency card. True when the key was used. */
+  function _graderCardKey(e) {
+    var t = e.target;
+    var cls = t && t.classList;
+    if (!cls) return false;
+    if (e.key === 'Enter' && cls.contains('grdp-input')) {
+      e.preventDefault();
+      t.blur();
+      return true;
+    }
+    var card = cls.contains('grdt-crit') ? t : null;
+    var tagCard = cls.contains('grdl-card') ? t : null;
+    if (!(card || tagCard) || e.metaKey || e.ctrlKey || e.altKey) return false;
+    var aid = _graderAid(t);
+    var up = e.key === '+' || e.key === '=';
+    if (['1', '2', '3', '4'].indexOf(e.key) >= 0) {
+      e.preventDefault();
+      if (card) _graderSetLevel(aid, card.dataset.critid, parseInt(e.key, 10));
+      else _graderSetTagLevel(aid, tagCard.dataset.tag, parseInt(e.key, 10));
+      return true;
+    }
+    if (up || e.key === '-' || e.key === '_') {
+      e.preventDefault();
+      if (card) _graderSetMod(aid, card.dataset.critid, up ? 1 : -1);
+      else _graderSetTagMod(aid, tagCard.dataset.tag, up ? 1 : -1);
+      return true;
+    }
+    return false;
   }
 
   function _renderGrader() {
@@ -6285,6 +6302,72 @@ window.PageAssignments = (function () {
     );
   }
 
+  var _GRADER_STATUS_LABELS = { NS: 'Missing', EXC: 'Excused', LATE: 'Late' };
+  // The Missing | Excused | Late control's buttons, in the order given.
+  function _graderStatusButtons(aid, sid, status, order) {
+    return order
+      .map(function (key) {
+        var on = status === key;
+        return (
+          '<button type="button" class="grader-status-btn' +
+          (on ? ' is-on is-' + key.toLowerCase() : '') +
+          '" aria-pressed="' +
+          on +
+          '" data-action="toggleStudentStatus" data-aid="' +
+          aid +
+          '" data-sid="' +
+          sid +
+          '" data-status="' +
+          key +
+          '">' +
+          _GRADER_STATUS_LABELS[key] +
+          '</button>'
+        );
+      })
+      .join('');
+  }
+
+  /* One student open on the Assignments page: the dialog's grader inside
+     the card, under a row with the student's name, the Late | Excused |
+     Missing control, Comment, the arrow-key hint and the grade. */
+  function _inlineGraderHtml(cid, a, tagObjs, st, scores) {
+    var status = getAssignmentStatus(cid, st.id, a.id);
+    var count = getAssignmentObs(cid, st.id, a.id).length;
+    var grade = _graderGrade(cid, a, st.id);
+    return (
+      '<div class="grader-inline' +
+      (status === 'NS' || status === 'EXC' ? ' is-locked' : '') +
+      '">' +
+      '<div class="grader-inline-head">' +
+      '<h4 class="grader-inline-name">' +
+      esc(displayNameWithLast(st)) +
+      '</h4>' +
+      '<div class="grader-status" role="group" aria-label="Status">' +
+      _graderStatusButtons(a.id, st.id, status, ['LATE', 'EXC', 'NS']) +
+      '</div>' +
+      '<button type="button" class="grader-add-comment" data-action="openCommentPopover" data-cid="' +
+      cid +
+      '" data-sid="' +
+      st.id +
+      '" data-aid="' +
+      a.id +
+      '">Comment' +
+      (count ? ' <span class="comment-count">' + count + '</span>' : '') +
+      '</button>' +
+      '<span class="grader-spacer"></span>' +
+      '<span class="grader-hint">← → change student</span>' +
+      '<span class="grader-grade-label">Grade</span>' +
+      '<span class="grader-grade' +
+      (grade.tone ? ' tone-' + grade.tone : '') +
+      '">' +
+      esc(grade.text) +
+      '</span>' +
+      '</div>' +
+      _graderHtml(cid, a, tagObjs, [st], scores, true) +
+      '</div>'
+    );
+  }
+
   /* The parts of the dialog that change with every click: the status
      control, the comment list and the grade. */
   function _refreshGraderChrome() {
@@ -6297,30 +6380,7 @@ window.PageAssignments = (function () {
     var dialog = _grader.overlay.querySelector('.grader-dialog');
     if (!a || !sid || !dialog) return;
     var status = getAssignmentStatus(cid, sid, a.id);
-    dialog.querySelector('.grader-status').innerHTML = [
-      ['NS', 'Missing'],
-      ['EXC', 'Excused'],
-      ['LATE', 'Late'],
-    ]
-      .map(function (s) {
-        var on = status === s[0];
-        return (
-          '<button type="button" class="grader-status-btn' +
-          (on ? ' is-on is-' + s[0].toLowerCase() : '') +
-          '" aria-pressed="' +
-          on +
-          '" data-action="toggleStudentStatus" data-aid="' +
-          a.id +
-          '" data-sid="' +
-          sid +
-          '" data-status="' +
-          s[0] +
-          '">' +
-          s[1] +
-          '</button>'
-        );
-      })
-      .join('');
+    dialog.querySelector('.grader-status').innerHTML = _graderStatusButtons(a.id, sid, status, ['NS', 'EXC', 'LATE']);
     var notes = getAssignmentObs(cid, sid, a.id)
       .slice()
       .sort(function (x, y) {
@@ -6363,49 +6423,55 @@ window.PageAssignments = (function () {
     return { text: 'Not Graded', tone: 'muted' };
   }
 
-  function _graderCriterion(critId) {
-    var a = getAssessments(activeCourse).find(function (x) {
-      return x.id === _grader.aid;
-    });
-    return a ? getRubricCriterion(a.id, critId) : null;
+  // The assessment a grading control belongs to: the card it sits in, in
+  // the dialog or open on the Assignments page for one student.
+  function _graderAid(el) {
+    var card = el && el.closest ? el.closest('.assess-card') : null;
+    if (card && card.id.indexOf('ac-') === 0) return card.id.slice(3);
+    return _grader ? _grader.aid : null;
+  }
+  function _graderRoot(aid) {
+    return _grader ? _grader.overlay : document.getElementById('ac-' + aid);
+  }
+  function _graderCriterion(aid, critId) {
+    return aid ? getRubricCriterion(aid, critId) : null;
   }
   /* Picking the chosen level again clears it; another level replaces it
      and drops any + or −. */
-  function _graderSetLevel(critId, level) {
-    if (!_grader || !focusStudentId) return;
-    var crit = _graderCriterion(critId);
+  function _graderSetLevel(aid, critId, level) {
+    if (!aid || !focusStudentId) return;
+    var crit = _graderCriterion(aid, critId);
     if (!crit) return;
-    var state = _criterionState(activeCourse, focusStudentId, _grader.aid, crit);
+    var state = _criterionState(activeCourse, focusStudentId, aid, crit);
     var next = state.level === level && !state.mixed ? 0 : level;
     rubricCriterionScoreKeys(crit).forEach(function (tid) {
-      setScore(activeCourse, focusStudentId, _grader.aid, tid, next, 0);
+      setScore(activeCourse, focusStudentId, aid, tid, next, 0);
     });
     refreshSidebarGrades(focusStudentId);
     render();
-    _focusGraderCriterion(critId);
+    _focusGraderCard(aid, '.grdt-crit[data-critid="' + critId + '"]');
   }
-  function _graderSetMod(critId, mod) {
-    if (!_grader || !focusStudentId) return;
-    var crit = _graderCriterion(critId);
+  function _graderSetMod(aid, critId, mod) {
+    if (!aid || !focusStudentId) return;
+    var crit = _graderCriterion(aid, critId);
     if (!crit) return;
-    var state = _criterionState(activeCourse, focusStudentId, _grader.aid, crit);
+    var state = _criterionState(activeCourse, focusStudentId, aid, crit);
     if (!state.level) return;
     var next = state.mod === mod ? 0 : mod;
     if (normalizeScoreMod(state.level, next) !== next) return;
     rubricCriterionScoreKeys(crit).forEach(function (tid) {
-      setScore(activeCourse, focusStudentId, _grader.aid, tid, state.level, next);
+      setScore(activeCourse, focusStudentId, aid, tid, state.level, next);
     });
     refreshSidebarGrades(focusStudentId);
     render();
-    _focusGraderCriterion(critId);
+    _focusGraderCard(aid, '.grdt-crit[data-critid="' + critId + '"]');
   }
   /* A tick saves the box and, like the Assignments checklist, moves the
      level to the one the boxes suggest unless the teacher picked another. */
-  function _graderTick(critId, checkId, on) {
-    if (!_grader || !focusStudentId) return;
+  function _graderTick(aid, critId, checkId, on) {
+    if (!aid || !focusStudentId) return;
     var cid = activeCourse;
-    var aid = _grader.aid;
-    var crit = _graderCriterion(critId);
+    var crit = _graderCriterion(aid, critId);
     if (!crit) return;
     var before = getRubricCheckIds(cid, focusStudentId, aid);
     var after = setRubricCheck(cid, focusStudentId, aid, checkId, on);
@@ -6417,34 +6483,35 @@ window.PageAssignments = (function () {
       });
     refreshSidebarGrades(focusStudentId);
     render();
-    var box = _grader.overlay.querySelector('.grdt-check input[data-checkid="' + checkId + '"]');
+    var root = _graderRoot(aid);
+    var box = root && root.querySelector('.grdt-check input[data-checkid="' + checkId + '"]');
     if (box) box.focus({ preventScroll: true });
   }
-  function _graderSetTagLevel(tagId, level) {
-    if (!_grader || !focusStudentId) return;
-    var state = _tagState(activeCourse, focusStudentId, _grader.aid, tagId);
-    setScore(activeCourse, focusStudentId, _grader.aid, tagId, state.level === level ? 0 : level, 0);
+  function _graderSetTagLevel(aid, tagId, level) {
+    if (!aid || !focusStudentId) return;
+    var state = _tagState(activeCourse, focusStudentId, aid, tagId);
+    setScore(activeCourse, focusStudentId, aid, tagId, state.level === level ? 0 : level, 0);
     refreshSidebarGrades(focusStudentId);
     render();
-    _focusGraderCard('.grdl-card[data-tag="' + tagId + '"]');
+    _focusGraderCard(aid, '.grdl-card[data-tag="' + tagId + '"]');
   }
-  function _graderSetTagMod(tagId, mod) {
-    if (!_grader || !focusStudentId) return;
-    var state = _tagState(activeCourse, focusStudentId, _grader.aid, tagId);
+  function _graderSetTagMod(aid, tagId, mod) {
+    if (!aid || !focusStudentId) return;
+    var state = _tagState(activeCourse, focusStudentId, aid, tagId);
     if (!state.level) return;
     var next = state.mod === mod ? 0 : mod;
     if (normalizeScoreMod(state.level, next) !== next) return;
-    setScore(activeCourse, focusStudentId, _grader.aid, tagId, state.level, next);
+    setScore(activeCourse, focusStudentId, aid, tagId, state.level, next);
     refreshSidebarGrades(focusStudentId);
     render();
-    _focusGraderCard('.grdl-card[data-tag="' + tagId + '"]');
+    _focusGraderCard(aid, '.grdl-card[data-tag="' + tagId + '"]');
   }
   // Saves typed points the way the Assignments ledger does: blank clears, a
   // typed 0 is a score, leaving an unchanged box saves nothing.
   function _graderCommitPoints(inp) {
-    if (!_grader || !focusStudentId) return;
+    var aid = _graderAid(inp);
+    if (!aid || !focusStudentId) return;
     var cid = activeCourse;
-    var aid = _grader.aid;
     var max = parseFloat(inp.dataset.max) || 100;
     var raw = parsePointsInput(inp.value, max);
     if (raw === getPointsScore(cid, focusStudentId, aid)) {
@@ -6456,15 +6523,10 @@ window.PageAssignments = (function () {
     refreshSidebarGrades(focusStudentId);
     render();
   }
-  function _focusGraderCard(selector) {
-    var card = _grader && _grader.overlay.querySelector(selector);
-    var active = document.activeElement;
-    var lost = !active || active === document.body || active.classList.contains('grader-dialog');
-    if (card && lost) card.focus({ preventScroll: true });
-  }
-  // A redraw keeps keyboard scoring on the same criterion.
-  function _focusGraderCriterion(critId) {
-    var card = _grader && _grader.overlay.querySelector('.grdt-crit[data-critid="' + critId + '"]');
+  // A redraw keeps keyboard scoring on the same card.
+  function _focusGraderCard(aid, selector) {
+    var root = _graderRoot(aid);
+    var card = root && root.querySelector(selector);
     var active = document.activeElement;
     var lost = !active || active === document.body || active.classList.contains('grader-dialog');
     if (card && lost) card.focus({ preventScroll: true });
