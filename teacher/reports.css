@@ -2864,32 +2864,9 @@ button.tq-att-mention:disabled {
   width: 13px;
   height: 13px;
 }
-/* Generate is secondary: Save & Next is this screen's main action. */
-.tq-tb-btn.tq-tb-auto {
-  width: auto;
-  padding: 4px 14px;
-  gap: 5px;
-  height: 32px;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  letter-spacing: var(--tracking-wide);
-  margin-left: auto;
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  color: var(--text);
-  border: 1px solid var(--border);
-}
-.tq-tb-btn.tq-tb-auto:hover {
-  background: var(--overlay-hover);
-  color: var(--text);
-}
-.tq-tb-btn.tq-tb-auto svg {
-  width: 13px;
-  height: 13px;
-  fill: currentColor;
-}
 .tq-tb-btn.tq-tb-copy {
   width: auto;
+  margin-left: auto;
   padding: 4px 12px;
   gap: 5px;
   height: 32px;
@@ -2957,25 +2934,6 @@ button.tq-att-mention:disabled {
 }
 .tq-narrative-editor li {
   margin-bottom: 2px;
-}
-
-.tq-auto-btn {
-  font-family: var(--font-base);
-  font-size: var(--text-sm);
-  font-weight: 500;
-  padding: 7px 14px;
-  border-radius: 8px;
-  background: var(--overlay-hover);
-  color: var(--text-2);
-  border: 1px solid var(--border);
-  cursor: pointer;
-  transition: all 0.12s;
-  width: 100%;
-}
-.tq-auto-btn:hover {
-  border-color: var(--active);
-  color: var(--link);
-  background: rgba(0, 122, 255, 0.04);
 }
 
 /* ── Nav footer — full-width page footer ──

@@ -152,9 +152,10 @@ describe('Reports questionnaire in a Letter class', () => {
     ReportQuestionnaire.tqStudentIndex = 0;
   }
 
-  function narrative() {
-    ReportQuestionnaire.tqAutoNarrative(NOOR.id);
-    return getStudentTermRating(CID, NOOR.id, TERM).narrative;
+  /* The Comment Bank's sentences that fit Noor, filled in. */
+  function bankSentences() {
+    const ctx = CommentBank.context(CommentBank.facts(CID, NOOR, TERM), {});
+    return COMMENT_BANK.sentences.filter(s => CommentBank.fits(s, ctx)).map(s => CommentBank.fill(s, ctx));
   }
 
   function snapshot() {
@@ -185,21 +186,19 @@ describe('Reports questionnaire in a Letter class', () => {
     expect(snapshot()).toEqual({ overall: 'Proficient', competencies: ['Proficient', 'Proficient'] });
   });
 
-  it('gives the narrative standing as a letter grade', () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0);
+  it('gives the comment bank a letter grade, not a proficiency word', () => {
     seed('letter');
-    const text = narrative();
-    // Was: "Academically, Noor is working at a proficient level, with strong
-    // results in cause and consequence."
-    expect(text).toContain('Academically, Noor has a B (75%) overall, with strong results in cause and consequence.');
+    const text = bankSentences().join(' ');
+    // Was (tqAutoNarrative): "Academically, Noor is working at a proficient
+    // level, with strong results in cause and consequence."
+    expect(text).toContain('Noor has a B (75%) overall, with their strongest work in Cause and Consequence.');
     expect(text).not.toMatch(PROF_WORDS);
   });
 
   it('keeps the proficiency wording in a Proficiency class', () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0);
     seed('proficiency');
-    expect(narrative()).toContain(
-      'Academically, Noor is working at a proficient level, with strong results in cause and consequence.',
+    expect(bankSentences()).toContain(
+      'Noor is working at a Proficient level overall, with their strongest results in Cause and Consequence.',
     );
   });
 });
