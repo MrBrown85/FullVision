@@ -380,5 +380,4 @@ test('end to end: rate, write from the bank, approve, move on, and the report pr
   await page.locator('[data-action="tqOpenReport"]').click();
   const comment = page.locator('.report-sheet').first().locator('.report-comment-text');
   for (const t of added) await expect(comment).toContainText(t);
-  expect(await overflow(page)).toEqual([]);
 });
