@@ -18,6 +18,7 @@ window.PageAssignments = (function () {
   var filterCategories = [];
   var assessSearch = '';
   var showUngraded = false;
+  var _filterMenuOpen = false;
   var rubricViewStates = {};
   // Advanced Rubric checklists open under their criterion rows, keyed
   // aid:sid:critId. In All mode every one is open except those closed.
@@ -166,6 +167,7 @@ window.PageAssignments = (function () {
     filterCategories = [];
     assessSearch = '';
     showUngraded = false;
+    _filterMenuOpen = false;
     focusStudentId = null;
     collapsedModules = _loadClosedModules(cid);
     rubricViewStates = {};
@@ -323,6 +325,87 @@ window.PageAssignments = (function () {
     }, 200);
   }
 
+  /* ── Filter menu ────────────────────────────────────────── */
+  /* One Filter button holds the category filters and Ungraded Only; it
+     reads "Filter · n" while any are on. Ticking keeps the menu open;
+     a click outside it or Escape closes it. */
+  var _FILTER_ICON =
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>';
+  function _filterCount() {
+    return filterCategories.length + (showUngraded ? 1 : 0);
+  }
+  function _filterMenuHtml(cid) {
+    var n = _filterCount();
+    var cats = _getSortedCategories(cid);
+    function item(action, attrs, on, dot, label) {
+      return (
+        '<button type="button" class="assess-filter-item' +
+        (on ? ' is-on' : '') +
+        '" role="menuitemcheckbox" aria-checked="' +
+        on +
+        '" data-action="' +
+        action +
+        '"' +
+        attrs +
+        '><span class="assess-filter-box" aria-hidden="true"></span>' +
+        (dot ? '<span class="assess-filter-dot" style="background:' + dot + '"></span>' : '') +
+        '<span>' +
+        esc(label) +
+        '</span></button>'
+      );
+    }
+    return (
+      '<div class="assess-filter-wrap' +
+      (_filterMenuOpen ? ' open' : '') +
+      '">' +
+      '<button type="button" class="assess-filter-btn' +
+      (n ? ' has-filters' : '') +
+      '" data-action="toggleAssessFilterMenu" aria-haspopup="true" aria-expanded="' +
+      _filterMenuOpen +
+      '">' +
+      _FILTER_ICON +
+      'Filter' +
+      (n ? ' · ' + n : '') +
+      '</button>' +
+      '<div class="assess-filter-menu" role="menu" aria-label="Filter assessments">' +
+      (cats.length
+        ? '<span class="assess-filter-head">Category</span>' +
+          cats
+            .map(function (cat, i) {
+              var t = typeof categoryTintByIndex === 'function' ? categoryTintByIndex(i, cat.name) : { fg: '' };
+              return item(
+                'toggleCategoryFilter',
+                ' data-catid="' + esc(cat.id) + '"',
+                filterCategories.indexOf(cat.id) >= 0,
+                t.fg,
+                cat.name,
+              );
+            })
+            .join('') +
+          '<span class="assess-filter-sep" aria-hidden="true"></span>'
+        : '') +
+      item('toggleUngraded', '', showUngraded, '', 'Ungraded Only') +
+      '<span class="assess-filter-sep" aria-hidden="true"></span>' +
+      '<button type="button" class="assess-filter-item assess-filter-clear" role="menuitem" data-action="clearFilterMenu"' +
+      (n ? '' : ' disabled') +
+      '>Clear Filters</button>' +
+      '</div>' +
+      '</div>'
+    );
+  }
+  function _setFilterMenu(open) {
+    _filterMenuOpen = open;
+    var wrap = document.querySelector('.assess-filter-wrap');
+    if (!wrap) return;
+    wrap.classList.toggle('open', open);
+    wrap.querySelector('.assess-filter-btn').setAttribute('aria-expanded', String(open));
+  }
+  // A tick redraws the page; keep the keyboard on the same menu item.
+  function _refocusFilterItem(selector) {
+    var item = document.querySelector('.assess-filter-menu ' + selector);
+    if (item) item.focus({ preventScroll: true });
+  }
+
   /* ── Toolbar ────────────────────────────────────────────── */
   function renderAssessToolbar(cid, assessments) {
     var courseOptions = getPickerCourses(cid)
@@ -337,35 +420,7 @@ window.PageAssignments = (function () {
       courseOptions +
       '</select>' +
       (window.AssessmentCopy ? AssessmentCopy.renderSiblingToggle(cid) : '') +
-      (function () {
-        var sortedCats = _getSortedCategories(cid);
-        if (!sortedCats.length) return '';
-        var pillsHtml =
-          '<div role="group" aria-label="Filter by category" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">';
-        sortedCats.forEach(function (cat, i) {
-          var t = typeof categoryTintByIndex === 'function' ? categoryTintByIndex(i, cat.name) : { fg: '' };
-          var isActive = filterCategories.indexOf(cat.id) >= 0;
-          pillsHtml +=
-            '<button class="gb-filter-chip' +
-            (isActive ? ' active' : '') +
-            '" data-action="toggleCategoryFilter" data-catid="' +
-            esc(cat.id) +
-            '" aria-pressed="' +
-            isActive +
-            '"><span class="chip-dot" style="background:' +
-            t.fg +
-            '"></span>' +
-            esc(cat.name) +
-            '</button>';
-        });
-        pillsHtml += '</div>';
-        return pillsHtml;
-      })() +
-      '<button class="assess-ungraded-chip' +
-      (showUngraded ? ' active' : '') +
-      '" data-action="toggleUngraded" aria-pressed="' +
-      showUngraded +
-      '" aria-label="Show ungraded assessments only">\u26A0\uFE0E Ungraded</button>' +
+      _filterMenuHtml(cid) +
       '<div class="assess-search-wrap">' +
       '<span class="assess-search-icon" aria-hidden="true">' +
       LINE_ICONS.search +
@@ -5266,6 +5321,8 @@ window.PageAssignments = (function () {
       kbFocusCell(null);
     }
 
+    if (_filterMenuOpen && !e.target.closest('.assess-filter-wrap')) _setFilterMenu(false);
+
     // Close menus on click outside
     if (
       !e.target.closest('.col-fill-menu') &&
@@ -5368,10 +5425,21 @@ window.PageAssignments = (function () {
       },
       toggleCategoryFilter: function () {
         toggleCategoryFilter(el.dataset.catid);
+        _refocusFilterItem('[data-catid="' + el.dataset.catid + '"]');
       },
       toggleUngraded: function () {
         showUngraded = !showUngraded;
         render();
+        _refocusFilterItem('[data-action="toggleUngraded"]');
+      },
+      toggleAssessFilterMenu: function () {
+        _setFilterMenu(!_filterMenuOpen);
+      },
+      clearFilterMenu: function () {
+        filterCategories = [];
+        showUngraded = false;
+        render();
+        _refocusFilterItem('[data-action="toggleUngraded"]');
       },
       expandAllAssess: function () {
         expandAllAssess();
@@ -5691,6 +5759,13 @@ window.PageAssignments = (function () {
   function _handleKeydown(e) {
     // One student's grader open on the page (the dialog runs its own).
     if (!_grader && _graderCardKey(e)) return;
+    if (_filterMenuOpen && e.key === 'Escape') {
+      e.preventDefault();
+      _setFilterMenu(false);
+      var trigger = document.querySelector('.assess-filter-btn');
+      if (trigger) trigger.focus();
+      return;
+    }
     // A module name: Enter saves, Escape puts back the saved name.
     if (e.target && e.target.dataset && e.target.dataset.actionBlur === 'moduleName') {
       if (e.key === 'Enter') {
@@ -6578,6 +6653,7 @@ window.PageAssignments = (function () {
     filterCategories = [];
     assessSearch = '';
     showUngraded = false;
+    _filterMenuOpen = false;
     rubricViewStates = {};
     _showingNewForm = false;
     _editingAssessId = null;
