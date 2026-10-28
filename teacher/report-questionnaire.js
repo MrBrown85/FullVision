@@ -1470,7 +1470,7 @@ window.ReportQuestionnaire = (function () {
     });
 
     // ══ ROW 1: Dispositions + Quick Profile (4/4/4) ══
-    const PILL_TEXT = { 1: 'Needs Support', 2: 'Developing', 3: 'Growing', 4: 'Thriving' };
+    const PILL_TEXT = OBS_LEVEL_LABELS;
     const ratedLearning = LEARNING_DIMS.filter(d => (dims[d] || 0) > 0).length;
     const ratedRelational = RELATIONAL_DIMS.filter(d => (dims[d] || 0) > 0).length;
 

@@ -98,7 +98,7 @@ window.ReportStudio = (function () {
   /* tab: 'blocks' | 'templates'. A block on the form is ticked; clicking
      it finds it on the page. A block with no room is greyed with the
      reason. */
-  function paletteHtml(form, tab, templates, sizes, fit) {
+  function paletteHtml(form, tab, templates, sizes, fit, thumbs) {
     var sheets = S();
     var on = sheets.onForm(form);
     var html =
@@ -115,14 +115,30 @@ window.ReportStudio = (function () {
       '">Templates</button>' +
       '</div>';
     if (tab === 'templates') {
+      // Each template drawn with the previewed student's real report
+      // (thumbs: { id: { html, sheets } }), and how many sheets it takes.
+      var card = function (attr, id, name, current) {
+        var th = thumbs && thumbs[id];
+        var count = th ? (th.sheets === 1 ? '1 sheet' : th.sheets + ' sheets') : '';
+        return (
+          '<button type="button" class="studio-blk studio-tpl' +
+          (current ? ' current' : '') +
+          '" data-action="studioTemplate" aria-label="' +
+          esc(name) +
+          '" ' +
+          attr +
+          '>' +
+          (th ? '<span class="studio-tpl-thumbs" aria-hidden="true">' + th.html + '</span>' : '') +
+          '<span class="studio-tpl-name"><span class="studio-blk-name">' +
+          esc(name) +
+          '</span><span class="studio-tpl-count">' +
+          count +
+          '</span></span></button>'
+        );
+      };
       html += '<h4>Starters</h4>';
       sheets.starters().forEach(function (st) {
-        html +=
-          '<button type="button" class="studio-blk studio-tpl" data-action="studioTemplate" data-starter="' +
-          st.id +
-          '"><span class="studio-blk-name">' +
-          esc(st.name) +
-          '</span></button>';
+        html += card('data-starter="' + st.id + '"', st.id, st.name, form.id === st.id && form.name === st.name);
       });
       var list = templates || [];
       html += '<h4>Your Templates</h4>';
@@ -131,11 +147,7 @@ window.ReportStudio = (function () {
       list.forEach(function (t) {
         html +=
           '<div class="studio-tpl-row">' +
-          '<button type="button" class="studio-blk studio-tpl" data-action="studioTemplate" data-id="' +
-          esc(t.id) +
-          '"><span class="studio-blk-name">' +
-          esc(t.name) +
-          '</span></button>' +
+          card('data-id="' + esc(t.id) + '"', t.id, t.name, false) +
           '<button type="button" class="studio-tpl-del" data-action="studioTemplateDelete" data-id="' +
           esc(t.id) +
           '" aria-label="Delete ' +
@@ -233,6 +245,27 @@ window.ReportStudio = (function () {
     return (
       (frontOnly ? 'Front only · 1 page for ' : '1 sheet for ') + (n === 1 ? '1 student' : 'all ' + n + ' students')
     );
+  }
+
+  /* Everyone leads with the students who need more than one sheet, most
+     first, then the rest in roster order. summary: the class fit (or
+     null, which keeps the order given). */
+  function orderBySheets(students, summary) {
+    if (!summary || !summary.perStudent) return students.slice();
+    var sheetsOf = function (st) {
+      var p = summary.perStudent[st.id];
+      return p && p.sheets ? p.sheets : 1;
+    };
+    return students
+      .map(function (st, i) {
+        return { st: st, i: i, n: sheetsOf(st) };
+      })
+      .sort(function (a, b) {
+        return b.n - a.n || a.i - b.i;
+      })
+      .map(function (x) {
+        return x.st;
+      });
   }
 
   /* The student whose report is longest (most measured px), for the
@@ -942,6 +975,7 @@ window.ReportStudio = (function () {
     fitsOn: fitsOn,
     fitLineHtml: fitLineHtml,
     longestStudent: longestStudent,
+    orderBySheets: orderBySheets,
     hasOptions: hasOptions,
     blockToolbarHtml: blockToolbarHtml,
     popoverHtml: popoverHtml,

@@ -717,7 +717,10 @@ const OBS_SHORT = {
   respect: 'Respect',
   responsibility: 'Respons.',
 };
-const OBS_LEVEL_LABELS = { 0: 'Not Assessed', 1: 'Needs Support', 2: 'Developing', 3: 'Growing', 4: 'Thriving' };
+/* How often a student shows a disposition: one scale, used by the Term
+   Questionnaire's pills and the printed report. Developing means proficiency
+   only (DECISIONS "Report forms" 12). */
+const OBS_LEVEL_LABELS = { 0: 'Not Rated', 1: 'Rarely', 2: 'Sometimes', 3: 'Usually', 4: 'Consistently' };
 const OBS_LEVEL_COLORS = {
   0: 'var(--text-3)',
   1: 'var(--score-1)',

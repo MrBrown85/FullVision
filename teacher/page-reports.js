@@ -408,7 +408,9 @@ window.PageReports = (function () {
         : all.filter(function (st) {
             return selectedStudentIds.includes(st.id);
           });
-    if (studioView === 'all') return chosen;
+    // Everyone leads with the students on more than one sheet.
+    if (studioView === 'all')
+      return ReportStudio.orderBySheets(chosen, _classFitKey === _classFitKeyNow() ? _classFit : null);
     if (previewAuto) {
       var longest = ReportStudio.longestStudent(_classFitKey === _classFitKeyNow() ? _classFit : null);
       if (
@@ -613,9 +615,36 @@ window.PageReports = (function () {
       _classFit = summary;
       _classFitKey = _classFitKeyNow();
       _renderFitLine();
+      _leadWithLongest(summary);
     } else {
       _scheduleClassFit();
     }
+  }
+
+  /* Everyone, once its own render has measured the class: the students
+     on more than one sheet move to the front, in place, without a redraw. */
+  function _leadWithLongest(summary) {
+    var preview = document.getElementById('rb-preview');
+    if (!preview || !summary || !summary.perStudent) return;
+    var nodes = Array.prototype.slice.call(preview.querySelectorAll(':scope > .sheet-student'));
+    var wanted = ReportStudio.orderBySheets(
+      nodes.map(function (el) {
+        return { id: el.dataset.sid };
+      }),
+      summary,
+    ).map(function (x) {
+      return x.id;
+    });
+    var current = nodes.map(function (el) {
+      return el.dataset.sid;
+    });
+    if (wanted.join() === current.join()) return;
+    wanted.forEach(function (sid) {
+      var el = nodes.find(function (n) {
+        return n.dataset.sid === sid;
+      });
+      if (el) preview.appendChild(el);
+    });
   }
 
   function _populateCopies() {
@@ -714,7 +743,7 @@ window.PageReports = (function () {
   var _issueState = null;
 
   function _issueCounts() {
-    var s = _lastSummary || { perStudent: {}, continued: [], noComment: [] };
+    var s = _lastSummary || { perStudent: {}, continued: [], noComment: [], noAttendance: [] };
     var ids = Object.keys(s.perStudent || {});
     var sheets = 0;
     var hashes = {};
@@ -806,6 +835,17 @@ window.PageReports = (function () {
           ' no Teacher Comment. The box prints with lines. <button type="button" data-issue="write">Write them now</button>',
       );
     }
+    // Attendance is optional: a student without totals prints without the
+    // block, and the dialog says so once, like a missing comment.
+    var noAtt = c.summary.noAttendance || [];
+    if (noAtt.length) {
+      warn.push(
+        (noAtt.length === c.ids.length
+          ? 'No attendance is entered for this report.'
+          : esc(noAtt.join(', ')) + (noAtt.length === 1 ? ' has' : ' have') + ' no attendance entered.') +
+          ' Their reports print without it. <button type="button" data-issue="attendance">Enter it now</button>',
+      );
+    }
     if (c.summary.over && c.summary.over.length) {
       warn.push(esc(c.summary.over.join(', ')) + ': a block is taller than a page.');
     }
@@ -856,10 +896,10 @@ window.PageReports = (function () {
       e.preventDefault();
       if (a.dataset.issue === 'cancel') closeIssueDialog();
       else if (a.dataset.issue === 'go') _issueFromDialog(overlay);
-      else if (a.dataset.issue === 'write') {
-        var names = c.summary.noComment;
+      else if (a.dataset.issue === 'write' || a.dataset.issue === 'attendance') {
+        var key = a.dataset.issue === 'write' ? 'noComment' : 'noAttendance';
         var first = Object.keys(c.summary.perStudent).find(function (sid) {
-          return c.summary.perStudent[sid].noComment;
+          return c.summary.perStudent[sid][key];
         });
         closeIssueDialog();
         if (first) {
@@ -990,6 +1030,7 @@ window.PageReports = (function () {
         ReportSheets.templates(),
         _blockSizes,
         _classFitKey === _classFitKeyNow() ? _classFit : null,
+        studioTab === 'templates' ? _templateThumbs() : null,
       );
     }
     _renderFitLine();
@@ -1000,6 +1041,35 @@ window.PageReports = (function () {
     if (!line) return;
     line.innerHTML = ReportStudio.fitLineHtml(_classFitKey === _classFitKeyNow() ? _classFit : null, _formOf());
     line.classList.toggle('ok', !!line.textContent && !line.firstElementChild);
+  }
+
+  /* Each starter and saved template drawn with the previewed student's
+     real report, for the Templates tab: { id: { html, sheets } }. Measured
+     once per class, student, paper and library. */
+  var _thumbCache = { key: '', thumbs: null };
+  function _templateThumbs() {
+    var st = _previewStudent();
+    if (!st) return null;
+    var list = ReportSheets.templates();
+    var key = [activeCourse, st.id, reportPaper, ReportBlocks.reportContext().termId, JSON.stringify(list)].join('|');
+    if (_thumbCache.key === key) return _thumbCache.thumbs;
+    var out = {};
+    var ctx = ReportBlocks.reportContext();
+    var draw = function (id, form) {
+      try {
+        out[id] = ReportSheets.thumbs(activeCourse, st, ctx, { form: form, paper: reportPaper });
+      } catch (e) {
+        out[id] = null;
+      }
+    };
+    ReportSheets.starters().forEach(function (s) {
+      draw(s.id, ReportSheets.starter(s.id));
+    });
+    list.forEach(function (t) {
+      draw(t.id, t.form);
+    });
+    _thumbCache = { key: key, thumbs: out };
+    return out;
   }
 
   /* Every block at both widths for every student: the tallest wins, so
@@ -1544,7 +1614,7 @@ window.PageReports = (function () {
       studioTemplate: function () {
         var f = el.dataset.starter ? ReportSheets.starter(el.dataset.starter) : ReportSheets.template(el.dataset.id);
         if (!f) return;
-        var name = el.textContent.trim();
+        var name = ((el.querySelector && el.querySelector('.studio-blk-name')) || el).textContent.trim();
         studioSelected = null;
         _setForm(f, 'Applied ' + name);
         _syncSidesButtons();

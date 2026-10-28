@@ -1527,7 +1527,7 @@ window.ReportSheets = (function () {
 
   /* Lays one student onto the form's sides. Returns { html, sheets, sides,
      continued: [blockId], after: [label], over, used, free: [px per
-     stored side], commentLines, room, noComment, badge }. */
+     stored side], commentLines, room, noComment, noAttendance, badge }. */
   function layoutStudent(cid, student, ctx, opts) {
     var f = opts.form || normalizeForm(FORM_REPORT_CARD);
     var probe = opts.probe;
@@ -1592,6 +1592,12 @@ window.ReportSheets = (function () {
         return row.y + row.h > H;
       });
     });
+    // An Attendance block on the form with nothing to print (no totals
+    // entered, and not left off on purpose), for the print dialog.
+    var attendance = measured.find(function (m) {
+      return m.cell.block === 'term-attendance';
+    });
+    var noAttendance = !!attendance && !attendance.off && !attendance.html;
     // The comment's lines and its box's room, for the questionnaire.
     var noComment = !!comment && /report-ruled-empty/.test(comment.html);
     var room = comment ? optionsFor(comment.cell).lines : 0;
@@ -1645,6 +1651,7 @@ window.ReportSheets = (function () {
       commentLines: commentLines,
       room: room,
       noComment: noComment,
+      noAttendance: noAttendance,
       badge: badge,
     };
   }
@@ -1675,7 +1682,16 @@ window.ReportSheets = (function () {
   }
 
   function _summary(students) {
-    return { students: students.length, sheets: 0, pages: 0, continued: [], over: [], noComment: [], perStudent: {} };
+    return {
+      students: students.length,
+      sheets: 0,
+      pages: 0,
+      continued: [],
+      over: [],
+      noComment: [],
+      noAttendance: [],
+      perStudent: {},
+    };
   }
   function _count(summary, st, r) {
     summary.sheets += r.sheets;
@@ -1683,6 +1699,7 @@ window.ReportSheets = (function () {
     if (r.sheets > 1) summary.continued.push(fullName(st));
     if (r.over) summary.over.push(fullName(st));
     if (r.noComment) summary.noComment.push(fullName(st));
+    if (r.noAttendance) summary.noAttendance.push(fullName(st));
     summary.perStudent[st.id] = {
       sheets: r.sheets,
       sides: r.sides,
@@ -1691,6 +1708,7 @@ window.ReportSheets = (function () {
       after: r.after,
       badge: r.badge,
       noComment: r.noComment,
+      noAttendance: r.noAttendance,
       name: fullName(st),
       used: r.used,
       free: r.free,
@@ -1804,14 +1822,39 @@ window.ReportSheets = (function () {
   }
 
   /* What the comment box tells the teacher while they write. Never a cap:
-     the form never shrinks a student's words. */
+     the form never shrinks a student's words; a comment past its box moves
+     the rows under it down, and onto a second sheet when the side is full. */
   function fitText(r) {
     if (!r || !r.room) return '';
     if (r.noComment) return 'No comment yet. The box holds ' + r.room + ' lines.';
     var n = r.commentLines;
     var word = n === 1 ? ' line' : ' lines';
     if (n <= r.room) return 'Fits. ' + n + word + '; room for ' + (r.room - n) + ' more.';
-    return n + word + ', ' + (n - r.room) + ' past the box; what is under it moves down. Nothing is cut.';
+    var past = n + word + ', ' + (n - r.room) + ' past the box; ';
+    if (r.sheets > 1) return past + 'this report runs to ' + r.sheets + ' sheets. Nothing is cut.';
+    return past + 'what is under it moves down. Nothing is cut.';
+  }
+
+  /* One student's sides on a form, as small pictures for the Templates
+     tab: { html, sheets }. The sides are the real sheets, scaled by CSS. */
+  function thumbs(cid, student, ctx, opts) {
+    opts = opts || {};
+    var paper = PAPER[opts.paper] ? opts.paper : 'letter';
+    var formUsed = normalizeForm(opts.form);
+    var stage = _stage(document.body, ROW_W, formUsed.type);
+    try {
+      var probe = _probe(stage);
+      var r = layoutStudent(cid, student, ctx, { form: formUsed, paper: paper, stage: stage, probe: probe });
+      var tpl = document.createElement('div');
+      tpl.innerHTML = r.html;
+      var sides = Array.prototype.map.call(tpl.querySelectorAll('.sheet-zoom'), function (z) {
+        var sheet = z.querySelector('.report-sheet');
+        return sheet ? '<div class="studio-tpl-side">' + sheet.outerHTML + '</div>' : '';
+      });
+      return { html: sides.join(''), sheets: r.sheets };
+    } finally {
+      stage.remove();
+    }
   }
 
   return {
@@ -1863,6 +1906,7 @@ window.ReportSheets = (function () {
     classSummary: classSummary,
     blockSizes: blockSizes,
     fitText: fitText,
+    thumbs: thumbs,
     paperSize: paperSize,
     layoutStudent: layoutStudent,
     renderPreview: renderPreview,
