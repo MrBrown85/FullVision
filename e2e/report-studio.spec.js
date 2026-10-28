@@ -329,39 +329,64 @@ test.describe('Page Studio', () => {
     expect(await overflowing(page)).toEqual([]);
   });
 
-  test('Side by Side pairs a block with its lone Side by Side neighbour; Row splits the pair; the pair takes the taller height', async ({
+  test('Side by Side pairs a block with a lone Side by Side neighbour of a similar height, never an uneven one; Row splits the pair', async ({
     page,
   }) => {
     await openStudio(page);
-    await cellOf(page, 'legend').click();
-    await bar(page).getByRole('radio', { name: 'Side by Side' }).click();
-    expect(await rowsOf(page, 0)).toContain('legend/half');
-    await expect(cellOf(page, 'legend')).toHaveCSS('width', '354px');
+    const side = async (id, name) => {
+      await cellOf(page, id).click();
+      await bar(page).getByRole('radio', { name }).click();
+    };
+    // Missing Work moves up under the legend.
+    await cellOf(page, 'missing-work').click();
+    await bar(page).getByRole('button', { name: 'Move Up' }).click();
+    // The legend goes Side by Side alone: Missing Work below it already has a partner (Attendance, empty here).
+    await side('legend', 'Side by Side');
     await expect(page.locator('#undo-toast')).toContainText('Proficiency Legend: Side by Side');
-    await cellOf(page, 'proficiency').click();
-    await bar(page).getByRole('radio', { name: 'Side by Side' }).click();
     expect(await rowsOf(page, 0)).toEqual([
       'header',
-      'proficiency/half+legend/half',
-      'teacher-narrative',
+      'proficiency',
+      'legend/half',
       'missing-work/half',
+      'teacher-narrative',
     ]);
+    // Proficiency at Side by Side is three times the legend's height: it stays alone.
+    await side('proficiency', 'Side by Side');
+    expect(await rowsOf(page, 0)).toEqual([
+      'header',
+      'proficiency/half',
+      'legend/half',
+      'missing-work/half',
+      'teacher-narrative',
+    ]);
+    // Missing Work leaves its partner, then goes Side by Side next to the legend: the two are close in height.
+    await side('missing-work', 'Row');
+    await side('missing-work', 'Side by Side');
+    expect(await rowsOf(page, 0)).toEqual([
+      'header',
+      'proficiency/half',
+      'legend/half+missing-work/half',
+      'term-attendance/half',
+      'teacher-narrative',
+    ]);
+    await expect(cellOf(page, 'legend')).toHaveCSS('width', '354px');
     const heights = await page
-      .locator('.sheet-row')
-      .nth(1)
+      .locator('#rb-preview .sheet-zoom[data-side="0"] .sheet-row')
+      .nth(2)
       .locator('.sheet-cell')
       .evaluateAll(cells => cells.map(c => c.offsetHeight));
     expect(heights[0]).toBe(heights[1]);
     expect(await overlapping(page)).toEqual([]);
     expect(await overflowing(page)).toEqual([]);
-    await cellOf(page, 'proficiency').click();
-    await bar(page).getByRole('radio', { name: 'Row' }).click();
+    // Row splits the pair; the partner stays at Side by Side under it.
+    await side('legend', 'Row');
     expect(await rowsOf(page, 0)).toEqual([
       'header',
-      'proficiency',
-      'legend/half',
-      'teacher-narrative',
+      'proficiency/half',
+      'legend',
       'missing-work/half',
+      'term-attendance/half',
+      'teacher-narrative',
     ]);
   });
 
@@ -523,6 +548,20 @@ test.describe('Page Studio', () => {
       .locator('.studio-bar-btn')
       .evaluateAll(btns => btns.filter(b => b.scrollWidth > b.clientWidth + 1).map(b => b.textContent));
     expect(cut).toEqual([]);
+  });
+
+  test('Side by Side heights are measured with the Side by Side layout', async ({ page }) => {
+    await openStudio(page);
+    await cellOf(page, 'legend').click();
+    await bar(page).getByRole('radio', { name: 'Side by Side' }).click();
+    const shown = await cellOf(page, 'legend').evaluate(el => el.querySelector('.report-legend').offsetHeight);
+    const measured = await page.evaluate(() => {
+      const cid = getActiveCourse();
+      const st = getStudents(cid)[0];
+      return ReportSheets.blockSizes(cid, [st], ReportBlocks.reportContext(), {}).legend.half;
+    });
+    // The 2 x 2 legend, not the four-column strip squeezed to 354px.
+    expect(Math.abs(measured - shown)).toBeLessThanOrEqual(2);
   });
 
   test('Black ink turns the levels black', async ({ page }) => {

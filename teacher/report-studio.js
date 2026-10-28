@@ -101,6 +101,21 @@ window.ReportStudio = (function () {
     return need + sheets.GAP <= free || (need <= free && free === H);
   }
 
+  /* { id: Side by Side height } from blockSizes, for pairsWell. */
+  function halfHeights(sizes) {
+    var out = {};
+    Object.keys(sizes || {}).forEach(function (id) {
+      if (sizes[id] && sizes[id].half) out[id] = sizes[id].half;
+    });
+    return out;
+  }
+  /* Whether a form is a template as it came: the same sides, rows, cells,
+     options and pin. An edited Report Card is no longer "the" Report Card. */
+  function sameLayout(a, b) {
+    if (!a || !b) return false;
+    return JSON.stringify([a.sides, a.pinned, a.type]) === JSON.stringify([b.sides, b.pinned, b.type]);
+  }
+
   /* tab: 'blocks' | 'templates'. A block on the form is ticked; clicking
      it finds it on the page. A block with no room is greyed with the
      reason. */
@@ -144,7 +159,7 @@ window.ReportStudio = (function () {
       };
       html += '<h4>Starters</h4>';
       sheets.starters().forEach(function (st) {
-        html += card('data-starter="' + st.id + '"', st.id, st.name, form.id === st.id && form.name === st.name);
+        html += card('data-starter="' + st.id + '"', st.id, st.name, sameLayout(form, sheets.starter(st.id)));
       });
       var list = templates || [];
       html += '<h4>Your Templates</h4>';
@@ -689,7 +704,12 @@ window.ReportStudio = (function () {
         for (var j = 0; j < i; j++) {
           var zj = zooms[j];
           var from = zj.dataset.side != null ? zj.dataset.side : zj.dataset.from;
-          if (Number(from) === side) base += zj.querySelectorAll('.sheet-row:not(.sheet-pinned)').length;
+          if (Number(from) !== side) continue;
+          // The held block's own row is not counted, as targetFor skips it.
+          Array.prototype.forEach.call(zj.querySelectorAll('.sheet-row:not(.sheet-pinned)'), function (row) {
+            var cells = row.querySelectorAll(':scope > .sheet-cell');
+            if (!(drag && cells.length === 1 && cells[0].dataset.block === drag.id)) base++;
+          });
         }
         var body = sheet.querySelector('.sheet-body');
         var br = body.getBoundingClientRect();
@@ -730,13 +750,7 @@ window.ReportStudio = (function () {
     }
     /* The pair rule: the shorter block is at least half the taller one. */
     function pairs(a, b) {
-      var sizes = api.sizes();
-      if (!api.canHalf(a) || !api.canHalf(b)) return false;
-      if (!sizes || !sizes[a] || !sizes[b]) return true;
-      var ha = sizes[a].half || 0;
-      var hb = sizes[b].half || 0;
-      if (!ha || !hb) return true;
-      return Math.min(ha, hb) >= Math.max(ha, hb) / 2;
+      return sheets.pairsWell(a, b, halfHeights(api.sizes()));
     }
     function heldHeight(size) {
       var sizes = api.sizes();
@@ -986,6 +1000,8 @@ window.ReportStudio = (function () {
     paletteHtml: paletteHtml,
     landing: landing,
     fitsOn: fitsOn,
+    halfHeights: halfHeights,
+    sameLayout: sameLayout,
     fitLineHtml: fitLineHtml,
     longestStudent: longestStudent,
     orderBySheets: orderBySheets,

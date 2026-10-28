@@ -146,3 +146,53 @@ describe('ReportSheets.fitText', () => {
     );
   });
 });
+
+describe('review fixes', () => {
+  it('a pair row taller than a side sends only the tall cell after the report; the short partner stays', () => {
+    const r = ReportSheets.pack(
+      [
+        [
+          [{ id: 'header', size: 'row', px: 81 }],
+          [
+            { id: 'tall', size: 'half', px: 1200 },
+            { id: 'short', size: 'half', px: 80 },
+          ],
+        ],
+      ],
+      { H: 996, gap: 12, pinned: null },
+    );
+    expect(r.after).toEqual(['tall']);
+    expect(r.sides[0].rows.map(row => row.cells.map(c => c.id + '@' + c.h).join('+'))).toEqual([
+      'header@81',
+      'short@80',
+    ]);
+  });
+
+  it('pairsWell: the shorter is at least half the taller; unmeasured blocks pair', () => {
+    expect(ReportSheets.pairsWell('legend', 'support-home', { legend: 116, 'support-home': 118 })).toBe(true);
+    expect(ReportSheets.pairsWell('missing-work', 'legend', { 'missing-work': 44, legend: 116 })).toBe(false);
+    expect(ReportSheets.pairsWell('legend', 'support-home', {})).toBe(true);
+    expect(ReportSheets.pairsWell('legend', 'parent-response', {})).toBe(false);
+  });
+
+  it('Side by Side does not pair blocks of very different heights', () => {
+    const f = ReportSheets.setSize(ReportSheets.form(), 'legend', 'half');
+    const uneven = ReportSheets.setSize(f, 'proficiency', 'half', { legend: 116, proficiency: 360 });
+    expect(uneven.sides[0].rows[1].cells.map(c => c.block)).toEqual(['proficiency']);
+    const even = ReportSheets.setSize(f, 'proficiency', 'half', { legend: 200, proficiency: 360 });
+    expect(even.sides[0].rows[1].cells.map(c => c.block)).toEqual(['proficiency', 'legend']);
+  });
+});
+
+describe('calc.js levelChangeAs', () => {
+  it('reads the change in levels, or in percent for a letter class', () => {
+    COURSES.lc1 = { id: 'lc1', gradingSystem: 'letter' };
+    COURSES.lc2 = { id: 'lc2', gradingSystem: 'both' };
+    COURSES.lc3 = { id: 'lc3', gradingSystem: 'proficiency' };
+    expect(levelChangeAs('lc3', 3.1, 3.3)).toBe('+0.2');
+    expect(levelChangeAs('lc2', 3.3, 3.1)).toBe('−0.2');
+    expect(levelChangeAs('lc1', 3, 3.33)).toBe('+8%');
+    expect(levelChangeAs('lc1', 3, 3)).toBe('0%');
+    expect(levelChangeAs('lc1', 0, 3)).toBe('—');
+  });
+});

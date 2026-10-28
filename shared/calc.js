@@ -1534,6 +1534,17 @@ function levelChange(before, after) {
   return (d > 0 ? '+' : d < 0 ? '\u2212' : '') + (Math.abs(d) / 10).toFixed(1);
 }
 
+/* The change between two levels as the class reads it: levels for a
+   Proficiency or Both class ("+0.2", levelChange), points of a percent for a
+   Letter class ("+5%", each level ÷ 4 rounded first, as formatLevel prints
+   it). "—" when either side has no level. */
+function levelChangeAs(cid, before, after) {
+  if (courseGradeMode(cid) !== 'letter') return levelChange(before, after);
+  if (!(before > 0 && after > 0)) return '\u2014';
+  var d = Math.round((after / 4) * 100) - Math.round((before / 4) * 100);
+  return (d > 0 ? '+' : d < 0 ? '\u2212' : '') + Math.abs(d) + '%';
+}
+
 /* A level printed as the teacher chose rather than as the class shows it:
    'percent' gives "75%" (level ÷ 4, the course's rule for a level as a %),
    anything else the proficiency, "3.0". The printed grade sheet's Scores
