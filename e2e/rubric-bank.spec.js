@@ -465,10 +465,10 @@ test.describe('Rubric Bank, Advanced Rubrics', () => {
     ]);
   });
 
-  test('+ New Rubric offers Standard and Advanced', async ({ page }) => {
+  test('+ New Rubric offers Standard, Advanced and Single-Point', async ({ page }) => {
     const bank = await openBank(page);
     await bank.getByRole('button', { name: /New Rubric/ }).click();
-    await expect(bank.getByRole('menuitem')).toHaveCount(2);
+    await expect(bank.getByRole('menuitem')).toHaveCount(3);
     await bank.getByRole('menuitem', { name: /Advanced Rubric/ }).click();
     await expect(bank).toHaveCount(0);
     const editor = page.locator('#rubric-modal');
@@ -477,6 +477,33 @@ test.describe('Rubric Bank, Advanced Rubrics', () => {
       'aria-checked',
       'true',
     );
+  });
+
+  test('a Single-Point rubric asks only for the Proficient standard', async ({ page }) => {
+    const bank = await openBank(page);
+    await bank.getByRole('button', { name: /New Rubric/ }).click();
+    await bank.getByRole('menuitem', { name: /Single-Point Rubric/ }).click();
+    const editor = page.locator('#rubric-modal');
+    await expect(editor.locator('.rubric-style-seg').getByRole('radio', { name: 'Single-Point' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    await expect(editor.locator('.rubric-level-card')).toHaveCount(1);
+    await expect(editor.locator('.rubric-level-name')).toHaveText('Meeting the Standard');
+    await editor.locator('.rubric-level-text').fill('Explains the trend with evidence.');
+    await editor.locator('#re-name').fill('Single-Point Lab');
+    // Standard shows all four levels and keeps the Proficient wording.
+    await editor.locator('.rubric-style-seg').getByRole('radio', { name: 'Standard' }).click();
+    await expect(editor.locator('.rubric-level-card')).toHaveCount(4);
+    await expect(editor.locator('.rubric-level-text[data-level="3"]')).toHaveValue('Explains the trend with evidence.');
+    await editor.locator('.rubric-style-seg').getByRole('radio', { name: 'Single-Point' }).click();
+    await editor.getByRole('button', { name: 'Save Rubric' }).click();
+    const saved = await page.evaluate(() =>
+      getRubrics(getActiveCourse())
+        .filter(r => r.name === 'Single-Point Lab')
+        .map(r => [r.style, r.criteria[0].levels[3]]),
+    );
+    expect(saved).toEqual([['single_point', 'Explains the trend with evidence.']]);
   });
 
   test('Print offers Checkboxes for an Advanced rubric', async ({ page }) => {

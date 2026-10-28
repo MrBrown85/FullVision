@@ -182,6 +182,9 @@ window.RubricBank = (function () {
   function isAdvanced(rubric) {
     return typeof rubricStyle === 'function' && rubricStyle(rubric) === 'advanced';
   }
+  function isSinglePoint(rubric) {
+    return typeof rubricStyle === 'function' && rubricStyle(rubric) === 'single_point';
+  }
 
   /* "3 Criteria", plus "· 24 Checkboxes" on an Advanced Rubric. */
   function _sizeText(rubric) {
@@ -192,7 +195,8 @@ window.RubricBank = (function () {
   }
 
   function _advTagHtml(rubric) {
-    return isAdvanced(rubric) ? '<span class="rb-adv-tag">Advanced</span>' : '';
+    if (isAdvanced(rubric)) return '<span class="rb-adv-tag">Advanced</span>';
+    return isSinglePoint(rubric) ? '<span class="rb-adv-tag">Single-Point</span>' : '';
   }
 
   /* An Advanced Rubric's checkboxes for one level, under its descriptor. */
@@ -580,17 +584,22 @@ window.RubricBank = (function () {
   function gridHtml(cid, rubric, opts) {
     opts = opts || {};
     var srcCid = opts.srcCid || cid;
-    var levels = _levels(cid);
-    var plainValues = _defaultValues(rubric);
-    var html = '<table class="rb-grid"><thead><tr><th class="rb-crit-head" scope="col">Criterion</th>';
+    // A single-point rubric shows its one column: the Proficient standard.
+    var single = isSinglePoint(rubric);
+    var levels = single ? [3] : _levels(cid);
+    var plainValues = single || _defaultValues(rubric);
+    var html =
+      '<table class="rb-grid' +
+      (single ? ' is-single-point' : '') +
+      '"><thead><tr><th class="rb-crit-head" scope="col">Criterion</th>';
     levels.forEach(function (lv) {
       html +=
         '<th scope="col" class="rb-level-head l' +
         lv +
         '"><span>' +
-        PROF_LABELS[lv] +
+        (single ? 'Proficient Standard' : PROF_LABELS[lv]) +
         '</span>' +
-        (plainValues ? '<span class="rb-level-value">' + lv + '</span>' : '') +
+        (plainValues && !single ? '<span class="rb-level-value">' + lv + '</span>' : '') +
         '</th>';
     });
     html += '</tr></thead><tbody>';
@@ -744,6 +753,7 @@ window.RubricBank = (function () {
         ? '<div class="rb-menu rb-new-menu" role="menu">' +
           '<button type="button" role="menuitem" data-rb="new" data-style="standard"><span class="rb-menu-title">Standard Rubric</span><span class="rb-menu-help">One descriptor per level. Pick a level to score.</span></button>' +
           '<button type="button" role="menuitem" data-rb="new" data-style="advanced"><span class="rb-menu-title">Advanced Rubric</span><span class="rb-menu-help">Checkboxes inside each level. Ticks suggest the level.</span></button>' +
+          '<button type="button" role="menuitem" data-rb="new" data-style="single_point"><span class="rb-menu-title">Single-Point Rubric</span><span class="rb-menu-help">Only the Proficient standard. Note what to work on and where they went beyond.</span></button>' +
           '</div>'
         : '')
     );
@@ -1104,7 +1114,7 @@ window.RubricBank = (function () {
         _renderNew(_s.newMenuOpen);
         break;
       case 'new': {
-        var style = el && el.dataset.style === 'advanced' ? 'advanced' : 'standard';
+        var style = rubricStyle({ style: el && el.dataset.style });
         close();
         if (hooks.newRubric) hooks.newRubric(style);
         break;
