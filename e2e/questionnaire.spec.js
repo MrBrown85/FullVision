@@ -156,9 +156,9 @@ test('Generate drafts the comment from the bank; ⌘Z brings the old text back; 
   const second = await box.inputValue();
   expect(second).not.toBe(first);
   await box.focus();
-  await page.keyboard.press('Meta+z');
+  await page.keyboard.press('ControlOrMeta+z');
   await expect(box).toHaveValue(first);
-  await page.keyboard.press('Meta+z');
+  await page.keyboard.press('ControlOrMeta+z');
   await expect(box).toHaveValue(before);
   // Every student in the class gets a draft with no slot left unfilled.
   const bad = await page.evaluate(() =>

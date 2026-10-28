@@ -1139,10 +1139,8 @@ window.ReportQuestionnaire = (function () {
           <textarea id="tq-narrative" class="qn-text" rows="4" spellcheck="true" data-cid="${esc(cid)}" data-sid="${esc(sid)}" data-term="${esc(termId)}">${esc(text)}</textarea>
         </label>
         <div class="qn-text-actions">
-          <button type="button" class="qn-link" data-action="tqClear">Clear</button>
-          <button type="button" class="qn-link" data-action="tqCopyNarrative" id="tq-copy-btn">Copy</button>
-          <button type="button" class="qn-generate" data-action="tqGenerate" id="tq-generate" title="A draft from the Comment Bank; \u2318 Z brings back what was there">Generate</button>
-          <button type="button" class="qn-approve${on ? ' on' : ''}" id="tq-approve" data-action="tqApprove" aria-pressed="${on}">${on ? '✓ Approved' : 'Approve Comment'}</button>
+          <span class="qn-text-links"><button type="button" class="qn-link" data-action="tqClear">Clear</button><button type="button" class="qn-link" data-action="tqCopyNarrative" id="tq-copy-btn">Copy</button></span>
+          <span class="qn-text-main"><button type="button" class="qn-generate" data-action="tqGenerate" id="tq-generate" title="A draft from the Comment Bank; \u2318 Z brings back what was there">Generate</button><button type="button" class="qn-approve${on ? ' on' : ''}" id="tq-approve" data-action="tqApprove" aria-pressed="${on}">${on ? '✓ Approved' : 'Approve Comment'}</button></span>
         </div>`;
     } else {
       var old = (getStudentTermRating(cid, sid, _commentTab) || {}).narrative;
