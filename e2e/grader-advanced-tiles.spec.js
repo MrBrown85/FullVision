@@ -53,16 +53,16 @@ test('Advanced Rubric tiles tick, suggest and keep a hand-picked level', async (
   await page.locator('[data-action="setView"][data-mode="scores"]').click();
   await page.locator('.gb-scores-cell[data-sid="stu-001"][data-aid="assess-adv"]').click();
 
-  const crit = page.locator('#grader-overlay .gt-crit[data-critid="crit-safe"]');
-  await expect(crit.locator('.gt-advice')).toContainText('No Level Suggested Yet');
+  const crit = page.locator('#grader-overlay .grdt-crit[data-critid="crit-safe"]');
+  await expect(crit.locator('.grdt-advice')).toContainText('No Level Suggested Yet');
 
   await crit.locator('input[data-checkid="k3a"]').check();
   await crit.locator('input[data-checkid="k3b"]').check();
-  await expect(crit.locator('.gt-advice')).toContainText('Suggested: Proficient');
-  await expect(crit.locator('.gt-tile.is-chosen')).toContainText('Proficient');
+  await expect(crit.locator('.grdt-advice')).toContainText('Suggested: Proficient');
+  await expect(crit.locator('.grdt-tile.is-chosen')).toContainText('Proficient');
 
-  await crit.locator('.gt-pick', { hasText: 'Pick Extending' }).click();
-  await expect(crit.locator('.gt-tile.is-chosen')).toContainText('Extending');
-  await expect(crit.locator('.gt-advice')).toContainText('You picked Extending');
-  await expect(crit.locator('.gt-tile.is-suggested')).toContainText('Goggles on');
+  await crit.locator('.grdt-pick', { hasText: 'Pick Extending' }).click();
+  await expect(crit.locator('.grdt-tile.is-chosen')).toContainText('Extending');
+  await expect(crit.locator('.grdt-advice')).toContainText('You picked Extending');
+  await expect(crit.locator('.grdt-tile.is-suggested')).toContainText('Goggles on');
 });
