@@ -253,6 +253,7 @@ create table assessment (
   collab_mode    text        not null default 'none',               -- none | pairs | groups
   collab_config  jsonb,
   copy_group     uuid,                                              -- shared by an assessment and its copies in the teacher's other classes; null = never copied (20261018_assessment_copy_group)
+  core_competency_ids text[]  not null default '{}',                -- BC Core Competency codes COM COL CT CRT PPI PAR SAR; check: only those (20261027_assessment_core_competencies)
   display_order  integer     not null default 0,
   created_at     timestamptz not null default now(),
   updated_at     timestamptz not null default now()

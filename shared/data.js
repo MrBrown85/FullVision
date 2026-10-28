@@ -3208,6 +3208,7 @@ function _assessmentFromDetail(existing, detail) {
   if (a.rubric_id !== undefined) next.rubricId = a.rubric_id || '';
   if (a.module_id !== undefined) next.moduleId = a.module_id || '';
   if (a.copy_group !== undefined) next.copyGroup = a.copy_group || null;
+  if (a.core_competency_ids !== undefined) next.coreCompetencyIds = _coreCompetencyIdsOf(a.core_competency_ids);
   if (a.evidence_type !== undefined) next.evidenceType = a.evidence_type || '';
   if (a.collab_mode !== undefined) next.collaboration = _localCollabModeFromCanonical(a.collab_mode || 'individual');
   if (a.collab_config !== undefined && a.collab_config) {
@@ -3704,6 +3705,7 @@ function _v2GradebookToCache(cid, payload) {
       rubricId: a.rubric_id || '',
       moduleId: a.module_id || '',
       copyGroup: a.copy_group || null,
+      coreCompetencyIds: _coreCompetencyIdsOf(a.core_competency_ids),
       has_rubric: !!a.has_rubric,
       due_date: _dateOnly(a.due_date),
       assigned_at: _dateOnly(a.date_assigned),
@@ -8257,6 +8259,7 @@ function _assessmentChanged(a, b) {
     (a.rubricId || '') !== (b.rubricId || '') ||
     (a.moduleId || '') !== (b.moduleId || '') ||
     (a.copyGroup || '') !== (b.copyGroup || '') ||
+    _coreCompetencyIdsOf(a.coreCompetencyIds).join() !== _coreCompetencyIdsOf(b.coreCompetencyIds).join() ||
     Number(a.display_order || 0) !== Number(b.display_order || 0) ||
     JSON.stringify(a.tagIds || []) !== JSON.stringify(b.tagIds || [])
   );
@@ -8320,6 +8323,9 @@ function _canonicalCreateAssessment(sb, cid, a) {
   // Only sent when set, so a page from before copies existed (and the
   // function before migration 20261018) keeps working unchanged.
   if (_isUuid(a.copyGroup)) params.p_copy_group = a.copyGroup;
+  // Likewise only when ticked (migration 20261027).
+  var coreIds = _coreCompetencyIdsOf(a.coreCompetencyIds);
+  if (coreIds.length) params.p_core_competency_ids = coreIds;
   var rec = _registerPendingCreate(cid, 'assessment', localId, 'create_assessment');
   var created = _writeRpc('create_assessment', params, { entryId: rec ? rec.entryId : undefined }).then(function (res) {
     if (res.error) {
@@ -8405,7 +8411,19 @@ function _assessmentFieldsPatchOf(a) {
     rubric_id: _isUuid(a.rubricId) ? a.rubricId : null,
     module_id: _isUuid(a.moduleId) ? a.moduleId : null,
     display_order: Number(a.display_order || 0),
+    core_competency_ids: _coreCompetencyIdsOf(a.coreCompetencyIds),
   };
+}
+
+/* An assessment's Core Competency codes in CORE_COMPETENCIES order, each
+   once, unknown codes dropped. The server refuses an unknown code. */
+function _coreCompetencyIdsOf(ids) {
+  if (!Array.isArray(ids) || !ids.length) return [];
+  return CORE_COMPETENCIES.map(function (cc) {
+    return cc.id;
+  }).filter(function (id) {
+    return ids.indexOf(id) >= 0;
+  });
 }
 
 /* v2 delete_assessment(p_id).  FK cascade handles scores/rubric_scores/
