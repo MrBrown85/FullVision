@@ -2,9 +2,8 @@ import { test, expect } from '@playwright/test';
 
 /* Attendance on the Term Questionnaire (Colin, 2026-10-24): the teacher
    copies the totals to date from MyEd at each report; the questionnaire
-   shows the change since the last report, warns when a total goes down,
-   and puts a sentence in the comment only when Mention in Comment is
-   picked. */
+   shows the change since the last report and warns when a total goes
+   down. Its sentences are in the Comment Bank (e2e/questionnaire.spec.js). */
 test.use({ viewport: { width: 1440, height: 900 } });
 
 async function openQuestionnaire(page) {
@@ -48,27 +47,4 @@ test('totals to date give this term without any math', async ({ page }) => {
   await page.locator('#tq-att-absences').press('Tab');
   await expect(page.locator('#tq-att-note')).toContainText('Lower than the 4 absences');
   await expect(page.locator('#tq-att-absences')).toHaveClass(/warn/);
-});
-
-test('Mention in Comment adds the sentence and takes it out again', async ({ page }) => {
-  await openQuestionnaire(page);
-  await pickReport(page, 1);
-  const mention = page.locator('#tq-att-mention');
-  await expect(mention).toBeDisabled();
-  await enter(page, 2, 0);
-  await expect(mention).toBeEnabled();
-  await expect(page.locator('#tq-narrative')).not.toContainText('has missed');
-
-  await mention.click();
-  await expect(mention).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.locator('#tq-narrative')).toContainText('has missed 2 classes this year and has not been late.');
-
-  // New totals change the sentence in the comment.
-  await enter(page, 3, 1);
-  await expect(page.locator('#tq-narrative')).toContainText('has missed 3 classes this year and has been late 1 time.');
-  await expect(page.locator('#tq-narrative')).not.toContainText('2 classes');
-
-  await mention.click();
-  await expect(mention).toHaveAttribute('aria-pressed', 'false');
-  await expect(page.locator('#tq-narrative')).not.toContainText('has missed');
 });

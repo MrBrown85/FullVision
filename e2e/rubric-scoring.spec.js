@@ -44,11 +44,14 @@ const RUBRIC_ASSESSMENT = {
  * Seed rubric + rubric-based assessment into localStorage.
  */
 async function seedRubricData(page) {
-  await page.addInitScript((fixtures) => {
-    const { rubric, assessment, cid } = fixtures;
-    localStorage.setItem('gb-rubrics-' + cid, JSON.stringify([rubric]));
-    localStorage.setItem('gb-assessments-' + cid, JSON.stringify([assessment]));
-  }, { rubric: TEST_RUBRIC, assessment: RUBRIC_ASSESSMENT, cid: TEST_COURSE.id });
+  await page.addInitScript(
+    fixtures => {
+      const { rubric, assessment, cid } = fixtures;
+      localStorage.setItem('gb-rubrics-' + cid, JSON.stringify([rubric]));
+      localStorage.setItem('gb-assessments-' + cid, JSON.stringify([assessment]));
+    },
+    { rubric: TEST_RUBRIC, assessment: RUBRIC_ASSESSMENT, cid: TEST_COURSE.id },
+  );
 }
 
 test.describe('Rubric Scoring Workflow', () => {
@@ -92,7 +95,9 @@ test.describe('Rubric Scoring Workflow', () => {
     await assessEl.click();
     await page.waitForTimeout(500);
     // Click Proficient (level 3) for first criterion, first student
-    const scoreBtn = page.locator('[data-action="selectRubricScore"][data-level="3"][data-sid="stu-001"][data-critid="crit-hyp"]').first();
+    const scoreBtn = page
+      .locator('[data-action="selectRubricScore"][data-level="3"][data-sid="stu-001"][data-critid="crit-hyp"]')
+      .first();
     if (await scoreBtn.isVisible()) {
       await scoreBtn.click();
       await page.waitForTimeout(300);

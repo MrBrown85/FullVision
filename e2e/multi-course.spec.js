@@ -11,8 +11,34 @@ const SECOND_COURSE = {
 };
 
 const SECOND_STUDENTS = [
-  { id: 'stu-101', firstName: 'Diana', lastName: 'Diaz', preferred: 'Diana', pronouns: '', studentNumber: '2001', email: '', dateOfBirth: '', designation: '', enrolledDate: '', attendance: [], sortName: 'Diaz Diana' },
-  { id: 'stu-102', firstName: 'Evan', lastName: 'Edwards', preferred: 'Evan', pronouns: '', studentNumber: '2002', email: '', dateOfBirth: '', designation: '', enrolledDate: '', attendance: [], sortName: 'Edwards Evan' },
+  {
+    id: 'stu-101',
+    firstName: 'Diana',
+    lastName: 'Diaz',
+    preferred: 'Diana',
+    pronouns: '',
+    studentNumber: '2001',
+    email: '',
+    dateOfBirth: '',
+    designation: '',
+    enrolledDate: '',
+    attendance: [],
+    sortName: 'Diaz Diana',
+  },
+  {
+    id: 'stu-102',
+    firstName: 'Evan',
+    lastName: 'Edwards',
+    preferred: 'Evan',
+    pronouns: '',
+    studentNumber: '2002',
+    email: '',
+    dateOfBirth: '',
+    designation: '',
+    enrolledDate: '',
+    attendance: [],
+    sortName: 'Edwards Evan',
+  },
 ];
 
 const SECOND_LEARNING_MAP = {
@@ -20,8 +46,23 @@ const SECOND_LEARNING_MAP = {
   subjects: [{ id: 'MATH9', name: 'Math 9', color: '#dc2626' }],
   sections: [
     {
-      id: 'NUM', subject: 'MATH9', name: 'Number Sense', shortName: 'Numbers', color: '#dc2626',
-      tags: [{ id: 'NUM', label: 'Number Operations', text: '', color: '#dc2626', subject: 'MATH9', name: 'Number Sense', shortName: 'Numbers', i_can_statements: [] }],
+      id: 'NUM',
+      subject: 'MATH9',
+      name: 'Number Sense',
+      shortName: 'Numbers',
+      color: '#dc2626',
+      tags: [
+        {
+          id: 'NUM',
+          label: 'Number Operations',
+          text: '',
+          color: '#dc2626',
+          subject: 'MATH9',
+          name: 'Number Sense',
+          shortName: 'Numbers',
+          i_can_statements: [],
+        },
+      ],
     },
   ],
 };
@@ -32,34 +73,42 @@ const SECOND_LEARNING_MAP = {
 async function seedTwoCourses(page) {
   await seedCourse(page); // Seeds TEST_COURSE (sci8)
   // Add second course + its data
-  await page.addInitScript((fixtures) => {
-    const { course, learningMap, students } = fixtures;
-    // Add to existing courses object
-    const courses = JSON.parse(localStorage.getItem('gb-courses') || '{}');
-    courses[course.id] = course;
-    localStorage.setItem('gb-courses', JSON.stringify(courses));
-    // Per-course data for second course
-    localStorage.setItem('gb-learningMaps-' + course.id, JSON.stringify(learningMap));
-    localStorage.setItem('gb-students-' + course.id, JSON.stringify(students));
-    localStorage.setItem('gb-assessments-' + course.id, JSON.stringify([]));
-    localStorage.setItem('gb-scores-' + course.id, JSON.stringify({}));
-    localStorage.setItem('gb-observations-' + course.id, JSON.stringify([]));
-    localStorage.setItem('gb-modules-' + course.id, JSON.stringify([]));
-    localStorage.setItem('gb-rubrics-' + course.id, JSON.stringify([]));
-    localStorage.setItem('gb-flags-' + course.id, JSON.stringify({}));
-    localStorage.setItem('gb-goals-' + course.id, JSON.stringify({}));
-    localStorage.setItem('gb-reflections-' + course.id, JSON.stringify({}));
-    localStorage.setItem('gb-overrides-' + course.id, JSON.stringify({}));
-    localStorage.setItem('gb-statuses-' + course.id, JSON.stringify({}));
-    localStorage.setItem('gb-notes-' + course.id, JSON.stringify({}));
-    localStorage.setItem('gb-termRatings-' + course.id, JSON.stringify({}));
-    localStorage.setItem('gb-customTags-' + course.id, JSON.stringify([]));
-    localStorage.setItem('gb-courseConfigs-' + course.id, JSON.stringify({}));
-    localStorage.setItem('gb-reportConfig-' + course.id, JSON.stringify({}));
-    localStorage.setItem('gb-gradingScales-' + course.id, JSON.stringify({}));
-    // Seed first course students too
-    localStorage.setItem('gb-students-sci8', JSON.stringify(fixtures.firstStudents));
-  }, { course: SECOND_COURSE, learningMap: SECOND_LEARNING_MAP, students: SECOND_STUDENTS, firstStudents: TEST_STUDENTS });
+  await page.addInitScript(
+    fixtures => {
+      const { course, learningMap, students } = fixtures;
+      // Add to existing courses object
+      const courses = JSON.parse(localStorage.getItem('gb-courses') || '{}');
+      courses[course.id] = course;
+      localStorage.setItem('gb-courses', JSON.stringify(courses));
+      // Per-course data for second course
+      localStorage.setItem('gb-learningMaps-' + course.id, JSON.stringify(learningMap));
+      localStorage.setItem('gb-students-' + course.id, JSON.stringify(students));
+      localStorage.setItem('gb-assessments-' + course.id, JSON.stringify([]));
+      localStorage.setItem('gb-scores-' + course.id, JSON.stringify({}));
+      localStorage.setItem('gb-observations-' + course.id, JSON.stringify([]));
+      localStorage.setItem('gb-modules-' + course.id, JSON.stringify([]));
+      localStorage.setItem('gb-rubrics-' + course.id, JSON.stringify([]));
+      localStorage.setItem('gb-flags-' + course.id, JSON.stringify({}));
+      localStorage.setItem('gb-goals-' + course.id, JSON.stringify({}));
+      localStorage.setItem('gb-reflections-' + course.id, JSON.stringify({}));
+      localStorage.setItem('gb-overrides-' + course.id, JSON.stringify({}));
+      localStorage.setItem('gb-statuses-' + course.id, JSON.stringify({}));
+      localStorage.setItem('gb-notes-' + course.id, JSON.stringify({}));
+      localStorage.setItem('gb-termRatings-' + course.id, JSON.stringify({}));
+      localStorage.setItem('gb-customTags-' + course.id, JSON.stringify([]));
+      localStorage.setItem('gb-courseConfigs-' + course.id, JSON.stringify({}));
+      localStorage.setItem('gb-reportConfig-' + course.id, JSON.stringify({}));
+      localStorage.setItem('gb-gradingScales-' + course.id, JSON.stringify({}));
+      // Seed first course students too
+      localStorage.setItem('gb-students-sci8', JSON.stringify(fixtures.firstStudents));
+    },
+    {
+      course: SECOND_COURSE,
+      learningMap: SECOND_LEARNING_MAP,
+      students: SECOND_STUDENTS,
+      firstStudents: TEST_STUDENTS,
+    },
+  );
 }
 
 test.describe('Multi-Course Switching', () => {

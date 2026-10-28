@@ -158,32 +158,10 @@ describe('Reports questionnaire in a Letter class', () => {
     return COMMENT_BANK.sentences.filter(s => CommentBank.fits(s, ctx)).map(s => CommentBank.fill(s, ctx));
   }
 
-  function snapshot() {
-    const html = ReportQuestionnaire.renderTermQuestionnaire(CID);
-    const panel = html.slice(html.indexOf('data-panel-id="academic-snapshot"'));
-    const values = [...panel.matchAll(/tq-snapshot-item-value[^>]*>([^<]*)</g)].map(m => m[1]);
-    return { overall: values[0], competencies: values.slice(1, 3) };
-  }
-
   beforeEach(() => localStorage.clear());
   afterEach(() => {
     vi.restoreAllMocks();
     delete COURSES[CID];
-  });
-
-  it('shows the letter and % as Overall, and competencies as a %', () => {
-    seed('letter');
-    expect(snapshot()).toEqual({ overall: 'B 75%', competencies: ['75%', '75%'] });
-  });
-
-  it('shows the proficiency word and the letter in a Both class', () => {
-    seed('both');
-    expect(snapshot()).toEqual({ overall: 'Proficient · B 75%', competencies: ['Proficient', 'Proficient'] });
-  });
-
-  it('keeps the proficiency word in a Proficiency class', () => {
-    seed('proficiency');
-    expect(snapshot()).toEqual({ overall: 'Proficient', competencies: ['Proficient', 'Proficient'] });
   });
 
   it('gives the comment bank a letter grade, not a proficiency word', () => {

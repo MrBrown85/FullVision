@@ -1,5 +1,14 @@
 import { test, expect } from '@playwright/test';
-import { mockAuth, seedCourse, seedStudents, seedAssessments, seedScores, gotoApp, TEST_ASSESSMENT, TEST_STUDENTS } from './helpers.js';
+import {
+  mockAuth,
+  seedCourse,
+  seedStudents,
+  seedAssessments,
+  seedScores,
+  gotoApp,
+  TEST_ASSESSMENT,
+  TEST_STUDENTS,
+} from './helpers.js';
 
 test.describe('Assignments — Create & Score', () => {
   test.beforeEach(async ({ page }) => {
@@ -26,7 +35,9 @@ test.describe('Assignments — Create & Score', () => {
       await btn.click();
       await page.waitForTimeout(500);
       // Should see a form with title field
-      const form = page.locator('input[placeholder*="itle"], input[placeholder*="name"], #assess-title, [data-field="title"]').first();
+      const form = page
+        .locator('input[placeholder*="itle"], input[placeholder*="name"], #assess-title, [data-field="title"]')
+        .first();
       const visible = await form.isVisible().catch(() => false);
       // The form might render differently - just verify page didn't crash
       const main = page.locator('#main');

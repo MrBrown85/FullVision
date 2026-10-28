@@ -641,14 +641,15 @@ test.describe('Page Studio', () => {
     await expect(dialog.getByRole('radio', { name: 'First Name', exact: true })).toBeChecked();
   });
 
-  test('the comment box says how the draft sits in its lines, as it is typed; a long comment continues, nothing is cut', async ({
+  test('the comment’s line meter counts its printed lines as it is typed; a long comment continues, nothing is cut', async ({
     page,
   }) => {
     await page.goto('/login.html?demo=1');
     await page.waitForURL(/\/dashboard/, { timeout: 15000 });
     await page.evaluate(r => window.Router.navigate(r), '/reports');
-    const fit = page.locator('#tq-fit-text');
-    await expect(fit).toContainText(/^Fits\. \d+ lines?; room for \d+ more\.$/);
+    const meter = page.locator('#tq-meter-label');
+    await expect(meter).toHaveText(/^\d+ of 10 lines$/);
+    await expect(meter).not.toHaveClass(/over/);
     const editor = page.locator('#tq-narrative');
     await editor.click();
     await page.keyboard.press('End');
@@ -656,13 +657,11 @@ test.describe('Page Studio', () => {
       await page.keyboard.type(
         ' She keeps asking questions that move the whole class forward and writes it all down with care.',
       );
-    await expect(fit).toContainText(
-      /\d+ lines, \d+ past the box; (what is under it moves down|this report runs to \d sheets)\. Nothing is cut\./,
-    );
-    await page.getByRole('button', { name: 'See the Page' }).click();
-    await expect(page.getByRole('tab', { name: 'Progress Reports' })).toHaveAttribute('aria-selected', 'true');
-    await expect(page.locator('#picker-label')).toHaveText('Cece Adeyemi');
-    await expect(page.locator('.report-sheet').first().locator('.report-student-name')).toHaveText('Cece Adeyemi');
+    await expect(meter).toHaveClass(/over/);
+    const lines = Number((await meter.textContent()).split(' ')[0]);
+    expect(lines).toBeGreaterThan(10);
+    await page.locator('.report-seg-btn[data-tab="progress"]').click();
+    await expect(page.locator('.report-sheet').first()).toBeVisible();
     expect(await overflowing(page)).toEqual([]);
   });
 

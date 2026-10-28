@@ -44,7 +44,13 @@ test.describe('One primary action per screen', () => {
     },
     { name: 'Observations', route: '/observations', ready: '.obsc-add', primary: ['Add'] },
     { name: 'Gradebook', route: '/gradebook', ready: '.tb-action-btn', primary: ['+ New Assessment'] },
-    { name: 'Term Questionnaire', route: '/reports', ready: '.tq-nav-btn.primary', primary: [/^Save & Next/] },
+    // Save and Next is one action, in the toolbar and in the bottom bar (the canvas, DECISIONS 14).
+    {
+      name: 'Term Questionnaire',
+      route: '/reports',
+      ready: '.qn-btn.primary',
+      primary: [/^Save and Next/, /^Save and Next/],
+    },
     {
       name: 'Student page',
       route: '/student?id=st23&course=sci8',

@@ -111,9 +111,6 @@ window.PageReports = (function () {
     _syncInkButtons();
   }
 
-  var tqIncludeAssignFeedback = true;
-  var tqObsFilter = 'all'; // 'all'|'general'|'assignment'
-
   /* ── Tab switching ───────────────────────────────────────────── */
   function switchTab(tab) {
     activeTab = tab;
@@ -122,6 +119,12 @@ window.PageReports = (function () {
     // Show/hide contextual toolbar elements
     document.getElementById('student-picker').style.display = tab === 'progress' ? '' : 'none';
     document.getElementById('tq-student-nav').style.display = tab === 'questionnaire' ? 'flex' : 'none';
+    document.querySelectorAll('.tq-only').forEach(function (el) {
+      el.style.display = tab === 'questionnaire' ? '' : 'none';
+    });
+    if (tab !== 'questionnaire') RQ.restoreRoster();
+    var out = document.getElementById('report-output');
+    if (out) out.classList.toggle('qn-output', tab === 'questionnaire');
     // Show Print button only on progress reports and class summary
     const tbPrint = document.getElementById('tb-print-btn');
     if (tbPrint) tbPrint.style.display = tab === 'questionnaire' ? 'none' : '';
@@ -265,8 +268,8 @@ window.PageReports = (function () {
         setLongFormAuthContext({
           kind: 'term-rating',
           getDraftText: function () {
-            var editor = document.getElementById('tq-narrative');
-            return editor ? editor.innerText || editor.textContent || '' : '';
+            var box = document.getElementById('tq-narrative');
+            return box ? box.value || '' : '';
           },
         });
       }
@@ -353,15 +356,7 @@ window.PageReports = (function () {
     if (activeTab === 'questionnaire') {
       output.innerHTML = renderTermQuestionnaire(cid);
       _syncLongFormAuthContext();
-      updateCommentFit();
-      // Highlight active student in sidebar
-      const students = getTqStudents();
-      const activeSid = students[RQ.tqStudentIndex]?.id;
-      document.querySelectorAll('#gb-sidebar .student-row').forEach(row => {
-        const href = row.getAttribute('data-href') || '';
-        const match = href.match(/id=([^&]+)/);
-        row.classList.toggle('selected', match && match[1] === activeSid);
-      });
+      RQ.afterRender();
       return;
     }
 
@@ -1432,29 +1427,8 @@ window.PageReports = (function () {
   function tqSaveCurrentIfNeeded() {
     RQ.tqSaveCurrentIfNeeded();
   }
-  function tqExec(cmd) {
-    RQ.tqExec(cmd);
-  }
-  function tqUpdateToolbar() {
-    RQ.tqUpdateToolbar();
-  }
   function tqCopyNarrative() {
     RQ.tqCopyNarrative();
-  }
-  function tqSetDim(sid, dim, val) {
-    RQ.tqSetDim(sid, dim, val);
-  }
-  function tqSetField(sid, field, val) {
-    RQ.tqSetField(sid, field, val);
-  }
-  function tqToggleTrait(sid, tid) {
-    RQ.tqToggleTrait(sid, tid);
-  }
-  function tqToggleAssignment(sid, aid) {
-    RQ.tqToggleAssignment(sid, aid);
-  }
-  function tqToggleOb(sid, obId) {
-    RQ.tqToggleOb(sid, obId);
   }
   function tqSelectStudent(sid) {
     RQ.tqSelectStudent(sid);
@@ -1467,8 +1441,10 @@ window.PageReports = (function () {
     RQ.configure({
       activeCourse: activeCourse,
       renderReports: renderReports,
-      tqIncludeAssignFeedback: tqIncludeAssignFeedback,
-      tqObsFilter: tqObsFilter,
+      onLastStudent: function () {
+        switchTab('progress');
+      },
+      commentFit: _queueCommentFit,
     });
   }
 
@@ -1721,34 +1697,20 @@ window.PageReports = (function () {
         e.stopPropagation();
         selectNoneStudents();
       },
-      tqSetDim: function () {
-        tqSetDim(el.dataset.sid, el.dataset.dim, parseInt(el.dataset.lvl, 10));
-      },
-      tqSetField: function () {
-        tqSetField(el.dataset.sid, el.dataset.field, parseInt(el.dataset.lvl, 10));
-      },
-      tqToggleTrait: function () {
-        tqToggleTrait(el.dataset.sid, el.dataset.tid);
-      },
-      tqToggleAttendanceMention: function () {
-        RQ.tqToggleAttendanceMention(el.dataset.sid);
-      },
-      tqToggleAssignment: function () {
-        tqToggleAssignment(el.dataset.sid, el.dataset.aid);
-      },
-      tqExec: function () {
-        tqExec(el.dataset.cmd);
-      },
       tqCopyNarrative: function () {
         tqCopyNarrative();
       },
-      tqObsFilter: function () {
-        tqObsFilter = el.dataset.filter;
-        RQ.tqObsFilter = el.dataset.filter;
-        renderReports();
+      tqClear: function () {
+        RQ.tqClear();
       },
-      tqToggleOb: function () {
-        tqToggleOb(el.dataset.sid, el.dataset.obid);
+      tqApprove: function () {
+        RQ.tqApprove();
+      },
+      tqCommentTab: function () {
+        RQ.tqCommentTab(el.dataset.tab);
+      },
+      tqRosterFilter: function () {
+        RQ.tqRosterFilter(el.dataset.filter);
       },
     };
     if (handlers[action]) {
@@ -1788,51 +1750,33 @@ window.PageReports = (function () {
     }
   }
 
-  function _handleSelectionChange() {
-    var editor = document.getElementById('tq-narrative');
-    if (!editor) return;
-    var sel = document.getSelection();
-    if (sel && sel.anchorNode && editor.contains(sel.anchorNode)) tqUpdateToolbar();
-  }
-
-  // The CSP blocks inline on* attributes, so the narrative's dirty flag is set here.
+  // The CSP blocks inline on* attributes, so the comment box's typing is heard here.
   function _handleNarrativeInput(e) {
-    if (e.target && e.target.id === 'tq-narrative') {
-      RQ.tqNarrativeDirty = true;
-      clearTimeout(_fitTimer);
-      _fitTimer = setTimeout(updateCommentFit, 250);
-    }
+    if (e.target && e.target.id === 'tq-narrative') RQ.tqNarrativeInput();
   }
 
   /* ── The comment box knows the form's room ─────────────────────
-     Under the questionnaire's editor: how the draft sits on the Report
-     Card's front, what it pushes, and a button to the student's pages. */
+     The line meter: the comment's printed lines on the class's form
+     against the Teacher Comment box's Lines, measured as it is typed. */
   var _fitTimer = null;
+  function _queueCommentFit() {
+    clearTimeout(_fitTimer);
+    _fitTimer = setTimeout(updateCommentFit, 250);
+  }
   function updateCommentFit() {
-    var line = document.getElementById('tq-fit');
-    var text = document.getElementById('tq-fit-text');
-    if (!line || !text) return;
-    if (typeof ReportSheets === 'undefined') {
-      line.hidden = true;
-      return;
-    }
+    if (activeTab !== 'questionnaire' || typeof ReportSheets === 'undefined') return;
     var student = getTqStudents()[RQ.tqStudentIndex];
-    var editor = document.getElementById('tq-narrative');
-    if (!student || !editor) {
-      line.hidden = true;
-      return;
-    }
+    var box = document.getElementById('tq-narrative');
+    if (!student || !box) return;
     var ctx = ReportBlocks.reportContext();
-    ctx.narrativeOverride = editor.innerHTML;
+    ctx.narrativeOverride = box.value;
     var r = ReportSheets.describeStudent(activeCourse, student, ctx, { paper: reportPaper, form: _formOf() });
-    text.textContent = ReportSheets.fitText(r);
-    line.classList.toggle('over', r.commentLines > r.room);
-    line.hidden = !text.textContent;
+    RQ.setMeter(r.commentLines || 0, r.room || 0);
   }
 
-  function _handleKeyup(e) {
-    var editor = document.getElementById('tq-narrative');
-    if (editor && editor.contains(e.target)) tqUpdateToolbar();
+  /* ⌘ Return and the arrow keys on the questionnaire. */
+  function _handleQuestionnaireKey(e) {
+    if (activeTab === 'questionnaire') RQ.handleKey(e);
   }
 
   function _handleReportPeriodChange() {
@@ -1928,8 +1872,6 @@ window.PageReports = (function () {
     setActiveCourse(activeCourse);
     activeTab = params.tab || 'questionnaire';
     selectedStudentIds = null;
-    tqIncludeAssignFeedback = true;
-    tqObsFilter = 'all';
 
     reportConfig = _loadReportConfig(activeCourse);
     _blockSizes = null;
@@ -1993,8 +1935,7 @@ window.PageReports = (function () {
     _addDocListener('change', _handleStudioChange);
     _addDocListener('keydown', _handleStudioKey);
     window.addEventListener('resize', _handleResize);
-    _addDocListener('selectionchange', _handleSelectionChange);
-    _addDocListener('keyup', _handleKeyup);
+    _addDocListener('keydown', _handleQuestionnaireKey);
     _addDocListener('input', _handleNarrativeInput);
     _addDocListener('focusin', _handleLatePolicyFocus);
     _addDocListener('focusout', _handleLatePolicyBlur);
@@ -2017,6 +1958,7 @@ window.PageReports = (function () {
     if (paperStyle) paperStyle.remove();
     if (typeof ReportSheets !== 'undefined') ReportSheets.clearPageStyle();
     _restoreSidebarBadges();
+    RQ.restoreRoster();
     if (typeof clearLongFormAuthContext === 'function') clearLongFormAuthContext('term-rating');
 
     _listeners.forEach(function (l) {
@@ -2046,7 +1988,7 @@ window.PageReports = (function () {
 
   /* -- Toolbar HTML (rendered into main on init) ---------- */
   var TOOLBAR_HTML =
-    '<div class="page-toolbar report-toolbar no-print">\n      <div class="seg report-seg-control" role="tablist" aria-label="Report type">\n        <button class="seg-btn report-seg-btn active" data-action="switchTab" data-tab="questionnaire" role="tab" aria-selected="true">Term Questionnaire</button>\n        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="progress" role="tab" aria-selected="false">Progress Reports</button>\n      </div>\n      <div class="report-stepper" id="report-stepper" style="display:none">\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="-1" title="Previous student" aria-label="Previous student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="1" title="Next student" aria-label="Next student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n      </div>\n      <div class="student-picker" id="student-picker">\n        <button class="student-picker-btn" data-action="toggleStudentPicker" aria-label="Select students" aria-expanded="false" aria-haspopup="listbox">\n          <span id="picker-label">All Students</span>\n        </button>\n        <div class="student-picker-dropdown" id="picker-dropdown"></div>\n      </div>\n      <div class="tq-student-nav" id="tq-student-nav" style="display:none">\n        <button class="tq-toolbar-arrow" data-action="tqPrevStudent" title="Previous student" aria-label="Previous student">\n          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>\n        </button>\n        <span class="tq-student-name" id="tq-student-name"></span>\n        <button class="tq-toolbar-arrow" data-action="tqNextStudent" title="Next student" aria-label="Next student">\n          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>\n        </button>\n        <div class="tq-progress-ring" id="tq-progress-ring">\n          <svg width="30" height="30" viewBox="0 0 30 30">\n            <circle class="ring-bg" cx="15" cy="15" r="12"/>\n            <circle class="ring-fill" id="tq-ring-fill" cx="15" cy="15" r="12" stroke-dasharray="75.4" stroke-dashoffset="75.4"/>\n          </svg>\n          <span class="tq-progress-label" id="tq-progress-label"></span>\n        </div>\n      </div>\n      <select id="report-period" class="term-select" aria-label="Report"></select>\n      <select id="report-copy" class="term-select" aria-label="Copy" style="display:none"></select>\n      <span class="tb-divider" id="tb-divider" aria-hidden="true">\u2502</span>\n      <span class="tb-label" id="tb-paper-label">Paper</span>\n      <div class="seg seg-sm" id="report-paper" role="radiogroup" aria-label="Paper" style="display:none">\n        <button class="seg-btn active" data-action="setPaper" data-paper="letter" role="radio" aria-checked="true">Letter</button>\n        <button class="seg-btn" data-action="setPaper" data-paper="legal" role="radio" aria-checked="false">Legal</button>\n      </div>\n      <span class="tb-label tb-label-progress">Sides</span>\n      <div class="seg seg-sm" id="report-sides" role="radiogroup" aria-label="Sides" style="display:none">\n        <button class="seg-btn" data-action="setSides" data-sides="1" role="radio" aria-checked="false">Front Only</button>\n        <button class="seg-btn active" data-action="setSides" data-sides="2" role="radio" aria-checked="true">Front and Back</button>\n      </div>\n      <span class="tb-label tb-label-progress">Ink</span>\n      <div class="seg seg-sm" id="report-ink" role="radiogroup" aria-label="Ink" style="display:none">\n        <button class="seg-btn" data-action="setInk" data-ink="black" role="radio" aria-checked="false">Black</button>\n        <button class="seg-btn active" data-action="setInk" data-ink="colour" role="radio" aria-checked="true">Colour</button>\n      </div>\n      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">\n        <button class="tb-toggle-btn" id="tb-phones-btn" style="display:none" data-action="togglePhones" aria-pressed="false">Sent to Phones</button>\n        <button class="tb-toggle-btn" id="tb-rail-btn" style="display:none" data-action="toggleRail" aria-pressed="false" aria-controls="studio-palette">Blocks</button>\n        <button class="tb-toggle-btn" id="tb-save-template" style="display:none" data-action="openSaveTemplate">Save as Template</button>\n        <button class="tb-action-btn" id="tb-print-btn" data-action="printReports">Print Reports</button>\n      </div>\n    </div>\n    <div id="report-output" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto"></div>';
+    '<div class="page-toolbar report-toolbar no-print">\n      <div class="seg report-seg-control" role="tablist" aria-label="Report type">\n        <button class="seg-btn report-seg-btn active" data-action="switchTab" data-tab="questionnaire" role="tab" aria-selected="true">Term Questionnaire</button>\n        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="progress" role="tab" aria-selected="false">Progress Reports</button>\n      </div>\n      <div class="report-stepper" id="report-stepper" style="display:none">\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="-1" title="Previous student" aria-label="Previous student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="1" title="Next student" aria-label="Next student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n      </div>\n      <div class="student-picker" id="student-picker">\n        <button class="student-picker-btn" data-action="toggleStudentPicker" aria-label="Select students" aria-expanded="false" aria-haspopup="listbox">\n          <span id="picker-label">All Students</span>\n        </button>\n        <div class="student-picker-dropdown" id="picker-dropdown"></div>\n      </div>\n      <div class="tq-student-nav" id="tq-student-nav" style="display:none">\n        <div class="qn-stepper">\n          <button type="button" class="tq-toolbar-arrow" data-action="tqPrevStudent" title="Previous Student" aria-label="Previous Student">\u2039</button>\n          <span class="tq-student-name" id="tq-student-name"></span>\n          <button type="button" class="tq-toolbar-arrow" data-action="tqNextStudent" title="Next Student" aria-label="Next Student">\u203A</button>\n        </div>\n        <span class="qn-pos" id="tq-student-pos"></span>\n      </div>\n      <select id="report-period" class="term-select" aria-label="Report"></select>\n      <select id="report-copy" class="term-select" aria-label="Copy" style="display:none"></select>\n      <span class="tb-divider" id="tb-divider" aria-hidden="true">\u2502</span>\n      <span class="tb-label" id="tb-paper-label">Paper</span>\n      <div class="seg seg-sm" id="report-paper" role="radiogroup" aria-label="Paper" style="display:none">\n        <button class="seg-btn active" data-action="setPaper" data-paper="letter" role="radio" aria-checked="true">Letter</button>\n        <button class="seg-btn" data-action="setPaper" data-paper="legal" role="radio" aria-checked="false">Legal</button>\n      </div>\n      <span class="tb-label tb-label-progress">Sides</span>\n      <div class="seg seg-sm" id="report-sides" role="radiogroup" aria-label="Sides" style="display:none">\n        <button class="seg-btn" data-action="setSides" data-sides="1" role="radio" aria-checked="false">Front Only</button>\n        <button class="seg-btn active" data-action="setSides" data-sides="2" role="radio" aria-checked="true">Front and Back</button>\n      </div>\n      <span class="tb-label tb-label-progress">Ink</span>\n      <div class="seg seg-sm" id="report-ink" role="radiogroup" aria-label="Ink" style="display:none">\n        <button class="seg-btn" data-action="setInk" data-ink="black" role="radio" aria-checked="false">Black</button>\n        <button class="seg-btn active" data-action="setInk" data-ink="colour" role="radio" aria-checked="true">Colour</button>\n      </div>\n      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">\n        <span class="qn-ready tq-only" id="tq-ready" style="display:none"></span>\n        <button type="button" class="tb-toggle-btn tq-only" id="tq-questions-btn" style="display:none" data-action="tqQuestions" disabled title="Comes with the Questions sheet">Questions</button>\n        <button type="button" class="tb-action-btn tq-only" id="tq-save-next" style="display:none" data-action="tqNextStudent" title="\u2318 Return">Save and Next \u203A</button>\n        <button class="tb-toggle-btn" id="tb-phones-btn" style="display:none" data-action="togglePhones" aria-pressed="false">Sent to Phones</button>\n        <button class="tb-toggle-btn" id="tb-rail-btn" style="display:none" data-action="toggleRail" aria-pressed="false" aria-controls="studio-palette">Blocks</button>\n        <button class="tb-toggle-btn" id="tb-save-template" style="display:none" data-action="openSaveTemplate">Save as Template</button>\n        <button class="tb-action-btn" id="tb-print-btn" data-action="printReports">Print Reports</button>\n      </div>\n    </div>\n    <div id="report-output" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto"></div>';
 
   /* -- Public API ----------------------------------------- */
   return {
