@@ -2749,6 +2749,17 @@
 .rubric-editor.advanced .rubric-level-text {
   min-height: 96px;
 }
+/* Single-Point: one wide Proficient box; the points stay with the levels
+   picked when scoring. */
+.rubric-editor.single-point .rubric-levels {
+  grid-template-columns: 1fr;
+}
+.rubric-editor.single-point .rubric-level-pts {
+  display: none;
+}
+.rubric-editor.single-point .rubric-level-text {
+  min-height: 72px;
+}
 .rubric-check-list {
   display: flex;
   flex-direction: column;

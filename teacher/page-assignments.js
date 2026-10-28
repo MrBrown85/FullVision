@@ -3813,8 +3813,8 @@ window.PageAssignments = (function () {
   function _closeRubricsPanel() {
     if (window.RubricBank) RubricBank.close();
   }
-  /* A new rubric, Standard unless `style` is 'advanced' (the Rubric Bank's
-     "+ New Rubric" menu picks). */
+  /* A new rubric in the style the Rubric Bank's "+ New Rubric" menu picks:
+     Standard, Advanced or Single-Point. */
   function newRubricUI(style) {
     _closeRubricsPanel();
     _whenWordingLoaded();
@@ -3823,7 +3823,7 @@ window.PageAssignments = (function () {
       id: uid(),
       name: 'New Rubric',
       created: new Date().toISOString(),
-      style: style === 'advanced' ? 'advanced' : 'standard',
+      style: rubricStyle({ style: style }),
       criteria: [{ id: uid(), name: 'Criterion 1', tagIds: [], levels: { 4: '', 3: '', 2: '', 1: '' }, checks: [] }],
       _isNew: true,
     };
@@ -3877,37 +3877,37 @@ window.PageAssignments = (function () {
     if (existing) existing.remove();
     var r = _editingRubric;
     var sections = getSections(activeCourse);
-    var advanced = _editorIsAdvanced();
+    var style = rubricStyle(r);
     var html =
       '<div class="rubric-modal-overlay" id="rubric-modal" data-action="rubricModalBackdrop" role="dialog" aria-modal="true">' +
       '<div class="rubric-editor' +
-      (advanced ? ' advanced' : '') +
+      _RUBRIC_STYLE_CLASS[style] +
       '"><div class="rubric-editor-header"><h2 class="rubric-editor-title">' +
       (r._isNew ? 'New Rubric' : 'Edit Rubric') +
       '</h2>' +
       // Standard: one descriptor per level. Advanced: checkboxes inside each
-      // level cell as well (Rubric Bank plan \u00a75).
+      // level cell as well (Rubric Bank plan \u00a75). Single-Point: the
+      // Proficient standard only (grader plan PR 15).
       '<div class="seg seg-sm rubric-style-seg" role="radiogroup" aria-label="Rubric Style">' +
-      ['standard', 'advanced']
-        .map(function (s) {
-          var on = advanced === (s === 'advanced');
-          return (
-            '<button type="button" class="seg-btn" role="radio" aria-checked="' +
-            on +
-            '" data-action="setRubricStyle" data-style="' +
-            s +
-            '">' +
-            (s === 'advanced' ? 'Advanced' : 'Standard') +
-            '</button>'
-          );
-        })
-        .join('') +
+      RUBRIC_STYLES.map(function (s) {
+        return (
+          '<button type="button" class="seg-btn" role="radio" aria-checked="' +
+          (style === s) +
+          '" data-action="setRubricStyle" data-style="' +
+          s +
+          '">' +
+          _RUBRIC_STYLE_NAMES[s] +
+          '</button>'
+        );
+      }).join('') +
       '</div>' +
       '<button class="rubric-editor-close" data-action="cancelRubricEdit" title="Close" aria-label="Close">\u2715</button></div>' +
       '<div class="rubric-editor-body"><p class="rubric-guard-note" id="re-guard-note" hidden></p>' +
       '<p class="rubric-style-hint" id="re-style-hint"' +
-      (advanced ? '' : ' hidden') +
-      '>Each level has a descriptor and checkboxes. When scoring, ticking boxes suggests the level: the highest level whose boxes are all ticked. You can always pick a different level.</p>' +
+      (_RUBRIC_STYLE_HINTS[style] ? '' : ' hidden') +
+      '>' +
+      _RUBRIC_STYLE_HINTS[style] +
+      '</p>' +
       '<input class="rubric-name-input" id="re-name" value="' +
       esc(r.name) +
       '" placeholder="Rubric name\u2026" aria-label="Rubric name"><div id="re-criteria">';
@@ -3927,6 +3927,18 @@ window.PageAssignments = (function () {
   function _editorIsAdvanced() {
     return !!_editingRubric && rubricStyle(_editingRubric) === 'advanced';
   }
+  function _editorIsSinglePoint() {
+    return !!_editingRubric && rubricStyle(_editingRubric) === 'single_point';
+  }
+  var _RUBRIC_STYLE_NAMES = { standard: 'Standard', advanced: 'Advanced', single_point: 'Single-Point' };
+  var _RUBRIC_STYLE_CLASS = { standard: '', advanced: ' advanced', single_point: ' single-point' };
+  var _RUBRIC_STYLE_HINTS = {
+    standard: '',
+    advanced:
+      'Each level has a descriptor and checkboxes. When scoring, ticking boxes suggests the level: the highest level whose boxes are all ticked. You can always pick a different level.',
+    single_point:
+      'Write only what meeting the standard looks like. When scoring, you pick a level and can note what to work on and where the student went beyond.',
+  };
   /* ── Advanced Rubrics: the checkboxes in each level cell ──────────── */
   /* One level cell's checkbox list: a row per checkbox (drag handle, box,
      label, remove) and "+ Add Checkbox". Enter in a label adds the next. */
@@ -4042,21 +4054,22 @@ window.PageAssignments = (function () {
     _rubricDirty = true;
     _refreshCriterionDOM(ci);
   }
-  /* Standard | Advanced. Advanced → Standard drops every checkbox, so it
-     asks first when there are any; scores keep their levels. Standard →
-     Advanced keeps the descriptors. */
+  /* Standard | Advanced | Single-Point. Leaving Advanced drops every
+     checkbox, so it asks first when there are any; scores keep their
+     levels. Every switch keeps the descriptors: Single-Point only hides all
+     but the Proficient one. */
   function setRubricStyle(style) {
     if (!_editingRubric) return;
-    var next = style === 'advanced' ? 'advanced' : 'standard';
+    var next = rubricStyle({ style: style });
     if (rubricStyle(_editingRubric) === next) return;
-    if (next === 'standard' && RubricChecks.countChecks(_editingRubric) > 0) {
+    if (next !== 'advanced' && RubricChecks.countChecks(_editingRubric) > 0) {
       showConfirm(
-        'Switch to a Standard Rubric?',
+        'Switch to a ' + _RUBRIC_STYLE_NAMES[next] + ' Rubric?',
         'The checkboxes in every level will be removed. Students’ scores keep their levels.',
         'Remove Checkboxes',
         'danger',
         function () {
-          _applyRubricStyle('standard');
+          _applyRubricStyle(next);
         },
       );
       return;
@@ -4066,7 +4079,7 @@ window.PageAssignments = (function () {
   function _applyRubricStyle(next) {
     if (!_editingRubric) return;
     _editingRubric.style = next;
-    if (next === 'standard') {
+    if (next !== 'advanced') {
       _editingRubric.criteria.forEach(function (c) {
         if (c) c.checks = [];
       });
@@ -4076,9 +4089,15 @@ window.PageAssignments = (function () {
       b.setAttribute('aria-checked', String(b.dataset.style === next));
     });
     var editor = document.querySelector('#rubric-modal .rubric-editor');
-    if (editor) editor.classList.toggle('advanced', next === 'advanced');
+    if (editor) {
+      editor.classList.toggle('advanced', next === 'advanced');
+      editor.classList.toggle('single-point', next === 'single_point');
+    }
     var hint = document.getElementById('re-style-hint');
-    if (hint) hint.hidden = next !== 'advanced';
+    if (hint) {
+      hint.textContent = _RUBRIC_STYLE_HINTS[next];
+      hint.hidden = !_RUBRIC_STYLE_HINTS[next];
+    }
     _refreshCriterionDOM(_expandedCriterion);
   }
   /* A checkbox without a label is nothing to save. */
@@ -4250,17 +4269,21 @@ window.PageAssignments = (function () {
           '</button>';
       }
     }
+    var single = _editorIsSinglePoint();
     html +=
-      '</div><div class="rubric-part"><div class="rubric-part-label">Level descriptors' +
+      '</div><div class="rubric-part"><div class="rubric-part-label">' +
+      (single ? 'Proficient Standard' : 'Level descriptors') +
       draftBtn +
       '</div><div class="rubric-levels">';
-    _rubricEditorLevels().forEach(function (L) {
+    // A single-point rubric states only the Proficient standard; the other
+    // levels' wording and point values are kept, just not shown.
+    (single ? [{ n: 3, name: PROF_LABELS[3] }] : _rubricEditorLevels()).forEach(function (L) {
       var pts = lv[L.n] != null ? lv[L.n] : L.n;
       html +=
         '<div class="rubric-level-card" style="--lvl:var(--score-' +
         L.n +
         ')"><div class="rubric-level-header"><span class="rubric-level-name">' +
-        L.name +
+        (single ? 'Meeting the Standard' : L.name) +
         '</span><label class="rubric-level-pts" title="Points for ' +
         L.name +
         '"><input class="rubric-level-value" type="number" step="0.5" min="0" value="' +
@@ -4276,10 +4299,10 @@ window.PageAssignments = (function () {
         '" data-level="' +
         L.n +
         '" data-action-blur="critLevel" placeholder="What does ' +
-        L.name.toLowerCase() +
+        (single ? 'meeting the standard' : L.name.toLowerCase()) +
         ' look like?" aria-label="' +
-        L.name +
-        ' descriptor">' +
+        (single ? 'Proficient standard' : L.name + ' descriptor') +
+        '">' +
         esc((crit.levels && crit.levels[L.n]) || '') +
         '</textarea>' +
         (_editorIsAdvanced() ? _renderCheckList(ci, crit, L) : '') +
