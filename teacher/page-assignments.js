@@ -5378,6 +5378,15 @@ window.PageAssignments = (function () {
               })
               .join('') +
             ObsCapture.linkPillsHtml(cid, o);
+          if (o.id === _commentEditId) {
+            return (
+              '<div class="comment-entry is-editing"><span class="comment-entry-date">' +
+              ds +
+              '</span><span class="comment-entry-main"><textarea class="comment-entry-input" rows="2" aria-label="Edit comment">' +
+              esc(o.text) +
+              '</textarea><span class="comment-entry-edit-actions"><button type="button" class="btn btn-ghost" data-action="cancelCommentEdit" data-stop-prop="true">Cancel</button><button type="button" class="btn btn-primary" data-action="saveCommentEdit" data-stop-prop="true">Save</button></span></span></div>'
+            );
+          }
           return (
             '<div class="comment-entry"><span class="comment-entry-date">' +
             ds +
@@ -5385,7 +5394,9 @@ window.PageAssignments = (function () {
             esc(o.text) +
             '</span>' +
             (pills ? '<span class="comment-entry-pills">' + pills + '</span>' : '') +
-            '</span><button class="comment-entry-del" data-action="deleteComment" data-obid="' +
+            '</span><button class="comment-entry-edit" data-action="editComment" data-obid="' +
+            o.id +
+            '" data-stop-prop="true" title="Edit" aria-label="Edit comment"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.5 2.5l3 3-8 8h-3v-3z"/></svg></button><button class="comment-entry-del" data-action="deleteComment" data-obid="' +
             o.id +
             '" data-stop-prop="true" title="Delete" aria-label="Delete comment">\u2715</button></div>'
           );
@@ -5456,18 +5467,61 @@ window.PageAssignments = (function () {
     }
     overlay.querySelector('.comment-popover-body').innerHTML = _commentEntriesHtml(cid, sid, aid);
     overlay.style.display = 'flex';
+    var input = overlay.querySelector('.comment-entry-input');
+    if (input) {
+      // Enter saves, Shift+Enter starts a new line, Escape cancels the edit
+      // without closing the dialog.
+      input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          saveCommentEdit();
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          cancelCommentEdit();
+        }
+      });
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+    }
+  }
+  /* One comment at a time is edited in place; nothing is written until Save. */
+  var _commentEditId = null;
+  function editComment(obId) {
+    _commentEditId = obId;
+    renderCommentPopover();
+  }
+  function cancelCommentEdit() {
+    _commentEditId = null;
+    renderCommentPopover();
+    if (_commentCapture) _commentCapture.focus();
+  }
+  function saveCommentEdit() {
+    if (!_commentPopoverState || !_commentEditId) return;
+    var cid = _commentPopoverState.cid,
+      sid = _commentPopoverState.sid;
+    var input = document.querySelector('#comment-popover-overlay .comment-entry-input');
+    var text = input ? input.value.trim() : '';
+    if (!text) {
+      if (input) input.focus();
+      return;
+    }
+    // The comment may have been re-keyed to its server id since the list drew.
+    updateQuickOb(cid, sid, resolveObservationId(cid, _commentEditId), { text: text });
+    cancelCommentEdit();
   }
   function deleteComment(obId) {
     if (!_commentPopoverState) return;
     var cid = _commentPopoverState.cid,
       sid = _commentPopoverState.sid,
       aid = _commentPopoverState.aid;
+    if (obId === _commentEditId) _commentEditId = null;
     deleteQuickOb(cid, sid, obId);
     renderCommentPopover();
     updateCommentBadge(sid, aid);
   }
   function closeCommentPopover() {
     _commentPopoverState = null;
+    _commentEditId = null;
     if (_commentCapture) _commentCapture.destroy();
     _commentCapture = null;
     var overlay = document.getElementById('comment-popover-overlay');
@@ -6234,6 +6288,15 @@ window.PageAssignments = (function () {
       },
       deleteComment: function () {
         deleteComment(el.dataset.obid);
+      },
+      editComment: function () {
+        editComment(el.dataset.obid);
+      },
+      saveCommentEdit: function () {
+        saveCommentEdit();
+      },
+      cancelCommentEdit: function () {
+        cancelCommentEdit();
       },
       openCriterionComment: function () {
         openCriterionComment(el.dataset.aid, el.dataset.sid, el.dataset.critid);
