@@ -384,6 +384,61 @@ function isDibelsScored(assessment) {
   return !!assessment && (assessment.scoreMode || assessment.score_mode) === 'dibels';
 }
 
+/* DIBELS 8th Edition Grade 8 benchmark goals (University of Oregon, goals
+   updated July 2020, reformatted October 2025): the lowest score in each
+   support level, per window. Above = Blue (core support, negligible risk),
+   Core = Green (core support, minimal risk), Strategic = Yellow (some risk);
+   anything lower is Intensive = Red (at risk). Maze is the adjusted score. */
+var DIBELS_CUTS = {
+  orf: {
+    boy: { above: 142, core: 125, strategic: 110 },
+    moy: { above: 156, core: 131, strategic: 116 },
+    eoy: { above: 159, core: 135, strategic: 121 },
+  },
+  maze: {
+    boy: { above: 24.5, core: 20, strategic: 16.5 },
+    moy: { above: 32, core: 26, strategic: 19.5 },
+    eoy: { above: 38, core: 28, strategic: 24.5 },
+  },
+};
+var DIBELS_PERIOD_NAMES = { boy: 'Beginning of Year', moy: 'Middle of Year', eoy: 'End of Year' };
+var DIBELS_LEVELS = {
+  above: { label: 'Above', tone: 'l4' },
+  core: { label: 'Core', tone: 'l3' },
+  strategic: { label: 'Strategic', tone: 'l2' },
+  intensive: { label: 'Intensive', tone: 'l1' },
+};
+
+/* Words read correctly as a percent of words attempted, to one decimal. */
+function dibelsAccuracy(wordsCorrect, errors) {
+  if (wordsCorrect == null || errors == null) return null;
+  var total = Number(wordsCorrect) + Number(errors);
+  return total > 0 ? Math.round((Number(wordsCorrect) / total) * 1000) / 10 : null;
+}
+/* The Maze score the goals use: correct − incorrect ÷ 2, never below 0. */
+function dibelsMazeAdjusted(correct, incorrect) {
+  if (correct == null) return null;
+  return Math.max(0, Number(correct) - Number(incorrect || 0) / 2);
+}
+/* The support level for an ORF words-correct or adjusted Maze score in a
+   window: 'above' | 'core' | 'strategic' | 'intensive', or null. */
+function dibelsLevel(measure, period, value) {
+  var cut = DIBELS_CUTS[measure] && DIBELS_CUTS[measure][period];
+  if (!cut || value == null || !isFinite(Number(value))) return null;
+  var v = Number(value);
+  if (v >= cut.above) return 'above';
+  if (v >= cut.core) return 'core';
+  if (v >= cut.strategic) return 'strategic';
+  return 'intensive';
+}
+/* The window a date falls in: Aug–Nov Beginning, Dec–Mar Middle, Apr–Jul End. */
+function dibelsPeriodFor(isoDate) {
+  var m = Number(String(isoDate || '').slice(5, 7));
+  if (m >= 8 && m <= 11) return 'boy';
+  if (m === 12 || m <= 3) return 'moy';
+  return 'eoy';
+}
+
 function isPointsScored(assessment) {
   var mode = assessment && (assessment.scoreMode || assessment.score_mode);
   return mode === 'points' || mode === 'complete';

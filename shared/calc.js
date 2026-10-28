@@ -359,7 +359,9 @@ function getAssessmentOverallScore(cid, studentId, assessmentId) {
   if (_assessmentOverallCache[cacheKey] !== undefined) return _assessmentOverallCache[cacheKey];
 
   var assessment = _getAssessMap(cid).get(assessmentId);
-  if (!assessment) {
+  // A DIBELS benchmark is a reading record, not graded work: it counts
+  // toward no grade, whatever its status.
+  if (!assessment || isDibelsScored(assessment)) {
     _assessmentOverallCache[cacheKey] = null;
     return null;
   }
@@ -533,7 +535,7 @@ var COLUMN_STATUS_RULES = {
    level), or { earned, possible } for points work read as points. */
 function columnCountedValue(cid, sid, col) {
   var a = col.assessment;
-  if (!a) return null;
+  if (!a || isDibelsScored(a)) return null;
   var status = getAssignmentStatus(cid, sid, a.id);
   if (isPointsScored(a)) {
     var pointsRule = COLUMN_STATUS_RULES.points[status];
@@ -1593,6 +1595,22 @@ function assessmentCellValue(cid, sid, assessment, today) {
     out.value = val;
     // Missing work shows as M; the stored status stays 'NS'.
     out.text = status === 'NS' ? 'M' : status;
+    return out;
+  }
+  // A DIBELS benchmark shows the latest window's reading level, as a word;
+  // it is never a score and never missing as 0.
+  if (isDibelsScored(a)) {
+    out.kind = 'dibels';
+    var latest = null;
+    ['eoy', 'moy', 'boy'].some(function (p) {
+      var row = typeof getDibelsScore === 'function' ? getDibelsScore(cid, sid, a.id, p) : null;
+      if (row && row.orfWrc != null) latest = { period: p, level: dibelsLevel('orf', p, row.orfWrc) };
+      return !!latest;
+    });
+    if (latest && latest.level) {
+      out.text = DIBELS_LEVELS[latest.level].label;
+      out.dibels = latest;
+    }
     return out;
   }
   var mark = isComplete ? getCompletionMark(cid, sid, a.id) : null;
