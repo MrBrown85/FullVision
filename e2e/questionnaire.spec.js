@@ -110,6 +110,71 @@ test('earlier reports are read only', async ({ page }) => {
   await expect(page.locator('.qn-earlier')).toContainText('consistent, dependable student');
 });
 
+test('Growth: every score as a dot, Start → Now as the Progress in One Area block prints them', async ({ page }) => {
+  await open(page);
+  const rows = page.locator('.qn-growth-row');
+  await expect(rows).toHaveCount(6);
+  await expect(rows.first().locator('.qn-dot')).toHaveCount(13);
+  await expect(rows.first().locator('.qn-growth-sn')).toHaveText('2.9 → 2.9');
+  // Dots sit on three rows by level and never overlap.
+  const overlaps = await page.evaluate(() =>
+    [...document.querySelectorAll('.qn-dots')].some(strip => {
+      const boxes = [...strip.children].map(d => d.getBoundingClientRect());
+      return boxes.some((b, i) => i && b.left < boxes[i - 1].right - 0.5);
+    }),
+  );
+  expect(overlaps).toBe(false);
+  // The report's Progress in One Area, for each competency, prints the same Start and Now.
+  const fromBlock = await page.evaluate(() => {
+    const st = getStudents('sci8').find(s => s.id === 'st1');
+    return CommentBank.facts('sci8', st, 'term-2').comps.map(c => {
+      const rating = getStudentTermRating('sci8', 'st1', 'term-2') || {};
+      upsertTermRating('sci8', 'st1', 'term-2', { focusSectionId: c.id });
+      const html = ReportBlocks.renderBlockProgress('sci8', st, { termId: 'term-2' }, {});
+      upsertTermRating('sci8', 'st1', 'term-2', { focusSectionId: rating.focusSectionId || null });
+      const d = document.createElement('div');
+      d.innerHTML = html;
+      const facts = [...d.querySelectorAll('.report-progress-facts span')].map(x => x.textContent);
+      const start = facts[facts.indexOf('Start of term') + 1].split(' ')[0];
+      const now = facts[facts.indexOf('Now') + 1].split(' ')[0];
+      return start + ' → ' + now;
+    });
+  });
+  expect(await page.locator('.qn-growth-sn').allTextContents()).toEqual(fromBlock);
+  await expect(page.locator('.qn-record')).toContainText('22 of 22');
+});
+
+test('a note quoted in the comment says In the comment; the private note is marked', async ({ page }) => {
+  await open(page);
+  const first = page.locator('.qn-obs').first();
+  await expect(first.locator('.qn-quoted')).toHaveCount(0);
+  const text = await first.locator('.qn-obs-text').textContent();
+  await page.locator('#tq-narrative').click();
+  await page.keyboard.press('End');
+  await page.keyboard.type(' I noted: “' + text.trim() + '”');
+  await expect(first.locator('.qn-quoted')).toHaveText('In the comment');
+  await expect(page.locator('.qn-private')).toContainText('Private · Never Printed');
+  await expect(page.locator('.qn-private')).toContainText('grandma');
+});
+
+test('a student with no observations this term gets the one-line explanation', async ({ page }) => {
+  await open(page);
+  await page.evaluate(() => getStudentQuickObs('sci8', 'st1').forEach(o => deleteQuickOb('sci8', 'st1', o.id)));
+  await page.locator('#gb-sidebar .student-row[data-sid="st7"]').click();
+  await page.locator('#gb-sidebar .student-row[data-sid="st1"]').click();
+  await expect(page.locator('[data-card="obs"] .qn-empty')).toHaveText(
+    'None this term. The comment works without them: Work Habits is built from your habit ratings.',
+  );
+});
+
+test('Jasper: nothing from his phone yet, his forms Not Answered, his goal Not set yet', async ({ page }) => {
+  await open(page, 'st7');
+  await expect(page.locator('[data-card="voice"] .qn-card-sub')).toHaveText('Nothing from his phone yet');
+  await expect(page.locator('[data-card="voice"] .qn-form').first()).toContainText('Not Answered');
+  await expect(page.locator('.qn-goal-text')).toHaveText('Not set yet');
+  await expect(page.locator('.qn-about')).toHaveText('Goes by Jas · he/him · STU-207');
+});
+
 test('no overflow at 1440 × 900', async ({ page }) => {
   await open(page);
   expect(await overflow(page)).toEqual([]);
@@ -124,5 +189,20 @@ test.describe('on a 1366 × 768 laptop', () => {
     await expect(page.locator('.qn-bottom')).toBeHidden();
     await expect(page.locator('#tq-save-next')).toBeVisible();
     expect(await overflow(page)).toEqual([]);
+  });
+
+  test('What FullVision Has is three tabs, one card at a time, none overflowing', async ({ page }) => {
+    await open(page);
+    await expect(page.locator('.qn-ev-tabs')).toBeVisible();
+    for (const [tab, card] of [
+      ['Observations', 'obs'],
+      ['Voice', 'voice'],
+      ['Growth', 'growth'],
+    ]) {
+      await page.locator('.qn-ev-tabs').getByRole('button', { name: tab }).click();
+      await expect(page.locator(`[data-card="${card}"]`)).toBeVisible();
+      await expect(page.locator('.qn-ev-card:visible')).toHaveCount(1);
+      expect(await overflow(page)).toEqual([]);
+    }
   });
 });

@@ -268,6 +268,31 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     expect(CommentBank.context(f, { habits: { completes: 2 } })._habits).toEqual({ completes: 2 });
   });
 
+  it('keeps the private note out of the bank: never an observation, never the note slot', () => {
+    const st = getStudents(cid).find(s => s.firstName === 'Cece');
+    const f = CommentBank.facts(cid, st, 'term-2');
+    expect(f.voice.private).toMatch(/grandma/);
+    expect(f.obs.some(o => /grandma/.test(o.text))).toBe(false);
+    const ctx = CommentBank.context(f, {});
+    Object.keys(ctx)
+      .filter(k => typeof ctx[k] === 'string')
+      .forEach(k => expect(ctx[k], k).not.toMatch(/grandma/));
+  });
+
+  it('gives Cece every score this term per competency, with the canvas’s Start and Now', () => {
+    const st = getStudents(cid).find(s => s.firstName === 'Cece');
+    const comps = CommentBank.facts(cid, st, 'term-2').comps;
+    expect(comps.map(c => c.scores.length)).toEqual([13, 9, 16, 13, 10, 8]);
+    expect(comps.map(c => levelFigure(c.start) + ' → ' + levelFigure(c.now))).toEqual([
+      '2.9 → 2.9',
+      '3.2 → 3.0',
+      '3.1 → 3.2',
+      '3.1 → 2.9',
+      '3.1 → 2.9',
+      '3.1 → 3.3',
+    ]);
+  });
+
   it('offers the attendance sentences once totals are entered', () => {
     const st = getStudents(cid).find(s => s.firstName === 'Cece');
     saveTermAttendance(cid, st.id, 'term-2', 4, 2);
