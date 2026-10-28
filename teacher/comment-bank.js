@@ -72,6 +72,60 @@ window.CommentBank = (function () {
     },
   ];
 
+  /* The kind of class, for the bank's subject wording: one of adst, arts,
+     career, ela, math, pe, science, socials, or '' when unknown. From the
+     learning map's subject (its BC subject area, or its course tag), else
+     the class's name. */
+  var FAMILIES = {
+    'Applied Design, Skills and Technologies': 'adst',
+    'Arts Education': 'arts',
+    'Career Education': 'career',
+    'English Language Arts': 'ela',
+    Mathematics: 'math',
+    'Physical and Health Education': 'pe',
+    Science: 'science',
+    'Social Studies': 'socials',
+  };
+  var TAG_FAMILIES = [
+    [/^(PHE|AL|FC|ODED)\d/, 'pe'],
+    [/^(SCI|ANAT|BIO|CHEM|EARTH|ENVSCI|GEO|LS\d+SCI|PHYS|SFC)/, 'science'],
+    [/^(MATH|APPM|CALC|CS\d|FOM|FPC|HOM|PC\d|STAT|WPM)/, 'math'],
+    [/^(ELA|COMP\d|CW|EFP|ES12|LS\d|NM|NMED|SL|SPKN|HUM)/, 'ela'],
+    [/^(SS|ASIA|BCFP|CC12|CIS12|ECON|ESS|GEN|HGEO|HIST|INDS|LAW|PGEO|PHIL|PHYG|POL|REL|SJ|URB)/, 'socials'],
+    [/^(CAREE|CLC|CLE)/, 'career'],
+    [
+      /^(ARTS|ARTSTUDIO|CHOR|CMUSIC|COMP_PROD|CP12|DANCE|DCHORE|DCOMP|DCOND|DFOUND|DRAMA|DSD|DTEP|FTVT|GARTS|INS|MEDIA|MTHEATRE|MUSIC|PHOTO|SA2D|SA3D|THCO|THPROD|VA)/,
+      'arts',
+    ],
+  ];
+  var NAME_FAMILIES = [
+    [/\b(pe|p\.e\.|phys(ical)?\s*(and health )?ed|fitness|outdoor|active living|health)\b/i, 'pe'],
+    [/\b(science|biology|chemistry|physics|earth|geology|environmental)\b/i, 'science'],
+    [/\b(math|calculus|pre-?calc|statistics|foundations|workplace math)/i, 'math'],
+    [/\b(english|ela|literary|composition|creative writing|spoken language|new media|humanities)\b/i, 'ela'],
+    [
+      /\b(social|socials|history|geography|law|philosophy|economics|political|psychology|genocide|justice)\b/i,
+      'socials',
+    ],
+    [/\b(career|planning|clc|cle)\b/i, 'career'],
+    [/\b(drama|theatre|theater|music|band|choir|choral|dance|art|arts|photo|film|media arts|visual)\b/i, 'arts'],
+    [
+      /\b(foods|textiles|wood|metal|tech|computer|coding|design|engineering|business|marketing|automotive|electronics|drafting|culinary|robotics|adst|shop)\b/i,
+      'adst',
+    ],
+  ];
+  function familyOf(cid) {
+    var map = typeof getLearningMap === 'function' ? getLearningMap(cid) : null;
+    var sub = map && map.subjects && map.subjects[0];
+    if (sub && sub.family && FAMILIES[sub.family]) return FAMILIES[sub.family];
+    var tag = sub && String(sub.id || '');
+    for (var i = 0; tag && i < TAG_FAMILIES.length; i++) if (TAG_FAMILIES[i][0].test(tag)) return TAG_FAMILIES[i][1];
+    var name = (typeof COURSES !== 'undefined' && COURSES[cid] && COURSES[cid].name) || '';
+    for (var k = 0; name && k < NAME_FAMILIES.length; k++)
+      if (NAME_FAMILIES[k][0].test(name)) return NAME_FAMILIES[k][1];
+    return '';
+  }
+
   var PER_GROUP = 2;
   var USED_BY = 3;
   var NUM = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
@@ -295,6 +349,7 @@ window.CommentBank = (function () {
       name: displayNameFirst(student),
       first: student.firstName || displayNameFirst(student),
       course: course.name || '',
+      family: familyOf(cid),
       pronouns: ReportBlocks.getPronouns(student),
       comps: comps,
       work: work,
@@ -394,7 +449,8 @@ window.CommentBank = (function () {
       options.find(function (c) {
         return c.id === picks.focus;
       }) || options[0];
-    var iCan = focus && focus.iCans.length ? focus.iCans[Math.min(picks.ican || 0, focus.iCans.length - 1)] : '';
+    var iCan =
+      focus && focus.iCans.length ? _ended(focus.iCans[Math.min(picks.ican || 0, focus.iCans.length - 1)]) : '';
     // Strengths are the highest levels now; the areas to grow, the two
     // lowest (only below the highest, so an even term names none).
     var byNow = f.comps.slice().sort(function (a, b) {
@@ -470,6 +526,15 @@ window.CommentBank = (function () {
         return habits[h.key] === lvl;
       });
     };
+    // In PE, Completes Work is taking part.
+    var PE_COMPLETES = {
+      does: 'takes a full part in every activity',
+      doing: 'taking a full part in every activity',
+      short: 'taking part fully',
+    };
+    var habitWords = function (h, k) {
+      return f.family === 'pe' && h.key === 'completes' ? PE_COMPLETES[k] : h[k];
+    };
     // A habit phrase names the student's own work ("{his} work"): filled
     // here, so fill() never reads a slot inside a value.
     var phrase = function (t) {
@@ -481,7 +546,7 @@ window.CommentBank = (function () {
         'consistently ' +
           list(
             withHabit(4).map(function (h) {
-              return phrase(h.does);
+              return phrase(habitWords(h, 'does'));
             }),
           ),
       );
@@ -490,7 +555,7 @@ window.CommentBank = (function () {
         'usually ' +
           list(
             withHabit(3).map(function (h) {
-              return phrase(h.does);
+              return phrase(habitWords(h, 'does'));
             }),
           ),
       );
@@ -501,6 +566,7 @@ window.CommentBank = (function () {
       _p: p,
       _habits: habits,
       _standing: f.standing || '',
+      _family: f.family || '',
       _options: options,
       _focus: focus || null,
       _note: note || null,
@@ -576,19 +642,19 @@ window.CommentBank = (function () {
       strengthHabits: strengthBits.join(', and '),
       growthHabits: list(
         growing.map(function (h) {
-          return phrase(h.doing);
+          return phrase(habitWords(h, 'doing'));
         }),
       ),
       strengthHabitNames: list(
         withHabit(4)
           .concat(withHabit(3))
           .map(function (h) {
-            return h.short;
+            return habitWords(h, 'short');
           }),
       ),
       growthHabitNames: list(
         growing.map(function (h) {
-          return h.short;
+          return habitWords(h, 'short');
         }),
       ),
       absent: f.absent > 0 ? String(f.absent) : '',
@@ -598,7 +664,16 @@ window.CommentBank = (function () {
 
   /* ── Offering and filling ──────────────────────────────────────────── */
 
+  /* A sentence for some kinds of class (`subjects`), or for all but some
+     (`except`); without either, for every class. */
+  function forFamily(s, family) {
+    if (s.subjects && s.subjects.indexOf(family) < 0) return false;
+    if (s.except && family && s.except.indexOf(family) >= 0) return false;
+    return true;
+  }
+
   function fits(s, ctx) {
+    if (!forFamily(s, ctx._family || '')) return false;
     var needs = s.needs || [];
     for (var i = 0; i < needs.length; i++) if (!ctx[needs[i]]) return false;
     var when = s.when || {};
@@ -812,13 +887,30 @@ window.CommentBank = (function () {
     { part: 'habits', groups: ['Completes Work and Takes Part'], unless: 1 },
     { part: 'habits', groups: ['Attendance'] },
     { part: 'now', groups: ['Overall'] },
-    { part: 'now', groups: ['Growth This Term'] },
     { part: 'now', groups: ['Examples From Work', 'From Your Notes', "In the Student's Words"] },
+    { part: 'now', groups: ['Growth This Term'] },
     { part: 'go', groups: ['Next Step'] },
     { part: 'go', groups: ["In the Student's Words", 'Work to Revisit', 'From Your Notes'] },
     { part: 'how', groups: ['At Home', 'In Class', "In the Student's Words"] },
     { part: 'how', groups: ['Looking Ahead'] },
   ];
+
+  /* Facts a draft states once, by topic: the strong habits named or
+     phrased are one fact, as are the growing ones. */
+  var NO_REPEAT = {
+    strengthHabits: 'strong',
+    strengthHabitNames: 'strong',
+    growthHabits: 'growing',
+    growthHabitNames: 'growing',
+    note: 'note',
+    concernNote: 'concern',
+    rise: 'rise',
+    fall: 'fall',
+    fellCount: 'fell',
+    nextStep: 'nextStep',
+    goal: 'goal',
+    plan: 'plan',
+  };
 
   /* A draft from the bank for one student: the sentences that fit, one per
      step, the least used for classmates first, a repeatable pick among the
@@ -830,12 +922,21 @@ window.CommentBank = (function () {
     var rand = _rng(opts.seed);
     var comments = opts.comments || [];
     var taken = {};
+    var said = {};
     var out = [];
     var got = [];
     DRAFT_STEPS.forEach(function (step, i) {
       if (step.unless != null && got[step.unless]) return;
       var cands = bank.sentences.filter(function (s) {
         if (s.part !== step.part || taken[s.id] || !fits(s, ctx)) return false;
+        // A fact the draft already states (the growing habits, the note, the
+        // competency that rose) is not said twice.
+        if (
+          (s.needs || []).some(function (k) {
+            return NO_REPEAT[k] && said[NO_REPEAT[k]];
+          })
+        )
+          return false;
         if (step.groups && step.groups.indexOf(s.group) < 0) return false;
         if (step.needsAny)
           return (s.needs || []).some(function (k) {
@@ -852,6 +953,8 @@ window.CommentBank = (function () {
       var scored = cands.map(function (s) {
         var t = fill(s, ctx);
         var used = usedBy(s, comments);
+        // Wording written for this kind of class comes before the general.
+        if (s.subjects) used -= 0.5;
         // A quotation already in the draft (the same note twice) is out.
         var quotes = t.match(/\u201C[^\u201D]+\u201D/g) || [];
         if (
@@ -870,6 +973,9 @@ window.CommentBank = (function () {
       });
       var pick = scored[0];
       taken[pick.s.id] = true;
+      (pick.s.needs || []).forEach(function (k) {
+        if (NO_REPEAT[k]) said[NO_REPEAT[k]] = true;
+      });
       out.push(pick.t);
       got[i] = true;
     });
@@ -905,6 +1011,8 @@ window.CommentBank = (function () {
     usedBy: usedBy,
     parts: parts,
     fitCount: fitCount,
+    familyOf: familyOf,
+    forFamily: forFamily,
     draft: draft,
     seedFor: seedFor,
     DRAFT_STEPS: DRAFT_STEPS,

@@ -65,3 +65,11 @@ The openings and closers, the six habit scales at every level, the student's-own
 2. Clean the 10–12 competency labels in the data file, or decide teachers rename them.
 3. Subject-tagged sentences and the `except` tags; the PE and Career guard; move the example step after Overall.
 4. Read Generate's drafts for one student per subject family before merging.
+
+## Status (2026-10-28, later the same day)
+
+1. Done: `CommentBank.facts` names competencies by their label (#481).
+2. Done: `scripts/clean-competency-labels.py` rewrote the 939 cut labels; `tests/curriculum-labels.test.js` keeps them out (#482).
+3. Done: 184 subject sentences (PE, Arts, Math, ADST, ELA, Socials, Science, Career) with `subjects` and `except` tags, read from the class's subject (`CommentBank.familyOf`); Generate prefers a class's own wording, states each fact once, and puts the example after Overall; PE's Completes Work reads as taking part; nine more phone sentences.
+4. Done with 3: PE and Career never get "area to build" wording; they get their own next-step lines.
+5. Open: the picture rule ("challenge" on any Developing competency) is left for reading real drafts in class.

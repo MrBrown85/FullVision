@@ -284,7 +284,7 @@ test('Jasper: nothing from his phone yet, his forms Not Answered, his goal Not s
 
 test('Add appends the filled sentence; the row shows ✓ Added in place, nothing redrawn', async ({ page }) => {
   await open(page);
-  await expect(page.locator('.qn-bank-card .qn-card-sub').first()).toHaveText('250 sentences · 96 fit Cece');
+  await expect(page.locator('.qn-bank-card .qn-card-sub').first()).toHaveText('434 sentences · 100 fit Cece');
   const row = page.locator('.qn-part[data-part="now"] .qn-row').first();
   const text = await row.getAttribute('data-text');
   await row.evaluate(el => (el.__mark = 'same'));
