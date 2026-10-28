@@ -2,7 +2,7 @@
    docs/questionnaire-plan.md). One student at a time, the whole picture on
    one screen, and the teacher leaves with the comment: the student strip
    (About Me, the goal, attendance from MyEd), what FullVision has, the
-   Comment Bank, and the Teacher Comment pinned on the right. The comment is
+   Comment Bank, and the Teacher Comment filling the right column. The comment is
    hand-written plain text; the bank only offers wording
    (teacher/comment-bank.js). The class's roster is the app's sidebar, which
    this page marks Needs Approval or ticked. */
@@ -212,7 +212,6 @@ window.ReportQuestionnaire = (function () {
   function _syncNote() {
     _syncQuotedSoon();
     _syncRows();
-    _syncBcSoon();
     var el = _box();
     var note = document.getElementById('tq-text-note');
     if (el && note)
@@ -234,7 +233,6 @@ window.ReportQuestionnaire = (function () {
     var card = document.getElementById('tq-comment-card');
     if (card) card.classList.toggle('waiting', !on);
     syncRoster();
-    _syncBc();
   }
 
   /* ── The roster (the app's sidebar) ───────────────────────── */
@@ -377,7 +375,7 @@ window.ReportQuestionnaire = (function () {
     return parts.join(' · ');
   }
 
-  function _stripHtml(cid, student, f, bc) {
+  function _stripHtml(cid, student, f) {
     var sid = student.id;
     var first = student.firstName || displayNameFirst(student);
     var termId = getTermId();
@@ -405,14 +403,10 @@ window.ReportQuestionnaire = (function () {
         </div>
         <div class="qn-att-note" id="tq-att-note" aria-live="polite"${note ? '' : ' hidden'}>${note}</div>
       </div>
-      <button type="button" class="qn-bc-btn" data-action="tqToggleBc" aria-expanded="false">
-        <span class="qn-bc-btn-label">BC Requirements</span>
-        <span class="qn-bc-btn-short${bc.all ? ' ok' : ''}" id="tq-bc-short">${esc(_bcShort(bc))}</span>
-      </button>
     </div>`;
   }
 
-  /* ── The BC Written Learning Update ──────────────────────── */
+  /* ── The class's report form ───────────────────────────── */
 
   function _form(cid) {
     return ReportSheets.formFor((typeof getReportConfig === 'function' && getReportConfig(cid)) || {});
@@ -420,186 +414,6 @@ window.ReportQuestionnaire = (function () {
   function _blockLabel(id) {
     var b = ReportSheets.BLOCKS[id];
     return b ? b.label : id;
-  }
-
-  /* BC's six requirements for a written learning update, each met by a
-     block on the class's form or by a part of the comment, and where. */
-  var _bcOpen = false;
-  function _bcState(cid, student, f) {
-    var first = student.firstName || displayNameFirst(student);
-    var on = ReportSheets.onForm(_form(cid));
-    var has = function (id) {
-      return on.indexOf(id) >= 0;
-    };
-    var termId = getTermId();
-    var rating = getStudentTermRating(cid, student.id, termId) || {};
-    var el = _box();
-    var text = el && el.dataset.sid === student.id ? el.value : plainComment(rating.narrative || '');
-    var parts = CommentBank.parts(_bankContext(cid, student, f), text, {});
-    var inPart = function (i) {
-      return parts[i] && parts[i].inComment;
-    };
-    var rated = Object.keys(rating.habits || {}).some(function (k) {
-      return rating.habits[k] >= 1 && rating.habits[k] <= 4;
-    });
-    var answered = (f.voice.entries || []).some(function (e) {
-      return e.kind === 'core_reflection' || e.kind === 'goal_checkin';
-    });
-    var req = function (name, done, where) {
-      return { name: name, done: !!done, where: where };
-    };
-    var part = function (i, name, block, blockWhere) {
-      if (inPart(i)) return req(name, true, 'Teacher Comment · part ' + (i + 1));
-      if (block) return req(name, true, blockWhere);
-      return req(name, false, 'Nothing from part ' + (i + 1) + ' yet');
-    };
-    var reqs = [
-      has('proficiency')
-        ? req('Proficiency in Each Area', true, 'Proficiency · from scores')
-        : req('Proficiency in Each Area', false, 'The Proficiency block is not on this report'),
-      part(0, 'Work Habits', has('learner-dimensions') && rated, 'Learning Dispositions · from your ratings'),
-      part(1, 'Strengths and Growth', has('progress'), 'Progress in One Area · from scores'),
-      part(2, 'Next Steps', has('next-steps'), 'Next Steps · from your Focus Area'),
-      part(3, 'Ways to Support', has('support-home'), 'Ways to Support at Home · from your Focus Area'),
-      has('self-assessment')
-        ? req(
-            'Self-Reflection and Goals',
-            answered,
-            'Self-Assessment and Goal · ' + (answered ? 'answered' : 'waiting on ' + first),
-          )
-        : req('Self-Reflection and Goals', false, 'The Self-Assessment and Goal block is not on this report'),
-    ];
-    var used = [
-      'header',
-      'proficiency',
-      'teacher-narrative',
-      'learner-dimensions',
-      'progress',
-      'next-steps',
-      'support-home',
-      'self-assessment',
-    ];
-    var att = getTermAttendance(cid, student.id, termId);
-    var also = on
-      .filter(function (id) {
-        return used.indexOf(id) < 0;
-      })
-      .map(function (id) {
-        var status = {
-          'missing-work': 'From assignments',
-          'grade-table': 'From scores',
-          'competency-table': 'From scores',
-          legend: 'Same for all',
-          'parent-response': 'Family writes',
-          'text-block': 'Your text',
-          'student-reflection-learning': 'Student writes',
-          'student-reflection-habits': 'Student writes',
-          'term-attendance':
-            att.absences != null || att.lates != null
-              ? [att.absences != null ? att.absences + ' absent' : '', att.lates != null ? att.lates + ' late' : '']
-                  .filter(Boolean)
-                  .join(' · ')
-              : 'Optional',
-        }[id];
-        return { name: _blockLabel(id), status: status || 'From FullVision' };
-      });
-    var done = reqs.filter(function (r) {
-      return r.done;
-    }).length;
-    return {
-      reqs: reqs,
-      done: done,
-      all: done === reqs.length,
-      also: also,
-      approved: !!rating.approvedAt,
-      waiting: has('self-assessment') && !answered,
-      first: first,
-    };
-  }
-
-  function _bcShort(b) {
-    return (b.all ? '✓ ' : '') + b.done + ' of ' + b.reqs.length + ' requirements';
-  }
-
-  function _bcInnerHtml(b) {
-    var shown = _bcOpen
-      ? b.reqs
-      : b.reqs.filter(function (r) {
-          return !r.done;
-        });
-    return `<div class="qn-card-title">BC Written Learning Update</div>
-      <button type="button" class="qn-bc-toggle" data-action="tqToggleBcAll" aria-expanded="${_bcOpen}">
-        <span class="qn-bc-count${b.all ? ' ok' : ''}">${_bcShort(b)}</span>
-        <span class="qn-link-text">${_bcOpen ? 'Hide' : 'Show All'}</span>
-      </button>
-      ${shown
-        .map(function (r) {
-          return `<div class="qn-req"><span class="qn-req-mark${r.done ? ' ok' : ''}" aria-label="${r.done ? 'Met' : 'Not met'}">${r.done ? '✓' : '●'}</span><span class="qn-req-name">${esc(r.name)}</span><span></span><span class="qn-req-where">${esc(r.where)}</span></div>`;
-        })
-        .join('')}
-      ${
-        _bcOpen && b.also.length
-          ? `<div class="qn-also"><span class="qn-also-title">Also on This Report</span>${b.also
-              .map(function (a) {
-                return `<div class="qn-also-row"><span>${esc(a.name)}</span><span>${esc(a.status)}</span></div>`;
-              })
-              .join('')}</div>`
-          : ''
-      }
-      <div class="qn-left">
-        <div class="qn-left-list">
-          <span class="qn-card-sub">Left for You</span>
-          ${b.approved ? `<span class="qn-left-item ok">Nothing. ${esc(b.first)} is ready.</span>` : '<span class="qn-left-item">Approve the Comment</span>'}
-          ${b.waiting ? `<span class="qn-card-sub qn-left-wait">Waiting on ${esc(b.first)}</span><span class="qn-left-item">Self-Assessment and Goal</span>` : ''}
-        </div>
-        <button type="button" class="qn-link" data-action="tqOpenReport">Open in Progress Reports ›</button>
-      </div>`;
-  }
-
-  function _bcCardHtml(b) {
-    return `<div class="qn-card qn-bc-card" id="tq-bc-card">${_bcInnerHtml(b)}</div>`;
-  }
-
-  /* The card and the strip's count, after the comment or a rating changes. */
-  function _syncBc() {
-    var st = _current();
-    var card = document.getElementById('tq-bc-card');
-    if (!st || !card) return;
-    var b = _bcState(_activeCourse, st, _facts(st));
-    card.innerHTML = _bcInnerHtml(b);
-    var short = document.getElementById('tq-bc-short');
-    if (short) {
-      short.textContent = _bcShort(b);
-      short.classList.toggle('ok', b.all);
-    }
-  }
-  var _bcTimer = null;
-  function _syncBcSoon() {
-    clearTimeout(_bcTimer);
-    _bcTimer = setTimeout(_syncBc, 300);
-  }
-
-  function tqToggleBcAll() {
-    _bcOpen = !_bcOpen;
-    _syncBc();
-  }
-
-  /* Below 1400 px the card opens under the strip's button. */
-  function tqToggleBc(force) {
-    var qn = document.querySelector('.qn');
-    var btn = document.querySelector('.qn-bc-btn');
-    var card = document.getElementById('tq-bc-card');
-    if (!qn || !card) return;
-    var open = typeof force === 'boolean' ? force : !qn.classList.contains('bc-open');
-    qn.classList.toggle('bc-open', open);
-    if (btn) btn.setAttribute('aria-expanded', String(open));
-    if (open) {
-      var strip = qn.querySelector('.qn-strip');
-      card.style.top = strip ? strip.offsetTop + strip.offsetHeight + 6 + 'px' : '';
-      card.scrollTop = 0;
-    } else {
-      card.style.top = '';
-    }
   }
 
   /* ── The Questions sheet ─────────────────────────────────── */
@@ -1165,7 +979,6 @@ window.ReportQuestionnaire = (function () {
     // A habit, the Focus Area or attendance changed: read the facts again.
     col.innerHTML = _bankHtml(_activeCourse, st, _facts(st, true));
     col.scrollTop = top;
-    _syncBc();
   }
 
   /* After the comment changes: each row's Added and "starts like" note, in
@@ -1325,11 +1138,15 @@ window.ReportQuestionnaire = (function () {
       </div>`;
   }
 
-  /* The line meter: the comment's printed lines against the form's box. */
+  /* The line meter: the comment's printed lines against the form's box.
+     A form with no Teacher Comment block has no box, so no meter. */
   function setMeter(lines, room) {
+    var meter = document.getElementById('tq-meter');
     var bar = document.getElementById('tq-meter-bar');
     var label = document.getElementById('tq-meter-label');
-    if (!bar || !label) return;
+    if (!meter || !bar || !label) return;
+    meter.hidden = !(room > 0);
+    if (!(room > 0)) return;
     var over = room > 0 && lines > room;
     label.textContent = lines + ' of ' + room + ' lines';
     label.classList.toggle('over', over);
@@ -1351,7 +1168,6 @@ window.ReportQuestionnaire = (function () {
     var student = students[tqStudentIndex];
     var termId = getTermId();
     var f = _facts(student, true);
-    var bc = _bcState(cid, student, f);
 
     var name = document.getElementById('tq-student-name');
     if (name) name.textContent = displayName(student);
@@ -1360,7 +1176,7 @@ window.ReportQuestionnaire = (function () {
 
     var last = tqStudentIndex >= students.length - 1;
     return `<div class="qn" data-sid="${student.id}">
-      ${_stripHtml(cid, student, f, bc)}
+      ${_stripHtml(cid, student, f)}
       <div class="qn-body">
         <div class="qn-mid">
           <div class="qn-cols">
@@ -1376,7 +1192,6 @@ window.ReportQuestionnaire = (function () {
         <div class="qn-side">
           <div class="qn-side-title">Teacher Comment · Built From FullVision</div>
           ${_commentHtml(cid, student)}
-          ${_bcCardHtml(bc)}
         </div>
       </div>
     </div>`;
@@ -1393,7 +1208,6 @@ window.ReportQuestionnaire = (function () {
   function handleKey(e) {
     if (e.key === 'Escape') {
       if (document.getElementById(QUESTIONS_ID)) tqCloseQuestions();
-      else tqToggleBc(false);
       return;
     }
     if (document.getElementById(QUESTIONS_ID)) return;
@@ -1432,8 +1246,6 @@ window.ReportQuestionnaire = (function () {
     tqPickFocus: tqPickFocus,
     tqPickICan: tqPickICan,
     tqMore: tqMore,
-    tqToggleBc: tqToggleBc,
-    tqToggleBcAll: tqToggleBcAll,
     tqOpenQuestions: tqOpenQuestions,
     tqCloseQuestions: tqCloseQuestions,
     tqSetCard: tqSetCard,

@@ -53,7 +53,7 @@ As `report-forms-plan.md`: decide first (the DECISIONS entry lands with this pla
 
 PR 2 waits on Colin for the migration; PRs 3 to 7 stack above it and can be reviewed before it is applied. Each PR is merged once CI is green (Colin, 2026-10-28: "merge on green").
 
-Built 2026-10-28: PR 2 #468 (the migration applied on Colin's OK), PR 3 #469, PR 4 #470, PR 5 #471, PR 6 #472, PR 7 #473, PR 8 this one. Each PR's description lists what it decided differently from this plan or the canvas.
+After the build (2026-10-28, Colin): the BC Written Learning Update card and the strip's BC Requirements button are gone; the Teacher Comment fills the right column. Built 2026-10-28: PR 2 #468 (the migration applied on Colin's OK), PR 3 #469, PR 4 #470, PR 5 #471, PR 6 #472, PR 7 #473, PR 8 this one. Each PR's description lists what it decided differently from this plan or the canvas.
 
 ## Open
 

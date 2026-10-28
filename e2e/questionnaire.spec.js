@@ -13,6 +13,17 @@ async function open(page, student = 'st1') {
   await page.locator('#tq-narrative').waitFor();
 }
 
+/* The comment card reaches the bottom of the right column (its 20 px
+   foot), and the box in it is most of the card. */
+async function commentFill(page) {
+  return page.evaluate(() => {
+    const side = document.querySelector('.qn-side').getBoundingClientRect();
+    const card = document.querySelector('.qn-comment-card').getBoundingClientRect();
+    const box = document.querySelector('#tq-narrative').getBoundingClientRect();
+    return { gap: Math.round(side.bottom - card.bottom), boxTall: box.height > card.height * 0.6 };
+  });
+}
+
 /* The cursor at the end of the comment (End only reaches the end of a
    wrapped line). */
 async function toEnd(page) {
@@ -292,10 +303,10 @@ test('no overflow at 1440 × 900, with every part of the bank shown in full', as
 test.describe('on a 1366 × 768 laptop', () => {
   test.use({ viewport: { width: 1366, height: 768 } });
 
-  test('the strip has the BC Requirements button, no bottom bar, no overflow', async ({ page }) => {
+  test('no bottom bar, the comment fills the right column, no overflow', async ({ page }) => {
     await open(page);
-    await expect(page.locator('.qn-bc-btn')).toBeVisible();
     await expect(page.locator('.qn-bottom')).toBeHidden();
+    expect(await commentFill(page)).toEqual({ gap: 20, boxTall: true });
     await expect(page.locator('#tq-save-next')).toBeVisible();
     expect(await overflow(page)).toEqual([]);
   });
@@ -316,100 +327,44 @@ test.describe('on a 1366 × 768 laptop', () => {
   });
 });
 
-test.describe('the BC Written Learning Update and the Questions sheet', () => {
-  test('the six requirements tick as sentences are added', async ({ page }) => {
-    await open(page);
-    const count = page.locator('.qn-bc-count');
-    await expect(count).toHaveText('2 of 6 requirements');
-    const req = name => page.locator('.qn-req', { hasText: name });
-    await expect(req('Work Habits')).toContainText('Nothing from part 1 yet');
-    for (const part of ['habits', 'now', 'go', 'how']) {
-      await page.locator(`.qn-part[data-part="${part}"] .qn-row:not(.added)`).first().click();
-    }
-    await expect(count).toHaveText('✓ 6 of 6 requirements');
-    await expect(page.locator('#tq-bc-short')).toHaveText('✓ 6 of 6 requirements');
-    await page.locator('[data-action="tqToggleBcAll"]').click();
-    await expect(req('Work Habits')).toContainText('Teacher Comment · part 1');
-    await expect(req('Self-Reflection and Goals')).toContainText('Self-Assessment and Goal · answered');
-    await expect(page.locator('.qn-also-row')).toHaveText([
-      /Proficiency Legend\s*Same for all/,
-      /Attendance\s*Optional/,
-      /Missing Work\s*From assignments/,
-      /Assignment Grades\s*From scores/,
-      /Parent \/ Guardian Response\s*Family writes/,
-    ]);
-    await expect(page.locator('.qn-left')).toContainText('Approve the Comment');
-    await page.locator('#tq-approve').click();
-    await expect(page.locator('.qn-left')).toContainText('Nothing. Cece is ready.');
-  });
-
-  test('Jasper is waiting on his Self-Assessment and Goal', async ({ page }) => {
-    await open(page, 'st7');
-    await expect(page.locator('.qn-req', { hasText: 'Self-Reflection and Goals' })).toContainText(
-      'Self-Assessment and Goal · waiting on Jasper',
-    );
-    await expect(page.locator('.qn-left')).toContainText('Waiting on Jasper');
-  });
-
-  test('a form without Proficiency shows it as not met, with the reason', async ({ page }) => {
-    await open(page);
-    await page.evaluate(() => {
-      const cfg = getReportConfig('sci8') || {};
-      const form = ReportSheets.removeCell(ReportSheets.formFor(cfg), 'proficiency');
-      saveReportConfig('sci8', Object.assign({}, cfg, { form }));
-    });
-    await page.reload();
-    await page.locator('#report-period').selectOption('Report 2');
-    await expect(page.locator('.qn-req', { hasText: 'Proficiency in Each Area' })).toContainText(
-      'The Proficiency block is not on this report',
-    );
-    await expect(page.locator('.qn-req', { hasText: 'Proficiency in Each Area' }).locator('.qn-req-mark')).toHaveText(
-      '●',
-    );
-  });
-
-  test('Questions lists exactly the form’s blocks; its boxes turn cards off', async ({ page }) => {
-    await open(page);
-    await page.locator('#tq-questions-btn').click();
-    const sheet = page.getByRole('dialog', { name: 'Questions' });
-    await expect(sheet).toBeVisible();
-    const blocks = await page.evaluate(() =>
-      ReportSheets.onForm(ReportSheets.formFor(getReportConfig('sci8') || {})).map(id => ReportSheets.BLOCKS[id].label),
-    );
-    await expect(sheet.locator('.qn-q-row:not(.qn-q-head) .qn-q-block')).toHaveText(blocks);
-    await expect(sheet.locator('.qn-q-row', { hasText: 'Teacher Comment' })).toContainText('You');
-    await sheet.locator('[data-tq-card="obs"]').uncheck();
-    await expect(page.locator('[data-card="obs"]')).toHaveCount(0);
-    await page.keyboard.press('Escape');
-    await expect(sheet).toHaveCount(0);
-    await page.reload();
-    await page.locator('#report-period').selectOption('Report 2');
-    await expect(page.locator('[data-card="obs"]')).toHaveCount(0);
-    expect(await overflow(page)).toEqual([]);
-  });
-
-  test('Open in Progress Reports lands on the student’s report', async ({ page }) => {
-    await open(page, 'st7');
-    await page.locator('[data-action="tqOpenReport"]').click();
-    await expect(page.getByRole('tab', { name: 'Progress Reports' })).toHaveAttribute('aria-selected', 'true');
-    await expect(page.locator('#picker-label')).toHaveText('Jasper Gill');
-    await expect(page.locator('.report-sheet').first().locator('.report-student-name')).toContainText('Jas');
-  });
+test('the Teacher Comment fills the right column; there is no BC card', async ({ page }) => {
+  await open(page);
+  await expect(page.locator('#tq-bc-card, .qn-bc-btn')).toHaveCount(0);
+  expect(await commentFill(page)).toEqual({ gap: 20, boxTall: true });
 });
 
-test.describe('the BC card on a 1366 × 768 laptop', () => {
-  test.use({ viewport: { width: 1366, height: 768 } });
-
-  test('opens from the strip’s button and closes with Escape', async ({ page }) => {
-    await open(page);
-    await expect(page.locator('#tq-bc-card')).toBeHidden();
-    await expect(page.locator('#tq-bc-short')).toHaveText('2 of 6 requirements');
-    await page.locator('.qn-bc-btn').click();
-    await expect(page.locator('#tq-bc-card')).toBeVisible();
-    expect(await overflow(page)).toEqual([]);
-    await page.keyboard.press('Escape');
-    await expect(page.locator('#tq-bc-card')).toBeHidden();
+test('a form with no Teacher Comment block has no line meter', async ({ page }) => {
+  await open(page);
+  await expect(page.locator('#tq-meter')).toBeVisible();
+  await page.evaluate(() => {
+    const cfg = getReportConfig('sci8') || {};
+    const form = ReportSheets.removeCell(ReportSheets.formFor(cfg), 'teacher-narrative');
+    saveReportConfig('sci8', Object.assign({}, cfg, { form }));
   });
+  await page.reload();
+  await page.locator('#report-period').selectOption('Report 2');
+  await expect(page.locator('#tq-narrative')).toBeVisible();
+  await expect(page.locator('#tq-meter')).toBeHidden();
+});
+
+test('Questions lists exactly the form’s blocks; its boxes turn cards off', async ({ page }) => {
+  await open(page);
+  await page.locator('#tq-questions-btn').click();
+  const sheet = page.getByRole('dialog', { name: 'Questions' });
+  await expect(sheet).toBeVisible();
+  const blocks = await page.evaluate(() =>
+    ReportSheets.onForm(ReportSheets.formFor(getReportConfig('sci8') || {})).map(id => ReportSheets.BLOCKS[id].label),
+  );
+  await expect(sheet.locator('.qn-q-row:not(.qn-q-head) .qn-q-block')).toHaveText(blocks);
+  await expect(sheet.locator('.qn-q-row', { hasText: 'Teacher Comment' })).toContainText('You');
+  await sheet.locator('[data-tq-card="obs"]').uncheck();
+  await expect(page.locator('[data-card="obs"]')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(sheet).toHaveCount(0);
+  await page.reload();
+  await page.locator('#report-period').selectOption('Report 2');
+  await expect(page.locator('[data-card="obs"]')).toHaveCount(0);
+  expect(await overflow(page)).toEqual([]);
 });
 
 test('end to end: rate, write from the bank, approve, move on, and the report prints it', async ({ page }) => {
@@ -421,15 +376,15 @@ test('end to end: rate, write from the bank, approve, move on, and the report pr
     added.push(await row.getAttribute('data-text'));
     await row.click();
   }
-  await expect(page.locator('.qn-bc-count')).toHaveText('✓ 6 of 6 requirements');
   await page.locator('#tq-approve').click();
   await page.locator('#tq-save-next').click();
   await expect(page.locator('.qn-name')).toHaveText('Noor Al-Rashid');
   await expect(page.locator('#tq-ready')).toHaveText('1 of 27 Ready');
   await expect(page.locator('#gb-sidebar .student-row[data-sid="st1"] .student-row-mark')).toHaveText('✓');
 
+  await page.locator('.report-seg-btn[data-tab="progress"]').click();
   await page.locator('#gb-sidebar .student-row[data-sid="st1"]').click();
-  await page.locator('[data-action="tqOpenReport"]').click();
+  await expect(page.locator('#picker-label')).toHaveText('Cece Adeyemi');
   const comment = page.locator('.report-sheet').first().locator('.report-comment-text');
   for (const t of added) await expect(comment).toContainText(t);
 });

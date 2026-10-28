@@ -1729,12 +1729,6 @@ window.PageReports = (function () {
       tqMore: function () {
         RQ.tqMore(el.dataset.part);
       },
-      tqToggleBc: function () {
-        RQ.tqToggleBc();
-      },
-      tqToggleBcAll: function () {
-        RQ.tqToggleBcAll();
-      },
       tqQuestions: function () {
         RQ.tqOpenQuestions();
       },
@@ -1744,14 +1738,6 @@ window.PageReports = (function () {
       tqOpenProgress: function () {
         RQ.tqCloseQuestions();
         tqSaveCurrentIfNeeded();
-        switchTab('progress');
-      },
-      tqOpenReport: function () {
-        // The student on screen, on their report.
-        var st = getTqStudents()[RQ.tqStudentIndex];
-        tqSaveCurrentIfNeeded();
-        if (st) selectedStudentIds = [st.id];
-        populateStudentSelect();
         switchTab('progress');
       },
     };
