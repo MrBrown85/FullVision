@@ -2051,6 +2051,7 @@ window.ReportBlocks = (function () {
     renderBlockSelfAssessment: renderBlockSelfAssessment,
     focusArea: focusArea,
     reportSections: _reportSections,
+    competencyLabel: _competencyLabel,
     showDefaults: showDefaults,
     renderBlockParentResponse: renderBlockParentResponse,
     renderBlockStudentReflectionLearning: renderBlockStudentReflectionLearning,

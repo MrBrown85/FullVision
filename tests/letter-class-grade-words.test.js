@@ -128,7 +128,7 @@ describe('Reports questionnaire in a Letter class', () => {
     id,
     name: 'Cause and Consequence',
     shortName: 'Cause',
-    tags: [{ id: tagId, label: 'Causes ' + id }],
+    tags: [{ id: tagId, label: 'Cause and Consequence' }],
   });
   const assess = (id, title, tagId) => ({ id, title, scoreMode: 'proficiency', tagIds: [tagId], type: 'summative' });
   const score = (assessmentId, tagId, level) => ({ assessmentId, tagId, score: level, date: '2026-10-10' });
