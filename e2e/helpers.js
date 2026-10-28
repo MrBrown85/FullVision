@@ -392,7 +392,7 @@ export async function mockAuth(page) {
           id: r.id,
           name: r.name || '',
           created_at: '2026-09-01T00:00:' + String(10 + ri) + 'Z',
-          style: r.style === 'advanced' ? 'advanced' : 'standard',
+          style: ['advanced', 'single_point'].includes(r.style) ? r.style : 'standard',
           // The live bundle sends the link between copies (20261018_rubric_copy_group).
           copy_group: r.copyGroup || null,
         });
