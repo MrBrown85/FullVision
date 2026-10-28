@@ -967,6 +967,14 @@ th.gb-group-alt {
   background: var(--bg);
   border-bottom-left-radius: var(--qr);
 }
+/* Room for the data area's horizontal scrollbar, so both scroll the same
+   distance (set in initGridScrollSync). A block, not padding: Safari leaves end padding out
+   of the scroll height. */
+.gb-grid-rowheads::after {
+  content: '';
+  display: block;
+  height: var(--gb-hscroll, 0px);
+}
 .gb-grid-rowhead {
   display: flex;
   align-items: center;

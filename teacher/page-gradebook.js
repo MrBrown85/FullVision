@@ -514,7 +514,15 @@ window.PageGradebook = (function () {
     var colheadsInner = colheads && colheads.querySelector('.gb-grid-colheads-inner');
     var rowheads = document.getElementById('gb-rowheads');
     if (!data || !colheads || !rowheads) return;
+    var pad = 0;
     var fn = function () {
+      // The data area's horizontal scrollbar shortens its view; the names
+      // get the same room at the bottom so the last rows still line up.
+      var gap = data.scrollHeight - data.clientHeight - (rowheads.scrollHeight - rowheads.clientHeight);
+      if (gap && pad + gap >= 0) {
+        pad += gap;
+        rowheads.style.setProperty('--gb-hscroll', pad + 'px');
+      }
       if (colheadsInner) colheadsInner.style.transform = 'translateX(-' + data.scrollLeft + 'px)';
       rowheads.scrollTop = data.scrollTop;
     };
