@@ -4014,10 +4014,24 @@ body.qn-roster #gb-sidebar .student-row-note {
   min-height: 160px;
   background: var(--surface);
 }
+/* Clear and Copy on the left, Generate and Approve on the right; where the
+   fonts are wider than the column (CI's Linux), the right pair wraps onto
+   its own line rather than clipping. */
 .qn-text-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+.qn-text-links,
+.qn-text-main {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+.qn-text-main {
+  margin-left: auto;
 }
 .qn-link {
   font: inherit;
@@ -4032,7 +4046,6 @@ body.qn-roster #gb-sidebar .student-row-note {
 }
 /* Generate is secondary: Approve Comment is the card's main action. */
 .qn-generate {
-  margin-left: auto;
   font: inherit;
   font-size: var(--text-sm);
   height: var(--control-h);
