@@ -3486,6 +3486,7 @@ window.DashClassManager = (function () {
       '<div class="cm-rule-title">Exactly How the % Works</div>' +
       '<div class="cm-rule-text">With no categories, the % is total points earned out of total points possible.</div>' +
       '<div class="cm-rule-text">A category with no marked work for a student is left out, and the other categories share its weight.</div>' +
+      '<div class="cm-rule-text">A category set to Average of Percentages turns each assessment into a percent first, so each counts the same however many points it has.</div>' +
       '<div class="cm-rule-text">Proficiency work counts as the percent set under Counts As in Points and Proficiency. Proficient counts as ' +
       _cmLevelPercents(getGradingScale(cid))[3] +
       '% now.</div>' +
@@ -3845,6 +3846,7 @@ window.DashClassManager = (function () {
             scoped.filter(function (a) {
               return (a.categoryId || a.category_id || null) === c.id;
             }),
+            categoryCalcMode(c),
           );
           return (
             '<span>' +
@@ -4770,6 +4772,7 @@ window.DashClassManager = (function () {
         idx +
         '" aria-label="Weight percent">' +
         '<span class="cm-cat-pct">%</span>' +
+        _cmCatModeSelect(row, idx) +
         '<button class="cm-delete-mini" data-action="cmCatDelete" data-idx="' +
         idx +
         '" title="Delete category" aria-label="Delete category">\u2715</button>' +
@@ -4777,6 +4780,9 @@ window.DashClassManager = (function () {
     });
     html +=
       '</div>' +
+      (rows.length
+        ? '<div class="cm-hint cm-cat-mode-hint">Total Points adds up every assessment’s points, so a rubric with more criteria counts more. Average of Percentages makes each assessment count the same. Factor still counts an assessment more than once.</div>'
+        : '') +
       _cmRenderUncategorized(cid) +
       '<div class="cm-cat-footer">' +
       '<button class="cm-add-link" data-action="cmCatAdd">+ Add Category</button>' +
@@ -4812,6 +4818,37 @@ window.DashClassManager = (function () {
     var row = st.rows[idx];
     if (!row) return;
     row.name = value || '';
+    st.dirty = true;
+    _cmCatRefreshFooter(cmSelectedCourse);
+  }
+
+  /* A category's Calculation: Total Points or Average of Percentages
+     (category.calc_mode, docs/DECISIONS.md "Category calculation"). */
+  var CM_CAT_MODES = [
+    ['points', 'Total Points'],
+    ['percent', 'Average of Percentages'],
+  ];
+  function _cmCatModeSelect(row, idx) {
+    var mode = categoryCalcMode(row);
+    return (
+      '<select class="cm-input cm-cat-mode" data-action-change="cmCatMode" data-idx="' +
+      idx +
+      '" aria-label="' +
+      esc((row.name || 'Category') + ' calculation') +
+      '">' +
+      CM_CAT_MODES.map(function (m) {
+        return '<option value="' + m[0] + '"' + (mode === m[0] ? ' selected' : '') + '>' + m[1] + '</option>';
+      }).join('') +
+      '</select>'
+    );
+  }
+
+  function cmCatMode(idx, value) {
+    if (!cmSelectedCourse) return;
+    var st = _cmCatState(cmSelectedCourse);
+    var row = st.rows[idx];
+    if (!row) return;
+    row.calc_mode = value === 'percent' ? 'percent' : 'points';
     st.dirty = true;
     _cmCatRefreshFooter(cmSelectedCourse);
   }
@@ -4995,6 +5032,35 @@ window.DashClassManager = (function () {
       r.name = (r.name || '').trim();
       r.display_order = i;
     });
+    // A changed Calculation moves the course % of every term, so with a
+    // term already ended the teacher confirms first.
+    var savedModes = {};
+    (getCategories(cid) || []).forEach(function (c) {
+      savedModes[c.id] = categoryCalcMode(c);
+    });
+    var modeChanged = rows.some(function (r) {
+      return r.id && savedModes[r.id] && savedModes[r.id] !== categoryCalcMode(r);
+    });
+    var ended = modeChanged ? _cmEndedTerm(cid) : null;
+    if (ended) {
+      showConfirm(
+        'Change the Course %?',
+        'This changes the course % for every term, including ' +
+          (ended.label || 'Term ' + ended.ordinal) +
+          ', which has already ended. Report cards printed before today won’t match.',
+        'Change',
+        'primary',
+        function () {
+          _cmCatSaveRows(cid, rows);
+        },
+      );
+      return Promise.resolve();
+    }
+    return _cmCatSaveRows(cid, rows);
+  }
+
+  function _cmCatSaveRows(cid, rows) {
+    var st = _cmCatState(cid);
     var pending = typeof _assessmentSaveQueue !== 'undefined' && _assessmentSaveQueue[cid];
     return Promise.resolve(pending)
       .then(function () {
@@ -8192,6 +8258,10 @@ window.DashClassManager = (function () {
     }
     if (el.dataset.actionChange === 'cmRecentLimit') {
       cmSetRecentLimit(el.value);
+      return true;
+    }
+    if (el.dataset.actionChange === 'cmCatMode') {
+      cmCatMode(parseInt(el.dataset.idx, 10), el.value);
       return true;
     }
     if (el.dataset.actionChange === 'cmPointsScale') {

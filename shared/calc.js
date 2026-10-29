@@ -666,36 +666,53 @@ function isScoreOutOfRange(assessment, value) {
    A proficiency level counts as that many points out of 4 (3 = 75%,
    3+ = 83.3%). Each assessment's points earned and possible are multiplied
    by its Factor (4/6 at 4x counts as 16/24). Returns { pct, count }
-   (count = graded assessments), or null when nothing in the group is graded. */
-function getAssessmentGroupPercentage(cid, studentId, assessments) {
+   (count = graded assessments), or null when nothing in the group is graded.
+   calcMode 'percent' (a category set to Average of Percentages,
+   categoryCalcMode): each assessment becomes its own percent first, and the
+   percents are averaged, each counted its Factor times, so a 20-point
+   rubric and an 8-point one count the same. */
+function getAssessmentGroupPercentage(cid, studentId, assessments, calcMode) {
+  var averaged = calcMode === 'percent';
   var earned = 0;
   var possible = 0;
+  var pctSum = 0;
+  var factors = 0;
   var count = 0;
   (assessments || []).forEach(function (assessment) {
+    var pts = _assessmentEarnedPossible(cid, studentId, assessment);
+    if (!pts) return;
     var factor = getAssessmentWeight(assessment);
-    if (isPointsScored(assessment)) {
-      var pts = _assessmentPoints(cid, studentId, assessment);
-      if (!pts) return;
+    if (averaged) {
+      if (!(pts.possible > 0)) return;
+      pctSum += factor * (pts.earned / pts.possible) * 100;
+      factors += factor;
+    } else {
       earned += factor * pts.earned;
       possible += factor * pts.possible;
-    } else {
-      // Rubric work counts its own points (6 of 10 = 60%), not a level.
-      var rubricPts = _rubricAssessmentPoints(cid, studentId, assessment);
-      if (rubricPts !== undefined) {
-        if (!rubricPts) return;
-        earned += factor * rubricPts.earned;
-        possible += factor * rubricPts.possible;
-        count++;
-        return;
-      }
-      var level = getAssessmentOverallScore(cid, studentId, assessment.id);
-      if (level == null) return;
-      earned += factor * _levelPoints(cid, level);
-      possible += factor * 4;
     }
     count++;
   });
+  if (averaged) return count > 0 && factors > 0 ? { pct: pctSum / factors, count: count } : null;
   return count > 0 && possible > 0 ? { pct: (earned / possible) * 100, count: count } : null;
+}
+
+// A category's Calculation (shared/data.js categoryCalcMode); points when
+// the data layer isn't loaded.
+function _categoryMode(category) {
+  return typeof categoryCalcMode === 'function' ? categoryCalcMode(category) : 'points';
+}
+
+/* One assessment's { earned, possible } for the course %, before its Factor,
+   or null when it doesn't count (not graded, excused). Points work counts
+   its points, rubric work its criteria's points (6 of 10 = 60%), not a
+   level; other proficiency work its level as points out of 4. */
+function _assessmentEarnedPossible(cid, studentId, assessment) {
+  if (isPointsScored(assessment)) return _assessmentPoints(cid, studentId, assessment) || null;
+  var rubricPts = _rubricAssessmentPoints(cid, studentId, assessment);
+  if (rubricPts !== undefined) return rubricPts || null;
+  var level = getAssessmentOverallScore(cid, studentId, assessment.id);
+  if (level == null) return null;
+  return { earned: _levelPoints(cid, level), possible: 4 };
 }
 
 /* A student's grade on any group of assessments (a category, a module, an
@@ -703,12 +720,14 @@ function getAssessmentGroupPercentage(cid, studentId, assessments) {
    prof: the mean of the scored assessments' overall levels, each counted
    its Factor times, as a category's
    average is worked out (getCategoryAverage). pct: points earned out of
-   points possible (getAssessmentGroupPercentage). A Proficiency class shows
-   the level, a Letter class the letter and %, a Both class both.
+   points possible (getAssessmentGroupPercentage), or the average of
+   percents for a category set to it (calcMode, as categoryCalcMode gives
+   it; any other group is points). A Proficiency class shows the level, a
+   Letter class the letter and %, a Both class both.
    Returns { text, level, prof, pct, count } or null when nothing is scored. */
-function assessmentGroupGrade(cid, studentId, assessments) {
+function assessmentGroupGrade(cid, studentId, assessments, calcMode) {
   var levels = _factoredMeanLevel(cid, studentId, assessments);
-  var group = getAssessmentGroupPercentage(cid, studentId, assessments);
+  var group = getAssessmentGroupPercentage(cid, studentId, assessments, calcMode);
   return _groupGrade(
     cid,
     levels ? levels.mean : null,
@@ -719,11 +738,11 @@ function assessmentGroupGrade(cid, studentId, assessments) {
 
 /* The class average on a group of assessments: each student's group grade,
    averaged, as assessmentGroupGrade shows it. */
-function classAssessmentGroupGrade(cid, studentIds, assessments) {
+function classAssessmentGroupGrade(cid, studentIds, assessments, calcMode) {
   var profs = [];
   var pcts = [];
   (studentIds || []).forEach(function (sid) {
-    var g = assessmentGroupGrade(cid, sid, assessments);
+    var g = assessmentGroupGrade(cid, sid, assessments, calcMode);
     if (!g) return;
     if (g.prof != null) profs.push(g.prof);
     if (g.pct != null) pcts.push(g.pct);
@@ -852,6 +871,7 @@ function categoryCourseShares(cid, studentId) {
       assessments.filter(function (a) {
         return (a.categoryId || a.category_id || null) === category.id;
       }),
+      _categoryMode(category),
     );
     if (pct == null) return;
     var weight = Number(category.weight || 0);
@@ -952,6 +972,7 @@ function getCourseLetterData(cid, studentId) {
         assessments.filter(function (assessment) {
           return (assessment.categoryId || assessment.category_id || null) === category.id;
         }),
+        _categoryMode(category),
       );
       if (pct == null) return;
       pctSum += weight * pct.pct;

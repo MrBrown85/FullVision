@@ -1395,6 +1395,7 @@ window.PageGradebook = (function () {
           scoped.filter(function (a) {
             return (a.categoryId || a.category_id || null) === cat.id;
           }),
+          categoryCalcMode(cat),
         );
         tip +=
           '<div class="gb-tip-row"><span class="gb-tip-label">' +

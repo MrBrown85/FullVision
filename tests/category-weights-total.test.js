@@ -15,6 +15,7 @@ describe('category weights must total 100', () => {
   var originalV2;
   var originalToast;
   var saves;
+  var modes;
   var toasts;
 
   const act = (action, idx) =>
@@ -31,6 +32,7 @@ describe('category weights must total 100', () => {
     saveCourses({ [CID]: { id: CID, name: 'Science 9', gradingSystem: 'letter' } });
     _cache.assessments[CID] = [];
     saves = [];
+    modes = [];
     toasts = [];
     originalToast = globalThis.showSyncToast;
     globalThis.showSyncToast = message => toasts.push(message);
@@ -43,6 +45,7 @@ describe('category weights must total 100', () => {
         ],
       });
     window.v2.saveCategories = (cid, rows) => {
+      modes.push(rows.map(r => categoryCalcMode(r)));
       saves.push(rows.map(r => ({ id: r.id, name: r.name, weight: r.weight })));
       return Promise.resolve({ data: rows.map((r, i) => r.id || 'new-' + i), error: null });
     };
@@ -113,6 +116,34 @@ describe('category weights must total 100', () => {
     await save();
     expect(saves).toEqual([[]]);
     expect(getCategories(CID)).toEqual([]);
+  });
+
+  it("saves a category's Calculation and keeps it in the class", async () => {
+    DashClassManager.handleChange({ dataset: { actionChange: 'cmCatMode', idx: '1' }, value: 'percent' });
+    await save();
+    expect(modes).toEqual([['points', 'percent']]);
+    expect(getCategories(CID).map(c => categoryCalcMode(c))).toEqual(['points', 'percent']);
+  });
+
+  it('asks first when a Calculation change moves a term that has ended', async () => {
+    _cache.courseConfigs[CID] = Object.assign({}, _cache.courseConfigs[CID], {
+      reportingTerms: [{ ordinal: 1, label: 'Term 1', starts_on: '2020-09-01', ends_on: '2020-11-30' }],
+    });
+    var confirms = [];
+    var originalConfirm = globalThis.showConfirm;
+    globalThis.showConfirm = (title, message, ok, style, onOk) => confirms.push({ title, message, onOk });
+    try {
+      DashClassManager.handleChange({ dataset: { actionChange: 'cmCatMode', idx: '0' }, value: 'percent' });
+      await save();
+      expect(saves).toEqual([]);
+      expect(confirms.map(c => c.title)).toEqual(['Change the Course %?']);
+      expect(confirms[0].message).toContain('Term 1');
+      confirms[0].onOk();
+      await new Promise(r => setTimeout(r, 20));
+      expect(modes).toEqual([['percent', 'points']]);
+    } finally {
+      globalThis.showConfirm = originalConfirm;
+    }
   });
 
   it('sends nothing when nothing changed', async () => {

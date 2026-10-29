@@ -24,6 +24,16 @@ Supersedes D2. Teachers asked for the multiplier back on points work (an assignm
 - **Toward competencies and level averages, it counts that many times:** competency proficiency, category averages and group grades.
 - A gradebook column and its Class Average still show the assessment's own points (5/6), not the multiplied ones.
 
+## Category calculation (2026-10-29)
+
+Rubric work counts as the sum of its criteria's points, so a 5-criterion rubric (20 points) outweighed a 2-criterion one (8 points) 2.5 to 1 in the same category. Easton Su's History 12 % was 66.2% (C) because his weakest work had the most criteria; counted one assessment each it is about 68% (C+). MyEd BC ("Categories Only") and Schoology ("Percentage") offer the same choice. Plan: `~/fullvision-rubric-weight-plan.md`.
+
+- **Each category has a Calculation: Total Points (default) or Average of Percentages** (`category.calc_mode`, `migrations/20261029_category_calc_mode.sql`). Every existing category is Total Points, so nothing moved.
+- **Average of Percentages turns each assessment into its percent and averages them, each counted its Factor times.** Points work is flattened too: a 10-point quiz counts the same as a 36-point test (Colin, 2026-10-29). Missing counts as 0% (D7); Excused and ungraded work are left out.
+- **Only a category uses its mode.** A class with no categories, and group grades by module, assignment type or rubric, stay Total Points. Category readers (the course %, each category's share, the class-check panel, the gradebook name tip, the student page's category groups) pass the category's mode.
+- **Competencies, level averages and Class Averages under a column are not affected.**
+- **Changing a category's Calculation with a term already ended asks first,** as Counts As does.
+
 ## Proficiency percents (2026-10-29)
 
 Supersedes D3. Easton Su (History 12) was Proficient-ish everywhere and sat at 66%, while the class's own Points to Proficiency table says Proficient starts at 84%. Plan: `~/fullvision-rubric-weight-plan.md`.
