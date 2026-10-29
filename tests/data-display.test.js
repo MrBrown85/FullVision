@@ -92,4 +92,37 @@ describe('sortStudents', () => {
     sortStudents(students);
     expect(students[0]).toBe(original[0]);
   });
+
+  describe('gradeLow and flagged', () => {
+    const roster = [
+      { id: 'a', firstName: 'Ann', lastName: 'Able' },
+      { id: 'b', firstName: 'Ben', lastName: 'Best' },
+      { id: 'c', firstName: 'Cal', lastName: 'Cole' },
+    ];
+    const saved = {};
+    const stub = (name, fn) => {
+      saved[name] = globalThis[name];
+      globalThis[name] = fn;
+    };
+    afterEach(() => {
+      Object.keys(saved).forEach(name => (globalThis[name] = saved[name]));
+    });
+
+    it('puts the lowest proficiency first and ungraded students last', () => {
+      stub('courseGradeMode', () => 'proficiency');
+      stub('getOverallProficiency', (cid, sid) => ({ a: 0, b: 3.2, c: 1.8 })[sid]);
+      expect(sortStudents(roster, 'gradeLow', 'c1').map(s => s.id)).toEqual(['c', 'b', 'a']);
+    });
+
+    it('sorts a Letter class by percent', () => {
+      stub('courseGradeMode', () => 'letter');
+      stub('getCourseLetterData', (cid, sid) => ({ R: { a: 91, b: 64, c: null }[sid] }));
+      expect(sortStudents(roster, 'gradeLow', 'c1').map(s => s.id)).toEqual(['b', 'a', 'c']);
+    });
+
+    it('puts flagged students first and keeps the order within each group', () => {
+      stub('getFlags', () => ({ c: true }));
+      expect(sortStudents(roster, 'flagged', 'c1').map(s => s.id)).toEqual(['c', 'a', 'b']);
+    });
+  });
 });

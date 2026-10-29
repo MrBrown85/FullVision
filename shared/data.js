@@ -5511,6 +5511,28 @@ function sortStudents(arr, mode, cid) {
       return missingMap[b.id] - missingMap[a.id];
     });
   }
+  // Lowest grade first, as the class is set to grade: percent for a Letter
+  // class, proficiency otherwise. Students with no grade yet go last.
+  if (mode === 'gradeLow' && cid) {
+    var letter = courseGradeMode(cid) === 'letter';
+    var gradeMap = {};
+    c.forEach(function (st) {
+      var v = letter ? getCourseLetterData(cid, st.id).R : getOverallProficiency(cid, st.id);
+      gradeMap[st.id] = v > 0 ? v : null;
+    });
+    return c.sort(function (a, b) {
+      var va = gradeMap[a.id];
+      var vb = gradeMap[b.id];
+      if (va === null || vb === null) return (va === null) - (vb === null);
+      return va - vb;
+    });
+  }
+  if (mode === 'flagged' && cid) {
+    var flags = getFlags(cid);
+    return c.sort(function (a, b) {
+      return (flags[b.id] ? 1 : 0) - (flags[a.id] ? 1 : 0);
+    });
+  }
   if (mode === 'lastObserved' && cid) {
     var lastObsMap = {};
     c.forEach(function (st) {
