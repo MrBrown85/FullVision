@@ -158,11 +158,19 @@ describe('normalizeForm', () => {
     expect(S.canHalf('legend')).toBe(true);
   });
 
-  it('formFor opens an old Brief class on the Interim Update and anything else on the Report Card', () => {
+  it('formFor opens an old Brief class on the Interim Update and anything else on the name and Assignment Grades', () => {
     expect(S.formFor({ preset: 'brief' }).id).toBe('interim-update');
     expect(S.formFor({ preset: 'brief' }).sides).toHaveLength(1);
-    expect(S.formFor({ preset: 'standard' }).id).toBe('report-card');
-    expect(S.formFor(null).id).toBe('report-card');
+    expect(S.formFor({ preset: 'standard' }).id).toBe('grades');
+    expect(S.onForm(S.formFor(null))).toEqual(['header', 'grade-table']);
+    // Assignment Grades starts in one column, on a new report or added from the palette.
+    expect(S.cellOf(S.formFor(null), 'grade-table').options).toEqual({ columns: 'one' });
+    const added = S.insert(S.form(), 'next-steps', { side: 0 });
+    expect(
+      S.cellOf(S.insert(S.removeCell(added, 'grade-table'), 'grade-table', { side: 1 }), 'grade-table').options,
+    ).toEqual({
+      columns: 'one',
+    });
     expect(S.formFor({ form: { v: 6, id: 'x', sides: [] } }).id).toBe('x');
   });
 });
@@ -989,11 +997,14 @@ describe('stage 3 blocks', () => {
     expect(t).toContain('Points shown as scored; other work scored out of 4.');
     expect(html).not.toMatch(/[●○]/);
     expect(html).toContain('report-grades-cols');
+    expect(ReportBlocks.renderReportBlock('grade-table', CID, CECE, {}, opts({ columns: 'one' }))).not.toContain(
+      'report-grades-cols',
+    );
     // One category fills both columns: it splits evenly and carries on at the
     // top of the right column under its name.
     stub('getCategories', () => [{ id: 'c2', name: 'Quizzes', weight: 100 }]);
     stub('getAssessments', () => work.map(a => Object.assign({}, a, { categoryId: 'c2' })));
-    const split = ReportBlocks.renderReportBlock('grade-table', CID, CECE, {}, opts({}));
+    const split = ReportBlocks.renderReportBlock('grade-table', CID, CECE, {}, opts({ columns: 'two' }));
     const cols = split.split('class="report-grades-col"').slice(1).map(text);
     expect(cols).toHaveLength(2);
     expect(cols[0]).toContain('Quizzes 100% of grade');

@@ -55,7 +55,21 @@ window.ReportSheets = (function () {
   function _row() {
     return { cells: Array.prototype.slice.call(arguments) };
   }
-  /* The Report Card: the default layout from the audit canvas. */
+  /* A new report: the student's name and their Assignment Grades, a
+     printout of how they are doing. Teachers add the rest. */
+  var FORM_DEFAULT = {
+    v: 6,
+    id: 'grades',
+    name: 'Grades',
+    type: 'standard',
+    sides: [
+      { rows: [_row(_c('header')), _row(_c('grade-table', 'row', { options: { columns: 'one' } }))] },
+      { rows: [] },
+    ],
+    pinned: null,
+    perStudent: {},
+  };
+  /* The Report Card starter, from the audit canvas. */
   var FORM_REPORT_CARD = {
     v: 6,
     id: 'report-card',
@@ -123,7 +137,7 @@ window.ReportSheets = (function () {
     perStudent: {},
   };
 
-  /* The Report Card, made whole. */
+  /* The Report Card starter, made whole. */
   function form() {
     return normalizeForm(FORM_REPORT_CARD);
   }
@@ -221,6 +235,9 @@ window.ReportSheets = (function () {
     'grade-table': {
       label: 'Assignment Grades',
       group: 'Grades',
+      // Added from the palette it starts in one column; a report saved
+      // before keeps the Two its options default to.
+      start: { columns: 'one' },
       options: [
         { key: 'course', label: 'Course Grade', def: true },
         { key: 'categoryGrade', label: 'Category Grades', def: true },
@@ -445,6 +462,12 @@ window.ReportSheets = (function () {
     var lines = _linesOf(def, raw.lines);
     if (lines != null) cell.lines = lines;
     return cell;
+  }
+
+  /* A block new to the form, with the options it starts on. */
+  function _newCell(id) {
+    var def = BLOCKS[id];
+    return _cleanCell({ block: id, options: def && def.start });
   }
 
   /* ── Migration from the earlier shapes ────────────────────────── */
@@ -723,11 +746,11 @@ window.ReportSheets = (function () {
 
   /* The class's form from its report config. A class still on the old
      Brief preset opens on the Interim Update; anything else without a
-     saved form is the Report Card. */
+     saved form opens on the name and Assignment Grades. */
   function formFor(reportConfig) {
     if (reportConfig && reportConfig.form) return normalizeForm(reportConfig.form);
     if (reportConfig && reportConfig.preset === 'brief') return normalizeForm(FORM_INTERIM);
-    return normalizeForm(FORM_REPORT_CARD);
+    return normalizeForm(FORM_DEFAULT);
   }
 
   /* ── Reading the form ─────────────────────────────────────────── */
@@ -805,7 +828,7 @@ window.ReportSheets = (function () {
     if (!BLOCKS[id] || id === 'header') return f;
     to = to || {};
     f = _clone(f);
-    var cell = _take(f, id) || _cleanCell({ block: id });
+    var cell = _take(f, id) || _newCell(id);
     if (to.size) cell.size = to.size;
     var side = _clamp(_int(to.side, f.sides.length - 1), 0, f.sides.length - 1);
     var last = _lastRow(f, side);
@@ -820,7 +843,7 @@ window.ReportSheets = (function () {
     var target = locate(f, targetId);
     if (!target || f.sides[target.side].rows[target.row].cells.length !== 1) return f;
     f = _clone(f);
-    var cell = _take(f, id) || _cleanCell({ block: id });
+    var cell = _take(f, id) || _newCell(id);
     var at = locate(f, targetId);
     var row = f.sides[at.side].rows[at.row];
     cell.size = 'half';
@@ -1827,7 +1850,7 @@ window.ReportSheets = (function () {
           // A placed block measures with its own options; each width with
           // the layout it prints at that width.
           var placed = formUsed && cellOf(formUsed, id);
-          var base = _cleanCell(placed || { block: id });
+          var base = placed ? _cleanCell(placed) : _newCell(id);
           var row = Object.assign({}, base, { size: 'row' });
           cells.push({ cell: row, size: 'row', html: _cellHtml(row, cid, st, ctx) });
           if (canHalf(id)) {

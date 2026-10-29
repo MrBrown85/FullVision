@@ -28,8 +28,8 @@ test.beforeEach(async ({ page }) => {
 
 const STUDENTS = 27;
 
-/* The Studio on the Report Card starter, on the longest report. */
-async function openStudio(page) {
+/* The Studio as a new report opens it: the name and Assignment Grades. */
+async function openFresh(page) {
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await page.evaluate(r => window.Router.navigate(r), '/reports');
@@ -37,6 +37,13 @@ async function openStudio(page) {
   await expect(page.locator('#studio')).toBeVisible();
   await expect(page.locator('#studio-fit')).not.toBeEmpty();
   await expect(page.locator('.report-sheet')).toHaveCount(2);
+}
+
+/* The Studio on the Report Card starter, on the longest report. */
+async function openStudio(page) {
+  await openFresh(page);
+  await applyTemplate(page, 'report-card');
+  await expect(page.locator('.sheet-cell[data-block="parent-response"]')).toHaveCount(1);
 }
 
 /* Everyone: every student's pages on the canvas, which is what prints. */
@@ -173,6 +180,14 @@ async function printToPdf(page) {
 test.describe('Page Studio', () => {
   test.setTimeout(90_000);
 
+  test('a new report is the name and Assignment Grades in one column', async ({ page }) => {
+    await openFresh(page);
+    await expect(page.locator('.studio-blk.placed')).toHaveCount(1);
+    await expect(page.locator('.studio-blk.placed')).toHaveAttribute('data-block', 'grade-table');
+    await expect(page.locator('.sheet-body .sheet-cell[data-block]')).toHaveCount(2);
+    await expect(page.locator('.report-grades-cols')).toHaveCount(0);
+  });
+
   test('opens on the longest report, Front and Back side by side, with the palette, the fit line and no third pane', async ({
     page,
   }) => {
@@ -254,7 +269,7 @@ test.describe('Page Studio', () => {
     await expect(page.locator('.report-sheet').first().locator('.report-student-name')).toHaveText('Noor Al-Rashid');
   });
 
-  test('a click selects a block and shows its card in the gutter; Remove takes it off with Undo; the palette finds it or adds it', async ({
+  test('a click selects a block and shows its card in the gutter; Remove takes it off with Undo; the palette removes it or adds it', async ({
     page,
   }) => {
     await openStudio(page);
@@ -298,9 +313,11 @@ test.describe('Page Studio', () => {
     await expect(page.locator('#undo-toast')).toContainText('Removed Proficiency Legend');
     await undo(page).click();
     expect(await rowsOf(page, 0)).toContain('legend');
-    // The palette finds a block on the report (never removes it).
+    // Clicking a placed block in the palette takes it off; Undo puts it back.
     await page.locator('[data-action="studioBlock"][data-block="legend"]').click();
-    await expect(legend).toHaveClass(/studio-sel/);
+    await expect(page.locator('.sheet-cell[data-block="legend"]')).toHaveCount(0);
+    await expect(page.locator('#undo-toast')).toContainText('Removed Proficiency Legend');
+    await undo(page).click();
     expect(await rowsOf(page, 0)).toContain('legend');
     // A block from the palette lands in its own row at the end of the Front when it has room.
     await page.locator('[data-action="studioBlock"][data-block="support-home"]').click();
@@ -659,9 +676,10 @@ test.describe('Page Studio', () => {
   test('the comment’s line meter counts its printed lines as it is typed; a long comment continues, nothing is cut', async ({
     page,
   }) => {
-    await page.goto('/login.html?demo=1');
-    await page.waitForURL(/\/dashboard/, { timeout: 15000 });
-    await page.evaluate(r => window.Router.navigate(r), '/reports');
+    // The meter measures against the Report Card's comment box; a new
+    // report has no comment block, so no meter.
+    await openStudio(page);
+    await page.locator('.report-seg-btn[data-tab="questionnaire"]').click();
     const meter = page.locator('#tq-meter-label');
     await expect(meter).toHaveText(/^\d+ of 10 lines$/);
     await expect(meter).not.toHaveClass(/over/);

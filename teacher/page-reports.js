@@ -1010,7 +1010,7 @@ window.PageReports = (function () {
         // Undo belongs to the class it was made in.
         if (activeCourse !== cid) return;
         studioSelected = wasSelected;
-        _setForm(before || ReportSheets.form());
+        _setForm(before || ReportSheets.formFor(null));
       });
     }
   }
@@ -1525,19 +1525,13 @@ window.PageReports = (function () {
         if (studioTab === 'templates') _syncTemplates();
       },
       studioBlock: function () {
-        // A block already on the form is found on the page. One that isn't
-        // lands in a row of its own: on the Front when it has room for
+        // A block already on the form comes off it (Undo puts it back). One
+        // that isn't lands in a row of its own: on the Front when it has room for
         // every student, else on the Back, with a toast that says so. A
         // block taller than a side prints after the report.
         var id = el.dataset.block;
         var f = _formOf();
-        if (ReportSheets.locate(f, id)) {
-          _focusBlock = id;
-          _selectBlock(id);
-          var cell = document.querySelector('.studio-pages .sheet-cell[data-block="' + id + '"]');
-          if (cell && cell.scrollIntoView) cell.scrollIntoView({ block: 'nearest' });
-          return;
-        }
+        if (ReportSheets.locate(f, id)) return _removeBlock(id);
         if (el.getAttribute('aria-disabled') === 'true') return;
         var land = _landing(id);
         if (!land) return;
