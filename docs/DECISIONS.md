@@ -24,6 +24,15 @@ Supersedes D2. Teachers asked for the multiplier back on points work (an assignm
 - **Toward competencies and level averages, it counts that many times:** competency proficiency, category averages and group grades.
 - A gradebook column and its Class Average still show the assessment's own points (5/6), not the multiplied ones.
 
+## Counts As by step (2026-10-29)
+
+Colin: "3+ should be 86." With one Counts As value per level and a + or − a third of the way, 3+ was 83.3% (a B) and could not be an A; Developing− failed (41.7%) and Emerging was 25%. Plan: `~/fullvision-counts-as-steps-plan.md`.
+
+- **Counts As has a box for every step a teacher can score:** 1, 1+, 2−, 2, 2+, 3−, 3, 3+, 4−, 4 (`grading_scale.percents` keys `'1'` … `'4-'`; `COUNTS_AS_STEPS`). A step with no value of its own sits a third of the way between its whole levels, so every saved scale computes as before.
+- **Between steps the % is a straight line** (an average of 2.9 is that far from 2+ toward 3−). Each step must count for more than the one below.
+- **BC Letter Bands preset:** 4 = 100, 4− = 92, 3+ = 86, 3 = 80, 3− = 73, 2+ = 67, 2 = 63, 2− = 55, 1+ = 50, 1 = 45 (Colin: Emerging 45). Extending is an A, Proficient a B that reaches A with a +, Developing a passing C range, plain Emerging fails. It sets Counts As only, not Points to Proficiency.
+- **New grade 10–12 classes start on the BC Letter Bands** (Colin, 2026-10-29). Existing classes and other grades keep level ÷ 4 until a teacher changes it. Supersedes plan §10.4 for 10–12.
+
 ## Category calculation (2026-10-29)
 
 Rubric work counts as the sum of its criteria's points, so a 5-criterion rubric (20 points) outweighed a 2-criterion one (8 points) 2.5 to 1 in the same category. Easton Su's History 12 % was 66.2% (C) because his weakest work had the most criteria; counted one assessment each it is about 68% (C+). MyEd BC ("Categories Only") and Schoology ("Percentage") offer the same choice. Plan: `~/fullvision-rubric-weight-plan.md`.
@@ -39,7 +48,7 @@ Rubric work counts as the sum of its criteria's points, so a 5-criterion rubric 
 Supersedes D3. Easton Su (History 12) was Proficient-ish everywhere and sat at 66%, while the class's own Points to Proficiency table says Proficient starts at 84%. Plan: `~/fullvision-rubric-weight-plan.md`.
 
 - **Each proficiency has a percent it counts as in the course %**, set per class under Points and Proficiency → Counts As (`course.grading_scale.percents`). The default is 100 / 75 / 50 / 25, level ÷ 4, so no class's grades move until a teacher changes it.
-- **A + or − is a third of the way to the next level's percent;** an average between levels is that far along. 3+ at 84 / 98 is 88.7%.
+- **A + or − is a third of the way to the next level's percent;** an average between levels is that far along. 3+ at 84 / 98 is 88.7%. _Superseded 2026-10-29 by Counts As by step below: that is now what a step with no value of its own does._
 - **It applies wherever a level becomes a percent:** proficiency work and standard 1–4 rubric criteria in the course %, the % a Letter or Both class shows for a level, printed and exported percents. A rubric criterion with its own point values keeps them. Competencies, level averages and the rubric overall stay on the 0–4 scale.
 - **Match Columns** fills Counts As from Points to Proficiency: Extending halfway from its start to 100, Proficient and Developing at their starts, Emerging at 50, the C- floor (Colin: "Near 50"), or half of Developing's start when that is 50 or lower.
 - **A Counts As value that reads back as another level is flagged, not blocked.** Each proficiency must count for more than the one below.

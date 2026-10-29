@@ -661,6 +661,41 @@ const DEFAULT_GRADING_SCALE = {
   labels: null,
 };
 
+/* The steps a level can be scored at (no 1− or 4+, DECISIONS D8), lowest
+   first, and where each sits on the 0–4 scale: a + or − is a third of a
+   level, so 3+ is 3.33. Counts As can give each its own percent
+   (grading_scale.percents, keyed as here); a step left out sits a third of
+   the way between its whole levels. */
+const COUNTS_AS_STEPS = [
+  { key: '1', at: 1 },
+  { key: '1+', at: 4 / 3 },
+  { key: '2-', at: 5 / 3 },
+  { key: '2', at: 2 },
+  { key: '2+', at: 7 / 3 },
+  { key: '3-', at: 8 / 3 },
+  { key: '3', at: 3 },
+  { key: '3+', at: 10 / 3 },
+  { key: '4-', at: 11 / 3 },
+  { key: '4', at: 4 },
+];
+
+/* Counts As preset: each step on a BC letter band (A 86, B 73, C+ 67, C 60,
+   C- 50). Extending is an A, Proficient a B that reaches A with a +,
+   Developing a passing C range, and only plain Emerging fails (Colin,
+   2026-10-29: 3+ is 86, Emerging 45). */
+const BC_LETTER_BAND_PERCENTS = {
+  4: 100,
+  '4-': 92,
+  '3+': 86,
+  3: 80,
+  '3-': 73,
+  '2+': 67,
+  2: 63,
+  '2-': 55,
+  '1+': 50,
+  1: 45,
+};
+
 const SUBJECT_COLOURS = {
   'Applied Design, Skills and Technologies': '#6366f1',
   'Arts Education': '#db2777',

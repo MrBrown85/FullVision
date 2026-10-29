@@ -3488,7 +3488,7 @@ window.DashClassManager = (function () {
       '<div class="cm-rule-text">A category with no marked work for a student is left out, and the other categories share its weight.</div>' +
       '<div class="cm-rule-text">A category set to Average of Percentages turns each assessment into a percent first, so each counts the same however many points it has.</div>' +
       '<div class="cm-rule-text">Proficiency work counts as the percent set under Counts As in Points and Proficiency. Proficient counts as ' +
-      _cmLevelPercents(getGradingScale(cid))[3] +
+      _cmPctText(_cmStepValues(getGradingScale(cid))['3']) +
       '% now.</div>' +
       '<div class="cm-rule-text">The letter comes from the % as shown. Shown as a whole number, 85.5% becomes 86% and an A. Shown to one decimal, 85.94% stays 85.9% and a B.</div>' +
       '</div>' +
@@ -3549,21 +3549,40 @@ window.DashClassManager = (function () {
 
   /* Points and Proficiency, both ways. Points to Proficiency: the percent a
      points score needs for each proficiency; the lowest takes everything
-     below the one above it. Counts As: the percent each proficiency is worth
-     in the course % (docs/DECISIONS.md, "Proficiency percents"). */
+     below the one above it. Counts As: the percent each step (1 to 4, with
+     + and −) is worth in the course % (docs/DECISIONS.md, "Proficiency
+     percents"). A step with no value of its own sits a third of the way
+     between its whole levels and is shown that way. */
   var _cmPtsError = null;
   var CM_PTS_LOCKED_HINT = 'A student at this level on every assessment would show as ';
+  // Each level's Counts As boxes: −, the level, + (no 4+ or 1−).
+  var CM_STEP_SLOTS = { 4: ['4-', '4', null], 3: ['3-', '3', '3+'], 2: ['2-', '2', '2+'], 1: [null, '1', '1+'] };
 
-  function _cmLevelPercents(scale) {
-    var d = DEFAULT_GRADING_SCALE.percents;
-    var p = (scale && scale.percents) || d;
-    return { 4: Number(p[4]), 3: Number(p[3]), 2: Number(p[2]), 1: Number(p[1]) };
+  function _cmStepId(key) {
+    return key.replace('+', 'p').replace('-', 'm');
+  }
+  // Every step's percent, keyed as COUNTS_AS_STEPS.
+  function _cmStepValues(scale) {
+    var list = countsAsStepPercents(scale && scale.percents);
+    var out = {};
+    COUNTS_AS_STEPS.forEach(function (step, i) {
+      out[step.key] = list[i];
+    });
+    return out;
+  }
+  function _cmHasOwnStep(scale, key) {
+    var p = scale && scale.percents;
+    return !!p && p[key] != null && p[key] !== '';
+  }
+  // One decimal at most: 91.7, 86.
+  function _cmPctText(v) {
+    return String(Math.round(v * 10) / 10);
   }
 
   function _cmRenderPointsScale(cid) {
     var scale = getGradingScale(cid);
     var b = scale.boundaries;
-    var pcts = _cmLevelPercents(scale);
+    var steps = _cmStepValues(scale);
     var rows = b
       .map(function (row, i) {
         var name = PROF_LABELS[row.proficiency];
@@ -3580,7 +3599,7 @@ window.DashClassManager = (function () {
               name +
               ' starts at this percent"><span class="cm-pts-unit">% and up</span>';
         // The level a student at this level everywhere would read back as.
-        var readsAs = pointsToProf(pcts[row.proficiency], 100, scale);
+        var readsAs = pointsToProf(steps[String(row.proficiency)], 100, scale);
         var warn =
           readsAs !== row.proficiency
             ? '<span class="cm-pts-warn" title="' +
@@ -3590,15 +3609,25 @@ window.DashClassManager = (function () {
               PROF_LABELS[readsAs] +
               '</span>'
             : '';
-        var counts =
-          '<input class="cm-input cm-pts-pct" type="number" min="0" max="100" id="cm-pts-pct-' +
-          row.proficiency +
-          '" value="' +
-          pcts[row.proficiency] +
-          '" data-action-change="cmPointsScale" aria-label="' +
-          name +
-          ' counts as this percent"><span class="cm-pts-unit">%</span>' +
-          warn;
+        var counts = CM_STEP_SLOTS[row.proficiency]
+          .map(function (key) {
+            if (!key) return '<span class="cm-pts-slot"></span>';
+            var text = _cmPctText(steps[key]);
+            var sign = key.slice(-1) === '+' ? ' Plus' : key.slice(-1) === '-' ? ' Minus' : '';
+            return (
+              '<input class="cm-input cm-pts-pct cm-pts-slot" type="number" min="0" max="100" step="0.1" id="cm-pts-pct-' +
+              _cmStepId(key) +
+              '" value="' +
+              text +
+              '"' +
+              (_cmHasOwnStep(scale, key) ? '' : ' data-derived="' + text + '"') +
+              ' data-action-change="cmPointsScale" aria-label="' +
+              name +
+              sign +
+              ' counts as this percent">'
+            );
+          })
+          .join('');
         return (
           '<div class="cm-pts-row"><span class="cm-pts-name">' +
           name +
@@ -3606,6 +3635,7 @@ window.DashClassManager = (function () {
           input +
           '</span><span class="cm-pts-cell">' +
           counts +
+          warn +
           '</span></div>'
         );
       })
@@ -3613,14 +3643,17 @@ window.DashClassManager = (function () {
     return (
       '<div class="cm-pts-scale">' +
       '<div class="cm-recent-text"><span class="cm-label">Points and Proficiency</span>' +
-      '<span class="cm-hint">A points score becomes a proficiency by its percent. Each proficiency counts as a percent in the course %.</span></div>' +
+      '<span class="cm-hint">A points score becomes a proficiency by its percent. Each proficiency, with its + and −, counts as a percent in the course %.</span></div>' +
       '<div class="cm-pts-rows">' +
       '<div class="cm-pts-row cm-pts-head"><span class="cm-pts-name"></span>' +
-      '<span class="cm-pts-cell">Points to Proficiency</span><span class="cm-pts-cell">Counts As</span></div>' +
+      '<span class="cm-pts-cell">Points to Proficiency</span><span class="cm-pts-cell">Counts As (%)</span></div>' +
+      '<div class="cm-pts-row cm-pts-head cm-pts-subhead"><span class="cm-pts-name"></span><span class="cm-pts-cell"></span>' +
+      '<span class="cm-pts-cell"><span class="cm-pts-slot">−</span><span class="cm-pts-slot">Level</span><span class="cm-pts-slot">+</span></span></div>' +
       rows +
       '</div>' +
       (_cmPtsError ? '<div class="cm-pts-error" role="alert">' + esc(_cmPtsError) + '</div>' : '') +
       '<div class="cm-pts-actions">' +
+      '<button type="button" class="cm-action-btn" data-action="cmPointsScaleBc">BC Letter Bands</button>' +
       '<button type="button" class="cm-action-btn" data-action="cmPointsScaleMatch">Match Columns</button>' +
       '<button type="button" class="cm-action-btn cm-pts-reset" data-action="cmPointsScaleReset">Reset to Defaults</button>' +
       '</div>' +
@@ -3657,15 +3690,17 @@ window.DashClassManager = (function () {
   }
 
   function _cmSamePercents(a, b) {
-    return [1, 2, 3, 4].every(function (l) {
-      return Number(a[l]) === Number(b[l]);
+    var x = countsAsStepPercents(a);
+    var y = countsAsStepPercents(b);
+    return x.every(function (v, i) {
+      return Math.abs(v - y[i]) < 1e-9;
     });
   }
 
   /* Saves the scale. A change to Counts As moves the course % of every
      term, so with a term already ended the teacher confirms first. */
   function _cmApplyPointsScale(cid, scale) {
-    var before = _cmLevelPercents(getGradingScale(cid));
+    var before = getGradingScale(cid).percents;
     function save() {
       var cc = getCourseConfig(cid);
       cc.gradingScale = scale;
@@ -3691,7 +3726,7 @@ window.DashClassManager = (function () {
     if (!cmSelectedCourse) return;
     var cid = cmSelectedCourse;
     var scale = getGradingScale(cid);
-    var saved = _cmLevelPercents(scale);
+    var saved = _cmStepValues(scale);
     var boundaries = DEFAULT_GRADING_SCALE.boundaries.map(function (db, i) {
       var inp = document.getElementById('cm-pts-min-' + i);
       return {
@@ -3699,14 +3734,31 @@ window.DashClassManager = (function () {
         proficiency: db.proficiency,
       };
     });
+    // A whole level always has a value. A + or − keeps its own value, or is
+    // left out (a third of the way between its levels) while it still shows
+    // that in-between value or is cleared.
     var percents = {};
-    [4, 3, 2, 1].forEach(function (l) {
-      var inp = document.getElementById('cm-pts-pct-' + l);
-      var v = inp ? parseInt(inp.value, 10) : NaN;
-      percents[l] = isFinite(v) ? Math.max(0, Math.min(100, v)) : saved[l];
+    COUNTS_AS_STEPS.forEach(function (step) {
+      var key = step.key;
+      var whole = key.length === 1;
+      var inp = document.getElementById('cm-pts-pct-' + _cmStepId(key));
+      if (!inp) {
+        if (whole || _cmHasOwnStep(scale, key)) percents[key] = saved[key];
+        return;
+      }
+      var raw = String(inp.value == null ? '' : inp.value).trim();
+      if (!whole && (raw === '' || (inp.dataset && raw === inp.dataset.derived))) return;
+      var v = parseFloat(raw);
+      if (isFinite(v)) percents[key] = Math.round(Math.max(0, Math.min(100, v)) * 10) / 10;
+      else if (whole) percents[key] = saved[key];
     });
-    if (!(percents[4] > percents[3] && percents[3] > percents[2] && percents[2] > percents[1])) {
-      _cmPtsError = 'Each proficiency must count for more than the one below it.';
+    var ladder = countsAsStepPercents(percents);
+    if (
+      !ladder.every(function (v, i) {
+        return i === 0 || v > ladder[i - 1];
+      })
+    ) {
+      _cmPtsError = 'Each step must count for more than the one below it.';
       renderClassManager();
       return;
     }
@@ -3723,6 +3775,19 @@ window.DashClassManager = (function () {
     _cmApplyPointsScale(cid, {
       boundaries: scale.boundaries,
       percents: _cmMatchedPercents(scale.boundaries),
+      labels: scale.labels || null,
+    });
+  }
+
+  // The BC Letter Bands preset: Counts As only; Points to Proficiency stays.
+  function cmBcPointsScale() {
+    if (!cmSelectedCourse) return;
+    var cid = cmSelectedCourse;
+    var scale = getGradingScale(cid);
+    _cmPtsError = null;
+    _cmApplyPointsScale(cid, {
+      boundaries: scale.boundaries,
+      percents: Object.assign({}, BC_LETTER_BAND_PERCENTS),
       labels: scale.labels || null,
     });
   }
@@ -4410,6 +4475,8 @@ window.DashClassManager = (function () {
     cc.calcMethod = cwStep2Calc;
     cc.decayWeight = parseInt(cwStep2Decay, 10) / 100;
     cc.levelOrder = _cmDefaultLevelOrder(course.gradeLevel);
+    var startScale = _cmDefaultGradingScale(course.gradeLevel);
+    if (startScale) cc.gradingScale = startScale;
     var defaultTerms = _cmDefaultReportingTerms(course.id, cwStep2Span);
     if (defaultTerms && !(Array.isArray(cc.reportingTerms) && cc.reportingTerms.length))
       cc.reportingTerms = defaultTerms;
@@ -4563,6 +4630,17 @@ window.DashClassManager = (function () {
 
   // Default Rubric Levels: Emerging First where the class grades by
   // proficiency (grades 8–9), Extending First otherwise.
+  // Grades 10–12 report a %, so their Counts As starts on the BC Letter
+  // Bands (Colin, 2026-10-29); other grades keep the default scale (null).
+  function _cmDefaultGradingScale(gradeLevel) {
+    if (_cmDefaultGradingSystem({ gradeLevel: gradeLevel }) !== 'letter') return null;
+    return {
+      boundaries: structuredClone(DEFAULT_GRADING_SCALE.boundaries),
+      percents: Object.assign({}, BC_LETTER_BAND_PERCENTS),
+      labels: null,
+    };
+  }
+
   function _cmDefaultLevelOrder(gradeLevel) {
     return _cmDefaultGradingSystem({ gradeLevel: gradeLevel }) === 'proficiency' ? 'asc' : 'desc';
   }
@@ -7967,6 +8045,9 @@ window.DashClassManager = (function () {
       cmPointsScaleMatch: function () {
         cmMatchPointsScale();
       },
+      cmPointsScaleBc: function () {
+        cmBcPointsScale();
+      },
       cmCatSave: function () {
         cmCatSave();
       },
@@ -8432,6 +8513,8 @@ window.DashClassManager = (function () {
     },
     openClassManager: openClassManager,
     closeClassManager: closeClassManager,
+    // The grading scale a new class starts with for its grade (tests).
+    defaultGradingScale: _cmDefaultGradingScale,
     renderClassManager: renderClassManager,
     // The copy step behind the Duplicate Class dialog (block '' = none).
     duplicateCourse: _cmDuplicateCourse,

@@ -211,7 +211,27 @@ describe('points to proficiency on the Grading tab', () => {
     inputs['cm-pts-pct-3'] = { value: '100' };
     DashClassManager.handleChange({ dataset: { actionChange: 'cmPointsScale' } });
     expect(getGradingScale(CID).percents || DEFAULT_GRADING_SCALE.percents).toEqual({ 4: 100, 3: 75, 2: 50, 1: 25 });
-    expect(main.innerHTML).toContain('Each proficiency must count for more than the one below it.');
+    expect(main.innerHTML).toContain('Each step must count for more than the one below it.');
+  });
+
+  it('sets the BC Letter Bands and leaves Points to Proficiency alone', () => {
+    DashClassManager.handleAction('cmPointsScaleBc', { dataset: {} });
+    expect(getGradingScale(CID).percents).toEqual(BC_LETTER_BAND_PERCENTS);
+    expect(getGradingScale(CID).boundaries).toEqual(DEFAULT_GRADING_SCALE.boundaries);
+    expect(main.innerHTML).toMatch(/id="cm-pts-pct-3p"[^>]*value="86"/);
+  });
+
+  it('keeps a + or − typed in, and leaves an untouched one in between', () => {
+    expect(main.innerHTML).toMatch(/id="cm-pts-pct-3p"[^>]*value="83.3"[^>]*data-derived="83.3"/);
+    inputs['cm-pts-pct-3p'] = { value: '86', dataset: { derived: '83.3' } };
+    inputs['cm-pts-pct-3m'] = { value: '66.7', dataset: { derived: '66.7' } };
+    DashClassManager.handleChange({ dataset: { actionChange: 'cmPointsScale' } });
+    expect(getGradingScale(CID).percents).toEqual({ 4: 100, 3: 75, 2: 50, 1: 25, '3+': 86 });
+  });
+
+  it('starts a new grade 10–12 class on the BC Letter Bands', () => {
+    expect(DashClassManager.defaultGradingScale('11').percents).toEqual(BC_LETTER_BAND_PERCENTS);
+    expect(DashClassManager.defaultGradingScale('8')).toBe(null);
   });
 
   it('matches Counts As to the thresholds, Emerging at 50', () => {

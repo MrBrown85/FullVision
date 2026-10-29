@@ -130,3 +130,37 @@ describe('Counts As in the course %', () => {
     expect(getCourseLetterData(CID, SID).R).toBe(69.4);
   });
 });
+
+describe('Counts As by step', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('fills a step with no value a third of the way between its levels', () => {
+    expect(countsAsStepPercents({ 4: 100, 3: 75, 2: 50, 1: 25 }).map(v => Math.round(v * 10) / 10)).toEqual([
+      25, 33.3, 41.7, 50, 58.3, 66.7, 75, 83.3, 91.7, 100,
+    ]);
+    expect(countsAsStepPercents({ 4: 100, 3: 75, '3+': 86, 2: 50, 1: 25 })[7]).toBe(86);
+  });
+
+  it('counts each step on the BC Letter Bands as its own value', () => {
+    seed({ percents: BC_LETTER_BAND_PERCENTS, assessments: [], scores: [] });
+    expect(levelToPercent(CID, 3 + 1 / 3)).toBeCloseTo(86, 9);
+    expect(levelToPercent(CID, 3)).toBe(80);
+    expect(levelToPercent(CID, 4 - 1 / 3)).toBeCloseTo(92, 9);
+    expect(levelToPercent(CID, 2 - 1 / 3)).toBeCloseTo(55, 9);
+    expect(levelToPercent(CID, 1)).toBe(45);
+    // Between 2+ (67) and 3− (73): halfway.
+    expect(levelToPercent(CID, 2.5)).toBeCloseTo(70, 9);
+    expect(formatLevel(CID, 3 + 1 / 3)).toBe('86%');
+    expect(percentageToLetter(levelToPercent(CID, 3 + 1 / 3), CID)).toBe('A');
+  });
+
+  it('counts a rubric criterion scored 3+ at its step', () => {
+    seed({
+      percents: BC_LETTER_BAND_PERCENTS,
+      assessments: [rubricAssessment],
+      scores: [score('r-a', 't1', 3, 1), score('r-a', 't2', 2, -1)],
+    });
+    // (86 + 55) / 2
+    expect(getCourseLetterData(CID, SID).R).toBe(70.5);
+  });
+});
