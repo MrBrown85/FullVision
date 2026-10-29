@@ -16,16 +16,14 @@
   margin-bottom: 12px;
   overflow: visible;
 }
-/* The header is a grid: grip | title, chips | actions | chevron. A closed
-   card's chips run the full width under the title (its actions, hidden
-   until hover, keep their space on the title row only); an open card's
-   controls stand beside both rows. */
+/* The header is a grid: grip | title, chips | actions | chevron. The
+   actions stand beside both rows, centred on the card. */
 .assess-header {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto auto;
   grid-template-areas:
     'grip title actions chevron'
-    'grip meta meta chevron';
+    'grip meta actions chevron';
   align-items: center;
   column-gap: 10px;
   row-gap: 6px;
@@ -40,9 +38,6 @@
   border-color: transparent;
 }
 .assess-card.open .assess-header {
-  grid-template-areas:
-    'grip title actions chevron'
-    'grip meta actions chevron';
   padding: 14px 16px 12px 10px;
 }
 /* No hover tint, as in the mockup. */
@@ -105,10 +100,6 @@
 .assess-card.open .assess-header-actions,
 .assess-header-actions:focus-within {
   opacity: 1;
-}
-/* On a closed card the hidden actions don't make the title row taller. */
-.assess-card:not(.open) .assess-header-actions {
-  margin: -6px 0;
 }
 .assess-chevron {
   grid-area: chevron;
