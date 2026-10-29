@@ -217,7 +217,7 @@ window.PageGradebook = (function () {
     var everyAssessment = getAssessments(cid);
     var allAssessments = everyAssessment
       .filter(function (a) {
-        return !term || assessmentInActiveTerm(cid, a);
+        return !_pendingDeleteAids[a.id] && (!term || assessmentInActiveTerm(cid, a));
       })
       .sort(function (a, b) {
         return (a.date || '').localeCompare(b.date || '');
@@ -606,35 +606,52 @@ window.PageGradebook = (function () {
   /* ── Column hover with 45-degree skew-aware hit-testing ── */
   var _hoveredColIdx = -1;
 
+  /* The slanted header column under a point: { idx, el }, or null. Each
+     title leans over the columns to its right, so the box under the pointer
+     is often a different column; this follows the slant instead, the same
+     band the hover highlights. */
+  function _slantedColAt(clientX, clientY) {
+    var inner = document.querySelector('#gb-colheads .gb-grid-colheads-inner');
+    if (!inner) return null;
+    var cols = inner.querySelectorAll('.gb-grid-colhead');
+    if (!cols.length) return null;
+    var innerRect = inner.getBoundingClientRect();
+    var colW = cols[0].getBoundingClientRect().width;
+    // innerRect.left already accounts for scroll — no scrollLeft needed
+    var mouseX = clientX - innerRect.left;
+    var mouseY = clientY - innerRect.top;
+    // Skew correction: skewX(-45deg) with transform-origin:bottom-right
+    // shifts fill RIGHT as you go up. At height h from bottom, column i's
+    // fill spans [i*colW + h, (i+1)*colW + h]. To find column index:
+    var hFromBottom = innerRect.height - mouseY;
+    var idx = Math.floor((mouseX - hFromBottom) / colW);
+    if (idx < 0 || idx >= cols.length) return null;
+    return { idx: idx, el: cols[idx] };
+  }
+
+  function _inSlantedHeads(target) {
+    return !!(
+      target &&
+      target.closest &&
+      target.closest('#gb-colheads .gb-grid-colheads-inner:not(.gb-grid-colheads-comp)')
+    );
+  }
+
   function initColHoverTooltip() {
     var colheads = document.getElementById('gb-colheads');
     if (!colheads) return;
     // Use mousemove for skew-aware hit-testing instead of DOM hover
     colheads.addEventListener('mousemove', function (e) {
-      var inner = colheads.querySelector('.gb-grid-colheads-inner');
-      if (!inner) return;
-      var cols = inner.querySelectorAll('.gb-grid-colhead');
-      if (!cols.length) return;
-      var innerRect = inner.getBoundingClientRect();
-      var colW = cols[0].getBoundingClientRect().width;
-      // innerRect.left already accounts for scroll — no scrollLeft needed
-      var mouseX = e.clientX - innerRect.left;
-      var mouseY = e.clientY - innerRect.top;
-      var containerH = innerRect.height;
-      // Skew correction: skewX(-45deg) with transform-origin:bottom-right
-      // shifts fill RIGHT as you go up. At height h from bottom, column i's
-      // fill spans [i*colW + h, (i+1)*colW + h]. To find column index:
-      var hFromBottom = containerH - mouseY;
-      var adjustedX = mouseX - hFromBottom;
-      var idx = Math.floor(adjustedX / colW);
-      if (idx < 0 || idx >= cols.length) {
+      var hit = _slantedColAt(e.clientX, e.clientY);
+      var idx = hit ? hit.idx : -1;
+      if (idx < 0) {
         if (_hoveredColIdx >= 0) hideColTooltip();
         return;
       }
       if (idx !== _hoveredColIdx) {
         hideColTooltip();
         _hoveredColIdx = idx;
-        showColTooltip(cols[idx], idx);
+        showColTooltip(hit.el, idx);
       }
     });
     colheads.addEventListener('mouseleave', function () {
@@ -2246,40 +2263,16 @@ window.PageGradebook = (function () {
         // P7.8: replace native confirm with the in-app dialog so the dialog
         // can spell out irreversibility and stay consistent with other
         // destructive actions in the gradebook.
+        // The dialog names the assignment so a click on the wrong column is
+        // caught before anything happens.
+        var title = assess && assess.title ? assess.title : 'this assignment';
         showConfirm(
-          'Delete this assignment?',
-          'All scores, statuses, and observations linked to this assignment will be removed. This cannot be undone.',
+          'Delete “' + title + '”?',
+          'All scores, statuses, and observations linked to this assignment will be removed. You can undo this for a few seconds.',
           'Delete',
           'danger',
           function () {
-            var cid = activeCourse;
-            var assessments = getAssessments(cid).filter(function (a) {
-              return a.id !== aid;
-            });
-            saveAssessments(cid, assessments);
-            var scores = getScores(cid);
-            Object.keys(scores).forEach(function (sid) {
-              scores[sid] = scores[sid].filter(function (e) {
-                return e.assessmentId !== aid;
-              });
-            });
-            saveScores(cid, scores);
-            // P6.5: previously this branch only cleaned scores+assessments,
-            // leaving status pills + observations orphaned in LS and on the
-            // server. Mirror page-assignments.js's deleteAssess so the two
-            // delete entry points produce the same canonical end state.
-            var statuses = getAssignmentStatuses(cid);
-            var statusChanged = false;
-            Object.keys(statuses).forEach(function (k) {
-              if (k.endsWith(':' + aid)) {
-                delete statuses[k];
-                statusChanged = true;
-              }
-            });
-            if (statusChanged) saveAssignmentStatuses(cid, statuses);
-            deleteAssessmentObservations(cid, aid);
-            clearProfCache();
-            render();
+            _deleteAssessWithUndo(activeCourse, aid, title);
           },
         );
       }
@@ -2288,6 +2281,72 @@ window.PageGradebook = (function () {
     setTimeout(function () {
       document.addEventListener('click', _dismissContextMenu, { once: true });
     }, 0);
+  }
+
+  /* Delete Assignment hides the column and offers Undo (the toast's button or
+     Cmd/Ctrl+Z). The delete reaches the data layer only when the toast closes
+     without Undo: it times out, another toast replaces it, or the page is left. */
+  var _pendingDeleteAids = {}; // aid → cid, hidden until the Undo window closes
+  var DELETE_UNDO_MS = 10000;
+  var _mounted = false;
+
+  function _deleteAssessWithUndo(cid, aid, title) {
+    if (_pendingDeleteAids[aid]) return;
+    _pendingDeleteAids[aid] = cid;
+    render();
+    var settled = false;
+    showUndoToast(
+      'Deleted “' + title + '”',
+      function () {
+        if (settled) return;
+        settled = true;
+        delete _pendingDeleteAids[aid];
+        if (_mounted && activeCourse === cid) render();
+      },
+      function () {
+        if (settled) return;
+        settled = true;
+        delete _pendingDeleteAids[aid];
+        _commitDeleteAssess(cid, aid);
+        if (_mounted && activeCourse === cid) render();
+      },
+      DELETE_UNDO_MS,
+    );
+  }
+
+  // Closing the tab inside the undo window still deletes.
+  if (typeof window.addEventListener === 'function')
+    window.addEventListener('pagehide', function () {
+      if (Object.keys(_pendingDeleteAids).length && typeof dismissUndoToast === 'function') dismissUndoToast();
+    });
+
+  function _commitDeleteAssess(cid, aid) {
+    var assessments = getAssessments(cid).filter(function (a) {
+      return a.id !== aid;
+    });
+    saveAssessments(cid, assessments);
+    var scores = getScores(cid);
+    Object.keys(scores).forEach(function (sid) {
+      scores[sid] = scores[sid].filter(function (e) {
+        return e.assessmentId !== aid;
+      });
+    });
+    saveScores(cid, scores);
+    // P6.5: previously this branch only cleaned scores+assessments,
+    // leaving status pills + observations orphaned in LS and on the
+    // server. Mirror page-assignments.js's deleteAssess so the two
+    // delete entry points produce the same canonical end state.
+    var statuses = getAssignmentStatuses(cid);
+    var statusChanged = false;
+    Object.keys(statuses).forEach(function (k) {
+      if (k.endsWith(':' + aid)) {
+        delete statuses[k];
+        statusChanged = true;
+      }
+    });
+    if (statusChanged) saveAssignmentStatuses(cid, statuses);
+    deleteAssessmentObservations(cid, aid);
+    clearProfCache();
   }
 
   /* ── Scores tab: column-focus score mode ────────────────── */
@@ -2547,6 +2606,19 @@ window.PageGradebook = (function () {
     // the field's own undo.
     var inTextField =
       e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable === true;
+    // While a deleted assignment can still be brought back, Cmd+Z does that first.
+    if (
+      (e.metaKey || e.ctrlKey) &&
+      e.key === 'z' &&
+      !e.shiftKey &&
+      !inTextField &&
+      Object.keys(_pendingDeleteAids).length &&
+      typeof executeUndo === 'function'
+    ) {
+      e.preventDefault();
+      executeUndo();
+      return;
+    }
     if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey && !inTextField && _undoStack.length > 0) {
       e.preventDefault();
       var undo = _undoStack.pop();
@@ -2928,6 +3000,7 @@ window.PageGradebook = (function () {
 
   /* ── init / destroy ─────────────────────────────────────── */
   function init(params) {
+    _mounted = true;
     activeCourse = params.course || getActiveCourse();
     setActiveCourse(activeCourse);
     viewMode = 'scores';
@@ -2970,6 +3043,12 @@ window.PageGradebook = (function () {
         return;
       }
       var header = e.target.closest('.gb-grid-colhead, .gb-scores-assess-head');
+      // A slanted title acts on the column it leans along, not the box under the pointer.
+      if (_inSlantedHeads(e.target)) {
+        var hit = _slantedColAt(e.clientX, e.clientY);
+        header = hit ? hit.el : null;
+        if (!header) e.preventDefault();
+      }
       if (header) {
         e.preventDefault();
         showHeaderContextMenu(e, header);
@@ -2979,6 +3058,10 @@ window.PageGradebook = (function () {
     _addDocListener('dblclick', function (e) {
       if (_graderOpen()) return;
       var el = e.target.closest('[data-action-dblclick]');
+      if (_inSlantedHeads(e.target)) {
+        var hit = _slantedColAt(e.clientX, e.clientY);
+        el = hit ? hit.el : null;
+      }
       if (!el) return;
       e.preventDefault();
       var action = el.dataset.actionDblclick;
@@ -3000,6 +3083,7 @@ window.PageGradebook = (function () {
   }
 
   function destroy() {
+    _mounted = false;
     if (_graderOpen()) PageAssignments.closeGrader();
     ObsCapture.closeDialog();
     if (window.GradesPrint) GradesPrint.close();
