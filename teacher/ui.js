@@ -631,6 +631,40 @@ function _sortedRoster(cid, mode) {
   return mode === 'lastName' ? byLast : sortStudents(byLast, mode, cid);
 }
 
+// Which grades show beside each name, remembered per class on this computer.
+// A Proficiency class has no percentage, so it offers Proficiency or None.
+const ROSTER_SHOWS = [
+  ['grade', 'Grade'],
+  ['percent', 'Percentage'],
+  ['both', 'Both'],
+  ['none', 'None'],
+];
+const ROSTER_SHOWS_PROFICIENCY = [
+  ['grade', 'Proficiency'],
+  ['none', 'None'],
+];
+function _rosterShowOptions(cid) {
+  return courseGradeMode(cid) === 'proficiency' ? ROSTER_SHOWS_PROFICIENCY : ROSTER_SHOWS;
+}
+function _rosterShowMode(cid) {
+  let mode = null;
+  try {
+    mode = localStorage.getItem('gb-roster-show-' + cid);
+  } catch (e) {}
+  const opts = _rosterShowOptions(cid);
+  return opts.some(o => o[0] === mode) ? mode : opts === ROSTER_SHOWS ? 'both' : 'grade';
+}
+function _rosterShowLabel(cid, mode) {
+  return _rosterShowOptions(cid).find(o => o[0] === mode)[1];
+}
+// The Show button beside Sort has room for a short word: % for Percentage.
+// "Proficiency" doesn't fit beside "Sort: Last Name", so a Proficiency class
+// shows the icon alone, its choice in the button's title.
+function _rosterShowShort(cid, mode) {
+  if (_rosterShowOptions(cid) === ROSTER_SHOWS_PROFICIENCY) return '';
+  return mode === 'percent' ? '%' : _rosterShowLabel(cid, mode);
+}
+
 function _sidebarRowsHtml(cid, students, selectedStudentId, onStudentClick) {
   const flags = getFlags(cid);
   let html = '';
@@ -655,11 +689,19 @@ function _sidebarRowsHtml(cid, students, selectedStudentId, onStudentClick) {
   return html;
 }
 
+function _rosterMenuHtml(options, mode, key) {
+  return options
+    .map(
+      ([m, label]) =>
+        `<button type="button" role="menuitemradio" aria-checked="${m === mode}" class="sb-sort-item${m === mode ? ' is-on' : ''}" data-${key}="${m}">${label}</button>`,
+    )
+    .join('');
+}
 function _rosterSortMenuHtml(mode) {
-  return ROSTER_SORTS.map(
-    ([m, label]) =>
-      `<button type="button" role="menuitemradio" aria-checked="${m === mode}" class="sb-sort-item${m === mode ? ' is-on' : ''}" data-sort="${m}">${label}</button>`,
-  ).join('');
+  return _rosterMenuHtml(ROSTER_SORTS, mode, 'sort');
+}
+function _rosterShowMenuHtml(cid, mode) {
+  return _rosterMenuHtml(_rosterShowOptions(cid), mode, 'show');
 }
 
 let _sidebarCid = null;
@@ -669,6 +711,7 @@ function renderSidebar(activeCourse, selectedStudentId, onStudentClick) {
   _sidebarCid = cid;
   const mode = _rosterSortMode(cid);
   const students = _sortedRoster(cid, mode);
+  const show = _rosterShowMode(cid);
 
   let html = `<aside id="gb-sidebar" aria-label="Student roster">
     <div id="gb-sidebar-top">
@@ -687,6 +730,12 @@ function renderSidebar(activeCourse, selectedStudentId, onStudentClick) {
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4l2.5 2.5L7.5 4"/></svg>
         </button>
         <div class="sb-sort-menu" id="sb-sort-menu" role="menu" aria-label="Sort students" hidden>${_rosterSortMenuHtml(mode)}</div>
+        <button type="button" class="sb-sort-btn" id="sb-show-btn" aria-haspopup="menu" aria-expanded="false" title="Show: ${_rosterShowLabel(cid, show)}" aria-label="Show: ${_rosterShowLabel(cid, show)}">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 6s1.8-3.5 5-3.5S11 6 11 6 9.2 9.5 6 9.5 1 6 1 6z"/><circle cx="6" cy="6" r="1.5"/></svg>
+          <span id="sb-show-label">${_rosterShowShort(cid, show)}</span>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4l2.5 2.5L7.5 4"/></svg>
+        </button>
+        <div class="sb-sort-menu" id="sb-show-menu" role="menu" aria-label="Grades beside each name" hidden>${_rosterShowMenuHtml(cid, show)}</div>
       </div>
     </div>
     <div id="gb-roster-list" role="list">${_sidebarRowsHtml(cid, students, selectedStudentId, onStudentClick)}</div>
@@ -698,11 +747,33 @@ function renderSidebar(activeCourse, selectedStudentId, onStudentClick) {
   return html;
 }
 
+// The roster's two menus: Sort and Show.
+const _ROSTER_MENUS = [
+  { btn: 'sb-sort-btn', menu: 'sb-sort-menu', key: 'sort', apply: m => _applyRosterSort(m) },
+  { btn: 'sb-show-btn', menu: 'sb-show-menu', key: 'show', apply: m => _applyRosterShow(m) },
+];
 function _closeRosterSortMenu() {
-  const menu = document.getElementById('sb-sort-menu');
-  const btn = document.getElementById('sb-sort-btn');
-  if (menu) menu.hidden = true;
-  if (btn) btn.setAttribute('aria-expanded', 'false');
+  _ROSTER_MENUS.forEach(function (m) {
+    const menu = document.getElementById(m.menu);
+    const btn = document.getElementById(m.btn);
+    if (menu) menu.hidden = true;
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+  });
+}
+
+// Show other grades beside the names, keeping the list as it is.
+function _applyRosterShow(mode) {
+  const cid = _sidebarCid;
+  if (!cid || !document.getElementById('gb-roster-list')) return;
+  try {
+    localStorage.setItem('gb-roster-show-' + cid, mode);
+  } catch (e) {}
+  const btn = document.getElementById('sb-show-btn');
+  btn.title = 'Show: ' + _rosterShowLabel(cid, mode);
+  btn.setAttribute('aria-label', btn.title);
+  document.getElementById('sb-show-label').textContent = _rosterShowShort(cid, mode);
+  document.getElementById('sb-show-menu').innerHTML = _rosterShowMenuHtml(cid, mode);
+  fillSidebarBadges(cid);
 }
 
 // Redraw only the list, keeping the selected student, the search and any
@@ -723,35 +794,43 @@ function _applyRosterSort(mode) {
 }
 
 document.addEventListener('click', function (e) {
-  const btn = e.target.closest && e.target.closest('#sb-sort-btn');
-  if (btn) {
-    const menu = document.getElementById('sb-sort-menu');
-    const open = menu.hidden;
-    menu.hidden = !open;
-    btn.setAttribute('aria-expanded', String(open));
-    if (open) (menu.querySelector('.is-on') || menu.firstElementChild).focus();
-    return;
+  if (!e.target.closest) return;
+  for (const m of _ROSTER_MENUS) {
+    const btn = e.target.closest('#' + m.btn);
+    if (btn) {
+      const menu = document.getElementById(m.menu);
+      const open = menu.hidden;
+      _closeRosterSortMenu();
+      menu.hidden = !open;
+      btn.setAttribute('aria-expanded', String(open));
+      if (open) (menu.querySelector('.is-on') || menu.firstElementChild).focus();
+      return;
+    }
+    const item = e.target.closest('#' + m.menu + ' [data-' + m.key + ']');
+    if (item) {
+      _closeRosterSortMenu();
+      m.apply(item.dataset[m.key]);
+      document.getElementById(m.btn).focus();
+      return;
+    }
   }
-  const item = e.target.closest && e.target.closest('#sb-sort-menu [data-sort]');
-  if (item) {
-    _closeRosterSortMenu();
-    _applyRosterSort(item.dataset.sort);
-    document.getElementById('sb-sort-btn').focus();
-    return;
-  }
-  if (!(e.target.closest && e.target.closest('#sb-sort-menu'))) _closeRosterSortMenu();
+  if (!e.target.closest('.sb-sort-menu')) _closeRosterSortMenu();
 });
 document.addEventListener(
   'keydown',
   function (e) {
-    const menu = document.getElementById('sb-sort-menu');
-    if (!menu || menu.hidden) return;
+    const m = _ROSTER_MENUS.find(x => {
+      const el = document.getElementById(x.menu);
+      return el && !el.hidden;
+    });
+    if (!m) return;
+    const menu = document.getElementById(m.menu);
     if (e.key === 'Escape') {
       _closeRosterSortMenu();
-      document.getElementById('sb-sort-btn').focus();
+      document.getElementById(m.btn).focus();
       e.stopPropagation();
     } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-      const items = [...menu.querySelectorAll('[data-sort]')];
+      const items = [...menu.querySelectorAll('[data-' + m.key + ']')];
       const i = items.indexOf(document.activeElement);
       items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length].focus();
       e.preventDefault();
@@ -794,10 +873,20 @@ function refreshSidebarGrades(sid) {
   if (el) el.innerHTML = _sidebarBadgesHtml(cid, sid);
 }
 
+/* The grades the roster's Show menu asks for. Grade (Proficiency in a
+   Proficiency class) is the proficiency code and the letter; Percentage is
+   the course %; Both is the grade and the %; None is nothing. */
 function _sidebarBadgesHtml(cid, sid) {
+  var show = _rosterShowMode(cid);
+  if (show === 'none') return '';
   var badges = studentRosterBadges(cid, sid);
+  var letter = badges.letter;
+  if (letter && show !== 'both') {
+    letter = Object.assign({}, letter, { text: show === 'percent' ? letter.pct : letter.grade || letter.pct });
+  }
   return (
-    (badges.prof ? _sidebarGradeBadge(badges.prof) : '') + (badges.letter ? _sidebarGradeBadge(badges.letter) : '')
+    (badges.prof && show !== 'percent' ? _sidebarGradeBadge(badges.prof) : '') +
+    (letter ? _sidebarGradeBadge(letter) : '')
   );
 }
 

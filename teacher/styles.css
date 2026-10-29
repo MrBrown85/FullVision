@@ -768,7 +768,29 @@ body.offline-active #app-dock {
   min-width: 0;
 }
 .sb-sort {
+  display: flex;
+  gap: 8px;
   margin-top: 8px;
+}
+#sb-sort-btn {
+  min-width: 0;
+}
+#sb-show-btn {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+#sb-show-label:empty {
+  display: none;
+}
+/* A menu in the flex row would sit at the row's start; put it under the
+   buttons, the Show menu at the right. */
+.sb-sort-menu {
+  top: calc(100% - 12px);
+}
+#sb-show-menu {
+  left: auto;
+  right: 16px;
+  min-width: 140px;
 }
 .sb-sort-btn {
   display: inline-flex;

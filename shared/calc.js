@@ -1964,7 +1964,13 @@ function studentGradeBadges(cid, sid) {
   }
   if (mode !== 'proficiency') {
     var lg = getCourseLetterData(cid, sid);
-    if (lg && lg.R != null) out.letter = { text: (lg.S ? lg.S + ' ' : '') + lg.R + '%', level: _percentLevel(lg.R) };
+    if (lg && lg.R != null)
+      out.letter = {
+        text: (lg.S ? lg.S + ' ' : '') + lg.R + '%',
+        grade: lg.S || '',
+        pct: lg.R + '%',
+        level: _percentLevel(lg.R),
+      };
   }
   return out;
 }
