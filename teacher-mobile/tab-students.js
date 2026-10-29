@@ -27,7 +27,12 @@ window.MStudents = (function () {
   function _syncViewVisibility(showCards) {
     var container = document.getElementById('m-student-card-stack');
     var list = document.getElementById('m-student-list');
-    if (container) container.style.display = showCards ? '' : 'none';
+    if (container) {
+      container.style.display = showCards ? '' : 'none';
+      // Cards view sizes the stack to the screen (see .m-cards-mode).
+      var content = container.closest('.m-screen-content');
+      if (content) content.classList.toggle('m-cards-mode', showCards);
+    }
     if (list) {
       list.style.display = showCards ? 'none' : '';
       if (!showCards)

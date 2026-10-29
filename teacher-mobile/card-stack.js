@@ -2,7 +2,7 @@
    Renders a stack of 3 visible cards with depth. Swipe left/right to advance.
    Used by Students tab (browse) and reusable elsewhere. */
 
-window.MCardStack = (function() {
+window.MCardStack = (function () {
   'use strict';
 
   /**
@@ -21,14 +21,18 @@ window.MCardStack = (function() {
     var _cards = cards;
     var _idx = 0;
     var _renderCard = opts.renderCard;
-    var _onSwipe = opts.onSwipe || function() {};
-    var _onTap = opts.onTap || function() {};
+    var _onSwipe = opts.onSwipe || function () {};
+    var _onTap = opts.onTap || function () {};
     var _destroyed = false;
     var _animating = false;
 
     // Touch state
-    var _startX = 0, _startY = 0, _startTime = 0;
-    var _deltaX = 0, _isDragging = false, _committed = false;
+    var _startX = 0,
+      _startY = 0,
+      _startTime = 0;
+    var _deltaX = 0,
+      _isDragging = false,
+      _committed = false;
     var _dragDir = null; // 'left' | 'right' — direction locked once per gesture
     var DEAD_ZONE = 10;
     var SWIPE_THRESHOLD = 100;
@@ -79,7 +83,7 @@ window.MCardStack = (function() {
         counter.className = 'm-card-counter';
         containerEl.appendChild(counter);
       }
-      counter.textContent = (_idx + 1) + ' of ' + _cards.length;
+      counter.textContent = _idx + 1 + ' of ' + _cards.length;
     }
 
     // --- Touch handlers ---
@@ -165,7 +169,7 @@ window.MCardStack = (function() {
       active.classList.remove('m-card-dragging');
       active.classList.add('m-card-spring');
       active.style.transform = '';
-      setTimeout(function() {
+      setTimeout(function () {
         if (active) active.classList.remove('m-card-spring');
       }, 350);
     }
@@ -177,6 +181,7 @@ window.MCardStack = (function() {
 
       active.classList.remove('m-card-dragging');
       active.classList.add(dir === 'left' ? 'm-card-exit-left' : 'm-card-exit-right');
+      active.setAttribute('data-depth', 'exit');
 
       var swipedIdx = _idx;
       var swipedData = _cards[_idx];
@@ -187,11 +192,49 @@ window.MCardStack = (function() {
       // Haptic
       if (typeof MComponents !== 'undefined' && MComponents.haptic) MComponents.haptic();
 
-      setTimeout(function() {
+      // Move the cards behind up one place while the top card leaves, so the
+      // next card eases to full size instead of snapping there after a rebuild.
+      _els.shift();
+      if (_els[0]) _setDepth(_els[0], 0);
+      if (_els[1]) {
+        var nextIdx = _mod(_idx + 1);
+        if (_els[1].getAttribute('data-idx') !== String(nextIdx)) {
+          _els[1].innerHTML = _renderCard(_cards[nextIdx], nextIdx);
+          _els[1].setAttribute('data-idx', String(nextIdx));
+        }
+        _setDepth(_els[1], 1);
+      }
+      _updateCounter();
+
+      setTimeout(function () {
+        if (_destroyed) return;
         _animating = false;
-        _render();
+        if (active.parentNode) active.parentNode.removeChild(active);
+        _fillBehind();
         _onSwipe(dir, swipedData, swipedIdx);
       }, 300);
+    }
+
+    function _setDepth(el, depth) {
+      el.setAttribute('data-depth', String(depth));
+    }
+
+    // Add the cards still missing at the back of the stack, faded in.
+    function _fillBehind() {
+      var depth = Math.min(3, _cards.length);
+      for (var d = _els.length; d < depth; d++) {
+        var el = _buildCard(_mod(_idx + d), d);
+        el.classList.add('m-card-enter');
+        containerEl.insertBefore(el, containerEl.firstChild);
+        _els[d] = el;
+      }
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          containerEl.querySelectorAll('.m-card-enter').forEach(function (el) {
+            el.classList.remove('m-card-enter');
+          });
+        });
+      });
     }
 
     // --- Public methods ---
@@ -231,7 +274,7 @@ window.MCardStack = (function() {
       goTo: goTo,
       destroy: destroy,
       refresh: refresh,
-      getCurrentIndex: getCurrentIndex
+      getCurrentIndex: getCurrentIndex,
     };
   }
 
