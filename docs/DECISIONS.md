@@ -24,6 +24,15 @@ Supersedes D2. Teachers asked for the multiplier back on points work (an assignm
 - **Toward competencies and level averages, it counts that many times:** competency proficiency, category averages and group grades.
 - A gradebook column and its Class Average still show the assessment's own points (5/6), not the multiplied ones.
 
+## Rubric criteria score on their own (2026-10-29)
+
+Colin: "when I click on Proficient for the first criterion, it automatically sets the next as the same thing." Rubric scores were kept on the client under each criterion's competencies, so two criteria on one competency (Reading Questions 1 and 2, both on CI) shared one slot: scoring one scored the other, and only the last one scored reached the server. Twelve of Colin's rubrics have criteria that share a competency.
+
+- **Each rubric criterion keeps its own score, under its criterion id** (`rubricCriterionScoreKeys` → `[criterion.id]`), on the client as on the server (`rubric_score.criterion_id`). Rubric work's score keys (`scoreTagIds`) are its criterion ids.
+- **A criterion's score is evidence for every competency it feeds** (`getTagScores`). Two criteria on one competency are two pieces of evidence, each named by its criterion. The gradebook's competency cell for rubric work shows the one level when they agree and the lowest, marked mixed, when they don't (`competencyLevelFromCriteria`); it is scored on the rubric, not in that cell.
+- **Scores saved under competencies before are moved when read** (`_migrateRubricScoreKeys`): each criterion takes the entry under its first competency, with its ± and note, and rubric work's competency-keyed entries are dropped. The server already held one row per criterion, so a class reloaded from it shows each criterion's own level.
+- A criterion's "disagreeing competencies" rule (lowest, mixed) no longer arises: a criterion has one level. Assignments' compact grid of rubric work lists criteria, not competencies ("Criteria | Rubric").
+
 ## Counts As by step (2026-10-29)
 
 Colin: "3+ should be 86." With one Counts As value per level and a + or − a third of the way, 3+ was 83.3% (a B) and could not be an A; Developing− failed (41.7%) and Emerging was 25%. Plan: `~/fullvision-counts-as-steps-plan.md`.

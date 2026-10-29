@@ -1537,7 +1537,7 @@ window.PageAssignments = (function () {
                 segAttr(!showRubric) +
                 ' data-action="setRubricView" data-aid="' +
                 a.id +
-                '" data-rubric="false">Competencies</button>' +
+                '" data-rubric="false">Criteria</button>' +
                 '<button class="seg-btn rubric-view-btn"' +
                 segAttr(showRubric) +
                 ' data-action="setRubricView" data-aid="' +

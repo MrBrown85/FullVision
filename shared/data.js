@@ -3316,9 +3316,9 @@ function _rubricCriterionForTag(cid, assessment, tagId) {
   return matches.length === 1 ? matches[0] : null;
 }
 
+// A server rubric_score row is kept under its criterion's own id.
 function _rubricCriterionTagIds(cid, assessment, criterionId) {
-  var criterion = _rubricCriterionById(cid, assessment, criterionId);
-  return criterion ? rubricCriterionScoreKeys(criterion) : [criterionId];
+  return [criterionId];
 }
 
 /* What a score key names, for column headers and grading rows: a
@@ -3331,7 +3331,17 @@ function scoreKeyInfo(cid, assessment, key) {
   var criterion = _rubricCriterionById(cid, assessment, key);
   if (criterion) {
     var name = criterion.name || 'Criterion';
-    return { id: key, label: name, text: name + ': counts toward the overall grade only' };
+    var codes = (criterion.tagIds || [])
+      .map(function (tid) {
+        var t = getTagById(cid, tid);
+        return t ? t.code || t.label || '' : '';
+      })
+      .filter(Boolean);
+    return {
+      id: key,
+      label: name,
+      text: codes.length ? name + ' \u00b7 ' + codes.join(', ') : name + ': counts toward the overall grade only',
+    };
   }
   return null;
 }
@@ -3412,7 +3422,12 @@ async function _hydrateAssessmentDetails(cid) {
             );
           });
         });
-        if (cell.score && cell.score.value != null && (tagScores.length === 0 || isPointsScored(merged))) {
+        // Rubric work's level lives in its rubric_scores, never under a tag.
+        if (
+          cell.score &&
+          cell.score.value != null &&
+          ((tagScores.length === 0 && rubricScores.length === 0) || isPointsScored(merged))
+        ) {
           var fallbackTag = scoreTagIds(merged)[0];
           _pushHydratedScore(
             scores,
@@ -8855,10 +8870,88 @@ function _persistNotesToCanonical(cid, prev, obj) {
   Each score entry = one score for one student, one assessment, one tag.
   An assessment with 4 tags produces 4 score entries per student.
 */
+/* Rubric criterion scores were once kept under the criterion's competencies,
+   one slot shared by every criterion on that competency; each now sits
+   under its own criterion id (docs/DECISIONS.md, "Rubric criteria score on
+   their own"). Scores from an older save are moved once: each criterion
+   takes the entry under its first competency, and rubric work's
+   competency-keyed entries are dropped. It runs again when the class's
+   rubrics change, so a rubric loaded later still moves its scores. */
+var _rubricKeyedScores = new WeakMap();
+function _rubricKeysSignature(cid) {
+  return (getRubrics(cid) || [])
+    .map(function (r) {
+      return (
+        r.id +
+        ':' +
+        (r.criteria || [])
+          .map(function (c) {
+            return c ? c.id + '=' + (c.tagIds || []).join('+') : '';
+          })
+          .join(',')
+      );
+    })
+    .join('|');
+}
+function _migrateRubricScoreKeys(cid, scores) {
+  if (!scores || typeof scores !== 'object') return scores;
+  var sig = _rubricKeysSignature(cid);
+  if (_rubricKeyedScores.get(scores) === sig) return scores;
+  var byAssessment = {};
+  (getAssessments(cid) || []).forEach(function (a) {
+    var rubricId = a && (a.rubricId || a.rubric_id);
+    if (!rubricId || isPointsScored(a)) return;
+    var rubric = getRubricById(cid, rubricId);
+    var criteria = ((rubric && rubric.criteria) || []).filter(function (c) {
+      return c && c.id && c.tagIds && c.tagIds.length;
+    });
+    if (criteria.length) byAssessment[a.id] = criteria;
+  });
+  Object.keys(scores).forEach(function (sid) {
+    var entries = scores[sid];
+    if (!Array.isArray(entries) || !entries.length) return;
+    var added = [];
+    var drop = [];
+    Object.keys(byAssessment).forEach(function (aid) {
+      var own = entries.filter(function (e) {
+        return e && e.assessmentId === aid;
+      });
+      if (!own.length) return;
+      var tagOwned = {};
+      byAssessment[aid].forEach(function (c) {
+        c.tagIds.forEach(function (t) {
+          tagOwned[t] = true;
+        });
+        var has = own.some(function (e) {
+          return e.tagId === c.id;
+        });
+        if (has) return;
+        var legacy = null;
+        for (var i = 0; i < c.tagIds.length && !legacy; i++) {
+          legacy =
+            own.find(function (e) {
+              return e.tagId === c.tagIds[i];
+            }) || null;
+        }
+        if (legacy) added.push(Object.assign({}, legacy, { id: aid + ':' + c.id, tagId: c.id }));
+      });
+      own.forEach(function (e) {
+        if (tagOwned[e.tagId]) drop.push(e);
+      });
+    });
+    if (!added.length && !drop.length) return;
+    for (var i = entries.length - 1; i >= 0; i--) if (drop.indexOf(entries[i]) >= 0) entries.splice(i, 1);
+    added.forEach(function (e) {
+      entries.push(e);
+    });
+  });
+  _rubricKeyedScores.set(scores, sig);
+  return scores;
+}
 function getScores(cid) {
-  if (_cache.scores[cid] !== undefined) return _cache.scores[cid];
+  if (_cache.scores[cid] !== undefined) return _migrateRubricScoreKeys(cid, _cache.scores[cid]);
   try {
-    return JSON.parse(localStorage.getItem('gb-scores-' + cid)) || {};
+    return _migrateRubricScoreKeys(cid, JSON.parse(localStorage.getItem('gb-scores-' + cid)) || {});
   } catch (e) {
     console.warn('Scores parse fallback:', e);
     return {};

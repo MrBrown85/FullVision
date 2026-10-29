@@ -56,12 +56,12 @@ describe('rubric assessment overall', () => {
     expect(getAssessmentOverallScore(CID, SID, 'a1')).toBeCloseTo(3, 5);
   });
 
-  it("averages a criterion's competency scores when they differ", () => {
+  it('keeps one level per criterion under its own id, even on a shared competency', () => {
     seed({
-      criteria: [crit('A', ['t1'], 1), crit('B', ['t2', 't3'], 1)],
-      scores: [score('t1', 4), score('t2', 3), score('t3', 1)],
+      criteria: [crit('A', ['t1'], 1), crit('B', ['t1'], 1)],
+      scores: [score('A', 4), score('B', 2)],
     });
-    // A = 4, B = (3 + 1) / 2 = 2
+    // (4 + 2) / 2: two criteria on one competency are two levels.
     expect(getAssessmentOverallScore(CID, SID, 'a1')).toBeCloseTo(3, 5);
   });
 
@@ -176,7 +176,7 @@ describe('rubric assessment overall', () => {
   it('gives the gradebook and report views the same weighted value', () => {
     seed({
       criteria: [crit('A', ['t1'], 1), crit('B', ['t2'], 3)],
-      scores: [score('t1', 4), score('t2', 2), { ...score('t1', 1), assessmentId: 'other' }],
+      scores: [score('A', 4), score('B', 2), { ...score('A', 1), assessmentId: 'other' }],
     });
     expect(getRubricAssessmentScore(CID, assessment, _cache.scores[CID][SID])).toBeCloseTo(2.5, 5);
     expect(getRubricAssessmentScore(CID, assessment, [])).toBeNull();

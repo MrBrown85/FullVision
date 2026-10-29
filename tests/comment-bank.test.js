@@ -411,7 +411,9 @@ describe('Demo Mode (Science 8, Report 2)', () => {
   it('gives Cece every score this term per competency, with the canvas’s Start and Now', () => {
     const st = getStudents(cid).find(s => s.firstName === 'Cece');
     const comps = CommentBank.facts(cid, st, 'term-2').comps;
-    expect(comps.map(c => c.scores.length)).toEqual([13, 9, 16, 13, 10, 8]);
+    // One point per piece of work; a rubric's criteria on the competency
+    // average into it (tagScoresByAssessment).
+    expect(comps.map(c => c.scores.length)).toEqual([13, 9, 16, 13, 9, 8]);
     expect(comps.map(c => levelFigure(c.start) + ' → ' + levelFigure(c.now))).toEqual([
       '2.9 → 2.9',
       '3.2 → 3.0',

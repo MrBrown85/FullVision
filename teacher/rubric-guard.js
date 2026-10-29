@@ -1,9 +1,9 @@
 /**
  * Guards for editing a rubric that already carries scores.
  *
- * A rubric criterion's scores are stored per criterion on the server and
- * fanned out to its competencies on the client (rubricCriterionScoreKeys), so
- * removing a criterion drops every score entered under it, and changing a
+ * A rubric criterion's scores are stored per criterion, on the server and
+ * on the client (rubricCriterionScoreKeys), so removing a criterion drops
+ * every score entered under it, and changing a
  * criterion's top value changes what past scores are worth. The editor asks
  * before the first and says so for the second. Nothing here writes data.
  */

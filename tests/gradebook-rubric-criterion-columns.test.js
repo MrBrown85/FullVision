@@ -37,18 +37,19 @@ describe('rubricCriterionColumns', () => {
   it('lists one column per criterion with its score keys', () => {
     const cols = rubricCriterionColumns(labAssessment, CID);
     expect(cols.map(c => c.criterion.name)).toEqual(['Scientific Inquiry', 'Data & Analysis', 'Neatness']);
-    expect(cols.map(c => c.keys)).toEqual([['QAP', 'PI'], ['IP', 'EM'], ['crit-neat']]);
+    // A criterion's score is kept under the criterion's own id.
+    expect(cols.map(c => c.keys)).toEqual([['crit-inquiry'], ['crit-data'], ['crit-neat']]);
   });
 
-  it('shows a criterion under its first key', () => {
+  it('shows a criterion under its own key', () => {
     const cols = rubricCriterionColumns(labAssessment, CID);
-    expect(cols[0].keys[0]).toBe('QAP');
+    expect(cols[0].keys[0]).toBe('crit-inquiry');
     expect(cols[2].keys[0]).toBe('crit-neat');
   });
 
   it('gives fewer columns than one per competency', () => {
     expect(rubricCriterionColumns(labAssessment, CID).length).toBe(3);
-    expect(scoreTagIds(labAssessment, CID).length).toBe(5);
+    expect(rubricCompetencyIds(CID, labAssessment)).toEqual(['QAP', 'PI', 'IP', 'EM']);
   });
 
   it('is empty for an assessment with no rubric', () => {

@@ -30,13 +30,13 @@ describe('rubric edit guard', () => {
       { id: 'a2', name: 'Quiz', tagIds: ['t1'] },
     ];
     _cache.scores[C] = {
+      // Rubric scores sit under their criterion's id.
       st1: [
-        { assessmentId: 'a1', tagId: 't1', score: 3 },
-        { assessmentId: 'a1', tagId: 't2', score: 3 },
+        { assessmentId: 'a1', tagId: 'cr1', score: 3 },
         { assessmentId: 'a1', tagId: 'cr2', score: 2 },
       ],
       st2: [
-        { assessmentId: 'a1', tagId: 't1', score: 4 },
+        { assessmentId: 'a1', tagId: 'cr1', score: 4 },
         // A quiz score on the same competency is not a rubric score.
         { assessmentId: 'a2', tagId: 't3', score: 2 },
       ],
