@@ -679,9 +679,6 @@ function renderSidebar(activeCourse, selectedStudentId, onStudentClick) {
       </select>
       <div class="sb-search-row">
         <input id="gb-roster-search" type="text" placeholder="Search..." aria-label="Search students">
-        <button type="button" class="sb-add-student" data-action="addStudent" title="Add Student" aria-label="Add Student">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6.5" cy="5" r="2.6"/><path d="M1.8 13.5c.5-2.5 2.4-4 4.7-4s4.2 1.5 4.7 4"/><line x1="13" y1="5" x2="13" y2="10"/><line x1="10.5" y1="7.5" x2="15.5" y2="7.5"/></svg>
-        </button>
       </div>
       <div class="sb-sort">
         <button type="button" class="sb-sort-btn" id="sb-sort-btn" aria-haspopup="menu" aria-expanded="false">
@@ -1286,10 +1283,6 @@ document.addEventListener('click', function (e) {
         fn = fn ? fn[parts[i]] : null;
       }
       if (typeof fn === 'function') fn(el.dataset.sid);
-    },
-    addStudent: function () {
-      if (typeof openClassManager === 'function') openClassManager();
-      else Router.navigate('/dashboard');
     },
     executeUndo: function () {
       executeUndo();
