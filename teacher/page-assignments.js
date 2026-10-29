@@ -2166,6 +2166,17 @@ window.PageAssignments = (function () {
         .join('') +
       '</select>' +
       '</div>' +
+      '</div>' +
+      '<div class="af-counts-as" id="af-counts-as" aria-live="polite">' +
+      esc(
+        _countsAsText(cid, {
+          categoryId: categoryId || (categories[0] ? categories[0].id : ''),
+          rubricId: assess ? assess.rubricId || '' : '',
+          scoreMode: scoreMode,
+          maxPoints: maxPoints,
+          weight: weight,
+        }),
+      ) +
       '</div>';
 
     // Tags — grouped by competency group
@@ -2342,6 +2353,52 @@ window.PageAssignments = (function () {
     return list.sort(function (a, b) {
       return a - b;
     });
+  }
+
+  /* What an assessment is worth in the course %, in a sentence, for the
+     line under its scoring in the form and under the grader's title:
+     "Counts as 20 points in Current Events (5 criteria)." Empty when the
+     class shows no % or the work counts toward no grade. */
+  function _countsAsText(cid, a) {
+    var w = assessmentCourseWorth(cid, a);
+    if (!w) return '';
+    if (w.kind === 'uncategorized') return 'Has no category, so it doesn’t count toward the course %.';
+    if (w.kind === 'zero')
+      return 'Is in ' + w.category + ', which is worth 0%, so it doesn’t count toward the course %.';
+    var where = w.category ? ' in ' + w.category : ' toward the course %';
+    if (w.kind === 'percent') {
+      return w.factor === 1
+        ? 'Counts as one assessment' + where + ', the same as every other.'
+        : 'Counts ' + w.factor + ' times' + where + ' (Factor ' + w.factor + 'x).';
+    }
+    var parts = [];
+    if (w.criteria) parts.push(w.criteria + (w.criteria === 1 ? ' criterion' : ' criteria'));
+    if (w.factor !== 1) parts.push(formatPoints(w.base) + ' points, Factor ' + w.factor + 'x');
+    return (
+      'Counts as ' +
+      formatPoints(w.points) +
+      (w.points === 1 ? ' point' : ' points') +
+      where +
+      (parts.length ? ' (' + parts.join(', ') + ')' : '') +
+      '.'
+    );
+  }
+
+  // The form's Counts As line, from what the form says now.
+  function _refreshFormCountsAs() {
+    var line = document.getElementById('af-counts-as');
+    if (!line) return;
+    var mode = (document.getElementById('af-scoremode') || {}).value || 'proficiency';
+    line.textContent = _countsAsText(activeCourse, {
+      categoryId: (document.getElementById('af-category') || {}).value || '',
+      rubricId: mode === 'proficiency' ? (document.getElementById('af-rubric') || {}).value || '' : '',
+      scoreMode: mode,
+      maxPoints: parseFloat((document.getElementById('af-maxpoints') || {}).value) || 0,
+      weight: _formAssessWeight(),
+    });
+  }
+  function _countsAsAfterEvent() {
+    if (document.getElementById('af-counts-as')) setTimeout(_refreshFormCountsAs, 0);
   }
 
   // The Factor applies to every kind of scoring; blank, 0 or less is 1.
@@ -7110,7 +7167,8 @@ window.PageAssignments = (function () {
       dialog.innerHTML =
         '<div class="grader-toolbar">' +
         '<div class="grader-toolbar-start"></div>' +
-        '<h2 class="grader-title" id="grader-title"></h2>' +
+        '<div class="grader-title-wrap"><h2 class="grader-title" id="grader-title"></h2>' +
+        '<p class="grader-counts-as"></p></div>' +
         '<div class="grader-toolbar-end"><button type="button" class="grader-done" data-grader="close">Done</button></div>' +
         '</div>' +
         '<div class="grader-scroll">' +
@@ -7140,6 +7198,7 @@ window.PageAssignments = (function () {
         '</div>';
     var i = _grader.studentIds.indexOf(st.id);
     dialog.querySelector('.grader-title').textContent = a.title || 'Assessment';
+    dialog.querySelector('.grader-counts-as').textContent = _countsAsText(cid, a);
     dialog.querySelector('.grader-student').textContent = displayNameWithLast(st);
     dialog.querySelector('[data-grader="prev"]').disabled = !(i > 0);
     dialog.querySelector('[data-grader="next"]').disabled = !(i >= 0 && i < _grader.studentIds.length - 1);
@@ -7564,6 +7623,9 @@ window.PageAssignments = (function () {
     _addDocListener('mouseover', _handleMouseOver);
     _addDocListener('mouseout', _handleMouseOut);
     _addDocListener('fv:id-rekeyed', _handleRekey);
+    ['change', 'input', 'click'].forEach(function (type) {
+      _addDocListener(type, _countsAsAfterEvent);
+    });
     ['click', 'change', 'keyup', 'focusout'].forEach(function (type) {
       _addDocListener(type, _statusLocksAfterEvent);
     });
