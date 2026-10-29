@@ -6106,6 +6106,9 @@ window.PageAssignments = (function () {
     )
       closeMenus();
 
+    // A click in a module's name edits it; it doesn't open or close the folder.
+    if (e.target.closest('.mod-folder-name-input')) return;
+
     var el = e.target.closest('[data-action]');
     if (!el) return;
     var action = el.dataset.action;
@@ -7610,6 +7613,21 @@ window.PageAssignments = (function () {
     }
     if (_editingAssessId === d.from) _editingAssessId = d.to;
     if (focusStudentId === d.from) focusStudentId = d.to;
+    // A new module's folder keeps its local id in the markup until the next
+    // render; swap it now, or a rename before then finds no module to save.
+    if (d.kind === 'module') {
+      if (d.from in collapsedModules) {
+        collapsedModules[d.to] = collapsedModules[d.from];
+        delete collapsedModules[d.from];
+        _saveClosedModules();
+      }
+      var from = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(d.from) : d.from;
+      ['data-module-id', 'data-uid', 'data-moduleid', 'data-module-drag', 'data-folder-drop'].forEach(function (attr) {
+        document.querySelectorAll('[' + attr + '="' + from + '"]').forEach(function (node) {
+          node.setAttribute(attr, d.to);
+        });
+      });
+    }
   }
 
   function destroy() {
