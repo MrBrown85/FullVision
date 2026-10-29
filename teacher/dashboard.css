@@ -193,31 +193,46 @@ button.dash-glance-cell:disabled {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
   align-self: stretch;
-  margin-top: 8px;
 }
 .dash-bday {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   min-width: 0;
 }
-.dash-bday-name {
-  font-size: var(--text-md);
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+/* Days to go, in the same figures as Class Average and Missing. */
+.dash-bday-count {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
 }
-.dash-bday-when {
+.dash-bday-count b {
+  font-size: var(--text-3xl);
+  font-weight: 600;
+  /* One line height for numbers and words, so the names line up. */
+  line-height: calc(var(--text-3xl) * 1.2);
+  font-variant-numeric: tabular-nums;
+}
+/* Today and Tomorrow are words, a size down so they fit a narrow column. */
+.dash-bday-count b.is-soon {
+  font-size: var(--text-2xl);
+  color: var(--score-3-text);
+}
+.dash-bday-count span {
   font-size: var(--text-sm);
   color: var(--text-2);
 }
-.dash-bday-when span {
-  white-space: nowrap;
-}
-.dash-bday-when.is-soon {
-  color: var(--score-3-text);
+/* The full name always shows: a long one wraps rather than being cut. */
+.dash-bday-name {
+  margin-top: 2px;
+  font-size: var(--text-md);
   font-weight: 600;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.dash-bday-date {
+  font-size: var(--text-sm);
+  color: var(--text-2);
 }
 @media (max-width: 900px) {
   .dash-glance {
