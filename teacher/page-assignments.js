@@ -7602,6 +7602,14 @@ window.PageAssignments = (function () {
         showNewForm();
       }, 100);
     }
+
+    // ?edit= opens that assessment in the editor (the gradebook's Edit
+    // Assignment Details).
+    if (params && params.edit) {
+      setTimeout(function () {
+        editAssess(params.edit);
+      }, 100);
+    }
   }
 
   // A new assessment or student got its server id (shared/data.js).
