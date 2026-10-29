@@ -427,11 +427,7 @@ window.PageDashboard = (function () {
     /* -- Toolbar (rendered to separate mount) -- */
     document.getElementById('page-toolbar-mount').innerHTML = Overview.renderDashToolbar({
       activeCourse: activeCourse,
-      sortMode: sortMode,
-      searchQuery: searchQuery,
-      showFlaggedOnly: showFlaggedOnly,
       students: students,
-      flagCount: flagCount,
     });
 
     /* -- Overview Panel -- */
@@ -468,7 +464,16 @@ window.PageDashboard = (function () {
     obsHighlight = _lastObsState.highlight;
 
     /* -- Students: cards or the grid -- */
-    if (allStudents.length) html += DashInsights.studentsHeaderHtml(studentView);
+    if (allStudents.length)
+      html += DashInsights.studentsHeaderHtml(
+        studentView,
+        Overview.studentControlsHtml({
+          sortMode: sortMode,
+          searchQuery: searchQuery,
+          showFlaggedOnly: showFlaggedOnly,
+          flagCount: flagCount,
+        }),
+      );
     if (studentView === 'grid' && students.length) html += DashInsights.studentGridHtml(cid, students, allStudents);
     else html += StudentCards.renderStudentCards(cid, students, allStudents, sections, assessments, allScores, flags);
 
