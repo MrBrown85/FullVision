@@ -42,7 +42,7 @@ async function openGrade(page) {
 /* Build Your Own as a new report opens it: the name and Assignment Grades. */
 async function openFresh(page) {
   await openGrade(page);
-  await page.getByRole('radio', { name: 'Build Your Own' }).click();
+  await page.getByRole('radio', { name: 'Custom' }).click();
   await expect(page.locator('.studio-blk.placed')).toHaveCount(1);
   await expect(page.locator('#studio-fit')).not.toBeEmpty();
 }
@@ -1175,7 +1175,7 @@ test.describe('Grade Report', () => {
     page,
   }) => {
     await openGrade(page);
-    await expect(page.getByRole('radio', { name: 'Grade Report' })).toHaveAttribute('aria-checked', 'true');
+    await expect(page.getByRole('radio', { name: 'Quick Report' })).toHaveAttribute('aria-checked', 'true');
     await expect(page.locator('#studio-fit')).toHaveText('1 sheet for all 27 students');
     // Build Your Own's controls are hidden.
     await expect(page.locator('#report-sides')).toBeHidden();
@@ -1214,12 +1214,12 @@ test.describe('Grade Report', () => {
     await expect(page.locator('.gr-summary')).toHaveCount(1);
     await page.getByRole('checkbox', { name: 'Category Summary' }).uncheck();
     await expect(page.locator('.gr-summary')).toHaveCount(0);
-    await page.getByRole('radio', { name: 'Build Your Own' }).click();
+    await page.getByRole('radio', { name: 'Custom' }).click();
     await expect(page.locator('.studio-blk.placed')).toHaveCount(1);
     await page.reload();
     await page.getByRole('tab', { name: 'Progress Reports' }).click();
     await expect(page.locator('.studio-blk.placed')).toHaveCount(1);
-    await page.getByRole('radio', { name: 'Grade Report' }).click();
+    await page.getByRole('radio', { name: 'Quick Report' }).click();
     await expect(page.getByRole('checkbox', { name: 'Category Summary' })).not.toBeChecked();
     await expect(page.locator('.gr-summary')).toHaveCount(0);
   });
