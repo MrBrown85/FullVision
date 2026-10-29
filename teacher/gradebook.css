@@ -434,6 +434,11 @@
 .gb-score:hover {
   background: rgba(0, 122, 255, 0.06);
 }
+/* A rubric competency whose criteria disagree: the lowest is shown, marked. */
+.gb-score-val.gb-mixed {
+  outline: 2px dashed currentColor;
+  outline-offset: -3px;
+}
 .gb-score-val {
   display: inline-flex;
   align-items: center;

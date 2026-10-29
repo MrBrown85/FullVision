@@ -1226,7 +1226,8 @@ function _criterionIndex(cid) {
 }
 
 /* The criteria of an assessment's rubric that feed a competency; [] for
-   work with no rubric. */
+   work with no rubric. Public as rubricCriteriaForTag, so a view can look
+   them up once per column and pass them to competencyLevelFromCriteria. */
 function _criteriaForTag(cid, assessment, tagId) {
   var rubricId = assessment && (assessment.rubricId || assessment.rubric_id);
   if (!rubricId || isPointsScored(assessment) || typeof getRubricById !== 'function') return [];
@@ -1234,6 +1235,10 @@ function _criteriaForTag(cid, assessment, tagId) {
   return ((rubric && rubric.criteria) || []).filter(function (c) {
     return c && c.id && (c.tagIds || []).indexOf(tagId) >= 0;
   });
+}
+
+function rubricCriteriaForTag(cid, assessment, tagId) {
+  return _criteriaForTag(cid, assessment, tagId);
 }
 
 /* The competencies a rubric assessment scores, through its criteria, in
@@ -1257,8 +1262,8 @@ function rubricCompetencyIds(cid, assessment) {
    marked mixed, with no ± (the grid's rule). Null when none is scored or
    the work has no rubric. Competency proficiency itself counts each
    criterion as its own evidence (getTagScores). */
-function competencyLevelFromCriteria(cid, sid, assessment, tagId) {
-  var criteria = _criteriaForTag(cid, assessment, tagId);
+function competencyLevelFromCriteria(cid, sid, assessment, tagId, criteria) {
+  if (!criteria) criteria = _criteriaForTag(cid, assessment, tagId);
   if (!criteria.length) return null;
   var entries = getScores(cid)[sid] || [];
   var levels = [];
@@ -2333,6 +2338,7 @@ window.Calc = {
   classColumnAverageText,
   getAssessmentGroupPercentage,
   rubricCompetencyIds,
+  rubricCriteriaForTag,
   competencyLevelFromCriteria,
   tagScoresByAssessment,
   assessmentCourseWorth,

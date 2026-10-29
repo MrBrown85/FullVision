@@ -156,6 +156,33 @@ describe('scores saved under competencies before', () => {
     ).toEqual([CRIT_Q1, CRIT_Q2].sort());
   });
 
+  it("move a note the criterion's own entry lacks, and keep its level", () => {
+    seed([
+      entry(CRIT_Q1, 2),
+      {
+        id: 'old-ci',
+        assessmentId: AID,
+        tagId: CI,
+        score: 3,
+        critNote: 'Nice.',
+        critBeyond: 'Extra',
+        date: '2026-09-10',
+        type: 'summative',
+        note: '',
+      },
+    ]);
+    const byKey = Object.fromEntries(getScores(CID)[SID].map(e => [e.tagId, e]));
+    expect(byKey[CI]).toBeUndefined();
+    expect(byKey[CRIT_Q1]).toMatchObject({ score: 2, critNote: 'Nice.', critBeyond: 'Extra' });
+    expect(byKey[CRIT_Q2]).toMatchObject({ score: 3, critNote: 'Nice.' });
+  });
+
+  it('is not reused from a copy saved before this change', () => {
+    expect(_BUNDLE_SCHEMA).toBe(4);
+    _saveClassMeta(CID, { schema: 3, owner: _teacherId, version: 9, lastOpenedAt: Date.now(), savedAt: Date.now() });
+    expect(_savedCopyUsable(CID)).toBe(false);
+  });
+
   it('leave a competency not fed by any criterion alone', () => {
     const OTHER = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
     seed([entry(OTHER, 2)]);
@@ -199,6 +226,28 @@ describe('a criterion score goes to the server as its own rubric_score', () => {
       p_criterion_id: CRIT_Q2,
       p_value: 2,
     });
+  });
+
+  it('sends nothing for a competency key on rubric work', () => {
+    upsertScore(CID, SID, AID, CI, 3, '2026-09-10', 'summative', '');
+    expect(client.calls.map(c => c.name).filter(n => /score/.test(n))).toEqual([]);
+  });
+
+  it('never clears criteria when the saved baseline still has competency keys', () => {
+    // A copy saved before 2026-10-29: competency-keyed, no server baseline.
+    const legacy = [
+      { id: 'old-ci', assessmentId: AID, tagId: CI, score: 3, date: '2026-09-10', type: 'summative', note: '' },
+      { id: 'old-cp', assessmentId: AID, tagId: CP, score: 4, date: '2026-09-10', type: 'summative', note: '' },
+    ];
+    localStorage.setItem('gb-scores-' + CID, JSON.stringify({ [SID]: legacy }));
+    _cache.scores[CID] = { [SID]: structuredClone(legacy) };
+    _forgetServerState(CID);
+    client.calls = [];
+
+    upsertScore(CID, SID, AID, CRIT_Q2, 2, '2026-09-10', 'summative', '');
+    const rubric = client.calls.filter(c => c.name === 'upsert_rubric_score').map(c => c.payload);
+    expect(rubric.map(p => [p.p_criterion_id, p.p_value])).toEqual([[CRIT_Q2, 2]]);
+    expect(client.calls.map(c => c.name).filter(n => /score/.test(n))).toEqual(['upsert_rubric_score']);
   });
 
   it('hydrates a rubric_score row under its criterion', () => {

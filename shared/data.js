@@ -1574,6 +1574,7 @@ function _keepOrDefaultField(cid, field, fallback) {
 function _persistLoadedField(cid, field, value) {
   if (_refreshMustSkip(cid, field)) return;
   _cache[field][cid] = value;
+  if (field === 'rubrics') _noteRubricsSet(cid);
   var key = _DATA_KEYS[field];
   if (key) {
     // Unchanged data isn't rewritten, so a reload that changed nothing
@@ -2150,6 +2151,7 @@ function _rekeyField(field, cid, transform) {
   var value = _readFieldForRekey(field, cid);
   if (value !== undefined && transform(value)) {
     _cache[field][cid] = value;
+    if (field === 'rubrics') _noteRubricsSet(cid);
     var dataKey = _DATA_KEYS[field];
     // A re-key from another tab: it wrote the shared copy already.
     if (dataKey && !_applyingRemoteRekey) _safeLSSet('gb-' + dataKey + '-' + cid, JSON.stringify(value));
@@ -3307,15 +3309,6 @@ function _rubricCriterionById(cid, assessment, criterionId) {
   );
 }
 
-function _rubricCriterionForTag(cid, assessment, tagId) {
-  var rubric = _rubricForAssessment(cid, assessment);
-  if (!rubric || !tagId) return null;
-  var matches = (rubric.criteria || []).filter(function (criterion) {
-    return criterion && (criterion.tagIds || []).indexOf(tagId) >= 0;
-  });
-  return matches.length === 1 ? matches[0] : null;
-}
-
 // A server rubric_score row is kept under its criterion's own id.
 function _rubricCriterionTagIds(cid, assessment, criterionId) {
   return [criterionId];
@@ -3807,6 +3800,7 @@ function _v2GradebookToCache(cid, payload) {
   _cache.notes[cid] = _safeParseLS('gb-notes-' + cid, {});
   _cache.modules[cid] = _safeParseLS('gb-modules-' + cid, _safeParseLS('gb-units-' + cid, [])) || [];
   _cache.rubrics[cid] = _safeParseLS('gb-rubrics-' + cid, []);
+  _noteRubricsSet(cid);
   _cache.customTags[cid] = _safeParseLS('gb-custom-tags-' + cid, []);
 }
 
@@ -4074,7 +4068,9 @@ function _bundleToCache(cid, bundle) {
    changed class is downloaded. gb-bundle-meta-<cid> records the copy's
    version, owner and age. FV_CACHE_FIRST (constants.js) or
    window.__FV_CACHE_FIRST = false turns this off. */
-var _BUNDLE_SCHEMA = 3;
+// 4 (2026-10-29): rubric scores are keyed by criterion, so a copy saved
+// before that is loaded again in full from the server rather than reused.
+var _BUNDLE_SCHEMA = 4;
 var _SAVED_COPY_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 var _classFresh = {}; // cid → the server confirmed or replaced this copy since it was shown
 var _dirtyMarked = {}; // cid → the saved copy has been flagged as holding local edits
@@ -4428,6 +4424,7 @@ function _loadCourseFromLS(cid) {
   _cache.studentProfileSummaries[cid] = _safeParseLS('gb-student-profile-summaries-' + cid, {});
   _cache.withdrawn[cid] = _safeParseLS('gb-withdrawn-' + cid, []);
   _cache.rubrics[cid] = _safeParseLS('gb-rubrics-' + cid, []);
+  _noteRubricsSet(cid);
   _cache.rubricChecks[cid] = _safeParseLS('gb-rubric-checks-' + cid, {});
 
   // Learning map: check localStorage first, then fall back to LEARNING_MAP constant
@@ -4581,6 +4578,7 @@ const _NORMALIZED_TABLES = {
 /* Helper: write to cache + sync */
 function _saveCourseField(field, cid, value) {
   _cache[field][cid] = value;
+  if (field === 'rubrics') _noteRubricsSet(cid);
   if (_PROF_FIELDS.includes(field) && typeof clearProfCache === 'function') clearProfCache();
   _markLocalWrite(field, cid);
   // Persist to localStorage (primary store in v2; remote writes happen through
@@ -4903,10 +4901,10 @@ function _reportScoreWriteFailure(rpc, error) {
   console.warn(rpc + ' failed:', error);
 }
 
-/* v2 per-cell / per-tag / per-criterion score write. Rubric grading UI writes
-   linked competency tag ids, while rubric_score requires criterion ids. Keep
-   tag writes authoritative for UI hydration and mirror to rubric_score only
-   when the tag has exactly one criterion owner.
+/* v2 per-cell / per-tag / per-criterion score write. Rubric work is scored
+   by criterion id (rubric_score); a competency key on rubric work is a stale
+   entry from before 2026-10-29 and sends nothing, so it can never reach a
+   criterion the teacher didn't touch.
 
    P6.4 audit (2026-05-01): every UI call site to upsertScore was traced and
    confirmed to pass (a) a truthy tid sourced from a tag column / data-tid /
@@ -4928,10 +4926,10 @@ function _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note, mod) {
   if ((_isSendableId(tid) || isUnlinkedTag(tid)) && intVal != null) {
     var assessment = _assessmentById(cid, aid);
     var criterion = _rubricCriterionById(cid, assessment, tid);
-    var criterionForTag = criterion ? null : _rubricCriterionForTag(cid, assessment, tid);
     var assessmentTagIds = (assessment && (assessment.tagIds || assessment.tag_ids)) || [];
     var isAssessmentTag = assessmentTagIds.indexOf(tid) >= 0;
     var isPoints = isPointsScored(assessment);
+    var isRubric = !isPoints && !!(assessment && (assessment.rubricId || assessment.rubric_id));
     var ops = [];
     var modifier = normalizeScoreMod(intVal, mod);
     // A criterion comment typed before the level was chosen waits in the
@@ -4951,7 +4949,10 @@ function _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note, mod) {
           p_beyond: criterionBeyond,
         },
       });
-    } else if (isPoints || isUnlinkedTag(tid) || (assessment && !isAssessmentTag && !criterionForTag)) {
+    } else if (isRubric) {
+      // Not one of the rubric's criteria: nothing to send.
+      return;
+    } else if (isPoints || isUnlinkedTag(tid) || (assessment && !isAssessmentTag)) {
       // An unlinked assessment's single score. On proficiency work 0 clears
       // it; on points and Complete/Incomplete work 0 is a score.
       var cellValue = isUnlinkedTag(tid) && intVal === 0 && !isPointsScored(assessment) ? null : intVal;
@@ -4961,36 +4962,17 @@ function _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note, mod) {
       if (!isPoints && cellValue != null) scoreParams.p_modifier = modifier;
       ops.push({ rpc: 'upsert_score', params: scoreParams });
     } else {
-      // The server rejects tag_score on rubric assessments; the rubric_score
-      // mirror below carries the value.
-      var isRubric = !!(assessment && (assessment.rubricId || assessment.rubric_id));
-      if (!isRubric) {
-        ops.push({
-          rpc: 'upsert_tag_score',
-          params: {
-            p_enrollment_id: sid,
-            p_assessment_id: aid,
-            p_tag_id: tid,
-            p_value: intVal,
-            p_modifier: modifier,
-            p_comment: criterionComment,
-          },
-        });
-      }
-      if (criterionForTag && _isSendableId(criterionForTag.id)) {
-        ops.push({
-          rpc: 'upsert_rubric_score',
-          params: {
-            p_enrollment_id: sid,
-            p_assessment_id: aid,
-            p_criterion_id: criterionForTag.id,
-            p_value: intVal,
-            p_modifier: modifier,
-            p_comment: criterionComment,
-            p_beyond: criterionBeyond,
-          },
-        });
-      }
+      ops.push({
+        rpc: 'upsert_tag_score',
+        params: {
+          p_enrollment_id: sid,
+          p_assessment_id: aid,
+          p_tag_id: tid,
+          p_value: intVal,
+          p_modifier: modifier,
+          p_comment: criterionComment,
+        },
+      });
     }
     ops.forEach(function (op) {
       _trackPendingSync(
@@ -8878,24 +8860,16 @@ function _persistNotesToCanonical(cid, prev, obj) {
    competency-keyed entries are dropped. It runs again when the class's
    rubrics change, so a rubric loaded later still moves its scores. */
 var _rubricKeyedScores = new WeakMap();
-function _rubricKeysSignature(cid) {
-  return (getRubrics(cid) || [])
-    .map(function (r) {
-      return (
-        r.id +
-        ':' +
-        (r.criteria || [])
-          .map(function (c) {
-            return c ? c.id + '=' + (c.tagIds || []).join('+') : '';
-          })
-          .join(',')
-      );
-    })
-    .join('|');
+// Counts up each time a class's rubrics are set (cache, save, load, re-key),
+// so a scores object moved under one set of rubrics is looked at again under
+// the next, and never otherwise.
+var _rubricsRev = {};
+function _noteRubricsSet(cid) {
+  _rubricsRev[cid] = (_rubricsRev[cid] || 0) + 1;
 }
 function _migrateRubricScoreKeys(cid, scores) {
   if (!scores || typeof scores !== 'object') return scores;
-  var sig = _rubricKeysSignature(cid);
+  var sig = _rubricsRev[cid] || 0;
   if (_rubricKeyedScores.get(scores) === sig) return scores;
   var byAssessment = {};
   (getAssessments(cid) || []).forEach(function (a) {
@@ -8922,10 +8896,9 @@ function _migrateRubricScoreKeys(cid, scores) {
         c.tagIds.forEach(function (t) {
           tagOwned[t] = true;
         });
-        var has = own.some(function (e) {
+        var has = own.find(function (e) {
           return e.tagId === c.id;
         });
-        if (has) return;
         var legacy = null;
         for (var i = 0; i < c.tagIds.length && !legacy; i++) {
           legacy =
@@ -8933,7 +8906,15 @@ function _migrateRubricScoreKeys(cid, scores) {
               return e.tagId === c.tagIds[i];
             }) || null;
         }
-        if (legacy) added.push(Object.assign({}, legacy, { id: aid + ':' + c.id, tagId: c.id }));
+        if (!legacy) return;
+        if (!has) {
+          added.push(Object.assign({}, legacy, { id: aid + ':' + c.id, tagId: c.id }));
+          return;
+        }
+        // The criterion's own entry wins; a note only the old entry holds moves.
+        ['critNote', 'critBeyond'].forEach(function (field) {
+          if (legacy[field] && !has[field]) has[field] = legacy[field];
+        });
       });
       own.forEach(function (e) {
         if (tagOwned[e.tagId]) drop.push(e);
@@ -8959,7 +8940,13 @@ function getScores(cid) {
 }
 function saveScores(cid, obj) {
   _applyIdRekeysToScores(cid, obj);
-  var prev = _loadPersistedCourseFieldSnapshot('scores', cid, (_cache.scores && _cache.scores[cid]) || {});
+  // The baseline is read in the same key space as the scores, or a copy
+  // saved with rubric scores under competencies would make every criterion
+  // look new and every competency key look removed (a clear on the server).
+  var prev = _migrateRubricScoreKeys(
+    cid,
+    _loadPersistedCourseFieldSnapshot('scores', cid, (_cache.scores && _cache.scores[cid]) || {}),
+  );
   var prevCount = prev ? Object.keys(prev).length : 0;
   var newCount = obj ? Object.keys(obj).length : 0;
   // Block catastrophic saves: if student-count drops >50%, refuse to save.
@@ -8996,7 +8983,7 @@ function saveScores(cid, obj) {
   var lsOk = _saveCourseField('scores', cid, obj);
   if (_writesEnabled()) {
     var refusals = _writeRefusals;
-    persistScoreDiffToCanonical(cid, _serverStateOr('scores', cid, prev), obj || {});
+    persistScoreDiffToCanonical(cid, _migrateRubricScoreKeys(cid, _serverStateOr('scores', cid, prev)), obj || {});
     _rememberServerState('scores', cid, obj || {});
     // A refused write's cell goes back in the baseline (_onWriteRefused).
     if (_writeRefusals !== refusals) return false;
