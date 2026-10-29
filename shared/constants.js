@@ -646,6 +646,10 @@ function getCoreCompetency(id) {
 }
 
 /* ── Traditional Gradebook — grading scale, points, weights ── */
+/* boundaries: the percent a points score needs for each proficiency.
+   percents: the percent each proficiency counts as in the course % (Counts
+   As). The default is level ÷ 4, so 3 is 75% (docs/DECISIONS.md,
+   "Proficiency percents"). */
 const DEFAULT_GRADING_SCALE = {
   boundaries: [
     { min: 86, proficiency: 4 },
@@ -653,6 +657,7 @@ const DEFAULT_GRADING_SCALE = {
     { min: 50, proficiency: 2 },
     { min: 0, proficiency: 1 },
   ],
+  percents: { 4: 100, 3: 75, 2: 50, 1: 25 },
   labels: null,
 };
 

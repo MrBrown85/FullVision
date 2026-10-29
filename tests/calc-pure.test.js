@@ -277,30 +277,20 @@ describe('calcProficiency', () => {
 });
 
 /* ── calcLetterGrade ──────────────────────────────────────── */
+// A level counts as its Counts As percent; with no class, the defaults,
+// level ÷ 4 (docs/DECISIONS.md, "Proficiency percents").
 describe('calcLetterGrade', () => {
-  it('returns A for 3.50+', () => {
-    expect(calcLetterGrade(3.5)).toEqual({ letter: 'A', pct: 89 });
-    expect(calcLetterGrade(4.0).letter).toBe('A');
-    expect(calcLetterGrade(4.0).pct).toBe(96);
+  it('counts a level as level ÷ 4 by default', () => {
+    expect(calcLetterGrade(4.0)).toEqual({ letter: 'A', pct: 100 });
+    expect(calcLetterGrade(3.5)).toEqual({ letter: 'A', pct: 87.5 });
+    expect(calcLetterGrade(3.0)).toEqual({ letter: 'B', pct: 75 });
+    expect(calcLetterGrade(2.5)).toEqual({ letter: 'C', pct: 62.5 });
+    expect(calcLetterGrade(2.0)).toEqual({ letter: 'C-', pct: 50 });
   });
 
-  it('returns B for 3.00-3.49', () => {
-    expect(calcLetterGrade(3.0)).toEqual({ letter: 'B', pct: 82 });
-    expect(calcLetterGrade(3.25).letter).toBe('B');
-  });
-
-  it('returns C+ for 2.00-2.99', () => {
-    expect(calcLetterGrade(2.0)).toEqual({ letter: 'C+', pct: 68 });
-    expect(calcLetterGrade(2.25).letter).toBe('C+');
-  });
-
-  it('returns C- for 1.25-1.99', () => {
-    expect(calcLetterGrade(1.25)).toEqual({ letter: 'C-', pct: 58.3 });
-  });
-
-  it('returns F for below 1.25', () => {
+  it('gives F at 0 and below 50%', () => {
     expect(calcLetterGrade(0)).toEqual({ letter: 'F', pct: 0 });
-    expect(calcLetterGrade(0.5).letter).toBe('F');
+    expect(calcLetterGrade(1.5).letter).toBe('F');
   });
 
   it('percentage increases monotonically with proficiency', () => {

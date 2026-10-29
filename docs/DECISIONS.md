@@ -8,7 +8,7 @@ Context: `grading-compliance-plan.md`. All implemented; see its status table.
 
 - **D1 Category weights must total exactly 100** to save. Not relative weights.
 - **D2 Per-assessment weight** (0.5×–3×) applies to proficiency work only; hidden on points and Complete/Incomplete work, labelled "Proficiency weight". _Superseded 2026-10-25 by the Factor below._
-- **D3 A proficiency level counts as level ÷ 4** toward a percentage (3 = 75%). Not the middle of a letter band.
+- **D3 A proficiency level counts as level ÷ 4** toward a percentage (3 = 75%). Not the middle of a letter band. _Superseded 2026-10-29 by Proficiency percents below: level ÷ 4 is now the default, and a class can change it._
 - **D4 Extra credit:** points work can score up to 2× its maximum; the course % can exceed 100.
 - **D5 No drop-lowest.** Skipped; low demand.
 - **D6 Rounding:** a class setting, whole number or one decimal; default whole for grades 10–12. The letter always comes from the % as shown.
@@ -23,6 +23,18 @@ Supersedes D2. Teachers asked for the multiplier back on points work (an assignm
 - **In the course %, its points earned and possible are multiplied by it:** 5/6 at 4 counts as 20/24. Proficiency work (level out of 4) and rubric points are multiplied the same way.
 - **Toward competencies and level averages, it counts that many times:** competency proficiency, category averages and group grades.
 - A gradebook column and its Class Average still show the assessment's own points (5/6), not the multiplied ones.
+
+## Proficiency percents (2026-10-29)
+
+Supersedes D3. Easton Su (History 12) was Proficient-ish everywhere and sat at 66%, while the class's own Points to Proficiency table says Proficient starts at 84%. Plan: `~/fullvision-rubric-weight-plan.md`.
+
+- **Each proficiency has a percent it counts as in the course %**, set per class under Points and Proficiency → Counts As (`course.grading_scale.percents`). The default is 100 / 75 / 50 / 25, level ÷ 4, so no class's grades move until a teacher changes it.
+- **A + or − is a third of the way to the next level's percent;** an average between levels is that far along. 3+ at 84 / 98 is 88.7%.
+- **It applies wherever a level becomes a percent:** proficiency work and standard 1–4 rubric criteria in the course %, the % a Letter or Both class shows for a level, printed and exported percents. A rubric criterion with its own point values keeps them. Competencies, level averages and the rubric overall stay on the 0–4 scale.
+- **Match Columns** fills Counts As from Points to Proficiency: Extending halfway from its start to 100, Proficient and Developing at their starts, Emerging at 50, the C- floor (Colin: "Near 50"), or half of Developing's start when that is 50 or lower.
+- **A Counts As value that reads back as another level is flagged, not blocked.** Each proficiency must count for more than the one below.
+- **Changing Counts As with a term already ended asks first:** it changes that term's % too, and there is no snapshot of issued reports.
+- `qToPercentage` (the old 55 / 68 / 82 table, reached only by `calcLetterGrade`) is gone; `calcLetterGrade` reads Counts As.
 
 ## New class defaults (2026-10-25)
 

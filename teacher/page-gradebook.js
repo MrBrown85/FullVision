@@ -202,7 +202,7 @@ window.PageGradebook = (function () {
     var letterData = _getStudentLetterData(cid, sid);
     if (letterData.R != null) return letterData.R;
     var overall = getOverallProficiency(cid, sid);
-    return overall > 0 ? Math.round((overall / 4) * 1000) / 10 : null;
+    return overall > 0 ? Math.round(levelToPercent(cid, overall) * 10) / 10 : null;
   }
 
   /* ══════════════════════════════════════════════════════════
@@ -1973,7 +1973,7 @@ window.PageGradebook = (function () {
     if (cell.kind === 'status') return cell.status;
     if (cell.kind === 'complete') return cell.mark === 'complete' ? 'Complete' : 'Incomplete';
     if (cell.kind === 'points') return formatPoints(cell.value);
-    if (cell.kind === 'level') return formatLevelAs(cell.value, 'proficiency');
+    if (cell.kind === 'level') return formatLevelAs(null, cell.value, 'proficiency');
     if (cell.kind === 'missing' && cell.zero) return '0';
     if (cell.kind === 'dibels') return cell.dibels ? cell.text : '';
     return '';
@@ -1984,7 +1984,7 @@ window.PageGradebook = (function () {
     if (!stats) return '';
     if (isCompletionScored(a)) return Math.round(stats.pct) + '%';
     if (isPointsScored(a)) return formatPoints(Math.round(stats.avg * 10) / 10);
-    return formatLevelAs(stats.avg, 'proficiency');
+    return formatLevelAs(null, stats.avg, 'proficiency');
   }
 
   function exportScoresCSV() {

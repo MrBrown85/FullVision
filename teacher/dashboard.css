@@ -5568,22 +5568,46 @@ label.cm-cr-row {
   gap: 6px;
 }
 .cm-pts-row {
+  display: grid;
+  grid-template-columns: 84px 170px auto;
+  align-items: center;
+  column-gap: 12px;
+  font-size: var(--text-sm);
+}
+.cm-pts-head {
+  color: var(--text-2);
+  font-weight: 600;
+}
+.cm-pts-cell {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: var(--text-sm);
 }
 .cm-pts-name {
-  width: 84px;
   color: var(--text);
 }
-.cm-pts-min {
+.cm-pts-min,
+.cm-pts-pct {
   width: 64px;
   text-align: center;
 }
 .cm-pts-unit,
 .cm-pts-below {
   color: var(--text-2);
+}
+.cm-pts-warn {
+  color: var(--score-1-text);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.cm-pts-error {
+  color: var(--score-1-text);
+  font-size: var(--text-sm);
+}
+.cm-pts-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 /* ── Questionnaires tab (teacher/cm-questionnaires.js; canvas 6b) ── */
