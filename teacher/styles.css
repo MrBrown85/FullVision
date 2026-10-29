@@ -767,22 +767,6 @@ body.offline-active #app-dock {
   flex: 1;
   min-width: 0;
 }
-.sb-add-student {
-  flex-shrink: 0;
-  width: var(--control-h);
-  height: var(--control-h);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text-2);
-  cursor: pointer;
-}
-.sb-add-student:hover {
-  color: var(--link);
-}
 .sb-sort {
   margin-top: 8px;
 }
