@@ -837,10 +837,7 @@ window.PageReports = (function () {
       warn.push(
         esc(c.summary.noComment.join(', ')) +
           (c.summary.noComment.length === 1 ? ' has' : ' have') +
-          (grade
-            ? ' no Teacher Comment. The report prints without one.'
-            : ' no Teacher Comment. The box prints with lines.') +
-          ' <button type="button" data-issue="write">Write them now</button>',
+          ' no Teacher Comment. The box prints with lines. <button type="button" data-issue="write">Write them now</button>',
       );
     }
     // Attendance is optional: a student without totals prints without the
@@ -1141,8 +1138,6 @@ window.PageReports = (function () {
       '<div class="gr-panel">' +
       '<h4>Include</h4>' +
       check('summary', 'Category Summary') +
-      check('attendance', 'Attendance') +
-      check('comment', 'Teacher Comment') +
       '<h4>Order</h4>' +
       '<div class="seg seg-sm" role="radiogroup" aria-label="Order">' +
       order('oldest', 'Oldest First') +

@@ -53,15 +53,11 @@ describe('options', () => {
   it('fills the defaults and keeps only known choices', () => {
     expect(G.options(null)).toEqual({
       summary: true,
-      attendance: true,
-      comment: true,
       order: 'oldest',
       name: 'preferred',
     });
-    expect(G.options({ summary: false, order: 'newest', name: 'first', junk: 1 })).toEqual({
+    expect(G.options({ summary: false, comment: true, order: 'newest', name: 'first', junk: 1 })).toEqual({
       summary: false,
-      attendance: true,
-      comment: true,
       order: 'newest',
       name: 'first',
     });

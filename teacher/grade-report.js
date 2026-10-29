@@ -2,8 +2,8 @@
    reads like the student printout from the old gradebook programs. The
    letterhead, one row per assessment this term (date, title, category,
    score, out of, percent or proficiency, and Missing, Late or Excused),
-   then a summary by category, the term grade, attendance and the teacher
-   comment.
+   then a summary by category, the term grade and the missing work. Grades
+   only: no comment, attendance or other feedback.
 
    Every student gets one sheet: the front, and the back when the front is
    full. When the rows don't fit, the table steps down to smaller rows, then
@@ -17,7 +17,7 @@ window.GradeReport = (function () {
   var PX_PER_IN = 96;
   var GAP = 12;
   var ROW_W = 720;
-  var DEFAULTS = { summary: true, attendance: true, comment: true, order: 'oldest', name: 'preferred' };
+  var DEFAULTS = { summary: true, order: 'oldest', name: 'preferred' };
   var WORDS = { 1: 'Emerging', 2: 'Developing', 3: 'Proficient', 4: 'Extending' };
   /* The table's sizes, largest first: row height and type in px, and
      whether each side holds two columns of rows. */
@@ -31,9 +31,7 @@ window.GradeReport = (function () {
   function options(saved) {
     var o = Object.assign({}, DEFAULTS);
     if (saved && typeof saved === 'object') {
-      ['summary', 'attendance', 'comment'].forEach(function (k) {
-        if (typeof saved[k] === 'boolean') o[k] = saved[k];
-      });
+      if (typeof saved.summary === 'boolean') o.summary = saved.summary;
       if (saved.order === 'newest' || saved.order === 'oldest') o.order = saved.order;
       if (saved.name === 'first' || saved.name === 'preferred') o.name = saved.name;
     }
@@ -225,9 +223,9 @@ window.GradeReport = (function () {
     );
   }
 
-  /* Everything after the table: the summary by category and term grade,
-     the attendance and missing work line, and the comment. */
-  function _tailHtml(cid, student, ctx, opts) {
+  /* Everything after the table: the summary by category, the term grade
+     and the missing work count. */
+  function _tailHtml(cid, student, opts) {
     var html = '';
     var term = studentGradeSummary(cid, student.id).text;
     if (opts.summary) {
@@ -255,31 +253,11 @@ window.GradeReport = (function () {
     }
     html +=
       '<div class="gr-term"><span>Term Grade</span><span class="gr-term-grade">' + esc(term || '—') + '</span></div>';
-    var facts = [];
-    var noAttendance = false;
-    if (opts.attendance) {
-      var att = getTermAttendance(cid, student.id, ctx.termId);
-      if (att.absences == null && att.lates == null) noAttendance = true;
-      else {
-        var n = function (v) {
-          return v == null ? '—' : String(v);
-        };
-        facts.push('Classes Absent: ' + n(att.absencesThisTerm));
-        facts.push('Times Late: ' + n(att.latesThisTerm));
-      }
-    }
     var missing = rows(cid, student, opts).filter(function (r) {
       return r.note === 'Missing';
     }).length;
-    facts.push('Missing Assignments: ' + missing);
-    html += '<div class="gr-facts">' + facts.map(esc).join('<span class="gr-dot">·</span>') + '</div>';
-    var noComment = false;
-    if (opts.comment) {
-      var comment = ReportBlocks.renderBlockTeacherNarrative(cid, student, ctx);
-      if (comment) html += comment;
-      else noComment = true;
-    }
-    return { html: '<div class="gr-tail">' + html + '</div>', noComment: noComment, noAttendance: noAttendance };
+    html += '<div class="gr-facts">Missing Assignments: ' + missing + '</div>';
+    return '<div class="gr-tail">' + html + '</div>';
   }
 
   /* ── Fitting ───────────────────────────────────────────────── */
@@ -343,13 +321,13 @@ window.GradeReport = (function () {
     var show = columnsFor(cid);
     var list = rows(cid, student, o);
     var letterhead = ReportBlocks.renderBlockHeader(cid, student, ctx, { name: o.name });
-    var tail = _tailHtml(cid, student, ctx, o);
+    var tail = _tailHtml(cid, student, o);
     var own = !opts.stage;
     var stage = opts.stage || _stage(document.body);
     var chosen = null;
     var p = null;
     try {
-      var sizes = { letterheadPx: _measure(stage, letterhead), tailPx: _measure(stage, tail.html) };
+      var sizes = { letterheadPx: _measure(stage, letterhead), tailPx: _measure(stage, tail) };
       for (var t = 0; t < TIERS.length; t++) {
         var tier = TIERS[t];
         // The header row and one row, measured at this tier.
@@ -369,15 +347,15 @@ window.GradeReport = (function () {
     var frontRows = list.slice(0, p.front);
     var backRows = list.slice(p.front, p.front + p.back);
     var cut = list.length - p.front - p.back;
-    var frontBody = letterhead + _sideTableHtml(frontRows, show, chosen) + (p.tailOnFront ? tail.html : '');
+    var frontBody = letterhead + _sideTableHtml(frontRows, show, chosen) + (p.tailOnFront ? tail : '');
     var backBody =
       _sideTableHtml(backRows, show, chosen) +
       (cut > 0 ? '<div class="gr-cut">' + cut + ' more not shown: they do not fit on one sheet.</div>' : '') +
-      tail.html;
+      tail;
     var sides = p.tailOnFront ? 1 : 2;
     var over = cut > 0;
     var name = fullName(student);
-    var badge = over ? 'Too long' : tail.noComment ? 'No comment' : '1 sheet';
+    var badge = over ? 'Too long' : '1 sheet';
     var html =
       '<div class="sheet-student" data-action="fitMapPick" data-sid="' +
       esc(student.id) +
@@ -385,7 +363,7 @@ window.GradeReport = (function () {
       '<div class="sheet-student-head no-print"><span class="sheet-student-name">' +
       esc(name) +
       '</span><span class="sheet-badge ' +
-      (over ? 'over' : tail.noComment ? 'none' : 'ok') +
+      (over ? 'over' : 'ok') +
       '">' +
       badge +
       '</span></div>' +
@@ -412,8 +390,8 @@ window.GradeReport = (function () {
       free: [],
       commentLines: 0,
       room: 0,
-      noComment: tail.noComment,
-      noAttendance: tail.noAttendance,
+      noComment: false,
+      noAttendance: false,
       badge: badge,
       tier: chosen.key,
       rows: list.length,
