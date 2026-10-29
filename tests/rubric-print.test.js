@@ -467,6 +467,73 @@ describe('Tag and General Rubrics', () => {
   });
 });
 
+describe('Score sheets for points and Complete/Incomplete work', () => {
+  const AID_PTS = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1';
+  const AID_CI = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2';
+  beforeEach(() => {
+    saveAssessments(CID, [
+      {
+        id: AID_PTS,
+        title: 'Quiz 3',
+        date: '2026-10-10',
+        type: 'summative',
+        scoreMode: 'points',
+        maxPoints: 20,
+        tagIds: [],
+      },
+      { id: AID_CI, title: 'Reading log', date: '2026-10-11', type: 'formative', scoreMode: 'complete', tagIds: [] },
+    ]);
+    saveScores(CID, {
+      [SID]: [
+        {
+          id: 'p1',
+          assessmentId: AID_PTS,
+          tagId: 'overall',
+          score: 18,
+          date: '2026-10-10',
+          type: 'summative',
+          note: 'Check question 4.',
+        },
+        { id: 'c1', assessmentId: AID_CI, tagId: 'overall', score: 1, date: '2026-10-11', type: 'formative', note: '' },
+      ],
+      [SID2]: [
+        { id: 'c2', assessmentId: AID_CI, tagId: 'overall', score: 0, date: '2026-10-11', type: 'formative', note: '' },
+      ],
+    });
+  });
+
+  it('prints the points, out of the most, the percent and the feedback', () => {
+    const data = RubricPrint.sheetData(CID, AID_PTS, SID);
+    expect(data.scoreOnly).toBe(true);
+    expect(data.overall).toMatchObject({ text: '18 / 20', word: '90%' });
+    const html = RubricPrint.renderSheet(data, RubricPrint.DEFAULT_OPTIONS);
+    expect(html).toContain('Score');
+    expect(html).toContain('18 / 20');
+    expect(html).toContain('Check question 4.');
+    expect(html).not.toContain('rubric-table');
+  });
+
+  it('prints Complete or Incomplete, and an Incomplete counts as scored', () => {
+    expect(RubricPrint.sheetData(CID, AID_CI, SID).overall.text).toBe('Complete');
+    expect(RubricPrint.sheetData(CID, AID_CI, SID2).overall.text).toBe('Incomplete');
+    expect(RubricPrint.isStudentScored(CID, AID_CI, SID2)).toBe(true);
+    expect(RubricPrint.isStudentScored(CID, AID_PTS, SID2)).toBe(false);
+  });
+
+  it('leaves the score off when not included, and prints a sheet per scored student', () => {
+    const opts = Object.assign({}, RubricPrint.DEFAULT_OPTIONS, {
+      include: Object.assign({}, RubricPrint.DEFAULT_OPTIONS.include, { overall: false }),
+    });
+    expect(RubricPrint.renderSheet(RubricPrint.sheetData(CID, AID_PTS, SID), opts)).not.toContain('18 / 20');
+    const out = RubricPrint.renderPages(
+      CID,
+      AID_CI,
+      Object.assign({}, RubricPrint.DEFAULT_OPTIONS, { students: 'scored' }),
+    );
+    expect(out.sheets).toBe(2);
+  });
+});
+
 describe('Print Rubrics layout for picked students', () => {
   it('is a full page for one, two to a page for two, four to a page for three or more', () => {
     expect(RubricPrint.layoutForCount(1)).toBe('full');

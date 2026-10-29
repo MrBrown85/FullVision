@@ -13,6 +13,10 @@
    line between sheets. Descriptors shrink by layout; a sheet whose content
    doesn't fit its box is clipped, and the dialog says so before printing.
 
+   Points and Complete/Incomplete work print a score sheet instead: the
+   student's points and percent, or their Complete or Incomplete mark, and
+   the feedback, with no rubric grid. Same window, same layouts.
+
    An assessment with no rubric of its own prints one too: a Tag Rubric, a
    row per competency it is scored on, or a General Rubric, one Overall row
    when it has none. Their level cells read the teacher's own wording for a
@@ -246,6 +250,7 @@
      `nameStyle` picks the name at the top (printName). */
   function sheetData(cid, aid, sid, nameStyle) {
     var assessment = _assessment(cid, aid);
+    if (assessment && isPointsScored(assessment)) return scoreSheetData(cid, aid, sid, nameStyle);
     var rubric = _rubric(cid, assessment);
     var student = getStudents(cid).find(function (s) {
       return s && s.id === sid;
@@ -307,6 +312,54 @@
       feedback: _feedbackText(cid, sid, aid, entries),
       // An Advanced Rubric's ticked checkboxes for this student.
       ticked: typeof getRubricCheckIds === 'function' ? getRubricCheckIds(cid, sid, aid) : [],
+    };
+  }
+
+  /* The score a points or Complete/Incomplete sheet shows: "18 / 20" and
+     "90%", or "Complete" / "Incomplete". Null when there is no score. */
+  function _scoreOverall(cid, sid, assessment) {
+    if (isCompletionScored(assessment)) {
+      var mark = getCompletionMark(cid, sid, assessment.id);
+      if (!mark) return null;
+      return { value: mark === 'complete' ? 1 : 0, text: mark === 'complete' ? 'Complete' : 'Incomplete', word: '' };
+    }
+    var points = getPointsScore(cid, sid, assessment.id);
+    if (points == null) return null;
+    var max = Number(assessment.maxPoints) || 0;
+    return {
+      value: points,
+      text: formatPoints(points) + (max > 0 ? ' / ' + formatPoints(max) : ''),
+      word: max > 0 ? formatPointsPercent(points, max) : '',
+    };
+  }
+
+  /* One student's score sheet on points or Complete/Incomplete work. */
+  function scoreSheetData(cid, aid, sid, nameStyle) {
+    var assessment = _assessment(cid, aid);
+    var student = getStudents(cid).find(function (s) {
+      return s && s.id === sid;
+    });
+    if (!assessment || !student) return null;
+    var entries = (getScores(cid)[sid] || []).filter(function (e) {
+      return e && e.assessmentId === aid;
+    });
+    var status = typeof getAssignmentStatus === 'function' ? getAssignmentStatus(cid, sid, aid) : null;
+    var overall = _scoreOverall(cid, sid, assessment);
+    return {
+      cid: cid,
+      scoreOnly: true,
+      courseName: _courseName(cid),
+      assessment: assessment,
+      rubric: null,
+      student: student,
+      studentName: printName(student, nameStyle || DEFAULT_OPTIONS.nameStyle),
+      date: assessment.date ? formatDate(assessment.date) : '',
+      status: status === 'NS' ? 'Missing' : status === 'EXC' ? 'Excused' : status === 'LATE' ? 'Late' : '',
+      scored: !!overall,
+      rows: [],
+      overall: overall,
+      feedback: _feedbackText(cid, sid, aid, entries),
+      ticked: [],
     };
   }
 
@@ -382,6 +435,11 @@
 
   function isStudentScored(cid, aid, sid) {
     var assessment = _assessment(cid, aid);
+    if (assessment && isPointsScored(assessment)) {
+      return (getScores(cid)[sid] || []).some(function (e) {
+        return e && e.assessmentId === aid && isScoreEntered(assessment, e);
+      });
+    }
     var rubric = _rubric(cid, assessment);
     if (!rubric) return false;
     var entries = getScores(cid)[sid] || [];
@@ -517,7 +575,9 @@
     html += '</div>';
     if (include.overall && data.overall) {
       html +=
-        '<div class="rubric-overall"><span class="rubric-label">Overall</span><span class="rubric-overall-value">' +
+        '<div class="rubric-overall"><span class="rubric-label">' +
+        (data.scoreOnly ? (isCompletionScored(data.assessment) ? 'Mark' : 'Score') : 'Overall') +
+        '</span><span class="rubric-overall-value">' +
         _esc(data.overall.text) +
         '</span>' +
         (data.overall.word ? '<span class="rubric-overall-word">' + _esc(data.overall.word) + '</span>' : '') +
@@ -527,6 +587,7 @@
     }
     html += '</div>';
 
+    if (data.scoreOnly) return html + _feedbackHtml(data, include) + '</div></div>';
     if (_isSinglePoint(data.rubric)) {
       html += _singlePointTableHtml(data, include);
       return html + _feedbackHtml(data, include) + '</div></div>';
@@ -864,6 +925,7 @@
     var blank = opts.mode === 'blank';
     var rubric = _jobRubric(cid, aid, opts);
     var students = getStudents(cid);
+    if (_state.scoreOnly) return _scoreDialogHtml(cid, aid, opts, students);
     var html = '<div class="confirm-card rubric-print-card">';
     html += '<div class="confirm-title" id="rp-title">Print Rubrics</div>';
     html +=
@@ -916,33 +978,7 @@
         _copies(opts.copies) +
         '"></label>';
     } else {
-      var scoredCount = students.filter(function (s) {
-        return isStudentScored(cid, aid, s.id);
-      }).length;
-      html += '<fieldset class="rp-group"><legend>Students</legend>';
-      html += _radio(
-        'rp-students',
-        'scored',
-        opts.students === 'scored',
-        'All Scored Students',
-        '(' + scoredCount + ')',
-      );
-      html += _radio('rp-students', 'all', opts.students === 'all', 'All Students', '(' + students.length + ')');
-      html += _radio('rp-students', 'pick', opts.students === 'pick', 'Pick Students');
-      // Always shown: ticking a name switches to Pick Students.
-      html += '<div class="rp-pick">';
-      students.forEach(function (s) {
-        html +=
-          '<label class="rp-option rp-pick-option"><input type="checkbox" data-pick="' +
-          _esc(s.id) +
-          '"' +
-          (opts.picked.indexOf(s.id) >= 0 ? ' checked' : '') +
-          '><span>' +
-          _esc(displayName(s)) +
-          (isStudentScored(cid, aid, s.id) ? '' : ' <span class="rp-help">not scored</span>') +
-          '</span></label>';
-      });
-      html += '</div></fieldset>';
+      html += _studentsGroupHtml(cid, aid, opts, students);
     }
 
     html += '<fieldset class="rp-group"><legend>Rubrics per Page</legend><div class="rp-tiles is-three">';
@@ -952,13 +988,7 @@
     });
     html += '</div></fieldset>';
 
-    if (!blank) {
-      html += '<fieldset class="rp-group"><legend>Name</legend>';
-      html += _radio('rp-name', 'preferred', opts.nameStyle !== 'first', 'Preferred Name', '(first name if none)');
-      html += _radio('rp-name', 'first', opts.nameStyle === 'first', 'First Name');
-      html += '<div class="rp-help">The last name always follows.</div>';
-      html += '</fieldset>';
-    }
+    if (!blank) html += _nameGroupHtml(opts);
 
     var includes = '';
     if (!blank) {
@@ -978,8 +1008,47 @@
     if (_isAdvancedRubric(rubric)) includes += _check('checks', opts.include.checks, 'Checkboxes');
     if (includes) html += '<fieldset class="rp-group"><legend>Include</legend>' + includes + '</fieldset>';
     html += '</div>';
+    html += _sideAndActionsHtml();
+    return html;
+  }
 
-    html +=
+  /* Who to print: all scored, everyone, or the students ticked. */
+  function _studentsGroupHtml(cid, aid, opts, students) {
+    var html = '';
+    var scoredCount = students.filter(function (s) {
+      return isStudentScored(cid, aid, s.id);
+    }).length;
+    html += '<fieldset class="rp-group"><legend>Students</legend>';
+    html += _radio('rp-students', 'scored', opts.students === 'scored', 'All Scored Students', '(' + scoredCount + ')');
+    html += _radio('rp-students', 'all', opts.students === 'all', 'All Students', '(' + students.length + ')');
+    html += _radio('rp-students', 'pick', opts.students === 'pick', 'Pick Students');
+    // Always shown: ticking a name switches to Pick Students.
+    html += '<div class="rp-pick">';
+    students.forEach(function (s) {
+      html +=
+        '<label class="rp-option rp-pick-option"><input type="checkbox" data-pick="' +
+        _esc(s.id) +
+        '"' +
+        (opts.picked.indexOf(s.id) >= 0 ? ' checked' : '') +
+        '><span>' +
+        _esc(displayName(s)) +
+        (isStudentScored(cid, aid, s.id) ? '' : ' <span class="rp-help">not scored</span>') +
+        '</span></label>';
+    });
+    html += '</div></fieldset>';
+    return html;
+  }
+
+  function _nameGroupHtml(opts) {
+    var html = '<fieldset class="rp-group"><legend>Name</legend>';
+    html += _radio('rp-name', 'preferred', opts.nameStyle !== 'first', 'Preferred Name', '(first name if none)');
+    html += _radio('rp-name', 'first', opts.nameStyle === 'first', 'First Name');
+    html += '<div class="rp-help">The last name always follows.</div>';
+    return html + '</fieldset>';
+  }
+
+  function _sideAndActionsHtml() {
+    var html =
       '<div class="rp-side"><div class="rp-legend">Preview</div>' +
       '<div class="rp-preview" id="rp-preview" aria-hidden="true"></div>' +
       '<div class="rp-preview-count" id="rp-preview-count"></div>' +
@@ -988,19 +1057,52 @@
     html +=
       '<div class="confirm-actions"><button type="button" class="confirm-cancel" data-rp="cancel">Cancel</button>';
     html += '<button type="button" class="confirm-ok primary" data-rp="print">Print</button></div>';
+    return html + '</div>';
+  }
+
+  /* The window for points and Complete/Incomplete work: students, sheets
+     per page, name and what to include. No blank copies: a score sheet
+     without a score is empty. */
+  function _scoreDialogHtml(cid, aid, opts, students) {
+    var assessment = _assessment(cid, aid);
+    var complete = isCompletionScored(assessment);
+    var html = '<div class="confirm-card rubric-print-card">';
+    html += '<div class="confirm-title" id="rp-title">Print Scores</div>';
+    html +=
+      '<div class="confirm-message">' +
+      _esc((assessment && assessment.title) || 'Untitled') +
+      ' · ' +
+      (complete ? 'Complete or Incomplete' : 'Out of ' + _esc(formatPoints(Number(assessment.maxPoints) || 0))) +
+      '</div>';
+    html += '<div class="rp-body"><div class="rp-groups">';
+    html += _studentsGroupHtml(cid, aid, opts, students);
+    html += '<fieldset class="rp-group"><legend>Sheets per Page</legend><div class="rp-tiles is-three">';
+    LAYOUT_ORDER.forEach(function (key) {
+      var layout = LAYOUTS[key];
+      html += _tile('rp-layout', key, opts.layout === key, layout.tile, layout.tileHelp, _pageDrawing(layout));
+    });
+    html += '</div></fieldset>';
+    html += _nameGroupHtml(opts);
+    html +=
+      '<fieldset class="rp-group"><legend>Include</legend>' +
+      _check('overall', opts.include.overall, complete ? 'Mark' : 'Score') +
+      _check('feedback', opts.include.feedback, 'Feedback Comment') +
+      '</fieldset>';
     html += '</div>';
+    html += _sideAndActionsHtml();
     return html;
   }
 
-  function _statusText(out, blank) {
+  function _statusText(out, blank, scoreOnly) {
     if (!out.sheets) return blank ? 'Nothing to print.' : 'No students selected.';
+    var noun = scoreOnly ? 'score sheet' : 'rubric';
     var sheets = blank
       ? out.sheets === 1
         ? '1 blank rubric'
         : out.sheets + ' blank rubrics'
       : out.sheets === 1
-        ? '1 rubric'
-        : out.sheets + ' rubrics';
+        ? '1 ' + noun
+        : out.sheets + ' ' + noun + 's';
     var pages = out.pages === 1 ? '1 page' : out.pages + ' pages';
     var text = sheets + ' on ' + pages + '. Black and white, ready for the photocopier.';
     if (out.scale < 1) text += ' Text is reduced to ' + Math.round(out.scale * 100) + '% to fit.';
@@ -1047,7 +1149,7 @@
     var out = stage(_state.cid, _state.aid, _state.opts);
     var status = document.getElementById('rp-status');
     if (status) {
-      status.textContent = _statusText(out, blank);
+      status.textContent = _statusText(out, blank, !!_state.scoreOnly);
       status.classList.toggle('is-warning', out.overflowing > 0);
     }
     _drawPreview(out);
@@ -1130,8 +1232,9 @@
     close();
     var assessment = aid ? _assessment(cid, aid) : null;
     var rubricId = openOpts.rubricId || (assessment && assessment.rubricId) || null;
+    var scoreOnly = !!assessment && isPointsScored(assessment);
     var rubric = assessment ? _rubric(cid, assessment) : rubricId ? getRubricById(cid, rubricId) : null;
-    if (!rubric) return;
+    if (!rubric && !scoreOnly) return;
     // A rubric of the teacher's own can be printed for any assessment that
     // uses it; a Tag or General Rubric belongs to its one assessment.
     var uses = openOpts.blankOnly ? [] : rubricId ? usesOf(cid, rubricId) : assessment ? [assessment] : [];
@@ -1159,6 +1262,7 @@
       aid: aid,
       rubricId: rubricId,
       uses: uses,
+      scoreOnly: scoreOnly,
       opts: opts,
       userLayout: userLayout,
       trigger: document.activeElement,
@@ -1268,6 +1372,7 @@
     defaultRubric: defaultRubric,
     GENERAL_LEVELS: GENERAL_LEVELS,
     sheetData: sheetData,
+    scoreSheetData: scoreSheetData,
     blankSheetData: blankSheetData,
     usesOf: usesOf,
     MAX_COPIES: MAX_COPIES,
