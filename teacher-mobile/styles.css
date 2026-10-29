@@ -248,13 +248,17 @@ body.fv-switching-course::after {
   font-size: 17px;
   font-weight: 600;
   color: var(--text);
-  opacity: 0;
   transition: opacity 0.2s;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.m-nav-bar-scrolled .m-nav-bar-title-inline {
+/* A bar over a large title fades its title in on scroll. Other bars (the
+   grading screen, the student page) always show it. */
+.m-screen:has(.m-title-large) .m-nav-bar-title-inline {
+  opacity: 0;
+}
+.m-screen:has(.m-title-large) .m-nav-bar-scrolled .m-nav-bar-title-inline {
   opacity: 1;
 }
 .m-nav-bar-actions {
