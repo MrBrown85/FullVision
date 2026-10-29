@@ -824,6 +824,174 @@
   background: var(--btn-hover-blue);
 }
 
+/* Edit Student (layout B): the name, record, contact and language support
+   on the left, every designation on the right. Fills, not lines; black
+   text; 44 px targets. Unchosen rows use the grader tiles' see-through
+   fill so dark mode keeps working. */
+.edit-modal.es-modal {
+  width: 880px;
+  max-width: 94vw;
+  max-height: 92vh;
+  overflow: hidden;
+  box-sizing: border-box;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.es-modal .edit-modal-title {
+  margin: 0;
+  font-size: 22px;
+}
+.es-sub {
+  margin-top: 4px;
+  font-size: var(--text-md);
+  color: var(--text);
+}
+/* On a short screen the fields scroll between the title and the buttons,
+   so Save stays in view. */
+.es-cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 28px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  margin: -4px;
+  padding: 4px;
+}
+.es-col {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.es-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.es-h {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+.es-hint {
+  margin-top: -8px;
+  font-size: 14px;
+  color: var(--text);
+}
+.es-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.es-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.es-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.es-req {
+  font-weight: 400;
+}
+.es-input {
+  height: 44px;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0 12px;
+  border: 1px solid rgba(118, 118, 128, 0.6);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+}
+.es-input:focus {
+  outline: none;
+  border: 2px solid var(--active);
+  padding: 0 11px;
+}
+/* !important to beat the app-wide blue input:focus (styles.css), which the
+   field has while it waits for a fix. */
+.es-input.es-bad,
+.es-input.es-bad:focus {
+  border: 2px solid var(--score-1) !important;
+  box-shadow: none !important;
+  padding: 0 11px;
+}
+.es-err {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--score-1);
+}
+.es-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.es-toggle {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 14px;
+  border: none;
+  border-radius: 10px;
+  background: rgba(118, 118, 128, 0.08);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+.es-toggle:hover {
+  background: rgba(118, 118, 128, 0.14);
+}
+.es-toggle[aria-pressed='true'] {
+  background: var(--active);
+  color: #fff;
+  font-weight: 600;
+}
+.es-code {
+  min-width: 20px;
+  flex-shrink: 0;
+  font-weight: 700;
+}
+.es-modal .edit-modal-actions {
+  margin-top: 0;
+  gap: 12px;
+}
+.es-modal .edit-modal-actions .btn-primary,
+.es-cancel {
+  min-height: 44px;
+  min-width: 100px;
+  padding: 0 20px;
+  border-radius: 10px;
+  font-size: 15px;
+}
+.es-cancel {
+  border: none;
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.es-cancel:hover {
+  background: var(--bg-secondary);
+}
+@media (max-width: 760px) {
+  .es-cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .desig-check-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

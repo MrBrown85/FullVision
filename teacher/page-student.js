@@ -185,77 +185,128 @@ window.PageStudent = (function () {
       if (e.target === overlay) closeEditStudent();
     };
 
+    // A field: label over a 44 px box; `extra` is the input's other attributes.
+    function field(id, label, value, extra, tail) {
+      return (
+        '<div class="es-field"><label class="es-label" for="' +
+        id +
+        '">' +
+        label +
+        '</label><input class="es-input" id="' +
+        id +
+        '" value="' +
+        esc(value || '') +
+        '"' +
+        (extra || '') +
+        '>' +
+        (tail || '') +
+        '</div>'
+      );
+    }
+    // A designation or support flag as a row that turns blue when chosen.
+    function toggles(map) {
+      return Object.entries(map)
+        .map(function (e) {
+          var on = (st.designations || []).indexOf(e[0]) >= 0;
+          return (
+            '<button type="button" class="es-toggle" data-action="toggleEditDesig" data-code="' +
+            e[0] +
+            '" aria-pressed="' +
+            on +
+            '" title="' +
+            esc(e[1].desc || '') +
+            '"><span class="es-code">' +
+            e[0] +
+            '</span><span>' +
+            esc(e[1].name) +
+            '</span></button>'
+          );
+        })
+        .join('');
+    }
+    var emailHint = ' type="email" placeholder="No email on file"';
+    var errLine = function (id, text) {
+      return '<div class="es-err" id="' + id + '-err" hidden>' + text + '</div>';
+    };
+    var badEmail = 'Enter an email address, or leave it blank.';
+
     overlay.innerHTML =
-      '<div class="edit-modal">' +
-      '<h2 class="edit-modal-title" id="edit-modal-heading">Edit Student</h2>' +
-      '<div class="edit-modal-form">' +
-      '<div class="cm-field"><label class="cm-label" for="edit-first">First Name *</label><input class="cm-input" id="edit-first" value="' +
-      esc(st.firstName || '') +
-      '" aria-required="true" style="font-size:0.875rem;padding:6px 10px"></div>' +
-      '<div class="cm-field"><label class="cm-label" for="edit-last">Last Name</label><input class="cm-input" id="edit-last" value="' +
-      esc(st.lastName || '') +
-      '" style="font-size:0.875rem;padding:6px 10px"></div>' +
-      '<div class="cm-field"><label class="cm-label" for="edit-pref">Preferred Name</label><input class="cm-input" id="edit-pref" value="' +
-      esc(st.preferred || '') +
-      '" style="font-size:0.875rem;padding:6px 10px"></div>' +
-      '<div class="cm-field"><label class="cm-label" for="edit-pro">Pronouns</label>' +
-      pronounsSelect('edit-pro', st.pronouns || '') +
+      '<div class="edit-modal es-modal">' +
+      '<div class="es-head"><h2 class="edit-modal-title" id="edit-modal-heading">Edit Student</h2>' +
+      '<div class="es-sub">' +
+      esc(fullName(st)) +
+      '</div></div>' +
+      '<div class="es-cols"><div class="es-col">' +
+      '<section class="es-sec"><h3 class="es-h">Name</h3>' +
+      field(
+        'edit-first',
+        'First Name <span class="es-req">(Required)</span>',
+        st.firstName,
+        ' aria-required="true" aria-describedby="edit-first-err"',
+        errLine('edit-first', 'Enter a first name.'),
+      ) +
+      field('edit-last', 'Last Name', st.lastName) +
+      '<div class="es-row">' +
+      field('edit-pref', 'Preferred Name', st.preferred) +
+      '<div class="es-field"><label class="es-label" for="edit-pro">Pronouns</label><select class="es-input" id="edit-pro">' +
+      '<option value="">Not Set</option>' +
+      PRONOUNS_OPTIONS.map(function (pr) {
+        return '<option' + (pr === st.pronouns ? ' selected' : '') + '>' + esc(pr) + '</option>';
+      }).join('') +
+      '</select></div></div></section>' +
+      '<section class="es-sec"><h3 class="es-h">School Record</h3><div class="es-row">' +
+      field('edit-num', 'Student Number', st.studentNumber) +
+      field('edit-dob', 'Date of Birth', st.dateOfBirth, ' type="date"') +
+      '</div></section>' +
+      '<section class="es-sec"><h3 class="es-h">Contact</h3>' +
+      field(
+        'edit-email',
+        'Student Email',
+        st.email,
+        emailHint + ' aria-describedby="edit-email-err"',
+        errLine('edit-email', badEmail),
+      ) +
+      field(
+        'edit-g0',
+        'Parent Email',
+        '',
+        emailHint + ' aria-describedby="edit-g0-err"',
+        errLine('edit-g0', badEmail),
+      ) +
+      field(
+        'edit-g1',
+        'Parent Email 2',
+        '',
+        emailHint + ' aria-describedby="edit-g1-err"',
+        errLine('edit-g1', badEmail),
+      ) +
+      '</section>' +
+      '<section class="es-sec"><h3 class="es-h">Language Support</h3><div class="es-list" role="group" aria-label="Language Support">' +
+      toggles(SUPPORT_FLAGS) +
+      '</div></section>' +
       '</div>' +
-      '<div class="cm-field"><label class="cm-label" for="edit-num">Student Number</label><input class="cm-input" id="edit-num" value="' +
-      esc(st.studentNumber || '') +
-      '" placeholder="e.g. STU-101" style="font-size:0.875rem;padding:6px 10px"></div>' +
-      '<div class="cm-field"><label class="cm-label" for="edit-email">Email</label><input class="cm-input" id="edit-email" type="email" value="' +
-      esc(st.email || '') +
-      '" placeholder="student@school.edu" style="font-size:0.875rem;padding:6px 10px"></div>' +
-      '<div class="cm-field"><label class="cm-label" for="edit-dob">Date of Birth</label><input class="cm-input" id="edit-dob" type="date" value="' +
-      (st.dateOfBirth || '') +
-      '" style="font-size:0.875rem;padding:6px 10px"></div>' +
-      '<div class="cm-field" style="grid-column:1/-1"><label class="cm-label">Designations</label><div class="desig-check-grid">' +
-      Object.entries(BC_DESIGNATIONS)
-        .map(function (e) {
-          var checked = (st.designations || []).indexOf(e[0]) >= 0 ? ' checked' : '';
-          return (
-            '<label class="desig-check-item" title="' +
-            esc(e[1].desc || '') +
-            '"><input type="checkbox" class="desig-check" value="' +
-            e[0] +
-            '"' +
-            checked +
-            '><span class="desig-check-code">' +
-            e[0] +
-            '</span><span class="desig-check-name">' +
-            esc(e[1].name) +
-            '</span></label>'
-          );
-        })
-        .join('') +
-      '</div></div>' +
-      '<div class="cm-field" style="grid-column:1/-1"><label class="cm-label">Language Support</label><div class="desig-check-grid">' +
-      Object.entries(SUPPORT_FLAGS)
-        .map(function (e) {
-          var checked = (st.designations || []).indexOf(e[0]) >= 0 ? ' checked' : '';
-          return (
-            '<label class="desig-check-item" title="' +
-            esc(e[1].desc || '') +
-            '"><input type="checkbox" class="desig-check" value="' +
-            e[0] +
-            '"' +
-            checked +
-            '><span class="desig-check-code">' +
-            e[0] +
-            '</span><span class="desig-check-name">' +
-            esc(e[1].name) +
-            '</span></label>'
-          );
-        })
-        .join('') +
-      '</div></div>' +
+      '<section class="es-sec"><h3 class="es-h">Designations</h3><div class="es-hint">Ministry designations. Tap each that applies.</div>' +
+      '<div class="es-list" role="group" aria-label="Designations">' +
+      toggles(BC_DESIGNATIONS) +
+      '</div></section>' +
       '</div>' +
       '<div class="edit-modal-actions">' +
-      '<button class="btn-ghost" data-action="closeEditStudent">Cancel</button>' +
-      '<button class="btn-primary" data-action="saveEditStudent">Update</button>' +
+      '<button class="es-cancel" data-action="closeEditStudent">Cancel</button>' +
+      '<button class="btn-primary" data-action="saveEditStudent">Save</button>' +
       '</div>' +
       '</div>';
+
+    // Parent emails come from the class's guardians, loaded once per class.
+    overlay._guardianEmails = ['', ''];
+    if (window.DashClassManager && DashClassManager.guardianEmails) {
+      DashClassManager.guardianEmails(cid, st.id).then(function (emails) {
+        overlay._guardianEmails = emails;
+        ['edit-g0', 'edit-g1'].forEach(function (id, i) {
+          var inp = document.getElementById(id);
+          if (inp && !inp.value && document.activeElement !== inp) inp.value = emails[i];
+        });
+      });
+    }
 
     document.body.appendChild(overlay);
     document.getElementById('edit-first').focus();
@@ -263,6 +314,21 @@ window.PageStudent = (function () {
       if (e.key === 'Escape') closeEditStudent();
     };
     document.addEventListener('keydown', overlay._escHandler);
+  }
+
+  // Marks a field as needing a fix: a red edge and the line under it, until
+  // it is typed in.
+  function _editFieldError(el) {
+    var msg = document.getElementById(el.id + '-err');
+    el.classList.add('es-bad');
+    el.setAttribute('aria-invalid', 'true');
+    if (msg) msg.hidden = false;
+    el.oninput = function () {
+      el.classList.remove('es-bad');
+      el.removeAttribute('aria-invalid');
+      if (msg) msg.hidden = true;
+    };
+    el.focus();
   }
 
   function closeEditStudent() {
@@ -277,23 +343,29 @@ window.PageStudent = (function () {
     var cid = activeCourse;
     var firstEl = document.getElementById('edit-first');
     var firstName = (firstEl.value || '').trim();
-    if (!firstName) {
-      firstEl.style.border = '2px solid var(--score-1)';
-      firstEl.placeholder = 'First name is required';
-      firstEl.oninput = function () {
-        this.style.border = '';
-      };
-      firstEl.focus();
-      return;
-    }
+    if (!firstName) return _editFieldError(firstEl);
+    var bad = ['edit-email', 'edit-g0', 'edit-g1']
+      .map(function (id) {
+        return document.getElementById(id);
+      })
+      .find(function (el) {
+        return el.value.trim() && !el.checkValidity();
+      });
+    if (bad) return _editFieldError(bad);
     var lastName = (document.getElementById('edit-last').value || '').trim();
     var preferred = (document.getElementById('edit-pref').value || '').trim();
     var pronouns = (document.getElementById('edit-pro').value || '').trim();
     var studentNumber = (document.getElementById('edit-num').value || '').trim();
     var email = (document.getElementById('edit-email').value || '').trim();
     var dateOfBirth = (document.getElementById('edit-dob').value || '').trim();
-    var designations = Array.from(document.querySelectorAll('.desig-check:checked')).map(function (cb) {
-      return cb.value;
+    var designations = Array.from(document.querySelectorAll('#edit-modal-overlay .es-toggle[aria-pressed="true"]')).map(
+      function (btn) {
+        return btn.dataset.code;
+      },
+    );
+    var overlay = document.getElementById('edit-modal-overlay');
+    var parentEmails = ['edit-g0', 'edit-g1'].map(function (id) {
+      return document.getElementById(id).value.trim();
     });
 
     var students = getStudents(cid);
@@ -314,6 +386,13 @@ window.PageStudent = (function () {
     st.sortName = ((lastName || '') + ' ' + firstName).trim();
 
     saveStudents(cid, students);
+    // Second first: clearing the first parent moves the second up a place.
+    if (window.DashClassManager && DashClassManager.saveGuardianEmail) {
+      [1, 0].forEach(function (i) {
+        if (parentEmails[i] !== overlay._guardianEmails[i])
+          DashClassManager.saveGuardianEmail(cid, studentId, i, parentEmails[i]);
+      });
+    }
     closeEditStudent();
     // Re-render sidebar with updated name
     document.getElementById('sidebar-mount').innerHTML = renderSidebar(
@@ -2858,6 +2937,9 @@ window.PageStudent = (function () {
       },
       closeEditStudent: function () {
         closeEditStudent();
+      },
+      toggleEditDesig: function () {
+        el.setAttribute('aria-pressed', String(el.getAttribute('aria-pressed') !== 'true'));
       },
       saveEditStudent: function () {
         saveEditStudent();
