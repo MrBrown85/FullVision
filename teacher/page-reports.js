@@ -781,7 +781,7 @@ window.PageReports = (function () {
     html += '<div class="issue-kv">';
     html +=
       '<span class="issue-k">Form</span><span>' +
-      esc(grade ? 'Grade Report' : form.name) +
+      esc(grade ? 'Quick Report' : form.name) +
       ' \u00B7 ' +
       (reportPaper === 'legal' ? 'Legal' : 'Letter') +
       ' \u00B7 ' +
@@ -1165,8 +1165,8 @@ window.PageReports = (function () {
     };
     return (
       '<div class="seg studio-mode" role="radiogroup" aria-label="Report">' +
-      btn('grade', 'Grade Report', grade) +
-      btn('build', 'Build Your Own', !grade) +
+      btn('grade', 'Quick Report', grade) +
+      btn('build', 'Custom', !grade) +
       '</div>'
     );
   }
@@ -1222,7 +1222,7 @@ window.PageReports = (function () {
     var palette = document.getElementById('studio-palette');
     if (palette && _isGrade()) {
       palette.innerHTML = _modeSwitchHtml() + _gradePanelHtml();
-      palette.setAttribute('aria-label', 'Grade Report');
+      palette.setAttribute('aria-label', 'Quick Report');
     } else if (palette) {
       palette.setAttribute('aria-label', 'Blocks');
       if (_blockSizes === null) _blockSizes = _measureBlockSizes();
