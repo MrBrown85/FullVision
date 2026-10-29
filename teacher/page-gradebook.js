@@ -825,9 +825,13 @@ window.PageGradebook = (function () {
         tagIds.forEach(function (tagId) {
           var key = scoreKeyInfo(cid, a, tagId);
           var sec = getSectionForTag(cid, tagId);
+          // A competency column of rubric work reads the criteria that feed
+          // it, looked up once here for every row.
+          var rubricCriteria = byCriterion ? [] : rubricCriteriaForTag(cid, a, tagId);
           cols.push({
             assessmentId: a.id,
             tagId: tagId,
+            rubricCriteria: rubricCriteria.length ? rubricCriteria : null,
             // A competency's short code, never its server id; a criterion's
             // name; '?' for one no longer in the learning map.
             tagCode: key && key.tag ? _tagShortCode(key.tag) || key.label : key ? key.label : '?',
@@ -1053,14 +1057,16 @@ window.PageGradebook = (function () {
         } else {
           var studentScores = scores[s.id] || [];
           // A competency column of rubric work reads the criteria that feed
-          // it, and is scored on the rubric, not here.
-          var rubricCol = !col.isCriterionCol && !!assess && rubricCompetencyIds(cid, assess).indexOf(col.tagId) >= 0;
+          // it, and is scored on the rubric, not here. Criteria that
+          // disagree show the lowest, marked.
+          var rubricCol = !!(col.rubricCriteria && assess);
           var entry = rubricCol
-            ? competencyLevelFromCriteria(cid, s.id, assess, col.tagId)
+            ? competencyLevelFromCriteria(cid, s.id, assess, col.tagId, col.rubricCriteria)
             : studentScores.find(function (e) {
                 return e.assessmentId === col.assessmentId && e.tagId === col.tagId;
               });
           var score = entry ? entry.score : 0;
+          var mixed = !!(entry && entry.mixed);
           var assigned = rubricCol || (assess && scoreTagIds(assess, cid).includes(col.tagId));
           var content = statusMark
             ? statusMark
@@ -1069,6 +1075,9 @@ window.PageGradebook = (function () {
               : assigned
                 ? '<span class="gb-unscored">\u00B7</span>'
                 : '\u2014';
+          var rubricTitle = mixed
+            ? 'The criteria on this competency disagree; the lowest is shown. Scored on the rubric in Assignments'
+            : 'Scored on the rubric in Assignments';
           html +=
             '<td class="gb-score' +
             startClass +
@@ -1083,9 +1092,10 @@ window.PageGradebook = (function () {
             '" data-sid="' +
             s.id +
             '"' +
-            (rubricCol ? ' title="Scored on the rubric in Assignments"' : ' data-action="cycleScore"') +
+            (rubricCol ? ' title="' + rubricTitle + '"' : ' data-action="cycleScore"') +
             '><span class="gb-score-val s' +
             score +
+            (mixed ? ' gb-mixed' : '') +
             '">' +
             content +
             '</span></td>';
@@ -2766,6 +2776,14 @@ window.PageGradebook = (function () {
       return;
     } else if (e.key === 'Escape') {
       focused.classList.remove('gb-focus');
+      return;
+    } else if (
+      focused.dataset.action !== 'cycleScore' &&
+      (['+', '=', '-', '_', 'Backspace', 'Delete'].includes(e.key) || /^[0-9]$/.test(e.key))
+    ) {
+      // A cell with no action (a competency of rubric work) is read-only:
+      // it is scored on the rubric in Assignments.
+      e.preventDefault();
       return;
     } else if (['+', '=', '-', '_'].includes(e.key)) {
       e.preventDefault();
