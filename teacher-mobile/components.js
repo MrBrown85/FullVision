@@ -184,6 +184,7 @@ window.MComponents = (function () {
     var el = document.getElementById('m-toast');
     var undoBtn = opts.onUndo ? '<button class="m-toast-undo" data-action="m-toast-undo">Undo</button>' : '';
     el.innerHTML = '<div class="m-toast-item"><span>' + _esc(message) + '</span>' + undoBtn + '</div>';
+    _placeToast(el);
     if (opts.onUndo) {
       el.querySelector('[data-action="m-toast-undo"]').onclick = function () {
         opts.onUndo();
@@ -192,6 +193,16 @@ window.MComponents = (function () {
     }
     clearTimeout(_toastTimer);
     _toastTimer = setTimeout(hideToast, opts.duration || 5000);
+  }
+
+  /* On a screen with the + button the toast sits 12 px above the button and
+     over it, so Undo is never under it. Elsewhere it stays above the tab bar. */
+  function _placeToast(el) {
+    var fab = Array.prototype.find.call(document.querySelectorAll('.m-fab'), function (f) {
+      return f.getBoundingClientRect().width > 0 && getComputedStyle(f).visibility !== 'hidden';
+    });
+    el.classList.toggle('m-toast-over-fab', !!fab);
+    el.style.bottom = fab ? window.innerHeight - fab.getBoundingClientRect().top + 12 + 'px' : '';
   }
 
   function hideToast() {
