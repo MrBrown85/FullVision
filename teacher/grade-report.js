@@ -1,7 +1,8 @@
 /* grade-report.js — the Grade Report: a ready-made progress report that
    reads like the student printout from the old gradebook programs. The
    letterhead, one row per assessment this term (date, title, category,
-   score, out of, percent or proficiency, and Missing, Late or Excused),
+   score, out of, percent in a Letter or Both class, and Missing, Late or
+   Excused),
    then a summary by category, the term grade and the missing work. Grades
    only: no comment, attendance or other feedback.
 
@@ -18,7 +19,6 @@ window.GradeReport = (function () {
   var GAP = 12;
   var ROW_W = 720;
   var DEFAULTS = { summary: true, order: 'oldest', name: 'preferred' };
-  var WORDS = { 1: 'Emerging', 2: 'Developing', 3: 'Proficient', 4: 'Extending' };
   /* The table's sizes, largest first: row height and type in px, and
      whether each side holds two columns of rows. */
   var TIERS = [
@@ -38,11 +38,11 @@ window.GradeReport = (function () {
     return o;
   }
 
-  /* Which mark columns the class shows: a Letter class the percent, a
-     Proficiency class the proficiency word, a Both class both. */
+  /* Which mark columns the class shows: the percent in a Letter or Both
+     class. The assignments are the point, so no proficiency words. */
   function columnsFor(cid) {
     var mode = typeof courseGradeMode === 'function' ? courseGradeMode(cid) : 'proficiency';
-    return { percent: mode !== 'proficiency', word: mode !== 'letter' };
+    return { percent: mode !== 'proficiency' };
   }
 
   function _when(d) {
@@ -50,13 +50,9 @@ window.GradeReport = (function () {
     return parseLocalDate(d).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
   }
 
-  function _word(level) {
-    return level > 0 ? WORDS[Math.min(4, Math.max(1, Math.round(level)))] : '';
-  }
-
   /* One student's rows: this term's assessments that have a mark or are
      Missing or Excused. Work not yet marked and not yet due is left off.
-     { date, title, category, score, outOf, percent, word, note }. */
+     { date, title, category, score, outOf, percent, note }. */
   function rows(cid, student, opts) {
     opts = options(opts);
     var cats = {};
@@ -86,7 +82,6 @@ window.GradeReport = (function () {
         score: '',
         outOf: '',
         percent: '',
-        word: '',
         note: cv.late ? 'Late' : '',
       };
       if (cv.kind === 'none' || cv.kind === 'dibels') return;
@@ -106,12 +101,10 @@ window.GradeReport = (function () {
         row.score = formatPoints(cv.value);
         row.outOf = formatPoints(max);
         row.percent = formatPointsPercent(cv.value, max);
-        row.word = _word(cv.level);
       } else if (cv.kind === 'level' && cv.value > 0) {
         row.score = levelFigure(cv.value);
         row.outOf = '4';
         row.percent = formatLevelAs(cid, cv.value, 'percent');
-        row.word = _word(cv.value);
       } else return;
       out.push(row);
     });
@@ -139,20 +132,65 @@ window.GradeReport = (function () {
   /* ── HTML ─────────────────────────────────────────────────── */
 
   /* The columns of a row, by tier: two columns of rows leave the category
-     and the proficiency word out so each row still reads in full. */
+     out so each row still reads in full. */
+  /* The category and assignment columns share the width the others leave,
+     by what the student's rows need (show.catPx and show.titlePx, measured
+     in layoutStudent): both print in full when they fit; when they don't,
+     each gets a share in proportion to its need, the title never less
+     than TITLE_MIN_PX and the category never less than 100px, and the
+     rest ends in "…". */
+  var TITLE_MIN_PX = 200;
+  var COL_GAP = 6; // reports.css .gr-row column-gap
   function _cols(show, tier) {
     var two = tier.cols === 2;
     var cols = [
-      ['date', 'Date', two ? '42px' : '50px', ''],
+      ['date', 'Date', '42px', ''],
       ['title', 'Assignment', 'minmax(0,1fr)', ''],
     ];
-    if (!two) cols.push(['category', 'Category', '150px', '']);
-    cols.push(['score', 'Score', two ? '52px' : '62px', 'r']);
-    cols.push(['outOf', 'Out Of', two ? '34px' : '44px', 'r']);
-    if (show.percent) cols.push(['percent', '%', two ? '34px' : '42px', 'r']);
-    if (show.word && !two) cols.push(['word', 'Proficiency', '74px', '']);
-    cols.push(['note', '', two ? '48px' : '56px', '']);
+    if (!two) cols.push(['category', 'Category', null, '']);
+    // Score holds "Incomplete"; the note "Excused" in bold.
+    cols.push(['score', 'Score', two ? '54px' : '64px', 'r']);
+    cols.push(['outOf', 'Out Of', two ? '34px' : '40px', 'r']);
+    if (show.percent) cols.push(['percent', '%', two ? '32px' : '36px', 'r']);
+    cols.push(['note', '', two ? '46px' : '52px', '']);
+    if (!two) {
+      var fixed = cols.reduce(function (sum, c) {
+        return sum + (c[2] && /px$/.test(c[2]) ? parseFloat(c[2]) : 0);
+      }, 0);
+      var avail = ROW_W - fixed - COL_GAP * (cols.length - 1);
+      var catNeed = show.catPx || 150;
+      var titleNeed = show.titlePx || avail - catNeed;
+      var cat =
+        catNeed + titleNeed <= avail
+          ? catNeed
+          : Math.max(100, Math.min(avail - TITLE_MIN_PX, (avail * catNeed) / (catNeed + titleNeed)));
+      cols.forEach(function (c) {
+        if (c[0] === 'category') c[2] = Math.round(cat) + 'px';
+      });
+    }
     return cols;
+  }
+
+  /* The widest of some texts at the table's largest type, in px. */
+  function _textPx(stage, names) {
+    names = names.filter(function (n, i) {
+      return n && names.indexOf(n) === i;
+    });
+    stage.innerHTML =
+      '<div class="gr-table gr-regular">' +
+      names
+        .map(function (n) {
+          return (
+            '<div><span class="gr-measure" style="display:inline-block;white-space:nowrap">' + esc(n) + '</span></div>'
+          );
+        })
+        .join('') +
+      '</div>';
+    var w = 0;
+    Array.prototype.forEach.call(stage.querySelectorAll('.gr-measure'), function (el) {
+      w = Math.max(w, el.offsetWidth);
+    });
+    return Math.ceil(w) + 4;
   }
 
   function _tableHtml(list, show, tier) {
@@ -327,6 +365,22 @@ window.GradeReport = (function () {
     var chosen = null;
     var p = null;
     try {
+      show.catPx = _textPx(
+        stage,
+        ['Category'].concat(
+          list.map(function (r) {
+            return r.category;
+          }),
+        ),
+      );
+      show.titlePx = _textPx(
+        stage,
+        ['Assignment'].concat(
+          list.map(function (r) {
+            return r.title;
+          }),
+        ),
+      );
       var sizes = { letterheadPx: _measure(stage, letterhead), tailPx: _measure(stage, tail) };
       for (var t = 0; t < TIERS.length; t++) {
         var tier = TIERS[t];

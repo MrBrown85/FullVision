@@ -466,9 +466,9 @@ window.PageReports = (function () {
   }
 
   /* + Page after the last side; Empty · Remove on an empty side past the
-     second. One Student view only. */
+     second. One Student view of Build Your Own only. */
   function _decoratePages(preview) {
-    if (studioView !== 'one' || viewingIssue) return;
+    if (studioView !== 'one' || viewingIssue || _isGrade()) return;
     var student = preview.querySelector('.sheet-student');
     if (!student) return;
     var f = _formOf();

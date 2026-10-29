@@ -1186,6 +1186,13 @@ test.describe('Grade Report', () => {
     // Grades only: no comment, attendance or other feedback on the sheet.
     await expect(page.locator('.gr-sheet .report-comment-box, .gr-sheet .report-attendance')).toHaveCount(0);
     await expect(page.getByRole('checkbox')).toHaveCount(1);
+    // No Proficiency column, nothing cut off in a row, and no + Page.
+    await expect(sheet.locator('.gr-head').first()).not.toContainText('Proficiency');
+    const cut = await page
+      .locator('.gr-sheet .gr-row:not(.gr-head) .gr-c')
+      .evaluateAll(cells => cells.filter(c => c.scrollWidth > c.clientWidth + 1).map(c => c.textContent));
+    expect(cut).toEqual([]);
+    await expect(page.locator('.studio-page-add')).toHaveCount(0);
     // The switch and the Order buttons stay inside the left column.
     const spill = await page.locator('#studio-palette').evaluate(pal => {
       const edge = pal.getBoundingClientRect().right - parseFloat(getComputedStyle(pal).paddingRight);
