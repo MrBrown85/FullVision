@@ -232,7 +232,9 @@ window.ReportStudio = (function () {
   /* The class fit in one line, from ReportSheets.classSummary: the sheets
      every student needs, or how many need a second sheet (a link to
      Everyone, which leads with them). */
-  function fitLineHtml(summary, form) {
+  /* text.over: what the link says when a report does not fit (the Grade
+     Report says so in its own words). */
+  function fitLineHtml(summary, form, text) {
     if (!summary || !summary.perStudent) return '';
     var ids = Object.keys(summary.perStudent);
     var n = ids.length;
@@ -247,7 +249,8 @@ window.ReportStudio = (function () {
     }).length;
     if (over) {
       return (
-        '<button type="button" class="studio-fit-link" data-action="studioView" data-view="all">A block is taller than a page for ' +
+        '<button type="button" class="studio-fit-link" data-action="studioView" data-view="all">' +
+        ((text && text.over) || 'A block is taller than a page for ') +
         students(over) +
         '</button>'
       );

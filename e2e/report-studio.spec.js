@@ -28,8 +28,8 @@ test.beforeEach(async ({ page }) => {
 
 const STUDENTS = 27;
 
-/* The Studio as a new report opens it: the name and Assignment Grades. */
-async function openFresh(page) {
+/* Progress Reports as a new class opens it: the Grade Report. */
+async function openGrade(page) {
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
   await page.evaluate(r => window.Router.navigate(r), '/reports');
@@ -37,6 +37,14 @@ async function openFresh(page) {
   await expect(page.locator('#studio')).toBeVisible();
   await expect(page.locator('#studio-fit')).not.toBeEmpty();
   await expect(page.locator('.report-sheet')).toHaveCount(2);
+}
+
+/* Build Your Own as a new report opens it: the name and Assignment Grades. */
+async function openFresh(page) {
+  await openGrade(page);
+  await page.getByRole('radio', { name: 'Build Your Own' }).click();
+  await expect(page.locator('.studio-blk.placed')).toHaveCount(1);
+  await expect(page.locator('#studio-fit')).not.toBeEmpty();
 }
 
 /* The Studio on the Report Card starter, on the longest report. */
@@ -1156,6 +1164,49 @@ test('below 1240 px wide, Save as Template is in the Templates tab and the toolb
   await palette(page).getByRole('tab', { name: 'Templates' }).click();
   await palette(page).getByRole('button', { name: 'Save as Template' }).click();
   await expect(page.getByRole('dialog', { name: 'Save as Template' })).toBeVisible();
+});
+
+test.describe('Grade Report', () => {
+  test.setTimeout(90_000);
+
+  test('a new class opens on the Grade Report: a table of this term, one sheet each, two Letter pages per student', async ({
+    page,
+  }) => {
+    await openGrade(page);
+    await expect(page.getByRole('radio', { name: 'Grade Report' })).toHaveAttribute('aria-checked', 'true');
+    await expect(page.locator('#studio-fit')).toHaveText('1 sheet for all 27 students');
+    // Build Your Own's controls are hidden.
+    await expect(page.locator('#report-sides')).toBeHidden();
+    await expect(page.locator('#tb-save-template')).toBeHidden();
+    const sheet = page.locator('.gr-sheet').first();
+    await expect(sheet.locator('.report-student-name')).toHaveText(/\w+ \w+/);
+    await expect(sheet.locator('.gr-head').first()).toContainText('Assignment');
+    await expect(sheet.locator('.gr-head').first()).toContainText('Out Of');
+    await expect(page.locator('.gr-term')).toContainText('Term Grade');
+    await showEveryone(page);
+    expect(await overflowing(page)).toEqual([]);
+    const pdf = await printToPdf(page);
+    expect(countPages(pdf)).toBe(STUDENTS * 2);
+  });
+
+  test('Include takes the summary and the comment off; the choice and Build Your Own are remembered', async ({
+    page,
+  }) => {
+    await openGrade(page);
+    await expect(page.locator('.gr-summary')).toHaveCount(1);
+    await page.getByRole('checkbox', { name: 'Category Summary' }).uncheck();
+    await expect(page.locator('.gr-summary')).toHaveCount(0);
+    await page.getByRole('checkbox', { name: 'Teacher Comment' }).uncheck();
+    await expect(page.locator('.gr-sheet .report-comment-box')).toHaveCount(0);
+    await page.getByRole('radio', { name: 'Build Your Own' }).click();
+    await expect(page.locator('.studio-blk.placed')).toHaveCount(1);
+    await page.reload();
+    await page.getByRole('tab', { name: 'Progress Reports' }).click();
+    await expect(page.locator('.studio-blk.placed')).toHaveCount(1);
+    await page.getByRole('radio', { name: 'Grade Report' }).click();
+    await expect(page.getByRole('checkbox', { name: 'Category Summary' })).not.toBeChecked();
+    await expect(page.locator('.gr-summary')).toHaveCount(0);
+  });
 });
 
 test.describe('Printed progress reports', () => {
