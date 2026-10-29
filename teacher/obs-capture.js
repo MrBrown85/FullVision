@@ -11,7 +11,8 @@
    + Starter, Tags (+ Add Tag: dispositions, Core Competencies, custom
    tags), the Context menu, + Link (an assessment, or one learning-map
    competency with an optional Level), and Add. After Add the next note
-   starts fresh: the students stay, the type, context and tags clear.
+   starts empty: no students, type, context, tags or links, except what the
+   host fixed (a locked student or assessment, a pre-filled competency).
    Shorthand in the box: @name, #tag, !strength|growth|concern|note, /starter.
    Enter sends, Shift+Enter adds a line.
 
@@ -1384,14 +1385,18 @@ window.ObsCapture = (function () {
       state.templateId = null;
       input.value = '';
       saveDraft();
+      var hadStudents = state.students.join() !== (opts.lockStudents ? opts.students || [] : []).join();
+      state.students = opts.lockStudents ? (opts.students || []).slice() : [];
       state.dims = [];
       state.sentiment = null;
       state.context = null;
+      state.assessmentId = opts.assessmentId || null;
       state.competencyId = opts.competencyId || null;
       state.level = null;
       state.menu = null;
       render();
       _focus(input);
+      if (hadStudents) studentsChanged();
       if (typeof opts.onAdd === 'function') {
         opts.onAdd({ studentIds: sids, text: text, sentiment: sentiment, ok: ok });
       }
@@ -1438,7 +1443,10 @@ window.ObsCapture = (function () {
         var j = state.dims.indexOf(val);
         if (j >= 0) state.dims.splice(j, 1);
         else state.dims.push(val);
-        render();
+        // One pick adds that tag, closes the list and goes back to the note;
+        // + Add Tag again picks another. Shift-click (Space) keeps it open.
+        if (j < 0 && !(e.shiftKey || e.metaKey || e.ctrlKey)) closeMenu(true);
+        else render();
       } else if (act === 'removeTag') {
         state.dims = state.dims.filter(function (k) {
           return k !== val;
@@ -1490,7 +1498,7 @@ window.ObsCapture = (function () {
       if (typeof addCustomTag === 'function') addCustomTag(cid, label);
       var key = 'tag:' + label;
       if (state.dims.indexOf(key) < 0) state.dims.push(key);
-      render();
+      closeMenu(true);
     }
 
     function onInput(e) {

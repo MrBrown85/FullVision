@@ -104,6 +104,8 @@ test.describe('Observations — keyboard, undo and views', () => {
     await pickStudent(page, 'Alice');
     await page.locator('#capture-input').fill('Measured the beaker twice');
     await page.keyboard.press('Enter');
+    // Add clears the student, so the second note picks her again.
+    await pickStudent(page, 'Alice');
     await page.locator('#capture-input').fill('Labelled every sample');
     await page.keyboard.press('Enter');
     const day = page.locator('.obs-feed-date-group').first();

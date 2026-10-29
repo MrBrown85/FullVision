@@ -93,8 +93,51 @@ test.describe('Observation capture strip', () => {
       TEST_COURSE.id,
     );
     expect(flagged['stu-002']).toBe(true);
-    // Students stay picked after Add.
-    await expect(page.locator('#obs-capture .obsc-chip-student')).toContainText('Bob');
+    // The next note starts with no student.
+    await expect(page.locator('#obs-capture .obsc-chip-student')).toHaveCount(0);
+  });
+
+  test('after Add the strip is empty and the note box has focus for the next one', async ({ page }) => {
+    await gotoApp(page, '/observations');
+    const strip = page.locator('#obs-capture');
+    await page.locator('#student-btn').click();
+    await page.locator('#student-dropdown .obsc-item', { hasText: 'Alice' }).click();
+    await strip.getByRole('button', { name: 'Growth' }).click();
+    await page.locator('#tag-btn').click();
+    await page.locator('#tag-dropdown .obsc-item', { hasText: 'Collaboration' }).first().click();
+    await page.locator('#context-btn').click();
+    await strip.locator('[data-obsc="setContext"][data-value="small-group"]').click();
+    await page.locator('#link-btn').click();
+    await page.locator('#assessment-btn').click();
+    await page.locator('[data-menu="assessment"] .obsc-item', { hasText: 'Lab Report 1' }).click();
+    await page.locator('#capture-input').fill('Checked her group’s units');
+    await page.locator('#capture-add-btn').click();
+
+    await expect(page.locator('.obs-card', { hasText: 'Checked her group’s units' })).toBeVisible();
+    await expect(strip.locator('.obsc-chip-student')).toHaveCount(0);
+    await expect(strip.locator('.obsc-chip-type.is-on')).toHaveCount(0);
+    await expect(strip.locator('.obsc-chip-tag')).toHaveCount(0);
+    await expect(strip.locator('.obsc-chip-assessment')).toHaveCount(0);
+    await expect(page.locator('#context-btn')).toHaveText(/\+ Context/);
+    await expect(page.locator('#capture-input')).toHaveValue('');
+    await expect(page.locator('#capture-input')).toBeFocused();
+    await expect(page.locator('#capture-add-btn')).toBeDisabled();
+  });
+
+  test('+ Add Tag adds the one tag picked and closes; another needs another click', async ({ page }) => {
+    await gotoApp(page, '/observations');
+    const tags = page.locator('#obs-capture .obsc-chip-tag');
+    await page.locator('#tag-btn').click();
+    await page.locator('#tag-dropdown .obsc-item', { hasText: 'Collaboration' }).first().click();
+    await expect(page.locator('#tag-dropdown')).toHaveCount(0);
+    await expect(tags).toHaveText(['Collaboration×']);
+    await expect(page.locator('#capture-input')).toBeFocused();
+
+    await page.locator('#tag-btn').click();
+    await page.locator('#tag-dropdown .obsc-menu-search').fill('engag');
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#tag-dropdown')).toHaveCount(0);
+    await expect(tags).toHaveText(['Collaboration×', 'Engagement×']);
   });
 
   test('unsent text survives a trip to another page', async ({ page }) => {
