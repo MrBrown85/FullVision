@@ -2461,6 +2461,23 @@ body.fv-switching-course::after {
   margin: 12px 0;
   perspective: 1200px;
 }
+/* Cards view: the stack takes the space left between the search field and
+   the tab bar, so the card fits every screen (safe areas included) and the
+   page itself does not scroll. Content taller than the card scrolls inside it. */
+.m-screen-content.m-cards-mode {
+  display: flex;
+  flex-direction: column;
+}
+.m-screen-content.m-cards-mode > * {
+  flex-shrink: 0;
+}
+.m-screen-content.m-cards-mode > .m-card-stack {
+  flex: 1 1 0;
+  height: auto;
+  min-height: 320px;
+  max-height: none;
+  margin: 4px 0 44px;
+}
 .m-card-stack-item {
   position: absolute;
   inset: 0 16px;
@@ -2471,7 +2488,9 @@ body.fv-switching-course::after {
     0 4px 24px rgba(0, 0, 0, 0.12),
     0 1px 4px rgba(0, 0, 0, 0.06);
   will-change: transform;
-  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition:
+    transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1),
+    opacity 0.3s ease;
 }
 .m-card-stack-item[data-depth='0'] {
   z-index: 3;
@@ -2493,14 +2512,24 @@ body.fv-switching-course::after {
   transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
 }
 .m-card-exit-left {
-  transform: translateX(-120%) rotate(-15deg) !important;
+  z-index: 4;
+  transform: translateX(-120%) rotate(-12deg) !important;
   opacity: 0;
-  transition: all 0.3s ease-out !important;
+  transition:
+    transform 0.3s ease-out,
+    opacity 0.3s ease-in !important;
 }
 .m-card-exit-right {
-  transform: translateX(120%) rotate(15deg) !important;
+  z-index: 4;
+  transform: translateX(120%) rotate(12deg) !important;
   opacity: 0;
-  transition: all 0.3s ease-out !important;
+  transition:
+    transform 0.3s ease-out,
+    opacity 0.3s ease-in !important;
+}
+.m-card-stack-item.m-card-enter {
+  opacity: 0;
+  transition: none;
 }
 .m-card-counter {
   text-align: center;
@@ -2703,7 +2732,9 @@ body.fv-switching-course::after {
 /* Scrollable middle zone */
 .m-scard-widgets {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   gap: 10px;
