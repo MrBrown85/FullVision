@@ -165,22 +165,26 @@ window.DashOverview = (function () {
       html += '<span class="dash-glance-sub">No birthdays on file.</span>';
     } else {
       html += '<div class="dash-bdays">';
+      // Days to go in the bar's large figures (Today and Tomorrow in green),
+      // then the full name and the date.
       bdays.forEach(function (b) {
-        var day = b.nextBday.toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' });
-        var countdown = b.daysUntil === 0 ? 'Today' : b.daysUntil === 1 ? 'Tomorrow' : 'in ' + b.daysUntil + ' days';
+        var date = b.nextBday.toLocaleDateString('en-CA', { weekday: 'long', month: 'short', day: 'numeric' });
+        var count =
+          b.daysUntil === 0
+            ? '<b class="is-soon">Today</b>'
+            : b.daysUntil === 1
+              ? '<b class="is-soon">Tomorrow</b>'
+              : '<b>' + b.daysUntil + '</b><span>days</span>';
         html +=
           '<div class="dash-bday">' +
+          '<span class="dash-bday-count">' +
+          count +
+          '</span>' +
           '<span class="dash-bday-name">' +
           esc(displayNameWithLast(b.student)) +
           '</span>' +
-          '<span class="dash-bday-when' +
-          (b.daysUntil <= 1 ? ' is-soon' : '') +
-          '">' +
-          '<span>' +
-          esc(day) +
-          '</span> · <span>' +
-          esc(countdown) +
-          '</span>' +
+          '<span class="dash-bday-date">' +
+          esc(date) +
           '</span>' +
           '</div>';
       });
