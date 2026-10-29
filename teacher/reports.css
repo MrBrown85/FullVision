@@ -2320,10 +2320,24 @@
   flex-wrap: wrap;
   row-gap: 8px;
 }
+/* The print settings and the view switch, at the right of the canvas head.
+   On narrower screens their labels go, and the fit line wraps above them
+   rather than being squeezed away. */
+.studio-head {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+.studio-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
 @media (max-width: 1520px) {
-  .report-toolbar .tb-label,
-  .report-toolbar .tb-divider {
-    display: none !important;
+  .studio-tools .tb-label,
+  .studio-tools .tb-divider {
+    display: none;
   }
 }
 @media (max-width: 1600px) {

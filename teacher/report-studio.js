@@ -20,8 +20,9 @@ window.ReportStudio = (function () {
     });
   }
 
-  /* The two panes. The canvas holds the fit line, the view switch and the
-     preview the sheet engine fills. */
+  /* The two panes. The canvas holds the fit line, the print settings
+     (opts.settingsHtml), the view switch and the preview the sheet engine
+     fills. */
   function layoutHtml(opts) {
     opts = opts || {};
     var all = opts.view === 'all';
@@ -31,6 +32,8 @@ window.ReportStudio = (function () {
       '<div class="studio-canvas">' +
       '<div class="studio-head no-print">' +
       '<span class="studio-fit" id="studio-fit"></span>' +
+      '<div class="studio-tools">' +
+      (opts.settingsHtml || '') +
       '<span class="seg seg-sm studio-view" role="radiogroup" aria-label="View">' +
       '<button type="button" class="seg-btn' +
       (all ? '' : ' active') +
@@ -42,7 +45,7 @@ window.ReportStudio = (function () {
       '" data-action="studioView" data-view="all" role="radio" aria-checked="' +
       all +
       '">Everyone</button>' +
-      '</span></div>' +
+      '</span></div></div>' +
       '<div class="rb-preview studio-pages' +
       (all ? ' studio-all' : '') +
       '" id="rb-preview"></div>' +
