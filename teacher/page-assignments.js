@@ -2786,7 +2786,9 @@ window.PageAssignments = (function () {
           sid +
           '" data-status="' +
           s[0] +
-          '" data-stop-prop="true">' +
+          '" data-stop-prop="true"' +
+          _statusLockAttrs(aid, sid, s[0]) +
+          '>' +
           s[1] +
           '</button>'
         );
@@ -3070,6 +3072,7 @@ window.PageAssignments = (function () {
         var marked = [];
         getStudents(cid).forEach(function (st) {
           if (statuses[st.id + ':' + aid] || getPointsScore(cid, st.id, aid) != null) return;
+          if (!canSetAssignmentStatus(cid, st.id, aid, 'NS')) return;
           applyAssignmentStatus(cid, st.id, aid, 'NS');
           marked.push(st.id);
         });
@@ -3253,6 +3256,7 @@ window.PageAssignments = (function () {
     var cid = activeCourse;
     var current = getAssignmentStatus(cid, sid, aid);
     var newStatus = current === status ? null : status;
+    if (!canSetAssignmentStatus(cid, sid, aid, newStatus)) return;
     var clearedScores = applyAssignmentStatus(cid, sid, aid, newStatus);
     var row =
       document.querySelector('.score-row[data-status-student="' + sid + '"][data-status-assess="' + aid + '"]') ||
@@ -7183,6 +7187,26 @@ window.PageAssignments = (function () {
   var _NOT_SCORED_ICON =
     '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/></svg>';
   var _GRADER_STATUS_LABELS = { NS: 'Missing', EXC: 'Excused', LATE: 'Late' };
+  // Missing and Excused are greyed out on work with a score or feedback
+  // (canSetAssignmentStatus, shared/data.js).
+  var _STATUS_LOCKED_TITLE = 'This student has a score or feedback on this work.';
+  function _statusLockAttrs(aid, sid, key) {
+    return canSetAssignmentStatus(activeCourse, sid, aid, key) ? '' : ' disabled title="' + _STATUS_LOCKED_TITLE + '"';
+  }
+  // Brings every status button on the page up to date after a score or
+  // comment changes, without redrawing anything.
+  function _syncStatusLocks() {
+    document.querySelectorAll('[data-action="toggleStudentStatus"]').forEach(function (btn) {
+      var locked = !canSetAssignmentStatus(activeCourse, btn.dataset.sid, btn.dataset.aid, btn.dataset.status);
+      if (btn.disabled === locked) return;
+      btn.disabled = locked;
+      if (locked) btn.title = _STATUS_LOCKED_TITLE;
+      else btn.removeAttribute('title');
+    });
+  }
+  function _statusLocksAfterEvent() {
+    setTimeout(_syncStatusLocks, 0);
+  }
   // The Missing | Excused | Late control's buttons, in the order given.
   function _graderStatusButtons(aid, sid, status, order) {
     return order
@@ -7199,7 +7223,9 @@ window.PageAssignments = (function () {
           sid +
           '" data-status="' +
           key +
-          '">' +
+          '"' +
+          _statusLockAttrs(aid, sid, key) +
+          '>' +
           _GRADER_STATUS_LABELS[key] +
           '</button>'
         );
@@ -7538,6 +7564,9 @@ window.PageAssignments = (function () {
     _addDocListener('mouseover', _handleMouseOver);
     _addDocListener('mouseout', _handleMouseOut);
     _addDocListener('fv:id-rekeyed', _handleRekey);
+    ['click', 'change', 'keyup', 'focusout'].forEach(function (type) {
+      _addDocListener(type, _statusLocksAfterEvent);
+    });
 
     render();
 

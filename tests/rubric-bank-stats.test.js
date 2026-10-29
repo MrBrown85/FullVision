@@ -73,7 +73,8 @@ describe('Rubric Bank class stats', () => {
   });
 
   it('leaves excused students out', () => {
-    setAssignmentStatus(CID, S3, A1, 'EXC');
+    // Excused can't be set on scored work any more, but older data has both.
+    saveAssignmentStatuses(CID, { [S3 + ':' + A1]: 'EXC' });
     var s = RubricBank.classStats(CID, getRubricById(CID, 'r-comp'), A1);
     expect(s.byCrit['c-inq']).toEqual({ 4: 0, 3: 1, 2: 1, 1: 0 });
   });

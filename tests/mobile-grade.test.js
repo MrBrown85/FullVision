@@ -528,7 +528,7 @@ describe('MGrade.setStatus', () => {
     expect(setTo).toBeNull(); // toggled off
   });
 
-  it('NS auto-zeros every tag score on the assessment (matches desktop behaviour)', () => {
+  it('NS is refused on work that already has a score, which stays as it was', () => {
     let store = {
       stu1: [
         { id: 's1', assessmentId: 'a1', tagId: 't1', score: 3, type: 'summative', date: '2025-03-20' },
@@ -537,11 +537,14 @@ describe('MGrade.setStatus', () => {
         { id: 's3', assessmentId: 'a2', tagId: 't1', score: 2, type: 'summative', date: '2025-03-20' },
       ],
     };
+    let statusSet = false;
     mockDataLayer({
       getScores: () => store,
       saveScores: () => {},
       getAssignmentStatus: () => null,
-      setAssignmentStatus: () => {},
+      setAssignmentStatus: () => {
+        statusSet = true;
+      },
       getAssessments: () => [
         { id: 'a1', type: 'summative', date: '2025-03-20', tagIds: ['t1', 't2'] },
         { id: 'a2', type: 'summative', date: '2025-03-20', tagIds: ['t1'] },
@@ -549,12 +552,8 @@ describe('MGrade.setStatus', () => {
     });
     MGrade.setStatus(CID, 'stu1', 'a1', 'NS');
 
-    const a1t1 = store.stu1.find(s => s.assessmentId === 'a1' && s.tagId === 't1');
-    const a1t2 = store.stu1.find(s => s.assessmentId === 'a1' && s.tagId === 't2');
-    const a2t1 = store.stu1.find(s => s.assessmentId === 'a2' && s.tagId === 't1');
-    expect(a1t1.score).toBe(0);
-    expect(a1t2.score).toBe(0);
-    expect(a2t1.score).toBe(2); // untouched — different assessment
+    expect(statusSet).toBe(false);
+    expect(store.stu1.map(s => s.score)).toEqual([3, 4, 2]);
   });
 
   it('NS leaves a points or Complete/Incomplete score alone (0 would be a real score)', () => {

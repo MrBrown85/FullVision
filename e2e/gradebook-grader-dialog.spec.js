@@ -27,17 +27,19 @@ test('a Scores cell opens the grader dialog', async ({ page }) => {
   await expect(dialog).toBeVisible();
   await expect(dialog.locator('.grader-foot')).toContainText('Proficient');
 
-  await dialog.locator('.grader-status [data-status="NS"]').click();
-  await expect(dialog.locator('.grader-foot')).toContainText('Missing');
+  // Scored work can't be Missing or Excused; Late still applies.
+  await expect(dialog.locator('.grader-status [data-status="NS"]')).toBeDisabled();
+  await expect(dialog.locator('.grader-status [data-status="EXC"]')).toBeDisabled();
+  await dialog.locator('.grader-status [data-status="LATE"]').click();
+  await expect(dialog.locator('.grader-status [data-status="LATE"]')).toHaveAttribute('aria-pressed', 'true');
 
   await dialog.locator('.grader-done').click();
   await expect(page.locator('#grader-overlay')).toHaveCount(0);
-  await expect(cell).toHaveText('M');
   const status = await page.evaluate(cid => {
     var all = JSON.parse(localStorage.getItem('gb-statuses-' + cid) || '{}');
     return all['stu-001:assess-001'] || null;
   }, TEST_COURSE.id);
-  expect(status).toBe('NS');
+  expect(status).toBe('LATE');
 });
 
 // A person holds the button down a moment. Focus leaving the dialog in that

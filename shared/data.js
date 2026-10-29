@@ -7114,7 +7114,27 @@ function saveAssignmentStatuses(cid, obj) {
 function getAssignmentStatus(cid, sid, aid) {
   return getAssignmentStatuses(cid)[sid + ':' + aid] || null;
 }
+/* Missing and Excused are for work that wasn't handed in. Neither is ever
+   set on work that has a score or feedback: a level, points, a Complete or
+   Incomplete mark, a DIBELS number, a criterion note or a comment. Late is
+   for work that was handed in, so it is always allowed, and a status already
+   on a cell can always be taken off. */
+function hasScoreOrFeedback(cid, sid, aid) {
+  var assess = _assessmentById(cid, aid);
+  var entered = (getScores(cid)[sid] || []).some(function (e) {
+    return e && e.assessmentId === aid && (isScoreEntered(assess, e) || !!e.critNote || !!e.critBeyond);
+  });
+  if (entered || hasAssignmentFeedback(cid, sid, aid)) return true;
+  var dibels = getDibelsScores(cid)[sid + ':' + aid];
+  return !!dibels && Object.keys(dibels).length > 0;
+}
+function canSetAssignmentStatus(cid, sid, aid, status) {
+  if (status !== 'NS' && status !== 'EXC') return true;
+  if (getAssignmentStatus(cid, sid, aid) === status) return true;
+  return !hasScoreOrFeedback(cid, sid, aid);
+}
 function setAssignmentStatus(cid, sid, aid, status) {
+  if (!canSetAssignmentStatus(cid, sid, aid, status)) return false;
   const st = getAssignmentStatuses(cid);
   const key = sid + ':' + aid;
   if (status) st[key] = status;
@@ -7127,7 +7147,9 @@ function setAssignmentStatus(cid, sid, aid, status) {
 // Complete/Incomplete work 0 is a real score that would outlive the NS, and
 // calc.js already counts NS as 0, so the score is left alone. Returns true
 // when the NS cleared scores, so callers can reset their score controls.
+// Missing or Excused on work with a score or feedback is refused (false).
 function applyAssignmentStatus(cid, sid, aid, status) {
+  if (!canSetAssignmentStatus(cid, sid, aid, status)) return false;
   setAssignmentStatus(cid, sid, aid, status);
   var assess = getAssessments(cid).find(function (a) {
     return a.id === aid;
@@ -11846,6 +11868,8 @@ window.GB = {
   saveAssignmentStatuses,
   getAssignmentStatus,
   setAssignmentStatus,
+  hasScoreOrFeedback,
+  canSetAssignmentStatus,
   applyAssignmentStatus,
   getRubrics,
   saveRubrics,

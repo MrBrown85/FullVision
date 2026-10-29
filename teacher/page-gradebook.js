@@ -2104,24 +2104,33 @@ window.PageGradebook = (function () {
     var aid = cell.dataset.aid;
     var sid = cell.dataset.sid;
     var status = getAssignmentStatus(activeCourse, sid, aid);
+    // Missing and Excused never go on work with a score or feedback.
+    function statusItem(ctx, key, label) {
+      var locked = !canSetAssignmentStatus(activeCourse, sid, aid, key);
+      return (
+        '<div class="gb-ctx-item' +
+        (locked ? ' is-disabled" aria-disabled="true" title="This student has a score or feedback on this work.' : '') +
+        '" data-ctx="' +
+        ctx +
+        '">' +
+        label +
+        '</div>'
+      );
+    }
     var menu = document.createElement('div');
     menu.className = 'gb-ctx-menu';
     menu.innerHTML =
       '<div class="gb-ctx-item" data-ctx="editCell">Edit score</div>' +
       '<div class="gb-ctx-item" data-ctx="clearCell">Clear score</div>' +
       '<div class="gb-ctx-divider"></div>' +
-      '<div class="gb-ctx-item" data-ctx="markMissing">' +
-      (status === 'NS' ? 'Undo missing' : 'Mark missing') +
-      '</div>' +
-      '<div class="gb-ctx-item" data-ctx="excuseCell">' +
-      (status === 'EXC' ? 'Undo excuse' : 'Excuse') +
-      '</div>' +
+      statusItem('markMissing', 'NS', status === 'NS' ? 'Undo missing' : 'Mark missing') +
+      statusItem('excuseCell', 'EXC', status === 'EXC' ? 'Undo excuse' : 'Excuse') +
       '<div class="gb-ctx-divider"></div>' +
       '<div class="gb-ctx-item" data-ctx="addObservation">Add observation</div>';
     _placeContextMenu(menu, e.clientX, e.clientY);
     menu.addEventListener('click', function (ev) {
       var item = ev.target.closest('[data-ctx]');
-      if (!item) return;
+      if (!item || item.classList.contains('is-disabled')) return;
       var action = item.dataset.ctx;
       if (action === 'editCell') startCellEdit(cell);
       else if (action === 'addObservation') openObservationDialog(sid, aid);
@@ -2237,7 +2246,11 @@ window.PageGradebook = (function () {
           document.querySelectorAll('.gb-scores-row[data-sid]').forEach(function (row) {
             var sid = row.dataset.sid;
             var cell = assessmentCellValue(activeCourse, sid, assess);
-            if ((cell.kind === 'none' || cell.kind === 'missing') && !cell.status) {
+            if (
+              (cell.kind === 'none' || cell.kind === 'missing') &&
+              !cell.status &&
+              canSetAssignmentStatus(activeCourse, sid, aid, next)
+            ) {
               statuses[sid + ':' + aid] = next;
               undo.push({ sid: sid, status: next });
               changed = true;

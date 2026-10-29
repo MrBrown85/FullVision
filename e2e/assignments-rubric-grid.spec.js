@@ -57,7 +57,10 @@ test('the whole-class rubric grid scores, fine-tunes and sets a status', async (
   await hyp.locator('.rsg-mod[data-mod="1"]').click();
   await expect(hyp.locator('.rsg-mod.active')).toHaveCount(1);
 
-  await alice.locator('.grader-status-btn[data-status="EXC"]').click();
-  await expect(alice).toHaveClass(/has-status/);
-  await expect(alice.locator('.grader-status-btn[data-status="EXC"]')).toHaveAttribute('aria-pressed', 'true');
+  // Scored work can't be Missing or Excused; Late still applies.
+  await expect(alice.locator('.grader-status-btn[data-status="EXC"]')).toBeDisabled();
+  await expect(alice.locator('.grader-status-btn[data-status="NS"]')).toBeDisabled();
+  await alice.locator('.grader-status-btn[data-status="LATE"]').click();
+  await expect(alice).toHaveClass(/has-late/);
+  await expect(alice.locator('.grader-status-btn[data-status="LATE"]')).toHaveAttribute('aria-pressed', 'true');
 });

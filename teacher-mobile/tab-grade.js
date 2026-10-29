@@ -730,14 +730,18 @@ window.MGrade = (function () {
       st.id +
       '" data-aid="' +
       assessment.id +
-      '">M</button>' +
+      '"' +
+      (canSetAssignmentStatus(cid, st.id, assessment.id, 'NS') ? '' : ' disabled') +
+      '>M</button>' +
       '<button class="m-status-pill' +
       (status === 'EXC' ? ' m-status-active' : '') +
       '" data-action="m-grade-status" data-val="EXC" data-sid="' +
       st.id +
       '" data-aid="' +
       assessment.id +
-      '">EXC</button>' +
+      '"' +
+      (canSetAssignmentStatus(cid, st.id, assessment.id, 'EXC') ? '' : ' disabled') +
+      '>EXC</button>' +
       '<button class="m-status-pill' +
       (status === 'LATE' ? ' m-status-active' : '') +
       '" data-action="m-grade-status" data-val="LATE" data-sid="' +
@@ -1213,6 +1217,8 @@ window.MGrade = (function () {
   function setStatus(cid, sid, aid, status) {
     var current = getAssignmentStatus(cid, sid, aid);
     var newStatus = current === status ? null : status;
+    // Missing and Excused never go on work with a score or feedback.
+    if (!canSetAssignmentStatus(cid, sid, aid, newStatus)) return;
     setAssignmentStatus(cid, sid, aid, newStatus);
     MC.haptic();
 
@@ -1385,6 +1391,10 @@ window.MGrade = (function () {
   }
 
   function _updateThumbGraded(cid, aid) {
+    // A score just changed: M and EXC grey out once the work has one.
+    document.querySelectorAll('.m-status-pill[data-aid="' + aid + '"]').forEach(function (pill) {
+      pill.disabled = !canSetAssignmentStatus(cid, pill.dataset.sid, aid, pill.dataset.val);
+    });
     var students = getStudents(cid);
     students = sortStudents(students.slice(), 'alpha');
     var allScores = getScores(cid);
