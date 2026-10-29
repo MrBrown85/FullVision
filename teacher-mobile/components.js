@@ -81,7 +81,7 @@ window.MComponents = (function () {
       '<div class="m-sheet-content">' +
       html +
       '</div></div>';
-    backdrop.style.display = '';
+    backdrop.classList.remove('u-hidden');
     _sheetCloseCallback = opts.onClose || null;
     requestAnimationFrame(function () {
       backdrop.classList.add('m-sheet-visible');
@@ -167,7 +167,7 @@ window.MComponents = (function () {
     if (sheet) sheet.classList.remove('m-sheet-visible');
     backdrop.classList.remove('m-sheet-visible');
     setTimeout(function () {
-      backdrop.style.display = 'none';
+      backdrop.classList.add('u-hidden');
       container.innerHTML = '';
       if (_sheetCloseCallback) {
         _sheetCloseCallback();
