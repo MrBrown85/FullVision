@@ -925,12 +925,26 @@ a.dash-ins-name:hover {
   color: var(--text-2);
 }
 
-/* Students heading: Cards | Grid. */
+/* Students heading: search, sort, Flagged and Cards | Grid. */
 .dash-students-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   margin-top: 12px;
+}
+/* Every control in the heading is one height (--control-h). On the page
+   background the search is a white field, like the sort menu beside it,
+   and Flagged is a button of the same shape. */
+.dash-students-head .dash-search-input {
+  background: var(--surface);
+  border-color: var(--border);
+}
+.dash-students-head .dash-filter-chip {
+  height: var(--control-h);
+  padding: 0 12px;
+  font-size: var(--text-base);
+  border-radius: 8px;
 }
 /* On the page background the track is darker than in a card. */
 .dash-view-toggle .seg-btn:not([aria-pressed='true']) {

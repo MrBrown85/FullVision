@@ -685,7 +685,7 @@ window.DashInsights = (function () {
   }
 
   /* ── Students: Cards | Grid ─────────────────────────────── */
-  function studentsHeaderHtml(view) {
+  function studentsHeaderHtml(view, controlsHtml) {
     var seg = function (id, label) {
       var on = view === id;
       return (
@@ -701,7 +701,8 @@ window.DashInsights = (function () {
     return (
       '<div class="dash-students-head">' +
       '<h2 class="dash-students-title">Students</h2>' +
-      '<div class="seg seg-sm dash-view-toggle" role="group" aria-label="Show students as">' +
+      (controlsHtml || '') +
+      '<div class="seg dash-view-toggle" role="group" aria-label="Show students as">' +
       seg('cards', 'Cards') +
       seg('grid', 'Grid') +
       '</div>' +

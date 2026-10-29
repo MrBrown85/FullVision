@@ -8,22 +8,29 @@ describe('DashOverview.renderDashToolbar', () => {
     globalThis.isCourseArchived = cid => !!(COURSES[cid] && COURSES[cid].archived);
   });
 
-  it('renders only non-archived course options and current state', () => {
+  it('renders only non-archived course options and the count', () => {
     const html = DashOverview.renderDashToolbar({
       activeCourse: 'c1',
-      sortMode: 'overall-desc',
-      searchQuery: 'noor',
-      showFlaggedOnly: true,
       students: [{ id: 's1' }, { id: 's2' }],
-      flagCount: 3,
     });
 
     expect(html).toContain('Alpha');
     expect(html).not.toContain('Archived');
+    expect(html).toContain('2 Students');
+    expect(html).not.toContain('dash-search-input');
+  });
+
+  it('puts search, sort and Flagged in the Students heading with their state', () => {
+    const html = DashOverview.studentControlsHtml({
+      sortMode: 'overall-desc',
+      searchQuery: 'noor',
+      showFlaggedOnly: true,
+      flagCount: 3,
+    });
+
     expect(html).toContain('value="overall-desc" selected');
     expect(html).toContain('value="noor"');
     expect(html).toContain('Flagged (3)');
-    expect(html).toContain('2 Students');
   });
 });
 

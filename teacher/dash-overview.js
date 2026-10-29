@@ -4,11 +4,7 @@ window.DashOverview = (function () {
 
   function renderDashToolbar(opts) {
     var activeCourse = opts.activeCourse;
-    var sortMode = opts.sortMode;
-    var searchQuery = opts.searchQuery;
-    var showFlaggedOnly = opts.showFlaggedOnly;
     var students = opts.students;
-    var flagCount = opts.flagCount;
     var courseOptions = getPickerCourses(activeCourse)
       .map(function (c) {
         return (
@@ -23,6 +19,23 @@ window.DashOverview = (function () {
       '</select>' +
       '<button class="tb-action-btn tb-action-secondary" data-action="openClassManager">Class Management</button>' +
       (typeof renderTermPicker === 'function' ? renderTermPicker(activeCourse) : '') +
+      '<div class="dash-toolbar-spacer"></div>' +
+      '<span class="dash-toolbar-label">' +
+      students.length +
+      ' Student' +
+      (students.length !== 1 ? 's' : '') +
+      '</span>' +
+      '</div>'
+    );
+  }
+
+  /* Search, sort and Flagged, in the Students heading beside Cards | Grid. */
+  function studentControlsHtml(opts) {
+    var sortMode = opts.sortMode;
+    var searchQuery = opts.searchQuery;
+    var showFlaggedOnly = opts.showFlaggedOnly;
+    var flagCount = opts.flagCount;
+    return (
       '<div class="dash-search-wrap">' +
       '<span class="search-icon" aria-hidden="true">' +
       LINE_ICONS.search +
@@ -62,14 +75,7 @@ window.DashOverview = (function () {
       (flagCount > 0 ? ', ' + flagCount + ' flagged' : '') +
       '">\u2691 Flagged' +
       (flagCount > 0 ? ' (' + flagCount + ')' : '') +
-      '</button>' +
-      '<div class="dash-toolbar-spacer"></div>' +
-      '<span class="dash-toolbar-label">' +
-      students.length +
-      ' Student' +
-      (students.length !== 1 ? 's' : '') +
-      '</span>' +
-      '</div>'
+      '</button>'
     );
   }
 
@@ -403,6 +409,7 @@ window.DashOverview = (function () {
 
   return {
     renderDashToolbar: renderDashToolbar,
+    studentControlsHtml: studentControlsHtml,
     renderOverviewPanel: renderOverviewPanel,
     glanceHtml: glanceHtml,
     renderBirthdayWidget: renderBirthdayWidget,
