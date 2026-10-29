@@ -726,9 +726,15 @@ window.MGrade = (function () {
         '" value="' +
         (rawScore != null ? formatPoints(rawScore) : '') +
         '">' +
-        '<span style="font-size:15px;color:var(--text-3)">/ ' +
+        '<div class="m-pts-of"><span style="font-size:15px;color:var(--text-3)">/ ' +
         assessment.maxPoints +
-        '</span></div>' +
+        '</span><span class="m-pts-pct" id="m-pts-pct-' +
+        st.id +
+        '-' +
+        assessment.id +
+        '">' +
+        pointsPctHtml(rawScore, assessment.maxPoints, 0) +
+        '</span></div></div>' +
         '<button class="m-score-btn" data-action="m-grade-points-inc" data-sid="' +
         st.id +
         '" data-aid="' +
@@ -1378,6 +1384,13 @@ window.MGrade = (function () {
     swiper.addEventListener('keydown', function (e) {
       if (e.key === 'Enter' && e.target.classList.contains('m-pts-input')) e.target.blur();
     });
+    // The % follows the typing, as on the desktop.
+    swiper.addEventListener('input', function (e) {
+      var inp = e.target;
+      if (!inp.classList.contains('m-pts-input')) return;
+      var max = parseFloat(inp.dataset.max) || 100;
+      _updatePointsPct(inp.dataset.sid, inp.dataset.aid, parsePointsInput(inp.value, max), max);
+    });
     swiper.addEventListener('focusout', function (e) {
       if (!e.target.classList.contains('m-pts-input')) return;
       selectOnUp = null;
@@ -1487,16 +1500,25 @@ window.MGrade = (function () {
     _updateThumbGraded(cid, aid);
   }
 
+  // + and − step within the same limit as typing: 0 up to the bonus cap.
   function adjustPointsScore(cid, sid, aid, delta, maxPts) {
     var current = getPointsScore(cid, sid, aid) || 0;
-    var next = Math.max(0, Math.min(maxPts, current + delta));
+    var next = Math.max(0, Math.min(maxPts * POINTS_EXTRA_CREDIT_FACTOR, current + delta));
     setPointsScore(cid, sid, aid, next);
     clearProfCache();
     MC.haptic();
     // Update display
     var el = document.getElementById('m-pts-' + sid + '-' + aid);
     if (el) el.value = formatPoints(next);
+    _updatePointsPct(sid, aid, next, maxPts);
     _updateThumbGraded(cid, aid);
+  }
+
+  /* The % beside the points field, as the desktop shows it: "bonus" under
+     it above the maximum, nothing with no score. */
+  function _updatePointsPct(sid, aid, value, max) {
+    var el = document.getElementById('m-pts-pct-' + sid + '-' + aid);
+    if (el) el.innerHTML = pointsPctHtml(value, max, 0);
   }
 
   /* Typed points save like the desktop points box: the same clamp
@@ -1505,8 +1527,10 @@ window.MGrade = (function () {
   function commitPointsInput(cid, inp) {
     var sid = inp.dataset.sid;
     var aid = inp.dataset.aid;
-    var raw = parsePointsInput(inp.value, parseFloat(inp.dataset.max) || 100);
+    var max = parseFloat(inp.dataset.max) || 100;
+    var raw = parsePointsInput(inp.value, max);
     inp.value = raw != null ? formatPoints(raw) : '';
+    _updatePointsPct(sid, aid, raw, max);
     if (raw === getPointsScore(cid, sid, aid)) return;
     setPointsScore(cid, sid, aid, raw);
     clearProfCache();

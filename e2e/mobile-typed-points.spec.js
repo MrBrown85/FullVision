@@ -96,3 +96,42 @@ test('a blank field clears the score', async ({ page }) => {
   await expect(field).toHaveValue('');
   expect(await stored(page, sid)).toBeNull();
 });
+
+test('+ and − step within the bonus limit, and the % shows beside the field', async ({ page }) => {
+  const card = await openExam(page);
+  const sid = await card.getAttribute('data-sid');
+  const field = card.locator('.m-pts-input');
+  const pct = card.locator('.m-pts-pct');
+  await expect(pct).toHaveText('81%'); // 65 / 80
+
+  // Typing updates the % as the desktop does; above the maximum it says bonus.
+  await field.tap();
+  await page.keyboard.type('95');
+  await expect(pct).toHaveText('119%bonus');
+  await page.keyboard.press('Enter');
+  // "bonus" is in the same --text colour as the student's name.
+  await expect(pct.locator('.gb-pts-bonus')).toHaveCSS(
+    'color',
+    await card.locator('.m-grade-student-name').evaluate(el => getComputedStyle(el).color),
+  );
+
+  // − from a bonus score steps down by one, not to the maximum.
+  await card.locator('[data-action="m-grade-points-dec"]').click();
+  await expect(field).toHaveValue('94');
+  expect(await stored(page, sid)).toBe(94);
+
+  // + stops at twice the maximum, the typing limit.
+  await field.tap();
+  await page.keyboard.type('160');
+  await page.keyboard.press('Enter');
+  await card.locator('[data-action="m-grade-points-inc"]').click();
+  await expect(field).toHaveValue('160');
+  await expect(pct).toHaveText('200%bonus');
+
+  // At or under the maximum there is no bonus line.
+  await field.tap();
+  await page.keyboard.type('72');
+  await page.keyboard.press('Enter');
+  await expect(pct).toHaveText('90%');
+  await expect(pct.locator('.gb-pts-bonus')).toHaveCount(0);
+});
