@@ -1814,6 +1814,28 @@ body.fv-switching-course::after {
     opacity 0.2s,
     filter 0.2s;
 }
+/* Typed points: a filled field, blue edge when focused. */
+.m-pts-input {
+  width: 96px;
+  height: 52px;
+  border: none;
+  border-radius: 12px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 28px;
+  font-weight: 700;
+  text-align: center;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.m-pts-input:focus {
+  box-shadow: 0 0 0 2px var(--active);
+}
+.m-pts-input::placeholder {
+  color: var(--text);
+}
 .m-score-tag-label {
   display: flex;
   align-items: center;

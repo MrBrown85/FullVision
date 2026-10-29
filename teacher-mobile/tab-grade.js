@@ -611,6 +611,8 @@ window.MGrade = (function () {
         })
         .join('');
     }
+    var ptsTagLines = '';
+    var ptsTid = null;
     (isCompletionScored(assessment) || rubric ? [] : scoreTagIds(assessment, cid)).forEach(function (tid, tagIdx) {
       var tag = getTagById(cid, tid);
       var sec = getSectionForTag(cid, tid);
@@ -630,48 +632,15 @@ window.MGrade = (function () {
       var currentMod = existing.length ? normalizeScoreMod(current, existing[existing.length - 1].mod) : 0;
 
       if (isPoints && assessment.maxPoints) {
-        // Points mode
-        if (tagIdx > 0) return;
-        var rawScore = getPointsScore(cid, st.id, assessment.id);
-        tagGroups +=
-          '<div class="m-score-group" data-sid="' +
-          st.id +
-          '" data-aid="' +
-          assessment.id +
-          '" data-tid="' +
-          tid +
-          '">' +
+        // Points mode: one score for the assessment, drawn after the loop
+        // under every competency it assesses.
+        ptsTagLines +=
           '<div class="m-score-tag-label"><span class="m-score-tag-dot" style="background:' +
           tagColor +
           '"></span>' +
           MC.esc(tagLabel) +
-          '</div>' +
-          '<div style="display:flex;align-items:center;justify-content:center;gap:12px">' +
-          '<button class="m-score-btn" data-action="m-grade-points-dec" data-sid="' +
-          st.id +
-          '" data-aid="' +
-          assessment.id +
-          '" data-max="' +
-          assessment.maxPoints +
-          '" style="width:44px;height:44px;font-size:20px">−</button>' +
-          '<div style="text-align:center"><span style="font-size:28px;font-weight:700" id="m-pts-' +
-          st.id +
-          '-' +
-          assessment.id +
-          '">' +
-          (rawScore != null ? rawScore : '\u2014') +
-          '</span>' +
-          '<span style="font-size:15px;color:var(--text-3)"> / ' +
-          assessment.maxPoints +
-          '</span></div>' +
-          '<button class="m-score-btn" data-action="m-grade-points-inc" data-sid="' +
-          st.id +
-          '" data-aid="' +
-          assessment.id +
-          '" data-max="' +
-          assessment.maxPoints +
-          '" style="width:44px;height:44px;font-size:20px">+</button>' +
-          '</div></div>';
+          '</div>';
+        if (ptsTid === null) ptsTid = tid;
       } else {
         // Proficiency mode — levels 1-4 only. 'No Evidence' (stored as 0) is
         // reachable by tapping the currently-active level to toggle it off;
@@ -722,6 +691,53 @@ window.MGrade = (function () {
           '</div>';
       }
     });
+
+    if (ptsTid !== null) {
+      var rawScore = getPointsScore(cid, st.id, assessment.id);
+      tagGroups +=
+        '<div class="m-score-group" data-sid="' +
+        st.id +
+        '" data-aid="' +
+        assessment.id +
+        '" data-tid="' +
+        ptsTid +
+        '">' +
+        ptsTagLines +
+        '<div style="display:flex;align-items:center;justify-content:center;gap:12px">' +
+        '<button class="m-score-btn" data-action="m-grade-points-dec" data-sid="' +
+        st.id +
+        '" data-aid="' +
+        assessment.id +
+        '" data-max="' +
+        assessment.maxPoints +
+        '" style="width:44px;height:44px;font-size:20px">−</button>' +
+        '<div style="display:flex;align-items:center;gap:6px"><input class="m-pts-input" type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" placeholder="\u2014" aria-label="Points out of ' +
+        assessment.maxPoints +
+        '" id="m-pts-' +
+        st.id +
+        '-' +
+        assessment.id +
+        '" data-sid="' +
+        st.id +
+        '" data-aid="' +
+        assessment.id +
+        '" data-max="' +
+        assessment.maxPoints +
+        '" value="' +
+        (rawScore != null ? formatPoints(rawScore) : '') +
+        '">' +
+        '<span style="font-size:15px;color:var(--text-3)">/ ' +
+        assessment.maxPoints +
+        '</span></div>' +
+        '<button class="m-score-btn" data-action="m-grade-points-inc" data-sid="' +
+        st.id +
+        '" data-aid="' +
+        assessment.id +
+        '" data-max="' +
+        assessment.maxPoints +
+        '" style="width:44px;height:44px;font-size:20px">+</button>' +
+        '</div></div>';
+    }
 
     // Status toggles
     var statusRow =
@@ -1346,6 +1362,28 @@ window.MGrade = (function () {
     var students = getStudents(cid);
     students = sortStudents(students.slice(), 'alpha');
 
+    // Points field: tapping selects the number so typing replaces it; Done
+    // or tapping away saves. The tap's mouseup would put the caret back, so
+    // that one mouseup is cancelled.
+    var selectOnUp = null;
+    swiper.addEventListener('focusin', function (e) {
+      if (!e.target.classList.contains('m-pts-input')) return;
+      e.target.setSelectionRange(0, e.target.value.length);
+      selectOnUp = e.target;
+    });
+    swiper.addEventListener('mouseup', function (e) {
+      if (e.target === selectOnUp) e.preventDefault();
+      selectOnUp = null;
+    });
+    swiper.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && e.target.classList.contains('m-pts-input')) e.target.blur();
+    });
+    swiper.addEventListener('focusout', function (e) {
+      if (!e.target.classList.contains('m-pts-input')) return;
+      selectOnUp = null;
+      commitPointsInput(cid, e.target);
+    });
+
     swiper.addEventListener(
       'scroll',
       function () {
@@ -1457,7 +1495,21 @@ window.MGrade = (function () {
     MC.haptic();
     // Update display
     var el = document.getElementById('m-pts-' + sid + '-' + aid);
-    if (el) el.textContent = next;
+    if (el) el.value = formatPoints(next);
+    _updateThumbGraded(cid, aid);
+  }
+
+  /* Typed points save like the desktop points box: the same clamp
+     (parsePointsInput), blank clears, a typed 0 is a score, and leaving the
+     field unchanged saves nothing. */
+  function commitPointsInput(cid, inp) {
+    var sid = inp.dataset.sid;
+    var aid = inp.dataset.aid;
+    var raw = parsePointsInput(inp.value, parseFloat(inp.dataset.max) || 100);
+    inp.value = raw != null ? formatPoints(raw) : '';
+    if (raw === getPointsScore(cid, sid, aid)) return;
+    setPointsScore(cid, sid, aid, raw);
+    clearProfCache();
     _updateThumbGraded(cid, aid);
   }
 
