@@ -5593,10 +5593,18 @@ label.cm-cr-row {
 .cm-pts-name {
   color: var(--text);
 }
-.cm-pts-min,
-.cm-pts-pct {
+.cm-pts-min {
   width: 64px;
   text-align: center;
+}
+.cm-pts-slot {
+  width: 64px;
+  flex-shrink: 0;
+  text-align: center;
+}
+.cm-pts-subhead {
+  font-weight: 500;
+  margin-top: -4px;
 }
 .cm-pts-unit,
 .cm-pts-below {

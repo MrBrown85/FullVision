@@ -478,40 +478,60 @@ function getCategoryAverage(cid, studentId, categoryId) {
   return result;
 }
 
-/* What each whole level counts as in the course %, from the class's
-   Counts As column (DEFAULT_GRADING_SCALE.percents when unset). With no
-   class, the defaults. */
+/* What each step (COUNTS_AS_STEPS, 1 to 4 with + and −) counts as in the
+   course %, lowest first, from a Counts As percents object: a whole level's
+   own value or the default, and a step left out a third of the way between
+   its whole levels. */
+function countsAsStepPercents(percents) {
+  var d = DEFAULT_GRADING_SCALE.percents;
+  var p = percents || d;
+  function num(key) {
+    var v = p[key] === '' || p[key] == null ? NaN : Number(p[key]);
+    return isFinite(v) ? Math.max(0, Math.min(100, v)) : null;
+  }
+  var whole = {};
+  [1, 2, 3, 4].forEach(function (l) {
+    var v = num(l);
+    whole[l] = v == null ? d[l] : v;
+  });
+  return COUNTS_AS_STEPS.map(function (step) {
+    var own = num(step.key);
+    if (own != null) return own;
+    var l = parseInt(step.key, 10);
+    if (step.key.slice(-1) === '+') return whole[l] + (whole[l + 1] - whole[l]) / 3;
+    return whole[l] - (whole[l] - whole[l - 1]) / 3;
+  });
+}
+// The class's steps; with no class, the defaults.
 function _levelPercents(cid) {
   var scale = cid && typeof getGradingScale === 'function' ? getGradingScale(cid) : null;
-  var p = scale && scale.percents;
-  var d = DEFAULT_GRADING_SCALE.percents;
-  if (!p) return d;
-  var out = {};
-  [1, 2, 3, 4].forEach(function (l) {
-    var v = Number(p[l]);
-    out[l] = isFinite(v) ? Math.max(0, Math.min(100, v)) : d[l];
-  });
-  return out;
+  return countsAsStepPercents(scale && scale.percents);
 }
-function _isLinearPercents(p) {
-  return p[1] === 25 && p[2] === 50 && p[3] === 75 && p[4] === 100;
+// Level ÷ 4 at every step, the default.
+function _isLinearPercents(steps) {
+  return COUNTS_AS_STEPS.every(function (step, i) {
+    return Math.abs(steps[i] - step.at * 25) < 1e-9;
+  });
 }
 
-/* A level from 0 to 4 as the percent it counts as. Between whole levels
-   (3+ is 3.33, an average 2.9) it is that far along to the next level's
-   percent, so 3+ at 84 / 96 is 88%. Below 1 it runs down to 0. With the
-   default percents this is level ÷ 4, worked out the same way as before so
-   no grade moves by a rounding hair. */
+/* A level from 0 to 4 as the percent it counts as. A step (3+ is 3.33)
+   counts as its own Counts As value; between steps (an average of 2.9) it
+   is that far along the line to the next step. Below 1 it runs down to 0.
+   With the default percents this is level ÷ 4, worked out the same way as
+   before so no grade moves by a rounding hair. */
 function levelToPercent(cid, value) {
   if (value == null) return null;
   var v = Math.max(0, Math.min(4, Number(value)));
   if (!(v > 0)) return 0;
   var p = _levelPercents(cid);
   if (_isLinearPercents(p)) return (v / 4) * 100;
-  var lo = Math.floor(v);
-  if (lo >= 4) return p[4];
-  var from = lo === 0 ? 0 : p[lo];
-  return from + (p[lo + 1] - from) * (v - lo);
+  if (v <= 1) return p[0] * v;
+  for (var i = 0; i < COUNTS_AS_STEPS.length - 1; i++) {
+    var a = COUNTS_AS_STEPS[i].at;
+    var b = COUNTS_AS_STEPS[i + 1].at;
+    if (v <= b + 1e-9) return p[i] + ((p[i + 1] - p[i]) * (v - a)) / (b - a);
+  }
+  return p[p.length - 1];
 }
 
 /* A level as points out of 4 for the course %: the level itself with the
@@ -2160,6 +2180,7 @@ window.Calc = {
   getRubricAssessmentScore,
   getCategoryAverage,
   levelToPercent,
+  countsAsStepPercents,
   percentageToLetter,
   courseHasEnded,
   getCourseLetterData,
