@@ -454,7 +454,9 @@ window.MObserve = (function () {
       '><span>' +
       (o.dot ? '<span class="dim-dot" style="background:' + o.dot + '"></span>' : '') +
       MC.esc(label) +
-      '</span><span class="m-pick-check" aria-hidden="true">' +
+      '</span>' +
+      (o.meta ? '<span class="m-pick-meta">' + MC.esc(o.meta) + '</span>' : '') +
+      '<span class="m-pick-check" aria-hidden="true">' +
       (on ? '\u2713' : '') +
       '</span></button>'
     );
@@ -480,14 +482,20 @@ window.MObserve = (function () {
         rows += _pickRow(kind, st.id, name, _selectedStudents.indexOf(st.id) >= 0, { search: name });
       });
     } else if (kind === 'assessment') {
+      rows +=
+        '<input type="search" class="m-pick-search" data-pick-search placeholder="Search assessments" aria-label="Search assessments">';
       (getAssessments(cid) || []).forEach(function (a) {
-        rows += _pickRow(kind, a.id, a.title || 'Untitled', _selectedAssessment === a.id);
+        var title = a.title || 'Untitled';
+        var date = a.date ? parseLocalDate(a.date).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' }) : '';
+        rows += _pickRow(kind, a.id, title, _selectedAssessment === a.id, { search: title, meta: date });
       });
       rows += _pickRow(kind, '', 'None', !_selectedAssessment, { none: true });
     } else if (kind === 'competency') {
+      rows +=
+        '<input type="search" class="m-pick-search" data-pick-search placeholder="Search competencies" aria-label="Search competencies">';
       ObsCapture.competencyItems(cid).forEach(function (c) {
         if (c.type === 'section') rows += '<div class="m-pick-section">' + MC.esc(c.label) + '</div>';
-        else rows += _pickRow(kind, c.id, c.label, _selectedCompetency === c.id);
+        else rows += _pickRow(kind, c.id, c.label, _selectedCompetency === c.id, { search: c.label });
       });
       rows += _pickRow(kind, '', 'None', !_selectedCompetency, { none: true });
     } else if (kind === 'level') {
@@ -557,6 +565,18 @@ window.MObserve = (function () {
     q = String(q || '').toLowerCase();
     document.querySelectorAll('#m-obs-edit-picker .m-pick-row[data-search]').forEach(function (row) {
       row.style.display = row.getAttribute('data-search').indexOf(q) >= 0 ? '' : 'none';
+    });
+    // A section heading shows only while a row under it does.
+    document.querySelectorAll('#m-obs-edit-picker .m-pick-section').forEach(function (head) {
+      var shown = false;
+      for (
+        var el = head.nextElementSibling;
+        el && !el.classList.contains('m-pick-section');
+        el = el.nextElementSibling
+      ) {
+        if (el.hasAttribute('data-search') && el.style.display !== 'none') shown = true;
+      }
+      head.style.display = shown ? '' : 'none';
     });
   }
 
