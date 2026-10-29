@@ -90,7 +90,10 @@ describe('grades shown by grading setting', () => {
     expect(studentRosterBadges(CID, 's1').prof.text).toBe('PRF');
     expect(studentRosterBadges(CID, 's1').letter.text).toBe('B 78.9%');
     setting('letter');
-    expect(studentRosterBadges(CID, 's1')).toEqual({ prof: null, letter: { text: 'B 78.9%', level: 3 } });
+    expect(studentRosterBadges(CID, 's1')).toEqual({
+      prof: null,
+      letter: { text: 'B 78.9%', grade: 'B', pct: '78.9%', level: 3 },
+    });
     expect(studentRosterBadges(CID, 's3')).toEqual({ prof: null, letter: null });
   });
 
