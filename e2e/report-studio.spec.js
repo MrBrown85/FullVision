@@ -212,10 +212,12 @@ test.describe('Page Studio', () => {
     // The longest report in the class.
     await expect(page.locator('.report-sheet').first().locator('.report-student-name')).toHaveText(/\w+ \w+/);
     await expect(page.locator('#studio-fit')).toHaveText('1 sheet for all 27 students');
-    await expect(page.locator('.studio-head')).toHaveText(/^1 sheet for all 27 studentsOne StudentEveryone$/);
+    await expect(page.locator('.studio-head')).toHaveText(
+      /^1 sheet for all 27 studentsPaperLetterLegalSidesFront OnlyFront and BackInkBlackColour│One StudentEveryone$/,
+    );
     await expect(page.locator('.studio-page-add')).toHaveText('+ Page');
-    // Sides, not Pages, in the toolbar.
-    await expect(page.getByRole('radiogroup', { name: 'Sides' })).toBeVisible();
+    // Sides, not Pages, over the canvas.
+    await expect(page.locator('.studio-head').getByRole('radiogroup', { name: 'Sides' })).toBeVisible();
     await expect(page.getByRole('radio', { name: 'Front and Back' })).toHaveAttribute('aria-checked', 'true');
     await expect(page.locator('#report-pages')).toHaveCount(0);
     await expect(page.getByRole('tab', { name: 'Class Summary' })).toHaveCount(0);

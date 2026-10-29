@@ -129,15 +129,8 @@ window.PageReports = (function () {
     // Show Print button only on progress reports and class summary
     const tbPrint = document.getElementById('tb-print-btn');
     if (tbPrint) tbPrint.style.display = tab === 'questionnaire' ? 'none' : '';
-    const tbPaper = document.getElementById('report-paper');
-    if (tbPaper) tbPaper.style.display = tab === 'questionnaire' ? 'none' : '';
-    ['report-sides', 'report-ink', 'tb-divider', 'tb-paper-label', 'tb-save-template'].forEach(function (id) {
-      const el = document.getElementById(id);
-      if (el) el.style.display = tab === 'progress' ? '' : 'none';
-    });
-    document.querySelectorAll('.tb-label-progress').forEach(function (el) {
-      el.style.display = tab === 'progress' ? '' : 'none';
-    });
+    const tbSave = document.getElementById('tb-save-template');
+    if (tbSave) tbSave.style.display = tab === 'progress' ? '' : 'none';
     const copySel = document.getElementById('report-copy');
     if (copySel && tab !== 'progress') copySel.style.display = 'none';
     if (tab === 'progress') {
@@ -372,7 +365,7 @@ window.PageReports = (function () {
     }
 
     // Progress Reports: Page Studio (report-studio.js)
-    output.innerHTML = ReportStudio.layoutHtml({ view: studioView });
+    output.innerHTML = ReportStudio.layoutHtml({ view: studioView, settingsHtml: _printSettingsHtml() });
     renderStudioPanels();
     renderReportPreview();
     _mountStudioKeys();
@@ -1073,18 +1066,87 @@ window.PageReports = (function () {
     renderStudioPanels();
     renderReportPreview();
   }
-  /* Sides, Ink and Save as Template belong to Build Your Own. */
+  /* Save as Template belongs to Build Your Own (so do Sides and Ink:
+     _printSettingsHtml). */
   function _syncProgressToolbar() {
     var build = activeTab === 'progress' && !_isGrade();
-    ['report-sides', 'report-ink', 'tb-save-template'].forEach(function (id) {
-      var el = document.getElementById(id);
-      if (el) el.style.display = build ? '' : 'none';
-    });
-    document.querySelectorAll('.tb-label-progress').forEach(function (el) {
-      el.style.display = build ? '' : 'none';
-    });
+    var save = document.getElementById('tb-save-template');
+    if (save) save.style.display = build ? '' : 'none';
     var rail = document.getElementById('tb-rail-btn');
     if (rail) rail.textContent = _isGrade() ? 'Options' : 'Blocks';
+  }
+  /* Paper, and for Build Your Own Sides and Ink, over the canvas beside
+     One Student and Everyone. */
+  function _printSettingsHtml() {
+    var seg = function (label, id, action, key, options, current) {
+      return (
+        '<span class="tb-label">' +
+        label +
+        '</span><div class="seg seg-sm" id="' +
+        id +
+        '" role="radiogroup" aria-label="' +
+        label +
+        '">' +
+        options
+          .map(function (o) {
+            var on = o[0] === current;
+            return (
+              '<button type="button" class="seg-btn' +
+              (on ? ' active' : '') +
+              '" data-action="' +
+              action +
+              '" data-' +
+              key +
+              '="' +
+              o[0] +
+              '" role="radio" aria-checked="' +
+              on +
+              '">' +
+              o[1] +
+              '</button>'
+            );
+          })
+          .join('') +
+        '</div>'
+      );
+    };
+    var html = seg(
+      'Paper',
+      'report-paper',
+      'setPaper',
+      'paper',
+      [
+        ['letter', 'Letter'],
+        ['legal', 'Legal'],
+      ],
+      reportPaper,
+    );
+    if (!_isGrade()) {
+      html +=
+        seg(
+          'Sides',
+          'report-sides',
+          'setSides',
+          'sides',
+          [
+            ['1', 'Front Only'],
+            ['2', 'Front and Back'],
+          ],
+          _formOf().sides.length > 1 ? '2' : '1',
+        ) +
+        seg(
+          'Ink',
+          'report-ink',
+          'setInk',
+          'ink',
+          [
+            ['black', 'Black'],
+            ['colour', 'Colour'],
+          ],
+          reportView === 'photocopy' ? 'black' : 'colour',
+        );
+    }
+    return html + '<span class="tb-divider" aria-hidden="true">\u2502</span>';
   }
   function _modeSwitchHtml() {
     var grade = _isGrade();
@@ -2160,7 +2222,7 @@ window.PageReports = (function () {
 
   /* -- Toolbar HTML (rendered into main on init) ---------- */
   var TOOLBAR_HTML =
-    '<div class="page-toolbar report-toolbar no-print">\n      <div class="seg report-seg-control" role="tablist" aria-label="Report type">\n        <button class="seg-btn report-seg-btn active" data-action="switchTab" data-tab="questionnaire" role="tab" aria-selected="true">Term Questionnaire</button>\n        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="progress" role="tab" aria-selected="false">Progress Reports</button>\n      </div>\n      <div class="report-stepper" id="report-stepper" style="display:none">\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="-1" title="Previous student" aria-label="Previous student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="1" title="Next student" aria-label="Next student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n      </div>\n      <div class="student-picker" id="student-picker">\n        <button class="student-picker-btn" data-action="toggleStudentPicker" aria-label="Select students" aria-expanded="false" aria-haspopup="listbox">\n          <span id="picker-label">All Students</span>\n        </button>\n        <div class="student-picker-dropdown" id="picker-dropdown"></div>\n      </div>\n      <div class="tq-student-nav" id="tq-student-nav" style="display:none">\n        <div class="qn-stepper">\n          <button type="button" class="tq-toolbar-arrow" data-action="tqPrevStudent" title="Previous Student" aria-label="Previous Student">\u2039</button>\n          <span class="tq-student-name" id="tq-student-name"></span>\n          <button type="button" class="tq-toolbar-arrow" data-action="tqNextStudent" title="Next Student" aria-label="Next Student">\u203A</button>\n        </div>\n        <span class="qn-pos" id="tq-student-pos"></span>\n      </div>\n      <select id="report-period" class="term-select" aria-label="Report"></select>\n      <select id="report-copy" class="term-select" aria-label="Copy" style="display:none"></select>\n      <span class="tb-divider" id="tb-divider" aria-hidden="true">\u2502</span>\n      <span class="tb-label" id="tb-paper-label">Paper</span>\n      <div class="seg seg-sm" id="report-paper" role="radiogroup" aria-label="Paper" style="display:none">\n        <button class="seg-btn active" data-action="setPaper" data-paper="letter" role="radio" aria-checked="true">Letter</button>\n        <button class="seg-btn" data-action="setPaper" data-paper="legal" role="radio" aria-checked="false">Legal</button>\n      </div>\n      <span class="tb-label tb-label-progress">Sides</span>\n      <div class="seg seg-sm" id="report-sides" role="radiogroup" aria-label="Sides" style="display:none">\n        <button class="seg-btn" data-action="setSides" data-sides="1" role="radio" aria-checked="false">Front Only</button>\n        <button class="seg-btn active" data-action="setSides" data-sides="2" role="radio" aria-checked="true">Front and Back</button>\n      </div>\n      <span class="tb-label tb-label-progress">Ink</span>\n      <div class="seg seg-sm" id="report-ink" role="radiogroup" aria-label="Ink" style="display:none">\n        <button class="seg-btn" data-action="setInk" data-ink="black" role="radio" aria-checked="false">Black</button>\n        <button class="seg-btn active" data-action="setInk" data-ink="colour" role="radio" aria-checked="true">Colour</button>\n      </div>\n      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">\n        <span class="qn-ready tq-only" id="tq-ready" style="display:none"></span>\n        <button type="button" class="tb-toggle-btn tq-only" id="tq-questions-btn" style="display:none" data-action="tqQuestions" aria-haspopup="dialog">Questions</button>\n        <button type="button" class="tb-action-btn tq-only" id="tq-save-next" style="display:none" data-action="tqNextStudent" title="\u2318 Return">Save and Next \u203A</button>\n        <button class="tb-toggle-btn" id="tb-phones-btn" style="display:none" data-action="togglePhones" aria-pressed="false">Sent to Phones</button>\n        <button class="tb-toggle-btn" id="tb-rail-btn" style="display:none" data-action="toggleRail" aria-pressed="false" aria-controls="studio-palette">Blocks</button>\n        <button class="tb-toggle-btn" id="tb-save-template" style="display:none" data-action="openSaveTemplate">Save as Template</button>\n        <button class="tb-action-btn" id="tb-print-btn" data-action="printReports">Print Reports</button>\n      </div>\n    </div>\n    <div id="report-output" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto"></div>';
+    '<div class="page-toolbar report-toolbar no-print">\n      <div class="seg report-seg-control" role="tablist" aria-label="Report type">\n        <button class="seg-btn report-seg-btn active" data-action="switchTab" data-tab="questionnaire" role="tab" aria-selected="true">Term Questionnaire</button>\n        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="progress" role="tab" aria-selected="false">Progress Reports</button>\n      </div>\n      <div class="report-stepper" id="report-stepper" style="display:none">\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="-1" title="Previous student" aria-label="Previous student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="1" title="Next student" aria-label="Next student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n      </div>\n      <div class="student-picker" id="student-picker">\n        <button class="student-picker-btn" data-action="toggleStudentPicker" aria-label="Select students" aria-expanded="false" aria-haspopup="listbox">\n          <span id="picker-label">All Students</span>\n        </button>\n        <div class="student-picker-dropdown" id="picker-dropdown"></div>\n      </div>\n      <div class="tq-student-nav" id="tq-student-nav" style="display:none">\n        <div class="qn-stepper">\n          <button type="button" class="tq-toolbar-arrow" data-action="tqPrevStudent" title="Previous Student" aria-label="Previous Student">\u2039</button>\n          <span class="tq-student-name" id="tq-student-name"></span>\n          <button type="button" class="tq-toolbar-arrow" data-action="tqNextStudent" title="Next Student" aria-label="Next Student">\u203A</button>\n        </div>\n        <span class="qn-pos" id="tq-student-pos"></span>\n      </div>\n      <select id="report-period" class="term-select" aria-label="Report"></select>\n      <select id="report-copy" class="term-select" aria-label="Copy" style="display:none"></select>\n      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">\n        <span class="qn-ready tq-only" id="tq-ready" style="display:none"></span>\n        <button type="button" class="tb-toggle-btn tq-only" id="tq-questions-btn" style="display:none" data-action="tqQuestions" aria-haspopup="dialog">Questions</button>\n        <button type="button" class="tb-action-btn tq-only" id="tq-save-next" style="display:none" data-action="tqNextStudent" title="\u2318 Return">Save and Next \u203A</button>\n        <button class="tb-toggle-btn" id="tb-phones-btn" style="display:none" data-action="togglePhones" aria-pressed="false">Sent to Phones</button>\n        <button class="tb-toggle-btn" id="tb-rail-btn" style="display:none" data-action="toggleRail" aria-pressed="false" aria-controls="studio-palette">Blocks</button>\n        <button class="tb-toggle-btn" id="tb-save-template" style="display:none" data-action="openSaveTemplate">Save as Template</button>\n        <button class="tb-action-btn" id="tb-print-btn" data-action="printReports">Print Reports</button>\n      </div>\n    </div>\n    <div id="report-output" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto"></div>';
 
   /* -- Public API ----------------------------------------- */
   return {
