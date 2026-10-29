@@ -1370,6 +1370,7 @@ window.MGrade = (function () {
     swiper.scrollTo({ left: idx * swiper.clientWidth, behavior: 'smooth' });
     _currentIdx = idx;
     _updateCurrentThumb(idx);
+    _updateSubtitle(idx, document.querySelectorAll('#m-thumb-strip .m-thumb').length);
   }
 
   function _updateCurrentThumb(idx) {
