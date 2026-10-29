@@ -409,6 +409,35 @@ describe('MCardWidgets.render growth', () => {
     expect(html).toContain('var(--score-3)');
   });
 
+  it('counts assessments, not competency scores', () => {
+    // Two assessments, each scoring both competencies: four scores.
+    mockWidgetDataLayer({
+      getTagScores: (cid, sid, tagId) => [
+        { score: 2, type: 'summative', date: '2026-01-01', tagId, assessmentId: 'a1' },
+        { score: 3, type: 'summative', date: '2026-02-01', tagId, assessmentId: 'a2' },
+      ],
+    });
+    const dataWithSections = {
+      sections: [{ id: 's1', name: 'Test', shortName: 'Test', color: '#888', tags: [{ id: 't1' }, { id: 't2' }] }],
+    };
+    const html = MCardWidgets.render('growth', STUDENT, CID, dataWithSections);
+    expect(html).toContain('(2 assessments)');
+    expect(html).not.toContain('(4 assessments)');
+  });
+
+  it('says 1 assessment when one assessment scores several competencies', () => {
+    mockWidgetDataLayer({
+      getTagScores: (cid, sid, tagId) => [
+        { score: tagId === 't1' ? 2 : 3, type: 'summative', date: '2026-01-01', tagId, assessmentId: 'a1' },
+      ],
+    });
+    const dataWithSections = {
+      sections: [{ id: 's1', name: 'Test', shortName: 'Test', color: '#888', tags: [{ id: 't1' }, { id: 't2' }] }],
+    };
+    const html = MCardWidgets.render('growth', STUDENT, CID, dataWithSections);
+    expect(html).toContain('(1 assessment)');
+  });
+
   it('shows single assessment note for only one score', () => {
     mockWidgetDataLayer({
       getTagScores: (cid, sid, tagId) => [

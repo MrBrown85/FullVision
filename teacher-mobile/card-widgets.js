@@ -282,6 +282,12 @@ window.MCardWidgets = (function () {
 
     var firstScore = allEvidenceScores[0].score;
     var lastScore = allEvidenceScores[allEvidenceScores.length - 1].score;
+    // One assessment scores several competencies; count each assessment once.
+    var assessmentIds = {};
+    allEvidenceScores.forEach(function (s) {
+      assessmentIds[s.assessmentId] = true;
+    });
+    var assessmentN = Object.keys(assessmentIds).length;
     var arrowColor, arrowChar;
     if (lastScore > firstScore) {
       arrowColor = 'var(--score-3)';
@@ -308,8 +314,9 @@ window.MCardWidgets = (function () {
       (PROF_LABELS[Math.round(lastScore)] || 'No Evidence') +
       '</span>' +
       '<span class="m-wdg-growth-meta"> (' +
-      allEvidenceScores.length +
-      ' assessments)</span>' +
+      assessmentN +
+      (assessmentN === 1 ? ' assessment)' : ' assessments)') +
+      '</span>' +
       '</div>'
     );
   };
