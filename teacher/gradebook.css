@@ -434,11 +434,6 @@
 .gb-score:hover {
   background: rgba(0, 122, 255, 0.06);
 }
-/* A rubric competency whose criteria disagree: the lowest is shown, marked. */
-.gb-score-val.gb-mixed {
-  outline: 2px dashed currentColor;
-  outline-offset: -3px;
-}
 .gb-score-val {
   display: inline-flex;
   align-items: center;
@@ -466,6 +461,18 @@
 }
 .gb-score-val.s4 {
   background: var(--score-4);
+}
+/* A rubric competency whose criteria disagree: the lowest is shown, with a
+   striped fill. */
+.gb-score-val.gb-mixed {
+  /* The rubric grid's mixed fill (assignments.css .rsg-level.active.mixed). */
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent,
+    transparent 3px,
+    rgba(255, 255, 255, 0.32) 3px,
+    rgba(255, 255, 255, 0.32) 6px
+  );
 }
 .gb-score.gb-focus {
   outline: 2px solid var(--active);

@@ -4068,8 +4068,9 @@ function _bundleToCache(cid, bundle) {
    changed class is downloaded. gb-bundle-meta-<cid> records the copy's
    version, owner and age. FV_CACHE_FIRST (constants.js) or
    window.__FV_CACHE_FIRST = false turns this off. */
-// 4 (2026-10-29): rubric scores are keyed by criterion, so a copy saved
-// before that is loaded again in full from the server rather than reused.
+// 4 (2026-10-29): rubric scores are keyed by criterion. A schema 3 copy is
+// still used unless it keeps rubric scores under competencies
+// (_savedCopyUsable), so only those classes are downloaded again in full.
 var _BUNDLE_SCHEMA = 4;
 var _SAVED_COPY_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 var _classFresh = {}; // cid → the server confirmed or replaced this copy since it was shown
@@ -4094,9 +4095,35 @@ function _saveClassMeta(cid, patch) {
    code reads, and within 14 days of last being opened. */
 function _savedCopyUsable(cid) {
   var meta = _classMeta(cid);
-  if (!meta || meta.schema !== _BUNDLE_SCHEMA || !meta.owner || meta.owner !== _teacherId) return false;
+  if (!meta || !meta.owner || meta.owner !== _teacherId) return false;
+  // A copy from schema 3 differs only in keeping rubric scores under
+  // competencies; one with none of those is used as it is.
+  if (meta.schema !== _BUNDLE_SCHEMA && !(meta.schema === 3 && !_savedCopyHasLegacyRubricKeys(cid))) return false;
   if (Date.now() - (meta.lastOpenedAt || meta.savedAt || 0) > _SAVED_COPY_MAX_AGE_MS) return false;
   return _hasLocalCopy(cid);
+}
+
+// A saved copy that still keeps rubric scores under competencies.
+function _savedCopyHasLegacyRubricKeys(cid) {
+  var scores = _safeParseLS('gb-scores-' + cid, {});
+  var assessments = _safeParseLS('gb-assessments-' + cid, []);
+  var rubricById = {};
+  _safeParseLS('gb-rubrics-' + cid, []).forEach(function (r) {
+    if (r && r.id) rubricById[r.id] = r;
+  });
+  var legacyTags = {};
+  (assessments || []).forEach(function (a) {
+    var rubric = a && !isPointsScored(a) && rubricById[a.rubricId || a.rubric_id];
+    if (!rubric) return;
+    var tags = {};
+    (rubric.criteria || []).forEach(function (c) {
+      ((c && c.tagIds) || []).forEach(function (t) {
+        tags[t] = true;
+      });
+    });
+    legacyTags[a.id] = tags;
+  });
+  return _hasLegacyRubricKeys(scores || {}, legacyTags);
 }
 
 /* The copy becomes the server baseline only when it holds no local edits:
@@ -4950,8 +4977,23 @@ function _persistScoreToCanonical(cid, sid, aid, tid, scoreVal, note, mod) {
         },
       });
     } else if (isRubric) {
-      // Not one of the rubric's criteria: nothing to send.
-      return;
+      // A competency key on rubric work is a stale entry: nothing to send.
+      // Any other key is a criterion this device can't match yet (the
+      // rubric still loading, or attached in another tab): it goes up as
+      // one, and the server checks it belongs to the assessment's rubric.
+      if (isAssessmentTag || getTagById(cid, tid)) return;
+      ops.push({
+        rpc: 'upsert_rubric_score',
+        params: {
+          p_enrollment_id: sid,
+          p_assessment_id: aid,
+          p_criterion_id: tid,
+          p_value: intVal,
+          p_modifier: modifier,
+          p_comment: criterionComment,
+          p_beyond: criterionBeyond,
+        },
+      });
     } else if (isPoints || isUnlinkedTag(tid) || (assessment && !isAssessmentTag)) {
       // An unlinked assessment's single score. On proficiency work 0 clears
       // it; on points and Complete/Incomplete work 0 is a score.
@@ -8867,11 +8909,11 @@ var _rubricsRev = {};
 function _noteRubricsSet(cid) {
   _rubricsRev[cid] = (_rubricsRev[cid] || 0) + 1;
 }
-function _migrateRubricScoreKeys(cid, scores) {
-  if (!scores || typeof scores !== 'object') return scores;
-  var sig = _rubricsRev[cid] || 0;
-  if (_rubricKeyedScores.get(scores) === sig) return scores;
+/* Rubric work whose criteria feed competencies: { assessmentId: criteria }
+   and, per assessment, the competency ids an old entry would sit under. */
+function _rubricLegacyKeyIndex(cid) {
   var byAssessment = {};
+  var legacyTags = {};
   (getAssessments(cid) || []).forEach(function (a) {
     var rubricId = a && (a.rubricId || a.rubric_id);
     if (!rubricId || isPointsScored(a)) return;
@@ -8879,8 +8921,41 @@ function _migrateRubricScoreKeys(cid, scores) {
     var criteria = ((rubric && rubric.criteria) || []).filter(function (c) {
       return c && c.id && c.tagIds && c.tagIds.length;
     });
-    if (criteria.length) byAssessment[a.id] = criteria;
+    if (!criteria.length) return;
+    byAssessment[a.id] = criteria;
+    var tags = {};
+    criteria.forEach(function (c) {
+      c.tagIds.forEach(function (t) {
+        tags[t] = true;
+      });
+    });
+    legacyTags[a.id] = tags;
   });
+  return { byAssessment: byAssessment, legacyTags: legacyTags };
+}
+// Whether any entry still sits under a competency on rubric work.
+function _hasLegacyRubricKeys(scores, legacyTags) {
+  return Object.keys(scores).some(function (sid) {
+    var entries = scores[sid];
+    return (
+      Array.isArray(entries) &&
+      entries.some(function (e) {
+        return e && legacyTags[e.assessmentId] && legacyTags[e.assessmentId][e.tagId];
+      })
+    );
+  });
+}
+function _migrateRubricScoreKeys(cid, scores) {
+  if (!scores || typeof scores !== 'object') return scores;
+  var sig = _rubricsRev[cid] || 0;
+  if (_rubricKeyedScores.get(scores) === sig) return scores;
+  var index = _rubricLegacyKeyIndex(cid);
+  var byAssessment = index.byAssessment;
+  // Nearly always: nothing old to move, found in one pass over the entries.
+  if (!_hasLegacyRubricKeys(scores, index.legacyTags)) {
+    _rubricKeyedScores.set(scores, sig);
+    return scores;
+  }
   Object.keys(scores).forEach(function (sid) {
     var entries = scores[sid];
     if (!Array.isArray(entries) || !entries.length) return;

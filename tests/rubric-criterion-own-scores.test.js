@@ -106,7 +106,10 @@ describe('two criteria on one competency', () => {
     expect(competencyLevelFromCriteria(CID, SID, assessment, CI)).toEqual({ score: 3, mod: 1, mixed: false });
     expect(competencyLevelFromCriteria(CID, SID, assessment, CP)).toBeNull();
     seed([entry(CRIT_Q1, 4), entry(CRIT_Q2, 2, { mod: 1 })]);
-    expect(competencyLevelFromCriteria(CID, SID, assessment, CI)).toEqual({ score: 2, mod: 0, mixed: true });
+    expect(competencyLevelFromCriteria(CID, SID, assessment, CI)).toEqual({ score: 2, mod: 1, mixed: true });
+    // 3 and 3−: the lowest is 3−, not 3.
+    seed([entry(CRIT_Q1, 3), entry(CRIT_Q2, 3, { mod: -1 })]);
+    expect(competencyLevelFromCriteria(CID, SID, assessment, CI)).toEqual({ score: 3, mod: -1, mixed: true });
     expect(rubricCompetencyIds(CID, assessment)).toEqual([CI, CP]);
     expect(scoreTagIds(assessment, CID)).toEqual([CRIT_Q1, CRIT_Q2, CRIT_Q3]);
   });
@@ -177,10 +180,25 @@ describe('scores saved under competencies before', () => {
     expect(byKey[CRIT_Q2]).toMatchObject({ score: 3, critNote: 'Nice.' });
   });
 
-  it('is not reused from a copy saved before this change', () => {
+  it('is reused from schema 3 only when it keeps no rubric score under a competency', () => {
     expect(_BUNDLE_SCHEMA).toBe(4);
+    seed([entry(CRIT_Q1, 3)]);
+    _teacherId = 'teacher-uuid';
     _saveClassMeta(CID, { schema: 3, owner: _teacherId, version: 9, lastOpenedAt: Date.now(), savedAt: Date.now() });
+    expect(_savedCopyHasLegacyRubricKeys(CID)).toBe(false);
+    expect(_savedCopyUsable(CID)).toBe(true);
+    // The same copy with an old competency-keyed rubric score is downloaded again.
+    localStorage.setItem('gb-scores-' + CID, JSON.stringify({ [SID]: [entry(CI, 3)] }));
+    expect(_savedCopyHasLegacyRubricKeys(CID)).toBe(true);
     expect(_savedCopyUsable(CID)).toBe(false);
+    _saveClassMeta(CID, { schema: 4 });
+    expect(_savedCopyUsable(CID)).toBe(true);
+  });
+
+  it('leaves a scores object with nothing old untouched', () => {
+    seed([entry(CRIT_Q1, 3), entry(CRIT_Q2, 2)]);
+    const before = JSON.stringify(getScores(CID));
+    expect(JSON.stringify(_migrateRubricScoreKeys(CID, JSON.parse(before)))).toBe(before);
   });
 
   it('leave a competency not fed by any criterion alone', () => {
@@ -230,6 +248,21 @@ describe('a criterion score goes to the server as its own rubric_score', () => {
 
   it('sends nothing for a competency key on rubric work', () => {
     upsertScore(CID, SID, AID, CI, 3, '2026-09-10', 'summative', '');
+    expect(client.calls.map(c => c.name).filter(n => /score/.test(n))).toEqual([]);
+  });
+
+  it('sends a criterion this device cannot match yet, rather than dropping it', () => {
+    // The rubric isn't loaded on this device (attached elsewhere, or still loading).
+    _cache.rubrics[CID] = [];
+    clearProfCache();
+    const LATER = '66666666-6666-4666-8666-666666666669';
+    upsertScore(CID, SID, AID, LATER, 3, '2026-09-10', 'summative', '');
+    const sent = client.calls.filter(c => c.name === 'upsert_rubric_score');
+    expect(sent).toHaveLength(1);
+    expect(sent[0].payload).toMatchObject({ p_criterion_id: LATER, p_value: 3 });
+    // A competency key is still never sent.
+    client.calls = [];
+    upsertScore(CID, SID, AID, CI, 2, '2026-09-10', 'summative', '');
     expect(client.calls.map(c => c.name).filter(n => /score/.test(n))).toEqual([]);
   });
 

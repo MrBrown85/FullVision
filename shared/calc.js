@@ -1226,19 +1226,15 @@ function _criterionIndex(cid) {
 }
 
 /* The criteria of an assessment's rubric that feed a competency; [] for
-   work with no rubric. Public as rubricCriteriaForTag, so a view can look
-   them up once per column and pass them to competencyLevelFromCriteria. */
-function _criteriaForTag(cid, assessment, tagId) {
+   work with no rubric. A view can look them up once per column and pass
+   them to competencyLevelFromCriteria. */
+function rubricCriteriaForTag(cid, assessment, tagId) {
   var rubricId = assessment && (assessment.rubricId || assessment.rubric_id);
   if (!rubricId || isPointsScored(assessment) || typeof getRubricById !== 'function') return [];
   var rubric = getRubricById(cid, rubricId);
   return ((rubric && rubric.criteria) || []).filter(function (c) {
     return c && c.id && (c.tagIds || []).indexOf(tagId) >= 0;
   });
-}
-
-function rubricCriteriaForTag(cid, assessment, tagId) {
-  return _criteriaForTag(cid, assessment, tagId);
 }
 
 /* The competencies a rubric assessment scores, through its criteria, in
@@ -1259,11 +1255,11 @@ function rubricCompetencyIds(cid, assessment) {
 /* A student's level on one competency of a rubric assessment, from the
    criteria that feed it: one scored criterion gives its level and ±;
    several that agree give that; several that disagree give the lowest,
-   marked mixed, with no ± (the grid's rule). Null when none is scored or
+   ± counted (3− is below 3), with its ±, marked mixed. Null when none is scored or
    the work has no rubric. Competency proficiency itself counts each
    criterion as its own evidence (getTagScores). */
 function competencyLevelFromCriteria(cid, sid, assessment, tagId, criteria) {
-  if (!criteria) criteria = _criteriaForTag(cid, assessment, tagId);
+  if (!criteria) criteria = rubricCriteriaForTag(cid, assessment, tagId);
   if (!criteria.length) return null;
   var entries = getScores(cid)[sid] || [];
   var levels = [];
@@ -1282,7 +1278,11 @@ function competencyLevelFromCriteria(cid, sid, assessment, tagId, criteria) {
     return l === levels[0] && mods[i] === mods[0];
   });
   if (same) return { score: levels[0], mod: mods[0], mixed: false };
-  return { score: Math.min.apply(null, levels), mod: 0, mixed: true };
+  var low = 0;
+  levels.forEach(function (l, i) {
+    if (l + mods[i] * SCORE_MOD_STEP < levels[low] + mods[low] * SCORE_MOD_STEP) low = i;
+  });
+  return { score: levels[low], mod: mods[low], mixed: true };
 }
 
 /* The score keys a column's ids name on an assessment: a criterion id is
@@ -1290,7 +1290,7 @@ function competencyLevelFromCriteria(cid, sid, assessment, tagId, criteria) {
 function _columnScoreKeys(cid, assessment, ids) {
   var keys = [];
   ids.forEach(function (id) {
-    var crits = _criteriaForTag(cid, assessment, id);
+    var crits = rubricCriteriaForTag(cid, assessment, id);
     (crits.length
       ? crits.map(function (c) {
           return c.id;
