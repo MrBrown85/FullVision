@@ -10,6 +10,8 @@
   var _navStacks = { students: [], observe: [], grade: [] };
   var _cid = null;
   var _searchTimer = null;
+  // The student whose page opened the current grading screen (Grade button).
+  var _gradeReturnSid = null;
   var _userEmail = '';
   var _userName = '';
 
@@ -350,6 +352,7 @@
   function _switchTab(tab) {
     if (tab === _activeTab) return;
     _activeTab = tab;
+    _gradeReturnSid = null;
 
     // Update tab bar active state
     document.querySelectorAll('.m-tab-item').forEach(function (t) {
@@ -447,6 +450,10 @@
 
     var top = screens[screens.length - 1];
     var below = screens[screens.length - 2];
+    if (_gradeReturnSid && top.id === 'm-screen-grade-swiper') {
+      _returnToStudent(_gradeReturnSid);
+      return;
+    }
 
     below.style.display = '';
     below.classList.add('m-pop-enter');
@@ -463,6 +470,23 @@
         if (top.id === 'm-screen-obs-sweep') MSweep.close();
       }, 360);
     });
+  }
+
+  /* Back from a grading screen that a student page's Grade button opened:
+     that student's page again, on the Students tab. */
+  function _returnToStudent(sid) {
+    _switchTab('students');
+    var stack = document.getElementById('m-nav-stack');
+    var list = stack.querySelector('.m-screen:last-child');
+    var tmp = document.createElement('div');
+    tmp.innerHTML = MStudents.renderDetail(_cid, sid);
+    var screen = tmp.firstElementChild;
+    screen.classList.remove('m-screen-hidden');
+    stack.appendChild(screen);
+    if (list) list.style.display = 'none';
+    _navStacks[_activeTab].push('detail');
+    var navBar = screen.querySelector('.m-nav-bar');
+    if (navBar) MC.setupScrollTitle(screen, navBar.id);
   }
 
   /* ── Event delegation ───────────────────────────────────────── */
@@ -484,9 +508,26 @@
         return;
       }
 
-      // Navigate to Grade tab from student detail
+      // Grade on a student page: the newest assessment's grading screen on
+      // the Grade tab, at that student's card. Back returns to the page.
       if (action === 'm-student-grade') {
+        var gradeSid = target.getAttribute('data-sid');
+        var newest = getAssessments(_cid)
+          .slice()
+          .sort(function (a, b) {
+            return (b.date || '').localeCompare(a.date || '');
+          })[0];
         _switchTab('grade');
+        if (!newest) return;
+        _gradeReturnSid = gradeSid;
+        _pushScreen(MGrade.renderSwiper(_cid, newest.id));
+        var gradeIdx = sortStudents(getStudents(_cid).slice(), 'alpha').findIndex(function (st) {
+          return st.id === gradeSid;
+        });
+        setTimeout(function () {
+          MGrade.setupSwiper(_cid, newest.id);
+          if (gradeIdx > 0) MGrade.jumpToStudent(gradeIdx);
+        }, 400);
         return;
       }
 
