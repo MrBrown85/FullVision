@@ -2044,6 +2044,36 @@
   flex: 1;
   text-align: center;
 }
+/* Grade Report or Build Your Own, above the palette. */
+.studio-mode {
+  display: flex;
+  width: 100%;
+  margin-bottom: 12px;
+}
+.studio-mode .seg-btn {
+  flex: 1;
+  text-align: center;
+}
+.gr-panel h4:first-child {
+  margin-top: 4px;
+}
+.studio-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 2px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+.gr-panel .seg {
+  display: flex;
+  width: 100%;
+}
+.gr-panel .seg .seg-btn {
+  flex: 1;
+  text-align: center;
+}
 .studio-palette h4 {
   font-family: var(--font-base);
   font-size: 12px;
@@ -4694,4 +4724,85 @@ body.qn-roster #gb-sidebar .student-row-note {
 }
 .report-comment-text p + p {
   margin-top: 0.4em;
+}
+
+/* ── Grade Report (grade-report.js) ──────────────────────────────
+   A plain table of this term's work, black on white, like the old
+   gradebook printouts. Rows have a fixed height so the layout can count
+   how many fit on a side; a title too long for its cell ends in "…". */
+.gr-sheet .sheet-body {
+  align-items: stretch;
+}
+.gr-table {
+  width: 100%;
+  font-size: 9pt;
+  line-height: 1.2;
+}
+.gr-table.gr-small,
+.gr-table.gr-two {
+  font-size: 7.5pt;
+}
+.gr-row {
+  display: grid;
+  grid-template-columns: var(--gr-cols);
+  column-gap: 8px;
+  align-items: center;
+  height: var(--gr-row, 19px);
+  border-bottom: 1px solid #d0d0d0;
+  white-space: nowrap;
+}
+.gr-head {
+  height: auto;
+  padding-bottom: 2px;
+  border-bottom: 1.5px solid #000;
+  font-weight: 700;
+}
+.gr-c {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gr-r {
+  text-align: right;
+}
+.gr-missing .gr-note,
+.gr-note {
+  font-weight: 700;
+}
+.gr-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 16px;
+  align-items: start;
+}
+.gr-tail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.gr-summary {
+  font-size: 9pt;
+}
+.gr-summary .gr-row {
+  height: 19px;
+}
+.gr-term {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 4px 0;
+  border-bottom: 1.5px solid #000;
+  font-size: 11pt;
+  font-weight: 700;
+}
+.gr-facts {
+  font-size: 9pt;
+}
+.gr-dot {
+  margin: 0 8px;
+  color: #777;
+}
+.gr-cut {
+  font-size: 8pt;
+  font-style: italic;
 }

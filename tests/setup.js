@@ -230,6 +230,7 @@ load('shared/comment-bank.js');
 load('teacher/comment-bank.js');
 load('teacher/report-questionnaire.js');
 load('teacher/report-studio.js');
+load('teacher/grade-report.js');
 load('teacher/report-preview.js');
 load('vendor/qrcode.js');
 load('shared/questionnaire-templates.js');

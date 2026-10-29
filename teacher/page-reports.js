@@ -144,6 +144,7 @@ window.PageReports = (function () {
       _syncInkButtons();
       _syncSidesButtons();
     }
+    _syncProgressToolbar();
     const tbRail = document.getElementById('tb-rail-btn');
     if (tbRail) tbRail.style.display = tab === 'progress' ? '' : 'none';
     if (tab !== 'progress') phonesView = false;
@@ -437,6 +438,7 @@ window.PageReports = (function () {
       students: _previewStudents(),
       reportConfig: reportConfig,
       paper: reportPaper,
+      layout: _layout(),
       onSheets: _rememberSummary,
     });
     _syncPrintButton();
@@ -779,17 +781,18 @@ window.PageReports = (function () {
           ? '1 sheet'
           : '1 sheet each');
     var form = ReportSheets.formFor(reportConfig);
+    var grade = _isGrade();
     var html = '<div class="confirm-card issue-card">';
     html += '<div class="confirm-title" id="issue-title">Print ' + n + (n === 1 ? ' Report' : ' Reports') + '</div>';
     html += '<div class="confirm-message">' + subtitle + '</div>';
     html += '<div class="issue-kv">';
     html +=
       '<span class="issue-k">Form</span><span>' +
-      esc(form.name) +
+      esc(grade ? 'Grade Report' : form.name) +
       ' \u00B7 ' +
       (reportPaper === 'legal' ? 'Legal' : 'Letter') +
       ' \u00B7 ' +
-      (reportView === 'photocopy' ? 'black' : 'colour') +
+      (grade ? 'black' : reportView === 'photocopy' ? 'black' : 'colour') +
       '</span>';
     html += '<span class="issue-k">Sheets</span><span>' + studentsLine + '</span>';
     html +=
@@ -815,7 +818,9 @@ window.PageReports = (function () {
     }
     html += '</fieldset>';
     // The Letterhead's Name option, here too so it can be set at print time.
-    var nameStyle = ReportSheets.optionsFor(ReportSheets.cellOf(form, 'header') || { block: 'header' }).name;
+    var nameStyle = grade
+      ? _gradeOpts().name
+      : ReportSheets.optionsFor(ReportSheets.cellOf(form, 'header') || { block: 'header' }).name;
     html += '<fieldset class="issue-group"><legend>Name</legend>';
     html +=
       '<label class="issue-option"><input type="radio" name="issue-name" value="preferred"' +
@@ -832,7 +837,10 @@ window.PageReports = (function () {
       warn.push(
         esc(c.summary.noComment.join(', ')) +
           (c.summary.noComment.length === 1 ? ' has' : ' have') +
-          ' no Teacher Comment. The box prints with lines. <button type="button" data-issue="write">Write them now</button>',
+          (grade
+            ? ' no Teacher Comment. The report prints without one.'
+            : ' no Teacher Comment. The box prints with lines.') +
+          ' <button type="button" data-issue="write">Write them now</button>',
       );
     }
     // Attendance is optional: a student without totals prints without the
@@ -847,7 +855,10 @@ window.PageReports = (function () {
       );
     }
     if (c.summary.over && c.summary.over.length) {
-      warn.push(esc(c.summary.over.join(', ')) + ': a block is taller than a page.');
+      warn.push(
+        esc(c.summary.over.join(', ')) +
+          (grade ? ': too many assessments to fit on one sheet.' : ': a block is taller than a page.'),
+      );
     }
     if (warn.length) {
       html +=
@@ -913,7 +924,8 @@ window.PageReports = (function () {
     overlay.addEventListener('change', function (e) {
       var t = e.target;
       if (!t || t.name !== 'issue-name') return;
-      _setForm(ReportSheets.setOption(_formOf(), 'header', 'name', t.value));
+      if (_isGrade()) _setGradeOption('name', t.value === 'first' ? 'first' : 'preferred');
+      else _setForm(ReportSheets.setOption(_formOf(), 'header', 'name', t.value));
       if (_issueState) _issueState.counts = _issueCounts();
     });
     _issueState.keyHandler = function (e) {
@@ -1032,8 +1044,118 @@ window.PageReports = (function () {
     return ReportSheets.formFor(reportConfig);
   }
 
+  /* ── Grade Report (grade-report.js) ──────────────────────────── */
+  function _isGrade() {
+    return !!reportConfig && reportConfig.progressMode === 'grade';
+  }
+  function _gradeOpts() {
+    return GradeReport.options(reportConfig && reportConfig.gradeReport);
+  }
+  // The layout the preview, the fit line and printing use: the Grade
+  // Report's, or the built form's (undefined).
+  function _layout() {
+    return _isGrade() ? GradeReport.layoutWith(_gradeOpts()) : undefined;
+  }
+  function _setProgressMode(mode) {
+    if (mode !== 'grade' && mode !== 'build') return;
+    if (reportConfig.progressMode === mode) return;
+    reportConfig.progressMode = mode;
+    saveReportConfig(activeCourse, reportConfig);
+    studioSelected = null;
+    popoverOpen = null;
+    _classFitKey = '';
+    previewAuto = true;
+    renderReports();
+    _syncProgressToolbar();
+  }
+  function _setGradeOption(key, value) {
+    reportConfig.gradeReport = Object.assign({}, _gradeOpts());
+    reportConfig.gradeReport[key] = value;
+    saveReportConfig(activeCourse, reportConfig);
+    _classFitKey = '';
+    renderStudioPanels();
+    renderReportPreview();
+  }
+  /* Sides, Ink and Save as Template belong to Build Your Own. */
+  function _syncProgressToolbar() {
+    var build = activeTab === 'progress' && !_isGrade();
+    ['report-sides', 'report-ink', 'tb-save-template'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.style.display = build ? '' : 'none';
+    });
+    document.querySelectorAll('.tb-label-progress').forEach(function (el) {
+      el.style.display = build ? '' : 'none';
+    });
+    var rail = document.getElementById('tb-rail-btn');
+    if (rail) rail.textContent = _isGrade() ? 'Options' : 'Blocks';
+  }
+  function _modeSwitchHtml() {
+    var grade = _isGrade();
+    var btn = function (mode, label, on) {
+      return (
+        '<button type="button" class="seg-btn' +
+        (on ? ' active' : '') +
+        '" data-action="progressMode" data-mode="' +
+        mode +
+        '" role="radio" aria-checked="' +
+        on +
+        '">' +
+        label +
+        '</button>'
+      );
+    };
+    return (
+      '<div class="seg studio-mode" role="radiogroup" aria-label="Report">' +
+      btn('grade', 'Grade Report', grade) +
+      btn('build', 'Build Your Own', !grade) +
+      '</div>'
+    );
+  }
+  function _gradePanelHtml() {
+    var o = _gradeOpts();
+    var check = function (key, label) {
+      return (
+        '<label class="studio-check"><input type="checkbox" data-action="gradeOption" data-key="' +
+        key +
+        '"' +
+        (o[key] ? ' checked' : '') +
+        '><span>' +
+        label +
+        '</span></label>'
+      );
+    };
+    var order = function (v, label) {
+      return (
+        '<button type="button" class="seg-btn' +
+        (o.order === v ? ' active' : '') +
+        '" data-action="gradeOrder" data-value="' +
+        v +
+        '" role="radio" aria-checked="' +
+        (o.order === v) +
+        '">' +
+        label +
+        '</button>'
+      );
+    };
+    return (
+      '<div class="gr-panel">' +
+      '<h4>Include</h4>' +
+      check('summary', 'Category Summary') +
+      check('attendance', 'Attendance') +
+      check('comment', 'Teacher Comment') +
+      '<h4>Order</h4>' +
+      '<div class="seg seg-sm" role="radiogroup" aria-label="Order">' +
+      order('oldest', 'Oldest First') +
+      order('newest', 'Newest First') +
+      '</div></div>'
+    );
+  }
+
   function _loadReportConfig(cid) {
     var rc = Object.assign({}, (typeof getReportConfig === 'function' && getReportConfig(cid)) || {});
+    // Progress Reports opens on the Grade Report, or on Build Your Own for a
+    // class that built a report before there was a choice.
+    if (rc.progressMode !== 'grade' && rc.progressMode !== 'build') rc.progressMode = rc.form ? 'build' : 'grade';
     rc.form = ReportSheets.formFor(rc);
     rc.preset = 'standard';
     return rc;
@@ -1041,7 +1163,11 @@ window.PageReports = (function () {
 
   function renderStudioPanels() {
     var palette = document.getElementById('studio-palette');
-    if (palette) {
+    if (palette && _isGrade()) {
+      palette.innerHTML = _modeSwitchHtml() + _gradePanelHtml();
+      palette.setAttribute('aria-label', 'Grade Report');
+    } else if (palette) {
+      palette.setAttribute('aria-label', 'Blocks');
       if (_blockSizes === null) _blockSizes = _measureBlockSizes();
       palette.innerHTML = ReportStudio.paletteHtml(
         _formOf(),
@@ -1051,6 +1177,7 @@ window.PageReports = (function () {
         _classFitKey === _classFitKeyNow() ? _classFit : null,
         studioTab === 'templates' ? _templateThumbs() : null,
       );
+      palette.insertAdjacentHTML('afterbegin', _modeSwitchHtml());
       ReportStudio.fitThumbs(palette);
     }
     _renderFitLine();
@@ -1059,7 +1186,11 @@ window.PageReports = (function () {
   function _renderFitLine() {
     var line = document.getElementById('studio-fit');
     if (!line) return;
-    line.innerHTML = ReportStudio.fitLineHtml(_classFitKey === _classFitKeyNow() ? _classFit : null, _formOf());
+    line.innerHTML = ReportStudio.fitLineHtml(
+      _classFitKey === _classFitKeyNow() ? _classFit : null,
+      _isGrade() ? null : _formOf(),
+      _isGrade() ? { over: 'Too many assessments to fit on one sheet for ' } : null,
+    );
     line.classList.toggle('ok', !!line.textContent && !line.firstElementChild);
   }
 
@@ -1127,7 +1258,12 @@ window.PageReports = (function () {
   var _classFitKey = '';
   function _classFitKeyNow() {
     var ctx = ReportBlocks.reportContext();
-    return [activeCourse, ctx.termId, reportPaper, JSON.stringify(_formOf())].join('|');
+    return [
+      activeCourse,
+      ctx.termId,
+      reportPaper,
+      _isGrade() ? 'grade:' + JSON.stringify(_gradeOpts()) : JSON.stringify(_formOf()),
+    ].join('|');
   }
   function _scheduleClassFit() {
     if (activeTab !== 'progress') return;
@@ -1144,6 +1280,7 @@ window.PageReports = (function () {
         _classFit = ReportSheets.classSummary(activeCourse, students, ReportBlocks.reportContext(), {
           paper: reportPaper,
           form: _formOf(),
+          layout: _layout(),
         });
       } catch (e) {
         _classFit = null;
@@ -1644,6 +1781,12 @@ window.PageReports = (function () {
         _syncPhonesButton();
         renderReports();
       },
+      progressMode: function () {
+        _setProgressMode(el.dataset.mode);
+      },
+      gradeOrder: function () {
+        _setGradeOption('order', el.dataset.value === 'newest' ? 'newest' : 'oldest');
+      },
       toggleRail: function () {
         // Narrow screens hide the palette; this opens it over the pages.
         var layout = document.getElementById('studio');
@@ -1770,7 +1913,9 @@ window.PageReports = (function () {
       return;
     }
     var a = el.dataset.action;
-    if (a === 'studioOption') {
+    if (a === 'gradeOption') {
+      _setGradeOption(el.dataset.key, !!el.checked);
+    } else if (a === 'studioOption') {
       _setForm(
         ReportSheets.setOption(_formOf(), el.dataset.block, el.dataset.key, el.checked),
         'Changed ' + _label(el.dataset.block) + ' options',

@@ -1760,18 +1760,20 @@ window.ReportSheets = (function () {
 
   /* Renders every student's sheets into `preview`. Returns a summary
      { students, sheets, pages, continued: [names], over: [names],
-     noComment: [names], perStudent }. */
+     noComment: [names], perStudent }. opts.layout replaces layoutStudent
+     (the Grade Report, grade-report.js). */
   function renderPreview(opts) {
     var preview = opts.preview;
     var paper = PAPER[opts.paper] ? opts.paper : 'letter';
     var formUsed = normalizeForm(opts.form);
+    var lay = opts.layout || layoutStudent;
     var stage = _stage(preview, ROW_W, formUsed.type);
     var probe = _probe(stage);
     var summary = _summary(opts.students);
     summary.sideHeight = sideHeight(paper);
     var html = opts.students
       .map(function (st) {
-        var r = layoutStudent(opts.cid, st, opts.ctx, { form: formUsed, paper: paper, stage: stage, probe: probe });
+        var r = lay(opts.cid, st, opts.ctx, { form: formUsed, paper: paper, stage: stage, probe: probe });
         _count(summary, st, r).html = r.html;
         return r.html;
       })
@@ -1804,18 +1806,19 @@ window.ReportSheets = (function () {
 
   /* The class laid out on the current form, without rendering: the same
      summary renderPreview returns, minus the HTML. For the fit line while
-     one student is on screen. */
+     one student is on screen. opts.layout as renderPreview. */
   function classSummary(cid, students, ctx, opts) {
     opts = opts || {};
     var paper = PAPER[opts.paper] ? opts.paper : 'letter';
     var formUsed = normalizeForm(opts.form);
+    var lay = opts.layout || layoutStudent;
     var stage = _stage(document.body, ROW_W, formUsed.type);
     var summary = _summary(students);
     try {
       var probe = _probe(stage);
       summary.sideHeight = sideHeight(paper);
       students.forEach(function (st) {
-        var r = layoutStudent(cid, st, ctx, { form: formUsed, paper: paper, stage: stage, probe: probe });
+        var r = lay(cid, st, ctx, { form: formUsed, paper: paper, stage: stage, probe: probe });
         _count(summary, st, r).hash = ReportIssuesHash(r.html);
       });
     } finally {

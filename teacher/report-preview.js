@@ -4,7 +4,7 @@ window.ReportPreview = (function () {
 
   /* Lays the students into #rb-preview on the class's form. opts.students
      is the list to show; without it, selectedStudentIds filters the class
-     (null means everyone). */
+     (null means everyone). opts.layout: the Grade Report's layout. */
   function renderReportPreview(opts) {
     var preview = document.getElementById('rb-preview');
     if (!preview) return;
@@ -39,6 +39,7 @@ window.ReportPreview = (function () {
         preview: preview,
         paper: opts.paper || 'letter',
         form: ReportSheets.formFor(opts.reportConfig),
+        layout: opts.layout,
       });
       if (typeof opts.onSheets === 'function') opts.onSheets(summary);
       return;
