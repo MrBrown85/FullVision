@@ -69,6 +69,10 @@ test('one student is graded with the grader inside the card', async ({ page }) =
   await page.keyboard.press('4');
   await expect(card.locator('.grdt-chosen-label')).toHaveText(/Extending/);
 
+  // Scored work can't be Excused; clearing the level frees it.
+  await expect(card.locator('.grader-status [data-status="EXC"]')).toBeDisabled();
+  await card.locator('.grdt-chosen-label').click();
+  await expect(card.locator('.grdt-tile.is-chosen')).toHaveCount(0);
   await card.locator('.grader-status [data-status="EXC"]').click();
   await expect(card.locator('.grader-inline')).toHaveClass(/is-locked/);
   await expect(card.locator('.grader-grade')).toHaveText('Excused');

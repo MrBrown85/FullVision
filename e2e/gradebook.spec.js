@@ -105,7 +105,6 @@ test.describe('Gradebook — Spreadsheet View', () => {
     await seedStudents(page);
     await seedAssessments(page);
     await seedScores(page, {
-      'stu-001': { 'assess-001': { QAP: 3 } },
       'stu-002': { 'assess-001': { QAP: 2 } },
     });
     await gotoApp(page, '/gradebook');
@@ -119,15 +118,18 @@ test.describe('Gradebook — Spreadsheet View', () => {
       await page.locator('.gb-ctx-menu .gb-ctx-item', { hasText: label }).click();
     };
 
+    // A scored cell can't be Missing or Excused.
+    const scored = page.locator('.gb-scores-cell[data-sid="stu-002"][data-aid="assess-001"]');
+    await scored.click({ button: 'right' });
+    await expect(page.locator('.gb-ctx-menu .gb-ctx-item', { hasText: 'Mark missing' })).toHaveClass(/is-disabled/);
+    await expect(page.locator('.gb-ctx-menu .gb-ctx-item', { hasText: 'Excuse' })).toHaveClass(/is-disabled/);
+    await page.locator('.gb-ctx-menu .gb-ctx-item', { hasText: 'Mark missing' }).click();
+    expect((await statuses())['stu-002:assess-001']).toBeUndefined();
+    await page.keyboard.press('Escape');
+
     await pick('Mark missing');
     expect((await statuses())['stu-001:assess-001']).toBe('NS');
     await expect(cell).toHaveText('M');
-    // NS clears the proficiency score, as on the Assignments page.
-    const scores = await page.evaluate(
-      cid => JSON.parse(localStorage.getItem('gb-scores-' + cid) || '{}'),
-      TEST_COURSE.id,
-    );
-    expect((scores['stu-001'] || []).filter(e => e.assessmentId === 'assess-001' && e.score > 0)).toHaveLength(0);
 
     await pick('Excuse');
     expect((await statuses())['stu-001:assess-001']).toBe('EXC');

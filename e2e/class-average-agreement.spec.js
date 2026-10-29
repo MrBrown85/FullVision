@@ -34,10 +34,14 @@ test('the gradebook, the printed sheet and the CSV export show the same Class Av
     upsertScore(cid, 'stu-003', 'a-prof', 'QAP', 1, '2026-03-20', 'summative', '');
     setPointsScore(cid, 'stu-003', 'a-pts', 2);
     setCompletionMark(cid, 'stu-003', 'a-cmp', 'incomplete');
+    // Excused can't be set on scored work any more; older data has both,
+    // so Carol's statuses are written straight in.
+    var statuses = getAssignmentStatuses(cid);
     ['a-prof', 'a-pts', 'a-cmp'].forEach(aid => {
       setAssignmentStatus(cid, 'stu-002', aid, 'NS');
-      setAssignmentStatus(cid, 'stu-003', aid, 'EXC');
+      statuses['stu-003:' + aid] = 'EXC';
     });
+    saveAssignmentStatuses(cid, statuses);
     clearProfCache();
     PageGradebook.render();
   }, TEST_COURSE.id);

@@ -4759,6 +4759,10 @@
   white-space: nowrap;
   cursor: pointer;
 }
+.grader-status-btn:disabled {
+  color: var(--text-3);
+  cursor: default;
+}
 .grader-status-btn.is-on {
   color: #fff;
   font-weight: 700;

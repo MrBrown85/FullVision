@@ -1373,6 +1373,12 @@ th.gb-group-alt {
   background: var(--active);
   color: #fff;
 }
+.gb-ctx-item.is-disabled,
+.gb-ctx-item.is-disabled:hover {
+  background: none;
+  color: var(--text-3);
+  cursor: default;
+}
 .gb-ctx-danger {
   color: var(--priority);
 }

@@ -1963,6 +1963,10 @@ body.fv-switching-course::after {
   -webkit-tap-highlight-color: transparent;
   transition: all 0.15s;
 }
+.m-status-pill:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
 .m-status-pill.m-status-active {
   border-color: var(--priority);
   background: var(--priority-light);
