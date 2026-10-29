@@ -1076,8 +1076,8 @@ window.PageGradebook = (function () {
                 ? '<span class="gb-unscored">\u00B7</span>'
                 : '\u2014';
           var rubricTitle = mixed
-            ? 'The criteria on this competency disagree; the lowest is shown. Scored on the rubric in Assignments'
-            : 'Scored on the rubric in Assignments';
+            ? 'The criteria on this competency disagree, so the lowest is shown. Click to grade it on the rubric.'
+            : 'Click to grade it on the rubric.';
           html +=
             '<td class="gb-score' +
             startClass +
@@ -1092,7 +1092,7 @@ window.PageGradebook = (function () {
             '" data-sid="' +
             s.id +
             '"' +
-            (rubricCol ? ' title="' + rubricTitle + '"' : ' data-action="cycleScore"') +
+            (rubricCol ? ' data-action="editScoreCell" title="' + rubricTitle + '"' : ' data-action="cycleScore"') +
             '><span class="gb-score-val s' +
             score +
             (mixed ? ' gb-mixed' : '') +
@@ -2781,8 +2781,8 @@ window.PageGradebook = (function () {
       focused.dataset.action !== 'cycleScore' &&
       (['+', '=', '-', '_', 'Backspace', 'Delete'].includes(e.key) || /^[0-9]$/.test(e.key))
     ) {
-      // A cell with no action (a competency of rubric work) is read-only:
-      // it is scored on the rubric in Assignments.
+      // A competency of rubric work is scored on the rubric: Enter or a
+      // click opens the grader (editScoreCell), and typed scores do nothing.
       e.preventDefault();
       return;
     } else if (['+', '=', '-', '_'].includes(e.key)) {
