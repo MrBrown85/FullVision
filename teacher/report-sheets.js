@@ -222,6 +222,8 @@ window.ReportSheets = (function () {
       label: 'Assignment Grades',
       group: 'Grades',
       options: [
+        { key: 'course', label: 'Course Grade', def: true },
+        { key: 'categoryGrade', label: 'Category Grades', def: true },
         { key: 'score', label: 'Score', def: true },
         { key: 'percent', label: 'Percent', def: 'auto' },
         { key: 'word', label: 'Proficiency Word', def: 'auto' },

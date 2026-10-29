@@ -952,9 +952,11 @@ describe('stage 3 blocks', () => {
     stub('assessmentInActiveTerm', () => true);
     stub('assessmentCellValue', (cid, sid, a) => cells[a.id]);
     stub('getCategories', () => [
-      { id: 'c1', name: 'Labs' },
-      { id: 'c2', name: 'Quizzes' },
+      { id: 'c1', name: 'Labs', weight: 40 },
+      { id: 'c2', name: 'Quizzes', weight: 60 },
     ]);
+    stub('studentGradeSummary', () => ({ text: '3.1 · B 78%', level: 3 }));
+    stub('assessmentGroupGrade', (cid, sid, list) => ({ text: list.map(a => a.id).join('+') + ' grade' }));
     stub('getGroupedSections', () => ({ groups: [], ungrouped: [] }));
     stub('getSections', () => [
       { id: 'q', name: 'Questioning', tags: [{ id: 't1', label: 'Question and Predict' }] },
@@ -972,12 +974,37 @@ describe('stage 3 blocks', () => {
     const html = ReportBlocks.renderReportBlock('grade-table', CID, CECE, {}, opts({}));
     const t = text(html);
     // A proficiency class: score and word, no percent; newest first, by category.
-    expect(t).toContain('Assignment Grades This term · 3 assessments');
-    expect(t).toContain('Labs Oct 5 Plate Tectonics Presentation 3.3 / 4 Proficient');
-    expect(t).toContain('Quizzes Oct 12 Energy Forms Quiz Missing Sep 10 Chemical Formulas Quiz 12/15 Proficient');
+    // The course grade sits in the title row; each category heading carries
+    // its weight and the student's grade in it.
+    expect(t).toContain('Assignment Grades Course Grade 3.1 · B 78% This term · 3 assessments');
+    expect(t).toContain('Labs 40% of grade · a2 grade Oct 5 Plate Tectonics Presentation 3.3 / 4 Proficient');
+    expect(t).toContain(
+      'Quizzes 60% of grade · a1+a3 grade Oct 12 Energy Forms Quiz Missing Sep 10 Chemical Formulas Quiz 12/15 Proficient',
+    );
+    const bare = text(
+      ReportBlocks.renderReportBlock('grade-table', CID, CECE, {}, opts({ course: false, categoryGrade: false })),
+    );
+    expect(bare).toContain('Assignment Grades This term · 3 assessments');
+    expect(bare).toContain('Labs Oct 5 Plate Tectonics');
     expect(t).toContain('Points shown as scored; other work scored out of 4.');
     expect(html).not.toMatch(/[●○]/);
     expect(html).toContain('report-grades-cols');
+    // One category fills both columns: it splits evenly and carries on at the
+    // top of the right column under its name.
+    stub('getCategories', () => [{ id: 'c2', name: 'Quizzes', weight: 100 }]);
+    stub('getAssessments', () => work.map(a => Object.assign({}, a, { categoryId: 'c2' })));
+    const split = ReportBlocks.renderReportBlock('grade-table', CID, CECE, {}, opts({}));
+    const cols = split.split('class="report-grades-col"').slice(1).map(text);
+    expect(cols).toHaveLength(2);
+    expect(cols[0]).toContain('Quizzes 100% of grade');
+    expect(cols[0]).toContain('Energy Forms Quiz');
+    expect(cols[1]).toContain('Quizzes (continued)');
+    expect(cols[1]).toContain('Chemical Formulas Quiz');
+    stub('getAssessments', () => work);
+    stub('getCategories', () => [
+      { id: 'c1', name: 'Labs', weight: 40 },
+      { id: 'c2', name: 'Quizzes', weight: 60 },
+    ]);
     // Percent on, word off, oldest first, one column, by date.
     const pct = text(
       ReportBlocks.renderReportBlock(
@@ -1009,7 +1036,7 @@ describe('stage 3 blocks', () => {
       {},
       opts({ organize: 'competency', size: 'half' }),
     );
-    expect(text(half)).toContain('Assignment Grades Last 10 Labs');
+    expect(text(half)).toContain('Assignment Grades Course Grade 3.1 · B 78% Last 10 Labs 40% of grade');
     expect(half).not.toContain('report-grades-cols');
     // A letter class starts with score and percent, no word.
     COURSES[CID].gradingSystem = 'letter';
