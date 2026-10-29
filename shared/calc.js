@@ -243,6 +243,13 @@ function _rubricCriterionMax(criterion) {
   return max;
 }
 
+// A criterion still on the standard values, 1 to 4 points for levels 1 to 4.
+function _isStandardCriterion(criterion) {
+  return [1, 2, 3, 4].every(function (l) {
+    return _rubricLevelValue(criterion, l, 0) === l;
+  });
+}
+
 function _rubricCriterionWeight(criterion) {
   var weight = criterion.weight == null || criterion.weight === '' ? 1 : Number(criterion.weight);
   return isFinite(weight) && weight >= 0 ? weight : 1;
@@ -251,8 +258,11 @@ function _rubricCriterionWeight(criterion) {
 /* A rubric assessment's scored criteria: { value, max, weight } each, where
    value is the average of the criterion's competency scores in its own
    points. Undefined when the assessment isn't rubric-scored, null when no
-   criterion is scored. When every criterion weighs 0 they count equally. */
-function _rubricScoredCriteria(cid, assessment, entries) {
+   criterion is scored. When every criterion weighs 0 they count equally.
+   `forPercent`: for the course %, a criterion on the standard 1–4 values
+   counts each level as its Counts As percent of 4 points; a criterion with
+   its own point values keeps them. */
+function _rubricScoredCriteria(cid, assessment, entries, forPercent) {
   var rubricId = assessment && (assessment.rubricId || assessment.rubric_id);
   if (!rubricId || isPointsScored(assessment) || typeof getRubricById !== 'function') return undefined;
   var rubric = getRubricById(cid, rubricId);
@@ -262,6 +272,7 @@ function _rubricScoredCriteria(cid, assessment, entries) {
   var scored = [];
   criteria.forEach(function (criterion) {
     if (!criterion) return;
+    var asPercent = forPercent && _isStandardCriterion(criterion);
     // A criterion with no competencies stores its score under its own id.
     var tagIds = rubricCriterionScoreKeys(criterion);
     var values = (entries || [])
@@ -269,7 +280,8 @@ function _rubricScoredCriteria(cid, assessment, entries) {
         return entry.assessmentId === assessment.id && tagIds.indexOf(entry.tagId) >= 0;
       })
       .map(function (entry) {
-        return _rubricLevelValue(criterion, entry.score, entry.mod);
+        var value = _rubricLevelValue(criterion, entry.score, entry.mod);
+        return value != null && asPercent ? _levelPoints(cid, value) : value;
       })
       .filter(function (value) {
         return value != null;
@@ -321,7 +333,7 @@ function _rubricAssessmentPoints(cid, studentId, assessment) {
   var entries = (getScores(cid)[studentId] || []).filter(function (entry) {
     return entry.assessmentId === assessment.id;
   });
-  var scored = _rubricScoredCriteria(cid, assessment, entries);
+  var scored = _rubricScoredCriteria(cid, assessment, entries, true);
   if (scored === undefined) return undefined;
   var status = getAssignmentStatus(cid, studentId, assessment.id);
   if (status === 'EXC') return null;
@@ -457,12 +469,49 @@ function getCategoryAverage(cid, studentId, categoryId) {
   return result;
 }
 
-function qToPercentage(Q) {
-  if (Q == null) return null;
-  if (Q <= 0) return 0;
-  if (Q <= 2) return 55 + (Q - 1) * 13;
-  if (Q <= 3) return 68 + (Q - 2) * 14;
-  return Math.min(100, 82 + (Q - 3) * 14);
+/* What each whole level counts as in the course %, from the class's
+   Counts As column (DEFAULT_GRADING_SCALE.percents when unset). With no
+   class, the defaults. */
+function _levelPercents(cid) {
+  var scale = cid && typeof getGradingScale === 'function' ? getGradingScale(cid) : null;
+  var p = scale && scale.percents;
+  var d = DEFAULT_GRADING_SCALE.percents;
+  if (!p) return d;
+  var out = {};
+  [1, 2, 3, 4].forEach(function (l) {
+    var v = Number(p[l]);
+    out[l] = isFinite(v) ? Math.max(0, Math.min(100, v)) : d[l];
+  });
+  return out;
+}
+function _isLinearPercents(p) {
+  return p[1] === 25 && p[2] === 50 && p[3] === 75 && p[4] === 100;
+}
+
+/* A level from 0 to 4 as the percent it counts as. Between whole levels
+   (3+ is 3.33, an average 2.9) it is that far along to the next level's
+   percent, so 3+ at 84 / 96 is 88%. Below 1 it runs down to 0. With the
+   default percents this is level ÷ 4, worked out the same way as before so
+   no grade moves by a rounding hair. */
+function levelToPercent(cid, value) {
+  if (value == null) return null;
+  var v = Math.max(0, Math.min(4, Number(value)));
+  if (!(v > 0)) return 0;
+  var p = _levelPercents(cid);
+  if (_isLinearPercents(p)) return (v / 4) * 100;
+  var lo = Math.floor(v);
+  if (lo >= 4) return p[4];
+  var from = lo === 0 ? 0 : p[lo];
+  return from + (p[lo + 1] - from) * (v - lo);
+}
+
+/* A level as points out of 4 for the course %: the level itself with the
+   default percents, else its percent of 4. */
+function _levelPoints(cid, value) {
+  var v = Math.max(0, Math.min(4, Number(value) || 0));
+  var p = _levelPercents(cid);
+  if (_isLinearPercents(p)) return v;
+  return (levelToPercent(cid, v) / 100) * 4;
 }
 
 /* BC reporting: under 50% is IE (Insufficient Evidence) until the course
@@ -641,7 +690,7 @@ function getAssessmentGroupPercentage(cid, studentId, assessments) {
       }
       var level = getAssessmentOverallScore(cid, studentId, assessment.id);
       if (level == null) return;
-      earned += factor * Math.max(0, Math.min(4, level));
+      earned += factor * _levelPoints(cid, level);
       possible += factor * 4;
     }
     count++;
@@ -1290,7 +1339,7 @@ function getOverallProficiency(cid, studentId) {
  * @returns {{letter: string, pct: number}} Letter grade and corresponding percentage
  */
 function calcLetterGrade(avgProf, cid) {
-  var pct = qToPercentage(avgProf);
+  var pct = levelToPercent(cid, avgProf);
   return { letter: percentageToLetter(pct, cid), pct: pct == null ? null : Math.round(pct * 10) / 10 };
 }
 
@@ -1512,7 +1561,7 @@ function formatLevel(cid, value, empty) {
   if (!(value > 0)) return empty === undefined ? '\u2014' : empty;
   var mode = courseGradeMode(cid);
   var num = Number(value).toFixed(1);
-  var pct = Math.round((value / 4) * 100) + '%';
+  var pct = Math.round(levelToPercent(cid, value)) + '%';
   if (mode === 'letter') return pct;
   if (mode === 'both') return num + ' \u00B7 ' + pct;
   return num;
@@ -1536,22 +1585,22 @@ function levelChange(before, after) {
 
 /* The change between two levels as the class reads it: levels for a
    Proficiency or Both class ("+0.2", levelChange), points of a percent for a
-   Letter class ("+5%", each level ÷ 4 rounded first, as formatLevel prints
-   it). "—" when either side has no level. */
+   Letter class ("+5%", each level's percent rounded first, as formatLevel
+   prints it). "—" when either side has no level. */
 function levelChangeAs(cid, before, after) {
   if (courseGradeMode(cid) !== 'letter') return levelChange(before, after);
   if (!(before > 0 && after > 0)) return '\u2014';
-  var d = Math.round((after / 4) * 100) - Math.round((before / 4) * 100);
+  var d = Math.round(levelToPercent(cid, after)) - Math.round(levelToPercent(cid, before));
   return (d > 0 ? '+' : d < 0 ? '\u2212' : '') + Math.abs(d) + '%';
 }
 
 /* A level printed as the teacher chose rather than as the class shows it:
-   'percent' gives "75%" (level ÷ 4, the course's rule for a level as a %),
+   'percent' gives "75%" (the percent the level counts as in the class),
    anything else the proficiency, "3.0". The printed grade sheet's Scores
    choice. */
-function formatLevelAs(value, as, empty) {
+function formatLevelAs(cid, value, as, empty) {
   if (!(value > 0)) return empty === undefined ? '\u2014' : empty;
-  if (as === 'percent') return Math.round((value / 4) * 100) + '%';
+  if (as === 'percent') return Math.round(levelToPercent(cid, value)) + '%';
   return Number(value).toFixed(1);
 }
 
@@ -2040,7 +2089,7 @@ window.Calc = {
   getAssessmentOverallScore,
   getRubricAssessmentScore,
   getCategoryAverage,
-  qToPercentage,
+  levelToPercent,
   percentageToLetter,
   courseHasEnded,
   getCourseLetterData,

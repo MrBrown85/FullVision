@@ -214,7 +214,8 @@ window.ReportBlocks = (function () {
         profLine = `<div class="report-overall-label" style="margin-top:6px">Overall Proficiency: ${profDisplay}</div>`;
       }
     } else if (usePercentage && (overall > 0 || (letterData && letterData.R != null))) {
-      overallDisplay = letterData && letterData.R != null ? letterData.R + '%' : Math.round((overall / 4) * 100) + '%';
+      overallDisplay =
+        letterData && letterData.R != null ? letterData.R + '%' : Math.round(levelToPercent(cid, overall)) + '%';
       overallHeading = 'Overall Grade';
     } else {
       overallDisplay = profDisplay;
@@ -595,7 +596,7 @@ window.ReportBlocks = (function () {
   function _mark(cid, v, word) {
     if (!(v > 0)) return '\u2014';
     const mode = courseGradeMode(cid);
-    const pct = formatLevelAs(v, 'percent');
+    const pct = formatLevelAs(cid, v, 'percent');
     if (mode === 'letter') return pct;
     const fig = levelFigure(v) + ' / 4' + (mode === 'both' ? ' \u00B7 ' + pct : '');
     return word === false ? fig : fig + ' ' + _profWord(v);
@@ -708,7 +709,7 @@ window.ReportBlocks = (function () {
         work
           .map(
             w =>
-              `<div class="report-progress-li"><span class="report-progress-date">${esc(_assessmentWhen(w.a))}</span><span class="report-progress-title">${esc(w.a.title || '')}</span><span class="report-progress-n">${esc(courseGradeMode(cid) === 'letter' ? formatLevelAs(w.score, 'percent') : levelFigure(w.score))}</span></div>`,
+              `<div class="report-progress-li"><span class="report-progress-date">${esc(_assessmentWhen(w.a))}</span><span class="report-progress-title">${esc(w.a.title || '')}</span><span class="report-progress-n">${esc(courseGradeMode(cid) === 'letter' ? formatLevelAs(cid, w.score, 'percent') : levelFigure(w.score))}</span></div>`,
           )
           .join('') +
         '</div>';
@@ -1474,7 +1475,11 @@ window.ReportBlocks = (function () {
   function _rowMarks(cid, a, cv, level) {
     if (level != null) {
       if (!(level > 0)) return { score: '—', percent: '', word: '' };
-      return { score: levelFigure(level) + ' / 4', percent: formatLevelAs(level, 'percent'), word: _profWord(level) };
+      return {
+        score: levelFigure(level) + ' / 4',
+        percent: formatLevelAs(cid, level, 'percent'),
+        word: _profWord(level),
+      };
     }
     if (cv.kind === 'status') return { score: cv.status === 'EXC' ? 'Excused' : 'Missing', percent: '', word: '' };
     if (cv.kind === 'missing') return { score: 'Missing', percent: '', word: '' };
@@ -1493,7 +1498,7 @@ window.ReportBlocks = (function () {
     if (cv.kind === 'level' && cv.value > 0) {
       return {
         score: levelFigure(cv.value) + ' / 4',
-        percent: formatLevelAs(cv.value, 'percent'),
+        percent: formatLevelAs(cid, cv.value, 'percent'),
         word: _profWord(cv.value),
       };
     }

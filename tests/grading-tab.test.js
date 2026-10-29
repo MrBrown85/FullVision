@@ -166,7 +166,9 @@ describe('points to proficiency on the Grading tab', () => {
 
   it('shows the default percents with the BC proficiency names', () => {
     expect(main.innerHTML).toContain('Points to Proficiency');
-    expect(main.innerHTML).toMatch(/Extending<\/span><input[^>]*id="cm-pts-min-0"[^>]*value="86"/);
+    expect(main.innerHTML).toMatch(
+      /Extending<\/span><span class="cm-pts-cell"><input[^>]*id="cm-pts-min-0"[^>]*value="86"/,
+    );
     expect(main.innerHTML).toMatch(/id="cm-pts-min-1"[^>]*value="73"/);
     expect(main.innerHTML).toMatch(/id="cm-pts-min-2"[^>]*value="50"/);
     expect(main.innerHTML).toContain('Below 50%');
@@ -188,9 +190,42 @@ describe('points to proficiency on the Grading tab', () => {
         { min: 55, proficiency: 2 },
         { min: 0, proficiency: 1 },
       ],
+      percents: { 4: 100, 3: 75, 2: 50, 1: 25 },
       labels: [null, null, 'Meeting', null],
     });
     expect(main.innerHTML).toContain('Below 55%');
+  });
+
+  it('shows Counts As at the defaults and saves new percents', () => {
+    expect(main.innerHTML).toContain('Counts As');
+    expect(main.innerHTML).toMatch(/id="cm-pts-pct-3"[^>]*value="75"/);
+    inputs['cm-pts-pct-4'] = { value: '98' };
+    inputs['cm-pts-pct-3'] = { value: '84' };
+    inputs['cm-pts-pct-2'] = { value: '62' };
+    inputs['cm-pts-pct-1'] = { value: '50' };
+    DashClassManager.handleChange({ dataset: { actionChange: 'cmPointsScale' } });
+    expect(getGradingScale(CID).percents).toEqual({ 4: 98, 3: 84, 2: 62, 1: 50 });
+  });
+
+  it('refuses Counts As out of order', () => {
+    inputs['cm-pts-pct-3'] = { value: '100' };
+    DashClassManager.handleChange({ dataset: { actionChange: 'cmPointsScale' } });
+    expect(getGradingScale(CID).percents || DEFAULT_GRADING_SCALE.percents).toEqual({ 4: 100, 3: 75, 2: 50, 1: 25 });
+    expect(main.innerHTML).toContain('Each proficiency must count for more than the one below it.');
+  });
+
+  it('matches Counts As to the thresholds, Emerging at 50', () => {
+    _cache.courseConfigs[CID].gradingScale = {
+      boundaries: [
+        { min: 96, proficiency: 4 },
+        { min: 84, proficiency: 3 },
+        { min: 62, proficiency: 2 },
+        { min: 0, proficiency: 1 },
+      ],
+      labels: null,
+    };
+    DashClassManager.handleAction('cmPointsScaleMatch', { dataset: {} });
+    expect(getGradingScale(CID).percents).toEqual({ 4: 98, 3: 84, 2: 62, 1: 50 });
   });
 
   it('resets to the defaults', () => {

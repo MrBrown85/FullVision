@@ -180,7 +180,9 @@ describe('cellText', () => {
   it('prints every score as a proficiency, a % or as marked', () => {
     const text = (id, scoresAs) => GP.cellText(CID, 's1', col(id), GP.normalizeOptions({ scoresAs })).text;
     // Quiz 1: 8 out of 10.
-    expect(text('q1', 'proficiency')).toBe(formatLevelAs(getAssessmentOverallScore(CID, 's1', 'q1'), 'proficiency'));
+    expect(text('q1', 'proficiency')).toBe(
+      formatLevelAs(CID, getAssessmentOverallScore(CID, 's1', 'q1'), 'proficiency'),
+    );
     expect(text('q1', 'percent')).toBe('80%');
     expect(text('q1', 'points')).toBe('8');
     // Cell Structure Lab: 3+ on the proficiency scale.
@@ -377,8 +379,8 @@ describe('buildModel', () => {
     const stats = getClassPointsAverage(CID, students, assessments[0]);
     expect(avg('points', 'q1')).toBe('7.7');
     expect(avg('percent', 'q1')).toBe(Math.round(stats.pct) + '%');
-    expect(avg('proficiency', 'l1')).toBe(formatLevelAs((3 + 1 / 3 + 4) / 2, 'proficiency'));
-    expect(avg('percent', 'l1')).toBe(formatLevelAs((3 + 1 / 3 + 4) / 2, 'percent'));
+    expect(avg('proficiency', 'l1')).toBe(formatLevelAs(CID, (3 + 1 / 3 + 4) / 2, 'proficiency'));
+    expect(avg('percent', 'l1')).toBe(formatLevelAs(CID, (3 + 1 / 3 + 4) / 2, 'percent'));
     expect(avg('points', 'l1')).toBe(formatLevel(CID, (3 + 1 / 3 + 4) / 2));
   });
 

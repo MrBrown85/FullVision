@@ -477,9 +477,9 @@
     if (cell.kind === 'points' && as === 'percent') {
       out.text = formatPointsPercent(cell.value, col.outOf);
     } else if (cell.kind === 'points' && as === 'proficiency') {
-      out.text = formatLevelAs(getAssessmentOverallScore(cid, sid, col.id), 'proficiency');
+      out.text = formatLevelAs(cid, getAssessmentOverallScore(cid, sid, col.id), 'proficiency');
     } else if (cell.kind === 'level' && as !== 'points') {
-      out.text = formatLevelAs(cell.value, as);
+      out.text = formatLevelAs(cid, cell.value, as);
     }
     if (cell.late && opts.late && (cell.kind === 'points' || cell.kind === 'level' || cell.kind === 'complete')) {
       out.late = true;
@@ -502,7 +502,7 @@
     // one column rule, the same as the gradebook's Class Average.
     var level = classColumnAverage(cid, students, { assessment: a, measure: 'level' });
     if (!level) return '—';
-    return as === 'points' ? formatLevel(cid, level.avg) : formatLevelAs(level.avg, as);
+    return as === 'points' ? formatLevel(cid, level.avg) : formatLevelAs(cid, level.avg, as);
   }
 
   /* ── Geometry and pagination ───────────────────────────── */

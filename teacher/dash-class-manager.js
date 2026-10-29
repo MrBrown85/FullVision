@@ -3425,7 +3425,7 @@ window.DashClassManager = (function () {
           t.desc +
           '</span></span>' +
           '<span class="cm-method-example">' +
-          formatLevelAs(calcMethodExample(CM_EXAMPLE_SCORES, m, dw, lastN), 'proficiency') +
+          formatLevelAs(null, calcMethodExample(CM_EXAMPLE_SCORES, m, dw, lastN), 'proficiency') +
           '</span>' +
           '</button>'
         );
@@ -3486,6 +3486,9 @@ window.DashClassManager = (function () {
       '<div class="cm-rule-title">Exactly How the % Works</div>' +
       '<div class="cm-rule-text">With no categories, the % is total points earned out of total points possible.</div>' +
       '<div class="cm-rule-text">A category with no marked work for a student is left out, and the other categories share its weight.</div>' +
+      '<div class="cm-rule-text">Proficiency work counts as the percent set under Counts As in Points and Proficiency. Proficient counts as ' +
+      _cmLevelPercents(getGradingScale(cid))[3] +
+      '% now.</div>' +
       '<div class="cm-rule-text">The letter comes from the % as shown. Shown as a whole number, 85.5% becomes 86% and an A. Shown to one decimal, 85.94% stays 85.9% and a B.</div>' +
       '</div>' +
       '</div>';
@@ -3543,10 +3546,23 @@ window.DashClassManager = (function () {
     );
   }
 
-  /* The percent a points score needs for each proficiency. The lowest
-     proficiency takes everything below the one above it. */
+  /* Points and Proficiency, both ways. Points to Proficiency: the percent a
+     points score needs for each proficiency; the lowest takes everything
+     below the one above it. Counts As: the percent each proficiency is worth
+     in the course % (docs/DECISIONS.md, "Proficiency percents"). */
+  var _cmPtsError = null;
+  var CM_PTS_LOCKED_HINT = 'A student at this level on every assessment would show as ';
+
+  function _cmLevelPercents(scale) {
+    var d = DEFAULT_GRADING_SCALE.percents;
+    var p = (scale && scale.percents) || d;
+    return { 4: Number(p[4]), 3: Number(p[3]), 2: Number(p[2]), 1: Number(p[1]) };
+  }
+
   function _cmRenderPointsScale(cid) {
-    var b = getGradingScale(cid).boundaries;
+    var scale = getGradingScale(cid);
+    var b = scale.boundaries;
+    var pcts = _cmLevelPercents(scale);
     var rows = b
       .map(function (row, i) {
         var name = PROF_LABELS[row.proficiency];
@@ -3562,25 +3578,119 @@ window.DashClassManager = (function () {
               '" data-action-change="cmPointsScale" aria-label="' +
               name +
               ' starts at this percent"><span class="cm-pts-unit">% and up</span>';
-        return '<div class="cm-pts-row"><span class="cm-pts-name">' + name + '</span>' + input + '</div>';
+        // The level a student at this level everywhere would read back as.
+        var readsAs = pointsToProf(pcts[row.proficiency], 100, scale);
+        var warn =
+          readsAs !== row.proficiency
+            ? '<span class="cm-pts-warn" title="' +
+              CM_PTS_LOCKED_HINT +
+              PROF_LABELS[readsAs] +
+              '.">Shows as ' +
+              PROF_LABELS[readsAs] +
+              '</span>'
+            : '';
+        var counts =
+          '<input class="cm-input cm-pts-pct" type="number" min="0" max="100" id="cm-pts-pct-' +
+          row.proficiency +
+          '" value="' +
+          pcts[row.proficiency] +
+          '" data-action-change="cmPointsScale" aria-label="' +
+          name +
+          ' counts as this percent"><span class="cm-pts-unit">%</span>' +
+          warn;
+        return (
+          '<div class="cm-pts-row"><span class="cm-pts-name">' +
+          name +
+          '</span><span class="cm-pts-cell">' +
+          input +
+          '</span><span class="cm-pts-cell">' +
+          counts +
+          '</span></div>'
+        );
       })
       .join('');
     return (
       '<div class="cm-pts-scale">' +
-      '<div class="cm-recent-text"><span class="cm-label">Points to Proficiency</span>' +
-      '<span class="cm-hint">A points score becomes a proficiency by its percent.</span></div>' +
+      '<div class="cm-recent-text"><span class="cm-label">Points and Proficiency</span>' +
+      '<span class="cm-hint">A points score becomes a proficiency by its percent. Each proficiency counts as a percent in the course %.</span></div>' +
       '<div class="cm-pts-rows">' +
+      '<div class="cm-pts-row cm-pts-head"><span class="cm-pts-name"></span>' +
+      '<span class="cm-pts-cell">Points to Proficiency</span><span class="cm-pts-cell">Counts As</span></div>' +
       rows +
       '</div>' +
+      (_cmPtsError ? '<div class="cm-pts-error" role="alert">' + esc(_cmPtsError) + '</div>' : '') +
+      '<div class="cm-pts-actions">' +
+      '<button type="button" class="cm-action-btn" data-action="cmPointsScaleMatch">Match Columns</button>' +
       '<button type="button" class="cm-action-btn cm-pts-reset" data-action="cmPointsScaleReset">Reset to Defaults</button>' +
+      '</div>' +
       '</div>'
+    );
+  }
+
+  /* Counts As from the Points to Proficiency column: Extending halfway from
+     its start to 100, Proficient and Developing at their own starts, and
+     Emerging at 50, the C- floor, so a Developing student with one Emerging
+     still passes (half of Developing's start when that is 50 or lower). */
+  function _cmMatchedPercents(boundaries) {
+    var at = {};
+    boundaries.forEach(function (row) {
+      at[row.proficiency] = row.min;
+    });
+    return {
+      4: Math.round(at[4] + (100 - at[4]) / 2),
+      3: at[3],
+      2: at[2],
+      1: at[2] > 50 ? 50 : Math.round(at[2] / 2),
+    };
+  }
+
+  // The first reporting term that has already ended, or null.
+  function _cmEndedTerm(cid) {
+    var today = typeof courseToday === 'function' ? courseToday(cid) : '';
+    if (!today) return null;
+    return (
+      getReportingTerms(cid).find(function (t) {
+        return t.ends_on && t.ends_on < today;
+      }) || null
+    );
+  }
+
+  function _cmSamePercents(a, b) {
+    return [1, 2, 3, 4].every(function (l) {
+      return Number(a[l]) === Number(b[l]);
+    });
+  }
+
+  /* Saves the scale. A change to Counts As moves the course % of every
+     term, so with a term already ended the teacher confirms first. */
+  function _cmApplyPointsScale(cid, scale) {
+    var before = _cmLevelPercents(getGradingScale(cid));
+    function save() {
+      var cc = getCourseConfig(cid);
+      cc.gradingScale = scale;
+      saveCourseConfig(cid, cc);
+      if (typeof clearProfCache === 'function') clearProfCache();
+      renderClassManager();
+    }
+    var ended = _cmSamePercents(before, scale.percents) ? null : _cmEndedTerm(cid);
+    if (!ended) return save();
+    renderClassManager();
+    showConfirm(
+      'Change the Course %?',
+      'This changes the course % for every term, including ' +
+        (ended.label || 'Term ' + ended.ordinal) +
+        ', which has already ended. Report cards printed before today won’t match.',
+      'Change',
+      'primary',
+      save,
     );
   }
 
   function cmSavePointsScale() {
     if (!cmSelectedCourse) return;
-    var cc = getCourseConfig(cmSelectedCourse);
-    var scale = getGradingScale(cmSelectedCourse);
+    var cid = cmSelectedCourse;
+    var scale = getGradingScale(cid);
+    var saved = _cmLevelPercents(scale);
     var boundaries = DEFAULT_GRADING_SCALE.boundaries.map(function (db, i) {
       var inp = document.getElementById('cm-pts-min-' + i);
       return {
@@ -3588,19 +3698,39 @@ window.DashClassManager = (function () {
         proficiency: db.proficiency,
       };
     });
+    var percents = {};
+    [4, 3, 2, 1].forEach(function (l) {
+      var inp = document.getElementById('cm-pts-pct-' + l);
+      var v = inp ? parseInt(inp.value, 10) : NaN;
+      percents[l] = isFinite(v) ? Math.max(0, Math.min(100, v)) : saved[l];
+    });
+    if (!(percents[4] > percents[3] && percents[3] > percents[2] && percents[2] > percents[1])) {
+      _cmPtsError = 'Each proficiency must count for more than the one below it.';
+      renderClassManager();
+      return;
+    }
+    _cmPtsError = null;
     // Labels saved before the scale moved here are kept as they were.
-    cc.gradingScale = { boundaries: boundaries, labels: scale.labels || null };
-    saveCourseConfig(cmSelectedCourse, cc);
-    renderClassManager();
+    _cmApplyPointsScale(cid, { boundaries: boundaries, percents: percents, labels: scale.labels || null });
+  }
+
+  function cmMatchPointsScale() {
+    if (!cmSelectedCourse) return;
+    var cid = cmSelectedCourse;
+    var scale = getGradingScale(cid);
+    _cmPtsError = null;
+    _cmApplyPointsScale(cid, {
+      boundaries: scale.boundaries,
+      percents: _cmMatchedPercents(scale.boundaries),
+      labels: scale.labels || null,
+    });
   }
 
   function cmResetPointsScale() {
     if (!cmSelectedCourse) return;
-    var cc = getCourseConfig(cmSelectedCourse);
+    _cmPtsError = null;
     // Saved, not deleted: other devices only take a scale the server has.
-    cc.gradingScale = structuredClone(DEFAULT_GRADING_SCALE);
-    saveCourseConfig(cmSelectedCourse, cc);
-    renderClassManager();
+    _cmApplyPointsScale(cmSelectedCourse, structuredClone(DEFAULT_GRADING_SCALE));
   }
 
   /* The categories' weights as one bar, so a teacher sees the split. */
@@ -3673,7 +3803,7 @@ window.DashClassManager = (function () {
           })
           .map(function (s) {
             if (s.level != null) return formatScoreLevel(s.level, s.mod);
-            return Number.isInteger(s.score) ? String(s.score) : formatLevelAs(s.score, 'proficiency');
+            return Number.isInteger(s.score) ? String(s.score) : formatLevelAs(cid, s.score, 'proficiency');
           });
         // The latest few, oldest first, so the method's rule can be followed.
         var shownScores = scores.length > 6 ? ['\u2026'].concat(scores.slice(-6)) : scores;
@@ -7764,6 +7894,9 @@ window.DashClassManager = (function () {
       },
       cmPointsScaleReset: function () {
         cmResetPointsScale();
+      },
+      cmPointsScaleMatch: function () {
+        cmMatchPointsScale();
       },
       cmCatSave: function () {
         cmCatSave();
