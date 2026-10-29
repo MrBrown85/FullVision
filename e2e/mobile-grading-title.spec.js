@@ -28,3 +28,22 @@ test('the grading bar shows the title and the student count, and follows a thumb
   await expect(title.locator('div')).toHaveText('5 of 27');
   await expect(title).toHaveCSS('opacity', '1');
 });
+
+test('the student page keeps its bar title hidden at rest and fades it in on scroll', async ({ page }) => {
+  await page.goto('/login.html');
+  await page.locator('#demo-mode-btn').click();
+  await page.waitForURL(/teacher-mobile\//);
+  await page.locator('.m-tab-item[data-tab="students"]').click();
+  await page.locator('[data-action="m-set-view"][data-mode="list"]').click();
+  await page.locator('[data-action="m-student-detail"]').first().click();
+  const title = page.locator('#m-nav-bar-student-detail .m-nav-bar-title-inline');
+  await expect(title).toHaveCSS('opacity', '0');
+  // The scroll handler is bound once the page has slid in, so scroll until it fades in.
+  await expect(async () => {
+    await page.locator('#m-screen-student-detail .m-screen-content').evaluate(el => {
+      el.scrollTop = 200;
+      el.dispatchEvent(new Event('scroll'));
+    });
+    await expect(title).toHaveCSS('opacity', '1', { timeout: 500 });
+  }).toPass();
+});
