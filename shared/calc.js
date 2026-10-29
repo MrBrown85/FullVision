@@ -338,14 +338,7 @@ function _rubricAssessmentPoints(cid, studentId, assessment) {
   var status = getAssignmentStatus(cid, studentId, assessment.id);
   if (status === 'EXC') return null;
   if (status === 'NS') {
-    var criteria = getRubricById(cid, assessment.rubricId || assessment.rubric_id).criteria.filter(Boolean);
-    var weights = criteria.map(_rubricCriterionWeight);
-    var anyWeight = weights.some(function (w) {
-      return w > 0;
-    });
-    var full = criteria.reduce(function (sum, c, i) {
-      return sum + (anyWeight ? weights[i] : 1) * _rubricCriterionMax(c);
-    }, 0);
+    var full = _rubricFullPoints(cid, assessment).possible;
     return full > 0 ? { earned: 0, possible: full } : null;
   }
   if (!scored) return null;
@@ -356,6 +349,22 @@ function _rubricAssessmentPoints(cid, studentId, assessment) {
     possible += c.weight * c.max;
   });
   return possible > 0 ? { earned: earned, possible: possible } : null;
+}
+
+/* A rubric's points when every criterion is at its top value, by weight:
+   { possible, criteria } (criteria = how many), as not-submitted work
+   counts out of. When every criterion weighs 0 they count equally. */
+function _rubricFullPoints(cid, assessment) {
+  var rubric = getRubricById(cid, assessment.rubricId || assessment.rubric_id);
+  var criteria = ((rubric && rubric.criteria) || []).filter(Boolean);
+  var weights = criteria.map(_rubricCriterionWeight);
+  var anyWeight = weights.some(function (w) {
+    return w > 0;
+  });
+  var possible = criteria.reduce(function (sum, c, i) {
+    return sum + (anyWeight ? weights[i] : 1) * _rubricCriterionMax(c);
+  }, 0);
+  return { possible: possible, criteria: criteria.length };
 }
 
 /* A competency removed from the class (section.removed_at) keeps its scores
@@ -694,6 +703,46 @@ function getAssessmentGroupPercentage(cid, studentId, assessments, calcMode) {
   });
   if (averaged) return count > 0 && factors > 0 ? { pct: pctSum / factors, count: count } : null;
   return count > 0 && possible > 0 ? { pct: (earned / possible) * 100, count: count } : null;
+}
+
+/* What one assessment is worth in the course %, for the line under its
+   scoring ("Counts as 20 points in Current Events"):
+     { kind: 'points', points, base, criteria, factor, category }
+        Total Points category, or a class with no categories. base is the
+        points before the Factor; criteria is a rubric's criterion count.
+     { kind: 'percent', factor, category }  Average of Percentages category.
+     { kind: 'uncategorized' }  the class has categories and this has none.
+     { kind: 'zero', category } its category is worth 0%.
+   null when no % is shown (a Proficiency class) or the work counts toward
+   no grade (DIBELS). category is the category's name, or null. */
+function assessmentCourseWorth(cid, assessment) {
+  if (!assessment || isDibelsScored(assessment) || courseGradeMode(cid) === 'proficiency') return null;
+  var categories = (typeof getCategories === 'function' && getCategories(cid)) || [];
+  var categoryId = assessment.categoryId || assessment.category_id || null;
+  var category = null;
+  if (categories.length) {
+    category =
+      categories.find(function (c) {
+        return c.id === categoryId;
+      }) || null;
+    if (!category) return { kind: 'uncategorized' };
+    if (!(Number(category.weight || 0) > 0)) return { kind: 'zero', category: category.name || '' };
+  }
+  var factor = getAssessmentWeight(assessment);
+  var name = category ? category.name || '' : null;
+  if (category && _categoryMode(category) === 'percent') return { kind: 'percent', factor: factor, category: name };
+  var base = 4;
+  var criteria = null;
+  if (isPointsScored(assessment)) {
+    base = isCompletionScored(assessment) ? COMPLETE_MAX_POINTS : Number(assessment.maxPoints) || 0;
+  } else if ((assessment.rubricId || assessment.rubric_id) && typeof getRubricById === 'function') {
+    var full = _rubricFullPoints(cid, assessment);
+    if (full.criteria) {
+      base = full.possible;
+      criteria = full.criteria;
+    }
+  }
+  return { kind: 'points', points: base * factor, base: base, criteria: criteria, factor: factor, category: name };
 }
 
 // A category's Calculation (shared/data.js categoryCalcMode); points when
@@ -2128,6 +2177,7 @@ window.Calc = {
   competencyDistribution,
   classColumnAverageText,
   getAssessmentGroupPercentage,
+  assessmentCourseWorth,
   assessmentGroupGrade,
   classAssessmentGroupGrade,
   groupGradeGap,
