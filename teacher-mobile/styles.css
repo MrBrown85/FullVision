@@ -1974,6 +1974,13 @@ body.fv-switching-course::after {
 }
 
 /* ── Undo Toast ────────────────────────────────────────────── */
+/* Over the + button: components.js sets bottom to the button's top + 12 px. */
+#m-toast.m-toast-over-fab {
+  position: fixed;
+  left: 0;
+  right: 0;
+  z-index: var(--z-toast);
+}
 .m-toast {
   position: fixed;
   bottom: calc(60px + env(safe-area-inset-bottom, 0px));
