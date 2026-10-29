@@ -68,6 +68,9 @@
   cursor: pointer;
   color: var(--text);
   min-width: 150px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   text-align: left;
   display: flex;
   align-items: center;
@@ -2044,15 +2047,24 @@
   flex: 1;
   text-align: center;
 }
-/* Grade Report or Build Your Own, above the palette. */
+/* Grade Report or Build Your Own, above the palette. The two halves
+   share the column's width and never run past it. */
 .studio-mode {
   display: flex;
   width: 100%;
+  box-sizing: border-box;
   margin-bottom: 12px;
 }
-.studio-mode .seg-btn {
-  flex: 1;
+.studio-mode .seg-btn,
+.gr-panel .seg .seg-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  padding-left: 6px;
+  padding-right: 6px;
+  font-size: 13px;
   text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .gr-panel h4:first-child {
   margin-top: 4px;
@@ -2069,10 +2081,6 @@
 .gr-panel .seg {
   display: flex;
   width: 100%;
-}
-.gr-panel .seg .seg-btn {
-  flex: 1;
-  text-align: center;
 }
 .studio-palette h4 {
   font-family: var(--font-base);
@@ -4797,10 +4805,6 @@ body.qn-roster #gb-sidebar .student-row-note {
 }
 .gr-facts {
   font-size: 9pt;
-}
-.gr-dot {
-  margin: 0 8px;
-  color: #777;
 }
 .gr-cut {
   font-size: 8pt;

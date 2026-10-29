@@ -1183,21 +1183,28 @@ test.describe('Grade Report', () => {
     await expect(sheet.locator('.gr-head').first()).toContainText('Assignment');
     await expect(sheet.locator('.gr-head').first()).toContainText('Out Of');
     await expect(page.locator('.gr-term')).toContainText('Term Grade');
+    // Grades only: no comment, attendance or other feedback on the sheet.
+    await expect(page.locator('.gr-sheet .report-comment-box, .gr-sheet .report-attendance')).toHaveCount(0);
+    await expect(page.getByRole('checkbox')).toHaveCount(1);
+    // The switch and the Order buttons stay inside the left column.
+    const spill = await page.locator('#studio-palette').evaluate(pal => {
+      const edge = pal.getBoundingClientRect().right - parseFloat(getComputedStyle(pal).paddingRight);
+      return [...pal.querySelectorAll('button, label')]
+        .filter(b => b.getBoundingClientRect().right > edge + 0.5 || b.scrollWidth > b.clientWidth + 1)
+        .map(b => b.textContent.trim());
+    });
+    expect(spill).toEqual([]);
     await showEveryone(page);
     expect(await overflowing(page)).toEqual([]);
     const pdf = await printToPdf(page);
     expect(countPages(pdf)).toBe(STUDENTS * 2);
   });
 
-  test('Include takes the summary and the comment off; the choice and Build Your Own are remembered', async ({
-    page,
-  }) => {
+  test('Include takes the summary off; the choice and Build Your Own are remembered', async ({ page }) => {
     await openGrade(page);
     await expect(page.locator('.gr-summary')).toHaveCount(1);
     await page.getByRole('checkbox', { name: 'Category Summary' }).uncheck();
     await expect(page.locator('.gr-summary')).toHaveCount(0);
-    await page.getByRole('checkbox', { name: 'Teacher Comment' }).uncheck();
-    await expect(page.locator('.gr-sheet .report-comment-box')).toHaveCount(0);
     await page.getByRole('radio', { name: 'Build Your Own' }).click();
     await expect(page.locator('.studio-blk.placed')).toHaveCount(1);
     await page.reload();
