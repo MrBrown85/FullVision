@@ -469,6 +469,14 @@ window.MSweep = (function () {
     var content = _el('m-sweep-content');
     if (!content || !panel || !panel.getBoundingClientRect || !content.scrollTo) return;
     var top = content.scrollTop + panel.getBoundingClientRect().top - content.getBoundingClientRect().top - 8;
+    // Scrolling past 10 px collapses the large title (setupScrollTitle), which
+    // would lift the panel by the title's height after the scroll is aimed.
+    // Collapse it first, then aim.
+    var nav = _el('m-nav-bar-obs-sweep');
+    if (top > 10 && nav && !nav.classList.contains('m-nav-bar-scrolled')) {
+      nav.classList.add('m-nav-bar-scrolled');
+      top = content.scrollTop + panel.getBoundingClientRect().top - content.getBoundingClientRect().top - 8;
+    }
     var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     content.scrollTo({ top: Math.max(0, top), behavior: reduce ? 'auto' : 'smooth' });
   }
