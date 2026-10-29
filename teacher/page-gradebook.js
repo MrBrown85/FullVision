@@ -2221,8 +2221,11 @@ window.PageGradebook = (function () {
       var item = ev.target.closest('[data-ctx]');
       if (!item) return;
       var action = item.dataset.ctx;
-      if (action === 'scoreMode') enterScoreMode(aid);
-      else if (action === 'editAssess') Router.navigate('/assignments?course=' + activeCourse + '&open=' + aid);
+      if (action === 'scoreMode') {
+        // The grader opens on the top student in the order shown.
+        var firstRow = document.querySelector('.gb-scores-row[data-sid]');
+        if (firstRow) openGrader(firstRow.dataset.sid, aid);
+      } else if (action === 'editAssess') Router.navigate('/assignments?course=' + activeCourse + '&edit=' + aid);
       else if (action === 'markUngradedNS' || action === 'markUngradedEXC') {
         // Every student row on screen with nothing in this column (no score,
         // no mark, no status) becomes NS (counted as 0) or EXC.
