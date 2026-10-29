@@ -1169,7 +1169,14 @@ body.fv-switching-course::after {
 .m-obs-edit .m-obs-sheet-delete {
   margin-top: 20px;
 }
-/* Pickers inside the sheet */
+/* Pickers inside the sheet. The header (Back, title, Done) stays put while
+   the list scrolls under it. */
+.m-edit-picker .m-edit-top {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
+}
 .m-pick-list {
   padding: 0 16px 20px;
 }
@@ -1210,6 +1217,18 @@ body.fv-switching-course::after {
   margin-left: auto;
   color: var(--link);
   font-weight: 700;
+}
+.m-pick-meta {
+  margin-left: auto;
+  padding-left: 12px;
+  font-size: 15px;
+  color: var(--text);
+  white-space: nowrap;
+}
+.m-pick-meta + .m-pick-check {
+  min-width: 14px;
+  margin-left: 8px;
+  text-align: right;
 }
 
 /* ── Filter Pills ──────────────────────────────────────────── */
