@@ -255,7 +255,7 @@ describe('capture strip', () => {
     expect(cap.el.querySelector('#capture-add-btn').disabled).toBe(true);
   });
 
-  it('Enter adds for every picked student; students stay, text and tags clear', () => {
+  it('Enter adds for every picked student; then the whole strip clears', () => {
     const cap = mount({ students: ['s1', 's2'] });
     click(cap.el.querySelector('[data-obsc="type"][data-value="strength"]'));
     click(cap.el.querySelector('#tag-btn'));
@@ -265,10 +265,56 @@ describe('capture strip', () => {
     expect(e.defaultPrevented).toBe(true);
     expect(added.map(a => a.sid)).toEqual(['s1', 's2']);
     expect(added[0]).toMatchObject({ text: 'Calibrated the balance', dims: ['collaboration'], sentiment: 'strength' });
-    expect(cap.getStudents()).toEqual(['s1', 's2']);
+    expect(cap.getStudents()).toEqual([]);
+    expect(cap.el.querySelectorAll('.obsc-chip-student')).toHaveLength(0);
     expect(cap.getText()).toBe('');
     expect(cap.getState().dims).toEqual([]);
     expect(cap.getState().sentiment).toBeNull();
+  });
+
+  it('after Add no context or link is left over', () => {
+    const cap = mount({ students: ['s1'] });
+    click(cap.el.querySelector('#context-btn'));
+    click(cap.el.querySelector('[data-obsc="setContext"][data-value="independent"]'));
+    click(cap.el.querySelector('#link-btn'));
+    click(cap.el.querySelector('#assessment-btn'));
+    click(cap.el.querySelector('[data-menu="assessment"] [data-value="a2"]'));
+    type(cap, 'Careful measurements');
+    cap.submit();
+    expect(added[0]).toMatchObject({ context: 'independent', ac: { assessmentId: 'a2' } });
+    const st = cap.getState();
+    expect([st.students, st.context, st.assessmentId, st.competencyId]).toEqual([[], null, null, null]);
+    expect(cap.el.textContent).not.toContain('Assessment:');
+  });
+
+  it('after Add a host keeps what it fixed: a locked student and assessment', () => {
+    const cap = mount({ students: ['s2'], lockStudents: true, assessmentId: 'a1', lockAssessment: true });
+    type(cap, 'Clean bench');
+    cap.submit();
+    expect(cap.getStudents()).toEqual(['s2']);
+    expect(cap.getState().assessmentId).toBe('a1');
+  });
+
+  it('+ Add Tag adds the one tag picked and closes; another pick needs another click', () => {
+    const cap = mount({ students: ['s1'] });
+    click(cap.el.querySelector('#tag-btn'));
+    click(cap.el.querySelector('[data-obsc="toggleTag"][data-value="collaboration"]'));
+    expect(cap.getState().dims).toEqual(['collaboration']);
+    expect(cap.el.querySelector('#tag-dropdown')).toBeNull();
+    click(cap.el.querySelector('#tag-btn'));
+    click(cap.el.querySelector('[data-obsc="toggleTag"][data-value="engagement"]'));
+    expect(cap.getState().dims).toEqual(['collaboration', 'engagement']);
+    expect(cap.el.querySelector('#tag-dropdown')).toBeNull();
+  });
+
+  it('a new custom tag from + Add Tag is added and the menu closes', () => {
+    const cap = mount({ students: ['s1'] });
+    setGlobal('addCustomTag', () => {});
+    click(cap.el.querySelector('#tag-btn'));
+    cap.el.querySelector('[data-obsc-newtag]').value = 'Fume hood';
+    click(cap.el.querySelector('[data-obsc="newTag"]'));
+    expect(cap.getState().dims).toEqual(['tag:Fume hood']);
+    expect(cap.el.querySelector('#tag-dropdown')).toBeNull();
   });
 
   it('Shift+Enter does not send', () => {
