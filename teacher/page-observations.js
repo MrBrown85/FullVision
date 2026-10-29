@@ -1053,17 +1053,17 @@ window.PageObservations = (function () {
 
     _animateFocusOpen();
 
-    requestAnimationFrame(function () {
-      _autosizeFocusTextarea();
-      var ta = document.getElementById('focus-textarea');
-      if (ta) {
-        ta.focus();
-        var len = ta.value.length;
-        try {
-          ta.setSelectionRange(len, len);
-        } catch (e) {}
-      }
-    });
+    // Caret at the end now, not a frame later: a late move would collapse a
+    // selection made in the meantime, so typing over it appended instead.
+    var ta = document.getElementById('focus-textarea');
+    if (ta) {
+      ta.focus();
+      var len = ta.value.length;
+      try {
+        ta.setSelectionRange(len, len);
+      } catch (e) {}
+    }
+    requestAnimationFrame(_autosizeFocusTextarea);
   }
 
   /* Closes without writing; Save writes first. */
