@@ -1857,6 +1857,40 @@ window.PageAssignments = (function () {
   }
 
   /* ── Assessment Form ────────────────────────────────────── */
+  // One row of the competency checklist. The row reads the competency's own
+  // wording; the section name (often just the category) is the last fallback.
+  function _afTagRow(sec, selTags) {
+    var tag = sec.tags[0];
+    if (!tag) return '';
+    var checked = selTags.includes(tag.id);
+    var wording = tag.text || tag.source_text || sec.name;
+    return (
+      '<label class="af-tag-item' +
+      (checked ? ' checked' : '') +
+      '" data-section="' +
+      sec.id +
+      '" style="border-left:3px solid ' +
+      sec.color +
+      ';padding-left:8px;margin-bottom:4px">' +
+      '<input type="checkbox" value="' +
+      tag.id +
+      '" class="af-tag-cb" data-section="' +
+      sec.id +
+      '"' +
+      (checked ? ' checked' : '') +
+      ' data-action-change="tagCheckbox">' +
+      '<span class="af-tag-id" style="color:' +
+      sec.color +
+      '">' +
+      esc(tag.code || tag.shortName || '') +
+      '</span>' +
+      '<span class="af-tag-name">' +
+      esc(wording) +
+      '</span>' +
+      '</label>'
+    );
+  }
+
   function renderAssessForm(cid, assess) {
     var sections = getSections(cid);
     var isEdit = !!assess;
@@ -2159,95 +2193,17 @@ window.PageAssignments = (function () {
           esc(g.name) +
           '</span></div>';
         gi.secs.forEach(function (sec) {
-          var tag = sec.tags[0];
-          if (!tag) return;
-          var checked = selTags.includes(tag.id);
-          html +=
-            '<label class="af-tag-item' +
-            (checked ? ' checked' : '') +
-            '" data-section="' +
-            sec.id +
-            '" style="border-left:3px solid ' +
-            sec.color +
-            ';padding-left:8px;margin-bottom:4px">' +
-            '<input type="checkbox" value="' +
-            tag.id +
-            '" class="af-tag-cb" data-section="' +
-            sec.id +
-            '"' +
-            (checked ? ' checked' : '') +
-            ' data-action-change="tagCheckbox">' +
-            '<span class="af-tag-id" style="color:' +
-            sec.color +
-            '">' +
-            esc(tag.code || tag.shortName || '') +
-            '</span>' +
-            '<span class="af-tag-name">' +
-            esc(sec.name) +
-            '</span>' +
-            '</label>';
+          html += _afTagRow(sec, selTags);
         });
         html += '</div>';
       });
       _afUngrouped.forEach(function (sec) {
-        var tag = sec.tags[0];
-        if (!tag) return;
-        var checked = selTags.includes(tag.id);
-        html +=
-          '<label class="af-tag-item' +
-          (checked ? ' checked' : '') +
-          '" data-section="' +
-          sec.id +
-          '" style="border-left:3px solid ' +
-          sec.color +
-          ';padding-left:8px;margin-bottom:4px">' +
-          '<input type="checkbox" value="' +
-          tag.id +
-          '" class="af-tag-cb" data-section="' +
-          sec.id +
-          '"' +
-          (checked ? ' checked' : '') +
-          ' data-action-change="tagCheckbox">' +
-          '<span class="af-tag-id" style="color:' +
-          sec.color +
-          '">' +
-          esc(tag.code || tag.shortName || '') +
-          '</span>' +
-          '<span class="af-tag-name">' +
-          esc(sec.name) +
-          '</span>' +
-          '</label>';
+        html += _afTagRow(sec, selTags);
       });
     } else {
       // No groups — flat list
       sections.forEach(function (sec) {
-        var tag = sec.tags[0];
-        if (!tag) return;
-        var checked = selTags.includes(tag.id);
-        html +=
-          '<label class="af-tag-item' +
-          (checked ? ' checked' : '') +
-          '" data-section="' +
-          sec.id +
-          '" style="border-left:3px solid ' +
-          sec.color +
-          ';padding-left:8px;margin-bottom:4px">' +
-          '<input type="checkbox" value="' +
-          tag.id +
-          '" class="af-tag-cb" data-section="' +
-          sec.id +
-          '"' +
-          (checked ? ' checked' : '') +
-          ' data-action-change="tagCheckbox">' +
-          '<span class="af-tag-id" style="color:' +
-          sec.color +
-          '">' +
-          esc(tag.code || tag.shortName || '') +
-          '</span>' +
-          '<span class="af-tag-name">' +
-          esc(sec.name) +
-          '</span>' +
-          '</label>';
+        html += _afTagRow(sec, selTags);
       });
     }
     html += '</div></div>';
