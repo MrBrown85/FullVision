@@ -1572,7 +1572,14 @@ window.PageAssignments = (function () {
                 ' rubric for each student">' +
                 _GRADER_PRINTER +
                 'Print Rubrics</button>'
-              : '') +
+              : // Points and Complete/Incomplete: a score sheet per student.
+                '<button class="rubric-print-btn" data-action="printRubrics" data-aid="' +
+                a.id +
+                '" title="Print each student\'s ' +
+                (isCompletionScored(a) ? 'mark' : 'score') +
+                ' and feedback">' +
+                _GRADER_PRINTER +
+                'Print Scores</button>') +
         '<button class="assess-header-action-btn" data-action="editAssess" data-aid="' +
         a.id +
         '" title="Edit" aria-label="Edit assessment">' +
@@ -7225,11 +7232,11 @@ window.PageAssignments = (function () {
   var _GRADER_PRINTER =
     '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/></svg>';
 
-  /* Print Rubric on rubric work, Print on work scored by competency levels
-     (it prints the levels and feedback), nothing on points or
-     Complete/Incomplete work, which has nothing of its own to print. */
+  /* Print Rubric on rubric work, Print on everything else but DIBELS: on
+     competency-level work it prints the levels and feedback, on points and
+     Complete/Incomplete work the score or mark and feedback. */
   function _graderPrintButton(cid, a) {
-    if (isPointsScored(a) || isDibelsScored(a)) return '';
+    if (isDibelsScored(a)) return '';
     var label = a.rubricId && getRubricById(cid, a.rubricId) ? 'Print Rubric' : 'Print';
     return (
       '<button type="button" class="grader-print" data-action="printRubrics" data-aid="' +
