@@ -2145,6 +2145,9 @@ window.PageGradebook = (function () {
   function _dismissContextMenu() {
     var existing = document.querySelector('.gb-ctx-menu');
     if (existing) existing.remove();
+    document.querySelectorAll('.gb-col-menu').forEach(function (el) {
+      el.classList.remove('gb-col-menu');
+    });
   }
 
   function showScoreContextMenu(e, cell) {
@@ -2273,6 +2276,12 @@ window.PageGradebook = (function () {
         : '') +
       '<div class="gb-ctx-divider"></div>' +
       '<div class="gb-ctx-item gb-ctx-danger" data-ctx="deleteAssess">Delete Assignment</div>';
+    // The column stays highlighted while its menu is open, so it is clear
+    // which assignment the menu acts on.
+    header.classList.add('gb-col-menu');
+    document.querySelectorAll('.gb-scores-cell[data-aid="' + aid + '"]').forEach(function (cell) {
+      cell.classList.add('gb-col-menu');
+    });
     _placeContextMenu(menu, e.clientX, e.clientY);
     menu.addEventListener('click', function (ev) {
       var item = ev.target.closest('[data-ctx]');
