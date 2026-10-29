@@ -96,6 +96,7 @@ window.DashClassManager = (function () {
   var _cmGuardians = {};
   var _cmGuardiansLoaded = {};
   var _cmGuardiansReady = {};
+  var _cmGuardiansLoading = {};
 
   // Import preview
   var cmPendingImport = null;
@@ -1325,13 +1326,16 @@ window.DashClassManager = (function () {
   /* Loads the class's guardians once per visit to the tab, then fills in
      the Parent Email boxes in place, so a box being typed in keeps focus. */
   function _cmLoadGuardians(cid) {
-    if (_cmGuardiansLoaded[cid] || !(window.v2 && window.v2.listCourseGuardians)) return;
+    if (_cmGuardiansLoaded[cid] || !(window.v2 && window.v2.listCourseGuardians))
+      return _cmGuardiansLoading[cid] || Promise.resolve();
     _cmGuardiansLoaded[cid] = true;
-    window.v2.listCourseGuardians(cid).then(function (res) {
-      if (!res || !res.data) return;
-      _cmGuardiansReady[cid] = true;
-      var byStudent = {};
-      res.data.forEach(function (g) {
+    return (_cmGuardiansLoading[cid] = window.v2.listCourseGuardians(cid).then(function (res) {
+      // With no server rows (Demo Mode, a failed read) the emails still
+      // waiting on the students are all there is; keep what is in memory.
+      var rows = res && res.data;
+      if (rows) _cmGuardiansReady[cid] = true;
+      var byStudent = rows ? {} : _cmGuardians[cid] || {};
+      (rows || []).forEach(function (g) {
         var sid = g.enrollment_id;
         if (!byStudent[sid]) byStudent[sid] = [];
         byStudent[sid].push(g);
@@ -1364,6 +1368,17 @@ window.DashClassManager = (function () {
         });
       var sum = document.getElementById('cm-rs-summary');
       if (sum) sum.textContent = _cmRosterSummary(cid);
+    }));
+  }
+
+  /* A student's first two parent emails ('' for none), once the class's
+     guardians are loaded. The Edit Student dialog shows them. */
+  function _cmGuardianEmails(cid, sid) {
+    return _cmLoadGuardians(cid).then(function () {
+      var mine = _cmGuardiansFor(cid, sid);
+      return [0, 1].map(function (i) {
+        return (mine[i] && mine[i].email) || '';
+      });
     });
   }
 
@@ -1617,11 +1632,8 @@ window.DashClassManager = (function () {
   }
 
   function _cmSaveGuardianEmail(cid, el, email) {
-    var sid = el.dataset.sid;
     var idx = el.dataset.col === 'g0' ? 0 : 1;
-    var list = (_cmGuardians[cid] = _cmGuardians[cid] || {});
-    var mine = (list[sid] = list[sid] || []);
-    var g = mine[idx];
+    var g = _cmGuardiansFor(cid, el.dataset.sid)[idx];
     if ((g ? g.email || '' : '') === email) return;
     if (email && !el.checkValidity()) {
       el.value = g ? g.email || '' : '';
@@ -1631,6 +1643,17 @@ window.DashClassManager = (function () {
       }, 1600);
       return;
     }
+    _cmSetGuardianEmail(cid, el.dataset.sid, idx, email);
+  }
+
+  /* Sets a student's first (idx 0) or second (idx 1) parent email; blank
+     removes that guardian. The roster and the Edit Student dialog both save
+     through here. */
+  function _cmSetGuardianEmail(cid, sid, idx, email) {
+    var list = (_cmGuardians[cid] = _cmGuardians[cid] || {});
+    var mine = (list[sid] = list[sid] || []);
+    var g = mine[idx];
+    if ((g ? g.email || '' : '') === email) return;
     var st = getStudents(cid).find(function (s) {
       return s.id === sid;
     });
@@ -1652,7 +1675,19 @@ window.DashClassManager = (function () {
     } else if (st) {
       // A guardian needs a name; the roster only asks for an address.
       _cmAddGuardianEmail(cid, st, email);
-      if (st.pendingGuardianEmails) saveStudents(cid, getStudents(cid));
+    }
+    // A student not on the server yet (or in Demo Mode) keeps its unsent
+    // emails on the record, in step with the change.
+    if (st && !_isServerPerson(st)) {
+      st.pendingGuardianEmails = mine
+        .filter(function (x) {
+          return !x.id;
+        })
+        .map(function (x) {
+          return x.email;
+        });
+      if (!st.pendingGuardianEmails.length) delete st.pendingGuardianEmails;
+      saveStudents(cid, getStudents(cid));
     }
     var sum = document.getElementById('cm-rs-summary');
     if (sum) sum.textContent = _cmRosterSummary(cid);
@@ -8527,6 +8562,9 @@ window.DashClassManager = (function () {
     rosterRowsFromTable: rosterRowsFromTable,
     cmCompRowsFromCsv: cmCompRowsFromCsv,
     withdrawnRecordRows: _cmWithdrawnRecordRows,
+    // The Edit Student dialog's Parent Email and Parent Email 2.
+    guardianEmails: _cmGuardianEmails,
+    saveGuardianEmail: _cmSetGuardianEmail,
     reportingTermsDraft: function (cid) {
       var st = _cmTermRows(cid || cmSelectedCourse);
       return { rows: st.rows.slice(), dirty: st.dirty, error: _cmTermError(cid || cmSelectedCourse) };
@@ -8550,6 +8588,7 @@ window.DashClassManager = (function () {
       cmRosterQuery = '';
       _cmGuardiansLoaded = {};
       _cmGuardiansReady = {};
+      _cmGuardiansLoading = {};
       cmPendingImport = null;
       cmCompSelect = false;
       cmCompSelected = {};
