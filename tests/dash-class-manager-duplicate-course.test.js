@@ -56,7 +56,7 @@ function seedSource() {
   };
   // Stored out of order: the copy follows displayOrder.
   _cache.categories[SRC] = [
-    { id: TEST, name: 'Tests', weight: 60, displayOrder: 1 },
+    { id: TEST, name: 'Tests', weight: 60, displayOrder: 1, calcMode: 'percent' },
     { id: LAB, name: 'Labs', weight: 40, displayOrder: 0 },
   ];
 }
@@ -148,8 +148,8 @@ describe('class manager — duplicate class', () => {
     expect(saves).toHaveLength(1);
     expect(saves[0].params.p_course_id).toBe(NEW_CID);
     expect(saves[0].params.p_categories).toEqual([
-      { name: 'Labs', weight: 40 },
-      { name: 'Tests', weight: 60 },
+      { name: 'Labs', weight: 40, calc_mode: 'points' },
+      { name: 'Tests', weight: 60, calc_mode: 'percent' },
     ]);
 
     // Re-keyed to the server's ids under the new class.

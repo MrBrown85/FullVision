@@ -126,6 +126,29 @@ describe('grading setup copies across classes', () => {
     expect(getReportingTerms(B)).toEqual([]);
   });
 
+  it("copies a category's Calculation and names the change", async () => {
+    _cache.categories[A][1].calcMode = 'percent';
+    const cats = GradingSetupCopy.planCategories(A, B);
+    expect(cats.lines).toContain('Tests: Total Points → Average of Percentages.');
+    await GradingSetupCopy.applySetup(GradingSetupCopy.planSetup(A, B, { categories: true }), {
+      'b-quiz': 2,
+      uncategorized: null,
+    });
+    const modes = Object.fromEntries(getCategories(B).map(c => [c.name, categoryCalcMode(c)]));
+    expect(modes).toEqual({ Labs: 'points', Tests: 'percent', Homework: 'points' });
+  });
+
+  it('sees a Calculation-only difference as a change', () => {
+    _cache.categories[B] = [
+      { id: 'b-lab', name: 'Labs', weight: 30, displayOrder: 0 },
+      { id: 'b-test', name: 'Tests', weight: 50, displayOrder: 1, calcMode: 'percent' },
+      { id: 'b-hw', name: 'Homework', weight: 20, displayOrder: 2 },
+    ];
+    const cats = GradingSetupCopy.planCategories(A, B);
+    expect(cats.same).toBe(false);
+    expect(cats.lines[0]).toBe('Tests: Average of Percentages → Total Points.');
+  });
+
   it('leaves work with no category when the teacher says so', async () => {
     const plan = GradingSetupCopy.planSetup(A, B, { categories: true });
     await GradingSetupCopy.applySetup(plan, { 'b-quiz': 1, uncategorized: null });

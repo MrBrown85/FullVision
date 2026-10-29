@@ -156,6 +156,7 @@ create table category (
   name          text        not null,
   weight        numeric     not null,                              -- sum per course must be 100 (fv_check_category_weight_sum, deferred)
   display_order integer     not null default 0,
+  calc_mode     text        not null default 'points' check (calc_mode in ('points', 'percent')), -- Total Points or Average of Percentages (20261029_category_calc_mode)
   created_at   timestamptz  not null default now(),
   updated_at   timestamptz  not null default now()
 );
