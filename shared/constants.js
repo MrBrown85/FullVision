@@ -463,13 +463,12 @@ function isUnlinkedTag(tagId) {
   return tagId === UNLINKED_TAG_ID || tagId === '';
 }
 
-/* A rubric criterion's scores are kept under its competencies, or under the
-   criterion's own id when it has none. That key counts toward the
-   assessment and the course grade, never toward a competency. */
+/* A rubric criterion's score is kept under the criterion's own id, whatever
+   competencies it feeds, so two criteria on one competency each keep their
+   own level. The score rolls up to each of the criterion's competencies in
+   getTagScores (docs/DECISIONS.md, "Rubric criteria score on their own"). */
 function rubricCriterionScoreKeys(criterion) {
-  if (!criterion) return [];
-  var ids = criterion.tagIds || [];
-  return ids.length ? ids : [criterion.id];
+  return criterion && criterion.id ? [criterion.id] : [];
 }
 
 /* The keys an assessment's scores are stored under: its competencies, plus
@@ -505,14 +504,15 @@ function scoreTagIds(assessment, cid) {
     rubric = getRubricById(cid, rubricId);
   }
   if (rubric) {
+    // Rubric work is scored by criterion: its keys are the criterion ids.
     var criterionIds = (rubric.criteria || [])
       .filter(function (c) {
-        return c && c.id && !(c.tagIds && c.tagIds.length) && ids.indexOf(c.id) < 0;
+        return c && c.id;
       })
       .map(function (c) {
         return c.id;
       });
-    if (criterionIds.length) ids = ids.concat(criterionIds);
+    if (criterionIds.length) ids = criterionIds;
   }
   return ids.length ? ids : [UNLINKED_TAG_ID];
 }

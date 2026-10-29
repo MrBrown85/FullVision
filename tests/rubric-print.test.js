@@ -67,13 +67,13 @@ describe('criterionLevel', () => {
     expect(lv).toEqual({ level: 3, mod: 1, mixed: false });
   });
 
-  it('takes the lowest level, marked mixed and with no ±, when they disagree', () => {
+  it("reads the criterion's own entry, not its competencies'", () => {
     const rubric = getRubricById(CID, RUBRIC);
     const entries = [
+      { assessmentId: AID, tagId: CRIT_A, score: 2, mod: -1 },
       { assessmentId: AID, tagId: TAG_1, score: 4, mod: 0 },
-      { assessmentId: AID, tagId: TAG_2, score: 2, mod: -1 },
     ];
-    expect(RubricPrint.criterionLevel(entries, AID, rubric.criteria[0])).toEqual({ level: 2, mod: 0, mixed: true });
+    expect(RubricPrint.criterionLevel(entries, AID, rubric.criteria[0])).toEqual({ level: 2, mod: -1, mixed: false });
   });
 
   it('is unscored with no entries', () => {
@@ -212,11 +212,11 @@ describe('criterion comments in the data layer', () => {
     return client.calls.filter(c => c.name === 'upsert_rubric_score');
   }
 
-  it('stores the comment on every key of a scored criterion and sends it with the level', () => {
+  it("stores the comment on the criterion's entry and sends it with the level", () => {
     saveRubricCriterionComment(CID, SID, AID, CRIT_A, 'Good control of variables.');
     const entries = getScores(CID)[SID];
-    expect(entries.find(e => e.tagId === TAG_1).critNote).toBe('Good control of variables.');
-    expect(entries.find(e => e.tagId === TAG_2).critNote).toBe('Good control of variables.');
+    expect(entries.find(e => e.tagId === CRIT_A).critNote).toBe('Good control of variables.');
+    expect(entries.some(e => e.tagId === TAG_1 || e.tagId === TAG_2)).toBe(false);
     expect(getRubricCriterionComment(CID, SID, AID, getRubricById(CID, RUBRIC).criteria[0])).toBe(
       'Good control of variables.',
     );
@@ -231,7 +231,7 @@ describe('criterion comments in the data layer', () => {
   it('clearing sends an empty string, which the server reads as "remove"', () => {
     saveRubricCriterionComment(CID, SID, AID, CRIT_A, 'Note');
     saveRubricCriterionComment(CID, SID, AID, CRIT_A, '');
-    expect(getScores(CID)[SID].find(e => e.tagId === TAG_1).critNote).toBeUndefined();
+    expect(getScores(CID)[SID].find(e => e.tagId === CRIT_A).critNote).toBeUndefined();
     const calls = rubricCalls();
     expect(calls).toHaveLength(2);
     expect(calls[1].payload.p_comment).toBe('');
@@ -254,7 +254,7 @@ describe('criterion comments in the data layer', () => {
   });
 
   it('a level change on a criterion with no comment sends null, which keeps the saved one', () => {
-    upsertScore(CID, SID, AID, TAG_1, 4, '2026-10-03', 'summative', '');
+    upsertScore(CID, SID, AID, CRIT_A, 4, '2026-10-03', 'summative', '');
     const calls = rubricCalls();
     expect(calls).toHaveLength(1);
     expect(calls[0].payload.p_comment).toBeNull();
@@ -290,7 +290,7 @@ describe('criterion comments in the data layer', () => {
       criterion_rows: [[0, 0, 0, 3, 0, 'Label axes', 'Added a trend line']],
     });
     expect(cells[SID][AID].rubric_scores[0].beyond).toBe('Added a trend line');
-    const entry = _scoreEntryFromCanonical(CID, getAssessments(CID)[0], TAG_1, 3, '', 0, 'Label axes', 'Extra');
+    const entry = _scoreEntryFromCanonical(CID, getAssessments(CID)[0], CRIT_A, 3, '', 0, 'Label axes', 'Extra');
     expect(entry.critBeyond).toBe('Extra');
 
     saveRubricCriterionBeyond(CID, SID, AID, CRIT_A, 'Added a trend line');
@@ -301,7 +301,7 @@ describe('criterion comments in the data layer', () => {
     // The comment isn't sent, so the server keeps it.
     expect('p_comment' in calls[0].payload).toBe(false);
     // A level change sends the saved Went Beyond along.
-    upsertScore(CID, SID, AID, TAG_1, 4, '2026-10-03', 'summative', '');
+    upsertScore(CID, SID, AID, CRIT_A, 4, '2026-10-03', 'summative', '');
     expect(rubricCalls()[1].payload.p_beyond).toBe('Added a trend line');
   });
 

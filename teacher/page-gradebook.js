@@ -738,13 +738,14 @@ window.PageGradebook = (function () {
         });
       })
       .map(function (c) {
-        var codes = c.keys
-          .map(function (key) {
-            var info = scoreKeyInfo(cid, a, key);
-            return info && info.tag ? _tagShortCode(info.tag) || info.label : '';
+        var tags = c.criterion.tagIds || [];
+        var codes = tags
+          .map(function (tid) {
+            var tag = getTagById(cid, tid);
+            return tag ? _tagShortCode(tag) || tag.label : '';
           })
           .filter(Boolean);
-        var sec = getSectionForTag(cid, c.keys[0]);
+        var sec = tags.length ? getSectionForTag(cid, tags[0]) : null;
         var name = c.criterion.name || 'Criterion';
         return {
           assessmentId: a.id,
@@ -760,6 +761,32 @@ window.PageGradebook = (function () {
       });
   }
 
+  /* The competencies a criterion key stands for: a criterion's competencies,
+     or the key itself for a competency or a criterion with none. */
+  function _keyCompetencyIds(cid, a, key) {
+    var rubric =
+      a && (a.rubricId || a.rubric_id) && !isPointsScored(a) ? getRubricById(cid, a.rubricId || a.rubric_id) : null;
+    var crit =
+      rubric &&
+      (rubric.criteria || []).find(function (c) {
+        return c && c.id === key;
+      });
+    return crit && crit.tagIds && crit.tagIds.length ? crit.tagIds : [key];
+  }
+
+  /* Rubric work in the Competencies columns: a column per competency the
+     criteria feed (a criterion with none keeps its own column), read from
+     the criteria. Rubrics by Criterion keeps a column per criterion. */
+  function _competencyColumnKeys(cid, a, keys) {
+    var out = [];
+    keys.forEach(function (key) {
+      _keyCompetencyIds(cid, a, key).forEach(function (t) {
+        if (out.indexOf(t) < 0) out.push(t);
+      });
+    });
+    return out;
+  }
+
   function renderDetailedTable(cid, students, assessments, sections, isLetter, scores) {
     var cols = [];
     var groups = [];
@@ -768,10 +795,13 @@ window.PageGradebook = (function () {
     assessments.forEach(function (a) {
       // Competencies, rubric criteria with none, or one overall column.
       var tagIds = scoreTagIds(a, cid);
+      if (!byCriterion) tagIds = _competencyColumnKeys(cid, a, tagIds);
       if (filterSections.length > 0) {
         tagIds = tagIds.filter(function (tid) {
-          var sec = getSectionForTag(cid, tid);
-          return sec && filterSections.includes(sec.id);
+          return _keyCompetencyIds(cid, a, tid).some(function (t) {
+            var sec = getSectionForTag(cid, t);
+            return sec && filterSections.includes(sec.id);
+          });
         });
       }
       if (tagIds.length === 0) return;
@@ -1022,11 +1052,16 @@ window.PageGradebook = (function () {
             '</td>';
         } else {
           var studentScores = scores[s.id] || [];
-          var entry = studentScores.find(function (e) {
-            return e.assessmentId === col.assessmentId && e.tagId === col.tagId;
-          });
+          // A competency column of rubric work reads the criteria that feed
+          // it, and is scored on the rubric, not here.
+          var rubricCol = !col.isCriterionCol && !!assess && rubricCompetencyIds(cid, assess).indexOf(col.tagId) >= 0;
+          var entry = rubricCol
+            ? competencyLevelFromCriteria(cid, s.id, assess, col.tagId)
+            : studentScores.find(function (e) {
+                return e.assessmentId === col.assessmentId && e.tagId === col.tagId;
+              });
           var score = entry ? entry.score : 0;
-          var assigned = assess && scoreTagIds(assess, cid).includes(col.tagId);
+          var assigned = rubricCol || (assess && scoreTagIds(assess, cid).includes(col.tagId));
           var content = statusMark
             ? statusMark
             : score > 0
@@ -1047,7 +1082,9 @@ window.PageGradebook = (function () {
             (col.tagIds && col.tagIds.length > 1 ? '" data-tids="' + esc(col.tagIds.join(',')) : '') +
             '" data-sid="' +
             s.id +
-            '" data-action="cycleScore"><span class="gb-score-val s' +
+            '"' +
+            (rubricCol ? ' title="Scored on the rubric in Assignments"' : ' data-action="cycleScore"') +
+            '><span class="gb-score-val s' +
             score +
             '">' +
             content +

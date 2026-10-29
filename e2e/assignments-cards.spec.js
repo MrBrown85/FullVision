@@ -42,11 +42,11 @@ test('a card opens to Competencies | Rubric and its actions', async ({ page }) =
   if (!(await card.evaluate(el => el.classList.contains('open')))) await card.locator('.assess-title').click();
   await expect(card).toHaveClass(/open/);
   const view = card.locator('.rubric-view-toggle .rubric-view-btn');
-  await expect(view).toHaveText(['Competencies', 'Rubric']);
+  await expect(view).toHaveText(['Criteria', 'Rubric']);
   await expect(card.locator('.rubric-print-btn')).toHaveText('Print Rubrics');
   await expect(card.locator('.assess-header-action-btn')).toHaveCount(3);
   await expect(card.locator('.assess-header-actions')).toHaveCSS('opacity', '1');
 
-  await view.filter({ hasText: 'Competencies' }).click();
-  await expect(view.filter({ hasText: 'Competencies' })).toHaveAttribute('aria-pressed', 'true');
+  await view.filter({ hasText: 'Criteria' }).click();
+  await expect(view.filter({ hasText: 'Criteria' })).toHaveAttribute('aria-pressed', 'true');
 });

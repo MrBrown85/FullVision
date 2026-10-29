@@ -123,6 +123,9 @@ window.CompetencyEvidence = (function () {
     var sColor = PROF_COLORS[sc.level || sc.score] || PROF_COLORS[0];
     var href = assess ? '/assignments?course=' + cid + '&open=' + assess.id + '&student=' + sid : '';
     var title = assess ? esc(assess.title) : 'Unknown';
+    // A rubric criterion's score names its criterion: two on one competency
+    // are two pieces of evidence.
+    if (sc.criterionName) title += ' \u00b7 ' + esc(sc.criterionName);
     return (
       '<li class="ced-item"><a class="tag-assess-row"' +
       (href ? ' role="link" tabindex="0" data-href="' + href + '"' : '') +

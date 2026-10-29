@@ -455,14 +455,21 @@ function seedIfNeeded() {
   }
 
   /* helper: build score entries from a compact map */
-  function buildScores(studentIds, assessments, scoreMap) {
+  function buildScores(studentIds, assessments, scoreMap, rubrics) {
     const sc = {};
+    const rubricById = {};
+    (rubrics || []).forEach(r => {
+      rubricById[r.id] = r;
+    });
     studentIds.forEach((sid, idx) => {
       sc[sid] = [];
       assessments.forEach(a => {
         const baseScore = scoreMap[a.id] ? scoreMap[a.id][idx] : 0;
         if (baseScore === 0) return; // blank — not yet assessed
-        (a.tagIds || []).forEach(tagId => {
+        // Rubric work is scored per criterion, under the criterion's id.
+        const rubric = a.rubricId ? rubricById[a.rubricId] : null;
+        const keys = rubric ? rubric.criteria.map(c => c.id) : a.tagIds || [];
+        keys.forEach(tagId => {
           const mod = seedScoreMod(sid, a, a.rubricId ? 'rubric' : tagId, baseScore);
           sc[sid].push({
             id: uid(),
@@ -1499,7 +1506,7 @@ function seedIfNeeded() {
         65, 76, 53, 67, 67, 42, 57, 68, 77, 65, 59, 42, 75, 64, 44, 42, 58, 39, 65, 62, 66, 53, 75, 56, 67, 44, 62,
       ],
     };
-    saveScores('sci8', current(buildScores(STIDS, sci8SeedAssessments, sci8ScoreMap)));
+    saveScores('sci8', current(buildScores(STIDS, sci8SeedAssessments, sci8ScoreMap, sci8Rubrics)));
 
     // Score-level notes (assignment-level comments). These edit the saved,
     // already-shifted scores, so they are saved as they are.

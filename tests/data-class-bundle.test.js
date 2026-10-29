@@ -416,16 +416,19 @@ describe('get_class_bundle', () => {
     expect(bundled.tagProficiency).toEqual(legacy.tagProficiency);
   });
 
-  it('maps rubric scores through the rubrics on the very first load', async () => {
+  it('keeps rubric scores under their criterion on the very first load', async () => {
     resetClass();
     globalThis.__FV_CLASS_BUNDLE = true;
     globalThis.getSupabase = bundleServer;
     await initData(CID);
-    var keys = (getScores(CID)[E1] || []).map(function (e) {
-      return e.tagId;
-    });
-    expect(keys).toContain(T1);
-    expect(keys).not.toContain(C1);
+    var keys = (getScores(CID)[E1] || [])
+      .filter(function (e) {
+        return e.assessmentId === A2;
+      })
+      .map(function (e) {
+        return e.tagId;
+      });
+    expect(keys).toEqual([C1]);
   });
 
   it('loads a class in one request and records its version', async () => {

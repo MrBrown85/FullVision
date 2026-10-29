@@ -56,14 +56,14 @@ describe('score keys for a rubric criterion with no competency', () => {
     seed('rubrics', [rubric]);
   });
 
-  it('uses the criterion id when the criterion has no competency', () => {
-    expect(rubricCriterionScoreKeys(rubric.criteria[0])).toEqual([TAG]);
+  it('uses the criterion id with or without a competency', () => {
+    expect(rubricCriterionScoreKeys(rubric.criteria[0])).toEqual([LINKED_CRIT]);
     expect(rubricCriterionScoreKeys(rubric.criteria[1])).toEqual([TAGLESS_CRIT]);
   });
 
-  it('adds the criterion id to the assessment competencies', () => {
+  it('scores a rubric assessment under its criteria', () => {
     const a = { id: AID, rubricId: RUBRIC, tagIds: [TAG] };
-    expect(scoreTagIds(a, CID)).toEqual([TAG, TAGLESS_CRIT]);
+    expect(scoreTagIds(a, CID)).toEqual([LINKED_CRIT, TAGLESS_CRIT]);
     // Without the course the rubric can't be found: competencies only.
     expect(scoreTagIds(a)).toEqual([TAG]);
   });

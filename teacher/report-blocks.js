@@ -576,7 +576,8 @@ window.ReportBlocks = (function () {
     getAssessments(cid).forEach(a => (byId[a.id] = a));
     const best = {};
     (sec.tags || []).forEach(tag => {
-      getTagScores(cid, sid, tag.id).forEach(sc => {
+      // One point per piece of work on each competency (tagScoresByAssessment).
+      tagScoresByAssessment(cid, sid, tag.id).forEach(sc => {
         if (!(sc.score > 0) || !byId[sc.assessmentId]) return;
         if (!best[sc.assessmentId] || sc.score > best[sc.assessmentId]) best[sc.assessmentId] = sc.score;
       });
