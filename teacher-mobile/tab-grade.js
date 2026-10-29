@@ -162,7 +162,7 @@ window.MGrade = (function () {
     } else {
       cells = '<div class="m-list" id="m-grade-list">';
       sorted.forEach(function (a) {
-        var dateStr = new Date(a.date).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
+        var dateStr = parseLocalDate(a.date).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
         var badge = _assessmentBadgeData(cid, a);
         var tagCount = (a.tagIds || []).length;
 
@@ -249,7 +249,7 @@ window.MGrade = (function () {
   function _matchesAllFilters(a, ctx) {
     // Segment: 'recent' narrows to last 30 days regardless of sheet state.
     if (_segmentMode === 'recent') {
-      if (ctx.recentCutoff && new Date(a.date) < ctx.recentCutoff) return false;
+      if (ctx.recentCutoff && parseLocalDate(a.date) < ctx.recentCutoff) return false;
     }
     // Category: '__none' sentinel matches assessments with no categoryId.
     if (_filters.category.length > 0) {
@@ -267,10 +267,12 @@ window.MGrade = (function () {
         // A reporting term keeps the assessments dated inside it. An
         // undated assessment is in no term (docs/DECISIONS.md, "Reporting
         // periods" item 2).
-        if (!a.date || a.date < ctx.term.starts_on || a.date > ctx.term.ends_on) return false;
+        if (!a.date) return false;
+        var day = parseLocalDate(a.date);
+        if (day < parseLocalDate(ctx.term.starts_on) || day > parseLocalDate(ctx.term.ends_on)) return false;
       } else {
         var cutoff = ctx.dateCutoffs[_filters.dateRange];
-        if (cutoff && new Date(a.date) < cutoff) return false;
+        if (cutoff && parseLocalDate(a.date) < cutoff) return false;
       }
     }
     // Graded status.
