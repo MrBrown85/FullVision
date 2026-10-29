@@ -4753,7 +4753,7 @@ body.qn-roster #gb-sidebar .student-row-note {
 .gr-row {
   display: grid;
   grid-template-columns: var(--gr-cols);
-  column-gap: 8px;
+  column-gap: 6px;
   align-items: center;
   height: var(--gr-row, 19px);
   border-bottom: 1px solid #d0d0d0;

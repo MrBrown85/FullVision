@@ -80,10 +80,10 @@ describe('rows', () => {
       score: '12',
       outOf: '15',
       percent: '80%',
-      word: 'Proficient',
       note: 'Late',
     });
-    expect(rows[1]).toMatchObject({ category: 'Labs', score: '3.3', outOf: '4', word: 'Proficient', note: '' });
+    expect(rows[1]).toMatchObject({ category: 'Labs', score: '3.3', outOf: '4', note: '' });
+    expect(rows[0]).not.toHaveProperty('word');
     expect(rows[2]).toMatchObject({ score: '', outOf: '', note: 'Missing' });
     expect(rows[3]).toMatchObject({ score: 'Complete', outOf: '' });
     expect(rows[4]).toMatchObject({ score: '', note: 'Excused' });
@@ -94,13 +94,13 @@ describe('rows', () => {
     expect(G.rows(CID, ST, { order: 'newest' })[0].title).toBe('Field Trip Form');
   });
 
-  it('shows the percent in a Letter class, the proficiency word in a Proficiency class, both in Both', () => {
+  it('shows the percent in a Letter or Both class, and never a proficiency word', () => {
     seed('letter');
-    expect(G.columnsFor(CID)).toEqual({ percent: true, word: false });
+    expect(G.columnsFor(CID)).toEqual({ percent: true });
     seed('proficiency');
-    expect(G.columnsFor(CID)).toEqual({ percent: false, word: true });
+    expect(G.columnsFor(CID)).toEqual({ percent: false });
     seed('both');
-    expect(G.columnsFor(CID)).toEqual({ percent: true, word: true });
+    expect(G.columnsFor(CID)).toEqual({ percent: true });
   });
 });
 
