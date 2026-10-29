@@ -3289,6 +3289,8 @@ window.PageAssignments = (function () {
       // One student's grader on the page: redraw its status, lock and grade.
       render();
     }
+    // Missing clears the scores: the dialog's tiles are drawn again to match.
+    if (_grader && clearedScores) render();
     refreshSidebarGrades(sid);
   }
 
