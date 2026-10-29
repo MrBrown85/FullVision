@@ -718,6 +718,7 @@ body.offline-active #app-dock {
   overflow: hidden;
 }
 #gb-sidebar-top {
+  position: relative;
   padding: 16px 16px 12px;
   border-bottom: 1px solid var(--divider-subtle);
   flex-shrink: 0;
@@ -757,6 +758,100 @@ body.offline-active #app-dock {
 }
 #gb-roster-search::placeholder {
   color: var(--text-3);
+}
+.sb-search-row {
+  display: flex;
+  gap: 6px;
+}
+.sb-search-row #gb-roster-search {
+  flex: 1;
+  min-width: 0;
+}
+.sb-add-student {
+  flex-shrink: 0;
+  width: var(--control-h);
+  height: var(--control-h);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-2);
+  cursor: pointer;
+}
+.sb-add-student:hover {
+  color: var(--link);
+}
+.sb-sort {
+  margin-top: 8px;
+}
+.sb-sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 2px 0;
+  white-space: nowrap;
+  font-family: var(--font-base);
+  font-size: var(--text-xs);
+  color: var(--text-2);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.sb-sort-btn:hover {
+  color: var(--text);
+}
+.sb-sort-btn > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sb-sort-btn svg {
+  flex-shrink: 0;
+}
+.sb-sort-menu {
+  position: absolute;
+  left: 16px;
+  min-width: calc(100% - 32px);
+  z-index: 20;
+  margin-top: 4px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+.sb-sort-menu[hidden] {
+  display: none;
+}
+.sb-sort-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  white-space: nowrap;
+  padding: 6px 8px;
+  font-family: var(--font-base);
+  font-size: var(--text-sm);
+  text-align: left;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+}
+.sb-sort-item:hover,
+.sb-sort-item:focus-visible {
+  background: var(--overlay-hover);
+  outline: none;
+}
+.sb-sort-item.is-on {
+  font-weight: 600;
+}
+.sb-sort-item.is-on::after {
+  content: '\2713';
+  color: var(--active);
 }
 #gb-roster-list {
   flex: 1;
@@ -850,33 +945,6 @@ body.offline-active #app-dock {
   padding: 2px 8px;
   border-radius: var(--radius-xs);
   flex-shrink: 0;
-}
-#gb-sidebar-foot {
-  padding: 8px 14px;
-  border-top: 1px solid var(--divider-subtle);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-shrink: 0;
-}
-#gb-sidebar-foot button {
-  font-family: var(--font-base);
-  font-size: var(--text-xs);
-  color: var(--text-2);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  transition: color var(--duration-micro);
-}
-#gb-sidebar-foot button:hover {
-  color: var(--link);
-}
-#gb-sidebar-foot .sb-count {
-  font-size: var(--text-xs);
-  color: var(--text-3);
 }
 /* Legacy compat */
 #gb-roster-count {

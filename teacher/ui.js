@@ -607,24 +607,33 @@ function _avatarColor(sid) {
   return _AVATAR_COLORS[Math.abs(h) % _AVATAR_COLORS.length];
 }
 
-function renderSidebar(activeCourse, selectedStudentId, onStudentClick) {
-  _sidebarClickFnName = onStudentClick || null;
-  const cid = activeCourse;
-  const courseName = COURSES[cid] ? COURSES[cid].name : cid;
-  const students = sortStudents(getStudents(cid), 'lastName');
+// The roster's order, remembered per class on this computer.
+const ROSTER_SORTS = [
+  ['firstName', 'First Name'],
+  ['lastName', 'Last Name'],
+  ['gradeLow', 'Grade, Lowest First'],
+  ['missing', 'Most Missing Work'],
+  ['flagged', 'Flagged First'],
+];
+function _rosterSortMode(cid) {
+  let mode = null;
+  try {
+    mode = localStorage.getItem('gb-roster-sort-' + cid);
+  } catch (e) {}
+  return ROSTER_SORTS.some(o => o[0] === mode) ? mode : 'lastName';
+}
+function _rosterSortLabel(mode) {
+  return ROSTER_SORTS.find(o => o[0] === mode)[1];
+}
+// Ties in the other sorts keep last-name order (the sort is stable).
+function _sortedRoster(cid, mode) {
+  const byLast = sortStudents(getStudents(cid), 'lastName');
+  return mode === 'lastName' ? byLast : sortStudents(byLast, mode, cid);
+}
 
-  let html = `<aside id="gb-sidebar" aria-label="Student roster">
-    <div id="gb-sidebar-top">
-      <select id="gb-course-select" class="class-picker" data-action="sidebarSwitchCourse" aria-label="Select course">
-        ${getPickerCourses(cid)
-          .map(c => `<option value="${c.id}"${c.id === cid ? ' selected' : ''}>${esc(c.name)}</option>`)
-          .join('')}
-      </select>
-      <input id="gb-roster-search" type="text" placeholder="Search..." aria-label="Search students">
-    </div>
-    <div id="gb-roster-list" role="list">`;
-
+function _sidebarRowsHtml(cid, students, selectedStudentId, onStudentClick) {
   const flags = getFlags(cid);
+  let html = '';
   students.forEach(s => {
     const href = `/student?id=${s.id}&course=${cid}`;
     const flagged = flags[s.id];
@@ -643,15 +652,47 @@ function renderSidebar(activeCourse, selectedStudentId, onStudentClick) {
       <span class="student-row-grades" data-prof-sid="${s.id}"></span>
     </${tag}>`;
   });
+  return html;
+}
 
-  html += `</div>
-    <div id="gb-sidebar-foot">
-      <button data-action="addStudent">
-        <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><line x1="6" y1="2" x2="6" y2="10"/><line x1="2" y1="6" x2="10" y2="6"/></svg>
-        Add Student
-      </button>
-      <span class="sb-count">${students.length} students</span>
+function _rosterSortMenuHtml(mode) {
+  return ROSTER_SORTS.map(
+    ([m, label]) =>
+      `<button type="button" role="menuitemradio" aria-checked="${m === mode}" class="sb-sort-item${m === mode ? ' is-on' : ''}" data-sort="${m}">${label}</button>`,
+  ).join('');
+}
+
+let _sidebarCid = null;
+function renderSidebar(activeCourse, selectedStudentId, onStudentClick) {
+  _sidebarClickFnName = onStudentClick || null;
+  const cid = activeCourse;
+  _sidebarCid = cid;
+  const mode = _rosterSortMode(cid);
+  const students = _sortedRoster(cid, mode);
+
+  let html = `<aside id="gb-sidebar" aria-label="Student roster">
+    <div id="gb-sidebar-top">
+      <select id="gb-course-select" class="class-picker" data-action="sidebarSwitchCourse" aria-label="Select course">
+        ${getPickerCourses(cid)
+          .map(c => `<option value="${c.id}"${c.id === cid ? ' selected' : ''}>${esc(c.name)}</option>`)
+          .join('')}
+      </select>
+      <div class="sb-search-row">
+        <input id="gb-roster-search" type="text" placeholder="Search..." aria-label="Search students">
+        <button type="button" class="sb-add-student" data-action="addStudent" title="Add Student" aria-label="Add Student">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6.5" cy="5" r="2.6"/><path d="M1.8 13.5c.5-2.5 2.4-4 4.7-4s4.2 1.5 4.7 4"/><line x1="13" y1="5" x2="13" y2="10"/><line x1="10.5" y1="7.5" x2="15.5" y2="7.5"/></svg>
+        </button>
+      </div>
+      <div class="sb-sort">
+        <button type="button" class="sb-sort-btn" id="sb-sort-btn" aria-haspopup="menu" aria-expanded="false">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 1.5v9M1.5 8.5l2 2 2-2M8.5 10.5v-9M6.5 3.5l2-2 2 2"/></svg>
+          <span>Sort: <span id="sb-sort-label">${_rosterSortLabel(mode)}</span></span>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 4l2.5 2.5L7.5 4"/></svg>
+        </button>
+        <div class="sb-sort-menu" id="sb-sort-menu" role="menu" aria-label="Sort students" hidden>${_rosterSortMenuHtml(mode)}</div>
+      </div>
     </div>
+    <div id="gb-roster-list" role="list">${_sidebarRowsHtml(cid, students, selectedStudentId, onStudentClick)}</div>
   </aside>`;
   // Auto-fill badges after caller mounts this HTML
   setTimeout(function () {
@@ -659,6 +700,69 @@ function renderSidebar(activeCourse, selectedStudentId, onStudentClick) {
   }, 0);
   return html;
 }
+
+function _closeRosterSortMenu() {
+  const menu = document.getElementById('sb-sort-menu');
+  const btn = document.getElementById('sb-sort-btn');
+  if (menu) menu.hidden = true;
+  if (btn) btn.setAttribute('aria-expanded', 'false');
+}
+
+// Redraw only the list, keeping the selected student, the search and any
+// page annotations.
+function _applyRosterSort(mode) {
+  const cid = _sidebarCid;
+  const list = document.getElementById('gb-roster-list');
+  if (!cid || !list) return;
+  try {
+    localStorage.setItem('gb-roster-sort-' + cid, mode);
+  } catch (e) {}
+  const sel = list.querySelector('.student-row.selected');
+  list.innerHTML = _sidebarRowsHtml(cid, _sortedRoster(cid, mode), sel ? sel.dataset.sid : null, _sidebarClickFnName);
+  document.getElementById('sb-sort-label').textContent = _rosterSortLabel(mode);
+  document.getElementById('sb-sort-menu').innerHTML = _rosterSortMenuHtml(mode);
+  fillSidebarBadges(cid);
+  filterRoster();
+}
+
+document.addEventListener('click', function (e) {
+  const btn = e.target.closest && e.target.closest('#sb-sort-btn');
+  if (btn) {
+    const menu = document.getElementById('sb-sort-menu');
+    const open = menu.hidden;
+    menu.hidden = !open;
+    btn.setAttribute('aria-expanded', String(open));
+    if (open) (menu.querySelector('.is-on') || menu.firstElementChild).focus();
+    return;
+  }
+  const item = e.target.closest && e.target.closest('#sb-sort-menu [data-sort]');
+  if (item) {
+    _closeRosterSortMenu();
+    _applyRosterSort(item.dataset.sort);
+    document.getElementById('sb-sort-btn').focus();
+    return;
+  }
+  if (!(e.target.closest && e.target.closest('#sb-sort-menu'))) _closeRosterSortMenu();
+});
+document.addEventListener(
+  'keydown',
+  function (e) {
+    const menu = document.getElementById('sb-sort-menu');
+    if (!menu || menu.hidden) return;
+    if (e.key === 'Escape') {
+      _closeRosterSortMenu();
+      document.getElementById('sb-sort-btn').focus();
+      e.stopPropagation();
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      const items = [...menu.querySelectorAll('[data-sort]')];
+      const i = items.indexOf(document.activeElement);
+      items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length].focus();
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  },
+  true,
+);
 
 /* The grade beside each name, as the class is set to grade
    (studentRosterBadges): proficiency code (EXT, PRF, DEV, EMG, IC), letter
