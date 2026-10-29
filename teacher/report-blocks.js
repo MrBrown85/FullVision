@@ -1515,6 +1515,8 @@ window.ReportBlocks = (function () {
     const showScore = pick('score', true);
     const showPct = pick('percent', autos.percent);
     const showWord = pick('word', autos.word);
+    const showCourse = pick('course', true);
+    const showCatGrade = pick('categoryGrade', true);
     const organize = half && options.organize === 'competency' ? 'category' : options.organize || 'category';
     const oldest = options.order === 'oldest';
     const one = half || options.columns === 'one';
@@ -1570,7 +1572,20 @@ window.ReportBlocks = (function () {
         });
         months.forEach(m => groups.push({ name: m.name, rows: m.rows }));
       } else {
-        const cats = (getCategories(cid) || []).map(c => ({ id: c.id, name: c.name, rows: [] }));
+        // Each category heading carries its weight and the student's grade
+        // in it this term, worked out as the gradebook does.
+        const termWork = getAssessments(cid).filter(a => assessmentInActiveTerm(cid, a));
+        const catGrade = c => {
+          if (!showCatGrade) return '';
+          const g = assessmentGroupGrade(
+            cid,
+            sid,
+            termWork.filter(a => (a.categoryId || a.category_id || null) === c.id),
+            categoryCalcMode(c),
+          );
+          return [Number(c.weight || 0) + '% of grade', g && g.text].filter(Boolean).join(' · ');
+        };
+        const cats = (getCategories(cid) || []).map(c => ({ id: c.id, name: c.name, grade: catGrade(c), rows: [] }));
         const none = { id: null, name: 'No Category', rows: [] };
         pool.forEach(x => {
           const id = x.a.categoryId || x.a.category_id || null;
@@ -1578,28 +1593,33 @@ window.ReportBlocks = (function () {
           g.rows.push(rowHtml(x, _rowMarks(cid, x.a, cells[x.a.id])));
         });
         cats.concat([none]).forEach(g => {
-          if (g.rows.length) groups.push({ name: g.name, rows: g.rows });
+          if (g.rows.length) groups.push({ name: g.name, grade: g.grade, rows: g.rows });
         });
       }
     }
     if (!groups.length) return '';
 
-    const groupHtml = g => `<div class="report-grades-head">${esc(g.name)}</div>${g.rows.join('')}`;
+    const groupHtml = g =>
+      `<div class="report-grades-head"><span>${esc(g.name)}</span>${g.grade ? `<span class="report-grades-headgrade">${esc(g.grade)}</span>` : ''}</div>${g.rows.join('')}`;
     let body;
     if (one) body = `<div class="report-grades-col">${groups.map(groupHtml).join('')}</div>`;
     else {
-      // Groups fill the left column in order until it holds about half the
-      // lines, then the rest go right. A group never splits.
-      const lines = g => g.rows.length + 1;
-      const total = groups.reduce((t, g) => t + lines(g), 0);
+      // The rows split evenly between the columns, read down the left and
+      // then the right. A group cut by the split carries on at the top of the
+      // right column under its name again; a heading never ends a column.
+      const total = groups.reduce((t, g) => t + g.rows.length + 1, 0);
+      const cut = Math.ceil(total / 2);
       const left = [];
       const right = [];
-      let acc = 0;
+      let used = 0;
       groups.forEach(g => {
-        if (!right.length && acc + lines(g) / 2 <= total / 2) {
-          left.push(g);
-          acc += lines(g);
+        const room = cut - used;
+        if (room >= g.rows.length + 1) left.push(g);
+        else if (room >= 2 && !right.length) {
+          left.push(Object.assign({}, g, { rows: g.rows.slice(0, room - 1) }));
+          right.push({ name: g.name + ' (continued)', rows: g.rows.slice(room - 1) });
         } else right.push(g);
+        used += g.rows.length + 1;
       });
       body = `<div class="report-grades-cols"><div class="report-grades-col">${left.map(groupHtml).join('')}</div><div class="report-grades-col">${right.map(groupHtml).join('')}</div></div>`;
     }
@@ -1610,6 +1630,11 @@ window.ReportBlocks = (function () {
         (organize === 'competency'
           ? ` · latest ${per} for each competency`
           : ` · ${n} assessment${n === 1 ? '' : 's'}`);
+    // The course grade for the term, as the gradebook shows it.
+    const course = showCourse ? studentGradeSummary(cid, sid).text : '';
+    const courseHtml = course
+      ? `<div class="report-grades-course">Course Grade <strong>${esc(course)}</strong></div>`
+      : '';
     const legend = [
       showScore ? 'Points shown as scored; other work scored out of 4.' : '',
       showWord ? 'Proficiency: 1 Emerging · 2 Developing · 3 Proficient · 4 Extending.' : '',
@@ -1618,7 +1643,7 @@ window.ReportBlocks = (function () {
       .filter(Boolean)
       .join(' ');
     return `<div class="report-block-box report-grades${half ? ' report-grades-half' : ''}${showWord ? '' : ' report-grades-noword'}">
-    <div class="report-prof-head"><div class="report-block-title">Assignment Grades</div><div class="report-prof-meta">${esc(meta)}</div></div>
+    <div class="report-prof-head"><div class="report-block-title">Assignment Grades</div>${courseHtml}<div class="report-prof-meta">${esc(meta)}</div></div>
     ${body}
     <div class="report-grades-legend">${legend}</div>
   </div>`;

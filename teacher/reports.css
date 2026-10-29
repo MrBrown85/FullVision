@@ -3273,6 +3273,10 @@ textarea.studio-text {
   min-width: 0;
 }
 .report-grades-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
   font-family: var(--font-base);
   font-size: var(--text-2xs);
   font-weight: 700;
@@ -3300,6 +3304,19 @@ textarea.studio-text {
 }
 .report-grades-noword .report-grades-col:only-child .report-grades-row {
   grid-template-columns: 44px minmax(0, 1fr) 104px;
+}
+.report-grades-headgrade {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.report-grades .report-prof-head {
+  flex-wrap: wrap;
+}
+.report-grades-course {
+  margin-left: auto;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .report-grades-date {
   color: #636366;
