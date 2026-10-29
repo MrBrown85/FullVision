@@ -542,6 +542,7 @@ export async function mockAuth(page) {
           name: c.name || '',
           weight: c.weight || 0,
           display_order: c.displayOrder != null ? c.displayOrder : i,
+          calc_mode: c.calcMode === 'percent' ? 'percent' : 'points',
         })),
         modules: data.modules.map((m, i) => ({
           id: m.id,

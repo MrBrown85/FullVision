@@ -2836,6 +2836,13 @@ a.dash-ins-name:hover {
   font-size: var(--text-sm);
   margin-right: 4px;
 }
+.cm-cat-mode {
+  width: auto;
+  flex-shrink: 0;
+}
+.cm-cat-mode-hint {
+  margin-top: 6px;
+}
 .cm-cat-footer {
   display: flex;
   justify-content: space-between;

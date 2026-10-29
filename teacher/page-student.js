@@ -763,6 +763,12 @@ window.PageStudent = (function () {
     return isPointsScored(a) ? '' : a.rubricId || a.rubric_id || '';
   }
 
+  /* A category group takes its category's Calculation (Total Points or
+     Average of Percentages); a module, type or rubric group is points. */
+  function _groupCalcMode(g) {
+    return g && g.category ? categoryCalcMode(g.category) : 'points';
+  }
+
   /* Assessments sorted into groups by category, module, assignment type or
      rubric, in the class's own order, with the ones in no group last. Each
      group is { key, name, assessments, category?, rubric? }; empty groups
@@ -1063,7 +1069,7 @@ window.PageStudent = (function () {
     ).forEach(function (g) {
       var fold = _assessGroup + ':' + g.key;
       var open = !_assessClosed[fold];
-      var mine = assessmentGroupGrade(cid, studentId, g.assessments);
+      var mine = assessmentGroupGrade(cid, studentId, g.assessments, _groupCalcMode(g));
       html +=
         '<div class="stu-agroup">' +
         '<button type="button" class="stu-agroup-head" data-action="stuAssessFold" data-fold="' +
@@ -1108,7 +1114,7 @@ window.PageStudent = (function () {
     if (mods.length) parts.push(_plural(mods.length, 'Module', 'Modules'));
     var lowest = null;
     cats.forEach(function (g) {
-      var gr = assessmentGroupGrade(cid, studentId, g.assessments);
+      var gr = assessmentGroupGrade(cid, studentId, g.assessments, _groupCalcMode(g));
       if (!gr) return;
       var v = courseGradeMode(cid) === 'letter' ? gr.pct : gr.prof;
       if (v != null && (!lowest || v < lowest.v)) lowest = { v: v, name: g.name };
@@ -1679,7 +1685,7 @@ window.PageStudent = (function () {
           ),
         );
       cats.forEach(function (g) {
-        var mine = assessmentGroupGrade(cid, studentId, g.assessments);
+        var mine = assessmentGroupGrade(cid, studentId, g.assessments, _groupCalcMode(g));
         var c = _bdGroupCells(ctx, g, mine);
         var open = !!_bdOpen[g.key || '-'];
         html +=
