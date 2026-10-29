@@ -596,10 +596,15 @@ window.PageAssignments = (function () {
             var modLabel = state.mod > 0 ? ' +' : state.mod < 0 ? ' −' : '';
             var canUp = normalizeScoreMod(lv, 1) === 1;
             var canDown = normalizeScoreMod(lv, -1) === -1;
+            // A click anywhere on the tile clears it, except on − | +.
             return (
               '<div class="grdt-tile is-chosen l' +
               lv +
-              '">' +
+              '" data-action="graderLevel" data-critid="' +
+              crit.id +
+              '" data-level="' +
+              lv +
+              '" title="Click to clear">' +
               '<div class="grdt-tile-head">' +
               '<button type="button" class="grdt-chosen-label" data-action="graderLevel" data-critid="' +
               crit.id +
@@ -6248,8 +6253,9 @@ window.PageAssignments = (function () {
         printDibels(el.dataset.aid);
       },
       graderLevel: function () {
-        // A tick inside an Advanced tile is its own action, not a pick.
-        if (e.target.closest('.grdt-check')) return;
+        // A tick inside an Advanced tile is its own action, not a pick, and
+        // a chosen tile's − | + (a disabled one, the gap) never clears it.
+        if (e.target.closest('.grdt-check, .grdt-stepper')) return;
         _graderSetLevel(_graderAid(el), el.dataset.critid, parseInt(el.dataset.level, 10));
       },
       graderTagLevel: function () {
@@ -7257,12 +7263,14 @@ window.PageAssignments = (function () {
     if (!a || !sid || !dialog) return;
     var status = getAssignmentStatus(cid, sid, a.id);
     // A DIBELS benchmark is given on the day or not at all: no Late.
-    dialog.querySelector('.grader-status').innerHTML = _graderStatusButtons(
-      a.id,
-      sid,
-      status,
-      isDibelsScored(a) ? ['NS', 'EXC'] : ['NS', 'EXC', 'LATE'],
-    );
+    var statusHtml = _graderStatusButtons(a.id, sid, status, isDibelsScored(a) ? ['NS', 'EXC'] : ['NS', 'EXC', 'LATE']);
+    // Redrawn only when it changes: pressing a button moves focus, which
+    // runs this, and new buttons under the mouse before it is released
+    // lose the click.
+    if (_grader.statusHtml !== statusHtml) {
+      dialog.querySelector('.grader-status').innerHTML = statusHtml;
+      _grader.statusHtml = statusHtml;
+    }
     var notes = getAssignmentObs(cid, sid, a.id)
       .slice()
       .sort(function (x, y) {
