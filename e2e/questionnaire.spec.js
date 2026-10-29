@@ -7,6 +7,11 @@ test.use({ viewport: { width: 1440, height: 900 } });
 async function open(page, student = 'st1') {
   await page.goto('/login.html?demo=1');
   await page.waitForURL(/\/dashboard/, { timeout: 15000 });
+  // On the Report Card: a new report has no Teacher Comment block.
+  await page.evaluate(() => {
+    const cfg = getReportConfig('sci8') || {};
+    saveReportConfig('sci8', Object.assign({}, cfg, { form: ReportSheets.form() }));
+  });
   await page.evaluate(r => window.Router.navigate(r), '/reports?tab=questionnaire&student=' + student);
   await page.locator('#tq-narrative').waitFor();
   await page.locator('#report-period').selectOption('Report 2');

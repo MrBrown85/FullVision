@@ -89,7 +89,7 @@ describe('ReportStudio', () => {
     const html = ReportStudio.paletteHtml(f, 'blocks', [], sizes, fit([{ free: [100, 100] }]));
     expect(html).toContain('Grades');
     expect(html).toMatch(/class="studio-blk placed"[^>]*data-block="proficiency"[^>]*aria-pressed="true"/);
-    expect(html).toContain('Click to find it');
+    expect(html).toContain('Click to remove it');
     expect(html).toMatch(
       /class="studio-blk nofit"[^>]*data-block="student-reflection-habits"[^>]*aria-disabled="true"/,
     );
