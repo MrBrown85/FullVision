@@ -1196,11 +1196,6 @@ window.ReportQuestionnaire = (function () {
     var termId = getTermId();
     var f = _facts(student, true);
 
-    var name = document.getElementById('tq-student-name');
-    if (name) name.textContent = displayName(student);
-    var pos = document.getElementById('tq-student-pos');
-    if (pos) pos.textContent = tqStudentIndex + 1 + ' of ' + students.length;
-
     var last = tqStudentIndex >= students.length - 1;
     return `<div class="qn" data-sid="${student.id}">
       ${_stripHtml(cid, student, f)}

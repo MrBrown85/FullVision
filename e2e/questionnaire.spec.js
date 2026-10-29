@@ -212,7 +212,7 @@ test('↑ ↓ change the student only outside a text field; ⌘ Return saves and
   await expect(page.locator('.qn-name')).toHaveText('Noor Al-Rashid');
   await page.keyboard.press('Meta+Enter');
   await expect(page.locator('.qn-name')).toHaveText('Hannah Berg');
-  await expect(page.locator('#tq-student-pos')).toHaveText('3 of 27');
+  await expect(page.locator('.qn-bottom-hint')).toContainText('3 of 27');
 });
 
 test('earlier reports are read only', async ({ page }) => {
