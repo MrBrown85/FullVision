@@ -217,17 +217,40 @@ window.MStudents = (function () {
   /* ── Handle search filtering ────────────────────────────────── */
   function filterList(query) {
     var q = (query || '').toLowerCase().trim();
+    var matches = 0;
     if (q) {
       // Searching: always show filtered list, hide cards
       _syncViewVisibility(false);
       document.querySelectorAll('#m-student-list .m-cell').forEach(function (cell) {
         var name = (cell.querySelector('.m-cell-title') || {}).textContent || '';
-        cell.style.display = name.toLowerCase().indexOf(q) >= 0 ? '' : 'none';
+        var match = name.toLowerCase().indexOf(q) >= 0;
+        if (match) matches++;
+        cell.style.display = match ? '' : 'none';
       });
     } else {
       // Search cleared: restore the active view mode
       _syncViewVisibility(_viewMode === 'cards' && !!_stackInstance);
     }
+    _showNoMatch(q && !matches ? (query || '').trim() : '');
+  }
+
+  // "No students match “zz”." under the list when a search finds no one.
+  function _showNoMatch(query) {
+    var list = document.getElementById('m-student-list');
+    if (!list) return;
+    var el = document.getElementById('m-student-search-empty');
+    if (!query) {
+      if (el) el.remove();
+      return;
+    }
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'm-student-search-empty';
+      el.className = 'm-search-empty';
+      el.setAttribute('role', 'status');
+      list.parentNode.insertBefore(el, list.nextSibling);
+    }
+    el.textContent = 'No students match \u201c' + query + '\u201d.';
   }
   return {
     renderList: renderList,
