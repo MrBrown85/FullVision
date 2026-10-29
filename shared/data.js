@@ -3694,6 +3694,7 @@ function _v2GradebookToCache(cid, payload) {
         name: c.name || '',
         weight: Number(c.weight || 0),
         displayOrder: Number(c.display_order || c.displayOrder || 0),
+        calcMode: categoryCalcMode(c),
       };
     })
     .sort(function (a, b) {
@@ -7016,6 +7017,7 @@ function _categoryChanged(a, b, idx) {
     !a ||
     (a.name || '') !== (b.name || '') ||
     Number(a.weight || 0) !== Number(b.weight || 0) ||
+    categoryCalcMode(a) !== categoryCalcMode(b) ||
     Number(a.displayOrder ?? a.display_order ?? idx) !== Number(b.displayOrder ?? b.display_order ?? idx)
   );
 }
@@ -8361,6 +8363,14 @@ function saveCategories(cid, arr) {
    reorder_categories) and hands the resulting rows here.
    Cache, localStorage and the server baseline take them without sending
    anything a second time. */
+/* A category's Calculation (category.calc_mode): 'percent' averages each
+   assessment's percent, 'points' (the default, and anything unset) pools
+   points earned and possible. Takes a cache row (calcMode) or a server or
+   Class Management row (calc_mode). */
+function categoryCalcMode(category) {
+  var mode = category && (category.calcMode || category.calc_mode);
+  return mode === 'percent' ? 'percent' : 'points';
+}
 function adoptCategoriesFromServer(cid, rows) {
   _persistLoadedField(cid, 'categories', rows || []);
   if (typeof clearProfCache === 'function') clearProfCache();
@@ -10272,7 +10282,11 @@ window.v2.saveCategories = function (courseId, rows, options) {
     {
       p_course_id: courseId,
       p_categories: (rows || []).map(function (r) {
-        var row = { name: (r.name || '').trim(), weight: r.weight != null ? Number(r.weight) : 0 };
+        var row = {
+          name: (r.name || '').trim(),
+          weight: r.weight != null ? Number(r.weight) : 0,
+          calc_mode: categoryCalcMode(r),
+        };
         if (_isUuid(r.id)) row.id = r.id;
         return row;
       }),

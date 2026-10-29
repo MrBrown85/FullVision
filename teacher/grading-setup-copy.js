@@ -134,6 +134,9 @@ window.GradingSetupCopy = (function () {
     };
   }
 
+  // A category's Calculation, as Class Management names it.
+  var _CALC_MODE_LABELS = { points: 'Total Points', percent: 'Average of Percentages' };
+
   /* ── Categories ────────────────────────────────────────────── */
   /* What the source's categories would do in dstCid. Nothing is saved.
      rows: the target's new list, in the source's order; a row with an id
@@ -151,8 +154,16 @@ window.GradingSetupCopy = (function () {
         id: hit ? hit.id : null,
         name: String(s.name || '').trim(),
         weight: Number(s.weight) || 0,
+        calcMode: categoryCalcMode(s),
         displayOrder: i,
-        before: hit ? { name: hit.name, weight: Number(hit.weight) || 0, order: dst.indexOf(hit) } : null,
+        before: hit
+          ? {
+              name: hit.name,
+              weight: Number(hit.weight) || 0,
+              calcMode: categoryCalcMode(hit),
+              order: dst.indexOf(hit),
+            }
+          : null,
       };
     });
     var assessments = getAssessments(dstCid) || [];
@@ -187,6 +198,8 @@ window.GradingSetupCopy = (function () {
       }
       if (r.before.weight !== r.weight) lines.push(r.name + ': ' + r.before.weight + '% → ' + r.weight + '%.');
       if (r.before.name !== r.name) lines.push('Rename ' + r.before.name + ' to ' + r.name + '.');
+      if (r.before.calcMode !== r.calcMode)
+        lines.push(r.name + ': ' + _CALC_MODE_LABELS[r.before.calcMode] + ' → ' + _CALC_MODE_LABELS[r.calcMode] + '.');
     });
     removed.forEach(function (d) {
       lines.push(
@@ -320,7 +333,7 @@ window.GradingSetupCopy = (function () {
     saveCategories(
       cid,
       rows.map(function (r, i) {
-        return { id: r.id, name: r.name, weight: r.weight, displayOrder: i };
+        return { id: r.id, name: r.name, weight: r.weight, displayOrder: i, calcMode: categoryCalcMode(r) };
       }),
     );
     return _wait(_categoryQueue(), cid);
@@ -346,7 +359,7 @@ window.GradingSetupCopy = (function () {
   function _applyCategories(dstCid, cats, moves) {
     moves = moves || {};
     var rows = cats.rows.map(function (r) {
-      return { id: r.id || uid(), name: r.name, weight: r.weight };
+      return { id: r.id || uid(), name: r.name, weight: r.weight, calcMode: r.calcMode };
     });
     var holding = cats.removed
       .filter(function (d) {
@@ -395,7 +408,7 @@ window.GradingSetupCopy = (function () {
       return _wait(_assessmentQueue(), dstCid).then(function () {
         if (!holding.length) return;
         var finalRows = rows.map(function (r, i) {
-          return { id: ids[i], name: r.name, weight: r.weight };
+          return { id: ids[i], name: r.name, weight: r.weight, calcMode: r.calcMode };
         });
         return _saveCats(dstCid, finalRows);
       });

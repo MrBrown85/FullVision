@@ -469,6 +469,22 @@ describe('write-path regressions (Phase 0)', () => {
     expect(fake.calls[0].params.p_categories.map(c => c.id)).toEqual([CAT2, CAT1]);
   });
 
+  it("sends a category's Calculation when only that changes", async () => {
+    var rows = [
+      { id: CAT1, name: 'Tests', weight: 60, displayOrder: 0 },
+      { id: CAT2, name: 'Labs', weight: 40, displayOrder: 1 },
+    ];
+    _persistLoadedField(CID, 'categories', rows);
+
+    var next = structuredClone(rows);
+    next[1].calcMode = 'percent';
+    saveCategories(CID, next);
+    await settle();
+
+    expect(fake.count('save_categories')).toBe(1);
+    expect(fake.calls[0].params.p_categories.map(c => c.calc_mode)).toEqual(['points', 'percent']);
+  });
+
   it('sends re-weighted categories as one list, so the total never leaves 100', async () => {
     var rows = [
       { id: CAT1, name: 'Tests', weight: 60, displayOrder: 0 },
@@ -486,8 +502,8 @@ describe('write-path regressions (Phase 0)', () => {
     expect(fake.calls[0].params).toEqual({
       p_course_id: CID,
       p_categories: [
-        { id: CAT1, name: 'Tests', weight: 70 },
-        { id: CAT2, name: 'Labs', weight: 30 },
+        { id: CAT1, name: 'Tests', weight: 70, calc_mode: 'points' },
+        { id: CAT2, name: 'Labs', weight: 30, calc_mode: 'points' },
       ],
     });
   });
@@ -501,7 +517,7 @@ describe('write-path regressions (Phase 0)', () => {
     ]);
     await settle();
 
-    expect(fake.calls[0].params.p_categories[1]).toEqual({ name: 'Labs', weight: 20 });
+    expect(fake.calls[0].params.p_categories[1]).toEqual({ name: 'Labs', weight: 20, calc_mode: 'points' });
     expect(getCategories(CID)[1].id).toMatch(/^aaaaaaaa-/);
   });
 

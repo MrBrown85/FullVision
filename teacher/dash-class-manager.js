@@ -4629,6 +4629,7 @@ window.DashClassManager = (function () {
         name: r.name || '',
         weight: Number(r.weight) || 0,
         displayOrder: Number(r.display_order) || 0,
+        calcMode: categoryCalcMode(r),
       };
     });
     adoptCategoriesFromServer(cid, camelRows);
@@ -4647,6 +4648,7 @@ window.DashClassManager = (function () {
           name: c.name || '',
           weight: Number(c.weight) || 0,
           display_order: c.displayOrder != null ? Number(c.displayOrder) : i,
+          calc_mode: categoryCalcMode(c),
         };
       });
       if (st.rows.length) renderClassManager();
@@ -4665,6 +4667,7 @@ window.DashClassManager = (function () {
                 name: r.name || '',
                 weight: Number(r.weight) || 0,
                 display_order: Number(r.display_order) || 0,
+                calc_mode: categoryCalcMode(r),
               };
             })
             .sort(function (a, b) {
@@ -6058,7 +6061,7 @@ window.DashClassManager = (function () {
         return (Number(a.displayOrder) || 0) - (Number(b.displayOrder) || 0);
       })
       .map(function (c, i) {
-        return { id: uid(), name: c.name, weight: c.weight, displayOrder: i };
+        return { id: uid(), name: c.name, weight: c.weight, displayOrder: i, calcMode: categoryCalcMode(c) };
       });
     if (cats.length) saveCategories(newCourse.id, cats);
     var srcMap = getLearningMap(sourceCid);
