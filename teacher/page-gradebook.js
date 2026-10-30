@@ -967,7 +967,8 @@ window.PageGradebook = (function () {
     sortedStudents.forEach(function (s, si) {
       var altClass = si % 2 === 1 ? ' gb-scores-alt' : '';
       var overall = getOverallProficiency(cid, s.id);
-      var grade = studentGradeSummary(cid, s.id);
+      // The term in view's reporting basis (IE, or No Letter Grade for goals).
+      var grade = studentGradeSummary(cid, s.id, viewedReportTerm(cid));
       var color = PROF_COLORS[grade.level] || PROF_COLORS[0];
       var label = levelWord(cid, overall);
       _setNameTip(cid, s, sections);
@@ -1232,8 +1233,9 @@ window.PageGradebook = (function () {
     sortedStudents.forEach(function (s, si) {
       var altClass = si % 2 === 1 ? ' gb-scores-alt' : '';
       // The overall grade as the class is set to show it (calc.js): the
-      // proficiency, the letter and %, or both stacked, each in its colour.
-      var badges = studentGradeBadges(cid, s.id);
+      // proficiency, the letter and %, or both stacked, each in its colour,
+      // with the term in view's reporting basis (IE, or No Letter Grade).
+      var badges = studentGradeBadges(cid, s.id, viewedReportTerm(cid));
       var gradeParts = [badges.prof, badges.letter].filter(Boolean);
       var desTags = (s.designations || [])
         .map(function (code) {
@@ -1375,7 +1377,7 @@ window.PageGradebook = (function () {
   // in a Letter class.
   function renderOverallCell(cid, sid) {
     var val = getOverallProficiency(cid, sid);
-    var grade = courseGradeMode(cid) === 'letter' ? studentGradeSummary(cid, sid) : null;
+    var grade = courseGradeMode(cid) === 'letter' ? studentGradeSummary(cid, sid, viewedReportTerm(cid)) : null;
     var r = grade ? grade.level : Math.round(val);
     var color = PROF_COLORS[r] || PROF_COLORS[0];
     var label = levelWord(cid, val);
@@ -1402,7 +1404,7 @@ window.PageGradebook = (function () {
      have evidence. Every value comes from calc.js. Kept in a map, not an
      attribute, so the HTML never round-trips through the DOM. */
   function _setNameTip(cid, student, sections) {
-    var grade = studentGradeSummary(cid, student.id);
+    var grade = studentGradeSummary(cid, student.id, viewedReportTerm(cid));
     var word = levelWord(cid, getOverallProficiency(cid, student.id));
     var tip =
       '<div class="gb-tip-head">Course Grade</div>' +

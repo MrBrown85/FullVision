@@ -193,7 +193,10 @@ window.ReportBlocks = (function () {
   </div>`;
   }
 
-  function renderBlockAcademicSummary(cid, student) {
+  /* ctx: the report ({ termId }); its reporting basis can print IE, or No
+     Letter Grade for language or IEP goals, in place of the letter
+     (calc.js reportingBasis). */
+  function renderBlockAcademicSummary(cid, student, ctx) {
     const sections = getSections(cid);
     const overall = getOverallProficiency(cid, student.id);
     const overallRound = Math.round(overall);
@@ -210,8 +213,13 @@ window.ReportBlocks = (function () {
     if (isLetter) {
       overallHeading = 'Overall Grade';
       overallDisplay = letterData && letterData.S ? `${letterData.S} (${letterData.R}%)` : 'No Evidence';
+      const basis = reportingBasis(cid, student.id, ctx && ctx.termId);
+      if (basis !== 'grade') {
+        overallDisplay = REPORTING_BASIS_TEXT[basis];
+        profLine = `<div class="report-overall-label" style="margin-top:6px">${esc(REPORTING_BASIS_NOTE[basis])}</div>`;
+      }
       if (course.gradingSystem === 'both') {
-        profLine = `<div class="report-overall-label" style="margin-top:6px">Overall Proficiency: ${profDisplay}</div>`;
+        profLine += `<div class="report-overall-label" style="margin-top:6px">Overall Proficiency: ${profDisplay}</div>`;
       }
     } else if (usePercentage && (overall > 0 || (letterData && letterData.R != null))) {
       overallDisplay =
@@ -1501,7 +1509,7 @@ window.ReportBlocks = (function () {
     return { score: '\u2014', percent: '', word: '' };
   }
 
-  function renderBlockGradeTable(cid, student, options) {
+  function renderBlockGradeTable(cid, student, options, ctx) {
     options = options || {};
     const sid = student.id;
     const half = options.size === 'half';
@@ -1629,8 +1637,9 @@ window.ReportBlocks = (function () {
         (organize === 'competency'
           ? ` · latest ${per} for each competency`
           : ` · ${n} assessment${n === 1 ? '' : 's'}`);
-    // The course grade for the term, as the gradebook shows it.
-    const course = showCourse ? studentGradeSummary(cid, sid).text : '';
+    // The course grade for the term, as the gradebook shows it, with the
+    // report's reporting basis (IE, or No Letter Grade for goals).
+    const course = showCourse ? studentGradeSummary(cid, sid, ctx && ctx.termId).text : '';
     const courseHtml = course
       ? `<div class="report-grades-course">Course Grade <strong>${esc(course)}</strong></div>`
       : '';
@@ -2006,13 +2015,13 @@ window.ReportBlocks = (function () {
       case 'header':
         return renderBlockHeader(cid, student, ctx, options);
       case 'academic-summary':
-        return renderBlockAcademicSummary(cid, student);
+        return renderBlockAcademicSummary(cid, student, ctx);
       case 'section-chart':
         return renderBlockSectionChart(cid, student);
       case 'score-distribution':
         return renderBlockScoreDistribution(cid, student);
       case 'grade-table':
-        return renderBlockGradeTable(cid, student, options);
+        return renderBlockGradeTable(cid, student, options, ctx);
       case 'section-outcomes':
         return renderBlockSectionOutcomes(cid, student);
       case 'core-competencies':

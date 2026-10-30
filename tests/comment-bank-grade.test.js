@@ -4,7 +4,8 @@
  * {standing} work." with the Letter Grades Order words, C- with its own
  * sentences, "close to" the next letter only upward, within 2 points, with
  * 6+ scored pieces and no downward trend. Proficiency classes use the
- * proficiency word. IE and F keep today's draft. The letter and % come
+ * proficiency word. IE takes the IE path (comment-bank-ie-goals.test.js);
+ * F keeps today's draft. The letter and % come
  * from calc.js, and verify() catches a grade sentence that is no longer true.
  */
 import './setup.js';
@@ -160,8 +161,8 @@ describe('gradeOf', () => {
     expect(CommentBank.gradeOf(letterFacts('B', 80, null, 'both')).kind).toBe('letter');
   });
 
-  it('has no grade sentence for IE, F or no marks', () => {
-    expect(CommentBank.gradeOf(letterFacts('IE', 42))).toBeNull();
+  it('has no grade sentence for F or no marks; IE takes the IE sentence', () => {
+    expect(CommentBank.gradeOf(letterFacts('IE', 42))).toEqual({ kind: 'ie' });
     expect(CommentBank.gradeOf(letterFacts('F', 42))).toBeNull();
     expect(CommentBank.gradeOf(letterFacts(null, null, []))).toBeNull();
   });
@@ -335,19 +336,14 @@ describe('Generate in a Letter class', () => {
     expect(CommentBank.verify(d, f, {}).replaced).toEqual([]);
   });
 
-  it('leaves the draft for an IE student as it was', () => {
+  it('opens an IE student’s draft with the IE sentence, and no letter sentence', () => {
     const f = seed('letter', [1, 1, 2, 1]); // 31.3%: IE before the course ends
     expect(f.grade.letter).toBe('IE');
-    expect(CommentBank.gradeOf(f)).toBeNull();
-    const without = {
-      parts: COMMENT_BANK.parts,
-      sentences: COMMENT_BANK.sentences.filter(s => s.group !== 'Grade'),
-    };
+    expect(CommentBank.gradeOf(f)).toEqual({ kind: 'ie' });
     for (let seedN = 1; seedN <= 10; seedN++) {
-      const ctx = CommentBank.context(f, {});
-      const d = CommentBank.draft(ctx, { seed: seedN });
+      const d = CommentBank.draft(CommentBank.context(f, {}), { seed: seedN });
+      expect(d.ids[0]).toBe('gr06');
       expect(d.ids.filter(id => GRADE_IDS.indexOf(id) >= 0)).toEqual([]);
-      expect(d.text).toBe(CommentBank.draft(ctx, { seed: seedN, bank: without }).text);
     }
   });
 });

@@ -29,6 +29,10 @@ function fullContext(p, habits) {
     gradeStanding: 'very good',
     gradeNext: 'an A',
     gradeWord: 'Proficient',
+    missingWork: 'Fifteen assignments are not handed in, including six Current Events assignments.',
+    markedMine: 'four',
+    markedClass: '28',
+    ieDeadline: 'December 18',
     strengths: 'Evaluating',
     growthAreas: 'Communicating',
     even: 'yes',
@@ -64,10 +68,10 @@ function fullContext(p, habits) {
 }
 
 describe('the bank', () => {
-  it('has 432 sentences in four parts, each with a unique id', () => {
-    expect(COMMENT_BANK.sentences).toHaveLength(432);
+  it('has 445 sentences in four parts, each with a unique id', () => {
+    expect(COMMENT_BANK.sentences).toHaveLength(445);
     expect(COMMENT_BANK.parts.map(p => p.id)).toEqual(['habits', 'now', 'go', 'how']);
-    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(432);
+    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(445);
   });
 
   it('has wording for every kind of class, and keeps handed-in work out of PE and Arts', () => {
@@ -134,6 +138,10 @@ describe('the bank', () => {
       gradeStanding: 'grade',
       gradeNext: 'grade',
       gradeWord: 'grade',
+      missingWork: 'notHandedIn',
+      markedMine: 'marks',
+      markedClass: 'marks',
+      ieDeadline: 'deadline',
       evidence: 'grade',
       even: 'even',
       strengths: 'strength',
@@ -174,7 +182,15 @@ describe('the bank', () => {
       });
       Object.keys(s.when || {}).forEach(k =>
         expect(s.claims, s.id + ' when ' + k).toContain(
-          k === 'picture' ? 'picture' : k === 'standing' || k === 'grade' ? 'grade' : 'habits',
+          k === 'picture'
+            ? 'picture'
+            : k === 'standing' || k === 'grade'
+              ? 'grade'
+              : k === 'path'
+                ? 'ie'
+                : k === 'ieProblem'
+                  ? { missing: 'notHandedIn', marks: 'marks', noMarks: 'marks', low: 'lowMarks' }[s.when[k]]
+                  : 'habits',
         ),
       );
       if (!s.claims.length) {
@@ -193,7 +209,19 @@ describe('the bank', () => {
       Object.entries(s.when || {}).forEach(([k, v]) => {
         if (k === 'picture') expect(['strong', 'steady', 'challenge', 'early']).toContain(v);
         else if (k === 'standing') expect(['Emerging', 'Developing', 'Proficient', 'Extending']).toContain(v);
-        else if (k === 'grade') expect(['letter', 'letterClose', 'cminus', 'cminusClose', 'proficiency']).toContain(v);
+        else if (k === 'grade')
+          expect([
+            'letter',
+            'letterClose',
+            'cminus',
+            'cminusClose',
+            'proficiency',
+            'ie',
+            'languageGoals',
+            'iepGoals',
+          ]).toContain(v);
+        else if (k === 'path') expect(v).toBe('ie');
+        else if (k === 'ieProblem') expect(['missing', 'marks', 'noMarks', 'low']).toContain(v);
         else {
           expect(keys, s.id).toContain(k);
           expect(v).toBeGreaterThanOrEqual(1);

@@ -1950,10 +1950,55 @@ function levelWord(cid, value) {
   return PROF_LABELS[Math.round(value)] || '';
 }
 
+/* ── What a report prints for the grade ──────────────────────────
+   Per student and report, the teacher can report something other than the
+   letter (term_rating.reporting_basis; Generate plan PR 3, approved by
+   Colin on 2026-10-30): 'ie' prints IE in place of the letter and %, and
+   'language_goals' or 'iep_goals' print no letter and no %. Only in Letter
+   and Both classes (grades 10–12); a Proficiency class always shows its
+   proficiency. 'grade', a missing value (a server without the column) and
+   anything unknown are the grade as calculated, IE under 50% included. */
+var REPORTING_BASES = ['grade', 'ie', 'language_goals', 'iep_goals'];
+var REPORTING_BASIS_TEXT = {
+  ie: 'IE',
+  language_goals: 'No Letter Grade',
+  iep_goals: 'No Letter Grade',
+};
+/* The line under "No Letter Grade" on the report and the review screen. */
+var REPORTING_BASIS_NOTE = {
+  ie: 'Insufficient Evidence',
+  language_goals: 'Assessed on language goals',
+  iep_goals: 'Assessed on IEP goals',
+};
+
+/* The report's id for a term ('term-2'), from an id or an ordinal. */
+function _reportTermId(term) {
+  if (term == null || term === '') return null;
+  var m = String(term).match(/(\d+)$/);
+  return m ? 'term-' + Number(m[1]) : null;
+}
+
+/** The basis a student's report for one term (`termId` 'term-N' or N) prints. */
+function reportingBasis(cid, sid, termId) {
+  var id = _reportTermId(termId);
+  if (!id || courseGradeMode(cid) === 'proficiency') return 'grade';
+  var r = typeof getStudentTermRating === 'function' ? getStudentTermRating(cid, sid, id) : null;
+  var b = r && r.reportingBasis;
+  return REPORTING_BASES.indexOf(b) > 0 ? b : 'grade';
+}
+
+/** The report the gradebook's grade follows: the term in view ('term-2'), none in All Time. */
+function viewedReportTerm(cid) {
+  var t = _activeTerm[cid];
+  return t ? 'term-' + t.ordinal : null;
+}
+
 /* A student's overall grade in parts: `prof` (the level out of 4) unless the
    class is Letter, `letter` (letter and %) unless it is Proficiency. Each is
-   null when the student has nothing to show yet. */
-function studentGradeBadges(cid, sid) {
+   null when the student has nothing to show yet. With `termId` (a report,
+   'term-N'), the letter follows that report's reporting basis: IE, or "No
+   Letter Grade" for language or IEP goals, each with no %, and `basis` set. */
+function studentGradeBadges(cid, sid, termId) {
   var mode = courseGradeMode(cid);
   var out = { prof: null, letter: null };
   if (mode !== 'letter') {
@@ -1969,6 +2014,16 @@ function studentGradeBadges(cid, sid) {
         pct: lg.R + '%',
         level: _percentLevel(lg.R),
       };
+    var basis = termId ? reportingBasis(cid, sid, termId) : 'grade';
+    if (basis !== 'grade') {
+      out.letter = {
+        text: REPORTING_BASIS_TEXT[basis],
+        grade: basis === 'ie' ? 'IE' : '',
+        pct: '',
+        level: basis === 'ie' ? 1 : 0,
+        basis: basis,
+      };
+    }
   }
   return out;
 }
@@ -1996,9 +2051,11 @@ function studentRosterBadges(cid, sid) {
 }
 
 /* A student's overall grade as one line, and the level its colour comes
-   from (the letter's in a Letter class, else the proficiency's). */
-function studentGradeSummary(cid, sid) {
-  var b = studentGradeBadges(cid, sid);
+   from (the letter's in a Letter class, else the proficiency's). With
+   `termId`, the letter follows that report's reporting basis
+   (studentGradeBadges). */
+function studentGradeSummary(cid, sid, termId) {
+  var b = studentGradeBadges(cid, sid, termId);
   var parts = [b.prof, b.letter].filter(Boolean);
   var lead = courseGradeMode(cid) === 'letter' ? b.letter : b.prof || b.letter;
   return {
@@ -2343,6 +2400,8 @@ window.Calc = {
   assessmentCellValue,
   levelWord,
   studentGradeBadges,
+  reportingBasis,
+  viewedReportTerm,
   levelCode,
   studentRosterBadges,
   studentGradeSummary,

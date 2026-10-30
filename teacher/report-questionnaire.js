@@ -193,6 +193,10 @@ window.ReportQuestionnaire = (function () {
     var st = _current();
     var el = _box();
     if (!st) return;
+    if (approveBlockers(st).length) {
+      syncApprove();
+      return;
+    }
     var termId = getTermId();
     var rating = getStudentTermRating(_activeCourse, st.id, termId) || {};
     var data = { approvedAt: new Date().toISOString() };
@@ -291,13 +295,20 @@ window.ReportQuestionnaire = (function () {
   /* The grade on the right of the header: the big line as the class shows
      it ("B · 82.9%" in a Letter class, the level in a Proficiency class,
      both in a Both class), and under it the standing word (a Letter class)
-     or the proficiency word (grades 8–9), with the assignments handed in. */
-  function headerGrade(cid, sid, f) {
+     or the proficiency word (grades 8–9), with the assignments handed in.
+     With the report's term id, a reporting basis the teacher chose shows as
+     the report prints it: "IE" over "Insufficient Evidence", or "No Letter
+     Grade" over "Assessed on language goals" (calc.js). An IE from calc.js
+     says Insufficient Evidence under it too. */
+  function headerGrade(cid, sid, f, termId) {
     var mode = courseGradeMode(cid);
-    var b = studentGradeBadges(cid, sid);
+    var b = studentGradeBadges(cid, sid, termId);
     var big = [];
     if (b.prof) big.push(b.prof.text);
-    if (b.letter) big.push(mode === 'letter' ? b.letter.grade + ' · ' + b.letter.pct : b.letter.text);
+    var basis = b.letter && b.letter.basis;
+    if (b.letter) big.push(basis || mode !== 'letter' ? b.letter.text : b.letter.grade + ' · ' + b.letter.pct);
+    if (basis) return { big: big.join(' · '), small: REPORTING_BASIS_NOTE[basis] };
+    if (b.letter && b.letter.grade === 'IE') return { big: big.join(' · '), small: REPORTING_BASIS_NOTE.ie };
     var standing = mode === 'proficiency' ? levelWord(cid, f.overall) : b.letter ? standingWord(b.letter.grade) : '';
     var rec = f.record || { handed: 0, total: 0 };
     var count = rec.total ? rec.handed + ' of ' + rec.total + ' assignments' : '';
@@ -310,7 +321,12 @@ window.ReportQuestionnaire = (function () {
   function _headerHtml(cid, student, f) {
     var sid = student.id;
     var first = student.firstName || displayNameFirst(student);
-    var g = headerGrade(cid, sid, f);
+    var g = headerGrade(cid, sid, f, getTermId());
+    // The designations that offer language or IEP goals, as the goals mockup
+    // shows them beside the pronouns.
+    var des = CommentBank.goalsOffered(f).map(function (b) {
+      return b === 'language_goals' ? 'ELL' : 'IEP';
+    });
     var link = `<a role="link" tabindex="0" data-href="/student?id=${esc(sid)}&course=${esc(cid)}" class="qn-head-link" title="${esc(
       'Opens ' + first + '’s Student Dashboard. Its Term Questionnaire button returns here, to the same student.',
     )}">Student Dashboard ›</a>`;
@@ -318,7 +334,7 @@ window.ReportQuestionnaire = (function () {
       <span class="qn-avatar" style="background:${_avatarColor(sid)}" aria-hidden="true">${esc(initials(student))}</span>
       <div class="qn-who">
         <span class="qn-name">${esc(fullName(student))}</span>
-        <span class="qn-head-sub">${student.pronouns ? esc(student.pronouns) + ' · ' : ''}${link}</span>
+        <span class="qn-head-sub">${student.pronouns ? esc(student.pronouns) + ' · ' : ''}${des.map(d => esc(d) + ' · ').join('')}${link}</span>
       </div>
       <div class="qn-grade">
         <span class="qn-grade-big">${esc(g.big)}</span>
@@ -842,6 +858,9 @@ window.ReportQuestionnaire = (function () {
      text back). Each press gives another version; the student's own seed
      keeps the first draft the same between visits. */
   var _generated = {};
+  // The last draft Generate wrote per student and report, so choosing IE or
+  // goals can redraw a draft the teacher has not edited.
+  var _lastDraft = {};
   function tqGenerate() {
     var st = _current();
     var el = _box();
@@ -869,6 +888,7 @@ window.ReportQuestionnaire = (function () {
       ok = false;
     }
     if (!ok || el.value !== d.text) el.value = d.text;
+    _lastDraft[_activeCourse + '|' + st.id + '|' + termId] = d.text;
     tqNarrativeDirty = true;
     tqSaveNarrative();
     _syncNote();
@@ -935,6 +955,7 @@ window.ReportQuestionnaire = (function () {
           ${tabs}
           ${thisTab ? '<button type="button" class="qn-generate" data-action="tqGenerate" id="tq-generate" title="Writes the comment from the gradebook, your ratings and Student Voice. Press again for another version. Sentences you edited and your order stay.">Generate Comment</button>' : ''}
         </div>
+        ${thisTab ? _basisHtml(cid, student, _facts(student)) : ''}
         ${body}
       </div>`;
   }
@@ -943,6 +964,421 @@ window.ReportQuestionnaire = (function () {
     tqSaveCurrentIfNeeded();
     _commentTab = tab || 'this';
     rerender();
+  }
+
+  /* ── IE, language goals and IEP goals (plan PR 3) ────────── */
+
+  /* What the Teacher Comment card's switch offers: { ie, goals, basis }.
+     IE when the student has marks on fewer than half the class's marked
+     work (CommentBank.ieOffered), unless calc.js already reports IE (that
+     path needs no switch); Language Goals for an ELL designation and IEP
+     Goals for an IEP; a stored choice always stays on offer so it can be
+     undone. Nothing in a Proficiency class. */
+  function basisChoices(f) {
+    var g = f.grade || {};
+    var basis = g.basis || 'grade';
+    var ie = basis === 'ie' || (CommentBank.ieOffered(f) && g.letter !== 'IE');
+    var goals = CommentBank.goalsOffered(f);
+    if ((basis === 'language_goals' || basis === 'iep_goals') && goals.indexOf(basis) < 0) goals = goals.concat(basis);
+    return { ie: ie, goals: goals, basis: basis };
+  }
+
+  var BASIS_LABEL = { grade: 'Letter Grade', ie: 'IE', language_goals: 'Language Goals', iep_goals: 'IEP Goals' };
+  var BASIS_TIP = {
+    ie: 'Report IE. The comment then must give the problem, a plan, a deadline and a chance to meet.',
+    language_goals: 'No letter grade. The comment must say the student is assessed against language goals.',
+    iep_goals: 'No letter grade. The comment must say the student is assessed against the goals in the IEP.',
+  };
+
+  /* The line beside the switch, per choice on offer, in plain sentences. */
+  function _basisLines(student, f, c) {
+    var first = student.firstName || displayNameFirst(student);
+    var p = ReportBlocks.getPronouns(student);
+    var m = (f.grade && f.grade.marked) || { mine: 0, all: 0 };
+    var they = p.subj === 'they';
+    var lines = [];
+    if (c.ie)
+      lines.push(
+        'Only ' +
+          m.mine +
+          ' of ' +
+          m.all +
+          ' assignments are marked. You can report IE (Insufficient Evidence) instead of a letter grade.',
+      );
+    if (c.goals.indexOf('language_goals') >= 0)
+      lines.push(
+        first +
+          ' has an ELL designation. If ' +
+          p.poss +
+          ' English level keeps ' +
+          p.obj +
+          ' from showing the learning, assess ' +
+          p.obj +
+          ' against ' +
+          p.poss +
+          ' language goals instead of a letter grade.',
+      );
+    if (c.goals.indexOf('iep_goals') >= 0)
+      lines.push(
+        first +
+          ' has an IEP. If ' +
+          p.subj +
+          (they ? ' are' : ' is') +
+          ' working on the goals in ' +
+          p.poss +
+          ' IEP instead of the course, assess ' +
+          p.obj +
+          ' against those goals instead of a letter grade.',
+      );
+    return lines;
+  }
+
+  /* The switch at the top of the Teacher Comment card: "Letter Grade | IE",
+     "Letter Grade | Language Goals" or "Letter Grade | IEP Goals" (one
+     group when more than one is on offer). Letter Grade is the default. */
+  function _basisHtml(cid, student, f) {
+    var c = basisChoices(f);
+    var opts = ['grade'];
+    if (c.ie) opts.push('ie');
+    opts = opts.concat(c.goals);
+    if (opts.length < 2) return '';
+    var lg = getCourseLetterData(cid, student.id);
+    var m = (f.grade && f.grade.marked) || { mine: 0 };
+    var letterTip =
+      c.ie && lg && lg.S && lg.R != null
+        ? 'Report ' + lg.S + ' ' + lg.R + '% from the ' + m.mine + ' marked assignments.'
+        : 'Report a letter grade, as for every other student.';
+    var btns = opts
+      .map(function (b) {
+        var on = c.basis === b;
+        return `<button type="button" role="radio" class="seg-btn" aria-checked="${on}" data-action="tqSetBasis" data-basis="${b}" title="${esc(b === 'grade' ? letterTip : BASIS_TIP[b])}">${esc(BASIS_LABEL[b])}</button>`;
+      })
+      .join('');
+    var lines = _basisLines(student, f, c)
+      .map(function (t) {
+        return `<span>${esc(t)}</span>`;
+      })
+      .join('');
+    return `<div class="qn-basis" id="tq-basis">
+      <span class="qn-basis-text">${lines}</span>
+      <div class="seg seg-sm qn-basis-seg" role="radiogroup" aria-label="${c.ie ? 'Report this term as' : 'Assess this student against'}">${btns}</div>
+    </div>`;
+  }
+
+  /* A choice on the switch: saved with the deadline for this report (the
+     report and gradebook read it), then the screen redraws. A comment
+     Generate wrote and the teacher has not edited is written again for the
+     new path; an edited one is left as it is. */
+  function tqSetBasis(basis) {
+    var st = _current();
+    if (!st || !BASIS_LABEL[basis]) return;
+    tqSaveCurrentIfNeeded();
+    var termId = getTermId();
+    var rating = getStudentTermRating(_activeCourse, st.id, termId) || {};
+    if ((rating.reportingBasis || 'grade') === basis) return;
+    var text = plainComment(rating.narrative || '').trim();
+    var redraft = !!text && text === (_lastDraft[_activeCourse + '|' + st.id + '|' + termId] || '').trim();
+    upsertTermRating(_activeCourse, st.id, termId, { reportingBasis: basis, ieDeadline: rating.ieDeadline || null });
+    _cal = null;
+    _facts(st, true);
+    rerender();
+    if (redraft) tqGenerate();
+  }
+
+  /* ── Checks before approving ─────────────────────────────── */
+
+  /* Rows the teacher ticks "I checked this" on before Approve and Next
+     (plan PR 3; PR 11c adds the general checks). Only the missing-work row
+     of an IE comment for now. Ticks last for this session. */
+  var _checked = {};
+  function _checkKey(sid, id) {
+    return _activeCourse + '|' + sid + '|' + getTermId() + '|' + id;
+  }
+  function _checksFor(f) {
+    return CommentBank.ieProblemOf(f) === 'missing' ? ['missing'] : [];
+  }
+  function tqSetCheck(id, on) {
+    var st = _current();
+    if (!st) return;
+    _checked[_checkKey(st.id, id)] = !!on;
+    syncApprove();
+  }
+
+  /* What keeps Approve and Next off for the student on screen: 'deadline'
+     until an IE's deadline is picked, and each check not yet ticked. */
+  function approveBlockers(st) {
+    if (!st) return [];
+    var f = _facts(st);
+    var out = [];
+    if (CommentBank.reportPath(f) !== 'ie') return out;
+    if (!f.grade.ieDeadline) out.push('deadline');
+    _checksFor(f).forEach(function (id) {
+      if (!_checked[_checkKey(st.id, id)]) out.push(id);
+    });
+    return out;
+  }
+
+  var APPROVE_TIP = 'Saves this comment to the report card and opens the next student.';
+  function syncApprove() {
+    var btn = document.getElementById('tq-approve-next');
+    if (!btn) return;
+    var blocked = approveBlockers(_current());
+    var date = blocked.indexOf('deadline') >= 0;
+    var tick = blocked.some(function (b) {
+      return b !== 'deadline';
+    });
+    btn.disabled = blocked.length > 0;
+    btn.title =
+      APPROVE_TIP +
+      (date && tick
+        ? ' Pick the deadline and tick “I checked this” first.'
+        : date
+          ? ' Pick the deadline first.'
+          : tick
+            ? ' Tick “I checked this” first.'
+            : ' ⌘ Return');
+  }
+
+  /* ── The deadline calendar ───────────────────────────────── */
+
+  /* The school year the deadline is picked in: the class's first reporting
+     term's start to its last term's end; with no terms, September 1 to June
+     30 of the school year today falls in. { start, end } as YYYY-MM-DD. */
+  function schoolYear(cid, today) {
+    var terms = typeof getReportingTerms === 'function' ? getReportingTerms(cid) : [];
+    var starts = terms
+      .map(function (t) {
+        return t.starts_on;
+      })
+      .filter(Boolean)
+      .sort();
+    var ends = terms
+      .map(function (t) {
+        return t.ends_on;
+      })
+      .filter(Boolean)
+      .sort();
+    if (starts.length && ends.length) return { start: starts[0], end: ends[ends.length - 1] };
+    var y = Number(String(today).slice(0, 4));
+    var fall = Number(String(today).slice(5, 7)) >= 8;
+    return { start: (fall ? y : y - 1) + '-09-01', end: (fall ? y + 1 : y) + '-06-30' };
+  }
+
+  function _today() {
+    return typeof courseToday === 'function' ? courseToday(_activeCourse) : new Date().toISOString().slice(0, 10);
+  }
+  function _pad(n) {
+    return (n < 10 ? '0' : '') + n;
+  }
+  function _ymd(y, m, d) {
+    return y + '-' + _pad(m) + '-' + _pad(d);
+  }
+  /* "January 26" for a YYYY-MM-DD. */
+  function _longDay(iso) {
+    var d = parseLocalDate(iso);
+    return isNaN(d) ? '' : d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+  }
+
+  var _cal = null; // { month: 'YYYY-MM' } while the calendar is open
+
+  /* The days a deadline can fall on: from today (or the year's start) to
+     the end of the school year. */
+  function _deadlineRange() {
+    var today = _today();
+    var yr = schoolYear(_activeCourse, today);
+    return { min: today > yr.start ? today : yr.start, max: yr.end };
+  }
+
+  function _calendarHtml(picked) {
+    if (!_cal) return '';
+    var range = _deadlineRange();
+    var y = Number(_cal.month.slice(0, 4));
+    var mo = Number(_cal.month.slice(5, 7));
+    var first = new Date(y, mo - 1, 1);
+    var days = new Date(y, mo, 0).getDate();
+    var title = first.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    var cells = '';
+    for (var i = 0; i < first.getDay(); i++) cells += '<span></span>';
+    for (var d = 1; d <= days; d++) {
+      var iso = _ymd(y, mo, d);
+      var dow = new Date(y, mo - 1, d).getDay();
+      var out = iso < range.min || iso > range.max;
+      var cls = 'qn-cal-day' + (iso === picked ? ' on' : '') + (dow === 0 || dow === 6 ? ' weekend' : '');
+      cells += `<button type="button" class="${cls}" data-action="tqPickDeadline" data-date="${iso}"${out ? ' disabled' : ''} aria-label="${esc(_longDay(iso))}"${iso === picked ? ' aria-pressed="true"' : ''}>${d}</button>`;
+    }
+    var prevOk = _cal.month > range.min.slice(0, 7);
+    var nextOk = _cal.month < range.max.slice(0, 7);
+    var term = typeof getActiveTerm === 'function' ? getActiveTerm(_activeCourse) : null;
+    var note =
+      term && term.endsOn && term.endsOn >= range.min
+        ? `<span class="qn-cal-note">${esc(term.label || 'This term')} ends ${esc(_longDay(term.endsOn))}. Pick a date before then.</span>`
+        : '';
+    return `<div class="qn-cal" role="dialog" aria-label="Pick a deadline" id="tq-cal">
+      <div class="qn-cal-top"><span class="qn-cal-title">${esc(title)}</span>
+        <span class="qn-cal-nav"><button type="button" data-action="tqDeadlineMonth" data-dir="-1" aria-label="Previous month" title="Previous month"${prevOk ? '' : ' disabled'}>‹</button><button type="button" data-action="tqDeadlineMonth" data-dir="1" aria-label="Next month" title="Next month"${nextOk ? '' : ' disabled'}>›</button></span></div>
+      <div class="qn-cal-week" aria-hidden="true"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
+      <div class="qn-cal-grid">${cells}</div>
+      ${note}
+    </div>`;
+  }
+
+  function tqOpenDeadline() {
+    var st = _current();
+    if (!st) return;
+    var picked = _facts(st).grade.ieDeadline;
+    var range = _deadlineRange();
+    var start = picked || range.min;
+    _cal = { month: start.slice(0, 7) };
+    _syncRequired();
+    var on =
+      document.querySelector('#tq-cal .qn-cal-day.on') || document.querySelector('#tq-cal .qn-cal-day:not([disabled])');
+    if (on) on.focus();
+  }
+  function tqCloseDeadline() {
+    if (!_cal) return;
+    _cal = null;
+    _syncRequired();
+    var b = document.getElementById('tq-deadline-btn');
+    if (b) b.focus();
+  }
+  function tqDeadlineMonth(dir) {
+    if (!_cal) return;
+    var y = Number(_cal.month.slice(0, 4));
+    var m = Number(_cal.month.slice(5, 7)) + (Number(dir) || 0);
+    if (m < 1) {
+      m = 12;
+      y--;
+    } else if (m > 12) {
+      m = 1;
+      y++;
+    }
+    _cal.month = y + '-' + _pad(m);
+    _syncRequired();
+  }
+
+  /* A day picked: saved with the reporting basis for this report, and the
+     deadline sentence in the comment says the new date in place of [date]
+     (or the date picked before). */
+  function tqPickDeadline(iso) {
+    var st = _current();
+    if (!st || !/^\d{4}-\d{2}-\d{2}$/.test(String(iso))) return;
+    var range = _deadlineRange();
+    if (iso < range.min || iso > range.max) return;
+    tqSaveCurrentIfNeeded();
+    var termId = getTermId();
+    var rating = getStudentTermRating(_activeCourse, st.id, termId) || {};
+    var sentence = function () {
+      var part = CommentBank.requiredParts(_bankContext(_activeCourse, st, _facts(st))).find(function (p) {
+        return p.key === 'ieDeadline';
+      });
+      return part ? part.text : '';
+    };
+    var before = sentence();
+    upsertTermRating(_activeCourse, st.id, termId, {
+      reportingBasis: rating.reportingBasis || 'grade',
+      ieDeadline: iso,
+    });
+    _facts(st, true);
+    var after = sentence();
+    var text = plainComment((getStudentTermRating(_activeCourse, st.id, termId) || {}).narrative || '');
+    if (before && after && before !== after && text.indexOf(before) >= 0) {
+      upsertTermRating(_activeCourse, st.id, termId, { narrative: text.replace(before, after) });
+      var key = _activeCourse + '|' + st.id + '|' + termId;
+      if (_lastDraft[key]) _lastDraft[key] = _lastDraft[key].replace(before, after);
+    }
+    _cal = null;
+    rerender();
+    var b = document.getElementById('tq-deadline-btn');
+    if (b) b.focus();
+  }
+
+  /* ── The Required sentences ──────────────────────────────── */
+
+  var CAL_ICON =
+    '<svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="1.5" y="2.5" width="10" height="9" rx="1.5"></rect><path d="M1.5 5.5 H11.5 M4.5 1 V3.5 M8.5 1 V3.5"></path></svg>';
+
+  /* Where each Required sentence comes from, as the mockup words it. */
+  function _requiredSource(cid, student, f, key) {
+    var g = f.grade || {};
+    var m = g.marked || { mine: 0, all: 0 };
+    var problem = CommentBank.ieProblemOf(f);
+    if (CommentBank.reportPath(f) !== 'ie')
+      return (
+        'Required when ' +
+        (g.basis === 'iep_goals' ? 'IEP Goals' : 'Language Goals') +
+        ' is chosen. Fixed wording; it cannot be reworded.'
+      );
+    if (key === 'grade') {
+      if (CommentBank.ieSource(f) === 'calc') return 'Your gradebook: under 50%, so IE until the course ends';
+      var lg = getCourseLetterData(cid, student.id);
+      return (
+        'You chose IE above' +
+        (lg && lg.S && lg.R != null ? ' · ' + lg.S + ' ' + lg.R + '% from the ' + m.mine + ' marked assignments' : '')
+      );
+    }
+    if (key === 'ieProblem') {
+      if (problem === 'missing')
+        return (
+          (f.notHandedIn.count || 0) + ' of ' + (m.all || f.record.total) + ' · check that these are really missing'
+        );
+      if (problem === 'marks' || problem === 'noMarks') return m.mine + ' of ' + m.all + ' assignments marked';
+      return 'Your gradebook';
+    }
+    if (key === 'iePlan')
+      return problem === 'missing'
+        ? 'From the work not handed in'
+        : problem === 'marks' || problem === 'noMarks'
+          ? 'From the work with no mark yet'
+          : 'Your gradebook';
+    if (key === 'ieDeadline')
+      return g.ieDeadline ? 'The date you picked' : 'Approve and Next stays off until you pick a date.';
+    return 'Gives the student and family a chance to talk with you';
+  }
+
+  /* The Required parts of an IE or goals comment, as rows of the Sentences
+     card: the part, Required, the sentence, where it comes from, and on the
+     IE path "I checked this" on the missing-work row and Pick a Date on the
+     deadline row. Nothing on the grade path. */
+  function _requiredHtml(cid, student, f) {
+    var path = CommentBank.reportPath(f);
+    if (!path) return '';
+    var parts = CommentBank.requiredParts(_bankContext(cid, student, f));
+    var checks = _checksFor(f);
+    var picked = (f.grade && f.grade.ieDeadline) || '';
+    var rows = parts
+      .map(function (p) {
+        var check = p.key === 'ieProblem' && checks.indexOf('missing') >= 0;
+        var date = p.key === 'ieDeadline';
+        var flag = check || (date && !picked);
+        var ctrl = check
+          ? `<label class="qn-req-ctrl" title="Tick once you have checked these are really missing."><input type="checkbox" data-tq-check="missing"${_checked[_checkKey(student.id, 'missing')] ? ' checked' : ''}>I checked this</label>`
+          : date
+            ? `<button type="button" class="qn-req-ctrl" id="tq-deadline-btn" data-action="tqOpenDeadline" aria-haspopup="dialog" aria-expanded="${!!_cal}" title="Pick the date by which the IE must become a grade.">${CAL_ICON}${picked ? esc(_longDay(picked)) : 'Pick a Date'}</button>`
+            : '';
+        return `<div class="qn-req-row${flag ? ' flag' : ''}${path !== 'ie' ? ' statement' : ''}${date ? ' has-cal' : ''}">
+          <div class="qn-req-part"><span class="qn-req-label">${esc(p.label)}</span><span class="qn-req-chip">Required</span></div>
+          <div class="qn-req-body"><span class="qn-req-text">${esc(p.text)}</span><span class="qn-req-source">${esc(_requiredSource(cid, student, f, p.key))}</span></div>
+          ${ctrl}
+          ${date ? _calendarHtml(picked) : ''}
+        </div>`;
+      })
+      .join('');
+    var hint =
+      path === 'ie'
+        ? 'An IE comment needs every part marked Required.'
+        : 'The grade sentence is replaced by the required statement.';
+    return `<div class="qn-card qn-required" id="tq-required">
+      <div class="qn-req-top"><span class="qn-card-title">Sentences</span><span class="qn-sub">${esc(hint)}</span></div>
+      ${rows}
+    </div>`;
+  }
+
+  /* The card redrawn in place (the calendar opened or moved a month). */
+  function _syncRequired() {
+    var st = _current();
+    var card = document.getElementById('tq-required');
+    if (!st || !card) return;
+    card.outerHTML = _requiredHtml(_activeCourse, st, _facts(st));
   }
 
   /* ── The page ────────────────────────────────────────────── */
@@ -963,7 +1399,8 @@ window.ReportQuestionnaire = (function () {
       <div class="qn-right">
         ${_commentHtml(cid, student)}
         ${_attendanceHtml(cid, student)}
-        <!-- The Sentences card (PR 11b) goes here. -->
+        ${_commentTab === 'this' ? _requiredHtml(cid, student, f) : ''}
+        <!-- The rest of the Sentences card (PR 11b) goes here. -->
       </div>
     </div>`;
   }
@@ -972,6 +1409,7 @@ window.ReportQuestionnaire = (function () {
   function afterRender() {
     syncRoster();
     _fitBox();
+    syncApprove();
   }
 
   /* ⌘ Return approves and moves on; ⌘⇧C copies; ↑ ↓ change the student
@@ -982,6 +1420,7 @@ window.ReportQuestionnaire = (function () {
     if (window.PageAssignments && PageAssignments.graderOpen && PageAssignments.graderOpen()) return;
     if (e.key === 'Escape') {
       if (document.getElementById(INFO_ID)) tqCloseInfo();
+      else if (_cal) tqCloseDeadline();
       return;
     }
     if (document.getElementById(INFO_ID)) return;
@@ -1025,6 +1464,19 @@ window.ReportQuestionnaire = (function () {
     tqSetAttendance: tqSetAttendance,
     tqAddReportNote: tqAddReportNote,
     tqSelectStudent: tqSelectStudent,
+    tqSetBasis: tqSetBasis,
+    tqSetCheck: tqSetCheck,
+    tqOpenDeadline: tqOpenDeadline,
+    tqCloseDeadline: tqCloseDeadline,
+    deadlineOpen: function () {
+      return !!_cal;
+    },
+    tqDeadlineMonth: tqDeadlineMonth,
+    tqPickDeadline: tqPickDeadline,
+    approveBlockers: approveBlockers,
+    syncApprove: syncApprove,
+    schoolYear: schoolYear,
+    basisChoices: basisChoices,
     renderTermQuestionnaire: renderTermQuestionnaire,
     afterRender: afterRender,
     fitBox: _fitBox,

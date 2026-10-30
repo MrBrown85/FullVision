@@ -8,14 +8,20 @@
    1 Rarely, 2 Sometimes, 3 Usually, 4 Consistently, 5 Not Seen. `picture`
    is the term's picture: strong, steady, challenge or early. `grade` is
    the grade sentence's kind (CommentBank.gradeOf): letter, letterClose,
-   cminus, cminusClose or proficiency; C- has its own sentences. `src` is the
+   cminus, cminusClose or proficiency; C- has its own sentences; ie,
+   languageGoals and iepGoals replace it (plan PR 3). `path: 'ie'` is a
+   Required part of an IE comment; `ieProblem` is what it names as the
+   problem (CommentBank.ieProblemOf): missing (work
+   labelled Missing), marks (marks on fewer of the class's marked work),
+   noMarks (none of it) or low (under 50%). `src` is the
    line of tqAutoNarrative the sentence came from on main before Oct 28 2026,
    or "new".
 
    `claims` names what a sentence asserts about the student, for
    CommentBank.verify(): grade, even, strength, growthArea, improved,
    slipped, bestPiece, weakPiece, focusWork, nextStep, habits, lateWork,
-   notHandedIn, attendance, studentWords, picture, support. [] is a
+   notHandedIn, attendance, studentWords, picture, support, marks,
+   lowMarks, deadline, ie. [] is a
    sentence that asserts nothing, the stand-in for a sentence of its part
    whose claim fails. Every sentence has the field; a test fails without it.
 
@@ -581,6 +587,133 @@ var COMMENT_BANK = {
       needs: ['gradeWord'],
       when: { grade: 'proficiency' },
       claims: ['grade'],
+      src: 'new',
+    },
+    // The IE path (plan PR 3): the grade, problem, plan, deadline and
+    // meeting sentences are Required. Each part has one sentence, worded as
+    // the approved mockup ("Reporting an IE").
+    {
+      id: 'gr06',
+      part: 'now',
+      group: 'Grade',
+      text: '{name}’s mark this term is IE, which means there is not yet enough evidence for a letter grade.',
+      when: { grade: 'ie' },
+      claims: ['grade'],
+      src: 'new',
+    },
+    // Language or IEP goals: the fixed statement replaces the grade sentence.
+    {
+      id: 'gr07',
+      part: 'now',
+      group: 'Grade',
+      text: 'This term, {name} is assessed in relation to {his} goals for English language proficiency.',
+      when: { grade: 'languageGoals' },
+      claims: ['grade'],
+      src: 'new',
+    },
+    {
+      id: 'gr08',
+      part: 'now',
+      group: 'Grade',
+      text: 'This term, {name} is assessed in relation to the goals in {his} IEP.',
+      when: { grade: 'iepGoals' },
+      claims: ['grade'],
+      src: 'new',
+    },
+    {
+      id: 'ie01',
+      part: 'now',
+      group: 'IE Problem',
+      // The plan's work-not-handed-in sentence, built whole in context().
+      text: '{missingWork}',
+      needs: ['missingWork'],
+      when: { path: 'ie', ieProblem: 'missing' },
+      claims: ['ie', 'notHandedIn'],
+      src: 'new',
+    },
+    {
+      id: 'ie02',
+      part: 'now',
+      group: 'IE Problem',
+      text: '{He} [has|have] a mark on {markedMine} of the {markedClass} assignments marked so far this term.',
+      needs: ['markedMine', 'markedClass'],
+      when: { path: 'ie', ieProblem: 'marks' },
+      claims: ['ie', 'marks'],
+      src: 'new',
+    },
+    {
+      id: 'ie09',
+      part: 'now',
+      group: 'IE Problem',
+      text: '{He} [has|have] no marks yet on the {markedClass} assignments marked so far this term.',
+      needs: ['markedClass'],
+      when: { path: 'ie', ieProblem: 'noMarks' },
+      claims: ['ie', 'marks'],
+      src: 'new',
+    },
+    {
+      id: 'ie03',
+      part: 'now',
+      group: 'IE Problem',
+      text: '{His} marks so far average below 50%.',
+      when: { path: 'ie', ieProblem: 'low' },
+      claims: ['ie', 'lowMarks'],
+      src: 'new',
+    },
+    {
+      id: 'ie04',
+      part: 'go',
+      group: 'IE Plan',
+      text: 'To earn a grade, {he} [needs|need] to hand in the missing work.',
+      when: { path: 'ie', ieProblem: 'missing' },
+      claims: ['ie', 'notHandedIn'],
+      src: 'new',
+    },
+    {
+      id: 'ie05',
+      part: 'go',
+      group: 'IE Plan',
+      text: 'To earn a grade, {he} [needs|need] to complete the work that has no mark yet.',
+      when: { path: 'ie', ieProblem: 'marks' },
+      claims: ['ie', 'marks'],
+      src: 'new',
+    },
+    {
+      id: 'ie10',
+      part: 'go',
+      group: 'IE Plan',
+      text: 'To earn a grade, {he} [needs|need] to complete the work that has no mark yet.',
+      when: { path: 'ie', ieProblem: 'noMarks' },
+      claims: ['ie', 'marks'],
+      src: 'new',
+    },
+    {
+      id: 'ie06',
+      part: 'go',
+      group: 'IE Plan',
+      text: 'To earn a grade, {he} [needs|need] to show more of the learning in {his} work.',
+      when: { path: 'ie', ieProblem: 'low' },
+      claims: ['ie', 'lowMarks'],
+      src: 'new',
+    },
+    {
+      id: 'ie07',
+      part: 'go',
+      group: 'IE Deadline',
+      // {ieDeadline} is the date the teacher picked, or [date] until then.
+      text: 'The deadline to replace this IE with a grade is {ieDeadline}.',
+      needs: ['ieDeadline'],
+      when: { path: 'ie' },
+      claims: ['ie', 'deadline'],
+      src: 'new',
+    },
+    {
+      id: 'ie08',
+      part: 'how',
+      group: 'IE Meeting',
+      text: 'Please contact me so we can talk about this plan together.',
+      when: { path: 'ie' },
+      claims: ['ie'],
       src: 'new',
     },
     {
