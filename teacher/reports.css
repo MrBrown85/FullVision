@@ -5232,6 +5232,341 @@ body.qn-roster #gb-sidebar .student-row-note {
   padding: 6px 10px;
 }
 
+/* The Sentences card's rows (plan PR 11b): a handle, the part, the
+   sentence and its source, Other Wording or Edited. */
+.qn-srow-handle {
+  flex: none;
+  width: 12px;
+  padding-top: 3px;
+  color: var(--text-3);
+  cursor: grab;
+  display: flex;
+  border-radius: 4px;
+}
+.qn-srow-handle:active {
+  cursor: grabbing;
+}
+.qn-srow-handle:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+.qn-srow-spacer {
+  cursor: default;
+}
+.qn-sentences .qn-req-row {
+  padding-left: 10px;
+}
+.qn-srow.best {
+  background: var(--qn-best-bg);
+}
+.qn-srow.dragging {
+  opacity: 0.35;
+}
+.qn-drop-line {
+  height: 4px;
+  margin: 0 14px;
+  border-radius: 2px;
+  background: var(--active);
+}
+.qn-edited {
+  flex: none;
+  font-size: 12px;
+  color: var(--text-2);
+  padding: 2px 8px;
+  background: var(--surface-2);
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.qn-reset {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+}
+.qn-req-top .qn-card-link {
+  font-size: 13px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-family: inherit;
+}
+.qn-req-top .qn-card-link:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.qn-wording {
+  width: 430px;
+}
+.qn-menu-all {
+  padding-left: 32px;
+}
+
+/* Browse Sentences: the sheet over the page. */
+.qn-browse-overlay {
+  padding: 30px 40px;
+}
+.qn-browse {
+  --qn-inuse-bg: #f5f9ff;
+  width: min(820px, 100%);
+  margin: 0 auto;
+  background: var(--bg);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  font-size: var(--text-base);
+  color: var(--text);
+}
+@media (prefers-color-scheme: dark) {
+  .qn-browse {
+    --qn-inuse-bg: rgba(10, 132, 255, 0.12);
+  }
+}
+.qn-browse-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--surface-2);
+}
+.qn-browse-title {
+  flex: 1;
+  font-size: 17px;
+  font-weight: 700;
+}
+.qn-browse-search {
+  width: 240px;
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--seg-track);
+  color: var(--text);
+}
+.qn-browse-search:focus-visible {
+  outline: 2px solid var(--active);
+}
+.qn-browse-done {
+  height: 30px;
+  border: 0;
+  background: var(--active);
+  color: #fff;
+  padding: 0 16px;
+  border-radius: 15px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.qn-browse-done:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+.qn-browse-body {
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.qn-browse-parts {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  background: var(--seg-track);
+  border-radius: 9px;
+  padding: 2px;
+  font-size: 13px;
+}
+.qn-browse-tab {
+  border: 0;
+  height: 28px;
+  padding: 0 4px;
+  border-radius: 7px;
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+  text-align: center;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.qn-browse-tab[aria-selected='true'] {
+  background: var(--seg-thumb);
+  font-weight: 600;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.12),
+    0 0 0 0.5px rgba(0, 0, 0, 0.04);
+}
+.qn-browse-tab:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: -2px;
+}
+.qn-browse-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+.qn-browse-fitwrap {
+  position: relative;
+}
+.qn-browse-fits {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  padding: 4px 10px 4px 12px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13px;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+}
+.qn-browse-fits:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+.qn-browse-n,
+.qn-browse-fits svg {
+  color: var(--text-2);
+}
+.qn-fits-menu {
+  left: 0;
+  right: auto;
+  top: calc(100% + 4px);
+  width: 300px;
+  max-width: none;
+}
+.qn-browse-order {
+  flex: 1;
+  text-align: right;
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+.qn-browse-listwrap {
+  position: relative;
+  background: var(--surface);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+.qn-browse-listwrap::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 48px;
+  background: linear-gradient(rgba(255, 255, 255, 0), var(--surface));
+  pointer-events: none;
+}
+.qn-browse-list {
+  overflow-y: auto;
+  padding-bottom: 32px;
+}
+.qn-browse-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+}
+.qn-browse-row + .qn-browse-row {
+  border-top: 1px solid var(--surface-2);
+}
+.qn-browse-row.on {
+  background: var(--qn-inuse-bg);
+}
+.qn-browse-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.qn-browse-sentence {
+  font-size: 14.5px;
+  line-height: 1.45;
+}
+.qn-browse-meta {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.qn-chip-yours {
+  flex: none;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: var(--score-4-bg);
+  color: var(--score-4-text);
+}
+.qn-browse-use {
+  flex: none;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 7px;
+  white-space: nowrap;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--link);
+  cursor: pointer;
+}
+.qn-browse-use:disabled {
+  color: var(--text-3);
+  cursor: not-allowed;
+}
+.qn-browse-use:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+.qn-browse-inuse {
+  flex: none;
+  font-size: 12.5px;
+  padding: 4px 12px;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.qn-browse-empty {
+  padding: 18px 14px;
+  font-size: 13.5px;
+  color: var(--text-2);
+}
+.qn-browse-hint {
+  font-size: 12px;
+  color: var(--text-2);
+  text-align: center;
+}
+.qn-browse-handle {
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: ns-resize;
+  background: var(--bg);
+  border-top: 1px solid var(--surface-2);
+  touch-action: none;
+}
+.qn-browse-handle:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: -2px;
+}
+.qn-browse-grip {
+  width: 44px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--border);
+}
+
 /* The IE deadline calendar: one month, the school year only. */
 .qn-req-row.has-cal {
   position: relative;

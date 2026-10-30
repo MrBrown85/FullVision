@@ -362,3 +362,193 @@ test('end to end: rate, generate, approve, move on, and the report prints it', a
   const comment = page.locator('.report-sheet').first().locator('.report-comment-text');
   await expect(comment).toContainText(draft.split('. ')[0]);
 });
+
+/* The Sentences card and Browse Sentences (fullvision-generate-plan PR 11b,
+   the "Review screen" and "Browse Sentences" mockups). */
+test.describe('the Sentences card', () => {
+  const rows = page => page.locator('#tq-sentences .qn-srow');
+  const rowByLabel = (page, label) =>
+    page.locator('#tq-sentences .qn-srow', { has: page.locator(`.qn-req-label:text-is("${label}")`) });
+
+  test('one row per sentence with its part, source and handle; ⌥↑ moves a row, the comment follows with the name first; Reset Order', async ({
+    page,
+  }) => {
+    await open(page);
+    await page.locator('#tq-generate').click();
+    const box = page.locator('#tq-narrative');
+    const draft = await box.inputValue();
+    const n = await page.evaluate(
+      () => ReportQuestionnaire.sentencesOf(document.getElementById('tq-narrative').value).length,
+    );
+    await expect(rows(page)).toHaveCount(n);
+    await expect(rows(page).first().locator('.qn-req-label')).toHaveText('Grade');
+    await expect(rows(page).first().locator('.qn-req-source')).toContainText('from this term’s scores');
+    await expect(rows(page).first().locator('[data-do="wording"]')).toHaveText('Other Wording ▾');
+    await expect(page.locator('#tq-sentences .qn-sub')).toHaveText(
+      'Reword, edit or drag to reorder. The comment above follows.',
+    );
+    await expect(page.locator('#tq-sentences .qn-srow-handle[draggable="true"]')).toHaveCount(n);
+    await expect(page.locator('[data-do="reset"]')).toHaveCount(0);
+    // The best piece's row, moved first, names Cece; the grade sentence now
+    // uses her pronoun.
+    const best = rowByLabel(page, 'Best Piece');
+    const bestText = await best.locator('.qn-req-text').textContent();
+    await best.locator('.qn-srow-handle').focus();
+    await page.keyboard.press('Alt+ArrowUp');
+    await expect(rows(page).first().locator('.qn-req-label')).toHaveText('Best Piece');
+    await expect(rows(page).first().locator('.qn-req-text')).toContainText('Cece');
+    await expect(rows(page).nth(1).locator('.qn-req-text')).toHaveText(/^She is /);
+    const moved = await box.inputValue();
+    expect(moved).not.toBe(draft);
+    expect(moved.startsWith(await rows(page).first().locator('.qn-req-text').textContent())).toBe(true);
+    expect(bestText).not.toBe(await rows(page).first().locator('.qn-req-text').textContent());
+    await expect(page.locator('#tq-sentences .qn-sub')).toHaveText('Your order is kept when you generate again.');
+    expect(await page.evaluate(() => getStudentTermRating('sci8', 'st1', 'term-2').narrative)).toBe(moved);
+    // The focus stays on the moved row's handle.
+    await expect(rows(page).first().locator('.qn-srow-handle')).toBeFocused();
+    // Generate again keeps the order; Reset Order puts the draft's back.
+    await page.locator('#tq-generate').click();
+    await expect(rows(page).first().locator('.qn-req-label')).toHaveText('Best Piece');
+    await page.locator('[data-do="reset"]').click();
+    await expect(rows(page).first().locator('.qn-req-label')).toHaveText('Grade');
+    await expect(page.locator('[data-do="reset"]')).toHaveCount(0);
+    await expect(box).toHaveValue(/^Cece is /);
+  });
+
+  test('Other Wording: up to three with the one in use ticked and its uses; a pick changes the comment; All N… opens Browse', async ({
+    page,
+  }) => {
+    await open(page);
+    await page.locator('#tq-generate').click();
+    const home = page.locator('#tq-sentences .qn-srow', { hasText: 'At home, you can ask' });
+    await home.locator('[data-do="wording"]').click();
+    const menu = page.locator('#tq-wording-menu');
+    await expect(menu).toBeVisible();
+    await expect(menu.locator('.qn-menu-head')).toHaveText('Other ways to say this');
+    const items = menu.locator('[role="menuitemradio"]');
+    expect(await items.count()).toBeGreaterThan(1);
+    expect(await items.count()).toBeLessThanOrEqual(3);
+    await expect(items.first()).toHaveAttribute('aria-checked', 'true');
+    await expect(items.first().locator('.qn-menu-meta')).toHaveText(/^In use/);
+    await expect(items.nth(1)).toHaveAttribute('aria-checked', 'false');
+    await expect(items.nth(1).locator('.qn-menu-meta')).toHaveText(
+      /^(Not used yet in this class|Used for \d+ classmates?)$/,
+    );
+    await expect(menu.locator('.qn-menu-all')).toHaveText(/^All \d+ next step sentences…$/);
+    const alt = await items.nth(1).locator('.qn-menu-text').textContent();
+    await items.nth(1).click();
+    await expect(menu).toHaveCount(0);
+    await expect(home.locator('.qn-req-text')).toHaveText(alt);
+    await expect(page.locator('#tq-narrative')).toHaveValue(new RegExp(alt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    // All N… opens the sheet on that part.
+    await home.locator('[data-do="wording"]').click();
+    await menu.locator('.qn-menu-all').click();
+    const sheet = page.getByRole('dialog', { name: 'Sentences for Cece' });
+    await expect(sheet).toBeVisible();
+    await expect(sheet.locator('[role="tab"][aria-selected="true"]')).toHaveText('Next Step');
+    await expect(sheet.locator('.qn-browse-row.on .qn-browse-sentence', { hasText: alt })).toHaveCount(1);
+    await page.keyboard.press('Escape');
+    await expect(sheet).toHaveCount(0);
+  });
+
+  test('an edited sentence is marked Edited, its source says so, and Generate Comment keeps it', async ({ page }) => {
+    await open(page);
+    await page.locator('#tq-generate').click();
+    const first = rows(page).first();
+    const was = await first.locator('.qn-req-text').textContent();
+    await page.evaluate(old => {
+      const el = document.getElementById('tq-narrative');
+      el.value = el.value.replace(old, 'Cece had a steady term in Science 8.');
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    }, was);
+    await expect(first.locator('.qn-edited')).toHaveText('Edited');
+    await expect(first.locator('.qn-req-text')).toHaveText('Cece had a steady term in Science 8.');
+    await expect(first.locator('.qn-req-source')).toHaveText('Edited by you · kept when you regenerate');
+    await expect(first.locator('[data-do="wording"]')).toHaveCount(0);
+    await page.locator('#tq-generate').click();
+    await expect(page.locator('#tq-narrative')).toHaveValue(/^Cece had a steady term in Science 8\. /);
+    await expect(first.locator('.qn-edited')).toHaveText('Edited');
+    // A sentence of the teacher's own, added at the end, gets a row with no part.
+    await toEnd(page);
+    await page.keyboard.type(' She asks good questions.');
+    const last = rows(page).last();
+    await expect(last.locator('.qn-req-text')).toHaveText('She asks good questions.');
+    await expect(last.locator('.qn-req-label')).toHaveText('');
+    await expect(last.locator('.qn-edited')).toHaveText('Edited');
+  });
+
+  test('Browse Sentences: the parts, Fits, least used first, Use and In Use, search; the height is remembered', async ({
+    page,
+  }) => {
+    await open(page);
+    await page.locator('#tq-generate').click();
+    await page.locator('#tq-browse-btn').click();
+    const sheet = page.getByRole('dialog', { name: 'Sentences for Cece' });
+    await expect(sheet).toBeVisible();
+    await expect(sheet.locator('[role="tab"]')).toHaveText([
+      'Grade',
+      'Best Piece',
+      'Strengths',
+      'Habits',
+      'Not Handed In',
+      'Next Step',
+      'Support',
+      'Closing',
+    ]);
+    await expect(sheet.locator('#tq-browse-search')).toBeFocused();
+    await expect(sheet.locator('.qn-browse-order')).toHaveText('Least used first');
+    await expect(sheet.locator('.qn-browse-hint')).toHaveText(
+      'The list scrolls. Drag the bottom edge to show more at once.',
+    );
+    // Grade: the one in use, In Use, and the count.
+    await expect(sheet.locator('#tq-browse-fits')).toHaveText(/^Fits Cece \d+ of \d+/);
+    await expect(sheet.locator('.qn-browse-row.on .qn-browse-inuse')).toHaveText('In Use');
+    await expect(sheet.locator('.qn-browse-row.on .qn-browse-meta')).toHaveText(/^In use/);
+    // Next Step: Use puts a sentence in the comment and the row says In Use.
+    await sheet.locator('[role="tab"]', { hasText: 'Next Step' }).click();
+    const rowsList = sheet.locator('.qn-browse-row');
+    const fitCount = Number((await sheet.locator('#tq-browse-n').textContent()).split(' of ')[0]);
+    await expect(rowsList).toHaveCount(fitCount);
+    const use = rowsList.filter({ has: page.locator('.qn-browse-use:not([disabled])') }).first();
+    const text = await use.locator('.qn-browse-sentence').textContent();
+    await use.locator('.qn-browse-use').click();
+    await expect(sheet.locator('.qn-browse-row.on .qn-browse-sentence').filter({ hasText: text })).toHaveCount(1);
+    await expect(page.locator('#tq-narrative')).toHaveValue(new RegExp(text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    // Every sentence: more rows, the ones that do not fit with Use off.
+    await sheet.locator('#tq-browse-fits').click();
+    await expect(sheet.locator('#tq-fits-menu [role="option"]')).toHaveText([
+      /Fits Cece\d+$/,
+      /Every sentence for this part\d+$/,
+    ]);
+    await sheet.locator('#tq-fits-menu [data-fits="0"]').click();
+    await expect(sheet.locator('#tq-browse-fits')).toHaveText(/^Every sentence \d+/);
+    expect(await rowsList.count()).toBeGreaterThan(fitCount);
+    await expect(sheet.locator('.qn-browse-use[disabled]').first()).toBeVisible();
+    // Search narrows the list.
+    await sheet.locator('#tq-browse-search').fill('zzzz');
+    await expect(sheet.locator('.qn-browse-empty')).toHaveText('No sentences match “zzzz”.');
+    await sheet.locator('#tq-browse-search').fill('');
+    // The bottom edge: ↓ makes the list taller; the height comes back next time.
+    const list = sheet.locator('#tq-browse-list');
+    await expect(list).toHaveCSS('max-height', '420px');
+    await sheet.locator('#tq-browse-handle').focus();
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowDown');
+    await expect(list).toHaveCSS('max-height', '468px');
+    await sheet.locator('.qn-browse-done').click();
+    await expect(sheet).toHaveCount(0);
+    await expect(page.locator('#tq-browse-btn')).toBeFocused();
+    await page.locator('#tq-browse-btn').click();
+    await expect(sheet.locator('#tq-browse-list')).toHaveCSS('max-height', '468px');
+    expect(await page.evaluate(() => localStorage.getItem('fv-browse-sentences-height'))).toBe('468');
+  });
+
+  test('no overflow with the rows drawn, at 1440 and 1366', async ({ page }) => {
+    await open(page);
+    await page.locator('#tq-generate').click();
+    await expect(rows(page).first()).toBeVisible();
+    expect(await overflow(page)).toEqual([]);
+    await page.setViewportSize({ width: 1366, height: 768 });
+    expect(await overflow(page)).toEqual([]);
+  });
+});
