@@ -46,9 +46,9 @@ test.describe('Class blocks', () => {
     ]);
     await gotoApp(page, '/assignments');
     await expect(page.locator('#gb-course-select option')).toHaveText([
-      'Block A · Philosophy 12',
-      'Block B · Philosophy 12',
-      'Block D · English 10',
+      'A · Philosophy 12',
+      'B · Philosophy 12',
+      'D · English 10',
     ]);
   });
 
