@@ -450,8 +450,9 @@ window.ReportQuestionnaire = (function () {
       });
   }
 
-  /* Strongest: every competency at the highest level; Next step: the
-     lowest, when it is below the highest. */
+  /* Strongest: the competencies past the comment's "strongest" evidence
+     gate (CommentBank.strongestOf), so the tag and the comment agree; Next
+     step: the lowest, when it is below the highest. */
   function skillTags(comps) {
     var list = (comps || []).filter(function (c) {
       return c.level > 0;
@@ -471,8 +472,8 @@ window.ReportQuestionnaire = (function () {
     );
     var out = {};
     if (max === min) return out;
-    list.forEach(function (c) {
-      if (c.level === max) out[c.id] = 'Strongest';
+    CommentBank.strongestOf(list).forEach(function (c) {
+      out[c.id] = 'Strongest';
     });
     var low = list.find(function (c) {
       return c.level === min;
