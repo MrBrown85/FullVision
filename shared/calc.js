@@ -795,7 +795,9 @@ function _assessmentEarnedPossible(cid, studentId, assessment) {
    percents for a category set to it (calcMode, as categoryCalcMode gives
    it; any other group is points). A Proficiency class shows the level, a
    Letter class the letter and %, a Both class both.
-   Returns { text, level, prof, pct, count } or null when nothing is scored. */
+   Returns { text, level, prof, pct, count, letter } or null when nothing is
+   scored. letter is the letter and % alone ("B 80%"), null in a Proficiency
+   class. */
 function assessmentGroupGrade(cid, studentId, assessments, calcMode) {
   var levels = _factoredMeanLevel(cid, studentId, assessments);
   var group = getAssessmentGroupPercentage(cid, studentId, assessments, calcMode);
@@ -837,7 +839,14 @@ function _groupGrade(cid, prof, pct, count) {
   var text = mode === 'letter' ? pctText : mode === 'both' ? [profText, pctText].filter(Boolean).join(' · ') : profText;
   var level = mode === 'letter' ? (shownPct == null ? 0 : _percentLevel(shownPct)) : prof > 0 ? Math.round(prof) : 0;
   if (!text) return null;
-  return { text: text, level: level, prof: prof, pct: pct, count: count };
+  return {
+    text: text,
+    level: level,
+    prof: prof,
+    pct: pct,
+    count: count,
+    letter: mode === 'proficiency' ? null : pctText,
+  };
 }
 
 /* How a student's group grade sits against the class's, in the grade the
