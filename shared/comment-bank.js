@@ -573,7 +573,7 @@ var COMMENT_BANK = {
       id: 'gr05',
       part: 'now',
       group: 'Grade',
-      text: '{name} is working at {gradeWord} level this term.',
+      text: '{name} is {gradeWord} on the BC proficiency scale this term.',
       needs: ['gradeWord'],
       when: { grade: 'proficiency' },
       claims: ['grade'],

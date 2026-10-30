@@ -170,7 +170,7 @@ describe('gradeOf', () => {
     const f = { ...letterFacts(null, null, [], 'proficiency'), overall: 3.1, standing: 'Proficient' };
     expect(CommentBank.gradeOf(f)).toEqual({ kind: 'proficiency', word: 'Proficient' });
     const ctx = CommentBank.context(f, {});
-    expect(CommentBank.fill(byId('gr05'), ctx)).toBe('Noor is working at a Proficient level this term.');
+    expect(CommentBank.fill(byId('gr05'), ctx)).toBe('Noor is Proficient on the BC proficiency scale this term.');
     expect(GRADE_IDS.filter(id => CommentBank.fits(byId(id), ctx))).toEqual(['gr05']);
   });
 });
@@ -330,7 +330,7 @@ describe('Generate in a Letter class', () => {
   it('uses the proficiency word in a Proficiency class', () => {
     const f = seed('proficiency', [3, 3, 3, 3]);
     const d = CommentBank.draft(CommentBank.context(f, {}), { seed: 1 });
-    expect(d.sentences[0].text).toBe('Noor is working at a Proficient level this term.');
+    expect(d.sentences[0].text).toBe('Noor is Proficient on the BC proficiency scale this term.');
     expect(d.ids.slice(1).filter(claimsGrade)).toEqual([]);
     expect(CommentBank.verify(d, f, {}).replaced).toEqual([]);
   });

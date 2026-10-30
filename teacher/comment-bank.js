@@ -584,7 +584,7 @@ window.CommentBank = (function () {
       gradeLetter: gr && gr.letter ? aOrAn(gr.letter) : '',
       gradeStanding: (gr && gr.standing) || '',
       gradeNext: gr && gr.next ? aOrAn(gr.next) : '',
-      gradeWord: gr && gr.word ? aOrAn(gr.word) : '',
+      gradeWord: (gr && gr.word) || '',
     };
   }
 

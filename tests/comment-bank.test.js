@@ -28,7 +28,7 @@ function fullContext(p, habits) {
     gradeLetter: 'a B',
     gradeStanding: 'very good',
     gradeNext: 'an A',
-    gradeWord: 'a Proficient',
+    gradeWord: 'Proficient',
     strengths: 'Evaluating',
     growthAreas: 'Communicating',
     even: 'yes',
