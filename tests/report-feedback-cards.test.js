@@ -376,9 +376,12 @@ describe('rubric tables', () => {
           levels: { 4: '', 3: 'Speaks clearly.', 2: '', 1: '' },
         }),
         row({ name: 'Volume', level: 0, comment: '', beyond: '' }),
+        row({ name: 'Pace', level: 3, mod: 1, comment: '', beyond: '', levels: { 4: '', 3: 'Steady.', 2: '', 1: '' } }),
       ],
     };
     const el = dom(F.cardHtml(item({ kind: 'rubric', rubric })));
+    // The ± goes with the level name, as Print Rubrics names it.
+    expect(el.querySelectorAll('tbody tr')[2].querySelector('b.fb-lvl').textContent).toBe('Proficient +');
     expect([...el.querySelectorAll('thead th')].map(h => h.textContent)).toEqual([
       'Speech',
       'Work On',

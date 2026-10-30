@@ -178,7 +178,8 @@
       '</th><th class="fb-c2">Work On</th><th class="fb-c3">Proficient Standard</th><th>Went Beyond</th></tr></thead>';
     var body = (rubric.rows || [])
       .map(function (row) {
-        var name = row.level > 0 ? _levelName(row.level) : '';
+        // The level with its ± as Print Rubrics names it: "Proficient +".
+        var name = row.level > 0 ? _levelName(row.level) + (row.mod > 0 ? ' +' : row.mod < 0 ? ' −' : '') : '';
         var std =
           '<td' +
           (row.level > 0 ? ' class="fb-on"' : '') +
