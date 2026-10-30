@@ -193,6 +193,76 @@ window.CommentBank = (function () {
     return it && it.v && it.v.text ? String(it.v.text).trim() : '';
   }
 
+  /* ── The best-piece sentence (plan, Sentence grammar) ──────────────── */
+
+  /* A title as a comment quotes it: the lesson number ("4.3 ", "Lesson 2:")
+     dropped. A title that is only a number keeps it. */
+  function workTitle(title) {
+    var t = String(title || '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    var bare = t.replace(
+      /^(?:lesson\s+\d+(?:\.\d+)*[a-z]?\s*[.:)\-\u2013\u2014]?|\d+(?:\.\d+)+[a-z]?\s*[.:)\-\u2013\u2014]?|\d+[a-z]?\s*[.:)\-\u2013\u2014])\s+/i,
+      '',
+    );
+    return bare || t;
+  }
+
+  /* The teacher's Note for the Report as the sentence uses it: one line,
+     its first letter lower case when it starts a plain word ("Linked" →
+     "linked"), no closing period (the sentence adds its own). */
+  function reportNoteText(note) {
+    var t = String(note || '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/[.\s]+$/, '');
+    if (/^[A-Z][a-z]/.test(t)) t = t.charAt(0).toLowerCase() + t.slice(1);
+    return t;
+  }
+
+  /* Who the sentence is about: the student's pronouns when on file, else
+     the preferred first name again. */
+  function _whose(o) {
+    if (!o.onFile || !o.pronouns) return o.name + '\u2019s';
+    var poss = String(o.pronouns.poss || 'their');
+    return poss.charAt(0).toUpperCase() + poss.slice(1);
+  }
+  function _who(o) {
+    return o.onFile && o.pronouns ? String(o.pronouns.subj || 'they') : o.name;
+  }
+
+  /* "{His} best piece was “{title}”, where {he} {note}." With no note:
+     "{His} best piece was “{title}.”" A title's own ? or ! stays inside the
+     quotes; the period ends inside the closing quote, any comma after it.
+     o: { title, note, name, pronouns, onFile }. '' with no title. */
+  function bestPieceSentence(o) {
+    o = o || {};
+    var title = workTitle(o.title);
+    if (!title) return '';
+    var note = reportNoteText(o.note);
+    var start = _whose(o) + ' best piece was \u201C';
+    if (note)
+      return (
+        start +
+        title.replace(/\.+$/, '') +
+        '\u201D, where ' +
+        _who(o) +
+        ' ' +
+        note +
+        (/[!?\u2026]$/.test(note) ? '' : '.')
+      );
+    return start + title + (/[.!?\u2026]$/.test(title) ? '' : '.') + '\u201D';
+  }
+
+  /* The name and pronouns a sentence about this student uses. */
+  function studentRef(student) {
+    return {
+      name: displayNameFirst(student),
+      pronouns: ReportBlocks.getPronouns(student),
+      onFile: !!String(student.pronouns || '').trim(),
+    };
+  }
+
   /* ── What FullVision has ───────────────────────────────────────────── */
 
   /* The work labelled Missing, oldest first: { count, titles, groups }.
@@ -301,7 +371,9 @@ window.CommentBank = (function () {
       })
       .map(function (a) {
         var v = getAssessmentOverallScore(cid, sid, a.id);
-        return v > 0 ? { id: a.id, title: a.title || '', d: dateOf(a), v: v } : null;
+        // The teacher's Note for the Report on the piece, for the best-piece sentence.
+        var note = typeof getScoreReportNote === 'function' ? getScoreReportNote(cid, sid, a.id) : '';
+        return v > 0 ? { id: a.id, title: a.title || '', d: dateOf(a), v: v, note: note } : null;
       })
       .filter(Boolean);
 
@@ -405,6 +477,7 @@ window.CommentBank = (function () {
       course: course.name || '',
       family: familyOf(cid),
       pronouns: ReportBlocks.getPronouns(student),
+      pronounsOnFile: !!String(student.pronouns || '').trim(),
       comps: comps,
       work: work,
       record: rec,
@@ -795,6 +868,7 @@ window.CommentBank = (function () {
       fellCount: keys('comp', fell),
       assignment: keys('work', [top]),
       level: keys('work', [top]),
+      bestPiece: keys('work', [top]),
       assignment2: keys('work', [weak]),
       level2: keys('work', [weak]),
       strongWorks: keys('work', best.slice(0, 2)),
@@ -832,6 +906,7 @@ window.CommentBank = (function () {
       _focus: focus || null,
       _note: note || null,
       _facts: factsOf,
+      _bestNote: !!(top && reportNoteText(top.note)),
       name: f.name,
       course: f.course,
       picture: picture,
@@ -863,6 +938,10 @@ window.CommentBank = (function () {
       fellCount: fell.length > 1 ? NUM[fell.length] || String(fell.length) : '',
       assignment: top ? top.title : '',
       level: top ? f.levelText(top.v) : '',
+      // The whole best-piece sentence, with the teacher's note when there is one.
+      bestPiece: top
+        ? bestPieceSentence({ title: top.title, note: top.note, name: f.name, pronouns: p, onFile: f.pronounsOnFile })
+        : '',
       assignment2: weak ? weak.title : '',
       level2: weak ? f.levelText(weak.v) : '',
       strongWorks: list(best.slice(0, 2).map(the)),
@@ -1270,6 +1349,9 @@ window.CommentBank = (function () {
         var used = usedBy(s, comments);
         // Wording written for this kind of class comes before the general.
         if (s.subjects) used -= 0.5;
+        // The teacher wrote a Note for the Report on the best piece: the
+        // sentence that carries it comes first.
+        if (ctx._bestNote && (s.needs || []).indexOf('bestPiece') >= 0) used -= 1;
         // A quotation already in the draft (the same note twice) is out.
         var quotes = t.match(/\u201C[^\u201D]+\u201D/g) || [];
         if (
@@ -1457,6 +1539,22 @@ window.CommentBank = (function () {
     bestPiece: function (pv, f) {
       var top = _maxTenths(f.work, 'v');
       var checks = [];
+      // The whole best-piece sentence: the top piece, said with its note.
+      if (_has(pv, 'bestPiece')) {
+        var bw = _byId(f.work, _ids(pv, 'bestPiece', 'work')[0]);
+        checks.push(
+          !!bw &&
+            tenths(bw.v) === top &&
+            pv.values.bestPiece ===
+              bestPieceSentence({
+                title: bw.title,
+                note: bw.note,
+                name: f.name,
+                pronouns: f.pronouns,
+                onFile: f.pronounsOnFile,
+              }),
+        );
+      }
       ['assignment', 'seeWork'].forEach(function (slot) {
         if (!_has(pv, slot)) return;
         var w = _byId(f.work, _ids(pv, slot, 'work')[0]);
@@ -1753,6 +1851,10 @@ window.CommentBank = (function () {
     gradeOf: gradeOf,
     pictureOf: pictureOf,
     seedFor: seedFor,
+    workTitle: workTitle,
+    reportNoteText: reportNoteText,
+    bestPieceSentence: bestPieceSentence,
+    studentRef: studentRef,
     DRAFT_STEPS: DRAFT_STEPS,
     list: list,
   };

@@ -391,6 +391,27 @@ window.ReportQuestionnaire = (function () {
 
   /* ── At a Glance ─────────────────────────────────────────── */
 
+  /* Under the best piece, when it has no Note for the Report: Add one
+     opens the grader on that piece for this student. */
+  function _reportNoteNudge(best) {
+    if (!best || !best.id || String(best.note || '').trim()) return '';
+    return `<span class="qn-muted qn-note-nudge">No note for the report yet · <button type="button" class="qn-card-link qn-note-add" data-action="tqAddReportNote" data-aid="${esc(best.id)}" title="Opens the grader on this piece. Write one line about what the student did, for the comment.">Add one</button></span>`;
+  }
+
+  /* Add one: the grader on the best piece, this student only. Closing it
+     reads the facts again, so the note shows in the comment's sentence. */
+  function tqAddReportNote(aid) {
+    var st = _current();
+    if (!st || !aid || !window.PageAssignments || !PageAssignments.openGrader) return;
+    PageAssignments.openGrader(_activeCourse, aid, st.id, {
+      studentIds: [st.id],
+      onClose: function () {
+        _facts(st, true);
+        rerender();
+      },
+    });
+  }
+
   /* The highest-marked piece this term; the latest when two tie. */
   function bestPiece(work) {
     var best = null;
@@ -463,7 +484,7 @@ window.ReportQuestionnaire = (function () {
       <div class="qn-band">Work</div>
       <div class="qn-fact qn-best">
         <span class="qn-fact-label">Best piece</span>
-        <div class="qn-fact-body">${best ? `<span>${esc(best.title)} · ${esc(formatLevel(cid, best.v))}</span>` : '<span class="qn-muted">No marked work this term yet</span>'}</div>
+        <div class="qn-fact-body">${best ? `<span>${esc(best.title)} · ${esc(formatLevel(cid, best.v))}</span>${_reportNoteNudge(best)}` : '<span class="qn-muted">No marked work this term yet</span>'}</div>
       </div>
       <div class="qn-fact">
         <span class="qn-fact-label">Not handed in</span>
@@ -951,6 +972,8 @@ window.ReportQuestionnaire = (function () {
      outside a text field (the sidebar handles them while it has the
      focus); Escape closes the sheet. */
   function handleKey(e) {
+    // The grader opened from At a Glance keeps its own keys.
+    if (window.PageAssignments && PageAssignments.graderOpen && PageAssignments.graderOpen()) return;
     if (e.key === 'Escape') {
       if (document.getElementById(INFO_ID)) tqCloseInfo();
       return;
@@ -994,6 +1017,7 @@ window.ReportQuestionnaire = (function () {
     tqCloseInfo: tqCloseInfo,
     tqEditStudent: tqEditStudent,
     tqSetAttendance: tqSetAttendance,
+    tqAddReportNote: tqAddReportNote,
     tqSelectStudent: tqSelectStudent,
     renderTermQuestionnaire: renderTermQuestionnaire,
     afterRender: afterRender,

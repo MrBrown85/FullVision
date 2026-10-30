@@ -7148,6 +7148,19 @@ window.PageAssignments = (function () {
       if (what === 'close') closeGrader();
       else stepFocusStudent(what === 'next' ? 1 : -1);
     });
+    // The Note for the Report: the preview follows each key, the note saves
+    // on Enter or leaving the box (and so before Done, a step or closing).
+    overlay.addEventListener('input', function (e) {
+      if (e.target.classList.contains('grader-report-note-input')) _reportNotePreview(e.target);
+    });
+    overlay.addEventListener('change', function (e) {
+      if (e.target.classList.contains('grader-report-note-input')) _saveReportNote(e.target);
+    });
+    overlay.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter' || !e.target.classList.contains('grader-report-note-input')) return;
+      e.preventDefault();
+      e.target.blur();
+    });
     _addDocListener('click', _handleClick);
     _addDocListener('input', _handleInput);
     _addDocListener('change', _handleChange);
@@ -7258,6 +7271,15 @@ window.PageAssignments = (function () {
         _GRADER_PLUS +
         'Add Comment</button></div>' +
         '<div class="grader-feedback-list"></div>' +
+        '</section>' +
+        '<section class="grader-report-note" aria-labelledby="grader-report-note-title">' +
+        '<div class="grader-report-note-head"><h2 id="grader-report-note-title">Note for the Report</h2>' +
+        '<p>Optional. One line about what the student did, written about them, not to them.</p></div>' +
+        '<div class="grader-report-note-body">' +
+        '<input type="text" class="grader-report-note-input" aria-label="Note for the report" ' +
+        'aria-describedby="grader-report-note-preview" maxlength="300" autocomplete="off">' +
+        '<p class="grader-report-note-preview" id="grader-report-note-preview"></p>' +
+        '</div>' +
         '</section>' +
         '</div>' +
         '<div class="grader-foot">' +
@@ -7444,6 +7466,7 @@ window.PageAssignments = (function () {
       : '<p class="grader-note grader-note-empty">No comments on this assignment yet.</p>';
     // Missing and Excused set the grading controls aside, as the grids do.
     dialog.querySelector('.grader-body').classList.toggle('is-locked', status === 'NS' || status === 'EXC');
+    _refreshReportNote(dialog, cid, a, sid);
     var grade = _graderGrade(cid, a, sid);
     var pill = dialog.querySelector('.grader-grade');
     pill.textContent = grade.text;
@@ -7461,6 +7484,71 @@ window.PageAssignments = (function () {
       }
       levels.innerHTML = _dibelsLevelPillsHtml(cid, a, sid);
     } else if (levels) levels.remove();
+  }
+
+  /* ── Note for the Report ──────────────────────────────────
+     One line about what the student did, for the comment's best-piece
+     sentence (score.report_note). Not on DIBELS or Complete/Incomplete
+     work, which is never a best piece. It is saved with the student's
+     score, so it waits for one. */
+  var _REPORT_NOTE_TITLE =
+    'One line about what the student did. The comment uses it when this is the student\u2019s best piece.';
+  var _REPORT_NOTE_LOCKED_TITLE = 'Score this work first. The note is saved with the score.';
+
+  function _refreshReportNote(dialog, cid, a, sid) {
+    var card = dialog.querySelector('.grader-report-note');
+    if (!card) return;
+    var never = isDibelsScored(a) || isCompletionScored(a);
+    card.hidden = never;
+    if (never) return;
+    var input = card.querySelector('.grader-report-note-input');
+    // The saved note goes in only when the student or work changes: this
+    // runs after every click and key, typing in the box too.
+    if (input.dataset.sid !== sid || input.dataset.aid !== a.id) {
+      input.dataset.sid = sid;
+      input.dataset.aid = a.id;
+      input.value = getScoreReportNote(cid, sid, a.id);
+    }
+    var scored = (getScores(cid)[sid] || []).some(function (e) {
+      return e && e.assessmentId === a.id;
+    });
+    input.disabled = !scored;
+    input.title = scored ? _REPORT_NOTE_TITLE : _REPORT_NOTE_LOCKED_TITLE;
+    _reportNotePreview(input);
+  }
+
+  /* The best-piece sentence this note makes, as the comment would read it
+     (teacher/comment-bank.js), the title's quotes turned single inside the
+     preview's own. */
+  function _reportNotePreview(input) {
+    var cid = activeCourse;
+    var preview = input.parentNode.querySelector('.grader-report-note-preview');
+    var st = getStudents(cid).find(function (x) {
+      return x.id === input.dataset.sid;
+    });
+    var a = getAssessments(cid).find(function (x) {
+      return x.id === input.dataset.aid;
+    });
+    if (!preview || !st || !a) return;
+    var sentence = CommentBank.bestPieceSentence(
+      Object.assign({ title: a.title, note: input.value }, CommentBank.studentRef(st)),
+    )
+      .replace(/\u201C/g, '\u2018')
+      .replace(/\u201D/g, '\u2019');
+    preview.textContent =
+      'When this is the student\u2019s best piece, the comment reads: \u201C' +
+      sentence +
+      '\u201D Start with what the student did, like \u201Clinked \u2026\u201D or \u201Cshowed \u2026\u201D.';
+  }
+
+  function _saveReportNote(input) {
+    var cid = activeCourse;
+    var sid = input.dataset.sid;
+    var aid = input.dataset.aid;
+    if (!cid || !sid || !aid || input.disabled) return;
+    saveScoreReportNote(cid, sid, aid, input.value);
+    input.value = getScoreReportNote(cid, sid, aid);
+    _reportNotePreview(input);
   }
 
   // The assessment's grade for the student, in words, and the colour its

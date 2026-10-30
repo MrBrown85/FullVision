@@ -274,6 +274,7 @@ create table score (
   value         numeric,
   status        text,                                                -- null | 'NS' | 'EXC' | 'LATE' | 'ABS' …
   comment       text,
+  report_note   text        check (report_note is null or char_length(report_note) between 1 and 300), -- Note for the Report: one line about what the student did, for the comment's best-piece sentence; null = none, 1..300 chars (20261031_score_report_note)
   scored_at     timestamptz not null default now(),
   updated_at    timestamptz not null default now(),
   unique (enrollment_id, assessment_id)
@@ -793,6 +794,8 @@ create table phone_report_student (
 --   upsert_score(p_enrollment_id uuid, p_assessment_id uuid, p_value numeric)
 --   set_score_status(p_enrollment_id uuid, p_assessment_id uuid, p_status text)
 --   save_score_comment(p_enrollment_id uuid, p_assessment_id uuid, p_comment text)
+--   save_score_report_note(p_enrollment_id uuid, p_assessment_id uuid, p_note text,
+--                          p_idempotency_key uuid)   -- (20261031) null or blank clears; makes the score row when there is none
 --   upsert_tag_score(p_enrollment_id uuid, p_assessment_id uuid, p_tag_id uuid,
 --                    p_value integer, p_modifier smallint default 0, p_comment text default null)
 --   upsert_rubric_score(p_enrollment_id uuid, p_assessment_id uuid, p_criterion_id uuid,
@@ -903,7 +906,7 @@ create table phone_report_student (
 -- Reads (hot path):
 --   list_teacher_courses()                                             -- includes block (20261020_course_block)
 --   get_gradebook(p_course_id uuid)                                    -- the single boot-path RPC
---   get_class_bundle(p_course_id uuid, p_if_version bigint)            -- one class in one call; includes observation_templates and withdrawn_students (20261019)
+--   get_class_bundle(p_course_id uuid, p_if_version bigint)            -- one class in one call; includes observation_templates and withdrawn_students (20261019); score_rows carry report_note as a 7th element (20261031)
 --   get_class_dashboard(p_course_id uuid)
 --   get_student_profile(p_enrollment_id uuid)
 --   list_course_student_profiles(p_course_id uuid)

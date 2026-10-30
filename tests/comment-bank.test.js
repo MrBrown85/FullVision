@@ -63,14 +63,15 @@ function fullContext(p, habits) {
     growthHabitNames: 'taking part in class',
     absent: '4',
     late: '2',
+    bestPiece: 'Her best piece was “Energy Lab”, where she measured every trial.',
   };
 }
 
 describe('the bank', () => {
-  it('has 439 sentences in four parts, each with a unique id', () => {
-    expect(COMMENT_BANK.sentences).toHaveLength(439);
+  it('has 440 sentences in four parts, each with a unique id', () => {
+    expect(COMMENT_BANK.sentences).toHaveLength(440);
     expect(COMMENT_BANK.parts.map(p => p.id)).toEqual(['habits', 'now', 'go', 'how']);
-    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(439);
+    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(440);
   });
 
   it('has wording for every kind of class, and keeps handed-in work out of PE and Arts', () => {
@@ -148,6 +149,7 @@ describe('the bank', () => {
       assignment: 'bestPiece',
       level: 'bestPiece',
       strongWorks: 'bestPiece',
+      bestPiece: 'bestPiece',
       assignment2: 'weakPiece',
       level2: 'weakPiece',
       weakWorks: 'weakPiece',
@@ -478,18 +480,18 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     return CommentBank.context(CommentBank.facts(cid, st, 'term-2'), {});
   };
 
-  it('knows the Demo class is Science from its name, and offers Cece 101 sentences (9, 47, 19, 26)', () => {
+  it('knows the Demo class is Science from its name, and offers Cece 102 sentences (9, 48, 19, 26)', () => {
     expect(CommentBank.familyOf(cid)).toBe('science');
     const ctx = ctxFor('Cece');
     expect(ctx._family).toBe('science');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 47, 19, 26]);
-    expect(CommentBank.fitCount(ctx)).toBe(101);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 48, 19, 26]);
+    expect(CommentBank.fitCount(ctx)).toBe(102);
   });
 
-  it('offers Jasper 88 (9, 40, 15, 24), by the name he goes by', () => {
+  it('offers Jasper 89 (9, 41, 15, 24), by the name he goes by', () => {
     const ctx = ctxFor('Jasper');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 40, 15, 24]);
-    expect(CommentBank.fitCount(ctx)).toBe(88);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 41, 15, 24]);
+    expect(CommentBank.fitCount(ctx)).toBe(89);
     expect(ctx.name).toBe('Jas');
     expect(ctx.fellCount).toBe('four');
   });

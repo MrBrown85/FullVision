@@ -796,6 +796,18 @@ var COMMENT_BANK = {
       src: '975',
     },
     {
+      id: 'n36',
+      part: 'now',
+      group: 'Examples From Work',
+      // The plan's best-piece sentence, built whole in context(): "Her best
+      // piece was “{title}”, where she {note}." with the teacher's Note for
+      // the Report, "Her best piece was “{title}.”" without one.
+      text: '{bestPiece}',
+      needs: ['bestPiece'],
+      claims: ['bestPiece'],
+      src: 'new',
+    },
+    {
       id: 'n34',
       part: 'now',
       group: 'Examples From Work',
