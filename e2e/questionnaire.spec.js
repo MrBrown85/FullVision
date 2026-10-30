@@ -181,13 +181,16 @@ test('Generate Comment drafts from the bank; the box grows, the count follows, â
   await page.keyboard.press('ControlOrMeta+z');
   await expect(box).toHaveValue(before);
   // Every student in the class gets a draft with no slot left unfilled. The
-  // Demo class has no closing sentence or support lines set (plan PR 8).
+  // Demo class has no closing sentence or support lines set (plan PR 8), no
+  // habit ratings and nothing labelled Missing, and no student passes the
+  // strongest gate (PR 6), so a draft can be four sentences: grade, best
+  // piece, next step and the family line.
   const bad = await page.evaluate(() =>
     ReportQuestionnaire.getTqStudents()
       .map(st => {
         const ctx = CommentBank.context(CommentBank.facts('sci8', st, 'term-2'), {});
         const d = CommentBank.draft(ctx, { seed: CommentBank.seedFor(st.id) });
-        return d.ids.length < 5 || /[{}[\]]/.test(d.text) ? st.firstName : null;
+        return d.ids.length < 4 || /[{}[\]]/.test(d.text) ? st.firstName : null;
       })
       .filter(Boolean),
   );
