@@ -1013,7 +1013,7 @@ window.PageReports = (function () {
     // Heights follow each placed block's options and lines; a move or a
     // size change keeps them.
     if (before && _optionsOf(before) !== _optionsOf(reportConfig.form)) _blockSizes = null;
-    saveReportConfig(activeCourse, reportConfig);
+    _saveReportConfig();
     if (studioSelected && !ReportSheets.locate(reportConfig.form, studioSelected)) studioSelected = null;
     _classFitKey = '';
     renderStudioPanels();
@@ -1064,7 +1064,7 @@ window.PageReports = (function () {
     if (mode !== 'grade' && mode !== 'build') return;
     if (reportConfig.progressMode === mode) return;
     reportConfig.progressMode = mode;
-    saveReportConfig(activeCourse, reportConfig);
+    _saveReportConfig();
     studioSelected = null;
     _classFitKey = '';
     previewAuto = true;
@@ -1074,7 +1074,7 @@ window.PageReports = (function () {
   function _setGradeOption(key, value) {
     reportConfig.gradeReport = Object.assign({}, _gradeOpts());
     reportConfig.gradeReport[key] = value;
-    saveReportConfig(activeCourse, reportConfig);
+    _saveReportConfig();
     _classFitKey = '';
     renderStudioPanels();
     renderReportPreview();
@@ -1236,6 +1236,17 @@ window.PageReports = (function () {
       order('newest', 'Newest First') +
       '</div></div>'
     );
+  }
+
+  /* Saves this page's copy of the report settings, with the comment
+     settings the Term Questionnaire saved since the page loaded it (its
+     support lines, closing sentence and character limit), so a change here
+     never puts back older ones. */
+  function _saveReportConfig() {
+    var saved = (typeof getReportConfig === 'function' && getReportConfig(activeCourse)) || {};
+    if (saved.commentSettings) reportConfig.commentSettings = saved.commentSettings;
+    else delete reportConfig.commentSettings;
+    saveReportConfig(activeCourse, reportConfig);
   }
 
   function _loadReportConfig(cid) {
@@ -1724,6 +1735,8 @@ window.PageReports = (function () {
 
     // A click outside the IE deadline calendar closes it.
     if (RQ.deadlineOpen() && !e.target.closest('#tq-cal, #tq-deadline-btn')) RQ.tqCloseDeadline();
+    // And outside the Support Line menu or the character limit.
+    if (RQ.linesOpen()) RQ.clickOutside(e.target);
 
     var el = e.target.closest('[data-action]');
     if (!el) return;
@@ -1747,6 +1760,10 @@ window.PageReports = (function () {
       },
       tqAddReportNote: function () {
         RQ.tqAddReportNote(el.dataset.aid);
+      },
+      // The class's lines on the Sentences card and the character limit.
+      tqLine: function () {
+        RQ.tqLine(el.dataset.do, el);
       },
       toggleStudentPicker: function () {
         toggleStudentPicker(e);
@@ -1994,6 +2011,11 @@ window.PageReports = (function () {
     // The questionnaire's attendance boxes save when they change.
     if (el.dataset.tqAtt) {
       RQ.tqSetAttendance(el.dataset.sid);
+      return;
+    }
+    // A support line ticked, or the character limit typed.
+    if (el.dataset.tqSupport || el.dataset.tqLimit) {
+      RQ.tqLineChange(el);
       return;
     }
     // "I checked this" on an IE comment's missing-work row.

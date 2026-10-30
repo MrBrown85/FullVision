@@ -167,6 +167,45 @@ window.ReportQuestionnaire = (function () {
     var el = _box();
     var out = document.getElementById('tq-count');
     if (el && out) out.textContent = _countText(el.value);
+    var btn = document.getElementById('tq-count-btn');
+    if (el && btn) btn.classList.toggle('over', _overLimit(el.value));
+    syncApprove();
+  }
+
+  /* ── The character limit (plan PR 8) ─────────────────────── */
+
+  /* The class's character limit, or null for no limit. */
+  function _limit() {
+    return CommentBank.classSettings(_activeCourse).charLimit;
+  }
+  function _overLimit(text) {
+    var lim = _limit();
+    return !!lim && String(text || '').length > lim;
+  }
+  /* "· no limit" or "· limit 1000" after the count. */
+  function _limitText() {
+    var lim = _limit();
+    return lim ? ' · limit ' + lim : ' · no limit';
+  }
+  var _limitOpen = false;
+  /* The count as a button that opens the limit, and the limit's popover. */
+  function _countHtml(cid, text) {
+    var course = _courseName(cid);
+    var pop = _limitOpen
+      ? `<div class="qn-limit" role="dialog" aria-label="Character limit" id="tq-limit">
+          <label class="qn-limit-field">Character limit for ${esc(course)}<input type="number" min="1" step="1" inputmode="numeric" placeholder="No limit" aria-label="Character limit" data-tq-limit="1" id="tq-limit-input" title="Leave it empty for no limit." value="${_limit() || ''}"></label>
+          <span class="qn-limit-hint">The longest comment your school’s report card allows. Approve stays off past it.</span>
+        </div>`
+      : '';
+    return `<span class="qn-count-wrap"><button type="button" class="qn-count-btn${_overLimit(text) ? ' over' : ''}" id="tq-count-btn" data-action="tqLine" data-do="limitMenu" aria-haspopup="dialog" aria-expanded="${_limitOpen}" title="The comment’s length. Click to set the longest comment ${esc(course)} allows."><span class="qn-count-text" id="tq-count">${esc(_countText(text))}</span><span id="tq-limit-text">${esc(_limitText())}</span> ▾</button>${pop}</span>`;
+  }
+  /* A limit typed: saved for the class (empty: no limit). */
+  function _setLimit(value) {
+    var n = Math.floor(Number(value));
+    _saveSettings({ charLimit: value !== '' && n > 0 ? n : null });
+    var t = document.getElementById('tq-limit-text');
+    if (t) t.textContent = _limitText();
+    _syncCount();
   }
 
   /* Copy: the comment as plain text, ready to paste (⌘⇧C too). */
@@ -494,32 +533,17 @@ window.ReportQuestionnaire = (function () {
 
   /* Strongest: the competencies past the comment's "strongest" evidence
      gate (CommentBank.strongestOf), so the tag and the comment agree; Next
-     step: the lowest, when it is below the highest. */
+     step: the competency the comment's next step names
+     (CommentBank.nextStepOf), the lowest with 3+ scored pieces. */
   function skillTags(comps) {
     var list = (comps || []).filter(function (c) {
       return c.level > 0;
     });
-    if (list.length < 2) return {};
-    var max = Math.max.apply(
-      null,
-      list.map(function (c) {
-        return c.level;
-      }),
-    );
-    var min = Math.min.apply(
-      null,
-      list.map(function (c) {
-        return c.level;
-      }),
-    );
     var out = {};
-    if (max === min) return out;
     CommentBank.strongestOf(list).forEach(function (c) {
       out[c.id] = 'Strongest';
     });
-    var low = list.find(function (c) {
-      return c.level === min;
-    });
+    var low = CommentBank.nextStepOf(list);
     if (low) out[low.id] = 'Next step';
     return out;
   }
@@ -905,6 +929,9 @@ window.ReportQuestionnaire = (function () {
   // it), so choosing IE or goals can redraw a draft the teacher has not
   // edited, and a habit rating can redraw its habits sentence.
   var _lastDraft = {};
+  // And the seed it was drafted with, so a class line's change can draft it
+  // again with only that line different.
+  var _lastSeed = {};
   function tqGenerate() {
     var st = _current();
     var el = _box();
@@ -933,6 +960,7 @@ window.ReportQuestionnaire = (function () {
     }
     if (!ok || el.value !== d.text) el.value = d.text;
     _lastDraft[_activeCourse + '|' + st.id + '|' + termId] = d;
+    _lastSeed[_activeCourse + '|' + st.id + '|' + termId] = d.seed;
     tqNarrativeDirty = true;
     tqSaveNarrative();
     _syncNote();
@@ -980,7 +1008,7 @@ window.ReportQuestionnaire = (function () {
     if (thisTab) {
       body = `<textarea id="tq-narrative" class="qn-text" rows="1" spellcheck="true" aria-label="Teacher Comment" data-cid="${esc(cid)}" data-sid="${esc(sid)}" data-term="${esc(termId)}">${esc(text)}</textarea>
         <div class="qn-comment-foot">
-          <span class="qn-count-text" id="tq-count">${esc(_countText(text))}</span>
+          ${_countHtml(cid, text)}
           <button type="button" class="qn-copy" data-action="tqCopyNarrative" id="tq-copy-btn" title="Copies the comment as plain text, ready to paste. ⌘⇧C">${COPY_ICON}<span class="qn-copy-label">Copy</span></button>
         </div>`;
     } else {
@@ -1155,11 +1183,19 @@ window.ReportQuestionnaire = (function () {
     if (!st) return [];
     var f = _facts(st);
     var out = [];
-    if (CommentBank.reportPath(f) !== 'ie') return out;
-    if (!f.grade.ieDeadline) out.push('deadline');
-    _checksFor(f).forEach(function (id) {
-      if (!_checked[_checkKey(st.id, id)]) out.push(id);
-    });
+    if (CommentBank.reportPath(f) === 'ie') {
+      if (!f.grade.ieDeadline) out.push('deadline');
+      _checksFor(f).forEach(function (id) {
+        if (!_checked[_checkKey(st.id, id)]) out.push(id);
+      });
+    }
+    // Past the class's character limit (plan PR 8).
+    var el = _box();
+    var text =
+      el && el.dataset.sid === String(st.id)
+        ? el.value
+        : plainComment((getStudentTermRating(_activeCourse, st.id, getTermId()) || {}).narrative || '');
+    if (_overLimit(text.replace(/\s+$/, ''))) out.push('limit');
     return out;
   }
 
@@ -1170,18 +1206,19 @@ window.ReportQuestionnaire = (function () {
     var blocked = approveBlockers(_current());
     var date = blocked.indexOf('deadline') >= 0;
     var tick = blocked.some(function (b) {
-      return b !== 'deadline';
+      return b !== 'deadline' && b !== 'limit';
     });
-    btn.disabled = blocked.length > 0;
-    btn.title =
-      APPROVE_TIP +
-      (date && tick
+    var tail =
+      date && tick
         ? ' Pick the deadline and tick “I checked this” first.'
         : date
           ? ' Pick the deadline first.'
           : tick
             ? ' Tick “I checked this” first.'
-            : ' ⌘ Return');
+            : '';
+    if (blocked.indexOf('limit') >= 0) tail += ' Shorten the comment to ' + _limit() + ' characters first.';
+    btn.disabled = blocked.length > 0;
+    btn.title = APPROVE_TIP + (tail || ' ⌘ Return');
   }
 
   /* ── The deadline calendar ───────────────────────────────── */
@@ -1390,7 +1427,7 @@ window.ReportQuestionnaire = (function () {
      card: the part, Required, the sentence, where it comes from, and on the
      IE path "I checked this" on the missing-work row and Pick a Date on the
      deadline row. Nothing on the grade path. */
-  function _requiredHtml(cid, student, f) {
+  function _requiredRows(cid, student, f) {
     var path = CommentBank.reportPath(f);
     if (!path) return '';
     var parts = CommentBank.requiredParts(_bankContext(cid, student, f));
@@ -1414,22 +1451,487 @@ window.ReportQuestionnaire = (function () {
         </div>`;
       })
       .join('');
-    var hint =
-      path === 'ie'
+    return rows;
+  }
+
+  /* The Sentences card: an IE or goals comment's Required rows, then the
+     rows for the class's lines (plan PR 8): Not Handed In with the
+     late-work line, Support and Closing. PR 11b adds a row per sentence. */
+  function _sentencesHtml(cid, student, f) {
+    var path = CommentBank.reportPath(f);
+    var hint = !path
+      ? ''
+      : path === 'ie'
         ? 'An IE comment needs every part marked Required.'
         : 'The grade sentence is replaced by the required statement.';
-    return `<div class="qn-card qn-required" id="tq-required">
-      <div class="qn-req-top"><span class="qn-card-title">Sentences</span><span class="qn-sub">${esc(hint)}</span></div>
-      ${rows}
+    return `<div class="qn-card qn-sentences${path ? ' qn-required' : ''}" id="tq-sentences">
+      <div class="qn-req-top"><span class="qn-card-title">Sentences</span>${hint ? `<span class="qn-sub">${esc(hint)}</span>` : ''}</div>
+      ${_requiredRows(cid, student, f)}
+      ${_classRowsHtml(cid, student, f)}
     </div>`;
   }
 
   /* The card redrawn in place (the calendar opened or moved a month). */
   function _syncRequired() {
     var st = _current();
-    var card = document.getElementById('tq-required');
+    var card = document.getElementById('tq-sentences');
     if (!st || !card) return;
-    card.outerHTML = _requiredHtml(_activeCourse, st, _facts(st));
+    card.outerHTML = _sentencesHtml(_activeCourse, st, _facts(st));
+  }
+
+  /* ── The class's lines (plan PR 8) ───────────────────────── */
+
+  /* Each class line is edited where it shows, and saved with the class's
+     report settings (report_config, under commentSettings); the late-work
+     line is the class's Late Work Policy (course.late_work_policy, as Class
+     Management edits it). Teacher text is used exactly as typed. */
+  var _lineEdit = null; // 'closing', 'late' or 'own' while its box is open
+  var _supportMenu = false;
+
+  function _courseName(cid) {
+    return (typeof COURSES !== 'undefined' && COURSES[cid] && COURSES[cid].name) || 'this class';
+  }
+
+  /* Merges a patch into the class's comment settings and saves the report
+     settings, as Progress Reports saves them. */
+  function _saveSettings(patch) {
+    var rc = Object.assign({}, (typeof getReportConfig === 'function' && getReportConfig(_activeCourse)) || {});
+    rc.commentSettings = Object.assign({}, rc.commentSettings || {}, patch);
+    saveReportConfig(_activeCourse, rc);
+  }
+
+  function _first(student) {
+    return student.firstName || displayNameFirst(student);
+  }
+
+  /* "2 of 28 · check that both are really missing before you approve". */
+  function _missingSource(f) {
+    var n = (f.notHandedIn && f.notHandedIn.count) || 0;
+    var total = (f.record && f.record.total) || n;
+    var which = n === 1 ? 'it is' : n === 2 ? 'both are' : 'these are';
+    return n + ' of ' + total + ' · check that ' + which + ' really missing before you approve';
+  }
+
+  function _missingRowHtml(cid, f) {
+    var course = _courseName(cid);
+    var late = String((COURSES[cid] && COURSES[cid].lateWorkPolicy) || '').trim();
+    var sentence = CommentBank.notHandedInSentence(f.notHandedIn);
+    var line;
+    if (_lineEdit === 'late') {
+      line = `<div class="qn-line-edit">
+          <input type="text" class="qn-line-input" id="tq-line-late" data-tq-line-input="late" aria-label="Late work line for ${esc(course)}" title="Used exactly as you type it, after the missing-work sentence." value="${esc(late)}">
+          <button type="button" class="qn-line-save" data-action="tqLine" data-do="saveLate" title="Saves this as ${esc(course)}’s Late Work Policy.">Save for Class</button>
+        </div>
+        <span class="qn-req-source">This is the class’s Late Work Policy. It follows the missing-work sentence for every student who has some.</span>`;
+    } else if (late) {
+      line = '';
+    } else {
+      line = `<span class="qn-line-empty-row"><span class="qn-line-empty">No late work line for this class.</span><button type="button" class="qn-line-choose" data-action="tqLine" data-do="editLate" title="Write the line that follows the missing-work sentence. It is ${esc(course)}’s Late Work Policy.">Add One…</button></span>`;
+    }
+    var lateBtn =
+      late && _lineEdit !== 'late'
+        ? ` <button type="button" class="qn-line-text" data-action="tqLine" data-do="editLate" title="Change ${esc(course)}’s late-work line. It is the class’s Late Work Policy.">${esc(late)}</button>`
+        : '';
+    return `<div class="qn-req-row flag qn-line-row" id="tq-row-missing">
+      <div class="qn-req-part"><span class="qn-req-label">Not Handed In</span></div>
+      <div class="qn-req-body">
+        <span class="qn-req-text">${esc(sentence)}${lateBtn}</span>
+        ${line}
+        <span class="qn-req-source">${esc(_missingSource(f))}</span>
+      </div>
+    </div>`;
+  }
+
+  /* What a support line fits, in words: the fit for this student, else the
+     first skill or habit it names that this class has. */
+  function _fitWords(line, f, fit) {
+    if (fit) return CommentBank.fitName(fit, f);
+    for (var i = 0; i < line.fits.length; i++) {
+      var n = CommentBank.fitName(line.fits[i], f);
+      if (n) return n;
+    }
+    return '';
+  }
+
+  function _supportMenuHtml(cid, student, f, choice) {
+    var course = _courseName(cid);
+    var first = _first(student);
+    var habits = CommentBank.effectiveHabits(
+      (getStudentTermRating(cid, student.id, getTermId()) || {}).habits || f.habits,
+      f.record,
+    );
+    var lines = CommentBank.supportChecklist(cid, f.family);
+    var on = lines.filter(function (l) {
+      return l.on;
+    });
+    var left = f.classLines && f.classLines.pick === 'none';
+    var item = function (id, text, meta, checked, tip) {
+      return `<button type="button" role="menuitemradio" aria-checked="${checked}" class="qn-menu-item${checked ? ' on' : ''}" data-action="tqLine" data-do="pickSupport" data-line="${esc(id)}" title="${esc(tip)}"><span class="qn-menu-mark" aria-hidden="true">${checked ? '✓' : ''}</span><span class="qn-menu-body"><span class="qn-menu-text">${esc(text)}</span>${meta ? `<span class="qn-menu-meta">${esc(meta)}</span>` : ''}</span></button>`;
+    };
+    var use = on
+      .map(function (l) {
+        var inUse = !left && !!choice && choice.line.id === l.id;
+        var fit = CommentBank.supportFit(l, f, habits);
+        var words = _fitWords(l, f, fit);
+        // In use: what it fits for this student, when it does; else what
+        // the line is for.
+        var meta = inUse ? 'In use' + (fit ? ' · fits ' + words : '') : words ? 'Fits ' + words : '';
+        return item(l.id, l.text, meta, inUse, 'Use this line in ' + first + '’s comment.');
+      })
+      .join('');
+    var useHtml = on.length
+      ? `<span class="qn-menu-head">Use for ${esc(first)}</span>${use}${item('none', 'Leave this sentence out', 'For ' + first + ' only', left, 'Leaves the support line out of ' + first + '’s comment only.')}<div class="qn-menu-sep" role="separator"></div>`
+      : '';
+    var checks = lines
+      .map(function (l) {
+        return `<label class="qn-menu-check" title="${esc(l.on ? 'Untick to stop using this line in ' + course + '.' : 'Tick if you will do this in ' + course + '.')}"><input type="checkbox" data-tq-support="${esc(l.id)}"${l.on ? ' checked' : ''}>${esc(l.text)}</label>`;
+      })
+      .join('');
+    var own =
+      _lineEdit === 'own'
+        ? `<div class="qn-line-edit qn-menu-own">
+            <input type="text" class="qn-line-input" id="tq-line-own" data-tq-line-input="own" aria-label="Your own support line for ${esc(course)}" title="Write what you will do in class. It is used exactly as you type it.">
+            <div class="qn-line-actions"><button type="button" class="qn-line-cancel" data-action="tqLine" data-do="cancel" title="Closes without adding a line.">Cancel</button><button type="button" class="qn-line-save" data-action="tqLine" data-do="saveOwn" title="Adds this line to ${esc(course)}’s list and ticks it.">Save for Class</button></div>
+          </div>`
+        : `<button type="button" class="qn-menu-add" data-action="tqLine" data-do="writeOwn" title="Write a support line of your own for ${esc(course)}.">+ Write Your Own</button>`;
+    return `<div class="qn-menu" role="menu" aria-label="Support lines for ${esc(course)}" id="tq-support-menu">
+      ${useHtml}
+      <span class="qn-menu-head">Lines you will do in ${esc(course)}</span>
+      ${checks}
+      ${own}
+    </div>`;
+  }
+
+  function _supportRowHtml(cid, student, f) {
+    var course = _courseName(cid);
+    var first = _first(student);
+    var habits = CommentBank.effectiveHabits(
+      (getStudentTermRating(cid, student.id, getTermId()) || {}).habits || f.habits,
+      f.record,
+    );
+    var any = ((f.classLines && f.classLines.support) || []).length > 0;
+    var choice = CommentBank.supportChoice(f, habits);
+    var menu = _supportMenu ? _supportMenuHtml(cid, student, f, choice) : '';
+    var open = ` aria-haspopup="menu" aria-expanded="${_supportMenu}"`;
+    if (!any)
+      return `<div class="qn-req-row qn-line-row has-menu" id="tq-row-support">
+        <div class="qn-req-part"><span class="qn-req-label">Support</span></div>
+        <span class="qn-line-empty">No support lines chosen for this class. The comment leaves this sentence out.</span>
+        <button type="button" class="qn-line-choose" data-action="tqLine" data-do="supportMenu"${open} title="Tick the support lines you will do in ${esc(course)}.">Choose…</button>
+        ${menu}
+      </div>`;
+    var body = choice
+      ? `<span class="qn-req-text">${esc(choice.line.text)}</span><span class="qn-req-source">One of your support lines for ${esc(course)}</span>`
+      : `<span class="qn-req-text qn-line-off">Left out of this comment.</span><span class="qn-req-source">For ${esc(first)} only</span>`;
+    return `<div class="qn-req-row qn-line-row has-menu" id="tq-row-support">
+      <div class="qn-req-part"><span class="qn-req-label">Support</span></div>
+      <div class="qn-req-body">${body}</div>
+      <button type="button" class="qn-line-menu${_supportMenu ? ' on' : ''}" data-action="tqLine" data-do="supportMenu"${open} title="Pick the support line for ${esc(first)}, or tick the lines you will do in ${esc(course)}.">Support Line ▾</button>
+      ${menu}
+    </div>`;
+  }
+
+  function _closingRowHtml(cid) {
+    var course = _courseName(cid);
+    var closing = CommentBank.classSettings(cid).closing;
+    if (_lineEdit === 'closing')
+      return `<div class="qn-req-row qn-line-row" id="tq-row-closing">
+        <div class="qn-req-part"><span class="qn-req-label">Closing</span></div>
+        <div class="qn-req-body qn-line-edit-body">
+          <input type="text" class="qn-line-input" id="tq-line-closing" data-tq-line-input="closing" aria-label="Closing sentence for ${esc(course)}" title="Used exactly as you type it, at the end of each new comment." value="${esc(closing)}">
+          <span class="qn-req-source">Ends every new comment in ${esc(course)}. Approved comments are flagged so you can update or keep each one. Leave it empty to end without one.</span>
+          <div class="qn-line-actions"><button type="button" class="qn-line-cancel" data-action="tqLine" data-do="cancel" title="Keeps the closing sentence as it was.">Cancel</button><button type="button" class="qn-line-save" data-action="tqLine" data-do="saveClosing" title="Saves this closing sentence for every comment in ${esc(course)}.">Save for Class</button></div>
+        </div>
+      </div>`;
+    if (!closing)
+      return `<div class="qn-req-row qn-line-row" id="tq-row-closing">
+        <div class="qn-req-part"><span class="qn-req-label">Closing</span></div>
+        <span class="qn-line-empty">No closing sentence for this class.</span>
+        <button type="button" class="qn-line-choose" data-action="tqLine" data-do="editClosing" title="Write a sentence to end every comment in ${esc(course)}.">Add One…</button>
+      </div>`;
+    return `<div class="qn-req-row qn-line-row" id="tq-row-closing">
+      <div class="qn-req-part"><span class="qn-req-label">Closing</span></div>
+      <div class="qn-req-body">
+        <button type="button" class="qn-line-text qn-req-text" data-action="tqLine" data-do="editClosing" title="Change the closing sentence for ${esc(course)}.">${esc(closing)}</button>
+        <span class="qn-req-source">From your class settings</span>
+      </div>
+    </div>`;
+  }
+
+  /* The rows for the class's lines, in the comment's order. An IE comment
+     states its own problem and plan, so it has only the closing row. */
+  function _classRowsHtml(cid, student, f) {
+    var ie = CommentBank.reportPath(f) === 'ie';
+    var rows = '';
+    if (!ie && f.notHandedIn && f.notHandedIn.count > 0) rows += _missingRowHtml(cid, f);
+    if (!ie) rows += _supportRowHtml(cid, student, f);
+    return rows + _closingRowHtml(cid);
+  }
+
+  /* After a class line changes: the comment on screen, when it is still
+     the draft Generate wrote, is drafted again with the same seed, so only
+     the class's lines differ; otherwise the old line is swapped for the new
+     where it appears (taken out when the new is empty). With `everyone`,
+     every other comment this report not yet approved gets the same swap.
+     An approved comment is never rewritten (Decision 1; PR 12 flags it). */
+  function _swapLine(oldText, newText, everyone) {
+    var st = _current();
+    var termId = getTermId();
+    var swap = function (text) {
+      if (!oldText || text.indexOf(oldText) < 0) return null;
+      if (newText) return text.replace(oldText, newText);
+      return text
+        .replace(oldText, '')
+        .replace(/[ \t]{2,}/g, ' ')
+        .trim();
+    };
+    var all = getTermRatings(_activeCourse) || {};
+    var sids = everyone ? Object.keys(all) : st ? [String(st.id)] : [];
+    sids.forEach(function (sid) {
+      var r = (all[sid] || {})[termId];
+      if (!r || r.approvedAt) return;
+      var key = _activeCourse + '|' + sid + '|' + termId;
+      var text = plainComment(r.narrative || '');
+      var last = _lastDraft[key];
+      if (st && String(st.id) === sid && text && last && text.trim() === last.text.trim()) {
+        _redraft(st);
+        return;
+      }
+      var next = swap(text);
+      if (next == null || next === text) return;
+      upsertTermRating(_activeCourse, sid, termId, { narrative: next });
+      if (last) {
+        last.text = swap(last.text) || last.text;
+        last.sentences = last.sentences
+          .map(function (x) {
+            return x.text === oldText ? Object.assign({}, x, { text: newText }) : x;
+          })
+          .filter(function (x) {
+            return x.text;
+          });
+      }
+    });
+  }
+
+  /* The draft on screen again, with the seed it was drafted with. */
+  function _redraft(st) {
+    var termId = getTermId();
+    var key = _activeCourse + '|' + st.id + '|' + termId;
+    _facts(st, true);
+    var d = CommentBank.draft(_bankContext(_activeCourse, st, _facts(st)), {
+      seed: _lastSeed[key] || CommentBank.seedFor(st.id + '|' + termId) + (_generated[st.id] || 1),
+      comments: _classmateComments(_activeCourse, st.id, termId),
+      exclude: [],
+    });
+    if (!d.text) return;
+    upsertTermRating(_activeCourse, st.id, termId, { narrative: d.text });
+    _lastDraft[key] = d;
+    _lastSeed[key] = d.seed;
+  }
+
+  /* The text in a line's box. */
+  function _lineValue(which) {
+    var el = document.getElementById('tq-line-' + which);
+    return el ? String(el.value || '').trim() : '';
+  }
+
+  function _redrawLines(focusId) {
+    var st = _current();
+    if (st) _facts(st, true);
+    rerender();
+    var el = focusId && document.getElementById(focusId);
+    if (el) el.focus();
+  }
+
+  /* The class lines' controls: data-action="tqLine" with data-do. */
+  function tqLine(what, el) {
+    var st = _current();
+    if (!st) return;
+    tqSaveCurrentIfNeeded();
+    var termId = getTermId();
+    var cs = CommentBank.classSettings(_activeCourse);
+    // The lines as the comment had them, before a save changes one.
+    var before = /^save|^pick/.test(what) ? _bankContext(_activeCourse, st, _facts(st, true)) : null;
+    switch (what) {
+      case 'limitMenu':
+        _limitOpen = !_limitOpen;
+        _supportMenu = false;
+        _redrawLines(_limitOpen ? 'tq-limit-input' : 'tq-count-btn');
+        return;
+      case 'supportMenu':
+        _supportMenu = !_supportMenu;
+        _limitOpen = false;
+        if (_lineEdit === 'own') _lineEdit = null;
+        _redrawLines(_supportMenu ? null : 'tq-row-support');
+        _focusMenu();
+        return;
+      case 'pickSupport': {
+        var picks = Object.assign({}, cs.supportFor);
+        picks[termId] = Object.assign({}, picks[termId] || {});
+        picks[termId][st.id] = el && el.dataset.line ? String(el.dataset.line) : null;
+        _saveSettings({ supportFor: picks });
+        _supportMenu = false;
+        _afterLine(before, 'supportLine', false);
+        _redrawLines(null);
+        _focusSel('#tq-row-support .qn-line-menu');
+        return;
+      }
+      case 'writeOwn':
+        _lineEdit = 'own';
+        _redrawLines('tq-line-own');
+        return;
+      case 'saveOwn': {
+        var text = _lineValue('own');
+        if (!text) return;
+        var id = 'own-' + Date.now().toString(36);
+        _saveSettings({
+          supportOwn: cs.supportOwn.concat([{ id: id, text: text }]),
+          supportChosen: cs.supportChosen.concat([id]),
+        });
+        _lineEdit = null;
+        _afterLine(before, 'supportLine', false);
+        _redrawLines(null);
+        _focusSel('#tq-support-menu .qn-menu-add');
+        return;
+      }
+      case 'editClosing':
+        _lineEdit = 'closing';
+        _supportMenu = false;
+        _redrawLines('tq-line-closing');
+        return;
+      case 'saveClosing':
+        _saveSettings({ closing: _lineValue('closing') });
+        _lineEdit = null;
+        _afterLine(before, 'closingLine', true);
+        _redrawLines(null);
+        _focusSel('#tq-row-closing button');
+        return;
+      case 'editLate':
+        _lineEdit = 'late';
+        _supportMenu = false;
+        _redrawLines('tq-line-late');
+        return;
+      case 'saveLate': {
+        var late = _lineValue('late');
+        if (late !== String((COURSES[_activeCourse] && COURSES[_activeCourse].lateWorkPolicy) || '').trim())
+          updateCourse(_activeCourse, { lateWorkPolicy: late || null });
+        _lineEdit = null;
+        _afterLine(before, 'lateLine', true);
+        _redrawLines(null);
+        _focusSel('#tq-row-missing button');
+        return;
+      }
+      case 'cancel': {
+        var was = _lineEdit;
+        _lineEdit = null;
+        _redrawLines(null);
+        _focusSel(
+          was === 'own' ? '#tq-support-menu .qn-menu-add' : was === 'closing' ? '#tq-row-closing button' : null,
+        );
+        return;
+      }
+    }
+  }
+
+  /* After a save: the line as it was against the line now, in the comment
+     on screen (and, for a class-wide line, the others not yet approved). */
+  function _afterLine(before, slot, everyone) {
+    var st = _current();
+    if (!st || !before) return;
+    var after = _bankContext(_activeCourse, st, _facts(st, true));
+    if (before[slot] !== after[slot]) _swapLine(before[slot], after[slot], everyone);
+  }
+
+  /* A checkbox in the support list, or the character limit, changed. */
+  function tqLineChange(el) {
+    if (!el || !el.dataset) return;
+    if (el.dataset.tqLimit) {
+      _setLimit(el.value);
+      return;
+    }
+    var id = el.dataset.tqSupport;
+    if (!id) return;
+    var st = _current();
+    if (!st) return;
+    tqSaveCurrentIfNeeded();
+    var before = _bankContext(_activeCourse, st, _facts(st, true));
+    var chosen = CommentBank.classSettings(_activeCourse).supportChosen.filter(function (x) {
+      return x !== id;
+    });
+    if (el.checked) chosen.push(id);
+    _saveSettings({ supportChosen: chosen });
+    _afterLine(before, 'supportLine', false);
+    _redrawLines(null);
+    _focusSel('#tq-support-menu [data-tq-support="' + id + '"]');
+  }
+
+  function _focusSel(sel) {
+    var el = sel && document.querySelector(sel);
+    if (el) el.focus();
+  }
+  function _focusMenu() {
+    _focusSel('#tq-support-menu .qn-menu-item.on, #tq-support-menu .qn-menu-item, #tq-support-menu input');
+  }
+
+  /* Whether a popover or a line's box is open. */
+  function linesOpen() {
+    return _supportMenu || _limitOpen || !!_lineEdit;
+  }
+  /* A click outside an open menu or the limit closes it; a box being
+     edited stays until Cancel, Save for Class or Escape. */
+  function clickOutside(target) {
+    if (!target || !target.closest) return;
+    var redraw = false;
+    if (_supportMenu && !target.closest('#tq-support-menu, #tq-row-support [data-do="supportMenu"]')) {
+      _supportMenu = false;
+      if (_lineEdit === 'own') _lineEdit = null;
+      redraw = true;
+    }
+    if (_limitOpen && !target.closest('#tq-limit, #tq-count-btn')) {
+      var input = document.getElementById('tq-limit-input');
+      if (input) _setLimit(input.value);
+      _limitOpen = false;
+      redraw = true;
+    }
+    if (redraw) _redrawLines(null);
+  }
+  /* Escape: the open menu, the limit or the box being edited closes. */
+  function closeLines() {
+    if (!linesOpen()) return false;
+    var limit = _limitOpen;
+    var menu = _supportMenu;
+    if (limit) {
+      var input = document.getElementById('tq-limit-input');
+      if (input) _setLimit(input.value);
+    }
+    var was = _lineEdit;
+    _supportMenu = false;
+    _limitOpen = false;
+    _lineEdit = null;
+    _redrawLines(null);
+    _focusSel(
+      limit
+        ? '#tq-count-btn'
+        : menu
+          ? '#tq-row-support [data-do="supportMenu"]'
+          : was === 'closing'
+            ? '#tq-row-closing button'
+            : was === 'late'
+              ? '#tq-row-missing button'
+              : null,
+    );
+    return true;
+  }
+  /* Return in the limit: saved, and only the limit closes. */
+  function closeLimit() {
+    var input = document.getElementById('tq-limit-input');
+    if (input) _setLimit(input.value);
+    _limitOpen = false;
+    _redrawLines('tq-count-btn');
+  }
+  /* Return in a line's box saves it. */
+  function _saveFromKey(which) {
+    tqLine(which === 'own' ? 'saveOwn' : which === 'closing' ? 'saveClosing' : 'saveLate');
   }
 
   /* ── The page ────────────────────────────────────────────── */
@@ -1450,7 +1952,7 @@ window.ReportQuestionnaire = (function () {
       <div class="qn-right">
         ${_commentHtml(cid, student)}
         ${_attendanceHtml(cid, student)}
-        ${_commentTab === 'this' ? _requiredHtml(cid, student, f) : ''}
+        ${_commentTab === 'this' ? _sentencesHtml(cid, student, f) : ''}
         <!-- The rest of the Sentences card (PR 11b) goes here. -->
       </div>
     </div>`;
@@ -1472,9 +1974,23 @@ window.ReportQuestionnaire = (function () {
     if (e.key === 'Escape') {
       if (document.getElementById(INFO_ID)) tqCloseInfo();
       else if (_cal) tqCloseDeadline();
+      else closeLines();
       return;
     }
     if (document.getElementById(INFO_ID)) return;
+    // Return in a class line's box saves it; in the limit, closes it.
+    var lineBox = (e.target && e.target.dataset && e.target.dataset.tqLineInput) || '';
+    if (
+      e.key === 'Enter' &&
+      !e.metaKey &&
+      !e.ctrlKey &&
+      (lineBox || (e.target && e.target.dataset && e.target.dataset.tqLimit))
+    ) {
+      e.preventDefault();
+      if (lineBox) _saveFromKey(lineBox);
+      else closeLimit();
+      return;
+    }
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
       tqApproveNext();
@@ -1524,6 +2040,11 @@ window.ReportQuestionnaire = (function () {
     },
     tqDeadlineMonth: tqDeadlineMonth,
     tqPickDeadline: tqPickDeadline,
+    tqLine: tqLine,
+    tqLineChange: tqLineChange,
+    linesOpen: linesOpen,
+    clickOutside: clickOutside,
+    closeLines: closeLines,
     approveBlockers: approveBlockers,
     syncApprove: syncApprove,
     schoolYear: schoolYear,

@@ -157,6 +157,497 @@ window.CommentBank = (function () {
     return '';
   }
 
+  /* ── Competencies as skills (plan PR 8) ────────────────────────────── */
+
+  /* The competency-to-skill table, per kind of class: a competency's label
+     (as the report names it) matched in order, first match wins, to one
+     skill in plain words. `skill` finishes "Next, {he} can …", so it starts
+     with a verb and names no competency. A label nothing matches has no
+     skill, and the comment never falls back to the bare label. */
+  var SKILLS = {
+    socials: [
+      {
+        key: 'ethical',
+        name: 'Ethical Judgment',
+        match: /ethical|judg/i,
+        skill: 'make a fair judgment about a past event, using what people knew at the time',
+      },
+      {
+        key: 'significance',
+        name: 'Significance',
+        match: /signific/i,
+        skill: 'explain why an event mattered and who it affected',
+      },
+      {
+        key: 'perspective',
+        name: 'Perspective',
+        match: /perspective/i,
+        skill: 'judge a source by who created it and why',
+      },
+      {
+        key: 'cause',
+        name: 'Cause and Consequence',
+        match: /cause|consequence|effect/i,
+        skill: 'explain the causes and results of an event',
+      },
+      {
+        key: 'continuity',
+        name: 'Continuity and Change',
+        match: /continuity|change|patterns and trends/i,
+        skill: 'explain what changed over time and what stayed the same',
+      },
+      {
+        key: 'evidence',
+        name: 'Evidence',
+        match: /evidence|source|cite|accounts/i,
+        skill: 'support each claim with evidence from a source',
+      },
+      {
+        key: 'inquiry',
+        name: 'Inquiry',
+        match: /inquiry/i,
+        skill: 'ask a clear question and gather sources to answer it',
+      },
+    ],
+    science: [
+      {
+        key: 'evaluating',
+        name: 'Evaluating',
+        match: /evaluat/i,
+        skill: 'judge how reliable the results are and how the method could be improved',
+      },
+      {
+        key: 'questioning',
+        name: 'Questioning and Predicting',
+        match: /question|predict|curiosity/i,
+        skill: 'ask a testable question and make a prediction',
+      },
+      {
+        key: 'planning',
+        name: 'Planning and Conducting',
+        match: /plan|conduct|investigat/i,
+        skill: 'plan a fair test and record measurements carefully',
+      },
+      {
+        key: 'processing',
+        name: 'Processing and Analyzing',
+        match: /process|analy[sz]|data|graph|pattern/i,
+        skill: 'describe the pattern in the data and what it shows',
+      },
+      {
+        key: 'applying',
+        name: 'Applying and Innovating',
+        match: /appl[yi]|innovat/i,
+        skill: 'apply a science idea to a problem in daily life',
+      },
+      {
+        key: 'communicating',
+        name: 'Communicating',
+        match: /communicat/i,
+        skill: 'explain results clearly, using science words and a labelled graph',
+      },
+    ],
+    math: [
+      {
+        key: 'communicating',
+        name: 'Communicating and Representing',
+        match: /communicat|represent/i,
+        skill: 'show each step of a solution so someone else can follow it',
+      },
+      {
+        key: 'connecting',
+        name: 'Connecting and Reflecting',
+        match: /connect|reflect/i,
+        skill: 'connect a math idea to a real situation',
+      },
+      {
+        key: 'reasoning',
+        name: 'Reasoning and Modelling',
+        match: /reason|model|logic|pattern|thinking/i,
+        skill: 'explain why a method works, not just the steps',
+      },
+      {
+        key: 'solving',
+        name: 'Understanding and Solving',
+        match: /understand|solv|strateg|problem/i,
+        skill: 'choose a strategy for a new problem and check the answer',
+      },
+    ],
+    ela: [
+      {
+        key: 'conventions',
+        name: 'Conventions',
+        match: /convention|spelling|grammar/i,
+        skill: 'check the spelling and punctuation in a final copy',
+      },
+      {
+        key: 'revising',
+        name: 'Revising',
+        match: /revis|refin/i,
+        skill: 'revise a draft so each idea is clear and in order',
+      },
+      {
+        key: 'speaking',
+        name: 'Exchanging Ideas',
+        match: /exchang|speak|oral|discuss|listen/i,
+        skill: 'share an idea in discussion and respond to what others say',
+      },
+      {
+        key: 'information',
+        name: 'Accessing Information',
+        match: /access|information|research/i,
+        skill: 'find information in a reliable source and say where it came from',
+      },
+      {
+        key: 'reading',
+        name: 'Comprehend and Connect',
+        match: /comprehen|read|respond|text|literary|literature|analy[sz]/i,
+        skill: 'support an idea about a text with details from it',
+      },
+      {
+        key: 'thinking',
+        name: 'Thinking Critically',
+        match: /critical|thinking/i,
+        skill: 'explain a view of a text and give reasons for it',
+      },
+      {
+        key: 'writing',
+        name: 'Create and Communicate',
+        match: /writ|compos|creat|communicat/i,
+        skill: 'plan a piece of writing before drafting it',
+      },
+    ],
+    arts: [
+      {
+        key: 'reflecting',
+        name: 'Reason and Reflect',
+        match: /reason|reflect|critique|critical|analy[sz]|evaluat|judg/i,
+        skill: 'explain the choices in a piece and what they add',
+      },
+      {
+        key: 'creating',
+        name: 'Explore and Create',
+        match: /explor|creat|compos|experiment|express/i,
+        skill: 'try more than one idea before choosing one to develop',
+      },
+      {
+        key: 'communicating',
+        name: 'Communicate and Document',
+        match: /communicat|document|present|perform|shar|exhibit/i,
+        skill: 'present work and explain the ideas behind it',
+      },
+      {
+        key: 'connecting',
+        name: 'Connect and Expand',
+        match: /connect|expand|context|tradition/i,
+        skill: 'connect a piece to the time and place it came from',
+      },
+      {
+        key: 'technique',
+        name: 'Technique',
+        match: /techni|skill|rehears|practi/i,
+        skill: 'practise one hard technique until it is steady',
+      },
+    ],
+    pe: [
+      { key: 'safety', name: 'Safety', match: /safe|risk|injur/i, skill: 'explain how to stay safe in an activity' },
+      {
+        key: 'wellbeing',
+        name: 'Well-being',
+        match: /well-?being|mental|health|wellness|nutrition/i,
+        skill: 'describe one healthy choice and how it helps the body or mind',
+      },
+      {
+        key: 'leading',
+        name: 'Leadership',
+        match: /lead|coach|social|community/i,
+        skill: 'encourage teammates and include others in an activity',
+      },
+      {
+        key: 'fitness',
+        name: 'Fitness',
+        match: /fitness|active|activity|training|strength|cardio/i,
+        skill: 'set a fitness goal and track progress toward it',
+      },
+      {
+        key: 'movement',
+        name: 'Movement Skills',
+        match: /skill|literacy|movement|develop|demonstrat/i,
+        skill: 'practise a movement skill and use it in a game or activity',
+      },
+    ],
+    adst: [
+      {
+        key: 'testing',
+        name: 'Testing',
+        match: /test|evaluat|iterat|feedback|revision/i,
+        skill: 'test a prototype and use the results to improve it',
+      },
+      {
+        key: 'sharing',
+        name: 'Sharing',
+        match: /shar|present|document|portfolio|communicat/i,
+        skill: 'explain how a project was made and what could be improved',
+      },
+      {
+        key: 'tools',
+        name: 'Tools and Technologies',
+        match: /tool|technolog|software|cad\b|digital|program|code|equipment/i,
+        skill: 'choose the right tool or program for each step of a project',
+      },
+      {
+        key: 'designing',
+        name: 'Designing',
+        match: /plan|design|ideat|defin|context/i,
+        skill: 'plan a design with a sketch and measurements before making it',
+      },
+      {
+        key: 'making',
+        name: 'Making',
+        match: /mak|construct|build|fabricat|finish|techniqu|weld|cook|prep/i,
+        skill: 'use tools safely and carefully to finish a project',
+      },
+    ],
+    career: [
+      {
+        key: 'self',
+        name: 'Self-Awareness',
+        match: /self|awareness|worldview|identity|personal/i,
+        skill: 'name personal strengths and connect them to a future goal',
+      },
+      {
+        key: 'connecting',
+        name: 'Connections',
+        match: /interact|mentor|network|experience|workplace|reflect/i,
+        skill: 'reflect on a work or volunteer experience and what it taught',
+      },
+      {
+        key: 'exploring',
+        name: 'Exploring Careers',
+        match: /explor|career|possibilit/i,
+        skill: 'research one career path and what it requires',
+      },
+      {
+        key: 'planning',
+        name: 'Planning',
+        match: /plan|life/i,
+        skill: 'set a goal for after school and the steps toward it',
+      },
+    ],
+  };
+
+  /* The skill a competency stands for in this kind of class: { key, name,
+     skill }, or null when the table has none for its label. */
+  function skillOf(family, label) {
+    var rows = SKILLS[family] || [];
+    var t = String(label || '');
+    for (var i = 0; t && i < rows.length; i++)
+      if (rows[i].match.test(t)) return { key: rows[i].key, name: rows[i].name, skill: rows[i].skill };
+    return null;
+  }
+
+  /* ── The class's lines (plan PR 8) ─────────────────────────────────── */
+
+  /* Support lines a teacher can tick for a class: what they will do in
+     class. FullVision never puts one in a comment the teacher did not
+     choose. `families` limits a line to some kinds of class (none: every
+     class); `fits` names the skills (SKILLS keys) and habits (HABITS keys)
+     the line helps with, so each student gets the one that fits. */
+  var SUPPORT_LINES = [
+    { id: 'sl-missing', text: 'In class, I will check in about missing work each week.', fits: ['completes'] },
+    {
+      id: 'sl-revise',
+      text: 'In class, there will be time to revise one piece using feedback.',
+      fits: ['feedback', 'revising', 'testing'],
+    },
+    {
+      id: 'sl-checklist',
+      text: 'In class, I will give a short checklist for each assignment.',
+      fits: ['completes', 'ready', 'conventions'],
+    },
+    {
+      id: 'sl-sources',
+      families: ['socials'],
+      text: 'In class, I will give feedback on source work each week.',
+      fits: ['evidence', 'perspective', 'significance', 'inquiry'],
+    },
+    {
+      id: 'sl-paragraph',
+      families: ['socials', 'ela'],
+      text: 'In class, I will model how to plan a paragraph before writing.',
+      fits: ['cause', 'continuity', 'ethical', 'writing', 'thinking', 'reading'],
+    },
+    {
+      id: 'sl-partner-sources',
+      families: ['socials'],
+      text: 'In class, I will pair the student with a partner for source work.',
+      fits: ['evidence', 'perspective', 'inquiry', 'others'],
+    },
+    {
+      id: 'sl-drafts',
+      families: ['ela'],
+      text: 'In class, I will give feedback on each draft before the final copy.',
+      fits: ['writing', 'revising', 'conventions'],
+    },
+    {
+      id: 'sl-partner-reading',
+      families: ['ela'],
+      text: 'In class, I will pair the student with a partner to talk about the reading.',
+      fits: ['reading', 'speaking', 'thinking', 'part'],
+    },
+    {
+      id: 'sl-labs',
+      families: ['science'],
+      text: 'In class, I will give feedback on each lab write-up.',
+      fits: ['communicating', 'processing', 'evaluating'],
+    },
+    {
+      id: 'sl-plan-lab',
+      families: ['science'],
+      text: 'In class, I will model how to plan an investigation before starting it.',
+      fits: ['planning', 'questioning'],
+    },
+    {
+      id: 'sl-partner-lab',
+      families: ['science'],
+      text: 'In class, I will pair the student with a partner for lab work.',
+      fits: ['planning', 'processing', 'others'],
+    },
+    {
+      id: 'sl-steps',
+      families: ['math'],
+      text: 'In class, I will check the steps on practice problems each week.',
+      fits: ['communicating', 'reasoning', 'solving'],
+    },
+    {
+      id: 'sl-model-steps',
+      families: ['math'],
+      text: 'In class, I will model how to show each step of a solution.',
+      fits: ['communicating', 'reasoning'],
+    },
+    {
+      id: 'sl-partner-math',
+      families: ['math'],
+      text: 'In class, I will pair the student with a partner for problem solving.',
+      fits: ['solving', 'connecting', 'others'],
+    },
+    {
+      id: 'sl-progress',
+      families: ['arts'],
+      text: 'In class, I will give feedback on each piece while it is in progress.',
+      fits: ['creating', 'technique', 'reflecting'],
+    },
+    {
+      id: 'sl-plan-piece',
+      families: ['arts'],
+      text: 'In class, I will model how to plan a piece before starting it.',
+      fits: ['creating', 'connecting'],
+    },
+    {
+      id: 'sl-partner-arts',
+      families: ['arts'],
+      text: 'In class, I will pair the student with a partner to give and get feedback.',
+      fits: ['reflecting', 'communicating', 'others'],
+    },
+    {
+      id: 'sl-one-skill',
+      families: ['pe'],
+      text: 'In class, I will give one skill to focus on each unit.',
+      fits: ['movement', 'fitness'],
+    },
+    {
+      id: 'sl-partner-pe',
+      families: ['pe'],
+      text: 'In class, I will pair the student with a partner for skill practice.',
+      fits: ['movement', 'leading', 'others'],
+    },
+    {
+      id: 'sl-stages',
+      families: ['adst'],
+      text: 'In class, I will check in at each stage of a project.',
+      fits: ['designing', 'making', 'testing'],
+    },
+    {
+      id: 'sl-plan-project',
+      families: ['adst'],
+      text: 'In class, I will model how to plan a project before starting it.',
+      fits: ['designing', 'tools'],
+    },
+    {
+      id: 'sl-goals',
+      families: ['career'],
+      text: 'In class, I will check in about goals and plans each month.',
+      fits: ['planning', 'self', 'exploring'],
+    },
+  ];
+
+  /* The support lines on offer for a kind of class, in order. */
+  function supportLinesFor(family) {
+    return SUPPORT_LINES.filter(function (l) {
+      return !l.families || l.families.indexOf(family) >= 0;
+    });
+  }
+
+  /* A class's comment settings, kept in its report settings (report_config,
+     under blocks_config.commentSettings): the support lines it ticked and
+     wrote, each student's own pick per report ({ termId: { sid: line id or
+     'none' } }), the closing sentence and the character limit (null: no
+     limit). The late-work line is the class's Late Work Policy. */
+  function classSettings(cid) {
+    var rc = (typeof getReportConfig === 'function' && getReportConfig(cid)) || {};
+    var cs = (rc && rc.commentSettings) || {};
+    var limit = Math.floor(Number(cs.charLimit));
+    return {
+      supportChosen: Array.isArray(cs.supportChosen) ? cs.supportChosen.map(String) : [],
+      supportOwn: Array.isArray(cs.supportOwn)
+        ? cs.supportOwn.filter(function (l) {
+            return l && l.id && String(l.text || '').trim();
+          })
+        : [],
+      supportFor: cs.supportFor && typeof cs.supportFor === 'object' ? cs.supportFor : {},
+      closing: String(cs.closing || '').trim(),
+      charLimit: limit > 0 ? limit : null,
+    };
+  }
+
+  /* The class's checklist: the lines on offer for its kind of class, then
+     the teacher's own, each { id, text, fits, own, on }. */
+  function supportChecklist(cid, family) {
+    var cs = classSettings(cid);
+    var on = function (id) {
+      return cs.supportChosen.indexOf(String(id)) >= 0;
+    };
+    return supportLinesFor(family)
+      .map(function (l) {
+        return { id: l.id, text: l.text, fits: l.fits.slice(), own: false, on: on(l.id) };
+      })
+      .concat(
+        cs.supportOwn.map(function (l) {
+          return { id: String(l.id), text: String(l.text).trim(), fits: [], own: true, on: on(l.id) };
+        }),
+      );
+  }
+
+  /* What the comment needs of the class's lines for one student this
+     report: { support: the ticked lines, pick: this student's own pick
+     (a line id, 'none' to leave the sentence out, or null), closing, late,
+     charLimit }. Teacher text is used exactly as typed. */
+  function classLines(cid, sid, termId, family) {
+    var cs = classSettings(cid);
+    var course = (typeof COURSES !== 'undefined' && COURSES[cid]) || {};
+    var picks = (termId && cs.supportFor[termId]) || {};
+    var pick = picks[sid] != null ? String(picks[sid]) : null;
+    return {
+      support: supportChecklist(cid, family).filter(function (l) {
+        return l.on;
+      }),
+      pick: pick,
+      closing: cs.closing,
+      late: String(course.lateWorkPolicy || '').trim(),
+      charLimit: cs.charLimit,
+    };
+  }
+
   var PER_GROUP = 2;
   var USED_BY = 3;
   var NUM = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
@@ -626,13 +1117,17 @@ window.CommentBank = (function () {
       .filter(Boolean)
       .sort()[0];
 
+    // The class's support lines, closing sentence and late-work line, and
+    // this student's own support pick for this report (plan PR 8).
+    var family = familyOf(cid);
+
     return {
       cid: cid,
       sid: sid,
       name: displayNameFirst(student),
       first: student.firstName || displayNameFirst(student),
       course: course.name || '',
-      family: familyOf(cid),
+      family: family,
       pronouns: ReportBlocks.getPronouns(student),
       pronounsOnFile: !!String(student.pronouns || '').trim(),
       comps: comps,
@@ -673,6 +1168,7 @@ window.CommentBank = (function () {
       enrolled: day(student.enrolledDate),
       classStart: classStart || '',
       termStart: (term && term.startsOn) || '',
+      classLines: classLines(cid, sid, termId, family),
     };
   }
 
@@ -1039,6 +1535,89 @@ window.CommentBank = (function () {
     return [];
   }
 
+  /* The next step (plan PR 8): the lowest competency with enough evidence,
+     3+ scored pieces this term (the "strongest" gate's minimum), and not
+     among the strongest; the first in report order on an exact tie. null when
+     none has enough. The comment's next-step sentence and the At a Glance
+     tag both read it. */
+  function nextStepOf(comps) {
+    var strong = strongestOf(comps);
+    var low = null;
+    (comps || []).forEach(function (c) {
+      if (!(c.level > 0) || (c.scores || []).length < STRONGEST_PIECES || strong.indexOf(c) >= 0) return;
+      if (!low || c.level < low.level) low = c;
+    });
+    return low;
+  }
+
+  /* The skill the next step names, from the table: { comp, key, name,
+     skill }, or null when there is no next step or the table has no skill
+     for it. */
+  function nextSkillOf(f) {
+    var c = nextStepOf(f.comps);
+    var sk = c ? skillOf(f.family, c.name) : null;
+    return sk ? { comp: c, key: sk.key, name: sk.name, skill: sk.skill } : null;
+  }
+
+  /* What a support line fits for this student: the next step's skill when
+     the line names it, else a habit rated Sometimes or Rarely that it
+     names; null when neither. */
+  function supportFit(line, f, habits) {
+    var fits = (line && line.fits) || [];
+    var next = nextSkillOf(f);
+    if (next && fits.indexOf(next.key) >= 0) return next.key;
+    return (
+      fits.find(function (k) {
+        return habits && (habits[k] === 1 || habits[k] === 2);
+      }) || null
+    );
+  }
+
+  /* A skill or habit key in words: the student's own competency for the
+     next step's skill, else the table's name, else the habit's. */
+  function fitName(key, f) {
+    var next = nextSkillOf(f);
+    if (next && next.key === key) return next.comp.name;
+    var row = (SKILLS[f.family] || []).find(function (r) {
+      return r.key === key;
+    });
+    if (row) return row.name;
+    var h = HABITS.find(function (x) {
+      return x.key === key;
+    });
+    return h ? h.name : '';
+  }
+
+  /* The support line in this student's comment: their own pick for this
+     report, else the class's ticked line that fits them (supportFit), else
+     the first ticked line. null when none is ticked or the teacher left the
+     sentence out for this student. { line, fit, mine }. */
+  function supportChoice(f, habits) {
+    var cl = (f && f.classLines) || {};
+    var lines = cl.support || [];
+    if (cl.pick === 'none') return null;
+    var mine = cl.pick
+      ? lines.find(function (l) {
+          return l.id === cl.pick;
+        })
+      : null;
+    if (mine) return { line: mine, fit: supportFit(mine, f, habits), mine: true };
+    if (!lines.length) return null;
+    var fitted = lines
+      .map(function (l) {
+        return { line: l, fit: supportFit(l, f, habits) };
+      })
+      .filter(function (x) {
+        return x.fit;
+      });
+    var next = nextSkillOf(f);
+    var bySkill = fitted.find(function (x) {
+      return next && x.fit === next.key;
+    });
+    var pick = bySkill || fitted[0] || { line: lines[0], fit: null };
+    return { line: pick.line, fit: pick.fit, mine: false };
+  }
+
   /* The claims a gate decides, and whether a sentence passes them for this
      context: a sentence claiming one below its gate is not eligible. A
      context built by hand, without facts, has nothing to gate. */
@@ -1183,6 +1762,10 @@ window.CommentBank = (function () {
       return keys('habit', ks);
     };
     var focusKeys = keys('comp', [focus]);
+    // The next step as a skill, and the class's lines (plan PR 8).
+    var next = nextSkillOf(f);
+    var support = supportChoice(f, habits);
+    var lines = f.classLines || {};
     var gr = gradeOf(f);
     var gslots = gradeSlots(gr);
     var factsOf = {
@@ -1219,6 +1802,7 @@ window.CommentBank = (function () {
       focus: focusKeys,
       focusLow: focusKeys,
       nextStep: focusKeys,
+      nextSkill: keys('comp', [next && next.comp]),
       seeWork: focusKeys.concat(keys('work', [seeId])),
       aboutWork: focusKeys.concat(keys('work', [aboutId])),
       whose: [],
@@ -1258,7 +1842,9 @@ window.CommentBank = (function () {
       gradeWord: gslots.gradeWord,
       // The IE path: the work not handed in as one sentence, the marks
       // against the class's, and the deadline ([date] until it is picked).
-      missingWork: ieProblemOf(f) === 'missing' ? notHandedInSentence(f.notHandedIn) : '',
+      // The work not handed in as one sentence: the IE path's problem, and
+      // the Not Handed In sentence on the others.
+      missingWork: _missingCount(f) > 0 ? notHandedInSentence(f.notHandedIn) : '',
       markedMine: ieProblemOf(f) === 'marks' ? numberIn(f.grade.marked.mine) : '',
       markedClass: /^(marks|noMarks)$/.test(ieProblemOf(f)) ? numberIn(f.grade.marked.all) : '',
       ieDeadline: reportPath(f) === 'ie' ? deadlineText(f.grade.ieDeadline) : '',
@@ -1311,6 +1897,13 @@ window.CommentBank = (function () {
           ? focus.name
           : '',
       nextStep: iCan,
+      // One skill in plain words for the next step, never the bare label.
+      nextSkill: next ? next.skill : '',
+      // The teacher's own text, exactly as typed: the support line for this
+      // student, the class's closing sentence and its late-work line.
+      supportLine: support ? support.line.text : '',
+      closingLine: lines.closing || '',
+      lateLine: lines.late || '',
       seeWork: seeWork,
       aboutWork: aboutWork,
       // Whose habits: the pronoun when on file, else the name again
@@ -1587,13 +2180,29 @@ window.CommentBank = (function () {
     { key: 'opening', part: 'now', groups: ['Openings'] },
     { key: 'habits', part: 'habits', groups: ['Work Habits'] },
     { key: 'attendance', part: 'habits', groups: ['Attendance'] },
+    // The work labelled Missing, then the class's late-work line after it
+    // (plan PR 8): only for a student with work not handed in.
+    { key: 'notHandedIn', part: 'habits', groups: ['Not Handed In'], says: 'notHandedIn' },
+    { key: 'lateWork', part: 'habits', line: 'lateLine', after: 'notHandedIn' },
     { key: 'overall', part: 'now', groups: ['Overall'] },
     { key: 'example', part: 'now', groups: ['Examples From Work', "In the Student's Words"] },
     { key: 'growth', part: 'now', groups: ['Growth This Term'] },
-    { key: 'nextStep', part: 'go', groups: ['Next Step'] },
+    // One skill from the table when there is one (`prefer`); never a
+    // sentence that names a bare competency label (`never`).
+    {
+      key: 'nextStep',
+      part: 'go',
+      groups: ['Next Step'],
+      prefer: 'nextSkill',
+      never: ['focus', 'focusLow', 'growthAreas', 'rise', 'fall'],
+    },
     { key: 'goWords', part: 'go', groups: ["In the Student's Words", 'Work to Revisit'] },
-    { key: 'home', part: 'how', groups: ['At Home', 'In Class', "In the Student's Words"] },
-    { key: 'closer', part: 'how', groups: ['Looking Ahead'] },
+    // The teacher's support line for this student, one thing the family can
+    // do at home, and the class's closing sentence (plan PR 8). Teacher
+    // lines (`line`) are used exactly as typed and are left out when empty.
+    { key: 'support', part: 'how', line: 'supportLine' },
+    { key: 'home', part: 'how', groups: ['For the Family'] },
+    { key: 'closer', part: 'how', line: 'closingLine' },
     // The IE path's Required parts (plan PR 3): only the IE story runs them.
     { key: 'ieProblem', part: 'now', groups: ['IE Problem'], ie: true },
     // The IE comment names the habits that are strong (the IE mockup).
@@ -1602,6 +2211,9 @@ window.CommentBank = (function () {
     { key: 'ieDeadline', part: 'go', groups: ['IE Deadline'], ie: true },
     { key: 'ieMeeting', part: 'how', groups: ['IE Meeting'], ie: true },
   ];
+
+  /* The facts a step `says` once: no later sentence claims them again. */
+  var SAYS = { grade: true, notHandedIn: true };
 
   /* Facts a draft states once, by topic. */
   var NO_REPEAT = {
@@ -1884,7 +2496,7 @@ window.CommentBank = (function () {
       .sort(function (x, y) {
         return (uses[x.id] || 0) - (uses[y.id] || 0) || ANGLES.indexOf(x) - ANGLES.indexOf(y);
       })[0];
-    return { id: pick.id, order: pick.order.slice(), lead: pick.order[0] };
+    return { id: pick.id, order: _withClassSteps(pick.order, pick.id === 'ie'), lead: pick.order[0] };
   }
 
   /* The stories told in each class this session, per student, for the
@@ -1903,7 +2515,7 @@ window.CommentBank = (function () {
      DRAFT_STEPS order. */
   function stepOf(s) {
     var st = DRAFT_STEPS.find(function (x) {
-      return !!s && x.part === s.part && x.groups.indexOf(s.group) >= 0;
+      return !!s && !x.line && x.part === s.part && x.groups.indexOf(s.group) >= 0;
     });
     return st ? st.key : null;
   }
@@ -1938,6 +2550,35 @@ window.CommentBank = (function () {
     slots.forEach(function (at, i) {
       seq[at] = named[i];
     });
+    return seq;
+  }
+
+  /* Every story's steps with the class's lines in place (plan PR 8): the
+     Not Handed In sentence and the late-work line after the habits, the
+     support line before the home sentence (else after the next step), and
+     the closing sentence last. The IE story states its own problem and
+     plan, so it takes only the closing sentence. */
+  var HABIT_KEYS = ['habits', 'strongHabits', 'attendance'];
+  function _withClassSteps(order, ie) {
+    var seq = (order || []).slice();
+    var at = function (keys) {
+      return keys.reduce(function (m, k) {
+        return Math.max(m, seq.indexOf(k));
+      }, -1);
+    };
+    var put = function (k, i) {
+      if (seq.indexOf(k) < 0) seq.splice(Math.max(0, Math.min(i, seq.length)), 0, k);
+    };
+    if (!ie) {
+      var h = at(HABIT_KEYS);
+      put('notHandedIn', h >= 0 ? h + 1 : Math.max(0, at(['nextStep', 'goWords', 'home', 'closer'])));
+      put('lateWork', seq.indexOf('notHandedIn') + 1);
+      var home = seq.indexOf('home');
+      var go = at(['nextStep', 'goWords']);
+      var close = seq.indexOf('closer');
+      put('support', home >= 0 ? home : go >= 0 ? go + 1 : close >= 0 ? close : seq.length);
+    }
+    if (seq.indexOf('closer') < 0) seq.push('closer');
     return seq;
   }
 
@@ -2063,6 +2704,8 @@ window.CommentBank = (function () {
     });
     var taken = {};
     var said = {};
+    // The steps that have a sentence, for a line that follows one (`after`).
+    var got = {};
     var out = [];
     var sentences = [];
     var prov = [];
@@ -2076,8 +2719,32 @@ window.CommentBank = (function () {
       });
       if (byKey[k].says) said[byKey[k].says] = true;
     });
+    // The Not Handed In sentence states the work not handed in, so no
+    // earlier habit sentence says it as well.
+    if (seq.indexOf('notHandedIn') >= 0 && ctx.missingWork) said.notHandedIn = true;
     seq.forEach(function (key) {
       var step = byKey[key];
+      // A class line: the teacher's text, as typed (plan PR 8).
+      if (step.line && !kept[key]) {
+        var lt = String(ctx[step.line] || '').trim();
+        if (!lt || (step.after && !got[step.after])) return;
+        var lid = 'class:' + key;
+        var values = {};
+        values[step.line] = lt;
+        out.push(lt);
+        sentences.push({ id: lid, part: step.part, step: key, text: lt, classLine: true });
+        prov.push({
+          sentenceId: lid,
+          part: step.part,
+          claims: [],
+          factKeys: ['class.' + key],
+          values: values,
+          sources: {},
+          classLine: true,
+        });
+        got[key] = true;
+        return;
+      }
       if (kept[key]) {
         var kp = kept[key];
         out.push(kp.text);
@@ -2091,6 +2758,7 @@ window.CommentBank = (function () {
           sources: {},
           kept: true,
         });
+        got[key] = true;
         return;
       }
       var cands = bank.sentences.filter(function (s) {
@@ -2103,9 +2771,26 @@ window.CommentBank = (function () {
           })
         )
           return false;
-        // Once the grade sentence leads, no other sentence states the grade.
-        if (said.grade && (s.claims || []).indexOf('grade') >= 0) return false;
-        return step.groups.indexOf(s.group) >= 0;
+        // Once the grade sentence leads, no other sentence states the grade;
+        // with a Not Handed In sentence, no other states the missing work.
+        if (
+          (s.claims || []).some(function (c) {
+            return c !== step.says && SAYS[c] && said[c];
+          })
+        )
+          return false;
+        if (step.groups && step.groups.indexOf(s.group) < 0) return false;
+        // The step's preferred slot, when it has a value, and never a slot
+        // the step rules out.
+        if (step.prefer && ctx[step.prefer] && (s.needs || []).indexOf(step.prefer) < 0) return false;
+        if (
+          step.never &&
+          slotsOf(s).some(function (k) {
+            return step.never.indexOf(k) >= 0;
+          })
+        )
+          return false;
+        return true;
       });
       if (!cands.length) return;
       // Most specific wins: only the top tier is kept.
@@ -2159,6 +2844,7 @@ window.CommentBank = (function () {
       out.push(pick.t);
       sentences.push({ id: pick.s.id, part: pick.s.part, step: key, text: pick.t });
       prov.push(provenance(pick.s, ctx));
+      got[key] = true;
     });
     return {
       text: out.join(' '),
@@ -2207,7 +2893,7 @@ window.CommentBank = (function () {
     var story = f ? angle(f, ctx._picks, { uses: opts.angleUses || (tally ? _usesFor(cid, sid) : {}) }) : null;
     var kept = _kept(opts.kept, bank);
     var seq = _sequence(
-      story ? story.order : ANGLES[ANGLES.length - 1].order,
+      _withClassSteps(story ? story.order : ANGLES[ANGLES.length - 1].order, !!story && story.id === 'ie'),
       Object.keys(kept),
       _orderSteps(opts.order, bank),
     );
@@ -2236,7 +2922,7 @@ window.CommentBank = (function () {
       _drafted[cid] = _drafted[cid] || {};
       _drafted[cid][String(sid)] = d.sentences
         .filter(function (x) {
-          return !x.kept;
+          return !x.kept && !x.classLine;
         })
         .map(function (x) {
           return { id: x.id, text: x.text };
@@ -2688,6 +3374,12 @@ window.CommentBank = (function () {
     },
     // The Focus Area and its I Can statement.
     nextStep: function (pv, f) {
+      // The next step as a skill: the competency nextStepOf() picks, said
+      // with the table's skill for it.
+      if (_has(pv, 'nextSkill')) {
+        var n = nextSkillOf(f);
+        return !!n && _ids(pv, 'nextSkill', 'comp')[0] === String(n.comp.id) && pv.values.nextSkill === n.skill;
+      }
       var compId = _ids(pv, 'focus', 'comp').concat(_ids(pv, 'nextStep', 'comp'))[0];
       var c = _byId(f.comps, compId);
       if (!c) return false;
@@ -2867,8 +3559,9 @@ window.CommentBank = (function () {
     var out = [];
     var replaced = [];
     prov.forEach(function (pv, i) {
-      // A sentence the teacher kept is theirs, as written: not checked.
-      if (pv.kept) {
+      // A sentence the teacher kept is theirs, as written, and so is a class
+      // line (support, closing, late work): not checked.
+      if (pv.kept || pv.classLine) {
         sentences.push(d.sentences[i]);
         out.push(pv);
         return;
@@ -2967,6 +3660,18 @@ window.CommentBank = (function () {
     climbed: climbed,
     slid: slid,
     strongestOf: strongestOf,
+    nextStepOf: nextStepOf,
+    nextSkillOf: nextSkillOf,
+    skillOf: skillOf,
+    SKILLS: SKILLS,
+    SUPPORT_LINES: SUPPORT_LINES,
+    supportLinesFor: supportLinesFor,
+    supportChecklist: supportChecklist,
+    supportChoice: supportChoice,
+    supportFit: supportFit,
+    fitName: fitName,
+    classSettings: classSettings,
+    classLines: classLines,
     passesGates: passesGates,
     angleFacts: angleFacts,
     stepOf: stepOf,

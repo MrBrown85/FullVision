@@ -4196,8 +4196,67 @@ body.qn-roster #gb-sidebar .student-row-note {
   font-size: 12.5px;
   color: var(--text-2);
 }
-.qn-count-text {
+/* The count opens the class's character limit (plan PR 8). */
+.qn-count-wrap {
   flex: 1;
+  position: relative;
+  display: flex;
+}
+.qn-count-btn {
+  border: 0;
+  background: var(--focus-banner-bg);
+  color: var(--link);
+  padding: 2px 6px;
+  border-radius: 6px;
+  font: inherit;
+  cursor: pointer;
+}
+.qn-count-btn.over {
+  color: var(--score-2-text);
+  background: var(--report-callout-bg);
+}
+.qn-count-btn:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+.qn-limit {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 6px);
+  z-index: var(--z-fab);
+  width: 330px;
+  box-sizing: border-box;
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 12px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.16),
+    0 0 0 1px rgba(0, 0, 0, 0.06);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.qn-limit-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.qn-limit-field input {
+  width: 90px;
+  font: inherit;
+  font-weight: 400;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--text);
+}
+.qn-limit-hint {
+  font-size: 12px;
+  color: var(--text-2);
 }
 .qn-copy {
   border: 1px solid var(--border);
@@ -4955,6 +5014,222 @@ body.qn-roster #gb-sidebar .student-row-note {
 .qn-req-ctrl:focus-within {
   outline: 2px solid var(--active);
   outline-offset: 2px;
+}
+
+/* The Sentences card's rows for the class's lines (plan PR 8). */
+.qn-sentences {
+  position: relative;
+  padding: 0;
+  overflow: visible;
+}
+.qn-line-row {
+  align-items: flex-start;
+}
+.qn-req-row.has-menu {
+  position: relative;
+}
+.qn-line-empty-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.qn-line-empty {
+  flex: 1;
+  font-size: 13.5px;
+  color: var(--text-2);
+}
+.qn-line-off {
+  color: var(--text-2);
+}
+.qn-line-text {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 14.5px;
+  line-height: 1.45;
+  padding: 0;
+  text-align: left;
+  cursor: text;
+  border-radius: 4px;
+}
+.qn-line-text:hover {
+  background: var(--overlay-hover);
+}
+.qn-line-text:focus-visible,
+.qn-line-choose:focus-visible,
+.qn-line-menu:focus-visible,
+.qn-menu-item:focus-visible,
+.qn-menu-add:focus-visible,
+.qn-line-save:focus-visible,
+.qn-line-cancel:focus-visible {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+.qn-line-choose {
+  flex: none;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--link);
+  padding: 3px 10px;
+  border-radius: 7px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.qn-line-menu {
+  flex: none;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 3px 8px 3px 10px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.qn-line-menu.on {
+  background: var(--focus-banner-bg);
+  border-color: var(--active);
+}
+.qn-line-edit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.qn-line-edit-body {
+  gap: 6px;
+}
+.qn-line-input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  font-size: 14.5px;
+  padding: 5px 10px;
+  border: 1px solid var(--active);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 0 0 3px var(--focus-banner-bg);
+}
+.qn-line-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.qn-line-save,
+.qn-line-cancel {
+  font: inherit;
+  font-size: 13px;
+  padding: 4px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.qn-line-save {
+  border: 0;
+  background: var(--active);
+  color: #fff;
+  font-weight: 600;
+}
+.qn-line-cancel {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+.qn-menu {
+  position: absolute;
+  top: calc(100% - 6px);
+  right: 10px;
+  z-index: var(--z-fab);
+  width: 470px;
+  max-width: calc(100% - 20px);
+  box-sizing: border-box;
+  background: var(--surface);
+  border-radius: 12px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.16),
+    0 0 0 1px rgba(0, 0, 0, 0.06);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+}
+.qn-menu-head {
+  padding: 6px 10px 2px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.qn-menu-item {
+  border: 0;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font: inherit;
+  text-align: left;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.qn-menu-item:hover {
+  background: var(--overlay-hover);
+}
+.qn-menu-item.on {
+  background: var(--focus-banner-bg);
+}
+.qn-menu-mark {
+  width: 14px;
+  flex: none;
+  color: var(--active);
+  font-weight: 700;
+}
+.qn-menu-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.qn-menu-text {
+  font-size: 13.5px;
+}
+.qn-menu-meta {
+  font-size: 11.5px;
+  color: var(--text-2);
+}
+.qn-menu-sep {
+  height: 1px;
+  background: var(--surface-2);
+  margin: 4px 6px;
+}
+.qn-menu-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.qn-menu-check input {
+  margin: 0;
+}
+.qn-menu-add {
+  border: 0;
+  background: transparent;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  color: var(--link);
+  cursor: pointer;
+}
+.qn-menu-own {
+  flex-direction: column;
+  align-items: stretch;
+  padding: 6px 10px;
 }
 
 /* The IE deadline calendar: one month, the school year only. */

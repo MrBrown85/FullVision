@@ -180,13 +180,14 @@ test('Generate Comment drafts from the bank; the box grows, the count follows, â
   await expect(box).toHaveValue(first);
   await page.keyboard.press('ControlOrMeta+z');
   await expect(box).toHaveValue(before);
-  // Every student in the class gets a draft with no slot left unfilled.
+  // Every student in the class gets a draft with no slot left unfilled. The
+  // Demo class has no closing sentence or support lines set (plan PR 8).
   const bad = await page.evaluate(() =>
     ReportQuestionnaire.getTqStudents()
       .map(st => {
         const ctx = CommentBank.context(CommentBank.facts('sci8', st, 'term-2'), {});
         const d = CommentBank.draft(ctx, { seed: CommentBank.seedFor(st.id) });
-        return d.ids.length < 6 || /[{}[\]]/.test(d.text) ? st.firstName : null;
+        return d.ids.length < 5 || /[{}[\]]/.test(d.text) ? st.firstName : null;
       })
       .filter(Boolean),
   );

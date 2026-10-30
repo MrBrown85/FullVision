@@ -277,7 +277,7 @@ describe('the Generate Comment button (Demo Mode, Science 8)', () => {
     const ctx = CommentBank.context(factsFor('Cece'), {});
     const d1 = CommentBank.draft(ctx, { seed: 1 });
     const steps = d1.sentences.map(s => s.step);
-    // The teacher moved the closer to second and the grade sentence last.
+    // The teacher moved the last sentence first and the grade sentence last.
     const order = [steps[steps.length - 1]].concat(steps.slice(1, -1), ['grade']);
     const ids = [d1.sentences[d1.sentences.length - 1].id].concat(
       d1.sentences.slice(1, -1).map(s => s.id),
@@ -287,7 +287,7 @@ describe('the Generate Comment button (Demo Mode, Science 8)', () => {
       for (let seed = 2; seed <= 5; seed++) {
         const d2 = CommentBank.draft(ctx, { seed, order: o });
         const got = d2.sentences.map(s => s.step);
-        expect(got[0]).toBe('closer');
+        expect(got[0]).toBe(steps[steps.length - 1]);
         expect(got[got.length - 1]).toBe('grade');
         expect(d2.replaced).toEqual([]);
       }
@@ -310,8 +310,13 @@ describe('the Generate Comment button (Demo Mode, Science 8)', () => {
     const f = factsFor('Cece');
     const ctx = CommentBank.context(f, {});
     // A bank where the only attendance sentence claims what nothing backs.
-    const h59 = COMMENT_BANK.sentences.find(s => s.id === 'h59');
-    const bad = { ...h59, id: 'x-unbacked', group: 'Attendance', when: undefined, needs: undefined };
+    const bad = {
+      id: 'x-unbacked',
+      part: 'habits',
+      group: 'Attendance',
+      text: '{name} benefits from extra support and encouragement.',
+      claims: ['support'],
+    };
     const bank = { parts: COMMENT_BANK.parts, sentences: COMMENT_BANK.sentences.concat([bad]) };
     expect(CommentBank.fits(bad, ctx)).toBe(true);
     const d = CommentBank.draft(ctx, { seed: 1, bank });
