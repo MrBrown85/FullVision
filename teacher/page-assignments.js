@@ -5497,6 +5497,7 @@ window.PageAssignments = (function () {
                 esc(sent.label) +
                 '</span>'
               : '') +
+            obsPrivateLabelHtml(o) +
             (o.dims || [])
               .map(function (t) {
                 return '<span class="obs-pill">' + esc(resolveTag(t).label) + '</span>';
@@ -7441,6 +7442,7 @@ window.PageAssignments = (function () {
             return (
               '<p class="grader-note">' +
               (o.date ? '<span class="grader-note-date">' + esc(formatDate(o.date)) + '</span>' : '') +
+              (isPrivateObservation(o) ? obsPrivateLabelHtml(o) + ' ' : '') +
               esc(o.text || '') +
               '</p>'
             );

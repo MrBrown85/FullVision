@@ -509,19 +509,24 @@ window.CommentBank = (function () {
       }
     }
 
+    // Private observations (Concern, Note) are never quoted: not as the note
+    // and not as something to work on.
+    var quotable = f.obs.filter(function (o) {
+      return !isPrivateObservation(o);
+    });
     var note =
-      f.obs.find(function (o) {
+      quotable.find(function (o) {
         return o.id === picks.note;
-      }) || f.obs[0];
-    // Something to work on: a growth or concern note other than the one
-    // being quoted, so a draft never quotes the same note twice.
-    var isConcern = function (o) {
-      return o.sentiment === 'concern' || o.sentiment === 'growth';
+      }) || quotable[0];
+    // Something to work on: a Growth note other than the one being quoted,
+    // so a draft never quotes the same note twice.
+    var isGrowth = function (o) {
+      return o.sentiment === 'growth';
     };
     var concern =
-      f.obs.find(function (o) {
-        return isConcern(o) && (!note || o.id !== note.id);
-      }) || f.obs.find(isConcern);
+      quotable.find(function (o) {
+        return isGrowth(o) && (!note || o.id !== note.id);
+      }) || quotable.find(isGrowth);
 
     var withHabit = function (lvl) {
       return HABITS.filter(function (h) {

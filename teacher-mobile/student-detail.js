@@ -515,7 +515,9 @@ window.MStudentDetail = (function () {
           MC.esc(OBS_LABELS[d] || d) +
           '</span><span class="m-st-dim-latest">' +
           (latest
-            ? MC.esc(_shortDay(_obDay(latest)) + ', ' + String(latest.text || '').split('\n')[0])
+            ? MC.esc(_shortDay(_obDay(latest)) + ', ') +
+              (isPrivateObservation(latest) ? obsPrivateLabelHtml(latest) + ' ' : '') +
+              MC.esc(String(latest.text || '').split('\n')[0])
             : 'Not seen yet') +
           '</span></div><span class="m-st-dim-count">' +
           tagged.length +

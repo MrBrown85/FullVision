@@ -244,6 +244,8 @@
         .slice()
         .reverse()
         .forEach(function (o) {
+          // Private (Concern, Note) comments never print.
+          if (isPrivateObservation(o)) return;
           var text = o && o.text ? String(o.text).trim() : '';
           if (text) items.push({ text: text, date: String(o.date || o.created || '').slice(0, 10) });
         });

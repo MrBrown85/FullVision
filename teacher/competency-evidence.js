@@ -154,6 +154,7 @@ window.CompetencyEvidence = (function () {
       'Observation, ' +
       formatDate(obDay(ob)) +
       (s ? ', ' + s.label : '') +
+      (isPrivateObservation(ob) ? ', Private' : '') +
       (lvl ? ', looks ' + lvl : '') +
       ': ' +
       full +
@@ -171,6 +172,7 @@ window.CompetencyEvidence = (function () {
       '<span class="ced-obs-mark" aria-hidden="true"></span>' +
       '<span class="ced-obs-main">' +
       (typeof ObsCard !== 'undefined' ? ObsCard.typePillHtml(ob.sentiment) : '') +
+      obsPrivateLabelHtml(ob) +
       '<span class="ced-obs-text"><span class="ced-obs-first">' +
       esc(first) +
       '</span><span class="ced-obs-full">' +

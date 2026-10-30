@@ -418,7 +418,8 @@ window.ReportBlocks = (function () {
   }
 
   function renderBlockObservations(cid, student) {
-    const quickObs = getStudentQuickObs(cid, student.id);
+    // Private (Concern, Note) observations never print.
+    const quickObs = getStudentQuickObs(cid, student.id).filter(ob => !isPrivateObservation(ob));
     const recentObs = quickObs.slice(0, 5);
     if (recentObs.length === 0) return '';
     let html = `<div class="report-learner-profile">`;

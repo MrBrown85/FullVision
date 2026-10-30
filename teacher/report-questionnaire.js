@@ -649,7 +649,9 @@ window.ReportQuestionnaire = (function () {
         var quoted = !!o.text && comment.indexOf(o.text.replace(/[.\s]+$/, '')) >= 0;
         return `<div class="qn-obs">
           <div class="qn-obs-text">${esc(o.text)}</div>
-          <div class="qn-obs-meta"><span class="qn-obs-date">${esc(o.day)}</span>${(o.dims || [])
+          <div class="qn-obs-meta"><span class="qn-obs-date">${esc(o.day)}</span>${obsPrivateLabelHtml(o)}${(
+            o.dims || []
+          )
             .map(function (d) {
               return `<span class="qn-tag">${esc(_tagLabel(d))}</span>`;
             })
@@ -871,7 +873,7 @@ window.ReportQuestionnaire = (function () {
     var chooser = function (label, opts) {
       return `<div class="qn-chooser"><span class="qn-chooser-label">${esc(label)}</span>${opts
         .map(function (o) {
-          return `<button type="button" class="qn-choice${o.on ? ' on' : ''}" data-action="${o.action}" data-value="${esc(o.value)}" aria-pressed="${o.on}">${esc(o.label)}</button>`;
+          return `<button type="button" class="qn-choice${o.on ? ' on' : ''}" data-action="${o.action}" data-value="${esc(o.value)}" aria-pressed="${o.on}"${o.disabled ? ' disabled title="Private notes are never quoted"' : ''}>${esc(o.label)}</button>`;
         })
         .join('')}</div>`;
     };
@@ -879,11 +881,14 @@ window.ReportQuestionnaire = (function () {
       return chooser(
         'Note to Quote',
         f.obs.map(function (o) {
+          var priv = isPrivateObservation(o);
           return {
             action: 'tqPickNote',
             value: o.id,
-            on: !!ctx._note && ctx._note.id === o.id,
-            label: o.day + (o.dims && o.dims[0] ? ' · ' + _tagLabel(o.dims[0]) : ''),
+            on: !priv && !!ctx._note && ctx._note.id === o.id,
+            // A private note is listed but cannot be quoted.
+            disabled: priv,
+            label: (priv ? 'Private · ' : '') + o.day + (o.dims && o.dims[0] ? ' · ' + _tagLabel(o.dims[0]) : ''),
           };
         }),
       );
@@ -1073,6 +1078,11 @@ window.ReportQuestionnaire = (function () {
   function tqPickNote(id) {
     var st = _current();
     if (!st) return;
+    // A private (Concern or Note) observation is never quoted.
+    var picked = (getStudentQuickObs(_activeCourse, st.id) || []).find(function (o) {
+      return o.id === id;
+    });
+    if (isPrivateObservation(picked)) return;
     _picksFor(st.id).note = id;
     _redrawBank();
   }

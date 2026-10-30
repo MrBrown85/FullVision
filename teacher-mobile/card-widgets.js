@@ -164,6 +164,7 @@ window.MCardWidgets = (function () {
       '<span style="color:var(--text-3);font-size:12px">' +
       MC.relativeTime(latest.created) +
       '</span> ' +
+      (isPrivateObservation(latest) ? obsPrivateLabelHtml(latest) + ' ' : '') +
       MC.esc(_trunc(latest.text || '', 80)) +
       '</div>'
     );

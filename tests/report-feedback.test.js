@@ -407,6 +407,54 @@ describe('observations', () => {
     ]);
   });
 
+  it('leaves out Concern and Note observations: they are private and never go home', () => {
+    const all = getQuickObs(CID);
+    saveQuickObs(CID, {
+      [SID]: all[SID].concat([
+        {
+          id: 'ob-concern',
+          text: 'Meeting with parents.',
+          sentiment: 'concern',
+          date: '2026-10-05',
+          created: '2026-10-05T18:00:00.000Z',
+        },
+        {
+          id: 'ob-note',
+          text: 'Away on vacation.',
+          sentiment: 'note',
+          date: '2026-10-06',
+          created: '2026-10-06T18:00:00.000Z',
+        },
+        {
+          id: 'ob-str',
+          text: 'Led the group.',
+          sentiment: 'strength',
+          date: '2026-10-07',
+          created: '2026-10-07T18:00:00.000Z',
+        },
+        {
+          id: 'ob-gr',
+          text: 'Check units.',
+          sentiment: 'growth',
+          date: '2026-10-08',
+          created: '2026-10-08T18:00:00.000Z',
+        },
+      ]),
+    });
+    const ids = F.observations(CID, ST).map(o => o.id);
+    expect(ids).toEqual(['ob-old', 'ob-early', 'ob-str', 'ob-gr', 'ob-late']);
+  });
+
+  it('leaves a private assignment comment off the assessment card', () => {
+    const all = getQuickObs(CID);
+    const priv = comment('o-priv', 'points', 'Parents meeting about this.', '2026-10-09');
+    priv.sentiment = 'concern';
+    saveQuickObs(CID, { [SID]: all[SID].concat([priv]) });
+    const texts = RubricPrint.feedbackItems(CID, SID, 'points').map(f => f.text);
+    expect(texts).toContain('Show the units.');
+    expect(texts).not.toContain('Parents meeting about this.');
+  });
+
   it('keeps to the report’s term', () => {
     saveCourseConfig(CID, {
       reportingTerms: [

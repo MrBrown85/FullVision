@@ -282,6 +282,7 @@ window.ObsCard = (function () {
       name: s ? displayName(s) : ob.studentId,
       withText: withLabel(others),
       quoted: quotedLabel(ctx.quoted[ob.studentId + '|' + ob.id], ctx.hasTerms),
+      private: isPrivateObservation(ob),
       context: ctxInfo ? ctxInfo.label : '',
       assessment: isLinked(ob) ? assessmentTitle(ctx.cid, ob) || 'Assessment' : '',
     };
@@ -303,6 +304,7 @@ window.ObsCard = (function () {
       })
       .join('');
     var out =
+      obsPrivateLabelHtml(ob) +
       (p.context ? '<span class="obs-card-context">' + esc(p.context) + '</span>' : '') +
       (p.assessment ? '<span class="obs-card-assessment">' + esc(p.assessment) + '</span>' : '') +
       ObsCapture.linkPillsHtml(ctx.cid, ob, 'obs-card-link') +
