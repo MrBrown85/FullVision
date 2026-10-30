@@ -57,10 +57,12 @@ function fullContext(p, habits) {
     nextStep: 'I can identify sources of error.',
     seeWork: 'Energy Lab',
     aboutWork: 'Map Quiz',
-    strengthHabits: 'consistently uses feedback to improve ' + p.poss + ' work',
-    growthHabits: 'taking part in class',
-    strengthHabitNames: 'using feedback',
-    growthHabitNames: 'taking part in class',
+    whose: p.poss,
+    habitsExcellent: 'yes',
+    habitsGood: 'yes',
+    habitToBuild: 'taking part in class',
+    habitsToBuild: 'using feedback and taking part in class',
+    habitStrengths: 'Noor comes to class ready.',
     absent: '4',
     late: '2',
     bestPiece: 'Her best piece was “Energy Lab”, where she measured every trial.',
@@ -68,10 +70,10 @@ function fullContext(p, habits) {
 }
 
 describe('the bank', () => {
-  it('has 445 sentences in four parts, each with a unique id', () => {
-    expect(COMMENT_BANK.sentences).toHaveLength(445);
+  it('has 270 sentences in four parts, each with a unique id', () => {
+    expect(COMMENT_BANK.sentences).toHaveLength(270);
     expect(COMMENT_BANK.parts.map(p => p.id)).toEqual(['habits', 'now', 'go', 'how']);
-    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(445);
+    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(270);
   });
 
   it('has wording for every kind of class, and keeps handed-in work out of PE and Arts', () => {
@@ -86,19 +88,16 @@ describe('the bank', () => {
         ).toBe(true),
       );
     });
-    COMMENT_BANK.sentences
-      .filter(s => s.part === 'habits' && /Completes Work/.test(s.group) && !s.subjects)
-      .forEach(s => expect(s.except, s.id).toEqual(['pe', 'arts']));
+    // The habits sentences name a habit only through habitWords, which says
+    // Completes Work in PE and Arts their own way.
+    COMMENT_BANK.sentences.filter(s => s.part === 'habits').forEach(s => expect(s.text, s.id).not.toMatch(/hand/i));
     ['g104', 'g105', 'w112'].forEach(id =>
       expect(COMMENT_BANK.sentences.find(s => s.id === id).except).toEqual(['pe', 'career']),
     );
   });
 
-  it('covers every habit at every level, and every picture with an opening and a closer', () => {
+  it('covers every picture with an opening and a closer', () => {
     const at = (key, lvl) => COMMENT_BANK.sentences.filter(s => s.when && s.when[key] === lvl);
-    CommentBank.HABITS.forEach(h =>
-      [1, 2, 3, 4].forEach(l => expect(at(h.key, l).length, h.key + ' ' + l).toBeGreaterThan(0)),
-    );
     ['strong', 'steady', 'challenge', 'early'].forEach(pic => {
       expect(at('picture', pic).filter(s => s.group === 'Openings').length, pic).toBeGreaterThanOrEqual(3);
       expect(at('picture', pic).filter(s => s.group === 'Looking Ahead').length, pic).toBeGreaterThanOrEqual(2);
@@ -111,7 +110,10 @@ describe('the bank', () => {
   it('keeps the old generator’s cut patterns out: no superlatives, no teacher’s feelings', () => {
     const banned =
       /outstanding|joy to have|pleased|proud|excellent|impressive|standout|shines|stay tuned|can't say enough/i;
-    COMMENT_BANK.sentences.forEach(s => expect(s.text, s.id).not.toMatch(banned));
+    // "Work habits are excellent" is the plan's own habits sentence.
+    COMMENT_BANK.sentences.forEach(s =>
+      expect(s.text.replace(/work habits are excellent/, ''), s.id).not.toMatch(banned),
+    );
   });
 
   it('puts a [singular|plural] verb only right after a pronoun', () => {
@@ -161,10 +163,11 @@ describe('the bank', () => {
       aboutWork: 'focusWork',
       focus: 'nextStep',
       nextStep: 'nextStep',
-      strengthHabits: 'habits',
-      growthHabits: 'habits',
-      strengthHabitNames: 'habits',
-      growthHabitNames: 'habits',
+      habitsExcellent: 'habits',
+      habitsGood: 'habits',
+      habitToBuild: 'habits',
+      habitsToBuild: 'habits',
+      habitStrengths: 'habits',
       absent: 'attendance',
       late: 'attendance',
       selfGood: 'studentWords',
@@ -178,7 +181,7 @@ describe('the bank', () => {
       const slots = (s.text.match(/\{(\w+)\}/g) || []).map(x => x.slice(1, -1)).concat(s.needs || []);
       slots.forEach(k => {
         if (SLOT[k]) expect(s.claims, s.id + ' {' + k + '}').toContain(SLOT[k]);
-        else expect(['name', 'course', 'He', 'he', 'him', 'His', 'his', 'himself'], s.id).toContain(k);
+        else expect(['name', 'whose', 'course', 'He', 'he', 'him', 'His', 'his', 'himself'], s.id).toContain(k);
       });
       Object.keys(s.when || {}).forEach(k =>
         expect(s.claims, s.id + ' when ' + k).toContain(
@@ -245,22 +248,17 @@ describe('fill', () => {
     });
   }
 
-  it('conjugates for singular they and keeps the name singular', () => {
-    const h13 = COMMENT_BANK.sentences.find(s => s.id === 'h13');
-    expect(CommentBank.fill(h13, fullContext(P.they))).toBe(
-      'Noor is well prepared each day and adds thoughtful ideas when they join a discussion.',
-    );
-    expect(CommentBank.fill(h13, fullContext(P.she))).toBe(
-      'Noor is well prepared each day and adds thoughtful ideas when she joins a discussion.',
-    );
-    const h02 = COMMENT_BANK.sentences.find(s => s.id === 'h02');
-    expect(CommentBank.fill(h02, fullContext(P.they))).toBe('They are working on taking part in class.');
-    expect(CommentBank.fill(h02, fullContext(P.he))).toBe('He is working on taking part in class.');
+  it('conjugates for singular they', () => {
+    const ie04 = COMMENT_BANK.sentences.find(s => s.id === 'ie04');
+    expect(CommentBank.fill(ie04, fullContext(P.they))).toBe('To earn a grade, they need to hand in the missing work.');
+    expect(CommentBank.fill(ie04, fullContext(P.she))).toBe('To earn a grade, she needs to hand in the missing work.');
   });
 
   it('puts a habit phrase in as the context gives it', () => {
-    const h01 = COMMENT_BANK.sentences.find(s => s.id === 'h01');
-    expect(CommentBank.fill(h01, fullContext(P.he))).toBe('Noor consistently uses feedback to improve his work.');
+    const hs08 = COMMENT_BANK.sentences.find(s => s.id === 'hs08');
+    expect(CommentBank.fill(hs08, fullContext(P.he))).toBe(
+      'His work habits to build next are using feedback and taking part in class.',
+    );
   });
 });
 
@@ -289,12 +287,14 @@ describe('fill takes values as written', () => {
       obs: [],
       voice: {},
       confidence: [],
-      habits: { feedback: 4, devices: 2 },
+      habits: { completes: 2, feedback: 4 },
       levelText: () => '',
     };
-    const ctx = CommentBank.context(f, {});
-    expect(ctx.strengthHabits).toBe('consistently uses feedback to improve her work');
-    expect(ctx.growthHabits).toBe('using devices for learning and putting her phone away when asked');
+    expect(CommentBank.context({ ...f, family: 'arts' }, {}).habitToBuild).toBe('completing her work');
+    expect(CommentBank.context({ ...f, family: 'pe' }, {}).habitToBuild).toBe('taking a full part in every activity');
+    expect(CommentBank.context(f, {}).habitToBuild).toBe('completing work on time');
+    const strong = { ...f, family: 'arts', pronounsOnFile: true, habits: { completes: 4, feedback: 4 } };
+    expect(CommentBank.context(strong, {}).habitStrengths).toBe('She completes her work and uses feedback.');
   });
 });
 
@@ -336,13 +336,16 @@ describe('fits', () => {
 
   it('filters by habit level with `when`', () => {
     const byId = id => COMMENT_BANK.sentences.find(s => s.id === id);
-    const ctx = fullContext(P.she, { completes: 4, part: 4 });
-    expect(CommentBank.fits(byId('h10'), ctx)).toBe(true); // Consistently and Consistently
-    expect(CommentBank.fits(byId('h12'), ctx)).toBe(false); // part Usually
-    expect(CommentBank.fits(byId('h30'), ctx)).toBe(true);
-    expect(CommentBank.fits(byId('h32'), ctx)).toBe(false);
+    const at = (when, id) => ({ id, part: 'how', group: 'At Home', text: 'Help {name}.', when, claims: ['habits'] });
+    const sometimes = at({ completes: 2 }, 'x1');
+    const rarely = at({ completes: 1 }, 'x2');
+    const both = at({ completes: 2, part: 1 }, 'x3');
+    const ctx = fullContext(P.she, { completes: 2, part: 1 });
+    expect(CommentBank.fits(sometimes, ctx)).toBe(true);
+    expect(CommentBank.fits(rarely, ctx)).toBe(false);
+    expect(CommentBank.fits(both, ctx)).toBe(true);
     const notSeen = fullContext(P.she, { completes: 5 });
-    expect(['h30', 'h32', 'h34', 'h36'].some(id => CommentBank.fits(byId(id), notSeen))).toBe(false);
+    expect([sometimes, rarely].some(x => CommentBank.fits(x, notSeen))).toBe(false);
     expect(CommentBank.fits(byId('n04'), ctx)).toBe(true); // picture steady
     expect(CommentBank.fits(byId('n01'), ctx)).toBe(false); // picture strong
   });
@@ -448,9 +451,9 @@ describe('parts', () => {
   });
 
   it('never matches a sentence that is mostly slots', () => {
-    const h01 = COMMENT_BANK.sentences.find(s => s.id === 'h01');
-    expect(CommentBank.pattern(h01)).toBeNull();
-    expect(CommentBank.usedBy(h01, ['Anything at all.', 'More.', 'Yes.'])).toBe(0);
+    const hs11 = COMMENT_BANK.sentences.find(s => s.id === 'hs11');
+    expect(CommentBank.pattern(hs11)).toBeNull();
+    expect(CommentBank.usedBy(hs11, ['Anything at all.', 'More.', 'Yes.'])).toBe(0);
   });
 });
 
@@ -476,18 +479,18 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     return CommentBank.context(CommentBank.facts(cid, st, 'term-2'), {});
   };
 
-  it('knows the Demo class is Science from its name, and offers Cece 84 sentences (9, 31, 18, 26)', () => {
+  it('knows the Demo class is Science from its name, and offers Cece 77 sentences (2, 31, 18, 26)', () => {
     expect(CommentBank.familyOf(cid)).toBe('science');
     const ctx = ctxFor('Cece');
     expect(ctx._family).toBe('science');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 31, 18, 26]);
-    expect(CommentBank.fitCount(ctx)).toBe(84);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([2, 31, 18, 26]);
+    expect(CommentBank.fitCount(ctx)).toBe(77);
   });
 
-  it('offers Jasper 77 (9, 29, 15, 24), by the name he goes by', () => {
+  it('offers Jasper 70 (2, 29, 15, 24), by the name he goes by', () => {
     const ctx = ctxFor('Jasper');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([9, 29, 15, 24]);
-    expect(CommentBank.fitCount(ctx)).toBe(77);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([2, 29, 15, 24]);
+    expect(CommentBank.fitCount(ctx)).toBe(70);
     expect(ctx.name).toBe('Jas');
     expect(ctx.fellCount).toBe('four');
   });
@@ -558,14 +561,19 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     saveTermAttendance(cid, st.id, 'term-2', 4, 2);
     const ctx = CommentBank.context(CommentBank.facts(cid, st, 'term-2'), {});
     const habits = CommentBank.parts(ctx, '', { more: { habits: true } })[0];
-    expect(habits.fit).toBe(9 + 7);
+    expect(habits.fit).toBe(2 + 7);
     expect(habits.rows.filter(r => r.group === 'Attendance')).toHaveLength(7);
     saveTermAttendance(cid, st.id, 'term-2', null, null);
   });
 
   it('Generate drafts a comment from the bank: one sentence per step, every slot filled', () => {
-    const ctx = ctxFor('Cece');
+    const st = getStudents(cid).find(s => s.firstName === 'Cece');
+    const rated = { completes: 4, ready: 3, others: 4, part: 2, feedback: 4, devices: 3 };
+    const ctx = CommentBank.context(CommentBank.facts(cid, st, 'term-2'), { habits: rated });
     const d = CommentBank.draft(ctx, { seed: 1 });
+    expect(d.sentences.filter(x => x.step === 'habits').map(x => x.text)).toEqual([
+      expect.stringMatching(/taking part in class/),
+    ]);
     const sentences = d.text.split(/(?<=[.!?”])\s+(?=[A-Z“])/);
     expect(sentences.length).toBeGreaterThanOrEqual(8);
     expect(d.text).not.toMatch(/[{}[\]]/);
@@ -610,12 +618,9 @@ describe('Demo Mode (Science 8, Report 2)', () => {
       expect(d.text, st.firstName).not.toMatch(/[{}[\]]|  /);
       const quotes = d.text.match(/“[^”]+”/g) || [];
       expect(new Set(quotes).size, st.firstName).toBe(quotes.length);
-      // The growing habits are said once.
-      const growing = d.ids.filter(id => {
-        const s = COMMENT_BANK.sentences.find(x => x.id === id);
-        return (s.needs || []).some(k => k === 'growthHabits' || k === 'growthHabitNames');
-      });
-      expect(growing.length, st.firstName).toBeLessThanOrEqual(1);
+      // The habits are said once, in one sentence.
+      const habits = d.ids.filter(id => /^hs/.test(id));
+      expect(habits.length, st.firstName).toBeLessThanOrEqual(1);
     });
   });
 
@@ -660,7 +665,8 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     const mateo = getStudents(cid).find(s => s.firstName === 'Mateo');
     const mctx = CommentBank.context(CommentBank.facts(cid, mateo, 'term-2'), {});
     expect(CommentBank.provenance(byId('n20'), mctx).factKeys).toEqual(['comp:SC']);
-    expect(CommentBank.provenance(byId('h03'), ctx).factKeys).toEqual(['habit:completes']);
+    // Only Completes Work is rated (from the record): the IE strengths name it.
+    expect(CommentBank.provenance(byId('hs11'), ctx).factKeys).toEqual(['habit:completes']);
     expect(CommentBank.provenance(byId('n04'), ctx).values['when.picture']).toBe('steady');
   });
 
@@ -710,18 +716,40 @@ describe('Demo Mode (Science 8, Report 2)', () => {
   it('checks a claim the wording makes beyond its slots: late work, work not handed in', () => {
     const f = cece();
     expect(f.record.late).toBe(0);
-    const usually = { habits: { completes: 3 } };
-    const late = one('h105', CommentBank.context(f, usually));
-    expect(CommentBank.verify(late, f, usually).replaced[0]).toMatchObject({ failed: ['lateWork'], by: null });
+    // Sentences whose wording, not a slot, claims late or missing work.
+    const lateS = {
+      id: 'x-late',
+      part: 'how',
+      group: 'At Home',
+      text: 'Some of the work came in late.',
+      claims: ['lateWork'],
+    };
+    const missS = {
+      id: 'x-miss',
+      part: 'how',
+      group: 'At Home',
+      text: 'Some work has not come in.',
+      claims: ['notHandedIn'],
+    };
+    const bank = { parts: COMMENT_BANK.parts, sentences: [lateS, missS] };
+    const ctx = CommentBank.context(f, {});
+    const as = s => ({
+      text: s.text,
+      ids: [s.id],
+      sentences: [{ id: s.id, part: s.part, text: s.text }],
+      provenance: [CommentBank.provenance(s, ctx)],
+    });
+    expect(CommentBank.verify(as(lateS), f, {}, { bank }).replaced[0]).toMatchObject({
+      failed: ['lateWork'],
+      by: null,
+    });
     const withLate = { ...f, record: { ...f.record, late: 1 } };
-    expect(CommentBank.verify(late, withLate, usually).replaced).toEqual([]);
+    expect(CommentBank.verify(as(lateS), withLate, {}, { bank }).replaced).toEqual([]);
 
-    const rarely = { habits: { completes: 1 } };
-    const missing = one('h108', CommentBank.context(f, rarely));
-    expect(CommentBank.verify(missing, f, rarely).replaced[0].failed).toEqual(['notHandedIn']);
+    expect(CommentBank.verify(as(missS), f, {}, { bank }).replaced[0].failed).toEqual(['notHandedIn']);
     expect(f.notHandedIn.count).toBe(0);
     expect(
-      CommentBank.verify(missing, { ...f, notHandedIn: { count: 1, titles: ['Lab 3'] } }, rarely).replaced,
+      CommentBank.verify(as(missS), { ...f, notHandedIn: { count: 1, titles: ['Lab 3'] } }, {}, { bank }).replaced,
     ).toEqual([]);
   });
 
@@ -898,7 +926,8 @@ describe('wording by kind of class', () => {
       const ctx = CommentBank.context(f, {});
       const d = CommentBank.draft(ctx, { seed: 5 });
       expect(CommentBank.verify(d, f, {}).replaced, tag).toEqual([]);
-      expect(d.ids.length, tag).toBeGreaterThanOrEqual(6);
+      // The habits are one sentence (plan PR 7): five or more in every kind of class.
+      expect(d.ids.length, tag).toBeGreaterThanOrEqual(5);
       expect(d.text, tag).not.toMatch(/[{}[\]]/);
       if (fam === 'pe' || fam === 'arts') expect(d.text, tag).not.toMatch(/hands? in|handing in/i);
       if (fam === 'pe' || fam === 'career')

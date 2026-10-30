@@ -178,27 +178,28 @@ describe('class usage for a sentence that is mostly slots', () => {
       {
         id: 'p1',
         part: 'habits',
-        group: 'From Your Ratings',
-        text: '{name} {strengthHabits}.',
-        needs: ['strengthHabits'],
+        group: 'Work Habits',
+        text: 'Next: {habitToBuild}.',
+        needs: ['habitToBuild'],
         claims: ['habits'],
       },
       {
         id: 'p2',
         part: 'habits',
-        group: 'From Your Ratings',
-        text: 'Also, {name} {strengthHabits}.',
-        needs: ['strengthHabits'],
+        group: 'Work Habits',
+        text: 'Also, {habitToBuild}.',
+        needs: ['habitToBuild'],
         claims: ['habits'],
       },
     ],
   };
   const cid = 'cls-slots';
+  const ONE_TO_BUILD = { habits: { ready: 2 } };
 
   it('counts a classmate’s drafted sentence while their saved comment holds it', () => {
     bank.sentences.forEach(s => expect(CommentBank.pattern(s)).toBeNull());
     const fa = facts(cid, 'a', 'Noor');
-    const da = CommentBank.draft(CommentBank.context(fa, {}), { bank, seed: 1 });
+    const da = CommentBank.draft(CommentBank.context(fa, ONE_TO_BUILD), { bank, seed: 1 });
     expect(da.ids).toHaveLength(1);
     const used = da.ids[0];
     const saved = [{ sid: 'a', text: da.text }];
@@ -206,17 +207,17 @@ describe('class usage for a sentence that is mostly slots', () => {
     // The next classmate gets the other one.
     const fb = facts(cid, 'b', 'Ava');
     for (let seed = 1; seed <= 5; seed++) {
-      const db = CommentBank.draft(CommentBank.context(fb, {}), { bank, seed, comments: saved });
+      const db = CommentBank.draft(CommentBank.context(fb, ONE_TO_BUILD), { bank, seed, comments: saved });
       expect(db.ids).toEqual([used === 'p1' ? 'p2' : 'p1']);
     }
   });
 
   it('stops counting it once the classmate’s comment no longer holds it', () => {
     const fa = facts(cid, 'c', 'Sam');
-    CommentBank.draft(CommentBank.context(fa, {}), { bank, seed: 1 });
+    CommentBank.draft(CommentBank.context(fa, ONE_TO_BUILD), { bank, seed: 1 });
     expect(CommentBank.classUsage(bank, [{ sid: 'c', text: 'Rewritten by the teacher.' }], cid, 'd')).toEqual({});
     // A plain string carries no sid, so the record cannot be matched to it.
-    const dc = CommentBank.draft(CommentBank.context(fa, {}), { bank, seed: 1 });
+    const dc = CommentBank.draft(CommentBank.context(fa, ONE_TO_BUILD), { bank, seed: 1 });
     expect(CommentBank.classUsage(bank, [dc.text], cid, 'd')).toEqual({});
   });
 });

@@ -386,7 +386,8 @@ window.ReportQuestionnaire = (function () {
   }
 
   /* A habit picked on the grid: saved with the others (the whole map); the
-     grid and the count change in place, nothing else redraws. */
+     grid, the count and the comment's habits sentence change in place,
+     nothing else redraws. */
   function tqRate(key, value) {
     var st = _current();
     if (!st) return;
@@ -403,6 +404,47 @@ window.ReportQuestionnaire = (function () {
     var rated = document.getElementById('tq-rated');
     if (rated) rated.textContent = _ratedCount(habits) + ' of 6 rated';
     _facts(st, true);
+    _redrawHabits(st);
+  }
+
+  /* After a rating: the comment's habits sentence written again for the new
+     ratings (plan PR 7), when Generate wrote this comment and the teacher
+     has not edited that sentence or approved the comment. The rest of the
+     comment stays as it is. A comment with no habits sentence gets one only
+     while it is exactly as Generate wrote it. */
+  function _redrawHabits(st) {
+    var termId = getTermId();
+    var key = _activeCourse + '|' + st.id + '|' + termId;
+    var last = _lastDraft[key];
+    var el = _box();
+    if (!last || !el || String(el.dataset.sid) !== String(st.id) || _approved(st.id)) return;
+    var d = CommentBank.redrawHabits(_bankContext(_activeCourse, st, _facts(st)), last, {
+      comments: _classmateComments(_activeCourse, st.id, termId),
+      exclude: [],
+    });
+    if (!d) return;
+    var text = el.value;
+    var before = d.habits.before;
+    var after = d.habits.after;
+    var next;
+    if (text.trim() === last.text.trim()) next = d.text;
+    else if (before && text.indexOf(before) >= 0) next = _swapSentence(text, before, after);
+    else return;
+    _lastDraft[key] = d;
+    if (next === text) return;
+    el.value = next;
+    tqNarrativeDirty = true;
+    tqSaveNarrative();
+    _syncNote();
+  }
+
+  /* One sentence of the comment in place of another; with none, the old one
+     and a space beside it taken out. */
+  function _swapSentence(text, before, after) {
+    if (after) return text.replace(before, after);
+    if (text.indexOf(before + ' ') >= 0) return text.replace(before + ' ', '');
+    if (text.indexOf(' ' + before) >= 0) return text.replace(' ' + before, '');
+    return text.replace(before, '');
   }
 
   /* ── At a Glance ─────────────────────────────────────────── */
@@ -859,8 +901,9 @@ window.ReportQuestionnaire = (function () {
      text back). Each press gives another version; the student's own seed
      keeps the first draft the same between visits. */
   var _generated = {};
-  // The last draft Generate wrote per student and report, so choosing IE or
-  // goals can redraw a draft the teacher has not edited.
+  // The last draft Generate wrote per student and report (as draft() gives
+  // it), so choosing IE or goals can redraw a draft the teacher has not
+  // edited, and a habit rating can redraw its habits sentence.
   var _lastDraft = {};
   function tqGenerate() {
     var st = _current();
@@ -889,7 +932,7 @@ window.ReportQuestionnaire = (function () {
       ok = false;
     }
     if (!ok || el.value !== d.text) el.value = d.text;
-    _lastDraft[_activeCourse + '|' + st.id + '|' + termId] = d.text;
+    _lastDraft[_activeCourse + '|' + st.id + '|' + termId] = d;
     tqNarrativeDirty = true;
     tqSaveNarrative();
     _syncNote();
@@ -1078,7 +1121,8 @@ window.ReportQuestionnaire = (function () {
     var rating = getStudentTermRating(_activeCourse, st.id, termId) || {};
     if ((rating.reportingBasis || 'grade') === basis) return;
     var text = plainComment(rating.narrative || '').trim();
-    var redraft = !!text && text === (_lastDraft[_activeCourse + '|' + st.id + '|' + termId] || '').trim();
+    var last = _lastDraft[_activeCourse + '|' + st.id + '|' + termId];
+    var redraft = !!text && !!last && text === last.text.trim();
     upsertTermRating(_activeCourse, st.id, termId, { reportingBasis: basis, ieDeadline: rating.ieDeadline || null });
     _cal = null;
     _facts(st, true);
@@ -1285,7 +1329,13 @@ window.ReportQuestionnaire = (function () {
     if (before && after && before !== after && text.indexOf(before) >= 0) {
       upsertTermRating(_activeCourse, st.id, termId, { narrative: text.replace(before, after) });
       var key = _activeCourse + '|' + st.id + '|' + termId;
-      if (_lastDraft[key]) _lastDraft[key] = _lastDraft[key].replace(before, after);
+      var last = _lastDraft[key];
+      if (last) {
+        last.text = last.text.replace(before, after);
+        last.sentences.forEach(function (x) {
+          if (x.text === before) x.text = after;
+        });
+      }
     }
     _cal = null;
     rerender();
