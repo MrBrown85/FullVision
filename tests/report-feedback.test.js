@@ -318,6 +318,16 @@ describe('forStudent: what a card carries', () => {
     expect(item.grade).toEqual({ text: 'Proficient', word: 'Proficient', letter: '' });
   });
 
+  it('a Tag Rubric with nothing written stays on the grade sheet; one of the teacher’s own always prints', () => {
+    const scores = getScores(CID);
+    scores[SID] = scores[SID].map(e => (e.assessmentId === 'tags' ? Object.assign({}, e, { critNote: '' }) : e));
+    saveScores(CID, scores);
+    clearProfCache();
+    const items = byId(F.forStudent(CID, ST));
+    expect(items.tags).toBeUndefined();
+    expect(items.rubric).toBeDefined();
+  });
+
   it('a General Rubric: one Overall row for work with no competencies', () => {
     saveAssessments(
       CID,
@@ -327,8 +337,16 @@ describe('forStudent: what a card carries', () => {
     scores[SID].push(entry('general', UNLINKED_TAG_ID, 4));
     saveScores(CID, scores);
     clearProfCache();
+    // Scored with nothing written: the grade sheet has it; no card.
+    expect(byId(F.forStudent(CID, ST)).general).toBeUndefined();
+    scores[SID] = scores[SID].map(e =>
+      e.assessmentId === 'general' ? Object.assign({}, e, { note: 'Read with expression.' }) : e,
+    );
+    saveScores(CID, scores);
+    clearProfCache();
     const item = byId(F.forStudent(CID, ST)).general;
     expect(item.kind).toBe('general');
+    expect(item.feedback.map(f => f.text)).toEqual(['Read with expression.']);
     expect(item.rubric.rows.map(r => r.name)).toEqual(['Overall']);
     expect(item.grade.text).toBe('Extending');
   });

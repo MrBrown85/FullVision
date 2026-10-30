@@ -159,6 +159,10 @@ window.ReportFeedback = (function () {
       return r.level > 0;
     });
     if (!written && (off || !scored)) return null;
+    // A Tag or General Rubric is only the class's general wording around a
+    // score; with nothing written it adds nothing to the grade sheet, so it
+    // stays there. A rubric of the teacher's own prints whenever scored.
+    if (!written && (!sheet || sheet.rubric.kind)) return null;
     item.kind = sheet ? sheet.rubric.kind || 'rubric' : 'general';
     item.rubric = sheet ? _rubric(cid, sheet) : null;
     item.grade = off ? null : _grade(cid, sid, a);
