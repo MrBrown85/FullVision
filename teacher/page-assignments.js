@@ -491,9 +491,25 @@ window.PageAssignments = (function () {
   }
 
   /* ── Assessment List ────────────────────────────────────── */
-  // Competencies, rubric criteria with none, or one overall score.
+  // Competencies, rubric criteria with none, or one overall score. Rubric
+  // work lists the competencies its criteria feed, scored through them
+  // (_tagState, _setTagScore), then any criterion that feeds none.
   function _scoreTagObjs(cid, a) {
-    var tagObjs = scoreTagIds(a, cid)
+    var keys = scoreTagIds(a, cid);
+    var comps = rubricCompetencyIds(cid, a);
+    if (comps.length) {
+      var rubric = getRubricById(cid, a.rubricId);
+      keys = comps.concat(
+        ((rubric && rubric.criteria) || [])
+          .filter(function (c) {
+            return c && c.id && !(c.tagIds || []).length;
+          })
+          .map(function (c) {
+            return c.id;
+          }),
+      );
+    }
+    var tagObjs = keys
       .map(function (key) {
         return scoreKeyInfo(cid, a, key);
       })
@@ -1217,12 +1233,44 @@ window.PageAssignments = (function () {
   }
 
   /* ── Levels, points and Complete/Incomplete for one student ── */
+  // On rubric work a competency is scored through the criteria that feed
+  // it: it shows their level (one level, or the lowest marked mixed, with
+  // no ±), and a level set on it goes to each of them. Any other key is
+  // scored on its own.
+  function _tagCriteria(cid, aid, tagId) {
+    var a = getAssessments(cid).find(function (x) {
+      return x.id === aid;
+    });
+    return a ? rubricCriteriaForTag(cid, a, tagId) : [];
+  }
+  function _tagScoreKeys(cid, aid, tagId) {
+    var crits = _tagCriteria(cid, aid, tagId);
+    return crits.length
+      ? crits.map(function (c) {
+          return c.id;
+        })
+      : [tagId];
+  }
+  function _setTagScore(cid, sid, aid, tagId, value, mod) {
+    _tagScoreKeys(cid, aid, tagId).forEach(function (key) {
+      setScore(cid, sid, aid, key, value, mod);
+    });
+  }
   function _tagState(cid, sid, aid, tagId) {
+    var crits = _tagCriteria(cid, aid, tagId);
+    if (crits.length) {
+      var a = getAssessments(cid).find(function (x) {
+        return x.id === aid;
+      });
+      var lv = competencyLevelFromCriteria(cid, sid, a, tagId, crits);
+      if (!lv) return { level: 0, mod: 0, mixed: false };
+      return { level: lv.score, mod: lv.mixed ? 0 : lv.mod, mixed: lv.mixed };
+    }
     var e = (getScores(cid)[sid] || []).find(function (x) {
       return x.assessmentId === aid && x.tagId === tagId;
     });
     var v = e ? Number(e.score) || 0 : 0;
-    return { level: v, mod: v && e.mod ? e.mod : 0 };
+    return { level: v, mod: v && e.mod ? e.mod : 0, mixed: false };
   }
   function _graderStepperHtml(level, mod, attrs) {
     var name = PROF_LABELS[level] || '';
@@ -1269,7 +1317,7 @@ window.PageAssignments = (function () {
               var on = state.level === lv;
               return (
                 '<button type="button" class="grdl-level' +
-                (on ? ' is-on l' + lv : '') +
+                (on ? ' is-on l' + lv + (state.mixed ? ' mixed' : '') : '') +
                 '" data-action="graderTagLevel" data-tag="' +
                 esc(t.id) +
                 '" data-level="' +
@@ -1300,7 +1348,11 @@ window.PageAssignments = (function () {
             '<div class="grdl-controls"><div class="grdl-seg" role="group" aria-label="Level">' +
             seg +
             '</div>' +
-            _graderStepperHtml(state.level, state.mod, 'data-action="graderTagMod" data-tag="' + esc(t.id) + '"') +
+            _graderStepperHtml(
+              state.mixed ? 0 : state.level,
+              state.mod,
+              'data-action="graderTagMod" data-tag="' + esc(t.id) + '"',
+            ) +
             '</div>' +
             (withNotes ? _tagNoteHtml(cid, a.id, st.id, t.id) : '') +
             '</section>'
@@ -1537,7 +1589,7 @@ window.PageAssignments = (function () {
                 segAttr(!showRubric) +
                 ' data-action="setRubricView" data-aid="' +
                 a.id +
-                '" data-rubric="false">Criteria</button>' +
+                '" data-rubric="false">Competencies</button>' +
                 '<button class="seg-btn rubric-view-btn"' +
                 segAttr(showRubric) +
                 ' data-action="setRubricView" data-aid="' +
@@ -3378,7 +3430,7 @@ window.PageAssignments = (function () {
   function rowScoreState(row) {
     var aid = row.dataset.assess;
     var tagIds = [];
-    if (row.dataset.tag) tagIds = [row.dataset.tag];
+    if (row.dataset.tag) tagIds = _tagScoreKeys(activeCourse, aid, row.dataset.tag);
     else {
       var crit = getRubricCriterion(aid, row.dataset.criterion);
       if (crit) tagIds = rubricCriterionScoreKeys(crit);
@@ -3443,20 +3495,32 @@ window.PageAssignments = (function () {
     st.tagIds.forEach(function (tid) {
       setScore(activeCourse, row.dataset.student, row.dataset.assess, tid, st.level, next);
     });
-    syncModRow(row);
+    if (row.dataset.tag) _syncTagRows(row.dataset.assess, row.dataset.student);
+    else syncModRow(row);
     refreshSidebarGrades(row.dataset.student);
   }
 
   function selectTagLevel(el, value, aid, sid, tagId) {
-    var wasActive = el.classList.contains('active');
+    // A mixed level is the lowest of disagreeing criteria: a click sets
+    // them all to it rather than clearing.
+    var wasActive = el.classList.contains('active') && !el.classList.contains('mixed');
     var next = wasActive ? 0 : value;
-    setScore(activeCourse, sid, aid, tagId, next);
-    el.parentElement.querySelectorAll('.rsg-level').forEach(function (o) {
-      o.classList.remove('active');
-    });
-    if (!wasActive) el.classList.add('active');
-    syncModRow(el.closest('.rsg-criterion-row'));
+    _setTagScore(activeCourse, sid, aid, tagId, next);
+    _syncTagRows(aid, sid);
     refreshSidebarGrades(sid);
+  }
+
+  // A criterion can feed several competencies, so a level set on one
+  // competency's row can change the student's other rows: redraw them all.
+  function _syncTagRows(aid, sid) {
+    var selector = '.rsg-criterion-row.is-tag[data-assess="' + aid + '"][data-student="' + sid + '"]';
+    document.querySelectorAll(selector).forEach(function (row) {
+      var st = _tagState(activeCourse, sid, aid, row.dataset.tag);
+      updateRubricRowUI(row, st.level);
+      var active = st.mixed && row.querySelector('.rsg-level.active');
+      if (active) active.classList.add('mixed');
+      syncModRow(row);
+    });
   }
 
   function selectScore(el, value) {
@@ -3522,7 +3586,7 @@ window.PageAssignments = (function () {
     if (scope === 'col') {
       students.forEach(function (st) {
         if (statuses[st.id + ':' + aid]) return;
-        setScore(cid, st.id, aid, tagId, value);
+        _setTagScore(cid, st.id, aid, tagId, value);
       });
       selector = '.rsg-criterion-row.is-tag[data-assess="' + aid + '"][data-tag="' + tagId + '"]';
       toastMsg = 'Column filled';
@@ -3553,6 +3617,9 @@ window.PageAssignments = (function () {
       updateRubricRowUI(row, st.mixed ? 0 : st.level);
     });
     syncModRows('.rsg-criterion-row[data-assess="' + aid + '"]');
+    students.forEach(function (st) {
+      _syncTagRows(aid, st.id);
+    });
     refreshSidebarGrades();
     showUndoToast(toastMsg, function () {
       var beforeScores = getScores(cid);
@@ -3598,7 +3665,8 @@ window.PageAssignments = (function () {
       l.classList.remove('active', 'mixed');
     });
     if (value > 0) {
-      var lvl = row.querySelector('.l' + value);
+      // The row's − | + carry the level's class too.
+      var lvl = row.querySelector('.rsg-level.l' + value);
       if (lvl) lvl.classList.add('active');
     }
   }
@@ -3860,7 +3928,6 @@ window.PageAssignments = (function () {
     html += _setEveryoneHtml(cid, 'confirmFillAll', a.id);
     var statuses = getAssignmentStatuses(cid);
     students.forEach(function (st) {
-      var studentScores = scores[st.id] || [];
       var stStatus = statuses[st.id + ':' + a.id] || null;
       var disableRow = stStatus && stStatus !== 'LATE';
       html +=
@@ -3875,11 +3942,9 @@ window.PageAssignments = (function () {
         _rsgStudentHeadHtml(cid, a.id, st, stStatus, 'fillScoresAndClose') +
         '<div class="rsg-criteria">';
       tagObjs.forEach(function (tag) {
-        var entry = studentScores.find(function (s) {
-          return s.assessmentId === a.id && s.tagId === tag.id;
-        });
-        var score = entry ? entry.score : 0;
-        var mod = entry ? normalizeScoreMod(score, entry.mod) : 0;
+        var state = _tagState(cid, st.id, a.id, tag.id);
+        var score = state.level;
+        var mod = normalizeScoreMod(score, state.mod);
         html +=
           '<div class="rsg-criterion-row is-tag" data-student="' +
           st.id +
@@ -3896,13 +3961,13 @@ window.PageAssignments = (function () {
           esc(tag.label) +
           '</span></div>' +
           '<div class="rsg-crit-tools"><div class="rsg-mods">' +
-          scoreModButtonsHtml(score, mod) +
+          scoreModButtonsHtml(state.mixed ? 0 : score, mod) +
           '</div></div></div>' +
           '<div class="rsg-levels">' +
           _levelButtonsHtml(
             cid,
             function (l) {
-              return score === l ? ' active' : '';
+              return score === l ? (state.mixed ? ' active mixed' : ' active') : '';
             },
             function (l) {
               return (
@@ -6779,6 +6844,8 @@ window.PageAssignments = (function () {
       e.preventDefault();
       if (_kbFocusEl.classList.contains('rsg-criterion-row')) {
         var active = _kbFocusEl.querySelector('.rsg-level.active');
+        // Delete clears a mixed competency too, not sets it to the lowest.
+        if (active) active.classList.remove('mixed');
         if (active) active.click();
       }
       return;
@@ -7485,7 +7552,7 @@ window.PageAssignments = (function () {
   function _graderSetTagLevel(aid, tagId, level) {
     if (!aid || !focusStudentId) return;
     var state = _tagState(activeCourse, focusStudentId, aid, tagId);
-    setScore(activeCourse, focusStudentId, aid, tagId, state.level === level ? 0 : level, 0);
+    _setTagScore(activeCourse, focusStudentId, aid, tagId, state.level === level && !state.mixed ? 0 : level, 0);
     refreshSidebarGrades(focusStudentId);
     render();
     _focusGraderCard(aid, '.grdl-card[data-tag="' + tagId + '"]');
@@ -7493,10 +7560,10 @@ window.PageAssignments = (function () {
   function _graderSetTagMod(aid, tagId, mod) {
     if (!aid || !focusStudentId) return;
     var state = _tagState(activeCourse, focusStudentId, aid, tagId);
-    if (!state.level) return;
+    if (!state.level || state.mixed) return;
     var next = state.mod === mod ? 0 : mod;
     if (normalizeScoreMod(state.level, next) !== next) return;
-    setScore(activeCourse, focusStudentId, aid, tagId, state.level, next);
+    _setTagScore(activeCourse, focusStudentId, aid, tagId, state.level, next);
     refreshSidebarGrades(focusStudentId);
     render();
     _focusGraderCard(aid, '.grdl-card[data-tag="' + tagId + '"]');
