@@ -764,7 +764,7 @@ window.PageStudent = (function () {
       );
     return (
       '<span class="stu-note">' +
-      (linked.length && String(linked[0].text || '').split('\n')[0] ? obsPrivateLabelHtml(linked[0]) + ' ' : '') +
+      (linked.length && isPrivateObservation(linked[0]) ? obsPrivateLabelHtml(linked[0]) + ' ' : '') +
       esc(text) +
       (linked.length > 1 ? ' <span class="stu-sub-inline">+' + (linked.length - 1) + ' more</span>' : '') +
       '</span>'
