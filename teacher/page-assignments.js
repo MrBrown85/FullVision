@@ -1555,27 +1555,20 @@ window.PageAssignments = (function () {
         formatDate(a.date) +
         '</span>' +
         (function () {
-          if (a.dueDate) {
-            var isPastDue = new Date(a.dueDate) < new Date();
-            if (isPastDue) {
-              var unscoredCount = students.filter(function (st) {
-                var sc = scores[st.id] || [];
-                return !sc.some(function (s) {
-                  return s.assessmentId === a.id && isScoreEntered(a, s);
-                });
-              }).length;
-              if (unscoredCount > 0)
-                return (
-                  '<span class="assess-missing" title="' +
-                  unscoredCount +
-                  ' students unscored past due date">' +
-                  _WARNING_ICON +
-                  unscoredCount +
-                  ' missing</span>'
-                );
-            }
-          }
-          return '';
+          // Students whose work is labelled Missing, whatever the due date.
+          var missingCount = students.filter(function (st) {
+            return getAssignmentStatus(cid, st.id, a.id) === 'NS';
+          }).length;
+          if (!missingCount) return '';
+          return (
+            '<span class="assess-missing" title="' +
+            missingCount +
+            (missingCount === 1 ? ' student' : ' students') +
+            ' labelled Missing">' +
+            _WARNING_ICON +
+            missingCount +
+            ' missing</span>'
+          );
         })() +
         '</span>' +
         '</div>' +

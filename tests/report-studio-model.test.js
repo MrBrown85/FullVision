@@ -639,26 +639,32 @@ describe('stage 3 blocks', () => {
     expect(ReportBlocks.renderReportBlock('progress', CID, CECE, {}, {})).toBe('');
   });
 
-  it('Missing Work names this term’s missing work on one line, says None this term, or stays off', () => {
+  it('Missing Work names this term’s work labelled Missing on one line, says None this term, or stays off', () => {
     const work = [
       { id: 'a1', title: 'Lab Report', dueDate: '2026-10-02' },
       { id: 'a2', title: 'Quiz', date: '2026-10-05' },
       { id: 'a3', title: 'Poster', date: '2026-10-07' },
+      { id: 'a4', title: 'Essay', date: '2026-10-08' },
     ];
     stub('getAssessments', () => work);
     stub('assessmentInActiveTerm', () => true);
     stub('courseToday', () => '2026-10-10');
+    // The Lab Report is past due with nothing in it: not missing.
     stub('assessmentCellValue', (cid, sid, a) =>
-      a.id === 'a1' ? { kind: 'missing' } : a.id === 'a2' ? { kind: 'status', status: 'NS' } : { kind: 'level' },
+      a.id === 'a1'
+        ? { kind: 'none', status: null }
+        : a.id === 'a2' || a.id === 'a4'
+          ? { kind: 'status', status: 'NS' }
+          : { kind: 'level' },
     );
     expect(text(ReportBlocks.renderReportBlock('missing-work', CID, CECE, {}, {}))).toBe(
-      'Missing Work Lab Report, Quiz As of Oct 10, 2026',
+      'Missing Work Quiz, Essay As of Oct 10, 2026',
     );
     expect(text(ReportBlocks.renderReportBlock('missing-work', CID, CECE, {}, { titles: false }))).toBe(
       'Missing Work 2 assignments As of Oct 10, 2026',
     );
     expect(text(ReportBlocks.renderReportBlock('missing-work', CID, CECE, {}, { size: 'half' }))).toBe(
-      'Missing Work As of Oct 10, 2026 2 Lab Report, Quiz',
+      'Missing Work As of Oct 10, 2026 2 Quiz, Essay',
     );
     stub('assessmentCellValue', () => ({ kind: 'level' }));
     expect(text(ReportBlocks.renderReportBlock('missing-work', CID, CECE, {}, {}))).toBe(
@@ -785,7 +791,7 @@ describe('stage 3 blocks', () => {
     const cells = {
       a1: { kind: 'level', late: true },
       a2: { kind: 'points' },
-      a3: { kind: 'missing' },
+      a3: { kind: 'none', status: null },
       a4: { kind: 'status', status: 'NS' },
     };
     stub('getAssessments', () => work);
@@ -805,7 +811,7 @@ describe('stage 3 blocks', () => {
     ]);
     stub('getSectionProficiency', (cid, sid, id) => ({ q: 3, p: 2.2, c: 3.6 })[id]);
     expect(text(ReportBlocks.renderReportBlock('term-glance', CID, CECE, {}, {}))).toBe(
-      'This Term at a Glance 2 Assessed 1 Late 2 Missing 2 Observations Comm. Strongest Planning Growing',
+      'This Term at a Glance 2 Assessed 1 Late 1 Missing 2 Observations Comm. Strongest Planning Growing',
     );
     stub('getAssessments', () => []);
     expect(ReportBlocks.renderReportBlock('term-glance', CID, CECE, {}, {})).toBe('');
@@ -957,7 +963,7 @@ describe('stage 3 blocks', () => {
     const cells = {
       a1: { kind: 'points', value: 12, level: 3 },
       a2: { kind: 'level', value: 3.33, level: 3 },
-      a3: { kind: 'missing', value: 0, level: 0 },
+      a3: { kind: 'status', status: 'NS', value: 0, level: 0 },
     };
     stub('getAssessments', () => work);
     stub('assessmentInActiveTerm', () => true);

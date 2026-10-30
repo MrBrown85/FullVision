@@ -295,7 +295,7 @@ window.DashOverview = (function () {
   function renderOverviewPanel(opts) {
     var cid = opts.cid;
     var allStudents = opts.allStudents;
-    var missing = DashInsights.missingItems(cid, allStudents, getTodayStr());
+    var missing = DashInsights.missingItems(cid, allStudents);
     var model = DashInsights.attentionModel(cid, allStudents, { rule: opts.helpRule });
     var html = '<div class="dash-section dash-overview">';
     html += glanceHtml(Object.assign({}, opts, { missing: missing }));

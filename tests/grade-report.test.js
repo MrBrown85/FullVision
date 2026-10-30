@@ -34,7 +34,7 @@ function seed(mode) {
   const cells = {
     a1: { kind: 'points', value: 12, level: 3, late: true },
     a2: { kind: 'level', value: 3.33, level: 3, late: false },
-    a3: { kind: 'missing', value: 0, level: 0, zero: false, late: false },
+    a3: { kind: 'status', status: 'NS', value: 0, level: 0, late: false },
     a4: { kind: 'complete', mark: 'complete', value: 1, late: false },
     a5: { kind: 'status', status: 'EXC', late: false },
     a6: { kind: 'none', late: false },

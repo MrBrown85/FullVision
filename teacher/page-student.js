@@ -522,7 +522,7 @@ window.PageStudent = (function () {
       return c.cell.kind === 'points' || c.cell.kind === 'level' || c.cell.kind === 'complete';
     });
     var unscored = ctx.cells.filter(function (c) {
-      return c.cell.kind === 'none' || c.cell.kind === 'missing';
+      return c.cell.kind === 'none';
     }).length;
     var latestA = scored.reduce(function (m, c) {
       return (c.a.date || '') > m ? c.a.date : m;
@@ -969,7 +969,7 @@ window.PageStudent = (function () {
       return isPointsScored(a);
     };
     var unscored = function (c) {
-      return c.cell.kind === 'none' || c.cell.kind === 'missing';
+      return c.cell.kind === 'none';
     };
     var cells = ctx.cells.slice().sort(function (x, y) {
       return (y.a.date || '').localeCompare(x.a.date || '');

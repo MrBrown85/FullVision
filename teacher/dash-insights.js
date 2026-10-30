@@ -281,12 +281,11 @@ window.DashInsights = (function () {
   var MISSING_KINDS = {
     ns: { label: 'Missing', cls: 'is-ns' },
     late: { label: 'Late', cls: 'is-late' },
-    due: { label: 'Past Due', cls: 'is-due' },
   };
 
-  /* Work marked Not Submitted or Late, and work past its due date with no
-     score, in the active term. Newest assessment first. */
-  function missingItems(cid, allStudents, todayStr) {
+  /* Work labelled Missing or Late in the active term, newest assessment
+     first. An empty cell past its due date is not missing. */
+  function missingItems(cid, allStudents) {
     var assessments = getAssessments(cid)
       .filter(function (a) {
         return assessmentInActiveTerm(cid, a);
@@ -299,9 +298,6 @@ window.DashInsights = (function () {
       allStudents.forEach(function (st) {
         var status = getAssignmentStatus(cid, st.id, a.id);
         var kind = status === 'NS' ? 'ns' : status === 'LATE' ? 'late' : null;
-        if (!kind && !status && a.dueDate && a.dueDate < todayStr) {
-          if (assessmentCellValue(cid, st.id, a, todayStr).kind === 'missing') kind = 'due';
-        }
         if (kind) items.push({ kind: kind, student: st, assessment: a });
       });
     });
@@ -309,7 +305,7 @@ window.DashInsights = (function () {
   }
 
   function missingCounts(items) {
-    var counts = { ns: 0, late: 0, due: 0, total: items.length };
+    var counts = { ns: 0, late: 0, total: items.length };
     items.forEach(function (it) {
       counts[it.kind]++;
     });
@@ -317,7 +313,7 @@ window.DashInsights = (function () {
   }
 
   /* The top bar's Missing and Late cell. Zero says so in a line; otherwise
-     the three counts, and a click shows those students in Needs Attention. */
+     the two counts, and a click shows those students in Needs Attention. */
   function missingGlanceHtml(items) {
     var c = missingCounts(items);
     var html =
@@ -332,7 +328,7 @@ window.DashInsights = (function () {
     return (
       html +
       '<span class="dash-glance-sub">' +
-      ['ns', 'late', 'due']
+      ['ns', 'late']
         .map(function (k) {
           return '<b>' + c[k] + '</b> ' + MISSING_KINDS[k].label;
         })
@@ -372,7 +368,7 @@ window.DashInsights = (function () {
       return r.observed;
     });
     var missingBy = {};
-    missingItems(cid, allStudents, today).forEach(function (it) {
+    missingItems(cid, allStudents).forEach(function (it) {
       (missingBy[it.student.id] = missingBy[it.student.id] || []).push(it);
     });
     var people = [];

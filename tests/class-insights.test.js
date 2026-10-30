@@ -168,25 +168,25 @@ describe('the Missing and Late cell', () => {
   it('says so at zero and counts each kind otherwise', () => {
     expect(DashInsights.missingGlanceHtml([])).toContain('Nothing is missing or late.');
     const html = DashInsights.missingGlanceHtml([{ kind: 'ns' }, { kind: 'late' }, { kind: 'late' }]);
-    expect(html).toContain('<b>1</b> Missing · <b>2</b> Late · <b>0</b> Past Due');
+    expect(html).toContain('<b>1</b> Missing · <b>2</b> Late</span>');
+    expect(html).not.toContain('Past Due');
   });
 });
 
 describe('Missing and Late', () => {
-  it('lists Not Submitted, Late and past-due unscored work in the active term', () => {
+  it('lists work labelled Missing or Late in the active term, never an empty cell past its due date', () => {
     const A = [
       { id: 'a1', title: 'Lab', date: '2026-10-01', dueDate: '2026-10-05' },
       { id: 'a2', title: 'Quiz', date: '2026-10-10', dueDate: '2026-10-30' },
     ];
     globalThis.getAssessments = () => A;
+    // s3 has nothing on the Lab, which is past due: not missing.
     globalThis.getAssignmentStatus = (cid, sid, aid) =>
       sid === 's1' && aid === 'a2' ? 'NS' : sid === 's2' && aid === 'a1' ? 'LATE' : null;
-    globalThis.assessmentCellValue = (cid, sid, a) => ({ kind: sid === 's3' && a.id === 'a1' ? 'missing' : 'level' });
-    const items = DashInsights.missingItems(CID, STUDENTS, '2026-10-22');
+    const items = DashInsights.missingItems(CID, STUDENTS);
     expect(items.map(it => [it.kind, it.student.id, it.assessment.id])).toEqual([
       ['ns', 's1', 'a2'],
       ['late', 's2', 'a1'],
-      ['due', 's3', 'a1'],
     ]);
   });
 });

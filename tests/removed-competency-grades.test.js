@@ -136,9 +136,9 @@ describe('the Remove confirm', () => {
 
 describe('the gradebook cell', () => {
   it('shows the same score the overall counts once a competency is removed', () => {
-    expect(assessmentCellValue(CID, 's1', getAssessments(CID)[0], '2026-10-22').value).toBe(3);
+    expect(assessmentCellValue(CID, 's1', getAssessments(CID)[0]).value).toBe(3);
     removeB();
-    const cell = assessmentCellValue(CID, 's1', getAssessments(CID)[0], '2026-10-22');
+    const cell = assessmentCellValue(CID, 's1', getAssessments(CID)[0]);
     expect(cell.value).toBe(4);
     expect(cell.value).toBe(getAssessmentOverallScore(CID, 's1', 'lab'));
   });

@@ -1156,7 +1156,6 @@ window.ReportBlocks = (function () {
   function renderBlockSectionChart(cid, student) {
     const sections = getSections(cid);
     const assessments = getAssessments(cid);
-    const allScores = getScores(cid)[student.id] || [];
     const levelScores = _levelScores(cid, student.id);
     let html = `<div class="report-block-box report-section-chart">
     <div class="report-block-title">Section Proficiency Breakdown</div>`;
@@ -1192,12 +1191,10 @@ window.ReportBlocks = (function () {
         })
         .filter(Boolean)
         .sort((a, b) => b.avg - a.avg);
-      // Missing: assessments that have tags in this section but student has no scores
-      const missingAssess = assessments.filter(a => {
-        const hasTags = (a.tagIds || []).some(tid => secTagIds.has(tid));
-        if (!hasTags) return false;
-        return !allScores.some(s => s.assessmentId === a.id && secTagIds.has(s.tagId) && s.score > 0);
-      });
+      // Missing: assessments with tags in this section labelled Missing.
+      const missingAssess = assessments.filter(
+        a => (a.tagIds || []).some(tid => secTagIds.has(tid)) && getAssignmentStatus(cid, student.id, a.id) === 'NS',
+      );
 
       // 4-dot proficiency indicator
       let dots = '';
@@ -1342,11 +1339,8 @@ window.ReportBlocks = (function () {
       .reverse()
       .slice(0, 3);
 
-    // Missing assignments (no scores at all for this student)
-    const missing = assessments.filter(a => {
-      const aScores = allScores.filter(s => s.assessmentId === a.id && isScoreEntered(a, s));
-      return aScores.length === 0;
-    });
+    // Missing assignments: work labelled Missing.
+    const missing = assessments.filter(a => getAssignmentStatus(cid, student.id, a.id) === 'NS');
 
     // Proficient+ percentage for circle gauge
     const profPlus = counts[3] + counts[4];
@@ -1485,7 +1479,6 @@ window.ReportBlocks = (function () {
       };
     }
     if (cv.kind === 'status') return { score: cv.status === 'EXC' ? 'Excused' : 'Missing', percent: '', word: '' };
-    if (cv.kind === 'missing') return { score: 'Missing', percent: '', word: '' };
     if (cv.kind === 'complete') {
       return { score: cv.mark === 'complete' ? '✓ Complete' : '✗ Incomplete', percent: '', word: '' };
     }
@@ -1800,7 +1793,7 @@ window.ReportBlocks = (function () {
     if (!cells.length) return '';
     const assessed = cells.filter(c => ['level', 'points', 'complete'].includes(c.cell.kind)).length;
     const late = cells.filter(c => c.cell.late).length;
-    const missing = cells.filter(c => c.cell.kind === 'missing' || c.cell.status === 'NS').length;
+    const missing = cells.filter(c => c.cell.status === 'NS').length;
     const obs = getStudentQuickObs(cid, student.id).filter(o =>
       _inActiveTerm(cid, String(o.date || o.created || '').slice(0, 10)),
     ).length;
@@ -1860,10 +1853,8 @@ window.ReportBlocks = (function () {
   </div>`;
   }
 
-  /* ── Missing Work ── this term's assessments past due with no score, or
-     marked not submitted. Nothing for a student with none. */
   /* ── Missing Work ────────────────────────────────────────────────
-     This term's missing and not-submitted work as of today: one line at
+     This term's work labelled Missing, as of today: one line at
      Row width ("None this term", or the titles), a count over its words at
      Side by Side. When there is none it says so, or stays off. */
   function _asOf(cid) {
@@ -1875,7 +1866,7 @@ window.ReportBlocks = (function () {
   function renderBlockMissingWork(cid, student, ctx, options) {
     options = options || {};
     const half = options.size === 'half';
-    const missing = _termCells(cid, student).filter(c => c.cell.kind === 'missing' || c.cell.status === 'NS');
+    const missing = _termCells(cid, student).filter(c => c.cell.status === 'NS');
     if (!missing.length && options.none === 'off') return '';
     const n = missing.length;
     const titles = missing.map(c => esc(c.a.title || '')).join(', ');
