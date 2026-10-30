@@ -54,14 +54,24 @@ describe('options', () => {
     expect(G.options(null)).toEqual({
       summary: true,
       ungraded: true,
+      numbers: false,
       order: 'oldest',
       name: 'preferred',
     });
     expect(
-      G.options({ summary: false, ungraded: false, comment: true, order: 'newest', name: 'first', junk: 1 }),
+      G.options({
+        summary: false,
+        ungraded: false,
+        numbers: true,
+        comment: true,
+        order: 'newest',
+        name: 'first',
+        junk: 1,
+      }),
     ).toEqual({
       summary: false,
       ungraded: false,
+      numbers: true,
       order: 'newest',
       name: 'first',
     });
@@ -113,6 +123,20 @@ describe('rows', () => {
     expect(G.rows(CID, ST, { order: 'newest', ungraded: false })[0].title).toBe('Field Trip Form');
   });
 
+  it('numbers the rows 1 to n in the order they print, ungraded work included', () => {
+    seed();
+    stub('courseToday', () => '2026-10-29');
+    const oldest = G.rows(CID, ST);
+    expect(oldest.map(r => r.n)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(oldest[0].title).toBe('Formulas Quiz');
+    expect(oldest[5]).toMatchObject({ n: 6, title: 'Next Week' });
+    const newest = G.rows(CID, ST, { order: 'newest' });
+    expect(newest.map(r => r.n)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(newest[0]).toMatchObject({ n: 1, title: 'Next Week' });
+    // Rows left off (Ungraded Assignments off) leave no gap.
+    expect(G.rows(CID, ST, { ungraded: false }).map(r => r.n)).toEqual([1, 2, 3, 4, 5]);
+  });
+
   it('shows the percent in a Letter or Both class, and never a proficiency word', () => {
     seed('letter');
     expect(G.columnsFor(CID)).toEqual({ percent: true });
@@ -146,5 +170,37 @@ describe('plan', () => {
     const p = G.plan(120, sizes, two, H);
     expect(p.fits).toBe(true);
     expect(p.front % 2).toBe(0);
+  });
+});
+
+describe('Assignment Numbers column', () => {
+  const stageHtml = numbers => {
+    seed();
+    stub('courseToday', () => '2026-10-29');
+    stub('ReportBlocks', {
+      renderBlockHeader: () => '<div class="gr-letterhead">Letterhead</div>',
+      reportContext: () => ({}),
+    });
+    stub('ReportSheets', { sideHeight: () => 996 });
+    stub('studentGradeSummary', () => ({ text: '80%' }));
+    stub('assessmentGroupGrade', () => ({ text: '80%' }));
+    stub('categoryCalcMode', () => 'average');
+    stub('fullName', s => s.firstName + ' ' + s.lastName);
+    // No DOM here: a stage that measures every block 50px tall.
+    const stage = { innerHTML: '', firstChild: { offsetHeight: 50 }, querySelectorAll: () => [] };
+    return G.layoutStudent(CID, ST, {}, { paper: 'letter', stage, grade: { numbers } }).html;
+  };
+  const cells = (html, re) => [...html.matchAll(re)].map(m => m[1]);
+
+  it('adds a # header and a number on every row when on', () => {
+    const html = stageHtml(true);
+    expect(cells(html, /gr-head"><span class="gr-c gr-n gr-r">([^<]*)</g)).toEqual(['#']);
+    expect(cells(html, /<span class="gr-c gr-n gr-r">(\d+)</g)).toEqual(['1', '2', '3', '4', '5', '6']);
+  });
+
+  it('leaves the table as it was when off', () => {
+    const html = stageHtml(false);
+    expect(html).not.toContain('gr-c gr-n ');
+    expect(html).toContain('gr-head"><span class="gr-c gr-date">Date<');
   });
 });
