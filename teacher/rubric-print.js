@@ -232,25 +232,39 @@
       .filter(Boolean);
   }
 
-  /* The feedback printed at the bottom: the assessment comments the teacher
-     added from the grid's Comment button, oldest first, then the score
-     comment if there is one. */
-  function _feedbackText(cid, sid, aid, entries) {
-    var parts = [];
+  /* The feedback printed at the bottom, one item per comment: the
+     assessment comments the teacher added from the grid's Comment button
+     (observations linked to the assessment), oldest first, each with its
+     day, then the score comment if there is one (score.comment; it has no
+     day of its own). [{ text, date: 'YYYY-MM-DD' or '' }]. */
+  function feedbackItems(cid, sid, aid, entries) {
+    var items = [];
     if (typeof getAssignmentObs === 'function') {
       getAssignmentObs(cid, sid, aid)
         .slice()
         .reverse()
         .forEach(function (o) {
-          if (o && o.text) parts.push(String(o.text).trim());
+          var text = o && o.text ? String(o.text).trim() : '';
+          if (text) items.push({ text: text, date: String(o.date || o.created || '').slice(0, 10) });
         });
     }
     var note = '';
-    entries.forEach(function (e) {
+    (entries || getScores(cid)[sid] || []).forEach(function (e) {
       if (e && e.assessmentId === aid && e.note && !note) note = String(e.note).trim();
     });
-    if (note && parts.indexOf(note) < 0) parts.push(note);
-    return parts.filter(Boolean).join('\n');
+    var seen = items.some(function (i) {
+      return i.text === note;
+    });
+    if (note && !seen) items.push({ text: note, date: '' });
+    return items;
+  }
+
+  function _feedbackText(cid, sid, aid, entries) {
+    return feedbackItems(cid, sid, aid, entries)
+      .map(function (i) {
+        return i.text;
+      })
+      .join('\n');
   }
 
   /* The name at the top of a sheet (printedStudentName in shared/data.js). */
@@ -1425,6 +1439,7 @@
     defaultRubric: defaultRubric,
     GENERAL_LEVELS: GENERAL_LEVELS,
     sheetData: sheetData,
+    feedbackItems: feedbackItems,
     scoreSheetData: scoreSheetData,
     blankSheetData: blankSheetData,
     usesOf: usesOf,
