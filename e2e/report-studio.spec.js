@@ -47,17 +47,38 @@ async function openFresh(page) {
   await expect(page.locator('#studio-fit')).not.toBeEmpty();
 }
 
-/* The Studio on the Report Card starter, on the longest report. */
+/* The Studio on the Report Card starter, on the longest report. These
+   tests were written for an Assignment Grades table that fits the Back:
+   Demo Mode's 37 assessments, year to date in one column (the defaults),
+   run to a second sheet, so it is set to This Term, two columns, by
+   category (shortGradeTable). The defaults have their own test. */
 async function openStudio(page) {
   await openFresh(page);
   await applyTemplate(page, 'report-card');
   await expect(page.locator('.sheet-cell[data-block="parent-response"]')).toHaveCount(1);
+  await shortGradeTable(page);
 }
 
-/* Everyone: every student's pages on the canvas, which is what prints. */
-async function showEveryone(page) {
+async function shortGradeTable(page) {
+  for (const [group, choice] of [
+    ['Range', 'This Term'],
+    ['Columns', 'Two'],
+    ['Organize By', 'Category'],
+  ]) {
+    const pop = await openOptions(page, 'grade-table');
+    await pop.getByRole('radiogroup', { name: group }).getByRole('radio', { name: choice }).click();
+    await expect(cellOf(page, 'grade-table')).toBeVisible();
+  }
+  if (await popover(page).count()) await page.keyboard.press('Escape');
+  await page.locator('.studio-head').click();
+  await expect(popover(page)).toHaveCount(0);
+}
+
+/* Everyone: every student's pages on the canvas, which is what prints.
+   sides: how many each student takes (2 for one sheet, Front and Back). */
+async function showEveryone(page, sides = 2) {
   await page.locator('.studio-view [data-view="all"]').click();
-  await expect(page.locator('.report-sheet')).toHaveCount(STUDENTS * 2);
+  await expect(page.locator('.report-sheet')).toHaveCount(STUDENTS * sides);
 }
 
 /* A template from the palette's Templates tab. */
@@ -537,7 +558,7 @@ test.describe('Page Studio', () => {
     // Every assessment as rows: more than the back holds above the Response,
     // so it continues (a block taller than a side would print after the report).
     await expect(page.locator('.sheet-label').nth(2)).toHaveText(/^(Continued|After the Report)$/);
-    await expect(page.locator('.report-grades .report-prof-meta').first()).toContainText('All ·');
+    await expect(page.locator('.report-grades .report-prof-meta').first()).toContainText('Year to date ·');
     await expect(page.locator('.sheet-zoom[data-side="1"] .sheet-pinned .report-parent-response')).toHaveCount(1);
     expect(await overflowing(page)).toEqual([]);
     expect(await overlapping(page)).toEqual([]);
@@ -545,8 +566,10 @@ test.describe('Page Studio', () => {
     await page.locator('#studio-fit .studio-fit-link').click();
     await expect(page.locator('.studio-view [data-view="all"]')).toHaveAttribute('aria-checked', 'true');
     await expect(page.locator('.report-sheet.sheet-overflow')).toHaveCount(0);
+    // The Report Card again, with Assignment Grades at its defaults (year to
+    // date, one column): Demo Mode's 37 assessments take a second sheet.
     await applyTemplate(page, 'report-card');
-    await expect(page.locator('.report-sheet')).toHaveCount(STUDENTS * 2, { timeout: 30_000 });
+    await expect(page.locator('.report-sheet')).toHaveCount(STUDENTS * 4, { timeout: 30_000 });
   });
 
   test('the paper stays white with dark ink in dark mode; the screen around it goes dark', async ({ page }) => {
@@ -780,6 +803,26 @@ test.describe('Page Studio', () => {
     await page.getByRole('radio', { name: 'Letter' }).click();
   });
 
+  test('Assignment Grades starts in one column, a heading per month, year to date', async ({ page }) => {
+    await openFresh(page);
+    const pop = await openOptions(page, 'grade-table');
+    for (const [group, choice] of [
+      ['Columns', 'One'],
+      ['Organize By', 'Date'],
+      ['Range', 'Year to Date'],
+    ]) {
+      await expect(pop.getByRole('radiogroup', { name: group }).getByRole('radio', { name: choice })).toHaveAttribute(
+        'aria-checked',
+        'true',
+      );
+    }
+    await page.keyboard.press('Escape');
+    const table = page.locator('#rb-preview .report-grades').first();
+    await expect(table.locator('.report-prof-meta')).toContainText('Year to date ·');
+    await expect(table.locator('.report-grades-cols')).toHaveCount(0);
+    await expect(table).toContainText('October');
+  });
+
   test('the Options popover unchecks Assessed Count and closes with Escape', async ({ page }) => {
     await openStudio(page);
     await expect(page.locator('.report-sheet .report-prof thead th')).toHaveCount(5);
@@ -883,7 +926,9 @@ test.describe('Page Studio', () => {
   test('a starter applies, and Undo puts the layout back; the Templates tab draws each template with the real report', async ({
     page,
   }) => {
-    await openStudio(page);
+    // The Report Card as the template draws it, Assignment Grades at its defaults.
+    await openFresh(page);
+    await applyTemplate(page, 'report-card');
     await rateEveryone(page);
     await palette(page).getByRole('tab', { name: 'Templates' }).click();
     await expect(palette(page)).toContainText('Your Templates');
@@ -891,9 +936,10 @@ test.describe('Page Studio', () => {
     // Each starter is drawn with the previewed student's sheets and says how many it takes.
     const card = palette(page).locator('.studio-tpl[data-starter="report-card"]');
     await expect(card).toHaveClass(/current/);
-    await expect(card.locator('.studio-tpl-side .report-sheet')).toHaveCount(2);
+    // Year to date in one column takes the longest report to a second sheet.
+    await expect(card.locator('.studio-tpl-side .report-sheet')).toHaveCount(4);
     await expect(card.locator('.studio-tpl-side .report-student-name').first()).toHaveText(await previewName(page));
-    await expect(card.locator('.studio-tpl-count')).toHaveText('1 sheet');
+    await expect(card.locator('.studio-tpl-count')).toHaveText('2 sheets');
     // Every side of every template sits inside its card: more sides draw smaller, none is cut off.
     const cut = await palette(page)
       .locator('.studio-tpl-thumbs')
@@ -1302,7 +1348,8 @@ test.describe('Printed progress reports', () => {
   }) => {
     await openStudio(page);
     await applyTemplate(page, 'conference-pack');
-    await showEveryone(page);
+    await page.locator('.studio-view [data-view="all"]').click();
+    await expect(page.locator('.report-sheet').first()).toBeVisible();
     // The Demo class has the old nine dispositions on this device and no habits: nothing prints.
     await expect(page.locator('.report-sheet .report-learner-profile')).toHaveCount(0);
     await page.evaluate(() =>
@@ -1312,7 +1359,8 @@ test.describe('Printed progress reports', () => {
     );
     await page.reload();
     await page.getByRole('tab', { name: 'Progress Reports' }).click();
-    await showEveryone(page);
+    await page.locator('.studio-view [data-view="all"]').click();
+    await expect(page.locator('.report-sheet').first()).toBeVisible();
     const block = page.locator('.report-sheet .report-learner-profile');
     await expect(block).toHaveCount(1);
     await expect(block.locator('.report-disp-row')).toHaveText([

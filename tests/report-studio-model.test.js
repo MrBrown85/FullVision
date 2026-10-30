@@ -163,14 +163,17 @@ describe('normalizeForm', () => {
     expect(S.formFor({ preset: 'brief' }).sides).toHaveLength(1);
     expect(S.formFor({ preset: 'standard' }).id).toBe('grades');
     expect(S.onForm(S.formFor(null))).toEqual(['header', 'grade-table']);
-    // Assignment Grades starts in one column, on a new report or added from the palette.
-    expect(S.cellOf(S.formFor(null), 'grade-table').options).toEqual({ columns: 'one' });
+    // Assignment Grades starts in one column, by date, year to date, on a
+    // new report or added from the palette.
+    expect(S.optionsFor(S.cellOf(S.formFor(null), 'grade-table'))).toMatchObject({
+      columns: 'one',
+      organize: 'date',
+      range: 'all',
+    });
     const added = S.insert(S.form(), 'next-steps', { side: 0 });
     expect(
-      S.cellOf(S.insert(S.removeCell(added, 'grade-table'), 'grade-table', { side: 1 }), 'grade-table').options,
-    ).toEqual({
-      columns: 'one',
-    });
+      S.optionsFor(S.cellOf(S.insert(S.removeCell(added, 'grade-table'), 'grade-table', { side: 1 }), 'grade-table')),
+    ).toMatchObject({ columns: 'one', organize: 'date', range: 'all' });
     expect(S.formFor({ form: { v: 6, id: 'x', sides: [] } }).id).toBe('x');
   });
 });
@@ -979,7 +982,19 @@ describe('stage 3 blocks', () => {
         : [{ assessmentId: 'a2', score: 3.33 }],
     );
     const opts = more => Object.assign(S.optionsFor({ block: 'grade-table' }), more);
-    const html = ReportBlocks.renderReportBlock('grade-table', CID, CECE, {}, opts({}));
+    // By default: one column, a heading per month, year to date.
+    const byDefault = ReportBlocks.renderReportBlock('grade-table', CID, CECE, {}, opts({}));
+    expect(byDefault).not.toContain('report-grades-cols');
+    expect(text(byDefault)).toContain('Year to date · 3 assessments');
+    expect(text(byDefault)).toContain('October Oct 12 Energy Forms Quiz Missing Oct 5 Plate Tectonics');
+    // Year to date leaves out work dated after today.
+    stub('getAssessments', () =>
+      work.concat([{ id: 'a4', title: 'Final Exam', date: '2099-06-01', categoryId: 'c2' }]),
+    );
+    expect(text(ReportBlocks.renderReportBlock('grade-table', CID, CECE, {}, opts({})))).not.toContain('Final Exam');
+    stub('getAssessments', () => work);
+    const byCat = { organize: 'category', columns: 'two', range: 'term' };
+    const html = ReportBlocks.renderReportBlock('grade-table', CID, CECE, {}, opts(byCat));
     const t = text(html);
     // A proficiency class: score and word, no percent; newest first, by category.
     // The course grade sits in the title row; each category heading carries
@@ -990,21 +1005,27 @@ describe('stage 3 blocks', () => {
       'Quizzes 60% of grade · a1+a3 grade Oct 12 Energy Forms Quiz Missing Sep 10 Chemical Formulas Quiz 12/15 Proficient',
     );
     const bare = text(
-      ReportBlocks.renderReportBlock('grade-table', CID, CECE, {}, opts({ course: false, categoryGrade: false })),
+      ReportBlocks.renderReportBlock(
+        'grade-table',
+        CID,
+        CECE,
+        {},
+        opts(Object.assign({ course: false, categoryGrade: false }, byCat)),
+      ),
     );
     expect(bare).toContain('Assignment Grades This term · 3 assessments');
     expect(bare).toContain('Labs Oct 5 Plate Tectonics');
     expect(t).toContain('Points shown as scored; other work scored out of 4.');
     expect(html).not.toMatch(/[●○]/);
     expect(html).toContain('report-grades-cols');
-    expect(ReportBlocks.renderReportBlock('grade-table', CID, CECE, {}, opts({ columns: 'one' }))).not.toContain(
-      'report-grades-cols',
-    );
+    expect(
+      ReportBlocks.renderReportBlock('grade-table', CID, CECE, {}, opts({ organize: 'category', columns: 'one' })),
+    ).not.toContain('report-grades-cols');
     // One category fills both columns: it splits evenly and carries on at the
     // top of the right column under its name.
     stub('getCategories', () => [{ id: 'c2', name: 'Quizzes', weight: 100 }]);
     stub('getAssessments', () => work.map(a => Object.assign({}, a, { categoryId: 'c2' })));
-    const split = ReportBlocks.renderReportBlock('grade-table', CID, CECE, {}, opts({ columns: 'two' }));
+    const split = ReportBlocks.renderReportBlock('grade-table', CID, CECE, {}, opts(byCat));
     const cols = split.split('class="report-grades-col"').slice(1).map(text);
     expect(cols).toHaveLength(2);
     expect(cols[0]).toContain('Quizzes 100% of grade');
@@ -1032,7 +1053,13 @@ describe('stage 3 blocks', () => {
     expect(pct).not.toContain('Proficient');
     // By competency: the latest few pieces of work under each, marked on that competency.
     const comp = text(
-      ReportBlocks.renderReportBlock('grade-table', CID, CECE, {}, opts({ organize: 'competency', per: 1 })),
+      ReportBlocks.renderReportBlock(
+        'grade-table',
+        CID,
+        CECE,
+        {},
+        opts({ organize: 'competency', per: 1, range: 'term' }),
+      ),
     );
     expect(comp).toContain('This term · latest 1 for each competency');
     expect(comp).toContain(
@@ -1078,9 +1105,9 @@ describe('stage 3 blocks', () => {
     );
   });
 
-  it('Assignment Grades offers Last 10, This Term and All; This Term is the default', () => {
+  it('Assignment Grades offers Last 10, This Term and Year to Date; Year to Date is the default', () => {
     const f = S.insert(S.form(), 'grade-table', { side: 1 });
-    expect(S.optionsFor(S.cellOf(f, 'grade-table')).range).toBe('term');
+    expect(S.optionsFor(S.cellOf(f, 'grade-table')).range).toBe('all');
     const pop = ReportStudio.popoverHtml(f, 'grade-table');
     expect(pop).toContain('aria-label="Range"');
     expect(pop).toContain('aria-label="Organize By"');
@@ -1096,8 +1123,8 @@ describe('stage 3 blocks', () => {
       score: true,
     });
     expect(pop).toMatch(/data-value="last10"[^>]*>Last 10</);
-    expect(pop).toMatch(/data-value="term" role="radio" aria-checked="true">This Term</);
-    expect(pop).toMatch(/data-value="all"[^>]*>All</);
+    expect(pop).toMatch(/data-value="term"[^>]*>This Term</);
+    expect(pop).toMatch(/data-value="all" role="radio" aria-checked="true">Year to Date</);
     const sup = ReportStudio.popoverHtml(S.insert(S.form(), 'support-home', { side: 1 }), 'support-home');
     expect(sup).toContain('Your Own Line');
     expect(sup).toContain('data-action="studioText" data-block="support-home" data-key="note"');
