@@ -1228,6 +1228,8 @@ window.PageReports = (function () {
       '<div class="gr-sub">' +
       check('rubrics', 'Rubrics', !o.feedback) +
       check('comments', 'Assignment Comments', !o.feedback) +
+      check('observations', 'Observations', !o.feedback) +
+      check('termComment', 'Term Comment', !o.feedback) +
       '</div>' +
       '<h4>Order</h4>' +
       '<div class="seg seg-sm" role="radiogroup" aria-label="Order">' +

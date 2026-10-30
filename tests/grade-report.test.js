@@ -378,3 +378,80 @@ describe('feedbackItems', () => {
     expect(seen).toBe('newest');
   });
 });
+
+describe('extra cards: Observations and Term Comment', () => {
+  const OBS = [
+    { id: 'o1', date: 'Oct 6', dateIso: '2026-10-06', text: 'Led the group.', tags: ['Collaboration'] },
+    { id: 'o2', date: 'Oct 9', dateIso: '2026-10-09', text: 'Asked a good question.', tags: [] },
+    { id: 'o3', date: 'Oct 12', dateIso: '2026-10-12', text: 'Helped a partner.', tags: [] },
+  ];
+  const feed = (obs, text) => {
+    const seen = {};
+    stub('ReportFeedback', {
+      observations: (cid, st, termId) => {
+        seen.obs = termId;
+        return obs;
+      },
+      termComment: (cid, st, termId) => {
+        seen.term = termId;
+        return text;
+      },
+    });
+    return seen;
+  };
+
+  it('the options are off until ticked, and they add nothing then', () => {
+    feed(OBS, 'A good term.');
+    expect(G.extraCards(CID, ST, { termId: 'term-1' }, G.options({ feedback: true }))).toEqual([]);
+  });
+
+  it('Observations, then the Term Comment, for the report term', () => {
+    const seen = feed(OBS, 'First.\nSecond.');
+    const out = G.extraCards(CID, ST, { termId: 'term-2' }, G.options({ observations: true, termComment: true }));
+    expect(out.map(x => x.kind)).toEqual(['observations', 'term']);
+    expect(out[0].rows).toHaveLength(3);
+    expect(out[1].rows).toEqual(['First.', 'Second.']);
+    expect(seen).toEqual({ obs: 'term-2', term: 'term-2' });
+  });
+
+  it('a card is left out when the student has nothing for it', () => {
+    feed([], 'A good term.');
+    const o = G.options({ observations: true, termComment: true });
+    expect(G.extraCards(CID, ST, {}, o).map(x => x.kind)).toEqual(['term']);
+    feed(OBS, '');
+    expect(G.extraCards(CID, ST, {}, o).map(x => x.kind)).toEqual(['observations']);
+  });
+
+  it('a piece of the Observations card holds its entries; a later piece says (continued)', () => {
+    stub('ReportFeedback', ReportFeedback);
+    const x = { kind: 'observations', rows: OBS };
+    const first = G.extraHtml(x, { from: 0, to: 2, part: 0 });
+    expect(first).toContain('Observations</b>');
+    expect(first).toContain('Led the group.');
+    expect(first).toContain('Asked a good question.');
+    expect(first).not.toContain('Helped a partner.');
+    const later = G.extraHtml(x, { from: 2, to: 3, part: 1 });
+    expect(later).toContain('Observations (continued)');
+    expect(later).toContain('Helped a partner.');
+    expect(later).not.toContain('Led the group.');
+  });
+
+  it('a Term Comment splits between paragraphs the same way', () => {
+    const x = { kind: 'term', rows: ['One.', 'Two.', 'Three.'] };
+    const later = G.extraHtml(x, { from: 1, to: 3, part: 1 });
+    expect(later).toContain('Term Comment (continued)');
+    expect(later).toContain('Two.');
+    expect(later).toContain('Three.');
+    expect(later).not.toContain('One.');
+  });
+
+  it('splitRows cuts a long observations log between entries', () => {
+    const rows = [100, 100, 100, 100, 100, 100];
+    const r = G.splitRows(rows, { head: 30, contHead: 30, foot: 6, tail: 6 }, 340, 340);
+    expect(r.over).toBe(false);
+    expect(r.pieces.map(p => [p.from, p.to])).toEqual([
+      [0, 3],
+      [3, 6],
+    ]);
+  });
+});

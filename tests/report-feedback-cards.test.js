@@ -434,6 +434,16 @@ describe('observations and Term Comment cards', () => {
     expect(el.querySelector('.fb-pill')).toBeNull();
   });
 
+  it('observations and term comment: a later piece says (continued)', () => {
+    const o = [{ id: 'o', date: 'Oct 6', dateIso: '', text: 'Led.', tags: [] }];
+    expect(dom(F.observationsCardHtml(o, { continued: true })).querySelector('.fb-title').textContent).toBe(
+      'Observations (continued)',
+    );
+    expect(dom(F.termCommentCardHtml('Hello.', { continued: true })).querySelector('.fb-title').textContent).toBe(
+      'Term Comment (continued)',
+    );
+  });
+
   it('observations: nothing for an empty list', () => {
     expect(F.observationsCardHtml([])).toBe('');
     expect(F.observationsCardHtml(null)).toBe('');
