@@ -90,3 +90,25 @@ describe('points work in a Letter class', () => {
     expect(r.summary.verifierReplaced).toBe(0);
   });
 });
+
+describe('the Term Questionnaire’s best piece (At a Glance)', () => {
+  it('shows the same % as the comment, not the level as a %', () => {
+    const run = generateClass(pointsClass());
+    const st = run.students.find(s => s.firstName === 'Owen');
+    const hadDoc = 'document' in globalThis;
+    const oldDoc = globalThis.document;
+    // The page reads the report picker's label through the document.
+    globalThis.document = { getElementById: () => null, querySelectorAll: () => [] };
+    try {
+      ReportQuestionnaire.configure({ activeCourse: run.cid, renderReports: () => {} });
+      ReportQuestionnaire.tqStudentIndex = ReportQuestionnaire.getTqStudents().findIndex(s => s.id === st.id);
+      const html = ReportQuestionnaire.renderTermQuestionnaire(run.cid);
+      const best = html.match(/<div class="qn-fact qn-best">[\s\S]*?<\/div>\s*<\/div>/)[0];
+      expect(best).toContain('Primary Source Analysis · 85%');
+      expect(best).not.toContain('87%');
+    } finally {
+      if (hadDoc) globalThis.document = oldDoc;
+      else delete globalThis.document;
+    }
+  });
+});

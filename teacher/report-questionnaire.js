@@ -556,6 +556,14 @@ window.ReportQuestionnaire = (function () {
 
   function _glanceHtml(cid, student, f) {
     var best = bestPiece(f.work);
+    // The best piece's mark as the comment prints it: in a Letter class,
+    // points work's own % (CommentBank.workMark, calc.js), never its level
+    // as a %.
+    var bestMark = best
+      ? courseGradeMode(cid) === 'letter'
+        ? CommentBank.workMark(f, best)
+        : formatLevel(cid, best.v)
+      : '';
     var missing = notHandedIn(cid, student.id);
     var tags = skillTags(f.comps);
     var skills = f.comps
@@ -573,7 +581,7 @@ window.ReportQuestionnaire = (function () {
       <div class="qn-band">Work</div>
       <div class="qn-fact qn-best">
         <span class="qn-fact-label">Best piece</span>
-        <div class="qn-fact-body">${best ? `<span>${esc(best.title)} · ${esc(formatLevel(cid, best.v))}</span>${_reportNoteNudge(best)}` : '<span class="qn-muted">No marked work this term yet</span>'}</div>
+        <div class="qn-fact-body">${best ? `<span>${esc(best.title)} · ${esc(bestMark)}</span>${_reportNoteNudge(best)}` : '<span class="qn-muted">No marked work this term yet</span>'}</div>
       </div>
       <div class="qn-fact">
         <span class="qn-fact-label">Not handed in</span>
