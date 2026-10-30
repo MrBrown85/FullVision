@@ -71,9 +71,9 @@ describe('the grade sentences in the bank', () => {
   });
 
   it('gives C- its own sentences, with the minimally acceptable wording', () => {
-    expect(byId('gr03').text).toBe('{name} is earning a C- this term, which is minimally acceptable work.');
+    expect(byId('gr03').text).toBe('{He} [is|are] earning a C- this term, which is minimally acceptable work.');
     expect(byId('gr04').text).toBe(
-      '{name} is earning a C- this term, which is minimally acceptable work and close to a C.',
+      '{He} [is|are] earning a C- this term, which is minimally acceptable work and close to a C.',
     );
   });
 });

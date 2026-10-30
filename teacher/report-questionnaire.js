@@ -1370,7 +1370,10 @@ window.ReportQuestionnaire = (function () {
       if (last) {
         last.text = last.text.replace(before, after);
         last.sentences.forEach(function (x) {
-          if (x.text === before) x.text = after;
+          if (x.text !== before) return;
+          x.text = after;
+          // Its realiser tokens hold the old date: keep the new text as written.
+          delete x.toks;
         });
       }
     }
