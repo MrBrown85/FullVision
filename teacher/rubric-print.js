@@ -52,6 +52,7 @@
       pageWidth: 8,
       pageHeight: 10.5,
       fontPt: 12.5,
+      minPt: 9,
     },
     half: {
       key: 'half',
@@ -66,6 +67,7 @@
       pageWidth: 10.5,
       pageHeight: 8,
       fontPt: 10,
+      minPt: 6.5,
     },
     quarter: {
       key: 'quarter',
@@ -80,6 +82,7 @@
       pageWidth: 8,
       pageHeight: 10.5,
       fontPt: 8,
+      minPt: 5.5,
     },
   };
   var LAYOUT_ORDER = ['full', 'half', 'quarter'];
@@ -103,8 +106,17 @@
     picked: [],
     layout: 'full',
     nameStyle: 'preferred', // preferred | first; the last name always follows
-    include: { feedback: true, criterionComments: true, codes: true, overall: true, checks: true },
+    include: {
+      feedback: true,
+      criterionComments: true,
+      codes: true,
+      overall: true,
+      checks: true,
+      nextSteps: false,
+    },
   };
+  // The Next Steps Reflection's question (Colin, Oct 29).
+  var NEXT_STEPS_PROMPT = 'What will you work on next, and how will you do it?';
 
   // { cid, aid, rubricId, uses, opts, userLayout, trigger } while the dialog is open
   var _state = null;
@@ -590,7 +602,7 @@
     if (data.scoreOnly) return html + _feedbackHtml(data, include) + '</div></div>';
     if (_isSinglePoint(data.rubric)) {
       html += _singlePointTableHtml(data, include);
-      return html + _feedbackHtml(data, include) + '</div></div>';
+      return html + _feedbackHtml(data, include) + _nextStepsHtml(include) + '</div></div>';
     }
     html +=
       '<table class="rubric-table"><thead><tr><th class="rubric-crit-head">' +
@@ -632,8 +644,25 @@
     });
     html += '</tbody></table>';
     html += _feedbackHtml(data, include);
+    html += _nextStepsHtml(include);
     html += '</div></div>';
     return html;
+  }
+
+  /* Next Steps Reflection: a question for the student at the foot of the
+     rubric, with ruled lines to answer on. Like the feedback lines, it
+     takes the rest of the sheet (sharing it with them), never fewer than
+     its minimum lines. */
+  function _nextStepsHtml(include) {
+    if (!include.nextSteps) return '';
+    return (
+      '<div class="rubric-feedback is-lines rubric-reflect"><div class="rubric-label">Next Steps</div>' +
+      '<div class="rubric-reflect-q">' +
+      _esc(NEXT_STEPS_PROMPT) +
+      '</div><div class="rubric-lines">' +
+      new Array(LINE_ROWS + 1).join('<div class="rubric-line"></div>') +
+      '</div></div>'
+    );
   }
 
   function _feedbackHtml(data, include) {
@@ -678,7 +707,11 @@
     var data = blankSheetData(cid, _jobRubric(cid, aid, opts), aid ? _assessment(cid, aid) : null);
     var count = data ? _copies(opts.copies) : 0;
     var sheetOpts = {
-      include: { codes: !!(opts.include && opts.include.codes), checks: !!(opts.include && opts.include.checks) },
+      include: {
+        codes: !!(opts.include && opts.include.codes),
+        checks: !!(opts.include && opts.include.checks),
+        nextSteps: !!(opts.include && opts.include.nextSteps),
+      },
     };
     var sheet = data ? renderSheet(data, sheetOpts) : '';
     var html = '';
@@ -703,8 +736,17 @@
     return root;
   }
 
-  // Text may shrink this far, in steps, before a sheet counts as overflowing.
-  var SHRINK_STEPS = [1, 0.95, 0.9, 0.85, 0.8];
+  /* How far the text may shrink, in 5% steps, before a sheet counts as
+     overflowing: down to the layout's minPt, the smallest that still reads
+     on paper. A long rubric on a half or quarter sheet goes smaller than a
+     short one so its cells and writing lines fit (Colin, Oct 29). */
+  function shrinkSteps(layout) {
+    var floor = (layout.minPt || layout.fontPt) / layout.fontPt;
+    var steps = [];
+    for (var f = 1; f > floor + 1e-9; f = Math.round((f - 0.05) * 100) / 100) steps.push(f);
+    steps.push(Math.round(floor * 1000) / 1000);
+    return steps;
+  }
 
   function _countOverflowing(sheets) {
     var n = 0;
@@ -718,7 +760,7 @@
   }
 
   /* Render into the off-screen root and measure. Every page's text shrinks
-     by the same step until all sheets fit, down to SHRINK_STEPS' floor; the
+     by the same step until all sheets fit, down to the layout's minPt; the
      sheets still too tall are counted so the dialog can warn. */
   function stage(cid, aid, opts) {
     var root = _root();
@@ -731,8 +773,9 @@
     var sheets = root.querySelectorAll ? root.querySelectorAll('.rubric-sheet:not(.is-blank)') : [];
     var overflowing = 0;
     var scale = 1;
-    for (var s = 0; s < SHRINK_STEPS.length; s++) {
-      scale = SHRINK_STEPS[s];
+    var steps = shrinkSteps(layout);
+    for (var s = 0; s < steps.length; s++) {
+      scale = steps[s];
       for (var p = 0; p < pages.length; p++) pages[p].style.fontSize = layout.fontPt * scale + 'pt';
       overflowing = _countOverflowing(sheets);
       if (!overflowing) break;
@@ -1006,6 +1049,7 @@
     }
     if (_hasCodes(cid, rubric)) includes += _check('codes', opts.include.codes, 'Competency Codes');
     if (_isAdvancedRubric(rubric)) includes += _check('checks', opts.include.checks, 'Checkboxes');
+    if (rubric) includes += _check('nextSteps', opts.include.nextSteps, 'Next Steps Reflection');
     if (includes) html += '<fieldset class="rp-group"><legend>Include</legend>' + includes + '</fieldset>';
     html += '</div>';
     html += _sideAndActionsHtml();
@@ -1127,16 +1171,25 @@
     var w = page.offsetWidth;
     var h = page.offsetHeight;
     if (!w || !h) return;
+    // The whole sheet of paper, with the print margins round the sheets,
+    // so the preview shows the page as the print preview does.
+    var layout = LAYOUTS[_state && _state.opts.layout] || LAYOUTS.full;
+    var m = (w / layout.pageWidth) * layout.margin;
+    var paperW = w + 2 * m;
+    var paperH = h + 2 * m;
     var room = box.clientWidth - 24;
     var roomH = 240;
-    var scale = Math.min(room / w, roomH / h);
+    var scale = Math.min(room / paperW, roomH / paperH);
     var frame = document.createElement('div');
     frame.className = 'rp-preview-frame';
-    frame.style.width = Math.round(w * scale) + 'px';
-    frame.style.height = Math.round(h * scale) + 'px';
+    frame.style.width = Math.round(paperW * scale) + 'px';
+    frame.style.height = Math.round(paperH * scale) + 'px';
     var clone = page.cloneNode(true);
     clone.style.width = w + 'px';
     clone.style.height = h + 'px';
+    clone.style.position = 'absolute';
+    clone.style.left = m * scale + 'px';
+    clone.style.top = m * scale + 'px';
     clone.style.transform = 'scale(' + scale + ')';
     clone.style.transformOrigin = '0 0';
     frame.appendChild(clone);
@@ -1382,6 +1435,7 @@
     layoutForCount: layoutForCount,
     printName: printName,
     renderSheet: renderSheet,
+    shrinkSteps: shrinkSteps,
     renderPages: renderPages,
     stage: stage,
     unstage: function () {
