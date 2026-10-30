@@ -44,12 +44,14 @@ test.describe('One primary action per screen', () => {
     },
     { name: 'Observations', route: '/observations', ready: '.obsc-add', primary: ['Add'] },
     { name: 'Gradebook', route: '/gradebook', ready: '.tb-action-btn', primary: ['+ New Assessment'] },
-    // Save and Next is one action, in the toolbar and in the bottom bar (the canvas, DECISIONS 14).
+    // The review screen's two actions are both solid: Generate Comment writes
+    // the comment and Approve and Next sends it on (the approved "Review
+    // screen" mockup, fullvision-generate-plan PR 11a).
     {
       name: 'Term Questionnaire',
       route: '/reports',
-      ready: '.qn-btn.primary',
-      primary: [/^Save and Next/, /^Save and Next/],
+      ready: '#tq-approve-next',
+      primary: [/^Approve and Next/, 'Generate Comment'],
     },
     {
       name: 'Student page',

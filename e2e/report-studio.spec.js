@@ -709,16 +709,14 @@ test.describe('Page Studio', () => {
     await expect(dialog.getByRole('radio', { name: 'First Name', exact: true })).toBeChecked();
   });
 
-  test('the comment’s line meter counts its printed lines as it is typed; a long comment continues, nothing is cut', async ({
+  test('a long comment typed on the questionnaire continues on the printed report, nothing is cut', async ({
     page,
   }) => {
-    // The meter measures against the Report Card's comment box; a new
-    // report has no comment block, so no meter.
+    // The questionnaire shows the comment's character count (the review
+    // screen mockup, PR 11a); the Report Card's comment box takes the
+    // overflow onto the next side, and that is what is checked here.
     await openStudio(page);
     await page.locator('.report-seg-btn[data-tab="questionnaire"]').click();
-    const meter = page.locator('#tq-meter-label');
-    await expect(meter).toHaveText(/^\d+ of 10 lines$/);
-    await expect(meter).not.toHaveClass(/over/);
     const editor = page.locator('#tq-narrative');
     await editor.click();
     await page.keyboard.press('End');
@@ -726,9 +724,7 @@ test.describe('Page Studio', () => {
       await page.keyboard.type(
         ' She keeps asking questions that move the whole class forward and writes it all down with care.',
       );
-    await expect(meter).toHaveClass(/over/);
-    const lines = Number((await meter.textContent()).split(' ')[0]);
-    expect(lines).toBeGreaterThan(10);
+    await expect(page.locator('#tq-count')).toHaveText(/^\d{4} characters$/);
     await page.locator('.report-seg-btn[data-tab="progress"]').click();
     await expect(page.locator('.report-sheet').first()).toBeVisible();
     expect(await overflowing(page)).toEqual([]);
