@@ -53,11 +53,15 @@ describe('options', () => {
   it('fills the defaults and keeps only known choices', () => {
     expect(G.options(null)).toEqual({
       summary: true,
+      ungraded: true,
       order: 'oldest',
       name: 'preferred',
     });
-    expect(G.options({ summary: false, comment: true, order: 'newest', name: 'first', junk: 1 })).toEqual({
+    expect(
+      G.options({ summary: false, ungraded: false, comment: true, order: 'newest', name: 'first', junk: 1 }),
+    ).toEqual({
       summary: false,
+      ungraded: false,
       order: 'newest',
       name: 'first',
     });
@@ -65,9 +69,10 @@ describe('options', () => {
 });
 
 describe('rows', () => {
-  it('lists this term’s marked, missing and excused work, oldest first, and leaves unmarked work off', () => {
+  it('lists this term’s marked, missing and excused work, oldest first, and unmarked work with a dash', () => {
     seed();
-    const rows = G.rows(CID, ST);
+    stub('courseToday', () => '2026-10-29');
+    const rows = G.rows(CID, ST, { ungraded: false });
     expect(rows.map(r => r.title)).toEqual([
       'Formulas Quiz',
       'Plate Tectonics',
@@ -87,11 +92,25 @@ describe('rows', () => {
     expect(rows[2]).toMatchObject({ score: '', outOf: '', note: 'Missing' });
     expect(rows[3]).toMatchObject({ score: 'Complete', outOf: '' });
     expect(rows[4]).toMatchObject({ score: '', note: 'Excused' });
+    // Ungraded Assignments (on by default): work up to today with no mark
+    // shows with a dash; work not yet due stays off.
+    const all = G.rows(CID, ST);
+    expect(all.map(r => r.title)).toEqual([
+      'Formulas Quiz',
+      'Plate Tectonics',
+      'Energy Quiz',
+      'Reading Log',
+      'Field Trip Form',
+      'Next Week',
+    ]);
+    expect(all[5]).toMatchObject({ score: '\u2014', outOf: '', percent: '', note: '' });
+    stub('courseToday', () => '2026-10-18');
+    expect(G.rows(CID, ST).map(r => r.title)).not.toContain('Next Week');
   });
 
   it('runs newest first on request', () => {
     seed();
-    expect(G.rows(CID, ST, { order: 'newest' })[0].title).toBe('Field Trip Form');
+    expect(G.rows(CID, ST, { order: 'newest', ungraded: false })[0].title).toBe('Field Trip Form');
   });
 
   it('shows the percent in a Letter or Both class, and never a proficiency word', () => {

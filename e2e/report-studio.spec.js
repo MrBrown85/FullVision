@@ -1230,7 +1230,8 @@ test.describe('Grade Report', () => {
     await expect(page.locator('.gr-term')).toContainText('Term Grade');
     // Grades only: no comment, attendance or other feedback on the sheet.
     await expect(page.locator('.gr-sheet .report-comment-box, .gr-sheet .report-attendance')).toHaveCount(0);
-    await expect(page.getByRole('checkbox')).toHaveCount(1);
+    await expect(page.getByRole('checkbox')).toHaveCount(2);
+    await expect(page.getByRole('checkbox', { name: 'Ungraded Assignments' })).toBeChecked();
     // No Proficiency column, nothing cut off in a row, and no + Page.
     await expect(sheet.locator('.gr-head').first()).not.toContainText('Proficiency');
     const cut = await page
