@@ -57,6 +57,11 @@ describe('options', () => {
       numbers: false,
       order: 'oldest',
       name: 'preferred',
+      feedback: false,
+      rubrics: true,
+      comments: true,
+      observations: false,
+      termComment: false,
     });
     expect(
       G.options({
@@ -74,7 +79,24 @@ describe('options', () => {
       numbers: true,
       order: 'newest',
       name: 'first',
+      feedback: false,
+      rubrics: true,
+      comments: true,
+      observations: false,
+      termComment: false,
     });
+  });
+
+  it('keeps the Feedback Pages choices when they are true or false, nothing else', () => {
+    const o = G.options({ feedback: true, rubrics: false, comments: false, observations: true, termComment: 'yes' });
+    expect(o).toMatchObject({
+      feedback: true,
+      rubrics: false,
+      comments: false,
+      observations: true,
+      termComment: false,
+    });
+    expect(G.options({ feedback: 1 }).feedback).toBe(false);
   });
 });
 
@@ -202,5 +224,157 @@ describe('Assignment Numbers column', () => {
     const html = stageHtml(false);
     expect(html).not.toContain('gr-c gr-n ');
     expect(html).toContain('gr-head"><span class="gr-c gr-date">Date<');
+  });
+});
+
+/* The Feedback Pages' packing: pure over measured heights. */
+describe('packColumns', () => {
+  const cols = r => r.sides.map(sd => sd.map(col => col.map(p => p.i)));
+
+  it('fits in one column', () => {
+    const r = G.packColumns([100, 200, 300], 1000, { gap: 12 });
+    expect(cols(r)).toEqual([[[0, 1, 2], []]]);
+    expect(r.over).toBe(false);
+  });
+
+  it('counts the gap between cards, not before the first', () => {
+    // 3 × 330 + 2 gaps = 1014 > 1000: the third card moves on.
+    expect(cols(G.packColumns([330, 330, 330], 1000, { gap: 12 }))).toEqual([[[0, 1], [2]]]);
+    // Exactly full: 2 × 494 + 12 = 1000.
+    expect(cols(G.packColumns([494, 494], 1000, { gap: 12 }))).toEqual([[[0, 1], []]]);
+  });
+
+  it('overflows to the right column, then to the next side', () => {
+    const r = G.packColumns([600, 600, 600, 600, 100], 1000, { gap: 12 });
+    expect(cols(r)).toEqual([
+      [[0], [1]],
+      [[2], [3, 4]],
+    ]);
+  });
+
+  it('keeps the order: a short card never moves back into an earlier gap', () => {
+    const r = G.packColumns([700, 400, 100, 900, 50], 1000, { gap: 12 });
+    const order = r.sides.flatMap(sd => sd.flatMap(col => col.map(p => p.i)));
+    expect(order).toEqual([0, 1, 2, 3, 4]);
+    expect(cols(r)).toEqual([
+      [[0], [1, 2]],
+      [[3, 4], []],
+    ]);
+  });
+
+  it('gives no sides for no cards', () => {
+    expect(G.packColumns([], 1000)).toEqual({ sides: [], over: false });
+  });
+
+  it('puts a card taller than a column alone and says it is over', () => {
+    const r = G.packColumns([100, 1200, 100], 1000, { gap: 12 });
+    expect(cols(r)).toEqual([
+      [[0], [1]],
+      [[2], []],
+    ]);
+    expect(r.over).toBe(true);
+  });
+
+  it('splits a rubric taller than a column between its rows, title and header repeated', () => {
+    const rubric = { h: 1500, rows: [300, 300, 300, 300, 200], head: 60, contHead: 64, foot: 10, tail: 80 };
+    const r = G.packColumns([200, rubric, 100], 1000, { gap: 12 });
+    const pieces = r.sides.flatMap(sd => sd.flatMap(col => col)).filter(p => p.i === 1);
+    // The first piece fills the room under the first card: 1000 − 200 − 12
+    // = 788 holds the head, two rows and the foot (670).
+    expect(pieces.map(p => [p.from, p.to, p.part, p.last])).toEqual([
+      [0, 2, 0, false],
+      [2, 5, 1, true],
+    ]);
+    expect(pieces[0].h).toBe(60 + 600 + 10);
+    expect(pieces[1].h).toBe(64 + 800 + 80);
+    expect(cols(r)).toEqual([
+      [[0, 1], [1]],
+      [[2], []],
+    ]);
+    expect(r.over).toBe(false);
+  });
+
+  it('never splits a card that fits a whole column: it moves to the next column instead', () => {
+    const rubric = { h: 900, rows: [450, 450], head: 0, contHead: 0, foot: 0, tail: 0 };
+    const r = G.packColumns([200, rubric], 1000, { gap: 12 });
+    expect(r.sides[0][1]).toEqual([{ i: 1, h: 900 }]);
+  });
+});
+
+describe('splitRows', () => {
+  const parts = { head: 50, contHead: 55, foot: 5, tail: 40 };
+
+  it('keeps every row whole and in order, the tail on the last piece', () => {
+    const r = G.splitRows([200, 200, 200, 200, 200, 200], parts, 600, 600);
+    expect(r.pieces).toEqual([
+      { from: 0, to: 2, h: 455 },
+      { from: 2, to: 4, h: 460 },
+      { from: 4, to: 6, h: 495 },
+    ]);
+    expect(r.startNext).toBe(false);
+    expect(r.over).toBe(false);
+  });
+
+  it('moves the last row on when the Feedback under it does not fit', () => {
+    const r = G.splitRows([270, 270], { head: 50, contHead: 50, foot: 5, tail: 300 }, 600, 600);
+    expect(r.pieces.map(p => [p.from, p.to])).toEqual([
+      [0, 1],
+      [1, 2],
+    ]);
+  });
+
+  it('starts on a fresh column when not one row fits the room left', () => {
+    const r = G.splitRows([300, 300, 300], parts, 600, 200);
+    expect(r.startNext).toBe(true);
+    expect(r.pieces[0]).toEqual({ from: 0, to: 1, h: 355 });
+  });
+
+  it('puts a row taller than a column alone and says it is over', () => {
+    const r = G.splitRows([100, 900, 100], parts, 600, 600);
+    expect(r.pieces.map(p => [p.from, p.to])).toEqual([
+      [0, 1],
+      [1, 2],
+      [2, 3],
+    ]);
+    expect(r.over).toBe(true);
+  });
+});
+
+describe('feedbackItems', () => {
+  const items = () => [
+    { id: 'r1', kind: 'rubric', rubric: { rows: [{}] }, feedback: [] },
+    { id: 'r2', kind: 'rubric', rubric: { rows: [{}] }, feedback: [{ text: 'Good' }] },
+    { id: 'p1', kind: 'points', rubric: null, feedback: [{ text: 'Check units' }] },
+  ];
+
+  it('keeps every card with Rubrics and Assignment Comments on', () => {
+    stub('ReportFeedback', { forStudent: () => items() });
+    expect(G.feedbackItems(CID, ST, G.options({})).map(x => x.id)).toEqual(['r1', 'r2', 'p1']);
+  });
+
+  it('Rubrics off drops the tables; a rubric with nothing written goes', () => {
+    stub('ReportFeedback', { forStudent: () => items() });
+    const out = G.feedbackItems(CID, ST, G.options({ rubrics: false }));
+    expect(out.map(x => x.id)).toEqual(['r2', 'p1']);
+    expect(out[0].rubric).toBe(null);
+  });
+
+  it('Assignment Comments off drops the feedback; a points card with nothing left goes', () => {
+    stub('ReportFeedback', { forStudent: () => items() });
+    const out = G.feedbackItems(CID, ST, G.options({ comments: false }));
+    expect(out.map(x => x.id)).toEqual(['r1', 'r2']);
+    expect(out[1].feedback).toEqual([]);
+  });
+
+  it('passes the order on', () => {
+    let seen = null;
+    stub('ReportFeedback', {
+      forStudent: (cid, st, o) => {
+        seen = o.order;
+        return [];
+      },
+    });
+    G.feedbackItems(CID, ST, G.options({ order: 'newest' }));
+    expect(seen).toBe('newest');
   });
 });

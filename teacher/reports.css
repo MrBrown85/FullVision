@@ -4982,7 +4982,9 @@ body.qn-roster #gb-sidebar .student-row-note {
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
-  font-size: 9px;
+  /* 9px; the Feedback Pages step it down for a rubric whose longest words
+     do not fit their cells (grade-report.js _rubricTextSize). */
+  font-size: var(--fb-rb-size, 9px);
   line-height: 1.25;
 }
 .fb-card .fb-rb th,
@@ -4997,7 +4999,7 @@ body.qn-roster #gb-sidebar .student-row-note {
 .fb-card .fb-rb thead th {
   background: #f1f1f1;
   text-align: center;
-  font-size: 9.5px;
+  font-size: calc(var(--fb-rb-size, 9px) + 0.5px);
   hyphens: none;
 }
 .fb-card .fb-rb .fb-c1 {
@@ -5058,7 +5060,7 @@ body.qn-roster #gb-sidebar .student-row-note {
   padding-top: 3px;
   border-top: 1px solid #9a9a9a;
   font-weight: 400;
-  font-size: 8.5px;
+  font-size: calc(var(--fb-rb-size, 9px) - 0.5px);
 }
 .fb-card .fb-ck {
   display: flex;
@@ -5115,4 +5117,55 @@ body.qn-roster #gb-sidebar .student-row-note {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
+}
+
+/* ── Feedback Pages (grade-report.js) ──────────────────────────────────
+   After the Quick Report's grade sheet: a head (the student's name, the
+   class, block and term, the page number) and two equal columns of cards,
+   16px apart, 12px between cards. The cards are measured at the column's
+   width (352px) and placed by those heights, so a column never overflows. */
+.fb-sheet .sheet-body {
+  align-items: stretch;
+}
+.fb-page-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding-bottom: 4px;
+  border-bottom: 2px solid #000;
+  color: #000;
+}
+.fb-page-who {
+  min-width: 0;
+}
+.fb-page-name {
+  font-size: 20px;
+  line-height: 1.2;
+}
+.fb-page-meta,
+.fb-page-n {
+  font-size: 12px;
+  color: #333;
+}
+.fb-page-n {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.fb-cols {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 16px;
+  align-items: start;
+}
+.fb-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.fb-col > .fb-card {
+  margin-bottom: 0;
 }

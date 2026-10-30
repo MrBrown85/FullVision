@@ -1274,6 +1274,144 @@ test.describe('Grade Report', () => {
     expect(countPages(await printToPdf(page))).toBe(STUDENTS * 2);
   });
 
+  test('Feedback Pages follow the grade sheet: a numbered card per assessment, two columns, page numbers', async ({
+    page,
+  }) => {
+    await openFeedback(page);
+    const student = page.locator('.sheet-student').first();
+    const zooms = student.locator('.sheet-zoom');
+    const kinds = await zooms.evaluateAll(list =>
+      list.map(z => {
+        const s = z.querySelector('.report-sheet');
+        return s.classList.contains('gr-sheet') ? 'grade' : s.classList.contains('fb-sheet') ? 'feedback' : 'blank';
+      }),
+    );
+    // The grade sheet first; the feedback starts on its back when it has
+    // only a front, else on the next side; an odd last side is left blank.
+    const grade = kinds.filter(k => k === 'grade').length;
+    expect(kinds[0]).toBe('grade');
+    expect(kinds.indexOf('feedback')).toBe(grade);
+    expect(kinds.slice(grade).every((k, i, a) => k === 'feedback' || (k === 'blank' && i === a.length - 1))).toBe(true);
+    expect(kinds.length % 2).toBe(0);
+    const pages = kinds.filter(k => k !== 'blank').length;
+    const sheets = kinds.length / 2;
+    expect(sheets).toBeGreaterThan(1);
+    await expect(student).toHaveAttribute('data-sheets', String(sheets));
+    await expect(student.locator('.sheet-badge')).toHaveText(sheets + ' sheets');
+    await expect(page.locator('#studio-fit')).toContainText('sheets for');
+
+    // The head: the name, the class, block and term, and Page X of Y.
+    const first = student.locator('.fb-sheet').first();
+    await expect(first.locator('.fb-page-name')).toHaveText(/\w+ \w+/);
+    await expect(first.locator('.fb-page-meta')).toContainText('Science 8 · Block A');
+    await expect(first.locator('.fb-page-n')).toHaveText(`Page ${grade + 1} of ${pages}`);
+    await expect(student.locator('.fb-sheet').last().locator('.fb-page-n')).toHaveText(`Page ${pages} of ${pages}`);
+    // Two columns 352px wide, 16px apart.
+    const cols = await first.locator('.fb-col').evaluateAll(list => list.map(c => c.getBoundingClientRect()));
+    expect(cols).toHaveLength(2);
+    const k = await first.evaluate(s => s.getBoundingClientRect().width / s.offsetWidth);
+    expect(Math.round(cols[0].width / k)).toBe(352);
+    expect(Math.round((cols[1].left - cols[0].right) / k)).toBe(16);
+
+    // Each card's number is its row on the grade sheet.
+    const rows = await student
+      .locator('.gr-sheet .gr-table .gr-row:not(.gr-head)')
+      .evaluateAll(list =>
+        Object.fromEntries(
+          list.map(r => [r.querySelector('.gr-n').textContent, r.querySelector('.gr-title').textContent]),
+        ),
+      );
+    const cards = await student
+      .locator('.fb-card')
+      .evaluateAll(list =>
+        list.map(c => [c.querySelector('.fb-num')?.textContent || '', c.querySelector('.fb-title').textContent]),
+      );
+    expect(cards.length).toBeGreaterThan(3);
+    for (const [n, title] of cards) {
+      expect(n).not.toBe('');
+      expect(rows[n]).toBe(title.replace(/ \(continued\)$/, ''));
+    }
+    // In grade sheet order.
+    const order = cards.map(([n]) => Number(n));
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+  });
+
+  test('a rubric taller than a column splits between criterion rows, its title and level headings repeated', async ({
+    page,
+  }) => {
+    await openFeedback(page);
+    // Demo Mode's rubrics all fit a column: give every student one with
+    // fifteen criteria, each with a comment under it.
+    await page.evaluate(() => {
+      const forStudent = ReportFeedback.forStudent;
+      ReportFeedback.forStudent = (cid, st, opts) => {
+        const list = forStudent(cid, st, opts);
+        const base = list.find(it => it.rubric && it.rubric.rows.length);
+        if (!base) return list;
+        const rows = Array.from({ length: 15 }, (_, i) => ({
+          ...base.rubric.rows[i % base.rubric.rows.length],
+          name: 'Criterion ' + (i + 1),
+          comment: 'Comment for criterion ' + (i + 1) + '. Checked each step and wrote the result down clearly.',
+        }));
+        return [...list, { ...base, id: 'tall', title: 'Tall Rubric', rubric: { ...base.rubric, rows } }];
+      };
+    });
+    // Redraw: Category Summary off and on.
+    await page.getByRole('checkbox', { name: 'Category Summary' }).uncheck();
+    await page.getByRole('checkbox', { name: 'Category Summary' }).check();
+    const student = page.locator('.sheet-student').first();
+    await expect(student.locator('.fb-title', { hasText: 'Tall Rubric' }).first()).toBeVisible();
+    const pieces = await student.locator('.fb-card').evaluateAll(cards =>
+      cards
+        .filter(c => /^Tall Rubric/.test(c.querySelector('.fb-title').textContent))
+        .map(c => ({
+          title: c.querySelector('.fb-title').textContent,
+          head: c.querySelectorAll('.fb-rb thead th').length,
+          crit: [...c.querySelectorAll('.fb-rb tbody .fb-crit')].map(th => th.textContent),
+          comments: [...c.querySelectorAll('.fb-rb tbody tr')].map(tr => (tr.classList.contains('fb-cm') ? 'c' : 'r')),
+          feedback: c.querySelectorAll('.fb-feedback').length,
+        })),
+    );
+    expect(pieces.length).toBeGreaterThan(1);
+    expect(pieces[0].title).toBe('Tall Rubric');
+    for (const p of pieces.slice(1)) expect(p.title).toBe('Tall Rubric (continued)');
+    for (const p of pieces) {
+      expect(p.head).toBe(pieces[0].head);
+      // Every criterion row has its comment right under it, in the same piece.
+      expect(p.comments.join('')).toBe('rc'.repeat(p.crit.length));
+    }
+    expect(pieces.flatMap(p => p.crit)).toEqual(Array.from({ length: 15 }, (_, i) => 'Criterion ' + (i + 1)));
+    expect(pieces.slice(0, -1).every(p => p.feedback === 0)).toBe(true);
+    expect(await cardSpill(page)).toEqual([]);
+    expect(await overflowing(page)).toEqual([]);
+  });
+
+  for (const paper of ['Letter', 'Legal']) {
+    test(`Feedback Pages on ${paper}: nothing overflows, no word breaks, two pages per sheet in print`, async ({
+      page,
+    }) => {
+      await openFeedback(page);
+      if (paper === 'Legal') {
+        await page.getByRole('radio', { name: 'Legal' }).click();
+        await expect(page.locator('.report-sheet[data-paper="legal"]').first()).toBeVisible();
+      }
+      await page.locator('.studio-view [data-view="all"]').click();
+      await expect(page.locator('.sheet-student')).toHaveCount(STUDENTS);
+      const sheets = await totalSheets(page);
+      expect(sheets).toBeGreaterThan(STUDENTS);
+      await expect(page.locator('.report-sheet')).toHaveCount(sheets * 2);
+      expect(await overflowing(page)).toEqual([]);
+      await page.emulateMedia({ media: 'print' });
+      expect(await cardSpill(page)).toEqual([]);
+      expect(await brokenWords(page)).toEqual([]);
+      await page.emulateMedia({ media: 'screen' });
+      const pdf = await printToPdf(page);
+      expect(countPages(pdf)).toBe(sheets * 2);
+      const box = paper === 'Legal' ? [612, 1008] : [612, 792];
+      for (const b of pageBoxes(pdf)) expect(b).toEqual(box);
+    });
+  }
+
   test('Grade Sheet takes the summary off; the choice and Build Your Own are remembered', async ({ page }) => {
     await openGrade(page);
     await expect(page.locator('.gr-summary')).toHaveCount(1);
@@ -1289,6 +1427,75 @@ test.describe('Grade Report', () => {
     await expect(page.locator('.gr-summary')).toHaveCount(0);
   });
 });
+
+/* Feedback Pages on, with Assignment Numbers, saved for the class as the
+   switch will save them (PR 5 adds the switch). */
+async function openFeedback(page) {
+  await openGrade(page);
+  await page.evaluate(() => {
+    const cid = getActiveCourse();
+    const c = getReportConfig(cid) || {};
+    saveReportConfig(cid, { ...c, gradeReport: { ...(c.gradeReport || {}), feedback: true, numbers: true } });
+  });
+  await page.reload();
+  await page.getByRole('tab', { name: 'Progress Reports' }).click();
+  await expect(page.locator('.fb-sheet').first()).toBeVisible();
+}
+
+/* Words in a rubric cell wider than the room they have, so the browser
+   would break them: each word measured in its own font on a canvas
+   against its box's content width. Run with print media (zoom 1). */
+async function brokenWords(page) {
+  return page.locator('.fb-rb').evaluateAll(tables => {
+    const ctx = document.createElement('canvas').getContext('2d');
+    const out = [];
+    tables.forEach(t =>
+      t.querySelectorAll('th, td').forEach(cell => {
+        const walk = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
+        let n;
+        while ((n = walk.nextNode())) {
+          let box = n.parentElement;
+          while (box !== cell && getComputedStyle(box).display === 'inline') box = box.parentElement;
+          const bs = getComputedStyle(box);
+          const room = box.clientWidth - parseFloat(bs.paddingLeft) - parseFloat(bs.paddingRight);
+          const fs = getComputedStyle(n.parentElement);
+          ctx.font = `${fs.fontStyle} ${fs.fontWeight} ${fs.fontSize} ${fs.fontFamily}`;
+          // A hyphen is a place to break, not a broken word.
+          n.textContent
+            .split(/\s+|(?<=-)/)
+            .filter(Boolean)
+            .forEach(w => {
+              if (ctx.measureText(w).width > room + 0.5) out.push(`${w} (${Math.round(room)}px)`);
+            });
+        }
+      }),
+    );
+    return out;
+  });
+}
+
+/* Each card's bottom against its column's and the side's, and any card
+   wider than its column. */
+async function cardSpill(page) {
+  return page.locator('.fb-sheet').evaluateAll(sheets =>
+    sheets.flatMap(s => {
+      const body = s.querySelector('.sheet-body').getBoundingClientRect();
+      return [...s.querySelectorAll('.fb-card')]
+        .filter(c => {
+          const r = c.getBoundingClientRect();
+          return r.bottom > body.bottom + 0.5 || c.scrollWidth > c.clientWidth + 1;
+        })
+        .map(c => c.querySelector('.fb-title').textContent);
+    }),
+  );
+}
+
+/* Every student's sheets as the layout counted them. */
+async function totalSheets(page) {
+  return page
+    .locator('.sheet-student')
+    .evaluateAll(list => list.reduce((sum, el) => sum + Number(el.dataset.sheets || 0), 0));
+}
 
 test.describe('Printed progress reports', () => {
   test.setTimeout(90_000);
