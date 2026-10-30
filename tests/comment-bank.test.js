@@ -597,12 +597,12 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     const ctx = ctxFor('Cece');
     expect(CommentBank.draft(ctx, { seed: 7 }).text).toBe(CommentBank.draft(ctx, { seed: 7 }).text);
     expect(CommentBank.draft(ctx, { seed: 7 }).text).not.toBe(CommentBank.draft(ctx, { seed: 8 }).text);
-    // The grade sentence leads both; the opening after it differs.
-    const opening = d => d.sentences.find(x => byId(x.id).group === 'Openings').text;
+    // The grade sentence leads both; the sentence after it differs.
     const mine = CommentBank.draft(ctx, { seed: 7 });
     const other = CommentBank.draft(ctx, { seed: 7, comments: [mine.text] });
     expect(other.sentences[0].text).toBe(mine.sentences[0].text);
-    expect(opening(other)).not.toBe(opening(mine));
+    expect(other.sentences[1].step).toBe(mine.sentences[1].step);
+    expect(other.sentences[1].text).not.toBe(mine.sentences[1].text);
   });
 
   it('drafts for every Demo student: six or more sentences, nothing unfilled, no note quoted twice', () => {

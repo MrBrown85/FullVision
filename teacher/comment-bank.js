@@ -468,6 +468,17 @@ window.CommentBank = (function () {
     var focus = ReportBlocks.focusArea(cid, student, { termId: termId }, 'change');
     var att = getTermAttendance(cid, sid, termId) || {};
     var rating = getStudentTermRating(cid, sid, termId) || {};
+    // When the student joined the class (enrollment.enrolled_at), and the
+    // class's first enrolment, for the new-to-the-class story (angle()).
+    var day = function (v) {
+      return v ? String(v).slice(0, 10) : '';
+    };
+    var classStart = (getStudents(cid) || [])
+      .map(function (s) {
+        return day(s.enrolledDate);
+      })
+      .filter(Boolean)
+      .sort()[0];
 
     return {
       cid: cid,
@@ -506,6 +517,9 @@ window.CommentBank = (function () {
       absent: att.absencesThisTerm,
       late: att.latesThisTerm,
       habits: rating.habits || {},
+      enrolled: day(student.enrolledDate),
+      classStart: classStart || '',
+      termStart: (term && term.startsOn) || '',
     };
   }
 
@@ -798,8 +812,16 @@ window.CommentBank = (function () {
       doing: 'taking a full part in every activity',
       short: 'taking part fully',
     };
+    // In Arts, where the bank keeps handed-in wording out, it is completing
+    // the work.
+    var ARTS_COMPLETES = {
+      does: 'completes {his} work',
+      doing: 'completing {his} work',
+      short: 'completing work',
+    };
     var habitWords = function (h, k) {
-      return f.family === 'pe' && h.key === 'completes' ? PE_COMPLETES[k] : h[k];
+      if (h.key !== 'completes') return h[k];
+      return f.family === 'pe' ? PE_COMPLETES[k] : f.family === 'arts' ? ARTS_COMPLETES[k] : h[k];
     };
     // A habit phrase names the student's own work ("{his} work"): filled
     // here, so fill() never reads a slot inside a value.
@@ -897,6 +919,10 @@ window.CommentBank = (function () {
     };
 
     return {
+      // The facts and picks this context was built from, so draft() can
+      // pick the story (angle) and verify the draft before returning it.
+      _f: f,
+      _picks: picks,
       _p: p,
       _habits: habits,
       _standing: f.standing || '',
@@ -1208,27 +1234,30 @@ window.CommentBank = (function () {
     return h || 1;
   }
 
-  /* The draft's shape: the grade sentence (gradeOf; none for IE, F or no
+  /* The draft's steps: the grade sentence (gradeOf; none for IE, F or no
      marks), an opening, the habits (what is strong, what is growing,
-     attendance when entered), where the student is now (overall, growth,
-     one example), the next step (and the student's own goal), and how they
-     will get there (home or class, then a closer). Each step takes at most
-     one sentence. A step that `says` a fact (the grade) keeps every later
-     sentence claiming it out. */
+     attendance when entered), where the student is now (overall, one
+     example, growth), the next step (and the student's own goal), and how
+     they will get there (home or class, then a closer). Each step takes at
+     most one sentence. A step that `says` a fact (the grade) keeps every
+     later sentence claiming it out; a step `unless` another has a sentence
+     is skipped (the growing habits and Completes Work and Takes Part name
+     the same habits). The angle (angle()) sets which steps run and in what
+     order; this is the order with no story to tell. */
   var DRAFT_STEPS = [
-    { part: 'now', groups: ['Grade'], says: 'grade' },
-    { part: 'now', groups: ['Openings'] },
-    { part: 'habits', needsAny: ['strengthHabits', 'strengthHabitNames'] },
-    { part: 'habits', needsAny: ['growthHabits', 'growthHabitNames'] },
-    { part: 'habits', groups: ['Completes Work and Takes Part'], unless: 2 },
-    { part: 'habits', groups: ['Attendance'] },
-    { part: 'now', groups: ['Overall'] },
-    { part: 'now', groups: ['Examples From Work', 'From Your Notes', "In the Student's Words"] },
-    { part: 'now', groups: ['Growth This Term'] },
-    { part: 'go', groups: ['Next Step'] },
-    { part: 'go', groups: ["In the Student's Words", 'Work to Revisit', 'From Your Notes'] },
-    { part: 'how', groups: ['At Home', 'In Class', "In the Student's Words"] },
-    { part: 'how', groups: ['Looking Ahead'] },
+    { key: 'grade', part: 'now', groups: ['Grade'], says: 'grade' },
+    { key: 'opening', part: 'now', groups: ['Openings'] },
+    { key: 'strongHabits', part: 'habits', needsAny: ['strengthHabits', 'strengthHabitNames'] },
+    { key: 'growingHabits', part: 'habits', needsAny: ['growthHabits', 'growthHabitNames'], unless: 'completes' },
+    { key: 'completes', part: 'habits', groups: ['Completes Work and Takes Part'], unless: 'growingHabits' },
+    { key: 'attendance', part: 'habits', groups: ['Attendance'] },
+    { key: 'overall', part: 'now', groups: ['Overall'] },
+    { key: 'example', part: 'now', groups: ['Examples From Work', 'From Your Notes', "In the Student's Words"] },
+    { key: 'growth', part: 'now', groups: ['Growth This Term'] },
+    { key: 'nextStep', part: 'go', groups: ['Next Step'] },
+    { key: 'goWords', part: 'go', groups: ["In the Student's Words", 'Work to Revisit', 'From Your Notes'] },
+    { key: 'home', part: 'how', groups: ['At Home', 'In Class', "In the Student's Words"] },
+    { key: 'closer', part: 'how', groups: ['Looking Ahead'] },
   ];
 
   /* Facts a draft states once, by topic: the strong habits named or
@@ -1300,25 +1329,451 @@ window.CommentBank = (function () {
     };
   }
 
-  /* A draft from the bank for one student: the sentences that fit, one per
-     step, the least used for classmates first, a repeatable pick among the
-     ties by `seed` (a new seed gives a new mix), never two in a row that
-     start with the same word. Returns { text, ids, sentences, provenance }:
-     the comment, the sentence ids, each sentence { id, part, text } in
-     order, and where each came from (provenance()), in the same order. */
-  function draft(ctx, opts) {
-    opts = opts || {};
-    var bank = opts.bank || COMMENT_BANK;
-    var rand = _rng(opts.seed);
-    var comments = opts.comments || [];
+  /* ── The angle: the story of this student's term ───────────────────── */
+
+  /* Before any sentence is chosen, angle() picks the story the comment
+     tells, from the facts alone. Each story sets which steps run, their
+     order and which leads; the grade sentence always comes first. Only
+     facts FullVision has: the scored pieces and their % (calc.js), the
+     levels per competency, the work labelled Missing, the habit ratings
+     (Completes Work from the record until rated), and the enrolment date.
+     The lowest tier that holds wins; inside a tier, the story used least in
+     the class, then this order. "Angle" is never shown. */
+  var ANGLE_DAYS = 28; // a climb or a slide spans four weeks or more
+  var ANGLE_POINTS = 5; // and moves the median by five points or more
+  var NEW_DAYS = 14; // joined two weeks or more after the class began
+  var THIN = 3; // fewer scored pieces than this is too little to judge
+
+  var ANGLES = [
+    {
+      // The mark is IE (calc.js, under 50% before the course ends): what is
+      // not in and what to do next lead.
+      id: 'ie',
+      tier: 1,
+      when: function (a) {
+        return a.letter === 'IE';
+      },
+      order: ['completes', 'growingHabits', 'attendance', 'example', 'nextStep', 'home', 'closer'],
+    },
+    {
+      // Too few scored pieces to say much: the habits and one example.
+      id: 'thin',
+      tier: 2,
+      when: function (a) {
+        return a.scored < THIN;
+      },
+      order: [
+        'opening',
+        'strongHabits',
+        'growingHabits',
+        'completes',
+        'attendance',
+        'example',
+        'nextStep',
+        'home',
+        'closer',
+      ],
+    },
+    {
+      // Joined the class two weeks or more after it began, during this
+      // term: no growth over a term that was not all theirs.
+      id: 'newcomer',
+      tier: 2,
+      when: function (a) {
+        return a.joinedLate;
+      },
+      order: [
+        'opening',
+        'strongHabits',
+        'growingHabits',
+        'completes',
+        'attendance',
+        'example',
+        'overall',
+        'nextStep',
+        'home',
+        'closer',
+      ],
+    },
+    {
+      // Strong handed-in work behind a grade pulled down by work labelled
+      // Missing: the best piece leads, then what is not in.
+      id: 'hidden',
+      tier: 3,
+      when: function (a) {
+        return a.missing >= 2 && a.missing * 5 >= a.total && a.strongWork;
+      },
+      order: ['example', 'overall', 'completes', 'growingHabits', 'attendance', 'nextStep', 'home', 'closer'],
+    },
+    {
+      // The marks climbed over the term: the growth leads.
+      id: 'climb',
+      tier: 4,
+      when: function (a) {
+        return a.trend >= ANGLE_POINTS;
+      },
+      order: [
+        'growth',
+        'example',
+        'overall',
+        'strongHabits',
+        'growingHabits',
+        'completes',
+        'attendance',
+        'nextStep',
+        'home',
+        'closer',
+      ],
+    },
+    {
+      // The marks slid over the term: the best piece first, then the slide.
+      id: 'slide',
+      tier: 4,
+      when: function (a) {
+        return a.trend <= -ANGLE_POINTS;
+      },
+      order: [
+        'example',
+        'growth',
+        'overall',
+        'growingHabits',
+        'completes',
+        'strongHabits',
+        'attendance',
+        'nextStep',
+        'goWords',
+        'home',
+        'closer',
+      ],
+    },
+    {
+      // Strong in one skill, weak in another (a full proficiency apart, each
+      // on three or more pieces): the strengths and the area to build lead.
+      id: 'split',
+      tier: 4,
+      when: function (a) {
+        return a.split;
+      },
+      order: [
+        'overall',
+        'example',
+        'strongHabits',
+        'growingHabits',
+        'completes',
+        'attendance',
+        'nextStep',
+        'goWords',
+        'home',
+        'closer',
+      ],
+    },
+    {
+      // Good marks, with two or more habits rated Sometimes or Rarely: the
+      // work first, then the habits to build.
+      id: 'habits',
+      tier: 4,
+      when: function (a) {
+        return a.growing >= 2 && a.good;
+      },
+      order: [
+        'example',
+        'growingHabits',
+        'completes',
+        'strongHabits',
+        'attendance',
+        'overall',
+        'nextStep',
+        'home',
+        'closer',
+      ],
+    },
+    {
+      // An A or B (or Proficient and up), nothing missing, no slide: the
+      // best piece leads.
+      id: 'strength',
+      tier: 5,
+      when: function (a) {
+        return a.high && !a.missing && a.trend > -ANGLE_POINTS;
+      },
+      order: [
+        'example',
+        'overall',
+        'strongHabits',
+        'growingHabits',
+        'completes',
+        'attendance',
+        'nextStep',
+        'goWords',
+        'home',
+        'closer',
+      ],
+    },
+    {
+      // A C or C- (or below Proficient): what is working leads.
+      id: 'building',
+      tier: 5,
+      when: function (a) {
+        return a.low;
+      },
+      order: [
+        'strongHabits',
+        'example',
+        'growingHabits',
+        'completes',
+        'attendance',
+        'overall',
+        'nextStep',
+        'goWords',
+        'home',
+        'closer',
+      ],
+    },
+    {
+      // No story stands out: the steps in their usual order.
+      id: 'steady',
+      tier: 6,
+      when: function () {
+        return true;
+      },
+      order: DRAFT_STEPS.slice(1).map(function (s) {
+        return s.key;
+      }),
+    },
+  ];
+
+  function _days(a, b) {
+    var x = typeof parseLocalDate === 'function' ? parseLocalDate(a) : new Date(a);
+    var y = typeof parseLocalDate === 'function' ? parseLocalDate(b) : new Date(b);
+    return (y - x) / 86400000;
+  }
+
+  /* The change over the term in points: the median % of the latest third of
+     the scored pieces less the earliest third's. Zero with fewer than six
+     pieces (so the earliest third never rests on one score) or under four
+     weeks between the first and last. */
+  function _trend(pieces) {
+    var xs = (pieces || []).slice().sort(function (a, b) {
+      return String(a.d).localeCompare(String(b.d));
+    });
+    var n = Math.floor(xs.length / 3);
+    if (n < 2 || !(_days(xs[0].d, xs[xs.length - 1].d) >= ANGLE_DAYS)) return 0;
+    var pct = function (p) {
+      return Number(p.pct);
+    };
+    return _median(xs.slice(-n).map(pct)) - _median(xs.slice(0, n).map(pct));
+  }
+
+  /* What the stories are told from, all read off the facts. */
+  function angleFacts(f, picks) {
+    var g = f.grade || {};
+    var pieces = g.pieces || [];
+    var work = f.work || [];
+    var rec = f.record || {};
+    var habits = effectiveHabits((picks && picks.habits) || f.habits, rec);
+    var letterMode = g.mode === 'letter' || g.mode === 'both';
+    var level = Number(f.overall) || 0;
+    var judged = (f.comps || []).filter(function (c) {
+      return (c.scores || []).length >= THIN;
+    });
+    var levels = judged.map(function (c) {
+      return tenths(c.level);
+    });
+    // The handed-in work on its own: its median %, else its median level.
+    var strongWork = pieces.length
+      ? pieces.length >= THIN &&
+        _median(
+          pieces.map(function (p) {
+            return Number(p.pct);
+          }),
+        ) >= 73
+      : work.length >= THIN &&
+        _median(
+          work.map(function (w) {
+            return Number(w.v);
+          }),
+        ) >= 3;
+    var joinedLate =
+      !!f.enrolled &&
+      !!f.classStart &&
+      !!f.termStart &&
+      f.enrolled > f.termStart &&
+      _days(f.classStart, f.enrolled) >= NEW_DAYS;
+    return {
+      letter: g.letter || '',
+      scored: Math.max(pieces.length, work.length),
+      missing: _missingCount(f),
+      total: rec.total || 0,
+      strongWork: strongWork,
+      trend: _trend(pieces),
+      split: levels.length >= 2 && Math.max.apply(null, levels) - Math.min.apply(null, levels) >= 10,
+      growing: Object.keys(habits).filter(function (k) {
+        return habits[k] === 1 || habits[k] === 2;
+      }).length,
+      good: letterMode ? ['A', 'B', 'C+'].indexOf(g.letter) >= 0 : level >= 2.5,
+      high: letterMode ? g.letter === 'A' || g.letter === 'B' : level >= 3,
+      low: letterMode ? g.letter === 'C' || g.letter === 'C-' : level > 0 && level < 2.5,
+      joinedLate: joinedLate,
+    };
+  }
+
+  /* The story for one student: { id, order, lead }. order is the steps
+     after the grade sentence; lead is the first of them. opts.uses: how
+     many classmates' drafts told each story ({ id: n }), for the tie. */
+  function angle(f, picks, opts) {
+    var a = angleFacts(f, picks);
+    var uses = (opts && opts.uses) || {};
+    var fit = ANGLES.filter(function (x) {
+      return x.when(a);
+    });
+    var tier = Math.min.apply(
+      null,
+      fit.map(function (x) {
+        return x.tier;
+      }),
+    );
+    var pick = fit
+      .filter(function (x) {
+        return x.tier === tier;
+      })
+      .sort(function (x, y) {
+        return (uses[x.id] || 0) - (uses[y.id] || 0) || ANGLES.indexOf(x) - ANGLES.indexOf(y);
+      })[0];
+    return { id: pick.id, order: pick.order.slice(), lead: pick.order[0] };
+  }
+
+  /* The stories told in each class this session, per student, for the
+     least-used tie: { cid: { sid: angle id } }. Kept in memory only. */
+  var _told = {};
+  function _usesFor(cid, sid) {
+    var mine = _told[cid] || {};
+    var out = {};
+    Object.keys(mine).forEach(function (k) {
+      if (k !== String(sid)) out[mine[k]] = (out[mine[k]] || 0) + 1;
+    });
+    return out;
+  }
+
+  /* The step a bank sentence belongs to: its part and group (or the habit
+     slots it needs), first step in DRAFT_STEPS order. */
+  function stepOf(s) {
+    var st = DRAFT_STEPS.find(function (x) {
+      if (!s || x.part !== s.part) return false;
+      if (x.groups) return x.groups.indexOf(s.group) >= 0;
+      return (s.needs || []).some(function (k) {
+        return x.needsAny.indexOf(k) >= 0;
+      });
+    });
+    return st ? st.key : null;
+  }
+
+  /* The steps a draft runs, in order: the grade, then the angle's order;
+     a kept step the angle leaves out goes back where DRAFT_STEPS has it;
+     then the teacher's order (step keys) over the steps it names, the
+     others keeping their places. */
+  function _sequence(order, keptSteps, teacherOrder) {
+    var seq = ['grade'].concat(order);
+    var all = DRAFT_STEPS.map(function (s) {
+      return s.key;
+    });
+    keptSteps.forEach(function (k) {
+      if (seq.indexOf(k) >= 0 || all.indexOf(k) < 0) return;
+      var at = 0;
+      seq.forEach(function (x, i) {
+        if (all.indexOf(x) < all.indexOf(k)) at = i + 1;
+      });
+      seq.splice(at, 0, k);
+    });
+    var named = (teacherOrder || []).filter(function (k, i, xs) {
+      return seq.indexOf(k) >= 0 && xs.indexOf(k) === i;
+    });
+    var slots = named
+      .map(function (k) {
+        return seq.indexOf(k);
+      })
+      .sort(function (x, y) {
+        return x - y;
+      });
+    slots.forEach(function (at, i) {
+      seq[at] = named[i];
+    });
+    return seq;
+  }
+
+  /* The teacher's kept sentences as { step: { id, text, s } }: opts.kept
+     maps a step key or a sentence id (from an earlier draft) to the text
+     the teacher wants kept, as written. */
+  function _isStep(k) {
+    return DRAFT_STEPS.some(function (x) {
+      return x.key === k;
+    });
+  }
+  function _bankSentence(bank, id) {
+    return bank.sentences.find(function (x) {
+      return x.id === id;
+    });
+  }
+  function _kept(kept, bank) {
+    var out = {};
+    Object.keys(kept || {}).forEach(function (k) {
+      var text = String(kept[k] == null ? '' : kept[k]).trim();
+      if (!text) return;
+      var s = _isStep(k) ? null : _bankSentence(bank, k);
+      var step = s ? stepOf(s) : _isStep(k) ? k : null;
+      if (step) out[step] = { id: s ? s.id : 'kept:' + step, text: text, s: s || null };
+    });
+    return out;
+  }
+  /* The teacher's order (step keys or sentence ids) as step keys. */
+  function _orderSteps(order, bank) {
+    return (order || [])
+      .map(function (k) {
+        return _isStep(k) ? k : stepOf(_bankSentence(bank, k));
+      })
+      .filter(Boolean);
+  }
+
+  /* One pass of the draft over the steps in `seq`. */
+  function _compose(ctx, bank, seq, kept, seed, comments) {
+    var rand = _rng(seed);
+    var byKey = {};
+    DRAFT_STEPS.forEach(function (s) {
+      byKey[s.key] = s;
+    });
     var taken = {};
     var said = {};
+    var got = {};
     var out = [];
-    var got = [];
     var sentences = [];
     var prov = [];
-    DRAFT_STEPS.forEach(function (step, i) {
-      if (step.unless != null && got[step.unless]) return;
+    // A kept sentence's facts count as said wherever it sits, so no other
+    // sentence repeats them.
+    Object.keys(kept).forEach(function (k) {
+      var s = kept[k].s;
+      if (s) taken[s.id] = true;
+      ((s && s.needs) || []).forEach(function (n) {
+        if (NO_REPEAT[n]) said[NO_REPEAT[n]] = true;
+      });
+      if (byKey[k].says) said[byKey[k].says] = true;
+    });
+    seq.forEach(function (key) {
+      var step = byKey[key];
+      if (kept[key]) {
+        var kp = kept[key];
+        out.push(kp.text);
+        sentences.push({ id: kp.id, part: step.part, step: key, text: kp.text, kept: true });
+        prov.push({
+          sentenceId: kp.id,
+          part: step.part,
+          claims: [],
+          factKeys: [],
+          values: {},
+          sources: {},
+          kept: true,
+        });
+        got[key] = true;
+        return;
+      }
+      if (step.unless && got[step.unless]) return;
       var cands = bank.sentences.filter(function (s) {
         if (s.part !== step.part || taken[s.id] || !fits(s, ctx)) return false;
         // A fact the draft already states (the growing habits, the note, the
@@ -1338,10 +1793,7 @@ window.CommentBank = (function () {
           });
         return true;
       });
-      if (!cands.length) {
-        got[i] = false;
-        return;
-      }
+      if (!cands.length) return;
       var last = out.length ? out[out.length - 1].split(/\s+/)[0] : '';
       var sofar = out.join(' ');
       var scored = cands.map(function (s) {
@@ -1353,7 +1805,7 @@ window.CommentBank = (function () {
         // sentence that carries it comes first.
         if (ctx._bestNote && (s.needs || []).indexOf('bestPiece') >= 0) used -= 1;
         // A quotation already in the draft (the same note twice) is out.
-        var quotes = t.match(/\u201C[^\u201D]+\u201D/g) || [];
+        var quotes = t.match(/“[^”]+”/g) || [];
         if (
           quotes.some(function (q) {
             return sofar.indexOf(q) >= 0;
@@ -1361,7 +1813,7 @@ window.CommentBank = (function () {
         )
           used += 100;
         // An opening a classmate already has reads as a form letter.
-        if (step.groups && step.groups[0] === 'Openings' && used) used += 10;
+        if (key === 'opening' && used) used += 10;
         if (repeatsLast(t, last)) used += 5;
         // The grade step has one sentence that fits and draws no random
         // number, so the rest of the draft's mix is as it was.
@@ -1377,16 +1829,73 @@ window.CommentBank = (function () {
       });
       if (step.says) said[step.says] = true;
       out.push(pick.t);
-      sentences.push({ id: pick.s.id, part: pick.s.part, text: pick.t });
+      sentences.push({ id: pick.s.id, part: pick.s.part, step: key, text: pick.t });
       prov.push(provenance(pick.s, ctx));
-      got[i] = true;
+      got[key] = true;
     });
     return {
       text: out.join(' '),
-      ids: Object.keys(taken),
+      ids: sentences.map(function (x) {
+        return x.id;
+      }),
       sentences: sentences,
       provenance: prov,
     };
+  }
+
+  /* A draft from the bank for one student: what the Generate Comment button
+     puts in the box. The angle (angle(), from the facts the context was
+     built from) sets the steps and their order, the grade sentence first;
+     each step takes a sentence that fits, the least used for classmates
+     first, a repeatable pick among the ties by `seed`, never two in a row
+     that start with the same word. Every draft is verified (verify())
+     before it is returned, so the screen only ever gets text the facts back.
+
+     opts: { seed; comments: classmates' comments this term; previous: the
+     text on screen, so each press gives another version (the next seeds
+     are tried until the text differs); kept: { step key or sentence id:
+     the teacher's text }, kept as written in its step; order: step keys or
+     sentence ids in the teacher's order; angleUses: { angle id: n } in the
+     class (else this session's drafts in the class); bank }.
+
+     Returns { text, ids, sentences, provenance, replaced, angle, seed }:
+     each sentence { id, part, step, text, kept? } in order, where each came
+     from (provenance()), what verify() replaced, the story told (never
+     shown) and the seed used. A context built by hand, without facts, gets
+     the steps in DRAFT_STEPS order and no verify. */
+  var RETRIES = 8;
+  function draft(ctx, opts) {
+    opts = opts || {};
+    var bank = opts.bank || COMMENT_BANK;
+    var f = ctx._f || null;
+    var cid = f && f.cid;
+    var sid = f && f.sid;
+    var tally = cid != null && sid != null;
+    var story = f ? angle(f, ctx._picks, { uses: opts.angleUses || (tally ? _usesFor(cid, sid) : {}) }) : null;
+    var kept = _kept(opts.kept, bank);
+    var seq = _sequence(
+      story ? story.order : ANGLES[ANGLES.length - 1].order,
+      Object.keys(kept),
+      _orderSteps(opts.order, bank),
+    );
+    var previous = String(opts.previous == null ? '' : opts.previous).trim();
+    var base = Number(opts.seed) || 1;
+    var d;
+    var seed = base;
+    for (var k = 0; k < RETRIES; k++) {
+      seed = base + k * 7919;
+      d = _compose(ctx, bank, seq, kept, seed, opts.comments || []);
+      if (f) d = verify(d, f, ctx._picks, { bank: bank });
+      else d.replaced = [];
+      if (!previous || d.text !== previous) break;
+    }
+    if (story && tally) {
+      _told[cid] = _told[cid] || {};
+      _told[cid][sid] = story.id;
+    }
+    d.angle = story ? story.id : null;
+    d.seed = seed;
+    return d;
   }
 
   /* How many sentences fit, in all. */
@@ -1789,6 +2298,12 @@ window.CommentBank = (function () {
     var out = [];
     var replaced = [];
     prov.forEach(function (pv, i) {
+      // A sentence the teacher kept is theirs, as written: not checked.
+      if (pv.kept) {
+        sentences.push(d.sentences[i]);
+        out.push(pv);
+        return;
+      }
       var s = byId[pv.sentenceId];
       var failed = s ? _failed(s, pv, f, ctx) : ['unknown'];
       if (!failed.length) {
@@ -1800,7 +2315,9 @@ window.CommentBank = (function () {
       replaced.push({ sentenceId: pv.sentenceId, failed: failed, by: stand ? stand.id : null });
       if (!stand) return;
       used[stand.id] = true;
-      sentences.push({ id: stand.id, part: stand.part, text: fill(stand, ctx) });
+      var x = { id: stand.id, part: stand.part, text: fill(stand, ctx) };
+      if (d.sentences[i] && d.sentences[i].step) x.step = d.sentences[i].step;
+      sentences.push(x);
       out.push(provenance(stand, ctx));
     });
     return {
@@ -1856,6 +2373,10 @@ window.CommentBank = (function () {
     bestPieceSentence: bestPieceSentence,
     studentRef: studentRef,
     DRAFT_STEPS: DRAFT_STEPS,
+    ANGLES: ANGLES,
+    angle: angle,
+    angleFacts: angleFacts,
+    stepOf: stepOf,
     list: list,
   };
 })();

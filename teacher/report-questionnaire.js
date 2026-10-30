@@ -852,6 +852,8 @@ window.ReportQuestionnaire = (function () {
     var d = CommentBank.draft(_bankContext(_activeCourse, st, f), {
       seed: CommentBank.seedFor(st.id + '|' + termId) + n,
       comments: _classmateComments(_activeCourse, st.id, termId),
+      // Each press gives another version: never the text already in the box.
+      previous: el.value,
     });
     if (!d.text) return;
     el.focus();
