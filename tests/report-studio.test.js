@@ -107,7 +107,7 @@ describe('ReportStudio', () => {
     expect(tpl).toContain('aria-label="Delete Mine"');
   });
 
-  it('the selected block’s card says where it is and offers Lines, Size, Move, Options, Leave Off and Remove', () => {
+  it('the selected block’s inspector says where it is and offers Lines, Size, Move, its options, Leave Off and Remove', () => {
     const f = ReportSheets.form();
     const who = { id: 'st1', name: 'Ethan Dubois' };
     const comment = ReportStudio.blockToolbarHtml(f, 'teacher-narrative', who);
@@ -117,16 +117,17 @@ describe('ReportStudio', () => {
     expect(comment).toContain('data-action="studioLines"');
     expect(comment).toContain('Room for the longest comment in the class');
     expect(comment).toContain('data-action="studioSize"');
-    expect(comment).toContain('>Move Up<');
-    expect(comment).toContain('>Move Down<');
-    expect(comment).toContain('>Move to Back<');
+    expect(comment).toContain('aria-label="Move Up"');
+    expect(comment).toContain('aria-label="Move Down"');
+    expect(comment).toContain('aria-label="Move to Back"');
+    expect(comment).toContain('>To Back<');
     expect(comment).toContain('Leave Off Ethan');
     expect(comment).toContain('>Remove<');
-    expect(comment).not.toContain('studioOptions');
-    // The legend: no lines; Options for the table.
+    expect(comment).not.toContain('studioOption');
+    // The legend: no lines; the table's options are in the inspector.
     expect(ReportStudio.blockToolbarHtml(f, 'legend', who)).not.toContain('studioLines');
-    expect(ReportStudio.blockToolbarHtml(f, 'proficiency', who)).toContain('Options ▾');
-    // The letterhead: Options and a line, nothing to move.
+    expect(ReportStudio.blockToolbarHtml(f, 'proficiency', who)).toContain('data-action="studioOption"');
+    // The letterhead: its options and a line, nothing to move.
     const head = ReportStudio.blockToolbarHtml(f, 'header', who);
     expect(head).toContain('Always first on the Front');
     expect(head).not.toContain('Move');
@@ -140,25 +141,25 @@ describe('ReportStudio', () => {
     expect(resp).not.toContain('Move');
     expect(resp).not.toContain('studioSize');
     // Move Up is off for the first row under the letterhead; Move Down for the last.
-    expect(ReportStudio.blockToolbarHtml(f, 'proficiency', who)).toMatch(/data-dir="-1" disabled/);
-    expect(ReportStudio.blockToolbarHtml(f, 'grade-table', who)).toMatch(/data-dir="1" disabled/);
+    expect(ReportStudio.blockToolbarHtml(f, 'proficiency', who)).toMatch(/data-dir="-1"[^>]* disabled>/);
+    expect(ReportStudio.blockToolbarHtml(f, 'grade-table', who)).toMatch(/data-dir="1"[^>]* disabled>/);
     expect(ReportStudio.blockToolbarHtml(f, 'nope', who)).toBe('');
     // Everyone view: no Leave Off.
     expect(ReportStudio.blockToolbarHtml(f, 'legend', null)).not.toContain('Leave Off');
   });
 
-  it('the Options popover is a dialog with the block’s Show checkboxes, choices, no-evidence rule or text fields', () => {
+  it('the inspector holds the block’s Show checkboxes, choices, no-evidence rule or text fields', () => {
     const f = ReportSheets.form();
-    const table = ReportStudio.popoverHtml(f, 'proficiency');
-    expect(table).toContain('role="dialog"');
-    expect(table).toContain('aria-label="Proficiency Options"');
+    const table = ReportStudio.blockToolbarHtml(f, 'proficiency', null);
+    expect(table).toContain('role="region"');
+    expect(table).toContain('aria-label="Proficiency Settings"');
     expect(table).toContain('data-key="score"');
     expect(table).toContain('aria-label="Compare With"');
     expect(table).toContain('Hide Row');
     expect(table).not.toMatch(/Width|Height|row \d/);
     const withSteps = ReportSheets.insert(f, 'next-steps', { side: 0 });
-    expect(ReportStudio.popoverHtml(withSteps, 'next-steps')).toContain('aria-label="Competencies"');
-    const text = ReportStudio.popoverHtml(ReportSheets.insert(f, 'text-block', { side: 1 }), 'text-block');
+    expect(ReportStudio.blockToolbarHtml(withSteps, 'next-steps', null)).toContain('aria-label="Competencies"');
+    const text = ReportStudio.blockToolbarHtml(ReportSheets.insert(f, 'text-block', { side: 1 }), 'text-block', null);
     expect(text).toContain('id="studio-text-title"');
     expect(text).toContain('id="studio-text-body"');
     expect(ReportStudio.hasOptions('text-block')).toBe(true);

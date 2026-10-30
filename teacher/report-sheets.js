@@ -231,13 +231,11 @@ window.ReportSheets = (function () {
     },
     // One row per assessment: date, full title and the marks the teacher
     // picks under Show. Percent and Proficiency Word start from the class
-    // grading setting ('auto': ReportBlocks.showDefaults).
+    // grading setting ('auto': ReportBlocks.showDefaults). It always starts
+    // in one column, a heading per month, year to date (Colin, Oct 29).
     'grade-table': {
       label: 'Assignment Grades',
       group: 'Grades',
-      // Added from the palette it starts in one column; a report saved
-      // before keeps the Two its options default to.
-      start: { columns: 'one' },
       options: [
         { key: 'course', label: 'Course Grade', def: true },
         { key: 'categoryGrade', label: 'Category Grades', def: true },
@@ -247,7 +245,7 @@ window.ReportSheets = (function () {
         {
           key: 'organize',
           label: 'Organize By',
-          def: 'category',
+          def: 'date',
           choices: [
             { v: 'category', label: 'Category' },
             { v: 'date', label: 'Date' },
@@ -266,23 +264,29 @@ window.ReportSheets = (function () {
         {
           key: 'columns',
           label: 'Columns',
-          def: 'two',
+          def: 'one',
           choices: [
-            { v: 'two', label: 'Two' },
             { v: 'one', label: 'One' },
+            { v: 'two', label: 'Two' },
           ],
         },
         {
           key: 'range',
           label: 'Range',
-          def: 'term',
+          def: 'all',
           choices: [
             { v: 'last10', label: 'Last 10' },
             { v: 'term', label: 'This Term' },
-            { v: 'all', label: 'All' },
+            { v: 'all', label: 'Year to Date' },
           ],
         },
-        { key: 'per', label: 'Per Competency', def: 5, choices: [3, 5, 8] },
+        {
+          key: 'per',
+          label: 'Per Competency',
+          def: 5,
+          choices: [3, 5, 8],
+          showIf: { key: 'organize', v: 'competency' },
+        },
       ],
     },
     'term-glance': { label: 'This Term at a Glance', group: 'Grades', retired: true },

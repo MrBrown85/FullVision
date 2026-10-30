@@ -484,17 +484,25 @@ window.PageReports = (function () {
     student.appendChild(add);
   }
 
-  /* The selected block: a blue outline on the page and its card in the
-     gutter beside the pages (in the canvas, not the scaled page, so it
-     reads at screen size), level with the block; the Options popover
-     under the card when it is open. */
+  /* The selected block: a blue outline on the page and its inspector
+     pinned at the top right of the canvas, over the gutter the pages leave
+     (ReportStudio.GUTTER_W), so it stays put as the pages scroll. A control
+     that had focus in the inspector has it again after a redraw. */
   function _applySelection(preview) {
+    var canvas = preview.parentElement;
+    var oldBar = canvas && canvas.querySelector('.studio-bar');
+    var had = oldBar && oldBar.contains(document.activeElement) ? document.activeElement : null;
+    var focusKey = had
+      ? ['action', 'key', 'value', 'dir', 'size', 'side', 'rule']
+          .map(function (k) {
+            return had.dataset[k] ? '[data-' + k + '="' + had.dataset[k] + '"]' : '';
+          })
+          .join('')
+      : '';
     preview.querySelectorAll('.sheet-cell.studio-sel').forEach(function (el) {
       el.classList.remove('studio-sel');
     });
-    preview.querySelectorAll('.studio-bar, .studio-pop').forEach(function (el) {
-      el.remove();
-    });
+    if (oldBar) oldBar.remove();
     preview.querySelectorAll('.sheet-body .sheet-cell[data-block]').forEach(function (el) {
       // Every block, the letterhead too, can be reached and selected from
       // the keyboard; a screen reader hears the block's name.
@@ -507,53 +515,33 @@ window.PageReports = (function () {
       _focusBlock = null;
       if (target) target.focus({ preventScroll: true });
     }
-    if (!studioSelected || studioView !== 'one' || viewingIssue) return;
+    if (!studioSelected || studioView !== 'one' || viewingIssue || !canvas) return;
     var cells = preview.querySelectorAll('.sheet-body .sheet-cell[data-block="' + studioSelected + '"]');
     if (!cells.length) return;
-    var first = cells[0];
     cells.forEach(function (el) {
       el.classList.add('studio-sel');
     });
     var st = _previewStudent();
     var who = st ? { id: st.id, name: fullName(st) } : null;
     var bar = document.createElement('div');
-    bar.innerHTML = ReportStudio.blockToolbarHtml(_formOf(), studioSelected, who);
+    bar.innerHTML = ReportStudio.blockToolbarHtml(
+      _formOf(),
+      studioSelected,
+      who,
+      ReportBlocks.showDefaults(activeCourse),
+    );
     var barEl = bar.firstElementChild;
     if (!barEl) return;
-    preview.appendChild(barEl);
-    var pr = preview.getBoundingClientRect();
-    var cr = first.getBoundingClientRect();
-    // The gutter: right of the rightmost page, level with the block.
-    var right = 0;
-    preview.querySelectorAll('.sheet-zoom').forEach(function (z) {
-      right = Math.max(right, z.getBoundingClientRect().right);
-    });
-    var left = right - pr.left + preview.scrollLeft + 16;
-    if (left + barEl.offsetWidth > preview.clientWidth + preview.scrollLeft) {
-      // No gutter (stacked pages): under the block instead.
-      left = Math.max(0, cr.left - pr.left + preview.scrollLeft);
-      barEl.style.top = cr.bottom - pr.top + preview.scrollTop + 8 + 'px';
-    } else {
-      barEl.style.top = Math.max(0, cr.top - pr.top + preview.scrollTop) + 'px';
-    }
-    barEl.style.left = left + 'px';
-    if (popoverOpen === studioSelected && ReportStudio.hasOptions(studioSelected)) {
-      var pop = document.createElement('div');
-      pop.innerHTML = ReportStudio.popoverHtml(_formOf(), studioSelected, ReportBlocks.showDefaults(activeCourse));
-      var popEl = pop.firstElementChild;
-      if (popEl) {
-        preview.appendChild(popEl);
-        popEl.style.left = barEl.style.left;
-        popEl.style.top = parseFloat(barEl.style.top) + barEl.offsetHeight + 6 + 'px';
-        var btn = barEl.querySelector('[data-action="studioOptions"]');
-        if (btn) btn.setAttribute('aria-expanded', 'true');
-      }
-    } else {
-      popoverOpen = null;
+    var top = preview.offsetTop + 12;
+    barEl.style.top = top + 'px';
+    barEl.style.maxHeight = 'calc(100% - ' + (top + 12) + 'px)';
+    canvas.appendChild(barEl);
+    if (focusKey) {
+      var again = barEl.querySelector(focusKey);
+      if (again) again.focus({ preventScroll: true });
     }
   }
   var _focusBlock = null;
-  var popoverOpen = null; // the block whose Options popover is open
 
   /* ── The rail: sheets per student ──────────────────────────────
      On the Report Card, each sidebar row shows how many sheets the
@@ -1051,7 +1039,6 @@ window.PageReports = (function () {
     reportConfig.progressMode = mode;
     saveReportConfig(activeCourse, reportConfig);
     studioSelected = null;
-    popoverOpen = null;
     _classFitKey = '';
     previewAuto = true;
     renderReports();
@@ -1416,7 +1403,6 @@ window.PageReports = (function () {
   }
 
   function _selectBlock(id) {
-    if (id !== studioSelected) popoverOpen = null;
     studioSelected = id || null;
     var preview = document.getElementById('rb-preview');
     if (preview) _applySelection(preview);
@@ -1577,7 +1563,6 @@ window.PageReports = (function () {
   }
   function _removeBlock(id) {
     if (studioSelected === id) studioSelected = null;
-    if (popoverOpen === id) popoverOpen = null;
     _setForm(ReportSheets.removeCell(_formOf(), id), 'Removed ' + _label(id));
     _announce(_label(id) + ' removed from the report.');
   }
@@ -1599,7 +1584,6 @@ window.PageReports = (function () {
     previewSid = null;
     previewAuto = true;
     studioSelected = null;
-    popoverOpen = null;
     _configureQuestionnaire();
     populateStudentSelect();
     populateReportPeriods(false);
@@ -1658,12 +1642,6 @@ window.PageReports = (function () {
       if (dd) dd.classList.remove('open');
     }
 
-    // The Options popover closes on a click anywhere outside it and its button.
-    if (popoverOpen && !e.target.closest('.studio-pop, [data-action="studioOptions"]')) {
-      popoverOpen = null;
-      var pv = document.getElementById('rb-preview');
-      if (pv) _applySelection(pv);
-    }
     var cell = e.target.closest('.studio-pages .sheet-body .sheet-cell[data-block]');
     if (cell && studioView === 'one' && !viewingIssue) {
       _selectBlock(cell.dataset.block);
@@ -1737,7 +1715,6 @@ window.PageReports = (function () {
         _announce(ReportStudio.placeText(_formOf(), id) + '.');
       },
       studioChoice: function () {
-        popoverOpen = null;
         var v = el.dataset.value;
         _setForm(
           ReportSheets.setOption(_formOf(), el.dataset.block, el.dataset.key, /^\d+$/.test(v) ? Number(v) : v),
@@ -1745,7 +1722,6 @@ window.PageReports = (function () {
         );
       },
       studioNoEvidence: function () {
-        popoverOpen = null;
         _setForm(
           ReportSheets.setNoEvidence(_formOf(), el.dataset.block, el.dataset.rule),
           'Changed ' + _label(el.dataset.block) + ' options',
@@ -1778,14 +1754,6 @@ window.PageReports = (function () {
           'Moved ' + _label(id) + ' to the ' + (to === 0 ? 'Front' : to === 1 ? 'Back' : 'Page ' + (to + 1)),
         );
         _announce(ReportStudio.placeText(_formOf(), id) + '.');
-      },
-      studioOptions: function () {
-        popoverOpen = popoverOpen === el.dataset.block ? null : el.dataset.block;
-        var pv = document.getElementById('rb-preview');
-        if (pv) _applySelection(pv);
-        var pop = document.getElementById('studio-pop');
-        var firstField = pop && pop.querySelector('input, button, textarea');
-        if (firstField) firstField.focus();
       },
       studioLeaveOff: function () {
         var on = el.getAttribute('aria-pressed') !== 'true';
@@ -1943,16 +1911,6 @@ window.PageReports = (function () {
       e.preventDefault();
       PhoneReports.handleAction(action, el, activeCourse, ReportBlocks.reportContext());
     }
-  }
-
-  /* Escape closes the Options popover and puts focus back on its button. */
-  function _handleStudioKey(e) {
-    if (e.key !== 'Escape' || !popoverOpen) return;
-    popoverOpen = null;
-    var pv = document.getElementById('rb-preview');
-    if (pv) _applySelection(pv);
-    var btn = pv && pv.querySelector('[data-action="studioOptions"]');
-    if (btn) btn.focus();
   }
 
   function _handleStudioChange(e) {
@@ -2166,7 +2124,6 @@ window.PageReports = (function () {
     _addDocListener('pointerout', _handlePeekOut);
     _addDocListener('pointerdown', _hidePeek);
     _addDocListener('change', _handleStudioChange);
-    _addDocListener('keydown', _handleStudioKey);
     window.addEventListener('resize', _handleResize);
     _addDocListener('keydown', _handleQuestionnaireKey);
     _addDocListener('input', _handleNarrativeInput);

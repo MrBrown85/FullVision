@@ -47,17 +47,36 @@ async function openFresh(page) {
   await expect(page.locator('#studio-fit')).not.toBeEmpty();
 }
 
-/* The Studio on the Report Card starter, on the longest report. */
+/* The Studio on the Report Card starter, on the longest report. These
+   tests were written for an Assignment Grades table that fits the Back:
+   Demo Mode's 37 assessments, year to date in one column (the defaults),
+   run to a second sheet, so it is set to This Term, two columns, by
+   category (shortGradeTable). The defaults have their own test. */
 async function openStudio(page) {
   await openFresh(page);
   await applyTemplate(page, 'report-card');
   await expect(page.locator('.sheet-cell[data-block="parent-response"]')).toHaveCount(1);
+  await shortGradeTable(page);
 }
 
-/* Everyone: every student's pages on the canvas, which is what prints. */
-async function showEveryone(page) {
+async function shortGradeTable(page) {
+  const insp = await openOptions(page, 'grade-table');
+  for (const [group, choice] of [
+    ['Range', 'This Term'],
+    ['Columns', 'Two'],
+    ['Organize By', 'Category'],
+  ]) {
+    const radio = insp.getByRole('radiogroup', { name: group }).getByRole('radio', { name: choice });
+    await radio.click();
+    await expect(radio).toHaveAttribute('aria-checked', 'true');
+  }
+}
+
+/* Everyone: every student's pages on the canvas, which is what prints.
+   sides: how many each student takes (2 for one sheet, Front and Back). */
+async function showEveryone(page, sides = 2) {
   await page.locator('.studio-view [data-view="all"]').click();
-  await expect(page.locator('.report-sheet')).toHaveCount(STUDENTS * 2);
+  await expect(page.locator('.report-sheet')).toHaveCount(STUDENTS * sides);
 }
 
 /* A template from the palette's Templates tab. */
@@ -150,20 +169,17 @@ async function rateEveryone(page) {
 
 const palette = page => page.locator('#studio-palette');
 const bar = page => page.locator('.studio-bar');
-const popover = page => page.locator('#studio-pop');
 const cellOf = (page, id) => page.locator(`#rb-preview .sheet-cell[data-block="${id}"]`).first();
 const undo = page => page.locator('#undo-toast').getByRole('button', { name: 'Undo' });
 /* The previewed student (the longest report), as the letterhead names them. */
 const previewName = page => page.locator('.report-sheet').first().locator('.report-student-name').innerText();
 const firstName = async page => (await previewName(page)).split(' ')[0];
 
-/* Selects a block on the page and opens its Options popover. */
+/* Selects a block on the page; its options are in the inspector. */
 async function openOptions(page, id) {
   await cellOf(page, id).click();
   await expect(bar(page)).toBeVisible();
-  await bar(page).locator('[data-action="studioOptions"]').click();
-  await expect(popover(page)).toBeVisible();
-  return popover(page);
+  return bar(page);
 }
 
 /* Chromium writes one "/Type /Page" object per page (and one "/Type /Pages"
@@ -255,7 +271,7 @@ test.describe('Page Studio', () => {
       const body = el.closest('.sheet-body').getBoundingClientRect();
       return Math.round(body.bottom - el.getBoundingClientRect().bottom);
     });
-    expect(docked).toBe(0);
+    expect(Math.abs(docked)).toBe(0);
     await expect(back.locator('.sheet-pinned')).toContainText('I have reviewed this report with my child');
     await expect(back.locator('.sheet-pinned')).toContainText(
       'Please review this report with your child and return this section to the school.',
@@ -279,7 +295,7 @@ test.describe('Page Studio', () => {
     await expect(page.locator('.report-sheet').first().locator('.report-student-name')).toHaveText('Noor Al-Rashid');
   });
 
-  test('a click selects a block and shows its card in the gutter; Remove takes it off with Undo; the palette removes it or adds it', async ({
+  test('a click selects a block and shows its inspector at the top right; Remove takes it off with Undo; the palette removes it or adds it', async ({
     page,
   }) => {
     await openStudio(page);
@@ -295,19 +311,21 @@ test.describe('Page Studio', () => {
     await expect(bar(page).getByRole('button', { name: 'Move to Back' })).toBeVisible();
     await expect(bar(page).getByRole('button', { name: 'Leave Off ' + (await firstName(page)) })).toBeVisible();
     await expect(bar(page).getByRole('button', { name: 'Remove' })).toBeVisible();
-    await expect(bar(page).locator('[data-action="studioOptions"]')).toHaveCount(0);
-    // The card sits to the right of the pages, level with the block.
+    await expect(bar(page).locator('[data-action="studioOption"]')).toHaveCount(0);
+    // The inspector sits to the right of the pages, pinned at the top of the
+    // canvas whichever block is selected.
     const cardBox = await bar(page).boundingBox();
     const pageRight = await page
       .locator('.sheet-zoom')
       .evaluateAll(els => Math.max(...els.map(e => e.getBoundingClientRect().right)));
-    const legendBox = await legend.boundingBox();
+    const pagesTop = (await page.locator('#rb-preview').boundingBox()).y;
     expect(cardBox.x).toBeGreaterThan(pageRight);
-    expect(Math.abs(cardBox.y - legendBox.y)).toBeLessThan(4);
-    // The letterhead: Options and a line, nothing to move.
+    expect(Math.abs(cardBox.y - (pagesTop + 12))).toBeLessThan(2);
+    // The letterhead: its options and a line, nothing to move.
     await cellOf(page, 'header').click();
     await expect(bar(page)).toContainText('Always first on the Front');
-    await expect(bar(page).locator('[data-action="studioOptions"]')).toHaveCount(1);
+    expect((await bar(page).boundingBox()).y).toBeCloseTo(cardBox.y, 0);
+    await expect(bar(page).locator('[data-action="studioOption"]').first()).toBeVisible();
     await expect(bar(page).getByRole('button', { name: 'Remove' })).toHaveCount(0);
     // The Response: Comment Lines, always last.
     await cellOf(page, 'parent-response').click();
@@ -537,7 +555,7 @@ test.describe('Page Studio', () => {
     // Every assessment as rows: more than the back holds above the Response,
     // so it continues (a block taller than a side would print after the report).
     await expect(page.locator('.sheet-label').nth(2)).toHaveText(/^(Continued|After the Report)$/);
-    await expect(page.locator('.report-grades .report-prof-meta').first()).toContainText('All ·');
+    await expect(page.locator('.report-grades .report-prof-meta').first()).toContainText('Year to date ·');
     await expect(page.locator('.sheet-zoom[data-side="1"] .sheet-pinned .report-parent-response')).toHaveCount(1);
     expect(await overflowing(page)).toEqual([]);
     expect(await overlapping(page)).toEqual([]);
@@ -545,8 +563,10 @@ test.describe('Page Studio', () => {
     await page.locator('#studio-fit .studio-fit-link').click();
     await expect(page.locator('.studio-view [data-view="all"]')).toHaveAttribute('aria-checked', 'true');
     await expect(page.locator('.report-sheet.sheet-overflow')).toHaveCount(0);
+    // The Report Card again, with Assignment Grades at its defaults (year to
+    // date, one column): Demo Mode's 37 assessments take a second sheet.
     await applyTemplate(page, 'report-card');
-    await expect(page.locator('.report-sheet')).toHaveCount(STUDENTS * 2, { timeout: 30_000 });
+    await expect(page.locator('.report-sheet')).toHaveCount(STUDENTS * 4, { timeout: 30_000 });
   });
 
   test('the paper stays white with dark ink in dark mode; the screen around it goes dark', async ({ page }) => {
@@ -757,19 +777,24 @@ test.describe('Page Studio', () => {
 
   test('Legal gives the same rows a taller side', async ({ page }) => {
     await openStudio(page);
-    const letter = await page
-      .locator('.sheet-zoom[data-side="1"] .sheet-pinned')
-      .evaluate(el =>
-        Math.round(el.getBoundingClientRect().top - el.closest('.sheet-body').getBoundingClientRect().top),
+    const letter = await page.locator('.sheet-zoom[data-side="1"] .sheet-pinned').evaluate(el => {
+      // In sheet px: the canvas scales the pages to fit beside the inspector.
+      const zoom = parseFloat(getComputedStyle(el.closest('.sheet-zoom')).getPropertyValue('--sheet-zoom')) || 1;
+      return Math.round(
+        (el.getBoundingClientRect().top - el.closest('.sheet-body').getBoundingClientRect().top) / zoom,
       );
+    });
     await page.getByRole('radio', { name: 'Legal' }).click();
     await expect(page.locator('.report-sheet[data-paper="legal"]')).toHaveCount(2);
-    const legal = await page
-      .locator('.sheet-zoom[data-side="1"] .sheet-pinned')
-      .evaluate(el =>
-        Math.round(el.getBoundingClientRect().top - el.closest('.sheet-body').getBoundingClientRect().top),
+    const legal = await page.locator('.sheet-zoom[data-side="1"] .sheet-pinned').evaluate(el => {
+      // In sheet px: the canvas scales the pages to fit beside the inspector.
+      const zoom = parseFloat(getComputedStyle(el.closest('.sheet-zoom')).getPropertyValue('--sheet-zoom')) || 1;
+      return Math.round(
+        (el.getBoundingClientRect().top - el.closest('.sheet-body').getBoundingClientRect().top) / zoom,
       );
-    expect(legal - letter).toBeGreaterThan(170);
+    });
+    // 3in more paper (288 sheet px), less the margins the body keeps.
+    expect(legal - letter).toBeGreaterThan(270);
     expect(await rowsOf(page, 0)).toEqual([
       'header',
       'proficiency',
@@ -780,22 +805,37 @@ test.describe('Page Studio', () => {
     await page.getByRole('radio', { name: 'Letter' }).click();
   });
 
-  test('the Options popover unchecks Assessed Count and closes with Escape', async ({ page }) => {
+  test('Assignment Grades starts in one column, a heading per month, year to date', async ({ page }) => {
+    await openFresh(page);
+    const pop = await openOptions(page, 'grade-table');
+    await expect(pop.getByRole('radiogroup', { name: 'Per Competency' })).toHaveCount(0);
+    for (const [group, choice] of [
+      ['Columns', 'One'],
+      ['Organize By', 'Date'],
+      ['Range', 'Year to Date'],
+    ]) {
+      await expect(pop.getByRole('radiogroup', { name: group }).getByRole('radio', { name: choice })).toHaveAttribute(
+        'aria-checked',
+        'true',
+      );
+    }
+    const table = page.locator('#rb-preview .report-grades').first();
+    await expect(table.locator('.report-prof-meta')).toContainText('Year to date ·');
+    await expect(table.locator('.report-grades-cols')).toHaveCount(0);
+    await expect(table).toContainText('October');
+  });
+
+  test('the inspector unchecks Assessed Count and stays open with the box still focused', async ({ page }) => {
     await openStudio(page);
     await expect(page.locator('.report-sheet .report-prof thead th')).toHaveCount(5);
-    const pop = await openOptions(page, 'proficiency');
-    await expect(pop).toHaveAttribute('role', 'dialog');
-    await pop.getByLabel('Assessed Count').uncheck();
+    const insp = await openOptions(page, 'proficiency');
+    await expect(insp).toHaveAttribute('role', 'region');
+    await insp.getByLabel('Assessed Count').uncheck();
     await expect(page.locator('.report-sheet .report-prof thead th')).toHaveCount(4);
     await expect(page.locator('#undo-toast')).toContainText('Changed Proficiency options');
-    await expect(popover(page)).toBeVisible();
-    await page.keyboard.press('Escape');
-    await expect(popover(page)).toHaveCount(0);
-    await expect(bar(page).locator('[data-action="studioOptions"]')).toBeFocused();
-    await bar(page).locator('[data-action="studioOptions"]').click();
-    await expect(popover(page)).toBeVisible();
-    await page.locator('.studio-head').click();
-    await expect(popover(page)).toHaveCount(0);
+    await expect(bar(page)).toBeVisible();
+    await expect(bar(page).getByLabel('Assessed Count')).toBeFocused();
+    await expect(bar(page).getByLabel('Assessed Count')).not.toBeChecked();
   });
 
   test('Leave Off hides a block for the previewed student only, and keeps its place as a dashed box', async ({
@@ -883,7 +923,9 @@ test.describe('Page Studio', () => {
   test('a starter applies, and Undo puts the layout back; the Templates tab draws each template with the real report', async ({
     page,
   }) => {
-    await openStudio(page);
+    // The Report Card as the template draws it, Assignment Grades at its defaults.
+    await openFresh(page);
+    await applyTemplate(page, 'report-card');
     await rateEveryone(page);
     await palette(page).getByRole('tab', { name: 'Templates' }).click();
     await expect(palette(page)).toContainText('Your Templates');
@@ -891,9 +933,10 @@ test.describe('Page Studio', () => {
     // Each starter is drawn with the previewed student's sheets and says how many it takes.
     const card = palette(page).locator('.studio-tpl[data-starter="report-card"]');
     await expect(card).toHaveClass(/current/);
-    await expect(card.locator('.studio-tpl-side .report-sheet')).toHaveCount(2);
+    // Year to date in one column takes the longest report to a second sheet.
+    await expect(card.locator('.studio-tpl-side .report-sheet')).toHaveCount(4);
     await expect(card.locator('.studio-tpl-side .report-student-name').first()).toHaveText(await previewName(page));
-    await expect(card.locator('.studio-tpl-count')).toHaveText('1 sheet');
+    await expect(card.locator('.studio-tpl-count')).toHaveText('2 sheets');
     // Every side of every template sits inside its card: more sides draw smaller, none is cut off.
     const cut = await palette(page)
       .locator('.studio-tpl-thumbs')
@@ -1302,7 +1345,8 @@ test.describe('Printed progress reports', () => {
   }) => {
     await openStudio(page);
     await applyTemplate(page, 'conference-pack');
-    await showEveryone(page);
+    await page.locator('.studio-view [data-view="all"]').click();
+    await expect(page.locator('.report-sheet').first()).toBeVisible();
     // The Demo class has the old nine dispositions on this device and no habits: nothing prints.
     await expect(page.locator('.report-sheet .report-learner-profile')).toHaveCount(0);
     await page.evaluate(() =>
@@ -1312,7 +1356,8 @@ test.describe('Printed progress reports', () => {
     );
     await page.reload();
     await page.getByRole('tab', { name: 'Progress Reports' }).click();
-    await showEveryone(page);
+    await page.locator('.studio-view [data-view="all"]').click();
+    await expect(page.locator('.report-sheet').first()).toBeVisible();
     const block = page.locator('.report-sheet .report-learner-profile');
     await expect(block).toHaveCount(1);
     await expect(block.locator('.report-disp-row')).toHaveText([

@@ -1459,10 +1459,11 @@ window.ReportBlocks = (function () {
      word start from the class grading setting (showDefaults). Organized by
      Category, by Date (a heading per month) or by Competency (a heading per
      competency over its latest few pieces of work, each row the mark on
-     that competency). Newest or oldest first; two columns or one, a
+     that competency). Newest or oldest first; one column or two, a
      heading never split across columns. Range: the last 10, this term or
-     all. Side by Side is one column of the last 10 (never by competency).
-     No dots (DECISIONS "Report forms" 13). */
+     the year to date (all, leaving out work dated after today). It starts
+     in one column, by date, year to date. Side by Side is one column of the
+     last 10 (never by competency). No dots (DECISIONS "Report forms" 13). */
   function showDefaults(cid) {
     const mode = courseGradeMode(cid);
     return { percent: mode !== 'proficiency', word: mode !== 'letter' };
@@ -1517,10 +1518,10 @@ window.ReportBlocks = (function () {
     const showWord = pick('word', autos.word);
     const showCourse = pick('course', true);
     const showCatGrade = pick('categoryGrade', true);
-    const organize = half && options.organize === 'competency' ? 'category' : options.organize || 'category';
+    const organize = half && options.organize === 'competency' ? 'category' : options.organize || 'date';
     const oldest = options.order === 'oldest';
-    const one = half || options.columns === 'one';
-    const range = half ? 'last10' : options.range === 'all' || options.range === 'last10' ? options.range : 'term';
+    const one = half || options.columns !== 'two';
+    const range = half ? 'last10' : options.range === 'term' || options.range === 'last10' ? options.range : 'all';
     const per = Math.max(1, Number(options.per) || 5);
 
     const dated = getAssessments(cid)
@@ -1530,6 +1531,10 @@ window.ReportBlocks = (function () {
     let pool = dated;
     if (range === 'term') pool = dated.filter(x => assessmentInActiveTerm(cid, x.a));
     else if (range === 'last10') pool = dated.slice(0, 10);
+    else {
+      const today = typeof courseToday === 'function' ? courseToday(cid) : new Date().toISOString().slice(0, 10);
+      pool = dated.filter(x => !x.d || x.d <= today);
+    }
     if (oldest) pool = pool.slice().reverse();
     if (!pool.length) return '';
 
@@ -1626,7 +1631,7 @@ window.ReportBlocks = (function () {
     const n = pool.length;
     const meta = half
       ? 'Last 10'
-      : (range === 'last10' ? 'Last 10' : range === 'all' ? 'All' : 'This term') +
+      : (range === 'last10' ? 'Last 10' : range === 'all' ? 'Year to date' : 'This term') +
         (organize === 'competency'
           ? ` · latest ${per} for each competency`
           : ` · ${n} assessment${n === 1 ? '' : 's'}`);
