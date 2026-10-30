@@ -199,9 +199,9 @@ describe('the best-piece sentence', () => {
     );
   });
 
-  it('uses the name again when no pronouns are on file, with ’s, and they after it in the sentence', () => {
+  it('uses the name again when no pronouns are on file, with ’s, never they', () => {
     expect(S({ title: 'Trench Letter', note: 'wrote from a soldier’s view', name: 'Chris', pronouns: they })).toBe(
-      'Chris’s best piece was “Trench Letter”, where they wrote from a soldier’s view.',
+      'Chris’s best piece was “Trench Letter”, where Chris wrote from a soldier’s view.',
     );
   });
 
@@ -222,10 +222,10 @@ describe('the best-piece sentence', () => {
 
   it('starts the note lower case and ends it with one period', () => {
     expect(S({ title: 'Map Quiz', note: 'Labelled every river.', name: 'Ava', pronouns: they })).toBe(
-      'Ava’s best piece was “Map Quiz”, where they labelled every river.',
+      'Ava’s best piece was “Map Quiz”, where Ava labelled every river.',
     );
     expect(S({ title: 'Map Quiz', note: 'DNA model built to scale', name: 'Ava', pronouns: they })).toBe(
-      'Ava’s best piece was “Map Quiz”, where they DNA model built to scale.',
+      'Ava’s best piece was “Map Quiz”, where Ava DNA model built to scale.',
     );
   });
 

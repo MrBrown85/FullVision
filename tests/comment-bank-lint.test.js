@@ -469,8 +469,8 @@ describe('the vocabulary lint', () => {
 describe('the bank’s templates follow the realiser’s rules', () => {
   const bank = COMMENT_BANK.sentences;
 
-  it('names the student only through the role slots, never {name} or {whose}', () => {
-    bank.forEach(s => expect(s.text, s.id).not.toMatch(/\{(name|whose)\}/));
+  it('names the student only through the role slots, never {name}, {whose} or a reflexive (the name has none)', () => {
+    bank.forEach(s => expect(s.text, s.id).not.toMatch(/\{(name|whose|himself)\}/));
   });
 
   it('puts a [singular|plural] verb only after a subject slot in the same sentence', () => {

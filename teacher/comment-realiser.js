@@ -5,7 +5,8 @@
 
    - Name and pronouns. The student is named in the first sentence that
      mentions them; later sentences use their pronouns, or the name again
-     when none are on file. Possessive is always ’s ("Chris’s"). A
+     when none are on file (every mention: FullVision never assumes
+     pronouns). Possessive is always ’s ("Chris’s"). A
      [singular|plural] verb agrees with the student mention before it, so
      singular they takes plural verbs ("they come to class ready").
      Moving a sentence first moves the name to it (realise()).
@@ -209,8 +210,8 @@ window.CommentRealiser = (function () {
   var THEY = { subj: 'they', obj: 'them', poss: 'their', refl: 'themselves' };
 
   /* Who a sentence is about: { name, p: pronouns { subj, obj, poss, refl
-     }, onFile }. With no pronouns on file the name starts each sentence's
-     mentions, and they, them and their follow it in that sentence. */
+     }, onFile }. With no pronouns on file every mention is the name:
+     "they" only when they/them is on file. */
   function _who(who) {
     who = who || {};
     return { name: String(who.name || ''), p: who.p || THEY, onFile: !!who.onFile };
@@ -244,16 +245,17 @@ window.CommentRealiser = (function () {
       if (tok.name || tok.ref) {
         var role = tok.name ? 'subj' : tok.ref;
         // The name: the first mention in the comment, an explicit {name},
-        // or, with no pronouns on file, the first mention in each sentence
-        // (they, them and their after it). Never a reflexive.
-        var useName = !!tok.name || (role !== 'refl' && (!state.named || (!who.onFile && !mentioned)));
+        // and, with no pronouns on file, every mention (FullVision never
+        // assumes pronouns: "Ava’s best piece was “X”, where Ava linked …").
+        // The bank writes no reflexive, so no "Ava sees Ava".
+        var useName = !!tok.name || !who.onFile || (role !== 'refl' && !state.named);
         var w;
         if (useName && who.name) {
           w = role === 'poss' ? possessive(who.name) : who.name;
           state.named = true;
           if (role === 'subj') one = true;
         } else {
-          w = String((who.onFile ? p : THEY)[role] || THEY[role]);
+          w = String(p[role] || THEY[role]);
           if (role === 'subj') one = w !== 'they';
         }
         out += atStart() ? cap(w) : w;
