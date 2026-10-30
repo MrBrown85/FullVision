@@ -309,6 +309,10 @@ window.CommentBank = (function () {
     // missing only when it is labelled Missing, whatever its due date.
     var rec = { total: 0, handed: 0, late: 0, missing: 0 };
     var notIn = [];
+    // The scored pieces this term with their % (calc.js), oldest first, for
+    // the grade sentence's "close to" (gradeOf). Work labelled Missing is
+    // not a scored piece.
+    var pieces = [];
     assessments.filter(inTerm).forEach(function (a) {
       var cell = assessmentCellValue(cid, sid, a);
       var missing = cell.status === 'NS';
@@ -319,6 +323,12 @@ window.CommentBank = (function () {
       if (missing) rec.missing++;
       else rec.handed++;
       if (cell.late) rec.late++;
+      if (missing || !dateOf(a)) return;
+      var pc = getAssessmentGroupPercentage(cid, sid, [a]);
+      if (pc && pc.pct != null) pieces.push({ id: a.id, d: dateOf(a), pct: pc.pct });
+    });
+    pieces.sort(function (x, y) {
+      return String(x.d).localeCompare(String(y.d));
     });
 
     // Observations this term, newest first.
@@ -405,6 +415,16 @@ window.CommentBank = (function () {
       overall: overall,
       standing: mode !== 'letter' && overall > 0 ? word(overall) : '',
       letter: letter && letter.S ? (/^[AFI]/.test(letter.S) ? 'an ' : 'a ') + letter.S + ' (' + letter.R + '%)' : '',
+      // The course grade for the grade sentence, all from calc.js: the class's
+      // grading style, the letter and % as shown, the band above, and the
+      // scored pieces (gradeOf).
+      grade: {
+        mode: mode,
+        letter: letter && letter.R != null ? percentageToLetter(letter.R, cid) : null,
+        pct: letter && letter.R != null ? letter.R : null,
+        next: letter && letter.R != null ? nextLetterBand(letter.R) : null,
+        pieces: pieces,
+      },
       levelText: function (v) {
         return mode === 'letter' ? formatLevel(cid, v) : levelWord(cid, v);
       },
@@ -481,6 +501,91 @@ window.CommentBank = (function () {
   function evidenceOf(f) {
     if (!f.work.length) return '';
     return f.overall >= 2.5 ? 'a solid grasp of the material' : 'progress toward understanding the key concepts';
+  }
+
+  /* ── The grade sentence ────────────────────────────────────────────── */
+
+  /* The standing words of the Letter Grades Order (M192/94). IE and F have
+     none, so they get no grade sentence here. */
+  var STANDING = { A: 'excellent', B: 'very good', 'C+': 'good', C: 'satisfactory', 'C-': 'minimally acceptable' };
+  /* "Close to" the next letter: at most this many points below its band,
+     with at least this many scored pieces. */
+  var CLOSE_POINTS = 2;
+  var CLOSE_PIECES = 6;
+
+  /* "a" or "an" by sound: a letter grade or initialism is said letter by
+     letter ("an A", "a B", "an IE"); a word by its first letter ("an
+     Extending", "a Proficient"). */
+  function aOrAn(w) {
+    var t = String(w || '');
+    var spelled = /^[A-Z]{1,3}[+-]?$/.test(t);
+    var vowel = spelled ? /^[AEFHILMNORSX]/.test(t) : /^[aeiou]/i.test(t);
+    return (vowel ? 'an ' : 'a ') + t;
+  }
+
+  function _median(xs) {
+    var s = xs.slice().sort(function (a, b) {
+      return a - b;
+    });
+    var m = Math.floor(s.length / 2);
+    return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+  }
+
+  /* Whether the marks are going down: the scored pieces in date order, and
+     the median % of the latest third below the median of the earliest
+     third. Fewer than three pieces show no trend. */
+  function trendingDown(pieces) {
+    var xs = (pieces || []).slice().sort(function (a, b) {
+      return String(a.d).localeCompare(String(b.d));
+    });
+    var n = Math.floor(xs.length / 3);
+    if (n < 1) return false;
+    var pct = function (p) {
+      return Number(p.pct);
+    };
+    return _median(xs.slice(-n).map(pct)) < _median(xs.slice(0, n).map(pct));
+  }
+
+  /* The next letter up when the student is close to it: { letter, min,
+     gap }, or null. Only upward, only within CLOSE_POINTS of the band, with
+     CLOSE_PIECES or more scored pieces and no downward trend. */
+  function closeTo(g) {
+    var nx = g && g.next;
+    if (!nx || g.pct == null) return null;
+    var gap = Math.round((nx.min - Number(g.pct)) * 10) / 10;
+    if (!(gap > 0) || gap > CLOSE_POINTS) return null;
+    if ((g.pieces || []).length < CLOSE_PIECES || trendingDown(g.pieces)) return null;
+    return { letter: nx.letter, min: nx.min, gap: gap };
+  }
+
+  /* What the grade sentence says, from the facts: { kind, letter,
+     standing, next } in a Letter or Both class, { kind: 'proficiency',
+     word } in a Proficiency class, or null when there is no grade sentence
+     (no marks yet, or IE or F, which keep today's draft). kind picks the
+     bank sentence: letter, letterClose, cminus, cminusClose, proficiency. */
+  function gradeOf(f) {
+    var g = (f && f.grade) || {};
+    if (g.mode === 'proficiency') return f.standing ? { kind: 'proficiency', word: f.standing } : null;
+    if (g.mode !== 'letter' && g.mode !== 'both') return null;
+    var standing = g.letter && STANDING[g.letter];
+    if (!standing) return null;
+    var close = closeTo(g);
+    return {
+      kind: (g.letter === 'C-' ? 'cminus' : 'letter') + (close ? 'Close' : ''),
+      letter: g.letter,
+      standing: standing,
+      next: close ? close.letter : '',
+    };
+  }
+
+  /* The grade sentence's slot values for a gradeOf result. */
+  function gradeSlots(gr) {
+    return {
+      gradeLetter: gr && gr.letter ? aOrAn(gr.letter) : '',
+      gradeStanding: (gr && gr.standing) || '',
+      gradeNext: gr && gr.next ? aOrAn(gr.next) : '',
+      gradeWord: gr && gr.word ? aOrAn(gr.word) : '',
+    };
   }
 
   /* Every value a bank sentence can ask for, from the facts and the
@@ -672,7 +777,13 @@ window.CommentBank = (function () {
     var focusKeys = keys('comp', [focus]);
     var noteKeys = keys('obs', [note]);
     var concernKeys = keys('obs', [concern]);
+    var gr = gradeOf(f);
+    var gslots = gradeSlots(gr);
     var factsOf = {
+      gradeLetter: ['grade.letter'],
+      gradeStanding: ['grade.letter'],
+      gradeNext: ['grade.pct', 'grade.pieces'],
+      gradeWord: ['overall'],
       standing: ['overall'],
       letterStanding: ['letter'],
       evidence: ['overall', 'work'],
@@ -716,6 +827,7 @@ window.CommentBank = (function () {
       _habits: habits,
       _standing: f.standing || '',
       _family: f.family || '',
+      _grade: gr ? gr.kind : '',
       _options: options,
       _focus: focus || null,
       _note: note || null,
@@ -725,6 +837,10 @@ window.CommentBank = (function () {
       picture: picture,
       standing: f.standing ? (/^[AEIOU]/.test(f.standing) ? 'an ' : 'a ') + f.standing + ' level' : '',
       letterStanding: f.letter,
+      gradeLetter: gslots.gradeLetter,
+      gradeStanding: gslots.gradeStanding,
+      gradeNext: gslots.gradeNext,
+      gradeWord: gslots.gradeWord,
       strengths: list(
         strongest.map(function (c) {
           return c.name;
@@ -817,6 +933,7 @@ window.CommentBank = (function () {
     return Object.keys(when).every(function (k) {
       if (k === 'picture') return ctx.picture === when[k];
       if (k === 'standing') return ctx._standing === when[k];
+      if (k === 'grade') return ctx._grade === when[k];
       return (ctx._habits || {})[k] === when[k];
     });
   }
@@ -1012,16 +1129,19 @@ window.CommentBank = (function () {
     return h || 1;
   }
 
-  /* The draft's shape: an opening, the habits (what is strong, what is
-     growing, attendance when entered), where the student is now (overall,
-     growth, one example), the next step (and the student's own goal), and
-     how they will get there (home or class, then a closer). Each step takes
-     at most one sentence. */
+  /* The draft's shape: the grade sentence (gradeOf; none for IE, F or no
+     marks), an opening, the habits (what is strong, what is growing,
+     attendance when entered), where the student is now (overall, growth,
+     one example), the next step (and the student's own goal), and how they
+     will get there (home or class, then a closer). Each step takes at most
+     one sentence. A step that `says` a fact (the grade) keeps every later
+     sentence claiming it out. */
   var DRAFT_STEPS = [
+    { part: 'now', groups: ['Grade'], says: 'grade' },
     { part: 'now', groups: ['Openings'] },
     { part: 'habits', needsAny: ['strengthHabits', 'strengthHabitNames'] },
     { part: 'habits', needsAny: ['growthHabits', 'growthHabitNames'] },
-    { part: 'habits', groups: ['Completes Work and Takes Part'], unless: 1 },
+    { part: 'habits', groups: ['Completes Work and Takes Part'], unless: 2 },
     { part: 'habits', groups: ['Attendance'] },
     { part: 'now', groups: ['Overall'] },
     { part: 'now', groups: ['Examples From Work', 'From Your Notes', "In the Student's Words"] },
@@ -1086,7 +1206,7 @@ window.CommentBank = (function () {
     var when = s.when || {};
     Object.keys(when).forEach(function (k) {
       values['when.' + k] = when[k];
-      add(k === 'picture' ? 'picture' : k === 'standing' ? 'overall' : 'habit:' + k);
+      add(k === 'picture' ? 'picture' : k === 'standing' ? 'overall' : k === 'grade' ? 'grade' : 'habit:' + k);
     });
     (s.claims || []).forEach(function (c) {
       if (CLAIM_FACTS[c]) add(CLAIM_FACTS[c]);
@@ -1130,6 +1250,8 @@ window.CommentBank = (function () {
           })
         )
           return false;
+        // Once the grade sentence leads, no other sentence states the grade.
+        if (said.grade && (s.claims || []).indexOf('grade') >= 0) return false;
         if (step.groups && step.groups.indexOf(s.group) < 0) return false;
         if (step.needsAny)
           return (s.needs || []).some(function (k) {
@@ -1159,7 +1281,9 @@ window.CommentBank = (function () {
         // An opening a classmate already has reads as a form letter.
         if (step.groups && step.groups[0] === 'Openings' && used) used += 10;
         if (repeatsLast(t, last)) used += 5;
-        return { s: s, t: t, used: used, r: rand() };
+        // The grade step has one sentence that fits and draws no random
+        // number, so the rest of the draft's mix is as it was.
+        return { s: s, t: t, used: used, r: step.says ? 0 : rand() };
       });
       scored.sort(function (a, b) {
         return a.used - b.used || a.r - b.r;
@@ -1169,6 +1293,7 @@ window.CommentBank = (function () {
       (pick.s.needs || []).forEach(function (k) {
         if (NO_REPEAT[k]) said[NO_REPEAT[k]] = true;
       });
+      if (step.says) said[step.says] = true;
       out.push(pick.t);
       sentences.push({ id: pick.s.id, part: pick.s.part, text: pick.t });
       prov.push(provenance(pick.s, ctx));
@@ -1252,6 +1377,15 @@ window.CommentBank = (function () {
       if (_has(pv, 'standing')) checks.push(!!now && f.standing === now && v.standing === _article(now) + ' level');
       if (_has(pv, 'when.standing')) checks.push(!!now && f.standing === now && v['when.standing'] === now);
       if (_has(pv, 'evidence')) checks.push(!!v.evidence && v.evidence === evidenceOf(f));
+      // The grade sentence: the kind it was written for (the letter, C-,
+      // close to the next letter, the proficiency word) and each grade
+      // slot, against gradeOf on the facts.
+      var gr = gradeOf(f);
+      if (_has(pv, 'when.grade')) checks.push(!!gr && v['when.grade'] === gr.kind);
+      var want = gradeSlots(gr);
+      Object.keys(want).forEach(function (k) {
+        if (_has(pv, k)) checks.push(!!gr && !!want[k] && v[k] === want[k]);
+      });
       return checks.length > 0 && checks.every(Boolean);
     },
     // Results are even: every competency with a start and now is at the
@@ -1403,7 +1537,7 @@ window.CommentBank = (function () {
       var checks = [];
       Object.keys(pv.values).forEach(function (k) {
         var m = k.match(/^when\.(\w+)$/);
-        if (m && m[1] !== 'picture' && m[1] !== 'standing') checks.push(eff[m[1]] === pv.values[k]);
+        if (m && m[1] !== 'picture' && m[1] !== 'standing' && m[1] !== 'grade') checks.push(eff[m[1]] === pv.values[k]);
       });
       ['strengthHabits', 'strengthHabitNames', 'growthHabits', 'growthHabitNames'].forEach(function (slot) {
         if (!_has(pv, slot)) return;
@@ -1612,6 +1746,11 @@ window.CommentBank = (function () {
     provenance: provenance,
     verify: verify,
     CLAIMS: CLAIMS,
+    STANDING: STANDING,
+    aOrAn: aOrAn,
+    trendingDown: trendingDown,
+    closeTo: closeTo,
+    gradeOf: gradeOf,
     pictureOf: pictureOf,
     seedFor: seedFor,
     DRAFT_STEPS: DRAFT_STEPS,

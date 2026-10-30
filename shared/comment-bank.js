@@ -6,7 +6,9 @@
 
    Here the habit levels in `when` use the stored scale (term_rating.habits):
    1 Rarely, 2 Sometimes, 3 Usually, 4 Consistently, 5 Not Seen. `picture`
-   is the term's picture: strong, steady, challenge or early. `src` is the
+   is the term's picture: strong, steady, challenge or early. `grade` is
+   the grade sentence's kind (CommentBank.gradeOf): letter, letterClose,
+   cminus, cminusClose or proficiency; C- has its own sentences. `src` is the
    line of tqAutoNarrative the sentence came from on main before Oct 28 2026,
    or "new".
 
@@ -528,6 +530,54 @@ var COMMENT_BANK = {
       needs: ['late'],
       claims: ['attendance'],
       src: '1207',
+    },
+    {
+      id: 'gr01',
+      part: 'now',
+      group: 'Grade',
+      text: '{name} is earning {gradeLetter} this term, which is {gradeStanding} work.',
+      needs: ['gradeLetter', 'gradeStanding'],
+      when: { grade: 'letter' },
+      claims: ['grade'],
+      src: 'new',
+    },
+    {
+      id: 'gr02',
+      part: 'now',
+      group: 'Grade',
+      text: '{name} is earning {gradeLetter} this term, which is {gradeStanding} work and close to {gradeNext}.',
+      needs: ['gradeLetter', 'gradeStanding', 'gradeNext'],
+      when: { grade: 'letterClose' },
+      claims: ['grade'],
+      src: 'new',
+    },
+    {
+      id: 'gr03',
+      part: 'now',
+      group: 'Grade',
+      text: '{name} is earning a C- this term, which is minimally acceptable work.',
+      when: { grade: 'cminus' },
+      claims: ['grade'],
+      src: 'new',
+    },
+    {
+      id: 'gr04',
+      part: 'now',
+      group: 'Grade',
+      text: '{name} is earning a C- this term, which is minimally acceptable work and close to a C.',
+      when: { grade: 'cminusClose' },
+      claims: ['grade'],
+      src: 'new',
+    },
+    {
+      id: 'gr05',
+      part: 'now',
+      group: 'Grade',
+      text: '{name} is working at {gradeWord} level this term.',
+      needs: ['gradeWord'],
+      when: { grade: 'proficiency' },
+      claims: ['grade'],
+      src: 'new',
     },
     {
       id: 'n01',
