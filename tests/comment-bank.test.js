@@ -70,10 +70,10 @@ function fullContext(p, habits) {
 }
 
 describe('the bank', () => {
-  it('has 270 sentences in four parts, each with a unique id', () => {
-    expect(COMMENT_BANK.sentences).toHaveLength(270);
+  it('has 239 sentences in four parts, each with a unique id', () => {
+    expect(COMMENT_BANK.sentences).toHaveLength(239);
     expect(COMMENT_BANK.parts.map(p => p.id)).toEqual(['habits', 'now', 'go', 'how']);
-    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(270);
+    expect(new Set(COMMENT_BANK.sentences.map(s => s.id)).size).toBe(239);
   });
 
   it('has wording for every kind of class, and keeps handed-in work out of PE and Arts', () => {
@@ -91,7 +91,7 @@ describe('the bank', () => {
     // The habits sentences name a habit only through habitWords, which says
     // Completes Work in PE and Arts their own way.
     COMMENT_BANK.sentences.filter(s => s.part === 'habits').forEach(s => expect(s.text, s.id).not.toMatch(/hand/i));
-    ['g104', 'g105', 'w112'].forEach(id =>
+    ['g104', 'g105'].forEach(id =>
       expect(COMMENT_BANK.sentences.find(s => s.id === id).except).toEqual(['pe', 'career']),
     );
   });
@@ -163,6 +163,7 @@ describe('the bank', () => {
       aboutWork: 'focusWork',
       focus: 'nextStep',
       nextStep: 'nextStep',
+      nextSkill: 'nextStep',
       habitsExcellent: 'habits',
       habitsGood: 'habits',
       habitToBuild: 'habits',
@@ -479,18 +480,18 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     return CommentBank.context(CommentBank.facts(cid, st, 'term-2'), {});
   };
 
-  it('knows the Demo class is Science from its name, and offers Cece 77 sentences (2, 31, 18, 26)', () => {
+  it('knows the Demo class is Science from its name, and offers Cece 65 sentences (1, 31, 19, 14)', () => {
     expect(CommentBank.familyOf(cid)).toBe('science');
     const ctx = ctxFor('Cece');
     expect(ctx._family).toBe('science');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([2, 31, 18, 26]);
-    expect(CommentBank.fitCount(ctx)).toBe(77);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([1, 31, 19, 14]);
+    expect(CommentBank.fitCount(ctx)).toBe(65);
   });
 
-  it('offers Jasper 70 (2, 29, 15, 24), by the name he goes by', () => {
+  it('offers Jasper 59 (1, 29, 16, 13), by the name he goes by', () => {
     const ctx = ctxFor('Jasper');
-    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([2, 29, 15, 24]);
-    expect(CommentBank.fitCount(ctx)).toBe(70);
+    expect(CommentBank.parts(ctx, '').map(p => p.fit)).toEqual([1, 29, 16, 13]);
+    expect(CommentBank.fitCount(ctx)).toBe(59);
     expect(ctx.name).toBe('Jas');
     expect(ctx.fellCount).toBe('four');
   });
@@ -561,7 +562,7 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     saveTermAttendance(cid, st.id, 'term-2', 4, 2);
     const ctx = CommentBank.context(CommentBank.facts(cid, st, 'term-2'), {});
     const habits = CommentBank.parts(ctx, '', { more: { habits: true } })[0];
-    expect(habits.fit).toBe(2 + 7);
+    expect(habits.fit).toBe(1 + 7);
     expect(habits.rows.filter(r => r.group === 'Attendance')).toHaveLength(7);
     saveTermAttendance(cid, st.id, 'term-2', null, null);
   });
@@ -575,7 +576,9 @@ describe('Demo Mode (Science 8, Report 2)', () => {
       expect.stringMatching(/taking part in class/),
     ]);
     const sentences = d.text.split(/(?<=[.!?”])\s+(?=[A-Z“])/);
-    expect(sentences.length).toBeGreaterThanOrEqual(8);
+    // The Demo class has no closing sentence or support lines set, so the
+    // comment leaves those out (plan PR 8).
+    expect(sentences.length).toBeGreaterThanOrEqual(7);
     expect(d.text).not.toMatch(/[{}[\]]/);
     expect(d.text).toMatch(/^Cece /);
     // The course is named wherever the story opens with it.
@@ -610,11 +613,12 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     expect(other.sentences[1].text).not.toBe(mine.sentences[1].text);
   });
 
-  it('drafts for every Demo student: six or more sentences, nothing unfilled, nothing quoted twice', () => {
+  it('drafts for every Demo student: five or more sentences, nothing unfilled, nothing quoted twice', () => {
     getStudents(cid).forEach(st => {
       const ctx = CommentBank.context(CommentBank.facts(cid, st, 'term-2'), {});
       const d = CommentBank.draft(ctx, { seed: CommentBank.seedFor(st.id) });
-      expect(d.ids.length, st.firstName).toBeGreaterThanOrEqual(6);
+      // The Demo class has no closing sentence or support lines (plan PR 8).
+      expect(d.ids.length, st.firstName).toBeGreaterThanOrEqual(5);
       expect(d.text, st.firstName).not.toMatch(/[{}[\]]|  /);
       const quotes = d.text.match(/“[^”]+”/g) || [];
       expect(new Set(quotes).size, st.firstName).toBe(quotes.length);
@@ -754,12 +758,28 @@ describe('Demo Mode (Science 8, Report 2)', () => {
   });
 
   it('catches “it is the best work this term” on a piece that is only best in the Focus Area', () => {
+    // The old At Home sentence w101 (cut in plan PR 8), kept here to test the claim.
+    const w101 = {
+      id: 'w101',
+      part: 'how',
+      group: 'For the Family',
+      text: 'At home, ask {name} to walk you through {his} {seeWork}; it is {his} best work this term.',
+      needs: ['seeWork'],
+      claims: ['bestPiece', 'focusWork'],
+    };
+    const bank = { parts: COMMENT_BANK.parts, sentences: COMMENT_BANK.sentences.concat([w101]) };
     const caught = [];
     getStudents(cid).forEach(st => {
       const f = CommentBank.facts(cid, st, 'term-2');
       const ctx = CommentBank.context(f, {});
-      if (!CommentBank.fits(byId('w101'), ctx)) return;
-      const v = CommentBank.verify(one('w101', ctx), f, {});
+      if (!CommentBank.fits(w101, ctx)) return;
+      const d = {
+        text: CommentBank.fill(w101, ctx),
+        ids: ['w101'],
+        sentences: [{ id: 'w101', part: 'how', text: CommentBank.fill(w101, ctx) }],
+        provenance: [CommentBank.provenance(w101, ctx)],
+      };
+      const v = CommentBank.verify(d, f, {}, { bank });
       const best = Math.max(...f.work.map(w => Math.round(w.v * 10)));
       const see = f.work.find(w => w.title === ctx.seeWork);
       expect(v.replaced.length > 0, st.firstName).toBe(!see || Math.round(see.v * 10) < best);
@@ -785,7 +805,22 @@ describe('Demo Mode (Science 8, Report 2)', () => {
   it('never passes a sentence with no fact behind it, or one with no claims field', () => {
     const f = cece();
     const ctx = CommentBank.context(f, {});
-    expect(CommentBank.verify(one('h59', ctx), f, {}).replaced[0].failed).toEqual(['support']);
+    // A sentence claiming support, which nothing in FullVision backs.
+    const h59 = {
+      id: 'h59',
+      part: 'habits',
+      group: 'Work Habits',
+      text: '{name} benefits from extra support and encouragement.',
+      claims: ['support'],
+    };
+    const d59 = {
+      text: CommentBank.fill(h59, ctx),
+      ids: ['h59'],
+      sentences: [{ id: 'h59', part: 'habits', text: CommentBank.fill(h59, ctx) }],
+      provenance: [CommentBank.provenance(h59, ctx)],
+    };
+    const b59 = { parts: COMMENT_BANK.parts, sentences: COMMENT_BANK.sentences.concat([h59]) };
+    expect(CommentBank.verify(d59, f, {}, { bank: b59 }).replaced[0].failed).toEqual(['support']);
     const bare = { ...byId('w129') };
     delete bare.claims;
     const bank = { parts: COMMENT_BANK.parts, sentences: [bare] };
@@ -926,8 +961,9 @@ describe('wording by kind of class', () => {
       const ctx = CommentBank.context(f, {});
       const d = CommentBank.draft(ctx, { seed: 5 });
       expect(CommentBank.verify(d, f, {}).replaced, tag).toEqual([]);
-      // The habits are one sentence (plan PR 7): five or more in every kind of class.
-      expect(d.ids.length, tag).toBeGreaterThanOrEqual(5);
+      // No closing sentence or support lines are set for these classes, and
+      // one piece per competency is too little evidence for a next step.
+      expect(d.ids.length, tag).toBeGreaterThanOrEqual(4);
       expect(d.text, tag).not.toMatch(/[{}[\]]/);
       if (fam === 'pe' || fam === 'arts') expect(d.text, tag).not.toMatch(/hands? in|handing in/i);
       if (fam === 'pe' || fam === 'career')
