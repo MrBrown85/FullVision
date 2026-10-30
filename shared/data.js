@@ -764,6 +764,7 @@ var _ECHO_SAFE_RPCS = {
   upsert_dibels_score: true,
   set_score_status: true,
   save_score_comment: true,
+  save_score_report_note: true,
   clear_score: true,
   update_assessment: true,
   save_collab: true,
@@ -1681,6 +1682,7 @@ function _baselineRowOf(name, params) {
     case 'upsert_tag_score':
     case 'upsert_rubric_score':
     case 'save_score_comment':
+    case 'save_score_report_note':
     case 'clear_score':
       return { field: 'scores', sid: params.p_enrollment_id, aid: params.p_assessment_id };
     case 'set_score_status':
@@ -3253,7 +3255,17 @@ function _pushHydratedScore(scores, sid, entry) {
   } else scores[sid].push(entry);
 }
 
-function _scoreEntryFromCanonical(cid, assessment, tagId, value, comment, modifier, criterionComment, criterionBeyond) {
+function _scoreEntryFromCanonical(
+  cid,
+  assessment,
+  tagId,
+  value,
+  comment,
+  modifier,
+  criterionComment,
+  criterionBeyond,
+  reportNote,
+) {
   var entry = {
     // Deterministic, so loading the same server data twice writes the same
     // localStorage string: a changing value here made every load look like an
@@ -3274,6 +3286,9 @@ function _scoreEntryFromCanonical(cid, assessment, tagId, value, comment, modifi
   if (criterionComment) entry.critNote = String(criterionComment);
   // A single-point rubric's Went Beyond note (rubric_score.beyond).
   if (criterionBeyond) entry.critBeyond = String(criterionBeyond);
+  // The Note for the Report on the whole piece (score.report_note), set on
+  // every score entry of the cell, like the overall comment.
+  if (reportNote) entry.reportNote = String(reportNote);
   return entry;
 }
 
@@ -3622,6 +3637,7 @@ function _gradebookCellsToScoreCache(cid, assessments, cells) {
       var cell = studentCells[aid] || {};
       var assessment = byAssessment[aid] || { id: aid, tagIds: [] };
       var comment = (cell.score && cell.score.comment) || '';
+      var reportNote = (cell.score && cell.score.report_note) || '';
       if (cell.score && cell.score.status) statuses[sid + ':' + aid] = cell.score.status;
       (cell.tag_scores || cell.tagScores || []).forEach(function (tagScore) {
         var tagId = tagScore && (tagScore.tag_id || tagScore.tagId);
@@ -3637,6 +3653,8 @@ function _gradebookCellsToScoreCache(cid, assessments, cells) {
             comment,
             tagScore.modifier,
             tagScore.comment,
+            null,
+            reportNote,
           ),
         );
       });
@@ -3656,6 +3674,7 @@ function _gradebookCellsToScoreCache(cid, assessments, cells) {
               rubricScore.modifier,
               rubricScore.comment,
               rubricScore.beyond,
+              reportNote,
             ),
           );
         });
@@ -3676,6 +3695,9 @@ function _gradebookCellsToScoreCache(cid, assessments, cells) {
             cell.score.value,
             comment,
             isPointsScored(assessment) ? 0 : cell.score.modifier,
+            null,
+            null,
+            reportNote,
           ),
         );
       }
@@ -3915,8 +3937,10 @@ function _bundleCells(gb) {
   }
   sorted(gb.score_rows).forEach(function (r) {
     var cell = cellFor(r[0], r[1]);
-    // A sixth value, the + / −, from migrations/20261022_score_modifier.sql.
-    if (cell) cell.score = { value: r[2], status: r[3], comment: r[4], modifier: r[5] || 0 };
+    // A sixth value, the + / −, from migrations/20261022_score_modifier.sql;
+    // a seventh, the Note for the Report, from
+    // migrations/20261031_score_report_note.sql (a six-value row has none).
+    if (cell) cell.score = { value: r[2], status: r[3], comment: r[4], modifier: r[5] || 0, report_note: r[6] || null };
   });
   sorted(gb.tag_rows).forEach(function (r) {
     var cell = cellFor(r[0], r[1]);
@@ -5243,6 +5267,56 @@ function saveScoreComment(cid, sid, aid, text) {
         p_comment: note,
       }).then(function (res) {
         if (res.error) _reportScoreWriteFailure('save_score_comment', res.error);
+      }),
+    );
+    entries.forEach(function (e) {
+      _rememberScoreCell(cid, sid, aid, e.tagId, scores);
+    });
+  }
+  _broadcastChange(cid, 'scores');
+  return lsOk;
+}
+
+/* ── Note for the Report ───────────────────────────────────────────────
+   One line about what the student did on a piece of work, written about
+   them ("linked the poster to the Act"), for the comment's best-piece
+   sentence: score.report_note on the server and, in the cache, the
+   `reportNote` every score entry of that student and assessment carries.
+   Never printed on the rubric handout. At most 300 characters. */
+var REPORT_NOTE_MAX = 300;
+
+function getScoreReportNote(cid, sid, aid) {
+  var entry = (getScores(cid)[sid] || []).find(function (e) {
+    return e && e.assessmentId === aid && e.reportNote;
+  });
+  return entry ? String(entry.reportNote) : '';
+}
+
+/* Change (or clear, with '') the note on work the student has a score
+   entry for. With no entry there is nothing to write it on. */
+function saveScoreReportNote(cid, sid, aid, text) {
+  var note = (text == null ? '' : String(text)).replace(/\s+/g, ' ').trim().slice(0, REPORT_NOTE_MAX).trim();
+  var scores = getScores(cid);
+  var entries = (scores[sid] || []).filter(function (e) {
+    return e && e.assessmentId === aid;
+  });
+  if (!entries.length) return false;
+  if (getScoreReportNote(cid, sid, aid) === note) return true;
+  entries.forEach(function (e) {
+    if (note) e.reportNote = note;
+    else delete e.reportNote;
+  });
+  _cache.scores[cid] = scores;
+  var lsOk = _safeLSSet('gb-scores-' + cid, JSON.stringify(scores));
+  _markLocalWrite('scores', cid);
+  if (_writesEnabled() && _isSendableId(sid) && _isSendableId(aid)) {
+    _trackPendingSync(
+      _writeRpc('save_score_report_note', {
+        p_enrollment_id: sid,
+        p_assessment_id: aid,
+        p_note: note || null,
+      }).then(function (res) {
+        if (res.error) _reportScoreWriteFailure('save_score_report_note', res.error);
       }),
     );
     entries.forEach(function (e) {
@@ -12134,6 +12208,8 @@ window.GB = {
   getAssignmentObs,
   getScoreComment,
   saveScoreComment,
+  getScoreReportNote,
+  saveScoreReportNote,
   getStudentAssignmentFeedback,
   hasAssignmentFeedback,
   getCustomTags,

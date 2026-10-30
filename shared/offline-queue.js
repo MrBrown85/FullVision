@@ -197,6 +197,7 @@
     upsert_rubric_score: true,
     set_score_status: true,
     save_score_comment: true,
+    save_score_report_note: true,
   };
 
   /* The record and field a write sets: endpoint plus every id param. Two

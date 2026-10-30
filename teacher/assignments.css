@@ -4858,6 +4858,70 @@
   font-size: var(--text-xs);
   font-weight: 600;
 }
+/* The Note for the Report card, under Overall Feedback. */
+.grader-report-note {
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 14px 16px;
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 16px;
+  box-shadow: 0 0 0 0.5px var(--divider-medium);
+}
+.grader-report-note[hidden] {
+  display: none;
+}
+.grader-report-note:focus-within {
+  box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.2);
+}
+.grader-report-note-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.grader-report-note-head h2 {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--text);
+}
+.grader-report-note-head p {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--text-2);
+}
+.grader-report-note-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.grader-report-note-input {
+  font: inherit;
+  font-size: 15px;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--seg-track);
+  color: var(--text);
+}
+.grader-report-note-input:disabled {
+  color: var(--text-2);
+  cursor: not-allowed;
+}
+.grader-report-note-preview {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--text-2);
+}
+@media (max-width: 560px) {
+  .grader-report-note {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+}
 .grader-foot {
   flex-shrink: 0;
   height: 56px;

@@ -1729,6 +1729,9 @@ window.PageReports = (function () {
       switchTab: function () {
         switchTab(el.dataset.tab);
       },
+      tqAddReportNote: function () {
+        RQ.tqAddReportNote(el.dataset.aid);
+      },
       toggleStudentPicker: function () {
         toggleStudentPicker(e);
       },

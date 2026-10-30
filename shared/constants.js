@@ -979,6 +979,7 @@ const FV_IDEMPOTENT_RPCS = {
   remove_section: true,
   restore_section: true,
   save_report_template: true,
+  save_score_report_note: true,
   set_questionnaire_on: true,
   update_phone_report: true,
   upsert_category: true,
