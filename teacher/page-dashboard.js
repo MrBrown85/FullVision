@@ -58,10 +58,10 @@ window.PageDashboard = (function () {
   var CM = DashClassManager;
   var Overview = DashOverview;
   var StudentCards = DashStudentCards;
-  function openClassManager() {
+  function openClassManager(tab) {
     CM.classManagerOpen = true;
     CM.configure({ activeCourse: activeCourse, onRender: render, onCourseChange: switchCourse });
-    CM.openClassManager();
+    CM.openClassManager(tab);
   }
   function closeClassManager() {
     CM.closeClassManager();
@@ -1171,6 +1171,9 @@ window.PageDashboard = (function () {
       Router.navigate('/observations/starters');
       return;
     }
+    // The Term Questionnaire's "Questionnaires ›" link: Class Management
+    // open on its Questionnaires tab.
+    else if (params && params.manage === 'questionnaires') openClassManager('questionnaires');
 
     // Ensure page starts at top
     requestAnimationFrame(function () {

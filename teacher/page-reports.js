@@ -1018,7 +1018,6 @@ window.PageReports = (function () {
     _classFitKey = '';
     renderStudioPanels();
     renderReportPreview();
-    updateCommentFit();
     _syncSidesButtons();
     if (label && typeof showUndoToast === 'function') {
       var wasSelected = studioSelected;
@@ -1689,7 +1688,16 @@ window.PageReports = (function () {
       onLastStudent: function () {
         switchTab('progress');
       },
-      commentFit: _queueCommentFit,
+      // The Edit Student icon opens the Student Dashboard's dialog; a save
+      // redraws this page with the new name or pronouns.
+      openEditStudent: function (cid, sid) {
+        if (typeof PageStudent !== 'undefined' && PageStudent.openEditStudent) {
+          PageStudent.openEditStudent(cid, sid, function () {
+            document.getElementById('sidebar-mount').innerHTML = renderSidebar(activeCourse, null);
+            renderReports();
+          });
+        }
+      },
     });
   }
 
@@ -1928,11 +1936,8 @@ window.PageReports = (function () {
       tqCopyNarrative: function () {
         tqCopyNarrative();
       },
-      tqClear: function () {
-        RQ.tqClear();
-      },
-      tqApprove: function () {
-        RQ.tqApprove();
+      tqApproveNext: function () {
+        RQ.tqApproveNext();
       },
       tqCommentTab: function () {
         RQ.tqCommentTab(el.dataset.tab);
@@ -1940,40 +1945,20 @@ window.PageReports = (function () {
       tqRosterFilter: function () {
         RQ.tqRosterFilter(el.dataset.filter);
       },
-      tqEvidenceTab: function () {
-        RQ.tqEvidenceTab(el.dataset.tab);
-      },
-      tqAdd: function () {
-        RQ.tqAdd(el);
-      },
       tqGenerate: function () {
         RQ.tqGenerate();
       },
       tqRate: function () {
         RQ.tqRate(el.dataset.habit, el.dataset.value);
       },
-      tqPickNote: function () {
-        RQ.tqPickNote(el.dataset.value);
+      tqInfo: function () {
+        RQ.tqOpenInfo();
       },
-      tqPickFocus: function () {
-        RQ.tqPickFocus(el.dataset.value);
+      tqCloseInfo: function () {
+        RQ.tqCloseInfo();
       },
-      tqPickICan: function () {
-        RQ.tqPickICan(el.dataset.value);
-      },
-      tqMore: function () {
-        RQ.tqMore(el.dataset.part);
-      },
-      tqQuestions: function () {
-        RQ.tqOpenQuestions();
-      },
-      tqCloseQuestions: function () {
-        RQ.tqCloseQuestions();
-      },
-      tqOpenProgress: function () {
-        RQ.tqCloseQuestions();
-        tqSaveCurrentIfNeeded();
-        switchTab('progress');
+      tqEditStudent: function () {
+        RQ.tqEditStudent();
       },
     };
     if (handlers[action]) {
@@ -1992,11 +1977,6 @@ window.PageReports = (function () {
       RQ.tqSetAttendance(el.dataset.sid);
       return;
     }
-    // The Questions sheet's What FullVision Has boxes.
-    if (el.dataset.tqCard) {
-      RQ.tqSetCard(el.dataset.tqCard, el.checked);
-      return;
-    }
     var a = el.dataset.action;
     if (a === 'gradeOption') {
       _setGradeOption(el.dataset.key, !!el.checked);
@@ -2013,25 +1993,6 @@ window.PageReports = (function () {
   // The CSP blocks inline on* attributes, so the comment box's typing is heard here.
   function _handleNarrativeInput(e) {
     if (e.target && e.target.id === 'tq-narrative') RQ.tqNarrativeInput();
-  }
-
-  /* ── The comment box knows the form's room ─────────────────────
-     The line meter: the comment's printed lines on the class's form
-     against the Teacher Comment box's Lines, measured as it is typed. */
-  var _fitTimer = null;
-  function _queueCommentFit() {
-    clearTimeout(_fitTimer);
-    _fitTimer = setTimeout(updateCommentFit, 250);
-  }
-  function updateCommentFit() {
-    if (activeTab !== 'questionnaire' || typeof ReportSheets === 'undefined') return;
-    var student = getTqStudents()[RQ.tqStudentIndex];
-    var box = document.getElementById('tq-narrative');
-    if (!student || !box) return;
-    var ctx = ReportBlocks.reportContext();
-    ctx.narrativeOverride = box.value;
-    var r = ReportSheets.describeStudent(activeCourse, student, ctx, { paper: reportPaper, form: _formOf() });
-    RQ.setMeter(r.commentLines || 0, r.room || 0);
   }
 
   /* ⌘ Return and the arrow keys on the questionnaire. */
@@ -2081,6 +2042,8 @@ window.PageReports = (function () {
 
   var _resizeTimer = null;
   function _handleResize() {
+    // The questionnaire's comment box refits its height to the new width.
+    if (activeTab === 'questionnaire') return RQ.fitBox();
     if (activeTab !== 'progress') return;
     clearTimeout(_resizeTimer);
     _resizeTimer = setTimeout(renderReportPreview, 150);
@@ -2228,7 +2191,6 @@ window.PageReports = (function () {
     _listeners = [];
 
     window.removeEventListener('resize', _handleResize);
-    clearTimeout(_fitTimer);
     if (_beforeUnloadHandler) {
       window.removeEventListener('beforeunload', _beforeUnloadHandler);
       _beforeUnloadHandler = null;
@@ -2249,7 +2211,7 @@ window.PageReports = (function () {
 
   /* -- Toolbar HTML (rendered into main on init) ---------- */
   var TOOLBAR_HTML =
-    '<div class="page-toolbar report-toolbar no-print">\n      <div class="seg report-seg-control" role="tablist" aria-label="Report type">\n        <button class="seg-btn report-seg-btn active" data-action="switchTab" data-tab="questionnaire" role="tab" aria-selected="true">Term Questionnaire</button>\n        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="progress" role="tab" aria-selected="false">Progress Reports</button>\n      </div>\n      <div class="report-stepper" id="report-stepper" style="display:none">\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="-1" title="Previous student" aria-label="Previous student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="1" title="Next student" aria-label="Next student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n      </div>\n      <div class="student-picker" id="student-picker">\n        <button class="student-picker-btn" data-action="toggleStudentPicker" aria-label="Select students" aria-expanded="false" aria-haspopup="listbox">\n          <span id="picker-label">All Students</span>\n        </button>\n        <div class="student-picker-dropdown" id="picker-dropdown"></div>\n      </div>\n      <select id="report-period" class="term-select" aria-label="Report"></select>\n      <select id="report-copy" class="term-select" aria-label="Copy" style="display:none"></select>\n      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">\n        <span class="qn-ready tq-only" id="tq-ready" style="display:none"></span>\n        <button type="button" class="tb-toggle-btn tq-only" id="tq-questions-btn" style="display:none" data-action="tqQuestions" aria-haspopup="dialog">Questions</button>\n        <button type="button" class="tb-action-btn tq-only" id="tq-save-next" style="display:none" data-action="tqNextStudent" title="\u2318 Return">Save and Next \u203A</button>\n        <button class="tb-toggle-btn" id="tb-save-template" style="display:none" data-action="openSaveTemplate">Save as Template</button>\n        <button class="tb-toggle-btn" id="tb-phones-btn" style="display:none" data-action="togglePhones" aria-pressed="false">Sent to Phones</button>\n        <button class="tb-toggle-btn" id="tb-rail-btn" style="display:none" data-action="toggleRail" aria-pressed="false" aria-controls="studio-palette">Blocks</button>\n        <button class="tb-action-btn" id="tb-print-btn" data-action="printReports">Print Reports</button>\n      </div>\n    </div>\n    <div id="report-output" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto"></div>';
+    '<div class="page-toolbar report-toolbar no-print">\n      <div class="seg report-seg-control" role="tablist" aria-label="Report type">\n        <button class="seg-btn report-seg-btn active" data-action="switchTab" data-tab="questionnaire" role="tab" aria-selected="true">Term Questionnaire</button>\n        <button class="seg-btn report-seg-btn" data-action="switchTab" data-tab="progress" role="tab" aria-selected="false">Progress Reports</button>\n      </div>\n      <div class="report-stepper" id="report-stepper" style="display:none">\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="-1" title="Previous student" aria-label="Previous student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M7.5 2.5L4 6l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n        <button type="button" class="tq-toolbar-arrow" data-action="stepStudent" data-dir="1" title="Next student" aria-label="Next student"><svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button>\n      </div>\n      <div class="student-picker" id="student-picker">\n        <button class="student-picker-btn" data-action="toggleStudentPicker" aria-label="Select students" aria-expanded="false" aria-haspopup="listbox">\n          <span id="picker-label">All Students</span>\n        </button>\n        <div class="student-picker-dropdown" id="picker-dropdown"></div>\n      </div>\n      <select id="report-period" class="term-select" aria-label="Report"></select>\n      <select id="report-copy" class="term-select" aria-label="Copy" style="display:none"></select>\n      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">\n        <span class="qn-ready tq-only" id="tq-ready" style="display:none"></span>\n        <button type="button" class="tb-icon-btn tq-only" id="tq-edit-student-btn" style="display:none" data-action="tqEditStudent" aria-label="Edit Student" title="Edit Student: name, pronouns, designations and contacts"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="7.5" r="3.5"></circle><path d="M2.5 19 c0.6-3.6 3.3-5.5 6.5-5.5 c1.2 0 2.3 0.25 3.2 0.75"></path><path d="M14.2 19.3 l0.4-2.3 l4.6-4.6 a1.35 1.35 0 0 1 1.9 1.9 l-4.6 4.6 z"></path></svg></button>\n        <button type="button" class="tb-icon-btn tq-only" id="tq-info-btn" style="display:none" data-action="tqInfo" aria-haspopup="dialog" aria-label="Where this information comes from" title="Where this information comes from"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="11" cy="11" r="9.25"></circle><path d="M8.4 8.6 a2.7 2.7 0 1 1 3.6 2.5 c-0.6 0.25 -1 0.8 -1 1.5 v0.6" stroke-linecap="round"></path><circle cx="11" cy="15.6" r="0.6" fill="currentColor"></circle></svg></button>\n        <button type="button" class="tb-action-btn tq-only" id="tq-approve-next" style="display:none" data-action="tqApproveNext" title="Saves this comment to the report card and opens the next student. \u2318 Return">Approve and Next \u203A</button>\n        <button class="tb-toggle-btn" id="tb-save-template" style="display:none" data-action="openSaveTemplate">Save as Template</button>\n        <button class="tb-toggle-btn" id="tb-phones-btn" style="display:none" data-action="togglePhones" aria-pressed="false">Sent to Phones</button>\n        <button class="tb-toggle-btn" id="tb-rail-btn" style="display:none" data-action="toggleRail" aria-pressed="false" aria-controls="studio-palette">Blocks</button>\n        <button class="tb-action-btn" id="tb-print-btn" data-action="printReports">Print Reports</button>\n      </div>\n    </div>\n    <div id="report-output" style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto"></div>';
 
   /* -- Public API ----------------------------------------- */
   return {

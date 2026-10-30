@@ -1,11 +1,12 @@
-/* report-questionnaire.js — the Term Questionnaire (DECISIONS 14,
-   docs/questionnaire-plan.md). One student at a time, the whole picture on
-   one screen, and the teacher leaves with the comment: the student strip
-   (About Me, the goal, attendance from MyEd), what FullVision has, the
-   Comment Bank, and the Teacher Comment filling the right column. The comment is
-   hand-written plain text; the bank only offers wording
+/* report-questionnaire.js — the Term Questionnaire's review screen
+   (fullvision-generate-plan, PR 11a; the "Review screen" mockup). One
+   student at a time: the header with the grade, Work Habits as a radio
+   grid, At a Glance (Work and Skills), the student's Voice, the Teacher
+   Comment with Generate Comment, and the one-line Attendance card. The
+   comment is plain text; Generate drafts it from the bank
    (teacher/comment-bank.js). The class's roster is the app's sidebar, which
-   this page marks Needs Approval or ticked. */
+   this page marks Needs Approval or ticked. Approve and Next in the toolbar
+   saves the comment as approved and opens the next student. */
 window.ReportQuestionnaire = (function () {
   'use strict';
 
@@ -13,13 +14,13 @@ window.ReportQuestionnaire = (function () {
   var _activeCourse = null;
   var _renderReports = null;
   var _onLastStudent = null;
-  var _commentFit = null;
+  var _openEditStudent = null;
 
   function configure(opts) {
     _activeCourse = opts.activeCourse;
     _renderReports = opts.renderReports;
     if (opts.onLastStudent) _onLastStudent = opts.onLastStudent;
-    if (opts.commentFit) _commentFit = opts.commentFit;
+    if (opts.openEditStudent) _openEditStudent = opts.openEditStudent;
   }
   function rerender() {
     if (_renderReports) _renderReports();
@@ -33,9 +34,9 @@ window.ReportQuestionnaire = (function () {
   var _commentTab = 'this'; // 'this' or an earlier report's term id
   var _saveTimer = null;
 
-  /* What FullVision has for the student on screen, read once per drawing and
-     again only after something it depends on changes (a habit, the Focus
-     Area, attendance); typing never re-reads it. */
+  /* What FullVision has for the student on screen, read once per drawing
+     and again only after something it depends on changes (a habit,
+     attendance); typing never re-reads it. */
   var _factsCache = null;
   function _facts(student, fresh) {
     var key = _activeCourse + '|' + student.id + '|' + getTermId();
@@ -63,6 +64,7 @@ window.ReportQuestionnaire = (function () {
   function tqPrevStudent() {
     _goTo(tqStudentIndex - 1);
   }
+  /* The roster and ↑ ↓ move without approving. */
   function tqNextStudent() {
     var students = getTqStudents();
     if (tqStudentIndex >= students.length - 1) {
@@ -138,7 +140,8 @@ window.ReportQuestionnaire = (function () {
     if (tqNarrativeDirty) tqSaveNarrative();
   }
 
-  /* Typing: save shortly after the teacher pauses. */
+  /* Typing: the box grows with its text, the count follows, and the text is
+     saved shortly after the teacher pauses. */
   function tqNarrativeInput() {
     tqNarrativeDirty = true;
     _syncNote();
@@ -146,25 +149,27 @@ window.ReportQuestionnaire = (function () {
     _saveTimer = setTimeout(tqSaveNarrative, 600);
   }
 
-  function tqClear() {
+  /* The comment grows with its text: no inner scrolling. */
+  function _fitBox() {
     var el = _box();
-    if (!el || !el.value) return;
-    if (!document.execCommand || !_tryDelete(el)) el.value = '';
-    tqNarrativeDirty = true;
-    tqSaveNarrative();
-    _syncNote();
-  }
-  function _tryDelete(el) {
-    el.focus();
-    el.select();
-    try {
-      return document.execCommand('delete') && el.value === '';
-    } catch (e) {
-      return false;
-    }
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
   }
 
-  /* Copy: the comment as plain text, to paste into MyEd. */
+  function _plural(n, one, many) {
+    return n + ' ' + (n === 1 ? one : many);
+  }
+  function _countText(text) {
+    return _plural(String(text || '').length, 'character', 'characters');
+  }
+  function _syncCount() {
+    var el = _box();
+    var out = document.getElementById('tq-count');
+    if (el && out) out.textContent = _countText(el.value);
+  }
+
+  /* Copy: the comment as plain text, ready to paste (⌘⇧C too). */
   function tqCopyNarrative() {
     var el = _box();
     var text = el ? el.value : '';
@@ -172,21 +177,25 @@ window.ReportQuestionnaire = (function () {
     if (!text.trim() || !navigator.clipboard) return;
     navigator.clipboard.writeText(text).then(function () {
       if (!btn) return;
-      btn.textContent = 'Copied';
+      var label = btn.querySelector('.qn-copy-label');
+      if (!label) return;
+      label.textContent = 'Copied';
       setTimeout(function () {
-        btn.textContent = 'Copy';
+        label.textContent = 'Copy';
       }, 1600);
     });
   }
 
-  /* Approve Comment, or take the approval back. Saves the text with it. */
-  function tqApprove() {
+  /* Approve and Next: saves the comment as approved and opens the next
+     student (⌘ Return too). On the last student it hands over to the
+     parent, as Save and Next did. */
+  function tqApproveNext() {
     var st = _current();
     var el = _box();
     if (!st) return;
     var termId = getTermId();
     var rating = getStudentTermRating(_activeCourse, st.id, termId) || {};
-    var data = { approvedAt: rating.approvedAt ? null : new Date().toISOString() };
+    var data = { approvedAt: new Date().toISOString() };
     if (el && el.value.replace(/\s+$/, '') !== plainComment(rating.narrative || '').replace(/\s+$/, '')) {
       data.narrative = el.value.replace(/\s+$/, '');
     }
@@ -194,6 +203,7 @@ window.ReportQuestionnaire = (function () {
     upsertTermRating(_activeCourse, st.id, termId, data);
     tqNarrativeDirty = false;
     _syncStatus();
+    tqNextStudent();
   }
 
   function _approved(sid) {
@@ -210,24 +220,13 @@ window.ReportQuestionnaire = (function () {
     }, 300);
   }
   function _syncNote() {
+    _fitBox();
+    _syncCount();
     _syncQuotedSoon();
-    _syncRows();
-    if (_commentFit) _commentFit();
   }
 
-  /* The approve button, the card's ring, the Ready count and the roster. */
+  /* The Ready count and the roster. */
   function _syncStatus() {
-    var st = _current();
-    if (!st) return;
-    var on = _approved(st.id);
-    var btn = document.getElementById('tq-approve');
-    if (btn) {
-      btn.textContent = on ? '✓ Approved' : 'Approve Comment';
-      btn.setAttribute('aria-pressed', String(on));
-      btn.classList.toggle('on', on);
-    }
-    var card = document.getElementById('tq-comment-card');
-    if (card) card.classList.toggle('waiting', !on);
     syncRoster();
   }
 
@@ -249,7 +248,7 @@ window.ReportQuestionnaire = (function () {
       var ok = _approved(sid);
       return {
         sub: ok ? '' : 'Needs Approval',
-        mark: ok ? '<span class="student-row-mark ok" aria-label="Ready">\u2713</span>' : '',
+        mark: ok ? '<span class="student-row-mark ok" aria-label="Ready">✓</span>' : '',
         hidden: _notReadyOnly && ok && !(cur && cur.id === sid),
       };
     };
@@ -274,6 +273,296 @@ window.ReportQuestionnaire = (function () {
     syncRoster();
   }
 
+  /* ── The header ──────────────────────────────────────────── */
+
+  /* The Letter Grades Order word for a letter, as the grade sentence says
+     it (the plan's "The target comment", 1). Nothing for IE or F. */
+  var STANDING = {
+    A: 'Excellent',
+    B: 'Very good',
+    'C+': 'Good',
+    C: 'Satisfactory',
+    'C-': 'Minimally acceptable',
+  };
+  function standingWord(letter) {
+    return STANDING[String(letter || '').trim()] || '';
+  }
+
+  /* The grade on the right of the header: the big line as the class shows
+     it ("B · 82.9%" in a Letter class, the level in a Proficiency class,
+     both in a Both class), and under it the standing word (a Letter class)
+     or the proficiency word (grades 8–9), with the assignments handed in. */
+  function headerGrade(cid, sid, f) {
+    var mode = courseGradeMode(cid);
+    var b = studentGradeBadges(cid, sid);
+    var big = [];
+    if (b.prof) big.push(b.prof.text);
+    if (b.letter) big.push(mode === 'letter' ? b.letter.grade + ' · ' + b.letter.pct : b.letter.text);
+    var standing = mode === 'proficiency' ? levelWord(cid, f.overall) : b.letter ? standingWord(b.letter.grade) : '';
+    var rec = f.record || { handed: 0, total: 0 };
+    var count = rec.total ? rec.handed + ' of ' + rec.total + ' assignments' : '';
+    return {
+      big: big.join(' · ') || '—',
+      small: [standing, count].filter(Boolean).join(' · '),
+    };
+  }
+
+  function _headerHtml(cid, student, f) {
+    var sid = student.id;
+    var first = student.firstName || displayNameFirst(student);
+    var g = headerGrade(cid, sid, f);
+    var link = `<a role="link" tabindex="0" data-href="/student?id=${esc(sid)}&course=${esc(cid)}" class="qn-head-link" title="${esc(
+      'Opens ' + first + '’s Student Dashboard. Its Term Questionnaire button returns here, to the same student.',
+    )}">Student Dashboard ›</a>`;
+    return `<div class="qn-head">
+      <span class="qn-avatar" style="background:${_avatarColor(sid)}" aria-hidden="true">${esc(initials(student))}</span>
+      <div class="qn-who">
+        <span class="qn-name">${esc(fullName(student))}</span>
+        <span class="qn-head-sub">${student.pronouns ? esc(student.pronouns) + ' · ' : ''}${link}</span>
+      </div>
+      <div class="qn-grade">
+        <span class="qn-grade-big">${esc(g.big)}</span>
+        <span class="qn-grade-sub">${esc(g.small)}</span>
+      </div>
+    </div>`;
+  }
+
+  /* ── Work Habits ─────────────────────────────────────────── */
+
+  /* The names and hints on the grid, as the mockup words them. */
+  var HABIT_LABELS = { ready: 'Comes Ready, Uses Class Time' };
+  var SCALE_TIPS = {
+    Rarely: 'Rarely: hardly ever this term',
+    Sometimes: 'Sometimes: some of the time, not most',
+    Usually: 'Usually: most of the time',
+    Consistently: 'Consistently: almost every time',
+    'Not Seen': 'Not Seen: no chance to see it yet. The comment leaves it out.',
+  };
+
+  function _ratedCount(habits) {
+    return CommentBank.HABITS.filter(function (h) {
+      return habits && habits[h.key] != null;
+    }).length;
+  }
+
+  function _habitsHtml(cid, f) {
+    var stored = (getStudentTermRating(cid, f.sid, getTermId()) || {}).habits || {};
+    var head = CommentBank.SCALE.map(function (label) {
+      return `<span title="${esc(SCALE_TIPS[label] || label)}">${esc(label)}</span>`;
+    }).join('');
+    var rows = CommentBank.HABITS.map(function (h) {
+      var v = stored[h.key];
+      var name = HABIT_LABELS[h.key] || h.name;
+      var opts = CommentBank.SCALE.map(function (label, i) {
+        var val = i + 1;
+        var on = v === val;
+        return `<span class="qn-habit-cell"><button type="button" role="radio" aria-checked="${on}" class="qn-radio${on ? ' on' : ''}" data-action="tqRate" data-habit="${h.key}" data-value="${val}" aria-label="${esc(name + ': ' + label)}" title="${esc(SCALE_TIPS[label] || label)}"></button></span>`;
+      }).join('');
+      return `<div class="qn-habit-row" role="radiogroup" aria-label="${esc(name)}">
+        <span class="qn-habit-name" title="${esc(h.hint)}">${esc(name)}</span>${opts}
+      </div>`;
+    }).join('');
+    return `<div class="qn-card qn-habits">
+      <div class="qn-card-top"><span class="qn-card-title">Work Habits</span><span class="qn-sub" id="tq-rated">${_ratedCount(stored)} of 6 rated</span></div>
+      <div class="qn-habit-head"><span></span>${head}</div>
+      ${rows}
+    </div>`;
+  }
+
+  /* A habit picked on the grid: saved with the others (the whole map); the
+     grid and the count change in place, nothing else redraws. */
+  function tqRate(key, value) {
+    var st = _current();
+    if (!st) return;
+    tqSaveCurrentIfNeeded();
+    var termId = getTermId();
+    var habits = Object.assign({}, (getStudentTermRating(_activeCourse, st.id, termId) || {}).habits || {});
+    habits[key] = Number(value);
+    upsertTermRating(_activeCourse, st.id, termId, { habits: habits });
+    document.querySelectorAll('.qn-radio[data-habit="' + key + '"]').forEach(function (b) {
+      var on = Number(b.dataset.value) === Number(value);
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-checked', String(on));
+    });
+    var rated = document.getElementById('tq-rated');
+    if (rated) rated.textContent = _ratedCount(habits) + ' of 6 rated';
+    _facts(st, true);
+  }
+
+  /* ── At a Glance ─────────────────────────────────────────── */
+
+  /* The highest-marked piece this term; the latest when two tie. */
+  function bestPiece(work) {
+    var best = null;
+    (work || []).forEach(function (w) {
+      if (!best || w.v > best.v || (w.v === best.v && String(w.d) > String(best.d))) best = w;
+    });
+    return best;
+  }
+
+  /* Work with no mark this term: labelled Missing, or past its due date
+     with nothing entered (the Missing Work block's rule, as facts() counts
+     it). */
+  function notHandedIn(cid, sid) {
+    return (getAssessments(cid) || [])
+      .filter(function (a) {
+        if (!assessmentInActiveTerm(cid, a)) return false;
+        var cell = assessmentCellValue(cid, sid, a);
+        return cell.kind === 'missing' || cell.status === 'NS';
+      })
+      .map(function (a) {
+        return a.title || '';
+      });
+  }
+
+  /* Strongest: every competency at the highest level; Next step: the
+     lowest, when it is below the highest. */
+  function skillTags(comps) {
+    var list = (comps || []).filter(function (c) {
+      return c.level > 0;
+    });
+    if (list.length < 2) return {};
+    var max = Math.max.apply(
+      null,
+      list.map(function (c) {
+        return c.level;
+      }),
+    );
+    var min = Math.min.apply(
+      null,
+      list.map(function (c) {
+        return c.level;
+      }),
+    );
+    var out = {};
+    if (max === min) return out;
+    list.forEach(function (c) {
+      if (c.level === max) out[c.id] = 'Strongest';
+    });
+    var low = list.find(function (c) {
+      return c.level === min;
+    });
+    if (low) out[low.id] = 'Next step';
+    return out;
+  }
+
+  function _glanceHtml(cid, student, f) {
+    var best = bestPiece(f.work);
+    var missing = notHandedIn(cid, student.id);
+    var tags = skillTags(f.comps);
+    var skills = f.comps
+      .map(function (c) {
+        var tag = tags[c.id];
+        return `<div class="qn-skill">
+          <span class="qn-skill-name">${esc(c.name)}</span>
+          ${tag ? `<span class="qn-tag${tag === 'Strongest' ? ' strongest' : ''}">${tag}</span>` : ''}
+          <span class="qn-level" data-level="${Math.max(1, Math.min(4, Math.round(c.level)))}">${esc(f.levelText(c.level))}</span>
+        </div>`;
+      })
+      .join('');
+    return `<div class="qn-card qn-glance">
+      <div class="qn-card-top"><span class="qn-card-title">At a Glance</span></div>
+      <div class="qn-band">Work</div>
+      <div class="qn-fact qn-best">
+        <span class="qn-fact-label">Best piece</span>
+        <div class="qn-fact-body">${best ? `<span>${esc(best.title)} · ${esc(formatLevel(cid, best.v))}</span>` : '<span class="qn-muted">No marked work this term yet</span>'}</div>
+      </div>
+      <div class="qn-fact">
+        <span class="qn-fact-label">Not handed in</span>
+        <div class="qn-fact-body">${
+          missing.length
+            ? missing
+                .map(function (t) {
+                  return `<span>${esc(t)}</span>`;
+                })
+                .join('')
+            : '<span class="qn-muted">None this term</span>'
+        }</div>
+        ${missing.length ? `<span class="qn-count">${missing.length}</span>` : ''}
+      </div>
+      <div class="qn-band">Skills</div>
+      ${skills || '<div class="qn-fact"><span class="qn-muted">No scores this term yet</span></div>'}
+    </div>`;
+  }
+
+  /* ── The student's Voice ─────────────────────────────────── */
+
+  function _answer(it) {
+    return it && it.v && it.v.text ? String(it.v.text).trim() : '';
+  }
+
+  /* The rows: the goal from the Goal Check-In, then the About Me answers
+     with the mockup's labels; the "To you only" answer is marked Private.
+     An answer the comment quotes is marked "In the comment". */
+  function voiceRows(f) {
+    var prof = f.voice && f.voice.profile;
+    var about = prof && prof.about;
+    var ck = prof && prof.checkin;
+    var rows = [];
+    var goal = ck ? _answer(ck.coreGoal) : '';
+    rows.push({
+      label: 'Goal',
+      text: goal ? '“' + goal.replace(/[“”"]/g, '') + '”' + (f.voice.goalStatus ? ' · ' + f.voice.goalStatus : '') : '',
+      empty: 'Not set yet',
+    });
+    var add = function (label, it, extra) {
+      var a = _answer(it);
+      if (!a) return;
+      rows.push(Object.assign({ label: label, text: a, quote: true }, extra || {}));
+    };
+    add('Good at', about && about.goodAt);
+    add('Hard right now', about && about.hard);
+    add('Wants to get better at', about && about.goal);
+    add('Learns best', about && about.learns, { quote: false });
+    add('To you only', about && about.note, { quote: false, priv: true });
+    return rows;
+  }
+
+  function _voiceHtml(cid, student, f, comment) {
+    var first = student.firstName || displayNameFirst(student);
+    var rows = voiceRows(f)
+      .map(function (r) {
+        var quoted = r.quote && r.text && _quotes(comment, r.text);
+        var chip = r.priv
+          ? '<span class="qn-chip-private" title="Only you see this. It is never printed and never used in the comment.">Private</span>'
+          : r.quote
+            ? `<span class="qn-chip-quoted" data-answer="${esc(r.text)}" title="Generate can quote this in the comment."${quoted ? '' : ' hidden'}>In the comment</span>`
+            : '';
+        return `<div class="qn-voice-row">
+          <span class="qn-fact-label">${esc(r.label)}</span>
+          <span class="qn-voice-text${r.text ? '' : ' qn-muted'}">${esc(r.text || r.empty)}</span>
+          ${chip}
+        </div>`;
+      })
+      .join('');
+    return `<div class="qn-card qn-voice">
+      <div class="qn-card-top">
+        <span class="qn-card-title">${esc(first)}’s Voice</span>
+        <a role="link" tabindex="0" data-href="/dashboard?course=${esc(cid)}&manage=questionnaires" class="qn-card-link" title="Opens this class’s Questionnaires in Class Management, where you choose and send the questions students answer.">Questionnaires ›</a>
+      </div>
+      ${rows}
+    </div>`;
+  }
+
+  /* Whether the comment quotes an answer (its words, without a closing
+     full stop). */
+  function _quotes(comment, text) {
+    var t = String(text || '')
+      .replace(/[“”"]/g, '')
+      .replace(/[.\s]+$/, '');
+    return !!t && String(comment || '').indexOf(t) >= 0;
+  }
+
+  /* After the comment changes: which answers it quotes. */
+  function _syncQuoted() {
+    var el = _box();
+    if (!el) return;
+    var comment = el.value;
+    document.querySelectorAll('.qn-chip-quoted[data-answer]').forEach(function (chip) {
+      chip.hidden = !_quotes(comment, chip.dataset.answer);
+    });
+  }
+
   /* ── Attendance ──────────────────────────────────────────── */
 
   /* The report a term id names, as the report picker shows it. */
@@ -284,12 +573,10 @@ window.ReportQuestionnaire = (function () {
     return opt ? opt.text : n ? 'Report ' + n[1] : '';
   }
 
-  function _plural(n, one, many) {
-    return n + ' ' + (n === 1 ? one : many);
-  }
-
-  /* Under the attendance boxes: the change since the last report with
-     totals, or a warning when a total is lower than that report's. */
+  /* The line at the right of the card: the change since the last report
+     with its totals, a warning when a total is lower than that report's
+     (totals are to date), or the mockup's note until something is
+     entered. */
   function _attendanceNoteHtml(att) {
     var lower = ['absences', 'lates'].find(function (f) {
       var prev = att['prev' + f[0].toUpperCase() + f.slice(1)];
@@ -300,12 +587,14 @@ window.ReportQuestionnaire = (function () {
       var what = lower === 'absences' ? _plural(prev, 'absence', 'absences') : _plural(prev, 'late', 'lates');
       return `<span class="qn-att-warn">Lower than the ${what} entered for the ${esc(
         _reportLabel(att[lower + 'PrevTerm']),
-      )} report. Enter the total to date from MyEd.</span>`;
+      )} report. Enter the total to date.</span>`;
     }
     var prevTerm = att.absencesPrevTerm || att.latesPrevTerm;
     var entered = att.absences != null || att.lates != null;
     if (!prevTerm) {
-      return entered ? 'No earlier report has attendance, so these are this term’s totals too.' : '';
+      return entered
+        ? 'No earlier report has attendance, so these are this term’s totals too.'
+        : 'Optional. Left out until entered.';
     }
     var was = [
       att.prevAbsences != null ? att.prevAbsences + ' absent' : '',
@@ -323,11 +612,18 @@ window.ReportQuestionnaire = (function () {
     return `Since the ${esc(_reportLabel(prevTerm))} report (${was}): <strong>${since}</strong>`;
   }
 
-  function _attChip(att) {
-    var done = att.absences != null && att.lates != null;
-    return done
-      ? '<span class="qn-chip ok" id="tq-att-chip">✓ Entered</span>'
-      : '<span class="qn-chip" id="tq-att-chip">Optional</span>';
+  function _attendanceHtml(cid, student) {
+    var sid = student.id;
+    var att = getTermAttendance(cid, sid, getTermId());
+    var warn = function (k, p) {
+      return att[k] != null && att[p] != null && att[k] < att[p] ? ' warn' : '';
+    };
+    return `<div class="qn-card qn-att">
+      <span class="qn-att-title">Attendance</span>
+      <label class="qn-att-field">Classes Absent<input type="number" min="0" step="1" inputmode="numeric" class="qn-att-input${warn('absences', 'prevAbsences')}" id="tq-att-absences" data-tq-att="absences" data-sid="${sid}" aria-label="Classes Absent" title="Classes absent so far this year, as a total to date. Optional." value="${att.absences == null ? '' : att.absences}"></label>
+      <label class="qn-att-field">Times Late<input type="number" min="0" step="1" inputmode="numeric" class="qn-att-input${warn('lates', 'prevLates')}" id="tq-att-lates" data-tq-att="lates" data-sid="${sid}" aria-label="Times Late" title="Times late so far this year, as a total to date. Optional." value="${att.lates == null ? '' : att.lates}"></label>
+      <span class="qn-att-note" id="tq-att-note" aria-live="polite">${_attendanceNoteHtml(att)}</span>
+    </div>`;
   }
 
   /* A box changed: save both totals and redraw only the note, so the
@@ -340,66 +636,11 @@ window.ReportQuestionnaire = (function () {
     saveTermAttendance(_activeCourse, sid, termId, abs.value, late.value);
     var att = getTermAttendance(_activeCourse, sid, termId);
     var note = document.getElementById('tq-att-note');
-    if (note) {
-      note.innerHTML = _attendanceNoteHtml(att);
-      note.hidden = !note.textContent;
-    }
-    var chip = document.getElementById('tq-att-chip');
-    if (chip) chip.outerHTML = _attChip(att);
+    if (note) note.innerHTML = _attendanceNoteHtml(att);
     abs.classList.toggle('warn', att.absences != null && att.prevAbsences != null && att.absences < att.prevAbsences);
     late.classList.toggle('warn', att.lates != null && att.prevLates != null && att.lates < att.prevLates);
-    _redrawBank();
-  }
-
-  /* ── The student strip ───────────────────────────────────── */
-
-  /* About Me in one line: how to say the name (or the name they go by),
-     pronouns, student number, languages, how they learn best. */
-  function _aboutLine(student, voice) {
-    var a = voice && voice.profile && voice.profile.about;
-    var answer = function (it) {
-      return it && it.v && it.v.text ? String(it.v.text).trim() : '';
-    };
-    var parts = [];
-    if (student.preferred && student.preferred !== student.firstName) parts.push('Goes by ' + student.preferred);
-    if (answer(a && a.say)) parts.push('Says it “' + answer(a.say) + '”');
-    if (student.pronouns) parts.push(student.pronouns);
-    if (student.studentNumber) parts.push(student.studentNumber);
-    if (answer(a && a.languages)) parts.push(answer(a.languages));
-    var learns = answer(a && a.learns);
-    if (learns) parts.push('Learns best ' + learns.charAt(0).toLowerCase() + learns.slice(1));
-    return parts.join(' · ');
-  }
-
-  function _stripHtml(cid, student, f) {
-    var sid = student.id;
-    var first = student.firstName || displayNameFirst(student);
-    var termId = getTermId();
-    var att = getTermAttendance(cid, sid, termId);
-    var goal = f.voice.goal;
-    var note = _attendanceNoteHtml(att);
-    var warn = function (k, p) {
-      return att[k] != null && att[p] != null && att[k] < att[p] ? ' warn' : '';
-    };
-    return `<div class="qn-strip">
-      <span class="qn-avatar" style="background:${_avatarColor(sid)}" aria-hidden="true">${esc(initials(student))}</span>
-      <div class="qn-who">
-        <div class="qn-name">${esc(fullName(student))}</div>
-        <div class="qn-about">${esc(_aboutLine(student, f.voice))}</div>
-      </div>
-      <div class="qn-goal">
-        <span class="qn-goal-label">${esc(first + '’s Goal' + (goal && f.voice.goalStatus ? ' · ' + f.voice.goalStatus : ''))}</span>
-        <span class="qn-goal-text">${goal ? esc('“' + goal.replace(/[“”"]/g, '') + '”') : 'Not set yet'}</span>
-      </div>
-      <div class="qn-att">
-        <div class="qn-att-head"><span>Attendance · from MyEd</span>${_attChip(att)}</div>
-        <div class="qn-att-fields">
-          <label>Classes Absent<input type="number" min="0" step="1" inputmode="numeric" class="qn-att-input${warn('absences', 'prevAbsences')}" id="tq-att-absences" data-tq-att="absences" data-sid="${sid}" value="${att.absences == null ? '' : att.absences}"></label>
-          <label>Times Late<input type="number" min="0" step="1" inputmode="numeric" class="qn-att-input${warn('lates', 'prevLates')}" id="tq-att-lates" data-tq-att="lates" data-sid="${sid}" value="${att.lates == null ? '' : att.lates}"></label>
-        </div>
-        <div class="qn-att-note" id="tq-att-note" aria-live="polite"${note ? '' : ' hidden'}>${note}</div>
-      </div>
-    </div>`;
+    var st = _current();
+    if (st) _facts(st, true);
   }
 
   /* ── The class's report form ───────────────────────────── */
@@ -412,16 +653,29 @@ window.ReportQuestionnaire = (function () {
     return b ? b.label : id;
   }
 
-  /* ── The Questions sheet ─────────────────────────────────── */
+  /* ── Where This Information Comes From ───────────────────── */
 
-  /* What the questionnaire asks for each block on the class's form. */
-  function _asks(cid, id) {
-    var mine = function (t) {
-      return { ask: t, who: 'You', asks: true };
-    };
-    var none = function (t, who) {
-      return { ask: t, who: who || 'FullVision', asks: false };
-    };
+  var SCREEN_SOURCES = [
+    ['Grade', 'Your gradebook: this term’s marks, with your category weights.', 'FullVision'],
+    ['Work Habits', 'Your six ratings, Rarely to Consistently.', 'You'],
+    ['Best Piece', 'The highest-marked assignment this term.', 'FullVision'],
+    ['Not Handed In', 'Assignments labelled Missing, or past the due date with no mark.', 'FullVision'],
+    ['Skills', 'This term’s competency scores.', 'FullVision'],
+    ['Goal and Voice', 'Answers to About Me and the goal check-in, sent from the student’s phone.', 'Student'],
+    [
+      'Attendance',
+      'Classes absent and times late, typed in by you. Optional; left out of the comment until entered.',
+      'You',
+    ],
+    [
+      'Teacher Comment',
+      'Written by Generate from everything above and your class settings. You edit and approve it.',
+      'You',
+    ],
+  ];
+
+  /* Where each block on the class's form gets its content. */
+  function _blockSource(cid, id) {
     var phones = '';
     if (typeof Questionnaires !== 'undefined' && Questionnaires.list) {
       phones = Questionnaires.list(cid)
@@ -436,44 +690,53 @@ window.ReportQuestionnaire = (function () {
         });
     }
     var map = {
-      header: none('Nothing. Comes from Class Settings.'),
-      proficiency: none('Nothing. Comes from scores.'),
-      legend: none('Nothing. Same for everyone.'),
-      'competency-table': none('Nothing. Comes from scores.'),
-      'grade-table': none('Nothing. Comes from scores.'),
-      'missing-work': none('Nothing. Comes from assignments.'),
-      'teacher-narrative': mine(
-        'Written by you. Six habit scales and the Comment Bank (' +
-          COMMENT_BANK.sentences.length +
-          ' sentences in four parts) supply wording to add and edit.',
-      ),
-      'term-attendance': mine('Optional. Classes Absent and Times Late, typed from MyEd.'),
-      'learner-dimensions': mine('The six habit scales, Rarely to Consistently.'),
-      'next-steps': mine('The Focus Area and I Can, picked in the Comment Bank.'),
-      progress: mine('The Focus Area, picked in the Comment Bank.'),
-      'support-home': mine('The Focus Area, picked in the Comment Bank. The work comes from scores.'),
-      'self-assessment': {
-        ask: (phones.length ? CommentBank.list(phones) : 'The reflection and Goal Check-In') + ', on phones.',
-        who: 'Student',
-        asks: true,
-      },
-      'student-reflection-learning': none('Nothing. The student writes on the printed page.', 'Student'),
-      'student-reflection-habits': none('Nothing. The student writes on the printed page.', 'Student'),
-      'parent-response': none('Nothing. The family writes it.', 'Family'),
-      'text-block': none('Nothing. Your text on the form, in Progress Reports.', 'You'),
+      header: ['Nothing to fill in. Comes from Class Settings.', 'FullVision'],
+      proficiency: ['Nothing to fill in. Comes from scores.', 'FullVision'],
+      legend: ['Nothing to fill in. Same for everyone.', 'FullVision'],
+      'competency-table': ['Nothing to fill in. Comes from scores.', 'FullVision'],
+      'grade-table': ['Nothing to fill in. Comes from scores.', 'FullVision'],
+      'missing-work': ['Nothing to fill in. Comes from assignments.', 'FullVision'],
+      'teacher-narrative': [SCREEN_SOURCES[7][1], 'You'],
+      'term-attendance': [SCREEN_SOURCES[6][1], 'You'],
+      'learner-dimensions': [SCREEN_SOURCES[1][1], 'You'],
+      'next-steps': ['The Focus Area: the competency that changed most this term.', 'FullVision'],
+      progress: ['The Focus Area: the competency that changed most this term.', 'FullVision'],
+      'support-home': [
+        'The Focus Area: the competency that changed most this term. The work comes from scores.',
+        'FullVision',
+      ],
+      'self-assessment': [
+        (phones.length ? CommentBank.list(phones) : 'The reflection and Goal Check-In') + ', on phones.',
+        'Student',
+      ],
+      'student-reflection-learning': ['Nothing to fill in. The student writes on the printed page.', 'Student'],
+      'student-reflection-habits': ['Nothing to fill in. The student writes on the printed page.', 'Student'],
+      'parent-response': ['Nothing to fill in. The family writes it.', 'Family'],
+      'text-block': ['Nothing to fill in. Your text on the form, in Progress Reports.', 'You'],
     };
-    return map[id] || none('Nothing. Comes from FullVision.');
+    return map[id] || ['Nothing to fill in. Comes from FullVision.', 'FullVision'];
   }
 
-  var QUESTIONS_ID = 'tq-questions-overlay';
-  function _questionsHtml(cid) {
+  function _whoChip(who) {
+    return `<span class="qn-info-who who-${who.toLowerCase()}">${esc(who)}</span>`;
+  }
+  function _sourceRow(part, from, who) {
+    return `<div class="qn-info-row"><span class="qn-info-part">${esc(part)}</span><span class="qn-info-from">${esc(from)}</span>${_whoChip(who)}</div>`;
+  }
+
+  var INFO_ID = 'tq-info-overlay';
+  function _infoHtml(cid) {
     var form = _form(cid);
     var on = ReportSheets.onForm(form);
     var course = (typeof COURSES !== 'undefined' && COURSES[cid] && COURSES[cid].name) || '';
-    var rows = on
+    var report = _reportLabel(getTermId());
+    var screen = SCREEN_SOURCES.map(function (r) {
+      return _sourceRow(r[0], r[1], r[2]);
+    }).join('');
+    var blocks = on
       .map(function (id) {
-        var a = _asks(cid, id);
-        return `<div class="qn-q-row"><span class="qn-q-block">${esc(_blockLabel(id))}</span><span class="qn-q-ask${a.asks ? '' : ' none'}">${esc(a.ask)}</span><span class="qn-q-who who-${a.who.toLowerCase()}">${esc(a.who)}</span></div>`;
+        var s = _blockSource(cid, id);
+        return _sourceRow(_blockLabel(id), s[0], s[1]);
       })
       .join('');
     var off = Object.keys(ReportSheets.BLOCKS)
@@ -482,341 +745,59 @@ window.ReportQuestionnaire = (function () {
         return !b.retired && on.indexOf(id) < 0 && id !== 'header';
       })
       .map(_blockLabel);
-    var cards = cardsOn(cid);
-    var CARDS = [
-      ['growth', 'Growth', 'Every score this term and Start → Now per competency'],
-      ['obs', 'Observations', 'Quick observations from this term'],
-      ['voice', 'Student Voice', 'About Me, reflections and goal check-ins'],
-      ['assignments', 'Assignments', 'Handed in, late and missing this term'],
-    ];
-    return `<div class="qn-q-sheet" role="document">
-      <div class="qn-q-top"><div class="confirm-title" id="tq-questions-title">Questions</div><button type="button" class="qn-btn" data-action="tqCloseQuestions">Done</button></div>
-      <div class="qn-q-grid">
-        <div class="qn-card">
-          <div class="qn-card-row"><div class="qn-q-title">Where Each Block Gets Its Content</div><div class="qn-card-sub">Set by the blocks on ${esc(course)}’s report</div></div>
-          <div class="qn-q-row qn-q-head"><span>Report Block</span><span>The Questionnaire Asks</span><span>Who</span></div>
-          ${rows}
-          ${
-            off.length
-              ? `<div class="qn-q-off"><div><b>Not on This Report</b><span>${esc(off.join(' · '))}</span></div><button type="button" class="qn-btn" data-action="tqOpenProgress">Open Progress Reports</button></div>`
-              : ''
-          }
-        </div>
-        <div class="qn-card">
-          <div class="qn-card-row"><div class="qn-q-title">What FullVision Has</div><div class="qn-card-sub">Shown beside your questions</div></div>
-          ${CARDS.map(function (c) {
-            return `<label class="qn-q-card"><span><b>${c[1]}</b><span>${c[2]}</span></span><input type="checkbox" data-tq-card="${c[0]}"${cards[c[0]] ? ' checked' : ''}></label>`;
-          }).join('')}
-          <div class="qn-q-never"><span class="qn-card-sub">Never Printed</span><span>Student Voice answers marked Private.</span></div>
-        </div>
+    return `<div class="qn-info" role="document">
+      <div class="qn-info-top"><span class="qn-info-title" id="tq-info-title">Where This Information Comes From</span><button type="button" class="qn-btn" data-action="tqCloseInfo">Done</button></div>
+      <span class="qn-info-label">On This Screen</span>
+      <div class="qn-info-card">${screen}</div>
+      <span class="qn-info-label">On ${esc(course)}’s ${esc(report)}</span>
+      <div class="qn-info-card">
+        ${blocks}
+        ${
+          off.length
+            ? `<div class="qn-info-off"><span class="qn-info-off-title">Not on this report</span><span>${esc(off.join(' · '))}</span><span>Add them in Progress Reports.</span></div>`
+            : ''
+        }
       </div>
+      <div class="qn-info-card qn-info-never"><span class="qn-info-part">Never printed</span><span class="qn-info-from">Student Voice answers marked Private.</span></div>
     </div>`;
   }
 
-  function tqOpenQuestions() {
-    tqCloseQuestions();
+  function tqOpenInfo() {
+    tqCloseInfo();
     var overlay = document.createElement('div');
-    overlay.id = QUESTIONS_ID;
-    overlay.className = 'confirm-overlay qn-q-overlay';
+    overlay.id = INFO_ID;
+    overlay.className = 'confirm-overlay qn-info-overlay';
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
-    overlay.setAttribute('aria-labelledby', 'tq-questions-title');
-    overlay.innerHTML = _questionsHtml(_activeCourse);
+    overlay.setAttribute('aria-labelledby', 'tq-info-title');
+    overlay.innerHTML = _infoHtml(_activeCourse);
     overlay.addEventListener('click', function (e) {
-      if (e.target === overlay) tqCloseQuestions();
+      if (e.target === overlay) tqCloseInfo();
     });
     document.body.appendChild(overlay);
-    var done = overlay.querySelector('[data-action="tqCloseQuestions"]');
+    var done = overlay.querySelector('[data-action="tqCloseInfo"]');
     if (done) done.focus();
   }
-  function tqCloseQuestions() {
-    var o = document.getElementById(QUESTIONS_ID);
+  function tqCloseInfo() {
+    var o = document.getElementById(INFO_ID);
     if (!o) return;
     o.remove();
-    var b = document.getElementById('tq-questions-btn');
+    var b = document.getElementById('tq-info-btn');
     if (b) b.focus();
   }
 
-  /* A What FullVision Has box on the sheet: saved on this device, and the
-     column redrawn at once. */
-  function tqSetCard(key, on) {
-    var cid = _activeCourse;
-    var cards = cardsOn(cid);
-    cards[key] = !!on;
-    try {
-      localStorage.setItem('gb-tq-cards-' + cid, JSON.stringify(cards));
-    } catch (e) {
-      /* the choice holds for this visit */
-    }
+  /* The Edit Student icon: the Student Dashboard's own dialog, for the
+     student on screen. */
+  function tqEditStudent() {
     var st = _current();
-    var col = document.getElementById('tq-evidence');
-    if (st && col) col.innerHTML = _evidenceHtml(cid, st, _facts(st));
+    if (!st || !_openEditStudent) return;
+    tqSaveCurrentIfNeeded();
+    _openEditStudent(_activeCourse, st.id);
   }
 
-  /* ── What FullVision Has ──────────────────────────────────── */
+  /* ── The Teacher Comment ─────────────────────────────────── */
 
-  /* The cards the teacher shows beside the questions, on this device
-     (the Questions sheet; gb-tq-cards-<cid>). All on until changed. */
-  var CARD_KEYS = ['growth', 'obs', 'voice', 'assignments'];
-  function cardsOn(cid) {
-    var out = { growth: true, obs: true, voice: true, assignments: true };
-    try {
-      var saved = JSON.parse(localStorage.getItem('gb-tq-cards-' + cid) || '{}') || {};
-      CARD_KEYS.forEach(function (k) {
-        if (saved[k] === false) out[k] = false;
-      });
-    } catch (e) {
-      /* keep the defaults */
-    }
-    return out;
-  }
-
-  var _evTab = 'growth'; // the laptop's one card at a time
-
-  /* A dot per score on three rows by level: Extending on top, Proficient
-     in the middle, Developing and Emerging at the bottom. */
-  function _dot(v) {
-    var lvl = Math.max(1, Math.min(4, Math.round(v)));
-    var row = lvl >= 4 ? 'top' : lvl === 3 ? 'mid' : 'low';
-    return `<span class="qn-dot ${row}" data-level="${lvl}"></span>`;
-  }
-
-  function _growthHtml(cid, f, cards) {
-    var rows = f.comps
-      .filter(function (c) {
-        return c.scores.length;
-      })
-      .map(function (c) {
-        var up = Math.round(c.now * 10) - Math.round(c.start * 10);
-        var sn = c.start > 0 ? formatLevel(cid, c.start) + ' → ' + formatLevel(cid, c.now) : '';
-        var aria =
-          c.name +
-          ': ' +
-          c.scores.length +
-          (c.scores.length === 1 ? ' score' : ' scores') +
-          (c.start > 0
-            ? ', ' +
-              (PROF_LABELS[Math.round(c.start)] || '') +
-              ' at the start, ' +
-              (PROF_LABELS[Math.round(c.now)] || '') +
-              ' now'
-            : '');
-        return `<div class="qn-growth-row">
-          <div class="qn-growth-head"><span class="qn-growth-name">${esc(c.name)}</span><span class="qn-growth-sn ${up > 0 ? 'up' : up < 0 ? 'down' : ''}">${esc(sn)}</span></div>
-          <span class="qn-dots" role="img" aria-label="${esc(aria)}">${c.scores
-            .map(function (sc) {
-              return _dot(sc.v);
-            })
-            .join('')}</span>
-        </div>`;
-      })
-      .join('');
-    var emerging = f.comps.some(function (c) {
-      return c.scores.some(function (sc) {
-        return Math.round(sc.v) <= 1;
-      });
-    });
-    var rec = f.record;
-    return `<div class="qn-card">
-      <div class="qn-card-head"><div class="qn-card-title">Growth</div><div class="qn-card-sub">Every score this term, oldest to newest. A higher dot is a higher level.</div></div>
-      ${
-        rows
-          ? `<div class="qn-growth-cols"><span>Competency and Scores</span><span>Start → Now</span></div>${rows}
-      <div class="qn-legend"><span><i class="qn-key" data-level="4"></i>Extending</span><span><i class="qn-key" data-level="3"></i>Proficient</span><span><i class="qn-key" data-level="2"></i>Developing</span>${emerging ? '<span><i class="qn-key" data-level="1"></i>Emerging</span>' : ''}</div>`
-          : '<div class="qn-empty">No scores this term yet.</div>'
-      }
-      ${
-        cards.assignments
-          ? `<div class="qn-record">
-        <div><span>Handed In</span><b>${rec.handed} of ${rec.total}</b></div>
-        <div><span>Late</span><b>${rec.late}</b></div>
-        <div><span>Missing</span><b>${rec.missing}</b></div>
-      </div>`
-          : ''
-      }
-    </div>`;
-  }
-
-  function _tagLabel(key) {
-    var t = typeof resolveTag === 'function' ? resolveTag(key) : { label: key };
-    var label = String(t.label || key);
-    return t.type === 'dim' ? label.split(' & ')[0] : label.replace(/ & /g, ' and ');
-  }
-
-  function _obsHtml(cid, f, comment) {
-    var items = f.obs
-      .map(function (o) {
-        var quoted = !!o.text && comment.indexOf(o.text.replace(/[.\s]+$/, '')) >= 0;
-        return `<div class="qn-obs">
-          <div class="qn-obs-text">${esc(o.text)}</div>
-          <div class="qn-obs-meta"><span class="qn-obs-date">${esc(o.day)}</span>${obsPrivateLabelHtml(o)}${(
-            o.dims || []
-          )
-            .map(function (d) {
-              return `<span class="qn-tag">${esc(_tagLabel(d))}</span>`;
-            })
-            .join(
-              '',
-            )}<span class="qn-fill"></span>${quoted ? '<span class="qn-quoted">In the Comment</span>' : ''}</div>
-        </div>`;
-      })
-      .join('');
-    return `<div class="qn-card">
-      <div class="qn-card-row"><div class="qn-card-title">Observations</div><div class="qn-card-sub">This Term · ${f.obs.length}</div></div>
-      ${items || '<div class="qn-empty">None this term. The comment works without them: Work Habits is built from your habit ratings.</div>'}
-    </div>`;
-  }
-
-  /* The student's own words: what they are good at and find hard, their
-     shield, the Core Competency goal with its Goal Check-In, the next step,
-     the private note (marked, never printed), and forms not answered. */
-  function _voiceHtml(cid, student, f) {
-    var first = student.firstName || displayNameFirst(student);
-    var p = f.pronouns;
-    var v = f.voice;
-    var prof = v.profile;
-    var answer = function (it) {
-      return it && it.v && it.v.text ? String(it.v.text).trim() : '';
-    };
-    var q = function (it, fallback) {
-      return (it && it.q && it.q.prompt) || fallback;
-    };
-    var rows = [];
-    var about = prof && prof.about;
-    if (answer(about && about.goodAt)) rows.push([q(about.goodAt), '“' + answer(about.goodAt) + '”']);
-    if (answer(about && about.hard)) rows.push([q(about.hard), '“' + answer(about.hard) + '”']);
-    var refl =
-      prof &&
-      prof.reflections &&
-      prof.reflections.find(function (e) {
-        return e.kind === 'core_reflection';
-      });
-    var shield =
-      refl &&
-      refl.items.find(function (it) {
-        return it.q.kind === 'short_set' && it.v;
-      });
-    if (shield) {
-      var words = Array.isArray(shield.v.json) ? shield.v.json.filter(Boolean).join(' · ') : answer(shield);
-      rows.push([String(shield.q.prompt || '').split(':')[0], words]);
-    }
-    var ck = prof && prof.checkin;
-    if (ck && (answer(ck.coreGoal) || answer(ck.status))) {
-      var code = answer(ck.core);
-      var cc = code && typeof getCoreCompetency === 'function' ? getCoreCompetency(code) : null;
-      var ccName = cc ? cc.label.replace(/ & /g, ' and ') : code;
-      var a =
-        (ccName ? ccName + ': ' : '') +
-        (answer(ck.coreGoal) ? '“' + answer(ck.coreGoal) + '” ' : '') +
-        (answer(ck.status) ? answer(ck.status) + '.' : '');
-      rows.push(['Core Competency to grow · Goal Check-In', a.trim()]);
-    }
-    if (ck && answer(ck.next)) rows.push([q(ck.next, 'What will you do next?'), '“' + answer(ck.next) + '”']);
-    var answered = {};
-    (v.entries || []).forEach(function (e) {
-      answered[e.qid] = true;
-    });
-    var forms =
-      typeof Questionnaires !== 'undefined' && Questionnaires.list
-        ? Questionnaires.list(cid).filter(function (qn) {
-            return !answered[qn.id] && qn.kind !== 'report_reply' && !qn.archived_at;
-          })
-        : [];
-    var sub = (v.entries || []).length ? 'From ' + p.poss + ' phone' : 'Nothing from ' + p.poss + ' phone yet';
-    return `<div class="qn-card">
-      <div class="qn-card-row"><div class="qn-card-title">${esc(first)}’s Voice</div><div class="qn-card-sub">${esc(sub)}</div></div>
-      ${rows
-        .map(function (r) {
-          return `<div class="qn-voice"><div class="qn-voice-q">${esc(r[0])}</div><div class="qn-voice-a">${esc(r[1])}</div></div>`;
-        })
-        .join('')}
-      ${
-        v.private
-          ? `<div class="qn-private"><div class="qn-private-head"><span>${esc(q(about && about.note, 'Anything else you want me to know?'))}</span><span class="qn-private-chip">Private · Never Printed</span></div><div class="qn-voice-a">“${esc(v.private)}”</div></div>`
-          : ''
-      }
-      ${forms
-        .map(function (qn) {
-          return `<div class="qn-form"><span>${esc(qn.title || '')}</span><span class="qn-chip warn">Not Answered</span></div>`;
-        })
-        .join('')}
-    </div>`;
-  }
-
-  function _evidenceHtml(cid, student, f) {
-    var cards = cardsOn(cid);
-    var comment = plainComment((getStudentTermRating(cid, student.id, getTermId()) || {}).narrative || '');
-    var shown = [
-      ['growth', 'Growth', cards.growth || cards.assignments],
-      ['obs', 'Observations', cards.obs],
-      ['voice', 'Voice', cards.voice],
-    ].filter(function (t) {
-      return t[2];
-    });
-    if (
-      !shown.some(function (t) {
-        return t[0] === _evTab;
-      })
-    )
-      _evTab = shown.length ? shown[0][0] : 'growth';
-    var tabs = shown.length
-      ? `<div class="seg qn-ev-tabs" role="group" aria-label="What FullVision Has">${shown
-          .map(function (t) {
-            var on = _evTab === t[0];
-            return `<button type="button" class="seg-btn${on ? ' active' : ''}" data-action="tqEvidenceTab" data-tab="${t[0]}" aria-pressed="${on}">${t[1]}</button>`;
-          })
-          .join('')}</div>`
-      : '';
-    var card = function (key, html) {
-      return `<div class="qn-ev-card${_evTab === key ? ' on' : ''}" data-card="${key}">${html}</div>`;
-    };
-    return (
-      tabs +
-      '<div class="qn-col-title">What FullVision Has</div>' +
-      (cards.growth || cards.assignments ? card('growth', _growthHtml(cid, f, cards)) : '') +
-      (cards.obs ? card('obs', _obsHtml(cid, f, comment)) : '') +
-      (cards.voice ? card('voice', _voiceHtml(cid, student, f)) : '') +
-      (shown.length ? '' : '<div class="qn-empty">Every card is off. Turn them on in Questions.</div>')
-    );
-  }
-
-  function tqEvidenceTab(tab) {
-    _evTab = tab;
-    document.querySelectorAll('.qn-ev-tabs .seg-btn').forEach(function (b) {
-      var on = b.dataset.tab === tab;
-      b.classList.toggle('active', on);
-      b.setAttribute('aria-pressed', String(on));
-    });
-    document.querySelectorAll('.qn-ev-card').forEach(function (c) {
-      c.classList.toggle('on', c.dataset.card === tab);
-    });
-  }
-
-  /* After the comment changes: which notes it quotes. */
-  function _syncQuoted() {
-    var el = _box();
-    if (!el) return;
-    var comment = el.value;
-    var st = _current();
-    if (!st) return;
-    var f = _facts(st);
-    var ev = document.querySelector('.qn-ev-card[data-card="obs"]');
-    if (ev) ev.innerHTML = _obsHtml(_activeCourse, f, comment);
-  }
-
-  /* ── The Comment Bank ────────────────────────────────────── */
-
-  /* The teacher's picks that are not saved: the note to quote and the I Can
-     per Focus Area, for each student, this session. The Focus Area is saved
-     on the rating (focusSectionId) so the report's Next Steps follow it. */
-  var _picks = {};
-  var _more = {};
-  function _picksFor(sid) {
-    if (!_picks[sid]) _picks[sid] = { note: null, ican: {} };
-    return _picks[sid];
-  }
-
-  /* Classmates' comments this report, for "used for 3 or more classmates". */
+  /* Classmates' comments this report, for the bank's least-used order. */
   function _classmateComments(cid, sid, termId) {
     var all = getTermRatings(cid) || {};
     return Object.keys(all)
@@ -830,218 +811,23 @@ window.ReportQuestionnaire = (function () {
 
   function _bankContext(cid, student, f) {
     var rating = getStudentTermRating(cid, student.id, getTermId()) || {};
-    var picks = _picksFor(student.id);
     return CommentBank.context(f, {
       habits: rating.habits || {},
       focus: rating.focusSectionId || f.focusId,
-      ican: (picks.ican || {})[rating.focusSectionId || f.focusId] || 0,
-      note: picks.note,
     });
   }
 
-  function _ratingsHtml(cid, f, ctx) {
-    var stored = (getStudentTermRating(cid, f.sid, getTermId()) || {}).habits || {};
-    var rated = CommentBank.HABITS.filter(function (h) {
-      return ctx._habits[h.key] != null;
-    }).length;
-    var rows = CommentBank.HABITS.map(function (h) {
-      var v = ctx._habits[h.key];
-      var auto = h.key === 'completes' && v != null && stored.completes == null;
-      var note =
-        v == null
-          ? '<span class="qn-rate-note waiting">Not Rated</span>'
-          : auto
-            ? `<span class="qn-rate-note">From assignments · ${f.record.handed} of ${f.record.total}, ${f.record.late} late, ${f.record.missing} missing</span>`
-            : '';
-      var opts = CommentBank.SCALE.map(function (label, i) {
-        var val = i + 1;
-        var on = v === val;
-        return `<button type="button" class="qn-rate-opt${on ? ' on' : ''}${val === CommentBank.NOT_SEEN ? ' not-seen' : ''}" data-action="tqRate" data-habit="${h.key}" data-value="${val}" aria-pressed="${on}">${label}</button>`;
-      }).join('');
-      return `<div class="qn-rate">
-        <div class="qn-rate-head"><span class="qn-rate-name">${esc(h.name)}</span><span class="qn-rate-hint">${esc(h.hint)}</span><span class="qn-fill"></span>${note}</div>
-        <div class="qn-rate-opts" role="group" aria-label="${esc(h.name)}">${opts}</div>
-      </div>`;
-    }).join('');
-    return `<div class="qn-rates">
-      <div class="qn-rates-head"><span>How Often You’ve Seen It This Term</span><span class="qn-card-sub">${rated} of 6 rated</span></div>
-      ${rows}
-    </div>`;
-  }
-
-  function _choosersHtml(cid, f, ctx, part) {
-    var chooser = function (label, opts) {
-      return `<div class="qn-chooser"><span class="qn-chooser-label">${esc(label)}</span>${opts
-        .map(function (o) {
-          return `<button type="button" class="qn-choice${o.on ? ' on' : ''}" data-action="${o.action}" data-value="${esc(o.value)}" aria-pressed="${o.on}"${o.disabled ? ' disabled title="Private notes are never quoted"' : ''}>${esc(o.label)}</button>`;
-        })
-        .join('')}</div>`;
-    };
-    if (part === 'now' && f.obs.length) {
-      return chooser(
-        'Note to Quote',
-        f.obs.map(function (o) {
-          var priv = isPrivateObservation(o);
-          return {
-            action: 'tqPickNote',
-            value: o.id,
-            on: !priv && !!ctx._note && ctx._note.id === o.id,
-            // A private note is listed but cannot be quoted.
-            disabled: priv,
-            label: (priv ? 'Private · ' : '') + o.day + (o.dims && o.dims[0] ? ' · ' + _tagLabel(o.dims[0]) : ''),
-          };
-        }),
-      );
-    }
-    if (part === 'go' && ctx._options.length) {
-      var focus = ctx._focus;
-      var html = chooser(
-        'Focus Area',
-        ctx._options.map(function (c) {
-          return {
-            action: 'tqPickFocus',
-            value: c.id,
-            on: !!focus && focus.id === c.id,
-            label: c.start > 0 ? c.name + ' ' + formatLevel(cid, c.start) + ' → ' + formatLevel(cid, c.now) : c.name,
-          };
-        }),
-      );
-      if (focus && focus.iCans.length) {
-        html += chooser(
-          'I Can',
-          focus.iCans.map(function (s) {
-            return {
-              action: 'tqPickICan',
-              value: String(focus.iCans.indexOf(s)),
-              on: ctx.nextStep === s,
-              label: s.replace(/^I can /i, '').replace(/\.$/, ''),
-            };
-          }),
-        );
-      }
-      return html;
-    }
-    return '';
-  }
-
-  function _rowHtml(r) {
-    return `${r.first ? `<div class="qn-group">${esc(r.group)}</div>` : ''}<button type="button" class="qn-row${r.added ? ' added' : ''}" data-action="tqAdd" data-id="${r.id}" data-used="${r.used}" data-text="${esc(r.text)}" aria-label="${esc((r.added ? 'Added: ' : 'Add: ') + r.text)}">
-        <span class="qn-row-body"><span class="qn-row-text">${esc(r.text)}</span><span class="qn-row-meta"${r.meta ? '' : ' hidden'}>${esc(r.meta)}</span></span>
-        <span class="qn-pill">${r.added ? '\u2713 Added' : 'Add'}</span>
-      </button>`;
-  }
-
-  function _bankHtml(cid, student, f) {
-    if (_commentTab !== 'this') {
-      return `<div class="qn-card"><div class="qn-card-title">Comment Bank</div><div class="qn-empty">The bank builds this report’s comment. Choose This Report on the Teacher Comment to use it.</div></div>`;
-    }
-    var termId = getTermId();
-    var ctx = _bankContext(cid, student, f);
-    var text = plainComment((getStudentTermRating(cid, student.id, termId) || {}).narrative || '');
-    var el = _box();
-    if (el && el.dataset.sid === student.id) text = el.value;
-    var parts = CommentBank.parts(ctx, text, {
-      first: student.firstName,
-      more: _more,
-      comments: _classmateComments(cid, student.id, termId),
-    });
-    var first = student.firstName || displayNameFirst(student);
-    var fit = parts.reduce(function (n, p) {
-      return n + p.fit;
-    }, 0);
-    var html = parts
-      .map(function (p) {
-        return `<div class="qn-part" data-part="${p.id}">
-          <div class="qn-part-head"><span class="qn-part-title"><span class="qn-part-n">${p.n}</span>${esc(p.title)}</span><span class="qn-card-sub">${p.fit} fit ${esc(first)}</span></div>
-          ${p.id === 'habits' ? _ratingsHtml(cid, f, ctx) : ''}
-          ${_choosersHtml(cid, f, ctx, p.id)}
-          ${p.rows.map(_rowHtml).join('')}
-          <div class="qn-part-foot"><span class="qn-card-sub">${p.waiting ? p.waiting + ' more appear once ' + esc(first) + ' has the ratings or data they use' : ''}</span>${
-            p.canMore
-              ? `<button type="button" class="qn-link" data-action="tqMore" data-part="${p.id}">${p.more ? 'Show Fewer' : 'Show All ' + p.fit}</button>`
-              : ''
-          }</div>
-        </div>`;
-      })
-      .join('');
-    return `<div class="qn-card qn-bank-card">
-      <div class="qn-card-row"><div class="qn-card-title">Comment Bank</div><div class="qn-card-sub">${COMMENT_BANK.sentences.length} sentences · ${fit} fit ${esc(first)}</div></div>
-      <div class="qn-bank-hint">Add puts a sentence, filled in for ${esc(first)}, at the end of your comment. Sentences you have used for ${CommentBank.USED_BY} or more classmates this term sit at the bottom of each list.</div>
-      ${html}
-    </div>`;
-  }
-
-  /* Redraws only the bank column, where it was scrolled to. */
-  function _redrawBank() {
-    var st = _current();
-    var col = document.getElementById('tq-bank');
-    if (!st || !col) return;
-    var top = col.scrollTop;
-    // A habit, the Focus Area or attendance changed: read the facts again.
-    col.innerHTML = _bankHtml(_activeCourse, st, _facts(st, true));
-    col.scrollTop = top;
-  }
-
-  /* After the comment changes: each row's Added and "starts like" note, in
-     place. */
-  function _syncRows() {
-    var el = _box();
-    if (!el) return;
-    var text = el.value;
-    var last = CommentBank.lastStart(text);
-    document.querySelectorAll('#tq-bank .qn-row').forEach(function (row) {
-      var t = row.dataset.text || '';
-      var added = text.indexOf(t) >= 0;
-      row.classList.toggle('added', added);
-      row.setAttribute('aria-label', (added ? 'Added: ' : 'Add: ') + t);
-      var pill = row.querySelector('.qn-pill');
-      if (pill) pill.textContent = added ? '\u2713 Added' : 'Add';
-      var meta = row.querySelector('.qn-row-meta');
-      if (meta) {
-        meta.textContent = CommentBank.rowMeta(
-          !added && CommentBank.repeatsLast(t, last),
-          Number(row.dataset.used) || 0,
-        );
-        meta.hidden = !meta.textContent;
-      }
-    });
-  }
-
-  /* Add: the filled sentence at the end of the comment, typed in so ⌘Z
-     undoes it; the row shows ✓ Added where it is. */
-  function tqAdd(btn) {
-    var el = _box();
-    var t = btn && btn.dataset.text;
-    if (!el || !t || el.value.indexOf(t) >= 0) return;
-    var end = el.value.replace(/\s+$/, '');
-    var add = (end ? (/\n$/.test(el.value) ? '' : ' ') : '') + t;
-    el.focus();
-    el.setSelectionRange(end.length, el.value.length);
-    var ok = false;
-    try {
-      ok = document.execCommand('insertText', false, add);
-    } catch (e) {
-      ok = false;
-    }
-    if (!ok) el.value = end + add;
-    el.scrollTop = el.scrollHeight;
-    tqNarrativeDirty = true;
-    tqSaveNarrative();
-    _syncNote();
-    _syncRows();
-  }
-
-  /* Generate: a draft from the bank, filled in for the student, in the
-     box in place of what was there (typed in, so ⌘Z brings the old text
-     back). Each press gives a new mix; the student's own seed keeps the
-     first draft the same between visits. */
+  /* Generate Comment: a draft from the bank, filled in for the student, in
+     the box in place of what was there (typed in, so ⌘ Z brings the old
+     text back). Each press gives another version; the student's own seed
+     keeps the first draft the same between visits. */
   var _generated = {};
   function tqGenerate() {
     var st = _current();
     var el = _box();
     if (!st || !el) return;
     var termId = getTermId();
-    var f = _facts(st);
+    var f = _facts(st, true);
     var n = (_generated[st.id] || 0) + 1;
     _generated[st.id] = n;
     var d = CommentBank.draft(_bankContext(_activeCourse, st, f), {
@@ -1058,55 +844,10 @@ window.ReportQuestionnaire = (function () {
       ok = false;
     }
     if (!ok || el.value !== d.text) el.value = d.text;
-    el.scrollTop = 0;
     tqNarrativeDirty = true;
     tqSaveNarrative();
     _syncNote();
   }
-
-  /* A habit picked on the scale: saved with the others (the whole map). */
-  function tqRate(key, value) {
-    var st = _current();
-    if (!st) return;
-    tqSaveCurrentIfNeeded();
-    var termId = getTermId();
-    var habits = Object.assign({}, (getStudentTermRating(_activeCourse, st.id, termId) || {}).habits || {});
-    habits[key] = Number(value);
-    upsertTermRating(_activeCourse, st.id, termId, { habits: habits });
-    _redrawBank();
-  }
-  function tqPickNote(id) {
-    var st = _current();
-    if (!st) return;
-    // A private (Concern or Note) observation is never quoted.
-    var picked = (getStudentQuickObs(_activeCourse, st.id) || []).find(function (o) {
-      return o.id === id;
-    });
-    if (isPrivateObservation(picked)) return;
-    _picksFor(st.id).note = id;
-    _redrawBank();
-  }
-  function tqPickFocus(id) {
-    var st = _current();
-    if (!st) return;
-    tqSaveCurrentIfNeeded();
-    upsertTermRating(_activeCourse, st.id, getTermId(), { focusSectionId: id });
-    _redrawBank();
-  }
-  function tqPickICan(i) {
-    var st = _current();
-    if (!st) return;
-    var rating = getStudentTermRating(_activeCourse, st.id, getTermId()) || {};
-    var focus = rating.focusSectionId || _facts(st).focusId;
-    _picksFor(st.id).ican[focus] = Number(i) || 0;
-    _redrawBank();
-  }
-  function tqMore(part) {
-    _more[part] = !_more[part];
-    _redrawBank();
-  }
-
-  /* ── The Teacher Comment ─────────────────────────────────── */
 
   /* Earlier reports with a comment, newest first, as tabs beside This Report. */
   function _earlierReports(cid, sid, termId) {
@@ -1122,6 +863,9 @@ window.ReportQuestionnaire = (function () {
       });
   }
 
+  var COPY_ICON =
+    '<svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><rect x="4" y="4" width="7.5" height="7.5" rx="1.5"></rect><path d="M8.5 4 V2.5 A1 1 0 0 0 7.5 1.5 H2.5 A1 1 0 0 0 1.5 2.5 V7.5 A1 1 0 0 0 2.5 8.5 H4"></path></svg>';
+
   function _commentHtml(cid, student) {
     var sid = student.id;
     var termId = getTermId();
@@ -1130,27 +874,25 @@ window.ReportQuestionnaire = (function () {
     var earlier = _earlierReports(cid, sid, termId);
     if (_commentTab !== 'this' && earlier.indexOf(_commentTab) < 0) _commentTab = 'this';
     var thisTab = _commentTab === 'this';
-    var on = !!rating.approvedAt;
-    var tabs = [['this', 'This Report']]
-      .concat(
-        earlier.map(function (k) {
-          return [k, _reportLabel(k)];
-        }),
-      )
-      .map(function (t) {
-        var pressed = _commentTab === t[0];
-        return `<button type="button" class="seg-btn${pressed ? ' active' : ''}" data-action="tqCommentTab" data-tab="${esc(t[0])}" aria-pressed="${pressed}">${esc(t[1])}</button>`;
-      })
-      .join('');
+    var tabs = earlier.length
+      ? `<div class="seg seg-sm qn-comment-tabs" role="group" aria-label="Report">${[['this', 'This Report']]
+          .concat(
+            earlier.map(function (k) {
+              return [k, _reportLabel(k)];
+            }),
+          )
+          .map(function (t) {
+            var pressed = _commentTab === t[0];
+            return `<button type="button" class="seg-btn${pressed ? ' active' : ''}" data-action="tqCommentTab" data-tab="${esc(t[0])}" aria-pressed="${pressed}">${esc(t[1])}</button>`;
+          })
+          .join('')}</div>`
+      : '';
     var body;
     if (thisTab) {
-      body = `<label class="qn-text-wrap">
-          <span class="qn-hint">Your comment. Type it, or add sentences from the Comment Bank and edit them. Prints as one paragraph.</span>
-          <textarea id="tq-narrative" class="qn-text" rows="4" spellcheck="true" data-cid="${esc(cid)}" data-sid="${esc(sid)}" data-term="${esc(termId)}">${esc(text)}</textarea>
-        </label>
-        <div class="qn-text-actions">
-          <span class="qn-text-links"><button type="button" class="qn-link" data-action="tqClear">Clear</button><button type="button" class="qn-link" data-action="tqCopyNarrative" id="tq-copy-btn">Copy</button></span>
-          <span class="qn-text-main"><button type="button" class="qn-generate" data-action="tqGenerate" id="tq-generate" title="A draft from the Comment Bank; \u2318 Z brings back what was there">Generate</button><button type="button" class="qn-approve${on ? ' on' : ''}" id="tq-approve" data-action="tqApprove" aria-pressed="${on}">${on ? '✓ Approved' : 'Approve Comment'}</button></span>
+      body = `<textarea id="tq-narrative" class="qn-text" rows="1" spellcheck="true" aria-label="Teacher Comment" data-cid="${esc(cid)}" data-sid="${esc(sid)}" data-term="${esc(termId)}">${esc(text)}</textarea>
+        <div class="qn-comment-foot">
+          <span class="qn-count-text" id="tq-count">${esc(_countText(text))}</span>
+          <button type="button" class="qn-copy" data-action="tqCopyNarrative" id="tq-copy-btn" title="Copies the comment as plain text, ready to paste. ⌘⇧C">${COPY_ICON}<span class="qn-copy-label">Copy</span></button>
         </div>`;
     } else {
       var old = (getStudentTermRating(cid, sid, _commentTab) || {}).narrative;
@@ -1162,33 +904,14 @@ window.ReportQuestionnaire = (function () {
           })
           .join('')}</div>`;
     }
-    return `<div class="qn-comment-card${thisTab && !on ? ' waiting' : ''}${thisTab ? '' : ' earlier'}" id="tq-comment-card">
-        <div class="qn-comment-head">
-          <div class="qn-card-title">Teacher Comment</div>
-          <div class="seg seg-sm qn-comment-tabs" role="group" aria-label="Report">${tabs}</div>
-          <div class="qn-meter" id="tq-meter"${thisTab ? '' : ' hidden'}>
-            <span class="qn-meter-track"><span class="qn-meter-bar" id="tq-meter-bar"></span></span>
-            <span class="qn-meter-label" id="tq-meter-label"></span>
-          </div>
+    return `<div class="qn-comment" id="tq-comment-card">
+        <div class="qn-comment-top">
+          <span class="qn-comment-title">Teacher Comment</span>
+          ${tabs}
+          ${thisTab ? '<button type="button" class="qn-generate" data-action="tqGenerate" id="tq-generate" title="Writes the comment from the gradebook, your ratings and Student Voice. Press again for another version. Sentences you edited and your order stay.">Generate Comment</button>' : ''}
         </div>
         ${body}
       </div>`;
-  }
-
-  /* The line meter: the comment's printed lines against the form's box.
-     A form with no Teacher Comment block has no box, so no meter. */
-  function setMeter(lines, room) {
-    var meter = document.getElementById('tq-meter');
-    var bar = document.getElementById('tq-meter-bar');
-    var label = document.getElementById('tq-meter-label');
-    if (!meter || !bar || !label) return;
-    meter.hidden = !(room > 0);
-    if (!(room > 0)) return;
-    var over = room > 0 && lines > room;
-    label.textContent = lines + ' of ' + room + ' lines';
-    label.classList.toggle('over', over);
-    bar.classList.toggle('over', over);
-    bar.style.width = room > 0 ? Math.min(100, Math.round((lines / room) * 100)) + '%' : '0%';
   }
 
   function tqCommentTab(tab) {
@@ -1203,49 +926,46 @@ window.ReportQuestionnaire = (function () {
     if (students.length === 0) return '<div class="empty-state"><div class="empty-state-title">No students</div></div>';
     if (tqStudentIndex >= students.length) tqStudentIndex = 0;
     var student = students[tqStudentIndex];
-    var termId = getTermId();
     var f = _facts(student, true);
-
-    var last = tqStudentIndex >= students.length - 1;
+    var comment = plainComment((getStudentTermRating(cid, student.id, getTermId()) || {}).narrative || '');
     return `<div class="qn" data-sid="${student.id}">
-      ${_stripHtml(cid, student, f)}
-      <div class="qn-body">
-        <div class="qn-mid">
-          <div class="qn-cols">
-            <div class="qn-col qn-evidence" id="tq-evidence">${_evidenceHtml(cid, student, f)}</div>
-            <div class="qn-col qn-bank" id="tq-bank">${_bankHtml(cid, student, f)}</div>
-          </div>
-          <div class="qn-bottom">
-            <button type="button" class="qn-btn" data-action="tqPrevStudent"${tqStudentIndex === 0 ? ' disabled' : ''}>‹ Previous</button>
-            <span class="qn-bottom-hint">${tqStudentIndex + 1} of ${students.length} · ⌘ Return saves and moves on · ↑ ↓ change student</span>
-            <button type="button" class="qn-btn primary" data-action="tqNextStudent">${last ? 'Save and Finish' : 'Save and Next ›'}</button>
-          </div>
-        </div>
-        <div class="qn-side">
-          <div class="qn-side-title">Teacher Comment · Built From FullVision</div>
-          ${_commentHtml(cid, student)}
-        </div>
+      <div class="qn-left">
+        ${_headerHtml(cid, student, f)}
+        ${_habitsHtml(cid, f)}
+        ${_glanceHtml(cid, student, f)}
+        ${_voiceHtml(cid, student, f, comment)}
+      </div>
+      <div class="qn-right">
+        ${_commentHtml(cid, student)}
+        ${_attendanceHtml(cid, student)}
+        <!-- The Sentences card (PR 11b) goes here. -->
       </div>
     </div>`;
   }
 
-  /* After the page is drawn: the roster, the meter. */
+  /* After the page is drawn: the roster and the box's height. */
   function afterRender() {
     syncRoster();
-    if (_commentFit) _commentFit();
+    _fitBox();
   }
 
-  /* ⌘ Return (or Ctrl Return) saves and moves on; ↑ ↓ change the student
-     outside a text field (the sidebar handles them while it has the focus). */
+  /* ⌘ Return approves and moves on; ⌘⇧C copies; ↑ ↓ change the student
+     outside a text field (the sidebar handles them while it has the
+     focus); Escape closes the sheet. */
   function handleKey(e) {
     if (e.key === 'Escape') {
-      if (document.getElementById(QUESTIONS_ID)) tqCloseQuestions();
+      if (document.getElementById(INFO_ID)) tqCloseInfo();
       return;
     }
-    if (document.getElementById(QUESTIONS_ID)) return;
+    if (document.getElementById(INFO_ID)) return;
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
-      tqNextStudent();
+      tqApproveNext();
+      return;
+    }
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'c' || e.key === 'C')) {
+      e.preventDefault();
+      tqCopyNarrative();
       return;
     }
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
@@ -1263,35 +983,34 @@ window.ReportQuestionnaire = (function () {
     getTqStudents: getTqStudents,
     tqPrevStudent: tqPrevStudent,
     tqNextStudent: tqNextStudent,
+    tqApproveNext: tqApproveNext,
     tqSaveCurrentIfNeeded: tqSaveCurrentIfNeeded,
     tqSaveNarrative: tqSaveNarrative,
     tqNarrativeInput: tqNarrativeInput,
     tqCopyNarrative: tqCopyNarrative,
-    tqClear: tqClear,
-    tqApprove: tqApprove,
     tqCommentTab: tqCommentTab,
     tqRosterFilter: tqRosterFilter,
-    tqEvidenceTab: tqEvidenceTab,
-    tqAdd: tqAdd,
     tqGenerate: tqGenerate,
     tqRate: tqRate,
-    tqPickNote: tqPickNote,
-    tqPickFocus: tqPickFocus,
-    tqPickICan: tqPickICan,
-    tqMore: tqMore,
-    tqOpenQuestions: tqOpenQuestions,
-    tqCloseQuestions: tqCloseQuestions,
-    tqSetCard: tqSetCard,
-    cardsOn: cardsOn,
+    tqOpenInfo: tqOpenInfo,
+    tqCloseInfo: tqCloseInfo,
+    tqEditStudent: tqEditStudent,
     tqSetAttendance: tqSetAttendance,
     tqSelectStudent: tqSelectStudent,
     renderTermQuestionnaire: renderTermQuestionnaire,
     afterRender: afterRender,
+    fitBox: _fitBox,
     syncRoster: syncRoster,
     restoreRoster: restoreRoster,
-    setMeter: setMeter,
     handleKey: handleKey,
     plainComment: plainComment,
+    standingWord: standingWord,
+    headerGrade: headerGrade,
+    bestPiece: bestPiece,
+    notHandedIn: notHandedIn,
+    skillTags: skillTags,
+    voiceRows: voiceRows,
+    SCREEN_SOURCES: SCREEN_SOURCES,
     get tqStudentIndex() {
       return tqStudentIndex;
     },

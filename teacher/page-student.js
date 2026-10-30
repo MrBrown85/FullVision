@@ -167,11 +167,16 @@ window.PageStudent = (function () {
   }
 
   /* ── Edit Student Modal ─────────────────────────────────── */
-  function openEditStudent() {
-    var cid = activeCourse;
+  /* The dialog for this page's student, or for another page's (the Term
+     Questionnaire's Edit Student icon): `cid` and `sid` name the student
+     and `onSaved` runs after a save in place of this page's redraw. The
+     dialog handles its own buttons, so it works on any page. */
+  function openEditStudent(cidArg, sidArg, onSaved) {
+    var cid = cidArg || activeCourse;
+    var sid = sidArg || studentId;
     var students = getStudents(cid);
     var st = students.find(function (s) {
-      return s.id === studentId;
+      return s.id === sid;
     });
     if (!st) return;
 
@@ -181,9 +186,22 @@ window.PageStudent = (function () {
     overlay.setAttribute('role', 'dialog');
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-labelledby', 'edit-modal-heading');
-    overlay.onclick = function (e) {
-      if (e.target === overlay) closeEditStudent();
-    };
+    overlay.dataset.cid = cid;
+    overlay.dataset.sid = sid;
+    overlay._onSaved = typeof onSaved === 'function' ? onSaved : null;
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay) return closeEditStudent();
+      var el = e.target.closest ? e.target.closest('[data-action]') : null;
+      if (!el) return;
+      var action = el.dataset.action;
+      if (action === 'closeEditStudent') closeEditStudent();
+      else if (action === 'saveEditStudent') saveEditStudent();
+      else if (action === 'toggleEditDesig')
+        el.setAttribute('aria-pressed', String(el.getAttribute('aria-pressed') !== 'true'));
+      else return;
+      e.preventDefault();
+      e.stopPropagation();
+    });
 
     // A field: label over a 44 px box; `extra` is the input's other attributes.
     function field(id, label, value, extra, tail) {
@@ -340,7 +358,10 @@ window.PageStudent = (function () {
   }
 
   function saveEditStudent() {
-    var cid = activeCourse;
+    var overlay = document.getElementById('edit-modal-overlay');
+    if (!overlay) return;
+    var cid = overlay.dataset.cid || activeCourse;
+    var sid = overlay.dataset.sid || studentId;
     var firstEl = document.getElementById('edit-first');
     var firstName = (firstEl.value || '').trim();
     if (!firstName) return _editFieldError(firstEl);
@@ -363,14 +384,13 @@ window.PageStudent = (function () {
         return btn.dataset.code;
       },
     );
-    var overlay = document.getElementById('edit-modal-overlay');
     var parentEmails = ['edit-g0', 'edit-g1'].map(function (id) {
       return document.getElementById(id).value.trim();
     });
 
     var students = getStudents(cid);
     var st = students.find(function (s) {
-      return s.id === studentId;
+      return s.id === sid;
     });
     if (!st) return;
 
@@ -390,10 +410,12 @@ window.PageStudent = (function () {
     if (window.DashClassManager && DashClassManager.saveGuardianEmail) {
       [1, 0].forEach(function (i) {
         if (parentEmails[i] !== overlay._guardianEmails[i])
-          DashClassManager.saveGuardianEmail(cid, studentId, i, parentEmails[i]);
+          DashClassManager.saveGuardianEmail(cid, sid, i, parentEmails[i]);
       });
     }
+    var onSaved = overlay._onSaved;
     closeEditStudent();
+    if (onSaved) return onSaved();
     // Re-render sidebar with updated name
     document.getElementById('sidebar-mount').innerHTML = renderSidebar(
       activeCourse,
@@ -2946,15 +2968,6 @@ window.PageStudent = (function () {
       saveOverride: function () {
         saveOverride(el.dataset.secid);
       },
-      closeEditStudent: function () {
-        closeEditStudent();
-      },
-      toggleEditDesig: function () {
-        el.setAttribute('aria-pressed', String(el.getAttribute('aria-pressed') !== 'true'));
-      },
-      saveEditStudent: function () {
-        saveEditStudent();
-      },
     };
     if (handlers[action]) {
       if (el.tagName !== 'SELECT') e.preventDefault();
@@ -3077,5 +3090,6 @@ window.PageStudent = (function () {
     render: render,
     switchStudent: switchStudent,
     switchCourse: switchCourse,
+    openEditStudent: openEditStudent,
   };
 })();

@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 /* Attendance on the Term Questionnaire (Colin, 2026-10-24): the teacher
    copies the totals to date from MyEd at each report; the questionnaire
    shows the change since the last report and warns when a total goes
-   down. Its sentences are in the Comment Bank (e2e/questionnaire.spec.js). */
+   down. Generate Comment uses the totals once entered. */
 test.use({ viewport: { width: 1440, height: 900 } });
 
 async function openQuestionnaire(page) {
@@ -49,17 +49,11 @@ test('totals to date give this term without any math', async ({ page }) => {
   await expect(page.locator('#tq-att-absences')).toHaveClass(/warn/);
 });
 
-test('the attendance sentences are in the Comment Bank once totals are entered', async ({ page }) => {
+test('Generate Comment uses the attendance totals once they are entered', async ({ page }) => {
   await openQuestionnaire(page);
   await pickReport(page, 1);
-  const habits = page.locator('.qn-part[data-part="habits"]');
-  await expect(habits.locator('.qn-group', { hasText: 'Attendance' })).toHaveCount(0);
+  await expect(page.locator('#tq-att-note')).toHaveText('Optional. Left out until entered.');
   await enter(page, 4, 2);
-  const absent = habits.locator('.qn-row', { hasText: 'has been absent from 4 classes this term' });
-  const late = habits.locator('.qn-row', { hasText: 'has arrived late 2 times this term' });
-  await expect(absent).toHaveCount(1);
-  await expect(late).toHaveCount(1);
-  await absent.click();
-  await expect(page.locator('#tq-narrative')).toHaveValue(/has been absent from 4 classes this term/);
-  await expect(absent.locator('.qn-pill')).toHaveText('✓ Added');
+  await page.locator('#tq-generate').click();
+  await expect(page.locator('#tq-narrative')).toHaveValue(/absent[^.]*4|late[^.]*2/);
 });
