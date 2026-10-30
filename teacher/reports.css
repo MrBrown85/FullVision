@@ -4834,3 +4834,226 @@ body.qn-roster #gb-sidebar .student-row-note {
   padding: 0;
   font: inherit;
 }
+
+/* The Teacher Comment's reporting switch: Letter Grade | IE, Language
+   Goals or IEP Goals (Generate plan PR 3, the IE and goals mockups). */
+.qn-basis {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--bg);
+  border-radius: 10px;
+}
+.qn-basis-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+}
+.qn-basis-seg {
+  flex: none;
+}
+.qn-basis-seg .seg-btn {
+  white-space: nowrap;
+}
+
+/* The Required sentences of an IE or goals comment. */
+.qn-required {
+  position: relative;
+  padding: 0;
+  overflow: visible;
+}
+.qn-req-top {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--surface-2);
+}
+.qn-req-top .qn-card-title {
+  font-size: var(--text-md);
+}
+.qn-req-top .qn-sub {
+  flex: 1;
+}
+.qn-req-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+}
+.qn-req-row + .qn-req-row {
+  border-top: 1px solid var(--surface-2);
+}
+.qn-req-row.flag {
+  background: var(--report-callout-bg);
+}
+.qn-req-row.statement {
+  background: var(--focus-banner-bg);
+}
+.qn-req-part {
+  width: 92px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-top: 2px;
+}
+.qn-req-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.qn-req-chip {
+  align-self: flex-start;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 0 6px;
+  border-radius: 5px;
+  background: var(--score-2-bg);
+  color: var(--score-2-text);
+}
+.qn-req-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.qn-req-text {
+  font-size: 14.5px;
+  line-height: 1.45;
+}
+.qn-req-source {
+  font-size: 12px;
+  color: var(--text-2);
+}
+.qn-req-ctrl {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--score-2-text);
+  background: var(--surface);
+  border: 1px solid var(--report-callout-border);
+  border-radius: 7px;
+  padding: 3px 9px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.qn-req-ctrl input {
+  margin: 0;
+}
+.qn-req-ctrl:focus-visible,
+.qn-req-ctrl:focus-within {
+  outline: 2px solid var(--active);
+  outline-offset: 2px;
+}
+
+/* The IE deadline calendar: one month, the school year only. */
+.qn-req-row.has-cal {
+  position: relative;
+}
+.qn-cal {
+  position: absolute;
+  right: 10px;
+  top: calc(100% - 4px);
+  z-index: var(--z-fab);
+  width: 280px;
+  box-sizing: border-box;
+  background: var(--surface);
+  border-radius: 12px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.16),
+    0 0 0 1px rgba(0, 0, 0, 0.06);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.qn-cal-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.qn-cal-title {
+  font-weight: 600;
+}
+.qn-cal-nav {
+  display: flex;
+  gap: 2px;
+}
+.qn-cal-nav button {
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 15px;
+  padding: 0 6px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.qn-cal-nav button:hover {
+  background: var(--overlay-hover);
+}
+.qn-cal-nav button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.qn-cal-week,
+.qn-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  text-align: center;
+}
+.qn-cal-week {
+  font-size: 11px;
+  color: var(--text-2);
+}
+.qn-cal-grid {
+  row-gap: 4px;
+}
+.qn-cal-day {
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  padding: 4px 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.qn-cal-day:hover {
+  background: var(--overlay-hover);
+}
+.qn-cal-day.weekend {
+  color: var(--text-2);
+}
+.qn-cal-day.on {
+  background: var(--active);
+  color: #fff;
+  font-weight: 600;
+}
+.qn-cal-day:disabled {
+  color: var(--border-2);
+  cursor: default;
+  background: transparent;
+}
+.qn-cal-note {
+  font-size: 11.5px;
+  color: var(--text-2);
+}
+
+/* Approve and Next while an IE still needs its deadline or a tick. */
+#tq-approve-next:disabled {
+  opacity: 0.4;
+  cursor: default;
+  filter: none;
+}

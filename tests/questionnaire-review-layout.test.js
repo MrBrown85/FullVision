@@ -183,7 +183,7 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     expect(html).toContain('Classes Absent');
     expect(html).toContain('Times Late');
     expect(html).toContain('Optional. Left out until entered.');
-    expect(html).toContain('The Sentences card (PR 11b) goes here.');
+    expect(html).toContain('The rest of the Sentences card (PR 11b) goes here.');
     expect(html).not.toContain('Comment Bank');
     expect(html).not.toContain('What FullVision Has');
     expect(html).not.toContain('Save and Next');

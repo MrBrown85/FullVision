@@ -732,7 +732,8 @@
           if (t.late) marks.L = true;
           return t;
         });
-        if (finalOn) r.final = studentGradeSummary(cid, r.id).text || '\u2014';
+        // As the gradebook shows it: the term in view's reporting basis.
+        if (finalOn) r.final = studentGradeSummary(cid, r.id, viewedReportTerm(cid)).text || '\u2014';
       });
       var averages =
         opts.average && !opts.blank

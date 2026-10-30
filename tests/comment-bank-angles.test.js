@@ -193,7 +193,7 @@ describe('the angle shapes the draft', () => {
     expect(climb.lead).toBe('growth');
     expect(CommentBank.angle(FIXTURES.strength, {}).lead).toBe('example');
     expect(CommentBank.angle(FIXTURES.hidden, {}).lead).toBe('example');
-    expect(CommentBank.angle(FIXTURES.ie, {}).lead).toBe('completes');
+    expect(CommentBank.angle(FIXTURES.ie, {}).lead).toBe('ieProblem');
   });
 });
 

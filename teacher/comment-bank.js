@@ -251,6 +251,80 @@ window.CommentBank = (function () {
     return start + title + (/[.!?\u2026]$/.test(title) ? '' : '.') + '\u201D';
   }
 
+  /* ── The work-not-handed-in sentence (plan, Sentence grammar) ──────── */
+
+  var ONES = [
+    'zero',
+    'one',
+    'two',
+    'three',
+    'four',
+    'five',
+    'six',
+    'seven',
+    'eight',
+    'nine',
+    'ten',
+    'eleven',
+    'twelve',
+    'thirteen',
+    'fourteen',
+    'fifteen',
+    'sixteen',
+    'seventeen',
+    'eighteen',
+    'nineteen',
+  ];
+  var TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+  /* A whole number in words, up to 99 ("fifteen", "twenty-one"); numerals
+     past that. */
+  function numberWords(n) {
+    n = Math.floor(Number(n));
+    if (!(n >= 0)) return '';
+    if (n < 20) return ONES[n];
+    if (n < 100) return TENS[Math.floor(n / 10)] + (n % 10 ? '-' + ONES[n % 10] : '');
+    return String(n);
+  }
+  /* A number inside a sentence: words from one to ten, numerals from 11. */
+  function numberIn(n) {
+    n = Math.floor(Number(n));
+    return n >= 0 && n <= 10 ? ONES[n] : String(n);
+  }
+  function _cap(w) {
+    return w ? w.charAt(0).toUpperCase() + w.slice(1) : '';
+  }
+
+  /* A title in quotes as the end of a sentence: the period inside the
+     closing quote, a title's own ? or ! in place of it. */
+  function _quotedEnd(title) {
+    var t = workTitle(title);
+    return '\u201C' + t + (/[.!?\u2026]$/.test(t) ? '' : '.') + '\u201D';
+  }
+  function _quotedMid(title) {
+    return '\u201C' + workTitle(title).replace(/\.+$/, '') + '\u201D';
+  }
+
+  /* The work labelled Missing as one sentence: "One assignment is not
+     handed in: “{title}.”"; two titles joined with "and"; three or more
+     as the count, with the largest group of three or more titles sharing
+     the words before a colon ("Fifteen assignments are not handed in,
+     including six Current Events assignments."). Nothing else is inferred.
+     nh: notHandedIn() { count, titles, groups }. '' with none. */
+  function notHandedInSentence(nh) {
+    var n = (nh && nh.count) || 0;
+    var titles = (nh && nh.titles) || [];
+    if (!n) return '';
+    if (n === 1 && titles[0]) return 'One assignment is not handed in: ' + _quotedEnd(titles[0]);
+    if (n === 2 && titles[0] && titles[1])
+      return 'Two assignments are not handed in: ' + _quotedMid(titles[0]) + ' and ' + _quotedEnd(titles[1]);
+    var group = nh.groups && nh.groups[0];
+    return (
+      _cap(numberWords(n)) +
+      ' assignments are not handed in' +
+      (group ? ', including ' + numberIn(group.count) + ' ' + group.name + ' assignments.' : '.')
+    );
+  }
+
   /* The name and pronouns a sentence about this student uses. */
   function studentRef(student) {
     return {
@@ -444,6 +518,12 @@ window.CommentBank = (function () {
     var focus = ReportBlocks.focusArea(cid, student, { termId: termId }, 'change');
     var att = getTermAttendance(cid, sid, termId) || {};
     var rating = getStudentTermRating(cid, sid, termId) || {};
+    // What the report prints for the grade (calc.js reportingBasis) and the
+    // IE's deadline; the student's marks against the class's marked work,
+    // for the teacher's IE choice; the designations that offer language or
+    // IEP goals.
+    var marked = markedCounts(cid, sid, assessments.filter(inTerm));
+    var des = student.designations || [];
     // When the student joined the class (enrollment.enrolled_at), and the
     // class's first enrolment, for the new-to-the-class story (angle()).
     var day = function (v) {
@@ -483,6 +563,14 @@ window.CommentBank = (function () {
         pct: letter && letter.R != null ? letter.R : null,
         next: letter && letter.R != null ? nextLetterBand(letter.R) : null,
         pieces: pieces,
+        basis: typeof reportingBasis === 'function' ? reportingBasis(cid, sid, termId) : 'grade',
+        ieDeadline: String(rating.ieDeadline || '').slice(0, 10),
+        ieAllowed: ieAllowed(cid),
+        marked: marked,
+        ell: des.indexOf('ELL') >= 0,
+        iep: des.some(function (c) {
+          return typeof BC_DESIGNATIONS !== 'undefined' && !!BC_DESIGNATIONS[c] && !!BC_DESIGNATIONS[c].iep;
+        }),
       },
       levelText: function (v) {
         return mode === 'letter' ? formatLevel(cid, v) : levelWord(cid, v);
@@ -496,6 +584,42 @@ window.CommentBank = (function () {
       classStart: classStart || '',
       termStart: (term && term.startsOn) || '',
     };
+  }
+
+  /* Whether a class can report IE: a Letter or Both class (grades 10–12);
+     a class whose grade level is set and below 10 cannot. */
+  function ieAllowed(cid) {
+    if (courseGradeMode(cid) === 'proficiency') return false;
+    var course = (typeof COURSES !== 'undefined' && COURSES[cid]) || {};
+    var grades = String(course.gradeLevel || '').match(/\d+/g);
+    return (
+      !grades ||
+      grades.some(function (g) {
+        return Number(g) >= 10;
+      })
+    );
+  }
+
+  /* The work the class has marks on this term (any student has a mark),
+     and how much of it this student has a mark on: { mine, all }. Work the
+     student is excused from is not counted for them. */
+  function markedCounts(cid, sid, list) {
+    var students = getStudents(cid) || [];
+    var isMark = function (cell) {
+      return ['level', 'points', 'complete'].indexOf(cell.kind) >= 0;
+    };
+    var out = { mine: 0, all: 0 };
+    list.forEach(function (a) {
+      var any = students.some(function (s) {
+        return isMark(assessmentCellValue(cid, s.id, a));
+      });
+      if (!any) return;
+      var cell = assessmentCellValue(cid, sid, a);
+      if (cell.status === 'EXC') return;
+      out.all++;
+      if (isMark(cell)) out.mine++;
+    });
+    return out;
   }
 
   /* The Focus Area choices: the report's Focus Area first, then the
@@ -620,13 +744,74 @@ window.CommentBank = (function () {
     return { letter: nx.letter, min: nx.min, gap: gap };
   }
 
+  /* ── IE, language goals and IEP goals (plan PR 3) ───────────────────── */
+
+  /* The teacher may choose IE when the student has marks on fewer than half
+     the work the class has marks on (a Letter or Both class, grades 10–12). */
+  function ieOffered(f) {
+    var g = (f && f.grade) || {};
+    var m = g.marked || {};
+    return g.ieAllowed !== false && (g.mode === 'letter' || g.mode === 'both') && m.all > 0 && m.mine * 2 < m.all;
+  }
+  /* The goals the student can be assessed against instead of a letter: an
+     ELL designation offers language goals, an IEP designation IEP goals.
+     Only where there is a letter to replace (a Letter or Both class). */
+  function goalsOffered(f) {
+    var g = (f && f.grade) || {};
+    if (g.mode !== 'letter' && g.mode !== 'both') return [];
+    var out = [];
+    if (g.ell) out.push('language_goals');
+    if (g.iep) out.push('iep_goals');
+    return out;
+  }
+  /* The path the comment takes: 'language_goals' or 'iep_goals' when the
+     teacher chose goals; 'ie' when the teacher chose IE, or calc.js reports
+     IE (under 50% before the course ends); '' for the grade sentence. */
+  function reportPath(f) {
+    var g = (f && f.grade) || {};
+    if (g.mode !== 'letter' && g.mode !== 'both') return '';
+    if (g.basis === 'language_goals' || g.basis === 'iep_goals') return g.basis;
+    if (g.ieAllowed !== false && (g.basis === 'ie' || g.letter === 'IE')) return 'ie';
+    return '';
+  }
+  /* Where an IE comes from: 'teacher' (the stored choice) or 'calc'. */
+  function ieSource(f) {
+    return reportPath(f) !== 'ie' ? '' : f.grade.basis === 'ie' ? 'teacher' : 'calc';
+  }
+  /* What an IE comment names as the problem: work labelled Missing first,
+     then marks on less of the work than the class has ('noMarks' with
+     none), then a mark under 50%. '' when none of these holds. */
+  function ieProblemOf(f) {
+    if (reportPath(f) !== 'ie') return '';
+    if (_missingCount(f) > 0) return 'missing';
+    var m = (f.grade && f.grade.marked) || {};
+    if (m.all > 0 && !m.mine) return 'noMarks';
+    if (m.all > 0 && m.mine < m.all) return 'marks';
+    if (f.grade.pct != null && Number(f.grade.pct) < 50) return 'low';
+    return '';
+  }
+  /* The deadline as the comment says it ("December 18"), or [date] until
+     the teacher picks one. */
+  function deadlineText(iso) {
+    var d = String(iso || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return '[date]';
+    var date = typeof parseLocalDate === 'function' ? parseLocalDate(d) : new Date(d + 'T00:00:00');
+    return isNaN(date) ? '[date]' : date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+  }
+
   /* What the grade sentence says, from the facts: { kind, letter,
      standing, next } in a Letter or Both class, { kind: 'proficiency',
-     word } in a Proficiency class, or null when there is no grade sentence
-     (no marks yet, or IE or F, which keep today's draft). kind picks the
-     bank sentence: letter, letterClose, cminus, cminusClose, proficiency. */
+     word } in a Proficiency class, { kind: 'ie' } on the IE path, {
+     kind: 'languageGoals' | 'iepGoals' } when the teacher chose goals, or
+     null when there is no grade sentence (no marks yet, or F). kind picks
+     the bank sentence: letter, letterClose, cminus, cminusClose,
+     proficiency, ie, languageGoals, iepGoals. */
   function gradeOf(f) {
     var g = (f && f.grade) || {};
+    var path = reportPath(f);
+    if (path === 'ie') return { kind: 'ie' };
+    if (path === 'language_goals') return { kind: 'languageGoals' };
+    if (path === 'iep_goals') return { kind: 'iepGoals' };
     if (g.mode === 'proficiency') return f.standing ? { kind: 'proficiency', word: f.standing } : null;
     if (g.mode !== 'letter' && g.mode !== 'both') return null;
     var standing = g.letter && STANDING[g.letter];
@@ -958,6 +1143,10 @@ window.CommentBank = (function () {
       gradeStanding: ['grade.letter'],
       gradeNext: ['grade.pct', 'grade.pieces'],
       gradeWord: ['overall'],
+      missingWork: ['notHandedIn'],
+      markedMine: ['grade.marked'],
+      markedClass: ['grade.marked'],
+      ieDeadline: ['grade.ieDeadline'],
       standing: ['overall'],
       letterStanding: ['letter'],
       evidence: ['overall', 'work'],
@@ -1003,6 +1192,8 @@ window.CommentBank = (function () {
       _standing: f.standing || '',
       _family: f.family || '',
       _grade: gr ? gr.kind : '',
+      _ieProblem: ieProblemOf(f),
+      _path: reportPath(f),
       _options: options,
       _focus: focus || null,
       _facts: factsOf,
@@ -1016,6 +1207,12 @@ window.CommentBank = (function () {
       gradeStanding: gslots.gradeStanding,
       gradeNext: gslots.gradeNext,
       gradeWord: gslots.gradeWord,
+      // The IE path: the work not handed in as one sentence, the marks
+      // against the class's, and the deadline ([date] until it is picked).
+      missingWork: ieProblemOf(f) === 'missing' ? notHandedInSentence(f.notHandedIn) : '',
+      markedMine: ieProblemOf(f) === 'marks' ? numberIn(f.grade.marked.mine) : '',
+      markedClass: /^(marks|noMarks)$/.test(ieProblemOf(f)) ? numberIn(f.grade.marked.all) : '',
+      ieDeadline: reportPath(f) === 'ie' ? deadlineText(f.grade.ieDeadline) : '',
       strengths: list(
         strongest.map(function (c) {
           return c.name;
@@ -1114,6 +1311,8 @@ window.CommentBank = (function () {
       if (k === 'picture') return ctx.picture === when[k];
       if (k === 'standing') return ctx._standing === when[k];
       if (k === 'grade') return ctx._grade === when[k];
+      if (k === 'path') return ctx._path === when[k];
+      if (k === 'ieProblem') return ctx._ieProblem === when[k];
       return (ctx._habits || {})[k] === when[k];
     });
   }
@@ -1360,6 +1559,11 @@ window.CommentBank = (function () {
     { key: 'goWords', part: 'go', groups: ["In the Student's Words", 'Work to Revisit'] },
     { key: 'home', part: 'how', groups: ['At Home', 'In Class', "In the Student's Words"] },
     { key: 'closer', part: 'how', groups: ['Looking Ahead'] },
+    // The IE path's Required parts (plan PR 3): only the IE story runs them.
+    { key: 'ieProblem', part: 'now', groups: ['IE Problem'], ie: true },
+    { key: 'iePlan', part: 'go', groups: ['IE Plan'], ie: true },
+    { key: 'ieDeadline', part: 'go', groups: ['IE Deadline'], ie: true },
+    { key: 'ieMeeting', part: 'how', groups: ['IE Meeting'], ie: true },
   ];
 
   /* Facts a draft states once, by topic: the strong habits named or
@@ -1414,7 +1618,15 @@ window.CommentBank = (function () {
     var when = s.when || {};
     Object.keys(when).forEach(function (k) {
       values['when.' + k] = when[k];
-      add(k === 'picture' ? 'picture' : k === 'standing' ? 'overall' : k === 'grade' ? 'grade' : 'habit:' + k);
+      add(
+        k === 'picture'
+          ? 'picture'
+          : k === 'standing'
+            ? 'overall'
+            : k === 'grade' || k === 'ieProblem' || k === 'path'
+              ? 'grade'
+              : 'habit:' + k,
+      );
     });
     (s.claims || []).forEach(function (c) {
       if (CLAIM_FACTS[c]) add(CLAIM_FACTS[c]);
@@ -1444,14 +1656,16 @@ window.CommentBank = (function () {
 
   var ANGLES = [
     {
-      // The mark is IE (calc.js, under 50% before the course ends): what is
-      // not in and what to do next lead.
+      // The mark is IE (calc.js, under 50% before the course ends, or the
+      // teacher chose IE): the Required parts of the approved IE comment,
+      // the problem, the habits that are strong, the plan, the deadline and
+      // a chance to meet (plan PR 3).
       id: 'ie',
       tier: 1,
       when: function (a) {
-        return a.letter === 'IE';
+        return a.ie;
       },
-      order: ['completes', 'growingHabits', 'attendance', 'example', 'nextStep', 'home', 'closer'],
+      order: ['ieProblem', 'strongHabits', 'iePlan', 'ieDeadline', 'ieMeeting'],
     },
     {
       // Too few scored pieces to say much: the habits and one example.
@@ -1636,9 +1850,13 @@ window.CommentBank = (function () {
       when: function () {
         return true;
       },
-      order: DRAFT_STEPS.slice(1).map(function (s) {
-        return s.key;
-      }),
+      order: DRAFT_STEPS.slice(1)
+        .filter(function (s) {
+          return !s.ie;
+        })
+        .map(function (s) {
+          return s.key;
+        }),
     },
   ];
 
@@ -1681,6 +1899,7 @@ window.CommentBank = (function () {
       _days(f.classStart, f.enrolled) >= NEW_DAYS;
     return {
       letter: g.letter || '',
+      ie: reportPath(f) === 'ie',
       scored: Math.max(pieces.length, work.length),
       missing: _missingCount(f),
       total: rec.total || 0,
@@ -2096,6 +2315,36 @@ window.CommentBank = (function () {
     return d;
   }
 
+  /* The Required parts of the comment on the IE or goals path, in the
+     comment's order, each filled for the student: { key, label, id, text }
+     (plan PR 3). IE: Grade, Problem, Plan, Deadline and Meeting. Goals:
+     the Statement that replaces the grade sentence. [] otherwise. A part
+     with no sentence that fits has id null and text ''. */
+  var REQUIRED_PARTS = {
+    ie: [
+      ['grade', 'Grade'],
+      ['ieProblem', 'Problem'],
+      ['iePlan', 'Plan'],
+      ['ieDeadline', 'Deadline'],
+      ['ieMeeting', 'Meeting'],
+    ],
+    goals: [['grade', 'Statement']],
+  };
+  function requiredParts(ctx, bank) {
+    bank = bank || COMMENT_BANK;
+    var path = ctx && ctx._path;
+    var list = path === 'ie' ? REQUIRED_PARTS.ie : path ? REQUIRED_PARTS.goals : [];
+    return list.map(function (p) {
+      var step = DRAFT_STEPS.find(function (x) {
+        return x.key === p[0];
+      });
+      var s = bank.sentences.find(function (x) {
+        return x.part === step.part && step.groups.indexOf(x.group) >= 0 && fits(x, ctx);
+      });
+      return { key: p[0], label: p[1], id: s ? s.id : null, text: s ? fill(s, ctx) : '' };
+    });
+  }
+
   /* How many sentences fit, in all. */
   function fitCount(ctx, bank) {
     return (bank || COMMENT_BANK).sentences.filter(function (s) {
@@ -2438,7 +2687,8 @@ window.CommentBank = (function () {
       var checks = [];
       Object.keys(pv.values).forEach(function (k) {
         var m = k.match(/^when\.(\w+)$/);
-        if (m && m[1] !== 'picture' && m[1] !== 'standing' && m[1] !== 'grade') checks.push(eff[m[1]] === pv.values[k]);
+        if (m && ['picture', 'standing', 'grade', 'ieProblem', 'path'].indexOf(m[1]) < 0)
+          checks.push(eff[m[1]] === pv.values[k]);
       });
       ['strengthHabits', 'strengthHabitNames', 'growthHabits', 'growthHabitNames'].forEach(function (slot) {
         if (!_has(pv, slot)) return;
@@ -2457,7 +2707,34 @@ window.CommentBank = (function () {
       return !!f.record && f.record.late > 0;
     },
     notHandedIn: function (pv, f) {
+      if (_has(pv, 'missingWork') && pv.values.missingWork !== notHandedInSentence(f.notHandedIn)) return false;
       return _missingCount(f) > 0;
+    },
+    // Marks on fewer of the class's marked work: the counts as said.
+    marks: function (pv, f) {
+      var m = (f.grade && f.grade.marked) || {};
+      if (!(m.all > 0 && m.mine < m.all)) return false;
+      if (_has(pv, 'markedMine') && pv.values.markedMine !== numberIn(m.mine)) return false;
+      if (_has(pv, 'markedClass') && pv.values.markedClass !== numberIn(m.all)) return false;
+      return true;
+    },
+    // A Required part of an IE comment: the comment is on the IE path, and
+    // the problem it names is still the problem.
+    ie: function (pv, f) {
+      if (reportPath(f) !== 'ie') return false;
+      return !_has(pv, 'when.ieProblem') || pv.values['when.ieProblem'] === ieProblemOf(f);
+    },
+    // A course mark under 50% (calc.js).
+    lowMarks: function (pv, f) {
+      return !!f.grade && f.grade.pct != null && Number(f.grade.pct) < 50;
+    },
+    // The IE's deadline as the teacher picked it ([date] until then).
+    deadline: function (pv, f) {
+      return (
+        reportPath(f) === 'ie' &&
+        _has(pv, 'ieDeadline') &&
+        pv.values.ieDeadline === deadlineText(f.grade && f.grade.ieDeadline)
+      );
     },
     attendance: function (pv, f) {
       var checks = [];
@@ -2633,6 +2910,17 @@ window.CommentBank = (function () {
     trendingDown: trendingDown,
     closeTo: closeTo,
     gradeOf: gradeOf,
+    ieAllowed: ieAllowed,
+    markedCounts: markedCounts,
+    ieOffered: ieOffered,
+    goalsOffered: goalsOffered,
+    reportPath: reportPath,
+    ieSource: ieSource,
+    ieProblemOf: ieProblemOf,
+    deadlineText: deadlineText,
+    numberWords: numberWords,
+    notHandedInSentence: notHandedInSentence,
+    requiredParts: requiredParts,
     pictureOf: pictureOf,
     seedFor: seedFor,
     workTitle: workTitle,
