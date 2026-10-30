@@ -251,11 +251,23 @@ window.ReportStudio = (function () {
       return summary.perStudent[id].over;
     }).length;
     if (over) {
+      // The Grade Report tells its two causes apart, each counted on its
+      // own flag (a student can have both): the grade sheet cannot hold
+      // the rows, or a feedback card is taller than a page.
+      var line = (text && text.over) || 'A block is taller than a page for ';
+      if (text && text.feedbackOver) {
+        var count = function (key) {
+          return ids.filter(function (id) {
+            return summary.perStudent[id][key];
+          }).length;
+        };
+        var parts = [];
+        if (count('gradeOver')) parts.push(text.over + students(count('gradeOver')));
+        if (count('feedbackOver')) parts.push(text.feedbackOver + students(count('feedbackOver')));
+        line = parts.join('; ') || line + students(over);
+      } else line += students(over);
       return (
-        '<button type="button" class="studio-fit-link" data-action="studioView" data-view="all">' +
-        ((text && text.over) || 'A block is taller than a page for ') +
-        students(over) +
-        '</button>'
+        '<button type="button" class="studio-fit-link" data-action="studioView" data-view="all">' + line + '</button>'
       );
     }
     if (more) {

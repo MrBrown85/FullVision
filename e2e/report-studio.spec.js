@@ -1230,7 +1230,8 @@ test.describe('Grade Report', () => {
     await expect(page.locator('.gr-term')).toContainText('Term Grade');
     // Grades only: no comment, attendance or other feedback on the sheet.
     await expect(page.locator('.gr-sheet .report-comment-box, .gr-sheet .report-attendance')).toHaveCount(0);
-    await expect(page.getByRole('checkbox')).toHaveCount(3);
+    // Three Grade Sheet choices and the two Feedback Pages choices (greyed while the switch is off).
+    await expect(page.getByRole('checkbox')).toHaveCount(5);
     await expect(page.getByRole('checkbox', { name: 'Assignment Numbers' })).not.toBeChecked();
     await expect(sheet.locator('.gr-head').first()).not.toContainText('#');
     await expect(page.getByRole('checkbox', { name: 'Ungraded Assignments' })).toBeChecked();
@@ -1272,6 +1273,90 @@ test.describe('Grade Report', () => {
     await showEveryone(page);
     expect(await overflowing(page)).toEqual([]);
     expect(countPages(await printToPdf(page))).toBe(STUDENTS * 2);
+  });
+
+  test('the Feedback Pages switch: off by default, turns the cards and its choices on, persists, greys with ticks kept', async ({
+    page,
+  }) => {
+    await openGrade(page);
+    const sw = page.getByRole('switch', { name: 'Feedback Pages' });
+    const rubrics = page.getByRole('checkbox', { name: 'Rubrics' });
+    const comments = page.getByRole('checkbox', { name: 'Assignment Comments' });
+    // The Observations and Term Comment choices are a later change.
+    await expect(page.getByRole('checkbox', { name: 'Observations' })).toHaveCount(0);
+    await expect(sw).toHaveAttribute('aria-checked', 'false');
+    await expect(rubrics).toBeDisabled();
+    await expect(comments).toBeDisabled();
+    await expect(rubrics).toBeChecked();
+    await expect(comments).toBeChecked();
+    await expect(page.locator('.fb-sheet')).toHaveCount(0);
+
+    await sw.click();
+    await expect(sw).toHaveAttribute('aria-checked', 'true');
+    await expect(rubrics).toBeEnabled();
+    await expect(comments).toBeEnabled();
+    const student = page.locator('.sheet-student').first();
+    await expect(student.locator('.fb-sheet').first()).toBeVisible();
+    // The cards come after the grade sheet.
+    const kinds = await student
+      .locator('.report-sheet')
+      .evaluateAll(list =>
+        list.map(s =>
+          s.classList.contains('gr-sheet') ? 'grade' : s.classList.contains('fb-sheet') ? 'feedback' : 'blank',
+        ),
+      );
+    expect(kinds[0]).toBe('grade');
+    expect(kinds).toContain('feedback');
+    await expect(page.locator('#studio-fit')).toContainText('sheets for');
+    await expect(page.locator('.fb-rb').first()).toBeVisible();
+
+    // Unticking Rubrics removes the rubric tables.
+    await rubrics.uncheck();
+    await expect(page.locator('.fb-rb')).toHaveCount(0);
+
+    // The choices stay after a reload.
+    await page.reload();
+    await page.getByRole('tab', { name: 'Progress Reports' }).click();
+    await expect(page.getByRole('switch', { name: 'Feedback Pages' })).toHaveAttribute('aria-checked', 'true');
+    await expect(page.getByRole('checkbox', { name: 'Rubrics' })).not.toBeChecked();
+    await expect(page.getByRole('checkbox', { name: 'Assignment Comments' })).toBeChecked();
+    await expect(page.locator('.fb-rb')).toHaveCount(0);
+    // Rubrics back on: the cards with their tables are back.
+    await page.getByRole('checkbox', { name: 'Rubrics' }).check();
+    await expect(page.locator('.fb-rb').first()).toBeVisible();
+    await page.getByRole('checkbox', { name: 'Rubrics' }).uncheck();
+
+    // Off again: the cards go, the choices grey out and keep their ticks.
+    await page.getByRole('switch', { name: 'Feedback Pages' }).click();
+    await expect(page.locator('.fb-sheet')).toHaveCount(0);
+    await expect(page.getByRole('checkbox', { name: 'Rubrics' })).toBeDisabled();
+    await expect(page.getByRole('checkbox', { name: 'Rubrics' })).not.toBeChecked();
+    await expect(page.getByRole('checkbox', { name: 'Assignment Comments' })).toBeDisabled();
+    await expect(page.getByRole('checkbox', { name: 'Assignment Comments' })).toBeChecked();
+    await page.getByRole('switch', { name: 'Feedback Pages' }).click();
+    await expect(page.getByRole('checkbox', { name: 'Rubrics' })).not.toBeChecked();
+  });
+
+  test('the print dialog counts every student by their sheets with Feedback Pages on', async ({ page }) => {
+    await openFeedback(page);
+    await page.getByRole('button', { name: 'Print Reports' }).click();
+    const dialog = page.locator('.issue-card');
+    // Every student's own sheet count, from the canvas.
+    const counts = await page.locator('.sheet-student').evaluateAll(list => list.map(el => Number(el.dataset.sheets)));
+    expect(counts).toHaveLength(27);
+    if (new Set(counts).size === 1) await expect(dialog).toContainText(`27 students · ${counts[0]} sheets each`);
+    else {
+      // "23 on 2, 4 on 3": how many students on each sheet count, fewest sheets first.
+      const by = {};
+      counts.forEach(n => (by[n] = (by[n] || 0) + 1));
+      const line = Object.keys(by)
+        .map(Number)
+        .sort((x, y) => x - y)
+        .map(k => by[k] + ' on ' + k + (k === 1 ? ' sheet' : ''))
+        .join(', ');
+      await expect(dialog).toContainText('27 students · ' + line);
+    }
+    await expect(dialog).not.toContainText('1 sheet each');
   });
 
   test('Feedback Pages follow the grade sheet: a numbered card per assessment, two columns, page numbers', async ({
