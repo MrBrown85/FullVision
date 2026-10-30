@@ -834,6 +834,21 @@ window.PageDashboard = (function () {
   function _onMouseover(e) {
     var t = e.target.closest && e.target.closest(POP_TARGET);
     if (t && t !== _popFor) _showPop(t);
+    var seg = e.target.closest && e.target.closest('.dash-glance-dist .dist-seg');
+    if (seg) _keepTipInside(seg);
+  }
+  /* A proficiency segment's list sits centred under it; near either end of
+     the bar that runs past the card (and under the sidebar or off the page),
+     so it moves sideways to stay inside the Class at a Glance card. */
+  function _keepTipInside(seg) {
+    var tip = seg.querySelector('.dist-tip');
+    var card = seg.closest('.dash-glance');
+    if (!tip || !card) return;
+    tip.style.removeProperty('--tip-shift');
+    var r = tip.getBoundingClientRect();
+    var box = card.getBoundingClientRect();
+    var shift = r.left < box.left ? box.left - r.left : r.right > box.right ? box.right - r.right : 0;
+    if (shift) tip.style.setProperty('--tip-shift', Math.round(shift) + 'px');
   }
   function _onMouseout(e) {
     var t = e.target.closest && e.target.closest(POP_TARGET);
