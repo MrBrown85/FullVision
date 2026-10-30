@@ -117,6 +117,74 @@ describe('the bank', () => {
     });
   });
 
+  it('says what every sentence claims, with claims the verifier can check', () => {
+    COMMENT_BANK.sentences.forEach(s => {
+      expect(Array.isArray(s.claims), s.id + ' has no claims').toBe(true);
+      expect(new Set(s.claims).size, s.id).toBe(s.claims.length);
+      s.claims.forEach(c => expect(typeof CommentBank.CLAIMS[c], s.id + ' ' + c).toBe('function'));
+    });
+  });
+
+  it('claims what its slots and `when` say, and a no-claim sentence has neither', () => {
+    const SLOT = {
+      standing: 'grade',
+      letterStanding: 'grade',
+      evidence: 'grade',
+      even: 'even',
+      strengths: 'strength',
+      growthAreas: 'growthArea',
+      focusLow: 'growthArea',
+      rise: 'improved',
+      fall: 'slipped',
+      fellCount: 'slipped',
+      assignment: 'bestPiece',
+      level: 'bestPiece',
+      strongWorks: 'bestPiece',
+      assignment2: 'weakPiece',
+      level2: 'weakPiece',
+      weakWorks: 'weakPiece',
+      seeWork: 'focusWork',
+      aboutWork: 'focusWork',
+      focus: 'nextStep',
+      nextStep: 'nextStep',
+      strengthHabits: 'habits',
+      growthHabits: 'habits',
+      strengthHabitNames: 'habits',
+      growthHabitNames: 'habits',
+      absent: 'attendance',
+      late: 'attendance',
+      note: 'note',
+      when: 'note',
+      concernNote: 'note',
+      concernWhen: 'note',
+      selfGood: 'studentWords',
+      selfHard: 'studentWords',
+      selfStrong: 'studentWords',
+      selfLow: 'studentWords',
+      goal: 'studentWords',
+      plan: 'studentWords',
+    };
+    COMMENT_BANK.sentences.forEach(s => {
+      const slots = (s.text.match(/\{(\w+)\}/g) || []).map(x => x.slice(1, -1)).concat(s.needs || []);
+      slots.forEach(k => {
+        if (SLOT[k]) expect(s.claims, s.id + ' {' + k + '}').toContain(SLOT[k]);
+        else expect(['name', 'course', 'He', 'he', 'him', 'His', 'his', 'himself'], s.id).toContain(k);
+      });
+      Object.keys(s.when || {}).forEach(k =>
+        expect(s.claims, s.id + ' when ' + k).toContain(
+          k === 'picture' ? 'picture' : k === 'standing' ? 'grade' : 'habits',
+        ),
+      );
+      if (!s.claims.length) {
+        expect(
+          slots.filter(k => SLOT[k]),
+          s.id,
+        ).toEqual([]);
+        expect(s.when, s.id).toBeUndefined();
+      }
+    });
+  });
+
   it('names only habits and levels that exist', () => {
     const keys = CommentBank.HABITS.map(h => h.key);
     COMMENT_BANK.sentences.forEach(s => {
@@ -395,6 +463,7 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     window.isDemoMode = saved;
     localStorage.clear();
   });
+  const byId = id => COMMENT_BANK.sentences.find(s => s.id === id);
   const ctxFor = first => {
     const st = getStudents(cid).find(s => s.firstName === first);
     return CommentBank.context(CommentBank.facts(cid, st, 'term-2'), {});
@@ -539,6 +608,143 @@ describe('Demo Mode (Science 8, Report 2)', () => {
     });
   });
 
+  it('every Demo draft verifies unchanged, with where each sentence came from', () => {
+    getStudents(cid).forEach(st => {
+      const f = CommentBank.facts(cid, st, 'term-2');
+      for (let seed = 1; seed <= 10; seed++) {
+        const d = CommentBank.draft(CommentBank.context(f, {}), { seed });
+        expect(
+          d.sentences.map(x => x.id),
+          st.firstName,
+        ).toEqual(d.ids);
+        expect(d.sentences.map(x => x.text).join(' ')).toBe(d.text);
+        expect(d.provenance.map(p => p.sentenceId)).toEqual(d.ids);
+        d.provenance.forEach(p => {
+          if (p.claims.length) expect(p.factKeys.length, p.sentenceId).toBeGreaterThan(0);
+          expect(typeof p.values, p.sentenceId).toBe('object');
+        });
+        const v = CommentBank.verify(d, f, {});
+        expect(v.replaced, st.firstName + ' ' + seed).toEqual([]);
+        expect(v.text).toBe(d.text);
+        expect(v.provenance).toEqual(d.provenance);
+      }
+    });
+  });
+
+  it('names the facts behind a sentence: the work, the competency, the habit', () => {
+    const st = getStudents(cid).find(s => s.firstName === 'Cece');
+    const f = CommentBank.facts(cid, st, 'term-2');
+    const ctx = CommentBank.context(f, {});
+    const top = f.work.slice().sort((a, b) => b.v - a.v || b.d.localeCompare(a.d))[0];
+    const n31 = CommentBank.provenance(byId('n31'), ctx);
+    expect(n31).toMatchObject({
+      sentenceId: 'n31',
+      claims: ['bestPiece'],
+      factKeys: ['work:' + top.id],
+      values: { assignment: top.title, level: ctx.level },
+    });
+    expect(CommentBank.provenance(byId('n20'), ctx).factKeys).toEqual(['comp:SC']);
+    expect(CommentBank.provenance(byId('h03'), ctx).factKeys).toEqual(['habit:completes']);
+    expect(CommentBank.provenance(byId('n04'), ctx).values['when.picture']).toBe('steady');
+  });
+
+  /* One sentence as a draft, to verify against changed facts. */
+  const one = (id, ctx) => {
+    const s = byId(id);
+    return {
+      text: CommentBank.fill(s, ctx),
+      ids: [id],
+      sentences: [{ id, part: s.part, text: CommentBank.fill(s, ctx) }],
+      provenance: [CommentBank.provenance(s, ctx)],
+    };
+  };
+  const cece = () =>
+    CommentBank.facts(
+      cid,
+      getStudents(cid).find(s => s.firstName === 'Cece'),
+      'term-2',
+    );
+
+  it('drops a best-piece sentence once that work is no longer the best (no no-claim sentence in its part)', () => {
+    const f = cece();
+    const ctx = CommentBank.context(f, {});
+    const d = one('n31', ctx);
+    const top = d.provenance[0].sources.assignment[0].slice(5);
+    const lower = { ...f, work: f.work.map(w => (w.id === top ? { ...w, v: 1 } : w)) };
+    const v = CommentBank.verify(d, lower, {});
+    expect(v.replaced).toEqual([{ sentenceId: 'n31', failed: ['slots', 'bestPiece'], by: null }]);
+    expect(v.text).toBe('');
+    expect(v.provenance).toEqual([]);
+  });
+
+  it('puts the part’s no-claim sentence in place of a closer whose picture of the term is no longer true', () => {
+    const f = cece();
+    const ctx = CommentBank.context(f, {});
+    expect(ctx.picture).toBe('steady');
+    const d = one('w120', ctx);
+    const harder = { ...f, comps: f.comps.map(c => ({ ...c, now: 1.6, level: 1.6 })) };
+    const v = CommentBank.verify(d, harder, {});
+    expect(v.replaced).toEqual([{ sentenceId: 'w120', failed: ['slots', 'picture'], by: 'w06' }]);
+    expect(byId('w06').claims).toEqual([]);
+    expect(v.ids).toEqual(['w06']);
+    expect(v.text).toBe('Next term, the goal is to build on what is working and keep using feedback.');
+    expect(v.provenance[0]).toMatchObject({ sentenceId: 'w06', claims: [], factKeys: [] });
+  });
+
+  it('checks a claim the wording makes beyond its slots: late work, work not handed in', () => {
+    const f = cece();
+    expect(f.record.late).toBe(0);
+    const usually = { habits: { completes: 3 } };
+    const late = one('h105', CommentBank.context(f, usually));
+    expect(CommentBank.verify(late, f, usually).replaced[0]).toMatchObject({ failed: ['lateWork'], by: null });
+    const withLate = { ...f, record: { ...f.record, late: 1 } };
+    expect(CommentBank.verify(late, withLate, usually).replaced).toEqual([]);
+
+    const rarely = { habits: { completes: 1 } };
+    const missing = one('h108', CommentBank.context(f, rarely));
+    expect(CommentBank.verify(missing, f, rarely).replaced[0].failed).toEqual(['notHandedIn']);
+    expect(CommentBank.verify(missing, { ...f, record: { ...f.record, missing: 2 } }, rarely).replaced).toEqual([]);
+    expect(
+      CommentBank.verify(missing, { ...f, notHandedIn: { count: 1, titles: ['Lab 3'] } }, rarely).replaced,
+    ).toEqual([]);
+  });
+
+  it('catches “it is the best work this term” on a piece that is only best in the Focus Area', () => {
+    const caught = [];
+    getStudents(cid).forEach(st => {
+      const f = CommentBank.facts(cid, st, 'term-2');
+      const ctx = CommentBank.context(f, {});
+      if (!CommentBank.fits(byId('w101'), ctx)) return;
+      const v = CommentBank.verify(one('w101', ctx), f, {});
+      const best = Math.max(...f.work.map(w => Math.round(w.v * 10)));
+      const see = f.work.find(w => w.title === ctx.seeWork);
+      expect(v.replaced.length > 0, st.firstName).toBe(!see || Math.round(see.v * 10) < best);
+      if (v.replaced.length) caught.push(v.replaced[0]);
+    });
+    expect(caught.length).toBeGreaterThan(0);
+    caught.forEach(r => {
+      expect(r.failed).toEqual(['bestPiece']);
+      expect(byId(r.by)).toMatchObject({ part: 'how', claims: [] });
+    });
+  });
+
+  it('re-checks the letter grade against the facts', () => {
+    const f = { ...cece(), letter: 'a B (78%)' };
+    const d = one('n14', CommentBank.context(f, {}));
+    expect(CommentBank.verify(d, f, {}).replaced).toEqual([]);
+    expect(CommentBank.verify(d, { ...f, letter: 'a C+ (68%)' }, {}).replaced[0].failed).toEqual(['slots', 'grade']);
+  });
+
+  it('never passes a sentence with no fact behind it, or one with no claims field', () => {
+    const f = cece();
+    const ctx = CommentBank.context(f, {});
+    expect(CommentBank.verify(one('h59', ctx), f, {}).replaced[0].failed).toEqual(['support']);
+    const bare = { ...byId('w129') };
+    delete bare.claims;
+    const bank = { parts: COMMENT_BANK.parts, sentences: [bare] };
+    expect(CommentBank.verify(one('w129', ctx), f, {}, { bank }).replaced[0].failed).toEqual(['claims']);
+  });
+
   it('never calls a rising Focus Area the area to build', () => {
     // Cece's Focus Area is Scientific Communication (the biggest change, upward).
     const ctx = ctxFor('Cece');
@@ -672,6 +878,7 @@ describe('wording by kind of class', () => {
       expect(f.family, tag).toBe(fam);
       const ctx = CommentBank.context(f, {});
       const d = CommentBank.draft(ctx, { seed: 5 });
+      expect(CommentBank.verify(d, f, {}).replaced, tag).toEqual([]);
       expect(d.ids.length, tag).toBeGreaterThanOrEqual(6);
       expect(d.text, tag).not.toMatch(/[{}[\]]/);
       if (fam === 'pe' || fam === 'arts') expect(d.text, tag).not.toMatch(/hands? in|handing in/i);
