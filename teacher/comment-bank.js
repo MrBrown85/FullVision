@@ -977,7 +977,12 @@ window.CommentBank = (function () {
         var v = getAssessmentOverallScore(cid, sid, a.id);
         // The teacher's Note for the Report on the piece, for the best-piece sentence.
         var note = typeof getScoreReportNote === 'function' ? getScoreReportNote(cid, sid, a.id) : '';
-        return v > 0 ? { id: a.id, title: a.title || '', d: dateOf(a), v: v, note: note } : null;
+        // Points work's own % (points earned out of possible, calc.js), the
+        // mark a Letter class prints for it (workMark): its level is only a
+        // band of that %.
+        var pc = isPointsScored(a) ? getAssessmentGroupPercentage(cid, sid, [a]) : null;
+        var pct = pc && pc.pct != null ? pc.pct : null;
+        return v > 0 ? { id: a.id, title: a.title || '', d: dateOf(a), v: v, pct: pct, note: note } : null;
       })
       .filter(Boolean);
 
@@ -1226,6 +1231,16 @@ window.CommentBank = (function () {
     solid: 'a good understanding of the course material',
     growing: 'progress toward understanding the key concepts',
   };
+  /* The mark a comment prints beside a piece of work, as the class shows
+     it (levelText); in a Letter class, points work prints its own % (points
+     earned out of possible, calc.js), the same number the gradebook works
+     out, never its level as a %. */
+  function workMark(f, w) {
+    if (!w) return '';
+    if (f.grade && f.grade.mode === 'letter' && w.pct != null) return Math.round(w.pct) + '%';
+    return f.levelText(w.v);
+  }
+
   function evidenceOf(f) {
     if (!f.work.length) return '';
     return f.overall >= 2.5 ? EVIDENCE.solid : EVIDENCE.growing;
@@ -1827,13 +1842,13 @@ window.CommentBank = (function () {
       fall: fallen ? fallen.name : '',
       fellCount: fell.length > 1 ? NUM[fell.length] || String(fell.length) : '',
       assignment: top ? top.title : '',
-      level: top ? f.levelText(top.v) : '',
+      level: top ? workMark(f, top) : '',
       // The whole best-piece sentence, with the teacher's note when there is one.
       bestPiece: top
         ? bestPieceSentence({ title: top.title, note: top.note, name: f.name, pronouns: p, onFile: f.pronounsOnFile })
         : '',
       assignment2: weak ? weak.title : '',
-      level2: weak ? f.levelText(weak.v) : '',
+      level2: weak ? workMark(f, weak) : '',
       strongWorks: list(best.slice(0, 2).map(the)),
       weakWorks: list(weakTwo.slice(0, 2).map(the)),
       evidence: evidenceOf(f),
@@ -3346,7 +3361,7 @@ window.CommentBank = (function () {
         if (!_has(pv, slot)) return;
         var w = _byId(f.work, _ids(pv, slot, 'work')[0]);
         checks.push(!!w && w.title === pv.values[slot] && tenths(w.v) === top);
-        if (w && slot === 'assignment' && _has(pv, 'level')) checks.push(pv.values.level === f.levelText(w.v));
+        if (w && slot === 'assignment' && _has(pv, 'level')) checks.push(pv.values.level === workMark(f, w));
       });
       if (_has(pv, 'strongWorks'))
         checks.push(
@@ -3367,7 +3382,7 @@ window.CommentBank = (function () {
       if (_has(pv, 'assignment2')) {
         var w = _byId(f.work, _ids(pv, 'assignment2', 'work')[0]);
         checks.push(!!w && w.title === pv.values.assignment2 && tenths(w.v) < top);
-        if (w && _has(pv, 'level2')) checks.push(pv.values.level2 === f.levelText(w.v));
+        if (w && _has(pv, 'level2')) checks.push(pv.values.level2 === workMark(f, w));
       }
       if (_has(pv, 'weakWorks'))
         checks.push(
